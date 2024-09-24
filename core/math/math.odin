@@ -406,6 +406,12 @@ remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) 
 }
 
 @(require_results)
+remap_clamped :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	remapped := #force_inline remap(old_value, old_min, old_max, new_min, new_max)
+	return clamp(remapped, new_min, new_max)
+}
+
+@(require_results)
 wrap :: proc "contextless" (x, y: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	tmp := mod(x, y)
 	return y + tmp if tmp < 0 else tmp
@@ -438,11 +444,11 @@ bias :: proc "contextless" (t, b: $T) -> T where intrinsics.type_is_numeric(T) {
 	return t / (((1/b) - 2) * (1 - t) + 1)
 }
 @(require_results)
-gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_numeric(T) {
+gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_float(T) {
 	if t < 0.5 {
-		return bias(t*2, g)*0.5
+		return bias(t*2, g) * 0.5
 	}
-	return bias(t*2 - 1, 1 - g)*0.5 + 0.5
+	return bias(t*2 - 1, 1 - g) * 0.5 + 0.5
 }
 
 

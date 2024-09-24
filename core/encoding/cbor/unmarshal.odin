@@ -675,10 +675,6 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 		return
 
 	case reflect.Type_Info_Map:
-		if !reflect.is_string(t.key) {
-			return _unsupported(v, hdr)
-		}
-
 		raw_map := (^mem.Raw_Map)(v.data)
 		if raw_map.allocator.procedure == nil {
 			raw_map.allocator = context.allocator
@@ -695,43 +691,31 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 			new_len := uintptr(min(scap, runtime.map_len(raw_map^)+length))
 			runtime.map_reserve_dynamic(raw_map, t.map_info, new_len) or_return
 		}
-		
-		// Temporary memory to unmarshal keys into before inserting them into the map.
+
+		// Temporary memory to unmarshal values into before inserting them into the map.
 		elem_backing := mem.alloc_bytes_non_zeroed(t.value.size, t.value.align, context.temp_allocator) or_return
 		defer delete(elem_backing, context.temp_allocator)
-
 		map_backing_value := any{raw_data(elem_backing), t.value.id}
 
-		for idx := 0; unknown || idx < length; idx += 1 {
-			// Decode key, keys can only be strings.
-			key: string
-			if keyv, kerr := decode_key(d, v); unknown && kerr == .Break {
-				break
-			} else if kerr != nil {
-				err = kerr
-				return
-			} else {
-				key = keyv
-			}
+		// Temporary memory to unmarshal keys into.
+		key_backing := mem.alloc_bytes_non_zeroed(t.key.size, t.key.align, context.temp_allocator) or_return
+		defer delete(key_backing, context.temp_allocator)
+		key_backing_value := any{raw_data(key_backing), t.key.id}
 
+		for idx := 0; unknown || idx < length; idx += 1 {
 			if unknown || idx > scap {
 				// Reserve space for new element so we can return allocator errors.
 				new_len := uintptr(runtime.map_len(raw_map^)+1)
 				runtime.map_reserve_dynamic(raw_map, t.map_info, new_len) or_return
 			}
 
+			mem.zero_slice(key_backing)
+			_unmarshal_value(d, key_backing_value, _decode_header(r) or_return) or_return
+
 			mem.zero_slice(elem_backing)
 			_unmarshal_value(d, map_backing_value, _decode_header(r) or_return) or_return
 
-			key_ptr := rawptr(&key)
-			key_cstr: cstring
-			if reflect.is_cstring(t.key) {
-				assert_safe_for_cstring(key)
-				key_cstr = cstring(raw_data(key))
-				key_ptr = &key_cstr
-			}
-
-			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
+			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_backing_value.data, map_backing_value.data)
 			// We already reserved space for it, so this shouldn't fail.
 			assert(set_ptr != nil)
 		}

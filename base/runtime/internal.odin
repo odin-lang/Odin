@@ -1,4 +1,4 @@
-//+vet !cast
+#+vet !cast
 package runtime
 
 import "base:intrinsics"
@@ -118,16 +118,15 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr)
 
 mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	if size == 0 {
-		return nil, nil
-	}
-	if allocator.procedure == nil {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
+	if size == 0 || allocator.procedure == nil{
 		return nil, nil
 	}
 	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
 }
 
 mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if size == 0 || allocator.procedure == nil {
 		return nil, nil
 	}
@@ -135,6 +134,7 @@ mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, a
 }
 
 mem_alloc_non_zeroed :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if size == 0 || allocator.procedure == nil {
 		return nil, nil
 	}
@@ -174,6 +174,7 @@ mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #calle
 }
 
 _mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, should_zero: bool, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if allocator.procedure == nil {
 		return nil, nil
 	}
@@ -215,9 +216,11 @@ _mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignmen
 }
 
 mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	return _mem_resize(ptr, old_size, new_size, alignment, allocator, true, loc)
 }
 non_zero_mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	return _mem_resize(ptr, old_size, new_size, alignment, allocator, false, loc)
 }
 

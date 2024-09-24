@@ -5,9 +5,9 @@ WARNING: The SHA1 algorithm is known to be insecure and should only be
 used for interoperating with legacy applications.
 
 See:
-- https://eprint.iacr.org/2017/190
-- https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
-- https://datatracker.ietf.org/doc/html/rfc3174
+- [[ https://eprint.iacr.org/2017/190 ]]
+- [[ https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf ]]
+- [[ https://datatracker.ietf.org/doc/html/rfc3174 ]]
 */
 package sha1
 

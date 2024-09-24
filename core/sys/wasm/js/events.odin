@@ -1,6 +1,7 @@
-//+build !js
+#+build js wasm32, js wasm64p32
 package wasm_js_interface
 
+foreign import dom_lib "odin_dom"
 
 Event_Kind :: enum u32 {
 	Invalid,
@@ -29,9 +30,12 @@ Event_Kind :: enum u32 {
 	Wheel,
 
 	Focus,
+	Focus_In,
+	Focus_Out,
 	Submit,
 	Blur,
 	Change,
+	Hash_Change,
 	Select,
 
 	Animation_Start,
@@ -78,6 +82,9 @@ Event_Kind :: enum u32 {
 
 	Context_Menu,
 
+	Gamepad_Connected,
+	Gamepad_Disconnected,
+
 	Custom,
 
 }
@@ -108,9 +115,12 @@ event_kind_string := [Event_Kind]string{
 	.Wheel = "wheel",
 
 	.Focus        = "focus",
+	.Focus_In     = "focusin",
+	.Focus_Out    = "focusout",
 	.Submit       = "submit",
 	.Blur         = "blur",
 	.Change       = "change",
+	.Hash_Change  = "hashchange",
 	.Select       = "select",
 
 	.Animation_Start     = "animationstart",
@@ -157,6 +167,9 @@ event_kind_string := [Event_Kind]string{
 
 	.Context_Menu = "contextmenu",
 
+	.Gamepad_Connected    = "gamepadconnected",
+	.Gamepad_Disconnected = "gamepaddisconnected",
+
 	.Custom = "?custom?",
 }
 
@@ -173,8 +186,14 @@ Key_Location :: enum u8 {
 	Numpad   = 3,
 }
 
-KEYBOARD_MAX_KEY_SIZE :: 16
+KEYBOARD_MAX_KEY_SIZE  :: 16
 KEYBOARD_MAX_CODE_SIZE :: 16
+
+GAMEPAD_MAX_ID_SIZE      :: 64
+GAMEPAD_MAX_MAPPING_SIZE :: 64
+
+GAMEPAD_MAX_BUTTONS :: 64
+GAMEPAD_MAX_AXES    :: 16
 
 Event_Target_Kind :: enum u32 {
 	Element  = 0,
@@ -195,6 +214,30 @@ Event_Option :: enum u8 {
 	Composed   = 2,
 }
 Event_Options :: distinct bit_set[Event_Option; u8]
+
+Gamepad_Button :: struct {
+	value:   f64,
+	pressed: bool,
+	touched: bool,
+}
+
+Gamepad_State :: struct {
+	id:           string,
+	mapping:      string,
+	index:        int,
+	connected:    bool,
+	timestamp:    f64,
+
+	button_count: int,
+	axis_count:   int,
+	buttons: [GAMEPAD_MAX_BUTTONS]Gamepad_Button `fmt:"v,button_count"`,
+	axes:    [GAMEPAD_MAX_AXES]f64               `fmt:"v,axes_count"`,
+
+	_id_len:      int `fmt:"-"`,
+	_mapping_len: int `fmt:"-"`,
+	_id_buf:      [GAMEPAD_MAX_ID_SIZE]byte      `fmt:"-"`,
+	_mapping_buf: [GAMEPAD_MAX_MAPPING_SIZE]byte `fmt:"-"`,
+}
 
 Event :: struct {
 	kind:                 Event_Kind,
@@ -232,8 +275,10 @@ Event :: struct {
 
 			repeat: bool,
 
-			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte,
-			_code_buf: [KEYBOARD_MAX_KEY_SIZE]byte,
+			_key_len:  int                         `fmt:"-"`,
+			_code_len: int                         `fmt:"-"`,
+			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte `fmt:"-"`,
+			_code_buf: [KEYBOARD_MAX_KEY_SIZE]byte `fmt:"-"`,
 		},
 
 		mouse: struct {
@@ -251,6 +296,8 @@ Event :: struct {
 			button:  i16,
 			buttons: bit_set[0..<16; u16],
 		},
+
+		gamepad: Gamepad_State,
 	},
 
 
@@ -258,31 +305,114 @@ Event :: struct {
 	callback:  proc(e: Event),
 }
 
+@(default_calling_convention="contextless")
+foreign dom_lib {
+	event_stop_propagation           :: proc() ---
+	event_stop_immediate_propagation :: proc() ---
+	event_prevent_default            :: proc() ---
+	dispatch_custom_event            :: proc(id: string, name: string, options := Event_Options{}) -> bool ---
+}
 
 add_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
-	panic("vendor:wasm/js not supported on non JS targets")
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="add_event_listener")
+		_add_event_listener :: proc(id: string, name: string, name_code: Event_Kind, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
+	}
+	// TODO: Pointer_Lock_Change etc related stuff for all different browsers
+	return _add_event_listener(id, event_kind_string[kind], kind, user_data, callback, use_capture)
 }
 
 remove_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
-	panic("vendor:wasm/js not supported on non JS targets")
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="remove_event_listener")
+		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+	}
+	return _remove_event_listener(id, event_kind_string[kind], user_data, callback)
 }
 
 add_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
-	panic("vendor:wasm/js not supported on non JS targets")
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="add_window_event_listener")
+		_add_window_event_listener :: proc(name: string, name_code: Event_Kind, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
+	}
+	return _add_window_event_listener(event_kind_string[kind], kind, user_data, callback, use_capture)
 }
 
 remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
-	panic("vendor:wasm/js not supported on non JS targets")
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="remove_window_event_listener")
+		_remove_window_event_listener :: proc(name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+	}
+	return _remove_window_event_listener(event_kind_string[kind], user_data, callback)
 }
 
 remove_event_listener_from_event :: proc(e: Event) -> bool {
-	panic("vendor:wasm/js not supported on non JS targets")
+	if e.id == "" {
+		return remove_window_event_listener(e.kind, e.user_data, e.callback)
+	}
+	return remove_event_listener(e.id, e.kind, e.user_data, e.callback)
 }
 
 add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
-	panic("vendor:wasm/js not supported on non JS targets")
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="add_event_listener")
+		_add_event_listener :: proc(id: string, name: string, name_code: Event_Kind, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
+	}
+	return _add_event_listener(id, name, .Custom, user_data, callback, use_capture)
 }
 remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event)) -> bool {
-	panic("vendor:wasm/js not supported on non JS targets")
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="remove_event_listener")
+		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+	}
+	return _remove_event_listener(id, name, user_data, callback)
 }
 
+get_gamepad_state :: proc "contextless" (index: int, s: ^Gamepad_State) -> bool {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="get_gamepad_state")
+		_get_gamepad_state :: proc(index: int, s: ^Gamepad_State) -> bool ---
+	}
+
+	if s == nil {
+		return false
+	}
+	return _get_gamepad_state(index, s)
+}
+
+
+@(export, link_name="odin_dom_do_event_callback")
+do_event_callback :: proc(user_data: rawptr, callback: proc(e: Event)) {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		init_event_raw :: proc(e: ^Event) ---
+	}
+
+	if callback != nil {
+		event := Event{
+			user_data = user_data,
+			callback  = callback,
+		}
+
+
+		init_event_raw(&event)
+
+		#partial switch event.kind {
+		case .Key_Up, .Key_Down, .Key_Press:
+			event.key.key = string(event.key._key_buf[:event.key._key_len]) 
+			event.key.code = string(event.key._code_buf[:event.key._code_len]) 
+		case .Gamepad_Connected, .Gamepad_Disconnected:
+			event.gamepad.id = string(event.gamepad._id_buf[:event.gamepad._id_len])
+			event.gamepad.mapping = string(event.gamepad._mapping_buf[:event.gamepad._mapping_len])
+		}
+
+		callback(event)
+	}
+}

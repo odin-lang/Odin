@@ -1,4 +1,4 @@
-//+build js wasm32, js wasm64p32
+#+build js wasm32, js wasm64p32
 package wasm_js_interface
 
 foreign import dom_lib "odin_dom"
@@ -8,8 +8,14 @@ foreign dom_lib {
 	get_element_value_f64    :: proc(id: string) -> f64 ---
 	set_element_value_f64    :: proc(id: string, value: f64) ---
 
+	get_element_key_f64      :: proc(id: string, key: string) -> f64 ---
+	set_element_key_f64      :: proc(id: string, key: string, value: f64) ---
+
 	set_element_value_string :: proc(id: string, value: string) ---
 	get_element_value_string_length :: proc(id: string) -> int ---
+
+	set_element_key_string :: proc(id: string, key: string, value: string) ---
+	get_element_key_string_length :: proc(id: string, key: string, ) -> int ---
 
 	device_pixel_ratio :: proc() -> f64 ---
 
@@ -24,8 +30,19 @@ get_element_value_string :: proc "contextless" (id: string, buf: []byte) -> stri
 	}
 	n := _get_element_value_string(id, buf)
 	return string(buf[:n])
+}
+
+get_element_key_string :: proc "contextless" (id: string, key: string, buf: []byte) -> string {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="get_element_key_string")
+		_get_element_key_string :: proc(id: string, key: string, buf: []byte) -> int ---
+	}
+	n := _get_element_key_string(id, key, buf)
+	return string(buf[:n])
 
 }
+
 
 
 get_element_min_max :: proc "contextless" (id: string) -> (min, max: f64) {

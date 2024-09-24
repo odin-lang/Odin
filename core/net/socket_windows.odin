@@ -1,5 +1,5 @@
+#+build windows
 package net
-// +build windows
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
@@ -117,6 +117,19 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	if res := win.listen(win.SOCKET(socket), i32(backlog)); res == win.SOCKET_ERROR {
 		err = Listen_Error(win.WSAGetLastError())
 	}
+	return
+}
+
+@(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	sockaddr: win.SOCKADDR_STORAGE_LH
+	sockaddrlen := c.int(size_of(sockaddr))
+	if win.getsockname(win.SOCKET(any_socket_to_socket(sock)), &sockaddr, &sockaddrlen) == win.SOCKET_ERROR {
+		err = Listen_Error(win.WSAGetLastError())
+		return
+	}
+
+	ep = _sockaddr_to_endpoint(&sockaddr)
 	return
 }
 

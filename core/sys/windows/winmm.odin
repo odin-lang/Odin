@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 foreign import winmm "system:Winmm.lib"

@@ -1,4 +1,4 @@
-//+build !js
+#+build !js
 package vendor_wgpu_example_triangle
 
 import "core:time"

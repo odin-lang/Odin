@@ -575,7 +575,7 @@ PRELOAD_TABLE :: "_PRELOAD"
 
 L_Reg :: struct {
 	name: cstring,
-  	func: CFunction,
+	func: CFunction,
 }
 
 L_NUMSIZES :: size_of(Integer)*16 + size_of(Number)

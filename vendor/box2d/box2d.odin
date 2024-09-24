@@ -3,7 +3,11 @@ package vendor_box2d
 import "base:intrinsics"
 import "core:c"
 
-@(private) VECTOR_EXT :: "avx2" when #config(VENDOR_BOX2D_ENABLE_AVX2, intrinsics.has_target_feature("avx2")) else "sse2"
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	@(private) VECTOR_EXT :: "_simd" when #config(VENDOR_BOX2D_ENABLE_SIMD128, intrinsics.has_target_feature("simd128")) else ""
+} else {
+	@(private) VECTOR_EXT :: "avx2" when #config(VENDOR_BOX2D_ENABLE_AVX2, intrinsics.has_target_feature("avx2")) else "sse2"
+}
 
 when ODIN_OS == .Windows {
 	@(private) LIB_PATH :: "lib/box2d_windows_amd64_" + VECTOR_EXT + ".lib"
@@ -13,6 +17,8 @@ when ODIN_OS == .Windows {
 	@(private) LIB_PATH :: "lib/box2d_darwin_amd64_" + VECTOR_EXT + ".a"
 } else when ODIN_ARCH == .amd64 {
 	@(private) LIB_PATH :: "lib/box2d_other_amd64_" + VECTOR_EXT + ".a"
+} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	@(private) LIB_PATH :: "lib/box2d_wasm" + VECTOR_EXT + ".o"
 } else {
 	@(private) LIB_PATH :: "lib/box2d_other.a"
 }
@@ -21,8 +27,16 @@ when !#exists(LIB_PATH) {
 	#panic("Could not find the compiled box2d libraries at \"" + LIB_PATH + "\", they can be compiled by running the `build.sh` script at `" + ODIN_ROOT + "vendor/box2d/build_box2d.sh\"`")
 }
 
-foreign import lib {
-	LIB_PATH,
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	when VECTOR_EXT == "_simd" {
+		foreign import lib "lib/box2d_wasm_simd.o"
+	} else {
+		foreign import lib "lib/box2d_wasm.o"
+	}
+} else {
+	foreign import lib {
+		LIB_PATH,
+	}
 }
 
 

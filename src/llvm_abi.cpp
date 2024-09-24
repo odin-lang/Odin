@@ -1257,11 +1257,12 @@ namespace lbAbiWasm {
 	}
 
 	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
-		if (!is_return && type == LLVMIntTypeInContext(c, 128)) {
-			LLVMTypeRef cast_type = LLVMVectorType(LLVMInt64TypeInContext(c), 2);
+		if (type == LLVMIntTypeInContext(c, 128)) {
+			// LLVMTypeRef cast_type = LLVMVectorType(LLVMInt64TypeInContext(c), 2);
+			LLVMTypeRef cast_type = nullptr;
 			return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 		}
-		
+
 		if (!is_return && lb_sizeof(type) > 8) {
 			return lb_arg_type_indirect(type, nullptr);
 		}
@@ -1282,7 +1283,7 @@ namespace lbAbiWasm {
 		case LLVMPointerTypeKind:
 			return true;
 		case LLVMIntegerTypeKind:
-			return lb_sizeof(type) <= 8;
+			return lb_sizeof(type) <= 16;
 		}	
 		return false;
 	}

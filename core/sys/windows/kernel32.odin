@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"
@@ -400,6 +400,9 @@ foreign kernel32 {
 	GlobalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
 	GlobalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
 	GlobalFree :: proc(mem: LPVOID) -> LPVOID ---
+	
+	GlobalLock :: proc(hMem: HGLOBAL) -> LPVOID ---
+	GlobalUnlock :: proc(hMem: HGLOBAL) -> BOOL ---
 
 	ReadDirectoryChangesW :: proc(
 		hDirectory: HANDLE,
@@ -1175,17 +1178,17 @@ SYSTEM_POWER_STATUS :: struct {
 }
 
 AC_Line_Status :: enum BYTE {
-   Offline = 0,
-   Online  = 1,
-   Unknown = 255,
+	Offline = 0,
+	Online  = 1,
+	Unknown = 255,
 }
 
 Battery_Flag :: enum BYTE {
-    High     = 0,
-    Low      = 1,
-    Critical = 2,
-    Charging = 3,
-    No_Battery = 7,
+	High     = 0,
+	Low      = 1,
+	Critical = 2,
+	Charging = 3,
+	No_Battery = 7,
 }
 Battery_Flags :: bit_set[Battery_Flag; BYTE]
 

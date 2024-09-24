@@ -264,7 +264,7 @@ write_test_suite :: proc(example_tests: []Example_Test) {
 	test_runner := strings.builder_make()
 
 	strings.write_string(&test_runner,
-`//+private
+`#+private
 package documentation_verification
 
 import "core:os"

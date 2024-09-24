@@ -1,5 +1,5 @@
-//+private
-//+build windows, linux, darwin, freebsd, openbsd, netbsd, haiku
+#+private
+#+build windows, linux, darwin, freebsd, openbsd, netbsd, haiku
 package testing
 
 /*
@@ -26,6 +26,8 @@ import "core:os"
 
 @(private="file", thread_local)
 local_test_index: libc.sig_atomic_t
+@(private="file", thread_local)
+local_test_index_set: bool
 
 // Windows does not appear to have a SIGTRAP, so this is defined here, instead
 // of in the libc package, just so there's no confusion about it being
@@ -45,6 +47,13 @@ stop_runner_callback :: proc "c" (sig: libc.int) {
 
 @(private="file")
 stop_test_callback :: proc "c" (sig: libc.int) {
+	if !local_test_index_set {
+		// We're a thread created by a test thread.
+		//
+		// There's nothing we can do to inform the test runner about who
+		// signalled, so hopefully the test will handle their own sub-threads.
+		return
+	}
 	if local_test_index == -1 {
 		// We're the test runner, and we ourselves have caught a signal from
 		// which there is no recovery.
@@ -114,6 +123,7 @@ This is a dire bug and should be reported to the Odin developers.
 
 _setup_signal_handler :: proc() {
 	local_test_index = -1
+	local_test_index_set = true
 
 	// Catch user interrupt / CTRL-C.
 	libc.signal(libc.SIGINT, stop_runner_callback)
@@ -135,6 +145,7 @@ _setup_signal_handler :: proc() {
 
 _setup_task_signal_handler :: proc(test_index: int) {
 	local_test_index = cast(libc.sig_atomic_t)test_index
+	local_test_index_set = true
 }
 
 _should_stop_runner :: proc() -> bool {

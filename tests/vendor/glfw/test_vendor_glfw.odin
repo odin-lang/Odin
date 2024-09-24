@@ -1,4 +1,4 @@
-//+build darwin, windows
+#+build darwin, windows
 package test_vendor_glfw
 
 import "core:testing"

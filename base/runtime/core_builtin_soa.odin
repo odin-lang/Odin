@@ -76,7 +76,7 @@ raw_soa_footer :: proc{
 
 
 @(builtin, require_results)
-make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
+make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	if length <= 0 {
 		return
 	}
@@ -135,7 +135,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 }
 
 @(builtin, require_results)
-make_soa_slice :: proc($T: typeid/#soa[]$E, length: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
+make_soa_slice :: proc($T: typeid/#soa[]$E, #any_int length: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	return make_soa_aligned(T, length, align_of(E), allocator, loc)
 }
 
@@ -172,7 +172,7 @@ make_soa :: proc{
 
 
 @builtin
-resize_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+resize_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int length: int, loc := #caller_location) -> Allocator_Error {
 	if array == nil {
 		return nil
 	}
@@ -183,7 +183,7 @@ resize_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, loc := #caller_locat
 }
 
 @builtin
-non_zero_resize_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+non_zero_resize_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int length: int, loc := #caller_location) -> Allocator_Error {
 	if array == nil {
 		return nil
 	}
@@ -194,12 +194,12 @@ non_zero_resize_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, loc := #cal
 }
 
 @builtin
-reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
 	return _reserve_soa(array, capacity, true, loc)
 }
 
 @builtin
-non_zero_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
+non_zero_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
 	return _reserve_soa(array, capacity, false, loc)
 }
 
@@ -484,7 +484,7 @@ into_dynamic_soa :: proc(array: $T/#soa[]$E) -> #soa[dynamic]E {
 // Note: If you the elements to remain in their order, use `ordered_remove_soa`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #caller_location) #no_bounds_check {
+unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	if index+1 < len(array) {
 		ti := type_info_of(typeid_of(T))
@@ -512,7 +512,7 @@ unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #cal
 // Note: If you the elements do not have to remain in their order, prefer `unordered_remove_soa`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-ordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, index: int, loc := #caller_location) #no_bounds_check {
+ordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	if index+1 < len(array) {
 		ti := type_info_of(typeid_of(T))

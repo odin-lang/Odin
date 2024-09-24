@@ -11,15 +11,13 @@ Command-Line Syntax:
 Arguments are treated differently depending on how they're formatted.
 The format is similar to the Odin binary's way of handling compiler flags.
 
-```
-type                  handling
-------------          ------------------------
-<positional>          depends on struct layout
--<flag>               set a bool true
--<flag:option>        set flag to option
--<flag=option>        set flag to option, alternative syntax
--<map>:<key>=<value>  set map[key] to value
-```
+	type                  handling
+	------------          ------------------------
+	<positional>          depends on struct layout
+	-<flag>               set a bool true
+	-<flag:option>        set flag to option
+	-<flag=option>        set flag to option, alternative syntax
+	-<map>:<key>=<value>  set map[key] to value
 
 
 Struct Tags:
@@ -40,11 +38,9 @@ Under the `args` tag, there are the following subtags:
 - `indistinct`: allow the setting of distinct types by their base type.
 
 `required` may be given a range specifier in the following formats:
-```
-min
-<max
-min<max
-```
+	min
+	<max
+	min<max
 
 `max` is not inclusive in this range, as noted by the less-than `<` sign, so if
 you want to require 3 and only 3 arguments in a dynamic array, you would
@@ -161,21 +157,15 @@ UNIX-style:
 This package also supports parsing arguments in a limited flavor of UNIX.
 Odin and UNIX style are mutually exclusive, and which one to be used is chosen
 at parse time.
-
-```
---flag
---flag=argument
---flag argument
---flag argument repeating-argument
-```
+	--flag
+	--flag=argument
+	--flag argument
+	--flag argument repeating-argument
 
 `-flag` may also be substituted for `--flag`.
 
 Do note that map flags are not currently supported in this parsing style.
 
-
-Example:
-
-A complete example is given in the `example` subdirectory.
+For a complete example, see: [[ core/flags/example; https://github.com/odin-lang/Odin/blob/master/core/flags/example/example.odin ]].
 */
 package flags

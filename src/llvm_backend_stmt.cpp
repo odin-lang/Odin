@@ -1404,6 +1404,10 @@ gb_internal bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, boo
 
 	}
 
+	if (is_typeid) {
+		return false;
+	}
+
 	return true;
 }
 
@@ -2195,8 +2199,7 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	// and `LLVMConstIntGetZExtValue()` calls below will be valid and `LLVMInstructionEraseFromParent()`
 	// will target the correct (& only) branch statement
 
-
-	if (cond.value && LLVMIsConstant(cond.value)) {
+	if (cond.value && LLVMIsAConstantInt(cond.value)) {
 		// NOTE(bill): Do a compile time short circuit for when the condition is constantly known.
 		// This done manually rather than relying on the SSA passes because sometimes the SSA passes
 		// miss some even if they are constantly known, especially with few optimization passes.

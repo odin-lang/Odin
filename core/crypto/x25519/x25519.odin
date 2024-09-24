@@ -3,7 +3,7 @@ package x25519 implements the X25519 (aka curve25519) Elliptic-Curve
 Diffie-Hellman key exchange protocol.
 
 See:
-- https://www.rfc-editor.org/rfc/rfc7748
+- [[ https://www.rfc-editor.org/rfc/rfc7748 ]]
 */
 package x25519
 

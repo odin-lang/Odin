@@ -1,5 +1,5 @@
-//+build darwin, netbsd, freebsd, openbsd
-//+private
+#+build darwin, netbsd, freebsd, openbsd
+#+private
 package mem_virtual
 
 import "core:sys/posix"
@@ -51,8 +51,10 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 }
 
 _platform_memory_init :: proc() {
-	DEFAULT_PAGE_SIZE = posix.PAGE_SIZE
-	
+	// NOTE: `posix.PAGESIZE` due to legacy reasons could be wrong so we use `sysconf`.
+	size := posix.sysconf(._PAGESIZE)
+	DEFAULT_PAGE_SIZE = uint(max(size, posix.PAGESIZE))
+
 	// is power of two
 	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }

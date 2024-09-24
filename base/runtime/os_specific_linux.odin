@@ -1,4 +1,4 @@
-//+private
+#+private
 package runtime
 
 import "base:intrinsics"

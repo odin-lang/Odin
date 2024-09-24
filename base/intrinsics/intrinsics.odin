@@ -1,5 +1,5 @@
 // This is purely for documentation
-//+build ignore
+#+build ignore
 package intrinsics
 
 // Package-Related
@@ -218,6 +218,8 @@ type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
 type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
+
+type_has_shared_fields :: proc($U, $V: typeid) -> bool typeid where type_is_struct(U), type_is_struct(V) ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 

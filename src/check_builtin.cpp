@@ -1632,6 +1632,22 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 
 		operand->type = t_source_code_location;
 		operand->mode = Addressing_Value;
+	} else if (name == "caller_expression") {
+		if (ce->args.count > 1) {
+			error(ce->args[0], "'#caller_expression' expects either 0 or 1 arguments, got %td", ce->args.count);
+		}
+		if (ce->args.count > 0) {
+			Ast *arg = ce->args[0];
+			Operand o = {};
+			Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
+			if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
+				error(ce->args[0], "'#caller_expression' expected a valid earlier parameter name");
+			}
+			arg->Ident.entity = e;
+		}
+
+		operand->type = t_string;
+		operand->mode = Addressing_Value;
 	} else if (name == "exists") {
 		if (ce->args.count != 1) {
 			error(ce->close, "'#exists' expects 1 argument, got %td", ce->args.count);
@@ -1792,7 +1808,10 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			error(call, "'#assert' expects either 1 or 2 arguments, got %td", ce->args.count);
 			return false;
 		}
-		if (!is_type_boolean(operand->type) || operand->mode != Addressing_Constant) {
+
+		// operand->type can be nil if the condition is a procedure, for example: #assert(assert())
+		// So let's check it before we use it, so we get the same error as if we wrote `#exists(assert())
+		if (operand->type == nullptr || !is_type_boolean(operand->type) || operand->mode != Addressing_Constant) {
 			gbString str = expr_to_string(ce->args[0]);
 			error(call, "'%s' is not a constant boolean", str);
 			gb_string_free(str);
@@ -2046,6 +2065,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->value = {};
 		operand->expr = call;
 		return ok;
+	}
+
+	if (BuiltinProc__atomic_begin < id && id < BuiltinProc__atomic_end) {
+		if (build_context.metrics.arch == TargetArch_riscv64) {
+			if (!check_target_feature_is_enabled(str_lit("a"), nullptr)) {
+				error(call, "missing required target feature \"a\" for atomics, enable it by setting a different -microarch or explicitly adding it through -target-features");
+			}
+		}
 	}
 
 	switch (id) {
@@ -4942,16 +4969,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			check_assignment(c, &x, elem, builtin_name);
 
 			Type *t = type_deref(operand->type);
-			switch (id) {
-			case BuiltinProc_atomic_add:
-			case BuiltinProc_atomic_sub:
-				if (!is_type_numeric(t)) {
+			if (id != BuiltinProc_atomic_exchange) {
+				if (!is_type_integer_like(t)) {
 					gbString str = type_to_string(t);
-					error(operand->expr, "Expected a numeric type for '%.*s', got %s", LIT(builtin_name), str);
+					error(operand->expr, "Expected an integer type for '%.*s', got %s", LIT(builtin_name), str);
 					gb_string_free(str);
 				} else if (is_type_different_to_arch_endianness(t)) {
 					gbString str = type_to_string(t);
-					error(operand->expr, "Expected a numeric type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), str);
+					error(operand->expr, "Expected an integer type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), str);
 					gb_string_free(str);
 				}
 			}
@@ -4987,19 +5012,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 
 			Type *t = type_deref(operand->type);
-			switch (id) {
-			case BuiltinProc_atomic_add_explicit:
-			case BuiltinProc_atomic_sub_explicit:
-				if (!is_type_numeric(t)) {
+			if (id != BuiltinProc_atomic_exchange_explicit) {
+				if (!is_type_integer_like(t)) {
 					gbString str = type_to_string(t);
-					error(operand->expr, "Expected a numeric type for '%.*s', got %s", LIT(builtin_name), str);
+					error(operand->expr, "Expected an integer type for '%.*s', got %s", LIT(builtin_name), str);
 					gb_string_free(str);
 				} else if (is_type_different_to_arch_endianness(t)) {
 					gbString str = type_to_string(t);
-					error(operand->expr, "Expected a numeric type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), str);
+					error(operand->expr, "Expected an integer type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), str);
 					gb_string_free(str);
 				}
-				break;
 			}
 
 			operand->type = elem;
@@ -5190,6 +5212,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			if (n > sz) {
 				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_name), n, sz);
 				return false;
+			}
+
+			if (sz >= 64) {
+				if (is_type_unsigned(x.type)) {
+					add_package_dependency(c, "runtime", "umodti3", true);
+					add_package_dependency(c, "runtime", "udivti3", true);
+				} else {
+					add_package_dependency(c, "runtime", "modti3", true);
+					add_package_dependency(c, "runtime", "divti3", true);
+				}
 			}
 
 			operand->type = x.type;
@@ -5665,6 +5697,59 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			break;
 		}
 		break;
+
+	case BuiltinProc_type_has_shared_fields:
+		{
+			Type *u = check_type(c, ce->args[0]);
+			Type *ut = base_type(u);
+			if (ut == nullptr || ut == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (ut->kind != Type_Struct || ut->Struct.soa_kind != StructSoa_None) {
+				gbString t = type_to_string(ut);
+				error(ce->args[0], "Expected a struct type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			Type *v = check_type(c, ce->args[1]);
+			Type *vt = base_type(v);
+			if (vt == nullptr || vt == t_invalid) {
+				error(ce->args[1], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (vt->kind != Type_Struct || vt->Struct.soa_kind != StructSoa_None) {
+				gbString t = type_to_string(vt);
+				error(ce->args[1], "Expected a struct type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			bool is_shared = true;
+
+			for (Entity *v_field : vt->Struct.fields) {
+				bool found = false;
+				for (Entity *u_field : ut->Struct.fields) {
+					if (v_field->token.string == u_field->token.string &&
+					    are_types_identical(v_field->type, u_field->type)) {
+						found = true;
+						break;
+					}
+				}
+
+				if (!found) {
+					is_shared = false;
+					break;
+				}
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_bool(is_shared);
+			operand->type = t_untyped_bool;
+			break;
+		}
+
 	case BuiltinProc_type_field_type:
 		{
 			Operand op = {};

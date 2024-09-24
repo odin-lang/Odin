@@ -1,4 +1,4 @@
-//+build darwin, freebsd, openbsd, netbsd
+#+build darwin, freebsd, openbsd, netbsd
 package tests_core_posix
 
 import "core:log"
@@ -63,6 +63,9 @@ execute_struct_checks :: proc(t: ^testing.T) {
 		waiting: for {
 			status: i32
 			wpid := posix.waitpid(pid, &status, {})
+			if wpid == -1 && posix.errno() == .EINTR {
+				continue
+			}
 			if !testing.expectf(t, wpid != -1, "waitpid() failure: %v", posix.strerror()) {
 				return false
 			}

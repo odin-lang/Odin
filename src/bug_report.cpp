@@ -155,7 +155,7 @@ gb_internal void report_windows_product_type(DWORD ProductType) {
 #endif
 
 gb_internal void odin_cpuid(int leaf, int result[]) {
-	#if defined(GB_CPU_ARM)
+	#if defined(GB_CPU_ARM) || defined(GB_CPU_RISCV)
 		return;
 
 	#elif defined(GB_CPU_X86)
@@ -225,6 +225,12 @@ gb_internal void report_cpu_info() {
 				gb_printf("ARM\n");
 			#endif
 		}
+	#elif defined(GB_CPU_RISCV)
+		#if defined(GB_ARCH_64_BIT)
+			gb_printf("RISCV64\n");
+		#else
+			gb_printf("RISCV32\n");
+		#endif
 	#else
 		gb_printf("Unknown\n");
 	#endif
@@ -913,6 +919,8 @@ gb_internal void report_os_info() {
 			{"23F79",    {23,  5,  0}, "macOS", {"Sonoma",        {14,  5,  0}}},
 			{"23G80",    {23,  6,  0}, "macOS", {"Sonoma",        {14,  6,  0}}},
 			{"23G93",    {23,  6,  0}, "macOS", {"Sonoma",        {14,  6,  1}}},
+			{"23H124",   {23,  6,  0}, "macOS", {"Sonoma",        {14,  7,  0}}},
+			{"24A335",   {24,  0,  0}, "macOS", {"Sequoia",       {15,  0,  0}}},
 		};
 
 

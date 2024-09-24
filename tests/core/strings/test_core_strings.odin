@@ -48,18 +48,19 @@ Cut_Test :: struct {
 }
 
 cut_tests :: []Cut_Test{
-	{"some example text", 0, 4, "some"        },
-	{"some example text", 2, 2, "me"          },
-	{"some example text", 5, 7, "example"     },
-	{"some example text", 5, 0, "example text"},
-	{"恥ずべきフクロウ",        4, 0, "フクロウ"       },
+	{"some example text", 0, 0, "some example text" },
+	{"some example text", 0, 4, "some"              },
+	{"some example text", 2, 2, "me"                },
+	{"some example text", 5, 7, "example"           },
+	{"some example text", 5, 0, "example text"      },
+	{"恥ずべきフクロウ",        0, 0, "恥ずべきフクロウ"        },
+	{"恥ずべきフクロウ",        4, 0, "フクロウ"             },
 }
 
 @test
 test_cut :: proc(t: ^testing.T) {
 	for test in cut_tests {
 		res := strings.cut(test.input, test.offset, test.length)
-		defer delete(res)
 
 		testing.expectf(
 			t,
@@ -122,5 +123,36 @@ test_case_conversion :: proc(t: ^testing.T) {
 
 			testing.expectf(t, result == entry.s, "ERROR: Input `{}` to converter {} does not match `{}`, got `{}`.\n", test_case.s, case_kind, entry.s, result)
 		}
+	}
+}
+
+@(test)
+test_substring :: proc(t: ^testing.T) {
+	Case :: struct {
+		s:     string,
+		start: int,
+		end:   int,
+		sub:   string,
+		ok:    bool,
+	}
+	cases := []Case {
+		{ok = true},
+		{s = "", start = -1, ok = false},
+		{s = "", end = -1, ok = false},
+		{s = "", end = +1, ok = false},
+		{s = "Hello", end = len("Hello"), sub = "Hello", ok = true},
+		{s = "Hello", start = 1, end = len("Hello"), sub = "ello", ok = true},
+		{s = "Hello", start = 1, end = len("Hello") - 1, sub = "ell", ok = true},
+		{s = "Hello", end = len("Hello") + 1, sub = "Hello", ok = false},
+		{s = "小猫咪", start = 0, end = 3, sub = "小猫咪", ok = true},
+		{s = "小猫咪", start = 1, end = 3, sub = "猫咪", ok = true},
+		{s = "小猫咪", start = 1, end = 5, sub = "猫咪", ok = false},
+		{s = "小猫咪", start = 1, end = 1, sub = "", ok = true},
+	}
+
+	for tc in cases {
+		sub, ok := strings.substring(tc.s, tc.start, tc.end)
+		testing.expectf(t, ok == tc.ok, "expected %v[%v:%v] to return ok: %v", tc.s, tc.start, tc.end, tc.ok)
+		testing.expectf(t, sub == tc.sub, "expected %v[%v:%v] to return sub: %v, got: %v", tc.s, tc.start, tc.end, tc.sub, sub)
 	}
 }

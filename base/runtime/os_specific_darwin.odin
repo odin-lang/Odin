@@ -1,5 +1,5 @@
-//+build darwin
-//+private
+#+build darwin
+#+private
 package runtime
 
 import "base:intrinsics"

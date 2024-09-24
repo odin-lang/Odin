@@ -13,7 +13,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-" + TYPE + "/wgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	foreign import libwgpu {
@@ -27,6 +27,8 @@ when ODIN_OS == .Windows {
 		"system:advapi32.lib",
 		"system:user32.lib",
 		"system:gdi32.lib",
+		"system:ole32.lib",
+		"system:oleaut32.lib",
 	}
 } else when ODIN_OS == .Darwin {
 	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
@@ -34,7 +36,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	foreign import libwgpu {
@@ -49,7 +51,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v0.19.4.1, make sure to read the README at '" + #directory + "vendor/wgpu/README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	foreign import libwgpu {
@@ -220,7 +222,8 @@ CullMode :: enum i32 {
 
 DeviceLostReason :: enum i32 {
 	Undefined = 0x00000000,
-	Destroyed = 0x00000001,
+	Unknown   = 0x00000001,
+	Destroyed = 0x00000002,
 }
 
 ErrorFilter :: enum i32 {
@@ -264,6 +267,30 @@ FeatureName :: enum i32 {
 	PipelineStatisticsQuery,
 	StorageResourceBindingArray,
 	PartiallyBoundBindingArray,
+	TextureFormat16bitNorm,
+	TextureCompressionAstcHdr,
+	// TODO: requires wgpu.h api change
+	// TimestampQueryInsidePasses,
+	MappablePrimaryBuffers = 0x0003000E,
+	BufferBindingArray,
+	UniformBufferAndStorageTextureArrayNonUniformIndexing,
+	// TODO: requires wgpu.h api change
+	// AddressModeClampToZero,
+	// AddressModeClampToBorder,
+	// PolygonModeLine,
+	// PolygonModePoint,
+	// ConservativeRasterization,
+	// ClearTexture,
+	// SprivShaderPassThrough,
+	// MultiView,
+	VertexAttribute64bit = 0x00030019,
+	TextureFormatNv12,
+	RayTracingAccelarationStructure,
+	RayQuery,
+	ShaderF64,
+	ShaderI16,
+	ShaderPrimitiveIndex,
+	ShaderEarlyDepthTest,
 }
 
 FilterMode :: enum i32 {
@@ -520,6 +547,18 @@ TextureFormat :: enum i32 {
 	ASTC12x10UnormSrgb = 0x0000005D,
 	ASTC12x12Unorm = 0x0000005E,
 	ASTC12x12UnormSrgb = 0x0000005F,
+
+	// Native.
+
+	// From FeatureName.TextureFormat16bitNorm
+	R16Unorm = 0x00030001,
+	R16Snorm,
+	Rg16Unorm,
+	Rg16Snorm,
+	Rgba16Unorm,
+	Rgba16Snorm,
+	// From FeatureName.TextureFormatNv12
+	NV12,
 }
 
 TextureSampleType :: enum i32 {
@@ -581,13 +620,13 @@ VertexStepMode :: enum i32 {
 	VertexBufferNotUsed = 0x00000002,
 }
 
-// WGSLFeatureName :: enum i32 {
-//     Undefined = 0x00000000,
-//     ReadonlyAndReadwriteStorageTextures = 0x00000001,
-//     Packed4x8IntegerDotProduct = 0x00000002,
-//     UnrestrictedPointerParameters = 0x00000003,
-//     PointerCompositeAccess = 0x00000004,
-// }
+WGSLFeatureName :: enum i32 {
+	Undefined = 0x00000000,
+	ReadonlyAndReadwriteStorageTextures = 0x00000001,
+	Packed4x8IntegerDotProduct = 0x00000002,
+	UnrestrictedPointerParameters = 0x00000003,
+	PointerCompositeAccess = 0x00000004,
+}
 
 BufferUsage :: enum i32 {
 	MapRead = 0x00000000,
@@ -634,22 +673,18 @@ TextureUsage :: enum i32 {
 }
 TextureUsageFlags :: bit_set[TextureUsage; Flags]
 
-
-BufferMapAsyncCallback :: #type proc "c" (status: BufferMapAsyncStatus, /* NULLABLE */ userdata: rawptr)
-ShaderModuleGetCompilationInfoCallback :: #type proc "c" (status: CompilationInfoRequestStatus, compilationInfo: ^CompilationInfo, /* NULLABLE */ userdata: rawptr)
-DeviceCreateComputePipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: ComputePipeline, message: cstring, /* NULLABLE */ userdata: rawptr)
-DeviceCreateRenderPipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: RenderPipeline, message: cstring, /* NULLABLE */ userdata: rawptr)
+Proc :: distinct rawptr
 
 DeviceLostCallback :: #type proc "c" (reason: DeviceLostReason, message: cstring, userdata: rawptr)
 ErrorCallback :: #type proc "c" (type: ErrorType, message: cstring, userdata: rawptr)
 
-Proc :: distinct rawptr
-
-QueueOnSubmittedWorkDoneCallback :: #type proc "c" (status: QueueWorkDoneStatus, /* NULLABLE */ userdata: rawptr)
-InstanceRequestAdapterCallback :: #type proc "c" (status: RequestAdapterStatus, adapter: Adapter, message: cstring, /* NULLABLE */ userdata: rawptr)
 AdapterRequestDeviceCallback :: #type proc "c" (status: RequestDeviceStatus, device: Device, message: cstring, /* NULLABLE */ userdata: rawptr)
-
-// AdapterRequestAdapterInfoCallback :: #type proc "c" (adapterInfo: AdapterInfo, /* NULLABLE */ userdata: rawptr)
+BufferMapAsyncCallback :: #type proc "c" (status: BufferMapAsyncStatus, /* NULLABLE */ userdata: rawptr)
+DeviceCreateComputePipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: ComputePipeline, message: cstring, /* NULLABLE */ userdata: rawptr)
+DeviceCreateRenderPipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: RenderPipeline, message: cstring, /* NULLABLE */ userdata: rawptr)
+InstanceRequestAdapterCallback :: #type proc "c" (status: RequestAdapterStatus, adapter: Adapter, message: cstring, /* NULLABLE */ userdata: rawptr)
+QueueOnSubmittedWorkDoneCallback :: #type proc "c" (status: QueueWorkDoneStatus, /* NULLABLE */ userdata: rawptr)
+ShaderModuleGetCompilationInfoCallback :: #type proc "c" (status: CompilationInfoRequestStatus, compilationInfo: ^CompilationInfo, /* NULLABLE */ userdata: rawptr)
 
 ChainedStruct :: struct {
 	next:  ^ChainedStruct,
@@ -661,28 +696,23 @@ ChainedStructOut :: struct {
 	sType: SType,
 }
 
-// AdapterInfo :: struct {
-// 	next: ^ChainedStructOut,
-//     vendor: cstring,
-//     architecture: cstring,
-//     device: cstring,
-//     description: cstring,
-// 	backendType: BackendType,
-// 	adapterType: AdapterType,
-// 	vendorID: u32,
-// 	deviceID: u32,
-// }
-
-AdapterProperties :: struct {
+AdapterInfo :: struct {
 	nextInChain: ^ChainedStructOut,
-	vendorID: u32,
-	vendorName: cstring,
+	vendor: cstring,
 	architecture: cstring,
-	deviceID: u32,
-	name: cstring,
-	driverDescription: cstring,
-	adapterType: AdapterType,
+	device: cstring,
+	description: cstring,
 	backendType: BackendType,
+	adapterType: AdapterType,
+	vendorID: u32,
+	deviceID: u32,
+}
+when ODIN_OS == .JS {
+	#assert(int(BackendType.WebGPU) == 2)
+	#assert(offset_of(AdapterInfo, backendType) == 20)
+
+	#assert(int(AdapterType.Unknown) == 3)
+	#assert(offset_of(AdapterInfo, adapterType) == 24)
 }
 
 BindGroupEntry :: struct {
@@ -943,12 +973,23 @@ StorageTextureBindingLayout :: struct {
 
 SurfaceCapabilities :: struct {
 	nextInChain: ^ChainedStructOut,
+	usages: TextureUsageFlags,
 	formatCount: uint,
 	formats: /* const */ [^]TextureFormat `fmt:"v,formatCount"`,
 	presentModeCount: uint,
 	presentModes: /* const */ [^]PresentMode `fmt:"v,presentModeCount"`,
 	alphaModeCount: uint,
 	alphaModes: /* const */ [^]CompositeAlphaMode `fmt:"v,alphaModeCount"`,
+}
+when ODIN_OS == .JS {
+	#assert(offset_of(SurfaceCapabilities, formatCount) == 8)
+	#assert(offset_of(SurfaceCapabilities, formats) == 8 + 1*size_of(int))
+
+	#assert(offset_of(SurfaceCapabilities, presentModeCount) == 8 + 2*size_of(int))
+	#assert(offset_of(SurfaceCapabilities, presentModes) == 8 + 3*size_of(int))
+
+	#assert(offset_of(SurfaceCapabilities, alphaModeCount) == 8 + 4*size_of(int))
+	#assert(offset_of(SurfaceCapabilities, alphaModes) == 8 + 5*size_of(int))
 }
 
 SurfaceConfiguration :: struct {
@@ -1040,6 +1081,12 @@ TextureViewDescriptor :: struct {
 	aspect: TextureAspect,
 }
 
+UncapturedErrorCallbackInfo :: struct {
+	nextInChain: ^ChainedStruct,
+	callback: ErrorCallback,
+	userdata: rawptr,
+}
+
 VertexAttribute :: struct {
 	format: VertexFormat,
 	offset: u64,
@@ -1120,11 +1167,20 @@ ProgrammableStageDescriptor :: struct {
 RenderPassColorAttachment :: struct {
 	nextInChain: ^ChainedStruct,
 	/* NULLABLE */ view: TextureView,
-	// depthSlice: u32,
+	depthSlice: u32,
 	/* NULLABLE */ resolveTarget: TextureView,
 	loadOp: LoadOp,
 	storeOp: StoreOp,
 	clearValue: Color,
+}
+when ODIN_OS == .JS {
+	#assert(size_of(RenderPassColorAttachment) == 56)
+	#assert(offset_of(RenderPassColorAttachment, view) == 4)
+	#assert(offset_of(RenderPassColorAttachment, depthSlice) == 8)
+	#assert(offset_of(RenderPassColorAttachment, resolveTarget) == 12)
+	#assert(offset_of(RenderPassColorAttachment, loadOp) == 16)
+	#assert(offset_of(RenderPassColorAttachment, storeOp) == 20)
+	#assert(offset_of(RenderPassColorAttachment, clearValue) == 24)
 }
 
 RequiredLimits :: struct {
@@ -1194,6 +1250,10 @@ DeviceDescriptor :: struct {
 	defaultQueue: QueueDescriptor,
 	deviceLostCallback: DeviceLostCallback,
 	deviceLostUserdata: rawptr,
+	uncapturedErrorCallbackInfo: UncapturedErrorCallbackInfo,
+}
+when ODIN_OS == .JS {
+	#assert(offset_of(DeviceDescriptor, deviceLostCallback) == 24 + size_of(int))
 }
 
 RenderPassDescriptor :: struct {
@@ -1245,15 +1305,17 @@ foreign libwgpu {
 	// Methods of Adapter
 	@(link_name="wgpuAdapterEnumerateFeatures")
 	RawAdapterEnumerateFeatures :: proc(adapter: Adapter, features: [^]FeatureName) -> uint ---
+	@(link_name="wgpuAdapterGetInfo")
+	RawAdapterGetInfo :: proc(adapter: Adapter, info: ^AdapterInfo) ---
 	@(link_name="wgpuAdapterGetLimits")
 	RawAdapterGetLimits :: proc(adapter: Adapter, limits: ^SupportedLimits) -> b32 ---
-	@(link_name="wgpuAdapterGetProperties")
-	RawAdapterGetProperties :: proc(adapter: Adapter, properties: ^AdapterProperties) ---
 	AdapterHasFeature :: proc(adapter: Adapter, feature: FeatureName) -> b32 ---
-	// AdapterRequestAdapterInfo :: proc(adapter: Adapter, callback: AdapterRequestAdapterInfoCallback, /* NULLABLE */ userdata: rawptr) ---
 	AdapterRequestDevice :: proc(adapter: Adapter, /* NULLABLE */ descriptor: /* const */ ^DeviceDescriptor, callback: AdapterRequestDeviceCallback, /* NULLABLE */ userdata: rawptr = nil) ---
 	AdapterReference :: proc(adapter: Adapter) ---
 	AdapterRelease :: proc(adapter: Adapter) ---
+
+	// Procs of AdapterInfo
+	AdapterInfoFreeMembers :: proc(adapterInfo: AdapterInfo) ---
 
 	// Methods of BindGroup
 	BindGroupSetLabel :: proc(bindGroup: BindGroup, label: cstring) ---
@@ -1348,13 +1410,12 @@ foreign libwgpu {
 	DevicePopErrorScope :: proc(device: Device, callback: ErrorCallback, userdata: rawptr) ---
 	DevicePushErrorScope :: proc(device: Device, filter: ErrorFilter) ---
 	DeviceSetLabel :: proc(device: Device, label: cstring) ---
-	DeviceSetUncapturedErrorCallback :: proc(device: Device, callback: ErrorCallback, userdata: rawptr) ---
 	DeviceReference :: proc(device: Device) ---
 	DeviceRelease :: proc(device: Device) ---
 
 	// Methods of Instance
 	InstanceCreateSurface :: proc(instance: Instance, descriptor: /* const */ ^SurfaceDescriptor) -> Surface ---
-	// InstanceHasWGSLLanguageFeature :: proc(instance: Instance, feature: WGSLFeatureName) -> b32 ---
+	InstanceHasWGSLLanguageFeature :: proc(instance: Instance, feature: WGSLFeatureName) -> b32 ---
 	InstanceProcessEvents :: proc(instance: Instance) ---
 	InstanceRequestAdapter :: proc(instance: Instance, /* NULLABLE */ options: /* const */ ^RequestAdapterOptions, callback: InstanceRequestAdapterCallback, /* NULLABLE */ userdata: rawptr = nil) ---
 	InstanceReference :: proc(instance: Instance) ---
@@ -1455,9 +1516,8 @@ foreign libwgpu {
 	RawSurfaceGetCapabilities :: proc(surface: Surface, adapter: Adapter, capabilities: ^SurfaceCapabilities) ---
 	@(link_name="wgpuSurfaceGetCurrentTexture")
 	RawSurfaceGetCurrentTexture :: proc(surface: Surface, surfaceTexture: ^SurfaceTexture) ---
-	SurfaceGetPreferredFormat :: proc(surface: Surface, adapter: Adapter) -> TextureFormat ---
 	SurfacePresent :: proc(surface: Surface) ---
-	// SurfaceSetLabel :: proc(surface: Surface, label: cstring) ---
+	SurfaceSetLabel :: proc(surface: Surface, label: cstring) ---
 	SurfaceUnconfigure :: proc(surface: Surface) ---
 	SurfaceReference :: proc(surface: Surface) ---
 	SurfaceRelease :: proc(surface: Surface) ---
@@ -1500,8 +1560,8 @@ AdapterGetLimits :: proc(adapter: Adapter) -> (limits: SupportedLimits, ok: bool
 	return
 }
 
-AdapterGetProperties :: proc(adapter: Adapter) -> (properties: AdapterProperties) {
-	RawAdapterGetProperties(adapter, &properties)
+AdapterGetInfo :: proc(adapter: Adapter) -> (info: AdapterInfo) {
+	RawAdapterGetInfo(adapter, &info)
 	return
 }
 
@@ -1634,8 +1694,8 @@ SurfaceGetCurrentTexture :: proc(surface: Surface) -> (surface_texture: SurfaceT
 
 // WGPU Native bindings
 
-BINDINGS_VERSION        :: [4]u8{0, 19, 4, 1}
-BINDINGS_VERSION_STRING :: "0.19.4.1"
+BINDINGS_VERSION        :: [4]u8{22, 1, 0, 1}
+BINDINGS_VERSION_STRING :: "22.1.0.1"
 
 when ODIN_OS != .JS {
 	@(private="file", init)

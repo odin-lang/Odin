@@ -395,9 +395,9 @@ SIOCGIFFLAG :: enum c.int {
 	PORTSEL        = 13, /* Can set media type.  */
 	AUTOMEDIA      = 14, /* Auto media select active.  */
 	DYNAMIC        = 15, /* Dialup device with changing addresses.  */
-        LOWER_UP       = 16,
-        DORMANT        = 17,
-        ECHO           = 18,
+	LOWER_UP       = 16,
+	DORMANT        = 17,
+	ECHO           = 18,
 }
 SIOCGIFFLAGS :: bit_set[SIOCGIFFLAG; c.int]
 
@@ -584,8 +584,7 @@ close :: proc(fd: Handle) -> Error {
 }
 
 flush :: proc(fd: Handle) -> Error {
-	// do nothing
-	return nil
+	return _get_errno(unix.sys_fsync(int(fd)))
 }
 
 // If you read or write more than `SSIZE_MAX` bytes, result is implementation defined (probably an error).
@@ -654,9 +653,20 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+	switch whence {
+	case SEEK_SET, SEEK_CUR, SEEK_END:
+		break
+	case:
+		return 0, .Invalid_Whence
+	}
 	res := unix.sys_lseek(int(fd), offset, whence)
 	if res < 0 {
-		return -1, _get_errno(int(res))
+		errno := _get_errno(int(res))
+		switch errno {
+		case .EINVAL:
+			return 0, .Invalid_Offset
+		}
+		return 0, errno
 	}
 	return i64(res), nil
 }
@@ -975,7 +985,8 @@ unset_env :: proc(key: string) -> Error {
 }
 
 @(require_results)
-get_current_directory :: proc() -> string {
+get_current_directory :: proc(allocator := context.allocator) -> string {
+	context.allocator = allocator
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
 	// The largest value I could find was 4096, so might as well use the page size.

@@ -1,5 +1,5 @@
-//+private
-//+build darwin, freebsd, openbsd, netbsd
+#+private
+#+build darwin, freebsd, openbsd, netbsd
 package time
 
 import "core:sys/posix"

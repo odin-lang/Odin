@@ -325,6 +325,7 @@ enum BuildFlagKind {
 	BuildFlag_NoTypeAssert,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_NoCRT,
+	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_UseSeparateModules,
@@ -339,12 +340,14 @@ enum BuildFlagKind {
 	BuildFlag_VetUnused,
 	BuildFlag_VetUnusedImports,
 	BuildFlag_VetUnusedVariables,
+	BuildFlag_VetUnusedProcedures,
 	BuildFlag_VetUsingStmt,
 	BuildFlag_VetUsingParam,
 	BuildFlag_VetStyle,
 	BuildFlag_VetSemicolon,
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
+	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
 	BuildFlag_IgnoreUnknownAttributes,
@@ -389,6 +392,7 @@ enum BuildFlagKind {
 	BuildFlag_PrintLinkerFlags,
 
 	// internal use only
+	BuildFlag_InternalFastISel,
 	BuildFlag_InternalIgnoreLazy,
 	BuildFlag_InternalIgnoreLLVMBuild,
 	BuildFlag_InternalIgnorePanic,
@@ -507,7 +511,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
-	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test);
+	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test | Command_doc);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
@@ -532,6 +536,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
@@ -544,6 +549,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnusedVariables,      str_lit("vet-unused-variables"),      BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUnusedProcedures,     str_lit("vet-unused-procedures"),     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnusedImports,        str_lit("vet-unused-imports"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetShadowing,            str_lit("vet-shadowing"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUsingStmt,            str_lit("vet-using-stmt"),            BuildFlagParam_None,    Command__does_check);
@@ -552,6 +558,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -594,6 +601,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_PrintLinkerFlags,        str_lit("print-linker-flags"),        BuildFlagParam_None,    Command_build);
 
+	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnorePanic,     str_lit("internal-ignore-panic"),     BuildFlagParam_None,    Command_all);
@@ -1181,6 +1189,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
 							break;
+						case BuildFlag_NoRPath:
+							build_context.no_rpath = true;
+							break;
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
@@ -1213,6 +1224,36 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetSemicolon:       build_context.vet_flags |= VetFlag_Semicolon;       break;
 						case BuildFlag_VetCast:            build_context.vet_flags |= VetFlag_Cast;            break;
 						case BuildFlag_VetTabs:            build_context.vet_flags |= VetFlag_Tabs;            break;
+						case BuildFlag_VetUnusedProcedures:
+							build_context.vet_flags |= VetFlag_UnusedProcedures;
+							if (!set_flags[BuildFlag_VetPackages]) {
+								gb_printf_err("-%.*s must be used with -vet-packages\n", LIT(name));
+								bad_flags = true;
+							}
+							break;
+
+						case BuildFlag_VetPackages:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								String val = value.value_string;
+								String_Iterator it = {val, 0};
+								for (;;) {
+									String pkg = string_split_iterator(&it, ',');
+									if (pkg.len == 0) {
+										break;
+									}
+
+									pkg = string_trim_whitespace(pkg);
+									if (!string_is_valid_identifier(pkg)) {
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(pkg));
+										bad_flags = true;
+										continue;
+									}
+
+									string_set_add(&build_context.vet_packages, pkg);
+								}
+							}
+							break;
 
 						case BuildFlag_CustomAttribute:
 							{
@@ -1227,7 +1268,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 									attr = string_trim_whitespace(attr);
 									if (!string_is_valid_identifier(attr)) {
-										gb_printf_err("-custom-attribute '%.*s' must be a valid identifier\n", LIT(attr));
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(attr));
 										bad_flags = true;
 										continue;
 									}
@@ -1408,6 +1449,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.print_linker_flags = true;
 							break;
 
+						case BuildFlag_InternalFastISel:
+							build_context.fast_isel = true;
+							break;
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
 							break;
@@ -2154,6 +2198,12 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-doc-format");
 		print_usage_line(2, "Generates documentation as the .odin-doc format (useful for external tooling).");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-out:<filepath>");
+		print_usage_line(2, "Sets the base name of the resultig .odin-doc file.");
+		print_usage_line(2, "The extension can be optionally included; the resulting file will always have an extension of '.odin-doc'.");
+		print_usage_line(2, "Example: -out:foo");
+		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
@@ -2268,6 +2318,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Sets the build mode.");
 		print_usage_line(2, "Available options:");
 		print_usage_line(3, "-build-mode:exe         Builds as an executable.");
+		print_usage_line(3, "-build-mode:test        Builds as an executable that executes tests.");
 		print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
 		print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
 		print_usage_line(3, "-build-mode:lib         Builds as a statically linked library.");
@@ -2309,6 +2360,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Disables automatic linking with the C Run Time.");
 		print_usage_line(0, "");
 
+		print_usage_line(1, "-no-rpath");
+		print_usage_line(2, "Disables automatic addition of an rpath linked to the executable directory.");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-no-thread-local");
 		print_usage_line(2, "Ignores @thread_local attribute, effectively treating the program as if it is single-threaded.");
 		print_usage_line(0, "");
@@ -2343,7 +2398,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-unused");
-		print_usage_line(2, "Checks for unused declarations.");
+		print_usage_line(2, "Checks for unused declarations (variables and imports).");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-unused-variables");
@@ -2384,6 +2439,16 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-vet-tabs");
 		print_usage_line(2, "Errs when the use of tabs has not been used for indentation.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-packages:<comma-separated-strings>");
+		print_usage_line(2, "Sets which packages by name will be vetted.");
+		print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-unused-procedures");
+		print_usage_line(2, "Checks for unused procedures.");
+		print_usage_line(2, "Must be used with -vet-packages or specified on a per file with +vet tags.");
 		print_usage_line(0, "");
 	}
 
@@ -3129,6 +3194,9 @@ int main(int arg_count, char const **arg_ptr) {
 
 	build_context.command = command;
 
+	string_set_init(&build_context.custom_attributes);
+	string_set_init(&build_context.vet_packages);
+
 	if (!parse_build_flags(args)) {
 		return 1;
 	}
@@ -3252,6 +3320,12 @@ int main(int arg_count, char const **arg_ptr) {
 			gb_printf_err("missing required target feature: \"%.*s\", enable it by setting a different -microarch or explicitly adding it through -target-features\n", LIT(disabled));
 			gb_exit(1);
 		}
+
+		// NOTE(laytan): some weird errors on LLVM 14 that LLVM 17 fixes.
+		if (LLVM_VERSION_MAJOR < 17) {
+			gb_printf_err("Invalid LLVM version %s, RISC-V targets require at least LLVM 17\n", LLVM_VERSION_STRING);
+			gb_exit(1);
+		} 
 	}
 
 	if (build_context.show_debug_messages) {

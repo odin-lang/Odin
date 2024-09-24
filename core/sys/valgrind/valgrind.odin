@@ -1,4 +1,4 @@
-//+build amd64
+#+build amd64
 package sys_valgrind
 
 import "base:intrinsics"

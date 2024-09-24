@@ -1015,6 +1015,74 @@ bit_set_is_big_endian :: proc(value: any, loc := #caller_location) -> bool {
 }
 
 
+Bit_Field :: struct {
+	name:   string,
+	type:   ^Type_Info,
+	size:   uintptr,     // Size in bits
+	offset: uintptr,     // Offset in bits
+	tag:    Struct_Tag,
+}
+
+@(require_results)
+bit_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Bit_Field) {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return soa_zip(
+			name   = s.names[:s.field_count],
+			type   = s.types[:s.field_count],
+			size   = s.bit_sizes[:s.field_count],
+			offset = s.bit_offsets[:s.field_count],
+			tag      = ([^]Struct_Tag)(s.tags)[:s.field_count],
+		)
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_names :: proc(T: typeid) -> []string {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return s.names[:s.field_count]
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_types :: proc(T: typeid) -> []^Type_Info {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return s.types[:s.field_count]
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_sizes :: proc(T: typeid) -> []uintptr {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return s.bit_sizes[:s.field_count]
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_offsets :: proc(T: typeid) -> []uintptr {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return s.bit_offsets[:s.field_count]
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_tags :: proc(T: typeid) -> []Struct_Tag {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return transmute([]Struct_Tag)s.tags[:s.field_count]
+	}
+	return nil
+}
+
 @(require_results)
 as_bool :: proc(a: any) -> (value: bool, valid: bool) {
 	if a == nil { return }

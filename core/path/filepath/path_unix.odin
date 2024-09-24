@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd, netbsd
+#+build linux, darwin, freebsd, openbsd, netbsd
 package filepath
 
 when ODIN_OS == .Darwin {

@@ -1,4 +1,4 @@
-//+build openbsd
+#+build openbsd
 package unix
 
 import "core:c"

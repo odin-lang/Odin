@@ -476,8 +476,8 @@ IVersionInfo3_VTable :: struct {
 }
 
 ArgPair :: struct {
-  pName:  wstring,
-  pValue: wstring,
+	pName:  wstring,
+	pValue: wstring,
 }
 
 IPdbUtils_UUID_STRING :: "E6C9647E-9D6A-4C3B-B94C-524B5A6C343D"

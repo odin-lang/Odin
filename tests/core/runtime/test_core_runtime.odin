@@ -11,6 +11,7 @@ import "core:testing"
 test_temp_allocator_alignment_boundary :: proc(t: ^testing.T) {
 	arena: runtime.Arena
 	context.allocator = runtime.arena_allocator(&arena)
+	defer runtime.arena_destroy(&arena)
 
 	_, _ = mem.alloc(int(runtime.DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE)-120)
 	_, err := mem.alloc(112, 32)
@@ -22,6 +23,7 @@ test_temp_allocator_alignment_boundary :: proc(t: ^testing.T) {
 test_temp_allocator_big_alloc_and_alignment :: proc(t: ^testing.T) {
 	arena: runtime.Arena
 	context.allocator = runtime.arena_allocator(&arena)
+	defer runtime.arena_destroy(&arena)
 
 	mappy: map[[8]int]int
 	err := reserve(&mappy, 50000)
@@ -32,6 +34,7 @@ test_temp_allocator_big_alloc_and_alignment :: proc(t: ^testing.T) {
 test_temp_allocator_returns_correct_size :: proc(t: ^testing.T) {
 	arena: runtime.Arena
 	context.allocator = runtime.arena_allocator(&arena)
+	defer runtime.arena_destroy(&arena)
 
 	bytes, err := mem.alloc_bytes(10, 16)
 	testing.expect(t, err == nil)

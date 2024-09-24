@@ -1,4 +1,4 @@
-//+private
+#+private
 package os2
 
 import "base:runtime"
@@ -22,9 +22,14 @@ global_default_temp_allocator_index: uint
 
 @(require_results)
 temp_allocator :: proc() -> runtime.Allocator {
+	arena := &global_default_temp_allocator_arenas[global_default_temp_allocator_index]
+	if arena.backing_allocator.procedure == nil {
+		arena.backing_allocator = heap_allocator()
+	}
+
 	return runtime.Allocator{
 		procedure = temp_allocator_proc,
-		data      = &global_default_temp_allocator_arenas[global_default_temp_allocator_index],
+		data      = arena,
 	}
 }
 
@@ -60,4 +65,9 @@ TEMP_ALLOCATOR_GUARD :: #force_inline proc(loc := #caller_location) -> (runtime.
 	tmp := temp_allocator_temp_begin(loc)
 	global_default_temp_allocator_index = (global_default_temp_allocator_index+1)%MAX_TEMP_ARENA_COUNT
 	return tmp, loc
+}
+
+@(init, private)
+init_thread_local_cleaner :: proc() {
+	runtime.add_thread_local_cleaner(temp_allocator_fini)
 }

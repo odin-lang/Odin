@@ -1,4 +1,4 @@
-//+build linux, freebsd, openbsd
+#+build linux, freebsd, openbsd
 package xlib
 
 /* ----  X11/extensions/XKB.h ---------------------------------------------------------*/

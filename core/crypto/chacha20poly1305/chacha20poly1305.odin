@@ -4,8 +4,8 @@ AEAD_XChaCha20_Poly1305 Authenticated Encryption with Additional Data
 algorithms.
 
 See:
-- https://www.rfc-editor.org/rfc/rfc8439
-- https://datatracker.ietf.org/doc/html/draft-arciszewski-xchacha-03
+- [[ https://www.rfc-editor.org/rfc/rfc8439 ]]
+- [[ https://datatracker.ietf.org/doc/html/draft-arciszewski-xchacha-03 ]]
 */
 package chacha20poly1305
 

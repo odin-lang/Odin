@@ -60,6 +60,7 @@ pool_thread_runner :: proc(t: ^Thread) {
 		if task, ok := pool_pop_waiting(pool); ok {
 			data.task = task
 			pool_do_work(pool, task)
+			sync.guard(&pool.mutex)
 			data.task = {}
 		}
 	}
@@ -122,9 +123,10 @@ pool_join :: proc(pool: ^Pool) {
 	for started_count < len(pool.threads) {
 		started_count = 0
 		for t in pool.threads {
-			if .Started in t.flags {
+			flags := intrinsics.atomic_load(&t.flags)
+			if .Started in flags {
 				started_count += 1
-				if .Joined not_in t.flags {
+				if .Joined not_in flags {
 					join(t)
 				}
 			}
@@ -175,10 +177,12 @@ pool_stop_task :: proc(pool: ^Pool, user_index: int, exit_code: int = 1) -> bool
 			intrinsics.atomic_sub(&pool.num_outstanding, 1)
 			intrinsics.atomic_sub(&pool.num_in_processing, 1)
 
+			old_thread_user_index := t.user_index
+
 			destroy(t)
 
 			replacement := create(pool_thread_runner)
-			replacement.user_index = t.user_index
+			replacement.user_index = old_thread_user_index
 			replacement.data = data
 			data.task = {}
 			pool.threads[i] = replacement
@@ -207,10 +211,12 @@ pool_stop_all_tasks :: proc(pool: ^Pool, exit_code: int = 1) {
 			intrinsics.atomic_sub(&pool.num_outstanding, 1)
 			intrinsics.atomic_sub(&pool.num_in_processing, 1)
 
+			old_thread_user_index := t.user_index
+
 			destroy(t)
 
 			replacement := create(pool_thread_runner)
-			replacement.user_index = t.user_index
+			replacement.user_index = old_thread_user_index
 			replacement.data = data
 			data.task = {}
 			pool.threads[i] = replacement

@@ -7,6 +7,7 @@ LIB :: (
 	     "../lib/stb_image.lib"      when ODIN_OS == .Windows
 	else "../lib/stb_image.a"        when ODIN_OS == .Linux
 	else "../lib/darwin/stb_image.a" when ODIN_OS == .Darwin
+	else "../lib/stb_image_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else ""
 )
 
@@ -15,11 +16,17 @@ when LIB != "" {
 		// The STB libraries are shipped with the compiler on Windows so a Windows specific message should not be needed.
 		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
 	}
+}
 
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import stbi "../lib/stb_image_wasm.o"
+} else when LIB != "" {
 	foreign import stbi { LIB }
 } else {
 	foreign import stbi "system:stb_image"
 }
+
+NO_STDIO :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 #assert(size_of(c.int) == size_of(b32))
 #assert(size_of(b32) == size_of(c.int))
@@ -33,14 +40,48 @@ Io_Callbacks :: struct {
 	eof:  proc "c" (user: rawptr) -> c.int,                             // returns nonzero if we are at end of file/data
 }
 
+when !NO_STDIO {
+	@(default_calling_convention="c", link_prefix="stbi_")
+	foreign stbi {
+		////////////////////////////////////
+		//
+		// 8-bits-per-channel interface
+		//
+		load           :: proc(filename: cstring, x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]byte ---
+		load_from_file :: proc(f: ^c.FILE,        x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]byte ---
+
+		////////////////////////////////////
+		//
+		// 16-bits-per-channel interface
+		//
+		load_16           :: proc(filename: cstring, x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]u16 ---
+		load_16_from_file :: proc(f: ^c.FILE,        x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]u16 ---
+
+		////////////////////////////////////
+		//
+		// float-per-channel interface
+		//
+		loadf           :: proc(filename: cstring, x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]f32 ---
+		loadf_from_file :: proc(f: ^c.FILE,        x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]f32 ---
+
+		is_hdr           :: proc(filename: cstring) -> c.int ---
+		is_hdr_from_file :: proc(f: ^c.FILE)        -> c.int ---
+
+		// get image dimensions & components without fully decoding
+		info           :: proc(filename: cstring, x, y, comp: ^c.int) -> c.int ---
+		info_from_file :: proc(f: ^c.FILE,        x, y, comp: ^c.int) -> c.int ---
+
+		is_16_bit           :: proc(filename: cstring) -> b32 ---
+		is_16_bit_from_file :: proc(f: ^c.FILE)        -> b32 ---
+	}
+}
+
 @(default_calling_convention="c", link_prefix="stbi_")
 foreign stbi {
 	////////////////////////////////////
 	//
 	// 8-bits-per-channel interface
 	//
-	load                :: proc(filename: cstring,                 x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]byte ---
-	load_from_file      :: proc(f: ^c.FILE,                        x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]byte ---
 	load_from_memory    :: proc(buffer: [^]byte, len: c.int,       x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]byte ---
 	load_from_callbacks :: proc(clbk: ^Io_Callbacks, user: rawptr, x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]byte ---
 
@@ -50,8 +91,6 @@ foreign stbi {
 	//
 	// 16-bits-per-channel interface
 	//
-	load_16                :: proc(filename: cstring,           x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]u16 ---
-	load_16_from_file      :: proc(f: ^c.FILE,                  x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]u16 ---
 	load_16_from_memory    :: proc(buffer: [^]byte, len: c.int, x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]u16 ---
 	load_16_from_callbacks :: proc(clbk: ^Io_Callbacks,         x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]u16 ---
 
@@ -59,8 +98,6 @@ foreign stbi {
 	//
 	// float-per-channel interface
 	//
-	loadf                 :: proc(filename: cstring,                 x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]f32 ---
-	loadf_from_file       :: proc(f: ^c.FILE,                        x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]f32 ---
 	loadf_from_memory     :: proc(buffer: [^]byte, len: c.int,       x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]f32 ---
 	loadf_from_callbacks  :: proc(clbk: ^Io_Callbacks, user: rawptr, x, y, channels_in_file: ^c.int, desired_channels: c.int) -> [^]f32 ---
 
@@ -73,9 +110,6 @@ foreign stbi {
 	is_hdr_from_callbacks :: proc(clbk: ^Io_Callbacks, user: rawptr) -> c.int ---
 	is_hdr_from_memory    :: proc(buffer: [^]byte, len: c.int)       -> c.int ---
 
-	is_hdr           :: proc(filename: cstring) -> c.int ---
-	is_hdr_from_file :: proc(f: ^c.FILE)        -> c.int ---
-
 	// get a VERY brief reason for failure
 	// NOT THREADSAFE
 	failure_reason :: proc() -> cstring ---
@@ -84,13 +118,9 @@ foreign stbi {
 	image_free :: proc(retval_from_load: rawptr) ---
 
 	// get image dimensions & components without fully decoding
-	info                :: proc(filename: cstring,                 x, y, comp: ^c.int) -> c.int ---
-	info_from_file      :: proc(f: ^c.FILE,                        x, y, comp: ^c.int) -> c.int ---
 	info_from_memory    :: proc(buffer: [^]byte, len: c.int,       x, y, comp: ^c.int) -> c.int ---
 	info_from_callbacks :: proc(clbk: ^Io_Callbacks, user: rawptr, x, y, comp: ^c.int) -> c.int ---
 	
-	is_16_bit             :: proc(filename: cstring) -> b32 ---
-	is_16_bit_from_file   :: proc(f: ^c.FILE) -> b32 ---
 	is_16_bit_from_memory :: proc(buffer: [^]byte, len: c.int) -> c.int ---
 
 	// for image formats that explicitly notate that they have premultiplied alpha,

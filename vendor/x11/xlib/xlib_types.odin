@@ -1,4 +1,4 @@
-//+build linux, freebsd, openbsd
+#+build linux, freebsd, openbsd
 package xlib
 
 // Since this is a unix-only library we make a few simplifying assumptions
@@ -47,9 +47,9 @@ XExtCodes :: struct {
 }
 
 XPixmapFormatValues :: struct {
-    depth:                 i32,
-    bits_per_pixel:        i32,
-    scanline_pad:          i32,
+	depth:                 i32,
+	bits_per_pixel:        i32,
+	scanline_pad:          i32,
 }
 
 XGCValues :: struct {
@@ -130,47 +130,47 @@ ScreenFormat :: struct {
 }
 
 XSetWindowAttributes :: struct {
-    background_pixmap:     Pixmap,
-    background_pixel:      uint,
-    border_pixmap:         Pixmap,
-    border_pixel:          uint,
-    bit_gravity:           Gravity,
-    win_gravity:           Gravity,
-    backing_store:         BackingStore,
-    backing_planes:        uint,
-    backing_pixel:         uint,
-    save_under:            b32,
-    event_mask:            EventMask,
-    do_not_propagate_mask: EventMask,
-    override_redirect:     b32,
-    colormap:              Colormap,
-    cursor:                Cursor,
+	background_pixmap:     Pixmap,
+	background_pixel:      uint,
+	border_pixmap:         Pixmap,
+	border_pixel:          uint,
+	bit_gravity:           Gravity,
+	win_gravity:           Gravity,
+	backing_store:         BackingStore,
+	backing_planes:        uint,
+	backing_pixel:         uint,
+	save_under:            b32,
+	event_mask:            EventMask,
+	do_not_propagate_mask: EventMask,
+	override_redirect:     b32,
+	colormap:              Colormap,
+	cursor:                Cursor,
 }
 
 XWindowAttributes :: struct {
-    x:                     i32,
-    y:                     i32,
-    width:                 i32,
-    height:                i32,
-    border_width:          i32,
-    depth:                 i32,
-    visual:                ^Visual,
-    root:                  Window,
-    class:                 WindowClass,
-    bit_gravity:           Gravity,
-    win_gravity:           Gravity,
-    backing_store:         BackingStore,
-    backing_planes:        uint,
-    backing_pixel:         uint,
-    save_under:            b32,
-    colormap:              Colormap,
-    map_installed:         b32,
-    map_state:             WindowMapState,
-    all_event_masks:       EventMask,
-    your_event_mask:       EventMask,
-    do_not_propagate_mask: EventMask,
-    override_redirect:     b32,
-    screen:                ^Screen,
+	x:                     i32,
+	y:                     i32,
+	width:                 i32,
+	height:                i32,
+	border_width:          i32,
+	depth:                 i32,
+	visual:                ^Visual,
+	root:                  Window,
+	class:                 WindowClass,
+	bit_gravity:           Gravity,
+	win_gravity:           Gravity,
+	backing_store:         BackingStore,
+	backing_planes:        uint,
+	backing_pixel:         uint,
+	save_under:            b32,
+	colormap:              Colormap,
+	map_installed:         b32,
+	map_state:             WindowMapState,
+	all_event_masks:       EventMask,
+	your_event_mask:       EventMask,
+	do_not_propagate_mask: EventMask,
+	override_redirect:     b32,
+	screen:                ^Screen,
 }
 
 XHostAddress :: struct {
@@ -187,50 +187,50 @@ XServerInterpretedAddress :: struct {
 }
 
 XImage :: struct {
-    width:                 i32,
-    height:                i32,
-    xoffset:               i32,
-    format:                ImageFormat,
-    data:                  rawptr,
-    byte_order:            i32,
-    bitmap_unit:           i32,
-    bitmap_bit_order:      ByteOrder,
-    bitmap_pad:            i32,
-    depth:                 i32,
-    bytes_per_line:        i32,
-    bits_per_pixel:        i32,
-    red_mask:              uint,
-    green_mask:            uint,
-    blue_mask:             uint,
-    obdata:                rawptr,
-    f: struct {
-    	create_image: proc "c" (
-    		display: ^Display,
-    		visual: ^Visual,
-    		depth: u32,
-    		format: i32,
-    		offset: i32,
-    		data: rawptr,
-    		width: u32,
-    		height: u32,
-    		pad: i32,
-    		stride: i32) -> ^XImage,
-    	destroy_image: proc "c" (image: ^XImage) -> i32,
-    	get_pixel: proc "c" (image: ^XImage) -> uint,
-    	put_pixel: proc "c" (image: ^XImage, x: i32, y: i32, pixel: uint) -> i32,
-    	sub_image: proc "c" (image: ^XImage, x: i32, y: i32, w: u32, h: u32) -> ^XImage,
-    	add_pixel: proc "c" (image: ^XImage, val: int) -> i32,
+	width:                 i32,
+	height:                i32,
+	xoffset:               i32,
+	format:                ImageFormat,
+	data:                  rawptr,
+	byte_order:            i32,
+	bitmap_unit:           i32,
+	bitmap_bit_order:      ByteOrder,
+	bitmap_pad:            i32,
+	depth:                 i32,
+	bytes_per_line:        i32,
+	bits_per_pixel:        i32,
+	red_mask:              uint,
+	green_mask:            uint,
+	blue_mask:             uint,
+	obdata:                rawptr,
+	f: struct {
+		create_image: proc "c" (
+			display: ^Display,
+			visual: ^Visual,
+			depth: u32,
+			format: i32,
+			offset: i32,
+			data: rawptr,
+			width: u32,
+			height: u32,
+			pad: i32,
+			stride: i32) -> ^XImage,
+		destroy_image: proc "c" (image: ^XImage) -> i32,
+		get_pixel: proc "c" (image: ^XImage) -> uint,
+		put_pixel: proc "c" (image: ^XImage, x: i32, y: i32, pixel: uint) -> i32,
+		sub_image: proc "c" (image: ^XImage, x: i32, y: i32, w: u32, h: u32) -> ^XImage,
+		add_pixel: proc "c" (image: ^XImage, val: int) -> i32,
 	},
 }
 
 XWindowChanges :: struct {
-    x:                     i32,
-    y:                     i32,
-    width:                 i32,
-    height:                i32,
-    border_width:          i32,
-    sibling:               Window,
-    stack_mode:            WindowStacking,
+	x:                     i32,
+	y:                     i32,
+	width:                 i32,
+	height:                i32,
+	border_width:          i32,
+	sibling:               Window,
+	stack_mode:            WindowStacking,
 }
 
 XColor :: struct {
@@ -243,42 +243,42 @@ XColor :: struct {
 }
 
 XSegment :: struct {
-    x1:     i16,
-    y1:     i16,
-    x2:     i16,
-    y2:     i16,
+	x1:     i16,
+	y1:     i16,
+	x2:     i16,
+	y2:     i16,
 }
 
 XPoint :: struct {
-    x:      i16,
-    y:      i16,
+	x:      i16,
+	y:      i16,
 }
 
 XRectangle :: struct {
-    x:      i16,
-    y:      i16,
-    width:  u16,
-    height: u16,
+	x:      i16,
+	y:      i16,
+	width:  u16,
+	height: u16,
 }
 
 XArc :: struct {
-    x:      i16,
-    y:      i16,
-    width:  u16,
-    height: u16,
-    angle1: i16,
-    angle2: i16,
+	x:      i16,
+	y:      i16,
+	width:  u16,
+	height: u16,
+	angle1: i16,
+	angle2: i16,
 }
 
 XKeyboardControl :: struct {
-    key_click_percent:  i32,
-    bell_percent:       i32,
-    bell_pitch:         i32,
-    bell_duration:      i32,
-    led:                i32,
-    led_mode:           KeyboardLedMode,
-    key:                i32,
-    auto_repeat_mode:   KeyboardAutoRepeatMode,
+	key_click_percent:  i32,
+	bell_percent:       i32,
+	bell_pitch:         i32,
+	bell_duration:      i32,
+	led:                i32,
+	led_mode:           KeyboardLedMode,
+	key:                i32,
+	auto_repeat_mode:   KeyboardAutoRepeatMode,
 }
 
 XKeyboardState :: struct {
@@ -700,23 +700,23 @@ XAnyEvent :: struct {
 }
 
 XGenericEvent :: struct {
-    type:              EventType,
-    serial:            uint,
-    send_event:        b32,
-    display:           ^Display,
-    extension:         i32,
-    evtype:            i32,
+	type:              EventType,
+	serial:            uint,
+	send_event:        b32,
+	display:           ^Display,
+	extension:         i32,
+	evtype:            i32,
 }
 
 XGenericEventCookie :: struct {
-    type:              EventType,
-    serial:            uint,
-    send_event:        b32,
-    display:           ^Display,
-    extension:         i32,
-    evtype:            i32,
-    cookie:            u32,
-    data:              rawptr,
+	type:              EventType,
+	serial:            uint,
+	send_event:        b32,
+	display:           ^Display,
+	extension:         i32,
+	evtype:            i32,
+	cookie:            u32,
+	data:              rawptr,
 }
 
 XEvent :: struct #raw_union {
@@ -758,55 +758,55 @@ XEvent :: struct #raw_union {
 }
 
 XCharStruct :: struct {
-    lbearing:          i16,
-    rbearing:          i16,
-    width:             i16,
-    ascent:            i16,
-    descent:           i16,
-    attributes:        u16,
+	lbearing:          i16,
+	rbearing:          i16,
+	width:             i16,
+	ascent:            i16,
+	descent:           i16,
+	attributes:        u16,
 }
 
 XFontProp :: struct {
-    name:              Atom,
-    card32:            uint,
+	name:              Atom,
+	card32:            uint,
 }
 
 XFontStruct :: struct {
-    ext_data:          ^XExtData,
-    fid:               Font,
-    direction:         u32,
-    min_char_or_byte2: u32,
-    max_char_or_byte2: u32,
-    min_byte1:         u32,
-    max_byte1:         u32,
-    all_chars_exist:   i32,
-    default_char:      u32,
-    n_properties:      i32,
-    properties:        ^XFontProp,
-    min_bounds:        XCharStruct,
-    max_bounds:        XCharStruct,
-    per_char:          ^XCharStruct,
-    ascent:            i32,
-    descent:           i32,
+	ext_data:          ^XExtData,
+	fid:               Font,
+	direction:         u32,
+	min_char_or_byte2: u32,
+	max_char_or_byte2: u32,
+	min_byte1:         u32,
+	max_byte1:         u32,
+	all_chars_exist:   i32,
+	default_char:      u32,
+	n_properties:      i32,
+	properties:        ^XFontProp,
+	min_bounds:        XCharStruct,
+	max_bounds:        XCharStruct,
+	per_char:          ^XCharStruct,
+	ascent:            i32,
+	descent:           i32,
 }
 
 XTextItem :: struct {
-    chars:  [^]u8,
-    nchars: i32,
-    delta:  i32,
-    font:   Font,
+	chars:  [^]u8,
+	nchars: i32,
+	delta:  i32,
+	font:   Font,
 }
 
 XChar2b :: struct {
-    byte1: u8,
-    byte2: u8,
+	byte1: u8,
+	byte2: u8,
 }
 
 XTextItem16 :: struct {
-    chars:  ^XChar2b,
-    nchars: i32,
-    delta:  i32,
-    font:   Font,
+	chars:  ^XChar2b,
+	nchars: i32,
+	delta:  i32,
+	font:   Font,
 }
 
 XEDataObject :: struct #raw_union {
@@ -819,8 +819,8 @@ XEDataObject :: struct #raw_union {
 }
 
 XFontSetExtents :: struct {
-    max_ink_extent:     XRectangle,
-    max_logical_extent: XRectangle,
+	max_ink_extent:     XRectangle,
+	max_logical_extent: XRectangle,
 }
 
 XOM      :: distinct rawptr
@@ -828,41 +828,41 @@ XOC      :: distinct rawptr
 XFontSet :: XOC
 
 XmbTextItem :: struct {
-    chars:    [^]u8,
-    nchars:   i32,
-    delta:    i32,
-    font_set: XFontSet,
+	chars:    [^]u8,
+	nchars:   i32,
+	delta:    i32,
+	font_set: XFontSet,
 }
 
 XwcTextItem :: struct {
-    chars:    [^]rune,
-    nchars:   i32,
-    delta:    i32,
-    font_set: XFontSet,
+	chars:    [^]rune,
+	nchars:   i32,
+	delta:    i32,
+	font_set: XFontSet,
 }
 
 XOMCharSetList :: struct {
-    charset_count: i32,
-    charset_list: [^]cstring,
+	charset_count: i32,
+	charset_list: [^]cstring,
 }
 
 XOrientation :: enum i32 {
-    XOMOrientation_LTR_TTB = 0,
-    XOMOrientation_RTL_TTB = 1,
-    XOMOrientation_TTB_LTR = 2,
-    XOMOrientation_TTB_RTL = 3,
-    XOMOrientation_Context = 4,
+	XOMOrientation_LTR_TTB = 0,
+	XOMOrientation_RTL_TTB = 1,
+	XOMOrientation_TTB_LTR = 2,
+	XOMOrientation_TTB_RTL = 3,
+	XOMOrientation_Context = 4,
 }
 
 XOMOrientation :: struct {
-    num_orientation:  i32,
-    orientation:      [^]XOrientation,
+	num_orientation:  i32,
+	orientation:      [^]XOrientation,
 }
 
 XOMFontInfo :: struct {
-    num_font:         i32,
-    font_struct_list: [^]^XFontStruct,
-    font_name_list:   [^]cstring,
+	num_font:         i32,
+	font_struct_list: [^]^XFontStruct,
+	font_name_list:   [^]cstring,
 }
 
 XIM :: distinct rawptr
@@ -875,38 +875,38 @@ XIDProc :: #type proc "c" (xim: XIM, client_data: rawptr, call_data: rawptr)
 XIMStyle :: uint
 
 XIMStyles :: struct {
-    count_styles:     u16,
-    supported_styles: [^]XIMStyle,
+	count_styles:     u16,
+	supported_styles: [^]XIMStyle,
 }
 
 XVaNestedList :: distinct rawptr
 
 XIMCallback :: struct {
-    client_data: rawptr,
-    callback:    XIMProc,
+	client_data: rawptr,
+	callback:    XIMProc,
 }
 
 XICCallback :: struct {
-    client_data: rawptr,
-    callback:    XICProc,
+	client_data: rawptr,
+	callback:    XICProc,
 }
 
 XIMFeedback :: uint
 
 XIMText :: struct {
-    length:            u16,
-    feedback:          ^XIMFeedback,
-    encoding_is_wchar: b32,
-    string: struct #raw_union {
+	length:            u16,
+	feedback:          ^XIMFeedback,
+	encoding_is_wchar: b32,
+	string: struct #raw_union {
 		multi_byte: [^]u8,
 		wide_char:  [^]rune,
-    },
+	},
 }
 
 XIMPreeditState :: uint
 
 XIMPreeditStateNotifyCallbackStruct :: struct {
-    state: XIMPreeditState,
+	state: XIMPreeditState,
 }
 
 XIMResetState :: uint
@@ -914,13 +914,13 @@ XIMResetState :: uint
 XIMStringConversionFeedback :: uint
 
 XIMStringConversionText :: struct {
-    length: u16,
-    feedback: ^XIMStringConversionFeedback,
-    encoding_is_wchar: b32,
-    string: struct #raw_union {
+	length: u16,
+	feedback: ^XIMStringConversionFeedback,
+	encoding_is_wchar: b32,
+	string: struct #raw_union {
 		mbs: [^]u8,
 		wcs: [^]rune,
-    },
+	},
 }
 
 XIMStringConversionPosition  :: u16
@@ -928,76 +928,76 @@ XIMStringConversionType      :: u16
 XIMStringConversionOperation :: u16
 
 XIMCaretDirection :: enum i32 {
-    XIMForwardChar      = 0,
-    XIMBackwardChar     = 1,
-    XIMForwardWord      = 2,
-    XIMBackwardWord     = 3,
-    XIMCaretUp          = 4,
-    XIMCaretDown        = 5,
-    XIMNextLine         = 6,
-    XIMPreviousLine     = 7,
-    XIMLineStart        = 8,
-    XIMLineEnd          = 9,
-    XIMAbsolutePosition = 10,
-    XIMDontChang        = 11,
+	XIMForwardChar      = 0,
+	XIMBackwardChar     = 1,
+	XIMForwardWord      = 2,
+	XIMBackwardWord     = 3,
+	XIMCaretUp          = 4,
+	XIMCaretDown        = 5,
+	XIMNextLine         = 6,
+	XIMPreviousLine     = 7,
+	XIMLineStart        = 8,
+	XIMLineEnd          = 9,
+	XIMAbsolutePosition = 10,
+	XIMDontChang        = 11,
 }
 
 XIMStringConversionCallbackStruct :: struct {
-    position:  XIMStringConversionPosition,
-    direction: XIMCaretDirection,
-    operation: XIMStringConversionOperation,
-    factor:    u16,
-    text:      ^XIMStringConversionText,
+	position:  XIMStringConversionPosition,
+	direction: XIMCaretDirection,
+	operation: XIMStringConversionOperation,
+	factor:    u16,
+	text:      ^XIMStringConversionText,
 }
 
 XIMPreeditDrawCallbackStruct :: struct {
-    caret:      i32,
-    chg_first:  i32,
-    chg_length: i32,
-    text:       ^XIMText,
+	caret:      i32,
+	chg_first:  i32,
+	chg_length: i32,
+	text:       ^XIMText,
 }
 
 XIMCaretStyle :: enum i32 {
-    XIMIsInvisible,
-    XIMIsPrimary,
-    XIMIsSecondary,
+	XIMIsInvisible,
+	XIMIsPrimary,
+	XIMIsSecondary,
 }
 
 XIMPreeditCaretCallbackStruct :: struct {
-    position:  i32,
-    direction: XIMCaretDirection,
-    style:     XIMCaretStyle,
+	position:  i32,
+	direction: XIMCaretDirection,
+	style:     XIMCaretStyle,
 }
 
 XIMStatusDataType :: enum {
-    XIMTextType,
-    XIMBitmapType,
+	XIMTextType,
+	XIMBitmapType,
 }
 
 XIMStatusDrawCallbackStruct :: struct {
-    type: XIMStatusDataType,
-    data: struct #raw_union {
+	type: XIMStatusDataType,
+	data: struct #raw_union {
 		text: ^XIMText,
 		bitmap: Pixmap,
-    },
+	},
 }
 
 XIMHotKeyTrigger :: struct {
-    keysym:        KeySym,
-    modifier:      i32,
-    modifier_mask: i32,
+	keysym:        KeySym,
+	modifier:      i32,
+	modifier_mask: i32,
 }
 
 XIMHotKeyTriggers :: struct {
-    num_hot_key: i32,
-    key:         [^]XIMHotKeyTrigger,
+	num_hot_key: i32,
+	key:         [^]XIMHotKeyTrigger,
 }
 
 XIMHotKeyState :: uint
 
 XIMValuesList :: struct {
-    count_values: u16,
-    supported_values: [^]cstring,
+	count_values: u16,
+	supported_values: [^]cstring,
 }
 
 XConnectionWatchProc :: #type proc "c" (
@@ -1775,62 +1775,62 @@ XcmsColorFormat :: uint
 XcmsFloat :: f64
 
 XcmsRGB :: struct {
-    red:   u16,
-    green: u16,
-    blue:  u16,
+	red:   u16,
+	green: u16,
+	blue:  u16,
 }
 
 XcmsRGBi :: struct {
-    red:   XcmsFloat,
-    green: XcmsFloat,
-    blue:  XcmsFloat,
+	red:   XcmsFloat,
+	green: XcmsFloat,
+	blue:  XcmsFloat,
 }
 
 XcmsCIEXYZ :: struct {
-    X: XcmsFloat,
-    Y: XcmsFloat,
-    Z: XcmsFloat,
+	X: XcmsFloat,
+	Y: XcmsFloat,
+	Z: XcmsFloat,
 }
 
 XcmsCIEuvY :: struct {
-    u_prime: XcmsFloat,
-    v_prime: XcmsFloat,
-    Y:       XcmsFloat,
+	u_prime: XcmsFloat,
+	v_prime: XcmsFloat,
+	Y:       XcmsFloat,
 }
 
 XcmsCIExyY :: struct {
-    x: XcmsFloat,
-    y: XcmsFloat,
-    Y: XcmsFloat,
+	x: XcmsFloat,
+	y: XcmsFloat,
+	Y: XcmsFloat,
 }
 
 XcmsCIELab :: struct {
-    L_star: XcmsFloat,
-    a_star: XcmsFloat,
-    b_star: XcmsFloat,
+	L_star: XcmsFloat,
+	a_star: XcmsFloat,
+	b_star: XcmsFloat,
 }
 
 XcmsCIELuv :: struct {
-    L_star: XcmsFloat,
-    u_star: XcmsFloat,
-    v_star: XcmsFloat,
+	L_star: XcmsFloat,
+	u_star: XcmsFloat,
+	v_star: XcmsFloat,
 }
 
 XcmsTekHVC :: struct {
-    H: XcmsFloat,
-    V: XcmsFloat,
-    C: XcmsFloat,
+	H: XcmsFloat,
+	V: XcmsFloat,
+	C: XcmsFloat,
 }
 
 XcmsPad :: struct {
-    _: XcmsFloat,
-    _: XcmsFloat,
-    _: XcmsFloat,
-    _: XcmsFloat,
+	_: XcmsFloat,
+	_: XcmsFloat,
+	_: XcmsFloat,
+	_: XcmsFloat,
 }
 
 XcmsColor :: struct {
-    spec: struct #raw_union {
+	spec: struct #raw_union {
 		RGB:    XcmsRGB,
 		RGBi:   XcmsRGBi,
 		CIEXYZ: XcmsCIEXYZ,
@@ -1840,17 +1840,17 @@ XcmsColor :: struct {
 		CIELuv: XcmsCIELuv,
 		TekHVC: XcmsTekHVC,
 		_:      XcmsPad,
-    },
-    pixel:  uint,
-    format: XcmsColorFormat,
+	},
+	pixel:  uint,
+	format: XcmsColorFormat,
 }
 
 XcmsPerScrnInfo :: struct {
-    screenWhitePt: XcmsColor,
-    functionSet:   rawptr,
-    screenData:    rawptr,
-    state:         u8,
-    _:             [3]u8,
+	screenWhitePt: XcmsColor,
+	functionSet:   rawptr,
+	screenData:    rawptr,
+	state:         u8,
+	_:             [3]u8,
 }
 
 XcmsCCC :: distinct rawptr
@@ -1872,15 +1872,15 @@ XcmsWhiteAdjustProc :: #type proc "c" (
 	compression: [^]b32) -> Status
 
 XcmsCCCRec :: struct {
-    dpy:                  ^Display,
-    screenNumber:         i32,
-    visual:               ^Visual,
-    clientWhitePt:        XcmsColor,
-    gamutCompProc:        XcmsCompressionProc,
-    gamutCompClientData:  rawptr,
-    whitePtAdjProc:       XcmsWhiteAdjustProc,
-    whitePtAdjClientData: rawptr,
-    pPerScrnInfo:         ^XcmsPerScrnInfo,
+	dpy:                  ^Display,
+	screenNumber:         i32,
+	visual:               ^Visual,
+	clientWhitePt:        XcmsColor,
+	gamutCompProc:        XcmsCompressionProc,
+	gamutCompClientData:  rawptr,
+	whitePtAdjProc:       XcmsWhiteAdjustProc,
+	whitePtAdjClientData: rawptr,
+	pPerScrnInfo:         ^XcmsPerScrnInfo,
 }
 
 XcmsScreenInitProc :: #type proc "c" (
@@ -1909,18 +1909,18 @@ XcmsFuncListPtr    :: [^]XcmsConversionProc
 XcmsParseStringProc :: #type proc "c" (color_string: cstring, color: ^XcmsColor) -> i32
 
 XcmsColorSpace :: struct {
-    prefix:        cstring,
-    id:            XcmsColorFormat,
-    parseString:   XcmsParseStringProc,
-    to_CIEXYZ:     XcmsFuncListPtr,
-    from_CIEXYZ:   XcmsFuncListPtr,
-    inverse_flag:  i32,
+	prefix:        cstring,
+	id:            XcmsColorFormat,
+	parseString:   XcmsParseStringProc,
+	to_CIEXYZ:     XcmsFuncListPtr,
+	from_CIEXYZ:   XcmsFuncListPtr,
+	inverse_flag:  i32,
 }
 
 XcmsFunctionSet :: struct {
-    DDColorSpaces: [^]^XcmsColorSpace,
-    screenInitProc: XcmsScreenInitProc,
-    screenFreeProc: XcmsScreenFreeProc,
+	DDColorSpaces: [^]^XcmsColorSpace,
+	screenInitProc: XcmsScreenInitProc,
+	screenFreeProc: XcmsScreenFreeProc,
 }
 
 
@@ -1958,18 +1958,18 @@ XWMHints :: struct {
 }
 
 XTextProperty :: struct {
-    value:         [^]u8,
-    encoding:      Atom,
-    format:        int,
-    nitems:        uint,
+	value:         [^]u8,
+	encoding:      Atom,
+	format:        int,
+	nitems:        uint,
 }
 
 XICCEncodingStyle :: enum i32 {
-    XStringStyle,
-    XCompoundTextStyle,
-    XTextStyle,
-    XStdICCTextStyle,
-    XUTF8StringStyle,
+	XStringStyle,
+	XCompoundTextStyle,
+	XTextStyle,
+	XStdICCTextStyle,
+	XUTF8StringStyle,
 }
 
 XIconSize :: struct {
@@ -1987,8 +1987,8 @@ XClassHint :: struct {
 }
 
 XComposeStatus :: struct {
-    compose_ptr:   rawptr,
-    chars_matched: i32,
+	compose_ptr:   rawptr,
+	chars_matched: i32,
 }
 
 Region :: distinct rawptr
@@ -2041,8 +2041,8 @@ XrmClassList      :: XrmQuarkList
 XrmRepresentation :: XrmQuark
 
 XrmValue :: struct {
-    size: u32,
-    addr: rawptr,
+	size: u32,
+	addr: rawptr,
 }
 XrmValuePtr   :: [^]XrmValue
 
@@ -2052,21 +2052,21 @@ XrmSearchList :: [^]XrmHashTable
 XrmDatabase   :: distinct rawptr
 
 XrmOptionKind :: enum {
-    XrmoptionNoArg,
-    XrmoptionIsArg,
-    XrmoptionStickyArg,
-    XrmoptionSepArg,
-    XrmoptionResArg,
-    XrmoptionSkipArg,
-    XrmoptionSkipLine,
-    XrmoptionSkipNArgs,
+	XrmoptionNoArg,
+	XrmoptionIsArg,
+	XrmoptionStickyArg,
+	XrmoptionSepArg,
+	XrmoptionResArg,
+	XrmoptionSkipArg,
+	XrmoptionSkipLine,
+	XrmoptionSkipNArgs,
 }
 
 XrmOptionDescRec :: struct {
-    option:    cstring,
-    specifier: cstring,
-    argKind:   XrmOptionKind,
-    value:     rawptr,
+	option:    cstring,
+	specifier: cstring,
+	argKind:   XrmOptionKind,
+	value:     rawptr,
 }
 
 XrmOptionDescList :: [^]XrmOptionDescRec

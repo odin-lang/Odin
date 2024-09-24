@@ -1180,11 +1180,15 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				      LIT(article),
 				      LIT(context_name));
 			} else {
+				ERROR_BLOCK();
 				error(operand->expr,
 				      "Cannot assign '%s', a type, to %.*s%.*s",
 				      op_type_str,
 				      LIT(article),
 				      LIT(context_name));
+				if (type && are_types_identical(type, t_any)) {
+					error_line("\tSuggestion: 'typeid_of(%s)'", expr_str);
+				}
 			}
 			break;
 		default:
@@ -2571,6 +2575,84 @@ gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 	return o->mode != Addressing_Variable && o->mode != Addressing_SoaVariable;
 }
 
+gb_internal ExactValue exact_bit_set_all_set_mask(Type *type) {
+	type = base_type(type);
+	GB_ASSERT(type->kind == Type_BitSet);
+
+	i64 lower = type->BitSet.lower;
+	i64 upper = type->BitSet.upper;
+	Type *elem = type->BitSet.elem;
+	Type *underlying = type->BitSet.underlying;
+	bool is_backed = underlying != nullptr;
+	gb_unused(is_backed);
+
+	BigInt b_lower = {};
+	BigInt b_upper = {};
+	big_int_from_i64(&b_lower, lower);
+	big_int_from_i64(&b_upper, upper);
+
+
+	BigInt one = {};
+	big_int_from_u64(&one, 1);
+
+	BigInt mask = {};
+
+	if (elem == nullptr) {
+		big_int_from_i64(&mask, -1);
+	} else if (is_type_enum(elem)) {
+		Type *e = base_type(elem);
+		GB_ASSERT(e->kind == Type_Enum);
+		gb_unused(e);
+
+		if ((big_int_cmp(&e->Enum.min_value->value_integer, &b_lower) == 0 || is_backed) &&
+		    big_int_cmp(&e->Enum.max_value->value_integer, &b_upper) == 0) {
+
+			i64 lower_base = is_backed ? gb_min(0, lower) : lower;
+			BigInt b_lower_base = {};
+			big_int_from_i64(&b_lower_base, lower_base);
+
+			for (Entity *f : e->Enum.fields) {
+				if (f->kind != Entity_Constant) {
+					continue;
+				}
+				if (f->Constant.value.kind != ExactValue_Integer) {
+					continue;
+				}
+
+				BigInt shift_amount = f->Constant.value.value_integer;
+				big_int_sub_eq(&shift_amount, &b_lower_base);
+
+
+				BigInt value = {};
+				big_int_shl(&value, &one, &shift_amount);
+
+				big_int_or(&mask, &mask, &value);
+			}
+
+		} else {
+			// TODO(bill): enum range based");
+			big_int_from_i64(&mask, -1);
+		}
+	} else {
+		i64 lower_base = lower;
+		for (i64 x = lower; x <= upper; x++) {
+			BigInt shift_amount = {};
+			big_int_from_i64(&shift_amount, x - lower_base);
+
+			BigInt value = {};
+			big_int_shl(&value, &one, &shift_amount);
+
+			big_int_or(&mask, &mask, &value);
+		}
+	}
+
+
+	ExactValue res = {};
+	res.kind = ExactValue_Integer;
+	res.value_integer = mask;
+	return res;
+}
+
 gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
@@ -2710,6 +2792,10 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 		}
 
 		o->value = exact_unary_operator_value(op.kind, o->value, precision, is_unsigned);
+		if (op.kind == Token_Xor && is_type_bit_set(type)) {
+			ExactValue mask = exact_bit_set_all_set_mask(type);
+			o->value = exact_binary_operator_value(Token_And, o->value, mask);
+		}
 
 		if (is_type_typed(type)) {
 			if (node != nullptr) {
@@ -3526,10 +3612,11 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		if (are_types_identical(src_bt, dst_bt)) {
 			return true;
 		}
-		if (is_type_integer(src_t) && is_type_integer(dst_t)) {
+		if ((is_type_integer(src_t) && is_type_integer(dst_t)) ||
+		    is_type_integer(src_t) && is_type_bit_set(dst_t)) {
 			if (types_have_same_internal_endian(src_t, dst_t)) {
 				ExactValue src_v = exact_value_to_integer(o->value);
-				GB_ASSERT(src_v.kind == ExactValue_Integer);
+				GB_ASSERT(src_v.kind == ExactValue_Integer || src_v.kind == ExactValue_Invalid);
 				BigInt v = src_v.value_integer;
 
 				BigInt smax = {};
@@ -3782,10 +3869,10 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		// NOTE(bill): Allow comparisons between types
 		if (is_ise_expr(be->left)) {
 			// Evalute the right before the left for an '.X' expression
-			check_expr_or_type(c, y, be->right, type_hint);
+			check_expr_or_type(c, y, be->right, nullptr /* ignore type hint */);
 			check_expr_or_type(c, x, be->left, y->type);
 		} else {
-			check_expr_or_type(c, x, be->left, type_hint);
+			check_expr_or_type(c, x, be->left, nullptr /* ignore type hint */);
 			check_expr_or_type(c, y, be->right, x->type);
 		}
 		bool xt = x->mode == Addressing_Type;
@@ -4516,7 +4603,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				    (operand->value.kind == ExactValue_Integer ||
 				     operand->value.kind == ExactValue_Float)) {
 					operand->mode = Addressing_Value;
-					target_type = t_untyped_nil;
+					// target_type = t_untyped_nil;
 				     	operand->value = empty_exact_value;
 					update_untyped_expr_value(c, operand->expr, operand->value);
 					break;
@@ -4658,7 +4745,8 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 	check_expr_with_type_hint(c, &operand, index_value, type_hint);
 	if (operand.mode == Addressing_Invalid) {
 		if (value) *value = 0;
-		return false;
+		// NOTE(bill): return true here to propagate the errors better
+		return true;
 	}
 
 	Type *index_type = t_int;
@@ -4879,7 +4967,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 							TypeAndValue tav = fv->value->tav;
 							if (success_) *success_ = true;
 							if (finish_) *finish_ = false;
-							return tav.value;;
+							return tav.value;
 						}
 					}
 
@@ -4954,7 +5042,6 @@ gb_internal ExactValue get_constant_field(CheckerContext *c, Operand const *oper
 				return value;
 			}
 		}
-
 		if (success_) *success_ = true;
 		return value;
 	} else if (value.kind == ExactValue_Quaternion) {
@@ -5652,7 +5739,7 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 gb_internal bool check_no_copy_assignment(Operand const &o, String const &context) {
 	if (o.type && is_type_no_copy(o.type)) {
 		Ast *expr = unparen_expr(o.expr);
-		if (expr && o.mode != Addressing_Constant) {
+		if (expr && o.mode != Addressing_Constant && o.mode != Addressing_Type) {
 			if (expr->kind == Ast_CallExpr) {
 				// Okay
 			} else {
@@ -6117,22 +6204,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
 					o.type = vt->type;
-
-					// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
-					if (c->decl) {
-						bool found = false;
-						for (auto &vr : c->decl->variadic_reuses) {
-							if (are_types_identical(vt->type, vr.slice_type)) {
-								vr.max_count = gb_max(vr.max_count, variadic_operands.count);
-								found = true;
-								break;
-							}
-						}
-						if (!found) {
-							array_add(&c->decl->variadic_reuses, VariadicReuseData{vt->type, variadic_operands.count});
-						}
-					}
-
 				} else {
 					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
@@ -6325,6 +6396,23 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				}
 			}
 			score += eval_param_and_score(c, o, t, err, true, var_entity, show_error);
+		}
+
+		if (!vari_expand && variadic_operands.count != 0) {
+			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
+			if (c->decl) {
+				bool found = false;
+				for (auto &vr : c->decl->variadic_reuses) {
+					if (are_types_identical(slice, vr.slice_type)) {
+						vr.max_count = gb_max(vr.max_count, variadic_operands.count);
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					array_add(&c->decl->variadic_reuses, VariadicReuseData{slice, variadic_operands.count});
+				}
+			}
 		}
 	}
 
@@ -7625,7 +7713,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			gbString s = gb_string_make_reserve(heap_allocator(), e->token.string.len+3);
 			s = gb_string_append_fmt(s, "%.*s(", LIT(e->token.string));
 
-			TypeTuple *tuple = get_record_polymorphic_params(e->type);
+			TypeTuple *tuple = get_record_polymorphic_params(bt);
 			if (tuple != nullptr) for_array(i, tuple->variables) {
 				Entity *v = tuple->variables[i];
 				String name = v->token.string;
@@ -7640,8 +7728,10 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 						s = write_type_to_string(s, v->type, false);
 					}
 				} else if (v->kind == Entity_Constant) {
-					s = gb_string_append_fmt(s, "=");
-					s = write_exact_value_to_string(s, v->Constant.value);
+					if (v->Constant.value.kind != ExactValue_Invalid) {
+						s = gb_string_append_fmt(s, "=");
+						s = write_exact_value_to_string(s, v->Constant.value);
+					}
 				}
 			}
 			s = gb_string_append_fmt(s, ")");
@@ -7717,7 +7807,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		    name == "load" ||
 		    name == "load_directory" ||
 		    name == "load_hash" ||
-		    name == "hash"
+		    name == "hash" ||
+		    name == "caller_expression"
 		) {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
@@ -7997,7 +8088,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
 					String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
 					if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
+						ERROR_BLOCK();
 						error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
+
+						error_line("\tSuggested Example: @(enable_target_feature=\"%.*s\")\n", LIT(invalid));
 					}
 				}
 			}
@@ -8632,6 +8726,10 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		error(node, "#caller_location may only be used as a default argument parameter");
 		o->type = t_source_code_location;
 		o->mode = Addressing_Value;
+	} else if (name == "caller_expression") {
+		error(node, "#caller_expression may only be used as a default argument parameter");
+		o->type = t_string;
+		o->mode = Addressing_Value;
 	} else {
 		if (name == "location") {
 			init_core_source_code_location(c->checker);
@@ -9033,6 +9131,10 @@ gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *no
 	}
 
 	if (label != nullptr) {
+		if (c->in_defer) {
+			error(label, "A labelled '%.*s' cannot be used within a 'defer'", LIT(name));
+			return Expr_Expr;
+		}
 		if (label->kind != Ast_Ident) {
 			error(label, "A branch statement's label name must be an identifier");
 			return Expr_Expr;
@@ -10055,6 +10157,22 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					is_constant = o->mode == Addressing_Constant;
 				}
 
+				if (elem->kind == Ast_BinaryExpr) {
+					switch (elem->BinaryExpr.op.kind) {
+					case Token_Or:
+						{
+							gbString x = expr_to_string(elem->BinaryExpr.left);
+							gbString y = expr_to_string(elem->BinaryExpr.right);
+							gbString e = expr_to_string(elem);
+							error(elem, "Was the following intended? '%s, %s'; if not, surround the expression with parentheses '(%s)'", x, y, e);
+							gb_string_free(e);
+							gb_string_free(y);
+							gb_string_free(x);
+						}
+						break;
+					}
+				}
+
 				check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
 				if (o->mode == Addressing_Constant) {
 					i64 lower = t->BitSet.lower;
@@ -10063,7 +10181,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					if (lower <= v && v <= upper) {
 						// okay
 					} else {
-						error(elem, "Bit field value out of bounds, %lld not in the range %lld .. %lld", v, lower, upper);
+						gbString s = expr_to_string(o->expr);
+						error(elem, "Bit field value out of bounds, %s (%lld) not in the range %lld .. %lld", s, v, lower, upper);
+						gb_string_free(s);
 						continue;
 					}
 				}
@@ -10544,7 +10664,8 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->expr = node;
 			return kind;
 		} else if (ok && !is_type_matrix(t)) {
-			ExactValue value = type_and_value_of_expr(ie->expr).value;
+			TypeAndValue tav = type_and_value_of_expr(ie->expr);
+			ExactValue value = tav.value;
 			o->mode = Addressing_Constant;
 			bool success = false;
 			bool finish = false;
@@ -10821,7 +10942,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		case Token_context:
 			{
 				if (c->proc_name.len == 0 && c->curr_proc_sig == nullptr) {
-					error(node, "'context' is only allowed within procedures %p", c->curr_proc_decl);
+					error(node, "'context' is only allowed within procedures");
 					return kind;
 				}
 				if (unparen_expr(c->assignment_lhs_hint) == node) {

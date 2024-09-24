@@ -338,7 +338,7 @@ foreign lib {
 	node_set_list_tight :: proc(node: ^Node, tight: b32) -> (success: b32) ---
 
 	// Returns the info string from a fenced code block.
-	get_fence_info :: proc(node: ^Node) -> (fence_info: cstring) ---
+	node_get_fence_info :: proc(node: ^Node) -> (fence_info: cstring) ---
 
 	// Sets the info string in a fenced code block, returning `true` on success and `false` on failure.
 	node_set_fence_info :: proc(node: ^Node, fence_info: cstring) -> (success: b32) ---

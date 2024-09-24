@@ -206,7 +206,7 @@ ENOPROTOOPT     :: _Platform_Error.ENOPROTOOPT
 EPROTONOSUPPORT :: _Platform_Error.EPROTONOSUPPORT
 ESOCKTNOSUPPORT :: _Platform_Error.ESOCKTNOSUPPORT
 ENOTSUP         :: _Platform_Error.ENOTSUP
-EOPNOTSUPP 	:: _Platform_Error.EOPNOTSUPP
+EOPNOTSUPP 	    :: _Platform_Error.EOPNOTSUPP
 EPFNOSUPPORT    :: _Platform_Error.EPFNOSUPPORT
 EAFNOSUPPORT    :: _Platform_Error.EAFNOSUPPORT
 EADDRINUSE      :: _Platform_Error.EADDRINUSE
@@ -812,10 +812,21 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	assert(fd != -1)
+	switch whence {
+	case SEEK_SET, SEEK_CUR, SEEK_END:
+		break
+	case:
+		return 0, .Invalid_Whence
+	}
 
 	final_offset := i64(_unix_lseek(fd, int(offset), c.int(whence)))
 	if final_offset == -1 {
-		return 0, get_last_error()
+		errno := get_last_error()
+		switch errno {
+		case .EINVAL:
+			return 0, .Invalid_Offset
+		}
+		return 0, errno
 	}
 	return final_offset, nil
 }
@@ -1119,7 +1130,8 @@ unset_env :: proc(key: string) -> Error {
 }
 
 @(require_results)
-get_current_directory :: proc() -> string {
+get_current_directory :: proc(allocator := context.allocator) -> string {
+	context.allocator = allocator
 	page_size := get_page_size() // NOTE(tetra): See note in os_linux.odin/get_current_directory.
 	buf := make([dynamic]u8, page_size)
 	for {

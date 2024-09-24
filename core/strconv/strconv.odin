@@ -7,11 +7,11 @@ Parses a boolean value from the input string
 
 **Inputs**  
 - s: The input string  
-  - true: "1", "t", "T", "true", "TRUE", "True"
-  - false: "0", "f", "F", "false", "FALSE", "False"
+	- true: "1", "t", "T", "true", "TRUE", "True"
+	- false: "0", "f", "F", "false", "FALSE", "False"
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
-**Returns**  
+**Returns**
 - result: The parsed boolean value (default: false)
 - ok: A boolean indicating whether the parsing was successful
 */
@@ -29,7 +29,7 @@ parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool)
 /*
 Finds the integer value of the given rune
 
-**Inputs**  
+**Inputs**
 - r: The input rune to find the integer value of
 
 **Returns**   The integer value of the given rune
@@ -47,7 +47,7 @@ _digit_value :: proc(r: rune) -> int {
 /*
 Parses an integer value from the input string in the given base, without a prefix
 
-**Inputs**  
+**Inputs**
 - str: The input string to parse the integer value from
 - base: The base of the integer value to be parsed (must be between 1 and 16)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
@@ -65,7 +65,7 @@ Output:
 
 	-1234 false
 
-**Returns**  
+**Returns**
 - value: Parses an integer value from a string, in the given base, without a prefix.
 - ok: ok=false if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
@@ -117,12 +117,12 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 /*
 Parses an integer value from the input string in base 10, unless there's a prefix
 
-**Inputs**  
+**Inputs**
 - str: The input string to parse the integer value from
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
-	
+
 	import "core:fmt"
 	import "core:strconv"
 	parse_i64_maybe_prefixed_example :: proc() {
@@ -132,13 +132,13 @@ Example:
 		n, ok = strconv.parse_i64_maybe_prefixed("0xeeee")
 		fmt.println(n,ok)
 	}
-	
+
 Output:
 
 	1234 true
 	61166 true
 
-**Returns**  
+**Returns**
 - value: The parsed integer value
 - ok: ok=false if a valid integer could not be found, or if the input string contained more than just the number.
 */
@@ -200,14 +200,14 @@ parse_i64 :: proc{parse_i64_maybe_prefixed, parse_i64_of_base}
 /*
 Parses an unsigned 64-bit integer value from the input string without a prefix, using the specified base
 
-**Inputs**  
+**Inputs**
 - str: The input string to parse
 - base: The base of the number system to use for parsing
-  - Must be between 1 and 16 (inclusive)
+	- Must be between 1 and 16 (inclusive)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
-	
+
 	import "core:fmt"
 	import "core:strconv"
 	parse_u64_of_base_example :: proc() {
@@ -217,13 +217,13 @@ Example:
 		n, ok = strconv.parse_u64_of_base("5678eee",16)
 		fmt.println(n,ok)
 	}
-	
+
 Output:
 
 	1234 false
 	90672878 true
 
-**Returns**  
+**Returns**
 - value: The parsed uint64 value
 - ok: A boolean indicating whether the parsing was successful
 */
@@ -261,15 +261,15 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 /*
 Parses an unsigned 64-bit integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**  
+**Inputs**
 - str: The input string to parse
 - base: The base of the number system to use for parsing (default: 0)
-  - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
-  - If base is not 0, it will be used for parsing regardless of any prefix in the input string
+	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
+	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
-	
+
 	import "core:fmt"
 	import "core:strconv"
 	parse_u64_maybe_prefixed_example :: proc() {
@@ -279,13 +279,13 @@ Example:
 		n, ok = strconv.parse_u64_maybe_prefixed("0xee")
 		fmt.println(n,ok)
 	}
-	
+
 Output:
 
 	1234 true
 	238 true
 
-**Returns**  
+**Returns**
 - value: The parsed uint64 value
 - ok: ok=false if a valid integer could not be found, if the value was negative, or if the input string contained more than just the number.
 */
@@ -336,14 +336,14 @@ parse_u64 :: proc{parse_u64_maybe_prefixed, parse_u64_of_base}
 /*
 Parses a signed integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**  
+**Inputs**
 - s: The input string to parse
 - base: The base of the number system to use for parsing (default: 0)
-  - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
-  - If base is not 0, it will be used for parsing regardless of any prefix in the input string
+	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
+	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
 
 Example:
-	
+
 	import "core:fmt"
 	import "core:strconv"
 	parse_int_example :: proc() {
@@ -356,14 +356,14 @@ Example:
 		n, ok = strconv.parse_int("0xffff") // with prefix and inferred base
 		fmt.println(n,ok)
 	}
-	
+
 Output:
 
 	1234 true
 	65535 true
 	65535 true
 
-**Returns**  
+**Returns**
 - value: The parsed int value
 - ok: `false` if no appropriate value could be found, or if the input string contained more than just the number.
 */
@@ -379,11 +379,11 @@ parse_int :: proc(s: string, base := 0, n: ^int = nil) -> (value: int, ok: bool)
 /*
 Parses an unsigned integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**  
+**Inputs**
 - s: The input string to parse
 - base: The base of the number system to use for parsing (default: 0, inferred)
-  - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
-  - If base is not 0, it will be used for parsing regardless of any prefix in the input string
+	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
+	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
 
 Example:
 	
@@ -1729,7 +1729,7 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 		}
 	}
 
-	if buf == nil {
+	if buf == nil || r < 0 {
 		return ""
 	}
 

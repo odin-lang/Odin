@@ -1,5 +1,5 @@
+#+build linux
 package net
-// +build linux
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
@@ -200,6 +200,19 @@ _listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (TCP_Socket, Network
 		return cast(TCP_Socket) os_sock, Listen_Error(errno)
 	}
 	return cast(TCP_Socket) os_sock, nil
+}
+
+@(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	addr: linux.Sock_Addr_Any
+	errno := linux.getsockname(_unwrap_os_socket(sock), &addr)
+	if errno != .NONE {
+		err = Listen_Error(errno)
+		return
+	}
+
+	ep = _wrap_os_addr(addr)
+	return
 }
 
 @(private)

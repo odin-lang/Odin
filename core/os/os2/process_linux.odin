@@ -1,5 +1,5 @@
-//+build linux
-//+private file
+#+build linux
+#+private file
 package os2
 
 import "base:runtime"
@@ -490,7 +490,6 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	if errno = linux.pipe2(&child_pipe_fds, {.CLOEXEC}); errno != .NONE {
 		return process, _get_platform_error(errno)
 	}
-	defer linux.close(child_pipe_fds[WRITE])
 	defer linux.close(child_pipe_fds[READ])
 
 
@@ -508,6 +507,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	//
 	pid: linux.Pid
 	if pid, errno = linux.fork(); errno != .NONE {
+		linux.close(child_pipe_fds[WRITE])
 		return process, _get_platform_error(errno)
 	}
 
@@ -573,25 +573,19 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 		}
 
-		success_byte: [1]u8
-		linux.write(child_pipe_fds[WRITE], success_byte[:])
-
 		errno = linux.execveat(exe_fd, "", &cargs[0], env, {.AT_EMPTY_PATH})
-
-		// NOTE: we can't tell the parent about this failure because we already wrote the success byte.
-		// So if this happens the user will just see the process failed when they call process_wait.
-
 		assert(errno != nil)
-		intrinsics.trap()
+		write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 	}
+
+	linux.close(child_pipe_fds[WRITE])
 
 	process.pid = int(pid)
 
-	n: int
 	child_byte: [1]u8
 	errno = .EINTR
 	for errno == .EINTR {
-		n, errno = linux.read(child_pipe_fds[READ], child_byte[:])
+		_, errno = linux.read(child_pipe_fds[READ], child_byte[:])
 	}
 
 	// If the read failed, something weird happened. Do not return the read

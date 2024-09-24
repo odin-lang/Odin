@@ -1,4 +1,4 @@
-//+build arm32, arm64
+#+build arm32, arm64
 package sysinfo
 
 import "core:sys/unix"

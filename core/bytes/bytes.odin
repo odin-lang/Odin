@@ -334,7 +334,7 @@ Inputs:
 Returns:
 - index: The index of the byte `c`, or -1 if it was not found.
 */
-index_byte :: proc(s: []byte, c: byte) -> (index: int) #no_bounds_check {
+index_byte :: proc "contextless" (s: []byte, c: byte) -> (index: int) #no_bounds_check {
 	i, l := 0, len(s)
 
 	// Guard against small strings.  On modern systems, it is ALWAYS
@@ -469,18 +469,16 @@ Inputs:
 Returns:
 - index: The index of the byte `c`, or -1 if it was not found.
 */
-last_index_byte :: proc(s: []byte, c: byte) -> int #no_bounds_check {
+last_index_byte :: proc "contextless" (s: []byte, c: byte) -> int #no_bounds_check {
 	i := len(s)
 
 	// Guard against small strings.  On modern systems, it is ALWAYS
 	// worth vectorizing assuming there is a hardware vector unit, and
 	// the data size is large enough.
 	if i < SIMD_REG_SIZE_128 {
-		if i > 0 { // Handle s == nil.
-			for /**/; i >= 0; i -= 1 {
-				if s[i] == c {
-					return i
-				}
+		#reverse for ch, j in s {
+			if ch == c {
+				return j
 			}
 		}
 		return -1

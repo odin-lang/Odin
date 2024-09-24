@@ -1,4 +1,4 @@
-//+vet !using-param
+#+vet !using-param
 package fontstash
 
 import "base:runtime"

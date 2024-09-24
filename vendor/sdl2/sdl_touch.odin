@@ -19,10 +19,10 @@ TouchDeviceType :: enum c.int {
 }
 
 Finger :: struct {
-    id: FingerID,
-    x:        f32,
-    y:        f32,
-    pressure: f32,
+	id: FingerID,
+	x:        f32,
+	y:        f32,
+	pressure: f32,
 }
 
 TOUCH_MOUSEID  :: ~u32(0)

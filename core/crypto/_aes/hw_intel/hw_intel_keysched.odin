@@ -20,7 +20,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-//+build amd64
+#+build amd64
 package aes_hw_intel
 
 import "base:intrinsics"

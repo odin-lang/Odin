@@ -241,7 +241,7 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 			written += fmt.wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
 
 			if len(doc.doctype.rest) > 0 {
-			 	fmt.wprintf(writer, "\t%v\n", doc.doctype.rest)
+				fmt.wprintf(writer, "\t%v\n", doc.doctype.rest)
 			}
 		}
 
@@ -250,10 +250,10 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 		}
 
 		if doc.element_count > 0 {
-		 	fmt.wprintln(writer, " --- ")
-		 	print_element(writer, doc, 0)
-		 	fmt.wprintln(writer, " --- ")
-		 }
+			fmt.wprintln(writer, " --- ")
+			print_element(writer, doc, 0)
+			fmt.wprintln(writer, " --- ")
+		}
 
 		return written, .None
 	}

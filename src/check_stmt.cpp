@@ -199,6 +199,9 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 		}
 		break;
 
+	case Ast_DeferStmt:
+		return check_has_break(stmt->DeferStmt.stmt, label, implicit);
+
 	case Ast_BlockStmt:
 		return check_has_break_list(stmt->BlockStmt.stmts, label, implicit);
 
@@ -1638,6 +1641,8 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 	Ast *expr = unparen_expr(rs->expr);
 
+	Operand rhs_operand = {};
+
 	bool is_range = false;
 	bool is_possibly_addressable = true;
 	isize max_val_count = 2;
@@ -1695,7 +1700,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					}
 				}
 			}
-			bool is_ptr = type_deref(operand.type);
+			bool is_ptr = is_type_pointer(operand.type);
 			Type *t = base_type(type_deref(operand.type));
 
 			switch (t->kind) {
@@ -1735,6 +1740,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				break;
 
 			case Type_EnumeratedArray:
+				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
 				array_add(&vals, t->EnumeratedArray.elem);
 				array_add(&vals, t->EnumeratedArray.index);
 				break;
@@ -1746,16 +1752,19 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				break;
 
 			case Type_DynamicArray:
+				is_possibly_addressable = true;
 				array_add(&vals, t->DynamicArray.elem);
 				array_add(&vals, t_int);
 				break;
 
 			case Type_Slice:
+				is_possibly_addressable = true;
 				array_add(&vals, t->Slice.elem);
 				array_add(&vals, t_int);
 				break;
 
 			case Type_Map:
+				is_possibly_addressable = true;
 				is_map = true;
 				array_add(&vals, t->Map.key);
 				array_add(&vals, t->Map.value);
@@ -1777,6 +1786,8 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 			case Type_Tuple:
 				{
+					is_possibly_addressable = false;
+
 					isize count = t->Tuple.variables.count;
 					if (count < 1) {
 						ERROR_BLOCK();
@@ -1806,8 +1817,6 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						array_add(&vals, e->type);
 					}
 
-					is_possibly_addressable = false;
-
 					bool do_break = false;
 					for (isize i = rs->vals.count-1; i >= 0; i--) {
 						if (rs->vals[i] != nullptr && count < i+2) {
@@ -1827,6 +1836,11 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 			case Type_Struct:
 				if (t->Struct.soa_kind != StructSoa_None) {
+					if (t->Struct.soa_kind == StructSoa_Fixed) {
+						is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
+					} else {
+						is_possibly_addressable = true;
+					}
 					is_soa = true;
 					array_add(&vals, t->Struct.soa_elem);
 					array_add(&vals, t_int);
@@ -1903,7 +1917,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
 					} else {
-						char const *idx_name = is_map ? "key" : is_bit_set ? "element" : "index";
+						char const *idx_name = is_map ? "key" : (is_bit_set || i == 0) ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
 					}
 				}
@@ -2706,6 +2720,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 				error(bs->label, "A branch statement's label name must be an identifier");
 				return;
 			}
+
 			Ast *ident = bs->label;
 			String name = ident->Ident.token.string;
 			Operand o = {};
@@ -2736,6 +2751,10 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 				}
 				break;
 
+			}
+
+			if (ctx->in_defer) {
+				error(bs->label, "A labelled '%.*s' cannot be used within a 'defer'", LIT(token.string));
 			}
 		}
 

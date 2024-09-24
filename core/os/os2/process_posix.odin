@@ -1,5 +1,5 @@
-//+private
-//+build darwin, netbsd, freebsd, openbsd
+#+private
+#+build darwin, netbsd, freebsd, openbsd
 package os2
 
 import "base:runtime"
@@ -139,20 +139,22 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		err = _get_platform_error()
 		return
 	}
-	defer posix.close(pipe[WRITE])
 	defer posix.close(pipe[READ])
 
 	if posix.fcntl(pipe[READ], .SETFD, i32(posix.FD_CLOEXEC)) == -1 {
+		posix.close(pipe[WRITE])
 		err = _get_platform_error()
 		return
 	}
 	if posix.fcntl(pipe[WRITE], .SETFD, i32(posix.FD_CLOEXEC)) == -1 {
+		posix.close(pipe[WRITE])
 		err = _get_platform_error()
 		return
 	}
 
 	switch pid := posix.fork(); pid {
 	case -1:
+		posix.close(pipe[WRITE])
 		err = _get_platform_error()
 		return
 
@@ -179,25 +181,20 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			if posix.chdir(cwd) != .OK { abort(pipe[WRITE]) }
 		}
 
-		ok := u8(0)
-		posix.write(pipe[WRITE], &ok, 1)
-
 		res := posix.execve(strings.to_cstring(&exe_builder), raw_data(cmd), env)
-
-		// NOTE: we can't tell the parent about this failure because we already wrote the success byte.
-		// So if this happens the user will just see the process failed when they call process_wait.
-
 		assert(res == -1)
-		runtime.trap()
+		abort(pipe[WRITE])
 
 	case:
+		posix.close(pipe[WRITE])
+
 		errno: posix.Errno
 		for {
 			errno_byte: u8
 			switch posix.read(pipe[READ], &errno_byte, 1) {
-			case 1:
+			case  1:
 				errno = posix.Errno(errno_byte)
-			case:
+			case -1:
 				errno = posix.errno()
 				if errno == .EINTR {
 					continue

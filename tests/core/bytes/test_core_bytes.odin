@@ -87,3 +87,11 @@ test_index_byte_zero :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_last_index_byte_bounds :: proc(t: ^testing.T) {
+	input := "helloworld.odin."
+	assert(len(input) == 16)
+	idx := bytes.last_index_byte(transmute([]byte)(input[:len(input)-1]), '.')
+	testing.expect_value(t, idx, 10)
+}

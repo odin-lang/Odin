@@ -39,7 +39,7 @@ extern "C" {
 	#endif
 #endif
 
-#if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__64BIT__) || defined(__powerpc64__) || defined(__ppc64__) || defined(__aarch64__)
+#if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__64BIT__) || defined(__powerpc64__) || defined(__ppc64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
 	#ifndef GB_ARCH_64_BIT
 	#define GB_ARCH_64_BIT 1
 	#endif
@@ -144,6 +144,13 @@ extern "C" {
 	#define GB_CACHE_LINE_SIZE 64
 	#endif
 
+#elif defined(__riscv)
+	#ifndef GB_CPU_RISCV
+	#define GB_CPU_RISCV 1
+	#endif
+	#ifndef GB_CACHE_LINE_SIZE
+	#define GB_CACHE_LINE_SIZE 64
+	#endif
 #else
 	#error Unknown CPU Type
 #endif
@@ -2562,7 +2569,7 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 
 	void *dest_copy = dest;
 	__asm__ __volatile__("rep movsb" : "+D"(dest_copy), "+S"(source), "+c"(n) : : "memory");
-#elif defined(GB_CPU_ARM)
+#elif defined(GB_CPU_ARM) || defined(GB_CPU_RISCV)
 	u8 *s = cast(u8 *)source;
 	u8 *d = cast(u8 *)dest;
 	for (isize i = 0; i < n; i++) {
@@ -3188,11 +3195,11 @@ void gb_affinity_init(gbAffinity *a) {
 	a->core_count       = 1;
 	a->threads_per_core = 1;
 
-	if (sysctlbyname("hw.logicalcpu", &count, &count_size, NULL, 0) == 0) {
+	if (sysctlbyname("kern.smp.cpus", &count, &count_size, NULL, 0) == 0) {
 		if (count > 0) {
 			a->thread_count = count;
 			// Get # of physical cores
-			if (sysctlbyname("hw.physicalcpu", &count, &count_size, NULL, 0) == 0) {
+			if (sysctlbyname("kern.smp.cores", &count, &count_size, NULL, 0) == 0) {
 				if (count > 0) {
 					a->core_count = count;
 					a->threads_per_core = a->thread_count / count;
@@ -3202,6 +3209,14 @@ void gb_affinity_init(gbAffinity *a) {
 						a->is_accurate = true;
 				}
 			}
+		}
+	} else if (sysctlbyname("hw.ncpu", &count, &count_size, NULL, 0) == 0) {
+		// SMP disabled or unavailable.
+		if (count > 0) {
+			a->is_accurate      = true;
+			a->thread_count     = count;
+			a->core_count       = count;
+			a->threads_per_core = 1;
 		}
 	}
 
@@ -6266,6 +6281,12 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 		int64_t virtual_timer_value;
 		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
 		return virtual_timer_value;
+	}
+#elif defined(__riscv)
+	gb_inline u64 gb_rdtsc(void) {
+		u64 result = 0;
+		__asm__ volatile("rdcycle %0" : "=r"(result));
+		return result;
 	}
 #else
 #warning "gb_rdtsc not supported"

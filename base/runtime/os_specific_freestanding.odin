@@ -1,5 +1,5 @@
-//+build freestanding
-//+private
+#+build freestanding
+#+private
 package runtime
 
 // TODO(bill): reimplement `os.write`

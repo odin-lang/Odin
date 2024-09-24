@@ -27,6 +27,8 @@ Proc_Calling_Convention :: union {
 Node_State_Flag :: enum {
 	Bounds_Check,
 	No_Bounds_Check,
+	Type_Assert,
+	No_Type_Assert,
 }
 Node_State_Flags :: distinct bit_set[Node_State_Flag]
 
@@ -67,6 +69,7 @@ File :: struct {
 	fullpath: string,
 	src:      string,
 
+	tags: [dynamic]tokenizer.Token,
 	docs: ^Comment_Group,
 
 	pkg_decl:  ^Package_Decl,

@@ -105,9 +105,13 @@ cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
 	append(&t.cleanups, Internal_Cleanup{procedure, user_data, context})
 }
 
-expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bool {
+expect :: proc(t: ^T, ok: bool, msg := "", expr := #caller_expression(ok), loc := #caller_location) -> bool {
 	if !ok {
-		log.error(msg, location=loc)
+		if msg == "" {
+			log.errorf("expected %v to be true", expr, location=loc)
+		} else {
+			log.error(msg, location=loc)
+		}
 	}
 	return ok
 }
@@ -119,10 +123,10 @@ expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_loc
 	return ok
 }
 
-expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> bool where intrinsics.type_is_comparable(T) {
+expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location, value_expr := #caller_expression(value)) -> bool where intrinsics.type_is_comparable(T) {
 	ok := value == expected || reflect.is_nil(value) && reflect.is_nil(expected)
 	if !ok {
-		log.errorf("expected %v, got %v", expected, value, location=loc)
+		log.errorf("expected %v to be %v, got %v", value_expr, expected, value, location=loc)
 	}
 	return ok
 }

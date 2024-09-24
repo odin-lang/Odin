@@ -1,4 +1,4 @@
-//+no-instrumentation
+#+no-instrumentation
 package linux
 
 import "base:intrinsics"
@@ -1443,8 +1443,9 @@ ptrace_traceme :: proc "contextless" (rq: PTrace_Traceme_Type) -> (Errno) {
 }
 
 ptrace_peek :: proc "contextless" (rq: PTrace_Peek_Type, pid: Pid, addr: uintptr) -> (uint, Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, addr)
-	return errno_unwrap(ret, uint)
+	res: uint = ---
+	ret := syscall(SYS_ptrace, rq, pid, addr, &res)
+	return res, Errno(-ret)
 }
 
 ptrace_poke :: proc "contextless" (rq: PTrace_Poke_Type, pid: Pid, addr: uintptr, data: uint) -> (Errno) {
@@ -1493,12 +1494,12 @@ ptrace_setregset :: proc "contextless" (rq: PTrace_Setregset_Type, pid: Pid, not
 }
 
 ptrace_getsiginfo :: proc "contextless" (rq: PTrace_Getsiginfo_Type, pid: Pid, si: ^Sig_Info) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, si)
+	ret := syscall(SYS_ptrace, rq, pid, si, rawptr(nil))
 	return Errno(-ret)
 }
 
 ptrace_peeksiginfo :: proc "contextless" (rq: PTrace_Peeksiginfo_Type, pid: Pid, si: ^Sig_Info) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, si)
+	ret := syscall(SYS_ptrace, rq, pid, si, rawptr(nil))
 	return Errno(-ret)
 }
 
@@ -1518,52 +1519,52 @@ ptrace_setoptions :: proc "contextless" (rq: PTrace_Setoptions_Type, pid: Pid, o
 }
 
 ptrace_geteventmsg :: proc "contextless" (rq: PTrace_Geteventmsg_Type, pid: Pid, msg: ^uint) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, msg)
+	ret := syscall(SYS_ptrace, rq, pid, msg, rawptr(nil))
 	return Errno(-ret)
 }
 
 ptrace_cont :: proc "contextless" (rq: PTrace_Cont_Type, pid: Pid, sig: Signal) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, sig)
+	ret := syscall(SYS_ptrace, rq, pid, rawptr(nil), sig)
 	return Errno(-ret)
 }
 
 ptrace_singlestep :: proc "contextless" (rq: PTrace_Singlestep_Type, pid: Pid, sig: Signal) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, sig)
+	ret := syscall(SYS_ptrace, rq, pid, rawptr(nil), sig)
 	return Errno(-ret)
 }
 
 ptrace_syscall :: proc "contextless" (rq: PTrace_Syscall_Type, pid: Pid, sig: Signal) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, sig)
+	ret := syscall(SYS_ptrace, rq, pid, rawptr(nil), sig)
 	return Errno(-ret)
 }
 
 ptrace_sysemu :: proc "contextless" (rq: PTrace_Sysemu_Type, pid: Pid, sig: Signal) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, sig)
+	ret := syscall(SYS_ptrace, rq, pid, rawptr(nil), sig)
 	return Errno(-ret)
 }
 
 ptrace_sysemu_singlestep :: proc "contextless" (rq: PTrace_Sysemu_Singlestep_Type, pid: Pid, sig: Signal) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, sig)
+	ret := syscall(SYS_ptrace, rq, pid, rawptr(nil), sig)
 	return Errno(-ret)
 }
 
 ptrace_listen :: proc "contextless" (rq: PTrace_Listen_Type, pid: Pid) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid)
+	ret := syscall(SYS_ptrace, rq, pid, 0, rawptr(nil))
 	return Errno(-ret)
 }
 
 ptrace_interrupt :: proc "contextless" (rq: PTrace_Interrupt_Type, pid: Pid) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid)
+	ret := syscall(SYS_ptrace, rq, pid, 0, rawptr(nil))
 	return Errno(-ret)
 }
 
 ptrace_attach :: proc "contextless" (rq: PTrace_Attach_Type, pid: Pid) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid)
+	ret := syscall(SYS_ptrace, rq, pid, 0, rawptr(nil))
 	return Errno(-ret)
 }
 
 ptrace_seize :: proc "contextless" (rq: PTrace_Seize_Type, pid: Pid, opt: PTrace_Options) -> (Errno) {
-	ret := syscall(SYS_ptrace, rq, pid, 0, transmute(u32) opt)
+	ret := syscall(SYS_ptrace, rq, pid, 0, transmute(u32) opt, rawptr(nil))
 	return Errno(-ret)
 }
 
@@ -2993,3 +2994,18 @@ epoll_pwait2 :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: ^Tim
 // TODO(flysand): fchmodat2
 
 // TODO(flysand): map_shadow_stack
+
+when ODIN_ARCH == .riscv64 {
+	/*
+		Probe for RISC-V Hardware Support.
+		Available since Linux 6.4.
+
+		TODO: cpu_set_t
+
+		See: https://docs.kernel.org/arch/riscv/hwprobe.html
+	*/
+	riscv_hwprobe :: proc "contextless" (pairs: [^]RISCV_HWProbe, pair_count: uint, cpu_count: uint, cpus: rawptr /* cpu_set_t */, flags: RISCV_HWProbe_Flags) -> Errno {
+		ret := syscall(SYS_riscv_hwprobe, pairs, pair_count, cpu_count, cpus, transmute(u32)flags)
+		return Errno(-ret)
+	}
+}

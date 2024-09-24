@@ -1,5 +1,5 @@
-//+private
-//+build darwin
+#+private
+#+build darwin
 package sync
 
 import "core:c"
@@ -12,6 +12,8 @@ foreign System {
 	// __ulock_wait is not available on 10.15
 	// See https://github.com/odin-lang/Odin/issues/1959
 	__ulock_wait  :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_us: u32) -> c.int ---
+	// >= MacOS 11.
+	__ulock_wait2 :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_ns: u64, value2: u64) -> c.int ---
 	__ulock_wake  :: proc "c" (operation: u32, addr: rawptr, wake_value: u64) -> c.int ---
 }
 
@@ -48,22 +50,29 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 		case -ETIMEDOUT:
 			return false
 		case:
-			_panic("darwin.os_sync_wait_on_address_with_timeout failure")
+			panic_contextless("darwin.os_sync_wait_on_address_with_timeout failure")
 		}
 	} else {
 
-	timeout_ns := u32(duration)
-	s := __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns)
+	when darwin.ULOCK_WAIT_2_AVAILABLE {
+		timeout_ns := u64(duration)
+		s := __ulock_wait2(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns, 0)
+	} else {
+		timeout_us := u32(duration / time.Microsecond)
+		s := __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_us)
+	}
+
 	if s >= 0 {
 		return true
 	}
+
 	switch s {
 	case EINTR, EFAULT:
 		return true
 	case ETIMEDOUT:
 		return false
 	case:
-		_panic("futex_wait failure")
+		panic_contextless("futex_wait failure")
 	}
 	return true
 
@@ -83,7 +92,7 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 			case -ENOENT:
 				return
 			case:
-				_panic("darwin.os_sync_wake_by_address_any failure")
+				panic_contextless("darwin.os_sync_wake_by_address_any failure")
 			}
 		}
 	} else {
@@ -99,7 +108,7 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 		case ENOENT:
 			return
 		case:
-			_panic("futex_wake_single failure")
+			panic_contextless("futex_wake_single failure")
 		}
 	}
 
@@ -119,7 +128,7 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 			case -ENOENT:
 				return
 			case:
-				_panic("darwin.os_sync_wake_by_address_all failure")
+				panic_contextless("darwin.os_sync_wake_by_address_all failure")
 			}
 		}
 	} else {
@@ -135,7 +144,7 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 		case ENOENT:
 			return
 		case:
-			_panic("futex_wake_all failure")
+			panic_contextless("futex_wake_all failure")
 		}
 	}
 

@@ -108,7 +108,7 @@ class WasmMemoryInterface {
 		const bytes = this.loadBytes(ptr, Number(len));
 		return new TextDecoder().decode(bytes);
 	}
- 
+
 	loadCstring(ptr) {
 		const start = this.loadPtr(ptr);
 		if (start == 0) {
@@ -1259,7 +1259,7 @@ class WebGLInterface {
 };
 
 
-function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
+function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, eventQueue, event_temp) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
 	let currentLine = {};
@@ -1377,10 +1377,8 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 		info.scrollTop = info.scrollHeight;
 	};
 
-	let event_temp_data = {};
-
 	let webglContext = new WebGLInterface(wasmMemoryInterface);
-	
+
 	const env = {};
 
 	if (memory) {
@@ -1455,9 +1453,13 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 				let wmi = wasmMemoryInterface;
 
-				let e = event_temp_data.event;
+				if (!event_temp.data) {
+					return;
+				}
 
-				wmi.storeU32(off(4), event_temp_data.name_code);
+				let e = event_temp.data.event;
+
+				wmi.storeU32(off(4), event_temp.data.name_code);
 				if (e.target == document) {
 					wmi.storeU32(off(4), 1);
 				} else if (e.target == window) {
@@ -1475,8 +1477,8 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 				align(W);
 
-				wmi.storeI32(off(W), event_temp_data.id_ptr);
-				wmi.storeUint(off(W), event_temp_data.id_len);
+				wmi.storeI32(off(W), event_temp.data.id_ptr);
+				wmi.storeUint(off(W), event_temp.data.id_len);
 
 				align(8);
 				wmi.storeF64(off(8), e.timeStamp*1e-3);
@@ -1518,7 +1520,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				} else if (e instanceof KeyboardEvent) {
 					// Note: those strings are constructed
 					// on the native side from buffers that
-					// are filled later, so skip them 
+					// are filled later, so skip them
 					const keyPtr  = off(W*2, W);
 					const codePtr = off(W*2, W);
 
@@ -1531,15 +1533,49 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					wmi.storeU8(off(1), !!e.repeat);
 
-					wmi.storeI32(off(W), e.key.length)
-					wmi.storeI32(off(W), e.code.length)
+					wmi.storeInt(off(W, W), e.key.length)
+					wmi.storeInt(off(W, W), e.code.length)
 					wmi.storeString(off(16, 1), e.key);
 					wmi.storeString(off(16, 1), e.code);
 				} else if (e.type === 'scroll') {
-					wmi.storeF64(off(8), window.scrollX);
-					wmi.storeF64(off(8), window.scrollY);
+					wmi.storeF64(off(8, 8), window.scrollX);
+					wmi.storeF64(off(8, 8), window.scrollY);
 				} else if (e.type === 'visibilitychange') {
 					wmi.storeU8(off(1), !document.hidden);
+				} else if (e instanceof GamepadEvent) {
+					const idPtr      = off(W*2, W);
+					const mappingPtr = off(W*2, W);
+
+					wmi.storeI32(off(W, W), e.gamepad.index);
+					wmi.storeU8(off(1), !!e.gamepad.connected);
+					wmi.storeF64(off(8, 8), e.gamepad.timestamp);
+
+					wmi.storeInt(off(W, W), e.gamepad.buttons.length);
+					wmi.storeInt(off(W, W), e.gamepad.axes.length);
+
+					for (let i = 0; i < 64; i++) {
+						if (i < e.gamepad.buttons.length) {
+							let b = e.gamepad.buttons[i];
+							wmi.storeF64(off(8, 8), b.value);
+							wmi.storeU8(off(1),  !!b.pressed);
+							wmi.storeU8(off(1),  !!b.touched);
+						} else {
+							off(16, 8);
+						}
+					}
+					for (let i = 0; i < 16; i++) {
+						if (i < e.gamepad.axes.length) {
+							let a = e.gamepad.axes[i];
+							wmi.storeF64(off(8, 8), a);
+						} else {
+							off(8, 8);
+						}
+					}
+
+					wmi.storeInt(off(W, W), e.gamepad.id.length)
+					wmi.storeInt(off(W, W), e.gamepad.mapping.length)
+					wmi.storeString(off(64, 1), e.gamepad.id);
+					wmi.storeString(off(64, 1), e.gamepad.mapping);
 				}
 			},
 
@@ -1552,12 +1588,30 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				}
 
 				let listener = (e) => {
-					const odin_ctx = wasmMemoryInterface.exports.default_context_ptr();
-					event_temp_data.id_ptr = id_ptr;
-					event_temp_data.id_len = id_len;
-					event_temp_data.event = e;
-					event_temp_data.name_code = name_code;
-					wasmMemoryInterface.exports.odin_dom_do_event_callback(data, callback, odin_ctx);
+					let event_data = {};
+					event_data.id_ptr = id_ptr;
+					event_data.id_len = id_len;
+					event_data.event = e;
+					event_data.name_code = name_code;
+
+					eventQueue.push({event_data: event_data, data: data, callback: callback});
+				};
+				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
+				element.addEventListener(name, listener, !!use_capture);
+				return true;
+			},
+
+			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
+				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
+				let element = window;
+				let listener = (e) => {
+					let event_data = {};
+					event_data.id_ptr = 0;
+					event_data.id_len = 0;
+					event_data.event = e;
+					event_data.name_code = name_code;
+
+					eventQueue.push({event_data: event_data, data: data, callback: callback});
 				};
 				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
 				element.addEventListener(name, listener, !!use_capture);
@@ -1579,24 +1633,6 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				element.removeEventListener(name, listener);
 				return true;
 			},
-
-
-			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
-				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
-				let element = window;
-				let listener = (e) => {
-					const odin_ctx = wasmMemoryInterface.exports.default_context_ptr();
-					event_temp_data.id_ptr = 0;
-					event_temp_data.id_len = 0;
-					event_temp_data.event = e;
-					event_temp_data.name_code = name_code;
-					wasmMemoryInterface.exports.odin_dom_do_event_callback(data, callback, odin_ctx);
-				};
-				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
-				element.addEventListener(name, listener, !!use_capture);
-				return true;
-			},
-
 			remove_window_event_listener: (name_ptr, name_len, data, callback) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
@@ -1612,18 +1648,18 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 			},
 
 			event_stop_propagation: () => {
-				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.stopPropagation();
+				if (event_temp.data && event_temp.data.event) {
+					event_temp.data.event.stopPropagation();
 				}
 			},
 			event_stop_immediate_propagation: () => {
-				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.stopImmediatePropagation();
+				if (event_temp.data && event_temp.data.event) {
+					event_temp.data.event.stopImmediatePropagation();
 				}
 			},
 			event_prevent_default: () => {
-				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.preventDefault();
+				if (event_temp.data && event_temp.data.event) {
+					event_temp.data.event.preventDefault();
 				}
 			},
 
@@ -1639,6 +1675,76 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				let element = getElement(id);
 				if (element) {
 					element.dispatchEvent(new Event(name, options));
+					return true;
+				}
+				return false;
+			},
+
+			get_gamepad_state: (gamepad_id, ep) => {
+				let index = gamepad_id;
+				let gps = navigator.getGamepads();
+				if (0 <= index && index < gps.length) {
+					let gamepad = gps[index];
+					if (!gamepad) {
+						return false;
+					}
+
+					const W = wasmMemoryInterface.intSize;
+					let offset = ep;
+					let off = (amount, alignment) => {
+						if (alignment === undefined) {
+							alignment = Math.min(amount, W);
+						}
+						if (offset % alignment != 0) {
+							offset += alignment - (offset%alignment);
+						}
+						let x = offset;
+						offset += amount;
+						return x;
+					};
+
+					let align = (alignment) => {
+						const modulo = offset & (alignment-1);
+						if (modulo != 0) {
+							offset += alignment - modulo
+						}
+					};
+
+					let wmi = wasmMemoryInterface;
+
+					const idPtr      = off(W*2, W);
+					const mappingPtr = off(W*2, W);
+
+					wmi.storeI32(off(W), gamepad.index);
+					wmi.storeU8(off(1), !!gamepad.connected);
+					wmi.storeF64(off(8), gamepad.timestamp);
+
+					wmi.storeInt(off(W), gamepad.buttons.length);
+					wmi.storeInt(off(W), gamepad.axes.length);
+
+					for (let i = 0; i < 64; i++) {
+						if (i < gamepad.buttons.length) {
+							let b = gamepad.buttons[i];
+							wmi.storeF64(off(8, 8), b.value);
+							wmi.storeU8(off(1),  !!b.pressed);
+							wmi.storeU8(off(1),  !!b.touched);
+						} else {
+							off(16, 8);
+						}
+					}
+					for (let i = 0; i < 16; i++) {
+						if (i < gamepad.axes.length) {
+							wmi.storeF64(off(8, 8), gamepad.axes[i]);
+						} else {
+							off(8, 8);
+						}
+					}
+
+					wmi.storeInt(off(W, W), gamepad.id.length)
+					wmi.storeInt(off(W, W), gamepad.mapping.length)
+					wmi.storeString(off(64, 1), gamepad.id);
+					wmi.storeString(off(64, 1), gamepad.mapping);
+
 					return true;
 				}
 				return false;
@@ -1696,6 +1802,55 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				}
 			},
 
+			get_element_key_f64: (id_ptr, id_len, key_ptr, key_len) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
+				let element = getElement(id);
+				return element ? element[key] : 0;
+			},
+			get_element_key_string: (id_ptr, id_len, key_ptr, key_len, buf_ptr, buf_len) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
+				let element = getElement(id);
+				if (element) {
+					let str = element[key];
+					if (buf_len > 0 && buf_ptr) {
+						let n = Math.min(buf_len, str.length);
+						str = str.substring(0, n);
+						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
+						return n;
+					}
+				}
+				return 0;
+			},
+			get_element_key_string_length: (id_ptr, id_len, key_ptr, key_len) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
+				let element = getElement(id);
+				if (element && element[key]) {
+					return element[key].length;
+				}
+				return 0;
+			},
+
+			set_element_key_f64: (id_ptr, id_len, key_ptr, key_len, value) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
+				let element = getElement(id);
+				if (element) {
+					element[key] = value;
+				}
+			},
+			set_element_key_string: (id_ptr, id_len, key_ptr, key_len, value_ptr, value_len) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
+				let value = wasmMemoryInterface.loadString(value_ptr, value_len);
+				let element = getElement(id);
+				if (element) {
+					element[key] = value;
+				}
+			},
+
 
 			get_bounding_client_rect: (rect_ptr, id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
@@ -1750,7 +1905,10 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 	}
 	wasmMemoryInterface.setIntSize(intSize);
 
-	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement, wasmMemoryInterface.memory);
+	let eventQueue = new Array();
+	let event_temp = {};
+
+	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement, wasmMemoryInterface.memory, eventQueue, event_temp);
 	let exports = {};
 
 	if (extraForeignImports !== undefined) {
@@ -1775,14 +1933,14 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 	exports._start();
 
-	// Define a `@export step :: proc(dt: f32) -> (keep_going: bool) {`
+	// Define a `@export step :: proc(current_type: f64) -> (keep_going: bool) {`
 	// in your app and it will get called every frame.
 	// return `false` to stop the execution of the module.
 	if (exports.step) {
 		const odin_ctx = exports.default_context_ptr();
 
 		let prevTimeStamp = undefined;
-		const step = (currTimeStamp) => {
+		function step(currTimeStamp) {
 			if (prevTimeStamp == undefined) {
 				prevTimeStamp = currTimeStamp;
 			}
@@ -1790,13 +1948,20 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 			const dt = (currTimeStamp - prevTimeStamp)*0.001;
 			prevTimeStamp = currTimeStamp;
 
-			if (!exports.step(dt, odin_ctx)) {
+			while (eventQueue.length > 0) {
+				let e = eventQueue.shift()
+				event_temp.data = e.event_data;
+				exports.odin_dom_do_event_callback(e.data, e.callback, odin_ctx);
+			}
+			event_temp.data = null;
+
+			if (!exports.step(currTimeStamp*0.001, odin_ctx)) {
 				exports._end();
 				return;
 			}
 
 			window.requestAnimationFrame(step);
-		};
+		}
 
 		window.requestAnimationFrame(step);
 	} else {

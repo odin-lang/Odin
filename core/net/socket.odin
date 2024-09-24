@@ -1,4 +1,4 @@
-// +build windows, linux, darwin, freebsd
+#+build windows, linux, darwin, freebsd
 package net
 
 /*
@@ -132,6 +132,13 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TC
 	assert(backlog > 0 && backlog < int(max(i32)))
 
 	return _listen_tcp(interface_endpoint, backlog)
+}
+
+/*
+	Returns the endpoint that the given socket is listening / bound on.
+*/
+bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Network_Error) {
+	return _bound_endpoint(socket)
 }
 
 accept_tcp :: proc(socket: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {

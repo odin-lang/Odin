@@ -7,8 +7,8 @@ synchronize threads' access to shared memory.
 To limit or control the threads' access to shared memory typically the
 following approaches are used:
 
-* Locks
-* Lock-free
+- Locks
+- Lock-free
 
 When using locks, sections of the code that access shared memory (also known as
 **critical sections**) are guarded by locks, allowing limited access to threads

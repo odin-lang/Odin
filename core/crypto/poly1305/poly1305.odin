@@ -2,7 +2,7 @@
 package poly1305 implements the Poly1305 one-time MAC algorithm.
 
 See:
-- https://datatracker.ietf.org/doc/html/rfc8439
+- [[ https://datatracker.ietf.org/doc/html/rfc8439 ]]
 */
 package poly1305
 

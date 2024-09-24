@@ -285,6 +285,7 @@ enum VetFlags : u64 {
 	VetFlag_Deprecated      = 1u<<7,
 	VetFlag_Cast            = 1u<<8,
 	VetFlag_Tabs            = 1u<<9,
+	VetFlag_UnusedProcedures = 1u<<10,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -316,6 +317,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Cast;
 	} else if (name == "tabs") {
 		return VetFlag_Tabs;
+	} else if (name == "unused-procedures") {
+		return VetFlag_UnusedProcedures;
 	}
 	return VetFlag_NONE;
 }
@@ -383,6 +386,7 @@ struct BuildContext {
 
 	u64 vet_flags;
 	u32 sanitizer_flags;
+	StringSet vet_packages;
 
 	bool   has_resource;
 	String link_flags;
@@ -411,6 +415,7 @@ struct BuildContext {
 	bool   no_dynamic_literals;
 	bool   no_output_files;
 	bool   no_crt;
+	bool   no_rpath;
 	bool   no_entry_point;
 	bool   no_thread_local;
 	bool   use_lld;
@@ -430,6 +435,7 @@ struct BuildContext {
 	bool   json_errors;
 	bool   has_ansi_terminal_colours;
 
+	bool   fast_isel;
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
 	bool   ignore_panic;
@@ -1460,8 +1466,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->thread_count = gb_max(bc->affinity.thread_count, 1);
 	}
 
-	string_set_init(&bc->custom_attributes);
-
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
@@ -1525,6 +1529,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			metrics = &target_haiku_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
+		#elif defined(GB_CPU_RISCV)
+			metrics = &target_linux_riscv64;
 		#else
 			metrics = &target_linux_amd64;
 		#endif
@@ -1647,7 +1653,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 		// Disallow on wasm
 		bc->use_separate_modules = false;
-	} if(bc->metrics.arch == TargetArch_riscv64) {
+	} if(bc->metrics.arch == TargetArch_riscv64 && bc->cross_compiling) {
 		bc->link_flags = str_lit("-target riscv64 ");
 	} else {
 		// NOTE: for targets other than darwin, we don't specify a `-target` link flag.
@@ -2046,10 +2052,11 @@ gb_internal bool init_build_paths(String init_filename) {
 	gbFile      output_file_test;
 	const char* output_file_name = (const char*)output_file.text;
 	gbFileError output_test_err = gb_file_open_mode(&output_file_test, gbFileMode_Append | gbFileMode_Rw, output_file_name);
-	gb_file_close(&output_file_test);
-	gb_file_remove(output_file_name);
 
-	if (output_test_err != 0) {
+	if (output_test_err == 0) {
+		gb_file_close(&output_file_test);
+		gb_file_remove(output_file_name);
+	} else {
 		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
 		defer (gb_free(ha, output_file.text));
 		gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));

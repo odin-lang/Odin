@@ -533,18 +533,13 @@ gb_internal u64 check_vet_flags(CheckerContext *c) {
 	    c->curr_proc_decl->proc_lit) {
 		file = c->curr_proc_decl->proc_lit->file();
 	}
-	if (file && file->vet_flags_set) {
-		return file->vet_flags;
-	}
-	return build_context.vet_flags;
+
+	return ast_file_vet_flags(file);
 }
 
 gb_internal u64 check_vet_flags(Ast *node) {
 	AstFile *file = node->file();
-	if (file && file->vet_flags_set) {
-		return file->vet_flags;
-	}
-	return build_context.vet_flags;
+	return ast_file_vet_flags(file);
 }
 
 enum VettedEntityKind {
@@ -681,20 +676,45 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 	return false;
 }
 
-gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
-	bool vet_unused = (vet_flags & VetFlag_Unused) != 0;
-	bool vet_shadowing = (vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0;
-
+gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_flags, bool per_entity) {
+	u64 original_vet_flags = vet_flags;
 	Array<VettedEntity> vetted_entities = {};
 	array_init(&vetted_entities, heap_allocator());
+	defer (array_free(&vetted_entities));
 
 	rw_mutex_shared_lock(&scope->mutex);
 	for (auto const &entry : scope->elements) {
 		Entity *e = entry.value;
 		if (e == nullptr) continue;
+
+		vet_flags = original_vet_flags;
+		if (per_entity) {
+			vet_flags = ast_file_vet_flags(e->file);
+		}
+
+		bool vet_unused = (vet_flags & VetFlag_Unused) != 0;
+		bool vet_shadowing = (vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0;
+		bool vet_unused_procedures = (vet_flags & VetFlag_UnusedProcedures) != 0;
+
 		VettedEntity ve_unused = {};
 		VettedEntity ve_shadowed = {};
-		bool is_unused = vet_unused && check_vet_unused(c, e, &ve_unused);
+		bool is_unused = false;
+		if (vet_unused && check_vet_unused(c, e, &ve_unused)) {
+			is_unused = true;
+		} else if (vet_unused_procedures &&
+		           e->kind == Entity_Procedure) {
+			if (e->flags&EntityFlag_Used) {
+				is_unused = false;
+			} else if (e->flags & EntityFlag_Require) {
+				is_unused = false;
+			} else if (e->pkg && e->pkg->kind == Package_Init && e->token.string == "main") {
+				is_unused = false;
+			} else {
+				is_unused = true;
+				ve_unused.kind = VettedEntity_Unused;
+				ve_unused.entity = e;
+			}
+		}
 		bool is_shadowed = vet_shadowing && check_vet_shadowing(c, e, &ve_shadowed);
 		if (is_unused && is_shadowed) {
 			VettedEntity ve_both = ve_shadowed;
@@ -717,12 +737,17 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 	}
 	rw_mutex_shared_unlock(&scope->mutex);
 
-	gb_sort(vetted_entities.data, vetted_entities.count, gb_size_of(VettedEntity), vetted_entity_variable_pos_cmp);
+	array_sort(vetted_entities, vetted_entity_variable_pos_cmp);
 
 	for (auto const &ve : vetted_entities) {
 		Entity *e = ve.entity;
 		Entity *other = ve.other;
 		String name = e->token.string;
+
+		vet_flags = original_vet_flags;
+		if (per_entity) {
+			vet_flags = ast_file_vet_flags(e->file);
+		}
 
 		if (ve.kind == VettedEntity_Shadowed_And_Unused) {
 			error(e->token, "'%.*s' declared but not used, possibly shadows declaration at line %d", LIT(name), other->token.pos.line);
@@ -730,6 +755,9 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
 				if (e->kind == Entity_Variable && (vet_flags & VetFlag_UnusedVariables) != 0) {
+					error(e->token, "'%.*s' declared but not used", LIT(name));
+				}
+				if (e->kind == Entity_Procedure && (vet_flags & VetFlag_UnusedProcedures) != 0) {
 					error(e->token, "'%.*s' declared but not used", LIT(name));
 				}
 				if ((e->kind == Entity_ImportName || e->kind == Entity_LibraryName) && (vet_flags & VetFlag_UnusedImports) != 0) {
@@ -749,7 +777,11 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 		}
 	}
 
-	array_free(&vetted_entities);
+}
+
+
+gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
+	check_scope_usage_internal(c, scope, vet_flags, false);
 
 	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
 		if (child->flags & (ScopeFlag_Proc|ScopeFlag_Type|ScopeFlag_File)) {
@@ -1786,7 +1818,9 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	entity->flags |= EntityFlag_Used;
 	if (entity_has_deferred_procedure(entity)) {
 		Entity *deferred = entity->Procedure.deferred_procedure.entity;
-		add_entity_use(c, nullptr, deferred);
+		if (deferred != entity) {
+			add_entity_use(c, nullptr, deferred);
+		}
 	}
 	if (identifier == nullptr || identifier->kind != Ast_Ident) {
 		return;
@@ -3174,8 +3208,8 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		return true;
 	} else if (name == "link_prefix") {
 		if (ev.kind == ExactValue_String) {
-			String link_prefix = ev.value_string;
-			if (!is_foreign_name_valid(link_prefix)) {
+			String link_prefix = string_trim_whitespace(ev.value_string);
+			if (link_prefix.len != 0 && !is_foreign_name_valid(link_prefix)) {
 				error(elem, "Invalid link prefix: '%.*s'", LIT(link_prefix));
 			} else {
 				c->foreign_context.link_prefix = link_prefix;
@@ -3186,8 +3220,8 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		return true;
 	} else if (name == "link_suffix") {
 		if (ev.kind == ExactValue_String) {
-			String link_suffix = ev.value_string;
-			if (!is_foreign_name_valid(link_suffix)) {
+			String link_suffix = string_trim_whitespace(ev.value_string);
+			if (link_suffix.len != 0 && !is_foreign_name_valid(link_suffix)) {
 				error(elem, "Invalid link suffix: '%.*s'", LIT(link_suffix));
 			} else {
 				c->foreign_context.link_suffix = link_suffix;
@@ -3489,7 +3523,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 
 		if (ev.kind == ExactValue_String) {
 			ac->link_prefix = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_prefix)) {
+			if (ac->link_prefix.len != 0 && !is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
 			}
 		} else {
@@ -3501,7 +3535,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 
 		if (ev.kind == ExactValue_String) {
 			ac->link_suffix = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_suffix)) {
+			if (ac->link_suffix.len != 0 && !is_foreign_name_valid(ac->link_suffix)) {
 				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
 			}
 		} else {
@@ -3774,7 +3808,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
 			ac->link_prefix = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_prefix)) {
+			if (ac->link_prefix.len != 0 && !is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
 			}
 		} else {
@@ -3785,7 +3819,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
 			ac->link_suffix = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_suffix)) {
+			if (ac->link_suffix.len != 0 && !is_foreign_name_valid(ac->link_suffix)) {
 				error(elem, "Invalid link suffix: %.*s", LIT(ac->link_suffix));
 			}
 		} else {
@@ -4532,7 +4566,9 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			check_add_foreign_block_decl(c, decl);
+			if (curr_file != nullptr) {
+				array_add(&curr_file->delayed_decls_queues[AstDelayQueue_ForeignBlock], decl);
+			}
 		case_end;
 
 		default:
@@ -4548,6 +4584,14 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
 	if (curr_file == nullptr) {
+		// For 'foreign' block statements that are not in file scope.
+		for_array(decl_index, nodes) {
+			Ast *decl = nodes[decl_index];
+			if (decl->kind == Ast_ForeignBlockDecl) {
+				check_add_foreign_block_decl(c, decl);
+			}
+		}
+
 		for_array(decl_index, nodes) {
 			Ast *decl = nodes[decl_index];
 			if (decl->kind == Ast_WhenStmt) {
@@ -4934,12 +4978,18 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 
 
-	if (import_name.len == 0) {
+	if (is_blank_ident(import_name) && !is_blank_ident(id->import_name.string)) {
 		String invalid_name = id->fullpath;
 		invalid_name = get_invalid_import_name(invalid_name);
 
-		error(id->token, "Import name %.*s, is not a valid identifier. Perhaps you want to reference the package by a different name like this: import <new_name> \"%.*s\" ", LIT(invalid_name), LIT(invalid_name));
-		error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+		ERROR_BLOCK();
+
+		if (id->import_name.string.len > 0) {
+			error(token, "Import name '%.*s' cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+		} else {
+			error(id->token, "Import name '%.*s' is not a valid identifier", LIT(invalid_name));
+			error_line("\tSuggestion: Rename the directory or explicitly set an import name like this 'import <new_name> %.*s'", LIT(id->relpath.string));
+		}
 	} else {
 		GB_ASSERT(id->import_name.pos.line != 0);
 		id->import_name.string = import_name;
@@ -5218,9 +5268,9 @@ gb_internal bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
 	case_end;
 
 	case_ast_node(fb, ForeignBlockDecl, decl);
-		if (check_add_foreign_block_decl(ctx, decl)) {
-			return true;
-		}
+		GB_ASSERT(ctx->collect_delayed_decls);
+		decl->state_flags |= StateFlag_BeenHandled;
+		array_add(&curr_file->delayed_decls_queues[AstDelayQueue_ForeignBlock], decl);
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
@@ -5503,9 +5553,18 @@ gb_internal void check_import_entities(Checker *c) {
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
-			ctx.collect_delayed_decls = false;
-
 			correct_type_aliases_in_scope(&ctx, pkg->scope);
+		}
+
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+			reset_checker_context(&ctx, f, &untyped);
+
+			ctx.collect_delayed_decls = true;
+			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_ForeignBlock]) {
+				check_add_foreign_block_decl(&ctx, decl);
+			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_ForeignBlock]);
 		}
 
 		for_array(i, pkg->files) {
@@ -6095,6 +6154,11 @@ gb_internal void check_deferred_procedures(Checker *c) {
 		case DeferredProcedure_in_out_by_ptr: attribute = "deferred_in_out_by_ptr"; break;
 		}
 
+		if (src == dst) {
+			error(src->token, "'%.*s' cannot be used as its own %s", LIT(dst->token.string), attribute);
+			continue;
+		}
+
 		if (is_type_polymorphic(src->type) || is_type_polymorphic(dst->type)) {
 			error(src->token, "'%s' cannot be used with a polymorphic procedure", attribute);
 			continue;
@@ -6465,11 +6529,12 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check scope usage");
 	for (auto const &entry : c->info.files) {
 		AstFile *f = entry.value;
-		u64 vet_flags = build_context.vet_flags;
-		if (f->vet_flags_set) {
-			vet_flags = f->vet_flags;
-		}
+		u64 vet_flags = ast_file_vet_flags(f);
 		check_scope_usage(c, f->scope, vet_flags);
+	}
+	for (auto const &entry : c->info.packages) {
+		AstPackage *pkg = entry.value;
+		check_scope_usage_internal(c, pkg->scope, 0, true);
 	}
 
 	TIME_SECTION("add basic type information");

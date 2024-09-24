@@ -1,4 +1,4 @@
-//+private
+#+private
 package runtime
 
 foreign import "system:Foundation.framework"

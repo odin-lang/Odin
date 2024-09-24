@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd, netbsd
+#+build linux, darwin, freebsd, openbsd, netbsd
 package ENet
 
 // When we implement the appropriate bindings for Unix, the section separated

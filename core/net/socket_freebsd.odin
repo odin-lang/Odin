@@ -1,4 +1,4 @@
-//+build freebsd
+#+build freebsd
 package net
 
 /*
@@ -146,6 +146,20 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 		return
 	}
 
+	return
+}
+
+@(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	sockaddr: freebsd.Socket_Address_Storage
+
+	errno := freebsd.getsockname(cast(Fd)any_socket_to_socket(sock), &sockaddr)
+	if errno != nil {
+		err = cast(Listen_Error)errno
+		return
+	}
+
+	ep = _sockaddr_to_endpoint(&sockaddr)
 	return
 }
 

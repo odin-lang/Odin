@@ -1,10 +1,28 @@
 #include "parser_pos.cpp"
 
+gb_internal bool in_vet_packages(AstFile *file) {
+	if (file == nullptr) {
+		return true;
+	}
+	if (file->pkg == nullptr) {
+		return true;
+	}
+	if (build_context.vet_packages.entries.count == 0) {
+		return true;
+	}
+	return string_set_exists(&build_context.vet_packages, file->pkg->name);
+}
+
 gb_internal u64 ast_file_vet_flags(AstFile *f) {
 	if (f != nullptr && f->vet_flags_set) {
 		return f->vet_flags;
 	}
-	return build_context.vet_flags;
+
+	bool found = in_vet_packages(f);
+	if (found) {
+		return build_context.vet_flags;
+	}
+	return 0;
 }
 
 gb_internal bool ast_file_vet_style(AstFile *f) {
@@ -1921,6 +1939,9 @@ gb_internal Array<Ast *> parse_enum_field_list(AstFile *f) {
 	       f->curr_token.kind != Token_EOF) {
 		CommentGroup *docs = f->lead_comment;
 		CommentGroup *comment = nullptr;
+
+		parse_enforce_tabs(f);
+
 		Ast *name = parse_value(f);
 		Ast *value = nullptr;
 		if (f->curr_token.kind == Token_Eq) {
@@ -2259,6 +2280,7 @@ gb_internal Array<Ast *> parse_union_variant_list(AstFile *f) {
 	auto variants = array_make<Ast *>(ast_allocator(f));
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
+		parse_enforce_tabs(f);
 		Ast *type = parse_type(f);
 		if (type->kind != Ast_BadExpr) {
 			array_add(&variants, type);
@@ -4274,6 +4296,7 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
+		if (!is_signature) parse_enforce_tabs(f);
 		u32 flags = parse_field_prefixes(f);
 		Ast *param = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 		if (param->kind == Ast_Ellipsis) {
@@ -4363,6 +4386,8 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 		       f->curr_token.kind != Token_EOF &&
 		       f->curr_token.kind != Token_Semicolon) {
 			CommentGroup *docs = f->lead_comment;
+
+			if (!is_signature) parse_enforce_tabs(f);
 			u32 set_flags = parse_field_prefixes(f);
 			Token tag = {};
 			Array<Ast *> names = parse_ident_list(f, allow_poly_names);
@@ -4532,6 +4557,10 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
+	Ast *top_if_stmt = nullptr;
+
+	Ast *prev_if_stmt = nullptr;
+if_else_chain:;
 	Token token = expect_token(f, Token_if);
 	Ast *init = nullptr;
 	Ast *cond = nullptr;
@@ -4573,12 +4602,24 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		ignore_strict_style = true;
 	}
 	skip_possible_newline_for_literal(f, ignore_strict_style);
+
+	Ast *curr_if_stmt = ast_if_stmt(f, token, init, cond, body, nullptr);
+	if (top_if_stmt == nullptr) {
+		top_if_stmt = curr_if_stmt;
+	}
+	if (prev_if_stmt != nullptr) {
+		prev_if_stmt->IfStmt.else_stmt = curr_if_stmt;
+	}
+
 	if (f->curr_token.kind == Token_else) {
 		Token else_token = expect_token(f, Token_else);
 		switch (f->curr_token.kind) {
 		case Token_if:
-			else_stmt = parse_if_stmt(f);
-			break;
+			// NOTE(bill): Instead of relying on recursive descent for an if-else chain
+			// we can just inline the tail-recursion manually with a simple loop like
+			// construct using a `goto`
+			prev_if_stmt = curr_if_stmt;
+			goto if_else_chain;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
 			break;
@@ -4593,7 +4634,9 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 		}
 	}
 
-	return ast_if_stmt(f, token, init, cond, body, else_stmt);
+	curr_if_stmt->IfStmt.else_stmt = else_stmt;
+
+	return top_if_stmt;
 }
 
 gb_internal Ast *parse_when_stmt(AstFile *f) {
@@ -4924,7 +4967,7 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	}
 
 	if (f->in_when_statement) {
-		syntax_error(import_name, "Cannot use 'import' within a 'when' statement. Prefer using the file suffixes (e.g. foo_windows.odin) or '//+build' tags");
+		syntax_error(import_name, "Cannot use 'import' within a 'when' statement. Prefer using the file suffixes (e.g. foo_windows.odin) or '#+build' tags");
 	}
 
 	if (kind != ImportDecl_Standard) {
@@ -5312,6 +5355,12 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 		s = ast_empty_stmt(f, token);
 		expect_semicolon(f);
 		return s;
+
+	case Token_FileTag:
+		// This is always an error because all valid file tags will have been processed in `parse_file` already.
+		// Any remaining file tags must be past the package line and thus invalid.
+		syntax_error(token, "Lines starting with #+ (file tags) are only allowed before the package line.");
+		return ast_bad_stmt(f, token, f->curr_token);
 	}
 
 	// Error correction statements
@@ -5347,16 +5396,12 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 }
 
 
-
-gb_internal u64 check_vet_flags(AstFile *file) {
-	if (file && file->vet_flags_set) {
-		return file->vet_flags;
-	}
-	return build_context.vet_flags;
-}
-
-
 gb_internal void parse_enforce_tabs(AstFile *f) {
+	// Checks to see if tabs have been used for indentation
+	if ((ast_file_vet_flags(f) & VetFlag_Tabs) == 0) {
+		return;
+	}
+
        	Token prev = f->prev_token;
 	Token curr = f->curr_token;
 	if (prev.pos.line < curr.pos.line) {
@@ -5373,6 +5418,10 @@ gb_internal void parse_enforce_tabs(AstFile *f) {
 
 		isize len = end-it;
 		for (isize i = 0; i < len; i++) {
+			if (it[i] == '/') {
+				// ignore comments
+				break;
+			}
 			if (it[i] == ' ') {
 				syntax_error(curr, "With '-vet-tabs', tabs must be used for indentation");
 				break;
@@ -5387,11 +5436,7 @@ gb_internal Array<Ast *> parse_stmt_list(AstFile *f) {
 	while (f->curr_token.kind != Token_case &&
 	       f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
-
-		// Checks to see if tabs have been used for indentation
-	       	if (check_vet_flags(f) & VetFlag_Tabs) {
-		       parse_enforce_tabs(f);
-		}
+		parse_enforce_tabs(f);
 
 		Ast *stmt = parse_stmt(f);
 		if (stmt && stmt->kind != Ast_EmptyStmt) {
@@ -5902,20 +5947,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 			do_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
 			return false;
 		}
-	} else {
-#if !defined(GB_SYSTEM_WINDOWS)
-		// @NOTE(vassvik): foreign imports of shared libraries that are not in the system collection on
-		//                 linux/mac have to be local to the executable for consistency with shared libraries.
-		//                 Unix does not have a concept of "import library" for shared/dynamic libraries,
-		//                 so we need to pass the relative path to the linker, and add the current
-		//                 working directory of the exe to the library search paths.
-		//                 Static libraries can be linked directly with the full pathname
-		//
-		if (node->kind == Ast_ForeignImportDecl && (string_ends_with(file_str, str_lit(".so")) || string_contains_string(file_str, str_lit(".so.")))) {
-			*path = file_str;
-			return true;
-		}
-#endif
 	}
 
 	if (is_package_name_reserved(file_str)) {
@@ -6061,7 +6092,7 @@ gb_internal String build_tag_get_token(String s, String *out) {
 }
 
 gb_internal bool parse_build_tag(Token token_for_pos, String s) {
-	String const prefix = str_lit("+build");
+	String const prefix = str_lit("build");
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
@@ -6073,6 +6104,10 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 
 	while (s.len > 0) {
 		bool this_kind_correct = true;
+
+		bool this_kind_os_seen = false;
+		bool this_kind_arch_seen = false;
+		int num_tokens = 0;
 
 		do {
 			String p = string_trim_whitespace(build_tag_get_token(s, &s));
@@ -6099,7 +6134,18 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 
 			TargetOsKind   os   = get_target_os_from_string(p);
 			TargetArchKind arch = get_target_arch_from_string(p);
+			num_tokens += 1;
+
+			// Catches 'windows linux', which is an impossible combination.
+			// Also catches usage of more than two things within a comma separated group.
+			if (num_tokens > 2 || (this_kind_os_seen && os != TargetOs_Invalid) || (this_kind_arch_seen && arch != TargetArch_Invalid)) {
+				syntax_error(token_for_pos, "Invalid build tag: Missing ',' before '%.*s'. Format: '#+build linux, windows amd64, darwin'", LIT(p));
+				break;
+			}
+
 			if (os != TargetOs_Invalid) {
+				this_kind_os_seen = true;
+
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
 					this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
@@ -6107,6 +6153,8 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 					this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
 				}
 			} else if (arch != TargetArch_Invalid) {
+				this_kind_arch_seen = true;
+
 				if (is_notted) {
 					this_kind_correct = this_kind_correct && (arch != build_context.metrics.arch);
 				} else {
@@ -6146,7 +6194,7 @@ gb_internal String vet_tag_get_token(String s, String *out) {
 
 
 gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
-	String const prefix = str_lit("+vet");
+	String const prefix = str_lit("vet");
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
@@ -6251,7 +6299,7 @@ gb_internal isize calc_decl_count(Ast *decl) {
 }
 
 gb_internal bool parse_build_project_directory_tag(Token token_for_pos, String s) {
-	String const prefix = str_lit("+build-project-name");
+	String const prefix = str_lit("build-project-name");
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 	if (s.len == 0) {
@@ -6295,6 +6343,48 @@ gb_internal bool parse_build_project_directory_tag(Token token_for_pos, String s
 	return any_correct;
 }
 
+gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) {
+	if (string_starts_with(lc, str_lit("build-project-name"))) {
+		if (!parse_build_project_directory_tag(tok, lc)) {
+			return false;
+		}
+	} else if (string_starts_with(lc, str_lit("build"))) {
+		if (!parse_build_tag(tok, lc)) {
+			return false;
+		}
+	} else if (string_starts_with(lc, str_lit("vet"))) {
+		f->vet_flags = parse_vet_tag(tok, lc);
+		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("ignore"))) {
+		return false;
+	} else if (string_starts_with(lc, str_lit("private"))) {
+		f->flags |= AstFile_IsPrivatePkg;
+		String command = string_trim_starts_with(lc, str_lit("private "));
+		command = string_trim_whitespace(command);
+		if (lc == "private") {
+			f->flags |= AstFile_IsPrivatePkg;
+		} else if (command == "package") {
+			f->flags |= AstFile_IsPrivatePkg;
+		} else if (command == "file") {
+			f->flags |= AstFile_IsPrivateFile;
+		}
+	} else if (lc == "lazy") {
+		if (build_context.ignore_lazy) {
+			// Ignore
+		} else if (f->pkg->kind == Package_Init && build_context.command_kind == Command_doc) {
+			// Ignore
+		} else {
+			f->flags |= AstFile_IsLazy;
+		}
+	} else if (lc == "no-instrumentation") {
+		f->flags |= AstFile_NoInstrumentation;
+	} else {
+		error(tok, "Unknown tag '%.*s'", LIT(lc));
+	}
+
+	return true;
+}
+
 gb_internal bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
@@ -6313,9 +6403,34 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	CommentGroup *docs = f->lead_comment;
 
+	Array<Token> tags = array_make<Token>(temporary_allocator());
+	bool first_invalid_token_set = false;
+	Token first_invalid_token = {};
+
+	while (f->curr_token.kind != Token_package && f->curr_token.kind != Token_EOF) {
+		if (f->curr_token.kind == Token_Comment) {
+			consume_comment_groups(f, f->prev_token);
+		} else if (f->curr_token.kind == Token_FileTag) {
+			array_add(&tags, f->curr_token);
+			advance_token(f);
+		} else {
+			if (!first_invalid_token_set) {
+				first_invalid_token_set = true;
+				first_invalid_token = f->curr_token;
+			}
+
+			advance_token(f);
+		}
+	}
+
 	if (f->curr_token.kind != Token_package) {
 		ERROR_BLOCK();
-		syntax_error(f->curr_token, "Expected a package declaration at the beginning of the file");
+
+		// The while loop above scanned until it found the package token. If we never
+		// found one, then make this error appear on the first invalid token line.
+		Token t = first_invalid_token_set ? first_invalid_token : f->curr_token;
+		syntax_error(t, "Expected a package declaration at the beginning of the file");
+
 		// IMPORTANT NOTE(bill): this is technically a race condition with the suggestion, but it's ony a suggession
 		// so in practice is should be "fine"
 		if (f->pkg && f->pkg->name != "") {
@@ -6324,17 +6439,15 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 		return false;
 	}
 
+	// There was an OK package declaration. But there some invalid token was hit before the package declaration.
+	if (first_invalid_token_set) {
+		syntax_error(first_invalid_token, "Expected only comments or lines starting with '#+' before the package declaration");
+		return false;
+	}
+
 	f->package_token = expect_token(f, Token_package);
 	if (f->package_token.kind != Token_package) {
 		return false;
-	}
-	if (docs != nullptr) {
-		TokenPos end = token_pos_end(docs->list[docs->list.count-1]);
-		if (end.line == f->package_token.pos.line || end.line+1 == f->package_token.pos.line) {
-			// Okay
-		} else {
-			docs = nullptr;
-		}
 	}
 
 	Token package_name = expect_token_after(f, Token_Ident, "package");
@@ -6349,50 +6462,37 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
-	if (!f->pkg->is_single_file && docs != nullptr && docs->list.count > 0) {
-		for (Token const &tok : docs->list) {
-			GB_ASSERT(tok.kind == Token_Comment);
-			String str = tok.string;
-			if (string_starts_with(str, str_lit("//"))) {
+	// TODO: Shouldn't single file only matter for build tags? no-instrumentation for example
+	// should be respected even when in single file mode.
+	if (!f->pkg->is_single_file) {
+		if (docs != nullptr && docs->list.count > 0) {
+			for (Token const &tok : docs->list) {
+				GB_ASSERT(tok.kind == Token_Comment);
+				String str = tok.string;
+
+				if (!string_starts_with(str, str_lit("//"))) {
+					continue;
+				}
+
 				String lc = string_trim_whitespace(substring(str, 2, str.len));
-				if (lc.len > 0 && lc[0] == '+') {
-					 if (string_starts_with(lc, str_lit("+build-project-name"))) {
-						if (!parse_build_project_directory_tag(tok, lc)) {
-							return false;
-						}
-					} else if (string_starts_with(lc, str_lit("+build"))) {
-						if (!parse_build_tag(tok, lc)) {
-							return false;
-						}
-					} else if (string_starts_with(lc, str_lit("+vet"))) {
-						f->vet_flags = parse_vet_tag(tok, lc);
-						f->vet_flags_set = true;
-					} else if (string_starts_with(lc, str_lit("+ignore"))) {
+				if (string_starts_with(lc, str_lit("+"))) {
+					syntax_warning(tok, "'//+' is deprecated: Use '#+' instead");
+					String lt = substring(lc, 1, lc.len);
+					if (parse_file_tag(lt, tok, f) == false) {
 						return false;
-					} else if (string_starts_with(lc, str_lit("+private"))) {
-						f->flags |= AstFile_IsPrivatePkg;
-						String command = string_trim_starts_with(lc, str_lit("+private "));
-						command = string_trim_whitespace(command);
-						if (lc == "+private") {
-							f->flags |= AstFile_IsPrivatePkg;
-						} else if (command == "package") {
-							f->flags |= AstFile_IsPrivatePkg;
-						} else if (command == "file") {
-							f->flags |= AstFile_IsPrivateFile;
-						}
-					} else if (lc == "+lazy") {
-						if (build_context.ignore_lazy) {
-							// Ignore
-						} else if (f->pkg->kind == Package_Init && build_context.command_kind == Command_doc) {
-							// Ignore
-						} else {
-							f->flags |= AstFile_IsLazy;
-						}
-					} else if (lc == "+no-instrumentation") {
-						f->flags |= AstFile_NoInstrumentation;
-					} else {
-						warning(tok, "Ignoring unknown tag '%.*s'", LIT(lc));
 					}
+				}
+			}
+		}
+
+		for (Token const &tok : tags) {
+			GB_ASSERT(tok.kind == Token_FileTag);
+			String str = tok.string;
+
+			if (string_starts_with(str, str_lit("#+"))) {
+				String lt = string_trim_whitespace(substring(str, 2, str.len));
+				if (parse_file_tag(lt, tok, f) == false) {
+					return false;
 				}
 			}
 		}
@@ -6416,7 +6516,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 				}
 
 				f->total_file_decl_count += calc_decl_count(stmt);
-				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl) {
+				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl || stmt->kind == Ast_ForeignBlockDecl) {
 					f->delayed_decl_count += 1;
 				}
 			}

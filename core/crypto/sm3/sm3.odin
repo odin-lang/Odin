@@ -2,7 +2,7 @@
 package sm3 implements the SM3 hash algorithm.
 
 See:
-- https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02
+- [[ https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02 ]]
 */
 package sm3
 

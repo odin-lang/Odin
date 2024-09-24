@@ -82,6 +82,7 @@ enum AstFileFlag : u32 {
 enum AstDelayQueueKind {
 	AstDelayQueue_Import,
 	AstDelayQueue_Expr,
+	AstDelayQueue_ForeignBlock,
 	AstDelayQueue_COUNT,
 };
 
@@ -886,3 +887,6 @@ gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind);
 
 gb_internal gbString expr_to_string(Ast *expression);
 gb_internal bool allow_field_separator(AstFile *f);
+
+
+gb_internal void parse_enforce_tabs(AstFile *f);

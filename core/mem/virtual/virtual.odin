@@ -7,6 +7,11 @@ _ :: runtime
 
 DEFAULT_PAGE_SIZE := uint(4096)
 
+@(init, private)
+platform_memory_init :: proc() {
+	_platform_memory_init()
+}
+
 Allocator_Error :: mem.Allocator_Error
 
 @(require_results)

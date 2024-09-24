@@ -1,8 +1,8 @@
 /*
 The package `table` implements plain-text/markdown/HTML/custom rendering of tables.
 
-**Custom rendering example:**
-
+**Custom rendering.**
+Example:
 	package main
 
 	import "core:io"
@@ -24,13 +24,12 @@ The package `table` implements plain-text/markdown/HTML/custom rendering of tabl
 		}
 	}
 
-This outputs:
-
+Output:
 	A_LONG_ENUM         = 54, // A comment about A_LONG_ENUM
 	AN_EVEN_LONGER_ENUM = 1,  // A comment about AN_EVEN_LONGER_ENUM
 
-**Plain-text rendering example:**
-
+**Plain-text rendering.**
+Example:
 	package main
 
 	import "core:fmt"
@@ -81,8 +80,7 @@ This outputs:
 		table.write_markdown_table(stdout, tbl)
 	}
 
-This outputs:
-
+Output:
 	+-----------------------------------------------+
 	|  This is a table caption and it is very long  |
 	+------------------+-----------------+----------+
@@ -93,15 +91,11 @@ This outputs:
 	|        a         | bbb             | c        |
 	+------------------+-----------------+----------+
 
-and
-
 	|    AAAAAAAAA     |        B        |    C     |
 	|:-----------------|:---------------:|---------:|
 	| 123              | foo             |          |
 	| 000000005        | 6.283185        |          |
 	| a                | bbb             | c        |
-
-respectively.
 
 
 Additionally, if you want to set the alignment and values in-line while
@@ -116,8 +110,7 @@ constructing a table, you can use `aligned_row_of_values` or
 If you only need to build a table once but display it potentially many times,
 it may be more efficient to cache the results of your write into a string.
 
-Here's an example of how you can do that:
-
+Example:
 	package main
 
 	import "core:fmt"
@@ -191,8 +184,7 @@ This package makes use of the `grapheme_count` procedure from the
 implementation for counting graphemes and calculating visual width of a Unicode
 grapheme cluster in monospace cells.
 
-Here is a full example of how well-supported Unicode is with this package:
-
+Example:
 	package main
 
 	import "core:fmt"
@@ -237,7 +229,7 @@ Here is a full example of how well-supported Unicode is with this package:
 		scripts(stdout)
 	}
 
-This will print out:
+Output:
 
 	+----------------------------------------------------------------------------------------------------------------------------+
 	|                                                        Tést Suite                                                          |
@@ -271,8 +263,7 @@ If you'd prefer to change the borders used by the plain-text table printing,
 there is the `write_decorated_table` procedure that allows you to change the
 corners and dividers.
 
-Here is a complete example:
-
+Example:
 	package main
 
 	import "core:fmt"

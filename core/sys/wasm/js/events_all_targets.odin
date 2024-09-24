@@ -1,7 +1,6 @@
-//+build js wasm32, js wasm64p32
+#+build !js
 package wasm_js_interface
 
-foreign import dom_lib "odin_dom"
 
 Event_Kind :: enum u32 {
 	Invalid,
@@ -33,7 +32,6 @@ Event_Kind :: enum u32 {
 	Submit,
 	Blur,
 	Change,
-	HashChange,
 	Select,
 
 	Animation_Start,
@@ -113,7 +111,6 @@ event_kind_string := [Event_Kind]string{
 	.Submit       = "submit",
 	.Blur         = "blur",
 	.Change       = "change",
-	.HashChange   = "hashchange",
 	.Select       = "select",
 
 	.Animation_Start     = "animationstart",
@@ -235,8 +232,6 @@ Event :: struct {
 
 			repeat: bool,
 
-			_key_len:  int,
-			_code_len: int,
 			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte,
 			_code_buf: [KEYBOARD_MAX_KEY_SIZE]byte,
 		},
@@ -263,99 +258,30 @@ Event :: struct {
 	callback:  proc(e: Event),
 }
 
-@(default_calling_convention="contextless")
-foreign dom_lib {
-	event_stop_propagation           :: proc() ---
-	event_stop_immediate_propagation :: proc() ---
-	event_prevent_default            :: proc() ---
-	dispatch_custom_event            :: proc(id: string, name: string, options := Event_Options{}) -> bool ---
-}
 
 add_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
-	@(default_calling_convention="contextless")
-	foreign dom_lib {
-		@(link_name="add_event_listener")
-		_add_event_listener :: proc(id: string, name: string, name_code: Event_Kind, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
-	}
-	// TODO: Pointer_Lock_Change etc related stuff for all different browsers
-	return _add_event_listener(id, event_kind_string[kind], kind, user_data, callback, use_capture)
+	panic("vendor:wasm/js not supported on non JS targets")
 }
 
 remove_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
-	@(default_calling_convention="contextless")
-	foreign dom_lib {
-		@(link_name="remove_event_listener")
-		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
-	}
-	return _remove_event_listener(id, event_kind_string[kind], user_data, callback)
+	panic("vendor:wasm/js not supported on non JS targets")
 }
 
 add_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
-	@(default_calling_convention="contextless")
-	foreign dom_lib {
-		@(link_name="add_window_event_listener")
-		_add_window_event_listener :: proc(name: string, name_code: Event_Kind, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
-	}
-	return _add_window_event_listener(event_kind_string[kind], kind, user_data, callback, use_capture)
+	panic("vendor:wasm/js not supported on non JS targets")
 }
 
 remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
-	@(default_calling_convention="contextless")
-	foreign dom_lib {
-		@(link_name="remove_window_event_listener")
-		_remove_window_event_listener :: proc(name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
-	}
-	return _remove_window_event_listener(event_kind_string[kind], user_data, callback)
+	panic("vendor:wasm/js not supported on non JS targets")
 }
 
 remove_event_listener_from_event :: proc(e: Event) -> bool {
-	if e.id == "" {
-		return remove_window_event_listener(e.kind, e.user_data, e.callback)
-	}
-	return remove_event_listener(e.id, e.kind, e.user_data, e.callback)
+	panic("vendor:wasm/js not supported on non JS targets")
 }
 
 add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
-	@(default_calling_convention="contextless")
-	foreign dom_lib {
-		@(link_name="add_event_listener")
-		_add_event_listener :: proc(id: string, name: string, name_code: Event_Kind, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
-	}
-	return _add_event_listener(id, name, .Custom, user_data, callback, use_capture)
+	panic("vendor:wasm/js not supported on non JS targets")
 }
 remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event)) -> bool {
-	@(default_calling_convention="contextless")
-	foreign dom_lib {
-		@(link_name="remove_event_listener")
-		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
-	}
-	return _remove_event_listener(id, name, user_data, callback)
-}
-
-
-
-
-@(export, link_name="odin_dom_do_event_callback")
-do_event_callback :: proc(user_data: rawptr, callback: proc(e: Event)) {
-	@(default_calling_convention="contextless")
-	foreign dom_lib {
-		init_event_raw :: proc(e: ^Event) ---
-	}
-
-	if callback != nil {
-		event := Event{
-			user_data = user_data,
-			callback  = callback,
-		}
-
-
-		init_event_raw(&event)
-
-		if event.kind == .Key_Up || event.kind == .Key_Down || event.kind == .Key_Press {
-			event.key.key = string(event.key._key_buf[:event.key._key_len]) 
-			event.key.code = string(event.key._code_buf[:event.key._code_len]) 
-		}
-
-		callback(event)
-	}
+	panic("vendor:wasm/js not supported on non JS targets")
 }

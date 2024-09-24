@@ -22,9 +22,9 @@ F32_EPSILON :: 1e-7
 F64_EPSILON :: 1e-15
 
 // Odin matrices are stored internally as Column-Major, which matches OpenGL/GLSL by default
-mat2 :: distinct matrix[2, 2]f32
-mat3 :: distinct matrix[3, 3]f32
-mat4 :: distinct matrix[4, 4]f32
+mat2 :: matrix[2, 2]f32
+mat3 :: matrix[3, 3]f32
+mat4 :: matrix[4, 4]f32
 mat2x2 :: mat2
 mat3x3 :: mat3
 mat4x4 :: mat4
@@ -33,52 +33,52 @@ mat4x4 :: mat4
 // but they match how GLSL and OpenGL defines them in name
 // Odin: matrix[R, C]f32 
 // GLSL: matCxR
-mat3x2 :: distinct matrix[2, 3]f32
-mat4x2 :: distinct matrix[2, 4]f32
-mat2x3 :: distinct matrix[3, 2]f32
-mat4x3 :: distinct matrix[3, 4]f32
-mat2x4 :: distinct matrix[4, 2]f32
-mat3x4 :: distinct matrix[4, 3]f32
+mat3x2 :: matrix[2, 3]f32
+mat4x2 :: matrix[2, 4]f32
+mat2x3 :: matrix[3, 2]f32
+mat4x3 :: matrix[3, 4]f32
+mat2x4 :: matrix[4, 2]f32
+mat3x4 :: matrix[4, 3]f32
 
-vec2 :: distinct [2]f32
-vec3 :: distinct [3]f32
-vec4 :: distinct [4]f32
+vec2 :: [2]f32
+vec3 :: [3]f32
+vec4 :: [4]f32
 
-ivec2 :: distinct [2]i32
-ivec3 :: distinct [3]i32
-ivec4 :: distinct [4]i32
+ivec2 :: [2]i32
+ivec3 :: [3]i32
+ivec4 :: [4]i32
 
-uvec2 :: distinct [2]u32
-uvec3 :: distinct [3]u32
-uvec4 :: distinct [4]u32
+uvec2 :: [2]u32
+uvec3 :: [3]u32
+uvec4 :: [4]u32
 
-bvec2 :: distinct [2]bool
-bvec3 :: distinct [3]bool
-bvec4 :: distinct [4]bool
+bvec2 :: [2]bool
+bvec3 :: [3]bool
+bvec4 :: [4]bool
 
-quat :: distinct quaternion128
+quat :: quaternion128
 
 // Double Precision (f64) Floating Point Types 
 
-dmat2 :: distinct matrix[2, 2]f64
-dmat3 :: distinct matrix[3, 3]f64
-dmat4 :: distinct matrix[4, 4]f64
+dmat2 :: matrix[2, 2]f64
+dmat3 :: matrix[3, 3]f64
+dmat4 :: matrix[4, 4]f64
 dmat2x2 :: dmat2
 dmat3x3 :: dmat3
 dmat4x4 :: dmat4
 
-dmat3x2 :: distinct matrix[2, 3]f64
-dmat4x2 :: distinct matrix[2, 4]f64
-dmat2x3 :: distinct matrix[3, 2]f64
-dmat4x3 :: distinct matrix[3, 4]f64
-dmat2x4 :: distinct matrix[4, 2]f64
-dmat3x4 :: distinct matrix[4, 3]f64
+dmat3x2 :: matrix[2, 3]f64
+dmat4x2 :: matrix[2, 4]f64
+dmat2x3 :: matrix[3, 2]f64
+dmat4x3 :: matrix[3, 4]f64
+dmat2x4 :: matrix[4, 2]f64
+dmat3x4 :: matrix[4, 3]f64
 
-dvec2 :: distinct [2]f64
-dvec3 :: distinct [3]f64
-dvec4 :: distinct [4]f64
+dvec2 :: [2]f64
+dvec3 :: [3]f64
+dvec4 :: [4]f64
 
-dquat :: distinct quaternion256
+dquat :: quaternion256
 
 cos :: proc{
 	cos_f32,

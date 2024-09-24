@@ -426,7 +426,9 @@ foreign libc {
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, #c_vararg mode: ..u32) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
+	@(link_name="pread")            _unix_pread         :: proc(fd: Handle, buf: rawptr, size: c.size_t, offset: i64) -> c.ssize_t ---
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
+	@(link_name="pwrite")           _unix_pwrite        :: proc(fd: Handle, buf: rawptr, size: c.size_t, offset: i64) -> c.ssize_t ---
 	@(link_name="lseek")            _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---
 	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
@@ -441,6 +443,7 @@ foreign libc {
 	@(link_name="rmdir")            _unix_rmdir         :: proc(path: cstring) -> c.int ---
 	@(link_name="mkdir")            _unix_mkdir         :: proc(path: cstring, mode: mode_t) -> c.int ---
 	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, #c_vararg args: ..any) -> c.int ---
+	@(link_name="fsync")            _unix_fsync         :: proc(fd: Handle) -> c.int ---
 	@(link_name="dup")              _unix_dup           :: proc(fd: Handle) -> Handle ---
 	
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
@@ -504,7 +507,10 @@ close :: proc(fd: Handle) -> Error {
 }
 
 flush :: proc(fd: Handle) -> Error {
-	// do nothing
+	result := _unix_fsync(fd)
+	if result == -1 {
+		return get_last_error()
+	}
 	return nil
 }
 
@@ -535,29 +541,48 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 }
 
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
-	curr := seek(fd, offset, SEEK_CUR) or_return
-	n, err = read(fd, data)
-	_, err1 := seek(fd, curr, SEEK_SET)
-	if err1 != nil && err == nil {
-		err = err1
+	if len(data) == 0 {
+		return 0, nil
 	}
-	return
+
+	to_read := min(uint(len(data)), MAX_RW)
+
+	bytes_read := _unix_pread(fd, raw_data(data), to_read, offset)
+	if bytes_read < 0 {
+		return -1, get_last_error()
+	}
+	return bytes_read, nil
 }
 
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
-	curr := seek(fd, offset, SEEK_CUR) or_return
-	n, err = write(fd, data)
-	_, err1 := seek(fd, curr, SEEK_SET)
-	if err1 != nil && err == nil {
-		err = err1
+	if len(data) == 0 {
+		return 0, nil
 	}
-	return
+
+	to_write := min(uint(len(data)), MAX_RW)
+
+	bytes_written := _unix_pwrite(fd, raw_data(data), to_write, offset)
+	if bytes_written < 0 {
+		return -1, get_last_error()
+	}
+	return bytes_written, nil
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+	switch whence {
+	case SEEK_SET, SEEK_CUR, SEEK_END:
+		break
+	case:
+		return 0, .Invalid_Whence
+	}
 	res := _unix_seek(fd, offset, c.int(whence))
 	if res == -1 {
-		return -1, get_last_error()
+		errno := get_last_error()
+		switch errno {
+		case .EINVAL:
+			return 0, .Invalid_Offset
+		}
+		return 0, errno
 	}
 	return res, nil
 }
@@ -869,7 +894,8 @@ get_env :: proc(key: string, allocator := context.allocator) -> (value: string) 
 }
 
 @(require_results)
-get_current_directory :: proc() -> string {
+get_current_directory :: proc(allocator := context.allocator) -> string {
+	context.allocator = allocator
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
 	// The largest value I could find was 4096, so might as well use the page size.
@@ -953,7 +979,7 @@ get_page_size :: proc() -> int {
 _processor_core_count :: proc() -> int {
 	count : int = 0
 	count_size := size_of(count)
-	if _sysctlbyname("hw.logicalcpu", &count, &count_size, nil, 0) == 0 {
+	if _sysctlbyname("hw.ncpu", &count, &count_size, nil, 0) == 0 {
 		if count > 0 {
 			return count
 		}

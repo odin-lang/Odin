@@ -7,7 +7,7 @@
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
 
-//+build ignore
+#+build ignore
 package math_big
 
 import "core:time"

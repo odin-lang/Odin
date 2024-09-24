@@ -2,7 +2,7 @@
 package tuplehash implements the TupleHash and TupleHashXOF algorithms.
 
 See:
-- https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-185.pdf
+- [[ https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-185.pdf ]]
 */
 package tuplehash
 

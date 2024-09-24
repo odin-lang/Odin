@@ -529,6 +529,9 @@ gb_internal gb_inline void yield_thread(void) {
 	_mm_pause();
 #elif defined(GB_CPU_ARM)
 	__asm__ volatile ("yield" : : : "memory");
+#elif defined(GB_CPU_RISCV)
+	// I guess?
+	__asm__ volatile ("nop" : : : "memory");
 #else
 #error Unknown architecture
 #endif

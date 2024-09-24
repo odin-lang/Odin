@@ -1,14 +1,14 @@
-//+private
-//+build !essence
-//+build !js
-//+build !linux
-//+build !openbsd
-//+build !freebsd
-//+build !netbsd
-//+build !darwin
-//+build !wasi
-//+build !windows
-//+build !orca
+#+private
+#+build !essence
+#+build !js
+#+build !linux
+#+build !openbsd
+#+build !freebsd
+#+build !netbsd
+#+build !darwin
+#+build !wasi
+#+build !windows
+#+build !orca
 package time
 
 _IS_SUPPORTED :: false

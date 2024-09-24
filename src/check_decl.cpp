@@ -768,6 +768,19 @@ gb_internal bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	if (a->result_count != b->result_count) {
 		return false;
 	}
+
+	if (a->c_vararg != b->c_vararg) {
+		return false;
+	}
+
+	if (a->variadic != b->variadic) {
+		return false;
+	}
+
+	if (a->variadic && a->variadic_index != b->variadic_index) {
+		return false;
+	}
+
 	for (isize i = 0; i < a->param_count; i++) {
 		Type *x = core_type(a->params->Tuple.variables[i]->type);
 		Type *y = core_type(b->params->Tuple.variables[i]->type);
@@ -777,6 +790,17 @@ gb_internal bool are_signatures_similar_enough(Type *a_, Type *b_) {
 		}
 		if (y->kind == Type_BitSet && y->BitSet.underlying) {
 			y = core_type(y->BitSet.underlying);
+		}
+
+		// Allow a `#c_vararg args: ..any` with `#c_vararg args: ..foo`.
+		if (a->variadic && i == a->variadic_index) {
+			GB_ASSERT(x->kind == Type_Slice);
+			GB_ASSERT(y->kind == Type_Slice);
+			Type *x_elem = core_type(x->Slice.elem);
+			Type *y_elem = core_type(y->Slice.elem);
+			if (is_type_any(x_elem) || is_type_any(y_elem)) {
+				continue;
+			}
 		}
 
 		if (!signature_parameter_similar_enough(x, y)) {

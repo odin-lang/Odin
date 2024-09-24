@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd, haiku
 package unix
 
 foreign import "system:pthread"
@@ -26,6 +26,8 @@ foreign pthread {
 	pthread_self :: proc() -> pthread_t ---
 
 	pthread_equal :: proc(a, b: pthread_t) -> b32 ---
+
+	pthread_detach :: proc(t: pthread_t) -> c.int ---
 
 	sched_get_priority_min :: proc(policy: c.int) -> c.int ---
 	sched_get_priority_max :: proc(policy: c.int) -> c.int ---

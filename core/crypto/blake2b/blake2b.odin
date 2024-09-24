@@ -2,8 +2,8 @@
 package blake2b implements the BLAKE2b hash algorithm.
 
 See:
-- https://datatracker.ietf.org/doc/html/rfc7693
-- https://www.blake2.net
+- [[ https://datatracker.ietf.org/doc/html/rfc7693 ]]
+- [[ https://www.blake2.net ]]
 */
 package blake2b
 

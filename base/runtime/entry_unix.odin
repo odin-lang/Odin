@@ -1,6 +1,6 @@
-//+private
-//+build linux, darwin, freebsd, openbsd, netbsd, haiku
-//+no-instrumentation
+#+private
+#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+no-instrumentation
 package runtime
 
 import "base:intrinsics"

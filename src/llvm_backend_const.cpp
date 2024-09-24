@@ -154,7 +154,7 @@ gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValue
 	GB_ASSERT(value_count_ == bt->Struct.fields.count);
 	
 	auto field_remapping = lb_get_struct_remapping(m, t);
-	unsigned values_with_padding_count = LLVMCountStructElementTypes(struct_type);
+	unsigned values_with_padding_count = elem_count;
 	
 	LLVMValueRef *values_with_padding = gb_alloc_array(permanent_allocator(), LLVMValueRef, values_with_padding_count);
 	for (unsigned i = 0; i < value_count; i++) {
@@ -722,7 +722,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		}
 
 	case ExactValue_Integer:
-		if (is_type_pointer(type) || is_type_multi_pointer(type)) {
+		if (is_type_pointer(type) || is_type_multi_pointer(type) || is_type_proc(type)) {
 			LLVMTypeRef t = lb_type(m, original_type);
 			LLVMValueRef i = lb_big_int_to_llvm(m, t_uintptr, &value.value_integer);
 			res.value = LLVMConstIntToPtr(i, t);

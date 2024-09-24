@@ -1,12 +1,17 @@
-//+build js
+#+build js
 package os
 
-import "base:runtime"
+foreign import "odin_env"
 
 @(require_results)
 is_path_separator :: proc(c: byte) -> bool {
 	return c == '/' || c == '\\'
 }
+
+Handle :: distinct u32
+
+stdout: Handle = 1
+stderr: Handle = 2
 
 @(require_results)
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Error) {
@@ -14,22 +19,20 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Erro
 }
 
 close :: proc(fd: Handle) -> Error {
-	unimplemented("core:os procedure not supported on JS target")
+	return nil
 }
 
 flush :: proc(fd: Handle) -> (err: Error) {
-	unimplemented("core:os procedure not supported on JS target")
+	return nil
 }
-
-
 
 write :: proc(fd: Handle, data: []byte) -> (int, Error) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
-@(private="file")
-read_console :: proc(handle: Handle, b: []byte) -> (n: int, err: Error) {
-	unimplemented("core:os procedure not supported on JS target")
+	foreign odin_env {
+		@(link_name="write")
+		_write :: proc "contextless" (fd: Handle, p: []byte) ---
+	}
+	_write(fd, data)
+	return len(data), nil
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Error) {
@@ -45,35 +48,12 @@ file_size :: proc(fd: Handle) -> (i64, Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-
-@(private)
-MAX_RW :: 1<<30
-
-@(private)
-pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-@(private)
-pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Error) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
 	unimplemented("core:os procedure not supported on JS target")
 }
-
-stdout: Handle = 1
-stderr: Handle = 2
-
-@(require_results)
-get_std_handle :: proc "contextless" (h: uint) -> Handle {
-	context = runtime.default_context()
-	unimplemented("core:os procedure not supported on JS target")
-}
-
 
 @(require_results)
 exists :: proc(path: string) -> bool {
@@ -89,9 +69,6 @@ is_file :: proc(path: string) -> bool {
 is_dir :: proc(path: string) -> bool {
 	unimplemented("core:os procedure not supported on JS target")
 }
-
-// NOTE(tetra): GetCurrentDirectory is not thread safe with SetCurrentDirectory and GetFullPathName
-//@private cwd_lock := win32.SRWLOCK{} // zero is initialized
 
 @(require_results)
 get_current_directory :: proc(allocator := context.allocator) -> string {
@@ -114,18 +91,6 @@ make_directory :: proc(path: string, mode: u32 = 0) -> (err: Error) {
 
 
 remove_directory :: proc(path: string) -> (err: Error) {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
-
-
-@(private, require_results)
-is_abs :: proc(path: string) -> bool {
-	unimplemented("core:os procedure not supported on JS target")
-}
-
-@(private, require_results)
-fix_long_path :: proc(path: string) -> string {
 	unimplemented("core:os procedure not supported on JS target")
 }
 
@@ -169,7 +134,6 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	unimplemented("core:os procedure not supported on JS target")
 }
 
-Handle    :: distinct uintptr
 File_Time :: distinct u64
 
 _Platform_Error :: enum i32 {
@@ -254,12 +218,7 @@ WSAECONNRESET             :: Platform_Error.WSAECONNRESET
 ERROR_FILE_IS_PIPE        :: General_Error.File_Is_Pipe
 ERROR_FILE_IS_NOT_DIR     :: General_Error.Not_Dir
 
-// "Argv" arguments converted to Odin strings
-args := _alloc_command_line_arguments()
-
-
-
-
+args: []string
 
 @(require_results)
 last_write_time :: proc(fd: Handle) -> (File_Time, Error) {
@@ -279,26 +238,14 @@ get_page_size :: proc() -> int {
 
 @(private, require_results)
 _processor_core_count :: proc() -> int {
-	unimplemented("core:os procedure not supported on JS target")
+	return 1
 }
 
 exit :: proc "contextless" (code: int) -> ! {
-	context = runtime.default_context()
-	unimplemented("core:os procedure not supported on JS target")
+	unimplemented_contextless("core:os procedure not supported on JS target")
 }
-
-
 
 @(require_results)
 current_thread_id :: proc "contextless" () -> int {
-	context = runtime.default_context()
-	unimplemented("core:os procedure not supported on JS target")
+	return 0
 }
-
-
-
-@(require_results)
-_alloc_command_line_arguments :: proc() -> []string {
-	return nil
-}
-

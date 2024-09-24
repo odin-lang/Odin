@@ -1,4 +1,4 @@
-//+build riscv64
+#+build riscv64
 package linux
 
 // https://github.com/riscv-collab/riscv-gnu-toolchain/blob/master/linux-headers/include/asm-generic/unistd.h
@@ -248,6 +248,7 @@ SYS_rt_tgsigqueueinfo            :: uintptr(240)
 SYS_perf_event_open              :: uintptr(241)
 SYS_accept4                      :: uintptr(242)
 SYS_recvmmsg                     :: uintptr(243)
+SYS_riscv_hwprobe                :: uintptr(258)
 SYS_wait4                        :: uintptr(260)
 SYS_prlimit64                    :: uintptr(261)
 SYS_fanotify_init                :: uintptr(262)

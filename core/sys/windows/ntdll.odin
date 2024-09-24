@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 foreign import ntdll_lib "system:ntdll.lib"

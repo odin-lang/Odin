@@ -1,4 +1,4 @@
-//+private
+#+private
 package testing
 
 /*
@@ -202,6 +202,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		case:
 			delete(s, allocator)
 		}
+	}
+
+	when ODIN_OS == .Windows {
+		console_ansi_init()
 	}
 
 	stdout := io.to_writer(os.stream_from_handle(os.stdout))

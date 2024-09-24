@@ -1,6 +1,5 @@
 package sync
 
-import "base:runtime"
 import "core:time"
 
 /*
@@ -390,7 +389,7 @@ recursive_mutex_guard :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 A condition variable.
 
 `Cond` implements a condition variable, a rendezvous point for threads waiting
-for signalling the occurence of an event. Condition variables are used on
+for signalling the occurence of an event. Condition variables are used in
 conjuction with mutexes to provide a shared access to one or more shared
 variable.
 
@@ -560,7 +559,7 @@ futex_wait :: proc "contextless" (f: ^Futex, expected: u32) {
 		return
 	}
 	ok := _futex_wait(f, expected)
-	_assert(ok, "futex_wait failure")
+	assert_contextless(ok, "futex_wait failure")
 }
 
 /*
@@ -596,19 +595,4 @@ Wake up multiple threads waiting on a futex.
 */
 futex_broadcast :: proc "contextless" (f: ^Futex) {
 	_futex_broadcast(f)
-}
-
-
-@(private)
-_assert :: proc "contextless" (cond: bool, msg: string) {
-	if !cond {
-		_panic(msg)
-	}
-}
-
-@(private)
-_panic :: proc "contextless" (msg: string) -> ! {
-	runtime.print_string(msg)
-	runtime.print_byte('\n')
-	runtime.trap()
 }

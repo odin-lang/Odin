@@ -21,89 +21,89 @@ LN10 :: 2.30258509299404568401799145468436421
 FLOAT_EPSILON :: 1e-7
 DOUBLE_EPSILON :: 1e-15
 
-// Aliases (not distinct) of types
+// Aliases (not distict) of types
 float  :: f32
 double :: f64
 int    :: builtin.i32
 uint   :: builtin.u32
 
 // Odin matrices are stored internally as Column-Major, which matches the internal layout of HLSL by default
-float1x1 :: distinct matrix[1, 1]float
-float2x2 :: distinct matrix[2, 2]float
-float3x3 :: distinct matrix[3, 3]float
-float4x4 :: distinct matrix[4, 4]float
+float1x1 :: matrix[1, 1]float
+float2x2 :: matrix[2, 2]float
+float3x3 :: matrix[3, 3]float
+float4x4 :: matrix[4, 4]float
 
-float1x2 :: distinct matrix[1, 2]float
-float1x3 :: distinct matrix[1, 3]float
-float1x4 :: distinct matrix[1, 4]float
-float2x1 :: distinct matrix[2, 1]float
-float2x3 :: distinct matrix[2, 3]float
-float2x4 :: distinct matrix[2, 4]float
-float3x1 :: distinct matrix[3, 1]float
-float3x2 :: distinct matrix[3, 2]float
-float3x4 :: distinct matrix[3, 4]float
-float4x1 :: distinct matrix[4, 1]float
-float4x2 :: distinct matrix[4, 2]float
-float4x3 :: distinct matrix[4, 3]float
+float1x2 :: matrix[1, 2]float
+float1x3 :: matrix[1, 3]float
+float1x4 :: matrix[1, 4]float
+float2x1 :: matrix[2, 1]float
+float2x3 :: matrix[2, 3]float
+float2x4 :: matrix[2, 4]float
+float3x1 :: matrix[3, 1]float
+float3x2 :: matrix[3, 2]float
+float3x4 :: matrix[3, 4]float
+float4x1 :: matrix[4, 1]float
+float4x2 :: matrix[4, 2]float
+float4x3 :: matrix[4, 3]float
 
-float2 :: distinct [2]float
-float3 :: distinct [3]float
-float4 :: distinct [4]float
+float2 :: [2]float
+float3 :: [3]float
+float4 :: [4]float
 
-int2 :: distinct [2]int
-int3 :: distinct [3]int
-int4 :: distinct [4]int
+int2 :: [2]int
+int3 :: [3]int
+int4 :: [4]int
 
-uint2 :: distinct [2]uint
-uint3 :: distinct [3]uint
-uint4 :: distinct [4]uint
+uint2 :: [2]uint
+uint3 :: [3]uint
+uint4 :: [4]uint
 
-bool2 :: distinct [2]bool
-bool3 :: distinct [3]bool
-bool4 :: distinct [4]bool
+bool2 :: [2]bool
+bool3 :: [3]bool
+bool4 :: [4]bool
 
 // Double Precision (double) Floating Point Types 
 
-double1x1 :: distinct matrix[1, 1]double
-double2x2 :: distinct matrix[2, 2]double
-double3x3 :: distinct matrix[3, 3]double
-double4x4 :: distinct matrix[4, 4]double
+double1x1 :: matrix[1, 1]double
+double2x2 :: matrix[2, 2]double
+double3x3 :: matrix[3, 3]double
+double4x4 :: matrix[4, 4]double
 
-double1x2 :: distinct matrix[1, 2]double
-double1x3 :: distinct matrix[1, 3]double
-double1x4 :: distinct matrix[1, 4]double
-double2x1 :: distinct matrix[2, 1]double
-double2x3 :: distinct matrix[2, 3]double
-double2x4 :: distinct matrix[2, 4]double
-double3x1 :: distinct matrix[3, 1]double
-double3x2 :: distinct matrix[3, 2]double
-double3x4 :: distinct matrix[3, 4]double
-double4x1 :: distinct matrix[4, 1]double
-double4x2 :: distinct matrix[4, 2]double
-double4x3 :: distinct matrix[4, 3]double
+double1x2 :: matrix[1, 2]double
+double1x3 :: matrix[1, 3]double
+double1x4 :: matrix[1, 4]double
+double2x1 :: matrix[2, 1]double
+double2x3 :: matrix[2, 3]double
+double2x4 :: matrix[2, 4]double
+double3x1 :: matrix[3, 1]double
+double3x2 :: matrix[3, 2]double
+double3x4 :: matrix[3, 4]double
+double4x1 :: matrix[4, 1]double
+double4x2 :: matrix[4, 2]double
+double4x3 :: matrix[4, 3]double
 
-double2 :: distinct [2]double
-double3 :: distinct [3]double
-double4 :: distinct [4]double
+double2 :: [2]double
+double3 :: [3]double
+double4 :: [4]double
 
 
-int1x1 :: distinct matrix[1, 1]int
-int2x2 :: distinct matrix[2, 2]int
-int3x3 :: distinct matrix[3, 3]int
-int4x4 :: distinct matrix[4, 4]int
+int1x1 :: matrix[1, 1]int
+int2x2 :: matrix[2, 2]int
+int3x3 :: matrix[3, 3]int
+int4x4 :: matrix[4, 4]int
 
-int1x2 :: distinct matrix[1, 2]int
-int1x3 :: distinct matrix[1, 3]int
-int1x4 :: distinct matrix[1, 4]int
-int2x1 :: distinct matrix[2, 1]int
-int2x3 :: distinct matrix[2, 3]int
-int2x4 :: distinct matrix[2, 4]int
-int3x1 :: distinct matrix[3, 1]int
-int3x2 :: distinct matrix[3, 2]int
-int3x4 :: distinct matrix[3, 4]int
-int4x1 :: distinct matrix[4, 1]int
-int4x2 :: distinct matrix[4, 2]int
-int4x3 :: distinct matrix[4, 3]int
+int1x2 :: matrix[1, 2]int
+int1x3 :: matrix[1, 3]int
+int1x4 :: matrix[1, 4]int
+int2x1 :: matrix[2, 1]int
+int2x3 :: matrix[2, 3]int
+int2x4 :: matrix[2, 4]int
+int3x1 :: matrix[3, 1]int
+int3x2 :: matrix[3, 2]int
+int3x4 :: matrix[3, 4]int
+int4x1 :: matrix[4, 1]int
+int4x2 :: matrix[4, 2]int
+int4x3 :: matrix[4, 3]int
 
 cos :: proc{
 	cos_float,
