@@ -7,6 +7,7 @@ foreign import pthread "system:System.framework"
 import "base:runtime"
 import "core:strings"
 import "core:c"
+import "core:sys/posix"
 
 Handle    :: distinct i32
 Pid       :: distinct i32
@@ -585,8 +586,6 @@ F_GETPATH :: 50 // return the full path of the fd
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^c.int ---
 
-	@(link_name="posix_spawn")      _unix_posix_spawn   :: proc(pid: ^Pid, path: cstring, file_actions: rawptr, attrp: rawptr, argv: [^]cstring, envp: [^]cstring) -> c.int ---
-
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, #c_vararg mode: ..u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
@@ -680,7 +679,7 @@ get_last_error_string :: proc() -> string {
 	return string(_darwin_string_error(__error()^))
 }
 
-posix_spawn :: proc(path: string, args: []string, envs: []string, file_actions: rawptr, attributes: rawptr) -> (Pid, Error) {
+_spawn :: #force_inline proc(path: string, args: []string, envs: []string, file_actions: rawptr, attributes: rawptr, is_spawnp: bool) -> (posix.pid_t, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
@@ -695,12 +694,23 @@ posix_spawn :: proc(path: string, args: []string, envs: []string, file_actions: 
 		envs_cstrs[i] = strings.clone_to_cstring(envs[i], context.temp_allocator)
 	}
 
-	child_pid: Pid
-	status := _unix_posix_spawn(&child_pid, path_cstr, file_actions, attributes, raw_data(args_cstrs), raw_data(envs_cstrs))
+	child_pid: posix.pid_t
+	status: i32
+	if is_spawnp {
+		status = posix.posix_spawnp(&child_pid, path_cstr, file_actions, attributes, raw_data(args_cstrs), raw_data(envs_cstrs))
+	} else {
+		status = posix.posix_spawn(&child_pid, path_cstr, file_actions, attributes, raw_data(args_cstrs), raw_data(envs_cstrs))
+	}
 	if status != 0 {
-		return 0, get_last_error()
+		return 0, Platform_Error(status)
 	}
 	return child_pid, nil
+}
+spawn :: proc(path: string, args: []string, envs: []string, file_actions: rawptr, attributes: rawptr) -> (posix.pid_t, Error) {
+	return _spawn(path, args, envs, file_actions, attributes, false)
+}
+spawnp :: proc(path: string, args: []string, envs: []string, file_actions: rawptr, attributes: rawptr) -> (posix.pid_t, Error) {
+	return _spawn(path, args, envs, file_actions, attributes, true)
 }
 
 @(require_results)

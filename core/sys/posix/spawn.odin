@@ -10,4 +10,5 @@ when ODIN_OS == .Darwin {
 
 foreign lib {
 	posix_spawn :: proc(pid: ^pid_t, path: cstring, file_actions: rawptr, attrp: rawptr, argv: [^]cstring, envp: [^]cstring) -> c.int ---
+	posix_spawnp :: proc(pid: ^pid_t, file: cstring, file_actions: rawptr, attrp: rawptr, argv: [^]cstring, envp: [^]cstring) -> c.int ---
 }

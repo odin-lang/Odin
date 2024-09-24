@@ -255,6 +255,7 @@ foreign mach {
 	task_resume    :: proc(task: task_t) -> kern_return_t ---
 	task_threads   :: proc(task: task_t, thread_list: ^thread_list_t, list_count: ^u32) -> kern_return_t ---
 	task_info      :: proc(task: task_t, flavor: i32, info: task_info_t, count: ^u32) -> kern_return_t ---
+	task_terminate :: proc(task: task_t) -> kern_return_t ---
 
 	thread_get_state :: proc(thread: thread_act_t, flavor: i32, thread_state: thread_state_t, old_state_count: ^u32) -> kern_return_t ---
 	thread_info :: proc(thread: thread_act_t, flavor: u32, thread_info: ^thread_identifier_info, info_count: ^u32) -> kern_return_t ---
