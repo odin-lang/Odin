@@ -27,6 +27,7 @@ when ODIN_OS == .Windows {
 		@(link_name="_gmtime64")       gmtime       :: proc(timer: ^time_t) -> ^tm ---
 		@(link_name="_localtime64")    localtime    :: proc(timer: ^time_t) -> ^tm ---
 		                               strftime     :: proc(s: [^]char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
+		@(link_name="_mkgmtime64")     timegm       :: proc(timeptr: ^tm) -> time_t ---
 	}
 
 	CLOCKS_PER_SEC :: 1000
@@ -67,6 +68,7 @@ when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS =
 		@(link_name=LLOCALTIME)
 		localtime    :: proc(timer: ^time_t) -> ^tm ---
 		strftime     :: proc(s: [^]char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
+		timegm       :: proc(timeptr: ^tm) -> time_t ---
 	}
 
 	when ODIN_OS == .NetBSD {
