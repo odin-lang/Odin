@@ -22,8 +22,8 @@ _pipe_has_data :: proc(r: ^File) -> (ok: bool, err: Error) {
 	}
 	handle := win32.HANDLE((^File_Impl)(r.impl).fd)
 	bytes_available: u32
-    if !win32.PeekNamedPipe(handle, nil, 0, nil, &bytes_available, nil) {
-        return false, _get_platform_error()
-    }
-    return bytes_available > 0, nil
+	if !win32.PeekNamedPipe(handle, nil, 0, nil, &bytes_available, nil) {
+		return false, _get_platform_error()
+	}
+	return bytes_available > 0, nil
 }
