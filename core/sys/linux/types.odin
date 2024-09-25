@@ -1136,6 +1136,12 @@ when ODIN_ARCH == .arm32 {
 		eflags:           uint,
 		rsp:              uint,
 		ss:               uint,
+		fs_base:          uint,
+		gs_base:          uint,
+		ds:               uint,
+		es:               uint,
+		fs:               uint,
+		gs:               uint,
 	}
 	// All floating point state
 	_Arch_User_FP_Regs :: struct {
