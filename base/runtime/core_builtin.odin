@@ -949,6 +949,11 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 	p("not yet implemented", message, loc)
 }
 
+@builtin
+unreachable :: proc(loc := #caller_location) -> ! {
+	panic("reached unreachable code", loc)
+}
+
 
 @builtin
 @(disabled=ODIN_DISABLE_ASSERT)
@@ -974,4 +979,9 @@ panic_contextless :: proc "contextless" (message: string, loc := #caller_locatio
 @builtin
 unimplemented_contextless :: proc "contextless" (message := "", loc := #caller_location) -> ! {
 	default_assertion_contextless_failure_proc("not yet implemented", message, loc)
+}
+
+@builtin
+unreachable_contextless :: proc "contextless" (loc := #caller_location) -> ! {
+	default_assertion_contextless_failure_proc("panic", "reached unreachable code", loc)
 }

@@ -221,7 +221,7 @@ pow2_f64 :: proc "contextless" (#any_int exp: int) -> (res: f64) {
 	case exp > 1023:                  // Overflow, +Inf
 		return 0h7ff00000_00000000
 	}
-	unreachable()
+	unreachable_contextless()
 }
 
 @(require_results)
@@ -237,7 +237,7 @@ pow2_f32 :: proc "contextless" (#any_int exp: int) -> (res: f32) {
 	case exp > 127:                  // Overflow, +Inf
 		return 0h7f80_0000
 	}
-	unreachable()
+	unreachable_contextless()
 }
 
 @(require_results)
@@ -255,7 +255,7 @@ pow2_f16 :: proc "contextless" (#any_int exp: int) -> (res: f16) {
 	case exp > 15:                   // Overflow, +Inf
 		return 0h7c00
 	}
-	unreachable()
+	unreachable_contextless()
 }
 
 @(require_results)

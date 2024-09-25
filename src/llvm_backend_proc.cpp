@@ -2203,10 +2203,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return lb_emit_matrix_flatten(p, m, tv.type);
 		}
 
-	case BuiltinProc_unreachable:
-		lb_emit_unreachable(p);
-		return {};
-
 	case BuiltinProc_raw_data:
 		{
 			lbValue x = lb_build_expr(p, ce->args[0]);

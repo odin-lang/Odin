@@ -4203,7 +4203,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->mode = Addressing_NoValue;
 		break;
 
-	case BuiltinProc_unreachable:
 	case BuiltinProc_trap:
 	case BuiltinProc_debug_trap:
 		operand->mode = Addressing_NoValue;
