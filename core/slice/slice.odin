@@ -96,6 +96,14 @@ contains :: proc(array: $T/[]$E, value: E) -> bool where intrinsics.type_is_comp
 	return found
 }
 
+/*
+	Searches the given element in the given slice in O(n) time.
+
+	Returns the first index at which the given element can be found in the slice,
+	or -1 if it is not present.
+
+	If you need a custom compare procedure, see `linear_search_proc`
+*/
 @(require_results)
 linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	where intrinsics.type_is_comparable(T) #no_bounds_check {
@@ -107,9 +115,70 @@ linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	return -1, false
 }
 
+/*
+	Searches the given element in the given slice in O(n) time, using the given predicate.
+
+	Returns the first index at which the given element can be found in the slice,
+	or -1 if it is not present.
+*/
 @(require_results)
 linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) #no_bounds_check {
 	for x, i in array {
+		if f(x) {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+/*
+	Reverse linear search searches the given element in the given slice in O(n) time,
+	starting from the slice end.
+
+	Returns the last index at which the given element can be found in the slice,
+	or -1 if it is not present
+
+	# Examples
+
+	```
+	index: int
+	found: bool
+
+	a := []i32{1, 1, 1, 2}
+
+	index, found = linear_search_reverse(a, 2)
+	assert(index == 3 && found == true)
+
+	index, found = linear_search_reverse(a, 1)
+	assert(index == 2 && found == true)
+
+	index, found = linear_search_reverse(a, 0)
+	assert(index == -1 && found == false)
+	```
+
+	If you need a custom compare procedure, see `linear_search_reverse_proc`
+*/
+@(require_results)
+linear_search_reverse :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
+	where intrinsics.type_is_comparable(T) #no_bounds_check {
+	#reverse for x, i in array {
+		if x == key {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+/*
+	Searches the given element in the given slice in O(n) time, starting from the end of
+	the slice and using the given predicate.
+
+	Returns the last index at which the given element can be found in the slice,
+	or -1 if it is not present
+*/
+@(require_results)
+linear_search_reverse_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) #no_bounds_check {
+	#reverse for x, i in array {
 		if f(x) {
 			return i, true
 		}
