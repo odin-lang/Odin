@@ -17,10 +17,14 @@ file_and_urls = [
     ("vulkan_ios.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',     False),
     ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
     # Vulkan Video
+    ("vulkan_video_codec_av1std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std.h', False),
     ("vulkan_video_codec_h264std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std.h', False),
     ("vulkan_video_codec_h265std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std.h', False),
+    ("vulkan_video_codec_av1std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std_decode.h', False),
     ("vulkan_video_codec_h264std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std_decode.h', False),
     ("vulkan_video_codec_h265std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_decode.h', False),
+    ("vulkan_video_codec_h264std_encode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std_encode.h', False),
+    ("vulkan_video_codec_h265std_encode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_encode.h', False),
 ]
 
 for file, url, _ in file_and_urls:
@@ -36,15 +40,15 @@ for file, _, skip in file_and_urls:
 
 
 def no_vk(t):
-    t = t.replace('Vk', '')
     t = t.replace('PFN_vk_icd', 'Procicd')
     t = t.replace('PFN_vk', 'Proc')
     t = t.replace('PFN_', 'Proc')
     t = t.replace('PFN_', 'Proc')
-    t = t.replace('VK_', '')
+
+    t = re.sub('(?:Vk|VK_)?(\w+)', '\\1', t)
     # Vulkan Video
-    t = t.replace('STD_', '')
-    t = t.replace('Std', '')
+
+    t = re.sub('(?:Std|STD_)?(\w+)', '\\1', t)
     return t
 
 OPAQUE_STRUCTS = """
@@ -61,6 +65,7 @@ def convert_type(t, prev_name, curr_name):
         "uint32_t":    'u32',
         "uint64_t":    'u64',
         "size_t":      'int',
+        'int16_t':     'i16',
         'int32_t':     'i32',
         'int64_t':     'i64',
         'int':         'c.int',
@@ -298,8 +303,8 @@ def parse_enums(f):
     f.write("import \"core:c\"\n\n")
     f.write("// Enums\n")
 
-    data = re.findall(r"typedef enum Vk(\w+) {(.+?)} \w+;", src, re.S)
-    data += re.findall(r"typedef enum Std(\w+) {(.+?)} \w+;", src, re.S)
+    data = re.findall(r"typedef enum (\w+) {(.+?)} \w+;", src, re.S)
+    data = [(no_vk(n), f) for n, f in data]
 
     data.sort(key=lambda x: x[0])
 
