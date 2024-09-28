@@ -357,15 +357,12 @@ the process is running, this procedure accumulates the output of its stdout
 and stderr streams and returns byte slices containing the captured data from
 the streams.
 
-Use this function when the target process doesn't require any input from stdin,
-in order to complete.
+This procedure expects that `stdout` and `stderr` fields of the `desc` parameter
+are left at default, i.e. a `nil` value. You can not capture stdout/stderr and
+redirect it to a file at the same time.
 
 This procedure does not free `stdout` and `stderr` slices before an error is
 returned. Make sure to call `delete` on these slices.
-
-This procedure is not thread-safe. It may alter the inheritance properties
-of file handles in an unpredictable manner. In case multiple threads change
-handle inheritance properties, make sure to serialize all those calls.
 */
 @(require_results)
 process_exec :: proc(
