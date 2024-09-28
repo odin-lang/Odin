@@ -1,6 +1,7 @@
 package os2
 
 import "base:runtime"
+import "core:strings"
 import "core:time"
 
 /*
@@ -345,6 +346,95 @@ handle inheritance properties, make sure to serialize all those calls.
 @(require_results)
 process_start :: proc(desc: Process_Desc) -> (Process, Error) {
 	return _process_start(desc)
+}
+
+/*
+Execute the process and capture stdout and stderr streams.
+
+This procedure creates a new process, with a given command and environment
+strings as parameters, and waits until the process finishes execution. While
+the process is running, this procedure accumulates the output of its stdout
+and stderr streams and returns byte slices containing the captured data from
+the streams.
+
+Use this function when the target process doesn't require any input from stdin,
+in order to complete.
+
+This procedure does not free `stdout` and `stderr` slices before an error is
+returned. Make sure to call `delete` on these slices.
+
+This procedure is not thread-safe. It may alter the inheritance properties
+of file handles in an unpredictable manner. In case multiple threads change
+handle inheritance properties, make sure to serialize all those calls.
+*/
+@(require_results)
+process_exec :: proc(
+	desc: Process_Desc,
+	allocator: runtime.Allocator,
+	loc := #caller_location,
+) -> (
+	state: Process_State,
+	stdout: []u8,
+	stderr: []u8,
+	err: Error,
+) {
+	assert(desc.stdout == nil, "Cannot redirect stdout when it's being captured", loc)
+	assert(desc.stderr == nil, "Cannot redirect stderr when it's being captured", loc)
+	stdout_r, stdout_w := pipe() or_return
+	defer close(stdout_r)
+	stderr_r, stderr_w := pipe() or_return
+	defer close(stdout_w)
+	process: Process
+	{
+		// NOTE(flysand): Make sure the write-ends are closed, regardless
+		// of the outcome. This makes read-ends readable on our side.
+		defer close(stdout_w)
+		defer close(stderr_w)
+		desc := desc
+		desc.stdout = stdout_w
+		desc.stderr = stderr_w
+		process = process_start(desc) or_return
+	}
+	stdout_builder := strings.builder_make(allocator) or_return
+	stderr_builder := strings.builder_make(allocator) or_return
+	read_data: for {
+		buf: [1024]u8
+		n: int
+		has_data: bool
+		hangup := false
+		has_data, err = pipe_has_data(stdout_r)
+		if has_data {
+			n, err = read(stdout_r, buf[:])
+			strings.write_bytes(&stdout_builder, buf[:n])
+		}
+		switch err {
+		case nil: // nothing
+		case .Broken_Pipe:
+			hangup = true
+		case:
+			return
+		}
+		has_data, err = pipe_has_data(stderr_r)
+		if has_data {
+			n, err = read(stderr_r, buf[:])
+			strings.write_bytes(&stderr_builder, buf[:n])
+		}
+		switch err {
+		case nil: // nothing
+		case .Broken_Pipe:
+			hangup = true
+		case:
+			return
+		}
+		if hangup {
+			break read_data
+		}
+	}
+	err = nil
+	stdout = transmute([]u8) strings.to_string(stdout_builder)
+	stderr = transmute([]u8) strings.to_string(stderr_builder)
+	state = process_wait(process) or_return
+	return
 }
 
 /*
