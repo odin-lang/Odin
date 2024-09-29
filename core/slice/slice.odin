@@ -106,7 +106,7 @@ contains :: proc(array: $T/[]$E, value: E) -> bool where intrinsics.type_is_comp
 */
 @(require_results)
 linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
-	where intrinsics.type_is_comparable(T) #no_bounds_check {
+	where intrinsics.type_is_comparable(T) {
 	for x, i in array {
 		if x == key {
 			return i, true
@@ -122,7 +122,7 @@ linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	or -1 if it is not present.
 */
 @(require_results)
-linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) #no_bounds_check {
+linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) {
 	for x, i in array {
 		if f(x) {
 			return i, true
@@ -160,7 +160,7 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 */
 @(require_results)
 linear_search_reverse :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
-	where intrinsics.type_is_comparable(T) #no_bounds_check {
+	where intrinsics.type_is_comparable(T) {
 	#reverse for x, i in array {
 		if x == key {
 			return i, true
@@ -177,7 +177,7 @@ linear_search_reverse :: proc(array: $A/[]$T, key: T) -> (index: int, found: boo
 	or -1 if it is not present
 */
 @(require_results)
-linear_search_reverse_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) #no_bounds_check {
+linear_search_reverse_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) {
 	#reverse for x, i in array {
 		if f(x) {
 			return i, true
