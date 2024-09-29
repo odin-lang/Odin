@@ -490,7 +490,7 @@ foreign lib {
 	World_Step                    :: proc(worldId: WorldId, timeStep: f32 , subStepCount: c.int) ---
 
 	// Call this to draw shapes and other debug draw data
-	World_Draw                    :: proc(worldId: WorldId, draw: DebugDraw) ---
+	World_Draw                    :: proc(worldId: WorldId, draw: ^DebugDraw) ---
 
 	// Get the body events for the current time step. The event data is transient. Do not store a reference to this data.
 	World_GetBodyEvents           :: proc(worldId: WorldId) -> BodyEvents ---
