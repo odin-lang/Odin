@@ -29,7 +29,7 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 foreign stbpf {
 	sprintf    :: proc(buf: [^]byte, fmt: cstring, #c_vararg args: ..any) -> i32 ---
 	snprintf   :: proc(buf: [^]byte, count: i32, fmt: cstring, #c_vararg args: ..any) -> i32 ---
-	vsprintf   :: proc(buf: [^]byte, fmt: cstring, va: c.va_list) -> i32 ---
+	vsprintf   :: proc(buf: [^]byte, fmt: cstring, va: ^c.va_list) -> i32 ---
 	vsnprintf  :: proc(buf: [^]byte, count: i32, fmt: cstring, va: ^c.va_list) -> i32 ---
 	vsprintfcb :: proc(callback: SPRINTFCB, user: rawptr, buf: [^]byte, fmt: cstring, va: ^c.va_list) -> i32 ---
 }
