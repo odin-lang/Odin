@@ -41,9 +41,13 @@ when ODIN_OS == .Windows {
 	when GLFW_SHARED {
 		foreign import glfw "system:glfw"
 	} else {
-		foreign import glfw { 
-			"../lib/libglfw3.a",
+		@(private)
+		LIBGLFW3 :: "../lib/libglfw3.a"
+		when !#exists(LIBGLFW3) {
+			#panic("Could not find the static glfw library, add it at \"" + ODIN_ROOT + "vendor/glfw/lib/\"`")
 		}
+
+		foreign import glfw { LIBGLFW3 }
 	}
 }
 
