@@ -1933,7 +1933,7 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 	exports._start();
 
-	// Define a `@export step :: proc(current_type: f64) -> (keep_going: bool) {`
+	// Define a `@export step :: proc(delta_time: f64) -> (keep_going: bool) {`
 	// in your app and it will get called every frame.
 	// return `false` to stop the execution of the module.
 	if (exports.step) {
@@ -1955,7 +1955,7 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 			}
 			event_temp.data = null;
 
-			if (!exports.step(currTimeStamp*0.001, odin_ctx)) {
+			if (!exports.step(dt, odin_ctx)) {
 				exports._end();
 				return;
 			}
