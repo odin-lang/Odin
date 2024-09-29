@@ -97,12 +97,32 @@ contains :: proc(array: $T/[]$E, value: E) -> bool where intrinsics.type_is_comp
 }
 
 /*
-	Searches the given element in the given slice in O(n) time.
+Searches the given slice for the given element in O(n) time.
 
-	Returns the first index at which the given element can be found in the slice,
-	or -1 if it is not present.
+If you need a custom search condition, see `linear_search_proc`
 
-	If you need a custom compare procedure, see `linear_search_proc`
+Inputs:
+- array: The slice to search in.
+- key: The element to search for.
+
+Returns:
+- index: The index `i`, such that `array[i]` is the first occurrence of `key` in `array`, or -1 if `key` is not present in `array`.
+
+Example:
+	index: int
+	found: bool
+
+	a := []i32{10, 10, 10, 20}
+
+	index, found = linear_search_reverse(a, 10)
+	assert(index == 0 && found == true)
+
+	index, found = linear_search_reverse(a, 30)
+	assert(index == -1 && found == false)
+
+	// Note that `index == 1`, since it is relative to `a[2:]`
+	index, found = linear_search_reverse(a[2:], 20)
+	assert(index == 1 && found == true)
 */
 @(require_results)
 linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
@@ -116,10 +136,14 @@ linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 }
 
 /*
-	Searches the given element in the given slice in O(n) time, using the given predicate.
+Searches the given slice for the first element satisfying predicate `f` in O(n) time.
 
-	Returns the first index at which the given element can be found in the slice,
-	or -1 if it is not present.
+Inputs:
+- array: The slice to search in.
+- f: The search condition.
+
+Returns:
+- index: The index `i`, such that `array[i]` is the first `x` in `array` for which `f(x) == true`, or -1 if such `x` does not exist.
 */
 @(require_results)
 linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) {
@@ -132,31 +156,36 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 }
 
 /*
-	Reverse linear search searches the given element in the given slice in O(n) time,
-	starting from the slice end.
+Searches the given slice for the given element in O(n) time, starting from the
+slice end.
 
-	Returns the last index at which the given element can be found in the slice,
-	or -1 if it is not present
+If you need a custom search condition, see `linear_search_reverse_proc`
 
-	# Examples
+Inputs:
+- array: The slice to search in.
+- key: The element to search for.
 
-	```
+Returns:
+- index: The index `i`, such that `array[i]` is the last occurrence of `key` in `array`, or -1 if `key` is not present in `array`.
+
+Example:
 	index: int
 	found: bool
 
-	a := []i32{1, 1, 1, 2}
+	a := []i32{10, 10, 10, 20}
 
-	index, found = linear_search_reverse(a, 2)
+	index, found = linear_search_reverse(a, 20)
 	assert(index == 3 && found == true)
 
-	index, found = linear_search_reverse(a, 1)
+	index, found = linear_search_reverse(a, 10)
 	assert(index == 2 && found == true)
 
-	index, found = linear_search_reverse(a, 0)
+	index, found = linear_search_reverse(a, 30)
 	assert(index == -1 && found == false)
-	```
 
-	If you need a custom compare procedure, see `linear_search_reverse_proc`
+	// Note that `index == 1`, since it is relative to `a[2:]`
+	index, found = linear_search_reverse(a[2:], 20)
+	assert(index == 1 && found == true)
 */
 @(require_results)
 linear_search_reverse :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
@@ -170,11 +199,15 @@ linear_search_reverse :: proc(array: $A/[]$T, key: T) -> (index: int, found: boo
 }
 
 /*
-	Searches the given element in the given slice in O(n) time, starting from the end of
-	the slice and using the given predicate.
+Searches the given slice for the last element satisfying predicate `f` in O(n)
+time, starting from the slice end.
 
-	Returns the last index at which the given element can be found in the slice,
-	or -1 if it is not present
+Inputs:
+- array: The slice to search in.
+- f: The search condition.
+
+Returns:
+- index: The index `i`, such that `array[i]` is the last `x` in `array` for which `f(x) == true`, or -1 if such `x` does not exist.
 */
 @(require_results)
 linear_search_reverse_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, found: bool) {
@@ -187,22 +220,24 @@ linear_search_reverse_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index
 }
 
 /*
-	Binary search searches the given slice for the given element.
-	If the slice is not sorted, the returned index is unspecified and meaningless.
+Searches the given slice for the given element.
+If the slice is not sorted, the returned index is unspecified and meaningless.
 
-	If the value is found then the returned int is the index of the matching element.
-	If there are multiple matches, then any one of the matches could be returned.
+If the value is found then the returned int is the index of the matching element.
+If there are multiple matches, then any one of the matches could be returned.
 
-	If the value is not found then the returned int is the index where a matching
-	element could be inserted while maintaining sorted order.
+If the value is not found then the returned int is the index where a matching
+element could be inserted while maintaining sorted order.
 
-	# Examples
+For slices of more complex types see: `binary_search_by`
 
+Example:
+	/*
 	Looks up a series of four elements. The first is found, with a
 	uniquely determined position; the second and third are not
 	found; the fourth could match any position in `[1, 4]`.
+	*/
 
-	```
 	index: int
 	found: bool
 
@@ -219,9 +254,6 @@ linear_search_reverse_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index
 
 	index, found = slice.binary_search(s, 1)
 	assert(index >= 1 && index <= 4 && found == true)
-	```
-
-	For slices of more complex types see: binary_search_by
 */
 @(require_results)
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
@@ -230,21 +262,21 @@ binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 }
 
 /*
-	Binary search searches the given slice for the given element.
-	If the slice is not sorted, the returned index is unspecified and meaningless.
+Searches the given slice for the given element.
+If the slice is not sorted, the returned index is unspecified and meaningless.
 
-	If the value is found then the returned int is the index of the matching element.
-	If there are multiple matches, then any one of the matches could be returned.
+If the value is found then the returned int is the index of the matching element.
+If there are multiple matches, then any one of the matches could be returned.
 
-	If the value is not found then the returned int is the index where a matching
-	element could be inserted while maintaining sorted order.
+If the value is not found then the returned int is the index where a matching
+element could be inserted while maintaining sorted order.
 
-	The array elements and key may be different types. This allows the filter procedure
-	to compare keys against a slice of structs, one struct value at a time.
+The array elements and key may be different types. This allows the filter procedure
+to compare keys against a slice of structs, one struct value at a time.
 
-	Returns:
-	index: int
-	found: bool
+Returns:
+- index: int
+- found: bool
 
 */
 @(require_results)
