@@ -3366,10 +3366,6 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 		return 1;
 	}
-	if (any_warnings()) {
-		print_all_errors();
-	}
-
 
 	checker->parser = parser;
 	init_checker(checker);
