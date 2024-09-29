@@ -306,3 +306,38 @@ test_compare_empty :: proc(t: ^testing.T) {
 	testing.expectf(t, slice.equal(c[:], d[:]),
 		"Expected two separate empty slices of two dynamic arrays to be equal")
 }
+
+@test
+test_linear_search_reverse :: proc(t: ^testing.T) {
+	index: int
+	found: bool
+
+	s := []i32{0, 50, 50, 100}
+
+	index, found = slice.linear_search_reverse(s, 100)
+	testing.expect(t, found)
+	testing.expect_value(t, index, len(s) - 1)
+
+	index, found = slice.linear_search_reverse(s[len(s) - 1:], 100)
+	testing.expect(t, found)
+	testing.expect_value(t, index, 0)
+
+	index, found = slice.linear_search_reverse(s, 50)
+	testing.expect(t, found)
+	testing.expect_value(t, index, 2)
+
+	index, found = slice.linear_search_reverse(s, 0)
+	testing.expect(t, found)
+	testing.expect_value(t, index, 0)
+
+	index, found = slice.linear_search_reverse(s, -1)
+	testing.expect(t, !found)
+
+	less_than_80 :: proc(x: i32) -> bool {
+		return x < 80
+	}
+
+	index, found = slice.linear_search_reverse_proc(s, less_than_80)
+	testing.expect(t, found)
+	testing.expect_value(t, index, 2)
+}
