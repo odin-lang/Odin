@@ -1,7 +1,8 @@
 package vendor_wgpu_example_triangle
 
+import "core:sys/wasm/js"
+
 import "vendor:wgpu"
-import "vendor:wasm/js"
 
 OS :: struct {
 	initialized: bool,
