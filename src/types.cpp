@@ -3913,6 +3913,14 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 				max = align;
 			}
 		}
+
+		if (t->Struct.custom_min_field_align > 0) {
+			max = gb_max(max, t->Struct.custom_min_field_align);
+		}
+		if (t->Struct.custom_max_field_align != 0 &&
+		    t->Struct.custom_max_field_align > t->Struct.custom_min_field_align) {
+			max = gb_min(max, t->Struct.custom_max_field_align);
+		}
 		return max;
 	} break;
 
