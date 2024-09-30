@@ -45,20 +45,18 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	}
 
 	when ODIN_OS == .Linux {
+
 		sockaddr_in :: struct {
 			sin_family: sa_family_t, /* [PSX] AF_INET (but a smaller size) */
 			sin_port:   in_port_t,   /* [PSX] port number */
 			sin_addr:   in_addr,     /* [PSX] IP address */
-			sin_zero: [size_of(sockaddr) -
-				u16 -
-				size_of(in_port_t) -
-				size_of(in_addr)]c.char,
+			sin_zero:   [8]c.char,
 		}
 
 		sockaddr_in6 :: struct {
 			sin6_family:   sa_family_t, /* [PSX] AF_INET6 (but a smaller size) */
 			sin6_port:     in_port_t,   /* [PSX] port number */
-			sin6_flowinfo: u32be,  /* [PSX] IPv6 traffic class and flow information */
+			sin6_flowinfo: u32be,       /* [PSX] IPv6 traffic class and flow information */
 			sin6_addr:     in6_addr,    /* [PSX] IPv6 address */
 			sin6_scope_id: c.uint32_t,  /* [PSX] set of interfaces for a scope */
 		}

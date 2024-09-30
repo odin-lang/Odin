@@ -191,11 +191,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS 
 	MCL_CURRENT :: 0x0001
 	MCL_FUTURE  :: 0x0002
 
-	when ODIN_OS == .Linux {
-		MAP_FAILED :: rawptr(~uintptr(-1))
-	} else {
-		MAP_FAILED :: rawptr(~uintptr(0))
-	}
+	MAP_FAILED :: rawptr(~uintptr(0))
 
 	POSIX_MADV_DONTNEED   :: 4
 	POSIX_MADV_NORMAL     :: 0

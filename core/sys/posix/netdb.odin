@@ -427,7 +427,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		NI_NUMERICHOST  :: 1
 		NI_NAMEREQD     :: 8
 		NI_NUMERICSERV  :: 2
-		NI_NUMERICSCOPE :: 0 // NOTE: not implemented
+		NI_NUMERICSCOPE :: 0x100
 		NI_DGRAM        :: 16
 
 	}

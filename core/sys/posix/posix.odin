@@ -1,5 +1,7 @@
 /*
-Bindings for most POSIX APIs.
+Raw bindings for most POSIX APIs.
+
+Targets glibc and musl compatibility.
 
 APIs that have been left out are due to not being useful,
 being fully replaced (and better) by other Odin packages,

@@ -323,11 +323,7 @@ when ODIN_OS == .NetBSD {
 
 when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
-	when ODIN_OS == .Linux {
-		socklen_t :: distinct c.uint32_t
-	} else {
-		socklen_t :: distinct c.uint
-	}
+	socklen_t :: distinct c.uint
 
 	_sa_family_t :: distinct c.uint8_t
 
@@ -518,11 +514,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	}
 
 	// The maximum backlog queue length for listen().
-	when ODIN_OS == .Linux {
-		SOMAXCONN :: 4096
-	} else {
-		SOMAXCONN :: 128
-	}
+	SOMAXCONN :: 128
 
 	when ODIN_OS == .Linux {
 		MSG_CTRUNC    :: 0x008

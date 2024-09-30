@@ -36,7 +36,7 @@ IPC_Flag_Bits :: enum c.int {
 }
 IPC_Flags :: bit_set[IPC_Flag_Bits; c.int]
 
-when ODIN_OS == .Darwin || ODIN_OS == .Linux {
+when ODIN_OS == .Darwin {
 
 	key_t :: distinct c.int32_t
 
@@ -72,6 +72,32 @@ when ODIN_OS == .Darwin || ODIN_OS == .Linux {
 		mode: mode_t,    /* [PSX] read/write perms */
 		_seq: c.ushort,
 		_key: key_t,
+	}
+
+	IPC_CREAT  :: 0o01000
+	IPC_EXCL   :: 0o02000
+	IPC_NOWAIT :: 0o04000
+
+	IPC_PRIVATE :: key_t(0)
+
+	IPC_RMID :: 0
+	IPC_SET  :: 1
+	IPC_STAT :: 2
+
+} else when ODIN_OS == .Linux {
+
+	key_t :: distinct c.int32_t
+
+	ipc_perm :: struct {
+		__ipc_perm_key: key_t,
+		uid:            uid_t,     /* [PSX] owner's user ID */
+		gid:            gid_t,     /* [PSX] owner's group ID */
+		cuid:           uid_t,     /* [PSX] creator's user ID */
+		cgid:           gid_t,     /* [PSX] creator's group ID */
+		mode:           mode_t,    /* [PSX] read/write perms */
+		__ipc_perm_seq: c.int,
+		__pad1:         c.long,
+		__pad2:         c.long,
 	}
 
 	IPC_CREAT  :: 0o01000

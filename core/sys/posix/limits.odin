@@ -466,24 +466,24 @@ when ODIN_OS == .Darwin {
 
 	// AIO_LISTIO_MAX             :: sysconf(._AIO_LISTIO_MAX)
 	// AIO_MAX                    :: sysconf(._AIO_MAX)
-	AIO_PRIO_DELTA_MAX            :: 20
+	// AIO_PRIO_DELTA_MAX         :: sysconf(._AIO_PRIO_DELTA_MAX)
 	ARG_MAX                       :: 131_072
 	// ATEXIT_MAX                 :: sysconf(._ATEXIT_MAX)
 	// CHILD_MAX                  :: sysconf(._POSIX_ARG_MAX)
-	DELAYTIMER_MAX                :: 2_147_483_647
-	HOST_NAME_MAX                 :: 64
+	// DELAYTIMER_MAX             :: sysconf(._DELAYTIMER_MAX)
+	// HOST_NAME_MAX              :: sysconf(._HOST_NAME_MAX)
 	// IOV_MAX                    :: sysconf(._XOPEN_IOV_MAX)
-	LOGIN_NAME_MAX                :: 256
+	// LOGIN_NAME_MAX             :: sysconf(._LOGIN_NAME_MAX)
 	// MQ_OPEN_MAX                :: sysconf(._MQ_OPEN_MAX)
 	// MQ_PRIO_MAX                :: sysconf(._MQ_PRIO_MAX)
 	// PAGESIZE                   :: PAGE_SIZE
 	// PAGE_SIZE                  :: sysconf(._PAGE_SIZE)
 	PTHREAD_DESTRUCTOR_ITERATIONS :: 4
-	PTHREAD_KEYS_MAX              :: 1024
-	PTHREAD_STACK_MIN             :: 16_384
-	RTSIG_MAX                     :: 32
+	// PTHREAD_KEYS_MAX           :: sysconf(._PTHREAD_KEYS_MAX)
+	// PTHREAD_STACK_MIN          :: sysconf(._PTHREAD_STACK_MIN)
+	// RTSIG_MAX                  :: sysconf(._RTSIG_MAX)
 	// SEM_NSEMS_MAX              :: sysconf(._SEM_NSEMS_MAX)
-	SEM_VALUE_MAX                 :: 2_147_483_647
+	// SEM_VALUE_MAX              :: sysconf(._SEM_VALUE_MAX)
 	// SIGQUEUE_MAX               :: sysconf(._SIGQUEUE_MAX)
 	// SS_REPL_MAX                :: sysconf(._SS_REPL_MAX)
 	// STREAM_MAX                 :: sysconf(._STREAM_MAX)
@@ -493,7 +493,7 @@ when ODIN_OS == .Darwin {
 	// TRACE_NAME_MAX             :: sysconf(._TRACE_NAME_MAX)
 	// TRACE_SYS_MAX              :: sysconf(._TRACE_SYS_MAX)
 	// TRACE_USER_EVENT_MAX       :: sysconf(._TRACE_USER_EVENT_MAX)
-	TTY_NAME_MAX                  :: 32
+	// TTY_NAME_MAX               :: sysconf(._TTY_NAME_MAX)
 	// TZNAME_MAX                 :: sysconf(._TZNAME_MAX)
 
 	// The values in the following list may be constants within an implementation or may vary from
@@ -518,7 +518,7 @@ when ODIN_OS == .Darwin {
 	// POSIX_REC_MAX_XFER_SIZE  :: sysconf(._POSIX_REC_MAX_XFER_SIZE)
 	// POSIX_REC_MIN_XFER_SIZE  :: sysconf(._POSIX_REC_MIN_XFER_SIZE)
 	// POSIX_REC_XFER_ALIGN     :: sysconf(._POSIX_REC_XFER_ALIGN)
-	SYMLINK_MAX                 :: PATH_MAX
+	// SYMLINK_MAX              :: pathconf(".", ._SYMLINK_MAX)
 
 
 	// The magnitude limitations in the following list shall be fixed by specific implementations.
@@ -536,17 +536,17 @@ when ODIN_OS == .Darwin {
 	CHARCLASS_NAME_MAX  :: 14
 	COLL_WEIGHTS_MAX    :: 2
 	EXPR_NEST_MAX       :: 32
-	LINE_MAX            :: 2048
-	NGROUPS_MAX         :: 65_536
+	// LINE_MAX         :: sysconf(._LINE_MAX)
+	// NGROUPS_MAX      :: sysconf(._NGROUPS_MAX)
 	RE_DUP_MAX          :: 255
 
 	// Other limits.
-	
+
 	NL_ARGMAX  :: 9
-	NL_LANGMAX :: 14
+	NL_LANGMAX :: 32 // 14 on glibc, 32 on musl
 	NL_MSGMAX  :: 32_767
 	NL_SETMAX  :: 255
-	NL_TEXTMAX :: 255
+	NL_TEXTMAX :: 2048 // 255 on glibc, 2048 on musl
 	NZERO      :: 20
 
 } else {

@@ -521,7 +521,7 @@ when ODIN_OS == .Darwin {
 	PTHREAD_CANCEL_ENABLE       :: 0
 	PTHREAD_CANCEL_DISABLE      :: 1
 
-	PTHREAD_CANCELED :: rawptr(uintptr(-1))
+	PTHREAD_CANCELED :: rawptr(~uintptr(0))
 
 	PTHREAD_CREATE_JOINABLE :: 0
 	PTHREAD_CREATE_DETACHED :: 1
@@ -542,7 +542,7 @@ when ODIN_OS == .Darwin {
 	pthread_t :: distinct c.ulong
 
 	pthread_attr_t :: struct #raw_union {
-		__size: [56]c.char,
+		__size: [56]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
 		__align: c.long,
 	}
 
@@ -550,6 +550,11 @@ when ODIN_OS == .Darwin {
 
 	sched_param :: struct {
 		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
+
+		// NOTE: may be smaller depending on libc or arch, but never larger.
+		__reserved1: c.int,
+		__reserved2: [4]c.long,
+		__reserved3: c.int,
 	}
 
 } else {

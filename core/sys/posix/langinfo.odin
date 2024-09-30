@@ -301,58 +301,58 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	DAY_1 :: 0x20_007
 	DAY_2 :: 0x20_008
 	DAY_3 :: 0x20_009
-	DAY_4 :: 0x20_010
-	DAY_5 :: 0x20_011
-	DAY_6 :: 0x20_012
-	DAY_7 :: 0x20_013
+	DAY_4 :: 0x20_00A
+	DAY_5 :: 0x20_00B
+	DAY_6 :: 0x20_00C
+	DAY_7 :: 0x20_00D
 
-	ABMON_1  :: 0x20_014
-	ABMON_2  :: 0x20_015
-	ABMON_3  :: 0x20_016
-	ABMON_4  :: 0x20_017
-	ABMON_5  :: 0x20_018
-	ABMON_6  :: 0x20_019
-	ABMON_7  :: 0x20_020
-	ABMON_8  :: 0x20_021
-	ABMON_9  :: 0x20_022
-	ABMON_10 :: 0x20_023
-	ABMON_11 :: 0x20_024
-	ABMON_12 :: 0x20_025
+	ABMON_1  :: 0x20_00E
+	ABMON_2  :: 0x20_010
+	ABMON_3  :: 0x20_011
+	ABMON_4  :: 0x20_012
+	ABMON_5  :: 0x20_013
+	ABMON_6  :: 0x20_014
+	ABMON_7  :: 0x20_015
+	ABMON_8  :: 0x20_016
+	ABMON_9  :: 0x20_017
+	ABMON_10 :: 0x20_018
+	ABMON_11 :: 0x20_019
+	ABMON_12 :: 0x20_01A
 
-	MON_1  :: 0x20_026
-	MON_2  :: 0x20_027
-	MON_3  :: 0x20_028
-	MON_4  :: 0x20_029
-	MON_5  :: 0x20_030
-	MON_6  :: 0x20_031
-	MON_7  :: 0x20_032
-	MON_8  :: 0x20_033
-	MON_9  :: 0x20_034
-	MON_10 :: 0x20_035
-	MON_11 :: 0x20_036
-	MON_12 :: 0x20_037
+	MON_1  :: 0x20_01B
+	MON_2  :: 0x20_01C
+	MON_3  :: 0x20_01D
+	MON_4  :: 0x20_01E
+	MON_5  :: 0x20_020
+	MON_6  :: 0x20_021
+	MON_7  :: 0x20_022
+	MON_8  :: 0x20_023
+	MON_9  :: 0x20_024
+	MON_10 :: 0x20_025
+	MON_11 :: 0x20_026
+	MON_12 :: 0x20_027
 
-	AM_STR :: 0x20_038
-	PM_STR :: 0x20_039
+	AM_STR :: 0x20_028
+	PM_STR :: 0x20_029
 
-	D_T_FMT    :: 0x20_040
-	D_FMT      :: 0x20_041
-	T_FMT      :: 0x20_042
-	T_FMT_AMPM :: 0x20_043
+	D_T_FMT    :: 0x20_02A
+	D_FMT      :: 0x20_02B
+	T_FMT      :: 0x20_02C
+	T_FMT_AMPM :: 0x20_02D
 
-	ERA         :: 0x20_044
-	ERA_D_FMT   :: 0x20_045
-	ALT_DIGITS  :: 0x20_046
-	ERA_D_T_FMT :: 0x20_047
-	ERA_T_FMT   :: 0x20_048
+	ERA         :: 0x20_02E
+	ERA_D_FMT   :: 0x20_030
+	ALT_DIGITS  :: 0x20_031
+	ERA_D_T_FMT :: 0x20_032
+	ERA_T_FMT   :: 0x20_033
 
 	// NOTE: CODESET is the 16th member of the enum group starting with value
 	// LC_CTYPE << 16, LC_CTYPE is 0.
-	CODESET :: 0x15
+	CODESET :: 0x0F
 
 	// NOTE: CRNCYSTR is the 16th member of the enum group starting with value
 	// LC_MONETARY << 16, LC_MONETARY is 4.
-	CRNCYSTR :: 0x40_000
+	CRNCYSTR :: 0x40_00F
 
 	// NOTE: RADIXCHAR is the 1st member of the enum group starting with value
 	// LC_NUMERIC << 16, LC_NUMERIC is 1.

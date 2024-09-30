@@ -220,16 +220,6 @@ foreign lib {
 	           const struct timespec *restrict);
 	int    sigwaitinfo(const sigset_t *restrict, siginfo_t *restrict);
 	*/
-
-	when ODIN_OS == .Linux {
-		/* Return number of available real-time signal with highest priority.  */
-		@(private)
-		__libc_current_sigrtmin :: proc() -> result ---
-
-		/* Return number of available real-time signal with lowest priority.  */
-		@(private)
-		__libc_current_sigrtmax :: proc() -> result ---
-	}
 }
 
 sigval :: struct #raw_union {
@@ -490,11 +480,6 @@ when ODIN_OS == .Darwin {
 	uid_t :: distinct c.uint32_t
 	sigset_t :: distinct c.uint32_t
 
-	// NOTE: unimplemented on darwin.
-	//
-	// SIGRTMIN :: 
-	// SIGRTMAX ::
-
 	SIGHUP    :: 1
 	SIGQUIT   :: 3
 	SIGTRAP   :: 5
@@ -634,11 +619,6 @@ when ODIN_OS == .Darwin {
 	sigset_t :: struct {
 		__bits: [4]c.uint32_t,
 	}
-
-	// NOTE: unimplemented on FreeBSD.
-	//
-	// SIGRTMIN :: 65
-	// SIGRTMAX :: 126
 
 	SIGHUP    :: 1
 	SIGQUIT   :: 3
@@ -803,11 +783,6 @@ when ODIN_OS == .Darwin {
 	sigset_t :: struct {
 		__bits: [4]c.uint32_t,
 	}
-
-	// NOTE: unimplemented on NetBSD.
-	//
-	// SIGRTMIN :: 33
-	// SIGRTMAX :: 63
 
 	SIGHUP    :: 1
 	SIGQUIT   :: 3
@@ -1146,9 +1121,6 @@ when ODIN_OS == .Darwin {
 		[1024/(8 * size_of(c.ulong))]val,
 	}
 
-	SIGRTMIN :: __libc_current_sigrtmin()
-	SIGRTMAX :: __libc_current_sigrtmax()
-
 	SIGHUP    :: 1
 	SIGQUIT   :: 3
 	SIGTRAP   :: 5
@@ -1174,10 +1146,15 @@ when ODIN_OS == .Darwin {
 
 	// NOTE: this is actually defined as `sigaction`, but due to the function with the same name
 	// `_t` has been added.
+
 	sigaction_t :: struct {
-		sa_handler:   proc "c" (Signal),
-		sa_flags: SA_Flags,
-		sa_mask: sigset_t,
+		using _: struct #raw_union {
+			sa_handler:   proc "c" (Signal),                     /* [PSX] signal-catching function or one of the SIG_IGN or SIG_DFL */
+			sa_sigaction: proc "c" (Signal, ^siginfo_t, rawptr), /* [PSX] signal-catching function */
+		},
+		sa_mask:     sigset_t, /* [PSX] set of signals to be blocked during execution of the signal handling function */
+		sa_flags:    SA_Flags, /* [PSX] special flags */
+		sa_restorer: proc "c" (),
 	}
 
 	SIG_BLOCK   :: 0
@@ -1195,8 +1172,13 @@ when ODIN_OS == .Darwin {
 	SS_ONSTACK :: 1
 	SS_DISABLE :: 2
 
-	MINSIGSTKSZ :: 2048
-	SIGSTKSZ    :: 8192
+	when ODIN_ARCH == .arm64 {
+		MINSIGSTKSZ :: 6144
+		SIGSTKSZ    :: 12288
+	} else {
+		MINSIGSTKSZ :: 2048
+		SIGSTKSZ    :: 8192
+	}
 
 	stack_t :: struct {
 		ss_sp:    rawptr,   /* [PSX] stack base or pointer */
@@ -1204,9 +1186,27 @@ when ODIN_OS == .Darwin {
 		ss_size:  c.size_t, /* [PSX] stack size */
 	}
 
-	// WARNING: This implementaion might be completely wrong and need to be reviewed and corrected.
-	siginfo_t :: struct {
+	@(private)
+	__SI_MAX_SIZE :: 128
+
+	when size_of(int) == 8 { 
+		@(private)
+		_pad0 :: struct {
+			_pad0: c.int,
+		}
+		@(private)
+		__SI_PAD_SIZE :: (__SI_MAX_SIZE / size_of(c.int)) - 4
+
+	} else {
+		@(private)
+		_pad0 :: struct {}
+		@(private)
+		__SI_PAD_SIZE :: (__SI_MAX_SIZE / size_of(c.int)) - 3
+	}
+
+	siginfo_t :: struct #align(8) {
 		si_signo:  Signal, /* [PSX] signal number */
+		si_errno:  Errno,  /* [PSX] errno value associated with this signal */
 		si_code: struct #raw_union { /* [PSX] specific more detailed codes per signal */
 			ill:  ILL_Code,
 			fpe:  FPE_Code,
@@ -1217,13 +1217,25 @@ when ODIN_OS == .Darwin {
 			poll: POLL_Code,
 			any:  Any_Code,
 		},
-		si_errno:  Errno,  /* [PSX] errno value associated with this signal */
-		si_pid:    pid_t,      /* [PSX] sending process ID */
-		si_uid:    uid_t,      /* [PSX] real user ID of sending process */
-		si_addr:   rawptr,     /* [PSX] address of faulting instruction */
-		si_status: c.int,      /* [PSX] exit value or signal */
-		si_band:   c.long,     /* [PSX] band event for SIGPOLL */
-		si_value:  sigval,     /* [PSX] signal value */
+		__pad0: _pad0,
+		using _sifields: struct #raw_union {
+			_pad: [__SI_PAD_SIZE]c.int,
+
+			using _: struct {
+				si_pid: pid_t, /* [PSX] sending process ID */
+				si_uid: uid_t, /* [PSX] real user ID of sending process */
+				using _: struct #raw_union {
+					si_status: c.int,  /* [PSX] exit value or signal */
+					si_value:  sigval, /* [PSX] signal value */
+				},
+			},
+			using _: struct {
+				si_addr: rawptr, /* [PSX] address of faulting instruction */
+			},
+			using _: struct {
+				si_band: c.long, /* [PSX] band event for SIGPOLL */
+			},
+		},
 	}
 
 	ILL_ILLOPC :: 1

@@ -178,14 +178,11 @@ when ODIN_OS == .Darwin {
 
 	glob_t :: struct {
 		gl_pathc:  c.size_t,                      /* [PSX] count of paths matched by pattern */
-		gl_matchc: c.size_t,                      /* count of paths matching pattern */
+		gl_pathv:  [^]cstring `fmt:"v,gl_pathc"`, /* [PSX] pointer to list of matched pathnames */
 		gl_offs:   c.size_t,                      /* [PSX] slots to reserve at the beginning of gl_pathv */
 		gl_flags:  Glob_Flags,                    /* copy of flags parameter to glob */
-		gl_pathv:  [^]cstring `fmt:"v,gl_pathc"`, /* [PSX] pointer to list of matched pathnames */
 
 		// Non-standard alternate file system access functions:
-
-		gl_errfunc:  proc "c" (cstring, c.int) -> c.int,
 
 		gl_closedir: proc "c" (dirp: DIR),
 		gl_readdir:  proc "c" (dirp: DIR) -> ^dirent,

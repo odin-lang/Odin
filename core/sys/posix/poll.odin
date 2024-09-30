@@ -21,16 +21,10 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/poll.html ]]
 	*/
-	poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: c.int) -> Poll_Error ---
+	poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: c.int) -> c.int ---
 }
 
 nfds_t :: c.uint
-
-Poll_Error :: enum c.int {
-	EAGAIN = cast(c.int)Errno.EAGAIN,
-	EINTR  = cast(c.int)Errno.EINTR,
-	EINVAL = cast(c.int)Errno.EINVAL,
-}
 
 Poll_Event_Bits :: enum c.short {
 	// Data other than high-priority data may be read without blocking.

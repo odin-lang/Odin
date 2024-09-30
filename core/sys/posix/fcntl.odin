@@ -92,120 +92,52 @@ Lock_Type :: enum c.short {
 	WRLCK = F_WRLCK,
 }
 
-// Assertions made to unify this bit set.
-#assert(O_RDONLY == 0)
+O_Flag_Bits :: enum c.int {
+	// Sets FD_CLOEXEC on the file descriptor.
+	CLOEXEC   = log2(O_CLOEXEC),
+	// If not exists, combined with DIRECTORY will cause creation of a directory, otherwise a regular file.
+	CREAT     = log2(O_CREAT),
+	// Fails if the opened descriptor would not be a directory.
+	DIRECTORY = log2(O_DIRECTORY),
+	// If combined with CREAT, causes a failure if the file already exists.
+	EXCL      = log2(O_EXCL),
+	// If terminal device, do not make it the controlling terminal for the process.
+	NOCTTY    = log2(O_NOCTTY),
+	// Don't follow symbolic links, fail with errno ELOOP.
+	NOFOLLOW  = log2(O_NOFOLLOW),
+	// If exists and regular, truncate the length to 0.
+	TRUNC     = log2(O_TRUNC),
 
-when ODIN_OS == .Linux {
+	// NOTE: use with `posix.O_TTY_INIT + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+	// this bit set enum because it is 0 on some platforms and a value on others.
+	// TTY_INIT = O_TTY_INIT,
 
-	O_Flag_Bits :: enum c.int {
-		// Sets FD_CLOEXEC on the file descriptor.
-		CLOEXEC   = log2(O_CLOEXEC),
-		// If not exists, combined with DIRECTORY will cause creation of a directory, otherwise a regular file.
-		CREAT     = log2(O_CREAT),
-		// Fails if the opened descriptor would not be a directory.
-		DIRECTORY = log2(O_DIRECTORY),
-		// If combined with CREAT, causes a failure if the file already exists.
-		EXCL      = log2(O_EXCL),
-		// If terminal device, do not make it the controlling terminal for the process.
-		NOCTTY    = log2(O_NOCTTY),
-		// Don't follow symbolic links, fail with errno ELOOP.
-		NOFOLLOW  = log2(O_NOFOLLOW),
-		// If exists and regular, truncate the length to 0.
-		TRUNC     = log2(O_TRUNC),
+	// Set file offset to end of file prior to each write.
+	APPEND    = log2(O_APPEND),
+	// Write I/O shall complete as defined by synchronized I/O data integrity completion.
+	DSYNC     = log2(O_DSYNC),
+	// Causes nonblocking behaviour in various situations.
+	NONBLOCK  = log2(O_NONBLOCK),
+	// Write I/O shall complete as defined by synchronized I/O file integrity completion.
+	SYNC      = log2(O_SYNC),
 
-		// NOTE: use with `posix.O_TTY_INIT + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-		// this bit set enum because it is 0 on some platforms and a value on others.
-		// TTY_INIT = O_TTY_INIT,
+	// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+	// this bit set enum because it is 0 on some platforms and a value on others.
+	// RSYNC = O_RSYNC,
 
-		// Set file offset to end of file prior to each write.
-		APPEND    = log2(O_APPEND),
-		// Write I/O shall complete as defined by synchronized I/O data integrity completion.
-		DSYNC     = log2(O_DSYNC),
-		// Causes nonblocking behaviour in various situations.
-		NONBLOCK  = log2(O_NONBLOCK),
-		// Write I/O shall complete as defined by synchronized I/O file integrity completion.
-		SYNC      = log2(O_SYNC),
-
-		// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-		// this bit set enum because it is 0 on some platforms and a value on others.
-		// RSYNC = O_RSYNC,
-
-		// Execute only.
-		// NOTE: use with `posix.O_ENTER + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-		// this bit set enum because it is 0 on some platforms and a value on others.
-		// EXEC      = O_EXEC
-
-		// Reading and writing.
-		RDWR      = log2(O_RDWR),
-		// Writing only.
-		WRONLY    = log2(O_WRONLY),
-		// Reading only.
-		// RDONLY = 0, // Default
-	}
-
-	O_Flags :: bit_set[O_Flag_Bits; c.int]
-
-} else {
-
-	O_Flag_Bits :: enum c.int {
-		// Sets FD_CLOEXEC on the file descriptor.
-		CLOEXEC   = log2(O_CLOEXEC),
-		// If not exists, combined with DIRECTORY will cause creation of a directory, otherwise a regular file.
-		CREAT     = log2(O_CREAT),
-		// Fails if the opened descriptor would not be a directory.
-		DIRECTORY = log2(O_DIRECTORY),
-		// If combined with CREAT, causes a failure if the file already exists.
-		EXCL      = log2(O_EXCL),
-		// If terminal device, do not make it the controlling terminal for the process.
-		NOCTTY    = log2(O_NOCTTY),
-		// Don't follow symbolic links, fail with errno ELOOP.
-		NOFOLLOW  = log2(O_NOFOLLOW),
-		// If exists and regular, truncate the length to 0.
-		TRUNC     = log2(O_TRUNC),
-
-		// NOTE: use with `posix.O_TTY_INIT + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-		// this bit set enum because it is 0 on some platforms and a value on others.
-		// TTY_INIT = O_TTY_INIT,
-
-		// Set file offset to end of file prior to each write.
-		APPEND    = log2(O_APPEND),
-		// Write I/O shall complete as defined by synchronized I/O data integrity completion.
-		DSYNC     = log2(O_DSYNC),
-		// Causes nonblocking behaviour in various situations.
-		NONBLOCK  = log2(O_NONBLOCK),
-		// Write I/O shall complete as defined by synchronized I/O file integrity completion.
-		SYNC      = log2(O_SYNC),
-
-		// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
-		// this bit set enum because it is 0 on some platforms and a value on others.
-		// RSYNC = O_RSYNC,
-
-		// Execute only.
-		EXEC      = log2(O_EXEC),
-
-		// Reading and writing.
-		RDWR      = log2(O_RDWR),
-		// Writing only.
-		WRONLY    = log2(O_WRONLY),
-		// Reading only.
-		// RDONLY = 0, // Default
-	}
-
-	O_Flags :: bit_set[O_Flag_Bits; c.int]
+	// Execute only.
+	EXEC      = log2(O_EXEC),
+	// Reading and writing.
+	RDWR      = log2(O_RDWR),
+	// Writing only.
+	WRONLY    = log2(O_WRONLY),
+	// Reading only.
+	// RDONLY = 0, // Default
 }
 
-// A mask of all the access mode bits.
-when ODIN_OS == .Linux {
+O_Flags :: bit_set[O_Flag_Bits; c.int]
 
-	// NOTE: .EXEC and .RDONLY also belong here, but they are 0 on some platforms. 
-	O_ACCMODE :: O_Flags{ .RDWR, .WRONLY }
-
-} else {
-
-	// NOTE: .RDONLY also belong here, but they are 0 on some platforms. 
-	O_ACCMODE :: O_Flags{ .EXEC, .RDWR, .WRONLY }
-
-}
+O_ACCMODE :: O_Flags{ .EXEC, .RDWR, .WRONLY }
 
 AT_Flag_Bits :: enum c.int {
 	EACCESS          = log2(AT_EACCESS),
@@ -265,7 +197,7 @@ when ODIN_OS == .Darwin {
 	_O_SEARCH :: O_EXEC | O_DIRECTORY
 	O_SEARCH  :: O_Flags{.EXEC, .DIRECTORY}
 
-	AT_FDCWD: FD : -2
+	AT_FDCWD: FD: -2
 
 	AT_EACCESS          :: 0x0010
 	AT_SYMLINK_NOFOLLOW :: 0x0020
@@ -329,7 +261,7 @@ when ODIN_OS == .Darwin {
 	_O_SEARCH :: O_EXEC
 	O_SEARCH  :: O_Flags{ .EXEC }
 
-	AT_FDCWD: FD : -100
+	AT_FDCWD: FD: -100
 
 	AT_EACCESS          :: 0x0100
 	AT_SYMLINK_NOFOLLOW :: 0x0200
@@ -396,7 +328,7 @@ when ODIN_OS == .Darwin {
 	_O_SEARCH :: 0x00800000
 	O_SEARCH  :: O_Flags{O_Flag_Bits(log2(_O_SEARCH))}
 
-	AT_FDCWD: FD : -100
+	AT_FDCWD: FD: -100
 
 	AT_EACCESS          :: 0x100
 	AT_SYMLINK_NOFOLLOW :: 0x200
@@ -460,7 +392,7 @@ when ODIN_OS == .Darwin {
 	_O_SEARCH :: 0
 	O_SEARCH  :: O_Flags{} // NOTE: not defined in the headers
 
-	AT_FDCWD: FD : -100
+	AT_FDCWD: FD: -100
 
 	AT_EACCESS          :: 0x01
 	AT_SYMLINK_NOFOLLOW :: 0x02
@@ -480,21 +412,21 @@ when ODIN_OS == .Darwin {
 	off_t :: distinct c.int64_t
 	pid_t :: distinct c.int
 
-	F_DUPFD  :: 0 // Duplicate file descriptor.
-	F_GETFD  :: 1 /* Get file descriptor flags.  */
-	F_SETFD  :: 2 /* Set file descriptor flags.  */
-	F_GETFL  :: 3 /* Get file status flags.  */
-	F_SETFL  :: 4 /* Set file status flags.  */
-	F_GETLK  :: 5 /* Get record locking info.  */
-	F_SETLK  :: 6 /* Set record locking info (non-blocking).  */
-	F_SETLKW :: 7 /* Set record locking info (blocking).  */
-	F_SETOWN :: 8 /* Get owner (process receiving SIGIO).  */
-	F_GETOWN :: 9 /* Set owner (process receiving SIGIO).  */
-	F_RDLCK  :: 0 /* Read lock.  */
-	F_UNLCK  :: 2 /* Remove lock.  */
-	F_WRLCK  :: 1 /* Write lock.  */
+	F_DUPFD  :: 0
+	F_GETFD  :: 1
+	F_SETFD  :: 2
+	F_GETFL  :: 3
+	F_SETFL  :: 4
+	F_GETLK  :: 5
+	F_SETLK  :: 6
+	F_SETLKW :: 7
+	F_SETOWN :: 8
+	F_GETOWN :: 9
+	F_RDLCK  :: 0
+	F_UNLCK  :: 2
+	F_WRLCK  :: 1
 
-	F_DUPFD_CLOEXEC :: 1030 /* Duplicate file descriptor with close-on-exit set.  */
+	F_DUPFD_CLOEXEC :: 1030
 
 	FD_CLOEXEC :: 1
 
@@ -517,8 +449,7 @@ when ODIN_OS == .Darwin {
 	_O_RSYNC :: 0
 	O_RSYNC  :: O_Flags{}
 
-	// NOTE: Not implemented in Linux
-	O_EXEC   :: 0
+	O_EXEC   :: 0x04000000 // NOTE: not defined in the headers
 
 	O_RDONLY :: 0
 	O_WRONLY :: 0o1
@@ -527,19 +458,19 @@ when ODIN_OS == .Darwin {
 	_O_SEARCH :: 0
 	O_SEARCH  :: O_Flags{}
 
-	AT_FDCWD: FD : -100 // Special value used to indicate the *at functions should use the current working directory.
+	AT_FDCWD: FD: -100
 
-	AT_EACCESS          :: 0x200 // Test access permitted for effective IDs, not real IDs.
-	AT_SYMLINK_NOFOLLOW :: 0x100 // Do not follow symbolic links.
-	AT_SYMLINK_FOLLOW   :: 0x400 // Follow symbolic links.
-	AT_REMOVEDIR        :: 0x200 // Remove directory instead of unlinking file.
+	AT_EACCESS          :: 0x200
+	AT_SYMLINK_NOFOLLOW :: 0x100
+	AT_SYMLINK_FOLLOW   :: 0x400
+	AT_REMOVEDIR        :: 0x200
 
 	flock :: struct {
-		l_start:  off_t,     // [PSX] relative offset in bytes.
-		l_len:    off_t,     // [PSX] size; if 0 then until EOF.
-		l_pid:    pid_t,     // [PSX] process ID of the process holding the lock.
-		l_type:   Lock_Type, // [PSX] type of lock.
-		l_whence: c.short,   // [PSX] flag (Whence) of starting offset.
+		l_start:  off_t,     /* [PSX] relative offset in bytes. */
+		l_len:    off_t,     /* [PSX] size; if 0 then until EOF. */
+		l_pid:    pid_t,     /* [PSX] process ID of the process holding the lock. */
+		l_type:   Lock_Type, /* [PSX] type of lock. */
+		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset. */
 	}
 
 } else {
