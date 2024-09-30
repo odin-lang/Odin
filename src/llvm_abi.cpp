@@ -573,6 +573,15 @@ namespace lbAbiAmd64SysV {
 	gb_internal Array<RegClass> classify(LLVMTypeRef t);
 	gb_internal LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes, LLVMTypeRef type);
 
+	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
+		if (!return_is_defined) {
+			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		}
+		LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
+		return amd64_type(c, return_type, Amd64TypeAttribute_StructRect, ft->calling_convention);
+	}
+
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
@@ -583,12 +592,7 @@ namespace lbAbiAmd64SysV {
 		for (unsigned i = 0; i < arg_count; i++) {
 			ft->args[i] = amd64_type(c, arg_types[i], Amd64TypeAttribute_ByVal, calling_convention);
 		}
-
-		if (return_is_defined) {
-			ft->ret = amd64_type(c, return_type, Amd64TypeAttribute_StructRect, calling_convention);
-		} else {
-			ft->ret = lb_arg_type_direct(LLVMVoidTypeInContext(c));
-		}
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 
 		return ft;
 	}
