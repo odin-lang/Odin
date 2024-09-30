@@ -6220,7 +6220,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					gbString d = type_to_string(dst_params);
 					error(src->token, "Deferred procedure '%.*s' parameters do not match the inputs of initial procedure '%.*s':\n\t(%s) =/= (%s)",
 					      LIT(dst->token.string), LIT(src->token.string),
-					      s, d
+					      d, s
 					);
 					gb_string_free(d);
 					gb_string_free(s);
@@ -6250,7 +6250,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					gbString d = type_to_string(dst_params);
 					error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s':\n\t(%s) =/= (%s)",
 					      LIT(dst->token.string), LIT(src->token.string),
-					      s, d
+					      d, s
 					);
 					gb_string_free(d);
 					gb_string_free(s);
@@ -6303,7 +6303,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					gbString d = type_to_string(dst_params);
 					error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s':\n\t(%s) =/= (%s)",
 					      LIT(dst->token.string), LIT(src->token.string),
-					      s, d
+					      d, s
 					);
 					gb_string_free(d);
 					gb_string_free(s);
