@@ -6,6 +6,7 @@ import "core:testing"
 import "core:crypto/kmac"
 import "core:crypto/shake"
 import "core:crypto/tuplehash"
+import "core:strings"
 
 @(test)
 test_shake :: proc(t: ^testing.T) {
@@ -101,6 +102,22 @@ test_cshake :: proc(t: ^testing.T) {
 			"Email Signature",
 			"07dc27b11e51fbac75bc7b3c1d983e8b4b85fb1defaf218912ac86430273091727f42b17ed1df63e8ec118f04b23633c1dfb1574c8fb55cb45da8e25afb092bb",
 			"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7",
+		},
+
+		// cSHAKE128 - bytepad edge case (https://github.com/golang/go/issues/69169)
+		//
+		// If the implementation incorrectly pads an extra rate-bytes of 0s
+		// if the domain separator is exactly rate-bytes long, this will
+		// return:
+		//
+		//  430d3ebae1528304465f3b6f2ed34a7b931af804afe97d0e2a2796abf5725281
+		//
+		// See: https://github.com/golang/go/issues/69169
+		{
+			128,
+			strings.repeat("x", 168-7, context.temp_allocator),
+			"2cf20c4b26c9ee7751eaa273368e616c868e7275178634e1ecdbac80d4cab5f4",
+			"",
 		},
 	}
 

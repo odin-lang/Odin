@@ -259,6 +259,7 @@ Inputs:
 unsafe_unset :: proc(b: ^Bit_Array, bit: int) #no_bounds_check {
 	b.bits[bit >> INDEX_SHIFT] &~= 1 << uint(bit & INDEX_MASK)
 }
+
 /*
 A helper function to create a Bit Array with optional bias, in case your smallest index is non-zero (including negative).
 
@@ -276,22 +277,50 @@ Returns:
 - ba: Allocates a bit_Array, backing data is set to `max-min / 64` indices, rounded up (eg 65 - 0 allocates for [2]u64).
 */
 create :: proc(max_index: int, min_index: int = 0, allocator := context.allocator) -> (res: ^Bit_Array, ok: bool) #optional_ok {
-	context.allocator = allocator
 	size_in_bits := max_index - min_index
 
 	if size_in_bits < 0 { return {}, false }
 
+	res = new(Bit_Array, allocator)
+	ok  = init(res, max_index, min_index, allocator)
+	res.free_pointer = true
+
+	if !ok { free(res, allocator) }
+
+	return
+}
+
+/*
+A helper function to initialize a Bit Array with optional bias, in case your smallest index is non-zero (including negative).
+
+The range of bits created by this procedure is `min_index..<max_index`, and the
+array will be able to expand beyond `max_index` if needed.
+
+*Allocates (`make(ba.bits)`)*
+
+Inputs:
+- max_index: maximum starting index
+- min_index: minimum starting index (used as a bias)
+- allocator: (default is context.allocator)
+*/
+init :: proc(res: ^Bit_Array, max_index: int, min_index: int = 0, allocator := context.allocator) -> (ok: bool) {
+	size_in_bits := max_index - min_index
+
+	if size_in_bits < 0 { return false }
+
 	legs := size_in_bits >> INDEX_SHIFT
-	if size_in_bits & INDEX_MASK > 0 {legs+=1}
-	bits, err := make([dynamic]u64, legs)
-	ok = err == mem.Allocator_Error.None
-	res = new(Bit_Array)
+	if size_in_bits & INDEX_MASK > 0 { legs += 1 }
+
+	bits, err := make([dynamic]u64, legs, allocator)
+	ok = err == nil
+
 	res.bits         = bits
 	res.bias         = min_index
 	res.length       = max_index - min_index
-	res.free_pointer = true
+	res.free_pointer = false
 	return
 }
+
 /*
 Sets all values in the Bit_Array to zero.
 

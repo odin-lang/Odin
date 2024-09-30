@@ -6,6 +6,39 @@ import "base:intrinsics"
 Maybe :: union($T: typeid) {T}
 
 
+/*
+Recovers the containing/parent struct from a pointer to one of its fields.
+Works by "walking back" to the struct's starting address using the offset between the field and the struct.
+
+Inputs:
+- ptr: Pointer to the field of a container struct
+- T: The type of the container struct
+- field_name: The name of the field in the `T` struct
+
+Returns:
+- A pointer to the container struct based on a pointer to a field in it
+
+Example:
+	package container_of
+	import "base:runtime"
+
+	Node :: struct {
+		value: int,
+		prev:  ^Node,
+		next:  ^Node,
+	}
+
+	main :: proc() {
+		node: Node
+		field_ptr := &node.next
+		container_struct_ptr: ^Node = runtime.container_of(field_ptr, Node, "next")
+		assert(container_struct_ptr == &node)
+		assert(uintptr(field_ptr) - uintptr(container_struct_ptr) == size_of(node.value) + size_of(node.prev))
+	}
+
+Output:
+	^Node
+*/
 @(builtin, require_results)
 container_of :: #force_inline proc "contextless" (ptr: $P/^$Field_Type, $T: typeid, $field_name: string) -> ^T
 	where intrinsics.type_has_field(T, field_name),
