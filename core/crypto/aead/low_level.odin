@@ -4,6 +4,7 @@ import "core:crypto/aegis"
 import "core:crypto/aes"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
+import "core:crypto/deoxysii"
 import "core:reflect"
 
 // Implementation is an AEAD implementation.  Most callers will not need
@@ -30,6 +31,7 @@ Algorithm :: enum {
 	AEGIS_128L_256, // AEGIS-128L (256-bit tag)
 	AEGIS_256,
 	AEGIS_256_256, // AEGIS-256 (256-bit tag)
+	DEOXYS_II_256,
 }
 
 // ALGORITM_NAMES is the Algorithm to algorithm name string.
@@ -44,6 +46,7 @@ ALGORITHM_NAMES := [Algorithm]string {
 	.AEGIS_128L_256    = "AEGIS-128L-256",
 	.AEGIS_256         = "AEGIS-256",
 	.AEGIS_256_256     = "AEGIS-256-256",
+	.DEOXYS_II_256     = "Deoxys-II-256",
 }
 
 // TAG_SIZES is the Algorithm to tag size in bytes.
@@ -58,6 +61,7 @@ TAG_SIZES := [Algorithm]int {
 	.AEGIS_128L_256    = aegis.TAG_SIZE_256,
 	.AEGIS_256         = aegis.TAG_SIZE_128,
 	.AEGIS_256_256     = aegis.TAG_SIZE_256,
+	.DEOXYS_II_256     = deoxysii.TAG_SIZE,
 }
 
 // KEY_SIZES is the Algorithm to key size in bytes.
@@ -72,6 +76,7 @@ KEY_SIZES := [Algorithm]int {
 	.AEGIS_128L_256    = aegis.KEY_SIZE_128L,
 	.AEGIS_256         = aegis.KEY_SIZE_256,
 	.AEGIS_256_256     = aegis.KEY_SIZE_256,
+	.DEOXYS_II_256     = deoxysii.KEY_SIZE,
 }
 
 // IV_SIZES is the Algorithm to initialization vector size in bytes.
@@ -88,6 +93,7 @@ IV_SIZES := [Algorithm]int {
 	.AEGIS_128L_256    = aegis.IV_SIZE_128L,
 	.AEGIS_256         = aegis.IV_SIZE_256,
 	.AEGIS_256_256     = aegis.IV_SIZE_256,
+	.DEOXYS_II_256     = deoxysii.IV_SIZE,
 }
 
 // Context is a concrete instantiation of a specific AEAD algorithm.
@@ -97,6 +103,7 @@ Context :: struct {
 		aes.Context_GCM,
 		chacha20poly1305.Context,
 		aegis.Context,
+		deoxysii.Context,
 	},
 }
 
@@ -112,6 +119,7 @@ _IMPL_IDS := [Algorithm]typeid {
 	.AEGIS_128L_256    = typeid_of(aegis.Context),
 	.AEGIS_256         = typeid_of(aegis.Context),
 	.AEGIS_256_256     = typeid_of(aegis.Context),
+	.DEOXYS_II_256     = typeid_of(deoxysii.Context),
 }
 
 // init initializes a Context with a specific AEAD Algorithm.
@@ -142,6 +150,9 @@ init :: proc(ctx: ^Context, algorithm: Algorithm, key: []byte, impl: Implementat
 	case .AEGIS_128L, .AEGIS_128L_256, .AEGIS_256, .AEGIS_256_256:
 		impl_ := impl != nil ? impl.(aes.Implementation) : aes.DEFAULT_IMPLEMENTATION
 		aegis.init(&ctx._impl.(aegis.Context), key, impl_)
+	case .DEOXYS_II_256:
+		impl_ := impl != nil ? impl.(aes.Implementation) : aes.DEFAULT_IMPLEMENTATION
+		deoxysii.init(&ctx._impl.(deoxysii.Context), key, impl_)
 	case .Invalid:
 		panic("crypto/aead: uninitialized algorithm")
 	case:
@@ -167,6 +178,8 @@ seal_ctx :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
 		chacha20poly1305.seal(&impl, dst, tag, iv, aad, plaintext)
 	case aegis.Context:
 		aegis.seal(&impl, dst, tag, iv, aad, plaintext)
+	case deoxysii.Context:
+		deoxysii.seal(&impl, dst, tag, iv, aad, plaintext)
 	case:
 		panic("crypto/aead: uninitialized algorithm")
 	}
@@ -191,6 +204,8 @@ open_ctx :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 		return chacha20poly1305.open(&impl, dst, iv, aad, ciphertext, tag)
 	case aegis.Context:
 		return aegis.open(&impl, dst, iv, aad, ciphertext, tag)
+	case deoxysii.Context:
+		return deoxysii.open(&impl, dst, iv, aad, ciphertext, tag)
 	case:
 		panic("crypto/aead: uninitialized algorithm")
 	}
@@ -206,6 +221,8 @@ reset :: proc(ctx: ^Context) {
 		chacha20poly1305.reset(&impl)
 	case aegis.Context:
 		aegis.reset(&impl)
+	case deoxysii.Context:
+		deoxysii.reset(&impl)
 	case:
 		// Calling reset repeatedly is fine.
 	}
