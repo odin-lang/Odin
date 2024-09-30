@@ -67,20 +67,16 @@ when ODIN_OS == .Darwin {
 
 	shmatt_t :: distinct c.ushort
 
-	// NOTE: this is #pragma pack(4)
-
-	shmid_ds :: struct #align(4) {
-		shm_perm:     ipc_perm,     /* [PSX] operation permission structure */
-		shm_segsz:    c.size_t,     /* [PSX] size of segment in bytes */
-		shm_lpid:     pid_t,        /* [PSX] process ID of last shared memory operation */
-		shm_cpid:     pid_t,        /* [PSX] process ID of creator */
-		shm_nattch:   shmatt_t,     /* [PSX] number of current attaches */
-		using _: struct #align(4) {
-			shm_atime:    time_t,   /* [PSX] time of last shmat() */
-			shm_dtime:    time_t,   /* [PSX] time of last shmdt() */
-			shm_ctime:    time_t,   /* [PSX] time of last change by shmctl() */
-			shm_internal: rawptr,
-		},
+	shmid_ds :: struct #max_field_align(4) {
+		shm_perm:     ipc_perm, /* [PSX] operation permission structure */
+		shm_segsz:    c.size_t, /* [PSX] size of segment in bytes */
+		shm_lpid:     pid_t,    /* [PSX] process ID of last shared memory operation */
+		shm_cpid:     pid_t,    /* [PSX] process ID of creator */
+		shm_nattch:   shmatt_t, /* [PSX] number of current attaches */
+		shm_atime:    time_t,   /* [PSX] time of last shmat() */
+		shm_dtime:    time_t,   /* [PSX] time of last shmdt() */
+		shm_ctime:    time_t,   /* [PSX] time of last change by shmctl() */
+		shm_internal: rawptr,
 	}
 
 } else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
