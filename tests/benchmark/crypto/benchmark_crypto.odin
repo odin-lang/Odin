@@ -12,6 +12,7 @@ import "core:crypto/aegis"
 import "core:crypto/aes"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
+import "core:crypto/deoxysii"
 import "core:crypto/ed25519"
 import "core:crypto/poly1305"
 import "core:crypto/x25519"
@@ -197,6 +198,43 @@ benchmark_crypto :: proc(t: ^testing.T) {
 		benchmark_print(&str, name, options)
 
 		name = "AEGIS-256 65536 bytes"
+		options.bytes = 65536
+		err = time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+	}
+	{
+		name := "Deoxys-II-256 64 bytes"
+		options := &time.Benchmark_Options {
+			rounds = 1_000,
+			bytes = 64,
+			setup = _setup_sized_buf,
+			bench = _benchmark_deoxysii_256,
+			teardown = _teardown_sized_buf,
+		}
+
+		key := [aegis.KEY_SIZE_256]byte {
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		}
+		ctx: deoxysii.Context
+		deoxysii.init(&ctx, key[:])
+
+		context.user_ptr = &ctx
+
+		err := time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+
+		name = "Deoxys-II-256 1024 bytes"
+		options.bytes = 1024
+		err = time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+
+		name = "Deoxys-II-256 65536 bytes"
 		options.bytes = 65536
 		err = time.benchmark(options, context.allocator)
 		testing.expect(t, err == nil, name)
@@ -475,6 +513,26 @@ _benchmark_aegis_256 :: proc(
 
 	for _ in 0 ..= options.rounds {
 		aegis.seal(ctx, buf, tag[:], iv[:], nil, buf)
+	}
+	options.count = options.rounds
+	options.processed = options.rounds * options.bytes
+	return nil
+}
+
+_benchmark_deoxysii_256 :: proc(
+	options: ^time.Benchmark_Options,
+	allocator := context.allocator,
+) -> (
+	err: time.Benchmark_Error,
+) {
+	buf := options.input
+	iv: [deoxysii.IV_SIZE]byte
+	tag: [deoxysii.TAG_SIZE]byte = ---
+
+	ctx := (^deoxysii.Context)(context.user_ptr)
+
+	for _ in 0 ..= options.rounds {
+		deoxysii.seal(ctx, buf, tag[:], iv[:], nil, buf)
 	}
 	options.count = options.rounds
 	options.processed = options.rounds * options.bytes
