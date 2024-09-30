@@ -531,6 +531,7 @@ namespace lbAbiAmd64SysV {
 		RegClass_SSEInt16,
 		RegClass_SSEInt32,
 		RegClass_SSEInt64,
+		RegClass_SSEInt128,
 		RegClass_SSEUp,
 		RegClass_X87,
 		RegClass_X87Up,
@@ -616,6 +617,10 @@ namespace lbAbiAmd64SysV {
 		}
 		switch (kind) {
 		case LLVMIntegerTypeKind:
+			if (LLVM_VERSION_MAJOR >= 18 && sz >= 16) {
+				return false;
+			}
+			return true;
 		case LLVMHalfTypeKind:
 		case LLVMFloatTypeKind:
 		case LLVMDoubleTypeKind:
