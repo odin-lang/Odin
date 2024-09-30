@@ -776,17 +776,18 @@ Dynamic_Array_Type :: struct {
 
 Struct_Type :: struct {
 	using node: Expr,
-	tok_pos:       tokenizer.Pos,
-	poly_params:   ^Field_List,
-	align:         ^Expr,
-	field_align:   ^Expr,
-	where_token:   tokenizer.Token,
-	where_clauses: []^Expr,
-	is_packed:     bool,
-	is_raw_union:  bool,
-	is_no_copy:    bool,
-	fields:        ^Field_List,
-	name_count:    int,
+	tok_pos:         tokenizer.Pos,
+	poly_params:     ^Field_List,
+	align:           ^Expr,
+	min_field_align: ^Expr,
+	max_field_align: ^Expr,
+	where_token:     tokenizer.Token,
+	where_clauses:   []^Expr,
+	is_packed:       bool,
+	is_raw_union:    bool,
+	is_no_copy:      bool,
+	fields:          ^Field_List,
+	name_count:      int,
 }
 
 Union_Type_Kind :: enum u8 {

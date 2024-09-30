@@ -673,7 +673,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 
 #define ST_ALIGN(_name) if (st->_name != nullptr) {                                                \
 		if (st->is_packed) {                                                               \
-			syntax_error(st->_name, "'#%s' cannot be applied with '#packed'", #_name); \
+			error(st->_name, "'#%s' cannot be applied with '#packed'", #_name); \
 			return;                                                                    \
 		}                                                                                  \
 		i64 align = 1;                                                                     \
@@ -682,12 +682,31 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		}                                                                                  \
 	}
 
-	ST_ALIGN(field_align);
+	ST_ALIGN(min_field_align);
+	ST_ALIGN(max_field_align);
 	ST_ALIGN(align);
-	if (struct_type->Struct.custom_align < struct_type->Struct.custom_field_align) {
-		warning(st->align, "#align(%lld) is defined to be less than #field_name(%lld)",
-		        cast(long long)struct_type->Struct.custom_align,
-		        cast(long long)struct_type->Struct.custom_field_align);
+	if (struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
+		error(st->align, "#align(%lld) is defined to be less than #min_field_align(%lld)",
+		      cast(long long)struct_type->Struct.custom_align,
+		      cast(long long)struct_type->Struct.custom_min_field_align);
+	}
+	if (struct_type->Struct.custom_max_field_align != 0 &&
+	    struct_type->Struct.custom_align > struct_type->Struct.custom_max_field_align) {
+		error(st->align, "#align(%lld) is defined to be greater than #max_field_align(%lld)",
+		      cast(long long)struct_type->Struct.custom_align,
+		      cast(long long)struct_type->Struct.custom_max_field_align);
+	}
+	if (struct_type->Struct.custom_max_field_align != 0 &&
+	    struct_type->Struct.custom_min_field_align > struct_type->Struct.custom_max_field_align) {
+		error(st->align, "#min_field_align(%lld) is defined to be greater than #max_field_align(%lld)",
+		      cast(long long)struct_type->Struct.custom_min_field_align,
+		      cast(long long)struct_type->Struct.custom_max_field_align);
+
+		i64 a = gb_min(struct_type->Struct.custom_min_field_align, struct_type->Struct.custom_max_field_align);
+		i64 b = gb_max(struct_type->Struct.custom_min_field_align, struct_type->Struct.custom_max_field_align);
+		// NOTE(bill): sort them to keep code consistent
+		struct_type->Struct.custom_min_field_align = a;
+		struct_type->Struct.custom_max_field_align = b;
 	}
 
 #undef ST_ALIGN
