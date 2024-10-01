@@ -663,6 +663,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					static_link_command_line = gb_string_appendc(static_link_command_line, " -static ");
 					static_link_command_line = gb_string_appendc(static_link_command_line, object_files);
 					return system_exec_command_line_app("libtool", static_link_command_line);
+				} else {
+					compiler_error("-build-mode:static on Linux and similar targets");
 				}
 			} else {
 				gbString link_command_line = gb_string_make(heap_allocator(), clang_path);
