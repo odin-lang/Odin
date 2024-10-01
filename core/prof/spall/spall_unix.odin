@@ -4,7 +4,6 @@ package spall
 
 // Only for types.
 import "core:os"
-
 import "core:sys/posix"
 
 MAX_RW :: 0x7fffffff
