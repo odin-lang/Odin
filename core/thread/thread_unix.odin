@@ -1,47 +1,44 @@
-// +build linux, darwin, freebsd, openbsd, haiku
-// +private
+#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+private
 package thread
 
-import "base:intrinsics"
+import "base:runtime"
 import "core:sync"
 import "core:sys/unix"
 
-CAS :: intrinsics.atomic_compare_exchange_strong
+_IS_SUPPORTED :: true
 
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
 Thread_Os_Specific :: struct #align(16) {
 	unix_thread: unix.pthread_t, // NOTE: very large on Darwin, small on Linux.
-	cond:        sync.Cond,
-	mutex:       sync.Mutex,
+	start_ok:    sync.Sema,
 }
 //
 // Creates a thread which will run the given procedure.
 // It then waits for `start` to be called.
 //
 _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
-	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
+	__unix_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
-		when ODIN_OS != .Darwin {
-			// We need to give the thread a moment to start up before we enable cancellation.
-			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE, nil) == 0
-		}
-
-		sync.lock(&t.mutex)
+		// We need to give the thread a moment to start up before we enable cancellation.
+		can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE, nil) == 0
 
 		t.id = sync.current_thread_id()
 
-		for (.Started not_in t.flags) {
-			sync.wait(&t.cond, &t.mutex)
+		if .Started not_in sync.atomic_load(&t.flags) {
+			sync.wait(&t.start_ok)
 		}
 
-		when ODIN_OS != .Darwin {
-			// Enable thread's cancelability.
-			if can_set_thread_cancel_state {
-				unix.pthread_setcanceltype (unix.PTHREAD_CANCEL_ASYNCHRONOUS, nil)
-				unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE,      nil)
-			}
+		if .Joined in sync.atomic_load(&t.flags) {
+			return nil
+		}
+
+		// Enable thread's cancelability.
+		if can_set_thread_cancel_state {
+			unix.pthread_setcanceltype (unix.PTHREAD_CANCEL_ASYNCHRONOUS, nil)
+			unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_ENABLE,       nil)
 		}
 
 		{
@@ -51,16 +48,20 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			// Here on Unix, we start the OS thread in a running state, and so we manually have it wait on a condition
 			// variable above. We must perform that waiting BEFORE we select the context!
 			context = _select_context_for_thread(init_context)
-			defer _maybe_destroy_default_temp_allocator(init_context)
+			defer {
+				_maybe_destroy_default_temp_allocator(init_context)
+				runtime.run_thread_local_cleaners()
+			}
 
 			t.procedure(t)
 		}
 
-		intrinsics.atomic_store(&t.flags, t.flags + { .Done })
+		sync.atomic_or(&t.flags, { .Done })
 
-		sync.unlock(&t.mutex)
+		if .Self_Cleanup in sync.atomic_load(&t.flags) {
+			res := unix.pthread_detach(t.unix_thread)
+			assert_contextless(res == 0)
 
-		if .Self_Cleanup in t.flags {
 			t.unix_thread = {}
 			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
 			context = {}
@@ -77,9 +78,12 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	defer unix.pthread_attr_destroy(&attrs)
 
 	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
-	assert(unix.pthread_attr_setdetachstate(&attrs, unix.PTHREAD_CREATE_JOINABLE) == 0)
-	when ODIN_OS != .Haiku {
-		assert(unix.pthread_attr_setinheritsched(&attrs, unix.PTHREAD_EXPLICIT_SCHED) == 0)
+	res: i32
+	res = unix.pthread_attr_setdetachstate(&attrs, unix.PTHREAD_CREATE_JOINABLE)
+	assert(res == 0)
+	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
+		res = unix.pthread_attr_setinheritsched(&attrs, unix.PTHREAD_EXPLICIT_SCHED)
+		assert(res == 0)
 	}
 
 	thread := new(Thread)
@@ -90,8 +94,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 	// Set thread priority.
 	policy: i32
-	res: i32
-	when ODIN_OS != .Haiku {
+	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
 		res = unix.pthread_attr_getschedpolicy(&attrs, &policy)
 		assert(res == 0)
 	}
@@ -109,7 +112,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	assert(res == 0)
 
 	thread.procedure = procedure
-	if unix.pthread_create(&thread.unix_thread, &attrs, __linux_thread_entry_proc, thread) != 0 {
+	if unix.pthread_create(&thread.unix_thread, &attrs, __unix_thread_entry_proc, thread) != 0 {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
@@ -118,30 +121,28 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 }
 
 _start :: proc(t: ^Thread) {
-	// sync.guard(&t.mutex)
-	t.flags += { .Started }
-	sync.signal(&t.cond)
+	sync.atomic_or(&t.flags, { .Started })
+	sync.post(&t.start_ok)
 }
 
 _is_done :: proc(t: ^Thread) -> bool {
-	return .Done in intrinsics.atomic_load(&t.flags)
+	return .Done in sync.atomic_load(&t.flags)
 }
 
 _join :: proc(t: ^Thread) {
-	// sync.guard(&t.mutex)
-
 	if unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
 		return
 	}
 
-	// Preserve other flags besides `.Joined`, like `.Started`.
-	unjoined := intrinsics.atomic_load(&t.flags) - {.Joined}
-	joined   := unjoined + {.Joined}
-
-	// Try to set `t.flags` from unjoined to joined. If it returns joined,
-	// it means the previous value had that flag set and we can return.
-	if res, ok := CAS(&t.flags, unjoined, joined); res == joined && !ok {
+	// If the previous value was already `Joined`, then we can return.
+	if .Joined in sync.atomic_or(&t.flags, {.Joined}) {
 		return
+	}
+
+	// Prevent non-started threads from blocking main thread with initial wait
+	// condition.
+	if .Started not_in sync.atomic_load(&t.flags) {
+		_start(t)
 	}
 	unix.pthread_join(t.unix_thread, nil)
 }
@@ -159,10 +160,17 @@ _destroy :: proc(t: ^Thread) {
 }
 
 _terminate :: proc(t: ^Thread, exit_code: int) {
-	// `pthread_cancel` is unreliable on Darwin for unknown reasons.
-	when ODIN_OS != .Darwin {
-		unix.pthread_cancel(t.unix_thread)
-	}
+	// NOTE(Feoramund): For thread cancellation to succeed on BSDs and
+	// possibly Darwin systems, the thread must call one of the pthread
+	// cancelation points at some point after this.
+	//
+	// The most obvious one of these is `pthread_cancel`, but there is an
+	// entire list of functions that act as cancelation points available in the
+	// pthreads manual page.
+	//
+	// This is in contrast to behavior I have seen on Linux where the thread is
+	// just terminated.
+	unix.pthread_cancel(t.unix_thread)
 }
 
 _yield :: proc() {

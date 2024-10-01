@@ -24,7 +24,7 @@ Builder :: struct {
 	buf: [dynamic]byte,
 }
 /*
-Produces a Builder with a default length of 0 and cap of 16
+Produces an empty Builder
 
 *Allocates Using Provided Allocator*
 
@@ -39,7 +39,7 @@ builder_make_none :: proc(allocator := context.allocator, loc := #caller_locatio
 	return Builder{buf=make([dynamic]byte, allocator, loc) or_return }, nil
 }
 /*
-Produces a Builder with a specified length and cap of max(16,len) byte buffer
+Produces a Builder with specified length and capacity `len`.
 
 *Allocates Using Provided Allocator*
 
@@ -55,7 +55,7 @@ builder_make_len :: proc(len: int, allocator := context.allocator, loc := #calle
 	return Builder{buf=make([dynamic]byte, len, allocator, loc) or_return }, nil
 }
 /*
-Produces a Builder with a specified length and cap
+Produces a Builder with specified length `len` and capacity `cap`.
 
 *Allocates Using Provided Allocator*
 
@@ -103,7 +103,7 @@ builder_make :: proc{
 	builder_make_len_cap,
 }
 /*
-Initializes a Builder with a length of 0 and cap of 16
+Initializes an empty Builder
 It replaces the existing `buf`
 
 *Allocates Using Provided Allocator*
@@ -121,7 +121,7 @@ builder_init_none :: proc(b: ^Builder, allocator := context.allocator, loc := #c
 	return b, nil
 }
 /*
-Initializes a Builder with a specified length and cap, which is max(len,16)
+Initializes a Builder with specified length and capacity `len`.
 It replaces the existing `buf`
 
 *Allocates Using Provided Allocator*
@@ -140,7 +140,7 @@ builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator, 
 	return b, nil
 }
 /*
-Initializes a Builder with a specified length and cap
+Initializes a Builder with specified length `len` and capacity `cap`.
 It replaces the existing `buf`
 
 Inputs:
@@ -286,6 +286,20 @@ to_string :: proc(b: Builder) -> (res: string) {
 	return string(b.buf[:])
 }
 /*
+Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
+
+Inputs:
+- b: A pointer to builder
+
+Returns:
+- res: A cstring of the Builder's buffer
+*/
+to_cstring :: proc(b: ^Builder) -> (res: cstring) {
+	append(&b.buf, 0)
+	pop(&b.buf)
+	return cstring(raw_data(b.buf))
+}
+/*
 Returns the length of the Builder's buffer, in bytes
 
 Inputs:
@@ -350,9 +364,9 @@ Output:
 	ab
 
 */
-write_byte :: proc(b: ^Builder, x: byte) -> (n: int) {
+write_byte :: proc(b: ^Builder, x: byte, loc := #caller_location) -> (n: int) {
 	n0 := len(b.buf)
-	append(&b.buf, x)
+	append(&b.buf, x, loc)
 	n1 := len(b.buf)
 	return n1-n0
 }
@@ -380,9 +394,9 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of bytes appended
 */
-write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
+write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int) {
 	n0 := len(b.buf)
-	append(&b.buf, ..x)
+	append(&b.buf, ..x, loc=loc)
 	n1 := len(b.buf)
 	return n1-n0
 }
@@ -502,7 +516,7 @@ pop_byte :: proc(b: ^Builder) -> (r: byte) {
 	}
 
 	r = b.buf[len(b.buf)-1]
-	d := cast(^runtime.Raw_Dynamic_Array)&b.buf
+	d := (^runtime.Raw_Dynamic_Array)(&b.buf)
 	d.len = max(d.len-1, 0)
 	return
 }
@@ -522,7 +536,7 @@ pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 	}
 
 	r, width = utf8.decode_last_rune(b.buf[:])
-	d := cast(^runtime.Raw_Dynamic_Array)&b.buf
+	d := (^runtime.Raw_Dynamic_Array)(&b.buf)
 	d.len = max(d.len-width, 0)
 	return
 }
@@ -709,11 +723,11 @@ write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n:
 	return write_string(b, s)
 }
 /*
-Writes a f32 value to the Builder and returns the number of characters written
+Writes a f64 value to the Builder and returns the number of characters written
 
 Inputs:
 - b: A pointer to the Builder
-- f: The f32 value to be appended
+- f: The f64 value to be appended
 - fmt: The format byte
 - always_signed: Optional boolean flag to always include the sign
 

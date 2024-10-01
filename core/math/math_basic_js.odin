@@ -1,4 +1,4 @@
-//+build js
+#+build js
 package math
 
 import "base:intrinsics"

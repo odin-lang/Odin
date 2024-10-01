@@ -278,7 +278,9 @@ clone_node :: proc(node: ^Node) -> ^Node {
 			r.foreign_library = clone(r.foreign_library)
 			r.body            = clone(r.body)
 		case ^Foreign_Import_Decl:
+			r.attributes = clone_dynamic_array(r.attributes)
 			r.name = auto_cast clone(r.name)
+			r.fullpaths  = clone_array(r.fullpaths)
 		case ^Proc_Group:
 			r.args = clone(r.args)
 		case ^Attribute:

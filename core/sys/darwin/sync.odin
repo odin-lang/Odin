@@ -7,19 +7,26 @@ foreign import system "system:System"
 when ODIN_OS == .Darwin {
 	when (ODIN_PLATFORM_SUBTARGET == .iOS || ODIN_PLATFORM_SUBTARGET == .iPhoneSimulator ) && ODIN_MINIMUM_OS_VERSION > 17_04_00 {
 		WAIT_ON_ADDRESS_AVAILABLE :: true
-	} else when ODIN_MINIMUM_OS_VERSION > 14_04_00 {
+	} else when ODIN_MINIMUM_OS_VERSION >= 14_04_00 {
 		WAIT_ON_ADDRESS_AVAILABLE :: true
 	} else {
 		WAIT_ON_ADDRESS_AVAILABLE :: false
 	}
+
+	when ODIN_PLATFORM_SUBTARGET == .iOS && ODIN_MINIMUM_OS_VERSION >= 14_00_00 {
+		ULOCK_WAIT_2_AVAILABLE :: true
+	} else when ODIN_MINIMUM_OS_VERSION >= 11_00_00 {
+		ULOCK_WAIT_2_AVAILABLE :: true
+	} else {
+		ULOCK_WAIT_2_AVAILABLE :: false
+	}
+
 } else {
 	WAIT_ON_ADDRESS_AVAILABLE :: false
+	ULOCK_WAIT_2_AVAILABLE    :: false
 }
 
 os_sync_wait_on_address_flag :: enum u32 {
-	// This flag should be used as a default flag when no other flags listed below are required.
-	NONE,
-
 	// This flag should be used when synchronizing among multiple processes by
 	// placing the @addr passed to os_sync_wait_on_address and its variants
 	// in a shared memory region.
@@ -31,15 +38,12 @@ os_sync_wait_on_address_flag :: enum u32 {
 	// This flag should not be used when synchronizing among multiple threads of
 	// a single process. It allows the kernel to perform performance optimizations
 	// as the @addr is local to the calling process.
-	SHARED,
+	SHARED = 0,
 }
 
-os_sync_wait_on_address_flags :: bit_set[os_sync_wait_on_address_flag; u32]
+os_sync_wait_on_address_flags :: distinct bit_set[os_sync_wait_on_address_flag; u32]
 
 os_sync_wake_by_address_flag :: enum u32 {
-	// This flag should be used as a default flag when no other flags listed below are required.
-	NONE,
-
 	// This flag should be used when synchronizing among multiple processes by
 	// placing the @addr passed to os_sync_wake_by_address_any and its variants
 	// in a shared memory region.
@@ -51,10 +55,10 @@ os_sync_wake_by_address_flag :: enum u32 {
 	// This flag should not be used when synchronizing among multiple threads of
 	// a single process. It allows the kernel to perform performance optimizations
 	// as the @addr is local the calling process.
-	SHARED,
+	SHARED = 0,
 }
 
-os_sync_wake_by_address_flags :: bit_set[os_sync_wake_by_address_flag; u32]
+os_sync_wake_by_address_flags :: distinct bit_set[os_sync_wake_by_address_flag; u32]
 
 os_clockid :: enum u32 {
 	MACH_ABSOLUTE_TIME = 32,
@@ -283,7 +287,7 @@ foreign system {
 	//				and the shared memory specification
 	//				(See os_sync_wake_by_address_flags_t).
 	// ENOENT	:	No waiter(s) found waiting on the @addr.
-	os_sync_wake_by_address_any :: proc(addr: rawptr, size: uint, flags: os_sync_wait_on_address_flags) -> i32 ---
+	os_sync_wake_by_address_any :: proc(addr: rawptr, size: uint, flags: os_sync_wake_by_address_flags) -> i32 ---
 
 	// This function is a variant of os_sync_wake_by_address_any that wakes up all waiters
 	// blocked in os_sync_wait_on_address or its variants.
@@ -305,5 +309,5 @@ foreign system {
 	// In the event of an error, returns -1 with errno set to indicate the error.
 	//
 	// This function returns same error codes as returned by os_sync_wait_on_address.
-	os_sync_wake_by_address_all :: proc(addr: rawptr, size: uint, flags: os_sync_wait_on_address_flags) -> i32 ---
+	os_sync_wake_by_address_all :: proc(addr: rawptr, size: uint, flags: os_sync_wake_by_address_flags) -> i32 ---
 }

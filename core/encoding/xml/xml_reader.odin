@@ -1,29 +1,11 @@
 /*
- XML 1.0 / 1.1 parser
+	2021-2022 Jeroen van Rijn <nom@duclavier.com>.
+	available under Odin's BSD-3 license.
 
- 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
- available under Odin's BSD-3 license.
-
- from-scratch XML implementation, loosely modelled on the [spec](https://www.w3.org/TR/2006/REC-xml11-20060816).
-
-Features:
-- Supports enough of the XML 1.0/1.1 spec to handle the 99.9% of XML documents in common current usage.
-- Simple to understand and use. Small.
-
-Caveats:
-- We do NOT support HTML in this package, as that may or may not be valid XML.
-  If it works, great. If it doesn't, that's not considered a bug.
-
-- We do NOT support UTF-16. If you have a UTF-16 XML file, please convert it to UTF-8 first. Also, our condolences.
-- <[!ELEMENT and <[!ATTLIST are not supported, and will be either ignored or return an error depending on the parser options.
-
-MAYBE:
-- XML writer?
-- Serialize/deserialize Odin types?
-
-List of contributors:
-- Jeroen van Rijn: Initial implementation.
+	List of contributors:
+	- Jeroen van Rijn: Initial implementation.
 */
+
 package encoding_xml
 // An XML 1.0 / 1.1 parser
 
@@ -203,9 +185,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 	doc.elements = make([dynamic]Element, 1024, 1024, allocator)
 
-	// strings.intern_init(&doc.intern, allocator, allocator)
-
-	err =            .Unexpected_Token
+	err = .Unexpected_Token
 	element, parent: Element_ID
 	open: Token
 
@@ -259,8 +239,8 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				case .Slash:
 					// Empty tag. Close it.
 					expect(t, .Gt) or_return
-					parent      = doc.elements[element].parent
-					element     = parent
+					parent  = doc.elements[element].parent
+					element = parent
 
 				case:
 					error(t, t.offset, "Expected close tag, got: %#v\n", end_token)
@@ -276,8 +256,8 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					error(t, t.offset, "Mismatched Closing Tag. Expected %v, got %v\n", doc.elements[element].ident, ident.text)
 					return doc, .Mismatched_Closing_Tag
 				}
-				parent      = doc.elements[element].parent
-				element     = parent
+				parent  = doc.elements[element].parent
+				element = parent
 
 			} else if open.kind == .Exclaim {
 				// <!
@@ -463,8 +443,8 @@ validate_options :: proc(options: Options) -> (validated: Options, err: Error) {
 	return validated, .None
 }
 
-expect :: proc(t: ^Tokenizer, kind: Token_Kind) -> (tok: Token, err: Error) {
-	tok = scan(t)
+expect :: proc(t: ^Tokenizer, kind: Token_Kind, multiline_string := false) -> (tok: Token, err: Error) {
+	tok = scan(t, multiline_string=multiline_string)
 	if tok.kind == kind { return tok, .None }
 
 	error(t, t.offset, "Expected \"%v\", got \"%v\".", kind, tok.kind)
@@ -480,7 +460,13 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 	offset  = t.offset - len(key.text)
 
 	_       = expect(t, .Eq)     or_return
-	value  := expect(t, .String) or_return
+	value  := expect(t, .String, multiline_string=true) or_return
+
+	normalized, normalize_err := entity.decode_xml(value.text, {.Normalize_Whitespace}, doc.allocator)
+	if normalize_err == .None {
+		append(&doc.strings_to_free, normalized)
+		value.text = normalized
+	}
 
 	attr.key = key.text
 	attr.val = value.text

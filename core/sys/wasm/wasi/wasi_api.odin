@@ -1,4 +1,4 @@
-//+build wasm32
+#+build wasm32
 package sys_wasi
 
 foreign import wasi "wasi_snapshot_preview1"
@@ -10,12 +10,13 @@ filesize_t :: distinct u64
 timestamp_t :: distinct u64
 
 clockid_t :: distinct u32
-CLOCK_MONOTONIC          :: clockid_t(0)
-CLOCK_PROCESS_CPUTIME_ID :: clockid_t(1)
-CLOCK_REALTIME           :: clockid_t(2)
+CLOCK_REALTIME           :: clockid_t(0)
+CLOCK_MONOTONIC          :: clockid_t(1)
+CLOCK_PROCESS_CPUTIME_ID :: clockid_t(2)
 CLOCK_THREAD_CPUTIME_ID  :: clockid_t(3)
 
 errno_t :: enum u16 {
+	NONE = 0,
 	// No error occurred. System call completed successfully.
 	SUCCESS = 0,
 	// Argument list too long.
@@ -714,7 +715,7 @@ subscription_t :: struct {
 	 * The type of the event to which to subscribe, and its contents
 	 */
 	using contents: struct {
-		tag: u8,
+		tag: eventtype_t,
 		using u: struct #raw_union {
 			clock: subscription_clock_t,
 			fd_read: subscription_fd_readwrite_t,
@@ -962,7 +963,7 @@ prestat_dir_t :: struct {
 }
 
 prestat_t :: struct {
-	tag: u8,
+	tag: preopentype_t,
 	using u: struct {
 		dir: prestat_dir_t,
 	},
@@ -1158,7 +1159,7 @@ foreign wasi {
 		/**
 		 * A buffer into which to write the preopened directory name.
 		 */
-		path: string,
+		path: []byte,
 	) -> errno_t ---
 	/**
 	 * Create a directory.

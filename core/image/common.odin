@@ -12,6 +12,7 @@ package image
 
 import "core:bytes"
 import "core:mem"
+import "core:io"
 import "core:compress"
 import "base:runtime"
 
@@ -62,6 +63,7 @@ Image_Metadata :: union #shared_nil {
 	^PNG_Info,
 	^QOI_Info,
 	^TGA_Info,
+	^BMP_Info,
 }
 
 
@@ -110,7 +112,8 @@ Image_Option:
 
 	`.alpha_drop_if_present`
 		If the image has an alpha channel, drop it.
-		You may want to use `.alpha_premultiply` in this case.
+		You may want to use `.alpha_
+		tiply` in this case.
 
 		NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
 		unless you select `alpha_premultiply`.
@@ -159,11 +162,13 @@ Error :: union #shared_nil {
 	Netpbm_Error,
 	PNG_Error,
 	QOI_Error,
+	BMP_Error,
 
 	compress.Error,
 	compress.General_Error,
 	compress.Deflate_Error,
 	compress.ZLIB_Error,
+	io.Error,
 	runtime.Allocator_Error,
 }
 
@@ -194,6 +199,128 @@ General_Image_Error :: enum {
 
 	// Allocation
 	Unable_To_Allocate_Or_Resize,
+}
+
+/*
+	BMP-specific
+*/
+BMP_Error :: enum {
+	None = 0,
+	Invalid_File_Size,
+	Unsupported_BMP_Version,
+	Unsupported_OS2_File,
+	Unsupported_Compression,
+	Unsupported_BPP,
+	Invalid_Stride,
+	Invalid_Color_Count,
+	Implausible_File_Size,
+	Bitfield_Version_Unhandled, // We don't (yet) handle bit fields for this BMP version.
+	Bitfield_Sum_Exceeds_BPP,   // Total mask bit count > bpp
+	Bitfield_Overlapped,        // Channel masks overlap
+}
+
+// img.metadata is wrapped in a struct in case we need to add to it later
+// without putting it in BMP_Header
+BMP_Info :: struct {
+	info: BMP_Header,
+}
+
+BMP_Magic :: enum u16le {
+	Bitmap            = 0x4d42, // 'BM'
+	OS2_Bitmap_Array  = 0x4142, // 'BA'
+	OS2_Icon          = 0x4349, // 'IC',
+	OS2_Color_Icon    = 0x4943, // 'CI'
+	OS2_Pointer       = 0x5450, // 'PT'
+	OS2_Color_Pointer = 0x5043, // 'CP'
+}
+
+// See: http://justsolve.archiveteam.org/wiki/BMP#Well-known_versions
+BMP_Version :: enum u32le {
+	OS2_v1    = 12,  // BITMAPCOREHEADER  (Windows V2 / OS/2 version 1.0)
+	OS2_v2    = 64,  // BITMAPCOREHEADER2 (OS/2 version 2.x)
+	V3        = 40,  // BITMAPINFOHEADER
+	V4        = 108, // BITMAPV4HEADER
+	V5        = 124, // BITMAPV5HEADER
+
+	ABBR_16   = 16,  // Abbreviated
+	ABBR_24   = 24,  // ..
+	ABBR_48   = 48,  // ..
+	ABBR_52   = 52,  // ..
+	ABBR_56   = 56,  // ..
+}
+
+BMP_Header :: struct #packed {
+	// File header
+	magic:            BMP_Magic,
+	size:             u32le,
+	_res1:            u16le, // Reserved; must be zero
+	_res2:            u16le, // Reserved; must be zero
+	pixel_offset:     u32le, // Offset in bytes, from the beginning of BMP_Header to the pixel data
+	// V3
+	info_size:        BMP_Version,
+	width:            i32le,
+	height:           i32le,
+	planes:           u16le,
+	bpp:              u16le,
+	compression:      BMP_Compression,
+	image_size:       u32le,
+	pels_per_meter:   [2]u32le,
+	colors_used:      u32le,
+	colors_important: u32le, // OS2_v2 is equal up to here
+	// V4
+	masks:            [4]u32le `fmt:"32b"`,
+	colorspace:       BMP_Logical_Color_Space,
+	endpoints:        BMP_CIEXYZTRIPLE,
+	gamma:            [3]BMP_GAMMA16_16,
+	// V5
+	intent:           BMP_Gamut_Mapping_Intent,
+	profile_data:     u32le,
+	profile_size:     u32le,
+	reserved:         u32le,
+}
+#assert(size_of(BMP_Header) == 138)
+
+OS2_Header :: struct #packed {
+	// BITMAPCOREHEADER minus info_size field
+	width:            i16le,
+	height:           i16le,
+	planes:           u16le,
+	bpp:              u16le,
+}
+#assert(size_of(OS2_Header) == 8)
+
+BMP_Compression :: enum u32le {
+	RGB              = 0x0000,
+	RLE8             = 0x0001,
+	RLE4             = 0x0002,
+	Bit_Fields       = 0x0003, // If Windows
+	Huffman1D        = 0x0003, // If OS2v2
+	JPEG             = 0x0004, // If Windows
+	RLE24            = 0x0004, // If OS2v2
+	PNG              = 0x0005,
+	Alpha_Bit_Fields = 0x0006,
+	CMYK             = 0x000B,
+	CMYK_RLE8        = 0x000C,
+	CMYK_RLE4        = 0x000D,
+}
+
+BMP_Logical_Color_Space :: enum u32le {
+	CALIBRATED_RGB      = 0x00000000,
+	sRGB                = 0x73524742, // 'sRGB'
+	WINDOWS_COLOR_SPACE = 0x57696E20, // 'Win '
+}
+
+BMP_FXPT2DOT30   :: u32le
+BMP_CIEXYZ       :: [3]BMP_FXPT2DOT30
+BMP_CIEXYZTRIPLE :: [3]BMP_CIEXYZ
+BMP_GAMMA16_16   :: [2]u16le
+
+BMP_Gamut_Mapping_Intent :: enum u32le {
+	INVALID          = 0x00000000, // If not V5, this field will just be zero-initialized and not valid.
+	ABS_COLORIMETRIC = 0x00000008,
+	BUSINESS         = 0x00000001,
+	GRAPHICS         = 0x00000002,
+	IMAGES           = 0x00000004,
 }
 
 /*
@@ -459,6 +586,32 @@ Channel :: enum u8 {
 	G = 2,
 	B = 3,
 	A = 4,
+}
+
+// Take a slice of pixels (`[]RGBA_Pixel`, etc), and return an `Image`
+// Don't call `destroy` on the resulting `Image`. Instead, delete the original `pixels` slice.
+pixels_to_image :: proc(pixels: [][$N]$E, width: int, height: int) -> (img: Image, ok: bool) where E == u8 || E == u16, N >= 1, N <= 4 {
+	if len(pixels) != width * height {
+		return {}, false
+	}
+
+	img.height   = height
+	img.width    = width
+	img.depth    = 8 when E == u8 else 16
+	img.channels = N
+
+	s := transmute(runtime.Raw_Slice)pixels
+	d := runtime.Raw_Dynamic_Array{
+		data = s.data,
+		len  = s.len * size_of(E) * N,
+		cap  = s.len * size_of(E) * N,
+		allocator = runtime.nil_allocator(),
+	}
+	img.pixels = bytes.Buffer{
+		buf = transmute([dynamic]u8)d,
+	}
+
+	return img, true
 }
 
 // When you have an RGB(A) image, but want a particular channel.
@@ -1133,6 +1286,76 @@ apply_palette_rgba :: proc(img: ^Image, palette: [256]RGBA_Pixel, allocator := c
 }
 apply_palette :: proc{apply_palette_rgb, apply_palette_rgba}
 
+blend_single_channel :: #force_inline proc(fg, alpha, bg: $T) -> (res: T) where T == u8 || T == u16 {
+	MAX :: 256 when T == u8 else 65536
+
+	c := u32(fg) * (MAX - u32(alpha)) + u32(bg) * (1 + u32(alpha))
+	return T(c & (MAX - 1))
+}
+
+blend_pixel :: #force_inline proc(fg: [$N]$T, alpha: T, bg: [N]T) -> (res: [N]T) where (T == u8 || T == u16), N >= 1, N <= 4 {
+	MAX :: 256 when T == u8 else 65536
+
+	when N == 1 {
+		r := u32(fg.r) * (MAX - u32(alpha)) + u32(bg.r) * (1 + u32(alpha))
+		return {T(r & (MAX - 1))}
+	}
+	when N == 2 {
+		r := u32(fg.r) * (MAX - u32(alpha)) + u32(bg.r) * (1 + u32(alpha))
+		g := u32(fg.g) * (MAX - u32(alpha)) + u32(bg.g) * (1 + u32(alpha))
+		return {T(r & (MAX - 1)), T(g & (MAX - 1))}
+	}
+	when N == 3 || N == 4 {
+		r := u32(fg.r) * (MAX - u32(alpha)) + u32(bg.r) * (1 + u32(alpha))
+		g := u32(fg.g) * (MAX - u32(alpha)) + u32(bg.g) * (1 + u32(alpha))
+		b := u32(fg.b) * (MAX - u32(alpha)) + u32(bg.b) * (1 + u32(alpha))
+
+		when N == 3 {
+			return {T(r & (MAX - 1)), T(g & (MAX - 1)), T(b & (MAX - 1))}
+		} else {
+			return {T(r & (MAX - 1)), T(g & (MAX - 1)), T(b & (MAX - 1)), MAX - 1}
+		}
+	}
+	unreachable()
+}
+blend :: proc{blend_single_channel, blend_pixel}
+
+// For all pixels of the image, multiplies R, G and B by Alpha. This is useful mainly for games rendering anti-aliased transparent sprites.
+// Grayscale with alpha images are supported as well.
+// Note that some image formats like QOI explicitly do NOT support premultiplied alpha, so you will end up with a non-standard file.
+premultiply_alpha :: proc(img: ^Image) -> (ok: bool) {
+	switch {
+	case img.channels == 2 && img.depth == 8:
+		pixels := mem.slice_data_cast([]GA_Pixel, img.pixels.buf[:])
+		for &pixel in pixels {
+			pixel.r = u8(u32(pixel.r) * u32(pixel.g) / 0xFF)
+		}
+		return true
+	case img.channels == 2 && img.depth == 16:
+		pixels := mem.slice_data_cast([]GA_Pixel_16, img.pixels.buf[:])
+		for &pixel in pixels {
+			pixel.r = u16(u32(pixel.r) * u32(pixel.g) / 0xFFFF)
+		}
+		return true
+	case img.channels == 4 && img.depth == 8:
+		pixels := mem.slice_data_cast([]RGBA_Pixel, img.pixels.buf[:])
+		for &pixel in pixels {
+			pixel.r = u8(u32(pixel.r) * u32(pixel.a) / 0xFF)
+			pixel.g = u8(u32(pixel.g) * u32(pixel.a) / 0xFF)
+			pixel.b = u8(u32(pixel.b) * u32(pixel.a) / 0xFF)
+		}
+		return true
+	case img.channels == 4 && img.depth == 16:
+		pixels := mem.slice_data_cast([]RGBA_Pixel_16, img.pixels.buf[:])
+		for &pixel in pixels {
+			pixel.r = u16(u32(pixel.r) * u32(pixel.a) / 0xFFFF)
+			pixel.g = u16(u32(pixel.g) * u32(pixel.a) / 0xFFFF)
+			pixel.b = u16(u32(pixel.b) * u32(pixel.a) / 0xFFFF)
+		}
+		return true
+	case: return false
+	}
+}
 
 // Replicates grayscale values into RGB(A) 8- or 16-bit images as appropriate.
 // Returns early with `false` if already an RGB(A) image.
@@ -1153,55 +1376,57 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 	}
 
 	switch img.depth {
-		case 8:
-			switch img.channels {
-			case 1: // Turn Gray into RGB
-				out := mem.slice_data_cast([]RGB_Pixel, buf.buf[:])
+	case 8:
+		switch img.channels {
+		case 1: // Turn Gray into RGB
+			out := mem.slice_data_cast([]RGB_Pixel, buf.buf[:])
 
-				for p in img.pixels.buf {
-					out[0] = p // Broadcast gray value into RGB components.
-					out    = out[1:]
-				}
-
-			case 2: // Turn Gray + Alpha into RGBA
-				inp := mem.slice_data_cast([]GA_Pixel,   img.pixels.buf[:])
-				out := mem.slice_data_cast([]RGBA_Pixel, buf.buf[:])
-
-				for p in inp {
-					out[0].rgb = p.r // Gray component.
-					out[0].a   = p.g // Alpha component.
-				}
-
-			case:
-				unreachable()
+			for p in img.pixels.buf {
+				out[0] = p // Broadcast gray value into RGB components.
+				out    = out[1:]
 			}
 
-		case 16:
-			switch img.channels {
-			case 1: // Turn Gray into RGB
-				inp := mem.slice_data_cast([]u16, img.pixels.buf[:])
-				out := mem.slice_data_cast([]RGB_Pixel_16, buf.buf[:])
+		case 2: // Turn Gray + Alpha into RGBA
+			inp := mem.slice_data_cast([]GA_Pixel,   img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGBA_Pixel, buf.buf[:])
 
-				for p in inp {
-					out[0] = p // Broadcast gray value into RGB components.
-					out    = out[1:]
-				}
-
-			case 2: // Turn Gray + Alpha into RGBA
-				inp := mem.slice_data_cast([]GA_Pixel_16,   img.pixels.buf[:])
-				out := mem.slice_data_cast([]RGBA_Pixel_16, buf.buf[:])
-
-				for p in inp {
-					out[0].rgb = p.r // Gray component.
-					out[0].a   = p.g // Alpha component.
-				}
-
-			case:
-				unreachable()
+			for p in inp {
+				out[0].rgb = p.r // Gray component.
+				out[0].a   = p.g // Alpha component.
+				out    = out[1:]
 			}
 
 		case:
 			unreachable()
+		}
+
+	case 16:
+		switch img.channels {
+		case 1: // Turn Gray into RGB
+			inp := mem.slice_data_cast([]u16, img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGB_Pixel_16, buf.buf[:])
+
+			for p in inp {
+				out[0] = p // Broadcast gray value into RGB components.
+				out    = out[1:]
+			}
+
+		case 2: // Turn Gray + Alpha into RGBA
+			inp := mem.slice_data_cast([]GA_Pixel_16,   img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGBA_Pixel_16, buf.buf[:])
+
+			for p in inp {
+				out[0].rgb = p.r // Gray component.
+				out[0].a   = p.g // Alpha component.
+				out    = out[1:]
+			}
+
+		case:
+			unreachable()
+		}
+
+	case:
+		unreachable()
 	}
 
 
@@ -1216,7 +1441,7 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 /*
 	Helper functions to read and write data from/to a Context, etc.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 read_data :: proc(z: $C, $T: typeid) -> (res: T, err: compress.General_Error) {
 	if r, e := compress.read_data(z, T); e != .None {
 		return {}, .Stream_Too_Short
@@ -1225,7 +1450,7 @@ read_data :: proc(z: $C, $T: typeid) -> (res: T, err: compress.General_Error) {
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 read_u8 :: proc(z: $C) -> (res: u8, err: compress.General_Error) {
 	if r, e := compress.read_u8(z); e != .None {
 		return {}, .Stream_Too_Short

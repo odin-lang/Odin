@@ -1,8 +1,37 @@
 package bytes
 
+import "base:intrinsics"
 import "core:mem"
+import "core:simd"
 import "core:unicode"
 import "core:unicode/utf8"
+
+when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
+	@(private)
+	SCANNER_INDICES_256 : simd.u8x32 : {
+		0,  1,  2,  3,  4,  5,  6,  7,
+		8,  9, 10, 11, 12, 13, 14, 15,
+		16, 17, 18, 19, 20, 21, 22, 23,
+		24, 25, 26, 27, 28, 29, 30, 31,
+	}
+	@(private)
+	SCANNER_SENTINEL_MAX_256: simd.u8x32 : u8(0x00)
+	@(private)
+	SCANNER_SENTINEL_MIN_256: simd.u8x32 : u8(0xff)
+	@(private)
+	SIMD_REG_SIZE_256 :: 32
+}
+@(private)
+SCANNER_INDICES_128 : simd.u8x16 : {
+	0,  1,  2,  3,  4,  5,  6,  7,
+	8,  9, 10, 11, 12, 13, 14, 15,
+}
+@(private)
+SCANNER_SENTINEL_MAX_128: simd.u8x16 : u8(0x00)
+@(private)
+SCANNER_SENTINEL_MIN_128: simd.u8x16 : u8(0xff)
+@(private)
+SIMD_REG_SIZE_128 :: 16
 
 clone :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
 	c := make([]byte, len(s), allocator, loc)
@@ -293,26 +322,275 @@ split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
 	return _split_iterator(s, sep, len(sep))
 }
 
+/*
+Scan a slice of bytes for a specific byte.
 
-index_byte :: proc(s: []byte, c: byte) -> int {
-	for i := 0; i < len(s); i += 1 {
+This procedure safely handles slices of any length, including empty slices.
+
+Inputs:
+- data: A slice of bytes.
+- c: The byte to search for.
+
+Returns:
+- index: The index of the byte `c`, or -1 if it was not found.
+*/
+index_byte :: proc "contextless" (s: []byte, c: byte) -> (index: int) #no_bounds_check {
+	i, l := 0, len(s)
+
+	// Guard against small strings.  On modern systems, it is ALWAYS
+	// worth vectorizing assuming there is a hardware vector unit, and
+	// the data size is large enough.
+	if l < SIMD_REG_SIZE_128 {
+		for /**/; i < l; i += 1 {
+			if s[i] == c {
+				return i
+			}
+		}
+		return -1
+	}
+
+	c_vec: simd.u8x16 = c
+	when !simd.IS_EMULATED {
+		// Note: While this is something that could also logically take
+		// advantage of AVX512, the various downclocking and power
+		// consumption related woes make premature to have a dedicated
+		// code path.
+		when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
+			c_vec_256: simd.u8x32 = c
+
+			s_vecs: [4]simd.u8x32 = ---
+			c_vecs: [4]simd.u8x32 = ---
+			m_vec: [4]u8 = ---
+
+			// Scan 128-byte chunks, using 256-bit SIMD.
+			for nr_blocks := l / (4 * SIMD_REG_SIZE_256); nr_blocks > 0; nr_blocks -= 1 {
+				#unroll for j in 0..<4 {
+					s_vecs[j] = intrinsics.unaligned_load(cast(^simd.u8x32)raw_data(s[i+j*SIMD_REG_SIZE_256:]))
+					c_vecs[j] = simd.lanes_eq(s_vecs[j], c_vec_256)
+					m_vec[j] = simd.reduce_or(c_vecs[j])
+				}
+				if m_vec[0] | m_vec[1] | m_vec[2] | m_vec[3] > 0 {
+					#unroll for j in 0..<4 {
+						if m_vec[j] > 0 {
+							sel := simd.select(c_vecs[j], SCANNER_INDICES_256, SCANNER_SENTINEL_MIN_256)
+							off := simd.reduce_min(sel)
+							return i + j * SIMD_REG_SIZE_256 + int(off)
+						}
+					}
+				}
+
+				i += 4 * SIMD_REG_SIZE_256
+			}
+
+			// Scan 64-byte chunks, using 256-bit SIMD.
+			for nr_blocks := (l - i) / (2 * SIMD_REG_SIZE_256); nr_blocks > 0; nr_blocks -= 1 {
+				#unroll for j in 0..<2 {
+					s_vecs[j] = intrinsics.unaligned_load(cast(^simd.u8x32)raw_data(s[i+j*SIMD_REG_SIZE_256:]))
+					c_vecs[j] = simd.lanes_eq(s_vecs[j], c_vec_256)
+					m_vec[j] = simd.reduce_or(c_vecs[j])
+				}
+				if m_vec[0] | m_vec[1] > 0 {
+					#unroll for j in 0..<2 {
+						if m_vec[j] > 0 {
+							sel := simd.select(c_vecs[j], SCANNER_INDICES_256, SCANNER_SENTINEL_MIN_256)
+							off := simd.reduce_min(sel)
+							return i + j * SIMD_REG_SIZE_256 + int(off)
+						}
+					}
+				}
+
+				i += 2 * SIMD_REG_SIZE_256
+			}
+		} else {
+			s_vecs: [4]simd.u8x16 = ---
+			c_vecs: [4]simd.u8x16 = ---
+			m_vecs: [4]u8 = ---
+
+			// Scan 64-byte chunks, using 128-bit SIMD.
+			for nr_blocks := l / (4 * SIMD_REG_SIZE_128); nr_blocks > 0; nr_blocks -= 1 {
+				#unroll for j in 0..<4 {
+					s_vecs[j]= intrinsics.unaligned_load(cast(^simd.u8x16)raw_data(s[i+j*SIMD_REG_SIZE_128:]))
+					c_vecs[j] = simd.lanes_eq(s_vecs[j], c_vec)
+					m_vecs[j] = simd.reduce_or(c_vecs[j])
+				}
+				if m_vecs[0] | m_vecs[1] | m_vecs[2] | m_vecs[3] > 0 {
+					#unroll for j in 0..<4 {
+						if m_vecs[j] > 0 {
+							sel := simd.select(c_vecs[j], SCANNER_INDICES_128, SCANNER_SENTINEL_MIN_128)
+							off := simd.reduce_min(sel)
+							return i + j * SIMD_REG_SIZE_128 + int(off)
+						}
+					}
+				}
+
+				i += 4 * SIMD_REG_SIZE_128
+			}
+		}
+	}
+
+	// Scan the remaining SIMD register sized chunks.
+	//
+	// Apparently LLVM does ok with 128-bit SWAR, so this path is also taken
+	// on potato targets.  Scanning more at a time when LLVM is emulating SIMD
+	// likely does not buy much, as all that does is increase GP register
+	// pressure.
+	for nr_blocks := (l - i) / SIMD_REG_SIZE_128; nr_blocks > 0; nr_blocks -= 1 {
+		s0 := intrinsics.unaligned_load(cast(^simd.u8x16)raw_data(s[i:]))
+		c0 := simd.lanes_eq(s0, c_vec)
+		if simd.reduce_or(c0) > 0 {
+			sel := simd.select(c0, SCANNER_INDICES_128, SCANNER_SENTINEL_MIN_128)
+			off := simd.reduce_min(sel)
+			return i + int(off)
+		}
+
+		i += SIMD_REG_SIZE_128
+	}
+
+	// Scan serially for the remainder.
+	for /**/; i < l; i += 1 {
 		if s[i] == c {
 			return i
 		}
 	}
+
 	return -1
 }
 
-// Returns -1 if c is not present
-last_index_byte :: proc(s: []byte, c: byte) -> int {
-	for i := len(s)-1; i >= 0; i -= 1 {
+/*
+Scan a slice of bytes for a specific byte, starting from the end and working
+backwards to the start.
+
+This procedure safely handles slices of any length, including empty slices.
+
+Inputs:
+- data: A slice of bytes.
+- c: The byte to search for.
+
+Returns:
+- index: The index of the byte `c`, or -1 if it was not found.
+*/
+last_index_byte :: proc "contextless" (s: []byte, c: byte) -> int #no_bounds_check {
+	i := len(s)
+
+	// Guard against small strings.  On modern systems, it is ALWAYS
+	// worth vectorizing assuming there is a hardware vector unit, and
+	// the data size is large enough.
+	if i < SIMD_REG_SIZE_128 {
+		#reverse for ch, j in s {
+			if ch == c {
+				return j
+			}
+		}
+		return -1
+	}
+
+	c_vec: simd.u8x16 = c
+	when !simd.IS_EMULATED {
+		// Note: While this is something that could also logically take
+		// advantage of AVX512, the various downclocking and power
+		// consumption related woes make premature to have a dedicated
+		// code path.
+		when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
+			c_vec_256: simd.u8x32 = c
+
+			s_vecs: [4]simd.u8x32 = ---
+			c_vecs: [4]simd.u8x32 = ---
+			m_vec: [4]u8 = ---
+
+			// Scan 128-byte chunks, using 256-bit SIMD.
+			for i >= 4 * SIMD_REG_SIZE_256 {
+				i -= 4 * SIMD_REG_SIZE_256
+
+				#unroll for j in 0..<4 {
+					s_vecs[j] = intrinsics.unaligned_load(cast(^simd.u8x32)raw_data(s[i+j*SIMD_REG_SIZE_256:]))
+					c_vecs[j] = simd.lanes_eq(s_vecs[j], c_vec_256)
+					m_vec[j] = simd.reduce_or(c_vecs[j])
+				}
+				if m_vec[0] | m_vec[1] | m_vec[2] | m_vec[3] > 0 {
+					#unroll for j in 0..<4 {
+						if m_vec[3-j] > 0 {
+							sel := simd.select(c_vecs[3-j], SCANNER_INDICES_256, SCANNER_SENTINEL_MAX_256)
+							off := simd.reduce_max(sel)
+							return i + (3-j) * SIMD_REG_SIZE_256 + int(off)
+						}
+					}
+				}
+			}
+
+			// Scan 64-byte chunks, using 256-bit SIMD.
+			for i >= 2 * SIMD_REG_SIZE_256 {
+				i -= 2 * SIMD_REG_SIZE_256
+
+				#unroll for j in 0..<2 {
+					s_vecs[j] = intrinsics.unaligned_load(cast(^simd.u8x32)raw_data(s[i+j*SIMD_REG_SIZE_256:]))
+					c_vecs[j] = simd.lanes_eq(s_vecs[j], c_vec_256)
+					m_vec[j] = simd.reduce_or(c_vecs[j])
+				}
+				if m_vec[0] | m_vec[1] > 0 {
+					#unroll for j in 0..<2 {
+						if m_vec[1-j] > 0 {
+							sel := simd.select(c_vecs[1-j], SCANNER_INDICES_256, SCANNER_SENTINEL_MAX_256)
+							off := simd.reduce_max(sel)
+							return i + (1-j) * SIMD_REG_SIZE_256 + int(off)
+						}
+					}
+				}
+			}
+		} else {
+			s_vecs: [4]simd.u8x16 = ---
+			c_vecs: [4]simd.u8x16 = ---
+			m_vecs: [4]u8 = ---
+
+			// Scan 64-byte chunks, using 128-bit SIMD.
+			for i >= 4 * SIMD_REG_SIZE_128 {
+				i -= 4 * SIMD_REG_SIZE_128
+
+				#unroll for j in 0..<4 {
+					s_vecs[j] = intrinsics.unaligned_load(cast(^simd.u8x16)raw_data(s[i+j*SIMD_REG_SIZE_128:]))
+					c_vecs[j] = simd.lanes_eq(s_vecs[j], c_vec)
+					m_vecs[j] = simd.reduce_or(c_vecs[j])
+				}
+				if m_vecs[0] | m_vecs[1] | m_vecs[2] | m_vecs[3] > 0 {
+					#unroll for j in 0..<4 {
+						if m_vecs[3-j] > 0 {
+							sel := simd.select(c_vecs[3-j], SCANNER_INDICES_128, SCANNER_SENTINEL_MAX_128)
+							off := simd.reduce_max(sel)
+							return i + (3-j) * SIMD_REG_SIZE_128 + int(off)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Scan the remaining SIMD register sized chunks.
+	//
+	// Apparently LLVM does ok with 128-bit SWAR, so this path is also taken
+	// on potato targets.  Scanning more at a time when LLVM is emulating SIMD
+	// likely does not buy much, as all that does is increase GP register
+	// pressure.
+	for i >= SIMD_REG_SIZE_128 {
+		i -= SIMD_REG_SIZE_128
+
+		s0 := intrinsics.unaligned_load(cast(^simd.u8x16)raw_data(s[i:]))
+		c0 := simd.lanes_eq(s0, c_vec)
+		if simd.reduce_or(c0) > 0 {
+			sel := simd.select(c0, SCANNER_INDICES_128, SCANNER_SENTINEL_MAX_128)
+			off := simd.reduce_max(sel)
+			return i + int(off)
+		}
+	}
+
+	// Scan serially for the remainder.
+	for i > 0 {
+		i -= 1
 		if s[i] == c {
 			return i
 		}
 	}
+
 	return -1
 }
-
 
 
 @private PRIME_RABIN_KARP :: 16777619
@@ -1166,4 +1444,29 @@ fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	return subslices[:]
+}
+
+// alias returns true iff a and b have a non-zero length, and any part of
+// a overlaps with b.
+alias :: proc "contextless" (a, b: []byte) -> bool {
+	a_len, b_len := len(a), len(b)
+	if a_len == 0 || b_len == 0 {
+		return false
+	}
+
+	a_start, b_start := uintptr(raw_data(a)), uintptr(raw_data(b))
+	a_end, b_end := a_start + uintptr(a_len-1), b_start + uintptr(b_len-1)
+
+	return a_start <= b_end && b_start <= a_end
+}
+
+// alias_inexactly returns true iff a and b have a non-zero length,
+// the base pointer of a and b are NOT equal, and any part of a overlaps
+// with b (ie: `alias(a, b)` with an exception that returns false for
+// `a == b`, `b = a[:len(a)-69]` and similar conditions).
+alias_inexactly :: proc "contextless" (a, b: []byte) -> bool {
+	if raw_data(a) == raw_data(b) {
+		return false
+	}
+	return alias(a, b)
 }

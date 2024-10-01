@@ -29,6 +29,7 @@ import "core:sort"
 import "core:strings"
 import "core:strconv"
 import "core:math"
+import textedit "core:text/edit"
 
 COMMAND_LIST_SIZE    :: #config(MICROUI_COMMAND_LIST_SIZE,    256 * 1024)
 ROOT_LIST_SIZE       :: #config(MICROUI_ROOT_LIST_SIZE,       32)
@@ -51,6 +52,7 @@ Clip :: enum u32 {
 
 Color_Type :: enum u32 {
 	TEXT,
+	SELECTION_BG,
 	BORDER,
 	WINDOW_BG,
 	TITLE_BG,
@@ -111,7 +113,16 @@ Key :: enum u32 {
 	CTRL,
 	ALT,
 	BACKSPACE,
+	DELETE,
 	RETURN,
+	LEFT,
+	RIGHT,
+	HOME,
+	END,
+	A,
+	X,
+	C,
+	V,
 }
 Key_Set :: distinct bit_set[Key; u32]
 
@@ -235,6 +246,8 @@ Context :: struct {
 	key_down_bits, key_pressed_bits:     Key_Set,
 	_text_store:                         [MAX_TEXT_STORE]u8,
 	text_input:                          strings.Builder, // uses `_text_store` as backing store with nil_allocator.
+	textbox_state:                       textedit.State,
+	textbox_offset:                      i32,
 }
 
 Stack :: struct($T: typeid, $N: int) {
@@ -260,6 +273,7 @@ default_style := Style{
 	scrollbar_size = 12, thumb_size = 8,
 	colors = {
 		.TEXT         = {230, 230, 230, 255},
+		.SELECTION_BG = {90,  90,  90,  255},
 		.BORDER       = {25,  25,  25,  255},
 		.WINDOW_BG    = {50,  50,  50,  255},
 		.TITLE_BG     = {25,  25,  25,  255},
@@ -305,12 +319,21 @@ default_draw_frame :: proc(ctx: ^Context, rect: Rect, colorid: Color_Type) {
 	}
 }
 
-init :: proc(ctx: ^Context) {
+init :: proc(
+	ctx: ^Context,
+	set_clipboard: proc(user_data: rawptr, text: string) -> (ok: bool) = nil,
+	get_clipboard: proc(user_data: rawptr) -> (text: string, ok: bool) = nil,
+	clipboard_user_data: rawptr = nil,
+) {
 	ctx^ = {} // zero memory
 	ctx.draw_frame  = default_draw_frame
 	ctx._style      = default_style
 	ctx.style       = &ctx._style
 	ctx.text_input  = strings.builder_from_bytes(ctx._text_store[:])
+
+	ctx.textbox_state.set_clipboard       = set_clipboard
+	ctx.textbox_state.get_clipboard       = get_clipboard
+	ctx.textbox_state.clipboard_user_data = clipboard_user_data
 }
 
 begin :: proc(ctx: ^Context) {
@@ -599,7 +622,7 @@ push_command :: proc(ctx: ^Context, $Type: typeid, extra_size := 0) -> ^Type {
 	return cmd
 }
 
-next_command :: proc(ctx: ^Context, pcmd: ^^Command) -> bool {
+next_command :: proc "contextless" (ctx: ^Context, pcmd: ^^Command) -> bool {
 	cmd := pcmd^
 	defer pcmd^ = cmd
 	if cmd != nil { 
@@ -607,7 +630,7 @@ next_command :: proc(ctx: ^Context, pcmd: ^^Command) -> bool {
 	} else {
 		cmd = (^Command)(&ctx.command_list.items[0])
 	}
-	invalid_command :: #force_inline proc(ctx: ^Context) -> ^Command {
+	invalid_command :: #force_inline proc "contextless" (ctx: ^Context) -> ^Command {
 		return (^Command)(&ctx.command_list.items[ctx.command_list.idx])
 	}
 	for cmd != invalid_command(ctx) {
@@ -620,7 +643,7 @@ next_command :: proc(ctx: ^Context, pcmd: ^^Command) -> bool {
 	return false
 }
 
-next_command_iterator :: proc(ctx: ^Context, pcm: ^^Command) -> (Command_Variant, bool) {
+next_command_iterator :: proc "contextless" (ctx: ^Context, pcm: ^^Command) -> (Command_Variant, bool) {
 	if next_command(ctx, pcm) {
 		return pcm^.variant, true
 	}
@@ -967,29 +990,120 @@ checkbox :: proc(ctx: ^Context, label: string, state: ^bool) -> (res: Result_Set
 textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect, opt := Options{}) -> (res: Result_Set) {
 	update_control(ctx, id, r, opt | {.HOLD_FOCUS})
 
+	font := ctx.style.font
+
 	if ctx.focus_id == id {
+		/* create a builder backed by the user's buffer */
+		builder := strings.builder_from_bytes(textbuf)
+		non_zero_resize(&builder.buf, textlen^)
+		ctx.textbox_state.builder = &builder
+		if ctx.textbox_state.id != u64(id) {
+			ctx.textbox_state.id = u64(id)
+			ctx.textbox_state.selection = {}
+		}
+
+		/* check selection bounds */
+		if ctx.textbox_state.selection[0] > textlen^ || ctx.textbox_state.selection[1] > textlen^ {
+			ctx.textbox_state.selection = {}
+		}
+
 		/* handle text input */
-		n := min(len(textbuf) - textlen^, strings.builder_len(ctx.text_input))
-		if n > 0 {
-			copy(textbuf[textlen^:], strings.to_string(ctx.text_input)[:n])
-			textlen^ += n
+		if strings.builder_len(ctx.text_input) > 0 {
+			if textedit.input_text(&ctx.textbox_state, strings.to_string(ctx.text_input)) > 0 {
+				textlen^ = strings.builder_len(builder)
+				res += {.CHANGE}
+			}
+		}
+		/* handle ctrl+a */
+		if .A in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
+			ctx.textbox_state.selection = {textlen^, 0}
+		}
+		/* handle ctrl+x */
+		if .X in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
+			if textedit.cut(&ctx.textbox_state) {
+				textlen^ = strings.builder_len(builder)
+				res += {.CHANGE}
+			}
+		}
+		/* handle ctrl+c */
+		if .C in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
+			textedit.copy(&ctx.textbox_state)
+		}
+		/* handle ctrl+v */
+		if .V in ctx.key_pressed_bits && .CTRL in ctx.key_down_bits && .ALT not_in ctx.key_down_bits {
+			if textedit.paste(&ctx.textbox_state) {
+				textlen^ = strings.builder_len(builder)
+				res += {.CHANGE}
+			}
+		}
+		/* handle left/right */
+		if .LEFT in ctx.key_pressed_bits {
+			move: textedit.Translation = .Word_Left if .CTRL in ctx.key_down_bits else .Left
+			if .SHIFT in ctx.key_down_bits {
+				textedit.select_to(&ctx.textbox_state, move)
+			} else {
+				textedit.move_to(&ctx.textbox_state, move)
+			}
+		}
+		if .RIGHT in ctx.key_pressed_bits {
+			move: textedit.Translation = .Word_Right if .CTRL in ctx.key_down_bits else .Right
+			if .SHIFT in ctx.key_down_bits {
+				textedit.select_to(&ctx.textbox_state, move)
+			} else {
+				textedit.move_to(&ctx.textbox_state, move)
+			}
+		}
+		/* handle home/end */
+		if .HOME in ctx.key_pressed_bits {
+			if .SHIFT in ctx.key_down_bits {
+				textedit.select_to(&ctx.textbox_state, .Start)
+			} else {
+				textedit.move_to(&ctx.textbox_state, .Start)
+			}
+		}
+		if .END in ctx.key_pressed_bits {
+			if .SHIFT in ctx.key_down_bits {
+				textedit.select_to(&ctx.textbox_state, .End)
+			} else {
+				textedit.move_to(&ctx.textbox_state, .End)
+			}
+		}
+		/* handle backspace/delete */
+		if .BACKSPACE in ctx.key_pressed_bits && textlen^ > 0 {
+			move: textedit.Translation = .Word_Left if .CTRL in ctx.key_down_bits else .Left
+			textedit.delete_to(&ctx.textbox_state, move)
+			textlen^ = strings.builder_len(builder)
 			res += {.CHANGE}
 		}
-		/* handle backspace */
-		if .BACKSPACE in ctx.key_pressed_bits && textlen^ > 0 {
-			/* skip utf-8 continuation bytes */
-			for textlen^ > 0 {
-				textlen^ -= 1
-				if textbuf[textlen^] & 0xc0 != 0x80 {
-					break
-				}
-			}
+		if .DELETE in ctx.key_pressed_bits && textlen^ > 0 {
+			move: textedit.Translation = .Word_Right if .CTRL in ctx.key_down_bits else .Right
+			textedit.delete_to(&ctx.textbox_state, move)
+			textlen^ = strings.builder_len(builder)
 			res += {.CHANGE}
 		}
 		/* handle return */
 		if .RETURN in ctx.key_pressed_bits {
 			set_focus(ctx, 0)
 			res += {.SUBMIT}
+		}
+
+		/* handle click/drag */
+		if .LEFT in ctx.mouse_down_bits {
+			idx := textlen^
+			for i in 0..<textlen^ {
+				/* skip continuation bytes */
+				if textbuf[i] >= 0x80 && textbuf[i] < 0xc0 {
+					continue
+				}
+				if ctx.mouse_pos.x < r.x + ctx.textbox_offset + ctx.text_width(font, string(textbuf[:i])) {
+					idx = i
+					break
+				}
+			}
+			ctx.textbox_state.selection[0] = idx
+			if .LEFT in ctx.mouse_pressed_bits && .SHIFT not_in ctx.key_down_bits {
+				ctx.textbox_state.selection[1] = idx
+			}
 		}
 	}
 
@@ -998,16 +1112,21 @@ textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect
 	/* draw */
 	draw_control_frame(ctx, id, r, .BASE, opt)
 	if ctx.focus_id == id {
-		color := ctx.style.colors[.TEXT]
-		font  := ctx.style.font
-		textw := ctx.text_width(font, textstr)
-		texth := ctx.text_height(font)
-		ofx   := r.w - ctx.style.padding - textw - 1
-		textx := r.x + min(ofx, ctx.style.padding)
-		texty := r.y + (r.h - texth) / 2
+		text_color := ctx.style.colors[.TEXT]
+		sel_color  := ctx.style.colors[.SELECTION_BG]
+		textw      := ctx.text_width(font, textstr)
+		texth      := ctx.text_height(font)
+		headx      := ctx.text_width(font, textstr[:ctx.textbox_state.selection[0]])
+		tailx      := ctx.text_width(font, textstr[:ctx.textbox_state.selection[1]])
+		ofmin      := max(ctx.style.padding - headx, r.w - textw - ctx.style.padding)
+		ofmax      := min(r.w - headx - ctx.style.padding, ctx.style.padding)
+		ctx.textbox_offset = clamp(ctx.textbox_offset, ofmin, ofmax)
+		textx      := r.x + ctx.textbox_offset
+		texty      := r.y + (r.h - texth) / 2
 		push_clip_rect(ctx, r)
-		draw_text(ctx, font, textstr, Vec2{textx, texty}, color)
-		draw_rect(ctx, Rect{textx + textw, texty, 1, texth}, color)
+		draw_rect(ctx, Rect{textx + min(headx, tailx), texty, abs(headx - tailx), texth}, sel_color)
+		draw_text(ctx, font, textstr, Vec2{textx, texty}, text_color)
+		draw_rect(ctx, Rect{textx + headx, texty, 1, texth}, text_color)
 		pop_clip_rect(ctx)
 	} else {
 		draw_control_text(ctx, textstr, r, .TEXT, opt)

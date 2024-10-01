@@ -1,4 +1,4 @@
-//+build windows, linux, darwin
+#+build windows, linux, darwin
 package nanovg
 
 // TODO rename structs to old nanovg style!

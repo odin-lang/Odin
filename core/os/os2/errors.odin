@@ -22,11 +22,15 @@ General_Error :: enum u32 {
 	Invalid_File,
 	Invalid_Dir,
 	Invalid_Path,
+	Invalid_Callback,
+	Invalid_Command,
+
+	Pattern_Has_Separator,
 
 	Unsupported,
 }
 
-Platform_Error :: enum i32 {None=0}
+Platform_Error :: _Platform_Error
 
 Error :: union #shared_nil {
 	General_Error,
@@ -36,14 +40,17 @@ Error :: union #shared_nil {
 }
 #assert(size_of(Error) == size_of(u64))
 
+ERROR_NONE :: Error{}
 
 
+@(require_results)
 is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
 	v := ferr.(Platform_Error) or_else {}
 	return i32(v), i32(v) != 0
 }
 
 
+@(require_results)
 error_string :: proc(ferr: Error) -> string {
 	if ferr == nil {
 		return ""
@@ -62,7 +69,10 @@ error_string :: proc(ferr: Error) -> string {
 		case .Invalid_File:      return "invalid file"
 		case .Invalid_Dir:       return "invalid directory"
 		case .Invalid_Path:      return "invalid path"
+		case .Invalid_Callback:  return "invalid callback"
+		case .Invalid_Command:   return "invalid command"
 		case .Unsupported:       return "unsupported"
+		case .Pattern_Has_Separator: return "pattern has separator"
 		}
 	case io.Error:
 		switch e {
@@ -95,4 +105,20 @@ error_string :: proc(ferr: Error) -> string {
 	}
 
 	return "unknown error"
+}
+
+print_error :: proc(f: ^File, ferr: Error, msg: string) {
+	TEMP_ALLOCATOR_GUARD()
+	err_str := error_string(ferr)
+
+	// msg + ": " + err_str + '\n'
+	length := len(msg) + 2 + len(err_str) + 1
+	buf := make([]u8, length, temp_allocator())
+
+	copy(buf, msg)
+	buf[len(msg)] = ':'
+	buf[len(msg) + 1] = ' '
+	copy(buf[len(msg) + 2:], err_str)
+	buf[length - 1] = '\n'
+	write(f, buf)
 }

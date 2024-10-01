@@ -44,6 +44,10 @@ enum BuiltinProcId {
 	// "Intrinsics"
 	BuiltinProc_is_package_imported,
 
+	BuiltinProc_has_target_feature,
+
+	BuiltinProc_constant_log2,
+
 	BuiltinProc_transpose,
 	BuiltinProc_outer_product,
 	BuiltinProc_hadamard_product,
@@ -67,6 +71,9 @@ enum BuiltinProcId {
 	BuiltinProc_overflow_add,
 	BuiltinProc_overflow_sub,
 	BuiltinProc_overflow_mul,
+
+	BuiltinProc_saturating_add,
+	BuiltinProc_saturating_sub,
 
 	BuiltinProc_sqrt,
 	BuiltinProc_fused_mul_add,
@@ -92,6 +99,7 @@ enum BuiltinProcId {
 	BuiltinProc_prefetch_write_instruction,
 	BuiltinProc_prefetch_write_data,
 
+BuiltinProc__atomic_begin,
 	BuiltinProc_atomic_type_is_lock_free,
 	BuiltinProc_atomic_thread_fence,
 	BuiltinProc_atomic_signal_fence,
@@ -117,6 +125,7 @@ enum BuiltinProcId {
 	BuiltinProc_atomic_compare_exchange_strong_explicit,
 	BuiltinProc_atomic_compare_exchange_weak,
 	BuiltinProc_atomic_compare_exchange_weak_explicit,
+BuiltinProc__atomic_end,
 
 	BuiltinProc_fixed_point_mul,
 	BuiltinProc_fixed_point_div,
@@ -136,8 +145,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_shl_masked, // C logic
 	BuiltinProc_simd_shr_masked, // C logic
 
-	BuiltinProc_simd_add_sat, // saturation arithmetic
-	BuiltinProc_simd_sub_sat, // saturation arithmetic
+	BuiltinProc_simd_saturating_add, // saturation arithmetic
+	BuiltinProc_simd_saturating_sub, // saturation arithmetic
 
 	BuiltinProc_simd_bit_and,
 	BuiltinProc_simd_bit_or,
@@ -169,6 +178,9 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_reduce_or,
 	BuiltinProc_simd_reduce_xor,
 
+	BuiltinProc_simd_reduce_any,
+	BuiltinProc_simd_reduce_all,
+
 	BuiltinProc_simd_shuffle,
 	BuiltinProc_simd_select,
 
@@ -183,6 +195,12 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_lanes_rotate_left,
 	BuiltinProc_simd_lanes_rotate_right,
 
+	BuiltinProc_simd_gather,
+	BuiltinProc_simd_scatter,
+	BuiltinProc_simd_masked_load,
+	BuiltinProc_simd_masked_store,
+	BuiltinProc_simd_masked_expand_load,
+	BuiltinProc_simd_masked_compress_store,
 
 	// Platform specific SIMD intrinsics
 	BuiltinProc_simd_x86__MM_SHUFFLE,
@@ -190,6 +208,7 @@ BuiltinProc__simd_end,
 	
 	// Platform specific intrinsics
 	BuiltinProc_syscall,
+	BuiltinProc_syscall_bsd,
 
 	BuiltinProc_x86_cpuid,
 	BuiltinProc_x86_xgetbv,
@@ -254,6 +273,9 @@ BuiltinProc__type_simple_boolean_begin,
 
 BuiltinProc__type_simple_boolean_end,
 
+	BuiltinProc_type_is_matrix_row_major,
+	BuiltinProc_type_is_matrix_column_major,
+
 	BuiltinProc_type_has_field,
 	BuiltinProc_type_field_type,
 
@@ -267,7 +289,11 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_variant_type_of,
 	BuiltinProc_type_variant_index_of,
 
+	BuiltinProc_type_bit_set_elem_type,
+	BuiltinProc_type_bit_set_underlying_type,
+
 	BuiltinProc_type_struct_field_count,
+	BuiltinProc_type_struct_has_implicit_padding,
 
 	BuiltinProc_type_proc_parameter_count,
 	BuiltinProc_type_proc_return_count,
@@ -289,7 +315,11 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_map_info,
 	BuiltinProc_type_map_cell_info,
 
+	BuiltinProc_type_has_shared_fields,
+
 BuiltinProc__type_end,
+
+	BuiltinProc_procedure_of,
 
 	BuiltinProc___entry_point,
 
@@ -354,6 +384,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	// "Intrinsics"
 	{STR_LIT("is_package_imported"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("has_target_feature"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("constant_log2"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -379,6 +413,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("overflow_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("overflow_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("saturating_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("saturating_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fused_mul_add"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -403,6 +440,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("prefetch_write_instruction"), 2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("prefetch_write_data"),        2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_type_is_lock_free"),                1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_thread_fence"),                     1, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_signal_fence"),                     1, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
@@ -428,6 +466,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("atomic_compare_exchange_strong_explicit"), 5, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("atomic_compare_exchange_weak"),            3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("atomic_compare_exchange_weak_explicit"),   5, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("fixed_point_mul"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fixed_point_div"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -447,8 +486,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_shl_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shr_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("simd_add_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_sub_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_saturating_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_saturating_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_bit_and"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_bit_or"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -481,6 +520,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_reduce_or"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_xor"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("simd_reduce_any"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_all"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+
 	{STR_LIT("simd_shuffle"), 2, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_select"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -495,12 +538,20 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_lanes_rotate_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("simd_gather"),       3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_scatter"),      3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_load"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_expand_load"),    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_masked_compress_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("simd_x86__MM_SHUFFLE"), 4, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 
-	{STR_LIT("syscall"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("syscall"),     1, true, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("syscall_bsd"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("x86_cpuid"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("x86_xgetbv"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -560,6 +611,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_has_nil"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_is_matrix_row_major"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_matrix_column_major"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("type_has_field"),            2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_field_type"),           2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -573,7 +627,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_variant_type_of"),        2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_variant_index_of"),       2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("type_struct_field_count"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_bit_set_elem_type"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_bit_set_underlying_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_struct_field_count"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_struct_has_implicit_padding"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_proc_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_proc_return_count"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -595,8 +653,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_map_info"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_map_cell_info"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_has_shared_fields"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("procedure_of"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("__entry_point"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 

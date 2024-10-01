@@ -15,8 +15,8 @@
 #ifndef LLVM_C_REMARKS_H
 #define LLVM_C_REMARKS_H
 
-#include "llvm-c/ExternC.h"
-#include "llvm-c/Types.h"
+#include "ExternC.h"
+#include "Types.h"
 #ifdef __cplusplus
 #include <cstddef>
 #else

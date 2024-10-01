@@ -5,12 +5,9 @@ The implementation is non-intrusive, and non-recursive.
 */
 package container_avl
 
-import "base:intrinsics"
-import "base:runtime"
+@(require) import "base:intrinsics"
+@(require) import "base:runtime"
 import "core:slice"
-
-_ :: intrinsics
-_ :: runtime
 
 // Originally based on the CC0 implementation by Eric Biggers
 // See: https://github.com/ebiggers/avl_tree/
@@ -90,7 +87,7 @@ init_cmp :: proc(
 init_ordered :: proc(
 	t: ^$T/Tree($Value),
 	node_allocator := context.allocator,
-) where intrinsics.type_is_ordered_numeric(Value) {
+) where intrinsics.type_is_ordered(Value) {
 	init_cmp(t, slice.cmp_proc(Value), node_allocator)
 }
 

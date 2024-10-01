@@ -1,5 +1,5 @@
-//+build linux, darwin, freebsd, openbsd
-//+private
+#+build linux, darwin, freebsd, openbsd, netbsd
+#+private
 package dynlib
 
 import "core:os"

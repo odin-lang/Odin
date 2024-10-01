@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd
+#+build linux, darwin, freebsd, openbsd, netbsd
 package filepath
 
 when ODIN_OS == .Darwin {
@@ -32,36 +32,35 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	if path_ptr == nil {
 		return "", __error()^ == 0
 	}
-	defer _unix_free(path_ptr)
+	defer _unix_free(rawptr(path_ptr))
 
-	path_cstr := cstring(path_ptr)
-	path_str := strings.clone(string(path_cstr), allocator)
+	path_str := strings.clone(string(path_ptr), allocator)
 	return path_str, true
 }
 
-join :: proc(elems: []string, allocator := context.allocator) -> string {
+join :: proc(elems: []string, allocator := context.allocator) -> (joined: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	for e, i in elems {
 		if e != "" {
 			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
-			p := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator)
+			p := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator) or_return
 			return clean(p, allocator)
 		}
 	}
-	return ""
+	return "", nil
 }
 
 @(private)
 foreign libc {
-	realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	realpath :: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
 	@(link_name="free") _unix_free :: proc(ptr: rawptr) ---
 
 }
-when ODIN_OS == .Darwin {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	@(private)
 	foreign libc {
 		@(link_name="__error")          __error :: proc() -> ^i32 ---
 	}
-} else when ODIN_OS == .OpenBSD {
+} else when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	@(private)
 	foreign libc {
 		@(link_name="__errno")		__error :: proc() -> ^i32 ---

@@ -17,7 +17,7 @@
 	#include <sys/sysctl.h>
 #endif
 
-#if defined(GB_SYSTEM_OPENBSD)
+#if defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD)
 	#include <sys/sysctl.h>
 	#include <sys/utsname.h>
 #endif
@@ -155,7 +155,7 @@ gb_internal void report_windows_product_type(DWORD ProductType) {
 #endif
 
 gb_internal void odin_cpuid(int leaf, int result[]) {
-	#if defined(GB_CPU_ARM)
+	#if defined(GB_CPU_ARM) || defined(GB_CPU_RISCV)
 		return;
 
 	#elif defined(GB_CPU_X86)
@@ -204,13 +204,32 @@ gb_internal void report_cpu_info() {
 	}
 
 	#elif defined(GB_CPU_ARM)
-		/*
-			TODO(Jeroen): On *nix, perhaps query `/proc/cpuinfo`.
-		*/
+		bool generic = true;
+
+		#if defined(GB_SYSTEM_OSX)
+			char cpu_name[128] = {};	
+			size_t cpu_name_size = 128;
+			if (sysctlbyname("machdep.cpu.brand_string", &cpu_name, &cpu_name_size, nullptr, 0) == 0) {
+				generic = false;
+				gb_printf("%s\n", (char *)&cpu_name[0]);
+			}
+		#endif
+
+		if (generic) {
+			/*
+				TODO(Jeroen): On *nix, perhaps query `/proc/cpuinfo`.
+			*/
+			#if defined(GB_ARCH_64_BIT)
+				gb_printf("ARM64\n");
+			#else
+				gb_printf("ARM\n");
+			#endif
+		}
+	#elif defined(GB_CPU_RISCV)
 		#if defined(GB_ARCH_64_BIT)
-			gb_printf("ARM64\n");
+			gb_printf("RISCV64\n");
 		#else
-			gb_printf("ARM\n");
+			gb_printf("RISCV32\n");
 		#endif
 	#else
 		gb_printf("Unknown\n");
@@ -238,7 +257,7 @@ gb_internal void report_ram_info() {
 		int result = sysinfo(&info);
 
 		if (result == 0x0) {
-			gb_printf("%lu MiB\n", info.totalram * info.mem_unit / gb_megabytes(1));
+			gb_printf("%lu MiB\n", (unsigned long)(info.totalram * info.mem_unit / gb_megabytes(1)));
 		} else {
 			gb_printf("Unknown.\n");
 		}
@@ -249,6 +268,14 @@ gb_internal void report_ram_info() {
 		int mibs[] = { CTL_HW, HW_MEMSIZE };
 		if (sysctl(mibs, 2, &ram_amount, &val_size, NULL, 0) != -1) {
 			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
+		}
+	#elif defined(GB_SYSTEM_NETBSD)
+		uint64_t ram_amount;
+		size_t   val_size = sizeof(ram_amount);
+
+		int mibs[] = { CTL_HW, HW_PHYSMEM64 };
+		if (sysctl(mibs, 2, &ram_amount, &val_size, NULL, 0) != -1) {
+			gb_printf("%lu MiB\n", ram_amount / gb_megabytes(1));
 		}
 	#elif defined(GB_SYSTEM_OPENBSD)
 		uint64_t ram_amount;
@@ -889,6 +916,11 @@ gb_internal void report_os_info() {
 			{"23D60",    {23,  3,  0}, "macOS", {"Sonoma",        {14,  3,  1}}},
 			{"23E214",   {23,  4,  0}, "macOS", {"Sonoma",        {14,  4,  0}}},
 			{"23E224",   {23,  4,  0}, "macOS", {"Sonoma",        {14,  4,  1}}},
+			{"23F79",    {23,  5,  0}, "macOS", {"Sonoma",        {14,  5,  0}}},
+			{"23G80",    {23,  6,  0}, "macOS", {"Sonoma",        {14,  6,  0}}},
+			{"23G93",    {23,  6,  0}, "macOS", {"Sonoma",        {14,  6,  1}}},
+			{"23H124",   {23,  6,  0}, "macOS", {"Sonoma",        {14,  7,  0}}},
+			{"24A335",   {24,  0,  0}, "macOS", {"Sequoia",       {15,  0,  0}}},
 		};
 
 
@@ -985,13 +1017,17 @@ gb_internal void report_os_info() {
 			gb_printf("macOS Unknown (kernel: %d.%d.%d)\n", major, minor, patch);
 			return;
 		}
-	#elif defined(GB_SYSTEM_OPENBSD)
+	#elif defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD)
 		struct utsname un;
 		
 		if (uname(&un) != -1) {
 			gb_printf("%s %s %s %s\n", un.sysname, un.release, un.version, un.machine);
 		} else {
-			gb_printf("OpenBSD: Unknown\n");    
+			#if defined(GB_SYSTEM_NETBSD)
+				gb_printf("NetBSD: Unknown\n");
+			#else
+				gb_printf("OpenBSD: Unknown\n");    
+			#endif
 		}
 	#elif defined(GB_SYSTEM_FREEBSD)
 		#define freebsd_version_buffer 129

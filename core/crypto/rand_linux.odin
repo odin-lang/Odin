@@ -4,8 +4,12 @@ import "core:fmt"
 
 import "core:sys/linux"
 
+HAS_RAND_BYTES :: true
+
+@(private)
 _MAX_PER_CALL_BYTES :: 33554431 // 2^25 - 1
 
+@(private)
 _rand_bytes :: proc (dst: []byte) {
 	dst := dst
 	l := len(dst)
@@ -28,13 +32,9 @@ _rand_bytes :: proc (dst: []byte) {
 			// All other failures are things that should NEVER happen
 			// unless the kernel interface changes (ie: the Linux
 			// developers break userland).
-			panic(fmt.tprintf("crypto: getrandom failed: %v", errno))
+			fmt.panicf("crypto: getrandom failed: %v", errno)
 		}
 		l -= n_read
 		dst = dst[n_read:]
 	}
-}
-
-_has_rand_bytes :: proc() -> bool {
-	return true
 }

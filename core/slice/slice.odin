@@ -156,13 +156,30 @@ linear_search_proc :: proc(array: $A/[]$T, f: proc(T) -> bool) -> (index: int, f
 */
 @(require_results)
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
-	where intrinsics.type_is_ordered(T) #no_bounds_check
-{
+	where intrinsics.type_is_ordered(T) #no_bounds_check {
 	return binary_search_by(array, key, cmp_proc(T))
 }
 
+/*
+	Binary search searches the given slice for the given element.
+	If the slice is not sorted, the returned index is unspecified and meaningless.
+
+	If the value is found then the returned int is the index of the matching element.
+	If there are multiple matches, then any one of the matches could be returned.
+
+	If the value is not found then the returned int is the index where a matching
+	element could be inserted while maintaining sorted order.
+
+	The array elements and key may be different types. This allows the filter procedure
+	to compare keys against a slice of structs, one struct value at a time.
+
+	Returns:
+	index: int
+	found: bool
+
+*/
 @(require_results)
-binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (index: int, found: bool) #no_bounds_check {
+binary_search_by :: proc(array: $A/[]$T, key: $K, f: proc(T, K) -> Ordering) -> (index: int, found: bool) #no_bounds_check {
 	n := len(array)
 	left, right := 0, n
 	for left < right {
@@ -174,17 +191,26 @@ binary_search_by :: proc(array: $A/[]$T, key: T, f: proc(T, T) -> Ordering) -> (
 			right = mid
 		}
 	}
-	// left == right
-	// f(array[left-1], key) == .Less (if left > 0)
 	return left, left < n && f(array[left], key) == .Equal
 }
 
 @(require_results)
-equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) {
+equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) #no_bounds_check {
 	if len(a) != len(b) {
 		return false
 	}
 	when intrinsics.type_is_simple_compare(E) {
+		if len(a) == 0 {
+			// Empty slices are always equivalent to each other.
+			//
+			// This check is here in the event that a slice with a `data` of
+			// nil is compared against a slice with a non-nil `data` but a
+			// length of zero.
+			//
+			// In that case, `memory_compare` would return -1 or +1 because one
+			// of the pointers is nil.
+			return true
+		}
 		return runtime.memory_compare(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
 	} else {
 		for i in 0..<len(a) {
@@ -222,7 +248,7 @@ prefix_length :: proc(a, b: $T/[]$E) -> (n: int) where intrinsics.type_is_compar
 }
 
 @(require_results)
-has_prefix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
+has_prefix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_comparable(E) {
 	n := len(needle)
 	if len(array) >= n {
 		return equal(array[:n], needle)
@@ -232,7 +258,7 @@ has_prefix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_c
 
 
 @(require_results)
-has_suffix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
+has_suffix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_comparable(E) {
 	array := array
 	m, n := len(array), len(needle)
 	if m >= n {
@@ -495,8 +521,10 @@ unique :: proc(s: $S/[]$T) -> S where intrinsics.type_is_comparable(T) #no_bound
 	}
 	i := 1
 	for j in 1..<len(s) {
-		if s[j] != s[j-1] && i != j {
-			s[i] = s[j]
+		if s[j] != s[j-1] {
+			if i != j {
+				s[i] = s[j]
+			}
 			i += 1
 		}
 	}
@@ -513,8 +541,10 @@ unique_proc :: proc(s: $S/[]$T, eq: proc(T, T) -> bool) -> S #no_bounds_check {
 	}
 	i := 1
 	for j in 1..<len(s) {
-		if !eq(s[j], s[j-1]) && i != j {
-			s[i] = s[j]
+		if !eq(s[j], s[j-1]) {
+			if i != j {
+				s[i] = s[j]
+			}
 			i += 1
 		}
 	}
@@ -701,3 +731,39 @@ enumerated_array :: proc(ptr: ^$T) -> []intrinsics.type_elem_type(T)
 	where intrinsics.type_is_enumerated_array(T) {
 	return ([^]intrinsics.type_elem_type(T))(ptr)[:len(T)]
 }
+
+// Turn a `[]E` into `bit_set[E]`
+// e.g.:
+//    bs := slice.enum_slice_to_bitset(my_flag_slice, rl.ConfigFlags)
+@(require_results)
+enum_slice_to_bitset :: proc(enums: []$E, $T: typeid/bit_set[E]) -> (bits: T) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
+	for v in enums {
+		bits += {v}
+	}
+	return
+}
+
+// Turn a `bit_set[E]` into a `[]E`
+// e.g.:
+//    sl := slice.bitset_to_enum_slice(flag_buf[:], bs)
+@(require_results)
+bitset_to_enum_slice_with_buffer :: proc(buf: []$E, bs: $T) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
+	count := 0
+	for v in bs {
+		buf[count] = v
+		count += 1
+	}
+	return buf[:count]
+}
+
+// Turn a `bit_set[E]` into a `[]E`, allocates
+// e.g.:
+//    sl := slice.bitset_to_enum_slice(bs)
+@(require_results)
+bitset_to_enum_slice_with_make :: proc(bs: $T, $E: typeid, allocator := context.allocator) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
+	ones := intrinsics.count_ones(transmute(E)bs)
+	buf  := make([]E, int(ones), allocator)
+	return bitset_to_enum_slice(buf, bs)
+}
+
+bitset_to_enum_slice :: proc{bitset_to_enum_slice_with_make, bitset_to_enum_slice_with_buffer}

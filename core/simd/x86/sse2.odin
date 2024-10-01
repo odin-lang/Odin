@@ -1,7 +1,7 @@
-//+build i386, amd64
+#+build i386, amd64
 package simd_x86
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:simd"
 
 @(enable_target_feature="sse2")
@@ -35,23 +35,23 @@ _mm_add_epi32 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_add_epi64 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add(transmute(i64x2)a, transmute(i64x2)b)
+	return simd.add(a, b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_adds_epi8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add_sat(transmute(i8x16)a, transmute(i8x16)b)
+	return transmute(__m128i)simd.saturating_add(transmute(i8x16)a, transmute(i8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_adds_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add_sat(transmute(i16x8)a, transmute(i16x8)b)
+	return transmute(__m128i)simd.saturating_add(transmute(i16x8)a, transmute(i16x8)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_adds_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add_sat(transmute(u8x16)a, transmute(u8x16)b)
+	return transmute(__m128i)simd.saturating_add(transmute(u8x16)a, transmute(u8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_adds_epu16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)simd.add_sat(transmute(u16x8)a, transmute(u16x8)b)
+	return transmute(__m128i)simd.saturating_add(transmute(u16x8)a, transmute(u16x8)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_avg_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
@@ -118,23 +118,23 @@ _mm_sub_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_sub_epi64 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub(transmute(i64x2)a, transmute(i64x2)b)
+	return simd.sub(a, b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_subs_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub_sat(transmute(i8x16)a, transmute(i8x16)b)
+	return transmute(__m128i)simd.saturating_sub(transmute(i8x16)a, transmute(i8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_subs_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub_sat(transmute(i16x8)a, transmute(i16x8)b)
+	return transmute(__m128i)simd.saturating_sub(transmute(i16x8)a, transmute(i16x8)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_subs_epu8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub_sat(transmute(u8x16)a, transmute(u8x16)b)
+	return transmute(__m128i)simd.saturating_sub(transmute(u8x16)a, transmute(u8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_subs_epu16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.sub_sat(transmute(u16x8)a, transmute(u16x8)b)
+	return transmute(__m128i)simd.saturating_sub(transmute(u16x8)a, transmute(u16x8)b)
 }
 
 
@@ -144,19 +144,26 @@ _mm_subs_epu16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 _mm_slli_si128_impl :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
 	shift :: IMM8 & 0xff
 
+	// This needs to emit behavior identical to PSLLDQ which is as follows:
+	//
+	// TEMP := COUNT
+	// IF (TEMP > 15) THEN TEMP := 16; FI
+	// DEST := DEST << (TEMP * 8)
+	// DEST[MAXVL-1:128] (Unmodified)
+
 	return transmute(__m128i)simd.shuffle(
-		transmute(i8x16)a,
 		i8x16(0),
-		0  when shift > 15 else (16 - shift + 0),
-		1  when shift > 15 else (16 - shift + 1),
-		2  when shift > 15 else (16 - shift + 2),
-		3  when shift > 15 else (16 - shift + 3),
-		4  when shift > 15 else (16 - shift + 4),
-		5  when shift > 15 else (16 - shift + 5),
-		6  when shift > 15 else (16 - shift + 6),
-		7  when shift > 15 else (16 - shift + 7),
-		8  when shift > 15 else (16 - shift + 8),
-		9  when shift > 15 else (16 - shift + 9),
+		transmute(i8x16)a,
+		0 when shift > 15 else (16 - shift + 0),
+		1 when shift > 15 else (16 - shift + 1),
+		2 when shift > 15 else (16 - shift + 2),
+		3 when shift > 15 else (16 - shift + 3),
+		4 when shift > 15 else (16 - shift + 4),
+		5 when shift > 15 else (16 - shift + 5),
+		6 when shift > 15 else (16 - shift + 6),
+		7 when shift > 15 else (16 - shift + 7),
+		8 when shift > 15 else (16 - shift + 8),
+		9 when shift > 15 else (16 - shift + 9),
 		10 when shift > 15 else (16 - shift + 10),
 		11 when shift > 15 else (16 - shift + 11),
 		12 when shift > 15 else (16 - shift + 12),
@@ -229,11 +236,11 @@ _mm_slli_epi64 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_sll_epi64 :: #force_inline proc "c" (a, count: __m128i) -> __m128i {
-	return transmute(__m128i)psllq(transmute(i64x2)a, transmute(i64x2)count)
+	return psllq(a, count)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_srai_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
-	return transmute(__m128i)psraiw(transmute(i16x8)a. IMM8)
+	return transmute(__m128i)psraiw(transmute(i16x8)a, IMM8)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_sra_epi16 :: #force_inline proc "c" (a, count: __m128i) -> __m128i {
@@ -255,7 +262,7 @@ _mm_srli_si128 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_srli_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
-	return transmute(__m128i)psrliw(transmute(i16x8)a. IMM8)
+	return transmute(__m128i)psrliw(transmute(i16x8)a, IMM8)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_srl_epi16 :: #force_inline proc "c" (a, count: __m128i) -> __m128i {
@@ -275,7 +282,7 @@ _mm_srli_epi64 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_srl_epi64 :: #force_inline proc "c" (a, count: __m128i) -> __m128i {
-	return transmute(__m128i)psrlq(transmute(i64x2)a, transmute(i64x2)count)
+	return psrlq(a, count)
 }
 
 
@@ -363,7 +370,7 @@ _mm_cvtsi128_si32 :: #force_inline proc "c" (a: __m128i) -> i32 {
 
 @(require_results, enable_target_feature="sse2")
 _mm_set_epi64x :: #force_inline proc "c" (e1, e0: i64) -> __m128i {
-	return transmute(__m128i)i64x2{e0, e1}
+	return i64x2{e0, e1}
 }
 @(require_results, enable_target_feature="sse2")
 _mm_set_epi32 :: #force_inline proc "c" (e3, e2, e1, e0: i32) -> __m128i {
@@ -435,7 +442,7 @@ _mm_store_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
 }
 @(enable_target_feature="sse2")
 _mm_storeu_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
-	storeudq(mem_addr, a)
+	intrinsics.unaligned_store(mem_addr, a)
 }
 @(enable_target_feature="sse2")
 _mm_storel_epi64 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
@@ -453,7 +460,7 @@ _mm_stream_si32 :: #force_inline proc "c" (mem_addr: ^i32, a: i32) {
 @(require_results, enable_target_feature="sse2")
 _mm_move_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	zero := _mm_setzero_si128()
-	return transmute(__m128i)simd.shuffle(transmute(i64x2)a, transmute(i64x2)zero, 0, 2)
+	return simd.shuffle(a, zero, 0, 2)
 }
 
 
@@ -545,7 +552,7 @@ _mm_unpackhi_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_unpackhi_epi64 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.shuffle(transmute(i64x2)a, transmute(i64x2)b, 1, 3)
+	return simd.shuffle(a, b, 1, 3)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_unpacklo_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
@@ -565,7 +572,7 @@ _mm_unpacklo_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_unpacklo_epi64 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)simd.shuffle(transmute(i64x2)a, transmute(i64x2)b, 0, 2)
+	return simd.shuffle(a, b, 0, 2)
 }
 
 
@@ -1023,7 +1030,7 @@ when ODIN_ARCH == .amd64 {
 	}
 	@(require_results, enable_target_feature="sse2")
 	_mm_cvtsi128_si64 :: #force_inline proc "c" (a: __m128i) -> i64 {
-		return simd.extract(transmute(i64x2)a, 0)
+		return simd.extract(a, 0)
 	}
 	@(require_results, enable_target_feature="sse2")
 	_mm_cvtsi128_si64x :: #force_inline proc "c" (a: __m128i) -> i64 {
@@ -1178,8 +1185,6 @@ foreign _ {
 	cvttsd2si  :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvttps2dq")
 	cvttps2dq  :: proc(a: __m128) -> i32x4 ---
-	@(link_name="llvm.x86.sse2.storeu.dq")
-	storeudq   :: proc(mem_addr: rawptr, a: __m128i) ---
 	@(link_name="llvm.x86.sse2.storeu.pd")
 	storeupd   :: proc(mem_addr: rawptr, a: __m128d) ---
 

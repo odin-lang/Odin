@@ -61,7 +61,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		return
 	}
 
-	switch n in &node.derived {
+	switch n in node.derived {
 	case ^File:
 		if n.docs != nil {
 			walk(v, n.docs)
@@ -320,6 +320,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.comment != nil {
 			walk(v, n.comment)
 		}
+		walk_expr_list(v, n.fullpaths)
 
 	case ^Proc_Group:
 		walk_expr_list(v, n.args)

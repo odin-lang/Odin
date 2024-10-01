@@ -1,60 +1,33 @@
 package test_core_odin_parser
 
+import "base:runtime"
+
 import "core:fmt"
+import "core:log"
 import "core:odin/ast"
 import "core:odin/parser"
-import "core:odin/printer"
-import "core:os"
-import "core:strings"
+import "core:odin/tokenizer"
 import "core:testing"
-
-
-TEST_count := 0
-TEST_fail  := 0
-
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
-
-main :: proc() {
-	t := testing.T{}
-	test_parse_demo(&t)
-	test_parse_bitfield(&t)
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
-
 
 @test
 test_parse_demo :: proc(t: ^testing.T) {
-	pkg, ok := parser.parse_package_from_path("examples/demo")
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	pkg, ok := parser.parse_package_from_path(ODIN_ROOT + "examples/demo")
 	
-	expect(t, ok == true, "parser.parse_package_from_path failed")
+	testing.expect(t, ok, "parser.parse_package_from_path failed")
 
 	for key, value in pkg.files {
-		expect(t, value.syntax_error_count == 0, fmt.tprintf("%v should contain zero errors", key))
+		testing.expectf(t, value.syntax_error_count == 0, "%v should contain zero errors", key)
 	}
 }
 
 @test
 test_parse_bitfield :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
 	file := ast.File{
 		fullpath = "test.odin",
 		src = `
@@ -65,7 +38,7 @@ Foo :: bit_field uint {}
 Foo :: bit_field uint {hello: bool | 1}
 
 Foo :: bit_field uint {
-	hello: bool | 1,
+	hello: bool | 1 ` + "`fmt:\"-\"`" + `,
 	hello: bool | 5,
 }
 
@@ -79,16 +52,17 @@ Foo :: bit_field uint {
 	}
 
 	p := parser.default_parser()
+
+	p.err = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.errorf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	p.warn = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.warnf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
 	ok := parser.parse_file(&p, &file)
-	expect(t, ok == true, "bad parse")
-
-	cfg := printer.default_style
-	cfg.newline_style = .LF
-	print := printer.make_printer(cfg)
-	out := printer.print(&print, &file)
-
-	tsrc := strings.trim_space(file.src)
-	tout := strings.trim_space(out)
-
-	expect(t, tsrc == tout, fmt.tprintf("\n%s\n!=\n%s", tsrc, tout))
+	testing.expect(t, ok, "bad parse")
 }

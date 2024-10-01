@@ -2,110 +2,74 @@ package test_core_varint
 
 import "core:encoding/varint"
 import "core:testing"
-import "core:fmt"
-import "core:os"
 import "core:slice"
 import "core:math/rand"
 
-TEST_count := 0
-TEST_fail  := 0
-
-RANDOM_TESTS :: 100
-
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
-
-main :: proc() {
-	t := testing.T{}
-
-	test_leb128(&t)
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
+NUM_RANDOM_TESTS_PER_BYTE_SIZE :: 10_000
 
 @(test)
-test_leb128 :: proc(t: ^testing.T) {
+test_uleb :: proc(t: ^testing.T) {
 	buf: [varint.LEB128_MAX_BYTES]u8
 
 	for vector in ULEB_Vectors {
 		val, size, err := varint.decode_uleb128(vector.encoded)
 
-		msg := fmt.tprintf("Expected %02x to decode to %v consuming %v bytes, got %v and %v", vector.encoded, vector.value, vector.size, val, size)
-		expect(t, size == vector.size && val == vector.value, msg)
-
-		msg  = fmt.tprintf("Expected decoder to return error %v, got %v for vector %v", vector.error, err, vector)
-		expect(t, err == vector.error, msg)
+		testing.expectf(t, size == vector.size && val == vector.value, "Expected %02x to decode to %v consuming %v bytes, got %v and %v", vector.encoded, vector.value, vector.size, val, size)
+		testing.expectf(t, err == vector.error, "Expected decoder to return error %v, got %v for vector %v", vector.error, err, vector)
 
 		if err == .None { // Try to roundtrip
 			size, err = varint.encode_uleb128(buf[:], vector.value)
 
-			msg = fmt.tprintf("Expected %v to encode to %02x, got %02x", vector.value, vector.encoded, buf[:size])
-			expect(t, size == vector.size && slice.simple_equal(vector.encoded, buf[:size]), msg)
+			testing.expectf(t, size == vector.size && slice.simple_equal(vector.encoded, buf[:size]), "Expected %v to encode to %02x, got %02x", vector.value, vector.encoded, buf[:size])
 		}
 	}
+}
+
+@(test)
+test_ileb :: proc(t: ^testing.T) {
+	buf: [varint.LEB128_MAX_BYTES]u8
 
 	for vector in ILEB_Vectors {
 		val, size, err := varint.decode_ileb128(vector.encoded)
 
-		msg := fmt.tprintf("Expected %02x to decode to %v consuming %v bytes, got %v and %v", vector.encoded, vector.value, vector.size, val, size)
-		expect(t, size == vector.size && val == vector.value, msg)
-
-		msg  = fmt.tprintf("Expected decoder to return error %v, got %v", vector.error, err)
-		expect(t, err == vector.error, msg)
+		testing.expectf(t, size == vector.size && val == vector.value, "Expected %02x to decode to %v consuming %v bytes, got %v and %v", vector.encoded, vector.value, vector.size, val, size)
+		testing.expectf(t, err == vector.error, "Expected decoder to return error %v, got %v", vector.error, err)
 
 		if err == .None { // Try to roundtrip
 			size, err = varint.encode_ileb128(buf[:], vector.value)
 
-			msg = fmt.tprintf("Expected %v to encode to %02x, got %02x", vector.value, vector.encoded, buf[:size])
-			expect(t, size == vector.size && slice.simple_equal(vector.encoded, buf[:size]), msg)
+			testing.expectf(t, size == vector.size && slice.simple_equal(vector.encoded, buf[:size]), "Expected %v to encode to %02x, got %02x", vector.value, vector.encoded, buf[:size])
 		}
 	}
+}
+
+@(test)
+test_random :: proc(t: ^testing.T) {
+	buf: [varint.LEB128_MAX_BYTES]u8
 
 	for num_bytes in 1..=uint(16) {
-		for _ in 0..=RANDOM_TESTS {
+		for _ in 0..=NUM_RANDOM_TESTS_PER_BYTE_SIZE {
 			unsigned, signed := get_random(num_bytes)
-
 			{
 				encode_size, encode_err := varint.encode_uleb128(buf[:], unsigned)
-				msg := fmt.tprintf("%v failed to encode as an unsigned LEB128 value, got %v", unsigned, encode_err)
-				expect(t, encode_err == .None, msg)
+				testing.expectf(t, encode_err == .None, "%v failed to encode as an unsigned LEB128 value, got %v", unsigned, encode_err)
 
 				decoded, decode_size, decode_err := varint.decode_uleb128(buf[:])
-				msg = fmt.tprintf("Expected %02x to decode as %v, got %v", buf[:encode_size], unsigned, decoded)
-				expect(t, decode_err == .None && decode_size == encode_size && decoded == unsigned, msg)
+				testing.expectf(t, decode_err == .None && decode_size == encode_size && decoded == unsigned, "Expected %02x to decode as %v, got %v", buf[:encode_size], unsigned, decoded)
 			}
 
 			{
 				encode_size, encode_err := varint.encode_ileb128(buf[:], signed)
-				msg := fmt.tprintf("%v failed to encode as a signed LEB128 value, got %v", signed, encode_err)
-				expect(t, encode_err == .None, msg)
+				testing.expectf(t, encode_err == .None, "%v failed to encode as a signed LEB128 value, got %v", signed, encode_err)
 
 				decoded, decode_size, decode_err := varint.decode_ileb128(buf[:])
-				msg = fmt.tprintf("Expected %02x to decode as %v, got %v, err: %v", buf[:encode_size], signed, decoded, decode_err)
-				expect(t, decode_err == .None && decode_size == encode_size && decoded == signed, msg)
+				testing.expectf(t, decode_err == .None && decode_size == encode_size && decoded == signed, "Expected %02x to decode as %v, got %v, err: %v", buf[:encode_size], signed, decoded, decode_err)
 			}
 		}
 	}
 }
 
+@(private)
 get_random :: proc(byte_count: uint) -> (u: u128, i: i128) {
 	assert(byte_count >= 0 && byte_count <= size_of(u128))
 

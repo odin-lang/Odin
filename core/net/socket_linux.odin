@@ -1,5 +1,5 @@
+#+build linux
 package net
-// +build linux
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
@@ -10,6 +10,7 @@ package net
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
@@ -17,6 +18,7 @@ package net
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 		flysand:         Move dependency from core:os to core:sys/linux
+		Feoramund:       FreeBSD platform code
 */
 
 import "core:c"
@@ -31,8 +33,8 @@ Socket_Option :: enum c.int {
 	Linger                    = c.int(linux.Socket_Option.LINGER),
 	Receive_Buffer_Size       = c.int(linux.Socket_Option.RCVBUF),
 	Send_Buffer_Size          = c.int(linux.Socket_Option.SNDBUF),
-	Receive_Timeout           = c.int(linux.Socket_Option.RCVTIMEO_NEW),
-	Send_Timeout              = c.int(linux.Socket_Option.SNDTIMEO_NEW),
+	Receive_Timeout           = c.int(linux.Socket_Option.RCVTIMEO),
+	Send_Timeout              = c.int(linux.Socket_Option.SNDTIMEO),
 }
 
 // Wrappers and unwrappers for system-native types
@@ -80,14 +82,14 @@ _unwrap_os_addr :: proc "contextless" (endpoint: Endpoint)->(linux.Sock_Addr_Any
 			ipv4 = {
 				sin_family = .INET,
 				sin_port = u16be(endpoint.port),
-				sin_addr = transmute([4]u8) endpoint.address.(IP4_Address),
+				sin_addr = ([4]u8)(endpoint.address.(IP4_Address)),
 			},
 		}
 	case IP6_Address:
 		return {
 			ipv6 = {
 				sin6_port = u16be(endpoint.port),
-				sin6_addr = transmute([16]u8) endpoint.address.(IP6_Address),
+				sin6_addr = transmute([16]u8)endpoint.address.(IP6_Address),
 				sin6_family = .INET6,
 			},
 		}
@@ -117,7 +119,7 @@ _wrap_os_addr :: proc "contextless" (addr: linux.Sock_Addr_Any)->(Endpoint) {
 _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (Any_Socket, Network_Error) {
 	family := _unwrap_os_family(family)
 	proto, socktype := _unwrap_os_proto_socktype(protocol)
-	sock, errno := linux.socket(family, socktype, {}, proto)
+	sock, errno := linux.socket(family, socktype, {.CLOEXEC}, proto)
 	if errno != .NONE {
 		return {}, Create_Socket_Error(errno)
 	}
@@ -132,7 +134,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	}
 	// Create new TCP socket
 	os_sock: linux.Fd
-	os_sock, errno = linux.socket(_unwrap_os_family(family_from_endpoint(endpoint)), .STREAM, {}, .TCP)
+	os_sock, errno = linux.socket(_unwrap_os_family(family_from_endpoint(endpoint)), .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
 		// TODO(flysand): should return invalid file descriptor here casted as TCP_Socket
 		return {}, Create_Socket_Error(errno)
@@ -172,7 +174,7 @@ _listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (TCP_Socket, Network
 	ep_address := _unwrap_os_addr(endpoint)
 	// Create TCP socket
 	os_sock: linux.Fd
-	os_sock, errno = linux.socket(ep_family, .STREAM, {}, .TCP)
+	os_sock, errno = linux.socket(ep_family, .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
 		// TODO(flysand): should return invalid file descriptor here casted as TCP_Socket
 		return {}, Create_Socket_Error(errno)
@@ -198,6 +200,19 @@ _listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (TCP_Socket, Network
 		return cast(TCP_Socket) os_sock, Listen_Error(errno)
 	}
 	return cast(TCP_Socket) os_sock, nil
+}
+
+@(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	addr: linux.Sock_Addr_Any
+	errno := linux.getsockname(_unwrap_os_socket(sock), &addr)
+	if errno != .NONE {
+		err = Listen_Error(errno)
+		return
+	}
+
+	ep = _wrap_os_addr(addr)
+	return
 }
 
 @(private)
@@ -377,9 +392,9 @@ _set_blocking :: proc(sock: Any_Socket, should_block: bool) -> (err: Network_Err
 		return Set_Blocking_Error(errno)
 	}
 	if should_block {
-		flags &= ~{.NONBLOCK}
+		flags -= {.NONBLOCK}
 	} else {
-		flags |= {.NONBLOCK}
+		flags += {.NONBLOCK}
 	}
 	errno = linux.fcntl(os_sock, linux.F_SETFL, flags)
 	if errno != .NONE {

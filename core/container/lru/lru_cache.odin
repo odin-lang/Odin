@@ -70,8 +70,7 @@ set :: proc(c: ^$C/Cache($Key, $Value), key: Key, value: Value) -> runtime.Alloc
 	if c.count == c.capacity {
 		e = c.tail
 		_remove_node(c, e)
-	}
-	else {
+	} else {
 		c.count += 1
 		e = new(Node(Key, Value), c.node_allocator) or_return
 	}

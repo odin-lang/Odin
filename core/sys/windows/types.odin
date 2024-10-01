@@ -30,14 +30,20 @@ HICON :: distinct HANDLE
 HCURSOR :: distinct HANDLE
 HMENU :: distinct HANDLE
 HBRUSH :: distinct HANDLE
+HPEN :: distinct HANDLE
 HGDIOBJ :: distinct HANDLE
 HBITMAP :: distinct HANDLE
+HPALETTE :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
 HHOOK :: distinct HANDLE
+HWINEVENTHOOK :: distinct HANDLE
 HKEY :: distinct HANDLE
 HDESK :: distinct HANDLE
 HFONT :: distinct HANDLE
 HRGN :: distinct HANDLE
+HRSRC :: distinct HANDLE
+HWINSTA :: distinct HANDLE
+HACCEL :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -63,6 +69,7 @@ LONG_PTR :: int
 UINT_PTR :: uintptr
 ULONG :: c_ulong
 ULONGLONG :: c_ulonglong
+LONGLONG :: c_longlong
 UCHAR :: BYTE
 NTSTATUS :: c.long
 COLORREF :: DWORD
@@ -93,10 +100,14 @@ LONG32  :: i32
 ULONG64 :: u64
 LONG64  :: i64
 
+DWORD64 :: u64
+PDWORD64 :: ^DWORD64
+
 PDWORD_PTR :: ^DWORD_PTR
 ATOM :: distinct WORD
 
 wstring :: [^]WCHAR
+PWSTR   :: [^]WCHAR
 
 PBYTE :: ^BYTE
 LPBYTE :: ^BYTE
@@ -133,11 +144,14 @@ LPSTR :: ^CHAR
 LPWSTR :: ^WCHAR
 OLECHAR :: WCHAR
 LPOLESTR :: ^OLECHAR
+LPCOLESTR :: LPCSTR
 LPFILETIME :: ^FILETIME
 LPWSABUF :: ^WSABUF
 LPWSAOVERLAPPED :: distinct rawptr
 LPWSAOVERLAPPED_COMPLETION_ROUTINE :: distinct rawptr
 LPCVOID :: rawptr
+SCODE :: LONG
+PSCODE :: ^SCODE
 
 PACCESS_TOKEN :: PVOID
 PSECURITY_DESCRIPTOR :: PVOID
@@ -693,11 +707,105 @@ FW_BLACK      :: FW_HEAVY
 
 PTIMERAPCROUTINE :: #type proc "system" (lpArgToCompletionRoutine: LPVOID, dwTimerLowValue, dwTimerHighValue: DWORD)
 
+// Character Sets
+ANSI_CHARSET        :: 0
+DEFAULT_CHARSET     :: 1
+SYMBOL_CHARSET      :: 2
+SHIFTJIS_CHARSET    :: 128
+HANGEUL_CHARSET     :: 129
+HANGUL_CHARSET      :: 129
+GB2312_CHARSET      :: 134
+CHINESEBIG5_CHARSET :: 136
+OEM_CHARSET         :: 255
+JOHAB_CHARSET       :: 130
+HEBREW_CHARSET      :: 177
+ARABIC_CHARSET      :: 178
+GREEK_CHARSET       :: 161
+TURKISH_CHARSET     :: 162
+VIETNAMESE_CHARSET  :: 163
+THAI_CHARSET        :: 222
+EASTEUROPE_CHARSET  :: 238
+RUSSIAN_CHARSET     :: 204
+MAC_CHARSET         :: 77
+BALTIC_CHARSET      :: 186
+
+// Font Signature Bitmaps
+FS_LATIN1      :: 0x00000001
+FS_LATIN2      :: 0x00000002
+FS_CYRILLIC    :: 0x00000004
+FS_GREEK       :: 0x00000008
+FS_TURKISH     :: 0x00000010
+FS_HEBREW      :: 0x00000020
+FS_ARABIC      :: 0x00000040
+FS_BALTIC      :: 0x00000080
+FS_VIETNAMESE  :: 0x00000100
+FS_THAI        :: 0x00010000
+FS_JISJAPAN    :: 0x00020000
+FS_CHINESESIMP :: 0x00040000
+FS_WANSUNG     :: 0x00080000
+FS_CHINESETRAD :: 0x00100000
+FS_JOHAB       :: 0x00200000
+FS_SYMBOL      :: 0x80000000
+
+// Output Precisions
+OUT_DEFAULT_PRECIS        :: 0
+OUT_STRING_PRECIS         :: 1
+OUT_CHARACTER_PRECIS      :: 2
+OUT_STROKE_PRECIS         :: 3
+OUT_TT_PRECIS             :: 4
+OUT_DEVICE_PRECIS         :: 5
+OUT_RASTER_PRECIS         :: 6
+OUT_TT_ONLY_PRECIS        :: 7
+OUT_OUTLINE_PRECIS        :: 8
+OUT_SCREEN_OUTLINE_PRECIS :: 9
+OUT_PS_ONLY_PRECIS        :: 10
+
+// Clipping Precisions
+CLIP_DEFAULT_PRECIS   :: 0
+CLIP_CHARACTER_PRECIS :: 1
+CLIP_STROKE_PRECIS    :: 2
+CLIP_MASK             :: 0xf
+CLIP_LH_ANGLES        :: 1 << 4
+CLIP_TT_ALWAYS        :: 2 << 4
+CLIP_DFA_DISABLE      :: 4 << 4
+CLIP_EMBEDDED         :: 8 << 4
+
+// Output Qualities
+DEFAULT_QUALITY           :: 0
+DRAFT_QUALITY             :: 1
+PROOF_QUALITY             :: 2
+NONANTIALIASED_QUALITY    :: 3
+ANTIALIASED_QUALITY       :: 4
+CLEARTYPE_QUALITY         :: 5
+CLEARTYPE_NATURAL_QUALITY :: 6
+
+// Font Pitches
+DEFAULT_PITCH  :: 0
+FIXED_PITCH    :: 1
+VARIABLE_PITCH :: 2
+MONO_FONT      :: 8
+
+// Font Families
+FF_DONTCARE   :: 0 << 4
+FF_ROMAN      :: 1 << 4
+FF_SWISS      :: 2 << 4
+FF_MODERN     :: 3 << 4
+FF_SCRIPT     :: 4 << 4
+FF_DECORATIVE :: 5 << 4
+
 TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
 
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
 HOOKPROC :: #type proc "system" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
+
+WINEVENTPROC :: #type proc "system" (
+	hWinEventHook: HWINEVENTHOOK,
+	event: DWORD,
+	hwnd: HWND,
+	idObject, idChild: LONG,
+	idEventThread, dwmsEventTime: DWORD,
+)
 
 CWPRETSTRUCT :: struct {
 	lResult: LRESULT,
@@ -918,6 +1026,16 @@ MF_RIGHTJUSTIFY :: 0x00004000
 MF_MOUSESELECT :: 0x00008000
 MF_END :: 0x00000080  // Obsolete -- only used by old RES files
 
+// Menu flags for Add/Check/EnableMenuItem()
+MFS_GRAYED    :: 0x00000003
+MFS_DISABLED  :: MFS_GRAYED
+MFS_CHECKED   :: MF_CHECKED
+MFS_HILITE    :: MF_HILITE
+MFS_ENABLED   :: MF_ENABLED
+MFS_UNCHECKED :: MF_UNCHECKED
+MFS_UNHILITE  :: MF_UNHILITE
+MFS_DEFAULT   :: MF_DEFAULT
+
 // Flags for TrackPopupMenu
 TPM_LEFTBUTTON :: 0x0000
 TPM_RIGHTBUTTON :: 0x0002
@@ -1013,16 +1131,25 @@ TRACKMOUSEEVENT :: struct {
 }
 
 WIN32_FIND_DATAW :: struct {
-	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
-	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
-	dwReserved0: DWORD,
-	dwReserved1: DWORD,
-	cFileName: [260]wchar_t, // #define MAX_PATH 260
-	cAlternateFileName: [14]wchar_t,
+	dwFileAttributes:   DWORD,
+	ftCreationTime:     FILETIME,
+	ftLastAccessTime:   FILETIME,
+	ftLastWriteTime:    FILETIME,
+	nFileSizeHigh:      DWORD,
+	nFileSizeLow:       DWORD,
+	dwReserved0:        DWORD,
+	dwReserved1:        DWORD,
+	cFileName:          [MAX_PATH]WCHAR,
+	cAlternateFileName: [14]WCHAR,
+}
+
+FILE_ID_128 :: struct {
+	Identifier: [16]BYTE,
+}
+
+FILE_ID_INFO :: struct {
+	VolumeSerialNumber: ULONGLONG,
+	FileId:             FILE_ID_128,
 }
 
 CREATESTRUCTA :: struct {
@@ -1076,6 +1203,11 @@ NMHDR :: struct {
 	hwndFrom: HWND,
 	idFrom:   UINT_PTR,
 	code:     UINT,      // NM_ code
+}
+
+NCCALCSIZE_PARAMS :: struct {
+	rgrc: [3]RECT,
+	lppos: PWINDOWPOS,
 }
 
 // Generic WM_NOTIFY notification codes
@@ -2132,6 +2264,7 @@ SECURITY_IMPERSONATION_LEVEL :: enum {
 SECURITY_INFORMATION :: DWORD
 ANYSIZE_ARRAY :: 1
 
+PLUID_AND_ATTRIBUTES :: ^LUID_AND_ATTRIBUTES
 LUID_AND_ATTRIBUTES :: struct {
 	Luid: LUID,
 	Attributes: DWORD,
@@ -2175,6 +2308,14 @@ CP_SYMBOL     :: 42    // SYMBOL translations
 CP_UTF7       :: 65000 // UTF-7 translation
 CP_UTF8       :: 65001 // UTF-8 translation
 
+LCID :: DWORD
+LANGID :: WORD
+
+LANG_NEUTRAL :: 0x00
+LANG_INVARIANT :: 0x7f
+SUBLANG_NEUTRAL :: 0x00 // language neutral
+SUBLANG_DEFAULT :: 0x01 // user default
+
 MB_ERR_INVALID_CHARS :: 8
 WC_ERR_INVALID_CHARS :: 128
 
@@ -2191,6 +2332,7 @@ FILE_TYPE_PIPE :: 0x0003
 RECT  :: struct {left, top, right, bottom: LONG}
 POINT :: struct {x, y: LONG}
 
+PWINDOWPOS :: ^WINDOWPOS
 WINDOWPOS :: struct {
 	hwnd: HWND,
 	hwndInsertAfter: HWND,
@@ -2389,8 +2531,10 @@ REFIID  :: ^GUID
 
 REFGUID :: GUID
 IID :: GUID
+LPIID :: ^IID
 CLSID :: GUID
 REFCLSID :: ^CLSID
+LPCLSID :: ^CLSID
 
 CLSCTX_INPROC_SERVER                  :: 0x1
 CLSCTX_INPROC_HANDLER                 :: 0x2
@@ -2420,6 +2564,7 @@ CLSCTX_RESERVED6                      :: 0x1000000
 CLSCTX_ACTIVATE_ARM32_SERVER          :: 0x2000000
 CLSCTX_ALLOW_LOWER_TRUST_REGISTRATION :: 0x4000000
 CLSCTX_PS_DLL                         :: 0x80000000
+CLSCTX_ALL                            :: CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER | CLSCTX_REMOTE_SERVER
 
 WSAPROTOCOLCHAIN :: struct {
 	ChainLen: c_int,
@@ -2479,10 +2624,11 @@ OBJECT_ATTRIBUTES :: struct {
 	SecurityQualityOfService: rawptr,
 }
 
+PUNICODE_STRING :: ^UNICODE_STRING
 UNICODE_STRING :: struct {
-	Length:        u16,
-	MaximumLength: u16,
-	Buffer:        ^u16,
+	Length:        u16    `fmt:"-"`,
+	MaximumLength: u16    `fmt:"-"`,
+	Buffer:        [^]u16 `fmt:"s,Length"`,
 }
 
 OVERLAPPED :: struct {
@@ -2557,45 +2703,177 @@ EXCEPTION_RECORD :: struct {
 	ExceptionInformation: [EXCEPTION_MAXIMUM_PARAMETERS]LPVOID,
 }
 
-CONTEXT :: struct{} // TODO(bill)
+
+CONTEXT :: struct {
+	P1Home: DWORD64,
+	P2Home: DWORD64,
+	P3Home: DWORD64,
+	P4Home: DWORD64,
+	P5Home: DWORD64,
+	P6Home: DWORD64,
+	ContextFlags: DWORD,
+	MxCsr: DWORD,
+	SegCs: WORD,
+	SegDs: WORD,
+	SegEs: WORD,
+	SegFs: WORD,
+	SegGs: WORD,
+	SegSs: WORD,
+	EFlags: DWORD,
+	Dr0: DWORD64,
+	Dr1: DWORD64,
+	Dr2: DWORD64,
+	Dr3: DWORD64,
+	Dr6: DWORD64,
+	Dr7: DWORD64,
+	Rax: DWORD64,
+	Rcx: DWORD64,
+	Rdx: DWORD64,
+	Rbx: DWORD64,
+	Rsp: DWORD64,
+	Rbp: DWORD64,
+	Rsi: DWORD64,
+	Rdi: DWORD64,
+	R8: DWORD64,
+	R9: DWORD64,
+	R10: DWORD64,
+	R11: DWORD64,
+	R12: DWORD64,
+	R13: DWORD64,
+	R14: DWORD64,
+	R15: DWORD64,
+	Rip: DWORD64,
+	_: struct #raw_union {
+		FltSave: XMM_SAVE_AREA32,
+		Q: [16]NEON128,
+		D: [32]ULONGLONG,
+		_: struct {
+			Header: [2]M128A,
+			Legacy: [8]M128A,
+			Xmm0: M128A,
+			Xmm1: M128A,
+			Xmm2: M128A,
+			Xmm3: M128A,
+			Xmm4: M128A,
+			Xmm5: M128A,
+			Xmm6: M128A,
+			Xmm7: M128A,
+			Xmm8: M128A,
+			Xmm9: M128A,
+			Xmm10: M128A,
+			Xmm11: M128A,
+			Xmm12: M128A,
+			Xmm13: M128A,
+			Xmm14: M128A,
+			Xmm15: M128A,
+		},
+		S: [32]DWORD,
+	},
+	VectorRegister: [26]M128A,
+	VectorControl: DWORD64,
+	DebugControl: DWORD64,
+	LastBranchToRip: DWORD64,
+	LastBranchFromRip: DWORD64,
+	LastExceptionToRip: DWORD64,
+	LastExceptionFromRip: DWORD64,
+}
+
+PCONTEXT :: ^CONTEXT
+LPCONTEXT :: ^CONTEXT
+
+when size_of(uintptr) == 32 {
+	XSAVE_FORMAT :: struct #align(16) {
+		ControlWord: WORD,
+		StatusWord: WORD,
+		TagWord: BYTE,
+		Reserved1: BYTE,
+		ErrorOpcode: WORD,
+		ErrorOffset: DWORD,
+		ErrorSelector: WORD,
+		Reserved2: WORD,
+		DataOffset: DWORD,
+		DataSelector: WORD,
+		Reserved3: WORD,
+		MxCsr: DWORD,
+		MxCsr_Mask: DWORD,
+		FloatRegisters: [8]M128A,
+		// 32-bit specific
+		XmmRegisters: [8]M128A,
+		Reserved4: [192]BYTE,
+		StackControl: [7]DWORD,
+		Cr0NpxState: DWORD,
+	}
+} else {
+	XSAVE_FORMAT :: struct #align(16) {
+		ControlWord: WORD,
+		StatusWord: WORD,
+		TagWord: BYTE,
+		Reserved1: BYTE,
+		ErrorOpcode: WORD,
+		ErrorOffset: DWORD,
+		ErrorSelector: WORD,
+		Reserved2: WORD,
+		DataOffset: DWORD,
+		DataSelector: WORD,
+		Reserved3: WORD,
+		MxCsr: DWORD,
+		MxCsr_Mask: DWORD,
+		FloatRegisters: [8]M128A,
+		// 64-bit specific
+		XmmRegisters: [16]M128A,
+		Reserved4: [96]BYTE,
+	}
+}
+
+XMM_SAVE_AREA32 :: XSAVE_FORMAT
+
+M128A :: struct {
+	Low: ULONGLONG,
+	High: LONGLONG,
+}
+
+NEON128 :: struct {
+	Low: ULONGLONG,
+	High: LONGLONG,
+}
 
 EXCEPTION_POINTERS :: struct {
 	ExceptionRecord: ^EXCEPTION_RECORD,
-	ContextRecord: ^CONTEXT,
+	ContextRecord:   ^CONTEXT,
 }
 
 PVECTORED_EXCEPTION_HANDLER :: #type proc "system" (ExceptionInfo: ^EXCEPTION_POINTERS) -> LONG
 
 CONSOLE_READCONSOLE_CONTROL :: struct {
-	nLength: ULONG,
-	nInitialChars: ULONG,
-	dwCtrlWakeupMask: ULONG,
+	nLength:           ULONG,
+	nInitialChars:     ULONG,
+	dwCtrlWakeupMask:  ULONG,
 	dwControlKeyState: ULONG,
 }
 
 PCONSOLE_READCONSOLE_CONTROL :: ^CONSOLE_READCONSOLE_CONTROL
 
 BY_HANDLE_FILE_INFORMATION :: struct {
-	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
-	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
+	dwFileAttributes:     DWORD,
+	ftCreationTime:       FILETIME,
+	ftLastAccessTime:     FILETIME,
+	ftLastWriteTime:      FILETIME,
 	dwVolumeSerialNumber: DWORD,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
-	nNumberOfLinks: DWORD,
-	nFileIndexHigh: DWORD,
-	nFileIndexLow: DWORD,
+	nFileSizeHigh:        DWORD,
+	nFileSizeLow:         DWORD,
+	nNumberOfLinks:       DWORD,
+	nFileIndexHigh:       DWORD,
+	nFileIndexLow:        DWORD,
 }
 
 LPBY_HANDLE_FILE_INFORMATION :: ^BY_HANDLE_FILE_INFORMATION
 
 FILE_STANDARD_INFO :: struct {
 	AllocationSize: LARGE_INTEGER,
-	EndOfFile: LARGE_INTEGER,
-	NumberOfLinks: DWORD,
-	DeletePending: BOOLEAN,
-	Directory: BOOLEAN,
+	EndOfFile:      LARGE_INTEGER,
+	NumberOfLinks:  DWORD,
+	DeletePending:  BOOLEAN,
+	Directory:      BOOLEAN,
 }
 
 FILE_ATTRIBUTE_TAG_INFO :: struct {
@@ -2661,6 +2939,22 @@ OSVERSIONINFOEXW :: struct {
 	wReserved:           UCHAR,
 }
 
+LoadLibraryEx_Flag :: enum DWORD {
+	LOAD_LIBRARY_AS_DATAFILE            = 1,  // 1 <<  1: 0x0002,
+	LOAD_WITH_ALTERED_SEARCH_PATH       = 3,  // 1 <<  3: 0x0008,
+	LOAD_IGNORE_CODE_AUTHZ_LEVEL        = 4,  // 1 <<  4: 0x0010,
+	LOAD_LIBRARY_AS_IMAGE_RESOURCE      = 5,  // 1 <<  5: 0x0020,
+	LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE  = 6,  // 1 <<  6: 0x0040,
+	LOAD_LIBRARY_REQUIRE_SIGNED_TARGET  = 7,  // 1 <<  7: 0x0080,
+	LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR    = 8,  // 1 <<  8: 0x0100,
+	LOAD_LIBRARY_SEARCH_APPLICATION_DIR = 9,  // 1 <<  9: 0x0200,
+	LOAD_LIBRARY_SEARCH_USER_DIRS       = 10, // 1 << 10: 0x0400,
+	LOAD_LIBRARY_SEARCH_SYSTEM32        = 11, // 1 << 11: 0x0800,
+	LOAD_LIBRARY_SEARCH_DEFAULT_DIRS    = 12, // 1 << 12: 0x1000,
+	LOAD_LIBRARY_SAFE_CURRENT_DIRS      = 13, // 1 << 13: 0x2000,
+}
+LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag]
+
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
 // Used in LogonUserExW
 PQUOTA_LIMITS :: struct {
@@ -2702,23 +2996,6 @@ PROFILEINFOW :: struct {
 	lpServerName: LPWSTR,
 	lpPolicyPath: LPWSTR,
 	hProfile: HANDLE,
-}
-
-// Used in LookupAccountNameW
-SID_NAME_USE :: distinct DWORD
-
-SID_TYPE :: enum SID_NAME_USE {
-	User = 1,
-	Group,
-	Domain,
-	Alias,
-	WellKnownGroup,
-	DeletedAccount,
-	Invalid,
-	Unknown,
-	Computer,
-	Label,
-	LogonSession,
 }
 
 SECURITY_MAX_SID_SIZE :: 68
@@ -3269,11 +3546,11 @@ SIGDN :: enum c_int {
 }
 
 SIATTRIBFLAGS :: enum c_int {
-  AND	= 0x1,
-  OR	= 0x2,
-  APPCOMPAT	= 0x3,
-  MASK	= 0x3,
-  ALLITEMS	= 0x4000,
+	AND       = 0x1,
+	OR        = 0x2,
+	APPCOMPAT = 0x3,
+	MASK      = 0x3,
+	ALLITEMS  = 0x4000,
 }
 
 FDAP :: enum c_int {
@@ -3970,6 +4247,70 @@ CONSOLE_CURSOR_INFO :: struct {
 PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
 PCONSOLE_CURSOR_INFO :: ^CONSOLE_CURSOR_INFO
 
+Event_Type :: enum WORD {
+	KEY_EVENT = 0x0001,
+	MOUSE_EVENT = 0x0002,
+	WINDOW_BUFFER_SIZE_EVENT = 0x0004,
+	MENU_EVENT = 0x0008,
+	FOCUS_EVENT = 0x0010,
+}
+
+INPUT_RECORD :: struct {
+	EventType: Event_Type,
+	Event: struct #raw_union {
+		KeyEvent: KEY_EVENT_RECORD,
+		MouseEvent: MOUSE_EVENT_RECORD,
+		WindowBufferSizeEvent: WINDOW_BUFFER_SIZE_RECORD,
+		MenuEvent: MENU_EVENT_RECORD,
+		FocusEvent: FOCUS_EVENT_RECORD,
+	},
+}
+
+Control_Key_State_Bits :: enum {
+	RIGHT_ALT_PRESSED,
+	LEFT_ALT_PRESSED,
+	RIGHT_CTRL_PRESSED,
+	LEFT_CTRL_PRESSED,
+	SHIFT_PRESSED,
+	NUMLOCK_ON,
+	SCROLLLOCK_ON,
+	CAPSLOCK_ON,
+	ENHANCED_KEY,
+}
+Control_Key_State :: bit_set[Control_Key_State_Bits; DWORD]
+
+KEY_EVENT_RECORD :: struct {
+	bKeyDown: BOOL,
+	wRepeatCount: WORD,
+	wVirtualKeyCode: WORD,
+	wVirtualScanCode: WORD,
+	uChar: struct #raw_union {
+		UnicodeChar: WCHAR,
+		AsciiChar: CHAR,
+	},
+	dwControlKeyState: Control_Key_State,
+}
+
+MOUSE_EVENT_RECORD :: struct {
+	dwMousePosition: COORD,
+	dwButtonState: DWORD,
+	dwControlKeyState: DWORD,
+	dwEventFlags: DWORD,
+}
+
+WINDOW_BUFFER_SIZE_RECORD :: struct {
+	dwSize: COORD,
+}
+
+MENU_EVENT_RECORD :: struct {
+	dwCommandId: UINT,
+}
+
+FOCUS_EVENT_RECORD :: struct {
+	bSetFocus: BOOL,
+}
+
+
 //
 // Networking
 //
@@ -4161,36 +4502,36 @@ DNS_STATUS :: distinct DWORD // zero is success
 DNS_INFO_NO_RECORDS :: 9501
 DNS_QUERY_NO_RECURSION :: 0x00000004
 
-DNS_RECORD :: struct {
-    pNext: ^DNS_RECORD,
-    pName: cstring,
-    wType: WORD,
-    wDataLength: USHORT,
-    Flags: DWORD,
-    dwTtl: DWORD,
-    _: DWORD,
-    Data: struct #raw_union {
-        CNAME: DNS_PTR_DATAA,
-        A:     u32be,  // Ipv4 Address
-        AAAA:  u128be, // Ipv6 Address
-        TXT:   DNS_TXT_DATAA,
-        NS:    DNS_PTR_DATAA,
-        MX:    DNS_MX_DATAA,
-        SRV:   DNS_SRV_DATAA,
-    },
+DNS_RECORD :: struct { // aka DNS_RECORDA
+	pNext: ^DNS_RECORD,
+	pName: cstring,
+	wType: WORD,
+	wDataLength: USHORT,
+	Flags: DWORD,
+	dwTtl: DWORD,
+	_: DWORD,
+	Data: struct #raw_union {
+		CNAME: DNS_PTR_DATAA,
+		A:     u32be,  // Ipv4 Address
+		AAAA:  u128be, // Ipv6 Address
+		TXT:   DNS_TXT_DATAA,
+		NS:    DNS_PTR_DATAA,
+		MX:    DNS_MX_DATAA,
+		SRV:   DNS_SRV_DATAA,
+	},
 }
 
 DNS_TXT_DATAA :: struct {
-    dwStringCount: DWORD,
-    pStringArray:  cstring,
+	dwStringCount: DWORD,
+	pStringArray:  cstring,
 }
 
 DNS_PTR_DATAA :: cstring
 
 DNS_MX_DATAA :: struct {
-    pNameExchange: cstring, // the hostname
-    wPreference: WORD,      // lower values preferred
-    _: WORD,                // padding.
+	pNameExchange: cstring, // the hostname
+	wPreference: WORD,      // lower values preferred
+	_: WORD,                // padding.
 }
 DNS_SRV_DATAA :: struct {
 	pNameTarget: cstring,
@@ -4204,3 +4545,96 @@ SOCKADDR :: struct {
 	sa_family: ADDRESS_FAMILY,
 	sa_data:   [14]CHAR,
 }
+
+ENUMRESNAMEPROCW :: #type proc (hModule: HMODULE, lpType: LPCWSTR, lpName: LPWSTR, lParam: LONG_PTR)-> BOOL
+ENUMRESTYPEPROCW :: #type proc (hModule: HMODULE, lpType: LPCWSTR, lParam: LONG_PTR)-> BOOL
+ENUMRESLANGPROCW :: #type proc (hModule: HMODULE, lpType: LPCWSTR, lpName: LPWSTR, wIDLanguage: LANGID, lParam: LONG_PTR)-> BOOL
+
+DTR_Control :: enum byte {
+	Disable = 0,
+	Enable = 1,
+	Handshake = 2,
+}
+RTS_Control :: enum byte {
+	Disable   = 0,
+	Enable    = 1,
+	Handshake = 2,
+	Toggle    = 3,
+}
+Parity :: enum byte {
+	None  = 0,
+	Odd   = 1,
+	Even  = 2,
+	Mark  = 3,
+	Space = 4,
+}
+Stop_Bits :: enum byte {
+	One = 0,
+	One_And_A_Half = 1,
+	Two = 2,
+}
+
+DCB :: struct {
+	DCBlength:  DWORD,
+	BaudRate:   DWORD,
+	using _: bit_field DWORD {
+		fBinary:           bool        | 1,
+		fParity:           bool        | 1,
+		fOutxCtsFlow:      bool        | 1,
+		fOutxDsrFlow:      bool        | 1,
+		fDtrControl:       DTR_Control | 2,
+		fDsrSensitivity:   bool        | 1,
+		fTXContinueOnXoff: bool        | 1,
+		fOutX:             bool        | 1,
+		fInX:              bool        | 1,
+		fErrorChar:        bool        | 1,
+		fNull:             bool        | 1,
+		fRtsControl:       RTS_Control | 2,
+		fAbortOnError:     bool        | 1,
+	},
+	wReserved:  WORD,
+	XOnLim:     WORD,
+	XOffLim:    WORD,
+	ByteSize:   BYTE,
+	Parity:     Parity,
+	StopBits:   Stop_Bits,
+	XonChar:    byte,
+	XoffChar:   byte,
+	ErrorChar:  byte,
+	EofChar:    byte,
+	EvtChar:    byte,
+	wReserved1: WORD,
+}
+
+COMMTIMEOUTS :: struct {
+	ReadIntervalTimeout: DWORD,
+	ReadTotalTimeoutMultiplier: DWORD,
+	ReadTotalTimeoutConstant: DWORD,
+	WriteTotalTimeoutMultiplier: DWORD,
+	WriteTotalTimeoutConstant: DWORD,
+}
+
+Com_Stat_Bits :: enum {
+	fCtsHold,
+	fDsrHold,
+	fRlsdHold,
+	fXoffHold,
+	fXoffSent,
+	fEof,
+	fTxim,
+}
+COMSTAT :: struct {
+	bits: bit_set[Com_Stat_Bits; DWORD],
+	cbInQue: DWORD,
+	cbOutQue: DWORD,
+}
+
+Com_Error_Bits :: enum {
+	RXOVER,
+	OVERRUN,
+	RXPARITY,
+	FRAME,
+	BREAK,
+}
+Com_Error :: bit_set[Com_Error_Bits; DWORD]
+

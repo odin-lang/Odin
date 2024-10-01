@@ -1,18 +1,19 @@
-//+build freebsd
+#+build freebsd
 package unix
 
 import "base:intrinsics"
 
 sysctl :: proc(mib: []i32, val: ^$T) -> (ok: bool) {
 	mib := mib
-	result_size := i64(size_of(T))
+	result_size := u64(size_of(T))
 
-	res := intrinsics.syscall(SYS_sysctl,
+	res: uintptr
+	res, ok = intrinsics.syscall_bsd(SYS_sysctl,
 		uintptr(raw_data(mib)), uintptr(len(mib)),
 		uintptr(val), uintptr(&result_size),
 		uintptr(0), uintptr(0),
 	)
-	return res == 0
+	return
 }
 
 // See /usr/include/sys/sysctl.h for details
@@ -22,6 +23,8 @@ CTL_KERN   :: 1
 	KERN_OSRELEASE :: 2
 	KERN_OSREV     :: 3
 	KERN_VERSION   :: 4
+	KERN_PROC      :: 14
+		KERN_PROC_PATHNAME :: 12
 CTL_VM     :: 2
 CTL_VFS    :: 3
 CTL_NET    :: 4

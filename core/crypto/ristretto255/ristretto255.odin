@@ -2,7 +2,7 @@
 package ristretto255 implement the ristretto255 prime-order group.
 
 See:
-- https://www.rfc-editor.org/rfc/rfc9496
+- [[ https://www.rfc-editor.org/rfc/rfc9496 ]]
 */
 package ristretto255
 
@@ -112,7 +112,7 @@ ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
 		return false
 	}
 
-	b_ := transmute(^[32]byte)(raw_data(b))
+	b_ := (^[32]byte)(raw_data(b))
 
 	s: field.Tight_Field_Element = ---
 	defer field.fe_clear(&s)
@@ -297,7 +297,7 @@ ge_bytes :: proc(ge: ^Group_Element, dst: []byte) {
 	// 2.  Return the 32-byte little-endian encoding of s.  More
 	// specifically, this is the encoding of the canonical
 	// representation of s as an integer between 0 and p-1, inclusive.
-	dst_ := transmute(^[32]byte)(raw_data(dst))
+	dst_ := (^[32]byte)(raw_data(dst))
 	field.fe_to_bytes(dst_, &tmp)
 
 	field.fe_clear_vec([]^field.Tight_Field_Element{&u1, &u2, &tmp, &z_inv, &ix0, &iy0, &x, &y})
@@ -417,7 +417,7 @@ ge_is_identity :: proc(ge: ^Group_Element) -> int {
 
 @(private)
 ge_map :: proc "contextless" (ge: ^Group_Element, b: []byte) {
-	b_ := transmute(^[32]byte)(raw_data(b))
+	b_ := (^[32]byte)(raw_data(b))
 
 	// The MAP function is defined on 32-byte strings as:
 	//

@@ -3,6 +3,14 @@ package simd
 import "base:builtin"
 import "base:intrinsics"
 
+// IS_EMULATED is true iff the compile-time target lacks hardware support
+// for at least 128-bit SIMD.
+IS_EMULATED :: true when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !intrinsics.has_target_feature("sse2") else
+	true when (ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32) && !intrinsics.has_target_feature("neon") else
+	true when (ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm32) && !intrinsics.has_target_feature("simd128") else
+	true when (ODIN_ARCH == .riscv64) && !intrinsics.has_target_feature("v") else
+	false
+
 // 128-bit vector aliases
 u8x16 :: #simd[16]u8
 i8x16 :: #simd[16]i8
@@ -74,8 +82,8 @@ shl_masked :: intrinsics.simd_shl_masked
 shr_masked :: intrinsics.simd_shr_masked
 
 // Saturation Arithmetic
-add_sat :: intrinsics.simd_add_sat
-sub_sat :: intrinsics.simd_sub_sat
+saturating_add :: intrinsics.simd_saturating_add
+saturating_sub :: intrinsics.simd_saturating_sub
 
 bit_and     :: intrinsics.simd_bit_and
 bit_or      :: intrinsics.simd_bit_or
@@ -102,6 +110,15 @@ lanes_le :: intrinsics.simd_lanes_le
 lanes_gt :: intrinsics.simd_lanes_gt
 lanes_ge :: intrinsics.simd_lanes_ge
 
+
+// Gather and Scatter intrinsics
+gather  :: intrinsics.simd_gather
+scatter :: intrinsics.simd_scatter
+masked_load  :: intrinsics.simd_masked_load
+masked_store :: intrinsics.simd_masked_store
+masked_expand_load    :: intrinsics.simd_masked_expand_load
+masked_compress_store :: intrinsics.simd_masked_compress_store
+
 // extract :: proc(a: #simd[N]T, idx: uint) -> T
 extract :: intrinsics.simd_extract
 // replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T
@@ -114,6 +131,9 @@ reduce_max         :: intrinsics.simd_reduce_max
 reduce_and         :: intrinsics.simd_reduce_and
 reduce_or          :: intrinsics.simd_reduce_or
 reduce_xor         :: intrinsics.simd_reduce_xor
+
+reduce_any         :: intrinsics.simd_reduce_any
+reduce_all         :: intrinsics.simd_reduce_all
 
 // swizzle :: proc(a: #simd[N]T, indices: ..int) -> #simd[len(indices)]T
 swizzle :: builtin.swizzle

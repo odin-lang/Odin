@@ -67,7 +67,7 @@ package math
 // masks any imprecision in the polynomial.
 @(private="file", require_results)
 stirling :: proc "contextless" (x: f64) -> (f64, f64) {
-	@(static) gamS := [?]f64{
+	@(static, rodata) gamS := [?]f64{
 		+7.87311395793093628397e-04,
 		-2.29549961613378126380e-04,
 		-2.68132617805781232825e-03,
@@ -103,7 +103,7 @@ gamma_f64 :: proc "contextless" (x: f64) -> f64 {
 		return false
 	}
 	
-	@(static) gamP := [?]f64{
+	@(static, rodata) gamP := [?]f64{
 		1.60119522476751861407e-04,
 		1.19135147006586384913e-03,
 		1.04213797561761569935e-02,
@@ -112,7 +112,7 @@ gamma_f64 :: proc "contextless" (x: f64) -> f64 {
 		4.94214826801497100753e-01,
 		9.99999999999999996796e-01,
 	}
-	@(static) gamQ := [?]f64{
+	@(static, rodata) gamQ := [?]f64{
 		-2.31581873324120129819e-05,
 		+5.39605580493303397842e-04,
 		-4.45641913851797240494e-03,

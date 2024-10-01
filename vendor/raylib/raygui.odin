@@ -5,47 +5,21 @@ import "core:c"
 RAYGUI_SHARED :: #config(RAYGUI_SHARED, false)
 
 when ODIN_OS == .Windows {
-	when RAYGUI_SHARED {
-		foreign import lib {
-			"windows/rayguidll.lib",
-		}
-	} else {
-		foreign import lib {
-			"windows/raygui.lib",
-		}
+	foreign import lib {
+		"windows/rayguidll.lib" when RAYGUI_SHARED else "windows/raygui.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	when RAYGUI_SHARED {
-		foreign import lib "linux/libraygui.so"
-	} else {
-		foreign import lib "linux/libraygui.a"
+	foreign import lib {
+		"linux/libraygui.so" when RAYGUI_SHARED else "linux/libraygui.a",
 	}
 } else when ODIN_OS == .Darwin {
 	when ODIN_ARCH == .arm64 {
-		when RAYGUI_SHARED {
-			foreign import lib {
-				"macos-arm64/libraygui.dylib",
-			}
-		} else {
-			foreign import lib {
-				"macos-arm64/libraygui.a",
-				// "system:Cocoa.framework",
-				// "system:OpenGL.framework",
-				// "system:IOKit.framework",
-			}
+		foreign import lib {
+			"macos-arm64/libraygui.dylib" when RAYGUI_SHARED else "macos-arm64/libraygui.a",
 		}
 	} else {
-		when RAYGUI_SHARED {
-			foreign import lib {
-				"macos/libraygui.dylib",
-			}
-		} else {
-			foreign import lib {
-				"macos/libraygui.a",
-				// "system:Cocoa.framework",
-				// "system:OpenGL.framework",
-				// "system:IOKit.framework",
-			}
+		foreign import lib {
+			"macos/libraygui.dylib" when RAYGUI_SHARED else "macos/libraygui.a",
 		}
 	}
 } else {
@@ -53,13 +27,6 @@ when ODIN_OS == .Windows {
 }
 
 RAYGUI_VERSION :: "4.0"
-
-// Style property
-GuiStyleProp :: struct {
-	controlId: u16,
-	propertyId: u16,
-	propertyValue: c.int,
-}
 
 // Gui control state
 GuiState :: enum c.int {
@@ -143,6 +110,8 @@ GuiDefaultProperty :: enum c.int {
 	LINE_COLOR,                 // Line control color
 	BACKGROUND_COLOR,           // Background color
 	TEXT_LINE_SPACING,          // Text spacing between lines
+	TEXT_ALIGNMENT_VERTICAL,    // Text vertical alignment inside text bounds (after border and padding)
+	TEXT_WRAP_MODE,             // Text wrap-mode inside text bounds
 }
 
 // Label
@@ -196,11 +165,7 @@ GuiDropdownBoxProperty :: enum c.int {
 
 // TextBox/TextBoxMulti/ValueBox/Spinner
 GuiTextBoxProperty :: enum c.int {
-	TEXT_INNER_PADDING = 16,    // TextBox/TextBoxMulti/ValueBox/Spinner inner text padding
-	TEXT_LINES_SPACING,         // TextBoxMulti lines separation
-	TEXT_ALIGNMENT_VERTICAL,    // TextBoxMulti vertical alignment: 0-CENTERED, 1-UP, 2-DOWN
-	TEXT_MULTILINE,             // TextBox supports multiple lines
-	TEXT_WRAP_MODE,             // TextBox wrap mode for multiline: 0-NO_WRAP, 1-CHAR_WRAP, 2-WORD_WRAP
+	TEXT_READONLY = 16,         // TextBox in read-only mode: 0-text editable, 1-text no-editable
 }
 
 // Spinner
@@ -226,7 +191,7 @@ GuiColorPickerProperty :: enum c.int {
 	HUEBAR_SELECTOR_OVERFLOW,   // ColorPicker right hue bar selector overflow
 }
 
-SCROLLBAR_LEFT_SIDE :: 0
+SCROLLBAR_LEFT_SIDE  :: 0
 SCROLLBAR_RIGHT_SIDE :: 1
 
 //----------------------------------------------------------------------------------
@@ -262,8 +227,8 @@ foreign lib {
 	
 	// Style set/get functions
 	
-	GuiSetStyle         :: proc(control: c.int, property: c.int, value: c.int) ---                            // Set one style property
-	GuiGetStyle         :: proc(control: c.int, property: c.int) -> c.int ---                                 // Get one style property
+	GuiSetStyle         :: proc(control: GuiControl, property: c.int, value: c.int) ---          // Set one style property
+	GuiGetStyle         :: proc(control: GuiControl, property: c.int) -> c.int ---               // Get one style property
 	
 	// Styles loading functions
 	
@@ -278,11 +243,11 @@ foreign lib {
 	
 	// Icons functionality
 	
-	GuiIconText         :: proc(iconId: c.int, text: cstring) -> cstring ---                                  // Get text with icon id prepended (if supported)
+	GuiIconText         :: proc(iconId: GuiIconName, text: cstring) -> cstring ---                            // Get text with icon id prepended (if supported)
 	GuiSetIconScale     :: proc(scale: c.int) ---                                                             // Set default icon drawing size
 	GuiGetIcons         :: proc() -> [^]u32 ---                                                               // Get raygui icons data pointer
 	GuiLoadIcons        :: proc(fileName: cstring, loadIconsName: bool) -> [^]cstring ---                     // Load raygui icons file (.rgi) into internal icons data
-	GuiDrawIcon         :: proc(iconId: c.int, posX: c.int, posY: c.int, pixelSize: c.int, color: Color) ---  // Draw icon using pixel size at specified position
+	GuiDrawIcon         :: proc(iconId: GuiIconName, posX, posY: c.int, pixelSize: c.int, color: Color) ---   // Draw icon using pixel size at specified position
 	
 	
 	// Controls
@@ -300,11 +265,11 @@ foreign lib {
 	
 	GuiLabel            :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Label control, shows text
 	GuiButton           :: proc(bounds: Rectangle, text: cstring) -> bool ---                                 // Button control, returns true when clicked
-	GuiLabelButton      :: proc(bounds: Rectangle, text: cstring) -> bool ---                                // Label button control, show true when clicked
+	GuiLabelButton      :: proc(bounds: Rectangle, text: cstring) -> bool ---                                 // Label button control, show true when clicked
 	GuiToggle           :: proc(bounds: Rectangle, text: cstring, active: ^bool) -> c.int ---                 // Toggle Button control, returns true when active
 	GuiToggleGroup      :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Toggle Group control, returns active toggle index
 	GuiToggleSlider     :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---
-	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> bool ---                // Check Box control, returns true when active
+	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> bool ---                 // Check Box control, returns true when active
 	GuiComboBox         :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Combo Box control, returns selected item index
 	
 	GuiDropdownBox      :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> bool --- // Dropdown Box control, returns selected item

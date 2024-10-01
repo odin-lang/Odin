@@ -1,4 +1,4 @@
-//+private
+#+private
 package mem_virtual
 
 Platform_Memory_Block :: struct {

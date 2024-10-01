@@ -3,11 +3,28 @@ package stb_truetype
 import c "core:c"
 import stbrp "vendor:stb/rect_pack"
 
-     when ODIN_OS == .Windows { foreign import stbtt "../lib/stb_truetype.lib"      }
-else when ODIN_OS == .Linux   { foreign import stbtt "../lib/stb_truetype.a"        }
-else when ODIN_OS == .Darwin  { foreign import stbtt "../lib/darwin/stb_truetype.a" }
-else                          { foreign import stbtt "system:stb_truetype"          }
+@(private)
+LIB :: (
+	     "../lib/stb_truetype.lib"      when ODIN_OS == .Windows
+	else "../lib/stb_truetype.a"        when ODIN_OS == .Linux
+	else "../lib/darwin/stb_truetype.a" when ODIN_OS == .Darwin
+	else "../lib/stb_truetype_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+	else ""
+)
 
+when LIB != "" {
+	when !#exists(LIB) {
+		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
+	}
+}
+
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import stbtt "../lib/stb_truetype_wasm.o"
+} else when LIB != "" {
+	foreign import stbtt { LIB }
+} else {
+	foreign import stbtt "system:stb_truetype"
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -554,7 +571,7 @@ foreign stbtt {
 	// some of the values for the IDs are below; for more see the truetype spec:
 	//     http://developer.apple.com/textfonts/TTRefMan/RM06/Chap6name.html
 	//     http://www.microsoft.com/typography/otspec/name.htm
-	GetFontNameString :: proc(font: ^fontinfo, length: c.int, platformID: PLATFORM_ID, encodingID, languageID, nameID: c.int) -> cstring ---
+	GetFontNameString :: proc(font: ^fontinfo, length: ^c.int, platformID: PLATFORM_ID, encodingID, languageID, nameID: c.int) -> cstring ---
 }
 
 

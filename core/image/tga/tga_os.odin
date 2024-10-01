@@ -1,4 +1,4 @@
-//+build !js
+#+build !js
 package tga
 
 import "core:os"

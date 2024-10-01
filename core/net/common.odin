@@ -1,4 +1,4 @@
-// +build windows, linux, darwin
+#+build windows, linux, darwin, freebsd
 package net
 
 /*
@@ -13,12 +13,14 @@ package net
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
 */
 
 import "base:runtime"
@@ -70,6 +72,8 @@ Network_Error :: union #shared_nil {
 	DNS_Error,
 }
 
+#assert(size_of(Network_Error) == 8)
+
 General_Error :: enum u32 {
 	None = 0,
 	Unable_To_Enumerate_Network_Interfaces = 1,
@@ -78,7 +82,7 @@ General_Error :: enum u32 {
 // `Platform_Error` is used to wrap errors returned by the different platforms that don't fit a common error.
 Platform_Error :: enum u32 {}
 
-Parse_Endpoint_Error :: enum {
+Parse_Endpoint_Error :: enum u32 {
 	None          = 0,
 	Bad_Port      = 1,
 	Bad_Address,
@@ -137,8 +141,8 @@ IP4_Address :: distinct [4]u8
 IP6_Address :: distinct [8]u16be
 Address :: union {IP4_Address, IP6_Address}
 
-IP4_Loopback := IP4_Address{127, 0, 0, 1}
-IP6_Loopback := IP6_Address{0, 0, 0, 0, 0, 0, 0, 1}
+IP4_Loopback :: IP4_Address{127, 0, 0, 1}
+IP6_Loopback :: IP6_Address{0, 0, 0, 0, 0, 0, 0, 1}
 
 IP4_Any := IP4_Address{}
 IP6_Any := IP6_Address{}

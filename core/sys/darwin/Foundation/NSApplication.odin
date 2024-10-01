@@ -79,7 +79,10 @@ Application_setActivationPolicy :: proc "c" (self: ^Application, activationPolic
 	return msgSend(BOOL, self, "setActivationPolicy:", activationPolicy)
 }
 
-@(deprecated="Use NSApplication method activate instead.")
+// NOTE: this is technically deprecated but still actively used (Sokol, glfw, SDL, etc.)
+// and has no clear alternative although `activate` is what Apple tells you to use,
+// that does not work the same way.
+// @(deprecated="Use NSApplication method activate instead.")
 @(objc_type=Application, objc_name="activateIgnoringOtherApps")
 Application_activateIgnoringOtherApps :: proc "c" (self: ^Application, ignoreOtherApps: BOOL) {
 	msgSend(nil, self, "activateIgnoringOtherApps:", ignoreOtherApps)
@@ -95,6 +98,11 @@ Application_setTitle :: proc "c" (self: ^Application, title: ^String) {
 	msgSend(nil, self, "setTitle", title)
 }
 
+@(objc_type=Application, objc_name="mainMenu")
+Window_mainMenu :: proc "c" (self: ^Application) -> ^Menu {
+	return msgSend(^Menu, self, "mainMenu")
+}
+
 @(objc_type=Application, objc_name="setMainMenu")
 Application_setMainMenu :: proc "c" (self: ^Application, menu: ^Menu) {
 	msgSend(nil, self, "setMainMenu:", menu)
@@ -108,6 +116,11 @@ Application_windows :: proc "c" (self: ^Application) -> ^Array {
 @(objc_type=Application, objc_name="run")
 Application_run :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "run")
+}
+
+@(objc_type=Application, objc_name="finishLaunching")
+Application_finishLaunching :: proc "c" (self: ^Application) {
+	msgSend(nil, self, "finishLaunching")
 }
 
 @(objc_type=Application, objc_name="terminate")
@@ -132,7 +145,7 @@ Application_nextEventMatchingMask :: proc "c" (self: ^Application, mask: EventMa
 
 @(objc_type=Application, objc_name="sendEvent")
 Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
-	msgSend(Event, self, "sendEvent:", event)
+	msgSend(nil, self, "sendEvent:", event)
 }
 @(objc_type=Application, objc_name="updateWindows")
 Application_updateWindows :: proc "c" (self: ^Application) {

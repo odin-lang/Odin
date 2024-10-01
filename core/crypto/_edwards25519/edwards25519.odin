@@ -110,7 +110,7 @@ ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
 	if len(b) != 32 {
 		intrinsics.trap()
 	}
-	b_ := transmute(^[32]byte)(raw_data(b))
+	b_ := (^[32]byte)(raw_data(b))
 
 	// Do the work in a scratch element, so that ge is unchanged on
 	// failure.
@@ -169,7 +169,7 @@ ge_bytes :: proc "contextless" (ge: ^Group_Element, dst: []byte) {
 	if len(dst) != 32 {
 		intrinsics.trap()
 	}
-	dst_ := transmute(^[32]byte)(raw_data(dst))
+	dst_ := (^[32]byte)(raw_data(dst))
 
 	// Convert the element to affine (x, y) representation.
 	x, y, z_inv: field.Tight_Field_Element = ---, ---, ---

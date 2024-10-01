@@ -18,7 +18,7 @@
 // This could change at a later date if the all these data structures are
 // implemented within the compiler rather than in this "preload" file
 //
-//+no-instrumentation
+#+no-instrumentation
 package runtime
 
 import "base:intrinsics"
@@ -66,7 +66,7 @@ Type_Info_Named :: struct {
 	name: string,
 	base: ^Type_Info,
 	pkg:  string,
-	loc:  Source_Code_Location,
+	loc:  ^Source_Code_Location,
 }
 Type_Info_Integer    :: struct {signed: bool, endianness: Platform_Endianness}
 Type_Info_Rune       :: struct {}
@@ -112,23 +112,32 @@ Type_Info_Parameters :: struct { // Only used for procedures parameters and resu
 }
 Type_Info_Tuple :: Type_Info_Parameters // Will be removed eventually
 
-Type_Info_Struct :: struct {
-	types:        []^Type_Info,
-	names:        []string,
-	offsets:      []uintptr,
-	usings:       []bool,
-	tags:         []string,
-	is_packed:    bool,
-	is_raw_union: bool,
-	is_no_copy:   bool,
-	custom_align: bool,
+Type_Info_Struct_Flags :: distinct bit_set[Type_Info_Struct_Flag; u8]
+Type_Info_Struct_Flag :: enum u8 {
+	packed    = 0,
+	raw_union = 1,
+	no_copy   = 2,
+	align     = 3,
+}
 
-	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
+Type_Info_Struct :: struct {
+	// Slice these with `field_count`
+	types:   [^]^Type_Info `fmt:"v,field_count"`,
+	names:   [^]string     `fmt:"v,field_count"`,
+	offsets: [^]uintptr    `fmt:"v,field_count"`,
+	usings:  [^]bool       `fmt:"v,field_count"`,
+	tags:    [^]string     `fmt:"v,field_count"`,
+
+	field_count: i32,
+
+	flags: Type_Info_Struct_Flags,
 
 	// These are only set iff this structure is an SOA structure
 	soa_kind:      Type_Info_Struct_Soa_Kind,
+	soa_len:       i32,
 	soa_base_type: ^Type_Info,
-	soa_len:       int,
+
+	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
 }
 Type_Info_Union :: struct {
 	variants:     []^Type_Info,
@@ -142,9 +151,9 @@ Type_Info_Union :: struct {
 	shared_nil:   bool,
 }
 Type_Info_Enum :: struct {
-	base:      ^Type_Info,
-	names:     []string,
-	values:    []Type_Info_Enum_Value,
+	base:   ^Type_Info,
+	names:  []string,
+	values: []Type_Info_Enum_Value,
 }
 Type_Info_Map :: struct {
 	key:      ^Type_Info,
@@ -187,11 +196,12 @@ Type_Info_Soa_Pointer :: struct {
 }
 Type_Info_Bit_Field :: struct {
 	backing_type: ^Type_Info,
-	names:        []string,
-	types:        []^Type_Info,
-	bit_sizes:    []uintptr,
-	bit_offsets:  []uintptr,
-	tags:         []string,
+	names:        [^]string     `fmt:"v,field_count"`,
+	types:        [^]^Type_Info `fmt:"v,field_count"`,
+	bit_sizes:    [^]uintptr    `fmt:"v,field_count"`,
+	bit_offsets:  [^]uintptr    `fmt:"v,field_count"`,
+	tags:         [^]string     `fmt:"v,field_count"`,
+	field_count:  int,
 }
 
 Type_Info_Flag :: enum u8 {
@@ -273,14 +283,14 @@ Typeid_Kind :: enum u8 {
 }
 #assert(len(Typeid_Kind) < 32)
 
-// Typeid_Bit_Field :: bit_field #align(align_of(uintptr)) {
-// 	index:    8*size_of(uintptr) - 8,
-// 	kind:     5, // Typeid_Kind
-// 	named:    1,
-// 	special:  1, // signed, cstring, etc
-// 	reserved: 1,
-// }
-// #assert(size_of(Typeid_Bit_Field) == size_of(uintptr));
+Typeid_Bit_Field :: bit_field uintptr {
+	index:    uintptr     | 8*size_of(uintptr) - 8,
+	kind:     Typeid_Kind | 5, // Typeid_Kind
+	named:    bool        | 1,
+	special:  bool        | 1, // signed, cstring, etc
+	reserved: bool        | 1,
+}
+#assert(size_of(Typeid_Bit_Field) == size_of(uintptr))
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
@@ -299,6 +309,8 @@ when ODIN_OS == .Windows {
 		Thread_Detach  = 3,
 	}
 	dll_forward_reason: DLL_Forward_Reason
+
+	dll_instance: rawptr
 }
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
@@ -397,11 +409,34 @@ Logger :: struct {
 	options:      Logger_Options,
 }
 
+
+Random_Generator_Mode :: enum {
+	Read,
+	Reset,
+	Query_Info,
+}
+
+Random_Generator_Query_Info_Flag :: enum u32 {
+	Cryptographic,
+	Uniform,
+	External_Entropy,
+	Resettable,
+}
+Random_Generator_Query_Info :: distinct bit_set[Random_Generator_Query_Info_Flag; u32]
+
+Random_Generator_Proc :: #type proc(data: rawptr, mode: Random_Generator_Mode, p: []byte)
+
+Random_Generator :: struct {
+	procedure: Random_Generator_Proc,
+	data:      rawptr,
+}
+
 Context :: struct {
 	allocator:              Allocator,
 	temp_allocator:         Allocator,
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
+	random_generator:       Random_Generator,
 
 	user_ptr:   rawptr,
 	user_index: int,
@@ -470,6 +505,15 @@ Raw_Soa_Pointer :: struct {
 	index: int,
 }
 
+Raw_Complex32     :: struct {real, imag: f16}
+Raw_Complex64     :: struct {real, imag: f32}
+Raw_Complex128    :: struct {real, imag: f64}
+Raw_Quaternion64  :: struct {imag, jmag, kmag: f16, real: f16}
+Raw_Quaternion128 :: struct {imag, jmag, kmag: f32, real: f32}
+Raw_Quaternion256 :: struct {imag, jmag, kmag: f64, real: f64}
+Raw_Quaternion64_Vector_Scalar  :: struct {vector: [3]f16, scalar: f16}
+Raw_Quaternion128_Vector_Scalar :: struct {vector: [3]f32, scalar: f32}
+Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64}
 
 
 /*
@@ -482,8 +526,11 @@ Raw_Soa_Pointer :: struct {
 		Essence,
 		FreeBSD,
 		OpenBSD,
+		NetBSD,
+		Haiku,
 		WASI,
 		JS,
+		Orca,
 		Freestanding,
 	}
 */
@@ -499,15 +546,29 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		arm64,
 		wasm32,
 		wasm64p32,
+		riscv64,
 	}
 */
 Odin_Arch_Type :: type_of(ODIN_ARCH)
+
+Odin_Arch_Types :: bit_set[Odin_Arch_Type]
+
+ALL_ODIN_ARCH_TYPES :: Odin_Arch_Types{
+	.amd64,
+	.i386,
+	.arm32,
+	.arm64,
+	.wasm32,
+	.wasm64p32,
+	.riscv64,
+}
 
 /*
 	// Defined internally by the compiler
 	Odin_Build_Mode_Type :: enum int {
 		Executable,
 		Dynamic,
+		Static,
 		Object,
 		Assembly,
 		LLVM_IR,
@@ -525,6 +586,22 @@ Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
 */
 Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 
+Odin_OS_Types :: bit_set[Odin_OS_Type]
+
+ALL_ODIN_OS_TYPES :: Odin_OS_Types{
+	.Windows,
+	.Darwin,
+	.Linux,
+	.Essence,
+	.FreeBSD,
+	.OpenBSD,
+	.NetBSD,
+	.Haiku,
+	.WASI,
+	.JS,
+	.Orca,
+	.Freestanding,
+}
 
 /*
 	// Defined internally by the compiler
@@ -543,12 +620,25 @@ Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 		Memory  = 1,
 		Thread  = 2,
 	}
-	Odin_Sanitizer_Flags :: distinct bitset[Odin_Sanitizer_Flag; u32]
+	Odin_Sanitizer_Flags :: distinct bit_set[Odin_Sanitizer_Flag; u32]
 
 	ODIN_SANITIZER_FLAGS // is a constant
 */
 Odin_Sanitizer_Flags :: type_of(ODIN_SANITIZER_FLAGS)
 
+/*
+	// Defined internally by the compiler
+	Odin_Optimization_Mode :: enum int {
+		None       = -1,
+		Minimal    =  0,
+		Size       =  1,
+		Speed      =  2,
+		Aggressive =  3,
+	}
+
+	ODIN_OPTIMIZATION_MODE // is a constant
+*/
+Odin_Optimization_Mode :: type_of(ODIN_OPTIMIZATION_MODE)
 
 /////////////////////////////
 // Init Startup Procedures //
@@ -684,13 +774,20 @@ __init_context :: proc "contextless" (c: ^Context) {
 
 	c.logger.procedure = default_logger_proc
 	c.logger.data = nil
+
+	c.random_generator.procedure = default_random_generator_proc
+	c.random_generator.data = nil
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
+	default_assertion_contextless_failure_proc(prefix, message, loc)
+}
+
+default_assertion_contextless_failure_proc :: proc "contextless" (prefix, message: string, loc: Source_Code_Location) -> ! {
 	when ODIN_OS == .Freestanding {
 		// Do nothing
 	} else {
-		when !ODIN_DISABLE_ASSERT {
+		when ODIN_OS != .Orca && !ODIN_DISABLE_ASSERT {
 			print_caller_location(loc)
 			print_string(" ")
 		}
@@ -699,7 +796,18 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 			print_string(": ")
 			print_string(message)
 		}
-		print_byte('\n')
+
+		when ODIN_OS == .Orca {
+			assert_fail(
+				cstring(raw_data(loc.file_path)),
+				cstring(raw_data(loc.procedure)),
+				loc.line,
+				"",
+				cstring(raw_data(orca_stderr_buffer[:orca_stderr_buffer_idx])),
+			)
+		} else {
+			print_byte('\n')
+		}
 	}
 	trap()
 }

@@ -171,9 +171,9 @@ KeyboardEvent :: struct {
 TEXTEDITINGEVENT_TEXT_SIZE :: 32
 TextEditingEvent :: struct {
 	type: EventType,                                /**< ::SDL_TEXTEDITING */
-    	timestamp: u32,                           /**< In milliseconds, populated using SDL_GetTicks() */
-    	windowID: u32,                            /**< The window with keyboard focus, if any */
-    	text: [TEXTEDITINGEVENT_TEXT_SIZE]u8,  /**< The editing text */
+	timestamp: u32,                           /**< In milliseconds, populated using SDL_GetTicks() */
+	windowID: u32,                            /**< The window with keyboard focus, if any */
+	text: [TEXTEDITINGEVENT_TEXT_SIZE]u8,  /**< The editing text */
 	start: i32,                               /**< The start cursor of selected editing text */
 	length: i32,                              /**< The length of selected editing text */
 }
@@ -184,7 +184,7 @@ TextInputEvent :: struct {
 	type: EventType,                              /**< ::SDL_TEXTINPUT */
 	timestamp: u32,                         /**< In milliseconds, populated using SDL_GetTicks() */
 	windowID: u32,                          /**< The window with keyboard focus, if any */
-    	text: [TEXTINPUTEVENT_TEXT_SIZE]u8,  /**< The input text */
+	text: [TEXTINPUTEVENT_TEXT_SIZE]u8,  /**< The input text */
 }
 
 MouseMotionEvent :: struct {

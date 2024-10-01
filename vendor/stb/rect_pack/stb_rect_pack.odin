@@ -4,10 +4,28 @@ import "core:c"
 
 #assert(size_of(b32) == size_of(c.int))
 
-     when ODIN_OS == .Windows { foreign import lib "../lib/stb_rect_pack.lib"      }
-else when ODIN_OS == .Linux   { foreign import lib "../lib/stb_rect_pack.a"        }
-else when ODIN_OS == .Darwin  { foreign import lib "../lib/darwin/stb_rect_pack.a" }
-else                          { foreign import lib "system:stb_rect_pack"          }
+@(private)
+LIB :: (
+	     "../lib/stb_rect_pack.lib"      when ODIN_OS == .Windows
+	else "../lib/stb_rect_pack.a"        when ODIN_OS == .Linux
+	else "../lib/darwin/stb_rect_pack.a" when ODIN_OS == .Darwin
+	else "../lib/stb_rect_pack_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+	else ""
+)
+
+when LIB != "" {
+	when !#exists(LIB) {
+		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
+	}
+}
+
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib "../lib/stb_rect_pack_wasm.o"
+} else when LIB != "" {
+	foreign import lib { LIB }
+} else {
+	foreign import lib "system:stb_rect_pack"
+}
 
 Coord :: distinct c.int
 _MAXVAL :: max(Coord)

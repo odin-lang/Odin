@@ -3,6 +3,7 @@ package encoding_cbor
 import "base:intrinsics"
 
 import "core:encoding/json"
+import "core:encoding/hex"
 import "core:io"
 import "core:mem"
 import "core:strconv"
@@ -320,8 +321,8 @@ to_diagnostic_format :: proc {
 
 // Turns the given CBOR value into a human-readable string.
 // See docs on the proc group `diagnose` for more info.
-to_diagnostic_format_string :: proc(val: Value, padding := 0, allocator := context.allocator) -> (string, mem.Allocator_Error) #optional_allocator_error {
-	b := strings.builder_make(allocator)
+to_diagnostic_format_string :: proc(val: Value, padding := 0, allocator := context.allocator, loc := #caller_location) -> (string, mem.Allocator_Error) #optional_allocator_error {
+	b := strings.builder_make(allocator, loc)
 	w := strings.to_stream(&b)
 	err := to_diagnostic_format_writer(w, val, padding)
 	if err == .EOF {
@@ -399,11 +400,11 @@ to_diagnostic_format_writer :: proc(w: io.Writer, val: Value, padding := 0) -> i
 		io.write_string(w, str) or_return
 
 	case bool: io.write_string(w, "true" if v else "false") or_return
-	case Nil: io.write_string(w, "nil") or_return
+	case Nil: io.write_string(w, "null") or_return
 	case Undefined: io.write_string(w, "undefined") or_return
 	case ^Bytes:
 		io.write_string(w, "h'") or_return
-		for b in v { io.write_int(w, int(b), 16) or_return }
+		hex.encode_into_writer(w, v^) or_return
 		io.write_string(w, "'") or_return
 	case ^Text:
 		io.write_string(w, `"`) or_return

@@ -1,28 +1,30 @@
 package os2
 
-import "core:strings"
 import "base:runtime"
 
+@(require_results)
 user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+
 	#partial switch ODIN_OS {
 	case .Windows:
-		dir = get_env("LocalAppData", allocator)
+		dir = get_env("LocalAppData", temp_allocator())
 		if dir != "" {
-			dir = strings.clone(dir, allocator) or_return
+			dir = clone_string(dir, allocator) or_return
 		}
 	case .Darwin:
-		dir = get_env("HOME", allocator)
+		dir = get_env("HOME", temp_allocator())
 		if dir != "" {
-			dir = strings.concatenate({dir, "/Library/Caches"}, allocator) or_return
+			dir = concatenate({dir, "/Library/Caches"}, allocator) or_return
 		}
 	case: // All other UNIX systems
 		dir = get_env("XDG_CACHE_HOME", allocator)
 		if dir == "" {
-			dir = get_env("HOME", allocator)
+			dir = get_env("HOME", temp_allocator())
 			if dir == "" {
 				return
 			}
-			dir = strings.concatenate({dir, "/.cache"}, allocator) or_return
+			dir = concatenate({dir, "/.cache"}, allocator) or_return
 		}
 	}
 	if dir == "" {
@@ -31,26 +33,29 @@ user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error
 	return
 }
 
+@(require_results)
 user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+
 	#partial switch ODIN_OS {
 	case .Windows:
-		dir = get_env("AppData", allocator)
+		dir = get_env("AppData", temp_allocator())
 		if dir != "" {
-			dir = strings.clone(dir, allocator) or_return
+			dir = clone_string(dir, allocator) or_return
 		}
 	case .Darwin:
-		dir = get_env("HOME", allocator)
+		dir = get_env("HOME", temp_allocator())
 		if dir != "" {
-			dir = strings.concatenate({dir, "/Library/Application Support"}, allocator) or_return
+			dir = concatenate({dir, "/.config"}, allocator) or_return
 		}
 	case: // All other UNIX systems
 		dir = get_env("XDG_CACHE_HOME", allocator)
 		if dir == "" {
-			dir = get_env("HOME", allocator)
+			dir = get_env("HOME", temp_allocator())
 			if dir == "" {
 				return
 			}
-			dir = strings.concatenate({dir, "/.config"}, allocator) or_return
+			dir = concatenate({dir, "/.config"}, allocator) or_return
 		}
 	}
 	if dir == "" {
@@ -59,6 +64,7 @@ user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 	return
 }
 
+@(require_results)
 user_home_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	env := "HOME"
 	#partial switch ODIN_OS {

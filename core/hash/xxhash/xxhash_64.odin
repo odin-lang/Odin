@@ -7,6 +7,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+
 package xxhash
 
 import "base:intrinsics"
@@ -19,15 +20,15 @@ xxh_u64    :: u64
 XXH64_DEFAULT_SEED :: XXH64_hash(0)
 
 XXH64_state :: struct {
-   total_len:    XXH64_hash,    /*!< Total length hashed. This is always 64-bit. */
-   v1:           XXH64_hash,    /*!< First accumulator lane */
-   v2:           XXH64_hash,    /*!< Second accumulator lane */
-   v3:           XXH64_hash,    /*!< Third accumulator lane */
-   v4:           XXH64_hash,    /*!< Fourth accumulator lane */
-   mem64:        [4]XXH64_hash, /*!< Internal buffer for partial reads. Treated as unsigned char[32]. */
-   memsize:      XXH32_hash,    /*!< Amount of data in @ref mem64 */
-   reserved32:   XXH32_hash,    /*!< Reserved field, needed for padding anyways*/
-   reserved64:   XXH64_hash,    /*!< Reserved field. Do not read or write to it, it may be removed. */
+	total_len:    XXH64_hash,    /*!< Total length hashed. This is always 64-bit. */
+	v1:           XXH64_hash,    /*!< First accumulator lane */
+	v2:           XXH64_hash,    /*!< Second accumulator lane */
+	v3:           XXH64_hash,    /*!< Third accumulator lane */
+	v4:           XXH64_hash,    /*!< Fourth accumulator lane */
+	mem64:        [4]XXH64_hash, /*!< Internal buffer for partial reads. Treated as unsigned char[32]. */
+	memsize:      XXH32_hash,    /*!< Amount of data in @ref mem64 */
+	reserved32:   XXH32_hash,    /*!< Reserved field, needed for padding anyways*/
+	reserved64:   XXH64_hash,    /*!< Reserved field. Do not read or write to it, it may be removed. */
 }
 
 XXH64_canonical :: struct {
@@ -40,7 +41,7 @@ XXH_PRIME64_3 :: 0x165667B19E3779F9 /*!< 0b0001011001010110011001111011000110011
 XXH_PRIME64_4 :: 0x85EBCA77C2B2AE63 /*!< 0b1000010111101011110010100111011111000010101100101010111001100011 */
 XXH_PRIME64_5 :: 0x27D4EB2F165667C5 /*!< 0b0010011111010100111010110010111100010110010101100110011111000101 */
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH64_round :: proc(acc, input: xxh_u64) -> (res: xxh_u64) {
 	acc := acc
 
@@ -50,14 +51,14 @@ XXH64_round :: proc(acc, input: xxh_u64) -> (res: xxh_u64) {
 	return acc
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH64_mergeRound :: proc(acc, val: xxh_u64) -> (res: xxh_u64) {
 	res  = acc ~ XXH64_round(0, val)
 	res  = res * XXH_PRIME64_1 + XXH_PRIME64_4
 	return res
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH64_avalanche :: proc(h64: xxh_u64) -> (res: xxh_u64) {
 	res = h64
 	res ~= res >> 33
@@ -68,7 +69,7 @@ XXH64_avalanche :: proc(h64: xxh_u64) -> (res: xxh_u64) {
 	return res
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH64_finalize :: proc(h64: xxh_u64, buf: []u8, alignment: Alignment) -> (res: xxh_u64) {
 	buf := buf
 	length := len(buf) & 31
@@ -100,7 +101,7 @@ XXH64_finalize :: proc(h64: xxh_u64, buf: []u8, alignment: Alignment) -> (res: x
 	return XXH64_avalanche(res)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH64_endian_align :: proc(input: []u8, seed := XXH64_DEFAULT_SEED, alignment := Alignment.Unaligned) -> (res: xxh_u64) {
 	buf    := input
 	length := len(buf)
@@ -191,7 +192,7 @@ XXH64_reset_state :: proc(state_ptr: ^XXH64_state, seed := XXH64_DEFAULT_SEED) -
 	return .None
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH64_update :: proc(state: ^XXH64_state, input: []u8) -> (err: Error) {
 	buf    := input
 	length := len(buf)
@@ -245,7 +246,7 @@ XXH64_update :: proc(state: ^XXH64_state, input: []u8) -> (err: Error) {
 	return .None
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH64_digest :: proc(state: ^XXH64_state) -> (res: XXH64_hash) {
 	if state.total_len >= 32 {
 		v1 := state.v1

@@ -10,15 +10,13 @@ import "core:sys/haiku"
 Handle    :: i32
 Pid       :: i32
 File_Time :: i64
-Errno     :: i32
+_Platform_Error :: haiku.Errno
 
 MAX_PATH :: haiku.PATH_MAX
 
-ENOSYS :: int(haiku.Errno.POSIX_ERROR_BASE) + 9
+ENOSYS :: _Platform_Error(i32(haiku.Errno.POSIX_ERROR_BASE) + 9)
 
 INVALID_HANDLE :: ~Handle(0)
-
-ERROR_NONE: Errno: 0
 
 stdin:  Handle = 0
 stdout: Handle = 1
@@ -121,49 +119,52 @@ S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK
 
 
 foreign libc {
-	@(link_name="_errnop")	__error		:: proc() -> ^c.int ---
+	@(link_name="_errorp")        __error              :: proc() -> ^c.int ---
 
-	@(link_name="fork")	_unix_fork	:: proc() -> pid_t ---
-	@(link_name="getthrid")	_unix_getthrid	:: proc() -> int ---
+	@(link_name="fork")           _unix_fork           :: proc() -> pid_t ---
+	@(link_name="getthrid")       _unix_getthrid       :: proc() -> int ---
 
-	@(link_name="open")	_unix_open	:: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
-	@(link_name="close")	_unix_close	:: proc(fd: Handle) -> c.int ---
-	@(link_name="read")	_unix_read	:: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
-	@(link_name="write")	_unix_write	:: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
-	@(link_name="lseek")	_unix_seek	:: proc(fd: Handle, offset: off_t, whence: c.int) -> off_t ---
-	@(link_name="stat")	_unix_stat	:: proc(path: cstring, sb: ^OS_Stat) -> c.int ---
-	@(link_name="fstat")	_unix_fstat	:: proc(fd: Handle, sb: ^OS_Stat) -> c.int ---
-	@(link_name="lstat")	_unix_lstat	:: proc(path: cstring, sb: ^OS_Stat) -> c.int ---
-	@(link_name="readlink")	_unix_readlink	:: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
-	@(link_name="access")	_unix_access	:: proc(path: cstring, mask: c.int) -> c.int ---
-	@(link_name="getcwd")	_unix_getcwd	:: proc(buf: cstring, len: c.size_t) -> cstring ---
-	@(link_name="chdir")	_unix_chdir	:: proc(path: cstring) -> c.int ---
-	@(link_name="rename")	_unix_rename	:: proc(old, new: cstring) -> c.int ---
-	@(link_name="unlink")	_unix_unlink	:: proc(path: cstring) -> c.int ---
-	@(link_name="rmdir")	_unix_rmdir	:: proc(path: cstring) -> c.int ---
-	@(link_name="mkdir")	_unix_mkdir	:: proc(path: cstring, mode: mode_t) -> c.int ---
+	@(link_name="open")           _unix_open           :: proc(path: cstring, flags: c.int, #c_vararg mode: ..u16) -> Handle ---
+	@(link_name="close")          _unix_close          :: proc(fd: Handle) -> c.int ---
+	@(link_name="read")           _unix_read           :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
+	@(link_name="pread")          _unix_pread          :: proc(fd: Handle, buf: rawptr, size: c.size_t, offset: i64) -> c.ssize_t ---
+	@(link_name="write")          _unix_write          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
+	@(link_name="pwrite")         _unix_pwrite         :: proc(fd: Handle, buf: rawptr, size: c.size_t, offset: i64) -> c.ssize_t ---
+	@(link_name="lseek")          _unix_seek           :: proc(fd: Handle, offset: off_t, whence: c.int) -> off_t ---
+	@(link_name="stat")           _unix_stat           :: proc(path: cstring, sb: ^OS_Stat) -> c.int ---
+	@(link_name="fstat")          _unix_fstat          :: proc(fd: Handle, sb: ^OS_Stat) -> c.int ---
+	@(link_name="lstat")          _unix_lstat          :: proc(path: cstring, sb: ^OS_Stat) -> c.int ---
+	@(link_name="readlink")       _unix_readlink       :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
+	@(link_name="access")         _unix_access         :: proc(path: cstring, mask: c.int) -> c.int ---
+	@(link_name="getcwd")         _unix_getcwd         :: proc(buf: cstring, len: c.size_t) -> cstring ---
+	@(link_name="chdir")          _unix_chdir          :: proc(path: cstring) -> c.int ---
+	@(link_name="rename")         _unix_rename         :: proc(old, new: cstring) -> c.int ---
+	@(link_name="unlink")         _unix_unlink         :: proc(path: cstring) -> c.int ---
+	@(link_name="rmdir")          _unix_rmdir          :: proc(path: cstring) -> c.int ---
+	@(link_name="mkdir")          _unix_mkdir          :: proc(path: cstring, mode: mode_t) -> c.int ---
+	@(link_name="fsync")          _unix_fsync          :: proc(fd: Handle) -> c.int ---
 
-	@(link_name="getpagesize") _unix_getpagesize :: proc() -> c.int ---
-	@(link_name="sysconf") _sysconf :: proc(name: c.int) -> c.long ---
-	@(link_name="fdopendir") _unix_fdopendir :: proc(fd: Handle) -> Dir ---
-	@(link_name="closedir")	_unix_closedir	:: proc(dirp: Dir) -> c.int ---
-	@(link_name="rewinddir") _unix_rewinddir :: proc(dirp: Dir) ---
-	@(link_name="readdir_r") _unix_readdir_r :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	@(link_name="getpagesize")    _unix_getpagesize    :: proc() -> c.int ---
+	@(link_name="sysconf")        _sysconf             :: proc(name: c.int) -> c.long ---
+	@(link_name="fdopendir")      _unix_fdopendir      :: proc(fd: Handle) -> Dir ---
+	@(link_name="closedir")       _unix_closedir       :: proc(dirp: Dir) -> c.int ---
+	@(link_name="rewinddir")      _unix_rewinddir      :: proc(dirp: Dir) ---
+	@(link_name="readdir_r")      _unix_readdir_r      :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
 
-	@(link_name="malloc")	_unix_malloc	:: proc(size: c.size_t) -> rawptr ---
-	@(link_name="calloc")	_unix_calloc	:: proc(num, size: c.size_t) -> rawptr ---
-	@(link_name="free")	_unix_free	:: proc(ptr: rawptr) ---
-	@(link_name="realloc")	_unix_realloc	:: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
+	@(link_name="malloc")         _unix_malloc         :: proc(size: c.size_t) -> rawptr ---
+	@(link_name="calloc")         _unix_calloc         :: proc(num, size: c.size_t) -> rawptr ---
+	@(link_name="free")           _unix_free           :: proc(ptr: rawptr) ---
+	@(link_name="realloc")        _unix_realloc        :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 
-	@(link_name="getenv")	_unix_getenv	:: proc(cstring) -> cstring ---
-	@(link_name="realpath")	_unix_realpath	:: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	@(link_name="getenv")         _unix_getenv         :: proc(cstring) -> cstring ---
+	@(link_name="realpath")       _unix_realpath       :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
-	@(link_name="exit")	_unix_exit	:: proc(status: c.int) -> ! ---
+	@(link_name="exit")           _unix_exit           :: proc(status: c.int) -> ! ---
 
-	@(link_name="dlopen")	_unix_dlopen	:: proc(filename: cstring, flags: c.int) -> rawptr ---
-	@(link_name="dlsym")	_unix_dlsym	:: proc(handle: rawptr, symbol: cstring) -> rawptr ---
-	@(link_name="dlclose")	_unix_dlclose	:: proc(handle: rawptr) -> c.int ---
-	@(link_name="dlerror")	_unix_dlerror	:: proc() -> cstring ---
+	@(link_name="dlopen")         _unix_dlopen         :: proc(filename: cstring, flags: c.int) -> rawptr ---
+	@(link_name="dlsym")          _unix_dlsym          :: proc(handle: rawptr, symbol: cstring) -> rawptr ---
+	@(link_name="dlclose")        _unix_dlclose        :: proc(handle: rawptr) -> c.int ---
+	@(link_name="dlerror")        _unix_dlerror        :: proc() -> cstring ---
 }
 
 MAXNAMLEN :: haiku.NAME_MAX
@@ -179,38 +180,50 @@ Dirent :: struct {
 
 Dir :: distinct rawptr // DIR*
 
+@(require_results)
 is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
-get_last_error :: proc "contextless" () -> int {
-	return int(__error()^)
+@(require_results, no_instrumentation)
+get_last_error :: proc "contextless" () -> Error {
+	return Platform_Error(__error()^)
 }
 
-fork :: proc() -> (Pid, Errno) {
+@(require_results)
+fork :: proc() -> (Pid, Error) {
 	pid := _unix_fork()
 	if pid == -1 {
-		return Pid(-1), Errno(get_last_error())
+		return Pid(-1), get_last_error()
 	}
-	return Pid(pid), ERROR_NONE
+	return Pid(pid), nil
 }
 
-open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
+@(require_results)
+open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	handle := _unix_open(cstr, c.int(flags), c.int(mode))
+	handle := _unix_open(cstr, c.int(flags), u16(mode))
 	if handle == -1 {
-		return INVALID_HANDLE, Errno(get_last_error())
+		return INVALID_HANDLE, get_last_error()
 	}
-	return handle, ERROR_NONE
+	return handle, nil
 }
 
-close :: proc(fd: Handle) -> Errno {
+close :: proc(fd: Handle) -> Error {
 	result := _unix_close(fd)
 	if result == -1 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
+}
+
+flush :: proc(fd: Handle) -> Error {
+	result := _unix_fsync(fd)
+	if result == -1 {
+		return get_last_error()
+	}
+	return nil
 }
 
 // In practice a read/write call would probably never read/write these big buffers all at once,
@@ -220,47 +233,88 @@ close :: proc(fd: Handle) -> Errno {
 @(private)
 MAX_RW :: 1 << 30
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	to_read    := min(c.size_t(len(data)), MAX_RW)
 	bytes_read := _unix_read(fd, &data[0], to_read)
 	if bytes_read == -1 {
-		return -1, Errno(get_last_error())
+		return -1, get_last_error()
 	}
-	return int(bytes_read), ERROR_NONE
+	return int(bytes_read), nil
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	if len(data) == 0 {
-		return 0, ERROR_NONE
+		return 0, nil
 	}
 
 	to_write      := min(c.size_t(len(data)), MAX_RW)
 	bytes_written := _unix_write(fd, &data[0], to_write)
 	if bytes_written == -1 {
-		return -1, Errno(get_last_error())
+		return -1, get_last_error()
 	}
-	return int(bytes_written), ERROR_NONE
+	return int(bytes_written), nil
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+	if len(data) == 0 {
+		return 0, nil
+	}
+
+	to_read := min(uint(len(data)), MAX_RW)
+
+	bytes_read := _unix_pread(fd, raw_data(data), to_read, offset)
+	if bytes_read < 0 {
+		return -1, get_last_error()
+	}
+	return bytes_read, nil
+}
+
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Error) {
+	if len(data) == 0 {
+		return 0, nil
+	}
+
+	to_write := min(uint(len(data)), MAX_RW)
+
+	bytes_written := _unix_pwrite(fd, raw_data(data), to_write, offset)
+	if bytes_written < 0 {
+		return -1, get_last_error()
+	}
+	return bytes_written, nil
+}
+
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+	switch whence {
+	case SEEK_SET, SEEK_CUR, SEEK_END:
+		break
+	case:
+		return 0, .Invalid_Whence
+	}
 	res := _unix_seek(fd, offset, c.int(whence))
 	if res == -1 {
-		return -1, Errno(get_last_error())
+		errno := get_last_error()
+		switch errno {
+		case .BAD_VALUE:
+			return 0, .Invalid_Offset
+		}
+		return 0, errno
 	}
-	return res, ERROR_NONE
+	return res, nil
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
+@(require_results)
+file_size :: proc(fd: Handle) -> (i64, Error) {
 	s, err := _fstat(fd)
-	if err != ERROR_NONE {
+	if err != nil {
 		return -1, err
 	}
-	return s.size, ERROR_NONE
+	return s.size, nil
 }
 
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
+@(require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for arg, i in runtime.args__ {
@@ -269,8 +323,8 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return res
 }
 
-@private
-_stat :: proc(path: string) -> (OS_Stat, Errno) {
+@(private, require_results)
+_stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
@@ -278,13 +332,13 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 	s: OS_Stat = ---
 	res := _unix_stat(cstr, &s)
 	if res == -1 {
-		return s, Errno(get_last_error())
+		return s, get_last_error()
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
-@private
-_lstat :: proc(path: string) -> (OS_Stat, Errno) {
+@(private, require_results)
+_lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
@@ -292,55 +346,54 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 	s: OS_Stat = ---
 	res := _unix_lstat(cstr, &s)
 	if res == -1 {
-		return s, Errno(get_last_error())
+		return s, get_last_error()
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
-@private
-_fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
+@(private, require_results)
+_fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	// deliberately uninitialized
 	s: OS_Stat = ---
 	res := _unix_fstat(fd, &s)
 	if res == -1 {
-		return s, Errno(get_last_error())
+		return s, get_last_error()
 	}
-	return s, ERROR_NONE
+	return s, nil
 }
 
-@private
-_fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
+@(private)
+_fdopendir :: proc(fd: Handle) -> (Dir, Error) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
-		return nil, Errno(get_last_error())
+		return nil, get_last_error()
 	}
-	return dirp, ERROR_NONE
+	return dirp, nil
 }
 
-@private
-_closedir :: proc(dirp: Dir) -> Errno {
+@(private)
+_closedir :: proc(dirp: Dir) -> Error {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
-		return Errno(get_last_error())
+		return get_last_error()
 	}
-	return ERROR_NONE
+	return nil
 }
 
-@private
+@(private)
 _rewinddir :: proc(dirp: Dir) {
 	_unix_rewinddir(dirp)
 }
 
-@private
-_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
+@(private, require_results)
+_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Error, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
 
 	if rc != 0 {
-		err = Errno(get_last_error())
+		err = get_last_error()
 		return
 	}
-	err = ERROR_NONE
 
 	if result == nil {
 		end_of_stream = true
@@ -350,8 +403,8 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 	return
 }
 
-@private
-_readlink :: proc(path: string) -> (string, Errno) {
+@(private, require_results)
+_readlink :: proc(path: string) -> (string, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
@@ -361,22 +414,24 @@ _readlink :: proc(path: string) -> (string, Errno) {
 		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
 		if rc == -1 {
 			delete(buf)
-			return "", Errno(get_last_error())
+			return "", get_last_error()
 		} else if rc == int(bufsz) {
 			bufsz += MAX_PATH
 			delete(buf)
 			buf = make([]byte, bufsz)
 		} else {
-			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE
+			return strings.string_from_ptr(&buf[0], rc), nil
 		}	
 	}
 }
 
-absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	return "", Errno(ENOSYS)
+@(require_results)
+absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
+	return "", Error(ENOSYS)
 }
 
-absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
+@(require_results)
+absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
 		rel = "."
@@ -387,26 +442,27 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", Errno(get_last_error())
+		return "", get_last_error()
 	}
 	defer _unix_free(path_ptr)
 
-	path_cstr := transmute(cstring)path_ptr
-	path = strings.clone( string(path_cstr) )
+	path_cstr := cstring(path_ptr)
+	path = strings.clone(string(path_cstr))
 
-	return path, ERROR_NONE
+	return path, nil
 }
 
-access :: proc(path: string, mask: int) -> (bool, Errno) {
+access :: proc(path: string, mask: int) -> (bool, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_access(cstr, c.int(mask))
 	if res == -1 {
-		return false, Errno(get_last_error())
+		return false, get_last_error()
 	}
-	return true, ERROR_NONE
+	return true, nil
 }
 
+@(require_results)
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
@@ -417,12 +473,13 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 	return strings.clone(string(cstr), allocator), true
 }
 
+@(require_results)
 get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
 
-@(private)
+@(private, require_results)
 _processor_core_count :: proc() -> int {
 	info: haiku.system_info
 	haiku.get_system_info(&info)

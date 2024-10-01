@@ -1,49 +1,9 @@
 // Tests "math.odin" in "core:math".
-// Must be run with `-collection:tests=` flag, e.g.
-// ./odin run tests/core/math/test_core_math.odin -collection:tests=./tests
 package test_core_math
 
-import "core:fmt"
 import "core:math"
+import "core:strconv"
 import "core:testing"
-import tc "tests:common"
-
-main :: proc() {
-	t := testing.T{}
-
-	test_classify_f16(&t)
-	test_classify_f32(&t)
-	test_classify_f64(&t)
-
-	test_trunc_f16(&t)
-	test_trunc_f32(&t)
-	test_trunc_f64(&t)
-
-	test_round_f16(&t)
-	test_round_f32(&t)
-	test_round_f64(&t)
-
-	test_nan(&t)
-	test_acos(&t)
-	test_acosh(&t)
-	test_asin(&t)
-	test_asinh(&t)
-	test_atan(&t)
-	test_atanh(&t)
-	test_atan2(&t)
-	test_cos(&t)
-	test_cosh(&t)
-	test_sin(&t)
-	test_sinh(&t)
-	test_sqrt(&t)
-	test_tan(&t)
-	test_tanh(&t)
-	test_large_cos(&t)
-	test_large_sin(&t)
-	test_large_tan(&t)
-
-	tc.report(&t)
-}
 
 @test
 test_classify_f16 :: proc(t: ^testing.T) {
@@ -68,7 +28,7 @@ test_classify_f16 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.classify_f16(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %v != %v", d.v, r, d.e)
 	}
 
 	/* Check all subnormals (exponent 0, 10-bit significand non-zero) */
@@ -76,7 +36,7 @@ test_classify_f16 :: proc(t: ^testing.T) {
 		v := transmute(f16)i
 		r = math.classify_f16(v)
 		e :: math.Float_Class.Subnormal
-		tc.expect(t, r == e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, v, r, e))
+		testing.expectf(t, r == e, "%h -> %v != %v", v, r, e)
 	}
 }
 
@@ -103,7 +63,7 @@ test_classify_f32 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.classify_f32(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %v != %v", d.v, r, d.e)
 	}
 }
 
@@ -130,7 +90,7 @@ test_classify_f64 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.classify_f64(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %v != %v", d.v, r, d.e)
 	}
 }
 
@@ -175,16 +135,16 @@ test_trunc_f16 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.trunc_f16(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %h != %h", d.v, r, d.e)
 	}
 
 	v = math.SNAN_F16
 	r = math.trunc_f16(v)
-	tc.expect(t, math.is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f16(r), "%f != NaN", v, r)
 
 	v = math.QNAN_F16
 	r = math.trunc_f16(v)
-	tc.expect(t, math.is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f16(r), "%f != NaN", v, r)
 }
 
 @test
@@ -237,16 +197,16 @@ test_trunc_f32 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.trunc_f32(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %h != %h", d.v, r, d.e)
 	}
 
 	v = math.SNAN_F32
 	r = math.trunc_f32(v)
-	tc.expect(t, math.is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f32(r), "%f -> %f != NaN", v, r)
 
 	v = math.QNAN_F32
 	r = math.trunc_f32(v)
-	tc.expect(t, math.is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f32(r), "%f -> %f != NaN", v, r)
 }
 
 @test
@@ -299,16 +259,16 @@ test_trunc_f64 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.trunc_f64(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %h != %h", d.v, r, d.e)
 	}
 
 	v = math.SNAN_F64
 	r = math.trunc_f64(v)
-	tc.expect(t, math.is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f64(r), "%f -> %f != NaN", v, r)
 
 	v = math.QNAN_F64
 	r = math.trunc_f64(v)
-	tc.expect(t, math.is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f64(r), "%f -> %f != NaN", v, r)
 }
 
 @test
@@ -352,16 +312,16 @@ test_round_f16 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.round_f16(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %h != %h", d.v, r, d.e)
 	}
 
 	v = math.SNAN_F16
 	r = math.round_f16(v)
-	tc.expect(t, math.is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f16(r), "%f -> %f != NaN", v, r)
 
 	v = math.QNAN_F16
 	r = math.round_f16(v)
-	tc.expect(t, math.is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f16(r), "%f -> %f != NaN", v, r)
 }
 
 @test
@@ -414,16 +374,16 @@ test_round_f32 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.round_f32(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %h != %h", i, d.v, r, d.e)
 	}
 
 	v = math.SNAN_F32
 	r = math.round_f32(v)
-	tc.expect(t, math.is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f32(r), "%f -> %f != NaN", v, r)
 
 	v = math.QNAN_F32
 	r = math.round_f32(v)
-	tc.expect(t, math.is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f32(r), "%f -> %f != NaN", v, r)
 }
 
 @test
@@ -476,16 +436,16 @@ test_round_f64 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = math.round_f64(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expectf(t, r == d.e, "%h -> %h != %h", d.v, r, d.e)
 	}
 
 	v = math.SNAN_F64
 	r = math.round_f64(v)
-	tc.expect(t, math.is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f64(r), "%f -> %f != NaN", v, r)
 
 	v = math.QNAN_F64
 	r = math.round_f64(v)
-	tc.expect(t, math.is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expectf(t, math.is_nan_f64(r), "%f -> %f != NaN", v, r)
 }
 
 
@@ -1033,17 +993,17 @@ tolerance :: proc(a, b, e: f64) -> bool {
 }
 close :: proc(t: ^testing.T, a, b: f64, loc := #caller_location) -> bool {
 	ok := tolerance(a, b, 1e-9)
-	// tc.expect(t, ok, fmt.tprintf("%.15g is not close to %.15g", a, b), loc)
+	testing.expectf(t, ok, "%.15g is not close to %.15g", a, b, loc=loc)
 	return ok
 }
 veryclose :: proc(t: ^testing.T, a, b: f64, loc := #caller_location) -> bool {
 	ok := tolerance(a, b, 4e-14)
-	// tc.expect(t, ok, fmt.tprintf("%.15g is not veryclose to %.15g", a, b), loc)
+	testing.expectf(t, ok, "%.15g is not veryclose to %.15g", a, b, loc=loc)
 	return ok
 }
 soclose :: proc(t: ^testing.T, a, b, e: f64, loc := #caller_location) -> bool {
 	ok := tolerance(a, b, e)
-	// tc.expect(t, ok, fmt.tprintf("%.15g is not soclose to %.15g", a, b), loc)
+	testing.expectf(t, ok, "%.15g is not soclose to %.15g", a, b, loc=loc)
 	return ok
 }
 alike :: proc(t: ^testing.T, a, b: f64, loc := #caller_location) -> bool {
@@ -1054,34 +1014,34 @@ alike :: proc(t: ^testing.T, a, b: f64, loc := #caller_location) -> bool {
 	case a == b:
 		ok = math.signbit(a) == math.signbit(b)
 	}
-	// tc.expect(t, ok, fmt.tprintf("%.15g is not alike to %.15g", a, b), loc)
+	testing.expectf(t, ok, "%.15g is not alike to %.15g", a, b, loc=loc)
 	return ok
 }
 
 @test
-test_nan :: proc(t: ^testing.T) {
+test_nan32 :: proc(t: ^testing.T) {
+	float32 := f32(NaN)
+	equal := float32 == float32
+	testing.expectf(t, !equal, "float32(NaN) is %.15g, expected NaN", float32)
+}
+
+@test
+test_nan64 :: proc(t: ^testing.T) {
 	float64 := NaN
-	if float64 == float64 {
-		tc.errorf(t, "NaN returns %.15g, expected NaN", float64)
-	}
-	float32 := f32(float64)
-	if float32 == float32 {
-		tc.errorf(t, "float32(NaN) is %.15g, expected NaN", float32)
-	}
+	equal := float64 == float64
+	testing.expectf(t, !equal, "NaN returns %.15g, expected NaN", float64)
 }
 
 @test
 test_acos :: proc(t: ^testing.T) {
 	for _, i in vf {
 		a := vf[i] / 10
-		if f := math.acos(a); !close(t, acos[i], f) {
-			tc.errorf(t, "math.acos(%.15g) = %.15g, want %.15g", a, f, acos[i])
-		}
+		f := math.acos(a)
+		testing.expectf(t, close(t, acos[i], f), "math.acos(%.15g) = %.15g, want %.15g", a, f, acos[i])
 	}
 	for _, i in vfacos_sc {
-		if f := math.acos(vfacos_sc[i]); !alike(t, acos_sc[i], f) {
-			tc.errorf(t, "math.acos(%.15g) = %.15g, want %.15g", vfacos_sc[i], f, acos_sc[i])
-		}
+		f := math.acos(vfacos_sc[i])
+		testing.expectf(t, alike(t, acos_sc[i], f), "math.acos(%.15g) = %.15g, want %.15g", vfacos_sc[i], f, acos_sc[i])
 	}
 }
 
@@ -1089,14 +1049,12 @@ test_acos :: proc(t: ^testing.T) {
 test_acosh :: proc(t: ^testing.T) {
 	for _, i in vf {
 		a := 1 + abs(vf[i])
-		if f := math.acosh(a); !veryclose(t, acosh[i], f) {
-			tc.errorf(t, "math.acosh(%.15g) = %.15g, want %.15g", a, f, acosh[i])
-		}
+		f := math.acosh(a)
+		testing.expectf(t, veryclose(t, acosh[i], f), "math.acosh(%.15g) = %.15g, want %.15g", a, f, acosh[i])
 	}
 	for _, i in vfacosh_sc {
-		if f := math.acosh(vfacosh_sc[i]); !alike(t, acosh_sc[i], f) {
-			tc.errorf(t, "math.acosh(%.15g) = %.15g, want %.15g", vfacosh_sc[i], f, acosh_sc[i])
-		}
+		f := math.acosh(vfacosh_sc[i])
+		testing.expectf(t, alike(t, acosh_sc[i], f), "math.acosh(%.15g) = %.15g, want %.15g", vfacosh_sc[i], f, acosh_sc[i])
 	}
 }
 
@@ -1104,42 +1062,36 @@ test_acosh :: proc(t: ^testing.T) {
 test_asin :: proc(t: ^testing.T) {
 	for _, i in vf {
 		a := vf[i] / 10
-		if f := math.asin(a); !veryclose(t, asin[i], f) {
-			tc.errorf(t, "math.asin(%.15g) = %.15g, want %.15g", a, f, asin[i])
-		}
+		f := math.asin(a)
+		testing.expectf(t, veryclose(t, asin[i], f), "math.asin(%.15g) = %.15g, want %.15g", a, f, asin[i])
 	}
 	for _, i in vfasin_sc {
-		if f := math.asin(vfasin_sc[i]); !alike(t, asin_sc[i], f) {
-			tc.errorf(t, "math.asin(%.15g) = %.15g, want %.15g", vfasin_sc[i], f, asin_sc[i])
-		}
+		f := math.asin(vfasin_sc[i])
+		testing.expectf(t, alike(t, asin_sc[i], f), "math.asin(%.15g) = %.15g, want %.15g", vfasin_sc[i], f, asin_sc[i])
 	}
 }
 
 @test
 test_asinh :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.asinh(vf[i]); !veryclose(t, asinh[i], f) {
-			tc.errorf(t, "math.asinh(%.15g) = %.15g, want %.15g", vf[i], f, asinh[i])
-		}
+		f := math.asinh(vf[i])
+		testing.expectf(t, veryclose(t, asinh[i], f), "math.asinh(%.15g) = %.15g, want %.15g", vf[i], f, asinh[i])
 	}
 	for _, i in vfasinh_sc {
-		if f := math.asinh(vfasinh_sc[i]); !alike(t, asinh_sc[i], f) {
-			tc.errorf(t, "math.asinh(%.15g) = %.15g, want %.15g", vfasinh_sc[i], f, asinh_sc[i])
-		}
+		f := math.asinh(vfasinh_sc[i])
+		testing.expectf(t, alike(t, asinh_sc[i], f), "math.asinh(%.15g) = %.15g, want %.15g", vfasinh_sc[i], f, asinh_sc[i])
 	}
 }
 
 @test
 test_atan :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.atan(vf[i]); !veryclose(t, atan[i], f) {
-			tc.errorf(t, "math.atan(%.15g) = %.15g, want %.15g", vf[i], f, atan[i])
-		}
+		f := math.atan(vf[i])
+		testing.expectf(t, veryclose(t, atan[i], f), "math.atan(%.15g) = %.15g, want %.15g", vf[i], f, atan[i])
 	}
 	for _, i in vfatan_sc {
-		if f := math.atan(vfatan_sc[i]); !alike(t, atan_sc[i], f) {
-			tc.errorf(t, "math.atan(%.15g) = %.15g, want %.15g", vfatan_sc[i], f, atan_sc[i])
-		}
+		f := math.atan(vfatan_sc[i])
+		testing.expectf(t, alike(t, atan_sc[i], f), "math.atan(%.15g) = %.15g, want %.15g", vfatan_sc[i], f, atan_sc[i])
 	}
 }
 
@@ -1147,84 +1099,72 @@ test_atan :: proc(t: ^testing.T) {
 test_atanh :: proc(t: ^testing.T) {
 	for _, i in vf {
 		a := vf[i] / 10
-		if f := math.atanh(a); !veryclose(t, atanh[i], f) {
-			tc.errorf(t, "math.atanh(%.15g) = %.15g, want %.15g", a, f, atanh[i])
-		}
+		f := math.atanh(a)
+		testing.expectf(t, veryclose(t, atanh[i], f), "math.atanh(%.15g) = %.15g, want %.15g", a, f, atanh[i])
 	}
 	for _, i in vfatanh_sc {
-		if f := math.atanh(vfatanh_sc[i]); !alike(t, atanh_sc[i], f) {
-			tc.errorf(t, "math.atanh(%.15g) = %.15g, want %.15g", vfatanh_sc[i], f, atanh_sc[i])
-		}
+		f := math.atanh(vfatanh_sc[i])
+		testing.expectf(t, alike(t, atanh_sc[i], f), "math.atanh(%.15g) = %.15g, want %.15g", vfatanh_sc[i], f, atanh_sc[i])
 	}
 }
 
 @test
 test_atan2 :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.atan2(10, vf[i]); !veryclose(t, atan2[i], f) {
-			tc.errorf(t, "math.atan2(10, %.15g) = %.15g, want %.15g", vf[i], f, atan2[i])
-		}
+		f := math.atan2(10, vf[i])
+		testing.expectf(t, veryclose(t, atan2[i], f), "math.atan2(10, %.15g) = %.15g, want %.15g", vf[i], f, atan2[i])
 	}
 	for _, i in vfatan2_sc {
-		if f := math.atan2(vfatan2_sc[i][0], vfatan2_sc[i][1]); !alike(t, atan2_sc[i], f) {
-			tc.errorf(t, "math.atan2(%.15g, %.15g) = %.15g, want %.15g", vfatan2_sc[i][0], vfatan2_sc[i][1], f, atan2_sc[i])
-		}
+		f := math.atan2(vfatan2_sc[i][0], vfatan2_sc[i][1])
+		testing.expectf(t, alike(t, atan2_sc[i], f), "math.atan2(%.15g, %.15g) = %.15g, want %.15g", vfatan2_sc[i][0], vfatan2_sc[i][1], f, atan2_sc[i])
 	}
 }
 
 @test
 test_cos :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.cos(vf[i]); !veryclose(t, cos[i], f) {
-			tc.errorf(t, "math.cos(%.15g) = %.15g, want %.15g", vf[i], f, cos[i])
-		}
+		f := math.cos(vf[i])
+		testing.expectf(t, veryclose(t, cos[i], f), "math.cos(%.15g) = %.15g, want %.15g", vf[i], f, cos[i])
 	}
 	for _, i in vfcos_sc {
-		if f := math.cos(vfcos_sc[i]); !alike(t, cos_sc[i], f) {
-			tc.errorf(t, "math.cos(%.15g) = %.15g, want %.15g", vfcos_sc[i], f, cos_sc[i])
-		}
+		f := math.cos(vfcos_sc[i])
+		testing.expectf(t, alike(t, cos_sc[i], f), "math.cos(%.15g) = %.15g, want %.15g", vfcos_sc[i], f, cos_sc[i])
 	}
 }
 
 @test
 test_cosh :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.cosh(vf[i]); !close(t, cosh[i], f) {
-			tc.errorf(t, "math.cosh(%.15g) = %.15g, want %.15g", vf[i], f, cosh[i])
-		}
+		f := math.cosh(vf[i])
+		testing.expectf(t, close(t, cosh[i], f), "math.cosh(%.15g) = %.15g, want %.15g", vf[i], f, cosh[i])
 	}
 	for _, i in vfcosh_sc {
-		if f := math.cosh(vfcosh_sc[i]); !alike(t, cosh_sc[i], f) {
-			tc.errorf(t, "math.cosh(%.15g) = %.15g, want %.15g", vfcosh_sc[i], f, cosh_sc[i])
-		}
+		f := math.cosh(vfcosh_sc[i])
+		testing.expectf(t, alike(t, cosh_sc[i], f), "math.cosh(%.15g) = %.15g, want %.15g", vfcosh_sc[i], f, cosh_sc[i])
 	}
 }
 
 @test
 test_sin :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.sin(vf[i]); !veryclose(t, sin[i], f) {
-			tc.errorf(t, "math.sin(%.15g) = %.15g, want %.15g", vf[i], f, sin[i])
-		}
+		f := math.sin(vf[i])
+		testing.expectf(t, veryclose(t, sin[i], f), "math.sin(%.15g) = %.15g, want %.15g", vf[i], f, sin[i])
 	}
 	for _, i in vfsin_sc {
-		if f := math.sin(vfsin_sc[i]); !alike(t, sin_sc[i], f) {
-			tc.errorf(t, "math.sin(%.15g) = %.15g, want %.15g", vfsin_sc[i], f, sin_sc[i])
-		}
+		f := math.sin(vfsin_sc[i])
+		testing.expectf(t, alike(t, sin_sc[i], f), "math.sin(%.15g) = %.15g, want %.15g", vfsin_sc[i], f, sin_sc[i])
 	}
 }
 
 @test
 test_sinh :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.sinh(vf[i]); !close(t, sinh[i], f) {
-			tc.errorf(t, "math.sinh(%.15g) = %.15g, want %.15g", vf[i], f, sinh[i])
-		}
+		f := math.sinh(vf[i])
+		testing.expectf(t, close(t, sinh[i], f), "math.sinh(%.15g) = %.15g, want %.15g", vf[i], f, sinh[i])
 	}
 	for _, i in vfsinh_sc {
-		if f := math.sinh(vfsinh_sc[i]); !alike(t, sinh_sc[i], f) {
-			tc.errorf(t, "math.sinh(%.15g) = %.15g, want %.15g", vfsinh_sc[i], f, sinh_sc[i])
-		}
+		f := math.sinh(vfsinh_sc[i])
+		testing.expectf(t, alike(t, sinh_sc[i], f), "math.sinh(%.15g) = %.15g, want %.15g", vfsinh_sc[i], f, sinh_sc[i])
 	}
 }
 
@@ -1232,38 +1172,33 @@ test_sinh :: proc(t: ^testing.T) {
 test_sqrt :: proc(t: ^testing.T) {
 	for _, i in vf {
 		a := abs(vf[i])
-		if f := math.sqrt(a); !veryclose(t, sqrt[i], f) {
-			tc.errorf(t, "math.sqrt(%.15g) = %.15g, want %.15g", a, f, sqrt[i])
-		}
+		f := math.sqrt(a)
+		testing.expectf(t, veryclose(t, sqrt[i], f), "math.sqrt(%.15g) = %.15g, want %.15g", a, f, sqrt[i])
 	}
 }
 
 @test
 test_tan :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.tan(vf[i]); !veryclose(t, tan[i], f) {
-			tc.errorf(t, "math.tan(%.15g) = %.15g, want %.15g", vf[i], f, tan[i])
-		}
+		f := math.tan(vf[i])
+		testing.expectf(t, veryclose(t, tan[i], f), "math.tan(%.15g) = %.15g, want %.15g", vf[i], f, tan[i])
 	}
 	// same special cases as Sin
 	for _, i in vfsin_sc {
-		if f := math.tan(vfsin_sc[i]); !alike(t, sin_sc[i], f) {
-			tc.errorf(t, "math.tan(%.15g) = %.15g, want %.15g", vfsin_sc[i], f, sin_sc[i])
-		}
+		f := math.tan(vfsin_sc[i])
+		testing.expectf(t, alike(t, sin_sc[i], f), "math.tan(%.15g) = %.15g, want %.15g", vfsin_sc[i], f, sin_sc[i])
 	}
 }
 
 @test
 test_tanh :: proc(t: ^testing.T) {
 	for _, i in vf {
-		if f := math.tanh(vf[i]); !veryclose(t, tanh[i], f) {
-			tc.errorf(t, "math.tanh(%.15g) = %.15g, want %.15g", vf[i], f, tanh[i])
-		}
+		f := math.tanh(vf[i])
+		testing.expectf(t, veryclose(t, tanh[i], f), "math.tanh(%.15g) = %.15g, want %.15g", vf[i], f, tanh[i])
 	}
 	for _, i in vftanh_sc {
-		if f := math.tanh(vftanh_sc[i]); !alike(t, tanh_sc[i], f) {
-			tc.errorf(t, "math.tanh(%.15g) = %.15g, want %.15g", vftanh_sc[i], f, tanh_sc[i])
-		}
+		f := math.tanh(vftanh_sc[i])
+		testing.expectf(t, alike(t, tanh_sc[i], f), "math.tanh(%.15g) = %.15g, want %.15g", vftanh_sc[i], f, tanh_sc[i])
 	}
 }
 
@@ -1273,9 +1208,7 @@ test_large_cos :: proc(t: ^testing.T) {
 	for _, i in vf {
 		f1 := cosLarge[i]
 		f2 := math.cos(vf[i] + large)
-		if !close(t, f1, f2) {
-			tc.errorf(t, "math.cos(%.15g) = %.15g, want %.15g", vf[i]+large, f2, f1)
-		}
+		testing.expectf(t, close(t, f1, f2), "math.cos(%.15g) = %.15g, want %.15g", vf[i]+large, f2, f1)
 	}
 }
 
@@ -1285,9 +1218,7 @@ test_large_sin :: proc(t: ^testing.T) {
 	for _, i in vf {
 		f1 := sinLarge[i]
 		f2 := math.sin(vf[i] + large)
-		if !close(t, f1, f2) {
-			tc.errorf(t, "math.sin(%.15g) = %.15g, want %.15g", vf[i]+large, f2, f1)
-		}
+		testing.expectf(t, close(t, f1, f2), "math.sin(%.15g) = %.15g, want %.15g", vf[i]+large, f2, f1)
 	}
 }
 
@@ -1297,8 +1228,39 @@ test_large_tan :: proc(t: ^testing.T) {
 	for _, i in vf {
 		f1 := tanLarge[i]
 		f2 := math.tan(vf[i] + large)
-		if !close(t, f1, f2) {
-			tc.errorf(t, "math.tan(%.15g) = %.15g, want %.15g", vf[i]+large, f2, f1)
+		testing.expectf(t, close(t, f1, f2), "math.tan(%.15g) = %.15g, want %.15g", vf[i]+large, f2, f1)
+	}
+}
+
+@test
+test_count_digits :: proc(t: ^testing.T) {
+	_run_test :: proc(t: ^testing.T, $base: int) {
+		buf: [64]u8
+		for n in 0..<i64(base*base*base) {
+			count := math.count_digits_of_base(n, base)
+			str := strconv.append_int(buf[:], n, base)
+			if !testing.expectf(t,
+				len(str) == count,
+				"decimal %i in base-%i digit count is %i, does not match length %i of %q",
+				n, base, count, len(str), str) {
+				break
+			}
 		}
 	}
+
+	_run_test(t, 2)
+	_run_test(t, 3)
+	_run_test(t, 4)
+	_run_test(t, 5)
+	_run_test(t, 6)
+	_run_test(t, 7)
+	_run_test(t, 8)
+	_run_test(t, 9)
+	_run_test(t, 10)
+	_run_test(t, 11)
+	_run_test(t, 12)
+	_run_test(t, 13)
+	_run_test(t, 14)
+	_run_test(t, 15)
+	_run_test(t, 16)
 }

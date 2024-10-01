@@ -1,9 +1,14 @@
-//+build linux, darwin, freebsd, openbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd, haiku
 package unix
 
 foreign import "system:pthread"
 
 import "core:c"
+
+timespec :: struct {
+	tv_sec:  i64,
+	tv_nsec: i64,
+}
 
 //
 // On success, these functions return 0.
@@ -21,6 +26,8 @@ foreign pthread {
 	pthread_self :: proc() -> pthread_t ---
 
 	pthread_equal :: proc(a, b: pthread_t) -> b32 ---
+
+	pthread_detach :: proc(t: pthread_t) -> c.int ---
 
 	sched_get_priority_min :: proc(policy: c.int) -> c.int ---
 	sched_get_priority_max :: proc(policy: c.int) -> c.int ---
@@ -116,4 +123,5 @@ foreign pthread {
 	pthread_mutexattr_setpshared :: proc(attrs: ^pthread_mutexattr_t, value: c.int) -> c.int ---
 	pthread_mutexattr_getpshared :: proc(attrs: ^pthread_mutexattr_t, result: ^c.int) -> c.int ---
 
+	pthread_testcancel :: proc () ---
 }

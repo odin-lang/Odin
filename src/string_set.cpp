@@ -208,7 +208,9 @@ gb_internal void string_set__erase(StringSet *s, MapFindResult fr) {
 	}
 	auto *entry = &s->entries[fr.entry_index];
 	*entry = s->entries[s->entries.count-1];
-	StringHashKey key = {entry->hash, entry->value};
+	StringHashKey key;
+	key.hash = entry->hash;
+	key.string = entry->value;
 	last = string_set__find(s, key);
 	if (last.entry_prev != MAP_SENTINEL) {
 		s->entries[last.entry_prev].next = fr.entry_index;

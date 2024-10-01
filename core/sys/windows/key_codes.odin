@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 // https://docs.microsoft.com/en-us/windows/win32/inputdev/about-keyboard-input

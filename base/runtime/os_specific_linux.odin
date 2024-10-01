@@ -1,4 +1,4 @@
-//+private
+#+private
 package runtime
 
 import "base:intrinsics"
@@ -12,6 +12,8 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 		SYS_write :: uintptr(4)
 	} else when ODIN_ARCH == .arm32 {
 		SYS_write :: uintptr(4)
+	} else when ODIN_ARCH == .riscv64 {
+		SYS_write :: uintptr(64)
 	}
 
 	stderr :: 2

@@ -1,5 +1,5 @@
-//+private
-//+build windows
+#+private
+#+build windows
 package sync
 
 import "core:time"

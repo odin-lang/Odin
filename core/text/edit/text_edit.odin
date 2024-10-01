@@ -1,10 +1,9 @@
-package text_edit
-
 /*
-	Based off the articles by rxi:
-		* https://rxi.github.io/textbox_behaviour.html
-		* https://rxi.github.io/a_simple_undo_system.html
+Based off the articles by rxi:
+- [[ https://rxi.github.io/textbox_behaviour.html ]]
+- [[ https://rxi.github.io/a_simple_undo_system.html ]]
 */
+package text_edit
 
 import "base:runtime"
 import "core:time"
@@ -137,7 +136,7 @@ clear_all :: proc(s: ^State) -> (cleared: bool) {
 
 // push current text state to the wanted undo|redo stack
 undo_state_push :: proc(s: ^State, undo: ^[dynamic]^Undo_State) -> mem.Allocator_Error {
-	if s.builder != nil {
+	if s.builder == nil {
 		return nil
 	}
 	text := string(s.builder.buf[:])
@@ -183,16 +182,17 @@ undo_check :: proc(s: ^State) {
 }
 
 // insert text into the edit state - deletes the current selection
-input_text :: proc(s: ^State, text: string) {
+input_text :: proc(s: ^State, text: string) -> int {
 	if len(text) == 0 {
-		return
+		return 0
 	}
 	if has_selection(s) {
 		selection_delete(s)
 	}
-	insert(s, s.selection[0], text)
-	offset := s.selection[0] + len(text)
+	n := insert(s, s.selection[0], text)
+	offset := s.selection[0] + n
 	s.selection = {offset, offset}
+	return n
 }
 
 // insert slice of runes into the edit state - deletes the current selection
@@ -206,8 +206,11 @@ input_runes :: proc(s: ^State, text: []rune) {
 	offset := s.selection[0]
 	for r in text {
 		b, w := utf8.encode_rune(r)
-		insert(s, offset, string(b[:w]))
-		offset += w
+		n := insert(s, offset, string(b[:w]))
+		offset += n
+		if n != w {
+			break
+		}
 	}
 	s.selection = {offset, offset}
 }
@@ -219,17 +222,29 @@ input_rune :: proc(s: ^State, r: rune) {
 	}
 	offset := s.selection[0]
 	b, w := utf8.encode_rune(r)
-	insert(s, offset, string(b[:w]))
-	offset += w
+	n := insert(s, offset, string(b[:w]))
+	offset += n
 	s.selection = {offset, offset}
 }
 
 // insert a single rune into the edit state - deletes the current selection
-insert :: proc(s: ^State, at: int, text: string) {
+insert :: proc(s: ^State, at: int, text: string) -> int {
 	undo_check(s)
 	if s.builder != nil {
-		inject_at(&s.builder.buf, at, text)
+		if ok, _ := inject_at(&s.builder.buf, at, text); !ok {
+			n := cap(s.builder.buf) - len(s.builder.buf)
+			assert(n < len(text))
+			for is_continuation_byte(text[n]) {
+				n -= 1
+			}
+			if ok2, _ := inject_at(&s.builder.buf, at, text[:n]); !ok2 {
+				n = 0
+			}
+			return n
+		}
+		return len(text)
 	}
+	return 0
 }
 
 // remove the wanted range withing, usually the selection within byte indices
@@ -263,11 +278,12 @@ selection_delete :: proc(s: ^State) {
 	s.selection = {lo, lo}
 }
 
+is_continuation_byte :: proc(b: byte) -> bool {
+	return b >= 0x80 && b < 0xc0
+}
+
 // translates the caret position 
 translate_position :: proc(s: ^State, t: Translation) -> int {
-	is_continuation_byte :: proc(b: byte) -> bool {
-		return b >= 0x80 && b < 0xc0
-	}
 	is_space :: proc(b: byte) -> bool {
 		return b == ' ' || b == '\t' || b == '\n'
 	}

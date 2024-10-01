@@ -7,11 +7,11 @@ Parses a boolean value from the input string
 
 **Inputs**  
 - s: The input string  
-  - true: "1", "t", "T", "true", "TRUE", "True"
-  - false: "0", "f", "F", "false", "FALSE", "False"
+	- true: "1", "t", "T", "true", "TRUE", "True"
+	- false: "0", "f", "F", "false", "FALSE", "False"
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
-**Returns**  
+**Returns**
 - result: The parsed boolean value (default: false)
 - ok: A boolean indicating whether the parsing was successful
 */
@@ -29,7 +29,7 @@ parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool)
 /*
 Finds the integer value of the given rune
 
-**Inputs**  
+**Inputs**
 - r: The input rune to find the integer value of
 
 **Returns**   The integer value of the given rune
@@ -47,7 +47,7 @@ _digit_value :: proc(r: rune) -> int {
 /*
 Parses an integer value from the input string in the given base, without a prefix
 
-**Inputs**  
+**Inputs**
 - str: The input string to parse the integer value from
 - base: The base of the integer value to be parsed (must be between 1 and 16)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
@@ -65,7 +65,7 @@ Output:
 
 	-1234 false
 
-**Returns**  
+**Returns**
 - value: Parses an integer value from a string, in the given base, without a prefix.
 - ok: ok=false if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
@@ -117,12 +117,12 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 /*
 Parses an integer value from the input string in base 10, unless there's a prefix
 
-**Inputs**  
+**Inputs**
 - str: The input string to parse the integer value from
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
-	
+
 	import "core:fmt"
 	import "core:strconv"
 	parse_i64_maybe_prefixed_example :: proc() {
@@ -132,13 +132,13 @@ Example:
 		n, ok = strconv.parse_i64_maybe_prefixed("0xeeee")
 		fmt.println(n,ok)
 	}
-	
+
 Output:
 
 	1234 true
 	61166 true
 
-**Returns**  
+**Returns**
 - value: The parsed integer value
 - ok: ok=false if a valid integer could not be found, or if the input string contained more than just the number.
 */
@@ -200,14 +200,14 @@ parse_i64 :: proc{parse_i64_maybe_prefixed, parse_i64_of_base}
 /*
 Parses an unsigned 64-bit integer value from the input string without a prefix, using the specified base
 
-**Inputs**  
+**Inputs**
 - str: The input string to parse
 - base: The base of the number system to use for parsing
-  - Must be between 1 and 16 (inclusive)
+	- Must be between 1 and 16 (inclusive)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
-	
+
 	import "core:fmt"
 	import "core:strconv"
 	parse_u64_of_base_example :: proc() {
@@ -217,13 +217,13 @@ Example:
 		n, ok = strconv.parse_u64_of_base("5678eee",16)
 		fmt.println(n,ok)
 	}
-	
+
 Output:
 
 	1234 false
 	90672878 true
 
-**Returns**  
+**Returns**
 - value: The parsed uint64 value
 - ok: A boolean indicating whether the parsing was successful
 */
@@ -261,15 +261,15 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 /*
 Parses an unsigned 64-bit integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**  
+**Inputs**
 - str: The input string to parse
 - base: The base of the number system to use for parsing (default: 0)
-  - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
-  - If base is not 0, it will be used for parsing regardless of any prefix in the input string
+	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
+	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
-	
+
 	import "core:fmt"
 	import "core:strconv"
 	parse_u64_maybe_prefixed_example :: proc() {
@@ -279,13 +279,13 @@ Example:
 		n, ok = strconv.parse_u64_maybe_prefixed("0xee")
 		fmt.println(n,ok)
 	}
-	
+
 Output:
 
 	1234 true
 	238 true
 
-**Returns**  
+**Returns**
 - value: The parsed uint64 value
 - ok: ok=false if a valid integer could not be found, if the value was negative, or if the input string contained more than just the number.
 */
@@ -336,14 +336,14 @@ parse_u64 :: proc{parse_u64_maybe_prefixed, parse_u64_of_base}
 /*
 Parses a signed integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**  
+**Inputs**
 - s: The input string to parse
 - base: The base of the number system to use for parsing (default: 0)
-  - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
-  - If base is not 0, it will be used for parsing regardless of any prefix in the input string
+	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
+	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
 
 Example:
-	
+
 	import "core:fmt"
 	import "core:strconv"
 	parse_int_example :: proc() {
@@ -356,14 +356,14 @@ Example:
 		n, ok = strconv.parse_int("0xffff") // with prefix and inferred base
 		fmt.println(n,ok)
 	}
-	
+
 Output:
 
 	1234 true
 	65535 true
 	65535 true
 
-**Returns**  
+**Returns**
 - value: The parsed int value
 - ok: `false` if no appropriate value could be found, or if the input string contained more than just the number.
 */
@@ -379,11 +379,11 @@ parse_int :: proc(s: string, base := 0, n: ^int = nil) -> (value: int, ok: bool)
 /*
 Parses an unsigned integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**  
+**Inputs**
 - s: The input string to parse
 - base: The base of the number system to use for parsing (default: 0, inferred)
-  - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
-  - If base is not 0, it will be used for parsing regardless of any prefix in the input string
+	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
+	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
 
 Example:
 	
@@ -727,10 +727,10 @@ Example:
 	import "core:strconv"
 	parse_f32_example :: proc() {
 		n, ok := strconv.parse_f32("1234eee")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 
 		n, ok = strconv.parse_f32("5678e2")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 	}
 	
 Output:
@@ -760,10 +760,10 @@ Example:
 	import "core:strconv"
 	parse_f64_example :: proc() {
 		n, ok := strconv.parse_f64("1234eee")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 
 		n, ok = strconv.parse_f64("5678e2")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 	}
 	
 Output:
@@ -796,10 +796,10 @@ Example:
 	import "core:strconv"
 	parse_f32_prefix_example :: proc() {
 		n, _, ok := strconv.parse_f32_prefix("1234eee")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 
 		n, _, ok = strconv.parse_f32_prefix("5678e2")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 	}
 	
 Output:
@@ -831,21 +831,25 @@ Example:
 	import "core:strconv"
 	parse_f64_prefix_example :: proc() {
 		n, _, ok := strconv.parse_f64_prefix("12.34eee")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
 
 		n, _, ok = strconv.parse_f64_prefix("12.34e2")
-		fmt.println(n, ok)
+		fmt.printfln("%.3f %v", n, ok)
+
+		n, _, ok = strconv.parse_f64_prefix("13.37 hellope")
+		fmt.printfln("%.3f %v", n, ok)
 	}
 
 Output:
 
 	0.000 false
 	1234.000 true
+	13.370 true
 
 **Returns**  
 - value: The parsed 64-bit floating point number.
 - nr: The length of the parsed substring.
-- ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
+- ok: `false` if a base 10 float could not be found
 */
 parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	common_prefix_len_ignore_case :: proc "contextless" (s, prefix: string) -> int {
@@ -878,13 +882,16 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 				s = s[1:]
 				fallthrough
 			case 'i', 'I':
-				n = common_prefix_len_ignore_case(s, "infinity")
-				if 3 < n && n < 8 { // "inf" or "infinity"
-					n = 3
-				}
-				if n == 3 || n == 8 {
+				m := common_prefix_len_ignore_case(s, "infinity")
+				if 3 <= m && m < 9 { // "inf" to "infinity"
 					f = 0h7ff00000_00000000 if sign == 1 else 0hfff00000_00000000
-					n = nsign + 3
+					if m == 8 {
+						// We only count the entire prefix if it is precisely "infinity".
+						n = nsign + m
+					} else {
+						// The string was either only "inf" or incomplete.
+						n = nsign + 3
+					}
 					ok = true
 					return
 				}
@@ -925,6 +932,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		nd := 0
 		nd_mant := 0
 		decimal_point := 0
+		trailing_zeroes_nd := -1
 		loop: for ; i < len(s); i += 1 {
 			switch c := s[i]; true {
 			case c == '_':
@@ -940,9 +948,16 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 
 			case '0' <= c && c <= '9':
 				saw_digits = true
-				if c == '0' && nd == 0 {
-					decimal_point -= 1
-					continue loop
+				if c == '0' {
+					if nd == 0 {
+						decimal_point -= 1
+						continue loop
+					}
+					if trailing_zeroes_nd == -1 {
+						trailing_zeroes_nd = nd
+					}
+				} else {
+					trailing_zeroes_nd = -1
 				}
 				nd += 1
 				if nd_mant < MAX_MANT_DIGITS {
@@ -973,6 +988,14 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		}
 		if !saw_dot {
 			decimal_point = nd
+		}
+		if trailing_zeroes_nd > 0 {
+			trailing_zeroes_nd = nd_mant - trailing_zeroes_nd
+		}
+		for /**/; trailing_zeroes_nd > 0; trailing_zeroes_nd -= 1 {
+			mantissa /= base
+			nd_mant -= 1
+			nd -= 1
 		}
 		if base == 16 {
 			decimal_point *= 4
@@ -1088,7 +1111,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	}
 
 	trunc_block: if !trunc {
-		@static pow10 := [?]f64{
+		@(static, rodata) pow10 := [?]f64{
 			1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,  1e8,  1e9,
 			1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 			1e20, 1e21, 1e22,
@@ -1123,6 +1146,275 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	value = transmute(f64)b
 	ok = !overflow
 	return
+}
+/*
+Parses a 128-bit complex number from a string
+
+**Inputs**  
+- str: The input string containing a 128-bit complex number.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_complex128_example :: proc() {
+		n: int
+		c, ok := strconv.parse_complex128("3+1i", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+
+		c, ok = strconv.parse_complex128("5+7i hellope", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+	}
+	
+Output:
+
+	3+1i 4 true
+	5+7i 4 false
+	
+**Returns**  
+- value: The parsed 128-bit complex number.
+- ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
+*/
+parse_complex128 :: proc(str: string, n: ^int = nil) -> (value: complex128, ok: bool) {
+	real_value, imag_value: f64
+	nr_r, nr_i: int
+
+	real_value, nr_r, _ = parse_f64_prefix(str)
+	imag_value, nr_i, _ = parse_f64_prefix(str[nr_r:])
+
+	i_parsed := len(str) >= nr_r + nr_i + 1 && str[nr_r + nr_i] == 'i'
+	if !i_parsed {
+		// No `i` means we refuse to treat the second float we parsed as an
+		// imaginary value.
+		imag_value = 0
+		nr_i = 0
+	}
+
+	ok = i_parsed && len(str) == nr_r + nr_i + 1
+
+	if n != nil {
+		n^ = nr_r + nr_i + (1 if i_parsed else 0)
+	}
+
+	value = complex(real_value, imag_value)
+	return 
+}
+/*
+Parses a 64-bit complex number from a string
+
+**Inputs**  
+- str: The input string containing a 64-bit complex number.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_complex64_example :: proc() {
+		n: int
+		c, ok := strconv.parse_complex64("3+1i", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+
+		c, ok = strconv.parse_complex64("5+7i hellope", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+	}
+	
+Output:
+
+	3+1i 4 true
+	5+7i 4 false
+	
+**Returns**  
+- value: The parsed 64-bit complex number.
+- ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
+*/
+parse_complex64 :: proc(str: string, n: ^int = nil) -> (value: complex64, ok: bool) {
+	v: complex128 = ---
+	v, ok = parse_complex128(str, n)
+	return cast(complex64)v, ok
+}
+/*
+Parses a 32-bit complex number from a string
+
+**Inputs**  
+- str: The input string containing a 32-bit complex number.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_complex32_example :: proc() {
+		n: int
+		c, ok := strconv.parse_complex32("3+1i", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+
+		c, ok = strconv.parse_complex32("5+7i hellope", &n)
+		fmt.printfln("%v %i %t", c, n, ok)
+	}
+	
+Output:
+
+	3+1i 4 true
+	5+7i 4 false
+	
+**Returns**  
+- value: The parsed 32-bit complex number.
+- ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
+*/
+parse_complex32 :: proc(str: string, n: ^int = nil) -> (value: complex32, ok: bool) {
+	v: complex128 = ---
+	v, ok = parse_complex128(str, n)
+	return cast(complex32)v, ok
+}
+/*
+Parses a 256-bit quaternion from a string
+
+**Inputs**  
+- str: The input string containing a 256-bit quaternion.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_quaternion256_example :: proc() {
+		n: int
+		q, ok := strconv.parse_quaternion256("1+2i+3j+4k", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+
+		q, ok = strconv.parse_quaternion256("1+2i+3j+4k hellope", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+	}
+	
+Output:
+
+	1+2i+3j+4k 10 true
+	1+2i+3j+4k 10 false
+	
+**Returns**  
+- value: The parsed 256-bit quaternion.
+- ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
+*/
+parse_quaternion256 :: proc(str: string, n: ^int = nil) -> (value: quaternion256, ok: bool) {
+	iterate_and_assign :: proc (iter: ^string, terminator: byte, nr_total: ^int, state: bool) -> (value: f64, ok: bool) {
+		if !state {
+			return
+		}
+
+		nr: int
+		value, nr, _ = parse_f64_prefix(iter^)
+		iter^ = iter[nr:]
+
+		if len(iter) > 0 && iter[0] == terminator {
+			iter^ = iter[1:]
+			nr_total^ += nr + 1
+			ok = true
+		} else {
+			value = 0
+		}
+
+		return
+	}
+
+	real_value, imag_value, jmag_value, kmag_value: f64
+	nr: int
+
+	real_value, nr, _ = parse_f64_prefix(str)
+	iter := str[nr:]
+
+	// Need to have parsed at least something in order to get started.
+	ok = nr > 0
+
+	// Quaternion parsing is done this way to honour the rest of the API with
+	// regards to partial parsing. Otherwise, we could error out early.
+	imag_value, ok = iterate_and_assign(&iter, 'i', &nr, ok)
+	jmag_value, ok = iterate_and_assign(&iter, 'j', &nr, ok)
+	kmag_value, ok = iterate_and_assign(&iter, 'k', &nr, ok)
+
+	if len(iter) != 0 {
+		ok = false
+	}
+
+	if n != nil {
+		n^ = nr
+	}
+
+	value = quaternion(
+		real = real_value,
+		imag = imag_value,
+		jmag = jmag_value,
+		kmag = kmag_value)
+	return
+}
+/*
+Parses a 128-bit quaternion from a string
+
+**Inputs**  
+- str: The input string containing a 128-bit quaternion.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_quaternion128_example :: proc() {
+		n: int
+		q, ok := strconv.parse_quaternion128("1+2i+3j+4k", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+
+		q, ok = strconv.parse_quaternion128("1+2i+3j+4k hellope", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+	}
+	
+Output:
+
+	1+2i+3j+4k 10 true
+	1+2i+3j+4k 10 false
+	
+**Returns**  
+- value: The parsed 128-bit quaternion.
+- ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
+*/
+parse_quaternion128 :: proc(str: string, n: ^int = nil) -> (value: quaternion128, ok: bool) {
+	v: quaternion256 = ---
+	v, ok = parse_quaternion256(str, n)
+	return cast(quaternion128)v, ok
+}
+/*
+Parses a 64-bit quaternion from a string
+
+**Inputs**  
+- str: The input string containing a 64-bit quaternion.
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil).
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv"
+	parse_quaternion64_example :: proc() {
+		n: int
+		q, ok := strconv.parse_quaternion64("1+2i+3j+4k", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+
+		q, ok = strconv.parse_quaternion64("1+2i+3j+4k hellope", &n)
+		fmt.printfln("%v %i %t", q, n, ok)
+	}
+	
+Output:
+
+	1+2i+3j+4k 10 true
+	1+2i+3j+4k 10 false
+	
+**Returns**  
+- value: The parsed 64-bit quaternion.
+- ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
+*/
+parse_quaternion64 :: proc(str: string, n: ^int = nil) -> (value: quaternion64, ok: bool) {
+	v: quaternion256 = ---
+	v, ok = parse_quaternion256(str, n)
+	return cast(quaternion64)v, ok
 }
 /* 
 Appends a boolean value as a string to the given buffer
@@ -1283,7 +1575,7 @@ Example:
 	import "core:fmt"
 	import "core:strconv"
 	atof_example :: proc() {
-		fmt.println(strconv.atof("3.14"))
+		fmt.printfln("%.3f", strconv.atof("3.14"))
 	}
 
 Output:
@@ -1437,7 +1729,7 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 		}
 	}
 
-	if buf == nil {
+	if buf == nil || r < 0 {
 		return ""
 	}
 

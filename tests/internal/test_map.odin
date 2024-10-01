@@ -1,13 +1,9 @@
-package test_internal_map
+package test_internal
 
-import "core:fmt"
+import "core:log"
 import "base:intrinsics"
 import "core:math/rand"
-import "core:mem"
-import "core:os"
 import "core:testing"
-
-seed: u64
 
 ENTRY_COUNTS := []int{11, 101, 1_001, 10_001, 100_001, 1_000_001}
 
@@ -15,15 +11,15 @@ ENTRY_COUNTS := []int{11, 101, 1_001, 10_001, 100_001, 1_000_001}
 map_insert_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {
-		fmt.printf("[map_insert_random_key_value] Testing %v entries.\n", entries)
+		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 		for _ in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			if k not_in m {
 				unique_keys += 1
@@ -36,25 +32,25 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 			key_count += 1
 		}
 
-		expect(t, key_count == unique_keys, fmt.tprintf("Expected key_count to equal %v, got %v", unique_keys, key_count))
-		expect(t, len(m)    == unique_keys, fmt.tprintf("Expected len(map) to equal %v, got %v",  unique_keys, len(m)))
+		testing.expectf(t, key_count == unique_keys, "Expected key_count to equal %v, got %v", unique_keys, key_count)
+		testing.expectf(t, len(m)    == unique_keys, "Expected len(map) to equal %v, got %v",  unique_keys, len(m))
 
 		// Reset randomizer and verify
-		r = rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for _ in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			cond := m[k] == v
 			if !cond {
 				num_fails += 1
 				if num_fails > 5 {
-					fmt.println("... and more")
+					log.info("... and more")
 					break
 				}
-				expect(t, false, fmt.tprintf("Unexpected value. Expected m[%v] = %v, got %v", k, v, m[k]))
+				testing.expectf(t, false, "Unexpected value. Expected m[%v] = %v, got %v", k, v, m[k])
 			}
 		}
 		seed_incr += 1
@@ -65,15 +61,16 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 map_update_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {
-		fmt.printf("[map_update_random_key_value] Testing %v entries.\n", entries)
+		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			if k not_in m {
 				unique_keys += 1
@@ -86,37 +83,38 @@ map_update_random_key_value :: proc(t: ^testing.T) {
 			key_count += 1
 		}
 
-		expect(t, key_count == unique_keys, fmt.tprintf("Expected key_count to equal %v, got %v", unique_keys, key_count))
-		expect(t, len(m)    == unique_keys, fmt.tprintf("Expected len(map) to equal %v, got %v",  unique_keys, len(m)))
+		testing.expectf(t, key_count == unique_keys, "Expected key_count to equal %v, got %v", unique_keys, key_count)
+		testing.expectf(t, len(m)    == unique_keys, "Expected len(map) to equal %v, got %v",  unique_keys, len(m))
 
 		half_entries := entries / 2
 
 		// Reset randomizer and update half the entries
-		r = rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<half_entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			m[k] = v + 42
 		}
 
 		// Reset randomizer and verify
-		r = rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for i in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			diff := i64(42) if i < half_entries else i64(0)
 			cond := m[k] == (v + diff)
 			if !cond {
 				num_fails += 1
 				if num_fails > 5 {
-					fmt.println("... and more")
+					log.info("... and more")
 					break
 				}
-				expect(t, false, fmt.tprintf("Unexpected value. Expected m[%v] = %v, got %v", k, v, m[k]))
+				testing.expectf(t, false, "Unexpected value. Expected m[%v] = %v, got %v", k, v, m[k])
 			}
 		}
 		seed_incr += 1
@@ -127,15 +125,16 @@ map_update_random_key_value :: proc(t: ^testing.T) {
 map_delete_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {
-		fmt.printf("[map_delete_random_key_value] Testing %v entries.\n", entries)
+		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			if k not_in m {
 				unique_keys += 1
@@ -148,52 +147,53 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 			key_count += 1
 		}
 
-		expect(t, key_count == unique_keys, fmt.tprintf("Expected key_count to equal %v, got %v", unique_keys, key_count))
-		expect(t, len(m)    == unique_keys, fmt.tprintf("Expected len(map) to equal %v, got %v",  unique_keys, len(m)))
+		testing.expectf(t, key_count == unique_keys, "Expected key_count to equal %v, got %v", unique_keys, key_count)
+		testing.expectf(t, len(m)    == unique_keys, "Expected len(map) to equal %v, got %v",  unique_keys, len(m))
 
 		half_entries := entries / 2
 
 		// Reset randomizer and delete half the entries
-		r = rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<half_entries {
-			k := rand.int63(&r)
-			_  = rand.int63(&r)
+			k := rand.int63()
+			_  = rand.int63()
 
 			delete_key(&m, k)
 		}
 
 		// Reset randomizer and verify
-		r = rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for i in 0..<entries {
-			k := rand.int63(&r)
-			v := rand.int63(&r)
+			k := rand.int63()
+			v := rand.int63()
 
 			if i < half_entries {
 				if k in m {
 					num_fails += 1
 					if num_fails > 5 {
-						fmt.println("... and more")
+						log.info("... and more")
 						break
 					}
-					expect(t, false, fmt.tprintf("Unexpected key present. Expected m[%v] to have been deleted, got %v", k, m[k]))
+					testing.expectf(t, false, "Unexpected key present. Expected m[%v] to have been deleted, got %v", k, m[k])
 				}
 			} else {
 				if k not_in m {
 					num_fails += 1
 					if num_fails > 5 {
-						fmt.println("... and more")
+						log.info("... and more")
 						break
 					}
-					expect(t, false, fmt.tprintf("Expected key not present. Expected m[%v] = %v", k, v))
+					testing.expectf(t, false, "Expected key not present. Expected m[%v] = %v", k, v)
 				} else if m[k] != v {
 					num_fails += 1
 					if num_fails > 5 {
-						fmt.println("... and more")
+						log.info("... and more")
 						break
 					}
-					expect(t, false, fmt.tprintf("Unexpected value. Expected m[%v] = %v, got %v", k, v, m[k]))
+					testing.expectf(t, false, "Unexpected value. Expected m[%v] = %v, got %v", k, v, m[k])
 				}
 			}
 		}
@@ -205,14 +205,15 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 set_insert_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {
-		fmt.printf("[set_insert_random_key_value] Testing %v entries.\n", entries)
+		log.infof("Testing %v entries", entries)
 		m: map[i64]struct{}
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 			if k not_in m {
 				unique_keys += 1
 			}
@@ -224,24 +225,24 @@ set_insert_random_key_value :: proc(t: ^testing.T) {
 			key_count += 1
 		}
 
-		expect(t, key_count == unique_keys, fmt.tprintf("Expected key_count to equal %v, got %v", unique_keys, key_count))
-		expect(t, len(m)    == unique_keys, fmt.tprintf("Expected len(map) to equal %v, got %v",  unique_keys, len(m)))
+		testing.expectf(t, key_count == unique_keys, "Expected key_count to equal %v, got %v", unique_keys, key_count)
+		testing.expectf(t, len(m)    == unique_keys, "Expected len(map) to equal %v, got %v",  unique_keys, len(m))
 
 		// Reset randomizer and verify
-		r = rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for _ in 0..<entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 
 			cond := k in m
 			if !cond {
 				num_fails += 1
 				if num_fails > 5 {
-					fmt.println("... and more")
+					log.info("... and more")
 					break
 				}
-				expect(t, false, fmt.tprintf("Unexpected value. Expected m[%v] to exist", k))
+				testing.expectf(t, false, "Unexpected value. Expected m[%v] to exist", k)
 			}
 		}
 		seed_incr += 1
@@ -252,14 +253,15 @@ set_insert_random_key_value :: proc(t: ^testing.T) {
 set_delete_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {
-		fmt.printf("[set_delete_random_key_value] Testing %v entries.\n", entries)
+		log.infof("Testing %v entries", entries)
 		m: map[i64]struct{}
 		defer delete(m)
 
 		unique_keys := 0
-		r := rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 
 			if k not_in m {
 				unique_keys += 1
@@ -272,42 +274,43 @@ set_delete_random_key_value :: proc(t: ^testing.T) {
 			key_count += 1
 		}
 
-		expect(t, key_count == unique_keys, fmt.tprintf("Expected key_count to equal %v, got %v", unique_keys, key_count))
-		expect(t, len(m)    == unique_keys, fmt.tprintf("Expected len(map) to equal %v, got %v",  unique_keys, len(m)))
+		testing.expectf(t, key_count == unique_keys, "Expected key_count to equal %v, got %v", unique_keys, key_count)
+		testing.expectf(t, len(m)    == unique_keys, "Expected len(map) to equal %v, got %v",  unique_keys, len(m))
 
 		half_entries := entries / 2
 
 		// Reset randomizer and delete half the entries
-		r = rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
+
 		for _ in 0..<half_entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 			delete_key(&m, k)
 		}
 
 		// Reset randomizer and verify
-		r = rand.create(seed + seed_incr)
+		rand.reset(t.seed + seed_incr)
 
 		num_fails := 0
 		for i in 0..<entries {
-			k := rand.int63(&r)
+			k := rand.int63()
 
 			if i < half_entries {
 				if k in m {
 					num_fails += 1
 					if num_fails > 5 {
-						fmt.println("... and more")
+						log.info("... and more")
 						break
 					}
-					expect(t, false, fmt.tprintf("Unexpected key present. Expected m[%v] to have been deleted", k))
+					testing.expectf(t, false, "Unexpected key present. Expected m[%v] to have been deleted", k)
 				}
 			} else {
 				if k not_in m {
 					num_fails += 1
 					if num_fails > 5 {
-						fmt.println("... and more")
+						log.info("... and more")
 						break
 					}
-					expect(t, false, fmt.tprintf("Expected key not present. Expected m[%v] to exist", k))
+					testing.expectf(t, false, "Expected key not present. Expected m[%v] to exist", k)
 				}
 			}
 		}
@@ -315,68 +318,22 @@ set_delete_random_key_value :: proc(t: ^testing.T) {
 	}
 }
 
-// -------- -------- -------- -------- -------- -------- -------- -------- -------- --------
-
-main :: proc() {
-	t := testing.T{}
-
-	// Allow tests to be repeatable
-	SEED :: #config(SEED, -1)
-	when SEED > 0 {
-		seed = u64(SEED)
-	} else {
-		seed = u64(intrinsics.read_cycle_counter())
+@test
+test_union_key_should_not_be_hashing_specifc_variant :: proc(t: ^testing.T) {
+	Vec2 :: [2]f32
+	BoneId :: distinct int
+	VertexId :: distinct int
+	Id :: union {
+		BoneId,
+		VertexId,
 	}
-	fmt.println("Initialized seed to", seed)
 
-	mem_track_test(&t, map_insert_random_key_value)
-	mem_track_test(&t, map_update_random_key_value)
-	mem_track_test(&t, map_delete_random_key_value)
+	m: map[Id]Vec2
+	defer delete(m)
 
-	mem_track_test(&t, set_insert_random_key_value)
-	mem_track_test(&t, set_delete_random_key_value)
+	bone_1: BoneId = 69
+	m[bone_1] = {4, 20}
 
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
-
-mem_track_test :: proc(t: ^testing.T, test: proc(t: ^testing.T)) {
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	context.allocator = mem.tracking_allocator(&track)
-
-	test(t)
-
-	expect(t, len(track.allocation_map) == 0, "Expected no leaks.")
-	expect(t, len(track.bad_free_array) == 0, "Expected no leaks.")
-
-	for _, leak in track.allocation_map {
-		fmt.printf("%v leaked %v bytes\n", leak.location, leak.size)
-	}
-	for bad_free in track.bad_free_array {
-		fmt.printf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory)
-	}
-}
-
-TEST_count := 0
-TEST_fail  := 0
-
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
+	testing.expect_value(t, bone_1 in m, true)
+	testing.expect_value(t, Id(bone_1) in m, true)
 }

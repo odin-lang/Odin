@@ -1,4 +1,4 @@
-// +build windows, linux, darwin
+#+build windows, linux, darwin, freebsd
 package net
 
 /*
@@ -10,12 +10,14 @@ package net
 	Copyright 2022-2023 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022-2023 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022-2023 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
 */
 
 any_socket_to_socket :: proc "contextless" (socket: Any_Socket) -> Socket {
@@ -130,6 +132,13 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TC
 	assert(backlog > 0 && backlog < int(max(i32)))
 
 	return _listen_tcp(interface_endpoint, backlog)
+}
+
+/*
+	Returns the endpoint that the given socket is listening / bound on.
+*/
+bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Network_Error) {
+	return _bound_endpoint(socket)
 }
 
 accept_tcp :: proc(socket: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {

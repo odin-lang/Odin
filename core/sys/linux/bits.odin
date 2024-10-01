@@ -48,6 +48,7 @@ Errno :: enum i32 {
 	ENOSYS          = 38,
 	ENOTEMPTY       = 39,
 	ELOOP           = 40,
+	EUNKNOWN_41     = 41,
 	ENOMSG          = 42,
 	EIDRM           = 43,
 	ECHRNG          = 44,
@@ -64,6 +65,7 @@ Errno :: enum i32 {
 	ENOANO          = 55,
 	EBADRQC         = 56,
 	EBADSLT         = 57,
+	EUNKNOWN_58     = 58,
 	EBFONT          = 59,
 	ENOSTR          = 60,
 	ENODATA         = 61,
@@ -145,26 +147,70 @@ Errno :: enum i32 {
 }
 
 /*
-	Bits for Open_Flags
+	Bits for Open_Flags.
+
+	RDONLY flag is not present, because it has the value of 0, i.e. it is the
+	default, unless WRONLY or RDWR is specified.
 */
-Open_Flags_Bits :: enum {
-	RDONLY    = 0,
-	WRONLY    = 1,
-	RDWR      = 2,
-	CREAT     = 6,
-	EXCL      = 7,
-	NOCTTY    = 8,
-	TRUNC     = 9,
-	APPEND    = 10,
-	NONBLOCK  = 11,
-	DSYNC     = 12,
-	ASYNC     = 13,
-	DIRECT    = 14,
-	DIRECTORY = 16,
-	NOFOLLOW  = 17,
-	NOATIME   = 18,
-	CLOEXEC   = 19,
-	PATH      = 21,
+when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECT    = 14,
+		LARGEFILE = 15,
+		DIRECTORY = 16,
+		NOFOLLOW  = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
+	// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
+	#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
+	#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
+	#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
+	#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
+	#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
+	#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
+	#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
+	#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
+	#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
+	#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
+	#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
+	#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
+	#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
+	#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
+	#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
+
+} else {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECTORY = 14,
+		NOFOLLOW  = 15,
+		DIRECT    = 16,
+		LARGEFILE = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
 }
 
 /*
@@ -198,7 +244,7 @@ Mode_Bits :: enum {
 	ISVTX  = 9,  // 0o0001000
 	ISGID  = 10, // 0o0002000
 	ISUID  = 11, // 0o0004000
-	IFFIFO = 12, // 0o0010000
+	IFIFO = 12, // 0o0010000
 	IFCHR  = 13, // 0o0020000
 	IFDIR  = 14, // 0o0040000
 	IFREG  = 15, // 0o0100000
@@ -845,7 +891,7 @@ Wait_Option :: enum {
 	WSTOPPED    = 1,
 	WEXITED     = 2,
 	WCONTINUED  = 3,
-	WNOWAIT     = 24, 
+	WNOWAIT     = 24,
 	// // For processes created using clone
 	__WNOTHREAD = 29,
 	__WALL      = 30,
@@ -924,9 +970,36 @@ Sig_Stack_Flag :: enum i32 {
 	AUTODISARM = 31,
 }
 
+Sig_Action_Flag :: enum u32 {
+	NOCLDSTOP      = 0,
+	NOCLDWAIT      = 1,
+	SIGINFO        = 2,
+	UNSUPPORTED    = 10,
+	EXPOSE_TAGBITS = 11,
+	RESTORER       = 26,
+	ONSTACK        = 27,
+	RESTART        = 28,
+	NODEFER        = 30,
+	RESETHAND      = 31,
+}
+
+/*
+	Translation of code in Sig_Info for when signo is SIGCHLD
+*/
+Sig_Child_Code :: enum {
+	NONE,
+	EXITED,
+	KILLED,
+	DUMPED,
+	TRAPPED,
+	STOPPED,
+	CONTINUED,
+}
+
+
 /*
 	Type of socket to create
-    - For TCP you want to use SOCK_STREAM
+	- For TCP you want to use SOCK_STREAM
 	- For UDP you want to use SOCK_DGRAM
 	Also see `Protocol`
 */
@@ -1270,13 +1343,15 @@ Socket_Option :: enum {
 	RESERVE_MEM                   = 73,
 	TXREHASH                      = 74,
 	RCVMARK                       = 75,
-	// Hardcoded 64-bit Time. It's time to move on.
-	TIMESTAMP                     = TIMESTAMP_NEW,
-	TIMESTAMPNS                   = TIMESTAMPNS_NEW,
-	TIMESTAMPING                  = TIMESTAMPING_NEW,
-	RCVTIMEO                      = RCVTIMEO_NEW,
-	SNDTIMEO                      = SNDTIMEO_NEW,
+	TIMESTAMP                     = TIMESTAMP_OLD    when _SOCKET_OPTION_OLD else TIMESTAMP_NEW,
+	TIMESTAMPNS                   = TIMESTAMPNS_OLD  when _SOCKET_OPTION_OLD else TIMESTAMPNS_NEW,
+	TIMESTAMPING                  = TIMESTAMPING_OLD when _SOCKET_OPTION_OLD else TIMESTAMPING_NEW,
+	RCVTIMEO                      = RCVTIMEO_OLD     when _SOCKET_OPTION_OLD else RCVTIMEO_NEW,
+	SNDTIMEO                      = SNDTIMEO_OLD     when _SOCKET_OPTION_OLD else SNDTIMEO_NEW,
 }
+
+@(private)
+_SOCKET_OPTION_OLD :: size_of(rawptr) == 8 /* || size_of(time_t) == size_of(__kernel_long_t) */
 
 Socket_UDP_Option :: enum {
 	CORK                   = 1,
@@ -1405,16 +1480,16 @@ Futex_Flags_Bits :: enum {
 	Kind of operation on futex, see FUTEX_WAKE_OP
 */
 Futex_Arg_Op :: enum {
-	SET      = 0,  /* uaddr2 =       oparg; */
-	ADD      = 1,  /* uaddr2 +=      oparg; */
-	OR       = 2,  /* uaddr2 |=      oparg; */
-	ANDN     = 3,  /* uaddr2 &=     ~oparg; */
-	XOR      = 4,  /* uaddr2 ^=      oparg; */
-	PO2_SET  = 0,  /* uaddr2 =    1<<oparg; */
-	PO2_ADD  = 1,  /* uaddr2 +=   1<<oparg; */
-	PO2_OR   = 2,  /* uaddr2 |=   1<<oparg; */
-	PO2_ANDN = 3,  /* uaddr2 &= ~(1<<oparg); */
-	PO2_XOR  = 4,  /* uaddr2 ^=   1<<oparg; */
+	SET      = 0,  /* uaddr2 =       oparg */
+	ADD      = 1,  /* uaddr2 +=      oparg */
+	OR       = 2,  /* uaddr2 |=      oparg */
+	ANDN     = 3,  /* uaddr2 &=     ~oparg */
+	XOR      = 4,  /* uaddr2 ^=      oparg */
+	PO2_SET  = 0,  /* uaddr2 =    1<<oparg */
+	PO2_ADD  = 1,  /* uaddr2 +=   1<<oparg */
+	PO2_OR   = 2,  /* uaddr2 |=   1<<oparg */
+	PO2_ANDN = 3,  /* uaddr2 &~=  1<<oparg */
+	PO2_XOR  = 4,  /* uaddr2 ^=   1<<oparg */
 }
 
 /*
@@ -1756,3 +1831,95 @@ EPoll_Ctl_Opcode :: enum i32 {
 	DEL = 2,
 	MOD = 3,
 }
+
+/*
+	Bits for execveat(2) flags.
+*/
+Execveat_Flags_Bits :: enum {
+	AT_SYMLINK_NOFOLLOW = 8,
+	AT_EMPTY_PATH       = 12,
+}
+
+RISCV_HWProbe_Key :: enum i64 {
+	UNSUPPORTED            = -1,
+	MVENDORID              = 0,
+	MARCHID                = 1,
+	MIMPID                 = 2,
+	BASE_BEHAVIOR          = 3,
+	IMA_EXT_0              = 4,
+ 	// Deprecated, try `.MISALIGNED_SCALAR_PERF` first, if that is `.UNSUPPORTED`, use this.
+	CPUPERF_0              = 5,
+	ZICBOZ_BLOCK_SIZE      = 6,
+	HIGHEST_VIRT_ADDRESS   = 7,
+	TIME_CSR_FREQ          = 8,
+	MISALIGNED_SCALAR_PERF = 9,
+}
+
+RISCV_HWProbe_Flags_Bits :: enum {
+	WHICH_CPUS,
+}
+
+RISCV_HWProbe_Base_Behavior_Bits :: enum {
+	IMA,
+}
+
+RISCV_HWProbe_IMA_Ext_0_Bits :: enum {
+	FD,
+	C,
+	V,
+	EXT_ZBA,
+	EXT_ZBB,
+	EXT_ZBS,
+	EXT_ZICBOZ,
+	EXT_ZBC,
+	EXT_ZBKB,
+	EXT_ZBKC,
+	EXT_ZBKX,
+	EXT_ZKND,
+	EXT_ZKNE,
+	EXT_ZKNH,
+	EXT_ZKSED,
+	EXT_ZKSH,
+	EXT_ZKT,
+	EXT_ZVBB,
+	EXT_ZVBC,
+	EXT_ZVKB,
+	EXT_ZVKG,
+	EXT_ZVKNED,
+	EXT_ZVKNHA,
+	EXT_ZVKNHB,
+	EXT_ZVKSED,
+	EXT_ZVKSH,
+	EXT_ZVKT,
+	EXT_ZFH,
+	EXT_ZFHMIN,
+	EXT_ZIHINTNTL,
+	EXT_ZVFH,
+	EXT_ZVFHMIN,
+	EXT_ZFA,
+	EXT_ZTSO,
+	EXT_ZACAS,
+	EXT_ZICOND,
+	EXT_ZIHINTPAUSE,
+	EXT_ZVE32X,
+	EXT_ZVE32F,
+	EXT_ZVE64X,
+	EXT_ZVE64F,
+	EXT_ZVE64D,
+	EXT_ZIMOP,
+	EXT_ZCA,
+	EXT_ZCB,
+	EXT_ZCD,
+	EXT_ZCF,
+	EXT_ZCMOP,
+	EXT_ZAWRS,
+}
+
+RISCV_HWProbe_Misaligned_Scalar_Perf :: enum {
+	UNKNOWN,
+	EMULATED,
+	SLOW,
+	FAST,
+	UNSUPPORTED,
+}
+

@@ -46,7 +46,7 @@ sc_set_bytes_wide :: proc(sc: ^Scalar, b: []byte) {
 		panic("crypto/ristretto255: invalid wide input size")
 	}
 
-	b_ := transmute(^[WIDE_SCALAR_SIZE]byte)(raw_data(b))
+	b_ := (^[WIDE_SCALAR_SIZE]byte)(raw_data(b))
 	grp.sc_set_bytes_wide(sc, b_)
 }
 

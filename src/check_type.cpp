@@ -19,10 +19,12 @@ gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstF
 		}
 	} else {
 		Token tok = make_token_ident(name);
-		if (field->names.count > 0) {
-			tok.pos = ast_token(field->names[0]).pos;
-		} else {
-			tok.pos = ast_token(field->type).pos;
+		if (field) {
+			if (field->names.count > 0) {
+				tok.pos = ast_token(field->names[0]).pos;
+			} else {
+				tok.pos = ast_token(field->type).pos;
+			}
 		}
 		Entity *f = alloc_entity_array_elem(nullptr, tok, t->Array.elem, idx);
 		add_entity(ctx, ctx->scope, nullptr, f);
@@ -191,9 +193,10 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 
 		if (is_using && p->names.count > 0) {
 			Type *first_type = fields_array[fields_array.count-1]->type;
+			bool soa_ptr = is_type_soa_pointer(first_type);
 			Type *t = base_type(type_deref(first_type));
 
-			if (!does_field_type_allow_using(t) &&
+			if ((soa_ptr || !does_field_type_allow_using(t)) &&
 			    p->names.count >= 1 &&
 			    p->names[0]->kind == Ast_Ident) {
 				Token name_token = p->names[0]->Ident.token;
@@ -332,7 +335,7 @@ bool check_constant_parameter_value(Type *type, Ast *expr) {
 
 gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
                                                   bool *is_polymorphic_,
-                                                  Ast *node, Array<Operand> *poly_operands) {
+                                                  Array<Operand> *poly_operands) {
 	Type *polymorphic_params_type = nullptr;
 	GB_ASSERT(is_polymorphic_ != nullptr);
 
@@ -381,6 +384,7 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 			Type *type = nullptr;
 			bool is_type_param = false;
 			bool is_type_polymorphic_type = false;
+			Type *specialization = nullptr;
 			if (type_expr == nullptr && default_value == nullptr) {
 				error(param, "Expected a type for this parameter");
 				continue;
@@ -393,7 +397,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 				}
 				if (type_expr->kind == Ast_TypeidType) {
 					is_type_param = true;
-					Type *specialization = nullptr;
 					if (type_expr->TypeidType.specialization != nullptr) {
 						Ast *s = type_expr->TypeidType.specialization;
 						specialization = check_type(ctx, s);
@@ -471,6 +474,15 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						if (is_type_polymorphic(base_type(operand.type))) {
 							*is_polymorphic_ = true;
 							can_check_fields = false;
+						} else if (specialization &&
+						           !check_type_specialization_to(ctx, specialization, operand.type, false, /*modify_type*/true)) {
+							if (!ctx->no_polymorphic_errors) {
+								gbString t = type_to_string(operand.type);
+								gbString s = type_to_string(specialization);
+								error(operand.expr, "Cannot convert type '%s' to the specialization '%s'", t, s);
+								gb_string_free(s);
+								gb_string_free(t);
+							}
 						}
 						e = alloc_entity_type_name(scope, token, operand.type);
 						e->TypeName.is_type_alias = true;
@@ -552,19 +564,7 @@ gb_internal bool check_record_poly_operand_specialization(CheckerContext *ctx, T
 gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types, isize param_count, Array<Operand> const &ordered_operands) {
 	for (Entity *e : found_gen_types->types) {
 		Type *t = base_type(e->type);
-		TypeTuple *tuple = nullptr;
-		switch (t->kind) {
-		case Type_Struct:
-			if (t->Struct.polymorphic_params) {
-				tuple = &t->Struct.polymorphic_params->Tuple;
-			}
-			break;
-		case Type_Union:
-			if (t->Union.polymorphic_params) {
-				tuple = &t->Union.polymorphic_params->Tuple;
-			}
-			break;
-		}
+		TypeTuple *tuple = get_record_polymorphic_params(t);
 		GB_ASSERT_MSG(tuple != nullptr, "%s :: %s", type_to_string(e->type), type_to_string(t));
 		GB_ASSERT(param_count == tuple->variables.count);
 
@@ -643,14 +643,17 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		context = str_lit("struct #raw_union");
 	}
 
+	struct_type->Struct.node       = node;
 	struct_type->Struct.scope      = ctx->scope;
 	struct_type->Struct.is_packed  = st->is_packed;
 	struct_type->Struct.is_no_copy = st->is_no_copy;
 	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
 		&struct_type->Struct.is_polymorphic,
-		node, poly_operands
+		poly_operands
 	);
+	wait_signal_set(&struct_type->Struct.polymorphic_wait_signal);
+
 	struct_type->Struct.is_poly_specialized = check_record_poly_operand_specialization(ctx, struct_type, poly_operands, &struct_type->Struct.is_polymorphic);
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
@@ -694,12 +697,15 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	ast_node(ut, UnionType, node);
 
 
+	union_type->Union.node  = node;
 	union_type->Union.scope = ctx->scope;
 	union_type->Union.polymorphic_params = check_record_polymorphic_params(
 		ctx, ut->polymorphic_params,
 		&union_type->Union.is_polymorphic,
-		node, poly_operands
+		poly_operands
 	);
+	wait_signal_set(&union_type->Union.polymorphic_wait_signal);
+
 	union_type->Union.is_poly_specialized = check_record_poly_operand_specialization(ctx, union_type, poly_operands, &union_type->Union.is_polymorphic);
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
@@ -734,7 +740,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 				gb_string_free(str);
 			} else {
 				for_array(j, variants) {
-					if (are_types_identical(t, variants[j])) {
+					if (union_variant_index_types_equal(t, variants[j])) {
 						ok = false;
 						ERROR_BLOCK();
 						gbString str = type_to_string(t);
@@ -772,7 +778,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 			}
 		}
 		if (variants.count < 2) {
-			error(ut->align, "A union with #no_nil must have at least 2 variants");
+			error(node, "A union with #no_nil must have at least 2 variants");
 		}
 		break;
 	}
@@ -797,11 +803,11 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 	enum_type->Enum.scope = ctx->scope;
 
 	Type *base_type = t_int;
-	if (et->base_type != nullptr) {
+	if (unparen_expr(et->base_type) != nullptr) {
 		base_type = check_type(ctx, et->base_type);
 	}
 
-	if (base_type == nullptr || !is_type_integer(base_type)) {
+	if (base_type == nullptr || base_type == t_invalid || !is_type_integer(base_type)) {
 		error(node, "Base type for enumeration must be an integer");
 		return;
 	}
@@ -933,35 +939,24 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 	enum_type->Enum.max_value_index = max_value_index;
 }
 
-gb_internal bool is_valid_bit_field_backing_type(Type *type) {
-	if (type == nullptr) {
-		return false;
-	}
-	type = base_type(type);
-	if (is_type_untyped(type)) {
-		return false;
-	}
-	if (is_type_integer(type)) {
-		return true;
-	}
-	if (type->kind == Type_Array) {
-		return is_type_integer(type->Array.elem);
-	}
-	return false;
-}
 
 gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, Type *named_type, Ast *node) {
 	ast_node(bf, BitFieldType, node);
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
 	Type *backing_type = check_type(ctx, bf->backing_type);
-	if (backing_type == nullptr || !is_valid_bit_field_backing_type(backing_type)) {
-		error(node, "Backing type for a bit_field must be an integer or an array of an integer");
+
+	bit_field_type->BitField.backing_type = backing_type ? backing_type : t_u8;
+	bit_field_type->BitField.scope = ctx->scope;
+
+	if (backing_type == nullptr) {
+		error(bf->backing_type, "Backing type for a bit_field must be an integer or an array of an integer");
 		return;
 	}
-
-	bit_field_type->BitField.backing_type = backing_type;
-	bit_field_type->BitField.scope = ctx->scope;
+	if (!is_valid_bit_field_backing_type(backing_type)) {
+		error(bf->backing_type, "Backing type for a bit_field must be an integer or an array of an integer");
+		return;
+	}
 
 	auto fields    = array_make<Entity *>(permanent_allocator(), 0, bf->fields.count);
 	auto bit_sizes = array_make<u8>      (permanent_allocator(), 0, bf->fields.count);
@@ -1075,6 +1070,8 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			array_add(&tags, tag);
 
 			add_entity_use(ctx, field, e);
+
+			total_bit_size += bit_size_u8;
 		}
 	}
 
@@ -1089,12 +1086,56 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 
 	if (total_bit_size > maximum_bit_size) {
 		gbString s = type_to_string(backing_type);
-		error(node, "The numbers required %llu exceeds the backing type's (%s) bit size %llu",
+		error(node, "The total bit size of a bit_field's fields (%llu) must fit into its backing type's (%s) bit size of %llu",
 		      cast(unsigned long long)total_bit_size,
 		      s,
 		      cast(unsigned long long)maximum_bit_size);
 		gb_string_free(s);
 	}
+
+	enum EndianKind {
+		Endian_Unknown,
+		Endian_Native,
+		Endian_Little,
+		Endian_Big,
+	};
+	auto const &determine_endian_kind = [](Type *type) -> EndianKind {
+		if (is_type_boolean(type)) {
+			// NOTE(bill): it doesn't matter, and when it does,
+			// that api is absolutely stupid
+			return Endian_Unknown;
+		} else if (type_size_of(type) < 2) {
+			return Endian_Unknown;
+		} else if (is_type_endian_specific(type)) {
+			if (is_type_endian_little(type)) {
+				return Endian_Little;
+			} else {
+				return Endian_Big;
+			}
+		}
+		return Endian_Native;
+	};
+
+	Type *backing_type_elem = core_array_type(backing_type);
+	i64 backing_type_elem_size = type_size_of(backing_type_elem);
+	EndianKind backing_type_endian_kind = determine_endian_kind(backing_type_elem);
+	EndianKind endian_kind = Endian_Unknown;
+	for (Entity *f : fields) {
+		EndianKind field_kind = determine_endian_kind(f->type);
+		i64 field_size = type_size_of(f->type);
+
+		if (field_kind && backing_type_endian_kind != field_kind && field_size > 1 && backing_type_elem_size > 1) {
+			error(f->token, "All 'bit_field' field types must match the same endian kind as the backing type, i.e. all native, all little, or all big");
+		}
+
+		if (endian_kind == Endian_Unknown) {
+			endian_kind = field_kind;
+		} else if (field_kind && endian_kind != field_kind && field_size > 1) {
+			error(f->token, "All 'bit_field' field types must be of the same endian variety, i.e. all native, all little, or all big");
+		}
+	}
+
+
 
 	if (bit_sizes.count > 0 && is_type_integer(backing_type)) {
 		bool all_booleans = is_type_boolean(fields[0]->type);
@@ -1111,7 +1152,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 				}
 			}
 			if (all_ones && all_booleans) {
-				if (build_context.vet_flags & VetFlag_Style) {
+				if (ast_file_vet_style(ctx->file)) {
 					char const *msg = "This 'bit_field' is better expressed as a 'bit_set' since all of the fields are booleans, of 1-bit in size, and the backing type is an integer (-vet-style)";
 					error(node, msg);
 				} else {
@@ -1211,11 +1252,14 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 		Type *t = default_type(lhs.type);
 		if (bs->underlying != nullptr) {
 			Type *u = check_type(c, bs->underlying);
+			// if (!is_valid_bit_field_backing_type(u)) {
 			if (!is_type_integer(u)) {
 				gbString ts = type_to_string(u);
 				error(bs->underlying, "Expected an underlying integer for the bit set, got %s", ts);
 				gb_string_free(ts);
-				return;
+				if (!is_valid_bit_field_backing_type(u)) {
+					return;
+				}
 			}
 			type->BitSet.underlying = u;
 		}
@@ -1384,6 +1428,10 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 		bool can_convert = check_cast_internal(ctx, &o, specialization);
 		return can_convert;
 	} else if (t->kind == Type_Struct) {
+		if (t->Struct.polymorphic_parent == nullptr &&
+		    t == s) {
+			return true;
+		}
 		if (t->Struct.polymorphic_parent == specialization) {
 			return true;
 		}
@@ -1392,8 +1440,8 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 		    s->Struct.polymorphic_params != nullptr &&
 		    t->Struct.polymorphic_params != nullptr) {
 
-			TypeTuple *s_tuple = &s->Struct.polymorphic_params->Tuple;
-			TypeTuple *t_tuple = &t->Struct.polymorphic_params->Tuple;
+			TypeTuple *s_tuple = get_record_polymorphic_params(s);
+			TypeTuple *t_tuple = get_record_polymorphic_params(t);
 			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
 			for_array(i, s_tuple->variables) {
 				Entity *s_e = s_tuple->variables[i];
@@ -1433,6 +1481,10 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 			return true;
 		}
 	} else if (t->kind == Type_Union) {
+		if (t->Union.polymorphic_parent == nullptr &&
+		    t == s) {
+			return true;
+		}
 		if (t->Union.polymorphic_parent == specialization) {
 			return true;
 		}
@@ -1441,8 +1493,8 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 		    s->Union.polymorphic_params != nullptr &&
 		    t->Union.polymorphic_params != nullptr) {
 
-			TypeTuple *s_tuple = &s->Union.polymorphic_params->Tuple;
-			TypeTuple *t_tuple = &t->Union.polymorphic_params->Tuple;
+			TypeTuple *s_tuple = get_record_polymorphic_params(s);
+			TypeTuple *t_tuple = get_record_polymorphic_params(t);
 			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
 			for_array(i, s_tuple->variables) {
 				Entity *s_e = s_tuple->variables[i];
@@ -1507,11 +1559,30 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		return poly_type;
 	}
 	if (show_error) {
+		ERROR_BLOCK();
 		gbString pts = type_to_string(poly_type);
 		gbString ots = type_to_string(operand.type, true);
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
 		error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
+
+		Type *pt = poly_type;
+		while (pt && pt->kind == Type_Generic && pt->Generic.specialized) {
+			pt = pt->Generic.specialized;
+		}
+		if (is_type_slice(pt) &&
+		    (is_type_dynamic_array(operand.type) || is_type_array(operand.type))) {
+			Ast *expr = unparen_expr(operand.expr);
+			if (expr->kind == Ast_CompoundLit) {
+				gbString es = type_to_string(base_any_array_type(operand.type));
+				error_line("\tSuggestion: Try using a slice compound literal instead '[]%s{...}'\n", es);
+				gb_string_free(es);
+			} else {
+				gbString os = expr_to_string(operand.expr);
+				error_line("\tSuggestion: Try slicing the value with '%s[:]'\n", os);
+				gb_string_free(os);
+			}
+		}
 	}
 	return t_invalid;
 }
@@ -1526,7 +1597,7 @@ gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 		return is_expr_from_a_parameter(ctx, lhs);
 	} else if (expr->kind == Ast_Ident) {
 		Operand x= {};
-		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
+		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, true);
 		if (e->flags & EntityFlag_Param) {
 			return true;
 		}
@@ -1534,6 +1605,25 @@ gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 	return false;
 }
 
+gb_internal bool is_caller_expression(Ast *expr) {
+	if (expr->kind == Ast_BasicDirective && expr->BasicDirective.name.string == "caller_expression") {
+		return true;
+	}
+
+	Ast *call = unparen_expr(expr);
+	if (call->kind != Ast_CallExpr) {
+		return false;
+	}
+
+	ast_node(ce, CallExpr, call);
+	if (ce->proc->kind != Ast_BasicDirective) {
+		return false;
+	}
+
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	return name == "caller_expression";
+}
 
 gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
 	ParameterValue param_value = {};
@@ -1555,7 +1645,19 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 		if (in_type) {
 			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
 		}
+	} else if (is_caller_expression(expr)) {
+		if (expr->kind != Ast_BasicDirective) {
+			check_builtin_procedure_directive(ctx, &o, expr, t_string);
+		}
 
+		param_value.kind = ParameterValue_Expression;
+		o.type = t_string;
+		o.mode = Addressing_Value;
+		o.expr = expr;
+
+		if (in_type) {
+			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
+		}
 	} else {
 		if (in_type) {
 			check_expr_with_type_hint(ctx, &o, expr, in_type);
@@ -1700,6 +1802,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		if (type_expr == nullptr) {
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, true);
 		} else {
+			Ast *original_type_expr = type_expr;
 			if (type_expr->kind == Ast_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
 				is_variadic = true;
@@ -1708,6 +1811,14 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					error(param, "Invalid AST: Invalid variadic parameter with multiple names");
 					success = false;
 				}
+
+				if (default_value != nullptr) {
+					error(type_expr, "A variadic parameter may not have a default value");
+					success = false;
+				}
+
+				GB_ASSERT(original_type_expr->kind == Ast_Ellipsis);
+				type_expr = ast_array_type(type_expr->file(), original_type_expr->Ellipsis.token, nullptr, type_expr);
 			}
 			if (type_expr->kind == Ast_TypeidType)  {
 				ast_node(tt, TypeidType, type_expr);
@@ -1731,6 +1842,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				if (operands != nullptr) {
 					ctx->allow_polymorphic_types = true;
 				}
+
 				type = check_type(ctx, type_expr);
 
 				ctx->allow_polymorphic_types = prev;
@@ -1763,12 +1875,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			}
 			type = t_invalid;
 		}
-		if (is_type_empty_union(type)) {
-			gbString str = type_to_string(type);
-			error(param, "Invalid use of an empty union '%s'", str);
-			gb_string_free(str);
-			type = t_invalid;
-		}
+		// if (is_type_empty_union(type)) {
+		// 	gbString str = type_to_string(type);
+		// 	error(param, "Invalid use of an empty union '%s'", str);
+		// 	gb_string_free(str);
+		// 	type = t_invalid;
+		// }
 
 		if (is_type_polymorphic(type)) {
 			switch (param_value.kind) {
@@ -1777,6 +1889,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			case ParameterValue_Nil:
 				break;
 			case ParameterValue_Location:
+			case ParameterValue_Expression:
 			case ParameterValue_Value:
 				gbString str = type_to_string(type);
 				error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);
@@ -1883,6 +1996,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					error(name, "'#by_ptr' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_by_ptr;
 				}
+				if (p->flags&FieldFlag_no_capture) {
+					error(name, "'#no_capture' can only be applied to variable fields");
+					p->flags &= ~FieldFlag_no_capture;
+				}
 
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
@@ -1973,8 +2090,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 
 				if (p->flags&FieldFlag_no_alias) {
-					if (!is_type_pointer(type)) {
-						error(name, "'#no_alias' can only be applied pointer typed parameters");
+					if (!is_type_pointer(type) && !is_type_multi_pointer(type)) {
+						error(name, "'#no_alias' can only be applied pointer or multi-pointer typed parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
@@ -1984,6 +2101,28 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						p->flags &= ~FieldFlag_by_ptr; // Remove the flag
 					}
 				}
+				if (p->flags&FieldFlag_no_capture) {
+					if (is_variadic && variadic_index == variables.count) {
+						if (p->flags & FieldFlag_c_vararg) {
+							error(name, "'#no_capture' cannot be applied to a #c_vararg parameter");
+							p->flags &= ~FieldFlag_no_capture;
+						} else {
+							error(name, "'#no_capture' is already implied on all variadic parameter");
+						}
+					} else if (is_type_polymorphic(type)) {
+						// ignore
+					} else {
+						if (is_type_internally_pointer_like(type)) {
+							error(name, "'#no_capture' is currently reserved for future use");
+						} else {
+							ERROR_BLOCK();
+							error(name, "'#no_capture' can only be applied to pointer-like types");
+							error_line("\t'#no_capture' does not currently do anything useful\n");
+							p->flags &= ~FieldFlag_no_capture;
+						}
+					}
+				}
+
 
 				if (is_poly_name) {
 					if (p->flags&FieldFlag_no_alias) {
@@ -2002,6 +2141,11 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						error(name, "'#by_ptr' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_by_ptr;
 					}
+					if (p->flags&FieldFlag_no_capture) {
+						error(name, "'#no_capture' can only be applied to variable fields");
+						p->flags &= ~FieldFlag_no_capture;
+					}
+
 
 					if (!is_type_polymorphic(type) && check_constant_parameter_value(type, params[i])) {
 						// failed
@@ -2013,8 +2157,19 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					param = alloc_entity_param(scope, name->Ident.token, type, is_using, true);
 					param->Variable.param_value = param_value;
 					param->Variable.field_group_index = field_group_index;
+					param->Variable.type_expr = type_expr;
 				}
 			}
+
+			if (is_variadic && variadic_index == variables.count) {
+				param->flags |= EntityFlag_Ellipsis;
+				if (is_c_vararg) {
+					param->flags |= EntityFlag_CVarArg;
+				} else {
+					param->flags |= EntityFlag_NoCapture;
+				}
+			}
+
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
 			}
@@ -2036,6 +2191,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			if (p->flags&FieldFlag_by_ptr) {
 				param->flags |= EntityFlag_ByPtr;
 			}
+			if (p->flags&FieldFlag_no_capture) {
+				param->flags |= EntityFlag_NoCapture;
+			}
+
 
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
 			add_entity(ctx, scope, name, param);
@@ -2049,18 +2208,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 
 	if (is_variadic) {
 		GB_ASSERT(variadic_index >= 0);
-	}
-
-	if (is_variadic) {
 		GB_ASSERT(params.count > 0);
-		// NOTE(bill): Change last variadic parameter to be a slice
-		// Custom Calling convention for variadic parameters
-		Entity *end = variables[variadic_index];
-		end->type = alloc_type_slice(end->type);
-		end->flags |= EntityFlag_Ellipsis;
-		if (is_c_vararg) {
-			end->flags |= EntityFlag_CVarArg;
-		}
 	}
 
 	isize specialization_count = 0;
@@ -2198,8 +2346,28 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 	return tuple;
 }
 
+gb_internal void check_procedure_param_polymorphic_type(CheckerContext *ctx, Type *type, Ast *type_expr) {
+	GB_ASSERT_NOT_NULL(type_expr);
+	if (type == nullptr || ctx->in_polymorphic_specialization) { return; }
+	if (!is_type_polymorphic_record_unspecialized(type)) { return; }
 
+	bool invalid_polymorpic_type_use = false;
+	switch (type_expr->kind) {
+	case_ast_node(pt, Ident, type_expr);
+		invalid_polymorpic_type_use = true;
+	case_end;
 
+	case_ast_node(pt, SelectorExpr, type_expr);
+		invalid_polymorpic_type_use = true;
+	case_end;
+	}
+
+	if (invalid_polymorpic_type_use) {
+		gbString expr_str = expr_to_string(type_expr);
+		defer (gb_string_free(expr_str));
+		error(type_expr, "Invalid use of a non-specialized polymorphic type '%s'", expr_str);
+	}
+}
 
 // NOTE(bill): 'operands' is for generating non generic procedure type
 gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, Array<Operand> const *operands) {
@@ -2322,6 +2490,7 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 		if (e->kind != Entity_Variable) {
 			is_polymorphic = true;
 		} else if (is_type_polymorphic(e->type)) {
+			check_procedure_param_polymorphic_type(c, e->type, e->Variable.type_expr);
 			is_polymorphic = true;
 		}
 
@@ -2362,9 +2531,15 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	if (e == nullptr) {
 		return 0;
 	}
-	if (e->kind == Ast_UnaryExpr &&
-	    e->UnaryExpr.op.kind == Token_Question) {
-		return -1;
+	if (e->kind == Ast_UnaryExpr) {
+		Token op = e->UnaryExpr.op;
+		if (op.kind == Token_Question) {
+			return -1;
+		}
+		if (e->UnaryExpr.expr == nullptr) {
+			error(op, "Invalid array count '[%.*s]'", LIT(op.string));
+			return 0;
+		}
 	}
 
 	check_expr_or_type(ctx, o, e);
@@ -2601,6 +2776,18 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
 
+	if (mt->key == NULL) {
+		if (mt->value != NULL) {
+			Type *value = check_type(ctx, mt->value);
+			gbString str = type_to_string(value);
+			error(node, "Missing map key type, got 'map[]%s'", str);
+			gb_string_free(str);
+			return;
+		}
+		error(node, "Missing map key type, got 'map[]T'");
+		return;
+	}
+
 	Type *key   = check_type(ctx, mt->key);
 	Type *value = check_type(ctx, mt->value);
 
@@ -2757,12 +2944,15 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 				GB_ASSERT(soa_count >= 0);
 				field_type = alloc_type_array(old_field->type, soa_count);
 			} else {
-				field_type = alloc_type_pointer(old_field->type);
+				field_type = alloc_type_multi_pointer(old_field->type);
 			}
 			Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
 			t->Struct.fields[i] = new_field;
 			add_entity(scope, new_field);
 			new_field->flags |= EntityFlag_Used;
+			if (t->Struct.soa_kind != StructSoa_Fixed) {
+				new_field->flags |= EntityFlag_SoaPtrField;
+			}
 		} else {
 			t->Struct.fields[i] = old_field;
 		}
@@ -2878,7 +3068,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 				GB_ASSERT(count >= 0);
 				field_type = alloc_type_array(old_array->Array.elem, count);
 			} else {
-				field_type = alloc_type_pointer(old_array->Array.elem);
+				field_type = alloc_type_multi_pointer(old_array->Array.elem);
 			}
 			Token token = {};
 			token.string = params_xyzw[i];
@@ -2887,6 +3077,9 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 			soa_struct->Struct.fields[i] = new_field;
 			add_entity(ctx, scope, nullptr, new_field);
 			add_entity_use(ctx, nullptr, new_field);
+			if (soa_kind != StructSoa_Fixed) {
+				new_field->flags |= EntityFlag_SoaPtrField;
+			}
 		}
 
 		is_complete = true;
@@ -2910,12 +3103,15 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 						GB_ASSERT(count >= 0);
 						field_type = alloc_type_array(old_field->type, count);
 					} else {
-						field_type = alloc_type_pointer(old_field->type);
+						field_type = alloc_type_multi_pointer(old_field->type);
 					}
 					Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
 					soa_struct->Struct.fields[i] = new_field;
 					add_entity(ctx, scope, nullptr, new_field);
 					add_entity_use(ctx, nullptr, new_field);
+					if (soa_kind != StructSoa_Fixed) {
+						new_field->flags |= EntityFlag_SoaPtrField;
+					}
 				} else {
 					soa_struct->Struct.fields[i] = old_field;
 				}
@@ -3045,7 +3241,7 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 			} else if (name == "simd") {
 				if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
 					gbString str = type_to_string(elem);
-					error(at->elem, "Invalid element type for #simd, expected an integer, float, or boolean with no specific endianness, got '%s'", str);
+					error(at->elem, "Invalid element type for #simd, expected an integer, float, boolean, or 'rawptr' with no specific endianness, got '%s'", str);
 					gb_string_free(str);
 					*type = alloc_type_array(elem, count, generic_type);
 					return;
@@ -3219,6 +3415,11 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
+		if (pe->expr == nullptr) {
+			error(e, "Expected an expression or type within the parentheses");
+			*type = t_invalid;
+			return true;
+		}
 		*type = check_type_expr(ctx, pe->expr, named_type);
 		set_base_type(named_type, *type);
 		return true;
@@ -3254,6 +3455,10 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			if (o.mode == Addressing_Variable) {
 				gbString s = expr_to_string(pt->type);
 				error(e, "^ is used for pointer types, did you mean '&%s'?", s);
+				gb_string_free(s);
+			} else if (is_type_pointer(o.type)) {
+				gbString s = expr_to_string(pt->type);
+				error(e, "^ is used for pointer types, did you mean a dereference: '%s^'?", s);
 				gb_string_free(s);
 			} else {
 				// NOTE(bill): call check_type_expr again to get a consistent error message

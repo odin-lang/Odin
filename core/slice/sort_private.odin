@@ -1,4 +1,4 @@
-//+private
+#+private
 package slice
 
 import "base:intrinsics"

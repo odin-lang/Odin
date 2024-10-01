@@ -7,6 +7,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+
 package xxhash
 
 import "base:intrinsics"
@@ -111,13 +112,13 @@ XXH128_canonical :: struct {
 	@param lhs, rhs The 64-bit integers to multiply
 	@return The low 64 bits of the product XOR'd by the high 64 bits.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH_mul_64_to_128_fold_64 :: #force_inline proc(lhs, rhs: xxh_u64) -> (res: xxh_u64) {
 	t := u128(lhs) * u128(rhs)
 	return u64(t & 0xFFFFFFFFFFFFFFFF) ~ u64(t >> 64)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH_xorshift_64 :: #force_inline proc(v: xxh_u64, #any_int shift: uint) -> (res: xxh_u64) {
 	return v ~ (v >> shift)
 }
@@ -125,7 +126,7 @@ XXH_xorshift_64 :: #force_inline proc(v: xxh_u64, #any_int shift: uint) -> (res:
 /*
 	This is a fast avalanche stage, suitable when input bits are already partially mixed
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_avalanche :: #force_inline proc(h64: xxh_u64) -> (res: xxh_u64) {
 	res = XXH_xorshift_64(h64, 37)
 	res *= 0x165667919E3779F9
@@ -137,7 +138,7 @@ XXH3_avalanche :: #force_inline proc(h64: xxh_u64) -> (res: xxh_u64) {
 	This is a stronger avalanche, inspired by Pelle Evensen's rrmxmx
 	preferable when input has not been previously mixed
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_rrmxmx :: #force_inline proc(h64, length: xxh_u64) -> (res: xxh_u64) {
 	/* this mix is inspired by Pelle Evensen's rrmxmx */
 	res = h64
@@ -166,7 +167,7 @@ XXH3_rrmxmx :: #force_inline proc(h64, length: xxh_u64) -> (res: xxh_u64) {
 	fast for a _128-bit_ hash on 32-bit (it usually clears XXH64).
 */
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_1to3_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u128) {
 	/* A doubled version of 1to3_64b with different constants. */
 	length := len(input)
@@ -190,7 +191,7 @@ XXH3_len_1to3_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u6
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_4to8_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u128) {
 	length := len(input)
 	seed   := seed
@@ -219,7 +220,7 @@ XXH3_len_4to8_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u6
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_9to16_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u128) {
 	length := len(input)
 
@@ -261,7 +262,7 @@ XXH3_len_9to16_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u
 /*
 	Assumption: `secret` size is >= XXH3_SECRET_SIZE_MIN
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_0to16_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u128) {
 	length := len(input)
 
@@ -279,7 +280,7 @@ XXH3_len_0to16_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u
 /*
 	A bit slower than XXH3_mix16B, but handles multiply by zero better.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH128_mix32B :: #force_inline proc(acc: xxh_u128, input_1: []u8, input_2: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u128) {
 	acc128 := XXH128_hash_t{
 		h = acc,
@@ -293,7 +294,7 @@ XXH128_mix32B :: #force_inline proc(acc: xxh_u128, input_1: []u8, input_2: []u8,
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_17to128_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u128) {
 	length := len(input)
 
@@ -323,7 +324,7 @@ XXH3_len_17to128_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh
 	unreachable()
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_129to240_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u128) {
 	length := len(input)
 
@@ -379,7 +380,7 @@ XXH3_INIT_ACC :: [XXH_ACC_NB]xxh_u64{
 
 XXH_SECRET_MERGEACCS_START :: 11
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_128b_internal :: #force_inline proc(
 			input: []u8,
 			secret: []u8,
@@ -407,7 +408,7 @@ XXH3_hashLong_128b_internal :: #force_inline proc(
 /*
  * It's important for performance that XXH3_hashLong is not inlined.
  */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_128b_default :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (res: XXH3_128_hash) {
 	return XXH3_hashLong_128b_internal(input, XXH3_kSecret[:], XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
@@ -415,12 +416,12 @@ XXH3_hashLong_128b_default :: #force_no_inline proc(input: []u8, seed: xxh_u64, 
 /*
  * It's important for performance that XXH3_hashLong is not inlined.
  */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_128b_withSecret :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (res: XXH3_128_hash) {
 	return XXH3_hashLong_128b_internal(input, secret, XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_128b_withSeed_internal :: #force_inline proc(
 								input: []u8, seed: xxh_u64, secret: []u8,
 								f_acc512: XXH3_accumulate_512_f,
@@ -441,14 +442,14 @@ XXH3_hashLong_128b_withSeed_internal :: #force_inline proc(
 /*
  * It's important for performance that XXH3_hashLong is not inlined.
  */
- @(optimization_mode="speed")
+ @(optimization_mode="favor_size")
 XXH3_hashLong_128b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (res: XXH3_128_hash) {
 	return XXH3_hashLong_128b_withSeed_internal(input, seed, secret, XXH3_accumulate_512, XXH3_scramble_accumulator , XXH3_init_custom_secret)
 }
 
 XXH3_hashLong128_f :: #type proc(input: []u8, seed: xxh_u64, secret: []u8)  -> (res: XXH3_128_hash)
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_128bits_internal :: #force_inline proc(
 	input: []u8, seed: xxh_u64, secret: []u8, f_hl128: XXH3_hashLong128_f) -> (res: XXH3_128_hash) {
 
@@ -474,17 +475,17 @@ XXH3_128bits_internal :: #force_inline proc(
 }
 
 /* ===   Public XXH128 API   === */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_128_default :: proc(input: []u8) -> (hash: XXH3_128_hash) {
 	return XXH3_128bits_internal(input, 0, XXH3_kSecret[:], XXH3_hashLong_128b_withSeed)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_128_with_seed :: proc(input: []u8, seed: xxh_u64) -> (hash: XXH3_128_hash) {
 	return XXH3_128bits_internal(input, seed, XXH3_kSecret[:], XXH3_hashLong_128b_withSeed)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_128_with_secret :: proc(input: []u8, secret: []u8) -> (hash: XXH3_128_hash) {
 	return XXH3_128bits_internal(input, 0, secret, XXH3_hashLong_128b_withSecret)
 }
@@ -519,7 +520,7 @@ XXH3_128 :: proc { XXH3_128_default, XXH3_128_with_seed, XXH3_128_with_secret }
 	The XOR mixing hides individual parts of the secret and increases entropy.
 	This adds an extra layer of strength for custom secrets.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_1to3_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u64) {
 	length := u32(len(input))
 	assert(input != nil)
@@ -542,7 +543,7 @@ XXH3_len_1to3_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_4to8_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u64) {
 	length := u32(len(input))
 	assert(input != nil)
@@ -562,7 +563,7 @@ XXH3_len_4to8_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_9to16_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u64) {
 	length := u64(len(input))
 	assert(input != nil)
@@ -579,7 +580,7 @@ XXH3_len_9to16_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u6
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_0to16_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u64) {
 	length := u64(len(input))
 	assert(input != nil)
@@ -621,7 +622,7 @@ XXH3_len_0to16_64b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u6
 	by this, although it is always a good idea to use a proper seed if you care
 	about strength.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_mix16B :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u64) {
 	input_lo := XXH64_read64(input[0:])
 	input_hi := XXH64_read64(input[8:])
@@ -632,7 +633,7 @@ XXH3_mix16B :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u64) -> (
 }
 
 /* For mid range keys, XXH3 uses a Mum-hash variant. */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_17to128_64b :: proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u64) {
 	assert(len(secret) >= XXH3_SECRET_SIZE_MIN)
 	length := len(input)
@@ -665,7 +666,7 @@ XXH3_MIDSIZE_MAX         :: 240
 XXH3_MIDSIZE_STARTOFFSET :: 3
 XXH3_MIDSIZE_LASTOFFSET  :: 17
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_len_129to240_64b :: proc(input: []u8, secret: []u8, seed: xxh_u64) -> (res: xxh_u64) {
 	assert(len(secret) >= XXH3_SECRET_SIZE_MIN)
 	length := len(input)
@@ -699,7 +700,7 @@ XXH_SECRET_CONSUME_RATE  :: 8 /* nb of secret bytes consumed at each accumulatio
 XXH_ACC_NB               :: (XXH_STRIPE_LEN / size_of(xxh_u64))
 XXH_SECRET_LASTACC_START :: 7 /* not aligned on 8, last secret is different from acc & scrambler */
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH_writeLE64 :: #force_inline proc(dst: []u8, v64: u64le) {
 	v := v64
 	mem_copy(raw_data(dst), &v, size_of(v64))
@@ -737,7 +738,7 @@ XXH3_scramble_accumulator : XXH3_scramble_accumulator_f = XXH3_scramble_accumula
 XXH3_init_custom_secret   : XXH3_init_custom_secret_f   = XXH3_init_custom_secret_scalar
 
 /* scalar variants - universal */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_accumulate_512_scalar :: #force_inline proc(acc: []xxh_u64, input: []u8, secret: []u8) {
 	xacc    := acc     /* presumed aligned */
 	xinput  := input   /* no alignment restriction */
@@ -754,7 +755,7 @@ XXH3_accumulate_512_scalar :: #force_inline proc(acc: []xxh_u64, input: []u8, se
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_scramble_accumulator_scalar :: #force_inline proc(acc: []xxh_u64, secret: []u8) {
 	xacc    := acc     /* presumed aligned */
 	xsecret := secret  /* no alignment restriction */
@@ -771,7 +772,7 @@ XXH3_scramble_accumulator_scalar :: #force_inline proc(acc: []xxh_u64, secret: [
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_init_custom_secret_scalar :: #force_inline proc(custom_secret: []u8, seed64: xxh_u64) {
 	#assert((XXH_SECRET_DEFAULT_SIZE & 15) == 0)
 
@@ -791,7 +792,7 @@ XXH_PREFETCH_DIST :: 320
  * Loops over XXH3_accumulate_512().
  * Assumption: nbStripes will not overflow the secret size
  */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_accumulate :: #force_inline proc(
 	acc: []xxh_u64, input: []u8, secret: []u8, nbStripes: uint, f_acc512: XXH3_accumulate_512_f) {
 
@@ -804,7 +805,7 @@ XXH3_accumulate :: #force_inline proc(
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_internal_loop :: #force_inline proc(acc: []xxh_u64, input: []u8, secret: []u8,
 	f_acc512: XXH3_accumulate_512_f, f_scramble: XXH3_scramble_accumulator_f) {
 
@@ -833,14 +834,14 @@ XXH3_hashLong_internal_loop :: #force_inline proc(acc: []xxh_u64, input: []u8, s
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_mix2Accs :: #force_inline proc(acc: []xxh_u64, secret: []u8) -> (res: xxh_u64) {
 	return XXH_mul_64_to_128_fold_64(
 		acc[0] ~ XXH64_read64(secret),
 		acc[1] ~ XXH64_read64(secret[8:]))
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_mergeAccs :: #force_inline proc(acc: []xxh_u64, secret: []u8, start: xxh_u64) -> (res: xxh_u64) {
 	result64 := start
 	#no_bounds_check for i := 0; i < 4; i += 1 {
@@ -849,7 +850,7 @@ XXH3_mergeAccs :: #force_inline proc(acc: []xxh_u64, secret: []u8, start: xxh_u6
 	return XXH3_avalanche(result64)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_64b_internal :: #force_inline proc(input: []u8, secret: []u8,
 			f_acc512: XXH3_accumulate_512_f, f_scramble: XXH3_scramble_accumulator_f) -> (hash: xxh_u64) {
 
@@ -868,7 +869,7 @@ XXH3_hashLong_64b_internal :: #force_inline proc(input: []u8, secret: []u8,
 /*
 	It's important for performance that XXH3_hashLong is not inlined.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_64b_withSecret :: #force_no_inline proc(input: []u8, seed64: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
 	return XXH3_hashLong_64b_internal(input, secret, XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
@@ -880,7 +881,7 @@ XXH3_hashLong_64b_withSecret :: #force_no_inline proc(input: []u8, seed64: xxh_u
 	This variant enforces that the compiler can detect that,
 	and uses this opportunity to streamline the generated code for better performance.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_64b_default :: #force_no_inline proc(input: []u8, seed64: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
 	return XXH3_hashLong_64b_internal(input, XXH3_kSecret[:], XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
@@ -896,26 +897,27 @@ XXH3_hashLong_64b_default :: #force_no_inline proc(input: []u8, seed64: xxh_u64,
 	It's important for performance that XXH3_hashLong is not inlined. Not sure
 	why (uop cache maybe?), but the difference is large and easily measurable.
 */
-@(optimization_mode="speed")
-XXH3_hashLong_64b_withSeed_internal :: #force_no_inline proc(input: []u8,
-									seed:        xxh_u64,
-									f_acc512:    XXH3_accumulate_512_f,
-									f_scramble:  XXH3_scramble_accumulator_f,
-									f_init_sec:  XXH3_init_custom_secret_f) -> (hash: xxh_u64) {
+@(optimization_mode="favor_size")
+XXH3_hashLong_64b_withSeed_internal :: #force_no_inline proc(
+	input:       []u8,
+	seed:        xxh_u64,
+	f_acc512:    XXH3_accumulate_512_f,
+	f_scramble:  XXH3_scramble_accumulator_f,
+	f_init_sec:  XXH3_init_custom_secret_f,
+) -> (hash: xxh_u64) {
 	if seed == 0 {
 		return XXH3_hashLong_64b_internal(input, XXH3_kSecret[:], f_acc512, f_scramble)
 	}
-	{
-		secret: [XXH_SECRET_DEFAULT_SIZE]u8
-		f_init_sec(secret[:], seed)
-		return XXH3_hashLong_64b_internal(input, secret[:], f_acc512, f_scramble)
-	}
+
+	secret: [XXH_SECRET_DEFAULT_SIZE]u8
+	f_init_sec(secret[:], seed)
+	return XXH3_hashLong_64b_internal(input, secret[:], f_acc512, f_scramble)
 }
 
 /*
 	It's important for performance that XXH3_hashLong is not inlined.
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_hashLong_64b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
 	return XXH3_hashLong_64b_withSeed_internal(input, seed, XXH3_accumulate_512, XXH3_scramble_accumulator, XXH3_init_custom_secret)
 }
@@ -923,7 +925,7 @@ XXH3_hashLong_64b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, 
 
 XXH3_hashLong64_f :: #type proc(input: []u8, seed: xxh_u64, secret: []u8)  -> (res: xxh_u64)
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_64bits_internal :: proc(input: []u8, seed: xxh_u64, secret: []u8, f_hashLong: XXH3_hashLong64_f) -> (hash: xxh_u64) {
 	assert(len(secret) >= XXH3_SECRET_SIZE_MIN)
 	/*
@@ -943,17 +945,17 @@ XXH3_64bits_internal :: proc(input: []u8, seed: xxh_u64, secret: []u8, f_hashLon
 }
 
 /* ===   Public entry point   === */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_64_default :: proc(input: []u8) -> (hash: xxh_u64) {
 	return XXH3_64bits_internal(input, 0, XXH3_kSecret[:], XXH3_hashLong_64b_default)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_64_with_seed :: proc(input: []u8, seed: xxh_u64) -> (hash: xxh_u64) {
 	return XXH3_64bits_internal(input, seed, XXH3_kSecret[:], XXH3_hashLong_64b_withSeed)
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 XXH3_64_with_secret :: proc(input, secret: []u8) -> (hash: xxh_u64) {
 	return XXH3_64bits_internal(input, 0, secret, XXH3_hashLong_64b_withSecret)
 }

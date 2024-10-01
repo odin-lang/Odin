@@ -1,104 +1,14 @@
 package test_encoding_cbor
 
 import "base:intrinsics"
-
 import "core:bytes"
 import "core:encoding/cbor"
 import "core:fmt"
 import "core:io"
 import "core:math/big"
-import "core:mem"
-import "core:os"
 import "core:reflect"
 import "core:testing"
 import "core:time"
-
-TEST_count := 0
-TEST_fail  := 0
-
-when ODIN_TEST {
-	expect       :: testing.expect
-	expect_value :: testing.expect_value
-	errorf       :: testing.errorf
-	log          :: testing.log
-
-} else {
-	expect :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-
-	expect_value :: proc(t: ^testing.T, value, expected: $T, loc := #caller_location) -> bool where intrinsics.type_is_comparable(T) {
-		TEST_count += 1
-		ok := value == expected || reflect.is_nil(value) && reflect.is_nil(expected)
-		if !ok {
-			TEST_fail += 1
-			fmt.printf("[%v] expected %v, got %v\n", loc, expected, value)
-		}
-		return ok
-	}
-
-	errorf :: proc(t: ^testing.T, fmts: string, args: ..any, loc := #caller_location) {
-		TEST_fail += 1
-		fmt.printf("[%v] ERROR: ", loc)
-		fmt.printf(fmts, ..args)
-		fmt.println()
-	}
-
-	log :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
-
-main :: proc() {
-	t := testing.T{}
-
-	test_marshalling(&t)
-
-	test_marshalling_maybe(&t)
-	test_marshalling_nil_maybe(&t)
-
-	test_marshalling_union(&t)
-
-	test_lying_length_array(&t)
-
-	test_decode_unsigned(&t)
-	test_encode_unsigned(&t)
-
-	test_decode_negative(&t)
-	test_encode_negative(&t)
-
-	test_decode_simples(&t)
-	test_encode_simples(&t)
-
-	test_decode_floats(&t)
-	test_encode_floats(&t)
-
-	test_decode_bytes(&t)
-	test_encode_bytes(&t)
-
-	test_decode_strings(&t)
-	test_encode_strings(&t)
-
-	test_decode_lists(&t)
-	test_encode_lists(&t)
-
-	test_decode_maps(&t)
-	test_encode_maps(&t)
-
-	test_decode_tags(&t)
-	test_encode_tags(&t)
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
 
 Foo :: struct {
 	str: string,
@@ -143,14 +53,6 @@ FooBars :: bit_set[FooBar; u16]
 
 @(test)
 test_marshalling :: proc(t: ^testing.T) {
-	tracker: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&tracker, context.allocator)
-	context.allocator = mem.tracking_allocator(&tracker)
-	context.temp_allocator = context.allocator
-	defer mem.tracking_allocator_destroy(&tracker)
-
-	ev :: expect_value
-
 	{
 		nice := "16 is a nice number"
 		now := time.Time{_nsec = 1701117968 * 1e9}
@@ -205,21 +107,35 @@ test_marshalling :: proc(t: ^testing.T) {
 		}
 		
 		data, err := cbor.marshal(f, cbor.ENCODE_FULLY_DETERMINISTIC)
-		ev(t, err, nil)
+		testing.expect_value(t, err, nil)
 		defer delete(data)
 
 		decoded, derr := cbor.decode(string(data))
-		ev(t, derr, nil)
+		testing.expect_value(t, derr, nil)
 		defer cbor.destroy(decoded)
 
 		diagnosis, eerr := cbor.to_diagnostic_format(decoded)
-		ev(t, eerr, nil)
+		testing.expect_value(t, eerr, nil)
 		defer delete(diagnosis)
-
-		ev(t, diagnosis, `{
-	"base64": 34("MTYgaXMgYSBuaWNlIG51bWJlcg=="),
-	"biggest": 2(h'f951a9fd3c158afdff08ab8e0'),
-	"biggie": 18446744073709551615,
+		testing.expect_value(t, diagnosis, `{
+	"no": null,
+	"neg": -69,
+	"nos": undefined,
+	"now": 1(1701117968),
+	"pos": 1212,
+	"str": "Hellope",
+	"yes": true,
+	"comp": [
+		32.0000,
+		33.0000
+	],
+	"cstr": "Hellnope",
+	"quat": [
+		17.0000,
+		18.0000,
+		19.0000,
+		16.0000
+	],
 	"child": {
 		"dyn": [
 			"one",
@@ -246,46 +162,31 @@ test_marshalling :: proc(t: ^testing.T) {
 			10
 		]
 	},
-	"comp": [
-		32.0000,
-		33.0000
-	],
-	"cstr": "Hellnope",
 	"ennie": 0,
-	"ennieb": 512,
-	"iamint": -256,
-	"important": "!",
-	"my_bytes": h'',
-	"neg": -69,
-	"no": nil,
-	"nos": undefined,
-	"now": 1(1701117968),
 	"nowie": {
 		"_nsec": 1701117968000000000
 	},
-	"onetwenty": 12345,
-	"pos": 1212,
-	"quat": [
-		17.0000,
-		18.0000,
-		19.0000,
-		16.0000
-	],
-	"renamed :)": 123123.12500000,
-	"small_onetwenty": -18446744073709551615,
-	"smallest": 3(h'f951a9fd3c158afdff08ab8e0'),
-	"smallie": -18446744073709551616,
-	"str": "Hellope",
 	"value": {
 		16: "16 is a nice number",
 		32: 69
 	},
-	"yes": true
+	"base64": 34("MTYgaXMgYSBuaWNlIG51bWJlcg=="),
+	"biggie": 18446744073709551615,
+	"ennieb": 512,
+	"iamint": -256,
+	"biggest": 2(h'0f951a9fd3c158afdff08ab8e0'),
+	"smallie": -18446744073709551616,
+	"my_bytes": h'',
+	"smallest": 3(h'0f951a9fd3c158afdff08ab8e0'),
+	"important": "!",
+	"onetwenty": 12345,
+	"renamed :)": 123123.12500000,
+	"small_onetwenty": -18446744073709551615
 }`)
 
 		backf: Foo
 		uerr := cbor.unmarshal(string(data), &backf)
-		ev(t, uerr, nil)
+		testing.expect_value(t, uerr, nil)
 		defer {
 			delete(backf.str)
 			delete(backf.cstr)
@@ -304,69 +205,61 @@ test_marshalling :: proc(t: ^testing.T) {
 			big.destroy(&backf.smallest)
 		}
 		
-		ev(t, backf.str, f.str)
-		ev(t, backf.cstr, f.cstr)
+		testing.expect_value(t, backf.str, f.str)
+		testing.expect_value(t, backf.cstr, f.cstr)
 
 		#partial switch v in backf.value {
 		case ^cbor.Map:
 			for entry, i in v {
 				fm := f.value.(^cbor.Map)
-				ev(t, entry.key, fm[i].key)
+				testing.expect_value(t, entry.key, fm[i].key)
 
 				if str, is_str := entry.value.(^cbor.Text); is_str {
-					ev(t, str^, fm[i].value.(^cbor.Text)^)
+					testing.expect_value(t, str^, fm[i].value.(^cbor.Text)^)
 				} else {
-					ev(t, entry.value, fm[i].value)
+					testing.expect_value(t, entry.value, fm[i].value)
 				}
 			}
 
-		case: errorf(t, "wrong type %v", v)
+		case: testing.expectf(t, false, "wrong type %v", v)
 		}
 
-		ev(t, backf.neg, f.neg)
-		ev(t, backf.iamint, f.iamint)
-		ev(t, backf.base64, f.base64)
-		ev(t, backf.renamed, f.renamed)
-		ev(t, backf.now, f.now)
-		ev(t, backf.nowie, f.nowie)
-		for e, i in f.child.dyn { ev(t, backf.child.dyn[i], e) }
-		for key, value in f.child.mappy { ev(t, backf.child.mappy[key], value) }
-		ev(t, backf.child.my_integers, f.child.my_integers)
-		ev(t, len(backf.my_bytes), 0)
-		ev(t, len(backf.my_bytes), len(f.my_bytes))
-		ev(t, backf.ennie, f.ennie)
-		ev(t, backf.ennieb, f.ennieb)
-		ev(t, backf.quat, f.quat)
-		ev(t, backf.comp, f.comp)
-		ev(t, backf.important, f.important)
-		ev(t, backf.no, nil)
-		ev(t, backf.nos, nil)
-		ev(t, backf.yes, f.yes)
-		ev(t, backf.biggie, f.biggie)
-		ev(t, backf.smallie, f.smallie)
-		ev(t, backf.onetwenty, f.onetwenty)
-		ev(t, backf.small_onetwenty, f.small_onetwenty)
-		ev(t, backf.ignore_this, nil)
+		testing.expect_value(t, backf.neg, f.neg)
+		testing.expect_value(t, backf.iamint, f.iamint)
+		testing.expect_value(t, backf.base64, f.base64)
+		testing.expect_value(t, backf.renamed, f.renamed)
+		testing.expect_value(t, backf.now, f.now)
+		testing.expect_value(t, backf.nowie, f.nowie)
+		for e, i in f.child.dyn { testing.expect_value(t, backf.child.dyn[i], e) }
+		for key, value in f.child.mappy { testing.expect_value(t, backf.child.mappy[key], value) }
+		testing.expect_value(t, backf.child.my_integers, f.child.my_integers)
+		testing.expect_value(t, len(backf.my_bytes), 0)
+		testing.expect_value(t, len(backf.my_bytes), len(f.my_bytes))
+		testing.expect_value(t, backf.ennie, f.ennie)
+		testing.expect_value(t, backf.ennieb, f.ennieb)
+		testing.expect_value(t, backf.quat, f.quat)
+		testing.expect_value(t, backf.comp, f.comp)
+		testing.expect_value(t, backf.important, f.important)
+		testing.expect_value(t, backf.no, nil)
+		testing.expect_value(t, backf.nos, nil)
+		testing.expect_value(t, backf.yes, f.yes)
+		testing.expect_value(t, backf.biggie, f.biggie)
+		testing.expect_value(t, backf.smallie, f.smallie)
+		testing.expect_value(t, backf.onetwenty, f.onetwenty)
+		testing.expect_value(t, backf.small_onetwenty, f.small_onetwenty)
+		testing.expect_value(t, backf.ignore_this, nil)
 		
 		s_equals, s_err := big.equals(&backf.smallest, &f.smallest)
-		ev(t, s_err, nil)
+		testing.expect_value(t, s_err, nil)
 		if !s_equals {
-			errorf(t, "smallest: %v does not equal %v", big.itoa(&backf.smallest), big.itoa(&f.smallest))
+			testing.expectf(t, false, "smallest: %v does not equal %v", big.itoa(&backf.smallest), big.itoa(&f.smallest))
 		}
 
 		b_equals, b_err := big.equals(&backf.biggest, &f.biggest)
-		ev(t, b_err, nil)
+		testing.expect_value(t, b_err, nil)
 		if !b_equals {
-			errorf(t, "biggest: %v does not equal %v", big.itoa(&backf.biggest), big.itoa(&f.biggest))
+			testing.expectf(t, false, "biggest: %v does not equal %v", big.itoa(&backf.biggest), big.itoa(&f.biggest))
 		}
-	}
-
-	for _, leak in tracker.allocation_map {
-		errorf(t, "%v leaked %m\n", leak.location, leak.size)
-	}
-
-	for bad_free in tracker.bad_free_array {
-		errorf(t, "%v allocation %p was freed badly\n", bad_free.location, bad_free.memory)
 	}
 }
 
@@ -374,34 +267,40 @@ test_marshalling :: proc(t: ^testing.T) {
 test_marshalling_maybe :: proc(t: ^testing.T) {
 	maybe_test: Maybe(int) = 1
 	data, err := cbor.marshal(maybe_test)
-	expect_value(t, err, nil)
+	defer delete(data)
+	testing.expect_value(t, err, nil)
 
 	val, derr := cbor.decode(string(data))
-	expect_value(t, derr, nil)
+	testing.expect_value(t, derr, nil)
 
-	expect_value(t, cbor.to_diagnostic_format(val), "1")
+	diag := cbor.to_diagnostic_format(val)
+	testing.expect_value(t, diag, "1")
+	delete(diag)
 	
 	maybe_dest: Maybe(int)
 	uerr := cbor.unmarshal(string(data), &maybe_dest)
-	expect_value(t, uerr, nil)
-	expect_value(t, maybe_dest, 1)
+	testing.expect_value(t, uerr, nil)
+	testing.expect_value(t, maybe_dest, 1)
 }
 
 @(test)
 test_marshalling_nil_maybe :: proc(t: ^testing.T) {
 	maybe_test: Maybe(int)
 	data, err := cbor.marshal(maybe_test)
-	expect_value(t, err, nil)
+	defer delete(data)
+	testing.expect_value(t, err, nil)
 
 	val, derr := cbor.decode(string(data))
-	expect_value(t, derr, nil)
+	testing.expect_value(t, derr, nil)
 
-	expect_value(t, cbor.to_diagnostic_format(val), "nil")
+	diag := cbor.to_diagnostic_format(val)
+	testing.expect_value(t, diag, "null")
+	delete(diag)
 	
 	maybe_dest: Maybe(int)
 	uerr := cbor.unmarshal(string(data), &maybe_dest)
-	expect_value(t, uerr, nil)
-	expect_value(t, maybe_dest, nil)
+	testing.expect_value(t, uerr, nil)
+	testing.expect_value(t, maybe_dest, nil)
 }
 
 @(test)
@@ -427,17 +326,24 @@ test_marshalling_union :: proc(t: ^testing.T) {
 	{
 		test: My_Union = My_Distinct("Hello, World!")
 		data, err := cbor.marshal(test)
-		expect_value(t, err, nil)
+		defer delete(data)
+		testing.expect_value(t, err, nil)
 
 		val, derr := cbor.decode(string(data))
-		expect_value(t, derr, nil)
+		defer cbor.destroy(val)
+		testing.expect_value(t, derr, nil)
 
-		expect_value(t, cbor.to_diagnostic_format(val, -1), `1010(["My_Distinct", "Hello, World!"])`)
+		diag := cbor.to_diagnostic_format(val, -1)
+		defer delete(diag)
+		testing.expect_value(t, diag, `1010(["My_Distinct", "Hello, World!"])`)
 
 		dest: My_Union
 		uerr := cbor.unmarshal(string(data), &dest)
-		expect_value(t, uerr, nil)
-		expect_value(t, dest, My_Distinct("Hello, World!"))
+		testing.expect_value(t, uerr, nil)
+		testing.expect_value(t, dest, My_Distinct("Hello, World!"))
+		if str, ok := dest.(My_Distinct); ok {
+			delete(string(str))
+		}
 	}
 
 	My_Union_No_Nil :: union #no_nil {
@@ -450,17 +356,21 @@ test_marshalling_union :: proc(t: ^testing.T) {
 	{
 		test: My_Union_No_Nil = My_Struct{.Two}
 		data, err := cbor.marshal(test)
-		expect_value(t, err, nil)
+		defer delete(data)
+		testing.expect_value(t, err, nil)
 
 		val, derr := cbor.decode(string(data))
-		expect_value(t, derr, nil)
+		defer cbor.destroy(val)
+		testing.expect_value(t, derr, nil)
 
-		expect_value(t, cbor.to_diagnostic_format(val, -1), `1010(["My_Struct", {"my_enum": 1}])`)
+		diag := cbor.to_diagnostic_format(val, -1)
+		defer delete(diag)
+		testing.expect_value(t, diag, `1010(["My_Struct", {"my_enum": 1}])`)
 
 		dest: My_Union_No_Nil
 		uerr := cbor.unmarshal(string(data), &dest)
-		expect_value(t, uerr, nil)
-		expect_value(t, dest, My_Struct{.Two})
+		testing.expect_value(t, uerr, nil)
+		testing.expect_value(t, dest, My_Struct{.Two})
 	}
 }
 
@@ -469,7 +379,7 @@ test_lying_length_array :: proc(t: ^testing.T) {
 	// Input says this is an array of length max(u64), this should not allocate that amount.
 	input := []byte{0x9B, 0x00, 0x00, 0x42, 0xFA, 0x42, 0xFA, 0x42, 0xFA, 0x42}
 	_, err := cbor.decode(string(input))
-	expect_value(t, err, io.Error.Unexpected_EOF) // .Out_Of_Memory would be bad.
+	testing.expect_value(t, err, io.Error.Unexpected_EOF) // .Out_Of_Memory would be bad.
 }
 
 @(test)
@@ -528,7 +438,7 @@ test_encode_negative :: proc(t: ^testing.T) {
 test_decode_simples :: proc(t: ^testing.T) {
 	expect_decoding(t, "\xf4", "false", bool)
 	expect_decoding(t, "\xf5", "true", bool)
-	expect_decoding(t, "\xf6", "nil", cbor.Nil)
+	expect_decoding(t, "\xf6", "null", cbor.Nil)
 	expect_decoding(t, "\xf7", "undefined", cbor.Undefined)
 
 	expect_decoding(t, "\xf0", "simple(16)", cbor.Simple)
@@ -592,11 +502,11 @@ test_encode_floats :: proc(t: ^testing.T) {
 @(test)
 test_decode_bytes :: proc(t: ^testing.T) {
 	expect_decoding(t, "\x40", "h''", ^cbor.Bytes)
-	expect_decoding(t, "\x44\x01\x02\x03\x04", "h'1234'", ^cbor.Bytes)
+	expect_decoding(t, "\x44\x01\x02\x03\x04", "h'01020304'", ^cbor.Bytes)
 
 	// Indefinite lengths
 	
-	expect_decoding(t, "\x5f\x42\x01\x02\x43\x03\x04\x05\xff", "h'12345'", ^cbor.Bytes)
+	expect_decoding(t, "\x5f\x42\x01\x02\x43\x03\x04\x05\xff", "h'0102030405'", ^cbor.Bytes)
 }
 
 @(test)
@@ -691,65 +601,73 @@ test_encode_lists :: proc(t: ^testing.T) {
 	expect_streamed_encoding(t, "\x9f\xff", &cbor.Array{})
 
 	{
-		bytes.buffer_reset(&buf)
+		buf: bytes.Buffer
+		bytes.buffer_init_allocator(&buf, 0, 0)
+		defer bytes.buffer_destroy(&buf)
+		stream  := bytes.buffer_to_stream(&buf)
+		encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream, {}}
 		
 		err: cbor.Encode_Error
 		err = cbor.encode_stream_begin(stream, .Array)
-		expect_value(t, err, nil)
+		testing.expect_value(t, err, nil)
 
 		{
 			err = cbor.encode_stream_array_item(encoder, u8(1))
-			expect_value(t, err, nil)
+			testing.expect_value(t, err, nil)
 
 			err = cbor.encode_stream_array_item(encoder, &cbor.Array{u8(2), u8(3)})
-			expect_value(t, err, nil)
+			testing.expect_value(t, err, nil)
 
 			err = cbor.encode_stream_begin(stream, .Array)
-			expect_value(t, err, nil)
+			testing.expect_value(t, err, nil)
 
 			{
 				err = cbor.encode_stream_array_item(encoder, u8(4))
-				expect_value(t, err, nil)
+				testing.expect_value(t, err, nil)
 
 				err = cbor.encode_stream_array_item(encoder, u8(5))
-				expect_value(t, err, nil)
+				testing.expect_value(t, err, nil)
 			}
 
 			err = cbor.encode_stream_end(stream)
-			expect_value(t, err, nil)
+			testing.expect_value(t, err, nil)
 		}
 
 		err = cbor.encode_stream_end(stream)
-		expect_value(t, err, nil)
+		testing.expect_value(t, err, nil)
 		
-		expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)string("\x9f\x01\x82\x02\x03\x9f\x04\x05\xff\xff")))
+		testing.expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)string("\x9f\x01\x82\x02\x03\x9f\x04\x05\xff\xff")))
 	}
 	
 	{
-		bytes.buffer_reset(&buf)
+		buf: bytes.Buffer
+		bytes.buffer_init_allocator(&buf, 0, 0)
+		defer bytes.buffer_destroy(&buf)
+		stream  := bytes.buffer_to_stream(&buf)
+		encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream, {}}
 	
 		err: cbor.Encode_Error
 		err = cbor._encode_u8(stream, 2, .Array)
-		expect_value(t, err, nil)
+		testing.expect_value(t, err, nil)
 		
 		a := "a"
 		err = cbor.encode(encoder, &a)
-		expect_value(t, err, nil)
+		testing.expect_value(t, err, nil)
 		
 		{
 			err = cbor.encode_stream_begin(stream, .Map)
-			expect_value(t, err, nil)
+			testing.expect_value(t, err, nil)
 			
 			b := "b"
 			c := "c"
 			err = cbor.encode_stream_map_entry(encoder, &b, &c)
-			expect_value(t, err, nil)
+			testing.expect_value(t, err, nil)
 
 			err = cbor.encode_stream_end(stream)
-			expect_value(t, err, nil)
+			testing.expect_value(t, err, nil)
 		}
 		
-		expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)string("\x82\x61\x61\xbf\x61\x62\x61\x63\xff")))
+		testing.expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)string("\x82\x61\x61\xbf\x61\x62\x61\x63\xff")))
 	}
 }
 
@@ -784,10 +702,10 @@ test_encode_maps :: proc(t: ^testing.T) {
 @(test)
 test_decode_tags :: proc(t: ^testing.T) {
 	// Tag number 2 (unsigned bignumber), value bytes, max(u64) + 1.
-	expect_tag(t, "\xc2\x49\x01\x00\x00\x00\x00\x00\x00\x00\x00", cbor.TAG_UNSIGNED_BIG_NR, "2(h'100000000')")
+	expect_tag(t, "\xc2\x49\x01\x00\x00\x00\x00\x00\x00\x00\x00", cbor.TAG_UNSIGNED_BIG_NR, "2(h'010000000000000000')")
 
 	// Tag number 3 (negative bignumber), value bytes, negative max(u64) - 1.
-	expect_tag(t, "\xc3\x49\x01\x00\x00\x00\x00\x00\x00\x00\x00", cbor.TAG_NEGATIVE_BIG_NR, "3(h'100000000')")
+	expect_tag(t, "\xc3\x49\x01\x00\x00\x00\x00\x00\x00\x00\x00", cbor.TAG_NEGATIVE_BIG_NR, "3(h'010000000000000000')")
 
 	expect_tag(t, "\xc1\x1a\x51\x4b\x67\xb0", cbor.TAG_EPOCH_TIME_NR, "1(1363896240)")
 	expect_tag(t, "\xc1\xfb\x41\xd4\x52\xd9\xec\x20\x00\x00", cbor.TAG_EPOCH_TIME_NR, "1(1363896240.5000000000000000)")
@@ -804,69 +722,73 @@ test_encode_tags :: proc(t: ^testing.T) {
 // Helpers
 
 expect_decoding :: proc(t: ^testing.T, encoded: string, decoded: string, type: typeid, loc := #caller_location) {
-    res, err := cbor.decode(encoded)
+	res, err := cbor.decode(encoded)
 	defer cbor.destroy(res)
 
-	expect_value(t, reflect.union_variant_typeid(res), type, loc)
-    expect_value(t, err, nil, loc)
+	testing.expect_value(t, reflect.union_variant_typeid(res), type, loc)
+	testing.expect_value(t, err, nil, loc)
 
 	str := cbor.to_diagnostic_format(res, padding=-1)
 	defer delete(str)
 
-    expect_value(t, str, decoded, loc)
+	testing.expect_value(t, str, decoded, loc)
 }
 
 expect_tag :: proc(t: ^testing.T, encoded: string, nr: cbor.Tag_Number, value_decoded: string, loc := #caller_location) {
 	res, err := cbor.decode(encoded)
 	defer cbor.destroy(res)
 
-	expect_value(t, err, nil, loc)
+	testing.expect_value(t, err, nil, loc)
 	
 	if tag, is_tag := res.(^cbor.Tag); is_tag {
-		expect_value(t, tag.number, nr, loc)
+		testing.expect_value(t, tag.number, nr, loc)
 
 		str := cbor.to_diagnostic_format(tag, padding=-1)
 		defer delete(str)
 
-		expect_value(t, str, value_decoded, loc)
+		testing.expect_value(t, str, value_decoded, loc)
 	} else {
-		errorf(t, "Value %#v is not a tag", res, loc)
+		testing.expectf(t, false, "Value %#v is not a tag", res, loc)
 	}
 }
 
 expect_float :: proc(t: ^testing.T, encoded: string, expected: $T, loc := #caller_location) where intrinsics.type_is_float(T) {
-    res, err := cbor.decode(encoded)
+	res, err := cbor.decode(encoded)
 	defer cbor.destroy(res)
 
-	expect_value(t, reflect.union_variant_typeid(res), typeid_of(T), loc)
-    expect_value(t, err, nil, loc)
+	testing.expect_value(t, reflect.union_variant_typeid(res), typeid_of(T), loc)
+	testing.expect_value(t, err, nil, loc)
 
 	#partial switch r in res {
 	case f16:
-		when T == f16 { expect_value(t, res, expected, loc) } else { unreachable() }
+		when T == f16 { testing.expect_value(t, res, expected, loc) } else { unreachable() }
 	case f32:
-		when T == f32 { expect_value(t, res, expected, loc) } else { unreachable() }
+		when T == f32 { testing.expect_value(t, res, expected, loc) } else { unreachable() }
 	case f64:
-		when T == f64 { expect_value(t, res, expected, loc) } else { unreachable() }
+		when T == f64 { testing.expect_value(t, res, expected, loc) } else { unreachable() }
 	case:
 		unreachable()
 	}
 }
 
-buf: bytes.Buffer
-stream  := bytes.buffer_to_stream(&buf)
-encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream, {}}
-
 expect_encoding :: proc(t: ^testing.T, val: cbor.Value, encoded: string, loc := #caller_location) {
-	bytes.buffer_reset(&buf)
+	buf: bytes.Buffer
+	bytes.buffer_init_allocator(&buf, 0, 0)
+	defer bytes.buffer_destroy(&buf)
+	stream  := bytes.buffer_to_stream(&buf)
+	encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream, {}}
 
-	err := cbor.encode(encoder, val)
-	expect_value(t, err, nil, loc)
-	expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)encoded), loc)
+	err := cbor.encode(encoder, val, loc)
+	testing.expect_value(t, err, nil, loc)
+	testing.expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)encoded), loc)
 }
 
 expect_streamed_encoding :: proc(t: ^testing.T, encoded: string, values: ..cbor.Value, loc := #caller_location) {
-	bytes.buffer_reset(&buf)
+	buf: bytes.Buffer
+	bytes.buffer_init_allocator(&buf, 0, 0)
+	defer bytes.buffer_destroy(&buf)
+	stream  := bytes.buffer_to_stream(&buf)
+	encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream, {}}
 
 	for value, i in values {
 		err: cbor.Encode_Error
@@ -891,15 +813,15 @@ expect_streamed_encoding :: proc(t: ^testing.T, encoded: string, values: ..cbor.
 				if err2 != nil { break }
 			}
 		case:
-			errorf(t, "%v does not support streamed encoding", reflect.union_variant_typeid(value))
+			testing.expectf(t, false, "%v does not support streamed encoding", reflect.union_variant_typeid(value))
 		}
 
-		expect_value(t, err, nil, loc)
-		expect_value(t, err2, nil, loc)
+		testing.expect_value(t, err, nil, loc)
+		testing.expect_value(t, err2, nil, loc)
 	}
 
 	err := cbor.encode_stream_end(stream)
-	expect_value(t, err, nil, loc)
+	testing.expect_value(t, err, nil, loc)
 
-	expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)encoded), loc)
+	testing.expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)encoded), loc)
 }

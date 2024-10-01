@@ -3,6 +3,7 @@ package linalg
 import "core:math"
 import "base:builtin"
 import "base:intrinsics"
+@require import "base:runtime"
 
 // Generic
 
@@ -223,33 +224,27 @@ quaternion_mul_quaternion :: proc "contextless" (q1, q2: $Q) -> Q where IS_QUATE
 
 @(require_results)
 quaternion64_mul_vector3 :: proc "contextless" (q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
-	Raw_Quaternion :: struct {xyz: [3]f16, r: f16}
-
-	q := transmute(Raw_Quaternion)q
+	q := transmute(runtime.Raw_Quaternion64_Vector_Scalar)q
 	v := v
 
-	t := cross(2*q.xyz, v)
-	return V(v + q.r*t + cross(q.xyz, t))
+	t := cross(2*q.vector, v)
+	return V(v + q.scalar*t + cross(q.vector, t))
 }
 @(require_results)
 quaternion128_mul_vector3 :: proc "contextless" (q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
-	Raw_Quaternion :: struct {xyz: [3]f32, r: f32}
-
-	q := transmute(Raw_Quaternion)q
+	q := transmute(runtime.Raw_Quaternion128_Vector_Scalar)q
 	v := v
 
-	t := cross(2*q.xyz, v)
-	return V(v + q.r*t + cross(q.xyz, t))
+	t := cross(2*q.vector, v)
+	return V(v + q.scalar*t + cross(q.vector, t))
 }
 @(require_results)
 quaternion256_mul_vector3 :: proc "contextless" (q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
-	Raw_Quaternion :: struct {xyz: [3]f64, r: f64}
-
-	q := transmute(Raw_Quaternion)q
+	q := transmute(runtime.Raw_Quaternion256_Vector_Scalar)q
 	v := v
 
-	t := cross(2*q.xyz, v)
-	return V(v + q.r*t + cross(q.xyz, t))
+	t := cross(2*q.vector, v)
+	return V(v + q.scalar*t + cross(q.vector, t))
 }
 quaternion_mul_vector3 :: proc{quaternion64_mul_vector3, quaternion128_mul_vector3, quaternion256_mul_vector3}
 
@@ -280,7 +275,8 @@ to_ptr :: proc{vector_to_ptr, matrix_to_ptr}
 vector_angle_between :: proc "contextless" (a, b: $V/[$N]$E) -> E {
 	a0 := normalize0(a)
 	b0 := normalize0(b)
-	return math.acos(dot(a0, b0))
+	d  := clamp(dot(a0, b0), -1, +1)
+	return math.acos(d)
 }
 quaternion64_angle_between :: proc "contextless" (a, b: $Q/quaternion64) -> f16 {
 	c := normalize0(conj(a) * b)

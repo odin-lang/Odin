@@ -1,3 +1,4 @@
+#+vet !cast
 package runtime
 
 import "base:intrinsics"
@@ -7,10 +8,9 @@ IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 @(private)
 RUNTIME_LINKAGE :: "strong" when (
-	(ODIN_USE_SEPARATE_MODULES || 
+	ODIN_USE_SEPARATE_MODULES || 
 	ODIN_BUILD_MODE == .Dynamic ||
-	!ODIN_NO_CRT) &&
-	!IS_WASM) else "internal"
+	!ODIN_NO_CRT) else "internal"
 RUNTIME_REQUIRE :: false // !ODIN_TILDE
 
 @(private)
@@ -29,8 +29,26 @@ is_power_of_two_int :: #force_inline proc "contextless" (x: int) -> bool {
 	return (x & (x-1)) == 0
 }
 
-align_forward_int :: #force_inline proc(ptr, align: int) -> int {
+align_forward_int :: #force_inline proc "odin" (ptr, align: int) -> int {
 	assert(is_power_of_two_int(align))
+
+	p := ptr
+	modulo := p & (align-1)
+	if modulo != 0 {
+		p += align - modulo
+	}
+	return p
+}
+
+is_power_of_two_uint :: #force_inline proc "contextless" (x: uint) -> bool {
+	if x <= 0 {
+		return false
+	}
+	return (x & (x-1)) == 0
+}
+
+align_forward_uint :: #force_inline proc "odin" (ptr, align: uint) -> uint {
+	assert(is_power_of_two_uint(align))
 
 	p := ptr
 	modulo := p & (align-1)
@@ -47,7 +65,7 @@ is_power_of_two_uintptr :: #force_inline proc "contextless" (x: uintptr) -> bool
 	return (x & (x-1)) == 0
 }
 
-align_forward_uintptr :: #force_inline proc(ptr, align: uintptr) -> uintptr {
+align_forward_uintptr :: #force_inline proc "odin" (ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two_uintptr(align))
 
 	p := ptr
@@ -56,6 +74,18 @@ align_forward_uintptr :: #force_inline proc(ptr, align: uintptr) -> uintptr {
 		p += align - modulo
 	}
 	return p
+}
+
+is_power_of_two :: proc {
+	is_power_of_two_int,
+	is_power_of_two_uint,
+	is_power_of_two_uintptr,
+}
+
+align_forward :: proc {
+	align_forward_int,
+	align_forward_uint,
+	align_forward_uintptr,
 }
 
 mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
@@ -88,16 +118,15 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr)
 
 mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	if size == 0 {
-		return nil, nil
-	}
-	if allocator.procedure == nil {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
+	if size == 0 || allocator.procedure == nil{
 		return nil, nil
 	}
 	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
 }
 
 mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if size == 0 || allocator.procedure == nil {
 		return nil, nil
 	}
@@ -105,6 +134,7 @@ mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, a
 }
 
 mem_alloc_non_zeroed :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if size == 0 || allocator.procedure == nil {
 		return nil, nil
 	}
@@ -144,6 +174,7 @@ mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #calle
 }
 
 _mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, should_zero: bool, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if allocator.procedure == nil {
 		return nil, nil
 	}
@@ -185,9 +216,11 @@ _mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignmen
 }
 
 mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	return _mem_resize(ptr, old_size, new_size, alignment, allocator, true, loc)
 }
 non_zero_mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	return _mem_resize(ptr, old_size, new_size, alignment, allocator, false, loc)
 }
 
@@ -453,7 +486,7 @@ quaternion256_ne :: #force_inline proc "contextless" (a, b: quaternion256) -> bo
 string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int) {
 	// NOTE(bill): Duplicated here to remove dependency on package unicode/utf8
 
-	@static accept_sizes := [256]u8{
+	@(static, rodata) accept_sizes := [256]u8{
 		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x00-0x0f
 		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x10-0x1f
 		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x20-0x2f
@@ -474,7 +507,7 @@ string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int
 	}
 	Accept_Range :: struct {lo, hi: u8}
 
-	@static accept_ranges := [5]Accept_Range{
+	@(static, rodata) accept_ranges := [5]Accept_Range{
 		{0x80, 0xbf},
 		{0xa0, 0xbf},
 		{0x80, 0x9f},
@@ -612,21 +645,24 @@ abs_quaternion256 :: #force_inline proc "contextless" (x: quaternion256) -> f64 
 
 
 quo_complex32 :: proc "contextless" (n, m: complex32) -> complex32 {
-	e, f: f16
+	nr, ni := f32(real(n)), f32(imag(n))
+	mr, mi := f32(real(m)), f32(imag(m))
 
-	if abs(real(m)) >= abs(imag(m)) {
-		ratio := imag(m) / real(m)
-		denom := real(m) + ratio*imag(m)
-		e = (real(n) + imag(n)*ratio) / denom
-		f = (imag(n) - real(n)*ratio) / denom
+	e, f: f32
+
+	if abs(mr) >= abs(mi) {
+		ratio := mi / mr
+		denom := mr + ratio*mi
+		e = (nr + ni*ratio) / denom
+		f = (ni - nr*ratio) / denom
 	} else {
-		ratio := real(m) / imag(m)
-		denom := imag(m) + ratio*real(m)
-		e = (real(n)*ratio + imag(n)) / denom
-		f = (imag(n)*ratio - real(n)) / denom
+		ratio := mr / mi
+		denom := mi + ratio*mr
+		e = (nr*ratio + ni) / denom
+		f = (ni*ratio - nr) / denom
 	}
 
-	return complex(e, f)
+	return complex(f16(e), f16(f))
 }
 
 
@@ -667,15 +703,15 @@ quo_complex128 :: proc "contextless" (n, m: complex128) -> complex128 {
 }
 
 mul_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
-	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q)
-	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r)
+	q0, q1, q2, q3 := f32(real(q)), f32(imag(q)), f32(jmag(q)), f32(kmag(q))
+	r0, r1, r2, r3 := f32(real(r)), f32(imag(r)), f32(jmag(r)), f32(kmag(r))
 
 	t0 := r0*q0 - r1*q1 - r2*q2 - r3*q3
 	t1 := r0*q1 + r1*q0 - r2*q3 + r3*q2
 	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1
 	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0
 
-	return quaternion(w=t0, x=t1, y=t2, z=t3)
+	return quaternion(w=f16(t0), x=f16(t1), y=f16(t2), z=f16(t3))
 }
 
 mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
@@ -703,8 +739,8 @@ mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 }
 
 quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
-	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q)
-	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r)
+	q0, q1, q2, q3 := f32(real(q)), f32(imag(q)), f32(jmag(q)), f32(kmag(q))
+	r0, r1, r2, r3 := f32(real(r)), f32(imag(r)), f32(jmag(r)), f32(kmag(r))
 
 	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3)
 
@@ -713,7 +749,7 @@ quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
 	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
 
-	return quaternion(w=t0, x=t1, y=t2, z=t3)
+	return quaternion(w=f16(t0), x=f16(t1), y=f16(t2), z=f16(t3))
 }
 
 quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
@@ -801,6 +837,10 @@ truncsfhf2 :: proc "c" (value: f32) -> __float16 {
 	}
 }
 
+@(link_name="__aeabi_d2h", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+aeabi_d2h :: proc "c" (value: f64) -> __float16 {
+	return truncsfhf2(f32(value))
+}
 
 @(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 truncdfhf2 :: proc "c" (value: f64) -> __float16 {
@@ -841,9 +881,6 @@ extendhfsf2 :: proc "c" (value: __float16) -> f32 {
 
 @(link_name="__floattidf", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 floattidf :: proc "c" (a: i128) -> f64 {
-when IS_WASM {
-	return 0
-} else {
 	DBL_MANT_DIG :: 53
 	if a == 0 {
 		return 0.0
@@ -883,14 +920,10 @@ when IS_WASM {
 	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
-}
 
 
 @(link_name="__floattidf_unsigned", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 floattidf_unsigned :: proc "c" (a: u128) -> f64 {
-when IS_WASM {
-	return 0
-} else {
 	DBL_MANT_DIG :: 53
 	if a == 0 {
 		return 0.0
@@ -927,7 +960,6 @@ when IS_WASM {
 	        u32((u64(a) >> 32) & 0x000FFFFF) // mantissa-high
 	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
-}
 }
 
 
@@ -978,26 +1010,44 @@ modti3 :: proc "c" (a, b: i128) -> i128 {
 	bn := (b ~ s_b) - s_b
 
 	r: u128 = ---
-	_ = udivmod128(transmute(u128)an, transmute(u128)bn, &r)
-	return (transmute(i128)r ~ s_a) - s_a
+	_ = udivmod128(u128(an), u128(bn), &r)
+	return (i128(r) ~ s_a) - s_a
 }
 
 
 @(link_name="__divmodti4", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 divmodti4 :: proc "c" (a, b: i128, rem: ^i128) -> i128 {
-	u := udivmod128(transmute(u128)a, transmute(u128)b, cast(^u128)rem)
-	return transmute(i128)u
+	s_a := a >> (128 - 1) // -1 if negative or 0
+	s_b := b >> (128 - 1)
+	an := (a ~ s_a) - s_a // absolute
+	bn := (b ~ s_b) - s_b
+
+	s_b   ~= s_a // quotient sign
+	u_s_b := u128(s_b)
+	u_s_a := u128(s_a)
+
+	r: u128 = ---
+	u := i128((udivmodti4(u128(an), u128(bn), &r) ~ u_s_b) - u_s_b) // negate if negative
+	rem^ = i128((r ~ u_s_a) - u_s_a)
+	return u
 }
 
 @(link_name="__divti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 divti3 :: proc "c" (a, b: i128) -> i128 {
-	u := udivmodti4(transmute(u128)a, transmute(u128)b, nil)
-	return transmute(i128)u
+	s_a := a >> (128 - 1) // -1 if negative or 0
+	s_b := b >> (128 - 1)
+	an := (a ~ s_a) - s_a // absolute
+	bn := (b ~ s_b) - s_b
+
+	s_a   ~= s_b // quotient sign
+	u_s_a := u128(s_a)
+
+	return i128((udivmodti4(u128(an), u128(bn), nil) ~ u_s_a) - u_s_a) // negate if negative
 }
 
 
 @(link_name="__fixdfti", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-fixdfti :: proc(a: u64) -> i128 {
+fixdfti :: proc "c" (a: u64) -> i128 {
 	significandBits :: 52
 	typeWidth       :: (size_of(u64)*8)
 	exponentBits    :: (typeWidth - significandBits - 1)
@@ -1042,19 +1092,17 @@ fixdfti :: proc(a: u64) -> i128 {
 __write_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {
 	for i in 0..<size {
 		j := offset+i
-		the_bit := byte((src[i/8]) & (1<<(i&7)) != 0)
-		b := the_bit<<(j&7)
-		dst[j/8] &~= b
-		dst[j/8] |=  b
+		the_bit := byte((src[i>>3]) & (1<<(i&7)) != 0)
+		dst[j>>3] &~=       1<<(j&7)
+		dst[j>>3]  |= the_bit<<(j&7)
 	}
 }
 
 __read_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {
 	for j in 0..<size {
 		i := offset+j
-		the_bit := byte((src[i/8]) & (1<<(i&7)) != 0)
-		b := the_bit<<(j&7)
-		dst[j/8] &~= b
-		dst[j/8] |=  b
+		the_bit := byte((src[i>>3]) & (1<<(i&7)) != 0)
+		dst[j>>3] &~=       1<<(j&7)
+		dst[j>>3]  |= the_bit<<(j&7)
 	}
 }

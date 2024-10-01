@@ -1,11 +1,11 @@
-// +build windows
+#+build windows
 package sys_windows
 
 foreign import shell32 "system:Shell32.lib"
 
 @(default_calling_convention="system")
 foreign shell32 {
-	CommandLineToArgvW :: proc(cmd_list: wstring, num_args: ^c_int) -> ^wstring ---
+	CommandLineToArgvW :: proc(cmd_list: wstring, num_args: ^c_int) -> [^]wstring ---
 	ShellExecuteW :: proc(
 		hwnd: HWND,
 		lpOperation: LPCWSTR,
@@ -30,6 +30,12 @@ foreign shell32 {
 	SHGetKnownFolderIDList :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, ppidl: rawptr) -> HRESULT ---
 	SHSetKnownFolderPath :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, pszPath: PCWSTR ) -> HRESULT ---
 	SHGetKnownFolderPath :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, ppszPath: ^LPWSTR) -> HRESULT ---
+
+	ExtractIconExW :: proc(pszFile: LPCWSTR, nIconIndex: INT, phiconLarge: ^HICON, phiconSmall: ^HICON, nIcons: UINT) -> UINT ---
+	DragAcceptFiles :: proc(hWnd: HWND, fAccept: BOOL) ---
+	DragQueryPoint :: proc(hDrop: HDROP, ppt: ^POINT) -> BOOL ---
+	DragQueryFileW :: proc(hDrop: HDROP, iFile: UINT, lpszFile: LPWSTR, cch: UINT) -> UINT ---
+	DragFinish :: proc(hDrop: HDROP) --- // @New
 }
 
 APPBARDATA :: struct {
@@ -66,6 +72,8 @@ ABE_BOTTOM           :: 3
 
 KNOWNFOLDERID :: GUID
 REFKNOWNFOLDERID :: ^KNOWNFOLDERID
+
+HDROP :: HANDLE
 
 KNOWN_FOLDER_FLAG :: enum u32 {
 	DEFAULT                          = 0x00000000,

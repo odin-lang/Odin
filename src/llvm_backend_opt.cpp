@@ -396,18 +396,22 @@ gb_internal LLVMValueRef lb_run_instrumentation_pass_insert_call(lbProcedure *p,
 	lbValue cc = lb_find_procedure_value_from_entity(m, entity);
 
 	LLVMValueRef args[3] = {};
-	args[0] = p->value;
+	args[0] = LLVMConstPointerCast(p->value, lb_type(m, t_rawptr));
 
-	LLVMValueRef returnaddress_args[1] = {};
+	if (is_arch_wasm()) {
+		args[1] = LLVMConstPointerNull(lb_type(m, t_rawptr));
+	} else {
+		LLVMValueRef returnaddress_args[1] = {};
 
-	returnaddress_args[0] = LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 0, false);
+		returnaddress_args[0] = LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 0, false);
 
-	char const *instrinsic_name = "llvm.returnaddress";
-	unsigned id = LLVMLookupIntrinsicID(instrinsic_name, gb_strlen(instrinsic_name));
-	GB_ASSERT_MSG(id != 0, "Unable to find %s", instrinsic_name);
-	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(m->mod, id, nullptr, 0);
-	LLVMTypeRef call_type = LLVMIntrinsicGetType(m->ctx, id, nullptr, 0);
-	args[1] = LLVMBuildCall2(dummy_builder, call_type, ip, returnaddress_args, gb_count_of(returnaddress_args), "");
+		char const *instrinsic_name = "llvm.returnaddress";
+		unsigned id = LLVMLookupIntrinsicID(instrinsic_name, gb_strlen(instrinsic_name));
+		GB_ASSERT_MSG(id != 0, "Unable to find %s", instrinsic_name);
+		LLVMValueRef ip = LLVMGetIntrinsicDeclaration(m->mod, id, nullptr, 0);
+		LLVMTypeRef call_type = LLVMIntrinsicGetType(m->ctx, id, nullptr, 0);
+		args[1] = LLVMBuildCall2(dummy_builder, call_type, ip, returnaddress_args, gb_count_of(returnaddress_args), "");
+	}
 
 	Token name = {};
 	if (p->entity) {

@@ -1,4 +1,4 @@
-//+build amd64
+#+build amd64
 package linux
 
 // AMD64 uses the new way to define syscalls, i.e. one that

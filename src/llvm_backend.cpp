@@ -1,11 +1,14 @@
 #define MULTITHREAD_OBJECT_GENERATION 1
+#ifndef MULTITHREAD_OBJECT_GENERATION
+#define MULTITHREAD_OBJECT_GENERATION 0
+#endif
 
 #ifndef USE_SEPARATE_MODULES
 #define USE_SEPARATE_MODULES build_context.use_separate_modules
 #endif
 
-#ifndef MULTITHREAD_OBJECT_GENERATION
-#define MULTITHREAD_OBJECT_GENERATION 0
+#ifndef LLVM_IGNORE_VERIFICATION
+#define LLVM_IGNORE_VERIFICATION 0
 #endif
 
 
@@ -37,8 +40,62 @@ String get_default_microarchitecture() {
 				default_march = str_lit("x86-64-v2");
 			}
 		}
+	} else if (build_context.metrics.arch == TargetArch_riscv64) {
+		default_march = str_lit("generic-rv64");
 	}
+
 	return default_march;
+}
+
+String get_final_microarchitecture() {
+	BuildContext *bc = &build_context;
+
+	String microarch = bc->microarch;
+	if (microarch.len == 0) {
+		microarch = get_default_microarchitecture();
+	} else if (microarch == str_lit("native")) {
+		microarch = make_string_c(LLVMGetHostCPUName());
+	}
+	return microarch;
+}
+
+gb_internal String get_default_features() {
+	BuildContext *bc = &build_context;
+
+	int off = 0;
+	for (int i = 0; i < bc->metrics.arch; i += 1) {
+		off += target_microarch_counts[i];
+	}
+
+	String microarch = get_final_microarchitecture();
+
+	// NOTE(laytan): for riscv64 to work properly with Odin, we need to enforce some features.
+	// and we also overwrite the generic target to include more features so we don't default to
+	// a potato feature set.
+	if (bc->metrics.arch == TargetArch_riscv64) {
+		if (microarch == str_lit("generic-rv64")) {
+			// This is what clang does by default (on -march=rv64gc for General Computing), seems good to also default to.
+			String features = str_lit("64bit,a,c,d,f,m,relax,zicsr,zifencei");
+
+			// Update the features string so LLVM uses it later.
+			if (bc->target_features_string.len > 0) {
+				bc->target_features_string = concatenate3_strings(permanent_allocator(), features, str_lit(","), bc->target_features_string);
+			} else {
+				bc->target_features_string = features;
+			}
+
+			return features;
+		}
+	}
+
+	for (int i = off; i < off+target_microarch_counts[bc->metrics.arch]; i += 1) {
+		if (microarch_features_list[i].microarch == microarch) {
+			return microarch_features_list[i].features;
+		}
+	}
+
+	GB_PANIC("unknown microarch: %.*s", LIT(microarch));
+	return {};
 }
 
 gb_internal void lb_add_foreign_library_path(lbModule *m, Entity *e) {
@@ -101,18 +158,27 @@ gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *ot
 	if (other_module == nullptr) {
 		return;
 	}
-	char const *cname = alloc_cstring(temporary_allocator(), name);
+	char const *cname = alloc_cstring(permanent_allocator(), name);
+	mpsc_enqueue(&other_module->gen->entities_to_correct_linkage, lbEntityCorrection{other_module, e, cname});
+}
 
-	LLVMValueRef other_global = nullptr;
-	if (e->kind == Entity_Variable) {
-		other_global = LLVMGetNamedGlobal(other_module->mod, cname);
-	} else if (e->kind == Entity_Procedure) {
-		other_global = LLVMGetNamedFunction(other_module->mod, cname);
-	}
-	if (other_global) {
-		LLVMSetLinkage(other_global, LLVMExternalLinkage);
+gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
+	for (lbEntityCorrection ec = {}; mpsc_dequeue(&gen->entities_to_correct_linkage, &ec); /**/) {
+		LLVMValueRef other_global = nullptr;
+		if (ec.e->kind == Entity_Variable) {
+			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
+			if (other_global) {
+				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+			}
+		} else if (ec.e->kind == Entity_Procedure) {
+			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
+			if (other_global) {
+				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+			}
+		}
 	}
 }
+
 
 gb_internal void lb_emit_init_context(lbProcedure *p, lbAddr addr) {
 	TEMPORARY_ALLOCATOR_GUARD();
@@ -933,14 +999,16 @@ gb_internal lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue const &map_ptr, lbValue key, lbValue *key_ptr_) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
-	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
+	Type* key_type = base_type(type_deref(map_ptr.type))->Map.key;
+
+	lbValue real_key = lb_emit_conv(p, key, key_type);
+
+	lbValue key_ptr = lb_address_from_load_or_generate_local(p, real_key);
 	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
 
 	if (key_ptr_) *key_ptr_ = key_ptr;
 
-	Type* key_type = base_type(type_deref(map_ptr.type))->Map.key;
-
-	lbValue hashed_key = lb_const_hash(p->module, key, key_type);
+	lbValue hashed_key = lb_const_hash(p->module, real_key, key_type);
 	if (hashed_key.value == nullptr) {
 		lbValue hasher = lb_hasher_proc_for_type(p->module, key_type);
 
@@ -1094,6 +1162,53 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 	lb_end_procedure_body(p);
 }
 
+gb_internal void lb_verify_function(lbModule *m, lbProcedure *p, bool dump_ll=false) {
+	if (LLVM_IGNORE_VERIFICATION) {
+		return;
+	}
+
+	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+		char *llvm_error = nullptr;
+
+		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
+		LLVMDumpValue(p->value);
+		gb_printf_err("\n");
+		if (dump_ll) {
+			gb_printf_err("\n\n\n");
+			String filepath_ll = lb_filepath_ll_for_module(m);
+			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+			}
+		}
+		LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
+		exit_with_errors();
+	}
+}
+
+gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
+	char *llvm_error = nullptr;
+	defer (LLVMDisposeMessage(llvm_error));
+	lbModule *m = cast(lbModule *)data;
+
+	if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
+		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
+		if (build_context.keep_temp_files) {
+			TIME_SECTION("LLVM Print Module to File");
+			String filepath_ll = lb_filepath_ll_for_module(m);
+			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+				exit_with_errors();
+				return false;
+			}
+		}
+		exit_with_errors();
+		return 1;
+	}
+	return 0;
+}
+
+
+
 gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
@@ -1129,6 +1244,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 				if (is_type_untyped_nil(init.type)) {
 					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
 					var.is_initialized = true;
+
+					if (e->Variable.is_rodata) {
+						LLVMSetGlobalConstant(var.var.value, true);
+					}
 					continue;
 				}
 				GB_PANIC("Invalid init value, got %s", expr_to_string(init_expr));
@@ -1143,6 +1262,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 					}
 					LLVMSetInitializer(var.var.value, init.value);
 					var.is_initialized = true;
+
+					if (e->Variable.is_rodata) {
+						LLVMSetGlobalConstant(var.var.value, true);
+					}
 					continue;
 				}
 			} else {
@@ -1175,8 +1298,9 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 			var.is_initialized = true;
 		}
+
+
 	}
-	
 	CheckerInfo *info = main_module->gen->info;
 	
 	for (Entity *e : info->init_procedures) {
@@ -1187,13 +1311,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lb_end_procedure_body(p);
 
-	if (!main_module->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-	}
-
+	lb_verify_function(main_module, p);
 	return p;
 }
 
@@ -1216,33 +1334,41 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	lb_end_procedure_body(p);
 
-	if (!main_module->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-	}
-
+	lb_verify_function(main_module, p);
 	return p;
 }
 
 
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 	lbModule *m = cast(lbModule *)data;
-	for (Entity *e : m->global_procedures_and_types_to_create) {
-		if (e->kind == Entity_TypeName) {
-			(void)lb_get_entity_name(m, e);
-			lb_type(m, e->type);
-		}
+	for (Entity *e : m->global_types_to_create) {
+		(void)lb_get_entity_name(m, e);
+		(void)lb_type(m, e->type);
 	}
 
-	for (Entity *e : m->global_procedures_and_types_to_create) {
-		if (e->kind == Entity_Procedure) {
-			(void)lb_get_entity_name(m, e);
-			array_add(&m->procedures_to_generate, lb_create_procedure(m, e));
-		}
+	for (Entity *e : m->global_procedures_to_create) {
+		(void)lb_get_entity_name(m, e);
+		array_add(&m->procedures_to_generate, lb_create_procedure(m, e));
 	}
 	return 0;
+}
+
+gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp) {
+	Entity *x = *cast(Entity **)a;
+	Entity *y = *cast(Entity **)b;
+	if (x == y) {
+		return 0;
+	}
+	if (x->kind != y->kind) {
+		return cast(i32)(x->kind - y->kind);
+	}
+
+	i32 cmp = 0;
+	cmp = token_pos_cmp(x->token.pos, y->token.pos);
+	if (!cmp) {
+		return cmp;
+	}
+	return cmp;
 }
 
 gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, CheckerInfo *info, bool do_threading) {
@@ -1293,17 +1419,32 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		if (USE_SEPARATE_MODULES) {
 			m = lb_module_of_entity(gen, e);
 		}
+		GB_ASSERT(m != nullptr);
 
-		array_add(&m->global_procedures_and_types_to_create, e);
+		if (e->kind == Entity_Procedure) {
+			array_add(&m->global_procedures_to_create, e);
+		} else if (e->kind == Entity_TypeName) {
+			array_add(&m->global_types_to_create, e);
+		}
 	}
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		if (do_threading) {
+		array_sort(m->global_types_to_create, llvm_global_entity_cmp);
+		array_sort(m->global_procedures_to_create, llvm_global_entity_cmp);
+	}
+
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			thread_pool_add_task(lb_generate_procedures_and_types_per_module, m);
-		} else {
+		}
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			lb_generate_procedures_and_types_per_module(m);
 		}
+
 	}
 
 	thread_pool_wait();
@@ -1324,7 +1465,9 @@ gb_internal bool lb_is_module_empty(lbModule *m) {
 	}
 
 	for (auto g = LLVMGetFirstGlobal(m->mod); g != nullptr; g = LLVMGetNextGlobal(g)) {
-		if (LLVMGetLinkage(g) == LLVMExternalLinkage) {
+		LLVMLinkage linkage = LLVMGetLinkage(g);
+		if (linkage == LLVMExternalLinkage ||
+		    linkage == LLVMWeakAnyLinkage) {
 			continue;
 		}
 		if (!LLVMIsExternallyInitialized(g)) {
@@ -1378,10 +1521,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
 		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],      -1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal],    0);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],       1);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],      2);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_aggressive], 3);
 
 		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
 			LLVMFinalizeFunctionPassManager(m->function_pass_managers[i]);
@@ -1405,15 +1544,12 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 				if (p->entity && p->entity->kind == Entity_Procedure) {
 					switch (p->entity->Procedure.optimization_mode) {
 					case ProcedureOptimizationMode_None:
-					case ProcedureOptimizationMode_Minimal:
-						pass_manager_kind = lbFunctionPassManager_minimal;
+						pass_manager_kind = lbFunctionPassManager_none;
+						GB_ASSERT(lb_proc_has_attribute(p->module, p->value, "optnone"));
+						GB_ASSERT(lb_proc_has_attribute(p->module, p->value, "noinline"));
 						break;
-					case ProcedureOptimizationMode_Size:
-						pass_manager_kind = lbFunctionPassManager_size;
-						lb_add_attribute_to_proc(p->module, p->value, "optsize");
-						break;
-					case ProcedureOptimizationMode_Speed:
-						pass_manager_kind = lbFunctionPassManager_speed;
+					case ProcedureOptimizationMode_FavorSize:
+						GB_ASSERT(lb_proc_has_attribute(p->module, p->value, "optsize"));
 						break;
 					}
 				}
@@ -1469,6 +1605,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 
 	switch (build_context.optimization_level) {
 	case -1:
+		array_add(&passes, "function(annotation-remarks)");
 		break;
 	case 0:
 		array_add(&passes, "always-inline");
@@ -1477,6 +1614,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	case 1:
 // default<Os>
 // Passes removed: coro, openmp, sroa
+#if LLVM_VERSION_MAJOR == 17
 		array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
@@ -1492,13 +1630,14 @@ globalopt,
 function<eager-inv>(
 	mem2reg,
 	instcombine<max-iterations=1000;no-use-loop-info>,
-	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>),
-	require<globals-aa>,
-	function(
-		invalidate<aa>
-	),
-	require<profile-summary>,
-	cgscc(
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
 	devirt<4>(
 		inline<only-mandatory>,
 		inline,
@@ -1599,10 +1738,142 @@ function(
 ),
 verify
 )");
+#else
+		array_add(&passes, u8R"(
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	sroa<modify-cfg>,
+	early-cse<>
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+always-inline,
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline,
+		function-attrs<skip-non-recursive-function-attrs>,
+		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
+			early-cse<memssa>,
+			speculative-execution<only-if-divergent-target>,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			aggressive-instcombine,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			reassociate,
+			constraint-elimination,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<no-nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			loop(
+				loop-idiom,
+				indvars,
+				loop-deletion,
+				loop-unroll-full
+			),
+			sroa<modify-cfg>,
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	float2int,
+	lower-constant-intrinsics,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	infer-alignment,
+	loop-load-elim,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-lookup;no-keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	loop-unroll<O2>,
+	transform-warning,
+	sroa<preserve-cfg>,
+	infer-alignment,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
+)");
+#endif
 		break;
 // default<O2>
 // Passes removed: coro, openmp, sroa
 	case 2:
+#if LLVM_VERSION_MAJOR == 17
 		array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
@@ -1727,11 +1998,144 @@ function(
 ),
 verify
 )");
+#else
+		array_add(&passes, u8R"(
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	sroa<modify-cfg>,
+	early-cse<>
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+always-inline,
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline,
+		function-attrs<skip-non-recursive-function-attrs>,
+		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
+			early-cse<memssa>,
+			speculative-execution<only-if-divergent-target>,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			aggressive-instcombine,
+			libcalls-shrinkwrap,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			reassociate,
+			constraint-elimination,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<no-nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			loop(
+				loop-idiom,
+				indvars,
+				loop-deletion,
+				loop-unroll-full
+			),
+			sroa<modify-cfg>,
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	float2int,
+	lower-constant-intrinsics,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	infer-alignment,
+	loop-load-elim,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-lookup;no-keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	loop-unroll<O2>,
+	transform-warning,
+	sroa<modify-cfg>,
+	infer-alignment,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
+)");
+#endif
 		break;
 
 	case 3:
 // default<O3>
 // Passes removed: coro, openmp, sroa
+#if LLVM_VERSION_MAJOR == 17
 		array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
@@ -1859,6 +2263,135 @@ function(
 ),
 verify
 )");
+#else
+		array_add(&passes, u8R"(
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	sroa<modify-cfg>,
+	early-cse<>,
+	callsite-splitting
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+always-inline,
+require<globals-aa>,
+function(invalidate<aa>),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline,
+		function-attrs<skip-non-recursive-function-attrs>,
+		argpromotion,
+		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
+			early-cse<memssa>,
+			speculative-execution<only-if-divergent-target>,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			aggressive-instcombine,
+			libcalls-shrinkwrap,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			reassociate,
+			constraint-elimination,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			loop(
+				loop-idiom,
+				indvars,
+				loop-deletion,
+				loop-unroll-full
+			),
+			sroa<modify-cfg>,
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(licm<allowspeculation>),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+			instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	float2int,
+	lower-constant-intrinsics,
+	chr,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	infer-alignment,
+	loop-load-elim,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-lookup;no-keep-loops;hoist-common-insts;sink-common-insts;speculate-blocks;simplify-cond-branch>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	loop-unroll<O3>,
+	transform-warning,
+	sroa<preserve-cfg>,
+	infer-alignment,
+	instcombine<max-iterations=1;no-use-loop-info;no-verify-fixpoint>,
+	loop-mssa(licm<allowspeculation>),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>
+),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
+)");
+#endif
 		break;
 	}
 
@@ -1938,16 +2471,19 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 }
 
 gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
-		} else {
+		}
+
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			lb_generate_procedures_worker_proc(m);
 		}
 	}
-
-	thread_pool_wait();
 }
 
 gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
@@ -1961,17 +2497,20 @@ gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc
 }
 
 gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		// NOTE(bill): procedures may be added during generation
-		if (do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			// NOTE(bill): procedures may be added during generation
 			thread_pool_add_task(lb_generate_missing_procedures_to_check_worker_proc, m);
-		} else {
+		}
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			// NOTE(bill): procedures may be added during generation
 			lb_generate_missing_procedures_to_check_worker_proc(m);
 		}
 	}
-
-	thread_pool_wait();
 }
 
 gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
@@ -1984,32 +2523,45 @@ gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
 }
 
 gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			thread_pool_add_task(lb_llvm_function_pass_per_module, m);
-		} else {
+		}
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			lb_llvm_function_pass_per_module(m);
 		}
 	}
-	thread_pool_wait();
 }
 
 
 gb_internal void lb_llvm_module_passes(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
-		wd->m = m;
-		wd->target_machine = m->target_machine;
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+			wd->m = m;
+			wd->target_machine = m->target_machine;
 
-		if (do_threading) {
-			thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
-		} else {
+			if (do_threading) {
+				thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
+			} else {
+				lb_llvm_module_pass_worker_proc(wd);
+			}
+		}
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+			wd->m = m;
+			wd->target_machine = m->target_machine;
 			lb_llvm_module_pass_worker_proc(wd);
 		}
 	}
-	thread_pool_wait();
 }
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m) {
@@ -2033,20 +2585,37 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 
 	return path;
 }
+
 gb_internal String lb_filepath_obj_for_module(lbModule *m) {
-	String path = concatenate3_strings(permanent_allocator(),
-		build_context.build_paths[BuildPath_Output].basename,
-		STR_LIT("/"),
-		build_context.build_paths[BuildPath_Output].name
-	);
+	String basename = build_context.build_paths[BuildPath_Output].basename;
+	String name = build_context.build_paths[BuildPath_Output].name;
+
+	bool use_temporary_directory = false;
+	if (USE_SEPARATE_MODULES && build_context.build_mode == BuildMode_Executable) {
+		// NOTE(bill): use a temporary directory
+		String dir = temporary_directory(permanent_allocator());
+		if (dir.len != 0) {
+			basename = dir;
+			use_temporary_directory = true;
+		}
+	}
+
+	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
+	path = gb_string_appendc(path, "/");
+	path = gb_string_append_length(path, name.text, name.len);
 
 	if (m->file) {
 		char buf[32] = {};
 		isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
 		String suffix = make_string((u8 *)buf, n-1);
-		path = concatenate_strings(permanent_allocator(), path, suffix);
+		path = gb_string_append_length(path, suffix.text, suffix.len);
 	} else if (m->pkg) {
-		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
+		path = gb_string_appendc(path, "-");
+		path = gb_string_append_length(path, m->pkg->name.text, m->pkg->name.len);
+	}
+
+	if (use_temporary_directory) {
+		path = gb_string_append_fmt(path, "-%p", m);
 	}
 
 	String ext = {};
@@ -2084,43 +2653,33 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 		}
 	}
 
-	return concatenate_strings(permanent_allocator(), path, ext);
-}
+	path = gb_string_append_length(path, ext.text, ext.len);
 
-gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
-	char *llvm_error = nullptr;
-	defer (LLVMDisposeMessage(llvm_error));
-	lbModule *m = cast(lbModule *)data;
-	if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
-		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
-		if (build_context.keep_temp_files) {
-			TIME_SECTION("LLVM Print Module to File");
-			String filepath_ll = lb_filepath_ll_for_module(m);
-			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-				gb_printf_err("LLVM Error: %s\n", llvm_error);
-				exit_with_errors();
-				return false;
-			}
-		}
-		exit_with_errors();
-		return 1;
-	}
-	return 0;
+	return make_string(cast(u8 *)path, gb_string_length(path));
+
 }
 
 
 gb_internal bool lb_llvm_module_verification(lbGenerator *gen, bool do_threading) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (do_threading) {
+	if (LLVM_IGNORE_VERIFICATION) {
+		return true;
+	}
+
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			thread_pool_add_task(lb_llvm_module_verification_worker_proc, m);
-		} else {
+		}
+		thread_pool_wait();
+
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			if (lb_llvm_module_verification_worker_proc(m)) {
 				return false;
 			}
 		}
 	}
-	thread_pool_wait();
 
 	return true;
 }
@@ -2156,7 +2715,6 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			String filepath_obj = lb_filepath_obj_for_module(m);
-			// gb_printf_err("%.*s\n", LIT(filepath_obj));
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
@@ -2341,12 +2899,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 	}
 
 
-	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-	}
+	lb_verify_function(m, p);
 
 	lb_run_function_pass_manager(default_function_pass_manager, p, lbFunctionPassManager_default);
 	return p;
@@ -2367,28 +2920,11 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 	lb_end_procedure(p);
 
 	// Add Flags
-	if (p->body != nullptr) {
-		if (p->name == "memcpy" || p->name == "memmove" ||
-		    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
-		    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
-		    string_starts_with(p->name, str_lit("llvm.memmove"))) {
-			p->flags |= lbProcedureFlag_WithoutMemcpyPass;
-		}
+	if (p->entity && p->entity->kind == Entity_Procedure && p->entity->Procedure.is_memcpy_like) {
+		p->flags |= lbProcedureFlag_WithoutMemcpyPass;
 	}
 
-	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-		char *llvm_error = nullptr;
-
-		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
-		LLVMDumpValue(p->value);
-		gb_printf_err("\n\n\n\n");
-		String filepath_ll = lb_filepath_ll_for_module(m);
-		if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-			gb_printf_err("LLVM Error: %s\n", llvm_error);
-		}
-		LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
-		exit_with_errors();
-	}
+	lb_verify_function(m, p, true);
 }
 
 
@@ -2468,69 +3004,24 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		code_mode = LLVMCodeModelKernel;
 	}
 
-	String      host_cpu_name = copy_string(permanent_allocator(), make_string_c(LLVMGetHostCPUName()));
-	String      llvm_cpu      = get_default_microarchitecture();
-	char const *llvm_features = "";
-	if (build_context.microarch.len != 0) {
-		if (build_context.microarch == "native") {
-			llvm_cpu = host_cpu_name;
-		} else {
-			llvm_cpu = copy_string(permanent_allocator(), build_context.microarch);
+	String llvm_cpu = get_final_microarchitecture();
+
+	gbString llvm_features = gb_string_make(temporary_allocator(), "");
+	String_Iterator it = {build_context.target_features_string, 0};
+	bool first = true;
+	for (;;) {
+		String str = string_split_iterator(&it, ',');
+		if (str == "") break;
+		if (!first) {
+			llvm_features = gb_string_appendc(llvm_features, ",");
 		}
-		if (llvm_cpu == host_cpu_name) {
-			llvm_features = LLVMGetHostCPUFeatures();
-		}
+		first = false;
+
+		llvm_features = gb_string_appendc(llvm_features, "+");
+		llvm_features = gb_string_append_length(llvm_features, str.text, str.len);
 	}
 
-	// NOTE(Jeroen): Uncomment to get the list of supported microarchitectures.
-	/*
-	if (build_context.microarch == "?") {
-		string_set_add(&build_context.target_features_set, str_lit("+cpuhelp"));
-	}
-	*/
-
-	if (build_context.target_features_set.entries.count != 0) {
-		// Prefix all of the features with a `+`, because we are
-		// enabling additional features.
-		char const *additional_features = target_features_set_to_cstring(permanent_allocator(), false, true);
-
-		String f_string = make_string_c(llvm_features);
-		String a_string = make_string_c(additional_features);
-		isize f_len = f_string.len;
-
-		if (f_len == 0) {
-			// The common case is that llvm_features is empty, so
-			// the target_features_set additions can be used as is.
-			llvm_features = additional_features;
-		} else {
-			// The user probably specified `-microarch:native`, so
-			// llvm_features is populated by LLVM's idea of what
-			// the host CPU supports.
-			//
-			// As far as I can tell, (which is barely better than
-			// wild guessing), a bitset is formed by parsing the
-			// string left to right.
-			//
-			// So, llvm_features + ',' + additonal_features, will
-			// makes the target_features_set override llvm_features.
-
-			char *tmp = gb_alloc_array(permanent_allocator(), char, f_len + 1 + a_string.len + 1);
-			isize len = 0;
-
-			// tmp = f_string
-			gb_memmove(tmp, f_string.text, f_string.len);
-			len += f_string.len;
-			// tmp += ','
-			tmp[len++] = ',';
-			// tmp += a_string
-			gb_memmove(tmp + len, a_string.text, a_string.len);
-			len += a_string.len;
-			// tmp += NUL
-			tmp[len++] = 0;
-
-			llvm_features = tmp;
-		}
-	}
+	debugf("CPU: %.*s, Features: %s\n", LIT(llvm_cpu), llvm_features);	
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
@@ -2562,6 +3053,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			// Always use PIC for OpenBSD and Haiku: they default to PIE
 			reloc_mode = LLVMRelocPIC;
 		}
+
+		if (build_context.metrics.arch == TargetArch_riscv64) {
+			// NOTE(laytan): didn't seem to work without this.
+			reloc_mode = LLVMRelocPIC;
+		}
+
 		break;
 	case RelocMode_Static:
 		reloc_mode = LLVMRelocStatic;
@@ -2584,6 +3081,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbModule *m = entry.value;
 		m->target_machine = target_machine;
 		LLVMSetModuleDataLayout(m->mod, LLVMCreateTargetDataLayout(target_machine));
+
+	#if LLVM_VERSION_MAJOR >= 18
+		if (build_context.fast_isel) {
+			LLVMSetTargetMachineFastISel(m->target_machine, true);
+		}
+	#endif
+
 		array_add(&target_machines, target_machine);
 	}
 
@@ -2798,8 +3302,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
 			LLVMSetExternallyInitialized(g.value, true);
 			lb_add_foreign_library_path(m, e->Variable.foreign_library);
-			
-			lb_set_wasm_import_attributes(g.value, e, name);
 		} else {
 			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
 		}
@@ -2807,7 +3309,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 		} else if (!is_foreign) {
-			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
+			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
 		}
 		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
 		
@@ -2824,18 +3326,26 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			if (!is_type_any(e->type) && !is_type_union(e->type)) {
 				if (tav.mode != Addressing_Invalid) {
 					if (tav.value.kind != ExactValue_Invalid) {
+						bool is_rodata = e->kind == Entity_Variable && e->Variable.is_rodata;
 						ExactValue v = tav.value;
-						lbValue init = lb_const_value(m, tav.type, v);
+						lbValue init = lb_const_value(m, tav.type, v, false, is_rodata);
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
+						if (is_rodata) {
+							LLVMSetGlobalConstant(g.value, true);
+						}
 					}
 				}
 			}
 			if (!var.is_initialized && is_type_untyped_nil(tav.type)) {
 				var.is_initialized = true;
+				if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+					LLVMSetGlobalConstant(g.value, true);
+				}
 			}
+		} else if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+			LLVMSetGlobalConstant(g.value, true);
 		}
-
 		array_add(&global_variables, var);
 
 		lb_add_entity(m, e, g);
@@ -2970,7 +3480,22 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 	lb_add_foreign_library_paths(gen);
 
-	TIME_SECTION("LLVM Object Generation");
+	TIME_SECTION("LLVM Correct Entity Linkage");
+	lb_correct_entity_linkage(gen);
+
+	////////////////////////////////////////////
+	for (auto const &entry: gen->modules) {
+		lbModule *m = entry.value;
+		if (!lb_is_module_empty(m)) {
+			gen->used_module_count += 1;
+		}
+	}
+
+	gbString label_object_generation = gb_string_make(heap_allocator(), "LLVM Object Generation");
+	if (gen->used_module_count > 1) {
+		label_object_generation = gb_string_append_fmt(label_object_generation, " (%td used modules)", gen->used_module_count);
+	}
+	TIME_SECTION_WITH_LEN(label_object_generation, gb_string_length(label_object_generation));
 	
 	if (build_context.ignore_llvm_build) {
 		gb_printf_err("LLVM object generation has been ignored!\n");

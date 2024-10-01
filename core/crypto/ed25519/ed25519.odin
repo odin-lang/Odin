@@ -2,9 +2,9 @@
 package ed25519 implements the Ed25519 EdDSA signature algorithm.
 
 See:
-- https://datatracker.ietf.org/doc/html/rfc8032
-- https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf
-- https://eprint.iacr.org/2020/1244.pdf
+- [[ https://datatracker.ietf.org/doc/html/rfc8032 ]]
+- [[ https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf ]]
+- [[ https://eprint.iacr.org/2020/1244.pdf ]]
 */
 package ed25519
 
@@ -21,7 +21,7 @@ PUBLIC_KEY_SIZE :: 32
 SIGNATURE_SIZE :: 64
 
 @(private)
-NONCE_SIZE :: 32
+HDIGEST2_SIZE :: 32
 
 // Private_Key is an Ed25519 private key.
 Private_Key :: struct {
@@ -33,7 +33,7 @@ Private_Key :: struct {
 	// See: https://github.com/MystenLabs/ed25519-unsafe-libs
 	_b:              [PRIVATE_KEY_SIZE]byte,
 	_s:              grp.Scalar,
-	_nonce:          [NONCE_SIZE]byte,
+	_hdigest2:       [HDIGEST2_SIZE]byte,
 	_pub_key:        Public_Key,
 	_is_initialized: bool,
 }
@@ -63,7 +63,7 @@ private_key_set_bytes :: proc(priv_key: ^Private_Key, b: []byte) -> bool {
 	sha2.final(&ctx, h_bytes[:])
 
 	copy(priv_key._b[:], b)
-	copy(priv_key._nonce[:], h_bytes[32:])
+	copy(priv_key._hdigest2[:], h_bytes[32:])
 	grp.sc_set_bytes_rfc8032(&priv_key._s, h_bytes[:32])
 
 	// Derive the corresponding public key.
@@ -116,7 +116,7 @@ sign :: proc(priv_key: ^Private_Key, msg, sig: []byte) {
 	ctx: sha2.Context_512 = ---
 	digest_bytes: [sha2.DIGEST_SIZE_512]byte = ---
 	sha2.init_512(&ctx)
-	sha2.update(&ctx, priv_key._nonce[:])
+	sha2.update(&ctx, priv_key._hdigest2[:])
 	sha2.update(&ctx, msg)
 	sha2.final(&ctx, digest_bytes[:])
 

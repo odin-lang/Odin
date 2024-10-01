@@ -126,7 +126,7 @@ error :: proc(t: ^Tokenizer, offset: int, msg: string, args: ..any) {
 	t.error_count += 1
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 advance_rune :: proc(t: ^Tokenizer) {
 	#no_bounds_check {
 		/*
@@ -170,7 +170,7 @@ peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
 	return 0
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 skip_whitespace :: proc(t: ^Tokenizer) {
 	for {
 		switch t.ch {
@@ -182,7 +182,7 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 	}
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 is_letter :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		switch r {
@@ -218,9 +218,7 @@ scan_identifier :: proc(t: ^Tokenizer) -> string {
 	for is_valid_identifier_rune(t.ch) {
 		advance_rune(t)
 		if t.ch == ':' {
-			/*
-				A namespaced attr can have at most two parts, `namespace:ident`.
-			*/
+			// A namespaced attr can have at most two parts, `namespace:ident`.
 			if namespaced {
 				break	
 			}
@@ -268,14 +266,10 @@ scan_comment :: proc(t: ^Tokenizer) -> (comment: string, err: Error) {
 	return string(t.src[offset : t.offset - 1]), .None
 }
 
-/*
-	Skip CDATA
-*/
+// Skip CDATA
 skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 	if t.read_offset + len(CDATA_START) >= len(t.src) {
-		/*
-			Can't be the start of a CDATA tag.
-		*/
+		// Can't be the start of a CDATA tag.
 		return .None
 	}
 
@@ -290,9 +284,7 @@ skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 				return .Premature_EOF
 			}
 
-			/*
-				Scan until the end of a CDATA tag.
-			*/
+			// Scan until the end of a CDATA tag.
 			if t.read_offset + len(CDATA_END) < len(t.src) {
 				if string(t.src[t.offset:][:len(CDATA_END)]) == CDATA_END {
 					t.read_offset += len(CDATA_END)
@@ -304,7 +296,7 @@ skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 	return
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true) -> (value: string, err: Error) {
 	err = .None
 
@@ -319,14 +311,10 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 		case '<':
 			if peek_byte(t) == '!' {
 				if peek_byte(t, 1) == '[' {
-					/*
-						Might be the start of a CDATA tag.
-					*/
+					// Might be the start of a CDATA tag.
 					skip_cdata(t) or_return
 				} else if peek_byte(t, 1) == '-' && peek_byte(t, 2) == '-' {
-					/*
-						Comment start. Eat comment.
-					*/
+					// Comment start. Eat comment.
 					t.read_offset += 3
 					_ = scan_comment(t) or_return
 				}
@@ -342,17 +330,13 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 		}
 
 		if t.ch == close {
-			/*
-				If it's not a CDATA or comment, it's the end of this body.
-			*/
+			// If it's not a CDATA or comment, it's the end of this body.
 			break loop
 		}
 		advance_rune(t)
 	}
 
-	/*
-		Strip trailing whitespace.
-	*/
+	// Strip trailing whitespace.
 	lit := string(t.src[offset : t.offset])
 
 	end := len(lit)
@@ -369,11 +353,6 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 	if consume_close {
 		advance_rune(t)
 	}
-
-	/*
-		TODO: Handle decoding escape characters and unboxing CDATA.
-	*/
-
 	return lit, err
 }
 
@@ -384,7 +363,7 @@ peek :: proc(t: ^Tokenizer) -> (token: Token) {
 	return token
 }
 
-scan :: proc(t: ^Tokenizer) -> Token {
+scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 	skip_whitespace(t)
 
 	offset := t.offset
@@ -418,7 +397,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case '"', '\'':
 			kind = .Invalid
 
-			lit, err = scan_string(t, t.offset, ch, true, false)
+			lit, err = scan_string(t, t.offset, ch, true, multiline_string)
 			if err == .None {
 				kind = .String
 			}

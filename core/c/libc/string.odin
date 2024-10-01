@@ -12,6 +12,7 @@ when ODIN_OS == .Windows {
 	foreign import libc "system:c"
 }
 
+@(default_calling_convention="c")
 foreign libc {
 	// 7.24.2 Copying functions
 	memcpy   :: proc(s1, s2: rawptr, n: size_t) -> rawptr ---
@@ -40,7 +41,7 @@ foreign libc {
 	strtok   :: proc(s1: [^]char, s2: cstring) -> [^]char ---
 
 	// 7.24.6 Miscellaneous functions
-	strerror :: proc(errnum: int) -> [^]char ---
+	strerror :: proc(errnum: int) -> cstring ---
 	strlen   :: proc(s: cstring) -> size_t ---
 }
 memset :: proc "c" (s: rawptr, c: int, n: size_t) -> rawptr {

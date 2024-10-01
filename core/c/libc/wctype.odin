@@ -14,7 +14,7 @@ when ODIN_OS == .Windows {
 	wctrans_t :: distinct wchar_t
 	wctype_t  :: distinct ushort
 
-} else when ODIN_OS == .Linux {
+} else when ODIN_OS == .Linux || ODIN_OS == .JS {
 	wctrans_t :: distinct intptr_t
 	wctype_t  :: distinct ulong
 
@@ -22,7 +22,7 @@ when ODIN_OS == .Windows {
 	wctrans_t :: distinct int
 	wctype_t  :: distinct u32
 
-} else when ODIN_OS == .OpenBSD {
+} else when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	wctrans_t :: distinct rawptr
 	wctype_t  :: distinct rawptr
 

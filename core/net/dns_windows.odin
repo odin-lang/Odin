@@ -1,4 +1,4 @@
-//+build windows
+#+build windows
 package net
 
 /*
@@ -10,12 +10,14 @@ package net
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
 */
 
 import "core:strings"
@@ -126,33 +128,37 @@ _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator :
 			append(&recs, record)
 
 		case .SRV:
-			target   := strings.clone(string(r.Data.SRV.pNameTarget)) // The target hostname/address that the service can be found on
-			priority := int(r.Data.SRV.wPriority)
-			weight   := int(r.Data.SRV.wWeight)
-			port     := int(r.Data.SRV.wPort)
-
 			// NOTE(tetra): Srv record name should be of the form '_servicename._protocol.hostname'
 			// The record name is the name of the record.
 			// Not to be confused with the _target_ of the record, which is--in combination with the port--what we're looking up
 			// by making this request in the first place.
 
-			// NOTE(Jeroen): Service Name and Protocol Name can probably just be string slices into the record name.
-			// It's already cloned, after all. I wouldn't put them on the temp allocator like this.
+			service_name, protocol_name: string
 
-			parts := strings.split_n(base_record.record_name, ".", 3, context.temp_allocator)
-			if len(parts) != 3 {
+			s := base_record.record_name
+			i := strings.index_byte(s, '.')
+			if i > -1 {
+				service_name = s[:i]
+				s = s[len(service_name) + 1:]
+			} else {
 				continue
 			}
-			service_name, protocol_name := parts[0], parts[1]
+
+			i  = strings.index_byte(s, '.')
+			if i > -1 {
+				protocol_name = s[:i]
+			} else {
+				continue
+			}
 
 			append(&recs, DNS_Record_SRV {
 				base          = base_record,
-				target        = target,
-				port          = port,
+				target        = strings.clone(string(r.Data.SRV.pNameTarget)), // The target hostname/address that the service can be found on
+				port          = int(r.Data.SRV.wPort),
 				service_name  = service_name,
 				protocol_name = protocol_name,
-				priority      = priority,
-				weight        = weight,
+				priority      = int(r.Data.SRV.wPriority),
+				weight        = int(r.Data.SRV.wWeight),
 
 			})
 		}

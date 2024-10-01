@@ -31,3 +31,7 @@ Screen_visibleFrame :: proc "c" (self: ^Screen) -> Rect {
 Screen_colorSpace :: proc "c" (self: ^Screen) -> ^ColorSpace {
 	return msgSend(^ColorSpace, self, "colorSpace")
 }
+@(objc_type=Screen, objc_name="backingScaleFactor")
+Screen_backingScaleFactor :: proc "c" (self: ^Screen) -> Float {
+	return msgSend(Float, self, "backingScaleFactor")
+}

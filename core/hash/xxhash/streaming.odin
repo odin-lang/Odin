@@ -7,6 +7,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+
 package xxhash
 
 import "core:mem"

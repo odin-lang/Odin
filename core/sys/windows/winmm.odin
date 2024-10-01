@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 foreign import winmm "system:Winmm.lib"
@@ -270,7 +270,7 @@ LPHWAVEOUT :: ^HWAVEOUT
 
 // https://learn.microsoft.com/en-us/windows/win32/multimedia/multimedia-timer-structures
 MMTIME :: struct {
-	wType: UINT,
+	wType: MMTIME_TYPE,
 	u: struct #raw_union {
 		ms: DWORD,
 		sample: DWORD,
@@ -291,6 +291,21 @@ MMTIME :: struct {
 	},
 }
 LPMMTIME :: ^MMTIME
+
+MMTIME_TYPE :: enum UINT {
+	/* time in milliseconds */
+	TIME_MS      = 0x0001,
+	/* number of wave samples */
+	TIME_SAMPLES = 0x0002,
+	/* current byte offset */
+	TIME_BYTES   = 0x0004,
+	/* SMPTE time */
+	TIME_SMPTE   = 0x0008,
+	/* MIDI time */
+	TIME_MIDI    = 0x0010,
+	/* Ticks within MIDI stream */
+	TIME_TICKS   = 0x0020,
+}
 
 MAXPNAMELEN :: 32
 MAXERRORLENGTH :: 256

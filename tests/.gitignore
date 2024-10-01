@@ -1,0 +1,22 @@
+# Ignore all files.
+*
+
+# Un-ignore all directories.
+!*/
+
+# Un-ignore files with an extension.
+#
+# In conjunction with the first two rules, this should catch extensionless
+# binaries on the UNIX-like platforms.
+!*.*
+
+# But remember to ignore executables with an extension.
+*.exe
+*.bin
+*.bat
+*.pdb
+*.sh
+
+# Ignore documentation-related files.
+/documentation/verify/
+/documentation/all.odin-doc

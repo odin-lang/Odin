@@ -1,10 +1,6 @@
 package miniaudio
 
-when ODIN_OS == .Windows {
-	foreign import lib "lib/miniaudio.lib"
-} else {
-	foreign import lib "lib/miniaudio.a"
-}
+foreign import lib { LIB }
 
 import "core:c"
 

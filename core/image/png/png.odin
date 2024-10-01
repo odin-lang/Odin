@@ -8,10 +8,7 @@
 */
 
 
-// package png implements a PNG image reader
-//
-// The PNG specification is at https://www.w3.org/TR/PNG/.
-//+vet !using-stmt
+#+vet !using-stmt
 package png
 
 import "core:compress"
@@ -341,7 +338,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	options := options
 
 	if .info in options {
-		options |= {.return_metadata, .do_not_decompress_image}
+		options += {.return_metadata, .do_not_decompress_image}
 		options -= {.info}
 	}
 
@@ -354,7 +351,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	if .do_not_expand_channels in options {
-		options |= {.do_not_expand_grayscale, .do_not_expand_indexed}
+		options += {.do_not_expand_grayscale, .do_not_expand_indexed}
 	}
 
 	if img == nil {
@@ -535,28 +532,28 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 			ct := transmute(u8)info.header.color_type
 			switch ct {
-				case 3: // Indexed color
-					if c.header.length != 1 {
-						return {}, .BKGD_Invalid_Length
-					}
-					col := _plte.entries[c.data[0]]
-					img.background = [3]u16{
-						u16(col[0]) << 8 | u16(col[0]),
-						u16(col[1]) << 8 | u16(col[1]),
-						u16(col[2]) << 8 | u16(col[2]),
-					}
-				case 0, 4: // Grayscale, with and without Alpha
-					if c.header.length != 2 {
-						return {}, .BKGD_Invalid_Length
-					}
-					col := u16(mem.slice_data_cast([]u16be, c.data[:])[0])
-					img.background = [3]u16{col, col, col}
-				case 2, 6: // Color, with and without Alpha
-					if c.header.length != 6 {
-						return {}, .BKGD_Invalid_Length
-					}
-					col := mem.slice_data_cast([]u16be, c.data[:])
-					img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])}
+			case 3: // Indexed color
+				if c.header.length != 1 {
+					return {}, .BKGD_Invalid_Length
+				}
+				col := _plte.entries[c.data[0]]
+				img.background = [3]u16{
+					u16(col[0]) << 8 | u16(col[0]),
+					u16(col[1]) << 8 | u16(col[1]),
+					u16(col[2]) << 8 | u16(col[2]),
+				}
+			case 0, 4: // Grayscale, with and without Alpha
+				if c.header.length != 2 {
+					return {}, .BKGD_Invalid_Length
+				}
+				col := u16(mem.slice_data_cast([]u16be, c.data[:])[0])
+				img.background = [3]u16{col, col, col}
+			case 2, 6: // Color, with and without Alpha
+				if c.header.length != 6 {
+					return {}, .BKGD_Invalid_Length
+				}
+				col := mem.slice_data_cast([]u16be, c.data[:])
+				img.background = [3]u16{u16(col[0]), u16(col[1]), u16(col[2])}
 			}
 
 		case .tRNS:
@@ -597,7 +594,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				dsc   := depth_scale_table
 				scale := dsc[info.header.bit_depth]
 				if scale != 1 {
-					key := mem.slice_data_cast([]u16be, c.data)[0] * u16be(scale)
+					key := (^u16be)(raw_data(c.data))^ * u16be(scale)
 					c.data = []u8{0, u8(key & 255)}
 				}
 			}
@@ -735,59 +732,48 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
-		i := 0; j := 0
-
 		// If we don't have transparency or drop it without applying it, we can do this:
 		if (!seen_trns || (seen_trns && .alpha_drop_if_present in options && .alpha_premultiply not_in options)) && .alpha_add_if_missing not_in options {
-			for h := 0; h < int(img.height); h += 1 {
-				for w := 0; w < int(img.width);  w += 1 {
-					c := _plte.entries[temp.buf[i]]
-					t.buf[j  ] = c.r
-					t.buf[j+1] = c.g
-					t.buf[j+2] = c.b
-					i += 1; j += 3
-				}
+			output := mem.slice_data_cast([]image.RGB_Pixel, t.buf[:])
+			for pal_idx, idx in temp.buf {
+				output[idx] = _plte.entries[pal_idx]
 			}
 		} else if add_alpha || .alpha_drop_if_present in options {
-			bg := [3]f32{0, 0, 0}
+			bg := PLTE_Entry{0, 0, 0}
 			if premultiply && seen_bkgd {
 				c16 := img.background.([3]u16)
-				bg = [3]f32{f32(c16.r), f32(c16.g), f32(c16.b)}
+				bg = {u8(c16.r), u8(c16.g), u8(c16.b)}
 			}
 
 			no_alpha := (.alpha_drop_if_present in options || premultiply) && .alpha_add_if_missing not_in options
 			blend_background := seen_bkgd && .blend_background in options
 
-			for h := 0; h < int(img.height); h += 1 {
-				for w := 0; w < int(img.width);  w += 1 {
-					index := temp.buf[i]
-
-					c     := _plte.entries[index]
-					a     := int(index) < len(trns.data) ? trns.data[index] : 255
-					alpha := f32(a) / 255.0
+			if no_alpha {
+				output := mem.slice_data_cast([]image.RGB_Pixel, t.buf[:])
+				for orig, idx in temp.buf {
+					c := _plte.entries[orig]
+					a := int(orig) < len(trns.data) ? trns.data[orig] : 255
 
 					if blend_background {
-						c.r = u8((1.0 - alpha) * bg[0] + f32(c.r) * alpha)
-						c.g = u8((1.0 - alpha) * bg[1] + f32(c.g) * alpha)
-						c.b = u8((1.0 - alpha) * bg[2] + f32(c.b) * alpha)
+						output[idx] = image.blend(c, a, bg)
+					} else if premultiply {
+						output[idx] = image.blend(PLTE_Entry{}, a, c)
+					}
+				}
+			} else {
+				output := mem.slice_data_cast([]image.RGBA_Pixel, t.buf[:])
+				for orig, idx in temp.buf {
+					c := _plte.entries[orig]
+					a := int(orig) < len(trns.data) ? trns.data[orig] : 255
+
+					if blend_background {
+						c = image.blend(c, a, bg)
 						a = 255
 					} else if premultiply {
-						c.r = u8(f32(c.r) * alpha)
-						c.g = u8(f32(c.g) * alpha)
-						c.b = u8(f32(c.b) * alpha)
+						c = image.blend(PLTE_Entry{}, a, c)
 					}
 
-					t.buf[j  ] = c.r
-					t.buf[j+1] = c.g
-					t.buf[j+2] = c.b
-					i += 1
-
-					if no_alpha {
-						j += 3
-					} else {
-						t.buf[j+3] = u8(a)
-						j += 4
-					}
+					output[idx] = {c.r, c.g, c.b, u8(a)}
 				}
 			}
 		} else {
@@ -1015,8 +1001,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
-		p := mem.slice_data_cast([]u8, temp.buf[:])
-		o := mem.slice_data_cast([]u8, t.buf[:])
+		p := temp.buf[:]
+		o := t.buf[:]
 
 		switch raw_image_channels {
 		case 1:
@@ -1626,7 +1612,6 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 
 	return nil
 }
-
 
 @(init, private)
 _register :: proc() {

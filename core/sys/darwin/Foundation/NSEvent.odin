@@ -5,8 +5,8 @@ Event :: struct {using _: Object}
 
 
 
-EventMask :: distinct bit_set[EventType; UInteger]
-EventMaskAny :: ~EventMask{}
+EventMask    :: distinct bit_set[EventType; UInteger]
+EventMaskAny :: transmute(EventMask)(max(UInteger))
 
 when size_of(UInteger) == 4 {
 	// We don't support a 32-bit darwin system but this is mostly to shut up the type checker for the time being
@@ -104,6 +104,28 @@ PointingDeviceType :: enum UInteger {
 	Cursor  = 2,
 	Eraser  = 3,
 }
+
+EventModifierFlag :: enum UInteger {
+	CapsLock                      = 16,
+	Shift                         = 17,
+	Control                       = 18,
+	Option                        = 19,
+	Command                       = 20,
+	NumericPad                    = 21,
+	Help                          = 22,
+	Function                      = 23,
+}
+
+EventModifierFlags :: distinct bit_set[EventModifierFlag; UInteger]
+EventModifierFlagCapsLock         :: EventModifierFlags{.CapsLock}
+EventModifierFlagShift            :: EventModifierFlags{.Shift}
+EventModifierFlagControl          :: EventModifierFlags{.Control}
+EventModifierFlagOption           :: EventModifierFlags{.Option}
+EventModifierFlagCommand          :: EventModifierFlags{.Command}
+EventModifierFlagNumericPad       :: EventModifierFlags{.NumericPad}
+EventModifierFlagHelp             :: EventModifierFlags{.Help}
+EventModifierFlagFunction         :: EventModifierFlags{.Function}
+EventModifierFlagDeviceIndependentFlagsMask : UInteger : 0xffff0000
 
 // Defined in Carbon.framework Events.h
 kVK :: enum {
@@ -236,8 +258,8 @@ Event_type :: proc "c" (self: ^Event) -> EventType {
 	return msgSend(EventType, self, "type")
 }
 @(objc_type=Event, objc_name="modifierFlags")
-Event_modifierFlags :: proc "c" (self: ^Event) -> UInteger {
-	return msgSend(UInteger, self, "modifierFlags")
+Event_modifierFlags :: proc "c" (self: ^Event) -> EventModifierFlags {
+	return msgSend(EventModifierFlags, self, "modifierFlags")
 }
 @(objc_type=Event, objc_name="timestamp")
 Event_timestamp :: proc "c" (self: ^Event) -> TimeInterval {

@@ -1,5 +1,5 @@
 // This is purely for documentation
-//+build ignore
+#+build ignore
 package intrinsics
 
 // Package-Related
@@ -38,9 +38,12 @@ count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) || type_is_sim
 reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 
-overflow_add :: proc(lhs, rhs: $T) -> (T, bool) ---
-overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) ---
-overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) ---
+overflow_add :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
+overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
+overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #optional_ok ---
+
+saturating_add :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
+saturating_sub :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
 
 sqrt :: proc(x: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
 
@@ -73,6 +76,8 @@ expect :: proc(val, expected_val: T) -> T ---
 
 // Linux and Darwin Only
 syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
+// FreeBSD, NetBSD, et cetera
+syscall_bsd :: proc(id: uintptr, args: ..uintptr) -> (uintptr, bool) ---
 
 
 // Atomics
@@ -167,17 +172,23 @@ type_is_matrix           :: proc($T: typeid) -> bool ---
 
 type_has_nil :: proc($T: typeid) -> bool ---
 
+type_is_matrix_row_major    :: proc($T: typeid) -> bool where type_is_matrix(T) ---
+type_is_matrix_column_major :: proc($T: typeid) -> bool where type_is_matrix(T) ---
+
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 
-type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
-type_union_tag_type :: proc($T: typeid) -> typeid where type_is_union(T) ---
-type_union_tag_offset :: proc($T: typeid) -> uintptr where type_is_union(T) ---
-type_union_base_tag_value :: proc($T: typeid) -> int where type_is_union(U) ---
-type_union_variant_count :: proc($T: typeid) -> int where type_is_union(T) ---
-type_variant_type_of :: proc($T: typeid, $index: int) -> typeid where type_is_union(T) ---
-type_variant_index_of :: proc($U, $V: typeid) -> int where type_is_union(U) ---
+type_is_variant_of        :: proc($U, $V: typeid)          -> bool    where type_is_union(U) ---
+type_union_tag_type       :: proc($T: typeid)              -> typeid  where type_is_union(T) ---
+type_union_tag_offset     :: proc($T: typeid)              -> uintptr where type_is_union(T) ---
+type_union_base_tag_value :: proc($T: typeid)              -> int     where type_is_union(U) ---
+type_union_variant_count  :: proc($T: typeid)              -> int     where type_is_union(T) ---
+type_variant_type_of      :: proc($T: typeid, $index: int) -> typeid  where type_is_union(T) ---
+type_variant_index_of     :: proc($U, $V: typeid)          -> int     where type_is_union(U) ---
 
-type_has_field :: proc($T: typeid, $name: string) -> bool ---
+type_bit_set_elem_type       :: proc($T: typeid) -> typeid where type_is_bit_set(T) ---
+type_bit_set_underlying_type :: proc($T: typeid) -> typeid where type_is_bit_set(T) ---
+
+type_has_field  :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
@@ -186,7 +197,8 @@ type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 
-type_struct_field_count :: proc($T: typeid) -> int where type_is_struct(T) ---
+type_struct_field_count          :: proc($T: typeid) -> int  where type_is_struct(T) ---
+type_struct_has_implicit_padding :: proc($T: typeid) -> bool where type_is_struct(T) ---
 
 type_polymorphic_record_parameter_count :: proc($T: typeid) -> typeid ---
 type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V ---
@@ -207,13 +219,20 @@ type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
 type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
 
+type_has_shared_fields :: proc($U, $V: typeid) -> bool typeid where type_is_struct(U), type_is_struct(V) ---
+
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
+
+constant_log2 :: proc($v: $T) -> T where type_is_integer(T) ---
 
 // SIMD related
 simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_mul  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_div  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_float(T) ---
+
+simd_saturating_add  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
+simd_saturating_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
 
 // Keeps Odin's Behaviour
 // (x << y) if y <= mask else 0
@@ -224,9 +243,6 @@ simd_shr :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
 // x << (y & mask)
 simd_shl_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
 simd_shr_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
-
-simd_add_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_sub_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 
 simd_bit_and     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_bit_or      :: proc(a, b: #simd[N]T) -> #simd[N]T ---
@@ -256,13 +272,28 @@ simd_lanes_ge :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
 simd_extract :: proc(a: #simd[N]T, idx: uint) -> T ---
 simd_replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T ---
 
-simd_reduce_add_ordered :: proc(a: #simd[N]T) -> T ---
-simd_reduce_mul_ordered :: proc(a: #simd[N]T) -> T ---
-simd_reduce_min         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_max         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_and         :: proc(a: #simd[N]T) -> T ---
-simd_reduce_or          :: proc(a: #simd[N]T) -> T ---
-simd_reduce_xor         :: proc(a: #simd[N]T) -> T ---
+simd_reduce_add_ordered :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_mul_ordered :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_min         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_max         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_and         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_or          :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_xor         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+
+simd_reduce_any         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
+simd_reduce_all         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
+
+
+simd_gather       :: proc(ptr: #simd[N]rawptr, val: #simd[N]T, mask: #simd[N]U) -> #simd[N]T where type_is_integer(U) || type_is_boolean(U) ---
+simd_scatter      :: proc(ptr: #simd[N]rawptr, val: #simd[N]T, mask: #simd[N]U)              where type_is_integer(U) || type_is_boolean(U) ---
+
+simd_masked_load  :: proc(ptr: rawptr, val: #simd[N]T, mask: #simd[N]U) -> #simd[N]T where type_is_integer(U) || type_is_boolean(U) ---
+simd_masked_store :: proc(ptr: rawptr, val: #simd[N]T, mask: #simd[N]U)              where type_is_integer(U) || type_is_boolean(U) ---
+
+simd_masked_expand_load    :: proc(ptr: rawptr, val: #simd[N]T, mask: #simd[N]U) -> #simd[N]T where type_is_integer(U) || type_is_boolean(U) ---
+simd_masked_compress_store :: proc(ptr: rawptr, val: #simd[N]T, mask: #simd[N]U)              where type_is_integer(U) || type_is_boolean(U) ---
+
+
 
 simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T ---
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
@@ -276,12 +307,22 @@ simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
 simd_to_bits :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
 
-// equivalent a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
-simd_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
+// equivalent to a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
+simd_lanes_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 
-simd_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
-simd_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_lanes_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 
+// Checks if the current target supports the given target features.
+//
+// Takes a constant comma-seperated string (eg: "sha512,sse4.1"), or a procedure type which has either
+// `@(require_target_feature)` or `@(enable_target_feature)` as its input and returns a boolean indicating
+// if all listed features are supported.
+has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is_proc(T) ---
+
+
+// Returns the value of the procedure where `x` must be a call expression
+procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---
 
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
@@ -293,9 +334,9 @@ wasm_memory_size :: proc(index: uintptr)        -> int ---
 // 0 - indicates that the thread blocked and then was woken up
 // 1 - the loaded value from `ptr` did not match `expected`, the thread did not block
 // 2 - the thread blocked, but the timeout
-@(enable_target_feature="atomics")
+@(require_target_feature="atomics")
 wasm_memory_atomic_wait32   :: proc(ptr: ^u32, expected: u32, timeout_ns: i64) -> u32 ---
-@(enable_target_feature="atomics")
+@(require_target_feature="atomics")
 wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_up: u32) ---
 
 // x86 Targets (i386, amd64)

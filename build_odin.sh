@@ -2,7 +2,6 @@
 set -eu
 
 : ${CPPFLAGS=}
-: ${CXX=clang++}
 : ${CXXFLAGS=}
 : ${LDFLAGS=}
 : ${LLVM_CONFIG=}
@@ -24,19 +23,29 @@ error() {
 	exit 1
 }
 
+# Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
+if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
+    if   [ -n "$(command -v $(brew --prefix llvm@18)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@18)/bin/llvm-config"
+    elif [ -n "$(command -v $(brew --prefix llvm@17)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@17)/bin/llvm-config"
+    elif [ -n "$(command -v $(brew --prefix llvm@14)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@14)/bin/llvm-config"
+    fi
+fi
+
 if [ -z "$LLVM_CONFIG" ]; then
 	# darwin, linux, openbsd
-	if   [ -n "$(command -v llvm-config-17)" ]; then LLVM_CONFIG="llvm-config-17"
+	if   [ -n "$(command -v llvm-config-18)" ]; then LLVM_CONFIG="llvm-config-18"
+	elif [ -n "$(command -v llvm-config-17)" ]; then LLVM_CONFIG="llvm-config-17"
 	elif [ -n "$(command -v llvm-config-14)" ]; then LLVM_CONFIG="llvm-config-14"
 	elif [ -n "$(command -v llvm-config-13)" ]; then LLVM_CONFIG="llvm-config-13"
 	elif [ -n "$(command -v llvm-config-12)" ]; then LLVM_CONFIG="llvm-config-12"
 	elif [ -n "$(command -v llvm-config-11)" ]; then LLVM_CONFIG="llvm-config-11"
 	# freebsd
-	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config-17"
-	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config-14"
-	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config-13"
-	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config-12"
-	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config-11"
+	elif [ -n "$(command -v llvm-config18)" ]; then  LLVM_CONFIG="llvm-config18"
+	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config17"
+	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config14"
+	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config13"
+	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config12"
+	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config11"
 	# fallback
 	elif [ -n "$(command -v llvm-config)" ]; then LLVM_CONFIG="llvm-config"
 	else
@@ -44,28 +53,48 @@ if [ -z "$LLVM_CONFIG" ]; then
 	fi
 fi
 
+if [ -x "$(which clang++)" ]; then
+	: ${CXX="clang++"}
+elif [ -x "$($LLVM_CONFIG --bindir)/clang++" ]; then
+	: ${CXX=$($LLVM_CONFIG --bindir)/clang++}
+else
+	error "No clang++ command found. Set CXX to proceed."
+fi
+
 LLVM_VERSION="$($LLVM_CONFIG --version)"
 LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
 
-if [ $LLVM_VERSION_MAJOR -lt 11 ] ||
-	([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]); then
-	error "Invalid LLVM version $LLVM_VERSION: must be 11, 12, 13, 14 or 17"
+if [ $LLVM_VERSION_MAJOR -lt 11 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 18 ]; then
+	error "Invalid LLVM version $LLVM_VERSION: must be 11, 12, 13, 14, 17 or 18"
 fi
 
 case "$OS_NAME" in
 Darwin)
 	if [ "$OS_ARCH" = "arm64" ]; then
-		if [ $LLVM_VERSION_MAJOR -lt 13 ] || [ $LLVM_VERSION_MAJOR -gt 17 ]; then
-			error "Darwin Arm64 requires LLVM 13, 14 or 17"
+		if [ $LLVM_VERSION_MAJOR -lt 13 ]; then
+			error "Invalid LLVM version $LLVM_VERSION: Darwin Arm64 requires LLVM 13, 14, 17 or 18"
 		fi
 	fi
 
-	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	darwin_sysroot=
+	if [ $(which xcrun) ]; then
+		darwin_sysroot="--sysroot $(xcrun --sdk macosx --show-sdk-path)"
+	elif [[ -e "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" ]]; then
+		darwin_sysroot="--sysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+	else
+		echo "Warning: MacOSX.sdk not found."
+	fi
+
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags) ${darwin_sysroot}"
 	LDFLAGS="$LDFLAGS -liconv -ldl -framework System -lLLVM"
 	;;
 FreeBSD)
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+	;;
+NetBSD)
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
@@ -74,7 +103,7 @@ Linux)
 	LDFLAGS="$LDFLAGS -ldl $($LLVM_CONFIG --libs core native --system-libs --libfiles)"
 	# Copy libLLVM*.so into current directory for linking
 	# NOTE: This is needed by the Linux release pipeline!
-	cp $(readlink -f $($LLVM_CONFIG --libfiles)) ./
+	# cp $(readlink -f $($LLVM_CONFIG --libfiles)) ./
 	LDFLAGS="$LDFLAGS -Wl,-rpath=\$ORIGIN"
 	;;
 OpenBSD)
@@ -123,12 +152,17 @@ build_odin() {
 }
 
 run_demo() {
-	./odin run examples/demo/demo.odin -file -- Hellope World
+	if [ $# -eq 0 ] || [ "$1" = "debug" ]; then
+		./odin run examples/demo -vet -strict-style -- Hellope World
+	fi
 }
 
 if [ $# -eq 0 ]; then
 	build_odin debug
 	run_demo
+
+	: ${PROGRAM:=$0}
+	printf "\nDebug compiler built. Note: run \"$PROGRAM release\" or \"$PROGRAM release-native\" if you want a faster, release mode compiler.\n"
 elif [ $# -eq 1 ]; then
 	case $1 in
 	report)

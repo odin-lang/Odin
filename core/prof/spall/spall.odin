@@ -68,7 +68,7 @@ BUFFER_DEFAULT_SIZE :: 0x10_0000
 
 context_create_with_scale :: proc(filename: string, precise_time: bool, timestamp_scale: f64) -> (ctx: Context, ok: bool) #optional_ok {
 	fd, err := os.open(filename, os.O_WRONLY | os.O_APPEND | os.O_CREATE | os.O_TRUNC, 0o600)
-	if err != os.ERROR_NONE {
+	if err != nil {
 		return
 	}
 
@@ -227,7 +227,7 @@ _buffer_end :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_ch
 }
 
 @(no_instrumentation)
-write :: proc "contextless" (fd: os.Handle, buf: []byte) -> (n: int, err: os.Errno) {
+write :: proc "contextless" (fd: os.Handle, buf: []byte) -> (n: int, err: os.Error) {
 	return _write(fd, buf)
 }
 

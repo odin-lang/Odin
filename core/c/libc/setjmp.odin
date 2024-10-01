@@ -32,24 +32,21 @@ when ODIN_OS == .Windows {
 		// the RDX register will contain zero and correctly set the flag to disable
 		// stack unwinding.
 		@(link_name="_setjmp")
-		setjmp  :: proc(env: ^jmp_buf, hack: rawptr = nil) -> int ---
+		setjmp :: proc(env: ^jmp_buf, hack: rawptr = nil) -> int ---
 	}
 } else {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.13.1 Save calling environment
-		//
-		// NOTE(dweiler): C11 requires setjmp be a macro, which means it won't
-		// necessarily export a symbol named setjmp but rather _setjmp in the case
-		// of musl, glibc, BSD libc, and msvcrt.
-		@(link_name="_setjmp")
-		setjmp  :: proc(env: ^jmp_buf) -> int ---
+		@(link_name=LSETJMP)
+		setjmp :: proc(env: ^jmp_buf) -> int ---
 	}
 }
 
 @(default_calling_convention="c")
 foreign libc {
 	// 7.13.2 Restore calling environment
+	@(link_name=LLONGJMP)
 	longjmp :: proc(env: ^jmp_buf, val: int) -> ! ---
 }
 
@@ -64,3 +61,11 @@ foreign libc {
 // The choice of 4096 bytes for storage of this type is more than enough on all
 // relevant platforms.
 jmp_buf :: struct #align(16) { _: [4096]char, }
+
+when ODIN_OS == .NetBSD {
+	@(private) LSETJMP  :: "__setjmp14"
+	@(private) LLONGJMP :: "__longjmp14"
+} else {
+	@(private) LSETJMP  :: "setjmp"
+	@(private) LLONGJMP :: "longjmp"
+}

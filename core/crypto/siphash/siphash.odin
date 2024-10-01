@@ -1,3 +1,12 @@
+/*
+package siphash Implements the SipHash hashing algorithm.
+
+Use the specific procedures for a certain setup. The generic procedures will default to Siphash 2-4.
+
+See:
+- [[ https://github.com/veorq/SipHash ]]
+- [[ https://www.aumasson.jp/siphash/siphash.pdf ]]
+*/
 package siphash
 
 /*
@@ -6,10 +15,6 @@ package siphash
 
     List of contributors:
         zhibog:  Initial implementation.
-
-    Implementation of the SipHash hashing algorithm, as defined at <https://github.com/veorq/SipHash> and <https://www.aumasson.jp/siphash/siphash.pdf>
-
-    Use the specific procedures for a certain setup. The generic procdedures will default to Siphash 2-4
 */
 
 import "core:crypto"

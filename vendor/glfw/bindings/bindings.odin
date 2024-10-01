@@ -197,7 +197,12 @@ foreign glfw {
 
 	SetErrorCallback :: proc(cbfun: ErrorProc) -> ErrorProc ---
 
+	// Functions added in 3.4, Linux links against system glfw so we define these as weak to be able
+	// to check at runtime if they are available.
+
+	@(linkage="weak")
 	GetPlatform       :: proc() -> c.int ---
+	@(linkage="weak")
 	PlatformSupported :: proc(platform: c.int) -> b32 ---
 }
 

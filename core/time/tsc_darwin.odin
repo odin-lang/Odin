@@ -1,5 +1,4 @@
-//+private
-//+build darwin
+#+private
 package time
 
 import "core:c"

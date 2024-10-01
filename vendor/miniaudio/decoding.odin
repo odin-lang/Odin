@@ -2,11 +2,7 @@ package miniaudio
 
 import "core:c"
 
-when ODIN_OS == .Windows {
-	foreign import lib "lib/miniaudio.lib"
-} else {
-	foreign import lib "lib/miniaudio.a"
-}
+foreign import lib { LIB }
 
 /************************************************************************************************************************************************************
 
@@ -73,9 +69,9 @@ decoder :: struct  {
 	outputSampleRate:       u32,
 	converter:              data_converter,    /* <-- Data conversion is achieved by running frames through this. */
 	pInputCache:            rawptr,            /* In input format. Can be null if it's not needed. */
-  inputCacheCap:          u64,               /* The capacity of the input cache. */
-  inputCacheConsumed:     u64,               /* The number of frames that have been consumed in the cache. Used for determining the next valid frame. */
-  inputCacheRemaining:    u64,               /* The number of valid frames remaining in the cahce. */
+	inputCacheCap:          u64,               /* The capacity of the input cache. */
+	inputCacheConsumed:     u64,               /* The number of frames that have been consumed in the cache. Used for determining the next valid frame. */
+	inputCacheRemaining:    u64,               /* The number of valid frames remaining in the cahce. */
 	allocationCallbacks:    allocation_callbacks,
 	data: struct #raw_union {
 		vfs: struct {
