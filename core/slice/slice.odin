@@ -37,6 +37,17 @@ to_bytes :: proc "contextless" (s: []$T) -> []byte {
 }
 
 /*
+	Turns a byte slice into a type.
+*/
+@(require_results)
+to_type :: proc(buf: []u8, $T: typeid) -> (T, bool) #optional_ok {
+	if len(buf) < size_of(T) {
+		return {}, false
+	}
+	return intrinsics.unaligned_load((^T)(raw_data(buf))), true
+}
+
+/*
 	Turn a slice of one type, into a slice of another type.
 
 	Only converts the type and length of the slice itself.
