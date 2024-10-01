@@ -9,4 +9,4 @@ set /a MAX_MEMORY_BYTES=%MAX_MEMORY_PAGES% * %PAGE_SIZE%
 call odin.exe build . -target:js_wasm32 -out:web/triangle.wasm -o:size -extra-linker-flags:"--export-table --import-memory --initial-memory=%INITIAL_MEMORY_BYTES% --max-memory=%MAX_MEMORY_BYTES%"
 
 copy "..\..\wgpu.js" "web\wgpu.js"
-copy "..\..\..\wasm\js\runtime.js" "web\runtime.js"
+copy "..\..\..\..\core\sys\wasm\js\odin.js" "web\odin.js"

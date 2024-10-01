@@ -137,7 +137,8 @@ struct TypeStruct {
 	Scope *         scope;
 
 	i64             custom_align;
-	i64             custom_field_align;
+	i64             custom_min_field_align;
+	i64             custom_max_field_align;
 	Type *          polymorphic_params; // Type_Tuple
 	Type *          polymorphic_parent;
 	Wait_Signal     polymorphic_wait_signal;
@@ -3912,6 +3913,14 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 				max = align;
 			}
 		}
+
+		if (t->Struct.custom_min_field_align > 0) {
+			max = gb_max(max, t->Struct.custom_min_field_align);
+		}
+		if (t->Struct.custom_max_field_align != 0 &&
+		    t->Struct.custom_max_field_align > t->Struct.custom_min_field_align) {
+			max = gb_min(max, t->Struct.custom_max_field_align);
+		}
 		return max;
 	} break;
 
@@ -3950,7 +3959,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 }
 
-gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union, i64 min_field_align) {
+gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union, i64 min_field_align, i64 max_field_align) {
 	gbAllocator a = permanent_allocator();
 	auto offsets = gb_alloc_array(a, i64, fields.count);
 	i64 curr_offset = 0;
@@ -3980,6 +3989,9 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 			} else {
 				Type *t = fields[i]->type;
 				i64 align = gb_max(type_align_of(t), min_field_align);
+				if (max_field_align > min_field_align) {
+					align = gb_min(align, max_field_align);
+				}
 				i64 size  = gb_max(type_size_of( t), 0);
 				curr_offset = align_formula(curr_offset, align);
 				offsets[i] = curr_offset;
@@ -3996,7 +4008,7 @@ gb_internal bool type_set_offsets(Type *t) {
 		MUTEX_GUARD(&t->Struct.offset_mutex);
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
-			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_field_align);
+			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align);
 			t->Struct.are_offsets_being_processed = false;
 			t->Struct.are_offsets_set = true;
 			return true;
@@ -4005,7 +4017,7 @@ gb_internal bool type_set_offsets(Type *t) {
 		MUTEX_GUARD(&t->Tuple.mutex);
 		if (!t->Tuple.are_offsets_set) {
 			t->Tuple.are_offsets_being_processed = true;
-			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false, 1);
+			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false, 1, 0);
 			t->Tuple.are_offsets_being_processed = false;
 			t->Tuple.are_offsets_set = true;
 			return true;

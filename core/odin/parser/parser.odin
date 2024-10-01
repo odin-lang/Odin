@@ -2610,9 +2610,10 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	case .Struct:
 		tok := expect_token(p, .Struct)
 
-		poly_params: ^ast.Field_List
-		align:        ^ast.Expr
-		field_align:  ^ast.Expr
+		poly_params:     ^ast.Field_List
+		align:           ^ast.Expr
+		min_field_align: ^ast.Expr
+		max_field_align: ^ast.Expr
 		is_packed:    bool
 		is_raw_union: bool
 		is_no_copy:   bool
@@ -2645,10 +2646,21 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				}
 				align = parse_expr(p, true)
 			case "field_align":
-				if field_align != nil {
+				if min_field_align != nil {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
 				}
-				field_align = parse_expr(p, true)
+				warn(p, tag.pos, "#field_align has been deprecated in favour of #min_field_align")
+				min_field_align = parse_expr(p, true)
+			case "min_field_align":
+				if min_field_align != nil {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				min_field_align = parse_expr(p, true)
+			case "max_field_align":
+				if max_field_align != nil {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				max_field_align = parse_expr(p, true)
 			case "raw_union":
 				if is_raw_union {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
@@ -2689,16 +2701,17 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		close := expect_closing_brace_of_field_list(p)
 
 		st := ast.new(ast.Struct_Type, tok.pos, end_pos(close))
-		st.poly_params   = poly_params
-		st.align         = align
-		st.field_align   = field_align
-		st.is_packed     = is_packed
-		st.is_raw_union  = is_raw_union
-		st.is_no_copy    = is_no_copy
-		st.fields        = fields
-		st.name_count    = name_count
-		st.where_token   = where_token
-		st.where_clauses = where_clauses
+		st.poly_params     = poly_params
+		st.align           = align
+		st.min_field_align = min_field_align
+		st.max_field_align = max_field_align
+		st.is_packed       = is_packed
+		st.is_raw_union    = is_raw_union
+		st.is_no_copy      = is_no_copy
+		st.fields          = fields
+		st.name_count      = name_count
+		st.where_token     = where_token
+		st.where_clauses   = where_clauses
 		return st
 
 	case .Union:
