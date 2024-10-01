@@ -1408,7 +1408,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.terse_errors = true;
 							break;
 						case BuildFlag_VerboseErrors:
-							gb_printf_err("-verbose-errors is not the default, -terse-errors can now disable it\n");
+							gb_printf_err("-verbose-errors is now the default, -terse-errors can disable it\n");
 							build_context.hide_error_line = false;
 							build_context.terse_errors = false;
 							break;
