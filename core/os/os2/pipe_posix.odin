@@ -49,7 +49,7 @@ _pipe_has_data :: proc(r: ^File) -> (ok: bool, err: Error) {
 	if r == nil || r.impl == nil {
 		return false, nil
 	}
-	fd := posix.FD((^File_Impl)(r.impl).fd)
+	fd := __fd(r)
 	poll_fds := []posix.pollfd {
 		posix.pollfd {
 			fd = fd,
@@ -57,8 +57,10 @@ _pipe_has_data :: proc(r: ^File) -> (ok: bool, err: Error) {
 		},
 	}
 	n := posix.poll(raw_data(poll_fds), u32(len(poll_fds)), 0)
-	if n != 1 {
+	if n < 0 {
 		return false, _get_platform_error()
+	} else if n != 1 {
+		return false, nil
 	}
 	pipe_events := poll_fds[0].revents
 	if pipe_events >= {.IN} {

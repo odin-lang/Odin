@@ -371,16 +371,18 @@ process_exec :: proc(
 	loc := #caller_location,
 ) -> (
 	state: Process_State,
-	stdout: []u8,
-	stderr: []u8,
+	stdout: []byte,
+	stderr: []byte,
 	err: Error,
 ) {
 	assert(desc.stdout == nil, "Cannot redirect stdout when it's being captured", loc)
 	assert(desc.stderr == nil, "Cannot redirect stderr when it's being captured", loc)
+
 	stdout_r, stdout_w := pipe() or_return
 	defer close(stdout_r)
 	stderr_r, stderr_w := pipe() or_return
 	defer close(stdout_w)
+
 	process: Process
 	{
 		// NOTE(flysand): Make sure the write-ends are closed, regardless
@@ -392,44 +394,54 @@ process_exec :: proc(
 		desc.stderr = stderr_w
 		process = process_start(desc) or_return
 	}
+
 	stdout_builder := strings.builder_make(allocator) or_return
 	stderr_builder := strings.builder_make(allocator) or_return
-	read_data: for {
-		buf: [1024]u8
+
+	has_stdout, has_stderr: bool
+	read_data: for !has_stdout || !has_stderr {
+		buf: [1024]u8 = ---
 		n: int
 		has_data: bool
-		hangup := false
-		has_data, err = pipe_has_data(stdout_r)
-		if has_data {
-			n, err = read(stdout_r, buf[:])
-			strings.write_bytes(&stdout_builder, buf[:n])
+
+		if !has_stdout {
+			has_data, err = pipe_has_data(stdout_r)
+			if has_data {
+				n, err = read(stdout_r, buf[:])
+				if strings.write_bytes(&stdout_builder, buf[:n]) != n {
+					err = .Out_Of_Memory
+				}
+			}
+			switch err {
+			case nil: // nothing
+			case .EOF, .Broken_Pipe:
+				stdout     = stdout_builder.buf[:]
+				has_stdout = true
+			case:
+				return
+			}
 		}
-		switch err {
-		case nil: // nothing
-		case .Broken_Pipe:
-			hangup = true
-		case:
-			return
-		}
-		has_data, err = pipe_has_data(stderr_r)
-		if has_data {
-			n, err = read(stderr_r, buf[:])
-			strings.write_bytes(&stderr_builder, buf[:n])
-		}
-		switch err {
-		case nil: // nothing
-		case .Broken_Pipe:
-			hangup = true
-		case:
-			return
-		}
-		if hangup {
-			break read_data
+
+		if !has_stderr {
+			has_data, err = pipe_has_data(stderr_r)
+			if has_data {
+				n, err = read(stderr_r, buf[:])
+				if strings.write_bytes(&stderr_builder, buf[:n]) != n {
+					err = .Out_Of_Memory
+				}
+			}
+			switch err {
+			case nil: // nothing
+			case .EOF, .Broken_Pipe:
+				stderr     = stderr_builder.buf[:]
+				has_stderr = true
+			case:
+				return
+			}
 		}
 	}
+
 	err = nil
-	stdout = transmute([]u8) strings.to_string(stdout_builder)
-	stderr = transmute([]u8) strings.to_string(stderr_builder)
 	state = process_wait(process) or_return
 	return
 }
