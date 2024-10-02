@@ -3098,7 +3098,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			// Okay
 		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
-			error(call, "Expected a ordered numeric type to 'min', got '%s'", type_str);
+			error(call, "Expected an ordered numeric type to 'min', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3184,7 +3184,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 				gbString type_str = type_to_string(b.type);
 				error(call,
-				      "Expected a ordered numeric type to 'min', got '%s'",
+				      "Expected an ordered numeric type to 'min', got '%s'",
 				      type_str);
 				gb_string_free(type_str);
 				return false;
@@ -3267,7 +3267,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			// Okay
 		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
-			error(call, "Expected a ordered numeric type to 'max', got '%s'", type_str);
+			error(call, "Expected an ordered numeric type to 'max', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3358,7 +3358,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 				gbString type_str = type_to_string(b.type);
 				error(arg,
-				      "Expected a ordered numeric type to 'max', got '%s'",
+				      "Expected an ordered numeric type to 'max', got '%s'",
 				      type_str);
 				gb_string_free(type_str);
 				return false;
@@ -3488,7 +3488,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Type *type = operand->type;
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected a ordered numeric or string type to 'clamp', got '%s'", type_str);
+			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3505,7 +3505,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		if (!is_type_ordered(y.type) || !(is_type_numeric(y.type) || is_type_string(y.type))) {
 			gbString type_str = type_to_string(y.type);
-			error(call, "Expected a ordered numeric or string type to 'clamp', got '%s'", type_str);
+			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3516,7 +3516,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		if (!is_type_ordered(z.type) || !(is_type_numeric(z.type) || is_type_string(z.type))) {
 			gbString type_str = type_to_string(z.type);
-			error(call, "Expected a ordered numeric or string type to 'clamp', got '%s'", type_str);
+			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
