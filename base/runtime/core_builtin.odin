@@ -383,12 +383,23 @@ _make_dynamic_array_len_cap :: proc(array: ^Raw_Dynamic_Array, size_of_elem, ali
 	return
 }
 
-// `make_map` allocates and initializes a map. Like `new`, the first argument is a type, not a value.
+// `make_map` initializes a map with an allocator. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 //
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
-make_map :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
+make_map :: proc($T: typeid/map[$K]$E, allocator := context.allocator) -> (m: T) {
+	m.allocator = allocator
+	return m
+}
+
+// `make_map_cap` initializes a map with an allocator and allocates space using `capacity`.
+// Like `new`, the first argument is a type, not a value.
+// Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
+//
+// Note: Prefer using the procedure group `make`.
+@(builtin, require_results)
+make_map_cap :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
 	make_map_expr_error_loc(loc, capacity)
 	context.allocator = allocator
 
@@ -425,6 +436,7 @@ make :: proc{
 	make_dynamic_array_len,
 	make_dynamic_array_len_cap,
 	make_map,
+	make_map_cap,
 	make_multi_pointer,
 
 	make_soa_slice,
