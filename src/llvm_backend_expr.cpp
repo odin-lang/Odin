@@ -1225,10 +1225,10 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			lbValue d3 = lb_emit_struct_ep(p, res.addr, 3);
 
 			if (immediate_type != ft) {
-				d0 = lb_emit_conv(p, d0, ft);
-				d1 = lb_emit_conv(p, d1, ft);
-				d2 = lb_emit_conv(p, d2, ft);
-				d3 = lb_emit_conv(p, d3, ft);
+				z0 = lb_emit_conv(p, z0, ft);
+				z1 = lb_emit_conv(p, z1, ft);
+				z2 = lb_emit_conv(p, z2, ft);
+				z3 = lb_emit_conv(p, z3, ft);
 			}
 
 			lb_emit_store(p, d0, z0);
