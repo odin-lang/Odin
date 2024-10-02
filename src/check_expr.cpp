@@ -8795,11 +8795,6 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 		return kind;
 	}
 
-	if (x.type == nullptr || x.type == t_invalid ||
-	    y.type == nullptr || y.type == t_invalid) {
-		return kind;
-	}
-
 	bool use_type_hint = type_hint != nullptr && (is_operand_nil(x) || is_operand_nil(y));
 
 	convert_to_typed(c, &x, use_type_hint ? type_hint : y.type);
