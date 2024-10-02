@@ -232,6 +232,10 @@ gb_internal bool check_override_as_type_due_to_aliasing(CheckerContext *ctx, Ent
 		// until there is a proper delaying system to try declaration again if they
 		// have failed.
 
+		if (e->type != nullptr && is_type_typed(e->type)) {
+			return false;
+		}
+
 		e->kind = Entity_TypeName;
 		check_type_decl(ctx, e, init, named_type);
 		return true;
