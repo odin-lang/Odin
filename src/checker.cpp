@@ -695,6 +695,9 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 		bool vet_unused = (vet_flags & VetFlag_Unused) != 0;
 		bool vet_shadowing = (vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0;
 		bool vet_unused_procedures = (vet_flags & VetFlag_UnusedProcedures) != 0;
+		if (vet_unused_procedures && e->pkg && e->pkg->kind == Package_Runtime) {
+			vet_unused_procedures = false;
+		}
 
 		VettedEntity ve_unused = {};
 		VettedEntity ve_shadowed = {};
