@@ -25,7 +25,7 @@ sizes := [?]int {
 
 // These are the normal, unoptimized algorithms.
 
-plain_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
+plain_index_byte :: proc "contextless" (s: []u8, c: byte) -> (res: int) #no_bounds_check {
 	for i := 0; i < len(s); i += 1 {
 		if s[i] == c {
 			return i
@@ -34,7 +34,7 @@ plain_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
 	return -1
 }
 
-plain_last_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
+plain_last_index_byte :: proc "contextless" (s: []u8, c: byte) -> (res: int) #no_bounds_check {
 	for i := len(s)-1; i >= 0; i -= 1 {
 		if s[i] == c {
 			return i
@@ -43,7 +43,7 @@ plain_last_index_byte :: proc(s: []u8, c: byte) -> (res: int) #no_bounds_check {
 	return -1
 }
 
-run_trial_size :: proc(p: proc([]u8, byte) -> int, size: int, idx: int, runs: int) -> (timing: time.Duration) {
+run_trial_size :: proc(p: proc "contextless" ([]u8, byte) -> int, size: int, idx: int, runs: int) -> (timing: time.Duration) {
 	data := make([]u8, size)
 	defer delete(data)
 
@@ -67,7 +67,7 @@ run_trial_size :: proc(p: proc([]u8, byte) -> int, size: int, idx: int, runs: in
 	return
 }
 
-bench_table :: proc(algo_name: string, forward: bool, plain: proc([]u8, byte) -> int, simd: proc([]u8, byte) -> int) {
+bench_table :: proc(algo_name: string, forward: bool, plain: proc "contextless" ([]u8, byte) -> int, simd: proc "contextless" ([]u8, byte) -> int) {
 	string_buffer := strings.builder_make()
 	defer strings.builder_destroy(&string_buffer)
 
