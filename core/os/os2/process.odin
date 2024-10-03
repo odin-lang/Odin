@@ -381,7 +381,7 @@ process_exec :: proc(
 	stdout_r, stdout_w := pipe() or_return
 	defer close(stdout_r)
 	stderr_r, stderr_w := pipe() or_return
-	defer close(stdout_w)
+	defer close(stderr_r)
 
 	process: Process
 	{
