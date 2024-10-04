@@ -400,9 +400,11 @@ process_exec :: proc(
 
 		stdout_b: [dynamic]byte
 		stdout_b.allocator = allocator
+		defer stdout = stdout_b[:]
 
 		stderr_b: [dynamic]byte
 		stderr_b.allocator = allocator
+		defer stderr = stderr_b[:]
 
 		buf: [1024]u8 = ---
 		n: int
@@ -419,7 +421,6 @@ process_exec :: proc(
 				switch err {
 				case nil: // nothing
 				case .EOF, .Broken_Pipe:
-					stdout      = stdout_b[:]
 					stdout_done = true
 				case:
 					return
@@ -435,7 +436,6 @@ process_exec :: proc(
 				switch err {
 				case nil: // nothing
 				case .EOF, .Broken_Pipe:
-					stderr      = stderr_b[:]
 					stderr_done = true
 				case:
 					return
