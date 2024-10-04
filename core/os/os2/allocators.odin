@@ -62,8 +62,8 @@ TEMP_ALLOCATOR_GUARD_END :: proc(temp: runtime.Arena_Temp, loc := #caller_locati
 
 @(deferred_out=TEMP_ALLOCATOR_GUARD_END)
 TEMP_ALLOCATOR_GUARD :: #force_inline proc(loc := #caller_location) -> (runtime.Arena_Temp, runtime.Source_Code_Location) {
-	tmp := temp_allocator_temp_begin(loc)
 	global_default_temp_allocator_index = (global_default_temp_allocator_index+1)%MAX_TEMP_ARENA_COUNT
+	tmp := temp_allocator_temp_begin(loc)
 	return tmp, loc
 }
 

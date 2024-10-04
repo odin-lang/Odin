@@ -15,6 +15,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 }
 
 _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process, err: Error) {
+	process.pid = pid
 	err = .Unsupported
 	return
 }

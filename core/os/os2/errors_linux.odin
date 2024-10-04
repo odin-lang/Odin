@@ -162,6 +162,8 @@ _get_platform_error :: proc(errno: linux.Errno) -> Error {
 		return .Invalid_File
 	case .ENOMEM:
 		return .Out_Of_Memory
+	case .ENOSYS:
+		return .Unsupported
 	}
 
 	return Platform_Error(i32(errno))
