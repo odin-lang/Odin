@@ -1,6 +1,7 @@
 package tests_core_os_os2
 
 import os "core:os/os2"
+import    "core:log"
 import    "core:testing"
 
 @(test)
@@ -10,6 +11,11 @@ test_process_exec :: proc(t: ^testing.T) {
 	}, context.allocator)
 	defer delete(stdout)
 	defer delete(stderr)
+
+	if err == .Unsupported {
+		log.warn("process_exec unsupported")
+		return
+	}
 
 	testing.expect_value(t, state.exited,  true)
 	testing.expect_value(t, state.success, true)
