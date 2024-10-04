@@ -622,9 +622,9 @@ namespace lbAbiAmd64SysV {
 		switch (kind) {
 		case LLVMIntegerTypeKind:
 			if (LLVM_VERSION_MAJOR >= 18 && sz >= 16) {
-				return false;
+				return true;
 			}
-			return true;
+			return false;
 		case LLVMHalfTypeKind:
 		case LLVMFloatTypeKind:
 		case LLVMDoubleTypeKind:
