@@ -638,19 +638,6 @@ _parse_command_line :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) ->
 	return
 }
 
-@(private)
-QUOTED_CHARS :: "()[]{}^=;!'+,`~\" "
-
-@(private)
-_char_needs_escape :: proc(ch: u8) -> bool {
-	for r in transmute([]byte) string(QUOTED_CHARS) {
-		if ch == r {
-			return true
-		}
-	}
-	return false
-}
-
 _build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> string {
 	_write_byte_n_times :: #force_inline proc(builder: ^strings.Builder, b: byte, n: int) {
 		for _ in 0 ..< n {
@@ -663,14 +650,7 @@ _build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> 
 			strings.write_byte(&builder, ' ')
 		}
 		j := 0
-		arg_needs_quoting := false
-		// Note(flysand): From documentation of `cmd.exe`, run "cmd /?"
-		if strings.contains_any(arg, QUOTED_CHARS) {
-			arg_needs_quoting = true
-		}
-		if !arg_needs_quoting {
-			strings.write_string(&builder, arg)
-		} else {
+		if strings.contains_any(arg, "()[]{}^=;!'+,`~\" ") {
 			strings.write_byte(&builder, '"')
 			for j < len(arg) {
 				backslashes := 0
@@ -691,6 +671,8 @@ _build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> 
 				j += 1
 			}
 			strings.write_byte(&builder, '"')
+		} else {
+			strings.write_string(&builder, arg)
 		}
 	}
 	return strings.to_string(builder)
