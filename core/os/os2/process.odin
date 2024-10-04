@@ -398,8 +398,11 @@ process_exec :: proc(
 	{
 		defer if err != nil { _ = process_kill(process) }
 
-		stdout_builder := strings.builder_make(allocator) or_return
-		stderr_builder := strings.builder_make(allocator) or_return
+		stdout_b: [dynamic]byte
+		stdout_b.allocator = allocator
+
+		stderr_b: [dynamic]byte
+		stderr_b.allocator = allocator
 
 		has_stdout, has_stderr: bool
 		read_data: for !has_stdout || !has_stderr {
@@ -411,14 +414,12 @@ process_exec :: proc(
 				has_data, err = pipe_has_data(stdout_r)
 				if has_data {
 					n, err = read(stdout_r, buf[:])
-					if strings.write_bytes(&stdout_builder, buf[:n]) != n {
-						err = .Out_Of_Memory
-					}
+					append(&stdout_b, ..buf[:n]) or_return
 				}
 				switch err {
 				case nil: // nothing
 				case .EOF, .Broken_Pipe:
-					stdout     = stdout_builder.buf[:]
+					stdout     = stdout_b[:]
 					has_stdout = true
 				case:
 					return
@@ -429,14 +430,12 @@ process_exec :: proc(
 				has_data, err = pipe_has_data(stderr_r)
 				if has_data {
 					n, err = read(stderr_r, buf[:])
-					if strings.write_bytes(&stderr_builder, buf[:n]) != n {
-						err = .Out_Of_Memory
-					}
+					append(&stderr_b, ..buf[:n]) or_return
 				}
 				switch err {
 				case nil: // nothing
 				case .EOF, .Broken_Pipe:
-					stderr     = stderr_builder.buf[:]
+					stderr     = stderr_b[:]
 					has_stderr = true
 				case:
 					return
