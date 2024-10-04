@@ -348,8 +348,6 @@ process_start :: proc(desc: Process_Desc) -> (Process, Error) {
 	return _process_start(desc)
 }
 
-import "core:log"
-
 /*
 Execute the process and capture stdout and stderr streams.
 
@@ -385,8 +383,6 @@ process_exec :: proc(
 	stderr_r, stderr_w := pipe() or_return
 	defer close(stderr_r)
 
-	log.info("starting process")
-
 	process: Process
 	{
 		// NOTE(flysand): Make sure the write-ends are closed, regardless
@@ -398,8 +394,6 @@ process_exec :: proc(
 		desc.stderr = stderr_w
 		process = process_start(desc) or_return
 	}
-
-	log.info("reading output")
 
 	{
 		defer if err != nil { _ = process_kill(process) }
@@ -429,7 +423,6 @@ process_exec :: proc(
 				case .EOF, .Broken_Pipe:
 					stdout_done = true
 				case:
-					log.infof("read stdout error: %v", err)
 					return
 				}
 			}
@@ -445,16 +438,13 @@ process_exec :: proc(
 				case .EOF, .Broken_Pipe:
 					stderr_done = true
 				case:
-					log.infof("read stderr error: %v", err)
 					return
 				}
 			}
 		}
 	}
 
-	log.info("waiting for exit")
 	state, err = process_wait(process)
-	log.info(state, err)
 	if !state.exited { _ = process_kill(process) }
 	return
 }
