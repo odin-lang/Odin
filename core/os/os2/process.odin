@@ -404,13 +404,13 @@ process_exec :: proc(
 		stderr_b: [dynamic]byte
 		stderr_b.allocator = allocator
 
-		has_stdout, has_stderr: bool
-		read_data: for !has_stdout || !has_stderr {
-			buf: [1024]u8 = ---
-			n: int
-			has_data: bool
+		buf: [1024]u8 = ---
+		n: int
 
-			if !has_stdout {
+		stdout_done, stderr_done, has_data: bool
+		for !stdout_done || !stderr_done {
+
+			if !stdout_done {
 				has_data, err = pipe_has_data(stdout_r)
 				if has_data {
 					n, err = read(stdout_r, buf[:])
@@ -419,14 +419,14 @@ process_exec :: proc(
 				switch err {
 				case nil: // nothing
 				case .EOF, .Broken_Pipe:
-					stdout     = stdout_b[:]
-					has_stdout = true
+					stdout      = stdout_b[:]
+					stdout_done = true
 				case:
 					return
 				}
 			}
 
-			if !has_stderr {
+			if !stderr_done {
 				has_data, err = pipe_has_data(stderr_r)
 				if has_data {
 					n, err = read(stderr_r, buf[:])
@@ -435,8 +435,8 @@ process_exec :: proc(
 				switch err {
 				case nil: // nothing
 				case .EOF, .Broken_Pipe:
-					stderr     = stderr_b[:]
-					has_stderr = true
+					stderr      = stderr_b[:]
+					stderr_done = true
 				case:
 					return
 				}
