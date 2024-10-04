@@ -223,7 +223,6 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			return
 		}
 
-		process.pid = int(pid)
 		process, _ = _process_open(int(pid), {})
 		return
 	}
