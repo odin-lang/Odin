@@ -445,6 +445,7 @@ process_exec :: proc(
 	}
 
 	state, err = process_wait(process)
+	if !state.exited { _ = process_kill(process) }
 	return
 }
 
