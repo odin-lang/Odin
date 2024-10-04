@@ -422,6 +422,7 @@ process_exec :: proc(
 				case nil: // nothing
 				case .EOF, .Broken_Pipe:
 					stdout_done = true
+					err = nil
 				case:
 					return
 				}
@@ -437,6 +438,7 @@ process_exec :: proc(
 				case nil: // nothing
 				case .EOF, .Broken_Pipe:
 					stderr_done = true
+					err = nil
 				case:
 					return
 				}
