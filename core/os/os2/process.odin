@@ -396,7 +396,7 @@ process_exec :: proc(
 	}
 
 	{
-		defer if err != nil { _ = process_kill(process) }
+		defer if err != nil { _, _ = process_wait(process) }
 
 		stdout_b: [dynamic]byte
 		stdout_b.allocator = allocator
@@ -445,7 +445,6 @@ process_exec :: proc(
 	}
 
 	state, err = process_wait(process)
-	if !state.exited { _ = process_kill(process) }
 	return
 }
 
