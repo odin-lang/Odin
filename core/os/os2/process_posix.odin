@@ -163,7 +163,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			#assert(len(posix.Errno) < max(u8))
 			errno := u8(posix.errno())
 			posix.write(parent_fd, &errno, 1)
-			runtime.trap()
+			posix.exit(126)
 		}
 
 		null := posix.open("/dev/null", {.RDWR})
