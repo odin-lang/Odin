@@ -395,54 +395,57 @@ process_exec :: proc(
 		process = process_start(desc) or_return
 	}
 
-	stdout_builder := strings.builder_make(allocator) or_return
-	stderr_builder := strings.builder_make(allocator) or_return
+	{
+		defer if err != nil { _ = process_kill(process) }
 
-	has_stdout, has_stderr: bool
-	read_data: for !has_stdout || !has_stderr {
-		buf: [1024]u8 = ---
-		n: int
-		has_data: bool
+		stdout_builder := strings.builder_make(allocator) or_return
+		stderr_builder := strings.builder_make(allocator) or_return
 
-		if !has_stdout {
-			has_data, err = pipe_has_data(stdout_r)
-			if has_data {
-				n, err = read(stdout_r, buf[:])
-				if strings.write_bytes(&stdout_builder, buf[:n]) != n {
-					err = .Out_Of_Memory
+		has_stdout, has_stderr: bool
+		read_data: for !has_stdout || !has_stderr {
+			buf: [1024]u8 = ---
+			n: int
+			has_data: bool
+
+			if !has_stdout {
+				has_data, err = pipe_has_data(stdout_r)
+				if has_data {
+					n, err = read(stdout_r, buf[:])
+					if strings.write_bytes(&stdout_builder, buf[:n]) != n {
+						err = .Out_Of_Memory
+					}
+				}
+				switch err {
+				case nil: // nothing
+				case .EOF, .Broken_Pipe:
+					stdout     = stdout_builder.buf[:]
+					has_stdout = true
+				case:
+					return
 				}
 			}
-			switch err {
-			case nil: // nothing
-			case .EOF, .Broken_Pipe:
-				stdout     = stdout_builder.buf[:]
-				has_stdout = true
-			case:
-				return
-			}
-		}
 
-		if !has_stderr {
-			has_data, err = pipe_has_data(stderr_r)
-			if has_data {
-				n, err = read(stderr_r, buf[:])
-				if strings.write_bytes(&stderr_builder, buf[:n]) != n {
-					err = .Out_Of_Memory
+			if !has_stderr {
+				has_data, err = pipe_has_data(stderr_r)
+				if has_data {
+					n, err = read(stderr_r, buf[:])
+					if strings.write_bytes(&stderr_builder, buf[:n]) != n {
+						err = .Out_Of_Memory
+					}
 				}
-			}
-			switch err {
-			case nil: // nothing
-			case .EOF, .Broken_Pipe:
-				stderr     = stderr_builder.buf[:]
-				has_stderr = true
-			case:
-				return
+				switch err {
+				case nil: // nothing
+				case .EOF, .Broken_Pipe:
+					stderr     = stderr_builder.buf[:]
+					has_stderr = true
+				case:
+					return
+				}
 			}
 		}
 	}
 
-	err = nil
-	state = process_wait(process) or_return
+	state, err = process_wait(process)
 	return
 }
 
