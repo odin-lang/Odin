@@ -1,7 +1,7 @@
 package os2
 
 import "base:runtime"
-import "core:strings"
+
 import "core:time"
 
 /*
