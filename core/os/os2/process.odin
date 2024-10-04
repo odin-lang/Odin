@@ -396,8 +396,6 @@ process_exec :: proc(
 	}
 
 	{
-		defer if err != nil { _, _ = process_wait(process) }
-
 		stdout_b: [dynamic]byte
 		stdout_b.allocator = allocator
 		defer stdout = stdout_b[:]
@@ -410,40 +408,47 @@ process_exec :: proc(
 		n: int
 
 		stdout_done, stderr_done, has_data: bool
-		for !stdout_done || !stderr_done {
+		for err == nil && (!stdout_done || !stderr_done) {
 
 			if !stdout_done {
 				has_data, err = pipe_has_data(stdout_r)
 				if has_data {
 					n, err = read(stdout_r, buf[:])
-					append(&stdout_b, ..buf[:n]) or_return
 				}
+
 				switch err {
-				case nil: // nothing
+				case nil:
+					_, err = append(&stdout_b, ..buf[:n])
 				case .EOF, .Broken_Pipe:
 					stdout_done = true
 					err = nil
-				case:
-					return
 				}
 			}
 
-			if !stderr_done {
+			if err == nil && !stderr_done {
 				has_data, err = pipe_has_data(stderr_r)
 				if has_data {
 					n, err = read(stderr_r, buf[:])
-					append(&stderr_b, ..buf[:n]) or_return
 				}
+
 				switch err {
-				case nil: // nothing
+				case nil:
+					_, err = append(&stderr_b, ..buf[:n])
 				case .EOF, .Broken_Pipe:
 					stderr_done = true
 					err = nil
-				case:
-					return
 				}
 			}
 		}
+	}
+
+	if err != nil {
+		state, _ = process_wait(process, timeout=0)
+		if !state.exited {
+			_ = process_kill(process)
+			state, _ = process_wait(process)
+		}
+		return
 	}
 
 	state, err = process_wait(process)
