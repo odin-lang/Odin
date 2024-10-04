@@ -49,7 +49,7 @@ user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 			dir = concatenate({dir, "/.config"}, allocator) or_return
 		}
 	case: // All other UNIX systems
-		dir = get_env("XDG_CACHE_HOME", allocator)
+		dir = get_env("XDG_CONFIG_HOME", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator())
 			if dir == "" {
