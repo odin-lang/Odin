@@ -365,3 +365,28 @@ VM_FLAGS_RESILIENT_MEDIA    : vm_flags_t : 0x00000040
 VM_FLAGS_PERMANENT          : vm_flags_t : 0x00000080
 VM_FLAGS_TPRO               : vm_flags_t : 0x00001000
 VM_FLAGS_OVERWRITE          : vm_flags_t : 0x00004000  /* delete any existing mappings first */
+
+// NOTE(beau): vm_prot_t types and constants, ported directly
+vm_prot_t :: c.int
+
+/*
+ *	Protection values, defined as bits within the vm_prot_t type
+ */
+
+VM_PROT_NONE    : vm_prot_t : 0x00
+
+VM_PROT_READ    : vm_prot_t : 0x01      /* read permission */
+VM_PROT_WRITE   : vm_prot_t : 0x02      /* write permission */
+VM_PROT_EXECUTE : vm_prot_t : 0x04      /* execute permission */
+
+/*
+ *	The default protection for newly-created virtual memory
+ */
+
+VM_PROT_DEFAULT :: VM_PROT_READ | VM_PROT_WRITE
+
+/*
+ *	The maximum privileges possible, for parameter checking.
+ */
+
+VM_PROT_ALL     :: VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE
