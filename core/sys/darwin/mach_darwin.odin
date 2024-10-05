@@ -316,3 +316,52 @@ KERN_NOT_FOUND                : kern_return_t : 56
  */
 
 KERN_RETURN_MAX               : kern_return_t : 0x100
+
+// NOTE(beau): VM_FLAGS constants - ported directly
+/* Maximum return value allowable
+ */
+/*
+ * VM allocation flags:
+ *
+ * VM_FLAGS_FIXED
+ *      (really the absence of VM_FLAGS_ANYWHERE)
+ *	Allocate new VM region at the specified virtual address, if possible.
+ *
+ * VM_FLAGS_ANYWHERE
+ *	Allocate new VM region anywhere it would fit in the address space.
+ *
+ * VM_FLAGS_PURGABLE
+ *	Create a purgable VM object for that new VM region.
+ *
+ * VM_FLAGS_4GB_CHUNK
+ *	The new VM region will be chunked up into 4GB sized pieces.
+ *
+ * VM_FLAGS_NO_PMAP_CHECK
+ *	(for DEBUG kernel config only, ignored for other configs)
+ *	Do not check that there is no stale pmap mapping for the new VM region.
+ *	This is useful for kernel memory allocations at bootstrap when building
+ *	the initial kernel address space while some memory is already in use.
+ *
+ * VM_FLAGS_OVERWRITE
+ *	The new VM region can replace existing VM regions if necessary
+ *	(to be used in combination with VM_FLAGS_FIXED).
+ *
+ * VM_FLAGS_NO_CACHE
+ *	Pages brought in to this VM region are placed on the speculative
+ *	queue instead of the active queue.  In other words, they are not
+ *	cached so that they will be stolen first if memory runs low.
+ */
+
+vm_flags_t :: distinct c.int // NOTE(beau): not in the apple sdk
+
+VM_FLAGS_FIXED              : vm_flags_t : 0x00000000
+VM_FLAGS_ANYWHERE           : vm_flags_t : 0x00000001
+VM_FLAGS_PURGABLE           : vm_flags_t : 0x00000002
+VM_FLAGS_4GB_CHUNK          : vm_flags_t : 0x00000004
+VM_FLAGS_RANDOM_ADDR        : vm_flags_t : 0x00000008
+VM_FLAGS_NO_CACHE           : vm_flags_t : 0x00000010
+VM_FLAGS_RESILIENT_CODESIGN : vm_flags_t : 0x00000020
+VM_FLAGS_RESILIENT_MEDIA    : vm_flags_t : 0x00000040
+VM_FLAGS_PERMANENT          : vm_flags_t : 0x00000080
+VM_FLAGS_TPRO               : vm_flags_t : 0x00001000
+VM_FLAGS_OVERWRITE          : vm_flags_t : 0x00004000  /* delete any existing mappings first */
