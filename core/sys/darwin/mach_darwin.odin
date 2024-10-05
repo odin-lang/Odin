@@ -1,6 +1,6 @@
 package darwin
 
-foreign import pthread "system:System.framework"
+foreign import mach "system:System.framework"
 
 import "core:c"
 
@@ -15,7 +15,7 @@ kern_return_t :: distinct u64
 thread_act_t :: distinct u64
 
 @(default_calling_convention="c")
-foreign pthread {
+foreign mach {
 	mach_task_self :: proc() -> task_t ---
 
 	semaphore_create :: proc(task: task_t, semaphore: ^semaphore_t, policy, value: c.int) -> kern_return_t ---
