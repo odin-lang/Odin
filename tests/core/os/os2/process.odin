@@ -21,4 +21,5 @@ test_process_exec :: proc(t: ^testing.T) {
 	testing.expect_value(t, state.success, true)
 	testing.expect_value(t, err, nil)
 	testing.expect_value(t, string(stdout), "hellope\n")
+	testing.expect_value(t, string(stderr), "")
 }

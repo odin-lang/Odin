@@ -426,6 +426,7 @@ process_exec :: proc(
 			}
 
 			if err == nil && !stderr_done {
+				n = 0
 				has_data, err = pipe_has_data(stderr_r)
 				if has_data {
 					n, err = read(stderr_r, buf[:])
