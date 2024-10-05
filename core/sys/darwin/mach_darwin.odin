@@ -27,3 +27,17 @@ foreign mach {
 	
 	semaphore_wait :: proc(semaphore: semaphore_t) -> kern_return_t ---
 }
+
+// NOTE(beau): types for stuff in the mach APIS, recreated from the typedefs as
+// faithfully as possible
+mach_port_t            :: c.uint
+vm_map_t               :: mach_port_t
+mem_entry_name_port_t  :: mach_port_t
+
+vm_size_t              :: c.uintptr_t
+
+vm_address_t           :: vm_offset_t
+vm_offset_t            :: c.uintptr_t
+
+boolean_t              :: c.int
+
