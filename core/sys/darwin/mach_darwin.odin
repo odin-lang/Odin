@@ -390,3 +390,16 @@ VM_PROT_DEFAULT :: VM_PROT_READ | VM_PROT_WRITE
  */
 
 VM_PROT_ALL     :: VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE
+
+
+// NOTE(beau): vm_inherit_t constants and type, ported directly
+vm_inherit_t           :: c.uint
+
+/*
+ *	Enumeration of valid values for vm_inherit_t.
+ */
+
+VM_INHERIT_SHARE       : vm_inherit_t : 0      /* share with child */
+VM_INHERIT_COPY        : vm_inherit_t : 1      /* copy into child */
+VM_INHERIT_NONE        : vm_inherit_t : 2      /* absent from child */
+VM_INHERIT_DONATE_COPY : vm_inherit_t : 3      /* copy and delete */
