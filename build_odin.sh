@@ -130,7 +130,7 @@ build_odin() {
 		EXTRAFLAGS="-O3"
 		;;
 	release-native)
-		if [ "$OS_ARCH" = "arm64" ]; then
+		if [ "$OS_ARCH" = "arm64" ] || [ "$OS_ARCH" = "aarch64" ]; then
 			# Use preferred flag for Arm (ie arm64 / aarch64 / etc)
 			EXTRAFLAGS="-O3 -mcpu=native"
 		else
