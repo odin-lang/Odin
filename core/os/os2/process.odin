@@ -405,10 +405,10 @@ process_exec :: proc(
 		defer stderr = stderr_b[:]
 
 		buf: [1024]u8 = ---
-		n: int
-
+		
 		stdout_done, stderr_done, has_data: bool
 		for err == nil && (!stdout_done || !stderr_done) {
+			n := 0
 
 			if !stdout_done {
 				has_data, err = pipe_has_data(stdout_r)
