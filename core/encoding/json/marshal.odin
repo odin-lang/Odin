@@ -45,25 +45,23 @@ Marshal_Options :: struct {
 	// If spec is MJSON and this is true, then use '=' as delimiter between
 	// keys and values, otherwise ':' is used.
 	mjson_keys_use_equal_sign: bool,
-	
+
 	// When outputting a map, sort the output by key.
 	//
 	// NOTE: This will temp allocate and sort a list for each map.
-	// TODO: handle non sortable keys!!!
 	sort_maps_by_key: bool,
 
 	// Output enum value's name instead of its underlying value.
 	//
 	// NOTE: If a name isn't found it'll use the underlying value.
 	use_enum_names: bool,
-	
+
 	// Store enumerated arrays as a map instead of a regular array with implicit index.
 	// Set 'enumerated_array_map_use_names' to use the enum name string as a key.
 	enumerated_array_as_map: bool,
 	// when 'enumerated_array_as_map' is true, use the enum value name is used as a key instead of the enum integer value.
 	enumerated_array_map_use_names: bool,
-	
-	
+
 	// Store bit sets as a list of values instead of the raw underlying integer value.
 	// Set 'bit_set_array_use_names' to use the enum names instead of the value.
 	bit_set_as_array: bool,
