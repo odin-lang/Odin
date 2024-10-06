@@ -45,16 +45,30 @@ Marshal_Options :: struct {
 	// If spec is MJSON and this is true, then use '=' as delimiter between
 	// keys and values, otherwise ':' is used.
 	mjson_keys_use_equal_sign: bool,
-
+	
 	// When outputting a map, sort the output by key.
 	//
 	// NOTE: This will temp allocate and sort a list for each map.
+	// TODO: handle non sortable keys!!!
 	sort_maps_by_key: bool,
 
 	// Output enum value's name instead of its underlying value.
 	//
 	// NOTE: If a name isn't found it'll use the underlying value.
 	use_enum_names: bool,
+	
+	// Store enumerated arrays as a map instead of a regular array with implicit index.
+	// Set 'enumerated_array_map_use_names' to use the enum name string as a key.
+	enumerated_array_as_map: bool,
+	// when 'enumerated_array_as_map' is true, use the enum value name is used as a key instead of the enum integer value.
+	enumerated_array_map_use_names: bool,
+	
+	
+	// Store bit sets as a list of values instead of the raw underlying integer value.
+	// Set 'bit_set_array_use_names' to use the enum names instead of the value.
+	bit_set_as_array: bool,
+	// when 'bit_set_as_array' is true, use the enum value name string is stored instead of the enum integer value.
+	bit_set_array_use_names: bool,
 
 	// Internal state
 	indentation: int,
@@ -215,13 +229,46 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, ']') or_return
 		
 	case runtime.Type_Info_Enumerated_Array:
-		opt_write_start(w, opt, '[') or_return
-		for i in 0..<info.count {
-			opt_write_iteration(w, opt, i == 0) or_return
-			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+		if opt.enumerated_array_as_map {
+			opt_write_start(w, opt, '{') or_return
+			enum_val := reflect.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
+			counter := 0
+			for i in 0..<info.count {
+				val := info.min_value + reflect.Type_Info_Enum_Value(i)
+				key: string
+				buf: [40]byte
+				for ev, ei in enum_val.values {
+					if val == ev {
+						if opt.enumerated_array_map_use_names {
+							key = enum_val.names[ei]
+						} else {
+							key = strconv.append_bits(buf[:], transmute(u64)enum_val.values[ei], 10, true, 8 * info.elem_size, "0123456789", nil)
+						}
+						break
+					}
+				}
+				
+				if key == "" {
+					continue
+				}
+				
+				defer counter += 1
+				opt_write_iteration(w, opt, counter == 0) or_return
+				opt_write_key(w, opt, key)
+				
+				data := uintptr(v.data) + uintptr(i*info.elem_size)
+				marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			}
+			opt_write_end(w, opt, '}') or_return
+		} else {
+			opt_write_start(w, opt, '[') or_return
+			for i in 0..<info.count {
+				opt_write_iteration(w, opt, i == 0) or_return
+				data := uintptr(v.data) + uintptr(i*info.elem_size)
+				marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			}
+			opt_write_end(w, opt, ']') or_return
 		}
-		opt_write_end(w, opt, ']') or_return
 		
 	case runtime.Type_Info_Dynamic_Array:
 		opt_write_start(w, opt, '[') or_return
@@ -254,44 +301,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			map_cap := uintptr(runtime.map_cap(m^))
 			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
 
-			if !opt.sort_maps_by_key {
-				i := 0
-				for bucket_index in 0..<map_cap {
-					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
-
-					opt_write_iteration(w, opt, i == 0) or_return
-					i += 1
-
-					key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
-					value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
-
-					// check for string type
-					{
-						kv  := any{key, info.key.id}
-						kti := runtime.type_info_base(type_info_of(kv.id))
-						ka  := any{kv.data, kti.id}
-						name: string
-
-						#partial switch info in kti.variant {
-						case runtime.Type_Info_String:
-							switch s in ka {
-							case string: name = s
-							case cstring: name = string(s)
-							}
-							opt_write_key(w, opt, name) or_return
-						case runtime.Type_Info_Integer:
-							buf: [40]byte
-							u := cast_any_int_to_u128(ka)
-							name = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
-							
-							opt_write_key(w, opt, name) or_return
-						case: return .Unsupported_Type
-						}
-					}
-
-					marshal_to_writer(w, any{value, info.value.id}, opt) or_return
-				}
-			} else {
+			_, can_sort := info.key.variant.(runtime.Type_Info_String)
+			
+			if opt.sort_maps_by_key && can_sort {
 				Entry :: struct {
 					key: string,
 					value: any,
@@ -333,6 +345,43 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					opt_write_iteration(w, opt, i == 0) or_return
 					opt_write_key(w, opt, s.key) or_return
 					marshal_to_writer(w, s.value, opt) or_return
+				}
+			} else {
+				i := 0
+				for bucket_index in 0..<map_cap {
+					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
+
+					opt_write_iteration(w, opt, i == 0) or_return
+					i += 1
+
+					key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
+					value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
+
+					// check for string type
+					{
+						kv  := any{key, info.key.id}
+						kti := runtime.type_info_base(type_info_of(kv.id))
+						ka  := any{kv.data, kti.id}
+						name: string
+
+						#partial switch info in kti.variant {
+						case runtime.Type_Info_String:
+							switch s in ka {
+							case string: name = s
+							case cstring: name = string(s)
+							}
+							opt_write_key(w, opt, name) or_return
+						case runtime.Type_Info_Integer:
+							buf: [40]byte
+							u := cast_any_int_to_u128(ka)
+							name = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
+							
+							opt_write_key(w, opt, name) or_return
+						case: return .Unsupported_Type
+						}
+					}
+
+					marshal_to_writer(w, any{value, info.value.id}, opt) or_return
 				}
 			}
 		}
@@ -473,53 +522,74 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		}
 
 	case runtime.Type_Info_Bit_Set:
-		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
-			if ti == nil {
-				return false
-			}
-			t := runtime.type_info_base(ti)
-			#partial switch info in t.variant {
-			case runtime.Type_Info_Integer:
-				switch info.endianness {
-				case .Platform: return false
-				case .Little:   return ODIN_ENDIAN != .Little
-				case .Big:      return ODIN_ENDIAN != .Big
-				}
-			}
-			return false
-		}
+		bit_data: u128
+		bit_size := u128(8*ti.size)
 
-		bit_data: u64
-		bit_size := u64(8*ti.size)
-
-		do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying)
+		do_byte_swap := reflect.bit_set_is_big_endian(v)
 
 		switch bit_size {
 		case  0: bit_data = 0
 		case  8:
 			x := (^u8)(v.data)^
-			bit_data = u64(x)
+			bit_data = u128(x)
 		case 16:
 			x := (^u16)(v.data)^
 			if do_byte_swap {
 				x = bits.byte_swap(x)
 			}
-			bit_data = u64(x)
+			bit_data = u128(x)
 		case 32:
 			x := (^u32)(v.data)^
 			if do_byte_swap {
 				x = bits.byte_swap(x)
 			}
-			bit_data = u64(x)
+			bit_data = u128(x)
 		case 64:
 			x := (^u64)(v.data)^
 			if do_byte_swap {
 				x = bits.byte_swap(x)
 			}
-			bit_data = u64(x)
+			bit_data = u128(x)
+		case 128:
+			x := (^u128)(v.data)^
+			if do_byte_swap {
+				x = bits.byte_swap(x)
+			}
+			bit_data = u128(x)
 		case: panic("unknown bit_size size")
 		}
-		io.write_u64(w, bit_data) or_return
+		
+		if opt.bit_set_as_array {
+			opt_write_start(w, opt, '[') or_return
+			et := runtime.type_info_base(info.elem)
+			en, is_enum := et.variant.(runtime.Type_Info_Enum)
+			counter := 0
+			bit_loop: for i in 0 ..< bit_size {
+				if bit_data & (1<<i) == 0 {
+					continue bit_loop
+				}
+				defer counter += 1
+				opt_write_iteration(w, opt, counter == 0) or_return
+				
+				if is_enum {
+					for enum_val, enum_val_index in en.values {
+						if i64(enum_val) == i64(i) + info.lower {
+							if opt.bit_set_array_use_names {
+								io.write_quoted_string(w, en.names[enum_val_index]) or_return
+							} else {
+								io.write_i64(w, i64(enum_val)) or_return
+							}
+							break
+						}
+					}
+				} else {
+					io.write_i64(w, i64(i) + info.lower) or_return
+				}
+			}
+			opt_write_end(w, opt, ']') or_return
+		} else {
+			io.write_u128(w, bit_data) or_return
+		}
 	}
 
 	return

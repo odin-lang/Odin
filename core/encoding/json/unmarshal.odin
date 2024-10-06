@@ -119,7 +119,7 @@ assign_int :: proc(val: any, i: $T) -> bool {
 	case:
 		ti := type_info_of(v.id)
 		if _, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
-			do_byte_swap := !reflect.bit_set_is_big_endian(v)
+			do_byte_swap := reflect.bit_set_is_big_endian(v)
 			switch ti.size * 8 {
 			case 0: // no-op.
 			case 8:
@@ -134,6 +134,9 @@ assign_int :: proc(val: any, i: $T) -> bool {
 			case 64:
 				x := (^u64)(v.data)
 				x^ = do_byte_swap ? intrinsics.byte_swap(u64(i)) : u64(i)
+			case 128:
+				x := (^u128)(v.data)
+				x^ = do_byte_swap ? intrinsics.byte_swap(u128(i)) : u128(i)
 			case:
 				panic("unknown bit_size size")
 			}
@@ -562,18 +565,23 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			unmarshal_expect_token(p, .Colon)
 			defer delete(key, p.allocator)
 
-			index := -1
-			for name, i in enum_type.names {
-				if key == name {
-					index = int(enum_type.values[i] - t.min_value)
-					break
+			index, ok := strconv.parse_i64_of_base(key, 10)
+			if !ok {
+				index = -1
+				for name, i in enum_type.names {
+					if key == name {
+						index = i64(enum_type.values[i])
+						break
+					}
 				}
 			}
-			if index < 0 || index >= t.count {
+			
+			index -= i64(t.min_value)
+			if index < 0 || index >= i64(t.count) {
 				return UNSUPPORTED_TYPE
 			}
-						
-			index_ptr := rawptr(uintptr(v.data) + uintptr(index*t.elem_size))
+			
+			index_ptr := rawptr(uintptr(v.data) + uintptr(index*i64(t.elem_size)))
 			index_any := any{index_ptr, t.elem.id}
 			
 			unmarshal_value(p, index_any) or_return
@@ -689,7 +697,42 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		}
 		
 		return UNSUPPORTED_TYPE
+	
+	case reflect.Type_Info_Bit_Set:
+		unmarshal_expect_token(p, .Open_Bracket)
 		
+		bit_data: u64
+		for p.curr_token.kind != .Close_Bracket {
+			value: i64
+			#partial switch p.curr_token.kind {
+			case .String:
+				str: string
+				unmarshal_value(p, str) or_return
+				val, ok := reflect.enum_from_name_any(t.elem.id, str)
+				if !ok {
+					return UNSUPPORTED_TYPE
+				}
+				value = i64(val)
+			
+			case .Integer:
+				unmarshal_value(p, value) or_return
+			
+			case:
+				return UNSUPPORTED_TYPE
+			}
+			
+			bit_data |= 1 << u64(value - t.lower)
+			
+			if parse_comma(p) {
+				break
+			}
+		}
+		
+		unmarshal_expect_token(p, .Close_Bracket)
+
+		if assign_int(v, bit_data) {
+			return nil
+		}
 	}
 		
 	return UNSUPPORTED_TYPE
