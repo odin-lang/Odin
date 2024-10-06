@@ -119,7 +119,23 @@ assign_int :: proc(val: any, i: $T) -> bool {
 	case:
 		ti := type_info_of(v.id)
 		if _, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
-			do_byte_swap := reflect.bit_set_is_big_endian(v)
+			is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
+				if ti == nil {
+					return false
+				}
+				t := runtime.type_info_base(ti)
+				#partial switch info in t.variant {
+				case runtime.Type_Info_Integer:
+					switch info.endianness {
+					case .Platform: return false
+					case .Little:   return ODIN_ENDIAN != .Little
+					case .Big:      return ODIN_ENDIAN != .Big
+					}
+				}
+				return false
+			}
+			
+			do_byte_swap := is_bit_set_different_endian_to_platform(ti)
 			switch ti.size * 8 {
 			case 0: // no-op.
 			case 8:
