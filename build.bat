@@ -19,8 +19,8 @@ if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
 	)
 )
 
-for /f "usebackq tokens=1,2 delims=,=- " %%i in (`wmic os get LocalDateTime /value`) do @if %%i==LocalDateTime (
-	set CURR_DATE_TIME=%%j
+for /f %%i in ('powershell get-date -format "{yyyyMMdd}"') do (
+	set CURR_DATE_TIME=%%i
 )
 set curr_year=%CURR_DATE_TIME:~0,4%
 set curr_month=%CURR_DATE_TIME:~4,2%
@@ -70,6 +70,7 @@ set rc_flags=-nologo ^
 -DV1=%V1% -DV2=%V2% -DV3=%V3% -DV4=%V4% ^
 -DVF=%odin_version_full% -DNIGHTLY=%nightly%
 
+where /Q git.exe || goto skip_git_hash
 if not exist .git\ goto skip_git_hash
 for /f "tokens=1,2" %%i IN ('git show "--pretty=%%cd %%h" "--date=format:%%Y-%%m" --no-patch --no-notes HEAD') do (
 	set odin_version_raw=dev-%%i
