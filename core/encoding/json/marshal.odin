@@ -240,7 +240,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 						if opt.enumerated_array_map_use_names {
 							key = enum_val.names[ei]
 						} else {
-							key = strconv.append_bits(buf[:], transmute(u64)enum_val.values[ei], 10, true, 8 * info.elem_size, "0123456789", nil)
+							key = strconv.append_bits(buf[:], cast(u64)enum_val.values[ei], 10, true, 8 * info.elem_size, "0123456789", nil)
 						}
 						break
 					}
