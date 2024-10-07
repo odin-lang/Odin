@@ -42,18 +42,9 @@ foreign mach {
 	
 	semaphore_wait :: proc(semaphore: semaphore_t) -> kern_return_t ---
 
-    vm_allocate :: proc (
-        target_task : vm_map_t,
-        address     : ^vm_address_t,
-        size        : vm_size_t,
-        flags       : vm_flags_t,
-    ) -> kern_return_t ---
+    vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: vm_flags_t,) -> kern_return_t ---
 
-    vm_deallocate :: proc(
-        target_task: vm_map_t,
-        address    : vm_address_t,
-        size       : vm_size_t
-    ) -> kern_return_t---
+    vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> kern_return_t---
 
     vm_map :: proc (
         target_task    : vm_map_t,
