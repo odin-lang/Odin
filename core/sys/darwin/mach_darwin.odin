@@ -14,6 +14,21 @@ semaphore_t :: distinct u64
 kern_return_t :: distinct u64
 thread_act_t :: distinct u64
 
+mach_port_t :: c.uint
+vm_map_t :: mach_port_t
+mem_entry_name_port_t :: mach_port_t
+
+vm_size_t :: c.uintptr_t
+
+vm_address_t :: vm_offset_t
+vm_offset_t :: c.uintptr_t
+
+boolean_t :: c.int
+
+vm_prot_t :: c.int
+
+vm_inherit_t           :: c.uint
+
 @(default_calling_convention="c")
 foreign mach {
 	mach_task_self :: proc() -> task_t ---
@@ -65,22 +80,6 @@ foreign mach {
 
     vm_page_size : vm_size_t
 }
-
-// NOTE(beau): types for stuff in the mach APIS, recreated from the typedefs as
-// faithfully as possible
-mach_port_t            :: c.uint
-vm_map_t               :: mach_port_t
-mem_entry_name_port_t  :: mach_port_t
-
-vm_size_t              :: c.uintptr_t
-
-vm_address_t           :: vm_offset_t
-vm_offset_t            :: c.uintptr_t
-
-boolean_t              :: c.int
-
-// REVIEW(beau): its actually defined as an int
-// kern_return_t          :: c.int
 
 // NOTE(beau): kern_return_t constants - ported directly
 KERN_SUCCESS                  : kern_return_t : 0
@@ -404,9 +403,6 @@ VM_FLAGS_PERMANENT          : vm_flags_t : 0x00000080
 VM_FLAGS_TPRO               : vm_flags_t : 0x00001000
 VM_FLAGS_OVERWRITE          : vm_flags_t : 0x00004000  /* delete any existing mappings first */
 
-// NOTE(beau): vm_prot_t types and constants, ported directly
-vm_prot_t :: c.int
-
 /*
  *	Protection values, defined as bits within the vm_prot_t type
  */
@@ -428,10 +424,6 @@ VM_PROT_DEFAULT :: VM_PROT_READ | VM_PROT_WRITE
  */
 
 VM_PROT_ALL     :: VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE
-
-
-// NOTE(beau): vm_inherit_t constants and type, ported directly
-vm_inherit_t           :: c.uint
 
 /*
  *	Enumeration of valid values for vm_inherit_t.
