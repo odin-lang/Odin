@@ -42,34 +42,34 @@ foreign mach {
 	
 	semaphore_wait :: proc(semaphore: semaphore_t) -> kern_return_t ---
 
-    vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: vm_flags_t,) -> kern_return_t ---
+	vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: vm_flags_t,) -> kern_return_t ---
 
-    vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> kern_return_t---
+	vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> kern_return_t---
 
-    vm_map :: proc (
-        target_task    : vm_map_t,
-        address        : ^vm_address_t,
-        size           : vm_size_t,
-        mask           : vm_address_t,
-        flags          : vm_flags_t,
-        object         : mem_entry_name_port_t,
-        offset         : vm_offset_t,
-        copy           : boolean_t,
-        cur_protection : vm_prot_t,
-        max_protection : vm_prot_t,
-        inheritance    : vm_inherit_t
-    ) -> kern_return_t ---
+	vm_map :: proc (
+		target_task    : vm_map_t,
+		address        : ^vm_address_t,
+		size           : vm_size_t,
+		mask           : vm_address_t,
+		flags          : vm_flags_t,
+		object         : mem_entry_name_port_t,
+		offset         : vm_offset_t,
+		copy           : boolean_t,
+		cur_protection : vm_prot_t,
+		max_protection : vm_prot_t,
+		inheritance    : vm_inherit_t
+	) -> kern_return_t ---
 
-    mach_make_memory_entry :: proc (
-        target_task   : vm_map_t,
-        size          : ^vm_size_t,
-        offset        : vm_offset_t,
-        permission    : vm_prot_t,
-        object_handle : ^mem_entry_name_port_t,
-        parent_entry  : mem_entry_name_port_t,
-    ) -> kern_return_t ---
+	mach_make_memory_entry :: proc (
+		target_task   : vm_map_t,
+		size          : ^vm_size_t,
+		offset        : vm_offset_t,
+		permission    : vm_prot_t,
+		object_handle : ^mem_entry_name_port_t,
+		parent_entry  : mem_entry_name_port_t,
+	) -> kern_return_t ---
 
-    vm_page_size : vm_size_t
+	vm_page_size : vm_size_t
 }
 
 KERN_SUCCESS                  : kern_return_t : 0
