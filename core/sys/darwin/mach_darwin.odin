@@ -55,7 +55,7 @@ foreign mach {
 		object         : mem_entry_name_port_t,
 		offset         : vm_offset_t,
 		copy           : boolean_t,
-		cur_protection : vm_prot_t,
+		cur_protection,
 		max_protection : vm_prot_t,
 		inheritance    : vm_inherit_t,
 	) -> kern_return_t ---
