@@ -72,7 +72,6 @@ foreign mach {
     vm_page_size : vm_size_t
 }
 
-// NOTE(beau): kern_return_t constants - ported directly
 KERN_SUCCESS                  : kern_return_t : 0
 
 KERN_INVALID_ADDRESS          : kern_return_t : 1
@@ -345,7 +344,6 @@ KERN_NOT_FOUND                : kern_return_t : 56
 
 KERN_RETURN_MAX               : kern_return_t : 0x100
 
-// NOTE(beau): VM_FLAGS constants - ported directly
 /* Maximum return value allowable
  */
 /*
