@@ -42,7 +42,7 @@ foreign mach {
 	
 	semaphore_wait :: proc(semaphore: semaphore_t) -> kern_return_t ---
 
-	vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: vm_flags_t,) -> kern_return_t ---
+	vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: c.int,) -> kern_return_t ---
 
 	vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> kern_return_t---
 
@@ -51,7 +51,7 @@ foreign mach {
 		address        : ^vm_address_t,
 		size           : vm_size_t,
 		mask           : vm_address_t,
-		flags          : vm_flags_t,
+		flags          : c.int,
 		object         : mem_entry_name_port_t,
 		offset         : vm_offset_t,
 		copy           : boolean_t,
@@ -378,19 +378,17 @@ KERN_RETURN_MAX               : kern_return_t : 0x100
  *	cached so that they will be stolen first if memory runs low.
  */
 
-vm_flags_t :: distinct c.int // NOTE(beau): not in the apple sdk
-
-VM_FLAGS_FIXED              : vm_flags_t : 0x00000000
-VM_FLAGS_ANYWHERE           : vm_flags_t : 0x00000001
-VM_FLAGS_PURGABLE           : vm_flags_t : 0x00000002
-VM_FLAGS_4GB_CHUNK          : vm_flags_t : 0x00000004
-VM_FLAGS_RANDOM_ADDR        : vm_flags_t : 0x00000008
-VM_FLAGS_NO_CACHE           : vm_flags_t : 0x00000010
-VM_FLAGS_RESILIENT_CODESIGN : vm_flags_t : 0x00000020
-VM_FLAGS_RESILIENT_MEDIA    : vm_flags_t : 0x00000040
-VM_FLAGS_PERMANENT          : vm_flags_t : 0x00000080
-VM_FLAGS_TPRO               : vm_flags_t : 0x00001000
-VM_FLAGS_OVERWRITE          : vm_flags_t : 0x00004000  /* delete any existing mappings first */
+VM_FLAGS_FIXED              :: 0x00000000
+VM_FLAGS_ANYWHERE           :: 0x00000001
+VM_FLAGS_PURGABLE           :: 0x00000002
+VM_FLAGS_4GB_CHUNK          :: 0x00000004
+VM_FLAGS_RANDOM_ADDR        :: 0x00000008
+VM_FLAGS_NO_CACHE           :: 0x00000010
+VM_FLAGS_RESILIENT_CODESIGN :: 0x00000020
+VM_FLAGS_RESILIENT_MEDIA    :: 0x00000040
+VM_FLAGS_PERMANENT          :: 0x00000080
+VM_FLAGS_TPRO               :: 0x00001000
+VM_FLAGS_OVERWRITE          :: 0x00004000  /* delete any existing mappings first */
 
 /*
  *	Protection values, defined as bits within the vm_prot_t type
