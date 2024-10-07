@@ -17,6 +17,7 @@ thread_act_t :: distinct u64
 mach_port_t :: distinct c.uint
 vm_map_t :: mach_port_t
 mem_entry_name_port_t :: mach_port_t
+ipc_space_t :: mach_port_t
 
 vm_size_t :: distinct c.uintptr_t
 
@@ -28,6 +29,8 @@ boolean_t :: distinct c.int
 vm_prot_t :: distinct c.int
 
 vm_inherit_t :: distinct c.uint
+
+mach_port_name_t :: distinct c.uint
 
 @(default_calling_convention="c")
 foreign mach {
@@ -67,6 +70,11 @@ foreign mach {
 		permission    : vm_prot_t,
 		object_handle : ^mem_entry_name_port_t,
 		parent_entry  : mem_entry_name_port_t,
+	) -> kern_return_t ---
+
+	mach_port_deallocate :: proc (
+		task: ipc_space_t,
+		name: mach_port_name_t,
 	) -> kern_return_t ---
 
 	vm_page_size : vm_size_t
