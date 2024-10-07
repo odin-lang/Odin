@@ -57,7 +57,7 @@ foreign mach {
 		copy           : boolean_t,
 		cur_protection : vm_prot_t,
 		max_protection : vm_prot_t,
-		inheritance    : vm_inherit_t
+		inheritance    : vm_inherit_t,
 	) -> kern_return_t ---
 
 	mach_make_memory_entry :: proc (
