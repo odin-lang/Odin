@@ -15,12 +15,12 @@ kern_return_t :: distinct u64
 thread_act_t :: distinct u64
 
 mach_port_t :: distinct c.uint
-vm_map_t :: distinct mach_port_t
-mem_entry_name_port_t :: distinct mach_port_t
+vm_map_t :: mach_port_t
+mem_entry_name_port_t :: mach_port_t
 
 vm_size_t :: distinct c.uintptr_t
 
-vm_address_t :: distinct vm_offset_t
+vm_address_t :: vm_offset_t
 vm_offset_t :: distinct c.uintptr_t
 
 boolean_t :: distinct c.int
