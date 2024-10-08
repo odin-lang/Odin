@@ -147,7 +147,8 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	addr := _unwrap_os_addr(endpoint)
 	errno = linux.connect(linux.Fd(os_sock), &addr)
 	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Dial_Error(errno)
+		close(cast(TCP_Socket) os_sock)
+		return {}, Dial_Error(errno)
 	}
 	// NOTE(tetra): Not vital to succeed; error ignored
 	no_delay: b32 = cast(b32) options.no_delay

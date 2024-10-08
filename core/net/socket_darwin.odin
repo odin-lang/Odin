@@ -88,8 +88,8 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
 	if res != nil {
-		err = Dial_Error(os.is_platform_error(res) or_else -1)
-		return
+		close(skt)
+		return {}, Dial_Error(os.is_platform_error(res) or_else -1)
 	}
 
 	return

@@ -80,8 +80,8 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	res := win.connect(win.SOCKET(socket), &sockaddr, size_of(sockaddr))
 	if res < 0 {
-		err = Dial_Error(win.WSAGetLastError())
-		return
+		close(socket)
+		return {}, Dial_Error(win.WSAGetLastError())
 	}
 
 	if options.no_delay {
