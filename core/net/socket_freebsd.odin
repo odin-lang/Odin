@@ -137,6 +137,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	family := family_from_endpoint(interface_endpoint)
 	new_socket := create_socket(family, .TCP) or_return
 	socket = new_socket.(TCP_Socket)
+	defer if err != nil { close(socket) }
 
 	bind(socket, interface_endpoint) or_return
 

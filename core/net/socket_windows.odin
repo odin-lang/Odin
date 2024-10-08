@@ -107,6 +107,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	family := family_from_endpoint(interface_endpoint)
 	sock := create_socket(family, .TCP) or_return
 	socket = sock.(TCP_Socket)
+	defer if err != nil { close(socket) }
 
 	// NOTE(tetra): While I'm not 100% clear on it, my understanding is that this will
 	// prevent hijacking of the server's endpoint by other applications.
