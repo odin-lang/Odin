@@ -31,18 +31,18 @@ mach_port_name_t :: distinct c.uint
 foreign mach {
 	mach_task_self :: proc() -> mach_port_t ---
 
-	semaphore_create :: proc(task: task_t, semaphore: ^semaphore_t, policy, value: c.int) -> kern_return_t ---
-	semaphore_destroy :: proc(task: task_t, semaphore: semaphore_t) -> kern_return_t ---
+	semaphore_create :: proc(task: task_t, semaphore: ^semaphore_t, policy, value: c.int) -> Kern_Return ---
+	semaphore_destroy :: proc(task: task_t, semaphore: semaphore_t) -> Kern_Return ---
 
-	semaphore_signal :: proc(semaphore: semaphore_t) -> kern_return_t ---
-	semaphore_signal_all :: proc(semaphore: semaphore_t) -> kern_return_t ---
-	semaphore_signal_thread :: proc(semaphore: semaphore_t, thread: thread_t) -> kern_return_t ---
+	semaphore_signal :: proc(semaphore: semaphore_t) -> Kern_Return ---
+	semaphore_signal_all :: proc(semaphore: semaphore_t) -> Kern_Return ---
+	semaphore_signal_thread :: proc(semaphore: semaphore_t, thread: thread_t) -> Kern_Return ---
 	
-	semaphore_wait :: proc(semaphore: semaphore_t) -> kern_return_t ---
+	semaphore_wait :: proc(semaphore: semaphore_t) -> Kern_Return ---
 
-	vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: c.int,) -> kern_return_t ---
+	vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: c.int,) -> Kern_Return ---
 
-	vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> kern_return_t---
+	vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> Kern_Return ---
 
 	vm_map :: proc (
 		target_task    : vm_map_t,
@@ -56,7 +56,7 @@ foreign mach {
 		cur_protection,
 		max_protection : vm_prot_t,
 		inheritance    : vm_inherit_t,
-	) -> kern_return_t ---
+	) -> Kern_Return ---
 
 	mach_make_memory_entry :: proc (
 		target_task   : vm_map_t,
@@ -65,287 +65,289 @@ foreign mach {
 		permission    : vm_prot_t,
 		object_handle : ^mem_entry_name_port_t,
 		parent_entry  : mem_entry_name_port_t,
-	) -> kern_return_t ---
+	) -> Kern_Return ---
 
 	mach_port_deallocate :: proc (
 		task: ipc_space_t,
 		name: mach_port_name_t,
-	) -> kern_return_t ---
+	) -> Kern_Return ---
 
 	vm_page_size : vm_size_t
 }
 
-KERN_SUCCESS                  : kern_return_t : 0
+Kern_Return :: enum kern_return_t {
+	Success,
 
-KERN_INVALID_ADDRESS          : kern_return_t : 1
-/* Specified address is not currently valid.
- */
+	Invalid_Address,
+	/* Specified address is not currently valid.
+	 */
 
-KERN_PROTECTION_FAILURE       : kern_return_t : 2
-/* Specified memory is valid, but does not permit the
- * required forms of access.
- */
+	Protection_Failure,
+	/* Specified memory is valid, but does not permit the
+	 * required forms of access.
+	 */
 
-KERN_NO_SPACE                 : kern_return_t : 3
-/* The address range specified is already in use, or
- * no address range of the size specified could be
- * found.
- */
+	No_Space,
+	/* The address range specified is already in use, or
+	 * no address range of the size specified could be
+	 * found.
+	 */
 
-KERN_INVALID_ARGUMENT         : kern_return_t : 4
-/* The function requested was not applicable to this
- * type of argument, or an argument is invalid
- */
+	Invalid_Argument,
+	/* The function requested was not applicable to this
+	 * type of argument, or an argument is invalid
+	 */
 
-KERN_FAILURE                  : kern_return_t : 5
-/* The function could not be performed.  A catch-all.
- */
+	Failure,
+	/* The function could not be performed.  A catch-all.
+	 */
 
-KERN_RESOURCE_SHORTAGE        : kern_return_t : 6
-/* A system resource could not be allocated to fulfill
- * this request.  This failure may not be permanent.
- */
+	Resource_Shortage,
+	/* A system resource could not be allocated to fulfill
+	 * this request.  This failure may not be permanent.
+	 */
 
-KERN_NOT_RECEIVER             : kern_return_t : 7
-/* The task in question does not hold receive rights
- * for the port argument.
- */
+	Not_Receiver,
+	/* The task in question does not hold receive rights
+	 * for the port argument.
+	 */
 
-KERN_NO_ACCESS                : kern_return_t : 8
-/* Bogus access restriction.
- */
+	No_Access,
+	/* Bogus access restriction.
+	 */
 
-KERN_MEMORY_FAILURE           : kern_return_t : 9
-/* During a page fault, the target address refers to a
- * memory object that has been destroyed.  This
- * failure is permanent.
- */
+	Memory_Failure,
+	/* During a page fault, the target address refers to a
+	 * memory object that has been destroyed.  This
+	 * failure is permanent.
+	 */
 
-KERN_MEMORY_ERROR             : kern_return_t : 10
-/* During a page fault, the memory object indicated
- * that the data could not be returned.  This failure
- * may be temporary; future attempts to access this
- * same data may succeed, as defined by the memory
- * object.
- */
+	Memory_Error,
+	/* During a page fault, the memory object indicated
+	 * that the data could not be returned.  This failure
+	 * may be temporary; future attempts to access this
+	 * same data may succeed, as defined by the memory
+	 * object.
+	 */
 
-KERN_ALREADY_IN_SET           : kern_return_t : 11
-/* The receive right is already a member of the portset.
- */
+	Already_In_Set,
+	/* The receive right is already a member of the portset.
+	 */
 
-KERN_NOT_IN_SET               : kern_return_t : 12
-/* The receive right is not a member of a port set.
- */
+	Not_In_Set,
+	/* The receive right is not a member of a port set.
+	 */
 
-KERN_NAME_EXISTS              : kern_return_t : 13
-/* The name already denotes a right in the task.
- */
+	Name_Exists,
+	/* The name already denotes a right in the task.
+	 */
 
-KERN_ABORTED                  : kern_return_t : 14
-/* The operation was aborted.  Ipc code will
- * catch this and reflect it as a message error.
- */
+	Aborted,
+	/* The operation was aborted.  Ipc code will
+	 * catch this and reflect it as a message error.
+	 */
 
-KERN_INVALID_NAME             : kern_return_t : 15
-/* The name doesn't denote a right in the task.
- */
+	Invalid_Name,
+	/* The name doesn't denote a right in the task.
+	 */
 
-KERN_INVALID_TASK             : kern_return_t : 16
-/* Target task isn't an active task.
- */
+	Invalid_Task,
+	/* Target task isn't an active task.
+	 */
 
-KERN_INVALID_RIGHT            : kern_return_t : 17
-/* The name denotes a right, but not an appropriate right.
- */
+	Invalid_Right,
+	/* The name denotes a right, but not an appropriate right.
+	 */
 
-KERN_INVALID_VALUE            : kern_return_t : 18
-/* A blatant range error.
- */
+	Invalid_Value,
+	/* A blatant range error.
+	 */
 
-KERN_UREFS_OVERFLOW           : kern_return_t : 19
-/* Operation would overflow limit on user-references.
- */
+	URefs_Overflow,
+	/* Operation would overflow limit on user-references.
+	 */
 
-KERN_INVALID_CAPABILITY       : kern_return_t : 20
-/* The supplied (port) capability is improper.
- */
+	Invalid_Capability,
+	/* The supplied (port) capability is improper.
+	 */
 
-KERN_RIGHT_EXISTS             : kern_return_t : 21
-/* The task already has send or receive rights
- * for the port under another name.
- */
+	Right_Exists,
+	/* The task already has send or receive rights
+	 * for the port under another name.
+	 */
 
-KERN_INVALID_HOST             : kern_return_t : 22
-/* Target host isn't actually a host.
- */
+	Invalid_Host,
+	/* Target host isn't actually a host.
+	 */
 
-KERN_MEMORY_PRESENT           : kern_return_t : 23
-/* An attempt was made to supply "precious" data
- * for memory that is already present in a
- * memory object.
- */
+	Memory_Present,
+	/* An attempt was made to supply "precious" data
+	 * for memory that is already present in a
+	 * memory object.
+	 */
 
-KERN_MEMORY_DATA_MOVED        : kern_return_t : 24
-/* A page was requested of a memory manager via
- * memory_object_data_request for an object using
- * a MEMORY_OBJECT_COPY_CALL strategy, with the
- * VM_PROT_WANTS_COPY flag being used to specify
- * that the page desired is for a copy of the
- * object, and the memory manager has detected
- * the page was pushed into a copy of the object
- * while the kernel was walking the shadow chain
- * from the copy to the object. This error code
- * is delivered via memory_object_data_error
- * and is handled by the kernel (it forces the
- * kernel to restart the fault). It will not be
- * seen by users.
- */
+	Memory_Data_Moved,
+	/* A page was requested of a memory manager via
+	 * memory_object_data_request for an object using
+	 * a MEMORY_OBJECT_COPY_CALL strategy, with the
+	 * VM_PROT_WANTS_COPY flag being used to specify
+	 * that the page desired is for a copy of the
+	 * object, and the memory manager has detected
+	 * the page was pushed into a copy of the object
+	 * while the kernel was walking the shadow chain
+	 * from the copy to the object. This error code
+	 * is delivered via memory_object_data_error
+	 * and is handled by the kernel (it forces the
+	 * kernel to restart the fault). It will not be
+	 * seen by users.
+	 */
 
-KERN_MEMORY_RESTART_COPY      : kern_return_t : 25
-/* A strategic copy was attempted of an object
- * upon which a quicker copy is now possible.
- * The caller should retry the copy using
- * vm_object_copy_quickly. This error code
- * is seen only by the kernel.
- */
+	Memory_Restart_Copy,
+	/* A strategic copy was attempted of an object
+	 * upon which a quicker copy is now possible.
+	 * The caller should retry the copy using
+	 * vm_object_copy_quickly. This error code
+	 * is seen only by the kernel.
+	 */
 
-KERN_INVALID_PROCESSOR_SET    : kern_return_t : 26
-/* An argument applied to assert processor set privilege
- * was not a processor set control port.
- */
+	Invalid_Processor_Set,
+	/* An argument applied to assert processor set privilege
+	 * was not a processor set control port.
+	 */
 
-KERN_POLICY_LIMIT             : kern_return_t : 27
-/* The specified scheduling attributes exceed the thread's
- * limits.
- */
+	Policy_Limit,
+	/* The specified scheduling attributes exceed the thread's
+	 * limits.
+	 */
 
-KERN_INVALID_POLICY           : kern_return_t : 28
-/* The specified scheduling policy is not currently
- * enabled for the processor set.
- */
+	Invalid_Policy,
+	/* The specified scheduling policy is not currently
+	 * enabled for the processor set.
+	 */
 
-KERN_INVALID_OBJECT           : kern_return_t : 29
-/* The external memory manager failed to initialize the
- * memory object.
- */
+	Invalid_Object,
+	/* The external memory manager failed to initialize the
+	 * memory object.
+	 */
 
-KERN_ALREADY_WAITING          : kern_return_t : 30
-/* A thread is attempting to wait for an event for which
- * there is already a waiting thread.
- */
+	Already_Waiting,
+	/* A thread is attempting to wait for an event for which
+	 * there is already a waiting thread.
+	 */
 
-KERN_DEFAULT_SET              : kern_return_t : 31
-/* An attempt was made to destroy the default processor
- * set.
- */
+	Default_Set,
+	/* An attempt was made to destroy the default processor
+	 * set.
+	 */
 
-KERN_EXCEPTION_PROTECTED      : kern_return_t : 32
-/* An attempt was made to fetch an exception port that is
- * protected, or to abort a thread while processing a
- * protected exception.
- */
+	Exception_Protected,
+	/* An attempt was made to fetch an exception port that is
+	 * protected, or to abort a thread while processing a
+	 * protected exception.
+	 */
 
-KERN_INVALID_LEDGER           : kern_return_t : 33
-/* A ledger was required but not supplied.
- */
+	Invalid_Ledger,
+	/* A ledger was required but not supplied.
+	 */
 
-KERN_INVALID_MEMORY_CONTROL   : kern_return_t : 34
-/* The port was not a memory cache control port.
- */
+	Invalid_Memory_Control,
+	/* The port was not a memory cache control port.
+	 */
 
-KERN_INVALID_SECURITY         : kern_return_t : 35
-/* An argument supplied to assert security privilege
- * was not a host security port.
- */
+	Invalid_Security,
+	/* An argument supplied to assert security privilege
+	 * was not a host security port.
+	 */
 
-KERN_NOT_DEPRESSED            : kern_return_t : 36
-/* thread_depress_abort was called on a thread which
- * was not currently depressed.
- */
+	Not_Depressed,
+	/* thread_depress_abort was called on a thread which
+	 * was not currently depressed.
+	 */
 
-KERN_TERMINATED               : kern_return_t : 37
-/* Object has been terminated and is no longer available
- */
+	Terminated,
+	/* Object has been terminated and is no longer available
+	 */
 
-KERN_LOCK_SET_DESTROYED       : kern_return_t : 38
-/* Lock set has been destroyed and is no longer available.
- */
+	Lock_Set_Destroyed,
+	/* Lock set has been destroyed and is no longer available.
+	 */
 
-KERN_LOCK_UNSTABLE            : kern_return_t : 39
-/* The thread holding the lock terminated before releasing
- * the lock
- */
+	Lock_Unstable,
+	/* The thread holding the lock terminated before releasing
+	 * the lock
+	 */
 
-KERN_LOCK_OWNED               : kern_return_t : 40
-/* The lock is already owned by another thread
- */
+	Lock_Owned,
+	/* The lock is already owned by another thread
+	 */
 
-KERN_LOCK_OWNED_SELF          : kern_return_t : 41
-/* The lock is already owned by the calling thread
- */
+	Lock_Owned_Self,
+	/* The lock is already owned by the calling thread
+	 */
 
-KERN_SEMAPHORE_DESTROYED      : kern_return_t : 42
-/* Semaphore has been destroyed and is no longer available.
- */
+	Semaphore_Destroyed,
+	/* Semaphore has been destroyed and is no longer available.
+	 */
 
-KERN_RPC_SERVER_TERMINATED    : kern_return_t : 43
-/* Return from RPC indicating the target server was
- * terminated before it successfully replied
- */
+	Rpc_Server_Terminated,
+	/* Return from RPC indicating the target server was
+	 * terminated before it successfully replied
+	 */
 
-KERN_RPC_TERMINATE_ORPHAN     : kern_return_t : 44
-/* Terminate an orphaned activation.
- */
+	RPC_Terminate_Orphan,
+	/* Terminate an orphaned activation.
+	 */
 
-KERN_RPC_CONTINUE_ORPHAN      : kern_return_t : 45
-/* Allow an orphaned activation to continue executing.
- */
+	RPC_Continue_Orphan,
+	/* Allow an orphaned activation to continue executing.
+	 */
 
-KERN_NOT_SUPPORTED            : kern_return_t : 46
-/* Empty thread activation (No thread linked to it)
- */
+	Not_Supported,
+	/* Empty thread activation (No thread linked to it)
+	 */
 
-KERN_NODE_DOWN                : kern_return_t : 47
-/* Remote node down or inaccessible.
- */
+	Node_Down,
+	/* Remote node down or inaccessible.
+	 */
 
-KERN_NOT_WAITING              : kern_return_t : 48
-/* A signalled thread was not actually waiting. */
+	Not_Waiting,
+	/* A signalled thread was not actually waiting. */
 
-KERN_OPERATION_TIMED_OUT      : kern_return_t : 49
-/* Some thread-oriented operation (semaphore_wait) timed out
- */
+	Operation_Timed_Out,
+	/* Some thread-oriented operation (semaphore_wait) timed out
+	 */
 
-KERN_CODESIGN_ERROR           : kern_return_t : 50
-/* During a page fault, indicates that the page was rejected
- * as a result of a signature check.
- */
+	Codesign_Error,
+	/* During a page fault, indicates that the page was rejected
+	 * as a result of a signature check.
+	 */
 
-KERN_POLICY_STATIC            : kern_return_t : 51
-/* The requested property cannot be changed at this time.
- */
+	Policy_Static,
+	/* The requested property cannot be changed at this time.
+	 */
 
-KERN_INSUFFICIENT_BUFFER_SIZE : kern_return_t : 52
-/* The provided buffer is of insufficient size for the requested data.
- */
+	Insufficient_Buffer_Size,
+	/* The provided buffer is of insufficient size for the requested data.
+	 */
 
-KERN_DENIED                   : kern_return_t : 53
-/* Denied by security policy
- */
+	Denied,
+	/* Denied by security policy
+	 */
 
-KERN_MISSING_KC               : kern_return_t : 54
-/* The KC on which the function is operating is missing
- */
+	Missing_KC,
+	/* The KC on which the function is operating is missing
+	 */
 
-KERN_INVALID_KC               : kern_return_t : 55
-/* The KC on which the function is operating is invalid
- */
+	Invalid_KC,
+	/* The KC on which the function is operating is invalid
+	 */
 
-KERN_NOT_FOUND                : kern_return_t : 56
-/* A search or query operation did not return a result
- */
+	Not_Found,
+	/* A search or query operation did not return a result
+	 */
 
-KERN_RETURN_MAX               : kern_return_t : 0x100
+	Return_Max               = 0x100,
+}
 
 /* Maximum return value allowable
  */
