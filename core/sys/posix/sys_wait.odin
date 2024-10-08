@@ -124,11 +124,11 @@ WIFCONTINUED :: #force_inline proc "contextless" (x: c.int) -> bool {
 
 idtype_t :: enum c.int {
 	// Wait for any children and `id` is ignored.
-	P_ALL,
+	P_ALL  = _P_ALL,
 	// Wait for any child wiith a process group ID equal to `id`.
-	P_PID,
+	P_PID  = _P_PID,
 	// Wait for any child with a process group ID equal to `id`.
-	P_PGID,
+	P_PGID = _P_PGID,
 }
 
 Wait_Flag_Bits :: enum c.int {
@@ -165,6 +165,10 @@ when ODIN_OS == .Darwin {
 	WEXITED  :: 0x00000004
 	WNOWAIT  :: 0x00000020
 	WSTOPPED :: 0x00000008
+
+	_P_ALL  :: 0
+	_P_PID  :: 1
+	_P_PGID :: 2
 
 	@(private)
 	_WSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
@@ -221,6 +225,10 @@ when ODIN_OS == .Darwin {
 	WNOWAIT  :: 8
 	WSTOPPED :: 2
 
+	_P_ALL  :: 7
+	_P_PID  :: 0
+	_P_PGID :: 2
+
 	@(private)
 	_WSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
 		return x & 0o177
@@ -274,6 +282,10 @@ when ODIN_OS == .Darwin {
 	WEXITED  :: 0x00000020
 	WNOWAIT  :: 0x00010000
 	WSTOPPED :: 0x00000002
+
+	_P_ALL  :: 0
+	_P_PID  :: 1
+	_P_PGID :: 2
 
 	@(private)
 	_WSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
@@ -329,6 +341,10 @@ when ODIN_OS == .Darwin {
 	WEXITED  :: 0x00000020
 	WNOWAIT  :: 0x00010000
 	WSTOPPED :: 0x00000002
+
+	_P_ALL  :: 0
+	_P_PID  :: 2
+	_P_PGID :: 1
 
 	@(private)
 	_WSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {

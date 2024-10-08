@@ -1,7 +1,7 @@
 package os2
 
 import "base:runtime"
-import "core:strings"
+
 import "core:time"
 
 /*
@@ -371,16 +371,18 @@ process_exec :: proc(
 	loc := #caller_location,
 ) -> (
 	state: Process_State,
-	stdout: []u8,
-	stderr: []u8,
+	stdout: []byte,
+	stderr: []byte,
 	err: Error,
 ) {
 	assert(desc.stdout == nil, "Cannot redirect stdout when it's being captured", loc)
 	assert(desc.stderr == nil, "Cannot redirect stderr when it's being captured", loc)
+
 	stdout_r, stdout_w := pipe() or_return
 	defer close(stdout_r)
 	stderr_r, stderr_w := pipe() or_return
-	defer close(stdout_w)
+	defer close(stderr_r)
+
 	process: Process
 	{
 		// NOTE(flysand): Make sure the write-ends are closed, regardless
@@ -392,45 +394,65 @@ process_exec :: proc(
 		desc.stderr = stderr_w
 		process = process_start(desc) or_return
 	}
-	stdout_builder := strings.builder_make(allocator) or_return
-	stderr_builder := strings.builder_make(allocator) or_return
-	read_data: for {
-		buf: [1024]u8
-		n: int
-		has_data: bool
-		hangup := false
-		has_data, err = pipe_has_data(stdout_r)
-		if has_data {
-			n, err = read(stdout_r, buf[:])
-			strings.write_bytes(&stdout_builder, buf[:n])
-		}
-		switch err {
-		case nil: // nothing
-		case .Broken_Pipe:
-			hangup = true
-		case:
-			return
-		}
-		has_data, err = pipe_has_data(stderr_r)
-		if has_data {
-			n, err = read(stderr_r, buf[:])
-			strings.write_bytes(&stderr_builder, buf[:n])
-		}
-		switch err {
-		case nil: // nothing
-		case .Broken_Pipe:
-			hangup = true
-		case:
-			return
-		}
-		if hangup {
-			break read_data
+
+	{
+		stdout_b: [dynamic]byte
+		stdout_b.allocator = allocator
+		defer stdout = stdout_b[:]
+
+		stderr_b: [dynamic]byte
+		stderr_b.allocator = allocator
+		defer stderr = stderr_b[:]
+
+		buf: [1024]u8 = ---
+		
+		stdout_done, stderr_done, has_data: bool
+		for err == nil && (!stdout_done || !stderr_done) {
+			n := 0
+
+			if !stdout_done {
+				has_data, err = pipe_has_data(stdout_r)
+				if has_data {
+					n, err = read(stdout_r, buf[:])
+				}
+
+				switch err {
+				case nil:
+					_, err = append(&stdout_b, ..buf[:n])
+				case .EOF, .Broken_Pipe:
+					stdout_done = true
+					err = nil
+				}
+			}
+
+			if err == nil && !stderr_done {
+				n = 0
+				has_data, err = pipe_has_data(stderr_r)
+				if has_data {
+					n, err = read(stderr_r, buf[:])
+				}
+
+				switch err {
+				case nil:
+					_, err = append(&stderr_b, ..buf[:n])
+				case .EOF, .Broken_Pipe:
+					stderr_done = true
+					err = nil
+				}
+			}
 		}
 	}
-	err = nil
-	stdout = transmute([]u8) strings.to_string(stdout_builder)
-	stderr = transmute([]u8) strings.to_string(stderr_builder)
-	state = process_wait(process) or_return
+
+	if err != nil {
+		state, _ = process_wait(process, timeout=0)
+		if !state.exited {
+			_ = process_kill(process)
+			state, _ = process_wait(process)
+		}
+		return
+	}
+
+	state, err = process_wait(process)
 	return
 }
 
