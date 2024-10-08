@@ -348,10 +348,10 @@ Kern_Return :: enum kern_return_t {
 	 */
 
 	Return_Max               = 0x100,
+	/* Maximum return value allowable
+	 */
 }
 
-/* Maximum return value allowable
- */
 /*
  * VM allocation flags:
  *
