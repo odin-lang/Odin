@@ -19,7 +19,8 @@ vm_size_t :: distinct c.uintptr_t
 vm_address_t :: vm_offset_t
 vm_offset_t :: distinct c.uintptr_t
 
-boolean_t :: distinct c.int
+// NOTE(beau): typedefed to int in the original headers
+boolean_t :: b32
 
 vm_prot_t :: distinct c.int
 
