@@ -54,7 +54,7 @@ foreign mach {
 		offset         : vm_offset_t,
 		copy           : boolean_t,
 		cur_protection,
-		max_protection : vm_prot_t,
+		max_protection : VM_Prot_Flags,
 		inheritance    : vm_inherit_t,
 	) -> Kern_Return ---
 
@@ -62,7 +62,7 @@ foreign mach {
 		target_task   : vm_map_t,
 		size          : ^vm_size_t,
 		offset        : vm_offset_t,
-		permission    : vm_prot_t,
+		permission    : VM_Prot_Flags,
 		object_handle : ^mem_entry_name_port_t,
 		parent_entry  : mem_entry_name_port_t,
 	) -> Kern_Return ---
@@ -399,23 +399,17 @@ VM_FLAGS_OVERWRITE          :: 0x00004000  /* delete any existing mappings first
  *	Protection values, defined as bits within the vm_prot_t type
  */
 
-VM_PROT_NONE    : vm_prot_t : 0x00
+VM_Prot :: enum vm_prot_t {
+    Read,
+    Write,
+    Execute,
+}
 
-VM_PROT_READ    : vm_prot_t : 0x01      /* read permission */
-VM_PROT_WRITE   : vm_prot_t : 0x02      /* write permission */
-VM_PROT_EXECUTE : vm_prot_t : 0x04      /* execute permission */
+VM_Prot_Flags :: distinct bit_set[VM_Prot; vm_prot_t]
 
-/*
- *	The default protection for newly-created virtual memory
- */
-
-VM_PROT_DEFAULT :: VM_PROT_READ | VM_PROT_WRITE
-
-/*
- *	The maximum privileges possible, for parameter checking.
- */
-
-VM_PROT_ALL     :: VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE
+VM_PROT_NONE    :: VM_Prot_Flags{}
+VM_PROT_DEFAULT :: VM_Prot_Flags{.Read, .Write}
+VM_PROT_ALL     :: VM_Prot_Flags{.Read, .Write, .Execute}
 
 /*
  *	Enumeration of valid values for vm_inherit_t.
