@@ -55,7 +55,7 @@ foreign mach {
 		copy           : boolean_t,
 		cur_protection,
 		max_protection : VM_Prot_Flags,
-		inheritance    : vm_inherit_t,
+		inheritance    : VM_Inherit,
 	) -> Kern_Return ---
 
 	mach_make_memory_entry :: proc (
@@ -415,7 +415,12 @@ VM_PROT_ALL     :: VM_Prot_Flags{.Read, .Write, .Execute}
  *	Enumeration of valid values for vm_inherit_t.
  */
 
-VM_INHERIT_SHARE       : vm_inherit_t : 0      /* share with child */
-VM_INHERIT_COPY        : vm_inherit_t : 1      /* copy into child */
-VM_INHERIT_NONE        : vm_inherit_t : 2      /* absent from child */
-VM_INHERIT_DONATE_COPY : vm_inherit_t : 3      /* copy and delete */
+VM_Inherit :: enum vm_inherit_t {
+    Share,
+    Copy,
+    None,
+    Donate_Copy,
+}
+
+VM_INHERIT_DEFAULT    :: VM_Inherit.Copy
+VM_INHERIT_LAST_VALID :: VM_Inherit.None
