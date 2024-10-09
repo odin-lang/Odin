@@ -3,6 +3,7 @@ package darwin
 foreign import mach "system:System.framework"
 
 import "core:c"
+import "base:intrinsics"
 
 kern_return_t :: distinct c.int
 
@@ -41,7 +42,7 @@ foreign mach {
 	
 	semaphore_wait :: proc(semaphore: semaphore_t) -> Kern_Return ---
 
-	vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: c.int,) -> Kern_Return ---
+	vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: VM_Flags) -> Kern_Return ---
 
 	vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> Kern_Return ---
 
@@ -50,7 +51,7 @@ foreign mach {
 		address        : ^vm_address_t,
 		size           : vm_size_t,
 		mask           : vm_address_t,
-		flags          : c.int,
+		flags          : VM_Flags,
 		object         : mem_entry_name_port_t,
 		offset         : vm_offset_t,
 		copy           : boolean_t,
@@ -384,17 +385,103 @@ Kern_Return :: enum kern_return_t {
  *	cached so that they will be stolen first if memory runs low.
  */
 
-VM_FLAGS_FIXED              :: 0x00000000
-VM_FLAGS_ANYWHERE           :: 0x00000001
-VM_FLAGS_PURGABLE           :: 0x00000002
-VM_FLAGS_4GB_CHUNK          :: 0x00000004
-VM_FLAGS_RANDOM_ADDR        :: 0x00000008
-VM_FLAGS_NO_CACHE           :: 0x00000010
-VM_FLAGS_RESILIENT_CODESIGN :: 0x00000020
-VM_FLAGS_RESILIENT_MEDIA    :: 0x00000040
-VM_FLAGS_PERMANENT          :: 0x00000080
-VM_FLAGS_TPRO               :: 0x00001000
-VM_FLAGS_OVERWRITE          :: 0x00004000  /* delete any existing mappings first */
+@(private="file")
+LOG2 :: intrinsics.constant_log2
+
+VM_Flag :: enum c.int {
+	Anywhere,
+	Purgable,
+	_4GB_Chunk,
+	Random_Addr,
+	No_Cache,
+	Resilient_Codesign,
+	Resilient_Media,
+	Permanent,
+
+	// NOTE(beau): log 2 of the bit we want in the bit set so we get that bit in
+	// the bit set
+
+	TPRO                = LOG2(0x1000),
+	Overwrite           = LOG2(0x4000),/* delete any existing mappings first */
+
+	Superpage_Size_Any  = LOG2(0x10000),
+	Superpage_Size_2MB  = LOG2(0x20000),
+	__Superpage3        = LOG2(0x40000),
+
+	Return_Data_Addr    = LOG2(0x100000),
+	Return_4K_Data_Addr = LOG2(0x800000),
+
+	Alias_Mask1         = 24,
+	Alias_Mask2,
+	Alias_Mask3,
+	Alias_Mask4,
+	Alias_Mask5,
+	Alias_Mask6,
+	Alias_Mask7,
+	Alias_Mask8,
+}
+
+VM_Flags :: distinct bit_set[VM_Flag; c.int]
+VM_FLAGS_FIXED :: VM_Flags{}
+
+/*
+ * VM_FLAGS_SUPERPAGE_MASK
+ *	3 bits that specify whether large pages should be used instead of
+ *	base pages (!=0), as well as the requested page size.
+ */
+VM_FLAGS_SUPERPAGE_MASK :: VM_Flags {
+	.Superpage_Size_Any,
+	.Superpage_Size_2MB,
+	.__Superpage3,
+}
+
+// 0xFF000000
+VM_FLAGS_ALIAS_MASK :: VM_Flags {
+	.Alias_Mask1,
+	.Alias_Mask2,
+	.Alias_Mask3,
+	.Alias_Mask4,
+	.Alias_Mask5,
+	.Alias_Mask6,
+	.Alias_Mask7,
+	.Alias_Mask8,
+}
+
+VM_GET_FLAGS_ALIAS :: proc(flags: VM_Flags) -> c.int {
+	return transmute(c.int)(flags & VM_FLAGS_ALIAS_MASK) >> 24
+}
+// NOTE(beau): no need for VM_SET_FLAGS_ALIAS, just mask in things from
+// VM_Flag.Alias_Mask*
+
+VM_FLAG_HW  :: VM_Flag.TPRO
+VM_FLAGS_HW :: VM_Flags{VM_FLAG_HW}
+
+/* These are the flags that we accept from user-space */
+VM_FLAGS_USER_ALLOCATE :: VM_Flags {
+	 .Anywhere,
+	 .Purgable,
+	 ._4GB_Chunk,
+	 .Random_Addr,
+	 .No_Cache,
+	 .Permanent,
+	 .Overwrite,
+} | VM_FLAGS_FIXED | VM_FLAGS_SUPERPAGE_MASK | VM_FLAGS_ALIAS_MASK | VM_FLAGS_HW
+
+VM_FLAGS_USER_MAP :: VM_Flags {
+	.Return_4K_Data_Addr,
+	.Return_Data_Addr,
+} | VM_FLAGS_USER_ALLOCATE
+
+VM_FLAGS_USER_REMAP :: VM_Flags {
+	.Anywhere,
+	.Random_Addr,
+	.Overwrite,
+	.Return_Data_Addr,
+	.Resilient_Codesign,
+	.Resilient_Media,
+} | VM_FLAGS_FIXED
+
+VM_FLAGS_SUPERPAGE_NONE :: VM_Flags{} /* no superpages, if all bits are 0 */
 
 /*
  *	Protection values, defined as bits within the vm_prot_t type
