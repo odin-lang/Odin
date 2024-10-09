@@ -39,7 +39,7 @@ foreign mach {
 	semaphore_signal :: proc(semaphore: semaphore_t) -> Kern_Return ---
 	semaphore_signal_all :: proc(semaphore: semaphore_t) -> Kern_Return ---
 	semaphore_signal_thread :: proc(semaphore: semaphore_t, thread: thread_t) -> Kern_Return ---
-	
+
 	semaphore_wait :: proc(semaphore: semaphore_t) -> Kern_Return ---
 
 	vm_allocate :: proc (target_task : vm_map_t, address: ^vm_address_t, size: vm_size_t, flags: VM_Flags) -> Kern_Return ---
@@ -488,9 +488,9 @@ VM_FLAGS_SUPERPAGE_NONE :: VM_Flags{} /* no superpages, if all bits are 0 */
  */
 
 VM_Prot :: enum vm_prot_t {
-    Read,
-    Write,
-    Execute,
+	Read,
+	Write,
+	Execute,
 }
 
 VM_Prot_Flags :: distinct bit_set[VM_Prot; vm_prot_t]
@@ -504,10 +504,10 @@ VM_PROT_ALL     :: VM_Prot_Flags{.Read, .Write, .Execute}
  */
 
 VM_Inherit :: enum vm_inherit_t {
-    Share,
-    Copy,
-    None,
-    Donate_Copy,
+	Share,
+	Copy,
+	None,
+	Donate_Copy,
 }
 
 VM_INHERIT_DEFAULT    :: VM_Inherit.Copy
