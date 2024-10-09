@@ -853,7 +853,7 @@ implicit_context_system :: proc() {
 	what_a_fool_believes :: proc() {
 		c := context // this `context` is the same as the parent procedure that it was called from
 		// From this example, context.user_index == 123
-		// An context.allocator is assigned to the return value of `my_custom_allocator()`
+		// A context.allocator is assigned to the return value of `my_custom_allocator()`
 		assert(context.user_index == 123)
 
 		// The memory management procedure use the `context.allocator` by
