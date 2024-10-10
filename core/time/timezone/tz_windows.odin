@@ -214,7 +214,7 @@ generate_rrule_from_tzi :: proc(tzi: ^REG_TZI_FORMAT, abbrevs: TZ_Abbrev, alloca
 		std_name = std_name,
 		std_offset = -(i64(tzi.bias) + i64(tzi.std_bias)) * 60,
 		dst_date = datetime.TZ_Transition_Date{
-			type = .MonthWeekDay,
+			type = .Month_Week_Day,
 			month = u8(tzi.std_date.month),
 			week = u8(tzi.std_date.day),
 			day = tzi.std_date.day_of_week,
@@ -224,7 +224,7 @@ generate_rrule_from_tzi :: proc(tzi: ^REG_TZI_FORMAT, abbrevs: TZ_Abbrev, alloca
 		dst_name = dst_name,
 		dst_offset = -(i64(tzi.bias) + i64(tzi.dst_bias)) * 60,
 		std_date = datetime.TZ_Transition_Date{
-			type = .MonthWeekDay,
+			type = .Month_Week_Day,
 			month = u8(tzi.dst_date.month),
 			week = u8(tzi.dst_date.day),
 			day = tzi.dst_date.day_of_week,
