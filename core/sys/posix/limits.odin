@@ -454,6 +454,101 @@ when ODIN_OS == .Darwin {
 	NL_TEXTMAX :: 255
 	NZERO      :: 20
 
+} else when ODIN_OS == .Linux {
+
+	// A definition of one of the symbolic constants in the following list shall be omitted from
+	// <limits.h> on specific implementations where the corresponding value is equal to or greater
+	// than the stated minimum, but is unspecified.
+	//
+	// This indetermination might depend on the amount of available memory space on a specific
+	// instance of a specific implementation. The actual value supported by a specific instance shall
+	// be provided by the sysconf() function.
+
+	// AIO_LISTIO_MAX             :: sysconf(._AIO_LISTIO_MAX)
+	// AIO_MAX                    :: sysconf(._AIO_MAX)
+	// AIO_PRIO_DELTA_MAX         :: sysconf(._AIO_PRIO_DELTA_MAX)
+	ARG_MAX                       :: 131_072
+	// ATEXIT_MAX                 :: sysconf(._ATEXIT_MAX)
+	// CHILD_MAX                  :: sysconf(._POSIX_ARG_MAX)
+	// DELAYTIMER_MAX             :: sysconf(._DELAYTIMER_MAX)
+	// HOST_NAME_MAX              :: sysconf(._HOST_NAME_MAX)
+	// IOV_MAX                    :: sysconf(._XOPEN_IOV_MAX)
+	// LOGIN_NAME_MAX             :: sysconf(._LOGIN_NAME_MAX)
+	// MQ_OPEN_MAX                :: sysconf(._MQ_OPEN_MAX)
+	// MQ_PRIO_MAX                :: sysconf(._MQ_PRIO_MAX)
+	// PAGESIZE                   :: PAGE_SIZE
+	// PAGE_SIZE                  :: sysconf(._PAGE_SIZE)
+	PTHREAD_DESTRUCTOR_ITERATIONS :: 4
+	// PTHREAD_KEYS_MAX           :: sysconf(._PTHREAD_KEYS_MAX)
+	// PTHREAD_STACK_MIN          :: sysconf(._PTHREAD_STACK_MIN)
+	// RTSIG_MAX                  :: sysconf(._RTSIG_MAX)
+	// SEM_NSEMS_MAX              :: sysconf(._SEM_NSEMS_MAX)
+	// SEM_VALUE_MAX              :: sysconf(._SEM_VALUE_MAX)
+	// SIGQUEUE_MAX               :: sysconf(._SIGQUEUE_MAX)
+	// SS_REPL_MAX                :: sysconf(._SS_REPL_MAX)
+	// STREAM_MAX                 :: sysconf(._STREAM_MAX)
+	// SYMLOOP_MAX                :: sysconf(._SYSLOOP_MAX)
+	// TIMER_MAX                  :: sysconf(._TIMER_MAX)
+	// TRACE_EVENT_NAME_MAX       :: sysconf(._TRACE_EVENT_NAME_MAX)
+	// TRACE_NAME_MAX             :: sysconf(._TRACE_NAME_MAX)
+	// TRACE_SYS_MAX              :: sysconf(._TRACE_SYS_MAX)
+	// TRACE_USER_EVENT_MAX       :: sysconf(._TRACE_USER_EVENT_MAX)
+	// TTY_NAME_MAX               :: sysconf(._TTY_NAME_MAX)
+	// TZNAME_MAX                 :: sysconf(._TZNAME_MAX)
+
+	// The values in the following list may be constants within an implementation or may vary from
+	// one pathname to another.
+	// For example, file systems or directories may have different characteristics.
+	//
+	// A definition of one of the symbolic constants in the following list shall be omitted from the 
+	// <limits.h> header on specific implementations where the corresponding value is equal to or
+	// greater than the stated minimum, but where the value can vary depending on the file to which
+	// it is applied.
+	// The actual value supported for a specific pathname shall be provided by the pathconf() function.
+
+	// FILESIZEBITS             :: pathconf(".", ._FILESIZEBITS)
+	LINK_MAX                    :: 127
+	MAX_CANON                   :: 255
+	MAX_INPUT                   :: 255
+	NAME_MAX                    :: 255
+	PATH_MAX                    :: 4096
+	PIPE_BUF                    :: 4096
+	// POSIX_ALLOC_SIZE_MIN     :: sysconf(._POSIX_ALLOC_SIZE_MIN)
+	// POSIX_REC_INCR_XFER_SIZE :: sysconf(._POSIX_REC_INCR_XFER_SIZE)
+	// POSIX_REC_MAX_XFER_SIZE  :: sysconf(._POSIX_REC_MAX_XFER_SIZE)
+	// POSIX_REC_MIN_XFER_SIZE  :: sysconf(._POSIX_REC_MIN_XFER_SIZE)
+	// POSIX_REC_XFER_ALIGN     :: sysconf(._POSIX_REC_XFER_ALIGN)
+	// SYMLINK_MAX              :: pathconf(".", ._SYMLINK_MAX)
+
+
+	// The magnitude limitations in the following list shall be fixed by specific implementations.
+	// An application should assume that the value of the symbolic constant defined by <limits.h>
+	// in a specific implementation is the minimum that pertains whenever the application is run
+	// under that implementation.
+	// A specific instance of a specific implementation may increase the value relative to that
+	// supplied by <limits.h> for that implementation.
+	// The actual value supported by a specific instance shall be provided by the sysconf() function.
+
+	BC_BASE_MAX         :: 99
+	BC_DIM_MAX          :: 2048
+	BC_SCALE_MAX        :: 99
+	BC_STRING_MAX       :: 1000
+	CHARCLASS_NAME_MAX  :: 14
+	COLL_WEIGHTS_MAX    :: 2
+	EXPR_NEST_MAX       :: 32
+	// LINE_MAX         :: sysconf(._LINE_MAX)
+	// NGROUPS_MAX      :: sysconf(._NGROUPS_MAX)
+	RE_DUP_MAX          :: 255
+
+	// Other limits.
+
+	NL_ARGMAX  :: 9
+	NL_LANGMAX :: 32 // 14 on glibc, 32 on musl
+	NL_MSGMAX  :: 32_767
+	NL_SETMAX  :: 255
+	NL_TEXTMAX :: 2048 // 255 on glibc, 2048 on musl
+	NZERO      :: 20
+
 } else {
 	#panic("posix is unimplemented for the current target")
 }

@@ -321,16 +321,23 @@ when ODIN_OS == .NetBSD {
 	@(private) LSOCKET :: "socket"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	socklen_t :: distinct c.uint
 
 	_sa_family_t :: distinct c.uint8_t
 
-	sockaddr :: struct {
-		sa_len:    c.uint8_t,   /* total length */
-		sa_family: sa_family_t, /* [PSX] address family */
-		sa_data:   [14]c.char,  /* [PSX] socket address */
+	when ODIN_OS == .Linux {
+		sockaddr :: struct {
+			sa_family: sa_family_t, /* [PSX] address family */
+			sa_data:   [14]c.char,  /* [PSX] socket address */
+		}
+	} else {
+		sockaddr :: struct {
+			sa_len:    c.uint8_t,   /* total length */
+			sa_family: sa_family_t, /* [PSX] address family */
+			sa_data:   [14]c.char,  /* [PSX] socket address */
+		}
 	}
 
 
@@ -339,6 +346,11 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		_SS_PAD1SIZE :: 6
 		@(private)
 		_SS_PAD2SIZE :: 240
+	} else when ODIN_OS == .Linux {
+		@(private)
+		_SS_SIZE :: 128
+		@(private)
+		_SS_PADSIZE :: _SS_SIZE - size_of(c.uint16_t) - size_of(c.uint64_t)
 	} else {
 		@(private)
 		_SS_MAXSIZE   :: 128
@@ -350,28 +362,52 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		_SS_PAD2SIZE  :: _SS_MAXSIZE - size_of(c.uint8_t) - size_of(sa_family_t) - _SS_PAD1SIZE - _SS_ALIGNSIZE
 	}
 
-	sockaddr_storage :: struct {
-		ss_len:     c.uint8_t,            /* address length */
-		ss_family:  sa_family_t,          /* [PSX] address family */
-		__ss_pad1:  [_SS_PAD1SIZE]c.char,
-		__ss_align: c.int64_t,            /* force structure storage alignment */
-		__ss_pad2:  [_SS_PAD2SIZE]c.char,
-	}
+	when ODIN_OS == .Linux {
+		sockaddr_storage :: struct {
+			ss_family:    sa_family_t,          /* [PSX] address family */
+			__ss_padding: [_SS_PADSIZE]c.char,
+			__ss_align:   c.uint64_t,           /* force structure storage alignment */
+		}
 
-	msghdr :: struct {
-		msg_name:       rawptr,    /* [PSX] optional address */
-		msg_namelen:    socklen_t, /* [PSX] size of address */
-		msg_iov:        [^]iovec,  /* [PSX] scatter/gather array */
-		msg_iovlen:     c.int,     /* [PSX] members in msg_iov */
-		msg_control:    rawptr,    /* [PSX] ancillary data */
-		msg_controllen: socklen_t, /* [PSX] ancillary data buffer length */
-		msg_flags:      Msg_Flags, /* [PSX] flags on received message */
-	}
+		msghdr :: struct {
+			msg_name:       rawptr,    /* [PSX] optional address */
+			msg_namelen:    socklen_t, /* [PSX] size of address */
+			msg_iov:        [^]iovec,  /* [PSX] scatter/gather array */
+			msg_iovlen:     c.size_t,  /* [PSX] members in msg_iov */
+			msg_control:    rawptr,    /* [PSX] ancillary data */
+			msg_controllen: c.size_t,  /* [PSX] ancillary data buffer length */
+			msg_flags:      Msg_Flags, /* [PSX] flags on received message */
+		}
 
-	cmsghdr :: struct {
-		cmsg_len:   socklen_t, /* [PSX] data byte count, including cmsghdr */
-		cmsg_level: c.int,     /* [PSX] originating protocol */
-		cmsg_type:  c.int,     /* [PSX] protocol-specific type */
+		cmsghdr :: struct {
+			cmsg_len:   c.size_t, /* [PSX] data byte count, including cmsghdr */
+			cmsg_level: c.int,     /* [PSX] originating protocol */
+			cmsg_type:  c.int,     /* [PSX] protocol-specific type */
+		}
+	} else {
+		sockaddr_storage :: struct {
+			ss_len:     c.uint8_t,            /* address length */
+			ss_family:  sa_family_t,          /* [PSX] address family */
+			__ss_pad1:  [_SS_PAD1SIZE]c.char,
+			__ss_align: c.int64_t,            /* force structure storage alignment */
+			__ss_pad2:  [_SS_PAD2SIZE]c.char,
+		}
+
+		msghdr :: struct {
+			msg_name:       rawptr,    /* [PSX] optional address */
+			msg_namelen:    socklen_t, /* [PSX] size of address */
+			msg_iov:        [^]iovec,  /* [PSX] scatter/gather array */
+			msg_iovlen:     c.int,     /* [PSX] members in msg_iov */
+			msg_control:    rawptr,    /* [PSX] ancillary data */
+			msg_controllen: socklen_t, /* [PSX] ancillary data buffer length */
+			msg_flags:      Msg_Flags, /* [PSX] flags on received message */
+		}
+
+		cmsghdr :: struct {
+			cmsg_len:   socklen_t, /* [PSX] data byte count, including cmsghdr */
+			cmsg_level: c.int,     /* [PSX] originating protocol */
+			cmsg_type:  c.int,     /* [PSX] protocol-specific type */
+		}
 	}
 
 	SCM_RIGHTS :: 0x01
@@ -421,57 +457,90 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	SOCK_STREAM    :: 1
 
 	// Options to be accessed at socket level, not protocol level.
-	SOL_SOCKET :: 0xffff
+	when ODIN_OS == .Linux {
+		SOL_SOCKET :: 1
 
-	SO_ACCEPTCONN :: 0x0002
-	SO_BROADCAST  :: 0x0020
-	SO_DEBUG      :: 0x0001
-	SO_DONTROUTE  :: 0x0010
-	SO_ERROR      :: 0x1007
-	SO_KEEPALIVE  :: 0x0008
-	SO_OOBINLINE  :: 0x0100
-	SO_RCVBUF     :: 0x1002
-	SO_RCVLOWAT   :: 0x1004
-	SO_REUSEADDR  :: 0x0004
-	SO_SNDBUF     :: 0x1001
-	SO_SNDLOWAT   :: 0x1003
-	SO_TYPE       :: 0x1008
+		SO_ACCEPTCONN :: 30
+		SO_BROADCAST  :: 6
+		SO_DEBUG      :: 1
+		SO_DONTROUTE  :: 5
+		SO_ERROR      :: 4
+		SO_KEEPALIVE  :: 9
+		SO_OOBINLINE  :: 10
+		SO_RCVBUF     :: 8
+		SO_RCVLOWAT   :: 18
+		SO_REUSEADDR  :: 2
+		SO_SNDBUF     :: 7
+		SO_SNDLOWAT   :: 19
+		SO_TYPE       :: 3
+		SO_LINGER     :: 13
 
-	when ODIN_OS == .Darwin {
-		SO_LINGER   :: 0x1080
-		SO_RCVTIMEO :: 0x1006
-		SO_SNDTIMEO :: 0x1005
-	} else when ODIN_OS == .FreeBSD {
-		SO_LINGER   :: 0x0080
-		SO_RCVTIMEO :: 0x1006
-		SO_SNDTIMEO :: 0x1005
-	} else when ODIN_OS == .NetBSD {
-		SO_LINGER   :: 0x0080
-		SO_RCVTIMEO :: 0x100c
-		SO_SNDTIMEO :: 0x100b
-	} else when ODIN_OS == .OpenBSD {
-		SO_LINGER   :: 0x0080
-		SO_RCVTIMEO :: 0x1006
-		SO_SNDTIMEO :: 0x1005
+		SO_RCVTIMEO   :: 66
+		SO_SNDTIMEO   :: 67
+	} else {
+		SOL_SOCKET :: 0xffff
+
+		SO_ACCEPTCONN :: 0x0002
+		SO_BROADCAST  :: 0x0020
+		SO_DEBUG      :: 0x0001
+		SO_DONTROUTE  :: 0x0010
+		SO_ERROR      :: 0x1007
+		SO_KEEPALIVE  :: 0x0008
+		SO_OOBINLINE  :: 0x0100
+		SO_RCVBUF     :: 0x1002
+		SO_RCVLOWAT   :: 0x1004
+		SO_REUSEADDR  :: 0x0004
+		SO_SNDBUF     :: 0x1001
+		SO_SNDLOWAT   :: 0x1003
+		SO_TYPE       :: 0x1008
+
+		when ODIN_OS == .Darwin {
+			SO_LINGER   :: 0x1080
+			SO_RCVTIMEO :: 0x1006
+			SO_SNDTIMEO :: 0x1005
+		} else when ODIN_OS == .FreeBSD {
+			SO_LINGER   :: 0x0080
+			SO_RCVTIMEO :: 0x1006
+			SO_SNDTIMEO :: 0x1005
+		} else when ODIN_OS == .NetBSD {
+			SO_LINGER   :: 0x0080
+			SO_RCVTIMEO :: 0x100c
+			SO_SNDTIMEO :: 0x100b
+		} else when ODIN_OS == .OpenBSD {
+			SO_LINGER   :: 0x0080
+			SO_RCVTIMEO :: 0x1006
+			SO_SNDTIMEO :: 0x1005
+		}
 	}
 
 	// The maximum backlog queue length for listen().
 	SOMAXCONN :: 128
 
-	MSG_CTRUNC    :: 0x20
-	MSG_DONTROUTE :: 0x4
-	MSG_EOR       :: 0x8
-	MSG_OOB       :: 0x1
-	MSG_PEEK      :: 0x2
-	MSG_TRUNC     :: 0x10
-	MSG_WAITALL   :: 0x40
+	when ODIN_OS == .Linux {
+		MSG_CTRUNC    :: 0x008
+		MSG_DONTROUTE :: 0x004
+		MSG_EOR       :: 0x080
+		MSG_OOB       :: 0x001
+		MSG_PEEK      :: 0x002
+		MSG_TRUNC     :: 0x020
+		MSG_WAITALL   :: 0x100
+		MSG_NOSIGNAL  :: 0x4000
+	} else {
+		MSG_CTRUNC    :: 0x20
+		MSG_DONTROUTE :: 0x4
+		MSG_EOR       :: 0x8
+		MSG_OOB       :: 0x1
+		MSG_PEEK      :: 0x2
+		MSG_TRUNC     :: 0x10
+		MSG_WAITALL   :: 0x40
 
-	when ODIN_OS == .Darwin {
-		MSG_NOSIGNAL :: 0x80000
-	} else when ODIN_OS == .FreeBSD {
-		MSG_NOSIGNAL :: 0x00020000
-	} else when ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
-		MSG_NOSIGNAL :: 0x0400
+		when ODIN_OS == .Darwin {
+			MSG_NOSIGNAL :: 0x80000
+		} else when ODIN_OS == .FreeBSD {
+			MSG_NOSIGNAL :: 0x00020000
+		} else when ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+			MSG_NOSIGNAL :: 0x0400
+		}
 	}
 
 	AF_INET   :: 2
@@ -483,6 +552,8 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		AF_INET6 :: 28
 	} else when ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 		AF_INET6 :: 24
+	} else when ODIN_OS == .Linux {
+		AF_INET6 :: 10
 	}
 
 	SHUT_RD   :: 0

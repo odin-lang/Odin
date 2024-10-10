@@ -37,10 +37,15 @@ foreign lib {
 	uname :: proc(uname: ^utsname) -> c.int ---
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
-	@(private)
-	_SYS_NAMELEN :: 256
+	when ODIN_OS == .Linux {
+		@(private)
+		_SYS_NAMELEN :: 65
+	} else {
+		@(private)
+		_SYS_NAMELEN :: 256
+	}
 
 	utsname :: struct {
 		sysname:  [_SYS_NAMELEN]c.char `fmt:"s,0"`, /* [PSX] name of OS */

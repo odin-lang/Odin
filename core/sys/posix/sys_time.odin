@@ -66,7 +66,7 @@ when ODIN_OS == .NetBSD {
 	@(private) LUTIMES       :: "utimes"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	itimerval :: struct {
 		it_interval: timeval, /* [PSX] timer interval */

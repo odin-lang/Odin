@@ -55,7 +55,7 @@ when ODIN_OS == .NetBSD {
 	LSELECT  :: "select"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	suseconds_t :: distinct (c.int32_t when ODIN_OS == .Darwin || ODIN_OS == .NetBSD else c.long)
 

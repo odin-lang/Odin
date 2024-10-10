@@ -92,9 +92,6 @@ Lock_Type :: enum c.short {
 	WRLCK = F_WRLCK,
 }
 
-// Assertions made to unify this bit set.
-#assert(O_RDONLY == 0)
-
 O_Flag_Bits :: enum c.int {
 	// Sets FD_CLOEXEC on the file descriptor.
 	CLOEXEC   = log2(O_CLOEXEC),
@@ -107,11 +104,11 @@ O_Flag_Bits :: enum c.int {
 	// If terminal device, do not make it the controlling terminal for the process.
 	NOCTTY    = log2(O_NOCTTY),
 	// Don't follow symbolic links, fail with errno ELOOP.
-	NOFOLLOW  = log2(O_NOFOLOW),
+	NOFOLLOW  = log2(O_NOFOLLOW),
 	// If exists and regular, truncate the length to 0.
 	TRUNC     = log2(O_TRUNC),
 
- 	// NOTE: use with `posix.O_TTY_INIT + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+	// NOTE: use with `posix.O_TTY_INIT + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
 	// this bit set enum because it is 0 on some platforms and a value on others.
 	// TTY_INIT = O_TTY_INIT,
 
@@ -123,7 +120,8 @@ O_Flag_Bits :: enum c.int {
 	NONBLOCK  = log2(O_NONBLOCK),
 	// Write I/O shall complete as defined by synchronized I/O file integrity completion.
 	SYNC      = log2(O_SYNC),
- 	// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
+
+	// NOTE: use with `posix.O_RSYNC + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
 	// this bit set enum because it is 0 on some platforms and a value on others.
 	// RSYNC = O_RSYNC,
 
@@ -135,11 +133,10 @@ O_Flag_Bits :: enum c.int {
 	WRONLY    = log2(O_WRONLY),
 	// Reading only.
 	// RDONLY = 0, // Default
-
 }
+
 O_Flags :: bit_set[O_Flag_Bits; c.int]
 
-// A mask of all the access mode bits.
 O_ACCMODE :: O_Flags{ .EXEC, .RDWR, .WRONLY }
 
 AT_Flag_Bits :: enum c.int {
@@ -152,8 +149,8 @@ AT_Flags :: bit_set[AT_Flag_Bits; c.int]
 
 when ODIN_OS == .Darwin {
 
-	off_t  :: distinct c.int64_t
-	pid_t  :: distinct c.int32_t
+	off_t :: distinct c.int64_t
+	pid_t :: distinct c.int32_t
 
 	F_DUPFD         :: 0
 	F_DUPFD_CLOEXEC :: 67
@@ -178,7 +175,7 @@ when ODIN_OS == .Darwin {
 	O_DIRECTORY :: 0x00100000
 	O_EXCL      :: 0x00000800
 	O_NOCTTY    :: 0x00020000
-	O_NOFOLOW   :: 0x00000100
+	O_NOFOLLOW  :: 0x00000100
 	O_TRUNC     :: 0x00000400
 
 	_O_TTY_INIT :: 0
@@ -189,16 +186,16 @@ when ODIN_OS == .Darwin {
 	O_NONBLOCK :: 0x00000004
 	O_SYNC     :: 0x0080
 
-	_O_RSYNC   :: 0
-	O_RSYNC    :: O_Flags{}
+	_O_RSYNC :: 0
+	O_RSYNC  :: O_Flags{}
 
-	O_EXEC    :: 0x40000000
-	O_RDONLY  :: 0
-	O_RDWR    :: 0x0002
-	O_WRONLY  :: 0x0001
+	O_EXEC   :: 0x40000000
+	O_RDONLY :: 0
+	O_RDWR   :: 0x0002
+	O_WRONLY :: 0x0001
 
 	_O_SEARCH :: O_EXEC | O_DIRECTORY
-	O_SEARCH  :: O_Flags{ .EXEC, .DIRECTORY }
+	O_SEARCH  :: O_Flags{.EXEC, .DIRECTORY}
 
 	AT_FDCWD: FD: -2
 
@@ -217,8 +214,8 @@ when ODIN_OS == .Darwin {
 
 } else when ODIN_OS == .FreeBSD {
 
-	off_t  :: distinct c.int64_t
-	pid_t  :: distinct c.int32_t
+	off_t :: distinct c.int64_t
+	pid_t :: distinct c.int32_t
 
 	F_DUPFD         :: 0
 	F_DUPFD_CLOEXEC :: 17
@@ -243,7 +240,7 @@ when ODIN_OS == .Darwin {
 	O_DIRECTORY :: 0x00020000
 	O_EXCL      :: 0x0800
 	O_NOCTTY    :: 0x8000
-	O_NOFOLOW   :: 0x0100
+	O_NOFOLLOW  :: 0x0100
 	O_TRUNC     :: 0x0400
 
 	_O_TTY_INIT :: 0x00080000
@@ -256,10 +253,10 @@ when ODIN_OS == .Darwin {
 	_O_RSYNC   :: 0
 	O_RSYNC    :: O_Flags{} // NOTE: not defined in headers
 
-	O_EXEC    :: 0x00040000
-	O_RDONLY  :: 0
-	O_RDWR    :: 0x0002
-	O_WRONLY  :: 0x0001
+	O_EXEC   :: 0x00040000
+	O_RDONLY :: 0
+	O_RDWR   :: 0x0002
+	O_WRONLY :: 0x0001
 
 	_O_SEARCH :: O_EXEC
 	O_SEARCH  :: O_Flags{ .EXEC }
@@ -282,8 +279,8 @@ when ODIN_OS == .Darwin {
 
 } else when ODIN_OS == .NetBSD {
 
-	off_t  :: distinct c.int64_t
-	pid_t  :: distinct c.int32_t
+	off_t :: distinct c.int64_t
+	pid_t :: distinct c.int32_t
 
 	F_DUPFD         :: 0
 	F_DUPFD_CLOEXEC :: 12
@@ -308,7 +305,7 @@ when ODIN_OS == .Darwin {
 	O_DIRECTORY :: 0x0020000
 	O_EXCL      :: 0x0800
 	O_NOCTTY    :: 0x8000
-	O_NOFOLOW   :: 0x0100
+	O_NOFOLLOW  :: 0x0100
 	O_TRUNC     :: 0x0400
 
 	_O_TTY_INIT :: 0
@@ -319,14 +316,14 @@ when ODIN_OS == .Darwin {
 	O_NONBLOCK :: 0x0004
 	O_SYNC     :: 0x0080
 
-	_O_RSYNC   :: 0x0002
-	O_RSYNC    :: O_Flags{O_Flag_Bits(log2(_O_RSYNC))}
+	_O_RSYNC :: 0x0002
+	O_RSYNC  :: O_Flags{O_Flag_Bits(log2(_O_RSYNC))}
 
 
-	O_EXEC    :: 0x04000000
-	O_RDONLY  :: 0
-	O_RDWR    :: 0x0002
-	O_WRONLY  :: 0x0001
+	O_EXEC   :: 0x04000000
+	O_RDONLY :: 0
+	O_RDWR   :: 0x0002
+	O_WRONLY :: 0x0001
 
 	_O_SEARCH :: 0x00800000
 	O_SEARCH  :: O_Flags{O_Flag_Bits(log2(_O_SEARCH))}
@@ -347,8 +344,8 @@ when ODIN_OS == .Darwin {
 	}
 } else when ODIN_OS == .OpenBSD {
 
-	off_t  :: distinct c.int64_t
-	pid_t  :: distinct c.int32_t
+	off_t :: distinct c.int64_t
+	pid_t :: distinct c.int32_t
 
 	F_DUPFD         :: 0
 	F_DUPFD_CLOEXEC :: 10
@@ -373,7 +370,7 @@ when ODIN_OS == .Darwin {
 	O_DIRECTORY :: 0x20000
 	O_EXCL      :: 0x0800
 	O_NOCTTY    :: 0x8000
-	O_NOFOLOW   :: 0x0100
+	O_NOFOLLOW  :: 0x0100
 	O_TRUNC     :: 0x0400
 
 	_O_TTY_INIT :: 0
@@ -384,13 +381,13 @@ when ODIN_OS == .Darwin {
 	O_NONBLOCK :: 0x0004
 	O_SYNC     :: 0x0080
 
-	_O_RSYNC   :: O_SYNC
-	O_RSYNC    :: O_Flags{ .SYNC }
+	_O_RSYNC :: O_SYNC
+	O_RSYNC  :: O_Flags{.SYNC}
 
-	O_EXEC    :: 0x04000000 // NOTE: not defined in the headers
-	O_RDONLY  :: 0
-	O_RDWR    :: 0x0002
-	O_WRONLY  :: 0x0001
+	O_EXEC   :: 0x04000000 // NOTE: not defined in the headers
+	O_RDONLY :: 0
+	O_RDWR   :: 0x0002
+	O_WRONLY :: 0x0001
 
 	_O_SEARCH :: 0
 	O_SEARCH  :: O_Flags{} // NOTE: not defined in the headers
@@ -408,6 +405,72 @@ when ODIN_OS == .Darwin {
 		l_pid:    pid_t,     /* [PSX] process ID of the process holding the lock */
 		l_type:   Lock_Type, /* [PSX] type of lock */
 		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset */
+	}
+
+} else when ODIN_OS == .Linux {
+
+	off_t :: distinct c.int64_t
+	pid_t :: distinct c.int
+
+	F_DUPFD  :: 0
+	F_GETFD  :: 1
+	F_SETFD  :: 2
+	F_GETFL  :: 3
+	F_SETFL  :: 4
+	F_GETLK  :: 5
+	F_SETLK  :: 6
+	F_SETLKW :: 7
+	F_SETOWN :: 8
+	F_GETOWN :: 9
+	F_RDLCK  :: 0
+	F_UNLCK  :: 2
+	F_WRLCK  :: 1
+
+	F_DUPFD_CLOEXEC :: 1030
+
+	FD_CLOEXEC :: 1
+
+	O_CREAT     :: 0o0_000_100
+	O_EXCL      :: 0o0_000_200
+	O_NOCTTY    :: 0o0_000_400
+	O_TRUNC     :: 0o0_001_000
+	O_DIRECTORY :: 0o0_200_000
+	O_NOFOLLOW  :: 0o0_400_000
+	O_CLOEXEC   :: 0o2_000_000
+
+	_O_TTY_INIT :: 0
+	O_TTY_INIT  :: O_Flags{}
+
+	O_APPEND   :: 0o0_002_000
+	O_NONBLOCK :: 0o0_004_000
+	O_DSYNC    :: 0o0_010_000
+	O_SYNC     :: 0o4_010_000
+
+	_O_RSYNC :: 0
+	O_RSYNC  :: O_Flags{}
+
+	O_EXEC   :: 0x04000000 // NOTE: not defined in the headers
+
+	O_RDONLY :: 0
+	O_WRONLY :: 0o1
+	O_RDWR   :: 0o2
+
+	_O_SEARCH :: 0
+	O_SEARCH  :: O_Flags{}
+
+	AT_FDCWD: FD: -100
+
+	AT_EACCESS          :: 0x200
+	AT_SYMLINK_NOFOLLOW :: 0x100
+	AT_SYMLINK_FOLLOW   :: 0x400
+	AT_REMOVEDIR        :: 0x200
+
+	flock :: struct {
+		l_start:  off_t,     /* [PSX] relative offset in bytes. */
+		l_len:    off_t,     /* [PSX] size; if 0 then until EOF. */
+		l_pid:    pid_t,     /* [PSX] process ID of the process holding the lock. */
+		l_type:   Lock_Type, /* [PSX] type of lock. */
+		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset. */
 	}
 
 } else {

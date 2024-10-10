@@ -513,6 +513,50 @@ when ODIN_OS == .Darwin {
 		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
 	}
 
+} else when ODIN_OS == .Linux {
+
+	PTHREAD_CANCEL_DEFERRED     :: 0
+	PTHREAD_CANCEL_ASYNCHRONOUS :: 1
+
+	PTHREAD_CANCEL_ENABLE       :: 0
+	PTHREAD_CANCEL_DISABLE      :: 1
+
+	PTHREAD_CANCELED :: rawptr(~uintptr(0))
+
+	PTHREAD_CREATE_JOINABLE :: 0
+	PTHREAD_CREATE_DETACHED :: 1
+
+	PTHREAD_INHERIT_SCHED  :: 0
+	PTHREAD_EXPLICIT_SCHED :: 1
+
+	PTHREAD_PRIO_NONE    :: 0
+	PTHREAD_PRIO_INHERIT :: 1
+	PTHREAD_PRIO_PROTECT :: 2
+
+	PTHREAD_PROCESS_PRIVATE :: 0
+	PTHREAD_PROCESS_SHARED  :: 1
+
+	PTHREAD_SCOPE_SYSTEM    :: 0
+	PTHREAD_SCOPE_PROCESS   :: 1
+
+	pthread_t :: distinct c.ulong
+
+	pthread_attr_t :: struct #raw_union {
+		__size: [56]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+		__align: c.long,
+	}
+
+	pthread_key_t :: distinct c.uint
+
+	sched_param :: struct {
+		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
+
+		// NOTE: may be smaller depending on libc or arch, but never larger.
+		__reserved1: c.int,
+		__reserved2: [4]c.long,
+		__reserved3: c.int,
+	}
+
 } else {
 	#panic("posix is unimplemented for the current target")
 }

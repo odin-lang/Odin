@@ -31,7 +31,7 @@ Ulimit_Cmd :: enum c.int {
 	SETFSIZE = UL_SETFSIZE,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD  || ODIN_OS == .Linux {
 
 	UL_GETFSIZE :: 1
 	UL_SETFSIZE :: 2

@@ -94,7 +94,7 @@ when ODIN_OS == .Darwin {
 	SCHED_RR       :: 3
 	SCHED_OTHER    :: 2
 
-} else when ODIN_OS == .NetBSD {
+} else when ODIN_OS == .NetBSD || ODIN_OS == .Linux {
 
 	SCHED_OTHER    :: 0
 	SCHED_FIFO     :: 1

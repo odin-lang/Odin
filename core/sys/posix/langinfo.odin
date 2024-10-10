@@ -238,7 +238,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	ABDAY_4 :: 16
 	ABDAY_5 :: 17
 	ABDAY_6 :: 18
-	ABDAY_7 :: 19
+	ABDAY_7 :: 19	
 
 	MON_1  :: 20
 	MON_2  :: 21
@@ -278,7 +278,91 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	YESEXPR :: 47
 	NOEXPR  :: 49
 
-	CRNCYSTR :: 50
+	CRNCYSTR :: 50	
+
+} else when ODIN_OS == .Linux {
+
+	// NOTE: declared with `_t` so we can enumerate the real `nl_info`.
+	nl_item_t :: distinct c.int
+
+	// NOTE: All these values are set in an enum on the Linux implementation.
+	// Some depend on locale.h contants (bits/locale.h to be precise).
+
+	// NOTE: ABDAY_1 is set to LC_TIME << 16 (LC_TIME is 2) on the enum group of
+	// the Linux implementation.
+	ABDAY_1 :: 0x20_000
+	ABDAY_2 :: 0x20_001
+	ABDAY_3 :: 0x20_002
+	ABDAY_4 :: 0x20_003
+	ABDAY_5 :: 0x20_004
+	ABDAY_6 :: 0x20_005
+	ABDAY_7 :: 0x20_006
+
+	DAY_1 :: 0x20_007
+	DAY_2 :: 0x20_008
+	DAY_3 :: 0x20_009
+	DAY_4 :: 0x20_00A
+	DAY_5 :: 0x20_00B
+	DAY_6 :: 0x20_00C
+	DAY_7 :: 0x20_00D
+
+	ABMON_1  :: 0x20_00E
+	ABMON_2  :: 0x20_010
+	ABMON_3  :: 0x20_011
+	ABMON_4  :: 0x20_012
+	ABMON_5  :: 0x20_013
+	ABMON_6  :: 0x20_014
+	ABMON_7  :: 0x20_015
+	ABMON_8  :: 0x20_016
+	ABMON_9  :: 0x20_017
+	ABMON_10 :: 0x20_018
+	ABMON_11 :: 0x20_019
+	ABMON_12 :: 0x20_01A
+
+	MON_1  :: 0x20_01B
+	MON_2  :: 0x20_01C
+	MON_3  :: 0x20_01D
+	MON_4  :: 0x20_01E
+	MON_5  :: 0x20_020
+	MON_6  :: 0x20_021
+	MON_7  :: 0x20_022
+	MON_8  :: 0x20_023
+	MON_9  :: 0x20_024
+	MON_10 :: 0x20_025
+	MON_11 :: 0x20_026
+	MON_12 :: 0x20_027
+
+	AM_STR :: 0x20_028
+	PM_STR :: 0x20_029
+
+	D_T_FMT    :: 0x20_02A
+	D_FMT      :: 0x20_02B
+	T_FMT      :: 0x20_02C
+	T_FMT_AMPM :: 0x20_02D
+
+	ERA         :: 0x20_02E
+	ERA_D_FMT   :: 0x20_030
+	ALT_DIGITS  :: 0x20_031
+	ERA_D_T_FMT :: 0x20_032
+	ERA_T_FMT   :: 0x20_033
+
+	// NOTE: CODESET is the 16th member of the enum group starting with value
+	// LC_CTYPE << 16, LC_CTYPE is 0.
+	CODESET :: 0x0F
+
+	// NOTE: CRNCYSTR is the 16th member of the enum group starting with value
+	// LC_MONETARY << 16, LC_MONETARY is 4.
+	CRNCYSTR :: 0x40_00F
+
+	// NOTE: RADIXCHAR is the 1st member of the enum group starting with value
+	// LC_NUMERIC << 16, LC_NUMERIC is 1.
+	RADIXCHAR :: 0x10_000
+	THOUSEP   :: 0x10_001
+
+	// NOTE: YESEXPR is the 1st member of the enum group starting with value
+	// LC_MESSAGES << 16, LC_MESSAGES is 5.
+	YESEXPR :: 0x50_000
+	NOEXPR  :: 0x50_001
 
 } else {
 	#panic("posix is unimplemented for the current target")

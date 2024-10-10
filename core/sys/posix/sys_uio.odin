@@ -30,7 +30,7 @@ foreign libc {
 	writev :: proc(fildes: FD, iov: [^]iovec, iovcnt: c.int) -> c.ssize_t ---
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	iovec :: struct {
 		iov_base: rawptr,   /* [PSX] base address of I/O memory region */

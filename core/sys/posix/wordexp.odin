@@ -102,6 +102,27 @@ when ODIN_OS == .Darwin {
 	WRDE_NOSPACE :: 4
 	WRDE_SYNTAX  :: 6
 
+} else when ODIN_OS == .Linux {
+
+	wordexp_t :: struct {
+		we_wordc: c.size_t,   /* [PSX] count of words matched by words */
+		we_wordv: [^]cstring, /* [PSX] pointer to list of expanded words */
+		we_offs:  c.size_t,   /* [PSX] slots to reserve at the beginning of we_wordv */
+	}
+
+	WRDE_DOOFFS  :: 1 << 0	/* Insert PWORDEXP->we_offs NULLs.  */
+	WRDE_APPEND  :: 1 << 1	/* Append to results of a previous call.  */
+	WRDE_NOCMD   :: 1 << 2	/* Don't do command substitution.  */
+	WRDE_REUSE   :: 1 << 3	/* Reuse storage in PWORDEXP.  */
+	WRDE_SHOWERR :: 1 << 4	/* Don't redirect stderr to /dev/null.  */
+	WRDE_UNDEF   :: 1 << 5	/* Error for expanding undefined variables.  */
+
+	WRDE_NOSPACE :: 1
+	WRDE_BADCHAR :: 2
+	WRDE_BADVAL  :: 3
+	WRDE_CMDSUB  :: 4
+	WRDE_SYNTAX  :: 5
+
 } else {
 	#panic("posix is unimplemented for the current target")
 }

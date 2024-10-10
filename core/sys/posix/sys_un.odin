@@ -12,6 +12,13 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		sun_path:   [104]c.char, /* [PSX] socket pathname */
 	}
 
+} else when ODIN_OS == .Linux {
+
+	sockaddr_un :: struct {
+		sun_family: sa_family_t, /* [PSX] address family */
+		sun_path:   [108]c.char, /* [PSX] socket pathname */
+	}
+
 } else {
 	#panic("posix is unimplemented for the current target")
 }

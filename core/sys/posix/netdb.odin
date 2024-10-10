@@ -318,7 +318,7 @@ Info_Errno :: enum c.int {
 	OVERFLOW = EAI_OVERFLOW,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	hostent :: struct {
 		h_name:      cstring,                /* [PSX] official name of host */
@@ -412,9 +412,28 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		NI_NUMERICSERV  :: 2
 		NI_NUMERICSCOPE :: 32
 		NI_DGRAM        :: 16
+
+	} else when ODIN_OS == .Linux {
+
+		AI_PASSIVE     :: 0x001
+		AI_CANONNAME   :: 0x002
+		AI_NUMERICHOST :: 0x004
+		AI_NUMERICSERV :: 0x400
+		AI_V4MAPPED    :: 0x008
+		AI_ALL         :: 0x010
+		AI_ADDRCONFIG  :: 0x020
+
+		NI_NOFQDN       :: 4
+		NI_NUMERICHOST  :: 1
+		NI_NAMEREQD     :: 8
+		NI_NUMERICSERV  :: 2
+		NI_NUMERICSCOPE :: 0x100
+		NI_DGRAM        :: 16
+
 	}
 
 	when ODIN_OS == .OpenBSD {
+
 		EAI_AGAIN    :: -3
 		EAI_BADFLAGS :: -1
 		EAI_FAIL     :: -4
@@ -425,7 +444,22 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		EAI_SOCKTYPE :: -7
 		EAI_SYSTEM   :: -11
 		EAI_OVERFLOW :: -14
+
+	} else when ODIN_OS == .Linux {
+
+		EAI_AGAIN    :: -3
+		EAI_BADFLAGS :: -1
+		EAI_FAIL     :: -4
+		EAI_FAMILY   :: -6
+		EAI_MEMORY   :: -10
+		EAI_NONAME   :: -2
+		EAI_SERVICE  :: -8
+		EAI_SOCKTYPE :: -7
+		EAI_SYSTEM   :: -11
+		EAI_OVERFLOW :: -12
+
 	} else {
+
 		EAI_AGAIN    :: 2
 		EAI_BADFLAGS :: 3
 		EAI_FAIL     :: 4
@@ -438,6 +472,6 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		EAI_OVERFLOW :: 14
 	}
 
-}else {
+} else {
 	#panic("posix is unimplemented for the current target")
 }
