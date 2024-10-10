@@ -11,7 +11,7 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 	local_str, ok := os.lookup_env("TZ", allocator)
 	if !ok {
 		orig_localtime_path := "/etc/localtime"
-		path, err := os.absolute_path_from_relative(orig_localtime_path)
+		path, err := os.absolute_path_from_relative(orig_localtime_path, allocator)
 		if err != nil {
 			// If we can't find /etc/localtime, fallback to UTC
 			if err == .ENOENT {
@@ -22,11 +22,11 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 
 			return
 		}
-		defer delete(path)
+		defer delete(path, allocator)
 
 		// FreeBSD makes me sad.
 		if path == orig_localtime_path {
-			data := os.read_entire_file("/var/db/zoneinfo") or_return
+			data := os.read_entire_file("/var/db/zoneinfo", allocator) or_return
 			return strings.trim_right_space(string(data)), true
 		}
 
@@ -52,6 +52,8 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 	}
 
 	if local_str == "" {
+		delete(local_str)
+
 		str, err := strings.clone("UTC", allocator)
 		if err != nil { return }
 		return str, true

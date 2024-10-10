@@ -38,6 +38,7 @@ region_destroy :: proc(region: ^datetime.TZ_Region, allocator := context.allocat
 }
 
 
+@private
 region_get_nearest :: proc(region: ^datetime.TZ_Region, tm: time.Time) -> (out: datetime.TZ_Record, success: bool) {
 	if len(region.records) == 0 {
 		return process_rrule(region.rrule, tm)
@@ -86,7 +87,7 @@ trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (se
 	ONE_DAY :: 86_400
 
 	#partial switch td.type {
-	case .MonthWeekDay:
+	case .Month_Week_Day:
 		year_start := datetime.DateTime{{year, 1, 1}, {0, 0, 0, 0}, nil}
 		year_start_time := time.datetime_to_time(year_start) or_return
 
@@ -115,7 +116,8 @@ trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (se
 
 	return
 }
-
+ 
+@private
 process_rrule :: proc(rrule: datetime.TZ_RRule, tm: time.Time) -> (out: datetime.TZ_Record, success: bool) {
 	if !rrule.has_dst {
 		return datetime.TZ_Record{

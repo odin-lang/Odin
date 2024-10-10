@@ -455,7 +455,7 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 		std_name   = "EST",
 		std_offset = -(5 * 60 * 60),
 		std_date   = dt.TZ_Transition_Date{
-			type   = .MonthWeekDay,
+			type   = .Month_Week_Day,
 			month  = 3,
 			week   = 2,
 			day    = 0,
@@ -465,7 +465,7 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 		dst_name   = "EDT",
 		dst_offset = -(4 * 60 * 60),
 		dst_date   = dt.TZ_Transition_Date{
-			type   = .MonthWeekDay,
+			type   = .Month_Week_Day,
 			month  = 11,
 			week   = 1,
 			day    = 0,
@@ -484,7 +484,7 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 		std_name   = "IST",
 		std_offset = (2 * 60 * 60),
 		std_date   = dt.TZ_Transition_Date{
-			type   = .MonthWeekDay,
+			type   = .Month_Week_Day,
 			month  = 3,
 			week   = 4,
 			day    = 4,
@@ -494,7 +494,7 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 		dst_name   = "IDT",
 		dst_offset = (3 * 60 * 60),
 		dst_date   = dt.TZ_Transition_Date{
-			type   = .MonthWeekDay,
+			type   = .Month_Week_Day,
 			month  = 10,
 			week   = 5,
 			day    = 0,
@@ -513,7 +513,7 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 		std_name   = "WART",
 		std_offset = -(4 * 60 * 60),
 		std_date   = dt.TZ_Transition_Date{
-			type   = .NoLeap,
+			type   = .No_Leap,
 			day    = 1,
 			time   = 0 * 60 * 60,
 		},
@@ -521,7 +521,7 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 		dst_name   = "WARST",
 		dst_offset = -(3 * 60 * 60),
 		dst_date   = dt.TZ_Transition_Date{
-			type   = .NoLeap,
+			type   = .No_Leap,
 			day    = 365,
 			time   = 25 * 60 * 60,
 		},
@@ -538,7 +538,7 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 		std_name   = "WGT",
 		std_offset = -(3 * 60 * 60),
 		std_date   = dt.TZ_Transition_Date{
-			type   = .MonthWeekDay,
+			type   = .Month_Week_Day,
 			month  = 3,
 			week   = 5,
 			day    = 0,
@@ -548,7 +548,7 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 		dst_name   = "WGST",
 		dst_offset = -(2 * 60 * 60),
 		dst_date   = dt.TZ_Transition_Date{
-			type   = .MonthWeekDay,
+			type   = .Month_Week_Day,
 			month  = 10,
 			week   = 5,
 			day    = 0,
