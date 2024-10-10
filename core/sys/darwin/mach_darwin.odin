@@ -29,11 +29,13 @@ vm_inherit_t :: distinct c.uint
 
 mach_port_name_t :: distinct c.uint
 
+sync_policy_t :: distinct c.int
+
 @(default_calling_convention="c")
 foreign mach {
 	mach_task_self :: proc() -> mach_port_t ---
 
-	semaphore_create :: proc(task: task_t, semaphore: ^semaphore_t, policy, value: c.int) -> Kern_Return ---
+	semaphore_create :: proc(task: task_t, semaphore: ^semaphore_t, policy: Sync_Policy, value: c.int) -> Kern_Return ---
 	semaphore_destroy :: proc(task: task_t, semaphore: semaphore_t) -> Kern_Return ---
 
 	semaphore_signal :: proc(semaphore: semaphore_t) -> Kern_Return ---
@@ -512,3 +514,12 @@ VM_Inherit :: enum vm_inherit_t {
 
 VM_INHERIT_DEFAULT    :: VM_Inherit.Copy
 VM_INHERIT_LAST_VALID :: VM_Inherit.None
+
+Sync_Policy :: enum sync_policy_t {
+	Fifo,
+	Fixed_Priority,
+	Reversed,
+	Order_Mask,
+}
+
+SYNC_POLICY_LIFO :: Sync_Policy.Fifo | Sync_Policy.Reversed
