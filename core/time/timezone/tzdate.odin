@@ -288,16 +288,14 @@ dst_unsafe :: proc(dt: datetime.DateTime) -> bool {
 	return record.dst
 }
 
-datetime_to_str :: proc(dt: datetime.DateTime, allocator := context.temp_allocator) -> string {
-	context.temp_allocator = allocator
-
+datetime_to_str :: proc(dt: datetime.DateTime, allocator := context.allocator) -> string {
 	if dt.tz == nil {
 		_, ok := time.datetime_to_time(dt)
 		if !ok {
 			return ""
 		}
 
-		return fmt.tprintf("%02d-%02d-%04d @ %02d:%02d:%02d UTC", dt.month, dt.day, dt.year, dt.hour, dt.minute, dt.second)
+		return fmt.aprintf("%02d-%02d-%04d @ %02d:%02d:%02d UTC", dt.month, dt.day, dt.year, dt.hour, dt.minute, dt.second, allocator = allocator)
 
 	} else {
 		tm, ok := time.datetime_to_time(dt)
@@ -317,6 +315,6 @@ datetime_to_str :: proc(dt: datetime.DateTime, allocator := context.temp_allocat
 			hour -= 12
 		}
 
-		return fmt.tprintf("%02d-%02d-%04d @ %02d:%02d:%02d %s %s", dt.month, dt.day, dt.year, hour, dt.minute, dt.second, am_pm_str, record.shortname)
+		return fmt.aprintf("%02d-%02d-%04d @ %02d:%02d:%02d %s %s", dt.month, dt.day, dt.year, hour, dt.minute, dt.second, am_pm_str, record.shortname, allocator = allocator)
 	}
 }
