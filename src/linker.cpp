@@ -571,10 +571,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
 			}
 
-			if (build_context.build_mode == BuildMode_StaticLibrary) {
-				compiler_error("TODO(bill): -build-mode:static on non-windows targets");
-			}
-
 			// NOTE(dweiler): We use clang as a frontend for the linker as there are
 			// other runtime and compiler support libraries that need to be linked in
 			// very specific orders such as libgcc_s, ld-linux-so, unwind, etc.
@@ -631,7 +627,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
 				}
 
-				if (build_context.build_mode != BuildMode_DynamicLibrary) {
+				if (build_context.build_mode != BuildMode_DynamicLibrary && build_context.build_mode != BuildMode_StaticLibrary) {
 					// This points the linker to where the entry point is
 					link_settings = gb_string_appendc(link_settings, "-e _main ");
 				}
@@ -657,39 +653,56 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					platform_lib_str = gb_string_appendc(platform_lib_str, "-lc ");
 				}
 			}
+			
 
-			gbString link_command_line = gb_string_make(heap_allocator(), clang_path);
-			defer (gb_string_free(link_command_line));
-
-			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
-			link_command_line = gb_string_appendc(link_command_line, object_files);
-			link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
-			link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
-			link_command_line = gb_string_append_fmt(link_command_line, " %s ", lib_str);
-			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
-			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
-			link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
-
-			if (build_context.use_lld) {
-				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
-				result = system_exec_command_line_app("lld-link", link_command_line);
+			if (build_context.build_mode == BuildMode_StaticLibrary) {
+				if (is_osx) {
+					gbString static_link_command_line = gb_string_make(heap_allocator(), "libtool");
+					defer (gb_string_free(static_link_command_line));
+					static_link_command_line = gb_string_append_fmt(static_link_command_line, " -o \"%.*s\" ", LIT(output_filename));
+					static_link_command_line = gb_string_appendc(static_link_command_line, " -static ");
+					static_link_command_line = gb_string_appendc(static_link_command_line, object_files);
+					return system_exec_command_line_app("libtool", static_link_command_line);
+				} else {
+					compiler_error("-build-mode:static on Linux and similar targets");
+				}
 			} else {
-				result = system_exec_command_line_app("ld-link", link_command_line);
-			}
+				gbString link_command_line = gb_string_make(heap_allocator(), clang_path);
+				defer (gb_string_free(link_command_line));
 
-			if (result) {
-				return result;
-			}
+				link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
+				link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
 
-			if (is_osx && build_context.ODIN_DEBUG) {
-				// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
-				// to the symbols in the object file
-				result = system_exec_command_line_app("dsymutil", "dsymutil %.*s", LIT(output_filename));
+				link_command_line = gb_string_appendc(link_command_line, object_files);
+				link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
+				link_command_line = gb_string_append_fmt(link_command_line, " %s ", lib_str);
+				link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
+				link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
+				link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
+
+				if (build_context.use_lld) {
+					link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
+					result = system_exec_command_line_app("lld-link", link_command_line);
+				} else {
+					result = system_exec_command_line_app("ld-link", link_command_line);
+				}
 
 				if (result) {
 					return result;
 				}
+
+				if (is_osx && build_context.ODIN_DEBUG) {
+					// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
+					// to the symbols in the object file
+					result = system_exec_command_line_app("dsymutil", "dsymutil %.*s", LIT(output_filename));
+
+					if (result) {
+						return result;
+					}
+				}
+
 			}
+
 		}
 	}
 
