@@ -38,8 +38,8 @@
 //
 // I don't claim that this is the absolute best way to solve this problem,
 // and so far we punt on things (if you have multiple versions of Visual Studio
-// installed, we return the first one, rather than the newest). But it
-// will solve the basic problem for you as simply as I know how to do it,
+// installed, we return the newest one, which may not be compatible with Odin's codebase).
+// But it will solve the basic problem for you as simply as I know how to do it,
 // and because there isn't too much code here, it's easy to modify and expand.
 //
 //
@@ -387,6 +387,8 @@ gb_internal bool find_visual_studio_by_fighting_through_microsoft_craziness(Find
 		if (!instances)  return false;
 		defer (instances->Release());
 
+		// First, find the newest Visual Studio version by looping through all existing instances.
+		int vs_newest_version = 0;
 		for (;;) {
 			ULONG found = 0;
 			ISetupInstance *instance = NULL;
@@ -394,6 +396,47 @@ gb_internal bool find_visual_studio_by_fighting_through_microsoft_craziness(Find
 			if (hr != S_OK) break;
 
 			defer (instance->Release());
+
+			wchar_t* inst_version_wide;
+			hr = instance->GetInstallationVersion(&inst_version_wide);
+			if (hr != S_OK)  continue;
+			defer (SysFreeString(inst_version_wide));
+
+			int i0, i1, i2, i3;
+			auto success = swscanf_s(inst_version_wide, L"%d.%d.%d.%d", &i0, &i1, &i2, &i3);
+			if (success < 4) continue;
+
+			// We only interested in major version number.
+			if (i0 > vs_newest_version) {
+				vs_newest_version = i0;
+			}
+		}
+
+		// Reset the enumerator to start from the beginning.
+		instances->Reset();
+
+		// Now loop through all instances again to find the chosen version and read its properties.
+		for (;;) {
+			ULONG found = 0;
+			ISetupInstance *instance = NULL;
+			auto hr = instances->Next(1, &instance, &found);
+			if (hr != S_OK) break;
+
+			defer (instance->Release());
+
+			wchar_t* inst_version_wide;
+			hr = instance->GetInstallationVersion(&inst_version_wide);
+			if (hr != S_OK)  continue;
+			defer (SysFreeString(inst_version_wide));
+
+			int i0, i1, i2, i3;
+			auto success = swscanf_s(inst_version_wide, L"%d.%d.%d.%d", &i0, &i1, &i2, &i3);
+			if (success < 4) continue;
+
+			if (i0 != vs_newest_version) {
+				// Skip until we find the newest version.
+				continue;
+			}
 
 			wchar_t* inst_path_wide;
 			hr = instance->GetInstallationPath(&inst_path_wide);
@@ -438,13 +481,6 @@ gb_internal bool find_visual_studio_by_fighting_through_microsoft_craziness(Find
 				result->vs_library_path = library_path;
 				return true;
 			}
-			/*
-			   Ryan Saunderson said:
-			   "Clang uses the 'SetupInstance->GetInstallationVersion' / ISetupHelper->ParseVersion to find the newest version
-			   and then reads the tools file to define the tools path - which is definitely better than what i did."
-
-			   So... @Incomplete: Should probably pick the newest version...
-			*/
 		}
 	}
 
