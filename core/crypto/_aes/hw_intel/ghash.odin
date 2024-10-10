@@ -155,7 +155,7 @@ square_f128 :: #force_inline proc "contextless" (kw: x86.__m128i) -> (x86.__m128
 @(enable_target_feature = "sse2,ssse3,pclmul")
 ghash :: proc "contextless" (dst, key, data: []byte) #no_bounds_check {
 	if len(dst) != _aes.GHASH_BLOCK_SIZE || len(key) != _aes.GHASH_BLOCK_SIZE {
-		intrinsics.trap()
+		panic_contextless("aes/ghash: invalid dst or key size")
 	}
 
 	// Note: BearSSL opts to copy the remainder into a zero-filled
