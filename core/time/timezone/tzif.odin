@@ -282,7 +282,7 @@ parse_posix_rrule :: proc(str: string) -> (out: datetime.TZ_Transition_Date, idx
 		}
 
 		return datetime.TZ_Transition_Date{
-			type   = .NoLeap,
+			type   = .No_Leap,
 			day    = u16(day),
 			time   = offset,
 		}, i, true
@@ -350,7 +350,7 @@ parse_posix_rrule :: proc(str: string) -> (out: datetime.TZ_Transition_Date, idx
 		}
 
 		return datetime.TZ_Transition_Date{
-			type   = .MonthWeekDay,
+			type   = .Month_Week_Day,
 			month  = u8(month),
 			week   = u8(week),
 			day    = u16(day),

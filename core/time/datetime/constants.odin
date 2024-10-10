@@ -85,9 +85,9 @@ TZ_Record :: struct {
 }
 
 TZ_Date_Kind :: enum {
-	NoLeap,
+	No_Leap,
 	Leap,
-	MonthWeekDay,
+	Month_Week_Day,
 }
 
 TZ_Transition_Date :: struct {
