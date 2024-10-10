@@ -52,7 +52,7 @@ GHASH_STRIDE_BYTES_HW :: GHASH_STRIDE_HW * _aes.GHASH_BLOCK_SIZE
 // that it is right-shifted by 1 bit. The left-shift is relatively
 // inexpensive, and it can be mutualised.
 //
-// Since SSE2 opcodes do not have facilities for shitfting full 128-bit
+// Since SSE2 opcodes do not have facilities for shifting full 128-bit
 // values with bit precision, we have to break down values into 64-bit
 // chunks. We number chunks from 0 to 3 in left to right order.
 
