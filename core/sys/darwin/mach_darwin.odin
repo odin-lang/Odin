@@ -47,26 +47,26 @@ foreign mach {
 	vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> Kern_Return ---
 
 	vm_map :: proc(
-		target_task    : vm_map_t,
-		address        : ^vm_address_t,
-		size           : vm_size_t,
-		mask           : vm_address_t,
-		flags          : VM_Flags,
-		object         : mem_entry_name_port_t,
-		offset         : vm_offset_t,
-		copy           : boolean_t,
+		target_task:    vm_map_t,
+		address:        ^vm_address_t,
+		size:           vm_size_t,
+		mask:           vm_address_t,
+		flags:          VM_Flags,
+		object:         mem_entry_name_port_t,
+		offset:         vm_offset_t,
+		copy:           boolean_t,
 		cur_protection,
-		max_protection : VM_Prot_Flags,
-		inheritance    : VM_Inherit,
+		max_protection: VM_Prot_Flags,
+		inheritance:    VM_Inherit,
 	) -> Kern_Return ---
 
 	mach_make_memory_entry :: proc(
-		target_task   : vm_map_t,
-		size          : ^vm_size_t,
-		offset        : vm_offset_t,
-		permission    : VM_Prot_Flags,
-		object_handle : ^mem_entry_name_port_t,
-		parent_entry  : mem_entry_name_port_t,
+		target_task:   vm_map_t,
+		size:          ^vm_size_t,
+		offset:        vm_offset_t,
+		permission:    VM_Prot_Flags,
+		object_handle: ^mem_entry_name_port_t,
+		parent_entry:  mem_entry_name_port_t,
 	) -> Kern_Return ---
 
 	mach_port_deallocate :: proc(
@@ -74,7 +74,7 @@ foreign mach {
 		name: mach_port_name_t,
 	) -> Kern_Return ---
 
-	vm_page_size : vm_size_t
+	vm_page_size: vm_size_t
 }
 
 Kern_Return :: enum kern_return_t {
