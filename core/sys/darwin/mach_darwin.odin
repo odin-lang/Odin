@@ -46,7 +46,7 @@ foreign mach {
 
 	vm_deallocate :: proc(target_task: vm_map_t, address: vm_address_t, size: vm_size_t) -> Kern_Return ---
 
-	vm_map :: proc (
+	vm_map :: proc(
 		target_task    : vm_map_t,
 		address        : ^vm_address_t,
 		size           : vm_size_t,
@@ -60,7 +60,7 @@ foreign mach {
 		inheritance    : VM_Inherit,
 	) -> Kern_Return ---
 
-	mach_make_memory_entry :: proc (
+	mach_make_memory_entry :: proc(
 		target_task   : vm_map_t,
 		size          : ^vm_size_t,
 		offset        : vm_offset_t,
@@ -69,7 +69,7 @@ foreign mach {
 		parent_entry  : mem_entry_name_port_t,
 	) -> Kern_Return ---
 
-	mach_port_deallocate :: proc (
+	mach_port_deallocate :: proc(
 		task: ipc_space_t,
 		name: mach_port_name_t,
 	) -> Kern_Return ---
