@@ -52,7 +52,7 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 	}
 
 	if local_str == "" {
-		delete(local_str)
+		delete(local_str, allocator)
 
 		str, err := strings.clone("UTC", allocator)
 		if err != nil { return }
