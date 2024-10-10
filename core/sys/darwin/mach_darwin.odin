@@ -80,115 +80,114 @@ foreign mach {
 Kern_Return :: enum kern_return_t {
 	Success,
 
-	Invalid_Address,
 	/* Specified address is not currently valid.
 	 */
+	Invalid_Address,
 
-	Protection_Failure,
 	/* Specified memory is valid, but does not permit the
 	 * required forms of access.
 	 */
+	Protection_Failure,
 
-	No_Space,
 	/* The address range specified is already in use, or
 	 * no address range of the size specified could be
 	 * found.
 	 */
+	No_Space,
 
-	Invalid_Argument,
 	/* The function requested was not applicable to this
 	 * type of argument, or an argument is invalid
 	 */
+	Invalid_Argument,
 
-	Failure,
 	/* The function could not be performed.  A catch-all.
 	 */
+	Failure,
 
-	Resource_Shortage,
 	/* A system resource could not be allocated to fulfill
 	 * this request.  This failure may not be permanent.
 	 */
+	Resource_Shortage,
 
-	Not_Receiver,
 	/* The task in question does not hold receive rights
 	 * for the port argument.
 	 */
+	Not_Receiver,
 
-	No_Access,
 	/* Bogus access restriction.
 	 */
+	No_Access,
 
-	Memory_Failure,
 	/* During a page fault, the target address refers to a
 	 * memory object that has been destroyed.  This
 	 * failure is permanent.
 	 */
+	Memory_Failure,
 
-	Memory_Error,
 	/* During a page fault, the memory object indicated
 	 * that the data could not be returned.  This failure
 	 * may be temporary; future attempts to access this
 	 * same data may succeed, as defined by the memory
 	 * object.
 	 */
+	Memory_Error,
 
-	Already_In_Set,
 	/* The receive right is already a member of the portset.
 	 */
+	Already_In_Set,
 
-	Not_In_Set,
 	/* The receive right is not a member of a port set.
 	 */
+	Not_In_Set,
 
-	Name_Exists,
 	/* The name already denotes a right in the task.
 	 */
+	Name_Exists,
 
-	Aborted,
 	/* The operation was aborted.  Ipc code will
 	 * catch this and reflect it as a message error.
 	 */
+	Aborted,
 
-	Invalid_Name,
 	/* The name doesn't denote a right in the task.
 	 */
+	Invalid_Name,
 
-	Invalid_Task,
 	/* Target task isn't an active task.
 	 */
+	Invalid_Task,
 
-	Invalid_Right,
 	/* The name denotes a right, but not an appropriate right.
 	 */
+	Invalid_Right,
 
-	Invalid_Value,
 	/* A blatant range error.
 	 */
+	Invalid_Value,
 
-	URefs_Overflow,
 	/* Operation would overflow limit on user-references.
 	 */
+	URefs_Overflow,
 
-	Invalid_Capability,
 	/* The supplied (port) capability is improper.
 	 */
+	Invalid_Capability,
 
-	Right_Exists,
 	/* The task already has send or receive rights
 	 * for the port under another name.
 	 */
+	Right_Exists,
 
-	Invalid_Host,
 	/* Target host isn't actually a host.
 	 */
+	Invalid_Host,
 
-	Memory_Present,
 	/* An attempt was made to supply "precious" data
 	 * for memory that is already present in a
 	 * memory object.
 	 */
+	Memory_Present,
 
-	Memory_Data_Moved,
 	/* A page was requested of a memory manager via
 	 * memory_object_data_request for an object using
 	 * a MEMORY_OBJECT_COPY_CALL strategy, with the
@@ -203,154 +202,155 @@ Kern_Return :: enum kern_return_t {
 	 * kernel to restart the fault). It will not be
 	 * seen by users.
 	 */
+	Memory_Data_Moved,
 
-	Memory_Restart_Copy,
 	/* A strategic copy was attempted of an object
 	 * upon which a quicker copy is now possible.
 	 * The caller should retry the copy using
 	 * vm_object_copy_quickly. This error code
 	 * is seen only by the kernel.
 	 */
+	Memory_Restart_Copy,
 
-	Invalid_Processor_Set,
 	/* An argument applied to assert processor set privilege
 	 * was not a processor set control port.
 	 */
+	Invalid_Processor_Set,
 
-	Policy_Limit,
 	/* The specified scheduling attributes exceed the thread's
 	 * limits.
 	 */
+	Policy_Limit,
 
-	Invalid_Policy,
 	/* The specified scheduling policy is not currently
 	 * enabled for the processor set.
 	 */
+	Invalid_Policy,
 
-	Invalid_Object,
 	/* The external memory manager failed to initialize the
 	 * memory object.
 	 */
+	Invalid_Object,
 
-	Already_Waiting,
 	/* A thread is attempting to wait for an event for which
 	 * there is already a waiting thread.
 	 */
+	Already_Waiting,
 
-	Default_Set,
 	/* An attempt was made to destroy the default processor
 	 * set.
 	 */
+	Default_Set,
 
-	Exception_Protected,
 	/* An attempt was made to fetch an exception port that is
 	 * protected, or to abort a thread while processing a
 	 * protected exception.
 	 */
+	Exception_Protected,
 
-	Invalid_Ledger,
 	/* A ledger was required but not supplied.
 	 */
+	Invalid_Ledger,
 
-	Invalid_Memory_Control,
 	/* The port was not a memory cache control port.
 	 */
+	Invalid_Memory_Control,
 
-	Invalid_Security,
 	/* An argument supplied to assert security privilege
 	 * was not a host security port.
 	 */
+	Invalid_Security,
 
-	Not_Depressed,
 	/* thread_depress_abort was called on a thread which
 	 * was not currently depressed.
 	 */
+	Not_Depressed,
 
-	Terminated,
 	/* Object has been terminated and is no longer available
 	 */
+	Terminated,
 
-	Lock_Set_Destroyed,
 	/* Lock set has been destroyed and is no longer available.
 	 */
+	Lock_Set_Destroyed,
 
-	Lock_Unstable,
 	/* The thread holding the lock terminated before releasing
 	 * the lock
 	 */
+	Lock_Unstable,
 
-	Lock_Owned,
 	/* The lock is already owned by another thread
 	 */
+	Lock_Owned,
 
-	Lock_Owned_Self,
 	/* The lock is already owned by the calling thread
 	 */
+	Lock_Owned_Self,
 
-	Semaphore_Destroyed,
 	/* Semaphore has been destroyed and is no longer available.
 	 */
+	Semaphore_Destroyed,
 
-	Rpc_Server_Terminated,
 	/* Return from RPC indicating the target server was
 	 * terminated before it successfully replied
 	 */
+	Rpc_Server_Terminated,
 
-	RPC_Terminate_Orphan,
 	/* Terminate an orphaned activation.
 	 */
+	RPC_Terminate_Orphan,
 
-	RPC_Continue_Orphan,
 	/* Allow an orphaned activation to continue executing.
 	 */
+	RPC_Continue_Orphan,
 
-	Not_Supported,
 	/* Empty thread activation (No thread linked to it)
 	 */
+	Not_Supported,
 
-	Node_Down,
 	/* Remote node down or inaccessible.
 	 */
+	Node_Down,
 
-	Not_Waiting,
 	/* A signalled thread was not actually waiting. */
+	Not_Waiting,
 
-	Operation_Timed_Out,
 	/* Some thread-oriented operation (semaphore_wait) timed out
 	 */
+	Operation_Timed_Out,
 
-	Codesign_Error,
 	/* During a page fault, indicates that the page was rejected
 	 * as a result of a signature check.
 	 */
+	Codesign_Error,
 
-	Policy_Static,
 	/* The requested property cannot be changed at this time.
 	 */
+	Policy_Static,
 
-	Insufficient_Buffer_Size,
 	/* The provided buffer is of insufficient size for the requested data.
 	 */
+	Insufficient_Buffer_Size,
 
-	Denied,
 	/* Denied by security policy
 	 */
+	Denied,
 
-	Missing_KC,
 	/* The KC on which the function is operating is missing
 	 */
+	Missing_KC,
 
-	Invalid_KC,
 	/* The KC on which the function is operating is invalid
 	 */
+	Invalid_KC,
 
-	Not_Found,
 	/* A search or query operation did not return a result
 	 */
+	Not_Found,
 
-	Return_Max               = 0x100,
 	/* Maximum return value allowable
 	 */
+	Return_Max               = 0x100,
 }
 
 /*
