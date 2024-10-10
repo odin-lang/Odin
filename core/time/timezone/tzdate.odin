@@ -84,17 +84,18 @@ month_to_seconds :: proc(month: int, is_leap: bool) -> i64 {
 @private
 trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (secs: i64, ok: bool) {
 	is_leap := datetime.is_leap_year(year)
-	ONE_DAY :: 86_400
+	DAY_SEC :: 86_400
 
-	#partial switch td.type {
+	year_start := datetime.DateTime{{year, 1, 1}, {0, 0, 0, 0}, nil}
+	year_start_time := time.datetime_to_time(year_start) or_return
+
+	t := i64(time.to_unix_seconds(year_start_time))
+
+	switch td.type {
 	case .Month_Week_Day:
-		year_start := datetime.DateTime{{year, 1, 1}, {0, 0, 0, 0}, nil}
-		year_start_time := time.datetime_to_time(year_start) or_return
-
-		t := i64(time.to_unix_seconds(year_start_time))
 		t += month_to_seconds(int(td.month) - 1, is_leap)
 
-		weekday := ((t + (4 * ONE_DAY)) %% (7 * ONE_DAY)) / ONE_DAY
+		weekday := ((t + (4 * DAY_SEC)) %% (7 * DAY_SEC)) / DAY_SEC
 		days := i64(td.day) - weekday
 		if days < 0 { days += 7 }
 
@@ -106,10 +107,28 @@ trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (se
 			week = 4
 		}
 
-		t += 86_400 * (days + (7 * i64(week - 1)))
+		t += DAY_SEC * (days + (7 * i64(week - 1)))
 		t += td.time
 
 		return t, true
+
+	// Both of these should result in 0 -> 365 days (in seconds)
+	case .No_Leap:
+		day := i64(td.day)
+
+		// if before Feb 29th || not a leap year
+		if day < 60 || !is_leap {
+			day -= 1
+		}
+		t += DAY_SEC * day
+
+		return t, true
+
+	case .Leap:
+		t += DAY_SEC * i64(td.day)
+
+		return t, true
+
 	case:
 		return
 	}
