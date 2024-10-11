@@ -14,16 +14,16 @@ but an attempt to allocate memory is not an error.
 nil_allocator :: proc() -> Allocator {
 	return Allocator{
 		procedure = nil_allocator_proc,
-		data = nil,
+		data      = nil,
 	}
 }
 
 nil_allocator_proc :: proc(
-	allocator_data: rawptr,
-	mode: Allocator_Mode,
+	allocator_data:  rawptr,
+	mode:            Allocator_Mode,
 	size, alignment: int,
-	old_memory: rawptr,
-	old_size: int,
+	old_memory:      rawptr,
+	old_size:        int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	return nil, nil
@@ -41,7 +41,7 @@ not be allocated, and an attempt to allocate memory is an error.
 panic_allocator :: proc() -> Allocator {
 	return Allocator{
 		procedure = panic_allocator_proc,
-		data = nil,
+		data      = nil,
 	}
 }
 
@@ -157,10 +157,10 @@ This procedure returns a pointer to the newly allocated memory region.
 */
 @(require_results)
 arena_alloc :: proc(
-	a: ^Arena,
+	a:    ^Arena,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := arena_alloc_bytes(a, size, alignment, loc)
 	return raw_data(bytes), err
@@ -175,10 +175,10 @@ This procedure returns a slice of the newly allocated memory region.
 */
 @(require_results)
 arena_alloc_bytes :: proc(
-	a: ^Arena,
+	a:    ^Arena,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
 	if bytes != nil {
@@ -197,10 +197,10 @@ memory region.
 */
 @(require_results)
 arena_alloc_non_zeroed :: proc(
-	a: ^Arena,
+	a:    ^Arena,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
 	return raw_data(bytes), err
@@ -216,10 +216,10 @@ memory region.
 */
 @(require_results)
 arena_alloc_bytes_non_zeroed :: proc(
-	a: ^Arena,
+	a:    ^Arena,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> ([]byte, Allocator_Error) {
 	if a.data == nil {
 		panic("Arena is not initialized", loc)
@@ -244,11 +244,11 @@ arena_free_all :: proc(a: ^Arena) {
 
 arena_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode: Allocator_Mode,
-	size: int,
-	alignment: int,
-	old_memory: rawptr,
-	old_size: int,
+	mode:           Allocator_Mode,
+	size:           int,
+	alignment:      int,
+	old_memory:     rawptr,
+	old_size:       int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error)  {
 	arena := cast(^Arena)allocator_data
@@ -398,10 +398,10 @@ returns a pointer to the allocated memory region.
 */
 @(require_results)
 scratch_alloc :: proc(
-	s: ^Scratch,
+	s:    ^Scratch,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := scratch_alloc_bytes(s, size, alignment, loc)
 	return raw_data(bytes), err
@@ -416,10 +416,10 @@ returns a slice of the allocated memory region.
 */
 @(require_results)
 scratch_alloc_bytes :: proc(
-	s: ^Scratch,
+	s:    ^Scratch,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := scratch_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	if bytes != nil {
@@ -437,10 +437,10 @@ This procedure returns a pointer to the allocated memory region.
 */
 @(require_results)
 scratch_alloc_non_zeroed :: proc(
-	s: ^Scratch,
+	s:    ^Scratch,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := scratch_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	return raw_data(bytes), err
@@ -455,10 +455,10 @@ This procedure returns a slice of the allocated memory region.
 */
 @(require_results)
 scratch_alloc_bytes_non_zeroed :: proc(
-	s: ^Scratch,
+	s:   ^Scratch,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if s.data == nil {
 		DEFAULT_BACKING_SIZE :: 4 * Megabyte
@@ -477,7 +477,7 @@ scratch_alloc_bytes_non_zeroed :: proc(
 			offset = 0
 		}
 		start := uintptr(raw_data(s.data))
-		ptr := align_forward_uintptr(offset+start, uintptr(alignment))
+		ptr   := align_forward_uintptr(offset+start, uintptr(alignment))
 		s.prev_allocation = rawptr(ptr)
 		s.curr_offset = int(offset) + size
 		return byte_slice(rawptr(ptr), size), nil
@@ -574,12 +574,12 @@ This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
 scratch_resize :: proc(
-	s: ^Scratch,
+	s:          ^Scratch,
 	old_memory: rawptr,
-	old_size: int,
-	size: int,
+	old_size:   int,
+	size:       int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := scratch_resize_bytes(s, byte_slice(old_memory, old_size), size, alignment, loc)
 	return raw_data(bytes), err
@@ -603,11 +603,11 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 scratch_resize_bytes :: proc(
-	s: ^Scratch,
+	s:        ^Scratch,
 	old_data: []byte,
-	size: int,
+	size:     int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := scratch_resize_bytes_non_zeroed(s, old_data, size, alignment, loc)
 	if bytes != nil && size > len(old_data) {
@@ -634,12 +634,12 @@ This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
 scratch_resize_non_zeroed :: proc(
-	s: ^Scratch,
+	s:          ^Scratch,
 	old_memory: rawptr,
-	old_size: int,
-	size: int,
+	old_size:   int,
+	size:       int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := scratch_resize_bytes_non_zeroed(s, byte_slice(old_memory, old_size), size, alignment, loc)
 	return raw_data(bytes), err
@@ -663,11 +663,11 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 scratch_resize_bytes_non_zeroed :: proc(
-	s: ^Scratch,
+	s:        ^Scratch,
 	old_data: []byte,
-	size: int,
+	size:     int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> ([]byte, Allocator_Error) {
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
@@ -678,8 +678,8 @@ scratch_resize_bytes_non_zeroed :: proc(
 		}
 		scratch_init(s, DEFAULT_BACKING_SIZE)
 	}
-	begin := uintptr(raw_data(s.data))
-	end := begin + uintptr(len(s.data))
+	begin   := uintptr(raw_data(s.data))
+	end     := begin + uintptr(len(s.data))
 	old_ptr := uintptr(old_memory)
 	if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
 		s.curr_offset = int(old_ptr-begin)+size
@@ -695,11 +695,11 @@ scratch_resize_bytes_non_zeroed :: proc(
 }
 
 scratch_allocator_proc :: proc(
-	allocator_data: rawptr,
-	mode: Allocator_Mode,
+	allocator_data:  rawptr,
+	mode:            Allocator_Mode,
 	size, alignment: int,
-	old_memory: rawptr,
-	old_size: int,
+	old_memory:      rawptr,
+	old_size:        int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := (^Scratch)(allocator_data)
@@ -735,10 +735,10 @@ scratch_allocator_proc :: proc(
 Stack allocator data.
 */
 Stack :: struct {
-	data: []byte,
+	data:        []byte,
 	prev_offset: int,
 	curr_offset: int,
-	peak_used: int,
+	peak_used:   int,
 }
 
 /*
@@ -769,7 +769,7 @@ previous allocation header.
 stack_allocator :: proc(stack: ^Stack) -> Allocator {
 	return Allocator{
 		procedure = stack_allocator_proc,
-		data = stack,
+		data      = stack,
 	}
 }
 
@@ -780,18 +780,18 @@ This procedure initializes the stack allocator with a backing buffer specified
 by `data` parameter.
 */
 stack_init :: proc(s: ^Stack, data: []byte) {
-	s.data = data
+	s.data        = data
 	s.prev_offset = 0
 	s.curr_offset = 0
-	s.peak_used = 0
+	s.peak_used   = 0
 }
 
 @(deprecated="prefer 'mem.stack_init'")
 init_stack :: proc(s: ^Stack, data: []byte) {
-	s.data = data
+	s.data        = data
 	s.prev_offset = 0
 	s.curr_offset = 0
-	s.peak_used = 0
+	s.peak_used   = 0
 }
 
 /*
@@ -803,10 +803,10 @@ procedure returns the pointer to the allocated memory.
 */
 @(require_results)
 stack_alloc :: proc(
-	s: ^Stack,
+	s:    ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := stack_alloc_bytes(s, size, alignment, loc)
 	return raw_data(bytes), err
@@ -821,10 +821,10 @@ procedure returns the slice of the allocated memory.
 */
 @(require_results)
 stack_alloc_bytes :: proc(
-	s: ^Stack,
+	s:    ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	if bytes != nil {
@@ -842,10 +842,10 @@ zero-initialized. This procedure returns the pointer to the allocated memory.
 */
 @(require_results)
 stack_alloc_non_zeroed :: proc(
-	s: ^Stack,
+	s:    ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	return raw_data(bytes), err
@@ -860,10 +860,10 @@ zero-initialized. This procedure returns the slice of the allocated memory.
 */
 @(require_results)
 stack_alloc_bytes_non_zeroed :: proc(
-	s: ^Stack,
+	s:    ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location
+	loc       := #caller_location
 ) -> ([]byte, Allocator_Error) {
 	if s.data == nil {
 		panic("Stack allocation on an uninitialized stack allocator", loc)
@@ -896,7 +896,7 @@ If the freeing does is an out of order freeing, the `.Invalid_Pointer` error
 is returned.
 */
 stack_free :: proc(
-	s: ^Stack,
+	s:          ^Stack,
 	old_memory: rawptr,
 	loc := #caller_location,
 ) -> (Allocator_Error) {
@@ -953,12 +953,12 @@ This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
 stack_resize :: proc(
-	s: ^Stack,
+	s:          ^Stack,
 	old_memory: rawptr,
-	old_size: int,
-	size: int,
+	old_size:   int,
+	size:       int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := stack_resize_bytes(s, byte_slice(old_memory, old_size), size, alignment)
 	return raw_data(bytes), err
@@ -982,11 +982,11 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 stack_resize_bytes :: proc(
-	s: ^Stack,
+	s:        ^Stack,
 	old_data: []byte,
-	size: int,
+	size:     int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	if bytes != nil {
@@ -1017,12 +1017,12 @@ This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
 stack_resize_non_zeroed :: proc(
-	s: ^Stack,
+	s:          ^Stack,
 	old_memory: rawptr,
-	old_size: int,
-	size: int,
+	old_size:   int,
+	size:       int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := stack_resize_bytes_non_zeroed(s, byte_slice(old_memory, old_size), size, alignment)
 	return raw_data(bytes), err
@@ -1046,11 +1046,11 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 stack_resize_bytes_non_zeroed :: proc(
-	s: ^Stack,
+	s:        ^Stack,
 	old_data: []byte,
-	size: int,
+	size:     int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
@@ -1063,8 +1063,8 @@ stack_resize_bytes_non_zeroed :: proc(
 	if size == 0 {
 		return nil, nil
 	}
-	start := uintptr(raw_data(s.data))
-	end := start + uintptr(len(s.data))
+	start     := uintptr(raw_data(s.data))
+	end       := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
 		panic("Out of bounds memory address passed to stack allocator (resize)")
@@ -1097,11 +1097,11 @@ stack_resize_bytes_non_zeroed :: proc(
 
 stack_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode: Allocator_Mode,
-	size: int,
-	alignment: int,
-	old_memory: rawptr,
-	old_size: int,
+	mode:           Allocator_Mode,
+	size:           int,
+	alignment:      int,
+	old_memory:     rawptr,
+	old_size:       int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := cast(^Stack)allocator_data
@@ -1200,10 +1200,10 @@ returns a pointer to the allocated memory region.
 */
 @(require_results)
 small_stack_alloc :: proc(
-	s: ^Small_Stack,
+	s:    ^Small_Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := small_stack_alloc_bytes(s, size, alignment, loc)
 	return raw_data(bytes), err
@@ -1218,10 +1218,10 @@ returns a slice of the allocated memory region.
 */
 @(require_results)
 small_stack_alloc_bytes :: proc(
-	s: ^Small_Stack,
+	s:    ^Small_Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	if bytes != nil {
@@ -1239,10 +1239,10 @@ procedure returns a pointer to the allocated memory region.
 */
 @(require_results)
 small_stack_alloc_non_zeroed :: proc(
-	s: ^Small_Stack,
+	s:    ^Small_Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	return raw_data(bytes), err
@@ -1257,10 +1257,10 @@ procedure returns a slice of the allocated memory region.
 */
 @(require_results)
 small_stack_alloc_bytes_non_zeroed :: proc(
-	s: ^Small_Stack,
+	s:    ^Small_Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if s.data == nil {
 		panic("Small stack is not initialized", loc)
@@ -1289,7 +1289,7 @@ by `alignment`. The allocated memory is not explicitly zero-initialized. This
 procedure returns a slice of the allocated memory region.
 */
 small_stack_free :: proc(
-	s: ^Small_Stack,
+	s:          ^Small_Stack,
 	old_memory: rawptr,
 	loc := #caller_location,
 ) -> Allocator_Error {
@@ -1341,12 +1341,12 @@ This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
 small_stack_resize :: proc(
-	s: ^Small_Stack,
+	s:          ^Small_Stack,
 	old_memory: rawptr,
-	old_size: int,
-	size: int,
+	old_size:   int,
+	size:       int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := small_stack_resize_bytes(s, byte_slice(old_memory, old_size), size, alignment, loc)
 	return raw_data(bytes), err
@@ -1370,11 +1370,11 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 small_stack_resize_bytes :: proc(
-	s: ^Small_Stack,
+	s:        ^Small_Stack,
 	old_data: []byte,
-	size: int,
+	size:     int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := small_stack_resize_bytes_non_zeroed(s, old_data, size, alignment, loc)
 	if bytes != nil {
@@ -1405,12 +1405,12 @@ This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
 small_stack_resize_non_zeroed :: proc(
-	s: ^Small_Stack,
+	s:          ^Small_Stack,
 	old_memory: rawptr,
-	old_size: int,
-	size: int,
+	old_size:   int,
+	size:       int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := small_stack_resize_bytes_non_zeroed(s, byte_slice(old_memory, old_size), size, alignment, loc)
 	return raw_data(bytes), err
@@ -1434,18 +1434,18 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 small_stack_resize_bytes_non_zeroed :: proc(
-	s: ^Small_Stack,
+	s:        ^Small_Stack,
 	old_data: []byte,
-	size: int,
+	size:     int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc := #caller_location,
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if s.data == nil {
 		panic("Small stack is not initialized", loc)
 	}
 	old_memory := raw_data(old_data)
-	old_size := len(old_data)
-	alignment := alignment
+	old_size   := len(old_data)
+	alignment  := alignment
 	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
 	if old_memory == nil {
 		return small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
@@ -1453,8 +1453,8 @@ small_stack_resize_bytes_non_zeroed :: proc(
 	if size == 0 {
 		return nil, nil
 	}
-	start := uintptr(raw_data(s.data))
-	end := start + uintptr(len(s.data))
+	start     := uintptr(raw_data(s.data))
+	end       := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
 		// panic("Out of bounds memory address passed to stack allocator (resize)");
@@ -1476,11 +1476,11 @@ small_stack_resize_bytes_non_zeroed :: proc(
 }
 
 small_stack_allocator_proc :: proc(
-	allocator_data: rawptr,
-	mode: Allocator_Mode,
-    size, alignment: int,
-    old_memory: rawptr,
-	old_size: int,
+	allocator_data:  rawptr,
+	mode:            Allocator_Mode,
+	size, alignment: int,
+	old_memory:      rawptr,
+	old_size:        int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := cast(^Small_Stack)allocator_data
@@ -1514,17 +1514,17 @@ small_stack_allocator_proc :: proc(
 
 
 /* Preserved for compatibility */
-Dynamic_Pool :: Dynamic_Arena
-DYNAMIC_POOL_BLOCK_SIZE_DEFAULT :: DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT
+Dynamic_Pool                          :: Dynamic_Arena
+DYNAMIC_POOL_BLOCK_SIZE_DEFAULT       :: DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT
 DYNAMIC_POOL_OUT_OF_BAND_SIZE_DEFAULT :: DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT
-dynamic_pool_allocator_proc :: dynamic_arena_allocator_proc
-dynamic_pool_free_all :: dynamic_arena_free_all
-dynamic_pool_reset :: dynamic_arena_reset
-dynamic_pool_alloc_bytes :: dynamic_arena_alloc_bytes
-dynamic_pool_alloc :: dynamic_arena_alloc
-dynamic_pool_init :: dynamic_arena_init
-dynamic_pool_allocator :: dynamic_arena_allocator
-dynamic_pool_destroy :: dynamic_arena_destroy
+dynamic_pool_allocator_proc           :: dynamic_arena_allocator_proc
+dynamic_pool_free_all                 :: dynamic_arena_free_all
+dynamic_pool_reset                    :: dynamic_arena_reset
+dynamic_pool_alloc_bytes              :: dynamic_arena_alloc_bytes
+dynamic_pool_alloc                    :: dynamic_arena_alloc
+dynamic_pool_init                     :: dynamic_arena_init
+dynamic_pool_allocator                :: dynamic_arena_allocator
+dynamic_pool_destroy                  :: dynamic_arena_destroy
 
 /*
 Default block size for dynamic arena.
@@ -1540,16 +1540,16 @@ DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT :: 6554
 Dynamic arena allocator data.
 */
 Dynamic_Arena :: struct {
-	block_size: int,
-	out_band_size: int,
-	alignment: int,
-	unused_blocks: [dynamic]rawptr,
-	used_blocks: [dynamic]rawptr,
+	block_size:           int,
+	out_band_size:        int,
+	alignment:            int,
+	unused_blocks:        [dynamic]rawptr,
+	used_blocks:          [dynamic]rawptr,
 	out_band_allocations: [dynamic]rawptr,
-	current_block: rawptr,
-	current_pos: rawptr,
-	bytes_left: int,
-	block_allocator: Allocator,
+	current_block:        rawptr,
+	current_pos:          rawptr,
+	bytes_left:           int,
+	block_allocator:      Allocator,
 }
 
 /*
@@ -1565,17 +1565,17 @@ dynamic_arena_init :: proc(
 	pool: ^Dynamic_Arena,
 	block_allocator := context.allocator,
 	array_allocator := context.allocator,
-	block_size := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT,
-	out_band_size := DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT,
-	alignment := DEFAULT_ALIGNMENT,
+	block_size      := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT,
+	out_band_size   := DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT,
+	alignment       := DEFAULT_ALIGNMENT,
 ) {
-	pool.block_size = block_size
-	pool.out_band_size = out_band_size
-	pool.alignment = alignment
-	pool.block_allocator = block_allocator
+	pool.block_size                     = block_size
+	pool.out_band_size                  = out_band_size
+	pool.alignment                      = alignment
+	pool.block_allocator                = block_allocator
 	pool.out_band_allocations.allocator = array_allocator
-	pool.unused_blocks.allocator = array_allocator
-	pool.used_blocks.allocator = array_allocator
+	pool.unused_blocks.allocator        = array_allocator
+	pool.used_blocks.allocator          = array_allocator
 }
 
 /*
@@ -1783,10 +1783,10 @@ This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
 dynamic_arena_resize :: proc(
-	a: ^Dynamic_Arena,
+	a:          ^Dynamic_Arena,
 	old_memory: rawptr,
-	old_size: int,
-	size: int,
+	old_size:   int,
+	size:       int,
 	loc := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := dynamic_arena_resize_bytes(a, byte_slice(old_memory, old_size), size, loc)
@@ -1811,9 +1811,9 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 dynamic_arena_resize_bytes :: proc(
-	a: ^Dynamic_Arena,
+	a:        ^Dynamic_Arena,
 	old_data: []byte,
-	size: int,
+	size:     int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := dynamic_arena_resize_bytes_non_zeroed(a, old_data, size, loc)
@@ -1845,10 +1845,10 @@ This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
 dynamic_arena_resize_non_zeroed :: proc(
-	a: ^Dynamic_Arena,
+	a:          ^Dynamic_Arena,
 	old_memory: rawptr,
-	old_size: int,
-	size: int,
+	old_size:   int,
+	size:       int,
 	loc := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := dynamic_arena_resize_bytes_non_zeroed(a, byte_slice(old_memory, old_size), size, loc)
@@ -1873,9 +1873,9 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 dynamic_arena_resize_bytes_non_zeroed :: proc(
-	a: ^Dynamic_Arena,
+	a:        ^Dynamic_Arena,
 	old_data: []byte,
-	size: int,
+	size:     int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	old_memory := raw_data(old_data)
@@ -1892,11 +1892,11 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 
 dynamic_arena_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode: Allocator_Mode,
-	size: int,
-	alignment: int,
-	old_memory: rawptr,
-	old_size: int,
+	mode:           Allocator_Mode,
+	size:           int,
+	alignment:      int,
+	old_memory:     rawptr,
+	old_size:       int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	arena := (^Dynamic_Arena)(allocator_data)
@@ -2048,7 +2048,7 @@ buddy_block_find_best :: proc(head, tail: ^Buddy_Block, size: uint) -> ^Buddy_Bl
 			// to pick the buddy as it "bounces around" less
 			best_block = buddy
 		}
-		if (block.size <= buddy.size) {
+		if block.size <= buddy.size {
 			block = buddy_block_next(buddy)
 			if (block < tail) {
 				// Delay the buddy block for the next iteration
@@ -2072,8 +2072,8 @@ buddy_block_find_best :: proc(head, tail: ^Buddy_Block, size: uint) -> ^Buddy_Bl
 The buddy allocator data.
 */
 Buddy_Allocator :: struct {
-	head: ^Buddy_Block,
-	tail: ^Buddy_Block,
+	head:      ^Buddy_Block,
+	tail:      ^Buddy_Block,
 	alignment: uint,
 }
 
@@ -2234,11 +2234,11 @@ buddy_allocator_free_all :: proc(b: ^Buddy_Allocator) {
 }
 
 buddy_allocator_proc :: proc(
-	allocator_data: rawptr,
-	mode: Allocator_Mode,
+	allocator_data:  rawptr,
+	mode:            Allocator_Mode,
 	size, alignment: int,
-	old_memory: rawptr,
-	old_size: int,
+	old_memory:      rawptr,
+	old_size:        int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	b := (^Buddy_Allocator)(allocator_data)
