@@ -79,13 +79,13 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	defer if err != nil {
 		strings.builder_destroy(&b)
 	}
-	
+
 	// temp guard in case we are sorting map keys, which will use temp allocations
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 
 	opt := opt
 	marshal_to_builder(&b, v, &opt) or_return
-	
+
 	if len(b.buf) != 0 {
 		data = b.buf[:]
 	}
@@ -210,7 +210,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Relative_Multi_Pointer:
 		return .Unsupported_Type
-		
+
 	case runtime.Type_Info_Matrix:
 		return .Unsupported_Type
 
@@ -225,7 +225,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
-		
+
 	case runtime.Type_Info_Enumerated_Array:
 		if opt.enumerated_array_as_map {
 			opt_write_start(w, opt, '{') or_return
@@ -240,20 +240,20 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 						if opt.enumerated_array_map_use_names {
 							key = enum_val.names[ei]
 						} else {
-							key = strconv.append_bits(buf[:], cast(u64)enum_val.values[ei], 10, true, 8 * info.elem_size, "0123456789", nil)
+							key = strconv.append_int(buf[:], cast(i64)enum_val.values[ei], 10)
 						}
 						break
 					}
 				}
-				
+
 				if key == "" {
 					continue
 				}
-				
+
 				defer counter += 1
 				opt_write_iteration(w, opt, counter == 0) or_return
-				opt_write_key(w, opt, key)
-				
+				opt_write_key(w, opt, key) or_return
+
 				data := uintptr(v.data) + uintptr(i*info.elem_size)
 				marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 			}
@@ -267,7 +267,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			}
 			opt_write_end(w, opt, ']') or_return
 		}
-		
+
 	case runtime.Type_Info_Dynamic_Array:
 		opt_write_start(w, opt, '[') or_return
 		array := cast(^mem.Raw_Dynamic_Array)v.data
@@ -300,7 +300,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
 
 			_, can_sort := info.key.variant.(runtime.Type_Info_String)
-			
+
 			if opt.sort_maps_by_key && can_sort {
 				Entry :: struct {
 					key: string,
@@ -373,7 +373,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 							buf: [40]byte
 							u := cast_any_int_to_u128(ka)
 							name = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
-							
+
 							opt_write_key(w, opt, name) or_return
 						case: return .Unsupported_Type
 						}
@@ -470,7 +470,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			}
 			return
 		}
-		
+
 		opt_write_start(w, opt, '{') or_return
 		marshal_struct_fields(w, v, opt) or_return
 		opt_write_end(w, opt, '}') or_return
@@ -535,11 +535,11 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			}
 			return false
 		}
-		
+
 		bit_data: u128
 		bit_size := u128(8*ti.size)
 
-		do_byte_swap := is_bit_set_different_endian_to_platform(ti)
+		do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying)
 
 		switch bit_size {
 		case  0: bit_data = 0
@@ -572,7 +572,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			bit_data = u128(x)
 		case: panic("unknown bit_size size")
 		}
-		
+
 		if opt.bit_set_as_array {
 			opt_write_start(w, opt, '[') or_return
 			et := runtime.type_info_base(info.elem)
@@ -584,7 +584,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				}
 				defer counter += 1
 				opt_write_iteration(w, opt, counter == 0) or_return
-				
+
 				if is_enum {
 					for enum_val, enum_val_index in en.values {
 						if i64(enum_val) == i64(i) + info.lower {
@@ -628,7 +628,7 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 		} else {
 			io.write_string(w, ": " if opt.pretty else ":") or_return
 		}
-	}	
+	}
 
 	return
 }
