@@ -520,25 +520,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		}
 
 	case runtime.Type_Info_Bit_Set:
-		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
-			if ti == nil {
-				return false
-			}
-			t := runtime.type_info_base(ti)
-			#partial switch info in t.variant {
-			case runtime.Type_Info_Integer:
-				switch info.endianness {
-				case .Platform: return false
-				case .Little:   return ODIN_ENDIAN != .Little
-				case .Big:      return ODIN_ENDIAN != .Big
-				}
-			}
-			return false
-		}
-
 		bit_data: u128
 		bit_size := u128(8*ti.size)
-
 		do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying)
 
 		switch bit_size {
@@ -757,4 +740,19 @@ cast_any_int_to_u128 :: proc(any_int_value: any) -> u128 {
 	}
 
 	return u
+}
+
+@(private)
+is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
+	if ti == nil {
+		return false
+	}
+	t := runtime.type_info_base(ti)
+	info := t.variant.(runtime.Type_Info_Integer)
+	switch info.endianness {
+	case .Platform: return false
+	case .Little:   return ODIN_ENDIAN != .Little
+	case .Big:      return ODIN_ENDIAN != .Big
+	case:           return false
+	}
 }
