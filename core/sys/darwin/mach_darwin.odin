@@ -421,6 +421,8 @@ VM_Flag :: enum c.int {
 	Alias_Mask6,
 	Alias_Mask7,
 	Alias_Mask8,
+
+	HW = TPRO,
 }
 
 VM_Flags :: distinct bit_set[VM_Flag; c.int]
@@ -455,9 +457,6 @@ VM_GET_FLAGS_ALIAS :: proc(flags: VM_Flags) -> c.int {
 // NOTE(beau): no need for VM_SET_FLAGS_ALIAS, just mask in things from
 // VM_Flag.Alias_Mask*
 
-VM_FLAG_HW  :: VM_Flag.TPRO
-VM_FLAGS_HW :: VM_Flags{VM_FLAG_HW}
-
 /* These are the flags that we accept from user-space */
 VM_FLAGS_USER_ALLOCATE :: VM_Flags {
 	 .Anywhere,
@@ -467,7 +466,7 @@ VM_FLAGS_USER_ALLOCATE :: VM_Flags {
 	 .No_Cache,
 	 .Permanent,
 	 .Overwrite,
-} | VM_FLAGS_FIXED | VM_FLAGS_SUPERPAGE_MASK | VM_FLAGS_ALIAS_MASK | VM_FLAGS_HW
+} | VM_FLAGS_FIXED | VM_FLAGS_SUPERPAGE_MASK | VM_FLAGS_ALIAS_MASK
 
 VM_FLAGS_USER_MAP :: VM_Flags {
 	.Return_4K_Data_Addr,
@@ -510,16 +509,16 @@ VM_Inherit :: enum vm_inherit_t {
 	Copy,
 	None,
 	Donate_Copy,
-}
 
-VM_INHERIT_DEFAULT    :: VM_Inherit.Copy
-VM_INHERIT_LAST_VALID :: VM_Inherit.None
+	Default    = Copy,
+	Last_Valid = None,
+}
 
 Sync_Policy :: enum sync_policy_t {
 	Fifo,
 	Fixed_Priority,
 	Reversed,
 	Order_Mask,
-}
 
-SYNC_POLICY_LIFO :: Sync_Policy.Fifo | Sync_Policy.Reversed
+	Lifo = Fifo | Reversed,
+}
