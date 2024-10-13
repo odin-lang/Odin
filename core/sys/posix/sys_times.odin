@@ -24,7 +24,7 @@ when ODIN_OS == .NetBSD {
 	@(private) LTIMES :: "times"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	tms :: struct {
 		tms_utime:  clock_t, /* [PSX] user CPU time */

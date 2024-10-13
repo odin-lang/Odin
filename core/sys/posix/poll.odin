@@ -72,6 +72,26 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	POLLHUP    :: 0x0010
 	POLLNVAL   :: 0x0020
 
+} else when ODIN_OS == .Linux {
+
+	pollfd :: struct {
+		fd:      FD,         /* [PSX] the following descriptor being polled */
+		events:  Poll_Event, /* [PSX] the input event flags */
+		revents: Poll_Event, /* [PSX] the output event flags */
+	}
+
+	POLLIN     :: 0x0001
+	POLLRDNORM :: 0x0040
+	POLLRDBAND :: 0x0080
+	POLLPRI    :: 0x0002
+	POLLOUT    :: 0x0004
+	POLLWRNORM :: 0x0100
+	POLLWRBAND :: 0x0200
+
+	POLLERR    :: 0x0008
+	POLLHUP    :: 0x0010
+	POLLNVAL   :: 0x0020
+
 } else {
 	#panic("posix is unimplemented for the current target")
 }

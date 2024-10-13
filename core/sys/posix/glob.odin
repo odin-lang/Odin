@@ -112,7 +112,7 @@ when ODIN_OS == .Darwin {
 
 	glob_t :: struct {
 		gl_pathc:  c.size_t,                      /* [PSX] count of paths matched by pattern */
-		gl_matchc: c.size_t,                         /* count of paths matching pattern */
+		gl_matchc: c.size_t,                      /* count of paths matching pattern */
 		gl_offs:   c.size_t,                      /* [PSX] slots to reserve at the beginning of gl_pathv */
 		gl_flags:  Glob_Flags,                    /* copy of flags parameter to glob */
 		gl_pathv:  [^]cstring `fmt:"v,gl_pathc"`, /* [PSX] pointer to list of matched pathnames */
@@ -144,7 +144,7 @@ when ODIN_OS == .Darwin {
 
 	glob_t :: struct {
 		gl_pathc:  c.size_t,                      /* [PSX] count of paths matched by pattern */
-		gl_matchc: c.size_t,                         /* count of paths matching pattern */
+		gl_matchc: c.size_t,                      /* count of paths matching pattern */
 		gl_offs:   c.size_t,                      /* [PSX] slots to reserve at the beginning of gl_pathv */
 		gl_flags:  Glob_Flags,                    /* copy of flags parameter to glob */
 		gl_pathv:  [^]cstring `fmt:"v,gl_pathc"`, /* [PSX] pointer to list of matched pathnames */
@@ -173,6 +173,35 @@ when ODIN_OS == .Darwin {
 	GLOB_ABORTED :: -2
 	GLOB_NOMATCH :: -3
 	GLOB_NOSPACE :: -1
+
+} else when ODIN_OS == .Linux {
+
+	glob_t :: struct {
+		gl_pathc:  c.size_t,                      /* [PSX] count of paths matched by pattern */
+		gl_pathv:  [^]cstring `fmt:"v,gl_pathc"`, /* [PSX] pointer to list of matched pathnames */
+		gl_offs:   c.size_t,                      /* [PSX] slots to reserve at the beginning of gl_pathv */
+		gl_flags:  Glob_Flags,                    /* copy of flags parameter to glob */
+
+		// Non-standard alternate file system access functions:
+
+		gl_closedir: proc "c" (dirp: DIR),
+		gl_readdir:  proc "c" (dirp: DIR) -> ^dirent,
+		gl_opendir:  proc "c" (path: cstring) -> DIR,
+		gl_lstat:    proc "c" (path: cstring, buf: ^stat_t) -> result,
+		gl_stat:     proc "c" (path: cstring, buf: ^stat_t) -> result,
+	}
+
+	GLOB_ERR      :: 1 << 0
+	GLOB_MARK     :: 1 << 1
+	GLOB_NOSORT   :: 1 << 2
+	GLOB_DOOFFS   :: 1 << 3
+	GLOB_NOCHECK  :: 1 << 4
+	GLOB_APPEND   :: 1 << 5
+	GLOB_NOESCAPE :: 1 << 6
+
+	GLOB_NOSPACE :: 1
+	GLOB_ABORTED :: 2
+	GLOB_NOMATCH :: 3
 
 } else {
 	#panic("posix is unimplemented for the current target")

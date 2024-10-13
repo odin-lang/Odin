@@ -30,7 +30,7 @@ Protocol :: enum c.int {
 	UDP  = IPPROTO_UDP,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	in_addr :: struct {
 		s_addr: in_addr_t, /* [PSX] big endian address */
@@ -44,26 +44,63 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		},
 	}
 
-	sockaddr_in :: struct {
-		sin_len:    c.uint8_t,
-		sin_family: sa_family_t, /* [PSX] AF_INET (but a smaller size) */
-		sin_port:   in_port_t,   /* [PSX] port number */
-		sin_addr:   in_addr,     /* [PSX] IP address */
-		sin_zero:   [8]c.char,
-	}
+	when ODIN_OS == .Linux {
 
-	sockaddr_in6 :: struct {
-		sin6_len:      c.uint8_t,
-		sin6_family:   sa_family_t, /* [PSX] AF_INET6 (but a smaller size) */
-		sin6_port:     in_port_t,   /* [PSX] port number */
-		sin6_flowinfo: c.uint32_t,  /* [PSX] IPv6 traffic class and flow information */
-		sin6_addr:     in6_addr,    /* [PSX] IPv6 address */
-		sin6_scope_id: c.uint32_t,  /* [PSX] set of interfaces for a scope */
-	}
+		sockaddr_in :: struct {
+			sin_family: sa_family_t, /* [PSX] AF_INET (but a smaller size) */
+			sin_port:   in_port_t,   /* [PSX] port number */
+			sin_addr:   in_addr,     /* [PSX] IP address */
+			sin_zero:   [8]c.char,
+		}
 
-	ipv6_mreq :: struct {
-		ipv6mr_multiaddr: in6_addr, /* [PSX] IPv6 multicast address */
-		ipv6mr_interface: c.uint,   /* [PSX] interface index */
+		sockaddr_in6 :: struct {
+			sin6_family:   sa_family_t, /* [PSX] AF_INET6 (but a smaller size) */
+			sin6_port:     in_port_t,   /* [PSX] port number */
+			sin6_flowinfo: u32be,       /* [PSX] IPv6 traffic class and flow information */
+			sin6_addr:     in6_addr,    /* [PSX] IPv6 address */
+			sin6_scope_id: c.uint32_t,  /* [PSX] set of interfaces for a scope */
+		}
+
+		IPV6_MULTICAST_IF   :: 17
+		IPV6_UNICAST_HOPS   :: 16
+		IPV6_MULTICAST_HOPS :: 18
+		IPV6_MULTICAST_LOOP :: 19
+		IPV6_JOIN_GROUP     :: 20
+		IPV6_LEAVE_GROUP    :: 21
+		IPV6_V6ONLY         :: 26
+
+	} else {
+
+		sockaddr_in :: struct {
+			sin_len:    c.uint8_t,
+			sin_family: sa_family_t, /* [PSX] AF_INET (but a smaller size) */
+			sin_port:   in_port_t,   /* [PSX] port number */
+			sin_addr:   in_addr,     /* [PSX] IP address */
+			sin_zero:   [8]c.char,
+		}
+
+		sockaddr_in6 :: struct {
+			sin6_len:      c.uint8_t,
+			sin6_family:   sa_family_t, /* [PSX] AF_INET6 (but a smaller size) */
+			sin6_port:     in_port_t,   /* [PSX] port number */
+			sin6_flowinfo: c.uint32_t,  /* [PSX] IPv6 traffic class and flow information */
+			sin6_addr:     in6_addr,    /* [PSX] IPv6 address */
+			sin6_scope_id: c.uint32_t,  /* [PSX] set of interfaces for a scope */
+		}
+
+		ipv6_mreq :: struct {
+			ipv6mr_multiaddr: in6_addr, /* [PSX] IPv6 multicast address */
+			ipv6mr_interface: c.uint,   /* [PSX] interface index */
+		}
+
+		IPV6_JOIN_GROUP     :: 12
+		IPV6_LEAVE_GROUP    :: 13
+		IPV6_MULTICAST_HOPS :: 10
+		IPV6_MULTICAST_IF   :: 9
+		IPV6_MULTICAST_LOOP :: 11
+		IPV6_UNICAST_HOPS   :: 4
+		IPV6_V6ONLY         :: 27
+
 	}
 
 	IPPROTO_IP   :: 0
@@ -75,14 +112,6 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 
 	INADDR_ANY       :: 0x00000000
 	INADDR_BROADCAST :: 0xFFFFFFFF
-
-	IPV6_JOIN_GROUP     :: 12
-	IPV6_LEAVE_GROUP    :: 13
-	IPV6_MULTICAST_HOPS :: 10
-	IPV6_MULTICAST_IF   :: 9
-	IPV6_MULTICAST_LOOP :: 11
-	IPV6_UNICAST_HOPS   :: 4
-	IPV6_V6ONLY         :: 27
 
 	IN6_IS_ADDR_UNSPECIFIED :: #force_inline proc "contextless" (a: in6_addr) -> b32 {
 		return a.s6_addr == 0

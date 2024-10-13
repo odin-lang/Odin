@@ -114,7 +114,7 @@ foreign lib {
 	getgrnam_r :: proc(name: cstring, grp: ^group, buffer: [^]byte, bufsize: c.size_t, result: ^^group) -> Errno ---
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	gid_t :: distinct c.uint32_t
 

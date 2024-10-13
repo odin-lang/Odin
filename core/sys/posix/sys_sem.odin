@@ -123,6 +123,36 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		sem_flg: c.short,  /* [PSX] operation flags */
 	}
 
+} else when ODIN_OS == .Linux {
+
+	SEM_UNDO :: 0x1000 // undo the operation on exit
+
+	// Commands for `semctl'.
+	GETPID  :: 11
+	GETVAL  :: 12
+	GETALL  :: 13
+	GETNCNT :: 14
+	GETZCNT :: 15
+	SETVAL  :: 16
+	SETALL  :: 17
+
+	semid_ds :: struct {
+		sem_perm:  ipc_perm,  // [PSX] operation permission structure
+		sem_otime: time_t,    // [PSX] last semop()
+		__sem_otime_high: c.ulong,
+		sem_ctime: time_t,    // [PSX] last time changed by semctl()
+		__sem_ctime_high: c.ulong,
+		sem_nsems: c.ulong, // [PSX] number of semaphores in set
+		__glibc_reserved3: c.ulong,
+		__glibc_reserved4: c.ulong,
+	}
+
+	sembuf :: struct {
+		sem_num: c.ushort, /* [PSX] semaphore number */
+		sem_op:  c.short,  /* [PSX] semaphore operation */
+		sem_flg: c.short,  /* [PSX] operation flags */
+	}
+
 } else {
 	#panic("posix is unimplemented for the current target")
 }
