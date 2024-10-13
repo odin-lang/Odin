@@ -285,7 +285,7 @@ gb_internal void error_operand_no_value(Operand *o) {
 	if (o->mode == Addressing_NoValue) {
 		Ast *x = unparen_expr(o->expr);
 
-		if (x->kind == Ast_CallExpr) {
+		if (x != nullptr && x->kind == Ast_CallExpr) {
 			Ast *p = unparen_expr(x->CallExpr.proc);
 			if (p->kind == Ast_BasicDirective) {
 				String tag = p->BasicDirective.name.string;
@@ -297,7 +297,7 @@ gb_internal void error_operand_no_value(Operand *o) {
 		}
 
 		gbString err = expr_to_string(o->expr);
-		if (x->kind == Ast_CallExpr) {
+		if (x != nullptr && x->kind == Ast_CallExpr) {
 			error(o->expr, "'%s' call does not return a value and cannot be used as a value", err);
 		} else {
 			error(o->expr, "'%s' used as a value", err);
@@ -3901,6 +3901,12 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		// IMPORTANT NOTE(bill): This uses right-left evaluation in type checking only no in
 		check_expr(c, y, be->right);
 		Type *rhs_type = type_deref(y->type);
+		if (rhs_type == nullptr) {
+			error(y->expr, "Cannot use '%.*s' on an expression with no value", LIT(op.string));
+			x->mode = Addressing_Invalid;
+			x->expr = node;
+			return;
+		}
 
 		if (is_type_bit_set(rhs_type)) {
 			Type *elem = base_type(rhs_type)->BitSet.elem;
