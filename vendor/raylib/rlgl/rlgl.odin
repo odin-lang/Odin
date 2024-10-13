@@ -438,6 +438,7 @@ foreign lib {
 	BlitFramebuffer	 :: proc(srcX, srcY, srcWidth, srcHeight, dstX, dstY, dstWidth, dstHeight, bufferMask: c.int) --- // Blit active framebuffer to main framebuffer
 
 	// General render state
+	EnableColorBlend       :: proc() ---                           // Enable color blending
 	DisableColorBlend      :: proc() ---                           // Disable color blending
 	EnableDepthTest        :: proc() ---                           // Enable depth test
 	DisableDepthTest       :: proc() ---                           // Disable depth test
