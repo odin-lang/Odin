@@ -28,6 +28,25 @@ CPU_Feature :: enum u64 {
 	ssse3,     // Supplemental streaming SIMD extension 3
 	sse41,     // Streaming SIMD extension 4 and 4.1
 	sse42,     // Streaming SIMD extension 4 and 4.2
+
+	avx512_4fmaps,       // Fused Multiply Accumulation Packed Single precision
+	avx512_4vnniw,       // Vector Neural Network Instructions Word variable precision
+	avx512_bf16,         // Vector Neural Network Instructions supporting bfloat16
+	avx512_bitalg,       // Bit Algorithms
+	avx512_bw,           // Byte and Word instructions
+	avx512_cd,           // Conflict Detection instructions
+	avx512_dq,           // Doubleword and Quadword instructions
+	avx512_er,           // Exponential and Reciprocal instructions
+	avx512_f,            // Foundation
+	avx512_fp16,         // Vector 16-bit float instructions
+	avx512_ifma,         // Integer Fused Multiply Add
+	avx512_pf,           // Prefetch instructions
+	avx512_vbmi,         // Vector Byte Manipulation Instructions
+	avx512_vbmi2,        // Vector Byte Manipulation Instructions 2
+	avx512_vl,           // Vector Length extensions
+	avx512_vnni,         // Vector Neural Network Instructions
+	avx512_vp2intersect, // Vector Pair Intersection to a Pair of Mask Registers
+	avx512_vpopcntdq,    // Vector Population Count for Doubleword and Quadword
 }
 
 CPU_Features :: distinct bit_set[CPU_Feature; u64]
@@ -82,9 +101,11 @@ init_cpu_features :: proc "c" () {
 	//
 	// See: crbug.com/375968
 	os_supports_avx := false
+	os_supports_avx512 := false
 	if .os_xsave in set && is_set(26, ecx1) {
 		eax, _ := xgetbv(0)
 		os_supports_avx = is_set(1, eax) && is_set(2, eax)
+		os_supports_avx512 = is_set(5, eax) && is_set(6, eax) && is_set(7, eax)
 	}
 	if os_supports_avx {
 		try_set(&set, .avx, 28, ecx1)
@@ -94,10 +115,34 @@ init_cpu_features :: proc "c" () {
 		return
 	}
 
-	_, ebx7, _, _ := cpuid(7, 0)
+	_, ebx7, ecx7, edx7 := cpuid(7, 0)
 	try_set(&set, .bmi1, 3, ebx7)
 	if os_supports_avx {
 		try_set(&set, .avx2, 5, ebx7)
+	}
+	if os_supports_avx512 {
+		try_set(&set, .avx512_f,    16, ebx7)
+		try_set(&set, .avx512_dq,   17, ebx7)
+		try_set(&set, .avx512_ifma, 21, ebx7)
+		try_set(&set, .avx512_pf,   26, ebx7)
+		try_set(&set, .avx512_er,   27, ebx7)
+		try_set(&set, .avx512_cd,   28, ebx7)
+		try_set(&set, .avx512_bw,   30, ebx7)
+		try_set(&set, .avx512_vl,   31, ebx7)
+
+		try_set(&set, .avx512_vbmi,       1, ecx7)
+		try_set(&set, .avx512_vbmi2,      6, ecx7)
+		try_set(&set, .avx512_vnni,      11, ecx7)
+		try_set(&set, .avx512_bitalg,    12, ecx7)
+		try_set(&set, .avx512_vpopcntdq, 14, ecx7)
+
+		try_set(&set, .avx512_4vnniw, 2, edx7)
+		try_set(&set, .avx512_4fmaps, 3, edx7)
+		try_set(&set, .avx512_vp2intersect, 8, edx7)
+		try_set(&set, .avx512_fp16, 23, edx7)
+
+		eax7_1, _, _, _ := cpuid(7, 1)
+		try_set(&set, .avx512_bf16, 5, eax7_1)
 	}
 	try_set(&set, .bmi2,    8, ebx7)
 	try_set(&set, .erms,    9, ebx7)
