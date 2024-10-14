@@ -136,10 +136,10 @@ init_cpu_features :: proc "c" () {
 		try_set(&set, .avx512_bitalg,    12, ecx7)
 		try_set(&set, .avx512_vpopcntdq, 14, ecx7)
 
-		try_set(&set, .avx512_4vnniw, 2, edx7)
-		try_set(&set, .avx512_4fmaps, 3, edx7)
-		try_set(&set, .avx512_vp2intersect, 8, edx7)
-		try_set(&set, .avx512_fp16, 23, edx7)
+		try_set(&set, .avx512_4vnniw,        2, edx7)
+		try_set(&set, .avx512_4fmaps,        3, edx7)
+		try_set(&set, .avx512_vp2intersect,  8, edx7)
+		try_set(&set, .avx512_fp16,         23, edx7)
 
 		eax7_1, _, _, _ := cpuid(7, 1)
 		try_set(&set, .avx512_bf16, 5, eax7_1)
