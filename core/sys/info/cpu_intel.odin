@@ -128,7 +128,11 @@ init_cpu_features :: proc "c" () {
 		try_set(&set, .avx512_er,   27, ebx7)
 		try_set(&set, .avx512_cd,   28, ebx7)
 		try_set(&set, .avx512_bw,   30, ebx7)
-		try_set(&set, .avx512_vl,   31, ebx7)
+
+		// XMM/YMM are also required for 128/256-bit instructions
+		if os_supports_avx {
+			try_set(&set, .avx512_vl, 31, ebx7)
+		}
 
 		try_set(&set, .avx512_vbmi,       1, ecx7)
 		try_set(&set, .avx512_vbmi2,      6, ecx7)
