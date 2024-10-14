@@ -534,6 +534,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 
 	// MacOS Sequoia
 	"24A335"     = {{24, 0, 0}, "macOS", {"Sequoia",        {15, 0, 0}}},
+	"24A348"     = {{24, 0, 0}, "macOS", {"Sequoia",        {15, 0, 1}}},
 }
 
 @(private)

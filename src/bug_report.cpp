@@ -921,6 +921,7 @@ gb_internal void report_os_info() {
 			{"23G93",    {23,  6,  0}, "macOS", {"Sonoma",        {14,  6,  1}}},
 			{"23H124",   {23,  6,  0}, "macOS", {"Sonoma",        {14,  7,  0}}},
 			{"24A335",   {24,  0,  0}, "macOS", {"Sequoia",       {15,  0,  0}}},
+			{"24A348",   {24,  0,  0}, "macOS", {"Sequoia",       {15,  0,  1}}},
 		};
 
 
