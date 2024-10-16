@@ -2701,10 +2701,14 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 
 	case_ast_node(bs, BlockStmt, node);
+		lbBlock *body = nullptr;
 		lbBlock *done = nullptr;
 		if (bs->label != nullptr) {
+			body = lb_create_block(p, "block.body");
 			done = lb_create_block(p, "block.done");
-			lb_add_debug_label(p, bs->label, p->curr_block);
+			lb_emit_jump(p, body);
+			lb_start_block(p, body);
+			lb_add_debug_label(p, bs->label, body);
 			lbTargetList *tl = lb_push_target_list(p, bs->label, done, nullptr, nullptr);
 			tl->is_block = true;
 		}
