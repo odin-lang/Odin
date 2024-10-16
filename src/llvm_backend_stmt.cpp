@@ -2403,16 +2403,17 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 		post = lb_create_block(p, "for.post");
 	}
 
-	lb_add_debug_label(p, fs->label, p->curr_block);
 	lb_push_target_list(p, fs->label, done, post, nullptr);
 
+	lbBlock *init = lb_create_block(p, "for.init");
+	lb_emit_jump(p, init);
+	lb_start_block(p, init);
 	if (fs->init != nullptr) {
-	#if 1
-		lbBlock *init = lb_create_block(p, "for.init");
-		lb_emit_jump(p, init);
-		lb_start_block(p, init);
-	#endif
 		lb_build_stmt(p, fs->init);
+	}
+	if (fs->label != nullptr && p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, fs->label));
+		lb_add_debug_label(p, fs->label, init);
 	}
 
 	lb_emit_jump(p, loop);
@@ -2426,7 +2427,6 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 		lb_build_cond(p, fs->cond, body, done);
 		lb_start_block(p, body);
 	}
-
 
 	lb_build_stmt(p, fs->body);
 
