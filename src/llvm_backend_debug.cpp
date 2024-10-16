@@ -1310,6 +1310,11 @@ extern "C" LLVMMetadataRef _ZN4llvm9DIBuilder11createLabelEPNS_7DIScopeENS_9Stri
 	LLVMMetadataRef File,
 	unsigned int LineNo,
 	unsigned int AlwaysPreserve);
+extern "C" LLVMMetadataRef _ZN4llvm9DIBuilder11insertLabelEPNS_7DILabelEPKNS_10DILocationEPNS_10BasicBlockE(
+	LLVMDIBuilderRef Builder,
+	LLVMMetadataRef Label,
+	LLVMMetadataRef Location,
+	LLVMBasicBlockRef Block);
 #endif
 gb_internal void lb_add_debug_label(lbProcedure *p, Scope *parent, Ast *ast) {
 	if (p == nullptr || p->debug_info == nullptr || p->body == nullptr) {
@@ -1337,11 +1342,13 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Scope *parent, Ast *ast) {
 		debugf("llvm file not found for label\n");
 		return;
 	}
-	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
+	LLVMMetadataRef llvm_scope = p->debug_info;
 	if(llvm_scope == nullptr) {
 		debugf("llvm scope not found for label\n");
 		return;
 	}
+	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, label_token.pos);
+	LLVMBasicBlockRef llvm_block = p->curr_block->block;
 	LLVMMetadataRef llvm_label = _ZN4llvm9DIBuilder11createLabelEPNS_7DIScopeENS_9StringRefEPNS_6DIFileEjb(
 		m->debug_builder,
 		llvm_scope,
@@ -1350,12 +1357,16 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Scope *parent, Ast *ast) {
 		label_token.pos.line,
 		1 // False by default. Not sure why.
 	);
+	_ZN4llvm9DIBuilder11insertLabelEPNS_7DILabelEPKNS_10DILocationEPNS_10BasicBlockE(	
+		m->debug_builder,
+		llvm_label,
+		llvm_debug_loc,
+		llvm_block
+	);
 	String file_name = file->fullpath;
 	debugf("New label: %.*s %.*s:%d %p\n",
-		label_token.string.len,
-		label_token.string.text,
-		file_name.len,
-		file_name.text,
+		LIT(label_token.string),
+		LIT(file_name),
 		label_token.pos.line,
 		llvm_label
 	);
