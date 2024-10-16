@@ -687,6 +687,18 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 	lbBlock *body = lb_create_block(p, "for.interval.body");
 	lbBlock *done = lb_create_block(p, "for.interval.done");
 
+	// TODO(tf2spi): This is inlined in more than several places.
+	//               Putting this in a function might be preferred.
+	//               LLVMSetCurrentDebugLocation2 has side effects,
+	//               so I didn't want to hide that before it got reviewed.
+	if (rs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.interval.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
+		lb_add_debug_label(p, rs->label, label);
+	}
 	lb_emit_jump(p, loop);
 	lb_start_block(p, loop);
 
@@ -715,7 +727,6 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 			continue_block = check;
 		}
 
-		lb_add_debug_label(p, rs->label, p->curr_block);
 		lb_push_target_list(p, rs->label, done, continue_block, nullptr);
 
 		lb_build_stmt(p, rs->body);
@@ -849,7 +860,6 @@ gb_internal void lb_build_range_tuple(lbProcedure *p, AstRangeStmt *rs, Scope *s
 		}
 	}
 
-	lb_add_debug_label(p, rs->label, p->curr_block);
 	lb_push_target_list(p, rs->label, done, loop, nullptr);
 
 	lb_build_stmt(p, rs->body);
@@ -894,6 +904,14 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 
 	lbAddr index = lb_add_local_generated(p, t_int, false);
 
+	if (rs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.soa.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
+		lb_add_debug_label(p, rs->label, label);
+	}
 	if (!is_reverse) {
 		/*
 			for x, i in array {
@@ -971,8 +989,6 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 		lb_store_range_stmt_val(p, val1, lb_addr_load(p, index));
 	}
 
-
-	lb_add_debug_label(p, rs->label, p->curr_block);
 	lb_push_target_list(p, rs->label, done, loop, nullptr);
 
 	lb_build_stmt(p, rs->body);
@@ -1030,6 +1046,15 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 	lbBlock *loop = nullptr;
 	lbBlock *done = nullptr;
 	bool is_map = false;
+
+	if (rs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.range.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
+		lb_add_debug_label(p, rs->label, label);
+	}
 
 	if (tav.mode == Addressing_Type) {
 		lb_build_range_enum(p, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
@@ -1170,7 +1195,6 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 		if (val1_type) lb_store_range_stmt_val(p, val1, key);
 	}
 
-	lb_add_debug_label(p, rs->label, p->curr_block);
 	lb_push_target_list(p, rs->label, done, loop, nullptr);
 
 	lb_build_stmt(p, rs->body);
@@ -1533,6 +1557,14 @@ gb_internal bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, boo
 gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	lb_open_scope(p, scope);
 
+	if (ss->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "switch.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, ss->label));
+		lb_add_debug_label(p, ss->label, label);
+	}
 	if (ss->init != nullptr) {
 		lb_build_stmt(p, ss->init);
 	}
@@ -1681,7 +1713,6 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		}
 		lb_start_block(p, default_block);
 
-		lb_add_debug_label(p, ss->label, p->curr_block);
 		lb_push_target_list(p, ss->label, done, nullptr, default_fall);
 		lb_open_scope(p, default_block->scope);
 		lb_build_stmt_list(p, default_stmts);
@@ -2312,7 +2343,14 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 		else_ = lb_create_block(p, "if.else");
 	}
 	if (is->label != nullptr) {
-		lb_add_debug_label(p, is->label, p->curr_block);
+		if (p->debug_info != nullptr) {
+			lbBlock *label = lb_create_block(p, "if.label");
+			lb_emit_jump(p, label);
+			lb_start_block(p, label);
+
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, is->label));
+			lb_add_debug_label(p, is->label, label);
+		}
 		lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
 		tl->is_block = true;
 	}
@@ -2405,15 +2443,20 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 
 	lb_push_target_list(p, fs->label, done, post, nullptr);
 
-	lbBlock *init = lb_create_block(p, "for.init");
-	lb_emit_jump(p, init);
-	lb_start_block(p, init);
-	if (fs->init != nullptr) {
-		lb_build_stmt(p, fs->init);
-	}
 	if (fs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
 		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, fs->label));
-		lb_add_debug_label(p, fs->label, init);
+		lb_add_debug_label(p, fs->label, label);
+	}
+	if (fs->init != nullptr) {
+		lbBlock *init = lb_create_block(p, "for.init");
+		lb_emit_jump(p, init);
+		lb_start_block(p, init);
+
+		lb_build_stmt(p, fs->init);
 	}
 
 	lb_emit_jump(p, loop);
@@ -2704,11 +2747,18 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 		lbBlock *body = nullptr;
 		lbBlock *done = nullptr;
 		if (bs->label != nullptr) {
+			if (p->debug_info != nullptr) {
+				lbBlock *label = lb_create_block(p, "block.label");
+				lb_emit_jump(p, label);
+				lb_start_block(p, label);
+
+				LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, bs->label));
+				lb_add_debug_label(p, bs->label, label);
+			}
 			body = lb_create_block(p, "block.body");
 			done = lb_create_block(p, "block.done");
 			lb_emit_jump(p, body);
 			lb_start_block(p, body);
-			lb_add_debug_label(p, bs->label, body);
 			lbTargetList *tl = lb_push_target_list(p, bs->label, done, nullptr, nullptr);
 			tl->is_block = true;
 		}
