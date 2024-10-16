@@ -1295,3 +1295,69 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 		}
 	}
 }
+
+// TODO(tf2spi) ... *sigh* I hate LLVM so much.
+// LLVM-C doesn't have an API to emit DILabel yet, so this is not exported in the dll.
+// For Linux, we can temporarily use the C++ APIs, but we're out of luck for Windows
+// until the DLL gets updated with a definition like LLVMDIBuilderCreateLabel.
+// These might be the 50 most disgusting lines in this entire compiler.
+#ifndef _WIN32
+// Don't you just love a good ol' mangled name? I know I do.
+extern "C" LLVMMetadataRef _ZN4llvm9DIBuilder11createLabelEPNS_7DIScopeENS_9StringRefEPNS_6DIFileEjb(
+	LLVMDIBuilderRef Builder,
+	LLVMMetadataRef Scope,
+	String Name, // Not technically proper to do, but it's ABI compatible for now...
+	LLVMMetadataRef File,
+	unsigned int LineNo,
+	unsigned int AlwaysPreserve);
+#endif
+gb_internal void lb_add_debug_label(lbProcedure *p, Scope *parent, Ast *ast) {
+	if (p == nullptr || p->debug_info == nullptr || p->body == nullptr) {
+		return;
+	}
+	if (parent == nullptr) {
+		return;
+	}
+	if (ast == nullptr || ast->kind != Ast_Label) {
+		return;
+	}
+	Token label_token = ast->Label.token;
+	if (is_blank_ident(label_token.string)) {
+		return;
+	}
+	lbModule *m = p->module;
+	if (m == nullptr) {
+		return;
+	}
+
+	#ifndef _WIN32
+	AstFile *file = ast->file();
+	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	if (llvm_file == nullptr) {
+		debugf("llvm file not found for label\n");
+		return;
+	}
+	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
+	if(llvm_scope == nullptr) {
+		debugf("llvm scope not found for label\n");
+		return;
+	}
+	LLVMMetadataRef llvm_label = _ZN4llvm9DIBuilder11createLabelEPNS_7DIScopeENS_9StringRefEPNS_6DIFileEjb(
+		m->debug_builder,
+		llvm_scope,
+		label_token.string,
+		llvm_file,
+		label_token.pos.line,
+		1 // False by default. Not sure why.
+	);
+	String file_name = file->fullpath;
+	debugf("New label: %.*s %.*s:%d %p\n",
+		label_token.string.len,
+		label_token.string.text,
+		file_name.len,
+		file_name.text,
+		label_token.pos.line,
+		llvm_label
+	);
+	#endif
+}
