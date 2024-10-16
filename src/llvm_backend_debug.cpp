@@ -1316,17 +1316,14 @@ extern "C" LLVMMetadataRef _ZN4llvm9DIBuilder11insertLabelEPNS_7DILabelEPKNS_10D
 	LLVMMetadataRef Location,
 	LLVMBasicBlockRef Block);
 #endif
-gb_internal void lb_add_debug_label(lbProcedure *p, Scope *parent, Ast *ast) {
+gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target) {
 	if (p == nullptr || p->debug_info == nullptr || p->body == nullptr) {
 		return;
 	}
-	if (parent == nullptr) {
+	if (target == nullptr || label == nullptr || label->kind != Ast_Label) {
 		return;
 	}
-	if (ast == nullptr || ast->kind != Ast_Label) {
-		return;
-	}
-	Token label_token = ast->Label.token;
+	Token label_token = label->Label.token;
 	if (is_blank_ident(label_token.string)) {
 		return;
 	}
@@ -1336,7 +1333,7 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Scope *parent, Ast *ast) {
 	}
 
 	#ifndef _WIN32
-	AstFile *file = ast->file();
+	AstFile *file = label->file();
 	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
 	if (llvm_file == nullptr) {
 		debugf("llvm file not found for label\n");
@@ -1348,7 +1345,10 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Scope *parent, Ast *ast) {
 		return;
 	}
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, label_token.pos);
-	LLVMBasicBlockRef llvm_block = p->curr_block->block;
+	LLVMBasicBlockRef llvm_block = target->block;
+	if (llvm_block == nullptr || llvm_debug_loc == nullptr) {
+		return;
+	}
 	LLVMMetadataRef llvm_label = _ZN4llvm9DIBuilder11createLabelEPNS_7DIScopeENS_9StringRefEPNS_6DIFileEjb(
 		m->debug_builder,
 		llvm_scope,
