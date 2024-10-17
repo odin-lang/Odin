@@ -1296,7 +1296,7 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 	}
 }
 
-// TODO(tf2spi) ... *sigh* I hate LLVM so much.
+// TODO(tf2spi) ... *sigh* I'm sad
 // LLVM-C doesn't have an API to emit DILabel yet, so this is not exported in the dll.
 // For POSIX, we can temporarily use the C++ APIs, but we're out of luck for Windows
 // until the DLL gets updated with definitions like LLVMDIBuilderCreateLabel.
@@ -1319,10 +1319,9 @@ extern "C" LLVMMetadataRef _ZN4llvm9DIBuilder11insertLabelEPNS_7DILabelEPKNS_10D
 	LLVMBasicBlockRef Block);
 #endif
 gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target) {
-	// TODO(tf2spi): Work with gingerBill to see if we can patch LLVM-C
-	//               to export DILabel functions for the C API on Windows
-	//               or to determine whether it is worthwhile to do this.
-	//               Until then, unimplemented, so just return.
+	// TODO(tf2spi): Not implemented on Windows because LLVM-C does not have
+	//               an official API for DILabel yet, so DLL does not export it.
+	//               When there is one, implement this function for Windows.
 	#ifdef _WIN32
 	if ((volatile int)0 == 0) return;
 	#endif
@@ -1372,6 +1371,7 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target)
 		//               Always preserve the label no matter what when debugging
 		true
 	);
+	GB_ASSERT(llvm_label != nullptr);
 	_ZN4llvm9DIBuilder11insertLabelEPNS_7DILabelEPKNS_10DILocationEPNS_10BasicBlockE(	
 		m->debug_builder,
 		llvm_label,
