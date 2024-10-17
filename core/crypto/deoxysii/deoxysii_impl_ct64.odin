@@ -49,6 +49,22 @@ enc_tweak :: #force_inline proc "contextless" (
 }
 
 @(private = "file")
+enc_plaintext :: #force_inline proc "contextless" (
+	dst: ^[8]u64,
+	iv:  []byte,
+) {
+	tmp: [BLOCK_SIZE]byte = ---
+	tmp[0] = 0
+	copy(tmp[1:], iv[:])
+
+	q_0, q_1 := aes.load_interleaved(tmp[:])
+	for i in 0 ..< 4 {
+		dst[i], dst[i+4] = q_0, q_1
+	}
+	aes.orthogonalize(dst)
+}
+
+@(private = "file")
 bc_x4 :: proc "contextless" (
 	ctx:     ^Context,
 	dst:     []byte,
@@ -267,15 +283,8 @@ e_ref :: proc "contextless" (ctx: ^Context, dst, tag, iv, aad, plaintext: []byte
 	// end
 	//
 	// return (C_1 || ... || C_l || C_∗, tag)
-	tmp: [BLOCK_SIZE]byte = ---
-	q_iv: [8]u64
-	tmp[0] = 0
-	copy(tmp[1:], iv[:])
-	q_iv_0, q_iv_1 := aes.load_interleaved(tmp[:])
-	for i in 0 ..< 4 {
-		q_iv[i], q_iv[i+4] = q_iv_0, q_iv_1
-	}
-	aes.orthogonalize(&q_iv)
+	q_iv: [8]u64 = ---
+	enc_plaintext(&q_iv, iv)
 
 	m = plaintext
 	n = bc_encrypt(&st, dst, m, &q_iv, &auth, 0)
