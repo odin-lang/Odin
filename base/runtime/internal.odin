@@ -1106,3 +1106,24 @@ __read_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uin
 		dst[j>>3]  |= the_bit<<(j&7)
 	}
 }
+
+// when !F64_SUPPORTED {
+	@(link_name="__truncdfsf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+	truncdfsf2 :: proc "c" (value: f64) -> f32 {
+		return 0
+	}
+// }
+
+// when !F32_SUPPORTED {
+	CMP_RESULT :: i32 when ODIN_ARCH == .arm64 else i64
+
+	@(link_name="__mulsf3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+	mulsf3 :: proc "c" (a, b: f32) -> f32 {
+		return 0
+	}
+
+	@(link_name="__gesf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+	gesf2 :: proc "c" (a, b: f32) -> CMP_RESULT {
+		return 0
+	}
+// }
