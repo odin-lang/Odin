@@ -8475,6 +8475,15 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 			error(node, "Undeclared name '%.*s' for type '%s'", LIT(name), typ);
 
 			check_did_you_mean_type(name, bt->Enum.fields);
+		} else if (is_type_bit_set(th) && is_type_enum(th->BitSet.elem)) {
+			ERROR_BLOCK();
+
+			gbString typ = type_to_string(th);
+			gbString str = expr_to_string(node);
+			error(node, "Cannot convert enum value to '%s'", typ);
+			error_line("\tSuggestion: Did you mean '{ %s }'?\n", str);
+			gb_string_free(typ);
+			gb_string_free(str);
 		} else {
 			gbString typ = type_to_string(th);
 			gbString str = expr_to_string(node);
