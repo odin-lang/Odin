@@ -291,7 +291,7 @@ scan_escape :: proc(t: ^Tokenizer) -> bool {
 		n -= 1
 	}
 
-	if x > max || 0xd800 <= x && x <= 0xe000 {
+	if x > max || 0xd800 <= x && x <= 0xdfff {
 		error_offset(t, offset, "escape sequence is an invalid Unicode code point")
 		return false
 	}
