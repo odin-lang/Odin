@@ -312,13 +312,18 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		
 	case .String:
 		advance_token(p)
-		str := unquote_string(token, p.spec, p.allocator) or_return
-		if unmarshal_string_token(p, any{v.data, ti.id}, str, ti) {
-			return nil
+		str  := unquote_string(token, p.spec, p.allocator) or_return
+		dest := any{v.data, ti.id}
+		if !unmarshal_string_token(p, dest, str, ti) {
+			delete(str, p.allocator)
+			return UNSUPPORTED_TYPE
 		}
-		delete(str, p.allocator)
-		return UNSUPPORTED_TYPE
 
+		switch destv in dest {
+		case string, cstring:
+		case: delete(str, p.allocator)
+		}
+		return nil
 
 	case .Open_Brace:
 		return unmarshal_object(p, v, .Close_Brace)
