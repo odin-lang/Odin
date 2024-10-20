@@ -442,9 +442,6 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		loc := #caller_location,
 	) -> (out_of_space: bool, err: Unmarshal_Error) {
 		for idx: uintptr = 0; length == -1 || idx < uintptr(length); idx += 1 {
-			elem_ptr := rawptr(uintptr(da.data) + idx*uintptr(elemt.size))
-			elem     := any{elem_ptr, elemt.id}
-
 			hdr := _decode_header(d.reader) or_return
 			
 			// Double size if out of capacity.
@@ -459,6 +456,10 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 				if !ok { return false, .Out_Of_Memory }
 			}
 			
+			// Set ptr after potential resizes to avoid invalidation.
+			elem_ptr := rawptr(uintptr(da.data) + idx*uintptr(elemt.size))
+			elem     := any{elem_ptr, elemt.id}
+
 			err = _unmarshal_value(d, elem, hdr, allocator=allocator, loc=loc)
 			if length == -1 && err == .Break { break }
 			if err != nil { return }
@@ -509,7 +510,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		raw           := (^mem.Raw_Dynamic_Array)(v.data)
 		raw.data       = raw_data(data) 
 		raw.len        = 0
-		raw.cap        = length
+		raw.cap        = scap
 		raw.allocator  = context.allocator
 
 		_ = assign_array(d, raw, t.elem, length) or_return
