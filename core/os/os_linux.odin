@@ -490,7 +490,7 @@ foreign libc {
 	@(link_name="free")             _unix_free          :: proc(ptr: rawptr) ---
 	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 
-	@(link_name="execvp")           _unix_execvp       :: proc(path: cstring, argv: [^]cstring) -> int ---
+	@(link_name="execvp")           _unix_execvp       :: proc(path: cstring, argv: [^]cstring) -> c.int ---
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
 	@(link_name="putenv")           _unix_putenv        :: proc(cstring) -> c.int ---
 	@(link_name="setenv")           _unix_setenv        :: proc(key: cstring, value: cstring, overwrite: c.int) -> c.int ---
