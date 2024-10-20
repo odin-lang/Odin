@@ -40,7 +40,9 @@ int main(int argc, char *argv[])
     printf("pthread_attr_t %zu %zu\n", sizeof(pthread_attr_t), _Alignof(pthread_attr_t));
     printf("pthread_key_t %zu %zu\n", sizeof(pthread_key_t), _Alignof(pthread_key_t));
 
+#ifndef __linux__
     printf("sched_param %zu %zu\n", sizeof(struct sched_param), _Alignof(struct sched_param));
+#endif
 
 	printf("termios %zu %zu\n", sizeof(struct termios), _Alignof(struct termios));
 

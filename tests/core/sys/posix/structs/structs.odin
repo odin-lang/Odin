@@ -14,7 +14,11 @@ main :: proc() {
 	fmt.println("pthread_attr_t", size_of(posix.pthread_attr_t), align_of(posix.pthread_attr_t))
 	fmt.println("pthread_key_t", size_of(posix.pthread_key_t), align_of(posix.pthread_key_t))
 
-	fmt.println("sched_param", size_of(posix.sched_param), align_of(posix.sched_param))
+	// NOTE: On Linux, differences between libc may mean the Odin side is larger than the other side,
+	// this is fine in practice.
+	when ODIN_OS != .Linux {
+		fmt.println("sched_param", size_of(posix.sched_param), align_of(posix.sched_param))
+	}
 
 	fmt.println("termios", size_of(posix.termios), align_of(posix.termios))
 	

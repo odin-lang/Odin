@@ -1,10 +1,11 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System.framework"
-} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Linux {
 	foreign import lib "system:pthread"
 } else {
 	foreign import lib "system:c"
@@ -557,6 +558,4 @@ when ODIN_OS == .Darwin {
 		__reserved3: c.int,
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

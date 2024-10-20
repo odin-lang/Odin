@@ -1,7 +1,7 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
-import "core:c/libc"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System.framework"
@@ -43,11 +43,7 @@ foreign lib {
 	sigsetjmp :: proc(env: ^sigjmp_buf, savemask: b32) -> c.int ---
 }
 
-jmp_buf    :: libc.jmp_buf
 sigjmp_buf :: distinct jmp_buf
-
-longjmp :: libc.longjmp
-setjmp  :: libc.setjmp
 
 when ODIN_OS == .NetBSD {
 	@(private) LSIGSETJMP  :: "__sigsetjmp14"

@@ -1,3 +1,4 @@
+#+build linux, darwin, openbsd, freebsd, netbsd
 package posix
 
 import "core:c"
@@ -466,13 +467,11 @@ when ODIN_OS == .Darwin {
 	AT_REMOVEDIR        :: 0x200
 
 	flock :: struct {
+		l_type:   Lock_Type, /* [PSX] type of lock. */
+		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset. */
 		l_start:  off_t,     /* [PSX] relative offset in bytes. */
 		l_len:    off_t,     /* [PSX] size; if 0 then until EOF. */
 		l_pid:    pid_t,     /* [PSX] process ID of the process holding the lock. */
-		l_type:   Lock_Type, /* [PSX] type of lock. */
-		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset. */
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }
