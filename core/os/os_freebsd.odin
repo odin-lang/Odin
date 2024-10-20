@@ -789,7 +789,7 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 }
 
 @(require_results)
-absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
+absolute_path_from_relative :: proc(rel: string, allocator := context.allocator) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
 		rel = "."
@@ -804,10 +804,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	}
 	defer _unix_free(rawptr(path_ptr))
 
-
-	path = strings.clone(string(path_ptr))
-
-	return path, nil
+	return strings.clone(string(path_ptr), allocator)
 }
 
 access :: proc(path: string, mask: int) -> (bool, Error) {
