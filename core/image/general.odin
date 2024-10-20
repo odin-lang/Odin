@@ -23,7 +23,15 @@ register :: proc(kind: Which_File_Type, loader: Loader_Proc, destroyer: Destroy_
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	loader := _internal_loaders[which(data)]
 	if loader == nil {
-		return nil, .Unsupported_Format
+
+		// Check if there is at least one loader, otherwise panic to let the user know about misuse.
+		for a_loader in _internal_loaders {
+			if a_loader != nil {
+				return nil, .Unsupported_Format
+			}
+		}
+
+		panic("image.load called when no image loaders are registered. Register a loader by first importing a subpackage (eg: `import \"core:image/png\"`), or with image.register")
 	}
 	return loader(data, options, allocator)
 }
