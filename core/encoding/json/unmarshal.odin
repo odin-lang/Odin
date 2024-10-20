@@ -37,19 +37,19 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 		return .Non_Pointer_Parameter
 	}
 	PARSE_INTEGERS :: true
-	
+
 	if !is_valid(data, spec, PARSE_INTEGERS) {
 		return .Invalid_Data
 	}
 	p := make_parser(data, spec, PARSE_INTEGERS, allocator)
-	
+
 	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}
 	if v.data == nil {
 		return .Invalid_Parameter
 	}
-	
+
 	context.allocator = p.allocator
-	
+
 	if p.spec == .MJSON {
 		#partial switch p.curr_token.kind {
 		case .Ident, .String:
@@ -118,8 +118,8 @@ assign_int :: proc(val: any, i: $T) -> bool {
 	case uintptr: dst = uintptr(i)
 	case:
 		ti := type_info_of(v.id)
-		if _, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
-			do_byte_swap := !reflect.bit_set_is_big_endian(v)
+		if bit_set_info, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
+			do_byte_swap := is_bit_set_different_endian_to_platform(bit_set_info.underlying)
 			switch ti.size * 8 {
 			case 0: // no-op.
 			case 8:
@@ -134,6 +134,9 @@ assign_int :: proc(val: any, i: $T) -> bool {
 			case 64:
 				x := (^u64)(v.data)
 				x^ = do_byte_swap ? intrinsics.byte_swap(u64(i)) : u64(i)
+			case 128:
+				x := (^u128)(v.data)
+				x^ = do_byte_swap ? intrinsics.byte_swap(u128(i)) : u128(i)
 			case:
 				panic("unknown bit_size size")
 			}
@@ -156,15 +159,15 @@ assign_float :: proc(val: any, f: $T) -> bool {
 	case f64:     dst = f64  (f)
 	case f64le:   dst = f64le(f)
 	case f64be:   dst = f64be(f)
-	
+
 	case complex32:  dst = complex(f16(f), 0)
 	case complex64:  dst = complex(f32(f), 0)
 	case complex128: dst = complex(f64(f), 0)
-	
+
 	case quaternion64:  dst = quaternion(w=f16(f), x=0, y=0, z=0)
 	case quaternion128: dst = quaternion(w=f32(f), x=0, y=0, z=0)
 	case quaternion256: dst = quaternion(w=f64(f), x=0, y=0, z=0)
-	
+
 	case: return false
 	}
 	return true
@@ -178,16 +181,16 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 	case string:
 		dst = str
 		return true
-	case cstring:  
+	case cstring:
 		if str == "" {
 			dst = strings.clone_to_cstring("", p.allocator)
 		} else {
 			// NOTE: This is valid because 'clone_string' appends a NUL terminator
-			dst = cstring(raw_data(str)) 
+			dst = cstring(raw_data(str))
 		}
 		return true
 	}
-	
+
 	#partial switch variant in ti.variant {
 	case reflect.Type_Info_Enum:
 		for name, i in variant.names {
@@ -198,7 +201,7 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 		}
 		// TODO(bill): should this be an error or not?
 		return true
-		
+
 	case reflect.Type_Info_Integer:
 		i := strconv.parse_i128(str) or_return
 		if assign_int(val, i) {
@@ -216,7 +219,7 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -262,7 +265,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		dst = parse_value(p) or_return
 		return
 	}
-	
+
 	#partial switch token.kind {
 	case .Null:
 		mem.zero(v.data, ti.size)
@@ -300,7 +303,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 			}
 		}
 		return UNSUPPORTED_TYPE
-		
+
 	case .Ident:
 		advance_token(p)
 		if p.spec == .MJSON {
@@ -309,7 +312,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 			}
 		}
 		return UNSUPPORTED_TYPE
-		
+
 	case .String:
 		advance_token(p)
 		str  := unquote_string(token, p.spec, p.allocator) or_return
@@ -385,26 +388,26 @@ json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
 @(private)
 unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
-	
+
 	if end_token == .Close_Brace {
 		unmarshal_expect_token(p, .Open_Brace)
 	}
 
 	v := v
 	ti := reflect.type_info_base(type_info_of(v.id))
-	
+
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_Struct:
 		if .raw_union in t.flags {
 			return UNSUPPORTED_TYPE
 		}
-	
+
 		struct_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
 			defer delete(key, p.allocator)
-			
-			unmarshal_expect_token(p, .Colon)						
-			
+
+			unmarshal_expect_token(p, .Colon)
+
 			fields := reflect.struct_fields_zipped(ti.id)
 
 			field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
@@ -418,7 +421,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			intrinsics.mem_zero(field_used, field_used_bytes)
 
 			use_field_idx := -1
-			
+
 			for field, field_idx in fields {
 				tag_value := string(reflect.struct_tag_get(field.tag, "json"))
 				json_name, _ := json_name_from_tag_value(tag_value)
@@ -427,7 +430,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 					break
 				}
 			}
-			
+
 			if use_field_idx < 0 {
 				for field, field_idx in fields {
 					if key == field.name {
@@ -436,7 +439,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 					}
 				}
 			}
-			
+
 			check_children_using_fields :: proc(key: string, parent: typeid) -> (
 				offset: uintptr,
 				type: ^reflect.Type_Info,
@@ -476,11 +479,11 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				if field_test(field_used, offset) {
 					return .Multiple_Use_Field
 				}
-				
+
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
 				unmarshal_value(p, field) or_return
-					
+
 				if parse_comma(p) {
 					break struct_loop
 				}
@@ -500,7 +503,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				continue struct_loop
 			}
 		}
-		
+
 	case reflect.Type_Info_Map:
 		if !reflect.is_string(t.key) && !reflect.is_integer(t.key) {
 			return UNSUPPORTED_TYPE
@@ -509,16 +512,16 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 		if raw_map.allocator.procedure == nil {
 			raw_map.allocator = p.allocator
 		}
-		
+
 		elem_backing := bytes_make(t.value.size, t.value.align, p.allocator) or_return
 		defer delete(elem_backing, p.allocator)
-		
+
 		map_backing_value := any{raw_data(elem_backing), t.value.id}
-		
+
 		map_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
 			unmarshal_expect_token(p, .Colon)
-			
+
 
 			mem.zero_slice(elem_backing)
 			if uerr := unmarshal_value(p, map_backing_value); uerr != nil {
@@ -529,7 +532,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			key_ptr: rawptr
 
 			#partial switch tk in t.key.variant {
-				case runtime.Type_Info_String:			
+				case runtime.Type_Info_String:
 					key_ptr = rawptr(&key)
 					key_cstr: cstring
 					if reflect.is_cstring(t.key) {
@@ -546,43 +549,48 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
 			if set_ptr == nil {
 				delete(key, p.allocator)
-			} 
+			}
 
-			// there's no need to keep string value on the heap, since it was copied into map 
+			// there's no need to keep string value on the heap, since it was copied into map
 			if reflect.is_integer(t.key) {
 				delete(key, p.allocator)
 			}
-			
+
 			if parse_comma(p) {
 				break map_loop
 			}
 		}
-		
+
 	case reflect.Type_Info_Enumerated_Array:
 		index_type := reflect.type_info_base(t.index)
 		enum_type := index_type.variant.(reflect.Type_Info_Enum)
-	
+
 		enumerated_array_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
 			unmarshal_expect_token(p, .Colon)
 			defer delete(key, p.allocator)
 
-			index := -1
-			for name, i in enum_type.names {
-				if key == name {
-					index = int(enum_type.values[i] - t.min_value)
-					break
+			index, ok := strconv.parse_i64_of_base(key, 10)
+			if !ok {
+				index = -1
+				for name, i in enum_type.names {
+					if key == name {
+						index = i64(enum_type.values[i])
+						break
+					}
 				}
 			}
-			if index < 0 || index >= t.count {
+
+			index -= i64(t.min_value)
+			if index < 0 || index >= i64(t.count) {
 				return UNSUPPORTED_TYPE
 			}
-						
-			index_ptr := rawptr(uintptr(v.data) + uintptr(index*t.elem_size))
+
+			index_ptr := rawptr(uintptr(v.data) + uintptr(index*i64(t.elem_size)))
 			index_any := any{index_ptr, t.elem.id}
-			
+
 			unmarshal_value(p, index_any) or_return
-			
+
 			if parse_comma(p) {
 				break enumerated_array_loop
 			}
@@ -591,7 +599,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	case:
 		return UNSUPPORTED_TYPE
 	}
-	
+
 	if end_token == .Close_Brace {
 		unmarshal_expect_token(p, .Close_Brace)
 	}
@@ -607,7 +615,7 @@ unmarshal_count_array :: proc(p: ^Parser) -> (length: uintptr) {
 	array_length_loop: for p.curr_token.kind != .Close_Bracket {
 		_, _ = parse_value(p)
 		length += 1
-		
+
 		if parse_comma(p) {
 			break
 		}
@@ -620,41 +628,41 @@ unmarshal_count_array :: proc(p: ^Parser) -> (length: uintptr) {
 unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	assign_array :: proc(p: ^Parser, base: rawptr, elem: ^reflect.Type_Info, length: uintptr) -> Unmarshal_Error {
 		unmarshal_expect_token(p, .Open_Bracket)
-		
+
 		for idx: uintptr = 0; p.curr_token.kind != .Close_Bracket; idx += 1 {
 			assert(idx < length)
-			
+
 			elem_ptr := rawptr(uintptr(base) + idx*uintptr(elem.size))
 			elem := any{elem_ptr, elem.id}
-			
+
 			unmarshal_value(p, elem) or_return
-			
+
 			if parse_comma(p) {
 				break
-			}	
+			}
 		}
-		
+
 		unmarshal_expect_token(p, .Close_Bracket)
-		
-		
+
+
 		return nil
 	}
 
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
-	
+
 	ti := reflect.type_info_base(type_info_of(v.id))
-	
+
 	length := unmarshal_count_array(p)
-	
+
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_Slice:	
+	case reflect.Type_Info_Slice:
 		raw := (^mem.Raw_Slice)(v.data)
 		data := bytes_make(t.elem.size * int(length), t.elem.align, p.allocator) or_return
 		raw.data = raw_data(data)
 		raw.len = int(length)
-			
+
 		return assign_array(p, raw.data, t.elem, length)
-		
+
 	case reflect.Type_Info_Dynamic_Array:
 		raw := (^mem.Raw_Dynamic_Array)(v.data)
 		data := bytes_make(t.elem.size * int(length), t.elem.align, p.allocator) or_return
@@ -662,40 +670,75 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		raw.len = int(length)
 		raw.cap = int(length)
 		raw.allocator = p.allocator
-		
+
 		return assign_array(p, raw.data, t.elem, length)
-		
+
 	case reflect.Type_Info_Array:
 		// NOTE(bill): Allow lengths which are less than the dst array
 		if int(length) > t.count {
 			return UNSUPPORTED_TYPE
 		}
-		
+
 		return assign_array(p, v.data, t.elem, length)
-		
+
 	case reflect.Type_Info_Enumerated_Array:
 		// NOTE(bill): Allow lengths which are less than the dst array
 		if int(length) > t.count {
 			return UNSUPPORTED_TYPE
 		}
-		
+
 		return assign_array(p, v.data, t.elem, length)
-		
+
 	case reflect.Type_Info_Complex:
 		// NOTE(bill): Allow lengths which are less than the dst array
 		if int(length) > 2 {
 			return UNSUPPORTED_TYPE
 		}
-	
+
 		switch ti.id {
 		case complex32:  return assign_array(p, v.data, type_info_of(f16), 2)
 		case complex64:  return assign_array(p, v.data, type_info_of(f32), 2)
 		case complex128: return assign_array(p, v.data, type_info_of(f64), 2)
 		}
-		
+
 		return UNSUPPORTED_TYPE
-		
+
+	case reflect.Type_Info_Bit_Set:
+		unmarshal_expect_token(p, .Open_Bracket)
+
+		bit_data: u64
+		for p.curr_token.kind != .Close_Bracket {
+			value: i64
+			#partial switch p.curr_token.kind {
+			case .String:
+				str: string
+				unmarshal_value(p, str) or_return
+				val, ok := reflect.enum_from_name_any(t.elem.id, str)
+				if !ok {
+					return UNSUPPORTED_TYPE
+				}
+				value = i64(val)
+
+			case .Integer:
+				unmarshal_value(p, value) or_return
+
+			case:
+				return UNSUPPORTED_TYPE
+			}
+
+			bit_data |= 1 << u64(value - t.lower)
+
+			if parse_comma(p) {
+				break
+			}
+		}
+
+		unmarshal_expect_token(p, .Close_Bracket)
+
+		if assign_int(v, bit_data) {
+			return nil
+		}
 	}
-		
+
 	return UNSUPPORTED_TYPE
 }
