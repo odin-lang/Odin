@@ -1,6 +1,5 @@
 package _chacha20
 
-import "base:intrinsics"
 import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
@@ -47,7 +46,7 @@ Context :: struct {
 // HChaCha call can be suitably accelerated.
 init :: proc "contextless" (ctx: ^Context, key, iv: []byte, is_xchacha: bool) {
 	if len(key) != KEY_SIZE || len(iv) != IV_SIZE {
-		intrinsics.trap()
+		panic_contextless("chacha20: invalid key or IV size")
 	}
 
 	k, n := key, iv
