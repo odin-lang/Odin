@@ -2060,8 +2060,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		bool ok = check_builtin_simd_operation(c, operand, call, id, type_hint);
 		if (!ok) {
 			operand->type = t_invalid;
+			operand->mode = Addressing_Value;
 		}
-		operand->mode = Addressing_Value;
 		operand->value = {};
 		operand->expr = call;
 		return ok;
