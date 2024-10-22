@@ -722,7 +722,10 @@ gb_internal unsigned lb_try_get_alignment(LLVMValueRef addr_ptr, unsigned defaul
 gb_internal bool lb_try_update_alignment(LLVMValueRef addr_ptr, unsigned alignment) {
 	if (LLVMIsAGlobalValue(addr_ptr) || LLVMIsAAllocaInst(addr_ptr) || LLVMIsALoadInst(addr_ptr)) {
 		if (LLVMGetAlignment(addr_ptr) < alignment) {
-			if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
+			if (LLVMIsAAllocaInst(addr_ptr)) {
+				LLVMSetAlignment(addr_ptr, alignment);
+			} else if (LLVMIsAGlobalValue(addr_ptr) && LLVMGetLinkage(addr_ptr) != LLVMExternalLinkage) {
+				// NOTE(laytan): setting alignment of an external global just changes the alignment we expect it to be.
 				LLVMSetAlignment(addr_ptr, alignment);
 			}
 		}
@@ -755,10 +758,7 @@ gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vecto
 
 		LLVMValueRef addr_ptr = ptr.value;
 		if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
-			unsigned alignment = LLVMGetAlignment(addr_ptr);
-			alignment = gb_max(alignment, vector_alignment);
-			possible = true;
-			LLVMSetAlignment(addr_ptr, alignment);
+			possible = lb_try_update_alignment(addr_ptr, vector_alignment);
 		} else if (LLVMIsALoadInst(addr_ptr)) {
 			unsigned alignment = LLVMGetAlignment(addr_ptr);
 			possible = alignment >= vector_alignment;
