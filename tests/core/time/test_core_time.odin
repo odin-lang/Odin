@@ -3,6 +3,7 @@ package test_core_time
 import "core:testing"
 import "core:time"
 import dt "core:time/datetime"
+import tz "core:time/timezone"
 
 is_leap_year :: time.is_leap_year
 
@@ -348,4 +349,215 @@ date_component_roundtrip_test :: proc(t: ^testing.T, moment: dt.DateTime) {
 		"Expected %4d-%2d-%2d %2d:%2d:%2d, got %4d-%2d-%2d %2d:%2d:%2d",
 		moment.year, moment.month, moment.day, moment.hour, moment.minute, moment.second, YYYY, MM, DD, hh, mm, ss,
 	)
+}
+
+datetime_eq :: proc(dt1: dt.DateTime, dt2: dt.DateTime) -> bool {
+	return (
+		dt1.year == dt2.year && dt1.month == dt2.month   && dt1.day == dt2.day &&
+		dt1.hour == dt2.hour && dt1.minute == dt2.minute && dt1.second == dt2.second
+	)
+}
+
+@test
+test_convert_timezone_roundtrip :: proc(t: ^testing.T) {
+	dst_dt, _ := dt.components_to_datetime(2024, 10, 4, 23, 47, 0)
+	std_dt, _ := dt.components_to_datetime(2024, 11, 4, 23, 47, 0)
+
+	local_tz, local_load_ok := tz.region_load("local")
+	testing.expectf(t, local_load_ok, "Failed to load local timezone")
+	defer tz.region_destroy(local_tz)
+
+	edm_tz, edm_load_ok := tz.region_load("America/Edmonton")
+	testing.expectf(t, edm_load_ok, "Failed to load America/Edmonton timezone")
+	defer tz.region_destroy(edm_tz)
+
+	shuffle_tz :: proc(start_dt: dt.DateTime, test_tz: ^dt.TZ_Region) -> dt.DateTime {
+		tz_dt := tz.datetime_to_tz(start_dt, test_tz)
+		utc_dt := tz.datetime_to_utc(tz_dt)
+		return utc_dt
+	}
+
+	testing.expectf(t, datetime_eq(dst_dt, shuffle_tz(dst_dt, local_tz)), "Failed to convert to/from local dst timezone")
+	testing.expectf(t, datetime_eq(std_dt, shuffle_tz(std_dt, local_tz)), "Failed to convert to/from local std timezone")
+	testing.expectf(t, datetime_eq(dst_dt, shuffle_tz(dst_dt, edm_tz)), "Failed to convert to/from Edmonton dst timezone")
+	testing.expectf(t, datetime_eq(std_dt, shuffle_tz(std_dt, edm_tz)), "Failed to convert to/from Edmonton std timezone")
+}
+
+@test
+test_check_timezone_metadata :: proc(t: ^testing.T) {
+	dst_dt, _ := dt.components_to_datetime(2024, 10, 4, 23, 47, 0)
+	std_dt, _ := dt.components_to_datetime(2024, 11, 4, 23, 47, 0)
+
+	pac_tz, pac_load_ok := tz.region_load("America/Los_Angeles")
+	testing.expectf(t, pac_load_ok, "Failed to load America/Los_Angeles timezone")
+	defer tz.region_destroy(pac_tz)
+
+	pac_dst_dt := tz.datetime_to_tz(dst_dt, pac_tz)
+	pac_std_dt := tz.datetime_to_tz(std_dt, pac_tz)
+	testing.expectf(t, tz.shortname_unsafe(pac_dst_dt) == "PDT", "Invalid timezone shortname")
+	testing.expectf(t, tz.shortname_unsafe(pac_std_dt) == "PST", "Invalid timezone shortname")
+	testing.expectf(t, tz.dst_unsafe(pac_std_dt) == false, "Expected daylight savings == false, got true")
+	testing.expectf(t, tz.dst_unsafe(pac_dst_dt) == true, "Expected daylight savings == true, got false")
+
+	pac_dst_name, ok := tz.shortname(pac_dst_dt)
+	testing.expectf(t, ok == true, "Invalid datetime")
+	testing.expectf(t, pac_dst_name == "PDT", "Invalid timezone shortname")
+
+	pac_std_name, ok2 := tz.shortname(pac_std_dt)
+	testing.expectf(t, ok2 == true, "Invalid datetime")
+	testing.expectf(t, pac_std_name == "PST", "Invalid timezone shortname")
+
+	pac_is_dst, ok3 := tz.dst(pac_dst_dt)
+	testing.expectf(t, ok3 == true, "Invalid datetime")
+	testing.expectf(t, pac_is_dst == true, "Expected daylight savings == false, got true")
+
+	pac_is_dst, ok3 = tz.dst(pac_std_dt)
+	testing.expectf(t, ok3 == true, "Invalid datetime")
+	testing.expectf(t, pac_is_dst == false, "Expected daylight savings == false, got true")
+}
+
+rrule_eq :: proc(r1, r2: dt.TZ_RRule) -> (eq: bool) {
+	if r1.has_dst    != r2.has_dst { return }
+
+	if r1.std_name   != r2.std_name { return }
+	if r1.std_offset != r2.std_offset { return }
+	if r1.std_date   != r2.std_date { return }
+
+	if r1.dst_name   != r2.dst_name { return }
+	if r1.dst_offset != r2.dst_offset { return }
+	if r1.dst_date   != r2.dst_date { return }
+
+	return true
+}
+
+@test
+test_check_timezone_posix_tz :: proc(t: ^testing.T) {
+	correct_simple_rrule := dt.TZ_RRule{
+		has_dst    = false,
+
+		std_name   = "UTC",
+		std_offset = -(5 * 60 * 60),
+		std_date   = dt.TZ_Transition_Date{
+			type   = .Leap,
+			day    = 0,
+			time   = 2 * 60 * 60,
+		},
+	}
+
+	simple_rrule, simple_rrule_ok := tz.parse_posix_tz("UTC+5")
+	testing.expectf(t, simple_rrule_ok, "Failed to parse posix tz")
+	defer tz.rrule_destroy(simple_rrule)
+	testing.expectf(t, rrule_eq(simple_rrule, correct_simple_rrule), "POSIX TZ parsed incorrectly")
+
+	correct_est_rrule := dt.TZ_RRule{
+		has_dst    = true,
+
+		std_name   = "EST",
+		std_offset = -(5 * 60 * 60),
+		std_date   = dt.TZ_Transition_Date{
+			type   = .Month_Week_Day,
+			month  = 3,
+			week   = 2,
+			day    = 0,
+			time   = 2 * 60 * 60,
+		},
+
+		dst_name   = "EDT",
+		dst_offset = -(4 * 60 * 60),
+		dst_date   = dt.TZ_Transition_Date{
+			type   = .Month_Week_Day,
+			month  = 11,
+			week   = 1,
+			day    = 0,
+			time   = 2 * 60 * 60,
+		},
+	}
+
+	est_rrule, est_rrule_ok := tz.parse_posix_tz("EST+5EDT,M3.2.0/2,M11.1.0/2")
+	testing.expectf(t, est_rrule_ok, "Failed to parse posix tz")
+	defer tz.rrule_destroy(est_rrule)
+	testing.expectf(t, rrule_eq(est_rrule, correct_est_rrule), "POSIX TZ parsed incorrectly")
+
+	correct_ist_rrule := dt.TZ_RRule{
+		has_dst    = true,
+
+		std_name   = "IST",
+		std_offset = (2 * 60 * 60),
+		std_date   = dt.TZ_Transition_Date{
+			type   = .Month_Week_Day,
+			month  = 3,
+			week   = 4,
+			day    = 4,
+			time   = 26 * 60 * 60,
+		},
+
+		dst_name   = "IDT",
+		dst_offset = (3 * 60 * 60),
+		dst_date   = dt.TZ_Transition_Date{
+			type   = .Month_Week_Day,
+			month  = 10,
+			week   = 5,
+			day    = 0,
+			time   = 2 * 60 * 60,
+		},
+	}
+
+	ist_rrule, ist_rrule_ok := tz.parse_posix_tz("IST-2IDT,M3.4.4/26,M10.5.0")
+	testing.expectf(t, ist_rrule_ok, "Failed to parse posix tz")
+	defer tz.rrule_destroy(ist_rrule)
+	testing.expectf(t, rrule_eq(ist_rrule, correct_ist_rrule), "POSIX TZ parsed incorrectly")
+
+	correct_warst_rrule := dt.TZ_RRule{
+		has_dst    = true,
+
+		std_name   = "WART",
+		std_offset = -(4 * 60 * 60),
+		std_date   = dt.TZ_Transition_Date{
+			type   = .No_Leap,
+			day    = 1,
+			time   = 0 * 60 * 60,
+		},
+
+		dst_name   = "WARST",
+		dst_offset = -(3 * 60 * 60),
+		dst_date   = dt.TZ_Transition_Date{
+			type   = .No_Leap,
+			day    = 365,
+			time   = 25 * 60 * 60,
+		},
+	}
+
+	warst_rrule, warst_rrule_ok := tz.parse_posix_tz("WART4WARST,J1/0,J365/25")
+	testing.expectf(t, warst_rrule_ok, "Failed to parse posix tz")
+	defer tz.rrule_destroy(warst_rrule)
+	testing.expectf(t, rrule_eq(warst_rrule, correct_warst_rrule), "POSIX TZ parsed incorrectly")
+
+	correct_wgt_rrule := dt.TZ_RRule{
+		has_dst    = true,
+
+		std_name   = "WGT",
+		std_offset = -(3 * 60 * 60),
+		std_date   = dt.TZ_Transition_Date{
+			type   = .Month_Week_Day,
+			month  = 3,
+			week   = 5,
+			day    = 0,
+			time   = -2 * 60 * 60,
+		},
+
+		dst_name   = "WGST",
+		dst_offset = -(2 * 60 * 60),
+		dst_date   = dt.TZ_Transition_Date{
+			type   = .Month_Week_Day,
+			month  = 10,
+			week   = 5,
+			day    = 0,
+			time   = -1 * 60 * 60,
+		},
+	}
+
+	wgt_rrule, wgt_rrule_ok := tz.parse_posix_tz("WGT3WGST,M3.5.0/-2,M10.5.0/-1")
+	testing.expectf(t, wgt_rrule_ok, "Failed to parse posix tz")
+	defer tz.rrule_destroy(wgt_rrule)
+	testing.expectf(t, rrule_eq(wgt_rrule, correct_wgt_rrule), "POSIX TZ parsed incorrectly")
 }
