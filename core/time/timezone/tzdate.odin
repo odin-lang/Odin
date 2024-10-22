@@ -291,7 +291,7 @@ dst :: proc(dt: datetime.DateTime) -> (is_dst: bool, success: bool) #optional_ok
 /*
 Checks DST for a given date.
 
-WARNING: This is unsafe because it doesn't check if you datetime is valid, or your region contains a valid record
+WARNING: This is unsafe because it doesn't check if your datetime is valid or if your region contains a valid record.
 
 Inputs:
 - dt: The input datetime
