@@ -25,6 +25,8 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 		defer delete(path, allocator)
 
 		// FreeBSD makes me sad.
+		// This is a hackaround, because FreeBSD copies rather than softlinks their local timezone file,
+		// *sometimes* and then stores the original name of the timezone in /var/db/zoneinfo instead
 		if path == orig_localtime_path {
 			data := os.read_entire_file("/var/db/zoneinfo", allocator) or_return
 			return strings.trim_right_space(string(data)), true
