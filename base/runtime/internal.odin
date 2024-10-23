@@ -309,36 +309,39 @@ memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_ch
 	y := uintptr(b)
 	n := uintptr(n)
 
-	SU :: size_of(uintptr)
-	if (x % SU) != 0 && (y % SU) != 0 {
-		for /**/; n >= SU; n -= SU {
-			va := (^uintptr)(x)^
-			vb := (^uintptr)(y)^
+	memory_compare_poly :: proc "contextless" ($T: typeid, x, y, n: uintptr) -> (x_, y_, n_: uintptr, result: int = 0) {
+		x, y, n := x, y, n
+		ST :: size_of(T)
+		if (x % ST) != 0 || (y % ST) != 0 {
+			return x, y, n, result
+		}
+		toplevel: for /**/; n >= ST; n -= ST {
+			va := (^T)(x)^
+			vb := (^T)(y)^
 			if va ~ vb != 0 {
-				for i := uintptr(0); i < SU; i += 1 {
+				for i := uintptr(0); i < ST; i += 1 {
 					a := (^byte)(x+i)^
 					b := (^byte)(y+i)^
 					if a ~ b != 0 {
-						return -1 if (int(a) - int(b)) < 0 else +1
+						result = -1 if (int(a) - int(b)) < 0 else +1
+						break toplevel
 					}
 				}
 			}
+			x += ST
+			y += ST
 		}
-		x += SU
-		y += SU
+		return x, y, n, result
 	}
-
-	for /**/; n != 0; n -= 1 {
-		a := (^byte)(x)^
-		b := (^byte)(y)^
-		if a ~ b != 0 {
-			return -1 if (int(a) - int(b)) < 0 else +1
-		}
-		x += 1
-		y += 1
-	}
-
-	return 0
+	r := 0
+	x, y, n, r = memory_compare_poly(uintptr, x, y, n)
+	if r != 0 { return r }
+	x, y, n, r = memory_compare_poly(u32, x, y, n)
+	if r != 0 { return r }
+	x, y, n, r = memory_compare_poly(u16, x, y, n)
+	if r != 0 { return r }
+	x, y, n, r = memory_compare_poly(byte, x, y, n)
+	return r
 }
 
 memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_check {
