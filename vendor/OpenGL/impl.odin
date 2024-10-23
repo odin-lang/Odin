@@ -7,6 +7,7 @@ loaded_up_to_minor := 0
 Set_Proc_Address_Type :: #type proc(p: rawptr, name: cstring)
 
 load_up_to :: proc(major, minor: int, set_proc_address: Set_Proc_Address_Type) {
+	assert(set_proc_address != nil)
 	loaded_up_to = {0, 0}
 	loaded_up_to[0] = major
 	loaded_up_to[1] = minor
@@ -14,25 +15,25 @@ load_up_to :: proc(major, minor: int, set_proc_address: Set_Proc_Address_Type) {
 	loaded_up_to_minor = minor
 
 	switch major*10+minor {
-	case 46: load_4_6(set_proc_address); fallthrough
-	case 45: load_4_5(set_proc_address); fallthrough
-	case 44: load_4_4(set_proc_address); fallthrough
-	case 43: load_4_3(set_proc_address); fallthrough
-	case 42: load_4_2(set_proc_address); fallthrough
-	case 41: load_4_1(set_proc_address); fallthrough
-	case 40: load_4_0(set_proc_address); fallthrough
-	case 33: load_3_3(set_proc_address); fallthrough
-	case 32: load_3_2(set_proc_address); fallthrough
-	case 31: load_3_1(set_proc_address); fallthrough
-	case 30: load_3_0(set_proc_address); fallthrough
-	case 21: load_2_1(set_proc_address); fallthrough
-	case 20: load_2_0(set_proc_address); fallthrough
-	case 15: load_1_5(set_proc_address); fallthrough
-	case 14: load_1_4(set_proc_address); fallthrough
-	case 13: load_1_3(set_proc_address); fallthrough
-	case 12: load_1_2(set_proc_address); fallthrough
-	case 11: load_1_1(set_proc_address); fallthrough
-	case 10: load_1_0(set_proc_address)
+	case 46: load_only_4_6(set_proc_address); fallthrough
+	case 45: load_only_4_5(set_proc_address); fallthrough
+	case 44: load_only_4_4(set_proc_address); fallthrough
+	case 43: load_only_4_3(set_proc_address); fallthrough
+	case 42: load_only_4_2(set_proc_address); fallthrough
+	case 41: load_only_4_1(set_proc_address); fallthrough
+	case 40: load_only_4_0(set_proc_address); fallthrough
+	case 33: load_only_3_3(set_proc_address); fallthrough
+	case 32: load_only_3_2(set_proc_address); fallthrough
+	case 31: load_only_3_1(set_proc_address); fallthrough
+	case 30: load_only_3_0(set_proc_address); fallthrough
+	case 21: load_only_2_1(set_proc_address); fallthrough
+	case 20: load_only_2_0(set_proc_address); fallthrough
+	case 15: load_only_1_5(set_proc_address); fallthrough
+	case 14: load_only_1_4(set_proc_address); fallthrough
+	case 13: load_only_1_3(set_proc_address); fallthrough
+	case 12: load_only_1_2(set_proc_address); fallthrough
+	case 11: load_only_1_1(set_proc_address); fallthrough
+	case 10: load_only_1_0(set_proc_address)
 	}
 }
 
@@ -113,7 +114,7 @@ impl_IsEnabled:              proc "c" (cap: u32) -> bool
 impl_DepthRange:             proc "c" (near: f64, far: f64)
 impl_Viewport:               proc "c" (x: i32, y: i32, width: i32, height: i32)
 
-load_1_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_1_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_CullFace,               "glCullFace")
 	set_proc_address(&impl_FrontFace,              "glFrontFace")
 	set_proc_address(&impl_Hint,                   "glHint")
@@ -180,7 +181,7 @@ impl_DeleteTextures:    proc "c" (n: i32, textures: [^]u32)
 impl_GenTextures:       proc "c" (n: i32, textures: [^]u32)
 impl_IsTexture:         proc "c" (texture: u32) -> bool
 
-load_1_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_1_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_DrawArrays,        "glDrawArrays")
 	set_proc_address(&impl_DrawElements,      "glDrawElements")
 	set_proc_address(&impl_PolygonOffset,     "glPolygonOffset")
@@ -203,7 +204,7 @@ impl_TexImage3D:        proc "c" (target: u32, level: i32, internalformat: i32, 
 impl_TexSubImage3D:     proc "c" (target: u32, level: i32, xoffset: i32, yoffset: i32, zoffset: i32, width: i32, height: i32, depth: i32, format: u32, type: u32, pixels: rawptr)
 impl_CopyTexSubImage3D: proc "c" (target: u32, level: i32, xoffset: i32, yoffset: i32, zoffset: i32, x: i32, y: i32, width: i32, height: i32)
 
-load_1_2 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_1_2 :: proc(set_proc_address: Set_Proc_Address_Type) {
 
 	set_proc_address(&impl_DrawRangeElements, "glDrawRangeElements")
 	set_proc_address(&impl_TexImage3D,        "glTexImage3D")
@@ -223,7 +224,7 @@ impl_CompressedTexSubImage2D: proc "c" (target: u32, level: i32, xoffset: i32, y
 impl_CompressedTexSubImage1D: proc "c" (target: u32, level: i32, xoffset: i32, width: i32, format: u32, imageSize: i32, data: rawptr)
 impl_GetCompressedTexImage:   proc "c" (target: u32, level: i32, img: rawptr)
 
-load_1_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_1_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_ActiveTexture,           "glActiveTexture")
 	set_proc_address(&impl_SampleCoverage,          "glSampleCoverage")
 	set_proc_address(&impl_CompressedTexImage3D,    "glCompressedTexImage3D")
@@ -248,7 +249,7 @@ impl_BlendColor:        proc "c" (red: f32, green: f32, blue: f32, alpha: f32)
 impl_BlendEquation:     proc "c" (mode: u32)
 
 
-load_1_4 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_1_4 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_BlendFuncSeparate, "glBlendFuncSeparate")
 	set_proc_address(&impl_MultiDrawArrays,   "glMultiDrawArrays")
 	set_proc_address(&impl_MultiDrawElements, "glMultiDrawElements")
@@ -282,7 +283,7 @@ impl_UnmapBuffer:          proc "c" (target: u32) -> bool
 impl_GetBufferParameteriv: proc "c" (target: u32, pname: u32, params: [^]i32)
 impl_GetBufferPointerv:    proc "c" (target: u32, pname: u32, params: [^]rawptr)
 
-load_1_5 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_1_5 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_GenQueries,           "glGenQueries")
 	set_proc_address(&impl_DeleteQueries,        "glDeleteQueries")
 	set_proc_address(&impl_IsQuery,              "glIsQuery")
@@ -400,7 +401,7 @@ impl_VertexAttrib4uiv:         proc "c" (index: u32, v: ^[4]u32)
 impl_VertexAttrib4usv:         proc "c" (index: u32, v: ^[4]u16)
 impl_VertexAttribPointer:      proc "c" (index: u32, size: i32, type: u32, normalized: bool, stride: i32, pointer: uintptr)
 
-load_2_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_2_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_BlendEquationSeparate,    "glBlendEquationSeparate")
 	set_proc_address(&impl_DrawBuffers,              "glDrawBuffers")
 	set_proc_address(&impl_StencilOpSeparate,        "glStencilOpSeparate")
@@ -505,7 +506,7 @@ impl_UniformMatrix4x2fv: proc "c" (location: i32, count: i32, transpose: bool, v
 impl_UniformMatrix3x4fv: proc "c" (location: i32, count: i32, transpose: bool, value: [^]f32)
 impl_UniformMatrix4x3fv: proc "c" (location: i32, count: i32, transpose: bool, value: [^]f32)
 
-load_2_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_2_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_UniformMatrix2x3fv, "glUniformMatrix2x3fv")
 	set_proc_address(&impl_UniformMatrix3x2fv, "glUniformMatrix3x2fv")
 	set_proc_address(&impl_UniformMatrix2x4fv, "glUniformMatrix2x4fv")
@@ -601,7 +602,7 @@ impl_DeleteVertexArrays:                  proc "c" (n: i32, arrays: [^]u32)
 impl_GenVertexArrays:                     proc "c" (n: i32, arrays: [^]u32)
 impl_IsVertexArray:                       proc "c" (array: u32) -> bool
 
-load_3_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_3_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_ColorMaski,                          "glColorMaski")
 	set_proc_address(&impl_GetBooleani_v,                       "glGetBooleani_v")
 	set_proc_address(&impl_GetIntegeri_v,                       "glGetIntegeri_v")
@@ -703,7 +704,7 @@ impl_GetActiveUniformBlockiv:   proc "c" (program: u32, uniformBlockIndex: u32, 
 impl_GetActiveUniformBlockName: proc "c" (program: u32, uniformBlockIndex: u32, bufSize: i32, length: ^i32, uniformBlockName: [^]u8)
 impl_UniformBlockBinding:       proc "c" (program: u32, uniformBlockIndex: u32, uniformBlockBinding: u32)
 
-load_3_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_3_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_DrawArraysInstanced,       "glDrawArraysInstanced")
 	set_proc_address(&impl_DrawElementsInstanced,     "glDrawElementsInstanced")
 	set_proc_address(&impl_TexBuffer,                 "glTexBuffer")
@@ -740,7 +741,7 @@ impl_TexImage3DMultisample:           proc "c" (target: u32, samples: i32, inter
 impl_GetMultisamplefv:                proc "c" (pname: u32, index: u32, val: ^f32)
 impl_SampleMaski:                     proc "c" (maskNumber: u32, mask: u32)
 
-load_3_2 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_3_2 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_DrawElementsBaseVertex,          "glDrawElementsBaseVertex")
 	set_proc_address(&impl_DrawRangeElementsBaseVertex,     "glDrawRangeElementsBaseVertex")
 	set_proc_address(&impl_DrawElementsInstancedBaseVertex, "glDrawElementsInstancedBaseVertex")
@@ -823,7 +824,7 @@ impl_ColorP4uiv:                  proc "c" (type: u32, color: ^u32)
 impl_SecondaryColorP3ui:          proc "c" (type: u32, color: u32)
 impl_SecondaryColorP3uiv:         proc "c" (type: u32, color: ^u32)
 
-load_3_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_3_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_BindFragDataLocationIndexed, "glBindFragDataLocationIndexed")
 	set_proc_address(&impl_GetFragDataIndex,            "glGetFragDataIndex")
 	set_proc_address(&impl_GenSamplers,                 "glGenSamplers")
@@ -955,7 +956,7 @@ impl_MakeImageHandleResidentARB:     proc "c" (handle: u64, access: u32)
 impl_MakeTextureHandleNonResidentARB:proc "c" (handle: u64)
 impl_MakeImageHandleNonResidentARB:  proc "c" (handle: u64)
 
-load_4_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_4_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_MinSampleShading,               "glMinSampleShading")
 	set_proc_address(&impl_BlendEquationi,                 "glBlendEquationi")
 	set_proc_address(&impl_BlendEquationSeparatei,         "glBlendEquationSeparatei")
@@ -1131,7 +1132,7 @@ impl_DepthRangeIndexed:         proc "c" (index: u32, n: f64, f: f64)
 impl_GetFloati_v:               proc "c" (target: u32, index: u32, data: ^f32)
 impl_GetDoublei_v:              proc "c" (target: u32, index: u32, data: ^f64)
 
-load_4_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_4_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_ReleaseShaderCompiler,     "glReleaseShaderCompiler")
 	set_proc_address(&impl_ShaderBinary,              "glShaderBinary")
 	set_proc_address(&impl_GetShaderPrecisionFormat,  "glGetShaderPrecisionFormat")
@@ -1237,7 +1238,7 @@ impl_TexStorage3D:                                proc "c" (target: u32, levels:
 impl_DrawTransformFeedbackInstanced:              proc "c" (mode: u32, id: u32, instancecount: i32)
 impl_DrawTransformFeedbackStreamInstanced:        proc "c" (mode: u32, id: u32, stream: u32, instancecount: i32)
 
-load_4_2 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_4_2 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_DrawArraysInstancedBaseInstance,             "glDrawArraysInstancedBaseInstance")
 	set_proc_address(&impl_DrawElementsInstancedBaseInstance,           "glDrawElementsInstancedBaseInstance")
 	set_proc_address(&impl_DrawElementsInstancedBaseVertexBaseInstance, "glDrawElementsInstancedBaseVertexBaseInstance")
@@ -1303,7 +1304,7 @@ impl_GetObjectLabel:                  proc "c" (identifier: u32, name: u32, bufS
 impl_ObjectPtrLabel:                  proc "c" (ptr: rawptr, length: i32, label: cstring)
 impl_GetObjectPtrLabel:               proc "c" (ptr: rawptr, bufSize: i32, length: ^i32, label: [^]u8)
 
-load_4_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_4_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_ClearBufferData,                 "glClearBufferData")
 	set_proc_address(&impl_ClearBufferSubData,              "glClearBufferSubData")
 	set_proc_address(&impl_DispatchCompute,                 "glDispatchCompute")
@@ -1360,7 +1361,7 @@ impl_BindSamplers:      proc "c" (first: u32, count: i32, samplers: [^]u32)
 impl_BindImageTextures: proc "c" (first: u32, count: i32, textures: [^]u32)
 impl_BindVertexBuffers: proc "c" (first: u32, count: i32, buffers: [^]u32, offsets: [^]uintptr, strides: [^]i32)
 
-load_4_4 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_4_4 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_BufferStorage,     "glBufferStorage")
 	set_proc_address(&impl_ClearTexImage,     "glClearTexImage")
 	set_proc_address(&impl_ClearTexSubImage,  "glClearTexSubImage")
@@ -1498,7 +1499,7 @@ impl_TextureBarrier:                           proc "c" ()
 impl_GetUnsignedBytevEXT:                    proc "c" (pname: u32, data: ^byte)
 impl_TexPageCommitmentARB:                     proc "c" (target: u32, level: i32, xoffset: i32, yoffset: i32, zoffset: i32, width: i32, height: i32, depth: i32, commit: bool)
 
-load_4_5 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_4_5 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_ClipControl,                              "glClipControl")
 	set_proc_address(&impl_CreateTransformFeedbacks,                 "glCreateTransformFeedbacks")
 	set_proc_address(&impl_TransformFeedbackBufferBase,              "glTransformFeedbackBufferBase")
@@ -1631,7 +1632,7 @@ impl_MultiDrawArraysIndirectCount:   proc "c" (mode: i32, indirect: [^]DrawArray
 impl_MultiDrawElementsIndirectCount: proc "c" (mode: i32, type: i32, indirect: [^]DrawElementsIndirectCommand, drawcount: i32, maxdrawcount, stride: i32)
 impl_PolygonOffsetClamp:             proc "c" (factor, units, clamp: f32)
 
-load_4_6 :: proc(set_proc_address: Set_Proc_Address_Type) {
+load_only_4_6 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_SpecializeShader,               "glSpecializeShader")
 	set_proc_address(&impl_MultiDrawArraysIndirectCount,   "glMultiDrawArraysIndirectCount")
 	set_proc_address(&impl_MultiDrawElementsIndirectCount, "glMultiDrawElementsIndirectCount")
