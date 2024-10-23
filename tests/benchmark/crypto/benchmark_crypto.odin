@@ -8,12 +8,15 @@ import "core:strings"
 import "core:testing"
 import "core:time"
 
+import "core:crypto/aegis"
 import "core:crypto/aes"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
+import "core:crypto/deoxysii"
 import "core:crypto/ed25519"
 import "core:crypto/poly1305"
 import "core:crypto/x25519"
+import "core:crypto/x448"
 
 // Cryptographic primitive benchmarks.
 
@@ -164,6 +167,80 @@ benchmark_crypto :: proc(t: ^testing.T) {
 		benchmark_print(&str, name, options)
 	}
 	{
+		name := "AEGIS-256 64 bytes"
+		options := &time.Benchmark_Options {
+			rounds = 1_000,
+			bytes = 64,
+			setup = _setup_sized_buf,
+			bench = _benchmark_aegis_256,
+			teardown = _teardown_sized_buf,
+		}
+
+		key := [aegis.KEY_SIZE_256]byte {
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		}
+		ctx: aegis.Context
+		aegis.init(&ctx, key[:])
+
+		context.user_ptr = &ctx
+
+		err := time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+
+		name = "AEGIS-256 1024 bytes"
+		options.bytes = 1024
+		err = time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+
+		name = "AEGIS-256 65536 bytes"
+		options.bytes = 65536
+		err = time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+	}
+	{
+		name := "Deoxys-II-256 64 bytes"
+		options := &time.Benchmark_Options {
+			rounds = 1_000,
+			bytes = 64,
+			setup = _setup_sized_buf,
+			bench = _benchmark_deoxysii_256,
+			teardown = _teardown_sized_buf,
+		}
+
+		key := [aegis.KEY_SIZE_256]byte {
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+			0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+		}
+		ctx: deoxysii.Context
+		deoxysii.init(&ctx, key[:])
+
+		context.user_ptr = &ctx
+
+		err := time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+
+		name = "Deoxys-II-256 1024 bytes"
+		options.bytes = 1024
+		err = time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+
+		name = "Deoxys-II-256 65536 bytes"
+		options.bytes = 65536
+		err = time.benchmark(options, context.allocator)
+		testing.expect(t, err == nil, name)
+		benchmark_print(&str, name, options)
+	}
+	{
 		iters :: 10000
 
 		priv_str := "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
@@ -234,6 +311,26 @@ benchmark_crypto :: proc(t: ^testing.T) {
 
 		fmt.sbprintfln(&str,
 			"x25519.scalarmult: ~%f us/op",
+			time.duration_microseconds(elapsed) / iters,
+		)
+	}
+	{
+		point_str := "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+		scalar_str := "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
+
+		point, _ := hex.decode(transmute([]byte)(point_str), context.temp_allocator)
+		scalar, _ := hex.decode(transmute([]byte)(scalar_str), context.temp_allocator)
+		out: [x448.POINT_SIZE]byte = ---
+
+		iters :: 10000
+		start := time.now()
+		for i := 0; i < iters; i = i + 1 {
+			x448.scalarmult(out[:], scalar[:], point[:])
+		}
+		elapsed := time.since(start)
+
+		fmt.sbprintfln(&str,
+			"x448.scalarmult: ~%f us/op",
 			time.duration_microseconds(elapsed) / iters,
 		)
 	}
@@ -396,6 +493,46 @@ _benchmark_aes256_gcm :: proc(
 
 	for _ in 0 ..= options.rounds {
 		aes.seal_gcm(ctx, buf, tag[:], iv[:], nil, buf)
+	}
+	options.count = options.rounds
+	options.processed = options.rounds * options.bytes
+	return nil
+}
+
+_benchmark_aegis_256 :: proc(
+	options: ^time.Benchmark_Options,
+	allocator := context.allocator,
+) -> (
+	err: time.Benchmark_Error,
+) {
+	buf := options.input
+	iv: [aegis.IV_SIZE_256]byte
+	tag: [aegis.TAG_SIZE_128]byte = ---
+
+	ctx := (^aegis.Context)(context.user_ptr)
+
+	for _ in 0 ..= options.rounds {
+		aegis.seal(ctx, buf, tag[:], iv[:], nil, buf)
+	}
+	options.count = options.rounds
+	options.processed = options.rounds * options.bytes
+	return nil
+}
+
+_benchmark_deoxysii_256 :: proc(
+	options: ^time.Benchmark_Options,
+	allocator := context.allocator,
+) -> (
+	err: time.Benchmark_Error,
+) {
+	buf := options.input
+	iv: [deoxysii.IV_SIZE]byte
+	tag: [deoxysii.TAG_SIZE]byte = ---
+
+	ctx := (^deoxysii.Context)(context.user_ptr)
+
+	for _ in 0 ..= options.rounds {
+		deoxysii.seal(ctx, buf, tag[:], iv[:], nil, buf)
 	}
 	options.count = options.rounds
 	options.processed = options.rounds * options.bytes
