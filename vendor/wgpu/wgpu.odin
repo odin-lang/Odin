@@ -1299,7 +1299,8 @@ RenderPipelineDescriptor :: struct {
 
 @(link_prefix="wgpu", default_calling_convention="c")
 foreign libwgpu {
-	CreateInstance :: proc(/* NULLABLE */ descriptor: /* const */ ^InstanceDescriptor = nil) -> Instance ---
+	@(link_name="wgpuCreateInstance")
+	RawCreateInstance :: proc(/* NULLABLE */ descriptor: /* const */ ^InstanceDescriptor = nil) -> Instance ---
 	GetProcAddress :: proc(device: Device, procName: cstring) -> Proc ---
 
 	// Methods of Adapter
@@ -1546,6 +1547,16 @@ foreign libwgpu {
 	TextureViewRelease :: proc(textureView: TextureView) ---
 }
 
+// Wrappers of Instance
+
+CreateInstance :: proc "c" (/* NULLABLE */ descriptor: /* const */ ^InstanceDescriptor = nil) -> Instance {
+	when ODIN_OS != .JS {
+		wgpu_native_version_check()
+	}
+
+	return RawCreateInstance(descriptor)
+}
+
 // Wrappers of Adapter
 
 AdapterEnumerateFeatures :: proc(adapter: Adapter, allocator := context.allocator) -> []FeatureName {
@@ -1555,49 +1566,49 @@ AdapterEnumerateFeatures :: proc(adapter: Adapter, allocator := context.allocato
 	return features
 }
 
-AdapterGetLimits :: proc(adapter: Adapter) -> (limits: SupportedLimits, ok: bool) {
+AdapterGetLimits :: proc "c" (adapter: Adapter) -> (limits: SupportedLimits, ok: bool) {
 	ok = bool(RawAdapterGetLimits(adapter, &limits))
 	return
 }
 
-AdapterGetInfo :: proc(adapter: Adapter) -> (info: AdapterInfo) {
+AdapterGetInfo :: proc "c" (adapter: Adapter) -> (info: AdapterInfo) {
 	RawAdapterGetInfo(adapter, &info)
 	return
 }
 
 // Wrappers of Buffer
 
-BufferGetConstMappedRange :: proc(buffer: Buffer, offset: uint, size: uint) -> []byte {
+BufferGetConstMappedRange :: proc "c" (buffer: Buffer, offset: uint, size: uint) -> []byte {
 	return ([^]byte)(RawBufferGetConstMappedRange(buffer, offset, size))[:size]
 }
 
-BufferGetConstMappedRangeTyped :: proc(buffer: Buffer, offset: uint, $T: typeid) -> ^T
+BufferGetConstMappedRangeTyped :: proc "c" (buffer: Buffer, offset: uint, $T: typeid) -> ^T
 	where !intrinsics.type_is_sliceable(T) {
 
 	return (^T)(RawBufferGetConstMappedRange(buffer, 0, size_of(T)))
 }
 
-BufferGetConstMappedRangeSlice :: proc(buffer: Buffer, offset: uint, length: uint, $T: typeid) -> []T {
+BufferGetConstMappedRangeSlice :: proc "c" (buffer: Buffer, offset: uint, length: uint, $T: typeid) -> []T {
 	return ([^]T)(RawBufferGetConstMappedRange(buffer, offset, size_of(T)*length))[:length]
 }
 
-BufferGetMappedRange :: proc(buffer: Buffer, offset: uint, size: uint) -> []byte {
+BufferGetMappedRange :: proc "c" (buffer: Buffer, offset: uint, size: uint) -> []byte {
 	return ([^]byte)(RawBufferGetMappedRange(buffer, offset, size))[:size]
 }
 
-BufferGetMappedRangeTyped :: proc(buffer: Buffer, offset: uint, $T: typeid) -> ^T
+BufferGetMappedRangeTyped :: proc "c" (buffer: Buffer, offset: uint, $T: typeid) -> ^T
 	where !intrinsics.type_is_sliceable(T) {
 
 	return (^T)(RawBufferGetMappedRange(buffer, offset, size_of(T)))
 }
 
-BufferGetMappedRangeSlice :: proc(buffer: Buffer, offset: uint, $T: typeid, length: uint) -> []T {
+BufferGetMappedRangeSlice :: proc "c" (buffer: Buffer, offset: uint, $T: typeid, length: uint) -> []T {
 	return ([^]T)(RawBufferGetMappedRange(buffer, offset, size_of(T)*length))[:length]
 }
 
 // Wrappers of ComputePassEncoder
 
-ComputePassEncoderSetBindGroup :: proc(computePassEncoder: ComputePassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsets: []u32 = nil) {
+ComputePassEncoderSetBindGroup :: proc "c" (computePassEncoder: ComputePassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsets: []u32 = nil) {
 	RawComputePassEncoderSetBindGroup(computePassEncoder, groupIndex, group, len(dynamicOffsets), raw_data(dynamicOffsets))
 }
 
@@ -1610,7 +1621,7 @@ DeviceEnumerateFeatures :: proc(device: Device, allocator := context.allocator) 
 	return features
 }
 
-DeviceGetLimits :: proc(device: Device) -> (limits: SupportedLimits, ok: bool) {
+DeviceGetLimits :: proc "c" (device: Device) -> (limits: SupportedLimits, ok: bool) {
 	ok = bool(RawDeviceGetLimits(device, &limits))
 	return
 }
@@ -1620,7 +1631,7 @@ BufferWithDataDescriptor :: struct {
 	usage: BufferUsageFlags,
 }
 
-DeviceCreateBufferWithDataSlice :: proc(device: Device, descriptor: /* const */ ^BufferWithDataDescriptor, data: []$T) -> (buf: Buffer) {
+DeviceCreateBufferWithDataSlice :: proc "c" (device: Device, descriptor: /* const */ ^BufferWithDataDescriptor, data: []$T) -> (buf: Buffer) {
 	size := u64(size_of(T) * len(data))
 	buf = DeviceCreateBuffer(device, &{
 		label            = descriptor.label,
@@ -1636,7 +1647,7 @@ DeviceCreateBufferWithDataSlice :: proc(device: Device, descriptor: /* const */ 
 	return
 }
 
-DeviceCreateBufferWithDataTyped :: proc(device: Device, descriptor: /* const */ ^BufferWithDataDescriptor, data: $T) -> (buf: Buffer)
+DeviceCreateBufferWithDataTyped :: proc "c" (device: Device, descriptor: /* const */ ^BufferWithDataDescriptor, data: $T) -> (buf: Buffer)
 	where !intrinsics.type_is_sliceable(T) {
 
 	buf = DeviceCreateBuffer(device, &{
@@ -1660,34 +1671,34 @@ DeviceCreateBufferWithData :: proc {
 
 // Wrappers of Queue
 
-QueueSubmit :: proc(queue: Queue, commands: []CommandBuffer) {
+QueueSubmit :: proc "c" (queue: Queue, commands: []CommandBuffer) {
 	RawQueueSubmit(queue, len(commands), raw_data(commands))
 }
 
 // Wrappers of RenderBundleEncoder
 
-RenderBundleEncoderSetBindGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsets: []u32 = nil) {
+RenderBundleEncoderSetBindGroup :: proc "c" (renderBundleEncoder: RenderBundleEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsets: []u32 = nil) {
 	RawRenderBundleEncoderSetBindGroup(renderBundleEncoder, groupIndex, group, len(dynamicOffsets), raw_data(dynamicOffsets))
 }
 
 // Wrappers of RenderPassEncoder
 
-RenderPassEncoderExecuteBundles :: proc(renderPassEncoder: RenderPassEncoder, bundles: []RenderBundle) {
+RenderPassEncoderExecuteBundles :: proc "c" (renderPassEncoder: RenderPassEncoder, bundles: []RenderBundle) {
 	RawRenderPassEncoderExecuteBundles(renderPassEncoder, len(bundles), raw_data(bundles))
 }
 
-RenderPassEncoderSetBindGroup :: proc(renderPassEncoder: RenderPassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsets: []u32 = nil) {
+RenderPassEncoderSetBindGroup :: proc "c" (renderPassEncoder: RenderPassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsets: []u32 = nil) {
 	RawRenderPassEncoderSetBindGroup(renderPassEncoder, groupIndex, group, len(dynamicOffsets), raw_data(dynamicOffsets))
 }
 
 // Wrappers of Surface
 
-SurfaceGetCapabilities :: proc(surface: Surface, adapter: Adapter) -> (capabilities: SurfaceCapabilities) {
+SurfaceGetCapabilities :: proc "c" (surface: Surface, adapter: Adapter) -> (capabilities: SurfaceCapabilities) {
 	RawSurfaceGetCapabilities(surface, adapter, &capabilities)
 	return
 }
 
-SurfaceGetCurrentTexture :: proc(surface: Surface) -> (surface_texture: SurfaceTexture) {
+SurfaceGetCurrentTexture :: proc "c" (surface: Surface) -> (surface_texture: SurfaceTexture) {
 	RawSurfaceGetCurrentTexture(surface, &surface_texture)
 	return
 }
@@ -1698,8 +1709,8 @@ BINDINGS_VERSION        :: [4]u8{22, 1, 0, 1}
 BINDINGS_VERSION_STRING :: "22.1.0.1"
 
 when ODIN_OS != .JS {
-	@(private="file", init)
-	wgpu_native_version_check :: proc() {
+	@(private="file")
+	wgpu_native_version_check :: proc "c" () {
 		v := (transmute([4]u8)GetVersion()).wzyx
 
 		if v != BINDINGS_VERSION {
@@ -1708,7 +1719,7 @@ when ODIN_OS != .JS {
 			n += copy(buf[n:], "bindings are for version ")
 			n += copy(buf[n:], BINDINGS_VERSION_STRING)
 			n += copy(buf[n:], ", but a different version is linked")
-			panic(string(buf[:n]))
+			panic_contextless(string(buf[:n]))
 		}
 	}
 
@@ -1745,7 +1756,7 @@ when ODIN_OS != .JS {
 		RenderPassEncoderEndPipelineStatisticsQuery :: proc(renderPassEncoder: RenderPassEncoder) ---
 	}
 
-	GenerateReport :: proc(instance: Instance) -> (report: GlobalReport) {
+	GenerateReport :: proc "c" (instance: Instance) -> (report: GlobalReport) {
 		RawGenerateReport(instance, &report)
 		return
 	}
@@ -1757,7 +1768,7 @@ when ODIN_OS != .JS {
 		return
 	}
 
-	QueueSubmitForIndex :: proc(queue: Queue, commands: []CommandBuffer) -> SubmissionIndex {
+	QueueSubmitForIndex :: proc "c" (queue: Queue, commands: []CommandBuffer) -> SubmissionIndex {
 		return RawQueueSubmitForIndex(queue, len(commands), raw_data(commands))
 	}
 }
