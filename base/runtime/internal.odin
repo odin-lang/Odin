@@ -310,67 +310,70 @@ memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_ch
 	n := uintptr(n)
 
 	SU :: size_of(uintptr)
-	fast := n/SU + 1
-	offset := (fast-1)*SU
-	curr_block := uintptr(0)
-	if n < SU {
-		fast = 0
-	}
-
-	for /**/; curr_block < fast; curr_block += 1 {
-		va := (^uintptr)(x + curr_block * size_of(uintptr))^
-		vb := (^uintptr)(y + curr_block * size_of(uintptr))^
-		if va ~ vb != 0 {
-			for pos := curr_block*SU; pos < n; pos += 1 {
-				a := (^byte)(x+pos)^
-				b := (^byte)(y+pos)^
-				if a ~ b != 0 {
-					return -1 if (int(a) - int(b)) < 0 else +1
+	if (x % SU) != 0 && (y % SU) != 0 {
+		for /**/; n >= SU; n -= SU {
+			va := (^uintptr)(x)^
+			vb := (^uintptr)(y)^
+			if va ~ vb != 0 {
+				for i := uintptr(0); i < SU; i += 1 {
+					a := (^byte)(x+i)^
+					b := (^byte)(y+i)^
+					if a ~ b != 0 {
+						return -1 if (int(a) - int(b)) < 0 else +1
+					}
 				}
 			}
 		}
+		x += SU
+		y += SU
 	}
 
-	for /**/; offset < n; offset += 1 {
-		a := (^byte)(x+offset)^
-		b := (^byte)(y+offset)^
+	for /**/; n != 0; n -= 1 {
+		a := (^byte)(x)^
+		b := (^byte)(y)^
 		if a ~ b != 0 {
 			return -1 if (int(a) - int(b)) < 0 else +1
 		}
+		x += 1
+		y += 1
 	}
 
 	return 0
 }
 
 memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_check {
+	if a == nil { return -1 }
 	x := uintptr(a)
 	n := uintptr(n)
 
 	SU :: size_of(uintptr)
-	fast := n/SU + 1
-	offset := (fast-1)*SU
-	curr_block := uintptr(0)
-	if n < SU {
-		fast = 0
+	for /**/; (x % SU) != 0 && n != 0; n -= 1 {
+		a := ((^byte)(x))^
+		if a ~ 0 != 0 {
+			return -1 if int(a) < 0 else +1
+		}
+		x += 1
 	}
 
-	for /**/; curr_block < fast; curr_block += 1 {
-		va := (^uintptr)(x + curr_block * size_of(uintptr))^
+	for /**/; n >= SU; n -= SU {
+		va := (^uintptr)(x)^
 		if va ~ 0 != 0 {
-			for pos := curr_block*SU; pos < n; pos += 1 {
-				a := (^byte)(x+pos)^
+			for i := uintptr(0); i < SU; i += 1 {
+				a := (^byte)(x+i)^
 				if a ~ 0 != 0 {
 					return -1 if int(a) < 0 else +1
 				}
 			}
 		}
+		x += SU
 	}
 
-	for /**/; offset < n; offset += 1 {
-		a := (^byte)(x+offset)^
+	for /**/; n != 0; n -= 1 {
+		a := (^byte)(x)^
 		if a ~ 0 != 0 {
 			return -1 if int(a) < 0 else +1
 		}
+		x += 1
 	}
 
 	return 0
