@@ -106,6 +106,18 @@ decode :: proc(d: []rune, s: []u16) -> (n: int) {
 	return
 }
 
+rune_count :: proc(s: []u16) -> (n: int) {
+	for i := 0; i < len(s); i += 1 {
+		c := s[i]
+		if _surr1 <= c && c < _surr2 && i+1 < len(s) && 
+			_surr2 <= s[i+1] && s[i+1] < _surr3 {
+			i += 1
+		}
+		n += 1
+	}
+	return
+}
+
 
 decode_to_utf8 :: proc(d: []byte, s: []u16) -> (n: int) {
 	for i := 0; i < len(s); i += 1 {
