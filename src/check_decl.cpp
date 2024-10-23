@@ -88,11 +88,12 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			e->type = t_invalid;
 			return nullptr;
 		} else if (is_type_polymorphic(t)) {
-			Entity *e = entity_of_node(operand->expr);
-			if (e == nullptr) {
+			Entity *e2 = entity_of_node(operand->expr);
+			if (e2 == nullptr) {
+				e->type = t_invalid;
 				return nullptr;
 			}
-			if (e->state.load() != EntityState_Resolved) {
+			if (e2->state.load() != EntityState_Resolved) {
 				gbString str = type_to_string(t);
 				defer (gb_string_free(str));
 				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
