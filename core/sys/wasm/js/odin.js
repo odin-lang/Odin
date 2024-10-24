@@ -1579,7 +1579,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 				}
 			},
 
-			add_event_listener: (id_ptr, id_len, name_ptr, name_len, name_code, data, callback, use_capture) => {
+			add_event_listener: (id_ptr, id_len, name_ptr, name_len, name_code, data, callback, use_capture, prevent_default, stop_prop, stop_imm_prop) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = getElement(id);
@@ -1594,6 +1594,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 					event_data.event = e;
 					event_data.name_code = name_code;
 
+					if (prevent_default) e.preventDefault();
+					if (stop_prop) e.stopPropagation();
+					if (stop_imm_prop) e.stopImmediatePropagation();
+
 					eventQueue.push({event_data: event_data, data: data, callback: callback});
 				};
 				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
@@ -1601,7 +1605,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 				return true;
 			},
 
-			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
+			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture, prevent_default, stop_prop, stop_imm_prop) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
 				let listener = (e) => {
@@ -1610,6 +1614,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 					event_data.id_len = 0;
 					event_data.event = e;
 					event_data.name_code = name_code;
+
+					if (prevent_default) e.preventDefault();
+					if (stop_prop) e.stopPropagation();
+					if (stop_imm_prop) e.stopImmediatePropagation();
 
 					eventQueue.push({event_data: event_data, data: data, callback: callback});
 				};
