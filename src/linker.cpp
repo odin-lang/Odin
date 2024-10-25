@@ -684,7 +684,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			if (is_osx && build_context.ODIN_DEBUG) {
 				// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 				// to the symbols in the object file
-				result = system_exec_command_line_app("dsymutil", "dsymutil %.*s", LIT(output_filename));
+				result = system_exec_command_line_app("dsymutil", "dsymutil \"%.*s\"", LIT(output_filename));
 
 				if (result) {
 					return result;
