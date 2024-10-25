@@ -269,7 +269,7 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		if (lb_try_update_alignment(ptr, align)) {
 			LLVMTypeRef result_type = lb_type(p->module, t);
 			res.value = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(result_type, 0), "");
-			res.value = LLVMBuildLoad2(p->builder, result_type, res.value, "");
+			res.value = OdinLLVMBuildLoad(p, result_type, res.value);
 			return res;
 		}
 		lbAddr addr = lb_add_local_generated(p, t, false);
