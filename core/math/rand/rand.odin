@@ -670,20 +670,20 @@ choice :: proc(array: $T/[]$E, gen := context.random_generator) -> (res: E) {
 
 
 @(require_results)
-choice_enum :: proc($T: typeid, gen := context.random_generator) -> T
-	where
-		intrinsics.type_is_enum(T),
-		size_of(T) <= 8,
-		len(T) == cap(T) /* Only allow contiguous enum types */ \
-{
-	when intrinsics.type_is_unsigned(intrinsics.type_core_type(T)) &&
-	     u64(max(T)) > u64(max(i64)) {
-		i := uint64(gen) % u64(len(T))
-		i += u64(min(T))
-		return T(i)
+choice_enum :: proc($T: typeid, gen := context.random_generator) -> T where intrinsics.type_is_enum(T) {
+	when size_of(T) <= 8 && len(T) == cap(T) {
+		when intrinsics.type_is_unsigned(intrinsics.type_core_type(T)) &&
+			 u64(max(T)) > u64(max(i64)) {
+			i := uint64(gen) % u64(len(T))
+			i += u64(min(T))
+			return T(i)
+		} else {
+			i := int63_max(i64(len(T)), gen)
+			i += i64(min(T))
+			return T(i)
+		}
 	} else {
-		i := int63_max(i64(len(T)), gen)
-		i += i64(min(T))
-		return T(i)
+		values := runtime.type_info_base(type_info_of(T)).variant.(runtime.Type_Info_Enum).values
+		return T(choice(values))
 	}
 }
