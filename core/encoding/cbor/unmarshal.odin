@@ -628,7 +628,8 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 		unknown := length == -1
 		fields := reflect.struct_fields_zipped(ti.id)
 
-		for idx := 0; idx < len(fields) && (unknown || idx < length); idx += 1 {
+		idx := 0
+		for ; idx < len(fields) && (unknown || idx < length); idx += 1 {
 			// Decode key, keys can only be strings.
 			key: string
 			if keyv, kerr := decode_key(d, v, context.temp_allocator); unknown && kerr == .Break {
@@ -673,6 +674,17 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 			fany  := any{ptr, field.type.id}
 			_unmarshal_value(d, fany, _decode_header(r) or_return) or_return
 		}
+
+		// If there are fields left in the map that did not get decoded into the struct, decode and discard them.
+		if !unknown {
+			for _ in idx..<length {
+				key := err_conv(_decode_from_decoder(d, allocator=context.temp_allocator)) or_return
+				destroy(key, context.temp_allocator)
+				val := err_conv(_decode_from_decoder(d, allocator=context.temp_allocator)) or_return
+				destroy(val, context.temp_allocator)
+			}
+		}
+
 		return
 
 	case reflect.Type_Info_Map:
