@@ -774,6 +774,36 @@ gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vecto
 	return false;
 }
 
+gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value) {
+	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
+
+	// If it is not an instruction it isn't a GEP, so we don't need to track alignment in the metadata,
+	// which is not possible anyway (only LLVM instructions can have metadata).
+	if (LLVMIsAInstruction(value)) {
+		u64 is_packed = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_IS_PACKED);
+		if (is_packed != 0) {
+			LLVMSetAlignment(result, 1);
+		}
+	}
+
+	return result;
+}
+
+gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value, i64 alignment) {
+	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
+
+	LLVMSetAlignment(result, cast(unsigned)alignment);
+
+	if (LLVMIsAInstruction(value)) {
+		u64 is_packed = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_IS_PACKED);
+		if (is_packed != 0) {
+			LLVMSetAlignment(result, 1);
+		}
+	}
+
+	return result;
+}
+
 gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	if (addr.addr.value == nullptr) {
 		return;
@@ -1119,7 +1149,7 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 		Type *vt = base_type(value.type);
 		GB_ASSERT(vt->kind == Type_MultiPointer);
 		Type *t = vt->MultiPointer.elem;
-		LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
+		LLVMValueRef v = OdinLLVMBuildLoad(p, lb_type(p->module, t), value.value);
 		return lbValue{v, t};
 	} else if (is_type_soa_pointer(value.type)) {
 		lbValue ptr = lb_emit_struct_ev(p, value, 0);
@@ -1130,16 +1160,7 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 
 	GB_ASSERT_MSG(is_type_pointer(value.type), "%s", type_to_string(value.type));
 	Type *t = type_deref(value.type);
-	LLVMValueRef v = LLVMBuildLoad2(p->builder, lb_type(p->module, t), value.value, "");
-
-	// If it is not an instruction it isn't a GEP, so we don't need to track alignment in the metadata,
-	// which is not possible anyway (only LLVM instructions can have metadata).
-	if (LLVMIsAInstruction(value.value)) {
-		u64 is_packed = lb_get_metadata_custom_u64(p->module, value.value, ODIN_METADATA_IS_PACKED);
-		if (is_packed != 0) {
-			LLVMSetAlignment(v, 1);
-		}
-	}
+	LLVMValueRef v = OdinLLVMBuildLoad(p, lb_type(p->module, t), value.value);
 
 	return lbValue{v, t};
 }
@@ -1413,7 +1434,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		LLVMTypeRef vector_type = nullptr;
 		if (lb_try_vector_cast(p->module, addr.addr, &vector_type)) {
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr.addr.value, LLVMPointerType(vector_type, 0), "");
-			LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
+			LLVMValueRef v = OdinLLVMBuildLoad(p, vector_type, vp);
 			LLVMValueRef scalars[4] = {};
 			for (u8 i = 0; i < addr.swizzle.count; i++) {
 				scalars[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);
@@ -2710,7 +2731,7 @@ general_end:;
 	if (LLVMIsALoadInst(val) && (src_size >= dst_size && src_align >= dst_align)) {
 		LLVMValueRef val_ptr = LLVMGetOperand(val, 0);
 		val_ptr = LLVMBuildPointerCast(p->builder, val_ptr, LLVMPointerType(dst_type, 0), "");
-		LLVMValueRef loaded_val = LLVMBuildLoad2(p->builder, dst_type, val_ptr, "");
+		LLVMValueRef loaded_val = OdinLLVMBuildLoad(p, dst_type, val_ptr);
 
 		// LLVMSetAlignment(loaded_val, gb_min(src_align, dst_align));
 
@@ -2726,7 +2747,7 @@ general_end:;
 		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
 		LLVMBuildStore(p->builder, val, nptr);
 
-		return LLVMBuildLoad2(p->builder, dst_type, ptr, "");
+		return OdinLLVMBuildLoad(p, dst_type, ptr);
 	}
 }
 

@@ -2001,7 +2001,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 			LLVMValueRef ptr = p->temp_callee_return_struct_memory;
 			LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
 			LLVMBuildStore(p->builder, ret_val, nptr);
-			ret_val = LLVMBuildLoad2(p->builder, ret_type, ptr, "");
+			ret_val = OdinLLVMBuildLoad(p, ret_type, ptr);
 		} else {
 			ret_val = OdinLLVMBuildTransmute(p, ret_val, ret_type);
 		}
