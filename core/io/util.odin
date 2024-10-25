@@ -225,7 +225,7 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 			} else {
 				write_byte(w, '\\', &n) or_return
 				write_byte(w, 'U', &n)  or_return
-				for s := 24; s >= 0; s -= 4 {
+				for s := 28; s >= 0; s -= 4 {
 					write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
 				}
 			}
