@@ -43,6 +43,8 @@ gb_internal u64 lb_typeid_kind(lbModule *m, Type *type, u64 id=0) {
 		if (flags & BasicFlag_Pointer)  kind = Typeid_Pointer;
 		if (flags & BasicFlag_String)   kind = Typeid_String;
 		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
+
+		if (bt->Basic.kind == Basic_typeid) kind = Typeid_Type_Id;
 	} break;
 	case Type_Pointer:         kind = Typeid_Pointer;          break;
 	case Type_MultiPointer:    kind = Typeid_Multi_Pointer;    break;
