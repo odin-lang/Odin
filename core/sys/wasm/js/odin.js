@@ -1802,6 +1802,16 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 				}
 			},
 
+			set_element_style: (id_ptr, id_len, key_ptr, key_len, value_ptr, value_len) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
+				let value = wasmMemoryInterface.loadString(value_ptr, value_len);
+				let element = getElement(id);
+				if (element) {
+					element.style[key] = value;
+				}
+			},
+
 			get_element_key_f64: (id_ptr, id_len, key_ptr, key_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
