@@ -392,6 +392,7 @@ test_unmarshal_map_into_struct_partially :: proc(t: ^testing.T) {
 		bar: struct {
 			hello: string,
 			world: string,
+			foo:   string `cbor:"-"`,
 		},
 		baz: int,
 	}
@@ -401,6 +402,7 @@ test_unmarshal_map_into_struct_partially :: proc(t: ^testing.T) {
 			hello:   string,
 			world:   string,
 			hellope: string,
+			foo:     string,
 		},
 		baz: int,
 	}
@@ -409,6 +411,7 @@ test_unmarshal_map_into_struct_partially :: proc(t: ^testing.T) {
 			hello   = "hello",
 			world   = "world",
 			hellope = "hellope",
+			foo     = "foo",
 		},
 		baz = 4,
 	}
@@ -426,7 +429,7 @@ test_unmarshal_map_into_struct_partially :: proc(t: ^testing.T) {
 	less_out: Foo
 	uerr := cbor.unmarshal(string(more_bin), &less_out)
 	testing.expect_value(t, uerr, nil)
-	testing.expect_value(t, less, less_out)
+	testing.expect_value(t, less_out, less)
 
 	delete(more_bin)
 	delete(less_out.bar.hello)
