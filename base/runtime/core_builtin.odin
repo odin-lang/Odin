@@ -939,19 +939,7 @@ map_upsert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 
 @builtin
 card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
-	when size_of(S) == 1 {
-		return int(intrinsics.count_ones(transmute(u8)s))
-	} else when size_of(S) == 2 {
-		return int(intrinsics.count_ones(transmute(u16)s))
-	} else when size_of(S) == 4 {
-		return int(intrinsics.count_ones(transmute(u32)s))
-	} else when size_of(S) == 8 {
-		return int(intrinsics.count_ones(transmute(u64)s))
-	} else when size_of(S) == 16 {
-		return int(intrinsics.count_ones(transmute(u128)s))
-	} else {
-		#panic("Unhandled card bit_set size")
-	}
+	return int(intrinsics.count_ones(transmute(intrinsics.type_bit_set_underlying_type(S))s))
 }
 
 
