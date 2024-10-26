@@ -664,6 +664,8 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 				
 				// Skips unused map entries.
 				if use_field_idx < 0 {
+					val := err_conv(_decode_from_decoder(d, allocator=context.temp_allocator)) or_return
+					destroy(val, context.temp_allocator)
 					continue
 				}
 			}
