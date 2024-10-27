@@ -243,6 +243,7 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 
 	m: []string
 	m, err = glob(dir)
+	defer for s in m { delete(s) }; if m != nil { delete(m) }
 	if err != .None {
 		return
 	}
