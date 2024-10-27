@@ -1,10 +1,15 @@
-#pragma warning(push)
-#pragma warning(disable: 4245)
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(push)
+	#pragma warning(disable: 4245)
+#endif
 
 extern "C" {
 #include "utf8proc/utf8proc.c"
 }
-#pragma warning(pop)
+
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(pop)
+#endif
 
 
 gb_internal bool rune_is_letter(Rune r) {
