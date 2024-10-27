@@ -2018,14 +2018,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 	lb_ensure_abi_function_type(p->module, p);
 
-	lbValue res = {};
-
-	TypeTuple *tuple  = &p->type->Proc.results->Tuple;
 	isize return_count = p->type->Proc.result_count;
-	isize res_count = return_results.count;
-
-	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
-	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
 	if (return_count == 0) {
 		// No return values
@@ -2038,7 +2031,17 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 			LLVMBuildRetVoid(p->builder);
 		}
 		return;
-	} else if (return_count == 1) {
+	}
+
+	lbValue res = {};
+
+	TypeTuple *tuple = &p->type->Proc.results->Tuple;
+	isize res_count = return_results.count;
+
+	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
+	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
+
+	if (return_count == 1) {
 		Entity *e = tuple->variables[0];
 		if (res_count == 0) {
 			rw_mutex_shared_lock(&p->module->values_mutex);
