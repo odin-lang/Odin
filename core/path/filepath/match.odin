@@ -246,6 +246,13 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	if err != .None {
 		return
 	}
+	defer {
+		for s in m {
+			delete(s)
+		}
+		delete(m)
+	}
+
 	dmatches := make([dynamic]string, 0, 0)
 	for d in m {
 		dmatches, err = _glob(d, file, &dmatches)
