@@ -8008,6 +8008,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			pt = data.gen_entity->type;
 		}
 	}
+	pt = base_type(pt);
 
 	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
 		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
