@@ -687,3 +687,52 @@ choice_enum :: proc($T: typeid, gen := context.random_generator) -> T where intr
 		return T(choice(values))
 	}
 }
+
+/*
+Returns a random *set* bit from the provided `bit_set`.
+
+Inputs:
+- set: The `bit_set` to choose a random set bit from
+
+Returns:
+- res: The randomly selected bit, or the zero value if `ok` is `false`
+- ok:  Whether the bit_set was not empty and thus `res` is actually a random set bit
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	choice_bit_set_example :: proc() {
+		Flags :: enum {
+			A,
+			B = 10,
+			C,
+		}
+
+		fmt.println(rand.choice_bit_set(bit_set[Flags]{}))
+		fmt.println(rand.choice_bit_set(bit_set[Flags]{.B}))
+		fmt.println(rand.choice_bit_set(bit_set[Flags]{.B, .C}))
+		fmt.println(rand.choice_bit_set(bit_set[0..<15]{5, 1, 4}))
+	}
+
+Possible Output:
+	A false
+	B true
+	C true
+	5 true
+*/
+@(require_results)
+choice_bit_set :: proc(set: $T/bit_set[$E], gen := context.random_generator) -> (res: E, ok: bool) {
+	total_set := card(set)
+	if total_set == 0 {
+		return {}, false
+	}
+
+	core_set := transmute(intrinsics.type_bit_set_underlying_type(T))set
+
+	for target := int_max(total_set, gen); target > 0; target -= 1 {
+		core_set &= core_set - 1
+	}
+
+	return E(intrinsics.count_trailing_zeros(core_set)), true
+}
