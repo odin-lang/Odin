@@ -196,7 +196,7 @@ test_stat :: proc(t: ^testing.T) {
 	stat: posix.stat_t
 	testing.expect_value(t, posix.stat(#file, &stat), posix.result.OK)
 	testing.expect(t, posix.S_ISREG(stat.st_mode))
-	testing.expect_value(t, stat.st_mode, posix.mode_t{.IROTH, .IRGRP, .IRUSR, .IWGRP, .IWUSR, .IFREG})
+	testing.expect_value(t, stat.st_mode, posix.mode_t{.IROTH, .IRGRP, .IRUSR, .IWUSR, .IFREG})
 
 	CONTENT := #load(#file)
 	testing.expect_value(t, stat.st_size, posix.off_t(len(CONTENT)))

@@ -442,17 +442,17 @@ when ODIN_OS == .Darwin {
 
 	pthread_t :: distinct u64
 
-	pthread_attr_t :: struct #align(16) {
+	pthread_attr_t :: struct #align(8) {
 		_: [8]byte,
 	}
 
 	pthread_key_t :: distinct c.int
 
-	pthread_mutex_t :: struct #align(16) {
+	pthread_mutex_t :: struct #align(8) {
 		_: [8]byte,
 	}
 
-	pthread_cond_t  :: struct #align(16) {
+	pthread_cond_t  :: struct #align(8) {
 		_: [8]byte,
 	}
 

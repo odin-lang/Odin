@@ -1,5 +1,8 @@
 package unix
 
-import "core:sys/posix"
+import "core:c"
 
-timespec :: posix.timespec
+timespec :: struct {
+	secs:  i64,
+	nsecs: c.long,
+}
