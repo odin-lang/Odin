@@ -695,8 +695,8 @@ Inputs:
 - set: The `bit_set` to choose a random set bit from
 
 Returns:
-- res:       The randomly selected bit, or the zero value if `not_empty` is `false`
-- not_empty: Whether the bit_set was not empty and thus `res` is actually a random set bit
+- res: The randomly selected bit, or the zero value if `ok` is `false`
+- ok:  Whether the bit_set was not empty and thus `res` is actually a random set bit
 
 Example:
 	import "core:math/rand"
@@ -722,7 +722,7 @@ Possible Output:
 	5 true
 */
 @(require_results)
-choice_bit_set :: proc(set: $T/bit_set[$E], gen := context.random_generator) -> (res: E, not_empty: bool) {
+choice_bit_set :: proc(set: $T/bit_set[$E], gen := context.random_generator) -> (res: E, ok: bool) {
 	total_set := card(set)
 	if total_set == 0 {
 		return {}, false
