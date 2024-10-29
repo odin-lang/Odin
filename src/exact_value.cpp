@@ -687,6 +687,7 @@ gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 	case ExactValue_String:
 	case ExactValue_Quaternion:
 	case ExactValue_Pointer:
+	case ExactValue_Compound:
 	case ExactValue_Procedure:
 	case ExactValue_Typeid:
 		return;
