@@ -212,7 +212,13 @@ matrix_mul_differ :: proc "contextless" (a: $A/matrix[$I, $J]$E, b: $B/matrix[J,
 
 
 @(require_results)
-matrix_mul_vector :: proc "contextless" (a: $A/matrix[$I, $J]$E, b: $B/[J]E) -> (c: B)
+matrix_mul_vector :: proc "contextless" (a: $A/matrix[$I, I]$E, b: $B/[I]E) -> (c: B)
+	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
+	return a * b
+}
+
+@(require_results)
+matrix_mul_vector_differ :: proc "contextless" (a: $A/matrix[$I, $J]$E, b: $B/[J]E) -> (c: matrix[I, 1]E)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	return a * b
 }
@@ -252,6 +258,7 @@ mul :: proc{
 	matrix_mul,
 	matrix_mul_differ,
 	matrix_mul_vector,
+	matrix_mul_vector_differ,
 	quaternion64_mul_vector3,
 	quaternion128_mul_vector3,
 	quaternion256_mul_vector3,
