@@ -442,7 +442,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		stderr_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
 	}
 	if desc.stdin != nil {
-		stdin_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
+		stdin_handle = win32.HANDLE((^File_Impl)(desc.stdin.impl).fd)
 	}
 
 	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator()) or_else nil) if len(desc.working_dir) > 0 else nil

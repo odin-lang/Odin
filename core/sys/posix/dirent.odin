@@ -1,3 +1,4 @@
+#+build darwin, linux, freebsd, openbsd, netbsd
 package posix
 
 import "core:c"
@@ -210,6 +211,4 @@ when ODIN_OS == .Darwin {
 			d_name:   [256]c.char `fmt:"s,0"`, /* [PSX] entry name */
 		}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

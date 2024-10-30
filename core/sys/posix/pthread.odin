@@ -1,10 +1,11 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System.framework"
-} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Linux {
 	foreign import lib "system:pthread"
 } else {
 	foreign import lib "system:c"
@@ -398,6 +399,16 @@ when ODIN_OS == .Darwin {
 
 	pthread_key_t :: distinct c.ulong
 
+	pthread_mutex_t :: struct {
+		__sig:    c.long,
+		__opaque: [56]c.char,
+	}
+
+	pthread_cond_t :: struct {
+		__sig:    c.long,
+		__opaque: [40]c.char,
+	}
+
 	sched_param :: struct {
 		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
 		_:              [4]c.char,
@@ -431,9 +442,19 @@ when ODIN_OS == .Darwin {
 
 	pthread_t :: distinct u64
 
-	pthread_attr_t :: distinct rawptr
+	pthread_attr_t :: struct #align(8) {
+		_: [8]byte,
+	}
 
 	pthread_key_t :: distinct c.int
+
+	pthread_mutex_t :: struct #align(8) {
+		_: [8]byte,
+	}
+
+	pthread_cond_t  :: struct #align(8) {
+		_: [8]byte,
+	}
 
 	sched_param :: struct {
 		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
@@ -475,6 +496,14 @@ when ODIN_OS == .Darwin {
 
 	pthread_key_t :: distinct c.int
 
+	pthread_cond_t :: struct #align(8) {
+		_: [40]byte,
+	}
+
+	pthread_mutex_t :: struct #align(8) {
+		_: [48]byte,
+	}
+
 	sched_param :: struct {
 		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
 	}
@@ -505,9 +534,11 @@ when ODIN_OS == .Darwin {
 	PTHREAD_SCOPE_PROCESS   :: 0
 	PTHREAD_SCOPE_SYSTEM    :: 0x2
 
-	pthread_t      :: distinct rawptr
-	pthread_attr_t :: distinct rawptr
-	pthread_key_t  :: distinct c.int
+	pthread_t       :: distinct rawptr
+	pthread_attr_t  :: distinct rawptr
+	pthread_key_t   :: distinct c.int
+	pthread_mutex_t :: distinct rawptr
+	pthread_cond_t  :: distinct rawptr
 
 	sched_param :: struct {
 		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
@@ -548,6 +579,16 @@ when ODIN_OS == .Darwin {
 
 	pthread_key_t :: distinct c.uint
 
+	pthread_cond_t :: struct {
+		__size: [40]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+		__align: c.long,
+	}
+
+	pthread_mutex_t :: struct {
+		__size: [32]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+		__align: c.long,
+	}
+
 	sched_param :: struct {
 		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
 
@@ -557,6 +598,4 @@ when ODIN_OS == .Darwin {
 		__reserved3: c.int,
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

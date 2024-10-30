@@ -1647,7 +1647,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			lb_emit_store(p, a1, id);
 			return lb_addr_load(p, res);
 		} else if (dst->kind == Type_Basic) {
-			if (src->Basic.kind == Basic_string && dst->Basic.kind == Basic_cstring) {
+			if (src->kind == Type_Basic && src->Basic.kind == Basic_string && dst->Basic.kind == Basic_cstring) {
 				String str = lb_get_const_string(m, value);
 				lbValue res = {};
 				res.type = t;

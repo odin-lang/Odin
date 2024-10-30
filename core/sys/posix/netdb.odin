@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -472,6 +473,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		EAI_OVERFLOW :: 14
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }
