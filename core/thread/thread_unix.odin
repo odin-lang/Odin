@@ -23,7 +23,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		t := (^Thread)(t)
 
 		// We need to give the thread a moment to start up before we enable cancellation.
-		can_set_thread_cancel_state := posix.pthread_setcancelstate(.ENABLE, nil) == nil
+		// NOTE(laytan): setting to .DISABLE on darwin, with .ENABLE pthread_cancel would deadlock
+		// most of the time, don't ask me why.
+		can_set_thread_cancel_state := posix.pthread_setcancelstate(.DISABLE when ODIN_OS == .Darwin else .ENABLE, nil) == nil
 
 		t.id = sync.current_thread_id()
 
@@ -36,9 +38,15 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		}
 
 		// Enable thread's cancelability.
-		if can_set_thread_cancel_state {
-			posix.pthread_setcanceltype (.ASYNCHRONOUS, nil)
-			posix.pthread_setcancelstate(.ENABLE,       nil)
+		// NOTE(laytan): Darwin does not correctly/fully support all of this, not doing this does
+		// actually make pthread_cancel work in the capacity of my tests, while executing this would
+		// basically always make it deadlock.
+		if ODIN_OS != .Darwin && can_set_thread_cancel_state {
+			err := posix.pthread_setcancelstate(.ENABLE, nil)
+			assert_contextless(err == nil)
+
+			err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
+			assert_contextless(err == nil)
 		}
 
 		{

@@ -101,5 +101,29 @@ int main(int argc, char *argv[])
 	printf("timespec %zu %zu\n", sizeof(struct timespec), _Alignof(struct timespec));
 	printf("clock_t %zu %zu\n", sizeof(clock_t), _Alignof(clock_t));
 
+	printf("PTHREAD_CANCEL_ASYNCHRONOUS %d\n", PTHREAD_CANCEL_ASYNCHRONOUS);
+	printf("PTHREAD_CANCEL_DEFERRED %d\n",     PTHREAD_CANCEL_DEFERRED);
+
+	printf("PTHREAD_CANCEL_DISABLE %d\n",      PTHREAD_CANCEL_DISABLE);
+	printf("PTHREAD_CANCEL_ENABLE %d\n",       PTHREAD_CANCEL_ENABLE);
+
+	printf("PTHREAD_CANCELED %p\n",            PTHREAD_CANCELED);
+
+	printf("PTHREAD_CREATE_JOINABLE %d\n",     PTHREAD_CREATE_JOINABLE);
+	printf("PTHREAD_CREATE_DETACHED %d\n",     PTHREAD_CREATE_DETACHED);
+
+	printf("PTHREAD_EXPLICIT_SCHED %d\n",      PTHREAD_EXPLICIT_SCHED);
+	printf("PTHREAD_INHERIT_SCHED %d\n",       PTHREAD_INHERIT_SCHED);
+
+	printf("PTHREAD_PRIO_INHERIT %d\n",        PTHREAD_PRIO_INHERIT);
+	printf("PTHREAD_PRIO_NONE %d\n",           PTHREAD_PRIO_NONE);
+	printf("PTHREAD_PRIO_PROTECT %d\n",        PTHREAD_PRIO_PROTECT);
+
+	printf("PTHREAD_PROCESS_SHARED %d\n",      PTHREAD_PROCESS_SHARED);
+	printf("PTHREAD_PROCESS_PRIVATE %d\n",     PTHREAD_PROCESS_PRIVATE);
+
+	printf("PTHREAD_SCOPE_PROCESS %d\n",       PTHREAD_SCOPE_PROCESS);
+	printf("PTHREAD_SCOPE_SYSTEM %d\n",        PTHREAD_SCOPE_SYSTEM);
+
 	return 0;
 }

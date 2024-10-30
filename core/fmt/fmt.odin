@@ -1531,7 +1531,7 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	case 'o': _fmt_int(fi, u,  8, false, 8*size_of(rawptr), __DIGITS_UPPER)
 	case 'i', 'd': _fmt_int(fi, u, 10, false, 8*size_of(rawptr), __DIGITS_UPPER)
 	case 'z': _fmt_int(fi, u, 12, false, 8*size_of(rawptr), __DIGITS_UPPER)
-	case 'x': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
+	case 'x': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_LOWER)
 	case 'X': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
 
 	case:
