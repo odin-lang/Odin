@@ -355,12 +355,16 @@ Thread_Scope :: enum c.int {
 }
 
 Cancel_State :: enum c.int {
+	// Cancel takes place at next cancellation point.
 	ENABLE  = PTHREAD_CANCEL_ENABLE,
+	// Cancel postponed.
 	DISABLE = PTHREAD_CANCEL_DISABLE,
 }
 
 Cancel_Type :: enum c.int {
+	// Cancel waits until cancellation point.
 	DEFERRED     = PTHREAD_CANCEL_DEFERRED,
+	// Cancel occurs immediately.
 	ASYNCHRONOUS = PTHREAD_CANCEL_ASYNCHRONOUS,
 }
 
@@ -371,6 +375,12 @@ when ODIN_OS == .Darwin {
 
 	PTHREAD_CANCEL_DISABLE      :: 0x00
 	PTHREAD_CANCEL_ENABLE       :: 0x01
+
+	// PTHREAD_CANCEL_ASYNCHRONOUS :: 1
+	// PTHREAD_CANCEL_DEFERRED     :: 0
+	//
+	// PTHREAD_CANCEL_DISABLE      :: 1
+	// PTHREAD_CANCEL_ENABLE       :: 0
 
 	PTHREAD_CANCELED :: rawptr(uintptr(1))
 
@@ -434,8 +444,8 @@ when ODIN_OS == .Darwin {
 	PTHREAD_PRIO_NONE    :: 0
 	PTHREAD_PRIO_PROTECT :: 2
 
-	PTHREAD_PROCESS_SHARED  :: 0
-	PTHREAD_PROCESS_PRIVATE :: 1
+	PTHREAD_PROCESS_SHARED  :: 1
+	PTHREAD_PROCESS_PRIVATE :: 0
 
 	PTHREAD_SCOPE_PROCESS   :: 0
 	PTHREAD_SCOPE_SYSTEM    :: 2
