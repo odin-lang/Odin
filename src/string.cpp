@@ -156,6 +156,7 @@ gb_internal isize string_index_byte(String const &s, u8 x) {
 
 gb_internal gb_inline bool str_eq(String const &a, String const &b) {
 	if (a.len != b.len) return false;
+	if (a.len == 0) return true;
 	return memcmp(a.text, b.text, a.len) == 0;
 }
 gb_internal gb_inline bool str_ne(String const &a, String const &b) { return !str_eq(a, b);                }

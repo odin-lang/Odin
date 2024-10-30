@@ -4262,8 +4262,6 @@ gb_internal bool allow_field_separator(AstFile *f) {
 gb_internal Ast *parse_struct_field_list(AstFile *f, isize *name_count_) {
 	Token start_token = f->curr_token;
 
-	auto decls = array_make<Ast *>(ast_allocator(f));
-
 	isize total_name_count = 0;
 
 	Ast *params = parse_field_list(f, &total_name_count, FieldFlag_Struct, Token_CloseBrace, false, false);
