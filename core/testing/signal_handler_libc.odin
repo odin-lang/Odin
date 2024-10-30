@@ -15,7 +15,7 @@ import "core:c/libc"
 import "core:encoding/ansi"
 import "core:sync"
 import "core:os"
-@require import "core:sys/unix"
+@require import "core:sys/posix"
 
 @(private="file") stop_runner_flag: libc.sig_atomic_t
 
@@ -114,8 +114,8 @@ This is a dire bug and should be reported to the Odin developers.
 				// properly set to PTHREAD_CANCEL_ASYNCHRONOUS.
 				//
 				// The runner would stall after returning from `pthread_cancel`.
-			
-				unix.pthread_testcancel()
+
+				posix.pthread_testcancel()
 			}
 		}
 	}

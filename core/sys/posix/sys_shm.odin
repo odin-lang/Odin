@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -137,6 +138,24 @@ when ODIN_OS == .Darwin {
 		_shm_internal:   rawptr,
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	SHM_RDONLY :: 0o10000
+	SHM_RND    :: 0o20000
+
+	SHMLBA     :: 4096
+
+	shmatt_t :: distinct c.ulong
+
+	shmid_ds :: struct {
+		shm_perm:        ipc_perm, /* [PSX] operation permission structure */
+		shm_segsz:       c.size_t, /* [PSX] size of segment in bytes */
+		shm_atime:       time_t,   /* [PSX] time of last shmat() */
+		shm_dtime:       time_t,   /* [PSX] time of last shmdt() */
+		shm_ctime:       time_t,   /* [PSX] time of last change by shmctl() */
+		shm_cpid:        pid_t,    /* [PSX] process ID of creator */
+		shm_lpid:        pid_t,    /* [PSX] process ID of last shared memory operation */
+		shm_nattch:      shmatt_t, /* [PSX] number of current attaches */
+		_:               [2]c.ulong,
+	}
 }

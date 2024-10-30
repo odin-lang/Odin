@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -391,6 +392,54 @@ when ODIN_OS == .Darwin {
 		return (x & _WCONTINUED) == _WCONTINUED
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	id_t :: distinct c.uint
+
+	WCONTINUED :: 8
+	WNOHANG    :: 1
+	WUNTRACED  :: 2
+
+	WEXITED  :: 4
+	WNOWAIT  :: 0x1000000
+	WSTOPPED :: 2
+
+	_P_ALL  :: 0
+	_P_PID  :: 1
+	_P_PGID :: 2
+
+	@(private)
+	_WIFEXITED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return _WTERMSIG(x) == nil
+	}
+
+	@(private)
+	_WEXITSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
+		return (x & 0xff00) >> 8
+	}
+
+	@(private)
+	_WIFSIGNALED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return (x & 0xffff) - 1 < 0xff
+	}
+
+	@(private)
+	_WTERMSIG :: #force_inline proc "contextless" (x: c.int) -> Signal {
+		return Signal(x & 0x7f)
+	}
+
+	@(private)
+	_WIFSTOPPED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return ((x & 0xffff) * 0x10001) >> 8 > 0x7f00
+	}
+
+	@(private)
+	_WSTOPSIG :: #force_inline proc "contextless" (x: c.int) -> Signal {
+		return Signal(_WEXITSTATUS(x))
+	}
+
+	@(private)
+	_WIFCONTINUED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return x == 0xffff
+	}
 }

@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -229,6 +230,16 @@ when ODIN_OS == .Darwin {
 
 	getdate_err: Errno = .ENOSYS // NOTE: looks like it's not a thing on OpenBSD.
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	clockid_t :: distinct c.int
+
+	CLOCK_MONOTONIC          :: 1
+	CLOCK_PROCESS_CPUTIME_ID :: 2
+	CLOCK_REALTIME           :: 0
+	CLOCK_THREAD_CPUTIME_ID  :: 3
+
+	foreign lib {
+		getdate_err: Errno
+	}
 }

@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 // limits.h - implementation-defined constants
@@ -549,6 +550,4 @@ when ODIN_OS == .Darwin {
 	NL_TEXTMAX :: 2048 // 255 on glibc, 2048 on musl
 	NZERO      :: 20
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }
