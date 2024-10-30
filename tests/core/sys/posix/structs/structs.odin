@@ -75,4 +75,28 @@ main :: proc() {
 	fmt.println("time_t", size_of(posix.time_t), align_of(posix.time_t))
 	fmt.println("timespec", size_of(posix.timespec), align_of(posix.timespec))
 	fmt.println("clock_t", size_of(posix.clock_t), align_of(posix.clock_t))
+
+	fmt.println("PTHREAD_CANCEL_ASYNCHRONOUS", posix.PTHREAD_CANCEL_ASYNCHRONOUS)
+	fmt.println("PTHREAD_CANCEL_DEFERRED",     posix.PTHREAD_CANCEL_DEFERRED)
+
+	fmt.println("PTHREAD_CANCEL_DISABLE",      posix.PTHREAD_CANCEL_DISABLE)
+	fmt.println("PTHREAD_CANCEL_ENABLE",       posix.PTHREAD_CANCEL_ENABLE)
+
+	fmt.printfln("PTHREAD_CANCELED %#x",       posix.PTHREAD_CANCELED)
+
+	fmt.println("PTHREAD_CREATE_JOINABLE",     posix.PTHREAD_CREATE_JOINABLE)
+	fmt.println("PTHREAD_CREATE_DETACHED",     posix.PTHREAD_CREATE_DETACHED)
+
+	fmt.println("PTHREAD_EXPLICIT_SCHED",      posix.PTHREAD_EXPLICIT_SCHED)
+	fmt.println("PTHREAD_INHERIT_SCHED",       posix.PTHREAD_INHERIT_SCHED)
+
+	fmt.println("PTHREAD_PRIO_INHERIT",        posix.PTHREAD_PRIO_INHERIT)
+	fmt.println("PTHREAD_PRIO_NONE",           posix.PTHREAD_PRIO_NONE)
+	fmt.println("PTHREAD_PRIO_PROTECT",        posix.PTHREAD_PRIO_PROTECT)
+
+	fmt.println("PTHREAD_PROCESS_SHARED",      posix.PTHREAD_PROCESS_SHARED)
+	fmt.println("PTHREAD_PROCESS_PRIVATE",     posix.PTHREAD_PROCESS_PRIVATE)
+
+	fmt.println("PTHREAD_SCOPE_PROCESS",       posix.PTHREAD_SCOPE_PROCESS)
+	fmt.println("PTHREAD_SCOPE_SYSTEM",        posix.PTHREAD_SCOPE_SYSTEM)
 }
