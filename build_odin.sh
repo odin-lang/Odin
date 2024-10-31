@@ -68,7 +68,7 @@ LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
 
-if [ $LLVM_VERSION_MAJOR -lt 11 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 18 ] | [ $LLVM_VERSION_MAJOR -gt 19 ]; then
+if [ $LLVM_VERSION_MAJOR -lt 11 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 19 ]; then
 	error "Invalid LLVM version $LLVM_VERSION: must be 11, 12, 13, 14, 17, 18 or 19"
 fi
 
