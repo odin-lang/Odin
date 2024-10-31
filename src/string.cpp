@@ -415,9 +415,11 @@ gb_internal String concatenate4_strings(gbAllocator a, String const &x, String c
 gb_internal String escape_char(gbAllocator a, String s, char cte) {
 	isize buf_len = s.len;
 	isize cte_count = 0;
-	for (isize j = 0; j < s.len; j++)
-		if (s.text[j] == cte)
+	for (isize j = 0; j < s.len; j++) {
+		if (s.text[j] == cte) {
 			cte_count++;
+		}
+	}
 
 	u8 *buf = gb_alloc_array(a, u8, buf_len+cte_count);
 	isize i = 0;
