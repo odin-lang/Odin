@@ -1259,13 +1259,30 @@ class WebGLInterface {
 };
 
 
-function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, eventQueue, event_temp) {
+function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, eventHookCallback) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
 	let currentLine = {};
 	currentLine[false] = "";
 	currentLine[true] = "";
 	let prevIsError = false;
+	
+	let event_temp = {};
+
+	const onEventReceived = (event_data, data, callback) => {
+		event_temp.data = event_data;
+		
+		const exports = wasmMemoryInterface.exports;
+		const odin_ctx = exports.default_context_ptr();
+		
+		const mute = eventHookCallback && !eventHookCallback(event_data.event, data, callback);
+	
+		if (!mute) {
+			exports.odin_dom_do_event_callback(data, callback, odin_ctx);
+		}
+		
+		event_temp.data = null;
+	};
 
 	const writeToConsole = (line, isError) => {
 		if (!line) {
@@ -1579,7 +1596,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 				}
 			},
 
-			add_event_listener: (id_ptr, id_len, name_ptr, name_len, name_code, data, callback, use_capture, prevent_default, stop_prop, stop_imm_prop) => {
+			add_event_listener: (id_ptr, id_len, name_ptr, name_len, name_code, data, callback, use_capture) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = getElement(id);
@@ -1594,18 +1611,14 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 					event_data.event = e;
 					event_data.name_code = name_code;
 
-					if (prevent_default) e.preventDefault();
-					if (stop_prop) e.stopPropagation();
-					if (stop_imm_prop) e.stopImmediatePropagation();
-
-					eventQueue.push({event_data: event_data, data: data, callback: callback});
+					onEventReceived(event_data, data, callback);
 				};
 				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
 				element.addEventListener(name, listener, !!use_capture);
 				return true;
 			},
 
-			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture, prevent_default, stop_prop, stop_imm_prop) => {
+			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
 				let listener = (e) => {
@@ -1615,11 +1628,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 					event_data.event = e;
 					event_data.name_code = name_code;
 
-					if (prevent_default) e.preventDefault();
-					if (stop_prop) e.stopPropagation();
-					if (stop_imm_prop) e.stopImmediatePropagation();
-
-					eventQueue.push({event_data: event_data, data: data, callback: callback});
+					onEventReceived(event_data, data, callback);
 				};
 				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
 				element.addEventListener(name, listener, !!use_capture);
@@ -1911,22 +1920,29 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 };
 
 /**
+ * A callback used to intersept events that are being dispatched to the application.
+ * @callback EventHookCallback
+ * @param {Object} [event] - The event that is about to be sent to the application.
+ * @param {Object} [data] - The user data that was passed in when the event listener for {@param event} was registered.
+ * @param {Object} [callback] - The callback that was passed in when the event listener for {@param event} was registered.
+ * @return {bool} If false, the event will not be sent to the application.
+ */
+
+/**
  * @param {string} wasmPath                          - Path to the WASM module to run
  * @param {?HTMLPreElement} consoleElement           - Optional console/pre element to append output to, in addition to the console
  * @param {any} extraForeignImports                  - Imports, in addition to the default runtime to provide the module
  * @param {?WasmMemoryInterface} wasmMemoryInterface - Optional memory to use instead of the defaults
  * @param {?int} intSize                             - Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
+ * @param {?EventHookCallback} eventHookCallback     - Callback that will be invoked when an event is dispatched to the application
  */
-async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemoryInterface, intSize = 4) {
+async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemoryInterface, intSize = 4, eventHookCallback = null) {
 	if (!wasmMemoryInterface) {
 		wasmMemoryInterface = new WasmMemoryInterface();
 	}
 	wasmMemoryInterface.setIntSize(intSize);
 
-	let eventQueue = new Array();
-	let event_temp = {};
-
-	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement, wasmMemoryInterface.memory, eventQueue, event_temp);
+	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement, wasmMemoryInterface.memory, eventHookCallback);
 	let exports = {};
 
 	if (extraForeignImports !== undefined) {
@@ -1965,13 +1981,6 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 			const dt = (currTimeStamp - prevTimeStamp)*0.001;
 			prevTimeStamp = currTimeStamp;
-
-			while (eventQueue.length > 0) {
-				let e = eventQueue.shift()
-				event_temp.data = e.event_data;
-				exports.odin_dom_do_event_callback(e.data, e.callback, odin_ctx);
-			}
-			event_temp.data = null;
 
 			if (!exports.step(dt, odin_ctx)) {
 				exports._end();
