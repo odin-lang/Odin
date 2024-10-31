@@ -153,7 +153,7 @@ Vector2Normalize :: proc "c" (v: Vector2) -> Vector2 {
 // Transforms a Vector2 by a given Matrix
 @(require_results)
 Vector2Transform :: proc "c" (v: Vector2, m: Matrix) -> Vector2 {
-	v4 := Vector4{v.x, v.y, 0, 0}
+	v4 := Vector4{v.x, v.y, 0, 1}
 	return (m * v4).xy
 }
 // Calculate linear interpolation between two vectors
@@ -399,7 +399,7 @@ Vector3RotateByAxisAngle :: proc "c" (v: Vector3, axis: Vector3, angle: f32) -> 
 // Transforms a Vector3 by a given Matrix
 @(require_results)
 Vector3Transform :: proc "c" (v: Vector3, m: Matrix) -> Vector3 {
-	v4 := Vector4{v.x, v.y, v.z, 0}
+	v4 := Vector4{v.x, v.y, v.z, 1}
 	return (m * v4).xyz
 }
 // Calculate linear interpolation between two vectors
