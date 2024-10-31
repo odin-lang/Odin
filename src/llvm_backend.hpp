@@ -57,6 +57,10 @@
 #define LB_USE_NEW_PASS_SYSTEM 0
 #endif
 
+#if LLVM_VERSION_MAJOR >= 19
+#define LLVMDIBuilderInsertDeclareAtEnd(...) LLVMDIBuilderInsertDeclareRecordAtEnd(__VA_ARGS__)
+#endif
+
 gb_internal bool lb_use_new_pass_system(void) {
 	return LB_USE_NEW_PASS_SYSTEM;
 }

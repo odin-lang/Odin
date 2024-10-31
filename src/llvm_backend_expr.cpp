@@ -4594,7 +4594,11 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 					auto const &f = fields[i];
 
 					LLVMValueRef mask = LLVMConstInt(lit, 1, false);
-					mask = LLVMConstShl(mask, LLVMConstInt(lit, f.bit_size, false));
+					#if LLVM_VERSION_MAJOR >= 19
+						mask = LLVMBuildShl(p->builder, mask, LLVMConstInt(lit, f.bit_size, false), "");
+					#else
+						mask = LLVMConstShl(mask, LLVMConstInt(lit, f.bit_size, false));
+					#endif
 					mask = LLVMConstSub(mask, LLVMConstInt(lit, 1, false));
 
 					LLVMValueRef elem = values[i].value;
@@ -4642,7 +4646,11 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 						bits_to_set -= mask_width;
 
 						LLVMValueRef mask = LLVMConstInt(vt, 1, false);
-						mask = LLVMConstShl(mask, LLVMConstInt(vt, mask_width, false));
+						#if LLVM_VERSION_MAJOR >= 19
+							mask = LLVMBuildShl(p->builder, mask, LLVMConstInt(vt, mask_width, false), "");
+						#else
+							mask = LLVMConstShl(mask, LLVMConstInt(vt, mask_width, false));
+						#endif
 						mask = LLVMConstSub(mask, LLVMConstInt(vt, 1, false));
 
 						LLVMValueRef to_set = LLVMBuildAnd(p->builder, val, mask, "");
