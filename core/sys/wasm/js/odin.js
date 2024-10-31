@@ -1259,7 +1259,7 @@ class WebGLInterface {
 };
 
 
-function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, eventHookCallback) {
+function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
 	let currentLine = {};
@@ -1275,11 +1275,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 		const exports = wasmMemoryInterface.exports;
 		const odin_ctx = exports.default_context_ptr();
 		
-		const mute = eventHookCallback && !eventHookCallback(event_data.event, data, callback);
-	
-		if (!mute) {
-			exports.odin_dom_do_event_callback(data, callback, odin_ctx);
-		}
+		exports.odin_dom_do_event_callback(data, callback, odin_ctx);
 		
 		event_temp.data = null;
 	};
@@ -1910,29 +1906,19 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory, ev
 };
 
 /**
- * A callback used to intersept events that are being dispatched to the application.
- * @callback EventHookCallback
- * @param {Object} [event] - The event that is about to be sent to the application.
- * @param {Object} [data] - The user data that was passed in when the event listener for {@param event} was registered.
- * @param {Object} [callback] - The callback that was passed in when the event listener for {@param event} was registered.
- * @return {bool} If false, the event will not be sent to the application.
- */
-
-/**
  * @param {string} wasmPath                          - Path to the WASM module to run
  * @param {?HTMLPreElement} consoleElement           - Optional console/pre element to append output to, in addition to the console
  * @param {any} extraForeignImports                  - Imports, in addition to the default runtime to provide the module
  * @param {?WasmMemoryInterface} wasmMemoryInterface - Optional memory to use instead of the defaults
  * @param {?int} intSize                             - Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
- * @param {?EventHookCallback} eventHookCallback     - Callback that will be invoked when an event is dispatched to the application
  */
-async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemoryInterface, intSize = 4, eventHookCallback = null) {
+async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemoryInterface, intSize = 4) {
 	if (!wasmMemoryInterface) {
 		wasmMemoryInterface = new WasmMemoryInterface();
 	}
 	wasmMemoryInterface.setIntSize(intSize);
 
-	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement, wasmMemoryInterface.memory, eventHookCallback);
+	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement, wasmMemoryInterface.memory);
 	let exports = {};
 
 	if (extraForeignImports !== undefined) {
