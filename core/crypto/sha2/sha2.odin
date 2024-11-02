@@ -15,9 +15,9 @@ package sha2
         zhibog, dotbmp:  Initial implementation.
 */
 
-import "core:encoding/endian"
+@(require) import "core:encoding/endian"
 import "core:math/bits"
-import "core:mem"
+@(require) import "core:mem"
 
 // DIGEST_SIZE_224 is the SHA-224 digest size in bytes.
 DIGEST_SIZE_224 :: 28
@@ -397,6 +397,11 @@ SHA512_F4 :: #force_inline proc "contextless" (x: u64) -> u64 {
 @(private)
 sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) {
 	when T == Context_256 {
+		if is_hardware_accelerated_256() {
+			sha256_transf_hw(ctx, data)
+			return
+		}
+
 		w: [64]u32
 		wv: [8]u32
 		t1, t2: u32

@@ -23,6 +23,7 @@ CPU_Feature :: enum u64 {
 	popcnt,    // Hamming weight instruction POPCNT.
 	rdrand,    // RDRAND instruction (on-chip random number generator)
 	rdseed,    // RDSEED instruction (on-chip random number generator)
+	sha,       // SHA Extensions (SHA-1, SHA-224, SHA-256)
 	sse2,      // Streaming SIMD extension 2 (always available on amd64)
 	sse3,      // Streaming SIMD extension 3
 	ssse3,     // Supplemental streaming SIMD extension 3
@@ -115,6 +116,7 @@ init_cpu_features :: proc "c" () {
 
 	_, ebx7, ecx7, edx7 := cpuid(7, 0)
 	try_set(&set, .bmi1, 3, ebx7)
+	try_set(&set, .sha, 29, ebx7)
 	if os_supports_avx {
 		try_set(&set, .avx2, 5, ebx7)
 	}
