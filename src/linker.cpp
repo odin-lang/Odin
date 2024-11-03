@@ -605,9 +605,29 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 				}
 
-			} else if (build_context.metrics.os != TargetOs_openbsd && build_context.metrics.os != TargetOs_haiku && build_context.metrics.arch != TargetArch_riscv64) {
-				// OpenBSD and Haiku default to PIE executable. do not pass -no-pie for it.
+			}
+
+			switch (build_context.link_pie) {
+			case (LinkPIE_Default):
+				if (build_context.build_mode != BuildMode_DynamicLibrary) {
+					if (build_context.metrics.os != TargetOs_openbsd
+				        && build_context.metrics.os != TargetOs_haiku
+						&& build_context.metrics.arch != TargetArch_riscv64
+					) {
+						// OpenBSD and Haiku default to PIE executable. do not pass -no-pie for it.
+						link_settings = gb_string_appendc(link_settings, "-no-pie ");
+					}
+				}
+				break;
+			case (LinkPIE_Yes):
+				if (build_context.build_mode != BuildMode_Executable) {
+					compiler_error("linking NON-EXECUTABLE as pie (position independent EXECUTABLE)");
+				}
+				link_settings = gb_string_appendc(link_settings, "-pie ");
+				break;
+			case (LinkPIE_No):
 				link_settings = gb_string_appendc(link_settings, "-no-pie ");
+				break;
 			}
 
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");

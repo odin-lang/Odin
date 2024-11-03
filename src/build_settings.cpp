@@ -257,6 +257,12 @@ enum RelocMode : u8 {
 	RelocMode_DynamicNoPIC,
 };
 
+enum LinkPIE : u8 {
+	LinkPIE_Default,
+	LinkPIE_No,
+	LinkPIE_Yes,
+};
+
 enum BuildPath : u8 {
 	BuildPath_Main_Package,     // Input  Path to the package directory (or file) we're building.
 	BuildPath_RC,               // Input  Path for .rc  file, can be set with `-resource:`.
@@ -453,7 +459,7 @@ struct BuildContext {
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
-	
+
 	bool   copy_file_contents;
 
 	bool   no_rtti;
@@ -467,6 +473,7 @@ struct BuildContext {
 	bool   print_linker_flags;
 
 	RelocMode reloc_mode;
+	LinkPIE link_pie;
 	bool   disable_red_zone;
 
 	isize max_error_count;
