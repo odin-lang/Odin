@@ -621,7 +621,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				
 				} else if (selected_subtarget == Subtarget_iPhoneSimulator) {
 						platform_lib_str = gb_string_append_fmt(platform_lib_str, "-target %.*s -Wl,-ld_classic -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk ", LIT(build_context.metrics.target_triplet));
-<<<<<<< HEAD
 
 						if (build_context.minimum_os_version_string_given) {
 							link_settings = gb_string_append_fmt(link_settings, "-mios-simulator-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
@@ -647,33 +646,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				}
 
 				if (build_context.build_mode != BuildMode_DynamicLibrary && build_context.build_mode != BuildMode_StaticLibrary) {
-=======
-
-						if (build_context.minimum_os_version_string_given) {
-							link_settings = gb_string_append_fmt(link_settings, "-mios-simulator-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
-						}
-				} else {
-					platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
-
-					// Homebrew's default library path, checking if it exists to avoid linking warnings.
-					if (gb_file_exists("/opt/homebrew/lib")) {
-						platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/homebrew/lib ");
-					}
-
-					// MacPort's default library path, checking if it exists to avoid linking warnings.
-					if (gb_file_exists("/opt/local/lib")) {
-						platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/local/lib ");
-					}
-
-					// Only specify this flag if the user has given a minimum version to target.
-					// This will cause warnings to show up for mismatched libraries.
-					if (build_context.minimum_os_version_string_given) {
-						link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
-					}
-				}
-
-				if (build_context.build_mode != BuildMode_DynamicLibrary) {
->>>>>>> 3451b4638 (Initial commit for iOS target)
 					// This points the linker to where the entry point is
 					link_settings = gb_string_appendc(link_settings, "-e _main ");
 				}
