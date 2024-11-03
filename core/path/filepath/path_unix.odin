@@ -1,6 +1,12 @@
 #+build linux, darwin, freebsd, openbsd, netbsd
 package filepath
 
+when ODIN_OS == .Darwin {
+	foreign import libc "system:System"
+} else {
+	foreign import libc "system:c"
+}
+
 import "base:runtime"
 
 import "core:strings"
