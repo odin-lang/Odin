@@ -466,7 +466,7 @@ The specified alignment must be a power of 2.
 */
 is_aligned :: proc "contextless" (x: rawptr, align: int) -> bool {
 	p := uintptr(x)
-	return (p & (uintptr(align) - 1) == 0
+	return (p & (uintptr(align) - 1)) == 0
 }
 
 /*
