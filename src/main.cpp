@@ -360,6 +360,7 @@ enum BuildFlagKind {
 	BuildFlag_NoThreadLocal,
 
 	BuildFlag_RelocMode,
+	BuildFlag_LinkPIE,
 	BuildFlag_DisableRedZone,
 
 	BuildFlag_DisallowDo,
@@ -570,6 +571,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_LinkPIE,                 str_lit("link-pie"),                  BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
@@ -1327,6 +1329,25 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("\tstatic\n");
 								gb_printf_err("\tpic\n");
 								gb_printf_err("\tdynamic-no-pic\n");
+								bad_flags = true;
+							}
+
+							break;
+						}
+						case BuildFlag_LinkPIE: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String v = value.value_string;
+							if (v == "default") {
+								build_context.link_pie = LinkPIE_Default;
+							} else if (v == "yes" || v == "true") {
+								build_context.link_pie = LinkPIE_Yes;
+							} else if (v == "no" || v == "false") {
+								build_context.link_pie = LinkPIE_No;
+							} else {
+								gb_printf_err("-link-pie flag expected one of the following\n");
+								gb_printf_err("\tdefault\n");
+								gb_printf_err("\tyes, true\n");
+								gb_printf_err("\tno, false\n");
 								bad_flags = true;
 							}
 
