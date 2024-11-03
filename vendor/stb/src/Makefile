@@ -58,3 +58,11 @@ darwin:
 	$(CC) -arch arm64  -c -O2 -Os -fPIC stb_sprintf.c -o stb_sprintf-arm64.o -mmacosx-version-min=10.12
 	lipo -create stb_sprintf-x86_64.o stb_sprintf-arm64.o -output ../lib/darwin/stb_sprintf.a
 	rm *.o
+ios:
+	mkdir -p ../lib/ios
+	xcrun -sdk iphoneos $(CC) -target arm64-apple-ios -arch arm64  -c -O2 -Os stb_truetype.c -o stb_truetype-ios.o
+	libtool -o ../lib/ios/stb_truetype.a stb_truetype-ios.o
+ios-simulator:
+	mkdir -p ../lib/ios-simulator
+	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64  -c -O2 -Os stb_truetype.c -o stb_truetype-ios-simulator.o
+	libtool -o ../lib/ios-simulator/stb_truetype.a stb_truetype-ios-simulator.o
