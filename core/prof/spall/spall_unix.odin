@@ -6,6 +6,28 @@ package spall
 import "core:os"
 
 import "core:sys/posix"
+when ODIN_OS == .Darwin {
+	foreign import libc "system:System"
+} else {
+	foreign import libc "system:c"
+}
+
+timespec :: struct {
+	tv_sec:  i64, // seconds
+	tv_nsec: i64, // nanoseconds
+}
+
+foreign libc {
+	__error :: proc() -> ^i32 ---
+	@(link_name="write")         _unix_write         :: proc(handle: os.Handle, buffer: rawptr, count: uint) -> int ---
+	@(link_name="clock_gettime") _unix_clock_gettime :: proc(clock_id: u64, timespec: ^timespec) -> i32 ---
+}
+
+@(no_instrumentation)
+get_last_error :: proc "contextless" () -> int {
+	return int(__error()^)
+}
+>>>>>>> 3451b4638 (Initial commit for iOS target)
 
 MAX_RW :: 0x7fffffff
 
