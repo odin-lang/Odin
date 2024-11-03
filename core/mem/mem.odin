@@ -461,10 +461,12 @@ Check if a pointer is aligned.
 
 This procedure checks whether a pointer `x` is aligned to a boundary specified
 by `align`, and returns `true` if the pointer is aligned, and false otherwise.
+
+The specified alignment must be a power of 2.
 */
 is_aligned :: proc "contextless" (x: rawptr, align: int) -> bool {
 	p := uintptr(x)
-	return (p & (1<<uintptr(align) - 1)) == 0
+	return (p & (uintptr(align) - 1)) == 0
 }
 
 /*
