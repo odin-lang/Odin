@@ -5397,17 +5397,16 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		} else {
 			if (is_type_dynamic_array(t)) {
 				init_mem_allocator(c->checker);
-			} else {
-				sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
-				entity = sel.entity;
+			}
+			sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
+			entity = sel.entity;
 
-				// NOTE(bill): Add type info needed for fields like 'names'
-				if (entity != nullptr && (entity->flags&EntityFlag_TypeField)) {
-					add_type_info_type(c, operand->type);
-				}
-				if (is_type_enum(operand->type)) {
-					add_type_info_type(c, operand->type);
-				}
+			// NOTE(bill): Add type info needed for fields like 'names'
+			if (entity != nullptr && (entity->flags&EntityFlag_TypeField)) {
+				add_type_info_type(c, operand->type);
+			}
+			if (is_type_enum(operand->type)) {
+				add_type_info_type(c, operand->type);
 			}
 		}
 	}
