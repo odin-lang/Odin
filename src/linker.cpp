@@ -607,7 +607,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			}
 
-			if (build_context.build_mode == BuildMode_Executable && build_context.reloc_mode == RelocMode_PIC) {
+			if (build_context.build_mode == BuildMode_Executable) {
 				// Do not disable PIE, let the linker choose. (most likely you want it enabled)
 			} else if (build_context.build_mode != BuildMode_DynamicLibrary) {
 				if (build_context.metrics.os != TargetOs_openbsd
