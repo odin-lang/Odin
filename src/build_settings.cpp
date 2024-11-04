@@ -453,7 +453,7 @@ struct BuildContext {
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
-	
+
 	bool   copy_file_contents;
 
 	bool   no_rtti;
