@@ -594,14 +594,14 @@ gb_global TargetMetrics target_darwin_ios_amd64 = {
 	TargetArch_amd64,
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-apple-ios"),
-	.subtarget=Subtarget_iOS,
+	Subtarget_iOS,
 };
 gb_global TargetMetrics target_darwin_ios_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
 	8, 8, 16, 32,
 	str_lit("arm64-apple-ios"),
-	.subtarget=Subtarget_iOS,
+	Subtarget_iOS,
 };
 
 
@@ -720,7 +720,8 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetArch_amd64,
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-none-gnu"),
-	.abi=TargetABI_SysV,
+	Subtarget_Default,
+	TargetABI_SysV,
 };
 
 gb_global TargetMetrics target_freestanding_amd64_win64 = {
@@ -728,7 +729,8 @@ gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetArch_amd64,
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-none-msvc"),
-	.abi=TargetABI_Win64,
+	Subtarget_Default,
+	TargetABI_Win64,
 };
 
 gb_global TargetMetrics target_freestanding_arm64 = {

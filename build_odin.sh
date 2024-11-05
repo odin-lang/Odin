@@ -8,7 +8,7 @@ set -eu
 
 CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
-DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value -Wno-c99-designator"
+DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 OS_ARCH="$(uname -m)"
 OS_NAME="$(uname -s)"
