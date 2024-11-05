@@ -150,6 +150,13 @@ gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
 
 gb_global String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
 
+enum Subtarget : u32 {
+	Subtarget_Default,
+	Subtarget_iOS,
+
+	Subtarget_COUNT,
+};
+
 struct TargetMetrics {
 	TargetOsKind   os;
 	TargetArchKind arch;
@@ -158,14 +165,8 @@ struct TargetMetrics {
 	isize          max_align;
 	isize          max_simd_align;
 	String         target_triplet;
+	Subtarget      subtarget;
 	TargetABIKind  abi;
-};
-
-enum Subtarget : u32 {
-	Subtarget_Default,
-	Subtarget_iOS,
-
-	Subtarget_COUNT,
 };
 
 gb_global String subtarget_strings[Subtarget_COUNT] = {
@@ -580,15 +581,29 @@ gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
-	str_lit("x86_64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
+	str_lit("x86_64-apple-macosx"),
 };
-
 gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
 	8, 8, 16, 32,
-	str_lit("arm64-apple-macosx"), // NOTE: Changes during initialization based on build flags.
+	str_lit("arm64-apple-macosx"),
 };
+gb_global TargetMetrics target_darwin_ios_amd64 = {
+	TargetOs_darwin,
+	TargetArch_amd64,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
+	str_lit("x86_64-apple-ios"),
+	.subtarget=Subtarget_iOS,
+};
+gb_global TargetMetrics target_darwin_ios_arm64 = {
+	TargetOs_darwin,
+	TargetArch_arm64,
+	8, 8, 16, 32,
+	str_lit("arm64-apple-ios"),
+	.subtarget=Subtarget_iOS,
+};
+
 
 gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
@@ -705,7 +720,7 @@ gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetArch_amd64,
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-none-gnu"),
-	TargetABI_SysV,
+	.abi=TargetABI_SysV,
 };
 
 gb_global TargetMetrics target_freestanding_amd64_win64 = {
@@ -713,7 +728,7 @@ gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetArch_amd64,
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-none-msvc"),
-	TargetABI_Win64,
+	.abi=TargetABI_Win64,
 };
 
 gb_global TargetMetrics target_freestanding_arm64 = {
@@ -743,8 +758,10 @@ struct NamedTargetMetrics {
 };
 
 gb_global NamedTargetMetrics named_targets[] = {
-	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
-	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
+	{ str_lit("darwin_amd64"),        &target_darwin_amd64     },
+	{ str_lit("darwin_arm64"),        &target_darwin_arm64     },
+	{ str_lit("darwin_ios_amd64"),    &target_darwin_ios_amd64 },
+	{ str_lit("darwin_ios_arm64"),    &target_darwin_ios_arm64 },
 
 	{ str_lit("essence_amd64"),       &target_essence_amd64  },
 
@@ -786,7 +803,6 @@ gb_global NamedTargetMetrics named_targets[] = {
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
-gb_global Subtarget selected_subtarget;
 
 
 gb_internal TargetOsKind get_target_os_from_string(String str) {
@@ -1458,7 +1474,7 @@ gb_internal char *token_pos_to_string(TokenPos const &pos) {
 	return s;
 }
 
-gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subtarget) {
+gb_internal void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
 
 	gb_affinity_init(&bc->affinity);
@@ -1610,19 +1626,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
 	}
 
-	if (metrics->os == TargetOs_darwin && subtarget == Subtarget_iOS) {
-		switch (metrics->arch) {
-		case TargetArch_arm64:
-			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
-			break;
-		case TargetArch_amd64:
-			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
-			break;
-		default:
-			GB_PANIC("Unknown architecture for darwin");
-		}
-	}
-
 	if (bc->metrics.os == TargetOs_windows) {
 		switch (bc->metrics.arch) {
 		case TargetArch_amd64:
@@ -1672,7 +1675,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->minimum_os_version_string = str_lit("11.0.0");
 		}
 
-		if (subtarget == Subtarget_Default) {
+		if (metrics->subtarget == Subtarget_Default) {
 			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
 		}
 	}

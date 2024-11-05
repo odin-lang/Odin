@@ -318,7 +318,6 @@ enum BuildFlagKind {
 	BuildFlag_Define,
 	BuildFlag_BuildMode,
 	BuildFlag_Target,
-	BuildFlag_Subtarget,
 	BuildFlag_Debug,
 	BuildFlag_DisableAssert,
 	BuildFlag_NoBoundsCheck,
@@ -528,7 +527,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Define,                  str_lit("define"),                    BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,               str_lit("build-mode"),                BuildFlagParam_String,  Command__does_build); // Commands_build is not used to allow for a better error message
 	add_flag(&build_flags, BuildFlag_Target,                  str_lit("target"),                    BuildFlagParam_String,  Command__does_check);
-	add_flag(&build_flags, BuildFlag_Subtarget,               str_lit("subtarget"),                 BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableAssert,           str_lit("disable-assert"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
@@ -1092,42 +1090,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 							break;
 						}
-
-						case BuildFlag_Subtarget:
-							if (selected_target_metrics == nullptr) {
-								gb_printf_err("-target must be set before -subtarget is used\n");
-								bad_flags = true;
-							} else {
-								GB_ASSERT(value.kind == ExactValue_String);
-								String str = value.value_string;
-								bool found = false;
-
-								if (selected_target_metrics->metrics->os != TargetOs_darwin) {
-									gb_printf_err("-subtarget can only be used with darwin based targets at the moment\n");
-									bad_flags = true;
-									break;
-								}
-
-								for (u32 i = 1; i < Subtarget_COUNT; i++) {
-									String name = subtarget_strings[i];
-									if (str_eq_ignore_case(str, name)) {
-										selected_subtarget = cast(Subtarget)i;
-										found = true;
-										break;
-									}
-								}
-
-								if (!found) {
-									gb_printf_err("Unknown subtarget '%.*s'\n", LIT(str));
-									gb_printf_err("All supported subtargets:\n");
-									for (u32 i = 1; i < Subtarget_COUNT; i++) {
-										String name = subtarget_strings[i];
-										gb_printf_err("\t%.*s\n", LIT(name));
-									}
-									bad_flags = true;
-								}
-							}
-							break;
 
 						case BuildFlag_BuildMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -3256,7 +3218,7 @@ int main(int arg_count, char const **arg_ptr) {
 			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared"), nullptr));
 	}
 
-	init_build_context(selected_target_metrics ? selected_target_metrics->metrics : nullptr, selected_subtarget);
+	init_build_context(selected_target_metrics ? selected_target_metrics->metrics : nullptr);
 	// if (build_context.word_size == 4 && build_context.metrics.os != TargetOs_js) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;

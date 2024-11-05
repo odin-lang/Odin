@@ -1116,7 +1116,7 @@ gb_internal void init_universal(void) {
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));
-		add_global_enum_constant(fields, "ODIN_PLATFORM_SUBTARGET", selected_subtarget);
+		add_global_enum_constant(fields, "ODIN_PLATFORM_SUBTARGET", bc->metrics.subtarget);
 	}
 
 	{
