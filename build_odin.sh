@@ -152,9 +152,7 @@ build_odin() {
 }
 
 run_demo() {
-	if [ $# -eq 0 ] || [ "$1" = "debug" ]; then
-		./odin run examples/demo -vet -strict-style -- Hellope World
-	fi
+	./odin run examples/demo -vet -strict-style -- Hellope World
 }
 
 if [ $# -eq 0 ]; then
@@ -166,14 +164,20 @@ if [ $# -eq 0 ]; then
 elif [ $# -eq 1 ]; then
 	case $1 in
 	report)
-		[ ! -f "./odin" ] && build_odin debug
+		if [ ! -f "./odin" ]; then
+			build_odin debug
+			run_demo
+		fi
 		./odin report
+		;;
+	debug)
+		build_odin debug
+		run_demo
 		;;
 	*)
 		build_odin $1
 		;;
 	esac
-	run_demo
 else
 	error "Too many arguments!"
 fi
