@@ -215,7 +215,7 @@ generate_rrule_from_tzi :: proc(tzi: ^REG_TZI_FORMAT, abbrevs: TZ_Abbrev, alloca
 				week = u8(tzi.std_date.day),
 				day = tzi.std_date.day_of_week,
 				time = (i64(tzi.std_date.hour) * 60 * 60) + (i64(tzi.std_date.minute) * 60) + i64(tzi.std_date.second),
-			}
+			},
 		}, true
 	}
 
