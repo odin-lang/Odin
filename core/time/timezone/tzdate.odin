@@ -93,6 +93,8 @@ trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (se
 
 	switch td.type {
 	case .Month_Week_Day:
+		if td.month < 1 { return }
+
 		t += month_to_seconds(int(td.month) - 1, is_leap)
 
 		weekday := ((t + (4 * DAY_SEC)) %% (7 * DAY_SEC)) / DAY_SEC
