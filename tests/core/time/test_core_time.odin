@@ -561,3 +561,17 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 	defer tz.rrule_destroy(wgt_rrule)
 	testing.expectf(t, rrule_eq(wgt_rrule, correct_wgt_rrule), "POSIX TZ parsed incorrectly")
 }
+
+@test
+test_check_timezone_edgecases :: proc(t: ^testing.T) {
+	utc_dt, _ := dt.components_to_datetime(2024, 10, 4, 0, 47, 0)
+
+	tok_tz, tok_load_ok := tz.region_load("Asia/Tokyo")
+	testing.expectf(t, tok_load_ok, "Failed to load Asia/Tokyo timezone")
+	defer tz.region_destroy(tok_tz)
+
+	ret_dt := tz.datetime_to_tz(utc_dt, tok_tz)
+	expected_tok_dt, _ := dt.components_to_datetime(2024, 10, 4, 9, 47, 0)
+
+	testing.expectf(t, datetime_eq(ret_dt, expected_tok_dt), "Failed to convert to Tokyo time")
+}
