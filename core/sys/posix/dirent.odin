@@ -1,3 +1,4 @@
+#+build darwin, linux, freebsd, openbsd, netbsd
 package posix
 
 import "core:c"
@@ -29,12 +30,12 @@ foreign lib {
 			panic(string(posix.strerror(posix.errno())))
 		}
 		defer posix.free(list)
-	
+
 		entries := list[:ret]
-	 	for entry in entries {
-	 		log.info(entry)
-	 		posix.free(entry)
-	 	}
+		for entry in entries {
+			log.info(entry)
+			posix.free(entry)
+		}
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/scandir.html ]]
 	*/
@@ -89,16 +90,16 @@ foreign lib {
 	Returns nil when the end is reached or an error occurred (which sets errno).
 
 	Example:
-	 	posix.set_errno(.NONE)
-	 	entry := posix.readdir(dirp)
-	 	if entry == nil {
-	 		if errno := posix.errno(); errno != .NONE {
-	 			panic(string(posix.strerror(errno)))
-	 		} else {
-	 			fmt.println("end of directory stream")
-	 		}
-	 	} else {
-	 		fmt.println(entry)
+		posix.set_errno(.NONE)
+		entry := posix.readdir(dirp)
+		if entry == nil {
+			if errno := posix.errno(); errno != .NONE {
+				panic(string(posix.strerror(errno)))
+			} else {
+				fmt.println("end of directory stream")
+			}
+		} else {
+			fmt.println(entry)
 		}
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html ]]
@@ -210,6 +211,4 @@ when ODIN_OS == .Darwin {
 			d_name:   [256]c.char `fmt:"s,0"`, /* [PSX] entry name */
 		}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

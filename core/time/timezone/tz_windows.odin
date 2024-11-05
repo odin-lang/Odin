@@ -203,6 +203,22 @@ generate_rrule_from_tzi :: proc(tzi: ^REG_TZI_FORMAT, abbrevs: TZ_Abbrev, alloca
 	if err != nil { return }
 	defer if err != nil { delete(std_name, allocator) }
 
+	if (tzi.std_date.month == 0) {
+		return datetime.TZ_RRule{
+			has_dst = false,
+
+			std_name = std_name,
+			std_offset = -(i64(tzi.bias) + i64(tzi.std_bias)) * 60,
+			dst_date = datetime.TZ_Transition_Date{
+				type = .Month_Week_Day,
+				month = u8(tzi.std_date.month),
+				week = u8(tzi.std_date.day),
+				day = tzi.std_date.day_of_week,
+				time = (i64(tzi.std_date.hour) * 60 * 60) + (i64(tzi.std_date.minute) * 60) + i64(tzi.std_date.second),
+			},
+		}, true
+	}
+
 	dst_name: string
 	dst_name, err = strings.clone(abbrevs.dst, allocator)
 	if err != nil { return }

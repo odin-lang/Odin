@@ -5394,22 +5394,25 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		Type *t = type_deref(operand->type);
 		if (t == nullptr) {
 			error(operand->expr, "Cannot use a selector expression on 0-value expression");
-		} else if (is_type_dynamic_array(t)) {
-			init_mem_allocator(c->checker);
-		}
-		sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
-		entity = sel.entity;
+		} else {
+			if (is_type_dynamic_array(t)) {
+				init_mem_allocator(c->checker);
+			}
+			sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
+			entity = sel.entity;
 
-		// NOTE(bill): Add type info needed for fields like 'names'
-		if (entity != nullptr && (entity->flags&EntityFlag_TypeField)) {
-			add_type_info_type(c, operand->type);
-		}
-		if (is_type_enum(operand->type)) {
-			add_type_info_type(c, operand->type);
+			// NOTE(bill): Add type info needed for fields like 'names'
+			if (entity != nullptr && (entity->flags&EntityFlag_TypeField)) {
+				add_type_info_type(c, operand->type);
+			}
+			if (is_type_enum(operand->type)) {
+				add_type_info_type(c, operand->type);
+			}
 		}
 	}
 
-	if (entity == nullptr && selector->kind == Ast_Ident && (is_type_array(type_deref(operand->type)) || is_type_simd_vector(type_deref(operand->type)))) {
+	if (entity == nullptr && selector->kind == Ast_Ident && operand->type != nullptr &&
+	    (is_type_array(type_deref(operand->type)) || is_type_simd_vector(type_deref(operand->type)))) {
 		String field_name = selector->Ident.token.string;
 		if (1 < field_name.len && field_name.len <= 4) {
 			u8 swizzles_xyzw[4] = {'x', 'y', 'z', 'w'};

@@ -1647,7 +1647,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			lb_emit_store(p, a1, id);
 			return lb_addr_load(p, res);
 		} else if (dst->kind == Type_Basic) {
-			if (src->Basic.kind == Basic_string && dst->Basic.kind == Basic_cstring) {
+			if (src->kind == Type_Basic && src->Basic.kind == Basic_string && dst->Basic.kind == Basic_cstring) {
 				String str = lb_get_const_string(m, value);
 				lbValue res = {};
 				res.type = t;
@@ -2363,12 +2363,23 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		GB_ASSERT(src->kind == Type_Matrix);
 		lbAddr v = lb_add_local_generated(p, t, true);
 
-		if (is_matrix_square(dst) && is_matrix_square(dst)) {
+		if (dst->Matrix.row_count    == src->Matrix.row_count &&
+		    dst->Matrix.column_count == src->Matrix.column_count) {
+			for (i64 j = 0; j < dst->Matrix.column_count; j++) {
+				for (i64 i = 0; i < dst->Matrix.row_count; i++) {
+					lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
+					lbValue s = lb_emit_matrix_ev(p, value, i, j);
+					s = lb_emit_conv(p, s, dst->Matrix.elem);
+					lb_emit_store(p, d, s);
+				}
+			}
+		} else if (is_matrix_square(dst) && is_matrix_square(dst)) {
 			for (i64 j = 0; j < dst->Matrix.column_count; j++) {
 				for (i64 i = 0; i < dst->Matrix.row_count; i++) {
 					if (i < src->Matrix.row_count && j < src->Matrix.column_count) {
 						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
 						lbValue s = lb_emit_matrix_ev(p, value, i, j);
+						s = lb_emit_conv(p, s, dst->Matrix.elem);
 						lb_emit_store(p, d, s);
 					} else if (i == j) {
 						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);

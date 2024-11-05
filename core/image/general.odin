@@ -193,7 +193,7 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 		return .HDR
 	case s[:4] == "\x38\x42\x50\x53":
 		return .PSD
-	case s[:4] != "\x53\x80\xF6\x34" && s[88:92] == "PICT":
+	case s[:4] == "\x53\x80\xF6\x34" && s[88:92] == "PICT":
 		return .PIC
 	case s[:4] == "\x69\x63\x6e\x73":
 		return .ICNS
