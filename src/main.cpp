@@ -348,6 +348,7 @@ enum BuildFlagKind {
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
 	BuildFlag_VetPackages,
+	BuildFlag_VetStructInit,
 
 	BuildFlag_CustomAttribute,
 	BuildFlag_IgnoreUnknownAttributes,
@@ -559,6 +560,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetStructInit,           str_lit("vet-struct-init"),           BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -1254,6 +1256,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								}
 							}
 							break;
+						case BuildFlag_VetStructInit:      build_context.vet_flags |= VetFlag_StructInit;   break;
 
 						case BuildFlag_CustomAttribute:
 							{

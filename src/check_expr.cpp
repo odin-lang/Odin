@@ -9181,7 +9181,7 @@ gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *no
 }
 
 
-gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<Ast *> const &elems, Operand *o, Type *type, bool &is_constant) {
+gb_internal void check_compound_literal_field_values(CheckerContext *c, Ast* node, Slice<Ast *> const &elems, Operand *o, Type *type, bool &is_constant) {
 	Type *bt = base_type(type);
 
 	StringSet fields_visited = {};
@@ -9335,6 +9335,18 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 
 		c->bit_field_bit_size = prev_bit_field_bit_size;
 	}
+
+	if ((check_vet_flags(c) & VetFlag_StructInit) && bt->kind == Type_Struct) {
+		if(fields_visited.entries.count != bt->Struct.fields.count) {
+			ERROR_BLOCK();
+			error(node, "Incomplete struct initialization, missing members:");
+			for (Entity *re : bt->Struct.fields) {
+				if(!string_set_exists(&fields_visited, re->token.string)) {
+					error_line("\t%.*s\n", LIT(re->token.string));
+				}
+			}
+		}
+	}
 }
 
 gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
@@ -9461,7 +9473,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						error(node, "%s ('struct #raw_union') compound literals are only allowed to contain up to 1 'field = value' element, got %td", type_str, cl->elems.count);
 						gb_string_free(type_str);
 					} else {
-						check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
+						check_compound_literal_field_values(c, node, cl->elems, o, type, is_constant);
 					}
 				}
 			}
@@ -9482,7 +9494,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
-			check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
+			check_compound_literal_field_values(c, node, cl->elems, o, type, is_constant);
 		} else {
 			bool seen_field_value = false;
 
@@ -10206,7 +10218,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			error(node, "%s ('bit_field') compound literals are only allowed to contain 'field = value' elements", type_str);
 			gb_string_free(type_str);
 		} else {
-			check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
+			check_compound_literal_field_values(c, node, cl->elems, o, type, is_constant);
 		}
 		break;
 	}
