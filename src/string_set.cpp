@@ -250,3 +250,4 @@ gb_internal StringSetEntry *end(StringSet &m) noexcept {
 gb_internal StringSetEntry const *end(StringSet const &m) noexcept {
 	return m.entries.data + m.entries.count;
 }
+

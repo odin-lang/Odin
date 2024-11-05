@@ -9336,7 +9336,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Ast* nod
 		c->bit_field_bit_size = prev_bit_field_bit_size;
 	}
 
-	if ((check_vet_flags(c) & VetFlag_StructInit) && bt->kind == Type_Struct) {
+	if ((check_vet_flags(c) & VetFlag_StructInit) && bt->kind == Type_Struct && !is_type_raw_union(bt)) {
 		if(fields_visited.entries.count != bt->Struct.fields.count) {
 			ERROR_BLOCK();
 			error(node, "Incomplete struct initialization, missing members:");
