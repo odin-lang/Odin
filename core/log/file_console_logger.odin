@@ -76,7 +76,7 @@ make_file_logger_os :: proc(
 	loc := #caller_location
 ) -> (
 	res: Logger,
-	err: runtime.Allocator_Error
+	err: runtime.Allocator_Error,
 ) {
 	return _make_file_logger_os(h, lowest, opt, ident, false, allocator, loc)
 }
@@ -93,7 +93,7 @@ _make_file_logger_os :: proc(
 	loc := #caller_location
 ) -> (
 	res: Logger,
-	err: runtime.Allocator_Error
+	err: runtime.Allocator_Error,
 ) {
 	data := new(File_Console_Logger_Data, allocator, loc) or_return
 	data.type = .os
@@ -130,7 +130,7 @@ make_file_logger_os2 :: proc(
 	loc := #caller_location
 ) -> (
 	res: Logger, 
-	err: runtime.Allocator_Error
+	err: runtime.Allocator_Error,
 ) {
 	data := new(File_Console_Logger_Data, allocator, loc) or_return
 	data.type = .os2
@@ -169,7 +169,7 @@ make_console_logger :: proc(
 	loc := #caller_location
 ) -> (
 	res: Logger,
-	err: runtime.Allocator_Error
+	err: runtime.Allocator_Error,
 ) {
 	data := new(File_Console_Logger_Data, allocator, loc) or_return
 	data.type = .console
