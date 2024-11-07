@@ -3321,6 +3321,19 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 	}
 
+	#if defined(GB_CPU_X86)
+	// We've detected that the CPU doesn't support popcnt, or another reason to use `-microarch:native`,
+	// and that no custom microarch was chosen.
+	if (should_use_march_native() && march == get_default_microarchitecture()) {
+		if (command == "run" || command == "test") {
+			gb_printf_err("Error: Try using '-microarch:native' as Odin defaults to %.*s (close to Nehalem), and your CPU seems to be older.\n", LIT(march));
+			gb_exit(1);
+		} else if (command == "build") {
+			gb_printf("Suggestion: Try using '-microarch:native' as Odin defaults to %.*s (close to Nehalem), and your CPU seems to be older.\n", LIT(march));
+		}
+	}
+	#endif
+
 	if (build_context.target_features_string.len != 0) {
 		String_Iterator target_it = {build_context.target_features_string, 0};
 		for (;;) {
