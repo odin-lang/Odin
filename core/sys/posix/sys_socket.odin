@@ -48,6 +48,12 @@ foreign libc {
 		addr.sun_family = .UNIX
 		copy(addr.sun_path[:], "/somepath\x00")
 
+		/*
+			unlink the socket before binding in case
+			of previous runs not cleaning up the socket
+		*/
+		posix.unlink("/somepath")
+
 		if posix.bind(sfd, (^posix.sockaddr)(&addr), size_of(addr)) != .OK {
 			/* Handle error */
 		}
