@@ -3326,10 +3326,10 @@ int main(int arg_count, char const **arg_ptr) {
 	// and that no custom microarch was chosen.
 	if (should_use_march_native() && march == get_default_microarchitecture()) {
 		if (command == "run" || command == "test") {
-			gb_printf_err("Error: Try using '-microarch:native' as Odin defaults to %.*s (close to Nehalem) by default and your CPU seems to be a much older CPU.\n", LIT(march));
+			gb_printf_err("Error: Try using '-microarch:native' as Odin defaults to %.*s (close to Nehalem), and your CPU seems to be older.\n", LIT(march));
 			gb_exit(1);
 		} else if (command == "build") {
-			gb_printf("Suggestion: Try using '-microarch:native' as Odin defaults to %.*s (close to Nehalem) by default and your CPU seems to be a much older CPU.\n", LIT(march));
+			gb_printf("Suggestion: Try using '-microarch:native' as Odin defaults to %.*s (close to Nehalem), and your CPU seems to be older.\n", LIT(march));
 		}
 	}
 	#endif
