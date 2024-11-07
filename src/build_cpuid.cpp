@@ -28,7 +28,7 @@ gb_internal bool should_use_march_native() {
 		int cpu[4];
 		odin_cpuid(0x1, &cpu[0]); // Get feature information in ECX + EDX
 
-		bool have_popcnt = cpu[2] && (1 << 23); // bit 23 in ECX = popcnt
+		bool have_popcnt = cpu[2] & (1 << 23); // bit 23 in ECX = popcnt
 		return !have_popcnt;
 
 	#endif
