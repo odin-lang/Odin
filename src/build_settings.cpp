@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
+#include "build_cpuid.cpp"
 
 // #if defined(GB_SYSTEM_WINDOWS)
 // #define DEFAULT_TO_THREADED_CHECKER
