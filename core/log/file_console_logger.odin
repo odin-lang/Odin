@@ -55,7 +55,7 @@ File_Console_Logger_Data :: struct {
 	file_handle_os2: ^os2.File,
 	ident: string,
 	close_file_on_delete: bool,
-	allocator: runtime.Allocator
+	allocator: runtime.Allocator,
 }
 
 /*

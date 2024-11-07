@@ -6,7 +6,7 @@ import "core:mem"
 
 Multi_Logger_Data :: struct {
 	loggers: []Logger,
-	allocator: runtime.Allocator
+	allocator: runtime.Allocator,
 }
 
 @(deprecated = "Use make_multi_logger instead")
