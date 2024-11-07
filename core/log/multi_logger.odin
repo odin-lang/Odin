@@ -27,9 +27,11 @@ Inputs:
 
 Returns:
 - res: The new multi logger 
-- res: An allocator error if one occured, `nil` otherwise 
+- err: An allocator error if one occured, `nil` otherwise 
 */
 make_multi_logger :: proc(logs: ..Logger, allocator := context.allocator, loc := #caller_location) -> (res: Logger, err: runtime.Allocator_Error) {
+	// NOTE(lperlind): we allocate the entire logger in a single allocation so we have only one
+	// allocation error to be handled. This is NOT for performance
 	logger_size := mem.align_forward_int(size_of(Multi_Logger_Data), align_of(Logger))
 	content_size := len(mem.slice_to_bytes(logs))
 
@@ -43,9 +45,16 @@ make_multi_logger :: proc(logs: ..Logger, allocator := context.allocator, loc :=
 	return Logger{multi_logger_proc, data, Level.Debug, nil}, nil
 }
 
-delete_multi_logger :: proc(log: Logger) {
+/*
+Deletes a logger made with `make_multi_logger`.
+
+Inputs:
+- log: The logger to delete
+- loc: The caller location for debugging purposes (default: `#caller_location`)
+*/
+delete_multi_logger :: proc(log: Logger, loc := #caller_location) {
 	data := (^Multi_Logger_Data)(log.data)
-	free(data, data.allocator)
+	free(data, data.allocator, loc)
 }
 destroy_multi_logger :: delete_multi_logger
 
