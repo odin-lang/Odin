@@ -9,16 +9,31 @@ Multi_Logger_Data :: struct {
 	allocator: runtime.Allocator
 }
 
+@(deprecated = "Use make_multi_logger instead")
 create_multi_logger :: proc(logs: ..Logger) -> Logger {
 	logger, _ := make_multi_logger(..logs, allocator = context.allocator)
 	return logger
 }
 
-make_multi_logger :: proc(logs: ..Logger, allocator := context.allocator) -> (res: Logger, err: runtime.Allocator_Error) {
+/*
+Makes a new logger that will write to several other loggers.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- logs: The loggers this logger will write to
+- allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
+
+Returns:
+- res: The new multi logger 
+- res: An allocator error if one occured, `nil` otherwise 
+*/
+make_multi_logger :: proc(logs: ..Logger, allocator := context.allocator, loc := #caller_location) -> (res: Logger, err: runtime.Allocator_Error) {
 	logger_size := mem.align_forward_int(size_of(Multi_Logger_Data), align_of(Logger))
 	content_size := len(mem.slice_to_bytes(logs))
 
-	data_bytes := make([]byte, logger_size + content_size, allocator) or_return
+	data_bytes := make([]byte, logger_size + content_size, allocator, loc) or_return
 	data := cast(^Multi_Logger_Data)raw_data(data_bytes)
 	data.loggers = slice.reinterpret([]Logger, data_bytes[logger_size:])
 	assert(len(data.loggers) == len(logs))
