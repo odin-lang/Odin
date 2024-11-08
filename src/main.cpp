@@ -1789,8 +1789,22 @@ gb_internal GB_COMPARE_PROC(defineables_cmp) {
 	return i32_cmp(x->pos.offset, y->pos.offset);
 }
 
-gb_internal void sort_defineables(Checker *c) {
+gb_internal void sort_defineables_and_remove_duplicates(Checker *c) {
+	if (c->info.defineables.count == 0) {
+		return;
+	}
 	gb_sort_array(c->info.defineables.data, c->info.defineables.count, defineables_cmp);
+
+	Defineable prev = c->info.defineables[0];
+	for (isize i = 1; i < c->info.defineables.count; ) {
+		Defineable curr = c->info.defineables[i];
+		if (prev.pos == curr.pos) {
+			array_ordered_remove(&c->info.defineables, i);
+			continue;
+		}
+		prev = curr;
+		i++;
+	}
 }
 
 gb_internal void export_defineables(Checker *c, String path) {
@@ -3451,7 +3465,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.show_defineables || build_context.export_defineables_file != "") {
 		TEMPORARY_ALLOCATOR_GUARD();
 		temp_alloc_defineable_strings(checker);
-		sort_defineables(checker);
+		sort_defineables_and_remove_duplicates(checker);
 
 		if (build_context.show_defineables) {
 			show_defineables(checker);
