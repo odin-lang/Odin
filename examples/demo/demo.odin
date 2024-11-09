@@ -2151,7 +2151,7 @@ or_return_operator :: proc() {
 		return .None
 	}
 	foo_2 :: proc() -> (n: int, err: Error) {
-		// It is more common that your procedure turns multiple values
+		// It is more common that your procedure returns multiple values
 		// If 'or_return' is used within a procedure multiple parameters (2+),
 		// then all the parameters must be named so that the remaining parameters
 		// so that a bare 'return' statement can be used
