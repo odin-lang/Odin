@@ -288,6 +288,7 @@ gb_internal void usage(String argv0, String argv1 = {}) {
 	print_usage_line(1, "test              Builds and runs procedures with the attribute @(test) in the initial package.");
 	print_usage_line(1, "doc               Generates documentation on a directory of .odin files.");
 	print_usage_line(1, "version           Prints version.");
+	print_usage_line(1, "targets           Prints the supported targets.");
 	print_usage_line(1, "report            Prints information useful to reporting a bug.");
 	print_usage_line(1, "root              Prints the root path where Odin looks for the builtin collections.");
 	print_usage_line(0, "");
@@ -3181,6 +3182,12 @@ int main(int arg_count, char const **arg_ptr) {
 		#endif
 
 		gb_printf("\n");
+		return 0;
+	} else if (command == "targets") {
+		gb_printf_err("All supported targets:\n");
+		for (isize i = 0; i < gb_count_of(named_targets); i++) {
+			gb_printf_err("\t%.*s\n", LIT(named_targets[i].name));
+		}
 		return 0;
 	} else if (command == "report") {
 		build_context.command_kind = Command_bug_report;
