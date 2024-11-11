@@ -723,6 +723,27 @@ enum_name_from_value_any :: proc(value: any) -> (name: string, ok: bool) {
 	return
 }
 
+/*
+Returns whether the value given has a defined name in the enum type.
+*/
+@(require_results)
+enum_value_has_name :: proc(value: $T) -> bool where intrinsics.type_is_enum(T) {
+	when len(T) == cap(T) {
+		return value >= min(T) && value <= max(T)
+	} else {
+		if value < min(T) || value > max(T) {
+			return false
+		}
+
+		for valid_value in T {
+			if valid_value == value {
+				return true
+			}
+		}
+
+		return false
+	}
+}
 
 
 
