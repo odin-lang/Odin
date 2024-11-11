@@ -74,7 +74,7 @@ sxm_hash64 :: proc "contextless" (x: u64) -> u64 {
 	return sxm_hash_generic(x)
 }
 
-// This function uses a generic hashing mechanism to return a hash value.
+// sxm_hash128 computes a hash for a 128-bit unsigned integer.
 sxm_hash128 :: proc "contextless" (x: u128) -> u128 {
 	return sxm_hash_generic(x)
 }
