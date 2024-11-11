@@ -42,7 +42,7 @@ ginger16 :: proc "contextless" (data: []byte) -> u16 {
 
 
 @(private)
-sxm_hash_uint_generic :: #force_inline proc "contextless" (x: $T) -> T {
+sxm_hash_generic :: #force_inline proc "contextless" (x: $T) -> T {
 	bits :: size_of(x) << 3
 	shift :: bits >> 1
 	mul :: 0x4ff55ba64bb740e135db2be3690a61d3 % (1 << bits)
@@ -56,32 +56,32 @@ sxm_hash_uint_generic :: #force_inline proc "contextless" (x: $T) -> T {
 
 // sxm_hash8 computes a hash for an 8-bit unsigned integer.
 sxm_hash8 :: proc "contextless" (x: u8) -> u8 {
-	return sxm_hash_uint_generic(x)
+	return sxm_hash_generic(x)
 }
 
 // sxm_hash16 computes a hash for a 16-bit unsigned integer.
 sxm_hash16 :: proc "contextless" (x: u16) -> u16 {
-	return sxm_hash_uint_generic(x)
+	return sxm_hash_generic(x)
 }
 
 // sxm_hash32 computes a hash for a 32-bit unsigned integer.
 sxm_hash32 :: proc "contextless" (x: u32) -> u32 {
-	return sxm_hash_uint_generic(x)
+	return sxm_hash_generic(x)
 }
 
 // sxm_hash64 computes a hash for a 64-bit unsigned integer.
 sxm_hash64 :: proc "contextless" (x: u64) -> u64 {
-	return sxm_hash_uint_generic(x)
+	return sxm_hash_generic(x)
 }
 
 // This function uses a generic hashing mechanism to return a hash value.
 sxm_hash128 :: proc "contextless" (x: u128) -> u128 {
-	return sxm_hash_uint_generic(x)
+	return sxm_hash_generic(x)
 }
 
-// sxm_hash_uint is a collection of hashing procedures for various unsigned integer types.
+// sxm_hash is a collection of hashing procedures for various unsigned integer types.
 // It provides a unified interface for hashing different sizes of unsigned integers.
-sxm_hash_uint :: proc {
+sxm_hash :: proc {
 	sxm_hash8,
 	sxm_hash16,
 	sxm_hash32,
@@ -93,9 +93,9 @@ sxm_hash_uint :: proc {
 // It initializes the hash with a seed value and iteratively hashes each byte in the slice.
 // The final hash value is returned as a 64-bit unsigned integer.
 sxm_hash_slice_u8 :: proc "contextless" (data: []byte) -> u64 {
-	h := sxm_hash_uint(u64(1))
+	h := sxm_hash(u64(1))
 	for b in data {
-		h ~= sxm_hash_uint(u64(b) ~ h)
+		h ~= sxm_hash(u64(b) ~ h)
 	}
 	return h
 }
