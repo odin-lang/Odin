@@ -783,8 +783,8 @@ CF_PRIVATEFIRST    :: 0x0200
 CF_PRIVATELAST     :: 0x02FF
 
 STICKYKEYS :: struct {
-    cbSize: UINT,
-    dwFlags: DWORD,
+	cbSize: UINT,
+	dwFlags: DWORD,
 }
 LPSTICKYKEYS :: ^STICKYKEYS
 
@@ -813,8 +813,8 @@ SKF_LALTLATCHED     :: 0x10000000
 SKF_RALTLATCHED     :: 0x20000000
 
 TOGGLEKEYS :: struct {
-    cbSize: UINT,
-    dwFlags: DWORD,
+	cbSize: UINT,
+	dwFlags: DWORD,
 }
 LPTOGGLEKEYS :: ^TOGGLEKEYS
 
@@ -826,12 +826,12 @@ TKF_HOTKEYSOUND   :: 0x10
 TKF_INDICATOR     :: 0x20
 
 FILTERKEYS :: struct {
-    cbSize:  UINT,
-    dwFlags: DWORD,
-    iWaitMSec: DWORD,
-    iDelayMSec: DWORD,
-    iRepeatMSec: DWORD,
-    iBounceMSec: DWORD,
+	cbSize:  UINT,
+	dwFlags: DWORD,
+	iWaitMSec: DWORD,
+	iDelayMSec: DWORD,
+	iRepeatMSec: DWORD,
+	iBounceMSec: DWORD,
 }
 LPFILTERKEYS :: ^FILTERKEYS
 
