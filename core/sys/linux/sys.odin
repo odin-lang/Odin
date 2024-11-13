@@ -2559,7 +2559,7 @@ inotify_rm_watch :: proc "contextless" (fd: Fd, wd: Wd) -> (Errno) {
 // helper procedure to access the data within an `Inotify_Event`
 // since Odin doesn't have an alternative to `__flexarr`
 inotify_event_name :: proc "contextless" (event: ^Inotify_Event) -> cstring {
-	return transmute(cstring)&event.name
+	return transmute(cstring)uintptr(&event.name)
 }
 
 // TODO(flysand): migrate_pages

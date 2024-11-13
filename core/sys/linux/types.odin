@@ -348,7 +348,7 @@ Poll_Fd :: struct {
 	revents: Fd_Poll_Events,
 }
 
-Inotify_Init_Flags :: bit_set[Inotify_Init_Bits; i32];
+Inotify_Init_Flags :: bit_set[Inotify_Init_Bits; i32]
 
 Inotify_Event :: struct {
 	wd: Wd,
