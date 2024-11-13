@@ -524,7 +524,7 @@ Inotify_Init_Bits :: enum {
 	IN_CLOEXEC  = 19,
 }
 
-Inotify_Events_Bits :: enum u32 {
+Inotify_Event_Bits :: enum u32 {
 	IN_ACCESS        = 0,
 	IN_MODIFY        = 1,
 	IN_ATTRIB        = 2,
@@ -539,6 +539,16 @@ Inotify_Events_Bits :: enum u32 {
 	IN_DELETE        = 9,
 	IN_DELETE_SELF   = 10,
 	IN_MOVE_SELF     = 11,
+	IN_UNMOUNT       = 13,
+	IN_Q_OVERFLOW    = 14,
+	IN_IGNORED       = 15,
+	IN_ONLYDIR       = 24,
+	IN_DONT_FOLLOW   = 25,
+	IN_EXCL_UNLINK   = 26,
+	IN_MASK_CREATE   = 28,
+	IN_MASK_ADD      = 29,
+	IN_ISDIR         = 30,
+	IN_ONESHOT       = 31,
 }
 
 /*

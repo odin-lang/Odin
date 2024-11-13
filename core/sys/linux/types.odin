@@ -351,16 +351,14 @@ Poll_Fd :: struct {
 Inotify_Init_Flags :: bit_set[Inotify_Init_Bits; i32]
 
 Inotify_Event :: struct {
-	wd: Wd,
-	mask: Inotify_Event_Mask,
+	wd:     Wd,
+	mask:   Inotify_Event_Mask,
 	cookie: u32,
-	len: u32,
-	// used in place of __flexarr
-	// use inotify_event_name to read
-	name: [0]u8,
+	len:    u32,
+	name:   [0]u8,
 }
 
-Inotify_Event_Mask :: bit_set[Inotify_Events_Bits; u32]
+Inotify_Event_Mask :: bit_set[Inotify_Event_Bits; u32]
 
 /*
 	Specifies protection for memory pages.
