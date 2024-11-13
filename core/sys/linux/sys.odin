@@ -2536,11 +2536,31 @@ waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, opt
 
 // TODO(flysand): ioprio_get
 
-// TODO(flysand): inotify_init
+inotify_init :: proc "contextless" () -> (Fd, Errno) {
+	ret := syscall(SYS_inotify_init)
+	return errno_unwrap(ret, Fd)
+}
 
-// TODO(flysand): inotify_add_watch
+inotify_init1 :: proc "contextless" (flags: Inotify_Init_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_inotify_init1, transmute(i32)flags)
+	return errno_unwrap(ret, Fd)
+}
 
-// TODO(flysand): inotify_rm_watch
+inotify_add_watch :: proc "contextless" (fd: Fd, pathname: cstring, mask: Inotify_Event_Mask) -> (Wd, Errno) {
+	ret := syscall(SYS_inotify_add_watch, fd, transmute(uintptr) pathname, transmute(u32) mask)
+	return errno_unwrap(ret, Wd)
+}
+
+inotify_rm_watch :: proc "contextless" (fd: Fd, wd: Wd) -> (Errno) {
+	ret := syscall(SYS_inotify_rm_watch, fd, wd)
+	return Errno(-ret)
+}
+
+// helper procedure to access the data within an `Inotify_Event`
+// since Odin doesn't have an alternative to `__flexarr`
+inotify_event_name :: proc "contextless" (event: ^Inotify_Event) -> cstring {
+	return transmute(cstring)&event.name
+}
 
 // TODO(flysand): migrate_pages
 
