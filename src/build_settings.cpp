@@ -420,6 +420,7 @@ struct BuildContext {
 	bool   no_entry_point;
 	bool   no_thread_local;
 	bool   use_lld;
+	bool   use_radlink;
 	bool   cross_compiling;
 	bool   different_os;
 	bool   keep_object_files;
@@ -1871,7 +1872,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			}
 
-			if (!build_context.use_lld && find_result.vs_exe_path.len == 0) {
+			if (!build_context.use_lld && !build_context.use_radlink && find_result.vs_exe_path.len == 0) {
 				gb_printf_err("link.exe not found.\n");
 				return false;
 			}

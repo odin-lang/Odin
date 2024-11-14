@@ -328,6 +328,7 @@ enum BuildFlagKind {
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
+	BuildFlag_UseRADLink,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
@@ -539,6 +540,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_UseRADLink,              str_lit("radlink"),                   BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
@@ -1202,6 +1204,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_UseLLD:
 							build_context.use_lld = true;
+							break;
+						case BuildFlag_UseRADLink:
+							build_context.use_radlink = true;
 							break;
 						case BuildFlag_UseSeparateModules:
 							build_context.use_separate_modules = true;
@@ -2508,6 +2513,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (run_or_build) {
+		print_usage_line(1, "-radlink");
+		print_usage_line(2, "Uses the RAD linker rather than the default.");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-reloc-mode:<string>");
 		print_usage_line(2, "Specifies the reloc mode.");
 		print_usage_line(2, "Available options:");
