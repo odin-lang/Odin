@@ -1203,9 +1203,17 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_thread_local = true;
 							break;
 						case BuildFlag_UseLLD:
+							if (build_context.use_radlink) {
+								gb_printf_err("-lld cannot be used along side -radlink\n");
+								bad_flags = true;
+							}
 							build_context.use_lld = true;
 							break;
 						case BuildFlag_UseRADLink:
+							if (build_context.use_lld) {
+								gb_printf_err("-radlink cannot be used along side -lld\n");
+								bad_flags = true;
+							}
 							build_context.use_radlink = true;
 							break;
 						case BuildFlag_UseSeparateModules:
