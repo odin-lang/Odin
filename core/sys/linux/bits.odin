@@ -519,6 +519,36 @@ Fd_Poll_Events_Bits :: enum {
 	RDHUP  = 13,
 }
 
+Inotify_Init_Bits :: enum {
+	NONBLOCK = 11,
+	CLOEXEC  = 19,
+}
+
+Inotify_Event_Bits :: enum u32 {
+	ACCESS        = 0,
+	MODIFY        = 1,
+	ATTRIB        = 2,
+	CLOSE_WRITE   = 3,
+	CLOSE_NOWRITE = 4,
+	OPEN          = 5,
+	MOVED_FROM    = 6,
+	MOVED_TO      = 7,
+	CREATE        = 8,
+	DELETE        = 9,
+	DELETE_SELF   = 10,
+	MOVE_SELF     = 11,
+	UNMOUNT       = 13,
+	Q_OVERFLOW    = 14,
+	IGNORED       = 15,
+	ONLYDIR       = 24,
+	DONT_FOLLOW   = 25,
+	EXCL_UNLINK   = 26,
+	MASK_CREATE   = 28,
+	MASK_ADD      = 29,
+	ISDIR         = 30,
+	ONESHOT       = 31,
+}
+
 /*
 	Bits for Mem_Protection bitfield
 */
