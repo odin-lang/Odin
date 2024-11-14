@@ -172,20 +172,33 @@ assign_float :: proc(val: any, f: $T) -> bool {
 
 
 @(private)
-unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> bool {
+unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> (ok: bool, err: Error) {
 	val := val
 	switch &dst in val {
 	case string:
 		dst = str
-		return true
+		return true, nil
 	case cstring:  
 		if str == "" {
-			dst = strings.clone_to_cstring("", p.allocator)
+			a_err: runtime.Allocator_Error
+			dst, a_err = strings.clone_to_cstring("", p.allocator)
+			#partial switch a_err {
+			case nil:
+				// okay
+			case .Out_Of_Memory:
+				err = .Out_Of_Memory
+			case:
+				err = .Invalid_Allocator
+			}
+			if err != nil {
+				return
+			}
 		} else {
 			// NOTE: This is valid because 'clone_string' appends a NUL terminator
 			dst = cstring(raw_data(str)) 
 		}
-		return true
+		ok = true
+		return
 	}
 	
 	#partial switch variant in ti.variant {
@@ -193,31 +206,37 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 		for name, i in variant.names {
 			if name == str {
 				assign_int(val, variant.values[i])
-				return true
+				return true, nil
 			}
 		}
 		// TODO(bill): should this be an error or not?
-		return true
+		return true, nil
 		
 	case reflect.Type_Info_Integer:
-		i := strconv.parse_i128(str) or_return
+		i, pok := strconv.parse_i128(str)
+		if !pok {
+			return false, nil
+		}
 		if assign_int(val, i) {
-			return true
+			return true, nil
 		}
 		if assign_float(val, i) {
-			return true
+			return true, nil
 		}
 	case reflect.Type_Info_Float:
-		f := strconv.parse_f64(str) or_return
+		f, pok := strconv.parse_f64(str)
+		if !pok {
+			return false, nil
+		}
 		if assign_int(val, f) {
-			return true
+			return true, nil
 		}
 		if assign_float(val, f) {
-			return true
+			return true, nil
 		}
 	}
 	
-	return false
+	return false, nil
 }
 
 
@@ -304,7 +323,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	case .Ident:
 		advance_token(p)
 		if p.spec == .MJSON {
-			if unmarshal_string_token(p, any{v.data, ti.id}, token.text, ti) {
+			if unmarshal_string_token(p, any{v.data, ti.id}, token.text, ti) or_return {
 				return nil
 			}
 		}
@@ -314,7 +333,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		advance_token(p)
 		str  := unquote_string(token, p.spec, p.allocator) or_return
 		dest := any{v.data, ti.id}
-		if !unmarshal_string_token(p, dest, str, ti) {
+		if !(unmarshal_string_token(p, dest, str, ti) or_return) {
 			delete(str, p.allocator)
 			return UNSUPPORTED_TYPE
 		}
