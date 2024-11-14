@@ -167,10 +167,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 		if (is_windows) {
 			String section_name = str_lit("msvc-link");
-			if (build_context.use_lld) {
-				section_name = str_lit("lld-link");
-			} else if (build_context.use_radlink) {
-				section_name = str_lit("rad-link");
+			switch (build_context.linker_choice) {
+			case Linker_Default:  break;
+			case Linker_lld:      section_name = str_lit("lld-link"); break;
+			case Linker_radlink:  section_name = str_lit("rad-link"); break;
 			}
 			timings_start_section(timings, section_name);
 
@@ -306,7 +306,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
 			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
 
-			if (build_context.use_lld) { // lld
+			switch (build_context.linker_choice) {
+			case Linker_lld:
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
@@ -325,7 +326,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				if (result) {
 					return result;
 				}
-			} else if (build_context.use_radlink)  {
+				break;
+			case Linker_radlink:
 				result = system_exec_command_line_app("msvc-rad-link",
 					"\"%.*s\\bin\\radlink\" %s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
@@ -344,7 +346,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				if (result) {
 					return result;
 				}
-			} else { // msvc
+				break;
+			default: { // msvc
 				String res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
 				String rc_path  = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RC]);
 				defer (gb_free(heap_allocator(), res_path.text));
@@ -405,6 +408,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				if (result) {
 					return result;
 				}
+				break;
+			}
 			}
 		} else {
 			timings_start_section(timings, str_lit("ld-link"));
@@ -700,7 +705,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
 
-			if (build_context.use_lld) {
+			if (build_context.linker_choice == Linker_lld) {
 				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
 				result = system_exec_command_line_app("lld-link", link_command_line);
 			} else {

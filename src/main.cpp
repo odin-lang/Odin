@@ -329,6 +329,7 @@ enum BuildFlagKind {
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_UseRADLink,
+	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
@@ -541,6 +542,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseRADLink,              str_lit("radlink"),                   BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("Linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
@@ -1203,19 +1205,38 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_thread_local = true;
 							break;
 						case BuildFlag_UseLLD:
-							if (build_context.use_radlink) {
-								gb_printf_err("-lld cannot be used along side -radlink\n");
-								bad_flags = true;
-							}
-							build_context.use_lld = true;
+							gb_printf_err("Warning: Use of -lld has been deprecated in favour of -linker:lld\n");
+							build_context.linker_choice = Linker_lld;
 							break;
 						case BuildFlag_UseRADLink:
-							if (build_context.use_lld) {
-								gb_printf_err("-radlink cannot be used along side -lld\n");
-								bad_flags = true;
-							}
-							build_context.use_radlink = true;
+							gb_printf_err("Warning: Use of -lld has been deprecated in favour of -linker:radlink\n");
+							build_context.linker_choice = Linker_radlink;
 							break;
+						case BuildFlag_Linker:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								LinkerChoice linker_choice = Linker_Invalid;
+
+								for (i32 i = 0; i < Linker_COUNT; i++) {
+									if (linker_choices[i] == value.value_string) {
+										linker_choice = cast(LinkerChoice)i;
+										break;
+									}
+								}
+
+								if (linker_choice == Linker_Invalid) {
+									gb_printf_err("Invalid option for -linker:<string>. Expected one of the following\n");
+									for (i32 i = 0; i < Linker_COUNT; i++) {
+										gb_printf_err("\t%.*s\n", LIT(linker_choices[i]));
+									}
+									bad_flags = true;
+								} else {
+									build_context.linker_choice = linker_choice;
+								}
+							}
+							break;
+
+
 						case BuildFlag_UseSeparateModules:
 							build_context.use_separate_modules = true;
 							break;
@@ -2400,6 +2421,14 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (run_or_build) {
+		print_usage_line(1, "-linker:<string>");
+		print_usage_line(2, "Specify the linker to use.");
+		print_usage_line(2, "Choices:");
+		for (i32 i = 0; i < Linker_COUNT; i++) {
+			print_usage_line(3, "%.*s", LIT(linker_choices[i]));
+		}
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-lld");
 		print_usage_line(2, "Uses the LLD linker rather than the default.");
 		print_usage_line(0, "");

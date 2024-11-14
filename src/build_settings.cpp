@@ -344,6 +344,22 @@ struct BuildCacheData {
 	bool copy_already_done;
 };
 
+
+enum LinkerChoice : i32 {
+	Linker_Invalid = -1,
+	Linker_Default = 0,
+	Linker_lld,
+	Linker_radlink,
+
+	Linker_COUNT,
+};
+
+String linker_choices[Linker_COUNT] = {
+	str_lit("default"),
+	str_lit("lld"),
+	str_lit("radlink"),
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -419,12 +435,12 @@ struct BuildContext {
 	bool   no_rpath;
 	bool   no_entry_point;
 	bool   no_thread_local;
-	bool   use_lld;
-	bool   use_radlink;
 	bool   cross_compiling;
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+
+	LinkerChoice linker_choice;
 
 	StringSet custom_attributes;
 
@@ -1872,7 +1888,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			}
 
-			if (!build_context.use_lld && !build_context.use_radlink && find_result.vs_exe_path.len == 0) {
+			if (build_context.linker_choice != Linker_Default && find_result.vs_exe_path.len == 0) {
 				gb_printf_err("link.exe not found.\n");
 				return false;
 			}
