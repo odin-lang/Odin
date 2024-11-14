@@ -135,6 +135,31 @@ STATX_BASIC_STATS :: Statx_Mask {
 	.BLOCKS,
 }
 
+IN_ALL_EVENTS	:: Inotify_Event_Mask {
+	.ACCESS,
+	.MODIFY,
+	.ATTRIB,
+	.CLOSE_WRITE,
+	.CLOSE_NOWRITE,
+	.OPEN,
+	.MOVED_FROM,
+	.MOVED_TO,
+	.CREATE,
+	.DELETE,
+	.DELETE_SELF,
+	.MOVE_SELF,
+}
+
+IN_CLOSE :: Inotify_Event_Mask {
+	.CLOSE_WRITE,
+	.CLOSE_NOWRITE,
+}
+
+IN_MOVE :: Inotify_Event_Mask {
+	.MOVED_FROM,
+	.MOVED_TO,
+}
+
 /*
 	Tell `shmget` to create a new key
 */
