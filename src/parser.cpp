@@ -2488,6 +2488,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				tag = parse_call_expr(f, tag);
 			}
 			Ast *type = parse_type(f);
+			syntax_error(tag, "#relative types have now been removed in favour of \"core:relative\"");
 			return ast_relative_type(f, tag, type);
 		} else if (name.string == "force_inline" ||
 		           name.string == "force_no_inline") {
