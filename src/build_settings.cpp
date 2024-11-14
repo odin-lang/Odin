@@ -1888,7 +1888,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			}
 
-			if (build_context.linker_choice != Linker_Default && find_result.vs_exe_path.len == 0) {
+			if (build_context.linker_choice == Linker_Default && find_result.vs_exe_path.len == 0) {
 				gb_printf_err("link.exe not found.\n");
 				return false;
 			}
