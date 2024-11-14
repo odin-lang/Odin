@@ -3002,18 +3002,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
 
-	case runtime.Type_Info_Relative_Pointer:
-		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id)
-		absolute_ptr := any{ptr, info.pointer.id}
-
-		fmt_value(fi, absolute_ptr, verb)
-
-	case runtime.Type_Info_Relative_Multi_Pointer:
-		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id)
-		absolute_ptr := any{ptr, info.pointer.id}
-
-		fmt_value(fi, absolute_ptr, verb)
-
 	case runtime.Type_Info_Matrix:
 		fmt_matrix(fi, v, verb, info)
 
