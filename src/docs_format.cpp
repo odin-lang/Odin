@@ -79,8 +79,7 @@ enum OdinDocTypeKind : u32 {
 	OdinDocType_SOAStructFixed       = 17,
 	OdinDocType_SOAStructSlice       = 18,
 	OdinDocType_SOAStructDynamic     = 19,
-	OdinDocType_RelativePointer      = 20,
-	OdinDocType_RelativeMultiPointer = 21,
+
 	OdinDocType_MultiPointer         = 22,
 	OdinDocType_Matrix               = 23,
 	OdinDocType_SoaPointer           = 24,

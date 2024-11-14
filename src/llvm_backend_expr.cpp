@@ -4200,30 +4200,6 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		return lb_addr(v);
 	}
 
-	case Type_RelativeMultiPointer: {
-		lbAddr rel_ptr_addr = {};
-		if (deref) {
-			lbValue rel_ptr_ptr = lb_build_expr(p, ie->expr);
-			rel_ptr_addr = lb_addr(rel_ptr_ptr);
-		} else {
-			rel_ptr_addr = lb_build_addr(p, ie->expr);
-		}
-		lbValue rel_ptr = lb_relative_pointer_to_pointer(p, rel_ptr_addr);
-
-		lbValue index = lb_build_expr(p, ie->index);
-		index = lb_emit_conv(p, index, t_int);
-		lbValue v = {};
-
-		Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
-		GB_ASSERT(pointer_type->kind == Type_MultiPointer);
-		Type *elem = pointer_type->MultiPointer.elem;
-
-		LLVMValueRef indices[1] = {index.value};
-		v.value = LLVMBuildGEP2(p->builder, lb_type(p->module, elem), rel_ptr.value, indices, 1, "");
-		v.type = alloc_type_pointer(elem);
-		return lb_addr(v);
-	}
-
 	case Type_DynamicArray: {
 		lbValue dynamic_array = {};
 		dynamic_array = lb_build_expr(p, ie->expr);
@@ -4332,13 +4308,6 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lb_fill_slice(p, slice, elem, new_len);
 		return slice;
 	}
-
-	case Type_RelativePointer:
-		GB_PANIC("TODO(bill): Type_RelativePointer should be handled above already on the lb_addr_load");
-		break;
-	case Type_RelativeMultiPointer:
-		GB_PANIC("TODO(bill): Type_RelativeMultiPointer should be handled above already on the lb_addr_load");
-		break;
 
 	case Type_DynamicArray: {
 		Type *elem_type = type->DynamicArray.elem;
@@ -5343,11 +5312,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(de, DerefExpr, expr);
 		Type *t = type_of_expr(de->expr);
-		if (is_type_relative_pointer(t)) {
-			lbAddr addr = lb_build_addr(p, de->expr);
-			addr.relative.deref = true;
-			return addr;
-		} else if (is_type_soa_pointer(t)) {
+		if (is_type_soa_pointer(t)) {
 			lbValue value = lb_build_expr(p, de->expr);
 			lbValue ptr = lb_emit_struct_ev(p, value, 0);
 			lbValue idx = lb_emit_struct_ev(p, value, 1);

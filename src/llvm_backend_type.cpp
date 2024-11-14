@@ -61,8 +61,6 @@ gb_internal u64 lb_typeid_kind(lbModule *m, Type *type, u64 id=0) {
 	case Type_Proc:            kind = Typeid_Procedure;        break;
 	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
-	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
-	case Type_RelativeMultiPointer: kind = Typeid_Relative_Multi_Pointer; break;
 	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
 	case Type_BitField:        kind = Typeid_Bit_Field;        break;
 	}
@@ -945,30 +943,6 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				vals[0] = get_type_info_ptr(m, t->SimdVector.elem);
 				vals[1] = lb_const_int(m, t_int, type_size_of(t->SimdVector.elem)).value;
 				vals[2] = lb_const_int(m, t_int, t->SimdVector.count).value;
-
-				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
-			}
-			break;
-
-		case Type_RelativePointer:
-			{
-				tag_type = t_type_info_relative_pointer;
-				LLVMValueRef vals[2] = {
-					get_type_info_ptr(m, t->RelativePointer.pointer_type),
-					get_type_info_ptr(m, t->RelativePointer.base_integer),
-				};
-
-				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
-			}
-			break;
-
-		case Type_RelativeMultiPointer:
-			{
-				tag_type = t_type_info_relative_multi_pointer;
-				LLVMValueRef vals[2] = {
-					get_type_info_ptr(m, t->RelativeMultiPointer.pointer_type),
-					get_type_info_ptr(m, t->RelativeMultiPointer.base_integer),
-				};
 
 				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
 			}

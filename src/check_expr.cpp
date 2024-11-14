@@ -897,20 +897,6 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	if (is_type_relative_pointer(dst)) {
-		i64 score = check_distance_between_types(c, operand, dst->RelativePointer.pointer_type, allow_array_programming);
-		if (score >= 0) {
-			return score+2;
-		}
-	}
-
-	if (is_type_relative_multi_pointer(dst)) {
-		i64 score = check_distance_between_types(c, operand, dst->RelativeMultiPointer.pointer_type, allow_array_programming);
-		if (score >= 0) {
-			return score+2;
-		}
-	}
-
 	if (is_type_proc(dst)) {
 		if (are_types_identical(src, dst)) {
 			return 3;
@@ -1051,12 +1037,6 @@ gb_internal AstPackage *get_package_of_type(Type *type) {
 			continue;
 		case Type_DynamicArray:
 			type = type->DynamicArray.elem;
-			continue;
-		case Type_RelativePointer:
-			type = type->RelativePointer.pointer_type;
-			continue;
-		case Type_RelativeMultiPointer:
-			type = type->RelativeMultiPointer.pointer_type;
 			continue;
 		}
 		return nullptr;
@@ -8230,17 +8210,6 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 		}
 		return true;
 
-	case Type_RelativeMultiPointer:
-		{
-			Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
-			GB_ASSERT(pointer_type->kind == Type_MultiPointer);
-			o->type = pointer_type->MultiPointer.elem;
-			if (o->mode != Addressing_Constant) {
-				o->mode = Addressing_Variable;
-			}
-		}
-		return true;
-
 	case Type_DynamicArray:
 		o->type = t->DynamicArray.elem;
 		if (o->mode != Addressing_Constant) {
@@ -10623,8 +10592,6 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			// Okay
 		} else if (is_type_string(t)) {
 			// Okay
-		} else if (is_type_relative_multi_pointer(t)) {
-			// Okay
 		} else if (is_type_matrix(t)) {
 			// Okay
 		} else {
@@ -10779,11 +10746,6 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		}
 		break;
 
-	case Type_RelativeMultiPointer:
-		valid = true;
-		o->type = type_deref(o->type);
-		break;
-
 	case Type_EnumeratedArray:
 		{
 			gbString str = expr_to_string(o->expr);
@@ -10860,16 +10822,6 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			x[i:n] -> []T
 		*/
 		o->type = alloc_type_slice(t->MultiPointer.elem);
-	} else if (t->kind == Type_RelativeMultiPointer && se->high != nullptr) {
-		/*
-			x[:]   -> [^]T
-			x[i:]  -> [^]T
-			x[:n]  -> []T
-			x[i:n] -> []T
-		*/
-		Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
-		GB_ASSERT(pointer_type->kind == Type_MultiPointer);
-		o->type = alloc_type_slice(pointer_type->MultiPointer.elem);
 	}
 
 
@@ -11230,22 +11182,6 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
  			} else if (t->kind == Type_SoaPointer) {
 				o->mode = Addressing_SoaVariable;
 				o->type = type_deref(t);
- 			} else if (t->kind == Type_RelativePointer) {
- 				if (o->mode != Addressing_Variable) {
- 					gbString str = expr_to_string(o->expr);
- 					gbString typ = type_to_string(o->type);
- 					error(o->expr, "Cannot dereference relative pointer '%s' of type '%s' as it does not have a variable addressing mode", str, typ);
- 					gb_string_free(typ);
- 					gb_string_free(str);
- 				}
-
- 				// NOTE(bill): This is required because when dereferencing, the original type has been lost
-				add_type_info_type(c, o->type);
-
- 				Type *ptr_type = base_type(t->RelativePointer.pointer_type);
- 				GB_ASSERT(ptr_type->kind == Type_Pointer);
-				o->mode = Addressing_Variable;
-				o->type = ptr_type->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
  				gbString typ = type_to_string(o->type);

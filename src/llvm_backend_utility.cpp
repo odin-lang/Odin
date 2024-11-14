@@ -1131,10 +1131,6 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	Type *t = base_type(type_deref(s.type));
 	Type *result_type = nullptr;
 
-	if (is_type_relative_pointer(t)) {
-		s = lb_addr_get_ptr(p, lb_addr(s));
-	}
-
 	if (is_type_struct(t)) {
 		result_type = get_struct_field_type(t, index);
 	} else if (is_type_union(t)) {
@@ -1439,8 +1435,6 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 		} else if (type->kind == Type_Array) {
 			e = lb_emit_array_epi(p, e, index);
 		} else if (type->kind == Type_Map) {
-			e = lb_emit_struct_ep(p, e, index);
-		} else if (type->kind == Type_RelativePointer) {
 			e = lb_emit_struct_ep(p, e, index);
 		} else {
 			GB_PANIC("un-gep-able type %s", type_to_string(type));

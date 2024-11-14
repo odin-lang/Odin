@@ -920,17 +920,6 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 				elem, subscripts, gb_count_of(subscripts));
 		}
 
-	case Type_RelativePointer: {
-		LLVMMetadataRef base_integer = lb_debug_type(m, type->RelativePointer.base_integer);
-		gbString name = type_to_string(type, temporary_allocator());
-		return LLVMDIBuilderCreateTypedef(m->debug_builder, base_integer, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
-	}
-	case Type_RelativeMultiPointer: {
-		LLVMMetadataRef base_integer = lb_debug_type(m, type->RelativeMultiPointer.base_integer);
-		gbString name = type_to_string(type, temporary_allocator());
-		return LLVMDIBuilderCreateTypedef(m->debug_builder, base_integer, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
-	}
-
 	case Type_Matrix: {
 		LLVMMetadataRef subscripts[1] = {};
 		subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,
