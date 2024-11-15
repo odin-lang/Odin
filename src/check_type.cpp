@@ -1205,7 +1205,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 	type->BitSet.node = node;
 
 	/* i64 const DEFAULT_BITS = cast(i64)(8*build_context.word_size); */
-	i64 const MAX_BITS = 128;
+	i64 const MAX_BITS = build_context.disallow_128_bit ? 64 : 128;
 
 	Ast *base = unparen_expr(bs->elem);
 	if (is_ast_range(base)) {
@@ -1340,10 +1340,14 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 			break;
 		}
 		if (!is_valid) {
+			ERROR_BLOCK();
 			if (actual_lower != lower) {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", bits, bits_required);
 			} else {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
+			}
+			if (bits == MAX_BITS && bits >= 64 && build_context.disallow_128_bit) {
+				error_line("\t128-bit integers have been disallowed, so `bit_set`s are limited to 64-bits\n");
 			}
 		}
 		
@@ -1409,11 +1413,15 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 				}
 
 				if (upper - lower >= bits) {
+					ERROR_BLOCK();
 					i64 bits_required = upper-lower+1;
 					if (lower_changed) {
 						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", bits, bits_required);
 					} else {
 						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
+					}
+					if (bits == MAX_BITS && bits >= 64 && build_context.disallow_128_bit) {
+						error_line("\t128-bit integers have been disallowed, so `bit_set`s are limited to 64-bits\n");
 					}
 				}
 
