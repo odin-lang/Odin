@@ -55,15 +55,6 @@ foreign lib {
 	closedir :: proc(dirp: DIR) -> result ---
 
 	/*
-	Return a file descriptor referring to the same directory as the dirp argument.
-
-	// TODO: this is a macro on NetBSD?
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dirfd.html ]]
-	*/
-	dirfd :: proc(dirp: DIR) -> FD ---
-
-	/*
 	Equivalent to the opendir() function except that the directory is specified by a file descriptor
 	rather than by a name.
 	The file offset associated with the file descriptor at the time of the call determines
@@ -161,11 +152,36 @@ when ODIN_OS == .NetBSD {
 	@(private) LSCANDIR   :: "__scandir30"
 	@(private) LOPENDIR   :: "__opendir30"
 	@(private) LREADDIR   :: "__readdir30"
+
+	/*
+	Return a file descriptor referring to the same directory as the dirp argument.
+
+	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dirfd.html ]]
+	*/
+	dirfd :: proc "c" (dirp: DIR) -> FD {
+		_dirdesc :: struct {
+			dd_fd: FD,
+
+			// more stuff...
+		}
+
+		return (^_dirdesc)(dirp).dd_fd
+	}
+
 } else {
 	@(private) LALPHASORT :: "alphasort" + INODE_SUFFIX
 	@(private) LSCANDIR   :: "scandir"   + INODE_SUFFIX
 	@(private) LOPENDIR   :: "opendir"   + INODE_SUFFIX
 	@(private) LREADDIR   :: "readdir"   + INODE_SUFFIX
+
+	foreign lib {
+		/*
+		Return a file descriptor referring to the same directory as the dirp argument.
+
+		[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dirfd.html ]]
+		*/
+		dirfd :: proc(dirp: DIR) -> FD ---
+	}
 }
 
 when ODIN_OS == .Darwin {
