@@ -3203,15 +3203,15 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 
 	case:
 		when ODIN_ALLOW_128_BIT {
-			switch a in base_arg {
-			case i128:   fmt_int_128(fi, u128(a), true,  128, verb)
-			case u128:   fmt_int_128(fi,       a, false, 128, verb)
+			switch a2 in base_arg {
+			case i128:   fmt_int_128(fi, u128(a2), true,  128, verb)
+			case u128:   fmt_int_128(fi,     (a2), false, 128, verb)
 
-			case i128le: fmt_int_128(fi, u128(a), true,  128, verb)
-			case u128le: fmt_int_128(fi, u128(a), false, 128, verb)
+			case i128le: fmt_int_128(fi, u128(a2), true,  128, verb)
+			case u128le: fmt_int_128(fi, u128(a2), false, 128, verb)
 
-			case i128be: fmt_int_128(fi, u128(a), true,  128, verb)
-			case u128be: fmt_int_128(fi, u128(a), false, 128, verb)
+			case i128be: fmt_int_128(fi, u128(a2), true,  128, verb)
+			case u128be: fmt_int_128(fi, u128(a2), false, 128, verb)
 			case:
 				fmt_value(fi, arg, verb)
 			}

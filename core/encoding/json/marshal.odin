@@ -100,18 +100,32 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Integer:
 		buf: [40]byte
-		u := cast_any_int_to_u128(a)
+		when ODIN_ALLOW_128_BIT {
+			u := cast_any_int_to_u128(a)
+		} else {
+			u := cast_any_int_to_u64(a)
+		}
 
 		s: string
 
 		// allow uints to be printed as hex
 		if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) {
-			switch i in a {
-			case u8, u16, u32, u64, u128:
-				s = strconv.append_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
+			when ODIN_ALLOW_128_BIT {
+				switch i in a {
+				case u8, u16, u32, u64, u128:
+					s = strconv.append_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
 
-			case:
-				s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+				case:
+					s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+				}
+			} else {
+				switch i in a {
+				case u8, u16, u32, u64:
+					s = strconv.append_bits(buf[:], u, 8, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
+
+				case:
+					s = strconv.append_bits(buf[:], u, 8, info.signed, 8*ti.size, "0123456789", nil)
+				}
 			}
 		} else {
 			s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
@@ -631,40 +645,79 @@ opt_write_indentation :: proc(w: io.Writer, opt: ^Marshal_Options) -> (err: io.E
 	return
 }
 
-@(private)
-cast_any_int_to_u128 :: proc(any_int_value: any) -> u128 {
-	u: u128 = 0
-	switch i in any_int_value {
-	case i8:      u = u128(i)
-	case i16:     u = u128(i)
-	case i32:     u = u128(i)
-	case i64:     u = u128(i)
-	case i128:    u = u128(i)
-	case int:     u = u128(i)
-	case u8:      u = u128(i)
-	case u16:     u = u128(i)
-	case u32:     u = u128(i)
-	case u64:     u = u128(i)
-	case u128:    u = u128(i)
-	case uint:    u = u128(i)
-	case uintptr: u = u128(i)
 
-	case i16le:  u = u128(i)
-	case i32le:  u = u128(i)
-	case i64le:  u = u128(i)
-	case u16le:  u = u128(i)
-	case u32le:  u = u128(i)
-	case u64le:  u = u128(i)
-	case u128le: u = u128(i)
+when ODIN_ALLOW_128_BIT {
+	@(private)
+	cast_any_int_to_u128 :: proc(any_int_value: any) -> u128 {
+		u: u128 = 0
+		switch i in any_int_value {
+		case i8:      u = u128(i)
+		case i16:     u = u128(i)
+		case i32:     u = u128(i)
+		case i64:     u = u128(i)
+		case i128:    u = u128(i)
+		case int:     u = u128(i)
+		case u8:      u = u128(i)
+		case u16:     u = u128(i)
+		case u32:     u = u128(i)
+		case u64:     u = u128(i)
+		case u128:    u = u128(i)
+		case uint:    u = u128(i)
+		case uintptr: u = u128(i)
 
-	case i16be:  u = u128(i)
-	case i32be:  u = u128(i)
-	case i64be:  u = u128(i)
-	case u16be:  u = u128(i)
-	case u32be:  u = u128(i)
-	case u64be:  u = u128(i)
-	case u128be: u = u128(i)
+		case i16le:  u = u128(i)
+		case i32le:  u = u128(i)
+		case i64le:  u = u128(i)
+		case u16le:  u = u128(i)
+		case u32le:  u = u128(i)
+		case u64le:  u = u128(i)
+		case u128le: u = u128(i)
+
+		case i16be:  u = u128(i)
+		case i32be:  u = u128(i)
+		case i64be:  u = u128(i)
+		case u16be:  u = u128(i)
+		case u32be:  u = u128(i)
+		case u64be:  u = u128(i)
+		case u128be: u = u128(i)
+		}
+
+		return u
+	}
+} else {
+	@(private)
+	cast_any_int_to_u64 :: proc(any_int_value: any) -> u64 {
+		u: u64 = 0
+		switch i in any_int_value {
+		case i8:      u = u64(i)
+		case i16:     u = u64(i)
+		case i32:     u = u64(i)
+		case i64:     u = u64(i)
+		case i128:    u = u64(i)
+		case int:     u = u64(i)
+		case u8:      u = u64(i)
+		case u16:     u = u64(i)
+		case u32:     u = u64(i)
+		case u64:     u = u64(i)
+		case uint:    u = u64(i)
+		case uintptr: u = u64(i)
+
+		case i16le:  u = u64(i)
+		case i32le:  u = u64(i)
+		case i64le:  u = u64(i)
+		case u16le:  u = u64(i)
+		case u32le:  u = u64(i)
+		case u64le:  u = u64(i)
+
+		case i16be:  u = u64(i)
+		case i32be:  u = u64(i)
+		case i64be:  u = u64(i)
+		case u16be:  u = u64(i)
+		case u32be:  u = u64(i)
+		case u64be:  u = u64(i)
+		}
+
+		return u
 	}
 
-	return u
 }

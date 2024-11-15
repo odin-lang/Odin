@@ -1178,13 +1178,13 @@ as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 		case i64be:   value = i64(v)
 		case:
 			when ODIN_ALLOW_128_BIT {
-				switch v in a {
-				case i128:    value = i64(v)
-				case u128:    value = i64(v)
-				case u128le:  value = i64(v)
-				case i128le:  value = i64(v)
-				case u128be:  value = i64(v)
-				case i128be:  value = i64(v)
+				switch v2 in a {
+				case i128:    value = i64(v2)
+				case u128:    value = i64(v2)
+				case u128le:  value = i64(v2)
+				case i128le:  value = i64(v2)
+				case u128be:  value = i64(v2)
+				case i128be:  value = i64(v2)
 				case: valid = false
 				}
 			} else {
@@ -1293,13 +1293,13 @@ as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 		case i64be:  value = u64(v)
 		case:
 			when ODIN_ALLOW_128_BIT {
-				switch v in a {
-				case i128:    value = u64(v)
-				case u128:    value = u64(v)
-				case u128le:  value = u64(v)
-				case i128le:  value = u64(v)
-				case u128be:  value = u64(v)
-				case i128be:  value = u64(v)
+				switch v2 in a {
+				case i128:    value = u64(v2)
+				case u128:    value = u64(v2)
+				case u128le:  value = u64(v2)
+				case i128le:  value = u64(v2)
+				case u128be:  value = u64(v2)
+				case i128be:  value = u64(v2)
 				case: valid = false
 				}
 			} else {
@@ -1407,13 +1407,13 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 		case i64be: value = f64(v)
 		case:
 			when ODIN_ALLOW_128_BIT {
-				switch v in a {
-				case i128:    value = f64(v)
-				case u128:    value = f64(v)
-				case u128le:  value = f64(v)
-				case i128le:  value = f64(v)
-				case u128be:  value = f64(v)
-				case i128be:  value = f64(v)
+				switch v2 in a {
+				case i128:    value = f64(v2)
+				case u128:    value = f64(v2)
+				case u128le:  value = f64(v2)
+				case i128le:  value = f64(v2)
+				case u128be:  value = f64(v2)
+				case i128be:  value = f64(v2)
 				case: valid = false
 				}
 			} else {
