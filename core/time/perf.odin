@@ -2,6 +2,8 @@ package time
 
 import "base:runtime"
 import "base:intrinsics"
+import "core:math/bits"
+_ :: bits
 
 /*
 Type representing monotonic time, useful for measuring durations.
@@ -129,8 +131,14 @@ tsc_frequency :: proc "contextless" (fallback_sleep := 2 * Second) -> (u64, bool
 		tsc_end := intrinsics.read_cycle_counter()
 		tick_end := tick_now()
 
-		time_diff := u128(duration_nanoseconds(tick_diff(tick_begin, tick_end)))
-		hz = u64((u128(tsc_end - tsc_begin) * 1_000_000_000) / time_diff)
+		when ODIN_ALLOW_128_BIT {
+			time_diff := u128(duration_nanoseconds(tick_diff(tick_begin, tick_end)))
+			hz = u64((u128(tsc_end - tsc_begin) * 1_000_000_000) / time_diff)
+		} else {
+			time_diff := u64(duration_nanoseconds(tick_diff(tick_begin, tick_end)))
+			hi, lo := bits.mul_u64(u64(tsc_end - tsc_begin), 1_000_000_000)
+			hz, _ = bits.div_u64(hi, lo, time_diff)
+		}
 	}
 
 	return hz, true
@@ -169,7 +177,7 @@ Benchmark_Options :: struct {
 	// `bench()` can write the output slice here.
 	output:    []u8, // Unused for hash benchmarks
 	// `bench()` can write the output hash here.
-	hash:      u128,
+	hash:      [16]u8,
 	// `benchmark()` procedure will output the duration of benchmark
 	duration:             Duration,
 	// `benchmark()` procedure will output the average count of elements

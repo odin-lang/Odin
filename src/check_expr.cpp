@@ -1851,6 +1851,11 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		if (o->type != nullptr && o->type->kind == Type_Named && o->type->Named.type_name->TypeName.is_type_alias) {
 			o->type = base_type(o->type);
 		}
+		if (build_context.disallow_128_bit && is_type_integer_128bit(o->type)) {
+			gbString s = type_to_string(o->type);
+			error(n, "Use of '%s' has been disallowed", s);
+			gb_string_free(s);
+		}
 
 		break;
 
@@ -3496,11 +3501,15 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		if (src != dst) {
 			bool const REQUIRE = true;
 			if (is_type_integer_128bit(src) && is_type_float(dst)) {
-				add_package_dependency(c, "runtime", "floattidf_unsigned", REQUIRE);
-				add_package_dependency(c, "runtime", "floattidf",          REQUIRE);
+				if (!build_context.disallow_128_bit) {
+					add_package_dependency(c, "runtime", "floattidf_unsigned", REQUIRE);
+					add_package_dependency(c, "runtime", "floattidf",          REQUIRE);
+				}
 			} else if (is_type_integer_128bit(dst) && is_type_float(src)) {
-				add_package_dependency(c, "runtime", "fixunsdfti",         REQUIRE);
-				add_package_dependency(c, "runtime", "fixunsdfdi",         REQUIRE);
+				if (!build_context.disallow_128_bit) {
+					add_package_dependency(c, "runtime", "fixunsdfti",         REQUIRE);
+					add_package_dependency(c, "runtime", "fixunsdfdi",         REQUIRE);
+				}
 			} else if (src == t_f16 && is_type_float(dst)) {
 				add_package_dependency(c, "runtime", "gnu_h2f_ieee",       REQUIRE);
 				add_package_dependency(c, "runtime", "extendhfsf2",        REQUIRE);
@@ -4043,8 +4052,16 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		case Basic_quaternion128: add_package_dependency(c, "runtime", "quo_quaternion128"); break;
 		case Basic_quaternion256: add_package_dependency(c, "runtime", "quo_quaternion256"); break;
 
-		case Basic_u128: add_package_dependency(c, "runtime", "udivti3", REQUIRE); break;
-		case Basic_i128: add_package_dependency(c, "runtime", "divti3",  REQUIRE); break;
+		case Basic_u128:
+			if (!build_context.disallow_128_bit) {
+				add_package_dependency(c, "runtime", "udivti3", REQUIRE);
+			}
+			break;
+		case Basic_i128:
+			if (!build_context.disallow_128_bit) {
+				add_package_dependency(c, "runtime", "divti3",  REQUIRE);
+			}
+			break;
 		}
 	} else if (op.kind == Token_Mul || op.kind == Token_MulEq) {
 		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {

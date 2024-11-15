@@ -1091,6 +1091,8 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	fi.zero = false
 	_pad(fi, s)
 }
+
+when ODIN_ALLOW_128_BIT {
 // Formats an int128 value based on the provided formatting options.
 //
 // Inputs:
@@ -1191,6 +1193,8 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	fi.zero = false
 	_pad(fi, s)
 }
+}
+
 // Units of measurements:
 __MEMORY_LOWER := " b kib mib gib tib pib eib"
 __MEMORY_UPPER := " B KiB MiB GiB TiB PiB EiB"
@@ -1306,6 +1310,8 @@ fmt_int :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, verb: rune) {
 		fmt_bad_verb(fi, verb)
 	}
 }
+
+when ODIN_ALLOW_128_BIT {
 // Formats an int128 value according to the specified formatting verb.
 //
 // Inputs:
@@ -1340,6 +1346,8 @@ fmt_int_128 :: proc(fi: ^Info, u: u128, is_signed: bool, bit_size: int, verb: ru
 		fmt_bad_verb(fi, verb)
 	}
 }
+}
+
 // Pads a formatted string with the appropriate padding, based on the provided formatting options.
 //
 // Inputs:
@@ -1696,8 +1704,10 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 		fmt_bit_set(fi, val, info.name, verb)
 
 	case runtime.Type_Info_Bit_Set:
-		bits: u128
-		bit_size := u128(8*type_info.size)
+		IT :: u128 when ODIN_ALLOW_128_BIT else u64
+
+		bits: IT
+		bit_size := IT(8*type_info.size)
 
 		do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying)
 
@@ -1715,7 +1725,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 				fmt_arg(fi, x, verb)
 				return
 			}
-			bits = u128(x)
+			bits = IT(x)
 		case 16:
 			x := (^u16)(v.data)^
 			if do_byte_swap { x = byte_swap(x) }
@@ -1723,7 +1733,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 				fmt_arg(fi, x, verb)
 				return
 			}
-			bits = u128(x)
+			bits = IT(x)
 		case 32:
 			x := (^u32)(v.data)^
 			if do_byte_swap { x = byte_swap(x) }
@@ -1731,7 +1741,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 				fmt_arg(fi, x, verb)
 				return
 			}
-			bits = u128(x)
+			bits = IT(x)
 		case 64:
 			x := (^u64)(v.data)^
 			if do_byte_swap { x = byte_swap(x) }
@@ -1739,9 +1749,10 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 				fmt_arg(fi, x, verb)
 				return
 			}
-			bits = u128(x)
+			bits = IT(x)
 		case 128:
-			x := (^u128)(v.data)^
+			assert(ODIN_ALLOW_128_BIT)
+			x := (^IT)(v.data)^
 			if do_byte_swap { x = byte_swap(x) }
 			if as_arg {
 				fmt_arg(fi, x, verb)
@@ -3190,16 +3201,23 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case i64be:     fmt_int(fi, u64(a), true,  64, verb)
 	case u64be:     fmt_int(fi, u64(a), false, 64, verb)
 
-	case i128:     fmt_int_128(fi, u128(a), true,  128, verb)
-	case u128:     fmt_int_128(fi,       a, false, 128, verb)
+	case:
+		when ODIN_ALLOW_128_BIT {
+			switch a in base_arg {
+			case i128:   fmt_int_128(fi, u128(a), true,  128, verb)
+			case u128:   fmt_int_128(fi,       a, false, 128, verb)
 
-	case i128le:   fmt_int_128(fi, u128(a), true,  128, verb)
-	case u128le:   fmt_int_128(fi, u128(a), false, 128, verb)
+			case i128le: fmt_int_128(fi, u128(a), true,  128, verb)
+			case u128le: fmt_int_128(fi, u128(a), false, 128, verb)
 
-	case i128be:   fmt_int_128(fi, u128(a), true,  128, verb)
-	case u128be:   fmt_int_128(fi, u128(a), false, 128, verb)
-
-	case: fmt_value(fi, arg, verb)
+			case i128be: fmt_int_128(fi, u128(a), true,  128, verb)
+			case u128be: fmt_int_128(fi, u128(a), false, 128, verb)
+			case:
+				fmt_value(fi, arg, verb)
+			}
+		} else {
+			fmt_value(fi, arg, verb)
+		}
 	}
 
 }

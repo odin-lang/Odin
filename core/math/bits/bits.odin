@@ -243,8 +243,19 @@ mul_u32 :: proc "contextless" (x, y: u32) -> (hi, lo: u32) {
 }
 @(require_results)
 mul_u64 :: proc "contextless" (x, y: u64) -> (hi, lo: u64) {
-	prod_wide := u128(x) * u128(y)
-	hi, lo = u64(prod_wide>>64), u64(prod_wide)
+	m :: 1<<32 - 1
+	x0 := x & m
+	x1 := x >> 32
+	y0 := y & m
+	y1 := y >> 32
+	w0 := x0 * y0
+	t  := x1*y0 + w0>>32
+	w1 := t & m
+	w2 := t >> 32
+	w1 += x0 * y1
+
+	hi = x1*y1 + w2 + w1>>32
+	lo = x * y
 	return
 }
 
@@ -263,22 +274,22 @@ mul :: proc{mul_u32, mul_u64, mul_uint}
 
 
 @(require_results)
-div_u32 :: proc "odin" (hi, lo, y: u32) -> (quo, rem: u32) {
-	assert(y != 0 && y <= hi)
+div_u32 :: proc "contextless" (hi, lo, y: u32) -> (quo, rem: u32) {
+	assert_contextless(y != 0 && y <= hi)
 	z := u64(hi)<<32 | u64(lo)
 	quo, rem = u32(z/u64(y)), u32(z%u64(y))
 	return
 }
 @(require_results)
-div_u64 :: proc "odin" (hi, lo, y: u64) -> (quo, rem: u64) {
+div_u64 :: proc "contextless" (hi, lo, y: u64) -> (quo, rem: u64) {
 	y := y
 	two32  :: 1 << 32
 	mask32 :: two32 - 1
 	if y == 0 {
-		panic("divide error")
+		panic_contextless("divide error")
 	}
 	if y <= hi {
-		panic("overflow error")
+		panic_contextless("overflow error")
 	}
 
 	s := uint(count_leading_zeros(y))
@@ -382,9 +393,11 @@ bitfield_extract_u32  :: proc "contextless" (value:  u32, offset, bits: uint) ->
 @(require_results)
 bitfield_extract_u64  :: proc "contextless" (value:  u64, offset, bits: uint) ->  u64 { return (value >> offset) &  u64(1<<bits - 1) }
 @(require_results)
-bitfield_extract_u128 :: proc "contextless" (value: u128, offset, bits: uint) -> u128 { return (value >> offset) & u128(1<<bits - 1) }
-@(require_results)
 bitfield_extract_uint :: proc "contextless" (value: uint, offset, bits: uint) -> uint { return (value >> offset) & uint(1<<bits - 1) }
+when ODIN_ALLOW_128_BIT {
+@(require_results)
+bitfield_extract_u128 :: proc "contextless" (value: u128, offset, bits: uint) -> u128 { return (value >> offset) & u128(1<<bits - 1) }
+}
 
 @(require_results)
 bitfield_extract_i8 :: proc "contextless" (value: i8, offset, bits: uint) -> i8 {
@@ -414,12 +427,14 @@ bitfield_extract_i64 :: proc "contextless" (value: i64, offset, bits: uint) -> i
 	r := (v~m) - m
 	return i64(r)
 }
+when ODIN_ALLOW_128_BIT {
 @(require_results)
 bitfield_extract_i128 :: proc "contextless" (value: i128, offset, bits: uint) -> i128 {
 	v := (u128(value) >> offset) & u128(1<<bits - 1)
 	m := u128(1<<(bits-1))
 	r := (v~m) - m
 	return i128(r)
+}
 }
 @(require_results)
 bitfield_extract_int :: proc "contextless" (value: int, offset, bits: uint) -> int {
@@ -429,21 +444,36 @@ bitfield_extract_int :: proc "contextless" (value: int, offset, bits: uint) -> i
 	return int(r)
 }
 
-
-bitfield_extract :: proc{
-	bitfield_extract_u8,
-	bitfield_extract_u16,
-	bitfield_extract_u32,
-	bitfield_extract_u64,
-	bitfield_extract_u128,
-	bitfield_extract_uint,
-	bitfield_extract_i8,
-	bitfield_extract_i16,
-	bitfield_extract_i32,
-	bitfield_extract_i64,
-	bitfield_extract_i128,
-	bitfield_extract_int,
+when ODIN_ALLOW_128_BIT {
+	bitfield_extract :: proc{
+		bitfield_extract_u8,
+		bitfield_extract_u16,
+		bitfield_extract_u32,
+		bitfield_extract_u64,
+		bitfield_extract_u128,
+		bitfield_extract_uint,
+		bitfield_extract_i8,
+		bitfield_extract_i16,
+		bitfield_extract_i32,
+		bitfield_extract_i64,
+		bitfield_extract_i128,
+		bitfield_extract_int,
+	}
+} else {
+	bitfield_extract :: proc{
+		bitfield_extract_u8,
+		bitfield_extract_u16,
+		bitfield_extract_u32,
+		bitfield_extract_u64,
+		bitfield_extract_uint,
+		bitfield_extract_i8,
+		bitfield_extract_i16,
+		bitfield_extract_i32,
+		bitfield_extract_i64,
+		bitfield_extract_int,
+	}
 }
+
 
 
 @(require_results)
@@ -466,10 +496,12 @@ bitfield_insert_u64 :: proc "contextless" (base, insert: u64, offset, bits: uint
 	mask := u64(1<<bits - 1)
 	return (base &~ (mask<<offset)) | ((insert&mask) << offset)
 }
+when ODIN_ALLOW_128_BIT {
 @(require_results)
 bitfield_insert_u128 :: proc "contextless" (base, insert: u128, offset, bits: uint) -> u128 {
 	mask := u128(1<<bits - 1)
 	return (base &~ (mask<<offset)) | ((insert&mask) << offset)
+}
 }
 @(require_results)
 bitfield_insert_uint :: proc "contextless" (base, insert: uint, offset, bits: uint) -> uint {
@@ -497,10 +529,12 @@ bitfield_insert_i64 :: proc "contextless" (base, insert: i64, offset, bits: uint
 	mask := i64(1<<bits - 1)
 	return (base &~ (mask<<offset)) | ((insert&mask) << offset)
 }
+when ODIN_ALLOW_128_BIT {
 @(require_results)
 bitfield_insert_i128 :: proc "contextless" (base, insert: i128, offset, bits: uint) -> i128 {
 	mask := i128(1<<bits - 1)
 	return (base &~ (mask<<offset)) | ((insert&mask) << offset)
+}
 }
 @(require_results)
 bitfield_insert_int :: proc "contextless" (base, insert: int, offset, bits: uint) -> int {
@@ -508,17 +542,34 @@ bitfield_insert_int :: proc "contextless" (base, insert: int, offset, bits: uint
 	return (base &~ (mask<<offset)) | ((insert&mask) << offset)
 }
 
-bitfield_insert :: proc{
-	bitfield_insert_u8,
-	bitfield_insert_u16,
-	bitfield_insert_u32,
-	bitfield_insert_u64,
-	bitfield_insert_u128,
-	bitfield_insert_uint,
-	bitfield_insert_i8,
-	bitfield_insert_i16,
-	bitfield_insert_i32,
-	bitfield_insert_i64,
-	bitfield_insert_i128,
-	bitfield_insert_int,
+
+when ODIN_ALLOW_128_BIT {
+	bitfield_insert :: proc{
+		bitfield_insert_u8,
+		bitfield_insert_u16,
+		bitfield_insert_u32,
+		bitfield_insert_u64,
+		bitfield_insert_u128,
+		bitfield_insert_uint,
+		bitfield_insert_i8,
+		bitfield_insert_i16,
+		bitfield_insert_i32,
+		bitfield_insert_i64,
+		bitfield_insert_i128,
+		bitfield_insert_int,
+	}
+} else {
+	bitfield_insert :: proc{
+		bitfield_insert_u8,
+		bitfield_insert_u16,
+		bitfield_insert_u32,
+		bitfield_insert_u64,
+		bitfield_insert_uint,
+		bitfield_insert_i8,
+		bitfield_insert_i16,
+		bitfield_insert_i32,
+		bitfield_insert_i64,
+		bitfield_insert_int,
+	}
 }
+

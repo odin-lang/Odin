@@ -103,6 +103,9 @@ append_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: i
 	copy(buf, out)
 	return string(buf[0:len(out)])
 }
+
+
+when ODIN_ALLOW_128_BIT {
 /*
 Determines whether the given unsigned 128-bit integer is a negative value by interpreting it as a signed integer with the specified bit size.
 
@@ -207,4 +210,5 @@ append_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_si
 	out := a[i:]
 	copy(buf, out)
 	return string(buf[0:len(out)])
+}
 }

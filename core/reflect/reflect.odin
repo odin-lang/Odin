@@ -1152,37 +1152,44 @@ as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 		case i16:     value = i64(v)
 		case i32:     value = i64(v)
 		case i64:     value =      v
-		case i128:    value = i64(v)
 		case int:     value = i64(v)
 
 		case u8:      value = i64(v)
 		case u16:     value = i64(v)
 		case u32:     value = i64(v)
 		case u64:     value = i64(v)
-		case u128:    value = i64(v)
 		case uint:    value = i64(v)
 		case uintptr: value = i64(v)
 
 		case u16le:   value = i64(v)
 		case u32le:   value = i64(v)
 		case u64le:   value = i64(v)
-		case u128le:  value = i64(v)
 
 		case i16le:   value = i64(v)
 		case i32le:   value = i64(v)
 		case i64le:   value = i64(v)
-		case i128le:  value = i64(v)
 
 		case u16be:   value = i64(v)
 		case u32be:   value = i64(v)
 		case u64be:   value = i64(v)
-		case u128be:  value = i64(v)
 
 		case i16be:   value = i64(v)
 		case i32be:   value = i64(v)
 		case i64be:   value = i64(v)
-		case i128be:  value = i64(v)
-		case: valid = false
+		case:
+			when ODIN_ALLOW_128_BIT {
+				switch v in a {
+				case i128:    value = i64(v)
+				case u128:    value = i64(v)
+				case u128le:  value = i64(v)
+				case i128le:  value = i64(v)
+				case u128be:  value = i64(v)
+				case i128be:  value = i64(v)
+				case: valid = false
+				}
+			} else {
+				valid = false
+			}
 		}
 
 	case Type_Info_Rune:
@@ -1260,37 +1267,44 @@ as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 		case i16:    value = u64(v)
 		case i32:    value = u64(v)
 		case i64:    value = u64(v)
-		case i128:   value = u64(v)
 		case int:    value = u64(v)
 
 		case u8:     value = u64(v)
 		case u16:    value = u64(v)
 		case u32:    value = u64(v)
 		case u64:    value =    (v)
-		case u128:   value = u64(v)
 		case uint:   value = u64(v)
 		case uintptr:value = u64(v)
 
 		case u16le:  value = u64(v)
 		case u32le:  value = u64(v)
 		case u64le:  value = u64(v)
-		case u128le: value = u64(v)
 
 		case i16le:  value = u64(v)
 		case i32le:  value = u64(v)
 		case i64le:  value = u64(v)
-		case i128le: value = u64(v)
 
 		case u16be:  value = u64(v)
 		case u32be:  value = u64(v)
 		case u64be:  value = u64(v)
-		case u128be: value = u64(v)
 
 		case i16be:  value = u64(v)
 		case i32be:  value = u64(v)
 		case i64be:  value = u64(v)
-		case i128be: value = u64(v)
-		case: valid = false
+		case:
+			when ODIN_ALLOW_128_BIT {
+				switch v in a {
+				case i128:    value = u64(v)
+				case u128:    value = u64(v)
+				case u128le:  value = u64(v)
+				case i128le:  value = u64(v)
+				case u128be:  value = u64(v)
+				case i128be:  value = u64(v)
+				case: valid = false
+				}
+			} else {
+				valid = false
+			}
 		}
 
 	case Type_Info_Rune:
@@ -1370,34 +1384,41 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 		case i16:   value = f64(v)
 		case i32:   value = f64(v)
 		case i64:   value = f64(v)
-		case i128:  value = f64(v)
 
 		case u8:    value = f64(v)
 		case u16:   value = f64(v)
 		case u32:   value = f64(v)
 		case u64:   value = f64(v)
-		case u128:  value = f64(v)
 
 		case u16le: value = f64(v)
 		case u32le: value = f64(v)
 		case u64le: value = f64(v)
-		case u128le:value = f64(v)
 
 		case i16le: value = f64(v)
 		case i32le: value = f64(v)
 		case i64le: value = f64(v)
-		case i128le:value = f64(v)
 
 		case u16be: value = f64(v)
 		case u32be: value = f64(v)
 		case u64be: value = f64(v)
-		case u128be:value = f64(v)
 
 		case i16be: value = f64(v)
 		case i32be: value = f64(v)
 		case i64be: value = f64(v)
-		case i128be:value = f64(v)
-		case: valid = false
+		case:
+			when ODIN_ALLOW_128_BIT {
+				switch v in a {
+				case i128:    value = f64(v)
+				case u128:    value = f64(v)
+				case u128le:  value = f64(v)
+				case i128le:  value = f64(v)
+				case u128be:  value = f64(v)
+				case i128be:  value = f64(v)
+				case: valid = false
+				}
+			} else {
+				valid = false
+			}
 		}
 
 	case Type_Info_Rune:
