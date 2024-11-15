@@ -218,7 +218,11 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 		return true, nil
 		
 	case reflect.Type_Info_Integer:
-		i, pok := strconv.parse_i128(str)
+		when ODIN_ALLOW_128_BIT {
+			i, pok := strconv.parse_i128(str)
+		} else {
+			i, pok := strconv.parse_i64(str)
+		}
 		if !pok {
 			return false, nil
 		}
@@ -301,7 +305,11 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 	case .Integer:
 		advance_token(p)
-		i, _ := strconv.parse_i128(token.text)
+		when ODIN_ALLOW_128_BIT {
+			i, _ := strconv.parse_i128(token.text)
+		} else {
+			i, _ := strconv.parse_i64(token.text)
+		}
 		if assign_int(v, i) {
 			return
 		}
@@ -561,7 +569,11 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 						key_ptr = &key_cstr
 					}
 				case runtime.Type_Info_Integer:
-					i, ok := strconv.parse_i128(key)
+					when ODIN_ALLOW_128_BIT {
+						i, ok := strconv.parse_i128(key)
+					} else {
+						i, ok := strconv.parse_i64(key)
+					}
 					if !ok	{ return UNSUPPORTED_TYPE }
 					key_ptr = rawptr(&i)
 				case: return UNSUPPORTED_TYPE

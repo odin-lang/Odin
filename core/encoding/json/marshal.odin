@@ -121,14 +121,18 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			} else {
 				switch i in a {
 				case u8, u16, u32, u64:
-					s = strconv.append_bits(buf[:], u, 8, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
+					s = strconv.append_bits(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
 
 				case:
-					s = strconv.append_bits(buf[:], u, 8, info.signed, 8*ti.size, "0123456789", nil)
+					s = strconv.append_bits(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
 				}
 			}
 		} else {
-			s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+			when ODIN_ALLOW_128_BIT {
+				s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+			} else {
+				s = strconv.append_bits(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+			}
 		}
 
 		io.write_string(w, s) or_return
@@ -289,8 +293,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 							opt_write_key(w, opt, name) or_return
 						case runtime.Type_Info_Integer:
 							buf: [40]byte
-							u := cast_any_int_to_u128(ka)
-							name = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
+							when ODIN_ALLOW_128_BIT {
+								u := cast_any_int_to_u128(ka)
+								name = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
+							} else {
+								u := cast_any_int_to_u64(ka)
+								name = strconv.append_bits(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
+
+							}
 							
 							opt_write_key(w, opt, name) or_return
 						case: return .Unsupported_Type
@@ -693,7 +703,6 @@ when ODIN_ALLOW_128_BIT {
 		case i16:     u = u64(i)
 		case i32:     u = u64(i)
 		case i64:     u = u64(i)
-		case i128:    u = u64(i)
 		case int:     u = u64(i)
 		case u8:      u = u64(i)
 		case u16:     u = u64(i)
