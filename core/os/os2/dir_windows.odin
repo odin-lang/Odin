@@ -137,5 +137,6 @@ _read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {
 		return
 	}
 	file_info_delete(it.impl.prev_fi, file_allocator())
+	delete(it.impl.path, file_allocator())
 	win32.FindClose(it.impl.find_handle)
 }
