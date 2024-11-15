@@ -106,7 +106,7 @@ MAX_ITERATIONS_RANDOM_PRIME  := 1_000_000
 	2) Optimizations thanks to precomputed masks wouldn't work.
 */
 MATH_BIG_FORCE_64_BIT   :: #config(MATH_BIG_FORCE_64_BIT, false)
-MATH_BIG_FORCE_32_BIT   :: #config(MATH_BIG_FORCE_32_BIT, false)
+MATH_BIG_FORCE_32_BIT   :: #config(MATH_BIG_FORCE_32_BIT, !ODIN_ALLOW_128_BIT)
 when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously.") }
 
 /*
@@ -209,7 +209,7 @@ Primality_Flags :: bit_set[Primality_Flag; u8]
 	- Must be large enough such that `init_integer` can store `u128` in the `Int` without growing.
  */
 
-_MIN_DIGIT_COUNT :: max(3, ((size_of(u128) + _DIGIT_BITS) - 1) / _DIGIT_BITS)
+_MIN_DIGIT_COUNT :: max(3, ((16 + _DIGIT_BITS) - 1) / _DIGIT_BITS)
 #assert(_DEFAULT_DIGIT_COUNT >= _MIN_DIGIT_COUNT)
 
 /*
