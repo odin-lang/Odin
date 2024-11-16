@@ -28,6 +28,7 @@ import crypto           "core:crypto"
 import aead             "core:crypto/aead"
 import aegis            "core:crypto/aegis"
 import aes              "core:crypto/aes"
+import argon2           "core:crypto/argon2"
 import blake2b          "core:crypto/blake2b"
 import blake2s          "core:crypto/blake2s"
 import chacha20         "core:crypto/chacha20"
@@ -174,6 +175,7 @@ _ :: crypto_hash
 _ :: aead
 _ :: aegis
 _ :: aes
+_ :: argon2
 _ :: blake2b
 _ :: blake2s
 _ :: chacha20
