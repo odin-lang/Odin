@@ -3170,6 +3170,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 
+		if (ce->args.count <= 1) {
+			error(call, "Too few arguments for 'min', two or more are required");
+			return false;
+		}
 
 		bool all_constant = operand->mode == Addressing_Constant;
 
@@ -3341,6 +3345,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gbString type_str = type_to_string(original_type);
 			error(call, "Invalid type for 'max', got %s", type_str);
 			gb_string_free(type_str);
+			return false;
+		}
+		
+		if (ce->args.count <= 1) {
+			error(call, "Too few arguments for 'max', two or more are required");
 			return false;
 		}
 
