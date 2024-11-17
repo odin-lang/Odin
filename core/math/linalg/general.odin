@@ -53,15 +53,15 @@ vector_dot :: proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E)
 }
 @(require_results)
 quaternion64_dot :: proc "contextless" (a, b: $T/quaternion64) -> (c: f16) {
-	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
+	return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 @(require_results)
 quaternion128_dot :: proc "contextless" (a, b: $T/quaternion128) -> (c: f32) {
-	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
+	return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 @(require_results)
 quaternion256_dot :: proc "contextless" (a, b: $T/quaternion256) -> (c: f64) {
-	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
+	return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 
 dot :: proc{scalar_dot, vector_dot, quaternion64_dot, quaternion128_dot, quaternion256_dot}
