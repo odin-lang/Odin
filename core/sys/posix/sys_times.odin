@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 when ODIN_OS == .Darwin {
@@ -33,6 +34,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		tms_cstime: clock_t, /* [PSX] terminated children system CPU time */
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -46,6 +47,12 @@ foreign libc {
 		addr: posix.sockaddr_un
 		addr.sun_family = .UNIX
 		copy(addr.sun_path[:], "/somepath\x00")
+
+		/*
+			unlink the socket before binding in case
+			of previous runs not cleaning up the socket
+		*/
+		posix.unlink("/somepath")
 
 		if posix.bind(sfd, (^posix.sockaddr)(&addr), size_of(addr)) != .OK {
 			/* Handle error */
@@ -325,14 +332,16 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 
 	socklen_t :: distinct c.uint
 
-	_sa_family_t :: distinct c.uint8_t
-
 	when ODIN_OS == .Linux {
+		_sa_family_t :: distinct c.ushort
+
 		sockaddr :: struct {
 			sa_family: sa_family_t, /* [PSX] address family */
 			sa_data:   [14]c.char,  /* [PSX] socket address */
 		}
 	} else {
+		_sa_family_t :: distinct c.uint8_t
+
 		sockaddr :: struct {
 			sa_len:    c.uint8_t,   /* total length */
 			sa_family: sa_family_t, /* [PSX] address family */
@@ -560,7 +569,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	SHUT_RDWR :: 2
 	SHUT_WR   :: 1
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }
-

@@ -14,7 +14,7 @@ The following is a mostly-complete projection of the C11 standard library as def
 | `<inttypes.h>`    | Fully projected                                    |
 | `<iso646.h>`      | Not applicable, use Odin's operators               |
 | `<limits.h>`      | Not projected                                      |
-| `<locale.h>`      | Not projected                                      |
+| `<locale.h>`      | Fully projected                                    |
 | `<math.h>`        | Mostly projected, see [limitations](#Limitations)  |
 | `<setjmp.h>`      | Fully projected                                    |
 | `<signal.h>`      | Fully projected                                    |

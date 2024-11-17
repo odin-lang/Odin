@@ -15,7 +15,6 @@ import "core:c/libc"
 import "core:encoding/ansi"
 import "core:sync"
 import "core:os"
-@require import "core:sys/unix"
 
 @(private="file") stop_runner_flag: libc.sig_atomic_t
 
@@ -45,7 +44,7 @@ stop_runner_callback :: proc "c" (sig: libc.int) {
 	}
 }
 
-@(private="file")
+@(private)
 stop_test_callback :: proc "c" (sig: libc.int) {
 	if !local_test_index_set {
 		// We're a thread created by a test thread.
@@ -106,17 +105,7 @@ This is a dire bug and should be reported to the Odin developers.
 			// otherwise we may continue to generate signals.
 			intrinsics.cpu_relax()
 
-			when ODIN_OS != .Windows {
-				// NOTE(Feoramund): Some UNIX-like platforms may require this.
-				//
-				// During testing, I found that NetBSD 10.0 refused to
-				// terminate a task thread, even when its thread had been
-				// properly set to PTHREAD_CANCEL_ASYNCHRONOUS.
-				//
-				// The runner would stall after returning from `pthread_cancel`.
-			
-				unix.pthread_testcancel()
-			}
+			_test_thread_cancel()
 		}
 	}
 }
@@ -133,14 +122,12 @@ _setup_signal_handler :: proc() {
 	// For tests:
 	// Catch asserts and panics.
 	libc.signal(libc.SIGILL, stop_test_callback)
-	when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Darwin {
-		// Catch panics on Darwin and unhandled calls to `debug_trap`.
-		libc.signal(SIGTRAP, stop_test_callback)
-	}
 	// Catch arithmetic errors.
 	libc.signal(libc.SIGFPE, stop_test_callback)
 	// Catch segmentation faults (illegal memory access).
 	libc.signal(libc.SIGSEGV, stop_test_callback)
+
+	__setup_signal_handler()
 }
 
 _setup_task_signal_handler :: proc(test_index: int) {

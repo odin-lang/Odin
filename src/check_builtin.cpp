@@ -1533,6 +1533,10 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 
 		for (FileInfo fi : list) {
 			LoadFileCache *cache = nullptr;
+			if (fi.is_dir) {
+				continue;
+			}
+
 			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &cache, LoadFileTier_Contents, /*use_mutex*/false)) {
 				array_add(&file_caches, cache);
 			} else {
@@ -2060,8 +2064,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		bool ok = check_builtin_simd_operation(c, operand, call, id, type_hint);
 		if (!ok) {
 			operand->type = t_invalid;
+			operand->mode = Addressing_Value;
 		}
-		operand->mode = Addressing_Value;
 		operand->value = {};
 		operand->expr = call;
 		return ok;

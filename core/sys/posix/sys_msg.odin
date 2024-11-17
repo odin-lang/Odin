@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -150,6 +151,24 @@ when ODIN_OS == .Darwin {
 		msg_pad4:    [4]c.long,
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	msgqnum_t :: distinct c.ulong
+	msglen_t  :: distinct c.ulong
+
+	MSG_NOERROR :: 0o10000
+
+	msqid_ds :: struct {
+		msg_perm:    ipc_perm,  /* [PSX] operation permission structure */
+		msg_stime:   time_t,    /* [PSX] time of last msgsnd() */
+		msg_rtime:   time_t,    /* [PSX] time of last msgrcv() */
+		msg_ctime:   time_t,    /* [PSX] time of last change */
+		msg_cbytes:  c.ulong,
+		msg_qnum:    msgqnum_t, /* [PSX] number of messages currently on queue */
+		msg_qbytes:  msglen_t,  /* [PSX] maximum number of bytes allowed on queue */
+		msg_lspid:   pid_t,     /* [PSX] process ID of last msgsnd() */
+		msg_lrpid:   pid_t,     /* [PSX] process ID of last msgrcv() */
+		__unused:    [2]c.ulong,
+	}
+
 }

@@ -6,8 +6,8 @@ _IS_SUPPORTED :: true
 
 _now :: proc "contextless" () -> Time {
 	time_spec_now, _ := linux.clock_gettime(.REALTIME)
-	ns := time_spec_now.time_sec * 1e9 + time_spec_now.time_nsec
-	return Time{_nsec=i64(ns)}
+	ns := i64(time_spec_now.time_sec) * 1e9 + i64(time_spec_now.time_nsec)
+	return Time{_nsec=ns}
 }
 
 _sleep :: proc "contextless" (d: Duration) {
@@ -29,7 +29,7 @@ _sleep :: proc "contextless" (d: Duration) {
 
 _tick_now :: proc "contextless" () -> Tick {
 	t, _ := linux.clock_gettime(.MONOTONIC_RAW)
-	return Tick{_nsec = i64(t.time_sec*1e9 + t.time_nsec)}
+	return Tick{_nsec = i64(t.time_sec)*1e9 + i64(t.time_nsec)}
 }
 
 _yield :: proc "contextless" () {

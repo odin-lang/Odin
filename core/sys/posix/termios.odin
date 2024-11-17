@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -152,7 +153,7 @@ CControl_Flag_Bits :: enum tcflag_t {
 CControl_Flags :: bit_set[CControl_Flag_Bits; tcflag_t]
 
 // character size mask
-CSIZE :: CControl_Flags{ .CS6, .CS7, .CS8 }
+CSIZE :: transmute(CControl_Flags)tcflag_t(_CSIZE)
 
 COutput_Flag_Bits :: enum tcflag_t {
 	OPOST  = log2(OPOST),  /* enable following output processing */
@@ -181,17 +182,17 @@ COutput_Flag_Bits :: enum tcflag_t {
 COutput_Flags :: bit_set[COutput_Flag_Bits; tcflag_t]
 
 // \n delay mask
-NLDLY  :: COutput_Flags{ .NL1, COutput_Flag_Bits(9) }
+NLDLY  :: transmute(COutput_Flags)tcflag_t(_NLDLY)
 // \r delay mask
-CRDLY  :: COutput_Flags{ .CR1, .CR2, .CR3 }
+CRDLY  :: transmute(COutput_Flags)tcflag_t(_CRDLY)
 // horizontal tab delay mask
-TABDLY :: COutput_Flags{ .TAB1, .TAB3, COutput_Flag_Bits(2) }
+TABDLY :: transmute(COutput_Flags)tcflag_t(_TABDLY)
 // \b delay mask
-BSDLY  :: COutput_Flags{ .BS1 }
+BSDLY  :: transmute(COutput_Flags)tcflag_t(_BSDLY)
 // vertical tab delay mask
-VTDLY  :: COutput_Flags{ .VT1 }
+VTDLY  :: transmute(COutput_Flags)tcflag_t(_VTDLY)
 // form feed delay mask
-FFDLY  :: COutput_Flags{ .FF1 }
+FFDLY  :: transmute(COutput_Flags)tcflag_t(_FFDLY)
 
 speed_t :: enum _speed_t {
 	B0     = B0,
@@ -596,6 +597,4 @@ when ODIN_OS == .Darwin {
 	TCOOFF :: 0
 	TCOON  :: 1
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

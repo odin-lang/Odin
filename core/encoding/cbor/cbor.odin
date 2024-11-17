@@ -563,7 +563,7 @@ to_json :: proc(val: Value, allocator := context.allocator) -> (json.Value, mem.
 					case: return false
 					}
 				}
-				return false
+				return true
 			}
 
 			if keys_all_strings(v) {

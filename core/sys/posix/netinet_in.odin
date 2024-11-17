@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -59,6 +60,11 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 			sin6_flowinfo: u32be,       /* [PSX] IPv6 traffic class and flow information */
 			sin6_addr:     in6_addr,    /* [PSX] IPv6 address */
 			sin6_scope_id: c.uint32_t,  /* [PSX] set of interfaces for a scope */
+		}
+
+		ipv6_mreq :: struct {
+			ipv6mr_multiaddr: in6_addr, /* [PSX] IPv6 multicast address */
+			ipv6mr_interface: c.uint,   /* [PSX] interface index */
 		}
 
 		IPV6_MULTICAST_IF   :: 17
@@ -223,6 +229,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		)
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

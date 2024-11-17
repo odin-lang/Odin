@@ -62,6 +62,7 @@ gb_internal void big_int_shl    (BigInt *dst, BigInt const *x, BigInt const *y);
 gb_internal void big_int_shr    (BigInt *dst, BigInt const *x, BigInt const *y);
 gb_internal void big_int_mul    (BigInt *dst, BigInt const *x, BigInt const *y);
 gb_internal void big_int_mul_u64(BigInt *dst, BigInt const *x, u64 y);
+gb_internal void big_int_exp_u64(BigInt *dst, BigInt const *x, u64 y, bool *success);
 
 gb_internal void big_int_quo_rem(BigInt const *x, BigInt const *y, BigInt *q, BigInt *r);
 gb_internal void big_int_quo    (BigInt *z, BigInt const *x, BigInt const *y);
@@ -250,9 +251,7 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			exp *= 10;
 			exp += v;
 		}
-		for (u64 x = 0; x < exp; x++) {
-			big_int_mul_eq(dst, &b);
-		}
+		big_int_exp_u64(dst, &b, exp, success);
 	}
 
 	if (is_negative) {
@@ -328,6 +327,18 @@ gb_internal void big_int_mul_u64(BigInt *dst, BigInt const *x, u64 y) {
 	big_int_dealloc(&d);
 }
 
+gb_internal void big_int_exp_u64(BigInt *dst, BigInt const *x, u64 y, bool *success) {
+	if (y > INT_MAX) {
+		*success = false;
+		return;
+	}
+
+	// Note: The cutoff for square-multiply being faster than the naive
+	// for loop is when exp > 4, but it probably isn't worth adding
+	// a fast path.
+	mp_err err = mp_expt_n(x, int(y), dst);
+	*success = err == MP_OKAY;
+}
 
 gb_internal void big_int_mul(BigInt *dst, BigInt const *x, BigInt const *y) {
 	mp_mul(x, y, dst);

@@ -1,14 +1,10 @@
 #+build linux, darwin, freebsd, openbsd, netbsd
 package filepath
 
-when ODIN_OS == .Darwin {
-	foreign import libc "system:System.framework"
-} else {
-	foreign import libc "system:c"
-}
-
 import "base:runtime"
+
 import "core:strings"
+import "core:sys/posix"
 
 SEPARATOR :: '/'
 SEPARATOR_STRING :: `/`
@@ -28,11 +24,11 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 		rel = "."
 	}
 	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator)
-	path_ptr := realpath(rel_cstr, nil)
+	path_ptr := posix.realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", __error()^ == 0
+		return "", posix.errno() == nil
 	}
-	defer _unix_free(rawptr(path_ptr))
+	defer posix.free(path_ptr)
 
 	path_str := strings.clone(string(path_ptr), allocator)
 	return path_str, true
@@ -47,27 +43,4 @@ join :: proc(elems: []string, allocator := context.allocator) -> (joined: string
 		}
 	}
 	return "", nil
-}
-
-@(private)
-foreign libc {
-	realpath :: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
-	@(link_name="free") _unix_free :: proc(ptr: rawptr) ---
-
-}
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
-	@(private)
-	foreign libc {
-		@(link_name="__error")          __error :: proc() -> ^i32 ---
-	}
-} else when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
-	@(private)
-	foreign libc {
-		@(link_name="__errno")		__error :: proc() -> ^i32 ---
-	}
-} else {
-	@(private)
-	foreign libc {
-		@(link_name="__errno_location") __error :: proc() -> ^i32 ---
-	}
 }

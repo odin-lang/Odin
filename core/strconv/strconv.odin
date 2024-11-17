@@ -1121,6 +1121,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 			break trunc_block
 		}
 		f := f64(mantissa)
+		f_abs := f
 		if neg {
 			f = -f
 		}
@@ -1132,7 +1133,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 				f *= pow10[exp-22]
 				exp = 22
 			}
-			if f > 1e15 || f < 1e-15 {
+			if f_abs > 1e15 || f_abs < 1e-15 {
 				break trunc_block
 			}
 			return f * pow10[exp], nr, true

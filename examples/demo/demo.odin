@@ -2052,22 +2052,6 @@ explicit_context_definition :: proc "c" () {
 	dummy_procedure()
 }
 
-relative_data_types :: proc() {
-	fmt.println("\n#relative data types")
-
-	x: int = 123
-	ptr: #relative(i16) ^int
-	ptr = &x
-	fmt.println(ptr^)
-
-	arr := [3]int{1, 2, 3}
-	multi_ptr: #relative(i16) [^]int
-	multi_ptr = &arr[0]
-	fmt.println(multi_ptr)
-	fmt.println(multi_ptr[:3])
-	fmt.println(multi_ptr[1])
-}
-
 or_else_operator :: proc() {
 	fmt.println("\n#'or_else'")
 	{
@@ -2151,7 +2135,7 @@ or_return_operator :: proc() {
 		return .None
 	}
 	foo_2 :: proc() -> (n: int, err: Error) {
-		// It is more common that your procedure turns multiple values
+		// It is more common that your procedure returns multiple values
 		// If 'or_return' is used within a procedure multiple parameters (2+),
 		// then all the parameters must be named so that the remaining parameters
 		// so that a bare 'return' statement can be used
@@ -2634,7 +2618,6 @@ main :: proc() {
 		constant_literal_expressions()
 		union_maybe()
 		explicit_context_definition()
-		relative_data_types()
 		or_else_operator()
 		or_return_operator()
 		or_break_and_or_continue_operators()

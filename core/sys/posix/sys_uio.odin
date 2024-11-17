@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -37,6 +38,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		iov_len:  c.size_t, /* [PSX] size of the region iov_base points to */
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

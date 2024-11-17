@@ -1,3 +1,4 @@
+#+build windows, darwin, linux, freebsd, openbsd, netbsd
 package posix
 
 import "core:c"
@@ -456,7 +457,84 @@ when ODIN_OS == .Darwin {
 
 	EOWNERDEAD      :: 130
 	ENOTRECOVERABLE :: 131
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Windows {
+	E2BIG           :: 7
+	EACCES          :: 13
+	EADDRINUSE      :: 100
+	EADDRNOTAVAIL   :: 101
+	EAFNOSUPPORT    :: 102
+	EAGAIN          :: 11
+	EALREADY        :: 103
+	EBADF           :: 9
+	EBADMSG         :: 104
+	EBUSY           :: 16
+	ECANCELED       :: 105
+	ECHILD          :: 10
+	ECONNABORTED    :: 106
+	ECONNREFUSED    :: 107
+	ECONNRESET      :: 108
+	EDEADLK         :: 36
+	EDESTADDRREQ    :: 109
+	EDQUOT          :: -1 // NOTE: not defined
+	EEXIST          :: 17
+	EFAULT          :: 14
+	EFBIG           :: 27
+	EHOSTUNREACH    :: 110
+	EIDRM           :: 111
+	EINPROGRESS     :: 112
+	EINTR           :: 4
+	EINVAL          :: 22
+	EIO             :: 5
+	EISCONN         :: 113
+	EISDIR          :: 21
+	ELOOP           :: 114
+	EMFILE          :: 24
+	EMLINK          :: 31
+	EMSGSIZE        :: 115
+	EMULTIHOP       :: -1 // NOTE: not defined
+	ENAMETOOLONG    :: 38
+	ENETDOWN        :: 116
+	ENETRESET       :: 117
+	ENETUNREACH     :: 118
+	ENFILE          :: 23
+	ENOBUFS         :: 119
+	ENODATA         :: 120
+	ENODEV          :: 19
+	ENOENT          :: 2
+	ENOEXEC         :: 8
+	ENOLCK          :: 39
+	ENOLINK         :: 121
+	ENOMEM          :: 12
+	ENOMSG          :: 122
+	ENOPROTOOPT     :: 123
+	ENOSPC          :: 28
+	ENOSR           :: 124
+	ENOSTR          :: 125
+	ENOSYS          :: 40
+	ENOTCONN        :: 126
+	ENOTDIR         :: 20
+	ENOTEMPTY       :: 41
+	ENOTRECOVERABLE :: 127
+	ENOTSOCK        :: 128
+	ENOTSUP         :: 129
+	ENOTTY          :: 25
+	ENXIO           :: 6
+	EOPNOTSUPP      :: 130
+	EOVERFLOW       :: 132
+	EOWNERDEAD      :: 133
+	EPERM           :: 1
+	EPIPE           :: 32
+	EPROTO          :: 134
+	EPROTONOSUPPORT :: 135
+	EPROTOTYPE      :: 136
+	EROFS           :: 30
+	ESPIPE          :: 29
+	ESRCH           :: 3
+	ESTALE          :: -1 // NOTE: not defined
+	ETIME           :: 137
+	ETIMEDOUT       :: 138
+	ETXTBSY         :: 139
+	EWOULDBLOCK     :: 140
+	EXDEV           :: 18
 }
 

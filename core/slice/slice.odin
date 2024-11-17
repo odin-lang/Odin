@@ -471,6 +471,12 @@ is_empty :: proc(a: $T/[]$E) -> bool {
 	return len(a) == 0
 }
 
+// Gets the byte size of the backing data
+@(require_results)
+size :: proc "contextless" (a: $T/[]$E) -> int {
+	return len(a) * size_of(E)
+}
+
 
 
 @(require_results)

@@ -63,11 +63,15 @@ _ :: xlib
 // NOTE: needed for doc generator
 
 import NS  "core:sys/darwin/Foundation"
+import CF  "core:sys/darwin/CoreFoundation"
+import SEC "core:sys/darwin/Security"
 import MTL "vendor:darwin/Metal"
 import MTK "vendor:darwin/MetalKit"
 import CA  "vendor:darwin/QuartzCore"
 
 _ :: NS
+_ :: CF
+_ :: SEC
 _ :: MTL
 _ :: MTK
 _ :: CA

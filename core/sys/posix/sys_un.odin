@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -19,6 +20,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		sun_path:   [108]c.char, /* [PSX] socket pathname */
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

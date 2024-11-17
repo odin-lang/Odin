@@ -776,24 +776,6 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		doc_type.types = odin_doc_type_as_slice(w, type->SimdVector.elem);
 		// TODO(bill):
 		break;
-	case Type_RelativePointer:
-		doc_type.kind = OdinDocType_RelativePointer;
-		{
-			OdinDocTypeIndex types[2] = {};
-			types[0] = odin_doc_type(w, type->RelativePointer.pointer_type);
-			types[1] = odin_doc_type(w, type->RelativePointer.base_integer);
-			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
-		}
-		break;
-	case Type_RelativeMultiPointer:
-		doc_type.kind = OdinDocType_RelativeMultiPointer;
-		{
-			OdinDocTypeIndex types[2] = {};
-			types[0] = odin_doc_type(w, type->RelativeMultiPointer.pointer_type);
-			types[1] = odin_doc_type(w, type->RelativeMultiPointer.base_integer);
-			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
-		}
-		break;
 		
 	case Type_Matrix:
 		doc_type.kind = OdinDocType_Matrix;

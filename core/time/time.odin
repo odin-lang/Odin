@@ -930,7 +930,7 @@ If the datetime represents a time outside of a valid range, `false` is returned
 as the second return value. See `Time` for the representable range.
 */
 compound_to_time :: proc "contextless" (datetime: dt.DateTime) -> (t: Time, ok: bool) {
-	unix_epoch := dt.DateTime{{1970, 1, 1}, {0, 0, 0, 0}}
+	unix_epoch := dt.DateTime{{1970, 1, 1}, {0, 0, 0, 0}, nil}
 	delta, err := dt.sub(datetime, unix_epoch)
 	if err != .None {
 		return
@@ -958,7 +958,7 @@ datetime_to_time :: proc{components_to_time, compound_to_time}
 Convert time into datetime.
 */
 time_to_datetime :: proc "contextless" (t: Time) -> (dt.DateTime, bool) {
-	unix_epoch := dt.DateTime{{1970, 1, 1}, {0, 0, 0, 0}}
+	unix_epoch := dt.DateTime{{1970, 1, 1}, {0, 0, 0, 0}, nil}
 
 	datetime, err := dt.add(unix_epoch, dt.Delta{ nanos = t._nsec })
 	if err != .None {

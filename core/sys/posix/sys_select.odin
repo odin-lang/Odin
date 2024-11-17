@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "base:intrinsics"
@@ -72,7 +73,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 
 	// NOTE: this seems correct for FreeBSD but they do use a set backed by the long type themselves (thus the align change).
 	@(private)
-	ALIGN ::  align_of(c.long) when ODIN_OS == .FreeBSD else align_of(c.int32_t)
+	ALIGN ::  align_of(c.long) when ODIN_OS == .FreeBSD || ODIN_OS == .Linux else align_of(c.int32_t)
 
 	fd_set :: struct #align(ALIGN) {
 		fds_bits: [(FD_SETSIZE / __NFDBITS) when (FD_SETSIZE % __NFDBITS) == 0 else (FD_SETSIZE / __NFDBITS) + 1]c.int32_t,
@@ -115,6 +116,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		intrinsics.mem_zero(_p, size_of(fd_set))
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

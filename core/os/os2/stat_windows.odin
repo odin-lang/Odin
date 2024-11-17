@@ -200,22 +200,21 @@ _file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: wi
 	} else {
 		mode |= 0o666
 	}
+
 	is_sym := false
 	if file_attributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		is_sym = false
 	} else {
 		is_sym = ReparseTag == win32.IO_REPARSE_TAG_SYMLINK || ReparseTag == win32.IO_REPARSE_TAG_MOUNT_POINT
 	}
+
 	if is_sym {
 		type = .Symlink
-	} else {
-		if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
-			type = .Directory
-			mode |= 0o111
-		}
-		if h != nil {
-			type = file_type(h)
-		}
+	} else if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
+		type = .Directory
+		mode |= 0o111
+	} else if h != nil {
+		type = file_type(h)
 	}
 	return
 }

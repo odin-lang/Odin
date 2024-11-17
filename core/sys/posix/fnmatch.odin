@@ -1,3 +1,4 @@
+#+build darwin, linux, openbsd, freebsd, netbsd
 package posix
 
 import "core:c"
@@ -61,6 +62,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	FNM_NOESCAPE :: 0x02
 	FNM_PERIOD   :: 0x04
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

@@ -31,6 +31,11 @@ Id :: distinct uint
 Fd  :: distinct i32
 
 /*
+	Represents a watch descriptor.
+*/
+Wd  :: distinct i32
+
+/*
 	Type for PID file descriptors.
 */
 Pid_FD :: distinct i32
@@ -342,6 +347,18 @@ Poll_Fd :: struct {
 	events:  Fd_Poll_Events,
 	revents: Fd_Poll_Events,
 }
+
+Inotify_Init_Flags :: bit_set[Inotify_Init_Bits; i32]
+
+Inotify_Event :: struct {
+	wd:     Wd,
+	mask:   Inotify_Event_Mask,
+	cookie: u32,
+	len:    u32,
+	name:   [0]u8,
+}
+
+Inotify_Event_Mask :: bit_set[Inotify_Event_Bits; u32]
 
 /*
 	Specifies protection for memory pages.

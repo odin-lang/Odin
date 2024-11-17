@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -11,19 +12,6 @@ when ODIN_OS == .Darwin {
 // unistd.h - standard symbolic constants and types
 
 foreign lib {
-	/*
-	Checks the file named by the pathname pointed to by the path argument for
-	accessibility according to the bit pattern contained in amode. 
-
-	Example:
-		if (posix.access("/tmp/myfile", posix.F_OK) != .OK) {
-			fmt.printfln("/tmp/myfile access check failed: %v", posix.strerror(posix.errno()))
-		}
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/access.html ]]
-	*/
-	access :: proc(path: cstring, amode: Mode_Flags = F_OK) -> result ---
-
 	/*
 	Equivalent to `access` but relative paths are resolved based on `fd`.
 
@@ -41,18 +29,6 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/alarm.html ]]
 	*/
 	alarm :: proc(seconds: c.uint) -> c.uint ---
-
-	/*
-	Causes the directory named by path to become the current working directory.
-
-	Example:
-		if (posix.chdir("/tmp") == .OK) {
-			fmt.println("changed current directory to /tmp")
-		}
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/chdir.html ]]
-	*/
-	chdir :: proc(path: cstring) -> result ---
 
 	/*
 	Equivalent to chdir but instead of a path the fildes is resolved to a directory.
@@ -203,15 +179,6 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dup.html ]] 
 	*/
 	dup2 :: proc(fildes, fildes2: FD) -> FD ---
-
-	/*
-	Exits but, shall not call functions registered with atexit() nor any registered signal handlers.
-	Open streams shall not be flushed.
-	Whether open streams are closed (without flushing) is implementation-defined. Finally, the calling process shall be terminated with the consequences described below.
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/_exit.html ]]
-	*/
-	_exit :: proc(status: c.int) -> ! ---
 
 	/*
 	The exec family of functions shall replace the current process image with a new process image.
@@ -391,44 +358,6 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/ftruncate.html ]]
 	*/
 	ftruncate :: proc(fildes: FD, length: off_t) -> result ---
-
-	/*
-	Places an absolute pathname of the current working directory into buf.
-
-	Returns: buf as a cstring on success, nil (setting errno) on failure
-
-	Example:
-		size: int
-		path_max := posix.pathconf(".", ._PATH_MAX)
-		if path_max == -1 {
-			size = 1024
-		} else if path_max > 10240 {
-			size = 10240
-		} else {
-			size = int(path_max)
-		}
-
-		buf: [dynamic]byte
-		cwd: cstring
-		for ; cwd == nil; size *= 2 {
-			if err := resize(&buf, size); err != nil {
-				fmt.panicf("allocation failure: %v", err)
-			}
-
-			cwd = posix.getcwd(raw_data(buf), len(buf))
-			if cwd == nil {
-				errno := posix.errno()
-				if errno != .ERANGE {
-					fmt.panicf("getcwd failure: %v", posix.strerror(errno))
-				}
-			}
-		}
-
-		fmt.println(path_max, cwd)
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/getcwd.html ]]
-	*/
-	getcwd :: proc(buf: [^]c.char, size: c.size_t) -> cstring ---
 
 	/*
 	Returns the effective group ID of the calling process.
@@ -830,13 +759,6 @@ foreign lib {
 	readlinkat :: proc(fd: FD, path: cstring, buf: [^]byte, bufsize: c.size_t) -> c.ssize_t ---
 
 	/*
-	Remove an (empty) directory.
-
-	]] More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/rmdir.html ]]
-	*/
-	rmdir :: proc(path: cstring) -> result ---
-
-	/*
 	Set the effective group ID.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/setegid.html ]]
@@ -913,13 +835,6 @@ foreign lib {
 	sleep :: proc(seconds: c.uint) -> c.uint ---
 
 	/*
-	Copy nbyte bytes, from src, to dest, exchanging adjecent bytes.
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/swab.html ]]
-	*/
-	swab :: proc(src: [^]byte, dest: [^]byte, nbytes: c.ssize_t) ---
-
-	/*
 	Schedule file system updates.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/sync.html ]]
@@ -959,33 +874,12 @@ foreign lib {
 	ttyname_r :: proc(fildes: FD, name: [^]byte, namesize: c.size_t) -> Errno ---
 
 	/*
-	Remove a directory entry.
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/unlink.html ]]
-	*/
-	unlink :: proc(path: cstring) -> result ---
-
-	/*
 	Equivalent to unlink or rmdir (if flag is .REMOVEDIR) but relative paths are relative to the dir fd.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/unlink.html ]]
 	*/
 	unlinkat :: proc(fd: FD, path: cstring, flag: AT_Flags) -> result ---
 }
-
-STDERR_FILENO :: 2
-STDIN_FILENO  :: 0
-STDOUT_FILENO :: 1
-
-Mode_Flag_Bits :: enum c.int {
-	X_OK = log2(X_OK),
-	W_OK = log2(W_OK),
-	R_OK = log2(R_OK),
-}
-Mode_Flags :: bit_set[Mode_Flag_Bits; c.int]
-
-#assert(_F_OK == 0)
-F_OK :: Mode_Flags{}
 
 CS :: enum c.int {
 	_PATH                           = _CS_PATH,
@@ -2063,6 +1957,7 @@ when ODIN_OS == .Darwin {
 	_SC_TYPED_MEMORY_OBJECTS   :: 165
 	_SC_2_PBS                  :: 168
 	_SC_2_PBS_ACCOUNTING       :: 169
+	_SC_2_PBS_LOCATE           :: 170
 	_SC_2_PBS_MESSAGE          :: 171
 	_SC_2_PBS_TRACK            :: 172
 	_SC_SYMLOOP_MAX            :: 173
@@ -2097,7 +1992,4 @@ when ODIN_OS == .Darwin {
 	// NOTE: Not implemented.
 	_POSIX_VDISABLE :: 0
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }
-

@@ -135,6 +135,7 @@ import table            "core:text/table"
 import thread           "core:thread"
 import time             "core:time"
 import datetime         "core:time/datetime"
+import timezone         "core:time/timezone"
 import flags            "core:flags"
 
 import orca             "core:sys/orca"
@@ -258,6 +259,7 @@ _ :: edit
 _ :: thread
 _ :: time
 _ :: datetime
+_ :: timezone
 _ :: flags
 _ :: orca
 _ :: sysinfo

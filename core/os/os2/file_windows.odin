@@ -50,9 +50,9 @@ init_std_files :: proc() {
 }
 @(fini)
 fini_std_files :: proc() {
-	close(stdin)
-	close(stdout)
-	close(stderr)
+	_destroy((^File_Impl)(stdin.impl))
+	_destroy((^File_Impl)(stdout.impl))
+	_destroy((^File_Impl)(stderr.impl))
 }
 
 

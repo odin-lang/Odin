@@ -3517,41 +3517,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(rt, RelativeType, e);
-		GB_ASSERT(rt->tag->kind == Ast_CallExpr);
-		ast_node(ce, CallExpr, rt->tag);
-
-		Type *base_integer = nullptr;
-
-		if (ce->args.count != 1) {
-			error(rt->type, "#relative expected 1 type argument, got %td", ce->args.count);
-		} else {
-			base_integer = check_type(ctx, ce->args[0]);
-			if (!is_type_integer(base_integer)) {
-				error(rt->type, "#relative base types must be an integer");
-				base_integer = nullptr;
-			} else if (type_size_of(base_integer) > 64) {
-				error(rt->type, "#relative base integer types be less than or equal to 64-bits");
-				base_integer = nullptr;
-			}
-		}
-
-		Type *relative_type = nullptr;
-		Type *base_type = check_type(ctx, rt->type);
-		if (!is_type_pointer(base_type) && !is_type_multi_pointer(base_type)) {
-			error(rt->type, "#relative types can only be a pointer or multi-pointer");
-			relative_type = base_type;
-		} else if (base_integer == nullptr) {
-			relative_type = base_type;
-		} else {
-			if (is_type_pointer(base_type)) {
-				relative_type = alloc_type_relative_pointer(base_type, base_integer);
-			} else if (is_type_multi_pointer(base_type)) {
-				relative_type = alloc_type_relative_multi_pointer(base_type, base_integer);
-			}
-		}
-		GB_ASSERT(relative_type != nullptr);
-
-		*type = relative_type;
+		error(e, "#relative types have been removed from the compiler. Prefer \"core:relative\".");
+		*type = t_invalid;
 		set_base_type(named_type, *type);
 		return true;
 	case_end;

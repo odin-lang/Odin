@@ -187,10 +187,7 @@ gb_internal bool try_copy_executable_from_cache(void) {
 extern char **environ;
 #endif
 
-// returns false if different, true if it is the same
-gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
-	TEMPORARY_ALLOCATOR_GUARD();
-
+Array<String> cache_gather_files(Checker *c) {
 	Parser *p = c->parser;
 
 	auto files = array_make<String>(heap_allocator());
@@ -222,29 +219,11 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 
 	array_sort(files, string_cmp);
 
-	u64 crc = 0;
-	for (String const &path : files) {
-		crc = crc64_with_seed(path.text, path.len, crc);
-	}
+	return files;
+}
 
-	String base_cache_dir = build_context.build_paths[BuildPath_Output].basename;
-	base_cache_dir = concatenate_strings(permanent_allocator(), base_cache_dir, str_lit("/.odin-cache"));
-	(void)check_if_exists_directory_otherwise_create(base_cache_dir);
-
-	gbString crc_str = gb_string_make_reserve(permanent_allocator(), 16);
-	crc_str = gb_string_append_fmt(crc_str, "%016llx", crc);
-	String cache_dir  = concatenate3_strings(permanent_allocator(), base_cache_dir, str_lit("/"), make_string_c(crc_str));
-	String files_path = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("files.manifest"));
-	String args_path  = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("args.manifest"));
-	String env_path   = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("env.manifest"));
-
-	build_context.build_cache_data.cache_dir  = cache_dir;
-	build_context.build_cache_data.files_path = files_path;
-	build_context.build_cache_data.args_path  = args_path;
-	build_context.build_cache_data.env_path   = env_path;
-
+Array<String> cache_gather_envs() {
 	auto envs = array_make<String>(heap_allocator());
-	defer (array_free(&envs));
 	{
 	#if defined(GB_SYSTEM_WINDOWS)
 		wchar_t *strings = GetEnvironmentStringsW();
@@ -275,19 +254,50 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 	#endif
 	}
 	array_sort(envs, string_cmp);
+	return envs;
+}
+
+// returns false if different, true if it is the same
+gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto files = cache_gather_files(c);
+	auto envs = cache_gather_envs();
+	defer (array_free(&envs));
+
+	u64 crc = 0;
+	for (String const &path : files) {
+		crc = crc64_with_seed(path.text, path.len, crc);
+	}
+
+	String base_cache_dir = build_context.build_paths[BuildPath_Output].basename;
+	base_cache_dir = concatenate_strings(permanent_allocator(), base_cache_dir, str_lit("/.odin-cache"));
+	(void)check_if_exists_directory_otherwise_create(base_cache_dir);
+
+	gbString crc_str = gb_string_make_reserve(permanent_allocator(), 16);
+	crc_str = gb_string_append_fmt(crc_str, "%016llx", crc);
+	String cache_dir  = concatenate3_strings(permanent_allocator(), base_cache_dir, str_lit("/"), make_string_c(crc_str));
+	String files_path = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("files.manifest"));
+	String args_path  = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("args.manifest"));
+	String env_path   = concatenate3_strings(permanent_allocator(), cache_dir, str_lit("/"), str_lit("env.manifest"));
+
+	build_context.build_cache_data.cache_dir  = cache_dir;
+	build_context.build_cache_data.files_path = files_path;
+	build_context.build_cache_data.args_path  = args_path;
+	build_context.build_cache_data.env_path   = env_path;
 
 	if (check_if_exists_directory_otherwise_create(cache_dir)) {
-		goto write_cache;
+		return false;
 	}
 
 	if (check_if_exists_file_otherwise_create(files_path)) {
-		goto write_cache;
+		return false;
 	}
 	if (check_if_exists_file_otherwise_create(args_path)) {
-		goto write_cache;
+		return false;
 	}
 	if (check_if_exists_file_otherwise_create(env_path)) {
-		goto write_cache;
+		return false;
 	}
 
 	{
@@ -297,7 +307,7 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 		LoadedFileError file_err = load_file_32(
 			alloc_cstring(temporary_allocator(), files_path),
 			&loaded_file,
-			false
+			true
 		);
 		if (file_err > LoadedFile_Empty) {
 			return false;
@@ -315,7 +325,7 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 			}
 			isize sep = string_index_byte(line, ' ');
 			if (sep < 0) {
-				goto write_cache;
+				return false;
 			}
 
 			String timestamp_str = substring(line, 0, sep);
@@ -325,21 +335,21 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 			path_str = string_trim_whitespace(path_str);
 
 			if (file_count >= files.count) {
-				goto write_cache;
+				return false;
 			}
 			if (files[file_count] != path_str) {
-				goto write_cache;
+				return false;
 			}
 
 			u64 timestamp = exact_value_to_u64(exact_value_integer_from_string(timestamp_str));
 			gbFileTime last_write_time = gb_file_last_write_time(alloc_cstring(temporary_allocator(), path_str));
 			if (last_write_time != timestamp) {
-				goto write_cache;
+				return false;
 			}
 		}
 
 		if (file_count != files.count) {
-			goto write_cache;
+			return false;
 		}
 	}
 	{
@@ -348,7 +358,7 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 		LoadedFileError file_err = load_file_32(
 			alloc_cstring(temporary_allocator(), args_path),
 			&loaded_file,
-			false
+			true
 		);
 		if (file_err > LoadedFile_Empty) {
 			return false;
@@ -366,11 +376,11 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 				break;
 			}
 			if (args_count >= args.count) {
-				goto write_cache;
+				return false;
 			}
 
 			if (line != args[args_count]) {
-				goto write_cache;
+				return false;
 			}
 		}
 	}
@@ -380,7 +390,7 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 		LoadedFileError file_err = load_file_32(
 			alloc_cstring(temporary_allocator(), env_path),
 			&loaded_file,
-			false
+			true
 		);
 		if (file_err > LoadedFile_Empty) {
 			return false;
@@ -398,20 +408,26 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 				break;
 			}
 			if (env_count >= envs.count) {
-				goto write_cache;
+				return false;
 			}
 
 			if (line != envs[env_count]) {
-				goto write_cache;
+				return false;
 			}
 		}
 	}
 
 	return try_copy_executable_from_cache();
+}
 
-write_cache:;
+void write_cached_build(Checker *c, Array<String> const &args) {
+	auto files = cache_gather_files(c);
+	defer (array_free(&files));
+	auto envs = cache_gather_envs();
+	defer (array_free(&envs));
+
 	{
-		char const *path_c = alloc_cstring(temporary_allocator(), files_path);
+		char const *path_c = alloc_cstring(temporary_allocator(), build_context.build_cache_data.files_path);
 		gb_file_remove(path_c);
 
 		debugf("Cache: updating %s\n", path_c);
@@ -426,7 +442,7 @@ write_cache:;
 		}
 	}
 	{
-		char const *path_c = alloc_cstring(temporary_allocator(), args_path);
+		char const *path_c = alloc_cstring(temporary_allocator(), build_context.build_cache_data.args_path);
 		gb_file_remove(path_c);
 
 		debugf("Cache: updating %s\n", path_c);
@@ -441,7 +457,7 @@ write_cache:;
 		}
 	}
 	{
-		char const *path_c = alloc_cstring(temporary_allocator(), env_path);
+		char const *path_c = alloc_cstring(temporary_allocator(), build_context.build_cache_data.env_path);
 		gb_file_remove(path_c);
 
 		debugf("Cache: updating %s\n", path_c);
@@ -454,8 +470,5 @@ write_cache:;
 			gb_fprintf(&f, "%.*s\n", LIT(env));
 		}
 	}
-
-
-	return false;
 }
 

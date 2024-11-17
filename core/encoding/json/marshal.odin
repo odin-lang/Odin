@@ -192,12 +192,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Simd_Vector:
 		return .Unsupported_Type
-
-	case runtime.Type_Info_Relative_Pointer:
-		return .Unsupported_Type
-
-	case runtime.Type_Info_Relative_Multi_Pointer:
-		return .Unsupported_Type
 		
 	case runtime.Type_Info_Matrix:
 		return .Unsupported_Type

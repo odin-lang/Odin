@@ -13,7 +13,7 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 
 @(require_results)
 _read_directory_iterator_create :: proc(f: ^File) -> (Read_Directory_Iterator, Error) {
-	return {}, nil
+	return {}, .Unsupported
 }
 
 _read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {

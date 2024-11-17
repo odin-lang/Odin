@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -130,6 +131,27 @@ when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
 	ST_RDONLY :: 0x00000001
 	ST_NOSUID :: 0x00000008
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	fsblkcnt_t :: distinct c.uint64_t
+
+	statvfs_t :: struct {
+		f_bsize:    c.ulong,    /* [PSX] file system block size */
+		f_frsize:   c.ulong,    /* [PSX] fundamental file system block size */
+		f_blocks:   fsblkcnt_t, /* [PSX] total number of blocks on file system in units of f_frsize */
+		f_bfree:    fsblkcnt_t, /* [PSX] total number of free blocks */
+		f_bavail:   fsblkcnt_t, /* [PSX] number of free blocks available to non-privileged process */
+		f_files:    fsblkcnt_t, /* [PSX] total number of file serial numbers */
+		f_ffree:    fsblkcnt_t, /* [PSX] total number of free file serial numbers */
+		f_favail:   fsblkcnt_t, /* [PSX] number of file serial numbers available to non-privileged process */
+		f_fsid:     c.ulong,    /* [PSX] file system ID */
+		_:          [2*size_of(c.int)-size_of(c.long)]byte,
+		f_flag:     VFS_Flags,  /* [PSX] bit mask of f_flag values */
+		f_namemax:  c.ulong,    /* [PSX] maximum filename length */
+		f_type:     c.uint,
+		__reserved: [5]c.int,
+	}
+
+	ST_RDONLY :: 0x00000001
+	ST_NOSUID :: 0x00000002
 }

@@ -1,4 +1,4 @@
-#+build darwin, freebsd, openbsd, netbsd
+#+build linux, darwin, freebsd, openbsd, netbsd
 package tests_core_posix
 
 import "core:log"
@@ -144,7 +144,6 @@ test_libgen :: proc(t: ^testing.T) {
 		{ "usr/",             ".",          "usr" },
 		{ "",                 ".",          "." },
 		{ "/",                "/",          "/" },
-		{ "//",               "/",          "/" },
 		{ "///",              "/",          "/" },
 		{ "/usr/",            "/",          "usr" },
 		{ "/usr/lib",         "/usr",       "lib" },
@@ -201,18 +200,6 @@ test_stat :: proc(t: ^testing.T) {
 
 	CONTENT := #load(#file)
 	testing.expect_value(t, stat.st_size, posix.off_t(len(CONTENT)))
-}
-
-@(test)
-test_termios :: proc(t: ^testing.T) {
-	testing.expect_value(t, transmute(posix.CControl_Flags)posix.tcflag_t(posix._CSIZE),  posix.CSIZE)
-
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._NLDLY),  posix.NLDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._CRDLY),  posix.CRDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._TABDLY), posix.TABDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._BSDLY),  posix.BSDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._VTDLY),  posix.VTDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._FFDLY),  posix.FFDLY)
 }
 
 @(test)

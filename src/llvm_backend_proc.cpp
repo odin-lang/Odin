@@ -2568,7 +2568,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_atomic_load_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 
-		LLVMValueRef instr = LLVMBuildLoad2(p->builder,  lb_type(p->module, type_deref(dst.type)), dst.value, "");
+		LLVMValueRef instr = OdinLLVMBuildLoad(p, lb_type(p->module, type_deref(dst.type)), dst.value);
 		switch (id) {
 		case BuiltinProc_non_temporal_load:
 			{
@@ -2621,8 +2621,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			if (is_type_simd_vector(t)) {
 				lbValue res = {};
 				res.type = t;
-				res.value = LLVMBuildLoad2(p->builder, lb_type(p->module, t), src.value, "");
-				LLVMSetAlignment(res.value, 1);
+				res.value = OdinLLVMBuildLoadAligned(p, lb_type(p->module, t), src.value, 1);
 				return res;
 			} else {
 				lbAddr dst = lb_add_local_generated(p, t, false);

@@ -20,6 +20,8 @@ foreign dom_lib {
 	device_pixel_ratio :: proc() -> f64 ---
 
 	window_set_scroll :: proc(x, y: f64) ---
+
+	set_element_style :: proc(id: string, key: string, value: string) ---
 }
 
 get_element_value_string :: proc "contextless" (id: string, buf: []byte) -> string {

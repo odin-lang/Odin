@@ -1,18 +1,18 @@
 #+build !windows
 package miniaudio
 
-import "core:sys/unix"
+import "core:sys/posix"
 import "core:c"
 
-thread :: unix.pthread_t
-mutex :: unix.pthread_mutex_t
+thread :: posix.pthread_t
+mutex :: posix.pthread_mutex_t
 event :: struct {
 	value: u32,
-	lock: unix.pthread_mutex_t,
-	cond: unix.pthread_cond_t,
+	lock: posix.pthread_mutex_t,
+	cond: posix.pthread_cond_t,
 }
 semaphore :: struct {
 	value: c.int,
-	lock: unix.pthread_mutex_t,
-	cond: unix.pthread_cond_t,
+	lock: posix.pthread_mutex_t,
+	cond: posix.pthread_cond_t,
 }

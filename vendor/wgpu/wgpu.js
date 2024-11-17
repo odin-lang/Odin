@@ -2452,6 +2452,16 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} renderPassEncoderIdx
+			 * @param {number} colorPtr
+			 */
+			wgpuRenderPassEncoderSetBlendConstant: (renderPassEncoderIdx, colorPtr) => {
+				const renderPassEncoder = this.renderPassEncoders.get(renderPassEncoderIdx);
+				this.assert(colorPtr != 0);
+				renderPassEncoder.setBlendConstant(this.Color(colorPtr));
+			},
+
+			/**
+			 * @param {number} renderPassEncoderIdx
 			 * @param {number} bufferIdx
 			 * @param {number} formatInt
 			 * @param {BigInt} offset

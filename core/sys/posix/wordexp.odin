@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -123,6 +124,4 @@ when ODIN_OS == .Darwin {
 	WRDE_CMDSUB  :: 4
 	WRDE_SYNTAX  :: 5
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

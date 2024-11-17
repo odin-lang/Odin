@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -280,20 +281,20 @@ when ODIN_OS == .Darwin {
 	ino_t      :: distinct c.uint64_t
 
 	stat_t :: struct {
-		st_dev:           dev_t,        /* [XSI] ID of device containing file */
-		st_mode:          mode_t,       /* [XSI] mode of file */
-		st_nlink:         nlink_t,      /* [XSI] number of hard links */
-		st_ino:           ino_t,        /* [XSI] file serial number */
-		st_uid:           uid_t,        /* [XSI] user ID of the file */
-		st_gid:           gid_t,        /* [XSI] group ID of the file */
-		st_rdev:          dev_t,        /* [XSI] device ID */
-		st_atim:          timespec,     /* [XSI] time of last access */
-		st_mtim:          timespec,     /* [XSI] time of last data modification */
-		st_ctim:          timespec,     /* [XSI] time of last status change */
+		st_dev:           dev_t,        /* [PSX] ID of device containing file */
+		st_mode:          mode_t,       /* [PSX] mode of file */
+		st_nlink:         nlink_t,      /* [PSX] number of hard links */
+		st_ino:           ino_t,        /* [PSX] file serial number */
+		st_uid:           uid_t,        /* [PSX] user ID of the file */
+		st_gid:           gid_t,        /* [PSX] group ID of the file */
+		st_rdev:          dev_t,        /* [PSX] device ID */
+		st_atim:          timespec,     /* [PSX] time of last access */
+		st_mtim:          timespec,     /* [PSX] time of last data modification */
+		st_ctim:          timespec,     /* [PSX] time of last status change */
 		st_birthtimespec: timespec,     /* time of file creation(birth) */
-		st_size:          off_t,        /* [XSI] file size, in bytes */
-		st_blocks:        blkcnt_t,     /* [XSI] blocks allocated for file */
-		st_blksize:       blksize_t,    /* [XSI] optimal blocksize for I/O */
+		st_size:          off_t,        /* [PSX] file size, in bytes */
+		st_blocks:        blkcnt_t,     /* [PSX] blocks allocated for file */
+		st_blksize:       blksize_t,    /* [PSX] optimal blocksize for I/O */
 		st_flags:         c.uint32_t,   /* user defined flags for file */
 		st_gen:           c.uint32_t,   /* file generation number */
 		st_lspare:        c.int32_t,    /* RESERVED */
@@ -314,47 +315,47 @@ when ODIN_OS == .Darwin {
 
 	when ODIN_ARCH == .i386 {
 		stat_t :: struct {
-			st_dev:           dev_t,        /* [XSI] ID of device containing file */
-			st_ino:           ino_t,        /* [XSI] file serial number */
-			st_nlink:         nlink_t,      /* [XSI] number of hard links */
-			st_mode:          mode_t,       /* [XSI] mode of file */
+			st_dev:           dev_t,        /* [PSX] ID of device containing file */
+			st_ino:           ino_t,        /* [PSX] file serial number */
+			st_nlink:         nlink_t,      /* [PSX] number of hard links */
+			st_mode:          mode_t,       /* [PSX] mode of file */
 			st_padding0:      c.int16_t,
-			st_uid:           uid_t,        /* [XSI] user ID of the file */
-			st_gid:           gid_t,        /* [XSI] group ID of the file */
+			st_uid:           uid_t,        /* [PSX] user ID of the file */
+			st_gid:           gid_t,        /* [PSX] group ID of the file */
 			st_padding1:      c.int32_t,
-			st_rdev:          dev_t,        /* [XSI] device ID */
+			st_rdev:          dev_t,        /* [PSX] device ID */
 			st_atim_ext:      c.int32_t,
-			st_atim:          timespec,     /* [XSI] time of last access */
+			st_atim:          timespec,     /* [PSX] time of last access */
 			st_mtim_ext:      c.int32_t,
-			st_mtim:          timespec,     /* [XSI] time of last data modification */
+			st_mtim:          timespec,     /* [PSX] time of last data modification */
 			st_ctim_ext:      c.int32_t,
-			st_ctim:          timespec,     /* [XSI] time of last status change */
+			st_ctim:          timespec,     /* [PSX] time of last status change */
 			st_birthtimespec: timespec,     /* time of file creation(birth) */
-			st_size:          off_t,        /* [XSI] file size, in bytes */
-			st_blocks:        blkcnt_t,     /* [XSI] blocks allocated for file */
-			st_blksize:       blksize_t,    /* [XSI] optimal blocksize for I/O */
+			st_size:          off_t,        /* [PSX] file size, in bytes */
+			st_blocks:        blkcnt_t,     /* [PSX] blocks allocated for file */
+			st_blksize:       blksize_t,    /* [PSX] optimal blocksize for I/O */
 			st_flags:         c.uint32_t,   /* user defined flags for file */
 			st_gen:           c.uint64_t,
 			st_spare:         [10]c.uint64_t,
 		}
 	} else {
 		stat_t :: struct {
-			st_dev:           dev_t,        /* [XSI] ID of device containing file */
-			st_ino:           ino_t,        /* [XSI] file serial number */
-			st_nlink:         nlink_t,      /* [XSI] number of hard links */
-			st_mode:          mode_t,       /* [XSI] mode of file */
+			st_dev:           dev_t,        /* [PSX] ID of device containing file */
+			st_ino:           ino_t,        /* [PSX] file serial number */
+			st_nlink:         nlink_t,      /* [PSX] number of hard links */
+			st_mode:          mode_t,       /* [PSX] mode of file */
 			st_padding0:      c.int16_t,
-			st_uid:           uid_t,        /* [XSI] user ID of the file */
-			st_gid:           gid_t,        /* [XSI] group ID of the file */
+			st_uid:           uid_t,        /* [PSX] user ID of the file */
+			st_gid:           gid_t,        /* [PSX] group ID of the file */
 			st_padding1:      c.int32_t,
-			st_rdev:          dev_t,        /* [XSI] device ID */
-			st_atim:          timespec,     /* [XSI] time of last access */
-			st_mtim:          timespec,     /* [XSI] time of last data modification */
-			st_ctim:          timespec,     /* [XSI] time of last status change */
+			st_rdev:          dev_t,        /* [PSX] device ID */
+			st_atim:          timespec,     /* [PSX] time of last access */
+			st_mtim:          timespec,     /* [PSX] time of last data modification */
+			st_ctim:          timespec,     /* [PSX] time of last status change */
 			st_birthtimespec: timespec,     /* time of file creation(birth) */
-			st_size:          off_t,        /* [XSI] file size, in bytes */
-			st_blocks:        blkcnt_t,     /* [XSI] blocks allocated for file */
-			st_blksize:       blksize_t,    /* [XSI] optimal blocksize for I/O */
+			st_size:          off_t,        /* [PSX] file size, in bytes */
+			st_blocks:        blkcnt_t,     /* [PSX] blocks allocated for file */
+			st_blksize:       blksize_t,    /* [PSX] optimal blocksize for I/O */
 			st_flags:         c.uint32_t,   /* user defined flags for file */
 			st_gen:           c.uint64_t,
 			st_spare:         [10]c.uint64_t,
@@ -374,20 +375,20 @@ when ODIN_OS == .Darwin {
 	ino_t      :: distinct c.uint64_t
 
 	stat_t :: struct {
-		st_dev:           dev_t,        /* [XSI] ID of device containing file */
-		st_mode:          mode_t,       /* [XSI] mode of file */
-		st_ino:           ino_t,        /* [XSI] file serial number */
-		st_nlink:         nlink_t,      /* [XSI] number of hard links */
-		st_uid:           uid_t,        /* [XSI] user ID of the file */
-		st_gid:           gid_t,        /* [XSI] group ID of the file */
-		st_rdev:          dev_t,        /* [XSI] device ID */
-		st_atim:          timespec,     /* [XSI] time of last access */
-		st_mtim:          timespec,     /* [XSI] time of last data modification */
-		st_ctim:          timespec,     /* [XSI] time of last status change */
+		st_dev:           dev_t,        /* [PSX] ID of device containing file */
+		st_mode:          mode_t,       /* [PSX] mode of file */
+		st_ino:           ino_t,        /* [PSX] file serial number */
+		st_nlink:         nlink_t,      /* [PSX] number of hard links */
+		st_uid:           uid_t,        /* [PSX] user ID of the file */
+		st_gid:           gid_t,        /* [PSX] group ID of the file */
+		st_rdev:          dev_t,        /* [PSX] device ID */
+		st_atim:          timespec,     /* [PSX] time of last access */
+		st_mtim:          timespec,     /* [PSX] time of last data modification */
+		st_ctim:          timespec,     /* [PSX] time of last status change */
 		st_birthtimespec: timespec,     /* time of file creation(birth) */
-		st_size:          off_t,        /* [XSI] file size, in bytes */
-		st_blocks:        blkcnt_t,     /* [XSI] blocks allocated for file */
-		st_blksize:       blksize_t,    /* [XSI] optimal blocksize for I/O */
+		st_size:          off_t,        /* [PSX] file size, in bytes */
+		st_blocks:        blkcnt_t,     /* [PSX] blocks allocated for file */
+		st_blksize:       blksize_t,    /* [PSX] optimal blocksize for I/O */
 		st_flags:         c.uint32_t,   /* user defined flags for file */
 		st_gen:           c.uint64_t,
 		st_spare:         [2]c.uint32_t,
@@ -406,19 +407,19 @@ when ODIN_OS == .Darwin {
 	ino_t      :: distinct c.uint64_t
 
 	stat_t :: struct {
-		st_mode:          mode_t,       /* [XSI] mode of file */
-		st_dev:           dev_t,        /* [XSI] ID of device containing file */
-		st_ino:           ino_t,        /* [XSI] file serial number */
-		st_nlink:         nlink_t,      /* [XSI] number of hard links */
-		st_uid:           uid_t,        /* [XSI] user ID of the file */
-		st_gid:           gid_t,        /* [XSI] group ID of the file */
-		st_rdev:          dev_t,        /* [XSI] device ID */
-		st_atim:          timespec,     /* [XSI] time of last access */
-		st_mtim:          timespec,     /* [XSI] time of last data modification */
-		st_ctim:          timespec,     /* [XSI] time of last status change */
-		st_size:          off_t,        /* [XSI] file size, in bytes */
-		st_blocks:        blkcnt_t,     /* [XSI] blocks allocated for file */
-		st_blksize:       blksize_t,    /* [XSI] optimal blocksize for I/O */
+		st_mode:          mode_t,       /* [PSX] mode of file */
+		st_dev:           dev_t,        /* [PSX] ID of device containing file */
+		st_ino:           ino_t,        /* [PSX] file serial number */
+		st_nlink:         nlink_t,      /* [PSX] number of hard links */
+		st_uid:           uid_t,        /* [PSX] user ID of the file */
+		st_gid:           gid_t,        /* [PSX] group ID of the file */
+		st_rdev:          dev_t,        /* [PSX] device ID */
+		st_atim:          timespec,     /* [PSX] time of last access */
+		st_mtim:          timespec,     /* [PSX] time of last data modification */
+		st_ctim:          timespec,     /* [PSX] time of last status change */
+		st_size:          off_t,        /* [PSX] file size, in bytes */
+		st_blocks:        blkcnt_t,     /* [PSX] blocks allocated for file */
+		st_blksize:       blksize_t,    /* [PSX] optimal blocksize for I/O */
 		st_flags:         c.uint32_t,   /* user defined flags for file */
 		st_gen:           c.int32_t,
 		st_birthtimespec: timespec,
@@ -427,6 +428,58 @@ when ODIN_OS == .Darwin {
 	UTIME_NOW  :: -2
 	UTIME_OMIT :: -1
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	dev_t     :: distinct u64
+	_mode_t   :: distinct c.uint 
+	blkcnt_t  :: distinct i64
+
+	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+		nlink_t   :: distinct c.uint
+		blksize_t :: distinct c.int
+	} else {
+		nlink_t   :: distinct c.size_t
+		blksize_t :: distinct c.long
+	}
+
+	ino_t :: distinct u64
+
+	when ODIN_ARCH == .amd64 {
+		stat_t :: struct {
+			st_dev:           dev_t,        /* [PSX] ID of device containing file */
+			st_ino:           ino_t,        /* [PSX] file serial number */
+			st_nlink:         nlink_t,      /* [PSX] number of hard links */
+			st_mode:          mode_t,       /* [PSX] mode of file */
+			st_uid:           uid_t,        /* [PSX] user ID of the file */
+			st_gid:           gid_t,        /* [PSX] group ID of the file */
+			_pad0:            c.uint,
+			st_rdev:          dev_t,        /* [PSX] device ID */
+			st_size:          off_t,        /* [PSX] file size, in bytes */
+			st_blksize:       blksize_t,    /* [PSX] optimal blocksize for I/O */
+			st_blocks:        blkcnt_t,     /* [PSX] blocks allocated for file */
+			st_atim:          timespec,     /* [PSX] time of last access */
+			st_mtim:          timespec,     /* [PSX] time of last data modification */
+			st_ctim:          timespec,     /* [PSX] time of last status change */
+			__unused:         [3]c.long,
+		}
+	} else {
+		stat_t :: struct {
+			st_dev:           dev_t,        /* [PSX] ID of device containing file */
+			st_ino:           ino_t,        /* [PSX] file serial number */
+			st_mode:          mode_t,       /* [PSX] mode of file */
+			st_nlink:         nlink_t,      /* [PSX] number of hard links */
+			st_uid:           uid_t,        /* [PSX] user ID of the file */
+			st_gid:           gid_t,        /* [PSX] group ID of the file */
+			st_rdev:          dev_t,        /* [PSX] device ID */
+			__pad:            c.ulonglong,
+			st_size:          off_t,        /* [PSX] file size, in bytes */
+			st_blksize:       blksize_t,    /* [PSX] optimal blocksize for I/O */
+			__pad2:           c.int,
+			st_blocks:        blkcnt_t,     /* [PSX] blocks allocated for file */
+			st_atim:          timespec,     /* [PSX] time of last access */
+			st_mtim:          timespec,     /* [PSX] time of last data modification */
+			st_ctim:          timespec,     /* [PSX] time of last status change */
+			__unused:         [2]c.uint,
+		}
+	}
 }

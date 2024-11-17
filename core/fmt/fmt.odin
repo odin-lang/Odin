@@ -1531,7 +1531,7 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	case 'o': _fmt_int(fi, u,  8, false, 8*size_of(rawptr), __DIGITS_UPPER)
 	case 'i', 'd': _fmt_int(fi, u, 10, false, 8*size_of(rawptr), __DIGITS_UPPER)
 	case 'z': _fmt_int(fi, u, 12, false, 8*size_of(rawptr), __DIGITS_UPPER)
-	case 'x': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
+	case 'x': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_LOWER)
 	case 'X': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
 
 	case:
@@ -3001,18 +3001,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
-
-	case runtime.Type_Info_Relative_Pointer:
-		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id)
-		absolute_ptr := any{ptr, info.pointer.id}
-
-		fmt_value(fi, absolute_ptr, verb)
-
-	case runtime.Type_Info_Relative_Multi_Pointer:
-		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id)
-		absolute_ptr := any{ptr, info.pointer.id}
-
-		fmt_value(fi, absolute_ptr, verb)
 
 	case runtime.Type_Info_Matrix:
 		fmt_matrix(fi, v, verb, info)

@@ -108,6 +108,16 @@ Application_setMainMenu :: proc "c" (self: ^Application, menu: ^Menu) {
 	msgSend(nil, self, "setMainMenu:", menu)
 }
 
+@(objc_type=Application, objc_name="mainWindow")
+Application_mainWindow :: proc "c" (self: ^Application) -> ^Window {
+	return msgSend(^Window, self, "mainWindow")
+}
+
+@(objc_type=Application, objc_name="keyWindow")
+Application_keyWindow :: proc "c" (self: ^Application) -> ^Window {
+	return msgSend(^Window, self, "keyWindow")
+}
+
 @(objc_type=Application, objc_name="windows")
 Application_windows :: proc "c" (self: ^Application) -> ^Array {
 	return msgSend(^Array, self, "windows")

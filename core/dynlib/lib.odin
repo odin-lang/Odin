@@ -37,8 +37,8 @@ Example:
 		fmt.println("The library %q was successfully loaded", LIBRARY_PATH)
 	}
 */
-load_library :: proc(path: string, global_symbols := false) -> (library: Library, did_load: bool) {
-	return _load_library(path, global_symbols)
+load_library :: proc(path: string, global_symbols := false, allocator := context.temp_allocator) -> (library: Library, did_load: bool) {
+	return _load_library(path, global_symbols, allocator)
 }
 
 /*
@@ -98,8 +98,8 @@ Example:
 		}
 	}
 */
-symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) #optional_ok {
-	return _symbol_address(library, symbol)
+symbol_address :: proc(library: Library, symbol: string, allocator := context.temp_allocator) -> (ptr: rawptr, found: bool) #optional_ok {
+	return _symbol_address(library, symbol, allocator)
 }
 
 /*

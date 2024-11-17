@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "base:intrinsics"
@@ -92,7 +93,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	POLLHUP    :: 0x0010
 	POLLNVAL   :: 0x0020
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }
-

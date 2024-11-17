@@ -2536,11 +2536,30 @@ waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, opt
 
 // TODO(flysand): ioprio_get
 
-// TODO(flysand): inotify_init
+inotify_init :: proc "contextless" () -> (Fd, Errno) {
+	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+		ret := syscall(SYS_inotify_init1, 0)
+		return errno_unwrap(ret, Fd)
+	} else {
+		ret := syscall(SYS_inotify_init)
+		return errno_unwrap(ret, Fd)
+	}
+}
 
-// TODO(flysand): inotify_add_watch
+inotify_init1 :: proc "contextless" (flags: Inotify_Init_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_inotify_init1, transmute(i32)flags)
+	return errno_unwrap(ret, Fd)
+}
 
-// TODO(flysand): inotify_rm_watch
+inotify_add_watch :: proc "contextless" (fd: Fd, pathname: cstring, mask: Inotify_Event_Mask) -> (Wd, Errno) {
+	ret := syscall(SYS_inotify_add_watch, fd, transmute(uintptr) pathname, transmute(u32) mask)
+	return errno_unwrap(ret, Wd)
+}
+
+inotify_rm_watch :: proc "contextless" (fd: Fd, wd: Wd) -> (Errno) {
+	ret := syscall(SYS_inotify_rm_watch, fd, wd)
+	return Errno(-ret)
+}
 
 // TODO(flysand): migrate_pages
 
