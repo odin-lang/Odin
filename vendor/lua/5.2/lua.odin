@@ -7,7 +7,7 @@ import c "core:c/libc"
 
 #assert(size_of(c.int) == size_of(b32))
 
-LUA_SHARED :: config(LUA_SHARED, false)
+LUA_SHARED :: #config(LUA_SHARED, false)
 
 when LUA_SHARED {
 	when ODIN_OS == .Windows {
