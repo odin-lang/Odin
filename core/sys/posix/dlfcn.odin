@@ -1,3 +1,4 @@
+#+build darwin, linux, freebsd, openbsd, netbsd
 package posix
 
 import "core:c"
@@ -111,7 +112,14 @@ when ODIN_OS == .Darwin {
 
 	RTLD_LOCAL   :: RTLD_Flags{RTLD_Flag_Bits(log2(_RTLD_LOCAL))}
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	RTLD_LAZY    :: 0x001
+	RTLD_NOW     :: 0x002
+	RTLD_GLOBAL  :: 0x100
+
+	_RTLD_LOCAL  :: 0
+	RTLD_LOCAL   :: RTLD_Flags{}
+
 }
 

@@ -442,7 +442,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		stderr_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
 	}
 	if desc.stdin != nil {
-		stdin_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
+		stdin_handle = win32.HANDLE((^File_Impl)(desc.stdin.impl).fd)
 	}
 
 	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator()) or_else nil) if len(desc.working_dir) > 0 else nil
@@ -650,26 +650,30 @@ _build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> 
 			strings.write_byte(&builder, ' ')
 		}
 		j := 0
-		strings.write_byte(&builder, '"')
-		for j < len(arg) {
-			backslashes := 0
-			for j < len(arg) && arg[j] == '\\' {
-				backslashes += 1
+		if strings.contains_any(arg, "()[]{}^=;!'+,`~\" ") {
+			strings.write_byte(&builder, '"')
+			for j < len(arg) {
+				backslashes := 0
+				for j < len(arg) && arg[j] == '\\' {
+					backslashes += 1
+					j += 1
+				}
+				if j == len(arg) {
+					_write_byte_n_times(&builder, '\\', 2*backslashes)
+					break
+				} else if arg[j] == '"' {
+					_write_byte_n_times(&builder, '\\', 2*backslashes+1)
+					strings.write_byte(&builder, arg[j])
+				} else {
+					_write_byte_n_times(&builder, '\\', backslashes)
+					strings.write_byte(&builder, arg[j])
+				}
 				j += 1
 			}
-			if j == len(arg) {
-				_write_byte_n_times(&builder, '\\', 2*backslashes)
-				break
-			} else if arg[j] == '"' {
-				_write_byte_n_times(&builder, '\\', 2*backslashes+1)
-				strings.write_byte(&builder, '"')
-			} else {
-				_write_byte_n_times(&builder, '\\', backslashes)
-				strings.write_byte(&builder, arg[j])
-			}
-			j += 1
+			strings.write_byte(&builder, '"')
+		} else {
+			strings.write_string(&builder, arg)
 		}
-		strings.write_byte(&builder, '"')
 	}
 	return strings.to_string(builder)
 }

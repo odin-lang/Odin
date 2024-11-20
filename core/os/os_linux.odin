@@ -242,10 +242,13 @@ F_SETFL: int : 4 /* Set file flags */
 
 // NOTE(zangent): These are OS specific!
 // Do not mix these up!
-RTLD_LAZY         :: 0x001
-RTLD_NOW          :: 0x002
-RTLD_BINDING_MASK :: 0x3
-RTLD_GLOBAL       :: 0x100
+RTLD_LAZY         :: 0x0001
+RTLD_NOW          :: 0x0002
+RTLD_BINDING_MASK :: 0x0003
+RTLD_GLOBAL       :: 0x0100
+RTLD_NOLOAD       :: 0x0004
+RTLD_DEEPBIND     :: 0x0008
+RTLD_NODELETE     :: 0x1000
 
 socklen_t :: c.int
 
@@ -487,7 +490,7 @@ foreign libc {
 	@(link_name="free")             _unix_free          :: proc(ptr: rawptr) ---
 	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 
-	@(link_name="execvp")           _unix_execvp       :: proc(path: cstring, argv: [^]cstring) -> int ---
+	@(link_name="execvp")           _unix_execvp       :: proc(path: cstring, argv: [^]cstring) -> c.int ---
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
 	@(link_name="putenv")           _unix_putenv        :: proc(cstring) -> c.int ---
 	@(link_name="setenv")           _unix_setenv        :: proc(key: cstring, value: cstring, overwrite: c.int) -> c.int ---
@@ -914,7 +917,7 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 }
 
 @(require_results)
-absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
+absolute_path_from_relative :: proc(rel: string, allocator := context.allocator) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
 		rel = "."
@@ -929,9 +932,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	}
 	defer _unix_free(rawptr(path_ptr))
 
-	path = strings.clone(string(path_ptr))
-
-	return path, nil
+	return strings.clone(string(path_ptr), allocator)
 }
 
 access :: proc(path: string, mask: int) -> (bool, Error) {

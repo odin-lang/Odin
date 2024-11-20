@@ -114,8 +114,8 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	errno := freebsd.connect(cast(Fd)socket, &sockaddr, cast(freebsd.socklen_t)sockaddr.len)
 	if errno != nil {
-		err = cast(Dial_Error)errno
-		return
+		close(socket)
+		return {}, cast(Dial_Error)errno
 	}
 
 	return
@@ -137,6 +137,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	family := family_from_endpoint(interface_endpoint)
 	new_socket := create_socket(family, .TCP) or_return
 	socket = new_socket.(TCP_Socket)
+	defer if err != nil { close(socket) }
 
 	bind(socket, interface_endpoint) or_return
 

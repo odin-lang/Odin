@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -11,19 +12,6 @@ when ODIN_OS == .Darwin {
 // unistd.h - standard symbolic constants and types
 
 foreign lib {
-	/*
-	Checks the file named by the pathname pointed to by the path argument for
-	accessibility according to the bit pattern contained in amode. 
-
-	Example:
-		if (posix.access("/tmp/myfile", posix.F_OK) != .OK) {
-			fmt.printfln("/tmp/myfile access check failed: %v", posix.strerror(posix.errno()))
-		}
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/access.html ]]
-	*/
-	access :: proc(path: cstring, amode: Mode_Flags = F_OK) -> result ---
-
 	/*
 	Equivalent to `access` but relative paths are resolved based on `fd`.
 
@@ -41,18 +29,6 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/alarm.html ]]
 	*/
 	alarm :: proc(seconds: c.uint) -> c.uint ---
-
-	/*
-	Causes the directory named by path to become the current working directory.
-
-	Example:
-		if (posix.chdir("/tmp") == .OK) {
-			fmt.println("changed current directory to /tmp")
-		}
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/chdir.html ]]
-	*/
-	chdir :: proc(path: cstring) -> result ---
 
 	/*
 	Equivalent to chdir but instead of a path the fildes is resolved to a directory.
@@ -203,15 +179,6 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dup.html ]] 
 	*/
 	dup2 :: proc(fildes, fildes2: FD) -> FD ---
-
-	/*
-	Exits but, shall not call functions registered with atexit() nor any registered signal handlers.
-	Open streams shall not be flushed.
-	Whether open streams are closed (without flushing) is implementation-defined. Finally, the calling process shall be terminated with the consequences described below.
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/_exit.html ]]
-	*/
-	_exit :: proc(status: c.int) -> ! ---
 
 	/*
 	The exec family of functions shall replace the current process image with a new process image.
@@ -391,44 +358,6 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/ftruncate.html ]]
 	*/
 	ftruncate :: proc(fildes: FD, length: off_t) -> result ---
-
-	/*
-	Places an absolute pathname of the current working directory into buf.
-
-	Returns: buf as a cstring on success, nil (setting errno) on failure
-
-	Example:
-		size: int
-		path_max := posix.pathconf(".", ._PATH_MAX)
-		if path_max == -1 {
-			size = 1024
-		} else if path_max > 10240 {
-			size = 10240
-		} else {
-			size = int(path_max)
-		}
-
-		buf: [dynamic]byte
-		cwd: cstring
-		for ; cwd == nil; size *= 2 {
-			if err := resize(&buf, size); err != nil {
-				fmt.panicf("allocation failure: %v", err)
-			}
-
-			cwd = posix.getcwd(raw_data(buf), len(buf))
-			if cwd == nil {
-				errno := posix.errno()
-				if errno != .ERANGE {
-					fmt.panicf("getcwd failure: %v", posix.strerror(errno))
-				}
-			}
-		}
-
-		fmt.println(path_max, cwd)
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/getcwd.html ]]
-	*/
-	getcwd :: proc(buf: [^]c.char, size: c.size_t) -> cstring ---
 
 	/*
 	Returns the effective group ID of the calling process.
@@ -830,13 +759,6 @@ foreign lib {
 	readlinkat :: proc(fd: FD, path: cstring, buf: [^]byte, bufsize: c.size_t) -> c.ssize_t ---
 
 	/*
-	Remove an (empty) directory.
-
-	]] More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/rmdir.html ]]
-	*/
-	rmdir :: proc(path: cstring) -> result ---
-
-	/*
 	Set the effective group ID.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/setegid.html ]]
@@ -913,13 +835,6 @@ foreign lib {
 	sleep :: proc(seconds: c.uint) -> c.uint ---
 
 	/*
-	Copy nbyte bytes, from src, to dest, exchanging adjecent bytes.
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/swab.html ]]
-	*/
-	swab :: proc(src: [^]byte, dest: [^]byte, nbytes: c.ssize_t) ---
-
-	/*
 	Schedule file system updates.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/sync.html ]]
@@ -959,33 +874,12 @@ foreign lib {
 	ttyname_r :: proc(fildes: FD, name: [^]byte, namesize: c.size_t) -> Errno ---
 
 	/*
-	Remove a directory entry.
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/unlink.html ]]
-	*/
-	unlink :: proc(path: cstring) -> result ---
-
-	/*
 	Equivalent to unlink or rmdir (if flag is .REMOVEDIR) but relative paths are relative to the dir fd.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/unlink.html ]]
 	*/
 	unlinkat :: proc(fd: FD, path: cstring, flag: AT_Flags) -> result ---
 }
-
-STDERR_FILENO :: 2
-STDIN_FILENO  :: 0
-STDOUT_FILENO :: 1
-
-Mode_Flag_Bits :: enum c.int {
-	X_OK = log2(X_OK),
-	W_OK = log2(W_OK),
-	R_OK = log2(R_OK),
-}
-Mode_Flags :: bit_set[Mode_Flag_Bits; c.int]
-
-#assert(_F_OK == 0)
-F_OK :: Mode_Flags{}
 
 CS :: enum c.int {
 	_PATH                           = _CS_PATH,
@@ -1181,20 +1075,20 @@ when ODIN_OS == .Darwin {
 	F_TLOCK :: 2
 	F_ULOCK :: 0
 
-	_CS_PATH                            :: 1
-	_CS_POSIX_V6_ILP32_OFF32_CFLAGS		:: 2
-	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS	:: 3
-	_CS_POSIX_V6_ILP32_OFF32_LIBS		:: 4
-	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS	:: 5
-	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS	:: 6
-	_CS_POSIX_V6_ILP32_OFFBIG_LIBS		:: 7
-	_CS_POSIX_V6_LP64_OFF64_CFLAGS		:: 8
-	_CS_POSIX_V6_LP64_OFF64_LDFLAGS		:: 9
-	_CS_POSIX_V6_LP64_OFF64_LIBS		:: 10
-	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS	:: 11
-	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS	:: 12
-	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS		:: 13
-	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS	:: 14
+	_CS_PATH                           :: 1
+	_CS_POSIX_V6_ILP32_OFF32_CFLAGS    :: 2
+	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS   :: 3
+	_CS_POSIX_V6_ILP32_OFF32_LIBS      :: 4
+	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS   :: 5
+	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS  :: 6
+	_CS_POSIX_V6_ILP32_OFFBIG_LIBS     :: 7
+	_CS_POSIX_V6_LP64_OFF64_CFLAGS     :: 8
+	_CS_POSIX_V6_LP64_OFF64_LDFLAGS    :: 9
+	_CS_POSIX_V6_LP64_OFF64_LIBS       :: 10
+	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS   :: 11
+	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS  :: 12
+	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS     :: 13
+	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS :: 14
 
 	_PC_LINK_MAX           :: 1
 	_PC_MAX_CANON          :: 2
@@ -1362,20 +1256,20 @@ when ODIN_OS == .Darwin {
 	F_TLOCK :: 2
 	F_ULOCK :: 0
 
-	_CS_PATH                            :: 1
-	_CS_POSIX_V6_ILP32_OFF32_CFLAGS		:: 2
-	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS	:: 3
-	_CS_POSIX_V6_ILP32_OFF32_LIBS		:: 4
-	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS	:: 5
-	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS	:: 6
-	_CS_POSIX_V6_ILP32_OFFBIG_LIBS		:: 7
-	_CS_POSIX_V6_LP64_OFF64_CFLAGS		:: 8
-	_CS_POSIX_V6_LP64_OFF64_LDFLAGS		:: 9
-	_CS_POSIX_V6_LP64_OFF64_LIBS		:: 10
-	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS	:: 11
-	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS	:: 12
-	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS		:: 13
-	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS	:: 14
+	_CS_PATH                           :: 1
+	_CS_POSIX_V6_ILP32_OFF32_CFLAGS    :: 2
+	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS   :: 3
+	_CS_POSIX_V6_ILP32_OFF32_LIBS      :: 4
+	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS   :: 5
+	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS  :: 6
+	_CS_POSIX_V6_ILP32_OFFBIG_LIBS     :: 7
+	_CS_POSIX_V6_LP64_OFF64_CFLAGS     :: 8
+	_CS_POSIX_V6_LP64_OFF64_LDFLAGS    :: 9
+	_CS_POSIX_V6_LP64_OFF64_LIBS       :: 10
+	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS   :: 11
+	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS  :: 12
+	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS     :: 13
+	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS :: 14
 
 	_PC_LINK_MAX           :: 1
 	_PC_MAX_CANON          :: 2
@@ -1543,20 +1437,20 @@ when ODIN_OS == .Darwin {
 	F_TLOCK :: 2
 	F_ULOCK :: 0
 
-	_CS_PATH                            :: 1
-	_CS_POSIX_V6_ILP32_OFF32_CFLAGS		:: 2
-	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS	:: 3
-	_CS_POSIX_V6_ILP32_OFF32_LIBS		:: 4
-	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS	:: 5
-	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS	:: 6
-	_CS_POSIX_V6_ILP32_OFFBIG_LIBS		:: 7
-	_CS_POSIX_V6_LP64_OFF64_CFLAGS		:: 8
-	_CS_POSIX_V6_LP64_OFF64_LDFLAGS		:: 9
-	_CS_POSIX_V6_LP64_OFF64_LIBS		:: 10
-	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS	:: 11
-	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS	:: 12
-	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS		:: 13
-	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS	:: 14
+	_CS_PATH                           :: 1
+	_CS_POSIX_V6_ILP32_OFF32_CFLAGS    :: 2
+	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS   :: 3
+	_CS_POSIX_V6_ILP32_OFF32_LIBS      :: 4
+	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS   :: 5
+	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS  :: 6
+	_CS_POSIX_V6_ILP32_OFFBIG_LIBS     :: 7
+	_CS_POSIX_V6_LP64_OFF64_CFLAGS     :: 8
+	_CS_POSIX_V6_LP64_OFF64_LDFLAGS    :: 9
+	_CS_POSIX_V6_LP64_OFF64_LIBS       :: 10
+	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS   :: 11
+	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS  :: 12
+	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS     :: 13
+	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS :: 14
 
 	_PC_LINK_MAX           :: 1
 	_PC_MAX_CANON          :: 2
@@ -1655,7 +1549,6 @@ when ODIN_OS == .Darwin {
 	_SC_TTY_NAME_MAX                 :: 68
 	_SC_HOST_NAME_MAX                :: 69
 
-	_SC_PASS_MAX                     :: 70
 	_SC_REGEXP                       :: 71
 	_SC_SHELL                        :: 72
 	_SC_SYMLOOP_MAX                  :: 73
@@ -1729,20 +1622,20 @@ when ODIN_OS == .Darwin {
 	F_TLOCK :: 2
 	F_ULOCK :: 0
 
-	_CS_PATH                            :: 1
-	_CS_POSIX_V6_ILP32_OFF32_CFLAGS		:: 2
-	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS	:: 3
-	_CS_POSIX_V6_ILP32_OFF32_LIBS		:: 4
-	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS	:: 5
-	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS	:: 6
-	_CS_POSIX_V6_ILP32_OFFBIG_LIBS		:: 7
-	_CS_POSIX_V6_LP64_OFF64_CFLAGS		:: 8
-	_CS_POSIX_V6_LP64_OFF64_LDFLAGS		:: 9
-	_CS_POSIX_V6_LP64_OFF64_LIBS		:: 10
-	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS	:: 11
-	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS	:: 12
-	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS		:: 13
-	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS	:: 14
+	_CS_PATH                           :: 1
+	_CS_POSIX_V6_ILP32_OFF32_CFLAGS    :: 2
+	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS   :: 3
+	_CS_POSIX_V6_ILP32_OFF32_LIBS      :: 4
+	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS   :: 5
+	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS  :: 6
+	_CS_POSIX_V6_ILP32_OFFBIG_LIBS     :: 7
+	_CS_POSIX_V6_LP64_OFF64_CFLAGS     :: 8
+	_CS_POSIX_V6_LP64_OFF64_LDFLAGS    :: 9
+	_CS_POSIX_V6_LP64_OFF64_LIBS       :: 10
+	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS   :: 11
+	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS  :: 12
+	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS     :: 13
+	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS :: 14
 
 	_PC_LINK_MAX           :: 1
 	_PC_MAX_CANON          :: 2
@@ -1911,7 +1804,192 @@ when ODIN_OS == .Darwin {
 
 	_POSIX_VDISABLE :: '\377'
 
-} else {
-	#panic("posix is unimplemented for the current target")
-}
+} else when ODIN_OS == .Linux {
 
+	_F_OK :: 0
+	X_OK :: 1
+	W_OK :: 2
+	R_OK :: 4
+
+	F_LOCK  :: 1
+	F_TEST  :: 3
+	F_TLOCK :: 2
+	F_ULOCK :: 0
+
+	_CS_PATH                           :: 1
+	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS :: 2
+
+	_CS_POSIX_V6_ILP32_OFF32_CFLAGS   :: 1116
+	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS  :: 1117
+	_CS_POSIX_V6_ILP32_OFF32_LIBS     :: 1118
+	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS  :: 1120
+	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS :: 1121
+	_CS_POSIX_V6_ILP32_OFFBIG_LIBS    :: 1122
+	_CS_POSIX_V6_LP64_OFF64_CFLAGS    :: 1124
+	_CS_POSIX_V6_LP64_OFF64_LDFLAGS   :: 1125
+	_CS_POSIX_V6_LP64_OFF64_LIBS      :: 1126
+	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS  :: 1128
+	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS :: 1129
+	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS    :: 1130
+
+	_PC_LINK_MAX           :: 1
+	_PC_MAX_CANON          :: 2
+	_PC_MAX_INPUT          :: 3
+	_PC_NAME_MAX           :: 4
+	_PC_PATH_MAX           :: 5
+	_PC_PIPE_BUF           :: 6
+	_PC_CHOWN_RESTRICTED   :: 7
+	_PC_NO_TRUNC           :: 8
+	_PC_VDISABLE           :: 9
+	_PC_SYNC_IO            :: 10
+	_PC_ASYNC_IO           :: 11
+	_PC_PRIO_IO            :: 12
+	_PC_FILESIZEBITS       :: 14
+	_PC_REC_INCR_XFER_SIZE :: 15
+	_PC_REC_MAX_XFER_SIZE  :: 16
+	_PC_REC_MIN_XFER_SIZE  :: 17
+	_PC_REC_XFER_ALIGN     :: 18
+	_PC_ALLOC_SIZE_MIN     :: 19
+	_PC_SYMLINK_MAX        :: 20
+	_PC_2_SYMLINK          :: 21
+
+	_SC_ARG_MAX               :: 1
+	_SC_CHILD_MAX             :: 2
+	_SC_CLK_TCK               :: 3
+	_SC_NGROUPS_MAX           :: 4
+	_SC_OPEN_MAX              :: 5
+	_SC_STREAM_MAX            :: 6
+	_SC_TZNAME_MAX            :: 7
+	_SC_JOB_CONTROL           :: 8
+	_SC_SAVED_IDS             :: 9
+	_SC_REALTIME_SIGNALS      :: 10
+	_SC_PRIORITY_SCHEDULING   :: 11
+	_SC_TIMERS                :: 12
+	_SC_ASYNCHRONOUS_IO       :: 13
+	_SC_PRIORITIZED_IO        :: 14
+	_SC_SYNCHRONIZED_IO       :: 15
+	_SC_FSYNC                 :: 16
+	_SC_MAPPED_FILES          :: 17
+	_SC_MEMLOCK               :: 18
+	_SC_MEMLOCK_RANGE         :: 19
+	_SC_MEMORY_PROTECTION     :: 20
+	_SC_MESSAGE_PASSING       :: 21
+	_SC_SEMAPHORES            :: 22
+	_SC_SHARED_MEMORY_OBJECTS :: 23
+	_SC_AIO_LISTIO_MAX        :: 24
+	_SC_AIO_MAX               :: 25
+	_SC_AIO_PRIO_DELTA_MAX    :: 26
+	_SC_DELAYTIMER_MAX        :: 27
+	_SC_MQ_OPEN_MAX           :: 28
+	_SC_MQ_PRIO_MAX           :: 29
+	_SC_VERSION               :: 30
+	_SC_PAGESIZE              :: 31
+	_SC_PAGE_SIZE             :: _SC_PAGESIZE
+	_SC_RTSIG_MAX             :: 32
+	_SC_SEM_NSEMS_MAX         :: 33
+	_SC_SEM_VALUE_MAX         :: 34
+	_SC_SIGQUEUE_MAX          :: 35
+	_SC_TIMER_MAX             :: 36
+	_SC_BC_BASE_MAX           :: 37
+	_SC_BC_DIM_MAX            :: 38
+	_SC_BC_SCALE_MAX          :: 39
+	_SC_BC_STRING_MAX         :: 40
+	_SC_COLL_WEIGHTS_MAX      :: 41
+	_SC_EXPR_NEST_MAX         :: 43
+	_SC_LINE_MAX              :: 44
+	_SC_RE_DUP_MAX            :: 45
+	_SC_2_VERSION             :: 47
+	_SC_2_C_BIND              :: 48
+	_SC_2_C_DEV               :: 49
+	_SC_2_FORT_DEV            :: 50
+	_SC_2_FORT_RUN            :: 51
+	_SC_2_SW_DEV              :: 52
+	_SC_2_LOCALEDEF           :: 53
+
+	_SC_IOV_MAX                      :: 62
+	_SC_THREADS                      :: 69
+	_SC_THREAD_SAFE_FUNCTIONS        :: 70
+	_SC_GETGR_R_SIZE_MAX             :: 71
+	_SC_GETPW_R_SIZE_MAX             :: 72
+	_SC_LOGIN_NAME_MAX               :: 73
+	_SC_TTY_NAME_MAX                 :: 74
+	_SC_THREAD_DESTRUCTOR_ITERATIONS :: 75
+	_SC_THREAD_KEYS_MAX              :: 76
+	_SC_THREAD_STACK_MIN             :: 77
+	_SC_THREAD_THREADS_MAX           :: 78
+	_SC_THREAD_ATTR_STACKADDR        :: 79
+	_SC_THREAD_ATTR_STACKSIZE        :: 80
+	_SC_THREAD_PRIORITY_SCHEDULING   :: 81
+	_SC_THREAD_PRIO_INHERIT          :: 82
+	_SC_THREAD_PRIO_PROTECT          :: 83
+	_SC_THREAD_PROCESS_SHARED        :: 84
+	_SC_NPROCESSORS_CONF             :: 85
+	_SC_NPROCESSORS_ONLN             :: 86
+	_SC_PHYS_PAGES                   :: 87
+	_SC_AVPHYS_PAGES                 :: 88
+	_SC_ATEXIT_MAX                   :: 89
+	_SC_PASS_MAX                     :: 90
+	_SC_XOPEN_VERSION                :: 91
+	_SC_XOPEN_UNIX                   :: 92
+	_SC_XOPEN_CRYPT                  :: 93
+	_SC_XOPEN_ENH_I18N               :: 94
+	_SC_XOPEN_SHM                    :: 95
+	_SC_2_CHAR_TERM                  :: 96
+	_SC_2_UPE                        :: 97
+
+	_SC_XOPEN_LEGACY           :: 129
+	_SC_XOPEN_REALTIME         :: 130
+	_SC_XOPEN_REALTIME_THREADS :: 131
+	_SC_ADVISORY_INFO          :: 132
+	_SC_BARRIERS               :: 133
+	_SC_CLOCK_SELECTION        :: 137
+	_SC_CPUTIME                :: 138
+	_SC_THREAD_CPUTIME         :: 139
+	_SC_MONOTONIC_CLOCK        :: 149
+	_SC_READER_WRITER_LOCKS    :: 153
+	_SC_SPIN_LOCKS             :: 154
+	_SC_REGEXP                 :: 155
+	_SC_SHELL                  :: 157
+	_SC_SPAWN                  :: 159
+	_SC_SPORADIC_SERVER        :: 160
+	_SC_THREAD_SPORADIC_SERVER :: 161
+	_SC_TIMEOUTS               :: 164
+	_SC_TYPED_MEMORY_OBJECTS   :: 165
+	_SC_2_PBS                  :: 168
+	_SC_2_PBS_ACCOUNTING       :: 169
+	_SC_2_PBS_LOCATE           :: 170
+	_SC_2_PBS_MESSAGE          :: 171
+	_SC_2_PBS_TRACK            :: 172
+	_SC_SYMLOOP_MAX            :: 173
+	_SC_2_PBS_CHECKPOINT       :: 174
+	_SC_V6_ILP32_OFF32         :: 175
+	_SC_V6_ILP32_OFFBIG        :: 176
+	_SC_V6_LP64_OFF64          :: 177
+	_SC_V6_LPBIG_OFFBIG        :: 178
+	_SC_HOST_NAME_MAX          :: 179
+	_SC_TRACE                  :: 180
+	_SC_TRACE_EVENT_FILTER     :: 181
+	_SC_TRACE_INHERIT          :: 182
+	_SC_TRACE_LOG              :: 183
+
+	_SC_IPV6                       :: 234
+	_SC_RAW_SOCKETS                :: 235
+	_SC_V7_ILP32_OFF32             :: 236
+	_SC_V7_ILP32_OFFBIG            :: 237
+	_SC_V7_LP64_OFF64              :: 238
+	_SC_V7_LPBIG_OFFBIG            :: 239
+	_SC_SS_REPL_MAX                :: 240
+	_SC_TRACE_EVENT_NAME_MAX       :: 241
+	_SC_TRACE_NAME_MAX             :: 242
+	_SC_TRACE_SYS_MAX              :: 243
+	_SC_TRACE_USER_EVENT_MAX       :: 244
+	_SC_XOPEN_STREAMS              :: 245
+	_SC_THREAD_ROBUST_PRIO_INHERIT :: 246
+	_SC_THREAD_ROBUST_PRIO_PROTECT :: 247
+
+	// NOTE: Not implemented.
+	_SC_XOPEN_UUCP :: 0
+	// NOTE: Not implemented.
+	_POSIX_VDISABLE :: 0
+
+}

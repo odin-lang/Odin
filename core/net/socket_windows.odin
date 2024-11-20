@@ -80,8 +80,8 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	res := win.connect(win.SOCKET(socket), &sockaddr, size_of(sockaddr))
 	if res < 0 {
-		err = Dial_Error(win.WSAGetLastError())
-		return
+		close(socket)
+		return {}, Dial_Error(win.WSAGetLastError())
 	}
 
 	if options.no_delay {
@@ -107,6 +107,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	family := family_from_endpoint(interface_endpoint)
 	sock := create_socket(family, .TCP) or_return
 	socket = sock.(TCP_Socket)
+	defer if err != nil { close(socket) }
 
 	// NOTE(tetra): While I'm not 100% clear on it, my understanding is that this will
 	// prevent hijacking of the server's endpoint by other applications.

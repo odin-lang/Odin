@@ -861,7 +861,7 @@ NPatchLayout :: enum c.int {
 
 // Callbacks to hook some internal functions
 // WARNING: This callbacks are intended for advance users
-TraceLogCallback     :: #type proc "c" (logLevel: TraceLogLevel, text: cstring, args: c.va_list)        // Logging: Redirect trace log messages
+TraceLogCallback     :: #type proc "c" (logLevel: TraceLogLevel, text: cstring, args: ^c.va_list)       // Logging: Redirect trace log messages
 LoadFileDataCallback :: #type proc "c"(fileName: cstring, dataSize: ^c.int) -> [^]u8                    // FileIO: Load binary data
 SaveFileDataCallback :: #type proc "c" (fileName: cstring, data: rawptr, dataSize: c.int) -> bool       // FileIO: Save binary data
 LoadFileTextCallback :: #type proc "c" (fileName: cstring) -> [^]u8                                     // FileIO: Load text data
@@ -1012,10 +1012,10 @@ foreign lib {
 
 	// Random value generation functions
 
-	SetRandomSeed  		 :: proc(seed: c.uint) ---                      // Set the seed for the random number generator
-	GetRandomValue 		 :: proc(min, max: c.int) -> c.int ---          // Get a random value between min and max (both included)
-	LoadRandomSequence 	 :: proc(count: c.uint, min, max: c.int) --- 	// Load random values sequence, no values repeated
-	UnloadRandomSequence     :: proc(sequence: ^c.int) ---                  // Unload random values sequence
+	SetRandomSeed        :: proc(seed: c.uint) ---                               // Set the seed for the random number generator
+	GetRandomValue       :: proc(min, max: c.int) -> c.int ---                   // Get a random value between min and max (both included)
+	LoadRandomSequence   :: proc(count: c.uint, min, max: c.int) -> [^]c.int --- // Load random values sequence, no values repeated
+	UnloadRandomSequence :: proc(sequence: [^]c.int) ---                         // Unload random values sequence
 
 	// Misc. functions
 	TakeScreenshot :: proc(fileName: cstring) ---        // Takes a screenshot of current screen (filename extension defines format)
@@ -1517,7 +1517,7 @@ foreign lib {
 	// Mesh generation functions
 
 	GenMeshPoly       :: proc(sides: c.int, radius: f32) -> Mesh ---               // Generate polygonal mesh
-	GenMeshPlane      :: proc(width, lengthL: f32, resX, resZ: c.int) -> Mesh ---  // Generate plane mesh (with subdivisions)
+	GenMeshPlane      :: proc(width, length: f32, resX, resZ: c.int) -> Mesh ---   // Generate plane mesh (with subdivisions)
 	GenMeshCube       :: proc(width, height, length: f32) -> Mesh ---              // Generate cuboid mesh
 	GenMeshSphere     :: proc(radius: f32, rings, slices: c.int) -> Mesh ---       // Generate sphere mesh (standard sphere)
 	GenMeshHemiSphere :: proc(radius: f32, rings, slices: c.int) -> Mesh ---       // Generate half-sphere mesh (no bottom cap)

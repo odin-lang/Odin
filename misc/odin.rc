@@ -1,0 +1,79 @@
+
+#include "winres.h"
+
+// https://learn.microsoft.com/en-us/windows/win32/menurc/stringfileinfo-block
+
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+#pragma code_page(65001) // CP_UTF8
+
+#define IDI_ICON1                       101
+#define IDI_ICON2                       102
+
+#ifndef V1
+#define V1 1
+#endif
+#ifndef V2
+#define V2 0
+#endif
+#ifndef V3
+#define V3 0
+#endif
+#ifndef V4
+#define V4 0
+#endif
+#ifndef VF
+#define VF "1.0.0.0"
+#endif
+#ifndef VP
+#define VP "1.0.0.0"
+#endif
+#ifndef GIT_SHA
+#define GIT_SHA 0
+#endif
+#ifndef NIGHTLY
+#define NIGHTLY 0
+#endif
+
+#define Q(x) #x
+#define QUOTE(x) Q(x)
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION V1,V2,V3,V4
+ PRODUCTVERSION V1,V2,V3,V4
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "0409FDE9"
+        BEGIN
+            VALUE "CompanyName", "https://odin-lang.org/"
+            VALUE "FileDescription", "Odin general-purpose programming language." // note this is shown in the task manager
+            VALUE "FileVersion", QUOTE(VF)
+            VALUE "InternalName", "odin.exe"
+            VALUE "LegalCopyright", "Copyright (c) 2016-2024 Ginger Bill. All rights reserved."
+            VALUE "OriginalFilename", "odin.exe"
+            VALUE "ProductName", "The Odin Programming Language"
+            VALUE "ProductVersion", QUOTE(VP)
+            VALUE "Comments", QUOTE(git-sha: GIT_SHA)
+			// custom values
+            VALUE "GitSha", QUOTE(GIT_SHA)
+            VALUE "NightlyBuild", QUOTE(NIGHTLY)
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        //0xFDE9=65001=CP_UTF8
+        VALUE "Translation", 0x0409, 0xFDE9
+    END
+END
+
+IDI_ICON1   ICON    "emblem.ico"
+IDI_ICON2   ICON    "sourcefile.ico"

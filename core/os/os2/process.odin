@@ -1,16 +1,17 @@
 package os2
 
 import "base:runtime"
+
 import "core:time"
 
 /*
-	In procedures that explicitly state this as one of the allowed values,
-	specifies an infinite timeout.
+In procedures that explicitly state this as one of the allowed values,
+specifies an infinite timeout.
 */
 TIMEOUT_INFINITE :: time.MIN_DURATION // Note(flysand): Any negative duration will be treated as infinity
 
 /*
-	Arguments to the current process.
+Arguments to the current process.
 */
 args := get_args()
 
@@ -24,17 +25,17 @@ get_args :: proc() -> []string {
 }
 
 /*
-	Exit the current process.
+Exit the current process.
 */
 exit :: proc "contextless" (code: int) -> ! {
 	_exit(code)
 }
 
 /*
-	Obtain the UID of the current process.
+Obtain the UID of the current process.
 
-	**Note(windows)**: Windows doesn't follow the posix permissions model, so
-	the function simply returns -1.
+**Note(windows)**: Windows doesn't follow the posix permissions model, so
+the function simply returns -1.
 */
 @(require_results)
 get_uid :: proc() -> int {
@@ -42,15 +43,15 @@ get_uid :: proc() -> int {
 }
 
 /*
-	Obtain the effective UID of the current process.
+Obtain the effective UID of the current process.
 
-	The effective UID is typically the same as the UID of the process. In case
-	the process was run by a user with elevated permissions, the process may
-	lower the privilege to perform some tasks without privilege. In these cases
-	the real UID of the process and the effective UID are different.
-	
-	**Note(windows)**: Windows doesn't follow the posix permissions model, so
-	the function simply returns -1.
+The effective UID is typically the same as the UID of the process. In case
+the process was run by a user with elevated permissions, the process may
+lower the privilege to perform some tasks without privilege. In these cases
+the real UID of the process and the effective UID are different.
+
+**Note(windows)**: Windows doesn't follow the posix permissions model, so
+the function simply returns -1.
 */
 @(require_results)
 get_euid :: proc() -> int {
@@ -58,10 +59,10 @@ get_euid :: proc() -> int {
 }
 
 /*
-	Obtain the GID of the current process.
-	
-	**Note(windows)**: Windows doesn't follow the posix permissions model, so
-	the function simply returns -1.
+Obtain the GID of the current process.
+
+**Note(windows)**: Windows doesn't follow the posix permissions model, so
+the function simply returns -1.
 */
 @(require_results)
 get_gid :: proc() -> int {
@@ -69,15 +70,15 @@ get_gid :: proc() -> int {
 }
 
 /*
-	Obtain the effective GID of the current process.
-	
-	The effective GID is typically the same as the GID of the process. In case
-	the process was run by a user with elevated permissions, the process may
-	lower the privilege to perform some tasks without privilege. In these cases
-	the real GID of the process and the effective GID are different.
+Obtain the effective GID of the current process.
 
-	**Note(windows)**: Windows doesn't follow the posix permissions model, so
-	the function simply returns -1.
+The effective GID is typically the same as the GID of the process. In case
+the process was run by a user with elevated permissions, the process may
+lower the privilege to perform some tasks without privilege. In these cases
+the real GID of the process and the effective GID are different.
+
+**Note(windows)**: Windows doesn't follow the posix permissions model, so
+the function simply returns -1.
 */
 @(require_results)
 get_egid :: proc() -> int {
@@ -85,7 +86,7 @@ get_egid :: proc() -> int {
 }
 
 /*
-	Obtain the ID of the current process.
+Obtain the ID of the current process.
 */
 @(require_results)
 get_pid :: proc() -> int {
@@ -93,13 +94,13 @@ get_pid :: proc() -> int {
 }
 
 /*
-	Obtain the ID of the parent process.
+Obtain the ID of the parent process.
 
-	**Note(windows)**: Windows does not mantain strong relationships between
-	parent and child processes. This function returns the ID of the process
-	that has created the current process. In case the parent has died, the ID
-	returned by this function can identify a non-existent or a different
-	process.
+**Note(windows)**: Windows does not mantain strong relationships between
+parent and child processes. This function returns the ID of the process
+that has created the current process. In case the parent has died, the ID
+returned by this function can identify a non-existent or a different
+process.
 */
 @(require_results)
 get_ppid :: proc() -> int {
@@ -107,7 +108,7 @@ get_ppid :: proc() -> int {
 }
 
 /*
-	Obtain ID's of all processes running in the system.
+Obtain ID's of all processes running in the system.
 */
 @(require_results)
 process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
@@ -115,9 +116,9 @@ process_list :: proc(allocator: runtime.Allocator) -> ([]int, Error) {
 }
 
 /*
-	Bit set specifying which fields of the `Process_Info` struct need to be
-	obtained by the `process_info()` procedure. Each bit corresponds to a
-	field in the `Process_Info` struct.
+Bit set specifying which fields of the `Process_Info` struct need to be
+obtained by the `process_info()` procedure. Each bit corresponds to a
+field in the `Process_Info` struct.
 */
 Process_Info_Fields :: bit_set[Process_Info_Field]
 Process_Info_Field :: enum {
@@ -134,8 +135,8 @@ Process_Info_Field :: enum {
 ALL_INFO :: Process_Info_Fields{.Executable_Path, .PPid, .Priority, .Command_Line, .Command_Args, .Environment, .Username, .Working_Dir}
 
 /*
-	Contains information about the process as obtained by the `process_info()`
-	procedure.
+Contains information about the process as obtained by the `process_info()`
+procedure.
 */
 Process_Info :: struct {
 	// The information about a process the struct contains. `pid` is always
@@ -162,19 +163,19 @@ Process_Info :: struct {
 }
 
 /*
-	Obtain information about a process.
+Obtain information about a process.
 
-	This procedure obtains an information, specified by `selection` parameter of
-	a process given by `pid`.
+This procedure obtains an information, specified by `selection` parameter of
+a process given by `pid`.
 
-	Use `free_process_info` to free the memory allocated by this procedure. The
-	`free_process_info` procedure needs to be called, even if this procedure
-	returned an error, as some of the fields may have been allocated.
+Use `free_process_info` to free the memory allocated by this procedure. The
+`free_process_info` procedure needs to be called, even if this procedure
+returned an error, as some of the fields may have been allocated.
 
-	**Note**: The resulting information may or may contain the fields specified
-	by the `selection` parameter. Always check whether the returned
-	`Process_Info` struct has the required fields before checking the error code
-	returned by this procedure.
+**Note**: The resulting information may or may contain the fields specified
+by the `selection` parameter. Always check whether the returned
+`Process_Info` struct has the required fields before checking the error code
+returned by this procedure.
 */
 @(require_results)
 process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
@@ -182,20 +183,20 @@ process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator:
 }
 
 /*
-	Obtain information about a process.
+Obtain information about a process.
 
-	This procedure obtains information, specified by `selection` parameter
-	about a process that has been opened by the application, specified in
-	the `process` parameter.
+This procedure obtains information, specified by `selection` parameter
+about a process that has been opened by the application, specified in
+the `process` parameter.
 
-	Use `free_process_info` to free the memory allocated by this procedure. The
-	`free_process_info` procedure needs to be called, even if this procedure
-	returned an error, as some of the fields may have been allocated.
+Use `free_process_info` to free the memory allocated by this procedure. The
+`free_process_info` procedure needs to be called, even if this procedure
+returned an error, as some of the fields may have been allocated.
 
-	**Note**: The resulting information may or may contain the fields specified
-	by the `selection` parameter. Always check whether the returned
-	`Process_Info` struct has the required fields before checking the error code
-	returned by this procedure.
+**Note**: The resulting information may or may contain the fields specified
+by the `selection` parameter. Always check whether the returned
+`Process_Info` struct has the required fields before checking the error code
+returned by this procedure.
 */
 @(require_results)
 process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
@@ -203,19 +204,19 @@ process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields,
 }
 
 /*
-	Obtain information about the current process.
+Obtain information about the current process.
 
-	This procedure obtains the information, specified by `selection` parameter
-	about the currently running process.
+This procedure obtains the information, specified by `selection` parameter
+about the currently running process.
 
-	Use `free_process_info` to free the memory allocated by this procedure. The
-	`free_process_info` procedure needs to be called, even if this procedure
-	returned an error, as some of the fields may have been allocated.
+Use `free_process_info` to free the memory allocated by this procedure. The
+`free_process_info` procedure needs to be called, even if this procedure
+returned an error, as some of the fields may have been allocated.
 
-	**Note**: The resulting information may or may contain the fields specified
-	by the `selection` parameter. Always check whether the returned
-	`Process_Info` struct has the required fields before checking the error code
-	returned by this procedure.
+**Note**: The resulting information may or may contain the fields specified
+by the `selection` parameter. Always check whether the returned
+`Process_Info` struct has the required fields before checking the error code
+returned by this procedure.
 */
 @(require_results)
 current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (Process_Info, Error) {
@@ -223,7 +224,7 @@ current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.
 }
 
 /*
-	Obtain information about the specified process.
+Obtain information about the specified process.
 */
 process_info :: proc {
 	process_info_by_pid,
@@ -232,11 +233,11 @@ process_info :: proc {
 }
 
 /*
-	Free the information about the process.
+Free the information about the process.
 
-	This procedure frees the memory occupied by process info using the provided
-	allocator. The allocator needs to be the same allocator that was supplied
-	to the `process_info` function.
+This procedure frees the memory occupied by process info using the provided
+allocator. The allocator needs to be the same allocator that was supplied
+to the `process_info` function.
 */
 free_process_info :: proc(pi: Process_Info, allocator: runtime.Allocator) {
 	delete(pi.executable_path, allocator)
@@ -254,13 +255,13 @@ free_process_info :: proc(pi: Process_Info, allocator: runtime.Allocator) {
 }
 
 /*
-	Represents a process handle.
+Represents a process handle.
 
-	When a process dies, the OS is free to re-use the pid of that process. The
-	`Process` struct represents a handle to the process that will refer to a
-	specific process, even after it has died.
+When a process dies, the OS is free to re-use the pid of that process. The
+`Process` struct represents a handle to the process that will refer to a
+specific process, even after it has died.
 
-	**Note(linux)**: The `handle` will be referring to pidfd.
+**Note(linux)**: The `handle` will be referring to pidfd.
 */
 Process :: struct {
 	pid: int,
@@ -276,13 +277,13 @@ Process_Open_Flag :: enum {
 }
 
 /*
-	Open a process handle using it's pid.
+Open a process handle using it's pid.
 
-	This procedure obtains a process handle of a process specified by `pid`.
-	This procedure can be subject to race conditions. See the description of
-	`Process`.
+This procedure obtains a process handle of a process specified by `pid`.
+This procedure can be subject to race conditions. See the description of
+`Process`.
 
-	Use `process_close()` function to close the process handle.
+Use `process_close()` function to close the process handle.
 */
 @(require_results)
 process_open :: proc(pid: int, flags := Process_Open_Flags {}) -> (Process, Error) {
@@ -322,29 +323,137 @@ Process_Desc :: struct {
 }
 
 /*
-	Create a new process and obtain its handle.
+Create a new process and obtain its handle.
 
-	This procedure creates a new process, with a given command and environment
-	strings as parameters. Use `environ()` to inherit the environment of the
-	current process.
+This procedure creates a new process, with a given command and environment
+strings as parameters. Use `environ()` to inherit the environment of the
+current process.
 
-	The `desc` parameter specifies the description of how the process should
-	be created. It contains information such as the command line, the
-	environment of the process, the starting directory and many other options.
-	Most of the fields in the struct can be set to `nil` or an empty value.
-	
-	Use `process_close` to close the handle to the process. Note, that this
-	is not the same as terminating the process. One can terminate the process
-	and not close the handle, in which case the handle would be leaked. In case
-	the function returns an error, an invalid handle is returned.
+The `desc` parameter specifies the description of how the process should
+be created. It contains information such as the command line, the
+environment of the process, the starting directory and many other options.
+Most of the fields in the struct can be set to `nil` or an empty value.
 
-	This procedure is not thread-safe. It may alter the inheritance properties
-	of file handles in an unpredictable manner. In case multiple threads change
-	handle inheritance properties, make sure to serialize all those calls.
+Use `process_close` to close the handle to the process. Note, that this
+is not the same as terminating the process. One can terminate the process
+and not close the handle, in which case the handle would be leaked. In case
+the function returns an error, an invalid handle is returned.
+
+This procedure is not thread-safe. It may alter the inheritance properties
+of file handles in an unpredictable manner. In case multiple threads change
+handle inheritance properties, make sure to serialize all those calls.
 */
 @(require_results)
-process_start :: proc(desc := Process_Desc {}) -> (Process, Error) {
+process_start :: proc(desc: Process_Desc) -> (Process, Error) {
 	return _process_start(desc)
+}
+
+/*
+Execute the process and capture stdout and stderr streams.
+
+This procedure creates a new process, with a given command and environment
+strings as parameters, and waits until the process finishes execution. While
+the process is running, this procedure accumulates the output of its stdout
+and stderr streams and returns byte slices containing the captured data from
+the streams.
+
+This procedure expects that `stdout` and `stderr` fields of the `desc` parameter
+are left at default, i.e. a `nil` value. You can not capture stdout/stderr and
+redirect it to a file at the same time.
+
+This procedure does not free `stdout` and `stderr` slices before an error is
+returned. Make sure to call `delete` on these slices.
+*/
+@(require_results)
+process_exec :: proc(
+	desc: Process_Desc,
+	allocator: runtime.Allocator,
+	loc := #caller_location,
+) -> (
+	state: Process_State,
+	stdout: []byte,
+	stderr: []byte,
+	err: Error,
+) {
+	assert(desc.stdout == nil, "Cannot redirect stdout when it's being captured", loc)
+	assert(desc.stderr == nil, "Cannot redirect stderr when it's being captured", loc)
+
+	stdout_r, stdout_w := pipe() or_return
+	defer close(stdout_r)
+	stderr_r, stderr_w := pipe() or_return
+	defer close(stderr_r)
+
+	process: Process
+	{
+		// NOTE(flysand): Make sure the write-ends are closed, regardless
+		// of the outcome. This makes read-ends readable on our side.
+		defer close(stdout_w)
+		defer close(stderr_w)
+		desc := desc
+		desc.stdout = stdout_w
+		desc.stderr = stderr_w
+		process = process_start(desc) or_return
+	}
+
+	{
+		stdout_b: [dynamic]byte
+		stdout_b.allocator = allocator
+		defer stdout = stdout_b[:]
+
+		stderr_b: [dynamic]byte
+		stderr_b.allocator = allocator
+		defer stderr = stderr_b[:]
+
+		buf: [1024]u8 = ---
+		
+		stdout_done, stderr_done, has_data: bool
+		for err == nil && (!stdout_done || !stderr_done) {
+			n := 0
+
+			if !stdout_done {
+				has_data, err = pipe_has_data(stdout_r)
+				if has_data {
+					n, err = read(stdout_r, buf[:])
+				}
+
+				switch err {
+				case nil:
+					_, err = append(&stdout_b, ..buf[:n])
+				case .EOF, .Broken_Pipe:
+					stdout_done = true
+					err = nil
+				}
+			}
+
+			if err == nil && !stderr_done {
+				n = 0
+				has_data, err = pipe_has_data(stderr_r)
+				if has_data {
+					n, err = read(stderr_r, buf[:])
+				}
+
+				switch err {
+				case nil:
+					_, err = append(&stderr_b, ..buf[:n])
+				case .EOF, .Broken_Pipe:
+					stderr_done = true
+					err = nil
+				}
+			}
+		}
+	}
+
+	if err != nil {
+		state, _ = process_wait(process, timeout=0)
+		if !state.exited {
+			_ = process_kill(process)
+			state, _ = process_wait(process)
+		}
+		return
+	}
+
+	state, err = process_wait(process)
+	return
 }
 
 /*
@@ -371,17 +480,17 @@ Process_State :: struct {
 }
 
 /*
-	Wait for a process event.
+Wait for a process event.
 
-	This procedure blocks the execution until the process has exited or the
-	timeout (if specified) has reached zero. If the timeout is `TIMEOUT_INFINITE`,
-	no timeout restriction is imposed and the procedure can block indefinately.
+This procedure blocks the execution until the process has exited or the
+timeout (if specified) has reached zero. If the timeout is `TIMEOUT_INFINITE`,
+no timeout restriction is imposed and the procedure can block indefinately.
 
-	If the timeout has expired, the `General_Error.Timeout` is returned as
-	the error.
+If the timeout has expired, the `General_Error.Timeout` is returned as
+the error.
 
-	If an error is returned for any other reason, other than timeout, the
-	process state is considered undetermined.
+If an error is returned for any other reason, other than timeout, the
+process state is considered undetermined.
 */
 @(require_results)
 process_wait :: proc(process: Process, timeout := TIMEOUT_INFINITE) -> (Process_State, Error) {
@@ -389,12 +498,12 @@ process_wait :: proc(process: Process, timeout := TIMEOUT_INFINITE) -> (Process_
 }
 
 /*
-	Close the handle to a process.
+Close the handle to a process.
 
-	This procedure closes the handle associated with a process. It **does not**
-	terminate a process, in case it was running. In case a termination is
-	desired, kill the process first, wait for the process to finish,
-	then close the handle.
+This procedure closes the handle associated with a process. It **does not**
+terminate a process, in case it was running. In case a termination is
+desired, kill the process first, wait for the process to finish,
+then close the handle.
 */
 @(require_results)
 process_close :: proc(process: Process) -> (Error) {
@@ -402,10 +511,9 @@ process_close :: proc(process: Process) -> (Error) {
 }
 
 /*
-	Terminate a process.
+Terminate a process.
 
-	This procedure terminates a process, specified by it's handle, `process`.
-
+This procedure terminates a process, specified by it's handle, `process`.
 */
 @(require_results)
 process_kill :: proc(process: Process) -> (Error) {

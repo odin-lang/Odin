@@ -40,7 +40,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 
 	internal_mkdir_all :: proc(path: string, perm: int) -> Error {
 		dir, file := filepath.split(path)
-		if file != path {
+		if file != path && dir != "/" {
 			if len(dir) > 1 && dir[len(dir) - 1] == '/' {
 				dir = dir[:len(dir) - 1]
 			}

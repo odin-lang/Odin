@@ -147,7 +147,8 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	addr := _unwrap_os_addr(endpoint)
 	errno = linux.connect(linux.Fd(os_sock), &addr)
 	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Dial_Error(errno)
+		close(cast(TCP_Socket) os_sock)
+		return {}, Dial_Error(errno)
 	}
 	// NOTE(tetra): Not vital to succeed; error ignored
 	no_delay: b32 = cast(b32) options.no_delay
@@ -166,40 +167,48 @@ _bind :: proc(sock: Any_Socket, endpoint: Endpoint) -> (Network_Error) {
 }
 
 @(private)
-_listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (TCP_Socket, Network_Error) {
+_listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket, err: Network_Error) {
 	errno: linux.Errno
 	assert(backlog > 0 && i32(backlog) < max(i32))
+
 	// Figure out the address family and address of the endpoint
 	ep_family := _unwrap_os_family(family_from_endpoint(endpoint))
 	ep_address := _unwrap_os_addr(endpoint)
+
 	// Create TCP socket
 	os_sock: linux.Fd
 	os_sock, errno = linux.socket(ep_family, .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
-		// TODO(flysand): should return invalid file descriptor here casted as TCP_Socket
-		return {}, Create_Socket_Error(errno)
+		err = Create_Socket_Error(errno)
+		return
 	}
+	socket = cast(TCP_Socket)os_sock
+	defer if err != nil { close(socket) }
+
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
 	// use the same address immediately.
 	//
 	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the address!
 	do_reuse_addr: b32 = true
-	errno = linux.setsockopt(os_sock, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &do_reuse_addr)
-	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Listen_Error(errno)
+	if errno = linux.setsockopt(os_sock, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &do_reuse_addr); errno != .NONE {
+		err = Listen_Error(errno)
+		return
 	}
+
 	// Bind the socket to endpoint address
-	errno = linux.bind(os_sock, &ep_address)
-	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Bind_Error(errno)
+	if errno = linux.bind(os_sock, &ep_address); errno != .NONE {
+		err = Bind_Error(errno)
+		return
 	}
+
 	// Listen on bound socket
-	errno = linux.listen(os_sock, cast(i32) backlog)
-	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Listen_Error(errno)
+	if errno = linux.listen(os_sock, cast(i32) backlog); errno != .NONE {
+		err = Listen_Error(errno)
+		return
 	}
-	return cast(TCP_Socket) os_sock, nil
+
+	return
 }
 
 @(private)

@@ -673,7 +673,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 
 #define ST_ALIGN(_name) if (st->_name != nullptr) {                                                \
 		if (st->is_packed) {                                                               \
-			syntax_error(st->_name, "'#%s' cannot be applied with '#packed'", #_name); \
+			error(st->_name, "'#%s' cannot be applied with '#packed'", #_name); \
 			return;                                                                    \
 		}                                                                                  \
 		i64 align = 1;                                                                     \
@@ -682,12 +682,31 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		}                                                                                  \
 	}
 
-	ST_ALIGN(field_align);
+	ST_ALIGN(min_field_align);
+	ST_ALIGN(max_field_align);
 	ST_ALIGN(align);
-	if (struct_type->Struct.custom_align < struct_type->Struct.custom_field_align) {
-		warning(st->align, "#align(%lld) is defined to be less than #field_name(%lld)",
-		        cast(long long)struct_type->Struct.custom_align,
-		        cast(long long)struct_type->Struct.custom_field_align);
+	if (struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
+		error(st->align, "#align(%lld) is defined to be less than #min_field_align(%lld)",
+		      cast(long long)struct_type->Struct.custom_align,
+		      cast(long long)struct_type->Struct.custom_min_field_align);
+	}
+	if (struct_type->Struct.custom_max_field_align != 0 &&
+	    struct_type->Struct.custom_align > struct_type->Struct.custom_max_field_align) {
+		error(st->align, "#align(%lld) is defined to be greater than #max_field_align(%lld)",
+		      cast(long long)struct_type->Struct.custom_align,
+		      cast(long long)struct_type->Struct.custom_max_field_align);
+	}
+	if (struct_type->Struct.custom_max_field_align != 0 &&
+	    struct_type->Struct.custom_min_field_align > struct_type->Struct.custom_max_field_align) {
+		error(st->align, "#min_field_align(%lld) is defined to be greater than #max_field_align(%lld)",
+		      cast(long long)struct_type->Struct.custom_min_field_align,
+		      cast(long long)struct_type->Struct.custom_max_field_align);
+
+		i64 a = gb_min(struct_type->Struct.custom_min_field_align, struct_type->Struct.custom_max_field_align);
+		i64 b = gb_max(struct_type->Struct.custom_min_field_align, struct_type->Struct.custom_max_field_align);
+		// NOTE(bill): sort them to keep code consistent
+		struct_type->Struct.custom_min_field_align = a;
+		struct_type->Struct.custom_max_field_align = b;
 	}
 
 #undef ST_ALIGN
@@ -3498,41 +3517,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(rt, RelativeType, e);
-		GB_ASSERT(rt->tag->kind == Ast_CallExpr);
-		ast_node(ce, CallExpr, rt->tag);
-
-		Type *base_integer = nullptr;
-
-		if (ce->args.count != 1) {
-			error(rt->type, "#relative expected 1 type argument, got %td", ce->args.count);
-		} else {
-			base_integer = check_type(ctx, ce->args[0]);
-			if (!is_type_integer(base_integer)) {
-				error(rt->type, "#relative base types must be an integer");
-				base_integer = nullptr;
-			} else if (type_size_of(base_integer) > 64) {
-				error(rt->type, "#relative base integer types be less than or equal to 64-bits");
-				base_integer = nullptr;
-			}
-		}
-
-		Type *relative_type = nullptr;
-		Type *base_type = check_type(ctx, rt->type);
-		if (!is_type_pointer(base_type) && !is_type_multi_pointer(base_type)) {
-			error(rt->type, "#relative types can only be a pointer or multi-pointer");
-			relative_type = base_type;
-		} else if (base_integer == nullptr) {
-			relative_type = base_type;
-		} else {
-			if (is_type_pointer(base_type)) {
-				relative_type = alloc_type_relative_pointer(base_type, base_integer);
-			} else if (is_type_multi_pointer(base_type)) {
-				relative_type = alloc_type_relative_multi_pointer(base_type, base_integer);
-			}
-		}
-		GB_ASSERT(relative_type != nullptr);
-
-		*type = relative_type;
+		error(e, "#relative types have been removed from the compiler. Prefer \"core:relative\".");
+		*type = t_invalid;
 		set_base_type(named_type, *type);
 		return true;
 	case_end;

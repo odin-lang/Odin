@@ -75,7 +75,6 @@ enum lbAddrKind {
 	lbAddr_Context,
 	lbAddr_SoaVariable,
 
-	lbAddr_RelativePointer,
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
@@ -103,9 +102,6 @@ struct lbAddr {
 			lbValue index;
 			Ast *node;
 		} index_set;
-		struct {
-			bool deref;
-		} relative;
 		struct {
 			Type *type;
 			u8 count;      // 2, 3, or 4 components

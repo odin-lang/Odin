@@ -1,7 +1,5 @@
-#+build darwin, freebsd, openbsd, netbsd
+#+build linux, darwin, freebsd, openbsd, netbsd
 package tests_core_posix
-
-import "base:runtime"
 
 import "core:log"
 import "core:path/filepath"
@@ -146,7 +144,6 @@ test_libgen :: proc(t: ^testing.T) {
 		{ "usr/",             ".",          "usr" },
 		{ "",                 ".",          "." },
 		{ "/",                "/",          "/" },
-		{ "//",               "/",          "/" },
 		{ "///",              "/",          "/" },
 		{ "/usr/",            "/",          "usr" },
 		{ "/usr/lib",         "/usr",       "lib" },
@@ -203,64 +200,6 @@ test_stat :: proc(t: ^testing.T) {
 
 	CONTENT := #load(#file)
 	testing.expect_value(t, stat.st_size, posix.off_t(len(CONTENT)))
-}
-
-@(test)
-test_termios :: proc(t: ^testing.T) {
-	testing.expect_value(t, transmute(posix.CControl_Flags)posix.tcflag_t(posix._CSIZE),  posix.CSIZE)
-
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._NLDLY),  posix.NLDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._CRDLY),  posix.CRDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._TABDLY), posix.TABDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._BSDLY),  posix.BSDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._VTDLY),  posix.VTDLY)
-	testing.expect_value(t, transmute(posix.COutput_Flags)posix.tcflag_t(posix._FFDLY),  posix.FFDLY)
-}
-
-@(test)
-test_signal :: proc(t: ^testing.T) {
-	@static tt: ^testing.T
-	tt = t
-
-	@static ctx: runtime.Context
-	ctx = context
-
-	act: posix.sigaction_t
-	act.sa_flags = {.SIGINFO, .RESETHAND}
-	act.sa_sigaction = handler
-	testing.expect_value(t, posix.sigaction(.SIGCHLD, &act, nil), posix.result.OK)
-
-	handler :: proc "c" (sig: posix.Signal, info: ^posix.siginfo_t, address: rawptr) {
-		context = ctx
-		testing.expect_value(tt, sig, posix.Signal.SIGCHLD)
-		testing.expect_value(tt, info.si_signo, posix.Signal.SIGCHLD)
-		testing.expect_value(tt, info.si_status, 69)
-		testing.expect_value(tt, info.si_code.chld, posix.CLD_Code.EXITED)
-	}
-
-	switch pid := posix.fork(); pid {
-	case -1:
-		log.errorf("fork() failure: %v", posix.strerror())
-	case 0:
-		posix.exit(69)
-	case:
-		for {
-			status: i32
-			res := posix.waitpid(pid, &status, {})
-			if res == -1 {
-				if !testing.expect_value(t, posix.errno(), posix.Errno.EINTR) {
-					break
-				}
-				continue
-			}
-
-			if posix.WIFEXITED(status) || posix.WIFSIGNALED(status) {
-				testing.expect(t, posix.WIFEXITED(status))
-				testing.expect(t, posix.WEXITSTATUS(status) == 69)
-				break
-			}
-        }
-	}
 }
 
 @(test)

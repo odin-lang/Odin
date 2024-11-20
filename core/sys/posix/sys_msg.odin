@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -64,28 +65,22 @@ when ODIN_OS == .Darwin {
 
 	MSG_NOERROR :: 0o10000
 
-	// NOTE: this is #pragma pack(4)
-
-	msqid_ds :: struct #align(4) {
-		msg_perm:   ipc_perm,             /* [PSX] operation permission structure */
+	msqid_ds :: struct #max_field_align(4) {
+		msg_perm:   ipc_perm,     /* [PSX] operation permission structure */
 		msg_first:  c.int32_t,
 		msg_last:   c.int32_t,
 		msg_cbytes: msglen_t,
-		msg_qnum:   msgqnum_t,            /* [PSX] number of messages currently on queue */
-		msg_qbytes: msglen_t,             /* [PSX] maximum number of bytes allowed on queue */
-		msg_lspid:  pid_t,                /* [PSX] process ID of last msgsnd() */
-		msg_lrpid:  pid_t,                /* [PSX] process ID of last msgrcv() */
-		msg_stime:  time_t,               /* [PSX] time of last msgsnd() */
+		msg_qnum:   msgqnum_t,    /* [PSX] number of messages currently on queue */
+		msg_qbytes: msglen_t,     /* [PSX] maximum number of bytes allowed on queue */
+		msg_lspid:  pid_t,        /* [PSX] process ID of last msgsnd() */
+		msg_lrpid:  pid_t,        /* [PSX] process ID of last msgrcv() */
+		msg_stime:  time_t,       /* [PSX] time of last msgsnd() */
 		msg_pad1:   c.int32_t,
-		using _: struct #align(4) {
-			msg_rtime:  time_t,           /* [PSX] time of last msgrcv() */
-			msg_pad2:   c.int32_t,
-			using _: struct #align(4) {
-				msg_ctime:  time_t,       /* [PSX] time of last change */
-				msg_pad3:   c.int32_t,
-				msg_pad4:   [4]c.int32_t,
-			},
-		},
+		msg_rtime:  time_t,       /* [PSX] time of last msgrcv() */
+		msg_pad2:   c.int32_t,
+		msg_ctime:  time_t,       /* [PSX] time of last change */
+		msg_pad3:   c.int32_t,
+		msg_pad4:   [4]c.int32_t,
 	}
 
 } else when ODIN_OS == .FreeBSD {
@@ -156,6 +151,24 @@ when ODIN_OS == .Darwin {
 		msg_pad4:    [4]c.long,
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	msgqnum_t :: distinct c.ulong
+	msglen_t  :: distinct c.ulong
+
+	MSG_NOERROR :: 0o10000
+
+	msqid_ds :: struct {
+		msg_perm:    ipc_perm,  /* [PSX] operation permission structure */
+		msg_stime:   time_t,    /* [PSX] time of last msgsnd() */
+		msg_rtime:   time_t,    /* [PSX] time of last msgrcv() */
+		msg_ctime:   time_t,    /* [PSX] time of last change */
+		msg_cbytes:  c.ulong,
+		msg_qnum:    msgqnum_t, /* [PSX] number of messages currently on queue */
+		msg_qbytes:  msglen_t,  /* [PSX] maximum number of bytes allowed on queue */
+		msg_lspid:   pid_t,     /* [PSX] process ID of last msgsnd() */
+		msg_lrpid:   pid_t,     /* [PSX] process ID of last msgrcv() */
+		__unused:    [2]c.ulong,
+	}
+
 }

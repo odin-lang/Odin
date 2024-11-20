@@ -88,11 +88,12 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			e->type = t_invalid;
 			return nullptr;
 		} else if (is_type_polymorphic(t)) {
-			Entity *e = entity_of_node(operand->expr);
-			if (e == nullptr) {
+			Entity *e2 = entity_of_node(operand->expr);
+			if (e2 == nullptr) {
+				e->type = t_invalid;
 				return nullptr;
 			}
-			if (e->state.load() != EntityState_Resolved) {
+			if (e2->state.load() != EntityState_Resolved) {
 				gbString str = type_to_string(t);
 				defer (gb_string_free(str));
 				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
@@ -231,6 +232,10 @@ gb_internal bool check_override_as_type_due_to_aliasing(CheckerContext *ctx, Ent
 		// For the time being, these are going to be treated as an unfortunate error
 		// until there is a proper delaying system to try declaration again if they
 		// have failed.
+
+		if (e->type != nullptr && is_type_typed(e->type)) {
+			return false;
+		}
 
 		e->kind = Entity_TypeName;
 		check_type_decl(ctx, e, init, named_type);

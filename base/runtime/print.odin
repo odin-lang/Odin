@@ -486,18 +486,6 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_u64(u64(info.count))
 		print_byte(']')
 		print_type(info.elem)
-
-	case Type_Info_Relative_Pointer:
-		print_string("#relative(")
-		print_type(info.base_integer)
-		print_string(") ")
-		print_type(info.pointer)
-
-	case Type_Info_Relative_Multi_Pointer:
-		print_string("#relative(")
-		print_type(info.base_integer)
-		print_string(") ")
-		print_type(info.pointer)
 		
 	case Type_Info_Matrix:
 		print_string("matrix[")

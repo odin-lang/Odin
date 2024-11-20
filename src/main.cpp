@@ -328,6 +328,8 @@ enum BuildFlagKind {
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
+	BuildFlag_UseRADLink,
+	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
@@ -539,6 +541,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_UseRADLink,              str_lit("radlink"),                   BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
@@ -1060,27 +1064,29 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 
 							if (!found) {
-								struct DistanceAndTargetIndex {
-									isize distance;
-									isize target_index;
-								};
+							    if (str != "?") {
+									struct DistanceAndTargetIndex {
+										isize distance;
+										isize target_index;
+									};
 
-								DistanceAndTargetIndex distances[gb_count_of(named_targets)] = {};
-								for (isize i = 0; i < gb_count_of(named_targets); i++) {
-									distances[i].target_index = i;
-									distances[i].distance = levenstein_distance_case_insensitive(str, named_targets[i].name);
-								}
-								gb_sort_array(distances, gb_count_of(distances), gb_isize_cmp(gb_offset_of(DistanceAndTargetIndex, distance)));
-
-								gb_printf_err("Unknown target '%.*s'\n", LIT(str));
-
-								if (distances[0].distance <= MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
-									gb_printf_err("Did you mean:\n");
+									DistanceAndTargetIndex distances[gb_count_of(named_targets)] = {};
 									for (isize i = 0; i < gb_count_of(named_targets); i++) {
-										if (distances[i].distance > MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
-											break;
+										distances[i].target_index = i;
+										distances[i].distance = levenstein_distance_case_insensitive(str, named_targets[i].name);
+									}
+									gb_sort_array(distances, gb_count_of(distances), gb_isize_cmp(gb_offset_of(DistanceAndTargetIndex, distance)));
+
+									gb_printf_err("Unknown target '%.*s'\n", LIT(str));
+
+									if (distances[0].distance <= MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
+										gb_printf_err("Did you mean:\n");
+										for (isize i = 0; i < gb_count_of(named_targets); i++) {
+											if (distances[i].distance > MAX_SMALLEST_DID_YOU_MEAN_DISTANCE) {
+												break;
+											}
+											gb_printf_err("\t%.*s\n", LIT(named_targets[distances[i].target_index].name));
 										}
-										gb_printf_err("\t%.*s\n", LIT(named_targets[distances[i].target_index].name));
 									}
 								}
 								gb_printf_err("All supported targets:\n");
@@ -1199,8 +1205,38 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_thread_local = true;
 							break;
 						case BuildFlag_UseLLD:
-							build_context.use_lld = true;
+							gb_printf_err("Warning: Use of -lld has been deprecated in favour of -linker:lld\n");
+							build_context.linker_choice = Linker_lld;
 							break;
+						case BuildFlag_UseRADLink:
+							gb_printf_err("Warning: Use of -lld has been deprecated in favour of -linker:radlink\n");
+							build_context.linker_choice = Linker_radlink;
+							break;
+						case BuildFlag_Linker:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								LinkerChoice linker_choice = Linker_Invalid;
+
+								for (i32 i = 0; i < Linker_COUNT; i++) {
+									if (linker_choices[i] == value.value_string) {
+										linker_choice = cast(LinkerChoice)i;
+										break;
+									}
+								}
+
+								if (linker_choice == Linker_Invalid) {
+									gb_printf_err("Invalid option for -linker:<string>. Expected one of the following\n");
+									for (i32 i = 0; i < Linker_COUNT; i++) {
+										gb_printf_err("\t%.*s\n", LIT(linker_choices[i]));
+									}
+									bad_flags = true;
+								} else {
+									build_context.linker_choice = linker_choice;
+								}
+							}
+							break;
+
+
 						case BuildFlag_UseSeparateModules:
 							build_context.use_separate_modules = true;
 							break;
@@ -1408,7 +1444,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.terse_errors = true;
 							break;
 						case BuildFlag_VerboseErrors:
-							gb_printf_err("-verbose-errors is not the default, -terse-errors can now disable it\n");
+							gb_printf_err("-verbose-errors is now the default, -terse-errors can disable it\n");
 							build_context.hide_error_line = false;
 							build_context.terse_errors = false;
 							break;
@@ -1747,7 +1783,7 @@ gb_internal void check_defines(BuildContext *bc, Checker *c) {
 		String name = make_string_c(entry.key);
 		ExactValue value = entry.value;
 		GB_ASSERT(value.kind != ExactValue_Invalid);
-		
+
 		bool found = false;
 		for_array(i, c->info.defineables) {
 			Defineable *def = &c->info.defineables[i];
@@ -1776,9 +1812,9 @@ gb_internal void temp_alloc_defineable_strings(Checker *c) {
 gb_internal GB_COMPARE_PROC(defineables_cmp) {
 	Defineable *x = (Defineable *)a;
 	Defineable *y = (Defineable *)b;
-	
+
 	int cmp = 0;
-	
+
 	String x_file = get_file_path_string(x->pos.file_id);
 	String y_file = get_file_path_string(y->pos.file_id);
 	cmp = string_compare(x_file, y_file);
@@ -1789,8 +1825,22 @@ gb_internal GB_COMPARE_PROC(defineables_cmp) {
 	return i32_cmp(x->pos.offset, y->pos.offset);
 }
 
-gb_internal void sort_defineables(Checker *c) {
+gb_internal void sort_defineables_and_remove_duplicates(Checker *c) {
+	if (c->info.defineables.count == 0) {
+		return;
+	}
 	gb_sort_array(c->info.defineables.data, c->info.defineables.count, defineables_cmp);
+
+	Defineable prev = c->info.defineables[0];
+	for (isize i = 1; i < c->info.defineables.count; ) {
+		Defineable curr = c->info.defineables[i];
+		if (prev.pos == curr.pos) {
+			array_ordered_remove(&c->info.defineables, i);
+			continue;
+		}
+		prev = curr;
+		i++;
+	}
 }
 
 gb_internal void export_defineables(Checker *c, String path) {
@@ -2125,11 +2175,12 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 }
 
 
-gb_internal void print_show_help(String const arg0, String const &command) {
+gb_internal void print_show_help(String const arg0, String const &command, String optional_flag = {}) {
 	print_usage_line(0, "%.*s is a tool for managing Odin source code.", LIT(arg0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
 	print_usage_line(0, "");
+	defer (print_usage_line(0, ""));
 
 	if (command == "build") {
 		print_usage_line(1, "build   Compiles directory of .odin files as an executable.");
@@ -2175,475 +2226,560 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	bool check_only      = command == "check" || strip_semicolon;
 	bool check           = run_or_build || check_only;
 
+	if (command == "help") {
+		doc             = true;
+		build           = true;
+		run_or_build    = true;
+		test_only       = true;
+		strip_semicolon = true;
+		check_only      = true;
+		check           = true;
+	}
+
 	print_usage_line(0, "");
 	print_usage_line(1, "Flags");
 	print_usage_line(0, "");
 
-	if (check) {
-		print_usage_line(1, "-file");
-		print_usage_line(2, "Tells `%.*s %.*s` to treat the given file as a self-contained package.", LIT(arg0), LIT(command));
-		print_usage_line(2, "This means that `<dir>/a.odin` won't have access to `<dir>/b.odin`'s contents.");
+
+
+	auto const print_flag = [&optional_flag](char const *flag) -> bool {
+		if (optional_flag.len != 0) {
+			String f = make_string_c(flag);
+			isize i = string_index_byte(f, ':');
+			if (i >= 0) {
+				f.len = i;
+			}
+			if (optional_flag != f) {
+				return false;
+			}
+		}
 		print_usage_line(0, "");
+		print_usage_line(1, flag);
+		return true;
+	};
+
+
+	if (doc) {
+		if (print_flag("-all-packages")) {
+			print_usage_line(2, "Generates documentation for all packages used in the current project.");
+		}
+	}
+	if (test_only) {
+		if (print_flag("-all-packages")) {
+			print_usage_line(2, "Tests all packages imported into the given initial package.");
+		}
+	}
+
+	if (build) {
+		if (print_flag("-build-mode:<mode>")) {
+			print_usage_line(2, "Sets the build mode.");
+			print_usage_line(2, "Available options:");
+			print_usage_line(3, "-build-mode:exe         Builds as an executable.");
+			print_usage_line(3, "-build-mode:test        Builds as an executable that executes tests.");
+			print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
+			print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
+			print_usage_line(3, "-build-mode:dynamic     Builds as a dynamically linked library.");
+			print_usage_line(3, "-build-mode:lib         Builds as a statically linked library.");
+			print_usage_line(3, "-build-mode:static      Builds as a statically linked library.");
+			print_usage_line(3, "-build-mode:obj         Builds as an object file.");
+			print_usage_line(3, "-build-mode:object      Builds as an object file.");
+			print_usage_line(3, "-build-mode:assembly    Builds as an assembly file.");
+			print_usage_line(3, "-build-mode:assembler   Builds as an assembly file.");
+			print_usage_line(3, "-build-mode:asm         Builds as an assembly file.");
+			print_usage_line(3, "-build-mode:llvm-ir     Builds as an LLVM IR file.");
+			print_usage_line(3, "-build-mode:llvm        Builds as an LLVM IR file.");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-collection:<name>=<filepath>")) {
+			print_usage_line(2, "Defines a library collection used for imports.");
+			print_usage_line(2, "Example: -collection:shared=dir/to/shared");
+			print_usage_line(2, "Usage in Code:");
+			print_usage_line(3, "import \"shared:foo\"");
+		}
+
+		if (print_flag("-custom-attribute:<string>")) {
+			print_usage_line(2, "Add a custom attribute which will be ignored if it is unknown.");
+			print_usage_line(2, "This can be used with metaprogramming tools.");
+			print_usage_line(2, "Examples:");
+			print_usage_line(3, "-custom-attribute:my_tag");
+			print_usage_line(3, "-custom-attribute:my_tag,the_other_thing");
+			print_usage_line(3, "-custom-attribute:my_tag -custom-attribute:the_other_thing");
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-debug")) {
+			print_usage_line(2, "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'.");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-default-to-nil-allocator")) {
+			print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing.");
+		}
+
+		if (print_flag("-define:<name>=<value>")) {
+			print_usage_line(2, "Defines a scalar boolean, integer or string as global constant.");
+			print_usage_line(2, "Example: -define:SPAM=123");
+			print_usage_line(2, "Usage in code:");
+			print_usage_line(3, "#config(SPAM, default_value)");
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-disable-assert")) {
+			print_usage_line(2, "Disables the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'.");
+		}
+
+		if (print_flag("-disable-red-zone")) {
+			print_usage_line(2, "Disables red zone on a supported freestanding target.");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-disallow-do")) {
+			print_usage_line(2, "Disallows the 'do' keyword in the project.");
+		}
 	}
 
 	if (doc) {
-		print_usage_line(1, "-short");
-		print_usage_line(2, "Shows shortened documentation for the packages.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-all-packages");
-		print_usage_line(2, "Generates documentation for all packages used in the current project.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-doc-format");
-		print_usage_line(2, "Generates documentation as the .odin-doc format (useful for external tooling).");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-out:<filepath>");
-		print_usage_line(2, "Sets the base name of the resultig .odin-doc file.");
-		print_usage_line(2, "The extension can be optionally included; the resulting file will always have an extension of '.odin-doc'.");
-		print_usage_line(2, "Example: -out:foo");
-		print_usage_line(0, "");
+		if (print_flag("-doc-format")) {
+			print_usage_line(2, "Generates documentation as the .odin-doc format (useful for external tooling).");
+		}
 	}
 
 	if (run_or_build) {
-		print_usage_line(1, "-out:<filepath>");
-		print_usage_line(2, "Sets the file name of the outputted executable.");
-		print_usage_line(2, "Example: -out:foo.exe");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-o:<string>");
-		print_usage_line(2, "Sets the optimization mode for compilation.");
-		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-o:none");
-		print_usage_line(3, "-o:minimal");
-		print_usage_line(3, "-o:size");
-		print_usage_line(3, "-o:speed");
-		if (LB_USE_NEW_PASS_SYSTEM) {
-			print_usage_line(3, "-o:aggressive");
+		if (print_flag("-dynamic-map-calls")) {
+			print_usage_line(2, "Uses dynamic map calls to minimize code generation at the cost of runtime execution.");
 		}
-		print_usage_line(2, "The default is -o:minimal.");
-		print_usage_line(0, "");
 	}
 
 	if (check) {
-		print_usage_line(1, "-show-timings");
-		print_usage_line(2, "Shows basic overview of the timings of different stages within the compiler in milliseconds.");
-		print_usage_line(0, "");
+		if (print_flag("-error-pos-style:<string>")) {
+			print_usage_line(2, "Available options:");
+			print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
+			print_usage_line(3, "-error-pos-style:odin      file/path(45:3)");
+			print_usage_line(3, "-error-pos-style:default   (Defaults to 'odin'.)");
+		}
 
-		print_usage_line(1, "-show-more-timings");
-		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds.");
-		print_usage_line(0, "");
+		if (print_flag("-export-defineables:<filename>")) {
+			print_usage_line(2, "Exports an overview of all the #config/#defined usages in CSV format to the given file path.");
+			print_usage_line(2, "Example: -export-defineables:defineables.csv");
+		}
 
-		print_usage_line(1, "-show-system-calls");
-		print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler.");
-		print_usage_line(0, "");
+		if (print_flag("-export-dependencies:<format>")) {
+			print_usage_line(2, "Exports dependencies to one of a few formats. Requires `-export-dependencies-file`.");
+			print_usage_line(2, "Available options:");
+			print_usage_line(3, "-export-dependencies:make   Exports in Makefile format");
+			print_usage_line(3, "-export-dependencies:json   Exports in JSON format");
+		}
 
-		print_usage_line(1, "-export-timings:<format>");
-		print_usage_line(2, "Exports timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
-		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-export-timings:json   Exports compile time stats to JSON.");
-		print_usage_line(3, "-export-timings:csv    Exports compile time stats to CSV.");
-		print_usage_line(0, "");
+		if (print_flag("-export-dependencies-file:<filename>")) {
+			print_usage_line(2, "Specifies the filename for `-export-dependencies`.");
+			print_usage_line(2, "Example: -export-dependencies-file:dependencies.d");
+		}
 
-		print_usage_line(1, "-export-timings-file:<filename>");
-		print_usage_line(2, "Specifies the filename for `-export-timings`.");
-		print_usage_line(2, "Example: -export-timings-file:timings.json");
-		print_usage_line(0, "");
+		if (print_flag("-export-timings:<format>")) {
+			print_usage_line(2, "Exports timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
+			print_usage_line(2, "Available options:");
+			print_usage_line(3, "-export-timings:json   Exports compile time stats to JSON.");
+			print_usage_line(3, "-export-timings:csv    Exports compile time stats to CSV.");
+		}
 
-		print_usage_line(1, "-export-dependencies:<format>");
-		print_usage_line(2, "Exports dependencies to one of a few formats. Requires `-export-dependencies-file`.");
-		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-export-dependencies:make   Exports in Makefile format");
-		print_usage_line(3, "-export-dependencies:json   Exports in JSON format");
-		print_usage_line(0, "");
+		if (print_flag("-export-timings-file:<filename>")) {
+			print_usage_line(2, "Specifies the filename for `-export-timings`.");
+			print_usage_line(2, "Example: -export-timings-file:timings.json");
+		}
+	}
 
-		print_usage_line(1, "-export-dependencies-file:<filename>");
-		print_usage_line(2, "Specifies the filename for `-export-dependencies`.");
-		print_usage_line(2, "Example: -export-dependencies-file:dependencies.d");
-		print_usage_line(0, "");
+	if (run_or_build) {
+		if (print_flag("-extra-assembler-flags:<string>")) {
+		print_usage_line(2, "Adds extra assembler specific flags in a string.");
+		}
 
-		print_usage_line(1, "-thread-count:<integer>");
-		print_usage_line(2, "Overrides the number of threads the compiler will use to compile with.");
-		print_usage_line(2, "Example: -thread-count:2");
-		print_usage_line(0, "");
+		if (print_flag("-extra-linker-flags:<string>")) {
+		print_usage_line(2, "Adds extra linker specific flags in a string.");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-file")) {
+			print_usage_line(2, "Tells `%.*s %.*s` to treat the given file as a self-contained package.", LIT(arg0), LIT(command));
+			print_usage_line(2, "This means that `<dir>/a.odin` won't have access to `<dir>/b.odin`'s contents.");
+		}
+
+		if (print_flag("-foreign-error-procedures")) {
+			print_usage_line(2, "States that the error procedures used in the runtime are defined in a separate translation unit.");
+		}
+
+		if (print_flag("-ignore-unknown-attributes")) {
+			print_usage_line(2, "Ignores unknown attributes.");
+			print_usage_line(2, "This can be used with metaprogramming tools.");
+		}
+	}
+
+	if (run_or_build) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (print_flag("-ignore-vs-search")) {
+			print_usage_line(2, "[Windows only]");
+			print_usage_line(2, "Ignores the Visual Studio search for library paths.");
+		}
+	#endif
+	}
+
+	if (check) {
+		if (print_flag("-ignore-warnings")) {
+			print_usage_line(2, "Ignores warning messages.");
+		}
+
+		if (print_flag("-json-errors")) {
+			print_usage_line(2, "Prints the error messages as json to stderr.");
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-keep-temp-files")) {
+			print_usage_line(2, "Keeps the temporary files generated during compilation.");
+		}
+	} else if (strip_semicolon) {
+		if (print_flag("-keep-temp-files")) {
+			print_usage_line(2, "Keeps the temporary files generated during stripping the unneeded semicolons from files.");
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-linker:<string>")) {
+			print_usage_line(2, "Specify the linker to use.");
+			print_usage_line(2, "Choices:");
+			for (i32 i = 0; i < Linker_COUNT; i++) {
+				print_usage_line(3, "%.*s", LIT(linker_choices[i]));
+			}
+		}
+
+		if (print_flag("-lld")) {
+			print_usage_line(2, "Uses the LLD linker rather than the default.");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-max-error-count:<integer>")) {
+			print_usage_line(2, "Sets the maximum number of errors that can be displayed before the compiler terminates.");
+			print_usage_line(2, "Must be an integer >0.");
+			print_usage_line(2, "If not set, the default max error count is %d.", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-microarch:<string>")) {
+			print_usage_line(2, "Specifies the specific micro-architecture for the build in a string.");
+			print_usage_line(2, "Examples:");
+			print_usage_line(3, "-microarch:sandybridge");
+			print_usage_line(3, "-microarch:native");
+			print_usage_line(3, "-microarch:\"?\" for a list");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-min-link-libs")) {
+			print_usage_line(2, "If set, the number of linked libraries will be minimized to prevent duplications.");
+			print_usage_line(2, "This is useful for so called \"dumb\" linkers compared to \"smart\" linkers.");
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-minimum-os-version:<string>")) {
+			print_usage_line(2, "Sets the minimum OS version targeted by the application.");
+			print_usage_line(2, "Default: -minimum-os-version:11.0.0");
+			print_usage_line(2, "Only used when target is Darwin, if given, linking mismatched versions will emit a warning.");
+		}
+
+		if (print_flag("-no-bounds-check")) {
+			print_usage_line(2, "Disables bounds checking program wide.");
+		}
+
+		if (print_flag("-no-crt")) {
+			print_usage_line(2, "Disables automatic linking with the C Run Time.");
+		}
+	}
+
+	if (check && command != "test") {
+		if (print_flag("-no-entry-point")) {
+			print_usage_line(2, "Removes default requirement of an entry point (e.g. main procedure).");
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-no-rpath")) {
+			print_usage_line(2, "Disables automatic addition of an rpath linked to the executable directory.");
+		}
+
+		if (print_flag("-no-thread-local")) {
+			print_usage_line(2, "Ignores @thread_local attribute, effectively treating the program as if it is single-threaded.");
+		}
+
+		if (print_flag("-no-threaded-checker")) {
+			print_usage_line(2, "Disables multithreading in the semantic checker stage.");
+		}
+
+		if (print_flag("-no-type-assert")) {
+			print_usage_line(2, "Disables type assertion checking program wide.");
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-o:<string>")) {
+			print_usage_line(2, "Sets the optimization mode for compilation.");
+			print_usage_line(2, "Available options:");
+			print_usage_line(3, "-o:none");
+			print_usage_line(3, "-o:minimal");
+			print_usage_line(3, "-o:size");
+			print_usage_line(3, "-o:speed");
+			if (LB_USE_NEW_PASS_SYSTEM) {
+				print_usage_line(3, "-o:aggressive (use this with caution)");
+			}
+			print_usage_line(2, "The default is -o:minimal.");
+		}
+
+
+		if (print_flag("-obfuscate-source-code-locations")) {
+			print_usage_line(2, "Obfuscate the file and procedure strings, and line and column numbers, stored with a 'runtime.Source_Code_Location' value.");
+		}
+
+
+		if (print_flag("-out:<filepath>")) {
+			print_usage_line(2, "Sets the file name of the outputted executable.");
+			print_usage_line(2, "Example: -out:foo.exe");
+		}
+	}
+
+	if (doc) {
+		if (print_flag("-out:<filepath>")) {
+			print_usage_line(2, "Sets the base name of the resultig .odin-doc file.");
+			print_usage_line(2, "The extension can be optionally included; the resulting file will always have an extension of '.odin-doc'.");
+			print_usage_line(2, "Example: -out:foo");
+		}
+	}
+
+	if (run_or_build) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (print_flag("-pdb-name:<filepath>")) {
+			print_usage_line(2, "[Windows only]");
+			print_usage_line(2, "Defines the generated PDB name when -debug is enabled.");
+			print_usage_line(2, "Example: -pdb-name:different.pdb");
+		}
+	#endif
+	}
+
+	if (build) {
+		if (print_flag("-print-linker-flags")) {
+			print_usage_line(2, "Prints the all of the flags/arguments that will be passed to the linker.");
+		}
+	}
+
+	if (run_or_build) {
+		if (print_flag("-radlink")) {
+			print_usage_line(2, "Uses the RAD linker rather than the default.");
+		}
+
+		if (print_flag("-reloc-mode:<string>")) {
+			print_usage_line(2, "Specifies the reloc mode.");
+			print_usage_line(2, "Available options:");
+			print_usage_line(3, "-reloc-mode:default");
+			print_usage_line(3, "-reloc-mode:static");
+			print_usage_line(3, "-reloc-mode:pic");
+			print_usage_line(3, "-reloc-mode:dynamic-no-pic");
+		}
+
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (print_flag("-resource:<filepath>")) {
+			print_usage_line(2, "[Windows only]");
+			print_usage_line(2, "Defines the resource file for the executable.");
+			print_usage_line(2, "Example: -resource:path/to/file.rc");
+			print_usage_line(2, "or:      -resource:path/to/file.res for a precompiled one.");
+		}
+	#endif
+
+		if (print_flag("-sanitize:<string>")) {
+			print_usage_line(2, "Enables sanitization analysis.");
+			print_usage_line(2, "Available options:");
+			print_usage_line(3, "-sanitize:address");
+			print_usage_line(3, "-sanitize:memory");
+			print_usage_line(3, "-sanitize:thread");
+			print_usage_line(2, "NOTE: This flag can be used multiple times.");
+		}
+	}
+
+	if (doc) {
+		if (print_flag("-short")) {
+			print_usage_line(2, "Shows shortened documentation for the packages.");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-show-defineables")) {
+			print_usage_line(2, "Shows an overview of all the #config/#defined usages in the project.");
+		}
+
+		if (print_flag("-show-system-calls")) {
+			print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler.");
+		}
+
+		if (print_flag("-show-timings")) {
+			print_usage_line(2, "Shows basic overview of the timings of different stages within the compiler in milliseconds.");
+		}
+
+		if (print_flag("-show-more-timings")) {
+			print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds.");
+		}
 	}
 
 	if (check_only) {
-		print_usage_line(1, "-show-unused");
-		print_usage_line(2, "Shows unused package declarations within the current project.");
-		print_usage_line(0, "");
-		print_usage_line(1, "-show-unused-with-location");
-		print_usage_line(2, "Shows unused package declarations within the current project with the declarations source location.");
-		print_usage_line(0, "");
-	}
-
-	if (run_or_build) {
-		print_usage_line(1, "-keep-temp-files");
-		print_usage_line(2, "Keeps the temporary files generated during compilation.");
-		print_usage_line(0, "");
-	} else if (strip_semicolon) {
-		print_usage_line(1, "-keep-temp-files");
-		print_usage_line(2, "Keeps the temporary files generated during stripping the unneeded semicolons from files.");
-		print_usage_line(0, "");
-	}
-
-	if (check) {
-		print_usage_line(1, "-collection:<name>=<filepath>");
-		print_usage_line(2, "Defines a library collection used for imports.");
-		print_usage_line(2, "Example: -collection:shared=dir/to/shared");
-		print_usage_line(2, "Usage in Code:");
-		print_usage_line(3, "import \"shared:foo\"");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-define:<name>=<value>");
-		print_usage_line(2, "Defines a scalar boolean, integer or string as global constant.");
-		print_usage_line(2, "Example: -define:SPAM=123");
-		print_usage_line(2, "Usage in code:");
-		print_usage_line(3, "#config(SPAM, default_value)");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-show-defineables");
-		print_usage_line(2, "Shows an overview of all the #config/#defined usages in the project.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-export-defineables:<filename>");
-		print_usage_line(2, "Exports an overview of all the #config/#defined usages in CSV format to the given file path.");
-		print_usage_line(2, "Example: -export-defineables:defineables.csv");
-		print_usage_line(0, "");
-	}
-
-	if (build) {
-		print_usage_line(1, "-build-mode:<mode>");
-		print_usage_line(2, "Sets the build mode.");
-		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-build-mode:exe         Builds as an executable.");
-		print_usage_line(3, "-build-mode:test        Builds as an executable that executes tests.");
-		print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
-		print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
-		print_usage_line(3, "-build-mode:lib         Builds as a statically linked library.");
-		print_usage_line(3, "-build-mode:static      Builds as a statically linked library.");
-		print_usage_line(3, "-build-mode:obj         Builds as an object file.");
-		print_usage_line(3, "-build-mode:object      Builds as an object file.");
-		print_usage_line(3, "-build-mode:assembly    Builds as an assembly file.");
-		print_usage_line(3, "-build-mode:assembler   Builds as an assembly file.");
-		print_usage_line(3, "-build-mode:asm         Builds as an assembly file.");
-		print_usage_line(3, "-build-mode:llvm-ir     Builds as an LLVM IR file.");
-		print_usage_line(3, "-build-mode:llvm        Builds as an LLVM IR file.");
-		print_usage_line(0, "");
-	}
-
-	if (check) {
-		print_usage_line(1, "-target:<string>");
-		print_usage_line(2, "Sets the target for the executable to be built in.");
-		print_usage_line(0, "");
-	}
-
-	if (run_or_build) {
-		print_usage_line(1, "-debug");
-		print_usage_line(2, "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-disable-assert");
-		print_usage_line(2, "Disables the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-no-bounds-check");
-		print_usage_line(2, "Disables bounds checking program wide.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-no-type-assert");
-		print_usage_line(2, "Disables type assertion checking program wide.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-no-crt");
-		print_usage_line(2, "Disables automatic linking with the C Run Time.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-no-rpath");
-		print_usage_line(2, "Disables automatic addition of an rpath linked to the executable directory.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-no-thread-local");
-		print_usage_line(2, "Ignores @thread_local attribute, effectively treating the program as if it is single-threaded.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-lld");
-		print_usage_line(2, "Uses the LLD linker rather than the default.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-use-separate-modules");
-		print_usage_line(2, "The backend generates multiple build units which are then linked together.");
-		print_usage_line(2, "Normally, a single build unit is generated for a standard project.");
-		print_usage_line(2, "This is the default behaviour on Windows for '-o:none' and '-o:minimal' builds.");
-		print_usage_line(0, "");
-
-	}
-
-	if (check) {
-		print_usage_line(1, "-no-threaded-checker");
-		print_usage_line(2, "Disables multithreading in the semantic checker stage.");
-		print_usage_line(0, "");
-	}
-
-	if (check) {
-		print_usage_line(1, "-vet");
-		print_usage_line(2, "Does extra checks on the code.");
-		print_usage_line(2, "Extra checks include:");
-		print_usage_line(3, "-vet-unused");
-		print_usage_line(3, "-vet-unused-variables");
-		print_usage_line(3, "-vet-unused-imports");
-		print_usage_line(3, "-vet-shadowing");
-		print_usage_line(3, "-vet-using-stmt");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-unused");
-		print_usage_line(2, "Checks for unused declarations (variables and imports).");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-unused-variables");
-		print_usage_line(2, "Checks for unused variable declarations.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-unused-imports");
-		print_usage_line(2, "Checks for unused import declarations.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-shadowing");
-		print_usage_line(2, "Checks for variable shadowing within procedures.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-using-stmt");
-		print_usage_line(2, "Checks for the use of 'using' as a statement.");
-		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-using-param");
-		print_usage_line(2, "Checks for the use of 'using' on procedure parameters.");
-		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-style");
-		print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
-		print_usage_line(2, "Errs on deprecated syntax.");
-		print_usage_line(2, "Does not err on unneeded tokens (unlike -strict-style).");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-semicolon");
-		print_usage_line(2, "Errs on unneeded semicolons.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-cast");
-		print_usage_line(2, "Errs on casting a value to its own type or using `transmute` rather than `cast`.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-tabs");
-		print_usage_line(2, "Errs when the use of tabs has not been used for indentation.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-packages:<comma-separated-strings>");
-		print_usage_line(2, "Sets which packages by name will be vetted.");
-		print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-vet-unused-procedures");
-		print_usage_line(2, "Checks for unused procedures.");
-		print_usage_line(2, "Must be used with -vet-packages or specified on a per file with +vet tags.");
-		print_usage_line(0, "");
-	}
-
-	if (check) {
-		print_usage_line(1, "-custom-attribute:<string>");
-		print_usage_line(2, "Add a custom attribute which will be ignored if it is unknown.");
-		print_usage_line(2, "This can be used with metaprogramming tools.");
-		print_usage_line(2, "Examples:");
-		print_usage_line(3, "-custom-attribute:my_tag");
-		print_usage_line(3, "-custom-attribute:my_tag,the_other_thing");
-		print_usage_line(3, "-custom-attribute:my_tag -custom-attribute:the_other_thing");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-ignore-unknown-attributes");
-		print_usage_line(2, "Ignores unknown attributes.");
-		print_usage_line(2, "This can be used with metaprogramming tools.");
-		print_usage_line(0, "");
-
-		if (command != "test") {
-			print_usage_line(1, "-no-entry-point");
-			print_usage_line(2, "Removes default requirement of an entry point (e.g. main procedure).");
-			print_usage_line(0, "");
+		if (print_flag("-show-unused")) {
+			print_usage_line(2, "Shows unused package declarations within the current project.");
+		}
+		if (print_flag("-show-unused-with-location")) {
+			print_usage_line(2, "Shows unused package declarations within the current project with the declarations source location.");
 		}
 	}
 
-	if (test_only) {
-		print_usage_line(1, "-all-packages");
-		print_usage_line(2, "Tests all packages imported into the given initial package.");
-		print_usage_line(0, "");
+	if (check) {
+		if (print_flag("-strict-style")) {
+			print_usage_line(2, "This enforces parts of same style as the Odin compiler, prefer '-vet-style -vet-semicolon' if you do not want to match it exactly.");
+			print_usage_line(2, "");
+			print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons.");
+			print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
+			print_usage_line(2, "Errs on deprecated syntax.");
+			print_usage_line(2, "Errs when the attached-brace style in not adhered to (also known as 1TBS).");
+			print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
+		}
 	}
 
 	if (run_or_build) {
-		print_usage_line(1, "-minimum-os-version:<string>");
-		print_usage_line(2, "Sets the minimum OS version targeted by the application.");
-		print_usage_line(2, "Default: -minimum-os-version:11.0.0");
-		print_usage_line(2, "Only used when target is Darwin, if given, linking mismatched versions will emit a warning.");
-		print_usage_line(0, "");
+		if (print_flag("-strict-target-features")) {
+			print_usage_line(2, "Makes @(enable_target_features=\"...\") behave the same way as @(require_target_features=\"...\").");
+			print_usage_line(2, "This enforces that all generated code uses features supported by the combination of -target, -microarch, and -target-features.");
+		}
 
-		print_usage_line(1, "-extra-linker-flags:<string>");
-		print_usage_line(2, "Adds extra linker specific flags in a string.");
-		print_usage_line(0, "");
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (print_flag("-subsystem:<option>")) {
+			print_usage_line(2, "[Windows only]");
+			print_usage_line(2, "Defines the subsystem for the application.");
+			print_usage_line(2, "Available options:");
+		print_usage_line(3, "-subsystem:console");
+		print_usage_line(3, "-subsystem:windows");
+		}
+	#endif
 
-		print_usage_line(1, "-extra-assembler-flags:<string>");
-		print_usage_line(2, "Adds extra assembler specific flags in a string.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-microarch:<string>");
-		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string.");
-		print_usage_line(2, "Examples:");
-		print_usage_line(3, "-microarch:sandybridge");
-		print_usage_line(3, "-microarch:native");
-		print_usage_line(3, "-microarch:\"?\" for a list");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-target-features:<string>");
-		print_usage_line(2, "Specifies CPU features to enable on top of the enabled features implied by -microarch.");
-		print_usage_line(2, "Examples:");
-		print_usage_line(3, "-target-features:atomics");
-		print_usage_line(3, "-target-features:\"sse2,aes\"");
-		print_usage_line(3, "-target-features:\"?\" for a list");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-strict-target-features");
-		print_usage_line(2, "Makes @(enable_target_features=\"...\") behave the same way as @(require_target_features=\"...\").");
-		print_usage_line(2, "This enforces that all generated code uses features supported by the combination of -target, -microarch, and -target-features.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-reloc-mode:<string>");
-		print_usage_line(2, "Specifies the reloc mode.");
-		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-reloc-mode:default");
-		print_usage_line(3, "-reloc-mode:static");
-		print_usage_line(3, "-reloc-mode:pic");
-		print_usage_line(3, "-reloc-mode:dynamic-no-pic");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-disable-red-zone");
-		print_usage_line(2, "Disables red zone on a supported freestanding target.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-dynamic-map-calls");
-		print_usage_line(2, "Uses dynamic map calls to minimize code generation at the cost of runtime execution.");
-		print_usage_line(0, "");
-	}
-
-	if (build) {
-		print_usage_line(1, "-print-linker-flags");
-		print_usage_line(2, "Prints the all of the flags/arguments that will be passed to the linker.");
-		print_usage_line(0, "");
+		if (print_flag("-target-features:<string>")) {
+			print_usage_line(2, "Specifies CPU features to enable on top of the enabled features implied by -microarch.");
+			print_usage_line(2, "Examples:");
+			print_usage_line(3, "-target-features:atomics");
+			print_usage_line(3, "-target-features:\"sse2,aes\"");
+			print_usage_line(3, "-target-features:\"?\" for a list");
+		}
 	}
 
 	if (check) {
-		print_usage_line(1, "-disallow-do");
-		print_usage_line(2, "Disallows the 'do' keyword in the project.");
-		print_usage_line(0, "");
+		if (print_flag("-target:<string>")) {
+			print_usage_line(2, "Sets the target for the executable to be built in.");
+		}
 
-		print_usage_line(1, "-default-to-nil-allocator");
-		print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing.");
-		print_usage_line(0, "");
+		if (print_flag("-terse-errors")) {
+			print_usage_line(2, "Prints a terse error message without showing the code on that line and the location in that line.");
+		}
 
-		print_usage_line(1, "-strict-style");
-		print_usage_line(2, "This enforces parts of same style as the Odin compiler, prefer '-vet-style -vet-semicolon' if you do not want to match it exactly.");
-		print_usage_line(2, "");
-		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons.");
-		print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
-		print_usage_line(2, "Errs on deprecated syntax.");
-		print_usage_line(2, "Errs when the attached-brace style in not adhered to (also known as 1TBS).");
-		print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-ignore-warnings");
-		print_usage_line(2, "Ignores warning messages.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-warnings-as-errors");
-		print_usage_line(2, "Treats warning messages as error messages.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-terse-errors");
-		print_usage_line(2, "Prints a terse error message without showing the code on that line and the location in that line.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-json-errors");
-		print_usage_line(2, "Prints the error messages as json to stderr.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-error-pos-style:<string>");
-		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
-		print_usage_line(3, "-error-pos-style:odin      file/path(45:3)");
-		print_usage_line(3, "-error-pos-style:default   (Defaults to 'odin'.)");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-max-error-count:<integer>");
-		print_usage_line(2, "Sets the maximum number of errors that can be displayed before the compiler terminates.");
-		print_usage_line(2, "Must be an integer >0.");
-		print_usage_line(2, "If not set, the default max error count is %d.", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-min-link-libs");
-		print_usage_line(2, "If set, the number of linked libraries will be minimized to prevent duplications.");
-		print_usage_line(2, "This is useful for so called \"dumb\" linkers compared to \"smart\" linkers.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-foreign-error-procedures");
-		print_usage_line(2, "States that the error procedures used in the runtime are defined in a separate translation unit.");
-		print_usage_line(0, "");
-
+		if (print_flag("-thread-count:<integer>")) {
+			print_usage_line(2, "Overrides the number of threads the compiler will use to compile with.");
+			print_usage_line(2, "Example: -thread-count:2");
+		}
 	}
 
 	if (run_or_build) {
-		print_usage_line(1, "-obfuscate-source-code-locations");
-		print_usage_line(2, "Obfuscate the file and procedure strings, and line and column numbers, stored with a 'runtime.Source_Code_Location' value.");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-sanitize:<string>");
-		print_usage_line(2, "Enables sanitization analysis.");
-		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-sanitize:address");
-		print_usage_line(3, "-sanitize:memory");
-		print_usage_line(3, "-sanitize:thread");
-		print_usage_line(2, "NOTE: This flag can be used multiple times.");
-		print_usage_line(0, "");
+		if (print_flag("-use-separate-modules")) {
+			print_usage_line(2, "The backend generates multiple build units which are then linked together.");
+			print_usage_line(2, "Normally, a single build unit is generated for a standard project.");
+			print_usage_line(2, "This is the default behaviour on Windows for '-o:none' and '-o:minimal' builds.");
+		}
 
 	}
 
-	if (run_or_build) {
-		#if defined(GB_SYSTEM_WINDOWS)
-		print_usage_line(1, "-ignore-vs-search");
-		print_usage_line(2, "[Windows only]");
-		print_usage_line(2, "Ignores the Visual Studio search for library paths.");
-		print_usage_line(0, "");
 
-		print_usage_line(1, "-resource:<filepath>");
-		print_usage_line(2, "[Windows only]");
-		print_usage_line(2, "Defines the resource file for the executable.");
-		print_usage_line(2, "Example: -resource:path/to/file.rc");
-		print_usage_line(2, "or:      -resource:path/to/file.res for a precompiled one.");
-		print_usage_line(0, "");
+	if (check) {
+		if (print_flag("-vet")) {
+			print_usage_line(2, "Does extra checks on the code.");
+			print_usage_line(2, "Extra checks include:");
+			print_usage_line(3, "-vet-unused");
+			print_usage_line(3, "-vet-unused-variables");
+			print_usage_line(3, "-vet-unused-imports");
+			print_usage_line(3, "-vet-shadowing");
+			print_usage_line(3, "-vet-using-stmt");
+		}
 
-		print_usage_line(1, "-pdb-name:<filepath>");
-		print_usage_line(2, "[Windows only]");
-		print_usage_line(2, "Defines the generated PDB name when -debug is enabled.");
-		print_usage_line(2, "Example: -pdb-name:different.pdb");
-		print_usage_line(0, "");
+		if (print_flag("-vet-cast")) {
+			print_usage_line(2, "Errs on casting a value to its own type or using `transmute` rather than `cast`.");
+		}
 
-		print_usage_line(1, "-subsystem:<option>");
-		print_usage_line(2, "[Windows only]");
-		print_usage_line(2, "Defines the subsystem for the application.");
-		print_usage_line(2, "Available options:");
-		print_usage_line(3, "-subsystem:console");
-		print_usage_line(3, "-subsystem:windows");
-		print_usage_line(0, "");
+		if (print_flag("-vet-packages:<comma-separated-strings>")) {
+			print_usage_line(2, "Sets which packages by name will be vetted.");
+			print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
+		}
 
-		#endif
+		if (print_flag("-vet-semicolon")) {
+			print_usage_line(2, "Errs on unneeded semicolons.");
+		}
+
+
+		if (print_flag("-vet-shadowing")) {
+			print_usage_line(2, "Checks for variable shadowing within procedures.");
+		}
+
+		if (print_flag("-vet-style")) {
+			print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
+			print_usage_line(2, "Errs on deprecated syntax.");
+			print_usage_line(2, "Does not err on unneeded tokens (unlike -strict-style).");
+		}
+
+
+		if (print_flag("-vet-tabs")) {
+			print_usage_line(2, "Errs when the use of tabs has not been used for indentation.");
+		}
+
+
+		if (print_flag("-vet-unused")) {
+			print_usage_line(2, "Checks for unused declarations (variables and imports).");
+		}
+
+		if (print_flag("-vet-unused-imports")) {
+			print_usage_line(2, "Checks for unused import declarations.");
+		}
+
+		if (print_flag("-vet-unused-procedures")) {
+			print_usage_line(2, "Checks for unused procedures.");
+			print_usage_line(2, "Must be used with -vet-packages or specified on a per file with +vet tags.");
+		}
+
+		if (print_flag("-vet-unused-variables")) {
+			print_usage_line(2, "Checks for unused variable declarations.");
+		}
+
+
+		if (print_flag("-vet-using-param")) {
+			print_usage_line(2, "Checks for the use of 'using' on procedure parameters.");
+			print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
+		}
+
+		if (print_flag("-vet-using-stmt")) {
+			print_usage_line(2, "Checks for the use of 'using' as a statement.");
+			print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-warnings-as-errors")) {
+			print_usage_line(2, "Treats warning messages as error messages.");
+		}
 	}
 }
 
@@ -3132,7 +3268,7 @@ int main(int arg_count, char const **arg_ptr) {
 			usage(args[0]);
 			return 1;
 		} else {
-			print_show_help(args[0], args[2]);
+			print_show_help(args[0], args[1], args[2]);
 			return 0;
 		}
 	} else if (command == "root") {
@@ -3276,6 +3412,19 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 	}
 
+	#if defined(GB_CPU_X86)
+	// We've detected that the CPU doesn't support popcnt, or another reason to use `-microarch:native`,
+	// and that no custom microarch was chosen.
+	if (should_use_march_native() && march == get_default_microarchitecture()) {
+		if (command == "run" || command == "test") {
+			gb_printf_err("Error: Try using '-microarch:native' as Odin defaults to %.*s (close to Nehalem), and your CPU seems to be older.\n", LIT(march));
+			gb_exit(1);
+		} else if (command == "build") {
+			gb_printf("Suggestion: Try using '-microarch:native' as Odin defaults to %.*s (close to Nehalem), and your CPU seems to be older.\n", LIT(march));
+		}
+	}
+	#endif
+
 	if (build_context.target_features_string.len != 0) {
 		String_Iterator target_it = {build_context.target_features_string, 0};
 		for (;;) {
@@ -3325,7 +3474,7 @@ int main(int arg_count, char const **arg_ptr) {
 		if (LLVM_VERSION_MAJOR < 17) {
 			gb_printf_err("Invalid LLVM version %s, RISC-V targets require at least LLVM 17\n", LLVM_VERSION_STRING);
 			gb_exit(1);
-		} 
+		}
 	}
 
 	if (build_context.show_debug_messages) {
@@ -3347,6 +3496,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	Parser *parser = gb_alloc_item(permanent_allocator(), Parser);
 	Checker *checker = gb_alloc_item(permanent_allocator(), Checker);
+	bool failed_to_cache_parsing = false;
 
 	MAIN_TIME_SECTION("parse files");
 
@@ -3366,10 +3516,6 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 		return 1;
 	}
-	if (any_warnings()) {
-		print_all_errors();
-	}
-
 
 	checker->parser = parser;
 	init_checker(checker);
@@ -3396,7 +3542,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.show_defineables || build_context.export_defineables_file != "") {
 		TEMPORARY_ALLOCATOR_GUARD();
 		temp_alloc_defineable_strings(checker);
-		sort_defineables(checker);
+		sort_defineables_and_remove_duplicates(checker);
 
 		if (build_context.show_defineables) {
 			show_defineables(checker);
@@ -3440,6 +3586,7 @@ int main(int arg_count, char const **arg_ptr) {
 		if (try_cached_build(checker, args)) {
 			goto end_of_code_gen;
 		}
+		failed_to_cache_parsing = true;
 	}
 
 #if ALLOW_TILDE
@@ -3505,18 +3652,23 @@ int main(int arg_count, char const **arg_ptr) {
 
 end_of_code_gen:;
 
-	if (build_context.show_timings) {
-		show_timings(checker, &global_timings);
-	}
-
 	if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
 		export_dependencies(checker);
 	}
 
+	if (build_context.cached) {
+		MAIN_TIME_SECTION("write cached build");
+		if (!build_context.build_cache_data.copy_already_done) {
+			try_copy_executable_to_cache();
+		}
 
-	if (!build_context.build_cache_data.copy_already_done &&
-	    build_context.cached) {
-		try_copy_executable_to_cache();
+		if (failed_to_cache_parsing) {
+			write_cached_build(checker, args);
+		}
+	}
+
+	if (build_context.show_timings) {
+		show_timings(checker, &global_timings);
 	}
 
 	if (run_output) {

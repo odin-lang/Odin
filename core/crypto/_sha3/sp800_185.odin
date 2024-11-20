@@ -81,16 +81,18 @@ bytepad :: proc(ctx: ^Context, x_strings: [][]byte, w: int) {
 	// 2. while len(z) mod 8 ≠ 0:
 	//    z = z || 0
 
-	// 3. while (len(z)/8) mod w ≠ 0:
+	// 3. while (len(z)/8) mod w != 0:
 	//    z = z || 00000000
 	z_len := u128(z_hi) << 64 | u128(z_lo)
 	z_rem := int(z_len % u128(w))
-	pad := _PAD[:w - z_rem]
+	if z_rem != 0 {
+		pad := _PAD[:w - z_rem]
 
-	// We just add the padding to the state, instead of returning z.
-	//
-	// 4. return z.
-	update(ctx, pad)
+		// We just add the padding to the state, instead of returning z.
+		//
+		// 4. return z.
+		update(ctx, pad)
+	}
 }
 
 encode_string :: #force_inline proc(ctx: ^Context, s: []byte) -> (u64, u64) {

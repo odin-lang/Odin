@@ -853,7 +853,7 @@ implicit_context_system :: proc() {
 	what_a_fool_believes :: proc() {
 		c := context // this `context` is the same as the parent procedure that it was called from
 		// From this example, context.user_index == 123
-		// An context.allocator is assigned to the return value of `my_custom_allocator()`
+		// A context.allocator is assigned to the return value of `my_custom_allocator()`
 		assert(context.user_index == 123)
 
 		// The memory management procedure use the `context.allocator` by
@@ -906,7 +906,7 @@ parametric_polymorphism :: proc() {
 
 	// This is how `new` is implemented
 	alloc_type :: proc($T: typeid) -> ^T {
-		t := cast(^T)alloc(size_of(T), align_of(T))
+		t := cast(^T)mem.alloc(size_of(T), align_of(T))
 		t^ = T{} // Use default initialization value
 		return t
 	}
@@ -2052,22 +2052,6 @@ explicit_context_definition :: proc "c" () {
 	dummy_procedure()
 }
 
-relative_data_types :: proc() {
-	fmt.println("\n#relative data types")
-
-	x: int = 123
-	ptr: #relative(i16) ^int
-	ptr = &x
-	fmt.println(ptr^)
-
-	arr := [3]int{1, 2, 3}
-	multi_ptr: #relative(i16) [^]int
-	multi_ptr = &arr[0]
-	fmt.println(multi_ptr)
-	fmt.println(multi_ptr[:3])
-	fmt.println(multi_ptr[1])
-}
-
 or_else_operator :: proc() {
 	fmt.println("\n#'or_else'")
 	{
@@ -2151,7 +2135,7 @@ or_return_operator :: proc() {
 		return .None
 	}
 	foo_2 :: proc() -> (n: int, err: Error) {
-		// It is more common that your procedure turns multiple values
+		// It is more common that your procedure returns multiple values
 		// If 'or_return' is used within a procedure multiple parameters (2+),
 		// then all the parameters must be named so that the remaining parameters
 		// so that a bare 'return' statement can be used
@@ -2634,7 +2618,6 @@ main :: proc() {
 		constant_literal_expressions()
 		union_maybe()
 		explicit_context_definition()
-		relative_data_types()
 		or_else_operator()
 		or_return_operator()
 		or_break_and_or_continue_operators()

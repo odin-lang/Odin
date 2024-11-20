@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -50,6 +51,17 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		machine:  [_SYS_NAMELEN]c.char `fmt:"s,0"`, /* [PSX] hardware type */
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	@(private)
+	_SYS_NAMELEN :: 65
+
+	utsname :: struct {
+		sysname:      [_SYS_NAMELEN]c.char `fmt:"s,0"`, /* [PSX] name of OS */
+		nodename:     [_SYS_NAMELEN]c.char `fmt:"s,0"`, /* [PSX] name of this network node */
+		release:      [_SYS_NAMELEN]c.char `fmt:"s,0"`, /* [PSX] release level */
+		version:      [_SYS_NAMELEN]c.char `fmt:"s,0"`, /* [PSX] version level */
+		machine:      [_SYS_NAMELEN]c.char `fmt:"s,0"`, /* [PSX] hardware type */
+		__domainname: [_SYS_NAMELEN]c.char `fmt:"s,0"`,
+	}
 }

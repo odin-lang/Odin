@@ -76,7 +76,7 @@ datetime, an error is returned.
 components_to_datetime :: proc "contextless" (#any_int year, #any_int month, #any_int day, #any_int hour, #any_int minute, #any_int second: i64, #any_int nanos := i64(0)) -> (datetime: DateTime, err: Error) {
 	date := components_to_date(year, month, day)            or_return
 	time := components_to_time(hour, minute, second, nanos) or_return
-	return {date, time}, .None
+	return {date, time, nil}, .None
 }
 
 /*
@@ -88,7 +88,7 @@ object will always have the time equal to `00:00:00.000`.
 */
 ordinal_to_datetime :: proc "contextless" (ordinal: Ordinal) -> (datetime: DateTime, err: Error) {
 	d := ordinal_to_date(ordinal) or_return
-	return {Date(d), {}}, .None
+	return {Date(d), {}, nil}, .None
 }
 
 /*

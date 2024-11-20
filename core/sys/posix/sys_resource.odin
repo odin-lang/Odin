@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -95,7 +96,7 @@ when ODIN_OS == .NetBSD {
 	@(private) LGETRUSAGE :: "getrusage"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	PRIO_PROCESS :: 0
 	PRIO_PGRP    :: 1
@@ -103,7 +104,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 
 	rlim_t :: distinct c.uint64_t
 
-	RLIM_INFINITY  :: (rlim_t(1) << 63) - 1
+	RLIM_INFINITY  :: ~rlim_t(0) when ODIN_OS == .Linux else (rlim_t(1) << 63) - 1
 	RLIM_SAVED_MAX :: RLIM_INFINITY
 	RLIM_SAVED_CUR :: RLIM_INFINITY
 
@@ -143,10 +144,15 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	RLIMIT_CPU    :: 0
 	RLIMIT_DATA   :: 2
 	RLIMIT_FSIZE  :: 1
-	RLIMIT_NOFILE :: 8
+	RLIMIT_NOFILE :: 7 when ODIN_OS == .Linux else 8
 	RLIMIT_STACK  :: 3
-	RLIMIT_AS     :: 5 when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD else 10
 
-} else {
-	#panic("posix is unimplemented for the current target")
+	when ODIN_OS == .Linux {
+		RLIMIT_AS :: 9
+	} else when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
+		RLIMIT_AS :: 5
+	} else {
+		RLIMIT_AS :: 10
+	}
+
 }

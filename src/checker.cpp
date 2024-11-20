@@ -695,6 +695,9 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 		bool vet_unused = (vet_flags & VetFlag_Unused) != 0;
 		bool vet_shadowing = (vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0;
 		bool vet_unused_procedures = (vet_flags & VetFlag_UnusedProcedures) != 0;
+		if (vet_unused_procedures && e->pkg && e->pkg->kind == Package_Runtime) {
+			vet_unused_procedures = false;
+		}
 
 		VettedEntity ve_unused = {};
 		VettedEntity ve_shadowed = {};
@@ -2183,16 +2186,6 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->SimdVector.elem);
 		break;
 
-	case Type_RelativePointer:
-		add_type_info_type_internal(c, bt->RelativePointer.pointer_type);
-		add_type_info_type_internal(c, bt->RelativePointer.base_integer);
-		break;
-
-	case Type_RelativeMultiPointer:
-		add_type_info_type_internal(c, bt->RelativeMultiPointer.pointer_type);
-		add_type_info_type_internal(c, bt->RelativeMultiPointer.base_integer);
-		break;
-
 	case Type_Matrix:
 		add_type_info_type_internal(c, bt->Matrix.elem);
 		break;
@@ -2436,16 +2429,6 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_SimdVector:
 		add_min_dep_type_info(c, bt->SimdVector.elem);
-		break;
-
-	case Type_RelativePointer:
-		add_min_dep_type_info(c, bt->RelativePointer.pointer_type);
-		add_min_dep_type_info(c, bt->RelativePointer.base_integer);
-		break;
-
-	case Type_RelativeMultiPointer:
-		add_min_dep_type_info(c, bt->RelativeMultiPointer.pointer_type);
-		add_min_dep_type_info(c, bt->RelativeMultiPointer.base_integer);
 		break;
 
 	case Type_Matrix:
@@ -3072,8 +3055,6 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_map              = find_core_type(c, str_lit("Type_Info_Map"));
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
-	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
-	t_type_info_relative_multi_pointer = find_core_type(c, str_lit("Type_Info_Relative_Multi_Pointer"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 	t_type_info_bit_field        = find_core_type(c, str_lit("Type_Info_Bit_Field"));
@@ -3102,8 +3083,6 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_map_ptr              = alloc_type_pointer(t_type_info_map);
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
-	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
-	t_type_info_relative_multi_pointer_ptr = alloc_type_pointer(t_type_info_relative_multi_pointer);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
@@ -6206,7 +6185,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 				}
 				if ((src_params == nullptr && dst_params != nullptr) ||
 				    (src_params != nullptr && dst_params == nullptr)) {
-					error(src->token, "Deferred procedure '%.*s' parameters do not match the inputs of initial procedure '%.*s'", LIT(src->token.string), LIT(dst->token.string));
+					error(src->token, "Deferred procedure '%.*s' parameters do not match the inputs of initial procedure '%.*s'", LIT(dst->token.string), LIT(src->token.string));
 					continue;
 				}
 
@@ -6219,8 +6198,8 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					gbString s = type_to_string(src_params);
 					gbString d = type_to_string(dst_params);
 					error(src->token, "Deferred procedure '%.*s' parameters do not match the inputs of initial procedure '%.*s':\n\t(%s) =/= (%s)",
-					      LIT(src->token.string), LIT(dst->token.string),
-					      s, d
+					      LIT(dst->token.string), LIT(src->token.string),
+					      d, s
 					);
 					gb_string_free(d);
 					gb_string_free(s);
@@ -6236,7 +6215,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 				}
 				if ((src_results == nullptr && dst_params != nullptr) ||
 				    (src_results != nullptr && dst_params == nullptr)) {
-					error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s'", LIT(src->token.string), LIT(dst->token.string));
+					error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s'", LIT(dst->token.string), LIT(src->token.string));
 					continue;
 				}
 
@@ -6249,8 +6228,8 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					gbString s = type_to_string(src_results);
 					gbString d = type_to_string(dst_params);
 					error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s':\n\t(%s) =/= (%s)",
-					      LIT(src->token.string), LIT(dst->token.string),
-					      s, d
+					      LIT(dst->token.string), LIT(src->token.string),
+					      d, s
 					);
 					gb_string_free(d);
 					gb_string_free(s);
@@ -6302,8 +6281,8 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					gbString s = type_to_string(tsrc);
 					gbString d = type_to_string(dst_params);
 					error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s':\n\t(%s) =/= (%s)",
-					      LIT(src->token.string), LIT(dst->token.string),
-					      s, d
+					      LIT(dst->token.string), LIT(src->token.string),
+					      d, s
 					);
 					gb_string_free(d);
 					gb_string_free(s);

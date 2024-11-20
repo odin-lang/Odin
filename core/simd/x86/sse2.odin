@@ -240,7 +240,7 @@ _mm_sll_epi64 :: #force_inline proc "c" (a, count: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_srai_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
-	return transmute(__m128i)psraiw(transmute(i16x8)a. IMM8)
+	return transmute(__m128i)psraiw(transmute(i16x8)a, IMM8)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_sra_epi16 :: #force_inline proc "c" (a, count: __m128i) -> __m128i {
@@ -262,7 +262,7 @@ _mm_srli_si128 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_srli_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
-	return transmute(__m128i)psrliw(transmute(i16x8)a. IMM8)
+	return transmute(__m128i)psrliw(transmute(i16x8)a, IMM8)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_srl_epi16 :: #force_inline proc "c" (a, count: __m128i) -> __m128i {

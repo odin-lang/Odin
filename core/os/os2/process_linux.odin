@@ -523,7 +523,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		write_errno_to_parent_and_abort :: proc(parent_fd: linux.Fd, errno: linux.Errno) -> ! {
 			error_byte: [1]u8 = { u8(errno) }
 			linux.write(parent_fd, error_byte[:])
-			intrinsics.trap()
+			linux.exit(126)
 		}
 
 		stdin_fd: linux.Fd

@@ -38,6 +38,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
+          include-hidden-files: true
           name: windows_artifacts
           path: dist
   build_linux:

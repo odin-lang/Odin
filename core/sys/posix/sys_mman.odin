@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -115,12 +116,14 @@ Prot_Flag_Bits :: enum c.int {
 Prot_Flags :: bit_set[Prot_Flag_Bits; c.int]
 
 Map_Flag_Bits :: enum c.int {
+	// Map anonymous memory.
+	ANONYMOUS = log2(MAP_ANONYMOUS),
 	// Interpret addr exactly.
-	FIXED   = log2(MAP_FIXED),
+	FIXED     = log2(MAP_FIXED),
 	// Changes are private.
-	PRIVATE = log2(MAP_PRIVATE),
+	PRIVATE   = log2(MAP_PRIVATE),
 	// Changes are shared.
-	SHARED  = log2(MAP_SHARED),
+	SHARED    = log2(MAP_SHARED),
 }
 Map_Flags :: bit_set[Map_Flag_Bits; c.int]
 
@@ -163,18 +166,19 @@ when ODIN_OS == .NetBSD {
 	@(private) LMSYNC :: "msync"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	PROT_EXEC   :: 0x04
 	_PROT_NONE  :: 0x00
 	PROT_READ   :: 0x01
 	PROT_WRITE  :: 0x02
 
-	MAP_FIXED   :: 0x0010
-	MAP_PRIVATE :: 0x0002
-	MAP_SHARED  :: 0x0001
+	MAP_FIXED     :: 0x0010
+	MAP_PRIVATE   :: 0x0002
+	MAP_SHARED    :: 0x0001
+	MAP_ANONYMOUS :: 0x0020 when ODIN_OS == .Linux else 0x1000
 
-	when ODIN_OS == .Darwin {
+	when ODIN_OS == .Darwin || ODIN_OS == .Linux {
 		MS_INVALIDATE :: 0x0002
 		_MS_SYNC      :: 0x0010
 	} else when ODIN_OS == .NetBSD {
@@ -184,6 +188,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 		MS_INVALIDATE :: 0x0004
 		_MS_SYNC      :: 0x0002
 	}
+
 	MS_ASYNC :: 0x0001
 	MS_SYNC  :: Sync_Flags{Sync_Flags_Bits(log2(_MS_SYNC))}
 
@@ -205,9 +210,10 @@ when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 	PROT_READ   :: 0x01
 	PROT_WRITE  :: 0x02
 
-	MAP_FIXED   :: 0x0010
-	MAP_PRIVATE :: 0x0002
-	MAP_SHARED  :: 0x0001
+	MAP_FIXED     :: 0x0010
+	MAP_PRIVATE   :: 0x0002
+	MAP_SHARED    :: 0x0001
+	MAP_ANONYMOUS :: 0x1000
 
 	MS_ASYNC      :: 0x0001
 	MS_INVALIDATE :: 0x0002
@@ -224,6 +230,4 @@ when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 	POSIX_MADV_SEQUENTIAL :: 2
 	POSIX_MADV_WILLNEED   :: 3
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

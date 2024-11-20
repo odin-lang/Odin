@@ -154,6 +154,7 @@ write_section :: proc(w: io.Writer, name: string, n_written: ^int = nil) -> (n: 
 	io.write_byte  (w, '[',  &n) or_return
 	io.write_string(w, name, &n) or_return
 	io.write_byte  (w, ']',  &n) or_return
+	io.write_byte  (w, '\n',  &n) or_return
 	return
 }
 

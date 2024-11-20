@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
+#include "build_cpuid.cpp"
 
 // #if defined(GB_SYSTEM_WINDOWS)
 // #define DEFAULT_TO_THREADED_CHECKER
@@ -343,6 +344,22 @@ struct BuildCacheData {
 	bool copy_already_done;
 };
 
+
+enum LinkerChoice : i32 {
+	Linker_Invalid = -1,
+	Linker_Default = 0,
+	Linker_lld,
+	Linker_radlink,
+
+	Linker_COUNT,
+};
+
+String linker_choices[Linker_COUNT] = {
+	str_lit("default"),
+	str_lit("lld"),
+	str_lit("radlink"),
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -418,11 +435,12 @@ struct BuildContext {
 	bool   no_rpath;
 	bool   no_entry_point;
 	bool   no_thread_local;
-	bool   use_lld;
 	bool   cross_compiling;
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+
+	LinkerChoice linker_choice;
 
 	StringSet custom_attributes;
 
@@ -453,7 +471,7 @@ struct BuildContext {
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
-	
+
 	bool   copy_file_contents;
 
 	bool   no_rtti;
@@ -1870,7 +1888,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			}
 
-			if (!build_context.use_lld && find_result.vs_exe_path.len == 0) {
+			if (build_context.linker_choice == Linker_Default && find_result.vs_exe_path.len == 0) {
 				gb_printf_err("link.exe not found.\n");
 				return false;
 			}
@@ -2049,19 +2067,19 @@ gb_internal bool init_build_paths(String init_filename) {
 		return false;
 	}
 
-	gbFile      output_file_test;
-	const char* output_file_name = (const char*)output_file.text;
-	gbFileError output_test_err = gb_file_open_mode(&output_file_test, gbFileMode_Append | gbFileMode_Rw, output_file_name);
+	// gbFile      output_file_test;
+	// const char* output_file_name = (const char*)output_file.text;
+	// gbFileError output_test_err = gb_file_open_mode(&output_file_test, gbFileMode_Append | gbFileMode_Rw, output_file_name);
 
-	if (output_test_err == 0) {
-		gb_file_close(&output_file_test);
-		gb_file_remove(output_file_name);
-	} else {
-		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
-		defer (gb_free(ha, output_file.text));
-		gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));
-		return false;
-	}
+	// if (output_test_err == 0) {
+	// 	gb_file_close(&output_file_test);
+	// 	gb_file_remove(output_file_name);
+	// } else {
+	// 	String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+	// 	defer (gb_free(ha, output_file.text));
+	// 	gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));
+	// 	return false;
+	// }
 
 	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
 		switch (build_context.metrics.os) {

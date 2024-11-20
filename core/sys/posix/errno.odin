@@ -1,3 +1,4 @@
+#+build windows, darwin, linux, freebsd, openbsd, netbsd
 package posix
 
 import "core:c"
@@ -141,7 +142,7 @@ when ODIN_OS == .Darwin {
 	EMLINK          :: 31
 	EPIPE           :: 32
 	EAGAIN          :: 35
-	EWOULDBLOCK     :: 35
+	EWOULDBLOCK     :: EAGAIN
 	EINPROGRESS     :: 36
 	EALREADY        :: 37
 	ENOTSOCK        :: 38
@@ -151,7 +152,7 @@ when ODIN_OS == .Darwin {
 	ENOPROTOOPT     :: 42
 	EPROTONOSUPPORT :: 43
 	ENOTSUP         :: 45
-	EOPNOTSUPP      :: 45
+	EOPNOTSUPP      :: ENOTSUP
 	EAFNOSUPPORT    :: 47
 	EADDRINUSE      :: 48
 	EADDRNOTAVAIL   :: 49
@@ -220,7 +221,7 @@ when ODIN_OS == .Darwin {
 	EMLINK          :: 31
 	EPIPE           :: 32
 	EAGAIN          :: 35
-	EWOULDBLOCK     :: 35
+	EWOULDBLOCK     :: EAGAIN
 	EINPROGRESS     :: 36
 	EALREADY        :: 37
 	ENOTSOCK        :: 38
@@ -230,7 +231,7 @@ when ODIN_OS == .Darwin {
 	ENOPROTOOPT     :: 42
 	EPROTONOSUPPORT :: 43
 	ENOTSUP         :: 45
-	EOPNOTSUPP      :: 45
+	EOPNOTSUPP      :: ENOTSUP
 	EAFNOSUPPORT    :: 47
 	EADDRINUSE      :: 48
 	EADDRNOTAVAIL   :: 49
@@ -301,7 +302,7 @@ when ODIN_OS == .Darwin {
 	EMLINK          :: 31
 	EPIPE           :: 32
 	EAGAIN          :: 35
-	EWOULDBLOCK     :: 35
+	EWOULDBLOCK     :: EAGAIN
 	EINPROGRESS     :: 36
 	EALREADY        :: 37
 	ENOTSOCK        :: 38
@@ -311,7 +312,7 @@ when ODIN_OS == .Darwin {
 	ENOPROTOOPT     :: 42
 	EPROTONOSUPPORT :: 43
 	ENOTSUP         :: 45
-	EOPNOTSUPP      :: 45
+	EOPNOTSUPP      :: ENOTSUP
 	EAFNOSUPPORT    :: 47
 	EADDRINUSE      :: 48
 	EADDRNOTAVAIL   :: 49
@@ -367,7 +368,173 @@ when ODIN_OS == .Darwin {
 		ETIME           :: -1
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+	EPERM           :: 1
+	ENOENT          :: 2
+	ESRCH           :: 3
+	EINTR           :: 4
+	EIO             :: 5
+	ENXIO           :: 6
+	E2BIG           :: 7
+	ENOEXEC         :: 8
+	EBADF           :: 9
+	ECHILD          :: 10
+	EAGAIN          :: 11
+	EWOULDBLOCK     :: EAGAIN
+	ENOMEM          :: 12
+	EACCES          :: 13
+	EFAULT          :: 14
+	EBUSY           :: 16
+	EEXIST          :: 17
+	EXDEV           :: 18
+	ENODEV          :: 19
+	ENOTDIR         :: 20
+	EISDIR          :: 21
+	EINVAL          :: 22
+	ENFILE          :: 23
+	EMFILE          :: 24
+	ENOTTY          :: 25
+	ETXTBSY         :: 26
+	EFBIG           :: 27
+	ENOSPC          :: 28
+	ESPIPE          :: 29
+	EROFS           :: 30
+	EMLINK          :: 31
+	EPIPE           :: 32
+
+	EDEADLK         :: 35
+	ENAMETOOLONG    :: 36
+	ENOLCK          :: 37
+	ENOSYS          :: 38
+	ENOTEMPTY       :: 39
+	ELOOP           :: 40
+	ENOMSG          :: 42
+	EIDRM           :: 43
+
+	ENOSTR          :: 60
+	ENODATA         :: 61
+	ETIME           :: 62
+	ENOSR           :: 63
+
+	ENOLINK         :: 67
+
+	EPROTO          :: 71
+	EMULTIHOP       :: 72
+	EBADMSG         :: 74
+	EOVERFLOW       :: 75
+
+	ENOTSOCK        :: 88
+	EDESTADDRREQ    :: 89
+	EMSGSIZE        :: 90
+	EPROTOTYPE      :: 91
+	ENOPROTOOPT     :: 92
+	EPROTONOSUPPORT :: 93
+
+	EOPNOTSUPP      :: 95
+	ENOTSUP         :: EOPNOTSUPP
+	EAFNOSUPPORT    :: 97
+	EADDRINUSE      :: 98
+	EADDRNOTAVAIL   :: 99
+	ENETDOWN        :: 100
+	ENETUNREACH     :: 101
+	ENETRESET       :: 102
+	ECONNABORTED    :: 103
+	ECONNRESET      :: 104
+	ENOBUFS         :: 105
+	EISCONN         :: 106
+	ENOTCONN        :: 107
+
+	ETIMEDOUT       :: 110
+	ECONNREFUSED    :: 111
+
+	EHOSTUNREACH    :: 113
+	EALREADY        :: 114
+	EINPROGRESS     :: 115
+	ESTALE          :: 116
+
+	EDQUOT          :: 122
+	ECANCELED       :: 125
+
+	EOWNERDEAD      :: 130
+	ENOTRECOVERABLE :: 131
+} else when ODIN_OS == .Windows {
+	E2BIG           :: 7
+	EACCES          :: 13
+	EADDRINUSE      :: 100
+	EADDRNOTAVAIL   :: 101
+	EAFNOSUPPORT    :: 102
+	EAGAIN          :: 11
+	EALREADY        :: 103
+	EBADF           :: 9
+	EBADMSG         :: 104
+	EBUSY           :: 16
+	ECANCELED       :: 105
+	ECHILD          :: 10
+	ECONNABORTED    :: 106
+	ECONNREFUSED    :: 107
+	ECONNRESET      :: 108
+	EDEADLK         :: 36
+	EDESTADDRREQ    :: 109
+	EDQUOT          :: -1 // NOTE: not defined
+	EEXIST          :: 17
+	EFAULT          :: 14
+	EFBIG           :: 27
+	EHOSTUNREACH    :: 110
+	EIDRM           :: 111
+	EINPROGRESS     :: 112
+	EINTR           :: 4
+	EINVAL          :: 22
+	EIO             :: 5
+	EISCONN         :: 113
+	EISDIR          :: 21
+	ELOOP           :: 114
+	EMFILE          :: 24
+	EMLINK          :: 31
+	EMSGSIZE        :: 115
+	EMULTIHOP       :: -1 // NOTE: not defined
+	ENAMETOOLONG    :: 38
+	ENETDOWN        :: 116
+	ENETRESET       :: 117
+	ENETUNREACH     :: 118
+	ENFILE          :: 23
+	ENOBUFS         :: 119
+	ENODATA         :: 120
+	ENODEV          :: 19
+	ENOENT          :: 2
+	ENOEXEC         :: 8
+	ENOLCK          :: 39
+	ENOLINK         :: 121
+	ENOMEM          :: 12
+	ENOMSG          :: 122
+	ENOPROTOOPT     :: 123
+	ENOSPC          :: 28
+	ENOSR           :: 124
+	ENOSTR          :: 125
+	ENOSYS          :: 40
+	ENOTCONN        :: 126
+	ENOTDIR         :: 20
+	ENOTEMPTY       :: 41
+	ENOTRECOVERABLE :: 127
+	ENOTSOCK        :: 128
+	ENOTSUP         :: 129
+	ENOTTY          :: 25
+	ENXIO           :: 6
+	EOPNOTSUPP      :: 130
+	EOVERFLOW       :: 132
+	EOWNERDEAD      :: 133
+	EPERM           :: 1
+	EPIPE           :: 32
+	EPROTO          :: 134
+	EPROTONOSUPPORT :: 135
+	EPROTOTYPE      :: 136
+	EROFS           :: 30
+	ESPIPE          :: 29
+	ESRCH           :: 3
+	ESTALE          :: -1 // NOTE: not defined
+	ETIME           :: 137
+	ETIMEDOUT       :: 138
+	ETXTBSY         :: 139
+	EWOULDBLOCK     :: 140
+	EXDEV           :: 18
 }
 

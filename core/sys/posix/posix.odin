@@ -1,5 +1,7 @@
 /*
-Bindings for most POSIX APIs.
+Raw bindings for most POSIX APIs.
+
+Targets glibc and musl compatibility.
 
 APIs that have been left out are due to not being useful,
 being fully replaced (and better) by other Odin packages,
@@ -8,6 +10,9 @@ or when one of the targets hasn't implemented the API or option.
 The struct fields that are cross-platform are documented with `[PSX]`.
 Accessing these fields on one target should be the same on others.
 Other fields are implementation specific.
+
+The parts of POSIX that Windows implements are also supported here, but
+other symbols are undefined on Windows targets.
 
 Most macros have been reimplemented in Odin with inlined functions.
 

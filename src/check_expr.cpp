@@ -285,7 +285,7 @@ gb_internal void error_operand_no_value(Operand *o) {
 	if (o->mode == Addressing_NoValue) {
 		Ast *x = unparen_expr(o->expr);
 
-		if (x->kind == Ast_CallExpr) {
+		if (x != nullptr && x->kind == Ast_CallExpr) {
 			Ast *p = unparen_expr(x->CallExpr.proc);
 			if (p->kind == Ast_BasicDirective) {
 				String tag = p->BasicDirective.name.string;
@@ -297,7 +297,7 @@ gb_internal void error_operand_no_value(Operand *o) {
 		}
 
 		gbString err = expr_to_string(o->expr);
-		if (x->kind == Ast_CallExpr) {
+		if (x != nullptr && x->kind == Ast_CallExpr) {
 			error(o->expr, "'%s' call does not return a value and cannot be used as a value", err);
 		} else {
 			error(o->expr, "'%s' used as a value", err);
@@ -897,20 +897,6 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	if (is_type_relative_pointer(dst)) {
-		i64 score = check_distance_between_types(c, operand, dst->RelativePointer.pointer_type, allow_array_programming);
-		if (score >= 0) {
-			return score+2;
-		}
-	}
-
-	if (is_type_relative_multi_pointer(dst)) {
-		i64 score = check_distance_between_types(c, operand, dst->RelativeMultiPointer.pointer_type, allow_array_programming);
-		if (score >= 0) {
-			return score+2;
-		}
-	}
-
 	if (is_type_proc(dst)) {
 		if (are_types_identical(src, dst)) {
 			return 3;
@@ -1051,12 +1037,6 @@ gb_internal AstPackage *get_package_of_type(Type *type) {
 			continue;
 		case Type_DynamicArray:
 			type = type->DynamicArray.elem;
-			continue;
-		case Type_RelativePointer:
-			type = type->RelativePointer.pointer_type;
-			continue;
-		case Type_RelativeMultiPointer:
-			type = type->RelativeMultiPointer.pointer_type;
 			continue;
 		}
 		return nullptr;
@@ -3901,6 +3881,12 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		// IMPORTANT NOTE(bill): This uses right-left evaluation in type checking only no in
 		check_expr(c, y, be->right);
 		Type *rhs_type = type_deref(y->type);
+		if (rhs_type == nullptr) {
+			error(y->expr, "Cannot use '%.*s' on an expression with no value", LIT(op.string));
+			x->mode = Addressing_Invalid;
+			x->expr = node;
+			return;
+		}
 
 		if (is_type_bit_set(rhs_type)) {
 			Type *elem = base_type(rhs_type)->BitSet.elem;
@@ -5388,22 +5374,25 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		Type *t = type_deref(operand->type);
 		if (t == nullptr) {
 			error(operand->expr, "Cannot use a selector expression on 0-value expression");
-		} else if (is_type_dynamic_array(t)) {
-			init_mem_allocator(c->checker);
-		}
-		sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
-		entity = sel.entity;
+		} else {
+			if (is_type_dynamic_array(t)) {
+				init_mem_allocator(c->checker);
+			}
+			sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
+			entity = sel.entity;
 
-		// NOTE(bill): Add type info needed for fields like 'names'
-		if (entity != nullptr && (entity->flags&EntityFlag_TypeField)) {
-			add_type_info_type(c, operand->type);
-		}
-		if (is_type_enum(operand->type)) {
-			add_type_info_type(c, operand->type);
+			// NOTE(bill): Add type info needed for fields like 'names'
+			if (entity != nullptr && (entity->flags&EntityFlag_TypeField)) {
+				add_type_info_type(c, operand->type);
+			}
+			if (is_type_enum(operand->type)) {
+				add_type_info_type(c, operand->type);
+			}
 		}
 	}
 
-	if (entity == nullptr && selector->kind == Ast_Ident && (is_type_array(type_deref(operand->type)) || is_type_simd_vector(type_deref(operand->type)))) {
+	if (entity == nullptr && selector->kind == Ast_Ident && operand->type != nullptr &&
+	    (is_type_array(type_deref(operand->type)) || is_type_simd_vector(type_deref(operand->type)))) {
 		String field_name = selector->Ident.token.string;
 		if (1 < field_name.len && field_name.len <= 4) {
 			u8 swizzles_xyzw[4] = {'x', 'y', 'z', 'w'};
@@ -8002,6 +7991,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			pt = data.gen_entity->type;
 		}
 	}
+	pt = base_type(pt);
 
 	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
 		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
@@ -8217,17 +8207,6 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 		o->type = t->Slice.elem;
 		if (o->mode != Addressing_Constant) {
 			o->mode = Addressing_Variable;
-		}
-		return true;
-
-	case Type_RelativeMultiPointer:
-		{
-			Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
-			GB_ASSERT(pointer_type->kind == Type_MultiPointer);
-			o->type = pointer_type->MultiPointer.elem;
-			if (o->mode != Addressing_Constant) {
-				o->mode = Addressing_Variable;
-			}
 		}
 		return true;
 
@@ -8469,6 +8448,15 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 			error(node, "Undeclared name '%.*s' for type '%s'", LIT(name), typ);
 
 			check_did_you_mean_type(name, bt->Enum.fields);
+		} else if (is_type_bit_set(th) && is_type_enum(th->BitSet.elem)) {
+			ERROR_BLOCK();
+
+			gbString typ = type_to_string(th);
+			gbString str = expr_to_string(node);
+			error(node, "Cannot convert enum value to '%s'", typ);
+			error_line("\tSuggestion: Did you mean '{ %s }'?\n", str);
+			gb_string_free(typ);
+			gb_string_free(str);
 		} else {
 			gbString typ = type_to_string(th);
 			gbString str = expr_to_string(node);
@@ -8792,11 +8780,6 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 		gbString type_string = expr_to_string(type_expr);
 		error(node, "Type %s is invalid operand for ternary if expression", type_string);
 		gb_string_free(type_string);
-		return kind;
-	}
-
-	if (x.type == nullptr || x.type == t_invalid ||
-	    y.type == nullptr || y.type == t_invalid) {
 		return kind;
 	}
 
@@ -10609,8 +10592,6 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			// Okay
 		} else if (is_type_string(t)) {
 			// Okay
-		} else if (is_type_relative_multi_pointer(t)) {
-			// Okay
 		} else if (is_type_matrix(t)) {
 			// Okay
 		} else {
@@ -10765,11 +10746,6 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		}
 		break;
 
-	case Type_RelativeMultiPointer:
-		valid = true;
-		o->type = type_deref(o->type);
-		break;
-
 	case Type_EnumeratedArray:
 		{
 			gbString str = expr_to_string(o->expr);
@@ -10846,16 +10822,6 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			x[i:n] -> []T
 		*/
 		o->type = alloc_type_slice(t->MultiPointer.elem);
-	} else if (t->kind == Type_RelativeMultiPointer && se->high != nullptr) {
-		/*
-			x[:]   -> [^]T
-			x[i:]  -> [^]T
-			x[:n]  -> []T
-			x[i:n] -> []T
-		*/
-		Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
-		GB_ASSERT(pointer_type->kind == Type_MultiPointer);
-		o->type = alloc_type_slice(pointer_type->MultiPointer.elem);
 	}
 
 
@@ -11216,22 +11182,6 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
  			} else if (t->kind == Type_SoaPointer) {
 				o->mode = Addressing_SoaVariable;
 				o->type = type_deref(t);
- 			} else if (t->kind == Type_RelativePointer) {
- 				if (o->mode != Addressing_Variable) {
- 					gbString str = expr_to_string(o->expr);
- 					gbString typ = type_to_string(o->type);
- 					error(o->expr, "Cannot dereference relative pointer '%s' of type '%s' as it does not have a variable addressing mode", str, typ);
- 					gb_string_free(typ);
- 					gb_string_free(str);
- 				}
-
- 				// NOTE(bill): This is required because when dereferencing, the original type has been lost
-				add_type_info_type(c, o->type);
-
- 				Type *ptr_type = base_type(t->RelativePointer.pointer_type);
- 				GB_ASSERT(ptr_type->kind == Type_Pointer);
-				o->mode = Addressing_Variable;
-				o->type = ptr_type->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
  				gbString typ = type_to_string(o->type);

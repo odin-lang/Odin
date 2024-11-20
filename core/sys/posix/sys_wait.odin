@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -124,11 +125,11 @@ WIFCONTINUED :: #force_inline proc "contextless" (x: c.int) -> bool {
 
 idtype_t :: enum c.int {
 	// Wait for any children and `id` is ignored.
-	P_ALL,
+	P_ALL  = _P_ALL,
 	// Wait for any child wiith a process group ID equal to `id`.
-	P_PID,
+	P_PID  = _P_PID,
 	// Wait for any child with a process group ID equal to `id`.
-	P_PGID,
+	P_PGID = _P_PGID,
 }
 
 Wait_Flag_Bits :: enum c.int {
@@ -165,6 +166,10 @@ when ODIN_OS == .Darwin {
 	WEXITED  :: 0x00000004
 	WNOWAIT  :: 0x00000020
 	WSTOPPED :: 0x00000008
+
+	_P_ALL  :: 0
+	_P_PID  :: 1
+	_P_PGID :: 2
 
 	@(private)
 	_WSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
@@ -221,6 +226,10 @@ when ODIN_OS == .Darwin {
 	WNOWAIT  :: 8
 	WSTOPPED :: 2
 
+	_P_ALL  :: 7
+	_P_PID  :: 0
+	_P_PGID :: 2
+
 	@(private)
 	_WSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
 		return x & 0o177
@@ -274,6 +283,10 @@ when ODIN_OS == .Darwin {
 	WEXITED  :: 0x00000020
 	WNOWAIT  :: 0x00010000
 	WSTOPPED :: 0x00000002
+
+	_P_ALL  :: 0
+	_P_PID  :: 1
+	_P_PGID :: 2
 
 	@(private)
 	_WSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
@@ -330,6 +343,10 @@ when ODIN_OS == .Darwin {
 	WNOWAIT  :: 0x00010000
 	WSTOPPED :: 0x00000002
 
+	_P_ALL  :: 0
+	_P_PID  :: 2
+	_P_PGID :: 1
+
 	@(private)
 	_WSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
 		return x & 0o177
@@ -375,6 +392,54 @@ when ODIN_OS == .Darwin {
 		return (x & _WCONTINUED) == _WCONTINUED
 	}
 
-} else {
-	#panic("posix is unimplemented for the current target")
+} else when ODIN_OS == .Linux {
+
+	id_t :: distinct c.uint
+
+	WCONTINUED :: 8
+	WNOHANG    :: 1
+	WUNTRACED  :: 2
+
+	WEXITED  :: 4
+	WNOWAIT  :: 0x1000000
+	WSTOPPED :: 2
+
+	_P_ALL  :: 0
+	_P_PID  :: 1
+	_P_PGID :: 2
+
+	@(private)
+	_WIFEXITED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return _WTERMSIG(x) == nil
+	}
+
+	@(private)
+	_WEXITSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
+		return (x & 0xff00) >> 8
+	}
+
+	@(private)
+	_WIFSIGNALED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return (x & 0xffff) - 1 < 0xff
+	}
+
+	@(private)
+	_WTERMSIG :: #force_inline proc "contextless" (x: c.int) -> Signal {
+		return Signal(x & 0x7f)
+	}
+
+	@(private)
+	_WIFSTOPPED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return ((x & 0xffff) * 0x10001) >> 8 > 0x7f00
+	}
+
+	@(private)
+	_WSTOPSIG :: #force_inline proc "contextless" (x: c.int) -> Signal {
+		return Signal(_WEXITSTATUS(x))
+	}
+
+	@(private)
+	_WIFCONTINUED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return x == 0xffff
+	}
 }

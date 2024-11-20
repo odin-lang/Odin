@@ -130,7 +130,7 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		LLVMTypeRef vector_type = nullptr;
 		if (op != Token_Not && lb_try_vector_cast(p->module, val, &vector_type)) {
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, val.value, LLVMPointerType(vector_type, 0), "");
-			LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
+			LLVMValueRef v = OdinLLVMBuildLoad(p, vector_type, vp);
 
 			LLVMValueRef opv = nullptr;
 			switch (op) {
@@ -324,8 +324,8 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 
 		LLVMValueRef lhs_vp = LLVMBuildPointerCast(p->builder, lhs_ptr.value, LLVMPointerType(vector_type, 0), "");
 		LLVMValueRef rhs_vp = LLVMBuildPointerCast(p->builder, rhs_ptr.value, LLVMPointerType(vector_type, 0), "");
-		LLVMValueRef x = LLVMBuildLoad2(p->builder, vector_type, lhs_vp, "");
-		LLVMValueRef y = LLVMBuildLoad2(p->builder, vector_type, rhs_vp, "");
+		LLVMValueRef x = OdinLLVMBuildLoad(p, vector_type, lhs_vp);
+		LLVMValueRef y = OdinLLVMBuildLoad(p, vector_type, rhs_vp);
 		LLVMValueRef z = nullptr;
 
 		if (is_type_float(integral_type)) {
@@ -551,15 +551,14 @@ gb_internal LLVMValueRef lb_matrix_to_vector(lbProcedure *p, lbValue matrix) {
 	Type *mt = base_type(matrix.type);
 	GB_ASSERT(mt->kind == Type_Matrix);
 	LLVMTypeRef elem_type = lb_type(p->module, mt->Matrix.elem);
-	
+
 	unsigned total_count = cast(unsigned)matrix_type_total_internal_elems(mt);
 	LLVMTypeRef total_matrix_type = LLVMVectorType(elem_type, total_count);
-	
+
 #if 1
 	LLVMValueRef ptr = lb_address_from_load_or_generate_local(p, matrix).value;
 	LLVMValueRef matrix_vector_ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(total_matrix_type, 0), "");
-	LLVMValueRef matrix_vector = LLVMBuildLoad2(p->builder, total_matrix_type, matrix_vector_ptr, "");
-	LLVMSetAlignment(matrix_vector, cast(unsigned)type_align_of(mt));
+	LLVMValueRef matrix_vector = OdinLLVMBuildLoadAligned(p, total_matrix_type, matrix_vector_ptr, type_align_of(mt));
 	return matrix_vector;
 #else
 	LLVMValueRef matrix_vector = LLVMBuildBitCast(p->builder, matrix.value, total_matrix_type, "");
@@ -1225,10 +1224,10 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			lbValue d3 = lb_emit_struct_ep(p, res.addr, 3);
 
 			if (immediate_type != ft) {
-				d0 = lb_emit_conv(p, d0, ft);
-				d1 = lb_emit_conv(p, d1, ft);
-				d2 = lb_emit_conv(p, d2, ft);
-				d3 = lb_emit_conv(p, d3, ft);
+				z0 = lb_emit_conv(p, z0, ft);
+				z1 = lb_emit_conv(p, z1, ft);
+				z2 = lb_emit_conv(p, z2, ft);
+				z3 = lb_emit_conv(p, z3, ft);
 			}
 
 			lb_emit_store(p, d0, z0);
@@ -1648,7 +1647,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			lb_emit_store(p, a1, id);
 			return lb_addr_load(p, res);
 		} else if (dst->kind == Type_Basic) {
-			if (src->Basic.kind == Basic_string && dst->Basic.kind == Basic_cstring) {
+			if (src->kind == Type_Basic && src->Basic.kind == Basic_string && dst->Basic.kind == Basic_cstring) {
 				String str = lb_get_const_string(m, value);
 				lbValue res = {};
 				res.type = t;
@@ -2364,12 +2363,23 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		GB_ASSERT(src->kind == Type_Matrix);
 		lbAddr v = lb_add_local_generated(p, t, true);
 
-		if (is_matrix_square(dst) && is_matrix_square(dst)) {
+		if (dst->Matrix.row_count    == src->Matrix.row_count &&
+		    dst->Matrix.column_count == src->Matrix.column_count) {
+			for (i64 j = 0; j < dst->Matrix.column_count; j++) {
+				for (i64 i = 0; i < dst->Matrix.row_count; i++) {
+					lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
+					lbValue s = lb_emit_matrix_ev(p, value, i, j);
+					s = lb_emit_conv(p, s, dst->Matrix.elem);
+					lb_emit_store(p, d, s);
+				}
+			}
+		} else if (is_matrix_square(dst) && is_matrix_square(dst)) {
 			for (i64 j = 0; j < dst->Matrix.column_count; j++) {
 				for (i64 i = 0; i < dst->Matrix.row_count; i++) {
 					if (i < src->Matrix.row_count && j < src->Matrix.column_count) {
 						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
 						lbValue s = lb_emit_matrix_ev(p, value, i, j);
+						s = lb_emit_conv(p, s, dst->Matrix.elem);
 						lb_emit_store(p, d, s);
 					} else if (i == j) {
 						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
@@ -2555,17 +2565,27 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 
 	if (are_types_identical(a, b)) {
 		// NOTE(bill): No need for a conversion
-	} else if (lb_is_const(left) || lb_is_const_nil(left)) {
+	} else if ((lb_is_const(left) && !is_type_array(left.type)) || lb_is_const_nil(left)) {
+		// NOTE(karl): !is_type_array(left.type) is there to avoid lb_emit_conv
+		// trying to convert a constant array into a non-array. In that case we
+		// want the `else` branch to happen, so it can try to convert the
+		// non-array into an array instead.
+
 		if (lb_is_const_nil(left)) {
+			if (internal_check_is_assignable_to(right.type, left.type)) {
+				right = lb_emit_conv(p, right, left.type);
+			}
 			return lb_emit_comp_against_nil(p, op_kind, right);
 		}
 		left = lb_emit_conv(p, left, right.type);
-	} else if (lb_is_const(right) || lb_is_const_nil(right)) {
+	} else if ((lb_is_const(right) && !is_type_array(right.type)) || lb_is_const_nil(right)) {
 		if (lb_is_const_nil(right)) {
+			if (internal_check_is_assignable_to(left.type, right.type)) {
+				left = lb_emit_conv(p, left, right.type);
+			}
 			return lb_emit_comp_against_nil(p, op_kind, left);
 		}
 		right = lb_emit_conv(p, right, left.type);
-
 	} else {
 		Type *lt = left.type;
 		Type *rt = right.type;
@@ -4180,30 +4200,6 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		return lb_addr(v);
 	}
 
-	case Type_RelativeMultiPointer: {
-		lbAddr rel_ptr_addr = {};
-		if (deref) {
-			lbValue rel_ptr_ptr = lb_build_expr(p, ie->expr);
-			rel_ptr_addr = lb_addr(rel_ptr_ptr);
-		} else {
-			rel_ptr_addr = lb_build_addr(p, ie->expr);
-		}
-		lbValue rel_ptr = lb_relative_pointer_to_pointer(p, rel_ptr_addr);
-
-		lbValue index = lb_build_expr(p, ie->index);
-		index = lb_emit_conv(p, index, t_int);
-		lbValue v = {};
-
-		Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
-		GB_ASSERT(pointer_type->kind == Type_MultiPointer);
-		Type *elem = pointer_type->MultiPointer.elem;
-
-		LLVMValueRef indices[1] = {index.value};
-		v.value = LLVMBuildGEP2(p->builder, lb_type(p->module, elem), rel_ptr.value, indices, 1, "");
-		v.type = alloc_type_pointer(elem);
-		return lb_addr(v);
-	}
-
 	case Type_DynamicArray: {
 		lbValue dynamic_array = {};
 		dynamic_array = lb_build_expr(p, ie->expr);
@@ -4312,13 +4308,6 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lb_fill_slice(p, slice, elem, new_len);
 		return slice;
 	}
-
-	case Type_RelativePointer:
-		GB_PANIC("TODO(bill): Type_RelativePointer should be handled above already on the lb_addr_load");
-		break;
-	case Type_RelativeMultiPointer:
-		GB_PANIC("TODO(bill): Type_RelativeMultiPointer should be handled above already on the lb_addr_load");
-		break;
 
 	case Type_DynamicArray: {
 		Type *elem_type = type->DynamicArray.elem;
@@ -5323,11 +5312,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(de, DerefExpr, expr);
 		Type *t = type_of_expr(de->expr);
-		if (is_type_relative_pointer(t)) {
-			lbAddr addr = lb_build_addr(p, de->expr);
-			addr.relative.deref = true;
-			return addr;
-		} else if (is_type_soa_pointer(t)) {
+		if (is_type_soa_pointer(t)) {
 			lbValue value = lb_build_expr(p, de->expr);
 			lbValue ptr = lb_emit_struct_ev(p, value, 0);
 			lbValue idx = lb_emit_struct_ev(p, value, 1);

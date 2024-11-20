@@ -96,6 +96,22 @@ package main
 				{{.JS, .wasm64p32, "baz"}, true},
 				{{.JS, .wasm64p32, "bar"}, false},
 			},
+		}, {// [5]
+			src = `
+#+build !freestanding, wasm32, wasm64p32
+package main`,
+			tags = {
+				build = {
+					{os = runtime.ALL_ODIN_OS_TYPES - {.Freestanding}, arch = runtime.ALL_ODIN_ARCH_TYPES},
+					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.wasm32}},
+					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.wasm64p32}},
+				},
+			},
+			matching_targets = {
+				{{.Freestanding, .wasm32, ""}, true},
+				{{.Freestanding, .wasm64p32, ""}, true},
+				{{.Freestanding, .arm64, ""}, false},
+			},
 		},
 	}
 

@@ -1,3 +1,4 @@
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -31,13 +32,11 @@ Ulimit_Cmd :: enum c.int {
 	SETFSIZE = UL_SETFSIZE,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD  || ODIN_OS == .Linux {
 
 	UL_GETFSIZE :: 1
 	UL_SETFSIZE :: 2
 
 	// NOTE: I don't think OpenBSD implements this API.
 
-} else {
-	#panic("posix is unimplemented for the current target")
 }

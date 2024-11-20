@@ -752,7 +752,7 @@ cut :: proc(s: string, rune_offset := int(0), rune_length := int(0)) -> (res: st
 		count += 1
 	}
 
-	if rune_length <= 1 {
+	if rune_length < 1 {
 		return s
 	}
 

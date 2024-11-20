@@ -2,12 +2,6 @@
 	Gather and print platform and version info to help with reporting Odin bugs.
 */
 
-#if !defined(GB_COMPILER_MSVC)
-	#if defined(GB_CPU_X86)
-		#include <cpuid.h>
-	#endif
-#endif
-
 #if defined(GB_SYSTEM_LINUX)
 	#include <sys/utsname.h>
 	#include <sys/sysinfo.h>
@@ -153,21 +147,6 @@ gb_internal void report_windows_product_type(DWORD ProductType) {
 	}
 }
 #endif
-
-gb_internal void odin_cpuid(int leaf, int result[]) {
-	#if defined(GB_CPU_ARM) || defined(GB_CPU_RISCV)
-		return;
-
-	#elif defined(GB_CPU_X86)
-	
-		#if defined(GB_COMPILER_MSVC)
-			__cpuid(result, leaf);
-		#else
-			__get_cpuid(leaf, (unsigned int*)&result[0], (unsigned int*)&result[1], (unsigned int*)&result[2], (unsigned int*)&result[3]);
-		#endif
-
-	#endif
-}
 
 gb_internal void report_cpu_info() {
 	gb_printf("\tCPU:     ");
@@ -887,6 +866,10 @@ gb_internal void report_os_info() {
 			{"21G816",   {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  0}}},
 			{"21G920",   {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  1}}},
 			{"21G1974",  {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  2}}},
+			{"21H1015",  {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  3}}},
+			{"21H1123",  {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  4}}},
+			{"21H1222",  {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  5}}},
+			{"21H1320",  {21,  6,  0}, "macOS", {"Monterey",      {12,  7,  6}}},
 			{"22A380",   {13,  0,  0}, "macOS", {"Ventura",       {22,  1,  0}}},
 			{"22A400",   {13,  0,  1}, "macOS", {"Ventura",       {22,  1,  0}}},
 			{"22C65",    {13,  1,  0}, "macOS", {"Ventura",       {22,  2,  0}}},
@@ -904,6 +887,15 @@ gb_internal void report_os_info() {
 			{"22G120",   {13,  6,  0}, "macOS", {"Ventura",       {22,  6,  0}}},
 			{"22G313",   {13,  6,  1}, "macOS", {"Ventura",       {22,  6,  0}}},
 			{"22G320",   {13,  6,  2}, "macOS", {"Ventura",       {22,  6,  0}}},
+			{"22G436",   {22,  6,  0}, "macOS", {"Ventura",       {13,  6,  3}}},
+			{"22G513",   {22,  6,  0}, "macOS", {"Ventura",       {13,  6,  4}}},
+			{"22G621",   {22,  6,  0}, "macOS", {"Ventura",       {13,  6,  5}}},
+			{"22G630",   {22,  6,  0}, "macOS", {"Ventura",       {13,  6,  6}}},
+			{"22G720",   {22,  6,  0}, "macOS", {"Ventura",       {13,  6,  7}}},
+			{"22G820",   {22,  6,  0}, "macOS", {"Ventura",       {13,  6,  8}}},
+			{"22G830",   {22,  6,  0}, "macOS", {"Ventura",       {13,  6,  9}}},
+			{"22H123",   {22,  6,  0}, "macOS", {"Ventura",       {13,  7,  0}}},
+			{"22H221",   {22,  6,  0}, "macOS", {"Ventura",       {13,  7,  1}}},
 			{"23A344",   {23,  0,  0}, "macOS", {"Sonoma",        {14,  0,  0}}},
 			{"23B74",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  0}}},
 			{"23B81",    {23,  1,  0}, "macOS", {"Sonoma",        {14,  1,  1}}},
@@ -920,7 +912,10 @@ gb_internal void report_os_info() {
 			{"23G80",    {23,  6,  0}, "macOS", {"Sonoma",        {14,  6,  0}}},
 			{"23G93",    {23,  6,  0}, "macOS", {"Sonoma",        {14,  6,  1}}},
 			{"23H124",   {23,  6,  0}, "macOS", {"Sonoma",        {14,  7,  0}}},
+			{"23H222",   {23,  6,  0}, "macOS", {"Sonoma",        {14,  7,  1}}},
 			{"24A335",   {24,  0,  0}, "macOS", {"Sequoia",       {15,  0,  0}}},
+			{"24A348",   {24,  0,  0}, "macOS", {"Sequoia",       {15,  0,  1}}},
+			{"24B83",    {24,  1,  0}, "macOS", {"Sequoia",       {15,  1,  0}}},
 		};
 
 
