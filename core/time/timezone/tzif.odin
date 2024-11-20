@@ -536,7 +536,7 @@ parse_tzif :: proc(_buffer: []u8, region_name: string, allocator := context.allo
 	buffer = buffer[(int(real_hdr.leapcnt) * size_of(Leapsecond_Record)):]
 
 	standard_wall_tags := buffer[:int(real_hdr.isstdcnt)]
-	for stdwall_tag, idx in standard_wall_tags {
+	for stdwall_tag, _ in standard_wall_tags {
 		if (stdwall_tag != 0 && stdwall_tag != 1) {
 			return
 		}
@@ -545,7 +545,7 @@ parse_tzif :: proc(_buffer: []u8, region_name: string, allocator := context.allo
 	buffer = buffer[int(real_hdr.isstdcnt):]
 
 	ut_tags := buffer[:int(real_hdr.isutcnt)]
-	for ut_tag, idx in ut_tags {
+	for ut_tag, _ in ut_tags {
 		if (ut_tag != 0 && ut_tag != 1) {
 			return
 		}
