@@ -581,7 +581,7 @@ test_check_timezone_edgecases :: proc(t: ^testing.T) {
 	defer tz.region_destroy(tog_tz)
 
 	ret_dt = tz.datetime_to_tz(utc_dt, tog_tz)
-	expected_tog_dt, _ := dt.components_to_datetime(2024, 10, 4, 9, 47, 0)
+	expected_tog_dt, _ := dt.components_to_datetime(2024, 10, 4, 13, 47, 0)
 
 	testing.expectf(t, datetime_eq(ret_dt, expected_tog_dt), "Failed to convert to Togatapu time")
 }
