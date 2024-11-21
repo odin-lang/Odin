@@ -3541,6 +3541,8 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		return false;
 	}
 
+	Operand src = *o;
+
 	Type *src_t = o->type;
 	Type *dst_t = t;
 	Type *src_bt = base_type(src_t);
@@ -3629,7 +3631,8 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		// identical casts that cannot be foreseen or otherwise
 		// forbidden, so just skip them.
 		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
-		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig))) {
+		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig)) &&
+		    check_is_castable_to(c, &src, dst_t)) {
 			if (are_types_identical(src_t, dst_t)) {
 				gbString oper_str = expr_to_string(o->expr);
 				gbString to_type  = type_to_string(dst_t);
