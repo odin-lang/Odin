@@ -142,6 +142,7 @@ make_soa_slice :: proc($T: typeid/#soa[]$E, #any_int length: int, allocator := c
 @(builtin, require_results)
 make_soa_dynamic_array :: proc($T: typeid/#soa[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	context.allocator = allocator
+	array.allocator = allocator
 	reserve_soa(&array, 0, loc) or_return
 	return array, nil
 }
@@ -149,6 +150,7 @@ make_soa_dynamic_array :: proc($T: typeid/#soa[dynamic]$E, allocator := context.
 @(builtin, require_results)
 make_soa_dynamic_array_len :: proc($T: typeid/#soa[dynamic]$E, #any_int length: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	context.allocator = allocator
+	array.allocator = allocator
 	resize_soa(&array, length, loc) or_return
 	return array, nil
 }
