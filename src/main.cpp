@@ -2175,12 +2175,18 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 }
 
 
-gb_internal void print_show_help(String const arg0, String const &command, String optional_flag = {}) {
+gb_internal void print_show_help(String const arg0, String command, String optional_flag = {}) {
+	if (command == "help" && optional_flag.len != 0 && optional_flag[0] != '-') {
+		command = optional_flag;
+		optional_flag = {};
+	}
+
 	print_usage_line(0, "%.*s is a tool for managing Odin source code.", LIT(arg0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
 	print_usage_line(0, "");
 	defer (print_usage_line(0, ""));
+
 
 	if (command == "build") {
 		print_usage_line(1, "build   Compiles directory of .odin files as an executable.");
