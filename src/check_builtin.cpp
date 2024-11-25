@@ -3098,9 +3098,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
+
 		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
 			// Okay
-		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
+		} else if (!operand->type || !is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
 			error(call, "Expected an ordered numeric type to 'min', got '%s'", type_str);
 			gb_string_free(type_str);
@@ -3273,7 +3274,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
 			// Okay
-		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
+		} else if (!operand->type || !is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
 			error(call, "Expected an ordered numeric type to 'max', got '%s'", type_str);
 			gb_string_free(type_str);
@@ -3443,7 +3444,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_abs: {
 		// abs :: proc(n: numeric) -> numeric
-		if (!(is_type_numeric(operand->type) && !is_type_array(operand->type))) {
+		if (!operand->type || (!(is_type_numeric(operand->type) && !is_type_array(operand->type)))) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a numeric type to 'abs', got '%s'", type_str);
 			gb_string_free(type_str);
