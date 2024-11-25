@@ -419,7 +419,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 		}
 	
 		struct_loop: for p.curr_token.kind != end_token {
-			key, _ := parse_object_key(p, p.allocator)
+			key := parse_object_key(p, p.allocator) or_return
 			defer delete(key, p.allocator)
 			
 			unmarshal_expect_token(p, .Colon)						
