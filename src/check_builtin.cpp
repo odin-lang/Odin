@@ -2909,7 +2909,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		Operand *x = operand;
 		if (!x->type) {
-			error(call, "Expected a complex or quaternion type to '%s'", id == BuiltinProc_real ? "real" : "imag");
 			return false;
 		}
 
@@ -2974,7 +2973,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		Operand *x = operand;
 		if (!x->type) {
-			error(call, "Expected a complex or quaternion type to '%s'", id == BuiltinProc_jmag ? "jmag" : "kmag");
 			return false;
 		}
 
@@ -3028,7 +3026,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// conj :: proc(x: type) -> type
 		Operand *x = operand;
 		if (!x->type) {
-			error(call, "Expected a complex or quaternion type to 'conj'");
 			return false;
 		}
 
@@ -3073,7 +3070,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_expand_values: {
 		if (!operand->type) {
-			error(call, "Expected a struct or array type to 'expand_values'");
 			return false;
 		}
 
@@ -3117,7 +3113,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		check_multi_expr_or_type(c, operand, ce->args[0]);
 
 		if (!operand->type) {
-			error(call, "Expected an ordered numeric type to 'min'");
 			return false;
 		}
 
@@ -3295,7 +3290,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		check_multi_expr_or_type(c, operand, ce->args[0]);
 
 		if (!operand->type) {
-			error(call, "Expected an ordered numeric type to 'max'");
 			return false;
 		}
 
@@ -3475,7 +3469,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_abs: {
 		// abs :: proc(n: numeric) -> numeric
 		if (!operand->type) {
-			error(call, "Expected an ordered numeric type to 'abs'");
 			return false;
 		}
 
