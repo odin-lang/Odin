@@ -303,7 +303,7 @@ Mesh :: struct {
 	boneIds:      [^]u8,          // Vertex bone ids, up to 4 bones influence by vertex (skinning)
 	boneWeights:  [^]f32,         // Vertex bone weight, up to 4 bones influence by vertex (skinning)
 	boneMatrices: [^]Matrix,      // Bones animated transformation matrices
-    boneCount:    c.int,          // Number of bones
+	boneCount:    c.int,          // Number of bones
 
 	// OpenGL identifiers
 	vaoId: u32,                   // OpenGL Vertex Array Object id
@@ -732,9 +732,9 @@ ShaderLocationIndex :: enum c.int {
 	MAP_IRRADIANCE,                   // Shader location: samplerCube texture: irradiance
 	MAP_PREFILTER,                    // Shader location: samplerCube texture: prefilter
 	MAP_BRDF,                         // Shader location: sampler2d texture: brdf
-    VERTEX_BONEIDS,                   // Shader location: vertex attribute: boneIds
-    VERTEX_BONEWEIGHTS,               // Shader location: vertex attribute: boneWeights
-    BONE_MATRICES,                    // Shader location: array of matrices uniform: boneMatrices
+	VERTEX_BONEIDS,                   // Shader location: vertex attribute: boneIds
+	VERTEX_BONEWEIGHTS,               // Shader location: vertex attribute: boneWeights
+	BONE_MATRICES,                    // Shader location: array of matrices uniform: boneMatrices
 }
 
 
