@@ -2931,7 +2931,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
-		if (!x->type || (!is_type_complex(x->type) && !is_type_quaternion(x->type))) {
+		if (!is_type_complex(x->type) && !is_type_quaternion(x->type)) {
 			gbString s = type_to_string(x->type);
 			error(call, "Argument has type '%s', expected a complex or quaternion type", s);
 			gb_string_free(s);
@@ -3072,10 +3072,15 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	}
 
 	case BuiltinProc_expand_values: {
+		if (!operand->type) {
+			error(call, "Expected a struct or array type to 'expand_values'");
+			return false;
+		}
+
 		Type *type = base_type(operand->type);
 		if (!is_type_struct(type) && !is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected a struct or array type, got '%s'", type_str);
+			error(call, "Expected a struct or array type to 'expand_values', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
