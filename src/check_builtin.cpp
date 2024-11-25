@@ -2908,6 +2908,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// imag :: proc(x: type) -> float_type
 
 		Operand *x = operand;
+		if (!x->type) {
+			error(call, "Expected a complex or quaternion type to '%s'", id == BuiltinProc_real ? "real" : "imag");
+			return false;
+		}
+
 		if (is_type_untyped(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				if (is_type_numeric(x->type)) {
@@ -2926,7 +2931,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
-		if (!is_type_complex(x->type) && !is_type_quaternion(x->type)) {
+		if (!x->type || (!is_type_complex(x->type) && !is_type_quaternion(x->type))) {
 			gbString s = type_to_string(x->type);
 			error(call, "Argument has type '%s', expected a complex or quaternion type", s);
 			gb_string_free(s);
@@ -2968,6 +2973,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// kmag :: proc(x: type) -> float_type
 
 		Operand *x = operand;
+		if (!x->type) {
+			error(call, "Expected a complex or quaternion type to '%s'", id == BuiltinProc_jmag ? "jmag" : "kmag");
+			return false;
+		}
+
 		if (is_type_untyped(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				if (is_type_numeric(x->type)) {
@@ -3017,6 +3027,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_conj: {
 		// conj :: proc(x: type) -> type
 		Operand *x = operand;
+		if (!x->type) {
+			error(call, "Expected a complex or quaternion type to 'conj'");
+			return false;
+		}
+
 		Type *t = x->type;
 		Type *elem = core_array_type(t);
 		
@@ -3096,12 +3111,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		check_multi_expr_or_type(c, operand, ce->args[0]);
 
+		if (!operand->type) {
+			error(call, "Expected an ordered numeric type to 'min'");
+			return false;
+		}
+
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
 
 		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
 			// Okay
-		} else if (!operand->type || !is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
+		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
 			error(call, "Expected an ordered numeric type to 'min', got '%s'", type_str);
 			gb_string_free(type_str);
@@ -3269,12 +3289,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		check_multi_expr_or_type(c, operand, ce->args[0]);
 
+		if (!operand->type) {
+			error(call, "Expected an ordered numeric type to 'max'");
+			return false;
+		}
+
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
 
 		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
 			// Okay
-		} else if (!operand->type || !is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
+		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
 			error(call, "Expected an ordered numeric type to 'max', got '%s'", type_str);
 			gb_string_free(type_str);
@@ -3444,7 +3469,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_abs: {
 		// abs :: proc(n: numeric) -> numeric
-		if (!operand->type || (!(is_type_numeric(operand->type) && !is_type_array(operand->type)))) {
+		if (!operand->type) {
+			error(call, "Expected an ordered numeric type to 'abs'");
+			return false;
+		}
+
+		if (!(is_type_numeric(operand->type) && !is_type_array(operand->type))) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a numeric type to 'abs', got '%s'", type_str);
 			gb_string_free(type_str);
