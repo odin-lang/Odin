@@ -365,7 +365,7 @@ ModelAnimation :: struct {
 	frameCount: c.int,            // Number of animation frames
 	bones:      [^]BoneInfo,      // Bones information (skeleton)
 	framePoses: [^][^]Transform,  // Poses array by frame
-	name:       [32]byte,           // Animation name
+	name:       [32]byte `fmt:"s,0"`, // Animation name
 }
 
 // Ray type (useful for raycast)
@@ -390,7 +390,7 @@ BoundingBox :: struct {
 
 // Wave type, defines audio wave data
 Wave :: struct {
-	frameCount: c.uint,           // Total number of frames (considering channels)
+	frameCount:  c.uint,          // Total number of frames (considering channels)
 	sampleRate:  c.uint,          // Frequency (samples per second)
 	sampleSize:  c.uint,          // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
 	channels:    c.uint,          // Number of channels (1-mono, 2-stereo)
@@ -400,7 +400,7 @@ Wave :: struct {
 // Audio stream type
 // NOTE: Actual structs are defined internally in raudio module
 AudioStream :: struct {
-	buffer: rawptr,               // Pointer to internal data used by the audio system
+	buffer:    rawptr,            // Pointer to internal data used by the audio system
 	processor: rawptr,            // Pointer to internal data processor, useful for audio effects
 
 	sampleRate: c.uint,           // Frequency (samples per second)
@@ -411,14 +411,14 @@ AudioStream :: struct {
 // Sound source type
 Sound :: struct {
 	using stream: AudioStream,    // Audio stream
-	frameCount:  c.uint,          // Total number of frames (considering channels)
+	frameCount:   c.uint,         // Total number of frames (considering channels)
 }
 
 // Music stream type (audio file streaming from memory)
 // NOTE: Anything longer than ~10 seconds should be streamed
 Music :: struct {
 	using stream: AudioStream,    // Audio stream
-	frameCount:  c.uint,          // Total number of frames (considering channels)
+	frameCount:   c.uint,         // Total number of frames (considering channels)
 	looping:      bool,           // Music looping enable
 
 	ctxType: c.int,               // Type of music context (audio filetype)
@@ -1766,3 +1766,17 @@ MemAllocatorProc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	}	
 	return nil, .Mode_Not_Implemented
 }
+
+// RayLib 5.5 renamed Is*Ready to Is*Valid.
+// See: https://github.com/raysan5/raylib/commit/8cbf34ddc495e2bca42245f786915c27210b0507
+IsImageReady         :: IsImageValid
+IsTextureReady       :: IsTextureValid
+IsRenderTextureReady :: IsRenderTextureValid
+IsFontReady          :: IsFontValid
+IsModelReady         :: IsModelValid
+IsMaterialReady      :: IsMaterialValid
+IsWaveReady          :: IsWaveValid
+IsSoundReady         :: IsSoundValid
+IsMusicReady         :: IsMusicValid
+IsAudioStreamReady   :: IsAudioStreamValid
+IsShaderReady        :: IsShaderValid
