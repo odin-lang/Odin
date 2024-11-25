@@ -2551,6 +2551,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_swizzle: {
 		// swizzle :: proc(v: [N]T, ..int) -> [M]T
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *original_type = operand->type;
 		Type *type = base_type(original_type);
 		i64 max_count = 0;
@@ -3527,6 +3531,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_clamp: {
 		// clamp :: proc(a, min, max: ordered) -> ordered
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *type = operand->type;
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
