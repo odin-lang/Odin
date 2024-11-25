@@ -112,9 +112,14 @@ out_of_memory_in_unmarshal :: proc(t: ^testing.T) {
 	err := json.unmarshal(transmute([]u8)json_data, &test_result)
 	testing.expectf(t, err == nil, "Expected `json.unmarshal` to succeed, got error %v", err)
 
-	err  = json.unmarshal(transmute([]u8)json_data, &test_result)
-	expected_error := json.Error.Out_Of_Memory
-	testing.expectf(t, err == json.Error.Out_Of_Memory, "Expected `json.unmarshal` to fail with %v, got %v", expected_error, err)
+	// Test #4515 fix.
+	// Without `or_return` in `unmarshal_object`'s struct_loop, `json.unmarshal` would return OOM a few times and then return `Unsupported_Type_Error`.
+	// With the fix we expect it to return OOM every time, so if this ever fails, it means we have a regression.
+	for _ in 0..<8 {
+		err  = json.unmarshal(transmute([]u8)json_data, &test_result)
+		expected_error := json.Error.Out_Of_Memory
+		testing.expectf(t, err == json.Error.Out_Of_Memory, "Expected `json.unmarshal` to fail with %v, got %v", expected_error, err)
+	}
 }
 
 @test
