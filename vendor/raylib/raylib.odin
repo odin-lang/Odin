@@ -734,7 +734,7 @@ ShaderLocationIndex :: enum c.int {
 	MAP_BRDF,                         // Shader location: sampler2d texture: brdf
     VERTEX_BONEIDS,                   // Shader location: vertex attribute: boneIds
     VERTEX_BONEWEIGHTS,               // Shader location: vertex attribute: boneWeights
-    BONE_MATRICES                     // Shader location: array of matrices uniform: boneMatrices
+    BONE_MATRICES,                    // Shader location: array of matrices uniform: boneMatrices
 }
 
 
@@ -851,7 +851,7 @@ CameraMode :: enum c.int {
 	FREE,                    // Camera free mode
 	ORBITAL,                 // Camera orbital, around target, zoom supported
 	FIRST_PERSON,            // Camera first person
-	THIRD_PERSON             // Camera third person
+	THIRD_PERSON,            // Camera third person
 }
 
 // Camera projection
