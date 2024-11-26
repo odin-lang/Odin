@@ -3925,13 +3925,15 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 gb_internal bool type_set_offsets(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
-		MUTEX_GUARD(&t->Struct.offset_mutex);
-		if (!t->Struct.are_offsets_set) {
-			t->Struct.are_offsets_being_processed = true;
-			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align);
-			t->Struct.are_offsets_being_processed = false;
-			t->Struct.are_offsets_set = true;
-			return true;
+		if (mutex_try_lock(&t->Struct.offset_mutex)) {
+			defer (mutex_unlock(&t->Struct.offset_mutex));
+			if (!t->Struct.are_offsets_set) {
+				t->Struct.are_offsets_being_processed = true;
+				t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align);
+				t->Struct.are_offsets_being_processed = false;
+				t->Struct.are_offsets_set = true;
+				return true;
+			}
 		}
 	} else if (is_type_tuple(t)) {
 		MUTEX_GUARD(&t->Tuple.mutex);
