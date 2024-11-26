@@ -122,7 +122,7 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"macos/libraylib.550.dylib" when RAYLIB_SHARED else "libraylib.a",
+		"macos/libraylib.550.dylib" when RAYLIB_SHARED else "macos/libraylib.a",
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
