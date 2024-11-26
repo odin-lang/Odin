@@ -4,7 +4,7 @@ Made available under Odin's BSD-3 license.
 
 List of contributors:
 	Jeroen van Rijn: Initial implementation.
-	Laytan: ARM and RISC-V CPU feature detection.
+	Laytan: ARM and RISC-V CPU feature detection, iOS/macOS platform overhaul.
 */
 
 /*
