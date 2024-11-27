@@ -201,6 +201,8 @@ gb_internal void lb_open_scope(lbProcedure *p, Scope *s) {
 		}
 	}
 
+	GB_ASSERT(s != nullptr);
+	p->curr_scope = s;
 	p->scope_index += 1;
 	array_add(&p->scope_stack, s);
 
@@ -219,6 +221,10 @@ gb_internal void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *b
 			break;
 		}
 
+	}
+
+	if (p->curr_scope) {
+		p->curr_scope = p->curr_scope->parent;
 	}
 
 	p->scope_index -= 1;
