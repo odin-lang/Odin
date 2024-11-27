@@ -6,7 +6,7 @@ jobs:
     name: NetBSD Build, Check, and Test
     runs-on: ubuntu-latest
     env:
-      PKGSRC_BRANCH: 2024Q2
+      PKGSRC_BRANCH: 2024Q3
     steps:
     - uses: actions/checkout@v4
     - name: Build, Check, and Test
