@@ -2366,8 +2366,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 }
 
 gb_internal void check_procedure_param_polymorphic_type(CheckerContext *ctx, Type *type, Ast *type_expr) {
-	GB_ASSERT_NOT_NULL(type_expr);
-	if (type == nullptr || ctx->in_polymorphic_specialization) { return; }
+	if (type == nullptr || type_expr == nullptr || ctx->in_polymorphic_specialization) { return; }
 	if (!is_type_polymorphic_record_unspecialized(type)) { return; }
 
 	bool invalid_polymorpic_type_use = false;
