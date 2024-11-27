@@ -97,9 +97,6 @@ assign_int :: proc(val: any, i: $T) -> bool {
 	case i64:     dst = i64    (i)
 	case i64le:   dst = i64le  (i)
 	case i64be:   dst = i64be  (i)
-	case i128:    dst = i128   (i)
-	case i128le:  dst = i128le (i)
-	case i128be:  dst = i128be (i)
 	case u8:      dst = u8     (i)
 	case u16:     dst = u16    (i)
 	case u16le:   dst = u16le  (i)
@@ -110,13 +107,21 @@ assign_int :: proc(val: any, i: $T) -> bool {
 	case u64:     dst = u64    (i)
 	case u64le:   dst = u64le  (i)
 	case u64be:   dst = u64be  (i)
-	case u128:    dst = u128   (i)
-	case u128le:  dst = u128le (i)
-	case u128be:  dst = u128be (i)
 	case int:     dst = int    (i)
 	case uint:    dst = uint   (i)
 	case uintptr: dst = uintptr(i)
 	case:
+		when ODIN_ALLOW_128_BIT {
+			switch &dst in v {
+			case i128:    dst = i128   (i); return true
+			case i128le:  dst = i128le (i); return true
+			case i128be:  dst = i128be (i); return true
+			case u128:    dst = u128   (i); return true
+			case u128le:  dst = u128le (i); return true
+			case u128be:  dst = u128be (i); return true
+			}
+		}
+
 		ti := type_info_of(v.id)
 		if _, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
 			do_byte_swap := !reflect.bit_set_is_big_endian(v)
@@ -213,7 +218,11 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 		return true, nil
 		
 	case reflect.Type_Info_Integer:
-		i, pok := strconv.parse_i128(str)
+		when ODIN_ALLOW_128_BIT {
+			i, pok := strconv.parse_i128(str)
+		} else {
+			i, pok := strconv.parse_i64(str)
+		}
 		if !pok {
 			return false, nil
 		}
@@ -296,7 +305,11 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 	case .Integer:
 		advance_token(p)
-		i, _ := strconv.parse_i128(token.text)
+		when ODIN_ALLOW_128_BIT {
+			i, _ := strconv.parse_i128(token.text)
+		} else {
+			i, _ := strconv.parse_i64(token.text)
+		}
 		if assign_int(v, i) {
 			return
 		}
@@ -556,7 +569,11 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 						key_ptr = &key_cstr
 					}
 				case runtime.Type_Info_Integer:
-					i, ok := strconv.parse_i128(key)
+					when ODIN_ALLOW_128_BIT {
+						i, ok := strconv.parse_i128(key)
+					} else {
+						i, ok := strconv.parse_i64(key)
+					}
 					if !ok	{ return UNSUPPORTED_TYPE }
 					key_ptr = rawptr(&i)
 				case: return UNSUPPORTED_TYPE

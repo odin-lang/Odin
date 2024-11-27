@@ -2,6 +2,8 @@ package runtime
 
 import "base:intrinsics"
 
+when ODIN_ALLOW_128_BIT {
+
 udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 	_ctz :: intrinsics.count_trailing_zeros
 	_clz :: intrinsics.count_leading_zeros
@@ -153,4 +155,6 @@ udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 	}
 
 	return q_all
+}
+
 }

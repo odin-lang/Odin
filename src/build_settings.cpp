@@ -439,6 +439,7 @@ struct BuildContext {
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+	bool   disallow_128_bit;
 
 	LinkerChoice linker_choice;
 

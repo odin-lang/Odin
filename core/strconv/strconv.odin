@@ -420,6 +420,8 @@ parse_uint :: proc(s: string, base := 0, n: ^int = nil) -> (value: uint, ok: boo
 	value = uint(v)
 	return
 }
+
+when ODIN_ALLOW_128_BIT {
 /*
 Parses an integer value from a string in the given base, without any prefix
 
@@ -703,6 +705,9 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 }
 //
 parse_u128 :: proc{parse_u128_maybe_prefixed, parse_u128_of_base}
+}
+
+
 /*
 Converts a byte to lowercase
 
@@ -1508,9 +1513,10 @@ append_int :: proc(buf: []byte, i: i64, base: int) -> string {
 }
 
 
-
+when ODIN_ALLOW_128_BIT {
 append_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
 	return append_bits_128(buf, u, base, false, 8*size_of(uint), digits, nil)
+}
 }
 
 /* 

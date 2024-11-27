@@ -27,7 +27,7 @@ benchmark_hash :: proc(t: ^testing.T) {
 		}
 		err := time.benchmark(options, context.allocator)
 		testing.expectf(t, err == nil, "%s failed with err %v", name, err)
-		hash := u128(0x85f6413c)
+		hash := transmute([16]u8)u128(0x85f6413c)
 		testing.expectf(t, options.hash == hash, "%v hash expected to be %v, got %v", name, hash, options.hash)
 		benchmark_print(&str, name, options)
 	}
@@ -42,7 +42,7 @@ benchmark_hash :: proc(t: ^testing.T) {
 		}
 		err := time.benchmark(options, context.allocator)
 		testing.expectf(t, err == nil, "%s failed with err %v", name, err)
-		hash := u128(0x9430f97f)
+		hash := transmute([16]u8)u128(0x9430f97f)
 		testing.expectf(t, options.hash == hash, "%v hash expected to be %v, got %v", name, hash, options.hash)
 		benchmark_print(&str, name, options)
 	}
@@ -57,7 +57,7 @@ benchmark_hash :: proc(t: ^testing.T) {
 		}
 		err := time.benchmark(options, context.allocator)
 		testing.expectf(t, err == nil, "%s failed with err %v", name, err)
-		hash := u128(0x17bb1103c92c502f)
+		hash := transmute([16]u8)u128(0x17bb1103c92c502f)
 		testing.expectf(t, options.hash == hash, "%v hash expected to be %v, got %v", name, hash, options.hash)
 		benchmark_print(&str, name, options)
 	}
@@ -72,7 +72,7 @@ benchmark_hash :: proc(t: ^testing.T) {
 		}
 		err := time.benchmark(options, context.allocator)
 		testing.expectf(t, err == nil, "%s failed with err %v", name, err)
-		hash := u128(0x87d2a1b6e1163ef1)
+		hash := transmute([16]u8)u128(0x87d2a1b6e1163ef1)
 		testing.expectf(t, options.hash == hash, "%v hash expected to be %v, got %v", name, hash, options.hash)
 		benchmark_print(&str, name, options)
 	}
@@ -87,7 +87,7 @@ benchmark_hash :: proc(t: ^testing.T) {
 		}
 		err := time.benchmark(options, context.allocator)
 		testing.expectf(t, err == nil, "%s failed with err %v", name, err)
-		hash := u128(0x801fedc74ccd608c)
+		hash := transmute([16]u8)u128(0x801fedc74ccd608c)
 		testing.expectf(t, options.hash == hash, "%v hash expected to be %v, got %v", name, hash, options.hash)
 		benchmark_print(&str, name, options)
 	}
@@ -102,7 +102,7 @@ benchmark_hash :: proc(t: ^testing.T) {
 		}
 		err := time.benchmark(options, context.allocator)
 		testing.expectf(t, err == nil, "%s failed with err %v", name, err)
-		hash := u128(0x918780b90550bf34)
+		hash := transmute([16]u8)u128(0x918780b90550bf34)
 		testing.expectf(t, options.hash == hash, "%v hash expected to be %v, got %v", name, hash, options.hash)
 		benchmark_print(&str, name, options)
 	}
@@ -117,7 +117,7 @@ benchmark_hash :: proc(t: ^testing.T) {
 		}
 		err := time.benchmark(options, context.allocator)
 		testing.expectf(t, err == nil, "%s failed with err %v", name, err)
-		hash := u128(0x6ba30a4e9dffe1ff801fedc74ccd608c)
+		hash := transmute([16]u8)u128(0x6ba30a4e9dffe1ff801fedc74ccd608c)
 		testing.expectf(t, options.hash == hash, "%v hash expected to be %v, got %v", name, hash, options.hash)
 		benchmark_print(&str, name, options)
 	}
@@ -132,7 +132,7 @@ benchmark_hash :: proc(t: ^testing.T) {
 		}
 		err := time.benchmark(options, context.allocator)
 		testing.expectf(t, err == nil, "%s failed with err %v", name, err)
-		hash := u128(0xb6ef17a3448492b6918780b90550bf34)
+		hash := transmute([16]u8)u128(0xb6ef17a3448492b6918780b90550bf34)
 		testing.expectf(t, options.hash == hash, "%v hash expected to be %v, got %v", name, hash, options.hash)
 		benchmark_print(&str, name, options)
 	}
@@ -163,7 +163,7 @@ benchmark_xxh32 :: proc(options: ^time.Benchmark_Options, allocator := context.a
 	}
 	options.count     = options.rounds
 	options.processed = options.rounds * options.bytes
-	options.hash      = u128(h)
+	options.hash      = transmute([8]u16)u128(h)
 	return nil
 }
 
@@ -176,7 +176,7 @@ benchmark_xxh64 :: proc(options: ^time.Benchmark_Options, allocator := context.a
 	}
 	options.count     = options.rounds
 	options.processed = options.rounds * options.bytes
-	options.hash      = u128(h)
+	options.hash      = transmute([8]u16)u128(h)
 	return nil
 }
 
@@ -189,7 +189,7 @@ benchmark_xxh3_64 :: proc(options: ^time.Benchmark_Options, allocator := context
 	}
 	options.count     = options.rounds
 	options.processed = options.rounds * options.bytes
-	options.hash      = u128(h)
+	options.hash      = transmute([8]u16)u128(h)
 	return nil
 }
 
@@ -202,7 +202,7 @@ benchmark_xxh3_128 :: proc(options: ^time.Benchmark_Options, allocator := contex
 	}
 	options.count     = options.rounds
 	options.processed = options.rounds * options.bytes
-	options.hash      = h
+	options.hash      = transmute([8]u16)h
 	return nil
 }
 

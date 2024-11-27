@@ -372,6 +372,7 @@ enum BuildFlagKind {
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
 	BuildFlag_ObfuscateSourceCodeLocations,
+	BuildFlag_Disallow128Bit,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -588,6 +589,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DynamicMapCalls,         str_lit("dynamic-map-calls"),         BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_ObfuscateSourceCodeLocations, str_lit("obfuscate-source-code-locations"), BuildFlagParam_None,    Command__does_build);
+
+	add_flag(&build_flags, BuildFlag_Disallow128Bit,          str_lit("disallow-128-bit"),          BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc | Command_test);
@@ -1387,6 +1390,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_ObfuscateSourceCodeLocations:
 							build_context.obfuscate_source_code_locations = true;
+							break;
+
+						case BuildFlag_Disallow128Bit:
+							build_context.disallow_128_bit = true;
 							break;
 
 						case BuildFlag_DefaultToNilAllocator:

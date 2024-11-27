@@ -201,7 +201,10 @@ when ODIN_NO_RTTI {
 				case 2:  idx = int((^u16)(tag_ptr)^)  - 1
 				case 4:  idx = int((^u32)(tag_ptr)^)  - 1
 				case 8:  idx = int((^u64)(tag_ptr)^)  - 1
-				case 16: idx = int((^u128)(tag_ptr)^) - 1
+				case 16:
+					when ODIN_ALLOW_128_BIT {
+						idx = int((^u128)(tag_ptr)^) - 1
+					}
 				}
 				if idx < 0 {
 					return nil

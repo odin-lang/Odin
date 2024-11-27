@@ -133,6 +133,8 @@ Possible Output:
 @(require_results)
 uint64 :: proc(gen := context.random_generator) -> (val: u64) { return _random_u64(gen) }
 
+
+when ODIN_ALLOW_128_BIT {
 /*
 Generates a random 128 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 
@@ -158,6 +160,7 @@ uint128 :: proc(gen := context.random_generator) -> (val: u128) {
 	a := u128(_random_u64(gen))
 	b := u128(_random_u64(gen))
 	return (a<<64) | b
+}
 }
 
 /*
@@ -206,6 +209,7 @@ Possible Output:
 */
 @(require_results) int63  :: proc(gen := context.random_generator) -> (val: i64)  { return i64(uint64(gen) << 1 >> 1) }
 
+when ODIN_ALLOW_128_BIT {
 /*
 Generates a random 127 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
 The sign bit will always be set to 0, thus all generated numbers will be positive.
@@ -228,6 +232,7 @@ Possible Output:
 
 */
 @(require_results) int127 :: proc(gen := context.random_generator) -> (val: i128) { return i128(uint128(gen) << 1 >> 1) }
+}
 
 /*
 Generates a random 31 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
@@ -311,6 +316,7 @@ int63_max :: proc(n: i64, gen := context.random_generator) -> (val: i64) {
 	return v % n
 }
 
+when ODIN_ALLOW_128_BIT {
 /*
 Generates a random 127 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
@@ -350,6 +356,7 @@ int127_max :: proc(n: i128, gen := context.random_generator) -> (val: i128) {
 		v = int127(gen)
 	}
 	return v % n
+}
 }
 
 /*

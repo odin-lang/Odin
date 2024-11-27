@@ -363,8 +363,14 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 
 		/* The "+1" here is the "+1" in "floor((la *  k) / 2^29) + 1" */
 		/* n = n + 1 + EOS + sign */
-		size_, _ := internal_get(k, u128)
-		size = int(size_)
+
+		when ODIN_ALLOW_128_BIT {
+			size_, _ := internal_get(k, u128)
+			size = int(size_)
+		} else {
+			size_, _ := internal_get(k, u64)
+			size = int(size_)
+		}
 	}
 
 	/*

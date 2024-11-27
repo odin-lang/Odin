@@ -2282,6 +2282,7 @@ internal_int_power_of_two :: proc(a: ^Int, power: int, allocator := context.allo
 	return nil
 }
 
+when ODIN_ALLOW_128_BIT {
 internal_int_get_u128 :: proc(a: ^Int) -> (res: u128, err: Error) {
 	return internal_int_get(a, u128)
 }
@@ -2291,6 +2292,7 @@ internal_int_get_i128 :: proc(a: ^Int) -> (res: i128, err: Error) {
 	return internal_int_get(a, i128)
 }
 internal_get_i128 :: proc { internal_int_get_i128, }
+}
 
 internal_int_get_u64 :: proc(a: ^Int) -> (res: u64, err: Error) {
 	return internal_int_get(a, u64)

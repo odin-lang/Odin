@@ -253,6 +253,7 @@ power_of_two :: proc(a: ^Int, power: int, allocator := context.allocator) -> (er
 	return #force_inline internal_int_power_of_two(a, power, allocator)
 }
 
+when ODIN_ALLOW_128_BIT {
 int_get_u128 :: proc(a: ^Int, allocator := context.allocator) -> (res: u128, err: Error) {
 	/*
 		Check that `a` is usable.
@@ -270,6 +271,7 @@ int_get_i128 :: proc(a: ^Int, allocator := context.allocator) -> (res: i128, err
 	return int_get(a, i128, allocator)
 }
 get_i128 :: proc { int_get_i128, }
+}
 
 int_get_u64 :: proc(a: ^Int, allocator := context.allocator) -> (res: u64, err: Error) {
 	/*

@@ -878,7 +878,7 @@ extendhfsf2 :: proc "c" (value: __float16) -> f32 {
 }
 
 
-
+when ODIN_ALLOW_128_BIT {
 @(link_name="__floattidf", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 floattidf :: proc "c" (a: i128) -> f64 {
 	DBL_MANT_DIG :: 53
@@ -1086,7 +1086,7 @@ fixdfti :: proc "c" (a: u64) -> i128 {
 	}
 
 }
-
+}
 
 
 __write_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {

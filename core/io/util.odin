@@ -38,6 +38,7 @@ write_int :: proc(w: Writer, i: int, base: int = 10, n_written: ^int = nil) -> (
 	return write_i64(w, i64(i), base, n_written)
 }
 
+when ODIN_ALLOW_128_BIT {
 write_u128 :: proc(w: Writer, i: u128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [39]byte
 	s := strconv.append_bits_128(buf[:], i, base, false, 128, strconv.digits, nil)
@@ -48,6 +49,8 @@ write_i128 :: proc(w: Writer, i: i128, base: int = 10, n_written: ^int = nil) ->
 	s := strconv.append_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
+}
+
 write_f16 :: proc(w: Writer, val: f16, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [386]byte
 

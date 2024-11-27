@@ -1177,6 +1177,8 @@ gb_internal void init_universal(void) {
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
+	add_global_bool_constant("ODIN_ALLOW_128_BIT", !bc->disallow_128_bit);
+
 	{
 		String version = {};
 

@@ -4519,10 +4519,10 @@ DNS_RECORD :: struct { // aka DNS_RECORDA
 	Flags: DWORD,
 	dwTtl: DWORD,
 	_: DWORD,
-	Data: struct #raw_union {
+	Data: struct #raw_union #align(16) {
 		CNAME: DNS_PTR_DATAA,
 		A:     u32be,  // Ipv4 Address
-		AAAA:  u128be, // Ipv6 Address
+		AAAA:  (u128be when ODIN_ALLOW_128_BIT else [16]u8), // Ipv6 Address
 		TXT:   DNS_TXT_DATAA,
 		NS:    DNS_PTR_DATAA,
 		MX:    DNS_MX_DATAA,
