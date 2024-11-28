@@ -679,7 +679,7 @@ get_last_error_string :: proc() -> string {
 
 
 @(require_results)
-open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (handle: Handle, err: Error) {
+open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (handle: Handle, err: Error) {
 	isDir := is_dir_path(path)
 	flags := flags
 	if isDir {
