@@ -8,6 +8,8 @@ import win32 "core:sys/windows"
 import "core:strings"
 import "core:reflect"
 
+_LIBRARY_FILE_EXTENSION :: "dll"
+
 _load_library :: proc(path: string, global_symbols: bool, allocator: runtime.Allocator) -> (Library, bool) {
 	// NOTE(bill): 'global_symbols' is here only for consistency with POSIX which has RTLD_GLOBAL
 	wide_path := win32.utf8_to_wstring(path, allocator)

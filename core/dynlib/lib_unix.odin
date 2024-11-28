@@ -7,6 +7,8 @@ import "base:runtime"
 import "core:strings"
 import "core:sys/posix"
 
+_LIBRARY_FILE_EXTENSION :: "dylib" when ODIN_OS == .Darwin else "so"
+
 _load_library :: proc(path: string, global_symbols: bool, allocator: runtime.Allocator) -> (Library, bool) {
 	flags := posix.RTLD_Flags{.NOW}
 	if global_symbols {
