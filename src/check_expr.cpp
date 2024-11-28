@@ -4454,8 +4454,8 @@ gb_internal ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 }
 
 gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
-	GB_ASSERT_NOT_NULL(target_type);
-	if (operand->mode == Addressing_Invalid ||
+	// GB_ASSERT_NOT_NULL(target_type);
+	if (target_type == nullptr || operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
 	    is_type_typed(operand->type) ||
 	    target_type == t_invalid) {
