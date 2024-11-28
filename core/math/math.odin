@@ -1271,7 +1271,7 @@ binomial :: proc "contextless" (n, k: int) -> int {
 	}
 
 	b := n
-	for i in 2..<k {
+	for i in 2..=k {
 		b = (b * (n+1-i))/i
 	}
 	return b
