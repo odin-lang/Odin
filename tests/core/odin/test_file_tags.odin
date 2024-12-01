@@ -46,14 +46,16 @@ package main
 					{os = {.OpenBSD}, arch = runtime.ALL_ODIN_ARCH_TYPES},
 					{os = {.NetBSD},  arch = runtime.ALL_ODIN_ARCH_TYPES},
 					{os = {.Haiku},   arch = runtime.ALL_ODIN_ARCH_TYPES},
+					parser.BUILD_KIND_NEWLINE_MARKER,
 					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.arm32}},
 					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.arm64}},
 				},
 			},
 			matching_targets = {
-				{{.Linux, .amd64, "foo"}, true},
-				{{.Windows, .arm64, "foo"}, true},
+				{{.Linux,   .amd64, "foo"}, false},
+				{{.Linux,   .arm64, "foo"}, true},
 				{{.Windows, .amd64, "foo"}, false},
+				{{.Windows, .arm64, "foo"}, false},
 			},
 		}, {// [3]
 			src = `
@@ -82,17 +84,12 @@ package main
 			tags = {
 				build_project_name = {{"foo", "!bar"}, {"baz"}},
 				build = {
-					{
-						os = {.JS},
-						arch = {.wasm32},
-					}, {
-						os = {.JS},
-						arch = {.wasm64p32},
-					},
+					{os = {.JS}, arch = {.wasm32}},
+					{os = {.JS}, arch = {.wasm64p32}},
 				},
 			},
 			matching_targets = {
-				{{.JS, .wasm32, "foo"}, true},
+				{{.JS, .wasm32,    "foo"}, true},
 				{{.JS, .wasm64p32, "baz"}, true},
 				{{.JS, .wasm64p32, "bar"}, false},
 			},
@@ -108,9 +105,9 @@ package main`,
 				},
 			},
 			matching_targets = {
-				{{.Freestanding, .wasm32, ""}, true},
+				{{.Freestanding, .wasm32,    ""}, true},
 				{{.Freestanding, .wasm64p32, ""}, true},
-				{{.Freestanding, .arm64, ""}, false},
+				{{.Freestanding, .arm64,     ""}, false},
 			},
 		},
 	}
