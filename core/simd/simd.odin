@@ -1400,7 +1400,7 @@ Graphic below shows how the data gets written into memory.
 	mask: | 1  | 0  | 1  | 0  |
 	      +-------------------+
 	        |    |    |    |
-			v    X    v    X
+	        v    X    v    X
 	      +-------------------+
 	vals: | d0 | d1 | d2 | d3 |
 	      +-------------------+
