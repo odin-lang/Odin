@@ -718,12 +718,12 @@ gb_internal bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_byt
 		Rune r = -1;
 		isize size = utf8_decode(s.text, s.len, &r);
 		*rune = r;
-		*multiple_bytes = true;
-		*tail_string = make_string(s.text+size, s.len-size);
+		if (multiple_bytes) *multiple_bytes = true;
+		if (tail_string) *tail_string = make_string(s.text+size, s.len-size);
 		return true;
 	} else if (s[0] != '\\') {
 		*rune = s[0];
-		*tail_string = make_string(s.text+1, s.len-1);
+		if (tail_string) *tail_string = make_string(s.text+1, s.len-1);
 		return true;
 	}
 
@@ -809,10 +809,10 @@ gb_internal bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_byt
 			return false;
 		}
 		*rune = r;
-		*multiple_bytes = true;
+		if (multiple_bytes) *multiple_bytes = true;
 	} break;
 	}
-	*tail_string = s;
+	if (tail_string) *tail_string = s;
 	return true;
 }
 
