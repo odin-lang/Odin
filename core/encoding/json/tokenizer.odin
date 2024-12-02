@@ -485,7 +485,7 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 	case '"':
 		// okay
 	case '\'':
-		if spec != .JSON {
+		if spec == .JSON {
 			return false
 		}
 		// okay
