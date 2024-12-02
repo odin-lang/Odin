@@ -4980,8 +4980,12 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
 				return tav.value;
+			} else if (is_type_proc(tav.type)) {
+				if (success_) *success_ = true;
+				if (finish_) *finish_ = false;
+				return tav.value;
 			} else {
-				GB_ASSERT(is_type_untyped_nil(tav.type));
+				GB_ASSERT_MSG(is_type_untyped_nil(tav.type), "%s", type_to_string(tav.type));
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
 				return tav.value;
