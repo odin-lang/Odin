@@ -49,13 +49,13 @@ test_index_multi_overlapping_substrs :: proc(t: ^testing.T) {
 
 @test
 test_index_multi_not_found :: proc(t: ^testing.T) {
-	index, width := strings.index_multi("some example text", {"ey", "tey"})
+	index, _ := strings.index_multi("some example text", {"ey", "tey"})
 	testing.expect_value(t, index, -1)
 }
 
 @test
 test_index_multi_with_empty_string :: proc(t: ^testing.T) {
-	index, width := strings.index_multi("some example text", {"ex", ""})
+	index, _ := strings.index_multi("some example text", {"ex", ""})
 	testing.expect_value(t, index, -1)
 }
 
