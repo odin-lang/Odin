@@ -632,7 +632,7 @@ saturating_add :: intrinsics.simd_saturating_add
 Saturated subtraction of vectors.
 
 The *saturated difference* is a difference, that upon overflow or underflow,
-instead of round-tripping, keeps the value clamped between the minimum and the
+instead of wrapping, keeps the value clamped between the minimum and the
 maximum values of the lane type.
 
 This procedure returns a vector where each lane is the saturated difference of
@@ -992,7 +992,7 @@ Example:
 	     +-------+-------+-------+-------+
 	min: |   0   |   0   |   0   |   0   |
 	     +-------+-------+-------+-------+
-		 +-------+-------+-------+-------+
+	     +-------+-------+-------+-------+
 	max: |   1   |   1   |   1   |   1   |
 	     +-------+-------+-------+-------+
 	res:
@@ -1260,7 +1260,7 @@ lanes_ge :: intrinsics.simd_lanes_ge
 /*
 Perform a gather load into a vector.
 
-A *gather* operation is memory load operation, that loads values from an vector
+A *gather* operation is a memory load operation, that loads values from a vector
 of addresses into a single value vector. This can be used to achieve the
 following results:
 
@@ -1525,7 +1525,7 @@ Graphic below shows the flow of lanes:
 	mask: | 1  | 0  | 1  | 0  |
 	      +-------------------+
 	        |    |    |    |
-			v    X    v    X
+	        v    X    v    X
 	      +-------------------+
 	vals: | v0 | v1 | v2 | v3 |
 	      +-------------------+
