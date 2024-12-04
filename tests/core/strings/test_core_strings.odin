@@ -40,6 +40,25 @@ test_last_index_any_small_string_not_found :: proc(t: ^testing.T) {
 	testing.expect(t, index == -1, "last_index_any should be -1")
 }
 
+@test
+test_index_multi_overlapping_substrs :: proc(t: ^testing.T) {
+	index, width := strings.index_multi("some example text", {"ample", "exam"})
+	testing.expect_value(t, index, 5)
+	testing.expect_value(t, width, 4)
+}
+
+@test
+test_index_multi_not_found :: proc(t: ^testing.T) {
+	index, _ := strings.index_multi("some example text", {"ey", "tey"})
+	testing.expect_value(t, index, -1)
+}
+
+@test
+test_index_multi_with_empty_string :: proc(t: ^testing.T) {
+	index, _ := strings.index_multi("some example text", {"ex", ""})
+	testing.expect_value(t, index, -1)
+}
+
 Cut_Test :: struct {
 	input:  string,
 	offset: int,

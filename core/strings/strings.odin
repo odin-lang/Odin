@@ -1872,7 +1872,8 @@ index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
 	lowest_index := len(s)
 	found := false
 	for substr in substrs {
-		if i := index(s, substr); i >= 0 {
+		haystack := s[:min(len(s), lowest_index + len(substr))]
+		if i := index(haystack, substr); i >= 0 {
 			if i < lowest_index {
 				lowest_index = i
 				width = len(substr)
