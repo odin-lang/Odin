@@ -846,15 +846,15 @@ Gesture :: enum c.uint {
 Gestures :: distinct bit_set[Gesture; c.uint]
 
 // Camera speed values 
-CAMERA_MOVE_SPEED :: #config(CAMERA_MOVE_SPEED, 5.4)
-CAMERA_ROTATION_SPEED :: #config(CAMERA_ROTATION_SPEED, 0.03)
-CAMERA_PAN_SPEED :: #config(CAMERA_PAN_SPEED, 0.2)
+CAMERA_MOVE_SPEED :: 5.4
+CAMERA_ROTATION_SPEED :: 0.03
+CAMERA_PAN_SPEED :: 0.2
 
 // Camera mouse movement sensitivity
-CAMERA_MOUSE_MOVE_SENSITIVITY :: #config(CAMERA_MOUSE_MOVE_SENSITIVITY, 0.003)
+CAMERA_MOUSE_MOVE_SENSITIVITY :: 0.003
 
 // Camera orbital speed in CAMERA_ORBITAL mode
-CAMERA_ORBITAL_SPEED :: #config(CAMERA_ORBITAL_SPEED, 0.5)
+CAMERA_ORBITAL_SPEED :: 0.5
 
 // Camera system modes
 CameraMode :: enum c.int {
