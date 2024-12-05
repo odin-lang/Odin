@@ -2601,7 +2601,7 @@ general_end:;
 		GB_ASSERT(p->decl_block != p->curr_block);
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
-		max_align = gb_max(max_align, 4);
+		max_align = gb_max(max_align, 16);
 
 		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
 
