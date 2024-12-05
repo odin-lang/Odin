@@ -467,6 +467,7 @@ struct BuildContext {
 	BuildCacheData build_cache_data;
 
 	bool internal_no_inline;
+	bool internal_by_value;
 
 	bool   no_threaded_checker;
 
