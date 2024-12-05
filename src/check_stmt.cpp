@@ -2605,6 +2605,7 @@ gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			if (cond && cond->kind == Ast_BinaryExpr &&
 			    cond->BinaryExpr.left && cond->BinaryExpr.right &&
 			    cond->BinaryExpr.op.kind == Token_GtEq &&
+			    type_of_expr(cond->BinaryExpr.left) != nullptr &&
 			    is_type_unsigned(type_of_expr(cond->BinaryExpr.left)) &&
 			    cond->BinaryExpr.right->tav.value.kind == ExactValue_Integer &&
 			    is_exact_value_zero(cond->BinaryExpr.right->tav.value)) {
