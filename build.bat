@@ -20,7 +20,7 @@ if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
 )
 
 pushd misc
-cl get-date.c
+cl /nologo get-date.c
 popd
 
 for /f %%i in ('misc\get-date') do (
