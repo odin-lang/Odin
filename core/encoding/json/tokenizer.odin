@@ -259,6 +259,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			skip_digits(t)
 		}
 		if t.r == 'e' || t.r == 'E' {
+			token.kind = .Float
 			switch r := next_rune(t); r {
 			case '+', '-':
 				next_rune(t)
