@@ -433,7 +433,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 
 			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
-			field_used := intrinsics.alloca(field_used_bytes, 1)
+			field_used := intrinsics.alloca(field_used_bytes + 1, 1) // + 1 to not overflow on size_of 0 types.
 			intrinsics.mem_zero(field_used, field_used_bytes)
 
 			use_field_idx := -1
