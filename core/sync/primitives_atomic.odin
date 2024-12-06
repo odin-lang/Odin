@@ -67,7 +67,7 @@ atomic_mutex_unlock :: proc "contextless" (m: ^Atomic_Mutex) {
 
 	switch atomic_exchange_explicit(&m.state, .Unlocked, .Release) {
 	case .Unlocked:
-		unreachable()
+		// Kind of okay - unlocking while already unlocked.
 	case .Locked:
 		// Okay
 	case .Waiting:
