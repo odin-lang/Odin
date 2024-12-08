@@ -1290,3 +1290,88 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 		}
 	}
 }
+
+// TODO(tf2spi) ... *sigh* I'm sad
+// LLVM-C doesn't have an API to emit DILabel yet, so this is not exported in the dll.
+// For POSIX, we can temporarily use the C++ APIs, but we're out of luck for Windows
+// until the DLL gets updated with definitions like LLVMDIBuilderCreateLabel.
+// These might be the ~80 most disgusting lines in this entire compiler.
+#ifndef _WIN32
+// Don't you just love a good ol' mangled name? I know I do.
+// Mangled name of "llvm::DIBuilder::createLabel(DIScope, StringRef, DIFile, unsigned, bool)"
+extern "C" LLVMMetadataRef _ZN4llvm9DIBuilder11createLabelEPNS_7DIScopeENS_9StringRefEPNS_6DIFileEjb(
+	LLVMDIBuilderRef Builder,
+	LLVMMetadataRef Scope,
+	String Name, // Not technically proper to do, but it's ABI compatible for now...
+	LLVMMetadataRef File,
+	unsigned int LineNo,
+	bool AlwaysPreserve);
+// Mangled name of "llvm::DIBuilder::insertLabel(DILabel, DILocation, BasicBlock)"
+extern "C" LLVMMetadataRef _ZN4llvm9DIBuilder11insertLabelEPNS_7DILabelEPKNS_10DILocationEPNS_10BasicBlockE(
+	LLVMDIBuilderRef Builder,
+	LLVMMetadataRef Label,
+	LLVMMetadataRef Location,
+	LLVMBasicBlockRef Block);
+#endif
+gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target) {
+	// TODO(tf2spi): Not implemented on Windows because LLVM-C does not have
+	//               an official API for DILabel yet, so DLL does not export it.
+	//               When there is one, implement this function for Windows.
+	#ifdef _WIN32
+	if ((volatile int)0 == 0) return;
+	#endif
+
+	if (p == nullptr || p->debug_info == nullptr) {
+		return;
+	}
+	if (target == nullptr || label == nullptr || label->kind != Ast_Label) {
+		return;
+	}
+	Token label_token = label->Label.token;
+	if (is_blank_ident(label_token.string)) {
+		return;
+	}
+	lbModule *m = p->module;
+	if (m == nullptr) {
+		return;
+	}
+
+	AstFile *file = label->file();
+	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	if (llvm_file == nullptr) {
+		debugf("llvm file not found for label\n");
+		return;
+	}
+	LLVMMetadataRef llvm_scope = p->debug_info;
+	if(llvm_scope == nullptr) {
+		debugf("llvm scope not found for label\n");
+		return;
+	}
+	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, label_token.pos);
+	LLVMBasicBlockRef llvm_block = target->block;
+	if (llvm_block == nullptr || llvm_debug_loc == nullptr) {
+		return;
+	}
+
+	// TODO(tf2spi): Generate and insert DILabel for Windows when feasible
+	#ifndef _WIN32
+	LLVMMetadataRef llvm_label = _ZN4llvm9DIBuilder11createLabelEPNS_7DIScopeENS_9StringRefEPNS_6DIFileEjb(
+		m->debug_builder,
+		llvm_scope,
+		label_token.string,
+		llvm_file,
+		label_token.pos.line,
+
+		// NOTE(tf2spi): Defaults to false in LLVM API, but I'd rather not take chances
+		//               Always preserve the label no matter what when debugging
+		true
+	);
+	GB_ASSERT(llvm_label != nullptr);
+	_ZN4llvm9DIBuilder11insertLabelEPNS_7DILabelEPKNS_10DILocationEPNS_10BasicBlockE(	
+		m->debug_builder,
+		llvm_label,
+		llvm_debug_loc,
+		llvm_block
+	);
+	#endif
+}
