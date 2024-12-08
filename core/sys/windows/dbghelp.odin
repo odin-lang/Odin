@@ -15,7 +15,7 @@ MINIDUMP_DIRECTORY :: struct {
 	Location:   MINIDUMP_LOCATION_DESCRIPTOR,
 }
 
-MINIDUMP_EXCEPTION_INFORMATION :: struct {
+MINIDUMP_EXCEPTION_INFORMATION :: struct #packed {
 	ThreadId:          DWORD,
 	ExceptionPointers: ^EXCEPTION_POINTERS,
 	ClientPointers:    BOOL,
