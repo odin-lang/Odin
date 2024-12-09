@@ -205,8 +205,21 @@ pow10_f64 :: proc "contextless" (n: f64) -> f64 {
 	return 0
 }
 
+@(require_results) pow2_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(pow2_f16(f16(x))) }
+@(require_results) pow2_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(pow2_f16(f16(x))) }
+@(require_results) pow2_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(pow2_f32(f32(x))) }
+@(require_results) pow2_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(pow2_f32(f32(x))) }
+@(require_results) pow2_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(pow2_f64(f64(x))) }
+@(require_results) pow2_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(pow2_f64(f64(x))) }
+pow2 :: proc{
+	pow2_f16, pow2_f16le, pow2_f16be,
+	pow2_f32, pow2_f32le, pow2_f32be,
+	pow2_f64, pow2_f64le, pow2_f64be,
+}
+
 @(require_results)
-pow2_f64 :: proc "contextless" (#any_int exp: int) -> (res: f64) {
+pow2_f64 :: proc "contextless" (n: f64) -> (res: f64) {
+	exp := i64(n)
 	switch {
 	case exp >= -1022 && exp <= 1023: // Normal
 		return transmute(f64)(u64(exp + F64_BIAS) << F64_SHIFT)
@@ -225,7 +238,8 @@ pow2_f64 :: proc "contextless" (#any_int exp: int) -> (res: f64) {
 }
 
 @(require_results)
-pow2_f32 :: proc "contextless" (#any_int exp: int) -> (res: f32) {
+pow2_f32 :: proc "contextless" (n: f32) -> (res: f32) {
+	exp := i32(n)
 	switch {
 	case exp >= -126 && exp <= 127:  // Normal
 		return transmute(f32)(u32(exp + F32_BIAS) << F32_SHIFT)
@@ -241,7 +255,8 @@ pow2_f32 :: proc "contextless" (#any_int exp: int) -> (res: f32) {
 }
 
 @(require_results)
-pow2_f16 :: proc "contextless" (#any_int exp: int) -> (res: f16) {
+pow2_f16 :: proc "contextless" (n: f16) -> (res: f16) {
+	exp := i16(n)
 	switch {
 	case exp >= -14 && exp <= 15:    // Normal
 		return transmute(f16)(u16(exp + F16_BIAS) << F16_SHIFT)
