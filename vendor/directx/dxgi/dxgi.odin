@@ -554,7 +554,7 @@ IOutput :: struct #raw_union {
 IOutput_VTable :: struct {
 	using idxgiobject_vtable: IObject_VTable,
 	GetDesc:                     proc "system" (this: ^IOutput, pDesc: ^OUTPUT_DESC) -> HRESULT,
-	GetDisplayModeList:          proc "system" (this: ^IOutput, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: ^MODE_DESC) -> HRESULT,
+	GetDisplayModeList:          proc "system" (this: ^IOutput, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: [^]MODE_DESC) -> HRESULT,
 	FindClosestMatchingMode:     proc "system" (this: ^IOutput, pModeToMatch: ^MODE_DESC, pClosestMatch: ^MODE_DESC, pConcernedDevice: ^IUnknown) -> HRESULT,
 	WaitForVBlank:               proc "system" (this: ^IOutput) -> HRESULT,
 	TakeOwnership:               proc "system" (this: ^IOutput, pDevice: ^IUnknown, Exclusive: BOOL) -> HRESULT,
@@ -934,7 +934,7 @@ IOutput1 :: struct #raw_union {
 }
 IOutput1_VTable :: struct {
 	using idxgioutput_vtable: IOutput_VTable,
-	GetDisplayModeList1:      proc "system" (this: ^IOutput1, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: ^MODE_DESC1) -> HRESULT,
+	GetDisplayModeList1:      proc "system" (this: ^IOutput1, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: [^]MODE_DESC1) -> HRESULT,
 	FindClosestMatchingMode1: proc "system" (this: ^IOutput1, pModeToMatch: ^MODE_DESC1, pClosestMatch: ^MODE_DESC1, pConcernedDevice: ^IUnknown) -> HRESULT,
 	GetDisplaySurfaceData1:   proc "system" (this: ^IOutput1, pDestination: ^IResource) -> HRESULT,
 	DuplicateOutput:          proc "system" (this: ^IOutput1, pDevice: ^IUnknown, ppOutputDuplication: ^^IOutputDuplication) -> HRESULT,
