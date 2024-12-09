@@ -53,17 +53,30 @@ to_type :: proc(buf: []u8, $T: typeid) -> (T, bool) #optional_ok {
 	Only converts the type and length of the slice itself.
 	The length is rounded down to the nearest whole number of items.
 
-	```
-	large_items := []i64{1, 2, 3, 4}
-	small_items := slice.reinterpret([]i32, large_items)
-	assert(len(small_items) == 8)
-	```
-	```
-	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
-						  2, 0, 0, 0}
-	large_items := slice.reinterpret([]i64, small_items)
-	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
-	```
+Example:
+
+	import "core:slice"
+	import "core:fmt"
+	{
+		large_items := []i64{1, 2, 3, 4}
+		small_items := slice.reinterpret([]i32, large_items)
+		assert(len(small_items) == 8)
+		fmt.println(large_items, "->", small_items)
+	}
+	{
+		small_items := [12]byte{}
+		small_items[0] = 1
+		small_items[8] = 2
+		large_items := slice.reinterpret([]i64, small_items[:])
+		assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
+		fmt.println(small_items, "->", large_items)
+	}
+	
+Output:
+
+	[1, 2, 3, 4] -> [1, 0, 2, 0, 3, 0, 4, 0]
+	[1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0] -> [1]
+
 */
 @(require_results)
 reinterpret :: proc "contextless" ($T: typeid/[]$U, s: []$V) -> []U {
