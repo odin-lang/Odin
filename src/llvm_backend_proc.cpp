@@ -1136,10 +1136,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			}
 		}
 
-		if (inlining == ProcInlining_none) {
-			inlining = p->inlining;
-		}
-
 		Type *rt = reduce_tuple_to_single_type(results);
 		Type *original_rt = rt;
 		if (split_returns) {
