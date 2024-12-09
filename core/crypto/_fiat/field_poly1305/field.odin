@@ -1,6 +1,5 @@
 package field_poly1305
 
-import "base:intrinsics"
 import "core:encoding/endian"
 import "core:mem"
 
@@ -30,7 +29,7 @@ fe_from_bytes :: #force_inline proc "contextless" (
 	// neater.
 
 	if len(arg1) != 16 {
-		intrinsics.trap()
+		panic_contextless("poly1305: invalid field element size")
 	}
 
 	// While it may be unwise to do deserialization here on our
