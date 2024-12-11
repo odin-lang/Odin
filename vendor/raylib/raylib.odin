@@ -845,6 +845,17 @@ Gesture :: enum c.uint {
 }
 Gestures :: distinct bit_set[Gesture; c.uint]
 
+// Camera speed values 
+CAMERA_MOVE_SPEED :: 5.4
+CAMERA_ROTATION_SPEED :: 0.03
+CAMERA_PAN_SPEED :: 0.2
+
+// Camera mouse movement sensitivity
+CAMERA_MOUSE_MOVE_SENSITIVITY :: 0.003
+
+// Camera orbital speed in CAMERA_ORBITAL mode
+CAMERA_ORBITAL_SPEED :: 0.5
+
 // Camera system modes
 CameraMode :: enum c.int {
 	CUSTOM = 0,              // Camera custom, controlled by user (UpdateCamera() does nothing)
@@ -1180,6 +1191,23 @@ foreign lib {
 
 	UpdateCamera :: proc(camera: ^Camera, mode: CameraMode) ---                                   // Set camera mode (multiple camera modes available)
 	UpdateCameraPro :: proc(camera: ^Camera, movement: Vector3, rotation: Vector3, zoom: f32) --- // Update camera movement/rotation
+
+	GetCameraForward :: proc(camera: ^Camera) -> Vector3 --- // returns the camera's forward vector (normalized)
+	GetCameraUp :: proc(camera: ^Camera) -> Vector3 --- // returns the camera's up vector (normalized) - might not be perpendicular to forward vector
+	GetCameraRight :: proc(camera: ^Camera) -> Vector3 --- // returns the camera's right vector (normalized)
+
+	// Camera Movement/Rotation. Angle is provided in radians
+
+	CameraMoveForward :: proc(camera: ^Camera, distance: f32, moveInWorldPlane: bool) --- // move the camera in its forward direction
+	CameraMoveUp :: proc(camera: ^Camera, distance: f32) --- // move camera in its up direction
+	CameraMoveRight :: proc(camera: ^Camera, distance: f32, delta: f32) --- // move camera in it's current right direction
+	CameraMoveToTarget :: proc(camera: ^Camera, delta: f32) --- // moves the camera position closer/farther to/from the camera target
+	CameraYaw :: proc(camera: ^Camera, angle: f32, rotateAroundTarget: bool) --- // rotates the camera around its up vector (left and right)
+	CameraPitch :: proc(camera: ^Camera, angle: f32, lockView: bool, rotateAroundTarget: bool, rotateUp: bool) --- // rotates the camera around its right vector (up and down)
+	CameraRoll :: proc(camera: ^Camera, angle: f32) --- // rotates the camera around its forward vector (left and right)
+
+	GetCameraViewMatrix :: proc(camera: ^Camera) -> Matrix --- // returns the camera view matrix
+	GetCameraProjectionMatrix :: proc(camera: ^Camera, aspect: f32) -> Matrix --- // returns the camera projection matrix
 
 	//------------------------------------------------------------------------------------
 	// Basic Shapes Drawing Functions (Module: shapes)
