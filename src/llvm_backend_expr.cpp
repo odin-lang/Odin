@@ -2817,6 +2817,12 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 				Type *it = bit_set_to_int(a);
 				lbValue lhs = lb_emit_transmute(p, left, it);
 				lbValue rhs = lb_emit_transmute(p, right, it);
+				if (is_type_different_to_arch_endianness(it)) {
+					it = integer_endian_type_to_platform_type(it);
+					lhs = lb_emit_byte_swap(p, lhs, it);
+					rhs = lb_emit_byte_swap(p, rhs, it);
+				}
+
 				lbValue res = lb_emit_arith(p, Token_And, lhs, rhs, it);
 
 				if (op_kind == Token_Lt || op_kind == Token_LtEq) {
@@ -2914,6 +2920,12 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			}
 		}
 
+		if (is_type_different_to_arch_endianness(left.type)) {
+			Type *pt = integer_endian_type_to_platform_type(left.type);
+			lhs = lb_emit_byte_swap(p, {lhs, pt}, pt).value;
+			rhs = lb_emit_byte_swap(p, {rhs, pt}, pt).value;
+		}
+
 		res.value = LLVMBuildICmp(p->builder, pred, lhs, rhs, "");
 	} else if (is_type_float(a)) {
 		LLVMRealPredicate pred = {};
@@ -2925,6 +2937,13 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		case Token_LtEq:  pred = LLVMRealOLE; break;
 		case Token_NotEq: pred = LLVMRealONE; break;
 		}
+
+		if (is_type_different_to_arch_endianness(left.type)) {
+			Type *pt = integer_endian_type_to_platform_type(left.type);
+			left  = lb_emit_byte_swap(p, left, pt);
+			right = lb_emit_byte_swap(p, right, pt);
+		}
+
 		res.value = LLVMBuildFCmp(p->builder, pred, left.value, right.value, "");
 	} else if (is_type_typeid(a)) {
 		LLVMIntPredicate pred = {};
