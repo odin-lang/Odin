@@ -1470,15 +1470,30 @@ namespace lbAbiArm32 {
 			} else {
 				i64 sz = lb_sizeof(t);
 				i64 a = lb_alignof(t);
+
+				// TODO(tf2spi): Not AAPCS-compliant. Work on fixing the ABI (excruciating...).
+				LLVMTypeKind tid = LLVMGetTypeKind(t);
 				if (is_calling_convention_odin(calling_convention) && sz > 8) {
 					// Minor change to improve performance using the Odin calling conventions
 					args[i] = lb_arg_type_indirect(t, nullptr);
 				} else if (a <= 4) {
 					unsigned n = cast(unsigned)((sz + 3) / 4);
-					args[i] = lb_arg_type_direct(llvm_array_type(LLVMIntTypeInContext(c, 32), n));
+
+					// TODO(tf2spi):
+					// Works with arrays, not structs which ARM32 also puts in registers
+					if (tid == LLVMArrayTypeKind && LLVMGetTypeKind(LLVMGetElementType(t)) == LLVMFloatTypeKind)
+						args[i] = lb_arg_type_direct(llvm_array_type(LLVMFloatTypeInContext(c), n));
+					else
+						args[i] = lb_arg_type_direct(llvm_array_type(LLVMIntTypeInContext(c, 32), n));
 				} else {
 					unsigned n = cast(unsigned)((sz + 7) / 8);
-					args[i] = lb_arg_type_direct(llvm_array_type(LLVMIntTypeInContext(c, 64), n));
+
+					// TODO(tf2spi):
+					// Works with arrays, not structs which ARM32 also puts in registers
+					if (tid == LLVMArrayTypeKind && LLVMGetTypeKind(LLVMGetElementType(t)) == LLVMDoubleTypeKind)
+						args[i] = lb_arg_type_direct(llvm_array_type(LLVMDoubleTypeInContext(c), n));
+					else
+						args[i] = lb_arg_type_direct(llvm_array_type(LLVMIntTypeInContext(c, 64), n));
 				}
 			}
 		}
