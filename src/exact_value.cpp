@@ -336,7 +336,8 @@ gb_internal ExactValue exact_value_float_from_string(String string) {
 		}
 	}
 
-	if (!string_contains_char(string, '.') && !string_contains_char(string, '-')) {
+	if (!string_contains_char(string, 'e') && !string_contains_char(string, 'E')
+		&& !string_contains_char(string, '.') && !string_contains_char(string, '-')) {
 		// NOTE(bill): treat as integer
 		return exact_value_integer_from_string(string);
 	}
