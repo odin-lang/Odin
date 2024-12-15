@@ -2849,6 +2849,7 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 		switch (op) {
 		case Token_CmpEq: /* comp = comp; */ break;
 		case Token_NotEq: comp = !comp; break;
+			// TODO(tf2spi): Error out on the rest of the operators?
 		}
 		x->mode  = Addressing_Constant;
 		x->type  = t_untyped_bool;
@@ -2862,7 +2863,9 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 		add_type_and_value(c, x->expr, Addressing_Value, y->type, exact_value_typeid(x->type));
 
 		x->mode = Addressing_Value;
-		x->type = t_untyped_bool;
+		x->type = t_bool;
+		x->value = exact_value_bool(false);
+		// TODO(tf2spi): No values b4?
 		return;
 	} else if (is_type_typeid(x->type) && y->mode == Addressing_Type) {
 		add_type_info_type(c, x->type);
@@ -2870,7 +2873,9 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 		add_type_and_value(c, y->expr, Addressing_Value, x->type, exact_value_typeid(y->type));
 
 		x->mode = Addressing_Value;
-		x->type = t_untyped_bool;
+		x->type = t_bool;
+		x->value = exact_value_bool(false);
+		// TODO(tf2spi): No values b4?
 		return;
 	}
 
@@ -3036,7 +3041,7 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 			}
 		}
 
-		x->type = t_untyped_bool;
+		x->type = t_bool;
 	}
 
 }
