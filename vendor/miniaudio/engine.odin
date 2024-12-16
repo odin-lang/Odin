@@ -11,19 +11,21 @@ Engine
 ************************************************************************************************************************************************************/
 
 /* Sound flags. */
-sound_flags :: enum c.int {
+sound_flag :: enum c.int {
 	/* Resource manager flags. */
-	STREAM                = 0x00000001,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_STREAM */
-	DECODE                = 0x00000002,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE */
-	ASYNC                 = 0x00000004,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_ASYNC */
-	WAIT_INIT             = 0x00000008,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_WAIT_INIT */
-	UNKNOWN_LENGTH        = 0x00000010,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_UNKNOWN_LENGTH */
+	STREAM                = 0,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_STREAM */
+	DECODE                = 1,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE */
+	ASYNC                 = 2,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_ASYNC */
+	WAIT_INIT             = 3,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_WAIT_INIT */
+	UNKNOWN_LENGTH        = 4,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_UNKNOWN_LENGTH */
 	
 	/* ma_sound specific flags. */
-	NO_DEFAULT_ATTACHMENT = 0x00001000,   /* Do not attach to the endpoint by default. Useful for when setting up nodes in a complex graph system. */
-	NO_PITCH              = 0x00002000,   /* Disable pitch shifting with ma_sound_set_pitch() and ma_sound_group_set_pitch(). This is an optimization. */
-	NO_SPATIALIZATION     = 0x00004000,   /* Disable spatialization. */
+	NO_DEFAULT_ATTACHMENT = 12,  /* Do not attach to the endpoint by default. Useful for when setting up nodes in a complex graph system. */
+	NO_PITCH              = 13,  /* Disable pitch shifting with ma_sound_set_pitch() and ma_sound_group_set_pitch(). This is an optimization. */
+	NO_SPATIALIZATION     = 14,  /* Disable spatialization. */
 }
+
+sound_flags :: bit_set[sound_flag; u32]
 
 ENGINE_MAX_LISTENERS :: 4
 
@@ -81,7 +83,7 @@ engine_node :: struct {
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	engine_node_config_init :: proc(pEngine: ^engine, type: engine_node_type, flags: u32) -> engine_node_config ---
+	engine_node_config_init :: proc(pEngine: ^engine, type: engine_node_type, flags: sound_flags) -> engine_node_config ---
 
 	engine_node_get_heap_size     :: proc(pConfig: ^engine_node_config, pHeapSizeInBytes: ^c.size_t) -> result ---
 	engine_node_init_preallocated :: proc(pConfig: ^engine_node_config, pHeap: rawptr, pEngineNode: ^engine_node) -> result ---
@@ -96,17 +98,17 @@ SOUND_SOURCE_CHANNEL_COUNT :: 0xFFFFFFFF
 sound_end_proc :: #type proc "c" (pUserData: rawptr, pSound: ^sound)
 
 sound_config :: struct {
-	pFilePath:                      cstring,          /* Set this to load from the resource manager. */
-	pFilePathW:                     [^]c.wchar_t,     /* Set this to load from the resource manager. */
-	pDataSource:                    ^data_source,     /* Set this to load from an existing data source. */
-	pInitialAttachment:             ^node,            /* If set, the sound will be attached to an input of this node. This can be set to a ma_sound. If set to NULL, the sound will be attached directly to the endpoint unless MA_SOUND_FLAG_NO_DEFAULT_ATTACHMENT is set in `flags`. */
-	initialAttachmentInputBusIndex: u32,              /* The index of the input bus of pInitialAttachment to attach the sound to. */
-	channelsIn:                     u32,              /* Ignored if using a data source as input (the data source's channel count will be used always). Otherwise, setting to 0 will cause the engine's channel count to be used. */
-	channelsOut:                    u32,              /* Set this to 0 (default) to use the engine's channel count. Set to MA_SOUND_SOURCE_CHANNEL_COUNT to use the data source's channel count (only used if using a data source as input). */
+	pFilePath:                      cstring,             /* Set this to load from the resource manager. */
+	pFilePathW:                     [^]c.wchar_t,        /* Set this to load from the resource manager. */
+	pDataSource:                    ^data_source,        /* Set this to load from an existing data source. */
+	pInitialAttachment:             ^node,               /* If set, the sound will be attached to an input of this node. This can be set to a ma_sound. If set to NULL, the sound will be attached directly to the endpoint unless MA_SOUND_FLAG_NO_DEFAULT_ATTACHMENT is set in `flags`. */
+	initialAttachmentInputBusIndex: u32,                 /* The index of the input bus of pInitialAttachment to attach the sound to. */
+	channelsIn:                     u32,                 /* Ignored if using a data source as input (the data source's channel count will be used always). Otherwise, setting to 0 will cause the engine's channel count to be used. */
+	channelsOut:                    u32,                 /* Set this to 0 (default) to use the engine's channel count. Set to MA_SOUND_SOURCE_CHANNEL_COUNT to use the data source's channel count (only used if using a data source as input). */
 	monoExpansionMode:              mono_expansion_mode, /* Controls how the mono channel should be expanded to other channels when spatialization is disabled on a sound. */
-	flags:                          u32,              /* A combination of MA_SOUND_FLAG_* flags. */
-	volumeSmoothTimeInPCMFrames:    u32,              /* The number of frames to smooth over volume changes. Defaults to 0 in which case no smoothing is used. */
-	initialSeekPointInPCMFrames:    u64,              /* Initializes the sound such that it's seeked to this location by default. */
+	flags:                          sound_flags,         /* A combination of MA_SOUND_FLAG_* flags. */
+	volumeSmoothTimeInPCMFrames:    u32,                 /* The number of frames to smooth over volume changes. Defaults to 0 in which case no smoothing is used. */
+	initialSeekPointInPCMFrames:    u64,                 /* Initializes the sound such that it's seeked to this location by default. */
 	rangeBegInPCMFrames:            u64,
 	rangeEndInPCMFrames:            u64,
 	loopPointBegInPCMFrames:        u64,
@@ -152,10 +154,10 @@ foreign lib {
 	sound_config_init  :: proc() -> sound_config ---
 	sound_config_init2 :: proc(pEngine: ^engine) -> sound_config --- /* Will be renamed to sound_config_init() in version 0.12. */
 
-	sound_init_from_file                     :: proc(pEngine: ^engine, pFilePath: cstring, flags: u32, pGroup: ^sound_group, pDoneFence: ^fence, pSound: ^sound) -> result ---
-	sound_init_from_file_w                   :: proc(pEngine: ^engine, pFilePath: [^]c.wchar_t, flags: u32, pGroup: ^sound_group, pDoneFence: ^fence, pSound: ^sound) -> result ---
-	sound_init_copy                          :: proc(pEngine: ^engine, pExistingSound: ^sound, flags: u32, pGroup: ^sound_group, pSound: ^sound) -> result ---
-	sound_init_from_data_source              :: proc(pEngine: ^engine, pDataSource: ^data_source, flags: u32, pGroup: ^sound_group, pSound: ^sound) -> result ---
+	sound_init_from_file                     :: proc(pEngine: ^engine, pFilePath: cstring, flags: sound_flags, pGroup: ^sound_group, pDoneFence: ^fence, pSound: ^sound) -> result ---
+	sound_init_from_file_w                   :: proc(pEngine: ^engine, pFilePath: [^]c.wchar_t, flags: sound_flags, pGroup: ^sound_group, pDoneFence: ^fence, pSound: ^sound) -> result ---
+	sound_init_copy                          :: proc(pEngine: ^engine, pExistingSound: ^sound, flags: sound_flags, pGroup: ^sound_group, pSound: ^sound) -> result ---
+	sound_init_from_data_source              :: proc(pEngine: ^engine, pDataSource: ^data_source, flags: sound_flags, pGroup: ^sound_group, pSound: ^sound) -> result ---
 	sound_init_ex                            :: proc(pEngine: ^engine, pConfig: ^sound_config, pSound: ^sound) -> result ---
 	sound_uninit                             :: proc(pSound: ^sound) ---
 	sound_get_engine                         :: proc(pSound: ^sound) -> ^engine ---
@@ -243,7 +245,7 @@ foreign lib {
 	sound_group_config_init  :: proc() -> sound_group_config ---
 	sound_group_config_init2 :: proc(pEngine: ^engine) -> sound_group_config ---
 
-	sound_group_init                               :: proc(pEngine: ^engine, flags: u32, pParentGroup, pGroup: ^sound_group) -> result ---
+	sound_group_init                               :: proc(pEngine: ^engine, flags: sound_flags, pParentGroup, pGroup: ^sound_group) -> result ---
 	sound_group_init_ex                            :: proc(pEngine: ^engine, pConfig: ^sound_group_config, pGroup: ^sound_group) -> result ---
 	sound_group_uninit                             :: proc(pGroup: ^sound_group) ---
 	sound_group_get_engine                         :: proc(pGroup: ^sound_group) -> ^engine ---
