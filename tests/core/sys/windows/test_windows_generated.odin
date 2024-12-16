@@ -377,6 +377,7 @@ verify_gdi32 :: proc(t: ^testing.T) {
 	expect_size(t, win32.RGBQUAD, 4)
 	expect_size(t, win32.PIXELFORMATDESCRIPTOR, 40)
 	expect_size(t, win32.BITMAPINFOHEADER, 40)
+	expect_size(t, win32.BITMAPFILEHEADER, 14)
 	expect_size(t, win32.BITMAP, 32)
 	expect_size(t, win32.BITMAPV5HEADER, 124)
 	expect_size(t, win32.CIEXYZTRIPLE, 36)

@@ -543,6 +543,7 @@ static void verify_gdi32(ofstream& out) {
 	expect_size(RGBQUAD);
 	expect_size(PIXELFORMATDESCRIPTOR);
 	expect_size(BITMAPINFOHEADER);
+	expect_size(BITMAPFILEHEADER);
 	expect_size(BITMAP);
 	expect_size(BITMAPV5HEADER);
 	expect_size(CIEXYZTRIPLE);

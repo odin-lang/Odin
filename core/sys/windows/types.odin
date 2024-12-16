@@ -2606,6 +2606,21 @@ BITMAP :: struct {
 	bmBits:       LPVOID,
 }
 
+BITMAPFILEHEADER :: struct #max_field_align(2) {
+	// The file type; must be 0x4d42 (the ASCII string "BM").
+	bfType: WORD,
+	// The size, in bytes, of the bitmap file.
+	bfSize: DWORD,
+	// Reserved; must be zero.
+	bfReserved1: WORD,
+	// Reserved; must be zero.
+	bfReserved2: WORD,
+	// The offset, in bytes, from the beginning of the BITMAPFILEHEADER structure to the bitmap bits.
+	bfOffBits: DWORD,
+}
+
+BITMAPFILEHEADER_TYPE : WORD : 0x4d42 // the ASCII string "BM"
+
 // pixel types
 PFD_TYPE_RGBA       :: 0
 PFD_TYPE_COLORINDEX :: 1
