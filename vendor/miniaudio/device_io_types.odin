@@ -357,8 +357,6 @@ data_format_flag :: enum c.int {
 
 data_format_flags :: bit_set[data_format_flag; u32]
 
-DATA_FORMAT_FLAG_EXCLUSIVE_MODE :: data_format_flags{.EXCLUSIVE_MODE}
-
 MAX_DEVICE_NAME_LENGTH :: 255
 
 device_info :: struct {
