@@ -473,6 +473,22 @@ floor :: proc{
 @(require_results) floor_dvec3 :: proc "c" (x: dvec3) -> dvec3 { return {floor(x.x), floor(x.y), floor(x.z)} }
 @(require_results) floor_dvec4 :: proc "c" (x: dvec4) -> dvec4 { return {floor(x.x), floor(x.y), floor(x.z), floor(x.w)} }
 
+trunc :: proc{
+	trunc_f32,
+	trunc_f64,
+	trunc_vec2,
+	trunc_vec3,
+	trunc_vec4,
+	trunc_dvec2,
+	trunc_dvec3,
+	trunc_dvec4,
+}
+@(require_results) trunc_vec2 :: proc "c" (x: vec2) -> vec2 { return {trunc(x.x), trunc(x.y)} }
+@(require_results) trunc_vec3 :: proc "c" (x: vec3) -> vec3 { return {trunc(x.x), trunc(x.y), trunc(x.z)} }
+@(require_results) trunc_vec4 :: proc "c" (x: vec4) -> vec4 { return {trunc(x.x), trunc(x.y), trunc(x.z), trunc(x.w)} }
+@(require_results) trunc_dvec2 :: proc "c" (x: dvec2) -> dvec2 { return {trunc(x.x), trunc(x.y)} }
+@(require_results) trunc_dvec3 :: proc "c" (x: dvec3) -> dvec3 { return {trunc(x.x), trunc(x.y), trunc(x.z)} }
+@(require_results) trunc_dvec4 :: proc "c" (x: dvec4) -> dvec4 { return {trunc(x.x), trunc(x.y), trunc(x.z), trunc(x.w)} }
 
 
 round :: proc{
