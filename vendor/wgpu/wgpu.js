@@ -1428,7 +1428,7 @@ class WebGPUInterface {
 			 * @param {number} workgroupCountY
 			 * @param {number} workgroupCountZ
 			 */
-			wgpuComputePassEncoderDispachWorkgroups: (computePassEncoderIdx, workgroupCountX, workgroupCountY, workgroupCountZ) => {
+			wgpuComputePassEncoderDispatchWorkgroups: (computePassEncoderIdx, workgroupCountX, workgroupCountY, workgroupCountZ) => {
 				const computePassEncoder = this.computePassEncoders.get(computePassEncoderIdx);
 				computePassEncoder.dispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
 			},
@@ -1438,7 +1438,7 @@ class WebGPUInterface {
 			 * @param {number} indirectBufferIdx
 			 * @param {BigInt} indirectOffset
 			 */
-			wgpuComputePassEncoderDispachWorkgroupsIndirect: (computePassEncoderIdx, indirectBufferIdx, indirectOffset) => {
+			wgpuComputePassEncoderDispatchWorkgroupsIndirect: (computePassEncoderIdx, indirectBufferIdx, indirectOffset) => {
 				const computePassEncoder = this.computePassEncoders.get(computePassEncoderIdx);
 				const indirectBuffer = this.buffers.get(indirectBufferIdx);
 				indirectOffset = this.unwrapBigInt(indirectOffset);
