@@ -62,10 +62,10 @@ RESOURCE_MANAGER_MAX_JOB_THREAD_COUNT :: 64
 
 resource_manager_flag :: enum c.int {
 	/* Indicates ma_resource_manager_next_job() should not block. Only valid when the job thread count is 0. */
-	NON_BLOCKING = 0x00000001,
+	NON_BLOCKING = 0,
 
 	/* Disables any kind of multithreading. Implicitly enables MA_RESOURCE_MANAGER_FLAG_NON_BLOCKING. */
-	NO_THREADING = 0x00000002,
+	NO_THREADING = 1,
 }
 
 resource_manager_flags :: bit_set[resource_manager_flag; u32]
