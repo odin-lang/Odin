@@ -1583,8 +1583,9 @@ gb_internal void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 			}
 		}
 
+		bool	detect_unused_decls = (build_context.vet_flags & VetFlag_UnusedVariables) || (build_context.vet_flags & VetFlag_Unused);
 		if (stmt_count == 1) {
-			if (the_stmt->kind == Ast_ValueDecl) {
+			if (detect_unused_decls && the_stmt->kind == Ast_ValueDecl) {
 				for (Ast *name : the_stmt->ValueDecl.names) {
 					if (name->kind != Ast_Ident) {
 						continue;
