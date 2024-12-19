@@ -31,35 +31,35 @@ foreign d3d12 {
 	CreateDevice                             :: proc(pAdapter: ^IUnknown, MinimumFeatureLevel: FEATURE_LEVEL, riid: ^IID, ppDevice: ^rawptr) -> HRESULT ---
 	CreateRootSignatureDeserializer          :: proc(pSrcData: rawptr, SrcDataSizeInBytes: SIZE_T, pRootSignatureDeserializerInterface: ^IID, ppRootSignatureDeserializer: ^rawptr) -> HRESULT ---
 	CreateVersionedRootSignatureDeserializer :: proc(pSrcData: rawptr, SrcDataSizeInBytes: SIZE_T, pRootSignatureDeserializerInterface: ^IID, ppRootSignatureDeserializer: ^rawptr) -> HRESULT ---
-	EnableExperimentalFeatures               :: proc(NumFeatures: u32, pIIDs: ^IID, pConfigurationStructs: rawptr, pConfigurationStructSizes: ^u32) -> HRESULT ---
+	EnableExperimentalFeatures               :: proc(NumFeatures: u32, pIIDs: [^]IID, pConfigurationStructs: rawptr, pConfigurationStructSizes: [^]u32) -> HRESULT ---
 	GetDebugInterface                        :: proc(riid: ^IID, ppvDebug: ^rawptr) -> HRESULT ---
 	SerializeRootSignature                   :: proc(pRootSignature: ^ROOT_SIGNATURE_DESC, Version: ROOT_SIGNATURE_VERSION, ppBlob: ^^IBlob, ppErrorBlob: ^^IBlob) -> HRESULT ---
 	SerializeVersionedRootSignature          :: proc(pRootSignature: ^VERSIONED_ROOT_SIGNATURE_DESC, ppBlob: ^^IBlob, ppErrorBlob: ^^IBlob) -> HRESULT ---
 }
 
-foreign d3d12 {
-	WKPDID_D3DDebugObjectNameW: GUID
-	WKPDID_CommentStringW:      GUID
+WKPDID_D3DDebugObjectNameW_UUID_STRING :: "4CCA5FD8-921F-42C8-8566-70CAF2A9B741"
+WKPDID_D3DDebugObjectNameW_UUID        := &IID{0x4cca5fd8, 0x921f, 0x42c8, {0x85, 0x66, 0x70, 0xca, 0xf2, 0xa9, 0xb7, 0x41}}
 
-	@(link_name="DXGI_DEBUG_D3D12")
-	DEBUG_D3D12: GUID
+WKPDID_CommentStringW_UUID_STRING :: "d0149dc0-90e8-4ec8-8144-e900ad266bb2"
+WKPDID_CommentStringW_UUID        := &IID{0xd0149dc0, 0x90e8, 0x4ec8, {0x81, 0x44, 0xe9, 0x00, 0xad, 0x26, 0x6b, 0xb2}}
 
-	@(link_name="D3D12_PROTECTED_RESOURCES_SESSION_HARDWARE_PROTECTED")
-	PROTECTED_RESOURCES_SESSION_HARDWARE_PROTECTED: GUID
-}
+DEBUG_D3D12_UUID_STRING :: "cf59a98c-a950-4326-91ef-9ba17bfd95"
+DEBUG_D3D12_UUID := &IID{0xcf59a98c, 0xa950, 0x4326, {0x91, 0xef, 0x9b, 0xba, 0xa1, 0x7b, 0xfd, 0x95}}
 
-@(link_prefix="D3D_")
-foreign d3d12 {
-	TEXTURE_LAYOUT_ROW_MAJOR:             GUID
-	TEXTURE_LAYOUT_64KB_STANDARD_SWIZZLE: GUID
-}
+PROTECTED_RESOURCES_SESSION_HARDWARE_PROTECTED_UUID_STRING :: "62b0084e-c70e-4daa-a109-30ff8d5a0482"
+PROTECTED_RESOURCES_SESSION_HARDWARE_PROTECTED_UUID := &IID{0x62b0084e, 0xc70e, 0x4daa, {0xa1, 0x09, 0x30, 0xff, 0x8d, 0x5a, 0x04, 0x82}}
 
-@(link_prefix="D3D12")
-foreign d3d12 {
-	ExperimentalShaderModels: UUID
-	TiledResourceTier4:       UUID
-	MetaCommand:              UUID
-}
+TEXTURE_LAYOUT_ROW_MAJOR_UUID_STRING :: "b5dc234f-72bb-4bec-9705-8cf258df6b6c"
+TEXTURE_LAYOUT_ROW_MAJOR_UUID        := &IID{0xb5dc234f, 0x72bb, 0x4bec, {0x97, 0x05, 0x8c, 0xf2, 0x58, 0xdf, 0x6b, 0x6c}}
+
+TEXTURE_LAYOUT_64KB_STANDARD_SWIZZLE_UUID_STRING :: "4c0f29e3-3f5f-4d35-84c9-bc0983b62c28"
+TEXTURE_LAYOUT_64KB_STANDARD_SWIZZLE_UUID        := &IID{0x4c0f29e3, 0x3f5f, 0x4d35, {0x84, 0xc9, 0xbc, 0x09, 0x83, 0xb6, 0x2c, 0x28}}
+
+ExperimentalShaderModels_UUID_STRING :: "76f5573e-f13a-40f5-b297-81ce9e18933f"
+ExperimentalShaderModels_UUID        := &IID{0x76f5573e, 0xf13a, 0x40f5, {0xb2, 0x97, 0x81, 0xce, 0x9e, 0x18, 0x93, 0x3f}}
+
+TiledResourceTier4_UUID_STRING :: "c9c4725f-a81a-4f56-8c5b-c51039d694fb"
+TiledResourceTier4_UUID        := &IID{0xc9c4725f, 0xa81a, 0x4f56, {0x8c, 0x5b, 0xc5, 0x10, 0x39, 0xd6, 0x94, 0xfb}}
 
 
 DRIVER_TYPE :: enum i32 {
@@ -716,7 +716,7 @@ STREAM_OUTPUT_DESC :: struct {
 }
 
 INPUT_LAYOUT_DESC :: struct {
-	pInputElementDescs: ^INPUT_ELEMENT_DESC,
+	pInputElementDescs: [^]INPUT_ELEMENT_DESC,
 	NumElements:        u32,
 }
 
@@ -1567,7 +1567,7 @@ VIEW_INSTANCING_FLAG :: enum u32 {
 
 VIEW_INSTANCING_DESC :: struct {
 	ViewInstanceCount:      u32,
-	pViewInstanceLocations: ^VIEW_INSTANCE_LOCATION,
+	pViewInstanceLocations: [^]VIEW_INSTANCE_LOCATION,
 	Flags:                  VIEW_INSTANCING_FLAGS,
 }
 
@@ -2489,14 +2489,14 @@ IGraphicsCommandList_VTable :: struct {
 	CopyTiles:                          proc "system" (this: ^IGraphicsCommandList, pTiledResource: ^IResource, pTileRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pTileRegionSize: ^TILE_REGION_SIZE, pBuffer: ^IResource, BufferStartOffsetInBytes: u64, Flags: TILE_COPY_FLAGS),
 	ResolveSubresource:                 proc "system" (this: ^IGraphicsCommandList, pDstResource: ^IResource, DstSubresource: u32, pSrcResource: ^IResource, SrcSubresource: u32, Format: dxgi.FORMAT),
 	IASetPrimitiveTopology:             proc "system" (this: ^IGraphicsCommandList, PrimitiveTopology: PRIMITIVE_TOPOLOGY),
-	RSSetViewports:                     proc "system" (this: ^IGraphicsCommandList, NumViewports: u32, pViewports: ^VIEWPORT),
-	RSSetScissorRects:                  proc "system" (this: ^IGraphicsCommandList, NumRects: u32, pRects: ^RECT),
+	RSSetViewports:                     proc "system" (this: ^IGraphicsCommandList, NumViewports: u32, pViewports: [^]VIEWPORT),
+	RSSetScissorRects:                  proc "system" (this: ^IGraphicsCommandList, NumRects: u32, pRects: [^]RECT),
 	OMSetBlendFactor:                   proc "system" (this: ^IGraphicsCommandList, BlendFactor: ^[4]f32),
 	OMSetStencilRef:                    proc "system" (this: ^IGraphicsCommandList, StencilRef: u32),
 	SetPipelineState:                   proc "system" (this: ^IGraphicsCommandList, pPipelineState: ^IPipelineState),
-	ResourceBarrier:                    proc "system" (this: ^IGraphicsCommandList, NumBarriers: u32, pBarriers: ^RESOURCE_BARRIER),
+	ResourceBarrier:                    proc "system" (this: ^IGraphicsCommandList, NumBarriers: u32, pBarriers: [^]RESOURCE_BARRIER),
 	ExecuteBundle:                      proc "system" (this: ^IGraphicsCommandList, pCommandList: ^IGraphicsCommandList),
-	SetDescriptorHeaps:                 proc "system" (this: ^IGraphicsCommandList, NumDescriptorHeaps: u32, ppDescriptorHeaps: ^^IDescriptorHeap),
+	SetDescriptorHeaps:                 proc "system" (this: ^IGraphicsCommandList, NumDescriptorHeaps: u32, ppDescriptorHeaps: [^]^IDescriptorHeap),
 	SetComputeRootSignature:            proc "system" (this: ^IGraphicsCommandList, pRootSignature: ^IRootSignature),
 	SetGraphicsRootSignature:           proc "system" (this: ^IGraphicsCommandList, pRootSignature: ^IRootSignature),
 	SetComputeRootDescriptorTable:      proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BaseDescriptor: GPU_DESCRIPTOR_HANDLE),
@@ -2512,13 +2512,13 @@ IGraphicsCommandList_VTable :: struct {
 	SetComputeRootUnorderedAccessView:  proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
 	SetGraphicsRootUnorderedAccessView: proc "system" (this: ^IGraphicsCommandList, RootParameterIndex: u32, BufferLocation: GPU_VIRTUAL_ADDRESS),
 	IASetIndexBuffer:                   proc "system" (this: ^IGraphicsCommandList, pView: ^INDEX_BUFFER_VIEW),
-	IASetVertexBuffers:                 proc "system" (this: ^IGraphicsCommandList, StartSlot: u32, NumViews: u32, pViews: ^VERTEX_BUFFER_VIEW),
-	SOSetTargets:                       proc "system" (this: ^IGraphicsCommandList, StartSlot: u32, NumViews: u32, pViews: ^STREAM_OUTPUT_BUFFER_VIEW),
-	OMSetRenderTargets:                 proc "system" (this: ^IGraphicsCommandList, NumRenderTargetDescriptors: u32, pRenderTargetDescriptors: ^CPU_DESCRIPTOR_HANDLE, RTsSingleHandleToDescriptorRange: BOOL, pDepthStencilDescriptor: ^CPU_DESCRIPTOR_HANDLE),
-	ClearDepthStencilView:              proc "system" (this: ^IGraphicsCommandList, DepthStencilView: CPU_DESCRIPTOR_HANDLE, ClearFlags: CLEAR_FLAGS, Depth: f32, Stencil: u8, NumRects: u32, pRects: ^RECT),
-	ClearRenderTargetView:              proc "system" (this: ^IGraphicsCommandList, RenderTargetView: CPU_DESCRIPTOR_HANDLE, ColorRGBA: ^[4]f32, NumRects: u32, pRects: ^RECT),
-	ClearUnorderedAccessViewUint:       proc "system" (this: ^IGraphicsCommandList, ViewGPUHandleInCurrentHeap: GPU_DESCRIPTOR_HANDLE, ViewCPUHandle: CPU_DESCRIPTOR_HANDLE, pResource: ^IResource, Values: ^[4]u32, NumRects: u32, pRects: ^RECT),
-	ClearUnorderedAccessViewFloat:      proc "system" (this: ^IGraphicsCommandList, ViewGPUHandleInCurrentHeap: GPU_DESCRIPTOR_HANDLE, ViewCPUHandle: CPU_DESCRIPTOR_HANDLE, pResource: ^IResource, Values: ^[4]f32, NumRects: u32, pRects: ^RECT),
+	IASetVertexBuffers:                 proc "system" (this: ^IGraphicsCommandList, StartSlot: u32, NumViews: u32, pViews: [^]VERTEX_BUFFER_VIEW),
+	SOSetTargets:                       proc "system" (this: ^IGraphicsCommandList, StartSlot: u32, NumViews: u32, pViews: [^]STREAM_OUTPUT_BUFFER_VIEW),
+	OMSetRenderTargets:                 proc "system" (this: ^IGraphicsCommandList, NumRenderTargetDescriptors: u32, pRenderTargetDescriptors: [^]CPU_DESCRIPTOR_HANDLE, RTsSingleHandleToDescriptorRange: BOOL, pDepthStencilDescriptor: ^CPU_DESCRIPTOR_HANDLE),
+	ClearDepthStencilView:              proc "system" (this: ^IGraphicsCommandList, DepthStencilView: CPU_DESCRIPTOR_HANDLE, ClearFlags: CLEAR_FLAGS, Depth: f32, Stencil: u8, NumRects: u32, pRects: [^]RECT),
+	ClearRenderTargetView:              proc "system" (this: ^IGraphicsCommandList, RenderTargetView: CPU_DESCRIPTOR_HANDLE, ColorRGBA: ^[4]f32, NumRects: u32, pRects: [^]RECT),
+	ClearUnorderedAccessViewUint:       proc "system" (this: ^IGraphicsCommandList, ViewGPUHandleInCurrentHeap: GPU_DESCRIPTOR_HANDLE, ViewCPUHandle: CPU_DESCRIPTOR_HANDLE, pResource: ^IResource, Values: ^[4]u32, NumRects: u32, pRects: [^]RECT),
+	ClearUnorderedAccessViewFloat:      proc "system" (this: ^IGraphicsCommandList, ViewGPUHandleInCurrentHeap: GPU_DESCRIPTOR_HANDLE, ViewCPUHandle: CPU_DESCRIPTOR_HANDLE, pResource: ^IResource, Values: ^[4]f32, NumRects: u32, pRects: [^]RECT),
 	DiscardResource:                    proc "system" (this: ^IGraphicsCommandList, pResource: ^IResource, pRegion: ^DISCARD_REGION),
 	BeginQuery:                         proc "system" (this: ^IGraphicsCommandList, pQueryHeap: ^IQueryHeap, Type: QUERY_TYPE, Index: u32),
 	EndQuery:                           proc "system" (this: ^IGraphicsCommandList, pQueryHeap: ^IQueryHeap, Type: QUERY_TYPE, Index: u32),
@@ -2539,10 +2539,10 @@ IGraphicsCommandList1 :: struct #raw_union {
 }
 IGraphicsCommandList1_VTable :: struct {
 	using id3d12graphicscommandlist_vtable: IGraphicsCommandList_VTable,
-	AtomicCopyBufferUINT:     proc "system" (this: ^IGraphicsCommandList1, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, Dependencies: u32, ppDependentResources: ^^IResource, pDependentSubresourceRanges: ^SUBRESOURCE_RANGE_UINT64),
-	AtomicCopyBufferUINT64:   proc "system" (this: ^IGraphicsCommandList1, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, Dependencies: u32, ppDependentResources: ^^IResource, pDependentSubresourceRanges: ^SUBRESOURCE_RANGE_UINT64),
+	AtomicCopyBufferUINT:     proc "system" (this: ^IGraphicsCommandList1, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, Dependencies: u32, ppDependentResources: [^]^IResource, pDependentSubresourceRanges: [^]SUBRESOURCE_RANGE_UINT64),
+	AtomicCopyBufferUINT64:   proc "system" (this: ^IGraphicsCommandList1, pDstBuffer: ^IResource, DstOffset: u64, pSrcBuffer: ^IResource, SrcOffset: u64, Dependencies: u32, ppDependentResources: [^]^IResource, pDependentSubresourceRanges: [^]SUBRESOURCE_RANGE_UINT64),
 	OMSetDepthBounds:         proc "system" (this: ^IGraphicsCommandList1, Min: f32, Max: f32),
-	SetSamplePositions:       proc "system" (this: ^IGraphicsCommandList1, NumSamplesPerPixel: u32, NumPixels: u32, pSamplePositions: ^SAMPLE_POSITION),
+	SetSamplePositions:       proc "system" (this: ^IGraphicsCommandList1, NumSamplesPerPixel: u32, NumPixels: u32, pSamplePositions: [^]SAMPLE_POSITION),
 	ResolveSubresourceRegion: proc "system" (this: ^IGraphicsCommandList1, pDstResource: ^IResource, DstSubresource: u32, DstX: u32, DstY: u32, pSrcResource: ^IResource, SrcSubresource: u32, pSrcRect: ^RECT, Format: dxgi.FORMAT, ResolveMode: RESOLVE_MODE),
 	SetViewInstanceMask:      proc "system" (this: ^IGraphicsCommandList1, Mask: u32),
 }
@@ -2567,7 +2567,7 @@ IGraphicsCommandList2 :: struct #raw_union {
 }
 IGraphicsCommandList2_VTable :: struct {
 	using id3d12graphicscommandlist1_vtable: IGraphicsCommandList1_VTable,
-	WriteBufferImmediate: proc "system" (this: ^IGraphicsCommandList2, Count: u32, pParams: ^WRITEBUFFERIMMEDIATE_PARAMETER, pModes: ^WRITEBUFFERIMMEDIATE_MODE),
+	WriteBufferImmediate: proc "system" (this: ^IGraphicsCommandList2, Count: u32, pParams: [^]WRITEBUFFERIMMEDIATE_PARAMETER, pModes: [^]WRITEBUFFERIMMEDIATE_MODE),
 }
 
 
@@ -2579,9 +2579,9 @@ ICommandQueue :: struct #raw_union {
 }
 ICommandQueue_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	UpdateTileMappings:    proc "system" (this: ^ICommandQueue, pResource: ^IResource, NumResourceRegions: u32, pResourceRegionStartCoordinates: ^TILED_RESOURCE_COORDINATE, pResourceRegionSizes: ^TILE_REGION_SIZE, pHeap: ^IHeap, NumRanges: u32, pRangeFlags: ^TILE_RANGE_FLAGS, pHeapRangeStartOffsets: ^u32, pRangeTileCounts: ^u32, Flags: TILE_MAPPING_FLAGS),
+	UpdateTileMappings:    proc "system" (this: ^ICommandQueue, pResource: ^IResource, NumResourceRegions: u32, pResourceRegionStartCoordinates: [^]TILED_RESOURCE_COORDINATE, pResourceRegionSizes: [^]TILE_REGION_SIZE, pHeap: ^IHeap, NumRanges: u32, pRangeFlags: [^]TILE_RANGE_FLAGS, pHeapRangeStartOffsets: [^]u32, pRangeTileCounts: [^]u32, Flags: TILE_MAPPING_FLAGS),
 	CopyTileMappings:      proc "system" (this: ^ICommandQueue, pDstResource: ^IResource, pDstRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pSrcResource: ^IResource, pSrcRegionStartCoordinate: ^TILED_RESOURCE_COORDINATE, pRegionSize: ^TILE_REGION_SIZE, Flags: TILE_MAPPING_FLAGS),
-	ExecuteCommandLists:   proc "system" (this: ^ICommandQueue, NumCommandLists: u32, ppCommandLists: ^^ICommandList),
+	ExecuteCommandLists:   proc "system" (this: ^ICommandQueue, NumCommandLists: u32, ppCommandLists: [^]^ICommandList),
 	SetMarker:             proc "system" (this: ^ICommandQueue, Metadata: u32, pData: rawptr, Size: u32),
 	BeginEvent:            proc "system" (this: ^ICommandQueue, Metadata: u32, pData: rawptr, Size: u32),
 	EndEvent:              proc "system" (this: ^ICommandQueue),
@@ -2617,9 +2617,9 @@ IDevice_VTable :: struct {
 	CreateRenderTargetView:           proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^RENDER_TARGET_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
 	CreateDepthStencilView:           proc "system" (this: ^IDevice, pResource: ^IResource, pDesc: ^DEPTH_STENCIL_VIEW_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
 	CreateSampler:                    proc "system" (this: ^IDevice, pDesc: ^SAMPLER_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	CopyDescriptors:                  proc "system" (this: ^IDevice, NumDestDescriptorRanges: u32, pDestDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pDestDescriptorRangeSizes: ^u32, NumSrcDescriptorRanges: u32, pSrcDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pSrcDescriptorRangeSizes: ^u32, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
+	CopyDescriptors:                  proc "system" (this: ^IDevice, NumDestDescriptorRanges: u32, pDestDescriptorRangeStarts: [^]CPU_DESCRIPTOR_HANDLE, pDestDescriptorRangeSizes: [^]u32, NumSrcDescriptorRanges: u32, pSrcDescriptorRangeStarts: [^]CPU_DESCRIPTOR_HANDLE, pSrcDescriptorRangeSizes: [^]u32, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
 	CopyDescriptorsSimple:            proc "system" (this: ^IDevice, NumDescriptors: u32, DestDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, SrcDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
-	GetResourceAllocationInfo:        proc "system" (this: ^IDevice, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC),
+	GetResourceAllocationInfo:        proc "system" (this: ^IDevice, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: [^]RESOURCE_DESC),
 	GetCustomHeapProperties:          proc "system" (this: ^IDevice, nodeMask: u32, heapType: HEAP_TYPE) -> HEAP_PROPERTIES,
 	CreateCommittedResource:          proc "system" (this: ^IDevice, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateHeap:                       proc "system" (this: ^IDevice, pDesc: ^HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
@@ -2628,11 +2628,11 @@ IDevice_VTable :: struct {
 	CreateSharedHandle:               proc "system" (this: ^IDevice, pObject: ^IDeviceChild, pAttributes: ^win32.SECURITY_ATTRIBUTES, Access: u32, Name: [^]u16, pHandle: ^HANDLE) -> HRESULT,
 	OpenSharedHandle:                 proc "system" (this: ^IDevice, NTHandle: HANDLE, riid: ^IID, ppvObj: ^rawptr) -> HRESULT,
 	OpenSharedHandleByName:           proc "system" (this: ^IDevice, Name: [^]u16, Access: u32, pNTHandle: ^HANDLE) -> HRESULT,
-	MakeResident:                     proc "system" (this: ^IDevice, NumObjects: u32, ppObjects: ^^IPageable) -> HRESULT,
-	Evict:                            proc "system" (this: ^IDevice, NumObjects: u32, ppObjects: ^^IPageable) -> HRESULT,
+	MakeResident:                     proc "system" (this: ^IDevice, NumObjects: u32, ppObjects: [^]^IPageable) -> HRESULT,
+	Evict:                            proc "system" (this: ^IDevice, NumObjects: u32, ppObjects: [^]^IPageable) -> HRESULT,
 	CreateFence:                      proc "system" (this: ^IDevice, InitialValue: u64, Flags: FENCE_FLAGS, riid: ^IID, ppFence: ^rawptr) -> HRESULT,
 	GetDeviceRemovedReason:           proc "system" (this: ^IDevice) -> HRESULT,
-	GetCopyableFootprints:            proc "system" (this: ^IDevice, pResourceDesc: ^RESOURCE_DESC, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
+	GetCopyableFootprints:            proc "system" (this: ^IDevice, pResourceDesc: ^RESOURCE_DESC, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: [^]PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: [^]u32, pRowSizeInBytes: [^]u64, pTotalBytes: ^u64),
 	CreateQueryHeap:                  proc "system" (this: ^IDevice, pDesc: ^QUERY_HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	SetStablePowerState:              proc "system" (this: ^IDevice, Enable: BOOL) -> HRESULT,
 	CreateCommandSignature:           proc "system" (this: ^IDevice, pDesc: ^COMMAND_SIGNATURE_DESC, pRootSignature: ^IRootSignature, riid: ^IID, ppvCommandSignature: ^rawptr) -> HRESULT,
@@ -2694,8 +2694,8 @@ IDevice1 :: struct #raw_union {
 IDevice1_VTable :: struct {
 	using id3d12device_vtable: IDevice_VTable,
 	CreatePipelineLibrary:             proc "system" (this: ^IDevice1, pLibraryBlob: rawptr, BlobLength: SIZE_T, riid: ^IID, ppPipelineLibrary: ^rawptr) -> HRESULT,
-	SetEventOnMultipleFenceCompletion: proc "system" (this: ^IDevice1, ppFences: ^^IFence, pFenceValues: ^u64, NumFences: u32, Flags: MULTIPLE_FENCE_WAIT_FLAGS, hEvent: HANDLE) -> HRESULT,
-	SetResidencyPriority:              proc "system" (this: ^IDevice1, NumObjects: u32, ppObjects: ^^IPageable, pPriorities: ^RESIDENCY_PRIORITY) -> HRESULT,
+	SetEventOnMultipleFenceCompletion: proc "system" (this: ^IDevice1, ppFences: [^]^IFence, pFenceValues: [^]u64, NumFences: u32, Flags: MULTIPLE_FENCE_WAIT_FLAGS, hEvent: HANDLE) -> HRESULT,
+	SetResidencyPriority:              proc "system" (this: ^IDevice1, NumObjects: u32, ppObjects: [^]^IPageable, pPriorities: [^]RESIDENCY_PRIORITY) -> HRESULT,
 }
 
 
@@ -2726,7 +2726,7 @@ IDevice3_VTable :: struct {
 	using id3d12device2_vtable: IDevice2_VTable,
 	OpenExistingHeapFromAddress:     proc "system" (this: ^IDevice3, pAddress: rawptr, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	OpenExistingHeapFromFileMapping: proc "system" (this: ^IDevice3, hFileMapping: HANDLE, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
-	EnqueueMakeResident:             proc "system" (this: ^IDevice3, Flags: RESIDENCY_FLAGS, NumObjects: u32, ppObjects: ^^IPageable, pFenceToSignal: ^IFence, FenceValueToSignal: u64) -> HRESULT,
+	EnqueueMakeResident:             proc "system" (this: ^IDevice3, Flags: RESIDENCY_FLAGS, NumObjects: u32, ppObjects: [^]^IPageable, pFenceToSignal: ^IFence, FenceValueToSignal: u64) -> HRESULT,
 }
 
 COMMAND_LIST_FLAGS :: distinct bit_set[COMMAND_LIST_FLAG; u32]
@@ -2804,7 +2804,7 @@ IDevice4_VTable :: struct {
 	CreateCommittedResource1:       proc "system" (this: ^IDevice4, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateHeap1:                    proc "system" (this: ^IDevice4, pDesc: ^HEAP_DESC, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	CreateReservedResource1:        proc "system" (this: ^IDevice4, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	GetResourceAllocationInfo1:     proc "system" (this: ^IDevice4, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
+	GetResourceAllocationInfo1:     proc "system" (this: ^IDevice4, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: [^]RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
 }
 
 LIFETIME_STATE :: enum i32 {
@@ -3220,7 +3220,7 @@ BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS :: struct {
 	using _: struct #raw_union {
 		InstanceDescs:   GPU_VIRTUAL_ADDRESS,
 		pGeometryDescs:  ^RAYTRACING_GEOMETRY_DESC,
-		ppGeometryDescs: ^^RAYTRACING_GEOMETRY_DESC,
+		ppGeometryDescs: [^]^RAYTRACING_GEOMETRY_DESC,
 	},
 }
 
@@ -3267,8 +3267,8 @@ IDevice5_VTable :: struct {
 	using id3d12device4_vtable: IDevice4_VTable,
 	CreateLifetimeTracker:                          proc "system" (this: ^IDevice5, pOwner: ^ILifetimeOwner, riid: ^IID, ppvTracker: ^rawptr) -> HRESULT,
 	RemoveDevice:                                   proc "system" (this: ^IDevice5),
-	EnumerateMetaCommands:                          proc "system" (this: ^IDevice5, pNumMetaCommands: ^u32, pDescs: ^META_COMMAND_DESC) -> HRESULT,
-	EnumerateMetaCommandParameters:                 proc "system" (this: ^IDevice5, CommandId: ^GUID, Stage: META_COMMAND_PARAMETER_STAGE, pTotalStructureSizeInBytes: ^u32, pParameterCount: ^u32, pParameterDescs: ^META_COMMAND_PARAMETER_DESC) -> HRESULT,
+	EnumerateMetaCommands:                          proc "system" (this: ^IDevice5, pNumMetaCommands: ^u32, pDescs: [^]META_COMMAND_DESC) -> HRESULT,
+	EnumerateMetaCommandParameters:                 proc "system" (this: ^IDevice5, CommandId: ^GUID, Stage: META_COMMAND_PARAMETER_STAGE, pTotalStructureSizeInBytes: ^u32, pParameterCount: ^u32, pParameterDescs: [^]META_COMMAND_PARAMETER_DESC) -> HRESULT,
 	CreateMetaCommand:                              proc "system" (this: ^IDevice5, CommandId: ^GUID, NodeMask: u32, pCreationParametersData: rawptr, CreationParametersDataSizeInBytes: SIZE_T, riid: ^IID, ppMetaCommand: ^rawptr) -> HRESULT,
 	CreateStateObject:                              proc "system" (this: ^IDevice5, pDesc: ^STATE_OBJECT_DESC, riid: ^IID, ppStateObject: ^rawptr) -> HRESULT,
 	GetRaytracingAccelerationStructurePrebuildInfo: proc "system" (this: ^IDevice5, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS, pInfo: ^RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO),
@@ -3635,11 +3635,11 @@ IDevice8 :: struct #raw_union {
 }
 IDevice8_VTable :: struct {
 	using id3d12device7_vtable: IDevice7_VTable,
-	GetResourceAllocationInfo2:               proc "system" (this: ^IDevice8, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
+	GetResourceAllocationInfo2:               proc "system" (this: ^IDevice8, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: [^]RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
 	CreateCommittedResource2:                 proc "system" (this: ^IDevice8, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC1, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreatePlacedResource1:                    proc "system" (this: ^IDevice8, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC1, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateSamplerFeedbackUnorderedAccessView: proc "system" (this: ^IDevice8, pTargetedResource: ^IResource, pFeedbackResource: ^IResource, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
-	GetCopyableFootprints1:                   proc "system" (this: ^IDevice8, pResourceDesc: ^RESOURCE_DESC1, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: ^PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
+	GetCopyableFootprints1:                   proc "system" (this: ^IDevice8, pResourceDesc: ^RESOURCE_DESC1, FirstSubresource: u32, NumSubresources: u32, BaseOffset: u64, pLayouts: [^]PLACED_SUBRESOURCE_FOOTPRINT, pNumRows: ^u32, pRowSizeInBytes: ^u64, pTotalBytes: ^u64),
 }
 
 
@@ -3727,7 +3727,7 @@ RENDER_PASS_ENDING_ACCESS_RESOLVE_PARAMETERS :: struct {
 	pSrcResource:           ^IResource,
 	pDstResource:           ^IResource,
 	SubresourceCount:       u32,
-	pSubresourceParameters: ^RENDER_PASS_ENDING_ACCESS_RESOLVE_SUBRESOURCE_PARAMETERS,
+	pSubresourceParameters: [^]RENDER_PASS_ENDING_ACCESS_RESOLVE_SUBRESOURCE_PARAMETERS,
 	Format:                 dxgi.FORMAT,
 	ResolveMode:            RESOLVE_MODE,
 	PreserveResolveSource:  BOOL,
@@ -3792,11 +3792,11 @@ IGraphicsCommandList4 :: struct #raw_union {
 }
 IGraphicsCommandList4_VTable :: struct {
 	using id3d12graphicscommandlist3_vtable: IGraphicsCommandList3_VTable,
-	BeginRenderPass:                                  proc "system" (this: ^IGraphicsCommandList4, NumRenderTargets: u32, pRenderTargets: ^RENDER_PASS_RENDER_TARGET_DESC, pDepthStencil: ^RENDER_PASS_DEPTH_STENCIL_DESC, Flags: RENDER_PASS_FLAGS),
+	BeginRenderPass:                                  proc "system" (this: ^IGraphicsCommandList4, NumRenderTargets: u32, pRenderTargets: [^]RENDER_PASS_RENDER_TARGET_DESC, pDepthStencil: ^RENDER_PASS_DEPTH_STENCIL_DESC, Flags: RENDER_PASS_FLAGS),
 	EndRenderPass:                                    proc "system" (this: ^IGraphicsCommandList4),
 	InitializeMetaCommand:                            proc "system" (this: ^IGraphicsCommandList4, pMetaCommand: ^IMetaCommand, pInitializationParametersData: rawptr, InitializationParametersDataSizeInBytes: SIZE_T),
 	ExecuteMetaCommand:                               proc "system" (this: ^IGraphicsCommandList4, pMetaCommand: ^IMetaCommand, pExecutionParametersData: rawptr, ExecutionParametersDataSizeInBytes: SIZE_T),
-	BuildRaytracingAccelerationStructure:             proc "system" (this: ^IGraphicsCommandList4, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC, NumPostbuildInfoDescs: u32, pPostbuildInfoDescs: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC),
+	BuildRaytracingAccelerationStructure:             proc "system" (this: ^IGraphicsCommandList4, pDesc: ^BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC, NumPostbuildInfoDescs: u32, pPostbuildInfoDescs: [^]RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC),
 	EmitRaytracingAccelerationStructurePostbuildInfo: proc "system" (this: ^IGraphicsCommandList4, pDesc: ^RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC, NumSourceAccelerationStructures: u32, pSourceAccelerationStructureData: ^GPU_VIRTUAL_ADDRESS),
 	CopyRaytracingAccelerationStructure:              proc "system" (this: ^IGraphicsCommandList4, DestAccelerationStructureData: GPU_VIRTUAL_ADDRESS, SourceAccelerationStructureData: GPU_VIRTUAL_ADDRESS, Mode: RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE),
 	SetPipelineState1:                                proc "system" (this: ^IGraphicsCommandList4, pStateObject: ^IStateObject),
