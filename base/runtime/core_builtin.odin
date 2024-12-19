@@ -826,10 +826,12 @@ _resize_dynamic_array :: #force_inline proc(a: ^Raw_Dynamic_Array, size_of_elem,
 		return nil
 	}
 
+	if should_zero && a.len < length {
+		num_reused := min(a.cap, length) - a.len
+		intrinsics.mem_zero(([^]byte)(a.data)[a.len*size_of_elem:], num_reused*size_of_elem)
+	}
+
 	if length <= a.cap {
-		if should_zero && a.len < length {
-			intrinsics.mem_zero(([^]byte)(a.data)[a.len*size_of_elem:], (length-a.len)*size_of_elem)
-		}
 		a.len = max(length, 0)
 		return nil
 	}
