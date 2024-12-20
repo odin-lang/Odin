@@ -1,11 +1,13 @@
 package os
 
-foreign import libc "system:c"
+foreign import lib "system:c"
 
 import "base:runtime"
 import "core:c"
+import "core:c/libc"
 import "core:strings"
 import "core:sys/haiku"
+import "core:sys/posix"
 
 Handle    :: i32
 Pid       :: i32
@@ -117,14 +119,13 @@ S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK 
 S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
 S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
+__error :: libc.errno
+_unix_open :: posix.open
 
-foreign libc {
-	@(link_name="_errorp")        __error              :: proc() -> ^c.int ---
-
+foreign lib {
 	@(link_name="fork")           _unix_fork           :: proc() -> pid_t ---
 	@(link_name="getthrid")       _unix_getthrid       :: proc() -> int ---
 
-	@(link_name="open")           _unix_open           :: proc(path: cstring, flags: c.int, #c_vararg mode: ..u16) -> Handle ---
 	@(link_name="close")          _unix_close          :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")           _unix_read           :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="pread")          _unix_pread          :: proc(fd: Handle, buf: rawptr, size: c.size_t, offset: i64) -> c.ssize_t ---
@@ -203,7 +204,7 @@ fork :: proc() -> (Pid, Error) {
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	handle := _unix_open(cstr, c.int(flags), u16(mode))
+	handle := cast(Handle)_unix_open(cstr, transmute(posix.O_Flags)i32(flags), transmute(posix.mode_t)i32(mode))
 	if handle == -1 {
 		return INVALID_HANDLE, get_last_error()
 	}

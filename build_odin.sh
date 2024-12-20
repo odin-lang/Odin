@@ -115,7 +115,7 @@ OpenBSD)
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
 Haiku)
-	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags) -I/system/develop/headers/private/shared -I/system/develop/headers/private/kernel"
+	CXXFLAGS="$CXXFLAGS -D_GNU_SOURCE $($LLVM_CONFIG --cxxflags --ldflags) -I/system/develop/headers/private/shared -I/system/develop/headers/private/kernel"
 	LDFLAGS="$LDFLAGS -liconv"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
