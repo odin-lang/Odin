@@ -16,7 +16,7 @@ _Platform_Error :: haiku.Errno
 
 MAX_PATH :: haiku.PATH_MAX
 
-ENOSYS :: _Platform_Error(i32(haiku.Errno.POSIX_ERROR_BASE) + 9)
+ENOSYS :: _Platform_Error(haiku.Errno.ENOSYS)
 
 INVALID_HANDLE :: ~Handle(0)
 
