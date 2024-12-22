@@ -742,3 +742,5 @@ gb_global char const *llvm_linkage_strings[] = {
 };
 
 #define ODIN_METADATA_IS_PACKED str_lit("odin-is-packed")
+#define ODIN_METADATA_MIN_ALIGN str_lit("odin-min-align")
+#define ODIN_METADATA_MAX_ALIGN str_lit("odin-max-align")
