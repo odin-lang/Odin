@@ -684,7 +684,6 @@ Address_Family :: distinct Protocol_Family
 */
 Socket_Msg :: bit_set[Socket_Msg_Bits; i32]
 
-
 /*
 	Struct representing a generic socket address.
 */
