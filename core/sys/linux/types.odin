@@ -684,6 +684,15 @@ Address_Family :: distinct Protocol_Family
 */
 Socket_Msg :: bit_set[Socket_Msg_Bits; i32]
 
+
+/*
+	Struct representing a generic socket address.
+*/
+Sock_Addr :: struct #packed {
+	sa_family: Address_Family,
+	sa_data:   [14]u8,
+}
+
 /*
 	Struct representing IPv4 socket address.
 */
@@ -691,6 +700,7 @@ Sock_Addr_In :: struct #packed {
 	sin_family: Address_Family,
 	sin_port:   u16be,
 	sin_addr:   [4]u8,
+	sin_zero:   [size_of(Sock_Addr) - size_of(Address_Family) - size_of(u16be) - size_of([4]u8)]u8,
 }
 
 /*
@@ -720,6 +730,7 @@ Sock_Addr_Any :: struct #raw_union {
 		family: Address_Family,
 		port:   u16be,
 	},
+	using generic: Sock_Addr,
 	using ipv4: Sock_Addr_In,
 	using ipv6: Sock_Addr_In6,
 	using uds: Sock_Addr_Un,
