@@ -94,12 +94,14 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 				return nullptr;
 			}
 			if (e2->state.load() != EntityState_Resolved) {
-				gbString str = type_to_string(t);
-				defer (gb_string_free(str));
-				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
-				e->type = t_invalid;
+				e->type = t;
 				return nullptr;
 			}
+			gbString str = type_to_string(t);
+			defer (gb_string_free(str));
+			error(operand->expr, "Invalid use of a non-specialized polymorphic type '%s' in %.*s", str, LIT(context_name));
+			e->type = t_invalid;
+			return nullptr;
 		} else if (is_type_empty_union(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
