@@ -3672,6 +3672,13 @@ gb_internal bool check_binary_array_expr(CheckerContext *c, Token op, Operand *x
 			}
 		}
 	}
+	if (is_type_simd_vector(x->type) && !is_type_simd_vector(y->type)) {
+		if (check_is_assignable_to(c, y, x->type)) {
+			if (check_binary_op(c, x, op)) {
+				return true;
+			}
+		}
+	}
 	return false;
 }
 
@@ -4548,6 +4555,19 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 					}
 				}
 			}
+			operand->mode = Addressing_Invalid;
+			convert_untyped_error(c, operand, target_type);
+			return;
+		}
+
+		break;
+	}
+	
+	case Type_SimdVector: {
+		Type *elem = base_array_type(t);
+		if (check_is_assignable_to(c, operand, elem)) {
+			operand->mode = Addressing_Value;
+		} else {
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
