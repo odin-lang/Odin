@@ -384,14 +384,6 @@ _Sys_Process_Attributes :: struct {}
 
 @(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
-	has_executable_permissions :: proc(fd: linux.Fd) -> bool {
-		backing: [48]u8
-		b := strings.builder_from_bytes(backing[:])
-		strings.write_string(&b, "/proc/self/fd/")
-		strings.write_int(&b, int(fd))
-		return linux.access(strings.to_cstring(&b), linux.X_OK) == .NONE
-	}
-
 	TEMP_ALLOCATOR_GUARD()
 
 	if len(desc.command) == 0 {
@@ -411,7 +403,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	}
 
 	// search PATH if just a plain name is provided
-	exe_fd: linux.Fd
+	exe_path: cstring
 	executable_name := desc.command[0]
 	if strings.index_byte(executable_name, '/') < 0 {
 		path_env := get_env("PATH", temp_allocator())
@@ -426,16 +418,11 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			strings.write_byte(&exe_builder, '/')
 			strings.write_string(&exe_builder, executable_name)
 
-			exe_path := strings.to_cstring(&exe_builder)
-			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
-				continue
+			exe_path = strings.to_cstring(&exe_builder)
+			if linux.access(exe_path, linux.X_OK) == .NONE {
+				found = true
+				break
 			}
-			if !has_executable_permissions(exe_fd) {
-				linux.close(exe_fd)
-				continue
-			}
-			found = true
-			break
 		}
 		if !found {
 			// check in cwd to match windows behavior
@@ -443,28 +430,17 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			strings.write_string(&exe_builder, "./")
 			strings.write_string(&exe_builder, executable_name)
 
-			exe_path := strings.to_cstring(&exe_builder)
-			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
+			exe_path = strings.to_cstring(&exe_builder)
+			if linux.access(exe_path, linux.X_OK) != .NONE {
 				return process, .Not_Exist
-			}
-			if !has_executable_permissions(exe_fd) {
-				linux.close(exe_fd)
-				return process, .Permission_Denied
 			}
 		}
 	} else {
-		exe_path := temp_cstring(executable_name) or_return
-		if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
-			return process, _get_platform_error(errno)
-		}
-		if !has_executable_permissions(exe_fd) {
-			linux.close(exe_fd)
-			return process, .Permission_Denied
+		exe_path = temp_cstring(executable_name) or_return
+		if linux.access(exe_path, linux.X_OK) != .NONE {
+			return process, .Not_Exist
 		}
 	}
-
-	// At this point, we have an executable.
-	defer linux.close(exe_fd)
 
 	// args and environment need to be a list of cstrings
 	// that are terminated by a nil pointer.
@@ -491,7 +467,6 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		return process, _get_platform_error(errno)
 	}
 	defer linux.close(child_pipe_fds[READ])
-
 
 	// TODO: This is the traditional textbook implementation with fork.
 	//       A more efficient implementation with vfork:
@@ -573,7 +548,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 		}
 
-		errno = linux.execveat(exe_fd, "", &cargs[0], env, {.AT_EMPTY_PATH})
+		errno = linux.execveat(dir_fd, exe_path, &cargs[0], env)
 		assert(errno != nil)
 		write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 	}

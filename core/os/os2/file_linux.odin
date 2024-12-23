@@ -272,28 +272,12 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	is_dir_fd :: proc(fd: linux.Fd) -> bool {
-		s: linux.Stat
-		if linux.fstat(fd, &s) != .NONE {
-			return false
-		}
-		return linux.S_ISDIR(s.mode)
-	}
-
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
-	fd, errno := linux.open(name_cstr, {.NOFOLLOW})
-	#partial switch (errno) {
-	case .ELOOP:
-		/* symlink */
-	case .NONE:
-		defer linux.close(fd)
-		if is_dir_fd(fd) {
-			return _get_platform_error(linux.rmdir(name_cstr))
-		}
-	case:
-		return _get_platform_error(errno)
+	if fd, errno := linux.open(name_cstr, _OPENDIR_FLAGS); errno == .NONE {
+		linux.close(fd)
+		return _get_platform_error(linux.rmdir(name_cstr))
 	}
 
 	return _get_platform_error(linux.unlink(name_cstr))

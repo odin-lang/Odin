@@ -415,7 +415,7 @@ _region_resize :: proc(alloc: ^Allocation_Header, new_size: int, alloc_is_free_l
 	back_idx := -1
 	idx: u16
 	infinite: for {
-		for i := 0; i < len(region_iter.hdr.free_list); i += 1 {
+		for i := 0; i < int(region_iter.hdr.free_list_len); i += 1 {
 			idx = region_iter.hdr.free_list[i]
 			if _get_block_count(region_iter.memory[idx]) >= new_block_count {
 				break infinite
