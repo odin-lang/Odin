@@ -5901,7 +5901,7 @@ gb_internal isize gb__print_string(char *text, isize max_len, gbprivFmtInfo *inf
 			len = info->precision < len ? info->precision : len;
 		}
 
-		res += gb_strlcpy(text, str, len);
+		res += gb_strlcpy(text, str, gb_min(len, max_len));
 
 		if (info->width > res) {
 			isize padding = info->width - len;
@@ -6056,14 +6056,16 @@ gb_internal isize gb__print_f64(char *text, isize max_len, gbprivFmtInfo *info, 
 gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va_list va) {
 	char const *text_begin = text;
 	isize remaining = max_len, res;
+	remaining--;
 
-	while (*fmt) {
+	while (*fmt && remaining) {
 		gbprivFmtInfo info = {0};
 		isize len = 0;
 		info.precision = -1;
 
 		while (*fmt && *fmt != '%' && remaining) {
 			*text++ = *fmt++;
+			remaining--;
 		}
 
 		if (*fmt == '%') {
@@ -6229,7 +6231,7 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 
 		text += len;
 		if (len >= remaining) {
-			remaining = gb_min(remaining, 1);
+			remaining = 0;
 		} else {
 			remaining -= len;
 		}
@@ -6237,7 +6239,7 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 
 	*text++ = '\0';
 	res = (text - text_begin);
-	return (res >= max_len || res < 0) ? -1 : res;
+	return (res > max_len || res < 0) ? -1 : res;
 }
 
 
