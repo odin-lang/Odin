@@ -44,7 +44,7 @@ Context :: struct {
 	is_finalized:   bool, // For SHAKE (unlimited squeeze is allowed)
 }
 
-@(private)
+@(private, rodata)
 keccakf_rndc := [?]u64 {
 	0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
 	0x8000000080008000, 0x000000000000808b, 0x0000000080000001,
@@ -56,13 +56,13 @@ keccakf_rndc := [?]u64 {
 	0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
 }
 
-@(private)
+@(private, rodata)
 keccakf_rotc := [?]int {
 	1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
 	27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44,
 }
 
-@(private)
+@(private, rodata)
 keccakf_piln := [?]i32 {
 	10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
 	15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1,

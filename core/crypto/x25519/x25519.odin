@@ -15,7 +15,7 @@ SCALAR_SIZE :: 32
 // POINT_SIZE is the size of a X25519 point (public key/shared secret) in bytes.
 POINT_SIZE :: 32
 
-@(private)
+@(private, rodata)
 _BASE_POINT: [32]byte = {9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 @(private)

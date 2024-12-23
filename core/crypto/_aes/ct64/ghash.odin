@@ -22,7 +22,6 @@
 
 package aes_ct64
 
-import "base:intrinsics"
 import "core:crypto/_aes"
 import "core:encoding/endian"
 
@@ -65,7 +64,7 @@ rev64 :: proc "contextless" (x: u64) -> u64 {
 // of GCM.
 ghash :: proc "contextless" (dst, key, data: []byte) {
 	if len(dst) != _aes.GHASH_BLOCK_SIZE || len(key) != _aes.GHASH_BLOCK_SIZE {
-		intrinsics.trap()
+		panic_contextless("aes/ghash: invalid dst or key size")
 	}
 
 	buf := data
