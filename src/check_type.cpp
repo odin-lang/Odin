@@ -2440,8 +2440,12 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	bool success = true;
 	isize specialization_count = 0;
 	Type *params  = check_get_params(c, c->scope, pt->params, &variadic, &variadic_index, &success, &specialization_count, operands);
-	Type *results = check_get_results(c, c->scope, pt->results);
 
+	bool no_poly_return = c->disallow_polymorphic_return_types;
+	c->disallow_polymorphic_return_types = c->scope == c->polymorphic_scope;
+	// NOTE(zen3ger): if the parapoly scope is the current proc's scope, then the return types shall not declare new poly vars
+	Type *results = check_get_results(c, c->scope, pt->results);
+	c->disallow_polymorphic_return_types = no_poly_return;
 
 	isize param_count = 0;
 	isize result_count = 0;
@@ -3383,6 +3387,9 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		}
 		Type *t = alloc_type_generic(ctx->scope, 0, token.string, specific);
 		if (ctx->allow_polymorphic_types) {
+			if (ctx->disallow_polymorphic_return_types) {
+				error(ident, "Undeclared polymorphic parameter '%.*s' in return type", LIT(token.string));
+			}
 			Scope *ps = ctx->polymorphic_scope;
 			Scope *s = ctx->scope;
 			Scope *entity_scope = s;
