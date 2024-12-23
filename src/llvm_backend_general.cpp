@@ -734,6 +734,17 @@ gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLV
 		if (is_packed != 0) {
 			LLVMSetAlignment(result, 1);
 		}
+		u64 align = LLVMGetAlignment(result);
+		u64 align_min = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_MIN_ALIGN);
+		u64 align_max = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_MAX_ALIGN);
+		if (align_min != 0 && align < align_min) {
+			align = align_min;
+		}
+		if (align_max != 0 && align > align_max) {
+			align = align_max;
+		}
+		GB_ASSERT(align <= UINT_MAX);
+		LLVMSetAlignment(result, (unsigned int)align);
 	}
 
 	return result;
@@ -2121,6 +2132,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 			
 			i64 prev_offset = 0;
+			bool requires_packing = type->Struct.is_packed;
 			for (i32 field_index : struct_fields_index_by_increasing_offset(temporary_allocator(), type)) {
 				Entity *field = type->Struct.fields[field_index];
 				i64 offset = type->Struct.offsets[field_index];
@@ -2141,6 +2153,10 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					field_type = t_rawptr;
 				}
 
+				// max_field_align might misalign items in a way that requires packing
+				// so check the alignment of all fields to see if packing is required.
+				requires_packing = requires_packing || ((offset % type_align_of(field_type)) != 0);
+
 				array_add(&fields, lb_type(m, field_type));
 
 				prev_offset = offset + type_size_of(field->type);
@@ -2155,7 +2171,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				GB_ASSERT(fields[i] != nullptr);
 			}
 			
-			LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, type->Struct.is_packed);
+			LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, requires_packing);
 			map_set(&m->struct_field_remapping, cast(void *)struct_type, field_remapping);
 			map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);			
 			#if 0
