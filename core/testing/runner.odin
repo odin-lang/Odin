@@ -391,6 +391,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		fmt.assertf(alloc_error == nil, "Error allocating memory for task allocator #%i: %v", i, alloc_error)
 		when TRACKING_MEMORY {
 			mem.tracking_allocator_init(&task_memory_trackers[i], mem.rollback_stack_allocator(&task_allocators[i]))
+			task_memory_trackers[i].bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
 		}
 	}
 

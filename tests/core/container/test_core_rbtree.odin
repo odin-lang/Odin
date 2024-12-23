@@ -11,6 +11,7 @@ import "core:log"
 test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
+	track.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
 	defer mem.tracking_allocator_destroy(&track)
 	context.allocator = mem.tracking_allocator(&track)
 
