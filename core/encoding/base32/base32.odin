@@ -45,13 +45,6 @@ DEC_TABLE := [?]u8 {
 	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 }
 
-REQUIRED_PADDING := map[int]int{
-	2 = 6, // 2 chars need 6 padding chars
-	4 = 4, // 4 chars need 4 padding chars
-	5 = 3, // 5 chars need 3 padding chars
-	7 = 1, // 7 chars need 1 padding char
-}
-
 encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> string {
 	out_length := (len(data) + 4) / 5 * 8
 	out := make([]byte, out_length, allocator)
@@ -154,8 +147,17 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
 
 		content_len := data_len - padding_count
 		mod8 := content_len % 8
-		if req_pad, ok := REQUIRED_PADDING[mod8]; ok {
-			if padding_count != req_pad {
+		required_padding: int
+		switch mod8 {
+		case 2: required_padding = 6 // 2 chars need 6 padding chars
+		case 4: required_padding = 4 // 4 chars need 4 padding chars
+		case 5: required_padding = 3 // 5 chars need 3 padding chars
+		case 7: required_padding = 1 // 7 chars need 1 padding char
+			case: required_padding = 0
+		}
+
+		if required_padding > 0 {
+			if padding_count != required_padding {
 				return nil, .Malformed_Input
 			}
 		} else if mod8 != 0 {
