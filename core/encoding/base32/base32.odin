@@ -103,88 +103,109 @@ _encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.al
 	}
 }
 
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> ([]byte, Error) {
+decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> (out: []byte, err: Error) {
 	if len(data) == 0 {
 		return nil, .None
 	}
 
-	// Calculate maximum possible output size and allocate buffer
-	out_len := (len(data) * 5 + 7) / 8 // Ceiling division to ensure enough space
-	out := make([]byte, out_len, allocator)
-
-	outi := 0
-	data := data
-
-	end := false
-	for len(data) > 0 && !end {
-		dbuf : [8]byte
-		dlen := 8
-
-		for j := 0; j < 8; {
-			if len(data) == 0 {
-				dlen, end = j, true
-				break
-			}
-			input := data[0]
-			data = data[1:]
-			if input == byte(PADDING) && j >= 2 && len(data) < 8 {
-				if len(data) + j < 8 - 1 {
-					return nil, .Malformed_Input
-				}
-				for k := 0; k < 8-1-j; k += 1 {
-					if len(data) < k || data[k] != byte(PADDING) {
-						return nil, .Malformed_Input
-					}
-				}
-				dlen, end = j, true
-				if dlen == 1 || dlen == 3 || dlen == 6 {
-					return nil, .Invalid_Length
-				}
-				break
-			}
-
-			decoded := DEC_TBL[input]
-			if decoded == 0 && input != byte(ENC_TABLE[0]) {
-				return nil, .Invalid_Character
-			}
-			dbuf[j] = decoded
-			j += 1
-		}
-
-		// Ensure we have enough space in output buffer
-		needed := 5  // Each full 8-char block produces 5 bytes
-		if outi + needed > len(out) {
-			return nil, .Invalid_Length
-		}
-
-		// Process complete input blocks
-		switch dlen {
-		case 8:
-			if len(dbuf) < 8 { return nil, .Invalid_Length }
-			out[outi + 4] = dbuf[6] << 5 | dbuf[7]
-			fallthrough
-		case 7:
-			if len(dbuf) < 7 { return nil, .Invalid_Length }
-			out[outi + 3] = dbuf[4] << 7 | dbuf[5] << 2 | dbuf[6] >> 3
-			fallthrough
-		case 5:
-			if len(dbuf) < 5 { return nil, .Invalid_Length }
-			out[outi + 2] = dbuf[3] << 4 | dbuf[4] >> 1
-			fallthrough
-		case 4:
-			if len(dbuf) < 4 { return nil, .Invalid_Length }
-			out[outi + 1] = dbuf[1] << 6 | dbuf[2] << 1 | dbuf[3] >> 4
-			fallthrough
-		case 2:
-			if len(dbuf) < 2 { return nil, .Invalid_Length }
-			out[outi + 0] = dbuf[0] << 3 | dbuf[1] >> 2
-		}
-		outi += 5
+	// Check minimum length requirement first
+	if len(data) < 2 {
+		return nil, .Invalid_Length
 	}
 
-	// Trim output buffer to actual size
-	if outi < len(out) {
-		out = out[:outi]
+	// Validate characters - only A-Z and 2-7 allowed before padding
+	for i := 0; i < len(data); i += 1 {
+		c := data[i]
+		if c == byte(PADDING) {
+			break
+		}
+		if !((c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7')) {
+			return nil, .Invalid_Character
+		}
+	}
+
+	// Validate padding and length
+	data_len := len(data)
+	padding_count := 0
+	for i := data_len - 1; i >= 0; i -= 1 {
+		if data[i] != byte(PADDING) {
+			break
+		}
+		padding_count += 1
+	}
+
+	// Check for proper padding and length combinations
+	if padding_count > 0 {
+		// Verify no padding in the middle
+		for i := 0; i < data_len - padding_count; i += 1 {
+			if data[i] == byte(PADDING) {
+				return nil, .Malformed_Input
+			}
+		}
+
+		// Required padding for each content length mod 8
+		content_len := data_len - padding_count
+		required_padding := map[int]int{
+			2 = 6, // 2 chars need 6 padding chars
+			4 = 4, // 4 chars need 4 padding chars
+			5 = 3, // 5 chars need 3 padding chars
+			7 = 1, // 7 chars need 1 padding char
+		}
+
+		mod8 := content_len % 8
+		if req_pad, ok := required_padding[mod8]; ok {
+			if padding_count != req_pad {
+				return nil, .Malformed_Input
+			}
+		} else if mod8 != 0 {
+			// If not in the map and not a multiple of 8, it's invalid
+			return nil, .Malformed_Input
+		}
+	} else {
+		// No padding - must be multiple of 8
+		if data_len % 8 != 0 {
+			return nil, .Malformed_Input
+		}
+	}
+
+	// Calculate decoded length: 5 bytes for every 8 input chars
+	input_chars := data_len - padding_count
+	out_len := input_chars * 5 / 8
+	out = make([]byte, out_len, allocator)
+	defer if err != .None {
+		delete(out)
+	}
+
+	// Process input in 8-byte blocks
+	outi := 0
+	for i := 0; i < input_chars; i += 8 {
+		buf: [8]byte
+		block_size := min(8, input_chars - i)
+
+		// Decode block
+		for j := 0; j < block_size; j += 1 {
+			buf[j] = DEC_TBL[data[i + j]]
+		}
+
+		// Convert to output bytes based on block size
+		bytes_to_write := block_size * 5 / 8
+		switch block_size {
+		case 8:
+			out[outi + 4] = (buf[6] << 5) | buf[7]
+			fallthrough
+		case 7:
+			out[outi + 3] = (buf[4] << 7) | (buf[5] << 2) | (buf[6] >> 3)
+			fallthrough
+		case 5:
+			out[outi + 2] = (buf[3] << 4) | (buf[4] >> 1)
+			fallthrough
+		case 4:
+			out[outi + 1] = (buf[1] << 6) | (buf[2] << 1) | (buf[3] >> 4)
+			fallthrough
+		case 2:
+			out[outi] = (buf[0] << 3) | (buf[1] >> 2)
+		}
+		outi += bytes_to_write
 	}
 
 	return out, .None
