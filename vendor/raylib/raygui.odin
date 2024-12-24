@@ -3,8 +3,11 @@ package raylib
 import "core:c"
 
 RAYGUI_SHARED :: #config(RAYGUI_SHARED, false)
+RAYGUI_SYSTEM :: #config(RAYGUI_SYSTEM, false)
 
-when ODIN_OS == .Windows {
+when RAYGUI_SYSTEM {
+	foreign import lib "system:raygui"
+} else when ODIN_OS == .Windows {
 	foreign import lib {
 		"windows/rayguidll.lib" when RAYGUI_SHARED else "windows/raygui.lib",
 	}
