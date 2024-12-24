@@ -100,15 +100,18 @@ _encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.al
 	}
 }
 
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> ([]byte, Error) #no_bounds_check {
+decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> ([]byte, Error) {
 	if len(data) == 0 {
 		return nil, .None
 	}
 
+	// Calculate maximum possible output size and allocate buffer
+	out_len := (len(data) * 5 + 7) / 8 // Ceiling division to ensure enough space
+	out := make([]byte, out_len, allocator)
+
 	outi := 0
 	data := data
 
-	out := make([]byte, len(data) / 8 * 5, allocator)
 	end := false
 	for len(data) > 0 && !end {
 		dbuf : [8]byte
@@ -122,25 +125,22 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
 			input := data[0]
 			data = data[1:]
 			if input == byte(PADDING) && j >= 2 && len(data) < 8 {
-				// assert(!(len(data) + j < 8 - 1), "Corrupted input")
 				if len(data) + j < 8 - 1 {
 					return nil, .Malformed_Input
 				}
-				// assert(len(data) < k || data[k] == byte(PADDING), "Corrupted input")
 				for k := 0; k < 8-1-j; k += 1 {
 					if len(data) < k || data[k] != byte(PADDING) {
 						return nil, .Malformed_Input
 					}
 				}
 				dlen, end = j, true
-				// assert(dlen != 1 && dlen != 3 && dlen != 6, "Corrupted input")
 				if dlen == 1 || dlen == 3 || dlen == 6 {
 					return nil, .Invalid_Length
 				}
 				break
 			}
+
 			decoded := DEC_TBL[input]
-			// assert(dbuf[j] != 0xff, "Corrupted input")
 			if decoded == 0 && input != byte(ENC_TABLE[0]) {
 				return nil, .Invalid_Character
 			}
@@ -148,23 +148,41 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
 			j += 1
 		}
 
+		// Ensure we have enough space in output buffer
+		needed := 5  // Each full 8-char block produces 5 bytes
+		if outi + needed > len(out) {
+			return nil, .Invalid_Length
+		}
+
+		// Process complete input blocks
 		switch dlen {
 		case 8:
+			if len(dbuf) < 8 { return nil, .Invalid_Length }
 			out[outi + 4] = dbuf[6] << 5 | dbuf[7]
 			fallthrough
 		case 7:
+			if len(dbuf) < 7 { return nil, .Invalid_Length }
 			out[outi + 3] = dbuf[4] << 7 | dbuf[5] << 2 | dbuf[6] >> 3
 			fallthrough
 		case 5:
+			if len(dbuf) < 5 { return nil, .Invalid_Length }
 			out[outi + 2] = dbuf[3] << 4 | dbuf[4] >> 1
 			fallthrough
 		case 4:
+			if len(dbuf) < 4 { return nil, .Invalid_Length }
 			out[outi + 1] = dbuf[1] << 6 | dbuf[2] << 1 | dbuf[3] >> 4
 			fallthrough
 		case 2:
+			if len(dbuf) < 2 { return nil, .Invalid_Length }
 			out[outi + 0] = dbuf[0] << 3 | dbuf[1] >> 2
 		}
 		outi += 5
 	}
+
+	// Trim output buffer to actual size
+	if outi < len(out) {
+		out = out[:outi]
+	}
+
 	return out, .None
 }
