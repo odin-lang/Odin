@@ -45,11 +45,19 @@ DEC_TABLE := [?]u8 {
 	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 }
 
+REQUIRED_PADDING := map[int]int{
+	2 = 6, // 2 chars need 6 padding chars
+	4 = 4, // 4 chars need 4 padding chars
+	5 = 3, // 5 chars need 3 padding chars
+	7 = 1, // 7 chars need 1 padding char
+}
+
 encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> string {
 	out_length := (len(data) + 4) / 5 * 8
-	out := make([]byte, out_length)
+	out := make([]byte, out_length, allocator)
+	defer delete(out)
 	_encode(out, data)
-	return string(out)
+	return string(out[:])
 }
 
 @private
@@ -143,22 +151,13 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
 			}
 		}
 
-		// Required padding for each content length mod 8
 		content_len := data_len - padding_count
-		required_padding := map[int]int{
-			2 = 6, // 2 chars need 6 padding chars
-			4 = 4, // 4 chars need 4 padding chars
-			5 = 3, // 5 chars need 3 padding chars
-			7 = 1, // 7 chars need 1 padding char
-		}
-
 		mod8 := content_len % 8
-		if req_pad, ok := required_padding[mod8]; ok {
+		if req_pad, ok := REQUIRED_PADDING[mod8]; ok {
 			if padding_count != req_pad {
 				return nil, .Malformed_Input
 			}
 		} else if mod8 != 0 {
-			// If not in the map and not a multiple of 8, it's invalid
 			return nil, .Malformed_Input
 		}
 	} else {
@@ -208,7 +207,7 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
 		outi += bytes_to_write
 	}
 
-	return out, .None
+	return
 }
 
 @(test)
@@ -226,12 +225,13 @@ test_base32_decode_valid :: proc(t: ^testing.T) {
 		{"MZXW6YTBOI======", "foobar"},
 	}
 
-
 	for c in cases {
 		output, err := decode(c.input)
+		if output != nil {
+			defer delete(output)
+		}
 		testing.expect_value(t, err, Error.None)
 		expected := transmute([]u8)c.expected
-
 		if output != nil {
 			testing.expect(t, bytes.equal(output, expected))
 		} else {
@@ -267,13 +267,19 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Characters outside alphabet
 		input := "MZ1W6YTB" // '1' not in alphabet (A-Z, 2-7)
-		_, err := decode(input)
+		output, err := decode(input)
+		if output != nil {
+			defer delete(output)
+		}
 		testing.expect_value(t, err, Error.Invalid_Character)
 	}
 	{
 		// Lowercase not allowed
 		input := "mzxq===="
-		_, err := decode(input)
+		output, err := decode(input)
+		if output != nil {
+			defer delete(output)
+		}
 		testing.expect_value(t, err, Error.Invalid_Character)
 	}
 
@@ -281,25 +287,37 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Padding must only be at end
 		input := "MZ=Q===="
-		_, err := decode(input)
+		output, err := decode(input)
+		if output != nil {
+			defer delete(output)
+		}
 		testing.expect_value(t, err, Error.Malformed_Input)
 	}
 	{
 		// Missing padding
 		input := "MZXQ" // Should be MZXQ====
-		_, err := decode(input)
+		output, err := decode(input)
+		if output != nil {
+			defer delete(output)
+		}
 		testing.expect_value(t, err, Error.Malformed_Input)
 	}
 	{
 		// Incorrect padding length
 		input := "MZXQ=" // Needs 4 padding chars
-		_, err := decode(input)
+		output, err := decode(input)
+		if output != nil {
+			defer delete(output)
+		}
 		testing.expect_value(t, err, Error.Malformed_Input)
 	}
 	{
 		// Too much padding
 		input := "MY=========" // Extra padding chars
-		_, err := decode(input)
+		output, err := decode(input)
+		if output != nil {
+			defer delete(output)
+		}
 		testing.expect_value(t, err, Error.Malformed_Input)
 	}
 
@@ -307,7 +325,10 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Single character (invalid block)
 		input := "M"
-		_, err := decode(input)
+		output, err := decode(input)
+		if output != nil {
+			defer delete(output)
+		}
 		testing.expect_value(t, err, Error.Invalid_Length)
 	}
 }
