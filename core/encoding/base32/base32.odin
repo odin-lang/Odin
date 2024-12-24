@@ -7,6 +7,15 @@ package encoding_base32
 // Incase your specific version does not use padding, you may
 // truncate it from the encoded output.
 
+// Error represents errors that can occur during base32 decoding operations.
+// See RFC 4648 sections 3.2, 4 and 6.
+Error :: enum {
+	None,
+	Invalid_Character, // Input contains characters outside of base32 alphabet (A-Z, 2-7)
+	Invalid_Length,    // Input length is not valid for base32 (must be a multiple of 8 with proper padding)
+	Malformed_Input,   // Input has improper structure (wrong padding position or incomplete groups)
+}
+
 ENC_TABLE := [32]byte {
 	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
 	'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
@@ -91,9 +100,9 @@ _encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.al
 	}
 }
 
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> []byte #no_bounds_check{
+decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> ([]byte, Error) #no_bounds_check {
 	if len(data) == 0 {
-		return nil
+		return nil, .None
 	}
 
 	outi := 0
@@ -113,16 +122,29 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
 			input := data[0]
 			data = data[1:]
 			if input == byte(PADDING) && j >= 2 && len(data) < 8 {
-				assert(!(len(data) + j < 8 - 1), "Corrupted input")
-				for k := 0; k < 8-1-j; k +=1 {
-					assert(len(data) < k || data[k] == byte(PADDING), "Corrupted input")
+				// assert(!(len(data) + j < 8 - 1), "Corrupted input")
+				if len(data) + j < 8 - 1 {
+					return nil, .Malformed_Input
+				}
+				// assert(len(data) < k || data[k] == byte(PADDING), "Corrupted input")
+				for k := 0; k < 8-1-j; k += 1 {
+					if len(data) < k || data[k] != byte(PADDING) {
+						return nil, .Malformed_Input
+					}
 				}
 				dlen, end = j, true
-				assert(dlen != 1 && dlen != 3 && dlen != 6, "Corrupted input")
+				// assert(dlen != 1 && dlen != 3 && dlen != 6, "Corrupted input")
+				if dlen == 1 || dlen == 3 || dlen == 6 {
+					return nil, .Invalid_Length
+				}
 				break
 			}
-			dbuf[j] = DEC_TABLE[input]
-			assert(dbuf[j] != 0xff, "Corrupted input")
+			decoded := DEC_TBL[input]
+			// assert(dbuf[j] != 0xff, "Corrupted input")
+			if decoded == 0 && input != byte(ENC_TABLE[0]) {
+				return nil, .Invalid_Character
+			}
+			dbuf[j] = decoded
 			j += 1
 		}
 
@@ -144,5 +166,5 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
 		}
 		outi += 5
 	}
-	return out
+	return out, .None
 }
