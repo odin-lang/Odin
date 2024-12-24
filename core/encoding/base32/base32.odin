@@ -111,6 +111,7 @@ _encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.al
 	}
 }
 
+@(optimization_mode="favor_size")
 decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> (out: []byte, err: Error) {
 	if len(data) == 0 {
 		return nil, .None
