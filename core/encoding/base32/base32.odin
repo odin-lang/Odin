@@ -7,16 +7,23 @@ import "core:bytes"
 // A secondary param can be used to supply a custom alphabet to
 // @link(encode) and a matching decoding table to @link(decode).
 // If none is supplied it just uses the standard Base32 alphabet.
-// Incase your specific version does not use padding, you may
+// In case your specific version does not use padding, you may
 // truncate it from the encoded output.
 
 // Error represents errors that can occur during base32 decoding operations.
 // See RFC 4648 sections 3.2, 4 and 6.
 Error :: enum {
 	None,
-	Invalid_Character, // Input contains characters outside of base32 alphabet (A-Z, 2-7)
+	Invalid_Character, // Input contains characters outside the specified alphabet
 	Invalid_Length,    // Input length is not valid for base32 (must be a multiple of 8 with proper padding)
 	Malformed_Input,   // Input has improper structure (wrong padding position or incomplete groups)
+}
+
+Validate_Proc :: #type proc(c: byte) -> bool
+
+@private
+_validate_default :: proc(c: byte) -> bool {
+	return (c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7')
 }
 
 ENC_TABLE := [32]byte {
@@ -105,7 +112,11 @@ _encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.al
 }
 
 @(optimization_mode="favor_size")
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> (out: []byte, err: Error) {
+decode :: proc(
+  data: string,
+  DEC_TBL := DEC_TABLE,
+  validate: Validate_Proc = _validate_default,
+  allocator := context.allocator) -> (out: []byte, err: Error) {
 	if len(data) == 0 {
 		return nil, .None
 	}
@@ -115,13 +126,13 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
 		return nil, .Invalid_Length
 	}
 
-	// Validate characters - only A-Z and 2-7 allowed before padding
+	// Validate characters using provided validation function
 	for i := 0; i < len(data); i += 1 {
 		c := data[i]
 		if c == byte(PADDING) {
 			break
 		}
-		if !((c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7')) {
+		if !validate(c) {
 			return nil, .Invalid_Character
 		}
 	}
