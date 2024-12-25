@@ -483,3 +483,57 @@ map_with_integer_keys :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+unparse_json_schema :: proc(t: ^testing.T) {
+	
+	json_schema: json.Value = json.Object{
+		"title" = "example",
+		"description" = "example json schema for unparse test",
+		"type" = "object",
+		"properties" = json.Object{
+			"id" = json.Object{"type" = "integer"},
+			"name" = json.Object{"type" = "string"},
+			"is_valid" = json.Object{"type" = "boolean"},
+			"tags" = json.Object{
+				"type" = "array",
+				"items" = json.Object{"type" = "string"}
+			}
+		}
+	}
+
+	// having fun cleaning up json literals
+	defer {
+		delete(json_schema.(json.Object)["properties"].(json.Object)["tags"].(json.Object)["items"].(json.Object))
+		for k, &v in json_schema.(json.Object)["properties"].(json.Object) {
+			delete(v.(json.Object))
+		}
+		delete(json_schema.(json.Object)["properties"].(json.Object))
+		delete(json_schema.(json.Object))
+	}
+
+	is_error :: proc(t: ^testing.T, E: $Error_Type, fn: string) -> bool {
+		testing.expectf(t, E == nil, "%s failed with error:", fn, E)
+		return E != nil
+	}
+
+	unparsed_json_schema, unparse_err := json.unparse(json_schema, json.Marshal_Options{sort_maps_by_key=true})
+	if is_error(t, unparse_err, "json.unparse(json_schema)") do return
+	defer delete(unparsed_json_schema)
+
+	parsed_json_schema, parse_err := json.parse(unparsed_json_schema, parse_integers=true)
+	if is_error(t, parse_err, "json.parse(unparsed_json_schema)") do return 
+	defer json.destroy_value(parsed_json_schema)
+
+	buf1, marshal_err1 := json.marshal(json_schema, json.Marshal_Options{sort_maps_by_key=true})
+	if is_error(t, marshal_err1, "json.marshal(json_schema)") do return
+	defer delete(buf1)
+	
+	buf2, marshal_err2 := json.marshal(parsed_json_schema, json.Marshal_Options{sort_maps_by_key=true})
+	if is_error(t, marshal_err2, "json.marshal(parsed_json_schema)") do return
+	defer delete(buf2)
+	
+	marshaled_parsed_json_schema := string(buf2)
+	testing.expect_value(t, marshaled_parsed_json_schema, string(buf1))
+	testing.expect_value(t, string(unparsed_json_schema), string(buf1))
+}
