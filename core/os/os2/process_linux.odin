@@ -392,6 +392,21 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		return linux.access(strings.to_cstring(&b), linux.X_OK) == .NONE
 	}
 
+    is_elf_file :: proc(fd: linux.Fd) -> bool {
+        @(static)
+        magic: [16]u8 = { 0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+        buf: [16]u8
+
+        n, errno := linux.read(fd, buf[:])
+        if n != 16 { return false }
+        if errno != .NONE { return false }
+        return slice.equal(buf[:], magic[:])
+    }
+
+    is_executable :: proc(fd: linux.Fd) -> bool {
+        return has_executable_permissions(fd) && is_elf_file(fd)
+    }
+
 	TEMP_ALLOCATOR_GUARD()
 
 	if len(desc.command) == 0 {
@@ -427,10 +442,11 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			strings.write_string(&exe_builder, executable_name)
 
 			exe_path := strings.to_cstring(&exe_builder)
-			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
+			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.CLOEXEC}); errno != .NONE {
 				continue
 			}
-			if !has_executable_permissions(exe_fd) {
+
+			if !is_executable(exe_fd) {
 				linux.close(exe_fd)
 				continue
 			}
@@ -444,20 +460,20 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			strings.write_string(&exe_builder, executable_name)
 
 			exe_path := strings.to_cstring(&exe_builder)
-			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
+			if exe_fd, errno = linux.openat(dir_fd, exe_path, {.CLOEXEC}); errno != .NONE {
 				return process, .Not_Exist
 			}
-			if !has_executable_permissions(exe_fd) {
+			if !is_executable(exe_fd) {
 				linux.close(exe_fd)
 				return process, .Permission_Denied
 			}
 		}
 	} else {
 		exe_path := temp_cstring(executable_name) or_return
-		if exe_fd, errno = linux.openat(dir_fd, exe_path, {.PATH, .CLOEXEC}); errno != .NONE {
+		if exe_fd, errno = linux.openat(dir_fd, exe_path, {.CLOEXEC}); errno != .NONE {
 			return process, _get_platform_error(errno)
 		}
-		if !has_executable_permissions(exe_fd) {
+        if !is_executable(exe_fd) {
 			linux.close(exe_fd)
 			return process, .Permission_Denied
 		}
