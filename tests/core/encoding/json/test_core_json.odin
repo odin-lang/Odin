@@ -498,12 +498,20 @@ unparse_json_schema :: proc(t: ^testing.T) {
 			"tags" = json.Object{
 				"type" = "array",
 				"items" = json.Object{"type" = "string"}
+			},
+			"also" = json.Object{
+				"integer" = 42,
+				"float" = 3.1415,
+				"bool" = false,
+				"null" = nil,
+				"array" = json.Array{42, 3.1415, false, nil, "string"}
 			}
 		}
 	}
 
 	// having fun cleaning up json literals
 	defer {
+		delete(json_schema.(json.Object)["properties"].(json.Object)["also"].(json.Object)["array"].(json.Array))
 		delete(json_schema.(json.Object)["properties"].(json.Object)["tags"].(json.Object)["items"].(json.Object))
 		for k, &v in json_schema.(json.Object)["properties"].(json.Object) {
 			delete(v.(json.Object))
@@ -513,7 +521,7 @@ unparse_json_schema :: proc(t: ^testing.T) {
 	}
 
 	is_error :: proc(t: ^testing.T, E: $Error_Type, fn: string) -> bool {
-		testing.expectf(t, E == nil, "%s failed with error:", fn, E)
+		testing.expectf(t, E == nil, "%s failed with error: %v", fn, E)
 		return E != nil
 	}
 

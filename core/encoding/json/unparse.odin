@@ -29,8 +29,12 @@ unparse_to_builder :: proc(b: ^strings.Builder, v: Value, opt: ^Marshal_Options)
 }
 
 unparse_to_writer :: proc(w: io.Writer, v: Value, opt: ^Marshal_Options) -> io.Error {
+	if v == nil {
+		return unparse_null_to_writer(w, opt)
+	}
+
 	switch uv in v {
-		case Null: return unparse_null_to_writer(w, uv, opt)
+		case Null: return unparse_null_to_writer(w, opt)
 		case Integer: return unparse_integer_to_writer(w, uv, opt)
 		case Float: return unparse_float_to_writer(w, uv, opt)
 		case Boolean: return unparse_boolean_to_writer(w, uv, opt)
@@ -41,7 +45,7 @@ unparse_to_writer :: proc(w: io.Writer, v: Value, opt: ^Marshal_Options) -> io.E
 	return nil
 }
 
-unparse_null_to_writer :: proc(w: io.Writer, v: Null, opt: ^Marshal_Options) -> io.Error {
+unparse_null_to_writer :: proc(w: io.Writer, opt: ^Marshal_Options) -> io.Error {
 	io.write_string(w, "null") or_return
 	return nil
 }
