@@ -56,7 +56,7 @@ encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocato
 	out_length := (len(data) + 4) / 5 * 8
 	out := make([]byte, out_length, allocator)
 	defer delete(out)
-	_encode(out, data)
+	_encode(out, data, ENC_TBL)
 	return string(out[:])
 }
 
@@ -69,26 +69,26 @@ _encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.al
 		carry: byte
 		switch len(data) {
 		case:
-			out[7] = ENC_TABLE[data[4] & 0x1f]
+			out[7] = ENC_TBL[data[4] & 0x1f]
 			carry = data[4] >> 5
 			fallthrough
 		case 4:
-			out[6] = ENC_TABLE[carry | (data[3] << 3) & 0x1f]
-			out[5] = ENC_TABLE[(data[3] >> 2) & 0x1f]
+			out[6] = ENC_TBL[carry | (data[3] << 3) & 0x1f]
+			out[5] = ENC_TBL[(data[3] >> 2) & 0x1f]
 			carry = data[3] >> 7
 			fallthrough
 		case 3:
-			out[4] = ENC_TABLE[carry | (data[2] << 1) & 0x1f]
+			out[4] = ENC_TBL[carry | (data[2] << 1) & 0x1f]
 			carry = (data[2] >> 4) & 0x1f
 			fallthrough
 		case 2:
-			out[3] = ENC_TABLE[carry | (data[1] << 4) & 0x1f]
-			out[2] = ENC_TABLE[(data[1] >> 1) & 0x1f]
+			out[3] = ENC_TBL[carry | (data[1] << 4) & 0x1f]
+			out[2] = ENC_TBL[(data[1] >> 1) & 0x1f]
 			carry = (data[1] >> 6) & 0x1f
 			fallthrough
 		case 1:
-			out[1] = ENC_TABLE[carry | (data[0] << 2) & 0x1f]
-			out[0] = ENC_TABLE[data[0] >> 3]
+			out[1] = ENC_TBL[carry | (data[0] << 2) & 0x1f]
+			out[0] = ENC_TBL[data[0] >> 3]
 		}
 
 		if len(data) < 5 {
