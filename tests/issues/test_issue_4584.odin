@@ -21,9 +21,11 @@ test_adjugate_2x2 :: proc(t: ^testing.T) {
 	testing.expect_value(t, linalg.adjugate(m) * m, 2 * linalg.identity(matrix[2,2]int))
 
 	testing.expect_value(t, glm.adjugate(m), expected)
+	testing.expect_value(t, glm.determinant(m), 2)
 	testing.expect_value(t, glm.adjugate(m) * m, 2 * linalg.identity(matrix[2,2]int))
 
 	testing.expect_value(t, hlm.adjugate(m), expected)
+	testing.expect_value(t, hlm.determinant(m), 2)
 	testing.expect_value(t, hlm.adjugate(m) * m, 2 * linalg.identity(matrix[2,2]int))
 }
 
@@ -44,9 +46,11 @@ test_adjugate_3x3 :: proc(t: ^testing.T) {
 	testing.expect_value(t, linalg.adjugate(m) * m, -6 * linalg.identity(matrix[3,3]int))
 
 	testing.expect_value(t, glm.adjugate(m), expected)
+	testing.expect_value(t, glm.determinant(m), -6)
 	testing.expect_value(t, glm.adjugate(m) * m, -6 * linalg.identity(matrix[3,3]int))
 
 	testing.expect_value(t, hlm.adjugate(m), expected)
+	testing.expect_value(t, hlm.determinant(m), -6)
 	testing.expect_value(t, hlm.adjugate(m) * m, -6 * linalg.identity(matrix[3,3]int))
 }
 
@@ -60,7 +64,7 @@ test_adjugate_4x4 :: proc(t: ^testing.T) {
 	}
 	expected := matrix[4,4]int {
 		-144,  266, -92, -16,
-		  57,   92,  -5, -16,
+		 -57,   92,  -5, -16,
 		 105, -142,  55,   2,
 		  33,  -96,   9,  -6,
 	}
@@ -69,8 +73,10 @@ test_adjugate_4x4 :: proc(t: ^testing.T) {
 	testing.expect_value(t, linalg.adjugate(m) * m, -174 * linalg.identity(matrix[4,4]int))
 
 	testing.expect_value(t, glm.adjugate(m), expected)
+	testing.expect_value(t, glm.determinant(m), -174)
 	testing.expect_value(t, glm.adjugate(m) * m, -174 * linalg.identity(matrix[4,4]int))
 
 	testing.expect_value(t, hlm.adjugate(m), expected)
+	testing.expect_value(t, hlm.determinant(m), -174)
 	testing.expect_value(t, hlm.adjugate(m) * m, -174 * linalg.identity(matrix[4,4]int))
 }
