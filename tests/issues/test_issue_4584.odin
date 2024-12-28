@@ -3,6 +3,8 @@ package test_issues
 
 import "core:testing"
 import "core:math/linalg"
+import glm "core:math/linalg/glsl"
+import hlm "core:math/linalg/hlsl"
 
 @test
 test_adjugate_2x2 :: proc(t: ^testing.T) {
@@ -17,6 +19,12 @@ test_adjugate_2x2 :: proc(t: ^testing.T) {
 	testing.expect_value(t, linalg.adjugate(m), expected)
 	testing.expect_value(t, linalg.determinant(m), 2)
 	testing.expect_value(t, linalg.adjugate(m) * m, 2 * linalg.identity(matrix[2,2]int))
+
+	testing.expect_value(t, glm.adjugate(m), expected)
+	testing.expect_value(t, glm.adjugate(m) * m, 2 * linalg.identity(matrix[2,2]int))
+
+	testing.expect_value(t, hlm.adjugate(m), expected)
+	testing.expect_value(t, hlm.adjugate(m) * m, 2 * linalg.identity(matrix[2,2]int))
 }
 
 @test
@@ -34,6 +42,12 @@ test_adjugate_3x3 :: proc(t: ^testing.T) {
 	testing.expect_value(t, linalg.adjugate(m), expected)
 	testing.expect_value(t, linalg.determinant(m), -6)
 	testing.expect_value(t, linalg.adjugate(m) * m, -6 * linalg.identity(matrix[3,3]int))
+
+	testing.expect_value(t, glm.adjugate(m), expected)
+	testing.expect_value(t, glm.adjugate(m) * m, -6 * linalg.identity(matrix[3,3]int))
+
+	testing.expect_value(t, hlm.adjugate(m), expected)
+	testing.expect_value(t, hlm.adjugate(m) * m, -6 * linalg.identity(matrix[3,3]int))
 }
 
 @test
@@ -53,4 +67,10 @@ test_adjugate_4x4 :: proc(t: ^testing.T) {
 	testing.expect_value(t, linalg.adjugate(m), expected)
 	testing.expect_value(t, linalg.determinant(m), -174)
 	testing.expect_value(t, linalg.adjugate(m) * m, -174 * linalg.identity(matrix[4,4]int))
+
+	testing.expect_value(t, glm.adjugate(m), expected)
+	testing.expect_value(t, glm.adjugate(m) * m, -174 * linalg.identity(matrix[4,4]int))
+
+	testing.expect_value(t, hlm.adjugate(m), expected)
+	testing.expect_value(t, hlm.adjugate(m) * m, -174 * linalg.identity(matrix[4,4]int))
 }
