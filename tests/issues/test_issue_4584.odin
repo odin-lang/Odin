@@ -106,14 +106,17 @@ test_inverse_regression_2x2 :: proc(t: ^testing.T) {
 		1.0/2.0, -3.0/2.0,
 	}
 	expect_float_matrix_value(t, linalg.inverse(m), expected)
+	expect_float_matrix_value(t, linalg.inverse_transpose(m), linalg.transpose(expected))
 	expect_float_matrix_value(t, linalg.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * linalg.inverse(m), I)
 
 	expect_float_matrix_value(t, glm.inverse(m), expected)
+	expect_float_matrix_value(t, glm.inverse_transpose(m), glm.transpose(expected))
 	expect_float_matrix_value(t, glm.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * glm.inverse(m), I)
 
 	expect_float_matrix_value(t, hlm.inverse(m), expected)
+	expect_float_matrix_value(t, hlm.inverse_transpose(m), hlm.transpose(expected))
 	expect_float_matrix_value(t, hlm.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * hlm.inverse(m), I)
 }
@@ -132,14 +135,17 @@ test_inverse_regression_3x3 :: proc(t: ^testing.T) {
 		-2.0/3.0,  1.0, -1.0/3.0,
 	}
 	expect_float_matrix_value(t, linalg.inverse(m), expected)
+	expect_float_matrix_value(t, linalg.inverse_transpose(m), linalg.transpose(expected))
 	expect_float_matrix_value(t, linalg.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * linalg.inverse(m), I)
 
 	expect_float_matrix_value(t, glm.inverse(m), expected)
+	expect_float_matrix_value(t, glm.inverse_transpose(m), glm.transpose(expected))
 	expect_float_matrix_value(t, glm.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * glm.inverse(m), I)
 
 	expect_float_matrix_value(t, hlm.inverse(m), expected)
+	expect_float_matrix_value(t, hlm.inverse_transpose(m), hlm.transpose(expected))
 	expect_float_matrix_value(t, hlm.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * hlm.inverse(m), I)
 }
@@ -160,14 +166,17 @@ test_inverse_regression_4x4 :: proc(t: ^testing.T) {
 		-11.0/58.0,   16.0/29.0,   -3.0/58.0,  1.0/29.0,
 	}
 	expect_float_matrix_value(t, linalg.inverse(m), expected)
+	expect_float_matrix_value(t, linalg.inverse_transpose(m), linalg.transpose(expected))
 	expect_float_matrix_value(t, linalg.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * linalg.inverse(m), I)
 
 	expect_float_matrix_value(t, glm.inverse(m), expected)
+	expect_float_matrix_value(t, glm.inverse_transpose(m), glm.transpose(expected))
 	expect_float_matrix_value(t, glm.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * glm.inverse(m), I)
 
 	expect_float_matrix_value(t, hlm.inverse(m), expected)
+	expect_float_matrix_value(t, hlm.inverse_transpose(m), hlm.transpose(expected))
 	expect_float_matrix_value(t, hlm.inverse(m) * m, I)
 	expect_float_matrix_value(t, m * hlm.inverse(m), I)
 }
