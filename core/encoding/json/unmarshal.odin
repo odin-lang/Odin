@@ -470,7 +470,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 						}
 					}
 
-					if field.name == key {
+					if field.name == key || (field.tag != "" && reflect.struct_tag_get(field.tag, "json") == key) {
 						offset = field.offset
 						type = field.type
 						found = true
