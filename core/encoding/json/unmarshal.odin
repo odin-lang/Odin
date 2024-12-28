@@ -439,7 +439,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			use_field_idx := -1
 			
 			for field, field_idx in fields {
-				tag_value := string(reflect.struct_tag_get(field.tag, "json"))
+				tag_value := reflect.struct_tag_get(field.tag, "json")
 				json_name, _ := json_name_from_tag_value(tag_value)
 				if key == json_name {
 					use_field_idx = field_idx
