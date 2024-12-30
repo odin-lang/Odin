@@ -54,7 +54,6 @@ DEC_TABLE := [256]u8 {
 encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> string {
 	out_length := (len(data) + 4) / 5 * 8
 	out := make([]byte, out_length, allocator)
-	defer delete(out)
 	_encode(out, data, ENC_TBL)
 	return string(out[:])
 }
