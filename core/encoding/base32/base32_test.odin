@@ -50,6 +50,7 @@ test_base32_encode :: proc(t: ^testing.T) {
 
 	for c in cases {
 		output := encode(transmute([]byte)c.input)
+		defer delete(output)
 		testing.expect(t, output == c.expected)
 	}
 }
@@ -140,6 +141,7 @@ test_base32_roundtrip :: proc(t: ^testing.T) {
 
 	for input in cases {
 		encoded := encode(transmute([]byte)input)
+		defer delete(encoded)
 		decoded, err := decode(encoded)
 		if decoded != nil {
 			defer delete(decoded)
@@ -150,7 +152,6 @@ test_base32_roundtrip :: proc(t: ^testing.T) {
 }
 
 @(test)
-
 test_base32_custom_alphabet :: proc(t: ^testing.T) {
 	custom_enc_table := [32]byte{
 		'0', '1', '2', '3', '4', '5', '6', '7',
@@ -201,6 +202,7 @@ test_base32_custom_alphabet :: proc(t: ^testing.T) {
 	for c in cases {
 		// Test encoding
 		encoded := encode(transmute([]byte)c.input, custom_enc_table)
+		defer delete(encoded)
 		testing.expect(t, encoded == c.enc_expected)
 
 		// Test decoding
