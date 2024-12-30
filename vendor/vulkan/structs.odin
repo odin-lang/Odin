@@ -32,7 +32,11 @@ when ODIN_OS == .Windows {
 	}
 }
 
-CAMetalLayer :: struct {}
+xcb_visualid_t :: u32
+xcb_window_t   :: u32
+XlibWindow     :: uint
+XlibVisualID   :: uint
+CAMetalLayer   :: struct {}
 
 MTLBuffer_id       :: rawptr
 MTLTexture_id      :: rawptr
@@ -8910,6 +8914,22 @@ WaylandSurfaceCreateInfoKHR :: struct {
 	surface: ^wl_surface,
 }
 
+XlibSurfaceCreateInfoKHR :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  XlibSurfaceCreateFlagsKHR,
+	dpy:    ^XlibDisplay,
+	window: XlibWindow,
+}
+
+XcbSurfaceCreateInfoKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	flags:      XcbSurfaceCreateFlagsKHR,
+	connection: ^xcb_connection_t,
+	window:     xcb_window_t,
+}
+
 VideoAV1ColorConfigFlags :: struct {
 	bitfield: u32,
 }
@@ -9753,9 +9773,11 @@ VideoEncodeH265ReferenceInfo :: struct {
 
 // Opaque structs
 
-wl_surface   :: struct {} // Opaque struct defined by Wayland
-wl_display   :: struct {} // Opaque struct defined by Wayland
-IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
+wl_surface       :: struct {} // Opaque struct defined by Wayland
+wl_display       :: struct {} // Opaque struct defined by Wayland
+xcb_connection_t :: struct {} // Opaque struct defined by xcb
+XlibDisplay      :: struct {} // Opaque struct defined by Xlib
+IOSurfaceRef     :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
 // Aliases
 PhysicalDeviceVariablePointerFeatures                       :: PhysicalDeviceVariablePointersFeatures
 PhysicalDeviceShaderDrawParameterFeatures                   :: PhysicalDeviceShaderDrawParametersFeatures

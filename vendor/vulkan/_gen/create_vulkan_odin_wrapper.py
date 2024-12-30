@@ -16,6 +16,8 @@ file_and_urls = [
     ("vulkan_macos.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_macos.h',   False),
     ("vulkan_ios.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',     False),
     ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
+    ("vulkan_xlib.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xlib.h',    False),
+    ("vulkan_xcb.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xcb.h',     False),
     # Vulkan Video
     ("vulkan_video_codec_av1std.h",         'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std.h', False),
     ("vulkan_video_codec_av1std_decode.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std_decode.h', False),
@@ -46,17 +48,19 @@ def no_vk(t):
     t = t.replace('PFN_', 'Proc')
     t = t.replace('PFN_', 'Proc')
 
-    t = re.sub('(?:Vk|VK_)?(\w+)', '\\1', t)
+    t = re.sub('(?:Vk|VK_)?(\\w+)', '\\1', t)
 
     # Vulkan Video
-    t = re.sub('(?:Std|STD_|VK_STD)?(\w+)', '\\1', t)
+    t = re.sub('(?:Std|STD_|VK_STD)?(\\w+)', '\\1', t)
     return t
 
 OPAQUE_STRUCTS = """
-wl_surface   :: struct {} // Opaque struct defined by Wayland
-wl_display   :: struct {} // Opaque struct defined by Wayland
-IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
-""" 
+wl_surface       :: struct {} // Opaque struct defined by Wayland
+wl_display       :: struct {} // Opaque struct defined by Wayland
+xcb_connection_t :: struct {} // Opaque struct defined by xcb
+XlibDisplay      :: struct {} // Opaque struct defined by Xlib
+IOSurfaceRef     :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
+"""
 
 def convert_type(t, prev_name, curr_name):
     table = {
@@ -91,6 +95,9 @@ def convert_type(t, prev_name, curr_name):
         "struct BaseInStructure":  "BaseInStructure",
         "struct wl_display": "wl_display",
         "struct wl_surface": "wl_surface",
+        "Display": "XlibDisplay",
+        "Window": "XlibWindow",
+        "VisualID": "XlibVisualID",
         'v': '',
     }
 
@@ -106,7 +113,7 @@ def convert_type(t, prev_name, curr_name):
     elif t.endswith("*"):
         pointer = "^"
         ttype = t[:len(t)-1]
-        elem = convert_type(ttype, prev_name, curr_name)    
+        elem = convert_type(ttype, prev_name, curr_name)
 
         if curr_name.endswith("s") or curr_name.endswith("Table"):
             if prev_name.endswith("Count") or prev_name.endswith("Counts"):
@@ -445,7 +452,7 @@ def parse_enums(f):
 
 def parse_fake_enums(f):
     data = re.findall(r"static const Vk(\w+FlagBits2) VK_(\w+?) = (\w+);", src, re.S)
-    
+
     data.sort(key=lambda x: x[0])
 
     fake_enums = {}
@@ -507,7 +514,7 @@ def parse_fake_enums(f):
                 continue
 
             ff.append((n, v))
-        
+
         max_flag_value = max([int(v) for n, v in ff if is_int(v)] + [0])
         max_group_value = max([int(v) for n, v in groups if is_int(v)] + [0])
         if max_flag_value < max_group_value:
@@ -575,13 +582,13 @@ def parse_structs(f):
                     ffields.append(tuple([bit_field_name, bit_field_type, comment]))
                     prev_name = ""
                     continue
-                
+
                 # The second way has many fields that are each 1 bit
                 elif int(fname) == 1:
                     bit_field_type = do_type(bit_field[0], prev_name, fname)
                     ffields.append(tuple(["bitfield", bit_field_type, comment]))
                     break
-                    
+
 
 
             if '[' in fname:
@@ -919,7 +926,11 @@ when ODIN_OS == .Windows {
 \t}
 }
 
-CAMetalLayer :: struct {}
+xcb_visualid_t :: u32
+xcb_window_t   :: u32
+XlibWindow     :: uint
+XlibVisualID   :: uint
+CAMetalLayer   :: struct {}
 
 MTLBuffer_id       :: rawptr
 MTLTexture_id      :: rawptr
