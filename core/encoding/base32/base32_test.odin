@@ -125,3 +125,26 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 		testing.expect_value(t, err, Error.Invalid_Length)
 	}
 }
+
+@(test)
+test_base32_roundtrip :: proc(t: ^testing.T) {
+	cases := [?]string{
+		"",
+		"f",
+		"fo",
+		"foo",
+		"foob",
+		"fooba",
+		"foobar",
+	}
+
+	for input in cases {
+		encoded := encode(transmute([]byte)input)
+		decoded, err := decode(encoded)
+		if decoded != nil {
+			defer delete(decoded)
+		}
+		testing.expect_value(t, err, Error.None)
+		testing.expect(t, bytes.equal(decoded, transmute([]byte)input))
+	}
+}
