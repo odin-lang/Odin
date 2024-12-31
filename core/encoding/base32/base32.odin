@@ -48,7 +48,7 @@ DEC_TABLE := [256]u8 {
 	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
+	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 }
 
 encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> string {
@@ -66,7 +66,7 @@ _encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.al
 	for len(data) > 0 {
 		carry: byte
 		switch len(data) {
-		  case:
+		case:
 			out[7] = ENC_TBL[data[4] & 0x1f]
 			carry = data[4] >> 5
 			fallthrough
@@ -114,8 +114,7 @@ decode :: proc(
   data: string,
   DEC_TBL := DEC_TABLE,
   validate: Validate_Proc = _validate_default,
-  allocator := context.allocator) -> (out: []byte, err: Error)
-{
+  allocator := context.allocator) -> (out: []byte, err: Error) {
 	if len(data) == 0 {
 		return nil, .None
 	}
@@ -163,7 +162,7 @@ decode :: proc(
 		case 4: required_padding = 4 // 4 chars need 4 padding chars
 		case 5: required_padding = 3 // 5 chars need 3 padding chars
 		case 7: required_padding = 1 // 7 chars need 1 padding char
-			case: required_padding = 0
+		case: required_padding = 0
 		}
 
 		if required_padding > 0 {
