@@ -22,6 +22,13 @@ when ODIN_OS == .Windows {
 			"macos/libraygui.dylib" when RAYGUI_SHARED else "macos/libraygui.a",
 		}
 	}
+} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	// `env.o` is emscripten's internal environment object file. You will link
+	// `wasm/libraylib.a` later as part of your call to `emcc`.
+
+	// TODO: Does this actually need a `wasm/libraygui.a` file? We have to
+	// compile that one ourselves.
+	foreign import lib "env.o"
 } else {
 	foreign import lib "system:raygui"
 }
