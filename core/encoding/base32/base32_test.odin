@@ -57,7 +57,7 @@ test_base32_encode :: proc(t: ^testing.T) {
 
 @(test)
 test_base32_decode_invalid :: proc(t: ^testing.T) {
-	// Section 3.2 - Alphabet check
+	// Section 3.3 - Non-alphabet characters
 	{
 		// Characters outside alphabet
 		input := "MZ1W6YTB" // '1' not in alphabet (A-Z, 2-7)
@@ -77,7 +77,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 		testing.expect_value(t, err, Error.Invalid_Character)
 	}
 
-	// Section 4 - Padding requirements
+	// Section 3.2 - Padding requirements
 	{
 		// Padding must only be at end
 		input := "MZ=Q===="
@@ -115,7 +115,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 		testing.expect_value(t, err, Error.Malformed_Input)
 	}
 
-	// Section 6 - Block size requirements
+	// Section 6 - Base32 block size requirements
 	{
 		// Single character (invalid block)
 		input := "M"

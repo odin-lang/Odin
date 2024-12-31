@@ -1,3 +1,5 @@
+// Base32 encoding/decoding implementation as specified in RFC 4648.
+// [[ More; https://www.rfc-editor.org/rfc/rfc4648.html ]]
 package encoding_base32
 
 // @note(zh): Encoding utility for Base32
@@ -8,7 +10,10 @@ package encoding_base32
 // truncate it from the encoded output.
 
 // Error represents errors that can occur during base32 decoding operations.
-// See RFC 4648 sections 3.2, 4 and 6.
+// As per RFC 4648:
+// - Section 3.3: Invalid character handling
+// - Section 3.2: Padding requirements
+// - Section 6: Base32 encoding specifics (including block size requirements)
 Error :: enum {
 	None,
 	Invalid_Character, // Input contains characters outside the specified alphabet
