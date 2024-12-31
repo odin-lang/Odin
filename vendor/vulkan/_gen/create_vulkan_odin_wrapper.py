@@ -58,7 +58,6 @@ OPAQUE_STRUCTS = """
 wl_surface       :: struct {} // Opaque struct defined by Wayland
 wl_display       :: struct {} // Opaque struct defined by Wayland
 xcb_connection_t :: struct {} // Opaque struct defined by xcb
-XlibDisplay      :: struct {} // Opaque struct defined by Xlib
 IOSurfaceRef     :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
 """
 
@@ -901,6 +900,10 @@ import "core:c"
 
 import win32 "core:sys/windows"
 _ :: win32
+
+import "vendor:x11/xlib"
+_ :: xlib
+
 when ODIN_OS == .Windows {
 \tHINSTANCE           :: win32.HINSTANCE
 \tHWND                :: win32.HWND
@@ -926,10 +929,19 @@ when ODIN_OS == .Windows {
 \t}
 }
 
+// We want to use `vendor:x11/xlib` types so we need to match their build constraints.
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
+\tXlibDisplay  :: xlib.Display
+\tXlibWindow   :: xlib.Window
+\tXlibVisualID :: xlib.VisualID
+} else {
+\tXlibDisplay  :: struct {} // Opaque struct defined by Xlib
+\tXlibWindow   :: c.ulong
+\tXlibVisualID :: c.ulong
+}
+
 xcb_visualid_t :: u32
 xcb_window_t   :: u32
-XlibWindow     :: uint
-XlibVisualID   :: uint
 CAMetalLayer   :: struct {}
 
 MTLBuffer_id       :: rawptr
