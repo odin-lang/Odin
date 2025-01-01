@@ -90,11 +90,11 @@ exp :: proc "c" (x: f64) -> f64 {
 }
 
 @(require, linkage="strong", link_name="log")
-log :: proc "c" (x: f32) -> f32 {
+log :: proc "c" (x: f64) -> f64 {
 	return math.ln(x)
 }
 
 @(require, linkage="strong", link_name="sin")
-sin :: proc "c" (x: f32) -> f32 {
+sin :: proc "c" (x: f64) -> f64 {
 	return math.sin(x)
 }
