@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -427,6 +427,36 @@ when ODIN_OS == .Darwin {
 
 	UTIME_NOW  :: -2
 	UTIME_OMIT :: -1
+
+} else when ODIN_OS == .Haiku {
+
+	dev_t      :: distinct c.int32_t
+	nlink_t    :: distinct c.int32_t
+	_mode_t    :: distinct c.uint32_t
+	blkcnt_t   :: distinct c.int64_t
+	blksize_t  :: distinct c.int32_t
+	ino_t      :: distinct c.int64_t
+
+	stat_t :: struct {
+		st_dev:           dev_t,        /* [PSX] ID of device containing file */
+		st_ino:           ino_t,        /* [PSX] file serial number */
+		st_mode:          mode_t,       /* [PSX] mode of file */
+		st_nlink:         nlink_t,      /* [PSX] number of hard links */
+		st_uid:           uid_t,        /* [PSX] user ID of the file */
+		st_gid:           gid_t,        /* [PSX] group ID of the file */
+		st_size:          off_t,        /* [PSX] file size, in bytes */
+		st_rdev:          dev_t,        /* [PSX] device ID */
+		st_blksize:       blksize_t,    /* [PSX] optimal blocksize for I/O */
+		st_atim:          timespec,     /* [PSX] time of last access */
+		st_mtim:          timespec,     /* [PSX] time of last data modification */
+		st_ctim:          timespec,     /* [PSX] time of last status change */
+		st_crtim:         timespec,     /* [PSX] time of last status change */
+		st_type:          c.uint32_t,
+		st_blocks:        blkcnt_t,     /* [PSX] blocks allocated for file */
+	}
+
+	UTIME_NOW  :: 1000000000
+	UTIME_OMIT :: 1000000001
 
 } else when ODIN_OS == .Linux {
 

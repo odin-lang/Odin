@@ -1,4 +1,4 @@
-#+build linux, darwin, openbsd, freebsd, netbsd
+#+build linux, darwin, openbsd, freebsd, netbsd, haiku
 package posix
 
 import "core:c"
@@ -343,6 +343,7 @@ when ODIN_OS == .Darwin {
 		l_type:   Lock_Type, /* [PSX] type of lock */
 		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset */
 	}
+
 } else when ODIN_OS == .OpenBSD {
 
 	off_t :: distinct c.int64_t
@@ -406,6 +407,72 @@ when ODIN_OS == .Darwin {
 		l_pid:    pid_t,     /* [PSX] process ID of the process holding the lock */
 		l_type:   Lock_Type, /* [PSX] type of lock */
 		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset */
+	}
+
+} else when ODIN_OS == .Haiku {
+
+	off_t :: distinct c.int64_t
+	pid_t :: distinct c.int32_t
+
+	/* commands that can be passed to fcntl() */
+	F_DUPFD         :: 0x0001 /* duplicate fd */
+	F_GETFD         :: 0x0002 /* get fd flags */
+	F_SETFD         :: 0x0004 /* set fd flags */
+	F_GETFL         :: 0x0008 /* get file status flags and access mode */
+	F_SETFL         :: 0x0010 /* set file status flags */
+	F_GETLK         :: 0x0020 /* get locking information */
+	F_SETLK         :: 0x0080 /* set locking information */
+	F_SETLKW        :: 0x0100 /* as above, but waits if blocked */
+	F_DUPFD_CLOEXEC :: 0x0200 /* duplicate fd with close on exec set */
+	F_GETOWN        :: -1 // NOTE: Not supported.
+	F_SETOWN        :: -1 // NOTE: Not supported.
+
+	/* advisory locking types */
+	F_RDLCK :: 0x0040 /* read or shared lock */
+	F_UNLCK :: 0x0200 /* unlock */
+	F_WRLCK :: 0x0400 /* write or exclusive lock */
+
+	/* file descriptor flags for fcntl() */
+	FD_CLOEXEC :: 1
+
+	O_CLOEXEC   :: 0x00000040
+	O_CREAT     :: 0x0200
+	O_DIRECTORY :: 0x00200000
+	O_EXCL      :: 0x0100
+	O_NOCTTY    :: 0x1000
+	O_NOFOLLOW  :: 0x00080000
+	O_TRUNC     :: 0x0400
+
+	_O_TTY_INIT :: 0
+	O_TTY_INIT  :: O_Flags{} // NOTE: not defined in the headers
+
+	O_APPEND   :: 0x0800
+	O_DSYNC    :: 0x040000
+	O_NONBLOCK :: 0x0080
+	O_SYNC     :: 0x010000
+	O_RSYNC    :: 0x020000
+
+	O_EXEC   :: 0x04000000 // NOTE: not defined in the headers
+	O_RDONLY :: 0
+	O_RDWR   :: 0x0002
+	O_WRONLY :: 0x0001
+
+	_O_SEARCH :: 0
+	O_SEARCH  :: O_Flags{} // NOTE: not defined in the headers
+
+	AT_FDCWD: FD: -100
+
+	AT_EACCESS          :: 0x08
+	AT_SYMLINK_NOFOLLOW :: 0x01
+	AT_SYMLINK_FOLLOW   :: 0x02
+	AT_REMOVEDIR        :: 0x04
+
+	flock :: struct {
+		l_type:   Lock_Type, /* [PSX] type of lock */
+		l_whence: c.short,   /* [PSX] flag (Whence) of starting offset */
+		l_start:  off_t,     /* [PSX] relative offset in bytes */
+		l_len:    off_t,     /* [PSX] size; if 0 then until EOF */
+		l_pid:    pid_t,     /* [PSX] process ID of the process holding the lock */
 	}
 
 } else when ODIN_OS == .Linux {
