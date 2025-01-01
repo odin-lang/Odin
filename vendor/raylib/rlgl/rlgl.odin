@@ -113,6 +113,7 @@ import rl "../."
 VERSION :: "5.0"
 
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
+RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "../wasm/libraylib.a")
 
 // Note: We pull in the full raylib library. If you want a truly stand-alone rlgl, then:
 // - Compile a separate rlgl library and use that in the foreign import blocks below.
@@ -145,6 +146,10 @@ when ODIN_OS == .Windows {
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
 	} 
+} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib {
+		RAYLIB_WASM_LIB,
+	}
 } else {
 	foreign import lib "system:raylib"
 }
