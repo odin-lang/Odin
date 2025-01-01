@@ -522,6 +522,7 @@ struct CheckerContext {
 	bool       in_enum_type;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
+	bool       disallow_polymorphic_return_types; // NOTE(zen3ger): no poly type decl in return types
 	bool       no_polymorphic_errors;
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
