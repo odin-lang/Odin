@@ -8725,6 +8725,18 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		error(node, "#caller_expression may only be used as a default argument parameter");
 		o->type = t_string;
 		o->mode = Addressing_Value;
+	} else if (name == "branch_location") {
+		if (!c->in_defer) {
+			error(node, "#branch_location may only be used within a 'defer' statement");
+		} else if (c->curr_proc_decl) {
+			Entity *e = c->curr_proc_decl->entity;
+			if (e != nullptr) {
+				GB_ASSERT(e->kind == Entity_Procedure);
+				e->Procedure.uses_branch_location = true;
+			}
+		}
+		o->type = t_source_code_location;
+		o->mode = Addressing_Value;
 	} else {
 		if (name == "location") {
 			init_core_source_code_location(c->checker);
