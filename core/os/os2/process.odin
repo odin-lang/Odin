@@ -290,12 +290,21 @@ process_open :: proc(pid: int, flags := Process_Open_Flags {}) -> (Process, Erro
 	return _process_open(pid, flags)
 }
 
+
+/*
+OS-specific process attributes.
+*/
+Process_Attributes :: struct {
+	sys_attr: _Sys_Process_Attributes,
+}
+
 /*
 	The description of how a process should be created.
 */
 Process_Desc :: struct {
 	// OS-specific attributes.
-	sys_attr: _Sys_Process_Attributes,
+	sys_attr: Process_Attributes,
+
 	// The working directory of the process. If the string has length 0, the
 	// working directory is assumed to be the current working directory of the
 	// current process.

@@ -686,10 +686,3 @@ calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, he
 	}
 	return int(padding)
 }
-
-@(require_results, deprecated="prefer 'slice.clone'")
-clone_slice :: proc(slice: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (new_slice: T) {
-	new_slice, _ = make(T, len(slice), allocator, loc)
-	runtime.copy(new_slice, slice)
-	return new_slice
-}

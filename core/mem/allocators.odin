@@ -140,14 +140,6 @@ arena_init :: proc(a: ^Arena, data: []byte) {
 	a.temp_count = 0
 }
 
-@(deprecated="prefer 'mem.arena_init'")
-init_arena :: proc(a: ^Arena, data: []byte) {
-	a.data       = data
-	a.offset     = 0
-	a.peak_used  = 0
-	a.temp_count = 0
-}
-
 /*
 Allocate memory from an arena.
 
@@ -786,14 +778,6 @@ stack_init :: proc(s: ^Stack, data: []byte) {
 	s.peak_used   = 0
 }
 
-@(deprecated="prefer 'mem.stack_init'")
-init_stack :: proc(s: ^Stack, data: []byte) {
-	s.data        = data
-	s.prev_offset = 0
-	s.curr_offset = 0
-	s.peak_used   = 0
-}
-
 /*
 Allocate memory from stack.
 
@@ -1157,13 +1141,6 @@ This procedure initializes the small stack allocator with `data` as its backing
 buffer.
 */
 small_stack_init :: proc(s: ^Small_Stack, data: []byte) {
-	s.data      = data
-	s.offset    = 0
-	s.peak_used = 0
-}
-
-@(deprecated="prefer 'small_stack_init'")
-init_small_stack :: proc(s: ^Small_Stack, data: []byte) {
 	s.data      = data
 	s.offset    = 0
 	s.peak_used = 0
