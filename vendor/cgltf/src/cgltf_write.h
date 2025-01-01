@@ -1,7 +1,7 @@
 /**
  * cgltf_write - a single-file glTF 2.0 writer written in C99.
  *
- * Version: 1.13
+ * Version: 1.14
  *
  * Website: https://github.com/jkuhlmann/cgltf
  *
@@ -85,6 +85,8 @@ cgltf_size cgltf_write(const cgltf_options* options, char* buffer, cgltf_size si
 #define CGLTF_EXTENSION_FLAG_MATERIALS_EMISSIVE_STRENGTH (1 << 13)
 #define CGLTF_EXTENSION_FLAG_MESH_GPU_INSTANCING (1 << 14)
 #define CGLTF_EXTENSION_FLAG_MATERIALS_IRIDESCENCE (1 << 15)
+#define CGLTF_EXTENSION_FLAG_MATERIALS_ANISOTROPY (1 << 16)
+#define CGLTF_EXTENSION_FLAG_MATERIALS_DISPERSION (1 << 17)
 
 typedef struct {
 	char* buffer;
@@ -152,7 +154,6 @@ typedef struct {
 			context->extension_flags |= CGLTF_EXTENSION_FLAG_TEXTURE_TRANSFORM; \
 			cgltf_write_texture_transform(context, &info.transform); \
 		} \
-		cgltf_write_extras(context, &info.extras); \
 		cgltf_write_line(context, "}"); }
 
 #define CGLTF_WRITE_NORMAL_TEXTURE_INFO(label, info) if (info.texture) { \
@@ -164,7 +165,6 @@ typedef struct {
 			context->extension_flags |= CGLTF_EXTENSION_FLAG_TEXTURE_TRANSFORM; \
 			cgltf_write_texture_transform(context, &info.transform); \
 		} \
-		cgltf_write_extras(context, &info.extras); \
 		cgltf_write_line(context, "}"); }
 
 #define CGLTF_WRITE_OCCLUSION_TEXTURE_INFO(label, info) if (info.texture) { \
@@ -176,12 +176,11 @@ typedef struct {
 			context->extension_flags |= CGLTF_EXTENSION_FLAG_TEXTURE_TRANSFORM; \
 			cgltf_write_texture_transform(context, &info.transform); \
 		} \
-		cgltf_write_extras(context, &info.extras); \
 		cgltf_write_line(context, "}"); }
 
 #ifndef CGLTF_CONSTS
-static const cgltf_size GlbHeaderSize = 12;
-static const cgltf_size GlbChunkHeaderSize = 8;
+#define GlbHeaderSize 12
+#define GlbChunkHeaderSize 8
 static const uint32_t GlbVersion = 2;
 static const uint32_t GlbMagic = 0x46546C67;
 static const uint32_t GlbMagicJsonChunk = 0x4E4F534A;
@@ -360,6 +359,21 @@ static int cgltf_int_from_component_type(cgltf_component_type ctype)
 	}
 }
 
+static int cgltf_int_from_primitive_type(cgltf_primitive_type ctype)
+{
+	switch (ctype)
+	{
+		case cgltf_primitive_type_points: return 0;
+		case cgltf_primitive_type_lines: return 1;
+		case cgltf_primitive_type_line_loop: return 2;
+		case cgltf_primitive_type_line_strip: return 3;
+		case cgltf_primitive_type_triangles: return 4;
+		case cgltf_primitive_type_triangle_strip: return 5;
+		case cgltf_primitive_type_triangle_fan: return 6;
+		default: return -1;
+	}
+}
+
 static const char* cgltf_str_from_alpha_mode(cgltf_alpha_mode alpha_mode)
 {
 	switch (alpha_mode)
@@ -455,7 +469,7 @@ static void cgltf_write_asset(cgltf_write_context* context, const cgltf_asset* a
 
 static void cgltf_write_primitive(cgltf_write_context* context, const cgltf_primitive* prim)
 {
-	cgltf_write_intprop(context, "mode", (int) prim->type, 4);
+	cgltf_write_intprop(context, "mode", cgltf_int_from_primitive_type(prim->type), 4);
 	CGLTF_WRITE_IDXPROP("indices", prim->indices, context->data->accessors);
 	CGLTF_WRITE_IDXPROP("material", prim->material, context->data->materials);
 	cgltf_write_line(context, "\"attributes\": {");
@@ -641,6 +655,16 @@ static void cgltf_write_material(cgltf_write_context* context, const cgltf_mater
 		context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_IRIDESCENCE;
 	}
 
+	if (material->has_anisotropy)
+	{
+		context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_ANISOTROPY;
+	}
+
+	if (material->has_dispersion)
+	{
+		context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_DISPERSION;
+	}
+
 	if (material->has_pbr_metallic_roughness)
 	{
 		const cgltf_pbr_metallic_roughness* params = &material->pbr_metallic_roughness;
@@ -656,7 +680,7 @@ static void cgltf_write_material(cgltf_write_context* context, const cgltf_mater
 		cgltf_write_line(context, "}");
 	}
 
-	if (material->unlit || material->has_pbr_specular_glossiness || material->has_clearcoat || material->has_ior || material->has_specular || material->has_transmission || material->has_sheen || material->has_volume || material->has_emissive_strength || material->has_iridescence)
+	if (material->unlit || material->has_pbr_specular_glossiness || material->has_clearcoat || material->has_ior || material->has_specular || material->has_transmission || material->has_sheen || material->has_volume || material->has_emissive_strength || material->has_iridescence || material->has_anisotropy || material->has_dispersion)
 	{
 		cgltf_write_line(context, "\"extensions\": {");
 		if (material->has_clearcoat)
@@ -765,6 +789,22 @@ static void cgltf_write_material(cgltf_write_context* context, const cgltf_mater
 			cgltf_write_floatprop(context, "iridescenceThicknessMinimum", params->iridescence_thickness_min, 100.f);
 			cgltf_write_floatprop(context, "iridescenceThicknessMaximum", params->iridescence_thickness_max, 400.f);
 			CGLTF_WRITE_TEXTURE_INFO("iridescenceThicknessTexture", params->iridescence_thickness_texture);
+			cgltf_write_line(context, "}");
+		}
+		if (material->has_anisotropy)
+		{
+			cgltf_write_line(context, "\"KHR_materials_anisotropy\": {");
+			const cgltf_anisotropy* params = &material->anisotropy;
+			cgltf_write_floatprop(context, "anisotropyFactor", params->anisotropy_strength, 0.f);
+			cgltf_write_floatprop(context, "anisotropyRotation", params->anisotropy_rotation, 0.f);
+			CGLTF_WRITE_TEXTURE_INFO("anisotropyTexture", params->anisotropy_texture);
+			cgltf_write_line(context, "}");
+		}
+		if (material->has_dispersion)
+		{
+			cgltf_write_line(context, "\"KHR_materials_dispersion\": {");
+			const cgltf_dispersion* params = &material->dispersion;
+			cgltf_write_floatprop(context, "dispersion", params->dispersion, 0.f);
 			cgltf_write_line(context, "}");
 		}
 		cgltf_write_line(context, "}");
@@ -977,7 +1017,6 @@ static void cgltf_write_node(cgltf_write_context* context, const cgltf_node* nod
 
 		cgltf_write_line(context, "\"EXT_mesh_gpu_instancing\": {");
 		{
-			CGLTF_WRITE_IDXPROP("bufferView", node->mesh_gpu_instancing.buffer_view, context->data->buffer_views);
 			cgltf_write_line(context, "\"attributes\": {");
 			{
 				for (cgltf_size i = 0; i < node->mesh_gpu_instancing.attributes_count; ++i)
@@ -1044,14 +1083,11 @@ static void cgltf_write_accessor(cgltf_write_context* context, const cgltf_acces
 		cgltf_write_sizeprop(context, "byteOffset", (int)accessor->sparse.indices_byte_offset, 0);
 		CGLTF_WRITE_IDXPROP("bufferView", accessor->sparse.indices_buffer_view, context->data->buffer_views);
 		cgltf_write_intprop(context, "componentType", cgltf_int_from_component_type(accessor->sparse.indices_component_type), 0);
-		cgltf_write_extras(context, &accessor->sparse.indices_extras);
 		cgltf_write_line(context, "}");
 		cgltf_write_line(context, "\"values\": {");
 		cgltf_write_sizeprop(context, "byteOffset", (int)accessor->sparse.values_byte_offset, 0);
 		CGLTF_WRITE_IDXPROP("bufferView", accessor->sparse.values_buffer_view, context->data->buffer_views);
-		cgltf_write_extras(context, &accessor->sparse.values_extras);
 		cgltf_write_line(context, "}");
-		cgltf_write_extras(context, &accessor->sparse.extras);
 		cgltf_write_line(context, "}");
 	}
 	cgltf_write_extras(context, &accessor->extras);
@@ -1123,6 +1159,7 @@ static void cgltf_write_light(cgltf_write_context* context, const cgltf_light* l
 		cgltf_write_floatprop(context, "outerConeAngle", light->spot_outer_cone_angle, 3.14159265358979323846f/4.0f);
 		cgltf_write_line(context, "}");
 	}
+	cgltf_write_extras( context, &light->extras );
 	cgltf_write_line(context, "}");
 }
 
@@ -1249,8 +1286,14 @@ static void cgltf_write_extensions(cgltf_write_context* context, uint32_t extens
 	if (extension_flags & CGLTF_EXTENSION_FLAG_MATERIALS_IRIDESCENCE) {
 		cgltf_write_stritem(context, "KHR_materials_iridescence");
 	}
+	if (extension_flags & CGLTF_EXTENSION_FLAG_MATERIALS_ANISOTROPY) {
+		cgltf_write_stritem(context, "KHR_materials_anisotropy");
+	}
 	if (extension_flags & CGLTF_EXTENSION_FLAG_MESH_GPU_INSTANCING) {
 		cgltf_write_stritem(context, "EXT_mesh_gpu_instancing");
+	}
+	if (extension_flags & CGLTF_EXTENSION_FLAG_MATERIALS_DISPERSION) {
+		cgltf_write_stritem(context, "KHR_materials_dispersion");
 	}
 }
 
