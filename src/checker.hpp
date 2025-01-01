@@ -461,6 +461,7 @@ struct CheckerInfo {
 	MPSCQueue<Entity *> required_global_variable_queue;
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
 	MPSCQueue<Entity *> foreign_imports_to_check_fullpaths;
+	MPSCQueue<Entity *> foreign_decls_to_check;
 
 	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 
