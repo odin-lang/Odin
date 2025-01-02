@@ -151,7 +151,8 @@ lseek :: proc "contextless" (fd: Fd, off: i64, whence: Seek_Whence) -> (i64, Err
 		return errno_unwrap(ret, i64)
 	} else {
 		result: i64 = ---
-		ret := syscall(SYS__llseek, fd, compat64_arg_pair(off), &result, whence)
+		lo, hi := compat64_arg_pair(off)
+		ret := syscall(SYS__llseek, fd, hi, lo, &result, whence)
 		return result, Errno(-ret)
 	}
 }
@@ -251,7 +252,11 @@ ioctl :: proc "contextless" (fd: Fd, request: u32, arg: uintptr) -> (uintptr) {
 	Available since Linux 2.2.
 */
 pread :: proc "contextless" (fd: Fd, buf: []u8, offset: i64) -> (int, Errno) {
-	ret := syscall(SYS_pread64, fd, raw_data(buf), len(buf), compat64_arg_pair(offset))
+	when ODIN_ARCH == .arm32 {
+		ret := syscall(SYS_pread64, fd, raw_data(buf), len(buf), 0, compat64_arg_pair(offset))
+	} else {
+		ret := syscall(SYS_pread64, fd, raw_data(buf), len(buf), compat64_arg_pair(offset))
+	}
 	return errno_unwrap(ret, int)
 }
 
@@ -261,7 +266,11 @@ pread :: proc "contextless" (fd: Fd, buf: []u8, offset: i64) -> (int, Errno) {
 	Available since Linux 2.2.
 */
 pwrite :: proc "contextless" (fd: Fd, buf: []u8, offset: i64) -> (int, Errno) {
-	ret := syscall(SYS_pwrite64, fd, raw_data(buf), len(buf), compat64_arg_pair(offset))
+	when ODIN_ARCH == .arm32 {
+		ret := syscall(SYS_pwrite64, fd, raw_data(buf), len(buf), 0, compat64_arg_pair(offset))
+	} else {
+		ret := syscall(SYS_pwrite64, fd, raw_data(buf), len(buf), compat64_arg_pair(offset))
+	}
 	return errno_unwrap(ret, int)
 }
 
@@ -1127,7 +1136,10 @@ fdatasync :: proc "contextless" (fd: Fd) -> (Errno) {
 	On 32-bit architectures available since Linux 2.4.
 */
 truncate :: proc "contextless" (name: cstring, length: i64) -> (Errno) {
-	when size_of(int) == 4 {
+	when ODIN_ARCH == .arm32 {
+		ret := syscall(SYS_truncate64, cast(rawptr) name, 0, compat64_arg_pair(length))
+		return Errno(-ret)
+	} else when size_of(int) == 4 {
 		ret := syscall(SYS_truncate64, cast(rawptr) name, compat64_arg_pair(length))
 		return Errno(-ret)
 	} else {
@@ -1141,7 +1153,10 @@ truncate :: proc "contextless" (name: cstring, length: i64) -> (Errno) {
 	On 32-bit architectures available since 2.4.
 */
 ftruncate :: proc "contextless" (fd: Fd, length: i64) -> (Errno) {
-	when size_of(int) == 4 {
+	when ODIN_ARCH == .arm32 {
+		ret := syscall(SYS_ftruncate64, fd, 0, compat64_arg_pair(length))
+		return Errno(-ret)
+	} else when size_of(int) == 4 {
 		ret := syscall(SYS_ftruncate64, fd, compat64_arg_pair(length))
 		return Errno(-ret)
 	} else {
