@@ -109,7 +109,6 @@ foreign kernel32 {
 	ClearCommError :: proc(hFile: HANDLE, lpErrors: ^Com_Error, lpStat: ^COMSTAT) -> BOOL ---
 	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
 	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-	GetCommPorts :: proc(lpPortNumbers: PULONG, uPortNumbersCount: ULONG, puPortNumbersFound: PULONG) -> ULONG ---
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetCurrentProcess :: proc() -> HANDLE ---
@@ -1068,6 +1067,7 @@ foreign one_core {
 		PageProtection: ULONG,
 		PreferredNode: ULONG,
 	) -> PVOID ---
+	GetCommPorts :: proc(lpPortNumbers: PULONG, uPortNumbersCount: ULONG, puPortNumbersFound: PULONG) -> ULONG ---
 }
 
 
