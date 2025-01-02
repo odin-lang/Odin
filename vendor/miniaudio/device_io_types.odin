@@ -351,8 +351,11 @@ device_id :: struct #raw_union {
 	nullbackend: c.int,                 /* The null backend uses an integer for device IDs. */
 }
 
+data_format_flag :: enum c.int {
+	EXCLUSIVE_MODE = 1, /* If set, this is supported in exclusive mode. Otherwise not natively supported by exclusive mode. */
+}
 
-DATA_FORMAT_FLAG_EXCLUSIVE_MODE :: 1 << 1    /* If set, this is supported in exclusive mode. Otherwise not natively supported by exclusive mode. */
+data_format_flags :: bit_set[data_format_flag; u32]
 
 MAX_DEVICE_NAME_LENGTH :: 255
 
@@ -364,10 +367,10 @@ device_info :: struct {
 
 	nativeDataFormatCount: u32,
 	nativeDataFormats: [/*len(format_count) * standard_sample_rate.rate_count * MAX_CHANNELS*/ 64]struct { /* Not sure how big to make this. There can be *many* permutations for virtual devices which can support anything. */
-		format:     format, /* Sample format. If set to ma_format_unknown, all sample formats are supported. */
-		channels:   u32,    /* If set to 0, all channels are supported. */
-		sampleRate: u32,    /* If set to 0, all sample rates are supported. */
-		flags:      u32,    /* A combination of MA_DATA_FORMAT_FLAG_* flags. */
+		format:     format,            /* Sample format. If set to ma_format_unknown, all sample formats are supported. */
+		channels:   u32,               /* If set to 0, all channels are supported. */
+		sampleRate: u32,               /* If set to 0, all sample rates are supported. */
+		flags:      data_format_flags, /* A combination of MA_DATA_FORMAT_FLAG_* flags. */
 	},  
 }
 
