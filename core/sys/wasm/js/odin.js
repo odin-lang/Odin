@@ -800,6 +800,23 @@ class WebGLInterface {
 			Uniform3i: (location, v0, v1, v2)     => { this.ctx.uniform3i(this.uniforms[location], v0, v1, v2);     },
 			Uniform4i: (location, v0, v1, v2, v3) => { this.ctx.uniform4i(this.uniforms[location], v0, v1, v2, v3); },
 
+			Uniform1iv: (location, count, addr) => {
+				let array = this.mem.loadI32Array(addr, count);
+				this.ctx.uniform1iv(this.uniforms[location], array);
+			},
+			Uniform2iv: (location, count, addr) => {
+				let array = this.mem.loadI32Array(addr, count);
+				this.ctx.uniform2iv(this.uniforms[location], array);
+			},
+			Uniform3iv: (location, count, addr) => {
+				let array = this.mem.loadI32Array(addr, count);
+				this.ctx.uniform3iv(this.uniforms[location], array);
+			},
+			Uniform4iv: (location, count, addr) => {
+				let array = this.mem.loadI32Array(addr, count);
+				this.ctx.uniform4iv(this.uniforms[location], array);
+			},
+
 			UniformMatrix2fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 2*2);
 				this.ctx.uniformMatrix2fv(this.uniforms[location], false, array);
