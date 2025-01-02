@@ -3,9 +3,16 @@ package libc
 import "core:io"
 
 when ODIN_OS == .Windows {
-	foreign import libc {
-		"system:libucrt.lib",
-		"system:legacy_stdio_definitions.lib",
+	when #config(WINDOWS_DYNAMIC_CRT, false) {
+		foreign import libc {
+			"system:ucrt.lib",
+			"system:legacy_stdio_definitions.lib",
+		}
+	} else {
+		foreign import libc {
+			"system:libucrt.lib",
+			"system:legacy_stdio_definitions.lib",
+		}
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
