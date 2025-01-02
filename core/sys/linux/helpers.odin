@@ -139,7 +139,7 @@ when size_of(int) == 4 {
 	// xxx64 system calls take some parameters as pairs of ulongs rather than a single pointer
 	@(private)
 	compat64_arg_pair :: #force_inline proc "contextless" (a: i64) -> (hi: uint, lo: uint) {
-		no_sign := uint(a)
+		no_sign := u64(a)
 		hi = uint(no_sign >> 32)
 		lo = uint(no_sign & 0xffff_ffff)
 		return

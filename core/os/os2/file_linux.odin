@@ -275,7 +275,7 @@ _remove :: proc(name: string) -> Error {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
-	if fd, errno := linux.open(name_cstr, _OPENDIR_FLAGS); errno == .NONE {
+	if fd, errno := linux.open(name_cstr, _OPENDIR_FLAGS + {.NOFOLLOW}); errno == .NONE {
 		linux.close(fd)
 		return _get_platform_error(linux.rmdir(name_cstr))
 	}

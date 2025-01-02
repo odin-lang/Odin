@@ -1952,10 +1952,10 @@ sigaltstack :: proc "contextless" (stack: ^Sig_Stack, old_stack: ^Sig_Stack) -> 
 */
 mknod :: proc "contextless" (name: cstring, mode: Mode, dev: Dev) -> (Errno) {
 	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
-		ret := syscall(SYS_mknodat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode, dev)
+		ret := syscall(SYS_mknodat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode, cast(uint) dev)
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_mknod, cast(rawptr) name, transmute(u32) mode, dev)
+		ret := syscall(SYS_mknod, cast(rawptr) name, transmute(u32) mode, cast(uint) dev)
 		return Errno(-ret)
 	}
 }
@@ -2586,7 +2586,7 @@ mkdirat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode) -> (Errno) 
 	Available since Linux 2.6.16.
 */
 mknodat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode, dev: Dev) -> (Errno) {
-	ret := syscall(SYS_mknodat, dirfd, cast(rawptr) name, transmute(u32) mode, dev)
+	ret := syscall(SYS_mknodat, dirfd, cast(rawptr) name, transmute(u32) mode, cast(uint) dev)
 	return Errno(-ret)
 }
 

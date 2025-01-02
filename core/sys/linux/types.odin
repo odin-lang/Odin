@@ -3,7 +3,7 @@ package linux
 /*
 	Type for storage device handle.
 */
-Dev :: distinct int
+Dev :: distinct u64
 
 /*
 	Type for 32-bit User IDs.
@@ -153,6 +153,7 @@ when ODIN_ARCH == .amd64 {
 		uid:        Uid,
 		gid:        Gid,
 		rdev:       Dev,
+		_:          [4]u8,
 		size:       i64,
 		blksize:    uint,
 		blocks:     u64,
