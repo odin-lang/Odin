@@ -527,8 +527,7 @@ gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 
 	case lbAddr_Swizzle:
 	case lbAddr_SwizzleLarge:
-		// TOOD(bill): is this good enough logic?
-		break;
+		return lb_address_from_load(p, lb_addr_load(p, addr));
 	}
 
 	return addr.addr;
