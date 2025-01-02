@@ -964,6 +964,24 @@ assert :: proc(condition: bool, message := #caller_expression(condition), loc :=
 	}
 }
 
+// Evaluates the condition and aborts the program iff the condition is
+// false.  This routine ignores `ODIN_DISABLE_ASSERT`, and will always
+// execute.
+@builtin
+ensure :: proc(condition: bool, message := #caller_expression(condition), loc := #caller_location) {
+	if !condition {
+		@(cold)
+		internal :: proc(message: string, loc: Source_Code_Location) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = default_assertion_failure_proc
+			}
+			p("unsatisfied ensure", message, loc)
+		}
+		internal(message, loc)
+	}
+}
+
 @builtin
 panic :: proc(message: string, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc
@@ -994,6 +1012,17 @@ assert_contextless :: proc "contextless" (condition: bool, message := #caller_ex
 		@(cold)
 		internal :: proc "contextless" (message: string, loc: Source_Code_Location) {
 			default_assertion_contextless_failure_proc("runtime assertion", message, loc)
+		}
+		internal(message, loc)
+	}
+}
+
+@builtin
+ensure_contextless :: proc "contextless" (condition: bool, message := #caller_expression(condition), loc := #caller_location) {
+	if !condition {
+		@(cold)
+		internal :: proc "contextless" (message: string, loc: Source_Code_Location) {
+			default_assertion_contextless_failure_proc("unsatisfied ensure", message, loc)
 		}
 		internal(message, loc)
 	}
