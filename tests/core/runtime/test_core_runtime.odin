@@ -109,6 +109,37 @@ test_map_get :: proc(t: ^testing.T) {
 		check(t, m)
 	}
 
+
+	// small keys; 3 values per cell
+	{
+		val :: struct #packed {
+			a, b: int,
+			c:    i32,
+		}
+		m := map[int]val{
+			1 = val{10, 100, 1000},
+			2 = val{20, 200, 2000},
+			3 = val{30, 300, 3000},
+		}
+		defer delete(m)
+		check(t, m)
+	}
+
+	// 3 keys per cell; small values
+	{
+		key :: struct #packed {
+			a, b: int,
+			c:    i32,
+		}
+		m := map[key]int{
+			key{10, 100, 1000} = 1,
+			key{20, 200, 2000} = 2,
+			key{30, 300, 3000} = 3,
+		}
+		defer delete(m)
+		check(t, m)
+	}
+
 	// small keys; value bigger than a chacheline
 	{
 		m := map[int][9]int{
