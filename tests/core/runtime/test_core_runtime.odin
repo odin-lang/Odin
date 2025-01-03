@@ -67,25 +67,66 @@ test_init_cap_map_dynarray :: proc(t: ^testing.T) {
 
 @(test)
 test_map_get :: proc(t: ^testing.T) {
-	m := map[int][3]int{
-		1 = {10, 100, 1000},
-		2 = {20, 200, 2000},
-		3 = {30, 300, 3000},
+	check :: proc(t: ^testing.T, m: map[$K]$V, loc := #caller_location) {
+		for k, v in m {
+			got_key, got_val, ok := runtime.map_get(m, k)
+			testing.expect_value(t, got_key, k, loc = loc)
+			testing.expect_value(t, got_val, v, loc = loc)
+			testing.expect(t, ok, loc = loc)
+		}
 	}
-	defer delete(m)
 
-	k1, v1, ok1 := runtime.map_get(m, 1)
-	testing.expect_value(t, k1, 1)
-	testing.expect_value(t, v1, [3]int{10, 100, 1000})
-	testing.expect_value(t, ok1, true)
+	// small keys & values
+	{
+		m := map[int]int{
+			1 = 10,
+			2 = 20,
+			3 = 30,
+		}
+		defer delete(m)
+		check(t, m)
+	}
 
-	k2, v2, ok2 := runtime.map_get(m, 2)
-	testing.expect_value(t, k2, 2)
-	testing.expect_value(t, v2, [3]int{20, 200, 2000})
-	testing.expect_value(t, ok2, true)
+	// small keys; 2 values per cell
+	{
+		m := map[int][3]int{
+			1 = [3]int{10, 100, 1000},
+			2 = [3]int{20, 200, 2000},
+			3 = [3]int{30, 300, 3000},
+		}
+		defer delete(m)
+		check(t, m)
+	}
 
-	k3, v3, ok3 := runtime.map_get(m, 3)
-	testing.expect_value(t, k3, 3)
-	testing.expect_value(t, v3, [3]int{30, 300, 3000})
-	testing.expect_value(t, ok3, true)
+	// 2 keys per cell; small values
+	{
+		m := map[[3]int]int{
+			[3]int{10, 100, 1000} = 1,
+			[3]int{20, 200, 2000} = 2,
+			[3]int{30, 300, 3000} = 3,
+		}
+		defer delete(m)
+		check(t, m)
+	}
+
+	// small keys; value bigger than a chacheline
+	{
+		m := map[int][9]int{
+			1 = [9]int{10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000},
+			2 = [9]int{20, 200, 2000, 20000, 200000, 2000000, 20000000, 200000000, 2000000000},
+			3 = [9]int{30, 300, 3000, 30000, 300000, 3000000, 30000000, 300000000, 3000000000},
+		}
+		defer delete(m)
+		check(t, m)
+	}
+	// keys bigger than a chacheline; small values
+	{
+		m := map[[9]int]int{
+			[9]int{10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000} = 1,
+			[9]int{20, 200, 2000, 20000, 200000, 2000000, 20000000, 200000000, 2000000000} = 2,
+			[9]int{30, 300, 3000, 30000, 300000, 3000000, 30000000, 300000000, 3000000000} = 3,
+		}
+		defer delete(m)
+		check(t, m)
+	}
 }
