@@ -161,11 +161,11 @@ map_cell_index_static :: #force_inline proc "contextless" (cells: [^]Map_Cell($T
 		// Compute the integer log 2 of N, this is the shift amount to index the
 		// correct cell. Odin's intrinsics.count_leading_zeros does not produce a
 		// constant, hence this approach. We only need to check up to N = 64.
-		SHIFT :: 1 when N < 2  else
-		         2 when N < 4  else
-		         3 when N < 8  else
-		         4 when N < 16 else
-		         5 when N < 32 else 6
+		SHIFT :: 1 when N == 2  else
+		         2 when N == 4  else
+		         3 when N == 8  else
+		         4 when N == 16 else
+		         5 when N == 32 else 6
 		#assert(SHIFT <= MAP_CACHE_LINE_LOG2)
 		// Unique case, no need to index data here since only one element.
 		when N == 1 {

@@ -64,3 +64,27 @@ test_init_cap_map_dynarray :: proc(t: ^testing.T) {
         testing.expect(t, cap(d2) == 0)
         testing.expect(t, d2.allocator.procedure == ally.procedure)
 }
+
+@(test)
+test_map_get :: proc(t: ^testing.T) {
+	m := map[int][3]int{
+		1 = {10, 100, 1000},
+		2 = {20, 200, 2000},
+		3 = {30, 300, 3000},
+	}
+
+	k1, v1, ok1 := runtime.map_get(m, 1)
+	testing.expect_value(t, k1, 1)
+	testing.expect_value(t, v1, [3]int{10, 100, 1000})
+	testing.expect_value(t, ok1, true)
+
+	k2, v2, ok2 := runtime.map_get(m, 2)
+	testing.expect_value(t, k2, 2)
+	testing.expect_value(t, v2, [3]int{20, 200, 2000})
+	testing.expect_value(t, ok2, true)
+
+	k3, v3, ok3 := runtime.map_get(m, 3)
+	testing.expect_value(t, k3, 3)
+	testing.expect_value(t, v3, [3]int{30, 300, 3000})
+	testing.expect_value(t, ok3, true)
+}
