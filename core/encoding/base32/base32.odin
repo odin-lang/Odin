@@ -28,6 +28,7 @@ _validate_default :: proc(c: byte) -> bool {
 	return (c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7')
 }
 
+@(rodata)
 ENC_TABLE := [32]byte {
 	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
 	'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
@@ -37,6 +38,7 @@ ENC_TABLE := [32]byte {
 
 PADDING :: '='
 
+@(rodata)
 DEC_TABLE := [256]u8 {
 	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
