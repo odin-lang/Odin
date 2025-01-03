@@ -72,6 +72,7 @@ test_map_get :: proc(t: ^testing.T) {
 		2 = {20, 200, 2000},
 		3 = {30, 300, 3000},
 	}
+	defer delete(m)
 
 	k1, v1, ok1 := runtime.map_get(m, 1)
 	testing.expect_value(t, k1, 1)
