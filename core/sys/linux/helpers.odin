@@ -138,8 +138,8 @@ errno_unwrap :: proc {errno_unwrap2, errno_unwrap3}
 when size_of(int) == 4 {
 	// xxx64 system calls take some parameters as pairs of ulongs rather than a single pointer
 	@(private)
-	compat64_arg_pair :: #force_inline proc "contextless" (a: i64) -> (hi: uint, lo: uint) {
-		no_sign := uint(a)
+	compat64_arg_pair :: #force_inline proc "contextless" (a: i64) -> (lo: uint, hi: uint) {
+		no_sign := u64(a)
 		hi = uint(no_sign >> 32)
 		lo = uint(no_sign & 0xffff_ffff)
 		return
