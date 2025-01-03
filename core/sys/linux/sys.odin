@@ -2699,13 +2699,8 @@ faccessat :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK) ->
 	Available since Linux 2.6.16.
 */
 ppoll :: proc "contextless" (fds: []Poll_Fd, timeout: ^Time_Spec, sigmask: ^Sig_Set) -> (i32, Errno) {
-	when size_of(int) == 8 {
-		ret := syscall(SYS_ppoll, raw_data(fds), len(fds), timeout, sigmask, size_of(Sig_Set))
-		return errno_unwrap(ret, i32)
-	} else {
-		ret := syscall(SYS_ppoll_time64, raw_data(fds), len(fds), timeout, sigmask, size_of(Sig_Set))
-		return errno_unwrap(ret, i32)
-	}
+	ret := syscall(SYS_ppoll, raw_data(fds), len(fds), timeout, sigmask, size_of(Sig_Set))
+	return errno_unwrap(ret, i32)
 }
 
 // TODO(flysand): unshare
