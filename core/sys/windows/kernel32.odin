@@ -239,6 +239,10 @@ foreign kernel32 {
 		hThread: HANDLE,
 		lpContext: LPCONTEXT,
 	) -> BOOL ---
+	SetThreadContext :: proc(
+		hThread: HANDLE,
+		lpContext: LPCONTEXT,
+	) -> BOOL ---
 	CreateProcessW :: proc(
 		lpApplicationName: LPCWSTR,
 		lpCommandLine: LPWSTR,
