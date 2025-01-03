@@ -388,7 +388,7 @@ _make_dynamic_array_len_cap :: proc(array: ^Raw_Dynamic_Array, size_of_elem, ali
 //
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
-make_map :: proc($T: typeid/map[$K]$E, allocator := context.allocator) -> (m: T) {
+make_map :: proc($T: typeid/map[$K]$E, allocator := context.allocator, loc := #caller_location) -> (m: T) {
 	m.allocator = allocator
 	return m
 }
@@ -399,7 +399,7 @@ make_map :: proc($T: typeid/map[$K]$E, allocator := context.allocator) -> (m: T)
 //
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
-make_map_cap :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
+make_map_cap :: proc($T: typeid/map[$K]$E, #any_int capacity: int, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
 	make_map_expr_error_loc(loc, capacity)
 	context.allocator = allocator
 
@@ -939,19 +939,7 @@ map_upsert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 
 @builtin
 card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
-	when size_of(S) == 1 {
-		return int(intrinsics.count_ones(transmute(u8)s))
-	} else when size_of(S) == 2 {
-		return int(intrinsics.count_ones(transmute(u16)s))
-	} else when size_of(S) == 4 {
-		return int(intrinsics.count_ones(transmute(u32)s))
-	} else when size_of(S) == 8 {
-		return int(intrinsics.count_ones(transmute(u64)s))
-	} else when size_of(S) == 16 {
-		return int(intrinsics.count_ones(transmute(u128)s))
-	} else {
-		#panic("Unhandled card bit_set size")
-	}
+	return int(intrinsics.count_ones(transmute(intrinsics.type_bit_set_underlying_type(S))s))
 }
 
 

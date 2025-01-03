@@ -17,13 +17,14 @@ file_and_urls = [
     ("vulkan_ios.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',     False),
     ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
     # Vulkan Video
-    ("vulkan_video_codec_av1std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std.h', False),
-    ("vulkan_video_codec_h264std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std.h', False),
-    ("vulkan_video_codec_h265std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std.h', False),
-    ("vulkan_video_codec_av1std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std_decode.h', False),
+    ("vulkan_video_codec_av1std.h",         'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std.h', False),
+    ("vulkan_video_codec_av1std_decode.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std_decode.h', False),
+    ("vulkan_video_codec_av1std_encode.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std_encode.h', False),
+    ("vulkan_video_codec_h264std.h",        'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std.h', False),
     ("vulkan_video_codec_h264std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std_decode.h', False),
-    ("vulkan_video_codec_h265std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_decode.h', False),
     ("vulkan_video_codec_h264std_encode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std_encode.h', False),
+    ("vulkan_video_codec_h265std.h",        'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std.h', False),
+    ("vulkan_video_codec_h265std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_decode.h', False),
     ("vulkan_video_codec_h265std_encode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_encode.h', False),
 ]
 
@@ -46,9 +47,9 @@ def no_vk(t):
     t = t.replace('PFN_', 'Proc')
 
     t = re.sub('(?:Vk|VK_)?(\w+)', '\\1', t)
-    # Vulkan Video
 
-    t = re.sub('(?:Std|STD_)?(\w+)', '\\1', t)
+    # Vulkan Video
+    t = re.sub('(?:Std|STD_|VK_STD)?(\w+)', '\\1', t)
     return t
 
 OPAQUE_STRUCTS = """
@@ -279,6 +280,16 @@ def parse_constants(f):
     vulkan_video_data = re.findall(r"#define STD_(\w+)\s*(.*?)U?\n", src, re.S)
     max_len = max(len(name) for name, value in vulkan_video_data)
     for name, value in vulkan_video_data:
+        f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
+
+    f.write("\n// Vulkan Video Codec Constants\n")
+    vulkan_video_codec_allowed_suffixes = (
+        "_EXTENSION_NAME",
+    )
+    vulkan_video_codec_data = re.findall(r"#define VK_STD_(\w+)\s*(.*?)U?\n", src, re.S)
+    vulkan_video_codec_allowed_data = [nv for nv in vulkan_video_codec_data if nv[0].endswith(vulkan_video_codec_allowed_suffixes)]
+    max_len = max(len(name) for name, value in vulkan_video_codec_allowed_data)
+    for name, value in vulkan_video_codec_allowed_data:
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
 
     f.write("\n// Vendor Constants\n")
@@ -797,10 +808,12 @@ package vulkan
 with open("../core.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
     f.write("""
+// Core API
 API_VERSION_1_0 :: (1<<22) | (0<<12) | (0)
 API_VERSION_1_1 :: (1<<22) | (1<<12) | (0)
 API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
+API_VERSION_1_4 :: (1<<22) | (4<<12) | (0)
 
 MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
 \treturn (major<<22) | (minor<<12) | (patch)
@@ -842,8 +855,26 @@ MAX_DEVICE_GROUP_SIZE                 :: 32
 LUID_SIZE_KHX                         :: 8
 LUID_SIZE                             :: 8
 MAX_QUEUE_FAMILY_EXTERNAL             :: ~u32(1)
-MAX_GLOBAL_PRIORITY_SIZE_EXT          :: 16
+MAX_GLOBAL_PRIORITY_SIZE              :: 16
+MAX_GLOBAL_PRIORITY_SIZE_EXT          :: MAX_GLOBAL_PRIORITY_SIZE
 QUEUE_FAMILY_EXTERNAL                 :: MAX_QUEUE_FAMILY_EXTERNAL
+
+// Vulkan Video API Constants
+VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0  :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0  :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0 :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0 :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0 :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_H265_ENCODE_API_VERSION_1_0_0 :: (1<<22) | (0<<12) | (0)
+
+VULKAN_VIDEO_CODEC_AV1_DECODE_SPEC_VERSION  :: VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_AV1_ENCODE_SPEC_VERSION  :: VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_H264_ENCODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_H264_DECODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_H265_DECODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_H265_ENCODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H265_ENCODE_API_VERSION_1_0_0
+
+MAKE_VIDEO_STD_VERSION :: MAKE_VERSION
 
 """[1::])
     parse_constants(f)

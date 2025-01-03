@@ -6,17 +6,13 @@ import "core:sys/posix"
 
 // Define non-posix needed flags:
 when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
-	MAP_ANONYMOUS :: 0x1000 /* allocated from memory, swap space */
-
-	MADV_FREE     :: 5      /* pages unneeded, discard contents */
+	MADV_FREE :: 5      /* pages unneeded, discard contents */
 } else when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
-	MAP_ANONYMOUS :: 0x1000
-
-	MADV_FREE     :: 6
+	MADV_FREE :: 6
 }
 
 _reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	flags  := posix.Map_Flags{ .PRIVATE } + transmute(posix.Map_Flags)i32(MAP_ANONYMOUS)
+	flags  := posix.Map_Flags{ .ANONYMOUS, .PRIVATE }
 	result := posix.mmap(nil, size, {}, flags)
 	if result == posix.MAP_FAILED {
 		return nil, .Out_Of_Memory

@@ -125,6 +125,10 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	// map_init(&p->selector_addr,    0);
 	// map_init(&p->tuple_fix_map,    0);
 
+	if (p->entity != nullptr && p->entity->Procedure.uses_branch_location) {
+		p->uses_branch_location = true;
+	}
+
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
 	}
@@ -579,6 +583,8 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 			p->raw_input_parameters = array_make<LLVMValueRef>(permanent_allocator(), raw_input_parameters_count);
 			LLVMGetParams(p->value, p->raw_input_parameters.data);
 
+			bool is_odin_cc = is_calling_convention_odin(ft->calling_convention);
+
 			unsigned param_index = 0;
 			for_array(i, params->variables) {
 				Entity *e = params->variables[i];
@@ -613,9 +619,26 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					}
 				} else if (arg_type->kind == lbArg_Indirect) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+						i64 sz = type_size_of(e->type);
+						bool do_callee_copy = false;
+
+						if (is_odin_cc) {
+							do_callee_copy = sz <= 16;
+							if (build_context.internal_by_value) {
+								do_callee_copy = true;
+							}
+						}
+
 						lbValue ptr = {};
 						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
 						ptr.type = alloc_type_pointer(e->type);
+
+						if (do_callee_copy) {
+							lbValue new_ptr = lb_add_local_generated(p, e->type, false).addr;
+							lb_mem_copy_non_overlapping(p, new_ptr, ptr, lb_const_int(p->module, t_uint, sz));
+							ptr = new_ptr;
+						}
+
 						lb_add_entity(p->module, e, ptr);
 						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block);
 					}
@@ -738,7 +761,7 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 	if (p->type->Proc.result_count == 0) {
 		instr = LLVMGetLastInstruction(p->curr_block->block);
 		if (!lb_is_instr_terminating(instr)) {
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, p->body);
 			lb_set_debug_position_to_procedure_end(p);
 			LLVMBuildRetVoid(p->builder);
 		}
@@ -1115,10 +1138,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			for (isize i = processed_args.count; i < args.count; i++) {
 				array_add(&processed_args, args[i]);
 			}
-		}
-
-		if (inlining == ProcInlining_none) {
-			inlining = p->inlining;
 		}
 
 		Type *rt = reduce_tuple_to_single_type(results);
@@ -2568,7 +2587,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_atomic_load_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 
-		LLVMValueRef instr = LLVMBuildLoad2(p->builder,  lb_type(p->module, type_deref(dst.type)), dst.value, "");
+		LLVMValueRef instr = OdinLLVMBuildLoad(p, lb_type(p->module, type_deref(dst.type)), dst.value);
 		switch (id) {
 		case BuiltinProc_non_temporal_load:
 			{
@@ -2621,8 +2640,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			if (is_type_simd_vector(t)) {
 				lbValue res = {};
 				res.type = t;
-				res.value = LLVMBuildLoad2(p->builder, lb_type(p->module, t), src.value, "");
-				LLVMSetAlignment(res.value, 1);
+				res.value = OdinLLVMBuildLoadAligned(p, lb_type(p->module, t), src.value, 1);
 				return res;
 			} else {
 				lbAddr dst = lb_add_local_generated(p, t, false);

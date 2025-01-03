@@ -17,5 +17,5 @@ double fabs(double x);
 int abs(int);
 double ldexp(double, int);
 double exp(double);
-float log(float);
-float sin(float);
+double log(double);
+double sin(double);

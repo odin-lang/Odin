@@ -124,8 +124,16 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 	switch (kind) {
 	case LLVMStructTypeKind:
 	case LLVMArrayTypeKind:
-		// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
-		lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment, false);
+		if (is_type_tuple(type)) {
+			// NOTE(bill): even though this should be safe, to keep ASAN happy, do not zero the implicit padding at the end
+			GB_ASSERT(type->kind == Type_Tuple);
+			i64 n = type->Tuple.variables.count-1;
+			i64 end_offset = type->Tuple.offsets[n] + type_size_of(type->Tuple.variables[n]->type);
+			lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, end_offset).value, alignment, false);
+		} else {
+			// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
+			lb_mem_zero_ptr_internal(p, ptr, lb_const_int(p->module, t_int, sz).value, alignment, false);
+		}
 		break;
 	default:
 		LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
@@ -269,7 +277,7 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		if (lb_try_update_alignment(ptr, align)) {
 			LLVMTypeRef result_type = lb_type(p->module, t);
 			res.value = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(result_type, 0), "");
-			res.value = LLVMBuildLoad2(p->builder, result_type, res.value, "");
+			res.value = OdinLLVMBuildLoad(p, result_type, res.value);
 			return res;
 		}
 		lbAddr addr = lb_add_local_generated(p, t, false);
@@ -468,8 +476,8 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 	}
 }
 
-gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results);
-gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res);
+gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results, TokenPos pos);
+gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, TokenPos pos);
 
 gb_internal lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue const &tv) {
 	lbValue lhs = {};
@@ -498,10 +506,10 @@ gb_internal lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue con
 			lbValue found = map_must_get(&p->module->values, end_entity);
 			lb_emit_store(p, found, rhs);
 
-			lb_build_return_stmt(p, {});
+			lb_build_return_stmt(p, {}, ast_token(arg).pos);
 		} else {
 			GB_ASSERT(tuple->variables.count == 1);
-			lb_build_return_stmt_internal(p, rhs);
+			lb_build_return_stmt_internal(p, rhs, ast_token(arg).pos);
 		}
 	}
 	lb_start_block(p, continue_block);
@@ -1123,10 +1131,6 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	Type *t = base_type(type_deref(s.type));
 	Type *result_type = nullptr;
 
-	if (is_type_relative_pointer(t)) {
-		s = lb_addr_get_ptr(p, lb_addr(s));
-	}
-
 	if (is_type_struct(t)) {
 		result_type = get_struct_field_type(t, index);
 	} else if (is_type_union(t)) {
@@ -1196,9 +1200,22 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	lbValue gep = lb_emit_struct_ep_internal(p, s, index, result_type);
 
 	Type *bt = base_type(t);
-	if (bt->kind == Type_Struct && bt->Struct.is_packed) {
-		lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED, 1);
-		GB_ASSERT(lb_get_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED) == 1);
+	if (bt->kind == Type_Struct) {
+		if (bt->Struct.is_packed) {
+			lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED, 1);
+			GB_ASSERT(lb_get_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED) == 1);
+		}
+		u64 align_max = bt->Struct.custom_max_field_align;
+		u64 align_min = bt->Struct.custom_min_field_align;
+		GB_ASSERT(align_min == 0 || align_max == 0 || align_min <= align_max);
+		if (align_max) {
+			lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_MAX_ALIGN, align_max);
+			GB_ASSERT(lb_get_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_MAX_ALIGN) == align_max);
+		}
+		if (align_min) {
+			lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_MIN_ALIGN, align_min);
+			GB_ASSERT(lb_get_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_MIN_ALIGN) == align_min);
+		}
 	}
 
 	return gep;
@@ -1431,8 +1448,6 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 		} else if (type->kind == Type_Array) {
 			e = lb_emit_array_epi(p, e, index);
 		} else if (type->kind == Type_Map) {
-			e = lb_emit_struct_ep(p, e, index);
-		} else if (type->kind == Type_RelativePointer) {
 			e = lb_emit_struct_ep(p, e, index);
 		} else {
 			GB_PANIC("un-gep-able type %s", type_to_string(type));

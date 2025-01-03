@@ -132,9 +132,13 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 			buf: [2]byte
 			s := strconv.append_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
 			switch len(s) {
-			case 0: write_string(w, "00", &n) or_return
-			case 1: write_byte(w, '0',    &n) or_return
-			case 2: write_string(w, s,    &n) or_return
+			case 0: 
+				write_string(w, "00", &n) or_return
+			case 1: 
+				write_byte(w, '0',    &n) or_return
+				fallthrough
+			case 2: 
+				write_string(w, s,    &n) or_return
 			}
 		} else {
 			write_rune(w, r, &n) or_return
@@ -225,7 +229,7 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 			} else {
 				write_byte(w, '\\', &n) or_return
 				write_byte(w, 'U', &n)  or_return
-				for s := 24; s >= 0; s -= 4 {
+				for s := 28; s >= 0; s -= 4 {
 					write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
 				}
 			}

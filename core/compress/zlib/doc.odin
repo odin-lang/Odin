@@ -13,6 +13,7 @@ Example:
 	package main
 
 	import "core:bytes"
+	import "core:compress/zlib"
 	import "core:fmt"
 
 	main :: proc() {
@@ -36,7 +37,7 @@ Example:
 		buf: bytes.Buffer
 
 		// We can pass ", true" to inflate a raw DEFLATE stream instead of a ZLIB wrapped one.
-		err := inflate(input=ODIN_DEMO, buf=&buf, expected_output_size=OUTPUT_SIZE)
+		err := zlib.inflate(input=ODIN_DEMO, buf=&buf, expected_output_size=OUTPUT_SIZE)
 		defer bytes.buffer_destroy(&buf)
 
 		if err != nil {

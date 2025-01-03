@@ -171,14 +171,6 @@ Type_Info_Simd_Vector :: struct {
 	elem_size:  int,
 	count:      int,
 }
-Type_Info_Relative_Pointer :: struct {
-	pointer:      ^Type_Info, // ^T
-	base_integer: ^Type_Info,
-}
-Type_Info_Relative_Multi_Pointer :: struct {
-	pointer:      ^Type_Info, // [^]T
-	base_integer: ^Type_Info,
-}
 Type_Info_Matrix :: struct {
 	elem:         ^Type_Info,
 	elem_size:    int,
@@ -241,8 +233,6 @@ Type_Info :: struct {
 		Type_Info_Map,
 		Type_Info_Bit_Set,
 		Type_Info_Simd_Vector,
-		Type_Info_Relative_Pointer,
-		Type_Info_Relative_Multi_Pointer,
 		Type_Info_Matrix,
 		Type_Info_Soa_Pointer,
 		Type_Info_Bit_Field,
@@ -275,8 +265,6 @@ Typeid_Kind :: enum u8 {
 	Map,
 	Bit_Set,
 	Simd_Vector,
-	Relative_Pointer,
-	Relative_Multi_Pointer,
 	Matrix,
 	Soa_Pointer,
 	Bit_Field,

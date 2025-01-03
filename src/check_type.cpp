@@ -2366,8 +2366,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 }
 
 gb_internal void check_procedure_param_polymorphic_type(CheckerContext *ctx, Type *type, Ast *type_expr) {
-	GB_ASSERT_NOT_NULL(type_expr);
-	if (type == nullptr || ctx->in_polymorphic_specialization) { return; }
+	if (type == nullptr || type_expr == nullptr || ctx->in_polymorphic_specialization) { return; }
 	if (!is_type_polymorphic_record_unspecialized(type)) { return; }
 
 	bool invalid_polymorpic_type_use = false;
@@ -2441,8 +2440,12 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	bool success = true;
 	isize specialization_count = 0;
 	Type *params  = check_get_params(c, c->scope, pt->params, &variadic, &variadic_index, &success, &specialization_count, operands);
-	Type *results = check_get_results(c, c->scope, pt->results);
 
+	bool no_poly_return = c->disallow_polymorphic_return_types;
+	c->disallow_polymorphic_return_types = c->scope == c->polymorphic_scope;
+	// NOTE(zen3ger): if the parapoly scope is the current proc's scope, then the return types shall not declare new poly vars
+	Type *results = check_get_results(c, c->scope, pt->results);
+	c->disallow_polymorphic_return_types = no_poly_return;
 
 	isize param_count = 0;
 	isize result_count = 0;
@@ -3384,6 +3387,9 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		}
 		Type *t = alloc_type_generic(ctx->scope, 0, token.string, specific);
 		if (ctx->allow_polymorphic_types) {
+			if (ctx->disallow_polymorphic_return_types) {
+				error(ident, "Undeclared polymorphic parameter '%.*s' in return type", LIT(token.string));
+			}
 			Scope *ps = ctx->polymorphic_scope;
 			Scope *s = ctx->scope;
 			Scope *entity_scope = s;
@@ -3517,41 +3523,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(rt, RelativeType, e);
-		GB_ASSERT(rt->tag->kind == Ast_CallExpr);
-		ast_node(ce, CallExpr, rt->tag);
-
-		Type *base_integer = nullptr;
-
-		if (ce->args.count != 1) {
-			error(rt->type, "#relative expected 1 type argument, got %td", ce->args.count);
-		} else {
-			base_integer = check_type(ctx, ce->args[0]);
-			if (!is_type_integer(base_integer)) {
-				error(rt->type, "#relative base types must be an integer");
-				base_integer = nullptr;
-			} else if (type_size_of(base_integer) > 64) {
-				error(rt->type, "#relative base integer types be less than or equal to 64-bits");
-				base_integer = nullptr;
-			}
-		}
-
-		Type *relative_type = nullptr;
-		Type *base_type = check_type(ctx, rt->type);
-		if (!is_type_pointer(base_type) && !is_type_multi_pointer(base_type)) {
-			error(rt->type, "#relative types can only be a pointer or multi-pointer");
-			relative_type = base_type;
-		} else if (base_integer == nullptr) {
-			relative_type = base_type;
-		} else {
-			if (is_type_pointer(base_type)) {
-				relative_type = alloc_type_relative_pointer(base_type, base_integer);
-			} else if (is_type_multi_pointer(base_type)) {
-				relative_type = alloc_type_relative_multi_pointer(base_type, base_integer);
-			}
-		}
-		GB_ASSERT(relative_type != nullptr);
-
-		*type = relative_type;
+		error(e, "#relative types have been removed from the compiler. Prefer \"core:relative\".");
+		*type = t_invalid;
 		set_base_type(named_type, *type);
 		return true;
 	case_end;

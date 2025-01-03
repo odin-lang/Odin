@@ -2600,6 +2600,25 @@ gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		check_expr(ctx, &o, fs->cond);
 		if (o.mode != Addressing_Invalid && !is_type_boolean(o.type)) {
 			error(fs->cond, "Non-boolean condition in 'for' statement");
+		} else {
+			Ast *cond = unparen_expr(o.expr);
+			if (cond && cond->kind == Ast_BinaryExpr &&
+			    cond->BinaryExpr.left && cond->BinaryExpr.right &&
+			    cond->BinaryExpr.op.kind == Token_GtEq &&
+			    type_of_expr(cond->BinaryExpr.left) != nullptr &&
+			    is_type_unsigned(type_of_expr(cond->BinaryExpr.left)) &&
+			    cond->BinaryExpr.right->tav.value.kind == ExactValue_Integer &&
+			    is_exact_value_zero(cond->BinaryExpr.right->tav.value)) {
+				warning(cond, "Expression is always true since unsigned numbers are always >= 0");
+			} else if (cond && cond->kind == Ast_BinaryExpr &&
+			    cond->BinaryExpr.left && cond->BinaryExpr.right &&
+			    cond->BinaryExpr.op.kind == Token_LtEq &&
+			    type_of_expr(cond->BinaryExpr.right) != nullptr &&
+			    is_type_unsigned(type_of_expr(cond->BinaryExpr.right)) &&
+			    cond->BinaryExpr.left->tav.value.kind == ExactValue_Integer &&
+			    is_exact_value_zero(cond->BinaryExpr.left->tav.value)) {
+				warning(cond, "Expression is always true since unsigned numbers are always >= 0");
+			}
 		}
 	}
 	if (fs->post != nullptr) {

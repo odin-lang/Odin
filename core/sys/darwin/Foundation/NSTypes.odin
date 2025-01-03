@@ -20,7 +20,7 @@ BOOL :: bool // TODO(bill): should this be `distinct`?
 YES  :: true
 NO   :: false
 
-OperatingSystemVersion :: struct #packed {
+OperatingSystemVersion :: struct #align(8) {
 	majorVersion: Integer,
 	minorVersion: Integer,
 	patchVersion: Integer,

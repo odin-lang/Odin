@@ -31,6 +31,11 @@ Id :: distinct uint
 Fd  :: distinct i32
 
 /*
+	Represents a watch descriptor.
+*/
+Wd  :: distinct i32
+
+/*
 	Type for PID file descriptors.
 */
 Pid_FD :: distinct i32
@@ -342,6 +347,18 @@ Poll_Fd :: struct {
 	events:  Fd_Poll_Events,
 	revents: Fd_Poll_Events,
 }
+
+Inotify_Init_Flags :: bit_set[Inotify_Init_Bits; i32]
+
+Inotify_Event :: struct {
+	wd:     Wd,
+	mask:   Inotify_Event_Mask,
+	cookie: u32,
+	len:    u32,
+	name:   [0]u8,
+}
+
+Inotify_Event_Mask :: bit_set[Inotify_Event_Bits; u32]
 
 /*
 	Specifies protection for memory pages.
@@ -668,12 +685,21 @@ Address_Family :: distinct Protocol_Family
 Socket_Msg :: bit_set[Socket_Msg_Bits; i32]
 
 /*
+	Struct representing a generic socket address.
+*/
+Sock_Addr :: struct #packed {
+	sa_family: Address_Family,
+	sa_data:   [14]u8,
+}
+
+/*
 	Struct representing IPv4 socket address.
 */
 Sock_Addr_In :: struct #packed {
 	sin_family: Address_Family,
 	sin_port:   u16be,
 	sin_addr:   [4]u8,
+	sin_zero:   [size_of(Sock_Addr) - size_of(Address_Family) - size_of(u16be) - size_of([4]u8)]u8,
 }
 
 /*
@@ -703,6 +729,7 @@ Sock_Addr_Any :: struct #raw_union {
 		family: Address_Family,
 		port:   u16be,
 	},
+	using generic: Sock_Addr,
 	using ipv4: Sock_Addr_In,
 	using ipv6: Sock_Addr_In6,
 	using uds: Sock_Addr_Un,

@@ -1356,6 +1356,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
+	mpsc_init(&i->foreign_decls_to_check, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
 
 	string_map_init(&i->load_directory_cache);
@@ -1382,6 +1383,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
+	mpsc_destroy(&i->foreign_decls_to_check);
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
@@ -2186,16 +2188,6 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->SimdVector.elem);
 		break;
 
-	case Type_RelativePointer:
-		add_type_info_type_internal(c, bt->RelativePointer.pointer_type);
-		add_type_info_type_internal(c, bt->RelativePointer.base_integer);
-		break;
-
-	case Type_RelativeMultiPointer:
-		add_type_info_type_internal(c, bt->RelativeMultiPointer.pointer_type);
-		add_type_info_type_internal(c, bt->RelativeMultiPointer.base_integer);
-		break;
-
 	case Type_Matrix:
 		add_type_info_type_internal(c, bt->Matrix.elem);
 		break;
@@ -2439,16 +2431,6 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_SimdVector:
 		add_min_dep_type_info(c, bt->SimdVector.elem);
-		break;
-
-	case Type_RelativePointer:
-		add_min_dep_type_info(c, bt->RelativePointer.pointer_type);
-		add_min_dep_type_info(c, bt->RelativePointer.base_integer);
-		break;
-
-	case Type_RelativeMultiPointer:
-		add_min_dep_type_info(c, bt->RelativeMultiPointer.pointer_type);
-		add_min_dep_type_info(c, bt->RelativeMultiPointer.base_integer);
 		break;
 
 	case Type_Matrix:
@@ -3075,8 +3057,6 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_map              = find_core_type(c, str_lit("Type_Info_Map"));
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
-	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
-	t_type_info_relative_multi_pointer = find_core_type(c, str_lit("Type_Info_Relative_Multi_Pointer"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 	t_type_info_bit_field        = find_core_type(c, str_lit("Type_Info_Bit_Field"));
@@ -3105,8 +3085,6 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_map_ptr              = alloc_type_pointer(t_type_info_map);
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
-	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
-	t_type_info_relative_multi_pointer_ptr = alloc_type_pointer(t_type_info_relative_multi_pointer);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
@@ -5117,6 +5095,38 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 		add_untyped_expressions(ctx.info, &untyped);
 
 		e->LibraryName.paths = fl->fullpaths;
+	}
+
+	for (Entity *e = nullptr; mpsc_dequeue(&c->info.foreign_decls_to_check, &e); /**/) {
+		GB_ASSERT(e != nullptr);
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+		if (!is_arch_wasm()) {
+			continue;
+		}
+		Entity *foreign_library = e->Procedure.foreign_library;
+		GB_ASSERT(foreign_library != nullptr);
+
+		String name = e->Procedure.link_name;
+
+		String module_name = str_lit("env");
+		GB_ASSERT (foreign_library->kind == Entity_LibraryName);
+		if (foreign_library->LibraryName.paths.count != 1) {
+			error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
+			      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
+		}
+
+		if (foreign_library->LibraryName.paths.count >= 1) {
+			module_name = foreign_library->LibraryName.paths[0];
+		}
+
+		if (!string_ends_with(module_name, str_lit(".o"))) {
+			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+		}
+		e->Procedure.link_name = name;
+
+		check_foreign_procedure(&ctx, e, e->decl_info);
 	}
 }
 

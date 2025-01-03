@@ -152,43 +152,65 @@ Errno :: enum i32 {
 	RDONLY flag is not present, because it has the value of 0, i.e. it is the
 	default, unless WRONLY or RDWR is specified.
 */
-Open_Flags_Bits :: enum {
-	WRONLY    = 0,
-	RDWR      = 1,
-	CREAT     = 6,
-	EXCL      = 7,
-	NOCTTY    = 8,
-	TRUNC     = 9,
-	APPEND    = 10,
-	NONBLOCK  = 11,
-	DSYNC     = 12,
-	ASYNC     = 13,
-	DIRECT    = 14,
-	LARGEFILE = 15,
-	DIRECTORY = 16,
-	NOFOLLOW  = 17,
-	NOATIME   = 18,
-	CLOEXEC   = 19,
-	PATH      = 21,
+when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECT    = 14,
+		LARGEFILE = 15,
+		DIRECTORY = 16,
+		NOFOLLOW  = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
+	// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
+	#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
+	#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
+	#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
+	#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
+	#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
+	#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
+	#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
+	#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
+	#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
+	#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
+	#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
+	#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
+	#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
+	#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
+	#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
+} else {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECTORY = 14,
+		NOFOLLOW  = 15,
+		DIRECT    = 16,
+		LARGEFILE = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
 }
-// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
-#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
-#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
-#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
-#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
-#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
-#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
-#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
-#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
-#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
-#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
-#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
-#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
-#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
-#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
-#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
-#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
-#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
 
 /*
 	Bits for FD_Flags bitset
@@ -517,6 +539,36 @@ Fd_Poll_Events_Bits :: enum {
 	MSG    = 10,
 	REMOVE = 12,
 	RDHUP  = 13,
+}
+
+Inotify_Init_Bits :: enum {
+	NONBLOCK = 11,
+	CLOEXEC  = 19,
+}
+
+Inotify_Event_Bits :: enum u32 {
+	ACCESS        = 0,
+	MODIFY        = 1,
+	ATTRIB        = 2,
+	CLOSE_WRITE   = 3,
+	CLOSE_NOWRITE = 4,
+	OPEN          = 5,
+	MOVED_FROM    = 6,
+	MOVED_TO      = 7,
+	CREATE        = 8,
+	DELETE        = 9,
+	DELETE_SELF   = 10,
+	MOVE_SELF     = 11,
+	UNMOUNT       = 13,
+	Q_OVERFLOW    = 14,
+	IGNORED       = 15,
+	ONLYDIR       = 24,
+	DONT_FOLLOW   = 25,
+	EXCL_UNLINK   = 26,
+	MASK_CREATE   = 28,
+	MASK_ADD      = 29,
+	ISDIR         = 30,
+	ONESHOT       = 31,
 }
 
 /*

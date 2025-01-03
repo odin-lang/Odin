@@ -370,7 +370,11 @@ gb_internal ExactValue exact_value_from_basic_literal(TokenKind kind, String con
 	}
 	case Token_Rune: {
 		Rune r = GB_RUNE_INVALID;
-		utf8_decode(string.text, string.len, &r);
+		if (string.len == 1) {
+			r = cast(Rune)string.text[0];
+		} else {
+			utf8_decode(string.text, string.len, &r);
+		}
 		return exact_value_i64(r);
 	}
 	}
@@ -687,6 +691,7 @@ gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 	case ExactValue_String:
 	case ExactValue_Quaternion:
 	case ExactValue_Pointer:
+	case ExactValue_Compound:
 	case ExactValue_Procedure:
 	case ExactValue_Typeid:
 		return;

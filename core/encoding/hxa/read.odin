@@ -117,7 +117,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 			layer.name = read_name(r) or_return
 			layer.components = read_value(r, u8) or_return
 			type := read_value(r, Layer_Data_Type) or_return
-			if type > max(type) {
+			if type > max(Layer_Data_Type) {
 				if r.print_error {
 					fmt.eprintf("HxA Error: file '%s' has layer data type %d. Maximum value is %d\n",
 								r.filename, u8(type), u8(max(Layer_Data_Type)))

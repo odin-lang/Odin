@@ -53,15 +53,15 @@ vector_dot :: proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E)
 }
 @(require_results)
 quaternion64_dot :: proc "contextless" (a, b: $T/quaternion64) -> (c: f16) {
-	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
+	return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 @(require_results)
 quaternion128_dot :: proc "contextless" (a, b: $T/quaternion128) -> (c: f32) {
-	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
+	return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 @(require_results)
 quaternion256_dot :: proc "contextless" (a, b: $T/quaternion256) -> (c: f64) {
-	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
+	return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 
 dot :: proc{scalar_dot, vector_dot, quaternion64_dot, quaternion128_dot, quaternion256_dot}
@@ -166,6 +166,18 @@ vector_triple_product :: proc "contextless" (a, b, c: $T/[$N]$E) -> T where IS_N
 
 length :: proc{vector_length, quaternion_length}
 length2 :: proc{vector_length2, quaternion_length2}
+
+
+@(require_results)
+clamp_length :: proc "contextless" (v: $T/[$N]$E, a: E) -> T where IS_FLOAT(E) {
+	if a <= 0 {
+		return 0
+	}
+	
+	m2 := length2(v)
+	return v if (m2 <= a*a) else (v / sqrt(m2) * a) // returns original when m2 is 0
+}
+
 
 @(require_results)
 projection :: proc "contextless" (x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {

@@ -72,7 +72,11 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa)
 	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		// Not a symlink
-		return _file_info_from_win32_file_attribute_data(&fa, name, allocator)
+		fi = _file_info_from_win32_file_attribute_data(&fa, name, allocator) or_return
+		if fi.type == .Undetermined {
+			fi.type = _file_type_from_create_file(wname, create_file_attributes)
+		}
+		return
 	}
 
 	err := 0 if ok else win32.GetLastError()
@@ -86,7 +90,11 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 		}
 		win32.FindClose(sh)
 
-		return _file_info_from_win32_find_data(&fd, name, allocator)
+		fi = _file_info_from_win32_find_data(&fd, name, allocator) or_return
+		if fi.type == .Undetermined {
+			fi.type = _file_type_from_create_file(wname, create_file_attributes)
+		}
+		return
 	}
 
 	h := win32.CreateFileW(wname, 0, 0, nil, win32.OPEN_EXISTING, create_file_attributes, nil)
@@ -194,28 +202,36 @@ file_type :: proc(h: win32.HANDLE) -> File_Type {
 	return .Undetermined
 }
 
+_file_type_from_create_file :: proc(wname: win32.wstring, create_file_attributes: u32) -> File_Type {
+	h := win32.CreateFileW(wname, 0, 0, nil, win32.OPEN_EXISTING, create_file_attributes, nil)
+	if h == win32.INVALID_HANDLE_VALUE {
+		return .Undetermined
+	}
+	defer win32.CloseHandle(h)
+	return file_type(h)
+}
+
 _file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (type: File_Type, mode: int) {
 	if file_attributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
 		mode |= 0o444
 	} else {
 		mode |= 0o666
 	}
+
 	is_sym := false
 	if file_attributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		is_sym = false
 	} else {
 		is_sym = ReparseTag == win32.IO_REPARSE_TAG_SYMLINK || ReparseTag == win32.IO_REPARSE_TAG_MOUNT_POINT
 	}
+
 	if is_sym {
 		type = .Symlink
-	} else {
-		if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
-			type = .Directory
-			mode |= 0o111
-		}
-		if h != nil {
-			type = file_type(h)
-		}
+	} else if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
+		type = .Directory
+		mode |= 0o111
+	} else if h != nil {
+		type = file_type(h)
 	}
 	return
 }
@@ -267,7 +283,7 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	fi.name = basename(path)
 	fi.inode = u128(u64(d.nFileIndexHigh)<<32 + u64(d.nFileIndexLow))
 	fi.size  = i64(d.nFileSizeHigh)<<32  + i64(d.nFileSizeLow)
-	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
+	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, h, 0)
 	fi.type = type
 	fi.mode |= mode
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))

@@ -679,7 +679,7 @@ get_last_error_string :: proc() -> string {
 
 
 @(require_results)
-open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (handle: Handle, err: Error) {
+open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (handle: Handle, err: Error) {
 	isDir := is_dir_path(path)
 	flags := flags
 	if isDir {
@@ -1026,7 +1026,7 @@ absolute_path_from_handle :: proc(fd: Handle) -> (path: string, err: Error) {
 }
 
 @(require_results)
-absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
+absolute_path_from_relative :: proc(rel: string, allocator := context.allocator) -> (path: string, err: Error) {
 	rel := rel
 	if rel == "" {
 		rel = "."
@@ -1041,9 +1041,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Error) {
 	}
 	defer _unix_free(rawptr(path_ptr))
 
-	path = strings.clone(string(path_ptr))
-
-	return path, nil
+	return strings.clone(string(path_ptr), allocator)
 }
 
 access :: proc(path: string, mask: int) -> bool {

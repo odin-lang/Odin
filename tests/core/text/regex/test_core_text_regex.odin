@@ -1043,3 +1043,40 @@ test_us_phone_number :: proc(t: ^testing.T) {
 	EXPR :: `^[2-9]\d{2}-\d{3}-\d{4}$`
 	check_expression(t, EXPR, "650-253-0001", "650-253-0001")
 }
+
+@test
+test_preallocated_capture :: proc(t: ^testing.T) {
+	capture := regex.preallocate_capture()
+	defer regex.destroy(capture)
+
+	for pos in capture.pos {
+		testing.expect_value(t, pos, [2]int{0, 0})
+	}
+	for group in capture.groups {
+		testing.expect_value(t, group, "")
+	}
+
+	rex, parse_err := regex.create(`f(o)ob(ar)`)
+	if !testing.expect_value(t, parse_err, nil) {
+		return
+	}
+	defer regex.destroy(rex)
+
+	num_groups, success := regex.match_with_preallocated_capture(rex, "foobar", &capture)
+	testing.expect_value(t, num_groups, 3)
+	testing.expect_value(t, success, true)
+
+	testing.expect_value(t, capture.pos[0], [2]int{0, 6})
+	testing.expect_value(t, capture.pos[1], [2]int{1, 2})
+	testing.expect_value(t, capture.pos[2], [2]int{4, 6})
+	for pos in capture.pos[3:] {
+		testing.expect_value(t, pos, [2]int{0, 0})
+	}
+
+	testing.expect_value(t, capture.groups[0], "foobar")
+	testing.expect_value(t, capture.groups[1], "o")
+	testing.expect_value(t, capture.groups[2], "ar")
+	for groups in capture.groups[3:] {
+		testing.expect_value(t, groups, "")
+	}
+}

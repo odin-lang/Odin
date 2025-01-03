@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
+#include "build_cpuid.cpp"
 
 // #if defined(GB_SYSTEM_WINDOWS)
 // #define DEFAULT_TO_THREADED_CHECKER
@@ -343,6 +344,22 @@ struct BuildCacheData {
 	bool copy_already_done;
 };
 
+
+enum LinkerChoice : i32 {
+	Linker_Invalid = -1,
+	Linker_Default = 0,
+	Linker_lld,
+	Linker_radlink,
+
+	Linker_COUNT,
+};
+
+String linker_choices[Linker_COUNT] = {
+	str_lit("default"),
+	str_lit("lld"),
+	str_lit("radlink"),
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -418,11 +435,12 @@ struct BuildContext {
 	bool   no_rpath;
 	bool   no_entry_point;
 	bool   no_thread_local;
-	bool   use_lld;
 	bool   cross_compiling;
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+
+	LinkerChoice linker_choice;
 
 	StringSet custom_attributes;
 
@@ -449,11 +467,12 @@ struct BuildContext {
 	BuildCacheData build_cache_data;
 
 	bool internal_no_inline;
+	bool internal_by_value;
 
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
-	
+
 	bool   copy_file_contents;
 
 	bool   no_rtti;
@@ -1870,7 +1889,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			}
 
-			if (!build_context.use_lld && find_result.vs_exe_path.len == 0) {
+			if (build_context.linker_choice == Linker_Default && find_result.vs_exe_path.len == 0) {
 				gb_printf_err("link.exe not found.\n");
 				return false;
 			}
@@ -2035,7 +2054,7 @@ gb_internal bool init_build_paths(String init_filename) {
 
 	// Do we have an extension? We might not if the output filename was supplied.
 	if (bc->build_paths[BuildPath_Output].ext.len == 0) {
-		if (build_context.metrics.os == TargetOs_windows || build_context.build_mode != BuildMode_Executable) {
+		if (build_context.metrics.os == TargetOs_windows || is_arch_wasm() || build_context.build_mode != BuildMode_Executable) {
 			bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
 		}
 	}

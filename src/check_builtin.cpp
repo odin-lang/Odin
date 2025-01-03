@@ -1533,6 +1533,10 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 
 		for (FileInfo fi : list) {
 			LoadFileCache *cache = nullptr;
+			if (fi.is_dir) {
+				continue;
+			}
+
 			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &cache, LoadFileTier_Contents, /*use_mutex*/false)) {
 				array_add(&file_caches, cache);
 			} else {
@@ -2060,8 +2064,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		bool ok = check_builtin_simd_operation(c, operand, call, id, type_hint);
 		if (!ok) {
 			operand->type = t_invalid;
+			operand->mode = Addressing_Value;
 		}
-		operand->mode = Addressing_Value;
 		operand->value = {};
 		operand->expr = call;
 		return ok;
@@ -2547,6 +2551,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_swizzle: {
 		// swizzle :: proc(v: [N]T, ..int) -> [M]T
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *original_type = operand->type;
 		Type *type = base_type(original_type);
 		i64 max_count = 0;
@@ -2904,6 +2912,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// imag :: proc(x: type) -> float_type
 
 		Operand *x = operand;
+		if (!x->type) {
+			return false;
+		}
+
 		if (is_type_untyped(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				if (is_type_numeric(x->type)) {
@@ -2964,6 +2976,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// kmag :: proc(x: type) -> float_type
 
 		Operand *x = operand;
+		if (!x->type) {
+			return false;
+		}
+
 		if (is_type_untyped(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				if (is_type_numeric(x->type)) {
@@ -3013,6 +3029,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_conj: {
 		// conj :: proc(x: type) -> type
 		Operand *x = operand;
+		if (!x->type) {
+			return false;
+		}
+
 		Type *t = x->type;
 		Type *elem = core_array_type(t);
 		
@@ -3053,10 +3073,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	}
 
 	case BuiltinProc_expand_values: {
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *type = base_type(operand->type);
 		if (!is_type_struct(type) && !is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected a struct or array type, got '%s'", type_str);
+			error(call, "Expected a struct or array type to 'expand_values', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3092,8 +3116,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		check_multi_expr_or_type(c, operand, ce->args[0]);
 
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
+
 		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
 			// Okay
 		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
@@ -3166,6 +3195,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 
+		if (ce->args.count <= 1) {
+			error(call, "Too few arguments for 'min', two or more are required");
+			return false;
+		}
 
 		bool all_constant = operand->mode == Addressing_Constant;
 
@@ -3260,6 +3293,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		check_multi_expr_or_type(c, operand, ce->args[0]);
 
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
 
@@ -3337,6 +3374,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gbString type_str = type_to_string(original_type);
 			error(call, "Invalid type for 'max', got %s", type_str);
 			gb_string_free(type_str);
+			return false;
+		}
+		
+		if (ce->args.count <= 1) {
+			error(call, "Too few arguments for 'max', two or more are required");
 			return false;
 		}
 
@@ -3430,6 +3472,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_abs: {
 		// abs :: proc(n: numeric) -> numeric
+		if (!operand->type) {
+			return false;
+		}
+
 		if (!(is_type_numeric(operand->type) && !is_type_array(operand->type))) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a numeric type to 'abs', got '%s'", type_str);
@@ -3485,6 +3531,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_clamp: {
 		// clamp :: proc(a, min, max: ordered) -> ordered
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *type = operand->type;
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);

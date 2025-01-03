@@ -13,6 +13,11 @@ A handle to a dynamically loaded library.
 Library :: distinct rawptr
 
 /*
+The file extension for dynamic libraries on the target OS.
+*/
+LIBRARY_FILE_EXTENSION :: _LIBRARY_FILE_EXTENSION
+
+/*
 Loads a dynamic library from the filesystem. The paramater `global_symbols` makes the symbols in the loaded
 library available to resolve references in subsequently loaded libraries.
 
@@ -37,8 +42,8 @@ Example:
 		fmt.println("The library %q was successfully loaded", LIBRARY_PATH)
 	}
 */
-load_library :: proc(path: string, global_symbols := false) -> (library: Library, did_load: bool) {
-	return _load_library(path, global_symbols)
+load_library :: proc(path: string, global_symbols := false, allocator := context.temp_allocator) -> (library: Library, did_load: bool) {
+	return _load_library(path, global_symbols, allocator)
 }
 
 /*
@@ -98,8 +103,8 @@ Example:
 		}
 	}
 */
-symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) #optional_ok {
-	return _symbol_address(library, symbol)
+symbol_address :: proc(library: Library, symbol: string, allocator := context.temp_allocator) -> (ptr: rawptr, found: bool) #optional_ok {
+	return _symbol_address(library, symbol, allocator)
 }
 
 /*
@@ -123,30 +128,35 @@ initialize_symbols :: proc(
 ) -> (count: int = -1, ok: bool = false) where intrinsics.type_is_struct(T) {
 	assert(symbol_table != nil)
 
-	handle := load_library(library_path) or_return
+	// First, (re)load the library.
+	handle: Library
+	for field in reflect.struct_fields_zipped(T) {
+		if field.name == handle_field_name {
+			field_ptr := rawptr(uintptr(symbol_table) + field.offset)
+
+			// We appear to be hot reloading. Unload previous incarnation of the library.
+			if old_handle := (^Library)(field_ptr)^; old_handle != nil {
+				unload_library(old_handle) or_return
+			}
+
+			handle = load_library(library_path) or_return
+			(^Library)(field_ptr)^ = handle
+			break
+		}
+	}
 
 	// Buffer to concatenate the prefix + symbol name.
 	prefixed_symbol_buf: [2048]u8 = ---
 
 	count = 0
 	for field in reflect.struct_fields_zipped(T) {
+		// If we're not the library handle, the field needs to be a pointer type, be it a procedure pointer or an exported global.
+		if field.name == handle_field_name || !(reflect.is_procedure(field.type) || reflect.is_pointer(field.type)) {
+			continue
+		}
+
 		// Calculate address of struct member
 		field_ptr := rawptr(uintptr(symbol_table) + field.offset)
-
-		// If we've come across the struct member for the handle, store it and continue scanning for other symbols.
-		if field.name == handle_field_name {
-			// We appear to be hot reloading. Unload previous incarnation of the library.
-			if old_handle := (^Library)(field_ptr)^; old_handle != nil {
-				unload_library(old_handle) or_return
-			}
-			(^Library)(field_ptr)^ = handle
-			continue
-		}
-
-		// We're not the library handle, so the field needs to be a pointer type, be it a procedure pointer or an exported global.
-		if !(reflect.is_procedure(field.type) || reflect.is_pointer(field.type)) {
-			continue
-		}
 
 		// Let's look up or construct the symbol name to find in the library
 		prefixed_name: string

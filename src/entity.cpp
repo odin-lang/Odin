@@ -256,6 +256,7 @@ struct Entity {
 			bool    entry_point_only           : 1;
 			bool    has_instrumentation        : 1;
 			bool    is_memcpy_like             : 1;
+			bool    uses_branch_location       : 1;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;

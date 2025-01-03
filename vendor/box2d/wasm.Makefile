@@ -10,7 +10,7 @@ SRCS      = $(wildcard box2d-$(VERSION)/src/*.c)
 OBJS_SIMD = $(SRCS:.c=_simd.o)
 OBJS      = $(SRCS:.c=.o)
 SYSROOT   = $(shell odin root)/vendor/libc
-CFLAGS    = -Ibox2d-$(VERSION)/include -Ibox2d-$(VERSION)/Extern/simde --target=wasm32 -D__EMSCRIPTEN__ -DNDEBUG -O3 --sysroot=$(SYSROOT)
+CFLAGS    = -Ibox2d-$(VERSION)/include -Ibox2d-$(VERSION)/extern/simde --target=wasm32 -D__EMSCRIPTEN__ -DNDEBUG -O3 --sysroot=$(SYSROOT)
 
 all: lib/box2d_wasm.o lib/box2d_wasm_simd.o clean
 

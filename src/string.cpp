@@ -156,6 +156,7 @@ gb_internal isize string_index_byte(String const &s, u8 x) {
 
 gb_internal gb_inline bool str_eq(String const &a, String const &b) {
 	if (a.len != b.len) return false;
+	if (a.len == 0) return true;
 	return memcmp(a.text, b.text, a.len) == 0;
 }
 gb_internal gb_inline bool str_ne(String const &a, String const &b) { return !str_eq(a, b);                }
@@ -411,6 +412,32 @@ gb_internal String concatenate4_strings(gbAllocator a, String const &x, String c
 	return make_string(data, len);
 }
 
+#if defined(GB_SYSTEM_WINDOWS)
+gb_internal String escape_char(gbAllocator a, String s, char cte) {
+	isize buf_len = s.len;
+	isize cte_count = 0;
+	for (isize j = 0; j < s.len; j++) {
+		if (s.text[j] == cte) {
+			cte_count++;
+		}
+	}
+
+	u8 *buf = gb_alloc_array(a, u8, buf_len+cte_count);
+	isize i = 0;
+	for (isize j = 0; j < s.len; j++) {
+		u8 c = s.text[j];
+
+		if (c == cte) {
+			buf[i++] = '\\';
+			buf[i++] = c;
+		} else {
+			buf[i++] = c;
+		}
+	}
+	return make_string(buf, i);
+}
+#endif
+
 gb_internal String string_join_and_quote(gbAllocator a, Array<String> strings) {
 	if (!strings.count) {
 		return make_string(nullptr, 0);
@@ -426,7 +453,11 @@ gb_internal String string_join_and_quote(gbAllocator a, Array<String> strings) {
 		if (i > 0) {
 			s = gb_string_append_fmt(s, " ");
 		}
+#if defined(GB_SYSTEM_WINDOWS)
+		s = gb_string_append_fmt(s, "\"%.*s\" ", LIT(escape_char(a, strings[i], '\\')));
+#else
 		s = gb_string_append_fmt(s, "\"%.*s\" ", LIT(strings[i]));
+#endif
 	}
 
 	return make_string(cast(u8 *) s, gb_string_length(s));
@@ -687,12 +718,12 @@ gb_internal bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_byt
 		Rune r = -1;
 		isize size = utf8_decode(s.text, s.len, &r);
 		*rune = r;
-		*multiple_bytes = true;
-		*tail_string = make_string(s.text+size, s.len-size);
+		if (multiple_bytes) *multiple_bytes = true;
+		if (tail_string) *tail_string = make_string(s.text+size, s.len-size);
 		return true;
 	} else if (s[0] != '\\') {
 		*rune = s[0];
-		*tail_string = make_string(s.text+1, s.len-1);
+		if (tail_string) *tail_string = make_string(s.text+1, s.len-1);
 		return true;
 	}
 
@@ -778,10 +809,10 @@ gb_internal bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_byt
 			return false;
 		}
 		*rune = r;
-		*multiple_bytes = true;
+		if (multiple_bytes) *multiple_bytes = true;
 	} break;
 	}
-	*tail_string = s;
+	if (tail_string) *tail_string = s;
 	return true;
 }
 

@@ -383,6 +383,60 @@ test_lying_length_array :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_unmarshal_map_into_struct_partially :: proc(t: ^testing.T) {
+
+	// Tests that when unmarshalling into a struct that has less fields than the binary map has fields,
+	// the additional fields in the binary are skipped and the rest of the binary is correctly decoded.
+
+	Foo :: struct {
+		bar: struct {
+			hello: string,
+			world: string,
+			foo:   string `cbor:"-"`,
+		},
+		baz: int,
+	}
+
+	Foo_More :: struct {
+		bar: struct {
+			hello:   string,
+			world:   string,
+			hellope: string,
+			foo:     string,
+		},
+		baz: int,
+	}
+	more := Foo_More{
+		bar = {
+			hello   = "hello",
+			world   = "world",
+			hellope = "hellope",
+			foo     = "foo",
+		},
+		baz = 4,
+	}
+
+	more_bin, err := cbor.marshal(more)
+	testing.expect_value(t, err, nil)
+
+	less := Foo{
+		bar = {
+			hello = "hello",
+			world = "world",
+		},
+		baz = 4,
+	}
+	less_out: Foo
+	uerr := cbor.unmarshal(string(more_bin), &less_out)
+	testing.expect_value(t, uerr, nil)
+	testing.expect_value(t, less_out, less)
+
+	delete(more_bin)
+	delete(less_out.bar.hello)
+	delete(less_out.bar.world)
+}
+
+@(test)
 test_decode_unsigned :: proc(t: ^testing.T) {
 	expect_decoding(t, "\x00", "0", u8)
 	expect_decoding(t, "\x01", "1", u8)

@@ -3696,6 +3696,8 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 		}
 	}
 
+	end := p.prev_tok
+
 	if p.expr_level >= 0 {
 		end: ^ast.Expr
 		if !is_mutable && len(values) > 0 {
@@ -3715,7 +3717,7 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 		}
 	}
 
-	decl := ast.new(ast.Value_Decl, names[0].pos, end_pos(p.prev_tok))
+	decl := ast.new(ast.Value_Decl, names[0].pos, end_pos(end))
 	decl.docs = docs
 	decl.names = names
 	decl.type = type

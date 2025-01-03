@@ -84,6 +84,45 @@ out_of_memory_in_parse_json :: proc(t: ^testing.T) {
 }
 
 @test
+out_of_memory_in_unmarshal :: proc(t: ^testing.T) {
+	arena: virtual.Arena
+	arena_buffer: [128]byte
+	arena_init_error := virtual.arena_init_buffer(&arena, arena_buffer[:])
+	testing.expectf(t, arena_init_error == nil, "Expected arena initialization to not return error, got: %v\n", arena_init_error)
+
+	context.allocator = virtual.arena_allocator(&arena)
+
+	json_data := `{
+		"number": 42,
+		"strs": [
+			"Cat",
+			"Dog",
+			"Toucan"
+		],
+		"flag": true
+	}`
+
+	Test_Structure :: struct {
+		number: int,
+		strs: []string,
+		flag: bool,
+	}
+	test_result: Test_Structure
+
+	err := json.unmarshal(transmute([]u8)json_data, &test_result)
+	testing.expectf(t, err == nil, "Expected `json.unmarshal` to succeed, got error %v", err)
+
+	// Test #4515 fix.
+	// Without `or_return` in `unmarshal_object`'s struct_loop, `json.unmarshal` would return OOM a few times and then return `Unsupported_Type_Error`.
+	// With the fix we expect it to return OOM every time, so if this ever fails, it means we have a regression.
+	for _ in 0..<8 {
+		err  = json.unmarshal(transmute([]u8)json_data, &test_result)
+		expected_error := json.Error.Out_Of_Memory
+		testing.expectf(t, err == json.Error.Out_Of_Memory, "Expected `json.unmarshal` to fail with %v, got %v", expected_error, err)
+	}
+}
+
+@test
 marshal_json :: proc(t: ^testing.T) {
    
 	My_Struct :: struct {
