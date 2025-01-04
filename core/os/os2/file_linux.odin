@@ -80,6 +80,9 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 	// terminal would be incredibly rare. This has no effect on files while
 	// allowing us to open serial devices.
 	sys_flags: linux.Open_Flags = {.NOCTTY, .CLOEXEC}
+	when size_of(rawptr) == 4 {
+		sys_flags += {.LARGEFILE}
+	}
 	switch flags & (O_RDONLY|O_WRONLY|O_RDWR) {
 	case O_RDONLY:
 	case O_WRONLY: sys_flags += {.WRONLY}
@@ -275,7 +278,7 @@ _remove :: proc(name: string) -> Error {
 	TEMP_ALLOCATOR_GUARD()
 	name_cstr := temp_cstring(name) or_return
 
-	if fd, errno := linux.open(name_cstr, _OPENDIR_FLAGS); errno == .NONE {
+	if fd, errno := linux.open(name_cstr, _OPENDIR_FLAGS + {.NOFOLLOW}); errno == .NONE {
 		linux.close(fd)
 		return _get_platform_error(linux.rmdir(name_cstr))
 	}

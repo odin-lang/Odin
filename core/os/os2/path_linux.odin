@@ -77,8 +77,6 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 }
 
 _remove_all :: proc(path: string) -> Error {
-	DT_DIR :: 4
-
 	remove_all_dir :: proc(dfd: linux.Fd) -> Error {
 		n := 64
 		buf := make([]u8, n)
