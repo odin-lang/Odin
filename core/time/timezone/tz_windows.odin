@@ -279,7 +279,7 @@ _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_re
 			break
 		}
 	}
-	if abbrevs_ok {
+	if !abbrevs_ok {
 		return
 	}
 	if abbrevs.std == "UTC" && abbrevs.dst == abbrevs.std {
