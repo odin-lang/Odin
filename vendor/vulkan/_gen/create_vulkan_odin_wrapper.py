@@ -929,8 +929,7 @@ when ODIN_OS == .Windows {
 \t}
 }
 
-// We want to use `vendor:x11/xlib` types so we need to match their build constraints.
-when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
+when xlib.IS_SUPPORTED {
 \tXlibDisplay  :: xlib.Display
 \tXlibWindow   :: xlib.Window
 \tXlibVisualID :: xlib.VisualID

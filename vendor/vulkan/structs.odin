@@ -36,8 +36,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
-// We want to use `vendor:x11/xlib` types so we need to match their build constraints.
-when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
+when xlib.IS_SUPPORTED {
 	XlibDisplay  :: xlib.Display
 	XlibWindow   :: xlib.Window
 	XlibVisualID :: xlib.VisualID
