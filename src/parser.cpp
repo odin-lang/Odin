@@ -6265,10 +6265,16 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			syntax_error(token_for_pos, "Invalid vet flag name: %.*s", LIT(p));
 			error_line("\tExpected one of the following\n");
 			error_line("\tunused\n");
+			error_line("\tunused-variables\n");
+			error_line("\tunused-imports\n");
+			error_line("\tunused-procedures\n");
 			error_line("\tshadowing\n");
 			error_line("\tusing-stmt\n");
 			error_line("\tusing-param\n");
+			error_line("\tstyle\n");
 			error_line("\textra\n");
+			error_line("\tcast\n");
+			error_line("\ttabs\n");
 			return build_context.vet_flags;
 		}
 	}
@@ -6284,6 +6290,63 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 	}
 	GB_ASSERT(vet_flags != 0 && vet_not_flags != 0);
 	return vet_flags &~ vet_not_flags;
+}
+
+gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
+	String const prefix = str_lit("feature");
+	GB_ASSERT(string_starts_with(s, prefix));
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	if (s.len == 0) {
+		return OptInFeatureFlag_NONE;
+	}
+
+	u64 feature_flags = 0;
+	u64 feature_not_flags = 0;
+
+	while (s.len > 0) {
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s));
+		if (p.len == 0) {
+			break;
+		}
+
+		bool is_notted = false;
+		if (p[0] == '!') {
+			is_notted = true;
+			p = substring(p, 1, p.len);
+			if (p.len == 0) {
+				syntax_error(token_for_pos, "Expected a feature flag name after '!'");
+				return OptInFeatureFlag_NONE;
+			}
+		}
+
+		u64 flag = get_vet_flag_from_name(p);
+		if (flag != OptInFeatureFlag_NONE) {
+			if (is_notted) {
+				feature_not_flags |= flag;
+			} else {
+				feature_flags     |= flag;
+			}
+		} else {
+			ERROR_BLOCK();
+			syntax_error(token_for_pos, "Invalid feature flag name: %.*s", LIT(p));
+			error_line("\tExpected one of the following\n");
+			error_line("\tdynamic-literals\n");
+			return OptInFeatureFlag_NONE;
+		}
+	}
+
+	if (feature_flags == 0 && feature_not_flags == 0) {
+		return OptInFeatureFlag_NONE;
+	}
+	if (feature_flags == 0 && feature_not_flags != 0) {
+		return OptInFeatureFlag_NONE &~ feature_not_flags;
+	}
+	if (feature_flags != 0 && feature_not_flags == 0) {
+		return feature_flags;
+	}
+	GB_ASSERT(feature_flags != 0 && feature_not_flags != 0);
+	return feature_flags &~ feature_not_flags;
 }
 
 gb_internal String dir_from_path(String path) {
@@ -6409,6 +6472,9 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 		}
 	} else if (lc == "no-instrumentation") {
 		f->flags |= AstFile_NoInstrumentation;
+	} else if (string_starts_with(lc, str_lit("feature"))) {
+		f->feature_flags = parse_feature_tag(tok, lc);
+		f->feature_flags_set = true;
 	} else {
 		error(tok, "Unknown tag '%.*s'", LIT(lc));
 	}

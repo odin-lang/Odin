@@ -9730,8 +9730,11 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 
 		if (t->kind == Type_DynamicArray) {
-			if (build_context.no_dynamic_literals && cl->elems.count) {
+			if (build_context.no_dynamic_literals && cl->elems.count && (node->file()->feature_flags & OptInFeatureFlag_DynamicLiterals) != 0) {
+				ERROR_BLOCK();
 				error(node, "Compound literals of dynamic types have been disabled");
+				error_line("\tSuggestion: If you want to enable them for this specific file, use '#+feature dynamic-literals' at the top of the file\n");
+				error_line("\tWarning: Please understand that dynamic literals will implicitly allocate using the current 'context.allocator' in that scope\n");
 			}
 		}
 
@@ -10120,8 +10123,11 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			}
 		}
 
-		if (build_context.no_dynamic_literals && cl->elems.count) {
+		if (build_context.no_dynamic_literals && cl->elems.count && (node->file()->feature_flags & OptInFeatureFlag_DynamicLiterals) != 0) {
+			ERROR_BLOCK();
 			error(node, "Compound literals of dynamic types have been disabled");
+			error_line("\tSuggestion: If you want to enable them for this specific file, use '#+feature dynamic-literals' at the top of the file\n");
+			error_line("\tWarning: Please understand that dynamic literals will implicitly allocate using the current 'context.allocator' in that scope\n");
 		} else {
 			add_map_reserve_dependencies(c);
 			add_map_set_dependencies(c);

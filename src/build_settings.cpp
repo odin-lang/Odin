@@ -324,6 +324,18 @@ u64 get_vet_flag_from_name(String const &name) {
 	return VetFlag_NONE;
 }
 
+enum OptInFeatureFlags : u64 {
+	OptInFeatureFlag_NONE            = 0,
+	OptInFeatureFlag_DynamicLiterals = 1u<<0,
+};
+
+u64 get_feature_flag_from_name(String const &name) {
+	if (name == "dynamic-literals") {
+		return OptInFeatureFlag_DynamicLiterals;
+	}
+	return OptInFeatureFlag_NONE;
+}
+
 
 enum SanitizerFlags : u32 {
 	SanitizerFlag_NONE = 0,
