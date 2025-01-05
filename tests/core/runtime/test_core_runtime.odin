@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package test_core_runtime
 
 import "base:intrinsics"
