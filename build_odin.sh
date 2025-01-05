@@ -110,8 +110,8 @@ Linux)
 	LDFLAGS="$LDFLAGS -Wl,-rpath=\$ORIGIN"
 	;;
 OpenBSD)
-	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS -liconv"
+	CXXFLAGS="$CXXFLAGS -I/usr/local/include $($LLVM_CONFIG --cxxflags --ldflags)"
+	LDFLAGS="$LDFLAGS -L/usr/local/lib -liconv"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
 Haiku)
