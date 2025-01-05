@@ -158,21 +158,21 @@ map_cell_index_static :: #force_inline proc "contextless" (cells: [^]Map_Cell($T
 	} else when (N & (N - 1)) == 0 && N <= 8*size_of(uintptr) {
 		// Likely case, N is a power of two because T is a power of two.
 
+		// Unique case, no need to index data here since only one element.
+		when N == 1 {
+			return &cells[index].data[0]
+		}
+
 		// Compute the integer log 2 of N, this is the shift amount to index the
 		// correct cell. Odin's intrinsics.count_leading_zeros does not produce a
 		// constant, hence this approach. We only need to check up to N = 64.
-		SHIFT :: 1 when N < 2  else
-		         2 when N < 4  else
-		         3 when N < 8  else
-		         4 when N < 16 else
-		         5 when N < 32 else 6
+		SHIFT :: 1 when N == 2  else
+		         2 when N == 4  else
+		         3 when N == 8  else
+		         4 when N == 16 else
+		         5 when N == 32 else 6
 		#assert(SHIFT <= MAP_CACHE_LINE_LOG2)
-		// Unique case, no need to index data here since only one element.
-		when N == 1 {
-			return &cells[index >> SHIFT].data[0]
-		} else {
-			return &cells[index >> SHIFT].data[index & (N - 1)]
-		}
+		return &cells[index >> SHIFT].data[index & (N - 1)]
 	} else {
 		// Least likely (and worst case), we pay for a division operation but we
 		// assume the compiler does not actually generate a division. N will be in the
