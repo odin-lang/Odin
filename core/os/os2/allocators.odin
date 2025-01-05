@@ -2,7 +2,6 @@
 package os2
 
 import "base:runtime"
-import "core:mem"
 
 @(require_results)
 file_allocator :: proc() -> runtime.Allocator {
