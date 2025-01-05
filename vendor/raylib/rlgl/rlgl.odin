@@ -514,7 +514,7 @@ foreign lib {
 	UpdateVertexBufferElements       :: proc(id: c.uint, data: rawptr, dataSize: c.int, offset: c.int) ---        // Update vertex buffer elements with new data
 	UnloadVertexArray                :: proc(vaoId: c.uint) ---
 	UnloadVertexBuffer               :: proc(vboId: c.uint) ---
-	SetVertexAttribute               :: proc(index: c.uint, compSize: c.int, type: c.int, normalized: bool, stride: c.int, pointer: rawptr) ---
+	SetVertexAttribute               :: proc(index: c.uint, compSize: c.int, type: c.int, normalized: bool, stride: c.int, offset: c.int) ---
 	SetVertexAttributeDivisor        :: proc(index: c.uint, divisor: c.int) ---
 	SetVertexAttributeDefault        :: proc(locIndex: c.int, value: rawptr, attribType: c.int, count: c.int) --- // Set vertex attribute default value
 	DrawVertexArray                  :: proc(offset: c.int, count: c.int) ---
