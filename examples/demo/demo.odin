@@ -1,4 +1,5 @@
 #+vet !using-stmt !using-param
+#+feature dynamic-literals
 package main
 
 import "core:fmt"

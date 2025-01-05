@@ -6320,7 +6320,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 			}
 		}
 
-		u64 flag = get_vet_flag_from_name(p);
+		u64 flag = get_feature_flag_from_name(p);
 		if (flag != OptInFeatureFlag_NONE) {
 			if (is_notted) {
 				feature_not_flags |= flag;
@@ -6473,7 +6473,7 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (lc == "no-instrumentation") {
 		f->flags |= AstFile_NoInstrumentation;
 	} else if (string_starts_with(lc, str_lit("feature"))) {
-		f->feature_flags = parse_feature_tag(tok, lc);
+		f->feature_flags |= parse_feature_tag(tok, lc);
 		f->feature_flags_set = true;
 	} else {
 		error(tok, "Unknown tag '%.*s'", LIT(lc));

@@ -1192,7 +1192,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_type_assert = true;
 							break;
 						case BuildFlag_NoDynamicLiterals:
-							build_context.no_dynamic_literals = true;
+							gb_printf_err("Warning: Use of -no-dynamic-literals is now redundant\n");
 							break;
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
