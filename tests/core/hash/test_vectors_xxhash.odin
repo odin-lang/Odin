@@ -1,4 +1,5 @@
 // Hash Test Vectors
+#+feature dynamic-literals
 package test_core_hash
 
 XXHASH_Test_Vectors :: struct #packed {
