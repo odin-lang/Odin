@@ -68,7 +68,12 @@ esac
 
 cd ..
 
+set +e
 make -f wasm.Makefile
+if [[ $? -ne 0 ]]; then
+	printf "\e[30;43mwarning:\e[0m Native Box2D libraries were built successfully, the WASM build failed, likely because your default C compiler and/or linker doesn't support WASM, you can set the CC and LD environment variables to point to a compiler and linker that support it\n"
+fi
+set -e
 
 rm -rf v3.0.0.tar.gz
 rm -rf box2d-3.0.0
