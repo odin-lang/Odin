@@ -6462,6 +6462,9 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 		} else if (command == "file") {
 			f->flags |= AstFile_IsPrivateFile;
 		}
+	} else if (string_starts_with(lc, str_lit("feature"))) {
+		f->feature_flags |= parse_feature_tag(tok, lc);
+		f->feature_flags_set = true;
 	} else if (lc == "lazy") {
 		if (build_context.ignore_lazy) {
 			// Ignore
@@ -6472,9 +6475,6 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 		}
 	} else if (lc == "no-instrumentation") {
 		f->flags |= AstFile_NoInstrumentation;
-	} else if (string_starts_with(lc, str_lit("feature"))) {
-		f->feature_flags |= parse_feature_tag(tok, lc);
-		f->feature_flags_set = true;
 	} else {
 		error(tok, "Unknown tag '%.*s'", LIT(lc));
 	}
@@ -6559,9 +6559,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
-	// TODO: Shouldn't single file only matter for build tags? no-instrumentation for example
-	// should be respected even when in single file mode.
-	if (!f->pkg->is_single_file) {
+	{
 		if (docs != nullptr && docs->list.count > 0) {
 			for (Token const &tok : docs->list) {
 				GB_ASSERT(tok.kind == Token_Comment);
