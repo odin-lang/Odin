@@ -21,7 +21,7 @@ _pipe :: proc() -> (r, w: ^File, err: Error) {
 		return
 	}
 
-	r = __new_file(fds[0])
+	r = __new_file(fds[0], file_allocator())
 	ri := (^File_Impl)(r.impl)
 
 	rname := strings.builder_make(file_allocator())
@@ -31,7 +31,7 @@ _pipe :: proc() -> (r, w: ^File, err: Error) {
 	ri.name  = strings.to_string(rname)
 	ri.cname = strings.to_cstring(&rname)
 
-	w = __new_file(fds[1])
+	w = __new_file(fds[1], file_allocator())
 	wi := (^File_Impl)(w.impl)
 	
 	wname := strings.builder_make(file_allocator())

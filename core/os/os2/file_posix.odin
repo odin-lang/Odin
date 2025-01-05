@@ -21,23 +21,29 @@ File_Impl :: struct {
 	name:  string,
 	cname: cstring,
 	fd:    posix.FD,
+	allocator: runtime.Allocator,
 }
 
 @(init)
 init_std_files :: proc() {
-	// NOTE: is this (paths) also the case on non darwin?
+	new_std :: proc(impl: ^File_Impl, fd: posix.FD, name: cstring) -> ^File {
+		impl.file.impl = impl
+		impl.fd = fd
+		impl.allocator = runtime.nil_allocator()
+		impl.cname = name
+		impl.name  = string(name)
+		impl.file.stream = {
+			data = impl,
+			procedure = _file_stream_proc,
+		}
+		impl.file.fstat = _fstat
+		return &impl.file
+	}
 
-	stdin = __new_file(posix.STDIN_FILENO)
-	(^File_Impl)(stdin.impl).name  = "/dev/stdin"
-	(^File_Impl)(stdin.impl).cname = "/dev/stdin"
-
-	stdout = __new_file(posix.STDIN_FILENO)
-	(^File_Impl)(stdout.impl).name  = "/dev/stdout"
-	(^File_Impl)(stdout.impl).cname = "/dev/stdout"
-
-	stderr = __new_file(posix.STDIN_FILENO)
-	(^File_Impl)(stderr.impl).name  = "/dev/stderr"
-	(^File_Impl)(stderr.impl).cname = "/dev/stderr"
+	@(static) files: [3]File_Impl
+	stdin  = new_std(&files[0], posix.STDIN_FILENO,  "/dev/stdin")
+	stdout = new_std(&files[1], posix.STDOUT_FILENO, "/dev/stdout")
+	stderr = new_std(&files[2], posix.STDERR_FILENO, "/dev/stderr")
 }
 
 _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
@@ -72,10 +78,10 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 		return
 	}
 
-	return _new_file(uintptr(fd), name)
+	return _new_file(uintptr(fd), name, file_allocator())
 }
 
-_new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
+_new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
 	if name == "" {
 		err = .Invalid_Path
 		return
@@ -84,10 +90,10 @@ _new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
 		return
 	}
 
-	crname := _posix_absolute_path(posix.FD(handle), name, file_allocator()) or_return
+	crname := _posix_absolute_path(posix.FD(handle), name, allocator) or_return
 	rname  := string(crname)
 
-	f = __new_file(posix.FD(handle))
+	f = __new_file(posix.FD(handle), allocator)
 	impl := (^File_Impl)(f.impl)
 	impl.name  = rname
 	impl.cname = crname
@@ -95,10 +101,11 @@ _new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
 	return f, nil
 }
 
-__new_file :: proc(handle: posix.FD) -> ^File {
-	impl := new(File_Impl, file_allocator())
+__new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
+	impl := new(File_Impl, allocator)
 	impl.file.impl = impl
 	impl.fd = posix.FD(handle)
+	impl.allocator = allocator
 	impl.file.stream = {
 		data = impl,
 		procedure = _file_stream_proc,
@@ -114,8 +121,10 @@ _close :: proc(f: ^File_Impl) -> (err: Error) {
 		err = _get_platform_error()
 	}
 
-	delete(f.cname, file_allocator())
-	free(f, file_allocator())
+	allocator := f.allocator
+
+	delete(f.cname, allocator)
+	free(f, allocator)
 	return
 }
 

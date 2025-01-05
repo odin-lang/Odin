@@ -115,7 +115,7 @@ open :: proc(name: string, flags := File_Flags{.Read}, perm := 0o777) -> (^File,
 
 @(require_results)
 new_file :: proc(handle: uintptr, name: string) -> ^File {
-	file, err := _new_file(handle, name)
+	file, err := _new_file(handle, name, file_allocator())
 	if err != nil {
 		panic(error_string(err))
 	}

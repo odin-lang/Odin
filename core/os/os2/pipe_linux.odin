@@ -10,8 +10,8 @@ _pipe :: proc() -> (r, w: ^File, err: Error) {
 		return nil, nil,_get_platform_error(errno)
 	}
 
-	r = _new_file(uintptr(fds[0])) or_return
-	w = _new_file(uintptr(fds[1])) or_return
+	r = _new_file(uintptr(fds[0]), "", file_allocator()) or_return
+	w = _new_file(uintptr(fds[1]), "", file_allocator()) or_return
 
 	return
 }

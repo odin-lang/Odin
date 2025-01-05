@@ -44,17 +44,38 @@ File_Impl :: struct {
 
 @(init)
 init_std_files :: proc() {
-	stdin  = new_file(uintptr(win32.GetStdHandle(win32.STD_INPUT_HANDLE)),  "<stdin>")
-	stdout = new_file(uintptr(win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)), "<stdout>")
-	stderr = new_file(uintptr(win32.GetStdHandle(win32.STD_ERROR_HANDLE)),  "<stderr>")
-}
-@(fini)
-fini_std_files :: proc() {
-	_destroy((^File_Impl)(stdin.impl))
-	_destroy((^File_Impl)(stdout.impl))
-	_destroy((^File_Impl)(stderr.impl))
-}
+	new_std :: proc(impl: ^File_Impl, code: u32, name: string) -> ^File {
+		impl.file.impl = impl
 
+		impl.allocator = runtime.nil_allocator()
+		impl.fd = win32.GetStdHandle(code)
+		impl.name = name
+		impl.wname = nil
+
+		handle := _handle(&impl.file)
+		kind := File_Impl_Kind.File
+		if m: u32; win32.GetConsoleMode(handle, &m) {
+			kind = .Console
+		}
+		if win32.GetFileType(handle) == win32.FILE_TYPE_PIPE {
+			kind = .Pipe
+		}
+		impl.kind = kind
+
+		impl.file.stream = {
+			data = impl,
+			procedure = _file_stream_proc,
+		}
+		impl.file.fstat = _fstat
+
+		return &impl.file
+	}
+
+	@(static) files: [3]File_Impl
+	stdin  = new_std(&files[0], win32.STD_INPUT_HANDLE,  "<stdin>")
+	stdout = new_std(&files[1], win32.STD_OUTPUT_HANDLE, "<stdout>")
+	stderr = new_std(&files[2], win32.STD_ERROR_HANDLE,  "<stderr>")
+}
 
 _handle :: proc(f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
@@ -132,21 +153,21 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
 	flags := flags if flags != nil else {.Read}
 	handle := _open_internal(name, flags, perm) or_return
-	return _new_file(handle, name)
+	return _new_file(handle, name, file_allocator())
 }
 
-_new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
+_new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
 	if handle == INVALID_HANDLE {
 		return
 	}
-	impl := new(File_Impl, file_allocator()) or_return
+	impl := new(File_Impl, allocator) or_return
 	defer if err != nil {
-		free(impl, file_allocator())
+		free(impl, allocator)
 	}
 
 	impl.file.impl = impl
 
-	impl.allocator = file_allocator()
+	impl.allocator = allocator
 	impl.fd = rawptr(handle)
 	impl.name = clone_string(name, impl.allocator) or_return
 	impl.wname = win32_utf8_to_wstring(name, impl.allocator) or_return
@@ -180,7 +201,7 @@ _open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Rea
 }
 
 _new_file_buffered :: proc(handle: uintptr, name: string, buffer_size: uint) -> (f: ^File, err: Error) {
-	f, err = _new_file(handle, name)
+	f, err = _new_file(handle, name, file_allocator())
 	if f != nil && err == nil {
 		impl := (^File_Impl)(f.impl)
 		impl.r_buf = make([]byte, buffer_size, file_allocator())
