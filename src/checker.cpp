@@ -542,6 +542,23 @@ gb_internal u64 check_vet_flags(Ast *node) {
 	return ast_file_vet_flags(file);
 }
 
+gb_internal u64 check_feature_flags(CheckerContext *c, Ast *node) {
+	AstFile *file = c->file;
+	if (file == nullptr &&
+	    c->curr_proc_decl &&
+	    c->curr_proc_decl->proc_lit) {
+		file = c->curr_proc_decl->proc_lit->file();
+	}
+	if (file == nullptr) {
+		file = node->file();
+	}
+	if (file != nullptr && file->feature_flags_set) {
+		return file->feature_flags;
+	}
+	return 0;
+}
+
+
 enum VettedEntityKind {
 	VettedEntity_Invalid,
 
@@ -1164,7 +1181,6 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_NO_BOUNDS_CHECK",            build_context.no_bounds_check);
 	add_global_bool_constant("ODIN_NO_TYPE_ASSERT",             build_context.no_type_assert);
 	add_global_bool_constant("ODIN_DEFAULT_TO_PANIC_ALLOCATOR", bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR);
-	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",        bc->no_dynamic_literals);
 	add_global_bool_constant("ODIN_NO_CRT",                     bc->no_crt);
 	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",       bc->use_separate_modules);
 	add_global_bool_constant("ODIN_TEST",                       bc->command_kind == Command_test);
@@ -1356,6 +1372,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
+	mpsc_init(&i->foreign_decls_to_check, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
 
 	string_map_init(&i->load_directory_cache);
@@ -1382,6 +1399,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
+	mpsc_destroy(&i->foreign_decls_to_check);
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
@@ -5093,6 +5111,38 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 		add_untyped_expressions(ctx.info, &untyped);
 
 		e->LibraryName.paths = fl->fullpaths;
+	}
+
+	for (Entity *e = nullptr; mpsc_dequeue(&c->info.foreign_decls_to_check, &e); /**/) {
+		GB_ASSERT(e != nullptr);
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+		if (!is_arch_wasm()) {
+			continue;
+		}
+		Entity *foreign_library = e->Procedure.foreign_library;
+		GB_ASSERT(foreign_library != nullptr);
+
+		String name = e->Procedure.link_name;
+
+		String module_name = str_lit("env");
+		GB_ASSERT (foreign_library->kind == Entity_LibraryName);
+		if (foreign_library->LibraryName.paths.count != 1) {
+			error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
+			      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
+		}
+
+		if (foreign_library->LibraryName.paths.count >= 1) {
+			module_name = foreign_library->LibraryName.paths[0];
+		}
+
+		if (!string_ends_with(module_name, str_lit(".o"))) {
+			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+		}
+		e->Procedure.link_name = name;
+
+		check_foreign_procedure(&ctx, e, e->decl_info);
 	}
 }
 

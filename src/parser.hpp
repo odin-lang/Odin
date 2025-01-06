@@ -108,7 +108,9 @@ struct AstFile {
 	String       package_name;
 
 	u64          vet_flags;
+	u64          feature_flags;
 	bool         vet_flags_set;
+	bool         feature_flags_set;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause

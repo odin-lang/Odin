@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package test_encoding_cbor
 
 import "base:intrinsics"

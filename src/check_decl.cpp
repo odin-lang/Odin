@@ -94,12 +94,14 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 				return nullptr;
 			}
 			if (e2->state.load() != EntityState_Resolved) {
-				gbString str = type_to_string(t);
-				defer (gb_string_free(str));
-				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
-				e->type = t_invalid;
+				e->type = t;
 				return nullptr;
 			}
+			gbString str = type_to_string(t);
+			defer (gb_string_free(str));
+			error(operand->expr, "Invalid use of a non-specialized polymorphic type '%s' in %.*s", str, LIT(context_name));
+			e->type = t_invalid;
+			return nullptr;
 		} else if (is_type_empty_union(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
@@ -971,6 +973,43 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 	}
 }
 
+gb_internal void check_foreign_procedure(CheckerContext *ctx, Entity *e, DeclInfo *d) {
+	GB_ASSERT(e != nullptr);
+	GB_ASSERT(e->kind == Entity_Procedure);
+	String name = e->Procedure.link_name;
+
+	mutex_lock(&ctx->info->foreign_mutex);
+
+	auto *fp = &ctx->info->foreigns;
+	StringHashKey key = string_hash_string(name);
+	Entity **found = string_map_get(fp, key);
+	if (found && e != *found) {
+		Entity *f = *found;
+		TokenPos pos = f->token.pos;
+		Type *this_type = base_type(e->type);
+		Type *other_type = base_type(f->type);
+		if (is_type_proc(this_type) && is_type_proc(other_type)) {
+			if (!are_signatures_similar_enough(this_type, other_type)) {
+				error(d->proc_lit,
+				      "Redeclaration of foreign procedure '%.*s' with different type signatures\n"
+				      "\tat %s",
+				      LIT(name), token_pos_to_string(pos));
+			}
+		} else if (!signature_parameter_similar_enough(this_type, other_type)) {
+			error(d->proc_lit,
+			      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
+			      "\tat %s",
+			      LIT(name), token_pos_to_string(pos));
+		}
+	} else if (name == "main") {
+		error(d->proc_lit, "The link name 'main' is reserved for internal use");
+	} else {
+		string_map_set(fp, key, e);
+	}
+
+	mutex_unlock(&ctx->info->foreign_mutex);
+}
+
 gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == nullptr);
 	if (d->proc_lit->kind != Ast_ProcLit) {
@@ -1307,57 +1346,16 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			name = e->Procedure.link_name;
 		}
 		Entity *foreign_library = init_entity_foreign_library(ctx, e);
-		
-		if (is_arch_wasm() && foreign_library != nullptr) {
-			String module_name = str_lit("env");
-			GB_ASSERT (foreign_library->kind == Entity_LibraryName);
-			if (foreign_library->LibraryName.paths.count != 1) {
-				error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
-				      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
-			}
-
-			if (foreign_library->LibraryName.paths.count >= 1) {
-				module_name = foreign_library->LibraryName.paths[0];
-			}
-
-			if (!string_ends_with(module_name, str_lit(".o"))) {
-				name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
-			}
-		}
-
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
+		e->Procedure.foreign_library = foreign_library;
 
-		mutex_lock(&ctx->info->foreign_mutex);
-
-		auto *fp = &ctx->info->foreigns;
-		StringHashKey key = string_hash_string(name);
-		Entity **found = string_map_get(fp, key);
-		if (found && e != *found) {
-			Entity *f = *found;
-			TokenPos pos = f->token.pos;
-			Type *this_type = base_type(e->type);
-			Type *other_type = base_type(f->type);
-			if (is_type_proc(this_type) && is_type_proc(other_type)) {
-				if (!are_signatures_similar_enough(this_type, other_type)) {
-					error(d->proc_lit,
-					      "Redeclaration of foreign procedure '%.*s' with different type signatures\n"
-					      "\tat %s",
-					      LIT(name), token_pos_to_string(pos));
-				}
-			} else if (!signature_parameter_similar_enough(this_type, other_type)) {
-				error(d->proc_lit,
-				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-				      "\tat %s",
-				      LIT(name), token_pos_to_string(pos));
-			}
-		} else if (name == "main") {
-			error(d->proc_lit, "The link name 'main' is reserved for internal use");
+		if (is_arch_wasm() && foreign_library != nullptr) {
+			// NOTE(bill): this must be delayed because the foreign import paths might not be evaluated yet until much later
+			mpsc_enqueue(&ctx->info->foreign_decls_to_check, e);
 		} else {
-			string_map_set(fp, key, e);
+			check_foreign_procedure(ctx, e, d);
 		}
-
-		mutex_unlock(&ctx->info->foreign_mutex);
 	} else {
 		String name = e->token.string;
 		if (e->Procedure.link_name.len > 0) {

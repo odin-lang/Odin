@@ -1192,7 +1192,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_type_assert = true;
 							break;
 						case BuildFlag_NoDynamicLiterals:
-							build_context.no_dynamic_literals = true;
+							gb_printf_err("Warning: Use of -no-dynamic-literals is now redundant\n");
 							break;
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
@@ -2120,7 +2120,7 @@ gb_internal void export_dependencies(Checker *c) {
 		for_array(i, files) {
 			AstFile *file = files[i];
 			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(file->fullpath));
-			if (i+1 == files.count) {
+			if (i+1 < files.count) {
 				gb_fprintf(&f, ",");
 			}
 			gb_fprintf(&f, "\n");
@@ -2133,7 +2133,7 @@ gb_internal void export_dependencies(Checker *c) {
 		for_array(i, load_files) {
 			LoadFileCache *cache = load_files[i];
 			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(cache->path));
-			if (i+1 == load_files.count) {
+			if (i+1 < load_files.count) {
 				gb_fprintf(&f, ",");
 			}
 			gb_fprintf(&f, "\n");

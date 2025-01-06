@@ -51,6 +51,7 @@ foreign user32 {
 	IsWindowVisible :: proc(hwnd: HWND) -> BOOL ---
 	IsWindowEnabled :: proc(hwnd: HWND) -> BOOL ---
 	IsIconic :: proc(hwnd: HWND) -> BOOL ---
+	IsZoomed :: proc(hwnd: HWND) -> BOOL ---
 	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
 	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
 	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---

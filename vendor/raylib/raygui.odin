@@ -3,6 +3,7 @@ package raylib
 import "core:c"
 
 RAYGUI_SHARED :: #config(RAYGUI_SHARED, false)
+RAYGUI_WASM_LIB :: #config(RAYGUI_WASM_LIB, "wasm/libraygui.a")
 
 when ODIN_OS == .Windows {
 	foreign import lib {
@@ -21,6 +22,10 @@ when ODIN_OS == .Windows {
 		foreign import lib {
 			"macos/libraygui.dylib" when RAYGUI_SHARED else "macos/libraygui.a",
 		}
+	}
+} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib {
+		RAYGUI_WASM_LIB,
 	}
 } else {
 	foreign import lib "system:raygui"

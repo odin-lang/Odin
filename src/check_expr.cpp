@@ -3672,6 +3672,13 @@ gb_internal bool check_binary_array_expr(CheckerContext *c, Token op, Operand *x
 			}
 		}
 	}
+	if (is_type_simd_vector(x->type) && !is_type_simd_vector(y->type)) {
+		if (check_is_assignable_to(c, y, x->type)) {
+			if (check_binary_op(c, x, op)) {
+				return true;
+			}
+		}
+	}
 	return false;
 }
 
@@ -4548,6 +4555,19 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 					}
 				}
 			}
+			operand->mode = Addressing_Invalid;
+			convert_untyped_error(c, operand, target_type);
+			return;
+		}
+
+		break;
+	}
+	
+	case Type_SimdVector: {
+		Type *elem = base_array_type(t);
+		if (check_is_assignable_to(c, operand, elem)) {
+			operand->mode = Addressing_Value;
+		} else {
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
@@ -8725,6 +8745,18 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		error(node, "#caller_expression may only be used as a default argument parameter");
 		o->type = t_string;
 		o->mode = Addressing_Value;
+	} else if (name == "branch_location") {
+		if (!c->in_defer) {
+			error(node, "#branch_location may only be used within a 'defer' statement");
+		} else if (c->curr_proc_decl) {
+			Entity *e = c->curr_proc_decl->entity;
+			if (e != nullptr) {
+				GB_ASSERT(e->kind == Entity_Procedure);
+				e->Procedure.uses_branch_location = true;
+			}
+		}
+		o->type = t_source_code_location;
+		o->mode = Addressing_Value;
 	} else {
 		if (name == "location") {
 			init_core_source_code_location(c->checker);
@@ -9339,6 +9371,23 @@ gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
 	return false;
 }
 
+gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCompoundLit *cl) {
+	if (cl->elems.count > 0 && (check_feature_flags(c, node) & OptInFeatureFlag_DynamicLiterals) == 0) {
+		ERROR_BLOCK();
+		error(node, "Compound literals of dynamic types are disabled by default");
+		error_line("\tSuggestion: If you want to enable them for this specific file, add '#+feature dynamic-literals' at the top of the file\n");
+		error_line("\tWarning: Please understand that dynamic literals will implicitly allocate using the current 'context.allocator' in that scope\n");
+		if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+			error_line("\tWarning: As '-default-to-panic-allocator' has been set, the dynamic compound literal may not be initialized as expected\n");
+		} else if (build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
+			error_line("\tWarning: As '-default-to-panic-allocator' has been set, the dynamic compound literal may not be initialized as expected\n");
+		}
+		return false;
+	}
+
+	return cl->elems.count > 0;
+}
+
 gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	ast_node(cl, CompoundLit, node);
@@ -9539,11 +9588,6 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			elem_type = t->DynamicArray.elem;
 			context_name = str_lit("dynamic array literal");
 			is_constant = false;
-
-			if (!build_context.no_dynamic_literals) {
-				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
-				add_package_dependency(c, "runtime", "__dynamic_array_append");
-			}
 		} else if (t->kind == Type_SimdVector) {
 			elem_type = t->SimdVector.elem;
 			context_name = str_lit("simd vector literal");
@@ -9718,8 +9762,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 
 		if (t->kind == Type_DynamicArray) {
-			if (build_context.no_dynamic_literals && cl->elems.count) {
-				error(node, "Compound literals of dynamic types have been disabled");
+			if (check_for_dynamic_literals(c, node, cl)) {
+				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
+				add_package_dependency(c, "runtime", "__dynamic_array_append");
 			}
 		}
 
@@ -10108,9 +10153,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			}
 		}
 
-		if (build_context.no_dynamic_literals && cl->elems.count) {
-			error(node, "Compound literals of dynamic types have been disabled");
-		} else {
+		if (check_for_dynamic_literals(c, node, cl)) {
 			add_map_reserve_dependencies(c);
 			add_map_set_dependencies(c);
 		}

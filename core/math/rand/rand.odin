@@ -34,30 +34,6 @@ Example:
 	import "core:fmt"
 
 	set_global_seed_example :: proc() {
-		rand.set_global_seed(1)
-		fmt.println(rand.uint64())
-	}
-
-Possible Output:
-
-	10
-*/
-@(deprecated="Prefer `rand.reset`")
-set_global_seed :: proc(seed: u64) {
-	runtime.random_generator_reset_u64(context.random_generator, seed)
-}
-
-/*
-Reset the seed used by the context.random_generator.
-
-Inputs:
-- seed: The seed value
-
-Example:
-	import "core:math/rand"
-	import "core:fmt"
-
-	set_global_seed_example :: proc() {
 		rand.reset(1)
 		fmt.println(rand.uint64())
 	}

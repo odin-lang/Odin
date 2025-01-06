@@ -2,6 +2,8 @@
 #+build ignore
 package intrinsics
 
+import "base:runtime"
+
 // Package-Related
 is_package_imported :: proc(package_name: string) -> bool ---
 
@@ -72,7 +74,7 @@ prefetch_write_instruction :: proc(address: rawptr, #const locality: i32 /* 0..=
 prefetch_write_data        :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
 
 // Compiler Hints
-expect :: proc(val, expected_val: T) -> T ---
+expect :: proc(val, expected_val: $T) -> T ---
 
 // Linux and Darwin Only
 syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
@@ -219,7 +221,7 @@ type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
 type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
 
-type_has_shared_fields :: proc($U, $V: typeid) -> bool typeid where type_is_struct(U), type_is_struct(V) ---
+type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 

@@ -208,8 +208,8 @@ gb_internal void lb_open_scope(lbProcedure *p, Scope *s) {
 
 }
 
-gb_internal void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, bool pop_stack=true) {
-	lb_emit_defer_stmts(p, kind, block);
+gb_internal void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node, bool pop_stack=true) {
+	lb_emit_defer_stmts(p, kind, block, node);
 	GB_ASSERT(p->scope_index > 0);
 
 	// NOTE(bill): Remove `context`s made in that scope
@@ -721,7 +721,7 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 
 		lb_build_stmt(p, rs->body);
 
-		lb_close_scope(p, lbDeferExit_Default, nullptr);
+		lb_close_scope(p, lbDeferExit_Default, nullptr, node->left);
 		lb_pop_target_list(p);
 
 		if (check != nullptr) {
@@ -854,7 +854,7 @@ gb_internal void lb_build_range_tuple(lbProcedure *p, AstRangeStmt *rs, Scope *s
 
 	lb_build_stmt(p, rs->body);
 
-	lb_close_scope(p, lbDeferExit_Default, nullptr);
+	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
 	lb_pop_target_list(p);
 	lb_emit_jump(p, loop);
 	lb_start_block(p, done);
@@ -976,7 +976,7 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 
 	lb_build_stmt(p, rs->body);
 
-	lb_close_scope(p, lbDeferExit_Default, nullptr);
+	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
 	lb_pop_target_list(p);
 	lb_emit_jump(p, loop);
 	lb_start_block(p, done);
@@ -1192,7 +1192,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 
 	lb_build_stmt(p, rs->body);
 
-	lb_close_scope(p, lbDeferExit_Default, nullptr);
+	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
 	lb_pop_target_list(p);
 	lb_emit_jump(p, loop);
 	lb_start_block(p, done);
@@ -1363,7 +1363,7 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 	}
 
 
-	lb_close_scope(p, lbDeferExit_Default, nullptr);
+	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
 }
 
 gb_internal bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, bool *default_found_) {
@@ -1433,6 +1433,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 	ast_node(body, BlockStmt, ss->body);
 
 	isize case_count = body->stmts.count;
+	Ast *default_clause = nullptr;
 	Slice<Ast *> default_stmts = {};
 	lbBlock *default_fall = nullptr;
 	lbBlock *default_block = nullptr;
@@ -1482,6 +1483,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 
 		if (cc->list.count == 0) {
 			// default case
+			default_clause = clause;
 			default_stmts = cc->stmts;
 			default_fall  = fall;
 			if (switch_instr == nullptr) {
@@ -1552,7 +1554,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		lb_push_target_list(p, ss->label, done, nullptr, fall);
 		lb_open_scope(p, body->scope);
 		lb_build_stmt_list(p, cc->stmts);
-		lb_close_scope(p, lbDeferExit_Default, body);
+		lb_close_scope(p, lbDeferExit_Default, body, clause);
 		lb_pop_target_list(p);
 
 		lb_emit_jump(p, done);
@@ -1570,13 +1572,13 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		lb_push_target_list(p, ss->label, done, nullptr, default_fall);
 		lb_open_scope(p, default_block->scope);
 		lb_build_stmt_list(p, default_stmts);
-		lb_close_scope(p, lbDeferExit_Default, default_block);
+		lb_close_scope(p, lbDeferExit_Default, default_block, default_clause);
 		lb_pop_target_list(p);
 	}
 
 	lb_emit_jump(p, done);
 	lb_start_block(p, done);
-	lb_close_scope(p, lbDeferExit_Default, done);
+	lb_close_scope(p, lbDeferExit_Default, done, ss->body);
 }
 
 gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value, bool is_default_case) {
@@ -1627,7 +1629,7 @@ gb_internal void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBl
 
 	lb_push_target_list(p, label, done, nullptr, nullptr);
 	lb_build_stmt_list(p, cc->stmts);
-	lb_close_scope(p, lbDeferExit_Default, body);
+	lb_close_scope(p, lbDeferExit_Default, body, clause);
 	lb_pop_target_list(p);
 
 	lb_emit_jump(p, done);
@@ -1835,7 +1837,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 
 	lb_emit_jump(p, done);
 	lb_start_block(p, done);
-	lb_close_scope(p, lbDeferExit_Default, done);
+	lb_close_scope(p, lbDeferExit_Default, done, ss->body);
 }
 
 
@@ -1959,7 +1961,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 	p->in_multi_assignment = prev_in_assignment;
 }
 
-gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
+gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, TokenPos pos) {
 	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
 	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 	bool split_returns = ft->multiple_return_original_type != nullptr;
@@ -1982,7 +1984,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 			LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
 		}
 
-		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
 
 		// Check for terminator in the defer stmts
 		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
@@ -2012,7 +2014,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 			ret_val = OdinLLVMBuildTransmute(p, ret_val, ret_type);
 		}
 
-		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
 
 		// Check for terminator in the defer stmts
 		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
@@ -2021,7 +2023,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 		}
 	}
 }
-gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
+gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results, TokenPos pos) {
 	lb_ensure_abi_function_type(p->module, p);
 
 	isize return_count = p->type->Proc.result_count;
@@ -2029,7 +2031,7 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 	if (return_count == 0) {
 		// No return values
 
-		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
 		
 		// Check for terminator in the defer stmts
 		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
@@ -2138,11 +2140,11 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 				GB_ASSERT(result_values.count-1 == result_eps.count);
 				lb_addr_store(p, p->return_ptr, result_values[result_values.count-1]);
 
-				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
 				LLVMBuildRetVoid(p->builder);
 				return;
 			} else {
-				return lb_build_return_stmt_internal(p, result_values[result_values.count-1]);
+				return lb_build_return_stmt_internal(p, result_values[result_values.count-1], pos);
 			}
 
 		} else {
@@ -2169,7 +2171,7 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 			}
 
 			if (return_by_pointer) {
-				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
 				LLVMBuildRetVoid(p->builder);
 				return;
 			}
@@ -2177,13 +2179,13 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 			res = lb_emit_load(p, res);
 		}
 	}
-	lb_build_return_stmt_internal(p, res);
+	lb_build_return_stmt_internal(p, res, pos);
 }
 
 gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	ast_node(is, IfStmt, node);
 	lb_open_scope(p, is->scope); // Scope #1
-	defer (lb_close_scope(p, lbDeferExit_Default, nullptr));
+	defer (lb_close_scope(p, lbDeferExit_Default, nullptr, node));
 
 	lbBlock *then = lb_create_block(p, "if.then");
 	lbBlock *done = lb_create_block(p, "if.done");
@@ -2234,7 +2236,7 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 
 				lb_open_scope(p, scope_of_node(is->else_stmt));
 				lb_build_stmt(p, is->else_stmt);
-				lb_close_scope(p, lbDeferExit_Default, nullptr);
+				lb_close_scope(p, lbDeferExit_Default, nullptr, is->else_stmt);
 			}
 			lb_emit_jump(p, done);
 
@@ -2251,7 +2253,7 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 
 			lb_open_scope(p, scope_of_node(is->else_stmt));
 			lb_build_stmt(p, is->else_stmt);
-			lb_close_scope(p, lbDeferExit_Default, nullptr);
+			lb_close_scope(p, lbDeferExit_Default, nullptr, is->else_stmt);
 
 			lb_emit_jump(p, done);
 		}
@@ -2322,7 +2324,7 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	}
 
 	lb_start_block(p, done);
-	lb_close_scope(p, lbDeferExit_Default, nullptr);
+	lb_close_scope(p, lbDeferExit_Default, nullptr, node);
 }
 
 gb_internal void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
@@ -2588,7 +2590,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 		lb_open_scope(p, bs->scope);
 		lb_build_stmt_list(p, bs->stmts);
-		lb_close_scope(p, lbDeferExit_Default, nullptr);
+		lb_close_scope(p, lbDeferExit_Default, nullptr, node);
 
 		if (done != nullptr) {
 			lb_emit_jump(p, done);
@@ -2702,7 +2704,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
-		lb_build_return_stmt(p, rs->results);
+		lb_build_return_stmt(p, rs->results, ast_token(node).pos);
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
@@ -2755,7 +2757,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 			}
 		}
 		if (block != nullptr) {
-			lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
+			lb_emit_defer_stmts(p, lbDeferExit_Branch, block, node);
 		}
 		lb_emit_jump(p, block);
 		lb_start_block(p, lb_create_block(p, "unreachable"));
@@ -2795,7 +2797,13 @@ gb_internal void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	}
 }
 
-gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block) {
+gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, TokenPos pos) {
+	TokenPos prev_token_pos = p->branch_location_pos;
+	if (p->uses_branch_location) {
+		p->branch_location_pos = pos;
+	}
+	defer (p->branch_location_pos = prev_token_pos);
+
 	isize count = p->defer_stmts.count;
 	isize i = count;
 	while (i --> 0) {
@@ -2821,6 +2829,21 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 		}
 	}
 }
+
+gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node) {
+	TokenPos pos = {};
+	if (node) {
+		if (node->kind == Ast_BlockStmt) {
+			pos = ast_end_token(node).pos;
+		} else if (node->kind == Ast_CaseClause) {
+			pos = ast_end_token(node).pos;
+		} else {
+			pos = ast_token(node).pos;
+		}
+	}
+	return lb_emit_defer_stmts(p, kind, block, pos);
+}
+
 
 gb_internal void lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt) {
 	Type *pt = base_type(p->type);

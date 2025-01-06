@@ -1096,8 +1096,6 @@ gb_internal void lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_
 }
 
 gb_internal lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos) {
-	GB_ASSERT(!build_context.no_dynamic_literals);
-
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	String proc_name = {};

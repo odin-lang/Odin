@@ -20,6 +20,15 @@ COMMON_LVB_GRID_RVERTICAL  :: WORD(0x1000)
 COMMON_LVB_REVERSE_VIDEO   :: WORD(0x4000)
 COMMON_LVB_UNDERSCORE      :: WORD(0x8000)
 COMMON_LVB_SBCSDBCS        :: WORD(0x0300)
+EV_BREAK                   :: DWORD(0x0040)
+EV_CTS                     :: DWORD(0x0008)
+EV_DSR                     :: DWORD(0x0010)
+EV_ERR                     :: DWORD(0x0080)
+EV_RING                    :: DWORD(0x0100)
+EV_RLSD                    :: DWORD(0x0020)
+EV_RXCHAR                  :: DWORD(0x0001)
+EV_RXFLAG                  :: DWORD(0x0002)
+EV_TXEMPTY                 :: DWORD(0x0004)
 
 @(default_calling_convention="system")
 foreign kernel32 {
@@ -109,7 +118,9 @@ foreign kernel32 {
 	ClearCommError :: proc(hFile: HANDLE, lpErrors: ^Com_Error, lpStat: ^COMSTAT) -> BOOL ---
 	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
 	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-	GetCommPorts :: proc(lpPortNumbers: PULONG, uPortNumbersCount: ULONG, puPortNumbersFound: PULONG) -> ULONG ---
+	SetCommMask :: proc(handle: HANDLE, dwEvtMap: DWORD) -> BOOL ---
+	GetCommMask :: proc(handle: HANDLE, lpEvtMask: LPDWORD) -> BOOL ---
+	WaitCommEvent :: proc(handle: HANDLE, lpEvtMask: LPDWORD, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetCurrentProcess :: proc() -> HANDLE ---
@@ -236,6 +247,10 @@ foreign kernel32 {
 	OpenProcess :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) -> HANDLE ---
 	OpenThread :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwThreadId: DWORD) -> HANDLE ---
 	GetThreadContext :: proc(
+		hThread: HANDLE,
+		lpContext: LPCONTEXT,
+	) -> BOOL ---
+	SetThreadContext :: proc(
 		hThread: HANDLE,
 		lpContext: LPCONTEXT,
 	) -> BOOL ---
@@ -1068,6 +1083,11 @@ foreign one_core {
 		PageProtection: ULONG,
 		PreferredNode: ULONG,
 	) -> PVOID ---
+	GetCommPorts :: proc(
+		lpPortNumbers: PULONG,
+		uPortNumbersCount: ULONG,
+		puPortNumbersFound: PULONG,
+	) -> ULONG ---
 }
 
 

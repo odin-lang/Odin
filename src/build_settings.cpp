@@ -324,6 +324,18 @@ u64 get_vet_flag_from_name(String const &name) {
 	return VetFlag_NONE;
 }
 
+enum OptInFeatureFlags : u64 {
+	OptInFeatureFlag_NONE            = 0,
+	OptInFeatureFlag_DynamicLiterals = 1u<<0,
+};
+
+u64 get_feature_flag_from_name(String const &name) {
+	if (name == "dynamic-literals") {
+		return OptInFeatureFlag_DynamicLiterals;
+	}
+	return OptInFeatureFlag_NONE;
+}
+
 
 enum SanitizerFlags : u32 {
 	SanitizerFlag_NONE = 0,
@@ -429,7 +441,6 @@ struct BuildContext {
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
 	bool   no_type_assert;
-	bool   no_dynamic_literals;
 	bool   no_output_files;
 	bool   no_crt;
 	bool   no_rpath;
@@ -1853,11 +1864,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		produces_output_file = true;
 	} else if (bc->command_kind & Command__does_build) {
 		produces_output_file = true;
-	}
-
-	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR ||
-	    build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
-		bc->no_dynamic_literals = true;
 	}
 
 	if (!produces_output_file) {

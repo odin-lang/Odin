@@ -3502,7 +3502,13 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(bd, BasicDirective, expr);
 		TokenPos pos = bd->token.pos;
-		GB_PANIC("Non-constant basic literal %s - %.*s", token_pos_to_string(pos), LIT(bd->name.string));
+		String name = bd->name.string;
+		if (name == "branch_location") {
+			GB_ASSERT(p->uses_branch_location);
+			String proc_name = p->entity->token.string;
+			return lb_emit_source_code_location_as_global(p, proc_name, p->branch_location_pos);
+		}
+		GB_PANIC("Non-constant basic literal %s - %.*s", token_pos_to_string(pos), LIT(name));
 	case_end;
 
 	case_ast_node(i, Implicit, expr);
@@ -3668,7 +3674,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 
 		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
 		lb_start_block(p, else_);
-		lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
+		lb_emit_defer_stmts(p, lbDeferExit_Branch, block, expr);
 		lb_emit_jump(p, block);
 		lb_start_block(p, then);
 
@@ -4807,7 +4813,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		if (cl->elems.count == 0) {
 			break;
 		}
-		GB_ASSERT(!build_context.no_dynamic_literals);
+		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals);
 
 		lbValue err = lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
 		gb_unused(err);
@@ -4896,7 +4902,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		if (cl->elems.count == 0) {
 			break;
 		}
-		GB_ASSERT(!build_context.no_dynamic_literals);
+		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals);
 
 		Type *et = bt->DynamicArray.elem;
 		lbValue size  = lb_const_int(p->module, t_int, type_size_of(et));
@@ -5493,7 +5499,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
 		lb_start_block(p, else_);
-		lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
+		lb_emit_defer_stmts(p, lbDeferExit_Branch, block, expr);
 		lb_emit_jump(p, block);
 		lb_start_block(p, then);
 

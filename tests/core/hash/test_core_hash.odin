@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package test_core_hash
 
 import "core:hash/xxhash"
