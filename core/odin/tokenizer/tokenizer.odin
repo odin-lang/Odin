@@ -39,6 +39,7 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 	t.read_offset = 0
 	t.line_offset = 0
 	t.line_count = len(src) > 0 ? 1 : 0
+	t.insert_semicolon = false
 	t.error_count = 0
 	t.path = path
 
@@ -205,6 +206,23 @@ scan_comment :: proc(t: ^Tokenizer) -> string {
 	return string(lit)
 }
 
+scan_file_tag :: proc(t: ^Tokenizer) -> string {
+	offset := t.offset - 1
+
+	for t.ch != '\n' {
+		if t.ch == '/' {
+			next := peek_byte(t, 0)
+
+			if next == '/' || next == '*' {
+				break
+			}
+		} 
+		advance_rune(t)
+	}
+
+	return string(t.src[offset : t.offset])
+}
+
 scan_identifier :: proc(t: ^Tokenizer) -> string {
 	offset := t.offset
 
@@ -313,7 +331,7 @@ scan_escape :: proc(t: ^Tokenizer) -> bool {
 		n -= 1
 	}
 
-	if x > max || 0xd800 <= x && x <= 0xe000 {
+	if x > max || 0xd800 <= x && x <= 0xdfff {
 		error(t, offset, "escape sequence is an invalid Unicode code point")
 		return false
 	}
@@ -635,6 +653,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			if t.ch == '!' {
 				kind = .Comment
 				lit = scan_comment(t)
+			} else if t.ch == '+' {
+				kind = .File_Tag
+				lit = scan_file_tag(t)
 			}
 		case '/':
 			kind = .Quo

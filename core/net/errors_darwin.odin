@@ -1,5 +1,5 @@
+#+build darwin
 package net
-// +build darwin
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
@@ -10,12 +10,14 @@ package net
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
 */
 
 import "core:c"
@@ -34,7 +36,7 @@ Create_Socket_Error :: enum c.int {
 
 Dial_Error :: enum c.int {
 	None                      = 0,
-	Port_Required             = -1,
+	Port_Required             = -1, // Attempted to dial an endpointing without a port being set.
 
 	Address_In_Use            = c.int(os.EADDRINUSE),
 	In_Progress               = c.int(os.EINPROGRESS),
@@ -54,7 +56,9 @@ Dial_Error :: enum c.int {
 }
 
 Bind_Error :: enum c.int {
-	None                    = 0,
+	None                         = 0,
+	Privileged_Port_Without_Root = -1, // Attempted to bind to a port less than 1024 without root access.
+
 	Address_In_Use          = c.int(os.EADDRINUSE),    // Another application is currently bound to this endpoint.
 	Given_Nonlocal_Address  = c.int(os.EADDRNOTAVAIL), // The address is not a local address on this machine.
 	Broadcast_Disabled      = c.int(os.EACCES),        // To bind a UDP socket to the broadcast address, the appropriate socket option must be set.

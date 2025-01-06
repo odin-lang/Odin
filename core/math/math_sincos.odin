@@ -189,12 +189,12 @@ sincos_f64 :: proc "contextless" (x: f64) -> (sin, cos: f64) #no_bounds_check {
 // sin coefficients
 @(private="file")
 _sin := [?]f64{
-	 0h3de5d8fd1fd19ccd, //  1.58962301576546568060e-10
-	 0hbe5ae5e5a9291f5d, // -2.50507477628578072866e-8
-	 0h3ec71de3567d48a1, //  2.75573136213857245213e-6
-	 0hbf2a01a019bfdf03, // -1.98412698295895385996e-4
-	 0h3f8111111110f7d0, //  8.33333333332211858878e-3
-	 0hbfc5555555555548, // -1.66666666666666307295e-1
+	0h3de5d8fd1fd19ccd, //  1.58962301576546568060e-10
+	0hbe5ae5e5a9291f5d, // -2.50507477628578072866e-8
+	0h3ec71de3567d48a1, //  2.75573136213857245213e-6
+	0hbf2a01a019bfdf03, // -1.98412698295895385996e-4
+	0h3f8111111110f7d0, //  8.33333333332211858878e-3
+	0hbfc5555555555548, // -1.66666666666666307295e-1
 }
 
 // cos coefficients
@@ -234,7 +234,7 @@ _trig_reduce_f64 :: proc "contextless" (x: f64) -> (j: u64, z: f64) #no_bounds_c
 	// that is, 4/pi = Sum bd_pi4[i]*2^(-64*i)
 	// 19 64-bit digits and the leading one bit give 1217 bits
 	// of precision to handle the largest possible f64 exponent.
-	@static bd_pi4 := [?]u64{
+	@(static, rodata) bd_pi4 := [?]u64{
 		0x0000000000000001,
 		0x45f306dc9c882a53,
 		0xf84eafa3ea69bb81,

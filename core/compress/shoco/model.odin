@@ -4,8 +4,7 @@
 	which is an English word model.
 */
 
-// package shoco is an implementation of the shoco short string compressor
-package shoco
+package compress_shoco
 
 DEFAULT_MODEL :: Shoco_Model {
 	min_char = 39,

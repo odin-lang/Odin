@@ -61,7 +61,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		return
 	}
 
-	switch n in &node.derived {
+	switch n in node.derived {
 	case ^File:
 		if n.docs != nil {
 			walk(v, n.docs)
@@ -320,6 +320,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.comment != nil {
 			walk(v, n.comment)
 		}
+		walk_expr_list(v, n.fullpaths)
 
 	case ^Proc_Group:
 		walk_expr_list(v, n.args)
@@ -414,7 +415,15 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		walk(v, n.row_count)
 		walk(v, n.column_count)
 		walk(v, n.elem)
-
+	case ^Bit_Field_Type:
+		walk(v, n.backing_type)
+		for f in n.fields {
+			walk(v, f)
+		}
+	case ^Bit_Field_Field:
+		walk(v, n.name)
+		walk(v, n.type)
+		walk(v, n.bit_size)
 	case:
 		fmt.panicf("ast.walk: unexpected node type %T", n)
 	}

@@ -40,7 +40,7 @@ when ODIN_OS == .FreeBSD {
 	ERANGE :: 34
 }
 
-when ODIN_OS == .OpenBSD {
+when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {
@@ -80,10 +80,36 @@ when ODIN_OS == .Darwin {
 	ERANGE :: 34
 }
 
+when ODIN_OS == .Haiku {
+	@(private="file")
+	@(default_calling_convention="c")
+	foreign libc {
+		@(link_name="_errnop")
+		_get_errno :: proc() -> ^int ---
+	}
+
+	@(private="file")
+	B_GENERAL_ERROR_BASE :: min(i32)
+	@(private="file")
+	B_POSIX_ERROR_BASE   :: B_GENERAL_ERROR_BASE + 0x7000
+
+	EDOM   :: B_POSIX_ERROR_BASE + 16
+	EILSEQ :: B_POSIX_ERROR_BASE + 38
+	ERANGE :: B_POSIX_ERROR_BASE + 17
+}
+
+when ODIN_OS == .JS {
+	_ :: libc
+	_get_errno :: proc "c" () -> ^int {
+		@(static) errno: int
+		return &errno
+	}
+}
+
 // Odin has no way to make an identifier "errno" behave as a function call to
 // read the value, or to produce an lvalue such that you can assign a different
 // error value to errno. To work around this, just expose it as a function like
 // it actually is.
-errno :: #force_inline proc() -> ^int {
+errno :: #force_inline proc "contextless" () -> ^int {
 	return _get_errno()
 }

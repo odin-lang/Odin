@@ -1,4 +1,4 @@
-//+build i386, amd64
+#+build i386, amd64
 package simd_x86
 
 @(enable_target_feature="fxsr")
@@ -21,7 +21,7 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.fxsave")
 	fxsave    :: proc(p: rawptr) ---

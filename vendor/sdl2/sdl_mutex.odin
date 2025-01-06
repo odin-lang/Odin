@@ -34,6 +34,7 @@ foreign lib {
 	SemWait          :: proc(s: ^sem) -> c.int ---
 	SemTryWait       :: proc(s: ^sem) -> c.int ---
 	SemWaitTimeout   :: proc(s: ^sem, ms: u32) -> c.int ---
+	SemPost          :: proc(s: ^sem) -> c.int ---
 	SemValue         :: proc(s: ^sem) -> u32 ---
 
 	CreateCond      :: proc() -> ^cond ---

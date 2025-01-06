@@ -1,7 +1,7 @@
 package lua_5_1
 
-import "core:intrinsics"
-import "core:builtin"
+import "base:intrinsics"
+import "base:builtin"
 
 import c "core:c/libc"
 
@@ -16,7 +16,7 @@ when LUA_SHARED {
 	} else when ODIN_OS == .Linux {
 		foreign import lib "linux/liblua5.1.so"
 	} else {
-		foreign import lib "system:liblua.so.5.1"
+		foreign import lib "system:lua5.1"
 	}
 } else {
 	when ODIN_OS == .Windows {
@@ -24,7 +24,7 @@ when LUA_SHARED {
 	} else when ODIN_OS == .Linux {
 		foreign import lib "linux/liblua5.1.a"
 	} else {
-		foreign import lib "system:liblua5.1.a"
+		foreign import lib "system:lua5.1"
 	}
 }
 

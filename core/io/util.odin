@@ -132,9 +132,13 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 			buf: [2]byte
 			s := strconv.append_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
 			switch len(s) {
-			case 0: write_string(w, "00", &n) or_return
-			case 1: write_byte(w, '0',    &n) or_return
-			case 2: write_string(w, s,    &n) or_return
+			case 0: 
+				write_string(w, "00", &n) or_return
+			case 1: 
+				write_byte(w, '0',    &n) or_return
+				fallthrough
+			case 2: 
+				write_string(w, s,    &n) or_return
 			}
 		} else {
 			write_rune(w, r, &n) or_return
@@ -225,7 +229,7 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 			} else {
 				write_byte(w, '\\', &n) or_return
 				write_byte(w, 'U', &n)  or_return
-				for s := 24; s >= 0; s -= 4 {
+				for s := 28; s >= 0; s -= 4 {
 					write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
 				}
 			}
@@ -340,6 +344,9 @@ _limited_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, 
 	l := (^Limited_Reader)(stream_data)
 	#partial switch mode {
 	case .Read:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		if l.n <= 0 {
 			return 0, .EOF
 		}
@@ -376,11 +383,12 @@ Section_Reader :: struct {
 	limit: i64,
 }
 
-section_reader_init :: proc(s: ^Section_Reader, r: Reader_At, off: i64, n: i64) {
+section_reader_init :: proc(s: ^Section_Reader, r: Reader_At, off: i64, n: i64) -> Reader {
 	s.r = r
+	s.base = off
 	s.off = off
 	s.limit = off + n
-	return
+	return section_reader_to_stream(s)
 }
 section_reader_to_stream :: proc(s: ^Section_Reader) -> (out: Stream) {
 	out.data = s
@@ -393,6 +401,9 @@ _section_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, 
 	s := (^Section_Reader)(stream_data)
 	#partial switch mode {
 	case .Read:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		if s.off >= s.limit {
 			return 0, .EOF
 		}
@@ -404,6 +415,9 @@ _section_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, 
 		s.off += i64(n)
 		return
 	case .Read_At:
+		if len(p) == 0 {
+			return 0, nil
+		}
 		p, off := p, offset
 
 		if off < 0 || off >= s.limit - s.base {

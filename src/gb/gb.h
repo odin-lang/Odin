@@ -39,7 +39,7 @@ extern "C" {
 	#endif
 #endif
 
-#if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__64BIT__) || defined(__powerpc64__) || defined(__ppc64__) || defined(__aarch64__)
+#if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__64BIT__) || defined(__powerpc64__) || defined(__ppc64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
 	#ifndef GB_ARCH_64_BIT
 	#define GB_ARCH_64_BIT 1
 	#endif
@@ -82,6 +82,14 @@ extern "C" {
 	#elif defined(__OpenBSD__)
 		#ifndef GB_SYSTEM_OPENBSD
 		#define GB_SYSTEM_OPENBSD 1
+		#endif
+	#elif defined(__NetBSD__)
+		#ifndef GB_SYSTEM_NETBSD
+		#define GB_SYSTEM_NETBSD 1
+		#endif
+	#elif defined(__HAIKU__) || defined(__haiku__)
+		#ifndef GB_SYSTEM_HAIKU
+		#define GB_SYSTEM_HAIKU 1
 		#endif
 	#else
 		#error This UNIX operating system is not supported
@@ -136,11 +144,16 @@ extern "C" {
 	#define GB_CACHE_LINE_SIZE 64
 	#endif
 
+#elif defined(__riscv)
+	#ifndef GB_CPU_RISCV
+	#define GB_CPU_RISCV 1
+	#endif
+	#ifndef GB_CACHE_LINE_SIZE
+	#define GB_CACHE_LINE_SIZE 64
+	#endif
 #else
 	#error Unknown CPU Type
 #endif
-
-
 
 #ifndef GB_STATIC_ASSERT
 	#define GB_STATIC_ASSERT3(cond, msg) typedef char static_assertion_##msg[(!!(cond))*2-1]
@@ -206,7 +219,7 @@ extern "C" {
 	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
-	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
+	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__HAIKU__)
 		#include <sys/sendfile.h>
 	#endif
 	#include <sys/stat.h>
@@ -245,6 +258,19 @@ extern "C" {
 #if defined(GB_SYSTEM_OPENBSD)
 	#include <stdio.h>
 	#include <pthread_np.h>
+	#define lseek64 lseek
+#endif
+
+#if defined(GB_SYSTEM_NETBSD)
+	#include <stdio.h>
+	#include <lwp.h>
+	#define lseek64 lseek
+#endif
+
+#if defined(GB_SYSTEM_HAIKU)
+	#include <stdio.h>
+	#include <pthread.h>
+	#include <kernel/OS.h>
 	#define lseek64 lseek
 #endif
     
@@ -448,7 +474,7 @@ typedef i32 b32; // NOTE(bill): Prefer this!!!
 		#define gb_inline __forceinline
 		#endif
 	#else
-		#define gb_inline __attribute__ ((__always_inline__))
+		#define gb_inline inline __attribute__ ((__always_inline__))
 	#endif
 #endif
 
@@ -469,6 +495,13 @@ typedef i32 b32; // NOTE(bill): Prefer this!!!
 	#endif
 #endif
 
+#if !defined(gb_no_asan)
+	#if defined(_MSC_VER)
+		#define gb_no_asan __declspec(no_sanitize_address)
+	#else
+		#define gb_no_asan __attribute__((disable_sanitizer_instrumentation))
+	#endif
+#endif
 
 // NOTE(bill): Easy to grep
 // NOTE(bill): Not needed in macros
@@ -795,6 +828,20 @@ typedef struct gbAffinity {
 	isize threads_per_core;
 } gbAffinity;
 #elif defined(GB_SYSTEM_OPENBSD)
+typedef struct gbAffinity {
+	b32   is_accurate;
+	isize core_count;
+	isize thread_count;
+	isize threads_per_core;
+} gbAffinity;
+#elif defined(GB_SYSTEM_NETBSD)
+typedef struct gbAffinity {
+	b32 is_accurate;
+	isize core_count;
+	isize thread_count;
+	isize threads_per_core;
+} gbAffinity;
+#elif defined(GB_SYSTEM_HAIKU)
 typedef struct gbAffinity {
 	b32   is_accurate;
 	isize core_count;
@@ -2494,7 +2541,11 @@ gb_inline void const *gb_pointer_add_const(void const *ptr, isize bytes)       {
 gb_inline void const *gb_pointer_sub_const(void const *ptr, isize bytes)       { return cast(void const *)(cast(u8 const *)ptr - bytes); }
 gb_inline isize       gb_pointer_diff     (void const *begin, void const *end) { return cast(isize)(cast(u8 const *)end - cast(u8 const *)begin); }
 
-gb_inline void gb_zero_size(void *ptr, isize size) { gb_memset(ptr, 0, size); }
+gb_inline void gb_zero_size(void *ptr, isize size) {
+	if (size != 0) {
+		memset(ptr, 0, size);
+	}
+}
 
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -2522,7 +2573,7 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 
 	void *dest_copy = dest;
 	__asm__ __volatile__("rep movsb" : "+D"(dest_copy), "+S"(source), "+c"(n) : : "memory");
-#elif defined(GB_CPU_ARM)
+#elif defined(GB_CPU_ARM) || defined(GB_CPU_RISCV)
 	u8 *s = cast(u8 *)source;
 	u8 *d = cast(u8 *)dest;
 	for (isize i = 0; i < n; i++) {
@@ -2984,6 +3035,12 @@ gb_inline u32 gb_thread_current_id(void) {
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
 #elif defined(GB_SYSTEM_LINUX)
 	thread_id = gettid();
+#elif defined(GB_SYSTEM_HAIKU)
+	thread_id = find_thread(NULL);
+#elif defined(GB_SYSTEM_FREEBSD)
+	thread_id = pthread_getthreadid_np();
+#elif defined(GB_SYSTEM_NETBSD)
+	thread_id = (u32)_lwp_self();
 #else
 	#error Unsupported architecture for gb_thread_current_id()
 #endif
@@ -3142,11 +3199,11 @@ void gb_affinity_init(gbAffinity *a) {
 	a->core_count       = 1;
 	a->threads_per_core = 1;
 
-	if (sysctlbyname("hw.logicalcpu", &count, &count_size, NULL, 0) == 0) {
+	if (sysctlbyname("kern.smp.cpus", &count, &count_size, NULL, 0) == 0) {
 		if (count > 0) {
 			a->thread_count = count;
 			// Get # of physical cores
-			if (sysctlbyname("hw.physicalcpu", &count, &count_size, NULL, 0) == 0) {
+			if (sysctlbyname("kern.smp.cores", &count, &count_size, NULL, 0) == 0) {
 				if (count > 0) {
 					a->core_count = count;
 					a->threads_per_core = a->thread_count / count;
@@ -3156,6 +3213,14 @@ void gb_affinity_init(gbAffinity *a) {
 						a->is_accurate = true;
 				}
 			}
+		}
+	} else if (sysctlbyname("hw.ncpu", &count, &count_size, NULL, 0) == 0) {
+		// SMP disabled or unavailable.
+		if (count > 0) {
+			a->is_accurate      = true;
+			a->thread_count     = count;
+			a->core_count       = count;
+			a->threads_per_core = 1;
 		}
 	}
 
@@ -3184,7 +3249,9 @@ b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
 	//info.affinity_tag = cast(integer_t)index;
 	//result = thread_policy_set(thread, THREAD_AFFINITY_POLICY, cast(thread_policy_t)&info, THREAD_AFFINITY_POLICY_COUNT);
 
+#if !defined(GB_SYSTEM_HAIKU)
 	result = pthread_setaffinity_np(thread, sizeof(cpuset_t), &mn);
+#endif
 	return result == 0;
 }
 
@@ -3218,6 +3285,54 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 }
 
 #elif defined(GB_SYSTEM_OPENBSD)
+#include <unistd.h>
+
+void gb_affinity_init(gbAffinity *a) {
+	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
+	a->threads_per_core = 1;
+	a->is_accurate      = a->core_count > 0;
+	a->core_count       = a->is_accurate ? a->core_count : 1;
+	a->thread_count     = a->core_count;
+}
+
+void gb_affinity_destroy(gbAffinity *a) {
+	gb_unused(a);
+}
+
+b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
+	return true;
+}
+
+isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
+	GB_ASSERT(0 <= core && core < a->core_count);
+	return a->threads_per_core;
+}
+
+#elif defined(GB_SYSTEM_NETBSD)
+#include <unistd.h>
+
+void gb_affinity_init(gbAffinity *a) {
+	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
+	a->threads_per_core = 1;
+	a->is_accurate      = a->core_count > 0;
+	a->core_count       = a->is_accurate ? a->core_count : 1;
+	a->thread_count     = a->core_count;
+}
+
+void gb_affinity_destroy(gbAffinity *a) {
+	gb_unused(a);
+}
+
+b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
+	return true;
+}
+
+isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
+	GB_ASSERT(0 <= core && core < a->core_count);
+	return a->threads_per_core;
+}
+
+#elif defined(GB_SYSTEM_HAIKU)
 #include <unistd.h>
 
 void gb_affinity_init(gbAffinity *a) {
@@ -3528,7 +3643,7 @@ gb_inline void gb_str_to_upper(char *str) {
 }
 
 
-gb_inline isize gb_strlen(char const *str) {
+gb_no_asan isize gb_strlen(char const *str) {
 	char const *begin = str;
 	isize const *w;
 	if (str == NULL)  {
@@ -5457,7 +5572,7 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 		}
 	}
 	
-	gb_free(buf);
+	gb_mfree(buf);
 	close(new_fd);
 	close(existing_fd);
 
@@ -5634,7 +5749,7 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 			isize path_len = gb_strlen(path);
 			isize cwd_len  = gb_strlen(cwd);
 			len            = cwd_len + 1 + path_len + 1;
-			result         = gb_alloc_array(a, char, len);
+			result         = gb_alloc_array(a, char, len+1);
 
 			gb_memmove(result, (void *)cwd, cwd_len);
 			result[cwd_len] = '/';
@@ -6168,11 +6283,18 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 #elif defined(__aarch64__)
 	gb_inline u64 gb_rdtsc(void) {
 		int64_t virtual_timer_value;
- 		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
- 		return virtual_timer_value;
+		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+		return virtual_timer_value;
+	}
+#elif defined(__riscv)
+	gb_inline u64 gb_rdtsc(void) {
+		u64 result = 0;
+		__asm__ volatile("rdcycle %0" : "=r"(result));
+		return result;
 	}
 #else
-#error "gb_rdtsc not supported"
+#warning "gb_rdtsc not supported"
+	gb_inline u64 gb_rdtsc(void) { return 0; }
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)

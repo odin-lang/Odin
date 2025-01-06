@@ -2,7 +2,7 @@ package sort
 
 import "core:mem"
 import _slice "core:slice"
-import "core:intrinsics"
+import "base:intrinsics"
 
 _ :: intrinsics
 _ :: _slice

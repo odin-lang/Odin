@@ -1,5 +1,5 @@
+#+build windows
 package net
-// +build windows
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
@@ -10,12 +10,14 @@ package net
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
 */
 
 import "core:c"
@@ -78,8 +80,8 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	res := win.connect(win.SOCKET(socket), &sockaddr, size_of(sockaddr))
 	if res < 0 {
-		err = Dial_Error(win.WSAGetLastError())
-		return
+		close(socket)
+		return {}, Dial_Error(win.WSAGetLastError())
 	}
 
 	if options.no_delay {
@@ -105,6 +107,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	family := family_from_endpoint(interface_endpoint)
 	sock := create_socket(family, .TCP) or_return
 	socket = sock.(TCP_Socket)
+	defer if err != nil { close(socket) }
 
 	// NOTE(tetra): While I'm not 100% clear on it, my understanding is that this will
 	// prevent hijacking of the server's endpoint by other applications.
@@ -115,6 +118,19 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	if res := win.listen(win.SOCKET(socket), i32(backlog)); res == win.SOCKET_ERROR {
 		err = Listen_Error(win.WSAGetLastError())
 	}
+	return
+}
+
+@(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	sockaddr: win.SOCKADDR_STORAGE_LH
+	sockaddrlen := c.int(size_of(sockaddr))
+	if win.getsockname(win.SOCKET(any_socket_to_socket(sock)), &sockaddr, &sockaddrlen) == win.SOCKET_ERROR {
+		err = Listen_Error(win.WSAGetLastError())
+		return
+	}
+
+	ep = _sockaddr_to_endpoint(&sockaddr)
 	return
 }
 
@@ -263,12 +279,15 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			ptr = &bool_value
 			len = size_of(bool_value)
 	case .Linger:
-		t, ok := value.(time.Duration)
-		if !ok do panic("set_option() value must be a time.Duration here", loc)
+		t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
 
 		num_secs := i64(time.duration_seconds(t))
-		if time.Duration(num_secs * 1e9) != t do return .Linger_Only_Supports_Whole_Seconds
-		if num_secs > i64(max(u16)) do return .Value_Out_Of_Range
+		if time.Duration(num_secs * 1e9) != t {
+			return .Linger_Only_Supports_Whole_Seconds
+		}
+		if num_secs > i64(max(u16)) {
+			return .Value_Out_Of_Range
+		}
 		linger_value.l_onoff = 1
 		linger_value.l_linger = c.ushort(num_secs)
 
@@ -277,8 +296,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 	case
 		.Receive_Timeout,
 		.Send_Timeout:
-			t, ok := value.(time.Duration)
-			if !ok do panic("set_option() value must be a time.Duration here", loc)
+			t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
 
 			int_value = i32(time.duration_milliseconds(t))
 			ptr = &int_value

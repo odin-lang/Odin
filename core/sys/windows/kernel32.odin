@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"
@@ -20,8 +20,17 @@ COMMON_LVB_GRID_RVERTICAL  :: WORD(0x1000)
 COMMON_LVB_REVERSE_VIDEO   :: WORD(0x4000)
 COMMON_LVB_UNDERSCORE      :: WORD(0x8000)
 COMMON_LVB_SBCSDBCS        :: WORD(0x0300)
+EV_BREAK                   :: DWORD(0x0040)
+EV_CTS                     :: DWORD(0x0008)
+EV_DSR                     :: DWORD(0x0010)
+EV_ERR                     :: DWORD(0x0080)
+EV_RING                    :: DWORD(0x0100)
+EV_RLSD                    :: DWORD(0x0020)
+EV_RXCHAR                  :: DWORD(0x0001)
+EV_RXFLAG                  :: DWORD(0x0002)
+EV_TXEMPTY                 :: DWORD(0x0004)
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	OutputDebugStringA :: proc(lpOutputString: LPCSTR) --- // The only A thing that is allowed
 	OutputDebugStringW :: proc(lpOutputString: LPCWSTR) ---
@@ -38,17 +47,32 @@ foreign kernel32 {
 	                      lpNumberOfCharsWritten: LPDWORD,
 	                      lpReserved: LPVOID) -> BOOL ---
 
-	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
-	                       lpMode: LPDWORD) -> BOOL ---
-	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
-	                       dwMode: DWORD) -> BOOL ---
-	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE,
-						   dwCursorPosition: COORD) -> BOOL ---
-	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE,
-									wAttributes: WORD) -> BOOL ---
-	SetConsoleOutputCP :: proc(wCodePageID: UINT) -> BOOL ---
-	
+	PeekConsoleInputW :: proc(hConsoleInput: HANDLE,
+	                          lpBuffer: ^INPUT_RECORD,
+	                          nLength: DWORD,
+	                          lpNumberOfEventsRead: LPDWORD) -> BOOL ---
+
+	ReadConsoleInputW :: proc(hConsoleInput: HANDLE,
+	                          lpBuffer: ^INPUT_RECORD,
+	                          nLength: DWORD,
+	                          lpNumberOfEventsRead: LPDWORD) -> BOOL ---
+
+	// https://learn.microsoft.com/en-us/windows/console/getnumberofconsoleinputevents
+	GetNumberOfConsoleInputEvents :: proc(hConsoleInput: HANDLE, lpcNumberOfEvents: LPDWORD) -> BOOL ---
+
+	GetConsoleMode :: proc(hConsoleHandle: HANDLE, lpMode: LPDWORD) -> BOOL ---
+	SetConsoleMode :: proc(hConsoleHandle: HANDLE, dwMode: DWORD) -> BOOL ---
+	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE, dwCursorPosition: COORD) -> BOOL ---
+	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE, wAttributes: WORD) -> BOOL ---
+	GetConsoleCP :: proc() -> CODEPAGE ---
+	SetConsoleCP :: proc(wCodePageID: CODEPAGE) -> BOOL ---
+	GetConsoleOutputCP :: proc() -> CODEPAGE ---
+	SetConsoleOutputCP :: proc(wCodePageID: CODEPAGE) -> BOOL ---
+	FlushConsoleInputBuffer :: proc(hConsoleInput: HANDLE) -> BOOL ---
+
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
+
+
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
 	                             dwFlags: DWORD) -> BOOL ---
@@ -64,10 +88,15 @@ foreign kernel32 {
 	RemoveVectoredContinueHandler  :: proc(Handle: LPVOID) -> DWORD ---
 	RaiseException :: proc(dwExceptionCode, dwExceptionFlags, nNumberOfArguments: DWORD, lpArguments: ^ULONG_PTR) -> ! ---
 
+	SetUnhandledExceptionFilter :: proc(lpTopLevelExceptionFilter: LPTOP_LEVEL_EXCEPTION_FILTER) -> LPTOP_LEVEL_EXCEPTION_FILTER ---
 
 	CreateHardLinkW :: proc(lpSymlinkFileName: LPCWSTR,
 	                        lpTargetFileName: LPCWSTR,
 	                        lpSecurityAttributes: LPSECURITY_ATTRIBUTES) -> BOOL ---
+
+	CreateSymbolicLinkW :: proc(lpSymlinkFileName: LPCWSTR,
+	                            lpTargetFileName:  LPCWSTR,
+	                            dwFlags:           DWORD) -> BOOLEAN ---
 
 	GetFileInformationByHandleEx :: proc(hFile: HANDLE,
 	                                     fileInfoClass: FILE_INFO_BY_HANDLE_CLASS,
@@ -84,6 +113,14 @@ foreign kernel32 {
 	RemoveDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
 	SetFileAttributesW :: proc(lpFileName: LPCWSTR, dwFileAttributes: DWORD) -> BOOL ---
 	SetLastError :: proc(dwErrCode: DWORD) ---
+	GetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	SetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	ClearCommError :: proc(hFile: HANDLE, lpErrors: ^Com_Error, lpStat: ^COMSTAT) -> BOOL ---
+	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	SetCommMask :: proc(handle: HANDLE, dwEvtMap: DWORD) -> BOOL ---
+	GetCommMask :: proc(handle: HANDLE, lpEvtMask: LPDWORD) -> BOOL ---
+	WaitCommEvent :: proc(handle: HANDLE, lpEvtMask: LPDWORD, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetCurrentProcess :: proc() -> HANDLE ---
@@ -112,7 +149,7 @@ foreign kernel32 {
 	CreateThread :: proc(
 		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
 		dwStackSize: SIZE_T,
-		lpStartAddress: proc "stdcall" (rawptr) -> DWORD,
+		lpStartAddress: proc "system" (rawptr) -> DWORD,
 		lpParameter: LPVOID,
 		dwCreationFlags: DWORD,
 		lpThreadId: LPDWORD,
@@ -121,7 +158,7 @@ foreign kernel32 {
 		hProcess: HANDLE,
 		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
 		dwStackSize: SIZE_T,
-		lpStartAddress: proc "stdcall" (rawptr) -> DWORD,
+		lpStartAddress: proc "system" (rawptr) -> DWORD,
 		lpParameter: LPVOID,
 		dwCreationFlags: DWORD,
 		lpThreadId: LPDWORD,
@@ -130,6 +167,7 @@ foreign kernel32 {
 	ResumeThread :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---
 	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
+	SetThreadDescription :: proc(hThread: HANDLE, lpThreadDescription: PCWSTR) -> HRESULT ---
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
 	SuspendThread :: proc(hThread: HANDLE) -> DWORD ---
@@ -172,6 +210,7 @@ foreign kernel32 {
 		TolerableDelay: ULONG,
 	) -> BOOL ---
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
+	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlterable: BOOL) -> DWORD ---
 	Sleep :: proc(dwMilliseconds: DWORD) ---
 	GetProcessId :: proc(handle: HANDLE) -> DWORD ---
 	CopyFileW :: proc(
@@ -205,6 +244,16 @@ foreign kernel32 {
 	QueryPerformanceCounter :: proc(lpPerformanceCount: ^LARGE_INTEGER) -> BOOL ---
 	GetExitCodeProcess :: proc(hProcess: HANDLE, lpExitCode: LPDWORD) -> BOOL ---
 	TerminateProcess :: proc(hProcess: HANDLE, uExitCode: UINT) -> BOOL ---
+	OpenProcess :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) -> HANDLE ---
+	OpenThread :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwThreadId: DWORD) -> HANDLE ---
+	GetThreadContext :: proc(
+		hThread: HANDLE,
+		lpContext: LPCONTEXT,
+	) -> BOOL ---
+	SetThreadContext :: proc(
+		hThread: HANDLE,
+		lpContext: LPCONTEXT,
+	) -> BOOL ---
 	CreateProcessW :: proc(
 		lpApplicationName: LPCWSTR,
 		lpCommandLine: LPWSTR,
@@ -222,6 +271,7 @@ foreign kernel32 {
 	SetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPCWSTR) -> BOOL ---
 	GetEnvironmentStringsW :: proc() -> LPWCH ---
 	FreeEnvironmentStringsW :: proc(env_ptr: LPWCH) -> BOOL ---
+	ExpandEnvironmentStringsW :: proc(lpSrc: LPCWSTR, lpDst: LPWSTR, nSize: DWORD) -> DWORD ---
 	GetModuleFileNameW :: proc(hModule: HMODULE, lpFilename: LPWSTR, nSize: DWORD) -> DWORD ---
 	CreateDirectoryW :: proc(
 		lpPathName: LPCWSTR,
@@ -290,6 +340,14 @@ foreign kernel32 {
 		hTemplateFile: HANDLE,
 	) -> HANDLE ---
 
+	GetFileTime :: proc(
+		hFile: HANDLE,
+		lpCreationTime: LPFILETIME,
+		lpLastAccessTime: LPFILETIME,
+		lpLastWriteTime: LPFILETIME,
+	) -> BOOL ---
+	CompareFileTime :: proc(lpFileTime1: LPFILETIME, lpFileTime2: LPFILETIME) -> LONG ---
+
 	FindFirstFileW :: proc(fileName: LPCWSTR, findFileData: LPWIN32_FIND_DATAW) -> HANDLE ---
 	FindNextFileW :: proc(findFile: HANDLE, findFileData: LPWIN32_FIND_DATAW) -> BOOL ---
 	FindClose :: proc(findFile: HANDLE) -> BOOL ---
@@ -314,11 +372,19 @@ foreign kernel32 {
 		lpName: LPCWSTR,
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
+	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
 		bWaitAll: BOOL,
 		dwMilliseconds: DWORD,
+	) -> DWORD ---
+	WaitForMultipleObjectsEx :: proc(
+		nCount: DWORD,
+		lpHandles: ^HANDLE,
+		bWaitAll: BOOL,
+		dwMilliseconds: DWORD,
+		bAlterable: BOOL,
 	) -> DWORD ---
 	CreateNamedPipeW :: proc(
 		lpName: LPCWSTR,
@@ -330,6 +396,14 @@ foreign kernel32 {
 		nDefaultTimeOut: DWORD,
 		lpSecurityAttributes: LPSECURITY_ATTRIBUTES,
 	) -> HANDLE ---
+	PeekNamedPipe :: proc(
+		hNamedPipe: HANDLE,
+		lpBuffer: rawptr,
+		nBufferSize: u32,
+		lpBytesRead: ^u32,
+		lpTotalBytesAvail: ^u32,
+		lpBytesLeftThisMessage: ^u32,
+	) -> BOOL ---
 	CancelIo :: proc(handle: HANDLE) -> BOOL ---
 	GetOverlappedResult :: proc(
 		hFile: HANDLE,
@@ -346,6 +420,12 @@ foreign kernel32 {
 	LocalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
 	LocalFree :: proc(mem: LPVOID) -> LPVOID ---
 
+	GlobalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
+	GlobalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
+	GlobalFree :: proc(mem: LPVOID) -> LPVOID ---
+	
+	GlobalLock :: proc(hMem: HGLOBAL) -> LPVOID ---
+	GlobalUnlock :: proc(hMem: HGLOBAL) -> BOOL ---
 
 	ReadDirectoryChangesW :: proc(
 		hDirectory: HANDLE,
@@ -387,11 +467,34 @@ foreign kernel32 {
 	GetFileAttributesExW :: proc(lpFileName: LPCWSTR, fInfoLevelId: GET_FILEEX_INFO_LEVELS, lpFileInformation: LPVOID) -> BOOL ---
 	GetSystemInfo :: proc(system_info: ^SYSTEM_INFO) ---
 	GetVersionExW :: proc(osvi: ^OSVERSIONINFOEXW) ---
-
+	GetSystemDirectoryW :: proc(lpBuffer: LPWSTR, uSize: UINT) -> UINT ---
+	GetWindowsDirectoryW :: proc(lpBuffer: LPWSTR, uSize: UINT) -> UINT ---
+	GetSystemDefaultLangID :: proc() -> LANGID ---
+	GetSystemDefaultLCID :: proc() -> LCID ---
+	GetSystemDefaultLocaleName :: proc(lpLocaleName: LPWSTR, cchLocaleName: INT) -> INT ---
+	LCIDToLocaleName :: proc(Locale: LCID, lpName: LPWSTR, cchName: INT, dwFlags: DWORD) -> INT ---
+	LocaleNameToLCID :: proc(lpName: LPCWSTR, dwFlags: DWORD) -> LCID ---
+	SetDllDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
+	AddDllDirectory :: proc(NewDirectory: PCWSTR) -> rawptr ---
+	RemoveDllDirectory :: proc(Cookie: rawptr) -> BOOL ---
 	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
+	LoadLibraryExW :: proc(c_str: LPCWSTR, hFile: HANDLE, dwFlags: LoadLibraryEx_Flags) -> HMODULE ---
 	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
 	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
 
+	LoadResource :: proc(hModule: HMODULE, hResInfo: HRSRC) -> HGLOBAL ---
+	FreeResource :: proc(hResData: HGLOBAL) -> BOOL ---
+	LockResource :: proc(hResData: HGLOBAL) -> LPVOID ---
+	SizeofResource :: proc(hModule: HMODULE, hResInfo: HRSRC) -> DWORD ---
+	FindResourceW :: proc(hModule: HMODULE, lpName: LPCWSTR, lpType: LPCWSTR) -> HRSRC ---
+	FindResourceExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpName: LPCWSTR, wLanguage: LANGID) -> HRSRC ---
+	EnumResourceNamesW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpEnumFunc: ENUMRESNAMEPROCW, lParam: LONG_PTR) -> BOOL ---
+	EnumResourceNamesExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpEnumFunc: ENUMRESNAMEPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	EnumResourceTypesExW :: proc(hModule: HMODULE, lpEnumFunc: ENUMRESTYPEPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	EnumResourceLanguagesExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpName: LPCWSTR, lpEnumFunc: ENUMRESLANGPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	LookupIconIdFromDirectory :: proc(presbits: PBYTE, fIcon: BOOL) -> INT ---
+	LookupIconIdFromDirectoryEx :: proc(presbits: PBYTE, fIcon: BOOL, cxDesired: INT, cyDesired: INT, Flags: UINT) -> INT ---
+	CreateIconFromResourceEx :: proc(presbits: PBYTE, dwResSize: DWORD, fIcon: BOOL, dwVer: DWORD, cxDesired: INT, cyDesired: INT, Flags: UINT) -> HICON ---
 
 	GetFullPathNameW  :: proc(filename: LPCWSTR, buffer_length: DWORD, buffer: LPCWSTR, file_part: ^LPCWSTR) -> DWORD ---
 	GetLongPathNameW  :: proc(short, long: LPCWSTR, len: DWORD) -> DWORD ---
@@ -408,13 +511,15 @@ foreign kernel32 {
 	DisconnectNamedPipe :: proc(hNamedPipe: HANDLE) -> BOOL ---
 	WaitNamedPipeW :: proc(lpNamedPipeName: LPCWSTR, nTimeOut: DWORD) -> BOOL ---
 
+	AllocConsole :: proc() -> BOOL ---
+	AttachConsole :: proc(dwProcessId: DWORD) -> BOOL ---
 	SetConsoleCtrlHandler :: proc(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL ---
 	GenerateConsoleCtrlEvent :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
 	FreeConsole :: proc() -> BOOL ---
 	GetConsoleWindow :: proc() -> HWND ---
 	GetConsoleScreenBufferInfo :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfo: PCONSOLE_SCREEN_BUFFER_INFO) -> BOOL ---
 	SetConsoleScreenBufferSize :: proc(hConsoleOutput: HANDLE, dwSize: COORD) -> BOOL ---
-	SetConsoleWindowInfo :: proc(hConsoleOutput: HANDLE, bAbsolute : BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
+	SetConsoleWindowInfo :: proc(hConsoleOutput: HANDLE, bAbsolute: BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
 	GetConsoleCursorInfo :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 	SetConsoleCursorInfo :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 
@@ -430,15 +535,19 @@ foreign kernel32 {
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setfilecompletionnotificationmodes)
 	SetFileCompletionNotificationModes :: proc(FileHandle: HANDLE, Flags: u8) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-createiocompletionport)
-	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ^uintptr, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
+	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
 	//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus)
-	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: uintptr, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
+	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: PULONG_PTR, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatusex)
 	GetQueuedCompletionStatusEx :: proc(CompletionPort: HANDLE, lpCompletionPortEntries: ^OVERLAPPED_ENTRY, ulCount: c_ulong, ulNumEntriesRemoved: ^c_ulong, dwMilliseconds: DWORD, fAlertable: BOOL) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus)
 	PostQueuedCompletionStatus :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: c_ulong, lpOverlapped: ^OVERLAPPED) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-gethandleinformation)
 	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
+
+	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---
+
+	GetSystemPowerStatus :: proc(lpSystemPowerStatus: ^SYSTEM_POWER_STATUS) -> BOOL ---
 }
 
 DEBUG_PROCESS                    :: 0x00000001
@@ -489,6 +598,45 @@ THREAD_PRIORITY_IDLE          :: THREAD_BASE_PRIORITY_IDLE
 THREAD_MODE_BACKGROUND_BEGIN  :: 0x00010000
 THREAD_MODE_BACKGROUND_END    :: 0x00020000
 
+PROCESS_ALL_ACCESS :: 0x000F0000 | SYNCHRONIZE | 0xFFFF
+PROCESS_CREATE_PROCESS :: 0x0080
+PROCESS_CREATE_THREAD :: 0x0002
+PROCESS_DUP_HANDLE :: 0x0040
+PROCESS_QUERY_INFORMATION :: 0x0400
+PROCESS_QUERY_LIMITED_INFORMATION :: 0x1000
+PROCESS_SET_INFORMATION :: 0x0200
+PROCESS_SET_QUOTA :: 0x0100
+PROCESS_SUSPEND_RESUME :: 0x0800
+PROCESS_TERMINATE :: 0x0001
+PROCESS_VM_OPERATION :: 0x0008
+PROCESS_VM_READ :: 0x0010
+PROCESS_VM_WRITE :: 0x0020
+
+THREAD_ALL_ACCESS :: \
+	THREAD_DIRECT_IMPERSONATION |
+	THREAD_GET_CONTEXT |
+	THREAD_IMPERSONATE |
+	THREAD_QUERY_INFORMATION |
+	THREAD_QUERY_LIMITED_INFORMATION |
+	THREAD_SET_CONTEXT |
+	THREAD_SET_INFORMATION |
+	THREAD_SET_LIMITED_INFORMATION |
+	THREAD_SET_THREAD_TOKEN |
+	THREAD_SUSPEND_RESUME |
+	THREAD_TERMINATE |
+	SYNCHRONIZE
+THREAD_DIRECT_IMPERSONATION :: 0x0200
+THREAD_GET_CONTEXT :: 0x0008
+THREAD_IMPERSONATE :: 0x0100
+THREAD_QUERY_INFORMATION :: 0x0040
+THREAD_QUERY_LIMITED_INFORMATION :: 0x0800
+THREAD_SET_CONTEXT :: 0x0010
+THREAD_SET_INFORMATION :: 0x0020
+THREAD_SET_LIMITED_INFORMATION :: 0x0400
+THREAD_SET_THREAD_TOKEN :: 0x0080
+THREAD_SUSPEND_RESUME :: 0x0002
+THREAD_TERMINATE :: 0x0001
+
 COPY_FILE_FAIL_IF_EXISTS              :: 0x00000001
 COPY_FILE_RESTARTABLE                 :: 0x00000002
 COPY_FILE_OPEN_SOURCE_FOR_WRITE       :: 0x00000004
@@ -524,6 +672,10 @@ FILE_MAP_COPY            :: DWORD(0x00000001)
 FILE_MAP_RESERVE         :: DWORD(0x80000000)
 FILE_MAP_TARGETS_INVALID :: DWORD(0x40000000)
 FILE_MAP_LARGE_PAGES     :: DWORD(0x20000000)
+
+// Flags for `SetFileCompletionNotificationModes`.
+FILE_SKIP_COMPLETION_PORT_ON_SUCCESS :: 0x1
+FILE_SKIP_SET_EVENT_ON_HANDLE        :: 0x2
 
 PAGE_NOACCESS          :: 0x01
 PAGE_READONLY          :: 0x02
@@ -562,7 +714,7 @@ MEM_TOP_DOWN    :: 0x100000
 MEM_LARGE_PAGES :: 0x20000000
 MEM_4MB_PAGES   :: 0x80000000
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	VirtualAlloc :: proc(
 		lpAddress: LPVOID,
@@ -705,7 +857,7 @@ LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryRes
 HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification
 
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	CreateMemoryResourceNotification :: proc(
 		NotificationType: MEMORY_RESOURCE_NOTIFICATION_TYPE,
@@ -721,7 +873,7 @@ FILE_CACHE_MAX_HARD_DISABLE :: DWORD(0x00000002)
 FILE_CACHE_MIN_HARD_ENABLE  :: DWORD(0x00000004)
 FILE_CACHE_MIN_HARD_DISABLE :: DWORD(0x00000008)
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	GetSystemFileCacheSize :: proc(
 		lpMinimumFileCacheSize: PSIZE_T,
@@ -751,7 +903,7 @@ WIN32_MEMORY_RANGE_ENTRY :: struct {
 
 PWIN32_MEMORY_RANGE_ENTRY :: ^WIN32_MEMORY_RANGE_ENTRY
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	PrefetchVirtualMemory :: proc(
 		hProcess: HANDLE,
@@ -809,23 +961,23 @@ foreign kernel32 {
 
 MEHC_PATROL_SCRUBBER_PRESENT :: ULONG(0x1)
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	GetMemoryErrorHandlingCapabilities :: proc(
 		Capabilities: PULONG,
 	) -> BOOL ---
 }
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	GlobalMemoryStatusEx :: proc(
 		lpBuffer: ^MEMORYSTATUSEX,
 	) -> BOOL ---
 }
 
-PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "stdcall" ()
+PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "system" ()
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	RegisterBadMemoryNotification :: proc(
 		Callback: PBAD_MEMORY_CALLBACK_ROUTINE,
@@ -846,7 +998,7 @@ VmOfferPriorityLow         :: OFFER_PRIORITY.VmOfferPriorityLow
 VmOfferPriorityBelowNormal :: OFFER_PRIORITY.VmOfferPriorityBelowNormal
 VmOfferPriorityNormal      :: OFFER_PRIORITY.VmOfferPriorityNormal
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	OfferVirtualMemory :: proc(
 		VirtualAddress: PVOID,
@@ -911,7 +1063,7 @@ WIN32_MEMORY_REGION_INFORMATION_u_s_Bitfield :: distinct ULONG
 	Reserved       : 32-6,
 }*/
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign one_core {
 	QueryVirtualMemoryInformation :: proc(
 		Process: HANDLE,
@@ -931,12 +1083,17 @@ foreign one_core {
 		PageProtection: ULONG,
 		PreferredNode: ULONG,
 	) -> PVOID ---
+	GetCommPorts :: proc(
+		lpPortNumbers: PULONG,
+		uPortNumbersCount: ULONG,
+		puPortNumbersFound: PULONG,
+	) -> ULONG ---
 }
 
 
 NUMA_NO_PREFERRED_NODE :: 0xffffffff
 
-MapViewOfFile2 :: #force_inline proc "stdcall" (
+MapViewOfFile2 :: #force_inline proc "system" (
 	FileMappingHandle: HANDLE,
 	ProcessHandle: HANDLE,
 	Offset: ULONG64,
@@ -957,7 +1114,7 @@ MapViewOfFile2 :: #force_inline proc "stdcall" (
 	)
 }
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	UnmapViewOfFile2 :: proc(
 		ProcessHandle: HANDLE,
@@ -966,7 +1123,7 @@ foreign kernel32 {
 	) -> BOOL ---
 }
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign kernel32 {
 	GetProductInfo :: proc(
 		OSMajorVersion: DWORD,
@@ -977,157 +1134,15 @@ foreign kernel32 {
 	) -> BOOL ---
 }
 
-HandlerRoutine :: proc "stdcall" (dwCtrlType: DWORD) -> BOOL
+HandlerRoutine :: proc "system" (dwCtrlType: DWORD) -> BOOL
 PHANDLER_ROUTINE :: HandlerRoutine
 
+// NOTE(Jeroen, 2024-06-13): As Odin now supports bit_fields, we no longer need
+// a helper procedure. `init_dcb_with_config` and `get_dcb_config` have been removed.
 
+LPFIBER_START_ROUTINE :: #type proc "system" (lpFiberParameter: LPVOID)
 
-
-DCB_Config :: struct {
-	fParity: bool,
-	fOutxCtsFlow: bool,
-	fOutxDsrFlow: bool,
-	fDtrControl: DTR_Control,
-	fDsrSensitivity: bool,
-	fTXContinueOnXoff: bool,
-	fOutX: bool,
-	fInX: bool,
-	fErrorChar: bool,
-	fNull: bool,
-	fRtsControl: RTS_Control,
-	fAbortOnError: bool,
-	BaudRate: DWORD,
-	ByteSize: BYTE,
-	Parity: Parity,
-	StopBits: Stop_Bits,
-	XonChar: byte,
-	XoffChar: byte,
-	ErrorChar: byte,
-	EvtChar: byte,
-}
-DTR_Control :: enum byte {
-	Disable = 0,
-	Enable = 1,
-	Handshake = 2,
-}
-RTS_Control :: enum byte {
-	Disable   = 0,
-	Enable    = 1,
-	Handshake = 2,
-	Toggle    = 3,
-}
-Parity :: enum byte {
-	None  = 0,
-	Odd   = 1,
-	Even  = 2,
-	Mark  = 3,
-	Space = 4,
-}
-Stop_Bits :: enum byte {
-	One = 0,
-	One_And_A_Half = 1,
-	Two = 2,
-}
-
-// A helper procedure to set the values of a DCB structure.
-init_dcb_with_config :: proc "contextless" (dcb: ^DCB, config: DCB_Config) {
-	out: u32
-
-	// NOTE(tetra, 2022-09-21): On both Clang 14 on Windows, and MSVC, the bits in the bitfield
-	// appear to be defined from LSB to MSB order.
-	// i.e: `fBinary` (the first bitfield in the C source) is the LSB in the `settings` u32.
-
-	out |= u32(1) << 0 // fBinary must always be true on Windows.
-
-	out |= u32(config.fParity) << 1
-	out |= u32(config.fOutxCtsFlow) << 2
-	out |= u32(config.fOutxDsrFlow) << 3
-
-	out |= u32(config.fDtrControl) << 4
-
-	out |= u32(config.fDsrSensitivity) << 6
-	out |= u32(config.fTXContinueOnXoff) << 7
-	out |= u32(config.fOutX) << 8
-	out |= u32(config.fInX) << 9
-	out |= u32(config.fErrorChar) << 10
-	out |= u32(config.fNull) << 11
-
-	out |= u32(config.fRtsControl) << 12
-
-	out |= u32(config.fAbortOnError) << 14
-
-	dcb.settings = out
-
-	dcb.BaudRate = config.BaudRate
-	dcb.ByteSize = config.ByteSize
-	dcb.Parity = config.Parity
-	dcb.StopBits = config.StopBits
-	dcb.XonChar = config.XonChar
-	dcb.XoffChar = config.XoffChar
-	dcb.ErrorChar = config.ErrorChar
-	dcb.EvtChar = config.EvtChar
-
-	dcb.DCBlength = size_of(DCB)
-}
-get_dcb_config :: proc "contextless" (dcb: DCB) -> (config: DCB_Config) {
-	config.fParity = bool((dcb.settings >> 1) & 0x01)
-	config.fOutxCtsFlow = bool((dcb.settings >> 2) & 0x01)
-	config.fOutxDsrFlow = bool((dcb.settings >> 3) & 0x01)
-
-	config.fDtrControl = DTR_Control((dcb.settings >> 4) & 0x02)
-
-	config.fDsrSensitivity = bool((dcb.settings >> 6) & 0x01)
-	config.fTXContinueOnXoff = bool((dcb.settings >> 7) & 0x01)
-	config.fOutX = bool((dcb.settings >> 8) & 0x01)
-	config.fInX = bool((dcb.settings >> 9) & 0x01)
-	config.fErrorChar = bool((dcb.settings >> 10) & 0x01)
-	config.fNull = bool((dcb.settings >> 11) & 0x01)
-
-	config.fRtsControl = RTS_Control((dcb.settings >> 12) & 0x02)
-
-	config.fAbortOnError = bool((dcb.settings >> 14) & 0x01)
-
-	config.BaudRate = dcb.BaudRate
-	config.ByteSize = dcb.ByteSize
-	config.Parity = dcb.Parity
-	config.StopBits = dcb.StopBits
-	config.XonChar = dcb.XonChar
-	config.XoffChar = dcb.XoffChar
-	config.ErrorChar = dcb.ErrorChar
-	config.EvtChar = dcb.EvtChar
-
-	return
-}
-
-// NOTE(tetra): See get_dcb_config() and init_dcb_with_config() for help with initializing this.
-DCB :: struct {
-	DCBlength: DWORD, // NOTE(tetra): Must be set to size_of(DCB).
-	BaudRate: DWORD,
-	settings: u32, // NOTE(tetra): These are bitfields in the C struct.
-	wReserved: WORD,
-	XOnLim: WORD,
-	XOffLim: WORD,
-	ByteSize: BYTE,
-	Parity: Parity,
-	StopBits: Stop_Bits,
-	XonChar: byte,
-	XoffChar: byte,
-	ErrorChar: byte,
-	EofChar: byte,
-	EvtChar: byte,
-	wReserved1: WORD,
-}
-
-@(default_calling_convention="stdcall")
-foreign kernel32 {
-	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-}
-
-
-LPFIBER_START_ROUTINE :: #type proc "stdcall" (lpFiberParameter: LPVOID)
-
-@(default_calling_convention = "stdcall")
+@(default_calling_convention = "system")
 foreign kernel32 {
 	CreateFiber :: proc(dwStackSize: SIZE_T, lpStartAddress: LPFIBER_START_ROUTINE, lpParameter: LPVOID) -> LPVOID ---
 	DeleteFiber :: proc(lpFiber: LPVOID) ---
@@ -1180,3 +1195,48 @@ SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
 	DummyUnion: DUMMYUNIONNAME_u,
 }
+
+SYSTEM_POWER_STATUS :: struct {
+	ACLineStatus:        AC_Line_Status,
+	BatteryFlag:         Battery_Flags,
+	BatteryLifePercent:  BYTE,
+	SystemStatusFlag:    BYTE,
+	BatteryLifeTime:     DWORD,
+	BatteryFullLifeTime: DWORD,
+}
+
+AC_Line_Status :: enum BYTE {
+	Offline = 0,
+	Online  = 1,
+	Unknown = 255,
+}
+
+Battery_Flag :: enum BYTE {
+	High     = 0,
+	Low      = 1,
+	Critical = 2,
+	Charging = 3,
+	No_Battery = 7,
+}
+Battery_Flags :: bit_set[Battery_Flag; BYTE]
+
+/* Global Memory Flags */
+GMEM_FIXED          :: 0x0000
+GMEM_MOVEABLE       :: 0x0002
+GMEM_NOCOMPACT      :: 0x0010
+GMEM_NODISCARD      :: 0x0020
+GMEM_ZEROINIT       :: 0x0040
+GMEM_MODIFY         :: 0x0080
+GMEM_DISCARDABLE    :: 0x0100
+GMEM_NOT_BANKED     :: 0x1000
+GMEM_SHARE          :: 0x2000
+GMEM_DDESHARE       :: 0x2000
+GMEM_NOTIFY         :: 0x4000
+GMEM_LOWER          :: GMEM_NOT_BANKED
+GMEM_VALID_FLAGS    :: 0x7F72
+GMEM_INVALID_HANDLE :: 0x8000
+
+GHND                :: (GMEM_MOVEABLE | GMEM_ZEROINIT)
+GPTR                :: (GMEM_FIXED | GMEM_ZEROINIT)
+
+LPTOP_LEVEL_EXCEPTION_FILTER :: PVECTORED_EXCEPTION_HANDLER

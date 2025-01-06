@@ -1,4 +1,4 @@
-//+build i386
+#+build i386
 package linux
 
 // The numbers are taken from

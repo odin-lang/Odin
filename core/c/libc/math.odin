@@ -2,7 +2,7 @@ package libc
 
 // 7.12 Mathematics
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"

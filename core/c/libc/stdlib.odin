@@ -10,6 +10,9 @@ when ODIN_OS == .Windows {
 	foreign import libc "system:c"
 }
 
+@(require)
+import "base:runtime"
+
 when ODIN_OS == .Windows {
 	RAND_MAX :: 0x7fff
 
@@ -40,10 +43,9 @@ when ODIN_OS == .Linux {
 }
 
 
-when ODIN_OS == .Darwin {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
 	RAND_MAX :: 0x7fffffff
 
-	// GLIBC and MUSL only
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {
@@ -52,6 +54,20 @@ when ODIN_OS == .Darwin {
 
 	MB_CUR_MAX :: #force_inline proc() -> size_t {
 		return size_t(___mb_cur_max())
+	}
+}
+
+when ODIN_OS == .NetBSD {
+	RAND_MAX :: 0x7fffffff
+
+	@(private="file")
+	@(default_calling_convention="c")
+	foreign libc {
+		__mb_cur_max: size_t
+	}
+
+	MB_CUR_MAX :: #force_inline proc() -> size_t {
+		return __mb_cur_max
 	}
 }
 
@@ -99,7 +115,7 @@ foreign libc {
 	at_quick_exit :: proc(func: proc "c" ()) -> int ---
 	exit          :: proc(status: int) -> ! ---
 	_Exit         :: proc(status: int) -> ! ---
-	getenv        :: proc(name: cstring) -> [^]char ---
+	getenv        :: proc(name: cstring) -> cstring ---
 	quick_exit    :: proc(status: int) -> ! ---
 	system        :: proc(cmd: cstring) -> int ---
 
@@ -132,6 +148,10 @@ aligned_alloc :: #force_inline proc "c" (alignment, size: size_t) -> rawptr {
 			_aligned_malloc :: proc(size, alignment: size_t) -> rawptr ---
 		}
 		return _aligned_malloc(size=size, alignment=alignment)
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		context = runtime.default_context()
+		data, _ := runtime.mem_alloc_bytes(auto_cast size, auto_cast alignment)
+		return raw_data(data)
 	} else {
 		foreign libc {
 			aligned_alloc :: proc(alignment, size: size_t) -> rawptr ---
@@ -147,6 +167,9 @@ aligned_free :: #force_inline proc "c" (ptr: rawptr) {
 			_aligned_free :: proc(ptr: rawptr) ---
 		}
 		_aligned_free(ptr)
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		context = runtime.default_context()
+		runtime.mem_free(ptr)
 	} else {
 		free(ptr)
 	}

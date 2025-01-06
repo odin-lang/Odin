@@ -6,7 +6,7 @@
 
 package math_big
 
-import "core:intrinsics"
+import "base:intrinsics"
 import rnd "core:math/rand"
 
 /*
@@ -356,17 +356,17 @@ int_count_lsb :: proc(a: ^Int, allocator := context.allocator) -> (count: int, e
 }
 
 platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
-	where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) {
+	where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T) {
 	return int(intrinsics.count_trailing_zeros(a)) if a > 0 else 0
 }
 
 count_lsb :: proc { int_count_lsb, platform_count_lsb, }
 
-int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
+int_random_digit :: proc() -> (res: DIGIT) {
 	when _DIGIT_BITS == 60 { // DIGIT = u64
-		return DIGIT(rnd.uint64(r)) & _MASK
+		return DIGIT(rnd.uint64()) & _MASK
 	} else when _DIGIT_BITS == 28 { // DIGIT = u32
-		return DIGIT(rnd.uint32(r)) & _MASK
+		return DIGIT(rnd.uint32()) & _MASK
 	} else {
 		panic("Unsupported DIGIT size.")
 	}
@@ -374,12 +374,12 @@ int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	return 0 // We shouldn't get here.
 }
 
-int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+int_random :: proc(dest: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(dest)
-	return #force_inline internal_int_random(dest, bits, r, allocator)
+	return #force_inline internal_int_random(dest, bits, allocator)
 
 }
 random :: proc { int_random, }
@@ -777,6 +777,11 @@ int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, alloca
 */
 INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 
+@(init, private)
+_init_constants :: proc() {
+	initialize_constants()
+}
+
 initialize_constants :: proc() -> (res: int) {
 	internal_set(     INT_ZERO,  0);      INT_ZERO.flags = {.Immutable}
 	internal_set(      INT_ONE,  1);       INT_ONE.flags = {.Immutable}
@@ -788,7 +793,7 @@ initialize_constants :: proc() -> (res: int) {
 	*/
 	internal_set(      INT_NAN,  1);       INT_NAN.flags = {.Immutable, .NaN}
 	internal_set(      INT_INF,  1);       INT_INF.flags = {.Immutable, .Inf}
-	internal_set(      INT_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
+	internal_set(INT_MINUS_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
 
 	return _DEFAULT_MUL_KARATSUBA_CUTOFF
 }

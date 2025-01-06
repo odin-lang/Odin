@@ -32,6 +32,7 @@ Token_Kind :: enum u32 {
 	Invalid,
 	EOF,
 	Comment,
+	File_Tag,
 
 	B_Literal_Begin,
 		Ident,   // main
@@ -137,6 +138,7 @@ Token_Kind :: enum u32 {
 		Union,       // union
 		Enum,        // enum
 		Bit_Set,     // bit_set
+		Bit_Field,   // bit_field
 		Map,         // map
 		Dynamic,     // dynamic
 		Auto_Cast,   // auto_cast
@@ -165,6 +167,7 @@ tokens := [Token_Kind.COUNT]string {
 	"Invalid",
 	"EOF",
 	"Comment",
+	"FileTag",
 
 	"",
 	"identifier",
@@ -270,6 +273,7 @@ tokens := [Token_Kind.COUNT]string {
 	"union",
 	"enum",
 	"bit_set",
+	"bit_field",
 	"map",
 	"dynamic",
 	"auto_cast",

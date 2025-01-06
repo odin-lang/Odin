@@ -1,4 +1,4 @@
-// +build windows, linux, darwin
+#+build windows, linux, darwin, freebsd
 package net
 
 /*
@@ -10,12 +10,14 @@ package net
 	Copyright 2022-2023 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022-2023 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022-2023 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
 */
 
 any_socket_to_socket :: proc "contextless" (socket: Any_Socket) -> Socket {
@@ -132,6 +134,13 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TC
 	return _listen_tcp(interface_endpoint, backlog)
 }
 
+/*
+	Returns the endpoint that the given socket is listening / bound on.
+*/
+bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Network_Error) {
+	return _bound_endpoint(socket)
+}
+
 accept_tcp :: proc(socket: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	return _accept_tcp(socket, options)
 }
@@ -148,7 +157,28 @@ recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_en
 	return _recv_udp(socket, buf)
 }
 
-recv :: proc{recv_tcp, recv_udp}
+/*
+	Receive data from into a buffer from any socket.
+
+	Note: `remote_endpoint` parameter is non-nil only if the socket type is UDP. On TCP sockets it
+	will always return `nil`.
+*/
+recv_any :: proc(socket: Any_Socket, buf: []byte) -> (
+	bytes_read: int,
+	remote_endpoint: Maybe(Endpoint),
+	err: Network_Error,
+) {
+	switch socktype in socket {
+	case TCP_Socket:
+		bytes_read, err = recv_tcp(socktype, buf)
+		return
+	case UDP_Socket:
+		return recv_udp(socktype, buf)
+	case: panic("Not supported")
+	}
+}
+
+recv :: proc{recv_tcp, recv_udp, recv_any}
 
 /*
 	Repeatedly sends data until the entire buffer is sent.
@@ -168,7 +198,20 @@ send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_writte
 	return _send_udp(socket, buf, to)
 }
 
-send :: proc{send_tcp, send_udp}
+send_any :: proc(socket: Any_Socket, buf: []byte, to: Maybe(Endpoint) = nil) -> (
+	bytes_written: int,
+	err: Network_Error,
+) {
+	switch socktype in socket {
+	case TCP_Socket:
+		return send_tcp(socktype, buf)
+	case UDP_Socket:
+		return send_udp(socktype, buf, to.(Endpoint))
+	case: panic("Not supported")
+	}
+}
+
+send :: proc{send_tcp, send_udp, send_any}
 
 shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	return _shutdown(socket, manner)

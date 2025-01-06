@@ -95,6 +95,10 @@ writer_write :: proc(b: ^Writer, p: []byte) -> (n: int, err: io.Error) {
 		m: int
 		if writer_buffered(b) == 0 {
 			m, b.err = io.write(b.wr, p)
+			if m < 0 && b.err == nil {
+				b.err = .Negative_Write
+				break
+			}
 		} else {
 			m = copy(b.buf[b.n:], p)
 			b.n += m
@@ -226,7 +230,6 @@ writer_to_writer :: proc(b: ^Writer) -> (s: io.Writer) {
 
 
 
-@(private)
 _writer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	b := (^Writer)(stream_data)
 	#partial switch mode {

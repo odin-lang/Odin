@@ -28,9 +28,9 @@
 package math_big
 
 import "core:mem"
-import "core:intrinsics"
+import "base:intrinsics"
 import rnd "core:math/rand"
-import "core:builtin"
+import "base:builtin"
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
@@ -546,7 +546,7 @@ internal_int_shl1 :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
  	Like `internal_int_mul_digit` but with an integer as the small input.
 */
 internal_int_mul_integer :: proc(dest, a: ^Int, b: $T, allocator := context.allocator) -> (err: Error)
-where intrinsics.type_is_integer(T) && T != DIGIT {
+where intrinsics.type_is_integer(T), T != DIGIT {
 	context.allocator = allocator
 
 	t := &Int{}
@@ -1181,28 +1181,18 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
-	/*
-		Compare based on used digits.
-	*/
+
+	// Compare based on used digits.
 	if a.used != b.used {
-		if a.used > b.used {
-			return +1
-		}
-		return -1
+		return +1 if a.used > b.used else -1
 	}
 
-	/*
-		Same number of used digits, compare based on their value.
-	*/
+	// Same number of used digits, compare based on their value.
 	#no_bounds_check for n := a.used - 1; n >= 0; n -= 1 {
 		if a.digit[n] != b.digit[n] {
-			if a.digit[n] > b.digit[n] {
-				return +1
-			}
-			return -1
+			return +1 if a.digit[n] > b.digit[n] else -1
 		}
 	}
-
 	return 0
 }
 internal_compare_magnitude :: proc { internal_int_compare_magnitude, }
@@ -2046,9 +2036,9 @@ internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.alloc
 	if internal_is_positive(a) && internal_eq(b, 1) { return internal_zero(dest)	}
 
 	/*
-		`b` cannot be negative and has to be > 1
+		`b` cannot be negative and b has to be > 1
 	*/
-	if internal_is_negative(b) || internal_gt(b, 1) { return .Invalid_Argument }
+	if internal_is_negative(b) || !internal_gt(b, 1) { return .Invalid_Argument }
 
 	/*
 		If the modulus is odd we can use a faster routine instead.
@@ -2057,6 +2047,7 @@ internal_int_inverse_modulo :: proc(dest, a, b: ^Int, allocator := context.alloc
 
 	return _private_inverse_modulo(dest, a, b)
 }
+internal_int_invmod :: internal_int_inverse_modulo
 internal_invmod :: proc{ internal_int_inverse_modulo, }
 
 /*
@@ -2187,15 +2178,20 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 	}
 
 	/*
-		If not yet iniialized, initialize the `digit` backing with the allocator we were passed.
+		If not yet initialized, initialize the `digit` backing with the allocator we were passed.
 	*/
 	if cap == 0 {
 		a.digit = make([dynamic]DIGIT, needed, allocator)
-	} else if cap != needed {
+	} else if cap < needed {
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
 		*/
 		resize(&a.digit, needed)
+	} else if cap > needed {
+		/*
+			Same applies to builtin.shrink here as resize above
+		*/
+		builtin.shrink(&a.digit, needed)
 	}
 	/*
 		Let's see if the allocation/resize worked as expected.
@@ -2815,17 +2811,17 @@ internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 }
 
 internal_platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
-	where intrinsics.type_is_integer(T) && intrinsics.type_is_unsigned(T) {
+	where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T) {
 	return int(intrinsics.count_trailing_zeros(a)) if a > 0 else 0
 }
 
 internal_count_lsb :: proc { internal_int_count_lsb, internal_platform_count_lsb, }
 
-internal_int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
+internal_int_random_digit :: proc() -> (res: DIGIT) {
 	when _DIGIT_BITS == 60 { // DIGIT = u64
-		return DIGIT(rnd.uint64(r)) & _MASK
+		return DIGIT(rnd.uint64()) & _MASK
 	} else when _DIGIT_BITS == 28 { // DIGIT = u32
-		return DIGIT(rnd.uint32(r)) & _MASK
+		return DIGIT(rnd.uint32()) & _MASK
 	} else {
 		panic("Unsupported DIGIT size.")
 	}
@@ -2833,7 +2829,7 @@ internal_int_random_digit :: proc(r: ^rnd.Rand = nil) -> (res: DIGIT) {
 	return 0 // We shouldn't get here.
 }
 
-internal_int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator := context.allocator) -> (err: Error) {
+internal_int_random :: proc(dest: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	bits := bits
@@ -2850,13 +2846,13 @@ internal_int_random :: proc(dest: ^Int, bits: int, r: ^rnd.Rand = nil, allocator
 	#force_inline internal_grow(dest, digits) or_return
 
 	for i := 0; i < digits; i += 1 {
-		dest.digit[i] = int_random_digit(r) & _MASK
+		dest.digit[i] = int_random_digit() & _MASK
 	}
 	if bits > 0 {
 		dest.digit[digits - 1] &= ((1 << uint(bits)) - 1)
 	}
 	dest.used = digits
-	return nil
+	return internal_clamp(dest)
 }
 internal_random :: proc { internal_int_random, }
 

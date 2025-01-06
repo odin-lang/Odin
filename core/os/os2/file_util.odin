@@ -1,12 +1,23 @@
 package os2
 
-import "core:mem"
-import "core:runtime"
+import "base:runtime"
 import "core:strconv"
 import "core:unicode/utf8"
 
 write_string :: proc(f: ^File, s: string) -> (n: int, err: Error) {
 	return write(f, transmute([]byte)s)
+}
+
+write_strings :: proc(f: ^File, strings: ..string) -> (n: int, err: Error) {
+	for s in strings {
+		m: int
+		m, err = write_string(f, s)
+		n += m
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 write_byte :: proc(f: ^File, b: byte) -> (n: int, err: Error) {
@@ -62,61 +73,104 @@ write_encoded_rune :: proc(f: ^File, r: rune) -> (n: int, err: Error) {
 	return
 }
 
+read_at_least :: proc(f: ^File, buf: []byte, min: int) -> (n: int, err: Error) {
+	if len(buf) < min {
+		return 0, .Short_Buffer
+	}
+	nn := max(int)
+	for nn > 0 && n < min && err == nil {
+		nn, err = read(f, buf[n:])
+		n += nn
+	}
+	if n >= min {
+		err = nil
+	}
+	return
+}
+
+read_full :: proc(f: ^File, buf: []byte) -> (n: int, err: Error) {
+	return read_at_least(f, buf, len(buf))
+}
 
 write_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
-	s := transmute([]byte)mem.Raw_Slice{data, len}
-	return write(f, s)
+	return write(f, ([^]byte)(data)[:len])
 }
 
 read_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
-	s := transmute([]byte)mem.Raw_Slice{data, len}
-	return read(f, s)
+	return read(f, ([^]byte)(data)[:len])
 }
 
 
+read_entire_file :: proc{
+	read_entire_file_from_path,
+	read_entire_file_from_file,
+}
 
-read_entire_file :: proc(name: string, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
+@(require_results)
+read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
 	f, ferr := open(name)
 	if ferr != nil {
 		return nil, ferr
 	}
 	defer close(f)
+	return read_entire_file_from_file(f, allocator)
+}
 
+@(require_results)
+read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
 	size: int
-	if size64, err := file_size(f); err == nil {
-		if i64(int(size64)) != size64 {
+	has_size := false
+	if size64, serr := file_size(f); serr == nil {
+		if i64(int(size64)) == size64 {
+			has_size = true
 			size = int(size64)
 		}
 	}
-	size += 1 // for EOF
 
-	// TODO(bill): Is this correct logic?
-	total: int
-	data = make([]byte, size, allocator) or_return
-	for {
-		n: int
-		n, err = read(f, data[total:])
-		total += n
-		if err != nil {
-			if err == .EOF {
-				err = nil
+	if has_size && size > 0 {
+		total: int
+		data = make([]byte, size, allocator) or_return
+		for total < len(data) {
+			n: int
+			n, err = read(f, data[total:])
+			total += n
+			if err != nil {
+				if err == .EOF {
+					err = nil
+				}
+				data = data[:total]
+				break
 			}
-			data = data[:total]
-			return
+		}
+		return
+	} else {
+		buffer: [1024]u8
+		out_buffer := make([dynamic]u8, 0, 0, allocator)
+		total := 0
+		for {
+			n: int
+			n, err = read(f, buffer[:])
+			total += n
+			append_elems(&out_buffer, ..buffer[:n])
+			if err != nil {
+				if err == .EOF || err == .Broken_Pipe {
+					err = nil
+				}
+				data = out_buffer[:total]
+				return
+			}
 		}
 	}
 }
 
-write_entire_file :: proc(name: string, data: []byte, perm: File_Mode, truncate := true) -> Error {
+@(require_results)
+write_entire_file :: proc(name: string, data: []byte, perm: int = 0o644, truncate := true) -> Error {
 	flags := O_WRONLY|O_CREATE
 	if truncate {
 		flags |= O_TRUNC
 	}
-	f, err := open(name, flags, perm)
-	if err != nil {
-		return err
-	}
-	_, err = write(f, data)
+	f := open(name, flags, perm) or_return
+	_, err := write(f, data)
 	if cerr := close(f); cerr != nil && err == nil {
 		err = cerr
 	}

@@ -7,10 +7,11 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+
 package xxhash
 
 import "core:mem"
-import "core:intrinsics"
+import "base:intrinsics"
 
 /*
 	===   XXH3 128-bit streaming   ===
@@ -129,7 +130,7 @@ XXH3_create_state :: proc(allocator := context.allocator) -> (res: ^XXH3_state, 
 }
 
 XXH3_destroy_state :: proc(state: ^XXH3_state, allocator := context.allocator) -> (err: Error) {
-	free(state)
+	free(state, allocator)
 	return .None
 }
 

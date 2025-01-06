@@ -67,7 +67,7 @@ atomic_mutex_unlock :: proc "contextless" (m: ^Atomic_Mutex) {
 
 	switch atomic_exchange_explicit(&m.state, .Unlocked, .Release) {
 	case .Unlocked:
-		unreachable()
+		// Kind of okay - unlocking while already unlocked.
 	case .Locked:
 		// Okay
 	case .Waiting:
@@ -169,7 +169,7 @@ atomic_rw_mutex_shared_unlock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 
 	if (state & Atomic_RW_Mutex_State_Reader_Mask == Atomic_RW_Mutex_State_Reader) &&
 	   (state & Atomic_RW_Mutex_State_Is_Writing != 0) {
-	   	atomic_sema_post(&rw.sema)
+		atomic_sema_post(&rw.sema)
 	}
 }
 
@@ -240,7 +240,7 @@ atomic_recursive_mutex_lock :: proc "contextless" (m: ^Atomic_Recursive_Mutex) {
 
 atomic_recursive_mutex_unlock :: proc "contextless" (m: ^Atomic_Recursive_Mutex) {
 	tid := current_thread_id()
-	_assert(tid == m.owner, "tid != m.owner")
+	assert_contextless(tid == m.owner, "tid != m.owner")
 	m.recursion -= 1
 	recursion := m.recursion
 	if recursion == 0 {
@@ -338,7 +338,7 @@ atomic_sema_wait :: proc "contextless" (s: ^Atomic_Sema) {
 		original_count := atomic_load_explicit(&s.count, .Relaxed)
 		for original_count == 0 {
 			futex_wait(&s.count, u32(original_count))
-			original_count = s.count
+			original_count = atomic_load_explicit(&s.count, .Relaxed)
 		}
 		if original_count == atomic_compare_exchange_strong_explicit(&s.count, original_count, original_count-1, .Acquire, .Acquire) {
 			return
@@ -361,7 +361,7 @@ atomic_sema_wait_with_timeout :: proc "contextless" (s: ^Atomic_Sema, duration: 
 			if !futex_wait_with_timeout(&s.count, u32(original_count), remaining) {
 				return false
 			}
-			original_count = s.count
+			original_count = atomic_load_explicit(&s.count, .Relaxed)
 		}
 		if original_count == atomic_compare_exchange_strong_explicit(&s.count, original_count, original_count-1, .Acquire, .Acquire) {
 			return true

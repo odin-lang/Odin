@@ -1,7 +1,8 @@
 // core:math/linalg/hlsl implements a HLSL-like mathematics library plus numerous other utility procedures
 package math_linalg_hlsl
 
-import "core:builtin"
+import "base:builtin"
+import "base:intrinsics"
 
 TAU :: 6.28318530717958647692528676655900576
 PI  :: 3.14159265358979323846264338327950288
@@ -20,89 +21,89 @@ LN10 :: 2.30258509299404568401799145468436421
 FLOAT_EPSILON :: 1e-7
 DOUBLE_EPSILON :: 1e-15
 
-// Aliases (not distinct) of types
+// Aliases (not distict) of types
 float  :: f32
 double :: f64
 int    :: builtin.i32
 uint   :: builtin.u32
 
 // Odin matrices are stored internally as Column-Major, which matches the internal layout of HLSL by default
-float1x1 :: distinct matrix[1, 1]float
-float2x2 :: distinct matrix[2, 2]float
-float3x3 :: distinct matrix[3, 3]float
-float4x4 :: distinct matrix[4, 4]float
+float1x1 :: matrix[1, 1]float
+float2x2 :: matrix[2, 2]float
+float3x3 :: matrix[3, 3]float
+float4x4 :: matrix[4, 4]float
 
-float1x2 :: distinct matrix[1, 2]float
-float1x3 :: distinct matrix[1, 3]float
-float1x4 :: distinct matrix[1, 4]float
-float2x1 :: distinct matrix[2, 1]float
-float2x3 :: distinct matrix[2, 3]float
-float2x4 :: distinct matrix[2, 4]float
-float3x1 :: distinct matrix[3, 1]float
-float3x2 :: distinct matrix[3, 2]float
-float3x4 :: distinct matrix[3, 4]float
-float4x1 :: distinct matrix[4, 1]float
-float4x2 :: distinct matrix[4, 2]float
-float4x3 :: distinct matrix[4, 3]float
+float1x2 :: matrix[1, 2]float
+float1x3 :: matrix[1, 3]float
+float1x4 :: matrix[1, 4]float
+float2x1 :: matrix[2, 1]float
+float2x3 :: matrix[2, 3]float
+float2x4 :: matrix[2, 4]float
+float3x1 :: matrix[3, 1]float
+float3x2 :: matrix[3, 2]float
+float3x4 :: matrix[3, 4]float
+float4x1 :: matrix[4, 1]float
+float4x2 :: matrix[4, 2]float
+float4x3 :: matrix[4, 3]float
 
-float2 :: distinct [2]float
-float3 :: distinct [3]float
-float4 :: distinct [4]float
+float2 :: [2]float
+float3 :: [3]float
+float4 :: [4]float
 
-int2 :: distinct [2]int
-int3 :: distinct [3]int
-int4 :: distinct [4]int
+int2 :: [2]int
+int3 :: [3]int
+int4 :: [4]int
 
-uint2 :: distinct [2]uint
-uint3 :: distinct [3]uint
-uint4 :: distinct [4]uint
+uint2 :: [2]uint
+uint3 :: [3]uint
+uint4 :: [4]uint
 
-bool2 :: distinct [2]bool
-bool3 :: distinct [3]bool
-bool4 :: distinct [4]bool
+bool2 :: [2]bool
+bool3 :: [3]bool
+bool4 :: [4]bool
 
 // Double Precision (double) Floating Point Types 
 
-double1x1 :: distinct matrix[1, 1]double
-double2x2 :: distinct matrix[2, 2]double
-double3x3 :: distinct matrix[3, 3]double
-double4x4 :: distinct matrix[4, 4]double
+double1x1 :: matrix[1, 1]double
+double2x2 :: matrix[2, 2]double
+double3x3 :: matrix[3, 3]double
+double4x4 :: matrix[4, 4]double
 
-double1x2 :: distinct matrix[1, 2]double
-double1x3 :: distinct matrix[1, 3]double
-double1x4 :: distinct matrix[1, 4]double
-double2x1 :: distinct matrix[2, 1]double
-double2x3 :: distinct matrix[2, 3]double
-double2x4 :: distinct matrix[2, 4]double
-double3x1 :: distinct matrix[3, 1]double
-double3x2 :: distinct matrix[3, 2]double
-double3x4 :: distinct matrix[3, 4]double
-double4x1 :: distinct matrix[4, 1]double
-double4x2 :: distinct matrix[4, 2]double
-double4x3 :: distinct matrix[4, 3]double
+double1x2 :: matrix[1, 2]double
+double1x3 :: matrix[1, 3]double
+double1x4 :: matrix[1, 4]double
+double2x1 :: matrix[2, 1]double
+double2x3 :: matrix[2, 3]double
+double2x4 :: matrix[2, 4]double
+double3x1 :: matrix[3, 1]double
+double3x2 :: matrix[3, 2]double
+double3x4 :: matrix[3, 4]double
+double4x1 :: matrix[4, 1]double
+double4x2 :: matrix[4, 2]double
+double4x3 :: matrix[4, 3]double
 
-double2 :: distinct [2]double
-double3 :: distinct [3]double
-double4 :: distinct [4]double
+double2 :: [2]double
+double3 :: [3]double
+double4 :: [4]double
 
 
-int1x1 :: distinct matrix[1, 1]int
-int2x2 :: distinct matrix[2, 2]int
-int3x3 :: distinct matrix[3, 3]int
-int4x4 :: distinct matrix[4, 4]int
+int1x1 :: matrix[1, 1]int
+int2x2 :: matrix[2, 2]int
+int3x3 :: matrix[3, 3]int
+int4x4 :: matrix[4, 4]int
 
-int1x2 :: distinct matrix[1, 2]int
-int1x3 :: distinct matrix[1, 3]int
-int1x4 :: distinct matrix[1, 4]int
-int2x1 :: distinct matrix[2, 1]int
-int2x3 :: distinct matrix[2, 3]int
-int2x4 :: distinct matrix[2, 4]int
-int3x1 :: distinct matrix[3, 1]int
-int3x2 :: distinct matrix[3, 2]int
-int3x4 :: distinct matrix[3, 4]int
-int4x1 :: distinct matrix[4, 1]int
-int4x2 :: distinct matrix[4, 2]int
-int4x3 :: distinct matrix[4, 3]int
+int1x2 :: matrix[1, 2]int
+int1x3 :: matrix[1, 3]int
+int1x4 :: matrix[1, 4]int
+int2x1 :: matrix[2, 1]int
+int2x3 :: matrix[2, 3]int
+int2x4 :: matrix[2, 4]int
+int3x1 :: matrix[3, 1]int
+int3x2 :: matrix[3, 2]int
+int3x4 :: matrix[3, 4]int
+int4x1 :: matrix[4, 1]int
+int4x2 :: matrix[4, 2]int
+int4x3 :: matrix[4, 3]int
 
 cos :: proc{
 	cos_float,
@@ -1471,14 +1472,14 @@ not :: proc{
 
 
 
-@(require_results) inverse_float1x1  :: proc "c" (m: float1x1)  -> float1x1  { return builtin.inverse(m) }
-@(require_results) inverse_float2x2  :: proc "c" (m: float2x2)  -> float2x2  { return builtin.inverse(m) }
-@(require_results) inverse_float3x3  :: proc "c" (m: float3x3)  -> float3x3  { return builtin.inverse(m) }
-@(require_results) inverse_float4x4  :: proc "c" (m: float4x4)  -> float4x4  { return builtin.inverse(m) }
-@(require_results) inverse_double1x1 :: proc "c" (m: double1x1) -> double1x1 { return builtin.inverse(m) }
-@(require_results) inverse_double2x2 :: proc "c" (m: double2x2) -> double2x2 { return builtin.inverse(m) }
-@(require_results) inverse_double3x3 :: proc "c" (m: double3x3) -> double3x3 { return builtin.inverse(m) }
-@(require_results) inverse_double4x4 :: proc "c" (m: double4x4) -> double4x4 { return builtin.inverse(m) }
+@(require_results) inverse_float1x1  :: proc "c" (m: float1x1)  -> float1x1  { return inverse_matrix1x1(m) }
+@(require_results) inverse_float2x2  :: proc "c" (m: float2x2)  -> float2x2  { return inverse_matrix2x2(m) }
+@(require_results) inverse_float3x3  :: proc "c" (m: float3x3)  -> float3x3  { return inverse_matrix3x3(m) }
+@(require_results) inverse_float4x4  :: proc "c" (m: float4x4)  -> float4x4  { return inverse_matrix4x4(m) }
+@(require_results) inverse_double1x1 :: proc "c" (m: double1x1) -> double1x1 { return inverse_matrix1x1(m) }
+@(require_results) inverse_double2x2 :: proc "c" (m: double2x2) -> double2x2 { return inverse_matrix2x2(m) }
+@(require_results) inverse_double3x3 :: proc "c" (m: double3x3) -> double3x3 { return inverse_matrix3x3(m) }
+@(require_results) inverse_double4x4 :: proc "c" (m: double4x4) -> double4x4 { return inverse_matrix4x4(m) }
 
 inverse :: proc{
 	inverse_float1x1,
@@ -1489,15 +1490,323 @@ inverse :: proc{
 	inverse_double2x2,
 	inverse_double3x3,
 	inverse_double4x4,
+
+	inverse_matrix1x1,
+	inverse_matrix2x2,
+	inverse_matrix3x3,
+	inverse_matrix4x4,
 }
 
-transpose         :: builtin.transpose
-inverse_transpose :: builtin.inverse_transpose
-adjugate          :: builtin.adjugate
-hermitian_adjoint :: builtin.hermitian_adjoint
-minor             :: builtin.matrix_minor
-determinant       :: builtin.determinant
-trace             :: builtin.matrix_trace
+transpose :: intrinsics.transpose
+
+
+determinant :: proc{
+	determinant_matrix1x1,
+	determinant_matrix2x2,
+	determinant_matrix3x3,
+	determinant_matrix4x4,
+}
+
+adjugate :: proc{
+	adjugate_matrix1x1,
+	adjugate_matrix2x2,
+	adjugate_matrix3x3,
+	adjugate_matrix4x4,
+}
+
+cofactor :: proc{
+	cofactor_matrix1x1,
+	cofactor_matrix2x2,
+	cofactor_matrix3x3,
+	cofactor_matrix4x4,
+}
+
+inverse_transpose :: proc{
+	inverse_transpose_matrix1x1,
+	inverse_transpose_matrix2x2,
+	inverse_transpose_matrix3x3,
+	inverse_transpose_matrix4x4,
+}
+
+@(require_results)
+hermitian_adjoint :: proc "contextless" (m: $M/matrix[$N, N]$T) -> M where intrinsics.type_is_complex(T), N >= 1 {
+	return conj(transpose(m))
+}
+
+@(require_results)
+trace :: proc "contextless" (m: $M/matrix[$N, N]$T) -> (trace: T) {
+	for i in 0..<N {
+		trace += m[i, i]
+	}
+	return
+}
+
+@(require_results)
+matrix_minor :: proc "contextless" (m: $M/matrix[$N, N]$T, #any_int row, column: int) -> (minor: T) where N > 1 {
+	K :: int(N-1)
+	cut_down: matrix[K, K]T
+	for col_idx in 0..<K {
+		j := col_idx + int(col_idx >= column)
+		for row_idx in 0..<K {
+			i := row_idx + int(row_idx >= row)
+			cut_down[row_idx, col_idx] = m[i, j]
+		}
+	}
+	return determinant(cut_down)
+}
+
+
+
+@(require_results)
+determinant_matrix1x1 :: proc "contextless" (m: $M/matrix[1, 1]$T) -> (det: T) {
+	return m[0, 0]
+}
+
+@(require_results)
+determinant_matrix2x2 :: proc "contextless" (m: $M/matrix[2, 2]$T) -> (det: T) {
+	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
+}
+@(require_results)
+determinant_matrix3x3 :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (det: T) {
+	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
+	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
+	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
+	return a + b + c
+}
+@(require_results)
+determinant_matrix4x4 :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) {
+	c := cofactor(m)
+	#no_bounds_check for i in 0..<4 {
+		det += m[0, i] * c[0, i]
+	}
+	return
+}
+
+
+
+
+@(require_results)
+adjugate_matrix1x1 :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
+	y = x
+	return
+}
+
+@(require_results)
+adjugate_matrix2x2 :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
+	y[0, 0] = +x[1, 1]
+	y[0, 1] = -x[0, 1]
+	y[1, 0] = -x[1, 0]
+	y[1, 1] = +x[0, 0]
+	return
+}
+
+@(require_results)
+adjugate_matrix3x3 :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) {
+	y[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
+	y[1, 0] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
+	y[2, 0] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	y[0, 1] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	y[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
+	y[2, 1] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
+	y[0, 2] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	y[1, 2] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	y[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
+	return
+}
+
+@(require_results)
+adjugate_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) {
+	for i in 0..<4 {
+		for j in 0..<4 {
+			sign: T = 1 if (i + j) % 2 == 0 else -1
+			y[i, j] = sign * matrix_minor(x, j, i)
+		}
+	}
+	return
+}
+
+
+@(require_results)
+cofactor_matrix1x1 :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
+	y = x
+	return
+}
+
+@(require_results)
+cofactor_matrix2x2 :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
+	y[0, 0] = +x[1, 1]
+	y[0, 1] = -x[1, 0]
+	y[1, 0] = -x[0, 1]
+	y[1, 1] = +x[0, 0]
+	return
+}
+
+@(require_results)
+cofactor_matrix3x3 :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) {
+	y[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
+	y[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
+	y[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	y[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	y[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
+	y[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
+	y[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	y[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	y[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
+	return
+}
+
+
+@(require_results)
+cofactor_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) {
+	for i in 0..<4 {
+		for j in 0..<4 {
+			sign: T = 1 if (i + j) % 2 == 0 else -1
+			y[i, j] = sign * matrix_minor(x, i, j)
+		}
+	}
+	return
+}
+
+@(require_results)
+inverse_transpose_matrix1x1 :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
+	y[0, 0] = 1/x[0, 0]
+	return
+}
+
+@(require_results)
+inverse_transpose_matrix2x2 :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
+	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
+	when intrinsics.type_is_integer(T) {
+		y[0, 0] = +x[1, 1] / d
+		y[1, 0] = -x[0, 1] / d
+		y[0, 1] = -x[1, 0] / d
+		y[1, 1] = +x[0, 0] / d
+	} else {
+		id := 1 / d
+		y[0, 0] = +x[1, 1] * id
+		y[1, 0] = -x[0, 1] * id
+		y[0, 1] = -x[1, 0] * id
+		y[1, 1] = +x[0, 0] * id
+	}
+	return
+}
+
+@(require_results)
+inverse_transpose_matrix3x3 :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
+	c := cofactor(x)
+	d := determinant(x)
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = c[i, j] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = c[i, j] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+inverse_transpose_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
+	c := cofactor(x)
+	d: T
+	for i in 0..<4 {
+		d += x[0, i] * c[0, i]
+	}
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = c[i, j] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = c[i, j] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+inverse_matrix1x1 :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) {
+	y[0, 0] = 1/x[0, 0]
+	return
+}
+
+@(require_results)
+inverse_matrix2x2 :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) {
+	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
+	when intrinsics.type_is_integer(T) {
+		y[0, 0] = +x[1, 1] / d
+		y[0, 1] = -x[0, 1] / d
+		y[1, 0] = -x[1, 0] / d
+		y[1, 1] = +x[0, 0] / d
+	} else {
+		id := 1 / d
+		y[0, 0] = +x[1, 1] * id
+		y[0, 1] = -x[0, 1] * id
+		y[1, 0] = -x[1, 0] * id
+		y[1, 1] = +x[0, 0] * id
+	}
+	return
+}
+
+@(require_results)
+inverse_matrix3x3 :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
+	c := cofactor(x)
+	d := determinant(x)
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = c[j, i] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<3 {
+			for j in 0..<3 {
+				y[i, j] = c[j, i] * id
+			}
+		}
+	}
+	return
+}
+
+@(require_results)
+inverse_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
+	c := cofactor(x)
+	d: T
+	for i in 0..<4 {
+		d += x[0, i] * c[0, i]
+	}
+	when intrinsics.type_is_integer(T) {
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = c[j, i] / d
+			}
+		}
+	} else {
+		id := 1/d
+		for i in 0..<4 {
+			for j in 0..<4 {
+				y[i, j] = c[j, i] * id
+			}
+		}
+	}
+	return
+}
+
+
+
 
 asfloat :: proc{
 	asfloat_float,

@@ -76,9 +76,9 @@ Answers to common questions about Odin.
 
 Documentation for all the official packages part of the [core](https://pkg.odin-lang.org/core/) and [vendor](https://pkg.odin-lang.org/vendor/) library collections.
 
-#### [The Odin Wiki](https://github.com/odin-lang/Odin/wiki)
+#### [Odin Documentation](https://odin-lang.org/docs/)
 
-A wiki maintained by the Odin community.
+Documentation for the Odin language itself.
 
 #### [Odin Discord](https://discord.gg/sVBPHEv)
 

@@ -1,4 +1,4 @@
-// +build windows
+#+build windows
 package sys_windows
 
 foreign import "system:bthprops.lib"
@@ -51,7 +51,7 @@ BLUETOOTH_DEVICE_INFO :: struct {
 	name:          [BLUETOOTH_MAX_NAME_SIZE]u16, //  Name of the device
 }
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign bthprops {
 	/*
 		Version

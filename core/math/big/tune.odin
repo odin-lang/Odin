@@ -7,11 +7,11 @@
 	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
 
-//+build ignore
+#+build ignore
 package math_big
 
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 
 print_value :: proc(name: string, value: i64) {
 	runtime.print_string("\t")

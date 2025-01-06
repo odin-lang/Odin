@@ -1,4 +1,4 @@
-//+build arm64
+#+build arm64
 package linux
 
 // Syscalls for arm64 are defined using the new way, i.e. differently from

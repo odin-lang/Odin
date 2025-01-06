@@ -10,8 +10,8 @@ Array :: struct($T: typeid) {
 String :: distinct Array(byte)
 
 Version_Type_Major :: 0
-Version_Type_Minor :: 2
-Version_Type_Patch :: 4
+Version_Type_Minor :: 3
+Version_Type_Patch :: 1
 
 Version_Type :: struct {
 	major, minor, patch: u8,
@@ -102,13 +102,17 @@ Entity_Flag :: enum u32le {
 	Foreign = 0,
 	Export  = 1,
 
-	Param_Using     = 2, // using
-	Param_Const     = 3, // #const
-	Param_Auto_Cast = 4, // auto_cast
-	Param_Ellipsis  = 5, // Variadic parameter
-	Param_CVararg   = 6, // #c_vararg
-	Param_No_Alias  = 7, // #no_alias
-	Param_Any_Int   = 8, // #any_int
+	Param_Using        = 2, // using
+	Param_Const        = 3, // #const
+	Param_Auto_Cast    = 4, // auto_cast
+	Param_Ellipsis     = 5, // Variadic parameter
+	Param_CVararg      = 6, // #c_vararg
+	Param_No_Alias     = 7, // #no_alias
+	Param_Any_Int      = 8, // #any_int
+	Param_By_Ptr       = 9, // #by_ptr
+	Param_No_Broadcast = 10, // #no_broadcast
+
+	Bit_Field_Field = 19,
 
 	Type_Alias = 20,
 
@@ -137,6 +141,7 @@ Entity :: struct {
 	// May be used by (Struct fields and procedure fields):
 	// .Variable
 	// .Constant
+	// This is equal to the negative of the "bit size" it this is a `bit_field`s field
 	field_group_index: i32le,
 
 	// May used by:
@@ -187,6 +192,7 @@ Type_Kind :: enum u32le {
 	Multi_Pointer          = 22,
 	Matrix                 = 23,
 	Soa_Pointer            = 24,
+	Bit_Field              = 25,
 }
 
 Type_Elems_Cap :: 4
@@ -243,10 +249,10 @@ Type :: struct {
 	// .Bit_Set            - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
 	// .Simd_Vector        - 1 type:    0=element
 	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
-	// .Relative_Slice     - 2 types:   0=slice type, 1=base integer
 	// .Multi_Pointer      - 1 type:    0=element
 	// .Matrix             - 1 type:    0=element
 	// .Soa_Pointer        - 1 type:    0=element
+	// .Bit_Field          - 1 type:    0=backing type
 	types: Array(Type_Index),
 
 	// Used by:

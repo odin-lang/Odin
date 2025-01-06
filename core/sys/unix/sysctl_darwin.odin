@@ -1,22 +1,62 @@
-//+build darwin
+#+build darwin
 package unix
 
+import "base:intrinsics"
+
 import "core:sys/darwin"
-import "core:intrinsics"
 
 _ :: darwin
 
-sysctl :: proc(mib: []i32, val: ^$T) -> (ok: bool) {
-	mib := mib
-	result_size := i64(size_of(T))
+sysctl :: proc "contextless" (mib: []i32, val: ^$T) -> (ok: bool) {
+	result_size := uint(size_of(T))
+	when ODIN_NO_CRT {
+		res := darwin.syscall_sysctl(
+			raw_data(mib), len(mib),
+			val, &result_size,
+			nil, 0,
+		)
+		return res == 0
+	} else {
+		foreign {
+			@(link_name="sysctl") _sysctl :: proc(
+				name: [^]i32, namelen: u32,
+				oldp: rawptr, oldlenp: ^uint,
+				newp: rawptr, newlen: uint,
+			) -> i32 ---
+		}
+		res := _sysctl(
+			raw_data(mib), u32(len(mib)),
+			val, &result_size,
+			nil, 0,
+		)
+		return res == 0
+	}
+}
 
-	res := intrinsics.syscall(
-		darwin.unix_offset_syscall(.sysctl),
-		uintptr(raw_data(mib)), uintptr(len(mib)),
-		uintptr(val), uintptr(&result_size),
-		uintptr(0), uintptr(0),
-	)
-	return res == 0
+sysctlbyname :: proc "contextless" (name: cstring, val: ^$T) -> (ok: bool) {
+	result_size := uint(size_of(T))
+	when ODIN_NO_CRT {
+		res := darwin.syscall_sysctlbyname(
+			string(name),
+			val, &result_size,
+			nil, 0,
+		)
+		return res == 0
+	} else {
+		foreign {
+			@(link_name="sysctlbyname") _sysctlbyname :: proc(
+				name: cstring,
+				oldp: rawptr, oldlenp: ^uint,
+				newp: rawptr, newlen: uint,
+			) -> i32 ---
+		}
+		res := _sysctlbyname(
+			name,
+			val, &result_size,
+			nil, 0,
+		)
+		return res == 0
+	}
 }
 
 // See sysctl.h for darwin for details
@@ -27,6 +67,8 @@ CTL_KERN    :: 1
 	KERN_VERSION   :: 4  // Darwin Kernel Version 21.5.0: Tue Apr 26 21:08:22 PDT 2022; root:darwin-8020.121.3~4/RELEASE_X86_64
 	KERN_OSRELDATE :: 26 // i32: OS release date
 	KERN_OSVERSION :: 65 // Build number, e.g. 21F79
+	KERN_PROCARGS  :: 38
+	KERN_PROCARGS2 :: 49
 CTL_VM      :: 2
 CTL_VFS     :: 3
 CTL_NET     :: 4

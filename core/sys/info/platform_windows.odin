@@ -1,13 +1,12 @@
-// +build windows
 package sysinfo
 
 import sys "core:sys/windows"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:strings"
 import "core:unicode/utf16"
 
 import "core:fmt"
-import "core:runtime"
+import "base:runtime"
 
 @(private)
 version_string_buf: [1024]u8
@@ -259,7 +258,7 @@ init_os_version :: proc () {
 	}
 }
 
-@(init)
+@(init, private)
 init_ram :: proc() {
 	state: sys.MEMORYSTATUSEX
 

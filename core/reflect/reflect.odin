@@ -1,9 +1,7 @@
 package reflect
 
-import "core:runtime"
-import "core:intrinsics"
-import "core:mem"
-_ :: mem
+import "base:runtime"
+import "base:intrinsics"
 _ :: intrinsics
 
 Type_Info :: runtime.Type_Info
@@ -33,10 +31,9 @@ Type_Info_Enum                   :: runtime.Type_Info_Enum
 Type_Info_Map                    :: runtime.Type_Info_Map
 Type_Info_Bit_Set                :: runtime.Type_Info_Bit_Set
 Type_Info_Simd_Vector            :: runtime.Type_Info_Simd_Vector
-Type_Info_Relative_Pointer       :: runtime.Type_Info_Relative_Pointer
-Type_Info_Relative_Multi_Pointer :: runtime.Type_Info_Relative_Multi_Pointer
 Type_Info_Matrix                 :: runtime.Type_Info_Matrix
 Type_Info_Soa_Pointer            :: runtime.Type_Info_Soa_Pointer
+Type_Info_Bit_Field              :: runtime.Type_Info_Bit_Field
 
 Type_Info_Enum_Value :: runtime.Type_Info_Enum_Value
 
@@ -68,10 +65,9 @@ Type_Kind :: enum {
 	Map,
 	Bit_Set,
 	Simd_Vector,
-	Relative_Pointer,
-	Relative_Multi_Pointer,
 	Matrix,
 	Soa_Pointer,
+	Bit_Field,
 }
 
 
@@ -80,34 +76,33 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 	ti := type_info_of(T)
 	if ti != nil {
 		switch _ in ti.variant {
-		case Type_Info_Named:                  return .Named
-		case Type_Info_Integer:                return .Integer
-		case Type_Info_Rune:                   return .Rune
-		case Type_Info_Float:                  return .Float
-		case Type_Info_Complex:                return .Complex
-		case Type_Info_Quaternion:             return .Quaternion
-		case Type_Info_String:                 return .String
-		case Type_Info_Boolean:                return .Boolean
-		case Type_Info_Any:                    return .Any
-		case Type_Info_Type_Id:                return .Type_Id
-		case Type_Info_Pointer:                return .Pointer
-		case Type_Info_Multi_Pointer:          return .Multi_Pointer
-		case Type_Info_Procedure:              return .Procedure
-		case Type_Info_Array:                  return .Array
-		case Type_Info_Enumerated_Array:       return .Enumerated_Array
-		case Type_Info_Dynamic_Array:          return .Dynamic_Array
-		case Type_Info_Slice:                  return .Slice
-		case Type_Info_Parameters:             return .Tuple
-		case Type_Info_Struct:                 return .Struct
-		case Type_Info_Union:                  return .Union
-		case Type_Info_Enum:                   return .Enum
-		case Type_Info_Map:                    return .Map
-		case Type_Info_Bit_Set:                return .Bit_Set
-		case Type_Info_Simd_Vector:            return .Simd_Vector
-		case Type_Info_Relative_Pointer:       return .Relative_Pointer
-		case Type_Info_Relative_Multi_Pointer: return .Relative_Multi_Pointer
-		case Type_Info_Matrix:                 return .Matrix
-		case Type_Info_Soa_Pointer:            return .Soa_Pointer
+		case Type_Info_Named:            return .Named
+		case Type_Info_Integer:          return .Integer
+		case Type_Info_Rune:             return .Rune
+		case Type_Info_Float:            return .Float
+		case Type_Info_Complex:          return .Complex
+		case Type_Info_Quaternion:       return .Quaternion
+		case Type_Info_String:           return .String
+		case Type_Info_Boolean:          return .Boolean
+		case Type_Info_Any:              return .Any
+		case Type_Info_Type_Id:          return .Type_Id
+		case Type_Info_Pointer:          return .Pointer
+		case Type_Info_Multi_Pointer:    return .Multi_Pointer
+		case Type_Info_Procedure:        return .Procedure
+		case Type_Info_Array:            return .Array
+		case Type_Info_Enumerated_Array: return .Enumerated_Array
+		case Type_Info_Dynamic_Array:    return .Dynamic_Array
+		case Type_Info_Slice:            return .Slice
+		case Type_Info_Parameters:       return .Tuple
+		case Type_Info_Struct:           return .Struct
+		case Type_Info_Union:            return .Union
+		case Type_Info_Enum:             return .Enum
+		case Type_Info_Map:              return .Map
+		case Type_Info_Bit_Set:          return .Bit_Set
+		case Type_Info_Simd_Vector:      return .Simd_Vector
+		case Type_Info_Matrix:           return .Matrix
+		case Type_Info_Soa_Pointer:      return .Soa_Pointer
+		case Type_Info_Bit_Field:        return .Bit_Field
 		}
 
 	}
@@ -142,7 +137,7 @@ when !ODIN_NO_RTTI {
 @(require_results)
 any_base :: proc(v: any) -> any {
 	v := v
-	if v != nil {
+	if v.id != nil {
 		v.id = typeid_base(v.id)
 	}
 	return v
@@ -150,7 +145,7 @@ any_base :: proc(v: any) -> any {
 @(require_results)
 any_core :: proc(v: any) -> any {
 	v := v
-	if v != nil {
+	if v.id != nil {
 		v.id = typeid_core(v.id)
 	}
 	return v
@@ -390,7 +385,7 @@ Struct_Field :: struct {
 struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		if 0 <= i && i < len(s.names) {
+		if 0 <= i && i < int(s.field_count) {
 			field.name     = s.names[i]
 			field.type     = s.types[i]
 			field.tag      = Struct_Tag(s.tags[i])
@@ -405,7 +400,7 @@ struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		for fname, i in s.names {
+		for fname, i in s.names[:s.field_count] {
 			if fname == name {
 				field.name     = s.names[i]
 				field.type     = s.types[i]
@@ -426,7 +421,7 @@ struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) 
 	ti := runtime.type_info_base(type_info_of(a.id))
 
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		for name, i in s.names {
+		for name, i in s.names[:s.field_count] {
 			if name == field {
 				return any{
 					rawptr(uintptr(a.data) + s.offsets[i]),
@@ -462,7 +457,7 @@ struct_field_value :: proc(a: any, field: Struct_Field) -> any {
 struct_field_names :: proc(T: typeid) -> []string {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		return s.names
+		return s.names[:s.field_count]
 	}
 	return nil
 }
@@ -471,7 +466,7 @@ struct_field_names :: proc(T: typeid) -> []string {
 struct_field_types :: proc(T: typeid) -> []^Type_Info {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		return s.types
+		return s.types[:s.field_count]
 	}
 	return nil
 }
@@ -481,7 +476,7 @@ struct_field_types :: proc(T: typeid) -> []^Type_Info {
 struct_field_tags :: proc(T: typeid) -> []Struct_Tag {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		return transmute([]Struct_Tag)s.tags
+		return transmute([]Struct_Tag)s.tags[:s.field_count]
 	}
 	return nil
 }
@@ -490,9 +485,67 @@ struct_field_tags :: proc(T: typeid) -> []Struct_Tag {
 struct_field_offsets :: proc(T: typeid) -> []uintptr {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
-		return s.offsets
+		return s.offsets[:s.field_count]
 	}
 	return nil
+}
+
+Struct_Field_Count_Method :: enum {
+	Top_Level,
+	Using,
+	Recursive,
+}
+
+/*
+Counts the number of fields in a struct
+
+This procedure returns the number of fields in a struct, counting in one of three ways:
+- .Top_Level: Only counts the top-level fields
+- .Using:     Same count as .Top_Level, and adds the field count of any `using s: Struct` it encounters (in addition to itself)
+- .Recursive: The count of all top-level fields, plus the count of any child struct's fields, recursively
+
+Inputs:
+- T:      The struct type
+- method: The counting method
+
+Returns:
+- The `count`, enumerated using the `method`, which will be `0` if the type is not a struct
+
+Example:
+	symbols_loaded, ok := dynlib.initialize_symbols(&game_api, "game.dll")
+	symbols_expected   := reflect.struct_field_count(Game_Api) - API_PRIVATE_COUNT
+
+	if symbols_loaded != symbols_expected {
+		fmt.eprintf("Expected %v symbols, got %v", symbols_expected, symbols_loaded)
+		return
+	}
+*/
+@(require_results)
+struct_field_count :: proc(T: typeid, method := Struct_Field_Count_Method.Top_Level) -> (count: int) {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
+		switch method {
+		case .Top_Level:
+			return int(s.field_count)
+
+		case .Using:
+			count = int(s.field_count)
+			for type, i in s.types[:s.field_count] {
+				if s.usings[i] {
+					count += struct_field_count(type.id)
+				}
+			}
+
+		case .Recursive:
+			count = int(s.field_count)
+			for type in s.types[:s.field_count] {
+				count += struct_field_count(type.id)
+			}
+
+		case: return 0
+		}
+	}
+	return
 }
 
 @(require_results)
@@ -500,11 +553,11 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(runtime.Type_Info_Struct); ok {
 		return soa_zip(
-			name     = s.names,
-			type     = s.types,
-			tag      = transmute([]Struct_Tag)s.tags,
-			offset   = s.offsets,
-			is_using = s.usings,
+			name     = s.names[:s.field_count],
+			type     = s.types[:s.field_count],
+			tag      = ([^]Struct_Tag)(s.tags)[:s.field_count],
+			offset   = s.offsets[:s.field_count],
+			is_using = s.usings[:s.field_count],
 		)
 	}
 	return nil
@@ -513,13 +566,13 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 
 
 @(require_results)
-struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag) {
-	value, _ = struct_tag_lookup(tag, key)
-	return
+struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: string) {
+	v, _ := struct_tag_lookup(tag, key)
+	return string(v)
 }
 
 @(require_results)
-struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, ok: bool) {
+struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: bool) {
 	for t := tag; t != ""; /**/ {
 		i := 0
 		for i < len(t) && t[i] == ' ' { // Skip whitespace
@@ -570,7 +623,7 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, o
 		t = t[i+1:]
 
 		if key == name {
-			return Struct_Tag(val[1:i]), true
+			return val[1:i], true
 		}
 	}
 	return
@@ -629,6 +682,64 @@ enum_from_name_any :: proc(Enum_Type: typeid, name: string) -> (value: Type_Info
 	return
 }
 
+@(require_results)
+enum_name_from_value :: proc(value: $Enum_Type) -> (name: string, ok: bool) where intrinsics.type_is_enum(Enum_Type) {
+	ti := type_info_base(type_info_of(Enum_Type))
+	e := ti.variant.(runtime.Type_Info_Enum) or_return
+	if len(e.values) == 0 {
+		return
+	}
+	ev := Type_Info_Enum_Value(value)
+	for val, idx in e.values {
+		if val == ev {
+			return e.names[idx], true
+		}
+	}
+	return
+}
+
+@(require_results)
+enum_name_from_value_any :: proc(value: any) -> (name: string, ok: bool) {
+	if value.id == nil {
+		return
+	}
+	ti := type_info_base(type_info_of(value.id))
+	e := ti.variant.(runtime.Type_Info_Enum) or_return
+	if len(e.values) == 0 {
+		return
+	}
+	ev := Type_Info_Enum_Value(as_i64(value) or_return)
+	for val, idx in e.values {
+		if val == ev {
+			return e.names[idx], true
+		}
+	}
+	return
+}
+
+/*
+Returns whether the value given has a defined name in the enum type.
+*/
+@(require_results)
+enum_value_has_name :: proc(value: $T) -> bool where intrinsics.type_is_enum(T) {
+	when len(T) == cap(T) {
+		return value >= min(T) && value <= max(T)
+	} else {
+		if value < min(T) || value > max(T) {
+			return false
+		}
+
+		for valid_value in T {
+			if valid_value == value {
+				return true
+			}
+		}
+
+		return false
+	}
+}
+
+
 
 @(require_results)
 enum_field_names :: proc(Enum_Type: typeid) -> []string {
@@ -671,7 +782,7 @@ union_variant_type_info :: proc(a: any) -> ^Type_Info {
 
 @(require_results)
 type_info_union_is_pure_maybe :: proc(info: runtime.Type_Info_Union) -> bool {
-	return len(info.variants) == 1 && is_pointer(info.variants[0])
+	return len(info.variants) == 1 && is_pointer_internally(info.variants[0])
 }
 
 @(require_results)
@@ -761,7 +872,7 @@ get_union_variant :: proc(a: any) -> any {
 get_union_as_ptr_variants :: proc(val: ^$T) -> (res: intrinsics.type_convert_variants_to_pointers(T)) where intrinsics.type_is_union(T) {
 	ptr := rawptr(val)
 	tag := get_union_variant_raw_tag(val^)
-	mem.copy(&res, &ptr, size_of(ptr))
+	intrinsics.mem_copy(&res, &ptr, size_of(ptr))
 	set_union_variant_raw_tag(res, tag)
 	return
 }
@@ -896,7 +1007,96 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 	panic("expected a union to reflect.set_union_variant_typeid")
 }
 
+@(require_results)
+bit_set_is_big_endian :: proc(value: any, loc := #caller_location) -> bool {
+	if value == nil { return ODIN_ENDIAN == .Big }
+	
+	ti := runtime.type_info_base(type_info_of(value.id))
+	if info, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
+		if info.underlying == nil { return ODIN_ENDIAN == .Big }
 
+		underlying_ti := runtime.type_info_base(info.underlying)
+		if underlying_info, uok := underlying_ti.variant.(runtime.Type_Info_Integer); uok {
+			switch underlying_info.endianness {
+			case .Platform: return ODIN_ENDIAN == .Big
+			case .Little:   return false
+			case .Big:      return true
+			}
+		}
+
+		return ODIN_ENDIAN == .Big
+	}
+	panic("expected a bit_set to reflect.bit_set_is_big_endian", loc)
+}
+
+
+Bit_Field :: struct {
+	name:   string,
+	type:   ^Type_Info,
+	size:   uintptr,     // Size in bits
+	offset: uintptr,     // Offset in bits
+	tag:    Struct_Tag,
+}
+
+@(require_results)
+bit_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Bit_Field) {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return soa_zip(
+			name   = s.names[:s.field_count],
+			type   = s.types[:s.field_count],
+			size   = s.bit_sizes[:s.field_count],
+			offset = s.bit_offsets[:s.field_count],
+			tag      = ([^]Struct_Tag)(s.tags)[:s.field_count],
+		)
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_names :: proc(T: typeid) -> []string {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return s.names[:s.field_count]
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_types :: proc(T: typeid) -> []^Type_Info {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return s.types[:s.field_count]
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_sizes :: proc(T: typeid) -> []uintptr {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return s.bit_sizes[:s.field_count]
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_offsets :: proc(T: typeid) -> []uintptr {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return s.bit_offsets[:s.field_count]
+	}
+	return nil
+}
+
+@(require_results)
+bit_field_tags :: proc(T: typeid) -> []Struct_Tag {
+	ti := runtime.type_info_base(type_info_of(T))
+	if s, ok := ti.variant.(runtime.Type_Info_Bit_Field); ok {
+		return transmute([]Struct_Tag)s.tags[:s.field_count]
+	}
+	return nil
+}
 
 @(require_results)
 as_bool :: proc(a: any) -> (value: bool, valid: bool) {
@@ -1283,21 +1483,6 @@ as_string :: proc(a: any) -> (value: string, valid: bool) {
 }
 
 @(require_results)
-relative_pointer_to_absolute :: proc(a: any) -> rawptr {
-	if a == nil { return nil }
-	a := a
-	ti := runtime.type_info_core(type_info_of(a.id))
-	a.id = ti.id
-
-	#partial switch info in ti.variant {
-	case Type_Info_Relative_Pointer:
-		return relative_pointer_to_absolute_raw(a.data, info.base_integer.id)
-	}
-	return nil
-}
-
-
-@(require_results)
 relative_pointer_to_absolute_raw :: proc(data: rawptr, base_integer_id: typeid) -> rawptr {
 	_handle :: proc(ptr: ^$T) -> rawptr where intrinsics.type_is_integer(T) {
 		if ptr^ == 0 {
@@ -1350,7 +1535,7 @@ as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
 	#partial switch info in ti.variant {
 	case Type_Info_Pointer:
 		valid = true
-		value = a.data
+		value = (^rawptr)(a.data)^
 
 	case Type_Info_String:
 		valid = true
@@ -1358,10 +1543,6 @@ as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
 		case cstring: value = rawptr(v)
 		case: valid = false
 		}
-
-	case Type_Info_Relative_Pointer:
-		valid = true
-		value = relative_pointer_to_absolute_raw(a.data, info.base_integer.id)
 	}
 
 	return
@@ -1471,8 +1652,6 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		Type_Info_Bit_Set,
 		Type_Info_Enum,
 		Type_Info_Simd_Vector,
-		Type_Info_Relative_Pointer,
-		Type_Info_Relative_Multi_Pointer,
 		Type_Info_Soa_Pointer,
 		Type_Info_Matrix:
 		return runtime.memory_compare(a.data, b.data, t.size) == 0
@@ -1510,7 +1689,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		if v.equal != nil {
 			return v.equal(a.data, b.data)
 		} else {
-			for offset, i in v.offsets {
+			for offset, i in v.offsets[:v.field_count] {
 				x := rawptr(uintptr(a.data) + offset)
 				y := rawptr(uintptr(b.data) + offset)
 				id := v.types[i].id
@@ -1569,6 +1748,13 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 			}	
 		}
 		return true
+
+	case Type_Info_Bit_Field:
+		x, y := a, b
+		x.id = v.backing_type.id
+		y.id = v.backing_type.id
+		return equal(x, y, including_indirect_array_recursion, recursion_level+0)
+
 	}
 	
 	runtime.print_typeid(a.id)

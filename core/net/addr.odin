@@ -1,4 +1,4 @@
-// +build windows, linux, darwin
+#+build windows, linux, darwin, freebsd
 package net
 
 /*
@@ -10,12 +10,14 @@ package net
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
 */
 
 import "core:strconv"
@@ -119,9 +121,9 @@ aton :: proc(address_and_maybe_port: string, family: Address_Family, allow_decim
 		}
 
 		a: [4]u8 = ---
-		for v, i in buf {
+		for v, j in buf {
 			if v > 255 { return {}, false }
-			a[i] = u8(v)
+			a[j] = u8(v)
 		}
 		return IP4_Address(a), true
 
@@ -370,7 +372,7 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 		val |= u16(ipv4[3])
 		piece_values[7] = u16be(val)
 	}
-	return transmute(IP6_Address)piece_values, true
+	return IP6_Address(piece_values), true
 }
 
 /*
@@ -462,7 +464,9 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 // Joins an address or hostname with a port.
 join_port :: proc(address_or_host: string, port: int, allocator := context.allocator) -> string {
 	addr_or_host, _, ok := split_port(address_or_host)
-	if !ok do return addr_or_host
+	if !ok {
+		return addr_or_host
+	}
 
 	b := strings.builder_make(allocator)
 
@@ -520,10 +524,9 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 		run  := Zero_Run{-1, -1}
 		best := Zero_Run{-1, -1}
 
-		addr := transmute([8]u16be)v
 
 		last := u16be(1)
-		for val, i in addr {
+		for val, i in v {
 			/*
 				If we encounter adjacent zeroes, then start a new run if not already in one.
 				Also remember the rightmost index regardless, because it'll be the new
@@ -557,7 +560,7 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 			last = val
 		}
 
-		for val, i in addr {
+		for val, i in v {
 			if best.start == i || best.end == i {
 				// For the left and right side of the best zero run, print a `:`.
 				fmt.sbprint(&b, ":")

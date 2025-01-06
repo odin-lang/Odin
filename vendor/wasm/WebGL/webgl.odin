@@ -64,7 +64,7 @@ foreign webgl {
 	ClearColor    :: proc(r, g, b, a: f32) ---
 	ClearDepth    :: proc(x: Enum) ---
 	ClearStencil  :: proc(x: Enum) ---
-	ClearMask     :: proc(r, g, b, a: bool) ---
+	ColorMask     :: proc(r, g, b, a: bool) ---
 	CompileShader :: proc(shader: Shader) ---
 	
 	CompressedTexImage2D    :: proc(target: Enum, level: i32, internalformat: Enum, width, height: i32, border: i32, imageSize: int, data: rawptr) ---
@@ -117,6 +117,7 @@ foreign webgl {
 	Hint :: proc(target: Enum, mode: Enum) ---
 	
 	IsBuffer       :: proc(buffer: Buffer) -> bool ---
+	IsEnabled      :: proc(cap: Enum) -> bool ---
 	IsFramebuffer  :: proc(framebuffer: Framebuffer) -> bool ---
 	IsProgram      :: proc(program: Program) -> bool ---
 	IsRenderbuffer :: proc(renderbuffer: Renderbuffer) -> bool ---
@@ -246,7 +247,7 @@ BufferDataSlice :: proc "contextless" (target: Enum, slice: $S/[]$E, usage: Enum
 	BufferData(target, len(slice)*size_of(E), raw_data(slice), usage)
 }
 BufferSubDataSlice :: proc "contextless" (target: Enum, offset: uintptr, slice: $S/[]$E) {
-	BufferSubData(target, offset, len(slice)*size_of(E), raw_data(slice), usage)
+	BufferSubData(target, offset, len(slice)*size_of(E), raw_data(slice))
 }
 
 CompressedTexImage2DSlice :: proc "contextless" (target: Enum, level: i32, internalformat: Enum, width, height: i32, border: i32, slice: $S/[]$E) {

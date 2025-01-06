@@ -3,7 +3,7 @@ package glfw_bindings
 import "core:c"
 import vk "vendor:vulkan"
 
-GLFW_SHARED :: #config(GLFW_SHARED, false)
+GLFW_SHARED :: #config(GLFW_SHARED, ODIN_OS != .Windows && ODIN_OS != .Darwin)
 
 when ODIN_OS == .Windows {
 	when GLFW_SHARED {
@@ -21,17 +21,34 @@ when ODIN_OS == .Windows {
 			"system:shell32.lib",
 		}
 	}
-} else when ODIN_OS == .Linux {
-	foreign import glfw "system:glfw"
 } else when ODIN_OS == .Darwin {
-	foreign import glfw { 
-		"../lib/darwin/libglfw3.a",
-		"system:Cocoa.framework",
-		"system:IOKit.framework",
-		"system:OpenGL.framework",
+	when GLFW_SHARED {
+		foreign import glfw {
+			"system:glfw",
+			"system:Cocoa.framework",
+			"system:IOKit.framework",
+			"system:OpenGL.framework",
+		}
+	} else {
+		foreign import glfw { 
+			"../lib/darwin/libglfw3.a",
+			"system:Cocoa.framework",
+			"system:IOKit.framework",
+			"system:OpenGL.framework",
+		}
 	}
 } else {
-	foreign import glfw "system:glfw"
+	when GLFW_SHARED {
+		foreign import glfw "system:glfw"
+	} else {
+		@(private)
+		LIBGLFW3 :: "../lib/libglfw3.a"
+		when !#exists(LIBGLFW3) {
+			#panic("Could not find the static glfw library, add it at \"" + ODIN_ROOT + "vendor/glfw/lib/\"`")
+		}
+
+		foreign import glfw { LIBGLFW3 }
+	}
 }
 
 #assert(size_of(c.int) == size_of(b32))
@@ -43,6 +60,10 @@ foreign glfw {
 	Terminate :: proc() ---
 	
 	InitHint  :: proc(hint, value: c.int) ---
+
+	InitAllocator :: proc(#by_ptr allocator: Allocator) ---
+
+	InitVulkanLoader :: proc(loader: vk.ProcGetInstanceProcAddr) ---
 
 	GetVersion :: proc(major, minor, rev: ^c.int) ---
 	GetError   :: proc(description: ^cstring) -> c.int ---
@@ -94,6 +115,7 @@ foreign glfw {
 	GetKey               :: proc(window: WindowHandle, key: c.int) -> c.int ---
 	GetKeyName           :: proc(key, scancode: c.int) -> cstring ---
 	SetWindowShouldClose :: proc(window: WindowHandle, value: b32) ---
+	GetWindowTitle       :: proc(window: WindowHandle) -> cstring ---
 	JoystickPresent      :: proc(joy: c.int) -> b32 ---
 	GetJoystickName      :: proc(joy: c.int) -> cstring ---
 	GetKeyScancode       :: proc(key: c.int) -> c.int ---
@@ -181,8 +203,16 @@ foreign glfw {
 	SetCharCallback        :: proc(window: WindowHandle, cbfun: CharProc)        -> CharProc ---
 	SetCharModsCallback    :: proc(window: WindowHandle, cbfun: CharModsProc)    -> CharModsProc ---
 	SetCursorEnterCallback :: proc(window: WindowHandle, cbfun: CursorEnterProc) -> CursorEnterProc ---
-	SetJoystickCallback    :: proc(window: WindowHandle, cbfun: JoystickProc)    -> JoystickProc ---
+	SetJoystickCallback    :: proc(cbfun: JoystickProc)    -> JoystickProc ---
 
 	SetErrorCallback :: proc(cbfun: ErrorProc) -> ErrorProc ---
+
+	// Functions added in 3.4, Linux links against system glfw so we define these as weak to be able
+	// to check at runtime if they are available.
+
+	@(linkage="weak")
+	GetPlatform       :: proc() -> c.int ---
+	@(linkage="weak")
+	PlatformSupported :: proc(platform: c.int) -> b32 ---
 }
 

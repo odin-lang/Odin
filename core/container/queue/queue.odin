@@ -1,7 +1,7 @@
 package container_queue
 
-import "core:builtin"
-import "core:runtime"
+import "base:builtin"
+import "base:runtime"
 _ :: runtime
 
 // Dynamically resizable double-ended queue/ring-buffer
@@ -22,7 +22,9 @@ init :: proc(q: ^$Q/Queue($T), capacity := DEFAULT_CAPACITY, allocator := contex
 	return reserve(q, capacity)
 }
 
-// Procedure to initialize a queue from a fixed backing slice
+// Procedure to initialize a queue from a fixed backing slice.
+// The contents of the `backing` will be overwritten as items are pushed onto the `Queue`.
+// Any previous contents are not available.
 init_from_slice :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
 	clear(q)
 	q.data = transmute([dynamic]T)runtime.Raw_Dynamic_Array{
@@ -31,6 +33,21 @@ init_from_slice :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
 		cap = builtin.len(backing),
 		allocator = {procedure=runtime.nil_allocator_proc, data=nil},
 	}
+	return true
+}
+
+// Procedure to initialize a queue from a fixed backing slice.
+// Existing contents are preserved and available on the queue.
+init_with_contents :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
+	clear(q)
+	q.data = transmute([dynamic]T)runtime.Raw_Dynamic_Array{
+		data = raw_data(backing),
+		len = builtin.len(backing),
+		cap = builtin.len(backing),
+		allocator = {procedure=runtime.nil_allocator_proc, data=nil},
+	}
+	q.len    = len(backing)
+	q.offset = len(backing)
 	return true
 }
 
@@ -78,11 +95,11 @@ front_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
 }
 
 back :: proc(q: ^$Q/Queue($T)) -> T {
-	idx := (q.offset+uint(q.len))%builtin.len(q.data)
+	idx := (q.offset+uint(q.len - 1))%builtin.len(q.data)
 	return q.data[idx]
 }
 back_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
-	idx := (q.offset+uint(q.len))%builtin.len(q.data)
+	idx := (q.offset+uint(q.len - 1))%builtin.len(q.data)
 	return &q.data[idx]
 }
 
@@ -172,7 +189,7 @@ pop_front_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 	return
 }
 
-// Push multiple elements to the front of the queue
+// Push multiple elements to the back of the queue
 push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T) -> (ok: bool, err: runtime.Allocator_Error)  {
 	n := uint(builtin.len(elems))
 	if space(q^) < int(n) {
@@ -224,7 +241,7 @@ clear :: proc(q: ^$Q/Queue($T)) {
 }
 
 
-// Internal growinh procedure
+// Internal growing procedure
 _grow :: proc(q: ^$Q/Queue($T), min_capacity: uint = 0) -> runtime.Allocator_Error {
 	new_capacity := max(min_capacity, uint(8), uint(builtin.len(q.data))*2)
 	n := uint(builtin.len(q.data))

@@ -1,26 +1,41 @@
-//+private
-//+build wasi
+#+private
+#+build wasi
 package time
 
-import wasi "core:sys/wasm/wasi"
+import "base:intrinsics"
 
-_IS_SUPPORTED :: false
+import "core:sys/wasm/wasi"
+
+_IS_SUPPORTED :: true
 
 _now :: proc "contextless" () -> Time {
-	return {}
+	ts, err := wasi.clock_time_get(wasi.CLOCK_REALTIME, 0)
+	assert_contextless(err == nil)
+	return Time{_nsec=i64(ts)}
 }
 
 _sleep :: proc "contextless" (d: Duration) {
+	ev: wasi.event_t
+	n, err := wasi.poll_oneoff(
+		&{
+			tag   = .CLOCK,
+			clock = {
+				id      = wasi.CLOCK_MONOTONIC,
+				timeout = wasi.timestamp_t(d),
+			},
+		},
+		&ev,
+		1,
+	)
+	assert_contextless(err == nil && n == 1 && ev.error == nil && ev.type == .CLOCK)
 }
 
 _tick_now :: proc "contextless" () -> Tick {
-	// mul_div_u64 :: proc "contextless" (val, num, den: i64) -> i64 {
-	// 	q := val / den
-	// 	r := val % den
-	// 	return q * num + r * num / den
-	// }
-	return {}
+	ts, err := wasi.clock_time_get(wasi.CLOCK_MONOTONIC, 0)
+	assert_contextless(err == nil)
+	return Tick{_nsec=i64(ts)}
 }
 
 _yield :: proc "contextless" () {
+	wasi.sched_yield()
 }

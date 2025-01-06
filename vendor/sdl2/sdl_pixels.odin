@@ -22,7 +22,7 @@ PIXELTYPE_ARRAYU8  ::  7
 PIXELTYPE_ARRAYU16 ::  8
 PIXELTYPE_ARRAYU32 ::  9
 PIXELTYPE_ARRAYF16 :: 10
-PIXELTYPE_ARRAYF3  :: 11
+PIXELTYPE_ARRAYF32 :: 11
 
 BITMAPORDER_NONE :: 0
 BITMAPORDER_4321 :: 1
@@ -47,7 +47,7 @@ ARRAYORDER_RGBA :: 2
 ARRAYORDER_ARGB :: 3
 ARRAYORDER_BGR  :: 4
 ARRAYORDER_BGRA :: 5
-ARRAYORDER_ABG  :: 6
+ARRAYORDER_ABGR :: 6
 
 PACKEDLAYOUT_NONE    :: 0
 PACKEDLAYOUT_332     :: 1
@@ -163,21 +163,21 @@ PixelFormatEnum :: enum u32 {
 	ABGR32 = ABGR8888 when ODIN_ENDIAN == .Big else RGBA8888,
 
 	YV12 =      /**< Planar mode: Y + V + U  (3 planes) */
-		'Y'<<24 | 'V'<<16 | '1'<<8 | '2'<<0,
+		'Y'<<0 | 'V'<<8 | '1'<<16 | '2'<<24,
 	IYUV =      /**< Planar mode: Y + U + V  (3 planes) */
-		'I'<<24 | 'Y'<<16 | 'U'<<8 | 'V'<<0,
+		'I'<<0 | 'Y'<<8 | 'U'<<16 | 'V'<<24,
 	YUY2 =      /**< Packed mode: Y0+U0+Y1+V0 (1 plane) */
-		'Y'<<24 | 'U'<<16 | 'Y'<<8 | '2'<<0,
+		'Y'<<0 | 'U'<<8 | 'Y'<<16 | '2'<<24,
 	UYVY =      /**< Packed mode: U0+Y0+V0+Y1 (1 plane) */
-		'U'<<24 | 'Y'<<16 | 'V'<<8 | 'Y'<<0,
+		'U'<<0 | 'Y'<<8 | 'V'<<16 | 'Y'<<24,
 	YVYU =      /**< Packed mode: Y0+V0+Y1+U0 (1 plane) */
-		'Y'<<24 | 'V'<<16 | 'Y'<<8 | 'U'<<0,
+		'Y'<<0 | 'V'<<8 | 'Y'<<16 | 'U'<<24,
 	NV12 =      /**< Planar mode: Y + U/V interleaved  (2 planes) */
-		'N'<<24 | 'V'<<16 | '1'<<8 | '2'<<0,
+		'N'<<0 | 'V'<<8 | '1'<<16 | '2'<<24,
 	NV21 =      /**< Planar mode: Y + V/U interleaved  (2 planes) */
-		'N'<<24 | 'V'<<16 | '2'<<8 | '1'<<0,
+		'N'<<0 | 'V'<<8 | '2'<<16 | '1'<<24,
 	EXTERNAL_OES =      /**< Android video texture format */
-		'O'<<24 | 'E'<<16 | 'S'<<8 | ' '<<0,
+		'O'<<0 | 'E'<<8 | 'S'<<16 | ' '<<24,
 }
 
 

@@ -3,8 +3,8 @@
 // map type is being used to accelerate lookups.
 package container_topological_sort
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 _ :: intrinsics
 _ :: runtime
 
@@ -61,7 +61,7 @@ add_dependency :: proc(sorter: ^$S/Sorter($K), key, dependency: K) -> bool {
 	}
 	find.dependents[key] = true
 
- 	find = &sorter.relations[key]
+	find = &sorter.relations[key]
 	if find == nil {
 		find = map_insert(&sorter.relations, key, make_relations(sorter))
 	}
@@ -80,11 +80,13 @@ sort :: proc(sorter: ^$S/Sorter($K)) -> (sorted, cycled: [dynamic]K) {
 		}
 	}
 
-	for root in sorted do for k, _ in relations[root].dependents {
-		relation := &relations[k]
-		relation.dependencies -= 1
-		if relation.dependencies == 0 {
-			append(&sorted, k)
+	for root in sorted {
+		for k, _ in relations[root].dependents {
+			relation := &relations[k]
+			relation.dependencies -= 1
+			if relation.dependencies == 0 {
+				append(&sorted, k)
+			}
 		}
 	}
 

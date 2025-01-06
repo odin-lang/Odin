@@ -1,5 +1,5 @@
-//+private
-//+build openbsd
+#+private
+#+build openbsd
 package sync
 
 import "core:c"
@@ -36,7 +36,7 @@ _futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
 		return false
 	}
 
-	_panic("futex_wait failure")
+	panic_contextless("futex_wait failure")
 }
 
 _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
@@ -62,14 +62,14 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 		return false
 	}
 
-	_panic("futex_wait_with_timeout failure")
+	panic_contextless("futex_wait_with_timeout failure")
 }
 
 _futex_signal :: proc "contextless" (f: ^Futex) {
 	res := _unix_futex(f, FUTEX_WAKE_PRIVATE, 1, nil)
 
 	if res == -1 {
-		_panic("futex_wake_single failure")
+		panic_contextless("futex_wake_single failure")
 	}
 }
 
@@ -77,6 +77,6 @@ _futex_broadcast :: proc "contextless" (f: ^Futex)  {
 	res := _unix_futex(f, FUTEX_WAKE_PRIVATE, u32(max(i32)), nil)
 
 	if res == -1 {
-		_panic("_futex_wake_all failure")
+		panic_contextless("_futex_wake_all failure")
 	}
 }

@@ -1,5 +1,8 @@
 package encoding_endian
 
+import "base:intrinsics"
+import "core:math/bits"
+
 Byte_Order :: enum u8 {
 	Little,
 	Big,
@@ -7,147 +10,154 @@ Byte_Order :: enum u8 {
 
 PLATFORM_BYTE_ORDER :: Byte_Order.Little when ODIN_ENDIAN == .Little else Byte_Order.Big
 
-get_u16 :: proc(b: []byte, order: Byte_Order) -> (v: u16, ok: bool) {
+unchecked_get_u16le :: #force_inline proc "contextless" (b: []byte) -> u16 {
+	return bits.from_le_u16(intrinsics.unaligned_load((^u16)(raw_data(b))))
+}
+unchecked_get_u32le :: #force_inline proc "contextless" (b: []byte) -> u32 {
+	return bits.from_le_u32(intrinsics.unaligned_load((^u32)(raw_data(b))))
+}
+unchecked_get_u64le :: #force_inline proc "contextless" (b: []byte) -> u64 {
+	return bits.from_le_u64(intrinsics.unaligned_load((^u64)(raw_data(b))))
+}
+unchecked_get_u16be :: #force_inline proc "contextless" (b: []byte) -> u16 {
+	return bits.from_be_u16(intrinsics.unaligned_load((^u16)(raw_data(b))))
+}
+unchecked_get_u32be :: #force_inline proc "contextless" (b: []byte) -> u32 {
+	return bits.from_be_u32(intrinsics.unaligned_load((^u32)(raw_data(b))))
+}
+unchecked_get_u64be :: #force_inline proc "contextless" (b: []byte) -> u64 {
+	return bits.from_be_u64(intrinsics.unaligned_load((^u64)(raw_data(b))))
+}
+
+get_u16 :: proc "contextless" (b: []byte, order: Byte_Order) -> (v: u16, ok: bool) {
 	if len(b) < 2 {
 		return 0, false
 	}
-	#no_bounds_check if order == .Little {
-		v = u16(b[0]) | u16(b[1])<<8
+	if order == .Little {
+		v = unchecked_get_u16le(b)
 	} else {
-		v = u16(b[1]) | u16(b[0])<<8
+		v = unchecked_get_u16be(b)
 	}
 	return v, true
 }
-get_u32 :: proc(b: []byte, order: Byte_Order) -> (v: u32, ok: bool) {
+get_u32 :: proc "contextless" (b: []byte, order: Byte_Order) -> (v: u32, ok: bool) {
 	if len(b) < 4 {
 		return 0, false
 	}
-	#no_bounds_check if order == .Little {
-		v = u32(b[0]) | u32(b[1])<<8 | u32(b[2])<<16 | u32(b[3])<<24
+	if order == .Little {
+		v = unchecked_get_u32le(b)
 	} else {
-		v = u32(b[3]) | u32(b[2])<<8 | u32(b[1])<<16 | u32(b[0])<<24
+		v = unchecked_get_u32be(b)
 	}
 	return v, true
 }
-
-get_u64 :: proc(b: []byte, order: Byte_Order) -> (v: u64, ok: bool) {
+get_u64 :: proc "contextless" (b: []byte, order: Byte_Order) -> (v: u64, ok: bool) {
 	if len(b) < 8 {
 		return 0, false
 	}
-	#no_bounds_check if order == .Little {
-		v = u64(b[0]) | u64(b[1])<<8 | u64(b[2])<<16 | u64(b[3])<<24 |
-		    u64(b[4])<<32 | u64(b[5])<<40 | u64(b[6])<<48 | u64(b[7])<<56
+	if order == .Little {
+		v = unchecked_get_u64le(b)
 	} else {
-		v = u64(b[7]) | u64(b[6])<<8 | u64(b[5])<<16 | u64(b[4])<<24 |
-		    u64(b[3])<<32 | u64(b[2])<<40 | u64(b[1])<<48 | u64(b[0])<<56
+		v = unchecked_get_u64be(b)
 	}
 	return v, true
 }
 
-get_i16 :: proc(b: []byte, order: Byte_Order) -> (i16, bool) {
+get_i16 :: proc "contextless" (b: []byte, order: Byte_Order) -> (i16, bool) {
 	v, ok := get_u16(b, order)
 	return i16(v), ok
 }
-get_i32 :: proc(b: []byte, order: Byte_Order) -> (i32, bool) {
+get_i32 :: proc "contextless" (b: []byte, order: Byte_Order) -> (i32, bool) {
 	v, ok := get_u32(b, order)
 	return i32(v), ok
 }
-get_i64 :: proc(b: []byte, order: Byte_Order) -> (i64, bool) {
+get_i64 :: proc "contextless" (b: []byte, order: Byte_Order) -> (i64, bool) {
 	v, ok := get_u64(b, order)
 	return i64(v), ok
 }
 
-get_f16 :: proc(b: []byte, order: Byte_Order) -> (f16, bool) {
+get_f16 :: proc "contextless" (b: []byte, order: Byte_Order) -> (f16, bool) {
 	v, ok := get_u16(b, order)
 	return transmute(f16)v, ok
 }
-get_f32 :: proc(b: []byte, order: Byte_Order) -> (f32, bool) {
+get_f32 :: proc "contextless" (b: []byte, order: Byte_Order) -> (f32, bool) {
 	v, ok := get_u32(b, order)
 	return transmute(f32)v, ok
 }
-get_f64 :: proc(b: []byte, order: Byte_Order) -> (f64, bool) {
+get_f64 :: proc "contextless" (b: []byte, order: Byte_Order) -> (f64, bool) {
 	v, ok := get_u64(b, order)
 	return transmute(f64)v, ok
 }
 
+unchecked_put_u16le :: #force_inline proc "contextless" (b: []byte, v: u16) {
+	intrinsics.unaligned_store((^u16)(raw_data(b)), bits.to_le_u16(v))
+}
+unchecked_put_u32le :: #force_inline proc "contextless" (b: []byte, v: u32) {
+	intrinsics.unaligned_store((^u32)(raw_data(b)), bits.to_le_u32(v))
+}
+unchecked_put_u64le :: #force_inline proc "contextless" (b: []byte, v: u64) {
+	intrinsics.unaligned_store((^u64)(raw_data(b)), bits.to_le_u64(v))
+}
+unchecked_put_u16be :: #force_inline proc "contextless" (b: []byte, v: u16) {
+	intrinsics.unaligned_store((^u16)(raw_data(b)), bits.to_be_u16(v))
+}
+unchecked_put_u32be :: #force_inline proc "contextless" (b: []byte, v: u32) {
+	intrinsics.unaligned_store((^u32)(raw_data(b)), bits.to_be_u32(v))
+}
+unchecked_put_u64be :: #force_inline proc "contextless" (b: []byte, v: u64) {
+	intrinsics.unaligned_store((^u64)(raw_data(b)), bits.to_be_u64(v))
+}
 
-put_u16 :: proc(b: []byte, order: Byte_Order, v: u16) -> bool {
+put_u16 :: proc  "contextless" (b: []byte, order: Byte_Order, v: u16) -> bool {
 	if len(b) < 2 {
 		return false
 	}
-	#no_bounds_check if order == .Little {
-		b[0] = byte(v)
-		b[1] = byte(v >> 8)
+	if order == .Little {
+		unchecked_put_u16le(b, v)
 	} else {
-		b[0] = byte(v >> 8)
-		b[1] = byte(v)
+		unchecked_put_u16be(b, v)
 	}
 	return true
 }
-put_u32 :: proc(b: []byte, order: Byte_Order, v: u32) -> bool {
+put_u32 :: proc "contextless" (b: []byte, order: Byte_Order, v: u32) -> bool {
 	if len(b) < 4 {
 		return false
 	}
-	#no_bounds_check if order == .Little {
-		b[0] = byte(v)
-		b[1] = byte(v >> 8)
-		b[2] = byte(v >> 16)
-		b[3] = byte(v >> 24)
+	if order == .Little {
+		unchecked_put_u32le(b, v)
 	} else {
-		b[0] = byte(v >> 24)
-		b[1] = byte(v >> 16)
-		b[2] = byte(v >> 8)
-		b[3] = byte(v)
+		unchecked_put_u32be(b, v)
 	}
 	return true
 }
-put_u64 :: proc(b: []byte, order: Byte_Order, v: u64) -> bool {
+put_u64 :: proc "contextless" (b: []byte, order: Byte_Order, v: u64) -> bool {
 	if len(b) < 8 {
 		return false
 	}
-	#no_bounds_check if order == .Little {
-		b[0] = byte(v >> 0)
-		b[1] = byte(v >> 8)
-		b[2] = byte(v >> 16)
-		b[3] = byte(v >> 24)
-		b[4] = byte(v >> 32)
-		b[5] = byte(v >> 40)
-		b[6] = byte(v >> 48)
-		b[7] = byte(v >> 56)
+	if order == .Little {
+		unchecked_put_u64le(b, v)
 	} else {
-		b[0] = byte(v >> 56)
-		b[1] = byte(v >> 48)
-		b[2] = byte(v >> 40)
-		b[3] = byte(v >> 32)
-		b[4] = byte(v >> 24)
-		b[5] = byte(v >> 16)
-		b[6] = byte(v >> 8)
-		b[7] = byte(v)
+		unchecked_put_u64be(b, v)
 	}
 	return true
 }
 
-put_i16 :: proc(b: []byte, order: Byte_Order, v: i16) -> bool {
+put_i16 :: proc "contextless" (b: []byte, order: Byte_Order, v: i16) -> bool {
 	return put_u16(b, order, u16(v))
 }
-
-put_i32 :: proc(b: []byte, order: Byte_Order, v: i32) -> bool {
+put_i32 :: proc "contextless" (b: []byte, order: Byte_Order, v: i32) -> bool {
 	return put_u32(b, order, u32(v))
 }
-
-put_i64 :: proc(b: []byte, order: Byte_Order, v: i64) -> bool {
+put_i64 :: proc "contextless" (b: []byte, order: Byte_Order, v: i64) -> bool {
 	return put_u64(b, order, u64(v))
 }
 
-
-put_f16 :: proc(b: []byte, order: Byte_Order, v: f16) -> bool {
+put_f16 :: proc "contextless" (b: []byte, order: Byte_Order, v: f16) -> bool {
 	return put_u16(b, order, transmute(u16)v)
 }
-
-put_f32 :: proc(b: []byte, order: Byte_Order, v: f32) -> bool {
+put_f32 :: proc "contextless" (b: []byte, order: Byte_Order, v: f32) -> bool {
 	return put_u32(b, order, transmute(u32)v)
 }
-
-put_f64 :: proc(b: []byte, order: Byte_Order, v: f64) -> bool {
+put_f64 :: proc "contextless" (b: []byte, order: Byte_Order, v: f64) -> bool {
 	return put_u64(b, order, transmute(u64)v)
 }

@@ -1,5 +1,5 @@
+#+build linux
 package net
-// +build linux
 
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
@@ -10,6 +10,7 @@ package net
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
@@ -17,6 +18,7 @@ package net
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 		flysand:         Move dependency from core:os to core:sys/linux
+		Feoramund:       FreeBSD platform code
 */
 
 import "core:c"
@@ -31,8 +33,8 @@ Socket_Option :: enum c.int {
 	Linger                    = c.int(linux.Socket_Option.LINGER),
 	Receive_Buffer_Size       = c.int(linux.Socket_Option.RCVBUF),
 	Send_Buffer_Size          = c.int(linux.Socket_Option.SNDBUF),
-	Receive_Timeout           = c.int(linux.Socket_Option.RCVTIMEO_NEW),
-	Send_Timeout              = c.int(linux.Socket_Option.SNDTIMEO_NEW),
+	Receive_Timeout           = c.int(linux.Socket_Option.RCVTIMEO),
+	Send_Timeout              = c.int(linux.Socket_Option.SNDTIMEO),
 }
 
 // Wrappers and unwrappers for system-native types
@@ -80,14 +82,14 @@ _unwrap_os_addr :: proc "contextless" (endpoint: Endpoint)->(linux.Sock_Addr_Any
 			ipv4 = {
 				sin_family = .INET,
 				sin_port = u16be(endpoint.port),
-				sin_addr = transmute([4]u8) endpoint.address.(IP4_Address),
+				sin_addr = ([4]u8)(endpoint.address.(IP4_Address)),
 			},
 		}
 	case IP6_Address:
 		return {
 			ipv6 = {
 				sin6_port = u16be(endpoint.port),
-				sin6_addr = transmute([16]u8) endpoint.address.(IP6_Address),
+				sin6_addr = transmute([16]u8)endpoint.address.(IP6_Address),
 				sin6_family = .INET6,
 			},
 		}
@@ -117,7 +119,7 @@ _wrap_os_addr :: proc "contextless" (addr: linux.Sock_Addr_Any)->(Endpoint) {
 _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (Any_Socket, Network_Error) {
 	family := _unwrap_os_family(family)
 	proto, socktype := _unwrap_os_proto_socktype(protocol)
-	sock, errno := linux.socket(family, socktype, {}, proto)
+	sock, errno := linux.socket(family, socktype, {.CLOEXEC}, proto)
 	if errno != .NONE {
 		return {}, Create_Socket_Error(errno)
 	}
@@ -125,14 +127,14 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (An
 }
 
 @(private)
-_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (tcp_sock: TCP_Socket, err: Network_Error) {
+_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (TCP_Socket, Network_Error) {
 	errno: linux.Errno
 	if endpoint.port == 0 {
 		return 0, .Port_Required
 	}
 	// Create new TCP socket
 	os_sock: linux.Fd
-	os_sock, errno = linux.socket(_unwrap_os_family(family_from_endpoint(endpoint)), .STREAM, {}, .TCP)
+	os_sock, errno = linux.socket(_unwrap_os_family(family_from_endpoint(endpoint)), .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
 		// TODO(flysand): should return invalid file descriptor here casted as TCP_Socket
 		return {}, Create_Socket_Error(errno)
@@ -145,7 +147,8 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	addr := _unwrap_os_addr(endpoint)
 	errno = linux.connect(linux.Fd(os_sock), &addr)
 	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Dial_Error(errno)
+		close(cast(TCP_Socket) os_sock)
+		return {}, Dial_Error(errno)
 	}
 	// NOTE(tetra): Not vital to succeed; error ignored
 	no_delay: b32 = cast(b32) options.no_delay
@@ -164,40 +167,61 @@ _bind :: proc(sock: Any_Socket, endpoint: Endpoint) -> (Network_Error) {
 }
 
 @(private)
-_listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (TCP_Socket, Network_Error) {
+_listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket, err: Network_Error) {
 	errno: linux.Errno
 	assert(backlog > 0 && i32(backlog) < max(i32))
+
 	// Figure out the address family and address of the endpoint
 	ep_family := _unwrap_os_family(family_from_endpoint(endpoint))
 	ep_address := _unwrap_os_addr(endpoint)
+
 	// Create TCP socket
 	os_sock: linux.Fd
-	os_sock, errno = linux.socket(ep_family, .STREAM, {}, .TCP)
+	os_sock, errno = linux.socket(ep_family, .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
-		// TODO(flysand): should return invalid file descriptor here casted as TCP_Socket
-		return {}, Create_Socket_Error(errno)
+		err = Create_Socket_Error(errno)
+		return
 	}
+	socket = cast(TCP_Socket)os_sock
+	defer if err != nil { close(socket) }
+
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
 	// use the same address immediately.
 	//
 	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the address!
 	do_reuse_addr: b32 = true
-	errno = linux.setsockopt(os_sock, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &do_reuse_addr)
-	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Listen_Error(errno)
+	if errno = linux.setsockopt(os_sock, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &do_reuse_addr); errno != .NONE {
+		err = Listen_Error(errno)
+		return
 	}
+
 	// Bind the socket to endpoint address
-	errno = linux.bind(os_sock, &ep_address)
-	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Bind_Error(errno)
+	if errno = linux.bind(os_sock, &ep_address); errno != .NONE {
+		err = Bind_Error(errno)
+		return
 	}
+
 	// Listen on bound socket
-	errno = linux.listen(os_sock, cast(i32) backlog)
-	if errno != .NONE {
-		return cast(TCP_Socket) os_sock, Listen_Error(errno)
+	if errno = linux.listen(os_sock, cast(i32) backlog); errno != .NONE {
+		err = Listen_Error(errno)
+		return
 	}
-	return cast(TCP_Socket) os_sock, nil
+
+	return
+}
+
+@(private)
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+	addr: linux.Sock_Addr_Any
+	errno := linux.getsockname(_unwrap_os_socket(sock), &addr)
+	if errno != .NONE {
+		err = Listen_Error(errno)
+		return
+	}
+
+	ep = _wrap_os_addr(addr)
+	return
 }
 
 @(private)
@@ -258,8 +282,12 @@ _send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
 	for total_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - total_written)
 		remaining := buf[total_written:][:limit]
-		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {})
-		if errno != .NONE {
+		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {.NOSIGNAL})
+		if errno == .EPIPE {
+			// If the peer is disconnected when we are trying to send we will get an `EPIPE` error,
+			// so we turn that into a clearer error
+			return total_written, TCP_Send_Error.Connection_Closed
+		} else if errno != .NONE {
 			return total_written, TCP_Send_Error(errno)
 		}
 		total_written += int(res)
@@ -333,7 +361,9 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 		.Send_Timeout,
 		.Receive_Timeout:
 			t, ok := value.(time.Duration)
-			if !ok do panic("set_option() value must be a time.Duration here", loc)
+			if !ok {
+				panic("set_option() value must be a time.Duration here", loc)
+			}
 
 			micros := cast(i64) (time.duration_microseconds(t))
 			timeval_value.microseconds = cast(int) (micros % 1e6)
@@ -371,9 +401,9 @@ _set_blocking :: proc(sock: Any_Socket, should_block: bool) -> (err: Network_Err
 		return Set_Blocking_Error(errno)
 	}
 	if should_block {
-		flags &= ~{.NONBLOCK}
+		flags -= {.NONBLOCK}
 	} else {
-		flags |= {.NONBLOCK}
+		flags += {.NONBLOCK}
 	}
 	errno = linux.fcntl(os_sock, linux.F_SETFL, flags)
 	if errno != .NONE {

@@ -1,7 +1,11 @@
 package darwin
 
 import "core:c"
-import "core:intrinsics"
+import "base:intrinsics"
+
+// IMPORTANT NOTE: direct syscall usage is not allowed by Apple's review process of apps and should
+// be entirely avoided in the builtin Odin collections, these are here for users if they don't
+// care about the Apple review process.
 
 /* flock */
 LOCK_SH :: 1 /* shared lock */
@@ -125,7 +129,7 @@ DARWIN_MAXCOMLEN :: 16
 /*--==========================================================================--*/
 
 __darwin_ino64_t :: u64
-__darwin_time_t :: u32
+__darwin_time_t :: c.long
 __darwin_dev_t :: i32
 __darwin_mode_t :: u16
 __darwin_off_t :: i64
@@ -188,43 +192,43 @@ _STRUCT_TIMEVAL :: struct {
 
 /* pwd.h */
 _Password_Entry :: struct {
-    pw_name: cstring, /* username */
-    pw_passwd: cstring, /* user password */
-    pw_uid: i32,   /* user ID */
-    pw_gid: i32,   /* group ID */
+	pw_name: cstring, /* username */
+	pw_passwd: cstring, /* user password */
+	pw_uid: i32,   /* user ID */
+	pw_gid: i32,   /* group ID */
 	pw_change: u64,     /* password change time */
 	pw_class: cstring, /* user access class */
-    pw_gecos: cstring, /* full user name */
-    pw_dir: cstring, /* home directory */
-    pw_shell: cstring, /* shell program */
+	pw_gecos: cstring, /* full user name */
+	pw_dir: cstring, /* home directory */
+	pw_shell: cstring, /* shell program */
 	pw_expire: u64,     /* account expiration */
 	pw_fields: i32,     /* filled fields */
 }
 
 /* processinfo.h */
 _Proc_Bsdinfo :: struct {
-  pbi_flags: u32, /* if is 64bit; emulated etc */
-  pbi_status: u32,
-  pbi_xstatus: u32,
-  pbi_pid: u32,
-  pbi_ppid: u32,
-  pbi_uid: u32,
-  pbi_gid: u32,
-  pbi_ruid: u32,
-  pbi_rgid: u32,
-  pbi_svuid: u32,
-  pbi_svgid: u32,
-  res: u32,
-  pbi_comm: [DARWIN_MAXCOMLEN]u8,
-  pbi_name: [2 * DARWIN_MAXCOMLEN]u8,	/* empty if no name is registered */
-  pbi_nfiles: u32,
-  pbi_pgid: u32,
-  pbi_pjobc: u32,
-  e_tdev: u32, /* controlling tty dev */
-  e_tpgid: u32,	/* tty process group id */
-  pbi_nice: i32,
-  pbi_start_tvsec: u64,
-  pbi_start_tvusec: u64,
+	pbi_flags: u32, /* if is 64bit; emulated etc */
+	pbi_status: u32,
+	pbi_xstatus: u32,
+	pbi_pid: u32,
+	pbi_ppid: u32,
+	pbi_uid: u32,
+	pbi_gid: u32,
+	pbi_ruid: u32,
+	pbi_rgid: u32,
+	pbi_svuid: u32,
+	pbi_svgid: u32,
+	res: u32,
+	pbi_comm: [DARWIN_MAXCOMLEN]u8,
+	pbi_name: [2 * DARWIN_MAXCOMLEN]u8,	/* empty if no name is registered */
+	pbi_nfiles: u32,
+	pbi_pgid: u32,
+	pbi_pjobc: u32,
+	e_tdev: u32, /* controlling tty dev */
+	e_tpgid: u32,	/* tty process group id */
+	pbi_nice: i32,
+	pbi_start_tvsec: u64,
+	pbi_start_tvusec: u64,
 }
 
 /*--==========================================================================--*/
@@ -337,7 +341,7 @@ syscall_ftruncate :: #force_inline proc "contextless" (fd: c.int, length: off_t)
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.ftruncate), uintptr(fd), uintptr(length))
 }
 
-syscall_sysctl :: #force_inline proc "contextless" (name: ^c.int, namelen: c.uint, oldp: rawptr, oldlenp: ^i64, newp: ^i8, newlen: i64) -> c.int {
+syscall_sysctl :: #force_inline proc "contextless" (name: [^]c.int, namelen: c.size_t, oldp: rawptr, oldlenp: ^c.size_t, newp: rawptr, newlen: c.size_t) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctl), uintptr(name), uintptr(namelen), uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
 }
 
@@ -367,7 +371,7 @@ syscall_execve :: #force_inline proc "contextless" (path: cstring, argv: [^]cstr
 }
 
 syscall_munmap :: #force_inline proc "contextless" (addr: rawptr, len: u64) -> c.int {
-	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.mmap), uintptr(addr), uintptr(len))
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.munmap), uintptr(addr), uintptr(len))
 }
 
 syscall_mmap :: #force_inline proc "contextless" (addr: ^u8, len: u64, port: c.int, flags: c.int, fd: int, offset: off_t) -> ^u8 {
@@ -390,8 +394,8 @@ syscall_adjtime :: #force_inline proc "contextless" (delta: ^timeval, old_delta:
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.adjtime), uintptr(delta), uintptr(old_delta))
 }
 
-syscall_sysctlbyname :: #force_inline proc "contextless" (name: cstring, oldp: rawptr, oldlenp: ^i64, newp: rawptr, newlen: i64) -> c.int {
-	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctlbyname), transmute(uintptr)name, uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
+syscall_sysctlbyname :: #force_inline proc "contextless" (name: string, oldp: rawptr, oldlenp: ^c.size_t, newp: rawptr, newlen: c.size_t) -> c.int {
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctlbyname), uintptr(raw_data(name)), uintptr(len(name)), uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
 }
 
 syscall_proc_info :: #force_inline proc "contextless" (num: c.int, pid: u32, flavor: c.int, arg: u64, buffer: rawptr, buffer_size: c.int) -> c.int {
@@ -416,4 +420,16 @@ syscall_chdir :: #force_inline proc "contextless" (path: cstring) -> c.int {
 
 syscall_fchdir :: #force_inline proc "contextless" (fd: c.int, path: cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), uintptr(fd), transmute(uintptr)path)
+}
+
+syscall_getrusage :: #force_inline proc "contextless" (who: c.int, rusage: ^RUsage) -> c.int {
+	return cast(c.int) intrinsics.syscall(unix_offset_syscall(.getrusage), uintptr(who), uintptr(rusage))
+}
+
+syscall_shm_open :: #force_inline proc "contextless" (name: cstring, oflag: u32, mode: u32) -> c.int {
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.shm_open), transmute(uintptr)name, uintptr(oflag), uintptr(mode))
+}
+
+syscall_shm_unlink :: #force_inline proc "contextless" (name: cstring) -> c.int {
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.shm_unlink), transmute(uintptr)name)
 }

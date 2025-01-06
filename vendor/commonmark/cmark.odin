@@ -8,7 +8,7 @@ package vendor_commonmark
 
 import "core:c"
 import "core:c/libc"
-import "core:runtime"
+import "base:runtime"
 
 COMMONMARK_SHARED :: #config(COMMONMARK_SHARED, false)
 BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}
@@ -22,6 +22,10 @@ when ODIN_OS == .Windows {
 		"cmark_static.lib",
 	}
 } else when ODIN_OS == .Linux {
+	foreign import lib "system:cmark"
+} else when ODIN_OS == .Darwin {
+	foreign import lib "system:cmark"
+} else {
 	foreign import lib "system:cmark"
 }
 
@@ -334,7 +338,7 @@ foreign lib {
 	node_set_list_tight :: proc(node: ^Node, tight: b32) -> (success: b32) ---
 
 	// Returns the info string from a fenced code block.
-	get_fence_info :: proc(node: ^Node) -> (fence_info: cstring) ---
+	node_get_fence_info :: proc(node: ^Node) -> (fence_info: cstring) ---
 
 	// Sets the info string in a fenced code block, returning `true` on success and `false` on failure.
 	node_set_fence_info :: proc(node: ^Node, fence_info: cstring) -> (success: b32) ---
@@ -361,6 +365,16 @@ foreign lib {
 	// Any children of the node will be rendered after this text.
 	// Returns `true` on success, `false`on failure.
 	node_set_on_enter :: proc(node: ^Node, on_enter: cstring) -> (success: b32) ---
+
+	// Returns the literal "on exit" text for a custom 'node', or
+	// an empty string if no on_exit is set.  Returns NULL if
+	// called on a non-custom node.
+	node_get_on_exit :: proc(node: ^Node) -> (on_exit: cstring) ---
+
+	// Sets the literal text to render "on exit" for a custom 'node'.
+	// Any children of the node will be rendered before this text.
+	// Returns 1 on success 0 on failure.
+	node_set_on_exit :: proc(node: ^Node, on_exit: cstring) -> (success: b32) ---
 
 	// Returns the line on which `node` begins.
 	node_get_start_line :: proc(node: ^Node) -> (line: c.int) ---
@@ -480,15 +494,15 @@ free_cstring :: proc "c" (str: cstring) {
 	free_rawptr(rawptr(str))
 }
 free_string :: proc "c" (s: string) {
-    free_rawptr(raw_data(s))
+	free_rawptr(raw_data(s))
 }
 free :: proc{free_rawptr, free_cstring}
 
 // Wrap CMark allocator as Odin allocator
 @(private)
 cmark_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
-                           size, alignment: int,
-                           old_memory: rawptr, old_size: int, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) {
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) {
 
 	cmark_alloc := cast(^Allocator)allocator_data
 	switch mode {
@@ -507,7 +521,7 @@ cmark_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 	case .Free_All:
 		return nil, .Mode_Not_Implemented
 
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		new_ptr := cmark_alloc.realloc(old_memory, c.size_t(size))
 		res = transmute([]byte)runtime.Raw_Slice{new_ptr, size}
 		if size > old_size {

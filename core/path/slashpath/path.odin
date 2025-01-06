@@ -5,7 +5,7 @@
 // To manipulate operating system specific paths, use the path/filepath package
 package slashpath
 
-import "core:runtime"
+import "base:runtime"
 import "core:strings"
 
 // is_separator checks whether the byte is a valid separator character

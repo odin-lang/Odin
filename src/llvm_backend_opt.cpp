@@ -380,6 +380,100 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 	}
 }
 
+gb_internal LLVMValueRef lb_run_instrumentation_pass_insert_call(lbProcedure *p, Entity *entity, LLVMBuilderRef dummy_builder, bool is_enter) {
+	lbModule *m = p->module;
+
+	if (p->debug_info != nullptr) {
+		TokenPos pos = {};
+		if (is_enter) {
+			pos = ast_token(p->body).pos;
+		} else {
+			pos = ast_end_token(p->body).pos;
+		}
+		LLVMSetCurrentDebugLocation2(dummy_builder, lb_debug_location_from_token_pos(p, pos));
+	}
+
+	lbValue cc = lb_find_procedure_value_from_entity(m, entity);
+
+	LLVMValueRef args[3] = {};
+	args[0] = LLVMConstPointerCast(p->value, lb_type(m, t_rawptr));
+
+	if (is_arch_wasm()) {
+		args[1] = LLVMConstPointerNull(lb_type(m, t_rawptr));
+	} else {
+		LLVMValueRef returnaddress_args[1] = {};
+
+		returnaddress_args[0] = LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 0, false);
+
+		char const *instrinsic_name = "llvm.returnaddress";
+		unsigned id = LLVMLookupIntrinsicID(instrinsic_name, gb_strlen(instrinsic_name));
+		GB_ASSERT_MSG(id != 0, "Unable to find %s", instrinsic_name);
+		LLVMValueRef ip = LLVMGetIntrinsicDeclaration(m->mod, id, nullptr, 0);
+		LLVMTypeRef call_type = LLVMIntrinsicGetType(m->ctx, id, nullptr, 0);
+		args[1] = LLVMBuildCall2(dummy_builder, call_type, ip, returnaddress_args, gb_count_of(returnaddress_args), "");
+	}
+
+	Token name = {};
+	if (p->entity) {
+		name = p->entity->token;
+	}
+	args[2] = lb_emit_source_code_location_as_global_ptr(p, name.string, name.pos).value;
+
+	LLVMTypeRef fnp = lb_type_internal_for_procedures_raw(p->module, entity->type);
+	return LLVMBuildCall2(dummy_builder, fnp, cc.value, args, gb_count_of(args), "");
+}
+
+
+gb_internal void lb_run_instrumentation_pass(lbProcedure *p) {
+	lbModule *m = p->module;
+	Entity *enter = m->info->instrumentation_enter_entity;
+	Entity *exit  = m->info->instrumentation_exit_entity;
+	if (enter == nullptr || exit == nullptr) {
+		return;
+	}
+	if (!(p->entity &&
+	      p->entity->kind == Entity_Procedure &&
+	      p->entity->Procedure.has_instrumentation)) {
+		return;
+	}
+
+#define LLVM_V_NAME(x) x, cast(unsigned)(gb_count_of(x)-1)
+
+	LLVMBuilderRef dummy_builder = LLVMCreateBuilderInContext(m->ctx);
+	defer (LLVMDisposeBuilder(dummy_builder));
+
+	LLVMBasicBlockRef entry_bb = p->entry_block->block;
+	LLVMPositionBuilder(dummy_builder, entry_bb, LLVMGetFirstInstruction(entry_bb));
+	lb_run_instrumentation_pass_insert_call(p, enter, dummy_builder, true);
+	LLVMRemoveStringAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, LLVM_V_NAME("instrument-function-entry"));
+
+	unsigned bb_count = LLVMCountBasicBlocks(p->value);
+	LLVMBasicBlockRef *bbs = gb_alloc_array(temporary_allocator(), LLVMBasicBlockRef, bb_count);
+	LLVMGetBasicBlocks(p->value, bbs);
+	for (unsigned i = 0; i < bb_count; i++) {
+		LLVMBasicBlockRef bb = bbs[i];
+		LLVMValueRef terminator = LLVMGetBasicBlockTerminator(bb);
+		if (terminator == nullptr ||
+		    !LLVMIsAReturnInst(terminator)) {
+			continue;
+		}
+
+		// TODO(bill): getTerminatingMustTailCall()
+		// If T is preceded by a musttail call, that's the real terminator.
+		// if (CallInst *CI = BB.getTerminatingMustTailCall())
+		// 	T = CI;
+
+
+		LLVMPositionBuilderBefore(dummy_builder, terminator);
+		lb_run_instrumentation_pass_insert_call(p, exit, dummy_builder, false);
+	}
+
+	LLVMRemoveStringAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, LLVM_V_NAME("instrument-function-exit"));
+
+#undef LLVM_V_NAME
+}
+
+
 
 gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p, lbFunctionPassManagerKind pass_manager_kind) {
 	if (p == nullptr) {
@@ -390,6 +484,8 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 	// This is also useful for read the .ll for debug purposes because a lot of instructions
 	// are not removed
 	lb_run_remove_dead_instruction_pass(p);
+
+	lb_run_instrumentation_pass(p);
 
 	switch (pass_manager_kind) {
 	case lbFunctionPassManager_none:
@@ -552,3 +648,5 @@ gb_internal void lb_run_remove_unused_globals_pass(lbModule *m) {
 		}
 	}
 }
+
+

@@ -4,8 +4,8 @@ import "core:io"
 
 to_stream :: proc(f: ^File) -> (s: io.Stream) {
 	if f != nil {
-		assert(f.impl.stream.procedure != nil)
-		s = f.impl.stream
+		assert(f.stream.procedure != nil)
+		s = f.stream
 	}
 	return
 }

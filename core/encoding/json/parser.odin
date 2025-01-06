@@ -1,4 +1,4 @@
-package json
+package encoding_json
 
 import "core:mem"
 import "core:unicode/utf8"
@@ -28,27 +28,27 @@ make_parser_from_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, par
 }
 
 
-parse :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> (Value, Error) {
-	return parse_string(string(data), spec, parse_integers, allocator)
+parse :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator, loc := #caller_location) -> (Value, Error) {
+	return parse_string(string(data), spec, parse_integers, allocator, loc)
 }
 
-parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> (Value, Error) {
+parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator, loc := #caller_location) -> (Value, Error) {
 	context.allocator = allocator
 	p := make_parser_from_string(data, spec, parse_integers, allocator)
 
 	switch p.spec {
 	case .JSON:
-		return parse_object(&p)
+		return parse_object(&p, loc)
 	case .JSON5:
-		return parse_value(&p)
+		return parse_value(&p, loc)
 	case .SJSON:
 		#partial switch p.curr_token.kind {
 		case .Ident, .String:
-			return parse_object_body(&p, .EOF)
+			return parse_object_body(&p, .EOF, loc)
 		}
-		return parse_value(&p)
+		return parse_value(&p, loc)
 	}
-	return parse_object(&p)
+	return parse_object(&p, loc)
 }
 
 token_end_pos :: proc(tok: Token) -> Pos {
@@ -106,7 +106,7 @@ parse_comma :: proc(p: ^Parser) -> (do_break: bool) {
 	return false
 }
 
-parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
+parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None
 	token := p.curr_token
 	#partial switch token.kind {
@@ -142,13 +142,13 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		
 	case .String:
 		advance_token(p)
-		return unquote_string(token, p.spec, p.allocator)
+		return unquote_string(token, p.spec, p.allocator, loc)
 
 	case .Open_Brace:
-		return parse_object(p)
+		return parse_object(p, loc)
 
 	case .Open_Bracket:
-		return parse_array(p)
+		return parse_array(p, loc)
 
 	case:
 		if p.spec != .JSON {
@@ -176,7 +176,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	return
 }
 
-parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
+parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None
 	expect_token(p, .Open_Bracket) or_return
 
@@ -184,14 +184,14 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	array.allocator = p.allocator
 	defer if err != nil {
 		for elem in array {
-			destroy_value(elem)
+			destroy_value(elem, loc=loc)
 		}
-		delete(array)
+		delete(array, loc)
 	}
 
 	for p.curr_token.kind != .Close_Bracket {
-		elem := parse_value(p) or_return
-		append(&array, elem)
+		elem := parse_value(p, loc) or_return
+		append(&array, elem, loc)
 		
 		if parse_comma(p) {
 			break
@@ -204,8 +204,8 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 }
 
 @(private)
-bytes_make :: proc(size, alignment: int, allocator: mem.Allocator) -> (bytes: []byte, err: Error) {
-	b, berr := mem.alloc_bytes(size, alignment, allocator)
+bytes_make :: proc(size, alignment: int, allocator: mem.Allocator, loc := #caller_location) -> (bytes: []byte, err: Error) {
+	b, berr := mem.alloc_bytes(size, alignment, allocator, loc)
 	if berr != nil {
 		if berr == .Out_Of_Memory {
 			err = .Out_Of_Memory
@@ -217,9 +217,9 @@ bytes_make :: proc(size, alignment: int, allocator: mem.Allocator) -> (bytes: []
 	return
 }
 
-clone_string :: proc(s: string, allocator: mem.Allocator) -> (str: string, err: Error) {
+clone_string :: proc(s: string, allocator: mem.Allocator, loc := #caller_location) -> (str: string, err: Error) {
 	n := len(s)
-	b := bytes_make(n+1, 1, allocator) or_return
+	b := bytes_make(n+1, 1, allocator, loc) or_return
 	copy(b, s)
 	if len(b) > n {
 		b[n] = 0
@@ -228,38 +228,39 @@ clone_string :: proc(s: string, allocator: mem.Allocator) -> (str: string, err: 
 	return
 }
 
-parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator) -> (key: string, err: Error) {
+parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator, loc := #caller_location) -> (key: string, err: Error) {
 	tok := p.curr_token
 	if p.spec != .JSON {
 		if allow_token(p, .Ident) {
-			return clone_string(tok.text, key_allocator)
+			return clone_string(tok.text, key_allocator, loc)
 		}
 	}
 	if tok_err := expect_token(p, .String); tok_err != nil {
 		err = .Expected_String_For_Object_Key
 		return
 	}
-	return unquote_string(tok, p.spec, key_allocator)
+	return unquote_string(tok, p.spec, key_allocator, loc)
 }
 
-parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, err: Error) {
-	obj.allocator = p.allocator
+parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_location) -> (obj: Object, err: Error) {
+	obj = make(Object, allocator=p.allocator, loc=loc)
+
 	defer if err != nil {
 		for key, elem in obj {
-			delete(key, p.allocator)
-			destroy_value(elem)
+			delete(key, p.allocator, loc)
+			destroy_value(elem, loc=loc)
 		}
-		delete(obj)
+		delete(obj, loc)
 	}
 
 	for p.curr_token.kind != end_token {
-		key := parse_object_key(p, p.allocator) or_return
+		key := parse_object_key(p, p.allocator, loc) or_return
 		parse_colon(p) or_return
-		elem := parse_value(p) or_return
+		elem := parse_value(p, loc) or_return
 
 		if key in obj {
 			err = .Duplicate_Object_Key
-			delete(key, p.allocator)
+			delete(key, p.allocator, loc)
 			return
 		}
 
@@ -267,7 +268,7 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, er
 		// inserting empty key/values into the object and for those we do not
 		// want to allocate anything
 		if key != "" {
-			reserve_error := reserve(&obj, len(obj) + 1)
+			reserve_error := reserve(&obj, len(obj) + 1, loc)
 			if reserve_error == mem.Allocator_Error.Out_Of_Memory {
 				return nil, .Out_Of_Memory
 			}
@@ -281,16 +282,16 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> (obj: Object, er
 	return obj, .None
 }
 
-parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
+parse_object :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	expect_token(p, .Open_Brace) or_return
-	obj := parse_object_body(p, .Close_Brace) or_return
+	obj := parse_object_body(p, .Close_Brace, loc) or_return
 	expect_token(p, .Close_Brace) or_return
 	return obj, .None
 }
 
 
 // IMPORTANT NOTE(bill): unquote_string assumes a mostly valid string
-unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator) -> (value: string, err: Error) {
+unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator, loc := #caller_location) -> (value: string, err: Error) {
 	get_u2_rune :: proc(s: string) -> rune {
 		if len(s) < 4 || s[0] != '\\' || s[1] != 'x' {
 			return -1
@@ -359,7 +360,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		i += w
 	}
 	if i == len(s) {
-		return clone_string(s, allocator)
+		return clone_string(s, allocator, loc)
 	}
 
 	b := bytes_make(len(s) + 2*utf8.UTF_MAX, 1, allocator) or_return

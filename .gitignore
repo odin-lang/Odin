@@ -17,15 +17,12 @@
 [Rr]eleases/
 x64/
 x86/
+!/core/simd/x86
 bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
 ![Cc]ore/[Ll]og/
-tests/documentation/verify/
-tests/documentation/all.odin-doc
-tests/internal/test_map
-tests/internal/test_rtti
 # Visual Studio 2015 cache/options directory
 .vs/
 # Visual Studio Code options directory
@@ -269,11 +266,14 @@ bin/
 *.exe
 *.obj
 *.pdb
+*.res
+desktop.ini
+Thumbs.db
 
 # - Linux/MacOS
 odin
 !odin/
-odin.dSYM
+**/*.dSYM
 *.bin
 demo.bin
 libLLVM*.so*
@@ -290,3 +290,8 @@ shared/
 examples/bug/
 build.sh
 !core/debug/
+
+# RAD debugger project file
+*.raddbg
+
+misc/featuregen/featuregen

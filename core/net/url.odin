@@ -8,12 +8,14 @@ package net
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
 */
 
 import "core:strings"
@@ -21,13 +23,19 @@ import "core:strconv"
 import "core:unicode/utf8"
 import "core:encoding/hex"
 
-split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string) {
+split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string, fragment: string) {
 	s := url
 
-	i := strings.last_index(s, "://")
+	i := strings.index(s, "://")
 	if i >= 0 {
 		scheme = s[:i]
 		s = s[i+3:]
+	}
+
+	i = strings.index(s, "#")
+	if i != -1 {
+		fragment = s[i+1:]
+		s = s[:i]
 	}
 
 	i = strings.index(s, "?")
@@ -62,7 +70,7 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 	return
 }
 
-join_url :: proc(scheme, host, path: string, queries: map[string]string, allocator := context.allocator) -> string {
+join_url :: proc(scheme, host, path: string, queries: map[string]string, fragment: string, allocator := context.allocator) -> string {
 	b := strings.builder_make(allocator)
 	strings.builder_grow(&b, len(scheme) + 3 + len(host) + 1 + len(path))
 
@@ -95,6 +103,13 @@ join_url :: proc(scheme, host, path: string, queries: map[string]string, allocat
 		i += 1
 	}
 
+	if fragment != "" {
+		if fragment[0] != '#' {
+			strings.write_string(&b, "#")
+		}
+		strings.write_string(&b, strings.trim_space(fragment))
+	}
+
 	return strings.to_string(b)
 }
 
@@ -123,7 +138,9 @@ percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 percent_decode :: proc(encoded_string: string, allocator := context.allocator) -> (decoded_string: string, ok: bool) {
 	b := strings.builder_make(allocator)
 	strings.builder_grow(&b, len(encoded_string))
-	defer if !ok do strings.builder_destroy(&b)
+	defer if !ok {
+		strings.builder_destroy(&b)
+	}
 
 	s := encoded_string
 
@@ -137,7 +154,9 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		strings.write_string(&b, s[:i])
 		s = s[i:]
 
-		if len(s) == 0 do return // percent without anything after it
+		if len(s) == 0 {
+			return // percent without anything after it
+		}
 		s = s[1:]
 
 		if s[0] == '%' {
@@ -177,7 +196,9 @@ base64url_encode :: proc(data: []byte, allocator := context.allocator) -> string
 	}
 	i := len(out)-1;
 	for ; i >= 0; i -= 1 {
-		if out[i] != '=' do break;
+		if out[i] != '=' {
+			break;
+		}
 	}
 	return string(out[:i+1]);
 }

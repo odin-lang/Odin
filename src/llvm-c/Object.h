@@ -19,9 +19,9 @@
 #ifndef LLVM_C_OBJECT_H
 #define LLVM_C_OBJECT_H
 
-#include "llvm-c/ExternC.h"
-#include "llvm-c/Types.h"
-#include "llvm-c/Config//llvm-config.h"
+#include "ExternC.h"
+#include "Types.h"
+#include "Config/llvm-config.h"
 
 LLVM_C_EXTERN_C_BEGIN
 

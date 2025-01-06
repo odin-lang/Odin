@@ -4,7 +4,7 @@
 	Ported from https://github.com/KdotJPG/OpenSimplex2.
 	Copyright 2022 Yuki2 (https://github.com/NoahR02)
 */
-//+private
+#+private
 package math_noise
 
 /*
@@ -637,22 +637,20 @@ _internal_noise_4d_unskewed_base :: proc(seed: i64, coord: Vec4) -> (value: f32)
 		
 		// Next point is the closest vertex on the 4-simplex whose base vertex is the aforementioned vertex.
 		score := 1.0 + ssi * (-1.0 / UNSKEW_4D) // Seems slightly faster than 1.0-xsi-ysi-zsi-wsi
-		if si.x >= si.x && si.x >= si.z && si.x >= si.w && si.x >= score {
+		switch {
+		case si.x >= si.x && si.x >= si.z && si.x >= si.w && si.x >= score:
 			svp.x += PRIME_X
 			si.x -= 1
 			ssi -= UNSKEW_4D
-		}
-		else if si.y > si.x && si.y >= si.z && si.y >= si.w && si.y >= score {
+		case si.y > si.x && si.y >= si.z && si.y >= si.w && si.y >= score:
 			svp.y += PRIME_Y
 			si.y -= 1
 			ssi -= UNSKEW_4D
-		}
-		else if si.z > si.x && si.z > si.y && si.z >= si.w && si.z >= score {
+		case si.z > si.x && si.z > si.y && si.z >= si.w && si.z >= score:
 			svp.z += PRIME_Z
 			si.z -= 1
 			ssi -= UNSKEW_4D
-		}
-		else if si.w > si.x && si.w > si.y && si.w > si.z && si.w >= score {
+		case si.w > si.x && si.w > si.y && si.w > si.z && si.w >= score:
 			svp.w += PRIME_W
 			si.w -= 1
 			ssi -= UNSKEW_4D
@@ -690,7 +688,7 @@ _internal_noise_4d_unskewed_base :: proc(seed: i64, coord: Vec4) -> (value: f32)
 /*
 	Utility functions
 */
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 grad_2d :: proc(seed: i64, svp: [2]i64, delta: [2]f32) -> (value: f32) {
 	hash := seed ~ svp.x ~ svp.y
 	hash *= HASH_MULTIPLIER
@@ -700,7 +698,7 @@ grad_2d :: proc(seed: i64, svp: [2]i64, delta: [2]f32) -> (value: f32) {
 	return GRADIENTS_2D[gi] * delta.x + GRADIENTS_2D[gi | 1] * delta.y
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 grad_3d :: proc(seed: i64, rvp: [3]i64, delta: [3]f32) -> (value: f32) {
 	hash := (seed ~ rvp.x) ~ (rvp.y ~ rvp.z)
 	hash *= HASH_MULTIPLIER
@@ -710,7 +708,7 @@ grad_3d :: proc(seed: i64, rvp: [3]i64, delta: [3]f32) -> (value: f32) {
 	return GRADIENTS_3D[gi] * delta.x + GRADIENTS_3D[gi | 1] * delta.y + GRADIENTS_3D[gi | 2] * delta.z
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 grad_4d :: proc(seed: i64, svp: [4]i64, delta: [4]f32) -> (value: f32) {
 	hash := seed ~ (svp.x ~ svp.y) ~ (svp.z ~ svp.w)
 	hash *= HASH_MULTIPLIER
@@ -722,13 +720,13 @@ grad_4d :: proc(seed: i64, svp: [4]i64, delta: [4]f32) -> (value: f32) {
 
 grad :: proc {grad_2d, grad_3d, grad_4d}
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 fast_floor :: proc(x: f64) -> (floored: i64) {
 	xi := i64(x)
 	return x < f64(xi) ? xi - 1 : xi
 }
 
-@(optimization_mode="speed")
+@(optimization_mode="favor_size")
 fast_round :: proc(x: f64) -> (rounded: i64) {
 	return x < 0 ? i64(x - 0.5) : i64(x + 0.5)
 }

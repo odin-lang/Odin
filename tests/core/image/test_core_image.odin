@@ -1,18 +1,20 @@
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2024 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
-	A test suite for PNG + QOI.
+	A test suite for PNG, TGA, NetPBM, QOI and BMP.
 */
+#+feature dynamic-literals
 package test_core_image
 
 import "core:testing"
 
 import "core:compress"
 import "core:image"
+import "core:image/bmp"
 import pbm "core:image/netpbm"
 import "core:image/png"
 import "core:image/qoi"
@@ -20,59 +22,24 @@ import "core:image/tga"
 
 import "core:bytes"
 import "core:hash"
-import "core:fmt"
 import "core:strings"
-
 import "core:mem"
-import "core:os"
 import "core:time"
 
-import "core:runtime"
+TEST_SUITE_PATH_PNG :: ODIN_ROOT + "tests/core/assets/PNG"
+TEST_SUITE_PATH_BMP :: ODIN_ROOT + "tests/core/assets/BMP"
 
-TEST_SUITE_PATH   :: "assets/PNG"
-
-TEST_count := 0
-TEST_fail  := 0
-
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
 I_Error :: image.Error
 
-main :: proc() {
-	t := testing.T{}
-	png_test(&t)
-
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
-
-PNG_Test :: struct {
+Test :: struct {
 	file:   string,
 	tests:  []struct {
 		options:        image.Options,
 		expected_error: image.Error,
-		dims:           PNG_Dims,
+		dims:           Dims,
 		hash:           u32,
 	},
 }
-
 Default              :: image.Options{}
 Alpha_Add            :: image.Options{.alpha_add_if_missing}
 Premul_Drop          :: image.Options{.alpha_premultiply, .alpha_drop_if_present}
@@ -82,19 +49,18 @@ Blend_BG_Keep        :: image.Options{.blend_background, .alpha_add_if_missing}
 Return_Metadata      :: image.Options{.return_metadata}
 No_Channel_Expansion :: image.Options{.do_not_expand_channels, .return_metadata}
 
-PNG_Dims    :: struct {
+Dims :: struct {
 	width:     int,
 	height:    int,
 	channels:  int,
 	depth:     int,
 }
 
-Basic_PNG_Tests       := []PNG_Test{
+Basic_PNG_Tests := []Test{
 	/*
 		Basic format tests:
 			http://www.schaik.com/pngsuite/pngsuite_bas_png.html
 	*/
-
 	{
 		"basn0g01", // Black and white.
 		{
@@ -202,7 +168,7 @@ Basic_PNG_Tests       := []PNG_Test{
 	},
 }
 
-Interlaced_PNG_Tests  := []PNG_Test{
+Interlaced_PNG_Tests  := []Test{
 	/*
 		Interlaced format tests:
 			http://www.schaik.com/pngsuite/pngsuite_int_png.html
@@ -320,9 +286,9 @@ Interlaced_PNG_Tests  := []PNG_Test{
 	},
 }
 
-Odd_Sized_PNG_Tests   := []PNG_Test{
+Odd_Sized_PNG_Tests := []Test{
 	/*
-"        PngSuite", // Odd sizes / PNG-files:
+		"PngSuite", // Odd sizes / PNG-files:
 			http://www.schaik.com/pngsuite/pngsuite_siz_png.html
 
 		This tests curious sizes with and without interlacing.
@@ -546,7 +512,7 @@ Odd_Sized_PNG_Tests   := []PNG_Test{
 	},
 }
 
-PNG_bKGD_Tests        := []PNG_Test{
+PNG_bKGD_Tests := []Test{
 	/*
 "        PngSuite", // Background colors / PNG-files:
 			http://www.schaik.com/pngsuite/pngsuite_bck_png.html
@@ -633,7 +599,7 @@ PNG_bKGD_Tests        := []PNG_Test{
 	},
 }
 
-PNG_tRNS_Tests        := []PNG_Test{
+PNG_tRNS_Tests := []Test{
 	/*
 		PngSuite - Transparency:
 			http://www.schaik.com/pngsuite/pngsuite_trn_png.html
@@ -795,7 +761,7 @@ PNG_tRNS_Tests        := []PNG_Test{
 	},
 }
 
-PNG_Filter_Tests      := []PNG_Test{
+PNG_Filter_Tests := []Test{
 	/*
 		PngSuite - Image filtering:
 
@@ -874,7 +840,7 @@ PNG_Filter_Tests      := []PNG_Test{
 	},
 }
 
-PNG_Varied_IDAT_Tests := []PNG_Test{
+PNG_Varied_IDAT_Tests := []Test{
 	/*
 		PngSuite - Chunk ordering:
 
@@ -933,7 +899,7 @@ PNG_Varied_IDAT_Tests := []PNG_Test{
 	},
 }
 
-PNG_ZLIB_Levels_Tests := []PNG_Test{
+PNG_ZLIB_Levels_Tests := []Test{
 	/*
 		PngSuite - Zlib compression:
 
@@ -974,7 +940,7 @@ PNG_ZLIB_Levels_Tests := []PNG_Test{
 	},
 }
 
-PNG_sPAL_Tests        := []PNG_Test{
+PNG_sPAL_Tests := []Test{
 	/*
 		PngSuite - Additional palettes:
 
@@ -1021,7 +987,7 @@ PNG_sPAL_Tests        := []PNG_Test{
 	},
 }
 
-PNG_Ancillary_Tests   := []PNG_Test{
+PNG_Ancillary_Tests := []Test{
 	/*
 		PngSuite" - Ancillary chunks:
 
@@ -1189,7 +1155,7 @@ PNG_Ancillary_Tests   := []PNG_Test{
 }
 
 
-Corrupt_PNG_Tests   := []PNG_Test{
+Corrupt_PNG_Tests := []Test{
 	/*
 		PngSuite - Corrupted files / PNG-files:
 
@@ -1285,7 +1251,7 @@ Corrupt_PNG_Tests   := []PNG_Test{
 
 }
 
-No_Postprocesing_Tests := []PNG_Test{
+No_Postprocesing_Tests := []Test{
 	/*
 		These are some custom tests where we skip expanding to RGB(A).
 	*/
@@ -1308,8 +1274,6 @@ No_Postprocesing_Tests := []PNG_Test{
 		},
 	},
 }
-
-
 
 Text_Title      :: "PngSuite"
 Text_Software   :: "Created on a NeXTstation color using \"pnmtopng\"."
@@ -1430,82 +1394,92 @@ Expected_Text := map[string]map[string]png.Text {
 }
 
 @test
-png_test :: proc(t: ^testing.T) {
-
-	total_tests    := 0
-	total_expected := 235
-
-	PNG_Suites := [][]PNG_Test{
-		Basic_PNG_Tests,
-		Interlaced_PNG_Tests,
-		Odd_Sized_PNG_Tests,
-		PNG_bKGD_Tests,
-		PNG_tRNS_Tests,
-		PNG_Filter_Tests,
-		PNG_Varied_IDAT_Tests,
-		PNG_ZLIB_Levels_Tests,
-		PNG_sPAL_Tests,
-		PNG_Ancillary_Tests,
-		Corrupt_PNG_Tests,
-
-		No_Postprocesing_Tests,
-
-	}
-
-	for suite in PNG_Suites {
-		total_tests += run_png_suite(t, suite)
-	}
-
-	error  := fmt.tprintf("Expected %v PNG tests, %v ran.", total_expected, total_tests)
-	expect(t, total_tests == total_expected, error)
+png_test_basic :: proc(t: ^testing.T) {
+	run_png_suite(t, Basic_PNG_Tests)
 }
 
-run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
+@test
+png_test_interlaced :: proc(t: ^testing.T) {
+	run_png_suite(t, Interlaced_PNG_Tests)
+}
 
-	context = runtime.default_context()
+@test
+png_test_odd_sized :: proc(t: ^testing.T) {
+	run_png_suite(t, Odd_Sized_PNG_Tests)
+}
 
+@test
+png_test_bKGD :: proc(t: ^testing.T) {
+	run_png_suite(t, PNG_bKGD_Tests)
+}
+
+@test
+png_test_tRNS :: proc(t: ^testing.T) {
+	run_png_suite(t, PNG_tRNS_Tests)
+}
+
+@test
+png_test_sPAL :: proc(t: ^testing.T) {
+	run_png_suite(t, PNG_sPAL_Tests)
+}
+
+@test
+png_test_filter :: proc(t: ^testing.T) {
+	run_png_suite(t, PNG_Filter_Tests)
+}
+
+@test
+png_test_varied_idat :: proc(t: ^testing.T) {
+	run_png_suite(t, PNG_Varied_IDAT_Tests)
+}
+
+@test
+png_test_zlib_levels :: proc(t: ^testing.T) {
+	run_png_suite(t, PNG_ZLIB_Levels_Tests)
+}
+
+@test
+png_test_ancillary :: proc(t: ^testing.T) {
+	run_png_suite(t, PNG_Ancillary_Tests)
+}
+
+@test
+png_test_corrupt :: proc(t: ^testing.T) {
+	run_png_suite(t, Corrupt_PNG_Tests)
+}
+
+@test
+png_test_no_postproc :: proc(t: ^testing.T) {
+	run_png_suite(t, No_Postprocesing_Tests)
+}
+
+run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 	for file in suite {
-		test_file := strings.concatenate({TEST_SUITE_PATH, "/", file.file, ".png"}, context.temp_allocator)
+		test_file := strings.concatenate({TEST_SUITE_PATH_PNG, "/", file.file, ".png"}, context.allocator)
+		defer delete(test_file)
 
 		img: ^png.Image
 		err: png.Error
 
 		count := 0
 		for test in file.tests {
-			count        += 1
-			subtotal     += 1
-			passed       := false
-
-			track: mem.Tracking_Allocator
-			mem.tracking_allocator_init(&track, context.allocator)
-			context.allocator = mem.tracking_allocator(&track)
+			count += 1
 
 			img, err = png.load(test_file, test.options)
 
-			error  := fmt.tprintf("%v failed with %v.", test_file, err)
-
-			passed = (test.expected_error == nil && err == nil) || (test.expected_error == err)
-
-			expect(t, passed, error)
+			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
+			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
 
 			if err == nil { // No point in running the other tests if it didn't load.
 				pixels := bytes.buffer_to_bytes(&img.pixels)
 
-				// This struct compare fails at -opt:2 if PNG_Dims is not #packed.
-
-				dims   := PNG_Dims{img.width, img.height, img.channels, img.depth}
-				error  = fmt.tprintf("%v has %v, expected: %v.", file.file, dims, test.dims)
-
+				dims      := Dims{img.width, img.height, img.channels, img.depth}
 				dims_pass := test.dims == dims
-
-				expect(t, dims_pass, error)
-
+				testing.expectf(t, dims_pass, "%v has %v, expected: %v", file.file, dims, test.dims)
 				passed &= dims_pass
 
-				png_hash   := hash.crc32(pixels)
-				error  = fmt.tprintf("%v test %v hash is %08x, expected %08x with %v.", file.file, count, png_hash, test.hash, test.options)
-				expect(t, test.hash == png_hash, error)
-
+				png_hash := hash.crc32(pixels)
+				testing.expectf(t, test.hash == png_hash, "%v test %v hash is %08x, expected %08x with %v", file.file, count, png_hash, test.hash, test.options)
 				passed &= test.hash == png_hash
 
 				if passed {
@@ -1515,19 +1489,16 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 						defer bytes.buffer_destroy(&qoi_buffer)
 						qoi_save_err := qoi.save(&qoi_buffer, img)
 
-						error  = fmt.tprintf("%v test %v QOI save failed with %v.", file.file, count, qoi_save_err)
-						expect(t, qoi_save_err == nil, error)
+						testing.expectf(t, qoi_save_err == nil, "%v test %v QOI save failed with %v", file.file, count, qoi_save_err)
 
 						if qoi_save_err == nil {
 							qoi_img, qoi_load_err := qoi.load(qoi_buffer.buf[:])
 							defer qoi.destroy(qoi_img)
 
-							error  = fmt.tprintf("%v test %v QOI load failed with %v.", file.file, count, qoi_load_err)
-							expect(t, qoi_load_err == nil, error)
+							testing.expectf(t, qoi_load_err == nil, "%v test %v QOI load failed with %v", file.file, count, qoi_load_err)
 
 							qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
-							error  = fmt.tprintf("%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, qoi_hash, png_hash, test.options)
-							expect(t, qoi_hash == png_hash, error)
+							testing.expectf(t, qoi_hash == png_hash, "%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v", file.file, count, qoi_hash, png_hash, test.options)
 						}
 					}
 
@@ -1537,19 +1508,15 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 						defer bytes.buffer_destroy(&tga_buffer)
 						tga_save_err := tga.save(&tga_buffer, img)
 
-						error  = fmt.tprintf("%v test %v TGA save failed with %v.", file.file, count, tga_save_err)
-						expect(t, tga_save_err == nil, error)
-
+						testing.expectf(t, tga_save_err == nil, "%v test %v TGA save failed with %v", file.file, count, tga_save_err)
 						if tga_save_err == nil {
 							tga_img, tga_load_err := tga.load(tga_buffer.buf[:])
 							defer tga.destroy(tga_img)
 
-							error  = fmt.tprintf("%v test %v TGA load failed with %v.", file.file, count, tga_load_err)
-							expect(t, tga_load_err == nil, error)
+							testing.expectf(t, tga_load_err == nil, "%v test %v TGA load failed with %v", file.file, count, tga_load_err)
 
 							tga_hash := hash.crc32(tga_img.pixels.buf[:])
-							error  = fmt.tprintf("%v test %v TGA load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, tga_hash, png_hash, test.options)
-							expect(t, tga_hash == png_hash, error)
+							testing.expectf(t, tga_hash == png_hash, "%v test %v TGA load hash is %08x, expected it match PNG's %08x with %v", file.file, count, tga_hash, png_hash, test.options)
 						}
 					}
 
@@ -1558,51 +1525,43 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 						pbm_buf, pbm_save_err := pbm.save_to_buffer(img)
 						defer delete(pbm_buf)
 
-						error = fmt.tprintf("%v test %v PBM save failed with %v.", file.file, count, pbm_save_err)
-						expect(t, pbm_save_err == nil, error)
+						testing.expectf(t, pbm_save_err == nil, "%v test %v PBM save failed with %v", file.file, count, pbm_save_err)
 
 						if pbm_save_err == nil {
 							// Try to load it again.
 							pbm_img, pbm_load_err := pbm.load(pbm_buf)
 							defer pbm.destroy(pbm_img)
 
-							error  = fmt.tprintf("%v test %v PBM load failed with %v.", file.file, count, pbm_load_err)
-							expect(t, pbm_load_err == nil, error)
+							testing.expectf(t, pbm_load_err == nil, "%v test %v PBM load failed with %v", file.file, count, pbm_load_err)
 
 							if pbm_load_err == nil {
 								pbm_hash := hash.crc32(pbm_img.pixels.buf[:])
-
-								error  = fmt.tprintf("%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, pbm_hash, png_hash, test.options)
-								expect(t, pbm_hash == png_hash, error)
+								testing.expectf(t, pbm_hash == png_hash, "%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v", file.file, count, pbm_hash, png_hash, test.options)
 							}
 						}
 					}
 
 					{
 						// Roundtrip through PBM to test the PBM encoders and decoders - prefer ASCII
-						pbm_info, pbm_format_selected := pbm.autoselect_pbm_format_from_image(img, false)
+						pbm_info, _ := pbm.autoselect_pbm_format_from_image(img, false)
 
 						// We already tested the binary formats above.
 						if pbm_info.header.format in pbm.ASCII {
 							pbm_buf, pbm_save_err := pbm.save_to_buffer(img, pbm_info)
 							defer delete(pbm_buf)
 
-							error = fmt.tprintf("%v test %v PBM save failed with %v.", file.file, count, pbm_save_err)
-							expect(t, pbm_save_err == nil, error)
+							testing.expectf(t, pbm_save_err == nil, "%v test %v PBM save failed with %v", file.file, count, pbm_save_err)
 
 							if pbm_save_err == nil {
 								// Try to load it again.
 								pbm_img, pbm_load_err := pbm.load(pbm_buf)
 								defer pbm.destroy(pbm_img)
 
-								error  = fmt.tprintf("%v test %v PBM load failed with %v.", file.file, count, pbm_load_err)
-								expect(t, pbm_load_err == nil, error)
+								testing.expectf(t, pbm_load_err == nil, "%v test %v PBM load failed with %v", file.file, count, pbm_load_err)
 
 								if pbm_load_err == nil {
 									pbm_hash := hash.crc32(pbm_img.pixels.buf[:])
-
-									error  = fmt.tprintf("%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, pbm_hash, png_hash, test.options)
-									expect(t, pbm_hash == png_hash, error)
+									testing.expectf(t, pbm_hash == png_hash, "%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v", file.file, count, pbm_hash, png_hash, test.options)
 								}
 							}
 						}
@@ -1655,21 +1614,18 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 							float_pbm_buf, float_pbm_save_err := pbm.save_to_buffer(float_img, pbm_info)
 							defer delete(float_pbm_buf)
 
-							error = fmt.tprintf("%v test %v save as PFM failed with %v", file.file, count, float_pbm_save_err)
-							expect(t, float_pbm_save_err == nil, error)
+							testing.expectf(t, float_pbm_save_err == nil, "%v test %v save as PFM failed with %v", file.file, count, float_pbm_save_err)
 
 							if float_pbm_save_err == nil {
 								// Load float image and compare.
 								float_pbm_img, float_pbm_load_err := pbm.load(float_pbm_buf)
 								defer pbm.destroy(float_pbm_img)
 
-								error = fmt.tprintf("%v test %v PFM load failed with %v", file.file, count, float_pbm_load_err)
-								expect(t, float_pbm_load_err == nil, error)
+								testing.expectf(t, float_pbm_load_err == nil, "%v test %v PFM load failed with %v", file.file, count, float_pbm_load_err)
 
 								load_float := mem.slice_data_cast([]f32, float_pbm_img.pixels.buf[:])
 
-								error = fmt.tprintf("%v test %v PFM load returned %v floats, expected %v", file.file, count, len(load_float), len(orig_float))
-								expect(t, len(load_float) == len(orig_float), error)
+								testing.expectf(t, len(load_float) == len(orig_float), "%v test %v PFM load returned %v floats, expected %v", file.file, count, len(load_float), len(orig_float))
 
 								// Compare floats
 								equal := true
@@ -1679,15 +1635,13 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 										break
 									}
 								}
-								error = fmt.tprintf("%v test %v PFM loaded floats to match", file.file, count)
-								expect(t, equal, error)
+								testing.expectf(t, equal, "%v test %v PFM loaded floats to match", file.file, count)
 							}
 						}
 					}
 				}
 
 				if .return_metadata in test.options {
-
 					if v, ok := img.metadata.(^image.PNG_Info); ok {
 						for c in v.chunks {
 							#partial switch(c.header.type) {
@@ -1696,8 +1650,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 								case "pp0n2c16", "pp0n6a08":
 									gamma, gamma_ok := png.gamma(c)
 									expected_gamma := f32(1.0)
-									error  = fmt.tprintf("%v test %v gAMA is %v, expected %v.", file.file, count, gamma, expected_gamma)
-									expect(t, gamma == expected_gamma && gamma_ok, error)
+									testing.expectf(t, gamma == expected_gamma && gamma_ok, "%v test %v gAMA is %v, expected %v", file.file, count, gamma, expected_gamma)
 								}
 							case .PLTE:
 								switch(file.file) {
@@ -1705,8 +1658,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									plte, plte_ok := png.plte(c)
 
 									expected_plte_len := u16(216)
-									error  = fmt.tprintf("%v test %v PLTE length is %v, expected %v.", file.file, count, plte.used, expected_plte_len)
-									expect(t, expected_plte_len == plte.used && plte_ok, error)
+									testing.expectf(t, expected_plte_len == plte.used && plte_ok, "%v test %v PLTE length is %v, expected %v", file.file, count, plte.used, expected_plte_len)
 								}
 							case .sPLT:
 								switch(file.file) {
@@ -1714,12 +1666,10 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									splt, splt_ok := png.splt(c)
 
 									expected_splt_len  := u16(216)
-									error  = fmt.tprintf("%v test %v sPLT length is %v, expected %v.", file.file, count, splt.used, expected_splt_len)
-									expect(t, expected_splt_len == splt.used && splt_ok, error)
+									testing.expectf(t, expected_splt_len == splt.used && splt_ok, "%v test %v sPLT length is %v, expected %v", file.file, count, splt.used, expected_splt_len)
 
 									expected_splt_name := "six-cube"
-									error  = fmt.tprintf("%v test %v sPLT name is %v, expected %v.", file.file, count, splt.name, expected_splt_name)
-									expect(t, expected_splt_name == splt.name && splt_ok, error)
+									testing.expectf(t, expected_splt_name == splt.name && splt_ok, "%v test %v sPLT name is %v, expected %v", file.file, count, splt.name, expected_splt_name)
 
 									png.splt_destroy(splt)
 								}
@@ -1733,48 +1683,37 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 										g = png.CIE_1931{x = 0.3000, y = 0.6000},
 										b = png.CIE_1931{x = 0.1500, y = 0.0600},
 									}
-									error  = fmt.tprintf("%v test %v cHRM is %v, expected %v.", file.file, count, chrm, expected_chrm)
-									expect(t, expected_chrm == chrm && chrm_ok, error)
+									testing.expectf(t, expected_chrm == chrm && chrm_ok, "%v test %v cHRM is %v, expected %v", file.file, count, chrm, expected_chrm)
 								}
 							case .pHYs:
 								phys, phys_ok := png.phys(c)
-								phys_err := "%v test %v cHRM is %v, expected %v."
 								switch (file.file) {
 								case "cdfn2c08":
 									expected_phys := png.pHYs{ppu_x =    1, ppu_y =    4, unit = .Unknown}
-									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys && phys_ok, error)
+									testing.expectf(t, expected_phys == phys && phys_ok, "%v test %v cHRM is %v, expected %v", file.file, count, phys, expected_phys)
 								case "cdhn2c08":
 									expected_phys := png.pHYs{ppu_x =    4, ppu_y =    1, unit = .Unknown}
-									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys && phys_ok, error)
+									testing.expectf(t, expected_phys == phys && phys_ok, "%v test %v cHRM is %v, expected %v", file.file, count, phys, expected_phys)
 								case "cdsn2c08":
 									expected_phys := png.pHYs{ppu_x =    1, ppu_y =    1, unit = .Unknown}
-									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys && phys_ok, error)
+									testing.expectf(t, expected_phys == phys && phys_ok, "%v test %v cHRM is %v, expected %v", file.file, count, phys, expected_phys)
 								case "cdun2c08":
 									expected_phys := png.pHYs{ppu_x = 1000, ppu_y = 1000, unit = .Meter}
-									error  = fmt.tprintf(phys_err, file.file, count, phys, expected_phys)
-									expect(t, expected_phys == phys && phys_ok, error)
+									testing.expectf(t, expected_phys == phys && phys_ok, "%v test %v cHRM is %v, expected %v", file.file, count, phys, expected_phys)
 								}
 							case .hIST:
 								hist, hist_ok := png.hist(c)
-								hist_err := "%v test %v hIST has %v entries, expected %v."
 								switch (file.file) {
 								case "ch1n3p04":
-									error  = fmt.tprintf(hist_err, file.file, count, hist.used, 15)
-									expect(t, hist.used == 15 && hist_ok, error)
+									testing.expectf(t, hist.used == 15 && hist_ok, "%v test %v hIST has %v entries, expected %v", file.file, count, hist.used, 15)
 								case "ch2n3p08":
-									error  = fmt.tprintf(hist_err, file.file, count, hist.used, 256)
-									expect(t, hist.used == 256 && hist_ok, error)
+									testing.expectf(t, hist.used == 256 && hist_ok, "%v test %v hIST has %v entries, expected %v", file.file, count, hist.used, 256)
 								}
 							case .tIME:
 								png_time, png_time_ok := png.time(c)
-								time_err := "%v test %v tIME was %v, expected %v."
 								expected_time: png.tIME
 
 								core_time, core_time_ok := png.core_time(c)
-								time_core_err := "%v test %v tIME->core:time is %v, expected %v."
 								expected_core: time.Time
 
 								switch(file.file) {
@@ -1789,14 +1728,10 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									expected_core = time.Time{_nsec = 946684799000000000}
 
 								}
-								error  = fmt.tprintf(time_err, file.file, count, png_time, expected_time)
-								expect(t, png_time  == expected_time && png_time_ok,  error)
-
-								error  = fmt.tprintf(time_core_err, file.file, count, core_time, expected_core)
-								expect(t, core_time == expected_core && core_time_ok, error)
+								testing.expectf(t, png_time  == expected_time && png_time_ok,  "%v test %v tIME was %v, expected %v", file.file, count, png_time, expected_time)
+								testing.expectf(t, core_time == expected_core && core_time_ok, "%v test %v tIME->core:time is %v, expected %v", file.file, count, core_time, expected_core)
 							case .sBIT:
 								sbit, sbit_ok  := png.sbit(c)
-								sbit_err       := "%v test %v sBIT was %v, expected %v."
 								expected_sbit: [4]u8
 
 								switch (file.file) {
@@ -1815,8 +1750,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 								case "cdfn2c08", "cdhn2c08", "cdsn2c08", "cdun2c08", "ch1n3p04", "basn3p04":
 									expected_sbit = [4]u8{ 4,  4,  4,  0}
 								}
-								error  = fmt.tprintf(sbit_err, file.file, count, sbit, expected_sbit)
-								expect(t, sbit == expected_sbit && sbit_ok, error)
+								testing.expectf(t, sbit == expected_sbit && sbit_ok, "%v test %v sBIT was %v, expected %v", file.file, count, sbit, expected_sbit)
 							case .tEXt, .zTXt:
 								text, text_ok := png.text(c)
 								defer png.text_destroy(text)
@@ -1828,8 +1762,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									if file.file in Expected_Text {
 										if text.keyword in Expected_Text[file.file] {
 											test_text := Expected_Text[file.file][text.keyword].text
-											error  = fmt.tprintf("%v test %v text keyword {{%v}}:'%v', expected '%v'.", file.file, count, text.keyword, text.text, test_text)
-											expect(t, text.text == test_text && text_ok, error)
+											testing.expectf(t, text.text == test_text && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text.text, test_text)
 										}
 									}
 								}
@@ -1842,74 +1775,623 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 									if file.file in Expected_Text {
 										if text.keyword in Expected_Text[file.file] {
 											test := Expected_Text[file.file][text.keyword]
-											error  = fmt.tprintf("%v test %v text keyword {{%v}}:'%v', expected '%v'.", file.file, count, text.keyword, text, test)
-											expect(t, text.language == test.language && text_ok, error)
-											expect(t, text.keyword_localized == test.keyword_localized && text_ok, error)
+											testing.expectf(t, text.language == test.language && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.keyword_localized == test.keyword_localized && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
 										}
 									}
 								case "ctfn0g04": // international UTF-8, finnish
 									if file.file in Expected_Text {
 										if text.keyword in Expected_Text[file.file] {
 											test := Expected_Text[file.file][text.keyword]
-											error  = fmt.tprintf("%v test %v text keyword {{%v}}:'%v', expected '%v'.", file.file, count, text.keyword, text, test)
-											expect(t, text.text == test.text && text_ok, error)
-											expect(t, text.language == test.language && text_ok, error)
-											expect(t, text.keyword_localized == test.keyword_localized && text_ok, error)
+											testing.expectf(t, text.text == test.text && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.language == test.language && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.keyword_localized == test.keyword_localized && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
 										}
 									}
 								case "ctgn0g04": // international UTF-8, greek
 									if file.file in Expected_Text {
 										if text.keyword in Expected_Text[file.file] {
 											test := Expected_Text[file.file][text.keyword]
-											error  = fmt.tprintf("%v test %v text keyword {{%v}}:'%v', expected '%v'.", file.file, count, text.keyword, text, test)
-											expect(t, text.text == test.text && text_ok, error)
-											expect(t, text.language == test.language && text_ok, error)
-											expect(t, text.keyword_localized == test.keyword_localized && text_ok, error)
+											testing.expectf(t, text.text == test.text && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.language == test.language && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.keyword_localized == test.keyword_localized && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
 										}
 									}
 								case "cthn0g04": // international UTF-8, hindi
 									if file.file in Expected_Text {
 										if text.keyword in Expected_Text[file.file] {
 											test := Expected_Text[file.file][text.keyword]
-											error  = fmt.tprintf("%v test %v text keyword {{%v}}:'%v', expected '%v'.", file.file, count, text.keyword, text, test)
-											expect(t, text.text == test.text && text_ok, error)
-											expect(t, text.language == test.language && text_ok, error)
-											expect(t, text.keyword_localized == test.keyword_localized && text_ok, error)
+											testing.expectf(t, text.text == test.text && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.language == test.language && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.keyword_localized == test.keyword_localized && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
 										}
 									}
 								case "ctjn0g04": // international UTF-8, japanese
 									if file.file in Expected_Text {
 										if text.keyword in Expected_Text[file.file] {
 											test := Expected_Text[file.file][text.keyword]
-											error  = fmt.tprintf("%v test %v text keyword {{%v}}:'%v', expected '%v'.", file.file, count, text.keyword, text, test)
-											expect(t, text.text == test.text && text_ok, error)
-											expect(t, text.language == test.language && text_ok, error)
-											expect(t, text.keyword_localized == test.keyword_localized && text_ok, error)
+											testing.expectf(t, text.text == test.text && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.language == test.language && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
+											testing.expectf(t, text.keyword_localized == test.keyword_localized && text_ok, "%v test %v text keyword {{%v}}:'%v', expected '%v'", file.file, count, text.keyword, text, test)
 										}
 									}
 								}
 							case .eXIf:
 								if file.file == "exif2c08" { // chunk with jpeg exif data
 									exif, exif_ok := png.exif(c)
-									error      = fmt.tprintf("%v test %v eXIf byte order '%v', expected 'big_endian'.", file.file, count, exif.byte_order)
-									error_len := fmt.tprintf("%v test %v eXIf data length '%v', expected '%v'.", file.file, len(exif.data), 978)
-									expect(t, exif.byte_order == .big_endian && exif_ok, error)
-									expect(t, len(exif.data)  == 978         && exif_ok, error_len)
+									testing.expectf(t, exif.byte_order == .big_endian && exif_ok, "%v test %v eXIf byte order '%v', expected 'big_endian'.", file.file, count, exif.byte_order)
+									testing.expectf(t, len(exif.data)  == 978         && exif_ok, "%v test %v eXIf data length '%v', expected '%v'", file.file, len(exif.data), 978)
 								}
 							}
 						}
 					}
 				}
 			}
-
 			png.destroy(img)
+		}
+	}
+	return
+}
 
-			for _, v in track.allocation_map {
-				error = fmt.tprintf("%v test %v leaked %v bytes @ loc %v.", file.file, count, v.size, v.location)
-				expect(t, false, error)
+/*
+	Basic format tests:
+		https://entropymine.com/jason/bmpsuite/bmpsuite/html/bmpsuite.html - Version 2.8; 2023-11-28
+
+	The BMP Suite image generator itself is GPL, and isn't included, nor did it have its code referenced.
+	We do thank the author for the well-researched test suite, which we are free to include:
+
+		"Image files generated by this program are not covered by this license, and are
+		in the public domain (except for the embedded ICC profiles)."
+
+	The files with embedded ICC profiles aren't part of Odin's test assets. We don't support BMP metadata.
+	We don't support all "possibly correct" images, and thus only ship a subset of these from the BMP Suite.
+*/
+Basic_BMP_Tests := []Test{
+	{
+		"pal1", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"pal1wb", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"pal1bg", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_9e91_174a},
+		},
+	},
+	{
+		"pal4", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_288e_4371},
+		},
+	},
+	{
+		"pal4gs", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_452d_a01a},
+		},
+	},
+	{
+		"pal4rle", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_288e_4371},
+		},
+	},
+	{
+		"pal8", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8-0", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8gs", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_09c2_7834},
+		},
+	},
+	{
+		"pal8rle", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8w126", {
+			{Default,         nil, {126, 63, 3,  8}, 0x_bb66_4cda},
+		},
+	},
+	{
+		"pal8w125", {
+			{Default,         nil, {125, 62, 3,  8}, 0x_3ab8_f7c5},
+		},
+	},
+	{
+		"pal8w124", {
+			{Default,         nil, {124, 61, 3,  8}, 0x_b53e_e6c8},
+		},
+	},
+	{
+		"pal8topdown", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8nonsquare", {
+			{Default,         nil, {127, 32, 3,  8}, 0x_8409_c689},
+		},
+	},
+	{
+		"pal8v4", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8v5", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"rgb16", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_8b6f_81a2},
+		},
+	},
+	{
+		"rgb16bfdef", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_8b6f_81a2},
+		},
+	},
+	{
+		"rgb16-565", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_8c73_a2ff},
+		},
+	},
+	{
+		"rgb16-565pal", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_8c73_a2ff},
+		},
+	},
+	{
+		"rgb24", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_025b_ba0a},
+		},
+	},
+	{
+		"rgb24pal", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_025b_ba0a},
+		},
+	},
+	{
+		"rgb32", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_025b_ba0a},
+		},
+	},
+	{
+		"rgb32bf", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_025b_ba0a},
+		},
+	},
+	{
+		"rgb32bfdef", {
+			{Default,         nil, {127, 64, 3,  8}, 0x_025b_ba0a},
+		},
+	},
+}
+
+OS2_Tests := []Test{
+	{
+		"pal8os2", { // An OS/2-style bitmap. This format can be called OS/2 BMPv1, or Windows BMPv2.
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8os2-sz", { // An OS/2-style bitmap. This format can be called OS/2 BMPv1, or Windows BMPv2.
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8os2-hs", { // An OS/2-style bitmap. This format can be called OS/2 BMPv1, or Windows BMPv2.
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8os2sp", { // An OS/2-style bitmap. This format can be called OS/2 BMPv1, or Windows BMPv2.
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8os2v2", { // An OS/2-style bitmap. This format can be called OS/2 BMPv1, or Windows BMPv2.
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8os2v2-16", { // An OS/2-style bitmap. This format can be called OS/2 BMPv1, or Windows BMPv2.
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8os2v2-sz", { // An OS/2-style bitmap. This format can be called OS/2 BMPv1, or Windows BMPv2.
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8os2v2-40sz", { // An OS/2-style bitmap. This format can be called OS/2 BMPv1, or Windows BMPv2.
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+}
+
+// BMP files that aren't 100% to spec. Some we support, some we don't.
+Questionable_BMP_Tests := []Test{
+	{
+		"pal1p1", { // Spec says 1-bit image has 2 palette entries. This one has 1.
+			{Default,         nil, {127, 64, 3,  8}, 0x_2b54_2560},
+		},
+	},
+	{
+		"pal2", { // 2-bit. Allowed on Windows CE. Irfanview doesn't support it.
+			{Default,         nil, {127, 64, 3,  8}, 0x_0da2_7594},
+		},
+	},
+	{
+		"pal2color", { // 2-bit, with color palette.
+			{Default,         nil, {127, 64, 3,  8}, 0x_f0d8_c5d6},
+		},
+	},
+	{
+		"pal8offs", { // 300 palette entries (yes, only 256 can be used)
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal8oversizepal", { // Some padding between palette and image data
+			{Default,         nil, {127, 64, 3,  8}, 0x_3845_4155},
+		},
+	},
+	{
+		"pal4rletrns", { // Using palette tricks to skip pixels
+			{Default,         nil, {127, 64, 3,  8}, 0x_eed4_e744},
+		},
+	},
+	{
+		"pal4rlecut", { // Using palette tricks to skip pixels
+			{Default,         nil, {127, 64, 3,  8}, 0x_473fbc7d},
+		},
+	},
+	{
+		"pal8rletrns", { // Using palette tricks to skip pixels
+			{Default,         nil, {127, 64, 3,  8}, 0x_fe1f_e560},
+		},
+	},
+	{
+		"pal8rlecut", { // Using palette tricks to skip pixels
+			{Default,         nil, {127, 64, 3,  8}, 0x_bd04_3619},
+		},
+	},
+	{
+		"rgb16faketrns", { // Using palette tricks to skip pixels
+			{Default,         nil, {127, 64, 3,  8}, 0x_8b6f_81a2},
+		},
+	},
+	{
+		"rgb16-231", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_7393_a163},
+		},
+	},
+	{
+		"rgb16-3103", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_3b66_2189},
+		},
+	},
+	{
+		"rgba16-4444", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_b785_1f9f},
+		},
+	},
+	{
+		"rgba16-5551", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_8b6f_81a2},
+		},
+	},
+	{
+		"rgba16-1924", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_f038_2bed},
+		},
+	},
+	{
+		"rgb32-xbgr", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_025b_ba0a},
+		},
+	},
+	{
+		"rgb32fakealpha", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_025b_ba0a},
+		},
+	},
+	{
+		"rgb32-111110", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_b2c7_a8ff},
+		},
+	},
+	{
+		"rgb32-7187", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_b93a_4291},
+		},
+	},
+	{
+		"rgba32-1", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_7b67_823d},
+		},
+	},
+	{
+		"rgba32-2", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_7b67_823d},
+		},
+	},
+	{
+		"rgba32-1010102", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_aa42_0b16},
+		},
+	},
+	{
+		"rgba32-81284", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_28a2_4c16},
+		},
+	},
+	{
+		"rgba32-61754", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_4aae_26ed},
+		},
+	},
+	{
+		"rgba32abf", { // Custom bit fields
+			{Default,         nil, {127, 64, 3,  8}, 0x_7b67_823d},
+		},
+	},
+	{
+		"rgb32h52", { // Truncated header (RGB bit fields included)
+			{Default,         nil, {127, 64, 3,  8}, 0x_025b_ba0a},
+		},
+	},
+	{
+		"rgba32h56", { // Truncated header (RGBA bit fields included)
+			{Default,         nil, {127, 64, 3,  8}, 0x_7b67_823d},
+		},
+	},
+}
+
+// Unsupported BMP features, or malformed images.
+Unsupported_BMP_Tests := []Test{
+	{
+		"ba-bm", { // An OS/2 Bitmap array. We don't support this BA format.
+			{Default, .Unsupported_OS2_File,    {127, 32, 3,  8}, 0x_0000_0000},
+		},
+	},
+	{
+		"pal1huffmsb", { // An OS/2 file with Huffman 1D compression
+			{Default, .Unsupported_Compression, {127, 32, 3,  8}, 0x_0000_0000},
+		},
+	},
+	{
+		"rgb24rle24", { // An OS/2 file with RLE24 compression
+			{Default, .Unsupported_Compression, {127, 64, 3,  8}, 0x_0000_0000},
+		},
+	},
+	{
+		"rgba64", { // An OS/2 file with RLE24 compression
+			{Default, .Unsupported_BPP,         {127, 64, 3,  8}, 0x_0000_0000},
+		},
+	},
+}
+
+// Malformed / malicious files
+Known_Bad_BMP_Tests := []Test{
+	{
+		"badbitcount", {
+			{Default, .Unsupported_BPP, {127, 64, 3, 8}, 0x_3ce81fae},
+		},
+	},
+	{
+		"badbitssize", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"baddens1", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"baddens2", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"badfilesize", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"badheadersize", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"badpalettesize", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3845_4155},
+		},
+	},
+	{
+		"badplanes", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"badrle", {
+			{Default, nil, {127, 64, 3, 8}, 0x_1457_aae4},
+		},
+	},
+	{
+		"badrle4", {
+			{Default, nil, {127, 64, 3, 8}, 0x_6764_d2ac},
+		},
+	},
+	{
+		"badrle4bis", {
+			{Default, nil, {127, 64, 3, 8}, 0x_935d_bb37},
+		},
+	},
+	{
+		"badrle4ter", {
+			{Default, nil, {127, 64, 3, 8}, 0x_f2ba_5b08},
+		},
+	},
+	{
+		"badrlebis", {
+			{Default, nil, {127, 64, 3, 8}, 0x_07e2_d730},
+		},
+	},
+	{
+		"badrleter", {
+			{Default, nil, {127, 64, 3, 8}, 0x_a874_2742},
+		},
+	},
+	{
+		"badwidth", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3ce8_1fae},
+		},
+	},
+	{
+		"pal8badindex", {
+			{Default, nil, {127, 64, 3, 8}, 0x_0450_0d02},
+		},
+	},
+	{
+		"reallybig", {
+			{Default, .Image_Dimensions_Too_Large, {3000000, 2000000, 1, 24}, 0x_0000_0000},
+		},
+	},
+	{
+		"rgb16-880", {
+			{Default, nil, {127, 64, 3, 8}, 0x_f1c2_0c73},
+		},
+	},
+	{
+		"rletopdown", {
+			{Default, nil, {127, 64, 3, 8}, 0x_3845_4155},
+		},
+	},
+	{
+		"shortfile", {
+			{Default, .Short_Buffer, {127, 64, 1, 1}, 0x_0000_0000},
+		},
+	},
+}
+
+@test
+bmp_test_basic :: proc(t: ^testing.T) {
+	run_bmp_suite(t, Basic_BMP_Tests)
+}
+
+@test
+bmp_test_os2 :: proc(t: ^testing.T) {
+	run_bmp_suite(t, OS2_Tests)
+}
+
+@test
+bmp_test_questionable :: proc(t: ^testing.T) {
+	run_bmp_suite(t, Questionable_BMP_Tests)
+}
+
+@test
+bmp_test_unsupported :: proc(t: ^testing.T) {
+	run_bmp_suite(t, Unsupported_BMP_Tests)
+}
+
+@test
+bmp_test_known_bad :: proc(t: ^testing.T) {
+	run_bmp_suite(t, Known_Bad_BMP_Tests)
+}
+
+run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
+	for file in suite {
+		test_file := strings.concatenate({TEST_SUITE_PATH_BMP, "/", file.file, ".bmp"}, context.allocator)
+		defer delete(test_file)
+
+		for test in file.tests {
+			img, err := bmp.load(test_file, test.options)
+
+			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
+			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
+
+			if err == nil { // No point in running the other tests if it didn't load.
+				pixels := bytes.buffer_to_bytes(&img.pixels)
+
+				dims   := Dims{img.width, img.height, img.channels, img.depth}
+				testing.expectf(t, test.dims == dims, "%v has %v, expected: %v.", file.file, dims, test.dims)
+
+				img_hash := hash.crc32(pixels)
+				testing.expectf(t, test.hash == img_hash, "%v test #1's hash is %08x, expected %08x with %v.", file.file, img_hash, test.hash, test.options)
+
+				// Save to BMP file in memory
+				buf: bytes.Buffer
+				save_err := bmp.save(&buf, img)
+				testing.expectf(t, save_err == nil, "expected saving to BMP in memory not to raise error, got %v", save_err)
+
+				// Reload BMP from memory
+				reload_img, reload_err := bmp.load(buf.buf[:])
+				testing.expectf(t, reload_err == nil, "expected reloading BMP from memory not to raise error, got %v", reload_err)
+
+				testing.expect(t, img.width    == reload_img.width    && img.height == reload_img.height, "expected saved BMP to have the same dimensions")
+				testing.expect(t, img.channels == reload_img.channels && img.depth  == reload_img.depth,  "expected saved BMP to have the same dimensions")
+
+				reload_pixels := bytes.buffer_to_bytes(&reload_img.pixels)
+				reload_hash   := hash.crc32(reload_pixels)
+
+				testing.expectf(t, img_hash == reload_hash, "expected saved BMP to have the same pixel hash (%08x), got %08x", img_hash, reload_hash)
+
+				bytes.buffer_destroy(&buf)
+				bmp.destroy(reload_img)
 			}
+			bmp.destroy(img)
+		}
+	}
+	return
+}
+
+@test
+will_it_blend :: proc(t: ^testing.T) {
+	Pixel    :: image.RGB_Pixel
+	Pixel_16 :: image.RGB_Pixel_16
+
+	{
+		bg := Pixel{255, 255,   0}
+		fg := Pixel{  0,   0, 255}
+
+		for a in 0..=255 {
+			blended := Pixel{
+				image.blend(fg.r, u8(a), bg.r),
+				image.blend(fg.g, u8(a), bg.g),
+				image.blend(fg.b, u8(a), bg.b),
+			}
+			testing.expectf(t, blended.r == bg.r - u8(a),    "Expected blend(%v, %3d, %v) = %v, got %v", fg.r, a, bg.r, bg.r - u8(a), blended.r)
+			testing.expectf(t, blended.b == 255 - blended.r, "Expected blend(%v, %3d, %v) = %v, got %v", fg.b, a, bg.b, 255 - blended.r, blended.b)
 		}
 	}
 
-	return
+	{
+		bg := Pixel_16{65535, 65535,     0}
+		fg := Pixel_16{    0,     0, 65535}
+
+		for a in 0..=65535 {
+			blended := Pixel_16{
+				image.blend(fg.r, u16(a), bg.r),
+				image.blend(fg.g, u16(a), bg.g),
+				image.blend(fg.b, u16(a), bg.b),
+			}
+			testing.expectf(t, blended.r == bg.r - u16(a),     "Expected blend(%v, %3d, %v) = %v, got %v", fg.r, a, bg.r, bg.r - u16(a), blended.r)
+			testing.expectf(t, blended.b == 65535 - blended.r, "Expected blend(%v, %3d, %v) = %v, got %v", fg.b, a, bg.b, 65535 - blended.r, blended.b)
+		}
+	}
 }

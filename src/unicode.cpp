@@ -1,10 +1,15 @@
-#pragma warning(push)
-#pragma warning(disable: 4245)
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(push)
+	#pragma warning(disable: 4245)
+#endif
 
 extern "C" {
 #include "utf8proc/utf8proc.c"
 }
-#pragma warning(pop)
+
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(pop)
+#endif
 
 
 gb_internal bool rune_is_letter(Rune r) {
@@ -109,7 +114,7 @@ gb_internal isize utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out)
 		u8 b1, b2, b3;
 		Utf8AcceptRange accept;
 		if (x >= 0xf0) {
-			Rune mask = (cast(Rune)x << 31) >> 31;
+			Rune mask = -cast(Rune)(x & 1);
 			codepoint = (cast(Rune)s0 & (~mask)) | (GB_RUNE_INVALID & mask);
 			width = 1;
 			goto end;
@@ -161,4 +166,9 @@ gb_internal isize utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out)
 end:
 	if (codepoint_out) *codepoint_out = codepoint;
 	return width;
+}
+
+// NOTE(Feoramund): It's down here because I made UCG use the utf8_decode above to avoid duplicating code.
+extern "C" {
+#include "ucg/ucg.c"
 }

@@ -6,6 +6,7 @@ import "core:path/filepath"
 import "core:fmt"
 import "core:os"
 import "core:slice"
+import "core:strings"
 
 collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 	NO_POS :: tokenizer.Pos{}
@@ -32,11 +33,18 @@ collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 		if !ok {
 			return
 		}
+
 		src, ok = os.read_entire_file(fullpath)
 		if !ok {
 			delete(fullpath)
 			return
 		}
+		if strings.trim_space(string(src)) == "" {
+			delete(fullpath)
+			delete(src)
+			continue
+		}
+
 		file := ast.new(ast.File, NO_POS, NO_POS)
 		file.pkg = pkg
 		file.src = string(src)

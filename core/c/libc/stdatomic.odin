@@ -2,7 +2,7 @@ package libc
 
 // 7.17 Atomics
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 ATOMIC_BOOL_LOCK_FREE     :: true
 ATOMIC_CHAR_LOCK_FREE     :: true
@@ -235,7 +235,7 @@ atomic_compare_exchange_weak :: #force_inline proc(object, expected: ^$T, desire
 	return ok
 }
 
-atomic_compare_exchange_weak_explicit :: #force_inline proc(object, expected: ^$T, desited: T, success, failure: memory_order) -> bool {
+atomic_compare_exchange_weak_explicit :: #force_inline proc(object, expected: ^$T, desired: T, success, failure: memory_order) -> bool {
 	assert(failure != .release)
 	assert(failure != .acq_rel)
 

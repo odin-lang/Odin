@@ -33,22 +33,23 @@ gb_internal u64 win32_time_stamp__freq(void) {
 
 #include <mach/mach_time.h>
 
+gb_internal mach_timebase_info_data_t osx_init_timebase_info(void) {
+	mach_timebase_info_data_t data;
+	data.numer = 0;
+	data.denom = 0;
+	kern_return_t r = mach_timebase_info(&data);
+	GB_ASSERT(r == KERN_SUCCESS);
+
+	return data;
+}
+
 gb_internal u64 osx_time_stamp_time_now(void) {
 	return mach_absolute_time();
 }
 
 gb_internal u64 osx_time_stamp__freq(void) {
-	mach_timebase_info_data_t data;
-	data.numer = 0;
-	data.denom = 0;
-	mach_timebase_info(&data);
-#if defined(GB_CPU_ARM)
-	// NOTE(bill, 2021-02-25): M1 Chip seems to have a different freq count
-	// TODO(bill): Is this truly correct?
-	return (1000000llu * cast(u64)data.numer) / cast(u64)data.denom;
-#else
-	return (1000000000llu * cast(u64)data.numer) / cast(u64)data.denom;
-#endif
+	gb_local_persist mach_timebase_info_data_t data = osx_init_timebase_info();
+	return 1000000000ull * cast(u64)data.denom / cast(u64)data.numer;
 }
 
 #elif defined(GB_SYSTEM_UNIX)
@@ -145,9 +146,10 @@ gb_internal f64 time_stamp_as_us(TimeStamp const &ts, u64 freq) {
 	return 1000000.0*time_stamp_as_s(ts, freq);
 }
 
-#define MAIN_TIME_SECTION(str)          do { debugf("[Section] %s\n", str);                                      timings_start_section(&global_timings, str_lit(str));                } while (0)
-#define TIME_SECTION(str)               do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str));                } while (0)
-#define TIME_SECTION_WITH_LEN(str, len) do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
+#define MAIN_TIME_SECTION(str)               do { debugf("[Section] %s\n", str);                                      timings_start_section(&global_timings, str_lit(str));                } while (0)
+#define MAIN_TIME_SECTION_WITH_LEN(str, len) do { debugf("[Section] %s\n", str);                                      timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
+#define TIME_SECTION(str)                    do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str));                } while (0)
+#define TIME_SECTION_WITH_LEN(str, len)      do { debugf("[Section] %s\n", str); if (build_context.show_more_timings) timings_start_section(&global_timings, make_string((u8 *)str, len)); } while (0)
 
 
 enum TimingUnit {

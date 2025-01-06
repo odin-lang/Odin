@@ -1,10 +1,10 @@
-// +build windows
+#+build windows
 package sys_windows
 
 foreign import dwmapi "system:Dwmapi.lib"
 
 DWMWINDOWATTRIBUTE :: enum {
-	DWMWA_NCRENDERING_ENABLED,
+	DWMWA_NCRENDERING_ENABLED = 1,
 	DWMWA_NCRENDERING_POLICY,
 	DWMWA_TRANSITIONS_FORCEDISABLED,
 	DWMWA_ALLOW_NCPAINT,
@@ -28,7 +28,7 @@ DWMWINDOWATTRIBUTE :: enum {
 	DWMWA_TEXT_COLOR,
 	DWMWA_VISIBLE_FRAME_BORDER_THICKNESS,
 	DWMWA_SYSTEMBACKDROP_TYPE,
-  	DWMWA_LAST,
+	DWMWA_LAST,
 }
 
 DWMNCRENDERINGPOLICY :: enum {
@@ -38,10 +38,11 @@ DWMNCRENDERINGPOLICY :: enum {
 	DWMNCRP_LAST,
 }
 
-@(default_calling_convention="stdcall")
+@(default_calling_convention="system")
 foreign dwmapi {
 	DwmFlush :: proc() -> HRESULT ---
 	DwmIsCompositionEnabled :: proc(pfEnabled: ^BOOL) -> HRESULT ---
 	DwmExtendFrameIntoClientArea :: proc(hWnd: HWND, pMarInset: PMARGINS) -> HRESULT ---
+	DwmGetWindowAttribute :: proc(hWnd: HWND, dwAttribute: DWORD, pvAttribute: PVOID, cbAttribute: DWORD) -> HRESULT ---
 	DwmSetWindowAttribute :: proc(hWnd: HWND, dwAttribute: DWORD, pvAttribute: LPCVOID, cbAttribute: DWORD) -> HRESULT ---
 }

@@ -1,7 +1,7 @@
-//+build i386, amd64
+#+build i386, amd64
 package simd_x86
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:simd"
 
 // _MM_SHUFFLE(z, y, x, w) -> (z<<6 | y<<4 | x<<2 | w)
@@ -532,7 +532,7 @@ when ODIN_ARCH == .amd64 {
 }
 
 
-@(private, default_calling_convention="c")
+@(private, default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.sse.add.ss")
 	addss       :: proc(a, b: __m128) -> __m128 ---

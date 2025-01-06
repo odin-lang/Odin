@@ -123,7 +123,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		return -x
 	}
 	
-	@static lgamA := [?]f64{
+	@(static, rodata) lgamA := [?]f64{
 		0h3FB3C467E37DB0C8,
 		0h3FD4A34CC4A60FAD,
 		0h3FB13E001A5562A7,
@@ -137,7 +137,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		0h3EFA7074428CFA52,
 		0h3F07858E90A45837,
 	}
-	@static lgamR := [?]f64{
+	@(static, rodata) lgamR := [?]f64{
 		1.0,
 		0h3FF645A762C4AB74,
 		0h3FE71A1893D3DCDC,
@@ -146,7 +146,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		0h3F497DDACA41A95B,
 		0h3EDEBAF7A5B38140,
 	}
-	@static lgamS := [?]f64{
+	@(static, rodata) lgamS := [?]f64{
 		0hBFB3C467E37DB0C8,
 		0h3FCB848B36E20878,
 		0h3FD4D98F4F139F59,
@@ -155,7 +155,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		0h3F5E26B67368F239,
 		0h3F00BFECDD17E945,
 	}
-	@static lgamT := [?]f64{
+	@(static, rodata) lgamT := [?]f64{
 		0h3FDEF72BC8EE38A2,
 		0hBFC2E4278DC6C509,
 		0h3FB08B4294D5419B,
@@ -172,7 +172,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		0hBF347F24ECC38C38,
 		0h3F35FD3EE8C2D3F4,
 	}
-	@static lgamU := [?]f64{
+	@(static, rodata) lgamU := [?]f64{
 		0hBFB3C467E37DB0C8,
 		0h3FE4401E8B005DFF,
 		0h3FF7475CD119BD6F,
@@ -180,7 +180,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		0h3FCD4EAEF6010924,
 		0h3F8B678BBF2BAB09,
 	}
-	@static lgamV := [?]f64{
+	@(static, rodata) lgamV := [?]f64{
 		1.0,
 		0h4003A5D7C2BD619C,
 		0h40010725A42B18F5,
@@ -188,7 +188,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		0h3FBAAE55D6537C88,
 		0h3F6A5ABB57D0CF61,
 	}
-	@static lgamW := [?]f64{
+	@(static, rodata) lgamW := [?]f64{
 		0h3FDACFE390C97D69,
 		0h3FB555555555553B,
 		0hBF66C16C16B02E5C,

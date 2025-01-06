@@ -1,13 +1,9 @@
 #if defined(GB_SYSTEM_WINDOWS)
-#include "llvm-c/Core.h"
-#include "llvm-c/ExecutionEngine.h"
-#include "llvm-c/Target.h"
-#include "llvm-c/Analysis.h"
-#include "llvm-c/Object.h"
-#include "llvm-c/BitWriter.h"
-#include "llvm-c/DebugInfo.h"
-#include "llvm-c/Transforms/PassBuilder.h"
+#include <llvm-c/Config/llvm-config.h>
 #else
+#include <llvm/Config/llvm-config.h>
+#endif
+
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Target.h>
@@ -25,7 +21,6 @@
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
-#endif
 #endif
 
 #if LLVM_VERSION_MAJOR < 11
@@ -62,6 +57,10 @@
 #define LB_USE_NEW_PASS_SYSTEM 0
 #endif
 
+#if LLVM_VERSION_MAJOR >= 19
+#define LLVMDIBuilderInsertDeclareAtEnd(...) LLVMDIBuilderInsertDeclareRecordAtEnd(__VA_ARGS__)
+#endif
+
 gb_internal bool lb_use_new_pass_system(void) {
 	return LB_USE_NEW_PASS_SYSTEM;
 }
@@ -80,10 +79,11 @@ enum lbAddrKind {
 	lbAddr_Context,
 	lbAddr_SoaVariable,
 
-	lbAddr_RelativePointer,
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
+
+	lbAddr_BitField,
 };
 
 struct lbAddr {
@@ -107,9 +107,6 @@ struct lbAddr {
 			Ast *node;
 		} index_set;
 		struct {
-			bool deref;
-		} relative;
-		struct {
 			Type *type;
 			u8 count;      // 2, 3, or 4 components
 			u8 indices[4];
@@ -118,6 +115,11 @@ struct lbAddr {
 			Type *type;
 			Slice<i32> indices;
 		} swizzle_large;
+		struct {
+			Type *type;
+			i64 bit_offset;
+			i64 bit_size;
+		} bitfield;
 	};
 };
 
@@ -132,12 +134,13 @@ enum lbFunctionPassManagerKind {
 	lbFunctionPassManager_default,
 	lbFunctionPassManager_default_without_memcpy,
 	lbFunctionPassManager_none,
-	lbFunctionPassManager_minimal,
-	lbFunctionPassManager_size,
-	lbFunctionPassManager_speed,
-	lbFunctionPassManager_aggressive,
-
 	lbFunctionPassManager_COUNT
+};
+
+struct lbPadType {
+	i64 padding;
+	i64 padding_align;
+	LLVMTypeRef type;
 };
 
 struct lbModule {
@@ -150,6 +153,7 @@ struct lbModule {
 	CheckerInfo *info;
 	AstPackage *pkg; // possibly associated
 	AstFile *file;   // possibly associated
+	char const *module_name;
 
 	PtrMap<Type *, LLVMTypeRef> types;                             // mutex: types_mutex
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *, mutex: types_mutex
@@ -179,7 +183,8 @@ struct lbModule {
 	std::atomic<u32> nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
-	Array<Entity *> global_procedures_and_types_to_create;
+	Array<Entity *> global_procedures_to_create;
+	Array<Entity *> global_types_to_create;
 
 	lbProcedure *curr_procedure;
 
@@ -191,8 +196,6 @@ struct lbModule {
 	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
-	Array<lbIncompleteDebugType> debug_incomplete_types;
-
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
 
@@ -202,6 +205,15 @@ struct lbModule {
 	PtrMap<Ast *, lbAddr> exact_value_compound_literal_addr_map; // Key: Ast_CompoundLit
 
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
+
+	BlockingMutex pad_types_mutex;
+	Array<lbPadType> pad_types;
+};
+
+struct lbEntityCorrection {
+	lbModule *  other_module;
+	Entity *    e;
+	char const *cname;
 };
 
 struct lbGenerator : LinkerData {
@@ -217,10 +229,13 @@ struct lbGenerator : LinkerData {
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
 
-	lbProcedure *startup_type_info;
+	isize used_module_count;
+
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
+
+	MPSCQueue<lbEntityCorrection> entities_to_correct_linkage;
 };
 
 
@@ -299,6 +314,11 @@ enum lbProcedureFlag : u32 {
 	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
+struct lbVariadicReuseSlices {
+	Type *slice_type;
+	lbAddr slice_addr;
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -339,6 +359,14 @@ struct lbProcedure {
 	bool             in_multi_assignment;
 	Array<LLVMValueRef> raw_input_parameters;
 
+	bool             uses_branch_location;
+	TokenPos         branch_location_pos;
+	TokenPos         curr_token_pos;
+
+	Array<lbVariadicReuseSlices> variadic_reuses;
+	lbAddr variadic_reuse_base_array_ptr;
+
+	LLVMValueRef temp_callee_return_struct_memory;
 	Ast *curr_stmt;
 
 	Array<Scope *>       scope_stack;
@@ -365,7 +393,7 @@ struct lbProcedure {
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
 
-gb_internal String lb_mangle_name(lbModule *m, Entity *e);
+gb_internal String lb_mangle_name(Entity *e);
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
 
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
@@ -383,7 +411,7 @@ gb_internal lbBlock *lb_create_block(lbProcedure *p, char const *name, bool appe
 
 gb_internal lbValue lb_const_nil(lbModule *m, Type *type);
 gb_internal lbValue lb_const_undef(lbModule *m, Type *type);
-gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local=true);
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local=true, bool is_rodata=false);
 gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value);
 gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 
@@ -420,7 +448,8 @@ gb_internal lbValue lb_emit_matrix_ev(lbProcedure *p, lbValue s, isize row, isiz
 
 gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
 gb_internal lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *end_type);
-gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block);
+gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, TokenPos pos);
+gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node);
 gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
 gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);
 gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none);
@@ -476,7 +505,7 @@ gb_internal lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValu
 
 gb_internal void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len);
 
-gb_internal lbValue lb_type_info(lbModule *m, Type *type);
+gb_internal lbValue lb_type_info(lbProcedure *p, Type *type);
 
 gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str);
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr);
@@ -499,12 +528,12 @@ gb_internal lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_pt
 gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e);
 gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e);
 
-gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);
+gb_internal void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value, bool is_default_case);
 gb_internal lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value);
 gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos);
 gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String const &procedure, TokenPos const &pos);
 
-gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
+gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TypeProc *procedure_type, Ast *call_expression);
 
 gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type);
 gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type);
@@ -550,6 +579,7 @@ gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLV
 gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
 gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
 gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile);
+gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, usize len, unsigned alignment, bool is_volatile);
 
 gb_internal gb_inline i64 lb_max_zero_init_size(void) {
 	return cast(i64)(4*build_context.int_size);
@@ -560,7 +590,11 @@ gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m);
 
+gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type);
 
+gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const &procedure, TokenPos const &pos);
+
+gb_internal LLVMMetadataRef lb_debug_location_from_token_pos(lbProcedure *p, TokenPos pos);
 
 gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t ElementCount) {
 #if LB_USE_NEW_PASS_SYSTEM
@@ -570,9 +604,12 @@ gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t Elemen
 #endif
 }
 
+
+gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value);
+gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name);
+
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"
-#define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
 #define LB_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
 #define LB_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
@@ -709,4 +746,6 @@ gb_global char const *llvm_linkage_strings[] = {
 	"linker private weak linkage"
 };
 
-#define ODIN_METADATA_REQUIRE "odin-metadata-require", 21
+#define ODIN_METADATA_IS_PACKED str_lit("odin-is-packed")
+#define ODIN_METADATA_MIN_ALIGN str_lit("odin-min-align")
+#define ODIN_METADATA_MAX_ALIGN str_lit("odin-max-align")

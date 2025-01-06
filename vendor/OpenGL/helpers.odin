@@ -5,7 +5,7 @@ package vendor_gl
 import "core:os"
 import "core:fmt"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 _ :: fmt
 _ :: runtime
 
@@ -120,7 +120,6 @@ when GL_DEBUG {
 }
 
 // Compiling shaders are identical for any shader (vertex, geometry, fragment, tesselation, (maybe compute too))
-@private
 compile_shader_from_source :: proc(shader_data: string, shader_type: Shader_Type) -> (shader_id: u32, ok: bool) {
 	shader_id = CreateShader(cast(u32)shader_type)
 	length := i32(len(shader_data))
@@ -134,7 +133,6 @@ compile_shader_from_source :: proc(shader_data: string, shader_type: Shader_Type
 }
 
 // only used once, but I'd just make a subprocedure(?) for consistency
-@private
 create_and_link_program :: proc(shader_ids: []u32, binary_retrievable := false) -> (program_id: u32, ok: bool) {
 	program_id = CreateProgram()
 	for id in shader_ids {

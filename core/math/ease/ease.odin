@@ -2,7 +2,7 @@
 package ease
 
 import "core:math"
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:time"
 
 @(private) PI_2 :: math.PI / 2

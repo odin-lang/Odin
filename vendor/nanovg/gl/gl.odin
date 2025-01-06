@@ -1,4 +1,4 @@
-//+build windows, linux, darwin
+#+build windows, linux, darwin
 package nanovg_gl
 
 import "core:log"
@@ -1390,7 +1390,7 @@ CreateFramebuffer :: proc(ctx: ^nvg.Context, w, h: int, imageFlags: ImageFlags) 
 	gl.GetIntegerv(gl.RENDERBUFFER_BINDING, &tempRBO)
 
 	imageFlags := imageFlags
-	incl(&imageFlags, ImageFlags { .FLIP_Y, .PREMULTIPLIED })
+	imageFlags += {.FLIP_Y, .PREMULTIPLIED}
 	fb.image = nvg.CreateImageRGBA(ctx, w, h, imageFlags, nil)
 	fb.texture = ImageHandle(ctx, fb.image)
 	fb.ctx = ctx

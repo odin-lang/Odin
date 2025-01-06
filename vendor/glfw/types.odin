@@ -11,6 +11,8 @@ GammaRamp :: glfw.GammaRamp
 Image :: glfw.Image
 GamepadState :: glfw.GamepadState
 
+Allocator :: glfw.Allocator
+
 /*** Procedure type declarations ***/
 WindowIconifyProc      :: glfw.WindowIconifyProc
 WindowRefreshProc      :: glfw.WindowRefreshProc
@@ -34,3 +36,7 @@ CursorEnterProc        :: glfw.CursorEnterProc
 JoystickProc           :: glfw.JoystickProc
 
 ErrorProc              :: glfw.ErrorProc
+
+AllocateProc           :: glfw.AllocateProc
+ReallocateProc         :: glfw.ReallocateProc
+DeallocateProc         :: glfw.DeallocateProc
