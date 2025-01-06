@@ -936,6 +936,32 @@ map_upsert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) 
 	return
 }
 
+/*
+Retrieves a pointer to the key and value for a possibly just inserted entry into the map.
+
+If the `key` was not in the map `m`, an entry is inserted with the zero value and `just_inserted` will be `true`.
+Otherwise the existing entry is left untouched and pointers to its key and value are returned.
+
+If the map has to grow in order to insert the entry and the allocation fails, `err` is set and returned.
+
+If `err` is `nil`, `key_ptr` and `value_ptr` are valid pointers and will not be `nil`.
+
+WARN: User modification of the key pointed at by `key_ptr` should only be done if the new key is equal to (in hash) the old key.
+If that is not the case you will corrupt the map.
+*/
+@(builtin, require_results)
+map_entry :: proc(m: ^$T/map[$K]$V, key: K, loc := #caller_location) -> (key_ptr: ^K, value_ptr: ^V, just_inserted: bool, err: Allocator_Error) {
+	key := key
+	zero: V
+
+	_key_ptr, _value_ptr: rawptr
+	_key_ptr, _value_ptr, just_inserted, err = __dynamic_map_entry((^Raw_Map)(m), map_info(T), &key, &zero, loc)
+
+	key_ptr   = (^K)(_key_ptr)
+	value_ptr = (^V)(_value_ptr)
+	return
+}
+
 
 @builtin
 card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {

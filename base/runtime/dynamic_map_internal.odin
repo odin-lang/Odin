@@ -941,6 +941,29 @@ __dynamic_map_set_extra :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 	return nil, rawptr(result)
 }
 
+__dynamic_map_entry :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key: rawptr, zero: rawptr, loc := #caller_location) -> (key_ptr: rawptr, value_ptr: rawptr, just_inserted: bool, err: Allocator_Error) {
+	hash := info.key_hasher(key, map_seed(m^))
+
+	if key_ptr, value_ptr = __dynamic_map_get_key_and_value(m, info, hash, key); value_ptr != nil {
+		return
+	}
+
+	has_grown: bool
+	if err, has_grown = __dynamic_map_check_grow(m, info, loc); err != nil {
+		return
+	} else if has_grown {
+		hash = info.key_hasher(key, map_seed(m^))
+	}
+
+	value_ptr = rawptr(map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(zero)))
+	assert(value_ptr != nil)
+	key_ptr = rawptr(map_cell_index_dynamic(map_data(m^), info.ks, map_desired_position(m^, hash)))
+
+	m.len += 1
+	just_inserted = true
+	return
+}
+
 
 // IMPORTANT: USED WITHIN THE COMPILER
 @(private)
