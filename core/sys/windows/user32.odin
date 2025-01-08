@@ -2,6 +2,7 @@
 package sys_windows
 
 import "base:intrinsics"
+import "core:c"
 foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="system")
@@ -31,6 +32,8 @@ foreign user32 {
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
+
+	RegisterHotKey :: proc(hnwd: HWND, id: c.int, fsModifiers: UINT, vk: UINT) -> BOOL ---
 
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
