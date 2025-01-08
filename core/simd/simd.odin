@@ -3,7 +3,7 @@ The SIMD support package.
 
 SIMD (Single Instruction Multiple Data), is a CPU hardware feature that
 introduce special registers and instructions which operate on multiple units
-of data at the same time which enables faster data processing for
+of data at the same time, which enables faster data processing for
 applications with heavy computational workloads.
 
 In Odin SIMD is exposed via a special kinds of arrays, called the *SIMD
@@ -12,7 +12,8 @@ power of two, and T could be any basic type (integers, floats, etc.). The
 documentation of this package will call *SIMD vectors* just *vectors*.
 
 SIMD vectors consist of elements, called *scalar values*, or
-*scalars*, each occupying a *lane* of the SIMD vector.
+*scalars*, each occupying a *lane* of the SIMD vector. In the type declaration,
+`N` specifies the amount of lanes, or values, that a vector stores.
 
 This package implements procedures for working with vectors.
 */
@@ -22,11 +23,11 @@ import "base:builtin"
 import "base:intrinsics"
 
 /*
-Check if SIMD is emulated on a target platform.
+Check if SIMD is software-emulated on a target platform.
 
-This value is `false`, if the compile-time target has the hardware support for
-at 128-bit (or wider) SIMD. If the compile-time target lacks the hardware support
-for 128-bit SIMD, this value is `true`, and all SIMD operations will likely be
+This value is `true`, if the compile-time target has the hardware support for
+at least 128-bit SIMD. If the compile-time target lacks the hardware support
+for 128-bit SIMD, this value is `false`, and all SIMD operations will be
 emulated.
 */
 IS_EMULATED :: true when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !intrinsics.has_target_feature("sse2") else
@@ -271,7 +272,7 @@ Inputs:
 - `b`: An integer or a float vector.
 
 Returns:
-- The sum of two vectors.
+- A vector that is the sum of two input vectors.
 
 **Operation**:
 	
@@ -303,11 +304,11 @@ the corresponding lanes of the vectors `a` and `b`. The lanes from the vector
 `b` are subtracted from the corresponding lanes of the vector `a`.
 
 Inputs:
-- `a`: Integer or a float vector to subtract from.
-- `b`: Integer or a float vector.
+- `a`: An integer or a float vector to subtract from.
+- `b`: An integer or a float vector.
 
 Returns:
-- The difference of two vectors.
+- A vector that is the difference of two vectors, `a` - `b`.
 
 **Operation**:
 
@@ -338,11 +339,11 @@ This procedure returns a vector, where each lane holds the product of the
 corresponding lanes of the vectors `a` and `b`.
 
 Inputs:
-- `a`: Integer or a float vector.
-- `b`: Integer or a float vector.
+- `a`: An integer or a float vector.
+- `b`: An integer or a float vector.
 
 Returns:
-- The product of two vectors.
+- A vector that is the product of two vectors.
 
 **Operation**:
 
@@ -376,11 +377,11 @@ lane of the vector `a` is divided by the corresponding lane of the vector `b`.
 This operation performs a standard floating-point division for each lane.
 
 Inputs:
-- `a`: Float vector.
-- `b`: Float vector to divide by.
+- `a`: A float vector.
+- `b`: A float vector to divide by.
 
 Returns:
-- The quotient of two vectors.
+- A vector that is the quotient of two vectors, `a` / `b`.
 
 **Operation**:
 
@@ -398,9 +399,9 @@ Example:
 	b: |  0  | -1  |  2  | -3  |
 	   +-----+-----+-----+-----+
 	res:
-	   +-----+-----+-----+-------+
-	   | +∞  | -2  |  1  | -0.66 |
-	   +-----+-----+-----+-------+
+	   +-----+-----+-----+------+
+	   | +∞  | -2  |  1  | -2/3 |
+	   +-----+-----+-----+------+
 */
 div :: intrinsics.simd_div
 
@@ -419,7 +420,8 @@ Inputs:
 - `b`: An unsigned integer vector of the shift amounts.
 
 Result:
-- Shifted vector.
+- A vector, where each lane is the lane from `a` shifted left by the amount
+specified in the corresponding lane of the vector `b`.
 
 **Operation**:
 
@@ -433,6 +435,8 @@ Result:
 	return res
 
 Example:
+
+This example assumes 1-byte lanes of the input vectors.
 
 	   +-------+-------+-------+-------+
 	a: |  0x11 |  0x55 |  0x03 |  0xff |
@@ -466,7 +470,8 @@ Inputs:
 - `b`: An unsigned integer vector of the shift amounts.
 
 Result:
-- Shifted vector.
+- A vector, where each lane is the lane from `a` shifted right by the amount
+specified in the corresponding lane of the vector `b`.
 
 **Operation**:
 
@@ -481,7 +486,7 @@ Result:
 
 Example:
 
-This example assumes that the `a` vector is of a signed 32 bit type.
+This example assumes that the `a` vector is of a signed type and a 1-byte lane size.
 
 	   +-------+-------+-------+-------+
 	a: |  0x11 |  0x55 |  0x03 |  0xff |
@@ -510,7 +515,8 @@ Inputs:
 - `b`: An unsigned integer vector of the shift amounts.
 
 Result:
-- Shifted vector.
+- A vector, where each lane is the lane from `a` shifted left by the amount
+specified in the corresponding lane of the vector `b`.
 
 **Operation**:
 
@@ -521,6 +527,8 @@ Result:
 	return res
 
 Example:
+
+This example assumes 1-byte lanes of the input vectors.
 
 	   +-------+-------+-------+-------+
 	a: |  0x11 |  0x55 |  0x03 |  0xff |
@@ -553,7 +561,8 @@ Inputs:
 - `b`: An unsigned integer vector of the shift amounts.
 
 Result:
-- Shifted vector.
+- A vector, where each lane is the lane from `a` shifted right by the amount
+specified in the corresponding lane of the vector `b`.
 
 **Operation**:
 
@@ -565,7 +574,8 @@ Result:
 
 Example:
 
-This example assumes that the `a` vector is of a signed type.
+This example assumes that the `a` vector is of a signed type and a 1-byte lane
+size of the input vectors.
 
 	   +-------+-------+-------+-------+
 	a: |  0x11 |  0x55 |  0x03 |  0xff |
@@ -583,8 +593,8 @@ shr_masked :: intrinsics.simd_shr_masked
 /*
 Saturated addition of vectors.
 
-The *saturated sum* is a sum, that upon overflow or underflow, instead of
-wrapping, keeps the value clamped between the minimum and the maximum
+The *saturated sum* is a sum that upon overflow or underflow, instead of
+round-tripping, keeps the value clamped between the minimum and the maximum
 values of the lane type.
 
 This procedure returns a vector where each lane is the saturated sum of the
@@ -595,7 +605,7 @@ Inputs:
 - `b`: An integer vector.
 
 Returns:
-- Saturated sum of the two vectors.
+- The saturated sum of the two vectors.
 
 **Operation**:
 
@@ -631,8 +641,8 @@ saturating_add :: intrinsics.simd_saturating_add
 /*
 Saturated subtraction of vectors.
 
-The *saturated difference* is a difference, that upon overflow or underflow,
-instead of wrapping, keeps the value clamped between the minimum and the
+The *saturated difference* is a difference that upon overflow or underflow,
+instead of round-tripping, keeps the value clamped between the minimum and the
 maximum values of the lane type.
 
 This procedure returns a vector where each lane is the saturated difference of
@@ -643,7 +653,7 @@ Inputs:
 - `b`: An integer vector.
 
 Returns:
-- Saturated difference of the two vectors.
+- The saturated difference of the two vectors.
 
 **Operation**:
 
@@ -683,11 +693,11 @@ This procedure returns a vector, such that each lane has the result of a bitwise
 AND operation between the corresponding lanes of the vectors `a` and `b`.
 
 Inputs:
-- `a`: An integer or boolean vector.
-- `b`: An integer or boolean vector.
+- `a`: An integer or a boolean vector.
+- `b`: An integer or a boolean vector.
 
 Returns:
-- Result of the bitwise AND operation between two vectors.
+- A vector that is the result of the bitwise AND operation between two vectors.
 
 **Operation**:
 
@@ -718,11 +728,11 @@ This procedure returns a vector, such that each lane has the result of a bitwise
 OR operation between the corresponding lanes of the vectors `a` and `b`.
 
 Inputs:
-- `a`: An integer or boolean vector.
-- `b`: An integer or boolean vector.
+- `a`: An integer or a boolean vector.
+- `b`: An integer or a boolean vector.
 
 Returns:
-- Result of the bitwise OR operation between two vectors.
+- A vector that is the result of the bitwise OR operation between two vectors.
 
 **Operation**:
 
@@ -753,11 +763,11 @@ This procedure returns a vector, such that each lane has the result of a bitwise
 XOR operation between the corresponding lanes of the vectors `a` and `b`.
 
 Inputs:
-- `a`: An integer or boolean vector.
-- `b`: An integer or boolean vector.
+- `a`: An integer or a boolean vector.
+- `b`: An integer or a boolean vector.
 
 Returns:
-- Result of the bitwise XOR operation between two vectors.
+- A vector that is the result of the bitwise XOR operation between two vectors.
 
 **Operation**:
 
@@ -788,11 +798,11 @@ This procedure returns a vector, such that each lane has the result of a bitwise
 AND NOT operation between the corresponding lanes of the vectors `a` and `b`.
 
 Inputs:
-- `a`: An integer or boolean vector.
-- `b`: An integer or boolean vector.
+- `a`: An integer or a boolean vector.
+- `b`: An integer or a boolean vector.
 
 Returns:
-- Result of the bitwise AND NOT operation between two vectors.
+- A vector that is the result of the bitwise AND NOT operation between two vectors.
 
 **Operation**:
 
@@ -826,7 +836,7 @@ Inputs:
 - `a`: An integer or a float vector to negate.
 
 Returns:
-- Negated vector.
+- The negated version of the vector `a`.
 
 **Operation**:
 
@@ -857,7 +867,7 @@ Inputs:
 - `a`: An integer or a float vector to negate
 
 Returns:
-- Absolute value of a vector.
+- The absolute value of a vector.
 
 **Operation**:
 
@@ -893,7 +903,7 @@ Inputs:
 - `b`: An integer or a float vector.
 
 Returns:
-- Vector with minimum values of each lane.
+- A vector containing with minimum values from corresponding lanes of `a` and `b`.
 
 **Operation**:
 
@@ -932,7 +942,7 @@ Inputs:
 - `b`: An integer or a float vector.
 
 Returns:
-- Vector with maximum values of each lane.
+- A vector containing with maximum values from corresponding lanes of `a` and `b`.
 
 **Operation**:
 
@@ -972,9 +982,12 @@ Inputs:
 - `min`: An integer or a float vector with minimum bounds.
 - `max`: An integer or a float vectoe with maximum bounds.
 
+Returns:
+- A vector containing clamped values in each lane.
+
 **Operation**:
 
-	for i in len(res) {
+	for i in 0 ..< len(res) {
 		val := v[i]
 		switch {
 			case val < min: val = min
@@ -1016,7 +1029,7 @@ Inputs:
 
 Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
-containing comparison results for each lane.
+containing the comparison results for each lane.
 
 **Operation**:
 
@@ -1058,7 +1071,7 @@ Inputs:
 
 Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
-containing comparison results for each lane.
+containing the comparison results for each lane.
 
 **Operation**:
 
@@ -1100,7 +1113,7 @@ Inputs:
 
 Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
-containing comparison results for each lane.
+containing the comparison results for each lane.
 
 **Operation**:
 
@@ -1123,7 +1136,7 @@ Example:
 	   +-------+-------+-------+-------+
 	res:
 	   +-------+-------+-------+-------+
-	r: | 0x00  | 0x00  | 0x00  | 0xff  |
+	r: | 0x00  | 0xff  | 0x00  | 0x00  |
 	   +-------+-------+-------+-------+
 */
 lanes_lt :: intrinsics.simd_lanes_lt
@@ -1143,7 +1156,7 @@ Inputs:
 
 Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
-containing comparison results for each lane.
+containing the comparison results for each lane.
 
 **Operation**:
 
@@ -1166,7 +1179,7 @@ Example:
 	   +-------+-------+-------+-------+
 	res:
 	   +-------+-------+-------+-------+
-	   | 0xff  | 0x00  | 0xff  | 0xff  |
+	   | 0xff  | 0xff  | 0xff  | 0x00  |
 	   +-------+-------+-------+-------+
 */
 lanes_le :: intrinsics.simd_lanes_le
@@ -1186,7 +1199,7 @@ Inputs:
 
 Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
-containing comparison results for each lane.
+containing the comparison results for each lane.
 
 **Operation**:
 
@@ -1229,7 +1242,7 @@ Inputs:
 
 Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
-containing comparison results for each lane.
+containing the comparison results for each lane.
 
 **Operation**:
 
@@ -1260,7 +1273,7 @@ lanes_ge :: intrinsics.simd_lanes_ge
 /*
 Perform a gather load into a vector.
 
-A *gather* operation is a memory load operation, that loads values from a vector
+A *gather* operation is memory load operation that loads values from an vector
 of addresses into a single value vector. This can be used to achieve the
 following results:
 
@@ -1274,8 +1287,8 @@ for the `ptr` and `mask` parameters.
 
 Inputs:
 - `ptr`: A vector of memory locations. Each pointer points to a single value,
-	of a vector's lane type, that will be loaded into the vector. Pointers
-	in this vector can be `nil` or any other invalid value if the corresponding
+	of a SIMD vector's lane type that will be loaded into the vector. Pointer
+	in this vector can be `nil` or any other invalid value, if the corresponding
 	value in the `mask` parameter is zero.
 - `val`: A vector of values that will be used at corresponding positions
 	of the result vector, if the corresponding memory location has been
@@ -1315,17 +1328,17 @@ dereferencing those `nil` addresses we provide the mask that only allows us
 to load valid positions of the `ptrs` array, and the array of defaults which
 will have `127` (`0x7f`) in each position as the default value.
 
-	v1 := [4]f32{1, 2, 3, 4}
-	v2 := [4]f32{9, 10,11, 12}
-	ptrs := #simd [4]rawptr{ &v1[1], nil, &v2[1], nil }
-	mask := #simd [4]bool{ true, false, true, false }
-	defaults := #simd [4]f32{ 0x7f, 0x7f, 0x7f, 0x7f }
+	v1 := [4] f32 {1, 2, 3, 4}
+	v2 := [4] f32 {9, 10,11,12}
+	ptrs := #simd [4]rawptr { &v1[1], nil, &v2[1], nil }
+	mask := #simd [4]bool { true, false, true, false }
+	defaults := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
 	res := simd.gather(ptrs, defaults, mask)
 	fmt.println(res)
 
-The code would print `<2, 127, 10, 127>`. The first and the third lane came
+The code would print `<2, 127, 10, 127>`. First and the third positions came
 from the `ptrs` array, and the other 2 lanes are from the default vector.
-The graphic below shows how the values of the result are decided based on the mask:
+Graphic below shows how the values of the result are decided based on the mask:
 
 	      +-------------------------------+ 
 	mask: |   1   |   0   |   1   |   0   | 
@@ -1360,7 +1373,7 @@ Inputs:
 	or any other invalid value if the corresponding value in the `mask`
 	parameter is zero.
 - `val`: A vector of values to write to the memory locations.
-- `mask`: A vector of booleans or unsigned integers, that decides which lanes
+- `mask`: A vector of booleans or unsigned integers that decides which lanes
 	get written to memory. If the value of the mask is `true` (the lowest bit
 	set), the corresponding lane is written into memory. Otherwise it's not
 	written into memory.
@@ -1388,7 +1401,7 @@ third argument of the `ptr` vector, and the `mask` is set accordingly.
 	fmt.println(v1)
 	fmt.println(v2)
 
-This code prints the values of the two vectors, after modification by `scatter`:
+Output:
 
 	[1, 127, 3, 4]
 	[5, 127, 7, 8]
@@ -1456,7 +1469,7 @@ of 127 (`0x7f`).
 	res := simd.masked_load(&src, vals, mask)
 	fmt.println(res)
 
-The above code prints the following:
+Output:
 
 	<1, 127, 3, 127>
 
@@ -1515,7 +1528,7 @@ vector `v`.
 	simd.masked_store(&v, vals, mask)
 	fmt.println(v)
 
-After the masked store the printed result is:
+Output:
 
 	[127, 2, 127, 4]
 
@@ -1555,7 +1568,7 @@ addresses.
 Inputs:
 - `ptr`: The pointer to the memory to read from.
 - `vals`: The default values for masked-off entries.
-- `mask`: The mask, that determines which lanes get consecutive memory values.
+- `mask`: The mask that determines which lanes get consecutive memory values.
 
 Returns:
 - The result vector, holding masked memory values unmasked default values.
@@ -1589,7 +1602,7 @@ will be initialized to the default value `127`.
 	res := simd.masked_expand_load(&v, vals, mask)
 	fmt.println(res)
 
-The above code prints the following:
+Output:
 
 	<1, 127, 2, 127>
 
@@ -1620,7 +1633,7 @@ Store masked values to consecutive memory locations.
 This procedure stores values from masked lanes of a vector `val` consecutively
 into memory. This operation is the opposite of `masked_expand_load`. The number
 of items stored into memory is the number of set bits in the mask. If the value
-in a lane of a mask is `true`, that lane is stored into memory. Otherwise
+in a lane of a mask is `true` that lane is stored into memory. Otherwise
 nothing is stored.
 
 Inputs:
@@ -1650,7 +1663,7 @@ in those lanes.
 	simd.masked_compress_store(&v, vals, mask)
 	fmt.println(v)
 
-The code above prints the following:
+Output:
 
 	[1, 3]
 
@@ -1844,11 +1857,11 @@ reduce_or :: intrinsics.simd_reduce_or
 /*
 Reduce SIMD vector to a scalar by performing bitwise XOR of all of the lanes.
 
-This procedure returns a scalar, that is the result of the bitwise XOR operation
+This procedure returns a scalar that is the result of the bitwise XOR operation
 between all of the lanes in a vector.
 
 Inputs:
-- `a`: Vector to reduce
+- `a`: The vector to reduce.
 
 Result:
 - Bitwise XOR of all lanes, as a scalar.
@@ -1865,11 +1878,11 @@ reduce_xor :: intrinsics.simd_reduce_xor
 /*
 Reduce SIMD vector to a scalar by performing bitwise OR of all of the lanes.
 
-This procedure returns a scalar, that is the result of the bitwise OR operation
+This procedure returns a scalar that is the result of the bitwise OR operation
 between all of the lanes in a vector.
 
 Inputs:
-- `a`: Vector to reduce
+- `a`: The vector to reduce.
 
 Result:
 - Bitwise OR of all lanes, as a scalar.
@@ -1886,11 +1899,11 @@ reduce_any :: intrinsics.simd_reduce_any
 /*
 Reduce SIMD vector to a scalar by performing bitwise AND of all of the lanes.
 
-This procedure returns a scalar, that is the result of the bitwise AND operation
+This procedure returns a scalar that is the result of the bitwise AND operation
 between all of the lanes in a vector.
 
 Inputs:
-- `a`: Vector to reduce
+- `a`: The vector to reduce.
 
 Result:
 - Bitwise AND of all lanes, as a scalar.
@@ -1928,7 +1941,7 @@ Result:
 	}
 	return res
 
-**Example**
+Example:
 
 The example below shows how the indices are used to determine which lanes of the
 input vector get written into the result vector.
@@ -1937,7 +1950,7 @@ input vector get written into the result vector.
 	res := simd.swizzle(x, 0, 3, 1, 1)
 	fmt.println("res")
 
-The above code will print the following to the console:
+Output:
 
 	[ 1.5, 3.5, 2.5, 2.5 ]
 
@@ -1998,18 +2011,18 @@ Result:
 	}
 	return res
 
-**Example**
+Example:
 
 The example below shows how the indices are used to determine lanes of the
 input vector that are shuffled into the result vector.
 	
-	a := #simd [4]f32 { 1, 2, 3, 4 }
-	b := #simd [4]f32 { 5, 6, 7, 8 }
+	a := #simd [4]f32{ 1, 2, 3, 4 }
+	b := #simd [4]f32{ 5, 6, 7, 8 }
 	indices := #simd[4]
 	res := simd.swizzle(x, 0, 4, 2, 5)
 	fmt.println("res")
 
-The above code will print the following to the console:
+Output:
 
 	[ 1, 5, 3, 6 ]
 
@@ -2065,13 +2078,13 @@ Result:
 	}
 	return res
 
-**Example**:
+Example::
 
 The following example selects values from the two input vectors, `a` and `b`
 into a single vector.
 
-	a := #simd [4] f64 { 1,2,3,4 };
-	b := #simd [4] f64 { 5,6,7,8 };
+	a := #simd [4] f64 { 1,2,3,4 }
+	b := #simd [4] f64 { 5,6,7,8 }
 	cond := #simd[4] int { 1, 0, 1, 0 }
 	fmt.println(simd.select(cond,a,b))
 
@@ -2135,7 +2148,7 @@ to_bits :: intrinsics.simd_to_bits
 /*
 Reverse the lanes of a SIMD vector.
 
-This procedure reverses the lanes of a SIMD vector, putting last lane in the
+This procedure reverses the lanes of a vector, putting last lane in the
 first spot, etc. This procedure is equivalent to the following call (for
 4-element vectors):
 
@@ -2146,7 +2159,7 @@ lanes_reverse :: intrinsics.simd_lanes_reverse
 /*
 Rotate the lanes of a SIMD vector left.
 
-This procedure rotates the lanes of a SIMD vector, putting the first lane of the
+This procedure rotates the lanes of a vector, putting the first lane of the
 last spot, second lane in the first spot, third lane in the second spot, etc.
 For 4-element vectors, this procedure is equvalent to the following:
 
@@ -2227,9 +2240,9 @@ that allows to minimize floating-point error and allow for faster computation.
 This procedure performs a FMA operation on each lane of the SIMD vectors.
 
 Inputs:
-- `a`: The multiplier
-- `b`: The multiplicand
-- `c`: The addend
+- `a`: The multiplier.
+- `b`: The multiplicand.
+- `c`: The addend.
 
 Returns:
 - `a*b+c`
@@ -2334,7 +2347,7 @@ This procedure returns a vector where each lane is the reciprocal of the
 corresponding lane in the vector `a`.
 
 Inputs:
-- `a`: An integer or a float vector to negate
+- `a`: An integer or a float vector to negate.
 
 Returns:
 - Negated vector.
@@ -2349,11 +2362,11 @@ Returns:
 Example:
 
 	   +------+------+------+------+
-	a: |   0  |   1  |   3  |   5  |
+	a: |   2  |   1  |   3  |   5  |
 	   +------+------+------+------+
 	res:
 	   +------+------+------+------+
-	   |   0  |   1  | 0.33 |  0.2 |
+	   |  0.5 |   1  | 0.33 |  0.2 |
 	   +------+------+------+------+
 */
 recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
