@@ -438,8 +438,13 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	for_array(j, bt->Union.variants) {
 		Type *variant = bt->Union.variants[j];
 
+		ptrdiff_t variant_index = j;
+		if (bt->Union.kind == UnionType_no_nil) {
+			variant_index += 1;
+		}
+
 		char name[32] = {};
-		gb_snprintf(name, gb_size_of(name), "v%td", j);
+		gb_snprintf(name, gb_size_of(name), "v%td", variant_index);
 		isize name_len = gb_strlen(name);
 
 		elements[index_offset+j] = LLVMDIBuilderCreateMemberType(
