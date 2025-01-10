@@ -1262,11 +1262,49 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 
 
 parse_unrolled_for_loop :: proc(p: ^Parser, inline_tok: tokenizer.Token) -> ^ast.Stmt {
-	for_tok := expect_token(p, .For)
 	val0, val1: ^ast.Expr
 	in_tok: tokenizer.Token
 	expr: ^ast.Expr
 	body: ^ast.Stmt
+	args: [dynamic]^ast.Expr
+
+	if allow_token(p, .Open_Paren) {
+		p.expr_level += 1
+		if p.curr_tok.kind == .Close_Paren {
+			error(p, p.curr_tok.pos, "#unroll expected at least 1 argument, got 0")
+		} else {
+			args = make([dynamic]^ast.Expr)
+			for p.curr_tok.kind != .Close_Paren &&
+			    p.curr_tok.kind != .EOF {
+			    	arg := parse_value(p)
+
+			    	if p.curr_tok.kind == .Eq {
+			    		eq := expect_token(p, .Eq)
+			    		if arg != nil {
+			    			if _, ok := arg.derived.(^ast.Ident); !ok {
+			    				error(p, arg.pos, "expected an identifier for 'key=value'")
+			    			}
+			    		}
+			    		value := parse_value(p)
+			    		fv := ast.new(ast.Field_Value, arg.pos, value)
+			    		fv.field = arg
+			    		fv.sep   = eq.pos
+			    		fv.value = value
+
+			    		arg = fv
+			    	}
+
+			    	append(&args, arg)
+
+				allow_token(p, .Comma) or_break
+			    }
+		}
+
+		p.expr_level -= 1
+		_ = expect_token_after(p, .Close_Paren, "#unroll")
+	}
+
+	for_tok := expect_token(p, .For)
 
 	bad_stmt := false
 
@@ -1309,7 +1347,8 @@ parse_unrolled_for_loop :: proc(p: ^Parser, inline_tok: tokenizer.Token) -> ^ast
 	}
 
 	range_stmt := ast.new(ast.Inline_Range_Stmt, inline_tok.pos, body)
-	range_stmt.inline_pos = inline_tok.pos
+	range_stmt.unroll_pos = inline_tok.pos
+	range_stmt.args = args[:]
 	range_stmt.for_pos = for_tok.pos
 	range_stmt.val0 = val0
 	range_stmt.val1 = val1

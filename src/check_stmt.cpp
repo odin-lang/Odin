@@ -894,14 +894,48 @@ gb_internal void error_var_decl_identifier(Ast *name) {
 	}
 }
 
-gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(irs, UnrollRangeStmt, node);
 	check_open_scope(ctx, node);
+	defer (check_close_scope(ctx));
 
 	Type *val0 = nullptr;
 	Type *val1 = nullptr;
 	Entity *entities[2] = {};
 	isize entity_count = 0;
+
+	i64 unroll_count = -1;
+
+	if (irs->args.count > 0) {
+		if (irs->args.count > 1) {
+			error(irs->args[1], "#unroll only supports a single argument for the unroll per loop amount");
+		}
+		Ast *arg = irs->args[0];
+		if (arg->kind == Ast_FieldValue) {
+			error(arg, "#unroll does not yet support named arguments");
+			arg = arg->FieldValue.value;
+		}
+
+		Operand x = {};
+		check_expr(ctx, &x, arg);
+		if (x.mode != Addressing_Constant || !is_type_integer(x.type)) {
+			gbString s = expr_to_string(x.expr);
+			error(x.expr, "Expected a constant integer for #unroll, got '%s'", s);
+			gb_string_free(s);
+		} else {
+			ExactValue value = exact_value_to_integer(x.value);
+			i64 v = exact_value_to_i64(value);
+			if (v < 1) {
+				error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
+			} else {
+				unroll_count = v;
+				if (v > 1024) {
+					error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+				}
+			}
+
+		}
+	}
 
 	Ast *expr = unparen_expr(irs->expr);
 
@@ -946,17 +980,38 @@ gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 					val0 = t_rune;
 					val1 = t_int;
 					inline_for_depth = exact_value_i64(operand.value.value_string.len);
+					if (unroll_count > 0) {
+						error(node, "#unroll(%lld) does not support strings", cast(long long)unroll_count);
+					}
 				}
 				break;
 			case Type_Array:
 				val0 = t->Array.elem;
 				val1 = t_int;
-				inline_for_depth = exact_value_i64(t->Array.count);
+				inline_for_depth = unroll_count > 0 ? exact_value_i64(unroll_count) : exact_value_i64(t->Array.count);
 				break;
 			case Type_EnumeratedArray:
 				val0 = t->EnumeratedArray.elem;
 				val1 = t->EnumeratedArray.index;
+				if (unroll_count > 0) {
+					error(node, "#unroll(%lld) does not support enumerated arrays", cast(long long)unroll_count);
+				}
 				inline_for_depth = exact_value_i64(t->EnumeratedArray.count);
+				break;
+
+			case Type_Slice:
+				if (unroll_count > 0) {
+					val0 = t->Slice.elem;
+					val1 = t_int;
+					inline_for_depth = exact_value_i64(unroll_count);
+				}
+				break;
+			case Type_DynamicArray:
+				if (unroll_count > 0) {
+					val0 = t->DynamicArray.elem;
+					val1 = t_int;
+					inline_for_depth = exact_value_i64(unroll_count);
+				}
 				break;
 			}
 		}
@@ -967,7 +1022,7 @@ gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an '#unroll for' statement", s, t);
 			gb_string_free(t);
 			gb_string_free(s);
-		} else if (operand.mode != Addressing_Constant) {
+		} else if (operand.mode != Addressing_Constant && unroll_count <= 0) {
 			error(operand.expr, "An '#unroll for' expression must be known at compile time");
 		}
 	}
@@ -1050,8 +1105,6 @@ gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 
 	check_stmt(ctx, irs->body, mod_flags);
 
-
-	check_close_scope(ctx);
 }
 
 gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
@@ -2679,7 +2732,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 	case_end;
 
 	case_ast_node(irs, UnrollRangeStmt, node);
-		check_inline_range_stmt(ctx, node, mod_flags);
+		check_unroll_range_stmt(ctx, node, mod_flags);
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);
