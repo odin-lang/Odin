@@ -151,6 +151,7 @@ foreign lib {
 	@(link_name="closedir")       _unix_closedir       :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")      _unix_rewinddir      :: proc(dirp: Dir) ---
 	@(link_name="readdir_r")      _unix_readdir_r      :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	@(link_name="dup")            _unix_dup            :: proc(fd: Handle) -> Handle ---
 
 	@(link_name="malloc")         _unix_malloc         :: proc(size: c.size_t) -> rawptr ---
 	@(link_name="calloc")         _unix_calloc         :: proc(num, size: c.size_t) -> rawptr ---
@@ -158,7 +159,7 @@ foreign lib {
 	@(link_name="realloc")        _unix_realloc        :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 
 	@(link_name="getenv")         _unix_getenv         :: proc(cstring) -> cstring ---
-	@(link_name="realpath")       _unix_realpath       :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	@(link_name="realpath")       _unix_realpath       :: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
 
 	@(link_name="exit")           _unix_exit           :: proc(status: c.int) -> ! ---
 
@@ -445,7 +446,7 @@ absolute_path_from_relative :: proc(rel: string, allocator := context.allocator)
 	if path_ptr == nil {
 		return "", get_last_error()
 	}
-	defer _unix_free(path_ptr)
+	defer _unix_free(rawptr(path_ptr))
 
 	path_cstr := cstring(path_ptr)
 	return strings.clone(string(path_cstr), allocator)
@@ -488,4 +489,18 @@ _processor_core_count :: proc() -> int {
 exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	_unix_exit(i32(code))
+}
+
+@(require_results)
+current_thread_id :: proc "contextless" () -> int {
+	return int(haiku.find_thread(nil))
+}
+
+@(private, require_results)
+_dup :: proc(fd: Handle) -> (Handle, Error) {
+	dup := _unix_dup(fd)
+	if dup == -1 {
+		return INVALID_HANDLE, get_last_error()
+	}
+	return dup, nil
 }
