@@ -497,16 +497,16 @@ unparse_json_schema :: proc(t: ^testing.T) {
 			"is_valid" = json.Object{"type" = "boolean"},
 			"tags" = json.Object{
 				"type" = "array",
-				"items" = json.Object{"type" = "string"}
+				"items" = json.Object{"type" = "string"},
 			},
 			"also" = json.Object{
 				"integer" = 42,
 				"float" = 3.1415,
 				"bool" = false,
 				"null" = nil,
-				"array" = json.Array{42, 3.1415, false, nil, "string"}
-			}
-		}
+				"array" = json.Array{42, 3.1415, false, nil, "string"},
+			},
+		},
 	}
 
 	// having fun cleaning up json literals

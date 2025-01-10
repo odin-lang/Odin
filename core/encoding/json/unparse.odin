@@ -34,13 +34,20 @@ unparse_to_writer :: proc(w: io.Writer, v: Value, opt: ^Marshal_Options) -> io.E
 	}
 
 	switch uv in v {
-		case Null: return unparse_null_to_writer(w, opt)
-		case Integer: return unparse_integer_to_writer(w, uv, opt)
-		case Float: return unparse_float_to_writer(w, uv, opt)
-		case Boolean: return unparse_boolean_to_writer(w, uv, opt)
-		case String: return unparse_string_to_writer(w, uv, opt)
-		case Array: return unparse_array_to_writer(w, uv, opt)
-		case Object: return unparse_object_to_writer(w, uv, opt)
+		case Null: 
+			return unparse_null_to_writer(w, opt)
+		case Integer: 
+			return unparse_integer_to_writer(w, uv, opt)
+		case Float: 
+			return unparse_float_to_writer(w, uv, opt)
+		case Boolean: 
+			return unparse_boolean_to_writer(w, uv, opt)
+		case String: 
+			return unparse_string_to_writer(w, uv, opt)
+		case Array: 
+			return unparse_array_to_writer(w, uv, opt)
+		case Object: 
+			return unparse_object_to_writer(w, uv, opt)
 	}
 	return nil
 }
@@ -73,9 +80,9 @@ unparse_string_to_writer :: proc(w: io.Writer, v: String, opt: ^Marshal_Options)
 
 unparse_array_to_writer :: proc(w: io.Writer, v: Array, opt: ^Marshal_Options) -> io.Error {
 	opt_write_start(w, opt, '[') or_return
-	for i in 0..<len(v) {
+	for e, i in v {
 		opt_write_iteration(w, opt, i == 0) or_return
-		unparse_to_writer(w, v[i], opt) or_return
+		unparse_to_writer(w, e, opt) or_return
 	}
 	opt_write_end(w, opt, ']') or_return
 	return nil
@@ -94,11 +101,10 @@ unparse_object_to_writer :: proc(w: io.Writer, m: Object, opt: ^Marshal_Options)
 		}
 
 		opt_write_end(w, opt, '}') or_return
-	}
-	else {
+	} else {
 		Entry :: struct {
 			key: string,
-			value: Value
+			value: Value,
 		}
 
 		entries := make([dynamic]Entry, 0, len(m), context.temp_allocator)
