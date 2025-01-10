@@ -4841,9 +4841,19 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 
 			} else { // NOTE(bill): Do array bound checking
 				i64 v = -1;
-				if (i.used <= 1) {
-					v = big_int_to_i64(&i);
+
+				switch (i.used) {
+				case 0: v = 0; break;
+				case 1: v = big_int_to_i64(&i); break;
+				default:
+					static BigInt max = big_int_make_i64(I64_MAX);
+					if (big_int_cmp(&max, &i) > 0) {
+						v = big_int_to_i64(&i);
+						GB_ASSERT(v >= 0);
+					}
+					break;
 				}
+
 				if (value) *value = v;
 				bool out_of_bounds = false;
 				if (v < 0) {
