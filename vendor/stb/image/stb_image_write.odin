@@ -19,7 +19,7 @@ when WRITE_LIB != "" {
 }
 
 foreign import stbi {
-	WRITE_LIB when WRITE_LIB != "" else "system:stb_image_write"
+	WRITE_LIB when WRITE_LIB != "" else "system:stb_image_write",
 }
 
 write_func :: proc "c" (ctx: rawptr, data: rawptr, size: c.int)

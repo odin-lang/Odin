@@ -19,7 +19,7 @@ when LIB != "" {
 }
 
 foreign import stbi {
-	LIB when LIB != "" else "system:stb_image"
+	LIB when LIB != "" else "system:stb_image",
 }
 
 NO_STDIO :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32

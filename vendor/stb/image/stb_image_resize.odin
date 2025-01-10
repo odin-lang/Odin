@@ -19,7 +19,7 @@ when RESIZE_LIB != "" {
 }
 
 foreign import stbi {
-	RESIZE_LIB when RESIZE_LIB != "" else "system:stb_image_resize"
+	RESIZE_LIB when RESIZE_LIB != "" else "system:stb_image_resize",
 }
 
 //////////////////////////////////////////////////////////////////////////////
