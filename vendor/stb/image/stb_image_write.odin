@@ -18,7 +18,7 @@ when WRITE_LIB != "" {
 	}
 }
 
-foreign import stbi {
+foreign import stbiw {
 	WRITE_LIB when WRITE_LIB != "" else "system:stb_image_write",
 }
 

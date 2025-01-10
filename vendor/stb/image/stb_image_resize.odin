@@ -18,7 +18,7 @@ when RESIZE_LIB != "" {
 	}
 }
 
-foreign import stbi {
+foreign import lib {
 	RESIZE_LIB when RESIZE_LIB != "" else "system:stb_image_resize",
 }
 
