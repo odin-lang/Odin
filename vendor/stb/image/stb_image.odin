@@ -18,12 +18,8 @@ when LIB != "" {
 	}
 }
 
-when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
-	foreign import stbi "../lib/stb_image_wasm.o"
-} else when LIB != "" {
-	foreign import stbi { LIB }
-} else {
-	foreign import stbi "system:stb_image"
+foreign import stbi {
+	LIB when LIB != "" else "system:stb_image",
 }
 
 NO_STDIO :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32

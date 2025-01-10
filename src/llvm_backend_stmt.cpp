@@ -256,7 +256,7 @@ gb_internal void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
 
 gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValue count_ptr,
                                         lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_,
-                                        bool is_reverse) {
+                                        bool is_reverse, i64 unroll_count=0) {
 	lbModule *m = p->module;
 
 	lbValue count = {};
@@ -1230,7 +1230,6 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 	TypeAndValue tav = type_and_value_of_expr(expr);
 
 	if (is_ast_range(expr)) {
-
 		lbAddr val0_addr = {};
 		lbAddr val1_addr = {};
 		if (val0_type) val0_addr = lb_build_addr(p, val0);
@@ -1268,7 +1267,6 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 			}
 		}
 
-
 	} else if (tav.mode == Addressing_Type) {
 		GB_ASSERT(is_type_enum(type_deref(tav.type)));
 		Type *et = type_deref(tav.type);
@@ -1293,72 +1291,203 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 		if (val0_type) val0_addr = lb_build_addr(p, val0);
 		if (val1_type) val1_addr = lb_build_addr(p, val1);
 
-		GB_ASSERT(expr->tav.mode == Addressing_Constant);
+		ExactValue unroll_count_ev = {};
+		if (rs->args.count != 0) {
+			unroll_count_ev = rs->args[0]->tav.value;
+		}
 
-		Type *t = base_type(expr->tav.type);
 
+		if (unroll_count_ev.kind == ExactValue_Invalid) {
+			GB_ASSERT(expr->tav.mode == Addressing_Constant);
 
-		switch (t->kind) {
-		case Type_Basic:
-			GB_ASSERT(is_type_string(t));
-			{
-				ExactValue value = expr->tav.value;
-				GB_ASSERT(value.kind == ExactValue_String);
-				String str = value.value_string;
-				Rune codepoint = 0;
-				isize offset = 0;
-				do {
-					isize width = utf8_decode(str.text+offset, str.len-offset, &codepoint);
-					if (val0_type) lb_addr_store(p, val0_addr, lb_const_value(m, val0_type, exact_value_i64(codepoint)));
-					if (val1_type) lb_addr_store(p, val1_addr, lb_const_value(m, val1_type, exact_value_i64(offset)));
-					lb_build_stmt(p, rs->body);
+			Type *t = base_type(expr->tav.type);
 
-					offset += width;
-				} while (offset < str.len);
-			}
-			break;
-		case Type_Array:
-			if (t->Array.count > 0) {
-				lbValue val = lb_build_expr(p, expr);
-				lbValue val_addr = lb_address_from_load_or_generate_local(p, val);
+			switch (t->kind) {
+			case Type_Basic:
+				GB_ASSERT(is_type_string(t));
+				{
+					ExactValue value = expr->tav.value;
+					GB_ASSERT(value.kind == ExactValue_String);
+					String str = value.value_string;
+					Rune codepoint = 0;
+					isize offset = 0;
+					do {
+						isize width = utf8_decode(str.text+offset, str.len-offset, &codepoint);
+						if (val0_type) lb_addr_store(p, val0_addr, lb_const_value(m, val0_type, exact_value_i64(codepoint)));
+						if (val1_type) lb_addr_store(p, val1_addr, lb_const_value(m, val1_type, exact_value_i64(offset)));
+						lb_build_stmt(p, rs->body);
 
-				for (i64 i = 0; i < t->Array.count; i++) {
-					if (val0_type) {
-						// NOTE(bill): Due to weird legacy issues in LLVM, this needs to be an i32
-						lbValue elem = lb_emit_array_epi(p, val_addr, cast(i32)i);
-						lb_addr_store(p, val0_addr, lb_emit_load(p, elem));
+						offset += width;
+					} while (offset < str.len);
+				}
+				break;
+			case Type_Array:
+				if (t->Array.count > 0) {
+					lbValue val = lb_build_expr(p, expr);
+					lbValue val_addr = lb_address_from_load_or_generate_local(p, val);
+
+					for (i64 i = 0; i < t->Array.count; i++) {
+						if (val0_type) {
+							// NOTE(bill): Due to weird legacy issues in LLVM, this needs to be an i32
+							lbValue elem = lb_emit_array_epi(p, val_addr, cast(i32)i);
+							lb_addr_store(p, val0_addr, lb_emit_load(p, elem));
+						}
+						if (val1_type) lb_addr_store(p, val1_addr, lb_const_value(m, val1_type, exact_value_i64(i)));
+
+						lb_build_stmt(p, rs->body);
 					}
-					if (val1_type) lb_addr_store(p, val1_addr, lb_const_value(m, val1_type, exact_value_i64(i)));
 
-					lb_build_stmt(p, rs->body);
+				}
+				break;
+			case Type_EnumeratedArray:
+				if (t->EnumeratedArray.count > 0) {
+					lbValue val = lb_build_expr(p, expr);
+					lbValue val_addr = lb_address_from_load_or_generate_local(p, val);
+
+					for (i64 i = 0; i < t->EnumeratedArray.count; i++) {
+						if (val0_type) {
+							// NOTE(bill): Due to weird legacy issues in LLVM, this needs to be an i32
+							lbValue elem = lb_emit_array_epi(p, val_addr, cast(i32)i);
+							lb_addr_store(p, val0_addr, lb_emit_load(p, elem));
+						}
+						if (val1_type) {
+							ExactValue idx = exact_value_add(exact_value_i64(i), *t->EnumeratedArray.min_value);
+							lb_addr_store(p, val1_addr, lb_const_value(m, val1_type, idx));
+						}
+
+						lb_build_stmt(p, rs->body);
+					}
+
+				}
+				break;
+			default:
+				GB_PANIC("Invalid '#unroll for' type");
+				break;
+			}
+		} else {
+
+			////////////////////////////////
+			//                            //
+			//      #unroll(N) logic      //
+			//                            //
+			////////////////////////////////
+
+
+			i64 unroll_count = exact_value_to_i64(unroll_count_ev);
+			gb_unused(unroll_count);
+
+			Type *t = base_type(expr->tav.type);
+
+			lbValue data_ptr = {};
+			lbValue count_ptr = {};
+
+			switch (t->kind) {
+			case Type_Slice:
+			case Type_DynamicArray: {
+				lbValue slice = lb_build_expr(p, expr);
+				if (is_type_pointer(slice.type)) {
+					count_ptr = lb_emit_struct_ep(p, slice, 1);
+					slice = lb_emit_load(p, slice);
+				} else {
+					count_ptr = lb_add_local_generated(p, t_int, false).addr;
+					lb_emit_store(p, count_ptr, lb_slice_len(p, slice));
+				}
+				data_ptr = lb_emit_struct_ev(p, slice, 0);
+				break;
+			}
+
+			case Type_Array: {
+				lbValue array = lb_build_expr(p, expr);
+				count_ptr = lb_add_local_generated(p, t_int, false).addr;
+				lb_emit_store(p, count_ptr, lb_const_int(p->module, t_int, t->Array.count));
+
+				if (!is_type_pointer(array.type)) {
+					array = lb_address_from_load_or_generate_local(p, array);
 				}
 
+				GB_ASSERT(is_type_pointer(array.type));
+				data_ptr = lb_emit_conv(p, array, alloc_type_pointer(t->Array.elem));
+				break;
 			}
-			break;
-		case Type_EnumeratedArray:
-			if (t->EnumeratedArray.count > 0) {
-				lbValue val = lb_build_expr(p, expr);
-				lbValue val_addr = lb_address_from_load_or_generate_local(p, val);
 
-				for (i64 i = 0; i < t->EnumeratedArray.count; i++) {
-					if (val0_type) {
-						// NOTE(bill): Due to weird legacy issues in LLVM, this needs to be an i32
-						lbValue elem = lb_emit_array_epi(p, val_addr, cast(i32)i);
-						lb_addr_store(p, val0_addr, lb_emit_load(p, elem));
-					}
-					if (val1_type) {
-						ExactValue idx = exact_value_add(exact_value_i64(i), *t->EnumeratedArray.min_value);
-						lb_addr_store(p, val1_addr, lb_const_value(m, val1_type, idx));
-					}
+			default:
+				GB_PANIC("Invalid '#unroll for' type");
+				break;
+			}
+
+			data_ptr.type = alloc_type_multi_pointer_to_pointer(data_ptr.type);
+
+			lbBlock *loop_top = lb_create_block(p, "for.unroll.loop.top");
+
+			lbBlock *body_top = lb_create_block(p, "for.unroll.body.top");
+			lbBlock *body_bot = lb_create_block(p, "for.unroll.body.bot");
+
+			lbBlock *done = lb_create_block(p, "for.unroll.done");
+
+			lbBlock *loop_bot = unroll_count > 1 ? lb_create_block(p, "for.unroll.loop.bot") : done;
+
+			/*
+				i := 0
+				for ; i+N <= len(array); i += N {
+					body
+				}
+				for ; i < len(array); i += 1 {
+					body
+				}
+			*/
+
+			Entity *val_entity = val0 ? entity_of_node(val0) : nullptr;
+			Entity *idx_entity = val1 ? entity_of_node(val1) : nullptr;
+
+			lbAddr val_addr = lb_add_local(p, type_deref(data_ptr.type, true), val_entity);
+			lbAddr idx_addr = lb_add_local(p, t_int, idx_entity);
+			lb_addr_store(p, idx_addr, lb_const_nil(p->module, t_int));
+
+			lb_emit_jump(p, loop_top);
+			lb_start_block(p, loop_top);
+
+			lbValue idx_add_n = lb_addr_load(p, idx_addr);
+			idx_add_n = lb_emit_arith(p, Token_Add, idx_add_n, lb_const_int(p->module, t_int, unroll_count), t_int);
+
+			lbValue cond_top = lb_emit_comp(p, Token_LtEq, idx_add_n, lb_emit_load(p, count_ptr));
+			lb_emit_if(p, cond_top, body_top, loop_bot);
+
+			lb_start_block(p, body_top);
+			for (i64 top = 0; top < unroll_count; top++) {
+				lbValue idx = lb_addr_load(p, idx_addr);
+				lbValue val = lb_emit_load(p, lb_emit_ptr_offset(p, data_ptr, idx));
+				lb_addr_store(p, val_addr, val);
+
+				lb_build_stmt(p, rs->body);
+
+				lb_emit_increment(p, lb_addr_get_ptr(p, idx_addr));
+			}
+			lb_emit_jump(p, loop_top);
+
+			if (unroll_count > 1) {
+				lb_start_block(p, loop_bot);
+
+				lbValue cond_bot = lb_emit_comp(p, Token_Lt, lb_addr_load(p, idx_addr), lb_emit_load(p, count_ptr));
+				lb_emit_if(p, cond_bot, body_bot, done);
+
+				lb_start_block(p, body_bot);
+				{
+					lbValue idx = lb_addr_load(p, idx_addr);
+					lbValue val = lb_emit_load(p, lb_emit_ptr_offset(p, data_ptr, idx));
+					lb_addr_store(p, val_addr, val);
 
 					lb_build_stmt(p, rs->body);
-				}
 
+					lb_emit_increment(p, lb_addr_get_ptr(p, idx_addr));
+				}
+				lb_emit_jump(p, loop_bot);
 			}
-			break;
-		default:
-			GB_PANIC("Invalid '#unroll for' type");
-			break;
+
+			lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
+			lb_emit_jump(p, done);
+			lb_start_block(p, done);
+
+			return;
 		}
 	}
 
