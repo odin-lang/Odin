@@ -89,6 +89,7 @@ intern_get_cstring :: proc(m: ^Intern, text: string) -> (str: cstring, err: runt
 	entry := _intern_get_entry(m, text) or_return
 	return cstring(&entry.str[0]), nil
 }
+
 /*
 Internal function to lookup whether the text string exists in the map, returns the entry
 Sets and allocates the entry if it wasn't set yet
@@ -104,11 +105,13 @@ Returns:
 - err: An allocator error if one occured, `nil` otherwise
 */
 _intern_get_entry :: proc(m: ^Intern, text: string) -> (new_entry: ^Intern_Entry, err: runtime.Allocator_Error) #no_bounds_check {
-	if prev, ok := m.entries[text]; ok {
-		return prev, nil
-	}
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
+	}
+
+	key_ptr, val_ptr, inserted := map_entry(&m.entries, text) or_return
+	if !inserted {
+		return val_ptr^, nil
 	}
 
 	entry_size := int(offset_of(Intern_Entry, str)) + len(text) + 1
@@ -120,6 +123,9 @@ _intern_get_entry :: proc(m: ^Intern, text: string) -> (new_entry: ^Intern_Entry
 	new_entry.str[new_entry.len] = 0
 
 	key := string(new_entry.str[:new_entry.len])
-	m.entries[key] = new_entry
-	return new_entry, nil
+
+	key_ptr^ = key
+	val_ptr^ = new_entry
+
+	return
 }

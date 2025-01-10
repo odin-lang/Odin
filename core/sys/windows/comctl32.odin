@@ -6,4 +6,5 @@ foreign import "system:Comctl32.lib"
 @(default_calling_convention="system")
 foreign Comctl32 {
 	LoadIconWithScaleDown :: proc(hinst: HINSTANCE, pszName: PCWSTR, cx: c_int, cy: c_int, phico: ^HICON) -> HRESULT ---
+	SetWindowSubclass :: proc(hwnd: HWND, pfnSubclass: SUBCLASSPROC, uIdSubclass: UINT_PTR, dwRefData: DWORD_PTR) ---
 }
