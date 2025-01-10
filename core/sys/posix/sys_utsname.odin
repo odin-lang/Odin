@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -38,10 +38,10 @@ foreign lib {
 	uname :: proc(uname: ^utsname) -> c.int ---
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku {
 
 	@(private)
-	_SYS_NAMELEN :: 256
+	_SYS_NAMELEN :: 32 when ODIN_OS == .Haiku else 256
 
 	utsname :: struct {
 		sysname:  [_SYS_NAMELEN]c.char `fmt:"s,0"`, /* [PSX] name of OS */

@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -442,4 +442,56 @@ when ODIN_OS == .Darwin {
 	_WIFCONTINUED :: #force_inline proc "contextless" (x: c.int) -> bool {
 		return x == 0xffff
 	}
+
+} else when ODIN_OS == .Haiku {
+
+	id_t :: distinct c.int32_t
+
+	WCONTINUED :: 0x04
+	WNOHANG    :: 0x01
+	WUNTRACED  :: 0x02
+
+	WEXITED  :: 0x08
+	WNOWAIT  :: 0x20
+	WSTOPPED :: 0x10
+
+	_P_ALL  :: 0
+	_P_PID  :: 1
+	_P_PGID :: 2
+
+	@(private)
+	_WIFEXITED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return (x & ~(c.int)(0xff)) == 0
+	}
+
+	@(private)
+	_WEXITSTATUS :: #force_inline proc "contextless" (x: c.int) -> c.int {
+		return x & 0xff
+	}
+
+	@(private)
+	_WIFSIGNALED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return ((x >> 8) & 0xff) != 0
+	}
+
+	@(private)
+	_WTERMSIG :: #force_inline proc "contextless" (x: c.int) -> Signal {
+		return Signal((x >> 8) & 0xff)
+	}
+
+	@(private)
+	_WIFSTOPPED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return ((x >> 16) & 0xff) != 0
+	}
+
+	@(private)
+	_WSTOPSIG :: #force_inline proc "contextless" (x: c.int) -> Signal {
+		return Signal((x >> 16) & 0xff)
+	}
+
+	@(private)
+	_WIFCONTINUED :: #force_inline proc "contextless" (x: c.int) -> bool {
+		return (x & 0x20000) != 0
+	}
+
 }

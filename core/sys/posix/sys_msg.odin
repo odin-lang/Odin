@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -169,6 +169,24 @@ when ODIN_OS == .Darwin {
 		msg_lspid:   pid_t,     /* [PSX] process ID of last msgsnd() */
 		msg_lrpid:   pid_t,     /* [PSX] process ID of last msgrcv() */
 		__unused:    [2]c.ulong,
+	}
+
+} else when ODIN_OS == .Haiku {
+
+	msgqnum_t :: distinct c.uint32_t
+	msglen_t  :: distinct c.uint32_t
+
+	MSG_NOERROR :: 0o10000
+
+	msqid_ds :: struct {
+		msg_perm:   ipc_perm,  /* [PSX] operation permission structure */
+		msg_qnum:   msgqnum_t, /* [PSX] number of messages currently on queue */
+		msg_qbytes: msglen_t,  /* [PSX] maximum number of bytes allowed on queue */
+		msg_lspid:  pid_t,     /* [PSX] process ID of last msgsnd() */
+		msg_lrpid:  pid_t,     /* [PSX] process ID of last msgrcv() */
+		msg_stime:  time_t,    /* [PSX] time of last msgsnd() */
+		msg_rtime:  time_t,    /* [PSX] time of last msgrcv() */
+		msg_ctime:  time_t,    /* [PSX] time of last change */
 	}
 
 }

@@ -185,16 +185,6 @@ foreign lib {
 	*/
 	sigwait :: proc(set: ^sigset_t, sig: ^Signal) -> Errno ---
 
-	when ODIN_OS != .Darwin {
-		/*
-		Wait for queued signals.
-
-		[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/sigtimedwait.html ]]
-		*/
-		sigtimedwait :: proc(set: ^sigset_t, info: ^siginfo_t, timeout: ^timespec) -> result ---
-	}
-
-
 	/* NOTE: unimplemented on darwin.
 
 	void   psiginfo(const siginfo_t *, const char *);

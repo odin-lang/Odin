@@ -2,7 +2,7 @@
 package sys_haiku
 
 import "base:intrinsics"
-import "core:c"
+import "core:sys/posix"
 
 foreign import libroot "system:c"
 
@@ -74,7 +74,7 @@ foreign libroot {
 	resize_area         :: proc(id: area_id, newSize: uintptr) -> status_t ---
 	set_area_protection :: proc(id: area_id, newProtection: area_protection_flags) -> status_t ---
 	_get_area_info      :: proc(id: area_id, areaInfo: ^area_info, size: uintptr) -> status_t ---
-	_get_next_area_info :: proc(team: team_id, cookie: ^c.ssize_t, areaInfo: ^area_info, size: uintptr) -> status_t ---
+	_get_next_area_info :: proc(team: team_id, cookie: ^int, areaInfo: ^area_info, size: uintptr) -> status_t ---
 }
 
 // Ports
@@ -99,15 +99,15 @@ port_flags :: distinct bit_set[port_flag; u32]
 foreign libroot {
 	create_port          :: proc(capacity: i32, name: cstring) -> port_id ---
 	find_port            :: proc(name: cstring) -> port_id ---
-	read_port            :: proc(port: port_id, code: ^i32, buffer: rawptr, bufferSize: uintptr) -> c.ssize_t ---
-	read_port_etc        :: proc(port: port_id, code: ^i32, buffer: rawptr, bufferSize: uintptr, flags: port_flags, timeout: bigtime_t) -> c.ssize_t ---
+	read_port            :: proc(port: port_id, code: ^i32, buffer: rawptr, bufferSize: uintptr) -> int ---
+	read_port_etc        :: proc(port: port_id, code: ^i32, buffer: rawptr, bufferSize: uintptr, flags: port_flags, timeout: bigtime_t) -> int ---
 	write_port           :: proc(port: port_id, code: i32, buffer: rawptr, bufferSize: uintptr) -> status_t ---
 	write_port_etc       :: proc(port: port_id, code: i32, buffer: rawptr, bufferSize: uintptr, flags: port_flags, timeout: bigtime_t) -> status_t ---
 	close_port           :: proc(port: port_id) -> status_t ---
 	delete_port          :: proc(port: port_id) -> status_t ---
-	port_buffer_size     :: proc(port: port_id) -> c.ssize_t ---
-	port_buffer_size_etc :: proc(port: port_id, flags: port_flags, timeout: bigtime_t) -> c.ssize_t ---
-	port_count           :: proc(port: port_id) -> c.ssize_t ---
+	port_buffer_size     :: proc(port: port_id) -> int ---
+	port_buffer_size_etc :: proc(port: port_id, flags: port_flags, timeout: bigtime_t) -> int ---
+	port_count           :: proc(port: port_id) -> int ---
 	set_port_owner       :: proc(port: port_id, team: team_id) -> status_t ---
 	_get_port_info       :: proc(port: port_id, portInfo: ^port_info, portInfoSize: uintptr) -> status_t ---
 	_get_next_port_info  :: proc(team: team_id, cookie: ^i32, portInfo: ^port_info, portInfoSize: uintptr) -> status_t ---
@@ -483,4 +483,16 @@ foreign libroot {
 
 	is_computer_on      :: proc() -> i32 ---
 	is_computer_on_fire :: proc() -> f64 ---
+}
+
+// POSIX signals
+
+@(default_calling_convention="c")
+foreign libroot {
+	/*
+	Wait for queued signals.
+
+	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/sigtimedwait.html ]]
+	*/
+	sigtimedwait :: proc(set: ^posix.sigset_t, info: ^posix.siginfo_t, timeout: ^posix.timespec) -> posix.result ---
 }
