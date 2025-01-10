@@ -110,7 +110,10 @@ class WasmMemoryInterface {
 	}
 
 	loadCstring(ptr) {
-		const start = this.loadPtr(ptr);
+		return this.loadCstringDirect(this.loadPtr(ptr));
+	}
+
+	loadCstringDirect(start) {
 		if (start == 0) {
 			return null;
 		}

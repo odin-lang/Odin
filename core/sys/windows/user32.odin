@@ -2,6 +2,7 @@
 package sys_windows
 
 import "base:intrinsics"
+import "core:c"
 foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="system")
@@ -31,6 +32,8 @@ foreign user32 {
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
+
+	RegisterHotKey :: proc(hnwd: HWND, id: c.int, fsModifiers: UINT, vk: UINT) -> BOOL ---
 
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
@@ -553,7 +556,7 @@ MOUSE_ATTRIBUTES_CHANGED :: 0x04
 MOUSE_MOVE_NOCOALESCE :: 0x08
 
 RI_MOUSE_BUTTON_1_DOWN :: 0x0001
-RI_MOUSE_LEFT_BUTTON_DOWNS :: RI_MOUSE_BUTTON_1_DOWN
+RI_MOUSE_LEFT_BUTTON_DOWN :: RI_MOUSE_BUTTON_1_DOWN
 RI_MOUSE_BUTTON_1_UP :: 0x0002
 RI_MOUSE_LEFT_BUTTON_UP :: RI_MOUSE_BUTTON_1_UP
 RI_MOUSE_BUTTON_2_DOWN :: 0x0004

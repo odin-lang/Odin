@@ -408,13 +408,18 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	lb_set_llvm_metadata(m, type, temp_forward_decl);
 
 	isize index_offset = 1;
+	isize variant_offset = 1;
 	if (is_type_union_maybe_pointer(bt)) {
 		index_offset = 0;
+		variant_offset = 0;
+	} else if (bt->Union.kind == UnionType_no_nil) {
+		variant_offset = 0;
 	}
 
 	LLVMMetadataRef member_scope = lb_get_llvm_metadata(m, bt->Union.scope);
 	unsigned element_count = cast(unsigned)bt->Union.variants.count;
 	if (index_offset > 0) {
+		GB_ASSERT(index_offset == 1);
 		element_count += 1;
 	}
 
@@ -437,13 +442,11 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	for_array(j, bt->Union.variants) {
 		Type *variant = bt->Union.variants[j];
 
-		unsigned field_index = cast(unsigned)(index_offset+j);
-
-		char name[16] = {};
-		gb_snprintf(name, gb_size_of(name), "v%u", field_index);
+		char name[32] = {};
+		gb_snprintf(name, gb_size_of(name), "v%td", variant_offset+j);
 		isize name_len = gb_strlen(name);
 
-		elements[field_index] = LLVMDIBuilderCreateMemberType(
+		elements[index_offset+j] = LLVMDIBuilderCreateMemberType(
 			m->debug_builder, member_scope,
 			name, name_len,
 			file, line,

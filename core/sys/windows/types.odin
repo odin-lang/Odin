@@ -796,6 +796,8 @@ TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
 
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
+SUBCLASSPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM, UINT_PTR, DWORD_PTR) -> LRESULT
+
 HOOKPROC :: #type proc "system" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
 
 WINEVENTPROC :: #type proc "system" (

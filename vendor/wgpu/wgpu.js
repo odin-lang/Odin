@@ -1181,7 +1181,7 @@ class WebGPUInterface {
 			 */
 			wgpuBufferSetLabel: (bufferIdx, labelPtr) => {
 				const buffer = this.buffers.get(bufferIdx);
-				buffer.buffer.label = this.mem.loadCstring(labelPtr);
+				buffer.buffer.label = this.mem.loadCstringDirect(labelPtr);
 			},
 
 			/**
@@ -1370,7 +1370,7 @@ class WebGPUInterface {
 			 */
 			wgpuCommandEncoderInsertDebugMarker: (commandEncoderIdx, markerLabelPtr) => {
 				const commandEncoder = this.commandEncoders.get(commandEncoderIdx);
-				commandEncoder.insertDebugMarker(this.mem.loadCstring(markerLabelPtr));
+				commandEncoder.insertDebugMarker(this.mem.loadCstringDirect(markerLabelPtr));
 			},
 
 			/**
@@ -1387,7 +1387,7 @@ class WebGPUInterface {
 			 */
 			wgpuCommandEncoderPushDebugGroup: (commandEncoderIdx, groupLabelPtr) => {
 				const commandEncoder = this.commandEncoders.get(commandEncoderIdx);
-				commandEncoder.pushDebugGroup(this.mem.loadCstring(groupLabelPtr));
+				commandEncoder.pushDebugGroup(this.mem.loadCstringDirect(groupLabelPtr));
 			},
 
 			/**
@@ -1459,7 +1459,7 @@ class WebGPUInterface {
 			 */
 			wgpuComputePassEncoderInsertDebugMarker: (computePassEncoderIdx, markerLabelPtr) => {
 				const computePassEncoder = this.computePassEncoders.get(computePassEncoderIdx);
-				computePassEncoder.insertDebugMarker(this.mem.loadCstring(markerLabelPtr));
+				computePassEncoder.insertDebugMarker(this.mem.loadCstringDirect(markerLabelPtr));
 			},
 
 			/**
@@ -1476,7 +1476,7 @@ class WebGPUInterface {
 			 */
 			wgpuComputePassEncoderPushDebugGroup: (computePassEncoderIdx, groupLabelPtr) => {
 				const computePassEncoder = this.computePassEncoders.get(computePassEncoderIdx);
-				computePassEncoder.pushDebugGroup(this.mem.loadCstring(groupLabelPtr));
+				computePassEncoder.pushDebugGroup(this.mem.loadCstringDirect(groupLabelPtr));
 			},
 
 			/**
@@ -2216,7 +2216,7 @@ class WebGPUInterface {
 			wgpuRenderBundleEncoderInsertDebugMarker: (renderBundleEncoderIdx, markerLabelPtr) => {
 				const renderBundleEncoder = this.renderBundleEncoders.get(renderBundleEncoderIdx);
 				this.assert(markerLabelPtr != 0);
-				const markerLabel = this.mem.loadCstring(markerLabelPtr);
+				const markerLabel = this.mem.loadCstringDirect(markerLabelPtr);
 				renderBundleEncoder.insertDebugMarker(markerLabel);
 			},
 
@@ -2235,7 +2235,7 @@ class WebGPUInterface {
 			wgpuRenderBundleEncoderPushDebugGroup: (renderBundleEncoderIdx, groupLabelPtr) => {
 				const renderBundleEncoder = this.renderBundleEncoders.get(renderBundleEncoderIdx);
 				this.assert(groupLabelPtr!= 0);
-				const groupLabel = this.mem.loadCstring(groupLabelPtr);
+				const groupLabel = this.mem.loadCstringDirect(groupLabelPtr);
 				renderBundleEncoder.pushDebugGroup(groupLabel);
 			},
 
@@ -2407,7 +2407,7 @@ class WebGPUInterface {
 			 */
 			wgpuRenderPassEncoderInsertDebugMarker: (renderPassEncoderIdx, markerLabelPtr) => {
 				const renderPassEncoder = this.renderPassEncoders.get(renderPassEncoderIdx);
-				const markerLabel = this.mem.loadCstring(markerLabelPtr);
+				const markerLabel = this.mem.loadCstringDirect(markerLabelPtr);
 				renderPassEncoder.insertDebugMarker(markerLabel);
 			},
 
@@ -2425,7 +2425,7 @@ class WebGPUInterface {
 			 */
 			wgpuRenderPassEncoderPushDebugGroup: (renderPassEncoderIdx, groupLabelPtr) => {
 				const renderPassEncoder = this.renderPassEncoders.get(renderPassEncoderIdx);
-				const groupLabel = this.mem.loadCstring(groupLabelPtr);
+				const groupLabel = this.mem.loadCstringDirect(groupLabelPtr);
 				renderPassEncoder.pushDebugGroup(groupLabel);
 			},
 
@@ -2881,11 +2881,11 @@ class WebGPUObjectManager {
 	}
 
 	/**
-	 * @param {number} idx
+	 * @param {?number} idx
 	 * @returns {T}
 	 */
 	get(idx) {
-		return this.objects[idx-1].object;
+		return this.objects[idx-1]?.object;
 	}
 
 	/** @param {number} idx */
@@ -2908,7 +2908,7 @@ class WebGPUObjectManager {
 		if (withLabelSetter) {
 			inter[`wgpu${this.name}SetLabel`] = (idx, labelPtr) => {
 				const obj = this.get(idx);
-				obj.label = this.mem.loadCstring(labelPtr);
+				obj.label = this.mem.loadCstringDirect(labelPtr);
 			};
 		}
 		return inter;
