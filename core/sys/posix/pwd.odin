@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -174,6 +174,18 @@ when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 		pw_gecos:  cstring, /* Real name.  */
 		pw_dir:    cstring, /* Home directory.  */
 		pw_shell:  cstring, /* Shell program.  */
+	}
+
+} else when ODIN_OS == .Haiku {
+
+	passwd :: struct {
+		pw_name:   cstring, /* [PSX] user name */
+		pw_passwd: cstring, /* encrypted password */
+		pw_uid:    uid_t,   /* [PSX] user uid */
+		pw_gid:    gid_t,   /* [PSX] user gid */
+		pw_dir:    cstring, /* Home directory.  */
+		pw_shell:  cstring, /* Shell program.  */
+		pw_gecos:  cstring, /* Real name.  */
 	}
 
 }

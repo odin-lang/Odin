@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "base:intrinsics"
@@ -56,9 +56,9 @@ when ODIN_OS == .NetBSD {
 	LSELECT  :: "select"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux || ODIN_OS == .Haiku {
 
-	suseconds_t :: distinct (c.int32_t when ODIN_OS == .Darwin || ODIN_OS == .NetBSD else c.long)
+	suseconds_t :: distinct (c.int32_t when ODIN_OS == .Darwin || ODIN_OS == .NetBSD || ODIN_OS == .Haiku else c.long)
 
 	timeval :: struct {
 		tv_sec:  time_t,      /* [PSX] seconds */
@@ -75,8 +75,14 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	@(private)
 	ALIGN ::  align_of(c.long) when ODIN_OS == .FreeBSD || ODIN_OS == .Linux else align_of(c.int32_t)
 
-	fd_set :: struct #align(ALIGN) {
-		fds_bits: [(FD_SETSIZE / __NFDBITS) when (FD_SETSIZE % __NFDBITS) == 0 else (FD_SETSIZE / __NFDBITS) + 1]c.int32_t,
+	when ODIN_OS == .Haiku {
+		fd_set :: struct #align(ALIGN) {
+			fds_bits: [(FD_SETSIZE + (__NFDBITS - 1)) / __NFDBITS]c.int32_t,
+		}
+	} else {
+		fd_set :: struct #align(ALIGN) {
+			fds_bits: [(FD_SETSIZE / __NFDBITS) when (FD_SETSIZE % __NFDBITS) == 0 else (FD_SETSIZE / __NFDBITS) + 1]c.int32_t,
+		}
 	}
 
 	@(private)

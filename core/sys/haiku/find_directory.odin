@@ -1,9 +1,11 @@
 #+build haiku
 package sys_haiku
 
-import "core:c"
+import "base:intrinsics"
 
-directory_which :: enum c.int {
+foreign import libroot "system:c"
+
+directory_which :: enum i32 {
 	// Per volume directories
 	DESKTOP_DIRECTORY = 0,
 	TRASH_DIRECTORY,
@@ -110,17 +112,18 @@ directory_which :: enum c.int {
 	BEOS_SOUNDS_DIRECTORY,
 }
 
-find_path_flags :: enum c.int {
-	CREATE_DIRECTORY        = 0x0001,
-	CREATE_PARENT_DIRECTORY = 0x0002,
-	EXISTING_ONLY           = 0x0004,
+find_path_flag :: enum u32 {
+	CREATE_DIRECTORY        = intrinsics.constant_log2(0x0001),
+	CREATE_PARENT_DIRECTORY = intrinsics.constant_log2(0x0002),
+	EXISTING_ONLY           = intrinsics.constant_log2(0x0004),
 	
-	// find_paths() only!
-	SYSTEM_ONLY             = 0x0010,
-	USER_ONLY               = 0x0020,
+	// find_paths() only
+	SYSTEM_ONLY             = intrinsics.constant_log2(0x0010),
+	USER_ONLY               = intrinsics.constant_log2(0x0020),
 }
+find_path_flags :: distinct bit_set[find_path_flag; u32]
 
-path_base_directory :: enum c.int {
+path_base_directory :: enum i32 {
 	INSTALLATION_LOCATION_DIRECTORY,
 	ADD_ONS_DIRECTORY,
 	APPS_DIRECTORY,
@@ -146,7 +149,7 @@ path_base_directory :: enum c.int {
 	TRANSLATORS_DIRECTORY,
 	VAR_DIRECTORY,
 
-	// find_path() only!
+	// find_path() only
 	IMAGE_PATH = 1000,
 	PACKAGE_PATH,
 }
@@ -154,15 +157,15 @@ path_base_directory :: enum c.int {
 // value that can be used instead of a pointer to a symbol in the program image
 APP_IMAGE_SYMBOL :: rawptr(addr_t(0))
 // pointer to a symbol in the callers image (same as B_CURRENT_IMAGE_SYMBOL)
-current_image_symbol :: proc() -> rawptr { return rawptr(current_image_symbol) }
+current_image_symbol :: proc "contextless" () -> rawptr { return rawptr(current_image_symbol) }
 
-foreign import libroot "system:c"
+@(default_calling_convention="c")
 foreign libroot {
-	find_directory         :: proc(which: directory_which, volume: dev_t, createIt: bool, pathString: [^]c.char, length: i32) -> status_t ---
-	find_path              :: proc(codePointer: rawptr, baseDirectory: path_base_directory, subPath: cstring, pathBuffer: [^]c.char, bufferSize: c.size_t) -> status_t ---
-	find_path_etc          :: proc(codePointer: rawptr, dependency: cstring, architecture: cstring, baseDirectory: path_base_directory, subPath: cstring, flags: find_path_flags, pathBuffer: [^]c.char, bufferSize: c.size_t) -> status_t ---
-	find_path_for_path     :: proc(path: cstring, baseDirectory: path_base_directory, subPath: cstring, pathBuffer: [^]c.char, bufferSize: c.size_t) -> status_t ---
-	find_path_for_path_etc :: proc(path: cstring, dependency: cstring, architecture: cstring, baseDirectory: path_base_directory, subPath: cstring, flags: find_path_flags, pathBuffer: [^]c.char, bufferSize: c.size_t) -> status_t ---
-	find_paths             :: proc(baseDirectory: path_base_directory, subPath: cstring, _paths: ^[^][^]c.char, _pathCount: ^c.size_t) -> status_t ---
-	find_paths_etc         :: proc(architecture: cstring, baseDirectory: path_base_directory, subPath: cstring, flags: find_path_flags, _paths: ^[^][^]c.char, _pathCount: ^c.size_t) -> status_t ---
+	find_directory         :: proc(which: directory_which, volume: dev_t, createIt: bool, pathString: [^]byte, length: i32) -> status_t ---
+	find_path              :: proc(codePointer: rawptr, baseDirectory: path_base_directory, subPath: cstring, pathBuffer: [^]byte, bufferSize: uint) -> status_t ---
+	find_path_etc          :: proc(codePointer: rawptr, dependency: cstring, architecture: cstring, baseDirectory: path_base_directory, subPath: cstring, flags: find_path_flags, pathBuffer: [^]byte, bufferSize: uint) -> status_t ---
+	find_path_for_path     :: proc(path: cstring, baseDirectory: path_base_directory, subPath: cstring, pathBuffer: [^]byte, bufferSize: uint) -> status_t ---
+	find_path_for_path_etc :: proc(path: cstring, dependency: cstring, architecture: cstring, baseDirectory: path_base_directory, subPath: cstring, flags: find_path_flags, pathBuffer: [^]byte, bufferSize: uint) -> status_t ---
+	find_paths             :: proc(baseDirectory: path_base_directory, subPath: cstring, _paths: ^[^][^]byte, _pathCount: ^uint) -> status_t ---
+	find_paths_etc         :: proc(architecture: cstring, baseDirectory: path_base_directory, subPath: cstring, flags: find_path_flags, _paths: ^[^][^]byte, _pathCount: ^uint) -> status_t ---
 }

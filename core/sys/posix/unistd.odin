@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -1852,7 +1852,7 @@ when ODIN_OS == .Darwin {
 	_PC_ALLOC_SIZE_MIN     :: 19
 	_PC_SYMLINK_MAX        :: 20
 	_PC_2_SYMLINK          :: 21
-
+	
 	_SC_ARG_MAX               :: 1
 	_SC_CHILD_MAX             :: 2
 	_SC_CLK_TCK               :: 3
@@ -1991,5 +1991,175 @@ when ODIN_OS == .Darwin {
 	_SC_XOPEN_UUCP :: 0
 	// NOTE: Not implemented.
 	_POSIX_VDISABLE :: 0
+
+} else when ODIN_OS == .Haiku {
+
+	_F_OK   :: 0
+	X_OK    :: 1
+	W_OK    :: 2
+	R_OK    :: 4
+
+	F_LOCK  :: 1
+	F_TEST  :: 3
+	F_TLOCK :: 2
+	F_ULOCK :: 0
+
+	_CS_PATH                           :: 1
+	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS :: 0 // Undefined.
+	_CS_POSIX_V6_ILP32_OFF32_CFLAGS    :: 0 // Undefined.
+	_CS_POSIX_V6_ILP32_OFF32_LDFLAGS   :: 0 // Undefined.
+	_CS_POSIX_V6_ILP32_OFF32_LIBS      :: 0 // Undefined.
+	_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS   :: 0 // Undefined.
+	_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS  :: 0 // Undefined.
+	_CS_POSIX_V6_ILP32_OFFBIG_LIBS     :: 0 // Undefined.
+	_CS_POSIX_V6_LP64_OFF64_CFLAGS     :: 0 // Undefined.
+	_CS_POSIX_V6_LP64_OFF64_LDFLAGS    :: 0 // Undefined.
+	_CS_POSIX_V6_LP64_OFF64_LIBS       :: 0 // Undefined.
+	_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS   :: 0 // Undefined.
+	_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS  :: 0 // Undefined.
+	_CS_POSIX_V6_LPBIG_OFFBIG_LIBS     :: 0 // Undefined.
+
+	_SC_ASYNCHRONOUS_IO      :: 0 // Undefined.
+	_SC_RAW_SOCKETS          :: 0 // Undefined.
+	_SC_SS_REPL_MAX          :: 0 // Undefined.
+	_SC_TRACE_EVENT_NAME_MAX :: 0 // Undefined.
+	_SC_TRACE_NAME_MAX       :: 0 // Undefined.
+	_SC_TRACE_SYS_MAX        :: 0 // Undefined.
+	_SC_TRACE_USER_EVENT_MAX :: 0 // Undefined.
+
+	_PC_CHOWN_RESTRICTED   :: 1
+	_PC_MAX_CANON          :: 2
+	_PC_MAX_INPUT          :: 3
+	_PC_NAME_MAX           :: 4
+	_PC_NO_TRUNC           :: 5
+	_PC_PATH_MAX           :: 6
+	_PC_PIPE_BUF           :: 7
+	_PC_VDISABLE           :: 8
+	_PC_LINK_MAX           :: 25
+	_PC_SYNC_IO            :: 26
+	_PC_ASYNC_IO           :: 27
+	_PC_PRIO_IO            :: 28
+	_PC_FILESIZEBITS       :: 30
+	_PC_REC_INCR_XFER_SIZE :: 31
+	_PC_REC_MAX_XFER_SIZE  :: 32
+	_PC_REC_MIN_XFER_SIZE  :: 33
+	_PC_REC_XFER_ALIGN     :: 34
+	_PC_ALLOC_SIZE_MIN     :: 35
+	_PC_SYMLINK_MAX        :: 36
+	_PC_2_SYMLINK          :: 37
+
+	_SC_ARG_MAX                    :: 15
+	_SC_CHILD_MAX                  :: 16
+	_SC_CLK_TCK                    :: 17
+	_SC_JOB_CONTROL                :: 18
+	_SC_NGROUPS_MAX                :: 19
+	_SC_OPEN_MAX                   :: 20
+	_SC_SAVED_IDS                  :: 21
+	_SC_STREAM_MAX                 :: 22
+	_SC_TZNAME_MAX                 :: 23
+	_SC_VERSION                    :: 24
+	_SC_GETGR_R_SIZE_MAX           :: 25
+	_SC_GETPW_R_SIZE_MAX           :: 26
+	_SC_PAGE_SIZE                  :: 27
+	_SC_PAGESIZE                   :: _SC_PAGE_SIZE
+	_SC_SEM_NSEMS_MAX              :: 28
+	_SC_SEM_VALUE_MAX              :: 29
+	_SC_SEMAPHORES                 :: 30
+	_SC_THREADS                    :: 31
+	_SC_IOV_MAX                    :: 32
+	_SC_NPROCESSORS_CONF           :: 34
+	_SC_NPROCESSORS_ONLN           :: 35
+	_SC_ATEXIT_MAX                 :: 37
+	_SC_MAPPED_FILES               :: 45
+	_SC_THREAD_PROCESS_SHARED      :: 46
+	_SC_THREAD_STACK_MIN           :: 47
+	_SC_THREAD_ATTR_STACKADDR      :: 48
+	_SC_THREAD_ATTR_STACKSIZE      :: 49
+	_SC_THREAD_PRIORITY_SCHEDULING :: 50
+	_SC_REALTIME_SIGNALS           :: 51
+	_SC_MEMORY_PROTECTION          :: 52
+	_SC_SIGQUEUE_MAX               :: 53
+	_SC_RTSIG_MAX                  :: 54
+	_SC_MONOTONIC_CLOCK            :: 55
+	_SC_DELAYTIMER_MAX             :: 56
+	_SC_TIMER_MAX                  :: 57
+	_SC_TIMERS                     :: 58
+	_SC_CPUTIME                    :: 59
+	_SC_THREAD_CPUTIME             :: 60
+	_SC_HOST_NAME_MAX              :: 61
+	_SC_REGEXP                     :: 62
+	_SC_SYMLOOP_MAX                :: 63
+	_SC_SHELL                      :: 64
+	_SC_TTY_NAME_MAX               :: 65
+	_SC_ADVISORY_INFO              :: 66
+	_SC_BARRIERS                   :: 67
+	_SC_CLOCK_SELECTION            :: 68
+	_SC_FSYNC                      :: 69
+	_SC_IPV6                       :: 70
+	_SC_MEMLOCK                    :: 71
+	_SC_MEMLOCK_RANGE              :: 72
+	_SC_MESSAGE_PASSING            :: 73
+	_SC_PRIORITIZED_IO             :: 74
+	_SC_PRIORITY_SCHEDULING        :: 75
+	_SC_READER_WRITER_LOCKS        :: 76
+	_SC_SHARED_MEMORY_OBJECTS      :: 77
+	_SC_SPAWN                      :: 78
+	_SC_SPIN_LOCKS                 :: 79
+	_SC_SPORADIC_SERVER            :: 80
+	_SC_SYNCHRONIZED_IO            :: 81
+	_SC_THREAD_PRIO_INHERIT        :: 82
+	_SC_THREAD_PRIO_PROTECT        :: 83
+	_SC_THREAD_SAFE_FUNCTIONS      :: 86
+	_SC_THREAD_SPORADIC_SERVER     :: 87
+	_SC_TIMEOUTS                   :: 88
+	_SC_TRACE                      :: 89
+	_SC_TRACE_EVENT_FILTER         :: 90
+	_SC_TRACE_INHERIT              :: 91
+	_SC_TRACE_LOG                  :: 92
+	_SC_TYPED_MEMORY_OBJECTS       :: 93
+	_SC_V6_ILP32_OFF32             :: 94
+	_SC_V6_ILP32_OFFBIG            :: 95
+	_SC_V6_LP64_OFF64              :: 96
+	_SC_V6_LPBIG_OFFBIG            :: 97
+	_SC_2_C_BIND                   :: 102
+	_SC_2_C_DEV                    :: 103
+	_SC_2_CHAR_TERM                :: 104
+	_SC_2_FORT_DEV                 :: 105
+	_SC_2_FORT_RUN                 :: 106
+	_SC_2_LOCALEDEF                :: 107
+	_SC_2_PBS                      :: 108
+	_SC_2_PBS_ACCOUNTING           :: 109
+	_SC_2_PBS_CHECKPOINT           :: 110
+	_SC_2_PBS_LOCATE               :: 111
+	_SC_2_PBS_MESSAGE              :: 112
+	_SC_2_PBS_TRACK                :: 113
+	_SC_2_SW_DEV                   :: 114
+	_SC_2_UPE                      :: 115
+	_SC_2_VERSION                  :: 116
+	_SC_XOPEN_CRYPT                :: 117
+	_SC_XOPEN_ENH_I18N             :: 118
+	_SC_XOPEN_REALTIME             :: 119
+	_SC_XOPEN_REALTIME_THREADS     :: 120
+	_SC_XOPEN_SHM                  :: 121
+	_SC_XOPEN_STREAMS              :: 122
+	_SC_XOPEN_UNIX                   :: 123
+	_SC_XOPEN_VERSION                :: 125
+	_SC_AIO_LISTIO_MAX               :: 126
+	_SC_AIO_MAX                      :: 127
+	_SC_AIO_PRIO_DELTA_MAX           :: 128
+	_SC_BC_BASE_MAX                  :: 129
+	_SC_BC_DIM_MAX                   :: 130
+	_SC_BC_SCALE_MAX                 :: 131
+	_SC_BC_STRING_MAX                :: 132
+	_SC_COLL_WEIGHTS_MAX             :: 133
+	_SC_EXPR_NEST_MAX                :: 134
+	_SC_LINE_MAX                     :: 135
+	_SC_LOGIN_NAME_MAX               :: 136
+	_SC_MQ_OPEN_MAX                  :: 137
+	_SC_MQ_PRIO_MAX                  :: 138
+	_SC_THREAD_DESTRUCTOR_ITERATIONS :: 139
+	_SC_THREAD_KEYS_MAX              :: 140
+	_SC_THREAD_THREADS_MAX           :: 141
+	_SC_RE_DUP_MAX                   :: 142
 
 }

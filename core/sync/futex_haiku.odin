@@ -1,14 +1,13 @@
 #+private
 package sync
 
-import "core:c"
 import "core:sys/haiku"
-import "core:sys/unix"
+import "core:sys/posix"
 import "core:time"
 
 @(private="file")
 Wait_Node :: struct {
-	thread:     unix.pthread_t,
+	thread:     posix.pthread_t,
 	futex:      ^Futex,
 	prev, next: ^Wait_Node,
 }
@@ -58,7 +57,7 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> (ok: bool) {
 
 	head   := &waitq.list
 	waiter := Wait_Node{
-		thread = unix.pthread_self(),
+		thread = posix.pthread_self(),
 		futex  = f,
 		prev   = head,
 		next   = head.next,
@@ -67,25 +66,24 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> (ok: bool) {
 	waiter.prev.next = &waiter
 	waiter.next.prev = &waiter
 
-	old_mask, mask: haiku.sigset_t
-	haiku.sigemptyset(&mask)
-	haiku.sigaddset(&mask, haiku.SIGCONT)
-	unix.pthread_sigmask(haiku.SIG_BLOCK, &mask, &old_mask)
+	old_mask, mask: posix.sigset_t
+	posix.sigemptyset(&mask)
+	posix.sigaddset(&mask, .SIGCONT)
+	posix.pthread_sigmask(.BLOCK, &mask, &old_mask)
 
 	if u32(atomic_load_explicit(f, .Acquire)) == expect {
 		waitq_unlock(waitq)
 		defer waitq_lock(waitq)
 		
-		sig: c.int
-		haiku.sigwait(&mask, &sig)
-		errno := haiku.errno() 
-		ok = errno == .OK
+		sig: posix.Signal
+		errno := posix.sigwait(&mask, &sig) 
+		ok = errno == nil
 	}
 
 	waiter.prev.next = waiter.next
 	waiter.next.prev = waiter.prev
 
-	_ = unix.pthread_sigmask(haiku.SIG_SETMASK, &old_mask, nil)
+	_ = posix.pthread_sigmask(.SETMASK, &old_mask, nil)
 
  	// FIXME: Add error handling!
 	return
@@ -101,7 +99,7 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration
 
 	head   := &waitq.list
 	waiter := Wait_Node{
-		thread = unix.pthread_self(),
+		thread = posix.pthread_self(),
 		futex  = f,
 		prev   = head,
 		next   = head.next,
@@ -110,29 +108,29 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration
 	waiter.prev.next = &waiter
 	waiter.next.prev = &waiter
 
-	old_mask, mask: haiku.sigset_t
-	haiku.sigemptyset(&mask)
-	haiku.sigaddset(&mask, haiku.SIGCONT)
-	unix.pthread_sigmask(haiku.SIG_BLOCK, &mask, &old_mask)
+	old_mask, mask: posix.sigset_t
+	posix.sigemptyset(&mask)
+	posix.sigaddset(&mask, .SIGCONT)
+	posix.pthread_sigmask(.BLOCK, &mask, &old_mask)
 
 	if u32(atomic_load_explicit(f, .Acquire)) == expect {
 		waitq_unlock(waitq)
 		defer waitq_lock(waitq)
 		
-		info: haiku.siginfo_t
-		ts := unix.timespec{
-			tv_sec  = i64(duration / 1e9),
+		info: posix.siginfo_t
+		ts := posix.timespec{
+			tv_sec  = posix.time_t(i64(duration / 1e9)),
 			tv_nsec = i64(duration % 1e9),
 		}
 		haiku.sigtimedwait(&mask, &info, &ts)
-		errno := haiku.errno() 
-		ok = errno == .EAGAIN || errno == .OK
+		errno := posix.errno() 
+		ok = errno == .EAGAIN || errno == nil
 	}
 
 	waiter.prev.next = waiter.next
 	waiter.next.prev = waiter.prev
 
-	unix.pthread_sigmask(haiku.SIG_SETMASK, &old_mask, nil)
+	posix.pthread_sigmask(.SETMASK, &old_mask, nil)
 
 	// FIXME: Add error handling!
 	return
@@ -146,7 +144,7 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 	head := &waitq.list
 	for waiter := head.next; waiter != head; waiter = waiter.next {
 		if waiter.futex == f {
-			unix.pthread_kill(waiter.thread, haiku.SIGCONT)
+			posix.pthread_kill(waiter.thread, .SIGCONT)
 			break
 		}
 	}
@@ -160,7 +158,7 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 	head := &waitq.list
 	for waiter := head.next; waiter != head; waiter = waiter.next {
 		if waiter.futex == f {
-			unix.pthread_kill(waiter.thread, haiku.SIGCONT)
+			posix.pthread_kill(waiter.thread, .SIGCONT)
 		}
 	}
 }

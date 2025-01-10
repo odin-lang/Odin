@@ -1,26 +1,31 @@
 #+build haiku
 package sys_haiku
 
-import "core:c"
+import "core:sys/posix"
 
-Errno :: enum c.int {
-	// Error baselines
-	GENERAL_ERROR_BASE     = min(c.int),
-	OS_ERROR_BASE          = GENERAL_ERROR_BASE + 0x1000,
-	APP_ERROR_BASE         = GENERAL_ERROR_BASE + 0x2000,
-	INTERFACE_ERROR_BASE   = GENERAL_ERROR_BASE + 0x3000,
-	MEDIA_ERROR_BASE       = GENERAL_ERROR_BASE + 0x4000,
-	TRANSLATION_ERROR_BASE = GENERAL_ERROR_BASE + 0x4800,
-	MIDI_ERROR_BASE        = GENERAL_ERROR_BASE + 0x5000,
-	STORAGE_ERROR_BASE     = GENERAL_ERROR_BASE + 0x6000,
-	POSIX_ERROR_BASE       = GENERAL_ERROR_BASE + 0x7000,
-	MAIL_ERROR_BASE        = GENERAL_ERROR_BASE + 0x8000,
-	PRINT_ERROR_BASE       = GENERAL_ERROR_BASE + 0x9000,
-	DEVICE_ERROR_BASE      = GENERAL_ERROR_BASE + 0xa000,
+foreign import libroot "system:c"
 
-	// Developer-defined errors start at (ERRORS_END+1)
-	ERRORS_END             = GENERAL_ERROR_BASE + 0xffff,
+USE_POSITIVE_POSIX_ERRORS :: posix._HAIKU_USE_POSITIVE_POSIX_ERRORS
+POSIX_ERROR_FACTOR        :: posix._POSIX_ERROR_FACTOR
 
+// Error baselines
+GENERAL_ERROR_BASE        :: min(i32)
+OS_ERROR_BASE             :: GENERAL_ERROR_BASE + 0x1000
+APP_ERROR_BASE            :: GENERAL_ERROR_BASE + 0x2000
+INTERFACE_ERROR_BASE      :: GENERAL_ERROR_BASE + 0x3000
+MEDIA_ERROR_BASE          :: GENERAL_ERROR_BASE + 0x4000
+TRANSLATION_ERROR_BASE    :: GENERAL_ERROR_BASE + 0x4800
+MIDI_ERROR_BASE           :: GENERAL_ERROR_BASE + 0x5000
+STORAGE_ERROR_BASE        :: GENERAL_ERROR_BASE + 0x6000
+POSIX_ERROR_BASE          :: GENERAL_ERROR_BASE + 0x7000
+MAIL_ERROR_BASE           :: GENERAL_ERROR_BASE + 0x8000
+PRINT_ERROR_BASE          :: GENERAL_ERROR_BASE + 0x9000
+DEVICE_ERROR_BASE         :: GENERAL_ERROR_BASE + 0xA000
+
+// Developer-defined errors start at (ERRORS_END+1)
+ERRORS_END                :: GENERAL_ERROR_BASE + 0xFFFF
+
+Errno :: enum i32 {
 	// General Errors
 	NO_MEMORY              = GENERAL_ERROR_BASE + 0,
 	IO_ERROR               = GENERAL_ERROR_BASE + 1,
@@ -107,31 +112,95 @@ Errno :: enum c.int {
 	PARTIAL_READ                      = STORAGE_ERROR_BASE + 16,
 	PARTIAL_WRITE                     = STORAGE_ERROR_BASE + 17,
 
-	// Some POSIX errors
-	E2BIG                             = POSIX_ERROR_BASE + 1,
-	EFBIG                             = POSIX_ERROR_BASE + 4,
-	ENODEV                            = POSIX_ERROR_BASE + 7,
-	ERANGE                            = POSIX_ERROR_BASE + 17,
-	EOVERFLOW                         = POSIX_ERROR_BASE + 41,
-	EOPNOTSUPP                        = POSIX_ERROR_BASE + 43,
-
-	ENOSYS                            = POSIX_ERROR_BASE + 9,
-	EAGAIN                            = WOULD_BLOCK,
+	EIO                          = posix.EIO,
+	EACCES                       = posix.EACCES,
+	EINVAL                       = posix.EINVAL,
+	ETIMEDOUT                    = posix.ETIMEDOUT,
+	EINTR                        = posix.EINTR,
+	EAGAIN                       = posix.EAGAIN,
+	EWOULDBLOCK                  = posix.EWOULDBLOCK,
+	EBUSY                        = posix.EBUSY,
+	EPERM                        = posix.EPERM,
+	EFAULT                       = posix.EFAULT,
+	ENOEXEC                      = posix.ENOEXEC,
+	EBADF                        = posix.EBADF,
+	EEXIST                       = posix.EEXIST,
+	ENOENT                       = posix.ENOENT,
+	ENAMETOOLONG                 = posix.ENAMETOOLONG,
+	ENOTDIR                      = posix.ENOTDIR,
+	ENOTEMPTY                    = posix.ENOTEMPTY,
+	ENOSPC                       = posix.ENOSPC,
+	EROFS                        = posix.EROFS,
+	EISDIR                       = posix.EISDIR,
+	EMFILE                       = posix.EMFILE,
+	EXDEV                        = posix.EXDEV,
+	ELOOP                        = posix.ELOOP,
+	EPIPE                        = posix.EPIPE,
+	ENOMEM                       = posix.ENOMEM,
+	E2BIG                        = posix.E2BIG,
+	ECHILD                       = posix.ECHILD,
+	EDEADLK                      = posix.EDEADLK,
+	EFBIG                        = posix.EFBIG,
+	EMLINK                       = posix.EMLINK,
+	ENFILE                       = posix.ENFILE,
+	ENODEV                       = posix.ENODEV,
+	ENOLCK                       = posix.ENOLCK,
+	ENOSYS                       = posix.ENOSYS,
+	ENOTTY                       = posix.ENOTTY,
+	ENXIO                        = posix.ENXIO,
+	ESPIPE                       = posix.ESPIPE,
+	ESRCH                        = posix.ESRCH,
+	EDOM                         = posix.EDOM,
+	ERANGE                       = posix.ERANGE,
+	EPROTOTYPE                   = posix.EPROTOTYPE,
+	EPROTONOSUPPORT              = posix.EPROTONOSUPPORT,
+	EAFNOSUPPORT                 = posix.EAFNOSUPPORT,
+	EADDRINUSE                   = posix.EADDRINUSE,
+	EADDRNOTAVAIL                = posix.EADDRNOTAVAIL,
+	ENETDOWN                     = posix.ENETDOWN,
+	ENETUNREACH                  = posix.ENETUNREACH,
+	ENETRESET                    = posix.ENETRESET,
+	ECONNABORTED                 = posix.ECONNABORTED,
+	ECONNRESET                   = posix.ECONNRESET,
+	EISCONN                      = posix.EISCONN,
+	ENOTCONN                     = posix.ENOTCONN,
+	ECONNREFUSED                 = posix.ECONNREFUSED,
+	EHOSTUNREACH                 = posix.EHOSTUNREACH,
+	ENOPROTOOPT                  = posix.ENOPROTOOPT,
+	ENOBUFS                      = posix.ENOBUFS,
+	EINPROGRESS                  = posix.EINPROGRESS,
+	EALREADY                     = posix.EALREADY,
+	EILSEQ                       = posix.EILSEQ,
+	ENOMSG                       = posix.ENOMSG,
+	ESTALE                       = posix.ESTALE,
+	EOVERFLOW                    = posix.EOVERFLOW,
+	EMSGSIZE                     = posix.EMSGSIZE,
+	EOPNOTSUPP                   = posix.EOPNOTSUPP,
+	ENOTSOCK                     = posix.ENOTSOCK,
+	EBADMSG                      = posix.EBADMSG,
+	ECANCELED                    = posix.ECANCELED,
+	EDESTADDRREQ                 = posix.EDESTADDRREQ,
+	EDQUOT                       = posix.EDQUOT,
+	EIDRM                        = posix.EIDRM,
+	EMULTIHOP                    = posix.EMULTIHOP,
+	ENODATA                      = posix.ENODATA,
+	ENOLINK                      = posix.ENOLINK,
+	ENOSR                        = posix.ENOSR,
+	ENOSTR                       = posix.ENOSTR,
+	ENOTSUP                      = posix.ENOTSUP,
+	EPROTO                       = posix.EPROTO,
+	ETIME                        = posix.ETIME,
+	ETXTBSY                      = posix.ETXTBSY,
+	ENOTRECOVERABLE              = posix.ENOTRECOVERABLE,
+	EOWNERDEAD                   = posix.EOWNERDEAD,
 
 	// New error codes that can be mapped to POSIX errors
-	TOO_MANY_ARGS_NEG                 = E2BIG,
-	FILE_TOO_LARGE_NEG                = EFBIG,
-	DEVICE_NOT_FOUND_NEG              = ENODEV,
-	RESULT_NOT_REPRESENTABLE_NEG      = ERANGE,
-	BUFFER_OVERFLOW_NEG               = EOVERFLOW,
-	NOT_SUPPORTED_NEG                 = EOPNOTSUPP,
-
-	TOO_MANY_ARGS_POS                 = -E2BIG,
-	FILE_TOO_LARGE_POS                = -EFBIG,
-	DEVICE_NOT_FOUND_POS              = -ENODEV,
-	RESULT_NOT_REPRESENTABLE_POS      = -ERANGE,
-	BUFFER_OVERFLOW_POS               = -EOVERFLOW,
-	NOT_SUPPORTED_POS                 = -EOPNOTSUPP,
+	TOO_MANY_ARGS                = POSIX_ERROR_FACTOR * E2BIG,
+	FILE_TOO_LARGE               = POSIX_ERROR_FACTOR * EFBIG,
+	DEVICE_NOT_FOUND             = POSIX_ERROR_FACTOR * ENODEV,
+	RESULT_NOT_REPRESENTABLE     = POSIX_ERROR_FACTOR * ERANGE,
+	BUFFER_OVERFLOW              = POSIX_ERROR_FACTOR * EOVERFLOW,
+	NOT_SUPPORTED                = POSIX_ERROR_FACTOR * EOPNOTSUPP,
 
 	// Media Kit Errors
 	STREAM_NOT_FOUND             = MEDIA_ERROR_BASE + 0,
@@ -226,14 +295,8 @@ Errno :: enum c.int {
 	ILLEGAL_DATA                 = TRANSLATION_ERROR_BASE + 2,
 }
 
-errno :: #force_inline proc "contextless" () -> Errno {
-	return Errno(_errnop()^)
-}
-
-foreign import libroot "system:c"
+@(default_calling_convention="c")
 foreign libroot {
-	_to_positive_error :: proc(error: c.int) -> c.int ---
-	_to_negative_error :: proc(error: c.int) -> c.int ---
-
-	_errnop :: proc() -> ^c.int ---
+	_to_positive_error :: proc(error: i32) -> i32 ---
+	_to_negative_error :: proc(error: i32) -> i32 ---
 }

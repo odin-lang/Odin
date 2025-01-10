@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 when ODIN_OS == .Darwin {
@@ -25,7 +25,7 @@ when ODIN_OS == .NetBSD {
 	@(private) LUTIME :: "utime"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD	|| ODIN_OS == .Linux {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux || ODIN_OS == .Haiku {
 
 	utimbuf :: struct {
 		actime:  time_t, /* [PSX] access time (seconds since epoch) */

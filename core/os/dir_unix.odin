@@ -1,4 +1,4 @@
-#+build darwin, linux, netbsd, freebsd, openbsd
+#+build darwin, linux, netbsd, freebsd, openbsd, haiku
 package os
 
 import "core:strings"

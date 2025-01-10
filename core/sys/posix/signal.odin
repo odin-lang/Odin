@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "base:intrinsics"
@@ -1180,4 +1180,151 @@ when ODIN_OS == .Darwin {
 	SI_TIMER   :: -2
 	SI_MESGQ   :: -3
 	SI_ASYNCIO :: -4
+
+} else when ODIN_OS == .Haiku {
+
+	// Request that signal be held
+	SIG_HOLD :: rawptr(uintptr(3))
+
+	uid_t :: distinct c.uint32_t
+	sigset_t :: distinct u64
+
+	SIGHUP     :: 1  // hangup -- tty is gone!
+	//SIGINT     :: 2  // interrupt
+	SIGQUIT    :: 3  // `quit' special character typed in tty
+	//SIGILL     :: 4  // illegal instruction
+	SIGCHLD    :: 5  // child process exited
+	//SIGABRT    :: 6  // abort() called, dont' catch
+	SIGPIPE    :: 7  // write to a pipe w/no readers
+	//SIGFPE     :: 8  // floating point exception
+	SIGKILL    :: 9  // kill a team (not catchable)
+	SIGSTOP    :: 10 // suspend a thread (not catchable)
+	//SIGSEGV    :: 11 // segmentation violation (read: invalid pointer)
+	SIGCONT    :: 12 // continue execution if suspended
+	SIGTSTP    :: 13 // `stop' special character typed in tty
+	SIGALRM    :: 14 // an alarm has gone off (see alarm())
+	//SIGTERM    :: 15 // termination requested
+	SIGTTIN    :: 16 // read of tty from bg process
+	SIGTTOU    :: 17 // write to tty from bg process
+	SIGUSR1    :: 18 // app defined signal 1
+	SIGUSR2    :: 19 // app defined signal 2
+	SIGWINCH   :: 20 // tty window size changed
+	SIGKILLTHR :: 21 // be specific: kill just the thread, not team
+	SIGTRAP    :: 22 // Trace/breakpoint trap
+	SIGPOLL    :: 23 // Pollable event
+	SIGPROF    :: 24 // Profiling timer expired
+	SIGSYS     :: 25 // Bad system call
+	SIGURG     :: 26 // High bandwidth data is available at socket
+	SIGVTALRM  :: 27 // Virtual timer expired
+	SIGXCPU    :: 28 // CPU time limit exceeded
+	SIGXFSZ    :: 29 // File size limit exceeded
+	SIGBUS     :: 30 // access to undefined portion of a memory object
+
+	// NOTE: this is actually defined as `sigaction`, but due to the function with the same name
+	// `_t` has been added.
+
+	sigaction_t :: struct {
+		using _: struct #raw_union {
+			sa_handler:   proc "c" (Signal),                     /* [PSX] signal-catching function or one of the SIG_IGN or SIG_DFL */
+			sa_sigaction: proc "c" (Signal, ^siginfo_t, rawptr), /* [PSX] signal-catching function */
+		},
+		sa_mask:     sigset_t, /* [PSX] set of signals to be blocked during execution of the signal handling function */
+		sa_flags:    SA_Flags, /* [PSX] special flags */
+		sa_userdata: rawptr,   /* will be passed to the signal handler, BeOS extension */
+	}
+
+	SIG_BLOCK   :: 1
+	SIG_UNBLOCK :: 2
+	SIG_SETMASK :: 3
+
+	SA_NOCLDSTOP :: 0x01
+	SA_NOCLDWAIT :: 0x02
+	SA_RESETHAND :: 0x04
+	SA_NODEFER   :: 0x08
+	SA_RESTART   :: 0x10
+	SA_ONSTACK   :: 0x20
+	SA_SIGINFO   :: 0x40
+
+	SS_ONSTACK :: 1
+	SS_DISABLE :: 2
+
+	MINSIGSTKSZ :: 8192
+	SIGSTKSZ    :: 16384
+
+	stack_t :: struct {
+		ss_sp:    rawptr,   /* [PSX] stack base or pointer */
+		ss_size:  c.size_t, /* [PSX] stack size */
+		ss_flags: SS_Flags, /* [PSX] flags */
+	}
+
+	siginfo_t :: struct {
+		si_signo: Signal,             /* [PSX] signal number */
+		si_code:  struct #raw_union { /* [PSX] specific more detailed codes per signal */
+			ill:  ILL_Code,
+			fpe:  FPE_Code,
+			segv: SEGV_Code,
+			bus:  BUS_Code,
+			trap: TRAP_Code,
+			chld: CLD_Code,
+			poll: POLL_Code,
+			any:  Any_Code,
+		},
+		si_errno:  Errno,  /* [PSX] errno value associated with this signal */
+		si_pid:    pid_t,  /* sending process ID */
+		si_uid:    uid_t,  /* real user ID of sending process */
+		si_addr:   rawptr, /* address of faulting instruction */
+		si_status: c.int,  /* exit value or signal */
+		si_band:   c.long, /* band event for SIGPOLL */
+		si_value:  sigval, /* signal value */
+	}
+
+	/* any signal */
+	SI_USER       :: 0 /* signal sent by user */
+	SI_QUEUE      :: 1 /* signal sent by sigqueue() */
+	SI_TIMER      :: 2 /* signal sent on timer_settime() timeout */
+	SI_ASYNCIO    :: 3 /* signal sent on asynchronous I/O completion */
+	SI_MESGQ      :: 4 /* signal sent on arrival of message on empty message queue */
+	/* SIGILL */
+	ILL_ILLOPC    :: 10 /* illegal opcode */
+	ILL_ILLOPN    :: 11 /* illegal operand */
+	ILL_ILLADR    :: 12 /* illegal addressing mode */
+	ILL_ILLTRP    :: 13 /* illegal trap */
+	ILL_PRVOPC    :: 14 /* privileged opcode */
+	ILL_PRVREG    :: 15 /* privileged register */
+	ILL_COPROC    :: 16 /* coprocessor error */
+	ILL_BADSTK    :: 17 /* internal stack error */
+	/* SIGFPE */
+	FPE_INTDIV    :: 20 /* integer division by zero */
+	FPE_INTOVF    :: 21 /* integer overflow */
+	FPE_FLTDIV    :: 22 /* floating-point division by zero */
+	FPE_FLTOVF    :: 23 /* floating-point overflow */
+	FPE_FLTUND    :: 24 /* floating-point underflow */
+	FPE_FLTRES    :: 25 /* floating-point inexact result */
+	FPE_FLTINV    :: 26 /* invalid floating-point operation */
+	FPE_FLTSUB    :: 27 /* subscript out of range */
+	/* SIGSEGV */
+	SEGV_MAPERR   :: 30 /* address not mapped to object */
+	SEGV_ACCERR   :: 31 /* invalid permissions for mapped object */
+	/* SIGBUS */
+	BUS_ADRALN    :: 40 /* invalid address alignment */
+	BUS_ADRERR    :: 41 /* nonexistent physical address */
+	BUS_OBJERR    :: 42 /* object-specific hardware error */
+	/* SIGTRAP */
+	TRAP_BRKPT    :: 50 /* process breakpoint */
+	TRAP_TRACE    :: 51 /* process trace trap. */
+	/* SIGCHLD */
+	CLD_EXITED    :: 60 /* child exited */
+	CLD_KILLED    :: 61 /* child terminated abnormally without core dump */
+	CLD_DUMPED    :: 62 /* child terminated abnormally with core dump */
+	CLD_TRAPPED   :: 63 /* traced child trapped */
+	CLD_STOPPED   :: 64 /* child stopped */
+	CLD_CONTINUED :: 65 /* stopped child continued */
+	/* SIGPOLL */
+	POLL_IN       :: 70 /* input available */
+	POLL_OUT      :: 71 /* output available */
+	POLL_MSG      :: 72 /* input message available */
+	POLL_ERR      :: 73 /* I/O error */
+	POLL_PRI      :: 74 /* high priority input available */
+	POLL_HUP      :: 75 /* device disconnected */
+
 }
