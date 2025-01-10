@@ -624,6 +624,14 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 is_file :: proc {is_file_path, is_file_handle}
 is_dir :: proc {is_dir_path, is_dir_handle}
 
+@(require_results)
+exists :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	cpath := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_access(cpath, O_RDONLY)
+	return res == 0
+}
+
 // NOTE(bill): Uses startup to initialize it
 
 stdin: Handle  = 0
