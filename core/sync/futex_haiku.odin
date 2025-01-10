@@ -1,6 +1,7 @@
 #+private
 package sync
 
+import "core:sys/haiku"
 import "core:sys/posix"
 import "core:time"
 
@@ -75,8 +76,7 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> (ok: bool) {
 		defer waitq_lock(waitq)
 		
 		sig: posix.Signal
-		posix.sigwait(&mask, &sig)
-		errno := posix.errno() 
+		errno := posix.sigwait(&mask, &sig) 
 		ok = errno == nil
 	}
 
@@ -122,7 +122,7 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration
 			tv_sec  = posix.time_t(i64(duration / 1e9)),
 			tv_nsec = i64(duration % 1e9),
 		}
-		posix.sigtimedwait(&mask, &info, &ts)
+		haiku.sigtimedwait(&mask, &info, &ts)
 		errno := posix.errno() 
 		ok = errno == .EAGAIN || errno == nil
 	}
