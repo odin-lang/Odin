@@ -488,6 +488,9 @@ struct BuildContext {
 
 	bool   no_rtti;
 
+	bool   no_core;
+	bool   no_vendor;
+
 	bool   dynamic_map_calls;
 
 	bool   obfuscate_source_code_locations;

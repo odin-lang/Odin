@@ -370,6 +370,8 @@ enum BuildFlagKind {
 	BuildFlag_StrictStyle,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
+	BuildFlag_NoCore,
+	BuildFlag_NoVendor,
 	BuildFlag_DynamicMapCalls,
 	BuildFlag_ObfuscateSourceCodeLocations,
 
@@ -585,6 +587,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
+
+	add_flag(&build_flags, BuildFlag_NoCore,                  str_lit("no-core"),             		BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoVendor,                str_lit("no-vendor"),             	BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_DynamicMapCalls,         str_lit("dynamic-map-calls"),         BuildFlagParam_None,    Command__does_check);
 
@@ -1382,6 +1387,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 							build_context.no_rtti = true;
+							break;
+						case BuildFlag_NoCore:
+							build_context.no_core = true;
+							break;
+						case BuildFlag_NoVendor:
+							build_context.no_vendor = true;
 							break;
 						case BuildFlag_DynamicMapCalls:
 							build_context.dynamic_map_calls = true;
@@ -3149,10 +3160,6 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 	};
 
-	add_collection(str_lit("base"));
-	add_collection(str_lit("core"));
-	add_collection(str_lit("vendor"));
-
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
@@ -3351,6 +3358,15 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.show_help) {
 		print_show_help(args[0], command);
 		return 0;
+	}
+
+	add_collection(str_lit("base"));
+
+	if (build_context.no_core == false) {
+		add_collection(str_lit("core"));
+	}
+	if (build_context.no_vendor == false) {
+		add_collection(str_lit("vendor"));
 	}
 
 	// NOTE(bill): add 'shared' directory if it is not already set
