@@ -316,13 +316,18 @@ file_size :: proc(fd: Handle) -> (i64, Error) {
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
-@(require_results)
+@(private, require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for arg, i in runtime.args__ {
 		res[i] = string(arg)
 	}
 	return res
+}
+
+@(private, fini)
+_delete_command_line_arguments :: proc() {
+	delete(args)
 }
 
 @(private, require_results)

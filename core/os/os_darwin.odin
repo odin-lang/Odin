@@ -1196,13 +1196,18 @@ _processor_core_count :: proc() -> int {
 	return 1
 }
 
-@(require_results)
+@(private, require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for _, i in res {
 		res[i] = string(runtime.args__[i])
 	}
 	return res
+}
+
+@(private, fini)
+_delete_command_line_arguments :: proc() {
+	delete(args)
 }
 
 socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Error) {
