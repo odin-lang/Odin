@@ -33,6 +33,10 @@ GetMonitorPos :: proc "c" (monitor: MonitorHandle) -> (xpos, ypos: c.int) {
 	glfw.GetMonitorPos(monitor, &xpos, &ypos)
 	return
 }
+GetMonitorWorkarea :: proc "c" (monitor: MonitorHandle) -> (xpos, ypos, width, height: c.int) {
+	glfw.GetMonitorWorkarea(monitor, &xpos, &ypos, &width, &height)
+	return
+}
 GetMonitorPhysicalSize :: proc "c" (monitor: MonitorHandle) -> (widthMM, heightMM: c.int) {
 	glfw.GetMonitorPhysicalSize(monitor, &widthMM, &heightMM)
 	return
