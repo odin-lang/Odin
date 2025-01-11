@@ -92,7 +92,7 @@ dirent_name :: proc "contextless" (dirent: ^Dirent) -> string #no_bounds_check {
 
 	trunc := min(str_size, 8)
 	str_size -= trunc
-	for i in 0..<trunc {
+	for _ in 0..<trunc {
 		str_size += 1
 		if str[str_size] == 0 {
 			break
