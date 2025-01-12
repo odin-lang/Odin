@@ -526,6 +526,20 @@ post_with :: proc($T: typeid, url: string, data: string, parser: Parser(T), conf
   return do_method_with(.Post, T, url, data, parser, config)
 }
 
+// post_string performs a POST request returning a string response.
+//
+// **Note**: The returned Response must be freed with destroy_response.
+//
+// Inputs:
+// - url: Target URL to request
+// - data: Data to send in request body
+// - config: Optional request configuration including headers, timeouts, etc.
+//
+// Returns: Response containing string body.
+post_string :: proc(url: string, data: string, config := Request_Config{}) -> Response(string) {
+  res := post_with(string, url, data, string_parser, config)
+  res.parser_type = .String
+  return res
 }
 
 // post_json performs a POST request with JSON response.
