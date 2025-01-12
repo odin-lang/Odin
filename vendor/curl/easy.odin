@@ -330,6 +330,72 @@ do_request :: proc(url: string, opts: Request_Options) -> Raw_Response {
   }
 }
 
+// do_method performs the internal request with specified HTTP method and returns raw bytes.
+//
+// **Note**: The returned Response bytes must be freed with destroy_response.
+//
+// Inputs:
+// - method: HTTP method to use for the request
+// - url: Target URL to request
+// - data: Data to send in request body (if applicable)
+// - config: Optional request configuration including headers, timeouts, etc.
+//
+// Returns: Response containing raw bytes.
+@(private)
+do_method :: proc(method: Method, url: string, data: string = "", config := Request_Config{}) -> Response([]byte) {
+  raw_res := do_request(url, Request_Options{
+    config = config,
+    method = method,
+    data = data,
+  })
+  return Response([]byte){
+    status_code = raw_res.status_code,
+    body = raw_res.body,
+    error = raw_res.error,
+    allocator = raw_res.allocator,
+    parser_type = .None,
+  }
+}
+
+// do_method_with performs the internal request with specified HTTP method and parses the response.
+//
+// **Note**: The returned Response must be freed with destroy_response. Memory management
+// for custom parsers must be handled by the Parser implementation.
+//
+// Inputs:
+// - method: HTTP method to use for the request
+// - T: Type to parse response into
+// - url: Target URL to request
+// - data: Data to send in request body (if applicable)
+// - parser: Parser to convert response bytes to type T
+// - config: Optional request configuration including headers, timeouts, etc.
+//
+// Returns: Response containing parsed body of type T.
+@(private)
+do_method_with :: proc(method: Method, $T: typeid, url: string, data: string, parser: Parser(T), config := Request_Config{}) -> Response(T) {
+  raw_res := do_method(method, url, data, config)
+  if raw_res.error != .None {
+    return Response(T){error = raw_res.error, allocator = raw_res.allocator}
+  }
+  defer if raw_res.body != nil {
+    delete(raw_res.body, raw_res.allocator)
+  }
+
+  err: Error
+  parsed_body := parser.parse(raw_res.body, raw_res.allocator, &err)
+  if err != .None {
+    return Response(T){error = err, allocator = raw_res.allocator}
+  }
+
+  return Response(T){
+    status_code = raw_res.status_code,
+    body = parsed_body,
+    error = .None,
+    allocator = raw_res.allocator,
+    parser_type = .Custom,
+  }
+}
+
 // string_parser provides built-in string parsing.
 //
 // Inputs:
@@ -381,42 +447,7 @@ json_parser :: proc($T: typeid) -> Parser(T) {
 //
 // Returns: Response containing raw bytes.
 get :: proc(url: string, config := Request_Config{}) -> Response([]byte) {
-  raw_res := do_request(url, Request_Options{
-    config = config,
-    method = .Get,
-  })
-  return Response([]byte){
-    status_code = raw_res.status_code,
-    body = raw_res.body,
-    error = raw_res.error,
-    allocator = raw_res.allocator,
-    parser_type = .None,
-  }
-}
-
-// post performs a POST request returning raw bytes.
-//
-// **Note**: The returned Response must be freed with destroy_response.
-//
-// Inputs:
-// - url: Target URL to request
-// - data: Data to send in request body
-// - config: Optional request configuration
-//
-// Returns: Response containing raw bytes.
-post :: proc(url: string, data: string, config := Request_Config{}) -> Response([]byte) {
-  raw_res := do_request(url, Request_Options{
-    config = config,
-    method = .Post,
-    data = data,
-  })
-  return Response([]byte){
-    status_code = raw_res.status_code,
-    body = raw_res.body,
-    error = raw_res.error,
-    allocator = raw_res.allocator,
-    parser_type = .None,
-  }
+  return do_method(.Get, url, "", config)
 }
 
 // get_with performs a GET request with custom response parsing.
@@ -431,27 +462,7 @@ post :: proc(url: string, data: string, config := Request_Config{}) -> Response(
 //
 // Returns: Response containing parsed body of type T.
 get_with :: proc($T: typeid, url: string, parser: Parser(T), config := Request_Config{}) -> Response(T) {
-  raw_res := get(url, config)
-  if raw_res.error != .None {
-    return Response(T){error = raw_res.error, allocator = raw_res.allocator}
-  }
-  defer if raw_res.body != nil {
-    delete(raw_res.body, raw_res.allocator)
-  }
-
-  err: Error
-  parsed_body := parser.parse(raw_res.body, raw_res.allocator, &err)
-  if err != .None {
-    return Response(T){error = err, allocator = raw_res.allocator}
-  }
-
-  return Response(T){
-    status_code = raw_res.status_code,
-    body = parsed_body,
-    error = .None,
-    allocator = raw_res.allocator,
-    parser_type = .Custom,
-  }
+  return do_method_with(.Get, T, url, "", parser, config)
 }
 
 // get_string performs a GET request returning a string response.
@@ -485,6 +496,20 @@ get_json :: proc($T: typeid, url: string, config := Request_Config{}) -> Respons
   return res
 }
 
+// post performs a POST request returning raw bytes.
+//
+// **Note**: The returned Response must be freed with destroy_response.
+//
+// Inputs:
+// - url: Target URL to request
+// - data: Data to send in request body
+// - config: Optional request configuration
+//
+// Returns: Response containing raw bytes.
+post :: proc(url: string, data: string, config := Request_Config{}) -> Response([]byte) {
+  return do_method(.Post, url, data, config)
+}
+
 // post_with performs a POST request with custom response parsing.
 //
 // **Note**: The returned Response must be freed with destroy_response.
@@ -498,27 +523,9 @@ get_json :: proc($T: typeid, url: string, config := Request_Config{}) -> Respons
 //
 // Returns: Response containing parsed body of type T.
 post_with :: proc($T: typeid, url: string, data: string, parser: Parser(T), config := Request_Config{}) -> Response(T) {
-  raw_res := post(url, data, config)
-  if raw_res.error != .None {
-    return Response(T){error = raw_res.error, allocator = raw_res.allocator}
-  }
-  defer if raw_res.body != nil {
-    delete(raw_res.body, raw_res.allocator)
-  }
+  return do_method_with(.Post, T, url, data, parser, config)
+}
 
-  err: Error
-  parsed_body := parser.parse(raw_res.body, raw_res.allocator, &err)
-  if err != .None {
-    return Response(T){error = err, allocator = raw_res.allocator}
-  }
-
-  return Response(T){
-    status_code = raw_res.status_code,
-    body = parsed_body,
-    error = .None,
-    allocator = raw_res.allocator,
-    parser_type = .Custom,
-  }
 }
 
 // post_json performs a POST request with JSON response.
