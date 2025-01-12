@@ -338,7 +338,7 @@ do_request :: proc(url: string, opts: Request_Options) -> Raw_Response {
 // - method: HTTP method to use for the request
 // - url: Target URL to request
 // - data: Data to send in request body (if applicable)
-// - config: Optional request configuration including headers, timeouts, etc.
+// - config: Optional request configuration
 //
 // Returns: Response containing raw bytes.
 @(private)
@@ -368,7 +368,7 @@ do_method :: proc(method: Method, url: string, data: string = "", config := Requ
 // - url: Target URL to request
 // - data: Data to send in request body (if applicable)
 // - parser: Parser to convert response bytes to type T
-// - config: Optional request configuration including headers, timeouts, etc.
+// - config: Optional request configuration
 //
 // Returns: Response containing parsed body of type T.
 @(private)
@@ -533,7 +533,7 @@ post_with :: proc($T: typeid, url: string, data: string, parser: Parser(T), conf
 // Inputs:
 // - url: Target URL to request
 // - data: Data to send in request body
-// - config: Optional request configuration including headers, timeouts, etc.
+// - config: Optional request configuration
 //
 // Returns: Response containing string body.
 post_string :: proc(url: string, data: string, config := Request_Config{}) -> Response(string) {
