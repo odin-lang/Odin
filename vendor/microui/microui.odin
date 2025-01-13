@@ -916,32 +916,37 @@ text :: proc(ctx: ^Context, text: string) {
 	font  := ctx.style.font
 	color := ctx.style.colors[.TEXT]
 	layout_begin_column(ctx)
+	defer layout_end_column(ctx)
+
 	layout_row(ctx, {-1}, ctx.text_height(font))
-	for len(text) > 0 {
-		w:     i32
-		start: int
-		end:   int = len(text)
+
+	outer: for len(text) > 0 {
+		last_space: int
 		r := layout_next(ctx)
+
 		for ch, i in text {
-			if ch == ' ' || ch == '\n' {
-				word := text[start:i]
-				w += ctx.text_width(font, word)
-				if w > r.w && start != 0 {
-					end = start
-					break
+			if ch == ' ' {
+				last_space = i
+			}
+
+			width := ctx.text_width(font, text[:i])
+			newline := ch == '\n'
+			if width > r.w || newline {
+				if newline {
+					last_space = i
 				}
-				w += ctx.text_width(font, text[i:i+1])
-				if ch == '\n' {
-					end = i+1
-					break
+				if last_space > 0 {
+					draw_text(ctx, font, text[:last_space], Vec2{r.x, r.y}, color)
+					text = text[last_space + 1:] // skip 1 char (space or newline)
+					continue outer
 				}
-				start = i+1
 			}
 		}
-		draw_text(ctx, font, text[:end], Vec2{r.x, r.y}, color)
-		text = text[end:]
+
+		// draw remainder of the text
+		draw_text(ctx, font, text[:], Vec2{r.x, r.y}, color)
+		break
 	}
-	layout_end_column(ctx)
 }
 
 label :: proc(ctx: ^Context, text: string) {
