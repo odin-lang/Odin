@@ -929,7 +929,7 @@ text :: proc(ctx: ^Context, text: string) {
 				last_space = i
 			}
 
-			width := ctx.text_width(font, text[:i])
+			width := ctx.text_width(font, text[:i + 1])
 			newline := ch == '\n'
 			if width > r.w || newline {
 				if newline {
