@@ -115,7 +115,7 @@ panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! 
 }
 
 @(disabled=ODIN_DISABLE_ASSERT)
-assert :: proc(condition: bool, message := "", loc := #caller_location) {
+assert :: proc(condition: bool, message := #caller_expression(condition), loc := #caller_location) {
 	if !condition {
 		@(cold)
 		internal :: proc(message: string, loc: runtime.Source_Code_Location) {
@@ -145,7 +145,38 @@ assertf :: proc(condition: bool, fmt_str: string, args: ..any, loc := #caller_lo
 			}
 			message := fmt.tprintf(fmt_str, ..args)
 			log(.Fatal, message, location=loc)
-			p("Runtime assertion", message, loc)
+			p("runtime assertion", message, loc)
+		}
+		internal(loc, fmt_str, ..args)
+	}
+}
+
+ensure :: proc(condition: bool, message := #caller_expression(condition), loc := #caller_location) {
+	if !condition {
+		@(cold)
+		internal :: proc(message: string, loc: runtime.Source_Code_Location) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			log(.Fatal, message, location=loc)
+			p("unsatisfied ensure", message, loc)
+		}
+		internal(message, loc)
+	}
+}
+
+ensuref :: proc(condition: bool, fmt_str: string, args: ..any, loc := #caller_location) {
+	if !condition {
+		@(cold)
+		internal :: proc(loc: runtime.Source_Code_Location, fmt_str: string, args: ..any) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			message := fmt.tprintf(fmt_str, ..args)
+			log(.Fatal, message, location=loc)
+			p("unsatisfied ensure", message, loc)
 		}
 		internal(loc, fmt_str, ..args)
 	}
