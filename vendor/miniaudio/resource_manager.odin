@@ -10,13 +10,15 @@ Resource Manager
 
 ************************************************************************************************************************************************************/
 
-resource_manager_data_source_flags :: enum c.int {
-	STREAM         = 0x00000001,   /* When set, does not load the entire data source in memory. Disk I/O will happen on job threads. */
-	DECODE         = 0x00000002,   /* Decode data before storing in memory. When set, decoding is done at the resource manager level rather than the mixing thread. Results in faster mixing, but higher memory usage. */
-	ASYNC          = 0x00000004,   /* When set, the resource manager will load the data source asynchronously. */
-	WAIT_INIT      = 0x00000008,   /* When set, waits for initialization of the underlying data source before returning from ma_resource_manager_data_source_init(). */
-	UNKNOWN_LENGTH = 0x00000010,   /* Gives the resource manager a hint that the length of the data source is unknown and calling `ma_data_source_get_length_in_pcm_frames()` should be avoided. */
+resource_manager_data_source_flag :: enum c.int {
+	STREAM         = 0,   /* When set, does not load the entire data source in memory. Disk I/O will happen on job threads. */
+	DECODE         = 1,   /* Decode data before storing in memory. When set, decoding is done at the resource manager level rather than the mixing thread. Results in faster mixing, but higher memory usage. */
+	ASYNC          = 2,   /* When set, the resource manager will load the data source asynchronously. */
+	WAIT_INIT      = 3,   /* When set, waits for initialization of the underlying data source before returning from ma_resource_manager_data_source_init(). */
+	UNKNOWN_LENGTH = 4,   /* Gives the resource manager a hint that the length of the data source is unknown and calling `ma_data_source_get_length_in_pcm_frames()` should be avoided. */
 }
+
+resource_manager_data_source_flags :: bit_set[resource_manager_data_source_flag; u32]
 
 /*
 Pipeline notifications used by the resource manager. Made up of both an async notification and a fence, both of which are optional.
@@ -58,13 +60,15 @@ resource_manager_job_queue_next                   :: job_queue_next
 /* Maximum job thread count will be restricted to this, but this may be removed later and replaced with a heap allocation thereby removing any limitation. */
 RESOURCE_MANAGER_MAX_JOB_THREAD_COUNT :: 64
 
-resource_manager_flags :: enum c.int {
+resource_manager_flag :: enum c.int {
 	/* Indicates ma_resource_manager_next_job() should not block. Only valid when the job thread count is 0. */
-	NON_BLOCKING = 0x00000001,
+	NON_BLOCKING = 0,
 
 	/* Disables any kind of multithreading. Implicitly enables MA_RESOURCE_MANAGER_FLAG_NON_BLOCKING. */
-	NO_THREADING = 0x00000002,
+	NO_THREADING = 1,
 }
+
+resource_manager_flags :: bit_set[resource_manager_flag; u32]
 
 resource_manager_data_source_config :: struct {
 	pFilePath:                   cstring,
@@ -126,7 +130,7 @@ resource_manager_data_buffer :: struct {
 	ds:                     data_source_base,                      /* Base data source. A data buffer is a data source. */
 	pResourceManager:       ^resource_manager,                     /* A pointer to the resource manager that owns this buffer. */
 	pNode:                  ^resource_manager_data_buffer_node,    /* The data node. This is reference counted and is what supplies the data. */
-	flags:                  u32,                                   /* The flags that were passed used to initialize the buffer. */
+	flags:                  resource_manager_flags,                /* The flags that were passed used to initialize the buffer. */
 	executionCounter:       u32, /*atomic*/                        /* For allocating execution orders for jobs. */
 	executionPointer:       u32, /*atomic*/                        /* For managing the order of execution for asynchronous jobs relating to this object. Incremented as jobs complete processing. */
 	seekTargetInPCMFrames:  u64,                                   /* Only updated by the public API. Never written nor read from the job thread. */
