@@ -929,8 +929,7 @@ text :: proc(ctx: ^Context, text: string) {
 				width := ctx.text_width(font, text[:i])
 				if width > r.w && last_space > 0 {
 					break
-				}
-				else {
+				} else {
 					last_space = i
 				}
 			}
