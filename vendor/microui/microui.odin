@@ -916,21 +916,19 @@ text :: proc(ctx: ^Context, text: string) {
 	font  := ctx.style.font
 	color := ctx.style.colors[.TEXT]
 	layout_begin_column(ctx)
-	defer layout_end_column(ctx)
 
 	layout_row(ctx, {-1}, ctx.text_height(font))
 
-	outer: for len(text) > 0 {
+	for len(text) > 0 {
 		r := layout_next(ctx)
 		last_space: int
 
 		for ch, i in text {
-			if ch == ' ' {
+			end := i == len(text) - 1
+			if ch == ' ' || end {
 				width := ctx.text_width(font, text[:i])
 				if width > r.w && last_space > 0 {
-					draw_text(ctx, font, text[:last_space], Vec2{r.x, r.y}, color)
-					text = text[last_space + 1:]
-					continue outer
+					break
 				}
 				else {
 					last_space = i
@@ -938,16 +936,15 @@ text :: proc(ctx: ^Context, text: string) {
 			}
 
 			if ch == '\n' {
-				draw_text(ctx, font, text[:i], Vec2{r.x, r.y}, color)
-				text = text[i + 1:]
-				continue outer
+				last_space = i
+				break
 			}
 		}
-
-		// draw remainder of the text
-		draw_text(ctx, font, text[:], Vec2{r.x, r.y}, color)
-		break
+		draw_text(ctx, font, text[:last_space + 1], Vec2{r.x, r.y}, color)
+		text = text[last_space + 1:]
 	}
+
+	layout_end_column(ctx)
 }
 
 label :: proc(ctx: ^Context, text: string) {
