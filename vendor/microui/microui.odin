@@ -921,25 +921,26 @@ text :: proc(ctx: ^Context, text: string) {
 	layout_row(ctx, {-1}, ctx.text_height(font))
 
 	outer: for len(text) > 0 {
-		last_space: int
 		r := layout_next(ctx)
+		last_space: int
 
 		for ch, i in text {
 			if ch == ' ' {
-				last_space = i
-			}
-
-			width := ctx.text_width(font, text[:i + 1])
-			newline := ch == '\n'
-			if width > r.w || newline {
-				if newline {
-					last_space = i
-				}
-				if last_space > 0 {
+				width := ctx.text_width(font, text[:i])
+				if width > r.w && last_space > 0 {
 					draw_text(ctx, font, text[:last_space], Vec2{r.x, r.y}, color)
-					text = text[last_space + 1:] // skip 1 char (space or newline)
+					text = text[last_space + 1:]
 					continue outer
 				}
+				else {
+					last_space = i
+				}
+			}
+
+			if ch == '\n' {
+				draw_text(ctx, font, text[:i], Vec2{r.x, r.y}, color)
+				text = text[i + 1:]
+				continue outer
 			}
 		}
 
