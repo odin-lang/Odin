@@ -147,7 +147,7 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 		return .JPEG
 	case s[:3] == "\xff\xd8\xff":
 		switch s[3] {
-		case 0xdb, 0xee, 0xe1, 0xe0:
+		case 0xdb, 0xee, 0xe1, 0xe0, 0xfe, 0xed:
 			return .JPEG
 		}
 		switch {
