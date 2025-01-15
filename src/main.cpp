@@ -1801,7 +1801,10 @@ gb_internal void check_defines(BuildContext *bc, Checker *c) {
 		if (!found) {
 			ERROR_BLOCK();
 			warning(nullptr, "given -define:%.*s is unused in the project", LIT(name));
-			error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
+
+			if (!global_ignore_warnings()) {
+				error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
+			}
 		}
 	}
 }
