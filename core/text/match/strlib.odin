@@ -698,11 +698,11 @@ gmatch :: proc(
 			first := length > 1 ? 1 : 0
 			cap := captures[first]
 			res = haystack[cap.byte_start:cap.byte_end]
-		} else {
-			captures^ = {}
 		}
 	} 
-
+	if !ok {
+		captures^ = {}
+	}
 	return
 }
 
@@ -813,11 +813,11 @@ gfind :: proc(
 			ok = true
 			cap := captures[0]
 			res = haystack[cap.byte_start:cap.byte_end]
-		} else {
-			captures^ = {}
 		}
 	} 
-
+	if !ok {
+		captures^ = {}
+	}
 	return
 }
 
