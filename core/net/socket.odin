@@ -34,23 +34,12 @@ any_socket_to_socket :: proc "contextless" (socket: Any_Socket) -> Socket {
     Expects both hostname and port to be present in the `hostname_and_port` parameter, either as:
     `a.host.name:9999`, or as `1.2.3.4:9999`, or IP6 equivalent.
 
-    Calls `parse_hostname_or_endpoint` and `resolve`, then `dial_tcp_from_endpoint`.
+    Calls `parse_hostname_or_endpoint` and `dial_tcp_from_host_or_endpoint`.
 */
 dial_tcp_from_hostname_and_port_string :: proc(hostname_and_port: string, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname_and_port) or_return
-	switch t in target {
-	case Endpoint:
-		return dial_tcp_from_endpoint(t, options)
-	case Host:
-		if t.port == 0 {
-			return 0, .Port_Required
-		}
-		ep4, ep6 := resolve(t.hostname) or_return
-		ep := ep4 if ep4.address != nil else ep6 // NOTE(tetra): We don't know what family the server uses, so we just default to IP4.
-		ep.port = t.port
-		return dial_tcp_from_endpoint(ep, options)
-	}
-	unreachable()
+
+	return dial_tcp_from_host_or_endpoint(target, options)
 }
 
 /*
@@ -61,17 +50,39 @@ dial_tcp_from_hostname_and_port_string :: proc(hostname_and_port: string, option
 */
 dial_tcp_from_hostname_with_port_override :: proc(hostname: string, port: int, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname) or_return
+	switch &t in target {
+	case Endpoint:
+		t.port = port
+	case Host:
+		t.port = port
+	}
+
+	return dial_tcp_from_host_or_endpoint(target, options)
+}
+
+/*
+    Expects the `host` as Host.
+*/
+dial_tcp_from_host :: proc(host: Host, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
+	if host.port == 0 {
+		return 0, .Port_Required
+	}
+	ep4, ep6 := resolve(host.hostname) or_return
+	ep := ep4 if ep4.address != nil else ep6 // NOTE(tetra): We don't know what family the server uses, so we just default to IP4.
+	ep.port = host.port
+	return dial_tcp_from_endpoint(ep, options)
+}
+
+/*
+    Expects the `target` as a Host_OrEndpoint.
+    Unwraps the underlying type and calls `dial_tcp_from_host` or `dial_tcp_from_endpoint`.
+*/
+dial_tcp_from_host_or_endpoint :: proc(target: Host_Or_Endpoint, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	switch t in target {
 	case Endpoint:
-		return dial_tcp_from_endpoint({t.address, port}, options)
+		return dial_tcp_from_endpoint(t, options)
 	case Host:
-		if port == 0 {
-			return 0, .Port_Required
-		}
-		ep4, ep6 := resolve(t.hostname) or_return
-		ep := ep4 if ep4.address != nil else ep6 // NOTE(tetra): We don't know what family the server uses, so we just default to IP4.
-		ep.port = port
-		return dial_tcp_from_endpoint(ep, options)
+		return dial_tcp_from_host(t, options)
 	}
 	unreachable()
 }
@@ -90,6 +101,8 @@ dial_tcp :: proc{
 	dial_tcp_from_address_and_port,
 	dial_tcp_from_hostname_and_port_string,
 	dial_tcp_from_hostname_with_port_override,
+	dial_tcp_from_host,
+	dial_tcp_from_host_or_endpoint,
 }
 
 create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
