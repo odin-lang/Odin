@@ -916,31 +916,33 @@ text :: proc(ctx: ^Context, text: string) {
 	font  := ctx.style.font
 	color := ctx.style.colors[.TEXT]
 	layout_begin_column(ctx)
+
 	layout_row(ctx, {-1}, ctx.text_height(font))
+
 	for len(text) > 0 {
-		w:     i32
-		start: int
-		end:   int = len(text)
 		r := layout_next(ctx)
+		last_space: int
+
 		for ch, i in text {
-			if ch == ' ' || ch == '\n' {
-				word := text[start:i]
-				w += ctx.text_width(font, word)
-				if w > r.w && start != 0 {
-					end = start
+			end := i == len(text) - 1
+			if ch == ' ' || end {
+				width := ctx.text_width(font, text[:i])
+				if width > r.w && last_space > 0 {
 					break
+				} else {
+					last_space = i
 				}
-				w += ctx.text_width(font, text[i:i+1])
-				if ch == '\n' {
-					end = i+1
-					break
-				}
-				start = i+1
+			}
+
+			if ch == '\n' {
+				last_space = i
+				break
 			}
 		}
-		draw_text(ctx, font, text[:end], Vec2{r.x, r.y}, color)
-		text = text[end:]
+		draw_text(ctx, font, text[:last_space + 1], Vec2{r.x, r.y}, color)
+		text = text[last_space + 1:]
 	}
+
 	layout_end_column(ctx)
 }
 
