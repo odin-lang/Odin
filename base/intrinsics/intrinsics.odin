@@ -354,6 +354,7 @@ objc_id    :: ^objc_object
 objc_SEL   :: ^objc_selector
 objc_Class :: ^objc_class
 
+objc_send  :: proc(args: ...) ---
 objc_find_selector     :: proc($name: string) -> objc_SEL   ---
 objc_register_selector :: proc($name: string) -> objc_SEL   ---
 objc_find_class        :: proc($name: string) -> objc_Class ---
