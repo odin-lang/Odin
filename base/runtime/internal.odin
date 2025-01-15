@@ -309,68 +309,74 @@ memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_ch
 	y := uintptr(b)
 	n := uintptr(n)
 
-	SU :: size_of(uintptr)
-	fast := n/SU + 1
-	offset := (fast-1)*SU
-	curr_block := uintptr(0)
-	if n < SU {
-		fast = 0
-	}
-
-	for /**/; curr_block < fast; curr_block += 1 {
-		va := (^uintptr)(x + curr_block * size_of(uintptr))^
-		vb := (^uintptr)(y + curr_block * size_of(uintptr))^
-		if va ~ vb != 0 {
-			for pos := curr_block*SU; pos < n; pos += 1 {
-				a := (^byte)(x+pos)^
-				b := (^byte)(y+pos)^
-				if a ~ b != 0 {
-					return -1 if (int(a) - int(b)) < 0 else +1
+	memory_compare_poly :: proc "contextless" ($T: typeid, x, y, n: uintptr) -> (x_, y_, n_: uintptr, result: int = 0) {
+		x, y, n := x, y, n
+		ST :: size_of(T)
+		if (x % ST) != 0 || (y % ST) != 0 {
+			return x, y, n, result
+		}
+		toplevel: for /**/; n >= ST; n -= ST {
+			va := (^T)(x)^
+			vb := (^T)(y)^
+			if va ~ vb != 0 {
+				for i := uintptr(0); i < ST; i += 1 {
+					a := (^byte)(x+i)^
+					b := (^byte)(y+i)^
+					if a ~ b != 0 {
+						result = -1 if (int(a) - int(b)) < 0 else +1
+						break toplevel
+					}
 				}
 			}
+			x += ST
+			y += ST
 		}
+		return x, y, n, result
 	}
-
-	for /**/; offset < n; offset += 1 {
-		a := (^byte)(x+offset)^
-		b := (^byte)(y+offset)^
-		if a ~ b != 0 {
-			return -1 if (int(a) - int(b)) < 0 else +1
-		}
-	}
-
-	return 0
+	r := 0
+	x, y, n, r = memory_compare_poly(uintptr, x, y, n)
+	if r != 0 { return r }
+	x, y, n, r = memory_compare_poly(u32, x, y, n)
+	if r != 0 { return r }
+	x, y, n, r = memory_compare_poly(u16, x, y, n)
+	if r != 0 { return r }
+	x, y, n, r = memory_compare_poly(byte, x, y, n)
+	return r
 }
 
 memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_check {
+	if a == nil { return -1 }
 	x := uintptr(a)
 	n := uintptr(n)
 
 	SU :: size_of(uintptr)
-	fast := n/SU + 1
-	offset := (fast-1)*SU
-	curr_block := uintptr(0)
-	if n < SU {
-		fast = 0
+	for /**/; (x % SU) != 0 && n != 0; n -= 1 {
+		a := ((^byte)(x))^
+		if a ~ 0 != 0 {
+			return -1 if int(a) < 0 else +1
+		}
+		x += 1
 	}
 
-	for /**/; curr_block < fast; curr_block += 1 {
-		va := (^uintptr)(x + curr_block * size_of(uintptr))^
+	for /**/; n >= SU; n -= SU {
+		va := (^uintptr)(x)^
 		if va ~ 0 != 0 {
-			for pos := curr_block*SU; pos < n; pos += 1 {
-				a := (^byte)(x+pos)^
+			for i := uintptr(0); i < SU; i += 1 {
+				a := (^byte)(x+i)^
 				if a ~ 0 != 0 {
 					return -1 if int(a) < 0 else +1
 				}
 			}
 		}
+		x += SU
 	}
 
-	for /**/; offset < n; offset += 1 {
-		a := (^byte)(x+offset)^
+	for /**/; n != 0; n -= 1 {
+		a := (^byte)(x)^
 		if a ~ 0 != 0 {
 			return -1 if int(a) < 0 else +1
 		}
+		x += 1
 	}
 
 	return 0
