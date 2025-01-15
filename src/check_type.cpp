@@ -685,7 +685,8 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	ST_ALIGN(min_field_align);
 	ST_ALIGN(max_field_align);
 	ST_ALIGN(align);
-	if (struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
+	if (struct_type->Struct.custom_align != 0 &&
+		struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
 		error(st->align, "#align(%lld) is defined to be less than #min_field_align(%lld)",
 		      cast(long long)struct_type->Struct.custom_align,
 		      cast(long long)struct_type->Struct.custom_min_field_align);
