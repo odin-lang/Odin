@@ -1,6 +1,5 @@
 package _edwards25519
 
-import "base:intrinsics"
 import field "core:crypto/_fiat/field_scalar25519"
 import "core:mem"
 
@@ -8,7 +7,7 @@ Scalar :: field.Montgomery_Domain_Field_Element
 
 // WARNING: This is non-canonical and only to be used when checking if
 // a group element is on the prime-order subgroup.
-@(private)
+@(private, rodata)
 SC_ELL := field.Non_Montgomery_Domain_Field_Element {
 	field.ELL[0],
 	field.ELL[1],
@@ -26,7 +25,7 @@ sc_set_u64 :: proc "contextless" (sc: ^Scalar, i: u64) {
 @(require_results)
 sc_set_bytes :: proc "contextless" (sc: ^Scalar, b: []byte) -> bool {
 	if len(b) != 32 {
-		intrinsics.trap()
+		panic_contextless("edwards25519: invalid scalar size")
 	}
 	b_ := (^[32]byte)(raw_data(b))
 	return field.fe_from_bytes(sc, b_)
@@ -34,7 +33,7 @@ sc_set_bytes :: proc "contextless" (sc: ^Scalar, b: []byte) -> bool {
 
 sc_set_bytes_rfc8032 :: proc "contextless" (sc: ^Scalar, b: []byte) {
 	if len(b) != 32 {
-		intrinsics.trap()
+		panic_contextless("edwards25519: invalid scalar size")
 	}
 	b_ := (^[32]byte)(raw_data(b))
 	field.fe_from_bytes_rfc8032(sc, b_)
