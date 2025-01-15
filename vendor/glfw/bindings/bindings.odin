@@ -71,6 +71,7 @@ foreign glfw {
 	GetPrimaryMonitor      :: proc() -> MonitorHandle ---
 	GetMonitors            :: proc(count: ^c.int) -> [^]MonitorHandle ---
 	GetMonitorPos          :: proc(monitor: MonitorHandle, xpos, ypos: ^c.int) ---
+	GetMonitorWorkarea     :: proc(monitor: MonitorHandle, xpos, ypos, width, height: ^c.int) ---
 	GetMonitorPhysicalSize :: proc(monitor: MonitorHandle, widthMM, heightMM: ^c.int) ---
 	GetMonitorContentScale :: proc(monitor: MonitorHandle, xscale, yscale: ^f32) ---
 
