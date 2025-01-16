@@ -600,6 +600,7 @@ JPEG_Error :: enum {
 	Encountered_RST_Marker_Outside_ECS,
 	Extra_Data_After_SOS, // Image seemed to have decoded okay, but there's more data after SOS
 	Invalid_Thumbnail_Size,
+	Huffman_Symbols_Exceeds_Max,
 }
 
 JFIF_Unit :: enum byte {

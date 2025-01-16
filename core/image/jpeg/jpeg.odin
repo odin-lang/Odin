@@ -13,7 +13,7 @@ Image :: image.Image
 Error :: image.Error
 Options :: image.Options
 
-HUFFMAN_MAX_SYMBOLS :: 162
+HUFFMAN_MAX_SYMBOLS :: 176
 HUFFMAN_MAX_BITS  :: 16
 // 768 bytes of 24-bit RGB values.
 THUMBNAIL_PALETTE_SIZE :: 768
@@ -75,21 +75,21 @@ refill_msb :: #force_inline proc(z: ^compress.Context_Memory_Input, width := i8(
 		if len(z.input_data) != 0 {
 			b = u64(z.input_data[0])
 
-			if len(z.input_data) > 1 {
+			if len(z.input_data) > 1 && b == 0xFF {
 				next := u64(z.input_data[1])
 
-				if b == 0xFF {
-					if next == 0x00 {
-						// 0x00 is used as a stuffing to indicate that the 0xFF is part of the data and not
-						// the beginning of a marker
-						z.input_data = z.input_data[2:]
-					} else if next >= cast(u64)image.JPEG_Marker.RST0 && next <= cast(u64)image.JPEG_Marker.RST7 {
-						// Skip any RSTn markers if we encounter them
+				if next == 0x00 {
+					// 0x00 is used as a stuffing to indicate that the 0xFF is part of the data and not
+					// the beginning of a marker
+					z.input_data = z.input_data[2:]
+				} else if next >= cast(u64)image.JPEG_Marker.RST0 && next <= cast(u64)image.JPEG_Marker.RST7 {
+					// Skip any RSTn markers if we encounter them
+					if len(z.input_data) > 2 {
 						b = u64(z.input_data[2])
 						z.input_data = z.input_data[3:]
+					} else {
+						b = 0
 					}
-				} else {
-					z.input_data = z.input_data[1:]
 				}
 			} else {
 				z.input_data = z.input_data[1:]
@@ -237,6 +237,12 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					append(&ident, b)
 				}
 				if slice.equal(ident[:], image.JFIF_Magic[:]) {
+					if length != 14 {
+						// Malformed APP0. Skip it
+						compress.read_slice(ctx, length - len(ident) - 1) or_return
+						continue
+					}
+
 					version := compress.read_data(ctx, u16be) or_return
 					units := cast(image.JFIF_Unit)(compress.read_u8(ctx) or_return)
 					x_density := compress.read_data(ctx, u16be) or_return
@@ -437,13 +443,17 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					}
 
 					lengths := compress.read_slice(ctx, HUFFMAN_MAX_BITS) or_return
-					num_symbols := 0
+					num_symbols: u8 = 0
 					for length, i in lengths {
-						num_symbols += cast(int)length
-						huffman[type][index].offsets[i + 1] = cast(u8)num_symbols
+						num_symbols += length
+						huffman[type][index].offsets[i + 1] = num_symbols
 					}
 
-					symbols := compress.read_slice(ctx, num_symbols) or_return
+					if num_symbols > HUFFMAN_MAX_SYMBOLS {
+						return img, .Huffman_Symbols_Exceeds_Max
+					}
+
+					symbols := compress.read_slice(ctx, cast(int)num_symbols) or_return
 					copy(huffman[type][index].symbols[:], symbols)
 
 					length -= cast(u16be)(1 + HUFFMAN_MAX_BITS + num_symbols)
