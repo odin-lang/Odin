@@ -49,9 +49,6 @@ _futex_signal :: proc "contextless" (futex: ^Futex) {
 }
 
 _futex_broadcast :: proc "contextless" (futex: ^Futex)  {
-	// NOTE(flysand): This code was kinda funny and I don't want to remove it, but here I will
-	// record history of what has been in here before
-	//     FUTEX_WAKE_PRIVATE | FUTEX_WAKE
 	_, errno := linux.futex(cast(^linux.Futex) futex, linux.FUTEX_WAKE, {.PRIVATE}, max(i32))
 	#partial switch errno {
 	case .NONE:
