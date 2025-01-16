@@ -610,19 +610,19 @@ JFIF_Unit :: enum byte {
 
 JFIF_APP0 :: struct {
 	version: u16be,
-	units: JFIF_Unit,
 	x_density: u16be,
 	y_density: u16be,
-	x_thumbnail: byte,
-	y_thumbnail: byte,
-	thumbnail: []RGB_Pixel `fmt:"-"`,
+	units: JFIF_Unit,
+	x_thumbnail: u8,
+	y_thumbnail: u8,
 	greyscale_thumbnail: bool,
+	thumbnail: []RGB_Pixel `fmt:"-"`,
 }
 
 JFXX_APP0 :: struct {
 	extension_code: JFXX_Extension_Code,
-	x_thumbnail: int,
-	y_thumbnail: int,
+	x_thumbnail: u8,
+	y_thumbnail: u8,
 	thumbnail: []byte `fmt:"-"`,
 }
 

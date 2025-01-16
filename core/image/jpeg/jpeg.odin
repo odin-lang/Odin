@@ -270,13 +270,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 							}
 							info.jfif_app0 = image.JFIF_APP0{
 								version,
-								units,
 								x_density,
 								y_density,
+								units,
 								cast(u8)x_thumbnail,
 								cast(u8)y_thumbnail,
-								thumbnail,
 								greyscale_thumbnail,
+								thumbnail,
 							}
 							img.metadata = info
 						}
@@ -330,8 +330,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 							}
 							info.jfxx_app0 = image.JFXX_APP0{
 								extension_code,
-								x_thumbnail,
-								y_thumbnail,
+								cast(u8)x_thumbnail,
+								cast(u8)y_thumbnail,
 								thumbnail,
 							}
 							img.metadata = info
@@ -359,8 +359,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 							}
 							info.jfxx_app0 = image.JFXX_APP0{
 								extension_code,
-								x_thumbnail,
-								y_thumbnail,
+								cast(u8)x_thumbnail,
+								cast(u8)y_thumbnail,
 								pixels,
 							}
 							img.metadata = info
