@@ -1044,7 +1044,7 @@ gb_internal AstPackage *get_package_of_type(Type *type) {
 }
 
 
-// NOTE(bill): 'content_name' is for debugging and error messages
+// NOTE(bill): 'context_name' is for debugging and error messages
 gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *type, String context_name) {
 	check_not_tuple(c, operand);
 	if (operand->mode == Addressing_Invalid) {
@@ -1822,6 +1822,19 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		break;
 
 	case Entity_Variable:
+		if (e->kind == Entity_Variable && build_context.no_crt && !build_context.no_thread_local && e->Variable.thread_local_model != "") {
+			switch (build_context.metrics.os) {
+			case TargetOs_linux:
+			case TargetOs_darwin:
+			case TargetOs_essence:
+			case TargetOs_freebsd:
+			case TargetOs_openbsd:
+			case TargetOs_netbsd:
+			case TargetOs_haiku:
+				Token token = ast_token(n);
+				error(token, "Illegal usage of thread locals: '%.*s'", LIT(e->token.string));
+			}
+		}
 		e->flags |= EntityFlag_Used;
 		if (type == t_invalid) {
 			o->type = t_invalid;

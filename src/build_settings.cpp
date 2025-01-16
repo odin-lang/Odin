@@ -2133,7 +2133,21 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
 		case TargetOs_haiku:
-			gb_printf_err("-no-crt on unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present because the default allocator requires crt\n");
+			gb_printf_err("-no-crt on unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present, because the default allocator requires crt\n");
+			return false;
+		}
+	}
+
+	if (build_context.no_crt && !build_context.no_thread_local && !build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+		case TargetOs_darwin:
+		case TargetOs_essence:
+		case TargetOs_freebsd:
+		case TargetOs_openbsd:
+		case TargetOs_netbsd:
+		case TargetOs_haiku:
+			gb_printf_err("-no-crt on unix systems requires either -default-to-nil-allocator or -no-thread-local to also be present, because the temporary allocator is a thread local, which are inaccessible without CRT initializing TLS\n");
 			return false;
 		}
 	}
