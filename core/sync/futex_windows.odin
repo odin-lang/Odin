@@ -26,7 +26,7 @@ foreign Ntdll {
 	BUT requires taking the return value of it and if it is non-zero
 	converting that status to a DOS error and then SetLastError
 	If this is not done, then things don't work as expected when
-	and error occurs
+	an error occurs
 
 	GODDAMN MICROSOFT!
 */
@@ -46,7 +46,7 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> bool {
 
 _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration: time.Duration) -> bool {
 	expect := expect
-	// NOTE(bill): for some bizarre reason, this has be a negative number
+	// NOTE(bill): for some bizarre reason, this has to be a negative number
 	timeout := -i64(duration / 100)
 	return CustomWaitOnAddress(f, &expect, size_of(expect), &timeout)
 }
