@@ -749,9 +749,15 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 			// TODO(bill): When is a good size warn?
 			// Is >256 KiB good enough?
 			if (sz > 1ll<<18) {
-				gbString type_str = type_to_string(e->type);
-				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
-				gb_string_free(type_str);
+				bool is_ref = false;
+				if((e->flags & EntityFlag_ForValue) != 0) {
+					is_ref = type_deref(e->Variable.for_loop_parent_type) != NULL;
+				}
+				if(!is_ref) {
+					gbString type_str = type_to_string(e->type);
+					warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
+					gb_string_free(type_str);
+				}
 			}
 		}
 	}
