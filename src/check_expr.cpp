@@ -1044,7 +1044,7 @@ gb_internal AstPackage *get_package_of_type(Type *type) {
 }
 
 
-// NOTE(bill): 'content_name' is for debugging and error messages
+// NOTE(bill): 'context_name' is for debugging and error messages
 gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *type, String context_name) {
 	check_not_tuple(c, operand);
 	if (operand->mode == Addressing_Invalid) {

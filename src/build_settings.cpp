@@ -2124,6 +2124,7 @@ gb_internal bool init_build_paths(String init_filename) {
 		}
 	}
 
+	bool no_crt_checks_failed = false;
 	if (build_context.no_crt && !build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR && !build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
 		switch (build_context.metrics.os) {
 		case TargetOs_linux:
@@ -2133,9 +2134,27 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
 		case TargetOs_haiku:
-			gb_printf_err("-no-crt on unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present because the default allocator requires crt\n");
-			return false;
+			gb_printf_err("-no-crt on Unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present, because the default allocator requires CRT\n");
+			no_crt_checks_failed = true;
 		}
+	}
+
+	if (build_context.no_crt && !build_context.no_thread_local) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+		case TargetOs_darwin:
+		case TargetOs_essence:
+		case TargetOs_freebsd:
+		case TargetOs_openbsd:
+		case TargetOs_netbsd:
+		case TargetOs_haiku:
+			gb_printf_err("-no-crt on Unix systems requires the -no-thread-local flag to also be present, because the TLS is inaccessible without CRT\n");
+			no_crt_checks_failed = true;
+		}
+	}
+
+	if (no_crt_checks_failed) {
+		return false;
 	}
 
 	return true;
