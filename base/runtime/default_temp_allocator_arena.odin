@@ -282,9 +282,10 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 
 		if block := arena.curr_block; block != nil {
 			assert(block.used >= temp.used, "out of order use of arena_temp_end", loc)
-			amount_to_zero := min(block.used-temp.used, block.capacity-block.used)
+			amount_to_zero := block.used-temp.used
 			intrinsics.mem_zero(block.base[temp.used:], amount_to_zero)
 			block.used = temp.used
+			arena.total_used -= amount_to_zero
 		}
 	}
 
