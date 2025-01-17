@@ -125,7 +125,6 @@ data_source_flag :: enum c.int {
 
 data_source_flags :: bit_set[data_source_flag; u32]
 
-DATA_SOURCE_SELF_MANAGED_RANGE_AND_LOOP_POINT :: data_source_flags{.SELF_MANAGED_RANGE_AND_LOOP_POINT}
 
 data_source_vtable :: struct {
 	onRead:          proc "c" (pDataSource: ^data_source, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result,
