@@ -67,9 +67,7 @@ _validate_common_slice_sizes :: proc (ctx: ^Context, tag, iv, aad, text: []byte)
 	case KEY_SIZE_256:
 		iv_ok = len(iv) == IV_SIZE_256
 	}
-	if !iv_ok {
-		panic("crypto/aegis: invalid IV size")
-	}
+	ensure(iv_ok,"crypto/aegis: invalid IV size")
 
 	#assert(size_of(int) == 8 || size_of(int) <= 4)
 	// As A_MAX and P_MAX are both defined to be 2^61 - 1 bytes, and
@@ -100,15 +98,11 @@ init :: proc(ctx: ^Context, key: []byte, impl := aes.DEFAULT_IMPLEMENTATION) {
 //
 // dst and plaintext MUST alias exactly or not at all.
 seal :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
-	assert(ctx._is_initialized)
+	ensure(ctx._is_initialized)
 
 	_validate_common_slice_sizes(ctx, tag, iv, aad, plaintext)
-	if len(dst) != len(plaintext) {
-		panic("crypto/aegis: invalid destination ciphertext size")
-	}
-	if bytes.alias_inexactly(dst, plaintext) {
-		panic("crypto/aegis: dst and plaintext alias inexactly")
-	}
+	ensure(len(dst) == len(plaintext), "crypto/aegis: invalid destination ciphertext size")
+	ensure(!bytes.alias_inexactly(dst, plaintext), "crypto/aegis: dst and plaintext alias inexactly")
 
 	switch ctx._impl {
 	case .Hardware:
@@ -156,15 +150,11 @@ seal :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
 // dst and plaintext MUST alias exactly or not at all.
 @(require_results)
 open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
-	assert(ctx._is_initialized)
+	ensure(ctx._is_initialized)
 
 	_validate_common_slice_sizes(ctx, tag, iv, aad, ciphertext)
-	if len(dst) != len(ciphertext) {
-		panic("crypto/aegis: invalid destination plaintext size")
-	}
-	if bytes.alias_inexactly(dst, ciphertext) {
-		panic("crypto/aegis: dst and ciphertext alias inexactly")
-	}
+	ensure(len(dst) == len(ciphertext), "crypto/aegis: invalid destination plaintext size")
+	ensure(!bytes.alias_inexactly(dst, ciphertext), "crypto/aegis: dst and ciphertext alias inexactly")
 
 	tmp: [TAG_SIZE_256]byte
 	derived_tag := tmp[:len(tag)]
@@ -206,6 +196,7 @@ open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 	}
 
 	if crypto.compare_constant_time(tag, derived_tag) != 1 {
+		mem.zero_explicit(raw_data(derived_tag), len(derived_tag))
 		mem.zero_explicit(raw_data(dst), ct_len)
 		return false
 	}
