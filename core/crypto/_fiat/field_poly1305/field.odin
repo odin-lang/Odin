@@ -28,9 +28,7 @@ fe_from_bytes :: #force_inline proc "contextless" (
 	// makes implementing the actual MAC block processing considerably
 	// neater.
 
-	if len(arg1) != 16 {
-		panic_contextless("poly1305: invalid field element size")
-	}
+	ensure_contextless(len(arg1) == 16, "poly1305: invalid field element size")
 
 	// While it may be unwise to do deserialization here on our
 	// own when fiat-crypto provides equivalent functionality,
