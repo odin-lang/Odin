@@ -16,6 +16,7 @@ Generator_Query_Info :: runtime.Random_Generator_Query_Info
 Default_Random_State :: runtime.Default_Random_State
 default_random_generator :: runtime.default_random_generator
 
+@(require_results)
 create :: proc(seed: u64) -> (state: Default_Random_State) {
 	seed := seed
 	runtime.default_random_generator(&state)
