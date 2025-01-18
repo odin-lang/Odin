@@ -63,9 +63,8 @@ rev64 :: proc "contextless" (x: u64) -> u64 {
 // Note: `dst` is both an input and an output, to support easy implementation
 // of GCM.
 ghash :: proc "contextless" (dst, key, data: []byte) {
-	if len(dst) != _aes.GHASH_BLOCK_SIZE || len(key) != _aes.GHASH_BLOCK_SIZE {
-		panic_contextless("aes/ghash: invalid dst or key size")
-	}
+	ensure_contextless(len(dst) == _aes.GHASH_BLOCK_SIZE)
+	ensure_contextless(len(key) == _aes.GHASH_BLOCK_SIZE)
 
 	buf := data
 	l := len(buf)
