@@ -158,7 +158,7 @@ _init :: proc(ctx: ^$T) {
 
 // update adds more data to the Context.
 update :: proc(ctx: ^$T, data: []byte) {
-	assert(ctx.is_initialized)
+	ensure(ctx.is_initialized)
 
 	when T == Context_256 {
 		CURR_BLOCK_SIZE :: BLOCK_SIZE_256
@@ -194,11 +194,8 @@ update :: proc(ctx: ^$T, data: []byte) {
 // Iff finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
-	assert(ctx.is_initialized)
-
-	if len(hash) * 8 < ctx.md_bits {
-		panic("crypto/sha2: invalid destination digest size")
-	}
+	ensure(ctx.is_initialized)
+	ensure(len(hash) * 8 >= ctx.md_bits, "crypto/sha2: invalid destination digest size")
 
 	ctx := ctx
 	if finalize_clone {
@@ -238,7 +235,7 @@ final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
 		endian.unchecked_put_u64be(pad[8:], length_lo)
 		update(ctx, pad[0:16])
 	}
-	assert(ctx.bitlength == 0)
+	assert(ctx.bitlength == 0) // Check for bugs
 
 	when T == Context_256 {
 		for i := 0; i < ctx.md_bits / 32; i += 1 {

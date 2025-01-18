@@ -24,17 +24,13 @@ sc_set_u64 :: proc "contextless" (sc: ^Scalar, i: u64) {
 
 @(require_results)
 sc_set_bytes :: proc "contextless" (sc: ^Scalar, b: []byte) -> bool {
-	if len(b) != 32 {
-		panic_contextless("edwards25519: invalid scalar size")
-	}
+	ensure_contextless(len(b) == 32, "edwards25519: invalid scalar size")
 	b_ := (^[32]byte)(raw_data(b))
 	return field.fe_from_bytes(sc, b_)
 }
 
 sc_set_bytes_rfc8032 :: proc "contextless" (sc: ^Scalar, b: []byte) {
-	if len(b) != 32 {
-		panic_contextless("edwards25519: invalid scalar size")
-	}
+	ensure_contextless(len(b) == 32, "edwards25519: invalid scalar size")
 	b_ := (^[32]byte)(raw_data(b))
 	field.fe_from_bytes_rfc8032(sc, b_)
 }

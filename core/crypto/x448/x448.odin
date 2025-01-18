@@ -127,15 +127,9 @@ _scalarmult :: proc "contextless" (out, scalar, point: ^[56]byte) {
 // scalarmult "multiplies" the provided scalar and point, and writes the
 // resulting point to dst.
 scalarmult :: proc(dst, scalar, point: []byte) {
-	if len(scalar) != SCALAR_SIZE {
-		panic("crypto/x448: invalid scalar size")
-	}
-	if len(point) != POINT_SIZE {
-		panic("crypto/x448: invalid point size")
-	}
-	if len(dst) != POINT_SIZE {
-		panic("crypto/x448: invalid destination point size")
-	}
+	ensure(len(scalar) == SCALAR_SIZE, "crypto/x448: invalid scalar size")
+	ensure(len(point) == POINT_SIZE, "crypto/x448: invalid point size")
+	ensure(len(dst) == POINT_SIZE, "crypto/x448: invalid destination point size")
 
 	// "clamp" the scalar
 	e: [56]byte = ---

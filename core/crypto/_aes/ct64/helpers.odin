@@ -31,41 +31,31 @@ and_interleaved :: #force_inline proc "contextless" (a0, a1, b0, b1: u64) -> (u6
 }
 
 load_blockx1 :: proc "contextless" (q: ^[8]u64, src: []byte) {
-	if len(src) != _aes.BLOCK_SIZE {
-		panic_contextless("aes/ct64: invalid block size")
-	}
+	ensure_contextless(len(src) == _aes.BLOCK_SIZE, "aes/ct64: invalid block size")
 
 	q[0], q[4] = #force_inline load_interleaved(src)
 	orthogonalize(q)
 }
 
 store_blockx1 :: proc "contextless" (dst: []byte, q: ^[8]u64) {
-	if len(dst) != _aes.BLOCK_SIZE {
-		panic_contextless("aes/ct64: invalid block size")
-	}
+	ensure_contextless(len(dst) == _aes.BLOCK_SIZE, "aes/ct64: invalid block size")
 
 	orthogonalize(q)
 	#force_inline store_interleaved(dst, q[0], q[4])
 }
 
 load_blocks :: proc "contextless" (q: ^[8]u64, src: [][]byte) {
-	if n := len(src); n > STRIDE || n == 0 {
-		panic_contextless("aes/ct64: invalid block(s) size")
-	}
+	ensure_contextless(len(src) == 0 || len(src) <= STRIDE, "aes/ct64: invalid block(s) size")
 
 	for s, i in src {
-		if len(s) != _aes.BLOCK_SIZE {
-			panic_contextless("aes/ct64: invalid block size")
-		}
+		ensure_contextless(len(s) == _aes.BLOCK_SIZE, "aes/ct64: invalid block size")
 		q[i], q[i + 4] = #force_inline load_interleaved(s)
 	}
 	orthogonalize(q)
 }
 
 store_blocks :: proc "contextless" (dst: [][]byte, q: ^[8]u64) {
-	if n := len(dst); n > STRIDE || n == 0 {
-		panic_contextless("aes/ct64: invalid block(s) size")
-	}
+	ensure_contextless(len(dst) == 0 || len(dst) <= STRIDE, "aes/ct64: invalid block(s) size")
 
 	orthogonalize(q)
 	for d, i in dst {
@@ -73,9 +63,7 @@ store_blocks :: proc "contextless" (dst: [][]byte, q: ^[8]u64) {
 		if d == nil {
 			break
 		}
-		if len(d) != _aes.BLOCK_SIZE {
-			panic_contextless("aes/ct64: invalid block size")
-		}
+		ensure_contextless(len(d) == _aes.BLOCK_SIZE, "aes/ct64: invalid block size")
 		#force_inline store_interleaved(d, q[i], q[i + 4])
 	}
 }
