@@ -615,7 +615,7 @@ try_cross_linking:;
 							//                local to the executable (unless the system collection is used, in which case we search
 							//                the system library paths for the library file).
 							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
-								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
+								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
 								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
