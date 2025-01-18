@@ -19,7 +19,7 @@ Data_initWithBytes :: proc "c" (self: ^Data, bytes: []byte) -> ^Data {
 }
 
 @(objc_type=Data, objc_name="initWithBytesNoCopy")
-Data_initWithBytesNoCopy :: proc "c" (self: ^Data, bytes: []byte, freeWhenDone: ns.BOOL) -> ^Data {
+Data_initWithBytesNoCopy :: proc "c" (self: ^Data, bytes: []byte, freeWhenDone: BOOL) -> ^Data {
 	return msgSend(
 		^Data,
 		self,
