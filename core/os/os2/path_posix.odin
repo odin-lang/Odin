@@ -81,7 +81,7 @@ _remove_all :: proc(path: string) -> Error {
 
 		fullpath, _ := concatenate({path, "/", string(cname), "\x00"}, temp_allocator())
 		if entry.d_type == .DIR {
-			_remove_all(fullpath[:len(fullpath)-1])
+			_remove_all(fullpath[:len(fullpath)-1]) or_return
 		} else {
 			if posix.unlink(cstring(raw_data(fullpath))) != .OK {
 				return _get_platform_error()
