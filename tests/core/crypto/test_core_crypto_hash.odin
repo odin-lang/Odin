@@ -621,7 +621,7 @@ test_blake2b_self :: proc(t: ^testing.T) {
 		0x7F, 0x5E, 0x76, 0x5A, 0x7B, 0xCC, 0xD4, 0x75,
 	}
 	md_lens := []int{20, 32, 48, 64}
-    src_lens := []int{0, 3, 128, 129, 255, 1024}
+	src_lens := []int{0, 3, 128, 129, 255, 1024}
 
 	b2b := proc(dst, src: []byte) {
 		ctx: blake2b.Context
@@ -683,7 +683,7 @@ test_blake2s_self :: proc(t: ^testing.T) {
 		0xFB, 0xDC, 0x88, 0x79, 0x7F, 0x4C, 0x1D, 0xFE,
 	}
 	md_lens := []int{16, 20, 28, 32}
-    src_lens := []int{0, 3, 64, 65, 255, 1024}
+	src_lens := []int{0, 3, 64, 65, 255, 1024}
 
 	b2s := proc(dst, src: []byte) {
 		ctx: blake2s.Context

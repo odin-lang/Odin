@@ -3,9 +3,62 @@ package test_core_crypto
 import "base:runtime"
 import "core:encoding/hex"
 import "core:testing"
+import "core:crypto/argon2id"
 import "core:crypto/hash"
 import "core:crypto/hkdf"
 import "core:crypto/pbkdf2"
+
+@(test)
+test_argon2id :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	test_vectors := []struct {
+		params:   ^argon2id.Parameters,
+		password: string,
+		salt:     string,
+		secret:   string,
+		ad:       string,
+		tag:      string,
+	} {
+		// RFC 9106 5.3.
+		{
+			&argon2id.Parameters{
+				32,
+				3,
+				4,
+			},
+			"0101010101010101010101010101010101010101010101010101010101010101",
+			"02020202020202020202020202020202",
+			"0303030303030303",
+			"040404040404040404040404",
+			"0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659",
+		},
+	}
+	for v, _ in test_vectors {
+		tag := make([]byte, len(v.tag)/2, context.temp_allocator)
+
+		password, _ := hex.decode(transmute([]byte)(v.password), context.temp_allocator)
+		salt, _ := hex.decode(transmute([]byte)(v.salt), context.temp_allocator)
+		secret, _ := hex.decode(transmute([]byte)(v.secret), context.temp_allocator)
+		ad, _ := hex.decode(transmute([]byte)(v.ad), context.temp_allocator)
+
+		_ = argon2id.derive(v.params, password, salt, tag, secret, ad)
+
+		tag_str := string(hex.encode(tag, context.temp_allocator))
+
+		testing.expectf(
+			t,
+			tag_str == v.tag,
+			"argon2id: Expected: %s for input of (%s, %s, %s, %s), but got %s instead",
+			v.tag,
+			v.password,
+			v.salt,
+			v.secret,
+			v.ad,
+			tag_str,
+		)
+	}
+}
 
 @(test)
 test_hkdf :: proc(t: ^testing.T) {
