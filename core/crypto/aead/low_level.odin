@@ -128,9 +128,7 @@ init :: proc(ctx: ^Context, algorithm: Algorithm, key: []byte, impl: Implementat
 		reset(ctx)
 	}
 
-	if len(key) != KEY_SIZES[algorithm] {
-		panic("crypto/aead: invalid key size")
-	}
+	ensure(len(key) == KEY_SIZES[algorithm], "crypto/aead: invalid key size")
 
 	// Directly specialize the union by setting the type ID (save a copy).
 	reflect.set_union_variant_typeid(
@@ -167,9 +165,7 @@ init :: proc(ctx: ^Context, algorithm: Algorithm, key: []byte, impl: Implementat
 //
 // dst and plaintext MUST alias exactly or not at all.
 seal_ctx :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
-	if len(tag) != TAG_SIZES[ctx._algo] {
-		panic("crypto/aead: invalid tag size")
-	}
+	ensure(len(tag) == TAG_SIZES[ctx._algo], "crypto/aead: invalid tag size")
 
 	switch &impl in ctx._impl {
 	case aes.Context_GCM:
@@ -193,9 +189,7 @@ seal_ctx :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
 // dst and plaintext MUST alias exactly or not at all.
 @(require_results)
 open_ctx :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
-	if len(tag) != TAG_SIZES[ctx._algo] {
-		panic("crypto/aead: invalid tag size")
-	}
+	ensure(len(tag) == TAG_SIZES[ctx._algo], "crypto/aead: invalid tag size")
 
 	switch &impl in ctx._impl {
 	case aes.Context_GCM:

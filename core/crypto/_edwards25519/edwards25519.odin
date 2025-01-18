@@ -108,9 +108,7 @@ ge_set :: proc "contextless" (ge, a: ^Group_Element) {
 
 @(require_results)
 ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
-	if len(b) != 32 {
-		panic_contextless("edwards25519: invalid group element size")
-	}
+	ensure_contextless(len(b) == 32, "edwards25519: invalid group element size")
 	b_ := (^[32]byte)(raw_data(b))
 
 	// Do the work in a scratch element, so that ge is unchanged on
@@ -167,9 +165,7 @@ ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
 }
 
 ge_bytes :: proc "contextless" (ge: ^Group_Element, dst: []byte) {
-	if len(dst) != 32 {
-		panic_contextless("edwards25519: invalid group element size")
-	}
+	ensure_contextless(len(dst) == 32, "edwards25519: invalid group element size")
 	dst_ := (^[32]byte)(raw_data(dst))
 
 	// Convert the element to affine (x, y) representation.
