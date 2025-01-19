@@ -76,7 +76,7 @@ _set_env :: proc(key, v_new: string) -> bool {
 			// wasn't in the environment in the first place.
 			k_addr, v_addr := _kv_addr_from_val(v_curr, key)
 			if len(v_new) > len(v_curr) {
-				k_addr = ([^]u8)(heap_resize(k_addr, kv_size))
+				k_addr = ([^]u8)(runtime.heap_resize(k_addr, kv_size))
 				if k_addr == nil {
 					return false
 				}
@@ -90,7 +90,7 @@ _set_env :: proc(key, v_new: string) -> bool {
 		}
 	}
 
-	k_addr := ([^]u8)(heap_alloc(kv_size))
+	k_addr := ([^]u8)(runtime.heap_alloc(kv_size))
 	if k_addr == nil {
 		return false
 	}
@@ -129,7 +129,7 @@ _unset_env :: proc(key: string) -> bool {
 	// if we got this far, the envrionment variable
 	// existed AND was allocated by us.
 	k_addr, _ := _kv_addr_from_val(v, key)
-	heap_free(k_addr)
+	runtime.heap_free(k_addr)
 	return true
 }
 
@@ -139,7 +139,7 @@ _clear_env :: proc() {
 
 	for kv in _env {
 		if !_is_in_org_env(kv) {
-			heap_free(raw_data(kv))
+			runtime.heap_free(raw_data(kv))
 		}
 	}
 	clear(&_env)
@@ -193,7 +193,7 @@ _build_env :: proc() {
 		return
 	}
 
-	_env = make(type_of(_env), heap_allocator())
+	_env = make(type_of(_env), runtime.heap_allocator())
 	cstring_env := _get_original_env()
 	_org_env_begin = uintptr(rawptr(cstring_env[0]))
 	for i := 0; cstring_env[i] != nil; i += 1 {
