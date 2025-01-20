@@ -7,6 +7,13 @@ import "core:time"
 import "core:sync"
 import "core:sys/linux"
 
+// Most implementations will EINVAL at some point when doing big writes.
+// In practice a read/write call would probably never read/write these big buffers all at once,
+// which is why the number of bytes is returned and why there are procs that will call this in a
+// loop for you.
+// We set a max of 1GB to keep alignment and to be safe.
+MAX_RW :: 1 << 30
+
 File_Impl :: struct {
 	file: File,
 	name: string,
@@ -179,10 +186,11 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 }
 
 _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
-	if len(p) == 0 {
+	if len(p) <= 0 {
 		return 0, nil
 	}
-	n, errno := linux.read(f.fd, p[:])
+
+	n, errno := linux.read(f.fd, p[:min(len(p), MAX_RW)])
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
@@ -190,13 +198,13 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 }
 
 _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
-	if len(p) == 0 {
+	if len(p) <= 0 {
 		return 0, nil
 	}
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-	n, errno := linux.pread(f.fd, p[:], offset)
+	n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
 	if errno != .NONE {
 		return -1, _get_platform_error(errno)
 	}
@@ -206,29 +214,42 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 	return i64(n), nil
 }
 
-_write :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
-	if len(p) == 0 {
-		return 0, nil
+_write :: proc(f: ^File_Impl, p: []byte) -> (nt: i64, err: Error) {
+	p := p
+	for len(p) > 0 {
+		n, errno := linux.write(f.fd, p[:min(len(p), MAX_RW)])
+		if errno != .NONE {
+			err = _get_platform_error(errno)
+			return
+		}
+
+		p = p[n:]
+		nt += i64(n)
 	}
-	n, errno := linux.write(f.fd, p[:])
-	if errno != .NONE {
-		return -1, _get_platform_error(errno)
-	}
-	return i64(n), nil
+
+	return
 }
 
-_write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
-	if len(p) == 0 {
-		return 0, nil
-	}
+_write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (nt: i64, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-	n, errno := linux.pwrite(f.fd, p[:], offset)
-	if errno != .NONE {
-		return -1, _get_platform_error(errno)
+
+	p := p
+	offset := offset
+	for len(p) > 0 {
+		n, errno := linux.pwrite(f.fd, p[:min(len(p), MAX_RW)], offset)
+		if errno != .NONE {
+			err = _get_platform_error(errno)
+			return
+		}
+
+		p = p[n:]
+		nt += i64(n)
+		offset += i64(n)
 	}
-	return i64(n), nil
+
+	return
 }
 
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
