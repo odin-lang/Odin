@@ -46,8 +46,7 @@ init_with_contents :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
 		cap = builtin.len(backing),
 		allocator = {procedure=runtime.nil_allocator_proc, data=nil},
 	}
-	q.len    = len(backing)
-	q.offset = len(backing)
+	q.len = builtin.len(backing)
 	return true
 }
 
