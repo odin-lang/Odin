@@ -30,6 +30,7 @@ MenuItem :: struct {using _: Object}
 MenuItem_alloc :: proc "c" () -> ^MenuItem {
 	return msgSend(^MenuItem, MenuItem, "alloc")
 }
+
 @(objc_type=MenuItem, objc_name="registerActionCallback", objc_is_class_method=true)
 MenuItem_registerActionCallback :: proc "c" (name: cstring, callback: MenuItemCallback) -> SEL {
 	s := string(name)
@@ -50,9 +51,19 @@ MenuItem_registerActionCallback :: proc "c" (name: cstring, callback: MenuItemCa
 	return sel
 }
 
+@(objc_type=MenuItem, objc_name="separatorItem", objc_is_class_method=true)
+MenuItem_separatorItem :: proc "c" () -> ^MenuItem {
+	return msgSend(^MenuItem, MenuItem, "separatorItem")
+}
+
 @(objc_type=MenuItem, objc_name="init")
 MenuItem_init :: proc "c" (self: ^MenuItem) -> ^MenuItem {
 	return msgSend(^MenuItem, self, "init")
+}
+
+@(objc_type=MenuItem, objc_name="initWithTitle")
+MenuItem_initWithTitle :: proc "c" (self: ^MenuItem, title: ^String, action: SEL, keyEquivalent: ^String) -> ^MenuItem {
+	return msgSend(^MenuItem, self, "initWithTitle:action:keyEquivalent:", title, action, keyEquivalent)
 }
 
 @(objc_type=MenuItem, objc_name="setKeyEquivalentModifierMask")
@@ -73,6 +84,11 @@ MenuItem_setSubmenu :: proc "c" (self: ^MenuItem, submenu: ^Menu) {
 @(objc_type=MenuItem, objc_name="title")
 MenuItem_title :: proc "c" (self: ^MenuItem) -> ^String {
 	return msgSend(^String, self, "title")
+}
+
+@(objc_type=MenuItem, objc_name="setTitle")
+MenuItem_setTitle :: proc "c" (self: ^MenuItem, title: ^String) -> ^String {
+	return msgSend(^String, self, "title:", title)
 }
 
 
