@@ -548,8 +548,9 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 		}
 		if dir_fd != linux.AT_FDCWD {
-			errno = linux.fchdir(dir_fd)
-			assert(errno == nil)
+			if errno = linux.fchdir(dir_fd); errno != .NONE {
+				write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
+			}
 		}
 
 		errno = linux.execveat(dir_fd, exe_path, &cargs[0], env)
