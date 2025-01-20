@@ -168,7 +168,7 @@ process_rrule :: proc(rrule: datetime.TZ_RRule, tm: time.Time) -> (out: datetime
 		},
 	}
 	record_sort_proc :: proc(i, j: datetime.TZ_Record) -> bool {
-		return i.time > j.time
+		return i.time < j.time
 	}
 	slice.sort_by(records, record_sort_proc)
 
@@ -179,7 +179,7 @@ process_rrule :: proc(rrule: datetime.TZ_RRule, tm: time.Time) -> (out: datetime
 		}
 	}
 
-	return records[len(records)-1], true
+	return records[0], true
 }
 
 datetime_to_utc :: proc(dt: datetime.DateTime) -> (out: datetime.DateTime, success: bool) #optional_ok {
