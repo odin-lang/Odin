@@ -1240,3 +1240,31 @@ GHND                :: (GMEM_MOVEABLE | GMEM_ZEROINIT)
 GPTR                :: (GMEM_FIXED | GMEM_ZEROINIT)
 
 LPTOP_LEVEL_EXCEPTION_FILTER :: PVECTORED_EXCEPTION_HANDLER
+
+ACTCTXW :: struct {
+	Size:                  ULONG,
+	Flags:                 DWORD,
+	Source:                LPCWSTR,
+	ProcessorArchitecture: USHORT,
+	LangId:                LANGID,
+	AssemblyDirectory:     LPCWSTR,
+	ResourceName:          LPCWSTR,
+	ApplicationName:       LPCWSTR,
+	Module:                HMODULE,
+}
+PACTCTXW  :: ^ACTCTXW
+PCACTCTXW :: ^ACTCTXW
+
+ACTCTX_FLAG_PROCESSOR_ARCHITECTURE_VALID :: 0x001
+ACTCTX_FLAG_LANGID_VALID                 :: 0x002
+ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID     :: 0x004
+ACTCTX_FLAG_RESOURCE_NAME_VALID          :: 0x008
+ACTCTX_FLAG_SET_PROCESS_DEFAULT          :: 0x010
+ACTCTX_FLAG_APPLICATION_NAME_VALID       :: 0x020
+ACTCTX_FLAG_HMODULE_VALID                :: 0x080
+
+@(default_calling_convention="system")
+foreign kernel32 {
+	CreateActCtxW :: proc(pActCtx: ^ACTCTXW) -> HANDLE ---
+	ActivateActCtx :: proc(hActCtx: HANDLE, lpCookie: ^ULONG_PTR) -> BOOL ---
+}
