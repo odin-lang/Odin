@@ -39,8 +39,11 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 		}
 
 		n := len(fimpl.name)+1
-		non_zero_resize(&it.impl.fullpath, n+len(sname))
-		n += copy(it.impl.fullpath[n:], sname)
+		if err := non_zero_resize(&it.impl.fullpath, n+len(sname)); err != nil {
+			// Can't really tell caller we had an error, sad.
+			return
+		}
+		copy(it.impl.fullpath[n:], sname)
 
 		fi = internal_stat(stat, string(it.impl.fullpath[:]))
 		ok = true
@@ -60,7 +63,7 @@ _read_directory_iterator_create :: proc(f: ^File) -> (iter: Read_Directory_Itera
 	iter.f = f
 	iter.impl.idx = 0
 
-	iter.impl.fullpath.allocator = file_allocator()
+	iter.impl.fullpath = make([dynamic]byte, 0, len(impl.name)+128, file_allocator()) or_return
 	append(&iter.impl.fullpath, impl.name)
 	append(&iter.impl.fullpath, "/")
 	defer if err != nil { delete(iter.impl.fullpath) }
