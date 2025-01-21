@@ -62,7 +62,7 @@ when ODIN_ARCH == .amd64 {
 			Shared:      ULONG_PTR | 1,
 			Reserved:    ULONG_PTR | 3,
 			VirtualPage: ULONG_PTR | 52,
-		}
+		},
 	}
 
 	PSAPI_WORKING_SET_EX_BLOCK :: struct #raw_union {
@@ -97,7 +97,7 @@ when ODIN_ARCH == .amd64 {
 			Shared:      ULONG_PTR | 1,
 			Reserved:    ULONG_PTR | 3,
 			VirtualPage: ULONG_PTR | 20,
-		}
+		},
 	}
 
 	PSAPI_WORKING_SET_EX_BLOCK :: struct #raw_union {
@@ -170,7 +170,7 @@ PROCESS_MEMORY_COUNTERS :: struct {
 
 PROCESS_MEMORY_COUNTERS_EX :: struct {
 	using counter: PROCESS_MEMORY_COUNTERS,
-	PrivateUsage:  SIZE_T
+	PrivateUsage:  SIZE_T,
 }
 
 PROCESS_MEMORY_COUNTERS_EX2 :: struct {
@@ -200,11 +200,11 @@ PERFORMANCE_INFORMATION :: struct {
 PPERFORMANCE_INFORMATION :: ^PERFORMANCE_INFORMATION
 
 ENUM_PAGE_FILE_INFORMATION :: struct {
-    cb:         DWORD,
-    Reserved:   DWORD,
-    TotalSize:  SIZE_T,
-    TotalInUse: SIZE_T,
-    PeakUsage:  SIZE_T,
+	cb:         DWORD,
+	Reserved:   DWORD,
+	TotalSize:  SIZE_T,
+	TotalInUse: SIZE_T,
+	PeakUsage:  SIZE_T,
 } 
 PENUM_PAGE_FILE_INFORMATION :: ^ENUM_PAGE_FILE_INFORMATION
 
