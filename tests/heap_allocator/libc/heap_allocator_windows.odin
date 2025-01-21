@@ -1,4 +1,4 @@
-package runtime
+package tests_heap_allocator_libc
 
 import "../sanitizer"
 

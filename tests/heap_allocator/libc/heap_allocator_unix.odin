@@ -1,6 +1,6 @@
 #+build linux, darwin, freebsd, openbsd, netbsd, haiku
 #+private
-package runtime
+package tests_heap_allocator_libc
 
 when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
