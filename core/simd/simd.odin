@@ -25,9 +25,9 @@ import "base:intrinsics"
 /*
 Check if SIMD is software-emulated on a target platform.
 
-This value is `true`, if the compile-time target has the hardware support for
-at least 128-bit SIMD. If the compile-time target lacks the hardware support
-for 128-bit SIMD, this value is `false`, and all SIMD operations will be
+This value is `false`, when the compile-time target has the hardware support for
+at 128-bit (or wider) SIMD. If the compile-time target lacks the hardware support
+for 128-bit SIMD, this value is `true`, and all SIMD operations will likely be
 emulated.
 */
 IS_EMULATED :: true when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !intrinsics.has_target_feature("sse2") else
@@ -436,7 +436,7 @@ specified in the corresponding lane of the vector `b`.
 
 Example:
 
-This example assumes 1-byte lanes of the input vectors.
+	// An example for a 4-lane 8-bit signed integer vector `a`.
 
 	   +-------+-------+-------+-------+
 	a: |  0x11 |  0x55 |  0x03 |  0xff |
@@ -486,7 +486,7 @@ specified in the corresponding lane of the vector `b`.
 
 Example:
 
-This example assumes that the `a` vector is of a signed type and a 1-byte lane size.
+	// An example for a 4-lane 8-bit signed integer vector `a`.
 
 	   +-------+-------+-------+-------+
 	a: |  0x11 |  0x55 |  0x03 |  0xff |
@@ -508,7 +508,7 @@ This procedure returns a vector, such that each lane holds the result of a
 shift-left (aka shift-up) operation, of lane from the vector `a` by the shift
 amount from the corresponding lane of the vector `b`.
 
-The shift amount is rounded to (masked) to the bit-width of the lane.
+The shift amount is wrapped (masked) to the bit-width of the lane.
 
 Inputs:
 - `a`: An integer vector of values to shift.
@@ -528,7 +528,7 @@ specified in the corresponding lane of the vector `b`.
 
 Example:
 
-This example assumes 1-byte lanes of the input vectors.
+	// An example for a 4-lane vector `a` of 8-bit signed integers.
 
 	   +-------+-------+-------+-------+
 	a: |  0x11 |  0x55 |  0x03 |  0xff |
@@ -550,7 +550,7 @@ This procedure returns a vector, such that each lane holds the result of a
 shift-right (aka shift-down) operation, of lane from the vector `a` by the shift
 amount from the corresponding lane of the vector `b`.
 
-The shift amount is rounded to (masked) to the bit-width of the lane.
+The shift amount is wrapped (masked) to the bit-width of the lane.
 
 If the first vector is a vector of signed integers, the arithmetic shift
 operation is performed. Otherwise, if the first vector is a vector of unsigned
@@ -574,8 +574,7 @@ specified in the corresponding lane of the vector `b`.
 
 Example:
 
-This example assumes that the `a` vector is of a signed type and a 1-byte lane
-size of the input vectors.
+	// An example for a 4-lane vector `a` of 8-bit signed integers.
 
 	   +-------+-------+-------+-------+
 	a: |  0x11 |  0x55 |  0x03 |  0xff |
@@ -591,11 +590,12 @@ size of the input vectors.
 shr_masked :: intrinsics.simd_shr_masked
 
 /*
-Saturated addition of vectors.
+Saturated addition of SIMD vectors.
 
-The *saturated sum* is a sum that upon overflow or underflow, instead of
-round-tripping, keeps the value clamped between the minimum and the maximum
-values of the lane type.
+The *saturated sum* is a just like a normal sum, except the treatment of the
+result upon overflow or underflow is different. In saturated operations, the
+result is not wrapped to the bit-width of the lane, and instead is kept clamped
+between the minimum and the maximum values of the lane type.
 
 This procedure returns a vector where each lane is the saturated sum of the
 corresponding lanes of vectors `a` and `b`.
@@ -623,7 +623,7 @@ Returns:
 
 Example:
 
-Assuming unsigned bytes as the type of the element in a lane:
+	// An example for a 4-lane vector `a` of 8-bit signed integers.
 
 	   +-----+-----+-----+-----+
 	a: |  0  | 255 |  2  |  3  |
@@ -639,11 +639,12 @@ Assuming unsigned bytes as the type of the element in a lane:
 saturating_add :: intrinsics.simd_saturating_add
 
 /*
-Saturated subtraction of vectors.
+Saturated subtraction of 2 lanes of vectors.
 
-The *saturated difference* is a difference that upon overflow or underflow,
-instead of round-tripping, keeps the value clamped between the minimum and the
-maximum values of the lane type.
+The *saturated difference* is a just like a normal difference, except the treatment of the
+result upon overflow or underflow is different. In saturated operations, the
+result is not wrapped to the bit-width of the lane, and instead is kept clamped
+between the minimum and the maximum values of the lane type.
 
 This procedure returns a vector where each lane is the saturated difference of
 the corresponding lanes of vectors `a` and `b`.
@@ -671,7 +672,7 @@ Returns:
 
 Example:
 
-Assuming unsigned bytes as the type of the element in a lane:
+	// An example for a 4-lane vector `a` of 8-bit signed integers.
 
 	   +-----+-----+-----+-----+
 	a: |  0  | 255 |  2  |  3  |
@@ -1273,12 +1274,11 @@ lanes_ge :: intrinsics.simd_lanes_ge
 /*
 Perform a gather load into a vector.
 
-A *gather* operation is memory load operation that loads values from an vector
+A *gather* operation is memory load operation, that loads values from an vector
 of addresses into a single value vector. This can be used to achieve the
 following results:
 
-
-- Accessing every N'th element of an array (strided access).
+- Accessing every N'th element of an array (strided access)
 - Access of elements according to some computed offsets (indexed access).
 - Access of elements in a different order (shuffling access).
 
@@ -1317,28 +1317,32 @@ from the value vector `val`.
 
 Example:
 
-Example below loads 2 lanes of values from 2 lanes of float vectors, `v1` and
-`v2`. From each of these vectors we're loading the second value, into the first
-and the third position of the result vector.
+	// Example below loads 2 lanes of values from 2 lanes of float vectors, `v1` and
+	// `v2`. From each of these vectors we're loading the second value, into the first
+	// and the third position of the result vector.
 
-Therefore the `ptrs` argument is initialized such that the first and the third
-value are the addresses of the values that we want to load into the result
-vector, and we'll fill in `nil` for the rest of them. To prevent CPU from
-dereferencing those `nil` addresses we provide the mask that only allows us
-to load valid positions of the `ptrs` array, and the array of defaults which
-will have `127` (`0x7f`) in each position as the default value.
+	// Therefore the `ptrs` argument is initialized such that the first and the third
+	// value are the addresses of the values that we want to load into the result
+	// vector, and we'll fill in `nil` for the rest of them. To prevent CPU from
+	// dereferencing those `nil` addresses we provide the mask that only allows us
+	// to load valid positions of the `ptrs` array, and the array of defaults which
+	// will have `127` in each position as the default value.
 
-	v1 := [4] f32 {1, 2, 3, 4}
-	v2 := [4] f32 {9, 10,11,12}
+	v1 := [4] f32 {1, 2, 3, 4};
+	v2 := [4] f32 {9, 10,11,12};
 	ptrs := #simd [4]rawptr { &v1[1], nil, &v2[1], nil }
 	mask := #simd [4]bool { true, false, true, false }
 	defaults := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
 	res := simd.gather(ptrs, defaults, mask)
 	fmt.println(res)
 
-The code would print `<2, 127, 10, 127>`. First and the third positions came
-from the `ptrs` array, and the other 2 lanes are from the default vector.
-Graphic below shows how the values of the result are decided based on the mask:
+Output:
+
+	<2, 127, 10, 127>
+
+The first and the third positions came from the `ptrs` array, and the other
+2 lanes of from the default vector. The graphic below shows how the values of
+the result are decided based on the mask:
 
 	      +-------------------------------+ 
 	mask: |   1   |   0   |   1   |   0   | 
@@ -1388,15 +1392,15 @@ Inputs:
 
 Example:
 
-Example below writes value `127` to the second element of two different
-vectors. The addresses of store destinations are written to the first and the
-third argument of the `ptr` vector, and the `mask` is set accordingly.
+	// Example below writes value `127` to the second element of two different
+	// vectors. The addresses of store destinations are written to the first and the
+	// third argument of the `ptr` vector, and the `mask` is set accordingly.
 
-	v1 := [4]f32{1, 2, 3, 4}
-	v2 := [4]f32{5, 6, 7, 8}
-	ptrs := #simd [4]rawptr{ &v1[1], nil, &v2[1], nil }
-	mask := #simd [4]bool{ true, false, true, false }
-	vals := #simd [4]f32{ 0x7f, 0x7f, 0x7f, 0x7f }
+	v1 := [4] f32 {1, 2, 3, 4};
+	v2 := [4] f32 {5, 6, 7, 8};
+	ptrs := #simd [4]rawptr { &v1[1], nil, &v2[1], nil }
+	mask := #simd [4]bool { true, false, true, false }
+	vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
 	simd.scatter(ptrs, vals, mask)
 	fmt.println(v1)
 	fmt.println(v2)
@@ -1406,7 +1410,7 @@ Output:
 	[1, 127, 3, 4]
 	[5, 127, 7, 8]
 
-Graphic below shows how the data gets written into memory.
+The graphic below shows how the data gets written into memory.
 
 	
 	      +-------------------+
@@ -1459,13 +1463,13 @@ memory, and the other lanes are loaded from the `val` vector.
 
 Example:
 
-The following code loads two values from the `src` vector, the first and the
-third value (selected by the mask). The masked-off values are given the value
-of 127 (`0x7f`).
+	// The following code loads two values from the `src` vector, the first and the
+	// third value (selected by the mask). The masked-off values are given the value
+	// of 127 (`0x7f`).
 
-	src := [4]f32{1, 2, 3, 4}
-	mask := #simd [4]bool{ true, false, true, false }
-	vals := #simd [4]f32{ 0x7f, 0x7f, 0x7f, 0x7f }
+	src := [4] f32 {1, 2, 3, 4};
+	mask := #simd [4]bool { true, false, true, false }
+	vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
 	res := simd.masked_load(&src, vals, mask)
 	fmt.println(res)
 
@@ -1473,7 +1477,7 @@ Output:
 
 	<1, 127, 3, 127>
 
-Graphic below demonstrates the flow of lanes.
+The graphic below demonstrates the flow of lanes.
 
 	      +-------------------------------+ 
 	mask: |   1   |   0   |   1   |   0   | 
@@ -1519,12 +1523,12 @@ Inputs:
 
 Example:
 
-Example below stores the value 127 into the first and the third slot of the
-vector `v`.
+	// Example below stores the value 127 into the first and the third slot of the
+	// vector `v`.
 
-	v := [4]f32{1, 2, 3, 4}
-	mask := #simd [4]bool{ true, false, true, false }
-	vals := #simd [4]f32{ 0x7f, 0x7f, 0x7f, 0x7f }
+	v := [4] f32 {1, 2, 3, 4};
+	mask := #simd [4]bool { true, false, true, false }
+	vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
 	simd.masked_store(&v, vals, mask)
 	fmt.println(v)
 
@@ -1532,7 +1536,7 @@ Output:
 
 	[127, 2, 127, 4]
 
-Graphic below shows the flow of lanes:
+The graphic below shows the flow of lanes:
 
 	      +-------------------+
 	mask: | 1  | 0  | 1  | 0  |
@@ -1588,17 +1592,17 @@ Returns:
 
 Example:
 
-The example below loads two values from memory of the vector `v`. Two values in
-the mask are set to `true`, meaning only two memory items will be loaded into
-the result vector. The mask is set to `true` in the first and the third
-position, which specifies that the first memory item will be read into the
-first lane of the result vector, and the second memory item will be read into
-the third lane of the result vector. All the other lanes of the result vector
-will be initialized to the default value `127`.
+	// The example below loads two values from memory of the vector `v`. Two values in
+	// the mask are set to `true`, meaning only two memory items will be loaded into
+	// the result vector. The mask is set to `true` in the first and the third
+	// position, which specifies that the first memory item will be read into the
+	// first lane of the result vector, and the second memory item will be read into
+	// the third lane of the result vector. All the other lanes of the result vector
+	// will be initialized to the default value `127`.
 
-	v := [2]f64{1, 2}
-	mask := #simd [4]bool{ true, false, true, false }
-	vals := #simd [4]f64{ 0x7f, 0x7f, 0x7f, 0x7f }
+	v := [2] f64 {1, 2};
+	mask := #simd [4]bool { true, false, true, false }
+	vals := #simd [4]f64 { 0x7f, 0x7f, 0x7f, 0x7f }
 	res := simd.masked_expand_load(&v, vals, mask)
 	fmt.println(res)
 
@@ -1633,7 +1637,7 @@ Store masked values to consecutive memory locations.
 This procedure stores values from masked lanes of a vector `val` consecutively
 into memory. This operation is the opposite of `masked_expand_load`. The number
 of items stored into memory is the number of set bits in the mask. If the value
-in a lane of a mask is `true` that lane is stored into memory. Otherwise
+in a lane of a mask is `true`, that lane is stored into memory. Otherwise
 nothing is stored.
 
 Inputs:
@@ -1653,13 +1657,13 @@ Inputs:
 
 Example:
 
-The code below fills the vector `v` with two values from a 4-element
-vector, the first and the third value. The items in the mask are set to `true`
-in those lanes.
+	// The code below fills the vector `v` with two values from a 4-element SIMD
+	// vector, the first and the third value. The items in the mask are set to `true`
+	// in those lanes.
 
-	v: [2]f64
-	mask := #simd [4]bool{ true, false, true, false }
-	vals := #simd [4]f64{ 1, 2, 3, 4 }
+	v := [2] f64 { };
+	mask := #simd [4]bool { true, false, true, false }
+	vals := #simd [4]f64 { 1, 2, 3, 4 }
 	simd.masked_compress_store(&v, vals, mask)
 	fmt.println(v)
 
@@ -1943,8 +1947,8 @@ Result:
 
 Example:
 
-The example below shows how the indices are used to determine which lanes of the
-input vector get written into the result vector.
+	// The example below shows how the indices are used to determine which lanes of the
+	// input vector get written into the result vector.
 	
 	x := #simd [4]f32 { 1.5, 2.5, 3.5, 4.5 }
 	res := simd.swizzle(x, 0, 3, 1, 1)
@@ -2013,11 +2017,11 @@ Result:
 
 Example:
 
-The example below shows how the indices are used to determine lanes of the
-input vector that are shuffled into the result vector.
+	// The example below shows how the indices are used to determine lanes of the
+	// input vector that are shuffled into the result vector.
 	
-	a := #simd [4]f32{ 1, 2, 3, 4 }
-	b := #simd [4]f32{ 5, 6, 7, 8 }
+	a := #simd [4]f32 { 1, 2, 3, 4 }
+	b := #simd [4]f32 { 5, 6, 7, 8 }
 	indices := #simd[4]
 	res := simd.swizzle(x, 0, 4, 2, 5)
 	fmt.println("res")
@@ -2078,10 +2082,10 @@ Result:
 	}
 	return res
 
-Example::
+Example:
 
-The following example selects values from the two input vectors, `a` and `b`
-into a single vector.
+	// The following example selects values from the two input vectors, `a` and `b`
+	// into a single vector.
 
 	a := #simd [4] f64 { 1,2,3,4 }
 	b := #simd [4] f64 { 5,6,7,8 }
