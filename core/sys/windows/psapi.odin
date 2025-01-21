@@ -9,8 +9,8 @@ foreign import psapi "system:Psapi.lib"
 @(default_calling_convention="system")
 foreign psapi {
 	EnumProcesses :: proc(lpidProcess: PDWORD, cb: DWORD, lpcbNeeded: LPDWORD) -> BOOL ---
-	EnumProcessModules :: proc(hProcess :HANDLE , lphModule: ^HMODULE , cb: DWORD, lpcbNeeded: LPDWORD) -> BOOL ---
-	EnumProcessModulesEx :: proc(hProcess: HANDLE, lphModule: ^HMODULE ,cb: DWORD, lpcbNeeded: LPDWORD , dwFilterFlag: DWORD ) -> BOOL ---
+	EnumProcessModules :: proc(hProcess: HANDLE, lphModule: ^HMODULE, cb: DWORD, lpcbNeeded: LPDWORD) -> BOOL ---
+	EnumProcessModulesEx :: proc(hProcess: HANDLE, lphModule: ^HMODULE, cb: DWORD, lpcbNeeded: LPDWORD, dwFilterFlag: DWORD) -> BOOL ---
 
 	GetModuleBaseNameW :: proc(hProcess: HANDLE, hModule: HMODULE, lpBaseName: LPWSTR, nSize: DWORD) -> DWORD ---
 	GetModuleFileNameExW :: proc(hProcess: HANDLE, hModule: HMODULE, lpFilename: LPWSTR, nSize: DWORD) -> DWORD ---
@@ -18,24 +18,24 @@ foreign psapi {
 	GetModuleInformation :: proc(hProcess: HANDLE, hModule: HMODULE,lpmodinfo: LPMODULEINFO, cb: DWORD) -> BOOL ---
 
 	EmptyWorkingSet :: proc(hProcess: HANDLE) -> BOOL ---
-	QueryWorkingSet :: proc(hProcess: HANDLE,pv: PVOID,cb:DWORD) -> BOOL ---
+	QueryWorkingSet :: proc(hProcess: HANDLE, pv: PVOID, cb: DWORD) -> BOOL ---
 	QueryWorkingSetEx :: proc(hProcess: HANDLE, pv: PVOID, cb: DWORD) -> BOOL ---
 
-	InitializeProcessForWsWatch :: proc( hProces: HANDLE) -> BOOL ---
-	GetWsChanges :: proc( hProcess: HANDLE, lpWatchInfo: PPSAPI_WS_WATCH_INFORMATION, cb: DWORD) -> BOOL ---
+	InitializeProcessForWsWatch :: proc(hProces: HANDLE) -> BOOL ---
+	GetWsChanges :: proc(hProcess: HANDLE, lpWatchInfo: PPSAPI_WS_WATCH_INFORMATION, cb: DWORD) -> BOOL ---
 	GetWsChangesEx :: proc(hProcess: HANDLE, lpWatchInfoEx: PPSAPI_WS_WATCH_INFORMATION_EX, cb: PDWORD) -> BOOL ---
 
 	GetMappedFileNameW :: proc (hProcess: HANDLE, lpv: LPVOID, lpFilename: LPWSTR, nSize: DWORD) -> DWORD ---
 
-	EnumDeviceDrivers :: proc ( lpImageBase: ^LPVOID, cb: DWORD, lpcbNeeded: LPDWORD) -> BOOL ---
-	GetDeviceDriverBaseNameW :: proc (ImageBase: LPVOID, lpBaseName: LPWSTR, nSize: DWORD) -> DWORD ---
-	GetDeviceDriverFileNameW :: proc (ImageBase: LPVOID, lpFilename: LPWSTR, nSize: DWORD) -> DWORD ---
+	EnumDeviceDrivers :: proc (lpImageBase: ^LPVOID, cb: DWORD, lpcbNeeded: LPDWORD) -> BOOL ---
+	GetDeviceDriverBaseNameW :: proc (lpImageBase: LPVOID, lpBaseName: LPWSTR, nSize: DWORD) -> DWORD ---
+	GetDeviceDriverFileNameW :: proc (lpImageBase: LPVOID, lpFilename: LPWSTR, nSize: DWORD) -> DWORD ---
 
-	GetProcessMemoryInfo :: proc(Process: HANDLE, ppsmemCounters: PPROCESS_MEMORY_COUNTERS, cb: DWORD) -> BOOL ---
+	GetProcessMemoryInfo :: proc(hProcess: HANDLE, ppsmemCounters: PPROCESS_MEMORY_COUNTERS, cb: DWORD) -> BOOL ---
 
-	GetPerformanceInfo :: proc( pPerformanceInformation: PPERFORMANCE_INFORMATION, cb: DWORD) -> BOOL ---
+	GetPerformanceInfo :: proc(pPerformanceInformation: PPERFORMANCE_INFORMATION, cb: DWORD) -> BOOL ---
 	EnumPageFilesW :: proc(pCallBackRoutine: Enum_Page_File_Callback, pContext: LPVOID) -> BOOL ---
-	GetProcessImageFileNameW :: proc ( hProcess: HANDLE, lpImageFileName: LPWSTR, nSize: DWORD) -> DWORD ---
+	GetProcessImageFileNameW :: proc (hProcess: HANDLE, lpImageFileName: LPWSTR, nSize: DWORD) -> DWORD ---
 }
 
 GetModuleBaseName :: GetModuleBaseNameW
@@ -58,9 +58,9 @@ when ODIN_ARCH == .amd64 {
 		Flags: ULONG_PTR,
 		using DUMMYNAME : bit_field uintptr {
 			Proctection: ULONG_PTR | 5,
-			ShareCount: ULONG_PTR  | 3,
-			Shared :ULONG_PTR | 1,
-			Reserved :ULONG_PTR | 3,
+			ShareCount:  ULONG_PTR | 3,
+			Shared:      ULONG_PTR | 1,
+			Reserved:    ULONG_PTR | 3,
 			VirtualPage: ULONG_PTR | 52,
 		}
 	}
@@ -68,36 +68,34 @@ when ODIN_ARCH == .amd64 {
 	PSAPI_WORKING_SET_EX_BLOCK :: struct #raw_union {
 		Flags: ULONG_PTR,
 		using DUMMYNAME : bit_field uintptr {
-			Valid: ULONG_PTR | 1,
-			ShareCount: ULONG_PTR | 3,
+			Valid:           ULONG_PTR | 1,
+			ShareCount:      ULONG_PTR | 3,
 			Win32Protection: ULONG_PTR | 11,
-			Shared: ULONG_PTR | 1,
-			Node: ULONG_PTR | 6,
-			Locked: ULONG_PTR | 1,
-			LargePage: ULONG_PTR | 1,
-			Reserved: ULONG_PTR | 7,
-			Bad: ULONG_PTR | 1,
-			ReservedUlong: ULONG_PTR | 32,
+			Shared:          ULONG_PTR | 1,
+			Node:            ULONG_PTR | 6,
+			Locked:          ULONG_PTR | 1,
+			LargePage:       ULONG_PTR | 1,
+			Reserved:        ULONG_PTR | 7,
+			Bad:             ULONG_PTR | 1,
+			ReservedUlong:   ULONG_PTR | 32,
 		},
 		Invalid: bit_field uintptr {
-			Valid: ULONG_PTR | 1,            // Valid = 0 in this format.
-			Reserved0: ULONG_PTR | 14,
-			Shared: ULONG_PTR | 1,
-			Reserved1: ULONG_PTR | 15,
-			Bad: ULONG_PTR | 1,
+			Valid:         ULONG_PTR | 1,
+			Reserved0:     ULONG_PTR | 14,
+			Shared:        ULONG_PTR | 1,
+			Reserved1:     ULONG_PTR | 15,
+			Bad:           ULONG_PTR | 1,
 			ReservedUlong: ULONG_PTR | 32,
 		},
 	}
-}
-
-when ODIN_ARCH == .i386 {
+} else when ODIN_ARCH == .i386 {
 	PSAPI_WORKING_SET_BLOCK :: struct #raw_union {
 		Flags: ULONG_PTR,
 		using DUMMYNAME : bit_field uintptr {
 			Proctection: ULONG_PTR | 5,
-			ShareCount: ULONG_PTR  | 3,
-			Shared :ULONG_PTR | 1,
-			Reserved :ULONG_PTR | 3,
+			ShareCount:  ULONG_PTR | 3,
+			Shared:      ULONG_PTR | 1,
+			Reserved:    ULONG_PTR | 3,
 			VirtualPage: ULONG_PTR | 20,
 		}
 	}
@@ -105,22 +103,22 @@ when ODIN_ARCH == .i386 {
 	PSAPI_WORKING_SET_EX_BLOCK :: struct #raw_union {
 		Flags: ULONG_PTR,
 		using DUMMYNAME : bit_field uintptr {
-			Valid: ULONG_PTR | 1,
-			ShareCount: ULONG_PTR | 3,
+			Valid:           ULONG_PTR | 1,
+			ShareCount:      ULONG_PTR | 3,
 			Win32Protection: ULONG_PTR | 11,
-			Shared: ULONG_PTR | 1,
-			Node: ULONG_PTR | 6,
-			Locked: ULONG_PTR | 1,
-			LargePage: ULONG_PTR | 1,
-			Reserved: ULONG_PTR | 7,
-			Bad: ULONG_PTR | 1,
+			Shared:          ULONG_PTR | 1,
+			Node:            ULONG_PTR | 6,
+			Locked:          ULONG_PTR | 1,
+			LargePage:       ULONG_PTR | 1,
+			Reserved:        ULONG_PTR | 7,
+			Bad:             ULONG_PTR | 1,
 		},
 		Invalid: bit_field uintptr {
-			Valid: ULONG_PTR | 1,            // Valid = 0 in this format.
+			Valid:     ULONG_PTR | 1,
 			Reserved0: ULONG_PTR | 14,
-			Shared: ULONG_PTR | 1,
+			Shared:    ULONG_PTR | 1,
 			Reserved1: ULONG_PTR | 15,
-			Bad: ULONG_PTR | 1,
+			Bad:       ULONG_PTR | 1,
 		},
 	}
 }
@@ -130,14 +128,14 @@ PPSAPI_WORKING_SET_EX_BLOCK :: ^PSAPI_WORKING_SET_EX_BLOCK
 
 PSAPI_WORKING_SET_INFORMATION :: struct{
 	NumberOfEntries: ULONG_PTR,
-	WorkingSetInfo: [1]PSAPI_WORKING_SET_BLOCK,
+	WorkingSetInfo:  [1]PSAPI_WORKING_SET_BLOCK,
 } 
 
 PPSAPI_WORKING_SET_INFORMATION :: ^PSAPI_WORKING_SET_INFORMATION
 
 
 PSAPI_WORKING_SET_EX_INFORMATION :: struct {
-	VirtualAddress: PVOID,
+	VirtualAddress:    PVOID,
 	VirtualAttributes: PSAPI_WORKING_SET_EX_BLOCK,
 } 
 PPSAPI_WORKING_SET_EX_INFORMATION :: ^PSAPI_WORKING_SET_EX_INFORMATION
@@ -184,29 +182,29 @@ PROCESS_MEMORY_COUNTERS_EX2 :: struct {
 PPROCESS_MEMORY_COUNTERS :: ^PROCESS_MEMORY_COUNTERS
 
 PERFORMANCE_INFORMATION :: struct {
-	cb: DWORD,
-	CommitTotal: SIZE_T,
-	CommitLimit: SIZE_T,
-	CommitPeak: SIZE_T,
-	PhysicalTotal: SIZE_T,
+	cb:                DWORD,
+	CommitTotal:       SIZE_T,
+	CommitLimit:       SIZE_T,
+	CommitPeak:        SIZE_T,
+	PhysicalTotal:     SIZE_T,
 	PhysicalAvailable: SIZE_T,
-	SystemCache: SIZE_T,
-	KernelTotal: SIZE_T,
-	KernelPaged: SIZE_T,
-	KernelNonpaged: SIZE_T,
-	PageSize: SIZE_T,
-	HandleCount: DWORD,
-	ProcessCount: DWORD,
-	ThreadCount: DWORD,
+	SystemCache:       SIZE_T,
+	KernelTotal:       SIZE_T,
+	KernelPaged:       SIZE_T,
+	KernelNonpaged:    SIZE_T,
+	PageSize:          SIZE_T,
+	HandleCount:       DWORD,
+	ProcessCount:      DWORD,
+	ThreadCount:       DWORD,
 } 
 PPERFORMANCE_INFORMATION :: ^PERFORMANCE_INFORMATION
 
 ENUM_PAGE_FILE_INFORMATION :: struct {
-    cb: DWORD,
-    Reserved: DWORD,
-    TotalSize: SIZE_T,
+    cb:         DWORD,
+    Reserved:   DWORD,
+    TotalSize:  SIZE_T,
     TotalInUse: SIZE_T,
-    PeakUsage: SIZE_T,
+    PeakUsage:  SIZE_T,
 } 
 PENUM_PAGE_FILE_INFORMATION :: ^ENUM_PAGE_FILE_INFORMATION
 
