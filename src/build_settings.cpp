@@ -472,6 +472,7 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
+	bool   use_single_module;
 	bool   use_separate_modules;
 	bool   module_per_file;
 	bool   cached;
@@ -1723,6 +1724,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		if (!is_arch_wasm()) {
 			bc->use_separate_modules = true;
 		}
+	}
+
+	if (build_context.use_single_module) {
+		bc->use_separate_modules = false;
 	}
 
 

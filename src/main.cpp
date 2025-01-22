@@ -331,6 +331,7 @@ enum BuildFlagKind {
 	BuildFlag_UseRADLink,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
+	BuildFlag_UseSingleModule,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 
@@ -545,6 +546,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseRADLink,              str_lit("radlink"),                   BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
 
@@ -1240,7 +1242,18 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 
 						case BuildFlag_UseSeparateModules:
+							if (build_context.use_single_module) {
+								gb_printf_err("-use-separate-modules cannot be used with -use-single-module\n");
+								bad_flags = true;
+							}
 							build_context.use_separate_modules = true;
+							break;
+						case BuildFlag_UseSingleModule:
+							if (build_context.use_separate_modules) {
+								gb_printf_err("-use-single-module cannot be used with -use-separate-modules\n");
+								bad_flags = true;
+							}
+							build_context.use_single_module = true;
 							break;
 						case BuildFlag_NoThreadedChecker:
 							build_context.no_threaded_checker = true;
@@ -2717,8 +2730,12 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	if (run_or_build) {
 		if (print_flag("-use-separate-modules")) {
 			print_usage_line(2, "The backend generates multiple build units which are then linked together.");
-			print_usage_line(2, "Normally, a single build unit is generated for a standard project.");
-			print_usage_line(2, "This is the default behaviour on Windows for '-o:none' and '-o:minimal' builds.");
+			print_usage_line(2, "This is the default behaviour for '-o:none' and '-o:minimal' builds.");
+			print_usage_line(2, "Normally, a single build unit is generated for a standard project for '-o:speed' or '-o:size'.");
+		}
+		if (print_flag("-use-single-module")) {
+			print_usage_line(2, "The backend generates only a single build unit.");
+			print_usage_line(2, "This is the default behaviour for '-o:speed' or '-o:size'.");
 		}
 
 	}
