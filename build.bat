@@ -20,7 +20,7 @@ if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
 )
 
 pushd misc
-cl /nologo get-date.c
+rem cl /nologo get-date.c
 popd
 
 for /f %%i in ('misc\get-date') do (
@@ -138,17 +138,33 @@ del *.ilk > NUL 2> NUL
 
 rc %rc_flags% %odin_rc%
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
-mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
+rem mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
 if %errorlevel% neq 0 goto end_of_build
 
-call build_vendor.bat
-if %errorlevel% neq 0 goto end_of_build
+rem call build_vendor.bat
+rem if %errorlevel% neq 0 goto end_of_build
 
-rem If the demo doesn't run for you and your CPU is more than a decade old, try -microarch:native
-if %release_mode% EQU 0 odin run examples/demo -vet -strict-style -resource:examples/demo/demo.rc -- Hellope World
+rem rem If the demo doesn't run for you and your CPU is more than a decade old, try -microarch:native
+rem if %release_mode% EQU 0 odin run examples/demo -vet -strict-style -resource:examples/demo/demo.rc -- Hellope World
 
-rem Many non-compiler devs seem to run debug build but don't realize.
-if %release_mode% EQU 0 echo: & echo Debug compiler built. Note: run "build.bat release" if you want a faster, release mode compiler.
+rem odin check core/os/os2 -no-entry-point -target:windows_amd64 -strict-style -vet
+rem odin check core/os/os2 -no-entry-point -target:linux_amd64   -strict-style -vet
+rem odin check core/os/os2 -no-entry-point -target:darwin_amd64  -strict-style -vet
+rem odin check core/os/os2 -no-entry-point -target:darwin_arm64  -strict-style -vet
+
+
+rem odin run examples/bug -keep-temp-files -debug -target:darwin_arm64
+odin check vendor/sdl3 -no-entry-point
+rem odin check examples/all -no-entry-point -target:windows_amd64 -strict-style -vet -no-dynamic-literals
+rem odin run examples/demo
+rem odin run examples/demo
+
+rem odin check tests/issues/test_issue_829.odin -file -no-entry-point -target:darwin_arm64 -strict-style -vet
+
+
+
+rem rem Many non-compiler devs seem to run debug build but don't realize.
+rem if %release_mode% EQU 0 echo: & echo Debug compiler built. Note: run "build.bat release" if you want a faster, release mode compiler.
 
 del *.obj > NUL 2> NUL
 
