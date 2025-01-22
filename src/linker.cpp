@@ -536,7 +536,16 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						}
 						array_add(&gen->output_object_paths, obj_file);
 					} else {
-						if (string_set_update(&min_libs_set, lib) && build_context.min_link_libs) {
+						bool short_circuit = false;
+						if (string_ends_with(lib, str_lit(".framework"))) {
+							short_circuit = true;
+						} else if (string_ends_with(lib, str_lit(".dylib"))) {
+							short_circuit = true;
+						}  else if (string_ends_with(lib, str_lit(".so"))) {
+							short_circuit = true;
+						}
+
+						if (string_set_update(&min_libs_set, lib) && (build_context.min_link_libs || short_circuit)) {
 							continue;
 						}
 
