@@ -123,6 +123,7 @@ foreign kernel32 {
 	WaitCommEvent :: proc(handle: HANDLE, lpEvtMask: LPDWORD, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
+	GetTempFileNameW :: proc(lpPathName: LPCWSTR, lpPrefixString: LPCWSTR, uUnique: c_int, lpTempFileName: LPWSTR) -> c_uint ---
 	GetCurrentProcess :: proc() -> HANDLE ---
 	GetCurrentProcessId :: proc() -> DWORD ---
 	GetCurrentThread :: proc() -> HANDLE ---
