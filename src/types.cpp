@@ -4773,7 +4773,9 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 
 	case Type_BitSet:
 		str = gb_string_appendc(str, "bit_set[");
-		if (is_type_enum(type->BitSet.elem)) {
+		if (type->BitSet.elem == nullptr) {
+			str = gb_string_appendc(str, "<unresolved>");
+		} else if (is_type_enum(type->BitSet.elem)) {
 			str = write_type_to_string(str, type->BitSet.elem);
 		} else {
 			str = gb_string_append_fmt(str, "%lld", type->BitSet.lower);
