@@ -1147,22 +1147,14 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 		String name = entry.key;
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
-
-		lbValue ptr_ = lb_find_value_from_entity(m, entry.value);
-		lbAddr local_addr = lb_addr(ptr_);
-
-		lb_addr_store(p, local_addr, ptr);
+		lb_addr_store(p, entry.value.local_module_addr, ptr);
 	}
 
 	for (auto const &entry : m->objc_selectors) {
 		String name = entry.key;
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
-
-		lbValue ptr_ = lb_find_value_from_entity(m, entry.value);
-		lbAddr local_addr = lb_addr(ptr_);
-
-		lb_addr_store(p, local_addr, ptr);
+		lb_addr_store(p, entry.value.local_module_addr, ptr);
 	}
 
 	lb_end_procedure_body(p);

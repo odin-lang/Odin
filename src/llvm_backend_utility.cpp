@@ -2093,33 +2093,31 @@ gb_internal void lb_set_wasm_export_attributes(LLVMValueRef value, String export
 
 
 gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, String const &name) {
+	lbObjcRef *found = string_map_get(&p->module->objc_selectors, name);
+	if (found) {
+		return found->local_module_addr;
+	}
+
 	lbModule *default_module = &p->module->gen->default_module;
 	Entity *entity = {};
 
-	Entity **found = string_map_get(&p->module->objc_selectors, name);
-	if (found) {
-		entity = *found;
+	if (default_module != p->module) {
+		found = string_map_get(&default_module->objc_selectors, name);
+		if (found) {
+			entity = found->entity;
+		}
 	}
 
 	if (!entity) {
-		if (default_module != p->module) {
-			found = string_map_get(&default_module->objc_selectors, name);
-			if (found) {
-				entity = *found;
-			}
-		}
-
-		if (!entity) {
-			lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &entity);
-			string_map_set(&default_module->objc_selectors, name, entity);
-		}
+		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &entity);
+		string_map_set(&default_module->objc_selectors, name, lbObjcRef{entity, default_addr});
 	}
 
 	lbValue ptr = lb_find_value_from_entity(p->module, entity);
 	lbAddr local_addr = lb_addr(ptr);
 
 	if (default_module != p->module) {
-		string_map_set(&p->module->objc_selectors, name, entity);
+		string_map_set(&p->module->objc_selectors, name, lbObjcRef{entity, local_addr});
 	}
 
 	return local_addr;
@@ -2152,33 +2150,31 @@ gb_internal lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) 
 }
 
 gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
+	lbObjcRef *found = string_map_get(&p->module->objc_classes, name);
+	if (found) {
+		return found->local_module_addr;
+	}
+
 	lbModule *default_module = &p->module->gen->default_module;
 	Entity *entity = {};
 
-	Entity **found = string_map_get(&p->module->objc_classes, name);
-	if (found) {
-		entity = *found;
+	if (default_module != p->module) {
+		found = string_map_get(&default_module->objc_classes, name);
+		if (found) {
+			entity = found->entity;
+		}
 	}
 
 	if (!entity) {
-		if (default_module != p->module) {
-			found = string_map_get(&default_module->objc_classes, name);
-			if (found) {
-				entity = *found;
-			}
-		}
-
-		if (!entity) {
-			lbAddr default_addr = lb_add_global_generated(default_module, t_objc_Class, {}, &entity);
-			string_map_set(&default_module->objc_classes, name, entity);
-		}
+		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_Class, {}, &entity);
+		string_map_set(&default_module->objc_classes, name, lbObjcRef{entity, default_addr});
 	}
 
 	lbValue ptr = lb_find_value_from_entity(p->module, entity);
 	lbAddr local_addr = lb_addr(ptr);
 
 	if (default_module != p->module) {
-		string_map_set(&p->module->objc_classes, name, entity);
+		string_map_set(&p->module->objc_classes, name, lbObjcRef{entity, local_addr});
 	}
 
 	return local_addr;
