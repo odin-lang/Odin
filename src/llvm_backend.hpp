@@ -143,6 +143,11 @@ struct lbPadType {
 	LLVMTypeRef type;
 };
 
+struct lbObjcRef {
+	Entity * entity;
+	lbAddr local_module_addr;
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -196,8 +201,8 @@ struct lbModule {
 	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
-	StringMap<lbAddr> objc_classes;
-	StringMap<lbAddr> objc_selectors;
+	StringMap<lbObjcRef> objc_classes;
+	StringMap<lbObjcRef> objc_selectors;
 
 	PtrMap<Type *, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<Type *, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info

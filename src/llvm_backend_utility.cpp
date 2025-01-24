@@ -2093,23 +2093,34 @@ gb_internal void lb_set_wasm_export_attributes(LLVMValueRef value, String export
 
 
 gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, String const &name) {
-	lbAddr *found = string_map_get(&p->module->objc_selectors, name);
+	lbObjcRef *found = string_map_get(&p->module->objc_selectors, name);
 	if (found) {
-		return *found;
-	} else {
-		lbModule *default_module = &p->module->gen->default_module;
-		Entity *e = nullptr;
-		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &e);
-
-		lbValue ptr = lb_find_value_from_entity(p->module, e);
-		lbAddr local_addr = lb_addr(ptr);
-
-		string_map_set(&default_module->objc_selectors, name, default_addr);
-		if (default_module != p->module) {
-			string_map_set(&p->module->objc_selectors, name, local_addr);
-		}
-		return local_addr;
+		return found->local_module_addr;
 	}
+
+	lbModule *default_module = &p->module->gen->default_module;
+	Entity *entity = {};
+
+	if (default_module != p->module) {
+		found = string_map_get(&default_module->objc_selectors, name);
+		if (found) {
+			entity = found->entity;
+		}
+	}
+
+	if (!entity) {
+		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &entity);
+		string_map_set(&default_module->objc_selectors, name, lbObjcRef{entity, default_addr});
+	}
+
+	lbValue ptr = lb_find_value_from_entity(p->module, entity);
+	lbAddr local_addr = lb_addr(ptr);
+
+	if (default_module != p->module) {
+		string_map_set(&p->module->objc_selectors, name, lbObjcRef{entity, local_addr});
+	}
+
+	return local_addr;
 }
 
 gb_internal lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
@@ -2139,23 +2150,34 @@ gb_internal lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) 
 }
 
 gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
-	lbAddr *found = string_map_get(&p->module->objc_classes, name);
+	lbObjcRef *found = string_map_get(&p->module->objc_classes, name);
 	if (found) {
-		return *found;
-	} else {
-		lbModule *default_module = &p->module->gen->default_module;
-		Entity *e = nullptr;
-		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_SEL, {}, &e);
-
-		lbValue ptr = lb_find_value_from_entity(p->module, e);
-		lbAddr local_addr = lb_addr(ptr);
-
-		string_map_set(&default_module->objc_classes, name, default_addr);
-		if (default_module != p->module) {
-			string_map_set(&p->module->objc_classes, name, local_addr);
-		}
-		return local_addr;
+		return found->local_module_addr;
 	}
+
+	lbModule *default_module = &p->module->gen->default_module;
+	Entity *entity = {};
+
+	if (default_module != p->module) {
+		found = string_map_get(&default_module->objc_classes, name);
+		if (found) {
+			entity = found->entity;
+		}
+	}
+
+	if (!entity) {
+		lbAddr default_addr = lb_add_global_generated(default_module, t_objc_Class, {}, &entity);
+		string_map_set(&default_module->objc_classes, name, lbObjcRef{entity, default_addr});
+	}
+
+	lbValue ptr = lb_find_value_from_entity(p->module, entity);
+	lbAddr local_addr = lb_addr(ptr);
+
+	if (default_module != p->module) {
+		string_map_set(&p->module->objc_classes, name, lbObjcRef{entity, local_addr});
+	}
+
+	return local_addr;
 }
 
 gb_internal lbValue lb_handle_objc_find_class(lbProcedure *p, Ast *expr) {
@@ -2196,23 +2218,7 @@ gb_internal lbValue lb_handle_objc_id(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(e->kind == Entity_TypeName);
 		String name = e->TypeName.objc_class_name;
 
-		lbAddr *found = string_map_get(&p->module->objc_classes, name);
-		if (found) {
-			return lb_addr_load(p, *found);
-		} else {
-			lbModule *default_module = &p->module->gen->default_module;
-			Entity *e = nullptr;
-			lbAddr default_addr = lb_add_global_generated(default_module, t_objc_Class, {}, &e);
-
-			lbValue ptr = lb_find_value_from_entity(p->module, e);
-			lbAddr local_addr = lb_addr(ptr);
-
-			string_map_set(&default_module->objc_classes, name, default_addr);
-			if (default_module != p->module) {
-				string_map_set(&p->module->objc_classes, name, local_addr);
-			}
-			return lb_addr_load(p, local_addr);
-		}
+		return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name));
 	}
 
 	return lb_build_expr(p, expr);
