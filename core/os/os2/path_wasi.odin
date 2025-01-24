@@ -4,6 +4,7 @@ package os2
 import "base:runtime"
 
 import "core:path/filepath"
+import "core:sync"
 import "core:sys/wasm/wasi"
 
 _Path_Separator        :: '/'
@@ -74,11 +75,39 @@ _remove_all :: proc(path: string) -> (err: Error) {
 	return remove(path)
 }
 
+g_wd: string
+g_wd_mutex: sync.Mutex
+
 _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	return ".", .Unsupported
+	sync.guard(&g_wd_mutex)
+
+	return clone_string(g_wd if g_wd != "" else "/", allocator)
 }
 
 _set_working_directory :: proc(dir: string) -> (err: Error) {
-	err = .Unsupported
+	sync.guard(&g_wd_mutex)
+
+	if dir == g_wd {
+		return
+	}
+
+	if g_wd != "" {
+		delete(g_wd, file_allocator())
+	}
+
+	g_wd = clone_string(dir, file_allocator()) or_return
 	return
+}
+
+_get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
+	if len(args) <= 0 {
+		return clone_string("/", allocator)
+	}
+
+	arg := args[0]
+	if len(arg) > 0 && (arg[0] == '.' || arg[0] == '/') {
+		return clone_string(arg, allocator)
+	}
+
+	return concatenate({"/", arg}, allocator)
 }

@@ -1,9 +1,10 @@
 #+private
 package os2
 
+import "base:runtime"
+
 import "core:strings"
 import "core:strconv"
-import "base:runtime"
 import "core:sys/linux"
 
 _Path_Separator        :: '/'
@@ -169,6 +170,25 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (string, Error) 
 _set_working_directory :: proc(dir: string) -> Error {
 	dir_cstr := temp_cstring(dir) or_return
 	return _get_platform_error(linux.chdir(dir_cstr))
+}
+
+_get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+
+	buf := make([dynamic]byte, 1024, temp_allocator()) or_return
+	for {
+		n, errno := linux.readlink("/proc/self/exe", buf[:])
+		if errno != .NONE {
+			err = _get_platform_error(errno)
+			return
+		}
+
+		if n < len(buf) {
+			return clone_string(string(buf[:n]), allocator)
+		}
+
+		resize(&buf, len(buf)*2) or_return
+	}
 }
 
 _get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fullpath: string, err: Error) {
