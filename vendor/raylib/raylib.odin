@@ -1205,7 +1205,7 @@ foreign lib {
 
 	CameraMoveForward :: proc(camera: ^Camera, distance: f32, moveInWorldPlane: bool) --- // move the camera in its forward direction
 	CameraMoveUp :: proc(camera: ^Camera, distance: f32) --- // move camera in its up direction
-	CameraMoveRight :: proc(camera: ^Camera, distance: f32, delta: f32) --- // move camera in it's current right direction
+	CameraMoveRight :: proc(camera: ^Camera, distance: f32, moveInWorldPlane: bool) --- // move camera in it's current right direction
 	CameraMoveToTarget :: proc(camera: ^Camera, delta: f32) --- // moves the camera position closer/farther to/from the camera target
 	CameraYaw :: proc(camera: ^Camera, angle: f32, rotateAroundTarget: bool) --- // rotates the camera around its up vector (left and right)
 	CameraPitch :: proc(camera: ^Camera, angle: f32, lockView: bool, rotateAroundTarget: bool, rotateUp: bool) --- // rotates the camera around its right vector (up and down)
