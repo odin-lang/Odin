@@ -1,6 +1,6 @@
 package stb_image
 
-import c "core:c/libc"
+import "core:c"
 
 @(private)
 LIB :: (

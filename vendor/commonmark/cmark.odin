@@ -7,7 +7,6 @@
 package vendor_commonmark
 
 import "core:c"
-import "core:c/libc"
 import "base:runtime"
 
 COMMONMARK_SHARED :: #config(COMMONMARK_SHARED, false)
@@ -450,7 +449,7 @@ foreign lib {
 	// Called `parse_from_libc_file` so as not to confuse with Odin's file handling.
 
 	@(link_name = "parse_from_file")
-	parse_from_libc_file :: proc(file: ^libc.FILE, options: Options) -> (root: ^Node) ---
+	parse_from_libc_file :: proc(file: ^c.FILE, options: Options) -> (root: ^Node) ---
 }
 
 parser_feed_from_string :: proc "c" (parser: ^Parser, s: string) {

@@ -114,3 +114,5 @@ CHAR_BIT :: 8
 va_list :: struct #align(16) {
 	_: [4096]u8,
 }
+
+FILE :: struct {}
