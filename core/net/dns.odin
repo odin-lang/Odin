@@ -132,7 +132,14 @@ resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Net
 			return
 		}
 	case Host:
-		recs, _ := get_dns_records_from_os(t.hostname, .IP4, context.temp_allocator)
+		recs: []DNS_Record
+
+		if ODIN_OS != .Windows && strings.has_suffix(t.hostname, ".local") {
+			recs, _ = get_dns_records_from_mdns(t.hostname, .IP4, context.temp_allocator)
+		} else {
+			recs, _ = get_dns_records_from_os(t.hostname, .IP4, context.temp_allocator)
+		}
+
 		if len(recs) == 0 {
 			err = .Unable_To_Resolve
 			return
@@ -159,7 +166,14 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 			return t, nil
 		}
 	case Host:
-		recs, _ := get_dns_records_from_os(t.hostname, .IP6, context.temp_allocator)
+		recs: []DNS_Record
+
+		if ODIN_OS != .Windows && strings.has_suffix(t.hostname, ".local") {
+			recs, _ = get_dns_records_from_mdns(t.hostname, .IP6, context.temp_allocator)
+		} else {
+			recs, _ = get_dns_records_from_os(t.hostname, .IP6, context.temp_allocator)
+		}
+
 		if len(recs) == 0 {
 			err = .Unable_To_Resolve
 			return
@@ -281,6 +295,77 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	}
 
 	return
+}
+
+get_dns_records_from_mdns :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
+	assert(type == .IP4 || type == .IP6)
+
+	context.allocator = allocator
+
+	if !validate_hostname(hostname) {
+		return nil, .Invalid_Hostname_Error
+	}
+
+	hdr := DNS_Header{
+		id = 0,
+		is_response = false,
+		opcode = 0,
+		is_authoritative = false,
+		is_truncated = false,
+		is_recursion_desired = true,
+		is_recursion_available = false,
+		response_code = DNS_Response_Code.No_Error,
+	}
+
+	id, bits := pack_dns_header(hdr)
+	dns_hdr := [6]u16be{}
+	dns_hdr[0] = id
+	dns_hdr[1] = bits
+	dns_hdr[2] = 1
+
+	dns_query := [2]u16be{ u16be(type), 1 }
+
+	output := [(size_of(u16be) * 6) + NAME_MAX + (size_of(u16be) * 2)]u8{}
+	b := strings.builder_from_slice(output[:])
+
+	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
+	ok := encode_hostname(&b, hostname)
+	if !ok {
+		return nil, .Invalid_Hostname_Error
+	}
+	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
+
+	dns_packet := output[:strings.builder_len(b)]
+
+	dns_response_buf := [4096]u8{}
+	dns_response: []u8
+
+	name_server := IP4_mDNS_Broadcast if type == .IP4 else IP6_mDNS_Broadcast
+
+	conn, sock_err := make_unbound_udp_socket(family_from_endpoint(name_server))
+	if sock_err != nil {
+		return nil, .Connection_Error
+	}
+	defer close(conn)
+
+	send(conn, dns_packet[:], name_server)
+
+	if set_option(conn, .Receive_Timeout, time.Second * 1) != nil {
+		return nil, .Connection_Error
+	}
+
+	recv_sz, _, _ := recv_udp(conn, dns_response_buf[:])
+	if recv_sz == 0 {
+		return nil, .Server_Error
+	}
+
+	dns_response = dns_response_buf[:recv_sz]
+
+	rsp, _ok := parse_response(dns_response, type)
+	if !_ok {
+		return nil, .Server_Error
+	}
+	return rsp[:], nil
 }
 
 // `records` slice is also destroyed.

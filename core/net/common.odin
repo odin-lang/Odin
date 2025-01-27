@@ -149,6 +149,7 @@ IP4_Any := IP4_Address{}
 IP6_Any := IP6_Address{}
 
 IP4_mDNS_Broadcast := Endpoint{address=IP4_Address{224, 0, 0, 251}, port=5353}
+IP6_mDNS_Broadcast := Endpoint{address=IP6_Address{65282, 0, 0, 0, 0, 0, 0, 251}, port = 5353}
 
 Endpoint :: struct {
 	address: Address,
