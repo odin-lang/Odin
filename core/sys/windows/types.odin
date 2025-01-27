@@ -4576,6 +4576,31 @@ DNS_SRV_DATAA :: struct {
 	_:           WORD, // padding
 }
 
+// See https://learn.microsoft.com/en-us/windows/win32/dns/dns-constants
+DNS_QUERY_OPTION :: enum DWORD {
+	ACCEPT_TRUNCATED_RESPONSE = 0,
+	DNS_QUERY_USE_TCP_ONLY    = 1,
+	NO_RECURSION              = 2,
+	BYPASS_CACHE              = 3,
+	NO_WIRE_QUERY             = 4,
+	NO_LOCAL_NAME             = 5,
+	NO_HOSTS_FILE             = 6,
+	NO_NETBT                  = 7,
+	WIRE_ONLY                 = 8,
+	RETURN_MESSAGE            = 9,
+	MULTICAST_ONLY            = 10,
+	NO_MULTICAST              = 11,
+	TREAT_AS_FQDN             = 12,
+	ADDRCONFIG                = 13,
+	DUAL_ADDR                 = 14,
+	MULTICAST_WAIT            = 17,
+	MULTICAST_VERIFY          = 18,
+	DONT_RESET_TTL_VALUES     = 20,
+	DISABLE_IDN_ENCODING      = 21,
+	APPEND_MULTILABEL         = 23,
+}
+DNS_QUERY_OPTIONS :: bit_set[DNS_QUERY_OPTION; DWORD]
+
 SOCKADDR :: struct {
 	sa_family: ADDRESS_FAMILY,
 	sa_data:   [14]CHAR,

@@ -35,6 +35,7 @@ Socket_Option :: enum c.int {
 	Send_Buffer_Size          = c.int(linux.Socket_Option.SNDBUF),
 	Receive_Timeout           = c.int(linux.Socket_Option.RCVTIMEO),
 	Send_Timeout              = c.int(linux.Socket_Option.SNDTIMEO),
+	Broadcast                 = c.int(linux.Socket_Option.BROADCAST),
 }
 
 // Wrappers and unwrappers for system-native types
@@ -337,7 +338,8 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 		.Reuse_Address,
 		.Keep_Alive,
 		.Out_Of_Bounds_Data_Inline,
-		.TCP_Nodelay:
+		.TCP_Nodelay,
+		.Broadcast:
 		// TODO: verify whether these are options or not on Linux
 		// .Broadcast, <-- yes
 		// .Conditional_Accept,

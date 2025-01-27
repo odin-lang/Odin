@@ -132,7 +132,14 @@ resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Net
 			return
 		}
 	case Host:
-		recs, _ := get_dns_records_from_os(t.hostname, .IP4, context.temp_allocator)
+		recs: []DNS_Record
+
+		if ODIN_OS != .Windows && strings.has_suffix(t.hostname, ".local") {
+			recs, _ = get_dns_records_from_nameservers(t.hostname, .IP4, {IP4_mDNS_Broadcast}, nil, context.temp_allocator)
+		} else {
+			recs, _ = get_dns_records_from_os(t.hostname, .IP4, context.temp_allocator)
+		}
+
 		if len(recs) == 0 {
 			err = .Unable_To_Resolve
 			return
@@ -159,7 +166,14 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 			return t, nil
 		}
 	case Host:
-		recs, _ := get_dns_records_from_os(t.hostname, .IP6, context.temp_allocator)
+		recs: []DNS_Record
+
+		if ODIN_OS != .Windows && strings.has_suffix(t.hostname, ".local") {
+			recs, _ = get_dns_records_from_nameservers(t.hostname, .IP6, {IP6_mDNS_Broadcast}, nil, context.temp_allocator)
+		} else {
+			recs, _ = get_dns_records_from_os(t.hostname, .IP6, context.temp_allocator)
+		}
+
 		if len(recs) == 0 {
 			err = .Unable_To_Resolve
 			return
@@ -255,12 +269,6 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 			return nil, .Connection_Error
 		}
 
-		// recv_sz, _, recv_err := recv_udp(conn, dns_response_buf[:])
-		// if recv_err == UDP_Recv_Error.Timeout {
-		// 	continue
-		// } else if recv_err != nil {
-		// 	continue
-		// }
 		recv_sz, _ := recv_udp(conn, dns_response_buf[:]) or_continue
 		if recv_sz == 0 {
 			continue
