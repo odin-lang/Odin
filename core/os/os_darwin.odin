@@ -1287,7 +1287,7 @@ sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: soc
 }
 
 send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Error) {
-	result := _unix_send(c.int(sd), raw_data(data), len(data), 0)
+	result := _unix_send(c.int(sd), raw_data(data), len(data), i32(flags))
 	if result < 0 {
 		return 0, get_last_error()
 	}
