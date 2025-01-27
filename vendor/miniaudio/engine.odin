@@ -150,9 +150,9 @@ sound_inlined :: struct {
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	@(deprecated="Will be removed in 0.12. Use sound_config_init2() instead.")
+	@(deprecated="Will be removed in 0.12. Use sound_config_init_2() instead.")
 	sound_config_init  :: proc() -> sound_config ---
-	sound_config_init2 :: proc(pEngine: ^engine) -> sound_config --- /* Will be renamed to sound_config_init() in version 0.12. */
+	sound_config_init_2 :: proc(pEngine: ^engine) -> sound_config --- /* Will be renamed to sound_config_init() in version 0.12. */
 
 	sound_init_from_file                     :: proc(pEngine: ^engine, pFilePath: cstring, flags: sound_flags, pGroup: ^sound_group, pDoneFence: ^fence, pSound: ^sound) -> result ---
 	sound_init_from_file_w                   :: proc(pEngine: ^engine, pFilePath: [^]c.wchar_t, flags: sound_flags, pGroup: ^sound_group, pDoneFence: ^fence, pSound: ^sound) -> result ---
@@ -241,9 +241,9 @@ sound_group        :: distinct sound
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	@(deprecated="Will be removed in 0.12. Use sound_config_init2() instead.")
+	@(deprecated="Will be removed in 0.12. Use sound_config_init_2() instead.")
 	sound_group_config_init  :: proc() -> sound_group_config ---
-	sound_group_config_init2 :: proc(pEngine: ^engine) -> sound_group_config ---
+	sound_group_config_init_2 :: proc(pEngine: ^engine) -> sound_group_config ---
 
 	sound_group_init                               :: proc(pEngine: ^engine, flags: sound_flags, pParentGroup, pGroup: ^sound_group) -> result ---
 	sound_group_init_ex                            :: proc(pEngine: ^engine, pConfig: ^sound_group_config, pGroup: ^sound_group) -> result ---
