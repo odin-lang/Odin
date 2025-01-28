@@ -490,11 +490,11 @@ heap_cache_register_superpage :: proc "contextless" (superpage: ^Heap_Superpage)
 			if slab.bin_size > HEAP_MAX_BIN_SIZE {
 				// Skip contiguous slabs.
 				i += heap_slabs_needed_for_size(slab.bin_size)
-			} else if slab.bin_size > 0 {
-				i += 1
 			} else {
 				i += 1
-				continue
+				if slab.bin_size == 0 {
+					continue
+				}
 			}
 
 			// When adopting a new Superpage, we take the opportunity to
@@ -1274,11 +1274,11 @@ setup_superpage_orphanage :: proc "contextless" () {
 				if slab.bin_size > HEAP_MAX_BIN_SIZE {
 					// Skip contiguous slabs.
 					i += heap_slabs_needed_for_size(slab.bin_size)
-				} else if slab.bin_size > 0 {
-					i += 1
 				} else {
 					i += 1
-					continue
+					if slab.bin_size == 0 {
+						continue
+					}
 				}
 
 				if intrinsics.atomic_load_explicit(&slab.remote_free_bins_scheduled, .Acquire) > 0 {
