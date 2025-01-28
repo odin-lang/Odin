@@ -704,16 +704,18 @@ heap_slab_setup :: proc "contextless" (superpage: ^Heap_Superpage, rounded_size:
 
 	base_alignment := uintptr(min(HEAP_MAX_ALIGNMENT, rounded_size))
 
-	pointer_padding := (uintptr(base_alignment) - (uintptr(slab) + size_of(Heap_Slab) + HEAP_SECTOR_TYPES * uintptr(sectors) * size_of(uint))) & uintptr(base_alignment - 1)
+	slab_bitmap_base := uintptr(slab) + size_of(Heap_Slab)
+	total_byte_size_of_all_bitmaps := HEAP_SECTOR_TYPES * uintptr(sectors) * size_of(uint)
+	pointer_padding := (uintptr(base_alignment) - (slab_bitmap_base + total_byte_size_of_all_bitmaps)) & uintptr(base_alignment - 1)
 
 	// These bitmaps are placed at the end of the struct, one after the other.
-	slab.local_free  = cast([^]uint)(uintptr(slab) + size_of(Heap_Slab))
-	slab.remote_free = cast([^]uint)(uintptr(slab) + size_of(Heap_Slab) + uintptr(sectors) * size_of(uint))
+	slab.local_free  = cast([^]uint)(slab_bitmap_base)
+	slab.remote_free = cast([^]uint)(slab_bitmap_base + uintptr(sectors) * size_of(uint))
 	// This pointer is specifically aligned.
-	slab.data        = (uintptr(slab) + size_of(Heap_Slab) + HEAP_SECTOR_TYPES * uintptr(sectors) * size_of(uint) + pointer_padding)
+	slab.data        = (slab_bitmap_base + total_byte_size_of_all_bitmaps + pointer_padding)
 
 	assert_contextless(slab.data & (base_alignment-1) == 0, "Incorrect calculation for aligning Slab data pointer.")
-	assert_contextless(size_of(Heap_Slab) + HEAP_SECTOR_TYPES * sectors * size_of(uint) + bins * rounded_size < HEAP_SLAB_SIZE, "Slab internal allocation overlimit.")
+	assert_contextless(size_of(Heap_Slab) + int(total_byte_size_of_all_bitmaps) + bins * rounded_size < HEAP_SLAB_SIZE, "Slab internal allocation overlimit.")
 	assert_contextless(find_slab_from_pointer(rawptr(slab.data)) == slab, "Slab data pointer cannot be traced back to its Slab.")
 
 	// Set all of the local free bits.
