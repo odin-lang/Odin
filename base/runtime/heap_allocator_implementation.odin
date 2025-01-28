@@ -922,9 +922,7 @@ heap_remote_cache_add_remote_free_superpage :: proc "contextless" (superpage: ^H
 		heap_debug_cover(.Superpage_Add_Remote_Free_Guarded_With_Set)
 		return
 	}
-	// This uses `Consume` ordering, as we have a data dependency on the data
-	// pointed to the variable and can get away with a weaker order.
-	master := intrinsics.atomic_load_explicit(&superpage.master_cache_block, .Consume)
+	master := intrinsics.atomic_load_explicit(&superpage.master_cache_block, .Acquire)
 	if master == nil {
 		// This superpage is not owned by anyone.
 		// Its remote frees will be acknowledged in whole when it's adopted.
@@ -943,7 +941,7 @@ heap_remote_cache_add_remote_free_superpage :: proc "contextless" (superpage: ^H
 				return
 			}
 		}
-		next_cache_block := intrinsics.atomic_load_explicit(&cache.next_cache_block, .Consume)
+		next_cache_block := intrinsics.atomic_load_explicit(&cache.next_cache_block, .Acquire)
 		assert_contextless(next_cache_block != nil, "A remote thread failed to find free space for a new entry in another heap's superpages_with_remote_frees.")
 		cache = next_cache_block
 	}
@@ -1373,7 +1371,7 @@ heap_alloc :: proc "contextless" (size: int, zero: bool = true) -> (ptr: rawptr)
 		// frees to see if any still have frees needing merged.
 		merge_loop: for {
 			consume_loop: for i in 0..<len(cache.superpages_with_remote_frees) {
-				superpage := intrinsics.atomic_load_explicit(&cache.superpages_with_remote_frees[i], .Consume)
+				superpage := intrinsics.atomic_load_explicit(&cache.superpages_with_remote_frees[i], .Acquire)
 				if superpage == nil {
 					continue consume_loop
 				}

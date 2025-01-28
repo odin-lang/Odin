@@ -178,7 +178,7 @@ validate_cache :: proc() {
 			}
 		}
 
-		next_cache := intrinsics.atomic_load_explicit(&cache.next_cache_block, .Consume)
+		next_cache := intrinsics.atomic_load_explicit(&cache.next_cache_block, .Acquire)
 		if next_cache == nil {
 			break
 		}
