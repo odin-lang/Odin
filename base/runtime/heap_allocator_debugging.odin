@@ -1,4 +1,6 @@
+#+build !js
 #+build !orca
+#+build !wasi
 package runtime
 
 import "base:intrinsics"
