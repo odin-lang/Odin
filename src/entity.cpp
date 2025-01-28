@@ -274,6 +274,7 @@ struct Entity {
 			Slice<String> paths;
 			String name;
 			i64 priority_index;
+			bool ignore_duplicates;
 			String extra_linker_flags;
 		} LibraryName;
 		i32 Nil;
