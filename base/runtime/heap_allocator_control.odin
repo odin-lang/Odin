@@ -1,3 +1,4 @@
+#+build !orca
 package runtime
 
 import "base:intrinsics"
