@@ -52,10 +52,14 @@ _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 _allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
 	address: u64
 	flags: i32 = VM_FLAGS_ANYWHERE
-	when SUPERPAGE_SIZE == 2 * Megabyte {
-		flags |= VM_FLAGS_SUPERPAGE_SIZE_2MB
-	} else {
-		flags |= VM_FLAGS_SUPERPAGE_SIZE_ANY
+	when ODIN_ARCH == .amd64 {
+		// NOTE(Feoramund): As far as we are aware, Darwin only supports
+		// explicit superpage allocation on AMD64 with a 2MiB parameter.
+		when SUPERPAGE_SIZE == 2 * Megabyte {
+			flags |= VM_FLAGS_SUPERPAGE_SIZE_2MB
+		} else {
+			#panic("An unsupported superpage size has been configured for AMD64 Darwin; only 2MB is supported.")
+		}
 	}
 	alignment_mask: u64 = SUPERPAGE_SIZE - 1 // Assumes a power of two size, ensured by an assertion in `virtual_memory.odin`.
 	result := mach_vm_map(mach_task_self(), &address, SUPERPAGE_SIZE, alignment_mask, flags, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_SHARE)
