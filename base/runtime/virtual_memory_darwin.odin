@@ -38,11 +38,11 @@ VM_FLAGS_SUPERPAGE_SIZE_2MB :: SUPERPAGE_SIZE_2MB << VM_FLAGS_SUPERPAGE_SHIFT
 MEMORY_OBJECT_NULL :: 0
 VM_PROT_READ  :: 0x01
 VM_PROT_WRITE :: 0x02
-VM_INHERIT_SHARE :: 0
+VM_INHERIT_COPY :: 1
 
 _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 	address: u64
-	result := mach_vm_map(mach_task_self(), &address, u64(size), 0, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_SHARE)
+	result := mach_vm_map(mach_task_self(), &address, u64(size), 0, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
 	if result != 0 {
 		return nil
 	}
@@ -62,7 +62,7 @@ _allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
 		}
 	}
 	alignment_mask: u64 = SUPERPAGE_SIZE - 1 // Assumes a power of two size, ensured by an assertion in `virtual_memory.odin`.
-	result := mach_vm_map(mach_task_self(), &address, SUPERPAGE_SIZE, alignment_mask, flags, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_SHARE)
+	result := mach_vm_map(mach_task_self(), &address, SUPERPAGE_SIZE, alignment_mask, flags, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
 	if result != 0 {
 		return nil
 	}
@@ -73,7 +73,7 @@ _allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
 _allocate_virtual_memory_aligned :: proc "contextless" (size: int, alignment: int) -> rawptr {
 	address: u64
 	alignment_mask: u64 = u64(alignment) - 1
-	result := mach_vm_map(mach_task_self(), &address, u64(size), alignment_mask, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_SHARE)
+	result := mach_vm_map(mach_task_self(), &address, u64(size), alignment_mask, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
 	if result != 0 {
 		return nil
 	}
