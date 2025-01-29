@@ -407,3 +407,85 @@ get_uniforms_from_program :: proc(program: u32) -> (uniforms: Uniforms) {
 
 	return uniforms
 }
+
+
+Attrib_Type :: enum u32 {
+	FLOAT      = 0x1406,
+	FLOAT_VEC2 = 0x8B50,
+	FLOAT_VEC3 = 0x8B51,
+	FLOAT_VEC4 = 0x8B52,
+
+	FLOAT_MAT2   = 0x8B5A,
+	FLOAT_MAT3   = 0x8B5B,
+	FLOAT_MAT4   = 0x8B5C,
+	FLOAT_MAT2x3 = 0x8B65,
+	FLOAT_MAT2x4 = 0x8B66,
+	FLOAT_MAT3x2 = 0x8B67,
+	FLOAT_MAT3x4 = 0x8B68,
+	FLOAT_MAT4x2 = 0x8B69,
+	FLOAT_MAT4x3 = 0x8B6A,
+
+	INT      = 0x1404,
+	INT_VEC2 = 0x8B53,
+	INT_VEC3 = 0x8B54,
+	INT_VEC4 = 0x8B55,
+
+	UNSIGNED_INT      = 0x1405,
+	UNSIGNED_INT_VEC2 = 0x8DC6,
+	UNSIGNED_INT_VEC3 = 0x8DC7,
+	UNSIGNED_INT_VEC4 = 0x8DC8,
+
+	DOUBLE      = 0x140A,
+	DOUBLE_VEC2 = 0x8FFC,
+	DOUBLE_VEC3 = 0x8FFD,
+	DOUBLE_VEC4 = 0x8FFE,
+
+	DOUBLE_MAT2   = 0x8F46,
+	DOUBLE_MAT3   = 0x8F47,
+	DOUBLE_MAT4   = 0x8F48,
+	DOUBLE_MAT2x3 = 0x8F49,
+	DOUBLE_MAT2x4 = 0x8F4A,
+	DOUBLE_MAT3x2 = 0x8F4B,
+	DOUBLE_MAT3x4 = 0x8F4C,
+	DOUBLE_MAT4x2 = 0x8F4D,
+	DOUBLE_MAT4x3 = 0x8F4E,
+}
+
+Attrib_Info :: struct {
+	location: i32,
+	size: i32,
+	type: Attrib_Type,
+	name: string, // NOTE: This will need to be freed
+}
+
+Attribs :: map[string]Attrib_Info
+
+destroy_attribs :: proc(a: Attribs) {
+	for _, v in a {
+		delete(v.name)
+	}
+	delete(a)
+}
+
+get_attribs_from_program :: proc(program: u32) -> (attribs: Attribs) {
+	attrib_count: i32
+	GetProgramiv(program, ACTIVE_ATTRIBUTES, &attrib_count)
+
+	if attrib_count > 0 {
+		reserve(&attribs, int(attrib_count))
+	}
+
+	for i in 0..<attrib_count {
+		attrib_info: Attrib_Info
+
+		length: i32
+		cname: [256]u8
+		GetActiveAttrib(program, u32(i), 256, &length, &attrib_info.size, cast(^u32)&attrib_info.type, &cname[0])
+
+		attrib_info.location = GetAttribLocation(program, cstring(&cname[0]))
+		attrib_info.name = strings.clone(string(cname[:length])) // NOTE(Dima): This need to be freed
+		attribs[attrib_info.name] = attrib_info
+	}
+
+	return attribs
+}
