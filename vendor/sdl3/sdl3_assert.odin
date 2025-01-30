@@ -2,7 +2,6 @@ package sdl3
 
 import "base:intrinsics"
 import "core:c"
-import "core:strings"
 
 TriggerBreakpoint :: intrinsics.debug_trap
 AssertBreakpoint  :: TriggerBreakpoint

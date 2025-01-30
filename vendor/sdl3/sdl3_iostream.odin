@@ -33,7 +33,7 @@ IOStreamInterface :: struct {
 
 #assert(
 	(size_of(IOStreamInterface) == 28 && size_of(rawptr) == 4) ||
-	(size_of(IOStreamInterface) == 56 && size_of(rawptr) == 8)
+	(size_of(IOStreamInterface) == 56 && size_of(rawptr) == 8),
 )
 
 IOStream :: struct {}
