@@ -5,6 +5,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
 		Ginger Bill:     Cosmetic changes.
+		DerTee:          Vertical flip.
 */
 
 // package image implements a general 2D image library to be used with other image related packages
@@ -12,6 +13,7 @@ package image
 
 import "core:bytes"
 import "core:mem"
+import "core:slice"
 import "core:io"
 import "core:compress"
 import "base:runtime"
@@ -146,6 +148,7 @@ Option :: enum {
 	alpha_drop_if_present,         // Unimplemented for QOI. Returns error.
 	alpha_premultiply,             // Unimplemented for QOI. Returns error.
 	blend_background,              // Ignored for non-PNG formats
+	flip_vertical,
 
 	// Unimplemented
 	do_not_expand_grayscale,
@@ -1436,6 +1439,17 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 	img.pixels   = buf
 	img.channels += 2
 	return true
+}
+
+flip_vertically :: proc(img: ^Image) {
+    pixels := img.pixels.buf[:]
+    bpp := img.depth/8 * img.channels
+    bytes_per_line := img.width * bpp
+    for y in 0..<img.height / 2 {
+        top := y * bytes_per_line
+        bot := (img.height - y - 1) * bytes_per_line
+        slice.ptr_swap_non_overlapping(&pixels[top], &pixels[bot], bytes_per_line)
+    }
 }
 
 /*
