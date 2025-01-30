@@ -242,8 +242,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	case: return img, .Unsupported_Compression
 	}
 
-	// Flipped vertically
-	if info.height < 0 {
+	// is flipped XOR user wants to flip
+	if (int(info.height < 0) ~ int(.flip_vertical in options)) == 1 {
 		image.flip_vertically(img)
 	}
 	return
