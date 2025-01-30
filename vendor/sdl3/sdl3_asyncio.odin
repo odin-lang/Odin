@@ -29,7 +29,7 @@ AsyncIOOutcome :: struct {
 
 AsyncIOQueue :: struct {}
 
-@(default_calling_convention="c", link_prefix="SDL_")
+@(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	AsyncIOFromFile     :: proc(file: cstring, mode: cstring) -> ^AsyncIO ---
 	GetAsyncIOSize      :: proc(asyncio: ^AsyncIO) -> Sint64 ---

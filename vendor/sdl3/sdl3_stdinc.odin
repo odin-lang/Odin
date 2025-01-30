@@ -7,11 +7,6 @@ import "core:c"
 #assert(size_of(c.int) == size_of(b32))
 #assert(size_of(c.int) == size_of(rune))
 
-foreign import lib_ {
-	"SDL3.lib"
-}
-lib :: lib_
-
 
 SIZE_MAX :: 1<<(8*size_of(uint)) - 1
 
