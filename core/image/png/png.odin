@@ -1182,6 +1182,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		panic("We should never see bit depths other than 8, 16 and 'Paletted' here.")
 	}
 
+	if .flip_vertical in options {
+		image.flip_vertically(img)
+	}
 	return img, nil
 }
 
