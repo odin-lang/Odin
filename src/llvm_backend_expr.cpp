@@ -4294,6 +4294,17 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	ast_node(se, SliceExpr, expr);
 
+	lbAddr addr = lb_build_addr(p, se->expr);
+	lbValue base = lb_addr_load(p, addr);
+	Type *type = base_type(base.type);
+
+	if (is_type_pointer(type)) {
+		type = base_type(type_deref(type));
+		addr = lb_addr(base);
+		base = lb_addr_load(p, addr);
+	}
+
+
 	lbValue low  = lb_const_int(p->module, t_int, 0);
 	lbValue high = {};
 
@@ -4305,16 +4316,6 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	}
 
 	bool no_indices = se->low == nullptr && se->high == nullptr;
-
-	lbAddr addr = lb_build_addr(p, se->expr);
-	lbValue base = lb_addr_load(p, addr);
-	Type *type = base_type(base.type);
-
-	if (is_type_pointer(type)) {
-		type = base_type(type_deref(type));
-		addr = lb_addr(base);
-		base = lb_addr_load(p, addr);
-	}
 
 	switch (type->kind) {
 	case Type_Slice: {

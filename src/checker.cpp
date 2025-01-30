@@ -5040,6 +5040,12 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 			ac->extra_linker_flags = ev.value_string;
 		}
 		return true;
+	} else if (name == "ignore_duplicates") {
+		if (value != nullptr) {
+			error(elem, "Expected no parameter for '%.*s'", LIT(name));
+		}
+		ac->ignore_duplicates = true;
+		return true;
 	}
 	return false;
 }
@@ -5189,6 +5195,9 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 	if (ac.foreign_import_priority_index != 0) {
 		e->LibraryName.priority_index = ac.foreign_import_priority_index;
+	}
+	if (ac.ignore_duplicates) {
+		e->LibraryName.ignore_duplicates = true;
 	}
 	String extra_linker_flags = string_trim_whitespace(ac.extra_linker_flags);
 	if (extra_linker_flags.len != 0) {

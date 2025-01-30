@@ -10,8 +10,12 @@ _error_string :: proc(errno: i32) -> string {
 	return string(posix.strerror(posix.Errno(errno)))
 }
 
-_get_platform_error :: proc() -> Error {
-	#partial switch errno := posix.errno(); errno {
+_get_platform_error_from_errno :: proc() -> Error {
+	return _get_platform_error_existing(posix.errno())
+}
+
+_get_platform_error_existing :: proc(errno: posix.Errno) -> Error {
+	#partial switch errno {
 	case .EPERM:
 		return .Permission_Denied
 	case .EEXIST:
@@ -31,4 +35,9 @@ _get_platform_error :: proc() -> Error {
 	case:
 		return Platform_Error(errno)
 	}
+}
+
+_get_platform_error :: proc{
+	_get_platform_error_existing,
+	_get_platform_error_from_errno,
 }

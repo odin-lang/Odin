@@ -1207,8 +1207,8 @@ matrix2_inverse_f16 :: proc "contextless" (m: Matrix2f16) -> (c: Matrix2f16) #no
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
-	c[0, 1] = -m[1, 0] * id
-	c[1, 0] = -m[0, 1] * id
+	c[0, 1] = -m[0, 1] * id
+	c[1, 0] = -m[1, 0] * id
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
@@ -1217,8 +1217,8 @@ matrix2_inverse_f32 :: proc "contextless" (m: Matrix2f32) -> (c: Matrix2f32) #no
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
-	c[0, 1] = -m[1, 0] * id
-	c[1, 0] = -m[0, 1] * id
+	c[0, 1] = -m[0, 1] * id
+	c[1, 0] = -m[1, 0] * id
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
@@ -1227,8 +1227,8 @@ matrix2_inverse_f64 :: proc "contextless" (m: Matrix2f64) -> (c: Matrix2f64) #no
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
-	c[0, 1] = -m[1, 0] * id
-	c[1, 0] = -m[0, 1] * id
+	c[0, 1] = -m[0, 1] * id
+	c[1, 0] = -m[1, 0] * id
 	c[1, 1] = +m[0, 0] * id
 	return c
 }

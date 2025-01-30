@@ -9,7 +9,7 @@ set -eu
 CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
-LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
+LDFLAGS="$LDFLAGS -pthread -lm"
 OS_ARCH="$(uname -m)"
 OS_NAME="$(uname -s)"
 
@@ -95,15 +95,15 @@ Darwin)
 	;;
 FreeBSD)
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+	LDFLAGS="$LDFLAGS -lstdc++ $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
 NetBSD)
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+	LDFLAGS="$LDFLAGS -lstdc++ $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
 Linux)
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS -ldl $($LLVM_CONFIG --libs core native --system-libs --libfiles)"
+	LDFLAGS="$LDFLAGS -lstdc++ -ldl $($LLVM_CONFIG --libs core native --system-libs --libfiles)"
 	# Copy libLLVM*.so into current directory for linking
 	# NOTE: This is needed by the Linux release pipeline!
 	# cp $(readlink -f $($LLVM_CONFIG --libfiles)) ./
@@ -111,12 +111,12 @@ Linux)
 	;;
 OpenBSD)
 	CXXFLAGS="$CXXFLAGS -I/usr/local/include $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS -L/usr/local/lib -liconv"
+	LDFLAGS="$LDFLAGS -lstdc++ -L/usr/local/lib -liconv"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
 Haiku)
 	CXXFLAGS="$CXXFLAGS -D_GNU_SOURCE $($LLVM_CONFIG --cxxflags --ldflags) -I/system/develop/headers/private/shared -I/system/develop/headers/private/kernel"
-	LDFLAGS="$LDFLAGS -liconv"
+	LDFLAGS="$LDFLAGS -lstdc++ -liconv"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
 *)

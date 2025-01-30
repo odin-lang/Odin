@@ -449,6 +449,26 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				if (extra_linker_flags.len != 0) {
 					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
 				}
+
+				if (build_context.metrics.os == TargetOs_darwin) {
+					// Print frameworks first
+					for (String lib : e->LibraryName.paths) {
+						lib = string_trim_whitespace(lib);
+						if (lib.len == 0) {
+							continue;
+						}
+						if (string_ends_with(lib, str_lit(".framework"))) {
+							if (string_set_update(&min_libs_set, lib)) {
+								continue;
+							}
+
+							String lib_name = lib;
+							lib_name = remove_extension_from_path(lib_name);
+							lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
+						}
+					}
+				}
+
 				for (String lib : e->LibraryName.paths) {
 					lib = string_trim_whitespace(lib);
 					if (lib.len == 0) {
@@ -541,7 +561,9 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							short_circuit = true;
 						} else if (string_ends_with(lib, str_lit(".dylib"))) {
 							short_circuit = true;
-						}  else if (string_ends_with(lib, str_lit(".so"))) {
+						} else if (string_ends_with(lib, str_lit(".so"))) {
+							short_circuit = true;
+						} else if (e->LibraryName.ignore_duplicates) {
 							short_circuit = true;
 						}
 
