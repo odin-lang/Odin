@@ -1329,6 +1329,7 @@ Socket_Option :: enum {
 	ACCEPTCONN                    = 30,
 	PEERSEC                       = 31,
 	PASSSEC                       = 34,
+	IP_ADD_MEMBERSHIP             = 35,
 	MARK                          = 36,
 	PROTOCOL                      = 38,
 	DOMAIN                        = 39,
