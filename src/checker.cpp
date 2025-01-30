@@ -5184,19 +5184,20 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
 
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+
+	Scope *scope = parent_scope;
+	if (ac.is_export) {
+		scope = parent_scope->parent;
+	}
+
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
 	e->LibraryName.decl = decl;
 	add_entity_flags_from_file(ctx, e, parent_scope);
+	add_entity(ctx, scope, nullptr, e);
 
-	AttributeContext ac = {};
-	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
-
-	if (ac.is_export) {
-		add_entity(ctx, parent_scope->pkg->scope, nullptr, e);
-	} else {
-		add_entity(ctx, parent_scope, nullptr, e);
-	}
 
 	if (ac.require_declaration) {
 		mpsc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
