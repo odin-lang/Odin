@@ -857,6 +857,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	} else {
 		String name = ident->Ident.token.string;
 		Entity *found = scope_lookup(ctx->scope, name);
+
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
 				// NOTE(bill): link against nothing
@@ -864,7 +865,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 				error(ident, "Undeclared name: %.*s", LIT(name));
 			}
 		} else if (found->kind != Entity_LibraryName) {
-			error(ident, "'%.*s' cannot be used as a library name", LIT(name));
+			error(ident, "'%.*s' cannot be used as a library name %d", LIT(name), found->kind);
 		} else {
 			// TODO(bill): Extra stuff to do with library names?
 			*foreign_library = found;
