@@ -341,10 +341,10 @@ foreign lib {
 	iconv_string :: proc(tocode: cstring, fromcode: cstring, inbuf: cstring, inbytesleft: uint)                 -> [^]byte ---
 }
 
-ICONV_ERROR  :: transmute(uint)-1  /**< Generic error. Check SDL_GetError()? */
-ICONV_E2BIG  :: transmute(uint)-2  /**< Output buffer was too small. */
-ICONV_EILSEQ :: transmute(uint)-3  /**< Invalid input sequence was encountered. */
-ICONV_EINVAL :: transmute(uint)-4  /**< Incomplete input sequence was encountered. */
+ICONV_ERROR  :: transmute(uint)int(-1)  /**< Generic error. Check SDL_GetError()? */
+ICONV_E2BIG  :: transmute(uint)int(-2)  /**< Output buffer was too small. */
+ICONV_EILSEQ :: transmute(uint)int(-3)  /**< Invalid input sequence was encountered. */
+ICONV_EINVAL :: transmute(uint)int(-4)  /**< Incomplete input sequence was encountered. */
 
 
 @(require_results)
@@ -364,7 +364,7 @@ iconv_utf8_ucs4 :: #force_inline proc "c" (S: cstring) -> [^]rune {
 
 @(require_results)
 iconv_wchar_utf8 :: #force_inline proc "c" (S: [^]wchar_t) -> [^]byte {
-	return iconv_string("UTF-8", "WCHAR_T", cstring(([^]u8)(raw_data(S))), (wcslen(S)+1)*size_of(wchar_t))
+	return iconv_string("UTF-8", "WCHAR_T", cstring(([^]u8)(S)), (wcslen(S)+1)*size_of(wchar_t))
 }
 
 
