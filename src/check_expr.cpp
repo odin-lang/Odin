@@ -10375,7 +10375,7 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 				add_type_info_type(c, o->type);
 				o->type = type_hint;
 				o->mode = Addressing_OptionalOk;
-				return kind;
+				goto end;
 			}
 		}
 
@@ -10439,6 +10439,8 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 			return kind;
 		}
 	}
+
+end:;
 
 	if ((c->state_flags & StateFlag_no_type_assert) == 0) {
 		add_package_dependency(c, "runtime", "type_assertion_check");
