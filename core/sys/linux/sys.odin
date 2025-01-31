@@ -2010,10 +2010,10 @@ statfs :: proc "contextless" (path: cstring, statfs: ^Stat_FS) -> (Errno) {
 */
 fstatfs :: proc "contextless" (fd: Fd, statfs: ^Stat_FS) -> (Errno) {
 	when size_of(int) == 8 {
-		ret := syscall(SYS_statfs, fd, statfs)
+		ret := syscall(SYS_fstatfs, fd, statfs)
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_statfs64, fd, size_of(Stat_FS), statfs)
+		ret := syscall(SYS_fstatfs64, fd, size_of(Stat_FS), statfs)
 		return Errno(-ret)
 	}
 }
