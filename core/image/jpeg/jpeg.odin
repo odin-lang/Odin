@@ -200,6 +200,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	img.which = .JPEG
 
 	expect_EOI := false
+	zero_based_components := false
 	huffman: [Coefficient][4]HuffmanTable
 	quantization: [4]QuantizationTable
 	color_components: [Component]ColorComponent
@@ -520,12 +521,17 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				for _ in 0..<components {
 					id := cast(Component)compress.read_u8(ctx) or_return
 
-					// TODO: some images write zero-based IDs for the components, which violates the spec, but most (if not all)
-					// decoders handle them just fine. Should we support that too?
+					if id == Component(0) {
+						zero_based_components = true
+					}
+
+					if zero_based_components {
+						id += Component(1)
+					}
+
 					// TODO: while others that use CMYK have these IDs 67, 77, 89, 75 which are CMYK in ASCII
 					// TODO: even more weird ids. 82, 71, 66 which is RGB in ASCII
 					if id < .Y || id > .Cr {
-						fmt.println("Found unknown component ID:", id)
 						return img, .Image_Does_Not_Adhere_to_Spec
 					}
 
@@ -606,6 +612,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 				for _ in 0..<num_components {
 					component_id := cast(Component)compress.read_u8(ctx) or_return
+					if zero_based_components {
+						component_id += Component(1)
+					}
 					if component_id < .Y || component_id > .Cr {
 						return img, .Image_Does_Not_Adhere_to_Spec
 					}
