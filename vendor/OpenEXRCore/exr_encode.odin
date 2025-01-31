@@ -1,11 +1,5 @@
 package vendor_openexr
 
-when ODIN_OS == .Windows {
-	foreign import lib "OpenEXRCore-3_1.lib"
-} else {
-	foreign import lib "system:OpenEXRCore-3_1"
-}
-
 import "core:c"
 
 /** Can be bit-wise or'ed into the decode_flags in the decode pipeline.
@@ -46,7 +40,13 @@ ENCODE_NON_IMAGE_DATA_AS_POINTERS :: u16(1 << 1)
  * meant to be used by separate threads, which can all be accessing
  * the same context concurrently.
  */
- encode_pipeline_t :: struct {
+encode_pipeline_t :: struct {
+	/** Used for versioning the decode pipeline in the future
+	 *
+	 * \ref EXR_ENCODE_PIPELINE_INITIALIZER
+	 */
+	pipe_size: c.size_t,
+
 	/** The output channel information for this chunk.
 	 *
 	 * User is expected to fill the channel pointers for the input
@@ -264,7 +264,7 @@ ENCODE_NON_IMAGE_DATA_AS_POINTERS :: u16(1 << 1)
 	_quick_chan_store: [5]coding_channel_info_t,
 }
 
-ENCODE_PIPELINE_INITIALIZER :: encode_pipeline_t{}
+ENCODE_PIPELINE_INITIALIZER :: encode_pipeline_t{ pipe_size = size_of(encode_pipeline_t) }
 
 
 @(link_prefix="exr_", default_calling_convention="c")
