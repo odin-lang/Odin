@@ -10,10 +10,10 @@ SavePanel_runModal :: proc "c" (self: ^SavePanel) -> ModalResponse {
 
 @(objc_type=SavePanel, objc_name="savePanel", objc_is_class_method=true)
 SavePanel_savePanel :: proc "c" () -> ^SavePanel {
-    return msgSend(^SavePanel, SavePanel, "savePanel")
+	return msgSend(^SavePanel, SavePanel, "savePanel")
 }
 
 @(objc_type=SavePanel, objc_name="URL")
 SavePanel_URL :: proc "c" (self: ^SavePanel) -> ^Array {
-    return msgSend(^Array, self, "URL")
+	return msgSend(^Array, self, "URL")
 }
