@@ -5016,6 +5016,9 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "export") {
+		ac->is_export = true;
+		return true;
 	} else if (name == "force" || name == "require") {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
@@ -5181,14 +5184,21 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
 
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+
+	Scope *scope = parent_scope;
+	if (ac.is_export) {
+		scope = parent_scope->parent;
+	}
+
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
 	e->LibraryName.decl = decl;
 	add_entity_flags_from_file(ctx, e, parent_scope);
-	add_entity(ctx, parent_scope, nullptr, e);
+	add_entity(ctx, scope, nullptr, e);
 
-	AttributeContext ac = {};
-	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+
 	if (ac.require_declaration) {
 		mpsc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
