@@ -243,8 +243,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	// is flipped XOR user wants to flip
-	if (int(info.height < 0) ~ int(.flip_vertical in options)) == 1 {
-		image.flip_vertically(img)
+	if (int(info.height < 0) ~ int(.vertical_flip in options)) == 1 {
+		image.vertical_flip(img)
 	}
 	return
 }

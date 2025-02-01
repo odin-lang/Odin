@@ -371,8 +371,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		}
 		line += 1 if origin_is_top else -1
 	}
-	if .flip_vertical in options {
-		image.flip_vertically(img)
+	if .vertical_flip in options {
+		image.vertical_flip(img)
 	}
 	return img, nil
 }
