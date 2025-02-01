@@ -148,7 +148,7 @@ Option :: enum {
 	alpha_drop_if_present,         // Unimplemented for QOI. Returns error.
 	alpha_premultiply,             // Unimplemented for QOI. Returns error.
 	blend_background,              // Ignored for non-PNG formats
-	flip_vertical,
+	vertical_flip,                 // flip image vertically on load
 
 	// Unimplemented
 	do_not_expand_grayscale,
@@ -1441,7 +1441,7 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 	return true
 }
 
-flip_vertically :: proc(img: ^Image) {
+vertical_flip :: proc(img: ^Image) {
     pixels := img.pixels.buf[:]
     bpp := img.depth/8 * img.channels
     bytes_per_line := img.width * bpp

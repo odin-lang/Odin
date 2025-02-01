@@ -323,8 +323,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, .Post_Processing_Error
 	}
 
-	if .flip_vertical in options {
-		image.flip_vertically(img)
+	if .vertical_flip in options {
+		image.vertical_flip(img)
 	}
 
 	return

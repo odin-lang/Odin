@@ -48,8 +48,8 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 	}
 	img.metadata = info
 
-	if .flip_vertical in options {
-		image.flip_vertically(img)
+	if .vertical_flip in options {
+		image.vertical_flip(img)
 	}
 	return img, nil
 }
