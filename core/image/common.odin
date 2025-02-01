@@ -67,6 +67,13 @@ Image_Metadata :: union #shared_nil {
 	^JPEG_Info,
 }
 
+Exif :: struct {
+	byte_order: enum {
+		little_endian,
+		big_endian,
+	},
+	data: []u8 `fmt:"-"`,
+}
 
 
 /*
@@ -582,6 +589,7 @@ TGA_Info :: struct {
 */
 JFIF_Magic := [?]byte{0x4A, 0x46, 0x49, 0x46} // "JFIF"
 JFXX_Magic := [?]byte{0x4A, 0x46, 0x58, 0x58} // "JFXX"
+Exif_Magic := [?]byte{0x45, 0x78, 0x69, 0x66} // "Exif"
 
 JPEG_Error :: enum {
 	None = 0,
@@ -704,7 +712,7 @@ JPEG_Info :: struct {
 	jfif_app0: Maybe(JFIF_APP0),
 	jfxx_app0: Maybe(JFXX_APP0),
 	comments: [dynamic]string,
-	//exif: Maybe(Exif),
+	exif: [dynamic]Exif,
 }
 
 // Function to help with image buffer calculations

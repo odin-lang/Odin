@@ -138,14 +138,6 @@ Text :: struct {
 	text:              string,
 }
 
-Exif :: struct {
-	byte_order: enum {
-		little_endian,
-		big_endian,
-	},
-	data: []u8,
-}
-
 iCCP :: struct {
 	name:    string,
 	profile: []u8,

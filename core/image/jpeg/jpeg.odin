@@ -2,7 +2,6 @@ package jpeg
 
 import "core:bytes"
 import "core:compress"
-import "core:fmt"
 import "core:math"
 import "core:mem"
 import "core:image"
@@ -19,6 +18,7 @@ HUFFMAN_MAX_BITS  :: 16
 THUMBNAIL_PALETTE_SIZE :: 768
 BLOCK_SIZE :: 8
 COEFFICIENT_COUNT :: BLOCK_SIZE * BLOCK_SIZE
+SEGMENT_MAX_SIZE :: 65533
 
 Coefficient :: enum u8 {
 	DC,
@@ -235,7 +235,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					if b == 0x00 {
 						break
 					}
-					append(&ident, b)
+					append(&ident, b) or_return
 				}
 				if slice.equal(ident[:], image.JFIF_Magic[:]) {
 					if length != 14 {
@@ -343,7 +343,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 							}
 							img.metadata = info
 						}
-					case .Thumbnail_1_Byte_Palette: // NOTE: NOT TESTED. Couldn't find a jpeg to test this with.
+					case .Thumbnail_1_Byte_Palette: // NOTE(illusionman1212): NOT TESTED. Couldn't find a jpeg to test this with.
 						x_thumbnail := cast(int)compress.read_u8(ctx) or_return
 						y_thumbnail := cast(int)compress.read_u8(ctx) or_return
 						palette := slice.reinterpret([]image.RGB_Pixel, compress.read_slice(ctx, THUMBNAIL_PALETTE_SIZE / 3) or_return)
@@ -380,17 +380,78 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					compress.read_slice(ctx, length - len(ident) - 1) or_return
 					continue
 				}
-			// case .APP1: // Exif metadata
-				// unimplemented("APP1")
+			case .APP1: // Metadata
+				length := cast(int)((compress.read_data(ctx, u16be) or_return) - 2)
+				if .return_metadata not_in options {
+					compress.read_slice(ctx, length) or_return
+					continue
+				}
+				info: ^image.JPEG_Info
+				if img.metadata == nil {
+					info = new(image.JPEG_Info) or_return
+				} else {
+					info = img.metadata.(^image.JPEG_Info)
+				}
+
+				ident := make([dynamic]byte, 0, 16, context.temp_allocator) or_return
+				for {
+					b := compress.read_u8(ctx) or_return
+					if b == 0x00 {
+						break
+					}
+					append(&ident, b) or_return
+				}
+
+				if slice.equal(ident[:], image.Exif_Magic[:]) {
+					// Padding byte according to section 4.7.2.2 in Exif spec 3.0
+					compress.read_u8(ctx) or_return
+
+					exif: image.Exif
+					peek := compress.peek_data(ctx, [4]byte) or_return
+					if peek[0] == 'M' && peek[1] == 'M' {
+						exif.byte_order = .big_endian
+						if peek[2] != 0 || peek[3] != 42 {
+							// - 2 for the NUL byte and padding byte
+							compress.read_slice(ctx, length - len(ident) - 2) or_return
+							continue
+						}
+					} else if peek[0] == 'I' && peek[1] == 'I' {
+						exif.byte_order = .little_endian
+						if peek[2] != 42 || peek[3] != 0 {
+							compress.read_slice(ctx, length - len(ident) - 2) or_return
+							continue
+						}
+					} else {
+						// If we can't determine the endianness then this Exif data is likely a continuation of the previous
+						// APP1 Exif data
+
+						// We only treat it as such if a previous Exif entry exists and its data length is the max
+						if len(info.exif) > 0 && len(info.exif[len(info.exif) - 1].data) == SEGMENT_MAX_SIZE - len(ident) - 2 {
+							exif.byte_order = info.exif[len(info.exif) - 1].byte_order
+						} else {
+							compress.read_slice(ctx, length - len(ident) - 2) or_return
+							continue
+						}
+					}
+
+					// - 2 for the NUL byte and padding byte
+					data := compress.read_slice(ctx, length - len(ident) - 2) or_return
+					exif.data = make([]byte, len(data)) or_return
+					copy(exif.data, data)
+
+					append(&info.exif, exif) or_return
+					img.metadata = info
+				} else {
+					// - 1 for the NUL byte
+					compress.read_slice(ctx, length - len(ident) - 1) or_return
+					continue
+				}
 			case .COM:
 				length := (compress.read_data(ctx, u16be) or_return) - 2
 				comment := string(compress.read_slice(ctx, cast(int)length) or_return)
 				if .return_metadata in options {
 					if info, ok := img.metadata.(^image.JPEG_Info); ok {
-						if info.comments == nil {
-							info.comments = make([dynamic]string, 0, 8, allocator) or_return
-						}
-						append(&info.comments, strings.clone(comment))
+						append(&info.comments, strings.clone(comment)) or_return
 					}
 				}
 			case .DQT:
@@ -504,7 +565,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				// how many lines in the frame we have.
 				// ISO/IEC 10918-1: 1993.
 				// Section B.2.5
-				if width == 0 || height == 0 {
+				if img.width == 0 || img.height == 0 || img.width * img.height > image.MAX_DIMENSIONS {
 					return img, .Invalid_Image_Dimensions
 				}
 
@@ -592,7 +653,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			case .SOF14: // Differential progressive DCT, Arithmetic coding
 				fallthrough
 			case .SOF15: // Differential lossless (sequential), Arithmetic coding
-				fmt.println(marker)
 				return img, .Unsupported_Frame_Type
 			case .SOS:
 				if img.channels == 0 && img.depth == 0 && img.width == 0 && img.height == 0 {
@@ -935,6 +995,11 @@ destroy :: proc(img: ^Image) {
 			delete(comment)
 		}
 		delete(v.comments)
+
+		for exif in v.exif {
+			delete(exif.data)
+		}
+		delete(v.exif)
 
 		free(v)
 	}
