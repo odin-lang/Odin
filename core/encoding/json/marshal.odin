@@ -209,13 +209,23 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, ']') or_return
 		
 	case runtime.Type_Info_Enumerated_Array:
-		opt_write_start(w, opt, '[') or_return
+		index_type := reflect.type_info_base(info.index)
+		enum_type := index_type.variant.(reflect.Type_Info_Enum)
+
+		opt_write_start(w, opt, '{') or_return
 		for i in 0..<info.count {
+			value := cast(runtime.Type_Info_Enum_Value)i
+			index, found := slice.linear_search(enum_type.values, value)
+			if !found {
+				continue
+			}
+
 			opt_write_iteration(w, opt, i == 0) or_return
+			opt_write_key(w, opt, enum_type.names[index]) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
-		opt_write_end(w, opt, ']') or_return
+		opt_write_end(w, opt, '}') or_return
 		
 	case runtime.Type_Info_Dynamic_Array:
 		opt_write_start(w, opt, '[') or_return
