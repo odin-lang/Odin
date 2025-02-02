@@ -75,9 +75,9 @@ orphanage. This limitation is due to the avoidance of heap allocation.
 compact_heap_orphanage :: proc "contextless" () {
 	// First, try to empty the orphanage so that we can evaluate each superpage.
 	buffer: [128]^Heap_Superpage
-	for i := 0; i < len(buffer); i += 1 {
-		buffer[i] = heap_pop_orphan()
-		if buffer[i] == nil {
+	for &b in buffer {
+		b = heap_pop_orphan()
+		if b == nil {
 			break
 		}
 	}
