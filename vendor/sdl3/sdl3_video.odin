@@ -456,3 +456,9 @@ foreign lib {
 	GL_SwapWindow                   :: proc(window: ^Window) -> bool ---
 	GL_DestroyContext               :: proc(ctx: GLContext) -> bool ---
 }
+
+
+// Used by vendor:OpenGL
+gl_set_proc_address :: proc(p: rawptr, name: cstring) {
+	(^FunctionPointer)(p)^ = GL_GetProcAddress(name)
+}
