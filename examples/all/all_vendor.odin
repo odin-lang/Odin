@@ -19,7 +19,6 @@ import IMG        "vendor:sdl2/image"
 import MIX        "vendor:sdl2/mixer"
 import TTF        "vendor:sdl2/ttf"
 
-import SDL3       "vendor:sdl3"
 
 import vk         "vendor:vulkan"
 
@@ -46,7 +45,6 @@ _ :: rl
 _ :: zlib
 
 _ :: SDL
-_ :: SDL3
 _ :: SDLNet
 _ :: IMG
 _ :: MIX
