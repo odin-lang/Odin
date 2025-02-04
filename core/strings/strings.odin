@@ -1031,7 +1031,7 @@ Returns:
 */
 @private
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
-	m := index(s^, sep)
+	m: int
 	if sep == "" {
 		if len(s) == 0 {
 			m = -1
@@ -1039,6 +1039,8 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 			_, w := utf8.decode_rune_in_string(s^)
 			m = w
 		}
+	} else {
+		m = index(s^, sep)
 	}
 	if m < 0 {
 		// not found
