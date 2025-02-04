@@ -197,7 +197,7 @@ HapticEffect :: struct #raw_union {
 HapticID :: distinct Uint32
 
 
-@(default_calling_convention="c", link_prefix="", require_results)
+@(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	GetHaptics                 :: proc(count: ^c.int) -> ^HapticID ---
 	GetHapticNameForID         :: proc(instance_id: HapticID) -> cstring ---

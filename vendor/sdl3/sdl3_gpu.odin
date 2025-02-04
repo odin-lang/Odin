@@ -776,7 +776,7 @@ PROP_GPU_TEXTURE_CREATE_NAME_STRING               :: "SDL.gpu.texture.create.nam
 PROP_GPU_BUFFER_CREATE_NAME_STRING                :: "SDL.gpu.buffer.create.name"
 PROP_GPU_TRANSFERBUFFER_CREATE_NAME_STRING        :: "SDL.gpu.transferbuffer.create.name"
 
-@(default_calling_convention="c", link_prefix="", require_results)
+@(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	GPUSupportsShaderFormats              :: proc(format_flags: GPUShaderFormat, name: cstring) -> bool ---
 	GPUSupportsProperties                 :: proc(props: PropertiesID) -> bool ---
@@ -876,7 +876,7 @@ foreign lib {
 
 
 // GDK
-@(default_calling_convention="c", link_prefix="")
+@(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
 	GDKSuspendGPU :: proc(device: ^GPUDevice) ---
 	GDKResumeGPU  :: proc(device: ^GPUDevice) ---

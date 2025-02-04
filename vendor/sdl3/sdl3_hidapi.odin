@@ -76,7 +76,7 @@ hid_device_info :: struct {
 }
 
 
-@(default_calling_convention="c", link_prefix="", require_results)
+@(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	hid_init                     :: proc() -> c.int ---
 	hid_exit                     :: proc() -> c.int ---
