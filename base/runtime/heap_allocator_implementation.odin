@@ -1438,8 +1438,11 @@ heap_alloc :: proc "contextless" (size: int, zero: bool = true) -> (ptr: rawptr)
 				}
 
 				if should_remove {
+					// NOTE: The order of operations here is important to keep
+					// the cache from overflowing. The entry must first be
+					// removed, then the superpage has its flag cleared.
 					intrinsics.atomic_store_explicit(&cache.superpages_with_remote_frees[i], nil, .Release)
-					intrinsics.atomic_store_explicit(&superpage.remote_free_set, false, .Release)
+					intrinsics.atomic_store_explicit(&superpage.remote_free_set, false, .Seq_Cst)
 					removed += 1
 				}
 
