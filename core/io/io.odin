@@ -126,7 +126,7 @@ _i64_err :: #force_inline proc "contextless" (n: int, err: Error) -> (i64, Error
 }
 
 
-// read reads up to len(p) bytes into s. It returns the number of bytes read and any error if occurred.
+// read reads up to len(p) bytes into p. It returns the number of bytes read and any error if occurred.
 //
 // When read encounters an .EOF or error after successfully reading n > 0 bytes, it returns the number of
 // bytes read along with the error.
@@ -142,7 +142,7 @@ read :: proc(s: Reader, p: []byte, n_read: ^int = nil) -> (n: int, err: Error) {
 	return
 }
 
-// write writes up to len(p) bytes into s. It returns the number of bytes written and any error if occurred.
+// write writes up to len(p) bytes into p. It returns the number of bytes written and any error if occurred.
 write :: proc(s: Writer, p: []byte, n_written: ^int = nil) -> (n: int, err: Error) {
 	if s.procedure != nil {
 		n64: i64
