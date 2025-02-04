@@ -128,9 +128,9 @@ WINDOWPOS_ISCENTERED :: proc "c" (X: c.int) -> bool {
 
 
 FlashOperation :: enum c.int {
-    	CANCEL,                   /**< Cancel any window flash state */
-    	BRIEFLY,                  /**< Flash the window briefly to get attention */
-    	UNTIL_FOCUSED,            /**< Flash the window until it gets focus */
+	CANCEL,                   /**< Cancel any window flash state */
+	BRIEFLY,                  /**< Flash the window briefly to get attention */
+	UNTIL_FOCUSED,            /**< Flash the window until it gets focus */
 }
 
 GLContextState :: struct {}
@@ -408,16 +408,16 @@ foreign lib {
 }
 
 HitTestResult :: enum c.int {
-    	NORMAL,             /**< Region is normal. No special properties. */
-    	DRAGGABLE,          /**< Region can drag entire window. */
-    	RESIZE_TOPLEFT,     /**< Region is the resizable top-left corner border. */
-    	RESIZE_TOP,         /**< Region is the resizable top border. */
-    	RESIZE_TOPRIGHT,    /**< Region is the resizable top-right corner border. */
-    	RESIZE_RIGHT,       /**< Region is the resizable right border. */
-    	RESIZE_BOTTOMRIGHT, /**< Region is the resizable bottom-right corner border. */
-    	RESIZE_BOTTOM,      /**< Region is the resizable bottom border. */
-    	RESIZE_BOTTOMLEFT,  /**< Region is the resizable bottom-left corner border. */
-    	RESIZE_LEFT,        /**< Region is the resizable left border. */
+	NORMAL,             /**< Region is normal. No special properties. */
+	DRAGGABLE,          /**< Region can drag entire window. */
+	RESIZE_TOPLEFT,     /**< Region is the resizable top-left corner border. */
+	RESIZE_TOP,         /**< Region is the resizable top border. */
+	RESIZE_TOPRIGHT,    /**< Region is the resizable top-right corner border. */
+	RESIZE_RIGHT,       /**< Region is the resizable right border. */
+	RESIZE_BOTTOMRIGHT, /**< Region is the resizable bottom-right corner border. */
+	RESIZE_BOTTOM,      /**< Region is the resizable bottom border. */
+	RESIZE_BOTTOMLEFT,  /**< Region is the resizable bottom-left corner border. */
+	RESIZE_LEFT,        /**< Region is the resizable left border. */
 }
 
 HitTest :: #type proc "c" (win: ^Window, area: ^Point, data: rawptr) -> HitTestResult

@@ -14,28 +14,28 @@ DEFINE_AUDIO_FORMAT :: #force_inline proc "c" (signed, bigendian, flt, size: Uin
 
 
 AudioFormat :: enum c.int {
-    UNKNOWN   = 0x0000,  /**< Unspecified audio format */
-    U8        = 0x0008,  /**< Unsigned 8-bit samples */
-        /* DEFINE_AUDIO_FORMAT(0, 0, 0, 8), */
-    S8        = 0x8008,  /**< Signed 8-bit samples */
-        /* DEFINE_AUDIO_FORMAT(1, 0, 0, 8), */
-    S16LE     = 0x8010,  /**< Signed 16-bit samples */
-        /* DEFINE_AUDIO_FORMAT(1, 0, 0, 16), */
-    S16BE     = 0x9010,  /**< As above, but big-endian byte order */
-        /* DEFINE_AUDIO_FORMAT(1, 1, 0, 16), */
-    S32LE     = 0x8020,  /**< 32-bit integer samples */
-        /* DEFINE_AUDIO_FORMAT(1, 0, 0, 32), */
-    S32BE     = 0x9020,  /**< As above, but big-endian byte order */
-        /* DEFINE_AUDIO_FORMAT(1, 1, 0, 32), */
-    F32LE     = 0x8120,  /**< 32-bit floating point samples */
-        /* DEFINE_AUDIO_FORMAT(1, 0, 1, 32), */
-    F32BE     = 0x9120,  /**< As above, but big-endian byte order */
-        /* DEFINE_AUDIO_FORMAT(1, 1, 1, 32), */
+	UNKNOWN   = 0x0000,  /**< Unspecified audio format */
+	U8        = 0x0008,  /**< Unsigned 8-bit samples */
+	                     /* DEFINE_AUDIO_FORMAT(0, 0, 0, 8), */
+	S8        = 0x8008,  /**< Signed 8-bit samples */
+	                     /* DEFINE_AUDIO_FORMAT(1, 0, 0, 8), */
+	S16LE     = 0x8010,  /**< Signed 16-bit samples */
+	                     /* DEFINE_AUDIO_FORMAT(1, 0, 0, 16), */
+	S16BE     = 0x9010,  /**< As above, but big-endian byte order */
+	                     /* DEFINE_AUDIO_FORMAT(1, 1, 0, 16), */
+	S32LE     = 0x8020,  /**< 32-bit integer samples */
+	                     /* DEFINE_AUDIO_FORMAT(1, 0, 0, 32), */
+	S32BE     = 0x9020,  /**< As above, but big-endian byte order */
+	                     /* DEFINE_AUDIO_FORMAT(1, 1, 0, 32), */
+	F32LE     = 0x8120,  /**< 32-bit floating point samples */
+	                     /* DEFINE_AUDIO_FORMAT(1, 0, 1, 32), */
+	F32BE     = 0x9120,  /**< As above, but big-endian byte order */
+	                     /* DEFINE_AUDIO_FORMAT(1, 1, 1, 32), */
 
-    /* These represent the current system's byteorder. */
-    S16 = S16LE when BYTEORDER == LIL_ENDIAN else S16BE,
-    S32 = S32LE when BYTEORDER == LIL_ENDIAN else S32BE,
-    F32 = F32LE when BYTEORDER == LIL_ENDIAN else F32BE,
+	/* These represent the current system's byteorder. */
+	S16 = S16LE when BYTEORDER == LIL_ENDIAN else S16BE,
+	S32 = S32LE when BYTEORDER == LIL_ENDIAN else S32BE,
+	F32 = F32LE when BYTEORDER == LIL_ENDIAN else F32BE,
 }
 
 @(require_results) AUDIO_BITSIZE        :: proc "c" (x: AudioFormat) -> Uint16 { return (Uint16(x) & AUDIO_MASK_BITSIZE)       }

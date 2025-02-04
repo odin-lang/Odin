@@ -81,10 +81,10 @@ GamepadBindingType :: enum c.int {
 GamepadBinding :: struct {
 	input_type: GamepadBindingType,
 	input: struct #raw_union {
-        	button: c.int,
+		button: c.int,
 
-        	axis: struct {
-        		axis: c.int,
+		axis: struct {
+			axis: c.int,
 			axis_min: c.int,
 			axis_max: c.int,
 		},
