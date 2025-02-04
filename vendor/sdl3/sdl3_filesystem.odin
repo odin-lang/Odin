@@ -49,10 +49,8 @@ EnumerationResult :: enum c.int {
 EnumerateDirectoryCallback :: #type proc "c" (userdata: rawptr, dirname, fname: cstring) -> EnumerationResult
 
 
-
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
-
 	GetBasePath         :: proc() -> cstring ---
 	GetPrefPath         :: proc(org, app: cstring) -> [^]c.char ---
 	GetUserFolder       :: proc(folder: Folder) -> cstring ---
