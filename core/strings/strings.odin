@@ -1033,7 +1033,12 @@ Returns:
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
 	m := index(s^, sep)
 	if sep == "" {
-		m = 1 if len(s) > 0 else -1
+		if len(s) == 0 {
+			m = -1
+		} else {
+			_, w := utf8.decode_rune_in_string(s^)
+			m = w
+		}
 	}
 	if m < 0 {
 		// not found
