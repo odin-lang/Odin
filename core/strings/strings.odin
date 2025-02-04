@@ -1031,14 +1031,10 @@ Returns:
 */
 @private
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
-	if sep == "" {
-		res = s[:]
-		ok = true
-		s^ = s[len(s):]
-		return
-	}
-
 	m := index(s^, sep)
+	if sep == "" {
+		m = 1 if len(s) > 0 else -1
+	}
 	if m < 0 {
 		// not found
 		res = s[:]
