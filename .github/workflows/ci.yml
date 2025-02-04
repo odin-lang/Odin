@@ -122,7 +122,7 @@ jobs:
       - name: Odin check examples/all
         run: ./odin check examples/all -strict-style -vet -disallow-do
       - name: Odin check vendor/sdl3
-        run: ./odin check vendor/sdl3  -strict-style -vet -disallow-do -entry-point
+        run: ./odin check vendor/sdl3  -strict-style -vet -disallow-do -no-entry-point
       - name: Normal Core library tests
         run: ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
       - name: Optimized Core library tests
