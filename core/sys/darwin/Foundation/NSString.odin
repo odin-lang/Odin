@@ -134,6 +134,11 @@ String_isEqualToString :: proc "c" (self, other: ^String) -> BOOL {
 	return msgSend(BOOL, self, "isEqualToString:", other)
 }
 
+@(objc_type=String, objc_name="stringByAppendingString")
+String_stringByAppendingString :: proc "c" (self, other: ^String) -> ^String {
+	return msgSend(^String, self, "stringByAppendingString:", other)
+}
+
 @(objc_type=String, objc_name="rangeOfString")
 String_rangeOfString :: proc "c" (self, other: ^String, options: StringCompareOptions) -> Range {
 	return msgSend(Range, self, "rangeOfString:options:", other, options)

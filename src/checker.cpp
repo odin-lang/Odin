@@ -6319,6 +6319,10 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					continue;
 				}
 
+				if (dst_params == nullptr) {
+					error(src->token, "Deferred procedure must have parameters for %s", attribute);
+					continue;
+				}
 				GB_ASSERT(dst_params->kind == Type_Tuple);
 
 				Type *tsrc = alloc_type_tuple();

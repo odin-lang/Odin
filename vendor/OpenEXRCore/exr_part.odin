@@ -1,11 +1,5 @@
 package vendor_openexr
 
-when ODIN_OS == .Windows {
-	foreign import lib "OpenEXRCore-3_1.lib"
-} else {
-	foreign import lib "system:OpenEXRCore-3_1"
-}
-
 import "core:c"
 
 attr_list_access_mode_t :: enum c.int {
@@ -73,6 +67,25 @@ foreign lib {
 		levely:     c.int,
 		tilew:      ^i32,
 		tileh:      ^i32) -> result_t ---
+	/** @brief Query the tile count for a particular level in the specified part.
+	 *
+	 * If the part is a tiled part, fills in the count for the
+	 * specified levels.
+	 *
+	 * Return `ERR_SUCCESS` on success, an error otherwise (i.e. if the part
+	 * is not tiled).
+	 *
+	 * It is valid to pass `NULL` to either of the @p countx or @p county
+	 * arguments, which enables testing if this part is a tiled part, or
+	 * if you don't need both for some reason.
+	 */
+	get_tile_counts :: proc(
+		ctxt:       const_context_t,
+		part_index: c.int,
+		levelx:     c.int,
+		levely:     c.int,
+		countx:     ^i32,
+		county:     ^i32) -> result_t ---
 
 	/** @brief Query the data sizes for a particular level in the specified part.
 	 *
@@ -107,6 +120,21 @@ foreign lib {
 	 * as well.
 	 */
 	get_chunk_count :: proc(ctxt: const_context_t, part_index: c.int, out: ^i32) -> result_t ---
+
+	/** Return a pointer to the chunk table and the count
+	 *
+	 * TODO: consider removing this prior to release once C++ fully converted
+	 */
+	get_chunk_table :: proc(ctxt: const_context_t, part_index: c.int, table: [^][^]u64, count: ^i32) -> result_t ---
+
+	/** Return whether the chunk table for this part is completely written.
+	 *
+	 * This only validates that all the offsets are valid.
+	 *
+	 * return EXR_ERR_INCOMPLETE_CHUNK_TABLE when incomplete, EXR_ERR_SUCCESS
+	 * if it appears ok, or another error if otherwise problematic
+	 */
+	exr_validate_chunk_table :: proc(ctxt: context_t, part_index: c.int) -> result_t ---
 
 	/** Return the number of scanlines chunks for this file part.
 	 *
@@ -303,10 +331,10 @@ foreign lib {
 		ctxt:       context_t,
 		part_index: c.int,
 		name:       cstring,
-		ptype:        pixel_type_t,
+		ptype:      pixel_type_t,
 		percept:    perceptual_treatment_t,
 		xsamp:      i32,
-		ysamp:      i32) -> c.int ---
+		ysamp:      i32) -> result_t ---
 
 	/** @brief Copy the channels from another source.
 	 *

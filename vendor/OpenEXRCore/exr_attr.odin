@@ -293,36 +293,37 @@ attr_opaquedata_t :: struct {
  * attributes.
  */
 attribute_type_t :: enum c.int {
-	UNKNOWN = 0,    // Type indicating an error or uninitialized attribute.
-	BOX2I,          // Integer region definition. @see attr_box2i_t.
-	BOX2F,          // Float region definition. @see attr_box2f_t.
-	CHLIST,         // Definition of channels in file @see chlist_entry.
-	CHROMATICITIES, // Values to specify color space of colors in file @see attr_chromaticities_t.
-	COMPRESSION,    // ``u8`` declaring compression present.
-	DOUBLE,         // Double precision floating point number.
-	ENVMAP,         // ``u8`` declaring environment map type.
-	FLOAT,          // Normal (4 byte) precision floating point number.
-	FLOAT_VECTOR,   // List of normal (4 byte) precision floating point numbers.
-	INT,            // 32-bit signed integer value.
-	KEYCODE,        // Struct recording keycode @see attr_keycode_t.
-	LINEORDER,      // ``u8`` declaring scanline ordering.
-	M33F,           // 9 32-bit floats representing a 3x3 matrix.
-	M33D,           // 9 64-bit floats representing a 3x3 matrix.
-	M44F,           // 16 32-bit floats representing a 4x4 matrix.
-	M44D,           // 16 64-bit floats representing a 4x4 matrix.
-	PREVIEW,        // 2 ``unsigned ints`` followed by 4 x w x h ``u8`` image.
-	RATIONAL,       // \c int followed by ``unsigned int``
-	STRING,         // ``int`` (length) followed by char string data.
-	STRING_VECTOR,  // 0 or more text strings (int + string). number is based on attribute size.
-	TILEDESC,       // 2 ``unsigned ints`` ``xSize``, ``ySize`` followed by mode.
-	TIMECODE,       // 2 ``unsigned ints`` time and flags, user data.
-	V2I,            // Pair of 32-bit integers.
-	V2F,            // Pair of 32-bit floats.
-	V2D,            // Pair of 64-bit floats.
-	V3I,            // Set of 3 32-bit integers.
-	V3F,            // Set of 3 32-bit floats.
-	V3D,            // Set of 3 64-bit floats.
-	OPAQUE,         // User/unknown provided type.
+	UNKNOWN = 0,      // Type indicating an error or uninitialized attribute.
+	BOX2I,            // Integer region definition. @see attr_box2i_t.
+	BOX2F,            // Float region definition. @see attr_box2f_t.
+	CHLIST,           // Definition of channels in file @see chlist_entry.
+	CHROMATICITIES,   // Values to specify color space of colors in file @see attr_chromaticities_t.
+	COMPRESSION,      // ``u8`` declaring compression present.
+	DOUBLE,           // Double precision floating point number.
+	ENVMAP,           // ``u8`` declaring environment map type.
+	FLOAT,            // Normal (4 byte) precision floating point number.
+	FLOAT_VECTOR,     // List of normal (4 byte) precision floating point numbers.
+	INT,              // 32-bit signed integer value.
+	KEYCODE,          // Struct recording keycode @see attr_keycode_t.
+	LINEORDER,        // ``u8`` declaring scanline ordering.
+	M33F,             // 9 32-bit floats representing a 3x3 matrix.
+	M33D,             // 9 64-bit floats representing a 3x3 matrix.
+	M44F,             // 16 32-bit floats representing a 4x4 matrix.
+	M44D,             // 16 64-bit floats representing a 4x4 matrix.
+	PREVIEW,          // 2 ``unsigned ints`` followed by 4 x w x h ``u8`` image.
+	RATIONAL,         // \c int followed by ``unsigned int``
+	STRING,           // ``int`` (length) followed by char string data.
+	STRING_VECTOR,    // 0 or more text strings (int + string). number is based on attribute size.
+	TILEDESC,         // 2 ``unsigned ints`` ``xSize``, ``ySize`` followed by mode.
+	TIMECODE,         // 2 ``unsigned ints`` time and flags, user data.
+	V2I,              // Pair of 32-bit integers.
+	V2F,              // Pair of 32-bit floats.
+	V2D,              // Pair of 64-bit floats.
+	V3I,              // Set of 3 32-bit integers.
+	V3F,              // Set of 3 32-bit floats.
+	V3D,              // Set of 3 64-bit floats.
+	DEEP_IMAGE_STATE, // ``uint8_t`` declaring deep image state.
+	OPAQUE,           // User/unknown provided type.
 }
 
 /** @brief Storage, name and type information for an attribute.
