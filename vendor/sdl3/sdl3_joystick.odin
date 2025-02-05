@@ -85,8 +85,8 @@ VirtualJoystickDesc :: struct {
 	                             e.g. (1 << SDL_GAMEPAD_AXIS_LEFTX) */
 
 	name:      cstring,                          /**< the name of the joystick */
-	touchpads: [^]VirtualJoystickTouchpadDesc,   /**< A pointer to an array of touchpad descriptions, required if `ntouchpads` is > 0 */
-	sensors:   [^]VirtualJoystickSensorDesc,     /**< A pointer to an array of sensor descriptions, required if `nsensors` is > 0 */
+	touchpads: [^]VirtualJoystickTouchpadDesc `fmt:"v,ntouchpads"`,   /**< A pointer to an array of touchpad descriptions, required if `ntouchpads` is > 0 */
+	sensors:   [^]VirtualJoystickSensorDesc   `fmt:"v,nsensors"`,     /**< A pointer to an array of sensor descriptions, required if `nsensors` is > 0 */
 
 	userdata:          rawptr,                                                                                   /**< User data pointer passed to callbacks */
 	Update:            proc "c" (userdata: rawptr),                                                              /**< Called when the joystick state should be updated */

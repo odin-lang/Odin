@@ -34,20 +34,20 @@ hid_bus_type :: enum c.int {
 
 hid_device_info :: struct {
 	/** Platform-specific device path */
-	path: [^]c.char,
+	path: [^]c.char `fmt:"q,0"`,
 	/** Device Vendor ID */
 	vendor_id: c.ushort,
 	/** Device Product ID */
 	product_id: c.ushort,
 	/** Serial Number */
-	serial_number: [^]c.wchar_t,
+	serial_number: [^]c.wchar_t `fmt:"q,0"`,
 	/** Device Release Number in binary-coded decimal,
 	also known as Device Version Number */
 	release_number: c.ushort,
 	/** Manufacturer String */
-	manufacturer_string: [^]c.wchar_t,
+	manufacturer_string: [^]c.wchar_t `fmt:"q,0"`,
 	/** Product string */
-	product_string: [^]c.wchar_t,
+	product_string: [^]c.wchar_t `fmt:"q,0"`,
 	/** Usage Page for this Device/Interface
 	(Windows/Mac/hidraw only) */
 	usage_page: c.ushort,

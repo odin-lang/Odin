@@ -523,17 +523,17 @@ Color  :: distinct [4]Uint8
 FColor :: distinct [4]f32
 
 Palette :: struct {
-	ncolors:  c.int,    /**< number of elements in `colors`. */
-	colors:   [^]Color, /**< an array of colors, `ncolors` long. */
-	version:  Uint32,   /**< internal use only, do not touch. */
-	refcount: c.int,    /**< internal use only, do not touch. */
+	ncolors:  c.int,                      /**< number of elements in `colors`. */
+	colors:   [^]Color `fmt:"v,ncolors"`, /**< an array of colors, `ncolors` long. */
+	version:  Uint32,                     /**< internal use only, do not touch. */
+	refcount: c.int,                      /**< internal use only, do not touch. */
 }
 
 PixelFormatDetails :: struct {
 	format:          PixelFormat,
 	bits_per_pixel:  Uint8,
 	bytes_per_pixel: Uint8,
-	padding:         [2]Uint8,
+	_:               [2]Uint8,
 	Rmask:           Uint32,
 	Gmask:           Uint32,
 	Bmask:           Uint32,
