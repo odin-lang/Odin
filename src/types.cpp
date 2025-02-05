@@ -1801,6 +1801,27 @@ gb_internal bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 }
 
 
+enum TypeEndianKind {
+	TypeEndian_Platform,
+	TypeEndian_Little,
+	TypeEndian_Big,
+};
+
+gb_internal TypeEndianKind type_endian_kind_of(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		if (t->Basic.flags & BasicFlag_EndianLittle) {
+			return TypeEndian_Little;
+		}
+		if (t->Basic.flags & BasicFlag_EndianBig) {
+			return TypeEndian_Big;
+		}
+	} else if (t->kind == Type_BitSet) {
+		return type_endian_kind_of(bit_set_to_int(t));
+	}
+	return TypeEndian_Platform;
+}
+
 
 gb_internal bool is_type_endian_big(Type *t) {
 	t = core_type(t);

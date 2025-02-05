@@ -3649,7 +3649,8 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 				gb_string_free(oper_str);
 				gb_string_free(to_type);
 			} else if (is_type_integer(src_t) && is_type_integer(dst_t) &&
-			           types_have_same_internal_endian(src_t, dst_t)) {
+			           types_have_same_internal_endian(src_t, dst_t) &&
+			           type_endian_kind_of(src_t) == type_endian_kind_of(dst_t)) {
 				gbString oper_type = type_to_string(src_t);
 				gbString to_type   = type_to_string(dst_t);
 				error(o->expr, "Use of 'transmute' where 'cast' would be preferred since both are integers of the same endianness, from '%s' to '%s'", oper_type, to_type);
