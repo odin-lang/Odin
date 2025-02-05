@@ -532,9 +532,9 @@ gb_internal void report_os_info() {
 			return;
 		}
 
-		uint32_t major, minor, patch;
+		uint32_t major, minor, patch = 0;
 
-		if (sscanf(cast(const char *)sw_vers, "%u.%u.%u", &major, &minor, &patch) != 3) {
+		if (sscanf(cast(const char *)sw_vers, "%u.%u.%u", &major, &minor, &patch) < 1) {
 			gb_printf("macOS Unknown\n");
 			return;
 		}
