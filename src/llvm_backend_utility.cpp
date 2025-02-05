@@ -771,9 +771,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 			auto args = array_make<lbValue>(permanent_allocator(), arg_count);
 			args[0] = ok;
 
-			args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
-			args[2] = lb_const_int(m, t_i32, pos.line);
-			args[3] = lb_const_int(m, t_i32, pos.column);
+			lb_set_file_line_col(p, array_slice(args, 1, args.count), pos);
 
 			if (!build_context.no_rtti) {
 				args[4] = lb_typeid(m, src_type);
@@ -847,9 +845,7 @@ gb_internal lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *ty
 			auto args = array_make<lbValue>(permanent_allocator(), arg_count);
 			args[0] = ok;
 
-			args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
-			args[2] = lb_const_int(m, t_i32, pos.line);
-			args[3] = lb_const_int(m, t_i32, pos.column);
+			lb_set_file_line_col(p, array_slice(args, 1, args.count), pos);
 
 			if (!build_context.no_rtti) {
 				args[4] = any_typeid;
