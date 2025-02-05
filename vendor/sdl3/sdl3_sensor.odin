@@ -19,7 +19,7 @@ SensorType :: enum c.int {
 	GYRO_R,          /**< Gyroscope for right Joy-Con controller */
 }
 
-@(default_calling_convention="c", link_prefix="SDL_")
+@(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	GetSensors                    :: proc(count: ^c.int) -> [^]SensorID ---
 	GetSensorNameForID            :: proc(instance_id: SensorID) -> cstring ---

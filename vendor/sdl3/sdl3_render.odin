@@ -132,7 +132,6 @@ DEBUG_TEXT_FONT_CHARACTER_SIZE :: 8
 foreign lib {
 	GetNumRenderDrivers              :: proc() -> c.int ---
 	GetRenderDriver                  :: proc(index: c.int) -> cstring ---
-	CreateWindowAndRenderer          :: proc(title: cstring, width, height: c.int, window_flags: WindowFlags, window: ^^Window, renderer: ^^Renderer) -> bool ---
 	CreateRenderer                   :: proc(window: ^Window, name: cstring) -> ^Renderer ---
 	CreateRendererWithProperties     :: proc(props: PropertiesID) -> ^Renderer ---
 	CreateSoftwareRenderer           :: proc(surface: ^Surface) -> ^Renderer ---
@@ -140,13 +139,24 @@ foreign lib {
 	GetRenderWindow                  :: proc(renderer: ^Renderer) -> ^Window ---
 	GetRendererName                  :: proc(renderer: ^Renderer) -> cstring ---
 	GetRendererProperties            :: proc(renderer: ^Renderer) -> PropertiesID ---
-	GetRenderOutputSize              :: proc(renderer: ^Renderer, w, h: ^c.int) -> bool ---
-	GetCurrentRenderOutputSize       :: proc(renderer: ^Renderer, w, h: ^c.int) -> bool ---
 	CreateTexture                    :: proc(renderer: ^Renderer, format: PixelFormat, access: TextureAccess, w, h: c.int) -> ^Texture ---
 	CreateTextureFromSurface         :: proc(renderer: ^Renderer, surface: ^Surface) -> ^Texture ---
 	CreateTextureWithProperties      :: proc(renderer: ^Renderer, props: PropertiesID) -> ^Texture ---
 	GetTextureProperties             :: proc(texture: ^Texture) -> PropertiesID ---
 	GetRendererFromTexture           :: proc(texture: ^Texture) -> ^Renderer ---
+	GetRenderTarget                  :: proc(renderer: ^Renderer) -> ^Texture ---
+	RenderViewportSet                :: proc(renderer: ^Renderer) -> bool ---
+	RenderClipEnabled                :: proc(renderer: ^Renderer) -> bool ---
+	RenderReadPixels                 :: proc(renderer: ^Renderer, #by_ptr rect: Rect) -> ^Surface ---
+	GetRenderMetalLayer              :: proc(renderer: ^Renderer) -> rawptr ---
+	GetRenderMetalCommandEncoder     :: proc(renderer: ^Renderer) -> rawptr ---
+}
+
+@(default_calling_convention="c", link_prefix="SDL_")
+foreign lib {
+	CreateWindowAndRenderer          :: proc(title: cstring, width, height: c.int, window_flags: WindowFlags, window: ^^Window, renderer: ^^Renderer) -> bool ---
+	GetRenderOutputSize              :: proc(renderer: ^Renderer, w, h: ^c.int) -> bool ---
+	GetCurrentRenderOutputSize       :: proc(renderer: ^Renderer, w, h: ^c.int) -> bool ---
 	GetTextureSize                   :: proc(texture: ^Texture, w, h: ^f32) -> bool ---
 	SetTextureColorMod               :: proc(texture: ^Texture, r, g, b: Uint8) -> bool ---
 	SetTextureColorModFloat          :: proc(texture: ^Texture, r, g, b: f32) -> bool ---
@@ -167,7 +177,6 @@ foreign lib {
 	LockTextureToSurface             :: proc(texture: ^Texture, #by_ptr rect: Rect, surface: ^^Surface) -> bool ---
 	UnlockTexture                    :: proc(texture: ^Texture) ---
 	SetRenderTarget                  :: proc(renderer: ^Renderer, texture: ^Texture) -> bool ---
-	GetRenderTarget                  :: proc(renderer: ^Renderer) -> ^Texture ---
 	SetRenderLogicalPresentation     :: proc(renderer: ^Renderer, w, h: c.int, mode: RendererLogicalPresentation) -> bool ---
 	GetRenderLogicalPresentation     :: proc(renderer: ^Renderer, w, h: ^c.int, mode: ^RendererLogicalPresentation) -> bool ---
 	GetRenderLogicalPresentationRect :: proc(renderer: ^Renderer, rect: ^FRect) -> bool ---
@@ -176,11 +185,9 @@ foreign lib {
 	ConvertEventToRenderCoordinates  :: proc(renderer: ^Renderer, event: ^Event) -> bool ---
 	SetRenderViewport                :: proc(renderer: ^Renderer, #by_ptr rect: Rect) -> bool ---
 	GetRenderViewport                :: proc(renderer: ^Renderer, rect: ^Rect) -> bool ---
-	RenderViewportSet                :: proc(renderer: ^Renderer) -> bool ---
 	GetRenderSafeArea                :: proc(renderer: ^Renderer, rect: ^Rect) -> bool ---
 	SetRenderClipRect                :: proc(renderer: ^Renderer, #by_ptr rect: Rect) -> bool ---
 	GetRenderClipRect                :: proc(renderer: ^Renderer, rect: ^Rect) -> bool ---
-	RenderClipEnabled                :: proc(renderer: ^Renderer) -> bool ---
 	SetRenderScale                   :: proc(renderer: ^Renderer, scaleX, scaleY: f32) -> bool ---
 	GetRenderScale                   :: proc(renderer: ^Renderer, scaleX, scaleY: ^f32) -> bool ---
 	SetRenderDrawColor               :: proc(renderer: ^Renderer, r, g, b, a: Uint8) -> bool ---
@@ -207,13 +214,10 @@ foreign lib {
 	RenderTexture9Grid               :: proc(renderer: ^Renderer, texture: ^Texture, #by_ptr srcrect: FRect, left_width, right_width, top_height, bottom_height: f32, scale: f32, #by_ptr dstrect: FRect) -> bool ---
 	RenderGeometry                   :: proc(renderer: ^Renderer, texture: ^Texture, vertices: [^]Vertex, num_vertices: c.int, indices: [^]c.int, num_indices: c.int) -> bool ---
 	RenderGeometryRaw                :: proc(renderer: ^Renderer, texture: ^Texture, xy: [^]f32, xy_stride: c.int, color: [^]FColor, color_stride: c.int, uv: [^]f32, uv_stride: c.int, num_vertices: c.int, indices: rawptr, num_indices: c.int, size_indices: c.int) -> bool ---
-	RenderReadPixels                 :: proc(renderer: ^Renderer, #by_ptr rect: Rect) -> ^Surface ---
 	RenderPresent                    :: proc(renderer: ^Renderer) -> bool ---
 	DestroyTexture                   :: proc(texture: ^Texture) ---
 	DestroyRenderer                  :: proc(renderer: ^Renderer) ---
 	FlushRenderer                    :: proc(renderer: ^Renderer) -> bool ---
-	GetRenderMetalLayer              :: proc(renderer: ^Renderer) -> rawptr ---
-	GetRenderMetalCommandEncoder     :: proc(renderer: ^Renderer) -> rawptr ---
 	AddVulkanRenderSemaphores        :: proc(renderer: ^Renderer, wait_stage_mask: Uint32 , wait_semaphore, signal_semaphore: Sint64) -> bool ---
 	SetRenderVSync                   :: proc(renderer: ^Renderer, vsync: c.int) -> bool ---
 	GetRenderVSync                   :: proc(renderer: ^Renderer, vsync: ^c.int) -> bool ---
