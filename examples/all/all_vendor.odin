@@ -19,7 +19,6 @@ import IMG        "vendor:sdl2/image"
 import MIX        "vendor:sdl2/mixer"
 import TTF        "vendor:sdl2/ttf"
 
-
 import vk         "vendor:vulkan"
 
 // NOTE(bill): only one can be checked at a time
