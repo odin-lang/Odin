@@ -865,7 +865,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 				error(ident, "Undeclared name: %.*s", LIT(name));
 			}
 		} else if (found->kind != Entity_LibraryName) {
-			error(ident, "'%.*s' cannot be used as a library name %d", LIT(name), found->kind);
+			error(ident, "'%.*s' cannot be used as a library name", LIT(name));
 		} else {
 			// TODO(bill): Extra stuff to do with library names?
 			*foreign_library = found;
