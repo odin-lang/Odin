@@ -810,7 +810,7 @@ foreign lib {
 	PushGPUVertexUniformData              :: proc(command_buffer: ^GPUCommandBuffer, slot_index: Uint32, data: rawptr, length: Uint32) ---
 	PushGPUFragmentUniformData            :: proc(command_buffer: ^GPUCommandBuffer, slot_index: Uint32, data: rawptr, length: Uint32) ---
 	PushGPUComputeUniformData             :: proc(command_buffer: ^GPUCommandBuffer, slot_index: Uint32, data: rawptr, length: Uint32) ---
-	BeginGPURenderPass                    :: proc(command_buffer: ^GPUCommandBuffer, color_target_infos: [^]GPUColorTargetInfo, num_color_targets: Uint32, #by_ptr depth_stencil_target_info: GPUDepthStencilTargetInfo) -> ^GPURenderPass ---
+	BeginGPURenderPass                    :: proc(command_buffer: ^GPUCommandBuffer, color_target_infos: [^]GPUColorTargetInfo, num_color_targets: Uint32, depth_stencil_target_info: Maybe(^GPUDepthStencilTargetInfo)) -> ^GPURenderPass ---
 	BindGPUGraphicsPipeline               :: proc(render_pass: ^GPURenderPass, graphics_pipeline: ^GPUGraphicsPipeline) ---
 	SetGPUViewport                        :: proc(render_pass: ^GPURenderPass, #by_ptr viewport: GPUViewport) ---
 	SetGPUScissor                         :: proc(render_pass: ^GPURenderPass, #by_ptr scissor: Rect) ---
