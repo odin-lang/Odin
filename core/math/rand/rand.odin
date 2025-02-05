@@ -468,7 +468,7 @@ Example:
 Possible Output:
 
 	15.312
-	673.130
+	273.130
 
 */
 @(require_results) float32_range :: proc(low, high: f32, gen := context.random_generator) -> (val: f32) {
