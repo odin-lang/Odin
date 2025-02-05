@@ -2174,7 +2174,35 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			case 128: return lb_emit_runtime_call(p, "abs_complex128", args);
 			}
 			GB_PANIC("Unknown complex type");
+		} else if (is_type_float(t)) {
+			Type *t_float;
+			Type *t_unsigned;
+			lbValue mask;
+			switch (type_size_of(t)) {
+			case 2:
+				t_float = t_f16;
+				t_unsigned = t_u16;
+				mask = lb_const_int(p->module, t_unsigned, 0x7FFF);
+				break;
+			case 4:
+				t_float = t_f32;
+				t_unsigned = t_u32;
+				mask = lb_const_int(p->module, t_unsigned, 0x7FFFFFFF);
+				break;
+			case 8:
+				t_float = t_f64;
+				t_unsigned = t_u64;
+				mask = lb_const_int(p->module, t_unsigned, 0x7FFFFFFFFFFFFFFF);
+				break;
+			default:
+				GB_PANIC("abs: unhandled float size");
+			}
+
+			lbValue as_unsigned = lb_emit_transmute(p, x, t_unsigned);
+			lbValue abs = lb_emit_arith(p, Token_And, as_unsigned, mask, t_unsigned);
+			return lb_emit_transmute(p, abs, t_float);
 		}
+
 		lbValue zero = lb_const_nil(p->module, t);
 		lbValue cond = lb_emit_comp(p, Token_Lt, x, zero);
 		lbValue neg = lb_emit_unary_arith(p, Token_Sub, x, t);
