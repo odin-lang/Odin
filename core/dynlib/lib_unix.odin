@@ -13,6 +13,8 @@ _load_library :: proc(path: string, global_symbols: bool, allocator: runtime.All
 	flags := posix.RTLD_Flags{.NOW}
 	if global_symbols {
 		flags += {.GLOBAL}
+	} else {
+		flags += posix.RTLD_LOCAL
 	}
 
 	cpath := strings.clone_to_cstring(path, allocator)
