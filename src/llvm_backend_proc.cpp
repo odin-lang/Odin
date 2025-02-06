@@ -2175,9 +2175,9 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			}
 			GB_PANIC("Unknown complex type");
 		} else if (is_type_float(t)) {
-			Type *t_float;
-			Type *t_unsigned;
-			lbValue mask;
+			Type *t_float = nullptr;
+			Type *t_unsigned = nullptr;
+			lbValue mask = {0};
 			switch (type_size_of(t)) {
 			case 2:
 				t_float = t_f16;
