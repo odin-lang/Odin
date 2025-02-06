@@ -29,7 +29,7 @@ ArcadeStickButtons_Flag :: enum c.int {
 	Action5  = 10,
 	Action6  = 11,
 	Special1 = 12,
-	Special2 = 13
+	Special2 = 13,
 }
 ArcadeStickButtons :: distinct bit_set[ArcadeStickButtons_Flag; c.int]
 
@@ -38,7 +38,7 @@ BatteryStatus :: enum c.int {
 	NotPresent  = 0,
 	Discharging = 1,
 	Idle        = 2,
-	Charging    = 3
+	Charging    = 3,
 }
 
 DeviceCapabilities_Flag :: enum c.int {
@@ -46,7 +46,7 @@ DeviceCapabilities_Flag :: enum c.int {
 	PluginModule    = 1,
 	PowerOff        = 2,
 	Synchronization = 3,
-	Wireless        = 4
+	Wireless        = 4,
 }
 DeviceCapabilities :: distinct bit_set[DeviceCapabilities_Flag; c.int]
 
@@ -56,7 +56,7 @@ DeviceFamily :: enum c.int {
 	XboxOne   = 1,
 	Xbox360   = 2,
 	Hid       = 3,
-	I8042     = 4
+	I8042     = 4,
 }
 
 DeviceStatus_Flag :: enum c.int {
@@ -75,7 +75,7 @@ DeviceStatus :: distinct bit_set[DeviceStatus_Flag; c.int]
 EnumerationKind :: enum c.int {
 	NoEnumeration       = 0,
 	AsyncEnumeration    = 1,
-	BlockingEnumeration = 2
+	BlockingEnumeration = 2,
 }
 
 FeedbackAxes_Flag :: enum c.int {
@@ -85,14 +85,14 @@ FeedbackAxes_Flag :: enum c.int {
 	AngularX = 3,
 	AngularY = 4,
 	AngularZ = 5,
-	Normal   = 6
+	Normal   = 6,
 }
 FeedbackAxes :: distinct bit_set[FeedbackAxes_Flag; c.int]
 
 FeedbackEffectState :: enum c.int {
 	Stopped = 0,
 	Running = 1,
-	Paused  = 2
+	Paused  = 2,
 }
 
 FlightStickButtons_Flag :: enum c.int {
@@ -100,7 +100,7 @@ FlightStickButtons_Flag :: enum c.int {
 	Menu          = 1,
 	View          = 2,
 	FirePrimary   = 3,
-	FireSecondary = 4
+	FireSecondary = 4,
 }
 FlightStickButtons :: distinct bit_set[FlightStickButtons_Flag; c.int]
 
@@ -110,7 +110,7 @@ FocusPolicy_Flag :: enum c.int {
 	DisableBackgroundGuideButton   = 2,
 	ExclusiveForegroundGuideButton = 3,
 	DisableBackgroundShareButton   = 4,
-	ExclusiveForegroundShareButton = 5
+	ExclusiveForegroundShareButton = 5,
 }
 FocusPolicy :: distinct bit_set[FocusPolicy_Flag; c.int]
 
@@ -125,7 +125,7 @@ ForceFeedbackEffectKind :: enum c.int {
 	Spring           = 7,
 	Friction         = 8,
 	Damper           = 9,
-	Inertia          = 10
+	Inertia          = 10,
 }
 
 GamepadButtons_Flag :: enum c.int {
@@ -142,7 +142,7 @@ GamepadButtons_Flag :: enum c.int {
 	LeftShoulder    = 10,
 	RightShoulder   = 11,
 	LeftThumbstick  = 12,
-	RightThumbstick = 13
+	RightThumbstick = 13,
 }
 GamepadButtons :: distinct bit_set[GamepadButtons_Flag; c.int]
 
@@ -152,7 +152,7 @@ KeyboardKind :: enum c.int {
 	IsoKeyboard     = 1,
 	KsKeyboard      = 2,
 	AbntKeyboard    = 3,
-	JisKeyboard     = 4
+	JisKeyboard     = 4,
 }
 
 Kind_Flag :: enum c.int {
@@ -168,7 +168,7 @@ Kind_Flag :: enum c.int {
 	FlightStick      = 17,
 	Gamepad          = 18,
 	RacingWheel      = 19,
-	UiNavigation     = 20
+	UiNavigation     = 20,
 }
 Kind :: distinct bit_set[Kind_Flag; c.int]
 Kind_Controller : Kind : { .ControllerAxis, .ControllerButton, .ControllerSwitch }
@@ -298,7 +298,7 @@ Label :: enum c.int {
 	P1                       = 121,
 	P2                       = 122,
 	P3                       = 123,
-	P4                       = 124
+	P4                       = 124,
 }
 
 Location :: enum c.int {
@@ -309,7 +309,7 @@ Location :: enum c.int {
 	Button   = 3,
 	Switch   = 4,
 	Key      = 5,
-	TouchPad = 6
+	TouchPad = 6,
 }
 
 MotionAccuracy :: enum c.int {
@@ -317,7 +317,7 @@ MotionAccuracy :: enum c.int {
 	Unavailable     = 0,
 	Unreliable      = 1,
 	Approximate     = 2,
-	Accurate        = 3
+	Accurate        = 3,
 }
 
 MouseButtons_Flag :: enum c.int {
@@ -327,7 +327,7 @@ MouseButtons_Flag :: enum c.int {
 	Button4        = 3,
 	Button5        = 4,
 	WheelTiltLeft  = 5,
-	WheelTiltRight = 6
+	WheelTiltRight = 6,
 }
 MouseButtons :: distinct bit_set[MouseButtons_Flag; c.int]
 
@@ -339,7 +339,7 @@ RacingWheelButtons_Flag :: enum c.int {
 	DpadUp       = 4,
 	DpadDown     = 5,
 	DpadLeft     = 6,
-	DpadRight    = 7
+	DpadRight    = 7,
 }
 RacingWheelButtons :: distinct bit_set[RacingWheelButtons_Flag; c.int]
 
@@ -351,7 +351,7 @@ RawDeviceItemCollectionKind :: enum c.int {
 	ReportItemCollection        = 3,
 	NamedArrayItemCollection    = 4,
 	UsageSwitchItemCollection   = 5,
-	UsageModifierItemCollection = 6
+	UsageModifierItemCollection = 6,
 }
 
 RawDevicePhysicalUnitKind :: enum c.int {
@@ -380,7 +380,7 @@ RawDevicePhysicalUnitKind :: enum c.int {
 	Temperature         = 21,
 	LuminousIntensity   = 22,
 	LuminousFlux        = 23,
-	Illuminance         = 24
+	Illuminance         = 24,
 }
 
 RawDeviceReportItemFlag :: enum c.int {
@@ -392,21 +392,21 @@ RawDeviceReportItemFlag :: enum c.int {
 	StableItem     = 5,
 	NullableItem   = 6,
 	VolatileItem   = 7,
-	BufferedItem   = 8
+	BufferedItem   = 8,
 }
 RawDeviceReportItemFlags :: distinct bit_set[RawDeviceReportItemFlag; c.int]
 
 RawDeviceReportKind :: enum c.int {
 	InputReport   = 0,
 	OutputReport  = 1,
-	FeatureReport = 2
+	FeatureReport = 2,
 }
 
 RumbleMotors_Flag :: enum c.int {
 	LowFrequency  = 0,
 	HighFrequency = 1,
 	LeftTrigger   = 2,
-	RightTrigger  = 3
+	RightTrigger  = 3,
 }
 RumbleMotors :: distinct bit_set[RumbleMotors_Flag; c.int]
 
@@ -414,7 +414,7 @@ SwitchKind :: enum c.int {
 	UnknownSwitchKind = -1,
 	TwoWaySwitch      = 0,
 	FourWaySwitch     = 1,
-	EightWaySwitch    = 2
+	EightWaySwitch    = 2,
 }
 
 SwitchPosition :: enum c.int {
@@ -426,12 +426,12 @@ SwitchPosition :: enum c.int {
 	Down      = 5,
 	DownLeft  = 6,
 	Left      = 7,
-	UpLeft    = 8
+	UpLeft    = 8,
 }
 
 SystemButtons_Flag :: enum c.int {
 	Guide = 0,
-	Share = 1 
+	Share = 1 ,
 }
 SystemButtons :: distinct bit_set[SystemButtons_Flag; c.int]
 
@@ -443,7 +443,7 @@ TouchShape :: enum c.int {
 	Shape1DIrregular   = 3,
 	Shape2DRectangular = 4,
 	Shape2DElliptical  = 5,
-	Shape2DIrregular   = 6
+	Shape2DIrregular   = 6,
 }
 
 UiNavigationButtons_Flag :: enum c.int {
@@ -466,7 +466,7 @@ UiNavigationButtons_Flag :: enum c.int {
 	ScrollUp    = 16,
 	ScrollDown  = 17,
 	ScrollLeft  = 18,
-	ScrollRight = 19
+	ScrollRight = 19,
 }
 UiNavigationButtons :: distinct bit_set[UiNavigationButtons_Flag; c.int]
 
@@ -676,7 +676,7 @@ ForceFeedbackParams :: struct {
 		friction: ForceFeedbackConditionParams,
 		damper: ForceFeedbackConditionParams,
 		inertia: ForceFeedbackConditionParams,
-	}
+	},
 }
 
 ForceFeedbackPeriodicParams :: struct {
