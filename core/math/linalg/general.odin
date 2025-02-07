@@ -204,6 +204,39 @@ identity :: proc{
 
 transpose :: intrinsics.transpose
 
+
+@(require_results)
+exchange_matrix :: proc "contextless" ($T: typeid/matrix[$N, N]$E) -> T #no_bounds_check {
+	ret : matrix[N, N]E
+	for i in 0..<N {
+		ret[N-i-1][i] = E(1)
+	}
+	return ret
+}
+
+flip_matrix :: exchange_matrix
+reversal_matrix :: exchange_matrix
+
+@(require_results)
+column_order_reversed :: proc (x: $M/matrix[$N, N]$T) -> M #no_bounds_check {
+	return x * exchange_matrix(M)
+}
+
+@(require_results)
+row_order_reversed :: proc (x: $M/matrix[$N, N]$T) -> M #no_bounds_check {
+	return exchange_matrix(M) * x
+}
+
+@(require_results)
+rotate_90_degrees_clockwise :: proc (x: $M/matrix[$N, N]$T) -> M #no_bounds_check {
+	return column_order_reversed(transpose(x))
+}
+
+@(require_results)
+rotate_90_degrees_counter_clockwise :: proc (x: $M/matrix[$N, N]$T) -> M #no_bounds_check {
+	return transpose(column_order_reversed(x))
+}
+
 @(require_results)
 matrix_mul :: proc "contextless" (a, b: $M/matrix[$N, N]$E) -> (c: M)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
