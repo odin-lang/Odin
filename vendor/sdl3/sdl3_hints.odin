@@ -260,5 +260,5 @@ foreign lib {
 	ResetHint           :: proc(name: cstring) -> bool ---
 	ResetHints          :: proc() ---
 	AddHintCallback     :: proc(name: cstring, callback: HintCallback, userdata: rawptr) -> bool ---
-	RemoveHintCallback  :: proc(name: cstring, callback: HintCallback. userdata: rawptr) ---
+	RemoveHintCallback  :: proc(name: cstring, callback: HintCallback, userdata: rawptr) ---
 }
