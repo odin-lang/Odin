@@ -5544,6 +5544,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			// NOTE(bill): Is this even correct?
 			new_type->Union.node = operand->expr;
 			new_type->Union.scope = bt->Union.scope;
+			if (bt->Union.kind == UnionType_no_nil) {
+				new_type->Union.kind = UnionType_no_nil;
+			}
 
 			operand->type = new_type;
 		}
