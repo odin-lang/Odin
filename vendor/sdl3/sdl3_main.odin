@@ -17,5 +17,4 @@ foreign lib {
 	RegisterApp           :: proc(name: cstring, style: Uint32, hInst: rawptr) -> bool ---
 	UnregisterApp         :: proc() ---
 	GDKSuspendComplete    :: proc() ---
-
 }
