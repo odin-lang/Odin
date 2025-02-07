@@ -15,7 +15,6 @@ gb_global isize lb_global_type_info_member_offsets_index = 0;
 gb_global isize lb_global_type_info_member_usings_index  = 0;
 gb_global isize lb_global_type_info_member_tags_index    = 0;
 
-
 gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	m->info = &c->info;
 
@@ -540,6 +539,22 @@ gb_internal lbValue lb_build_addr_ptr(lbProcedure *p, Ast *expr) {
 	return lb_addr_get_ptr(p, addr);
 }
 
+gb_internal void lb_set_file_line_col(lbProcedure *p, Array<lbValue> arr, TokenPos pos) {
+	String file = get_file_path_string(pos.file_id);
+	i32 line    = pos.line;
+	i32 col     = pos.column;
+
+	if (build_context.obfuscate_source_code_locations) {
+		file = obfuscate_string(file, "F");
+		line = obfuscate_i32(line);
+		col  = obfuscate_i32(col);
+	}
+
+	arr[0] = lb_find_or_add_entity_string(p->module, file);
+	arr[1] = lb_const_int(p->module, t_i32, line);
+	arr[2] = lb_const_int(p->module, t_i32, col);
+}
+
 gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue len) {
 	if (build_context.no_bounds_check) {
 		return;
@@ -553,14 +568,8 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 	index = lb_emit_conv(p, index, t_int);
 	len = lb_emit_conv(p, len, t_int);
 
-	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
-	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
-	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
-
 	auto args = array_make<lbValue>(temporary_allocator(), 5);
-	args[0] = file;
-	args[1] = line;
-	args[2] = column;
+	lb_set_file_line_col(p, args, token.pos);
 	args[3] = index;
 	args[4] = len;
 
@@ -582,14 +591,8 @@ gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValu
 	row_count = lb_emit_conv(p, row_count, t_int);
 	column_count = lb_emit_conv(p, column_count, t_int);
 
-	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
-	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
-	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
-
 	auto args = array_make<lbValue>(temporary_allocator(), 7);
-	args[0] = file;
-	args[1] = line;
-	args[2] = column;
+	lb_set_file_line_col(p, args, token.pos);
 	args[3] = row_index;
 	args[4] = column_index;
 	args[5] = row_count;
@@ -610,14 +613,8 @@ gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token 
 	low = lb_emit_conv(p, low, t_int);
 	high = lb_emit_conv(p, high, t_int);
 
-	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
-	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
-	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
-
 	auto args = array_make<lbValue>(permanent_allocator(), 5);
-	args[0] = file;
-	args[1] = line;
-	args[2] = column;
+	lb_set_file_line_col(p, args, token.pos);
 	args[3] = low;
 	args[4] = high;
 
@@ -632,16 +629,11 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		return;
 	}
 
-	lbValue file = lb_find_or_add_entity_string(p->module, get_file_path_string(token.pos.file_id));
-	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
-	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
 	high = lb_emit_conv(p, high, t_int);
 
 	if (!lower_value_used) {
 		auto args = array_make<lbValue>(permanent_allocator(), 5);
-		args[0] = file;
-		args[1] = line;
-		args[2] = column;
+		lb_set_file_line_col(p, args, token.pos);
 		args[3] = high;
 		args[4] = len;
 
@@ -651,9 +643,7 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		low  = lb_emit_conv(p, low, t_int);
 
 		auto args = array_make<lbValue>(permanent_allocator(), 6);
-		args[0] = file;
-		args[1] = line;
-		args[2] = column;
+		lb_set_file_line_col(p, args, token.pos);
 		args[3] = low;
 		args[4] = high;
 		args[5] = len;

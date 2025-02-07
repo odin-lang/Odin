@@ -3364,9 +3364,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					auto args = array_make<lbValue>(permanent_allocator(), arg_count);
 					args[0] = ok;
 
-					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
-					args[2] = lb_const_int(p->module, t_i32, pos.line);
-					args[3] = lb_const_int(p->module, t_i32, pos.column);
+					lb_set_file_line_col(p, array_slice(args, 1, args.count), pos);
 
 					if (!build_context.no_rtti) {
 						args[4] = lb_typeid(p->module, src_type);
@@ -3393,9 +3391,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					auto args = array_make<lbValue>(permanent_allocator(), 6);
 					args[0] = ok;
 
-					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
-					args[2] = lb_const_int(p->module, t_i32, pos.line);
-					args[3] = lb_const_int(p->module, t_i32, pos.column);
+					lb_set_file_line_col(p, array_slice(args, 1, args.count), pos);
 
 					args[4] = any_id;
 					args[5] = id;

@@ -1031,14 +1031,17 @@ Returns:
 */
 @private
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
+	m: int
 	if sep == "" {
-		res = s[:]
-		ok = true
-		s^ = s[len(s):]
-		return
+		if len(s) == 0 {
+			m = -1
+		} else {
+			_, w := utf8.decode_rune_in_string(s^)
+			m = w
+		}
+	} else {
+		m = index(s^, sep)
 	}
-
-	m := index(s^, sep)
 	if m < 0 {
 		// not found
 		res = s[:]
