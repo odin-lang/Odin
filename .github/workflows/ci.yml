@@ -32,6 +32,8 @@ jobs:
           gmake -C vendor/miniaudio/src
           ./odin check examples/all -vet -strict-style -disallow-do -target:netbsd_amd64
           ./odin check examples/all -vet -strict-style -disallow-do -target:netbsd_arm64
+          ./odin check vendor/sdl3  -vet -strict-style -disallow-do -target:netbsd_amd64 -no-entry-point
+          ./odin check vendor/sdl3  -vet -strict-style -disallow-do -target:netbsd_arm64 -no-entry-point
           ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/core/speed.odin -file -all-packages -vet -strict-style -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
@@ -62,6 +64,7 @@ jobs:
           gmake -C vendor/cgltf/src
           gmake -C vendor/miniaudio/src
           ./odin check examples/all -vet -strict-style -disallow-do -target:freebsd_amd64
+          ./odin check vendor/sdl3  -vet -strict-style -disallow-do -target:freebsd_amd64 -no-entry-point
           ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/core/speed.odin -file -all-packages -vet -strict-style -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
@@ -117,7 +120,9 @@ jobs:
       - name: Odin run -debug
         run: ./odin run examples/demo -debug
       - name: Odin check examples/all
-        run: ./odin check examples/all -strict-style
+        run: ./odin check examples/all -strict-style -vet -disallow-do
+      - name: Odin check vendor/sdl3
+        run: ./odin check vendor/sdl3  -strict-style -vet -disallow-do -no-entry-point
       - name: Normal Core library tests
         run: ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
       - name: Optimized Core library tests
@@ -145,6 +150,20 @@ jobs:
       - name: Odin check examples/all for OpenBSD amd64
         run: ./odin check examples/all -vet -strict-style -disallow-do -target:openbsd_amd64
         if: matrix.os == 'ubuntu-latest'
+
+      - name: Odin check vendor/sdl3 for Linux i386
+        run: ./odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point -target:linux_i386
+        if: matrix.os == 'ubuntu-latest'
+      - name: Odin check vendor/sdl3 for Linux arm64
+        run: ./odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point -target:linux_arm64
+        if: matrix.os == 'ubuntu-latest'
+      - name: Odin check vendor/sdl3 for FreeBSD amd64
+        run: ./odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point -target:freebsd_amd64
+        if: matrix.os == 'ubuntu-latest'
+      - name: Odin check vendor/sdl3 for OpenBSD amd64
+        run: ./odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point -target:openbsd_amd64
+        if: matrix.os == 'ubuntu-latest'
+
 
       - name: Run demo on WASI WASM32
         run: |
@@ -187,6 +206,11 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/all -vet -strict-style -disallow-do
+      - name: Odin check vendor/sdl3
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point
       - name: Core library tests
         shell: cmd
         run: |
@@ -266,8 +290,11 @@ jobs:
           make -C vendor/cgltf/src
           make -C vendor/miniaudio/src
 
-      - name: Odin check
+      - name: Odin check examples/all
         run: ./odin check examples/all -target:linux_riscv64 -vet -strict-style -disallow-do
+
+      - name: Odin check vendor/sdl3
+        run: ./odin check vendor/sdl3 -target:linux_riscv64 -vet -strict-style -disallow-do -no-entry-point
 
       - name: Install riscv64 toolchain and qemu
         run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
