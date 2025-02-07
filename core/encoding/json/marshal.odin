@@ -176,6 +176,10 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Pointer:
+		if a.(rawptr) == nil {
+			io.write_string(w, "null") or_return
+			return
+		}
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Multi_Pointer:
