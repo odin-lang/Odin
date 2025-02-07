@@ -9,25 +9,39 @@ package runtime
 import "base:intrinsics"
 
 foreign {
-	@(link_name="malloc")   _libc_malloc   :: proc "c" (size: int) -> rawptr ---
-	@(link_name="calloc")   _libc_calloc   :: proc "c" (num, size: int) -> rawptr ---
+	@(link_name="malloc")   _libc_malloc   :: proc "c" (size: uint) -> rawptr ---
+	@(link_name="calloc")   _libc_calloc   :: proc "c" (num, size: uint) -> rawptr ---
 	@(link_name="free")     _libc_free     :: proc "c" (ptr: rawptr) ---
-	@(link_name="realloc")  _libc_realloc  :: proc "c" (ptr: rawptr, size: int) -> rawptr ---
+	@(link_name="realloc")  _libc_realloc  :: proc "c" (ptr: rawptr, size: uint) -> rawptr ---
 }
 
+@(require_results)
 heap_alloc :: proc "contextless" (size: int, zero_memory := true) -> rawptr {
 	if size <= 0 {
 		return nil
 	}
 	if zero_memory {
-		return _libc_calloc(1, size)
+		return _libc_calloc(1, uint(size))
 	} else {
-		return _libc_malloc(size)
+		return _libc_malloc(uint(size))
 	}
 }
 
-heap_resize :: proc "contextless" (ptr: rawptr, new_size: int) -> rawptr {
-	return _libc_realloc(ptr, new_size)
+@(require_results)
+heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int, zero_memory: bool = true) -> (new_ptr: rawptr) {
+	new_ptr = _libc_realloc(old_ptr, uint(new_size))
+
+	// Section 7.22.3.5.2 of the C17 standard: "The contents of the new object
+	// shall be the same as that of the old object prior to deallocation, up to
+	// the lesser of the new and old sizes. Any bytes in the new object beyond
+	// the size of the old object have indeterminate values."
+	//
+	// Therefore, we zero the memory ourselves.
+	if zero_memory && new_size > old_size {
+		intrinsics.mem_zero(rawptr(uintptr(new_ptr) + uintptr(old_size)), new_size - old_size)
+	}
+
+	return
 }
 
 heap_free :: proc "contextless" (ptr: rawptr) {
@@ -44,84 +58,67 @@ heap_allocator :: proc() -> Allocator {
 heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	//
-	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
-	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
-	// padding. We also store the original pointer returned by heap_alloc right before
-	// the pointer we return to the user.
-	//
 
-	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr, old_size: int, zero_memory := true) -> ([]byte, Allocator_Error) {
-		// NOTE(flysand): We need to reserve enough space for alignment, which
-		// includes the user data itself, the space to store the pointer to
-		// allocation start, as well as the padding required to align both
-		// the user data and the pointer.
-		a := max(alignment, align_of(rawptr))
-		space := a-1 + size_of(rawptr) + size
-		allocated_mem: rawptr
-
-		force_copy := old_ptr != nil && alignment > align_of(rawptr)
-
-		if old_ptr != nil && !force_copy {
-			original_old_ptr := ([^]rawptr)(old_ptr)[-1]
-			allocated_mem = heap_resize(original_old_ptr, space)
-		} else {
-			allocated_mem = heap_alloc(space, zero_memory)
-		}
-		aligned_mem := rawptr(([^]u8)(allocated_mem)[size_of(rawptr):])
-
-		ptr := uintptr(aligned_mem)
-		aligned_ptr := (ptr + uintptr(a)-1) & ~(uintptr(a)-1)
-		if allocated_mem == nil {
-			aligned_free(old_ptr)
-			aligned_free(allocated_mem)
-			return nil, .Out_Of_Memory
-		}
-
-		aligned_mem = rawptr(aligned_ptr)
-		([^]rawptr)(aligned_mem)[-1] = allocated_mem
-
-		if force_copy {
-			mem_copy_non_overlapping(aligned_mem, old_ptr, min(old_size, size))
-			aligned_free(old_ptr)
-		}
-
-		return byte_slice(aligned_mem, size), nil
-	}
-
-	aligned_free :: proc(p: rawptr) {
-		if p != nil {
-			heap_free(([^]rawptr)(p)[-1])
-		}
-	}
-
-	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int, zero_memory := true) -> (new_memory: []byte, err: Allocator_Error) {
-		if p == nil {
-			return aligned_alloc(new_size, new_alignment, nil, old_size, zero_memory)
-		}
-
-		new_memory = aligned_alloc(new_size, new_alignment, p, old_size, zero_memory) or_return
-
-		// NOTE: heap_resize does not zero the new memory, so we do it
-		if zero_memory && new_size > old_size {
-			new_region := raw_data(new_memory[old_size:])
-			intrinsics.mem_zero(new_region, new_size - old_size)
-		}
-		return
-	}
+	// Because malloc does not support alignment requests, and aligned_alloc
+	// has specific requirements for what sizes it supports, this allocator
+	// over-allocates by the alignment requested and stores the original
+	// pointer behind the address returned to the user.
 
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		return aligned_alloc(size, alignment, nil, 0, mode == .Alloc)
+		padding := max(alignment, size_of(rawptr))
+		ptr := heap_alloc(size + padding, mode == .Alloc)
+		if ptr == nil {
+			return nil, .Out_Of_Memory
+		}
+		shift := uintptr(padding) - uintptr(ptr) & uintptr(padding-1)
+		aligned_ptr := rawptr(uintptr(ptr) + shift)
+		([^]rawptr)(aligned_ptr)[-1] = ptr
+		return byte_slice(aligned_ptr, size), nil
 
 	case .Free:
-		aligned_free(old_memory)
+		if old_memory != nil {
+			heap_free(([^]rawptr)(old_memory)[-1])
+		}
 
 	case .Free_All:
 		return nil, .Mode_Not_Implemented
 
 	case .Resize, .Resize_Non_Zeroed:
-		return aligned_resize(old_memory, old_size, size, alignment, mode == .Resize)
+		new_padding := max(alignment, size_of(rawptr))
+		original_ptr := ([^]rawptr)(old_memory)[-1]
+		ptr: rawptr
+
+		if alignment > align_of(rawptr) {
+			// The alignment is in excess of what malloc/realloc will return
+			// for address alignment per the C standard, so we must reallocate
+			// manually in order to guarantee alignment for the user.
+			//
+			// Resizing through realloc simply won't work because it's possible
+			// that our target address originally only needed a padding of 8
+			// bytes, but if we expand the memory used and the address is moved,
+			// we may then need 16 bytes for proper alignment, for example.
+			//
+			// We'll copy the old data later.
+			ptr = heap_alloc(size + new_padding, mode == .Resize)
+
+		} else {
+			real_old_size := size_of(rawptr) + old_size
+			real_new_size := new_padding + size
+
+			ptr = heap_resize(original_ptr, real_old_size, real_new_size, mode == .Resize)
+		}
+
+		shift := uintptr(new_padding) - uintptr(ptr) & uintptr(new_padding-1)
+		aligned_ptr := rawptr(uintptr(ptr) + shift)
+		([^]rawptr)(aligned_ptr)[-1] = ptr
+
+		if alignment > align_of(rawptr) {
+			intrinsics.mem_copy_non_overlapping(aligned_ptr, old_memory, min(size, old_size))
+			heap_free(original_ptr)
+		}
+
+		return byte_slice(aligned_ptr, size), nil
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)

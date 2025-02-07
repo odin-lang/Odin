@@ -1347,7 +1347,7 @@ heap_orphanage_count: int
 Allocate an arbitrary amount of memory from the heap and optionally zero it.
 */
 @(require_results)
-heap_alloc :: proc "contextless" (size: int, zero: bool = true) -> (ptr: rawptr) {
+heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: rawptr) {
 	assert_contextless(size >= 0, "The heap allocator was given a negative size.")
 
 	// Handle Huge allocations.
@@ -1491,7 +1491,7 @@ heap_alloc :: proc "contextless" (size: int, zero: bool = true) -> (ptr: rawptr)
 	slab.local_free[sector] &~= (1 << index)
 
 	// Zero the memory, if needed.
-	if zero && index < uintptr(slab.dirty_bins) {
+	if zero_memory && index < uintptr(slab.dirty_bins) {
 		// Ensure that the memory zeroing is not optimized out by the compiler.
 		intrinsics.mem_zero_volatile(ptr, rounded_size)
 		// NOTE: A full memory fence should not be needed for any newly-zeroed
@@ -1694,7 +1694,7 @@ heap_free :: proc "contextless" (ptr: rawptr) {
 Resize memory returned by `heap_alloc`.
 */
 @(require_results)
-heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int, zero: bool = true) -> (new_ptr: rawptr) {
+heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int, zero_memory: bool = true) -> (new_ptr: rawptr) {
 	Size_Category :: enum {
 		Unknown,
 		Bin,
@@ -1722,7 +1722,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 
 	if new_category != old_category {
 		// A change in size category cannot be optimized.
-		new_ptr = heap_alloc(new_size, zero)
+		new_ptr = heap_alloc(new_size, zero_memory)
 		intrinsics.mem_copy_non_overlapping(new_ptr, old_ptr, min(old_size, new_size))
 		heap_free(old_ptr)
 		heap_debug_cover(.Resize_Crossed_Size_Categories)
@@ -1750,7 +1750,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 		u := uintptr(resized_superpage) + HEAP_HUGE_ALLOCATION_BOOK_KEEPING
 		new_ptr = rawptr(u - u & (HEAP_MAX_ALIGNMENT-1))
 
-		if zero && new_size > old_size {
+		if zero_memory && new_size > old_size {
 			intrinsics.mem_zero_volatile(
 				rawptr(uintptr(new_ptr) + uintptr(old_size)),
 				new_size - old_size,
@@ -1771,7 +1771,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 		contiguous_new := heap_slabs_needed_for_size(new_size)
 		if contiguous_new == contiguous_old {
 			// We already have enough slabs to serve the request.
-			if zero && new_size > old_size {
+			if zero_memory && new_size > old_size {
 				intrinsics.mem_zero_volatile(
 					rawptr(uintptr(old_ptr) + uintptr(old_size)),
 					new_size - old_size,
@@ -1785,7 +1785,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 		if slab.index + contiguous_new >= HEAP_SLAB_COUNT {
 			// Expanding this slab would go beyond the Superpage.
 			// We need more memory.
-			new_ptr = heap_alloc(new_size, zero)
+			new_ptr = heap_alloc(new_size, zero_memory)
 			intrinsics.mem_copy_non_overlapping(new_ptr, old_ptr, min(old_size, new_size))
 			heap_free(old_ptr)
 			return
@@ -1797,7 +1797,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 			// involve touching the Superpage.
 			//
 			// We must re-allocate.
-			new_ptr = heap_alloc(new_size, zero)
+			new_ptr = heap_alloc(new_size, zero_memory)
 			intrinsics.mem_copy_non_overlapping(new_ptr, old_ptr, min(old_size, new_size))
 			heap_free(old_ptr)
 			heap_debug_cover(.Resize_Wide_Slab_From_Remote_Thread)
@@ -1826,7 +1826,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 			for i := slab.index + contiguous_old; i < slab.index + contiguous_new; i += 1 {
 				if heap_superpage_index_slab(superpage, i).bin_size != 0 {
 					// Contiguous space is unavailable.
-					new_ptr = heap_alloc(new_size, zero)
+					new_ptr = heap_alloc(new_size, zero_memory)
 					intrinsics.mem_copy_non_overlapping(new_ptr, old_ptr, min(old_size, new_size))
 					heap_free(old_ptr)
 					heap_debug_cover(.Resize_Wide_Slab_Failed_To_Find_Contiguous_Expansion)
@@ -1859,7 +1859,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 	// See if a bin rank change is needed.
 	new_rounded_size := heap_round_to_bin_size(new_size)
 	if slab.bin_size == new_rounded_size {
-		if zero && new_size > old_size {
+		if zero_memory && new_size > old_size {
 			intrinsics.mem_zero_volatile(
 				rawptr(uintptr(old_ptr) + uintptr(old_size)),
 				new_size - old_size,
@@ -1879,7 +1879,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 	}
 
 	// Allocate and copy, as a last resort.
-	new_ptr = heap_alloc(new_size, zero)
+	new_ptr = heap_alloc(new_size, zero_memory)
 	intrinsics.mem_copy_non_overlapping(new_ptr, old_ptr, min(old_size, new_size))
 	heap_free(old_ptr)
 	return
