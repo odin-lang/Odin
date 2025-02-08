@@ -3488,9 +3488,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			case ExactValue_Integer:
 				mp_abs(&operand->value.value_integer, &operand->value.value_integer);
 				break;
-			case ExactValue_Float:
-				operand->value.value_float = gb_abs(operand->value.value_float);
+			case ExactValue_Float: {
+				u64 abs = bit_cast<u64>(operand->value.value_float);
+				abs &= 0x7FFFFFFFFFFFFFFF;
+				operand->value.value_float = bit_cast<f64>(abs);
 				break;
+			}
 			case ExactValue_Complex: {
 				f64 r = operand->value.value_complex->real;
 				f64 i = operand->value.value_complex->imag;
