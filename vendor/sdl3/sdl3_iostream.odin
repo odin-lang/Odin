@@ -90,18 +90,18 @@ foreign lib {
 	ReadU64BE       :: proc(src: ^IOStream, value: ^Uint64) -> bool ---
 	ReadS64BE       :: proc(src: ^IOStream, value: ^Sint64) -> bool ---
 
-	WriteU8         :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteS8         :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteU16LE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteS16LE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteU16BE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteS16BE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteU32LE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteS32LE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteU32BE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteS32BE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteU64LE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteS64LE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteU64BE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
-	WriteS64BE      :: proc(dst: ^IOStream, value: IOStream) -> bool ---
+	WriteU8         :: proc(dst: ^IOStream, value: Uint8) -> bool ---
+	WriteS8         :: proc(dst: ^IOStream, value: Sint8) -> bool ---
+	WriteU16LE      :: proc(dst: ^IOStream, value: Uint16) -> bool ---
+	WriteS16LE      :: proc(dst: ^IOStream, value: Sint16) -> bool ---
+	WriteU16BE      :: proc(dst: ^IOStream, value: Uint16) -> bool ---
+	WriteS16BE      :: proc(dst: ^IOStream, value: Sint16) -> bool ---
+	WriteU32LE      :: proc(dst: ^IOStream, value: Uint32) -> bool ---
+	WriteS32LE      :: proc(dst: ^IOStream, value: Sint32) -> bool ---
+	WriteU32BE      :: proc(dst: ^IOStream, value: Uint32) -> bool ---
+	WriteS32BE      :: proc(dst: ^IOStream, value: Sint32) -> bool ---
+	WriteU64LE      :: proc(dst: ^IOStream, value: Uint64) -> bool ---
+	WriteS64LE      :: proc(dst: ^IOStream, value: Sint64) -> bool ---
+	WriteU64BE      :: proc(dst: ^IOStream, value: Uint64) -> bool ---
+	WriteS64BE      :: proc(dst: ^IOStream, value: Sint64) -> bool ---
 }
