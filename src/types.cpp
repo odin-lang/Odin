@@ -161,10 +161,10 @@ struct TypeStruct {
 
 struct TypeUnion {
 	Slice<Type *> variants;
-	
+
 	Ast *         node;
 	Scope *       scope;
-	
+
 	i64           variant_block_size;
 	i64           custom_align;
 	Type *        polymorphic_params; // Type_Tuple
@@ -1438,7 +1438,7 @@ gb_internal bool is_type_matrix(Type *t) {
 gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
-	
+
 	Type *elem = t->Matrix.elem;
 	i64 row_count = gb_max(t->Matrix.row_count, 1);
 	i64 column_count = gb_max(t->Matrix.column_count, 1);
@@ -1450,15 +1450,15 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 
 	i64 elem_align = type_align_of_internal(elem, tp);
 	if (pop) type_path_pop(tp);
-	
+
 	i64 elem_size = type_size_of(elem);
-	
+
 
 	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
 	// It would be better for performance to pad each column so that each column
 	// could be maximally aligned but as a compromise, having no padding will be
 	// beneficial to third libraries that assume no padding
-	
+
 	i64 total_expected_size = row_count*column_count*elem_size;
 	// i64 min_alignment = prev_pow2(elem_align * row_count);
 	i64 min_alignment = prev_pow2(total_expected_size);
@@ -1466,7 +1466,7 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 		min_alignment >>= 1;
 	}
 	min_alignment = gb_max(min_alignment, elem_align);
-	
+
 	i64 align = gb_min(min_alignment, build_context.max_simd_align);
 	return align;
 }
@@ -1480,7 +1480,7 @@ gb_internal i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	} else if (t->Matrix.row_count == 0) {
 		return 0;
 	}
-	
+
 	i64 elem_size;
 	if (tp != nullptr) {
 		elem_size = type_size_of_internal(t->Matrix.elem, tp);
@@ -1489,7 +1489,7 @@ gb_internal i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	}
 
 	i64 stride_in_bytes = 0;
-	
+
 	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
 	// It would be better for performance to pad each column/row so that each column/row
 	// could be maximally aligned but as a compromise, having no padding will be
@@ -1545,7 +1545,7 @@ gb_internal i64 matrix_row_major_index_to_offset(Type *t, i64 index) {
 gb_internal i64 matrix_column_major_index_to_offset(Type *t, i64 index) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
-	
+
 	i64 row_index    = index%t->Matrix.row_count;
 	i64 column_index = index/t->Matrix.row_count;
 	return matrix_indices_to_offset(t, row_index, column_index);
@@ -1566,7 +1566,7 @@ gb_internal bool is_type_valid_for_matrix_elems(Type *t) {
 		return true;
 	} else if (is_type_complex(t)) {
 		return true;
-	} 
+	}
 	if (t->kind == Type_Generic) {
 		return true;
 	}
@@ -2485,7 +2485,7 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	case Type_Proc:
 	case Type_BitSet:
 		return true;
-		
+
 	case Type_Matrix:
 		return is_type_simple_compare(t->Matrix.elem);
 
@@ -2732,7 +2732,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	case Type_Array:
 		return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
-		
+
 	case Type_Matrix:
 		return x->Matrix.row_count == y->Matrix.row_count &&
 		       x->Matrix.column_count == y->Matrix.column_count &&
@@ -3592,7 +3592,7 @@ gb_internal bool are_struct_fields_reordered(Type *type) {
 		return false;
 	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
-	
+
 	i64 prev_offset = 0;
 	for_array(i, type->Struct.fields) {
 		i64 offset = type->Struct.offsets[i];
@@ -3613,9 +3613,9 @@ gb_internal Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allo
 		return {};
 	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
-	
+
 	auto indices = slice_make<i32>(allocator, type->Struct.fields.count);
-	
+
 	i64 prev_offset = 0;
 	bool is_ordered = true;
 	for_array(i, indices) {
@@ -3630,14 +3630,14 @@ gb_internal Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allo
 		isize n = indices.count;
 		for (isize i = 1; i < n; i++) {
 			isize j = i;
-			
+
 			while (j > 0 && type->Struct.offsets[indices[j-1]] > type->Struct.offsets[indices[j]]) {
 				gb_swap(i32, indices[j-1], indices[j]);
 				j -= 1;
-			}				
+			}
 		}
 	}
-	
+
 	return indices;
 }
 
@@ -3887,8 +3887,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
 		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align*2);
 	}
-	
-	case Type_Matrix: 
+
+	case Type_Matrix:
 		return matrix_align_of(t, path);
 
 	case Type_SoaPointer:
@@ -4175,7 +4175,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		Type *elem = t->SimdVector.elem;
 		return count * type_size_of_internal(elem, path);
 	}
-	
+
 	case Type_Matrix: {
 		i64 stride_in_bytes = matrix_type_stride_in_bytes(t, path);
 		if (t->Matrix.is_row_major) {
@@ -4675,6 +4675,10 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 
 	case Type_Named:
 		if (type->Named.type_name != nullptr) {
+			if (type->Named.type_name->pkg && type->Named.type_name->pkg->name.len != 0) {
+				str = gb_string_append_length(str, type->Named.type_name->pkg->name.text, type->Named.type_name->pkg->name.len);
+				str = gb_string_append_rune(str, '.');
+			}
 			str = gb_string_append_length(str, type->Named.name.text, type->Named.name.len);
 		} else {
 			// NOTE(bill): Just in case
@@ -4814,7 +4818,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
 		str = write_type_to_string(str, type->SimdVector.elem);
 		break;
-		
+
 	case Type_Matrix:
 		if (type->Matrix.is_row_major) {
 			str = gb_string_appendc(str, "#row_major ");
@@ -4855,6 +4859,3 @@ gb_internal gbString type_to_string(Type *type, bool shorthand) {
 gb_internal gbString type_to_string_shorthand(Type *type) {
 	return type_to_string(type, true);
 }
-
-
-
