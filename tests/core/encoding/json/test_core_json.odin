@@ -483,3 +483,49 @@ map_with_integer_keys :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+enumerated_array :: proc(t: ^testing.T) {
+	Fruit :: enum { Apple, Banana, Pear }
+	Fruit_Stock :: [Fruit]uint {
+		.Apple = 14,
+		.Banana = 3,
+		.Pear = 513,
+	}
+
+	{ // test unmarshaling from array
+		marshaled := "[14,3,513]"
+
+		unmarshaled: [Fruit]uint
+		err := json.unmarshal_string(marshaled, &unmarshaled)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, unmarshaled, Fruit_Stock)
+	}
+
+	Sparse_Fruit :: enum { Apple, Banana, Cherry = 23, Pear }
+	Sparse_Fruit_Stock :: #partial #sparse [Sparse_Fruit]uint {
+		.Apple = 14,
+		.Banana = 3,
+		.Pear = 513,
+	}
+
+	{ // test unmarshaling from object
+		marshaled := `{"Apple":14,"Banana":3,"Cherry":0,"Pear":513}`
+
+		unmarshaled: #sparse [Sparse_Fruit]uint
+		err := json.unmarshal_string(marshaled, &unmarshaled)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, unmarshaled, Sparse_Fruit_Stock)
+	}
+
+	{ // test marshal -> unmarshal
+		marshaled, err_marshal := json.marshal(Sparse_Fruit_Stock)
+		defer delete(marshaled)
+		testing.expect_value(t, err_marshal, nil)
+
+		unmarshaled: #sparse [Sparse_Fruit]uint
+		err_unmarshal := json.unmarshal(marshaled, &unmarshaled)
+		testing.expect_value(t, err_unmarshal, nil)
+		testing.expect_value(t, unmarshaled, Sparse_Fruit_Stock)
+	}
+}
