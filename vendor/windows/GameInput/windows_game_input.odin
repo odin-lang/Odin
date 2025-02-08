@@ -15,7 +15,7 @@ import "core:c"
 import "core:sys/windows"
 
 // Enums
-ArcadeStickButtons_Flag :: enum c.int {
+ArcadeStickButtonsFlag :: enum c.int {
 	Menu     = 0,
 	View     = 1,
 	Up       = 2,
@@ -31,7 +31,7 @@ ArcadeStickButtons_Flag :: enum c.int {
 	Special1 = 12,
 	Special2 = 13,
 }
-ArcadeStickButtons :: distinct bit_set[ArcadeStickButtons_Flag; c.int]
+ArcadeStickButtons :: distinct bit_set[ArcadeStickButtonsFlag; c.int]
 
 BatteryStatus :: enum c.int {
 	Unknown     = -1,
@@ -41,14 +41,14 @@ BatteryStatus :: enum c.int {
 	Charging    = 3,
 }
 
-DeviceCapabilities_Flag :: enum c.int {
+DeviceCapabilitiesFlag :: enum c.int {
 	Audio           = 0,
 	PluginModule    = 1,
 	PowerOff        = 2,
 	Synchronization = 3,
 	Wireless        = 4,
 }
-DeviceCapabilities :: distinct bit_set[DeviceCapabilities_Flag; c.int]
+DeviceCapabilities :: distinct bit_set[DeviceCapabilitiesFlag; c.int]
 
 DeviceFamily :: enum c.int {
 	Virtual   = -1,
@@ -59,7 +59,7 @@ DeviceFamily :: enum c.int {
 	I8042     = 4,
 }
 
-DeviceStatus_Flag :: enum c.int {
+DeviceStatusFlag :: enum c.int {
 	Connected     = 0,
 	InputEnabled  = 1,
 	OutputEnabled = 2,
@@ -70,7 +70,7 @@ DeviceStatus_Flag :: enum c.int {
 	Wireless      = 7,
 	UserIdle      = 20,
 }
-DeviceStatus :: distinct bit_set[DeviceStatus_Flag; c.int]
+DeviceStatus :: distinct bit_set[DeviceStatusFlag; c.int]
 
 EnumerationKind :: enum c.int {
 	NoEnumeration       = 0,
@@ -78,7 +78,7 @@ EnumerationKind :: enum c.int {
 	BlockingEnumeration = 2,
 }
 
-FeedbackAxes_Flag :: enum c.int {
+FeedbackAxesFlag :: enum c.int {
 	LinearX  = 0,
 	LinearY  = 1,
 	LinearZ  = 2,
@@ -87,7 +87,7 @@ FeedbackAxes_Flag :: enum c.int {
 	AngularZ = 5,
 	Normal   = 6,
 }
-FeedbackAxes :: distinct bit_set[FeedbackAxes_Flag; c.int]
+FeedbackAxes :: distinct bit_set[FeedbackAxesFlag; c.int]
 
 FeedbackEffectState :: enum c.int {
 	Stopped = 0,
@@ -95,16 +95,16 @@ FeedbackEffectState :: enum c.int {
 	Paused  = 2,
 }
 
-FlightStickButtons_Flag :: enum c.int {
+FlightStickButtonsFlag :: enum c.int {
 	None          = 0,
 	Menu          = 1,
 	View          = 2,
 	FirePrimary   = 3,
 	FireSecondary = 4,
 }
-FlightStickButtons :: distinct bit_set[FlightStickButtons_Flag; c.int]
+FlightStickButtons :: distinct bit_set[FlightStickButtonsFlag; c.int]
 
-FocusPolicy_Flag :: enum c.int {
+FocusPolicyFlag :: enum c.int {
 	DisableBackgroundInput         = 0,
 	ExclusiveForegroundInput       = 1,
 	DisableBackgroundGuideButton   = 2,
@@ -112,7 +112,7 @@ FocusPolicy_Flag :: enum c.int {
 	DisableBackgroundShareButton   = 4,
 	ExclusiveForegroundShareButton = 5,
 }
-FocusPolicy :: distinct bit_set[FocusPolicy_Flag; c.int]
+FocusPolicy :: distinct bit_set[FocusPolicyFlag; c.int]
 
 ForceFeedbackEffectKind :: enum c.int {
 	Constant         = 0,
@@ -128,7 +128,7 @@ ForceFeedbackEffectKind :: enum c.int {
 	Inertia          = 10,
 }
 
-GamepadButtons_Flag :: enum c.int {
+GamepadButtonsFlag :: enum c.int {
 	Menu            = 0,
 	View            = 1,
 	A               = 2,
@@ -144,7 +144,7 @@ GamepadButtons_Flag :: enum c.int {
 	LeftThumbstick  = 12,
 	RightThumbstick = 13,
 }
-GamepadButtons :: distinct bit_set[GamepadButtons_Flag; c.int]
+GamepadButtons :: distinct bit_set[GamepadButtonsFlag; c.int]
 
 KeyboardKind :: enum c.int {
 	UnknownKeyboard = -1,
@@ -155,7 +155,7 @@ KeyboardKind :: enum c.int {
 	JisKeyboard     = 4,
 }
 
-Kind_Flag :: enum c.int {
+KindFlag :: enum c.int {
 	RawDeviceReport  = 0,
 	ControllerAxis   = 1,
 	ControllerButton = 2,
@@ -170,7 +170,7 @@ Kind_Flag :: enum c.int {
 	RacingWheel      = 19,
 	UiNavigation     = 20,
 }
-Kind :: distinct bit_set[Kind_Flag; c.int]
+Kind :: distinct bit_set[KindFlag; c.int]
 Kind_Controller : Kind : { .ControllerAxis, .ControllerButton, .ControllerSwitch }
 
 Label :: enum c.int {
@@ -320,7 +320,7 @@ MotionAccuracy :: enum c.int {
 	Accurate        = 3,
 }
 
-MouseButtons_Flag :: enum c.int {
+MouseButtonsFlag :: enum c.int {
 	LeftButton     = 0,
 	RightButton    = 1,
 	MiddleButton   = 2,
@@ -329,9 +329,9 @@ MouseButtons_Flag :: enum c.int {
 	WheelTiltLeft  = 5,
 	WheelTiltRight = 6,
 }
-MouseButtons :: distinct bit_set[MouseButtons_Flag; c.int]
+MouseButtons :: distinct bit_set[MouseButtonsFlag; c.int]
 
-RacingWheelButtons_Flag :: enum c.int {
+RacingWheelButtonsFlag :: enum c.int {
 	Menu         = 0,
 	View         = 1,
 	PreviousGear = 2,
@@ -341,7 +341,7 @@ RacingWheelButtons_Flag :: enum c.int {
 	DpadLeft     = 6,
 	DpadRight    = 7,
 }
-RacingWheelButtons :: distinct bit_set[RacingWheelButtons_Flag; c.int]
+RacingWheelButtons :: distinct bit_set[RacingWheelButtonsFlag; c.int]
 
 RawDeviceItemCollectionKind :: enum c.int {
 	UnknownItemCollection       = -1,
@@ -402,13 +402,13 @@ RawDeviceReportKind :: enum c.int {
 	FeatureReport = 2,
 }
 
-RumbleMotors_Flag :: enum c.int {
+RumbleMotorsFlag :: enum c.int {
 	LowFrequency  = 0,
 	HighFrequency = 1,
 	LeftTrigger   = 2,
 	RightTrigger  = 3,
 }
-RumbleMotors :: distinct bit_set[RumbleMotors_Flag; c.int]
+RumbleMotors :: distinct bit_set[RumbleMotorsFlag; c.int]
 
 SwitchKind :: enum c.int {
 	UnknownSwitchKind = -1,
@@ -429,11 +429,11 @@ SwitchPosition :: enum c.int {
 	UpLeft    = 8,
 }
 
-SystemButtons_Flag :: enum c.int {
+SystemButtonsFlag :: enum c.int {
 	Guide = 0,
 	Share = 1 ,
 }
-SystemButtons :: distinct bit_set[SystemButtons_Flag; c.int]
+SystemButtons :: distinct bit_set[SystemButtonsFlag; c.int]
 
 TouchShape :: enum c.int {
 	Unknown            = -1,
@@ -446,7 +446,7 @@ TouchShape :: enum c.int {
 	Shape2DIrregular   = 6,
 }
 
-UiNavigationButtons_Flag :: enum c.int {
+UiNavigationButtonsFlag :: enum c.int {
 	Menu        = 0,
 	View        = 1,
 	Accept      = 2,
@@ -468,25 +468,25 @@ UiNavigationButtons_Flag :: enum c.int {
 	ScrollLeft  = 18,
 	ScrollRight = 19,
 }
-UiNavigationButtons :: distinct bit_set[UiNavigationButtons_Flag; c.int]
+UiNavigationButtons :: distinct bit_set[UiNavigationButtonsFlag; c.int]
 
 // Structs
 
 APP_LOCAL_DEVICE_ID :: distinct [32]byte
 
 ArcadeStickInfo :: struct {
-	menuButtonLabel: Label,
-	viewButtonLabel: Label,
-	stickUpLabel: Label,
-	stickDownLabel: Label,
-	stickLeftLabel: Label,
-	stickRightLabel: Label,
-	actionButton1Label: Label,
-	actionButton2Label: Label,
-	actionButton3Label: Label,
-	actionButton4Label: Label,
-	actionButton5Label: Label,
-	actionButton6Label: Label,
+	menuButtonLabel:     Label,
+	viewButtonLabel:     Label,
+	stickUpLabel:        Label,
+	stickDownLabel:      Label,
+	stickLeftLabel:      Label,
+	stickRightLabel:     Label,
+	actionButton1Label:  Label,
+	actionButton2Label:  Label,
+	actionButton3Label:  Label,
+	actionButton4Label:  Label,
+	actionButton5Label:  Label,
+	actionButton6Label:  Label,
 	specialButton1Label: Label,
 	specialButton2Label: Label,
 }
@@ -496,447 +496,447 @@ ArcadeStickState :: struct {
 }
 
 BatteryState :: struct {
-	chargeRate: f32,
-	maxChargeRate: f32,
-	remainingCapacity: f32,
+	chargeRate:         f32,
+	maxChargeRate:      f32,
+	remainingCapacity:  f32,
 	fullChargeCapacity: f32,
-	status: BatteryStatus,
+	status:             BatteryStatus,
 }
 
 ControllerAxisInfo :: struct {
-	mappedInputKinds: Kind,
-	label: Label,
-	isContinuous: bool,
-	isNonlinear: bool,
-	isQuantized: bool,
-	hasRestValue: bool,
-	restValue: f32,
-	resolution: u64,
+	mappedInputKinds:  Kind,
+	label:             Label,
+	isContinuous:      bool,
+	isNonlinear:       bool,
+	isQuantized:       bool,
+	hasRestValue:      bool,
+	restValue:         f32,
+	resolution:        u64,
 	legacyDInputIndex: u16,
-	legacyHidIndex: u16,
-	rawReportIndex: u32,
-	inputReport: ^RawDeviceReportInfo,
-	inputReportItem: ^RawDeviceReportItemInfo,
+	legacyHidIndex:    u16,
+	rawReportIndex:    u32,
+	inputReport:       ^RawDeviceReportInfo,
+	inputReportItem:   ^RawDeviceReportItemInfo,
 }
 
 ControllerButtonInfo :: struct {
-	mappedInputKinds: Kind,
-	label: Label,
+	mappedInputKinds:  Kind,
+	label:             Label,
 	legacyDInputIndex: u16,
-	legacyHidIndex: u16,
-	rawReportIndex: u32,
-	inputReport: ^RawDeviceReportInfo,
-	inputReportItem: ^RawDeviceReportItemInfo,
+	legacyHidIndex:    u16,
+	rawReportIndex:    u32,
+	inputReport:       ^RawDeviceReportInfo,
+	inputReportItem:   ^RawDeviceReportItemInfo,
 }
 
 ControllerSwitchInfo :: struct {
-	mappedInputKinds: Kind,
-	label: Label,
-	positionLabels: [9]Label,
-	kind: SwitchKind,
+	mappedInputKinds:  Kind,
+	label:             Label,
+	positionLabels:    [9]Label,
+	kind:              SwitchKind,
 	legacyDInputIndex: u16,
-	legacyHidIndex: u16,
-	rawReportIndex: u32,
-	inputReport: ^RawDeviceReportInfo,
-	inputReportItem: ^RawDeviceReportItemInfo,
+	legacyHidIndex:    u16,
+	rawReportIndex:    u32,
+	inputReport:       ^RawDeviceReportInfo,
+	inputReportItem:   ^RawDeviceReportItemInfo,
 }
 
 DeviceInfo :: struct {
-	infoSize: u32,
-	vendorId: u16,
-	productId: u16,
-	revisionNumber: u16,
-	interfaceNumber: u8,
-	collectionNumber: u8,
-	usage: Usage,
-	hardwareVersion: Version,
-	firmwareVersion: Version,
-	deviceId: APP_LOCAL_DEVICE_ID,
-	deviceRootId: APP_LOCAL_DEVICE_ID,
-	deviceFamily: DeviceFamily,
-	capabilities: DeviceCapabilities,
-	supportedInput: Kind,
-	supportedRumbleMotors: RumbleMotors,
-	inputReportCount: u32,
-	outputReportCount: u32,
-	featureReportCount: u32,
-	controllerAxisCount: u32,
-	controllerButtonCount: u32,
-	controllerSwitchCount: u32,
-	touchPointCount: u32,
-	touchSensorCount: u32,
-	forceFeedbackMotorCount: u32,
+	infoSize:                 u32,
+	vendorId:                 u16,
+	productId:                u16,
+	revisionNumber:           u16,
+	interfaceNumber:          u8,
+	collectionNumber:         u8,
+	usage:                    Usage,
+	hardwareVersion:          Version,
+	firmwareVersion:          Version,
+	deviceId:                 APP_LOCAL_DEVICE_ID,
+	deviceRootId:             APP_LOCAL_DEVICE_ID,
+	deviceFamily:             DeviceFamily,
+	capabilities:             DeviceCapabilities,
+	supportedInput:           Kind,
+	supportedRumbleMotors:    RumbleMotors,
+	inputReportCount:         u32,
+	outputReportCount:        u32,
+	featureReportCount:       u32,
+	controllerAxisCount:      u32,
+	controllerButtonCount:    u32,
+	controllerSwitchCount:    u32,
+	touchPointCount:          u32,
+	touchSensorCount:         u32,
+	forceFeedbackMotorCount:  u32,
 	hapticFeedbackMotorCount: u32,
-	deviceStringCount: u32,
-	deviceDescriptorSize: u32,
-	inputReportInfo: ^RawDeviceReportInfo,
-	outputReportInfo: ^RawDeviceReportInfo,
-	featureReportInfo: ^RawDeviceReportInfo,
-	controllerAxisInfo: ^ControllerAxisInfo,
-	controllerButtonInfo: ^ControllerButtonInfo,
-	controllerSwitchInfo: ^ControllerSwitchInfo,
-	keyboardInfo: ^KeyboardInfo,
-	mouseInfo: ^MouseInfo,
-	touchSensorInfo: ^TouchSensorInfo,
-	motionInfo: ^MotionInfo,
-	arcadeStickInfo: ^ArcadeStickInfo,
-	flightStickInfo: ^FlightStickInfo,
-	gamepadInfo: ^GamepadInfo,
-	racingWheelInfo: ^RacingWheelInfo,
-	uiNavigationInfo: ^UiNavigationInfo,
-	forceFeedbackMotorInfo: ^ForceFeedbackMotorInfo,
-	hapticFeedbackMotorInfo: ^HapticFeedbackMotorInfo,
-	displayName: ^String,
-	deviceStrings: ^String,
-	deviceDescriptorData: rawptr,
+	deviceStringCount:        u32,
+	deviceDescriptorSize:     u32,
+	inputReportInfo:          ^RawDeviceReportInfo,
+	outputReportInfo:         ^RawDeviceReportInfo,
+	featureReportInfo:        ^RawDeviceReportInfo,
+	controllerAxisInfo:       ^ControllerAxisInfo,
+	controllerButtonInfo:     ^ControllerButtonInfo,
+	controllerSwitchInfo:     ^ControllerSwitchInfo,
+	keyboardInfo:             ^KeyboardInfo,
+	mouseInfo:                ^MouseInfo,
+	touchSensorInfo:          ^TouchSensorInfo,
+	motionInfo:               ^MotionInfo,
+	arcadeStickInfo:          ^ArcadeStickInfo,
+	flightStickInfo:          ^FlightStickInfo,
+	gamepadInfo:              ^GamepadInfo,
+	racingWheelInfo:          ^RacingWheelInfo,
+	uiNavigationInfo:         ^UiNavigationInfo,
+	forceFeedbackMotorInfo:   ^ForceFeedbackMotorInfo,
+	hapticFeedbackMotorInfo:  ^HapticFeedbackMotorInfo,
+	displayName:              ^String,
+	deviceStrings:            ^String,
+	deviceDescriptorData:     rawptr,
 }
 
 FlightStickInfo :: struct {
-	menuButtonLabel: Label,
-	viewButtonLabel: Label,
-	firePrimaryButtonLabel: Label,
+	menuButtonLabel:          Label,
+	viewButtonLabel:          Label,
+	firePrimaryButtonLabel:   Label,
 	fireSecondaryButtonLabel: Label,
-	hatSwitchKind: SwitchKind,
+	hatSwitchKind:            SwitchKind,
 }
 
 FlightStickState :: struct {
-	buttons: FlightStickButtons,
+	buttons:   FlightStickButtons,
 	hatSwitch: SwitchPosition,
-	roll: f32,
-	pitch: f32,
-	yaw: f32,
-	throttle: f32,
+	roll:      f32,
+	pitch:     f32,
+	yaw:       f32,
+	throttle:  f32,
 }
 
 ForceFeedbackConditionParams :: struct {
-	magnitude: ForceFeedbackMagnitude,
-	positiveCoefficient: f32,
-	negativeCoefficient: f32,
+	magnitude:            ForceFeedbackMagnitude,
+	positiveCoefficient:  f32,
+	negativeCoefficient:  f32,
 	maxPositiveMagnitude: f32,
 	maxNegativeMagnitude: f32,
-	deadZone: f32,
-	bias: f32,
+	deadZone:             f32,
+	bias:                 f32,
 }
 
 ForceFeedbackConstantParams :: struct {
-	envelope: ForceFeedbackEnvelope,
+	envelope:  ForceFeedbackEnvelope,
 	magnitude: ForceFeedbackMagnitude,
 }
 
 ForceFeedbackEnvelope :: struct {
-	attackDuration: u64,
+	attackDuration:  u64,
 	sustainDuration: u64,
 	releaseDuration: u64,
-	attackGain: f32,
-	sustainGain: f32,
-	releaseGain: f32,
-	playCount: u32,
-	repeatDelay: u64,
+	attackGain:      f32,
+	sustainGain:     f32,
+	releaseGain:     f32,
+	playCount:       u32,
+	repeatDelay:     u64,
 }
 
 ForceFeedbackMagnitude :: struct {
-	linearX: f32,
-	linearY: f32,
-	linearZ: f32,
+	linearX:  f32,
+	linearY:  f32,
+	linearZ:  f32,
 	angularX: f32,
 	angularY: f32,
 	angularZ: f32,
-	normal: f32,
+	normal:   f32,
 }
 
 ForceFeedbackMotorInfo :: struct {
-	supportedAxes: FeedbackAxes,
-	location: Location,
-	locationId: u32,
-	maxSimultaneousEffects: u32,
-	isConstantEffectSupported: bool,
-	isRampEffectSupported: bool,
-	isSineWaveEffectSupported: bool,
-	isSquareWaveEffectSupported: bool,
-	isTriangleWaveEffectSupported: bool,
-	isSawtoothUpWaveEffectSupported: bool,
+	supportedAxes:                     FeedbackAxes,
+	location:                          Location,
+	locationId:                        u32,
+	maxSimultaneousEffects:            u32,
+	isConstantEffectSupported:         bool,
+	isRampEffectSupported:             bool,
+	isSineWaveEffectSupported:         bool,
+	isSquareWaveEffectSupported:       bool,
+	isTriangleWaveEffectSupported:     bool,
+	isSawtoothUpWaveEffectSupported:   bool,
 	isSawtoothDownWaveEffectSupported: bool,
-	isSpringEffectSupported: bool,
-	isFrictionEffectSupported: bool,
-	isDamperEffectSupported: bool,
-	isInertiaEffectSupported: bool,
+	isSpringEffectSupported:           bool,
+	isFrictionEffectSupported:         bool,
+	isDamperEffectSupported:           bool,
+	isInertiaEffectSupported:          bool,
 }
 
 ForceFeedbackParams :: struct {
 	kind: ForceFeedbackEffectKind,
 	using _: struct #raw_union {  
-		constant: ForceFeedbackConstantParams,
-		ramp: ForceFeedbackRampParams,
-		sineWave: ForceFeedbackPeriodicParams,
-		squareWave: ForceFeedbackPeriodicParams,
-		triangleWave: ForceFeedbackPeriodicParams,
-		sawtoothUpWave: ForceFeedbackPeriodicParams,
+		constant:         ForceFeedbackConstantParams,
+		ramp:             ForceFeedbackRampParams,
+		sineWave:         ForceFeedbackPeriodicParams,
+		squareWave:       ForceFeedbackPeriodicParams,
+		triangleWave:     ForceFeedbackPeriodicParams,
+		sawtoothUpWave:   ForceFeedbackPeriodicParams,
 		sawtoothDownWave: ForceFeedbackPeriodicParams,
-		spring: ForceFeedbackConditionParams,
-		friction: ForceFeedbackConditionParams,
-		damper: ForceFeedbackConditionParams,
-		inertia: ForceFeedbackConditionParams,
+		spring:           ForceFeedbackConditionParams,
+		friction:         ForceFeedbackConditionParams,
+		damper:           ForceFeedbackConditionParams,
+		inertia:          ForceFeedbackConditionParams,
 	},
 }
 
 ForceFeedbackPeriodicParams :: struct {
-	envelope: ForceFeedbackEnvelope,
+	envelope:  ForceFeedbackEnvelope,
 	magnitude: ForceFeedbackMagnitude,
 	frequency: f32,
-	phase: f32,
-	bias: f32,
+	phase:     f32,
+	bias:      f32,
 }
 
 ForceFeedbackRampParams :: struct {
-	envelope: ForceFeedbackEnvelope,
+	envelope:       ForceFeedbackEnvelope,
 	startMagnitude: ForceFeedbackMagnitude,
-	endMagnitude: ForceFeedbackMagnitude,
+	endMagnitude:   ForceFeedbackMagnitude,
 }
 
 GamepadInfo :: struct {
-	menuButtonLabel: Label,
-	viewButtonLabel: Label,
-	aButtonLabel: Label,
-	bButtonLabel: Label,
-	xButtonLabel: Label,
-	yButtonLabel: Label,
-	dpadUpLabel: Label,
-	dpadDownLabel: Label,
-	dpadLeftLabel: Label,
-	dpadRightLabel: Label,
-	leftShoulderButtonLabel: Label,
-	rightShoulderButtonLabel: Label,
-	leftThumbstickButtonLabel: Label,
+	menuButtonLabel:            Label,
+	viewButtonLabel:            Label,
+	aButtonLabel:               Label,
+	bButtonLabel:               Label,
+	xButtonLabel:               Label,
+	yButtonLabel:               Label,
+	dpadUpLabel:                Label,
+	dpadDownLabel:              Label,
+	dpadLeftLabel:              Label,
+	dpadRightLabel:             Label,
+	leftShoulderButtonLabel:    Label,
+	rightShoulderButtonLabel:   Label,
+	leftThumbstickButtonLabel:  Label,
 	rightThumbstickButtonLabel: Label,
 }
 
 GamepadState :: struct {
-	buttons: GamepadButtons,
-	leftTrigger: f32,
-	rightTrigger: f32,
-	leftThumbstickX: f32,
-	leftThumbstickY: f32,
+	buttons:          GamepadButtons,
+	leftTrigger:      f32,
+	rightTrigger:     f32,
+	leftThumbstickX:  f32,
+	leftThumbstickY:  f32,
 	rightThumbstickX: f32,
 	rightThumbstickY: f32,
 }
 
 HapticFeedbackMotorInfo :: struct {
 	mappedRumbleMotor: RumbleMotors,
-	location: Location,
-	locationId: u32,
-	waveformCount: u32,
-	waveformInfo: [^]HapticWaveformInfo `fmt:"v,waveformCount"`,
+	location:          Location,
+	locationId:        u32,
+	waveformCount:     u32,
+	waveformInfo:      [^]HapticWaveformInfo `fmt:"v,waveformCount"`,
 }
 
 HapticFeedbackParams :: struct {
 	waveformIndex: u32,
-	duration: u64,
-	intensity: f32,
-	playCount: u32,
-	repeatDelay: u64,
+	duration:      u64,
+	intensity:     f32,
+	playCount:     u32,
+	repeatDelay:   u64,
 }
 
 HapticWaveformInfo :: struct {
-	usage: Usage,
-	isDurationSupported: bool,
-	isIntensitySupported: bool,
-	isRepeatSupported: bool,
+	usage:                  Usage,
+	isDurationSupported:    bool,
+	isIntensitySupported:   bool,
+	isRepeatSupported:      bool,
 	isRepeatDelaySupported: bool,
-	defaultDuration: u64,
+	defaultDuration:        u64,
 }
 
 KeyboardInfo :: struct {
-	kind: KeyboardKind,
-	layout: u32,
-	keyCount: u32,
-	functionKeyCount: u32,
+	kind:                KeyboardKind,
+	layout:              u32,
+	keyCount:            u32,
+	functionKeyCount:    u32,
 	maxSimultaneousKeys: u32,
-	platformType: u32,
-	platformSubtype: u32,
-	nativeLanguage: ^String,
+	platformType:        u32,
+	platformSubtype:     u32,
+	nativeLanguage:      ^String,
 }
 
 KeyState :: struct {
-	scanCode: u32,
-	codePoint: u32,
+	scanCode:   u32,
+	codePoint:  u32,
 	virtualKey: u8,
-	isDeadKey: bool,
+	isDeadKey:  bool,
 }
 
 MotionInfo :: struct {
-	maxAcceleration: f32,
-	maxAngularVelocity: f32,
+	maxAcceleration:          f32,
+	maxAngularVelocity:       f32,
 	maxMagneticFieldStrength: f32,
 }
 
 MotionState :: struct {
-	accelerationX: f32,
-	accelerationY: f32,
-	accelerationZ: f32,
-	angularVelocityX: f32,
-	angularVelocityY: f32,
-	angularVelocityZ: f32,
-	magneticFieldX: f32,
-	magneticFieldY: f32,
-	magneticFieldZ: f32,
-	orientationW: f32,
-	orientationX: f32,
-	orientationY: f32,
-	orientationZ: f32,
+	accelerationX:         f32,
+	accelerationY:         f32,
+	accelerationZ:         f32,
+	angularVelocityX:      f32,
+	angularVelocityY:      f32,
+	angularVelocityZ:      f32,
+	magneticFieldX:        f32,
+	magneticFieldY:        f32,
+	magneticFieldZ:        f32,
+	orientationW:          f32,
+	orientationX:          f32,
+	orientationY:          f32,
+	orientationZ:          f32,
 	accelerometerAccuracy: MotionAccuracy,
-	gyroscopeAccuracy: MotionAccuracy,
-	magnetometerAccuracy: MotionAccuracy,
-	orientationAccuracy: MotionAccuracy,
+	gyroscopeAccuracy:     MotionAccuracy,
+	magnetometerAccuracy:  MotionAccuracy,
+	orientationAccuracy:   MotionAccuracy,
 }
 
 MouseInfo :: struct {
 	supportedButtons: MouseButtons,
-	sampleRate: u32,
-	sensorDpi: u32,
-	hasWheelX: bool,
-	hasWheelY: bool,
+	sampleRate:       u32,
+	sensorDpi:        u32,
+	hasWheelX:        bool,
+	hasWheelY:        bool,
 }
 
 MouseState :: struct {
-	buttons: MouseButtons,
+	buttons:   MouseButtons,
 	positionX: i64,
 	positionY: i64,
-	wheelX: i64,
-	wheelY: i64,
+	wheelX:    i64,
+	wheelY:    i64,
 }
 
 RacingWheelInfo :: struct {
-	menuButtonLabel: Label,
-	viewButtonLabel: Label,
+	menuButtonLabel:         Label,
+	viewButtonLabel:         Label,
 	previousGearButtonLabel: Label,
-	nextGearButtonLabel: Label,
-	dpadUpLabel: Label,
-	dpadDownLabel: Label,
-	dpadLeftLabel: Label,
-	dpadRightLabel: Label,
-	hasClutch: bool,
-	hasHandbrake: bool,
-	hasPatternShifter: bool,
-	minPatternShifterGear: i32,
-	maxPatternShifterGear: i32,
-	maxWheelAngle: f32,
+	nextGearButtonLabel:     Label,
+	dpadUpLabel:             Label,
+	dpadDownLabel:           Label,
+	dpadLeftLabel:           Label,
+	dpadRightLabel:          Label,
+	hasClutch:               bool,
+	hasHandbrake:            bool,
+	hasPatternShifter:       bool,
+	minPatternShifterGear:   i32,
+	maxPatternShifterGear:   i32,
+	maxWheelAngle:           f32,
 }
 
 RacingWheelState :: struct {
-	buttons: RacingWheelButtons,
+	buttons:            RacingWheelButtons,
 	patternShifterGear: i32,
-	wheel: f32,
-	throttle: f32,
-	brake: f32,
-	clutch: f32,
-	handbrake: f32,
+	wheel:              f32,
+	throttle:           f32,
+	brake:              f32,
+	clutch:             f32,
+	handbrake:          f32,
 }
 
 RawDeviceItemCollectionInfo :: struct {
-	kind: RawDeviceItemCollectionKind,
-	childCount: u32,
-	siblingCount: u32,
-	usageCount: u32,
-	usages: [^]Usage,
-	parent: ^RawDeviceItemCollectionInfo,
-	firstSibling: ^RawDeviceItemCollectionInfo,
+	kind:            RawDeviceItemCollectionKind,
+	childCount:      u32,
+	siblingCount:    u32,
+	usageCount:      u32,
+	usages:          [^]Usage `fmt:v,usageCount`,
+	parent:          ^RawDeviceItemCollectionInfo,
+	firstSibling:    ^RawDeviceItemCollectionInfo,
 	previousSibling: ^RawDeviceItemCollectionInfo,
-	nextSibling: ^RawDeviceItemCollectionInfo,
-	lastSibling: ^RawDeviceItemCollectionInfo,
-	firstChild: ^RawDeviceItemCollectionInfo,
-	lastChild: ^RawDeviceItemCollectionInfo,
+	nextSibling:     ^RawDeviceItemCollectionInfo,
+	lastSibling:     ^RawDeviceItemCollectionInfo,
+	firstChild:      ^RawDeviceItemCollectionInfo,
+	lastChild:       ^RawDeviceItemCollectionInfo,
 }
 
 RawDeviceReportInfo :: struct {
-	kind: RawDeviceReportKind,
-	id: u32,
-	size: u32,
+	kind:      RawDeviceReportKind,
+	id:        u32,
+	size:      u32,
 	itemCount: u32,
-	items: [^]RawDeviceReportItemInfo,
+	items:     [^]RawDeviceReportItemInfo `fmt:"v,itemCount"`,
 }
 
 RawDeviceReportItemInfo :: struct {
-	bitOffset: u32,
-	bitSize: u32,
-	logicalMin: i64,
-	logicalMax: i64,
-	physicalMin: f64,
-	physicalMax: f64,
-	physicalUnits: RawDevicePhysicalUnitKind,
-	rawPhysicalUnits: u32,
+	bitOffset:                u32,
+	bitSize:                  u32,
+	logicalMin:               i64,
+	logicalMax:               i64,
+	physicalMin:              f64,
+	physicalMax:              f64,
+	physicalUnits:            RawDevicePhysicalUnitKind,
+	rawPhysicalUnits:         u32,
 	rawPhysicalUnitsExponent: i32,
-	flags: RawDeviceReportItemFlags,
-	usageCount: u32,
-	usages: [^]Usage,
-	collection: ^RawDeviceItemCollectionInfo,
-	itemString: ^String,
+	flags:                    RawDeviceReportItemFlags,
+	usageCount:               u32,
+	usages:                   [^]Usage `fmt:"v,usageCount"`,
+	collection:               ^RawDeviceItemCollectionInfo,
+	itemString:               ^String,
 }
 
 RumbleParams :: struct {
-	lowFrequency: f32,
+	lowFrequency:  f32,
 	highFrequency: f32,
-	leftTrigger: f32,
-	rightTrigger: f32,
+	leftTrigger:   f32,
+	rightTrigger:  f32,
 }
 
 String :: struct {
-	sizeInBytes: u32,
+	sizeInBytes:    u32,
 	codePointCount: u32,
-	data: [^]byte,
+	data:           [^]byte,
 }
 
 TouchSensorInfo :: struct {
 	mappedInputKinds: Kind,
-	label: Label,
-	location: Location,
-	locationId: u32,
-	resolutionX: u64,
-	resolutionY: u64,
-	shape: TouchShape,
-	aspectRatio: f32,
-	orientation: f32,
-	physicalWidth: f32,
-	physicalHeight: f32,
-	maxPressure: f32,
-	maxProximity: f32,
-	maxTouchPoints: u32,
+	label:            Label,
+	location:         Location,
+	locationId:       u32,
+	resolutionX:      u64,
+	resolutionY:      u64,
+	shape:            TouchShape,
+	aspectRatio:      f32,
+	orientation:      f32,
+	physicalWidth:    f32,
+	physicalHeight:   f32,
+	maxPressure:      f32,
+	maxProximity:     f32,
+	maxTouchPoints:   u32,
 }
 
 TouchState :: struct {
-	touchId: u64,
-	sensorIndex: u32,
-	positionX: f32,
-	positionY: f32,
-	pressure: f32,
-	proximity: f32,
-	contactRectTop: f32,
-	contactRectLeft: f32,
-	contactRectRight: f32,
+	touchId:           u64,
+	sensorIndex:       u32,
+	positionX:         f32,
+	positionY:         f32,
+	pressure:          f32,
+	proximity:         f32,
+	contactRectTop:    f32,
+	contactRectLeft:   f32,
+	contactRectRight:  f32,
 	contactRectBottom: f32,
 }
 
 UiNavigationInfo :: struct {
-	menuButtonLabel: Label,
-	viewButtonLabel: Label,
-	acceptButtonLabel: Label,
-	cancelButtonLabel: Label,
-	upButtonLabel: Label,
-	downButtonLabel: Label,
-	leftButtonLabel: Label,
-	rightButtonLabel: Label,
-	contextButton1Label: Label,
-	contextButton2Label: Label,
-	contextButton3Label: Label,
-	contextButton4Label: Label,
-	pageUpButtonLabel: Label,
-	pageDownButtonLabel: Label,
-	pageLeftButtonLabel: Label,
-	pageRightButtonLabel: Label,
-	scrollUpButtonLabel: Label,
-	scrollDownButtonLabel: Label,
-	scrollLeftButtonLabel: Label,
+	menuButtonLabel:        Label,
+	viewButtonLabel:        Label,
+	acceptButtonLabel:      Label,
+	cancelButtonLabel:      Label,
+	upButtonLabel:          Label,
+	downButtonLabel:        Label,
+	leftButtonLabel:        Label,
+	rightButtonLabel:       Label,
+	contextButton1Label:    Label,
+	contextButton2Label:    Label,
+	contextButton3Label:    Label,
+	contextButton4Label:    Label,
+	pageUpButtonLabel:      Label,
+	pageDownButtonLabel:    Label,
+	pageLeftButtonLabel:    Label,
+	pageRightButtonLabel:   Label,
+	scrollUpButtonLabel:    Label,
+	scrollDownButtonLabel:  Label,
+	scrollLeftButtonLabel:  Label,
 	scrollRightButtonLabel: Label,
-	guideButtonLabel: Label,
+	guideButtonLabel:       Label,
 }
 
 UiNavigationState :: struct {
@@ -945,13 +945,13 @@ UiNavigationState :: struct {
 
 Usage :: struct {
 	page: u16,
-	id: u16,
+	id:   u16,
 }
 
 Version :: struct {
-	major: u16,
-	minor: u16,
-	build: u16,
+	major:    u16,
+	minor:    u16,
+	build:    u16,
 	revision: u16,
 }
 
@@ -969,25 +969,25 @@ IGameInput :: struct #raw_union {
 }
 IGameInput_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetCurrentTimestamp: proc "system" (this: ^IGameInput) -> u64,
-	GetCurrentReading: proc "system" (this: ^IGameInput, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
-	GetNextReading: proc "system" (this: ^IGameInput, referenceReading: ^IGameInputReading, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
-	GetPreviousReading: proc "system" (this: ^IGameInput, referenceReading: ^IGameInputReading, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
-	GetTemporalReading: proc "system" (this: ^IGameInput, timestamp: u64, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
-	RegisterReadingCallback: proc "system" (this: ^IGameInput, device: ^IGameInputDevice, inputKind: Kind, analogThreshold: f32, ctx: rawptr, callbackFunc: ReadingCallback, callbackToken: ^CallbackToken) -> HRESULT,
-	RegisterDeviceCallback: proc "system" (this: ^IGameInput, device: ^IGameInputDevice, inputKind: Kind, statusFilter: DeviceStatus, enumerationKind: EnumerationKind, ctx: rawptr, callbackFunc: DeviceCallback, callbackToken: ^CallbackToken) -> HRESULT,
-	RegisterSystemButtonCallback: proc "system" (this: ^IGameInput, device: ^IGameInputDevice, buttonFilter: SystemButtons, ctx: rawptr, callbackFunc: SystemButtonCallback, callbackToken: ^CallbackToken) -> HRESULT,
+	GetCurrentTimestamp:            proc "system" (this: ^IGameInput) -> u64,
+	GetCurrentReading:              proc "system" (this: ^IGameInput, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
+	GetNextReading:                 proc "system" (this: ^IGameInput, referenceReading: ^IGameInputReading, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
+	GetPreviousReading:             proc "system" (this: ^IGameInput, referenceReading: ^IGameInputReading, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
+	GetTemporalReading:             proc "system" (this: ^IGameInput, timestamp: u64, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
+	RegisterReadingCallback:        proc "system" (this: ^IGameInput, device: ^IGameInputDevice, inputKind: Kind, analogThreshold: f32, ctx: rawptr, callbackFunc: ReadingCallback, callbackToken: ^CallbackToken) -> HRESULT,
+	RegisterDeviceCallback:         proc "system" (this: ^IGameInput, device: ^IGameInputDevice, inputKind: Kind, statusFilter: DeviceStatus, enumerationKind: EnumerationKind, ctx: rawptr, callbackFunc: DeviceCallback, callbackToken: ^CallbackToken) -> HRESULT,
+	RegisterSystemButtonCallback:   proc "system" (this: ^IGameInput, device: ^IGameInputDevice, buttonFilter: SystemButtons, ctx: rawptr, callbackFunc: SystemButtonCallback, callbackToken: ^CallbackToken) -> HRESULT,
 	RegisterKeyboardLayoutCallback: proc "system" (this: ^IGameInput, device: ^IGameInputDevice, ctx: rawptr, callbackFunc: KeyboardLayoutCallback, callbackToken: ^CallbackToken) -> HRESULT,
-	StopCallback: proc "system" (this: ^IGameInput, callbackToken: CallbackToken),
-	UnregisterCallback: proc "system" (this: ^IGameInput, callbackToken: CallbackToken, timeoutInMicroseconds: u64) -> bool,
-	CreateDispatcher: proc "system" (this: ^IGameInput, dispatcher: ^^IGameInputDispatcher) -> HRESULT,
-	CreateAggregateDevice: proc "system" (this: ^IGameInput, kind: Kind, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromId: proc "system" (this: ^IGameInput, value: ^APP_LOCAL_DEVICE_ID, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromObject: proc "system" (this: ^IGameInput, value: ^IUnknown, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromPlatformHandle: proc "system" (this: ^IGameInput, value: HANDLE, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromPlatformString: proc "system" (this: ^IGameInput, value: windows.LPCWSTR, device: ^^IGameInputDevice) -> HRESULT,
-	EnableOemDeviceSupport: proc "system" (this: ^IGameInput, vendorId: u16, productId: u16, interfaceNumber: u8, collectionNumber: u8) -> HRESULT,
-	SetFocusPolicy: proc "system" (this: ^IGameInput, policy: FocusPolicy),
+	StopCallback:                   proc "system" (this: ^IGameInput, callbackToken: CallbackToken),
+	UnregisterCallback:             proc "system" (this: ^IGameInput, callbackToken: CallbackToken, timeoutInMicroseconds: u64) -> bool,
+	CreateDispatcher:               proc "system" (this: ^IGameInput, dispatcher: ^^IGameInputDispatcher) -> HRESULT,
+	CreateAggregateDevice:          proc "system" (this: ^IGameInput, kind: Kind, device: ^^IGameInputDevice) -> HRESULT,
+	FindDeviceFromId:               proc "system" (this: ^IGameInput, value: ^APP_LOCAL_DEVICE_ID, device: ^^IGameInputDevice) -> HRESULT,
+	FindDeviceFromObject:           proc "system" (this: ^IGameInput, value: ^IUnknown, device: ^^IGameInputDevice) -> HRESULT,
+	FindDeviceFromPlatformHandle:   proc "system" (this: ^IGameInput, value: HANDLE, device: ^^IGameInputDevice) -> HRESULT,
+	FindDeviceFromPlatformString:   proc "system" (this: ^IGameInput, value: windows.LPCWSTR, device: ^^IGameInputDevice) -> HRESULT,
+	EnableOemDeviceSupport:         proc "system" (this: ^IGameInput, vendorId: u16, productId: u16, interfaceNumber: u8, collectionNumber: u8) -> HRESULT,
+	SetFocusPolicy:                 proc "system" (this: ^IGameInput, policy: FocusPolicy),
 }
 
 IGameInputReading_UUID_STRING :: "2156947A-E1FA-4DE0-A30B-D812931DBD8D"
@@ -998,28 +998,28 @@ IGameInputReading :: struct #raw_union {
 }
 IGameInputReading_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetInputKind: proc "system" (this: ^IGameInputReading) -> Kind,
-	GetSequenceNumber: proc "system" (this: ^IGameInputReading) -> u64,
-	GetTimestamp: proc "system" (this: ^IGameInputReading) -> u64,
-	GetDevice: proc "system" (this: ^IGameInputReading, device: ^^IGameInputDevice),
-	GetRawReport: proc "system" (this: ^IGameInputReading, report: ^^IGameInputRawDeviceReport) -> bool,
-	GetControllerAxisCount: proc "system" (this: ^IGameInputReading) -> u32,
-	GetControllerAxisState: proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]f32) -> u32,
+	GetInputKind:             proc "system" (this: ^IGameInputReading) -> Kind,
+	GetSequenceNumber:        proc "system" (this: ^IGameInputReading) -> u64,
+	GetTimestamp:             proc "system" (this: ^IGameInputReading) -> u64,
+	GetDevice:                proc "system" (this: ^IGameInputReading, device: ^^IGameInputDevice),
+	GetRawReport:             proc "system" (this: ^IGameInputReading, report: ^^IGameInputRawDeviceReport) -> bool,
+	GetControllerAxisCount:   proc "system" (this: ^IGameInputReading) -> u32,
+	GetControllerAxisState:   proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]f32) -> u32,
 	GetControllerButtonCount: proc "system" (this: ^IGameInputReading) -> u32,
 	GetControllerButtonState: proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]bool) -> u32,
 	GetControllerSwitchCount: proc "system" (this: ^IGameInputReading) -> u32,
 	GetControllerSwitchState: proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]SwitchPosition) -> u32,
-	GetKeyCount: proc "system" (this: ^IGameInputReading) -> u32,
-	GetKeyState: proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]KeyState) -> u32,
-	GetMouseState: proc "system" (this: ^IGameInputReading, state: ^MouseState) -> bool,
-	GetTouchCount: proc "system" (this: ^IGameInputReading) -> u32,
-	GetTouchState: proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]TouchState) -> u32,
-	GetMotionState: proc "system" (this: ^IGameInputReading, state: ^MotionState) -> bool,
-	GetArcadeStickState: proc "system" (this: ^IGameInputReading, state: ^ArcadeStickState) -> bool,
-	GetFlightStickState: proc "system" (this: ^IGameInputReading, state: ^FlightStickState) -> bool,
-	GetGamepadState: proc "system" (this: ^IGameInputReading, state: ^GamepadState) -> bool,
-	GetRacingWheelState: proc "system" (this: ^IGameInputReading, state: ^RacingWheelState) -> bool,
-	GetUiNavigationState: proc "system" (this: ^IGameInputReading, state: ^UiNavigationState) -> bool,
+	GetKeyCount:              proc "system" (this: ^IGameInputReading) -> u32,
+	GetKeyState:              proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]KeyState) -> u32,
+	GetMouseState:            proc "system" (this: ^IGameInputReading, state: ^MouseState) -> bool,
+	GetTouchCount:            proc "system" (this: ^IGameInputReading) -> u32,
+	GetTouchState:            proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]TouchState) -> u32,
+	GetMotionState:           proc "system" (this: ^IGameInputReading, state: ^MotionState) -> bool,
+	GetArcadeStickState:      proc "system" (this: ^IGameInputReading, state: ^ArcadeStickState) -> bool,
+	GetFlightStickState:      proc "system" (this: ^IGameInputReading, state: ^FlightStickState) -> bool,
+	GetGamepadState:          proc "system" (this: ^IGameInputReading, state: ^GamepadState) -> bool,
+	GetRacingWheelState:      proc "system" (this: ^IGameInputReading, state: ^RacingWheelState) -> bool,
+	GetUiNavigationState:     proc "system" (this: ^IGameInputReading, state: ^UiNavigationState) -> bool,
 }
 
 IGameInputDevice_UUID_STRING :: "31DD86FB-4C1B-408A-868F-439B3CD47125"
@@ -1030,23 +1030,23 @@ IGameInputDevice :: struct #raw_union {
 }
 IGameInputDevice_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDeviceInfo: proc "system" (this: ^IGameInputDevice) -> ^DeviceInfo,
-	GetDeviceStatus: proc "system" (this: ^IGameInputDevice) -> DeviceStatus,
-	GetBatteryState: proc "system" (this: ^IGameInputDevice, state: ^BatteryState),
-	CreateForceFeedbackEffect: proc "system" (this: ^IGameInputDevice, motorIndex: u32, params: ^ForceFeedbackParams, effect: ^^IGameInputForceFeedbackEffect) -> HRESULT,
-	IsForceFeedbackMotorPoweredOn: proc "system" (this: ^IGameInputDevice, motorIndex: u32) -> bool,
-	SetForceFeedbackMotorGain: proc "system" (this: ^IGameInputDevice, motorIndex: u32, masterGain: f32),
-	SetHapticMotorState: proc "system" (this: ^IGameInputDevice, motorIndex: u32, params: ^HapticFeedbackParams) -> HRESULT,
-	SetRumbleState: proc "system" (this: ^IGameInputDevice, params: ^RumbleParams),
-	SetInputSynchronizationState: proc "system" (this: ^IGameInputDevice, enabled: bool),
-	SendInputSynchronizationHint: proc "system" (this: ^IGameInputDevice),
-	PowerOff: proc "system" (this: ^IGameInputDevice),
-	CreateRawDeviceReport: proc "system" (this: ^IGameInputDevice, reportId: u32, reportKind: RawDeviceReportKind, report: ^^IGameInputRawDeviceReport) -> HRESULT,
-	GetRawDeviceFeature: proc "system" (this: ^IGameInputDevice, reportId: u32, report: ^^IGameInputRawDeviceReport) -> HRESULT,
-	SetRawDeviceFeature: proc "system" (this: ^IGameInputDevice, report: ^IGameInputRawDeviceReport) -> HRESULT,
-	SendRawDeviceOutput: proc "system" (this: ^IGameInputDevice, report: ^IGameInputRawDeviceReport) -> HRESULT,
+	GetDeviceInfo:                   proc "system" (this: ^IGameInputDevice) -> ^DeviceInfo,
+	GetDeviceStatus:                 proc "system" (this: ^IGameInputDevice) -> DeviceStatus,
+	GetBatteryState:                 proc "system" (this: ^IGameInputDevice, state: ^BatteryState),
+	CreateForceFeedbackEffect:       proc "system" (this: ^IGameInputDevice, motorIndex: u32, params: ^ForceFeedbackParams, effect: ^^IGameInputForceFeedbackEffect) -> HRESULT,
+	IsForceFeedbackMotorPoweredOn:   proc "system" (this: ^IGameInputDevice, motorIndex: u32) -> bool,
+	SetForceFeedbackMotorGain:       proc "system" (this: ^IGameInputDevice, motorIndex: u32, masterGain: f32),
+	SetHapticMotorState:             proc "system" (this: ^IGameInputDevice, motorIndex: u32, params: ^HapticFeedbackParams) -> HRESULT,
+	SetRumbleState:                  proc "system" (this: ^IGameInputDevice, params: ^RumbleParams),
+	SetInputSynchronizationState:    proc "system" (this: ^IGameInputDevice, enabled: bool),
+	SendInputSynchronizationHint:    proc "system" (this: ^IGameInputDevice),
+	PowerOff:                        proc "system" (this: ^IGameInputDevice),
+	CreateRawDeviceReport:           proc "system" (this: ^IGameInputDevice, reportId: u32, reportKind: RawDeviceReportKind, report: ^^IGameInputRawDeviceReport) -> HRESULT,
+	GetRawDeviceFeature:             proc "system" (this: ^IGameInputDevice, reportId: u32, report: ^^IGameInputRawDeviceReport) -> HRESULT,
+	SetRawDeviceFeature:             proc "system" (this: ^IGameInputDevice, report: ^IGameInputRawDeviceReport) -> HRESULT,
+	SendRawDeviceOutput:             proc "system" (this: ^IGameInputDevice, report: ^IGameInputRawDeviceReport) -> HRESULT,
 	SendRawDeviceOutputWithResponse: proc "system" (this: ^IGameInputDevice, requestReport: ^IGameInputRawDeviceReport, responseReport: ^^IGameInputRawDeviceReport) -> HRESULT,
-	ExecuteRawDeviceIoControl: proc "system" (this: ^IGameInputDevice, controlCode: u32, inputBufferSize: c.size_t, inputBuffer: rawptr, outputBufferSize: c.size_t, outputBuffer: rawptr, outputSize: ^c.size_t) -> HRESULT,
+	ExecuteRawDeviceIoControl:       proc "system" (this: ^IGameInputDevice, controlCode: u32, inputBufferSize: c.size_t, inputBuffer: rawptr, outputBufferSize: c.size_t, outputBuffer: rawptr, outputSize: ^c.size_t) -> HRESULT,
 	AcquireExclusiveRawDeviceAccess: proc "system" (this: ^IGameInputDevice, timeoutInMicroseconds: u64) -> bool,
 	ReleaseExclusiveRawDeviceAccess: proc "system" (this: ^IGameInputDevice),
 }
@@ -1059,7 +1059,7 @@ IGameInputDispatcher :: struct #raw_union {
 }
 IGameInputDispatcher_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Dispatch: proc "system" (this: ^IGameInputDispatcher, quotaInMicroseconds: u64) -> bool,
+	Dispatch:       proc "system" (this: ^IGameInputDispatcher, quotaInMicroseconds: u64) -> bool,
 	OpenWaitHandle: proc "system" (this: ^IGameInputDispatcher, waitHandle: ^HANDLE) -> HRESULT,
 }
 
@@ -1071,14 +1071,14 @@ IGameInputForceFeedbackEffect :: struct #raw_union {
 }
 IGameInputForceFeedbackEffect_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDevice: proc "system" (this: ^IGameInputForceFeedbackEffect, device: ^^IGameInputDevice),
+	GetDevice:     proc "system" (this: ^IGameInputForceFeedbackEffect, device: ^^IGameInputDevice),
 	GetMotorIndex: proc "system" (this: ^IGameInputForceFeedbackEffect) -> u32,
-	GetGain: proc "system" (this: ^IGameInputForceFeedbackEffect) -> f32,
-	SetGain: proc "system" (this: ^IGameInputForceFeedbackEffect, gain: f32),
-	GetParams: proc "system" (this: ^IGameInputForceFeedbackEffect, params: ^ForceFeedbackParams),
-	SetParams: proc "system" (this: ^IGameInputForceFeedbackEffect, params: ^ForceFeedbackParams) -> bool,
-	GetState: proc "system" (this: ^IGameInputForceFeedbackEffect) -> FeedbackEffectState,
-	SetState: proc "system" (this: ^IGameInputForceFeedbackEffect, state: FeedbackEffectState),
+	GetGain:       proc "system" (this: ^IGameInputForceFeedbackEffect) -> f32,
+	SetGain:       proc "system" (this: ^IGameInputForceFeedbackEffect, gain: f32),
+	GetParams:     proc "system" (this: ^IGameInputForceFeedbackEffect, params: ^ForceFeedbackParams),
+	SetParams:     proc "system" (this: ^IGameInputForceFeedbackEffect, params: ^ForceFeedbackParams) -> bool,
+	GetState:      proc "system" (this: ^IGameInputForceFeedbackEffect) -> FeedbackEffectState,
+	SetState:      proc "system" (this: ^IGameInputForceFeedbackEffect, state: FeedbackEffectState),
 }
 
 IGameInputRawDeviceReport_UUID_STRING :: "61F08CF1-1FFC-40CA-A2B8-E1AB8BC5B6DC"
@@ -1089,41 +1089,41 @@ IGameInputRawDeviceReport :: struct #raw_union {
 }
 IGameInputRawDeviceReport_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDevice: proc "system" (this: ^IGameInputRawDeviceReport, device: ^^IGameInputDevice),
-	GetReportInfo: proc "system" (this: ^IGameInputRawDeviceReport) -> ^RawDeviceReportInfo,
+	GetDevice:      proc "system" (this: ^IGameInputRawDeviceReport, device: ^^IGameInputDevice),
+	GetReportInfo:  proc "system" (this: ^IGameInputRawDeviceReport) -> ^RawDeviceReportInfo,
 	GetRawDataSize: proc "system" (this: ^IGameInputRawDeviceReport) -> c.size_t,
-	GetRawData: proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: c.size_t, buffer: rawptr) -> c.size_t,
-	SetRawData: proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: c.size_t, buffer: rawptr) -> bool,
-	GetItemValue: proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32, value: ^u64) -> bool,
-	SetItemValue: proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32, value: u64) -> bool,
+	GetRawData:     proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: c.size_t, buffer: rawptr) -> c.size_t,
+	SetRawData:     proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: c.size_t, buffer: rawptr) -> bool,
+	GetItemValue:   proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32, value: ^u64) -> bool,
+	SetItemValue:   proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32, value: u64) -> bool,
 	ResetItemValue: proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32) -> bool,
-	ResetAllItems: proc "system" (this: ^IGameInputRawDeviceReport) -> bool,
+	ResetAllItems:  proc "system" (this: ^IGameInputRawDeviceReport) -> bool,
 }
 
 // Functions
 HRESULT :: windows.HRESULT
-HANDLE :: windows.HANDLE
+HANDLE  :: windows.HANDLE
 
-DEVICE_DISCONNECTED : HRESULT : -0x7C75FFFF
-DEVICE_NOT_FOUND : HRESULT : -0x7C75FFFE
-READING_NOT_FOUND : HRESULT : -0x7C75FFFD
-REFERENCE_READING_TOO_OLD : HRESULT : -0x7C75FFFC
-TIMESTAMP_OUT_OF_RANGE : HRESULT : -0x7C75FFFB
-INSUFFICIENT_FORCE_FEEDBACK_RESOURCES : HRESULT : -0x7C75FFFA
+DEVICE_DISCONNECTED                   :: HRESULT(-0x7C75FFFF)
+DEVICE_NOT_FOUND                      :: HRESULT(-0x7C75FFFE)
+READING_NOT_FOUND                     :: HRESULT(-0x7C75FFFD)
+REFERENCE_READING_TOO_OLD             :: HRESULT(-0x7C75FFFC)
+TIMESTAMP_OUT_OF_RANGE                :: HRESULT(-0x7C75FFFB)
+INSUFFICIENT_FORCE_FEEDBACK_RESOURCES :: HRESULT(-0x7C75FFFA)
 
 CallbackToken :: distinct u64
 
-CURRENT_CALLBACK_TOKEN_VALUE : CallbackToken : 0xFFFFFFFFFFFFFFFF
-INVALID_CALLBACK_TOKEN_VALUE : CallbackToken : 0x0000000000000000
+CURRENT_CALLBACK_TOKEN_VALUE :: CallbackToken(0xFFFFFFFFFFFFFFFF)
+INVALID_CALLBACK_TOKEN_VALUE :: CallbackToken(0x0000000000000000)
 
 @(default_calling_convention="system", link_prefix="GameInput")
 foreign wgi {
 	Create :: proc(gameInput: ^^IGameInput) -> HRESULT ---
 }
 
-DeviceCallback :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentState: DeviceStatus, previousState: DeviceStatus)
-GuideButtonCallback :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, isPressed: bool)
-SystemButtonCallback :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentState: DeviceStatus, previousState: DeviceStatus)
-ReadingCallback :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, reading: ^IGameInputReading, hasOverrunOccured: bool)
+DeviceCallback         :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentState: DeviceStatus, previousState: DeviceStatus)
+GuideButtonCallback    :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, isPressed: bool)
+SystemButtonCallback   :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentState: DeviceStatus, previousState: DeviceStatus)
+ReadingCallback        :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, reading: ^IGameInputReading, hasOverrunOccured: bool)
 KeyboardLayoutCallback :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentState: DeviceStatus, previousState: DeviceStatus)
 
