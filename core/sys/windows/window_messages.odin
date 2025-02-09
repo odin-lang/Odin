@@ -687,10 +687,14 @@ EM_GETAUTOURLDETECT               :: 0x045c
 TB_GETSTRINGA                     :: 0x045c
 EM_SETPALETTE                     :: 0x045d
 EM_GETTEXTEX                      :: 0x045e
+TB_SETHOTITEM2                    :: 0x045e
 EM_GETTEXTLENGTHEX                :: 0x045f
 EM_SHOWSCROLLBAR                  :: 0x0460
+TB_SETLISTGAP                     :: 0x0460
 EM_SETTEXTEX                      :: 0x0461
+TB_GETIMAGELISTCOUNT              :: 0x0462
 TAPI_REPLY                        :: 0x0463
+TB_GETIDEALSIZE                   :: 0x0463
 ACM_OPENA                         :: 0x0464
 BFFM_SETSTATUSTEXTA               :: 0x0464
 CDM_FIRST                         :: 0x0464
@@ -704,6 +708,7 @@ CDM_GETFILEPATH                   :: 0x0465
 EM_GETPUNCTUATION                 :: 0x0465
 IPM_SETADDRESS                    :: 0x0465
 PSM_SETCURSEL                     :: 0x0465
+TB_GETMETRICS                     :: 0x0465
 UDM_SETRANGE                      :: 0x0465
 WM_CHOOSEFONT_SETLOGFONT          :: 0x0465
 ACM_STOP                          :: 0x0466
@@ -712,6 +717,7 @@ CDM_GETFOLDERPATH                 :: 0x0466
 EM_SETWORDWRAPMODE                :: 0x0466
 IPM_GETADDRESS                    :: 0x0466
 PSM_REMOVEPAGE                    :: 0x0466
+TB_SETMETRICS                     :: 0x0466
 UDM_GETRANGE                      :: 0x0466
 WM_CAP_SET_CALLBACK_ERRORW        :: 0x0466
 WM_CHOOSEFONT_SETFLAGS            :: 0x0466
@@ -721,6 +727,7 @@ CDM_GETFOLDERIDLIST               :: 0x0467
 EM_GETWORDWRAPMODE                :: 0x0467
 IPM_SETRANGE                      :: 0x0467
 PSM_ADDPAGE                       :: 0x0467
+TB_GETITEMDROPDOWNRECT            :: 0x0467
 UDM_SETPOS                        :: 0x0467
 WM_CAP_SET_CALLBACK_STATUSW       :: 0x0467
 BFFM_SETSTATUSTEXTW               :: 0x0468
@@ -728,11 +735,13 @@ CDM_SETCONTROLTEXT                :: 0x0468
 EM_SETIMECOLOR                    :: 0x0468
 IPM_SETFOCUS                      :: 0x0468
 PSM_CHANGED                       :: 0x0468
+TB_SETPRESSEDIMAGELIST            :: 0x0468
 UDM_GETPOS                        :: 0x0468
 CDM_HIDECONTROL                   :: 0x0469
 EM_GETIMECOLOR                    :: 0x0469
 IPM_ISBLANK                       :: 0x0469
 PSM_RESTARTWINDOWS                :: 0x0469
+TB_GETPRESSEDIMAGELIST            :: 0x0469
 UDM_SETBUDDY                      :: 0x0469
 CDM_SETDEFEXT                     :: 0x046a
 EM_SETIMEOPTIONS                  :: 0x046a
@@ -915,6 +924,10 @@ FM_GETDRIVEINFOW                  :: 0x0611
 FM_GETFILESELW                    :: 0x0614
 FM_GETFILESELLFNW                 :: 0x0615
 WLX_WM_SAS                        :: 0x0659
+LM_HITTEST                        :: 0x0700
+LM_GETIDEALHEIGHT                 :: 0x0701
+LM_SETITEM                        :: 0x0702
+LM_GETITEM                        :: 0x0703
 SM_GETSELCOUNT                    :: 0x07e8
 UM_GETSELCOUNT                    :: 0x07e8
 WM_CPL_LAUNCH                     :: 0x07e8
@@ -1011,6 +1024,7 @@ LVM_GETITEMW                      :: 0x104b
 LVM_SETITEMW                      :: 0x104c
 LVM_INSERTITEMW                   :: 0x104d
 LVM_GETTOOLTIPS                   :: 0x104e
+LVM_SORTITEMSEX                   :: 0x1051
 LVM_FINDITEMW                     :: 0x1053
 LVM_GETSTRINGWIDTHW               :: 0x1057
 LVM_GETCOLUMNW                    :: 0x105f
@@ -1065,7 +1079,143 @@ LVM_GETFOOTERITEM                 :: 0x10d0
 LVM_GETITEMINDEXRECT              :: 0x10d1
 LVM_SETITEMINDEXSTATE             :: 0x10d2
 LVM_GETNEXTITEMINDEX              :: 0x10d3
+TV_FIRST                          :: 0x1100
+TVM_INSERTITEMA                   :: (TV_FIRST+0)
+TVM_DELETEITEM                    :: (TV_FIRST+1)
+TVM_EXPAND                        :: (TV_FIRST+2)
+TVM_GETITEMRECT                   :: (TV_FIRST+4)
+TVM_GETCOUNT                      :: (TV_FIRST+5)
+TVM_GETINDENT                     :: (TV_FIRST+6)
+TVM_SETINDENT                     :: (TV_FIRST+7)
+TVM_GETIMAGELIST                  :: (TV_FIRST+8)
+TVM_SETIMAGELIST                  :: (TV_FIRST+9)
+TVM_GETNEXTITEM                   :: (TV_FIRST+10)
+TVM_SELECTITEM                    :: (TV_FIRST+11)
+TVM_GETITEMA                      :: (TV_FIRST+12)
+TVM_SETITEMA                      :: (TV_FIRST+13)
+TVM_EDITLABELA                    :: (TV_FIRST+14)
+TVM_GETEDITCONTROL                :: (TV_FIRST+15)
+TVM_GETVISIBLECOUNT               :: (TV_FIRST+16)
+TVM_HITTEST                       :: (TV_FIRST+17)
+TVM_CREATEDRAGIMAGE               :: (TV_FIRST+18)
+TVM_SORTCHILDREN                  :: (TV_FIRST+19)
+TVM_ENSUREVISIBLE                 :: (TV_FIRST+20)
+TVM_SORTCHILDRENCB                :: (TV_FIRST+21)
+TVM_ENDEDITLABELNOW               :: (TV_FIRST+22)
+TVM_GETISEARCHSTRINGA             :: (TV_FIRST+23)
+TVM_SETTOOLTIPS                   :: (TV_FIRST+24)
+TVM_GETTOOLTIPS                   :: (TV_FIRST+25)
+TVM_SETINSERTMARK                 :: (TV_FIRST+26)
+TVM_SETUNICODEFORMAT              :: CCM_SETUNICODEFORMAT
+TVM_GETUNICODEFORMAT              :: CCM_GETUNICODEFORMAT
+TVM_SETITEMHEIGHT                 :: (TV_FIRST+27)
+TVM_GETITEMHEIGHT                 :: (TV_FIRST+28)
+TVM_SETBKCOLOR                    :: (TV_FIRST+29)
+TVM_SETTEXTCOLOR                  :: (TV_FIRST+30)
+TVM_GETBKCOLOR                    :: (TV_FIRST+31)
+TVM_GETTEXTCOLOR                  :: (TV_FIRST+32)
+TVM_SETSCROLLTIME                 :: (TV_FIRST+33)
+TVM_GETSCROLLTIME                 :: (TV_FIRST+34)
+TVM_SETINSERTMARKCOLOR            :: (TV_FIRST+37)
+TVM_GETINSERTMARKCOLOR            :: (TV_FIRST+38)
+TVM_GETITEMSTATE                  :: (TV_FIRST+39)
+TVM_SETLINECOLOR                  :: (TV_FIRST+40)
+TVM_GETLINECOLOR                  :: (TV_FIRST+41)
+TVM_MAPACCIDTOHTREEITEM           :: (TV_FIRST+42)
+TVM_MAPHTREEITEMTOACCID           :: (TV_FIRST+43)
+TVM_INSERTITEMW                   :: (TV_FIRST+50)
+TVM_GETITEMW                      :: (TV_FIRST+62)
+TVM_SETITEMW                      :: (TV_FIRST+63)
+TVM_GETISEARCHSTRINGW             :: (TV_FIRST+64)
+TVM_EDITLABELW                    :: (TV_FIRST+65)
+HDM_FIRST                         :: 0x1200
+HDM_GETITEMCOUNT                  :: (HDM_FIRST+0)
+HDM_INSERTITEMA                   :: (HDM_FIRST+1)
+HDM_DELETEITEM                    :: (HDM_FIRST+2)
+HDM_GETITEMA                      :: (HDM_FIRST+3)
+HDM_SETITEMA                      :: (HDM_FIRST+4)
+HDM_LAYOUT                        :: (HDM_FIRST+5)
+HDM_HITTEST                       :: (HDM_FIRST+6)
+HDM_GETITEMRECT                   :: (HDM_FIRST+7)
+HDM_SETIMAGELIST                  :: (HDM_FIRST+8)
+HDM_GETIMAGELIST                  :: (HDM_FIRST+9)
+HDM_INSERTITEMW                   :: (HDM_FIRST+10)
+HDM_GETITEMW                      :: (HDM_FIRST+11)
+HDM_SETITEMW                      :: (HDM_FIRST+12)
+HDM_ORDERTOINDEX                  :: (HDM_FIRST+15)
+HDM_CREATEDRAGIMAGE               :: (HDM_FIRST+16)
+HDM_GETORDERARRAY                 :: (HDM_FIRST+17)
+HDM_SETORDERARRAY                 :: (HDM_FIRST+18)
+HDM_SETHOTDIVIDER                 :: (HDM_FIRST+19)
+HDM_SETBITMAPMARGIN               :: (HDM_FIRST+20)
+HDM_GETBITMAPMARGIN               :: (HDM_FIRST+21)
+HDM_SETFILTERCHANGETIMEOUT        :: (HDM_FIRST+22)
+HDM_SETUNICODEFORMAT              :: CCM_SETUNICODEFORMAT
+HDM_GETUNICODEFORMAT              :: CCM_GETUNICODEFORMAT
+HDM_EDITFILTER                    :: (HDM_FIRST+23)
+HDM_CLEARFILTER                   :: (HDM_FIRST+24)
+TCM_FIRST                         :: 0x1300
+TCM_GETIMAGELIST                  :: (TCM_FIRST+2)
+TCM_SETIMAGELIST                  :: (TCM_FIRST+3)
+TCM_GETITEMCOUNT                  :: (TCM_FIRST+4)
+TCM_GETITEMA                      :: (TCM_FIRST+5)
+TCM_SETITEMA                      :: (TCM_FIRST+6)
+TCM_INSERTITEMA                   :: (TCM_FIRST+7)
+TCM_DELETEITEM                    :: (TCM_FIRST+8)
+TCM_DELETEALLITEMS                :: (TCM_FIRST+9)
+TCM_GETITEMRECT                   :: (TCM_FIRST+10)
+TCM_GETCURSEL                     :: (TCM_FIRST+11)
+TCM_SETCURSEL                     :: (TCM_FIRST+12)
+TCM_HITTEST                       :: (TCM_FIRST+13)
+TCM_SETITEMEXTRA                  :: (TCM_FIRST+14)
+TCM_ADJUSTRECT                    :: (TCM_FIRST+40)
+TCM_SETITEMSIZE                   :: (TCM_FIRST+41)
+TCM_REMOVEIMAGE                   :: (TCM_FIRST+42)
+TCM_SETPADDING                    :: (TCM_FIRST+43)
+TCM_GETROWCOUNT                   :: (TCM_FIRST+44)
+TCM_GETTOOLTIPS                   :: (TCM_FIRST+45)
+TCM_SETTOOLTIPS                   :: (TCM_FIRST+46)
+TCM_GETCURFOCUS                   :: (TCM_FIRST+47)
+TCM_SETCURFOCUS                   :: (TCM_FIRST+48)
+TCM_SETMINTABWIDTH                :: (TCM_FIRST+49)
+TCM_DESELECTALL                   :: (TCM_FIRST+50)
+TCM_HIGHLIGHTITEM                 :: (TCM_FIRST+51)
+TCM_SETEXTENDEDSTYLE              :: (TCM_FIRST+52)
+TCM_GETEXTENDEDSTYLE              :: (TCM_FIRST+53)
+TCM_SETUNICODEFORMAT              :: CCM_SETUNICODEFORMAT
+TCM_GETUNICODEFORMAT              :: CCM_GETUNICODEFORMAT
+TCM_GETITEMW                      :: (TCM_FIRST+60)
+TCM_SETITEMW                      :: (TCM_FIRST+61)
+TCM_INSERTITEMW                   :: (TCM_FIRST+62)
+PGM_FIRST                         :: 0x1400
+PGM_SETCHILD                      :: (PGM_FIRST+1)
+PGM_RECALCSIZE                    :: (PGM_FIRST+2)
+PGM_FORWARDMOUSE                  :: (PGM_FIRST+3)
+PGM_SETBKCOLOR                    :: (PGM_FIRST+4)
+PGM_GETBKCOLOR                    :: (PGM_FIRST+5)
+PGM_SETBORDER                     :: (PGM_FIRST+6)
+PGM_GETBORDER                     :: (PGM_FIRST+7)
+PGM_SETPOS                        :: (PGM_FIRST+8)
+PGM_GETPOS                        :: (PGM_FIRST+9)
+PGM_SETBUTTONSIZE                 :: (PGM_FIRST+10)
+PGM_GETBUTTONSIZE                 :: (PGM_FIRST+11)
+PGM_GETBUTTONSTATE                :: (PGM_FIRST+12)
+PGM_GETDROPTARGET                 :: CCM_GETDROPTARGET
+ECM_FIRST                         :: 0x1500
+EM_SETCUEBANNER                   :: ECM_FIRST + 0x0001
+EM_GETCUEBANNER                   :: ECM_FIRST + 0x0002
+EM_SHOWBALLOONTIP                 :: ECM_FIRST + 0x0003
+EM_HIDEBALLOONTIP                 :: ECM_FIRST + 0x0004
+EM_SETHILITE                      :: ECM_FIRST + 0x0005
+EM_GETHILITE                      :: ECM_FIRST + 0x0006
+EM_NOSETFOCUS                     :: ECM_FIRST + 0x0007
+EM_TAKEFOCUS                      :: ECM_FIRST + 0x0008
 BCM_FIRST                         :: 0x1600
+BCM_GETIDEALSIZE                  :: BCM_FIRST + 0x0001
+BCM_SETIMAGELIST                  :: BCM_FIRST + 0x0002
+BCM_GETIMAGELIST                  :: BCM_FIRST + 0x0003
+BCM_SETTEXTMARGIN                 :: BCM_FIRST + 0x0004
+BCM_GETTEXTMARGIN                 :: BCM_FIRST + 0x0005
 BCM_SETDROPDOWNSTATE              :: BCM_FIRST + 0x0006
 BCM_SETSPLITINFO                  :: BCM_FIRST + 0x0007
 BCM_GETSPLITINFO                  :: BCM_FIRST + 0x0008
@@ -1073,9 +1223,29 @@ BCM_SETNOTE                       :: BCM_FIRST + 0x0009
 BCM_GETNOTE                       :: BCM_FIRST + 0x000A
 BCM_GETNOTELENGTH                 :: BCM_FIRST + 0x000B
 BCM_SETSHIELD                     :: BCM_FIRST + 0x000C
+CBM_FIRST                         :: 0x1700
+CB_SETMINVISIBLE                  :: CBM_FIRST + 0x0001
+CB_GETMINVISIBLE                  :: CBM_FIRST + 0x0002
+CCM_FIRST                         :: 0x2000
+CCM_LAST                          :: (CCM_FIRST+0x200)
+CCM_SETBKCOLOR                    :: (CCM_FIRST+1)
+CCM_SETCOLORSCHEME                :: (CCM_FIRST+2)
+CCM_GETCOLORSCHEME                :: (CCM_FIRST+3)
+CCM_GETDROPTARGET                 :: (CCM_FIRST+4)
+CCM_SETUNICODEFORMAT              :: (CCM_FIRST+5)
+CCM_GETUNICODEFORMAT              :: (CCM_FIRST+6)
+CCM_SETVERSION                    :: (CCM_FIRST+7)
+CCM_GETVERSION                    :: (CCM_FIRST+8)
+CCM_SETNOTIFYWINDOW               :: (CCM_FIRST+9)
+CCM_SETWINDOWTHEME                :: (CCM_FIRST+11)
+CCM_DPISCALE                      :: (CCM_FIRST+12)
 OCM__BASE                         :: 0x2000
 LVM_SETUNICODEFORMAT              :: 0x2005
+SB_SETUNICODEFORMAT               :: 0x2005
 LVM_GETUNICODEFORMAT              :: 0x2006
+SB_GETUNICODEFORMAT               :: 0x2006
+CBEM_SETWINDOWTHEME               :: 0x200b
+TB_SETWINDOWTHEME                 :: 0x200b
 OCM_CTLCOLOR                      :: 0x2019
 OCM_DRAWITEM                      :: 0x202b
 OCM_MEASUREITEM                   :: 0x202c
