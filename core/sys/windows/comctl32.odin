@@ -1612,7 +1612,7 @@ TVINSERTSTRUCTW :: struct {
 	_: struct #raw_union {
 		itemex: TVITEMEXW,
 		item: TV_ITEMW,
-	}
+	},
 }
 TV_INSERTSTRUCTW   :: TVINSERTSTRUCTW
 LPTVINSERTSTRUCTW  :: ^TVINSERTSTRUCTW
