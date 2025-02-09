@@ -50,9 +50,12 @@ init_dns_configuration :: proc() {
 	dns_configuration.hosts_file,  _ = replace_environment_path(dns_configuration.hosts_file)
 }
 
+@(fini, private)
 destroy_dns_configuration :: proc() {
 	delete(dns_configuration.resolv_conf)
+	dns_configuration.resolv_conf = ""
 	delete(dns_configuration.hosts_file)
+	dns_configuration.hosts_file = ""
 }
 
 dns_configuration := DEFAULT_DNS_CONFIGURATION
