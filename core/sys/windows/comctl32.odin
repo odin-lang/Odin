@@ -66,44 +66,6 @@ ANIMATE_CLASS      :: "SysAnimate32"
 MONTHCAL_CLASS     :: "SysMonthCal32"
 DATETIMEPICK_CLASS :: "SysDateTimePick32"
 
-// Common Control Notification Code Ranges
-NM_FIRST   :: 0
-NM_LAST    :: ~DWORD(99 - 1)
-LVN_FIRST  :: ~DWORD(100 - 1)
-LVN_LAST   :: ~DWORD(199 - 1)
-HDN_FIRST  :: ~DWORD(300 - 1)
-HDN_LAST   :: ~DWORD(399 - 1)
-TVN_FIRST  :: ~DWORD(400 - 1)
-TVN_LAST   :: ~DWORD(499 - 1)
-TTN_FIRST  :: ~DWORD(520 - 1)
-TTN_LAST   :: ~DWORD(549 - 1)
-TCN_FIRST  :: ~DWORD(550 - 1)
-TCN_LAST   :: ~DWORD(580 - 1)
-CDN_FIRST  :: ~DWORD(601 - 1)
-CDN_LAST   :: ~DWORD(699 - 1)
-TBN_FIRST  :: ~DWORD(700 - 1)
-TBN_LAST   :: ~DWORD(720 - 1)
-UDN_FIRST  :: ~DWORD(721 - 1)
-UDN_LAST   :: ~DWORD(740 - 1)
-MCN_FIRST  :: ~DWORD(750 - 1)
-MCN_LAST   :: ~DWORD(759 - 1)
-DTN_FIRST  :: ~DWORD(760 - 1)
-DTN_LAST   :: ~DWORD(799 - 1)
-CBEN_FIRST :: ~DWORD(800 - 1)
-CBEN_LAST  :: ~DWORD(830 - 1)
-RBN_FIRST  :: ~DWORD(831 - 1)
-RBN_LAST   :: ~DWORD(859 - 1)
-IPN_FIRST  :: ~DWORD(860 - 1)
-IPN_LAST   :: ~DWORD(879 - 1)
-SBN_FIRST  :: ~DWORD(880 - 1)
-SBN_LAST   :: ~DWORD(899 - 1)
-PGN_FIRST  :: ~DWORD(900 - 1)
-PGN_LAST   :: ~DWORD(950 - 1)
-WMN_FIRST  :: ~DWORD(1000 - 1)
-WMN_LAST   :: ~DWORD(1200 - 1)
-BCN_FIRST  :: ~DWORD(1250 - 1)
-BCN_LAST   :: ~DWORD(1350 - 1)
-
 // Common Control Constants
 MSGF_COMMCTRL_BEGINDRAG   :: 0x4200
 MSGF_COMMCTRL_SIZEHEADER  :: 0x4201
@@ -360,6 +322,34 @@ HD_HITTESTINFO   :: HDHITTESTINFO
 LPHDHITTESTINFO  :: ^HDHITTESTINFO
 LPHD_HITTESTINFO :: LPHDHITTESTINFO
 
+NMHEADERW :: struct {
+	hdr: NMHDR,
+	iItem: c_int,
+	iButton: c_int,
+	pitem: ^HDITEMW,
+}
+LPNMHEADERW  :: ^NMHEADERW
+HD_NOTIFYW   :: NMHEADERW
+LPHD_NOTIFYW :: LPNMHEADERW
+
+NMHDDISPINFOW :: struct {
+	hdr: NMHDR,
+	iItem: c_int,
+	mask: UINT,
+	pszText: LPWSTR,
+	cchTextMax: c_int,
+	iImage: c_int,
+	lParam: LPARAM,
+}
+LPNMHDDISPINFOW :: ^NMHDDISPINFOW
+
+NMHDFILTERBTNCLICK :: struct {
+	hdr: NMHDR,
+	iItem: c_int,
+	rc: RECT,
+}
+LPNMHDFILTERBTNCLICK :: ^NMHDFILTERBTNCLICK
+
 Header_GetItemCount :: #force_inline proc "system" (hwndHD: HWND) -> c_int {
 	return cast(c_int)SendMessageW(hwndHD, HDM_GETITEMCOUNT, 0, 0)
 }
@@ -508,6 +498,12 @@ TBMETRICS :: struct {
 }
 LPTBMETRICS :: ^TBMETRICS
 
+NMTTCUSTOMDRAW :: struct {
+	nmcd: NMCUSTOMDRAW,
+	uDrawFlags: UINT,
+}
+LPNMTTCUSTOMDRAW :: ^NMTTCUSTOMDRAW
+
 @(default_calling_convention="system")
 foreign Comctl32 {
 	CreateToolbarEx :: proc(hwnd: HWND, ws: DWORD, wID: UINT, nBitmaps: c_int, hBMInst: HINSTANCE, wBMID: UINT_PTR, lpButtons: LPCTBBUTTON, iNumButtons: c_int, dxButton,dyButton: c_int, dxBitmap,dyBitmap: c_int, uStructSize: UINT) -> HWND ---
@@ -551,6 +547,12 @@ NMBCHOTITEM :: struct {
     dwFlags: DWORD,
 }
 LPNMBCHOTITEM :: ^NMBCHOTITEM
+
+NMBCDROPDOWN :: struct {
+	hdr: NMHDR,
+	rcButton: RECT,
+}
+LPNMBCDROPDOWN :: ^NMBCDROPDOWN
 
 // BCM_SETIMAGELIST value
 BCCL_NOGLYPH :: cast(HIMAGELIST)(~uintptr(0))
@@ -1044,7 +1046,7 @@ NMLISTVIEW :: struct {
     uOldState: UINT,
     uChanged: UINT,
     ptAction: POINT,
-    lParam: LPARAM
+    lParam: LPARAM,
 }
 NM_LISTVIEW   :: NMLISTVIEW
 LPNMLISTVIEW  :: ^NMLISTVIEW
