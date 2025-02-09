@@ -574,13 +574,13 @@ Button_SetNote :: #force_inline proc "system" (hwnd: HWND, psz: LPCWSTR) -> BOOL
 	return cast(BOOL)SendMessageW(hwnd, BCM_SETNOTE, 0, cast(LPARAM)uintptr(psz))
 }
 Button_GetNote :: #force_inline proc "system" (hwnd: HWND, psz: LPCWSTR, pcc: ^c_int) -> BOOL {
-	return cast(BOOL)SendMessageW(hwnd, BCM_GETNOTE, cast(WPARAM)uintptr(pcc), cast(LPARAM)uintptr(psz))
+	return cast(BOOL)SendMessageW(hwnd, BCM_GETNOTE, uintptr(pcc), cast(LPARAM)uintptr(psz))
 }
 Button_GetNoteLength :: #force_inline proc "system" (hwnd: HWND) -> LRESULT {
-	return cast(LRESULT)SendMessageW(hwnd, BCM_GETNOTELENGTH, 0, 0)
+	return SendMessageW(hwnd, BCM_GETNOTELENGTH, 0, 0)
 }
 Button_SetElevationRequiredState :: #force_inline proc "system" (hwnd: HWND, fRequired: BOOL) -> LRESULT {
-	return cast(LRESULT)SendMessageW(hwnd, BCM_SETSHIELD, 0, cast(LPARAM)fRequired)
+	return SendMessageW(hwnd, BCM_SETSHIELD, 0, cast(LPARAM)fRequired)
 }
 Button_SetDropDownState :: #force_inline proc "system" (hwnd: HWND, fDropDown: BOOL) -> BOOL {
 	return cast(BOOL)SendMessageW(hwnd, BCM_SETDROPDOWNSTATE, cast(WPARAM)fDropDown, 0)
@@ -608,7 +608,7 @@ Edit_SetCueBannerTextFocused :: #force_inline proc "system" (hwnd: HWND, lpcwTex
 	return cast(BOOL)SendMessageW(hwnd, EM_SETCUEBANNER, cast(WPARAM)fDrawFocused, cast(LPARAM)uintptr(lpcwText))
 }
 Edit_GetCueBannerText :: #force_inline proc "system" (hwnd: HWND, lpwText: LPWSTR, cchText: LONG) -> BOOL {
-	return cast(BOOL)SendMessageW(hwnd, EM_GETCUEBANNER, cast(WPARAM)uintptr(lpwText), cast(LPARAM)cchText)
+	return cast(BOOL)SendMessageW(hwnd, EM_GETCUEBANNER, uintptr(lpwText), cast(LPARAM)cchText)
 }
 Edit_ShowBalloonTip :: #force_inline proc "system" (hwnd: HWND, peditballoontip: PEDITBALLOONTIP) -> BOOL {
 	return cast(BOOL)SendMessageW(hwnd, EM_SHOWBALLOONTIP, 0, cast(LPARAM)uintptr(peditballoontip))
@@ -1432,10 +1432,10 @@ ListView_EnableGroupView :: #force_inline proc "system" (hwnd: HWND, fEnable: BO
 	return cast(c_int)SendMessageW(hwnd, LVM_ENABLEGROUPVIEW, cast(WPARAM)fEnable, 0)
 }
 ListView_SortGroups :: #force_inline proc "system" (hwnd: HWND, pfnGroupCompare: PFNLVGROUPCOMPARE, pUser: rawptr) -> c_int {
-	return cast(c_int)SendMessageW(hwnd, LVM_SORTGROUPS, cast(WPARAM)transmute(uintptr)(pfnGroupCompare), cast(LPARAM)uintptr(pUser))
+	return cast(c_int)SendMessageW(hwnd, LVM_SORTGROUPS, transmute(uintptr)(pfnGroupCompare), cast(LPARAM)uintptr(pUser))
 }
 ListView_InsertGroupSorted :: #force_inline proc "system" (hwnd: HWND, structInsert: PLVINSERTGROUPSORTED) {
-	SendMessageW(hwnd, LVM_INSERTGROUPSORTED, cast(WPARAM)uintptr(structInsert), 0)
+	SendMessageW(hwnd, LVM_INSERTGROUPSORTED, uintptr(structInsert), 0)
 }
 ListView_RemoveAllGroups :: #force_inline proc "system" (hwnd: HWND) {
 	SendMessageW(hwnd, LVM_REMOVEALLGROUPS, 0, 0)
@@ -1462,7 +1462,7 @@ ListView_GetInsertMark :: #force_inline proc "system" (hwnd: HWND, lvim: LPLVINS
 	return cast(BOOL)SendMessageW(hwnd, LVM_GETINSERTMARK, 0, cast(LPARAM)uintptr(lvim))
 }
 ListView_InsertMarkHitTest :: #force_inline proc "system" (hwnd: HWND, point: LPPOINT, lvim: LPLVINSERTMARK) -> c_int {
-	return cast(c_int)SendMessageW(hwnd, LVM_INSERTMARKHITTEST, cast(WPARAM)uintptr(point), cast(LPARAM)uintptr(lvim))
+	return cast(c_int)SendMessageW(hwnd, LVM_INSERTMARKHITTEST, uintptr(point), cast(LPARAM)uintptr(lvim))
 }
 ListView_GetInsertMarkRect :: #force_inline proc "system" (hwnd: HWND, rc: LPRECT) -> c_int {
 	return cast(c_int)SendMessageW(hwnd, LVM_GETINSERTMARKRECT, 0, cast(LPARAM)uintptr(rc))
@@ -1807,7 +1807,7 @@ TreeView_EndEditLabelNow :: #force_inline proc "system" (hwnd: HWND, fCancel: BO
 	return cast(BOOL)SendMessageW(hwnd, TVM_ENDEDITLABELNOW, cast(WPARAM)fCancel, 0)
 }
 TreeView_SetToolTips :: #force_inline proc "system" (hwnd: HWND, hwndTT: HWND) -> HWND {
-	return cast(HWND)uintptr(SendMessageW(hwnd, TVM_SETTOOLTIPS, cast(WPARAM)uintptr(hwndTT), 0))
+	return cast(HWND)uintptr(SendMessageW(hwnd, TVM_SETTOOLTIPS, uintptr(hwndTT), 0))
 }
 TreeView_GetToolTips :: #force_inline proc "system" (hwnd: HWND) -> HWND {
 	return cast(HWND)uintptr(SendMessageW(hwnd, TVM_GETTOOLTIPS, 0, 0))
@@ -1867,10 +1867,10 @@ TreeView_SetCheckState :: #force_inline proc "system" (hwndTV: HWND, hti: HTREEI
 	TreeView_SetItemState(hwndTV, hti, INDEXTOSTATEIMAGEMASK(2 if fCheck else 1), TVIS_STATEIMAGEMASK)
 }
 TreeView_GetItemState :: #force_inline proc "system" (hwndTV: HWND, hti: HTREEITEM, mask: UINT) -> UINT {
-	return cast(UINT)SendMessageW(hwndTV, TVM_GETITEMSTATE, cast(WPARAM)uintptr(hti), cast(LPARAM)mask)
+	return cast(UINT)SendMessageW(hwndTV, TVM_GETITEMSTATE, uintptr(hti), cast(LPARAM)mask)
 }
 TreeView_GetCheckState :: #force_inline proc "system" (hwndTV: HWND, hti: HTREEITEM) -> UINT {
-	return ((cast(UINT)SendMessageW(hwndTV, TVM_GETITEMSTATE, cast(WPARAM)uintptr(hti), cast(LPARAM)TVIS_STATEIMAGEMASK)) >> 12) - 1
+	return ((cast(UINT)SendMessageW(hwndTV, TVM_GETITEMSTATE, uintptr(hti), cast(LPARAM)TVIS_STATEIMAGEMASK)) >> 12) - 1
 }
 TreeView_SetLineColor :: #force_inline proc "system" (hwnd: HWND, clr: COLORREF) -> COLORREF {
 	return cast(COLORREF)SendMessageW(hwnd, TVM_SETLINECOLOR, 0, cast(LPARAM)clr)
@@ -1882,7 +1882,7 @@ TreeView_MapAccIDToHTREEITEM :: #force_inline proc "system" (hwnd: HWND, id: UIN
 	return cast(HTREEITEM)uintptr(SendMessageW(hwnd, TVM_MAPACCIDTOHTREEITEM, cast(WPARAM)id, 0))
 }
 TreeView_MapHTREEITEMToAccID :: #force_inline proc "system" (hwnd: HWND, htreeitem: HTREEITEM) -> UINT {
-	return cast(UINT)SendMessageW(hwnd, TVM_MAPHTREEITEMTOACCID, cast(WPARAM)uintptr(htreeitem), 0)
+	return cast(UINT)SendMessageW(hwnd, TVM_MAPHTREEITEMTOACCID, uintptr(htreeitem), 0)
 }
 
 // Combo Box Ex Control
@@ -2064,7 +2064,7 @@ TabCtrl_GetToolTips :: #force_inline proc "system" (hwnd: HWND) -> HWND {
     return cast(HWND)uintptr(SendMessageW(hwnd, TCM_GETTOOLTIPS, 0, 0))
 }
 TabCtrl_SetToolTips :: #force_inline proc "system" (hwnd: HWND, hwndTT: HWND) {
-    SendMessageW(hwnd, TCM_SETTOOLTIPS, cast(WPARAM)uintptr(hwndTT), 0)
+    SendMessageW(hwnd, TCM_SETTOOLTIPS, uintptr(hwndTT), 0)
 }
 TabCtrl_GetCurFocus :: #force_inline proc "system" (hwnd: HWND) -> c_int {
     return cast(c_int)SendMessageW(hwnd, TCM_GETCURFOCUS, 0, 0)
