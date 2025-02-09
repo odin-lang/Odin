@@ -533,18 +533,21 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 			return
 		}
 
-		if packet[cur_idx] > 63 && packet[cur_idx] != 0xC0 {
-			return
-		}
+		switch {
 
-		switch packet[cur_idx] {
-
-		// This is a offset to more data in the packet, jump to it
-		case 0xC0:
+		// A pointer is when the two higher bits are set.
+		case packet[cur_idx] & 0xC0 == 0xC0:
+			if len(packet[cur_idx:]) < 2 {
+				return
+			}
 			pkt := packet[cur_idx:cur_idx+2]
 			val := (^u16be)(raw_data(pkt))^
 			offset := int(val & 0x3FFF)
-			if offset > len(packet) {
+			// RFC 9267 a ptr should only point backwards, enough to avoid infinity.
+			// "The offset at which this octet is located must be smaller than the offset
+			// at which the compression pointer is located". Still keep iteration_max to
+			// avoid tiny jumps.
+			if offset > len(packet) || offset >= cur_idx {
 				return
 			}
 
@@ -554,6 +557,10 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 				out_size += 2
 				level += 1
 			}
+
+		// Validate label len
+		case packet[cur_idx] > LABEL_MAX:
+			return
 
 		// This is a label, insert it into the hostname
 		case:
