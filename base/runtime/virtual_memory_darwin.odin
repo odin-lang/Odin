@@ -8,7 +8,7 @@ VIRTUAL_MEMORY_SUPPORTED :: true
 foreign import lib "system:System.framework"
 
 foreign lib {
-	mach_task_self :: proc() -> u32 ---
+	mach_task_self_: u32
 	mach_vm_allocate :: proc(target: u32, address: ^u64, size: u64, flags: i32) -> i32 ---
 	mach_vm_deallocate :: proc(target: u32, address: u64, size: u64) -> i32 ---
 	mach_vm_map :: proc(
@@ -56,7 +56,7 @@ VM_INHERIT_COPY :: 1
 
 _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 	address: u64
-	result := mach_vm_map(mach_task_self(), &address, u64(size), 0, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
+	result := mach_vm_map(mach_task_self_, &address, u64(size), 0, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
 	if result != 0 {
 		return nil
 	}
@@ -76,7 +76,7 @@ _allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
 		}
 	}
 	alignment_mask: u64 = SUPERPAGE_SIZE - 1 // Assumes a power of two size, ensured by an assertion in `virtual_memory.odin`.
-	result := mach_vm_map(mach_task_self(), &address, SUPERPAGE_SIZE, alignment_mask, flags, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
+	result := mach_vm_map(mach_task_self_, &address, SUPERPAGE_SIZE, alignment_mask, flags, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
 	if result != 0 {
 		return nil
 	}
@@ -87,7 +87,7 @@ _allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
 _allocate_virtual_memory_aligned :: proc "contextless" (size: int, alignment: int) -> rawptr {
 	address: u64
 	alignment_mask: u64 = u64(alignment) - 1
-	result := mach_vm_map(mach_task_self(), &address, u64(size), alignment_mask, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
+	result := mach_vm_map(mach_task_self_, &address, u64(size), alignment_mask, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
 	if result != 0 {
 		return nil
 	}
@@ -95,7 +95,7 @@ _allocate_virtual_memory_aligned :: proc "contextless" (size: int, alignment: in
 }
 
 _free_virtual_memory :: proc "contextless" (ptr: rawptr, size: int) {
-	mach_vm_deallocate(mach_task_self(), u64(uintptr(ptr)), u64(size))
+	mach_vm_deallocate(mach_task_self_, u64(uintptr(ptr)), u64(size))
 }
 
 _resize_virtual_memory :: proc "contextless" (ptr: rawptr, old_size: int, new_size: int, alignment: int) -> rawptr {
@@ -112,7 +112,7 @@ _resize_virtual_memory :: proc "contextless" (ptr: rawptr, old_size: int, new_si
 		return ptr
 	} else if new_size_pages > old_size_pages {
 		new_address: u64
-		result_alloc := mach_vm_allocate(mach_task_self(), &new_address, u64(new_size), VM_FLAGS_ANYWHERE)
+		result_alloc := mach_vm_allocate(mach_task_self_, &new_address, u64(new_size), VM_FLAGS_ANYWHERE)
 		if result_alloc != 0 {
 			return nil
 		}
@@ -123,16 +123,16 @@ _resize_virtual_memory :: proc "contextless" (ptr: rawptr, old_size: int, new_si
 		}
 
 		cur_protection, max_protection: i32
-		result_remap := mach_vm_remap(mach_task_self(), &new_address, u64(old_size), alignment_mask, VM_FLAGS_ANYWHERE, mach_task_self(), u64(uintptr(ptr)), true, &cur_protection, &max_protection, VM_INHERIT_COPY)
+		result_remap := mach_vm_remap(mach_task_self_, &new_address, u64(old_size), alignment_mask, VM_FLAGS_ANYWHERE, mach_task_self_, u64(uintptr(ptr)), true, &cur_protection, &max_protection, VM_INHERIT_COPY)
 		if result_remap != 0 {
 			return nil
 		}
-		mach_vm_deallocate(mach_task_self(), u64(uintptr(ptr)), u64(old_size))
+		mach_vm_deallocate(mach_task_self_, u64(uintptr(ptr)), u64(old_size))
 		return rawptr(uintptr(new_address))
 	} else {
 		new_size_boundary := new_size_pages * PAGE_SIZE
 		shrink_by := u64(old_size - new_size)
-		mach_vm_deallocate(mach_task_self(), u64(uintptr(ptr) + uintptr(new_size_boundary)), shrink_by)
+		mach_vm_deallocate(mach_task_self_, u64(uintptr(ptr) + uintptr(new_size_boundary)), shrink_by)
 		return rawptr(uintptr(ptr))
 	}
 }
