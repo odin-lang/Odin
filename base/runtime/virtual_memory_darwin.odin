@@ -11,6 +11,7 @@ foreign lib {
 	mach_task_self_: u32
 	mach_vm_allocate :: proc(target: u32, address: ^u64, size: u64, flags: i32) -> i32 ---
 	mach_vm_deallocate :: proc(target: u32, address: u64, size: u64) -> i32 ---
+	mach_vm_protect :: proc(target_task: u32, address: u64, size: u64, set_maximum: b32, new_protection: i32) -> i32 ---
 	mach_vm_map :: proc(
 		target_task:    u32,
 		address:        ^u64,
@@ -122,6 +123,8 @@ _resize_virtual_memory :: proc "contextless" (ptr: rawptr, old_size: int, new_si
 			alignment_mask = u64(alignment) - 1
 		}
 
+		mach_vm_protect(mach_task_self_, new_address, u64(new_size), true, VM_PROT_READ|VM_PROT_WRITE)
+		mach_vm_protect(mach_task_self_, new_address, u64(new_size), false, VM_PROT_READ|VM_PROT_WRITE)
 		cur_protection, max_protection: i32
 		result_remap := mach_vm_remap(mach_task_self_, &new_address, u64(old_size), alignment_mask, VM_FLAGS_ANYWHERE, mach_task_self_, u64(uintptr(ptr)), true, &cur_protection, &max_protection, VM_INHERIT_COPY)
 		if result_remap != 0 {
