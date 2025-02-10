@@ -260,7 +260,7 @@ adjust_request_size :: proc(size, align: uint) -> (adjusted: uint) {
 
 	// aligned size must not exceed `BLOCK_SIZE_MAX`, or we'll go out of bounds on `sl_bitmap`.
 	if aligned := align_up(size, align); aligned < BLOCK_SIZE_MAX {
-		adjusted = min(aligned, BLOCK_SIZE_MAX)
+		adjusted = max(aligned, BLOCK_SIZE_MIN)
 	}
 	return
 }
