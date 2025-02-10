@@ -1380,14 +1380,23 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 				if superpage == nil {
 					continue consume_loop
 				}
-				// `should_remove` determines whether or not we keep the cache
-				// entry around, pending comparison of the consistency of the
-				// number of free bins we expect to have versus the free bins
-				// we do merge.
+
+				// First, we will remove the cache entry, to avoid issues with
+				// freeing operations that happen simultaneously while we're
+				// merging.
 				//
-				// This is a heuristic to help with mergers that happen during
-				// simultaneous remote frees.
-				should_remove := true
+				// For example, if we merge the freed bins in one slab while a
+				// lower-index slab receives a remote free, we would otherwise
+				// be unaware of that, and if the superpage was still marked as
+				// being in the cache, the freeing thread would not schedule
+				// it.
+				//
+				// The performance hit should be negligible in the event that
+				// we have to reschedule the superpage.
+				intrinsics.atomic_store_explicit(&cache.superpages_with_remote_frees[i], nil, .Release)
+				// Seq_Cst, to prevent these two from being seen out of order.
+				intrinsics.atomic_store_explicit(&superpage.remote_free_set, false, .Seq_Cst)
+				should_reschedule := false
 
 				for j := 0; j < HEAP_SLAB_COUNT; /**/ {
 					slab := heap_superpage_index_slab(superpage, j)
@@ -1396,24 +1405,14 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 					// signals that it has remote frees. This is for the sake
 					// of speed, given how large the bitmaps can be.
 					merge_block: if bin_size > 0 && slab.free_bins == 0 && intrinsics.atomic_load_explicit(&slab.remote_free_bins_scheduled, .Acquire) > 0 {
-						bins_left := heap_merge_remote_frees(slab)
-						if bins_left != 0 {
-							// Here we've detected that there are still remote
-							// frees left, so the entry is left in the cache
-							// for the next round of merges.
-							//
-							// NOTE: If we were to loop back and try to
-							// re-merge the unmerged bins, we could end up in a
-							// situation where this thread is stalled under
-							// heavy load.
-							should_remove = false
-						}
+						heap_merge_remote_frees(slab)
 						if slab.free_bins == 0 {
 							// No bins were freed at all, which is possible due
 							// to the parallel nature of this code. The freeing
 							// thread could have signalled its intent, but we
 							// merged before it had a chance to flip the
 							// necessary bit.
+							should_reschedule = true
 							break merge_block
 						}
 						intrinsics.atomic_store_explicit(&slab.is_full, false, .Release)
@@ -1437,12 +1436,25 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 					}
 				}
 
-				if should_remove {
-					// NOTE: The order of operations here is important to keep
-					// the cache from overflowing. The entry must first be
-					// removed, then the superpage has its flag cleared.
-					intrinsics.atomic_store_explicit(&cache.superpages_with_remote_frees[i], nil, .Release)
-					intrinsics.atomic_store_explicit(&superpage.remote_free_set, false, .Seq_Cst)
+				if should_reschedule {
+					// This is the logic found in `heap_remote_cache_add_remote_free_superpage`, simplified.
+					if !intrinsics.atomic_exchange_explicit(&superpage.remote_free_set, true, .Acq_Rel) {
+						cache_reschedule := local_heap_cache
+						reschedule_loop: for {
+							for j := 0; j < len(cache_reschedule.superpages_with_remote_frees); j += 1 {
+								old, swapped := intrinsics.atomic_compare_exchange_strong_explicit(&cache_reschedule.superpages_with_remote_frees[j], nil, superpage, .Acq_Rel, .Relaxed)
+								assert_contextless(old != superpage, "The heap allocator found a duplicate of a superpage in its superpages_with_remote_frees while rescheduling.")
+								if swapped {
+									intrinsics.atomic_add_explicit(&local_heap_cache.remote_free_count, 1, .Release)
+									break reschedule_loop
+								}
+							}
+							next_cache_block := intrinsics.atomic_load_explicit(&cache_reschedule.next_cache_block, .Acquire)
+							assert_contextless(next_cache_block != nil, "The heap allocator failed to find free space for a new entry in its superpages_with_remote_frees cache.")
+							cache_reschedule = next_cache_block
+						}
+					}
+				} else {
 					removed += 1
 				}
 
