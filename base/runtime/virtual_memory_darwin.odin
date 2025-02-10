@@ -9,6 +9,7 @@ foreign import lib "system:System.framework"
 
 foreign lib {
 	mach_task_self :: proc() -> u32 ---
+	mach_vm_allocate :: proc(target: u32, address: ^u64, size: u64, flags: i32) -> i32 ---
 	mach_vm_deallocate :: proc(target: u32, address: u64, size: u64) -> i32 ---
 	mach_vm_map :: proc(
 		target_task:    u32,
@@ -21,6 +22,19 @@ foreign lib {
 		copy:           b32,
 		cur_protection,
 		max_protection: i32,
+		inheritance:    u32,
+	) -> i32 ---
+	mach_vm_remap :: proc(
+		target_task:    u32,
+		target_address: ^u64,
+		size:           u64,
+		mask:           u64,
+		flags:          i32,
+		src_task:       u32,
+		src_address:    u64,
+		copy:           b32,
+		cur_protection,
+		max_protection: ^i32,
 		inheritance:    u32,
 	) -> i32 ---
 }
@@ -85,14 +99,40 @@ _free_virtual_memory :: proc "contextless" (ptr: rawptr, size: int) {
 }
 
 _resize_virtual_memory :: proc "contextless" (ptr: rawptr, old_size: int, new_size: int, alignment: int) -> rawptr {
-	// NOTE(Feoramund): mach_vm_remap does not permit resizing, as far as I understand it.
-	result: rawptr = ---
-	if alignment == 0 {
-		result = _allocate_virtual_memory(new_size)
-	} else {
-		result = _allocate_virtual_memory_aligned(new_size, alignment)
+	old_size_pages := old_size / PAGE_SIZE
+	new_size_pages := new_size / PAGE_SIZE
+	if old_size % PAGE_SIZE != 0 {
+		old_size_pages += 1
 	}
-	intrinsics.mem_copy_non_overlapping(result, ptr, min(new_size, old_size))
-	mach_vm_deallocate(mach_task_self(), u64(uintptr(ptr)), u64(old_size))
-	return result
+	if new_size % PAGE_SIZE != 0 {
+		new_size_pages += 1
+	}
+
+	if new_size_pages == old_size_pages {
+		return ptr
+	} else if new_size_pages > old_size_pages {
+		new_address: u64
+		result_alloc := mach_vm_allocate(mach_task_self(), &new_address, u64(new_size), VM_FLAGS_ANYWHERE)
+		if result_alloc != 0 {
+			return nil
+		}
+
+		alignment_mask: u64
+		if alignment != 0 {
+			alignment_mask = u64(alignment) - 1
+		}
+
+		cur_protection, max_protection: i32
+		result_remap := mach_vm_remap(mach_task_self(), &new_address, u64(old_size), alignment_mask, VM_FLAGS_ANYWHERE, mach_task_self(), u64(uintptr(ptr)), true, &cur_protection, &max_protection, VM_INHERIT_COPY)
+		if result_remap != 0 {
+			return nil
+		}
+		mach_vm_deallocate(mach_task_self(), u64(uintptr(ptr)), u64(old_size))
+		return rawptr(uintptr(new_address))
+	} else {
+		new_size_boundary := new_size_pages * PAGE_SIZE
+		shrink_by := u64(old_size - new_size)
+		mach_vm_deallocate(mach_task_self(), u64(uintptr(ptr) + uintptr(new_size_boundary)), shrink_by)
+		return rawptr(uintptr(ptr))
+	}
 }
