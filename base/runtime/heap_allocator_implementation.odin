@@ -52,7 +52,6 @@ HEAP_MIN_BIN_SIZE                  :: #config(ODIN_HEAP_MIN_BIN_SIZE, 8 * Byte)
 HEAP_MAX_EMPTY_ORPHANED_SUPERPAGES :: #config(ODIN_HEAP_MAX_EMPTY_ORPHANED_SUPERPAGES, 3)
 HEAP_SUPERPAGE_CACHE_RATIO         :: #config(ODIN_HEAP_SUPERPAGE_CACHE_RATIO, 20)
 HEAP_PANIC_ON_DOUBLE_FREE          :: #config(ODIN_HEAP_PANIC_ON_DOUBLE_FREE, true)
-HEAP_PANIC_ON_FREE_NIL             :: #config(ODIN_HEAP_PANIC_ON_FREE_NIL, false)
 
 //
 // Constants
@@ -1557,11 +1556,7 @@ Free memory returned by `heap_alloc`.
 heap_free :: proc "contextless" (ptr: rawptr) {
 	// Check for nil.
 	if ptr == nil {
-		when HEAP_PANIC_ON_FREE_NIL {
-			panic_contextless("The heap allocator was given a nil pointer to free.")
-		} else {
-			return
-		}
+		return
 	}
 
 	superpage := find_superpage_from_pointer(ptr)
