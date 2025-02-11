@@ -8,15 +8,12 @@ import "core:strings"
 /*
 Parse any arguments into an annotated struct or exit if there was an error.
 
-*Allocates Using Provided Allocator*
-
 This is a convenience wrapper over `parse` and `print_errors`.
 
 Inputs:
 - model: A pointer to an annotated struct.
 - program_args: A slice of strings, usually `os.args`.
 - style: The argument parsing style.
-- allocator: (default: context.allocator)
 - loc: The caller location for debugging purposes (default: #caller_location)
 */
 @(optimization_mode="favor_size")
@@ -24,7 +21,6 @@ parse_or_exit :: proc(
 	model: ^$T,
 	program_args: []string,
 	style: Parsing_Style = .Odin,
-	allocator := context.allocator,
 	loc := #caller_location,
 ) {
 	assert(len(program_args) > 0, "Program arguments slice is empty.", loc)
