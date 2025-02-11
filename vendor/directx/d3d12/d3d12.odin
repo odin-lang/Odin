@@ -2423,7 +2423,7 @@ IFence1 :: struct #raw_union {
 	using id3d12fence1_vtable: ^IFence1_VTable,
 }
 IFence1_VTable :: struct {
-	#subtype id3d12fence_vtable: IFence_VTable,
+	using id3d12fence_vtable: IFence_VTable,
 	GetCreationFlags: proc "system" (this: ^IFence1) -> FENCE_FLAGS,
 }
 
@@ -2456,14 +2456,14 @@ IDescriptorHeap_VTable :: struct {
 IQueryHeap_UUID_STRING :: "0d9658ae-ed45-469e-a61d-970ec583cab4"
 IQueryHeap_UUID := &IID{0x0d9658ae, 0xed45, 0x469e, {0xa6, 0x1d, 0x97, 0x0e, 0xc5, 0x83, 0xca, 0xb4}}
 IQueryHeap :: struct {
-	#subtype id3d12pageable: IPageable,
+	using id3d12pageable: IPageable,
 }
 
 
 ICommandSignature_UUID_STRING :: "c36a797c-ec80-4f0a-8985-a7b2475082d1"
 ICommandSignature_UUID := &IID{0xc36a797c, 0xec80, 0x4f0a, {0x89, 0x85, 0xa7, 0xb2, 0x47, 0x50, 0x82, 0xd1}}
 ICommandSignature :: struct {
-	#subtype id3d12pageable: IPageable,
+	using id3d12pageable: IPageable,
 }
 
 
@@ -2921,7 +2921,7 @@ META_COMMAND_DESC :: struct {
 IStateObject_UUID_STRING :: "47016943-fca8-4594-93ea-af258b55346d"
 IStateObject_UUID := &IID{0x47016943, 0xfca8, 0x4594, {0x93, 0xea, 0xaf, 0x25, 0x8b, 0x55, 0x34, 0x6d}}
 IStateObject :: struct #raw_union {
-	#subtype id3d12pageable: IPageable,
+	using id3d12pageable: IPageable,
 }
 
 
