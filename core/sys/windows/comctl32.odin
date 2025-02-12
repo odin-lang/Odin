@@ -250,8 +250,8 @@ SB_SIMPLEID :: 0xFF
 
 @(default_calling_convention="system")
 foreign Comctl32 {
-    DrawStatusTextW :: proc(hDC: HDC, lprc: ^RECT, pszText: LPCWSTR, uFlags: UINT) ---
-    CreateStatusWindowW :: proc(style: LONG, lpszText: LPCWSTR, hwndParent: HWND, wID: UINT) -> HWND ---
+	DrawStatusTextW :: proc(hDC: HDC, lprc: ^RECT, pszText: LPCWSTR, uFlags: UINT) ---
+	CreateStatusWindowW :: proc(style: LONG, lpszText: LPCWSTR, hwndParent: HWND, wID: UINT) -> HWND ---
 }
 
 // Menu Help
@@ -543,8 +543,8 @@ BUTTON_SPLITINFO :: struct {
 PBUTTON_SPLITINFO :: ^BUTTON_SPLITINFO
 
 NMBCHOTITEM :: struct {
-    hdr: NMHDR,
-    dwFlags: DWORD,
+	hdr: NMHDR,
+	dwFlags: DWORD,
 }
 LPNMBCHOTITEM :: ^NMBCHOTITEM
 
@@ -1039,56 +1039,56 @@ LVSETINFOTIP :: struct {
 PLVSETINFOTIP :: ^LVSETINFOTIP
 
 NMLISTVIEW :: struct {
-    hdr: NMHDR,
-    iItem: c_int,
-    iSubItem: c_int,
-    uNewState: UINT,
-    uOldState: UINT,
-    uChanged: UINT,
-    ptAction: POINT,
-    lParam: LPARAM,
+	hdr: NMHDR,
+	iItem: c_int,
+	iSubItem: c_int,
+	uNewState: UINT,
+	uOldState: UINT,
+	uChanged: UINT,
+	ptAction: POINT,
+	lParam: LPARAM,
 }
 NM_LISTVIEW   :: NMLISTVIEW
 LPNMLISTVIEW  :: ^NMLISTVIEW
 LPNM_LISTVIEW :: LPNMLISTVIEW
 
 NMITEMACTIVATE :: struct {
-    hdr: NMHDR,
-    iItem: c_int,
-    iSubItem: c_int,
-    uNewState: UINT,
-    uOldState: UINT,
-    uChanged: UINT,
-    ptAction: POINT,
-    lParam: LPARAM,
-    uKeyFlags: UINT,
+	hdr: NMHDR,
+	iItem: c_int,
+	iSubItem: c_int,
+	uNewState: UINT,
+	uOldState: UINT,
+	uChanged: UINT,
+	ptAction: POINT,
+	lParam: LPARAM,
+	uKeyFlags: UINT,
 }
 NM_ITEMACTIVATE   :: NMITEMACTIVATE
 LPNMITEMACTIVATE  :: ^NMITEMACTIVATE
 LPNM_ITEMACTIVATE :: LPNMITEMACTIVATE
 
 NMLVCUSTOMDRAW :: struct {
-    nmcd: NMCUSTOMDRAW,
-    clrText: COLORREF,
-    clrTextBk: COLORREF,
-    iSubItem: c_int,
-    dwItemType: DWORD,
-    clrFace: COLORREF,
-    iIconEffect: c_int,
-    iIconPhase: c_int,
-    iPartId: c_int,
-    iStateId: c_int,
-    rcText: RECT,
-    uAlign: UINT,
+	nmcd: NMCUSTOMDRAW,
+	clrText: COLORREF,
+	clrTextBk: COLORREF,
+	iSubItem: c_int,
+	dwItemType: DWORD,
+	clrFace: COLORREF,
+	iIconEffect: c_int,
+	iIconPhase: c_int,
+	iPartId: c_int,
+	iStateId: c_int,
+	rcText: RECT,
+	uAlign: UINT,
 }
 NMLV_CUSTOMDRAW   :: NMLVCUSTOMDRAW
 LPNMLVCUSTOMDRAW  :: ^NMLVCUSTOMDRAW
 LPNMLV_CUSTOMDRAW :: LPNMLVCUSTOMDRAW
 
 NMLVCACHEHINT :: struct {
-    hdr: NMHDR,
-    iFrom: c_int,
-    iTo: c_int,
+	hdr: NMHDR,
+	iFrom: c_int,
+	iTo: c_int,
 }
 LPNMLVCACHEHINT :: ^NMLVCACHEHINT
 NM_CACHEHINT    :: NMLVCACHEHINT
@@ -1096,9 +1096,9 @@ PNM_CACHEHINT   :: LPNMLVCACHEHINT
 LPNM_CACHEHINT  :: LPNMLVCACHEHINT
 
 NMLVFINDITEMW :: struct {
-    hdr: NMHDR,
-    iStart: c_int,
-    lvfi: LVFINDINFOW,
+	hdr: NMHDR,
+	iStart: c_int,
+	lvfi: LVFINDINFOW,
 }
 LPNMLVFINDITEMW :: ^NMLVFINDITEMW
 NM_FINDITEMW    :: NMLVFINDITEMW
@@ -1106,11 +1106,11 @@ PNM_FINDITEMW   :: LPNMLVFINDITEMW
 LPNM_FINDITEMW  :: LPNMLVFINDITEMW
 
 NMLVODSTATECHANGE :: struct {
-    hdr: NMHDR,
-    iFrom: c_int,
-    iTo: c_int,
-    uNewState: UINT,
-    uOldState: UINT,
+	hdr: NMHDR,
+	iFrom: c_int,
+	iTo: c_int,
+	uNewState: UINT,
+	uOldState: UINT,
 }
 LPNMLVODSTATECHANGE :: ^NMLVODSTATECHANGE
 NM_ODSTATECHANGE    :: NMLVODSTATECHANGE
@@ -1118,35 +1118,35 @@ PNM_ODSTATECHANGE   :: NMLVODSTATECHANGE
 LPNM_ODSTATECHANGE  :: LPNMLVODSTATECHANGE
 
 LVDISPINFOW :: struct {
-    hdr: NMHDR,
-    item: LVITEMW,
+	hdr: NMHDR,
+	item: LVITEMW,
 }
 LV_DISPINFO      :: LVDISPINFOW
 LPNMLVDISPINFOW  :: ^LVDISPINFOW
 
 NMLVKEYDOWN :: struct #packed {
-    hdr: NMHDR,
-    wVKey: WORD,
-    flags: UINT,
+	hdr: NMHDR,
+	wVKey: WORD,
+	flags: UINT,
 }
 LV_KEYDOWN    :: NMLVKEYDOWN
 LPNMLVKEYDOWN :: ^NMLVKEYDOWN
 
 NMLVGETINFOTIPW :: struct {
-    hdr: NMHDR,
-    dwFlags: DWORD,
-    pszText: LPWSTR,
-    cchTextMax: c_int,
-    iItem: c_int,
-    iSubItem: c_int,
-    lParam: LPARAM,
+	hdr: NMHDR,
+	dwFlags: DWORD,
+	pszText: LPWSTR,
+	cchTextMax: c_int,
+	iItem: c_int,
+	iSubItem: c_int,
+	lParam: LPARAM,
 }
 LPNMLVGETINFOTIPW :: ^NMLVGETINFOTIPW
 
 NMLVSCROLL :: struct {
-    hdr: NMHDR,
-    dx: c_int,
-    dy: c_int,
+	hdr: NMHDR,
+	dx: c_int,
+	dy: c_int,
 }
 LPNMLVSCROLL :: ^NMLVSCROLL
 
@@ -1610,8 +1610,8 @@ TVINSERTSTRUCTW :: struct {
 	hParent: HTREEITEM,
 	hInsertAfter: HTREEITEM,
 	_: struct #raw_union {
-		itemex: TVITEMEXW,
-		item: TV_ITEMW,
+	itemex: TVITEMEXW,
+	item: TV_ITEMW,
 	},
 }
 TV_INSERTSTRUCTW   :: TVINSERTSTRUCTW
@@ -1619,9 +1619,9 @@ LPTVINSERTSTRUCTW  :: ^TVINSERTSTRUCTW
 LPTV_INSERTSTRUCTW :: LPTVINSERTSTRUCTW
 
 TVHITTESTINFO :: struct {
-    pt: POINT,
-    flags: UINT,
-    hItem: HTREEITEM,
+	pt: POINT,
+	flags: UINT,
+	hItem: HTREEITEM,
 }
 TV_HITTESTINFO   :: TVHITTESTINFO
 LPTVHITTESTINFO  :: ^TVHITTESTINFO
@@ -1637,52 +1637,52 @@ LPTVSORTCB  :: ^TVSORTCB
 LPTV_SORTCB :: LPTVSORTCB
 
 NMTREEVIEWW :: struct {
-    hdr: NMHDR,
-    action: UINT,
-    itemOld: TVITEMW,
-    itemNew: TVITEMW,
-    ptDrag: POINT,
+	hdr: NMHDR,
+	action: UINT,
+	itemOld: TVITEMW,
+	itemNew: TVITEMW,
+	ptDrag: POINT,
 }
 NM_TREEVIEWW   :: NMTREEVIEWW
 LPNMTREEVIEWW  :: ^NMTREEVIEWW
 LPNM_TREEVIEWW :: LPNMTREEVIEWW
 
 NMTVDISPINFOW :: struct {
-    hdr: NMHDR,
-    item: TVITEMW,
+	hdr: NMHDR,
+	item: TVITEMW,
 }
 TV_DISPINFOW    :: NMTVDISPINFOW
 LPNMTVDISPINFOW :: ^NMTVDISPINFOW
 
 NMTVDISPINFOEXW :: struct {
-    hdr: NMHDR,
-    item: TVITEMEXW,
+	hdr: NMHDR,
+	item: TVITEMEXW,
 }
 TV_DISPINFOEXW    :: NMTVDISPINFOEXW
 LPNMTVDISPINFOEXW :: ^NMTVDISPINFOEXW
 
 NMTVKEYDOWN :: struct #packed {
-    hdr: NMHDR,
-    wVKey: WORD,
-    flags: UINT,
+	hdr: NMHDR,
+	wVKey: WORD,
+	flags: UINT,
 }
 TV_KEYDOWN    :: NMTVKEYDOWN
 LPNMTVKEYDOWN :: ^NMTVKEYDOWN
 
 NMTVCUSTOMDRAW :: struct {
-    nmcd: NMCUSTOMDRAW,
-    clrText: COLORREF,
-    clrTextBk: COLORREF,
-    iLevel: c_int,
+	nmcd: NMCUSTOMDRAW,
+	clrText: COLORREF,
+	clrTextBk: COLORREF,
+	iLevel: c_int,
 }
 LPNMTVCUSTOMDRAW :: ^NMTVCUSTOMDRAW
 
 NMTVGETINFOTIPW :: struct {
-    hdr: NMHDR,
-    pszText: LPWSTR,
-    cchTextMax: c_int,
-    hItem: HTREEITEM,
-    lParam: LPARAM,
+	hdr: NMHDR,
+	pszText: LPWSTR,
+	cchTextMax: c_int,
+	hItem: HTREEITEM,
+	lParam: LPARAM,
 }
 TV_GETINFOTIPW    :: NMTVGETINFOTIPW
 LPNMTVGETINFOTIPW :: ^NMTVGETINFOTIPW
@@ -1921,39 +1921,39 @@ CBENF_DROPDOWN  :: 4
 CBEMAXSTRLEN :: 260
 
 COMBOBOXEXITEMW :: struct {
-    mask: UINT,
-    iItem: INT_PTR,
-    pszText: LPWSTR,
-    cchTextMax: c_int,
-    iImage: c_int,
-    iSelectedImage: c_int,
-    iOverlay: c_int,
-    iIndent: c_int,
-    lParam: LPARAM,
+	mask: UINT,
+	iItem: INT_PTR,
+	pszText: LPWSTR,
+	cchTextMax: c_int,
+	iImage: c_int,
+	iSelectedImage: c_int,
+	iOverlay: c_int,
+	iIndent: c_int,
+	lParam: LPARAM,
 }
 PCOMBOBOXEXITEMW  :: ^COMBOBOXEXITEMW
 PCCOMBOBOXEXITEMW :: ^COMBOBOXEXITEMW
 
 NMCOMBOBOXEXW :: struct {
-    hdr: NMHDR,
-    ceItem: COMBOBOXEXITEMW,
+	hdr: NMHDR,
+	ceItem: COMBOBOXEXITEMW,
 }
 PNMCOMBOBOXEXW :: ^NMCOMBOBOXEXW
 
 NMCBEDRAGBEGINW :: struct {
-    hdr: NMHDR,
-    iItemId: c_int,
-    szText: [CBEMAXSTRLEN]WCHAR,
+	hdr: NMHDR,
+	iItemId: c_int,
+	szText: [CBEMAXSTRLEN]WCHAR,
 }
 PNMCBEDRAGBEGINW  :: ^NMCBEDRAGBEGINW
 LPNMCBEDRAGBEGINW :: PNMCBEDRAGBEGINW
 
 NMCBEENDEDITW :: struct {
-    hdr: NMHDR,
-    fChanged: BOOL,
-    iNewSelection: c_int,
-    szText: [CBEMAXSTRLEN]WCHAR,
-    iWhy: c_int,
+	hdr: NMHDR,
+	fChanged: BOOL,
+	iNewSelection: c_int,
+	szText: [CBEMAXSTRLEN]WCHAR,
+	iWhy: c_int,
 }
 PNMCBEENDEDITW  :: ^NMCBEENDEDITW
 LPNMCBEENDEDITW :: PNMCBEENDEDITW
@@ -1969,129 +1969,129 @@ TCN_GETOBJECT   :: TCN_FIRST - 3
 TCN_FOCUSCHANGE :: TCN_FIRST - 4
 
 TCITEMHEADERW :: struct {
-    mask: UINT,
-    lpReserved1: UINT,
-    lpReserved2: UINT,
-    pszText: LPWSTR,
-    cchTextMax: c_int,
-    iImage: c_int,
+	mask: UINT,
+	lpReserved1: UINT,
+	lpReserved2: UINT,
+	pszText: LPWSTR,
+	cchTextMax: c_int,
+	iImage: c_int,
 }
 TC_ITEMHEADERW   :: TCITEMHEADERW
 LPTCITEMHEADERW  :: ^TCITEMHEADERW
 LPTC_ITEMHEADERW :: LPTCITEMHEADERW
 
 TCITEMW :: struct {
-    mask: UINT,
-    dwState: DWORD,
-    dwStateMask: DWORD,
-    pszText: LPWSTR,
-    cchTextMax: c_int,
-    iImage: c_int,
-    lParam: LPARAM,
+	mask: UINT,
+	dwState: DWORD,
+	dwStateMask: DWORD,
+	pszText: LPWSTR,
+	cchTextMax: c_int,
+	iImage: c_int,
+	lParam: LPARAM,
 }
 TC_ITEMW   :: TCITEMW
 LPTCITEMW  :: ^TCITEMW
 LPTC_ITEMW :: LPTCITEMW
 
 TCHITTESTINFO :: struct {
-    pt: POINT,
-    flags: UINT,
+	pt: POINT,
+	flags: UINT,
 }
 TC_HITTESTINFO   :: TCHITTESTINFO
 LPTCHITTESTINFO  :: ^TCHITTESTINFO
 LPTC_HITTESTINFO :: LPTCHITTESTINFO
 
 NMTCKEYDOWN :: struct #packed {
-    hdr: NMHDR,
-    wVKey: WORD,
-    flags: UINT,
+	hdr: NMHDR,
+	wVKey: WORD,
+	flags: UINT,
 }
 TC_KEYDOWN :: NMTCKEYDOWN
 
 TabCtrl_GetImageList :: #force_inline proc "system" (hwnd: HWND) -> HIMAGELIST {
-    return cast(HIMAGELIST)uintptr(SendMessageW(hwnd, TCM_GETIMAGELIST, 0, 0))
+	return cast(HIMAGELIST)uintptr(SendMessageW(hwnd, TCM_GETIMAGELIST, 0, 0))
 }
 TabCtrl_SetImageList :: #force_inline proc "system" (hwnd: HWND, himl: HIMAGELIST) -> HIMAGELIST {
-    return cast(HIMAGELIST)uintptr(SendMessageW(hwnd, TCM_SETIMAGELIST, 0, cast(LPARAM)uintptr(himl)))
+	return cast(HIMAGELIST)uintptr(SendMessageW(hwnd, TCM_SETIMAGELIST, 0, cast(LPARAM)uintptr(himl)))
 }
 TabCtrl_GetItemCount :: #force_inline proc "system" (hwnd: HWND) -> c_int {
-    return cast(c_int)SendMessageW(hwnd, TCM_GETITEMCOUNT, 0, 0)
+	return cast(c_int)SendMessageW(hwnd, TCM_GETITEMCOUNT, 0, 0)
 }
 TabCtrl_GetItem :: #force_inline proc "system" (hwnd: HWND, iItem: c_int, pitem: ^TC_ITEMW) -> BOOL {
-    return cast(BOOL)SendMessageW(hwnd, TCM_GETITEMW, cast(WPARAM)iItem, cast(LPARAM)uintptr(pitem))
+	return cast(BOOL)SendMessageW(hwnd, TCM_GETITEMW, cast(WPARAM)iItem, cast(LPARAM)uintptr(pitem))
 }
 TabCtrl_SetItem :: #force_inline proc "system" (hwnd: HWND, iItem: c_int, pitem: ^TC_ITEMW) -> BOOL {
-    return cast(BOOL)SendMessageW(hwnd, TCM_SETITEMW, cast(WPARAM)iItem, cast(LPARAM)uintptr(pitem))
+	return cast(BOOL)SendMessageW(hwnd, TCM_SETITEMW, cast(WPARAM)iItem, cast(LPARAM)uintptr(pitem))
 }
 TabCtrl_InsertItem :: #force_inline proc "system" (hwnd: HWND, iItem: c_int, pitem: ^TC_ITEMW) -> c_int {
-    return cast(c_int)SendMessageW(hwnd, TCM_INSERTITEMW, cast(WPARAM)iItem, cast(LPARAM)uintptr(pitem))
+	return cast(c_int)SendMessageW(hwnd, TCM_INSERTITEMW, cast(WPARAM)iItem, cast(LPARAM)uintptr(pitem))
 }
 TabCtrl_DeleteItem :: #force_inline proc "system" (hwnd: HWND, i: c_int) -> BOOL {
-    return cast(BOOL)SendMessageW(hwnd, TCM_DELETEITEM, cast(WPARAM)i, 0)
+	return cast(BOOL)SendMessageW(hwnd, TCM_DELETEITEM, cast(WPARAM)i, 0)
 }
 TabCtrl_DeleteAllItems :: #force_inline proc "system" (hwnd: HWND) -> BOOL {
-    return cast(BOOL)SendMessageW(hwnd, TCM_DELETEALLITEMS, 0, 0)
+	return cast(BOOL)SendMessageW(hwnd, TCM_DELETEALLITEMS, 0, 0)
 }
 TabCtrl_GetItemRect :: #force_inline proc "system" (hwnd: HWND, i: c_int, prc: ^RECT) -> BOOL {
-    return cast(BOOL)SendMessageW(hwnd, TCM_GETITEMRECT, cast(WPARAM)i, cast(LPARAM)uintptr(prc))
+	return cast(BOOL)SendMessageW(hwnd, TCM_GETITEMRECT, cast(WPARAM)i, cast(LPARAM)uintptr(prc))
 }
 TabCtrl_GetCurSel :: #force_inline proc "system" (hwnd: HWND) -> c_int {
-    return cast(c_int)SendMessageW(hwnd, TCM_GETCURSEL, 0, 0)
+	return cast(c_int)SendMessageW(hwnd, TCM_GETCURSEL, 0, 0)
 }
 TabCtrl_SetCurSel :: #force_inline proc "system" (hwnd: HWND, i: c_int) -> c_int {
-    return cast(c_int)SendMessageW(hwnd, TCM_SETCURSEL, cast(WPARAM)i, 0)
+	return cast(c_int)SendMessageW(hwnd, TCM_SETCURSEL, cast(WPARAM)i, 0)
 }
 TabCtrl_HitTest :: #force_inline proc "system" (hwndTC: HWND, pinfo: ^TC_HITTESTINFO) -> c_int {
-    return cast(c_int)SendMessageW(hwndTC, TCM_HITTEST, 0, cast(LPARAM)uintptr(pinfo))
+	return cast(c_int)SendMessageW(hwndTC, TCM_HITTEST, 0, cast(LPARAM)uintptr(pinfo))
 }
 TabCtrl_SetItemExtra :: #force_inline proc "system" (hwndTC: HWND, cb: c_int) -> BOOL {
-    return cast(BOOL)SendMessageW(hwndTC, TCM_SETITEMEXTRA, cast(WPARAM)cb, 0)
+	return cast(BOOL)SendMessageW(hwndTC, TCM_SETITEMEXTRA, cast(WPARAM)cb, 0)
 }
 TabCtrl_AdjustRect :: #force_inline proc "system" (hwnd: HWND, bLarger: BOOL, prc: ^RECT) -> c_int {
-    return cast(c_int)SendMessageW(hwnd, TCM_ADJUSTRECT, cast(WPARAM)bLarger, cast(LPARAM)uintptr(prc))
+	return cast(c_int)SendMessageW(hwnd, TCM_ADJUSTRECT, cast(WPARAM)bLarger, cast(LPARAM)uintptr(prc))
 }
 TabCtrl_SetItemSize :: #force_inline proc "system" (hwnd: HWND, x,y: c_int) -> DWORD {
-    return cast(DWORD)SendMessageW(hwnd, TCM_SETITEMSIZE, 0, MAKELPARAM(x,y))
+	return cast(DWORD)SendMessageW(hwnd, TCM_SETITEMSIZE, 0, MAKELPARAM(x,y))
 }
 TabCtrl_RemoveImage :: #force_inline proc "system" (hwnd: HWND, i: c_int) {
-    SendMessageW(hwnd, TCM_REMOVEIMAGE, cast(WPARAM)i, 0)
+	SendMessageW(hwnd, TCM_REMOVEIMAGE, cast(WPARAM)i, 0)
 }
 TabCtrl_SetPadding :: #force_inline proc "system" (hwnd: HWND, cx,cy: c_int) {
-    SendMessageW(hwnd, TCM_SETPADDING, 0, MAKELPARAM(cx,cy))
+	SendMessageW(hwnd, TCM_SETPADDING, 0, MAKELPARAM(cx,cy))
 }
 TabCtrl_GetRowCount :: #force_inline proc "system" (hwnd: HWND) -> c_int {
-    return cast(c_int)SendMessageW(hwnd, TCM_GETROWCOUNT, 0, 0)
+	return cast(c_int)SendMessageW(hwnd, TCM_GETROWCOUNT, 0, 0)
 }
 TabCtrl_GetToolTips :: #force_inline proc "system" (hwnd: HWND) -> HWND {
-    return cast(HWND)uintptr(SendMessageW(hwnd, TCM_GETTOOLTIPS, 0, 0))
+	return cast(HWND)uintptr(SendMessageW(hwnd, TCM_GETTOOLTIPS, 0, 0))
 }
 TabCtrl_SetToolTips :: #force_inline proc "system" (hwnd: HWND, hwndTT: HWND) {
-    SendMessageW(hwnd, TCM_SETTOOLTIPS, uintptr(hwndTT), 0)
+	SendMessageW(hwnd, TCM_SETTOOLTIPS, uintptr(hwndTT), 0)
 }
 TabCtrl_GetCurFocus :: #force_inline proc "system" (hwnd: HWND) -> c_int {
-    return cast(c_int)SendMessageW(hwnd, TCM_GETCURFOCUS, 0, 0)
+	return cast(c_int)SendMessageW(hwnd, TCM_GETCURFOCUS, 0, 0)
 }
 TabCtrl_SetCurFocus :: #force_inline proc "system" (hwnd: HWND, i: c_int) {
-    SendMessageW(hwnd, TCM_SETCURFOCUS, cast(WPARAM)i, 0)
+	SendMessageW(hwnd, TCM_SETCURFOCUS, cast(WPARAM)i, 0)
 }
 TabCtrl_SetMinTabWidth :: #force_inline proc "system" (hwnd: HWND, x: c_int) -> c_int {
-    return cast(c_int)SendMessageW(hwnd, TCM_SETMINTABWIDTH, 0, cast(LPARAM)x)
+	return cast(c_int)SendMessageW(hwnd, TCM_SETMINTABWIDTH, 0, cast(LPARAM)x)
 }
 TabCtrl_DeselectAll :: #force_inline proc "system" (hwnd: HWND, fExcludeFocus: BOOL) {
-    SendMessageW(hwnd, TCM_DESELECTALL, cast(WPARAM)fExcludeFocus, 0)
+	SendMessageW(hwnd, TCM_DESELECTALL, cast(WPARAM)fExcludeFocus, 0)
 }
 TabCtrl_HighlightItem :: #force_inline proc "system" (hwnd: HWND, i: c_int, fHighlight: BOOL) -> BOOL {
-    return cast(BOOL)SendMessageW(hwnd, TCM_HIGHLIGHTITEM, cast(WPARAM)i, cast(LPARAM)MAKELONG(fHighlight,0))
+	return cast(BOOL)SendMessageW(hwnd, TCM_HIGHLIGHTITEM, cast(WPARAM)i, cast(LPARAM)MAKELONG(fHighlight,0))
 }
 TabCtrl_SetExtendedStyle :: #force_inline proc "system" (hwnd: HWND, dw: DWORD) -> DWORD {
-    return cast(DWORD)SendMessageW(hwnd, TCM_SETEXTENDEDSTYLE, 0, cast(LPARAM)dw)
+	return cast(DWORD)SendMessageW(hwnd, TCM_SETEXTENDEDSTYLE, 0, cast(LPARAM)dw)
 }
 TabCtrl_GetExtendedStyle :: #force_inline proc "system" (hwnd: HWND) -> DWORD {
-    return cast(DWORD)SendMessageW(hwnd, TCM_GETEXTENDEDSTYLE, 0, 0)
+	return cast(DWORD)SendMessageW(hwnd, TCM_GETEXTENDEDSTYLE, 0, 0)
 }
 TabCtrl_SetUnicodeFormat :: #force_inline proc "system" (hwnd: HWND, fUnicode: BOOL) -> BOOL {
-    return cast(BOOL)SendMessageW(hwnd, TCM_SETUNICODEFORMAT, cast(WPARAM)fUnicode, 0)
+	return cast(BOOL)SendMessageW(hwnd, TCM_SETUNICODEFORMAT, cast(WPARAM)fUnicode, 0)
 }
 TabCtrl_GetUnicodeFormat :: #force_inline proc "system" (hwnd: HWND) -> BOOL {
-    return cast(BOOL)SendMessageW(hwnd, TCM_GETUNICODEFORMAT, 0, 0)
+	return cast(BOOL)SendMessageW(hwnd, TCM_GETUNICODEFORMAT, 0, 0)
 }
