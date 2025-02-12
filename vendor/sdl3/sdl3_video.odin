@@ -342,13 +342,13 @@ foreign lib {
 	GetCurrentDisplayMode           :: proc(displayID: DisplayID) -> ^DisplayMode ---
 	GetDisplayForPoint              :: proc(#by_ptr point: Point) -> DisplayID ---
 	GetDisplayForRect               :: proc(#by_ptr rect: Rect) -> DisplayID ---
-	GetDisplayForWindow             :: proc(window: Window) -> DisplayID ---
-	GetWindowPixelDensity           :: proc(window: Window) -> f32 ---
-	GetWindowDisplayScale           :: proc(window: Window) -> f32 ---
-	SetWindowFullscreenMode         :: proc(window: Window, #by_ptr mode: DisplayMode) -> bool ---
-	GetWindowFullscreenMode         :: proc(window: Window) -> ^DisplayMode ---
-	GetWindowICCProfile             :: proc(window: Window, size: ^uint) -> rawptr ---
-	GetWindowPixelFormat            :: proc(window: Window) -> PixelFormat ---
+	GetDisplayForWindow             :: proc(window: ^Window) -> DisplayID ---
+	GetWindowPixelDensity           :: proc(window: ^Window) -> f32 ---
+	GetWindowDisplayScale           :: proc(window: ^Window) -> f32 ---
+	SetWindowFullscreenMode         :: proc(window: ^Window, #by_ptr mode: DisplayMode) -> bool ---
+	GetWindowFullscreenMode         :: proc(window: ^Window) -> ^DisplayMode ---
+	GetWindowICCProfile             :: proc(window: ^Window, size: ^uint) -> rawptr ---
+	GetWindowPixelFormat            :: proc(window: ^Window) -> PixelFormat ---
 	GetWindows                      :: proc(count: ^c.int) -> [^]^Window ---
 	CreateWindow                    :: proc(title: cstring, w, h: c.int, flags: WindowFlags) -> ^Window ---
 	CreatePopupWindow               :: proc(parent: ^Window, offset_x, offset_y: c.int, w, h: c.int, flags: WindowFlags) -> ^Window ---
