@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <glob.h>
@@ -70,6 +71,7 @@ int main(int argc, char *argv[])
 	printf("protoent %zu %zu\n", sizeof(struct protoent), _Alignof(struct protoent));
 	printf("servent %zu %zu\n", sizeof(struct servent), _Alignof(struct servent));
 	printf("addrinfo %zu %zu\n", sizeof(struct addrinfo), _Alignof(struct addrinfo));
+	printf("ai_canonname %zu\n", offsetof(struct addrinfo, ai_canonname));
 
 	printf("pollfd %zu %zu\n", sizeof(struct pollfd), _Alignof(struct pollfd));
 

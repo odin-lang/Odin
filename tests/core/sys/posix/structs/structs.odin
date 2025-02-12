@@ -38,6 +38,7 @@ main :: proc() {
 	fmt.println("protoent", size_of(posix.protoent), align_of(posix.protoent))
 	fmt.println("servent", size_of(posix.servent), align_of(posix.servent))
 	fmt.println("addrinfo", size_of(posix.addrinfo), align_of(posix.addrinfo))
+	fmt.println("ai_canonname", offset_of(posix.addrinfo, ai_canonname))
 
 	fmt.println("pollfd", size_of(posix.pollfd), align_of(posix.pollfd))
 	fmt.println("passwd", size_of(posix.passwd), align_of(posix.passwd))
