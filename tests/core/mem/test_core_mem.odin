@@ -44,6 +44,7 @@ test_tlsf_bitscan :: proc(t: ^testing.T) {
 @(test)
 test_align_bumping_block_limit :: proc(t: ^testing.T) {
 	a: virtual.Arena
+	defer virtual.arena_destroy(&a)
 
 	data, err := virtual.arena_alloc(&a, 4193371, 1)
 	testing.expect_value(t, err, nil)

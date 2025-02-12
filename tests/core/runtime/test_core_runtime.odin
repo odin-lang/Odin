@@ -35,6 +35,7 @@ test_temp_allocator_big_alloc_and_alignment :: proc(t: ^testing.T) {
 test_align_bumping_block_limit :: proc(t: ^testing.T) {
 	a: runtime.Arena
 	a.minimum_block_size = 8*mem.Megabyte
+	defer runtime.arena_destroy(&a)
 
 	data, err := runtime.arena_alloc(&a, 4193371, 1)
 	testing.expect_value(t, err, nil)
