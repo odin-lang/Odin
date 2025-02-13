@@ -44,7 +44,7 @@ GetSurface :: proc(instance: wgpu.Instance, window: ^sdl3.Window) -> wgpu.Surfac
 				nextInChain = &wgpu.SurfaceDescriptorFromWaylandSurface {
 					chain = {sType = .SurfaceDescriptorFromWaylandSurface},
 					display = display,
-					surface = u64(w_surface),
+					surface = w_surface,
 				},
 			},
 		)
