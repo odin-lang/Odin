@@ -2185,7 +2185,7 @@ or_break_and_or_continue_operators :: proc() {
 	// The concept of 'or_break' and 'or_continue' is very similar to that of 'or_return'.
 	// The difference is that unlike 'or_return', the value does not get returned from
 	// the current procedure but rather discarded if it is 'false' or not 'nil', and then
-	// the specified branch (i.e. break or_continue).
+	// the specified branch (i.e. break or continue).
 	// The or branch expression can be labelled if a specific statement needs to be used.
 
 	Error :: enum {
@@ -2337,7 +2337,7 @@ matrix_type :: proc() {
 		// There is no support for booleans, quaternions, or any compound type.
 
 		// Indexing a matrix can be used with the matrix indexing syntax
-		// This mirrors othe type usages: type on the left, usage on the right
+		// This mirrors other type usages: type on the left, usage on the right
 
 		elem := m[1, 2] // row 1, column 2
 		assert(elem == -6)
@@ -2599,6 +2599,7 @@ main :: proc() {
 		using_statement()
 		implicit_context_system()
 		parametric_polymorphism()
+		threading_example()
 		array_programming()
 		map_type()
 		implicit_selector_expression()
@@ -2614,7 +2615,6 @@ main :: proc() {
 		ranged_fields_for_array_compound_literals()
 		deprecated_attribute()
 		range_statements_with_multiple_return_values()
-		threading_example()
 		soa_struct_layout()
 		constant_literal_expressions()
 		union_maybe()
