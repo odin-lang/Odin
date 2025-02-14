@@ -1,5 +1,5 @@
-struct Scope;
 struct Ast;
+struct Scope;
 struct Entity;
 
 enum BasicKind {
@@ -161,10 +161,10 @@ struct TypeStruct {
 
 struct TypeUnion {
 	Slice<Type *> variants;
-	
+
 	Ast *         node;
 	Scope *       scope;
-	
+
 	i64           variant_block_size;
 	i64           custom_align;
 	Type *        polymorphic_params; // Type_Tuple
@@ -1438,7 +1438,7 @@ gb_internal bool is_type_matrix(Type *t) {
 gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
-	
+
 	Type *elem = t->Matrix.elem;
 	i64 row_count = gb_max(t->Matrix.row_count, 1);
 	i64 column_count = gb_max(t->Matrix.column_count, 1);
@@ -1450,15 +1450,15 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 
 	i64 elem_align = type_align_of_internal(elem, tp);
 	if (pop) type_path_pop(tp);
-	
+
 	i64 elem_size = type_size_of(elem);
-	
+
 
 	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
 	// It would be better for performance to pad each column so that each column
 	// could be maximally aligned but as a compromise, having no padding will be
 	// beneficial to third libraries that assume no padding
-	
+
 	i64 total_expected_size = row_count*column_count*elem_size;
 	// i64 min_alignment = prev_pow2(elem_align * row_count);
 	i64 min_alignment = prev_pow2(total_expected_size);
@@ -1466,7 +1466,7 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 		min_alignment >>= 1;
 	}
 	min_alignment = gb_max(min_alignment, elem_align);
-	
+
 	i64 align = gb_min(min_alignment, build_context.max_simd_align);
 	return align;
 }
@@ -1480,7 +1480,7 @@ gb_internal i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	} else if (t->Matrix.row_count == 0) {
 		return 0;
 	}
-	
+
 	i64 elem_size;
 	if (tp != nullptr) {
 		elem_size = type_size_of_internal(t->Matrix.elem, tp);
@@ -1489,7 +1489,7 @@ gb_internal i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	}
 
 	i64 stride_in_bytes = 0;
-	
+
 	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
 	// It would be better for performance to pad each column/row so that each column/row
 	// could be maximally aligned but as a compromise, having no padding will be
@@ -1545,7 +1545,7 @@ gb_internal i64 matrix_row_major_index_to_offset(Type *t, i64 index) {
 gb_internal i64 matrix_column_major_index_to_offset(Type *t, i64 index) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
-	
+
 	i64 row_index    = index%t->Matrix.row_count;
 	i64 column_index = index/t->Matrix.row_count;
 	return matrix_indices_to_offset(t, row_index, column_index);
@@ -1566,7 +1566,7 @@ gb_internal bool is_type_valid_for_matrix_elems(Type *t) {
 		return true;
 	} else if (is_type_complex(t)) {
 		return true;
-	} 
+	}
 	if (t->kind == Type_Generic) {
 		return true;
 	}
@@ -2119,6 +2119,23 @@ gb_internal bool is_type_sliceable(Type *t) {
 	return false;
 }
 
+gb_internal Entity *type_get_polymorphic_parent(Type *t, Type **params_) {
+	t = base_type(t);
+	Type *parent = nullptr;
+	if (t->kind == Type_Struct) {
+		parent = t->Struct.polymorphic_parent;
+		if (params_) *params_ = t->Struct.polymorphic_params;
+	} else if (t->kind == Type_Union) {
+		parent = t->Union.polymorphic_parent;
+		if (params_) *params_ = t->Union.polymorphic_params;
+	}
+	if (parent != nullptr) {
+		GB_ASSERT(parent->kind == Type_Named);
+
+		return parent->Named.type_name;
+	}
+	return nullptr;
+}
 
 gb_internal bool is_type_polymorphic_record(Type *t) {
 	t = base_type(t);
@@ -2485,7 +2502,7 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	case Type_Proc:
 	case Type_BitSet:
 		return true;
-		
+
 	case Type_Matrix:
 		return is_type_simple_compare(t->Matrix.elem);
 
@@ -2732,7 +2749,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	case Type_Array:
 		return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
-		
+
 	case Type_Matrix:
 		return x->Matrix.row_count == y->Matrix.row_count &&
 		       x->Matrix.column_count == y->Matrix.column_count &&
@@ -3592,7 +3609,7 @@ gb_internal bool are_struct_fields_reordered(Type *type) {
 		return false;
 	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
-	
+
 	i64 prev_offset = 0;
 	for_array(i, type->Struct.fields) {
 		i64 offset = type->Struct.offsets[i];
@@ -3613,9 +3630,9 @@ gb_internal Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allo
 		return {};
 	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
-	
+
 	auto indices = slice_make<i32>(allocator, type->Struct.fields.count);
-	
+
 	i64 prev_offset = 0;
 	bool is_ordered = true;
 	for_array(i, indices) {
@@ -3630,14 +3647,14 @@ gb_internal Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allo
 		isize n = indices.count;
 		for (isize i = 1; i < n; i++) {
 			isize j = i;
-			
+
 			while (j > 0 && type->Struct.offsets[indices[j-1]] > type->Struct.offsets[indices[j]]) {
 				gb_swap(i32, indices[j-1], indices[j]);
 				j -= 1;
-			}				
+			}
 		}
 	}
-	
+
 	return indices;
 }
 
@@ -3887,8 +3904,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
 		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align*2);
 	}
-	
-	case Type_Matrix: 
+
+	case Type_Matrix:
 		return matrix_align_of(t, path);
 
 	case Type_SoaPointer:
@@ -4175,7 +4192,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		Type *elem = t->SimdVector.elem;
 		return count * type_size_of_internal(elem, path);
 	}
-	
+
 	case Type_Matrix: {
 		i64 stride_in_bytes = matrix_type_stride_in_bytes(t, path);
 		if (t->Matrix.is_row_major) {
@@ -4580,7 +4597,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		break;
 
 	case Type_Array:
-		str = gb_string_appendc(str, gb_bprintf("[%d]", cast(int)type->Array.count));
+		str = gb_string_appendc(str, gb_bprintf("[%lld]", cast(long long)type->Array.count));
 		str = write_type_to_string(str, type->Array.elem);
 		break;
 
@@ -4753,10 +4770,10 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			}
 			break;
 		case ProcCC_CDecl:
-			str = gb_string_appendc(str, " \"cdecl\" ");
+			str = gb_string_appendc(str, " \"c\" ");
 			break;
 		case ProcCC_StdCall:
-			str = gb_string_appendc(str, " \"stdcall\" ");
+			str = gb_string_appendc(str, " \"std\" ");
 			break;
 		case ProcCC_FastCall:
 			str = gb_string_appendc(str, " \"fastcall\" ");
@@ -4814,7 +4831,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
 		str = write_type_to_string(str, type->SimdVector.elem);
 		break;
-		
+
 	case Type_Matrix:
 		if (type->Matrix.is_row_major) {
 			str = gb_string_appendc(str, "#row_major ");
@@ -4856,5 +4873,209 @@ gb_internal gbString type_to_string_shorthand(Type *type) {
 	return type_to_string(type, true);
 }
 
+gb_internal gbString write_type_to_canonical_string(gbString w, Type *type);
+gb_internal gbString write_canonical_params(gbString w, Type *params) {
+	w = gb_string_appendc(w, "(");
+	if (params) {
+		GB_ASSERT(params->kind == Type_Tuple);
+		for_array(i, params->Tuple.variables) {
+			Entity *v = params->Tuple.variables[i];
+			if (i > 0) {
+				w = gb_string_appendc(w, ",");
+			}
+			if (v->kind == Entity_Variable) {
+				if (v->flags&EntityFlag_CVarArg) {
+					w = gb_string_appendc(w, "#c_vararg");
+				}
+				if (v->flags&EntityFlag_Ellipsis) {
+					Type *slice = base_type(v->type);
+					w = gb_string_appendc(w, "..");
+					GB_ASSERT(v->type->kind == Type_Slice);
+					w = write_type_to_canonical_string(w, slice->Slice.elem);
+				} else {
+					w = write_type_to_canonical_string(w, v->type);
+				}
+			} else if (v->kind == Entity_TypeName) {
+				w = gb_string_appendc(w, "$");
+				w = write_type_to_canonical_string(w, v->type);
+			} else if (v->kind == Entity_Constant) {
+				w = gb_string_appendc(w, "$$");
+				w = write_exact_value_to_string(w, v->Constant.value);
+			} else {
+				GB_PANIC("TODO(bill): handle non type/const parapoly parameter values");
+			}
+		}
+	}
+	return gb_string_appendc(w, ")");
+}
 
+gb_internal u64 type_hash_canonical_type(Type *type) {
+	if (type == nullptr) {
+		return 0;
+	}
+	TEMPORARY_ALLOCATOR_GUARD();
+	gbString w = write_type_to_canonical_string(gb_string_make(temporary_allocator(), ""), type);
+	u64 hash = fnv64a(w, gb_string_length(w));
+	return hash;
+}
 
+// NOTE(bill): This exists so that we deterministically hash a type by serializing it to a canonical string
+gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
+	if (type == nullptr) {
+		return gb_string_appendc(w, "<>"); // none/void type
+	}
+
+	type = default_type(type);
+	GB_ASSERT(!is_type_untyped(type));
+
+	switch (type->kind) {
+	case Type_Basic:
+		return gb_string_append_length(w, type->Basic.name.text, type->Basic.name.len);
+	case Type_Pointer:
+		w = gb_string_append_rune(w, '^');
+		return write_type_to_canonical_string(w, type->Pointer.elem);
+	case Type_MultiPointer:
+		w = gb_string_appendc(w, "[^]");
+		return write_type_to_canonical_string(w, type->Pointer.elem);
+	case Type_SoaPointer:
+		w = gb_string_appendc(w, "#soa^");
+		return write_type_to_canonical_string(w, type->Pointer.elem);
+	case Type_EnumeratedArray:
+		if (type->EnumeratedArray.is_sparse) {
+			w = gb_string_appendc(w, "#sparse");
+		}
+		w = gb_string_append_rune(w, '[');
+		w = write_type_to_canonical_string(w, type->EnumeratedArray.index);
+		w = gb_string_append_rune(w, ']');
+		return write_type_to_canonical_string(w, type->EnumeratedArray.elem);
+	case Type_Array:
+		w = gb_string_appendc(w, gb_bprintf("[%lld]", cast(long long)type->Array.count));
+		return write_type_to_canonical_string(w, type->Array.elem);
+	case Type_Slice:
+		w = gb_string_appendc(w, "[]");
+		return write_type_to_canonical_string(w, type->Array.elem);
+	case Type_DynamicArray:
+		w = gb_string_appendc(w, "[dynamic]");
+		return write_type_to_canonical_string(w, type->DynamicArray.elem);
+	case Type_SimdVector:
+		w = gb_string_appendc(w, gb_bprintf("#simd[%lld]", cast(long long)type->SimdVector.count));
+		return write_type_to_canonical_string(w, type->SimdVector.elem);
+	case Type_Matrix:
+		if (type->Matrix.is_row_major) {
+			w = gb_string_appendc(w, "#row_major ");
+		}
+		w = gb_string_appendc(w, gb_bprintf("matrix[%lld, %lld]", cast(long long)type->Matrix.row_count, cast(long long)type->Matrix.column_count));
+		return write_type_to_canonical_string(w, type->Matrix.elem);
+	case Type_Map:
+		w = gb_string_appendc(w, "map[");
+		w = write_type_to_canonical_string(w, type->Map.key);
+		w = gb_string_appendc(w, "]");
+		return write_type_to_canonical_string(w, type->Map.value);
+
+	case Type_Enum:
+		w = gb_string_appendc(w, "enum");
+		if (type->Enum.base_type != nullptr) {
+			w = gb_string_append_rune(w, ' ');
+			w = write_type_to_canonical_string(w, type->Enum.base_type);
+			w = gb_string_append_rune(w, ' ');
+		}
+		w = gb_string_append_rune(w, '{');
+		for_array(i, type->Enum.fields) {
+			Entity *f = type->Enum.fields[i];
+			GB_ASSERT(f->kind == Entity_Constant);
+			if (i > 0) {
+				w = gb_string_appendc(w, ",");
+			}
+			w = gb_string_append_length(w, f->token.string.text, f->token.string.len);
+			w = gb_string_appendc(w, "=");
+			w = write_exact_value_to_string(w, f->Constant.value);
+		}
+		return gb_string_append_rune(w, '}');
+	case Type_BitSet:
+		w = gb_string_appendc(w, "bit_set[");
+		if (type->BitSet.elem == nullptr) {
+			w = write_type_to_canonical_string(w, type->BitSet.elem);
+		} else if (is_type_enum(type->BitSet.elem)) {
+			w = write_type_to_canonical_string(w, type->BitSet.elem);
+		} else {
+			w = gb_string_append_fmt(w, "%lld", type->BitSet.lower);
+			w = gb_string_append_fmt(w, "..=");
+			w = gb_string_append_fmt(w, "%lld", type->BitSet.upper);
+		}
+		if (type->BitSet.underlying != nullptr) {
+			w = gb_string_appendc(w, ";");
+			w = write_type_to_canonical_string(w, type->BitSet.underlying);
+		}
+		return gb_string_appendc(w, "]");
+
+	case Type_Union:
+		w = gb_string_appendc(w, "union");
+		return w;
+	case Type_Struct:
+		w = gb_string_appendc(w, "struct");
+		return w;
+
+	case Type_BitField:
+		w = gb_string_appendc(w, "bit_field");
+		w = write_type_to_canonical_string(w, type->BitField.backing_type);
+		w = gb_string_appendc(w, " {");
+		for (isize i = 0; i < type->BitField.fields.count; i++) {
+			Entity *f = type->BitField.fields[i];
+			if (i > 0) {
+				w = gb_string_appendc(w, ",");
+			}
+			w = gb_string_append_length(w, f->token.string.text, f->token.string.len);
+			w = gb_string_appendc(w, ":");
+			w = write_type_to_canonical_string(w, f->type);
+			w = gb_string_appendc(w, "|");
+			w = gb_string_appendc(w, gb_bprintf("%u", type->BitField.bit_sizes[i]));
+		}
+		return gb_string_appendc(w, " }");
+
+	case Type_Proc:
+		w = gb_string_appendc(w, "proc");
+		if (default_calling_convention() != type->Proc.calling_convention) {
+			w = gb_string_appendc(w, "\"");
+			w = gb_string_appendc(w, proc_calling_convention_strings[type->Proc.calling_convention]);
+			w = gb_string_appendc(w, "\"");
+		}
+
+		w = write_canonical_params(w, type->Proc.params);
+		if (type->Proc.result_count > 0) {
+			w = gb_string_appendc(w, "->");
+			w = write_canonical_params(w, type->Proc.results);
+		}
+		return w;
+
+	case Type_Generic:
+		GB_PANIC("Type_Generic should never be hit");
+		return w;
+
+	case Type_Named:
+		if (type->Named.type_name != nullptr) {
+			Entity *e = type->Named.type_name;
+			if (e->pkg != nullptr) {
+				w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
+				w = gb_string_appendc(w, ".");
+			}
+			Type *params = nullptr;
+			Entity *parent = type_get_polymorphic_parent(type, &params);
+			if (parent) {
+				w = gb_string_append_length(w, parent->token.string.text, parent->token.string.len);
+				w = write_canonical_params(w, params);
+			} else {
+				w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
+			}
+		} else {
+			w = gb_string_append_length(w, type->Named.name.text, type->Named.name.len);
+		}
+		// Handle parapoly stuff here?
+		return w;
+
+	default:
+		GB_PANIC("unknown type kind %d", type->kind);
+		break;
+	}
+
+	return w;
+}
