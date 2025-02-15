@@ -5010,10 +5010,57 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 
 	case Type_Union:
 		w = gb_string_appendc(w, "union");
-		return w;
+
+		switch (type->Union.kind) {
+		case UnionType_no_nil:     w = gb_string_appendc(w, "#no_nil");     break;
+		case UnionType_shared_nil: w = gb_string_appendc(w, "#shared_nil"); break;
+		}
+		if (type->Union.custom_align != 0) {
+			w = gb_string_append_fmt(w, "#align(%lld)", cast(long long)type->Union.custom_align);
+		}
+		w = gb_string_appendc(w, "{");
+		for_array(i, type->Union.variants) {
+			Type *t = type->Union.variants[i];
+			if (i > 0) w = gb_string_appendc(w, ", ");
+			w = write_type_to_canonical_string(w, t);
+		}
+		return gb_string_appendc(w, "}");
 	case Type_Struct:
+		if (type->Struct.soa_kind != StructSoa_None) {
+			switch (type->Struct.soa_kind) {
+			case StructSoa_Fixed:   w = gb_string_append_fmt(w, "#soa[%lld]", cast(long long)type->Struct.soa_count); break;
+			case StructSoa_Slice:   w = gb_string_appendc(w,    "#soa[]");                                    break;
+			case StructSoa_Dynamic: w = gb_string_appendc(w,    "#soa[dynamic]");                             break;
+			default: GB_PANIC("Unknown StructSoaKind"); break;
+			}
+			return write_type_to_canonical_string(w, type->Struct.soa_elem);
+		}
+
 		w = gb_string_appendc(w, "struct");
-		return w;
+		if (type->Struct.is_packed)    w = gb_string_appendc(w, "#packed");
+		if (type->Struct.is_raw_union) w = gb_string_appendc(w, "#raw_union");
+		if (type->Struct.is_no_copy)   w = gb_string_appendc(w, "#no_copy");
+		if (type->Struct.custom_min_field_align != 0) w = gb_string_append_fmt(w, "#min_field_align(%lld)", cast(long long)type->Struct.custom_min_field_align);
+		if (type->Struct.custom_max_field_align != 0) w = gb_string_append_fmt(w, "#max_field_align(%lld)", cast(long long)type->Struct.custom_max_field_align);
+		if (type->Struct.custom_align != 0)           w = gb_string_append_fmt(w, "#align(%lld)",           cast(long long)type->Struct.custom_align);
+		w = gb_string_appendc(w, "{");
+		for_array(i, type->Struct.fields) {
+			Entity *f = type->Struct.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable);
+			if (i > 0) {
+				w = gb_string_appendc(w, ",");
+			}
+			w = gb_string_append_length       (w, f->token.string.text, f->token.string.len);
+			w = gb_string_appendc             (w, ":");
+			w = write_type_to_canonical_string(w, f->type);
+			String tag = type->Struct.tags[i];
+			if (tag.len != 0) {
+				String s = quote_to_ascii(heap_allocator(), tag);
+				w = gb_string_append_length(w, s.text, s.len);
+				gb_free(heap_allocator(), s.text);
+			}
+		}
+		return gb_string_appendc(w, "}");
 
 	case Type_BitField:
 		w = gb_string_appendc(w, "bit_field");
