@@ -67,14 +67,14 @@ when GL_DEBUG {
 				last_compile_error_type = type
 
 				log_func(id, i32(info_log_length), nil, raw_data(last_compile_error_message), loc)
-				fmt.eprintf("Error in %v:\n%s", type, string(last_compile_error_message[0:len(last_compile_error_message)-1]));
+				fmt.eprintf("Error in %v:\n%s", type, string(last_compile_error_message[0:len(last_compile_error_message)-1]))
 			} else {
 				delete(last_link_error_message)
 				last_link_error_message = make([]byte, info_log_length)
 				last_link_error_type = type
 
 				log_func(id, i32(info_log_length), nil, raw_data(last_link_error_message), loc)
-				fmt.eprintf("Error in %v:\n%s", type, string(last_link_error_message[0:len(last_link_error_message)-1]));
+				fmt.eprintf("Error in %v:\n%s", type, string(last_link_error_message[0:len(last_link_error_message)-1]))
 			}
 
 			return false
@@ -100,14 +100,14 @@ when GL_DEBUG {
 				last_compile_error_type = type
 
 				log_func(id, i32(info_log_length), nil, raw_data(last_compile_error_message))
-				// fmt.eprintf("Error in %v:\n%s", type, string(last_compile_error_message[0:len(last_compile_error_message)-1]));
+				// fmt.eprintf("Error in %v:\n%s", type, string(last_compile_error_message[0:len(last_compile_error_message)-1]))
 			} else {
 				delete(last_link_error_message)
 				last_link_error_message = make([]byte, info_log_length)
 				last_link_error_type = type
 
 				log_func(id, i32(info_log_length), nil, raw_data(last_link_error_message))
-				// fmt.eprintf("Error in %v:\n%s", type, string(last_link_error_message[0:len(last_link_error_message)-1]));
+				// fmt.eprintf("Error in %v:\n%s", type, string(last_link_error_message[0:len(last_link_error_message)-1]))
 			}
 			
 			return false
