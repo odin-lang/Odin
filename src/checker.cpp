@@ -1363,6 +1363,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	map_init(&i->gen_types);
 	array_init(&i->type_info_types, a);
 	map_init(&i->type_info_map);
+	type_set_init(&i->type_info_set);
 	string_map_init(&i->files);
 	string_map_init(&i->packages);
 	array_init(&i->variable_init_order, a);
@@ -1397,6 +1398,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->gen_types);
 	array_free(&i->type_info_types);
 	map_destroy(&i->type_info_map);
+	type_set_destroy(&i->type_info_set);
 	string_map_destroy(&i->files);
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
@@ -2040,7 +2042,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			// Unique entry
 			// NOTE(bill): map entries grow linearly and in order
 			ti_index = c->info->type_info_types.count;
-			Type_Info_Type tt = {t, type_hash_canonical_type(t)};
+			TypeInfoPair tt = {t, type_hash_canonical_type(t)};
 			array_add(&c->info->type_info_types, tt);
 		}
 		map_set(&c->checker->info.type_info_map, t, ti_index);
@@ -2293,21 +2295,10 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		return;
 	}
 
-	auto *set = &c->info.minimum_dependency_type_info_set;
+	if (type_set_update(&c->info.type_info_set, t)) {
+		// return;
+	}
 
-	isize ti_index = type_info_index(&c->info, t, false);
-	if (ti_index < 0) {
-		add_type_info_type(&c->builtin_ctx, t); // Missing the type information
-		ti_index = type_info_index(&c->info, t, false);
-	}
-	GB_ASSERT(ti_index >= 0);
-	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
-	// and effectively assigns the `+1` of the value
-	isize const count = set->count;
-	if (map_set_if_not_previously_exists(set, ti_index+1, count)) {
-		// Type already exists;
-		return;
-	}
 
 	// Add nested types
 	if (t->kind == Type_Named) {

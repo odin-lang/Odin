@@ -409,10 +409,26 @@ struct Defineable {
 	String pos_str;
 };
 
-struct Type_Info_Type {
+struct TypeInfoPair {
 	Type *type;
 	u64   hash; // see: type_hash_canonical_type
 };
+
+struct TypeSet {
+	TypeInfoPair *keys;
+	usize count;
+	usize capacity;
+};
+
+gb_internal void  type_set_init   (TypeSet *s, isize capacity = 16);
+gb_internal void  type_set_destroy(TypeSet *s);
+gb_internal Type *type_set_add    (TypeSet *s, Type *ptr);
+gb_internal bool  type_set_update (TypeSet *s, Type *ptr); // returns true if it previously existed
+gb_internal bool  type_set_update (TypeSet *s, TypeInfoPair pair); // returns true if it previously existed
+gb_internal bool  type_set_exists (TypeSet *s, Type *ptr);
+gb_internal void  type_set_remove (TypeSet *s, Type *ptr);
+gb_internal void  type_set_clear  (TypeSet *s);
+gb_internal TypeInfoPair *type_set_retrieve(TypeSet *s, Type *ptr);
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
@@ -458,8 +474,9 @@ struct CheckerInfo {
 	PtrMap<Type *, GenTypesData *> gen_types;
 
 	BlockingMutex type_info_mutex; // NOT recursive
-	Array<Type_Info_Type> type_info_types;
+	Array<TypeInfoPair> type_info_types;
 	PtrMap<Type *, isize> type_info_map;
+	TypeSet type_info_set;
 
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;

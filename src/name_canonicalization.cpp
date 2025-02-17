@@ -44,6 +44,227 @@ gb_internal u64      type_hash_canonical_type(Type *type);
 gb_internal String   type_to_canonical_string(gbAllocator allocator, Type *type);
 gb_internal gbString temp_canonical_string(Type *type);
 
+
+struct TypeInfoPair;
+struct TypeSet;
+
+static constexpr u64 TYPE_SET_TOMBSTONE = ~(u64)(0ull);
+
+gb_internal void  type_set_init   (TypeSet *s, isize capacity);
+gb_internal void  type_set_destroy(TypeSet *s);
+gb_internal Type *type_set_add    (TypeSet *s, Type *ptr);
+gb_internal bool  type_set_update (TypeSet *s, Type *ptr); // returns true if it previously existed
+gb_internal bool  type_set_update (TypeSet *s, TypeInfoPair pair); // returns true if it previously existed
+gb_internal bool  type_set_exists (TypeSet *s, Type *ptr);
+gb_internal void  type_set_remove (TypeSet *s, Type *ptr);
+gb_internal void  type_set_clear  (TypeSet *s);
+gb_internal TypeInfoPair *type_set_retrieve(TypeSet *s, Type *ptr);
+
+gb_internal gbAllocator type_set_allocator(void) {
+	return heap_allocator();
+}
+
+struct TypeSetIterator {
+	TypeSet *set;
+	usize index;
+
+	TypeSetIterator &operator++() noexcept {
+		for (;;) {
+			++index;
+			if (set->capacity == index) {
+				return *this;
+			}
+			TypeInfoPair key = set->keys[index];
+			if (key.hash != 0 && key.hash != TYPE_SET_TOMBSTONE) {
+				return *this;
+			}
+		}
+	}
+
+	bool operator==(TypeSetIterator const &other) const noexcept {
+		return this->set == other.set && this->index == other.index;
+	}
+
+
+	operator TypeInfoPair *() const {
+		return &set->keys[index];
+	}
+};
+
+
+gb_internal TypeSetIterator begin(TypeSet &set) noexcept {
+	usize index = 0;
+	while (index < set.capacity) {
+		TypeInfoPair key = set.keys[index];
+		if (key.hash != 0 && key.hash != TYPE_SET_TOMBSTONE) {
+			break;
+		}
+		index++;
+	}
+	return TypeSetIterator{&set, index};
+}
+gb_internal TypeSetIterator end(TypeSet &set) noexcept {
+	return TypeSetIterator{&set, set.capacity};
+}
+
+
+gb_internal void type_set_init(TypeSet *s, isize capacity) {
+	GB_ASSERT(s->keys == nullptr);
+	if (capacity != 0) {
+		capacity = next_pow2_isize(gb_max(16, capacity));
+		s->keys = gb_alloc_array(type_set_allocator(), TypeInfoPair, capacity);
+		// This memory will be zeroed, no need to explicitly zero it
+	}
+	s->count = 0;
+	s->capacity = capacity;
+}
+
+gb_internal void type_set_destroy(TypeSet *s) {
+	gb_free(type_set_allocator(), s->keys);
+	s->keys = nullptr;
+	s->count = 0;
+	s->capacity = 0;
+}
+
+
+gb_internal isize type_set__find(TypeSet *s, TypeInfoPair pair) {
+	GB_ASSERT(pair.type != nullptr);
+	GB_ASSERT(pair.hash != 0);
+	if (s->count != 0) {
+		usize hash = pair.hash;
+		usize mask = s->capacity-1;
+		usize hash_index = cast(usize)hash & mask;
+		for (usize i = 0; i < s->capacity; i++) {
+			Type *key = s->keys[hash_index].type;
+			if (are_types_identical(key, pair.type)) {
+				return hash_index;
+			} else if (key == 0) {
+				return -1;
+			}
+			hash_index = (hash_index+1)&mask;
+		}
+	}
+	return -1;
+}
+gb_internal isize type_set__find(TypeSet *s, Type *ptr) {
+	GB_ASSERT(ptr != 0);
+	if (s->count != 0) {
+		usize hash = cast(usize)type_hash_canonical_type(ptr);
+		usize mask = s->capacity-1;
+		usize hash_index = cast(usize)hash & mask;
+		for (usize i = 0; i < s->capacity; i++) {
+			Type *key = s->keys[hash_index].type;
+			if (are_types_identical(key, ptr)) {
+				return hash_index;
+			} else if (key == 0) {
+				return -1;
+			}
+			hash_index = (hash_index+1)&mask;
+		}
+	}
+	return -1;
+}
+
+gb_internal bool type_set__full(TypeSet *s) {
+	return 0.75f * s->capacity <= s->count;
+}
+
+gb_internal gb_inline void type_set_grow(TypeSet *old_set) {
+	if (old_set->capacity == 0) {
+		type_set_init(old_set);
+		return;
+	}
+
+	TypeSet new_set = {};
+	type_set_init(&new_set, gb_max(old_set->capacity<<1, 16));
+
+	for (TypeInfoPair const &set : *old_set) {
+		bool was_new = type_set_update(&new_set, set);
+		GB_ASSERT(!was_new);
+	}
+	GB_ASSERT(old_set->count == new_set.count);
+
+	type_set_destroy(old_set);
+
+	*old_set = new_set;
+}
+
+
+gb_internal gb_inline bool type_set_exists(TypeSet *s, Type *ptr) {
+	return type_set__find(s, ptr) >= 0;
+}
+gb_internal gb_inline bool type_set_exists(TypeSet *s, TypeInfoPair pair) {
+	return type_set__find(s, pair) >= 0;
+}
+gb_internal gb_inline TypeInfoPair *type_set_retrieve(TypeSet *s, Type *type) {
+	isize index = type_set__find(s, type);
+	if (index >= 0) {
+		return &s->keys[index];
+	}
+	return nullptr;
+}
+
+
+gb_internal bool type_set_update(TypeSet *s, TypeInfoPair pair) { // returns true if it previously existsed
+	if (type_set_exists(s, pair)) {
+		return true;
+	}
+
+	if (s->keys == nullptr) {
+		type_set_init(s);
+	} else if (type_set__full(s)) {
+		type_set_grow(s);
+	}
+	GB_ASSERT(s->count < s->capacity);
+	GB_ASSERT(s->capacity >= 0);
+
+	usize mask = s->capacity-1;
+	usize hash = cast(usize)pair.hash;
+	usize hash_index = (cast(usize)hash) & mask;
+	GB_ASSERT(hash_index < s->capacity);
+	for (usize i = 0; i < s->capacity; i++) {
+		TypeInfoPair *key = &s->keys[hash_index];
+		GB_ASSERT(!are_types_identical(key->type, pair.type));
+		if (key->hash == TYPE_SET_TOMBSTONE || key->hash == 0) {
+			*key = pair;
+			s->count++;
+			return false;
+		}
+		hash_index = (hash_index+1)&mask;
+	}
+
+	GB_PANIC("ptr set out of memory");
+	return false;
+}
+
+gb_internal bool type_set_update(TypeSet *s, Type *ptr) { // returns true if it previously existsed
+	TypeInfoPair pair = {ptr, type_hash_canonical_type(ptr)};
+	return type_set_update(s, pair);
+}
+
+
+gb_internal Type *type_set_add(TypeSet *s, Type *ptr) {
+	type_set_update(s, ptr);
+	return ptr;
+}
+
+
+gb_internal void type_set_remove(TypeSet *s, Type *ptr) {
+	isize index = type_set__find(s, ptr);
+	if (index >= 0) {
+		GB_ASSERT(s->count > 0);
+		s->keys[index].type = nullptr;
+		s->keys[index].hash = TYPE_SET_TOMBSTONE;
+		s->count--;
+	}
+}
+
+gb_internal gb_inline void type_set_clear(TypeSet *s) {
+	s->count = 0;
+	gb_zero_size(s->keys, s->capacity*gb_size_of(*s->keys));
+}
+
+
 gb_internal gbString write_canonical_params(gbString w, Type *params) {
 	w = gb_string_appendc(w, "(");
 	if (params) {
