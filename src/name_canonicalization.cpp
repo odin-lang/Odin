@@ -1,3 +1,43 @@
+/*
+	General Rules for canonical name mangling
+
+	* No spaces between any values
+
+	* normal declarations - pkg.name
+	* builtin names - just their normal name e.g. `i32` or `string`
+	* nested - pkg.parent1.parent2.name
+	* file private - pkg.[file_name].name
+		* Example: `foo.[bar.odin].Type`
+	* polymorphic procedure/type - pkg.foo::TYPE
+		* naming convention for parameters
+			* type
+			* $typeid_based_name
+			* $$constant_parameter
+		* Example: `foo.to_thing::proc(u64)->([]u8)`
+	* nested decl in polymorphic procedure - pkg.foo::TYPE.name
+	* anonymous procedures - pkg.foo.$anon123
+		* 123 is the file offset in bytes
+
+
+*/
+
+#define CANONICAL_TYPE_SEPARATOR  ":"
+#define CANONICAL_NAME_SEPARATOR  "."
+
+#define CANONICAL_PARAM_SEPARATOR ","
+
+#define CANONICAL_PARAM_TYPEID    "$"
+#define CANONICAL_PARAM_CONST     "$$"
+
+#define CANONICAL_PARAM_C_VARARG  "#c_vararg"
+#define CANONICAL_PARAM_VARARG    ".."
+
+#define CANONICAL_FIELD_SEPARATOR ","
+
+#define CANONICAL_ANON_PREFIX     "$anon"
+
+#define CANONICAL_NONE_TYPE       "<>"
+
 gb_internal gbString write_type_to_canonical_string(gbString w, Type *type);
 gb_internal gbString write_canonical_params(gbString w, Type *params) {
 	w = gb_string_appendc(w, "(");
@@ -6,25 +46,25 @@ gb_internal gbString write_canonical_params(gbString w, Type *params) {
 		for_array(i, params->Tuple.variables) {
 			Entity *v = params->Tuple.variables[i];
 			if (i > 0) {
-				w = gb_string_appendc(w, ",");
+				w = gb_string_appendc(w, CANONICAL_PARAM_SEPARATOR);
 			}
 			if (v->kind == Entity_Variable) {
 				if (v->flags&EntityFlag_CVarArg) {
-					w = gb_string_appendc(w, "#c_vararg");
+					w = gb_string_appendc(w, CANONICAL_PARAM_C_VARARG);
 				}
 				if (v->flags&EntityFlag_Ellipsis) {
 					Type *slice = base_type(v->type);
-					w = gb_string_appendc(w, "..");
+					w = gb_string_appendc(w, CANONICAL_PARAM_VARARG);
 					GB_ASSERT(v->type->kind == Type_Slice);
 					w = write_type_to_canonical_string(w, slice->Slice.elem);
 				} else {
 					w = write_type_to_canonical_string(w, v->type);
 				}
 			} else if (v->kind == Entity_TypeName) {
-				w = gb_string_appendc(w, "$");
+				w = gb_string_appendc(w, CANONICAL_PARAM_TYPEID);
 				w = write_type_to_canonical_string(w, v->type);
 			} else if (v->kind == Entity_Constant) {
-				w = gb_string_appendc(w, "$$");
+				w = gb_string_appendc(w, CANONICAL_PARAM_CONST);
 				w = write_exact_value_to_string(w, v->Constant.value);
 			} else {
 				GB_PANIC("TODO(bill): handle non type/const parapoly parameter values");
@@ -88,24 +128,24 @@ gb_internal gbString write_canonical_parent_prefix(gbString w, Entity *e, bool i
 			w = write_canonical_parent_prefix(w, p);
 			w = gb_string_append_length(w, p->token.string.text, p->token.string.len);
 			if (is_type_polymorphic(p->type)) {
-				w = gb_string_appendc(w, "::");
+				w = gb_string_appendc(w, CANONICAL_TYPE_SEPARATOR);
 				w = write_type_to_canonical_string(w, p->type);
 			}
-			w = gb_string_appendc(w, ".");
+			w = gb_string_appendc(w, CANONICAL_NAME_SEPARATOR);
 
 		} else if (e->pkg && (scope_lookup_current(e->pkg->scope, e->token.string) == e)) {
 			w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
 			if (e->pkg->name == "llvm") {
 				gb_string_appendc(w, "$");
 			}
-			w = gb_string_appendc(w, ".");
+			w = gb_string_appendc(w, CANONICAL_NAME_SEPARATOR);
 		} else {
 			String file_name = filename_without_directory(e->file->fullpath);
 			w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
 			if (e->pkg->name == "llvm") {
 				gb_string_appendc(w, "$");
 			}
-			w = gb_string_appendc(w, gb_bprintf(".[%.*s].", LIT(file_name)));
+			w = gb_string_appendc(w, gb_bprintf(CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name)));
 		}
 	} else if (e->kind == Entity_Procedure) {
 		if (e->Procedure.is_export || e->Procedure.is_foreign) {
@@ -116,17 +156,17 @@ gb_internal gbString write_canonical_parent_prefix(gbString w, Entity *e, bool i
 	}
 
 	if (e->kind == Entity_Procedure && e->Procedure.is_anonymous) {
-		w = gb_string_appendc(w, gb_bprintf("$anon%d", e->token.pos.offset));
+		w = gb_string_appendc(w, gb_bprintf(CANONICAL_ANON_PREFIX "%d", e->token.pos.offset));
 	} else {
 		w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
 	}
 
 	if (is_type_polymorphic(e->type)) {
-		w = gb_string_appendc(w, "::");
+		w = gb_string_appendc(w, CANONICAL_TYPE_SEPARATOR);
 		w = write_type_to_canonical_string(w, e->type);
 	}
 	if (!ignore_final_dot) {
-		w = gb_string_appendc(w, ".");
+		w = gb_string_appendc(w, CANONICAL_NAME_SEPARATOR);
 	}
 
 	return w;
@@ -177,7 +217,7 @@ gb_internal gbString write_canonical_entity_name(gbString w, Entity *e) {
 			if (e->pkg->name == "llvm") {
 				gb_string_appendc(w, "$");
 			}
-			w = gb_string_appendc(w, gb_bprintf(".[%.*s].", LIT(file_name)));
+			w = gb_string_appendc(w, gb_bprintf(CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name)));
 			goto write_base_name;
 		}
 		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
@@ -186,7 +226,7 @@ gb_internal gbString write_canonical_entity_name(gbString w, Entity *e) {
 	}
 	if (e->pkg != nullptr) {
 		w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
-		w = gb_string_appendc(w, ".");
+		w = gb_string_appendc(w, CANONICAL_NAME_SEPARATOR);
 	}
 
 write_base_name:
@@ -210,7 +250,7 @@ write_base_name:
 	case Entity_Variable:
 		w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
 		if (is_type_polymorphic(e->type)) {
-			w = gb_string_appendc(w, "::");
+			w = gb_string_appendc(w, CANONICAL_TYPE_SEPARATOR);
 			w = write_type_to_canonical_string(w, e->type);
 		}
 		return w;
@@ -225,7 +265,7 @@ write_base_name:
 // NOTE(bill): This exists so that we deterministically hash a type by serializing it to a canonical string
 gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 	if (type == nullptr) {
-		return gb_string_appendc(w, "<>"); // none/void type
+		return gb_string_appendc(w, CANONICAL_NONE_TYPE); // none/void type
 	}
 
 	type = default_type(type);
@@ -287,7 +327,7 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 			Entity *f = type->Enum.fields[i];
 			GB_ASSERT(f->kind == Entity_Constant);
 			if (i > 0) {
-				w = gb_string_appendc(w, ",");
+				w = gb_string_appendc(w, CANONICAL_FIELD_SEPARATOR);
 			}
 			w = gb_string_append_length(w, f->token.string.text, f->token.string.len);
 			w = gb_string_appendc(w, "=");
@@ -324,7 +364,7 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 		w = gb_string_appendc(w, "{");
 		for_array(i, type->Union.variants) {
 			Type *t = type->Union.variants[i];
-			if (i > 0) w = gb_string_appendc(w, ", ");
+			if (i > 0) w = gb_string_appendc(w, CANONICAL_FIELD_SEPARATOR);
 			w = write_type_to_canonical_string(w, t);
 		}
 		return gb_string_appendc(w, "}");
@@ -351,7 +391,7 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 			Entity *f = type->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			if (i > 0) {
-				w = gb_string_appendc(w, ",");
+				w = gb_string_appendc(w, CANONICAL_FIELD_SEPARATOR);
 			}
 			w = gb_string_append_length       (w, f->token.string.text, f->token.string.len);
 			w = gb_string_appendc             (w, ":");
@@ -372,7 +412,7 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 		for (isize i = 0; i < type->BitField.fields.count; i++) {
 			Entity *f = type->BitField.fields[i];
 			if (i > 0) {
-				w = gb_string_appendc(w, ",");
+				w = gb_string_appendc(w, CANONICAL_FIELD_SEPARATOR);
 			}
 			w = gb_string_append_length(w, f->token.string.text, f->token.string.len);
 			w = gb_string_appendc(w, ":");
@@ -407,7 +447,6 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 		} else {
 			w = gb_string_append_length(w, type->Named.name.text, type->Named.name.len);
 		}
-		// Handle parapoly stuff here?
 		return w;
 
 	default:
