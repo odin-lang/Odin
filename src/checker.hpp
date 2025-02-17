@@ -276,6 +276,8 @@ struct Scope {
 	StringMap<Entity *> elements;
 	PtrSet<Scope *> imported;
 
+	DeclInfo *decl_info;
+
 	i32             flags; // ScopeFlag
 	union {
 		AstPackage *pkg;

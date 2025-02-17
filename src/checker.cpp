@@ -3894,6 +3894,7 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 #include "check_expr.cpp"
 #include "check_builtin.cpp"
 #include "check_type.cpp"
+#include "name_canonicalization.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
 

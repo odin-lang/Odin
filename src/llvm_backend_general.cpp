@@ -1444,6 +1444,7 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 }
 
 gb_internal String lb_mangle_name(Entity *e) {
+#if 1
 	String name = e->token.string;
 
 	AstPackage *pkg = e->pkg;
@@ -1483,9 +1484,18 @@ gb_internal String lb_mangle_name(Entity *e) {
 
 	String mangled_name = make_string((u8 const *)new_name, new_name_len-1);
 	return mangled_name;
+#else
+	gbString w = gb_string_make(gb_heap_allocator(), "");
+	w = write_canonical_entity_name(w, e);
+	gb_printf_err(">> %s\n", w);
+
+	String mangled_name = make_string(cast(u8 const *)w, gb_string_length(w));
+	return mangled_name;
+#endif
 }
 
 gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedure *p, lbModule *module) {
+#if 0
 	// NOTE(bill, 2020-03-08): A polymorphic procedure may take a nested type declaration
 	// and as a result, the declaration does not have time to determine what it should be
 
@@ -1516,6 +1526,7 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 		}
 	}
 
+
 	// NOTE(bill): Generate a new name
 	// parent_proc.name-guid
 	String ts_name = e->token.string;
@@ -1528,6 +1539,12 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 
 		String name = make_string(cast(u8 *)name_text, name_len-1);
 		e->TypeName.ir_mangled_name = name;
+
+		{
+			String s = type_to_canonical_string(temporary_allocator(), e->type);
+			gb_printf_err("1) %.*s\n", LIT(s));
+			gb_printf_err("2) %.*s\n", LIT(name));
+		}
 		return name;
 	} else {
 		// NOTE(bill): a nested type be required before its parameter procedure exists. Just give it a temp name for now
@@ -1538,11 +1555,18 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 
 		String name = make_string(cast(u8 *)name_text, name_len-1);
 		e->TypeName.ir_mangled_name = name;
+
+		{
+			String s = type_to_canonical_string(temporary_allocator(), e->type);
+			gb_printf_err("3) %.*s\n", LIT(s));
+			gb_printf_err("4) %.*s\n", LIT(name));
+		}
 		return name;
 	}
+#endif
 }
 
-gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
+gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 	GB_ASSERT(m != nullptr);
 	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
@@ -1553,6 +1577,13 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_nam
 		return e->token.string;
 	}
 
+#if 1
+	gbString w = gb_string_make(heap_allocator(), "");
+	w = write_canonical_entity_name(w, e);
+	defer (gb_string_free(w));
+
+	String name = copy_string(permanent_allocator(), make_string(cast(u8 const *)w, gb_string_length(w)));
+#else
 	if (e->kind == Entity_TypeName && (e->scope->flags & ScopeFlag_File) == 0) {
 		return lb_set_nested_type_name_ir_mangled_name(e, nullptr, m);
 	}
@@ -1576,11 +1607,17 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_nam
 
 	if (!no_name_mangle) {
 		name = lb_mangle_name(e);
+
+		gbString w = gb_string_make(gb_heap_allocator(), "");
+		w = write_canonical_entity_name(w, e);
+		if (w[0] == 0) {
+			gb_printf_err(">> %s %.*s\n", w, LIT(name));
+		}
 	}
 	if (name.len == 0) {
 		name = e->token.string;
 	}
-
+#endif
 	if (e->kind == Entity_TypeName) {
 		e->TypeName.ir_mangled_name = name;
 	} else if (e->kind == Entity_Procedure) {
@@ -2869,6 +2906,8 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	pl->decl->code_gen_module = m;
 	e->decl_info = pl->decl;
 	pl->decl->entity = e;
+	e->parent_proc_decl = pl->decl->parent;
+	e->Procedure.is_anonymous = true;
 	e->flags |= EntityFlag_ProcBodyChecked;
 
 	lbProcedure *p = lb_create_procedure(m, e);

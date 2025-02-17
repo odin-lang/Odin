@@ -399,7 +399,7 @@ struct lbProcedure {
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
 
 gb_internal String lb_mangle_name(Entity *e);
-gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
+gb_internal String lb_get_entity_name(lbModule *m, Entity *e);
 
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
 gb_internal LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char const *name, LLVMTypeRef type);

@@ -1784,6 +1784,10 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
+	if (decl->parent && decl->entity && decl->parent->entity) {
+		decl->entity->parent_proc_decl = decl->parent;
+	}
+
 	if (ctx->pkg->name != "runtime") {
 		switch (type->Proc.calling_convention) {
 		case ProcCC_None:
@@ -1873,6 +1877,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	check_open_scope(ctx, body);
 	{
+		ctx->scope->decl_info = decl;
+
 		for (auto const &entry : using_entities) {
 			Entity *uvar = entry.uvar;
 			Entity *prev = scope_insert(ctx->scope, uvar);
