@@ -4919,6 +4919,12 @@ gb_internal u64 type_hash_canonical_type(Type *type) {
 	return hash;
 }
 
+gb_internal String type_to_canonical_string(gbAllocator allocator, Type *type) {
+	gbString w = gb_string_make(allocator, "");
+	w = write_type_to_canonical_string(w, type);
+	return make_string(cast(u8 const *)w, gb_string_length(w));
+}
+
 // NOTE(bill): This exists so that we deterministically hash a type by serializing it to a canonical string
 gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 	if (type == nullptr) {
@@ -5101,6 +5107,15 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 	case Type_Named:
 		if (type->Named.type_name != nullptr) {
 			Entity *e = type->Named.type_name;
+
+			if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0 ||
+			    e->flags & EntityFlag_NotExported) {
+				if (e->scope->flags & ScopeFlag_Proc) {
+					GB_PANIC("NESTED IN PROC\n");
+				} else if (e->scope->flags & ScopeFlag_File) {
+					GB_PANIC("PRIVATE TO FILE\n");
+				}
+			}
 			if (e->pkg != nullptr) {
 				w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
 				w = gb_string_appendc(w, ".");
