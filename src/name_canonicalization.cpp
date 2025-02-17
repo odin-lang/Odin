@@ -180,7 +180,7 @@ gb_internal gbString write_canonical_entity_name(gbString w, Entity *e) {
 			w = gb_string_appendc(w, gb_bprintf(".[%.*s].", LIT(file_name)));
 			goto write_base_name;
 		}
-		gb_printf_err("%s HERE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
+		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
 		print_scope_flags(s);
 		GB_PANIC("weird entity");
 	}

@@ -1568,10 +1568,12 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 	GB_ASSERT(m != nullptr);
-	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
-		return e->TypeName.ir_mangled_name;
-	}
 	GB_ASSERT(e != nullptr);
+	if (e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
+		return e->TypeName.ir_mangled_name;
+	} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len != 0) {
+		return e->Procedure.link_name;
+	}
 
 	if (e->pkg == nullptr) {
 		return e->token.string;
