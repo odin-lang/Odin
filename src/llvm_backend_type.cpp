@@ -12,7 +12,7 @@ gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 		gb_printf_err("NOT FOUND lb_type_info_index:\n\t%s\n\t@ index %td\n\tmax count: %u\nFound:\n", type_to_string(type), index, set->count);
 		for (auto const &entry : *set) {
 			isize type_info_index = entry.key;
-			gb_printf_err("\t%s\n", type_to_string(info->type_info_types[type_info_index]));
+			gb_printf_err("\t%s\n", type_to_string(info->type_info_types[type_info_index].type));
 		}
 		GB_PANIC("NOT FOUND");
 	}
@@ -280,7 +280,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	LLVMTypeRef *modified_types = lb_setup_modified_types_for_type_info(m, global_type_info_data_entity_count);
 	defer (gb_free(heap_allocator(), modified_types));
 	for_array(type_info_type_index, info->type_info_types) {
-		Type *t = info->type_info_types[type_info_type_index];
+		Type *t = info->type_info_types[type_info_type_index].type;
 		if (t == nullptr || t == t_invalid) {
 			continue;
 		}
@@ -343,7 +343,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	};
 
 	for_array(type_info_type_index, info->type_info_types) {
-		Type *t = info->type_info_types[type_info_type_index];
+		Type *t = info->type_info_types[type_info_type_index].type;
 		if (t == nullptr || t == t_invalid) {
 			continue;
 		}

@@ -3,7 +3,10 @@
 #include "entity.cpp"
 #include "types.cpp"
 
-String get_final_microarchitecture();
+
+gb_internal u64 type_hash_canonical_type(Type *type);
+
+gb_internal String get_final_microarchitecture();
 
 gb_internal void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
@@ -2037,7 +2040,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			// Unique entry
 			// NOTE(bill): map entries grow linearly and in order
 			ti_index = c->info->type_info_types.count;
-			array_add(&c->info->type_info_types, t);
+			Type_Info_Type tt = {t, type_hash_canonical_type(t)};
+			array_add(&c->info->type_info_types, tt);
 		}
 		map_set(&c->checker->info.type_info_map, t, ti_index);
 
@@ -6724,6 +6728,42 @@ gb_internal void check_parsed_files(Checker *c) {
 		}
 		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
 	}
+
+	TIME_SECTION("check for type hash collisions");
+	{
+		PtrSet<uintptr> found = {};
+		ptr_set_init(&found, c->info.type_info_types.count);
+		defer (ptr_set_destroy(&found));
+		for (auto const &tt : c->info.type_info_types) {
+			if (ptr_set_update(&found, cast(uintptr)tt.hash)) {
+				Type *other_type = nullptr;
+				for (auto const &other : c->info.type_info_types) {
+					if (&tt == &other) {
+						continue;
+					}
+					if (cast(uintptr)other.hash == cast(uintptr)tt.hash &&
+					    !are_types_identical(tt.type, other.type)) {
+						other_type = other.type;
+						break;
+					}
+				}
+				if (other_type != nullptr) {
+					String ts = type_to_canonical_string(temporary_allocator(), tt.type);
+					String os = type_to_canonical_string(temporary_allocator(), other_type);
+					if (ts != os) {
+						compiler_error("%s found type hash collision with %s (hash = %llu)\n"
+						               "%s vs %s\n",
+						               type_to_string(tt.type), type_to_string(other_type), cast(unsigned long long)tt.hash,
+						               temp_canonical_string(tt.type),
+						               temp_canonical_string(other_type)
+						);
+					}
+				}
+			}
+		}
+	}
+
+
 
 	TIME_SECTION("sort init and fini procedures");
 	check_sort_init_and_fini_procedures(c);

@@ -2774,7 +2774,37 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 
 	case Type_Enum:
-		return x == y; // NOTE(bill): All enums are unique
+		if (x == y) {
+			return true;
+		}
+		if (x->Enum.fields.count != y->Enum.fields.count) {
+			return false;
+		}
+		if (!are_types_identical(x->Enum.base_type, y->Enum.base_type)) {
+			return false;
+		}
+		if (x->Enum.min_value_index != y->Enum.min_value_index) {
+			return false;
+		}
+		if (x->Enum.max_value_index != y->Enum.max_value_index) {
+			return false;
+		}
+
+		for (isize i = 0; i < x->Enum.fields.count; i++) {
+			Entity *a = x->Enum.fields[i];
+			Entity *b = y->Enum.fields[i];
+			if (a->token.string != b->token.string) {
+				return false;
+			}
+			GB_ASSERT(a->kind == b->kind);
+			GB_ASSERT(a->kind == Entity_Constant);
+			bool same = compare_exact_values(Token_CmpEq, a->Constant.value, b->Constant.value);
+			if (!same) {
+				return false;
+			}
+		}
+
+		return true;
 
 	case Type_Union:
 		if (x->Union.variants.count == y->Union.variants.count &&
@@ -2832,7 +2862,9 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 					return false;
 				}
 			}
-			return are_types_identical(x->Struct.polymorphic_params, y->Struct.polymorphic_params);
+			// TODO(bill): Which is the correct logic here?
+			// return are_types_identical(x->Struct.polymorphic_params, y->Struct.polymorphic_params);
+			return true;
 		}
 		break;
 

@@ -409,6 +409,11 @@ struct Defineable {
 	String pos_str;
 };
 
+struct Type_Info_Type {
+	Type *type;
+	u64   hash; // see: type_hash_canonical_type
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -453,7 +458,7 @@ struct CheckerInfo {
 	PtrMap<Type *, GenTypesData *> gen_types;
 
 	BlockingMutex type_info_mutex; // NOT recursive
-	Array<Type *> type_info_types;
+	Array<Type_Info_Type> type_info_types;
 	PtrMap<Type *, isize> type_info_map;
 
 	BlockingMutex foreign_mutex; // NOT recursive

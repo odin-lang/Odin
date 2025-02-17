@@ -1460,8 +1460,6 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 	w = write_canonical_entity_name(w, e);
 	defer (gb_string_free(w));
 
-	gb_printf_err("%s\n", w);
-
 	String name = copy_string(permanent_allocator(), make_string(cast(u8 const *)w, gb_string_length(w)));
 
 	if (e->kind == Entity_TypeName) {

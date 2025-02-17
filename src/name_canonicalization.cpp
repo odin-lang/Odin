@@ -7,7 +7,7 @@
 	* builtin names - just their normal name e.g. `i32` or `string`
 	* nested - pkg.parent1.parent2.name
 	* file private - pkg.[file_name].name
-		* Example: `foo.[bar.odin].Type`
+		* Example: `pkg.[file.odin].Type`
 	* polymorphic procedure/type - pkg.foo::TYPE
 		* naming convention for parameters
 			* type
@@ -15,7 +15,7 @@
 			* $$constant_parameter
 		* Example: `foo.to_thing::proc(u64)->([]u8)`
 	* nested decl in polymorphic procedure - pkg.foo::TYPE.name
-	* anonymous procedures - pkg.foo.$anon123
+	* anonymous procedures - pkg.foo.$anon[file.odin:123]
 		* 123 is the file offset in bytes
 
 
@@ -38,7 +38,12 @@
 
 #define CANONICAL_NONE_TYPE       "<>"
 
+
 gb_internal gbString write_type_to_canonical_string(gbString w, Type *type);
+gb_internal u64      type_hash_canonical_type(Type *type);
+gb_internal String   type_to_canonical_string(gbAllocator allocator, Type *type);
+gb_internal gbString temp_canonical_string(Type *type);
+
 gb_internal gbString write_canonical_params(gbString w, Type *params) {
 	w = gb_string_appendc(w, "(");
 	if (params) {
@@ -81,13 +86,18 @@ gb_internal u64 type_hash_canonical_type(Type *type) {
 	TEMPORARY_ALLOCATOR_GUARD();
 	gbString w = write_type_to_canonical_string(gb_string_make(temporary_allocator(), ""), type);
 	u64 hash = fnv64a(w, gb_string_length(w));
-	return hash;
+	return hash ? hash : 1;
 }
 
 gb_internal String type_to_canonical_string(gbAllocator allocator, Type *type) {
 	gbString w = gb_string_make(allocator, "");
 	w = write_type_to_canonical_string(w, type);
 	return make_string(cast(u8 const *)w, gb_string_length(w));
+}
+
+gb_internal gbString temp_canonical_string(Type *type) {
+	gbString w = gb_string_make(temporary_allocator(), "");
+	return write_type_to_canonical_string(w, type);
 }
 
 gb_internal void print_scope_flags(Scope *s) {
@@ -156,7 +166,8 @@ gb_internal gbString write_canonical_parent_prefix(gbString w, Entity *e, bool i
 	}
 
 	if (e->kind == Entity_Procedure && e->Procedure.is_anonymous) {
-		w = gb_string_appendc(w, gb_bprintf(CANONICAL_ANON_PREFIX "%d", e->token.pos.offset));
+		String file_name = filename_without_directory(e->file->fullpath);
+		w = gb_string_appendc(w, gb_bprintf(CANONICAL_ANON_PREFIX "[%.*s:%d]", LIT(file_name), e->token.pos.offset));
 	} else {
 		w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
 	}
@@ -449,8 +460,12 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 		}
 		return w;
 
+	case Type_Tuple:
+		w = gb_string_appendc(w, "params");
+		w = write_canonical_params(w, type);
+		return w;
 	default:
-		GB_PANIC("unknown type kind %d", type->kind);
+		GB_PANIC("unknown type kind %d %.*s", type->kind, LIT(type_strings[type->kind]));
 		break;
 	}
 

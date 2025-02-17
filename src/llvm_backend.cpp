@@ -24,7 +24,7 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
-String get_default_microarchitecture() {
+gb_internal String get_default_microarchitecture() {
 	String default_march = str_lit("generic");
 	if (build_context.metrics.arch == TargetArch_amd64) {
 		// NOTE(bill): x86-64-v2 is more than enough for everyone
@@ -47,7 +47,7 @@ String get_default_microarchitecture() {
 	return default_march;
 }
 
-String get_final_microarchitecture() {
+gb_internal String get_final_microarchitecture() {
 	BuildContext *bc = &build_context;
 
 	String microarch = bc->microarch;
@@ -3182,7 +3182,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			isize count = 0;
 			isize offsets_extra = 0;
 
-			for (Type *t : m->info->type_info_types) {
+			for (auto const &tt : m->info->type_info_types) {
+				Type *t = tt.type;
 				isize index = lb_type_info_index(m->info, t, false);
 				if (index < 0) {
 					continue;
