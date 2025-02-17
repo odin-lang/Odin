@@ -48,6 +48,15 @@ gb_internal gbString temp_canonical_string(Type *type);
 struct TypeInfoPair;
 struct TypeSet;
 
+gb_internal GB_COMPARE_PROC(type_info_pair_cmp) {
+	TypeInfoPair *x = cast(TypeInfoPair *)a;
+	TypeInfoPair *y = cast(TypeInfoPair *)b;
+	if (x->hash == y->hash) {
+		return 0;
+	}
+	return x->hash < y->hash ? -1 : +1;
+}
+
 static constexpr u64 TYPE_SET_TOMBSTONE = ~(u64)(0ull);
 
 gb_internal void  type_set_init   (TypeSet *s, isize capacity);
@@ -136,7 +145,7 @@ gb_internal isize type_set__find(TypeSet *s, TypeInfoPair pair) {
 		usize hash_index = cast(usize)hash & mask;
 		for (usize i = 0; i < s->capacity; i++) {
 			Type *key = s->keys[hash_index].type;
-			if (are_types_identical(key, pair.type)) {
+			if (are_types_identical_unique_tuples(key, pair.type)) {
 				return hash_index;
 			} else if (key == 0) {
 				return -1;
@@ -154,7 +163,7 @@ gb_internal isize type_set__find(TypeSet *s, Type *ptr) {
 		usize hash_index = cast(usize)hash & mask;
 		for (usize i = 0; i < s->capacity; i++) {
 			Type *key = s->keys[hash_index].type;
-			if (are_types_identical(key, ptr)) {
+			if (are_types_identical_unique_tuples(key, ptr)) {
 				return hash_index;
 			} else if (key == 0) {
 				return -1;
@@ -224,7 +233,7 @@ gb_internal bool type_set_update(TypeSet *s, TypeInfoPair pair) { // returns tru
 	GB_ASSERT(hash_index < s->capacity);
 	for (usize i = 0; i < s->capacity; i++) {
 		TypeInfoPair *key = &s->keys[hash_index];
-		GB_ASSERT(!are_types_identical(key->type, pair.type));
+		GB_ASSERT(!are_types_identical_unique_tuples(key->type, pair.type));
 		if (key->hash == TYPE_SET_TOMBSTONE || key->hash == 0) {
 			*key = pair;
 			s->count++;
@@ -274,6 +283,9 @@ gb_internal gbString write_canonical_params(gbString w, Type *params) {
 			if (i > 0) {
 				w = gb_string_appendc(w, CANONICAL_PARAM_SEPARATOR);
 			}
+			w = gb_string_append_length(w, v->token.string.text, v->token.string.len);
+			w = gb_string_appendc(w, CANONICAL_TYPE_SEPARATOR);
+
 			if (v->kind == Entity_Variable) {
 				if (v->flags&EntityFlag_CVarArg) {
 					w = gb_string_appendc(w, CANONICAL_PARAM_C_VARARG);
@@ -466,14 +478,17 @@ write_base_name:
 	switch (e->kind) {
 	case Entity_TypeName:
 		{
+
 			Type *params = nullptr;
 			Entity *parent = type_get_polymorphic_parent(e->type, &params);
-			if (parent) {
+			if (parent && (parent->token.string == e->token.string)) {
 				w = gb_string_append_length(w, parent->token.string.text, parent->token.string.len);
 				w = write_canonical_params(w, params);
 			} else {
 				w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
 			}
+			gb_unused(parent);
+
 		}
 		// Handle parapoly stuff here?
 		return w;

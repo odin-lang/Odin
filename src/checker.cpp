@@ -828,8 +828,14 @@ gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
 	rw_mutex_unlock(&d->deps_mutex);
 }
 gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
-	if (d == nullptr) {
+	if (d == nullptr || type == nullptr) {
 		return;
+	}
+	if (type->kind == Type_Named) {
+		Entity *e = type->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			type = type->Named.base;
+		}
 	}
 	rw_mutex_lock(&d->type_info_deps_mutex);
 	ptr_set_add(&d->type_info_deps, type);
@@ -1361,9 +1367,12 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->foreigns);
 	// map_init(&i->gen_procs);
 	map_init(&i->gen_types);
+
 	array_init(&i->type_info_types, a);
-	map_init(&i->type_info_map);
-	type_set_init(&i->type_info_set);
+	type_set_init(&i->min_dep_type_info_set);
+	map_init(&i->minimum_dependency_type_info_index_map);
+
+	// map_init(&i->type_info_map);
 	string_map_init(&i->files);
 	string_map_init(&i->packages);
 	array_init(&i->variable_init_order, a);
@@ -1396,9 +1405,11 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->foreigns);
 	// map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
+
 	array_free(&i->type_info_types);
-	map_destroy(&i->type_info_map);
-	type_set_destroy(&i->type_info_set);
+	type_set_destroy(&i->min_dep_type_info_set);
+	map_destroy(&i->minimum_dependency_type_info_index_map);
+
 	string_map_destroy(&i->files);
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
@@ -1632,6 +1643,23 @@ gb_internal void check_remove_expr_info(CheckerContext *c, Ast *e) {
 	}
 }
 
+gb_internal isize type_info_index(CheckerInfo *info, TypeInfoPair pair, bool error_on_failure) {
+	mutex_lock(&info->minimum_dependency_type_info_mutex);
+
+	isize entry_index = -1;
+	uintptr hash = cast(uintptr)pair.hash;
+	isize *found_entry_index = map_get(&info->minimum_dependency_type_info_index_map, hash);
+	if (found_entry_index) {
+		entry_index = *found_entry_index;
+	}
+	mutex_unlock(&info->minimum_dependency_type_info_mutex);
+
+	if (error_on_failure && entry_index < 0) {
+		compiler_error("Type_Info for '%s' could not be found", type_to_string(pair.type));
+	}
+	return entry_index;
+}
+
 
 gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	type = default_type(type);
@@ -1639,32 +1667,10 @@ gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_f
 		type = t_bool;
 	}
 
-	mutex_lock(&info->type_info_mutex);
-
-	isize entry_index = -1;
-	isize *found_entry_index = map_get(&info->type_info_map, type);
-	if (found_entry_index) {
-		entry_index = *found_entry_index;
-	}
-	if (entry_index < 0) {
-		// NOTE(bill): Do manual linear search
-		for (auto const &e : info->type_info_map) {
-			if (are_types_identical_unique_tuples(e.key, type)) {
-				entry_index = e.value;
-				// NOTE(bill): Add it to the search map
-				map_set(&info->type_info_map, type, entry_index);
-				break;
-			}
-		}
-	}
-
-	mutex_unlock(&info->type_info_mutex);
-
-	if (error_on_failure && entry_index < 0) {
-		compiler_error("Type_Info for '%s' could not be found", type_to_string(type));
-	}
-	return entry_index;
+	u64 hash = type_hash_canonical_type(type);
+	return type_info_index(info, {type, hash}, error_on_failure);
 }
+
 
 
 gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
@@ -2018,8 +2024,12 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	}
 
 	add_type_info_dependency(c->info, c->decl, t);
-
+#if 0
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
+		if (type_set_update(&c->info->type_info_set, t)) {
+			// return;
+		}
+
 		auto found = map_get(&c->info->type_info_map, t);
 		if (found != nullptr) {
 			// Types have already been added
@@ -2238,6 +2248,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
 		break;
 	}
+#endif
 }
 
 
@@ -2295,10 +2306,9 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		return;
 	}
 
-	if (type_set_update(&c->info.type_info_set, t)) {
-		// return;
+	if (type_set_update(&c->info.min_dep_type_info_set, t)) {
+		return;
 	}
-
 
 	// Add nested types
 	if (t->kind == Type_Named) {
@@ -2697,7 +2707,6 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
 
 	ptr_set_init(&c->info.minimum_dependency_set, min_dep_set_cap);
-	map_init(&c->info.minimum_dependency_type_info_set);
 
 #define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
 	if (condition) {                                                                             \
@@ -6720,39 +6729,70 @@ gb_internal void check_parsed_files(Checker *c) {
 		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
 	}
 
-	TIME_SECTION("check for type hash collisions");
+	TIME_SECTION("initilize type info array");
 	{
-		PtrSet<uintptr> found = {};
-		ptr_set_init(&found, c->info.type_info_types.count);
-		defer (ptr_set_destroy(&found));
-		for (auto const &tt : c->info.type_info_types) {
-			if (ptr_set_update(&found, cast(uintptr)tt.hash)) {
-				Type *other_type = nullptr;
-				for (auto const &other : c->info.type_info_types) {
-					if (&tt == &other) {
-						continue;
-					}
-					if (cast(uintptr)other.hash == cast(uintptr)tt.hash &&
-					    !are_types_identical(tt.type, other.type)) {
-						other_type = other.type;
-						break;
-					}
-				}
-				if (other_type != nullptr) {
-					String ts = type_to_canonical_string(temporary_allocator(), tt.type);
-					String os = type_to_canonical_string(temporary_allocator(), other_type);
-					if (ts != os) {
-						compiler_error("%s found type hash collision with %s (hash = %llu)\n"
-						               "%s vs %s\n",
-						               type_to_string(tt.type), type_to_string(other_type), cast(unsigned long long)tt.hash,
-						               temp_canonical_string(tt.type),
-						               temp_canonical_string(other_type)
-						);
+		for (auto const &tt : c->info.min_dep_type_info_set) {
+			array_add(&c->info.type_info_types, tt);
+		}
+		array_sort(c->info.type_info_types, type_info_pair_cmp);
+
+		map_reserve(&c->info.minimum_dependency_type_info_index_map, c->info.type_info_types.count);
+
+		for_array(i, c->info.type_info_types) {
+			auto const &tt = c->info.type_info_types[i];
+			bool exists = map_set_if_not_previously_exists(&c->info.minimum_dependency_type_info_index_map, cast(uintptr)tt.hash, i);
+			if (exists) {
+				for (auto const &entry : c->info.minimum_dependency_type_info_index_map) {
+					if (entry.key == cast(uintptr)tt.hash) {
+						auto const &other = c->info.type_info_types[entry.value];
+						if (!are_types_identical_unique_tuples(tt.type, other.type)) {
+							gbString t = temp_canonical_string(tt.type);
+							gbString o = temp_canonical_string(other.type);
+							GB_PANIC("%s (%s) %llu vs %s (%s) %llu",
+							         type_to_string(tt.type, false),    t, cast(unsigned long long)tt.hash,
+							         type_to_string(other.type, false), o, cast(unsigned long long)other.hash);
+						}
 					}
 				}
 			}
 		}
+
+		GB_ASSERT(c->info.minimum_dependency_type_info_index_map.count <= c->info.type_info_types.count);
 	}
+
+	// TIME_SECTION("check for type hash collisions");
+	// {
+	// 	PtrSet<uintptr> found = {};
+	// 	ptr_set_init(&found, c->info.type_info_types.count);
+	// 	defer (ptr_set_destroy(&found));
+	// 	for (auto const &tt : c->info.type_info_types) {
+	// 		if (ptr_set_update(&found, cast(uintptr)tt.hash)) {
+	// 			Type *other_type = nullptr;
+	// 			for (auto const &other : c->info.type_info_types) {
+	// 				if (&tt == &other) {
+	// 					continue;
+	// 				}
+	// 				if (cast(uintptr)other.hash == cast(uintptr)tt.hash &&
+	// 				    !are_types_identical(tt.type, other.type)) {
+	// 					other_type = other.type;
+	// 					break;
+	// 				}
+	// 			}
+	// 			if (other_type != nullptr) {
+	// 				String ts = type_to_canonical_string(temporary_allocator(), tt.type);
+	// 				String os = type_to_canonical_string(temporary_allocator(), other_type);
+	// 				if (ts != os) {
+	// 					compiler_error("%s found type hash collision with %s (hash = %llu)\n"
+	// 					               "%s vs %s\n",
+	// 					               type_to_string(tt.type), type_to_string(other_type), cast(unsigned long long)tt.hash,
+	// 					               temp_canonical_string(tt.type),
+	// 					               temp_canonical_string(other_type)
+	// 					);
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 
 

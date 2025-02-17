@@ -1,22 +1,22 @@
-gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
-	auto *set = &info->minimum_dependency_type_info_set;
-	isize index = type_info_index(info, type, err_on_not_found);
+
+gb_internal isize lb_type_info_index(CheckerInfo *info, TypeInfoPair pair, bool err_on_not_found=true) {
+	isize index = type_info_index(info, pair, err_on_not_found);
 	if (index >= 0) {
-		auto *found = map_get(set, index+1);
-		if (found) {
-			GB_ASSERT(*found >= 0);
-			return *found + 1;
-		}
+		return index+1;
 	}
 	if (err_on_not_found) {
-		gb_printf_err("NOT FOUND lb_type_info_index:\n\t%s\n\t@ index %td\n\tmax count: %u\nFound:\n", type_to_string(type), index, set->count);
-		for (auto const &entry : *set) {
+		gb_printf_err("NOT FOUND lb_type_info_index:\n\t%s\n\t@ index %td\n\tmax count: %u\nFound:\n", type_to_string(pair.type), index, info->minimum_dependency_type_info_index_map.count);
+		for (auto const &entry : info->minimum_dependency_type_info_index_map) {
 			isize type_info_index = entry.key;
 			gb_printf_err("\t%s\n", type_to_string(info->type_info_types[type_info_index].type));
 		}
 		GB_PANIC("NOT FOUND");
 	}
 	return -1;
+}
+
+gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
+	return lb_type_info_index(info, {type, type_hash_canonical_type(type)}, err_on_not_found);
 }
 
 gb_internal u64 lb_typeid_kind(lbModule *m, Type *type, u64 id=0) {
@@ -280,12 +280,13 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	LLVMTypeRef *modified_types = lb_setup_modified_types_for_type_info(m, global_type_info_data_entity_count);
 	defer (gb_free(heap_allocator(), modified_types));
 	for_array(type_info_type_index, info->type_info_types) {
-		Type *t = info->type_info_types[type_info_type_index].type;
+		auto const &tt = info->type_info_types[type_info_type_index];
+		Type *t = tt.type;
 		if (t == nullptr || t == t_invalid) {
 			continue;
 		}
 
-		isize entry_index = lb_type_info_index(info, t, false);
+		isize entry_index = lb_type_info_index(info, tt, false);
 		if (entry_index <= 0) {
 			continue;
 		}

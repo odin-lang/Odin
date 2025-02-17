@@ -222,7 +222,7 @@ struct DeclInfo {
 	PtrSet<Entity *> deps;
 
 	RwMutex     type_info_deps_mutex;
-	PtrSet<Type *>    type_info_deps;
+	PtrSet<Type *>    type_info_deps; // TODO(bill): Use TypeSet
 
 	BlockingMutex type_and_value_mutex;
 
@@ -444,8 +444,10 @@ struct CheckerInfo {
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
-	PtrMap</*type info index*/isize, /*min dep index*/isize>  minimum_dependency_type_info_set;
-
+	BlockingMutex minimum_dependency_type_info_mutex;
+	PtrMap</*type info hash*/uintptr, /*min dep index*/isize> minimum_dependency_type_info_index_map;
+	TypeSet min_dep_type_info_set;
+	Array<TypeInfoPair> type_info_types; // sorted after filled
 
 
 	Array<Entity *> testing_procedures;
@@ -473,10 +475,10 @@ struct CheckerInfo {
 	BlockingMutex                  gen_types_mutex;
 	PtrMap<Type *, GenTypesData *> gen_types;
 
-	BlockingMutex type_info_mutex; // NOT recursive
-	Array<TypeInfoPair> type_info_types;
-	PtrMap<Type *, isize> type_info_map;
-	TypeSet type_info_set;
+	// BlockingMutex type_info_mutex; // NOT recursive
+	// Array<TypeInfoPair> type_info_types;
+	// PtrMap<Type *, isize> type_info_map;
+	// TypeSet type_info_set;
 
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;
@@ -595,6 +597,7 @@ gb_internal DeclInfo *   decl_info_of_entity    (Entity * e);
 gb_internal AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 // IMPORTANT: Only to use once checking is done
 gb_internal isize        type_info_index        (CheckerInfo *i, Type *type, bool error_on_failure);
+gb_internal isize        type_info_index        (CheckerInfo *info, TypeInfoPair pair, bool error_on_failure);
 
 // Will return nullptr if not found
 gb_internal Entity *entity_of_node(Ast *expr);
