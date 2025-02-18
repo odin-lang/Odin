@@ -57,11 +57,10 @@ gb_internal GB_COMPARE_PROC(type_info_pair_cmp) {
 	return x->hash < y->hash ? -1 : +1;
 }
 
-static constexpr u64 TYPE_SET_TOMBSTONE = ~(u64)(0ull);
-
 gb_internal void  type_set_init   (TypeSet *s, isize capacity);
 gb_internal void  type_set_destroy(TypeSet *s);
 gb_internal Type *type_set_add    (TypeSet *s, Type *ptr);
+gb_internal Type *type_set_add    (TypeSet *s, TypeInfoPair pair);
 gb_internal bool  type_set_update (TypeSet *s, Type *ptr); // returns true if it previously existed
 gb_internal bool  type_set_update (TypeSet *s, TypeInfoPair pair); // returns true if it previously existed
 gb_internal bool  type_set_exists (TypeSet *s, Type *ptr);
@@ -72,34 +71,6 @@ gb_internal TypeInfoPair *type_set_retrieve(TypeSet *s, Type *ptr);
 gb_internal gbAllocator type_set_allocator(void) {
 	return heap_allocator();
 }
-
-struct TypeSetIterator {
-	TypeSet *set;
-	usize index;
-
-	TypeSetIterator &operator++() noexcept {
-		for (;;) {
-			++index;
-			if (set->capacity == index) {
-				return *this;
-			}
-			TypeInfoPair key = set->keys[index];
-			if (key.hash != 0 && key.hash != TYPE_SET_TOMBSTONE) {
-				return *this;
-			}
-		}
-	}
-
-	bool operator==(TypeSetIterator const &other) const noexcept {
-		return this->set == other.set && this->index == other.index;
-	}
-
-
-	operator TypeInfoPair *() const {
-		return &set->keys[index];
-	}
-};
-
 
 gb_internal TypeSetIterator begin(TypeSet &set) noexcept {
 	usize index = 0;
@@ -256,6 +227,12 @@ gb_internal Type *type_set_add(TypeSet *s, Type *ptr) {
 	type_set_update(s, ptr);
 	return ptr;
 }
+
+gb_internal Type *type_set_add(TypeSet *s, TypeInfoPair pair) {
+	type_set_update(s, pair);
+	return pair.type;
+}
+
 
 
 gb_internal void type_set_remove(TypeSet *s, Type *ptr) {

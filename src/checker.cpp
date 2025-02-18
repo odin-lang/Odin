@@ -173,7 +173,7 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	d->parent = parent;
 	d->scope  = scope;
 	ptr_set_init(&d->deps, 0);
-	ptr_set_init(&d->type_info_deps, 0);
+	type_set_init(&d->type_info_deps, 0);
 	d->labels.allocator = heap_allocator();
 	d->variadic_reuses.allocator = heap_allocator();
 	d->variadic_reuse_max_bytes = 0;
@@ -838,7 +838,7 @@ gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *
 		}
 	}
 	rw_mutex_lock(&d->type_info_deps_mutex);
-	ptr_set_add(&d->type_info_deps, type);
+	type_set_add(&d->type_info_deps, type);
 	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
@@ -2506,8 +2506,8 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (decl == nullptr) {
 		return;
 	}
-	for (Type *t : decl->type_info_deps) {
-		add_min_dep_type_info(c, t);
+	for (TypeInfoPair const tt : decl->type_info_deps) {
+		add_min_dep_type_info(c, tt.type);
 	}
 
 	for (Entity *e : decl->deps) {
@@ -6742,7 +6742,7 @@ gb_internal void check_parsed_files(Checker *c) {
 			auto const &tt = c->info.type_info_types[i];
 			bool exists = map_set_if_not_previously_exists(&c->info.minimum_dependency_type_info_index_map, cast(uintptr)tt.hash, i);
 			if (!exists) {
-				continue
+				continue;
 			}
 			for (auto const &entry : c->info.minimum_dependency_type_info_index_map) {
 				if (entry.key != cast(uintptr)tt.hash) {

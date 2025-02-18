@@ -167,6 +167,61 @@ typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 
 gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
 
+struct TypeInfoPair {
+	Type *type;
+	u64   hash; // see: type_hash_canonical_type
+};
+
+struct TypeSet {
+	TypeInfoPair *keys;
+	usize count;
+	usize capacity;
+};
+
+static constexpr u64 TYPE_SET_TOMBSTONE = ~(u64)(0ull);
+
+struct TypeSetIterator {
+	TypeSet *set;
+	usize index;
+
+	TypeSetIterator &operator++() noexcept {
+		for (;;) {
+			++index;
+			if (set->capacity == index) {
+				return *this;
+			}
+			TypeInfoPair key = set->keys[index];
+			if (key.hash != 0 && key.hash != TYPE_SET_TOMBSTONE) {
+				return *this;
+			}
+		}
+	}
+
+	bool operator==(TypeSetIterator const &other) const noexcept {
+		return this->set == other.set && this->index == other.index;
+	}
+
+
+	operator TypeInfoPair *() const {
+		return &set->keys[index];
+	}
+};
+
+
+gb_internal void  type_set_init   (TypeSet *s, isize capacity = 16);
+gb_internal void  type_set_destroy(TypeSet *s);
+gb_internal Type *type_set_add    (TypeSet *s, Type *ptr);
+gb_internal Type *type_set_add    (TypeSet *s, TypeInfoPair pair);
+gb_internal bool  type_set_update (TypeSet *s, Type *ptr); // returns true if it previously existed
+gb_internal bool  type_set_update (TypeSet *s, TypeInfoPair pair); // returns true if it previously existed
+gb_internal bool  type_set_exists (TypeSet *s, Type *ptr);
+gb_internal void  type_set_remove (TypeSet *s, Type *ptr);
+gb_internal void  type_set_clear  (TypeSet *s);
+gb_internal TypeInfoPair *type_set_retrieve(TypeSet *s, Type *ptr);
+
+gb_internal TypeSetIterator begin(TypeSet &set) noexcept;
+gb_internal TypeSetIterator end(TypeSet &set) noexcept;
+
 
 enum ProcCheckedState : u8 {
 	ProcCheckedState_Unchecked,
@@ -221,8 +276,8 @@ struct DeclInfo {
 	RwMutex          deps_mutex;
 	PtrSet<Entity *> deps;
 
-	RwMutex     type_info_deps_mutex;
-	PtrSet<Type *>    type_info_deps; // TODO(bill): Use TypeSet
+	RwMutex type_info_deps_mutex;
+	TypeSet type_info_deps;
 
 	BlockingMutex type_and_value_mutex;
 
@@ -408,27 +463,6 @@ struct Defineable {
 	String default_value_str;
 	String pos_str;
 };
-
-struct TypeInfoPair {
-	Type *type;
-	u64   hash; // see: type_hash_canonical_type
-};
-
-struct TypeSet {
-	TypeInfoPair *keys;
-	usize count;
-	usize capacity;
-};
-
-gb_internal void  type_set_init   (TypeSet *s, isize capacity = 16);
-gb_internal void  type_set_destroy(TypeSet *s);
-gb_internal Type *type_set_add    (TypeSet *s, Type *ptr);
-gb_internal bool  type_set_update (TypeSet *s, Type *ptr); // returns true if it previously existed
-gb_internal bool  type_set_update (TypeSet *s, TypeInfoPair pair); // returns true if it previously existed
-gb_internal bool  type_set_exists (TypeSet *s, Type *ptr);
-gb_internal void  type_set_remove (TypeSet *s, Type *ptr);
-gb_internal void  type_set_clear  (TypeSet *s);
-gb_internal TypeInfoPair *type_set_retrieve(TypeSet *s, Type *ptr);
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {

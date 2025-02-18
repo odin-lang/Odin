@@ -1742,8 +1742,8 @@ gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
 			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
 			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
 
-			for (Type *t : decl->type_info_deps) {
-				ptr_set_add(&decl->parent->type_info_deps, t);
+			for (auto const &tt : decl->type_info_deps) {
+				type_set_add(&decl->parent->type_info_deps, tt);
 			}
 
 			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
