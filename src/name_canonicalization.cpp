@@ -38,8 +38,10 @@
 
 #define CANONICAL_NONE_TYPE       "<>"
 
+struct TypeWriter;
 
-gb_internal gbString write_type_to_canonical_string(gbString w, Type *type);
+gb_internal void     write_type_to_canonical_string(TypeWriter *w, Type *type);
+gb_internal void     write_canonical_entity_name(TypeWriter *w, Entity *e);
 gb_internal u64      type_hash_canonical_type(Type *type);
 gb_internal String   type_to_canonical_string(gbAllocator allocator, Type *type);
 gb_internal gbString temp_canonical_string(Type *type);
@@ -251,63 +253,138 @@ gb_internal gb_inline void type_set_clear(TypeSet *s) {
 }
 
 
-gb_internal gbString write_canonical_params(gbString w, Type *params) {
-	w = gb_string_appendc(w, "(");
+#define TYPE_WRITER_PROC(name) bool name(TypeWriter *w, void const *ptr, isize len)
+typedef TYPE_WRITER_PROC(TypeWriterProc);
+
+
+struct TypeWriter {
+	TypeWriterProc *proc;
+	void *user_data;
+};
+
+bool type_writer_append(TypeWriter *w, void const *ptr, isize len) {
+	return w->proc(w, ptr, len);
+}
+
+bool type_writer_appendb(TypeWriter *w, char b) {
+	return w->proc(w, &b, 1);
+}
+
+bool type_writer_appendc(TypeWriter *w, char const *str) {
+	isize len = gb_strlen(str);
+	return w->proc(w, str, len);
+}
+
+bool type_writer_append_fmt(TypeWriter *w, char const *fmt, ...) {
+	va_list va;
+	char *str;
+	va_start(va, fmt);
+	str = gb_bprintf_va(fmt, va);
+	va_end(va);
+
+	return type_writer_appendc(w, str);
+}
+
+
+
+TYPE_WRITER_PROC(type_writer_string_writer_proc) {
+	gbString *s = cast(gbString *)&w->user_data;
+	*s = gb_string_append_length(*s, ptr, len);
+	return true;
+}
+
+void type_writer_make_string(TypeWriter *w, gbAllocator allocator) {
+	w->user_data = gb_string_make(allocator, "");
+	w->proc = type_writer_string_writer_proc;
+}
+
+void type_writer_destroy_string(TypeWriter *w) {
+	gb_string_free(cast(gbString)w->user_data);
+}
+
+
+TYPE_WRITER_PROC(type_writer_hasher_writer_proc) {
+	u64 *seed = cast(u64 *)w->user_data;
+	*seed = fnv64a(ptr, len, *seed);
+	return true;
+}
+
+void type_writer_make_hasher(TypeWriter *w, u64 *hash) {
+	w->user_data = hash;
+	w->proc = type_writer_hasher_writer_proc;
+}
+
+
+
+
+gb_internal void write_canonical_params(TypeWriter *w, Type *params) {
+	type_writer_appendc(w, "(");
 	if (params) {
 		GB_ASSERT(params->kind == Type_Tuple);
 		for_array(i, params->Tuple.variables) {
 			Entity *v = params->Tuple.variables[i];
 			if (i > 0) {
-				w = gb_string_appendc(w, CANONICAL_PARAM_SEPARATOR);
+				type_writer_appendc(w, CANONICAL_PARAM_SEPARATOR);
 			}
-			w = gb_string_append_length(w, v->token.string.text, v->token.string.len);
-			w = gb_string_appendc(w, CANONICAL_TYPE_SEPARATOR);
+			type_writer_append(w, v->token.string.text, v->token.string.len);
+			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
 
 			if (v->kind == Entity_Variable) {
 				if (v->flags&EntityFlag_CVarArg) {
-					w = gb_string_appendc(w, CANONICAL_PARAM_C_VARARG);
+					type_writer_appendc(w, CANONICAL_PARAM_C_VARARG);
 				}
 				if (v->flags&EntityFlag_Ellipsis) {
 					Type *slice = base_type(v->type);
-					w = gb_string_appendc(w, CANONICAL_PARAM_VARARG);
+					type_writer_appendc(w, CANONICAL_PARAM_VARARG);
 					GB_ASSERT(v->type->kind == Type_Slice);
-					w = write_type_to_canonical_string(w, slice->Slice.elem);
+					write_type_to_canonical_string(w, slice->Slice.elem);
 				} else {
-					w = write_type_to_canonical_string(w, v->type);
+					write_type_to_canonical_string(w, v->type);
 				}
 			} else if (v->kind == Entity_TypeName) {
-				w = gb_string_appendc(w, CANONICAL_PARAM_TYPEID);
-				w = write_type_to_canonical_string(w, v->type);
+				type_writer_appendc(w, CANONICAL_PARAM_TYPEID);
+				write_type_to_canonical_string(w, v->type);
 			} else if (v->kind == Entity_Constant) {
-				w = gb_string_appendc(w, CANONICAL_PARAM_CONST);
-				w = write_exact_value_to_string(w, v->Constant.value);
+				type_writer_appendc(w, CANONICAL_PARAM_CONST);
+				gbString s = exact_value_to_string(v->Constant.value, 1<<16);
+				type_writer_append(w, s, gb_string_length(s));
+				gb_string_free(s);
 			} else {
 				GB_PANIC("TODO(bill): handle non type/const parapoly parameter values");
 			}
 		}
 	}
-	return gb_string_appendc(w, ")");
+	type_writer_appendc(w, ")");
+	return;
 }
 
 gb_internal u64 type_hash_canonical_type(Type *type) {
 	if (type == nullptr) {
 		return 0;
 	}
-	TEMPORARY_ALLOCATOR_GUARD();
-	gbString w = write_type_to_canonical_string(gb_string_make(temporary_allocator(), ""), type);
-	u64 hash = fnv64a(w, gb_string_length(w));
+	u64 hash = fnv64a(nullptr, 0);
+	TypeWriter w = {};
+	type_writer_make_hasher(&w, &hash);
+	write_type_to_canonical_string(&w, type);
+
 	return hash ? hash : 1;
 }
 
 gb_internal String type_to_canonical_string(gbAllocator allocator, Type *type) {
-	gbString w = gb_string_make(allocator, "");
-	w = write_type_to_canonical_string(w, type);
-	return make_string(cast(u8 const *)w, gb_string_length(w));
+	TypeWriter w = {};
+	type_writer_make_string(&w, allocator);
+	write_type_to_canonical_string(&w, type);
+
+	gbString s = cast(gbString)w.user_data;
+	return make_string(cast(u8 const *)s, gb_string_length(s));
 }
 
 gb_internal gbString temp_canonical_string(Type *type) {
-	gbString w = gb_string_make(temporary_allocator(), "");
-	return write_type_to_canonical_string(w, type);
+	TypeWriter w = {};
+	type_writer_make_string(&w, temporary_allocator());
+	write_type_to_canonical_string(&w, type);
+
+	return cast(gbString)w.user_data;
 }
 
 gb_internal void print_scope_flags(Scope *s) {
@@ -323,77 +400,74 @@ gb_internal void print_scope_flags(Scope *s) {
 	gb_printf_err("\n");
 }
 
+gb_internal gbString string_canonical_entity_name(gbAllocator allocator, Entity *e) {
+	TypeWriter w = {};
+	type_writer_make_string(&w, allocator);
+	write_canonical_entity_name(&w, e);
+	return cast(gbString)w.user_data;
+}
 
 
-gb_internal gbString write_canonical_parent_prefix(gbString w, Entity *e, bool ignore_final_dot=false) {
+
+gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e, bool ignore_final_dot=false) {
 	GB_ASSERT(e != nullptr);
-
-	// auto const &parent_entity = [](Scope *s) -> Entity* {
-	// 	while ((s->flags & (ScopeFlag_Proc|ScopeFlag_File)) == 0 && s->decl_info == nullptr) {
-	// 		s = s->parent;
-	// 	}
-	// 	if (s->decl_info && s->decl_info->entity) {
-	// 		return s->decl_info->entity;
-	// 	}
-	// 	return nullptr;
-	// };
 
 	if (e->kind == Entity_Procedure) {
 		if (e->Procedure.is_export || e->Procedure.is_foreign) {
 			// no prefix
-			return w;
+			return;
 		}
 		if (e->parent_proc_decl) {
 			Entity *p = e->parent_proc_decl->entity;
-			w = write_canonical_parent_prefix(w, p);
-			w = gb_string_append_length(w, p->token.string.text, p->token.string.len);
+			write_canonical_parent_prefix(w, p);
+			type_writer_append(w, p->token.string.text, p->token.string.len);
 			if (is_type_polymorphic(p->type)) {
-				w = gb_string_appendc(w, CANONICAL_TYPE_SEPARATOR);
-				w = write_type_to_canonical_string(w, p->type);
+				type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
+				write_type_to_canonical_string(w, p->type);
 			}
-			w = gb_string_appendc(w, CANONICAL_NAME_SEPARATOR);
+			type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 
 		} else if (e->pkg && (scope_lookup_current(e->pkg->scope, e->token.string) == e)) {
-			w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
+			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
 			if (e->pkg->name == "llvm") {
-				gb_string_appendc(w, "$");
+				type_writer_appendc(w, "$");
 			}
-			w = gb_string_appendc(w, CANONICAL_NAME_SEPARATOR);
+			type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 		} else {
 			String file_name = filename_without_directory(e->file->fullpath);
-			w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
+			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
 			if (e->pkg->name == "llvm") {
-				gb_string_appendc(w, "$");
+				type_writer_appendc(w, "$");
 			}
-			w = gb_string_appendc(w, gb_bprintf(CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name)));
+			type_writer_appendc(w, gb_bprintf(CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name)));
 		}
 	} else if (e->kind == Entity_Procedure) {
 		if (e->Procedure.is_export || e->Procedure.is_foreign) {
 			// no prefix
-			return w;
+			return;
 		}
 		GB_PANIC("TODO(bill): handle entity kind: %d", e->kind);
 	}
 
 	if (e->kind == Entity_Procedure && e->Procedure.is_anonymous) {
 		String file_name = filename_without_directory(e->file->fullpath);
-		w = gb_string_appendc(w, gb_bprintf(CANONICAL_ANON_PREFIX "[%.*s:%d]", LIT(file_name), e->token.pos.offset));
+		type_writer_appendc(w, gb_bprintf(CANONICAL_ANON_PREFIX "[%.*s:%d]", LIT(file_name), e->token.pos.offset));
 	} else {
-		w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
+		type_writer_append(w, e->token.string.text, e->token.string.len);
 	}
 
 	if (is_type_polymorphic(e->type)) {
-		w = gb_string_appendc(w, CANONICAL_TYPE_SEPARATOR);
-		w = write_type_to_canonical_string(w, e->type);
+		type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
+		write_type_to_canonical_string(w, e->type);
 	}
 	if (!ignore_final_dot) {
-		w = gb_string_appendc(w, CANONICAL_NAME_SEPARATOR);
+		type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 	}
 
-	return w;
+	return;
 }
 
-gb_internal gbString write_canonical_entity_name(gbString w, Entity *e) {
+gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 	GB_ASSERT(e != nullptr);
 
 	if (e->token.string == "_") {
@@ -407,18 +481,18 @@ gb_internal gbString write_canonical_entity_name(gbString w, Entity *e) {
 		bool is_foreign = e->Variable.is_foreign;
 		bool is_export  = e->Variable.is_export;
 		if (e->Variable.link_name.len > 0) {
-			w = gb_string_append_length(w, e->Variable.link_name.text, e->Variable.link_name.len);
-			return w;
+			type_writer_append(w, e->Variable.link_name.text, e->Variable.link_name.len);
+			return;
 		} else if (is_foreign || is_export) {
-			w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
-			return w;
+			type_writer_append(w, e->token.string.text, e->token.string.len);
+			return;
 		}
 	} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
-		w = gb_string_append_length(w, e->Procedure.link_name.text, e->Procedure.link_name.len);
-		return w;
+		type_writer_append(w, e->Procedure.link_name.text, e->Procedure.link_name.len);
+		return;
 	} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
-		w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
-		return w;
+		type_writer_append(w, e->token.string.text, e->token.string.len);
+		return;
 	}
 
 	if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0 ||
@@ -430,15 +504,15 @@ gb_internal gbString write_canonical_entity_name(gbString w, Entity *e) {
 		}
 
 		if (s->decl_info != nullptr && s->decl_info->entity)  {
-			w = write_canonical_parent_prefix(w, s->decl_info->entity);
+			write_canonical_parent_prefix(w, s->decl_info->entity);
 			goto write_base_name;
 		} else if ((s->flags & ScopeFlag_File) && s->file != nullptr) {
 			String file_name = filename_without_directory(s->file->fullpath);
-			w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
+			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
 			if (e->pkg->name == "llvm") {
-				gb_string_appendc(w, "$");
+				type_writer_appendc(w, "$");
 			}
-			w = gb_string_appendc(w, gb_bprintf(CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name)));
+			type_writer_appendc(w, gb_bprintf(CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name)));
 			goto write_base_name;
 		}
 		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
@@ -446,8 +520,8 @@ gb_internal gbString write_canonical_entity_name(gbString w, Entity *e) {
 		GB_PANIC("weird entity");
 	}
 	if (e->pkg != nullptr) {
-		w = gb_string_append_length(w, e->pkg->name.text, e->pkg->name.len);
-		w = gb_string_appendc(w, CANONICAL_NAME_SEPARATOR);
+		type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
+		type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 	}
 
 write_base_name:
@@ -459,37 +533,38 @@ write_base_name:
 			Type *params = nullptr;
 			Entity *parent = type_get_polymorphic_parent(e->type, &params);
 			if (parent && (parent->token.string == e->token.string)) {
-				w = gb_string_append_length(w, parent->token.string.text, parent->token.string.len);
-				w = write_canonical_params(w, params);
+				type_writer_append(w, parent->token.string.text, parent->token.string.len);
+				write_canonical_params(w, params);
 			} else {
-				w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
+				type_writer_append(w, e->token.string.text, e->token.string.len);
 			}
 			gb_unused(parent);
 
 		}
 		// Handle parapoly stuff here?
-		return w;
+		return;
 
 	case Entity_Procedure:
 	case Entity_Variable:
-		w = gb_string_append_length(w, e->token.string.text, e->token.string.len);
+		type_writer_append(w, e->token.string.text, e->token.string.len);
 		if (is_type_polymorphic(e->type)) {
-			w = gb_string_appendc(w, CANONICAL_TYPE_SEPARATOR);
-			w = write_type_to_canonical_string(w, e->type);
+			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
+			write_type_to_canonical_string(w, e->type);
 		}
-		return w;
+		return;
 
 	default:
 		GB_PANIC("TODO(bill): entity kind %d", e->kind);
 		break;
 	}
-	return w;
+	return;
 }
 
 // NOTE(bill): This exists so that we deterministically hash a type by serializing it to a canonical string
-gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
+gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 	if (type == nullptr) {
-		return gb_string_appendc(w, CANONICAL_NONE_TYPE); // none/void type
+		type_writer_appendc(w, CANONICAL_NONE_TYPE); // none/void type
+		return;
 	}
 
 	type = default_type(type);
@@ -497,190 +572,210 @@ gb_internal gbString write_type_to_canonical_string(gbString w, Type *type) {
 
 	switch (type->kind) {
 	case Type_Basic:
-		return gb_string_append_length(w, type->Basic.name.text, type->Basic.name.len);
+		type_writer_append(w, type->Basic.name.text, type->Basic.name.len);
+		return;
 	case Type_Pointer:
-		w = gb_string_append_rune(w, '^');
-		return write_type_to_canonical_string(w, type->Pointer.elem);
+		type_writer_appendb(w, '^');
+		write_type_to_canonical_string(w, type->Pointer.elem);
+		return;
 	case Type_MultiPointer:
-		w = gb_string_appendc(w, "[^]");
-		return write_type_to_canonical_string(w, type->Pointer.elem);
+		type_writer_appendc(w, "[^]");
+		write_type_to_canonical_string(w, type->Pointer.elem);
+		return;
 	case Type_SoaPointer:
-		w = gb_string_appendc(w, "#soa^");
-		return write_type_to_canonical_string(w, type->Pointer.elem);
+		type_writer_appendc(w, "#soa^");
+		write_type_to_canonical_string(w, type->Pointer.elem);
+		return;
 	case Type_EnumeratedArray:
 		if (type->EnumeratedArray.is_sparse) {
-			w = gb_string_appendc(w, "#sparse");
+			type_writer_appendc(w, "#sparse");
 		}
-		w = gb_string_append_rune(w, '[');
-		w = write_type_to_canonical_string(w, type->EnumeratedArray.index);
-		w = gb_string_append_rune(w, ']');
-		return write_type_to_canonical_string(w, type->EnumeratedArray.elem);
+		type_writer_appendb(w, '[');
+		write_type_to_canonical_string(w, type->EnumeratedArray.index);
+		type_writer_appendb(w, ']');
+		write_type_to_canonical_string(w, type->EnumeratedArray.elem);
+		return;
 	case Type_Array:
-		w = gb_string_appendc(w, gb_bprintf("[%lld]", cast(long long)type->Array.count));
-		return write_type_to_canonical_string(w, type->Array.elem);
+		type_writer_appendc(w, gb_bprintf("[%lld]", cast(long long)type->Array.count));
+		write_type_to_canonical_string(w, type->Array.elem);
+		return;
 	case Type_Slice:
-		w = gb_string_appendc(w, "[]");
-		return write_type_to_canonical_string(w, type->Array.elem);
+		type_writer_appendc(w, "[]");
+		write_type_to_canonical_string(w, type->Array.elem);
+		return;
 	case Type_DynamicArray:
-		w = gb_string_appendc(w, "[dynamic]");
-		return write_type_to_canonical_string(w, type->DynamicArray.elem);
+		type_writer_appendc(w, "[dynamic]");
+		write_type_to_canonical_string(w, type->DynamicArray.elem);
+		return;
 	case Type_SimdVector:
-		w = gb_string_appendc(w, gb_bprintf("#simd[%lld]", cast(long long)type->SimdVector.count));
-		return write_type_to_canonical_string(w, type->SimdVector.elem);
+		type_writer_appendc(w, gb_bprintf("#simd[%lld]", cast(long long)type->SimdVector.count));
+		write_type_to_canonical_string(w, type->SimdVector.elem);
+		return;
 	case Type_Matrix:
 		if (type->Matrix.is_row_major) {
-			w = gb_string_appendc(w, "#row_major ");
+			type_writer_appendc(w, "#row_major ");
 		}
-		w = gb_string_appendc(w, gb_bprintf("matrix[%lld, %lld]", cast(long long)type->Matrix.row_count, cast(long long)type->Matrix.column_count));
-		return write_type_to_canonical_string(w, type->Matrix.elem);
+		type_writer_appendc(w, gb_bprintf("matrix[%lld, %lld]", cast(long long)type->Matrix.row_count, cast(long long)type->Matrix.column_count));
+		write_type_to_canonical_string(w, type->Matrix.elem);
+		return;
 	case Type_Map:
-		w = gb_string_appendc(w, "map[");
-		w = write_type_to_canonical_string(w, type->Map.key);
-		w = gb_string_appendc(w, "]");
-		return write_type_to_canonical_string(w, type->Map.value);
+		type_writer_appendc(w, "map[");
+		write_type_to_canonical_string(w, type->Map.key);
+		type_writer_appendc(w, "]");
+		write_type_to_canonical_string(w, type->Map.value);
+		return;
 
 	case Type_Enum:
-		w = gb_string_appendc(w, "enum");
+		type_writer_appendc(w, "enum");
 		if (type->Enum.base_type != nullptr) {
-			w = gb_string_append_rune(w, ' ');
-			w = write_type_to_canonical_string(w, type->Enum.base_type);
-			w = gb_string_append_rune(w, ' ');
+			type_writer_appendb(w, ' ');
+			write_type_to_canonical_string(w, type->Enum.base_type);
+			type_writer_appendb(w, ' ');
 		}
-		w = gb_string_append_rune(w, '{');
+		type_writer_appendb(w, '{');
 		for_array(i, type->Enum.fields) {
 			Entity *f = type->Enum.fields[i];
 			GB_ASSERT(f->kind == Entity_Constant);
 			if (i > 0) {
-				w = gb_string_appendc(w, CANONICAL_FIELD_SEPARATOR);
+				type_writer_appendc(w, CANONICAL_FIELD_SEPARATOR);
 			}
-			w = gb_string_append_length(w, f->token.string.text, f->token.string.len);
-			w = gb_string_appendc(w, "=");
-			w = write_exact_value_to_string(w, f->Constant.value);
+			type_writer_append(w, f->token.string.text, f->token.string.len);
+			type_writer_appendc(w, "=");
+
+			gbString s = exact_value_to_string(f->Constant.value, 1<<16);
+			type_writer_append(w, s, gb_string_length(s));
+			gb_string_free(s);
 		}
-		return gb_string_append_rune(w, '}');
+		type_writer_appendb(w, '}');
+		return;
 	case Type_BitSet:
-		w = gb_string_appendc(w, "bit_set[");
+		type_writer_appendc(w, "bit_set[");
 		if (type->BitSet.elem == nullptr) {
-			w = write_type_to_canonical_string(w, type->BitSet.elem);
+			write_type_to_canonical_string(w, type->BitSet.elem);
 		} else if (is_type_enum(type->BitSet.elem)) {
-			w = write_type_to_canonical_string(w, type->BitSet.elem);
+			write_type_to_canonical_string(w, type->BitSet.elem);
 		} else {
-			w = gb_string_append_fmt(w, "%lld", type->BitSet.lower);
-			w = gb_string_append_fmt(w, "..=");
-			w = gb_string_append_fmt(w, "%lld", type->BitSet.upper);
+			type_writer_append_fmt(w, "%lld", type->BitSet.lower);
+			type_writer_append_fmt(w, "..=");
+			type_writer_append_fmt(w, "%lld", type->BitSet.upper);
 		}
 		if (type->BitSet.underlying != nullptr) {
-			w = gb_string_appendc(w, ";");
-			w = write_type_to_canonical_string(w, type->BitSet.underlying);
+			type_writer_appendc(w, ";");
+			write_type_to_canonical_string(w, type->BitSet.underlying);
 		}
-		return gb_string_appendc(w, "]");
+		type_writer_appendc(w, "]");
+		return;
 
 	case Type_Union:
-		w = gb_string_appendc(w, "union");
+		type_writer_appendc(w, "union");
 
 		switch (type->Union.kind) {
-		case UnionType_no_nil:     w = gb_string_appendc(w, "#no_nil");     break;
-		case UnionType_shared_nil: w = gb_string_appendc(w, "#shared_nil"); break;
+		case UnionType_no_nil:     type_writer_appendc(w, "#no_nil");     break;
+		case UnionType_shared_nil: type_writer_appendc(w, "#shared_nil"); break;
 		}
 		if (type->Union.custom_align != 0) {
-			w = gb_string_append_fmt(w, "#align(%lld)", cast(long long)type->Union.custom_align);
+			type_writer_append_fmt(w, "#align(%lld)", cast(long long)type->Union.custom_align);
 		}
-		w = gb_string_appendc(w, "{");
+		type_writer_appendc(w, "{");
 		for_array(i, type->Union.variants) {
 			Type *t = type->Union.variants[i];
-			if (i > 0) w = gb_string_appendc(w, CANONICAL_FIELD_SEPARATOR);
-			w = write_type_to_canonical_string(w, t);
+			if (i > 0) type_writer_appendc(w, CANONICAL_FIELD_SEPARATOR);
+			write_type_to_canonical_string(w, t);
 		}
-		return gb_string_appendc(w, "}");
+		type_writer_appendc(w, "}");
+		return;
 	case Type_Struct:
 		if (type->Struct.soa_kind != StructSoa_None) {
 			switch (type->Struct.soa_kind) {
-			case StructSoa_Fixed:   w = gb_string_append_fmt(w, "#soa[%lld]", cast(long long)type->Struct.soa_count); break;
-			case StructSoa_Slice:   w = gb_string_appendc(w,    "#soa[]");                                    break;
-			case StructSoa_Dynamic: w = gb_string_appendc(w,    "#soa[dynamic]");                             break;
+			case StructSoa_Fixed:   type_writer_append_fmt(w, "#soa[%lld]", cast(long long)type->Struct.soa_count); break;
+			case StructSoa_Slice:   type_writer_appendc(w,    "#soa[]");                                    break;
+			case StructSoa_Dynamic: type_writer_appendc(w,    "#soa[dynamic]");                             break;
 			default: GB_PANIC("Unknown StructSoaKind"); break;
 			}
 			return write_type_to_canonical_string(w, type->Struct.soa_elem);
 		}
 
-		w = gb_string_appendc(w, "struct");
-		if (type->Struct.is_packed)    w = gb_string_appendc(w, "#packed");
-		if (type->Struct.is_raw_union) w = gb_string_appendc(w, "#raw_union");
-		if (type->Struct.is_no_copy)   w = gb_string_appendc(w, "#no_copy");
-		if (type->Struct.custom_min_field_align != 0) w = gb_string_append_fmt(w, "#min_field_align(%lld)", cast(long long)type->Struct.custom_min_field_align);
-		if (type->Struct.custom_max_field_align != 0) w = gb_string_append_fmt(w, "#max_field_align(%lld)", cast(long long)type->Struct.custom_max_field_align);
-		if (type->Struct.custom_align != 0)           w = gb_string_append_fmt(w, "#align(%lld)",           cast(long long)type->Struct.custom_align);
-		w = gb_string_appendc(w, "{");
+		type_writer_appendc(w, "struct");
+		if (type->Struct.is_packed)    type_writer_appendc(w, "#packed");
+		if (type->Struct.is_raw_union) type_writer_appendc(w, "#raw_union");
+		if (type->Struct.is_no_copy)   type_writer_appendc(w, "#no_copy");
+		if (type->Struct.custom_min_field_align != 0) type_writer_append_fmt(w, "#min_field_align(%lld)", cast(long long)type->Struct.custom_min_field_align);
+		if (type->Struct.custom_max_field_align != 0) type_writer_append_fmt(w, "#max_field_align(%lld)", cast(long long)type->Struct.custom_max_field_align);
+		if (type->Struct.custom_align != 0)           type_writer_append_fmt(w, "#align(%lld)",           cast(long long)type->Struct.custom_align);
+		type_writer_appendb(w, '{');
 		for_array(i, type->Struct.fields) {
 			Entity *f = type->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			if (i > 0) {
-				w = gb_string_appendc(w, CANONICAL_FIELD_SEPARATOR);
+				type_writer_appendc(w, CANONICAL_FIELD_SEPARATOR);
 			}
-			w = gb_string_append_length       (w, f->token.string.text, f->token.string.len);
-			w = gb_string_appendc             (w, ":");
-			w = write_type_to_canonical_string(w, f->type);
+			type_writer_append(w, f->token.string.text, f->token.string.len);
+			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
+			write_type_to_canonical_string(w, f->type);
 			String tag = type->Struct.tags[i];
 			if (tag.len != 0) {
 				String s = quote_to_ascii(heap_allocator(), tag);
-				w = gb_string_append_length(w, s.text, s.len);
+				type_writer_append(w, s.text, s.len);
 				gb_free(heap_allocator(), s.text);
 			}
 		}
-		return gb_string_appendc(w, "}");
+		type_writer_appendb(w, '}');
+		return;
 
 	case Type_BitField:
-		w = gb_string_appendc(w, "bit_field");
-		w = write_type_to_canonical_string(w, type->BitField.backing_type);
-		w = gb_string_appendc(w, " {");
+		type_writer_appendc(w, "bit_field");
+		write_type_to_canonical_string(w, type->BitField.backing_type);
+		type_writer_appendc(w, " {");
 		for (isize i = 0; i < type->BitField.fields.count; i++) {
 			Entity *f = type->BitField.fields[i];
 			if (i > 0) {
-				w = gb_string_appendc(w, CANONICAL_FIELD_SEPARATOR);
+				type_writer_appendc(w, CANONICAL_FIELD_SEPARATOR);
 			}
-			w = gb_string_append_length(w, f->token.string.text, f->token.string.len);
-			w = gb_string_appendc(w, ":");
-			w = write_type_to_canonical_string(w, f->type);
-			w = gb_string_appendc(w, "|");
-			w = gb_string_appendc(w, gb_bprintf("%u", type->BitField.bit_sizes[i]));
+			type_writer_append(w, f->token.string.text, f->token.string.len);
+			type_writer_appendc(w, ":");
+			write_type_to_canonical_string(w, f->type);
+			type_writer_appendc(w, "|");
+			type_writer_appendc(w, gb_bprintf("%u", type->BitField.bit_sizes[i]));
 		}
-		return gb_string_appendc(w, " }");
+		type_writer_appendc(w, " }");
+		return;
 
 	case Type_Proc:
-		w = gb_string_appendc(w, "proc");
+		type_writer_appendc(w, "proc");
 		if (default_calling_convention() != type->Proc.calling_convention) {
-			w = gb_string_appendc(w, "\"");
-			w = gb_string_appendc(w, proc_calling_convention_strings[type->Proc.calling_convention]);
-			w = gb_string_appendc(w, "\"");
+			type_writer_appendc(w, "\"");
+			type_writer_appendc(w, proc_calling_convention_strings[type->Proc.calling_convention]);
+			type_writer_appendc(w, "\"");
 		}
 
-		w = write_canonical_params(w, type->Proc.params);
+		write_canonical_params(w, type->Proc.params);
 		if (type->Proc.result_count > 0) {
-			w = gb_string_appendc(w, "->");
-			w = write_canonical_params(w, type->Proc.results);
+			type_writer_appendc(w, "->");
+			write_canonical_params(w, type->Proc.results);
 		}
-		return w;
+		return;
 
 	case Type_Generic:
 		GB_PANIC("Type_Generic should never be hit");
-		return w;
+		return;
 
 	case Type_Named:
 		if (type->Named.type_name != nullptr) {
-			return write_canonical_entity_name(w, type->Named.type_name);
+			write_canonical_entity_name(w, type->Named.type_name);
+			return;
 		} else {
-			w = gb_string_append_length(w, type->Named.name.text, type->Named.name.len);
+			type_writer_append(w, type->Named.name.text, type->Named.name.len);
 		}
-		return w;
+		return;
 
 	case Type_Tuple:
-		w = gb_string_appendc(w, "params");
-		w = write_canonical_params(w, type);
-		return w;
+		type_writer_appendc(w, "params");
+		write_canonical_params(w, type);
+		return;
 	default:
 		GB_PANIC("unknown type kind %d %.*s", type->kind, LIT(type_strings[type->kind]));
 		break;
 	}
 
-	return w;
+	return;
 }
