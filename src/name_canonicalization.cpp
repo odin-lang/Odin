@@ -366,11 +366,10 @@ gb_internal gbString string_canonical_entity_name(gbAllocator allocator, Entity 
 
 
 
-gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e, bool ignore_final_dot=false) {
+gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 	GB_ASSERT(e != nullptr);
-
-	if (e->kind == Entity_Procedure) {
-		if (e->Procedure.is_export || e->Procedure.is_foreign) {
+	if (e->kind == Entity_Procedure || e->kind == Entity_TypeName) {
+		if (e->kind == Entity_Procedure && (e->Procedure.is_export || e->Procedure.is_foreign)) {
 			// no prefix
 			return;
 		}
@@ -396,7 +395,7 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e, bool ig
 			if (e->pkg->name == "llvm") {
 				type_writer_appendc(w, "$");
 			}
-			type_writer_appendc(w, gb_bprintf(CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name)));
+			type_writer_append_fmt(w, CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name));
 		}
 	} else if (e->kind == Entity_Procedure) {
 		if (e->Procedure.is_export || e->Procedure.is_foreign) {
@@ -405,10 +404,9 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e, bool ig
 		}
 		GB_PANIC("TODO(bill): handle entity kind: %d", e->kind);
 	}
-
 	if (e->kind == Entity_Procedure && e->Procedure.is_anonymous) {
 		String file_name = filename_without_directory(e->file->fullpath);
-		type_writer_appendc(w, gb_bprintf(CANONICAL_ANON_PREFIX "[%.*s:%d]", LIT(file_name), e->token.pos.offset));
+		type_writer_append_fmt(w, CANONICAL_ANON_PREFIX "[%.*s:%d]", LIT(file_name), e->token.pos.offset);
 	} else {
 		type_writer_append(w, e->token.string.text, e->token.string.len);
 	}
@@ -417,9 +415,7 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e, bool ig
 		type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
 		write_type_to_canonical_string(w, e->type);
 	}
-	if (!ignore_final_dot) {
-		type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
-	}
+	type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 
 	return;
 }
@@ -461,7 +457,10 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		}
 
 		if (s->decl_info != nullptr && s->decl_info->entity)  {
-			write_canonical_parent_prefix(w, s->decl_info->entity);
+			Entity *parent = s->decl_info->entity;
+			write_canonical_parent_prefix(w, parent);
+			type_writer_append_fmt(w, CANONICAL_TYPE_SEPARATOR "[%d]", e->token.pos.offset);
+
 			goto write_base_name;
 		} else if ((s->flags & ScopeFlag_File) && s->file != nullptr) {
 			String file_name = filename_without_directory(s->file->fullpath);
