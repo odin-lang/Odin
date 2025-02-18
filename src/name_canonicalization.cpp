@@ -449,8 +449,9 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 	}
 
 	if (e->scope->flags & (ScopeFlag_Builtin)) {
-		// ignore
-	} else if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0) {
+		goto write_base_name;
+	} else if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0 ||
+	           e->flags & EntityFlag_NotExported) {
 		Scope *s = e->scope;
 
 		while ((s->flags & (ScopeFlag_Proc|ScopeFlag_File)) == 0 && s->decl_info == nullptr) {
