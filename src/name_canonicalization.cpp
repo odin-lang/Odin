@@ -448,11 +448,15 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		return;
 	}
 
-	if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0 ||
-	    e->flags & EntityFlag_NotExported) {
-
+	if (e->scope->flags & (ScopeFlag_Builtin)) {
+		// ignore
+	} else if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0) {
 		Scope *s = e->scope;
+
 		while ((s->flags & (ScopeFlag_Proc|ScopeFlag_File)) == 0 && s->decl_info == nullptr) {
+			if (s->parent == nullptr) {
+				break;
+			}
 			s = s->parent;
 		}
 
@@ -469,6 +473,8 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 				type_writer_appendc(w, "$");
 			}
 			type_writer_appendc(w, gb_bprintf(CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name)));
+			goto write_base_name;
+		} else if (s->flags & (ScopeFlag_Builtin)) {
 			goto write_base_name;
 		}
 		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
@@ -487,7 +493,7 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		};
 
 		print_scope_flags(s);
-		GB_PANIC("weird entity");
+		GB_PANIC("weird entity %.*s", LIT(e->token.string));
 	}
 	if (e->pkg != nullptr) {
 		type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
