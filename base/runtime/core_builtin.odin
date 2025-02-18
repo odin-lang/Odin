@@ -992,7 +992,7 @@ assert :: proc(condition: bool, message := #caller_expression(condition), loc :=
 	}
 }
 
-// Evaluates the condition and aborts the program iff the condition is
+// Evaluates the condition and aborts the program if the condition is
 // false.  This routine ignores `ODIN_DISABLE_ASSERT`, and will always
 // execute.
 @builtin
