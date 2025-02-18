@@ -6741,59 +6741,27 @@ gb_internal void check_parsed_files(Checker *c) {
 		for_array(i, c->info.type_info_types) {
 			auto const &tt = c->info.type_info_types[i];
 			bool exists = map_set_if_not_previously_exists(&c->info.minimum_dependency_type_info_index_map, cast(uintptr)tt.hash, i);
-			if (exists) {
-				for (auto const &entry : c->info.minimum_dependency_type_info_index_map) {
-					if (entry.key == cast(uintptr)tt.hash) {
-						auto const &other = c->info.type_info_types[entry.value];
-						if (!are_types_identical_unique_tuples(tt.type, other.type)) {
-							gbString t = temp_canonical_string(tt.type);
-							gbString o = temp_canonical_string(other.type);
-							GB_PANIC("%s (%s) %llu vs %s (%s) %llu",
-							         type_to_string(tt.type, false),    t, cast(unsigned long long)tt.hash,
-							         type_to_string(other.type, false), o, cast(unsigned long long)other.hash);
-						}
-					}
+			if (!exists) {
+				continue
+			}
+			for (auto const &entry : c->info.minimum_dependency_type_info_index_map) {
+				if (entry.key != cast(uintptr)tt.hash) {
+					continue;
 				}
+				auto const &other = c->info.type_info_types[entry.value];
+				if (are_types_identical_unique_tuples(tt.type, other.type)) {
+					continue;
+				}
+				gbString t = temp_canonical_string(tt.type);
+				gbString o = temp_canonical_string(other.type);
+				GB_PANIC("%s (%s) %llu vs %s (%s) %llu",
+				         type_to_string(tt.type, false),    t, cast(unsigned long long)tt.hash,
+				         type_to_string(other.type, false), o, cast(unsigned long long)other.hash);
 			}
 		}
 
 		GB_ASSERT(c->info.minimum_dependency_type_info_index_map.count <= c->info.type_info_types.count);
 	}
-
-	// TIME_SECTION("check for type hash collisions");
-	// {
-	// 	PtrSet<uintptr> found = {};
-	// 	ptr_set_init(&found, c->info.type_info_types.count);
-	// 	defer (ptr_set_destroy(&found));
-	// 	for (auto const &tt : c->info.type_info_types) {
-	// 		if (ptr_set_update(&found, cast(uintptr)tt.hash)) {
-	// 			Type *other_type = nullptr;
-	// 			for (auto const &other : c->info.type_info_types) {
-	// 				if (&tt == &other) {
-	// 					continue;
-	// 				}
-	// 				if (cast(uintptr)other.hash == cast(uintptr)tt.hash &&
-	// 				    !are_types_identical(tt.type, other.type)) {
-	// 					other_type = other.type;
-	// 					break;
-	// 				}
-	// 			}
-	// 			if (other_type != nullptr) {
-	// 				String ts = type_to_canonical_string(temporary_allocator(), tt.type);
-	// 				String os = type_to_canonical_string(temporary_allocator(), other_type);
-	// 				if (ts != os) {
-	// 					compiler_error("%s found type hash collision with %s (hash = %llu)\n"
-	// 					               "%s vs %s\n",
-	// 					               type_to_string(tt.type), type_to_string(other_type), cast(unsigned long long)tt.hash,
-	// 					               temp_canonical_string(tt.type),
-	// 					               temp_canonical_string(other_type)
-	// 					);
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
-
 
 
 	TIME_SECTION("sort init and fini procedures");
