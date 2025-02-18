@@ -3,19 +3,19 @@
 
 	* No spaces between any values
 
-	* normal declarations - pkg.name
+	* normal declarations - pkg::name
 	* builtin names - just their normal name e.g. `i32` or `string`
-	* nested - pkg.parent1.parent2.name
-	* file private - pkg.[file_name].name
-		* Example: `pkg.[file.odin].Type`
-	* polymorphic procedure/type - pkg.foo::TYPE
+	* nested - pkg::parent1::parent2::name
+	* file private - pkg::[file_name]::name
+		* Example: `pkg::[file.odin]::Type`
+	* polymorphic procedure/type - pkg::foo:TYPE
 		* naming convention for parameters
 			* type
 			* $typeid_based_name
 			* $$constant_parameter
-		* Example: `foo.to_thing::proc(u64)->([]u8)`
-	* nested decl in polymorphic procedure - pkg.foo::TYPE.name
-	* anonymous procedures - pkg.foo.$anon[file.odin:123]
+		* Example: `foo::to_thing:proc(u64)->([]u8)`
+	* nested decl in polymorphic procedure - pkg::foo:TYPE::name
+	* anonymous procedures - pkg::foo::$anon[file.odin:123]
 		* 123 is the file offset in bytes
 
 
@@ -280,42 +280,51 @@ void type_writer_make_hasher(TypeWriter *w, u64 *hash) {
 
 gb_internal void write_canonical_params(TypeWriter *w, Type *params) {
 	type_writer_appendc(w, "(");
-	if (params) {
-		GB_ASSERT(params->kind == Type_Tuple);
-		for_array(i, params->Tuple.variables) {
-			Entity *v = params->Tuple.variables[i];
-			if (i > 0) {
-				type_writer_appendc(w, CANONICAL_PARAM_SEPARATOR);
-			}
-			type_writer_append(w, v->token.string.text, v->token.string.len);
-			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
+	defer (type_writer_appendc(w, ")"));
 
-			if (v->kind == Entity_Variable) {
-				if (v->flags&EntityFlag_CVarArg) {
-					type_writer_appendc(w, CANONICAL_PARAM_C_VARARG);
-				}
-				if (v->flags&EntityFlag_Ellipsis) {
-					Type *slice = base_type(v->type);
-					type_writer_appendc(w, CANONICAL_PARAM_VARARG);
-					GB_ASSERT(v->type->kind == Type_Slice);
-					write_type_to_canonical_string(w, slice->Slice.elem);
-				} else {
-					write_type_to_canonical_string(w, v->type);
-				}
-			} else if (v->kind == Entity_TypeName) {
-				type_writer_appendc(w, CANONICAL_PARAM_TYPEID);
+	if (params == nullptr) {
+		return;
+	}
+	GB_ASSERT(params->kind == Type_Tuple);
+	for_array(i, params->Tuple.variables) {
+		Entity *v = params->Tuple.variables[i];
+		if (i > 0) {
+			type_writer_appendc(w, CANONICAL_PARAM_SEPARATOR);
+		}
+		type_writer_append(w, v->token.string.text, v->token.string.len);
+		type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
+
+		switch (v->kind) {
+		case Entity_Variable:
+			if (v->flags&EntityFlag_CVarArg) {
+				type_writer_appendc(w, CANONICAL_PARAM_C_VARARG);
+			}
+			if (v->flags&EntityFlag_Ellipsis) {
+				Type *slice = base_type(v->type);
+				type_writer_appendc(w, CANONICAL_PARAM_VARARG);
+				GB_ASSERT(v->type->kind == Type_Slice);
+				write_type_to_canonical_string(w, slice->Slice.elem);
+			} else {
 				write_type_to_canonical_string(w, v->type);
-			} else if (v->kind == Entity_Constant) {
+			}
+			break;
+		case Entity_TypeName:
+			type_writer_appendc(w, CANONICAL_PARAM_TYPEID);
+			write_type_to_canonical_string(w, v->type);
+			break;
+		case Entity_Constant:
+			{
 				type_writer_appendc(w, CANONICAL_PARAM_CONST);
 				gbString s = exact_value_to_string(v->Constant.value, 1<<16);
 				type_writer_append(w, s, gb_string_length(s));
 				gb_string_free(s);
-			} else {
-				GB_PANIC("TODO(bill): handle non type/const parapoly parameter values");
 			}
+			break;
+		default:
+			GB_PANIC("TODO(bill): handle non type/const parapoly parameter values");
+			break;
 		}
 	}
-	type_writer_appendc(w, ")");
 	return;
 }
 
@@ -346,19 +355,6 @@ gb_internal gbString temp_canonical_string(Type *type) {
 	write_type_to_canonical_string(&w, type);
 
 	return cast(gbString)w.user_data;
-}
-
-gb_internal void print_scope_flags(Scope *s) {
-	if (s->flags & ScopeFlag_Pkg)             gb_printf_err("Pkg ");
-	if (s->flags & ScopeFlag_Builtin)         gb_printf_err("Builtin ");
-	if (s->flags & ScopeFlag_Global)          gb_printf_err("Global ");
-	if (s->flags & ScopeFlag_File)            gb_printf_err("File ");
-	if (s->flags & ScopeFlag_Init)            gb_printf_err("Init ");
-	if (s->flags & ScopeFlag_Proc)            gb_printf_err("Proc ");
-	if (s->flags & ScopeFlag_Type)            gb_printf_err("Type ");
-	if (s->flags & ScopeFlag_HasBeenImported) gb_printf_err("HasBeenImported ");
-	if (s->flags & ScopeFlag_ContextDefined)  gb_printf_err("ContextDefined ");
-	gb_printf_err("\n");
 }
 
 gb_internal gbString string_canonical_entity_name(gbAllocator allocator, Entity *e) {
@@ -477,6 +473,20 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 			goto write_base_name;
 		}
 		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
+
+		auto const print_scope_flags = [](Scope *s) {
+			if (s->flags & ScopeFlag_Pkg)             gb_printf_err("Pkg ");
+			if (s->flags & ScopeFlag_Builtin)         gb_printf_err("Builtin ");
+			if (s->flags & ScopeFlag_Global)          gb_printf_err("Global ");
+			if (s->flags & ScopeFlag_File)            gb_printf_err("File ");
+			if (s->flags & ScopeFlag_Init)            gb_printf_err("Init ");
+			if (s->flags & ScopeFlag_Proc)            gb_printf_err("Proc ");
+			if (s->flags & ScopeFlag_Type)            gb_printf_err("Type ");
+			if (s->flags & ScopeFlag_HasBeenImported) gb_printf_err("HasBeenImported ");
+			if (s->flags & ScopeFlag_ContextDefined)  gb_printf_err("ContextDefined ");
+			gb_printf_err("\n");
+		};
+
 		print_scope_flags(s);
 		GB_PANIC("weird entity");
 	}
@@ -499,10 +509,7 @@ write_base_name:
 			} else {
 				type_writer_append(w, e->token.string.text, e->token.string.len);
 			}
-			gb_unused(parent);
-
 		}
-		// Handle parapoly stuff here?
 		return;
 
 	case Entity_Procedure:
