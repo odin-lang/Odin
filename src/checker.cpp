@@ -6729,7 +6729,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
 	}
 
-	TIME_SECTION("initilize type info array");
+	TIME_SECTION("initialize and check for collisions in type info array");
 	{
 		for (auto const &tt : c->info.min_dep_type_info_set) {
 			array_add(&c->info.type_info_types, tt);
