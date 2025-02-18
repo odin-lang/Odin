@@ -56,6 +56,15 @@ Marshal_Options :: struct {
 	// NOTE: If a name isn't found it'll use the underlying value.
 	use_enum_names: bool,
 
+	// Always omit empty values including empty (c)strings, (dynamic) arrays,
+	// slices, unions, bit sets, maps, and nil values.
+	always_omitempty: bool,
+
+	// Always omit nil values.
+	//
+	// Doesn't omit empty values, unlike always_omitempty.
+	always_omitnil: bool,
+
 	// Internal state
 	indentation: int,
 	mjson_skipped_first_braces_start: bool,
@@ -346,9 +355,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	case runtime.Type_Info_Struct:
 		is_omitempty :: proc(v: any) -> bool {
 			v := v
-			if v == nil {
-				return true
-			}
 			ti := runtime.type_info_core(type_info_of(v.id))
 			#partial switch info in ti.variant {
 			case runtime.Type_Info_String:
@@ -356,36 +362,54 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				case string:
 					return x == ""
 				case cstring:
-					return x == nil || x == ""
+					return x == ""
 				}
-			case runtime.Type_Info_Any:
-				return v.(any) == nil
-			case runtime.Type_Info_Type_Id:
-				return v.(typeid) == nil
-			case runtime.Type_Info_Pointer,
-			     runtime.Type_Info_Multi_Pointer,
-			     runtime.Type_Info_Procedure:
-				return (^rawptr)(v.data)^ == nil
 			case runtime.Type_Info_Dynamic_Array:
 				return (^runtime.Raw_Dynamic_Array)(v.data).len == 0
 			case runtime.Type_Info_Slice:
 				return (^runtime.Raw_Slice)(v.data).len == 0
-			case runtime.Type_Info_Union,
-			     runtime.Type_Info_Bit_Set,
-			     runtime.Type_Info_Soa_Pointer:
-				return reflect.is_nil(v)
 			case runtime.Type_Info_Map:
 				return (^runtime.Raw_Map)(v.data).len == 0
 			}
 			return false
 		}
 
+		is_omitnil :: proc(v: any) -> bool {
+			v := v
+			if v == nil {
+				return true
+			}
+			ti := runtime.type_info_core(type_info_of(v.id))
+			#partial switch info in ti.variant {
+			case runtime.Type_Info_String:
+				switch x in v {
+				case cstring:
+					return x == nil
+				}
+			case runtime.Type_Info_Any:
+				return v.(any) == nil
+			case runtime.Type_Info_Type_Id:
+				return v.(typeid) == nil
+			case runtime.Type_Info_Pointer,
+				runtime.Type_Info_Multi_Pointer,
+				runtime.Type_Info_Procedure:
+				return (^rawptr)(v.data)^ == nil
+			case runtime.Type_Info_Union,
+				runtime.Type_Info_Bit_Set,
+				runtime.Type_Info_Soa_Pointer:
+				return reflect.is_nil(v)
+			}
+			return false
+		}
+
+
 		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 			ti := runtime.type_info_base(type_info_of(v.id))
 			info := ti.variant.(runtime.Type_Info_Struct)
 			first_iteration := true
 			for name, i in info.names[:info.field_count] {
-				omitempty := false
+				omitempty := opt.always_omitempty
+				omitnil := opt.always_omitnil || omitempty
 
 				json_name, extra := json_name_from_tag_value(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json"))
 
@@ -393,17 +417,23 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					continue
 				}
 
-				for flag in strings.split_iterator(&extra, ",") {
-					switch flag {
-					case "omitempty":
-						omitempty = true
-					}
-				}
-
 				id := info.types[i].id
 				data := rawptr(uintptr(v.data) + info.offsets[i])
 				the_value := any{data, id}
 
+				for flag in strings.split_iterator(&extra, ",") {
+					switch flag {
+					case "omitempty":
+						omitempty = true
+						fallthrough
+					case "omitnil":
+						omitnil = true
+					}
+				}
+
+				if omitnil && is_omitnil(the_value) {
+					continue
+				}
 				if omitempty && is_omitempty(the_value) {
 					continue
 				}
