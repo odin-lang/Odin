@@ -1456,11 +1456,11 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 		return e->token.string;
 	}
 
-	gbString w = gb_string_make(heap_allocator(), "");
-	w = write_canonical_entity_name(w, e);
+	gbString w = string_canonical_entity_name(heap_allocator(), e);
 	defer (gb_string_free(w));
 
 	String name = copy_string(permanent_allocator(), make_string(cast(u8 const *)w, gb_string_length(w)));
+	gb_printf_err("%.*s\n", LIT(name));
 
 	if (e->kind == Entity_TypeName) {
 		e->TypeName.ir_mangled_name = name;
