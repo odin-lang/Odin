@@ -1,26 +1,3 @@
-/*
-	General Rules for canonical name mangling
-
-	* No spaces between any values
-
-	* normal declarations - pkg::name
-	* builtin names - just their normal name e.g. `i32` or `string`
-	* nested - pkg::parent1::parent2::name
-	* file private - pkg::[file_name]::name
-		* Example: `pkg::[file.odin]::Type`
-	* polymorphic procedure/type - pkg::foo:TYPE
-		* naming convention for parameters
-			* type
-			* $typeid_based_name
-			* $$constant_parameter
-		* Example: `foo::to_thing:proc(u64)->([]u8)`
-	* nested decl in polymorphic procedure - pkg::foo:TYPE::name
-	* anonymous procedures - pkg::foo::$anon[file.odin:123]
-		* 123 is the file offset in bytes
-
-
-*/
-
 gb_internal GB_COMPARE_PROC(type_info_pair_cmp) {
 	TypeInfoPair *x = cast(TypeInfoPair *)a;
 	TypeInfoPair *y = cast(TypeInfoPair *)b;
@@ -397,11 +374,7 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			}
 			type_writer_append_fmt(w, CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name));
 		}
-	} else if (e->kind == Entity_Procedure) {
-		if (e->Procedure.is_export || e->Procedure.is_foreign) {
-			// no prefix
-			return;
-		}
+	} else {
 		GB_PANIC("TODO(bill): handle entity kind: %d", e->kind);
 	}
 	if (e->kind == Entity_Procedure && e->Procedure.is_anonymous) {
@@ -467,7 +440,6 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 			if (e->scope->index > 0) {
 				type_writer_append_fmt(w, CANONICAL_TYPE_SEPARATOR "[%d]", e->scope->index);
 			}
-			// type_writer_append_fmt(w, CANONICAL_TYPE_SEPARATOR "[%d]", e->token.pos.offset);
 
 			goto write_base_name;
 		} else if ((s->flags & ScopeFlag_File) && s->file != nullptr) {

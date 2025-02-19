@@ -1,3 +1,25 @@
+/*
+	General Rules for canonical name mangling
+
+	* No spaces between any values
+
+	* normal declarations - pkg::name
+	* builtin names - just their normal name e.g. `i32` or `string`
+	* nested (zero level) - pkg::parent1::parent2::name
+	* nested (more scopes) - pkg::parent1::parent2::name[4]
+		* [4] indicates the 4th scope within a procedure numbered in depth-first order
+	* file private - pkg::[file_name]::name
+		* Example: `pkg::[file.odin]::Type`
+	* polymorphic procedure/type - pkg::foo:TYPE
+		* naming convention for parameters
+			* type
+			* $typeid_based_name
+			* $$constant_parameter
+		* Example: `foo::to_thing:proc(u64)->([]u8)`
+	* nested decl in polymorphic procedure - pkg::foo:TYPE::name
+	* anonymous procedures - pkg::foo::$anon[file.odin:123]
+		* 123 is the file offset in bytes
+*/
 
 #define CANONICAL_TYPE_SEPARATOR  ":"
 #define CANONICAL_NAME_SEPARATOR  "::"
