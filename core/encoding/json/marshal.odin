@@ -353,6 +353,36 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Struct:
+		is_omitempty :: proc(v: any) -> bool {
+			ti := runtime.type_info_core(type_info_of(v.id))
+			#partial switch info in ti.variant {
+			case runtime.Type_Info_String,
+				 runtime.Type_Info_Dynamic_Array,
+				 runtime.Type_Info_Slice,
+				 runtime.Type_Info_Map:
+				return reflect.length(v) == 0
+			}
+			return false
+		}
+
+		is_omitnil :: proc(v: any) -> bool {
+			ti := runtime.type_info_core(type_info_of(v.id))
+			#partial switch info in ti.variant {
+			case runtime.Type_Info_String,
+				runtime.Type_Info_Any,
+				runtime.Type_Info_Type_Id,
+				runtime.Type_Info_Pointer,
+				runtime.Type_Info_Multi_Pointer,
+				runtime.Type_Info_Procedure,
+				runtime.Type_Info_Union,
+				runtime.Type_Info_Bit_Set,
+				runtime.Type_Info_Soa_Pointer:
+				return reflect.is_nil(v)
+			}
+			return false
+		}
+
+
 		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 			ti := runtime.type_info_base(type_info_of(v.id))
 			info := ti.variant.(runtime.Type_Info_Struct)
@@ -367,6 +397,10 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					continue
 				}
 
+				id := info.types[i].id
+				data := rawptr(uintptr(v.data) + info.offsets[i])
+				the_value := any{data, id}
+
 				for flag in strings.split_iterator(&extra, ",") {
 					switch flag {
 					case "omitempty":
@@ -377,14 +411,10 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					}
 				}
 
-				id := info.types[i].id
-				data := rawptr(uintptr(v.data) + info.offsets[i])
-				the_value := any{data, id}
-
-				if omitnil && reflect.is_nil(the_value) {
+				if omitnil && is_omitnil(the_value) {
 					continue
 				}
-				if omitempty && reflect.length(the_value) == 0 {
+				if omitempty && is_omitempty(the_value) {
 					continue
 				}
 
