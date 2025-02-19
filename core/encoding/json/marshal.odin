@@ -377,16 +377,16 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					}
 				}
 
-				if omitnil && reflect.is_nil(v) {
-					continue
-				}
-				if omitempty && reflect.length(v) == 0 {
-					continue
-				}
-
 				id := info.types[i].id
 				data := rawptr(uintptr(v.data) + info.offsets[i])
 				the_value := any{data, id}
+
+				if omitnil && reflect.is_nil(the_value) {
+					continue
+				}
+				if omitempty && reflect.length(the_value) == 0 {
+					continue
+				}
 
 				opt_write_iteration(w, opt, first_iteration) or_return
 				first_iteration = false
