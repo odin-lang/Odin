@@ -353,56 +353,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Struct:
-		is_omitempty :: proc(v: any) -> bool {
-			v := v
-			ti := runtime.type_info_core(type_info_of(v.id))
-			#partial switch info in ti.variant {
-			case runtime.Type_Info_String:
-				switch x in v {
-				case string:
-					return x == ""
-				case cstring:
-					return x == ""
-				}
-			case runtime.Type_Info_Dynamic_Array:
-				return (^runtime.Raw_Dynamic_Array)(v.data).len == 0
-			case runtime.Type_Info_Slice:
-				return (^runtime.Raw_Slice)(v.data).len == 0
-			case runtime.Type_Info_Map:
-				return (^runtime.Raw_Map)(v.data).len == 0
-			}
-			return false
-		}
-
-		is_omitnil :: proc(v: any) -> bool {
-			v := v
-			if v == nil {
-				return true
-			}
-			ti := runtime.type_info_core(type_info_of(v.id))
-			#partial switch info in ti.variant {
-			case runtime.Type_Info_String:
-				switch x in v {
-				case cstring:
-					return x == nil
-				}
-			case runtime.Type_Info_Any:
-				return v.(any) == nil
-			case runtime.Type_Info_Type_Id:
-				return v.(typeid) == nil
-			case runtime.Type_Info_Pointer,
-				runtime.Type_Info_Multi_Pointer,
-				runtime.Type_Info_Procedure:
-				return (^rawptr)(v.data)^ == nil
-			case runtime.Type_Info_Union,
-				runtime.Type_Info_Bit_Set,
-				runtime.Type_Info_Soa_Pointer:
-				return reflect.is_nil(v)
-			}
-			return false
-		}
-
-
 		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 			ti := runtime.type_info_base(type_info_of(v.id))
 			info := ti.variant.(runtime.Type_Info_Struct)
@@ -417,10 +367,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					continue
 				}
 
-				id := info.types[i].id
-				data := rawptr(uintptr(v.data) + info.offsets[i])
-				the_value := any{data, id}
-
 				for flag in strings.split_iterator(&extra, ",") {
 					switch flag {
 					case "omitempty":
@@ -431,12 +377,16 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					}
 				}
 
-				if omitnil && is_omitnil(the_value) {
+				if omitnil && reflect.is_nil(v) {
 					continue
 				}
-				if omitempty && is_omitempty(the_value) {
+				if omitempty && reflect.length(v) == 0 {
 					continue
 				}
+
+				id := info.types[i].id
+				data := rawptr(uintptr(v.data) + info.offsets[i])
+				the_value := any{data, id}
 
 				opt_write_iteration(w, opt, first_iteration) or_return
 				first_iteration = false
