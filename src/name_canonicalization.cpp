@@ -464,7 +464,10 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		if (s->decl_info != nullptr && s->decl_info->entity)  {
 			Entity *parent = s->decl_info->entity;
 			write_canonical_parent_prefix(w, parent);
-			type_writer_append_fmt(w, CANONICAL_TYPE_SEPARATOR "[%d]", e->token.pos.offset);
+			if (e->scope->index > 0) {
+				type_writer_append_fmt(w, CANONICAL_TYPE_SEPARATOR "[%d]", e->scope->index);
+			}
+			// type_writer_append_fmt(w, CANONICAL_TYPE_SEPARATOR "[%d]", e->token.pos.offset);
 
 			goto write_base_name;
 		} else if ((s->flags & ScopeFlag_File) && s->file != nullptr) {

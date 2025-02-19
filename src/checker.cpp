@@ -358,6 +358,10 @@ gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 		scope->flags |= ScopeFlag_Type;
 		break;
 	}
+	if (c->decl && c->decl->proc_lit) {
+		// Number the scopes within a procedure body depth-first
+		scope->index = c->decl->scope_index++;
+	}
 	c->scope = scope;
 	c->state_flags |= StateFlag_bounds_check;
 }

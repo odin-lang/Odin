@@ -229,6 +229,8 @@ struct DeclInfo {
 
 	Array<BlockLabel> labels;
 
+	i32 scope_index;
+
 	Array<VariadicReuseData> variadic_reuses;
 	i64 variadic_reuse_max_bytes;
 	i64 variadic_reuse_max_align;
@@ -272,6 +274,8 @@ struct Scope {
 	Scope *       parent;
 	std::atomic<Scope *> next;
 	std::atomic<Scope *> head_child;
+
+	i32 index; // within a procedure
 
 	RwMutex mutex;
 	StringMap<Entity *> elements;
