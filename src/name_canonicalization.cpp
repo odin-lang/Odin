@@ -421,6 +421,8 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		return;
 	}
 
+	bool write_scope_index_suffix = false;
+
 	if (e->scope->flags & (ScopeFlag_Builtin)) {
 		goto write_base_name;
 	} else if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0 ||
@@ -438,7 +440,7 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 			Entity *parent = s->decl_info->entity;
 			write_canonical_parent_prefix(w, parent);
 			if (e->scope->index > 0) {
-				type_writer_append_fmt(w, CANONICAL_TYPE_SEPARATOR "[%d]", e->scope->index);
+				write_scope_index_suffix = true;
 			}
 
 			goto write_base_name;
@@ -491,8 +493,11 @@ write_base_name:
 				type_writer_append(w, e->token.string.text, e->token.string.len);
 			}
 		}
-		return;
+		break;
 
+	case Entity_Constant:
+		// For debug symbols only
+		/*fallthrough*/
 	case Entity_Procedure:
 	case Entity_Variable:
 		type_writer_append(w, e->token.string.text, e->token.string.len);
@@ -500,12 +505,18 @@ write_base_name:
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
 			write_type_to_canonical_string(w, e->type);
 		}
-		return;
+		break;
 
 	default:
 		GB_PANIC("TODO(bill): entity kind %d", e->kind);
 		break;
 	}
+
+	if (write_scope_index_suffix) {
+		GB_ASSERT(e != nullptr && e->scope != nullptr);
+		type_writer_append_fmt(w, "[%d]", e->scope->index);
+	}
+
 	return;
 }
 
@@ -661,7 +672,10 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			type_writer_append(w, f->token.string.text, f->token.string.len);
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
 			write_type_to_canonical_string(w, f->type);
-			String tag = type->Struct.tags[i];
+			String tag = {};
+			if (type->Struct.tags != nullptr) {
+				tag = type->Struct.tags[i];
+			}
 			if (tag.len != 0) {
 				String s = quote_to_ascii(heap_allocator(), tag);
 				type_writer_append(w, s.text, s.len);

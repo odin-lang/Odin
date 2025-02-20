@@ -843,7 +843,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			8*cast(unsigned)type_align_of(type),
 			lb_debug_type(m, type->EnumeratedArray.elem),
 			subscripts, gb_count_of(subscripts));
-		gbString name = type_to_string(type, temporary_allocator());
+		gbString name = temp_canonical_string(type);
 		return LLVMDIBuilderCreateTypedef(m->debug_builder, array_type, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
 	}
 
@@ -852,16 +852,16 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		Type *bt = base_type(type->Map.debug_metadata_type);
 		GB_ASSERT(bt->kind == Type_Struct);
 
-		return lb_debug_struct(m, type, bt, make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
+		return lb_debug_struct(m, type, bt, type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
 	}
 
-	case Type_Struct:       return lb_debug_struct(       m, type, type, make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
-	case Type_Slice:        return lb_debug_slice(        m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
-	case Type_DynamicArray: return lb_debug_dynamic_array(m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
-	case Type_Union:        return lb_debug_union(        m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
-	case Type_BitSet:       return lb_debug_bitset(       m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
-	case Type_Enum:         return lb_debug_enum(         m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
-	case Type_BitField:     return lb_debug_bitfield(     m, type,       make_string_c(type_to_string(type, temporary_allocator())), nullptr, nullptr, 0);
+	case Type_Struct:       return lb_debug_struct(       m, type, type, type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
+	case Type_Slice:        return lb_debug_slice(        m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
+	case Type_DynamicArray: return lb_debug_dynamic_array(m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
+	case Type_Union:        return lb_debug_union(        m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
+	case Type_BitSet:       return lb_debug_bitset(       m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
+	case Type_Enum:         return lb_debug_enum(         m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
+	case Type_BitField:     return lb_debug_bitfield(     m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
 
 	case Type_Tuple:
 		if (type->Tuple.variables.count == 1) {
@@ -904,7 +904,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		{
 			LLVMMetadataRef proc_underlying_type = lb_debug_type_internal_proc(m, type);
 			LLVMMetadataRef pointer_type = LLVMDIBuilderCreatePointerType(m->debug_builder, proc_underlying_type, ptr_bits, ptr_bits, 0, nullptr, 0);
-			gbString name = type_to_string(type, temporary_allocator());
+			gbString name = temp_canonical_string(type);
 			return LLVMDIBuilderCreateTypedef(m->debug_builder, pointer_type, name, gb_string_length(name), nullptr, 0, nullptr, cast(u32)(8*type_align_of(type)));
 		}
 		break;
@@ -987,10 +987,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 			line = cast(unsigned)e->token.pos.line;
 		}
 
-		String name = type->Named.name;
-		if (type->Named.type_name && type->Named.type_name->pkg && type->Named.type_name->pkg->name.len != 0) {
-			name = concatenate3_strings(temporary_allocator(), type->Named.type_name->pkg->name, str_lit("."), type->Named.name);
-		}
+		String name = type_to_canonical_string(temporary_allocator(), type);
 
 		Type *bt = base_type(type->Named.base);
 
@@ -1187,8 +1184,8 @@ gb_internal void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx
 gb_internal String debug_info_mangle_constant_name(Entity *e, gbAllocator const &allocator, bool *did_allocate_) {
 	String name = e->token.string;
 	if (e->pkg && e->pkg->name.len > 0) {
-		// NOTE(bill): C++ NONSENSE FOR DEBUG SHITE!
-		name = concatenate3_strings(allocator, e->pkg->name, str_lit("::"), name);
+		gbString s = string_canonical_entity_name(allocator, e);
+		name = make_string(cast(u8 const *)s, gb_string_length(s));
 		if (did_allocate_) *did_allocate_ = true;
 	}
 	return name;
