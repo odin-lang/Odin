@@ -647,7 +647,7 @@ type_info_base_without_enum :: type_info_core
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
 	n := u64(len(type_table))
 	i := transmute(u64)id % n
-	for k in 0..<n {
+	for _ in 0..<n {
 		ptr := type_table[i]
 		if ptr != nil && ptr.id == id {
 			return ptr
