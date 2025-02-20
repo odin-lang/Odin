@@ -1443,148 +1443,30 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 	LLVMStructSetBody(dst, fields, field_count, LLVMIsPackedStruct(src));
 }
 
-gb_internal String lb_mangle_name(Entity *e) {
-	String name = e->token.string;
-
-	AstPackage *pkg = e->pkg;
-	GB_ASSERT_MSG(pkg != nullptr, "Missing package for '%.*s'", LIT(name));
-	String pkgn = pkg->name;
-	GB_ASSERT(!rune_is_digit(pkgn[0]));
-	if (pkgn == "llvm") {
-		pkgn = str_lit("llvm$");
-	}
-
-	isize max_len = pkgn.len + 1 + name.len + 1;
-	bool require_suffix_id = is_type_polymorphic(e->type, true);
-
-	if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0) {
-		require_suffix_id = true;
-	} else if (is_blank_ident(e->token)) {
-		require_suffix_id = true;
-	}if (e->flags & EntityFlag_NotExported) {
-		require_suffix_id = true;
-	}
-
-	if (require_suffix_id) {
-		max_len += 21;
-	}
-
-	char *new_name = gb_alloc_array(permanent_allocator(), char, max_len);
-	isize new_name_len = gb_snprintf(
-		new_name, max_len,
-		"%.*s" ABI_PKG_NAME_SEPARATOR "%.*s", LIT(pkgn), LIT(name)
-	);
-	if (require_suffix_id) {
-		char *str = new_name + new_name_len-1;
-		isize len = max_len-new_name_len;
-		isize extra = gb_snprintf(str, len, "-%llu", cast(unsigned long long)e->id);
-		new_name_len += extra-1;
-	}
-
-	String mangled_name = make_string((u8 const *)new_name, new_name_len-1);
-	return mangled_name;
-}
-
-gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedure *p, lbModule *module) {
-	// NOTE(bill, 2020-03-08): A polymorphic procedure may take a nested type declaration
-	// and as a result, the declaration does not have time to determine what it should be
-
-	GB_ASSERT(e != nullptr && e->kind == Entity_TypeName);
-	if (e->TypeName.ir_mangled_name.len != 0)  {
-		return e->TypeName.ir_mangled_name;
-	}
-	GB_ASSERT((e->scope->flags & ScopeFlag_File) == 0);
-
-	if (p == nullptr) {
-		Entity *proc = nullptr;
-		if (e->parent_proc_decl != nullptr) {
-			proc = e->parent_proc_decl->entity;
-		} else {
-			Scope *scope = e->scope;
-			while (scope != nullptr && (scope->flags & ScopeFlag_Proc) == 0) {
-				scope = scope->parent;
-			}
-			GB_ASSERT(scope != nullptr);
-			GB_ASSERT(scope->flags & ScopeFlag_Proc);
-			proc = scope->procedure_entity;
-		}
-		if (proc != nullptr) {
-			GB_ASSERT(proc->kind == Entity_Procedure);
-			if (proc->code_gen_procedure != nullptr) {
-				p = proc->code_gen_procedure;
-			}
-		}
-	}
-
-	// NOTE(bill): Generate a new name
-	// parent_proc.name-guid
-	String ts_name = e->token.string;
-
-	if (p != nullptr) {
-		isize name_len = p->name.len + 1 + ts_name.len + 1 + 10 + 1;
-		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-		u32 guid = 1+p->module->nested_type_name_guid.fetch_add(1);
-		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%u", LIT(p->name), LIT(ts_name), guid);
-
-		String name = make_string(cast(u8 *)name_text, name_len-1);
-		e->TypeName.ir_mangled_name = name;
-		return name;
-	} else {
-		// NOTE(bill): a nested type be required before its parameter procedure exists. Just give it a temp name for now
-		isize name_len = 9 + 1 + ts_name.len + 1 + 10 + 1;
-		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-		static std::atomic<u32> guid;
-		name_len = gb_snprintf(name_text, name_len, "_internal" ABI_PKG_NAME_SEPARATOR "%.*s-%u", LIT(ts_name), 1+guid.fetch_add(1));
-
-		String name = make_string(cast(u8 *)name_text, name_len-1);
-		e->TypeName.ir_mangled_name = name;
-		return name;
-	}
-}
-
-gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
+gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 	GB_ASSERT(m != nullptr);
-	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
-		return e->TypeName.ir_mangled_name;
-	}
 	GB_ASSERT(e != nullptr);
+	if (e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
+		return e->TypeName.ir_mangled_name;
+	} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len != 0) {
+		return e->Procedure.link_name;
+	}
 
 	if (e->pkg == nullptr) {
 		return e->token.string;
 	}
 
-	if (e->kind == Entity_TypeName && (e->scope->flags & ScopeFlag_File) == 0) {
-		return lb_set_nested_type_name_ir_mangled_name(e, nullptr, m);
-	}
+	gbString w = string_canonical_entity_name(heap_allocator(), e);
+	defer (gb_string_free(w));
 
-	String name = {};
-
-	bool no_name_mangle = false;
-
-	if (e->kind == Entity_Variable) {
-		bool is_foreign = e->Variable.is_foreign;
-		bool is_export  = e->Variable.is_export;
-		no_name_mangle = e->Variable.link_name.len > 0 || is_foreign || is_export;
-		if (e->Variable.link_name.len > 0) {
-			return e->Variable.link_name;
-		}
-	} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
-		return e->Procedure.link_name;
-	} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
-		no_name_mangle = true;
-	}
-
-	if (!no_name_mangle) {
-		name = lb_mangle_name(e);
-	}
-	if (name.len == 0) {
-		name = e->token.string;
-	}
+	String name = copy_string(permanent_allocator(), make_string(cast(u8 const *)w, gb_string_length(w)));
 
 	if (e->kind == Entity_TypeName) {
 		e->TypeName.ir_mangled_name = name;
 	} else if (e->kind == Entity_Procedure) {
 		e->Procedure.link_name = name;
+	} else if (e->kind == Entity_Variable) {
+		e->Variable.link_name = name;
 	}
 
 	return name;
@@ -2869,6 +2751,8 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	pl->decl->code_gen_module = m;
 	e->decl_info = pl->decl;
 	pl->decl->entity = e;
+	e->parent_proc_decl = pl->decl->parent;
+	e->Procedure.is_anonymous = true;
 	e->flags |= EntityFlag_ProcBodyChecked;
 
 	lbProcedure *p = lb_create_procedure(m, e);

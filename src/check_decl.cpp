@@ -1742,8 +1742,8 @@ gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
 			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
 			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
 
-			for (Type *t : decl->type_info_deps) {
-				ptr_set_add(&decl->parent->type_info_deps, t);
+			for (auto const &tt : decl->type_info_deps) {
+				type_set_add(&decl->parent->type_info_deps, tt);
 			}
 
 			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
@@ -1783,6 +1783,10 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_decl = decl;
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
+
+	if (decl->parent && decl->entity && decl->parent->entity) {
+		decl->entity->parent_proc_decl = decl->parent;
+	}
 
 	if (ctx->pkg->name != "runtime") {
 		switch (type->Proc.calling_convention) {
@@ -1873,6 +1877,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	check_open_scope(ctx, body);
 	{
+		ctx->scope->decl_info = decl;
+
 		for (auto const &entry : using_entities) {
 			Entity *uvar = entry.uvar;
 			Entity *prev = scope_insert(ctx->scope, uvar);

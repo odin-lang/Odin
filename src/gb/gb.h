@@ -5856,7 +5856,7 @@ gb_inline isize gb_fprintf_va(struct gbFile *f, char const *fmt, va_list va) {
 
 
 gb_inline char *gb_bprintf_va(char const *fmt, va_list va) {
-	gb_local_persist char buffer[4096];
+	gb_thread_local gb_local_persist char buffer[4096];
 	gb_snprintf_va(buffer, gb_size_of(buffer), fmt, va);
 	return buffer;
 }
