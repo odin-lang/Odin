@@ -971,6 +971,13 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 	if (t->kind == Type_Struct) {
 		auto field_remapping = lb_get_struct_remapping(m, t);
 		return field_remapping[index];
+	} else if (is_type_any(t) && build_context.ptr_size == 4) {
+		GB_ASSERT(t->kind == Type_Basic);
+		GB_ASSERT(t->Basic.kind == Basic_any);
+		switch (index) {
+		case 0: return 0; // data
+		case 1: return 2; // id
+		}
 	} else if (build_context.ptr_size != build_context.int_size) {
 		switch (t->kind) {
 		case Type_Basic:

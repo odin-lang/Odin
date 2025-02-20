@@ -1784,11 +1784,20 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					return type;
 				}
 				type = LLVMStructCreateNamed(ctx, name);
-				LLVMTypeRef fields[2] = {
-					lb_type(m, t_rawptr),
-					lb_type(m, t_typeid),
-				};
-				LLVMStructSetBody(type, fields, 2, false);
+				if (build_context.ptr_size == 4) {
+					LLVMTypeRef fields[3] = {
+						lb_type(m, t_rawptr),
+						lb_type_padding_filler(m, build_context.ptr_size, build_context.ptr_size), // padding
+						lb_type(m, t_typeid),
+					};
+					LLVMStructSetBody(type, fields, 3, false);
+				} else {
+					LLVMTypeRef fields[2] = {
+						lb_type(m, t_rawptr),
+						lb_type(m, t_typeid),
+					};
+					LLVMStructSetBody(type, fields, 2, false);
+				}
 				return type;
 			}
 
