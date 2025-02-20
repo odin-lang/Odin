@@ -1801,7 +1801,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return type;
 			}
 
-		case Basic_typeid: return LLVMIntTypeInContext(m->ctx, 8*cast(unsigned)build_context.ptr_size);
+		case Basic_typeid: return LLVMIntTypeInContext(m->ctx, 64);
 
 		// Endian Specific Types
 		case Basic_i16le:  return LLVMInt16TypeInContext(ctx);
