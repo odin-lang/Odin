@@ -372,14 +372,14 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			if (e->pkg->name == "llvm") {
 				type_writer_appendc(w, "$");
 			}
-			type_writer_append_fmt(w, CANONICAL_NAME_SEPARATOR "[%.*s]" CANONICAL_NAME_SEPARATOR, LIT(file_name));
+			type_writer_append_fmt(w, CANONICAL_NAME_SEPARATOR "%.*s" CANONICAL_NAME_SEPARATOR, LIT(file_name));
 		}
 	} else {
 		GB_PANIC("TODO(bill): handle entity kind: %d", e->kind);
 	}
 	if (e->kind == Entity_Procedure && e->Procedure.is_anonymous) {
 		String file_name = filename_without_directory(e->file->fullpath);
-		type_writer_append_fmt(w, CANONICAL_ANON_PREFIX "[%.*s:%d]", LIT(file_name), e->token.pos.offset);
+		type_writer_append_fmt(w, CANONICAL_ANON_PREFIX "_%.*s:%d", LIT(file_name), e->token.pos.offset);
 	} else {
 		type_writer_append(w, e->token.string.text, e->token.string.len);
 	}
@@ -514,7 +514,7 @@ write_base_name:
 
 	if (write_scope_index_suffix) {
 		GB_ASSERT(e != nullptr && e->scope != nullptr);
-		type_writer_append_fmt(w, "[%d]", e->scope->index);
+		type_writer_append_fmt(w, CANONICAL_NAME_SEPARATOR "$%d", e->scope->index);
 	}
 
 	return;
