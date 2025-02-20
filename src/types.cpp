@@ -856,40 +856,6 @@ gb_internal void type_path_pop(TypePath *tp) {
 #define FAILURE_SIZE      0
 #define FAILURE_ALIGNMENT 0
 
-gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t);
-
-gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
-	if (t == nullptr) {
-		return true;
-	}
-	if (type_ptr_set_exists(s, t)) {
-		return true;
-	}
-	ptr_set_add(s, t);
-	return false;
-}
-
-gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
-	if (t == nullptr) {
-		return true;
-	}
-
-	if (ptr_set_exists(s, t)) {
-		return true;
-	}
-
-	// TODO(bill, 2019-10-05): This is very slow and it's probably a lot
-	// faster to cache types correctly
-	for (Type *f : *s) {
-		if (are_types_identical(t, f)) {
-			ptr_set_add(s, t);
-			return true;
-		}
-	}
-
-	return false;
-}
-
 gb_internal Type *base_type(Type *t) {
 	for (;;) {
 		if (t == nullptr) {

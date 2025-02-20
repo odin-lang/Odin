@@ -1446,8 +1446,8 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 
 
 	Ast *nil_seen = nullptr;
-	PtrSet<Type *> seen = {};
-	defer (ptr_set_destroy(&seen));
+	TypeSet seen = {};
+	defer (type_set_destroy(&seen));
 
 	for (Ast *stmt : bs->stmts) {
 		if (stmt->kind != Ast_CaseClause) {
@@ -1515,7 +1515,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					GB_PANIC("Unknown type to type switch statement");
 				}
 
-				if (type_ptr_set_update(&seen, y.type)) {
+				if (type_set_update(&seen, y.type)) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
@@ -1569,7 +1569,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		auto unhandled = array_make<Type *>(temporary_allocator(), 0, variants.count);
 
 		for (Type *t : variants) {
-			if (!type_ptr_set_exists(&seen, t)) {
+			if (!type_set_exists(&seen, t)) {
 				array_add(&unhandled, t);
 			}
 		}
