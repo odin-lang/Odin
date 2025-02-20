@@ -503,9 +503,9 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_rawptr,            BasicFlag_Pointer,                         -1, STR_LIT("rawptr")}},
 	{Type_Basic, {Basic_string,            BasicFlag_String,                          -1, STR_LIT("string")}},
 	{Type_Basic, {Basic_cstring,           BasicFlag_String,                          -1, STR_LIT("cstring")}},
-	{Type_Basic, {Basic_any,               0,                                         -1, STR_LIT("any")}},
+	{Type_Basic, {Basic_any,               0,                                         16, STR_LIT("any")}},
 
-	{Type_Basic, {Basic_typeid,            0,                                         -1, STR_LIT("typeid")}},
+	{Type_Basic, {Basic_typeid,            0,                                          8, STR_LIT("typeid")}},
 
 	// Endian
 	{Type_Basic, {Basic_i16le,  BasicFlag_Integer |                      BasicFlag_EndianLittle,  2, STR_LIT("i16le")}},
@@ -3700,7 +3700,7 @@ gb_internal i64 type_size_of(Type *t) {
 		switch (t->Basic.kind) {
 		case Basic_string:  size = 2*build_context.int_size; break;
 		case Basic_cstring: size = build_context.ptr_size;   break;
-		case Basic_any:     size = 2*build_context.ptr_size; break;
+		case Basic_any:     size = 16;                       break;
 		case Basic_typeid:  size = build_context.ptr_size;   break;
 
 		case Basic_int: case Basic_uint:
@@ -3763,7 +3763,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		switch (t->Basic.kind) {
 		case Basic_string:  return build_context.int_size;
 		case Basic_cstring: return build_context.ptr_size;
-		case Basic_any:     return build_context.ptr_size;
+		case Basic_any:     return 8;
 		case Basic_typeid:  return build_context.ptr_size;
 
 		case Basic_int: case Basic_uint:
@@ -4014,7 +4014,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		switch (kind) {
 		case Basic_string:  return 2*build_context.int_size;
 		case Basic_cstring: return build_context.ptr_size;
-		case Basic_any:     return 2*build_context.ptr_size;
+		case Basic_any:     return 16;
 		case Basic_typeid:  return build_context.ptr_size;
 
 		case Basic_int: case Basic_uint:
@@ -4251,7 +4251,7 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 				return 0;                      // data
 			case 1:
 				if (field_type_) *field_type_ = t_typeid;
-				return build_context.ptr_size; // id
+				return 8; // id
 			}
 		}
 		break;
@@ -4322,8 +4322,8 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 					}
 				} else if (t->Basic.kind == Basic_any) {
 					switch (index) {
-					case 0: t = t_type_info_ptr; break;
-					case 1: t = t_rawptr;        break;
+					case 0: t = t_rawptr; break;
+					case 1: t = t_typeid; break;
 					}
 				}
 				break;

@@ -6740,29 +6740,42 @@ gb_internal void check_parsed_files(Checker *c) {
 		}
 		array_sort(c->info.type_info_types, type_info_pair_cmp);
 
+		array_init(&c->info.type_info_types_hash_map, heap_allocator(), c->info.type_info_types.count*2 + 1);
 		map_reserve(&c->info.minimum_dependency_type_info_index_map, c->info.type_info_types.count);
 
-		for_array(i, c->info.type_info_types) {
-			auto const &tt = c->info.type_info_types[i];
-			bool exists = map_set_if_not_previously_exists(&c->info.minimum_dependency_type_info_index_map, tt.hash, i);
-			if (!exists) {
-				continue;
+		isize hash_map_len = c->info.type_info_types_hash_map.count;
+		for (auto const &tt : c->info.type_info_types) {
+			isize index = tt.hash % hash_map_len;
+			// NOTE(bill): no need for a sanity check since there
+			// will always be enough space for the entries
+			for (;;) {
+				if (index == 0 || c->info.type_info_types_hash_map[index].hash != 0) {
+					index = (index+1) % hash_map_len;
+					continue;
+				}
+				break;
 			}
-			for (auto const &entry : c->info.minimum_dependency_type_info_index_map) {
-				if (entry.key != tt.hash) {
-					continue;
+			c->info.type_info_types_hash_map[index] = tt;
+
+			bool exists = map_set_if_not_previously_exists(&c->info.minimum_dependency_type_info_index_map, tt.hash, index);
+			if (exists) {
+				for (auto const &entry : c->info.minimum_dependency_type_info_index_map) {
+					if (entry.key != tt.hash) {
+						continue;
+					}
+					auto const &other = c->info.type_info_types[entry.value];
+					if (are_types_identical_unique_tuples(tt.type, other.type)) {
+						continue;
+					}
+					gbString t = temp_canonical_string(tt.type);
+					gbString o = temp_canonical_string(other.type);
+					GB_PANIC("%s (%s) %llu vs %s (%s) %llu",
+					         type_to_string(tt.type, false),    t, cast(unsigned long long)tt.hash,
+					         type_to_string(other.type, false), o, cast(unsigned long long)other.hash);
 				}
-				auto const &other = c->info.type_info_types[entry.value];
-				if (are_types_identical_unique_tuples(tt.type, other.type)) {
-					continue;
-				}
-				gbString t = temp_canonical_string(tt.type);
-				gbString o = temp_canonical_string(other.type);
-				GB_PANIC("%s (%s) %llu vs %s (%s) %llu",
-				         type_to_string(tt.type, false),    t, cast(unsigned long long)tt.hash,
-				         type_to_string(other.type, false), o, cast(unsigned long long)other.hash);
 			}
 		}
+
 
 		GB_ASSERT(c->info.minimum_dependency_type_info_index_map.count <= c->info.type_info_types.count);
 	}
