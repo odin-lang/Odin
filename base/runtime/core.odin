@@ -442,10 +442,12 @@ Raw_Any :: struct {
 	data: rawptr,
 	id:   typeid,
 }
+#assert(size_of(Raw_Any) == size_of(any))
 
 Raw_Cstring :: struct {
 	data: [^]byte,
 }
+#assert(size_of(Raw_Cstring) == size_of(cstring))
 
 Raw_Soa_Pointer :: struct {
 	data:  rawptr,

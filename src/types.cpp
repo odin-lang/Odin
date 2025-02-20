@@ -3701,7 +3701,7 @@ gb_internal i64 type_size_of(Type *t) {
 		case Basic_string:  size = 2*build_context.int_size; break;
 		case Basic_cstring: size = build_context.ptr_size;   break;
 		case Basic_any:     size = 16;                       break;
-		case Basic_typeid:  size = build_context.ptr_size;   break;
+		case Basic_typeid:  size = 8;                        break;
 
 		case Basic_int: case Basic_uint:
 			size = build_context.int_size;
@@ -3764,7 +3764,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		case Basic_string:  return build_context.int_size;
 		case Basic_cstring: return build_context.ptr_size;
 		case Basic_any:     return 8;
-		case Basic_typeid:  return build_context.ptr_size;
+		case Basic_typeid:  return 8;
 
 		case Basic_int: case Basic_uint:
 			return build_context.int_size;
@@ -4015,7 +4015,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		case Basic_string:  return 2*build_context.int_size;
 		case Basic_cstring: return build_context.ptr_size;
 		case Basic_any:     return 16;
-		case Basic_typeid:  return build_context.ptr_size;
+		case Basic_typeid:  return 8;
 
 		case Basic_int: case Basic_uint:
 			return build_context.int_size;
