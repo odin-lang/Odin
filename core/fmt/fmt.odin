@@ -613,6 +613,10 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 			i += 1
 			width_index, _, index_ok := _arg_number(fmt, &i, len(args))
 
+			if !index_ok {
+				width_index, index_ok = error_check_arg(fi, false, unused_args^)
+			}
+
 			if index_ok {
 				unused_args^ -= {width_index}
 
@@ -637,6 +641,10 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 			if i < end && fmt[i] == '*' {
 				i += 1
 				precision_index, _, index_ok := _arg_number(fmt, &i, len(args))
+
+				if !index_ok {
+					precision_index, index_ok = error_check_arg(fi, false, unused_args^)
+				}
 
 				if index_ok {
 					unused_args^ -= {precision_index}
