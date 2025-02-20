@@ -387,7 +387,7 @@ gb_global Arena string_intern_arena = {};
 
 gb_internal char const *string_intern(char const *text, isize len) {
 	u64 hash = gb_fnv64a(text, len);
-	u64 key = hash ? hash : 1;
+	uintptr key = cast(uintptr)(hash ? hash : 1);
 	StringIntern **found = map_get(&string_intern_map, key);
 	if (found) {
 		for (StringIntern *it = *found; it != nullptr; it = it->next) {
