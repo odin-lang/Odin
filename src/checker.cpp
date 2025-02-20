@@ -1651,7 +1651,7 @@ gb_internal isize type_info_index(CheckerInfo *info, TypeInfoPair pair, bool err
 	mutex_lock(&info->minimum_dependency_type_info_mutex);
 
 	isize entry_index = -1;
-	uintptr hash = cast(uintptr)pair.hash;
+	u64 hash = pair.hash;
 	isize *found_entry_index = map_get(&info->minimum_dependency_type_info_index_map, hash);
 	if (found_entry_index) {
 		entry_index = *found_entry_index;
@@ -6744,12 +6744,12 @@ gb_internal void check_parsed_files(Checker *c) {
 
 		for_array(i, c->info.type_info_types) {
 			auto const &tt = c->info.type_info_types[i];
-			bool exists = map_set_if_not_previously_exists(&c->info.minimum_dependency_type_info_index_map, cast(uintptr)tt.hash, i);
+			bool exists = map_set_if_not_previously_exists(&c->info.minimum_dependency_type_info_index_map, tt.hash, i);
 			if (!exists) {
 				continue;
 			}
 			for (auto const &entry : c->info.minimum_dependency_type_info_index_map) {
-				if (entry.key != cast(uintptr)tt.hash) {
+				if (entry.key != tt.hash) {
 					continue;
 				}
 				auto const &other = c->info.type_info_types[entry.value];
