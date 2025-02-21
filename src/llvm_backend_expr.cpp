@@ -3004,7 +3004,16 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 
 		LLVMTypeRef mask_int_type = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*type_size_of(a)));
 		LLVMValueRef mask_int = LLVMBuildBitCast(p->builder, mask, mask_int_type, "");
-		res.value = LLVMBuildICmp(p->builder, LLVMIntNE, mask_int, LLVMConstNull(LLVMTypeOf(mask_int)), "");
+
+		switch (op_kind) {
+		case Token_CmpEq:
+			res.value = LLVMBuildICmp(p->builder, LLVMIntEQ, mask_int, LLVMConstInt(mask_int_type, U64_MAX, true), "");
+			break;
+		case Token_NotEq:
+			res.value = LLVMBuildICmp(p->builder, LLVMIntNE, mask_int, LLVMConstNull(mask_int_type), "");
+			break;
+		}
+
 		return res;
 
 	} else {
