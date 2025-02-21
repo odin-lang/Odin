@@ -5509,6 +5509,11 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			case Addressing_SwizzleVariable:
 				operand->mode = Addressing_SwizzleVariable;
 				break;
+			case Addressing_Value:
+				if (is_type_pointer(original_type)) {
+					operand->mode = Addressing_SwizzleVariable;
+				}
+				break;
 			}
 
 			if (array_type->kind == Type_SimdVector) {
