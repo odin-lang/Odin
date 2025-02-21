@@ -3154,9 +3154,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbModule *m = default_module;
 
 		{ // Add type info data
-			GB_ASSERT_MSG(info->minimum_dependency_type_info_index_map.count == info->type_info_types.count, "%tu vs %tu", info->minimum_dependency_type_info_index_map.count, info->type_info_types.count);
+			// GB_ASSERT_MSG(info->minimum_dependency_type_info_index_map.count == info->type_info_types.count, "%tu vs %tu", info->minimum_dependency_type_info_index_map.count, info->type_info_types.count);
 
-			isize max_type_info_count = info->minimum_dependency_type_info_index_map.count+1;
+			// isize max_type_info_count = info->minimum_dependency_type_info_index_map.count+1;
+			isize max_type_info_count = info->type_info_types_hash_map.count;
 			Type *t = alloc_type_array(t_type_info_ptr, max_type_info_count);
 
 			// IMPORTANT NOTE(bill): As LLVM does not have a union type, an array of unions cannot be initialized

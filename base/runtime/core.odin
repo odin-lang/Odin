@@ -239,47 +239,6 @@ Type_Info :: struct {
 	},
 }
 
-// NOTE(bill): This must match the compiler's
-Typeid_Kind :: enum u8 {
-	Invalid,
-	Integer,
-	Rune,
-	Float,
-	Complex,
-	Quaternion,
-	String,
-	Boolean,
-	Any,
-	Type_Id,
-	Pointer,
-	Multi_Pointer,
-	Procedure,
-	Array,
-	Enumerated_Array,
-	Dynamic_Array,
-	Slice,
-	Tuple,
-	Struct,
-	Union,
-	Enum,
-	Map,
-	Bit_Set,
-	Simd_Vector,
-	Matrix,
-	Soa_Pointer,
-	Bit_Field,
-}
-#assert(len(Typeid_Kind) < 32)
-
-Typeid_Bit_Field :: bit_field uintptr {
-	index:    uintptr     | 8*size_of(uintptr) - 8,
-	kind:     Typeid_Kind | 5, // Typeid_Kind
-	named:    bool        | 1,
-	special:  bool        | 1, // signed, cstring, etc
-	reserved: bool        | 1,
-}
-#assert(size_of(Typeid_Bit_Field) == size_of(uintptr))
-
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
 type_table: []^Type_Info
@@ -483,10 +442,12 @@ Raw_Any :: struct {
 	data: rawptr,
 	id:   typeid,
 }
+#assert(size_of(Raw_Any) == size_of(any))
 
 Raw_Cstring :: struct {
 	data: [^]byte,
 }
+#assert(size_of(Raw_Cstring) == size_of(cstring))
 
 Raw_Soa_Pointer :: struct {
 	data:  rawptr,
@@ -686,13 +647,16 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 type_info_base_without_enum :: type_info_core
 
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
-	MASK :: 1<<(8*size_of(typeid) - 8) - 1
-	data := transmute(uintptr)id
-	n := int(data & MASK)
-	if n < 0 || n >= len(type_table) {
-		n = 0
+	n := u64(len(type_table))
+	i := transmute(u64)id % n
+	for _ in 0..<n {
+		ptr := type_table[i]
+		if ptr != nil && ptr.id == id {
+			return ptr
+		}
+		i = i+1 if i+1 < n else 0
 	}
-	return type_table[n]
+	return type_table[0]
 }
 
 when !ODIN_NO_RTTI {
