@@ -7,10 +7,11 @@ package net
 */
 
 /*
-	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
-	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
-	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
-	Copyright 2024 Feoramund       <rune@swevencraft.org>.
+	Copyright 2022 Tetralux             <tetraluxonpc@gmail.com>
+	Copyright 2022 Colin Davidson       <colrdavidson@gmail.com>
+	Copyright 2022 Jeroen van Rijn      <nom@duclavier.com>.
+	Copyright 2024 Feoramund            <rune@swevencraft.org>.
+	Copyright 2025 Christiano Haesbaert <haesbaert@haesbaert.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
@@ -18,12 +19,14 @@ package net
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 		Feoramund:       FreeBSD platform code
+		Haesbaert:       Security fixes
 */
 
 import "core:mem"
 import "core:strings"
 import "core:time"
 import "core:os"
+import "core:math/rand"
 /*
 	Default configuration for DNS resolution.
 */
@@ -227,7 +230,7 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	}
 
 	hdr := DNS_Header{
-		id = 0,
+		id = u16be(rand.uint32()),
 		is_response = false,
 		opcode = 0,
 		is_authoritative = false,
@@ -272,16 +275,22 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 			return nil, .Connection_Error
 		}
 
-		recv_sz, _ := recv_udp(conn, dns_response_buf[:]) or_continue
+		recv_sz, src := recv_udp(conn, dns_response_buf[:]) or_continue
 		if recv_sz == 0 {
+			continue
+		}
+		if src != name_server {
 			continue
 		}
 
 		dns_response = dns_response_buf[:recv_sz]
 
-		rsp, _ok := parse_response(dns_response, type)
+		rsp, xid, _ok := parse_response(dns_response, type)
 		if !_ok {
 			return nil, .Server_Error
+		}
+		if id != xid {
+			continue
 		}
 
 		if len(rsp) == 0 {
@@ -803,7 +812,7 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 	- Data[]
 */
 
-parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
+parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator := context.allocator) -> (records: []DNS_Record, xid: u16be, ok: bool) {
 	context.allocator = allocator
 
 	HEADER_SIZE_BYTES :: 12
@@ -816,11 +825,13 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 	dns_hdr_chunks := mem.slice_data_cast([]u16be, response[:HEADER_SIZE_BYTES])
 	hdr := unpack_dns_header(dns_hdr_chunks[0], dns_hdr_chunks[1])
 	if !hdr.is_response {
+		delete(_records)
 		return
 	}
 
 	question_count := int(dns_hdr_chunks[2])
 	if question_count != 1 {
+		delete(_records)
 		return
 	}
 	answer_count := int(dns_hdr_chunks[3])
@@ -872,6 +883,7 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 			append(&_records, rec)
 		}
 	}
+	xid = hdr.id
 
-	return _records[:], true
+	return _records[:], xid, true
 }
