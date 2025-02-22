@@ -234,6 +234,154 @@ arena_free_all :: proc(a: ^Arena) {
 	a.offset = 0
 }
 
+/*
+Resize an allocation.
+
+This procedure resizes a memory region, specified by `old_data`, to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any
+is not explicityly zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `arena_alloc_bytes_non_zeroed()`,
+allocating a memory region `size` bytes in size, aligned on a boundary specified
+by `alignment`.
+
+If `size` is 0 and there is no memory allocated after the `old_data`, this procedure
+will free the memory.
+
+This procedure returns the slice of the resized memory region.
+*/
+arena_resize_bytes_non_zeroed :: proc(
+	a:         ^Arena,
+	old_data:  []byte,
+	size:      int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	if old_data == nil {
+		return arena_alloc_bytes_non_zeroed(a, size, loc=loc)
+	}
+	if size == len(old_data) {
+		return old_data, nil
+	}
+
+	old_data_offset := cast(int)(cast(uintptr)raw_data(old_data) - cast(uintptr)raw_data(a.data))
+	if a.offset - len(old_data) == old_data_offset {
+		if size == 0 {
+			a.offset = old_data_offset
+			return nil, nil
+		}
+
+		new_offset := old_data_offset + size
+		if new_offset > len(a.data) {
+			return old_data, .Out_Of_Memory
+		}
+
+		a.offset = new_offset
+		return a.data[old_data_offset:][:size], nil
+	} else {
+		if size == 0 {
+			return nil, nil
+		}
+		new_data, err := arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
+		if err != nil {
+			return old_data, nil
+		}
+		copy_non_overlapping(raw_data(new_data), raw_data(old_data), len(old_data))
+		return new_data, nil
+	}
+}
+
+/*
+Resize an allocation.
+
+This procedure resizes a memory region, specified by `old_data` and `old_size`,
+to have a size `size` and alignment `alignment`. The newly allocated memory,
+if any is not explicityly zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `arena_alloc_non_zeroed()`,
+allocating a memory region `size` bytes in size, aligned on a boundary specified
+by `alignment`.
+
+If `size` is 0 and there is no memory allocated after the `old_data`, this procedure
+will free the memory.
+
+This procedure returns a raw pointer of the resized memory region.
+*/
+arena_resize_non_zeroed :: proc(
+	a:        ^Arena,
+	old_data: rawptr,
+	old_size: int,
+	size:     int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	bytes, err := arena_resize_bytes(a, byte_slice(old_data, old_size), size, alignment, loc)
+	return raw_data(bytes), err
+}
+
+/*
+Resize an allocation.
+
+This procedure resizes a memory region, specified by `old_data`, to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any
+is zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `arena_alloc_bytes()`,
+allocating a memory region `size` bytes in size, aligned on a boundary specified
+by `alignment`.
+
+If `size` is 0 and there is no memory allocated after the `old_data`, this procedure
+will free the memory.
+
+This procedure returns the slice of the resized memory region.
+*/
+@(require_results)
+arena_resize_bytes :: proc(
+	a:        ^Arena,
+	old_data: []byte,
+	size:     int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	bytes, err := arena_resize_bytes_non_zeroed(a, old_data, size, alignment, loc)
+	if bytes != nil {
+		if old_data == nil {
+			zero_slice(bytes)
+		} else if size > len(old_data) {
+			zero_slice(bytes[len(old_data):])
+		}
+	}
+	return bytes, err
+}
+
+/*
+Resize an allocation.
+
+This procedure resizes a memory region, specified by `old_data` and `old_size`,
+to have a size `size` and alignment `alignment`. The newly allocated memory,
+if any is zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `arena_alloc()`,
+allocating a memory region `size` bytes in size, aligned on a boundary specified
+by `alignment`.
+
+If `size` is 0 and there is no memory allocated after the `old_data`, this procedure
+will free the memory.
+
+This procedure returns a raw pointer of the resized memory region.
+*/
+arena_resize :: proc(
+	a:        ^Arena,
+	old_data: rawptr,
+	old_size: int,
+	size:     int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	bytes, err := arena_resize_bytes(a, byte_slice(old_data, old_size), size, alignment, loc)
+	return raw_data(bytes), err
+}
+
 arena_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode:           Allocator_Mode,
@@ -254,9 +402,9 @@ arena_allocator_proc :: proc(
 	case .Free_All:
 		arena_free_all(arena)
 	case .Resize:
-		return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena), loc)
+		return arena_resize_bytes(arena, byte_slice(old_memory, old_size), size, alignment, loc)
 	case .Resize_Non_Zeroed:
-		return default_resize_bytes_align_non_zeroed(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena), loc)
+		return arena_resize_bytes_non_zeroed(arena, byte_slice(old_memory, old_size), size, alignment, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
