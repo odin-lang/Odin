@@ -2859,15 +2859,23 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 	}
 	
 	if (generic_row == nullptr && row_count < MATRIX_ELEMENT_COUNT_MIN) {
-		gbString s = expr_to_string(row.expr);
-		error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
-		gb_string_free(s);
+		if (row.expr == nullptr) {
+			error(node, "Invalid matrix row count, got nothing");
+		} else {
+			gbString s = expr_to_string(row.expr);
+			error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			gb_string_free(s);
+		}
 	}
 	
 	if (generic_column == nullptr && column_count < MATRIX_ELEMENT_COUNT_MIN) {
-		gbString s = expr_to_string(column.expr);
-		error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
-		gb_string_free(s);
+		if (column.expr == nullptr) {
+			error(node, "Invalid matrix column count, got nothing");
+		} else {
+			gbString s = expr_to_string(column.expr);
+			error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			gb_string_free(s);
+		}
 	}
 	
 	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
