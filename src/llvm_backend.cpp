@@ -3185,8 +3185,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			isize count = 0;
 			isize offsets_extra = 0;
 
-			for (auto const &tt : m->info->type_info_types) {
+			for (auto const &tt : m->info->type_info_types_hash_map) {
 				Type *t = tt.type;
+				if (t == nullptr) {
+					continue;
+				}
 				isize index = lb_type_info_index(m->info, t, false);
 				if (index < 0) {
 					continue;

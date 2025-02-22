@@ -5,8 +5,8 @@ gb_internal isize lb_type_info_index(CheckerInfo *info, TypeInfoPair pair, bool 
 		return index;
 	}
 	if (err_on_not_found) {
-		gb_printf_err("NOT FOUND lb_type_info_index:\n\t%s\n\t@ index %td\n\tmax count: %u\nFound:\n", type_to_string(pair.type), index, info->minimum_dependency_type_info_index_map.count);
-		for (auto const &entry : info->minimum_dependency_type_info_index_map) {
+		gb_printf_err("NOT FOUND lb_type_info_index:\n\t%s\n\t@ index %td\n\tmax count: %u\nFound:\n", type_to_string(pair.type), index, info->min_dep_type_info_index_map.count);
+		for (auto const &entry : info->min_dep_type_info_index_map) {
 			isize type_info_index = entry.key;
 			gb_printf_err("\t%s\n", type_to_string(info->type_info_types_hash_map[type_info_index].type));
 		}

@@ -1372,9 +1372,8 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	// map_init(&i->gen_procs);
 	map_init(&i->gen_types);
 
-	array_init(&i->type_info_types, a);
 	type_set_init(&i->min_dep_type_info_set);
-	map_init(&i->minimum_dependency_type_info_index_map);
+	map_init(&i->min_dep_type_info_index_map);
 
 	// map_init(&i->type_info_map);
 	string_map_init(&i->files);
@@ -1410,9 +1409,8 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	// map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
 
-	array_free(&i->type_info_types);
 	type_set_destroy(&i->min_dep_type_info_set);
-	map_destroy(&i->minimum_dependency_type_info_index_map);
+	map_destroy(&i->min_dep_type_info_index_map);
 
 	string_map_destroy(&i->files);
 	string_map_destroy(&i->packages);
@@ -1652,7 +1650,7 @@ gb_internal isize type_info_index(CheckerInfo *info, TypeInfoPair pair, bool err
 
 	isize entry_index = -1;
 	u64 hash = pair.hash;
-	isize *found_entry_index = map_get(&info->minimum_dependency_type_info_index_map, hash);
+	isize *found_entry_index = map_get(&info->min_dep_type_info_index_map, hash);
 	if (found_entry_index) {
 		entry_index = *found_entry_index;
 	}
@@ -6735,16 +6733,20 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("initialize and check for collisions in type info array");
 	{
-		for (auto const &tt : c->info.min_dep_type_info_set) {
-			array_add(&c->info.type_info_types, tt);
-		}
-		array_sort(c->info.type_info_types, type_info_pair_cmp);
+		Array<TypeInfoPair> type_info_types; // sorted after filled
+		array_init(&type_info_types, heap_allocator());
+		defer (array_free(&type_info_types));
 
-		array_init(&c->info.type_info_types_hash_map, heap_allocator(), c->info.type_info_types.count*2 + 1);
-		map_reserve(&c->info.minimum_dependency_type_info_index_map, c->info.type_info_types.count);
+		for (auto const &tt : c->info.min_dep_type_info_set) {
+			array_add(&type_info_types, tt);
+		}
+		array_sort(type_info_types, type_info_pair_cmp);
+
+		array_init(&c->info.type_info_types_hash_map, heap_allocator(), type_info_types.count*2 + 1);
+		map_reserve(&c->info.min_dep_type_info_index_map, type_info_types.count);
 
 		isize hash_map_len = c->info.type_info_types_hash_map.count;
-		for (auto const &tt : c->info.type_info_types) {
+		for (auto const &tt : type_info_types) {
 			isize index = tt.hash % hash_map_len;
 			// NOTE(bill): no need for a sanity check since there
 			// will always be enough space for the entries
@@ -6757,13 +6759,13 @@ gb_internal void check_parsed_files(Checker *c) {
 			}
 			c->info.type_info_types_hash_map[index] = tt;
 
-			bool exists = map_set_if_not_previously_exists(&c->info.minimum_dependency_type_info_index_map, tt.hash, index);
+			bool exists = map_set_if_not_previously_exists(&c->info.min_dep_type_info_index_map, tt.hash, index);
 			if (exists) {
-				for (auto const &entry : c->info.minimum_dependency_type_info_index_map) {
+				for (auto const &entry : c->info.min_dep_type_info_index_map) {
 					if (entry.key != tt.hash) {
 						continue;
 					}
-					auto const &other = c->info.type_info_types[entry.value];
+					auto const &other = type_info_types[entry.value];
 					if (are_types_identical_unique_tuples(tt.type, other.type)) {
 						continue;
 					}
@@ -6777,7 +6779,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		}
 
 
-		GB_ASSERT(c->info.minimum_dependency_type_info_index_map.count <= c->info.type_info_types.count);
+		GB_ASSERT(c->info.min_dep_type_info_index_map.count <= type_info_types.count);
 	}
 
 

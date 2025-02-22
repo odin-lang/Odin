@@ -429,9 +429,8 @@ struct CheckerInfo {
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
 	BlockingMutex minimum_dependency_type_info_mutex;
-	PtrMap</*type info hash*/u64, /*min dep index*/isize> minimum_dependency_type_info_index_map;
-	TypeSet min_dep_type_info_set;
-	Array<TypeInfoPair> type_info_types; // sorted after filled
+	PtrMap</*type info hash*/u64, /*min dep index*/isize> min_dep_type_info_index_map;
+	TypeSet             min_dep_type_info_set;
 	Array<TypeInfoPair> type_info_types_hash_map; // 2 * type_info_types.count
 
 
