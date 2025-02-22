@@ -4342,33 +4342,132 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 	}
 
 
-	if (f->curr_token.kind == Token_Colon) {
-		if (f->prev_token.kind == Token_Comma) {
-			syntax_error(f->prev_token, "Trailing comma before a colon is not allowed");
+	if (f->curr_token.kind != Token_Colon) {
+		// NOTE(bill): proc(Type, Type, Type)
+		for (AstAndFlags const &item : list) {
+			Ast *type = item.node;
+			Token token = blank_token;
+			if (allowed_flags&FieldFlag_Results) {
+				// NOTE(bill): Make this nothing and not `_`
+				token.string = str_lit("");
+			}
+
+			auto names = array_make<Ast *>(ast_allocator(f), 1);
+			token.pos = ast_token(type).pos;
+			names[0] = ast_ident(f, token);
+			u32 flags = check_field_prefixes(f, list.count, allowed_flags, item.flags);
+			Token tag = {};
+			Ast *param = ast_field(f, names, item.node, nullptr, flags, tag, docs, f->line_comment);
+			array_add(&params, param);
 		}
-		Array<Ast *> names = convert_to_ident_list(f, list, true, allow_poly_names); // Copy for semantic reasons
+
+		if (name_count_) *name_count_ = total_name_count;
+		return ast_field_list(f, start_token, params);
+	}
+
+	// NOTE(bill): proc(ident, ident, ident: Type)
+
+	if (f->prev_token.kind == Token_Comma) {
+		syntax_error(f->prev_token, "Trailing comma before a colon is not allowed");
+	}
+	Array<Ast *> names = convert_to_ident_list(f, list, true, allow_poly_names); // Copy for semantic reasons
+	if (names.count == 0) {
+		syntax_error(f->curr_token, "Empty field declaration");
+	}
+	bool any_polymorphic_names = check_procedure_name_list(names);
+	u32 set_flags = 0;
+	if (list.count > 0) {
+		set_flags = list[0].flags;
+	}
+	set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
+	total_name_count += names.count;
+
+	Ast *type = nullptr;
+	Ast *default_value = nullptr;
+	Token tag = {};
+
+	expect_token_after(f, Token_Colon, "field list");
+	if (f->curr_token.kind != Token_Eq) {
+		type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
+		Ast *tt = unparen_expr(type);
+		if (tt == nullptr) {
+			syntax_error(f->prev_token, "Invalid type expression in field list");
+		} else if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+			syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
+		}
+	}
+
+	if (allow_token(f, Token_Eq)) {
+		default_value = parse_expr(f, false);
+		if (!allow_default_parameters) {
+			syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
+			default_value = nullptr;
+		}
+	}
+
+	if (default_value != nullptr && names.count > 1) {
+		syntax_error(f->curr_token, "Default parameters can only be applied to single values");
+	}
+
+	if (allowed_flags == FieldFlag_Struct && default_value != nullptr) {
+		syntax_error(default_value, "Default parameters are not allowed for structs");
+		default_value = nullptr;
+	}
+
+	if (type != nullptr && type->kind == Ast_Ellipsis) {
+		if (seen_ellipsis) syntax_error(type, "Extra variadic parameter after ellipsis");
+		seen_ellipsis = true;
+		if (names.count != 1) {
+			syntax_error(type, "Variadic parameters can only have one field name");
+		}
+	} else if (seen_ellipsis && default_value == nullptr) {
+		syntax_error(f->curr_token, "Extra parameter after ellipsis without a default value");
+	}
+
+	if (type != nullptr && default_value == nullptr) {
+		if (f->curr_token.kind == Token_String) {
+			tag = expect_token(f, Token_String);
+			if ((allowed_flags & FieldFlag_Tags) == 0) {
+				syntax_error(tag, "Field tags are only allowed within structures");
+			}
+		}
+	}
+
+	bool more_fields = allow_field_separator(f);
+	Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
+	array_add(&params, param);
+
+	if (!more_fields) {
+		if (name_count_) *name_count_ = total_name_count;
+		return ast_field_list(f, start_token, params);
+	}
+
+	while (f->curr_token.kind != follow &&
+	       f->curr_token.kind != Token_EOF &&
+	       f->curr_token.kind != Token_Semicolon) {
+		CommentGroup *docs = f->lead_comment;
+
+		if (!is_signature) parse_enforce_tabs(f);
+		u32 set_flags = parse_field_prefixes(f);
+		Token tag = {};
+		Array<Ast *> names = parse_ident_list(f, allow_poly_names);
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
+			break;
 		}
 		bool any_polymorphic_names = check_procedure_name_list(names);
-		u32 set_flags = 0;
-		if (list.count > 0) {
-			set_flags = list[0].flags;
-		}
 		set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
 		total_name_count += names.count;
 
 		Ast *type = nullptr;
 		Ast *default_value = nullptr;
-		Token tag = {};
-
 		expect_token_after(f, Token_Colon, "field list");
 		if (f->curr_token.kind != Token_Eq) {
 			type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 			Ast *tt = unparen_expr(type);
-			if (tt == nullptr) {
-				syntax_error(f->prev_token, "Invalid type expression in field list");
-			} else if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+			if (is_signature && !any_polymorphic_names &&
+			    tt != nullptr &&
+			    tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 				syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 			}
 		}
@@ -4383,11 +4482,6 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 
 		if (default_value != nullptr && names.count > 1) {
 			syntax_error(f->curr_token, "Default parameters can only be applied to single values");
-		}
-
-		if (allowed_flags == FieldFlag_Struct && default_value != nullptr) {
-			syntax_error(default_value, "Default parameters are not allowed for structs");
-			default_value = nullptr;
 		}
 
 		if (type != nullptr && type->kind == Ast_Ellipsis) {
@@ -4409,105 +4503,14 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 			}
 		}
 
-		bool more_fields = allow_field_separator(f);
+
+		bool ok = allow_field_separator(f);
 		Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
 		array_add(&params, param);
 
-		if (!more_fields) {
-			if (name_count_) *name_count_ = total_name_count;
-			return ast_field_list(f, start_token, params);
+		if (!ok) {
+			break;
 		}
-
-		while (f->curr_token.kind != follow &&
-		       f->curr_token.kind != Token_EOF &&
-		       f->curr_token.kind != Token_Semicolon) {
-			CommentGroup *docs = f->lead_comment;
-
-			if (!is_signature) parse_enforce_tabs(f);
-			u32 set_flags = parse_field_prefixes(f);
-			Token tag = {};
-			Array<Ast *> names = parse_ident_list(f, allow_poly_names);
-			if (names.count == 0) {
-				syntax_error(f->curr_token, "Empty field declaration");
-				break;
-			}
-			bool any_polymorphic_names = check_procedure_name_list(names);
-			set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
-			total_name_count += names.count;
-
-			Ast *type = nullptr;
-			Ast *default_value = nullptr;
-			expect_token_after(f, Token_Colon, "field list");
-			if (f->curr_token.kind != Token_Eq) {
-				type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
-				Ast *tt = unparen_expr(type);
-				if (is_signature && !any_polymorphic_names &&
-				    tt != nullptr &&
-				    tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
-					syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
-				}
-			}
-
-			if (allow_token(f, Token_Eq)) {
-				default_value = parse_expr(f, false);
-				if (!allow_default_parameters) {
-					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
-					default_value = nullptr;
-				}
-			}
-
-			if (default_value != nullptr && names.count > 1) {
-				syntax_error(f->curr_token, "Default parameters can only be applied to single values");
-			}
-
-			if (type != nullptr && type->kind == Ast_Ellipsis) {
-				if (seen_ellipsis) syntax_error(type, "Extra variadic parameter after ellipsis");
-				seen_ellipsis = true;
-				if (names.count != 1) {
-					syntax_error(type, "Variadic parameters can only have one field name");
-				}
-			} else if (seen_ellipsis && default_value == nullptr) {
-				syntax_error(f->curr_token, "Extra parameter after ellipsis without a default value");
-			}
-
-			if (type != nullptr && default_value == nullptr) {
-				if (f->curr_token.kind == Token_String) {
-					tag = expect_token(f, Token_String);
-					if ((allowed_flags & FieldFlag_Tags) == 0) {
-						syntax_error(tag, "Field tags are only allowed within structures");
-					}
-				}
-			}
-
-
-			bool ok = allow_field_separator(f);
-			Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
-			array_add(&params, param);
-
-			if (!ok) {
-				break;
-			}
-		}
-
-		if (name_count_) *name_count_ = total_name_count;
-		return ast_field_list(f, start_token, params);
-	}
-
-	for (AstAndFlags const &item : list) {
-		Ast *type = item.node;
-		Token token = blank_token;
-		if (allowed_flags&FieldFlag_Results) {
-			// NOTE(bill): Make this nothing and not `_`
-			token.string = str_lit("");
-		}
-
-		auto names = array_make<Ast *>(ast_allocator(f), 1);
-		token.pos = ast_token(type).pos;
-		names[0] = ast_ident(f, token);
-		u32 flags = check_field_prefixes(f, list.count, allowed_flags, item.flags);
-		Token tag = {};
-		Ast *param = ast_field(f, names, item.node, nullptr, flags, tag, docs, f->line_comment);
-		array_add(&params, param);
 	}
 
 	if (name_count_) *name_count_ = total_name_count;
