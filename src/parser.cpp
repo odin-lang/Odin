@@ -4343,6 +4343,9 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 
 
 	if (f->curr_token.kind == Token_Colon) {
+		if (f->prev_token.kind == Token_Comma) {
+			syntax_error(f->prev_token, "Trailing comma before a colon is not allowed");
+		}
 		Array<Ast *> names = convert_to_ident_list(f, list, true, allow_poly_names); // Copy for semantic reasons
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
