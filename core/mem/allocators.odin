@@ -285,7 +285,7 @@ arena_resize_bytes_non_zeroed :: proc(
 		}
 		new_data, err := arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
 		if err != nil {
-			return old_data, nil
+			return old_data, err
 		}
 		copy_non_overlapping(raw_data(new_data), raw_data(old_data), len(old_data))
 		return new_data, nil
