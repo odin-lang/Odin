@@ -277,6 +277,7 @@ arena_resize_bytes_non_zeroed :: proc(
 		}
 
 		a.offset = new_offset
+		a.peak_used = max(a.peak_used, a.offset)
 		return a.data[old_data_offset:][:size], nil
 	} else {
 		if size == 0 {
