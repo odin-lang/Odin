@@ -1554,7 +1554,7 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			lbValue cmp = lb_emit_comp_against_nil(p, be->op.kind, right);
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
-		} else if (lb_is_empty_string_constant(be->right)) {
+		} else if (lb_is_empty_string_constant(be->right) && !is_type_union(be->left->tav.type)) {
 			// `x == ""` or `x != ""`
 			lbValue s = lb_build_expr(p, be->left);
 			s = lb_emit_conv(p, s, t_string);
@@ -1562,7 +1562,7 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
-		} else if (lb_is_empty_string_constant(be->left)) {
+		} else if (lb_is_empty_string_constant(be->left) && !is_type_union(be->right->tav.type)) {
 			// `"" == x` or `"" != x`
 			lbValue s = lb_build_expr(p, be->right);
 			s = lb_emit_conv(p, s, t_string);
