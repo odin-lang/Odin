@@ -3110,6 +3110,17 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 			}
 		}
 		break;
+	case Type_Array: {
+			// For arrays where the element type is nil-comparable (like string),
+			// perform a memory comparison of the entire array.
+			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			lbValue lhs = lb_address_from_load_or_generate_local(p, x);
+			args[0] = lb_emit_conv(p, lhs, t_rawptr);
+			args[1] = lb_const_int(p->module, t_int, type_size_of(x.type));
+			lbValue mem_cmp = lb_emit_runtime_call(p, "memory_compare_zero", args);
+			return lb_emit_comp(p, op_kind, mem_cmp, lb_const_int(p->module, t_int, 0));
+	} break;
+		
 
 	case Type_DynamicArray:
 		{
