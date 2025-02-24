@@ -2087,6 +2087,9 @@ gb_internal bool is_type_sliceable(Type *t) {
 
 gb_internal Entity *type_get_polymorphic_parent(Type *t, Type **params_) {
 	t = base_type(t);
+	if (t == nullptr) {
+		return nullptr;
+	}
 	Type *parent = nullptr;
 	if (t->kind == Type_Struct) {
 		parent = t->Struct.polymorphic_parent;
