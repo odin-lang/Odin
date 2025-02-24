@@ -223,6 +223,32 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 	return &impl.file, nil
 }
 
+_clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
+	if f == nil || f.impl == nil {
+		return
+	}
+
+	dir_fd, relative, ok := match_preopen(name(f))
+	if !ok {
+		return nil, .Invalid_Path
+	}
+
+	fd, fderr := wasi.path_open(dir_fd, {.SYMLINK_FOLLOW}, relative, {}, {}, {}, {})
+	if fderr != nil {
+		err = _get_platform_error(fderr)
+		return
+	}
+	defer if err != nil { wasi.fd_close(fd) }
+
+	fderr = wasi.fd_renumber((^File_Impl)(f.impl).fd, fd)
+	if fderr != nil {
+		err = _get_platform_error(fderr)
+		return
+	}
+
+	return _new_file(uintptr(fd), name(f), file_allocator())
+}
+
 _close :: proc(f: ^File_Impl) -> (err: Error) {
 	if errno := wasi.fd_close(f.fd); errno != nil {
 		err = _get_platform_error(errno)

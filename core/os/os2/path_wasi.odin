@@ -60,16 +60,20 @@ _remove_all :: proc(path: string) -> (err: Error) {
 		dir := open(path) or_return
 		defer close(dir)
 
-		iter := read_directory_iterator_create(dir) or_return
+		iter := read_directory_iterator_create(dir)
 		defer read_directory_iterator_destroy(&iter)
 
 		for fi in read_directory_iterator(&iter) {
+			_ = read_directory_iterator_error(&iter) or_break
+
 			if fi.type == .Directory {
 				_remove_all(fi.fullpath) or_return
 			} else {
 				remove(fi.fullpath) or_return
 			}
 		}
+
+		_ = read_directory_iterator_error(&iter) or_return
 	}
 
 	return remove(path)

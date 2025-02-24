@@ -6,7 +6,6 @@ import "core:sys/posix"
 
 Read_Directory_Iterator_Impl :: struct {
 	dir:      posix.DIR,
-	idx:      int,
 	fullpath: [dynamic]byte,
 }
 
@@ -14,14 +13,16 @@ Read_Directory_Iterator_Impl :: struct {
 _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info, index: int, ok: bool) {
 	fimpl := (^File_Impl)(it.f.impl)
 
-	index = it.impl.idx
-	it.impl.idx += 1
+	index = it.index
+	it.index += 1
 
 	for {
+		posix.set_errno(nil)
 		entry := posix.readdir(it.impl.dir)
 		if entry == nil {
-			// NOTE(laytan): would be good to have an `error` field on the `Read_Directory_Iterator`
-			// There isn't a way to now know if it failed or if we are at the end.
+			if errno := posix.errno(); errno != nil {
+				read_directory_iterator_set_error(it, name(it.f), _get_platform_error(errno))
+			}
 			return
 		}
 
@@ -31,19 +32,20 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 		}
 		sname := string(cname)
 
-		stat: posix.stat_t
-		if posix.fstatat(posix.dirfd(it.impl.dir), cname, &stat, { .SYMLINK_NOFOLLOW }) != .OK {
-			// NOTE(laytan): would be good to have an `error` field on the `Read_Directory_Iterator`
-			// There isn't a way to now know if it failed or if we are at the end.
-			return
-		}
-
 		n := len(fimpl.name)+1
 		if err := non_zero_resize(&it.impl.fullpath, n+len(sname)); err != nil {
-			// Can't really tell caller we had an error, sad.
+			read_directory_iterator_set_error(it, sname, err)
+			ok = true
 			return
 		}
 		copy(it.impl.fullpath[n:], sname)
+
+		stat: posix.stat_t
+		if posix.fstatat(posix.dirfd(it.impl.dir), cname, &stat, { .SYMLINK_NOFOLLOW }) != .OK {
+			read_directory_iterator_set_error(it, string(it.impl.fullpath[:]), _get_platform_error())
+			ok = true
+			return
+		}
 
 		fi = internal_stat(stat, string(it.impl.fullpath[:]))
 		ok = true
@@ -51,34 +53,41 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 	}
 }
 
-@(require_results)
-_read_directory_iterator_create :: proc(f: ^File) -> (iter: Read_Directory_Iterator, err: Error) {
+_read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 	if f == nil || f.impl == nil {
-		err = .Invalid_File
+		read_directory_iterator_set_error(it, "", .Invalid_File)
 		return
 	}
 
 	impl := (^File_Impl)(f.impl)
 
-	iter.f = f
-	iter.impl.idx = 0
+	// NOTE: Allow calling `init` to target a new directory with the same iterator.
+	it.impl.fullpath.allocator = file_allocator()
+	clear(&it.impl.fullpath)
+	if err := reserve(&it.impl.fullpath, len(impl.name)+128); err != nil {
+		read_directory_iterator_set_error(it, name(f), err)
+		return
+	}
 
-	iter.impl.fullpath = make([dynamic]byte, 0, len(impl.name)+128, file_allocator()) or_return
-	append(&iter.impl.fullpath, impl.name)
-	append(&iter.impl.fullpath, "/")
-	defer if err != nil { delete(iter.impl.fullpath) }
+	append(&it.impl.fullpath, impl.name)
+	append(&it.impl.fullpath, "/")
 
 	// `fdopendir` consumes the file descriptor so we need to `dup` it.
 	dupfd := posix.dup(impl.fd)
 	if dupfd == -1 {
-		err = _get_platform_error()
+		read_directory_iterator_set_error(it, name(f), _get_platform_error())
 		return
 	}
-	defer if err != nil { posix.close(dupfd) }
+	defer if it.err.err != nil { posix.close(dupfd) }
 
-	iter.impl.dir = posix.fdopendir(dupfd)
-	if iter.impl.dir == nil {
-		err = _get_platform_error()
+	// NOTE: Allow calling `init` to target a new directory with the same iterator.
+	if it.impl.dir != nil {
+		posix.closedir(it.impl.dir)
+	}
+
+	it.impl.dir = posix.fdopendir(dupfd)
+	if it.impl.dir == nil {
+		read_directory_iterator_set_error(it, name(f), _get_platform_error())
 		return
 	}
 
@@ -86,7 +95,7 @@ _read_directory_iterator_create :: proc(f: ^File) -> (iter: Read_Directory_Itera
 }
 
 _read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {
-	if it == nil || it.impl.dir == nil {
+	if it.impl.dir == nil {
 		return
 	}
 

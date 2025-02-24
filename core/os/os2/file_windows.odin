@@ -210,6 +210,29 @@ _new_file_buffered :: proc(handle: uintptr, name: string, buffer_size: uint) -> 
 	return
 }
 
+_clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
+	if f == nil || f.impl == nil {
+		return
+	}
+
+	clonefd: win32.HANDLE
+	process := win32.GetCurrentProcess()
+	if !win32.DuplicateHandle(
+		process,
+		win32.HANDLE(_fd(f)),
+		process,
+		&clonefd,
+		0,
+		false,
+		win32.DUPLICATE_SAME_ACCESS,
+	) {
+		err = _get_platform_error()
+		return
+	}
+	defer if err != nil { win32.CloseHandle(clonefd) }
+
+	return _new_file(uintptr(clonefd), name(f), file_allocator())
+}
 
 _fd :: proc(f: ^File) -> uintptr {
 	if f == nil || f.impl == nil {

@@ -113,6 +113,23 @@ _new_file :: proc(fd: uintptr, _: string, allocator: runtime.Allocator) -> (f: ^
 	return &impl.file, nil
 }
 
+_clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
+	if f == nil || f.impl == nil {
+		return
+	}
+
+	fd := (^File_Impl)(f.impl).fd
+
+	clonefd, errno := linux.dup(fd)
+	if errno != nil {
+		err = _get_platform_error(errno)
+		return
+	}
+	defer if err != nil { linux.close(clonefd) }
+
+	return _new_file(uintptr(clonefd), "", file_allocator())
+}
+
 
 @(require_results)
 _open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm := 0o777) -> (f: ^File, err: Error) {

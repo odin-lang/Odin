@@ -123,6 +123,11 @@ new_file :: proc(handle: uintptr, name: string) -> ^File {
 }
 
 @(require_results)
+clone :: proc(f: ^File) -> (^File, Error) {
+	return _clone(f)
+}
+
+@(require_results)
 fd :: proc(f: ^File) -> uintptr {
 	return _fd(f)
 }
