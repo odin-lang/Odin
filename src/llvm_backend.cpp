@@ -910,8 +910,6 @@ gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
 	lbValue res = {llvm_res, t_map_cell_info};
 
 	lbAddr addr = lb_add_global_generated_with_name(m, t_map_cell_info, res, lb_internal_gen_name_from_type("ggv$map_cell_info", type));
-
-	lb_add_global_generated(m, t_map_cell_info, res, nullptr);
 	lb_make_global_private_const(addr);
 
 	map_set(&m->map_cell_info_map, type, addr);
@@ -1278,7 +1276,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 			if (is_type_any(t)) {
 				// NOTE(bill): Edge case for 'any' type
 				Type *var_type = default_type(var.init.type);
-				lbAddr g = lb_add_global_generated(main_module, var_type, var.init);
+				gbString var_name = gb_string_make(permanent_allocator(), "__$global_any::");
+				gbString e_str = string_canonical_entity_name(temporary_allocator(), e);
+				var_name = gb_string_append_length(var_name, e_str, gb_strlen(e_str));
+				lbAddr g = lb_add_global_generated_with_name(main_module, var_type, var.init, make_string_c(var_name));
 				lb_addr_store(p, g, var.init);
 				lbValue gp = lb_addr_get_ptr(p, g);
 
@@ -2819,7 +2820,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
 		Type *array_type = alloc_type_array(t_Internal_Test, m->info->testing_procedures.count);
 		Type *slice_type = alloc_type_slice(t_Internal_Test);
-		lbAddr all_tests_array_addr = lb_add_global_generated(p->module, array_type, {});
+		lbAddr all_tests_array_addr = lb_add_global_generated_with_name(p->module, array_type, {}, str_lit("__$all_tests_array"));
 		lbValue all_tests_array = lb_addr_get_ptr(p, all_tests_array_addr);
 
 		LLVMValueRef indices[2] = {};
