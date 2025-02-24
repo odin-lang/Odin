@@ -233,6 +233,16 @@ gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx
 }
 
 
+gb_internal String lb_internal_gen_proc_name_from_type(char const *prefix, Type *type) {
+	gbString str = gb_string_make(permanent_allocator(), prefix);
+	gbString tcs = temp_canonical_string(type);
+	str = gb_string_appendc(str, CANONICAL_TYPE_SEPARATOR);
+	str = gb_string_append_length(str, tcs, gb_string_length(tcs));
+	String proc_name = make_string(cast(u8 const *)str, gb_string_length(str));
+	return proc_name;
+}
+
+
 gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	type = base_type(type);
 	GB_ASSERT(is_type_comparable(type));
@@ -248,16 +258,8 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 		return {compare_proc->value, compare_proc->type};
 	}
 
-	static std::atomic<u32> proc_index;
 
-	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$equal%u", 1+proc_index.fetch_add(1));
-	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-	String proc_name = make_string_c(str);
-
-	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
-	map_set(&m->equal_procs, type, p);
-	lb_begin_procedure_body(p);
+	String proc_name = lb_internal_gen_proc_name_from_type("__$equal", type);
 
 	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
@@ -416,12 +418,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		return {(*found)->value, (*found)->type};
 	}
 
-	static std::atomic<u32> proc_index;
-
-	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$hasher%u", 1+proc_index.fetch_add(1));
-	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-	String proc_name = make_string_c(str);
+	String proc_name = lb_internal_gen_proc_name_from_type("__$hasher", type);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_hasher_proc);
 	map_set(&m->hasher_procs, type, p);
@@ -583,12 +580,8 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
-	static std::atomic<u32> proc_index;
 
-	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$map_get-%u", 1+proc_index.fetch_add(1));
-	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-	String proc_name = make_string_c(str);
+	String proc_name = lb_internal_gen_proc_name_from_type("__$map_get", type);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_get_proc);
 	map_set(&m->map_get_procs, type, p);
@@ -764,12 +757,8 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
-	static std::atomic<u32> proc_index;
 
-	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$map_set-%u", 1+proc_index.fetch_add(1));
-	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-	String proc_name = make_string_c(str);
+	String proc_name = lb_internal_gen_proc_name_from_type("__$map_set", type);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_set_proc);
 	map_set(&m->map_set_procs, type, p);

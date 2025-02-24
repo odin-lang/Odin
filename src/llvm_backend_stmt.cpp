@@ -5,8 +5,6 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 
 	auto *min_dep_set = &p->module->info->minimum_dependency_set;
 
-	static i32 global_guid = 0;
-
 	for (Ast *ident : vd->names) {
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
