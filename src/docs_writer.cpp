@@ -16,6 +16,8 @@ gb_global char const* OdinDocWriterState_strings[] {
 	"writing  ",
 };
 
+gb_global std::atomic<bool> g_in_doc_writer;
+
 struct OdinDocWriter {
 	CheckerInfo *info;
 	OdinDocWriterState state;
@@ -1137,6 +1139,8 @@ gb_internal void odin_doc_write_to_file(OdinDocWriter *w, char const *filename) 
 }
 
 gb_internal void odin_doc_write(CheckerInfo *info, char const *filename) {
+	g_in_doc_writer.store(true);
+
 	OdinDocWriter w_ = {};
 	OdinDocWriter *w = &w_;
 	defer (odin_doc_writer_destroy(w));
@@ -1152,4 +1156,11 @@ gb_internal void odin_doc_write(CheckerInfo *info, char const *filename) {
 	odin_doc_writer_end_writing(w);
 
 	odin_doc_write_to_file(w, filename);
+
+	g_in_doc_writer.store(false);
+}
+
+
+gb_internal bool is_in_doc_writer(void) {
+	return g_in_doc_writer.load();
 }
