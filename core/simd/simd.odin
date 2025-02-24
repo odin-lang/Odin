@@ -135,6 +135,9 @@ reduce_xor         :: intrinsics.simd_reduce_xor
 reduce_any         :: intrinsics.simd_reduce_any
 reduce_all         :: intrinsics.simd_reduce_all
 
+extract_lsbs       :: intrinsics.simd_extract_lsbs
+extract_msbs       :: intrinsics.simd_extract_msbs
+
 // swizzle :: proc(a: #simd[N]T, indices: ..int) -> #simd[len(indices)]T
 swizzle :: builtin.swizzle
 

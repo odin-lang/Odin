@@ -1564,6 +1564,34 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			return res;
 		}
 
+	case BuiltinProc_simd_extract_lsbs:
+	case BuiltinProc_simd_extract_msbs:
+		{
+			Type *vt = arg0.type;
+			GB_ASSERT(vt->kind == Type_SimdVector);
+
+			i64 elem_bits = 8*type_size_of(elem);
+			i64 num_elems = get_array_type_count(vt);
+
+			LLVMValueRef broadcast_value = arg0.value;
+			if (builtin_id == BuiltinProc_simd_extract_msbs) {
+				LLVMTypeRef word_type = lb_type(m, elem);
+				LLVMValueRef shift_value = llvm_splat_int(num_elems, word_type, elem_bits - 1);
+				broadcast_value = LLVMBuildAShr(p->builder, broadcast_value, shift_value, "");
+			}
+
+			LLVMTypeRef bitvec_type = LLVMVectorType(LLVMInt1TypeInContext(m->ctx), (unsigned)num_elems);
+			LLVMValueRef bitvec_value = LLVMBuildTrunc(p->builder, broadcast_value, bitvec_type, "");
+
+			LLVMTypeRef mask_type = LLVMIntTypeInContext(m->ctx, (unsigned)num_elems);
+			LLVMValueRef mask_value = LLVMBuildBitCast(p->builder, bitvec_value, mask_type, "");
+
+			LLVMTypeRef result_type = lb_type(m, res.type);
+			res.value = LLVMBuildZExtOrBitCast(p->builder, mask_value, result_type, "");
+
+			return res;
+		}
+
 
 	case BuiltinProc_simd_shuffle:
 		{
