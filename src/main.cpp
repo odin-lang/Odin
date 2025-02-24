@@ -3593,10 +3593,15 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.generate_docs) {
+		MAIN_TIME_SECTION("generate documentation");
 		if (global_error_collector.count != 0) {
 			return 1;
 		}
 		generate_documentation(checker);
+
+		if (build_context.show_timings) {
+			show_timings(checker, &global_timings);
+		}
 		return 0;
 	}
 
