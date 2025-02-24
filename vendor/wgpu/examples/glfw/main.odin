@@ -35,18 +35,18 @@ main :: proc() {
 	}
 	state.surface = os_get_surface(&state.os, state.instance)
 
-	wgpu.InstanceRequestAdapter(state.instance, &{ compatibleSurface = state.surface }, on_adapter, nil)
+	wgpu.InstanceRequestAdapter(state.instance, &{ compatibleSurface = state.surface }, { callback = on_adapter })
 
-	on_adapter :: proc "c" (status: wgpu.RequestAdapterStatus, adapter: wgpu.Adapter, message: cstring, userdata: rawptr) {
+	on_adapter :: proc "c" (status: wgpu.RequestAdapterStatus, adapter: wgpu.Adapter, message: string, userdata1: rawptr, userdata2: rawptr) {
 		context = state.ctx
 		if status != .Success || adapter == nil {
 			fmt.panicf("request adapter failure: [%v] %s", status, message)
 		}
 		state.adapter = adapter
-		wgpu.AdapterRequestDevice(adapter, nil, on_device)
+		wgpu.AdapterRequestDevice(adapter, nil, { callback = on_device })
 	}
 
-	on_device :: proc "c" (status: wgpu.RequestDeviceStatus, device: wgpu.Device, message: cstring, userdata: rawptr) {
+	on_device :: proc "c" (status: wgpu.RequestDeviceStatus, device: wgpu.Device, message: string, userdata1: rawptr, userdata2: rawptr) {
 		context = state.ctx
 		if status != .Success || device == nil {
 			fmt.panicf("request device failure: [%v] %s", status, message)
@@ -82,8 +82,8 @@ main :: proc() {
 	}`
 
 		state.module = wgpu.DeviceCreateShaderModule(state.device, &{
-			nextInChain = &wgpu.ShaderModuleWGSLDescriptor{
-				sType = .ShaderModuleWGSLDescriptor,
+			nextInChain = &wgpu.ShaderSourceWGSL{
+				sType = .ShaderSourceWGSL,
 				code  = shader,
 			},
 		})
@@ -130,8 +130,8 @@ frame :: proc "c" (dt: f32) {
 
 	surface_texture := wgpu.SurfaceGetCurrentTexture(state.surface)
 	switch surface_texture.status {
-	case .Success:
-		// All good, could check for `surface_texture.suboptimal` here.
+	case .SuccessOptimal, .SuccessSuboptimal:
+		// All good, could handle suboptimal here.
 	case .Timeout, .Outdated, .Lost:
 		// Skip this frame, and re-configure surface.
 		if surface_texture.texture != nil {
@@ -139,7 +139,7 @@ frame :: proc "c" (dt: f32) {
 		}
 		resize()
 		return
-	case .OutOfMemory, .DeviceLost:
+	case .OutOfMemory, .DeviceLost, .Error:
 		// Fatal error
 		fmt.panicf("[triangle] get_current_texture status=%v", surface_texture.status)
 	}

@@ -12,9 +12,9 @@ GetSurface :: proc(instance: wgpu.Instance, window: glfw.WindowHandle) -> wgpu.S
 	return wgpu.InstanceCreateSurface(
 		instance,
 		&wgpu.SurfaceDescriptor{
-			nextInChain = &wgpu.SurfaceDescriptorFromMetalLayer{
+			nextInChain = &wgpu.SurfaceSourceMetalLayer{
 				chain = wgpu.ChainedStruct{
-					sType = .SurfaceDescriptorFromMetalLayer,
+					sType = .SurfaceSourceMetalLayer,
 				},
 				layer = rawptr(metal_layer),
 			},

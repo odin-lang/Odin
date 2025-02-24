@@ -23,7 +23,7 @@ os_init :: proc(os: ^OS) {
 }
 
 os_run :: proc(os: ^OS) {
-    dt: f32
+	dt: f32
 
 	for !glfw.WindowShouldClose(os.window) {
 		start := time.tick_now()
