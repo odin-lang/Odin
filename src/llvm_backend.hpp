@@ -180,10 +180,7 @@ struct lbModule {
 
 	PtrMap<Type *, struct lbFunctionType *> function_type_map; 
 
-	PtrMap<Type *, lbProcedure *> equal_procs;
-	PtrMap<Type *, lbProcedure *> hasher_procs;
-	PtrMap<Type *, lbProcedure *> map_get_procs;
-	PtrMap<Type *, lbProcedure *> map_set_procs;
+	StringMap<lbProcedure *> gen_procs;   // key is the canonicalized name
 
 	std::atomic<u32> nested_type_name_guid;
 

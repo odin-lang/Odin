@@ -67,10 +67,7 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	string_map_init(&m->procedures);
 	string_map_init(&m->const_strings);
 	map_init(&m->function_type_map);
-	map_init(&m->equal_procs);
-	map_init(&m->hasher_procs);
-	map_init(&m->map_get_procs);
-	map_init(&m->map_set_procs);
+	string_map_init(&m->gen_procs);
 	if (USE_SEPARATE_MODULES) {
 		array_init(&m->procedures_to_generate, a, 0, 1<<10);
 		map_init(&m->procedure_values,               1<<11);

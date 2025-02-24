@@ -235,9 +235,9 @@ gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx
 
 gb_internal String lb_internal_gen_name_from_type(char const *prefix, Type *type) {
 	gbString str = gb_string_make(permanent_allocator(), prefix);
-	gbString tcs = temp_canonical_string(type);
-	str = gb_string_appendc(str, CANONICAL_TYPE_SEPARATOR);
-	str = gb_string_append_length(str, tcs, gb_string_length(tcs));
+	u64 hash = type_hash_canonical_type(type);
+	str = gb_string_appendc(str, "-");
+	str = gb_string_append_fmt(str, "%llu", cast(unsigned long long)hash);
 	String proc_name = make_string(cast(u8 const *)str, gb_string_length(str));
 	return proc_name;
 }
@@ -250,7 +250,8 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	Type *pt = alloc_type_pointer(type);
 	LLVMTypeRef ptr_type = lb_type(m, pt);
 
-	lbProcedure **found = map_get(&m->equal_procs, type);
+	String proc_name = lb_internal_gen_name_from_type("__$equal", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
 	lbProcedure *compare_proc = nullptr;
 	if (found) {
 		compare_proc = *found;
@@ -259,11 +260,11 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	}
 
 
-	String proc_name = lb_internal_gen_name_from_type("__$equal", type);
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
-	map_set(&m->equal_procs, type, p);
+	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
@@ -415,19 +416,19 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 
 	Type *pt = alloc_type_pointer(type);
 
-	lbProcedure **found = map_get(&m->hasher_procs, type);
+	String proc_name = lb_internal_gen_name_from_type("__$hasher", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
 	if (found) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
 
-	String proc_name = lb_internal_gen_name_from_type("__$hasher", type);
-
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_hasher_proc);
-	map_set(&m->hasher_procs, type, p);
+	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
@@ -577,17 +578,15 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Map);
 
-
-	lbProcedure **found = map_get(&m->map_get_procs, type);
+	String proc_name = lb_internal_gen_name_from_type("__$map_get", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
 	if (found) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
 
-	String proc_name = lb_internal_gen_name_from_type("__$map_get", type);
-
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_get_proc);
-	map_set(&m->map_get_procs, type, p);
+	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
@@ -754,17 +753,15 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Map);
 
-
-	lbProcedure **found = map_get(&m->map_set_procs, type);
+	String proc_name = lb_internal_gen_name_from_type("__$map_set", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
 	if (found) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
 
-	String proc_name = lb_internal_gen_name_from_type("__$map_set", type);
-
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_set_proc);
-	map_set(&m->map_set_procs, type, p);
+	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
@@ -1558,21 +1555,13 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		}
 	}
 
-	for (auto const &entry : m->equal_procs) {
+	for (auto const &entry : m->gen_procs) {
 		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p);
-	}
-	for (auto const &entry : m->hasher_procs) {
-		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p);
-	}
-	for (auto const &entry : m->map_get_procs) {
-		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p, lbFunctionPassManager_none);
-	}
-	for (auto const &entry : m->map_set_procs) {
-		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p, lbFunctionPassManager_none);
+		if (string_starts_with(p->name, str_lit("__$map"))) {
+			lb_llvm_function_pass_per_function_internal(m, p, lbFunctionPassManager_none);
+		} else {
+			lb_llvm_function_pass_per_function_internal(m, p);
+		}
 	}
 
 	return 0;
