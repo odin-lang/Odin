@@ -59,28 +59,20 @@ InstanceExtras :: struct {
 	flags: InstanceFlags,
 	dx12ShaderCompiler: Dx12Compiler,
 	gles3MinorVersion: Gles3MinorVersion,
-	dxilPath: cstring,
-	dxcPath: cstring,
+	dxilPath: StringView,
+	dxcPath: StringView,
 }
 
 DeviceExtras :: struct {
 	using chain: ChainedStruct,
-	tracePath: cstring,
+	tracePath: StringView,
 }
 
 NativeLimits :: struct {
+	/** This struct chain is used as mutable in some places and immutable in others. */
+	using chain: ChainedStructOut,
 	maxPushConstantSize: u32,
 	maxNonSamplerBindings: u32,
-}
-
-RequiredLimitsExtras :: struct {
-	using chain: ChainedStruct,
-	limits: NativeLimits,
-}
-
-SupportedLimitsExtras :: struct {
-	using chain: ChainedStructOut,
-	limits: NativeLimits,
 }
 
 PushConstantRange :: struct {
@@ -97,29 +89,29 @@ PipelineLayoutExtras :: struct {
 
 SubmissionIndex :: distinct u64
 
-WrappedSubmissionIndex :: struct {
-	queue: Queue,
-	submissionIndex: SubmissionIndex,
-}
-
 ShaderDefine :: struct {
-	name: cstring,
-	value: cstring,
+	name: StringView,
+	value: StringView,
 }
 
 ShaderModuleGLSLDescriptor :: struct {
 	using chain: ChainedStruct,
 	stage: ShaderStage,
-	code: cstring,
-	defineCount: uint,
+	code: StringView,
+	defineCount: u32,
 	defines: [^]ShaderDefine `fmt:"v,defineCount"`,
+}
+
+ShaderModuleDescriptorSpirV :: struct {
+	label: StringView,
+	sourceSize: u32,
+	source: /* const */ [^]u32 `fmt:"v,sourceSize"`,
 }
 
 RegistryReport :: struct {
 	numAllocated: uint,
 	numKeptFromUser: uint,
 	numReleasedFromUser: uint,
-	numErrors: uint,
 	elementSize: uint,
 }
 
@@ -135,6 +127,7 @@ HubReport :: struct {
 	renderBundles: RegistryReport,
 	renderPipelines: RegistryReport,
 	computePipelines: RegistryReport,
+	pipelineCaches: RegistryReport,
 	querySets: RegistryReport,
 	buffers: RegistryReport,
 	textures: RegistryReport,
@@ -144,11 +137,7 @@ HubReport :: struct {
 
 GlobalReport :: struct {
 	surfaces: RegistryReport,
-	backendType: BackendType,
-	vulkan: HubReport,
-	metal: HubReport,
-	dx12: HubReport,
-	gl: HubReport,
+	hub: HubReport,
 }
 
 InstanceEnumerateAdapterOptions :: struct {
@@ -179,10 +168,10 @@ QuerySetDescriptorExtras :: struct {
 
 SurfaceConfigurationExtras :: struct {
 	using chain: ChainedStruct,
-	desiredMaximumFrameLatency: i32,
+	desiredMaximumFrameLatency: u32,
 }
 
-LogCallback :: #type proc "c" (level: LogLevel, message: cstring, userdata: rawptr)
+LogCallback :: #type proc "c" (level: LogLevel, message: StringView, userdata: rawptr)
 
 // Wrappers
 
