@@ -330,30 +330,56 @@ gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, Ast *node
 	return lb_emit_source_code_location_const(p, proc_name, pos);
 }
 
+gb_internal String lb_source_code_location_gen_name(String const &procedure, TokenPos const &pos) {
+	gbString s = gb_string_make(permanent_allocator(), "scl$[");
+
+	s = gb_string_append_length(s, procedure.text, procedure.len);
+	if (pos.offset != 0) {
+		s = gb_string_append_fmt(s, "%d", pos.offset);
+	} else {
+		s = gb_string_append_fmt(s, "%d_%d", pos.line, pos.column);
+	}
+	s = gb_string_appendc(s, "]");
+
+	return make_string(cast(u8 const *)s, gb_string_length(s));
+}
+
+gb_internal String lb_source_code_location_gen_name(lbProcedure *p, Ast *node) {
+	String proc_name = {};
+	if (p->entity) {
+		proc_name = p->entity->token.string;
+	}
+	TokenPos pos = {};
+	if (node) {
+		pos = ast_token(node).pos;
+	}
+	return lb_source_code_location_gen_name(proc_name, pos);
+}
+
+
 
 gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const &procedure, TokenPos const &pos) {
 	lbValue loc = lb_emit_source_code_location_const(p, procedure, pos);
-	lbAddr addr = lb_add_global_generated(p->module, loc.type, loc, nullptr);
+	lbAddr addr = lb_add_global_generated_with_name(p->module, loc.type, loc, lb_source_code_location_gen_name(procedure, pos));
 	lb_make_global_private_const(addr);
 	return addr.addr;
 }
 
 gb_internal lbValue lb_const_source_code_location_as_global_ptr(lbModule *m, String const &procedure, TokenPos const &pos) {
 	lbValue loc = lb_const_source_code_location_const(m, procedure, pos);
-	lbAddr addr = lb_add_global_generated(m, loc.type, loc, nullptr);
+	lbAddr addr = lb_add_global_generated_with_name(m, loc.type, loc, lb_source_code_location_gen_name(procedure, pos));
 	lb_make_global_private_const(addr);
 	return addr.addr;
 }
-
-
-
 
 gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, Ast *node) {
 	lbValue loc = lb_emit_source_code_location_const(p, node);
-	lbAddr addr = lb_add_global_generated(p->module, loc.type, loc, nullptr);
+	lbAddr addr = lb_add_global_generated_with_name(p->module, loc.type, loc, lb_source_code_location_gen_name(p, node));
 	lb_make_global_private_const(addr);
 	return addr.addr;
 }
+
+
 
 gb_internal lbValue lb_emit_source_code_location_as_global(lbProcedure *p, String const &procedure, TokenPos const &pos) {
 	return lb_emit_load(p, lb_emit_source_code_location_as_global_ptr(p, procedure, pos));
