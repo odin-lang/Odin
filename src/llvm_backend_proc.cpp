@@ -2576,8 +2576,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		}
 	case BuiltinProc_ptr_sub:
 		{
-			Type *elem0 = type_deref(type_of_expr(ce->args[0]));
-			Type *elem1 = type_deref(type_of_expr(ce->args[1]));
+			Type *elem0 = type_deref(type_of_expr(ce->args[0]), true);
+			Type *elem1 = type_deref(type_of_expr(ce->args[1]), true);
 			GB_ASSERT(are_types_identical(elem0, elem1));
 			Type *elem = elem0;
 
