@@ -233,7 +233,7 @@ gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx
 }
 
 
-gb_internal String lb_internal_gen_proc_name_from_type(char const *prefix, Type *type) {
+gb_internal String lb_internal_gen_name_from_type(char const *prefix, Type *type) {
 	gbString str = gb_string_make(permanent_allocator(), prefix);
 	gbString tcs = temp_canonical_string(type);
 	str = gb_string_appendc(str, CANONICAL_TYPE_SEPARATOR);
@@ -259,7 +259,10 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	}
 
 
-	String proc_name = lb_internal_gen_proc_name_from_type("__$equal", type);
+	String proc_name = lb_internal_gen_name_from_type("__$equal", type);
+	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
+	map_set(&m->equal_procs, type, p);
+	lb_begin_procedure_body(p);
 
 	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
@@ -418,7 +421,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		return {(*found)->value, (*found)->type};
 	}
 
-	String proc_name = lb_internal_gen_proc_name_from_type("__$hasher", type);
+	String proc_name = lb_internal_gen_name_from_type("__$hasher", type);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_hasher_proc);
 	map_set(&m->hasher_procs, type, p);
@@ -581,7 +584,7 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 		return {(*found)->value, (*found)->type};
 	}
 
-	String proc_name = lb_internal_gen_proc_name_from_type("__$map_get", type);
+	String proc_name = lb_internal_gen_name_from_type("__$map_get", type);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_get_proc);
 	map_set(&m->map_get_procs, type, p);
@@ -758,7 +761,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		return {(*found)->value, (*found)->type};
 	}
 
-	String proc_name = lb_internal_gen_proc_name_from_type("__$map_set", type);
+	String proc_name = lb_internal_gen_name_from_type("__$map_set", type);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_set_proc);
 	map_set(&m->map_set_procs, type, p);
@@ -906,7 +909,9 @@ gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
 	LLVMValueRef llvm_res =  llvm_const_named_struct(m, t_map_cell_info, const_values, gb_count_of(const_values));
 	lbValue res = {llvm_res, t_map_cell_info};
 
-	lbAddr addr = lb_add_global_generated(m, t_map_cell_info, res, nullptr);
+	lbAddr addr = lb_add_global_generated_with_name(m, t_map_cell_info, res, lb_internal_gen_name_from_type("ggv$map_cell_info", type));
+
+	lb_add_global_generated(m, t_map_cell_info, res, nullptr);
 	lb_make_global_private_const(addr);
 
 	map_set(&m->map_cell_info_map, type, addr);
@@ -937,7 +942,7 @@ gb_internal lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type) {
 	LLVMValueRef llvm_res = llvm_const_named_struct(m, t_map_info, const_values, gb_count_of(const_values));
 	lbValue res = {llvm_res, t_map_info};
 
-	lbAddr addr = lb_add_global_generated(m, t_map_info, res, nullptr);
+	lbAddr addr = lb_add_global_generated_with_name(m, t_map_info, res, lb_internal_gen_name_from_type("ggv$map_info", map_type));
 	lb_make_global_private_const(addr);
 
 	map_set(&m->map_info_map, map_type, addr);

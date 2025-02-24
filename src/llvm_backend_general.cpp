@@ -2814,6 +2814,32 @@ gb_internal lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue valu
 	return lb_addr(g);
 }
 
+gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lbValue value, String name) {
+	GB_ASSERT(type != nullptr);
+	type = default_type(type);
+
+	isize max_len = 7+8+1;
+	u8 *str = cast(u8 *)gb_alloc_array(permanent_allocator(), u8, max_len);
+
+	Scope *scope = nullptr;
+	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
+	lbValue g = {};
+	g.type = alloc_type_pointer(type);
+	g.value = LLVMAddGlobal(m->mod, lb_type(m, type), cast(char const *)str);
+	if (value.value != nullptr) {
+		GB_ASSERT_MSG(LLVMIsConstant(value.value), LLVMPrintValueToString(value.value));
+		LLVMSetInitializer(g.value, value.value);
+	} else {
+		LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, type)));
+	}
+
+	lb_add_entity(m, e, g);
+	lb_add_member(m, name, g);
+
+	return lb_addr(g);
+}
+
+
 gb_internal lbValue lb_find_runtime_value(lbModule *m, String const &name) {
 	AstPackage *p = m->info->runtime_package;
 	Entity *e = scope_lookup_current(p->scope, name);
