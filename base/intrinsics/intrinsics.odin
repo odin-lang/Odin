@@ -285,6 +285,7 @@ simd_reduce_xor         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || t
 simd_reduce_any         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
 simd_reduce_all         :: proc(a: #simd[N]T) -> T where type_is_boolean(T) ---
 
+simd_extract_lsbs       :: proc(a: #simd[N]T) -> bit_set[0..<N] where type_is_integer(T) || type_is_boolean(T) ---
 simd_extract_msbs       :: proc(a: #simd[N]T) -> bit_set[0..<N] where type_is_integer(T) || type_is_boolean(T) ---
 
 
