@@ -19,7 +19,6 @@ default_random_generator :: runtime.default_random_generator
 @(require_results)
 create :: proc(seed: u64) -> (state: Default_Random_State) {
 	seed := seed
-	runtime.default_random_generator(&state)
 	runtime.default_random_generator_proc(&state, .Reset, ([^]byte)(&seed)[:size_of(seed)])
 	return
 }
