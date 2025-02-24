@@ -14,6 +14,6 @@ SavePanel_savePanel :: proc "c" () -> ^SavePanel {
 }
 
 @(objc_type=SavePanel, objc_name="URL")
-SavePanel_URL :: proc "c" (self: ^SavePanel) -> ^Array {
-	return msgSend(^Array, self, "URL")
+SavePanel_URL :: proc "c" (self: ^SavePanel) -> ^URL {
+	return msgSend(^URL, self, "URL")
 }
