@@ -3291,10 +3291,10 @@ IUserDefinedAnnotation :: struct #raw_union {
 }
 IUserDefinedAnnotation_VTable :: struct {
 	using iunknown_vtable : IUnknown_VTable,
-	BeginEvent: proc "stdcall" (this: ^IUserDefinedAnnotation, Name: LPCWSTR) -> i32,
-	EndEvent:   proc "stdcall" (this: ^IUserDefinedAnnotation) -> i32,
-	GetStatus:  proc "stdcall" (this: ^IUserDefinedAnnotation) -> i32,
-	SetMarker:  proc "stdcall" (this: ^IUserDefinedAnnotation, Name: LPCWSTR),
+	BeginEvent: proc "system" (this: ^IUserDefinedAnnotation, Name: LPCWSTR) -> i32,
+	EndEvent:   proc "system" (this: ^IUserDefinedAnnotation) -> i32,
+	GetStatus:  proc "system" (this: ^IUserDefinedAnnotation) -> i32,
+	SetMarker:  proc "system" (this: ^IUserDefinedAnnotation, Name: LPCWSTR),
 }
 
 IVideoDevice_UUID_STRING :: "10EC4D5B-975A-4689-B9E4-D0AAC30FE333"
