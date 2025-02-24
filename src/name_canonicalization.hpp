@@ -109,3 +109,20 @@ gb_internal TypeInfoPair *type_set_retrieve(TypeSet *s, Type *ptr);
 
 gb_internal TypeSetIterator begin(TypeSet &set) noexcept;
 gb_internal TypeSetIterator end(TypeSet &set) noexcept;
+
+
+template <typename V>
+gb_internal gb_inline V *map_get(PtrMap<u64, V> *h, Type *key) {
+	return map_get(h, type_hash_canonical_type(key));
+}
+template <typename V>
+gb_internal gb_inline void map_set(PtrMap<u64, V> *h, Type *key, V const &value) {
+	map_set(h, type_hash_canonical_type(key), value);
+}
+
+template <typename V>
+gb_internal gb_inline V &map_must_get(PtrMap<u64, V> *h, Type *key) {
+	V *ptr = map_get(h, type_hash_canonical_type(key));
+	GB_ASSERT(ptr != nullptr);
+	return *ptr;
+}
