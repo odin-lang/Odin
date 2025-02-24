@@ -114,6 +114,29 @@ __new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
 	return &impl.file
 }
 
+_clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
+	if f == nil || f.impl == nil {
+		err = .Invalid_Pointer
+		return
+	}
+
+	impl := (^File_Impl)(f.impl)
+
+	fd := posix.dup(impl.fd)
+	if fd <= 0 {
+		err = _get_platform_error()
+		return
+	}
+	defer if err != nil { posix.close(fd) }
+
+	clone = __new_file(fd, file_allocator())	
+	clone_impl := (^File_Impl)(clone.impl)
+	clone_impl.cname = clone_to_cstring(impl.name, file_allocator()) or_return
+	clone_impl.name  = string(clone_impl.cname)
+
+	return
+}
+
 _close :: proc(f: ^File_Impl) -> (err: Error) {
 	if f == nil { return nil }
 
