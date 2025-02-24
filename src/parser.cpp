@@ -3016,9 +3016,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			syntax_error(token, "Expected a type or range, got nothing");
 		}
 
-		if (allow_token(f, Token_Semicolon)) {
+		if (f->curr_token.kind == Token_Semicolon && f->curr_token.string == ";") {
+			expect_token(f, Token_Semicolon);
 			underlying = parse_type(f);
-		} else if (allow_token(f, Token_Comma)) {
+		} else if (allow_token(f, Token_Comma) || allow_token(f, Token_Semicolon)) {
 			String p = token_to_string(f->prev_token);
 			syntax_error(token_end_of_line(f, f->prev_token), "Expected a semicolon, got a %.*s", LIT(p));
 
@@ -4578,6 +4579,9 @@ gb_internal Ast *parse_do_body(AstFile *f, Token const &token, char const *msg) 
 gb_internal bool parse_control_statement_semicolon_separator(AstFile *f) {
 	Token tok = peek_token(f);
 	if (tok.kind != Token_OpenBrace) {
+		if (f->curr_token.kind == Token_Semicolon && f->curr_token.string != ";")  {
+			syntax_error(token_end_of_line(f, f->prev_token), "Expected ';', got newline");
+		}
 		return allow_token(f, Token_Semicolon);
 	}
 	if (f->curr_token.string == ";") {
