@@ -898,8 +898,7 @@ bitset_to_enum_slice_with_buffer :: proc(buf: []$E, bs: $T) -> (slice: []E) wher
 //    sl := slice.bitset_to_enum_slice(bs)
 @(require_results)
 bitset_to_enum_slice_with_make :: proc(bs: $T, $E: typeid, allocator := context.allocator) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
-	ones := intrinsics.count_ones(transmute(E)bs)
-	buf  := make([]E, int(ones), allocator)
+	buf := make([]E, card(bs), allocator)
 	return bitset_to_enum_slice(buf, bs)
 }
 
