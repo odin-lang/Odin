@@ -26,11 +26,10 @@ struct OdinDocWriter {
 
 	StringMap<OdinDocString> string_cache;
 
-	OrderedInsertPtrMap<AstFile *,    OdinDocFileIndex>   file_cache;
-	OrderedInsertPtrMap<AstPackage *, OdinDocPkgIndex>    pkg_cache;
-	OrderedInsertPtrMap<Entity *,     OdinDocEntityIndex> entity_cache;
-	OrderedInsertPtrMap<Type *,       OdinDocTypeIndex>   type_cache;
-	OrderedInsertPtrMap<Type *,       Type *>             stable_type_cache;
+	OrderedInsertPtrMap<AstFile *,    OdinDocFileIndex>     file_cache;
+	OrderedInsertPtrMap<AstPackage *, OdinDocPkgIndex>      pkg_cache;
+	OrderedInsertPtrMap<Entity *,     OdinDocEntityIndex>   entity_cache;
+	OrderedInsertPtrMap<u64/*type hash*/, OdinDocTypeIndex> type_cache;
 
 	OdinDocWriterItemTracker<OdinDocFile>   files;
 	OdinDocWriterItemTracker<OdinDocPkg>    pkgs;
@@ -61,7 +60,6 @@ gb_internal void odin_doc_writer_prepare(OdinDocWriter *w) {
 	map_init(&w->pkg_cache,         1<<10);
 	map_init(&w->entity_cache,      1<<18);
 	map_init(&w->type_cache,        1<<18);
-	map_init(&w->stable_type_cache, 1<<18);
 
 	odin_doc_writer_item_tracker_init(&w->files,    1);
 	odin_doc_writer_item_tracker_init(&w->pkgs,     1);
@@ -81,7 +79,6 @@ gb_internal void odin_doc_writer_destroy(OdinDocWriter *w) {
 	map_destroy(&w->pkg_cache);
 	map_destroy(&w->entity_cache);
 	map_destroy(&w->type_cache);
-	map_destroy(&w->stable_type_cache);
 }
 
 
@@ -492,46 +489,10 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		}
 	}
 
-	// Type **mapped_type = map_get(&w->stable_type_cache, type); // may map to itself
-	// if (mapped_type && *mapped_type) {
-	// 	type = *mapped_type;
-	// }
-
-	OdinDocTypeIndex *found = map_get(&w->type_cache, type);
+	u64 type_hash = type_hash_canonical_type(type);
+	OdinDocTypeIndex *found = map_get(&w->type_cache, type_hash);
 	if (found) {
 		return *found;
-	}
-	for (auto const &entry : w->type_cache) {
-		// NOTE(bill): THIS IS SLOW
-		Type *x = type;
-		Type *y = entry.key;
-
-		if (x == y) {
-			goto do_set;
-		}
-
-		if (!x | !y) {
-			continue;
-		}
-		if (y->kind == Type_Named) {
-			Entity *e = y->Named.type_name;
-			if (e->TypeName.is_type_alias) {
-				y = y->Named.base;
-			}
-		}
-		if (x->kind != y->kind) {
-			continue;
-		}
-
-		if (!are_types_identical_internal(x, y, true)) {
-			continue;
-		}
-
-	do_set:
-		OdinDocTypeIndex index = entry.value;
-		map_set(&w->type_cache, type, index);
-		map_set(&w->stable_type_cache, type, entry.key);
-		return index;
 	}
 
 
@@ -539,8 +500,7 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	OdinDocType doc_type = {};
 	OdinDocTypeIndex type_index = 0;
 	type_index = odin_doc_write_item(w, &w->types, &doc_type, &dst);
-	map_set(&w->type_cache, type, type_index);
-	map_set(&w->stable_type_cache, type, type);
+	map_set(&w->type_cache, type_hash, type_index);
 
 	switch (type->kind) {
 	case Type_Basic:
