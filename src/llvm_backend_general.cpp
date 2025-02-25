@@ -2819,14 +2819,10 @@ gb_internal lbAddr lb_add_global_generated_from_procedure(lbProcedure *p, Type *
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
-	static std::atomic<u32> global_index;
-	u32 index = ++global_index;
-	// u32 index = ++p->global_generated_index;
+	u32 index = ++p->global_generated_index;
 
 	gbString s = gb_string_make(temporary_allocator(), "ggv$");
-	// s = gb_string_appendc(s, p->module->module_name);
-	// s = gb_string_appendc(s, "$");
-	// s = gb_string_append_length(s, p->name.text, p->name.len);
+	s = gb_string_append_length(s, p->name.text, p->name.len);
 	s = gb_string_append_fmt(s, "$%u", index);
 
 	String name = make_string(cast(u8 const *)s, gb_string_length(s));
