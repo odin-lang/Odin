@@ -182,8 +182,6 @@ struct lbModule {
 
 	StringMap<lbProcedure *> gen_procs;   // key is the canonicalized name
 
-	std::atomic<u32> nested_type_name_guid;
-
 	Array<lbProcedure *> procedures_to_generate;
 	Array<Entity *> global_procedures_to_create;
 	Array<Entity *> global_types_to_create;
@@ -229,7 +227,6 @@ struct lbGenerator : LinkerData {
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
 
 	std::atomic<u32> global_array_index;
-	std::atomic<u32> global_generated_index;
 
 	isize used_module_count;
 

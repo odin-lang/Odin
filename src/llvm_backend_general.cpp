@@ -20,7 +20,13 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 
 	gbString module_name = gb_string_make(heap_allocator(), "odin_package");
 	if (m->file) {
-		module_name = gb_string_append_fmt(module_name, "-%u", m->file->id+1);
+		if (m->pkg) {
+			module_name = gb_string_appendc(module_name, "-");
+			module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
+		}
+		module_name = gb_string_appendc(module_name, "-");
+		String filename = filename_from_path(m->file->filename);
+		module_name = gb_string_append_length(module_name, filename.text, filename.len);
 	} else if (m->pkg) {
 		module_name = gb_string_appendc(module_name, "-");
 		module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
@@ -2814,9 +2820,10 @@ gb_internal lbAddr lb_add_global_generated_from_procedure(lbProcedure *p, Type *
 	u32 index = ++p->global_generated_index;
 
 	gbString s = gb_string_make(temporary_allocator(), "ggv$");
+	s = gb_string_appendc(s, p->module->module_name);
+	s = gb_string_appendc(s, "$");
 	s = gb_string_append_length(s, p->name.text, p->name.len);
 	s = gb_string_append_fmt(s, "$%u", index);
-
 
 	String name = make_string(cast(u8 const *)s, gb_string_length(s));
 	return lb_add_global_generated_with_name(p->module, type, value, name);
