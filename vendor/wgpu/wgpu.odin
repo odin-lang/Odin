@@ -76,7 +76,7 @@ QUERY_SET_INDEX_UNDEFINED :: max(u32)
 WHOLE_MAP_SIZE :: max(uint)
 WHOLE_SIZE :: max(u64)
 
-Flags :: u32
+Flags :: u64
 
 /**
  * Nullable value defining a pointer+length view into a UTF-8 encoded string.
@@ -1651,14 +1651,14 @@ SurfaceCapabilities :: struct {
 	alphaModes: /* const */ [^]CompositeAlphaMode `fmt:"v,alphaModeCount"`,
 }
 when ODIN_OS == .JS {
-	#assert(offset_of(SurfaceCapabilities, formatCount) == 8)
-	#assert(offset_of(SurfaceCapabilities, formats) == 8 + 1*size_of(int))
+	#assert(offset_of(SurfaceCapabilities, formatCount) == 12)
+	#assert(offset_of(SurfaceCapabilities, formats) == 16)
 
-	#assert(offset_of(SurfaceCapabilities, presentModeCount) == 8 + 2*size_of(int))
-	#assert(offset_of(SurfaceCapabilities, presentModes) == 8 + 3*size_of(int))
+	#assert(offset_of(SurfaceCapabilities, presentModeCount) == 20)
+	#assert(offset_of(SurfaceCapabilities, presentModes) == 24)
 
-	#assert(offset_of(SurfaceCapabilities, alphaModeCount) == 8 + 4*size_of(int))
-	#assert(offset_of(SurfaceCapabilities, alphaModes) == 8 + 5*size_of(int))
+	#assert(offset_of(SurfaceCapabilities, alphaModeCount) == 28)
+	#assert(offset_of(SurfaceCapabilities, alphaModes) == 32)
 }
 
 /**
