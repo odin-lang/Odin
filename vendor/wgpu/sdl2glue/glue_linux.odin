@@ -14,9 +14,9 @@ GetSurface :: proc(instance: wgpu.Instance, window: ^sdl2.Window) -> wgpu.Surfac
 		return wgpu.InstanceCreateSurface(
 			instance,
 			&wgpu.SurfaceDescriptor{
-				nextInChain = &wgpu.SurfaceDescriptorFromWaylandSurface{
+				nextInChain = &wgpu.SurfaceSourceWaylandSurface{
 					chain = {
-						sType = .SurfaceDescriptorFromWaylandSurface,
+						sType = .SurfaceSourceWaylandSurface,
 					},
 					display = display,
 					surface = surface,
@@ -29,9 +29,9 @@ GetSurface :: proc(instance: wgpu.Instance, window: ^sdl2.Window) -> wgpu.Surfac
 		return wgpu.InstanceCreateSurface(
 			instance,
 			&wgpu.SurfaceDescriptor{
-				nextInChain = &wgpu.SurfaceDescriptorFromXlibWindow{
+				nextInChain = &wgpu.SurfaceSourceXlibWindow{
 					chain = {
-						sType = .SurfaceDescriptorFromXlibWindow,
+						sType = .SurfaceSourceXlibWindow,
 					},
 					display = display,
 					window  = u64(window),

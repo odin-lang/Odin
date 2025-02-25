@@ -9,8 +9,8 @@ GetSurface :: proc(instance: wgpu.Instance, window: ^sdl3.Window) -> wgpu.Surfac
 	return wgpu.InstanceCreateSurface(
 		instance,
 		&wgpu.SurfaceDescriptor {
-			nextInChain = &wgpu.SurfaceDescriptorFromMetalLayer {
-				chain = wgpu.ChainedStruct{sType = .SurfaceDescriptorFromMetalLayer},
+			nextInChain = &wgpu.SurfaceSourceMetalLayer {
+				chain = wgpu.ChainedStruct{sType = .SurfaceSourceMetalLayer},
 				layer = metal_layer,
 			},
 		},
