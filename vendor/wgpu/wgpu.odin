@@ -1696,7 +1696,7 @@ SurfaceDescriptor :: struct {
 /**
  * Chained in @ref SurfaceDescriptor to make an @ref Surface wrapping an Android [`ANativeWindow`](https://developer.android.com/ndk/reference/group/a-native-window).
  */
-SurfaceDescriptorFromAndroidNativeWindow :: struct {
+SurfaceSourceAndroidNativeWindow :: struct {
 	using chain: ChainedStruct,
 	/**
 	 * The pointer to the [`ANativeWindow`](https://developer.android.com/ndk/reference/group/a-native-window) that will be wrapped by the @ref Surface.
@@ -1707,7 +1707,7 @@ SurfaceDescriptorFromAndroidNativeWindow :: struct {
 /**
  * Chained in @ref SurfaceDescriptor to make an @ref Surface wrapping a [`CAMetalLayer`](https://developer.apple.com/documentation/quartzcore/cametallayer?language=objc).
  */
-SurfaceDescriptorFromMetalLayer :: struct {
+SurfaceSourceMetalLayer :: struct {
 	using chain: ChainedStruct,
 	/**
 	 * The pointer to the [`CAMetalLayer`](https://developer.apple.com/documentation/quartzcore/cametallayer?language=objc) that will be wrapped by the @ref Surface.
@@ -1718,7 +1718,7 @@ SurfaceDescriptorFromMetalLayer :: struct {
 /**
  * Chained in @ref SurfaceDescriptor to make an @ref Surface wrapping a [Wayland](https://wayland.freedesktop.org/) [`wl_surface`](https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_surface).
  */
-SurfaceDescriptorFromWaylandSurface :: struct {
+SurfaceSourceWaylandSurface :: struct {
 	using chain: ChainedStruct,
 	/**
 	 * A [`wl_display`](https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_display) for this Wayland instance.
@@ -1733,7 +1733,7 @@ SurfaceDescriptorFromWaylandSurface :: struct {
 /**
  * Chained in @ref SurfaceDescriptor to make an @ref Surface wrapping a Windows [`HWND`](https://learn.microsoft.com/en-us/windows/apps/develop/ui-input/retrieve-hwnd).
  */
-SurfaceDescriptorFromWindowsHWND :: struct {
+SurfaceSourceWindowsHWND :: struct {
 	using chain: ChainedStruct,
 	/**
 	 * The [`HINSTANCE`](https://learn.microsoft.com/en-us/windows/win32/learnwin32/winmain--the-application-entry-point) for this application.
@@ -1749,7 +1749,7 @@ SurfaceDescriptorFromWindowsHWND :: struct {
 /**
  * Chained in @ref SurfaceDescriptor to make an @ref Surface wrapping an [XCB](https://xcb.freedesktop.org/) `xcb_window_t`.
  */
-SurfaceDescriptorFromXcbWindow :: struct {
+SurfaceSourceXCBWindow :: struct {
 	using chain: ChainedStruct,
 	/**
 	 * The `xcb_connection_t` for the connection to the X server.
@@ -1764,7 +1764,7 @@ SurfaceDescriptorFromXcbWindow :: struct {
 /**
  * Chained in @ref SurfaceDescriptor to make an @ref Surface wrapping an [Xlib](https://www.x.org/releases/current/doc/libX11/libX11/libX11.html) `Window`.
  */
-SurfaceDescriptorFromXlibWindow :: struct {
+SurfaceSourceXlibWindow :: struct {
 	using chain: ChainedStruct,
 	/**
 	 * A pointer to the [`Display`](https://www.x.org/releases/current/doc/libX11/libX11/libX11.html#Opening_the_Display) connected to the X server.
