@@ -1,6 +1,7 @@
 package wgpu
 
 import "base:intrinsics"
+import "core:fmt"
 import "core:strings"
 
 WGPU_SHARED :: #config(WGPU_SHARED, false)
@@ -105,6 +106,31 @@ StringView :: struct {
 }
 
 STRLEN :: max(uint)
+
+StringView_Formatter :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
+	v := cast(^StringView)arg.data
+	switch verb {
+	case 'v', 's', 'q':
+		switch {
+		case v^ == StringView_CreateNil():
+			fmt.fmt_string(fi, "nil", verb)
+
+		case v.length == 0:
+			fmt.fmt_string(fi, "", verb)
+
+		case v.length == STRLEN:
+			fmt.fmt_cstring(fi, v.data, verb)
+
+		case:
+			s := strings.string_from_ptr(transmute([^]u8)(v.data), int(v.length))
+			fmt.fmt_string(fi, s, verb)
+		}
+		return true
+
+	case:
+		return false
+	}
+}
 
 StringView_CreateNil :: proc() -> StringView {
 	return {nil, STRLEN}
