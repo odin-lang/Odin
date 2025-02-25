@@ -2790,8 +2790,9 @@ gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lb
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
-	isize max_len = 7+8+1;
-	u8 *str = cast(u8 *)gb_alloc_array(permanent_allocator(), u8, max_len);
+	u8 *str = cast(u8 *)gb_alloc_array(temporary_allocator(), u8, name.len);
+	memcpy(str, name.text, name.len);
+	str[name.len] = 0;
 
 	Scope *scope = nullptr;
 	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
