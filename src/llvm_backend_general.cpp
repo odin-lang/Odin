@@ -221,7 +221,7 @@ gb_internal void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 
 gb_internal void lb_make_global_private_const(LLVMValueRef global_data) {
 	LLVMSetLinkage(global_data, LLVMLinkerPrivateLinkage);
-	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	// LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
 	LLVMSetGlobalConstant(global_data, true);
 }
 gb_internal void lb_make_global_private_const(lbAddr const &addr) {
@@ -2786,6 +2786,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 
 
 gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lbValue value, String name, Entity **entity_) {
+	GB_ASSERT(name.len != 0);
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
@@ -2817,12 +2818,14 @@ gb_internal lbAddr lb_add_global_generated_from_procedure(lbProcedure *p, Type *
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
-	u32 index = ++p->global_generated_index;
+	static std::atomic<u32> global_index;
+	u32 index = ++global_index;
+	// u32 index = ++p->global_generated_index;
 
 	gbString s = gb_string_make(temporary_allocator(), "ggv$");
-	s = gb_string_appendc(s, p->module->module_name);
-	s = gb_string_appendc(s, "$");
-	s = gb_string_append_length(s, p->name.text, p->name.len);
+	// s = gb_string_appendc(s, p->module->module_name);
+	// s = gb_string_appendc(s, "$");
+	// s = gb_string_append_length(s, p->name.text, p->name.len);
 	s = gb_string_append_fmt(s, "$%u", index);
 
 	String name = make_string(cast(u8 const *)s, gb_string_length(s));
@@ -2938,7 +2941,7 @@ gb_internal lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 c
 	g.type = alloc_type_pointer(t);
 	LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, t)));
 	LLVMSetLinkage(g.value, LLVMPrivateLinkage);
-	LLVMSetUnnamedAddress(g.value, LLVMGlobalUnnamedAddr);
+	// LLVMSetUnnamedAddress(g.value, LLVMGlobalUnnamedAddr);
 	string_map_set(&m->members, s, g);
 	return g;
 }

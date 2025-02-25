@@ -2112,7 +2112,7 @@ gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, Stri
 	}
 
 	if (!entity) {
-		gbString global_name = gb_string_make(temporary_allocator(), "__$objc_selector-");
+		gbString global_name = gb_string_make(temporary_allocator(), "__$objc_SEL$");
 		global_name = gb_string_append_length(global_name, name.text, name.len);
 
 		lbAddr default_addr = lb_add_global_generated_with_name(
@@ -2175,7 +2175,7 @@ gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String 
 	}
 
 	if (!entity) {
-		gbString global_name = gb_string_make(temporary_allocator(), "__$objc_class-");
+		gbString global_name = gb_string_make(temporary_allocator(), "__$objc_Class$");
 		global_name = gb_string_append_length(global_name, name.text, name.len);
 
 		lbAddr default_addr = lb_add_global_generated_with_name(default_module, t_objc_Class, {},
