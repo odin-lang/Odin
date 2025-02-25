@@ -2312,9 +2312,9 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				lbValue array_const_value = {};
 				array_const_value.type = t;
 				array_const_value.value = LLVMConstArray(lb_type(m, elem), values, cast(unsigned)index_count);
-				v = lb_add_global_generated(m, t, array_const_value);
+				v = lb_add_global_generated_from_procedure(p, t, array_const_value);
 			} else {
-				v = lb_add_global_generated(m, t);
+				v = lb_add_global_generated_from_procedure(p, t);
 			}
 
 			lb_make_global_private_const(v);
@@ -3264,7 +3264,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		Type *type = v.type;
 		lbAddr addr = {};
 		if (p->is_startup) {
-			addr = lb_add_global_generated(p->module, type, v);
+			addr = lb_add_global_generated_from_procedure(p, type, v);
 		} else {
 			addr = lb_add_local_generated(p, type, false);
 		}
@@ -3851,7 +3851,7 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 		Type *t = default_type(type_of_expr(expr));
 		lbValue v = lb_const_value(p->module, t, e->Constant.value);
 		if (LLVMIsConstant(v.value)) {
-			lbAddr g = lb_add_global_generated(p->module, t, v);
+			lbAddr g = lb_add_global_generated_from_procedure(p, t, v);
 			return g;
 		}
 		GB_ASSERT(LLVMIsALoadInst(v.value));

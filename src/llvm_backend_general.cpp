@@ -1007,7 +1007,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		} else if (LLVMIsConstant(value.value)) {
-			lbAddr addr = lb_add_global_generated(p->module, value.type, value, nullptr);
+			lbAddr addr = lb_add_global_generated_from_procedure(p, value.type, value);
 			lb_make_global_private_const(addr);
 
 			LLVMValueRef dst_ptr = ptr.value;
@@ -2779,17 +2779,12 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 }
 
 
-gb_internal lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value, Entity **entity_) {
+gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lbValue value, String name, Entity **entity_) {
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
 	isize max_len = 7+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(permanent_allocator(), u8, max_len);
-
-	u32 id = m->gen->global_generated_index.fetch_add(1);
-
-	isize len = gb_snprintf(cast(char *)str, max_len, "ggv$%x", id);
-	String name = make_string(str, len-1);
 
 	Scope *scope = nullptr;
 	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
@@ -2811,30 +2806,22 @@ gb_internal lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue valu
 	return lb_addr(g);
 }
 
-gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lbValue value, String name) {
+
+gb_internal lbAddr lb_add_global_generated_from_procedure(lbProcedure *p, Type *type, lbValue value) {
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
-	isize max_len = 7+8+1;
-	u8 *str = cast(u8 *)gb_alloc_array(permanent_allocator(), u8, max_len);
+	u32 index = ++p->global_generated_index;
 
-	Scope *scope = nullptr;
-	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
-	lbValue g = {};
-	g.type = alloc_type_pointer(type);
-	g.value = LLVMAddGlobal(m->mod, lb_type(m, type), cast(char const *)str);
-	if (value.value != nullptr) {
-		GB_ASSERT_MSG(LLVMIsConstant(value.value), LLVMPrintValueToString(value.value));
-		LLVMSetInitializer(g.value, value.value);
-	} else {
-		LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, type)));
-	}
+	gbString s = gb_string_make(temporary_allocator(), "ggv$");
+	s = gb_string_append_length(s, p->name.text, p->name.len);
+	s = gb_string_append_fmt(s, "$%u", index);
 
-	lb_add_entity(m, e, g);
-	lb_add_member(m, name, g);
 
-	return lb_addr(g);
+	String name = make_string(cast(u8 const *)s, gb_string_length(s));
+	return lb_add_global_generated_with_name(p->module, type, value, name);
 }
+
 
 
 gb_internal lbValue lb_find_runtime_value(lbModule *m, String const &name) {
