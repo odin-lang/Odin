@@ -169,6 +169,8 @@ struct lbModule {
 
 	RwMutex values_mutex;
 
+	std::atomic<u32> global_array_index;
+
 	PtrMap<Entity *, lbValue> values;           
 	PtrMap<Entity *, lbAddr>  soa_values;       
 	StringMap<lbValue>  members;
@@ -225,8 +227,6 @@ struct lbGenerator : LinkerData {
 
 	RecursiveMutex anonymous_proc_lits_mutex;
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
-
-	std::atomic<u32> global_array_index;
 
 	isize used_module_count;
 

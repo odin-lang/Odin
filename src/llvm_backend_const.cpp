@@ -588,12 +588,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					return lb_addr_load(p, slice);
 				}
 			} else {
-				isize max_len = 7+8+1;
-				char *str = gb_alloc_array(permanent_allocator(), char, max_len);
-				u32 id = m->gen->global_array_index.fetch_add(1);
-				isize len = gb_snprintf(str, max_len, "csba$%x", id);
+				u32 id = m->global_array_index.fetch_add(1);
+				gbString str = gb_string_make(temporary_allocator(), "csba$");
+				str = gb_string_appendc(str, m->module_name);
+				str = gb_string_append_fmt(str, "$%x", id);
 
-				String name = make_string(cast(u8 *)str, len-1);
+				String name = make_string(cast(u8 const *)str, gb_string_length(str));
 
 				Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
 				array_data = LLVMAddGlobal(m->mod, lb_type(m, t), str);

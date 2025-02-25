@@ -2527,12 +2527,10 @@ gb_internal LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String co
 			false);
 
 
-		isize max_len = 7+8+1;
-		char *name = gb_alloc_array(permanent_allocator(), char, max_len);
-
-		u32 id = m->gen->global_array_index.fetch_add(1);
-		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
-		len -= 1;
+		u32 id = m->global_array_index.fetch_add(1);
+		gbString name = gb_string_make(temporary_allocator(), "csbs$");
+		name = gb_string_appendc(name, m->module_name);
+		name = gb_string_append_fmt(name, "$%x", id);
 
 		LLVMTypeRef type = LLVMTypeOf(data);
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
@@ -2570,14 +2568,11 @@ gb_internal lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *
 		false);
 
 
-	char *name = nullptr;
-	{
-		isize max_len = 7+8+1;
-		name = gb_alloc_array(permanent_allocator(), char, max_len);
-		u32 id = m->gen->global_array_index.fetch_add(1);
-		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
-		len -= 1;
-	}
+	u32 id = m->global_array_index.fetch_add(1);
+	gbString name = gb_string_make(temporary_allocator(), "csba$");
+	name = gb_string_appendc(name, m->module_name);
+	name = gb_string_append_fmt(name, "$%x", id);
+
 	LLVMTypeRef type = LLVMTypeOf(data);
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 	LLVMSetInitializer(global_data, data);
@@ -2822,6 +2817,8 @@ gb_internal lbAddr lb_add_global_generated_from_procedure(lbProcedure *p, Type *
 	u32 index = ++p->global_generated_index;
 
 	gbString s = gb_string_make(temporary_allocator(), "ggv$");
+	// s = gb_string_appendc(s, p->module->module_name);
+	// s = gb_string_appendc(s, "$");
 	s = gb_string_append_length(s, p->name.text, p->name.len);
 	s = gb_string_append_fmt(s, "$%u", index);
 

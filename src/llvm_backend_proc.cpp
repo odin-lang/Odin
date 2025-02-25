@@ -3308,13 +3308,14 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			{
 				isize max_len = 7+8+1;
 				name = gb_alloc_array(permanent_allocator(), char, max_len);
-				u32 id = m->gen->global_array_index.fetch_add(1);
+				u32 id = m->global_array_index.fetch_add(1);
 				isize len = gb_snprintf(name, max_len, "csbs$%x", id);
 				len -= 1;
 			}
 			LLVMTypeRef type = LLVMTypeOf(array);
 			LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 			LLVMSetInitializer(global_data, array);
+			LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
 			LLVMSetLinkage(global_data, LLVMInternalLinkage);
 
 
