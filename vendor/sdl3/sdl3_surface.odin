@@ -78,7 +78,7 @@ foreign lib {
 	GetSurfaceAlphaMod           :: proc(surface: ^Surface, alpha: ^Uint8) -> bool ---
 	SetSurfaceBlendMode          :: proc(surface: ^Surface, blendMode: BlendMode) -> bool ---
 	GetSurfaceBlendMode          :: proc(surface: ^Surface, blendMode: ^BlendMode) -> bool ---
-	SetSurfaceClipRect           :: proc(surface: ^Surface, #by_ptr rect: Rect) -> bool ---
+	SetSurfaceClipRect           :: proc(surface: ^Surface, rect: Maybe(^Rect)) -> bool ---
 	GetSurfaceClipRect           :: proc(surface: ^Surface, rect: ^Rect) -> bool ---
 	FlipSurface                  :: proc(surface: ^Surface, flip: FlipMode) -> bool ---
 	DuplicateSurface             :: proc(surface: ^Surface) -> ^Surface ---
@@ -90,15 +90,15 @@ foreign lib {
 	PremultiplyAlpha             :: proc(width, height: c.int, src_format: PixelFormat, src: rawptr, src_pitch: c.int, dst_format: PixelFormat, dst: rawptr, dst_pitch: c.int, linear: bool) -> bool ---
 	PremultiplySurfaceAlpha      :: proc(surface: ^Surface, linear: bool) -> bool ---
 	ClearSurface                 :: proc(surface: ^Surface, r, g, b, a: f32) -> bool ---
-	FillSurfaceRect              :: proc(dst: ^Surface, #by_ptr rect: Rect, color: Uint32) -> bool ---
+	FillSurfaceRect              :: proc(dst: ^Surface, rect: Maybe(^Rect), color: Uint32) -> bool ---
 	FillSurfaceRects             :: proc(dst: ^Surface, rects: [^]Rect, count: c.int, color: Uint32) -> bool ---
-	BlitSurface                  :: proc(src: ^Surface, #by_ptr srcrect: Rect, dst: ^Surface, #by_ptr dstrect: Rect) -> bool ---
-	BlitSurfaceUnchecked         :: proc(src: ^Surface, #by_ptr srcrect: Rect, dst: ^Surface, #by_ptr dstrect: Rect) -> bool ---
-	BlitSurfaceScaled            :: proc(src: ^Surface, #by_ptr srcrect: Rect, dst: ^Surface, #by_ptr dstrect: Rect, scaleMode: ScaleMode) -> bool ---
-	BlitSurfaceUncheckedScaled   :: proc(src: ^Surface, #by_ptr srcrect: Rect, dst: ^Surface, #by_ptr dstrect: Rect, scaleMode: ScaleMode) -> bool ---
-	BlitSurfaceTiled             :: proc(src: ^Surface, #by_ptr srcrect: Rect, dst: ^Surface, #by_ptr dstrect: Rect) -> bool ---
-	BlitSurfaceTiledWithScale    :: proc(src: ^Surface, #by_ptr srcrect: Rect, scale: f32, scaleMode: ScaleMode, dst: ^Surface, #by_ptr dstrect: Rect) -> bool ---
-	BlitSurface9Grid             :: proc(src: ^Surface, #by_ptr srcrect: Rect, left_width, right_width, top_height, bottom_height: c.int, scale: f32, scaleMode: ScaleMode, dst: ^Surface, #by_ptr dstrect: Rect) -> bool ---
+	BlitSurface                  :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
+	BlitSurfaceUnchecked         :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
+	BlitSurfaceScaled            :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect), scaleMode: ScaleMode) -> bool ---
+	BlitSurfaceUncheckedScaled   :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect), scaleMode: ScaleMode) -> bool ---
+	BlitSurfaceTiled             :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
+	BlitSurfaceTiledWithScale    :: proc(src: ^Surface, srcrect: Maybe(^Rect), scale: f32, scaleMode: ScaleMode, dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
+	BlitSurface9Grid             :: proc(src: ^Surface, srcrect: Maybe(^Rect), left_width, right_width, top_height, bottom_height: c.int, scale: f32, scaleMode: ScaleMode, dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
 	MapSurfaceRGB                :: proc(surface: ^Surface, r, g, b: Uint8) -> Uint32 ---
 	MapSurfaceRGBA               :: proc(surface: ^Surface, r, g, b, a: Uint8) -> Uint32 ---
 	ReadSurfacePixel             :: proc(surface: ^Surface, x, y: c.int, r, g, b, a: ^Uint8) -> bool ---

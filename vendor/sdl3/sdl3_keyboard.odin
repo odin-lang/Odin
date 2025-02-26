@@ -52,7 +52,7 @@ foreign lib {
 	TextInputActive              :: proc(window: ^Window) -> bool ---
 	StopTextInput                :: proc(window: ^Window) -> bool ---
 	ClearComposition             :: proc(window: ^Window) -> bool ---
-	SetTextInputArea             :: proc(window: ^Window, #by_ptr rect: Rect, cursor: c.int) -> bool ---
+	SetTextInputArea             :: proc(window: ^Window, rect: Maybe(^Rect), cursor: c.int) -> bool ---
 	GetTextInputArea             :: proc(window: ^Window, rect: ^Rect, cursor: ^c.int) -> bool ---
 	HasScreenKeyboardSupport     :: proc() -> bool ---
 	ScreenKeyboardShown          :: proc(window: ^Window) -> bool ---
