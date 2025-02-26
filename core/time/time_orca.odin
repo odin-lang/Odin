@@ -17,7 +17,7 @@ _now :: proc "contextless" () -> Time {
 _sleep :: proc "contextless" (d: Duration) {
 	// NOTE: no way to sleep afaict.
 	if d > 0 {
-		orca.log_warning("core:time 'sleep' is unimplemented for orca")
+		// orca.log_warning("core:time 'sleep' is unimplemented for orca")
 	}
 }
 
