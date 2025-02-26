@@ -2559,17 +2559,15 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		build_context.build_paths[BuildPath_Output].name
 	);
 
-	if (m->file) {
-		char buf[32] = {};
-		isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
-		String suffix = make_string((u8 *)buf, n-1);
-		path = concatenate_strings(permanent_allocator(), path, suffix);
-	} else if (m->pkg) {
-		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
-	} else if (USE_SEPARATE_MODULES) {
-		path = concatenate_strings(permanent_allocator(), path, STR_LIT("-builtin"));
-	}
-	path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
+	GB_ASSERT(m->module_name != nullptr);
+	String s = make_string_c(m->module_name);
+	String prefix = str_lit("odin_package-");
+	GB_ASSERT(string_starts_with(s, prefix));
+	s.text += prefix.len;
+	s.len  -= prefix.len;
+
+	path = concatenate_strings(permanent_allocator(), path, s);
+	path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
 
 	return path;
 }
@@ -2592,14 +2590,16 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	path = gb_string_appendc(path, "/");
 	path = gb_string_append_length(path, name.text, name.len);
 
-	if (m->file) {
-		char buf[32] = {};
-		isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
-		String suffix = make_string((u8 *)buf, n-1);
-		path = gb_string_append_length(path, suffix.text, suffix.len);
-	} else if (m->pkg) {
-		path = gb_string_appendc(path, "-");
-		path = gb_string_append_length(path, m->pkg->name.text, m->pkg->name.len);
+	{
+
+		GB_ASSERT(m->module_name != nullptr);
+		String s = make_string_c(m->module_name);
+		String prefix = str_lit("odin_package");
+		GB_ASSERT(string_starts_with(s, prefix));
+		s.text += prefix.len;
+		s.len  -= prefix.len;
+
+		path = gb_string_append_length(path, s.text, s.len);
 	}
 
 	if (use_temporary_directory) {
@@ -3153,7 +3153,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
-			LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+			// LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
 			LLVMSetGlobalConstant(g, true);
 
 			lbValue value = {};

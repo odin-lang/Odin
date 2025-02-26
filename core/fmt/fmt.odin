@@ -1297,7 +1297,7 @@ fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	case 'q', 'w':
 		fi.n += io.write_quoted_rune(fi.writer, r)
 	case:
-		fmt_int(fi, u64(r), false, 32, verb)
+		fmt_int(fi, u64(u32(r)), false, 32, verb)
 	}
 }
 // Formats an integer value according to the specified formatting verb.
