@@ -647,8 +647,8 @@ def parse_structs(f):
                 if not bitfield:
                     bitfield = Bitfield(field_type)
 
-                    # Add the field to the bitfield
-                bitfield.add_field(bf_field[1], 'bool' if bitsize == 1 else field_type, bitsize)
+                # Add the field to the bitfield
+                bitfield.add_field(bf_field[1], field_type, bitsize)
                 continue
 
             # Close the bitfield because this is not a field

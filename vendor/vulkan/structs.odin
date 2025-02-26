@@ -10013,13 +10013,13 @@ VideoH265SubLayerHrdParameters :: struct {
 }
 
 VideoH265HrdFlags :: bit_field u32 {
-	nal_hrd_parameters_present_flag:           bool | 1,
-	vcl_hrd_parameters_present_flag:           bool | 1,
-	sub_pic_hrd_params_present_flag:           bool | 1,
-	sub_pic_cpb_params_in_pic_timing_sei_flag: bool | 1,
-	fixed_pic_rate_general_flag:               u32  | 8,
-	fixed_pic_rate_within_cvs_flag:            u32  | 8,
-	low_delay_hrd_flag:                        u32  | 8,
+	nal_hrd_parameters_present_flag:           u32 | 1,
+	vcl_hrd_parameters_present_flag:           u32 | 1,
+	sub_pic_hrd_params_present_flag:           u32 | 1,
+	sub_pic_cpb_params_in_pic_timing_sei_flag: u32 | 1,
+	fixed_pic_rate_general_flag:               u32 | 8,
+	fixed_pic_rate_within_cvs_flag:            u32 | 8,
+	low_delay_hrd_flag:                        u32 | 8,
 }
 
 VideoH265HrdParameters :: struct {
