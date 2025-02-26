@@ -183,10 +183,10 @@ foreign lib {
 	RenderCoordinatesFromWindow      :: proc(renderer: ^Renderer, window_x, window_y: f32, x, y: ^f32) -> bool ---
 	RenderCoordinatesToWindow        :: proc(renderer: ^Renderer, x, y: f32, window_x, window_y: ^f32) -> bool ---
 	ConvertEventToRenderCoordinates  :: proc(renderer: ^Renderer, event: ^Event) -> bool ---
-	SetRenderViewport                :: proc(renderer: ^Renderer, #by_ptr rect: Rect) -> bool ---
+	SetRenderViewport                :: proc(renderer: ^Renderer, rect: Maybe(^Rect)) -> bool ---
 	GetRenderViewport                :: proc(renderer: ^Renderer, rect: ^Rect) -> bool ---
 	GetRenderSafeArea                :: proc(renderer: ^Renderer, rect: ^Rect) -> bool ---
-	SetRenderClipRect                :: proc(renderer: ^Renderer, #by_ptr rect: Rect) -> bool ---
+	SetRenderClipRect                :: proc(renderer: ^Renderer, rect: Maybe(^Rect)) -> bool ---
 	GetRenderClipRect                :: proc(renderer: ^Renderer, rect: ^Rect) -> bool ---
 	SetRenderScale                   :: proc(renderer: ^Renderer, scaleX, scaleY: f32) -> bool ---
 	GetRenderScale                   :: proc(renderer: ^Renderer, scaleX, scaleY: ^f32) -> bool ---
@@ -203,9 +203,9 @@ foreign lib {
 	RenderPoints                     :: proc(renderer: ^Renderer, points: [^]FPoint, count: c.int) -> bool ---
 	RenderLine                       :: proc(renderer: ^Renderer, x1, y1, x2, y2: f32) -> bool ---
 	RenderLines                      :: proc(renderer: ^Renderer, points: [^]FPoint, count: c.int) -> bool ---
-	RenderRect                       :: proc(renderer: ^Renderer, #by_ptr rect: FRect) -> bool ---
+	RenderRect                       :: proc(renderer: ^Renderer, rect: Maybe(^FRect)) -> bool ---
 	RenderRects                      :: proc(renderer: ^Renderer, rects: [^]FRect, count: c.int) -> bool ---
-	RenderFillRect                   :: proc(renderer: ^Renderer, #by_ptr rect: FRect) -> bool ---
+	RenderFillRect                   :: proc(renderer: ^Renderer, rect: Maybe(^FRect)) -> bool ---
 	RenderFillRects                  :: proc(renderer: ^Renderer, rects: [^]FRect, count: c.int) -> bool ---
 	RenderTexture                    :: proc(renderer: ^Renderer, texture: ^Texture, srcrect, dstrect: Maybe(^FRect)) -> bool ---
 	RenderTextureRotated             :: proc(renderer: ^Renderer, texture: ^Texture, srcrect, dstrect: Maybe(^FRect), angle: f64, #by_ptr center: FPoint, flip: FlipMode) -> bool ---
