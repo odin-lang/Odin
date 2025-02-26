@@ -16,8 +16,8 @@ a multipointer can be indexed, but does not have a definite length. A slice is
 a pointer that points to multiple objects equipped with the length, specifying
 the amount of objects a slice points to.
 
-When object's values are read through a pointer, that operation is called a
-*load* operation. When memory is read through a pointer, that operation is
+When an object's values are read through a pointer, that operation is called a
+*load* operation. When memory is written to through a pointer, that operation is
 called a *store* operation. Both of these operations can be called a *memory
 access operation*.
 
