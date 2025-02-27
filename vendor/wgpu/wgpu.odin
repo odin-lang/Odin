@@ -12,7 +12,7 @@ WGPU_DEBUG  :: #config(WGPU_DEBUG,  false)
 when ODIN_OS == .Windows {
 	@(private) ARCH :: "x86_64"   when ODIN_ARCH == .amd64 else "x86_64" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
 	@(private) EXT  :: ".dll.lib" when WGPU_SHARED else ".lib"
-	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-" + TYPE + "/wgpu_native" + EXT
+	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-msvc-" + TYPE + "/wgpu_native" + EXT
 
 	when !#exists(LIB) {
 		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v24.0.0.1, make sure to read the README at '" + #directory + "README.md'")
