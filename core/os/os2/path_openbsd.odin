@@ -46,7 +46,7 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 		strings.write_string(&buf, "/")
 		strings.write_string(&buf, sarg)
 
-		cpath := strings.to_cstring(&buf)
+		cpath := strings.to_cstring(&buf) or_return
 		if posix.access(cpath, {.X_OK}) == .OK {
 			return real(cpath, allocator)
 		}

@@ -288,16 +288,39 @@ to_string :: proc(b: Builder) -> (res: string) {
 /*
 Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
 
+NOTE: This procedure will not check if the backing buffer has enough space to include the extra null byte.
+
 Inputs:
 - b: A pointer to builder
 
 Returns:
 - res: A cstring of the Builder's buffer
 */
-to_cstring :: proc(b: ^Builder) -> (res: cstring) {
+unsafe_to_cstring :: proc(b: ^Builder) -> (res: cstring) {
 	append(&b.buf, 0)
 	pop(&b.buf)
 	return cstring(raw_data(b.buf))
+}
+/*
+Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
+
+Inputs:
+- b: A pointer to builder
+
+Returns:
+- res: A cstring of the Builder's buffer upon success
+- err: An optional allocator error if one occured, `nil` otherwise
+*/
+to_cstring :: proc(b: ^Builder) -> (res: cstring, err: mem.Allocator_Error) {
+	n := append(&b.buf, 0) or_return
+	if n != 1 {
+		return nil, .Out_Of_Memory
+	}
+	pop(&b.buf)
+	#no_bounds_check {
+		assert(b.buf[len(b.buf)] == 0)
+	}
+	return cstring(raw_data(b.buf)), nil
 }
 /*
 Returns the length of the Builder's buffer, in bytes
