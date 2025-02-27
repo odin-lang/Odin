@@ -1570,7 +1570,7 @@ class WebGPUInterface {
 				let descriptor;
 				if (descriptorPtr != 0) {
 					descriptor = {
-						label: this.stringView(descriptorPtr + 4),
+						label: this.StringView(descriptorPtr + 4),
 					};
 				}
 
