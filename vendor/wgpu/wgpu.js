@@ -748,7 +748,7 @@ class WebGPUInterface {
 		const layoutIdx = this.mem.loadPtr(off(4));
 		return {
 			label: label,
-			layout: layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : undefined,
+			layout: layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : "auto",
 			compute: this.ProgrammableStageDescriptor(off(this.sizes.ProgrammableStageDescriptor)),
 		};
 	}
@@ -853,7 +853,7 @@ class WebGPUInterface {
 		const layoutIdx = this.mem.loadPtr(off(4));
 		return {
 			label:        label,
-			layout:       layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : undefined,
+			layout:       layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : "auto",
 			vertex:       this.VertexState(off(this.sizes.VertexState)),
 			primitive:    this.PrimitiveState(off(this.sizes.PrimitiveState)),
 			depthStencil: this.DepthStencilStatePtr(off(4)),
