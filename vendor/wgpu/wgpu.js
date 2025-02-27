@@ -1297,6 +1297,9 @@ class WebGPUInterface {
 
 				const ptr = this.mem.exports.wgpu_alloc(range.byteLength);
 
+				const mapping = new Uint8Array(this.mem.memory.buffer, ptr, size);
+				mapping.set(new Uint8Array(range));
+
 				buffer.mapping = { range: range, ptr: ptr, size: range.byteLength };
 				return ptr;
 			},
@@ -1326,6 +1329,9 @@ class WebGPUInterface {
 				const range = buffer.buffer.getMappedRange(offset, size);
 
 				const ptr = this.mem.exports.wgpu_alloc(range.byteLength);
+
+				const mapping = new Uint8Array(this.mem.memory.buffer, ptr, size);
+				mapping.set(new Uint8Array(range));
 
 				buffer.mapping = { range: range, ptr: ptr, size: range.byteLength };
 				return ptr;
