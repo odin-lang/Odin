@@ -107,13 +107,29 @@ StringView :: struct {
 
 STRLEN :: max(uint)
 
+STRINGVIEW_NIL :: StringView{nil, STRLEN}
+STRINGVIEW_EMPTY :: StringView{nil, 0}
+
+StringView_CreateCString :: proc(str: cstring) -> StringView {
+	return {str, STRLEN}
+}
+
+StringView_CreateString :: proc(str: string) -> StringView {
+	return {strings.unsafe_string_to_cstring(str), len(str)}
+}
+
+StringView_Create :: proc {
+	StringView_CreateCString,
+	StringView_CreateString,
+}
+
 StringView_Formatter :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
 	v := cast(^StringView)arg.data
 	switch verb {
-	case 'v', 's', 'q':
+	case 'v', 'w', 's', 'q':
 		switch {
-		case v^ == StringView_CreateNil():
-			fmt.fmt_string(fi, "nil", verb)
+		case v^ == STRINGVIEW_NIL:
+			fmt.fmt_string(fi, "<nil>", verb)
 
 		case v.length == 0:
 			fmt.fmt_string(fi, "", verb)
@@ -130,27 +146,6 @@ StringView_Formatter :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
 	case:
 		return false
 	}
-}
-
-StringView_CreateNil :: proc() -> StringView {
-	return {nil, STRLEN}
-}
-
-StringView_CreateEmpty :: proc() -> StringView {
-	return {nil, 0}
-}
-
-StringView_CreateCString :: proc(str: cstring) -> StringView {
-	return {str, STRLEN}
-}
-
-StringView_CreateString :: proc(str: string) -> StringView {
-	return {strings.unsafe_string_to_cstring(str), len(str)}
-}
-
-StringView_Create :: proc {
-	StringView_CreateCString,
-	StringView_CreateString,
 }
 
 Adapter :: distinct rawptr
