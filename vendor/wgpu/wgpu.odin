@@ -1530,8 +1530,10 @@ foreign libwgpu {
 	DeviceCreateShaderModule :: proc(device: Device, descriptor: /* const */ ^ShaderModuleDescriptor) -> ShaderModule ---
 	DeviceCreateTexture :: proc(device: Device, descriptor: /* const */ ^TextureDescriptor) -> Texture ---
 	DeviceDestroy :: proc(device: Device) ---
-	DeviceGetAdapterInfo :: proc(device: Device, info: ^AdapterInfo) -> Status ---
-	DeviceGetFeatures :: proc(device: Device, features: ^SupportedFeatures) ---
+	@(link_name="wgpuDeviceGetAdapterInfo")
+	RawDeviceGetAdapterInfo :: proc(device: Device, info: ^AdapterInfo) -> Status ---
+	@(link_name="wgpuDeviceGetFeatures")
+	RawDeviceGetFeatures :: proc(device: Device, features: ^SupportedFeatures) ---
 	@(link_name="wgpuDeviceGetLimits")
 	RawDeviceGetLimits :: proc(device: Device, limits: ^Limits) -> Status ---
 	DeviceGetLostFuture :: proc(device: Device) -> Future ---
@@ -1721,8 +1723,8 @@ AdapterGetLimits :: proc "c" (adapter: Adapter) -> (limits: Limits, status: Stat
 	return
 }
 
-AdapterGetInfo :: proc "c" (adapter: Adapter) -> (info: AdapterInfo) {
-	RawAdapterGetInfo(adapter, &info)
+AdapterGetInfo :: proc "c" (adapter: Adapter) -> (info: AdapterInfo, status: Status) {
+	status = RawAdapterGetInfo(adapter, &info)
 	return
 }
 
@@ -1771,6 +1773,16 @@ ComputePassEncoderSetBindGroup :: proc "c" (computePassEncoder: ComputePassEncod
 
 DeviceGetLimits :: proc "c" (device: Device) -> (limits: Limits, status: Status) {
 	status = RawDeviceGetLimits(device, &limits)
+	return
+}
+
+DeviceGetAdapterInfo :: proc "c" (device: Device) -> (info: AdapterInfo, status: Status) {
+	status = RawDeviceGetAdapterInfo(device, &info)
+	return
+}
+
+DeviceGetFeatures :: proc "c" (device: Device) -> (features: SupportedFeatures) {
+	RawDeviceGetFeatures(device, &features)
 	return
 }
 
