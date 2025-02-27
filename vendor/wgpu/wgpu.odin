@@ -2109,7 +2109,7 @@ foreign libwgpu {
 	@(link_name="wgpuAdapterGetFeatures")
 	RawAdapterGetFeatures :: proc(adapter: Adapter, features: ^SupportedFeatures) ---
 	@(link_name="wgpuAdapterGetInfo")
-	RawAdapterGetInfo :: proc(adapter: Adapter, info: ^AdapterInfo) ---
+	RawAdapterGetInfo :: proc(adapter: Adapter, info: ^AdapterInfo) -> Status ---
 	@(link_name="wgpuAdapterGetLimits")
 	RawAdapterGetLimits :: proc(adapter: Adapter, limits: ^Limits) -> Status ---
 	AdapterHasFeature :: proc(adapter: Adapter, feature: FeatureName) -> b32 ---
@@ -2383,8 +2383,8 @@ AdapterGetFeatures :: proc "c" (adapter: Adapter) -> (features: SupportedFeature
 	return
 }
 
-AdapterGetInfo :: proc "c" (adapter: Adapter) -> (info: AdapterInfo) {
-	RawAdapterGetInfo(adapter, &info)
+AdapterGetInfo :: proc "c" (adapter: Adapter) -> (info: AdapterInfo, status: Status) {
+	status = RawAdapterGetInfo(adapter, &info)
 	return
 }
 
