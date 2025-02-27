@@ -1194,6 +1194,15 @@ KHR_XLIB_SURFACE_EXTENSION_NAME                           :: "VK_KHR_xlib_surfac
 KHR_xcb_surface                                           :: 1
 KHR_XCB_SURFACE_SPEC_VERSION                              :: 6
 KHR_XCB_SURFACE_EXTENSION_NAME                            :: "VK_KHR_xcb_surface"
+KHR_portability_subset                                    :: 1
+KHR_PORTABILITY_SUBSET_SPEC_VERSION                       :: 1
+KHR_PORTABILITY_SUBSET_EXTENSION_NAME                     :: "VK_KHR_portability_subset"
+AMDX_shader_enqueue                                       :: 1
+AMDX_SHADER_ENQUEUE_SPEC_VERSION                          :: 2
+AMDX_SHADER_ENQUEUE_EXTENSION_NAME                        :: "VK_AMDX_shader_enqueue"
+NV_displacement_micromap                                  :: 1
+NV_DISPLACEMENT_MICROMAP_SPEC_VERSION                     :: 2
+NV_DISPLACEMENT_MICROMAP_EXTENSION_NAME                   :: "VK_NV_displacement_micromap"
 
 // Handles types
 Instance       :: distinct Handle

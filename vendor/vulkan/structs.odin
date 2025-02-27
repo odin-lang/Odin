@@ -9353,6 +9353,129 @@ XcbSurfaceCreateInfoKHR :: struct {
 	window:     xcb_window_t,
 }
 
+PhysicalDevicePortabilitySubsetFeaturesKHR :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	constantAlphaColorBlendFactors:         b32,
+	events:                                 b32,
+	imageViewFormatReinterpretation:        b32,
+	imageViewFormatSwizzle:                 b32,
+	imageView2DOn3DImage:                   b32,
+	multisampleArrayImage:                  b32,
+	mutableComparisonSamplers:              b32,
+	pointPolygons:                          b32,
+	samplerMipLodBias:                      b32,
+	separateStencilMaskRef:                 b32,
+	shaderSampleRateInterpolationFunctions: b32,
+	tessellationIsolines:                   b32,
+	tessellationPointMode:                  b32,
+	triangleFans:                           b32,
+	vertexAttributeAccessBeyondStride:      b32,
+}
+
+PhysicalDevicePortabilitySubsetPropertiesKHR :: struct {
+	sType:                                StructureType,
+	pNext:                                rawptr,
+	minVertexInputBindingStrideAlignment: u32,
+}
+
+PhysicalDeviceShaderEnqueueFeaturesAMDX :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	shaderEnqueue:     b32,
+	shaderMeshEnqueue: b32,
+}
+
+PhysicalDeviceShaderEnqueuePropertiesAMDX :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	maxExecutionGraphDepth:                 u32,
+	maxExecutionGraphShaderOutputNodes:     u32,
+	maxExecutionGraphShaderPayloadSize:     u32,
+	maxExecutionGraphShaderPayloadCount:    u32,
+	executionGraphDispatchAddressAlignment: u32,
+	maxExecutionGraphWorkgroupCount:        [3]u32,
+	maxExecutionGraphWorkgroups:            u32,
+}
+
+ExecutionGraphPipelineScratchSizeAMDX :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	minSize:         DeviceSize,
+	maxSize:         DeviceSize,
+	sizeGranularity: DeviceSize,
+}
+
+ExecutionGraphPipelineCreateInfoAMDX :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	flags:              PipelineCreateFlags,
+	stageCount:         u32,
+	pStages:            [^]PipelineShaderStageCreateInfo,
+	pLibraryInfo:       ^PipelineLibraryCreateInfoKHR,
+	layout:             PipelineLayout,
+	basePipelineHandle: Pipeline,
+	basePipelineIndex:  i32,
+}
+
+DeviceOrHostAddressConstAMDX :: struct #raw_union {
+	deviceAddress: DeviceAddress,
+	hostAddress:   rawptr,
+}
+
+DispatchGraphInfoAMDX :: struct {
+	nodeIndex:     u32,
+	payloadCount:  u32,
+	payloads:      DeviceOrHostAddressConstAMDX,
+	payloadStride: u64,
+}
+
+DispatchGraphCountInfoAMDX :: struct {
+	count:  u32,
+	infos:  DeviceOrHostAddressConstAMDX,
+	stride: u64,
+}
+
+PipelineShaderStageNodeCreateInfoAMDX :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	pName: cstring,
+	index: u32,
+}
+
+PhysicalDeviceDisplacementMicromapFeaturesNV :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	displacementMicromap: b32,
+}
+
+PhysicalDeviceDisplacementMicromapPropertiesNV :: struct {
+	sType:                                   StructureType,
+	pNext:                                   rawptr,
+	maxDisplacementMicromapSubdivisionLevel: u32,
+}
+
+AccelerationStructureTrianglesDisplacementMicromapNV :: struct {
+	sType:                                 StructureType,
+	pNext:                                 rawptr,
+	displacementBiasAndScaleFormat:        Format,
+	displacementVectorFormat:              Format,
+	displacementBiasAndScaleBuffer:        DeviceOrHostAddressConstKHR,
+	displacementBiasAndScaleStride:        DeviceSize,
+	displacementVectorBuffer:              DeviceOrHostAddressConstKHR,
+	displacementVectorStride:              DeviceSize,
+	displacedMicromapPrimitiveFlags:       DeviceOrHostAddressConstKHR,
+	displacedMicromapPrimitiveFlagsStride: DeviceSize,
+	indexType:                             IndexType,
+	indexBuffer:                           DeviceOrHostAddressConstKHR,
+	indexStride:                           DeviceSize,
+	baseTriangle:                          u32,
+	usageCountsCount:                      u32,
+	pUsageCounts:                          [^]MicromapUsageEXT,
+	ppUsageCounts:                         ^[^]MicromapUsageEXT,
+	micromap:                              MicromapEXT,
+}
+
 VideoAV1ColorConfigFlags :: distinct bit_set[VideoAV1ColorConfigFlag; u32]
 VideoAV1ColorConfigFlag :: enum u32 {
 	mono_chrome,

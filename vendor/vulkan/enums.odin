@@ -768,6 +768,12 @@ DiscardRectangleModeEXT :: enum c.int {
 	EXCLUSIVE = 1,
 }
 
+DisplacementMicromapFormatNV :: enum c.int {
+	_64_TRIANGLES_64_BYTES    = 1,
+	_256_TRIANGLES_128_BYTES  = 2,
+	_1024_TRIANGLES_128_BYTES = 3,
+}
+
 DisplayEventTypeEXT :: enum c.int {
 	FIRST_PIXEL_OUT = 0,
 }
