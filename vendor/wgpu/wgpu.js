@@ -1365,6 +1365,7 @@ class WebGPUInterface {
 			 */
 			wgpuBufferMapAsync: (bufferIdx, mode, offset, size, callbackInfoPtr) => {
 				const buffer = this.buffers.get(bufferIdx);
+				mode   = this.unwrapBigInt(mode);
 				offset = this.unwrapBigInt(offset);
 				size   = this.unwrapBigInt(size);
 
