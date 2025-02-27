@@ -138,7 +138,7 @@ StringView_Formatter :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
 			fmt.fmt_cstring(fi, v.data, verb)
 
 		case:
-			s := strings.string_from_ptr(transmute([^]u8)(v.data), int(v.length))
+			s := strings.string_from_ptr(cast([^]u8)(v.data), int(v.length))
 			fmt.fmt_string(fi, s, verb)
 		}
 		return true

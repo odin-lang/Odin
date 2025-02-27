@@ -1,7 +1,5 @@
 package wgpu_sdl3_glue
 
-import win "core:sys/windows"
-
 import "vendor:sdl3"
 import "vendor:wgpu"
 
