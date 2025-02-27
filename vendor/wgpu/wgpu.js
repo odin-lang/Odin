@@ -84,6 +84,7 @@ class WebGPUInterface {
 			Origin3D: [12, 4],
 			QueueDescriptor: [this.mem.intSize*3, this.mem.intSize],
 			CallbackInfo: [20, 4],
+			UncapturedErrorCallbackInfo: [16, 4],
 			RenderPassColorAttachment: [56, 8],
 			BindGroupEntry: [40, 8],
 			BindGroupLayoutEntry: [80, 8],
@@ -1053,6 +1054,16 @@ class WebGPUInterface {
 		};
 	}
 
+	UncapturedErrorCallbackInfo(start) {
+		const off = this.struct(start);
+		off(4);
+		return {
+			callback: this.mem.exports.__indirect_function_table.get(this.mem.loadPtr(off(4))),
+			userdata1: this.mem.loadPtr(off(4)),
+			userdata2: this.mem.loadPtr(off(4)),
+		};
+	}
+
 	callCallback(callback, args) {
 		args.push(callback.userdata1);
 		args.push(callback.userdata2);
@@ -1195,7 +1206,7 @@ class WebGPUInterface {
 				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
 
 				const deviceLostCallbackInfo = this.CallbackInfo(off(this.sizes.CallbackInfo));
-				const uncapturedErrorCallbackInfo = this.CallbackInfo(off(this.sizes.CallbackInfo));
+				const uncapturedErrorCallbackInfo = this.UncapturedErrorCallbackInfo(off(this.sizes.UncapturedErrorCallbackInfo));
 
 				adapter.requestDevice(descriptor)
 					.catch((e) => {

@@ -853,7 +853,6 @@ RequestDeviceCallbackInfo :: struct {
 
 UncapturedErrorCallbackInfo :: struct {
 	nextInChain: ^ChainedStructOut,
-	mode: CallbackMode,
 	callback: UncapturedErrorCallback,
 	userdata1: rawptr,
 	userdata2: rawptr,
