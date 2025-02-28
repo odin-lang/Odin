@@ -2,8 +2,8 @@ package wgpu
 
 import "base:runtime"
 
-BINDINGS_VERSION        :: [4]u8{24, 0, 0, 1}
-BINDINGS_VERSION_STRING :: "24.0.0.1"
+BINDINGS_VERSION        :: [4]u8{24, 0, 0, 2}
+BINDINGS_VERSION_STRING :: "24.0.0.2"
 
 LogLevel :: enum i32 {
 	Off,
