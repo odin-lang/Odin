@@ -1114,62 +1114,34 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			}
 
 			Type *elem = et->BitSet.elem;
-			if (is_type_enum(elem)) {
-				i64 enum_count = 0;
-				lbValue values      = lb_enum_values_slice(p, elem, &enum_count);
-				lbValue values_data = lb_slice_elem(p, values);
-				lbValue max_count   = lb_const_int(m, t_int, enum_count);
+			Type *mask = bit_set_to_int(et);
 
-				lbAddr offset_ = lb_add_local_generated(p, t_int, false);
-				lb_addr_store(p, offset_, lb_const_int(m, t_int, 0));
+			lbValue all_mask = lb_const_value(p->module, mask, exact_bit_set_all_set_mask(et));
+			lbValue initial_mask = lb_emit_arith(p, Token_And, the_set, all_mask, mask);
 
-				loop = lb_create_block(p, "for.bit_set.enum.loop");
-				lb_emit_jump(p, loop);
-				lb_start_block(p, loop);
+			lbAddr remaining = lb_add_local_generated(p, mask, false);
+			lb_addr_store(p, remaining, initial_mask);
 
-				lbBlock *body_check = lb_create_block(p, "for.bit_set.enum.body-check");
-				lbBlock *body = lb_create_block(p, "for.bit_set.enum.body");
-				done = lb_create_block(p, "for.bit_set.enum.done");
+			loop = lb_create_block(p, "for.bit_set.loop");
+			lbBlock *body = lb_create_block(p, "for.bit_set.body");
+			done = lb_create_block(p, "for.bit_set.done");
 
-				lbValue offset = lb_addr_load(p, offset_);
-				lbValue cond = lb_emit_comp(p, Token_Lt, offset, max_count);
-				lb_emit_if(p, cond, body_check, done);
-				lb_start_block(p, body_check);
+			lb_emit_jump(p, loop);
+			lb_start_block(p, loop);
 
-				lbValue val_ptr = lb_emit_ptr_offset(p, values_data, offset);
-				lb_emit_increment(p, offset_.addr);
-				val = lb_emit_load(p, val_ptr);
-				val = lb_emit_conv(p, val, elem);
+			lbValue remaining_val = lb_addr_load(p, remaining);
+			lbValue cond = lb_emit_comp(p, Token_NotEq, remaining_val, lb_zero(m, mask));
+			lb_emit_if(p, cond, body, done);
 
-				lbValue check = lb_build_binary_in(p, val, the_set, Token_in);
-				lb_emit_if(p, check, body, loop);
-				lb_start_block(p, body);
-			} else {
-				lbAddr offset_ = lb_add_local_generated(p, t_int, false);
-				lb_addr_store(p, offset_, lb_const_int(m, t_int, et->BitSet.lower));
+			lb_start_block(p, body);
+			val = lb_emit_count_trailing_zeros(p, remaining_val, mask);
+			val = lb_emit_conv(p, val, elem);
+			val = lb_emit_arith(p, Token_Add, val, lb_const_int(m, elem, et->BitSet.lower), elem);
 
-				lbValue max_count = lb_const_int(m, t_int, et->BitSet.upper);
+			lbValue reduce_val = lb_emit_arith(p, Token_Sub, remaining_val, lb_const_int(m, mask, 1), mask);
+			remaining_val = lb_emit_arith(p, Token_And, remaining_val, reduce_val, mask);
+			lb_addr_store(p, remaining, remaining_val);
 
-				loop = lb_create_block(p, "for.bit_set.range.loop");
-				lb_emit_jump(p, loop);
-				lb_start_block(p, loop);
-
-				lbBlock *body_check = lb_create_block(p, "for.bit_set.range.body-check");
-				lbBlock *body = lb_create_block(p, "for.bit_set.range.body");
-				done = lb_create_block(p, "for.bit_set.range.done");
-
-				lbValue offset = lb_addr_load(p, offset_);
-				lbValue cond = lb_emit_comp(p, Token_LtEq, offset, max_count);
-				lb_emit_if(p, cond, body_check, done);
-				lb_start_block(p, body_check);
-
-				val = lb_emit_conv(p, offset, elem);
-				lb_emit_increment(p, offset_.addr);
-
-				lbValue check = lb_build_binary_in(p, val, the_set, Token_in);
-				lb_emit_if(p, check, body, loop);
-				lb_start_block(p, body);
-			}
 			break;
 		}
 		default:
