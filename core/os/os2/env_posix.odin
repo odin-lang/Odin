@@ -26,13 +26,15 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	return
 }
 
-_set_env :: proc(key, value: string) -> (ok: bool) {
+_set_env :: proc(key, value: string) -> (err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
-	ckey := strings.clone_to_cstring(key, temp_allocator())
-	cval := strings.clone_to_cstring(key, temp_allocator())
+	ckey := strings.clone_to_cstring(key, temp_allocator()) or_return
+	cval := strings.clone_to_cstring(key, temp_allocator()) or_return
 
-	ok = posix.setenv(ckey, cval, true) == .OK
+	if posix.setenv(ckey, cval, true) != nil {
+		err = _get_platform_error_from_errno()
+	}
 	return
 }
 

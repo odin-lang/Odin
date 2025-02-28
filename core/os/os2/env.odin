@@ -22,8 +22,8 @@ lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string,
 }
 
 // set_env sets the value of the environment variable named by the key
-// Returns true on success, false on failure
-set_env :: proc(key, value: string) -> bool {
+// Returns Error on failure
+set_env :: proc(key, value: string) -> Error {
 	return _set_env(key, value)
 }
 

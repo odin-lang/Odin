@@ -54,7 +54,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	return
 }
 
-_set_env :: proc(key, v_new: string) -> bool {
+_set_env :: proc(key, v_new: string) -> Error {
 	if _org_env_begin == 0 {
 		_build_env()
 	}
@@ -63,7 +63,7 @@ _set_env :: proc(key, v_new: string) -> bool {
 	kv_size := len(key) + len(v_new) + 2
 	if v_curr, idx := _lookup(key); idx != NOT_FOUND {
 		if v_curr == v_new {
-			return true
+			return nil
 		}
 		sync.mutex_lock(&_env_mutex)
 		defer sync.mutex_unlock(&_env_mutex)
@@ -78,7 +78,7 @@ _set_env :: proc(key, v_new: string) -> bool {
 			if len(v_new) > len(v_curr) {
 				k_addr = ([^]u8)(runtime.heap_resize(k_addr, kv_size))
 				if k_addr == nil {
-					return false
+					return .Out_Of_Memory
 				}
 				v_addr = &k_addr[len(key) + 1]
 			}
@@ -86,13 +86,13 @@ _set_env :: proc(key, v_new: string) -> bool {
 			v_addr[len(v_new)] = 0
 
 			append(&_env, string(k_addr[:kv_size]))
-			return true
+			return nil
 		}
 	}
 
 	k_addr := ([^]u8)(runtime.heap_alloc(kv_size))
 	if k_addr == nil {
-		return false
+		return .Out_Of_Memory
 	}
 	intrinsics.mem_copy_non_overlapping(k_addr, raw_data(key), len(key))
 	k_addr[len(key)] = '='
@@ -104,7 +104,7 @@ _set_env :: proc(key, v_new: string) -> bool {
 	sync.mutex_lock(&_env_mutex)
 	append(&_env, string(k_addr[:kv_size - 1]))
 	sync.mutex_unlock(&_env_mutex)
-	return true
+	return nil
 }
 
 _unset_env :: proc(key: string) -> bool {

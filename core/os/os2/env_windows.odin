@@ -36,12 +36,15 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	return
 }
 
-_set_env :: proc(key, value: string) -> bool {
+_set_env :: proc(key, value: string) -> Error {
 	TEMP_ALLOCATOR_GUARD()
-	k, _ := win32_utf8_to_wstring(key,   temp_allocator())
-	v, _ := win32_utf8_to_wstring(value, temp_allocator())
+	k := win32_utf8_to_wstring(key,   temp_allocator()) or_return
+	v := win32_utf8_to_wstring(value, temp_allocator()) or_return
 
-	return bool(win32.SetEnvironmentVariableW(k, v))
+	if !win32.SetEnvironmentVariableW(k, v) {
+		return _get_platform_error()
+	}
+	return nil
 }
 
 _unset_env :: proc(key: string) -> bool {
