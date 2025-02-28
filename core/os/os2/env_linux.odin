@@ -149,18 +149,26 @@ _clear_env :: proc() {
 	_org_env_end = ~uintptr(0)
 }
 
-_environ :: proc(allocator: runtime.Allocator) -> []string {
+_environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
 	if _org_env_begin == 0 {
 		_build_env()
 	}
-	env := make([]string, len(_env), allocator)
+	env := make([dynamic]string, 0, len(_env), allocator) or_return
+	defer if err != nil {
+		for e in env {
+			delete(e, allocator)
+		}
+		delete(env)
+	}
 
 	sync.mutex_lock(&_env_mutex)
 	defer sync.mutex_unlock(&_env_mutex)
-	for entry, i in _env {
-		env[i], _ = clone_string(entry, allocator)
+	for entry in _env {
+		s := clone_string(entry, allocator) or_return
+		append(&env, s)
 	}
-	return env
+	environ = env[:]
+	return
 }
 
 // The entire environment is stored as 0 terminated strings,

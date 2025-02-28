@@ -427,7 +427,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	command_line_w := win32_utf8_to_wstring(command_line, temp_allocator()) or_return
 	environment := desc.env
 	if desc.env == nil {
-		environment = environ(temp_allocator())
+		environment = environ(temp_allocator()) or_return
 	}
 	environment_block   := _build_environment_block(environment, temp_allocator())
 	environment_block_w := win32_utf8_to_utf16(environment_block, temp_allocator()) or_return

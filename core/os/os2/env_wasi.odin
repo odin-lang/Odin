@@ -153,34 +153,23 @@ _clear_env :: proc() {
 }
 
 @(require_results)
-_environ :: proc(allocator: runtime.Allocator) -> []string {
-	if err := build_env(); err != nil {
-		return nil
-	}
+_environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
+	build_env() or_return
 
 	sync.shared_guard(&g_env_mutex)
 
-	envs, alloc_err := make([]string, len(g_env), allocator)
-	if alloc_err != nil {
-		return nil
-	}
-
-	defer if alloc_err != nil {
+	envs := make([dynamic]string, 0, len(g_env), allocator) or_return
+	defer if err != nil {
 		for env in envs {
 			delete(env, allocator)
 		}
-		delete(envs, allocator)
+		delete(envs)
 	}
 
-	i: int
 	for k, v in g_env {
-		defer i += 1
-
-		envs[i], alloc_err = concatenate({k, "=", v}, allocator)
-		if alloc_err != nil {
-			return nil
-		}
+		append(&envs, concatenate({k, "=", v}, allocator) or_return)
 	}
 
-	return envs
+	environ = envs[:]
+	return
 }
