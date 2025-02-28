@@ -71,7 +71,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			strings.write_byte(&exe_builder, '/')
 			strings.write_string(&exe_builder, exe_name)
 
-			if exe_fd := posix.open(strings.to_cstring(&exe_builder), {.CLOEXEC, .EXEC}); exe_fd == -1 {
+			if exe_fd := posix.open(strings.to_cstring(&exe_builder) or_return, {.CLOEXEC, .EXEC}); exe_fd == -1 {
 				continue
 			} else {
 				posix.close(exe_fd)
@@ -91,7 +91,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 
 			// "hello/./world" is fine right?
 
-			if exe_fd := posix.open(strings.to_cstring(&exe_builder), {.CLOEXEC, .EXEC}); exe_fd == -1 {
+			if exe_fd := posix.open(strings.to_cstring(&exe_builder) or_return, {.CLOEXEC, .EXEC}); exe_fd == -1 {
 				err = .Not_Exist
 				return
 			} else {
@@ -102,7 +102,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		strings.builder_reset(&exe_builder)
 		strings.write_string(&exe_builder, exe_name)
 
-		if exe_fd := posix.open(strings.to_cstring(&exe_builder), {.CLOEXEC, .EXEC}); exe_fd == -1 {
+		if exe_fd := posix.open(strings.to_cstring(&exe_builder) or_return, {.CLOEXEC, .EXEC}); exe_fd == -1 {
 			err = .Not_Exist
 			return
 		} else {
@@ -181,7 +181,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			if posix.chdir(cwd) != .OK { abort(pipe[WRITE]) }
 		}
 
-		res := posix.execve(strings.to_cstring(&exe_builder), raw_data(cmd), env)
+		res := posix.execve(strings.to_cstring(&exe_builder) or_return, raw_data(cmd), env)
 		assert(res == -1)
 		abort(pipe[WRITE])
 
