@@ -14,18 +14,6 @@ pool :: struct {
 	blockSize: u64,
 }
 
-
-SYS_MAX_ERROR :: 1024
-
-sys_err_def :: struct {
-	msg: [SYS_MAX_ERROR]u8 `fmt:"s,0"`,
-	code: i32,
-}
-
-@(link_prefix="oc_")
-foreign {
-	sys_error: sys_err_def
-}
 UNICODE_BASIC_LATIN :: unicode_range { 0x0000, 127 }
 UNICODE_C1_CONTROLS_AND_LATIN_1_SUPPLEMENT :: unicode_range { 0x0080, 127 }
 UNICODE_LATIN_EXTENDED_A :: unicode_range { 0x0100, 127 }
@@ -169,43 +157,6 @@ file_write_slice :: proc(file: file, slice: []char) -> u64 {
 file_read_slice :: proc(file: file, slice: []char) -> u64 {
 	return file_read(file, u64(len(slice)), raw_data(slice))
 }
-
-style_enum :: enum {
-	SIZE_WIDTH = 1,
-	SIZE_HEIGHT,
-	
-	LAYOUT_AXIS,
-	LAYOUT_ALIGN_X,
-	LAYOUT_ALIGN_Y,
-	LAYOUT_SPACING,
-	LAYOUT_MARGIN_X,
-	LAYOUT_MARGIN_Y,
-	
-	FLOAT_X,
-	FLOAT_Y,
-
-	COLOR,
-	BG_COLOR,
-	BORDER_COLOR,
-	BORDER_SIZE,
-	ROUNDNESS,
-
-	FONT,
-	FONT_SIZE,
-
-	ANIMATION_TIME,
-	ANIMATION_MASK,
-}
-
-ui_style_mask :: bit_set[style_enum; u64]
-
-// Masks like the C version that can be used as common combinations
-SIZE :: ui_style_mask { .SIZE_WIDTH, .SIZE_HEIGHT }
-LAYOUT_MARGINS :: ui_style_mask { .LAYOUT_MARGIN_X, .LAYOUT_MARGIN_Y }
-LAYOUT :: ui_style_mask { .LAYOUT_AXIS, .LAYOUT_ALIGN_X, .LAYOUT_ALIGN_Y, .LAYOUT_SPACING, .LAYOUT_MARGIN_X, .LAYOUT_MARGIN_Y }
-FLOAT :: ui_style_mask { .FLOAT_X, .FLOAT_Y }
-MASK_INHERITED :: ui_style_mask { .COLOR, .FONT, .FONT_SIZE, .ANIMATION_TIME, .ANIMATION_MASK }
-
 ////////////////////////////////////////////////////////////////////////////////
 // Utility data structures and helpers used throughout the Orca API.
 ////////////////////////////////////////////////////////////////////////////////
@@ -572,19 +523,19 @@ utf32 :: rune
 // This enum declares the possible return status of UTF8 decoding/encoding operations.
 utf8_status :: enum u32 {
 	// The operation was successful.
-	OC_UTF8_OK = 0,
+	OK = 0,
 	// The operation unexpectedly encountered the end of the utf8 sequence.
-	OC_UTF8_OUT_OF_BOUNDS = 1,
+	OUT_OF_BOUNDS = 1,
 	// A continuation byte was encountered where a leading byte was expected.
-	OC_UTF8_UNEXPECTED_CONTINUATION_BYTE = 3,
+	UNEXPECTED_CONTINUATION_BYTE = 3,
 	// A leading byte was encountered in the middle of the encoding of utf8 codepoint.
-	OC_UTF8_UNEXPECTED_LEADING_BYTE = 4,
+	UNEXPECTED_LEADING_BYTE = 4,
 	// The utf8 sequence contains an invalid byte.
-	OC_UTF8_INVALID_BYTE = 5,
+	INVALID_BYTE = 5,
 	// The operation encountered an invalid utf8 codepoint.
-	OC_UTF8_INVALID_CODEPOINT = 6,
+	INVALID_CODEPOINT = 6,
 	// The utf8 sequence contains an overlong encoding of a utf8 codepoint.
-	OC_UTF8_OVERLONG_ENCODING = 7,
+	OVERLONG_ENCODING = 7,
 }
 
 // A type representing the result of decoding of utf8-encoded codepoint.
@@ -1191,7 +1142,7 @@ io_req :: struct {
 		unused: u64,
 	},
 	using _: struct #raw_union {
-		open: struct {
+		using open: struct {
 			// The access permissions requested on the file to open.
 			rights: file_access,
 			// The options to use when opening the file.
@@ -1772,7 +1723,7 @@ mouse_state :: struct {
 	wheel: vec2,
 	using _: struct #raw_union {
 		buttons: [5]key_state,
-		_: struct {
+		using _: struct {
 			left: key_state,
 			right: key_state,
 			middle: key_state,
@@ -1862,9 +1813,9 @@ ui_size :: struct {
 }
 
 ui_overflow :: enum u32 {
-	OVERFLOW_CLIP = 0,
-	OVERFLOW_ALLOW = 1,
-	OVERFLOW_SCROLL = 2,
+	CLIP = 0,
+	ALLOW = 1,
+	SCROLL = 2,
 }
 
 ui_attribute :: enum u32 {
@@ -1874,8 +1825,8 @@ ui_attribute :: enum u32 {
 	MARGIN_X = 3,
 	MARGIN_Y = 4,
 	SPACING = 5,
-	X = 6,
-	Y = 7,
+	ALIGN_X = 6,
+	ALIGN_Y = 7,
 	FLOATING_X = 8,
 	FLOATING_Y = 9,
 	FLOAT_TARGET_X = 10,
@@ -1899,34 +1850,34 @@ ui_attribute :: enum u32 {
 }
 
 ui_attribute_mask :: enum u32 {
-	MASK_NONE = 0,
-	MASK_SIZE_WIDTH = 1,
-	MASK_SIZE_HEIGHT = 2,
-	MASK_LAYOUT_AXIS = 4,
-	MASK_LAYOUT_ALIGN_X = 64,
-	MASK_LAYOUT_ALIGN_Y = 128,
-	MASK_LAYOUT_SPACING = 32,
-	MASK_LAYOUT_MARGIN_X = 8,
-	MASK_LAYOUT_MARGIN_Y = 16,
-	MASK_FLOATING_X = 256,
-	MASK_FLOATING_Y = 512,
-	MASK_FLOAT_TARGET_X = 1024,
-	MASK_FLOAT_TARGET_Y = 2048,
-	MASK_OVERFLOW_X = 4096,
-	MASK_OVERFLOW_Y = 8192,
-	MASK_CONSTRAIN_X = 16384,
-	MASK_CONSTRAIN_Y = 32768,
-	MASK_COLOR = 65536,
-	MASK_BG_COLOR = 131072,
-	MASK_BORDER_COLOR = 262144,
-	MASK_BORDER_SIZE = 2097152,
-	MASK_ROUNDNESS = 4194304,
-	MASK_FONT = 524288,
-	MASK_FONT_SIZE = 1048576,
-	MASK_DRAW_MASK = 8388608,
-	MASK_ANIMATION_TIME = 16777216,
-	MASK_ANIMATION_MASK = 33554432,
-	MASK_CLICK_THROUGH = 67108864,
+	NONE = 0,
+	SIZE_WIDTH = 1,
+	SIZE_HEIGHT = 2,
+	LAYOUT_AXIS = 4,
+	LAYOUT_ALIGN_X = 64,
+	LAYOUT_ALIGN_Y = 128,
+	LAYOUT_SPACING = 32,
+	LAYOUT_MARGIN_X = 8,
+	LAYOUT_MARGIN_Y = 16,
+	FLOATING_X = 256,
+	FLOATING_Y = 512,
+	FLOAT_TARGET_X = 1024,
+	FLOAT_TARGET_Y = 2048,
+	OVERFLOW_X = 4096,
+	OVERFLOW_Y = 8192,
+	CONSTRAIN_X = 16384,
+	CONSTRAIN_Y = 32768,
+	COLOR = 65536,
+	BG_COLOR = 131072,
+	BORDER_COLOR = 262144,
+	BORDER_SIZE = 2097152,
+	ROUNDNESS = 4194304,
+	FONT = 524288,
+	FONT_SIZE = 1048576,
+	DRAW_MASK = 8388608,
+	ANIMATION_TIME = 16777216,
+	ANIMATION_MASK = 33554432,
+	CLICK_THROUGH = 67108864,
 }
 
 ui_layout_align :: [2]ui_align
@@ -1936,6 +1887,8 @@ ui_layout :: struct {
 	spacing: f32,
 	margin: [2]f32,
 	align: ui_layout_align,
+	overflow: [2]ui_overflow,
+	constrain: [2]bool,
 }
 
 ui_box_size :: [2]ui_size
@@ -1943,10 +1896,10 @@ ui_box_size :: [2]ui_size
 ui_box_floating :: [2]bool
 
 ui_draw_mask :: enum u32 {
-	DRAW_MASK_BACKGROUND = 1,
-	DRAW_MASK_BORDER = 2,
-	DRAW_MASK_TEXT = 4,
-	DRAW_MASK_PROC = 8,
+	BACKGROUND = 1,
+	BORDER = 2,
+	TEXT = 4,
+	PROC = 8,
 }
 
 ui_style :: struct {
