@@ -2562,9 +2562,10 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 	GB_ASSERT(m->module_name != nullptr);
 	String s = make_string_c(m->module_name);
 	String prefix = str_lit("odin_package-");
-	GB_ASSERT(string_starts_with(s, prefix));
-	s.text += prefix.len;
-	s.len  -= prefix.len;
+	if (string_starts_with(s, prefix)) {
+		s.text += prefix.len;
+		s.len  -= prefix.len;
+	}
 
 	path = concatenate_strings(permanent_allocator(), path, s);
 	path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
@@ -2595,14 +2596,16 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 		GB_ASSERT(m->module_name != nullptr);
 		String s = make_string_c(m->module_name);
 		String prefix = str_lit("odin_package");
-		GB_ASSERT(string_starts_with(s, prefix));
-		s.text += prefix.len;
-		s.len  -= prefix.len;
+		if (string_starts_with(s, prefix)) {
+			s.text += prefix.len;
+			s.len  -= prefix.len;
+		}
 
 		path = gb_string_append_length(path, s.text, s.len);
 	}
 
 	if (use_temporary_directory) {
+		// NOTE(bill): this must be suffixed to ensure it is not conflicting with anything else in the temporary directory
 		path = gb_string_append_fmt(path, "-%p", m);
 	}
 
