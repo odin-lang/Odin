@@ -5681,7 +5681,7 @@ AabbPositionsKHR :: struct {
 }
 
 AccelerationStructureInstanceKHR :: struct {
-	transform: TransformMatrixKHR,
+	transform:                      TransformMatrixKHR,
 	using _: bit_field u32 {
 		instanceCustomIndex: u32 | 24,
 		mask:                u32 | 8,
@@ -6752,8 +6752,8 @@ AccelerationStructureMotionInfoNV :: struct {
 }
 
 AccelerationStructureMatrixMotionInstanceNV :: struct {
-	transformT0: TransformMatrixKHR,
-	transformT1: TransformMatrixKHR,
+	transformT0:                    TransformMatrixKHR,
+	transformT1:                    TransformMatrixKHR,
 	using _: bit_field u32 {
 		instanceCustomIndex: u32 | 24,
 		mask:                u32 | 8,
@@ -6785,8 +6785,8 @@ SRTDataNV :: struct {
 }
 
 AccelerationStructureSRTMotionInstanceNV :: struct {
-	transformT0: SRTDataNV,
-	transformT1: SRTDataNV,
+	transformT0:                    SRTDataNV,
+	transformT1:                    SRTDataNV,
 	using _: bit_field u32 {
 		instanceCustomIndex: u32 | 24,
 		mask:                u32 | 8,
@@ -8378,8 +8378,8 @@ ClusterAccelerationStructureBuildClustersBottomLevelInfoNV :: struct {
 }
 
 ClusterAccelerationStructureBuildTriangleClusterInfoNV :: struct {
-	clusterID: u32,
-	clusterFlags: ClusterAccelerationStructureClusterFlagsNV,
+	clusterID:                         u32,
+	clusterFlags:                      ClusterAccelerationStructureClusterFlagsNV,
 	using _: bit_field u32 {
 		triangleCount:            u32 | 9,
 		vertexCount:              u32 | 9,
@@ -8388,20 +8388,20 @@ ClusterAccelerationStructureBuildTriangleClusterInfoNV :: struct {
 		opacityMicromapIndexType: u32 | 4,
 	},
 	baseGeometryIndexAndGeometryFlags: ClusterAccelerationStructureGeometryIndexAndGeometryFlagsNV,
-	indexBufferStride: u16,
-	vertexBufferStride: u16,
+	indexBufferStride:                 u16,
+	vertexBufferStride:                u16,
 	geometryIndexAndFlagsBufferStride: u16,
-	opacityMicromapIndexBufferStride: u16,
-	indexBuffer: DeviceAddress,
-	vertexBuffer: DeviceAddress,
-	geometryIndexAndFlagsBuffer: DeviceAddress,
-	opacityMicromapArray: DeviceAddress,
-	opacityMicromapIndexBuffer: DeviceAddress,
+	opacityMicromapIndexBufferStride:  u16,
+	indexBuffer:                       DeviceAddress,
+	vertexBuffer:                      DeviceAddress,
+	geometryIndexAndFlagsBuffer:       DeviceAddress,
+	opacityMicromapArray:              DeviceAddress,
+	opacityMicromapIndexBuffer:        DeviceAddress,
 }
 
 ClusterAccelerationStructureBuildTriangleClusterTemplateInfoNV :: struct {
-	clusterID: u32,
-	clusterFlags: ClusterAccelerationStructureClusterFlagsNV,
+	clusterID:                         u32,
+	clusterFlags:                      ClusterAccelerationStructureClusterFlagsNV,
 	using _: bit_field u32 {
 		triangleCount:            u32 | 9,
 		vertexCount:              u32 | 9,
@@ -8410,26 +8410,26 @@ ClusterAccelerationStructureBuildTriangleClusterTemplateInfoNV :: struct {
 		opacityMicromapIndexType: u32 | 4,
 	},
 	baseGeometryIndexAndGeometryFlags: ClusterAccelerationStructureGeometryIndexAndGeometryFlagsNV,
-	indexBufferStride: u16,
-	vertexBufferStride: u16,
+	indexBufferStride:                 u16,
+	vertexBufferStride:                u16,
 	geometryIndexAndFlagsBufferStride: u16,
-	opacityMicromapIndexBufferStride: u16,
-	indexBuffer: DeviceAddress,
-	vertexBuffer: DeviceAddress,
-	geometryIndexAndFlagsBuffer: DeviceAddress,
-	opacityMicromapArray: DeviceAddress,
-	opacityMicromapIndexBuffer: DeviceAddress,
-	instantiationBoundingBoxLimit: DeviceAddress,
+	opacityMicromapIndexBufferStride:  u16,
+	indexBuffer:                       DeviceAddress,
+	vertexBuffer:                      DeviceAddress,
+	geometryIndexAndFlagsBuffer:       DeviceAddress,
+	opacityMicromapArray:              DeviceAddress,
+	opacityMicromapIndexBuffer:        DeviceAddress,
+	instantiationBoundingBoxLimit:     DeviceAddress,
 }
 
 ClusterAccelerationStructureInstantiateClusterInfoNV :: struct {
-	clusterIdOffset: u32,
+	clusterIdOffset:        u32,
 	using _: bit_field u32 {
 		geometryIndexOffset: u32 | 24,
 		reserved:            u32 | 8,
 	},
 	clusterTemplateAddress: DeviceAddress,
-	vertexBuffer: StridedDeviceAddressNV,
+	vertexBuffer:           StridedDeviceAddressNV,
 }
 
 AccelerationStructureBuildSizesInfoKHR :: struct {

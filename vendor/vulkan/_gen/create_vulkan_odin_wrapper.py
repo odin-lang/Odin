@@ -683,7 +683,7 @@ def parse_structs(f):
         # and inject anonymous bitfields into the struct if there are any
         else:
             has_anon_bitfield = any(name is None for name, _ in ffields)
-            max_len = 1 if has_anon_bitfield else max([len(n) for n, _ in ffields], default=0)
+            max_len = max([0 if n is None else len(n) for n, _ in ffields], default=0)
             f.write("{} :: struct ".format(struct_name))
             if _type == "union":
                 f.write("#raw_union ")
