@@ -1,7 +1,7 @@
 package sdl3_image
 
 import "core:c"
-import SDL ".."
+import SDL "vendor:sdl3"
 
 when ODIN_OS == .Windows {
 	foreign import lib "SDL3_image.lib"
