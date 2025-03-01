@@ -169,7 +169,7 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
 			if (other_global) {
 				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
-				if (!ec.e->Variable.is_export) {
+				if (!ec.e->Variable.is_export && !ec.e->Variable.is_foreign) {
 					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
 				}
 			}
@@ -177,7 +177,7 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
 			if (other_global) {
 				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
-				if (!ec.e->Procedure.is_export) {
+				if (!ec.e->Procedure.is_export && !ec.e->Procedure.is_foreign) {
 					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
 				}
 			}
