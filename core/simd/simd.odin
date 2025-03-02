@@ -2013,7 +2013,7 @@ Example:
 
 	// Since lanes 0, 1, 4, 7 contain negative numbers, the most significant
 	// bits for them will be set.
-	v := #simd[8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
+	v := #simd [8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
 	fmt.println(simd.extract_msbs(v))
 
 Output:
@@ -2052,7 +2052,7 @@ Example:
 
 	// Since lanes 0, 2, 4, 6 contain odd integers, the least significant bits
 	// for these lanes are set.
-	v := #simd[8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
+	v := #simd [8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
 	fmt.println(simd.extract_lsbs(v))
 
 Output:
@@ -2100,8 +2100,7 @@ Example:
 	
 	a := #simd [4]f32 { 1, 2, 3, 4 }
 	b := #simd [4]f32 { 5, 6, 7, 8 }
-	indices := #simd[4]
-	res := simd.swizzle(x, 0, 4, 2, 5)
+	res := simd.shuffle(a, b, 0, 4, 2, 5)
 	fmt.println("res")
 
 Output:
@@ -2164,7 +2163,6 @@ Example:
 
 	// The following example selects values from the two input vectors, `a` and `b`
 	// into a single vector.
-
 	a := #simd [4] f64 { 1,2,3,4 }
 	b := #simd [4] f64 { 5,6,7,8 }
 	cond := #simd[4] int { 1, 0, 1, 0 }
