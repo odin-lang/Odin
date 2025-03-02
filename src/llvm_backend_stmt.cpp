@@ -1119,6 +1119,10 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			lbValue all_mask = lb_const_value(p->module, mask, exact_bit_set_all_set_mask(et));
 			lbValue initial_mask = lb_emit_arith(p, Token_And, the_set, all_mask, mask);
 
+			if (rs->reverse) {
+				initial_mask = lb_emit_reverse_bits(p, initial_mask, mask);
+			}
+
 			lbAddr remaining = lb_add_local_generated(p, mask, false);
 			lb_addr_store(p, remaining, initial_mask);
 
@@ -1136,7 +1140,12 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			lb_start_block(p, body);
 			val = lb_emit_count_trailing_zeros(p, remaining_val, mask);
 			val = lb_emit_conv(p, val, elem);
-			val = lb_emit_arith(p, Token_Add, val, lb_const_int(m, elem, et->BitSet.lower), elem);
+
+			if (rs->reverse) {
+				val = lb_emit_arith(p, Token_Sub, lb_const_int(m, elem, et->BitSet.lower + 8*type_size_of(mask) - 1), val, elem);
+			} else {
+				val = lb_emit_arith(p, Token_Add, val, lb_const_int(m, elem, et->BitSet.lower), elem);
+			}
 
 			lbValue reduce_val = lb_emit_arith(p, Token_Sub, remaining_val, lb_const_int(m, mask, 1), mask);
 			remaining_val = lb_emit_arith(p, Token_And, remaining_val, reduce_val, mask);
