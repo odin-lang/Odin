@@ -18,6 +18,7 @@ file_and_urls = [
     ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
     ("vulkan_xlib.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xlib.h',    False),
     ("vulkan_xcb.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xcb.h',     False),
+    ("vulkan_beta.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_beta.h',    False),
     # Vulkan Video
     ("vulkan_video_codec_av1std.h",         'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std.h', False),
     ("vulkan_video_codec_av1std_decode.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std_decode.h', False),
@@ -338,7 +339,6 @@ def parse_enums(f):
             generated_flags.add(flags_name)
             f.write("{} :: distinct bit_set[{}; Flags]\n".format(flags_name, enum_name))
 
-
         if is_flag_bit:
             f.write("{} :: enum Flags {{\n".format(name.replace("FlagBits", "Flag")))
         else:
@@ -537,80 +537,164 @@ def parse_fake_enums(f):
 
         f.write("}\n\n")
 
+class BitfieldError(ValueError):
+    pass
+
+def bitfield_type_to_size(type_):
+    if type_ == 'u8':
+        return 8
+    if type_ == 'u16':
+        return 16
+    if type_ == 'u32':
+        return 32
+    if type_ == 'u64':
+        return 64
+    if 'Flags' in type_:
+        return 32
+    else:
+        raise BitfieldError(f"Invalid type for bitfield: {type_}")
+
+def bitfield_size_to_type(size):
+    if size == 8:
+        return 'u8'
+    if size == 16:
+        return 'u16'
+    if size == 32:
+        return 'u32'
+    if size == 64:
+        return 'u64'
+    else:
+        raise BitfieldError(f"Invalid size for bitfield: {size}")
+
+
+class Bitfield:
+    class Field:
+        def __init__(self, name, type_, bitsize):
+            self.name = name
+            self.type = type_
+            self.bitsize = bitsize
+            
+    def __init__(self, type_):
+        self.bitsize = bitfield_type_to_size(type_)
+        self.type = bitfield_size_to_type(self.bitsize)
+        self.fields_bitsize = 0
+        self.fields = []
+
+    def add_field(self, name, type_, bitsize):
+        self.fields.append(Bitfield.Field(name, type_, bitsize))
+        self.fields_bitsize += bitsize
+        
+    def write(self, f, name=None, indent=0, justify=True):
+        max_name = 1 if not justify else max([len(f.name) for f in self.fields], default=0)
+        max_type = 1 if not justify else max([len(f.type) for f in self.fields], default=0)
+        is_bit_set = all([f.bitsize == 1 or f.name == "reserved" for f in self.fields])
+        if is_bit_set and name is None:
+            raise BitfieldError(f"bit_set can not be anonymous")
+            
+        if is_bit_set:
+            if not name.endswith("Flags"):
+                raise BitfieldError(f"bit_set name should end with 'Flags': {name}")
+            enum_name = re.sub('Flags$', 'Flag', name)
+            f.write("{}{} :: distinct bit_set[{}; {}]\n".format('\t' * indent, name, enum_name, self.type))
+            f.write("{}{} :: enum {} {{\n".format('\t' * indent, enum_name, self.type))
+            for field in self.fields:
+                if field.name != "reserved":
+                    f.write("{}{},\n".format('\t' * (indent + 1), field.name))
+            f.write(('\t' * indent) + "}\n")
+                
+        else:
+            f.write("{}{} bit_field {} {{\n".format('\t' * indent, name + ' ::' if name else 'using _:', self.type))
+            for field in self.fields:
+                type_ = field.type.replace("Flags", "Flag")
+                f.write("{}{} {} | {},\n".format(
+                    '\t' * (indent + 1),
+                    (field.name + ":").ljust(max_name + 1),
+                    type_.ljust(max_type),
+                    field.bitsize))
+            f.write(('\t' * indent) + "}" + ("," if name is None else "") + "\n")
+
 def parse_structs(f):
     data = re.findall(r"typedef (struct|union) Vk(\w+?) {(.+?)} \w+?;", src, re.S)
     data += re.findall(r"typedef (struct|union) Std(\w+?) {(.+?)} \w+?;", src, re.S)
 
-    for _type, name, fields in data:
+    for _type, struct_name, fields in data:
         fields = re.findall(r"\s+(.+?)[\s:]+([_a-zA-Z0-9[\]]+);", fields)
-        f.write("{} :: struct ".format(name))
-        if _type == "union":
-            f.write("#raw_union ")
-        f.write("{\n")
-
 
         prev_name = ""
         ffields = []
+        bitfield = None
         for type_, fname in fields:
-
             # If the field name only has a number in it, then it is a C bit field.
+            # We will collect all the bit fields and then create either a bit_field or a bit_set.
             if is_int(fname):
-                comment = None
-                bit_field = type_.split(' ')
+                bf_field = type_.split(' ')
                 # Get rid of empty spaces
-                bit_field = list(filter(bool, bit_field))
+                bf_field = list(filter(bool, bf_field))
                 # [type, fieldname]
-                assert len(bit_field) == 2, "Failed to parse the bit field!"
+                assert len(bf_field) == 2, "Failed to parse the bit field!"
+                field_type = do_type(bf_field[0])
+                bitsize = int(fname)
 
+                # Close the set because the field size is greater than the bitfield type
+                if bitfield and (bitfield.fields_bitsize + bitsize) > bitfield_type_to_size(field_type):
+                    ffields.append(tuple([None, bitfield]))
+                    bitfield = None
 
-                bit_field_type = ""
-                # Right now there are only two ways that C bit fields exist in
-                # the header files.
+                # Raise an error if the field type size is greater than the bitfield type size
+                if bitfield is not None and bitfield_type_to_size(bitfield.type) < bitfield_type_to_size(field_type):
+                    raise BitfieldError(f"field will not fit in the bitfield: {bitfield.type} < {field_type}")
 
-                # First one uses the 8 MOST significant bits for one field, and
-                # 24 bits for the other field.
-                # In the bindings these two fields are merged into one u32.
-                if int(fname) == 24:
-                    prev_name = bit_field[1]
-                    continue
+                # Create a new bitfield if we don't have one
+                if not bitfield:
+                    bitfield = Bitfield(field_type)
 
-                elif prev_name:
-                    bit_field_type = do_type("uint32_t")
-                    bit_field_name = prev_name + "And" + bit_field[1].capitalize()
-                    comment = " // Most significant byte is {}".format(bit_field[1])
-                    ffields.append(tuple([bit_field_name, bit_field_type, comment]))
-                    prev_name = ""
-                    continue
+                # Add the field to the bitfield
+                bitfield.add_field(bf_field[1], field_type, bitsize)
+                continue
 
-                # The second way has many fields that are each 1 bit
-                elif int(fname) == 1:
-                    bit_field_type = do_type(bit_field[0], prev_name, fname)
-                    ffields.append(tuple(["bitfield", bit_field_type, comment]))
-                    break
-
-
+            # Close the bitfield because this is not a field
+            elif bitfield:
+                ffields.append(tuple([None, bitfield]))
+                bitfield = None
 
             if '[' in fname:
                 fname, type_ = parse_array(fname, type_)
-            comment = None
             n = fix_arg(fname)
             if "Flag_Bits" in type_:
-                comment = " // only single bit set"
+                # comment = " // only single bit set"
+                raise BitfieldError("only single bit set")
             t = do_type(type_, prev_name, fname)
             if n == "matrix":
                 n = "mat"
 
-            ffields.append(tuple([n, t, comment]))
+            ffields.append(tuple([n, t]))
             prev_name = fname
 
-        max_len = max([len(n) for n, _, _ in ffields], default=0)
+        # Close the bitfield because we have no more fields
+        if bitfield:
+            ffields.append(tuple([None, bitfield]))
 
-        for n, t, comment in ffields:
-            k = max_len-len(n)+len(t)
-            f.write("\t{}: {},{}\n".format(n, t.rjust(k), comment or ""))
+        # Write the struct as a bitfield if it only has bit fields
+        if len(ffields) == 1 and ffields[0][0] is None:
+            ffields[0][1].write(f, struct_name, 0, True)
+            f.write("\n")
 
-
-        f.write("}\n\n")
+        # Write as a normal struct (or union) if it has other fields
+        # and inject anonymous bitfields into the struct if there are any
+        else:
+            has_anon_bitfield = any(name is None for name, _ in ffields)
+            max_len = max([0 if n is None else len(n) for n, _ in ffields], default=0)
+            f.write("{} :: struct ".format(struct_name))
+            if _type == "union":
+                f.write("#raw_union ")
+            f.write("{\n")
+            for name, type_ in ffields:
+                if name is None:
+                    # Inject an anonymous bitfield into the struct
+                    type_.write(f, None, indent=1, justify=True)
+                else:
+                    f.write("\t{} {},\n".format((name + ":").ljust(max_len + 1), type_))
+            f.write("}\n\n")
 
     f.write("// Opaque structs\n")
     f.write(OPAQUE_STRUCTS)
