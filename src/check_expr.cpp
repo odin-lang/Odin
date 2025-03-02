@@ -2599,9 +2599,8 @@ gb_internal ExactValue exact_bit_set_all_set_mask(Type *type) {
 					continue;
 				}
 
-				BigInt shift_amount = f->Constant.value.value_integer;
-				big_int_sub_eq(&shift_amount, &b_lower_base);
-
+				BigInt shift_amount = {};
+				big_int_sub(&shift_amount, &f->Constant.value.value_integer, &b_lower_base);
 
 				BigInt value = {};
 				big_int_shl(&value, &one, &shift_amount);
