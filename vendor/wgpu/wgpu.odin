@@ -762,12 +762,12 @@ BufferMapCallback :: #type proc "c" (status: MapAsyncStatus, message: StringView
 CompilationInfoCallback :: #type proc "c" (status: CompilationInfoRequestStatus, compilationInfo: ^CompilationInfo, userdata1: rawptr, userdata2: rawptr)
 CreateComputePipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: ComputePipeline, message: StringView, userdata1: rawptr, userdata2: rawptr)
 CreateRenderPipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: RenderPipeline, message: StringView, userdata1: rawptr, userdata2: rawptr)
-DeviceLostCallback :: #type proc "c" (device: Device, reason: DeviceLostReason, message: StringView, userdata1: rawptr, userdata2: rawptr)
+DeviceLostCallback :: #type proc "c" (device: Maybe(Device), reason: DeviceLostReason, message: StringView, userdata1: rawptr, userdata2: rawptr)
 PopErrorScopeCallback :: #type proc "c" (status: PopErrorScopeStatus, type: ErrorType, message: StringView, userdata1: rawptr, userdata2: rawptr)
 QueueWorkDoneCallback :: #type proc "c" (status: QueueWorkDoneStatus, userdata1: rawptr, userdata2: rawptr)
 RequestAdapterCallback :: #type proc "c" (status: RequestAdapterStatus, adapter: Adapter, message: StringView, userdata1: rawptr, userdata2: rawptr)
 RequestDeviceCallback :: #type proc "c" (status: RequestDeviceStatus, adapter: Device, message: StringView, userdata1: rawptr, userdata2: rawptr)
-UncapturedErrorCallback :: #type proc "c" (device: Device, type: ErrorType, message: StringView, userdata1: rawptr, userdata2: rawptr)
+UncapturedErrorCallback :: #type proc "c" (device: Maybe(Device), type: ErrorType, message: StringView, userdata1: rawptr, userdata2: rawptr)
 
 ChainedStruct :: struct {
 	next:  ^ChainedStruct,
@@ -1453,7 +1453,7 @@ foreign libwgpu {
 
 	// Methods of BindGroupLayout
 	BindGroupLayoutSetLabel :: proc(bindGroupLayout: BindGroupLayout, label: cstring) ---
-	BindGroupLayoutReference :: proc(bindGroupLayout: BindGroupLayout) ---
+	BindGroupLayoutAddRef :: proc(bindGroupLayout: BindGroupLayout) ---
 	BindGroupLayoutRelease :: proc(bindGroupLayout: BindGroupLayout) ---
 
 	// Methods of Buffer
@@ -1853,8 +1853,8 @@ RenderPassEncoderSetBindGroup :: proc "c" (renderPassEncoder: RenderPassEncoder,
 
 // Wrappers of Surface
 
-SurfaceGetCapabilities :: proc "c" (surface: Surface, adapter: Adapter) -> (capabilities: SurfaceCapabilities) {
-	RawSurfaceGetCapabilities(surface, adapter, &capabilities)
+SurfaceGetCapabilities :: proc "c" (surface: Surface, adapter: Adapter) -> (capabilities: SurfaceCapabilities, status: Status) {
+	status = RawSurfaceGetCapabilities(surface, adapter, &capabilities)
 	return
 }
 
