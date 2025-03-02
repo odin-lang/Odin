@@ -301,7 +301,7 @@ FeatureName :: enum i32 {
 	// PolygonModePoint,
 	// ConservativeRasterization,
 	// ClearTexture,
-	SprivShaderPassThrough = 0x00030017,
+	SpirvShaderPassthrough = 0x00030017,
 	// MultiView,
 	VertexAttribute64bit = 0x00030019,
 	TextureFormatNv12,
@@ -762,100 +762,100 @@ BufferMapCallback :: #type proc "c" (status: MapAsyncStatus, message: StringView
 CompilationInfoCallback :: #type proc "c" (status: CompilationInfoRequestStatus, compilationInfo: ^CompilationInfo, userdata1: rawptr, userdata2: rawptr)
 CreateComputePipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: ComputePipeline, message: StringView, userdata1: rawptr, userdata2: rawptr)
 CreateRenderPipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: RenderPipeline, message: StringView, userdata1: rawptr, userdata2: rawptr)
-DeviceLostCallback :: #type proc "c" (device: Device, reason: DeviceLostReason, message: StringView, userdata1: rawptr, userdata2: rawptr)
+DeviceLostCallback :: #type proc "c" (device: ^Device, reason: DeviceLostReason, message: StringView, userdata1: rawptr, userdata2: rawptr)
 PopErrorScopeCallback :: #type proc "c" (status: PopErrorScopeStatus, type: ErrorType, message: StringView, userdata1: rawptr, userdata2: rawptr)
 QueueWorkDoneCallback :: #type proc "c" (status: QueueWorkDoneStatus, userdata1: rawptr, userdata2: rawptr)
 RequestAdapterCallback :: #type proc "c" (status: RequestAdapterStatus, adapter: Adapter, message: StringView, userdata1: rawptr, userdata2: rawptr)
 RequestDeviceCallback :: #type proc "c" (status: RequestDeviceStatus, adapter: Device, message: StringView, userdata1: rawptr, userdata2: rawptr)
-UncapturedErrorCallback :: #type proc "c" (device: Device, type: ErrorType, message: StringView, userdata1: rawptr, userdata2: rawptr)
+UncapturedErrorCallback :: #type proc "c" (device: ^Device, type: ErrorType, message: StringView, userdata1: rawptr, userdata2: rawptr)
 
 ChainedStruct :: struct {
-	next:  ^ChainedStruct,
+	next: ^ChainedStruct,
 	sType: SType,
 }
 
 ChainedStructOut :: struct {
-	next:  ^ChainedStructOut,
+	next: ^ChainedStructOut,
 	sType: SType,
 }
 
 BufferMapCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: BufferMapCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 CompilationInfoCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: CompilationInfoCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 CreateComputePipelineAsyncCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: CreateComputePipelineAsyncCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 CreateRenderPipelineAsyncCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: CreateRenderPipelineAsyncCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 DeviceLostCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: DeviceLostCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 PopErrorScopeCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: PopErrorScopeCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 QueueWorkDoneCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: QueueWorkDoneCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 RequestAdapterCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: RequestAdapterCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 RequestDeviceCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	mode: CallbackMode,
 	callback: RequestDeviceCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 UncapturedErrorCallbackInfo :: struct {
-	nextInChain: ^ChainedStructOut,
+	nextInChain: /* const */ ^ChainedStruct,
 	callback: UncapturedErrorCallback,
-	userdata1: rawptr,
-	userdata2: rawptr,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 AdapterInfo :: struct {
@@ -894,7 +894,7 @@ BufferBindingLayout :: struct {
 }
 
 BufferDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	usage: BufferUsageFlags,
 	size: u64,
@@ -904,12 +904,12 @@ BufferDescriptor :: struct {
 Color :: [4]f64
 
 CommandBufferDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 }
 
 CommandEncoderDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 }
 
@@ -930,7 +930,7 @@ ComputePassTimestampWrites :: struct {
 }
 
 ConstantEntry :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	key: StringView,
 	value: f64,
 }
@@ -987,7 +987,7 @@ Limits :: struct {
 }
 
 MultisampleState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	count: u32,
 	mask: u32,
 	alphaToCoverageEnabled: b32,
@@ -1000,14 +1000,14 @@ Origin3D :: struct {
 }
 
 PipelineLayoutDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	bindGroupLayoutCount: uint,
 	bindGroupLayouts: [^]BindGroupLayout `fmt:"v,bindGroupLayoutCount"`,
 }
 
 PrimitiveState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	topology: PrimitiveTopology,
 	stripIndexFormat: IndexFormat,
 	frontFace: FrontFace,
@@ -1016,27 +1016,27 @@ PrimitiveState :: struct {
 }
 
 QuerySetDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	type: QueryType,
 	count: u32,
 }
 
 QueueDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 }
 
 RenderBundleDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 }
 
 RenderBundleEncoderDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	colorFormatCount: uint,
-	colorFormats: [^]TextureFormat `fmt:"v,colorFormatCount"`,
+	colorFormats: /* const */ [^]TextureFormat `fmt:"v,colorFormatCount"`,
 	depthStencilFormat: TextureFormat,
 	sampleCount: u32,
 	depthReadOnly: b32,
@@ -1067,7 +1067,7 @@ RenderPassTimestampWrites :: struct {
 }
 
 RequestAdapterOptions :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	featureLevel: FeatureLevel,
 	powerPreference: PowerPreference,
 	forceFallbackAdapter: b32,
@@ -1076,12 +1076,12 @@ RequestAdapterOptions :: struct {
 }
 
 SamplerBindingLayout :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	type: SamplerBindingType,
 }
 
 SamplerDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	addressModeU: AddressMode,
 	addressModeV: AddressMode,
@@ -1096,7 +1096,7 @@ SamplerDescriptor :: struct {
 }
 
 ShaderModuleDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 }
 
@@ -1119,7 +1119,7 @@ StencilFaceState :: struct {
 }
 
 StorageTextureBindingLayout :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	access: StorageTextureAccess,
 	format: TextureFormat,
 	viewDimension: TextureViewDimension,
@@ -1127,12 +1127,12 @@ StorageTextureBindingLayout :: struct {
 
 SupportedFeatures :: struct {
 	featureCount: uint,
-	features: [^]FeatureName `fmt:"v,featureCount"`,
+	features: /* const */ [^]FeatureName `fmt:"v,featureCount"`,
 }
 
 SupportedWGSLLanguageFeatures :: struct {
 	featureCount: uint,
-	features: [^]WGSLLanguageFeatureName `fmt:"v,featureCount"`,
+	features: /* const */ [^]WGSLLanguageFeatureName `fmt:"v,featureCount"`,
 }
 
 SurfaceCapabilities :: struct {
@@ -1147,20 +1147,20 @@ SurfaceCapabilities :: struct {
 }
 
 SurfaceConfiguration :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	device: Device,
 	format: TextureFormat,
 	usage: TextureUsageFlags,
 	width: u32,
 	height: u32,
 	viewFormatCount: uint,
-	viewFormats: [^]TextureFormat `fmt:"v,viewFormatCount"`,
+	viewFormats: /* const */ [^]TextureFormat `fmt:"v,viewFormatCount"`,
 	alphaMode: CompositeAlphaMode,
 	presentMode: PresentMode,
 }
 
 SurfaceDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 }
 
@@ -1204,7 +1204,7 @@ SurfaceSourceXlibWindow :: struct {
 }
 
 SurfaceTexture :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: ^ChainedStructOut,
 	texture: Texture,
 	status: SurfaceGetCurrentTextureStatus,
 }
@@ -1216,14 +1216,14 @@ TexelCopyBufferLayout :: struct {
 }
 
 TextureBindingLayout :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	sampleType: TextureSampleType,
 	viewDimension: TextureViewDimension,
 	multisampled: b32,
 }
 
 TextureViewDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	format: TextureFormat,
 	dimension: TextureViewDimension,
@@ -1242,15 +1242,15 @@ VertexAttribute :: struct {
 }
 
 BindGroupDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	layout: BindGroupLayout,
 	entryCount: uint,
-	entries: [^]BindGroupEntry `fmt:"v,entryCount"`,
+	entries: /* const */ [^]BindGroupEntry `fmt:"v,entryCount"`,
 }
 
 BindGroupLayoutEntry :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	binding: u32,
 	visibility: ShaderStageFlags,
 	buffer: BufferBindingLayout,
@@ -1265,19 +1265,19 @@ BlendState :: struct {
 }
 
 CompilationInfo :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	messageCount: uint,
-	messages: [^]CompilationMessage `fmt:"v,messageCount"`,
+	messages: /* const */ [^]CompilationMessage `fmt:"v,messageCount"`,
 }
 
 ComputePassDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	/* NULLABLE */ timestampWrites: /* const */ ^ComputePassTimestampWrites,
 }
 
 DepthStencilState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	format: TextureFormat,
 	depthWriteEnabled: OptionalBool,
 	depthCompare: CompareFunction,
@@ -1291,10 +1291,10 @@ DepthStencilState :: struct {
 }
 
 DeviceDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	requiredFeatureCount: uint,
-	requiredFeatures: [^]FeatureName `fmt:"v,requiredFeatureCount"`,
+	requiredFeatures: /* const */ [^]FeatureName `fmt:"v,requiredFeatureCount"`,
 	/* NULLABLE */ requiredLimits: /* const */ ^Limits,
 	defaultQueue: QueueDescriptor,
 	deviceLostCallbackInfo: DeviceLostCallbackInfo,
@@ -1307,12 +1307,12 @@ FutureWaitInfo :: struct {
 }
 
 InstanceDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	features: InstanceCapabilities,
 }
 
 ProgrammableStageDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	module: ShaderModule,
 	entryPoint: StringView,
 	constantCount: uint,
@@ -1320,7 +1320,7 @@ ProgrammableStageDescriptor :: struct {
 }
 
 RenderPassColorAttachment :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	/* NULLABLE */ view: TextureView,
 	depthSlice: u32,
 	/* NULLABLE */ resolveTarget: TextureView,
@@ -1342,7 +1342,7 @@ TexelCopyTextureInfo :: struct {
 }
 
 TextureDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	usage: TextureUsageFlags,
 	dimension: TextureDimension,
@@ -1351,21 +1351,21 @@ TextureDescriptor :: struct {
 	mipLevelCount: u32,
 	sampleCount: u32,
 	viewFormatCount: uint,
-	viewFormats: [^]TextureFormat `fmt:"v,viewFormatCount"`,
+	viewFormats: /* const */ [^]TextureFormat `fmt:"v,viewFormatCount"`,
 }
 
 VertexBufferLayout :: struct {
 	stepMode: VertexStepMode,
 	arrayStride: u64,
 	attributeCount: uint,
-	attributes: [^]VertexAttribute `fmt:"v,attributeCount"`,
+	attributes: /* const */ [^]VertexAttribute `fmt:"v,attributeCount"`,
 }
 
 BindGroupLayoutDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	entryCount: uint,
-	entries: [^]BindGroupLayoutEntry `fmt:"v,entryCount"`,
+	entries: /* const */ [^]BindGroupLayoutEntry `fmt:"v,entryCount"`,
 }
 
 ColorTargetState :: struct {
@@ -1376,44 +1376,44 @@ ColorTargetState :: struct {
 }
 
 ComputePipelineDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	/* NULLABLE */ layout: PipelineLayout,
 	compute: ProgrammableStageDescriptor,
 }
 
 RenderPassDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	colorAttachmentCount: uint,
-	colorAttachments: [^]RenderPassColorAttachment `fmt:"v,colorAttachmentCount"`,
+	colorAttachments: /* const */ [^]RenderPassColorAttachment `fmt:"v,colorAttachmentCount"`,
 	/* NULLABLE */ depthStencilAttachment: /* const */ ^RenderPassDepthStencilAttachment,
 	/* NULLABLE */ occlusionQuerySet: QuerySet,
 	/* NULLABLE */ timestampWrites: /* const */ ^RenderPassTimestampWrites,
 }
 
 VertexState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	module: ShaderModule,
 	entryPoint: StringView,
 	constantCount: uint,
-	constants: [^]ConstantEntry `fmt:"v,constantCount"`,
+	constants: /* const */ [^]ConstantEntry `fmt:"v,constantCount"`,
 	bufferCount: uint,
-	buffers: [^]VertexBufferLayout `fmt:"v,bufferCount"`,
+	buffers: /* const */ [^]VertexBufferLayout `fmt:"v,bufferCount"`,
 }
 
 FragmentState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	module: ShaderModule,
 	entryPoint: StringView,
 	constantCount: uint,
-	constants: [^]ConstantEntry `fmt:"v,constantCount"`,
+	constants: /* const */ [^]ConstantEntry `fmt:"v,constantCount"`,
 	targetCount: uint,
-	targets: [^]ColorTargetState `fmt:"v,targetCount"`,
+	targets: /* const */ [^]ColorTargetState `fmt:"v,targetCount"`,
 }
 
 RenderPipelineDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	label: StringView,
 	/* NULLABLE */ layout: PipelineLayout,
 	vertex: VertexState,
@@ -1453,7 +1453,7 @@ foreign libwgpu {
 
 	// Methods of BindGroupLayout
 	BindGroupLayoutSetLabel :: proc(bindGroupLayout: BindGroupLayout, label: cstring) ---
-	BindGroupLayoutReference :: proc(bindGroupLayout: BindGroupLayout) ---
+	BindGroupLayoutAddRef :: proc(bindGroupLayout: BindGroupLayout) ---
 	BindGroupLayoutRelease :: proc(bindGroupLayout: BindGroupLayout) ---
 
 	// Methods of Buffer
@@ -1465,7 +1465,7 @@ foreign libwgpu {
 	RawBufferGetMappedRange :: proc(buffer: Buffer, offset: uint, size: uint) -> rawptr ---
 	BufferGetSize :: proc(buffer: Buffer) -> u64 ---
 	BufferGetUsage :: proc(buffer: Buffer) -> BufferUsageFlags ---
-	BufferMapAsync :: proc(buffer: Buffer, mode: MapModeFlags, offset: uint, size: uint, callback: BufferMapCallbackInfo) -> Future ---
+	BufferMapAsync :: proc(buffer: Buffer, mode: MapModeFlags, offset: uint, size: uint, callbackInfo: BufferMapCallbackInfo) -> Future ---
 	BufferSetLabel :: proc(buffer: Buffer, label: StringView) ---
 	BufferUnmap :: proc(buffer: Buffer) ---
 	BufferAddRef :: proc(buffer: Buffer) ---
@@ -1502,7 +1502,7 @@ foreign libwgpu {
 	ComputePassEncoderPopDebugGroup :: proc(computePassEncoder: ComputePassEncoder) ---
 	ComputePassEncoderPushDebugGroup :: proc(computePassEncoder: ComputePassEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuComputePassEncoderSetBindGroup")
-	RawComputePassEncoderSetBindGroup :: proc(computePassEncoder: ComputePassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: [^]u32) ---
+	RawComputePassEncoderSetBindGroup :: proc(computePassEncoder: ComputePassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
 	ComputePassEncoderSetLabel :: proc(computePassEncoder: ComputePassEncoder, label: StringView) ---
 	ComputePassEncoderSetPipeline :: proc(computePassEncoder: ComputePassEncoder, pipeline: ComputePipeline) ---
 	ComputePassEncoderAddRef :: proc(computePassEncoder: ComputePassEncoder) ---
@@ -1573,7 +1573,7 @@ foreign libwgpu {
 	QueueOnSubmittedWorkDone :: proc(queue: Queue, callbackInfo: QueueWorkDoneCallbackInfo) -> Future ---
 	QueueSetLabel :: proc(queue: Queue, label: StringView) ---
 	@(link_name="wgpuQueueSubmit")
-	RawQueueSubmit :: proc(queue: Queue, commandCount: uint, commands: [^]CommandBuffer) ---
+	RawQueueSubmit :: proc(queue: Queue, commandCount: uint, commands: /* const */ [^]CommandBuffer) ---
 	QueueWriteBuffer :: proc(queue: Queue, buffer: Buffer, bufferOffset: u64, data: /* const */ rawptr, size: uint) ---
 	QueueWriteTexture :: proc(queue: Queue, destination: /* const */ ^TexelCopyTextureInfo, data: /* const */ rawptr, dataSize: uint, dataLayout: /* const */ ^TexelCopyBufferLayout, writeSize: /* const */ ^Extent3D) ---
 	QueueAddRef :: proc(queue: Queue) ---
@@ -1594,7 +1594,7 @@ foreign libwgpu {
 	RenderBundleEncoderPopDebugGroup :: proc(renderBundleEncoder: RenderBundleEncoder) ---
 	RenderBundleEncoderPushDebugGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuRenderBundleEncoderSetBindGroup")
-	RawRenderBundleEncoderSetBindGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: [^]u32) ---
+	RawRenderBundleEncoderSetBindGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
 	RenderBundleEncoderSetIndexBuffer :: proc(renderBundleEncoder: RenderBundleEncoder, buffer: Buffer, format: IndexFormat, offset: u64, size: u64) ---
 	RenderBundleEncoderSetLabel :: proc(renderBundleEncoder: RenderBundleEncoder, label: StringView) ---
 	RenderBundleEncoderSetPipeline :: proc(renderBundleEncoder: RenderBundleEncoder, pipeline: RenderPipeline) ---
@@ -1611,12 +1611,12 @@ foreign libwgpu {
 	RenderPassEncoderEnd :: proc(renderPassEncoder: RenderPassEncoder) ---
 	RenderPassEncoderEndOcclusionQuery :: proc(renderPassEncoder: RenderPassEncoder) ---
 	@(link_name="wgpuRenderPassEncoderExecuteBundles")
-	RawRenderPassEncoderExecuteBundles :: proc(renderPassEncoder: RenderPassEncoder, bundleCount: uint, bundles: [^]RenderBundle) ---
+	RawRenderPassEncoderExecuteBundles :: proc(renderPassEncoder: RenderPassEncoder, bundleCount: uint, bundles: /* const */ [^]RenderBundle) ---
 	RenderPassEncoderInsertDebugMarker :: proc(renderPassEncoder: RenderPassEncoder, markerLabel: StringView) ---
 	RenderPassEncoderPopDebugGroup :: proc(renderPassEncoder: RenderPassEncoder) ---
 	RenderPassEncoderPushDebugGroup :: proc(renderPassEncoder: RenderPassEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuRenderPassEncoderSetBindGroup")
-	RawRenderPassEncoderSetBindGroup :: proc(renderPassEncoder: RenderPassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: [^]u32) ---
+	RawRenderPassEncoderSetBindGroup :: proc(renderPassEncoder: RenderPassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
 	RenderPassEncoderSetBlendConstant :: proc(renderPassEncoder: RenderPassEncoder, color: /* const */ ^Color) ---
 	RenderPassEncoderSetIndexBuffer :: proc(renderPassEncoder: RenderPassEncoder, buffer: Buffer, format: IndexFormat, offset: u64, size: u64) ---
 	RenderPassEncoderSetLabel :: proc(renderPassEncoder: RenderPassEncoder, label: StringView) ---
@@ -1853,8 +1853,8 @@ RenderPassEncoderSetBindGroup :: proc "c" (renderPassEncoder: RenderPassEncoder,
 
 // Wrappers of Surface
 
-SurfaceGetCapabilities :: proc "c" (surface: Surface, adapter: Adapter) -> (capabilities: SurfaceCapabilities) {
-	RawSurfaceGetCapabilities(surface, adapter, &capabilities)
+SurfaceGetCapabilities :: proc "c" (surface: Surface, adapter: Adapter) -> (capabilities: SurfaceCapabilities, status: Status) {
+	status = RawSurfaceGetCapabilities(surface, adapter, &capabilities)
 	return
 }
 

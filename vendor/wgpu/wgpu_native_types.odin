@@ -72,7 +72,7 @@ DeviceExtras :: struct {
 }
 
 NativeLimits :: struct {
-	chain: ChainedStructOut,
+	using chain: ChainedStructOut,
 	maxPushConstantSize: u32,
 	maxNonSamplerBindings: u32,
 }
@@ -101,13 +101,13 @@ ShaderModuleGLSLDescriptor :: struct {
 	stage: ShaderStage,
 	code: StringView,
 	defineCount: uint,
-	defines: [^]ShaderDefine `fmt:"v,defineCount"`,
+	defines: /* const */ [^]ShaderDefine `fmt:"v,defineCount"`,
 }
 
 ShaderModuleDescriptorSpirV :: struct {
 	label: StringView,
 	sourceSize: u32,
-	source: [^]u32 `fmt:"v,sourceSize"`,
+	source: /* const */ [^]u32 `fmt:"v,sourceSize"`,
 }
 
 RegistryReport :: struct {
@@ -170,7 +170,7 @@ QuerySetDescriptorExtras :: struct {
 
 SurfaceConfigurationExtras :: struct {
 	using chain: ChainedStruct,
-	desiredMaximumFrameLatency: i32,
+	desiredMaximumFrameLatency: u32,
 }
 
 LogCallback :: #type proc "c" (level: LogLevel, message: StringView, userdata: rawptr)
