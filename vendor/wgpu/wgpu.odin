@@ -301,7 +301,7 @@ FeatureName :: enum i32 {
 	// PolygonModePoint,
 	// ConservativeRasterization,
 	// ClearTexture,
-	SprivShaderPassThrough = 0x00030017,
+	SpirvShaderPassthrough = 0x00030017,
 	// MultiView,
 	VertexAttribute64bit = 0x00030019,
 	TextureFormatNv12,
