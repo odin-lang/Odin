@@ -341,7 +341,9 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 				new_end := start + size
 				if start < old_end && old_end == block.used && new_end <= block.reserved {
 					// grow data in-place, adjusting next allocation
+					prev_used := block.used
 					_ = alloc_from_memory_block(block, new_end - old_end, 1, default_commit_size=arena.default_commit_size) or_return
+					arena.total_used += block.used - prev_used
 					data = block.base[start:new_end]
 					return
 				}
