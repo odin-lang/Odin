@@ -1982,6 +1982,84 @@ the picture represents the `indices` parameter:
 */
 swizzle :: builtin.swizzle
 
+/*
+Extract the set of most-significant bits of a SIMD vector.
+
+This procedure checks the the most-significant bit (MSB) for each lane of vector
+and returns the numbers of lanes with the most-significant bit set. This procedure
+can be used in conjuction with `lanes_eq` (and other similar procedures) to
+count the number of matched lanes by computing the cardinality of the resulting
+set.
+
+Inputs:
+- `a`: An input vector.
+
+Result:
+- A bitset of integers, corresponding to the indexes of the lanes, whose MSBs
+  are set.
+
+**Operation**:
+
+	bits_per_lane = 8*size_of(a[0])
+	res = bit_set {}
+	for i in 0 ..< len(a) {
+		if a[i] & 1<<(bits_per_lane-1) != 0 {
+			res |= i
+		}
+	}
+	return res
+
+Example:
+
+	// Since lanes 0, 1, 4, 7 contain negative numbers, the most significant
+	// bits for them will be set.
+	v := #simd[8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
+	fmt.println(simd.extract_msbs(v))
+
+Output:
+
+	bit_set[0..=7]{0, 1, 4, 7}
+*/
+extract_msbs :: intrinsics.simd_extract_msbs
+
+/*
+Extract the set of least-significant bits of a SIMD vector.
+
+This procedure checks the the least-significant bit (LSB) for each lane of vector
+and returns the numbers of lanes with the least-significant bit set. This procedure
+can be used in conjuction with `lanes_eq` (and other similar procedures) to
+count the number of matched lanes by computing the cardinality of the resulting
+set.
+
+Inputs:
+- `a`: An input vector.
+
+Result:
+- A bitset of integers, corresponding to the indexes of the lanes, whose LSBs
+  are set.
+
+**Operation**:
+
+	res = bit_set {}
+	for i in 0 ..< len(a) {
+		if a[i] & 1 != 0 {
+			res |= i
+		}
+	}
+	return res
+
+Example:
+
+	// Since lanes 0, 2, 4, 6 contain odd integers, the least significant bits
+	// for these lanes are set.
+	v := #simd[8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
+	fmt.println(simd.extract_lsbs(v))
+
+Output:
+
+	bit_set[0..=7]{0, 2, 4, 6}
+*/
+extract_lsbs :: intrinsics.simd_extract_lsbs
 
 /*
 Reorder the lanes of two SIMD vectors.

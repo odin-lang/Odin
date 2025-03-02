@@ -36,12 +36,15 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	return
 }
 
-_set_env :: proc(key, value: string) -> bool {
+_set_env :: proc(key, value: string) -> Error {
 	TEMP_ALLOCATOR_GUARD()
-	k, _ := win32_utf8_to_wstring(key,   temp_allocator())
-	v, _ := win32_utf8_to_wstring(value, temp_allocator())
+	k := win32_utf8_to_wstring(key,   temp_allocator()) or_return
+	v := win32_utf8_to_wstring(value, temp_allocator()) or_return
 
-	return bool(win32.SetEnvironmentVariableW(k, v))
+	if !win32.SetEnvironmentVariableW(k, v) {
+		return _get_platform_error()
+	}
+	return nil
 }
 
 _unset_env :: proc(key: string) -> bool {
@@ -52,7 +55,7 @@ _unset_env :: proc(key: string) -> bool {
 
 _clear_env :: proc() {
 	TEMP_ALLOCATOR_GUARD()
-	envs := environ(temp_allocator())
+	envs, _ := environ(temp_allocator())
 	for env in envs {
 		for j in 1..<len(env) {
 			if env[j] == '=' {
@@ -63,10 +66,10 @@ _clear_env :: proc() {
 	}
 }
 
-_environ :: proc(allocator: runtime.Allocator) -> []string {
+_environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
 	envs := win32.GetEnvironmentStringsW()
 	if envs == nil {
-		return nil
+		return
 	}
 	defer win32.FreeEnvironmentStringsW(envs)
 
@@ -82,7 +85,13 @@ _environ :: proc(allocator: runtime.Allocator) -> []string {
 		}
 	}
 
-	r := make([dynamic]string, 0, n, allocator)
+	r := make([dynamic]string, 0, n, allocator) or_return
+	defer if err != nil {
+		for e in r {
+			delete(e, allocator)
+		}
+		delete(r)
+	}
 	for from, i, p := 0, 0, envs; true; i += 1 {
 		c := ([^]u16)(p)[i]
 		if c == 0 {
@@ -90,12 +99,14 @@ _environ :: proc(allocator: runtime.Allocator) -> []string {
 				break
 			}
 			w := ([^]u16)(p)[from:i]
-			append(&r, win32_utf16_to_utf8(w, allocator) or_else "")
+			s := win32_utf16_to_utf8(w, allocator) or_return
+			append(&r, s)
 			from = i + 1
 		}
 	}
 
-	return r[:]
+	environ = r[:]
+	return
 }
 
 

@@ -1,5 +1,6 @@
 package test_core_strings
 
+import "core:mem"
 import "core:strings"
 import "core:testing"
 import "base:runtime"
@@ -38,6 +39,25 @@ test_last_index_any_small_string_found :: proc(t: ^testing.T) {
 test_last_index_any_small_string_not_found :: proc(t: ^testing.T) {
 	index := strings.last_index_any(".", "/:\"")
 	testing.expect(t, index == -1, "last_index_any should be -1")
+}
+
+@test
+test_index_multi_overlapping_substrs :: proc(t: ^testing.T) {
+	index, width := strings.index_multi("some example text", {"ample", "exam"})
+	testing.expect_value(t, index, 5)
+	testing.expect_value(t, width, 4)
+}
+
+@test
+test_index_multi_not_found :: proc(t: ^testing.T) {
+	index, _ := strings.index_multi("some example text", {"ey", "tey"})
+	testing.expect_value(t, index, -1)
+}
+
+@test
+test_index_multi_with_empty_string :: proc(t: ^testing.T) {
+	index, _ := strings.index_multi("some example text", {"ex", ""})
+	testing.expect_value(t, index, -1)
 }
 
 Cut_Test :: struct {
@@ -154,5 +174,47 @@ test_substring :: proc(t: ^testing.T) {
 		sub, ok := strings.substring(tc.s, tc.start, tc.end)
 		testing.expectf(t, ok == tc.ok, "expected %v[%v:%v] to return ok: %v", tc.s, tc.start, tc.end, tc.ok)
 		testing.expectf(t, sub == tc.sub, "expected %v[%v:%v] to return sub: %v, got: %v", tc.s, tc.start, tc.end, tc.sub, sub)
+	}
+}
+
+@test
+test_builder_to_cstring_with_nil_allocator :: proc(t: ^testing.T) {
+	b := strings.builder_make_none(mem.nil_allocator())
+
+	cstr, err := strings.to_cstring(&b)
+	testing.expect_value(t, cstr, nil)
+	testing.expect_value(t, err, mem.Allocator_Error.Out_Of_Memory)
+}
+
+@test
+test_builder_to_cstring :: proc(t: ^testing.T) {
+	buf: [8]byte
+	a: mem.Arena
+	mem.arena_init(&a, buf[:])
+
+	b := strings.builder_make_none(mem.arena_allocator(&a))
+
+	{
+		cstr, err := strings.to_cstring(&b)
+		testing.expectf(t, cstr != nil, "expected cstr to not be nil, got %v", cstr)
+		testing.expect_value(t, err, nil)
+	}
+
+	n := strings.write_byte(&b, 'a')
+	testing.expect(t, n == 1)
+
+	{
+		cstr, err := strings.to_cstring(&b)
+		testing.expectf(t, cstr != nil, "expected cstr to not be nil, got %v", cstr)
+		testing.expect_value(t, err, nil)
+	}
+
+	n = strings.write_string(&b, "aaaaaaa")
+	testing.expect(t, n == 7)
+
+	{
+		cstr, err := strings.to_cstring(&b)
+		testing.expect(t, cstr == nil)
+		testing.expect(t, err == .Out_Of_Memory)
 	}
 }

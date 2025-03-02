@@ -17,6 +17,9 @@ Build_Kind :: struct {
 	arch: runtime.Odin_Arch_Types,
 }
 
+// empty build kind acts as a marker for separating multiple lines with build tags
+BUILD_KIND_NEWLINE_MARKER :: Build_Kind{}
+
 File_Tags :: struct {
 	build_project_name: [][]string,
 	build:              []Build_Kind,
@@ -147,6 +150,11 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 					append(build_project_names, build_project_name_strings[index_start:])
 				}
 			case "build":
+
+				if len(build_kinds) > 0 {
+					append(build_kinds, BUILD_KIND_NEWLINE_MARKER)
+				}
+
 				kinds_loop: for {
 					os_positive: runtime.Odin_OS_Types
 					os_negative: runtime.Odin_OS_Types
@@ -248,10 +256,20 @@ match_build_tags :: proc(file_tags: File_Tags, target: Build_Target) -> bool {
 		project_name_correct ||= group_correct
 	}
 
-	os_and_arch_correct := len(file_tags.build) == 0
+	os_and_arch_correct := true
 
-	for kind in file_tags.build {
-		os_and_arch_correct ||= target.os in kind.os && target.arch in kind.arch
+	if len(file_tags.build) > 0 {
+		os_and_arch_correct_line := false
+
+		for kind in file_tags.build {
+			if kind == BUILD_KIND_NEWLINE_MARKER {
+				os_and_arch_correct &&= os_and_arch_correct_line
+				os_and_arch_correct_line = false
+			} else {
+				os_and_arch_correct_line ||= target.os in kind.os && target.arch in kind.arch
+			}
+		}
+		os_and_arch_correct &&= os_and_arch_correct_line
 	}
 
 	return !file_tags.ignore && project_name_correct && os_and_arch_correct

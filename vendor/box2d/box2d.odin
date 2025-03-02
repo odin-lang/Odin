@@ -24,19 +24,11 @@ when ODIN_OS == .Windows {
 }
 
 when !#exists(LIB_PATH) {
-	#panic("Could not find the compiled box2d libraries at \"" + LIB_PATH + "\", they can be compiled by running the `build.sh` script at `" + ODIN_ROOT + "vendor/box2d/build_box2d.sh\"`")
+	#panic("Could not find the compiled box2d libraries at \"" + LIB_PATH + "\", they can be compiled by running the `build_box2d.sh` script at `" + ODIN_ROOT + "vendor/box2d/build_box2d.sh\"`")
 }
 
-when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
-	when VECTOR_EXT == "_simd" {
-		foreign import lib "lib/box2d_wasm_simd.o"
-	} else {
-		foreign import lib "lib/box2d_wasm.o"
-	}
-} else {
-	foreign import lib {
-		LIB_PATH,
-	}
+foreign import lib {
+	LIB_PATH,
 }
 
 

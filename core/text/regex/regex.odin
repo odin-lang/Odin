@@ -381,6 +381,7 @@ match_with_preallocated_capture :: proc(
 			capture.pos[n] = {a, b}
 			n += 1
 		}
+		num_groups = n
 	}
 
 	return

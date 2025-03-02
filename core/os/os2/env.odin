@@ -22,8 +22,8 @@ lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string,
 }
 
 // set_env sets the value of the environment variable named by the key
-// Returns true on success, false on failure
-set_env :: proc(key, value: string) -> bool {
+// Returns Error on failure
+set_env :: proc(key, value: string) -> Error {
 	return _set_env(key, value)
 }
 
@@ -41,7 +41,7 @@ clear_env :: proc() {
 // environ returns a copy of strings representing the environment, in the form "key=value"
 // NOTE: the slice of strings and the strings with be allocated using the supplied allocator
 @(require_results)
-environ :: proc(allocator: runtime.Allocator) -> []string {
+environ :: proc(allocator: runtime.Allocator) -> ([]string, Error) {
 	return _environ(allocator)
 }
 

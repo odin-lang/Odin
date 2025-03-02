@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -109,7 +109,7 @@ when ODIN_OS == .Darwin {
 	GLOB_NOMATCH :: -3
 	GLOB_NOSPACE :: -1
 
-} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku {
 
 	glob_t :: struct {
 		gl_pathc:  c.size_t,                      /* [PSX] count of paths matched by pattern */
@@ -134,7 +134,7 @@ when ODIN_OS == .Darwin {
 	GLOB_ERR      :: 0x0004
 	GLOB_MARK     :: 0x0008
 	GLOB_NOCHECK  :: 0x0010
-	GLOB_NOESCAPE :: 0x2000 when ODIN_OS == .FreeBSD else 0x0100
+	GLOB_NOESCAPE :: 0x2000 when ODIN_OS == .FreeBSD || ODIN_OS == .Haiku else 0x0100
 	GLOB_NOSORT   :: 0x0020
 
 	GLOB_ABORTED :: -2

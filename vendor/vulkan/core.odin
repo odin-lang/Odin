@@ -2,10 +2,12 @@
 // Vulkan wrapper generated from "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h"
 //
 package vulkan
+// Core API
 API_VERSION_1_0 :: (1<<22) | (0<<12) | (0)
 API_VERSION_1_1 :: (1<<22) | (1<<12) | (0)
 API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
+API_VERSION_1_4 :: (1<<22) | (4<<12) | (0)
 
 MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
 	return (major<<22) | (minor<<12) | (patch)
@@ -47,11 +49,29 @@ MAX_DEVICE_GROUP_SIZE                 :: 32
 LUID_SIZE_KHX                         :: 8
 LUID_SIZE                             :: 8
 MAX_QUEUE_FAMILY_EXTERNAL             :: ~u32(1)
-MAX_GLOBAL_PRIORITY_SIZE_EXT          :: 16
+MAX_GLOBAL_PRIORITY_SIZE              :: 16
+MAX_GLOBAL_PRIORITY_SIZE_EXT          :: MAX_GLOBAL_PRIORITY_SIZE
 QUEUE_FAMILY_EXTERNAL                 :: MAX_QUEUE_FAMILY_EXTERNAL
 
+// Vulkan Video API Constants
+VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0  :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0  :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0 :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0 :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0 :: (1<<22) | (0<<12) | (0)
+VULKAN_VIDEO_CODEC_H265_ENCODE_API_VERSION_1_0_0 :: (1<<22) | (0<<12) | (0)
+
+VULKAN_VIDEO_CODEC_AV1_DECODE_SPEC_VERSION  :: VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_AV1_ENCODE_SPEC_VERSION  :: VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_H264_ENCODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_H264_DECODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_H265_DECODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0
+VULKAN_VIDEO_CODEC_H265_ENCODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H265_ENCODE_API_VERSION_1_0_0
+
+MAKE_VIDEO_STD_VERSION :: MAKE_VERSION
+
 // General Constants
-HEADER_VERSION       :: 296
+HEADER_VERSION       :: 303
 MAX_DRIVER_NAME_SIZE :: 256
 MAX_DRIVER_INFO_SIZE :: 256
 
@@ -85,6 +105,7 @@ VIDEO_H264_SCALING_LIST_8X8_NUM_ELEMENTS            :: 64
 VIDEO_H264_MAX_NUM_LIST_REF                         :: 32
 VIDEO_H264_MAX_CHROMA_PLANES                        :: 2
 VIDEO_H264_NO_REFERENCE_PICTURE                     :: 0xFF
+VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE       :: 2
 VIDEO_H265_CPB_CNT_LIST_SIZE                        :: 32
 VIDEO_H265_SUBLAYERS_LIST_SIZE                      :: 7
 VIDEO_H265_SCALING_LIST_4X4_NUM_LISTS               :: 6
@@ -108,8 +129,15 @@ VIDEO_H265_MAX_LONG_TERM_REF_PICS_SPS               :: 32
 VIDEO_H265_MAX_LONG_TERM_PICS                       :: 16
 VIDEO_H265_MAX_DELTA_POC                            :: 48
 VIDEO_H265_NO_REFERENCE_PICTURE                     :: 0xFF
-VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE       :: 2
 VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE             :: 8
+
+// Vulkan Video Codec Constants
+VULKAN_VIDEO_CODEC_AV1_DECODE_EXTENSION_NAME  :: "VK_STD_vulkan_video_codec_av1_decode"
+VULKAN_VIDEO_CODEC_AV1_ENCODE_EXTENSION_NAME  :: "VK_STD_vulkan_video_codec_av1_encode"
+VULKAN_VIDEO_CODEC_H264_DECODE_EXTENSION_NAME :: "VK_STD_vulkan_video_codec_h264_decode"
+VULKAN_VIDEO_CODEC_H264_ENCODE_EXTENSION_NAME :: "VK_STD_vulkan_video_codec_h264_encode"
+VULKAN_VIDEO_CODEC_H265_DECODE_EXTENSION_NAME :: "VK_STD_vulkan_video_codec_h265_decode"
+VULKAN_VIDEO_CODEC_H265_ENCODE_EXTENSION_NAME :: "VK_STD_vulkan_video_codec_h265_encode"
 
 // Vendor Constants
 KHR_surface                                               :: 1
@@ -281,9 +309,9 @@ KHR_video_decode_h265                                     :: 1
 KHR_VIDEO_DECODE_H265_SPEC_VERSION                        :: 8
 KHR_VIDEO_DECODE_H265_EXTENSION_NAME                      :: "VK_KHR_video_decode_h265"
 KHR_global_priority                                       :: 1
-MAX_GLOBAL_PRIORITY_SIZE_KHR                              :: 16
 KHR_GLOBAL_PRIORITY_SPEC_VERSION                          :: 1
 KHR_GLOBAL_PRIORITY_EXTENSION_NAME                        :: "VK_KHR_global_priority"
+MAX_GLOBAL_PRIORITY_SIZE_KHR                              :: MAX_GLOBAL_PRIORITY_SIZE
 KHR_driver_properties                                     :: 1
 KHR_DRIVER_PROPERTIES_SPEC_VERSION                        :: 1
 KHR_DRIVER_PROPERTIES_EXTENSION_NAME                      :: "VK_KHR_driver_properties"
@@ -414,6 +442,9 @@ KHR_video_decode_av1                                      :: 1
 MAX_VIDEO_AV1_REFERENCES_PER_FRAME_KHR                    :: 7
 KHR_VIDEO_DECODE_AV1_SPEC_VERSION                         :: 1
 KHR_VIDEO_DECODE_AV1_EXTENSION_NAME                       :: "VK_KHR_video_decode_av1"
+KHR_video_encode_av1                                      :: 1
+KHR_VIDEO_ENCODE_AV1_SPEC_VERSION                         :: 1
+KHR_VIDEO_ENCODE_AV1_EXTENSION_NAME                       :: "VK_KHR_video_encode_av1"
 KHR_video_maintenance1                                    :: 1
 KHR_VIDEO_MAINTENANCE_1_SPEC_VERSION                      :: 1
 KHR_VIDEO_MAINTENANCE_1_EXTENSION_NAME                    :: "VK_KHR_video_maintenance1"
@@ -441,6 +472,9 @@ KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME                   :: "VK_KHR_shader_expe
 KHR_maintenance6                                          :: 1
 KHR_MAINTENANCE_6_SPEC_VERSION                            :: 1
 KHR_MAINTENANCE_6_EXTENSION_NAME                          :: "VK_KHR_maintenance6"
+KHR_video_encode_quantization_map                         :: 1
+KHR_VIDEO_ENCODE_QUANTIZATION_MAP_SPEC_VERSION            :: 2
+KHR_VIDEO_ENCODE_QUANTIZATION_MAP_EXTENSION_NAME          :: "VK_KHR_video_encode_quantization_map"
 KHR_shader_relaxed_extended_instruction                   :: 1
 KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_SPEC_VERSION      :: 1
 KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME    :: "VK_KHR_shader_relaxed_extended_instruction"
@@ -478,10 +512,10 @@ EXT_transform_feedback                                    :: 1
 EXT_TRANSFORM_FEEDBACK_SPEC_VERSION                       :: 1
 EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME                     :: "VK_EXT_transform_feedback"
 NVX_binary_import                                         :: 1
-NVX_BINARY_IMPORT_SPEC_VERSION                            :: 1
+NVX_BINARY_IMPORT_SPEC_VERSION                            :: 2
 NVX_BINARY_IMPORT_EXTENSION_NAME                          :: "VK_NVX_binary_import"
 NVX_image_view_handle                                     :: 1
-NVX_IMAGE_VIEW_HANDLE_SPEC_VERSION                        :: 2
+NVX_IMAGE_VIEW_HANDLE_SPEC_VERSION                        :: 3
 NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME                      :: "VK_NVX_image_view_handle"
 AMD_draw_indirect_count                                   :: 1
 AMD_DRAW_INDIRECT_COUNT_SPEC_VERSION                      :: 2
@@ -905,6 +939,9 @@ EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME                     :: "VK_EXT_depth_clip_
 EXT_primitive_topology_list_restart                       :: 1
 EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_SPEC_VERSION          :: 1
 EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME        :: "VK_EXT_primitive_topology_list_restart"
+EXT_present_mode_fifo_latest_ready                        :: 1
+EXT_PRESENT_MODE_FIFO_LATEST_READY_SPEC_VERSION           :: 1
+EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME         :: "VK_EXT_present_mode_fifo_latest_ready"
 NV_external_memory_rdma                                   :: 1
 NV_EXTERNAL_MEMORY_RDMA_SPEC_VERSION                      :: 1
 NV_EXTERNAL_MEMORY_RDMA_EXTENSION_NAME                    :: "VK_NV_external_memory_rdma"
@@ -1046,6 +1083,9 @@ EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME :: "VK_EXT_attachment_
 NV_descriptor_pool_overallocation                         :: 1
 NV_DESCRIPTOR_POOL_OVERALLOCATION_SPEC_VERSION            :: 1
 NV_DESCRIPTOR_POOL_OVERALLOCATION_EXTENSION_NAME          :: "VK_NV_descriptor_pool_overallocation"
+NV_display_stereo                                         :: 1
+NV_DISPLAY_STEREO_SPEC_VERSION                            :: 1
+NV_DISPLAY_STEREO_EXTENSION_NAME                          :: "VK_NV_display_stereo"
 NV_raw_access_chains                                      :: 1
 NV_RAW_ACCESS_CHAINS_SPEC_VERSION                         :: 1
 NV_RAW_ACCESS_CHAINS_EXTENSION_NAME                       :: "VK_NV_raw_access_chains"
@@ -1067,6 +1107,12 @@ EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME              :: "VK_EXT_device_gene
 EXT_depth_clamp_control                                   :: 1
 EXT_DEPTH_CLAMP_CONTROL_SPEC_VERSION                      :: 1
 EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME                    :: "VK_EXT_depth_clamp_control"
+NV_cooperative_matrix2                                    :: 1
+NV_COOPERATIVE_MATRIX_2_SPEC_VERSION                      :: 1
+NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME                    :: "VK_NV_cooperative_matrix2"
+EXT_vertex_attribute_robustness                           :: 1
+EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_SPEC_VERSION              :: 1
+EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME            :: "VK_EXT_vertex_attribute_robustness"
 KHR_acceleration_structure                                :: 1
 KHR_ACCELERATION_STRUCTURE_SPEC_VERSION                   :: 13
 KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME                 :: "VK_KHR_acceleration_structure"
@@ -1115,6 +1161,12 @@ EXT_METAL_OBJECTS_EXTENSION_NAME                          :: "VK_EXT_metal_objec
 KHR_wayland_surface                                       :: 1
 KHR_WAYLAND_SURFACE_SPEC_VERSION                          :: 6
 KHR_WAYLAND_SURFACE_EXTENSION_NAME                        :: "VK_KHR_wayland_surface"
+KHR_xlib_surface                                          :: 1
+KHR_XLIB_SURFACE_SPEC_VERSION                             :: 6
+KHR_XLIB_SURFACE_EXTENSION_NAME                           :: "VK_KHR_xlib_surface"
+KHR_xcb_surface                                           :: 1
+KHR_XCB_SURFACE_SPEC_VERSION                              :: 6
+KHR_XCB_SURFACE_EXTENSION_NAME                            :: "VK_KHR_xcb_surface"
 
 // Handles types
 Instance       :: distinct Handle

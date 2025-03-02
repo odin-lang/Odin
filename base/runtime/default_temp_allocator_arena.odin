@@ -210,10 +210,24 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		case size == 0:
 			err = .Mode_Not_Implemented
 			return
-		case (uintptr(old_data) & uintptr(alignment-1) == 0) && size < old_size:
-			// shrink data in-place
-			data = old_data[:size]
-			return
+		case uintptr(old_data) & uintptr(alignment-1) == 0:
+			if size < old_size {
+				// shrink data in-place
+				data = old_data[:size]
+				return
+			}
+
+			if block := arena.curr_block; block != nil {
+				start := uint(uintptr(old_memory)) - uint(uintptr(block.base))
+				old_end := start + old_size
+				new_end := start + size
+				if start < old_end && old_end == block.used && new_end <= block.capacity {
+					// grow data in-place, adjusting next allocation
+					block.used = uint(new_end)
+					data = block.base[start:new_end]
+					return
+				}
+			}
 		}
 
 		new_memory := arena_alloc(arena, size, alignment, location) or_return
@@ -282,9 +296,10 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 
 		if block := arena.curr_block; block != nil {
 			assert(block.used >= temp.used, "out of order use of arena_temp_end", loc)
-			amount_to_zero := min(block.used-temp.used, block.capacity-block.used)
+			amount_to_zero := block.used-temp.used
 			intrinsics.mem_zero(block.base[temp.used:], amount_to_zero)
 			block.used = temp.used
+			arena.total_used -= amount_to_zero
 		}
 	}
 

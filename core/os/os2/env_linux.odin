@@ -54,7 +54,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	return
 }
 
-_set_env :: proc(key, v_new: string) -> bool {
+_set_env :: proc(key, v_new: string) -> Error {
 	if _org_env_begin == 0 {
 		_build_env()
 	}
@@ -63,7 +63,7 @@ _set_env :: proc(key, v_new: string) -> bool {
 	kv_size := len(key) + len(v_new) + 2
 	if v_curr, idx := _lookup(key); idx != NOT_FOUND {
 		if v_curr == v_new {
-			return true
+			return nil
 		}
 		sync.mutex_lock(&_env_mutex)
 		defer sync.mutex_unlock(&_env_mutex)
@@ -76,9 +76,9 @@ _set_env :: proc(key, v_new: string) -> bool {
 			// wasn't in the environment in the first place.
 			k_addr, v_addr := _kv_addr_from_val(v_curr, key)
 			if len(v_new) > len(v_curr) {
-				k_addr = ([^]u8)(heap_resize(k_addr, kv_size))
+				k_addr = ([^]u8)(runtime.heap_resize(k_addr, kv_size))
 				if k_addr == nil {
-					return false
+					return .Out_Of_Memory
 				}
 				v_addr = &k_addr[len(key) + 1]
 			}
@@ -86,13 +86,13 @@ _set_env :: proc(key, v_new: string) -> bool {
 			v_addr[len(v_new)] = 0
 
 			append(&_env, string(k_addr[:kv_size]))
-			return true
+			return nil
 		}
 	}
 
-	k_addr := ([^]u8)(heap_alloc(kv_size))
+	k_addr := ([^]u8)(runtime.heap_alloc(kv_size))
 	if k_addr == nil {
-		return false
+		return .Out_Of_Memory
 	}
 	intrinsics.mem_copy_non_overlapping(k_addr, raw_data(key), len(key))
 	k_addr[len(key)] = '='
@@ -104,7 +104,7 @@ _set_env :: proc(key, v_new: string) -> bool {
 	sync.mutex_lock(&_env_mutex)
 	append(&_env, string(k_addr[:kv_size - 1]))
 	sync.mutex_unlock(&_env_mutex)
-	return true
+	return nil
 }
 
 _unset_env :: proc(key: string) -> bool {
@@ -129,7 +129,7 @@ _unset_env :: proc(key: string) -> bool {
 	// if we got this far, the envrionment variable
 	// existed AND was allocated by us.
 	k_addr, _ := _kv_addr_from_val(v, key)
-	heap_free(k_addr)
+	runtime.heap_free(k_addr)
 	return true
 }
 
@@ -139,7 +139,7 @@ _clear_env :: proc() {
 
 	for kv in _env {
 		if !_is_in_org_env(kv) {
-			heap_free(raw_data(kv))
+			runtime.heap_free(raw_data(kv))
 		}
 	}
 	clear(&_env)
@@ -149,18 +149,26 @@ _clear_env :: proc() {
 	_org_env_end = ~uintptr(0)
 }
 
-_environ :: proc(allocator: runtime.Allocator) -> []string {
+_environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
 	if _org_env_begin == 0 {
 		_build_env()
 	}
-	env := make([]string, len(_env), allocator)
+	env := make([dynamic]string, 0, len(_env), allocator) or_return
+	defer if err != nil {
+		for e in env {
+			delete(e, allocator)
+		}
+		delete(env)
+	}
 
 	sync.mutex_lock(&_env_mutex)
 	defer sync.mutex_unlock(&_env_mutex)
-	for entry, i in _env {
-		env[i], _ = clone_string(entry, allocator)
+	for entry in _env {
+		s := clone_string(entry, allocator) or_return
+		append(&env, s)
 	}
-	return env
+	environ = env[:]
+	return
 }
 
 // The entire environment is stored as 0 terminated strings,
@@ -193,7 +201,7 @@ _build_env :: proc() {
 		return
 	}
 
-	_env = make(type_of(_env), heap_allocator())
+	_env = make(type_of(_env), runtime.heap_allocator())
 	cstring_env := _get_original_env()
 	_org_env_begin = uintptr(rawptr(cstring_env[0]))
 	for i := 0; cstring_env[i] != nil; i += 1 {

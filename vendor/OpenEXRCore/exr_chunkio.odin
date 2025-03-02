@@ -1,11 +1,5 @@
 package vendor_openexr
 
-when ODIN_OS == .Windows {
-	foreign import lib "OpenEXRCore-3_1.lib"
-} else {
-	foreign import lib "system:OpenEXRCore-3_1"
-}
-
 import "core:c"
 
 /**
@@ -41,6 +35,20 @@ chunk_info_t :: struct {
 
 @(link_prefix="exr_", default_calling_convention="c")
 foreign lib {
+	/** @brief Retrieve the chunk table offset for the part in question.
+	*/
+	get_chunk_table_offset :: proc(ctxt: const_context_t , part_index: c.int, chunk_offset_out: ^c.uint64_t) -> result_t ---
+
+	/** initialize chunk info with the default values from the specified part
+	*
+	* The 'x' and 'y' parameters are used to indicate the starting position
+	* of the chunk being initialized. This does not perform any I/O to validate
+	* and so the values are only indicative. (but can be used to do things
+	* like compress / decompress a chunk without having a file to actually
+	* read
+	*/
+	chunk_default_initialize :: proc(ctxt: context_t, part_index: c.int, box: ^attr_box2i_t, levelx: c.int, levely: c.int, cinfo: ^chunk_info_t) -> result_t ---
+
 	read_scanline_chunk_info :: proc(ctxt: const_context_t, part_index: c.int, y: c.int, cinfo: ^chunk_info_t) -> result_t ---
 
 	read_tile_chunk_info :: proc(

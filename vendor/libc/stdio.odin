@@ -1,3 +1,4 @@
+#+build !freestanding
 package odin_libc
 
 import "core:c"

@@ -3,7 +3,10 @@
 #include "entity.cpp"
 #include "types.cpp"
 
-String get_final_microarchitecture();
+
+gb_internal u64 type_hash_canonical_type(Type *type);
+
+gb_internal String get_final_microarchitecture();
 
 gb_internal void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
@@ -170,7 +173,7 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	d->parent = parent;
 	d->scope  = scope;
 	ptr_set_init(&d->deps, 0);
-	ptr_set_init(&d->type_info_deps, 0);
+	type_set_init(&d->type_info_deps, 0);
 	d->labels.allocator = heap_allocator();
 	d->variadic_reuses.allocator = heap_allocator();
 	d->variadic_reuse_max_bytes = 0;
@@ -354,6 +357,10 @@ gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 	case Ast_BitFieldType:
 		scope->flags |= ScopeFlag_Type;
 		break;
+	}
+	if (c->decl && c->decl->proc_lit) {
+		// Number the scopes within a procedure body depth-first
+		scope->index = c->decl->scope_index++;
 	}
 	c->scope = scope;
 	c->state_flags |= StateFlag_bounds_check;
@@ -541,6 +548,23 @@ gb_internal u64 check_vet_flags(Ast *node) {
 	AstFile *file = node->file();
 	return ast_file_vet_flags(file);
 }
+
+gb_internal u64 check_feature_flags(CheckerContext *c, Ast *node) {
+	AstFile *file = c->file;
+	if (file == nullptr &&
+	    c->curr_proc_decl &&
+	    c->curr_proc_decl->proc_lit) {
+		file = c->curr_proc_decl->proc_lit->file();
+	}
+	if (file == nullptr) {
+		file = node->file();
+	}
+	if (file != nullptr && file->feature_flags_set) {
+		return file->feature_flags;
+	}
+	return 0;
+}
+
 
 enum VettedEntityKind {
 	VettedEntity_Invalid,
@@ -732,9 +756,15 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 			// TODO(bill): When is a good size warn?
 			// Is >256 KiB good enough?
 			if (sz > 1ll<<18) {
-				gbString type_str = type_to_string(e->type);
-				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
-				gb_string_free(type_str);
+				bool is_ref = false;
+				if((e->flags & EntityFlag_ForValue) != 0) {
+					is_ref = type_deref(e->Variable.for_loop_parent_type) != NULL;
+				}
+				if(!is_ref) {
+					gbString type_str = type_to_string(e->type);
+					warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
+					gb_string_free(type_str);
+				}
 			}
 		}
 	}
@@ -802,11 +832,17 @@ gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
 	rw_mutex_unlock(&d->deps_mutex);
 }
 gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
-	if (d == nullptr) {
+	if (d == nullptr || type == nullptr) {
 		return;
 	}
+	if (type->kind == Type_Named) {
+		Entity *e = type->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			type = type->Named.base;
+		}
+	}
 	rw_mutex_lock(&d->type_info_deps_mutex);
-	ptr_set_add(&d->type_info_deps, type);
+	type_set_add(&d->type_info_deps, type);
 	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
@@ -1164,7 +1200,6 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_NO_BOUNDS_CHECK",            build_context.no_bounds_check);
 	add_global_bool_constant("ODIN_NO_TYPE_ASSERT",             build_context.no_type_assert);
 	add_global_bool_constant("ODIN_DEFAULT_TO_PANIC_ALLOCATOR", bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR);
-	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",        bc->no_dynamic_literals);
 	add_global_bool_constant("ODIN_NO_CRT",                     bc->no_crt);
 	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",       bc->use_separate_modules);
 	add_global_bool_constant("ODIN_TEST",                       bc->command_kind == Command_test);
@@ -1336,8 +1371,11 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->foreigns);
 	// map_init(&i->gen_procs);
 	map_init(&i->gen_types);
-	array_init(&i->type_info_types, a);
-	map_init(&i->type_info_map);
+
+	type_set_init(&i->min_dep_type_info_set);
+	map_init(&i->min_dep_type_info_index_map);
+
+	// map_init(&i->type_info_map);
 	string_map_init(&i->files);
 	string_map_init(&i->packages);
 	array_init(&i->variable_init_order, a);
@@ -1356,6 +1394,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
+	mpsc_init(&i->foreign_decls_to_check, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
 
 	string_map_init(&i->load_directory_cache);
@@ -1369,8 +1408,10 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->foreigns);
 	// map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
-	array_free(&i->type_info_types);
-	map_destroy(&i->type_info_map);
+
+	type_set_destroy(&i->min_dep_type_info_set);
+	map_destroy(&i->min_dep_type_info_index_map);
+
 	string_map_destroy(&i->files);
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
@@ -1382,6 +1423,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
+	mpsc_destroy(&i->foreign_decls_to_check);
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
@@ -1603,6 +1645,23 @@ gb_internal void check_remove_expr_info(CheckerContext *c, Ast *e) {
 	}
 }
 
+gb_internal isize type_info_index(CheckerInfo *info, TypeInfoPair pair, bool error_on_failure) {
+	mutex_lock(&info->minimum_dependency_type_info_mutex);
+
+	isize entry_index = -1;
+	u64 hash = pair.hash;
+	isize *found_entry_index = map_get(&info->min_dep_type_info_index_map, hash);
+	if (found_entry_index) {
+		entry_index = *found_entry_index;
+	}
+	mutex_unlock(&info->minimum_dependency_type_info_mutex);
+
+	if (error_on_failure && entry_index < 0) {
+		compiler_error("Type_Info for '%s' could not be found", type_to_string(pair.type));
+	}
+	return entry_index;
+}
+
 
 gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	type = default_type(type);
@@ -1610,32 +1669,10 @@ gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_f
 		type = t_bool;
 	}
 
-	mutex_lock(&info->type_info_mutex);
-
-	isize entry_index = -1;
-	isize *found_entry_index = map_get(&info->type_info_map, type);
-	if (found_entry_index) {
-		entry_index = *found_entry_index;
-	}
-	if (entry_index < 0) {
-		// NOTE(bill): Do manual linear search
-		for (auto const &e : info->type_info_map) {
-			if (are_types_identical_unique_tuples(e.key, type)) {
-				entry_index = e.value;
-				// NOTE(bill): Add it to the search map
-				map_set(&info->type_info_map, type, entry_index);
-				break;
-			}
-		}
-	}
-
-	mutex_unlock(&info->type_info_mutex);
-
-	if (error_on_failure && entry_index < 0) {
-		compiler_error("Type_Info for '%s' could not be found", type_to_string(type));
-	}
-	return entry_index;
+	u64 hash = type_hash_canonical_type(type);
+	return type_info_index(info, {type, hash}, error_on_failure);
 }
+
 
 
 gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
@@ -1989,8 +2026,12 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	}
 
 	add_type_info_dependency(c->info, c->decl, t);
-
+#if 0
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
+		if (type_set_update(&c->info->type_info_set, t)) {
+			// return;
+		}
+
 		auto found = map_get(&c->info->type_info_map, t);
 		if (found != nullptr) {
 			// Types have already been added
@@ -2013,7 +2054,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			// Unique entry
 			// NOTE(bill): map entries grow linearly and in order
 			ti_index = c->info->type_info_types.count;
-			array_add(&c->info->type_info_types, t);
+			TypeInfoPair tt = {t, type_hash_canonical_type(t)};
+			array_add(&c->info->type_info_types, tt);
 		}
 		map_set(&c->checker->info.type_info_map, t, ti_index);
 
@@ -2208,6 +2250,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
 		break;
 	}
+#endif
 }
 
 
@@ -2265,19 +2308,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		return;
 	}
 
-	auto *set = &c->info.minimum_dependency_type_info_set;
-
-	isize ti_index = type_info_index(&c->info, t, false);
-	if (ti_index < 0) {
-		add_type_info_type(&c->builtin_ctx, t); // Missing the type information
-		ti_index = type_info_index(&c->info, t, false);
-	}
-	GB_ASSERT(ti_index >= 0);
-	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
-	// and effectively assigns the `+1` of the value
-	isize const count = set->count;
-	if (map_set_if_not_previously_exists(set, ti_index+1, count)) {
-		// Type already exists;
+	if (type_set_update(&c->info.min_dep_type_info_set, t)) {
 		return;
 	}
 
@@ -2477,8 +2508,8 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (decl == nullptr) {
 		return;
 	}
-	for (Type *t : decl->type_info_deps) {
-		add_min_dep_type_info(c, t);
+	for (TypeInfoPair const tt : decl->type_info_deps) {
+		add_min_dep_type_info(c, tt.type);
 	}
 
 	for (Entity *e : decl->deps) {
@@ -2678,7 +2709,6 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
 
 	ptr_set_init(&c->info.minimum_dependency_set, min_dep_set_cap);
-	map_init(&c->info.minimum_dependency_type_info_set);
 
 #define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
 	if (condition) {                                                                             \
@@ -3870,6 +3900,7 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 #include "check_expr.cpp"
 #include "check_builtin.cpp"
 #include "check_type.cpp"
+#include "name_canonicalization.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
 
@@ -4992,6 +5023,9 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "export") {
+		ac->is_export = true;
+		return true;
 	} else if (name == "force" || name == "require") {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
@@ -5015,6 +5049,12 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 		} else {
 			ac->extra_linker_flags = ev.value_string;
 		}
+		return true;
+	} else if (name == "ignore_duplicates") {
+		if (value != nullptr) {
+			error(elem, "Expected no parameter for '%.*s'", LIT(name));
+		}
+		ac->ignore_duplicates = true;
 		return true;
 	}
 	return false;
@@ -5094,6 +5134,38 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 
 		e->LibraryName.paths = fl->fullpaths;
 	}
+
+	for (Entity *e = nullptr; mpsc_dequeue(&c->info.foreign_decls_to_check, &e); /**/) {
+		GB_ASSERT(e != nullptr);
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+		if (!is_arch_wasm()) {
+			continue;
+		}
+		Entity *foreign_library = e->Procedure.foreign_library;
+		GB_ASSERT(foreign_library != nullptr);
+
+		String name = e->Procedure.link_name;
+
+		String module_name = str_lit("env");
+		GB_ASSERT (foreign_library->kind == Entity_LibraryName);
+		if (foreign_library->LibraryName.paths.count != 1) {
+			error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
+			      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
+		}
+
+		if (foreign_library->LibraryName.paths.count >= 1) {
+			module_name = foreign_library->LibraryName.paths[0];
+		}
+
+		if (!string_ends_with(module_name, str_lit(".o"))) {
+			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+		}
+		e->Procedure.link_name = name;
+
+		check_foreign_procedure(&ctx, e, e->decl_info);
+	}
 }
 
 gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
@@ -5119,20 +5191,30 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
 
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+
+	Scope *scope = parent_scope;
+	if (ac.is_export) {
+		scope = parent_scope->parent;
+	}
+
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
 	e->LibraryName.decl = decl;
 	add_entity_flags_from_file(ctx, e, parent_scope);
-	add_entity(ctx, parent_scope, nullptr, e);
+	add_entity(ctx, scope, nullptr, e);
 
-	AttributeContext ac = {};
-	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+
 	if (ac.require_declaration) {
 		mpsc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
 	}
 	if (ac.foreign_import_priority_index != 0) {
 		e->LibraryName.priority_index = ac.foreign_import_priority_index;
+	}
+	if (ac.ignore_duplicates) {
+		e->LibraryName.ignore_duplicates = true;
 	}
 	String extra_linker_flags = string_trim_whitespace(ac.extra_linker_flags);
 	if (extra_linker_flags.len != 0) {
@@ -6244,6 +6326,10 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					continue;
 				}
 
+				if (dst_params == nullptr) {
+					error(src->token, "Deferred procedure must have parameters for %s", attribute);
+					continue;
+				}
 				GB_ASSERT(dst_params->kind == Type_Tuple);
 
 				Type *tsrc = alloc_type_tuple();
@@ -6644,6 +6730,58 @@ gb_internal void check_parsed_files(Checker *c) {
 		}
 		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
 	}
+
+	TIME_SECTION("initialize and check for collisions in type info array");
+	{
+		Array<TypeInfoPair> type_info_types; // sorted after filled
+		array_init(&type_info_types, heap_allocator());
+		defer (array_free(&type_info_types));
+
+		for (auto const &tt : c->info.min_dep_type_info_set) {
+			array_add(&type_info_types, tt);
+		}
+		array_sort(type_info_types, type_info_pair_cmp);
+
+		array_init(&c->info.type_info_types_hash_map, heap_allocator(), type_info_types.count*2 + 1);
+		map_reserve(&c->info.min_dep_type_info_index_map, type_info_types.count);
+
+		isize hash_map_len = c->info.type_info_types_hash_map.count;
+		for (auto const &tt : type_info_types) {
+			isize index = tt.hash % hash_map_len;
+			// NOTE(bill): no need for a sanity check since there
+			// will always be enough space for the entries
+			for (;;) {
+				if (index == 0 || c->info.type_info_types_hash_map[index].hash != 0) {
+					index = (index+1) % hash_map_len;
+					continue;
+				}
+				break;
+			}
+			c->info.type_info_types_hash_map[index] = tt;
+
+			bool exists = map_set_if_not_previously_exists(&c->info.min_dep_type_info_index_map, tt.hash, index);
+			if (exists) {
+				for (auto const &entry : c->info.min_dep_type_info_index_map) {
+					if (entry.key != tt.hash) {
+						continue;
+					}
+					auto const &other = type_info_types[entry.value];
+					if (are_types_identical_unique_tuples(tt.type, other.type)) {
+						continue;
+					}
+					gbString t = temp_canonical_string(tt.type);
+					gbString o = temp_canonical_string(other.type);
+					GB_PANIC("%s (%s) %llu vs %s (%s) %llu",
+					         type_to_string(tt.type, false),    t, cast(unsigned long long)tt.hash,
+					         type_to_string(other.type, false), o, cast(unsigned long long)other.hash);
+				}
+			}
+		}
+
+
+		GB_ASSERT(c->info.min_dep_type_info_index_map.count <= type_info_types.count);
+	}
+
 
 	TIME_SECTION("sort init and fini procedures");
 	check_sort_init_and_fini_procedures(c);

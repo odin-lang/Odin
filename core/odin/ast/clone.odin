@@ -242,8 +242,9 @@ clone_node :: proc(node: ^Node) -> ^Node {
 			r.vals = clone(r.vals)
 			r.expr = clone(r.expr)
 			r.body = clone(r.body)
-		case ^Inline_Range_Stmt:
+		case ^Unroll_Range_Stmt:
 			r.label = clone(r.label)
+			r.args = clone(r.args)
 			r.val0 = clone(r.val0)
 			r.val1 = clone(r.val1)
 			r.expr = clone(r.expr)

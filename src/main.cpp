@@ -331,6 +331,7 @@ enum BuildFlagKind {
 	BuildFlag_UseRADLink,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
+	BuildFlag_UseSingleModule,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 
@@ -401,6 +402,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalModulePerFile,
 	BuildFlag_InternalCached,
 	BuildFlag_InternalNoInline,
+	BuildFlag_InternalByValue,
 
 	BuildFlag_Tilde,
 
@@ -544,6 +546,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseRADLink,              str_lit("radlink"),                   BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
 
@@ -612,6 +615,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalModulePerFile,   str_lit("internal-module-per-file"),  BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalCached,          str_lit("internal-cached"),           BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalNoInline,        str_lit("internal-no-inline"),        BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
@@ -1190,7 +1194,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_type_assert = true;
 							break;
 						case BuildFlag_NoDynamicLiterals:
-							build_context.no_dynamic_literals = true;
+							gb_printf_err("Warning: Use of -no-dynamic-literals is now redundant\n");
 							break;
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
@@ -1238,7 +1242,18 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 
 						case BuildFlag_UseSeparateModules:
+							if (build_context.use_single_module) {
+								gb_printf_err("-use-separate-modules cannot be used with -use-single-module\n");
+								bad_flags = true;
+							}
 							build_context.use_separate_modules = true;
+							break;
+						case BuildFlag_UseSingleModule:
+							if (build_context.use_separate_modules) {
+								gb_printf_err("-use-single-module cannot be used with -use-separate-modules\n");
+								bad_flags = true;
+							}
+							build_context.use_single_module = true;
 							break;
 						case BuildFlag_NoThreadedChecker:
 							build_context.no_threaded_checker = true;
@@ -1507,6 +1522,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_InternalNoInline:
 							build_context.internal_no_inline = true;
+							break;
+						case BuildFlag_InternalByValue:
+							build_context.internal_by_value = true;
 							break;
 
 						case BuildFlag_Tilde:
@@ -1796,7 +1814,10 @@ gb_internal void check_defines(BuildContext *bc, Checker *c) {
 		if (!found) {
 			ERROR_BLOCK();
 			warning(nullptr, "given -define:%.*s is unused in the project", LIT(name));
-			error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
+
+			if (!global_ignore_warnings()) {
+				error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
+			}
 		}
 	}
 }
@@ -2115,7 +2136,7 @@ gb_internal void export_dependencies(Checker *c) {
 		for_array(i, files) {
 			AstFile *file = files[i];
 			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(file->fullpath));
-			if (i+1 == files.count) {
+			if (i+1 < files.count) {
 				gb_fprintf(&f, ",");
 			}
 			gb_fprintf(&f, "\n");
@@ -2128,7 +2149,7 @@ gb_internal void export_dependencies(Checker *c) {
 		for_array(i, load_files) {
 			LoadFileCache *cache = load_files[i];
 			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(cache->path));
-			if (i+1 == load_files.count) {
+			if (i+1 < load_files.count) {
 				gb_fprintf(&f, ",");
 			}
 			gb_fprintf(&f, "\n");
@@ -2324,6 +2345,10 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	if (check) {
 		if (print_flag("-default-to-nil-allocator")) {
 			print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing.");
+		}
+
+		if (print_flag("-default-to-panic-allocator")) {
+			print_usage_line(2, "Sets the default allocator to be the panic_allocator, an allocator which calls panic() on any allocation attempt.");
 		}
 
 		if (print_flag("-define:<name>=<value>")) {
@@ -2705,8 +2730,12 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	if (run_or_build) {
 		if (print_flag("-use-separate-modules")) {
 			print_usage_line(2, "The backend generates multiple build units which are then linked together.");
-			print_usage_line(2, "Normally, a single build unit is generated for a standard project.");
-			print_usage_line(2, "This is the default behaviour on Windows for '-o:none' and '-o:minimal' builds.");
+			print_usage_line(2, "This is the default behaviour for '-o:none' and '-o:minimal' builds.");
+			print_usage_line(2, "Normally, a single build unit is generated for a standard project for '-o:speed' or '-o:size'.");
+		}
+		if (print_flag("-use-single-module")) {
+			print_usage_line(2, "The backend generates only a single build unit.");
+			print_usage_line(2, "This is the default behaviour for '-o:speed' or '-o:size'.");
 		}
 
 	}
@@ -3564,10 +3593,15 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.generate_docs) {
+		MAIN_TIME_SECTION("generate documentation");
 		if (global_error_collector.count != 0) {
 			return 1;
 		}
 		generate_documentation(checker);
+
+		if (build_context.show_timings) {
+			show_timings(checker, &global_timings);
+		}
 		return 0;
 	}
 

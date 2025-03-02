@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -319,7 +319,7 @@ Info_Errno :: enum c.int {
 	OVERFLOW = EAI_OVERFLOW,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux || ODIN_OS == .Haiku {
 
 	hostent :: struct {
 		h_name:      cstring,                /* [PSX] official name of host */
@@ -352,15 +352,28 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	// The highest reserved port number.
 	IPPORT_RESERVED :: 1024
 
-	addrinfo :: struct {
-		ai_flags:     Addrinfo_Flags, /* [PSX] input flags */
-		ai_family:    AF,             /* [PSX] address family of socket */
-		ai_socktype:  Sock,           /* [PSX] socket type */
-		ai_protocol:  Protocol,       /* [PSX] protocol of socket */
-		ai_addrlen:   socklen_t,      /* [PSX] length of socket address */
-		ai_canonname: cstring,        /* [PSX] canonical name of service location */
-		ai_addr:      ^sockaddr,      /* [PSX] binary address */
-		ai_next:      ^addrinfo,      /* [PSX] pointer to next in list */
+	when ODIN_OS == .Linux || ODIN_OS == .OpenBSD {
+		addrinfo :: struct {
+			ai_flags:     Addrinfo_Flags, /* [PSX] input flags */
+			ai_family:    AF,             /* [PSX] address family of socket */
+			ai_socktype:  Sock,           /* [PSX] socket type */
+			ai_protocol:  Protocol,       /* [PSX] protocol of socket */
+			ai_addrlen:   socklen_t,      /* [PSX] length of socket address */
+			ai_addr:      ^sockaddr,      /* [PSX] binary address */
+			ai_canonname: cstring,        /* [PSX] canonical name of service location */
+			ai_next:      ^addrinfo,      /* [PSX] pointer to next in list */
+		}
+	} else {
+		addrinfo :: struct {
+			ai_flags:     Addrinfo_Flags, /* [PSX] input flags */
+			ai_family:    AF,             /* [PSX] address family of socket */
+			ai_socktype:  Sock,           /* [PSX] socket type */
+			ai_protocol:  Protocol,       /* [PSX] protocol of socket */
+			ai_addrlen:   socklen_t,      /* [PSX] length of socket address */
+			ai_canonname: cstring,        /* [PSX] canonical name of service location */
+			ai_addr:      ^sockaddr,      /* [PSX] binary address */
+			ai_next:      ^addrinfo,      /* [PSX] pointer to next in list */
+		}
 	}
 
 	when ODIN_OS == .Darwin {
@@ -430,6 +443,23 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		NI_NUMERICSERV  :: 2
 		NI_NUMERICSCOPE :: 0x100
 		NI_DGRAM        :: 16
+
+	} else when ODIN_OS == .Haiku {
+
+		AI_PASSIVE     :: 0x001
+		AI_CANONNAME   :: 0x002
+		AI_NUMERICHOST :: 0x004
+		AI_NUMERICSERV :: 0x008
+		AI_V4MAPPED    :: 0x800
+		AI_ALL         :: 0x100
+		AI_ADDRCONFIG  :: 0x400
+
+		NI_NOFQDN       :: 0x01
+		NI_NUMERICHOST  :: 0x02
+		NI_NAMEREQD     :: 0x04
+		NI_NUMERICSERV  :: 0x08
+		NI_DGRAM        :: 0x10
+		NI_NUMERICSCOPE :: 0x40
 
 	}
 

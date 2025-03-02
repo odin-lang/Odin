@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -143,7 +143,7 @@ nl_item :: enum nl_item_t {
 	CRNCYSTR    = CRNCYSTR,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku {
 
 	// NOTE: declared with `_t` so we can enumerate the real `nl_info`.
 	nl_item_t :: distinct c.int
@@ -210,7 +210,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	YESEXPR :: 52
 	NOEXPR  :: 53
 
-	CRNCYSTR :: 56
+	CRNCYSTR :: 54 when ODIN_OS == .Haiku else 56
 
 } else when ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 

@@ -1,22 +1,22 @@
-gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
-	auto *set = &info->minimum_dependency_type_info_set;
-	isize index = type_info_index(info, type, err_on_not_found);
+
+gb_internal isize lb_type_info_index(CheckerInfo *info, TypeInfoPair pair, bool err_on_not_found=true) {
+	isize index = type_info_index(info, pair, err_on_not_found);
 	if (index >= 0) {
-		auto *found = map_get(set, index+1);
-		if (found) {
-			GB_ASSERT(*found >= 0);
-			return *found + 1;
-		}
+		return index;
 	}
 	if (err_on_not_found) {
-		gb_printf_err("NOT FOUND lb_type_info_index:\n\t%s\n\t@ index %td\n\tmax count: %u\nFound:\n", type_to_string(type), index, set->count);
-		for (auto const &entry : *set) {
+		gb_printf_err("NOT FOUND lb_type_info_index:\n\t%s\n\t@ index %td\n\tmax count: %u\nFound:\n", type_to_string(pair.type), index, info->min_dep_type_info_index_map.count);
+		for (auto const &entry : info->min_dep_type_info_index_map) {
 			isize type_info_index = entry.key;
-			gb_printf_err("\t%s\n", type_to_string(info->type_info_types[type_info_index]));
+			gb_printf_err("\t%s\n", type_to_string(info->type_info_types_hash_map[type_info_index].type));
 		}
 		GB_PANIC("NOT FOUND");
 	}
 	return -1;
+}
+
+gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
+	return lb_type_info_index(info, {type, type_hash_canonical_type(type)}, err_on_not_found);
 }
 
 gb_internal u64 lb_typeid_kind(lbModule *m, Type *type, u64 id=0) {
@@ -73,37 +73,8 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 
 	type = default_type(type);
 
-	u64 id = cast(u64)lb_type_info_index(m->info, type);
-	GB_ASSERT(id >= 0);
-
-	u64 kind = lb_typeid_kind(m, type, id);
-	u64 named = is_type_named(type) && type->kind != Type_Basic;
-	u64 special = 0;
-	u64 reserved = 0;
-
-	if (is_type_cstring(type)) {
-		special = 1;
-	} else if (is_type_integer(type) && !is_type_unsigned(type)) {
-		special = 1;
-	}
-
-	u64 data = 0;
-	if (build_context.ptr_size == 4) {
-		GB_ASSERT(id <= (1u<<24u));
-		data |= (id       &~ (1u<<24)) << 0u;  // index
-		data |= (kind     &~ (1u<<5))  << 24u; // kind
-		data |= (named    &~ (1u<<1))  << 29u; // named
-		data |= (special  &~ (1u<<1))  << 30u; // special
-		data |= (reserved &~ (1u<<1))  << 31u; // reserved
-	} else {
-		GB_ASSERT(build_context.ptr_size == 8);
-		GB_ASSERT(id <= (1ull<<56u));
-		data |= (id       &~ (1ull<<56)) << 0ul;  // index
-		data |= (kind     &~ (1ull<<5))  << 56ull; // kind
-		data |= (named    &~ (1ull<<1))  << 61ull; // named
-		data |= (special  &~ (1ull<<1))  << 62ull; // special
-		data |= (reserved &~ (1ull<<1))  << 63ull; // reserved
-	}
+	u64 data = type_hash_canonical_type(type);
+	GB_ASSERT(data != 0);
 
 	lbValue res = {};
 	res.value = LLVMConstInt(lb_type(m, t_typeid), data, false);
@@ -279,13 +250,14 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 	LLVMTypeRef *modified_types = lb_setup_modified_types_for_type_info(m, global_type_info_data_entity_count);
 	defer (gb_free(heap_allocator(), modified_types));
-	for_array(type_info_type_index, info->type_info_types) {
-		Type *t = info->type_info_types[type_info_type_index];
+	for_array(type_info_type_index, info->type_info_types_hash_map) {
+		auto const &tt = info->type_info_types_hash_map[type_info_type_index];
+		Type *t = tt.type;
 		if (t == nullptr || t == t_invalid) {
 			continue;
 		}
 
-		isize entry_index = lb_type_info_index(info, t, false);
+		isize entry_index = lb_type_info_index(info, tt, false);
 		if (entry_index <= 0) {
 			continue;
 		}
@@ -342,8 +314,8 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		return giant_const_values[index];
 	};
 
-	for_array(type_info_type_index, info->type_info_types) {
-		Type *t = info->type_info_types[type_info_type_index];
+	for_array(type_info_type_index, info->type_info_types_hash_map) {
+		Type *t = info->type_info_types_hash_map[type_info_type_index].type;
 		if (t == nullptr || t == t_invalid) {
 			continue;
 		}
@@ -1071,7 +1043,12 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		LLVMSetInitializer(giant_const_values[entry_index], LLVMConstNamedStruct(stype, small_const_values, variant_index+1));
 	}
 	for (isize i = 0; i < global_type_info_data_entity_count; i++) {
-		giant_const_values[i] = LLVMConstPointerCast(giant_const_values[i], lb_type(m, t_type_info_ptr));
+		auto *ptr = &giant_const_values[i];
+		if (*ptr != nullptr) {
+			*ptr = LLVMConstPointerCast(*ptr, lb_type(m, t_type_info_ptr));
+		} else {
+			*ptr = LLVMConstNull(lb_type(m, t_type_info_ptr));
+		}
 	}
 
 

@@ -1,6 +1,7 @@
 #+private
 package runtime
 
+@(priority_index=-1e6)
 foreign import "system:Foundation.framework"
 
 import "base:intrinsics"

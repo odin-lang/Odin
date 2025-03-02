@@ -5837,15 +5837,26 @@ gb_inline isize gb_printf_err_va(char const *fmt, va_list va) {
 }
 
 gb_inline isize gb_fprintf_va(struct gbFile *f, char const *fmt, va_list va) {
-	gb_local_persist char buf[4096];
+	char buf[4096];
 	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
+	char *new_buf = NULL;
+	isize n = gb_size_of(buf);
+	while (len < 0) {
+		n <<= 1;
+		gb_free(gb_heap_allocator(), new_buf);
+		new_buf = gb_alloc_array(gb_heap_allocator(), char, n);;
+		len = gb_snprintf_va(new_buf, n, fmt, va);
+	}
 	gb_file_write(f, buf, len-1); // NOTE(bill): prevent extra whitespace
+	if (new_buf != NULL) {
+		gb_free(gb_heap_allocator(), new_buf);
+	}
 	return len;
 }
 
 
 gb_inline char *gb_bprintf_va(char const *fmt, va_list va) {
-	gb_local_persist char buffer[4096];
+	gb_thread_local gb_local_persist char buffer[4096];
 	gb_snprintf_va(buffer, gb_size_of(buffer), fmt, va);
 	return buffer;
 }

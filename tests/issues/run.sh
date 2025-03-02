@@ -17,6 +17,7 @@ $ODIN test ../test_issue_2615.odin $COMMON
 $ODIN test ../test_issue_2637.odin $COMMON
 $ODIN test ../test_issue_2666.odin $COMMON
 $ODIN test ../test_issue_4210.odin $COMMON
+$ODIN test ../test_issue_4584.odin $COMMON
 if [[ $($ODIN build ../test_issue_2395.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]] ; then
 	echo "SUCCESSFUL 1/1"
 else

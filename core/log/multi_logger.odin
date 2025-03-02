@@ -5,17 +5,17 @@ Multi_Logger_Data :: struct {
 	loggers: []Logger,
 }
 
-create_multi_logger :: proc(logs: ..Logger) -> Logger {
-	data := new(Multi_Logger_Data)
-	data.loggers = make([]Logger, len(logs))
+create_multi_logger :: proc(logs: ..Logger, allocator := context.allocator) -> Logger {
+	data := new(Multi_Logger_Data, allocator)
+	data.loggers = make([]Logger, len(logs), allocator)
 	copy(data.loggers, logs)
 	return Logger{multi_logger_proc, data, Level.Debug, nil}
 }
 
-destroy_multi_logger :: proc(log: Logger) {
+destroy_multi_logger :: proc(log: Logger, allocator := context.allocator) {
 	data := (^Multi_Logger_Data)(log.data)
-	delete(data.loggers)
-	free(data)
+	delete(data.loggers, allocator)
+	free(data, allocator)
 }
 
 multi_logger_proc :: proc(logger_data: rawptr, level: Level, text: string,

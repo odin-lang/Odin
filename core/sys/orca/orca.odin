@@ -14,27 +14,6 @@ pool :: struct {
 	blockSize: u64,
 }
 
-@(link_prefix="OC_")
-foreign {
-	UI_DARK_THEME: ui_theme
-	UI_LIGHT_THEME: ui_theme
-
-	UI_DARK_PALETTE: ui_palette
-	UI_LIGHT_PALETTE: ui_palette
-}
-
-
-SYS_MAX_ERROR :: 1024
-
-sys_err_def :: struct {
-	msg: [SYS_MAX_ERROR]u8 `fmt:"s,0"`,
-	code: i32,
-}
-
-@(link_prefix="oc_")
-foreign {
-	sys_error: sys_err_def
-}
 UNICODE_BASIC_LATIN :: unicode_range { 0x0000, 127 }
 UNICODE_C1_CONTROLS_AND_LATIN_1_SUPPLEMENT :: unicode_range { 0x0080, 127 }
 UNICODE_LATIN_EXTENDED_A :: unicode_range { 0x0100, 127 }
@@ -178,43 +157,6 @@ file_write_slice :: proc(file: file, slice: []char) -> u64 {
 file_read_slice :: proc(file: file, slice: []char) -> u64 {
 	return file_read(file, u64(len(slice)), raw_data(slice))
 }
-
-style_enum :: enum {
-	SIZE_WIDTH = 1,
-	SIZE_HEIGHT,
-	
-	LAYOUT_AXIS,
-	LAYOUT_ALIGN_X,
-	LAYOUT_ALIGN_Y,
-	LAYOUT_SPACING,
-	LAYOUT_MARGIN_X,
-	LAYOUT_MARGIN_Y,
-	
-	FLOAT_X,
-	FLOAT_Y,
-
-	COLOR,
-	BG_COLOR,
-	BORDER_COLOR,
-	BORDER_SIZE,
-	ROUNDNESS,
-
-	FONT,
-	FONT_SIZE,
-
-	ANIMATION_TIME,
-	ANIMATION_MASK,
-}
-
-ui_style_mask :: bit_set[style_enum; u64]
-
-// Masks like the C version that can be used as common combinations
-SIZE :: ui_style_mask { .SIZE_WIDTH, .SIZE_HEIGHT }
-LAYOUT_MARGINS :: ui_style_mask { .LAYOUT_MARGIN_X, .LAYOUT_MARGIN_Y }
-LAYOUT :: ui_style_mask { .LAYOUT_AXIS, .LAYOUT_ALIGN_X, .LAYOUT_ALIGN_Y, .LAYOUT_SPACING, .LAYOUT_MARGIN_X, .LAYOUT_MARGIN_Y }
-FLOAT :: ui_style_mask { .FLOAT_X, .FLOAT_Y }
-MASK_INHERITED :: ui_style_mask { .COLOR, .FONT, .FONT_SIZE, .ANIMATION_TIME, .ANIMATION_MASK }
-
 ////////////////////////////////////////////////////////////////////////////////
 // Utility data structures and helpers used throughout the Orca API.
 ////////////////////////////////////////////////////////////////////////////////
@@ -578,8 +520,28 @@ foreign {
 // A unicode codepoint.
 utf32 :: rune
 
+// This enum declares the possible return status of UTF8 decoding/encoding operations.
+utf8_status :: enum u32 {
+	// The operation was successful.
+	OK = 0,
+	// The operation unexpectedly encountered the end of the utf8 sequence.
+	OUT_OF_BOUNDS = 1,
+	// A continuation byte was encountered where a leading byte was expected.
+	UNEXPECTED_CONTINUATION_BYTE = 3,
+	// A leading byte was encountered in the middle of the encoding of utf8 codepoint.
+	UNEXPECTED_LEADING_BYTE = 4,
+	// The utf8 sequence contains an invalid byte.
+	INVALID_BYTE = 5,
+	// The operation encountered an invalid utf8 codepoint.
+	INVALID_CODEPOINT = 6,
+	// The utf8 sequence contains an overlong encoding of a utf8 codepoint.
+	OVERLONG_ENCODING = 7,
+}
+
 // A type representing the result of decoding of utf8-encoded codepoint.
 utf8_dec :: struct {
+	// The status of the decoding operation. If not `OC_UTF8_OK`, it describes the error that was encountered during decoding.
+	status: utf8_status,
 	// The decoded codepoint.
 	codepoint: utf32,
 	// The size of the utf8 sequence encoding that codepoint.
@@ -1033,7 +995,7 @@ file_dialog_kind :: enum u32 {
 // File dialog flags.
 file_dialog_flag :: enum u32 {
 	// This dialog allows selecting files.
-	FILES = 1,
+	FILES = 0,
 	// This dialog allows selecting directories.
 	DIRECTORIES,
 	// This dialog allows selecting multiple items.
@@ -1180,7 +1142,7 @@ io_req :: struct {
 		unused: u64,
 	},
 	using _: struct #raw_union {
-		open: struct {
+		using open: struct {
 			// The access permissions requested on the file to open.
 			rights: file_access,
 			// The options to use when opening the file.
@@ -1390,181 +1352,333 @@ foreign {
 // A 2D Vector Graphics API.
 ////////////////////////////////////////////////////////////////////////////////
 
+// An opaque handle to a graphics surface.
 surface :: distinct u64
 
+// An opaque handle representing a rendering engine for the canvas API.
 canvas_renderer :: distinct u64
 
+// An opaque handle to a canvas context. Canvas contexts are used to hold contextual state about drawing commands, such as the current color or the current line width, and to record drawing commands. Once commands have been recorded, they can be rendered to a surface using `oc_canvas_render()`.
 canvas_context :: distinct u64
 
+// An opaque font handle.
 font :: distinct u64
 
+// An opaque image handle.
 image :: distinct u64
 
+// This enum describes possible blending modes for color gradient.
 gradient_blend_space :: enum u32 {
+	// The gradient colors are interpolated in linear space.
 	LINEAR = 0,
+	// The gradient colors are interpolated in sRGB space.
 	SRGB = 1,
 }
 
+// An enum identifying possible color spaces.
 color_space :: enum u32 {
+	// A linear RGB color space.
 	RGB = 0,
+	// An sRGB color space.
 	SRGB = 1,
 }
 
+// A struct representing a color.
 color :: struct { using c: [4]f32, colorSpace: color_space }
 
+// Stroke joint types.
 joint_type :: enum u32 {
+	// Miter joint.
 	MITER = 0,
+	// Bevel joint.
 	BEVEL = 1,
+	// Don't join path segments.
 	NONE = 2,
 }
 
+// Cap types.
 cap_type :: enum u32 {
+	// Don't draw caps.
 	NONE = 0,
+	// Square caps.
 	SQUARE = 1,
 }
 
+// A struct describing the metrics of a font.
 font_metrics :: struct {
+	// The ascent from the baseline to the top of the line (a positive value means the top line is above the baseline). 
 	ascent: f32,
+	// The descent from the baseline to the bottom line (a positive value means the bottom line is below the baseline). 
 	descent: f32,
+	// The gap between two lines of text.
 	lineGap: f32,
+	// The height of the lowercase character 'x'.
 	xHeight: f32,
+	// The height of capital letters.
 	capHeight: f32,
+	// The maximum character width.
 	width: f32,
 }
 
+// A struct describing the metrics of a single glyph.
 glyph_metrics :: struct {
 	ink: rect,
+	// The default amount from which to advance the cursor after drawing this glyph.
 	advance: vec2,
 }
 
+// A struct describing the metrics of a run of glyphs.
 text_metrics :: struct {
+	// The bounding box of the inked portion of the text.
 	ink: rect,
+	// The logical bounding box of the text (including ascents, descents, and line gaps).
 	logical: rect,
+	// The amount from which to advance the cursor after drawing the text.
 	advance: vec2,
 }
 
+// An opaque struct representing a rectangle atlas. This is used to allocate rectangular regions of an image to make texture atlases.
 rect_atlas :: struct {}
 
+// A struct describing a rectangular sub-region of an image.
 image_region :: struct {
+	// The image handle.
 	image: image,
+	// The rectangular region of the image.
 	rect: rect,
 }
 
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
+	// Returns a `nil` surface handle.
 	surface_nil :: proc() -> surface ---
+	// Check if a surface handle is `nil`.
 	surface_is_nil :: proc(surface: surface) -> bool ---
+	// Destroy a graphics surface.
 	surface_destroy :: proc(surface: surface) ---
+	/*
+	Get a surface's size.
+	
+	The size is returned in device-independent "points". To get the size in pixels, multiply the size in points by the scaling factor returned by `oc_surface_contents_scaling()`.
+	*/
 	surface_get_size :: proc(surface: surface) -> vec2 ---
+	// Get the scaling factor of a surface.
 	surface_contents_scaling :: proc(surface: surface) -> vec2 ---
+	// Bring a surface to the foreground, rendering it on top of other surfaces.
 	surface_bring_to_front :: proc(surface: surface) ---
+	// Send a surface to the background, rendering it below other surfaces.
 	surface_send_to_back :: proc(surface: surface) ---
+	// Checks if a surface is hidden.
 	surface_get_hidden :: proc(surface: surface) -> bool ---
+	// Set the hidden status of a surface.
 	surface_set_hidden :: proc(surface: surface, hidden: bool) ---
+	// Create a color using RGBA values.
 	color_rgba :: proc(r: f32, g: f32, b: f32, a: f32) -> color ---
+	// Create a current color using sRGBA values.
 	color_srgba :: proc(r: f32, g: f32, b: f32, a: f32) -> color ---
+	// Convert a color from one color space to another.
 	color_convert :: proc(_color: color, colorSpace: color_space) -> color ---
+	// Returns a `nil` canvas renderer handle.
 	canvas_renderer_nil :: proc() -> canvas_renderer ---
+	// Checks if a canvas renderer handle is `nil`.
 	canvas_renderer_is_nil :: proc(renderer: canvas_renderer) -> bool ---
+	// Create a canvas renderer.
 	canvas_renderer_create :: proc() -> canvas_renderer ---
+	// Destroy a canvas renderer.
 	canvas_renderer_destroy :: proc(renderer: canvas_renderer) ---
+	// Render canvas commands onto a surface.
 	canvas_render :: proc(renderer: canvas_renderer, _context: canvas_context, surface: surface) ---
+	// Present a canvas surface to the display.
 	canvas_present :: proc(renderer: canvas_renderer, surface: surface) ---
+	// Create a surface for rendering vector graphics.
 	canvas_surface_create :: proc(renderer: canvas_renderer) -> surface ---
-	canvas_surface_swap_interval :: proc(surface: surface, swap: i32) ---
+	// Returns a `nil` canvas context handle.
 	canvas_context_nil :: proc() -> canvas_context ---
+	// Checks if a canvas context handle is `nil`.
 	canvas_context_is_nil :: proc(_context: canvas_context) -> bool ---
+	// Create a canvas context.
 	canvas_context_create :: proc() -> canvas_context ---
+	// Destroy a canvas context
 	canvas_context_destroy :: proc(_context: canvas_context) ---
+	// Make a canvas context current in the calling thread. Subsequent canvas commands will refer to this context until another context is made current.
 	canvas_context_select :: proc(_context: canvas_context) -> canvas_context ---
+	// Set the multisample anti-aliasing sample count for the commands of a context.
 	canvas_context_set_msaa_sample_count :: proc(_context: canvas_context, sampleCount: u32) ---
+	// Return a `nil` font handle.
 	font_nil :: proc() -> font ---
+	// Check if a font handle is `nil`.
 	font_is_nil :: proc(font: font) -> bool ---
+	// Create a font from in-memory TrueType data.
 	font_create_from_memory :: proc(mem: str8, rangeCount: u32, ranges: ^unicode_range) -> font ---
+	// Create a font from a TrueType font file.
 	font_create_from_file :: proc(file: file, rangeCount: u32, ranges: ^unicode_range) -> font ---
+	// Create a font from a TrueType font file path.
 	font_create_from_path :: proc(path: str8, rangeCount: u32, ranges: ^unicode_range) -> font ---
+	// Destroy a font.
 	font_destroy :: proc(font: font) ---
+	// Get the glyph indices of a run of unicode code points in a given font.
 	font_get_glyph_indices :: proc(font: font, codePoints: str32, backing: str32) -> str32 ---
+	// Get the glyph indices of a run of unicode code points in a given font and push them on an arena.
 	font_push_glyph_indices :: proc(arena: ^arena, font: font, codePoints: str32) -> str32 ---
+	// Get the glyp index of a single codepoint in a given font.
 	font_get_glyph_index :: proc(font: font, codePoint: utf32) -> u32 ---
+	// Get a font's metrics for a given font size.
 	font_get_metrics :: proc(font: font, emSize: f32) -> font_metrics ---
+	// Get a font's unscaled metrics.
 	font_get_metrics_unscaled :: proc(font: font) -> font_metrics ---
+	// Get a scale factor to apply to unscaled font metrics to obtain a given 'm' size.
 	font_get_scale_for_em_pixels :: proc(font: font, emSize: f32) -> f32 ---
+	// Get text metrics for a run of unicode code points.
 	font_text_metrics_utf32 :: proc(font: font, fontSize: f32, codepoints: str32) -> text_metrics ---
+	// Get the text metrics for a utf8 string.
 	font_text_metrics :: proc(font: font, fontSize: f32, text: str8) -> text_metrics ---
+	// Returns a `nil` image handle.
 	image_nil :: proc() -> image ---
+	// Check if an image handle is `nil`.
 	image_is_nil :: proc(a: image) -> bool ---
+	// Create an uninitialized image.
 	image_create :: proc(renderer: canvas_renderer, width: u32, height: u32) -> image ---
+	// Create an image from an array of 8 bit per channel rgba values.
 	image_create_from_rgba8 :: proc(renderer: canvas_renderer, width: u32, height: u32, pixels: [^]u8) -> image ---
+	// Create an image from in-memory png, jpeg or bmp data.
 	image_create_from_memory :: proc(renderer: canvas_renderer, mem: str8, flip: bool) -> image ---
+	// Create an image from an image file. Supported formats are: png, jpeg or bmp.
 	image_create_from_file :: proc(renderer: canvas_renderer, file: file, flip: bool) -> image ---
+	// Create an image from an image file path. Supported formats are: png, jpeg or bmp.
 	image_create_from_path :: proc(renderer: canvas_renderer, path: str8, flip: bool) -> image ---
+	// Destroy an image.
 	image_destroy :: proc(image: image) ---
+	// Upload pixels to an image.
 	image_upload_region_rgba8 :: proc(image: image, region: rect, pixels: [^]u8) ---
+	// Get the size of an image.
 	image_size :: proc(image: image) -> vec2 ---
+	// Create a rectangle atlas.
 	rect_atlas_create :: proc(arena: ^arena, width: i32, height: i32) -> ^rect_atlas ---
+	// Allocate a rectangular region from an atlas.
 	rect_atlas_alloc :: proc(atlas: ^rect_atlas, width: i32, height: i32) -> rect ---
+	// Recycle a rectangular region that was previously allocated from an atlas.
 	rect_atlas_recycle :: proc(atlas: ^rect_atlas, rect: rect) ---
+	// Allocate an image region from an atlas and upload pixels to that region.
 	image_atlas_alloc_from_rgba8 :: proc(atlas: ^rect_atlas, backingImage: image, width: u32, height: u32, pixels: [^]u8) -> image_region ---
+	// Allocate an image region from an atlas and upload an image to it.
 	image_atlas_alloc_from_memory :: proc(atlas: ^rect_atlas, backingImage: image, mem: str8, flip: bool) -> image_region ---
+	// Allocate an image region from an atlas and upload an image to it.
 	image_atlas_alloc_from_file :: proc(atlas: ^rect_atlas, backingImage: image, file: file, flip: bool) -> image_region ---
+	// Allocate an image region from an atlas and upload an image to it.
 	image_atlas_alloc_from_path :: proc(atlas: ^rect_atlas, backingImage: image, path: str8, flip: bool) -> image_region ---
+	// Recycle an image region allocated from an atlas.
 	image_atlas_recycle :: proc(atlas: ^rect_atlas, imageRgn: image_region) ---
+	// Push a matrix on the transform stack.
 	matrix_push :: proc(_matrix: mat2x3) ---
+	// Multiply a matrix with the top of the transform stack, and push the result on the top of the stack.
 	matrix_multiply_push :: proc(_matrix: mat2x3) ---
+	// Pop a matrix from the transform stack.
 	matrix_pop :: proc() ---
+	// Get the top matrix of the transform stack.
 	matrix_top :: proc() -> mat2x3 ---
+	// Push a clip rectangle to the clip stack.
 	clip_push :: proc(x: f32, y: f32, w: f32, h: f32) ---
+	// Pop from the clip stack.
 	clip_pop :: proc() ---
+	// Get the clip rectangle from the top of the clip stack.
 	clip_top :: proc() -> rect ---
+	// Set the current color.
 	set_color :: proc(_color: color) ---
+	// Set the current color using linear RGBA values.
 	set_color_rgba :: proc(r: f32, g: f32, b: f32, a: f32) ---
+	// Set the current color using sRGBA values.
 	set_color_srgba :: proc(r: f32, g: f32, b: f32, a: f32) ---
+	// Set the current color gradient.
 	set_gradient :: proc(blendSpace: gradient_blend_space, bottomLeft: color, bottomRight: color, topRight: color, topLeft: color) ---
+	// Set the current line width.
 	set_width :: proc(width: f32) ---
+	// Set the current tolerance for the line width. Bigger values increase performance but allow more inconsistent stroke widths along a path.
 	set_tolerance :: proc(tolerance: f32) ---
+	// Set the current joint style.
 	set_joint :: proc(joint: joint_type) ---
+	// Set the maximum joint excursion. If a joint would extend past this threshold, the renderer falls back to a bevel joint.
 	set_max_joint_excursion :: proc(maxJointExcursion: f32) ---
+	// Set the current cap style.
 	set_cap :: proc(cap: cap_type) ---
+	// The the current font.
 	set_font :: proc(font: font) ---
+	// Set the current font size.
 	set_font_size :: proc(size: f32) ---
+	// Set the current text flip value. `true` flips the y-axis of text rendering commands.
 	set_text_flip :: proc(flip: bool) ---
+	// Set the current source image.
 	set_image :: proc(image: image) ---
+	// Set the current source image region.
 	set_image_source_region :: proc(region: rect) ---
+	// Get the current color
 	get_color :: proc() -> color ---
+	// Get the current line width.
 	get_width :: proc() -> f32 ---
+	// Get the current line width tolerance.
 	get_tolerance :: proc() -> f32 ---
+	// Get the current joint style.
 	get_joint :: proc() -> joint_type ---
+	// Get the current max joint excursion.
 	get_max_joint_excursion :: proc() -> f32 ---
+	// Get the current cap style.
 	get_cap :: proc() -> cap_type ---
+	// Get the current font.
 	get_font :: proc() -> font ---
+	// Get the current font size.
 	get_font_size :: proc() -> f32 ---
+	// Get the current text flip value.
 	get_text_flip :: proc() -> bool ---
+	// Get the current source image.
 	get_image :: proc() -> image ---
+	// Get the current image source region.
 	get_image_source_region :: proc() -> rect ---
+	// Get the current cursor position.
 	get_position :: proc() -> vec2 ---
+	// Move the cursor to a given position.
 	move_to :: proc(x: f32, y: f32) ---
+	// Add a line to the path from the current position to a new one.
 	line_to :: proc(x: f32, y: f32) ---
+	// Add a quadratic Bézier curve to the path from the current position to a new one.
 	quadratic_to :: proc(x1: f32, y1: f32, x2: f32, y2: f32) ---
+	// Add a cubic Bézier curve to the path from the current position to a new one.
 	cubic_to :: proc(x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) ---
+	// Close the current path with a line.
 	close_path :: proc() ---
+	// Add the outlines of a glyph run to the path, using glyph indices.
 	glyph_outlines :: proc(glyphIndices: str32) -> rect ---
+	// Add the outlines of a glyph run to the path, using unicode codepoints.
 	codepoints_outlines :: proc(string: str32) ---
+	// Add the outlines of a glyph run to the path, using a utf8 string.
 	text_outlines :: proc(string: str8) ---
+	// Clear the canvas to the current color.
 	clear :: proc() ---
+	// Fill the current path.
 	fill :: proc() ---
+	// Stroke the current path.
 	stroke :: proc() ---
+	// Draw a filled rectangle.
 	rectangle_fill :: proc(x: f32, y: f32, w: f32, h: f32) ---
+	// Draw a stroked rectangle.
 	rectangle_stroke :: proc(x: f32, y: f32, w: f32, h: f32) ---
+	// Draw a filled rounded rectangle.
 	rounded_rectangle_fill :: proc(x: f32, y: f32, w: f32, h: f32, r: f32) ---
+	// Draw a stroked rounded rectangle.
 	rounded_rectangle_stroke :: proc(x: f32, y: f32, w: f32, h: f32, r: f32) ---
+	// Draw a filled ellipse.
 	ellipse_fill :: proc(x: f32, y: f32, rx: f32, ry: f32) ---
+	// Draw a stroked ellipse.
 	ellipse_stroke :: proc(x: f32, y: f32, rx: f32, ry: f32) ---
+	// Draw a filled circle.
 	circle_fill :: proc(x: f32, y: f32, r: f32) ---
+	// Draw a stroked circle.
 	circle_stroke :: proc(x: f32, y: f32, r: f32) ---
+	// Add an arc to the path.
 	arc :: proc(x: f32, y: f32, r: f32, arcAngle: f32, startAngle: f32) ---
+	// Draw a text line.
 	text_fill :: proc(x: f32, y: f32, text: str8) ---
+	// Draw an image.
 	image_draw :: proc(image: image, rect: rect) ---
+	// Draw a sub-region of an image.
 	image_draw_region :: proc(image: image, srcRegion: rect, dstRegion: rect) ---
 }
 
@@ -1574,9 +1688,11 @@ foreign {
 
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
+	// Create a graphics surface for GLES rendering.
 	gles_surface_create :: proc() -> surface ---
+	// Make the GL context of the surface current.
 	gles_surface_make_current :: proc(surface: surface) ---
-	gles_surface_swap_interval :: proc(surface: surface, interval: i32) ---
+	// Swap the buffers of a GLES surface.
 	gles_surface_swap_buffers :: proc(surface: surface) ---
 }
 
@@ -1638,463 +1754,6 @@ input_state :: struct {
 	clipboard: clipboard_state,
 }
 
-ui_key :: struct {
-	hash: u64,
-}
-
-ui_axis :: enum u32 {
-	X = 0,
-	Y = 1,
-	COUNT = 2,
-}
-
-ui_align :: enum u32 {
-	START = 0,
-	END = 1,
-	CENTER = 2,
-}
-
-ui_layout_align :: [2]ui_align
-
-ui_layout :: struct {
-	axis: ui_axis,
-	spacing: f32,
-	margin: [2]f32,
-	align: ui_layout_align,
-}
-
-ui_size_kind :: enum u32 {
-	TEXT = 0,
-	PIXELS = 1,
-	CHILDREN = 2,
-	PARENT = 3,
-	PARENT_MINUS_PIXELS = 4,
-}
-
-ui_size :: struct {
-	kind: ui_size_kind,
-	value: f32,
-	relax: f32,
-	minSize: f32,
-}
-
-ui_box_size :: [2]ui_size
-
-ui_box_floating :: [2]bool
-
-ui_style :: struct {
-	size: ui_box_size,
-	layout: ui_layout,
-	floating: ui_box_floating,
-	floatTarget: vec2,
-	_color: color,
-	bgColor: color,
-	borderColor: color,
-	font: font,
-	fontSize: f32,
-	borderSize: f32,
-	roundness: f32,
-	animationTime: f32,
-	animationMask: ui_style_mask,
-}
-
-ui_palette :: struct {
-	red0: color,
-	red1: color,
-	red2: color,
-	red3: color,
-	red4: color,
-	red5: color,
-	red6: color,
-	red7: color,
-	red8: color,
-	red9: color,
-	orange0: color,
-	orange1: color,
-	orange2: color,
-	orange3: color,
-	orange4: color,
-	orange5: color,
-	orange6: color,
-	orange7: color,
-	orange8: color,
-	orange9: color,
-	amber0: color,
-	amber1: color,
-	amber2: color,
-	amber3: color,
-	amber4: color,
-	amber5: color,
-	amber6: color,
-	amber7: color,
-	amber8: color,
-	amber9: color,
-	yellow0: color,
-	yellow1: color,
-	yellow2: color,
-	yellow3: color,
-	yellow4: color,
-	yellow5: color,
-	yellow6: color,
-	yellow7: color,
-	yellow8: color,
-	yellow9: color,
-	lime0: color,
-	lime1: color,
-	lime2: color,
-	lime3: color,
-	lime4: color,
-	lime5: color,
-	lime6: color,
-	lime7: color,
-	lime8: color,
-	lime9: color,
-	lightGreen0: color,
-	lightGreen1: color,
-	lightGreen2: color,
-	lightGreen3: color,
-	lightGreen4: color,
-	lightGreen5: color,
-	lightGreen6: color,
-	lightGreen7: color,
-	lightGreen8: color,
-	lightGreen9: color,
-	green0: color,
-	green1: color,
-	green2: color,
-	green3: color,
-	green4: color,
-	green5: color,
-	green6: color,
-	green7: color,
-	green8: color,
-	green9: color,
-	teal0: color,
-	teal1: color,
-	teal2: color,
-	teal3: color,
-	teal4: color,
-	teal5: color,
-	teal6: color,
-	teal7: color,
-	teal8: color,
-	teal9: color,
-	cyan0: color,
-	cyan1: color,
-	cyan2: color,
-	cyan3: color,
-	cyan4: color,
-	cyan5: color,
-	cyan6: color,
-	cyan7: color,
-	cyan8: color,
-	cyan9: color,
-	lightBlue0: color,
-	lightBlue1: color,
-	lightBlue2: color,
-	lightBlue3: color,
-	lightBlue4: color,
-	lightBlue5: color,
-	lightBlue6: color,
-	lightBlue7: color,
-	lightBlue8: color,
-	lightBlue9: color,
-	blue0: color,
-	blue1: color,
-	blue2: color,
-	blue3: color,
-	blue4: color,
-	blue5: color,
-	blue6: color,
-	blue7: color,
-	blue8: color,
-	blue9: color,
-	indigo0: color,
-	indigo1: color,
-	indigo2: color,
-	indigo3: color,
-	indigo4: color,
-	indigo5: color,
-	indigo6: color,
-	indigo7: color,
-	indigo8: color,
-	indigo9: color,
-	violet0: color,
-	violet1: color,
-	violet2: color,
-	violet3: color,
-	violet4: color,
-	violet5: color,
-	violet6: color,
-	violet7: color,
-	violet8: color,
-	violet9: color,
-	purple0: color,
-	purple1: color,
-	purple2: color,
-	purple3: color,
-	purple4: color,
-	purple5: color,
-	purple6: color,
-	purple7: color,
-	purple8: color,
-	purple9: color,
-	pink0: color,
-	pink1: color,
-	pink2: color,
-	pink3: color,
-	pink4: color,
-	pink5: color,
-	pink6: color,
-	pink7: color,
-	pink8: color,
-	pink9: color,
-	grey0: color,
-	grey1: color,
-	grey2: color,
-	grey3: color,
-	grey4: color,
-	grey5: color,
-	grey6: color,
-	grey7: color,
-	grey8: color,
-	grey9: color,
-	black: color,
-	white: color,
-}
-
-ui_theme :: struct {
-	white: color,
-	primary: color,
-	primaryHover: color,
-	primaryActive: color,
-	border: color,
-	fill0: color,
-	fill1: color,
-	fill2: color,
-	bg0: color,
-	bg1: color,
-	bg2: color,
-	bg3: color,
-	bg4: color,
-	text0: color,
-	text1: color,
-	text2: color,
-	text3: color,
-	sliderThumbBorder: color,
-	elevatedBorder: color,
-	roundnessSmall: f32,
-	roundnessMedium: f32,
-	roundnessLarge: f32,
-	palette: ^ui_palette,
-}
-
-ui_tag :: struct {
-	hash: u64,
-}
-
-ui_selector_kind :: enum u32 {
-	ANY = 0,
-	OWNER = 1,
-	TEXT = 2,
-	TAG = 3,
-	STATUS = 4,
-	KEY = 5,
-}
-
-ui_status_flag :: enum u8 {
-	HOVER = 1,
-	HOT,
-	ACTIVE,
-	DRAGGING,
-}
-ui_status :: bit_set[ui_status_flag; u8]
-
-ui_selector_op :: enum u32 {
-	DESCENDANT = 0,
-	AND = 1,
-}
-
-ui_selector :: struct {
-	listElt: list_elt,
-	kind: ui_selector_kind,
-	op: ui_selector_op,
-	using _: struct #raw_union {
-		text: str8,
-		key: ui_key,
-		tag: ui_tag,
-		status: ui_status,
-	},
-}
-
-ui_pattern :: struct {
-	l: list,
-}
-
-ui_box :: struct {
-	listElt: list_elt,
-	children: list,
-	parent: ^ui_box,
-	overlayElt: list_elt,
-	bucketElt: list_elt,
-	key: ui_key,
-	frameCounter: u64,
-	flags: ui_flags,
-	string: str8,
-	tags: list,
-	drawProc: ui_box_draw_proc,
-	drawData: rawptr,
-	beforeRules: list,
-	afterRules: list,
-	targetStyle: ^ui_style,
-	style: ui_style,
-	z: u32,
-	floatPos: vec2,
-	childrenSum: [2]f32,
-	spacing: [2]f32,
-	minSize: [2]f32,
-	rect: rect,
-	sig: ^ui_sig,
-	fresh: bool,
-	closed: bool,
-	parentClosed: bool,
-	dragging: bool,
-	hot: bool,
-	active: bool,
-	scroll: vec2,
-	pressedMouse: vec2,
-	hotTransition: f32,
-	activeTransition: f32,
-}
-
-ui_style_rule :: struct {
-	boxElt: list_elt,
-	buildElt: list_elt,
-	tmpElt: list_elt,
-	owner: ^ui_box,
-	pattern: ui_pattern,
-	mask: ui_style_mask,
-	style: ^ui_style,
-}
-
-ui_sig :: struct {
-	box: ^ui_box,
-	mouse: vec2,
-	delta: vec2,
-	wheel: vec2,
-	pressed: bool,
-	released: bool,
-	clicked: bool,
-	doubleClicked: bool,
-	tripleClicked: bool,
-	rightPressed: bool,
-	dragging: bool,
-	hovering: bool,
-	pasted: bool,
-}
-
-ui_box_draw_proc :: proc "c" (arg0: ^ui_box, arg1: rawptr)
-
-ui_flag :: enum u32 {
-	CLICKABLE = 0,
-	SCROLL_WHEEL_X,
-	SCROLL_WHEEL_Y,
-	BLOCK_MOUSE,
-	HOT_ANIMATION,
-	ACTIVE_ANIMATION,
-	OVERFLOW_ALLOW_X,
-	OVERFLOW_ALLOW_Y,
-	CLIP,
-	DRAW_BACKGROUND,
-	DRAW_FOREGROUND,
-	DRAW_BORDER,
-	DRAW_TEXT,
-	DRAW_PROC,
-	OVERLAY,
-}
-ui_flags :: bit_set[ui_flag; u32]
-
-MAX_INPUT_CHAR_PER_FRAME :: 64
-
-ui_input_text :: struct {
-	count: u8 `fmt:"-"`,
-	codePoints: [64]utf32 `fmt:"s,count"`,
-}
-
-ui_stack_elt :: struct {
-	parent: ^ui_stack_elt,
-	using _: struct #raw_union {
-		box: ^ui_box,
-		size: ui_size,
-		clip: rect,
-	},
-}
-
-ui_tag_elt :: struct {
-	listElt: list_elt,
-	tag: ui_tag,
-}
-
-BOX_MAP_BUCKET_COUNT :: 1024
-
-ui_edit_move :: enum u32 {
-	NONE = 0,
-	CHAR = 1,
-	WORD = 2,
-	LINE = 3,
-}
-
-ui_context :: struct {
-	init: bool,
-	input: input_state,
-	frameCounter: u64,
-	frameTime: f64,
-	lastFrameDuration: f64,
-	frameArena: arena,
-	boxPool: pool,
-	boxMap: [1024]list,
-	root: ^ui_box,
-	overlay: ^ui_box,
-	overlayList: list,
-	boxStack: ^ui_stack_elt,
-	clipStack: ^ui_stack_elt,
-	nextBoxBeforeRules: list,
-	nextBoxAfterRules: list,
-	nextBoxTags: list,
-	z: u32,
-	hovered: ^ui_box,
-	focus: ^ui_box,
-	editCursor: i32,
-	editMark: i32,
-	editFirstDisplayedChar: i32,
-	editCursorBlinkStart: f64,
-	editSelectionMode: ui_edit_move,
-	editWordSelectionInitialCursor: i32,
-	editWordSelectionInitialMark: i32,
-	theme: ^ui_theme,
-}
-
-ui_text_box_result :: struct {
-	changed: bool,
-	accepted: bool,
-	text: str8,
-}
-
-ui_select_popup_info :: struct {
-	changed: bool,
-	selectedIndex: i32,
-	optionCount: i32 `fmt:"-"`,
-	options: [^]str8 `fmt:"s,optionCount"`,
-	placeholder: str8,
-}
-
-ui_radio_group_info :: struct {
-	changed: bool,
-	selectedIndex: i32,
-	optionCount: i32 `fmt:"-"`,
-	options: [^]str8 `fmt:"s,optionCount"`,
-}
-
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
 	input_process_event :: proc(arena: ^arena, state: ^input_state, event: ^event) ---
@@ -2120,59 +1779,364 @@ foreign {
 	clipboard_pasted :: proc(state: ^input_state) -> bool ---
 	clipboard_pasted_text :: proc(state: ^input_state) -> str8 ---
 	key_mods :: proc(state: ^input_state) -> keymod_flags ---
-	ui_init :: proc(_context: ^ui_context) ---
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Graphical User Interface Core API.
+////////////////////////////////////////////////////////////////////////////////
+
+ui_axis :: enum u32 {
+	X = 0,
+	Y = 1,
+	COUNT = 2,
+}
+
+ui_align :: enum u32 {
+	START = 0,
+	END = 1,
+	CENTER = 2,
+}
+
+ui_size_kind :: enum u32 {
+	CHILDREN = 0,
+	TEXT = 1,
+	PIXELS = 2,
+	PARENT = 3,
+	PARENT_MINUS_PIXELS = 4,
+}
+
+ui_size :: struct {
+	kind: ui_size_kind,
+	value: f32,
+	relax: f32,
+	minSize: f32,
+}
+
+ui_overflow :: enum u32 {
+	CLIP = 0,
+	ALLOW = 1,
+	SCROLL = 2,
+}
+
+ui_attribute :: enum u32 {
+	WIDTH = 0,
+	HEIGHT = 1,
+	AXIS = 2,
+	MARGIN_X = 3,
+	MARGIN_Y = 4,
+	SPACING = 5,
+	ALIGN_X = 6,
+	ALIGN_Y = 7,
+	FLOATING_X = 8,
+	FLOATING_Y = 9,
+	FLOAT_TARGET_X = 10,
+	FLOAT_TARGET_Y = 11,
+	OVERFLOW_X = 12,
+	OVERFLOW_Y = 13,
+	CONSTRAIN_X = 14,
+	CONSTRAIN_Y = 15,
+	COLOR = 16,
+	BG_COLOR = 17,
+	BORDER_COLOR = 18,
+	FONT = 19,
+	TEXT_SIZE = 20,
+	BORDER_SIZE = 21,
+	ROUNDNESS = 22,
+	DRAW_MASK = 23,
+	ANIMATION_TIME = 24,
+	ANIMATION_MASK = 25,
+	CLICK_THROUGH = 26,
+	ATTRIBUTE_COUNT = 27,
+}
+
+ui_attribute_mask :: enum u32 {
+	NONE = 0,
+	SIZE_WIDTH = 1,
+	SIZE_HEIGHT = 2,
+	LAYOUT_AXIS = 4,
+	LAYOUT_ALIGN_X = 64,
+	LAYOUT_ALIGN_Y = 128,
+	LAYOUT_SPACING = 32,
+	LAYOUT_MARGIN_X = 8,
+	LAYOUT_MARGIN_Y = 16,
+	FLOATING_X = 256,
+	FLOATING_Y = 512,
+	FLOAT_TARGET_X = 1024,
+	FLOAT_TARGET_Y = 2048,
+	OVERFLOW_X = 4096,
+	OVERFLOW_Y = 8192,
+	CONSTRAIN_X = 16384,
+	CONSTRAIN_Y = 32768,
+	COLOR = 65536,
+	BG_COLOR = 131072,
+	BORDER_COLOR = 262144,
+	BORDER_SIZE = 2097152,
+	ROUNDNESS = 4194304,
+	FONT = 524288,
+	FONT_SIZE = 1048576,
+	DRAW_MASK = 8388608,
+	ANIMATION_TIME = 16777216,
+	ANIMATION_MASK = 33554432,
+	CLICK_THROUGH = 67108864,
+}
+
+ui_layout_align :: [2]ui_align
+
+ui_layout :: struct {
+	axis: ui_axis,
+	spacing: f32,
+	margin: [2]f32,
+	align: ui_layout_align,
+	overflow: [2]ui_overflow,
+	constrain: [2]bool,
+}
+
+ui_box_size :: [2]ui_size
+
+ui_box_floating :: [2]bool
+
+ui_draw_mask :: enum u32 {
+	BACKGROUND = 1,
+	BORDER = 2,
+	TEXT = 4,
+	PROC = 8,
+}
+
+ui_style :: struct {
+	size: ui_box_size,
+	layout: ui_layout,
+	floating: ui_box_floating,
+	floatTarget: vec2,
+	_color: color,
+	bgColor: color,
+	borderColor: color,
+	font: font,
+	fontSize: f32,
+	borderSize: f32,
+	roundness: f32,
+	drawMask: u32,
+	animationTime: f32,
+	animationMask: ui_attribute_mask,
+	clickThrough: bool,
+}
+
+ui_context :: struct {}
+
+ui_sig :: struct {
+	box: ^ui_box,
+	mouse: vec2,
+	delta: vec2,
+	wheel: vec2,
+	lastPressedMouse: vec2,
+	pressed: bool,
+	released: bool,
+	clicked: bool,
+	doubleClicked: bool,
+	tripleClicked: bool,
+	rightPressed: bool,
+	closed: bool,
+	active: bool,
+	hover: bool,
+	focus: bool,
+	pasted: bool,
+}
+
+ui_box_draw_proc :: proc "c" (arg0: ^ui_box, arg1: rawptr)
+
+ui_key :: struct {
+	hash: u64,
+}
+
+ui_box :: struct {
+	listElt: list_elt,
+	children: list,
+	parent: ^ui_box,
+	overlayElt: list_elt,
+	overlay: bool,
+	bucketElt: list_elt,
+	key: ui_key,
+	frameCounter: u64,
+	keyString: str8,
+	text: str8,
+	tags: list,
+	drawProc: ui_box_draw_proc,
+	drawData: rawptr,
+	rules: list,
+	targetStyle: ^ui_style,
+	style: ui_style,
+	z: u32,
+	floatPos: vec2,
+	childrenSum: [2]f32,
+	spacing: [2]f32,
+	minSize: [2]f32,
+	rect: rect,
+	styleVariables: list,
+	sig: ui_sig,
+	fresh: bool,
+	closed: bool,
+	parentClosed: bool,
+	dragging: bool,
+	hot: bool,
+	active: bool,
+	scroll: vec2,
+	pressedMouse: vec2,
+	hotTransition: f32,
+	activeTransition: f32,
+}
+
+@(default_calling_convention="c", link_prefix="oc_")
+foreign {
+	ui_context_create :: proc(defaultFont: font) -> ^ui_context ---
+	ui_context_destroy :: proc(_context: ^ui_context) ---
 	ui_get_context :: proc() -> ^ui_context ---
 	ui_set_context :: proc(_context: ^ui_context) ---
 	ui_process_event :: proc(event: ^event) ---
-	ui_begin_frame :: proc(size: vec2, #by_ptr defaultStyle: ui_style, mask: ui_style_mask) ---
-	ui_end_frame :: proc() ---
+	ui_frame_begin :: proc(size: vec2) ---
+	ui_frame_end :: proc() ---
 	ui_draw :: proc() ---
-	ui_set_theme :: proc(theme: ^ui_theme) ---
-	ui_key_make_str8 :: proc(string: str8) -> ui_key ---
-	ui_key_make_path :: proc(path: str8_list) -> ui_key ---
-	ui_box_make_str8 :: proc(string: str8, flags: ui_flags) -> ^ui_box ---
-	ui_box_begin_str8 :: proc(string: str8, flags: ui_flags) -> ^ui_box ---
+	ui_input :: proc() -> ^input_state ---
+	ui_frame_arena :: proc() -> ^arena ---
+	ui_frame_time :: proc() -> f64 ---
+	ui_box_begin_str8 :: proc(string: str8) -> ^ui_box ---
 	ui_box_end :: proc() -> ^ui_box ---
-	ui_box_push :: proc(box: ^ui_box) ---
-	ui_box_pop :: proc() ---
-	ui_box_top :: proc() -> ^ui_box ---
-	ui_box_lookup_key :: proc(key: ui_key) -> ^ui_box ---
-	ui_box_lookup_str8 :: proc(string: str8) -> ^ui_box ---
 	ui_box_set_draw_proc :: proc(box: ^ui_box, _proc: ui_box_draw_proc, data: rawptr) ---
-	ui_box_closed :: proc(box: ^ui_box) -> bool ---
+	ui_box_set_text :: proc(box: ^ui_box, text: str8) ---
+	ui_box_set_overlay :: proc(box: ^ui_box, overlay: bool) ---
 	ui_box_set_closed :: proc(box: ^ui_box, closed: bool) ---
-	ui_box_active :: proc(box: ^ui_box) -> bool ---
-	ui_box_activate :: proc(box: ^ui_box) ---
-	ui_box_deactivate :: proc(box: ^ui_box) ---
-	ui_box_hot :: proc(box: ^ui_box) -> bool ---
-	ui_box_set_hot :: proc(box: ^ui_box, hot: bool) ---
-	ui_box_sig :: proc(box: ^ui_box) -> ui_sig ---
-	ui_tag_make_str8 :: proc(string: str8) -> ui_tag ---
-	ui_tag_box_str8 :: proc(box: ^ui_box, string: str8) ---
+	ui_box_user_data_get :: proc(box: ^ui_box) -> cstring ---
+	ui_box_user_data_push :: proc(box: ^ui_box, size: u64) -> cstring ---
+	ui_box_request_focus :: proc(box: ^ui_box) ---
+	ui_box_release_focus :: proc(box: ^ui_box) ---
+	ui_box_get_sig :: proc(box: ^ui_box) -> ui_sig ---
+	ui_set_draw_proc :: proc(_proc: ui_box_draw_proc, data: rawptr) ---
+	ui_set_text :: proc(text: str8) ---
+	ui_set_overlay :: proc(overlay: bool) ---
+	ui_set_closed :: proc(closed: bool) ---
+	ui_user_data_get :: proc() -> cstring ---
+	ui_user_data_push :: proc(size: u64) -> cstring ---
+	ui_request_focus :: proc() ---
+	ui_release_focus :: proc() ---
+	ui_get_sig :: proc() -> ui_sig ---
+	ui_box_tag_str8 :: proc(box: ^ui_box, string: str8) ---
+	ui_tag_str8 :: proc(string: str8) ---
 	ui_tag_next_str8 :: proc(string: str8) ---
-	ui_apply_style_with_mask :: proc(dst: ^ui_style, src: ^ui_style, mask: ui_style_mask) ---
-	ui_pattern_push :: proc(arena: ^arena, pattern: ^ui_pattern, selector: ui_selector) ---
-	ui_pattern_all :: proc() -> ui_pattern ---
-	ui_pattern_owner :: proc() -> ui_pattern ---
-	ui_style_next :: proc(#by_ptr style: ui_style, mask: ui_style_mask) ---
-	ui_style_match_before :: proc(pattern: ui_pattern, #by_ptr style: ui_style, mask: ui_style_mask) ---
-	ui_style_match_after :: proc(pattern: ui_pattern, #by_ptr style: ui_style, mask: ui_style_mask) ---
-	ui_label :: proc(label: cstring) -> ui_sig ---
-	ui_label_str8 :: proc(label: str8) -> ui_sig ---
-	ui_button :: proc(label: cstring) -> ui_sig ---
-	ui_checkbox :: proc(name: cstring, checked: ^bool) -> ui_sig ---
+	ui_style_rule_begin :: proc(pattern: str8) ---
+	ui_style_rule_end :: proc() ---
+	ui_style_set_i32 :: proc(attr: ui_attribute, i: i32) ---
+	ui_style_set_f32 :: proc(attr: ui_attribute, f: f32) ---
+	ui_style_set_color :: proc(attr: ui_attribute, _color: color) ---
+	ui_style_set_font :: proc(attr: ui_attribute, font: font) ---
+	ui_style_set_size :: proc(attr: ui_attribute, size: ui_size) ---
+	ui_style_set_var_str8 :: proc(attr: ui_attribute, var: str8) ---
+	ui_style_set_var :: proc(attr: ui_attribute, var: cstring) ---
+	ui_var_default_i32_str8 :: proc(name: str8, i: i32) ---
+	ui_var_default_f32_str8 :: proc(name: str8, f: f32) ---
+	ui_var_default_size_str8 :: proc(name: str8, size: ui_size) ---
+	ui_var_default_color_str8 :: proc(name: str8, _color: color) ---
+	ui_var_default_font_str8 :: proc(name: str8, font: font) ---
+	ui_var_default_str8 :: proc(name: str8, src: str8) ---
+	ui_var_default_i32 :: proc(name: cstring, i: i32) ---
+	ui_var_default_f32 :: proc(name: cstring, f: f32) ---
+	ui_var_default_size :: proc(name: cstring, size: ui_size) ---
+	ui_var_default_color :: proc(name: cstring, _color: color) ---
+	ui_var_default_font :: proc(name: cstring, font: font) ---
+	ui_var_default :: proc(name: cstring, src: cstring) ---
+	ui_var_set_i32_str8 :: proc(name: str8, i: i32) ---
+	ui_var_set_f32_str8 :: proc(name: str8, f: f32) ---
+	ui_var_set_size_str8 :: proc(name: str8, size: ui_size) ---
+	ui_var_set_color_str8 :: proc(name: str8, _color: color) ---
+	ui_var_set_font_str8 :: proc(name: str8, font: font) ---
+	ui_var_set_str8 :: proc(name: str8, src: str8) ---
+	ui_var_set_i32 :: proc(name: cstring, i: i32) ---
+	ui_var_set_f32 :: proc(name: cstring, f: f32) ---
+	ui_var_set_size :: proc(name: cstring, size: ui_size) ---
+	ui_var_set_color :: proc(name: cstring, _color: color) ---
+	ui_var_set_font :: proc(name: cstring, font: font) ---
+	ui_var_set :: proc(name: cstring, src: cstring) ---
+	ui_var_get_i32_str8 :: proc(name: str8) -> i32 ---
+	ui_var_get_f32_str8 :: proc(name: str8) -> f32 ---
+	ui_var_get_size_str8 :: proc(name: str8) -> ui_size ---
+	ui_var_get_color_str8 :: proc(name: str8) -> color ---
+	ui_var_get_font_str8 :: proc(name: str8) -> font ---
+	ui_var_get_i32 :: proc(name: cstring) -> i32 ---
+	ui_var_get_f32 :: proc(name: cstring) -> f32 ---
+	ui_var_get_size :: proc(name: cstring) -> ui_size ---
+	ui_var_get_color :: proc(name: cstring) -> color ---
+	ui_var_get_font :: proc(name: cstring) -> font ---
+	ui_theme_dark :: proc() ---
+	ui_theme_light :: proc() ---
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Graphical User Interface Widgets.
+////////////////////////////////////////////////////////////////////////////////
+
+ui_text_box_result :: struct {
+	changed: bool,
+	accepted: bool,
+	text: str8,
+	box: ^ui_box,
+}
+
+ui_edit_move :: enum u32 {
+	NONE = 0,
+	CHAR = 1,
+	WORD = 2,
+	LINE = 3,
+}
+
+ui_text_box_info :: struct {
+	text: str8,
+	defaultText: str8,
+	cursor: i32,
+	mark: i32,
+	selectionMode: ui_edit_move,
+	wordSelectionInitialCursor: i32,
+	wordSelectionInitialMark: i32,
+	firstDisplayedChar: i32,
+	cursorBlinkStart: f64,
+}
+
+ui_select_popup_info :: struct {
+	changed: bool,
+	selectedIndex: i32,
+	optionCount: i32 `fmt:"-"`,
+	options: [^]str8 `fmt:"s,optionCount"`,
+	placeholder: str8,
+}
+
+ui_radio_group_info :: struct {
+	changed: bool,
+	selectedIndex: i32,
+	optionCount: i32 `fmt:"-"`,
+	options: [^]str8 `fmt:"s,optionCount"`,
+}
+
+@(default_calling_convention="c", link_prefix="oc_")
+foreign {
+	ui_label :: proc(key: cstring, label: cstring) -> ui_sig ---
+	ui_label_str8 :: proc(key: str8, label: str8) -> ui_sig ---
+	ui_button :: proc(key: cstring, text: cstring) -> ui_sig ---
+	ui_button_str8 :: proc(key: str8, text: str8) -> ui_sig ---
+	ui_checkbox :: proc(key: cstring, checked: ^bool) -> ui_sig ---
+	ui_checkbox_str8 :: proc(key: str8, checked: ^bool) -> ui_sig ---
 	ui_slider :: proc(name: cstring, value: ^f32) -> ^ui_box ---
-	ui_scrollbar :: proc(name: cstring, thumbRatio: f32, scrollValue: ^f32) -> ^ui_box ---
-	ui_tooltip :: proc(label: cstring) ---
-	ui_panel_begin :: proc(name: cstring, flags: ui_flags) ---
-	ui_panel_end :: proc() ---
-	ui_menu_bar_begin :: proc(name: cstring) ---
+	ui_slider_str8 :: proc(name: str8, value: ^f32) -> ^ui_box ---
+	ui_tooltip :: proc(key: cstring, text: cstring) ---
+	ui_tooltip_str8 :: proc(key: str8, text: str8) ---
+	ui_menu_bar_begin :: proc(key: cstring) ---
+	ui_menu_bar_begin_str8 :: proc(key: str8) ---
 	ui_menu_bar_end :: proc() ---
-	ui_menu_begin :: proc(label: cstring) ---
+	ui_menu_begin :: proc(key: cstring, name: cstring) ---
+	ui_menu_begin_str8 :: proc(key: str8, name: str8) ---
 	ui_menu_end :: proc() ---
-	ui_menu_button :: proc(label: cstring) -> ui_sig ---
-	ui_text_box :: proc(name: cstring, arena: ^arena, text: str8) -> ui_text_box_result ---
-	ui_select_popup :: proc(name: cstring, info: ^ui_select_popup_info) -> ui_select_popup_info ---
-	ui_radio_group :: proc(name: cstring, info: ^ui_radio_group_info) -> ui_radio_group_info ---
+	ui_menu_button :: proc(key: cstring, text: cstring) -> ui_sig ---
+	ui_menu_button_str8 :: proc(key: str8, text: str8) -> ui_sig ---
+	ui_text_box :: proc(key: cstring, arena: ^arena, info: ^ui_text_box_info) -> ui_text_box_result ---
+	ui_text_box_str8 :: proc(key: str8, arena: ^arena, info: ^ui_text_box_info) -> ui_text_box_result ---
+	ui_select_popup :: proc(key: cstring, info: ^ui_select_popup_info) -> ui_select_popup_info ---
+	ui_select_popup_str8 :: proc(key: str8, info: ^ui_select_popup_info) -> ui_select_popup_info ---
+	ui_radio_group :: proc(key: cstring, info: ^ui_radio_group_info) -> ui_radio_group_info ---
+	ui_radio_group_str8 :: proc(key: str8, info: ^ui_radio_group_info) -> ui_radio_group_info ---
 }
 

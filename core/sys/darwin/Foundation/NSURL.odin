@@ -28,3 +28,8 @@ URL_initFileURLWithPath :: proc "c" (self: ^URL, path: ^String) -> ^URL {
 URL_fileSystemRepresentation :: proc "c" (self: ^URL) -> cstring {
 	return msgSend(cstring, self, "fileSystemRepresentation")
 }
+
+@(objc_type=URL, objc_name="relativePath")
+URL_relativePath :: proc "c" (self: ^URL) -> ^String {
+	return msgSend(^String, self, "relativePath")
+}

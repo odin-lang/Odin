@@ -22,13 +22,15 @@ NODE_BUS_COUNT_UNKNOWN :: 255
 node :: struct {}
 
 /* Node flags. */
-node_flags :: enum c.int {
-	PASSTHROUGH                = 0x00000001,
-	CONTINUOUS_PROCESSING      = 0x00000002,
-	ALLOW_NULL_INPUT           = 0x00000004,
-	DIFFERENT_PROCESSING_RATES = 0x00000008,
-	SILENT_OUTPUT              = 0x00000010,
+node_flag :: enum c.int {
+	PASSTHROUGH                = 0,
+	CONTINUOUS_PROCESSING      = 1,
+	ALLOW_NULL_INPUT           = 2,
+	DIFFERENT_PROCESSING_RATES = 3,
+	SILENT_OUTPUT              = 4,
 }
+
+node_flags :: bit_set[node_flag; u32]
 
 /* The playback state of a node. Either started or stopped. */
 node_state :: enum c.int {
@@ -75,7 +77,7 @@ node_vtable :: struct {
 	Flags describing characteristics of the node. This is currently just a placeholder for some
 	ideas for later on.
 	*/
-	flags: u32,
+	flags: node_flags,
 }
 
 node_config :: struct {
@@ -86,6 +88,12 @@ node_config :: struct {
 	pInputChannels:  ^u32,          /* The number of elements are determined by the input bus count as determined by the vtable, or `inputBusCount` if the vtable specifies `MA_NODE_BUS_COUNT_UNKNOWN`. */
 	pOutputChannels: ^u32,          /* The number of elements are determined by the output bus count as determined by the vtable, or `outputBusCount` if the vtable specifies `MA_NODE_BUS_COUNT_UNKNOWN`. */
 }
+
+node_output_bus_flag :: enum c.int {
+	HAS_READ = 0, /* 0x01 */
+}
+
+node_output_bus_flags :: bit_set[node_output_bus_flag; u32]
 
 /*
 A node has multiple output buses. An output bus is attached to an input bus as an item in a linked
@@ -99,7 +107,7 @@ node_output_bus :: struct {
 
 	/* Mutable via multiple threads. Must be used atomically. The weird ordering here is for packing reasons. */
 	inputNodeInputBusIndex: u8,                             /* The index of the input bus on the input. Required for detaching. Will only be used in the spinlock so does not need to be atomic. */
-	flags:                  u32, /*atomic*/                 /* Some state flags for tracking the read state of the output buffer. A combination of MA_NODE_OUTPUT_BUS_FLAG_*. */
+	flags:                  node_output_bus_flags, /*atomic*/                 /* Some state flags for tracking the read state of the output buffer. A combination of MA_NODE_OUTPUT_BUS_FLAG_*. */
 	refCount:               u32, /*atomic*/                 /* Reference count for some thread-safety when detaching. */
 	isAttached:             b32, /*atomic*/                 /* This is used to prevent iteration of nodes that are in the middle of being detached. Used for thread safety. */
 	lock:                   spinlock, /*atomic*/            /* Unfortunate lock, but significantly simplifies the implementation. Required for thread-safe attaching and detaching. */

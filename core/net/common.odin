@@ -95,6 +95,7 @@ Resolve_Error :: enum u32 {
 }
 
 DNS_Error :: enum u32 {
+	None = 0,
 	Invalid_Hostname_Error = 1,
 	Invalid_Hosts_Config_Error,
 	Invalid_Resolv_Config_Error,
@@ -146,6 +147,9 @@ IP6_Loopback :: IP6_Address{0, 0, 0, 0, 0, 0, 0, 1}
 
 IP4_Any := IP4_Address{}
 IP6_Any := IP6_Address{}
+
+IP4_mDNS_Broadcast := Endpoint{address=IP4_Address{224, 0, 0, 251}, port=5353}
+IP6_mDNS_Broadcast := Endpoint{address=IP6_Address{65282, 0, 0, 0, 0, 0, 0, 251}, port = 5353}
 
 Endpoint :: struct {
 	address: Address,

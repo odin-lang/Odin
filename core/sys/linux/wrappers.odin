@@ -86,22 +86,18 @@ dirent_iterate_buf :: proc "contextless" (buf: []u8, offs: ^int) -> (d: ^Dirent,
 /// The lifetime of the string is bound to the lifetime of the provided dirent structure
 dirent_name :: proc "contextless" (dirent: ^Dirent) -> string #no_bounds_check {
 	str := ([^]u8)(&dirent.name)
-	// Note(flysand): The string size calculated above applies only to the ideal case
-	// we subtract 1 byte from the string size, because a null terminator is guaranteed
-	// to be present. But! That said, the dirents are aligned to 8 bytes and the padding
-	// between the null terminator and the start of the next struct may be not initialized
-	// which means we also have to scan these garbage bytes.
-	str_size := int(dirent.reclen) - 1 - cast(int)offset_of(Dirent, name)
-	// This skips *only* over the garbage, since if we're not garbage we're at nul terminator,
-	// which skips this loop
-	for str[str_size] != 0 {
-		str_size -= 1
+	// Dirents are aligned to 8 bytes, so there is guaranteed to be a null
+	// terminator in the last 8 bytes.
+	str_size := int(dirent.reclen) - cast(int)offset_of(Dirent, name)
+
+	trunc := min(str_size, 8)
+	str_size -= trunc
+	for _ in 0..<trunc {
+		str_size += 1
+		if str[str_size] == 0 {
+			break
+		}
 	}
-	for str[str_size-1] == 0 {
-		str_size -= 1
-	}
-	// Oh yeah btw i could also just `repne scasb` this thing, but honestly I started doing
-	// it the painful way, might as well finish doing it that way
 	return string(str[:str_size])
 }
 

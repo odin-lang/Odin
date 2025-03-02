@@ -523,7 +523,7 @@ Vector3Unproject :: proc "c" (source: Vector3, projection: Matrix, view: Matrix)
 
 	quat: Quaternion
 	quat.x = source.x
-	quat.y = source.z
+	quat.y = source.y
 	quat.z = source.z
 	quat.w = 1
 

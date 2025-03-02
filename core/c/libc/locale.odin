@@ -110,7 +110,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD  || ODIN_OS == .OpenBSD || ODIN_OS == .Windows {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD  || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku || ODIN_OS == .Windows {
 
 	LC_ALL      :: 0
 	LC_COLLATE  :: 1

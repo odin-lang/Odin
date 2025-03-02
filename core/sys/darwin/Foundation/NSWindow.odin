@@ -129,6 +129,10 @@ WindowDelegateTemplate :: struct {
 	windowDidExitVersionBrowser:                                         proc(notification: ^Notification),
 }
 
+Window_Title_Visibility :: enum UInteger {
+	Visible,
+	Hidden,
+}
 
 WindowDelegate :: struct { using _: Object } // This is not the same as NSWindowDelegate
 _WindowDelegateInternal :: struct {
@@ -616,6 +620,10 @@ View_setWantsLayer :: proc "c" (self: ^View, wantsLayer: BOOL) {
 View_convertPointFromView :: proc "c" (self: ^View, point: Point, view: ^View) -> Point {
 	return msgSend(Point, self, "convertPoint:fromView:", point, view)
 }
+@(objc_type=View, objc_name="addSubview")
+View_addSubview :: proc "c" (self: ^View, view: ^View) {
+	msgSend(nil, self, "addSubview:", view)
+}
 
 @(objc_class="NSWindow")
 Window :: struct {using _: Responder}
@@ -748,4 +756,28 @@ Window_hasTitleBar :: proc "c" (self: ^Window) -> BOOL {
 @(objc_type=Window, objc_name="orderedIndex")
 Window_orderedIndex :: proc "c" (self: ^Window) -> Integer {
 	return msgSend(Integer, self, "orderedIndex")
+}
+@(objc_type=Window, objc_name="setMinSize")
+Window_setMinSize :: proc "c" (self: ^Window, size: Size) {
+	msgSend(nil, self, "setMinSize:", size)
+}
+@(objc_type=Window, objc_name="setTitleVisibility")
+Window_setTitleVisibility :: proc "c" (self: ^Window, visibility: Window_Title_Visibility) {
+	msgSend(nil, self, "setTitleVisibility:", visibility)
+}
+@(objc_type=Window, objc_name="performZoom")
+Window_performZoom :: proc "c" (self: ^Window) {
+	msgSend(nil, self, "performZoom:", self)
+}
+@(objc_type=Window, objc_name="setFrameAutosaveName")
+NSWindow_setFrameAutosaveName :: proc "c" (self: ^Window, name: ^String) {
+	msgSend(nil, self, "setFrameAutosaveName:", name)
+}
+@(objc_type=Window, objc_name="performWindowDragWithEvent")
+Window_performWindowDragWithEvent :: proc "c" (self: ^Window, event: ^Event) {
+	msgSend(nil, self, "performWindowDragWithEvent:", event)
+}
+@(objc_type=Window, objc_name="setToolbar")
+Window_setToolbar :: proc "c" (self: ^Window, toolbar: ^Toolbar) {
+	msgSend(nil, self, "setToolbar:", toolbar)
 }

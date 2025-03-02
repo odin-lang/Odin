@@ -48,22 +48,41 @@ to_type :: proc(buf: []u8, $T: typeid) -> (T, bool) #optional_ok {
 }
 
 /*
-	Turn a slice of one type, into a slice of another type.
+Turn a slice of one type, into a slice of another type.
 
-	Only converts the type and length of the slice itself.
-	The length is rounded down to the nearest whole number of items.
+Only converts the type and length of the slice itself.
+The length is rounded down to the nearest whole number of items.
 
-	```
-	large_items := []i64{1, 2, 3, 4}
-	small_items := slice.reinterpret([]i32, large_items)
-	assert(len(small_items) == 8)
-	```
-	```
-	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
-						  2, 0, 0, 0}
-	large_items := slice.reinterpret([]i64, small_items)
-	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
-	```
+Example:
+
+	import "core:fmt"
+	import "core:slice"
+
+	i64s_as_i32s :: proc() {
+		large_items := []i64{1, 2, 3, 4}
+		small_items := slice.reinterpret([]i32, large_items)
+		assert(len(small_items) == 8)
+		fmt.println(large_items, "->", small_items)
+	}
+
+	bytes_as_i64s :: proc() {
+		small_items := [12]byte{}
+		small_items[0] = 1
+		small_items[8] = 2
+		large_items := slice.reinterpret([]i64, small_items[:])
+		assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
+		fmt.println(small_items, "->", large_items)
+	}
+
+	reinterpret_example :: proc() {
+		i64s_as_i32s()
+		bytes_as_i64s()
+	}
+
+Output:
+	[1, 2, 3, 4] -> [1, 0, 2, 0, 3, 0, 4, 0]
+	[1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0] -> [1]
+
 */
 @(require_results)
 reinterpret :: proc "contextless" ($T: typeid/[]$U, s: []$V) -> []U {
@@ -879,8 +898,7 @@ bitset_to_enum_slice_with_buffer :: proc(buf: []$E, bs: $T) -> (slice: []E) wher
 //    sl := slice.bitset_to_enum_slice(bs)
 @(require_results)
 bitset_to_enum_slice_with_make :: proc(bs: $T, $E: typeid, allocator := context.allocator) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
-	ones := intrinsics.count_ones(transmute(E)bs)
-	buf  := make([]E, int(ones), allocator)
+	buf := make([]E, card(bs), allocator)
 	return bitset_to_enum_slice(buf, bs)
 }
 

@@ -100,6 +100,7 @@ MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
 #assert(size_of(rune) == size_of(c.int))
 
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
+RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "wasm/libraylib.a")
 
 when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
@@ -127,6 +128,10 @@ when ODIN_OS == .Windows {
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
 	} 
+} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib {
+		RAYLIB_WASM_LIB,
+	}
 } else {
 	foreign import lib "system:raylib"
 }
@@ -845,6 +850,17 @@ Gesture :: enum c.uint {
 }
 Gestures :: distinct bit_set[Gesture; c.uint]
 
+// Camera speed values 
+CAMERA_MOVE_SPEED :: 5.4
+CAMERA_ROTATION_SPEED :: 0.03
+CAMERA_PAN_SPEED :: 0.2
+
+// Camera mouse movement sensitivity
+CAMERA_MOUSE_MOVE_SENSITIVITY :: 0.003
+
+// Camera orbital speed in CAMERA_ORBITAL mode
+CAMERA_ORBITAL_SPEED :: 0.5
+
 // Camera system modes
 CameraMode :: enum c.int {
 	CUSTOM = 0,              // Camera custom, controlled by user (UpdateCamera() does nothing)
@@ -1181,6 +1197,23 @@ foreign lib {
 	UpdateCamera :: proc(camera: ^Camera, mode: CameraMode) ---                                   // Set camera mode (multiple camera modes available)
 	UpdateCameraPro :: proc(camera: ^Camera, movement: Vector3, rotation: Vector3, zoom: f32) --- // Update camera movement/rotation
 
+	GetCameraForward :: proc(camera: ^Camera) -> Vector3 --- // returns the camera's forward vector (normalized)
+	GetCameraUp :: proc(camera: ^Camera) -> Vector3 --- // returns the camera's up vector (normalized) - might not be perpendicular to forward vector
+	GetCameraRight :: proc(camera: ^Camera) -> Vector3 --- // returns the camera's right vector (normalized)
+
+	// Camera Movement/Rotation. Angle is provided in radians
+
+	CameraMoveForward :: proc(camera: ^Camera, distance: f32, moveInWorldPlane: bool) --- // move the camera in its forward direction
+	CameraMoveUp :: proc(camera: ^Camera, distance: f32) --- // move camera in its up direction
+	CameraMoveRight :: proc(camera: ^Camera, distance: f32, moveInWorldPlane: bool) --- // move camera in it's current right direction
+	CameraMoveToTarget :: proc(camera: ^Camera, delta: f32) --- // moves the camera position closer/farther to/from the camera target
+	CameraYaw :: proc(camera: ^Camera, angle: f32, rotateAroundTarget: bool) --- // rotates the camera around its up vector (left and right)
+	CameraPitch :: proc(camera: ^Camera, angle: f32, lockView: bool, rotateAroundTarget: bool, rotateUp: bool) --- // rotates the camera around its right vector (up and down)
+	CameraRoll :: proc(camera: ^Camera, angle: f32) --- // rotates the camera around its forward vector (left and right)
+
+	GetCameraViewMatrix :: proc(camera: ^Camera) -> Matrix --- // returns the camera view matrix
+	GetCameraProjectionMatrix :: proc(camera: ^Camera, aspect: f32) -> Matrix --- // returns the camera projection matrix
+
 	//------------------------------------------------------------------------------------
 	// Basic Shapes Drawing Functions (Module: shapes)
 	//------------------------------------------------------------------------------------
@@ -1223,7 +1256,7 @@ foreign lib {
 	DrawRectangleLines          :: proc(posX, posY: c.int, width, height: c.int, color: Color) ---                                                    // Draw rectangle outline
 	DrawRectangleLinesEx        :: proc(rec: Rectangle, lineThick: f32, color: Color) ---                                                             // Draw rectangle outline with extended parameters
 	DrawRectangleRounded        :: proc(rec: Rectangle, roundness: f32, segments: c.int, color: Color) ---                                            // Draw rectangle with rounded edges
-	DrawRectangleRoundedLines   :: proc(rec: Rectangle, roundness: f32, segments: c.int, lineThick: f32, color: Color) ---                            // Draw rectangle lines with rounded edges
+	DrawRectangleRoundedLines   :: proc(rec: Rectangle, roundness: f32, segments: c.int, color: Color) ---                                            // Draw rectangle lines with rounded edges
 	DrawRectangleRoundedLinesEx :: proc(rec: Rectangle, roundness: f32, segments: c.int, lineThick: f32, color: Color) ---                            // Draw rectangle with rounded edges outline
 	DrawTriangle                :: proc(v1, v2, v3: Vector2, color: Color) ---                                                                        // Draw a color-filled triangle (vertex in counter-clockwise order!)
 	DrawTriangleLines           :: proc(v1, v2, v3: Vector2, color: Color) ---                                                                        // Draw triangle outline (vertex in counter-clockwise order!)

@@ -1,9 +1,7 @@
 #+build haiku
 package sys_haiku
 
-import "core:c"
-
-status_t       :: i32
+status_t       :: Errno
 bigtime_t      :: i64
 nanotime_t     :: i64
 type_code      :: u32
@@ -37,16 +35,20 @@ mode_t         :: u32
 umode_t        :: u32
 nlink_t        :: i32
 
-caddr_t        :: ^c.char
+caddr_t        :: [^]byte
 
 addr_t         :: phys_addr_t
 key_t          :: i32
 
 clockid_t      :: i32
 
-time_t         :: i64 when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 else i32
+time_t   :: int
+timespec :: struct {
+	tv_sec:  time_t,
+	tv_nsec: int,
+}
 
-sig_atomic_t   :: c.int
+sig_atomic_t   :: i32
 sigset_t       :: u64
 
 image_id       :: i32

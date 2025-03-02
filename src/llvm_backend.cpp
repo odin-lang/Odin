@@ -24,7 +24,7 @@
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
 
-String get_default_microarchitecture() {
+gb_internal String get_default_microarchitecture() {
 	String default_march = str_lit("generic");
 	if (build_context.metrics.arch == TargetArch_amd64) {
 		// NOTE(bill): x86-64-v2 is more than enough for everyone
@@ -47,7 +47,7 @@ String get_default_microarchitecture() {
 	return default_march;
 }
 
-String get_final_microarchitecture() {
+gb_internal String get_final_microarchitecture() {
 	BuildContext *bc = &build_context;
 
 	String microarch = bc->microarch;
@@ -169,11 +169,17 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
 			if (other_global) {
 				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+				if (!ec.e->Variable.is_export && !ec.e->Variable.is_foreign) {
+					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
+				}
 			}
 		} else if (ec.e->kind == Entity_Procedure) {
 			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
 			if (other_global) {
 				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+				if (!ec.e->Procedure.is_export && !ec.e->Procedure.is_foreign) {
+					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
+				}
 			}
 		}
 	}
@@ -227,6 +233,16 @@ gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx
 }
 
 
+gb_internal String lb_internal_gen_name_from_type(char const *prefix, Type *type) {
+	gbString str = gb_string_make(permanent_allocator(), prefix);
+	u64 hash = type_hash_canonical_type(type);
+	str = gb_string_appendc(str, "-");
+	str = gb_string_append_fmt(str, "%llu", cast(unsigned long long)hash);
+	String proc_name = make_string(cast(u8 const *)str, gb_string_length(str));
+	return proc_name;
+}
+
+
 gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	type = base_type(type);
 	GB_ASSERT(is_type_comparable(type));
@@ -234,7 +250,8 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	Type *pt = alloc_type_pointer(type);
 	LLVMTypeRef ptr_type = lb_type(m, pt);
 
-	lbProcedure **found = map_get(&m->equal_procs, type);
+	String proc_name = lb_internal_gen_name_from_type("__$equal", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
 	lbProcedure *compare_proc = nullptr;
 	if (found) {
 		compare_proc = *found;
@@ -242,17 +259,12 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 		return {compare_proc->value, compare_proc->type};
 	}
 
-	static std::atomic<u32> proc_index;
-
-	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$equal%u", 1+proc_index.fetch_add(1));
-	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-	String proc_name = make_string_c(str);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
-	map_set(&m->equal_procs, type, p);
+	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
@@ -404,24 +416,19 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 
 	Type *pt = alloc_type_pointer(type);
 
-	lbProcedure **found = map_get(&m->hasher_procs, type);
+	String proc_name = lb_internal_gen_name_from_type("__$hasher", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
 	if (found) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
 
-	static std::atomic<u32> proc_index;
-
-	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$hasher%u", 1+proc_index.fetch_add(1));
-	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-	String proc_name = make_string_c(str);
-
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_hasher_proc);
-	map_set(&m->hasher_procs, type, p);
+	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
@@ -571,21 +578,15 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Map);
 
-
-	lbProcedure **found = map_get(&m->map_get_procs, type);
+	String proc_name = lb_internal_gen_name_from_type("__$map_get", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
 	if (found) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
-	static std::atomic<u32> proc_index;
-
-	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$map_get-%u", 1+proc_index.fetch_add(1));
-	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-	String proc_name = make_string_c(str);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_get_proc);
-	map_set(&m->map_get_procs, type, p);
+	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
@@ -752,21 +753,15 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Map);
 
-
-	lbProcedure **found = map_get(&m->map_set_procs, type);
+	String proc_name = lb_internal_gen_name_from_type("__$map_set", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
 	if (found) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
-	static std::atomic<u32> proc_index;
-
-	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$map_set-%u", 1+proc_index.fetch_add(1));
-	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-	String proc_name = make_string_c(str);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_set_proc);
-	map_set(&m->map_set_procs, type, p);
+	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
@@ -911,7 +906,7 @@ gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
 	LLVMValueRef llvm_res =  llvm_const_named_struct(m, t_map_cell_info, const_values, gb_count_of(const_values));
 	lbValue res = {llvm_res, t_map_cell_info};
 
-	lbAddr addr = lb_add_global_generated(m, t_map_cell_info, res, nullptr);
+	lbAddr addr = lb_add_global_generated_with_name(m, t_map_cell_info, res, lb_internal_gen_name_from_type("ggv$map_cell_info", type));
 	lb_make_global_private_const(addr);
 
 	map_set(&m->map_cell_info_map, type, addr);
@@ -942,7 +937,7 @@ gb_internal lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type) {
 	LLVMValueRef llvm_res = llvm_const_named_struct(m, t_map_info, const_values, gb_count_of(const_values));
 	lbValue res = {llvm_res, t_map_info};
 
-	lbAddr addr = lb_add_global_generated(m, t_map_info, res, nullptr);
+	lbAddr addr = lb_add_global_generated_with_name(m, t_map_info, res, lb_internal_gen_name_from_type("ggv$map_info", map_type));
 	lb_make_global_private_const(addr);
 
 	map_set(&m->map_info_map, map_type, addr);
@@ -1096,8 +1091,6 @@ gb_internal void lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_
 }
 
 gb_internal lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos) {
-	GB_ASSERT(!build_context.no_dynamic_literals);
-
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	String proc_name = {};
@@ -1149,14 +1142,14 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 		String name = entry.key;
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
-		lb_addr_store(p, entry.value, ptr);
+		lb_addr_store(p, entry.value.local_module_addr, ptr);
 	}
 
 	for (auto const &entry : m->objc_selectors) {
 		String name = entry.key;
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
-		lb_addr_store(p, entry.value, ptr);
+		lb_addr_store(p, entry.value.local_module_addr, ptr);
 	}
 
 	lb_end_procedure_body(p);
@@ -1280,7 +1273,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 			if (is_type_any(t)) {
 				// NOTE(bill): Edge case for 'any' type
 				Type *var_type = default_type(var.init.type);
-				lbAddr g = lb_add_global_generated(main_module, var_type, var.init);
+				gbString var_name = gb_string_make(permanent_allocator(), "__$global_any::");
+				gbString e_str = string_canonical_entity_name(temporary_allocator(), e);
+				var_name = gb_string_append_length(var_name, e_str, gb_strlen(e_str));
+				lbAddr g = lb_add_global_generated_with_name(main_module, var_type, var.init, make_string_c(var_name));
 				lb_addr_store(p, g, var.init);
 				lbValue gp = lb_addr_get_ptr(p, g);
 
@@ -1559,21 +1555,13 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		}
 	}
 
-	for (auto const &entry : m->equal_procs) {
+	for (auto const &entry : m->gen_procs) {
 		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p);
-	}
-	for (auto const &entry : m->hasher_procs) {
-		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p);
-	}
-	for (auto const &entry : m->map_get_procs) {
-		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p, lbFunctionPassManager_none);
-	}
-	for (auto const &entry : m->map_set_procs) {
-		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p, lbFunctionPassManager_none);
+		if (string_starts_with(p->name, str_lit("__$map"))) {
+			lb_llvm_function_pass_per_function_internal(m, p, lbFunctionPassManager_none);
+		} else {
+			lb_llvm_function_pass_per_function_internal(m, p);
+		}
 	}
 
 	return 0;
@@ -2571,17 +2559,16 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		build_context.build_paths[BuildPath_Output].name
 	);
 
-	if (m->file) {
-		char buf[32] = {};
-		isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
-		String suffix = make_string((u8 *)buf, n-1);
-		path = concatenate_strings(permanent_allocator(), path, suffix);
-	} else if (m->pkg) {
-		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
-	} else if (USE_SEPARATE_MODULES) {
-		path = concatenate_strings(permanent_allocator(), path, STR_LIT("-builtin"));
+	GB_ASSERT(m->module_name != nullptr);
+	String s = make_string_c(m->module_name);
+	String prefix = str_lit("odin_package-");
+	if (string_starts_with(s, prefix)) {
+		s.text += prefix.len;
+		s.len  -= prefix.len;
 	}
-	path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
+
+	path = concatenate_strings(permanent_allocator(), path, s);
+	path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
 
 	return path;
 }
@@ -2604,17 +2591,21 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	path = gb_string_appendc(path, "/");
 	path = gb_string_append_length(path, name.text, name.len);
 
-	if (m->file) {
-		char buf[32] = {};
-		isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
-		String suffix = make_string((u8 *)buf, n-1);
-		path = gb_string_append_length(path, suffix.text, suffix.len);
-	} else if (m->pkg) {
-		path = gb_string_appendc(path, "-");
-		path = gb_string_append_length(path, m->pkg->name.text, m->pkg->name.len);
+	{
+
+		GB_ASSERT(m->module_name != nullptr);
+		String s = make_string_c(m->module_name);
+		String prefix = str_lit("odin_package");
+		if (string_starts_with(s, prefix)) {
+			s.text += prefix.len;
+			s.len  -= prefix.len;
+		}
+
+		path = gb_string_append_length(path, s.text, s.len);
 	}
 
 	if (use_temporary_directory) {
+		// NOTE(bill): this must be suffixed to ensure it is not conflicting with anything else in the temporary directory
 		path = gb_string_append_fmt(path, "-%p", m);
 	}
 
@@ -2821,7 +2812,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
 		Type *array_type = alloc_type_array(t_Internal_Test, m->info->testing_procedures.count);
 		Type *slice_type = alloc_type_slice(t_Internal_Test);
-		lbAddr all_tests_array_addr = lb_add_global_generated(p->module, array_type, {});
+		lbAddr all_tests_array_addr = lb_add_global_generated_with_name(p->module, array_type, {}, str_lit("__$all_tests_array"));
 		lbValue all_tests_array = lb_addr_get_ptr(p, all_tests_array_addr);
 
 		LLVMValueRef indices[2] = {};
@@ -3150,7 +3141,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbModule *m = default_module;
 
 		{ // Add type info data
-			isize max_type_info_count = info->minimum_dependency_type_info_set.count+1;
+			// GB_ASSERT_MSG(info->minimum_dependency_type_info_index_map.count == info->type_info_types.count, "%tu vs %tu", info->minimum_dependency_type_info_index_map.count, info->type_info_types.count);
+
+			// isize max_type_info_count = info->minimum_dependency_type_info_index_map.count+1;
+			isize max_type_info_count = info->type_info_types_hash_map.count;
 			Type *t = alloc_type_array(t_type_info_ptr, max_type_info_count);
 
 			// IMPORTANT NOTE(bill): As LLVM does not have a union type, an array of unions cannot be initialized
@@ -3162,7 +3156,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
-			LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+			// LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
 			LLVMSetGlobalConstant(g, true);
 
 			lbValue value = {};
@@ -3178,7 +3172,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			isize count = 0;
 			isize offsets_extra = 0;
 
-			for (Type *t : m->info->type_info_types) {
+			for (auto const &tt : m->info->type_info_types_hash_map) {
+				Type *t = tt.type;
+				if (t == nullptr) {
+					continue;
+				}
 				isize index = lb_type_info_index(m->info, t, false);
 				if (index < 0) {
 					continue;

@@ -136,6 +136,26 @@ _set_working_directory :: proc(dir: string) -> (err: Error) {
 	return
 }
 
+_get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+
+	buf := make([dynamic]u16, 512, temp_allocator()) or_return
+	for {
+		ret := win32.GetModuleFileNameW(nil, raw_data(buf), win32.DWORD(len(buf)))
+		if ret == 0 {
+			err = _get_platform_error()
+			return
+		}
+
+		if ret == win32.DWORD(len(buf)) && win32.GetLastError() == win32.ERROR_INSUFFICIENT_BUFFER {
+			resize(&buf, len(buf)*2) or_return
+			continue
+		}
+
+		return win32_utf16_to_utf8(buf[:ret], allocator)
+	}
+}
+
 can_use_long_paths: bool
 
 @(init)

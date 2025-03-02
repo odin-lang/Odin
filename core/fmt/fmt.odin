@@ -314,7 +314,29 @@ assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_locati
 				p = runtime.default_assertion_failure_proc
 			}
 			message := tprintf(fmt, ..args)
-			p("Runtime assertion", message, loc)
+			p("runtime assertion", message, loc)
+		}
+		internal(loc, fmt, ..args)
+	}
+}
+// Runtime ensure with a formatted message
+//
+// Inputs:
+// - condition: The boolean condition to be asserted
+// - fmt: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+// - loc: The location of the caller
+//
+ensuref :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) {
+	if !condition {
+		@(cold)
+		internal :: proc(loc: runtime.Source_Code_Location, fmt: string, args: ..any) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			message := tprintf(fmt, ..args)
+			p("unsatisfied ensure", message, loc)
 		}
 		internal(loc, fmt, ..args)
 	}
@@ -332,7 +354,7 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 		p = runtime.default_assertion_failure_proc
 	}
 	message := tprintf(fmt, ..args)
-	p("Panic", message, loc)
+	p("panic", message, loc)
 }
 
 // 	Creates a formatted C string
@@ -591,6 +613,10 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 			i += 1
 			width_index, _, index_ok := _arg_number(fmt, &i, len(args))
 
+			if !index_ok {
+				width_index, index_ok = error_check_arg(fi, false, unused_args^)
+			}
+
 			if index_ok {
 				unused_args^ -= {width_index}
 
@@ -615,6 +641,10 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 			if i < end && fmt[i] == '*' {
 				i += 1
 				precision_index, _, index_ok := _arg_number(fmt, &i, len(args))
+
+				if !index_ok {
+					precision_index, index_ok = error_check_arg(fi, false, unused_args^)
+				}
 
 				if index_ok {
 					unused_args^ -= {precision_index}
@@ -1267,7 +1297,7 @@ fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	case 'q', 'w':
 		fi.n += io.write_quoted_rune(fi.writer, r)
 	case:
-		fmt_int(fi, u64(r), false, 32, verb)
+		fmt_int(fi, u64(u32(r)), false, 32, verb)
 	}
 }
 // Formats an integer value according to the specified formatting verb.
@@ -1357,9 +1387,9 @@ _pad :: proc(fi: ^Info, s: string) {
 	if fi.minus { // right pad
 		io.write_string(fi.writer, s, &fi.n)
 		fmt_write_padding(fi, width)
-	} else if !fi.space && s != "" && s[0] == '-' {
+	} else if !fi.space && s != "" && (s[0] == '-' || s[0] == '+') {
 		// left pad accounting for zero pad of negative number
-		io.write_byte(fi.writer, '-', &fi.n)
+		io.write_byte(fi.writer, s[0], &fi.n)
 		fmt_write_padding(fi, width)
 		io.write_string(fi.writer, s[1:], &fi.n)
 	} else { // left pad

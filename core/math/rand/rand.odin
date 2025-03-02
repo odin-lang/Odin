@@ -16,35 +16,11 @@ Generator_Query_Info :: runtime.Random_Generator_Query_Info
 Default_Random_State :: runtime.Default_Random_State
 default_random_generator :: runtime.default_random_generator
 
+@(require_results)
 create :: proc(seed: u64) -> (state: Default_Random_State) {
 	seed := seed
-	runtime.default_random_generator(&state)
 	runtime.default_random_generator_proc(&state, .Reset, ([^]byte)(&seed)[:size_of(seed)])
 	return
-}
-
-/*
-Reset the seed used by the context.random_generator.
-
-Inputs:
-- seed: The seed value
-
-Example:
-	import "core:math/rand"
-	import "core:fmt"
-
-	set_global_seed_example :: proc() {
-		rand.set_global_seed(1)
-		fmt.println(rand.uint64())
-	}
-
-Possible Output:
-
-	10
-*/
-@(deprecated="Prefer `rand.reset`")
-set_global_seed :: proc(seed: u64) {
-	runtime.random_generator_reset_u64(context.random_generator, seed)
 }
 
 /*
@@ -491,7 +467,7 @@ Example:
 Possible Output:
 
 	15.312
-	673.130
+	273.130
 
 */
 @(require_results) float32_range :: proc(low, high: f32, gen := context.random_generator) -> (val: f32) {

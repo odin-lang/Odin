@@ -19,7 +19,11 @@ if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
 	)
 )
 
-for /f %%i in ('powershell get-date -format "{yyyyMMdd}"') do (
+pushd misc
+cl /nologo get-date.c
+popd
+
+for /f %%i in ('misc\get-date') do (
 	set CURR_DATE_TIME=%%i
 )
 set curr_year=%CURR_DATE_TIME:~0,4%
@@ -57,7 +61,6 @@ if %release_mode% equ 0 (
 set V4=0
 set odin_version_full="%V1%.%V2%.%V3%.%V4%"
 set odin_version_raw="dev-%V1%-%V2%"
-
 
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
 rem Parse source code as utf-8 even on shift-jis and other codepages

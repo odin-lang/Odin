@@ -417,15 +417,15 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 		if .raw_union in t.flags {
 			return UNSUPPORTED_TYPE
 		}
-	
+
+		fields := reflect.struct_fields_zipped(ti.id)
+		
 		struct_loop: for p.curr_token.kind != end_token {
 			key := parse_object_key(p, p.allocator) or_return
 			defer delete(key, p.allocator)
 			
 			unmarshal_expect_token(p, .Colon)						
 			
-			fields := reflect.struct_fields_zipped(ti.id)
-
 			field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
 				prev_set := field_used[offset/8] & byte(offset&7) != 0
 				field_used[offset/8] |= byte(offset&7)
@@ -433,13 +433,13 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 
 			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
-			field_used := intrinsics.alloca(field_used_bytes, 1)
+			field_used := intrinsics.alloca(field_used_bytes + 1, 1) // + 1 to not overflow on size_of 0 types.
 			intrinsics.mem_zero(field_used, field_used_bytes)
 
 			use_field_idx := -1
 			
 			for field, field_idx in fields {
-				tag_value := string(reflect.struct_tag_get(field.tag, "json"))
+				tag_value := reflect.struct_tag_get(field.tag, "json")
 				json_name, _ := json_name_from_tag_value(tag_value)
 				if key == json_name {
 					use_field_idx = field_idx
@@ -470,7 +470,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 						}
 					}
 
-					if field.name == key {
+					if field.name == key || (field.tag != "" && reflect.struct_tag_get(field.tag, "json") == key) {
 						offset = field.offset
 						type = field.type
 						found = true

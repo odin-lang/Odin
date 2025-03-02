@@ -685,7 +685,8 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	ST_ALIGN(min_field_align);
 	ST_ALIGN(max_field_align);
 	ST_ALIGN(align);
-	if (struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
+	if (struct_type->Struct.custom_align != 0 &&
+		struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
 		error(st->align, "#align(%lld) is defined to be less than #min_field_align(%lld)",
 		      cast(long long)struct_type->Struct.custom_align,
 		      cast(long long)struct_type->Struct.custom_min_field_align);
@@ -2440,8 +2441,12 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	bool success = true;
 	isize specialization_count = 0;
 	Type *params  = check_get_params(c, c->scope, pt->params, &variadic, &variadic_index, &success, &specialization_count, operands);
-	Type *results = check_get_results(c, c->scope, pt->results);
 
+	bool no_poly_return = c->disallow_polymorphic_return_types;
+	c->disallow_polymorphic_return_types = c->scope == c->polymorphic_scope;
+	// NOTE(zen3ger): if the parapoly scope is the current proc's scope, then the return types shall not declare new poly vars
+	Type *results = check_get_results(c, c->scope, pt->results);
+	c->disallow_polymorphic_return_types = no_poly_return;
 
 	isize param_count = 0;
 	isize result_count = 0;
@@ -2854,15 +2859,23 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 	}
 	
 	if (generic_row == nullptr && row_count < MATRIX_ELEMENT_COUNT_MIN) {
-		gbString s = expr_to_string(row.expr);
-		error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
-		gb_string_free(s);
+		if (row.expr == nullptr) {
+			error(node, "Invalid matrix row count, got nothing");
+		} else {
+			gbString s = expr_to_string(row.expr);
+			error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			gb_string_free(s);
+		}
 	}
 	
 	if (generic_column == nullptr && column_count < MATRIX_ELEMENT_COUNT_MIN) {
-		gbString s = expr_to_string(column.expr);
-		error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
-		gb_string_free(s);
+		if (column.expr == nullptr) {
+			error(node, "Invalid matrix column count, got nothing");
+		} else {
+			gbString s = expr_to_string(column.expr);
+			error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			gb_string_free(s);
+		}
 	}
 	
 	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
@@ -3383,6 +3396,9 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		}
 		Type *t = alloc_type_generic(ctx->scope, 0, token.string, specific);
 		if (ctx->allow_polymorphic_types) {
+			if (ctx->disallow_polymorphic_return_types) {
+				error(ident, "Undeclared polymorphic parameter '%.*s' in return type", LIT(token.string));
+			}
 			Scope *ps = ctx->polymorphic_scope;
 			Scope *s = ctx->scope;
 			Scope *entity_scope = s;

@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -328,24 +328,32 @@ when ODIN_OS == .NetBSD {
 	@(private) LSOCKET :: "socket"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux || ODIN_OS == .Haiku {
 
 	socklen_t :: distinct c.uint
+
+	when ODIN_OS == .Haiku {
+		@(private)
+		_SA_DATASIZE :: 30
+	} else {
+		@(private)
+		_SA_DATASIZE :: 14
+	}
 
 	when ODIN_OS == .Linux {
 		_sa_family_t :: distinct c.ushort
 
 		sockaddr :: struct {
-			sa_family: sa_family_t, /* [PSX] address family */
-			sa_data:   [14]c.char,  /* [PSX] socket address */
+			sa_family: sa_family_t,           /* [PSX] address family */
+			sa_data:   [_SA_DATASIZE]c.char,  /* [PSX] socket address */
 		}
 	} else {
 		_sa_family_t :: distinct c.uint8_t
 
 		sockaddr :: struct {
-			sa_len:    c.uint8_t,   /* total length */
-			sa_family: sa_family_t, /* [PSX] address family */
-			sa_data:   [14]c.char,  /* [PSX] socket address */
+			sa_len:    c.uint8_t,             /* total length */
+			sa_family: sa_family_t,           /* [PSX] address family */
+			sa_data:   [_SA_DATASIZE]c.char,  /* [PSX] socket address */
 		}
 	}
 
@@ -355,6 +363,11 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		_SS_PAD1SIZE :: 6
 		@(private)
 		_SS_PAD2SIZE :: 240
+	} else when ODIN_OS == .Haiku {
+		@(private)
+		_SS_PAD1SIZE :: 6
+		@(private)
+		_SS_PAD2SIZE :: 112
 	} else when ODIN_OS == .Linux {
 		@(private)
 		_SS_SIZE :: 128
@@ -486,6 +499,26 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 
 		SO_RCVTIMEO   :: 66
 		SO_SNDTIMEO   :: 67
+	} else when ODIN_OS == .Haiku {
+		SOL_SOCKET :: -1
+
+		SO_ACCEPTCONN :: 0x00000001
+		SO_BROADCAST  :: 0x00000002
+		SO_DEBUG      :: 0x00000004
+		SO_DONTROUTE  :: 0x00000008
+		SO_ERROR      :: 0x40000007
+		SO_KEEPALIVE  :: 0x00000010
+		SO_OOBINLINE  :: 0x00000020
+		SO_RCVBUF     :: 0x40000004
+		SO_RCVLOWAT   :: 0x40000005
+		SO_REUSEADDR  :: 0x00000040
+		SO_SNDBUF     :: 0x40000001
+		SO_SNDLOWAT   :: 0x40000002
+		SO_TYPE       :: 0x40000008
+
+		SO_LINGER     :: 0x00000200
+		SO_RCVTIMEO   :: 0x40000006
+		SO_SNDTIMEO   :: 0x40000003
 	} else {
 		SOL_SOCKET :: 0xffff
 
@@ -523,7 +556,11 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	}
 
 	// The maximum backlog queue length for listen().
-	SOMAXCONN :: 128
+	when ODIN_OS == .Haiku {
+		SOMAXCONN :: 32
+	} else {
+		SOMAXCONN :: 128
+	}
 
 	when ODIN_OS == .Linux {
 		MSG_CTRUNC    :: 0x008
@@ -549,11 +586,18 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 			MSG_NOSIGNAL :: 0x00020000
 		} else when ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 			MSG_NOSIGNAL :: 0x0400
+		} else when ODIN_OS == .Haiku {
+			MSG_NOSIGNAL :: 0x800
 		}
 	}
 
-	AF_INET   :: 2
-	AF_UNIX   :: 1
+	when ODIN_OS == .Haiku {
+		AF_INET :: 1
+		AF_UNIX :: 9
+	} else {
+		AF_INET :: 2
+		AF_UNIX :: 1
+	}
 
 	when ODIN_OS == .Darwin {
 		AF_INET6 :: 30
@@ -563,6 +607,8 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		AF_INET6 :: 24
 	} else when ODIN_OS == .Linux {
 		AF_INET6 :: 10
+	} else when ODIN_OS == .Haiku {
+		AF_INET6 :: 5
 	}
 
 	SHUT_RD   :: 0

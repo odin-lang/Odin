@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -77,5 +77,16 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	ITIMER_REAL    :: 0
 	ITIMER_VIRTUAL :: 1
 	ITIMER_PROF    :: 2
+
+} else when ODIN_OS == .Haiku {
+
+	itimerval :: struct {
+		it_interval: timeval, /* [PSX] timer interval */
+		it_value:    timeval, /* [PSX] current value */
+	}
+
+	ITIMER_REAL    :: 1
+	ITIMER_VIRTUAL :: 2
+	ITIMER_PROF    :: 3
 
 }

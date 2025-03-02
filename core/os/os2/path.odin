@@ -2,6 +2,8 @@ package os2
 
 import "base:runtime"
 
+import "core:path/filepath"
+
 Path_Separator        :: _Path_Separator        // OS-Specific
 Path_Separator_String :: _Path_Separator_String // OS-Specific
 Path_List_Separator   :: _Path_List_Separator   // OS-Specific
@@ -38,4 +40,14 @@ setwd :: set_working_directory
 
 set_working_directory :: proc(dir: string) -> (err: Error) {
 	return _set_working_directory(dir)
+}
+
+get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
+	return _get_executable_path(allocator)
+}
+
+get_executable_directory :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
+	path = _get_executable_path(allocator) or_return
+	path, _ = filepath.split(path)
+	return
 }

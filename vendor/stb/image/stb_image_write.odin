@@ -18,12 +18,8 @@ when WRITE_LIB != "" {
 	}
 }
 
-when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
-	foreign import stbiw "../lib/stb_image_write_wasm.o"
-} else when WRITE_LIB != "" {
-	foreign import stbiw { WRITE_LIB }
-} else {
-	foreign import stbiw "system:stb_image_write"
+foreign import stbiw {
+	WRITE_LIB when WRITE_LIB != "" else "system:stb_image_write",
 }
 
 write_func :: proc "c" (ctx: rawptr, data: rawptr, size: c.int)

@@ -324,6 +324,18 @@ u64 get_vet_flag_from_name(String const &name) {
 	return VetFlag_NONE;
 }
 
+enum OptInFeatureFlags : u64 {
+	OptInFeatureFlag_NONE            = 0,
+	OptInFeatureFlag_DynamicLiterals = 1u<<0,
+};
+
+u64 get_feature_flag_from_name(String const &name) {
+	if (name == "dynamic-literals") {
+		return OptInFeatureFlag_DynamicLiterals;
+	}
+	return OptInFeatureFlag_NONE;
+}
+
 
 enum SanitizerFlags : u32 {
 	SanitizerFlag_NONE = 0,
@@ -429,7 +441,6 @@ struct BuildContext {
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
 	bool   no_type_assert;
-	bool   no_dynamic_literals;
 	bool   no_output_files;
 	bool   no_crt;
 	bool   no_rpath;
@@ -461,12 +472,14 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
+	bool   use_single_module;
 	bool   use_separate_modules;
 	bool   module_per_file;
 	bool   cached;
 	BuildCacheData build_cache_data;
 
 	bool internal_no_inline;
+	bool internal_by_value;
 
 	bool   no_threaded_checker;
 
@@ -1707,13 +1720,15 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 3);
 
-#if defined(GB_SYSTEM_WINDOWS)
 	if (bc->optimization_level <= 0) {
 		if (!is_arch_wasm()) {
 			bc->use_separate_modules = true;
 		}
 	}
-#endif
+
+	if (build_context.use_single_module) {
+		bc->use_separate_modules = false;
+	}
 
 
 	// TODO: Static map calls are bugged on `amd64sysv` abi.
@@ -1852,11 +1867,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		produces_output_file = true;
 	} else if (bc->command_kind & Command__does_build) {
 		produces_output_file = true;
-	}
-
-	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR ||
-	    build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
-		bc->no_dynamic_literals = true;
 	}
 
 	if (!produces_output_file) {
@@ -2053,7 +2063,7 @@ gb_internal bool init_build_paths(String init_filename) {
 
 	// Do we have an extension? We might not if the output filename was supplied.
 	if (bc->build_paths[BuildPath_Output].ext.len == 0) {
-		if (build_context.metrics.os == TargetOs_windows || build_context.build_mode != BuildMode_Executable) {
+		if (build_context.metrics.os == TargetOs_windows || is_arch_wasm() || build_context.build_mode != BuildMode_Executable) {
 			bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
 		}
 	}
@@ -2117,6 +2127,7 @@ gb_internal bool init_build_paths(String init_filename) {
 		}
 	}
 
+	bool no_crt_checks_failed = false;
 	if (build_context.no_crt && !build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR && !build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
 		switch (build_context.metrics.os) {
 		case TargetOs_linux:
@@ -2126,9 +2137,27 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
 		case TargetOs_haiku:
-			gb_printf_err("-no-crt on unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present because the default allocator requires crt\n");
-			return false;
+			gb_printf_err("-no-crt on Unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present, because the default allocator requires CRT\n");
+			no_crt_checks_failed = true;
 		}
+	}
+
+	if (build_context.no_crt && !build_context.no_thread_local) {
+		switch (build_context.metrics.os) {
+		case TargetOs_linux:
+		case TargetOs_darwin:
+		case TargetOs_essence:
+		case TargetOs_freebsd:
+		case TargetOs_openbsd:
+		case TargetOs_netbsd:
+		case TargetOs_haiku:
+			gb_printf_err("-no-crt on Unix systems requires the -no-thread-local flag to also be present, because the TLS is inaccessible without CRT\n");
+			no_crt_checks_failed = true;
+		}
+	}
+
+	if (no_crt_checks_failed) {
+		return false;
 	}
 
 	return true;

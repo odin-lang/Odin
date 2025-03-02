@@ -108,7 +108,7 @@ job :: struct {
 				pDataBufferNode:   rawptr /*ma_resource_manager_data_buffer_node**/,
 				pFilePath:         cstring,
 				pFilePathW:        [^]c.wchar_t,
-				flags:             u32,                       /* Resource manager data source flags that were used when initializing the data buffer. */
+				flags:             resource_manager_data_source_flags, /* Resource manager data source flags that were used when initializing the data buffer. */
 				pInitNotification: ^async_notification,       /* Signalled when the data buffer has been initialized and the format/channels/rate can be retrieved. */
 				pDoneNotification: ^async_notification,       /* Signalled when the data buffer has been fully decoded. Will be passed through to MA_JOB_TYPE_RESOURCE_MANAGER_PAGE_DATA_BUFFER_NODE when decoding. */
 				pInitFence:        ^fence,                    /* Released when initialization of the decoder is complete. */
@@ -194,19 +194,21 @@ ma_job_queue_post(). ma_job_queue_next() will return MA_NO_DATA_AVAILABLE if not
 
 This flag should always be used for platforms that do not support multithreading.
 */
-job_queue_flags :: enum c.int {
-	NON_BLOCKING = 0x00000001,
+job_queue_flag :: enum c.int {
+	NON_BLOCKING = 0,
 }
 
+job_queue_flags :: bit_set[job_queue_flag; u32]
+
 job_queue_config :: struct {
-	flags:    u32,
+	flags:    job_queue_flags,
 	capacity: u32, /* The maximum number of jobs that can fit in the queue at a time. */
 }
 
 USE_EXPERIMENTAL_LOCK_FREE_JOB_QUEUE :: false
 
 job_queue :: struct {
-	flags:     u32,                                          /* Flags passed in at initialization time. */
+	flags:     job_queue_flags,                              /* Flags passed in at initialization time. */
 	capacity:  u32,                                          /* The maximum number of jobs that can fit in the queue at a time. Set by the config. */
 	head:      u64, /*atomic*/                               /* The first item in the list. Required for removing from the top of the list. */
 	tail:      u64, /*atomic*/                               /* The last item in the list. Required for appending to the end of the list. */
@@ -222,7 +224,7 @@ job_queue :: struct {
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	job_queue_config_init :: proc(flags, capacity: u32) -> job_queue_config ---
+	job_queue_config_init :: proc(flags: job_queue_flags, capacity: u32) -> job_queue_config ---
 
 	job_queue_get_heap_size     :: proc(pConfig: ^job_queue_config, pHeapSizeInBytes: ^c.size_t) -> result ---
 	job_queue_init_preallocated :: proc(pConfig: ^job_queue_config, pHeap: rawptr, pQueue: ^job_queue) -> result ---
