@@ -53,7 +53,7 @@ init :: proc(ctx: ^Context) {
 
 // update adds more data to the Context.
 update :: proc(ctx: ^Context, data: []byte) {
-	assert(ctx.is_initialized)
+	ensure(ctx.is_initialized)
 
 	data := data
 	ctx.length += u64(len(data))
@@ -83,11 +83,8 @@ update :: proc(ctx: ^Context, data: []byte) {
 // Iff finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
-	assert(ctx.is_initialized)
-
-	if len(hash) < DIGEST_SIZE {
-		panic("crypto/sm3: invalid destination digest size")
-	}
+	ensure(ctx.is_initialized)
+	ensure(len(hash) >= DIGEST_SIZE, "crypto/sm3: invalid destination digest size")
 
 	ctx := ctx
 	if finalize_clone {
@@ -110,7 +107,7 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	length <<= 3
 	endian.unchecked_put_u64be(pad[:], length)
 	update(ctx, pad[0:8])
-	assert(ctx.bitlength == 0)
+	assert(ctx.bitlength == 0) // Check for bugs
 
 	for i := 0; i < DIGEST_SIZE / 4; i += 1 {
 		endian.unchecked_put_u32be(hash[i * 4:], ctx.state[i])
@@ -136,7 +133,7 @@ reset :: proc(ctx: ^Context) {
     SM3 implementation
 */
 
-@(private)
+@(private, rodata)
 IV := [8]u32 {
 	0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
 	0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e,
