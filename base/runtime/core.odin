@@ -442,7 +442,9 @@ Raw_Any :: struct {
 	data: rawptr,
 	id:   typeid,
 }
-#assert(size_of(Raw_Any) == size_of(any))
+when !ODIN_NO_RTTI {
+	#assert(size_of(Raw_Any) == size_of(any))
+}
 
 Raw_Cstring :: struct {
 	data: [^]byte,
