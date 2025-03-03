@@ -2,7 +2,7 @@
 A cross-platform (and WASM) GPU API.
 
 WASM support is achieved by providing wrappers around the browser native WebGPU API
-that are called instead of the [wgpu-native](https://github.com/gfx-rs/wgpu-native) library,
+that are called instead of the [[wgpu-native; https://github.com/gfx-rs/wgpu-native]] library,
 the wgpu-native library provides support for all other targets.
 
 **Examples**
