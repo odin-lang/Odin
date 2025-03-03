@@ -1217,17 +1217,22 @@ class WebGPUInterface {
 					.then((device) => {
 						const deviceIdx = this.devices.create(device);
 
-						const deviceLostCallbackInfo = off(this.sizes.CallbackInfo);
-						if (descriptorPtr !== 0 && deviceLostCallbackInfo !== null) {
+						if (deviceLostCallbackInfo.callback !== null) {
 							device.lost.then((info) => {
 								const reason = ENUMS.DeviceLostReason.indexOf(info.reason);
+
+								const devicePtr = this.mem.exports.wgpu_alloc(4);
+								this.mem.storeI32(devicePtr, deviceIdx);
+
 								const messageAddr = this.makeMessageArg(info.message);
-								this.callCallback(deviceLostCallbackInfo, [deviceIdx, reason, messageAddr]);
+								this.callCallback(deviceLostCallbackInfo, [devicePtr, reason, messageAddr]);
+
+								this.mem.exports.wgpu_free(devicePtr);
 								this.mem.exports.wgpu_free(messageAddr);
 							});
 						}
 
-						if (descriptorPtr !== 0 && uncapturedErrorCallbackInfo !== null) {
+						if (uncapturedErrorCallbackInfo.callback !== null) {
 							device.onuncapturederror = (ev) => {
 								let status;
 								if (ev.error instanceof GPUValidationError) {
