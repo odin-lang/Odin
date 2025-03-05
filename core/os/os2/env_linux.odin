@@ -126,7 +126,7 @@ _unset_env :: proc(key: string) -> bool {
 		return true
 	}
 
-	// if we got this far, the envrionment variable
+	// if we got this far, the environment variable
 	// existed AND was allocated by us.
 	k_addr, _ := _kv_addr_from_val(v, key)
 	runtime.heap_free(k_addr)
