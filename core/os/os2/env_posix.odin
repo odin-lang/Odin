@@ -57,7 +57,7 @@ _clear_env :: proc() {
 }
 
 _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
-	n := 0	
+	n := 0
 	for entry := posix.environ[0]; entry != nil; n, entry = n+1, posix.environ[n] {}
 
 	r := make([dynamic]string, 0, n, allocator) or_return
