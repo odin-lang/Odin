@@ -25,7 +25,7 @@ Returns:
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	c := make([]byte, len(s), allocator, loc) or_return
 	copy(c, s)
-	return string(c[:len(s)]), nil
+	return string(c), nil
 }
 /*
 Clones a string safely (returns early with an allocation error on failure)
