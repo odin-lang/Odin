@@ -20,19 +20,18 @@ NOT_FOUND :: -1
 // the environment is a 0 delimited list of <key>=<value> strings
 _env: [dynamic]string
 
-_env_mutex: sync.Mutex
+_env_mutex: sync.Recursive_Mutex
 
 // We need to be able to figure out if the environment variable
 // is contained in the original environment or not. This also
 // serves as a flag to determine if we have built _env.
-_org_env_begin: uintptr
-_org_env_end:   uintptr
+_org_env_begin: uintptr // atomic
+_org_env_end:   uintptr // guarded by _env_mutex
 
 // Returns value + index location into _env
 // or -1 if not found
 _lookup :: proc(key: string) -> (value: string, idx: int) {
-	sync.mutex_lock(&_env_mutex)
-	defer sync.mutex_unlock(&_env_mutex)
+	sync.guard(&_env_mutex)
 
 	for entry, i in _env {
 		if k, v := _kv_from_entry(entry); k == key {
@@ -43,7 +42,7 @@ _lookup :: proc(key: string) -> (value: string, idx: int) {
 }
 
 _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
-	if _org_env_begin == 0 {
+	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {
 		_build_env()
 	}
 
@@ -55,9 +54,10 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 }
 
 _set_env :: proc(key, v_new: string) -> Error {
-	if _org_env_begin == 0 {
+	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {
 		_build_env()
 	}
+	sync.guard(&_env_mutex)
 
 	// all key values are stored as "key=value\x00"
 	kv_size := len(key) + len(v_new) + 2
@@ -65,8 +65,6 @@ _set_env :: proc(key, v_new: string) -> Error {
 		if v_curr == v_new {
 			return nil
 		}
-		sync.mutex_lock(&_env_mutex)
-		defer sync.mutex_unlock(&_env_mutex)
 
 		unordered_remove(&_env, idx)
 
@@ -101,16 +99,15 @@ _set_env :: proc(key, v_new: string) -> Error {
 	intrinsics.mem_copy_non_overlapping(&val_slice[0], raw_data(v_new), len(v_new))
 	val_slice[len(v_new)] = 0
 
-	sync.mutex_lock(&_env_mutex)
 	append(&_env, string(k_addr[:kv_size - 1]))
-	sync.mutex_unlock(&_env_mutex)
 	return nil
 }
 
 _unset_env :: proc(key: string) -> bool {
-	if _org_env_begin == 0 {
+	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {
 		_build_env()
 	}
+	sync.guard(&_env_mutex)
 
 	v: string
 	i: int
@@ -118,9 +115,7 @@ _unset_env :: proc(key: string) -> bool {
 		return false
 	}
 
-	sync.mutex_lock(&_env_mutex)
 	unordered_remove(&_env, i)
-	sync.mutex_unlock(&_env_mutex)
 
 	if _is_in_org_env(v) {
 		return true
@@ -134,8 +129,7 @@ _unset_env :: proc(key: string) -> bool {
 }
 
 _clear_env :: proc() {
-	sync.mutex_lock(&_env_mutex)
-	defer sync.mutex_unlock(&_env_mutex)
+	sync.guard(&_env_mutex)
 
 	for kv in _env {
 		if !_is_in_org_env(kv) {
@@ -145,14 +139,16 @@ _clear_env :: proc() {
 	clear(&_env)
 
 	// nothing resides in the original environment either
-	_org_env_begin = ~uintptr(0)
+	intrinsics.atomic_store_explicit(&_org_env_begin, ~uintptr(0), .Release)
 	_org_env_end = ~uintptr(0)
 }
 
 _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
-	if _org_env_begin == 0 {
+	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {
 		_build_env()
 	}
+	sync.guard(&_env_mutex)
+
 	env := make([dynamic]string, 0, len(_env), allocator) or_return
 	defer if err != nil {
 		for e in env {
@@ -161,8 +157,6 @@ _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error
 		delete(env)
 	}
 
-	sync.mutex_lock(&_env_mutex)
-	defer sync.mutex_unlock(&_env_mutex)
 	for entry in _env {
 		s := clone_string(entry, allocator) or_return
 		append(&env, s)
@@ -174,7 +168,7 @@ _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error
 // The entire environment is stored as 0 terminated strings,
 // so there is no need to clone/free individual variables
 export_cstring_environment :: proc(allocator: runtime.Allocator) -> []cstring {
-	if _org_env_begin == 0 {
+	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {
 		// The environment has not been modified, so we can just
 		// send the original environment
 		org_env := _get_original_env()
@@ -182,12 +176,11 @@ export_cstring_environment :: proc(allocator: runtime.Allocator) -> []cstring {
 		for ; org_env[n] != nil; n += 1 {}
 		return slice.clone(org_env[:n + 1], allocator)
 	}
+	sync.guard(&_env_mutex)
 
 	// NOTE: already terminated by nil pointer via + 1
 	env := make([]cstring, len(_env) + 1, allocator)
 
-	sync.mutex_lock(&_env_mutex)
-	defer sync.mutex_unlock(&_env_mutex)
 	for entry, i in _env {
 		env[i] = cstring(raw_data(entry))
 	}
@@ -195,15 +188,14 @@ export_cstring_environment :: proc(allocator: runtime.Allocator) -> []cstring {
 }
 
 _build_env :: proc() {
-	sync.mutex_lock(&_env_mutex)
-	defer sync.mutex_unlock(&_env_mutex)
-	if _org_env_begin != 0 {
+	sync.guard(&_env_mutex)
+	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) != 0 {
 		return
 	}
 
 	_env = make(type_of(_env), runtime.heap_allocator())
 	cstring_env := _get_original_env()
-	_org_env_begin = uintptr(rawptr(cstring_env[0]))
+	intrinsics.atomic_store_explicit(&_org_env_begin, uintptr(rawptr(cstring_env[0])), .Release)
 	for i := 0; cstring_env[i] != nil; i += 1 {
 		bytes := ([^]u8)(cstring_env[i])
 		n := len(cstring_env[i])
@@ -235,5 +227,5 @@ _kv_addr_from_val :: #force_inline proc(val: string, key: string) -> ([^]u8, [^]
 
 _is_in_org_env :: #force_inline proc(env_data: string) -> bool {
 	addr := uintptr(raw_data(env_data))
-	return addr >= _org_env_begin && addr < _org_env_end
+	return addr >= intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) && addr < _org_env_end
 }
