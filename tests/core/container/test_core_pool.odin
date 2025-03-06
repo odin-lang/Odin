@@ -1,7 +1,7 @@
 package test_core_container
 
 import "core:testing"
-import "core:pool"
+import "core:container/pool"
 
 import "core:fmt"
 
