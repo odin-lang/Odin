@@ -18,23 +18,36 @@ gb_global isize lb_global_type_info_member_tags_index    = 0;
 gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	m->info = &c->info;
 
-	gbString module_name = gb_string_make(heap_allocator(), "odin_package");
-	if (m->file) {
-		if (m->pkg) {
+
+	String name = build_context.build_paths[BuildPath_Output].name;
+	gbString module_name = gb_string_make(heap_allocator(), "");
+	module_name = gb_string_append_length(module_name, name.text, name.len);
+
+	if (!USE_SEPARATE_MODULES) {
+		// ignore suffixes
+	} else if (m->file) {
+		if (gb_string_length(module_name)) {
 			module_name = gb_string_appendc(module_name, "-");
-			module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
 		}
-		module_name = gb_string_appendc(module_name, "-");
+		if (m->pkg) {
+			module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
+			module_name = gb_string_appendc(module_name, "-");
+		}
 		String filename = filename_from_path(m->file->filename);
 		module_name = gb_string_append_length(module_name, filename.text, filename.len);
 	} else if (m->pkg) {
-		module_name = gb_string_appendc(module_name, "-");
+		if (gb_string_length(module_name)) {
+			module_name = gb_string_appendc(module_name, "-");
+		}
 		module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
-	} else if (USE_SEPARATE_MODULES) {
-		module_name = gb_string_appendc(module_name, "-builtin");
+	} else {
+		if (gb_string_length(module_name)) {
+			module_name = gb_string_appendc(module_name, "-");
+		}
+		module_name = gb_string_appendc(module_name, "builtin");
 	}
 
-	m->module_name = module_name ? module_name : "odin_package";
+	m->module_name = module_name;
 	m->ctx = LLVMContextCreate();
 	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
@@ -1982,26 +1995,26 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	case Type_Struct:
 		{
 			type_set_offsets(type);
-			
+
 			i64 full_type_size = type_size_of(type);
 			i64 full_type_align = type_align_of(type);
 			GB_ASSERT(full_type_size % full_type_align == 0);
-			
+
 			if (type->Struct.is_raw_union) {
-				
+
 				lbStructFieldRemapping field_remapping = {};
 				slice_init(&field_remapping, permanent_allocator(), 1);
-				
+
 				LLVMTypeRef fields[1] = {};
 				fields[0] = lb_type_padding_filler(m, full_type_size, full_type_align);
 				field_remapping[0] = 0;
-				
+
 				LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 				map_set(&m->struct_field_remapping, cast(void *)struct_type, field_remapping);
 				map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);
 				return struct_type;
 			}
-			
+
 			lbStructFieldRemapping field_remapping = {};
 			slice_init(&field_remapping, permanent_allocator(), type->Struct.fields.count);
 
@@ -2014,7 +2027,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef padding_type = lb_type_padding_filler(m, 0, type_align_of(type));
 				array_add(&fields, padding_type);
 			}
-			
+
 			i64 prev_offset = 0;
 			bool requires_packing = type->Struct.is_packed;
 			for (i32 field_index : struct_fields_index_by_increasing_offset(temporary_allocator(), type)) {
@@ -2045,7 +2058,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 				prev_offset = offset + type_size_of(field->type);
 			}
-			
+
 			i64 end_padding = full_type_size-prev_offset;
 			if (end_padding > 0) {
 				array_add(&fields, lb_type_padding_filler(m, end_padding, 1));
@@ -2054,14 +2067,14 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			for_array(i, fields) {
 				GB_ASSERT(fields[i] != nullptr);
 			}
-			
+
 			LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, requires_packing);
 			map_set(&m->struct_field_remapping, cast(void *)struct_type, field_remapping);
-			map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);			
+			map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);
 			#if 0
-			GB_ASSERT_MSG(lb_sizeof(struct_type) == full_type_size, 
-			              "(%lld) %s vs (%lld) %s", 
-			              cast(long long)lb_sizeof(struct_type), LLVMPrintTypeToString(struct_type), 
+			GB_ASSERT_MSG(lb_sizeof(struct_type) == full_type_size,
+			              "(%lld) %s vs (%lld) %s",
+			              cast(long long)lb_sizeof(struct_type), LLVMPrintTypeToString(struct_type),
 			              cast(long long)full_type_size, type_to_string(type));
 			#endif
 			return struct_type;
@@ -2090,8 +2103,22 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
 				array_add(&fields, variant);
 			} else {
-				LLVMTypeRef block_type = lb_type_padding_filler(m, block_size, align);
-				LLVMTypeRef tag_type   = lb_type(m, union_tag_type(type));
+				LLVMTypeRef block_type = nullptr;
+
+				bool all_pointers = align == build_context.ptr_size;
+				for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {
+					Type *t = type->Union.variants[i];
+					if (!is_type_internally_pointer_like(t)) {
+						all_pointers = false;
+					}
+				}
+				if (all_pointers) {
+					block_type = lb_type(m, t_rawptr);
+				} else {
+					block_type = lb_type_padding_filler(m, block_size, align);
+				}
+
+				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
 				array_add(&fields, tag_type);
 				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
