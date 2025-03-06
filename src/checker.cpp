@@ -2645,6 +2645,10 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_init = false;
 				}
 
+				if (is_blank_ident(e->token)) {
+					error(e->token, "An @(init) procedure must not use a blank identifier as its name");
+				}
+
 				if (is_init) {
 					add_dependency_to_set(c, e);
 					array_add(&c->info.init_procedures, e);
@@ -2665,6 +2669,10 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
 					error(e->token, "@(fini) procedures must be declared at the file scope");
 					is_fini = false;
+				}
+
+				if (is_blank_ident(e->token)) {
+					error(e->token, "An @(fini) procedure must not use a blank identifier as its name");
 				}
 
 				if (is_fini) {
