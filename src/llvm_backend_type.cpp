@@ -162,65 +162,6 @@ gb_internal lbValue lb_type_info_member_tags_offset(lbModule *m, isize count, i6
 }
 
 gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isize max_type_info_count) {
-#if 0
-	LLVMTypeRef *element_types = gb_alloc_array(heap_allocator(), LLVMTypeRef, max_type_info_count);
-	defer (gb_free(heap_allocator(), element_types));
-
-	auto entries_handled = slice_make<bool>(heap_allocator(), max_type_info_count);
-	defer (gb_free(heap_allocator(), entries_handled.data));
-	entries_handled[0] = true;
-
-	element_types[0] = lb_type(m, t_type_info);
-
-	Type *tibt = base_type(t_type_info);
-	GB_ASSERT(tibt->kind == Type_Struct);
-	Type *ut = base_type(tibt->Struct.fields[tibt->Struct.fields.count-1]->type);
-	GB_ASSERT(ut->kind == Type_Union);
-
-	GB_ASSERT(tibt->Struct.fields.count == 5);
-	LLVMTypeRef stypes[6] = {};
-	stypes[0] = lb_type(m, tibt->Struct.fields[0]->type);
-	stypes[1] = lb_type(m, tibt->Struct.fields[1]->type);
-	stypes[2] = lb_type(m, tibt->Struct.fields[2]->type);
-	isize variant_index = 0;
-	if (build_context.ptr_size == 8) {
-		stypes[3] = lb_type(m, t_i32); // padding
-		stypes[4] = lb_type(m, tibt->Struct.fields[3]->type);
-		variant_index = 5;
-	} else {
-		stypes[3] = lb_type(m, tibt->Struct.fields[3]->type);
-		variant_index = 4;
-	}
-
-	LLVMTypeRef *modified_types = gb_alloc_array(heap_allocator(), LLVMTypeRef, Typeid__COUNT);
-	GB_ASSERT(Typeid__COUNT == ut->Union.variants.count);
-	modified_types[0] = element_types[0];
-
-	i64 tag_offset = ut->Union.variant_block_size;
-	LLVMTypeRef tag = lb_type(m, union_tag_type(ut));
-
-	for_array(i, ut->Union.variants) {
-		Type *t = ut->Union.variants[i];
-		LLVMTypeRef padding = llvm_array_type(lb_type(m, t_u8), tag_offset-type_size_of(t));
-
-		LLVMTypeRef vtypes[3] = {};
-		vtypes[0] = lb_type(m, t);
-		vtypes[1] = padding;
-		vtypes[2] = tag;
-		LLVMTypeRef variant_type = LLVMStructType(vtypes, gb_count_of(vtypes), true);
-
-		stypes[variant_index] = variant_type;
-		LLVMTypeRef modified_type = LLVMStructType(stypes, cast(unsigned)(variant_index+1), false);
-
-		modified_types[i] = modified_type;
-	}
-
-	for (isize i = 0; i < Typeid__COUNT; i++) {
-		GB_ASSERT_MSG(modified_types[i] != nullptr, "%td", ut->Union.variants.count);
-	}
-
-	return modified_types;
-#else
 	Type *tibt = base_type(t_type_info);
 	GB_ASSERT(tibt->kind == Type_Struct);
 	Type *ut = base_type(tibt->Struct.fields[tibt->Struct.fields.count-1]->type);
@@ -235,7 +176,6 @@ gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isiz
 	}
 
 	return modified_types;
-#endif
 }
 
 gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_type_info_data_entity_count) { // NOTE(bill): Setup type_info data
@@ -360,7 +300,6 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		} else {
 			stype = modified_types[lb_typeid_kind(m, t)];
 		}
-
 
 		LLVMValueRef vals[32] = {};
 
