@@ -164,7 +164,7 @@ _error_string :: proc "contextless" (e: Platform_Error) -> string where intrinsi
 
 		err := runtime.Type_Info_Enum_Value(e)
 
-		ti := &runtime.type_info_base(type_info_of(Platform_Error)).variant.(runtime.Type_Info_Enum)
+		ti := runtime.type_info_base(type_info_of(Platform_Error)).variant.(^runtime.Type_Info_Enum)
 		if idx, ok := binary_search(ti.values, err); ok {
 			return ti.names[idx]
 		}

@@ -63,38 +63,44 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 
 // Variant Types
 Type_Info_Named :: struct {
+	using info: Type_Info,
 	name: string,
 	base: ^Type_Info,
 	pkg:  string,
 	loc:  ^Source_Code_Location,
 }
-Type_Info_Integer    :: struct {signed: bool, endianness: Platform_Endianness}
-Type_Info_Rune       :: struct {}
-Type_Info_Float      :: struct {endianness: Platform_Endianness}
-Type_Info_Complex    :: struct {}
-Type_Info_Quaternion :: struct {}
-Type_Info_String     :: struct {is_cstring: bool}
-Type_Info_Boolean    :: struct {}
-Type_Info_Any        :: struct {}
-Type_Info_Type_Id    :: struct {}
+Type_Info_Integer    :: struct {using info: Type_Info, signed: bool, endianness: Platform_Endianness}
+Type_Info_Rune       :: struct {using info: Type_Info}
+Type_Info_Float      :: struct {using info: Type_Info, endianness: Platform_Endianness}
+Type_Info_Complex    :: struct {using info: Type_Info}
+Type_Info_Quaternion :: struct {using info: Type_Info}
+Type_Info_String     :: struct {using info: Type_Info, is_cstring: bool}
+Type_Info_Boolean    :: struct {using info: Type_Info}
+Type_Info_Any        :: struct {using info: Type_Info}
+Type_Info_Type_Id    :: struct {using info: Type_Info}
 Type_Info_Pointer :: struct {
+	using info: Type_Info,
 	elem: ^Type_Info, // nil -> rawptr
 }
 Type_Info_Multi_Pointer :: struct {
+	using info: Type_Info,
 	elem: ^Type_Info,
 }
 Type_Info_Procedure :: struct {
+	using info: Type_Info,
 	params:     ^Type_Info, // Type_Info_Parameters
 	results:    ^Type_Info, // Type_Info_Parameters
 	variadic:   bool,
 	convention: Calling_Convention,
 }
 Type_Info_Array :: struct {
+	using info: Type_Info,
 	elem:      ^Type_Info,
 	elem_size: int,
 	count:     int,
 }
 Type_Info_Enumerated_Array :: struct {
+	using info: Type_Info,
 	elem:      ^Type_Info,
 	index:     ^Type_Info,
 	elem_size: int,
@@ -103,12 +109,21 @@ Type_Info_Enumerated_Array :: struct {
 	max_value: Type_Info_Enum_Value,
 	is_sparse: bool,
 }
-Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int}
-Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int}
+Type_Info_Dynamic_Array :: struct {
+	using info: Type_Info,
+	elem:      ^Type_Info,
+	elem_size: int,
+}
+Type_Info_Slice         :: struct {
+	using info: Type_Info,
+	elem:      ^Type_Info,
+	elem_size: int,
+}
 
 Type_Info_Parameters :: struct { // Only used for procedures parameters and results
-	types:        []^Type_Info,
-	names:        []string,
+	using info: Type_Info,
+	types: []^Type_Info,
+	names: []string,
 }
 Type_Info_Tuple :: Type_Info_Parameters // Will be removed eventually
 
@@ -121,6 +136,8 @@ Type_Info_Struct_Flag :: enum u8 {
 }
 
 Type_Info_Struct :: struct {
+	using info: Type_Info,
+
 	// Slice these with `field_count`
 	types:   [^]^Type_Info `fmt:"v,field_count"`,
 	names:   [^]string     `fmt:"v,field_count"`,
@@ -130,16 +147,20 @@ Type_Info_Struct :: struct {
 
 	field_count: i32,
 
-	flags: Type_Info_Struct_Flags,
+	struct_flags: Type_Info_Struct_Flags,
 
 	// These are only set iff this structure is an SOA structure
 	soa_kind:      Type_Info_Struct_Soa_Kind,
+	_:             [2]u8,
 	soa_len:       i32,
+	_:             [4]u8,
 	soa_base_type: ^Type_Info,
 
 	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
 }
 Type_Info_Union :: struct {
+	using info: Type_Info,
+
 	variants:     []^Type_Info,
 	tag_offset:   uintptr,
 	tag_type:     ^Type_Info,
@@ -151,27 +172,32 @@ Type_Info_Union :: struct {
 	shared_nil:   bool,
 }
 Type_Info_Enum :: struct {
+	using info: Type_Info,
 	base:   ^Type_Info,
 	names:  []string,
 	values: []Type_Info_Enum_Value,
 }
 Type_Info_Map :: struct {
+	using info: Type_Info,
 	key:      ^Type_Info,
 	value:    ^Type_Info,
 	map_info: ^Map_Info,
 }
 Type_Info_Bit_Set :: struct {
+	using info: Type_Info,
 	elem:       ^Type_Info,
 	underlying: ^Type_Info, // Possibly nil
 	lower:      i64,
 	upper:      i64,
 }
 Type_Info_Simd_Vector :: struct {
+	using info: Type_Info,
 	elem:       ^Type_Info,
 	elem_size:  int,
 	count:      int,
 }
 Type_Info_Matrix :: struct {
+	using info: Type_Info,
 	elem:         ^Type_Info,
 	elem_size:    int,
 	elem_stride:  int, // elem_stride >= row_count
@@ -184,9 +210,11 @@ Type_Info_Matrix :: struct {
 	},
 }
 Type_Info_Soa_Pointer :: struct {
+	using info: Type_Info,
 	elem: ^Type_Info,
 }
 Type_Info_Bit_Field :: struct {
+	using info: Type_Info,
 	backing_type: ^Type_Info,
 	names:        [^]string     `fmt:"v,field_count"`,
 	types:        [^]^Type_Info `fmt:"v,field_count"`,
@@ -209,33 +237,33 @@ Type_Info :: struct {
 	id:    typeid,
 
 	variant: union {
-		Type_Info_Named,
-		Type_Info_Integer,
-		Type_Info_Rune,
-		Type_Info_Float,
-		Type_Info_Complex,
-		Type_Info_Quaternion,
-		Type_Info_String,
-		Type_Info_Boolean,
-		Type_Info_Any,
-		Type_Info_Type_Id,
-		Type_Info_Pointer,
-		Type_Info_Multi_Pointer,
-		Type_Info_Procedure,
-		Type_Info_Array,
-		Type_Info_Enumerated_Array,
-		Type_Info_Dynamic_Array,
-		Type_Info_Slice,
-		Type_Info_Parameters,
-		Type_Info_Struct,
-		Type_Info_Union,
-		Type_Info_Enum,
-		Type_Info_Map,
-		Type_Info_Bit_Set,
-		Type_Info_Simd_Vector,
-		Type_Info_Matrix,
-		Type_Info_Soa_Pointer,
-		Type_Info_Bit_Field,
+		^Type_Info_Named,
+		^Type_Info_Integer,
+		^Type_Info_Rune,
+		^Type_Info_Float,
+		^Type_Info_Complex,
+		^Type_Info_Quaternion,
+		^Type_Info_String,
+		^Type_Info_Boolean,
+		^Type_Info_Any,
+		^Type_Info_Type_Id,
+		^Type_Info_Pointer,
+		^Type_Info_Multi_Pointer,
+		^Type_Info_Procedure,
+		^Type_Info_Array,
+		^Type_Info_Enumerated_Array,
+		^Type_Info_Dynamic_Array,
+		^Type_Info_Slice,
+		^Type_Info_Parameters,
+		^Type_Info_Struct,
+		^Type_Info_Union,
+		^Type_Info_Enum,
+		^Type_Info_Map,
+		^Type_Info_Bit_Set,
+		^Type_Info_Simd_Vector,
+		^Type_Info_Matrix,
+		^Type_Info_Soa_Pointer,
+		^Type_Info_Bit_Field,
 	},
 }
 
@@ -622,7 +650,7 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named: base = i.base
+		case ^Type_Info_Named: base = i.base
 		case: break loop
 		}
 	}
@@ -638,9 +666,9 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named:     base = i.base
-		case Type_Info_Enum:      base = i.base
-		case Type_Info_Bit_Field: base = i.backing_type
+		case ^Type_Info_Named:     base = i.base
+		case ^Type_Info_Enum:      base = i.base
+		case ^Type_Info_Bit_Field: base = i.backing_type
 		case: break loop
 		}
 	}

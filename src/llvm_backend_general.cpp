@@ -18,23 +18,36 @@ gb_global isize lb_global_type_info_member_tags_index    = 0;
 gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	m->info = &c->info;
 
-	gbString module_name = gb_string_make(heap_allocator(), "odin_package");
-	if (m->file) {
-		if (m->pkg) {
+
+	String name = build_context.build_paths[BuildPath_Output].name;
+	gbString module_name = gb_string_make(heap_allocator(), "");
+	module_name = gb_string_append_length(module_name, name.text, name.len);
+
+	if (!USE_SEPARATE_MODULES) {
+		// ignore suffixes
+	} else if (m->file) {
+		if (gb_string_length(module_name)) {
 			module_name = gb_string_appendc(module_name, "-");
-			module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
 		}
-		module_name = gb_string_appendc(module_name, "-");
+		if (m->pkg) {
+			module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
+			module_name = gb_string_appendc(module_name, "-");
+		}
 		String filename = filename_from_path(m->file->filename);
 		module_name = gb_string_append_length(module_name, filename.text, filename.len);
 	} else if (m->pkg) {
-		module_name = gb_string_appendc(module_name, "-");
+		if (gb_string_length(module_name)) {
+			module_name = gb_string_appendc(module_name, "-");
+		}
 		module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
-	} else if (USE_SEPARATE_MODULES) {
-		module_name = gb_string_appendc(module_name, "-builtin");
+	} else {
+		if (gb_string_length(module_name)) {
+			module_name = gb_string_appendc(module_name, "-");
+		}
+		module_name = gb_string_appendc(module_name, "builtin");
 	}
 
-	m->module_name = module_name ? module_name : "odin_package";
+	m->module_name = module_name;
 	m->ctx = LLVMContextCreate();
 	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
@@ -2090,8 +2103,22 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
 				array_add(&fields, variant);
 			} else {
-				LLVMTypeRef block_type = lb_type_padding_filler(m, block_size, align);
-				LLVMTypeRef tag_type   = lb_type(m, union_tag_type(type));
+				LLVMTypeRef block_type = nullptr;
+
+				bool all_pointers = align == build_context.ptr_size;
+				for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {
+					Type *t = type->Union.variants[i];
+					if (!is_type_internally_pointer_like(t)) {
+						all_pointers = false;
+					}
+				}
+				if (all_pointers) {
+					block_type = lb_type(m, t_rawptr);
+				} else {
+					block_type = lb_type_padding_filler(m, block_size, align);
+				}
+
+				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
 				array_add(&fields, tag_type);
 				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);

@@ -10,11 +10,11 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 
 	ti := type_info_base(type_info_of(val.id))
 	#partial switch info in ti.variant {
-	case Type_Info_Pointer:
+	case ^Type_Info_Pointer:
 		if ptr := (^rawptr)(val.data)^; ptr != nil {
 			return iterate_array(any{ptr, info.elem.id}, it)
 		}
-	case Type_Info_Array:
+	case ^Type_Info_Array:
 		if it^ < info.count {
 			elem.data = rawptr(uintptr(val.data) + uintptr(it^ * info.elem_size))
 			elem.id = info.elem.id
@@ -22,7 +22,7 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 			index = it^
 			it^ += 1
 		}
-	case Type_Info_Slice:
+	case ^Type_Info_Slice:
 		array := (^runtime.Raw_Slice)(val.data)
 		if it^ < array.len {
 			elem.data = rawptr(uintptr(array.data) + uintptr(it^ * info.elem_size))
@@ -31,7 +31,7 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 			index = it^
 			it^ += 1
 		}
-	case Type_Info_Dynamic_Array:
+	case ^Type_Info_Dynamic_Array:
 		array := (^runtime.Raw_Dynamic_Array)(val.data)
 		if it^ < array.len {
 			elem.data = rawptr(uintptr(array.data) + uintptr(it^ * info.elem_size))
@@ -52,11 +52,11 @@ iterate_map :: proc(val: any, it: ^int) -> (key, value: any, ok: bool) {
 	}
 	ti := type_info_base(type_info_of(val.id))
 	#partial switch info in ti.variant {
-	case Type_Info_Pointer:
+	case ^Type_Info_Pointer:
 		if ptr := (^rawptr)(val.data)^; ptr != nil {
 			return iterate_map(any{ptr, info.elem.id}, it)
 		}
-	case Type_Info_Map:
+	case ^Type_Info_Map:
 		if info.map_info == nil {
 			break
 		}
