@@ -264,17 +264,17 @@ tag_cbor_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_
 	_encode_u8(e.writer, TAG_CBOR_NR, .Tag) or_return
 	ti := runtime.type_info_base(type_info_of(v.id))
 	#partial switch t in ti.variant {
-	case runtime.Type_Info_String:
+	case ^runtime.Type_Info_String:
 		return marshal_into(e, v)
-	case runtime.Type_Info_Array:
+	case ^runtime.Type_Info_Array:
 		elem_base := reflect.type_info_base(t.elem)
 		if elem_base.id != byte { return .Bad_Tag_Value }
 		return marshal_into(e, v)
-	case runtime.Type_Info_Slice:
+	case ^runtime.Type_Info_Slice:
 		elem_base := reflect.type_info_base(t.elem)
 		if elem_base.id != byte { return .Bad_Tag_Value }
 		return marshal_into(e, v)
-	case runtime.Type_Info_Dynamic_Array:
+	case ^runtime.Type_Info_Dynamic_Array:
 		elem_base := reflect.type_info_base(t.elem)
 		if elem_base.id != byte { return .Bad_Tag_Value }
 		return marshal_into(e, v)
@@ -297,7 +297,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 	defer delete(bytes, context.temp_allocator)
 
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_String:
+	case ^reflect.Type_Info_String:
 
 		if t.is_cstring {
 			length  := base64.decoded_len(bytes)
@@ -313,7 +313,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 
 		return
 
-	case reflect.Type_Info_Slice:
+	case ^reflect.Type_Info_Slice:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
@@ -322,7 +322,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		raw^  = base64.decode(bytes) or_return
 		return
 		
-	case reflect.Type_Info_Dynamic_Array:
+	case ^reflect.Type_Info_Dynamic_Array:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
@@ -336,7 +336,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		raw.allocator  = context.allocator
 		return
 
-	case reflect.Type_Info_Array:
+	case ^reflect.Type_Info_Array:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
@@ -366,7 +366,7 @@ tag_base64_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marsha
 	case [dynamic]byte: bytes = val[:]
 	case:
 		#partial switch t in ti.variant {
-		case runtime.Type_Info_Array:
+		case ^runtime.Type_Info_Array:
 			if t.elem.id != byte { return .Bad_Tag_Value }
 			bytes = ([^]byte)(v.data)[:t.count]
 		case:
