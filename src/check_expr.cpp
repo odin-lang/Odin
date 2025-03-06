@@ -863,6 +863,11 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			if (are_types_identical(vt, s)) {
 				return 1;
 			}
+			if (is_type_proc(vt)) {
+				if (are_types_identical(base_type(vt), src)) {
+					return 1;
+				}
+			}
 		}
 
 		if (dst->Union.variants.count == 1) {
