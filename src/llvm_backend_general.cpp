@@ -1995,26 +1995,26 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	case Type_Struct:
 		{
 			type_set_offsets(type);
-			
+
 			i64 full_type_size = type_size_of(type);
 			i64 full_type_align = type_align_of(type);
 			GB_ASSERT(full_type_size % full_type_align == 0);
-			
+
 			if (type->Struct.is_raw_union) {
-				
+
 				lbStructFieldRemapping field_remapping = {};
 				slice_init(&field_remapping, permanent_allocator(), 1);
-				
+
 				LLVMTypeRef fields[1] = {};
 				fields[0] = lb_type_padding_filler(m, full_type_size, full_type_align);
 				field_remapping[0] = 0;
-				
+
 				LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 				map_set(&m->struct_field_remapping, cast(void *)struct_type, field_remapping);
 				map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);
 				return struct_type;
 			}
-			
+
 			lbStructFieldRemapping field_remapping = {};
 			slice_init(&field_remapping, permanent_allocator(), type->Struct.fields.count);
 
@@ -2027,7 +2027,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef padding_type = lb_type_padding_filler(m, 0, type_align_of(type));
 				array_add(&fields, padding_type);
 			}
-			
+
 			i64 prev_offset = 0;
 			bool requires_packing = type->Struct.is_packed;
 			for (i32 field_index : struct_fields_index_by_increasing_offset(temporary_allocator(), type)) {
@@ -2058,7 +2058,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 				prev_offset = offset + type_size_of(field->type);
 			}
-			
+
 			i64 end_padding = full_type_size-prev_offset;
 			if (end_padding > 0) {
 				array_add(&fields, lb_type_padding_filler(m, end_padding, 1));
@@ -2067,14 +2067,14 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			for_array(i, fields) {
 				GB_ASSERT(fields[i] != nullptr);
 			}
-			
+
 			LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, requires_packing);
 			map_set(&m->struct_field_remapping, cast(void *)struct_type, field_remapping);
-			map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);			
+			map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);
 			#if 0
-			GB_ASSERT_MSG(lb_sizeof(struct_type) == full_type_size, 
-			              "(%lld) %s vs (%lld) %s", 
-			              cast(long long)lb_sizeof(struct_type), LLVMPrintTypeToString(struct_type), 
+			GB_ASSERT_MSG(lb_sizeof(struct_type) == full_type_size,
+			              "(%lld) %s vs (%lld) %s",
+			              cast(long long)lb_sizeof(struct_type), LLVMPrintTypeToString(struct_type),
 			              cast(long long)full_type_size, type_to_string(type));
 			#endif
 			return struct_type;
