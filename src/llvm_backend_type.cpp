@@ -855,11 +855,8 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		small_const_values[0] = LLVMConstInt(lb_type(m, t_int), size, true);
 		small_const_values[1] = LLVMConstInt(lb_type(m, t_int), align, true);
 		small_const_values[2] = type_info_flags.value;
-
-		unsigned variant_index = 5;
-		LLVMTypeRef base_type_info_type = LLVMStructGetTypeAtIndex(stype, 0);
-		small_const_values[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(base_type_info_type, 3));
-		small_const_values[4] = id.value;
+		small_const_values[3] = id.value;
+		unsigned const VARIANT_INDEX_IN_STRUCT = 4;
 
 		i64 tag_index = 0;
 		if (tag_type != nullptr) {
@@ -881,9 +878,9 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		}
 		LLVMValueRef full_variant_value = LLVMConstNamedStruct(variant_type, full_variant_values, 2);
 
-		small_const_values[variant_index] = full_variant_value;
+		small_const_values[VARIANT_INDEX_IN_STRUCT] = full_variant_value;
 
-		vals[0] = LLVMConstNamedStruct(LLVMStructGetTypeAtIndex(stype, 0), small_const_values, variant_index+1);
+		vals[0] = LLVMConstNamedStruct(LLVMStructGetTypeAtIndex(stype, 0), small_const_values, VARIANT_INDEX_IN_STRUCT+1);
 
 		unsigned total_elem_count = LLVMCountStructElementTypes(stype);
 		for (unsigned i = 0; i < total_elem_count; i++) {
