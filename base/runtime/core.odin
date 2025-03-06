@@ -228,7 +228,7 @@ Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
 	Simple_Compare = 1,
 }
-Type_Info_Flags :: distinct bit_set[Type_Info_Flag; u32]
+Type_Info_Flags :: distinct bit_set[Type_Info_Flag; u64]
 
 Type_Info :: struct {
 	size:  int,
