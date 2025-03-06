@@ -856,17 +856,10 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		small_const_values[1] = LLVMConstInt(lb_type(m, t_int), align, true);
 		small_const_values[2] = type_info_flags.value;
 
-		unsigned variant_index = 0;
-		if (build_context.ptr_size == 8) {
-			LLVMTypeRef base_type_info_type = LLVMStructGetTypeAtIndex(stype, 0);
-			small_const_values[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(base_type_info_type, 3));
-			small_const_values[4] = id.value;
-			variant_index = 5;
-		} else {
-			small_const_values[3] = id.value;
-			variant_index = 4;
-		}
-
+		unsigned variant_index = 5;
+		LLVMTypeRef base_type_info_type = LLVMStructGetTypeAtIndex(stype, 0);
+		small_const_values[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(base_type_info_type, 3));
+		small_const_values[4] = id.value;
 
 		i64 tag_index = 0;
 		if (tag_type != nullptr) {
