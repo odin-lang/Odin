@@ -4508,8 +4508,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		} else {
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
-				if (!is_type_boolean(target_type) &&
-				    !is_type_integer(target_type)) {
+				if (!is_type_boolean(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
 					return;
