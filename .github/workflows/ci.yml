@@ -167,7 +167,7 @@ jobs:
 
       - name: Run demo on WASI WASM32
         run: |
-          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -disallow-do -out:demo.wasm
+          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -disallow-do -out:demo
           wasmtime ./demo.wasm
         if: matrix.os == 'macos-14'
 
