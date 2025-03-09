@@ -27,13 +27,18 @@ stderr: Handle = 2
 
 args := _alloc_command_line_arguments()
 
-@(require_results)
+@(private, require_results)
 _alloc_command_line_arguments :: proc() -> (args: []string) {
 	args = make([]string, len(runtime.args__))
 	for &arg, i in args {
 		arg = string(runtime.args__[i])
 	}
 	return
+}
+
+@(private, fini)
+_delete_command_line_arguments :: proc() {
+	delete(args)
 }
 
 // WASI works with "preopened" directories, the environment retrieves directories
