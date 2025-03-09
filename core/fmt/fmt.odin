@@ -116,11 +116,12 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 }
 // 	Creates a formatted string
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 // 	- args: A variadic list of arguments to be formatted.
 // 	- sep: An optional separator string (default is a single space).
+// 	- allocator: (default: context.allocator)
 //
 // 	Returns: A formatted string. 
 //
@@ -132,11 +133,12 @@ aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> strin
 }
 // 	Creates a formatted string with a newline character at the end
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 // 	- args: A variadic list of arguments to be formatted.
 // 	- sep: An optional separator string (default is a single space).
+// 	- allocator: (default: context.allocator)
 //
 // 	Returns: A formatted string with a newline character at the end.
 //
@@ -148,11 +150,12 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 }
 // 	Creates a formatted string using a format string and arguments
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 //	- fmt: A format string with placeholders for the provided arguments.
 //	- args: A variadic list of arguments to be formatted.
+//	- allocator: (default: context.allocator)
 //	- newline: Whether the string should end with a newline. (See `aprintfln`.)
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
@@ -165,11 +168,12 @@ aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newlin
 }
 // 	Creates a formatted string using a format string and arguments, followed by a newline.
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 // 	- fmt: A format string with placeholders for the provided arguments.
 // 	- args: A variadic list of arguments to be formatted.
+// 	- allocator: (default: context.allocator)
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
@@ -359,11 +363,12 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 
 // 	Creates a formatted C string
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 // 	- args: A variadic list of arguments to be formatted.
 // 	- sep: An optional separator string (default is a single space).
+// 	- allocator: (default: context.allocator)
 //
 // 	Returns: A formatted C string.
 //
@@ -379,11 +384,12 @@ caprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstr
 
 // Creates a formatted C string
 //
-// *Allocates Using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - format: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
+// - allocator: (default: context.allocator)
 // - newline: Whether the string should end with a newline. (See `caprintfln`.)
 //
 // Returns: A formatted C string
@@ -399,11 +405,12 @@ caprintf :: proc(format: string, args: ..any, allocator := context.allocator, ne
 }
 // Creates a formatted C string, followed by a newline.
 //
-// *Allocates Using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - format: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
+// - allocator: (default: context.allocator)
 //
 // Returns: A formatted C string
 //
