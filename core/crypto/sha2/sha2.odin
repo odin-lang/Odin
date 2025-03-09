@@ -15,9 +15,9 @@ package sha2
         zhibog, dotbmp:  Initial implementation.
 */
 
-import "core:encoding/endian"
+@(require) import "core:encoding/endian"
 import "core:math/bits"
-import "core:mem"
+@(require) import "core:mem"
 
 // DIGEST_SIZE_224 is the SHA-224 digest size in bytes.
 DIGEST_SIZE_224 :: 28
@@ -158,7 +158,7 @@ _init :: proc(ctx: ^$T) {
 
 // update adds more data to the Context.
 update :: proc(ctx: ^$T, data: []byte) {
-	assert(ctx.is_initialized)
+	ensure(ctx.is_initialized)
 
 	when T == Context_256 {
 		CURR_BLOCK_SIZE :: BLOCK_SIZE_256
@@ -194,11 +194,8 @@ update :: proc(ctx: ^$T, data: []byte) {
 // Iff finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
-	assert(ctx.is_initialized)
-
-	if len(hash) * 8 < ctx.md_bits {
-		panic("crypto/sha2: invalid destination digest size")
-	}
+	ensure(ctx.is_initialized)
+	ensure(len(hash) * 8 >= ctx.md_bits, "crypto/sha2: invalid destination digest size")
 
 	ctx := ctx
 	if finalize_clone {
@@ -238,7 +235,7 @@ final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
 		endian.unchecked_put_u64be(pad[8:], length_lo)
 		update(ctx, pad[0:16])
 	}
-	assert(ctx.bitlength == 0)
+	assert(ctx.bitlength == 0) // Check for bugs
 
 	when T == Context_256 {
 		for i := 0; i < ctx.md_bits / 32; i += 1 {
@@ -270,8 +267,8 @@ reset :: proc(ctx: ^$T) {
     SHA2 implementation
 */
 
-@(private)
-sha256_k := [64]u32 {
+@(private, rodata)
+SHA256_K := [64]u32 {
 	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
 	0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
 	0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -290,8 +287,8 @@ sha256_k := [64]u32 {
 	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 }
 
-@(private)
-sha512_k := [80]u64 {
+@(private, rodata)
+SHA512_K := [80]u64 {
 	0x428a2f98d728ae22, 0x7137449123ef65cd,
 	0xb5c0fbcfec4d3b2f, 0xe9b5dba58189dbbc,
 	0x3956c25bf348b538, 0x59f111f1b605d019,
@@ -333,6 +330,11 @@ sha512_k := [80]u64 {
 	0x4cc5d4becb3e42b6, 0x597f299cfc657e2a,
 	0x5fcb6fab3ad6faec, 0x6c44198c4a475817,
 }
+
+@(private)
+SHA256_ROUNDS :: 64
+@(private)
+SHA512_ROUNDS :: 80
 
 @(private)
 SHA256_CH :: #force_inline proc "contextless" (x, y, z: u32) -> u32 {
@@ -395,22 +397,29 @@ SHA512_F4 :: #force_inline proc "contextless" (x: u64) -> u64 {
 }
 
 @(private)
-sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) {
+sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) #no_bounds_check {
 	when T == Context_256 {
-		w: [64]u32
+		if is_hardware_accelerated_256() {
+			sha256_transf_hw(ctx, data)
+			return
+		}
+
+		w: [SHA256_ROUNDS]u32
 		wv: [8]u32
 		t1, t2: u32
+
 		CURR_BLOCK_SIZE :: BLOCK_SIZE_256
 	} else when T == Context_512 {
-		w: [80]u64
+		w: [SHA512_ROUNDS]u64
 		wv: [8]u64
 		t1, t2: u64
+
 		CURR_BLOCK_SIZE :: BLOCK_SIZE_512
 	}
 
 	data := data
 	for len(data) >= CURR_BLOCK_SIZE {
-		for i := 0; i < 16; i += 1 {
+		for i in 0 ..< 16 {
 			when T == Context_256 {
 				w[i] = endian.unchecked_get_u32be(data[i * 4:])
 			} else when T == Context_512 {
@@ -419,22 +428,22 @@ sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) {
 		}
 
 		when T == Context_256 {
-			for i := 16; i < 64; i += 1 {
+			for i in 16 ..< SHA256_ROUNDS {
 				w[i] = SHA256_F4(w[i - 2]) + w[i - 7] + SHA256_F3(w[i - 15]) + w[i - 16]
 			}
 		} else when T == Context_512 {
-			for i := 16; i < 80; i += 1 {
+			for i in 16 ..< SHA512_ROUNDS {
 				w[i] = SHA512_F4(w[i - 2]) + w[i - 7] + SHA512_F3(w[i - 15]) + w[i - 16]
 			}
 		}
 
-		for i := 0; i < 8; i += 1 {
+		for i in 0 ..< 8 {
 			wv[i] = ctx.h[i]
 		}
 
 		when T == Context_256 {
-			for i := 0; i < 64; i += 1 {
-				t1 = wv[7] + SHA256_F2(wv[4]) + SHA256_CH(wv[4], wv[5], wv[6]) + sha256_k[i] + w[i]
+			for i in 0 ..< SHA256_ROUNDS {
+				t1 = wv[7] + SHA256_F2(wv[4]) + SHA256_CH(wv[4], wv[5], wv[6]) + SHA256_K[i] + w[i]
 				t2 = SHA256_F1(wv[0]) + SHA256_MAJ(wv[0], wv[1], wv[2])
 				wv[7] = wv[6]
 				wv[6] = wv[5]
@@ -446,8 +455,8 @@ sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) {
 				wv[0] = t1 + t2
 			}
 		} else when T == Context_512 {
-			for i := 0; i < 80; i += 1 {
-				t1 = wv[7] + SHA512_F2(wv[4]) + SHA512_CH(wv[4], wv[5], wv[6]) + sha512_k[i] + w[i]
+			for i in 0 ..< SHA512_ROUNDS {
+				t1 = wv[7] + SHA512_F2(wv[4]) + SHA512_CH(wv[4], wv[5], wv[6]) + SHA512_K[i] + w[i]
 				t2 = SHA512_F1(wv[0]) + SHA512_MAJ(wv[0], wv[1], wv[2])
 				wv[7] = wv[6]
 				wv[6] = wv[5]
@@ -460,7 +469,7 @@ sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) {
 			}
 		}
 
-		for i := 0; i < 8; i += 1 {
+		for i in 0 ..< 8 {
 			ctx.h[i] += wv[i]
 		}
 

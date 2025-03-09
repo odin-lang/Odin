@@ -44,7 +44,7 @@ Context :: struct {
 	is_finalized:   bool, // For SHAKE (unlimited squeeze is allowed)
 }
 
-@(private)
+@(private, rodata)
 keccakf_rndc := [?]u64 {
 	0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
 	0x8000000080008000, 0x000000000000808b, 0x0000000080000001,
@@ -56,13 +56,13 @@ keccakf_rndc := [?]u64 {
 	0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
 }
 
-@(private)
+@(private, rodata)
 keccakf_rotc := [?]int {
 	1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
 	27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44,
 }
 
-@(private)
+@(private, rodata)
 keccakf_piln := [?]i32 {
 	10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
 	15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1,
@@ -122,7 +122,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 	}
 }
 
-init :: proc(ctx: ^Context) {
+init :: proc "contextless" (ctx: ^Context) {
 	for i := 0; i < 25; i += 1 {
 		ctx.st.q[i] = 0
 	}
@@ -133,9 +133,9 @@ init :: proc(ctx: ^Context) {
 	ctx.is_finalized = false
 }
 
-update :: proc(ctx: ^Context, data: []byte) {
-	assert(ctx.is_initialized)
-	assert(!ctx.is_finalized)
+update :: proc "contextless" (ctx: ^Context, data: []byte) {
+	ensure_contextless(ctx.is_initialized)
+	ensure_contextless(!ctx.is_finalized)
 
 	j := ctx.pt
 	for i := 0; i < len(data); i += 1 {
@@ -149,12 +149,9 @@ update :: proc(ctx: ^Context, data: []byte) {
 	ctx.pt = j
 }
 
-final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
-	assert(ctx.is_initialized)
-
-	if len(hash) < ctx.mdlen {
-		panic("crypto/sha3: invalid destination digest size")
-	}
+final :: proc "contextless" (ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
+	ensure_contextless(ctx.is_initialized)
+	ensure_contextless(len(hash) >= ctx.mdlen, "crypto/sha3: invalid destination digest size")
 
 	ctx := ctx
 	if finalize_clone {
@@ -173,11 +170,11 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	}
 }
 
-clone :: proc(ctx, other: ^Context) {
+clone :: proc "contextless" (ctx, other: ^Context) {
 	ctx^ = other^
 }
 
-reset :: proc(ctx: ^Context) {
+reset :: proc "contextless" (ctx: ^Context) {
 	if !ctx.is_initialized {
 		return
 	}
@@ -185,9 +182,9 @@ reset :: proc(ctx: ^Context) {
 	mem.zero_explicit(ctx, size_of(ctx^))
 }
 
-shake_xof :: proc(ctx: ^Context) {
-	assert(ctx.is_initialized)
-	assert(!ctx.is_finalized)
+shake_xof :: proc "contextless" (ctx: ^Context) {
+	ensure_contextless(ctx.is_initialized)
+	ensure_contextless(!ctx.is_finalized)
 
 	ctx.st.b[ctx.pt] ~= ctx.dsbyte
 	ctx.st.b[ctx.rsiz - 1] ~= 0x80
@@ -197,9 +194,9 @@ shake_xof :: proc(ctx: ^Context) {
 	ctx.is_finalized = true // No more absorb, unlimited squeeze.
 }
 
-shake_out :: proc(ctx: ^Context, hash: []byte) {
-	assert(ctx.is_initialized)
-	assert(ctx.is_finalized)
+shake_out :: proc "contextless" (ctx: ^Context, hash: []byte) {
+	ensure_contextless(ctx.is_initialized)
+	ensure_contextless(ctx.is_finalized)
 
 	j := ctx.pt
 	for i := 0; i < len(hash); i += 1 {
