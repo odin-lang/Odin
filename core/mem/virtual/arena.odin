@@ -107,8 +107,9 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 
 	switch arena.kind {
 	case .Growing:
-		needed := mem.align_forward_uint(size, alignment)
-		if arena.curr_block == nil || (safe_add(arena.curr_block.used, needed) or_else 0) > arena.curr_block.reserved {
+		prev_used := 0 if arena.curr_block == nil else arena.curr_block.used
+		data, err = alloc_from_memory_block(arena.curr_block, size, alignment, default_commit_size=arena.default_commit_size)
+		if err == .Out_Of_Memory {
 			if arena.minimum_block_size == 0 {
 				arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
 				arena.minimum_block_size = mem.align_forward_uint(arena.minimum_block_size, DEFAULT_PAGE_SIZE)
@@ -124,6 +125,7 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 					max(arena.default_commit_size, arena.minimum_block_size)
 			}
 
+			needed := mem.align_forward_uint(size, alignment)
 			needed = max(needed, arena.default_commit_size)
 			block_size := max(needed, arena.minimum_block_size)
 
@@ -131,10 +133,10 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 			new_block.prev = arena.curr_block
 			arena.curr_block = new_block
 			arena.total_reserved += new_block.reserved
-		}
 
-		prev_used := arena.curr_block.used
-		data, err = alloc_from_memory_block(arena.curr_block, size, alignment, default_commit_size=arena.default_commit_size)
+			prev_used = 0
+			data, err = alloc_from_memory_block(arena.curr_block, size, alignment, default_commit_size=arena.default_commit_size)
+		}
 		arena.total_used += arena.curr_block.used - prev_used
 	case .Static:
 		if arena.curr_block == nil {
