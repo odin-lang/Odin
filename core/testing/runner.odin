@@ -611,7 +611,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 						total_done_count += 1
 					}
 
-					when ODIN_DEBUG {
+					when ODIN_DEBUG || LOG_LEVEL == "debug" {
 						log.debugf("Test #%i %s.%s changed state to %v.", task_channel.test_index, it.pkg, it.name, event.new_state)
 					}
 
