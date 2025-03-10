@@ -2592,7 +2592,6 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	path = gb_string_append_length(path, name.text, name.len);
 
 	{
-
 		GB_ASSERT(m->module_name != nullptr);
 		String s = make_string_c(m->module_name);
 		String prefix = str_lit("odin_package");

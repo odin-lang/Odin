@@ -77,7 +77,7 @@ _unmarshal_any_ptr :: proc(d: Decoder, v: any, hdr: Maybe(Header) = nil, allocat
 		return .Non_Pointer_Parameter
 	}
 	
-	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}	
+	data := any{(^rawptr)(v.data)^, ti.variant.(^reflect.Type_Info_Pointer).elem.id}
 	return _unmarshal_value(d, data, hdr.? or_else (_decode_header(d.reader) or_return), allocator, temp_allocator, loc)
 }
 
@@ -87,7 +87,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 	r := d.reader
 
 	// If it's a union with only one variant, then treat it as that variant
-	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && len(u.variants) == 1 {
+	if u, ok := ti.variant.(^reflect.Type_Info_Union); ok && len(u.variants) == 1 {
 		#partial switch hdr {
 		case .Nil, .Undefined, nil: // no-op.
 		case:
@@ -328,7 +328,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 
 _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add, allocator := context.allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_String:
+	case ^reflect.Type_Info_String:
 		bytes := err_conv(_decode_bytes(d, add, allocator=allocator, loc=loc)) or_return
 
 		if t.is_cstring {
@@ -343,7 +343,7 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 		return
 
-	case reflect.Type_Info_Slice:
+	case ^reflect.Type_Info_Slice:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
@@ -353,7 +353,7 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		raw^   = transmute(mem.Raw_Slice)bytes
 		return
 		
-	case reflect.Type_Info_Dynamic_Array:
+	case ^reflect.Type_Info_Dynamic_Array:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
@@ -366,7 +366,7 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		raw.allocator  = allocator
 		return
 
-	case reflect.Type_Info_Array:
+	case ^reflect.Type_Info_Array:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
@@ -388,7 +388,7 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 _unmarshal_string :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_String:
+	case ^reflect.Type_Info_String:
 		text := err_conv(_decode_text(d, add, allocator, loc)) or_return
 
 		if t.is_cstring {
@@ -403,7 +403,7 @@ _unmarshal_string :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Heade
 		return
 
 	// Enum by its variant name.
-	case reflect.Type_Info_Enum:
+	case ^reflect.Type_Info_Enum:
 		text := err_conv(_decode_text(d, add, allocator=temp_allocator, loc=loc)) or_return
 		defer delete(text, temp_allocator, loc)
 
@@ -414,7 +414,7 @@ _unmarshal_string :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Heade
 			}
 		}
 	
-	case reflect.Type_Info_Rune:
+	case ^reflect.Type_Info_Rune:
 		text := err_conv(_decode_text(d, add, allocator=temp_allocator, loc=loc)) or_return
 		defer delete(text, temp_allocator, loc)
 
@@ -481,7 +481,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 	}
 
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_Slice:
+	case ^reflect.Type_Info_Slice:
 		length, scap := err_conv(_decode_len_container(d, add)) or_return
 
 		data := mem.alloc_bytes_non_zeroed(t.elem.size * scap, t.elem.align, allocator=allocator, loc=loc) or_return
@@ -501,7 +501,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		raw.len   = da.len
 		return
 
-	case reflect.Type_Info_Dynamic_Array:
+	case ^reflect.Type_Info_Dynamic_Array:
 		length, scap := err_conv(_decode_len_container(d, add)) or_return
 
 		data := mem.alloc_bytes_non_zeroed(t.elem.size * scap, t.elem.align, loc=loc) or_return
@@ -521,7 +521,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		}
 		return
 
-	case reflect.Type_Info_Array:
+	case ^reflect.Type_Info_Array:
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > t.count {
 			return _unsupported(v, hdr)
@@ -533,7 +533,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
-	case reflect.Type_Info_Enumerated_Array:
+	case ^reflect.Type_Info_Enumerated_Array:
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > t.count {
 			return _unsupported(v, hdr)
@@ -545,7 +545,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
-	case reflect.Type_Info_Complex:
+	case ^reflect.Type_Info_Complex:
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > 2 {
 			return _unsupported(v, hdr)
@@ -565,7 +565,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 	
-	case reflect.Type_Info_Quaternion:
+	case ^reflect.Type_Info_Quaternion:
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > 4 {
 			return _unsupported(v, hdr)
@@ -619,8 +619,8 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 	}
 
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_Struct:
-		if .raw_union in t.flags {
+	case ^reflect.Type_Info_Struct:
+		if .raw_union in t.struct_flags {
 			return _unsupported(v, hdr)
 		}
 
@@ -689,7 +689,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 
 		return
 
-	case reflect.Type_Info_Map:
+	case ^reflect.Type_Info_Map:
 		raw_map := (^mem.Raw_Map)(v.data)
 		if raw_map.allocator.procedure == nil {
 			raw_map.allocator = context.allocator
@@ -751,7 +751,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 _unmarshal_union :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, loc := #caller_location) -> (err: Unmarshal_Error) {
 	r := d.reader
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_Union:
+	case ^reflect.Type_Info_Union:
 		idhdr: Header
 		target_name: string
 		{
@@ -783,7 +783,7 @@ _unmarshal_union :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 			}
 
 			#partial switch vti in variant.variant {
-			case reflect.Type_Info_Named:
+			case ^reflect.Type_Info_Named:
 				if vti.name == target_name {
 					reflect.set_union_variant_raw_tag(v, tag)
 					return _unmarshal_value(d, any{v.data, variant.id}, _decode_header(r) or_return, loc=loc)
@@ -850,7 +850,7 @@ _assign_int :: proc(val: any, i: $T) -> bool {
 	case uintptr: dst = uintptr(i)
 	case:
 		ti := type_info_of(v.id)
-		if _, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
+		if _, ok := ti.variant.(^runtime.Type_Info_Bit_Set); ok {
 			do_byte_swap := !reflect.bit_set_is_big_endian(v)
 			switch ti.size * 8 {
 			case 0: // no-op.
