@@ -16,7 +16,7 @@ seal_oneshot :: proc(algo: Algorithm, dst, tag, key, iv, aad, plaintext: []byte,
 // returning true iff the authentication was successful.  If authentication
 // fails, the destination buffer will be zeroed.
 //
-// dst and plaintext MUST alias exactly or not at all.
+// dst and ciphertext MUST alias exactly or not at all.
 @(require_results)
 open_oneshot :: proc(algo: Algorithm, dst, key, iv, aad, ciphertext, tag: []byte, impl: Implementation = nil) -> bool {
 	ctx: Context
