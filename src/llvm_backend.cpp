@@ -2645,8 +2645,6 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 	path = gb_string_append_length(path, ext.text, ext.len);
 
-	gb_printf_err("%s\n", path);
-
 	return make_string(cast(u8 *)path, gb_string_length(path));
 
 }
