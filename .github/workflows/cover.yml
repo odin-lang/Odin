@@ -1,0 +1,46 @@
+name: Test Coverage
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build_linux_amd64:
+    runs-on: ubuntu-latest
+    name: Linux AMD64 Test Coverage
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kcov
+        run: |
+          sudo apt-get update
+          sudo apt-get install kcov
+
+      - name: Download LLVM (Linux)
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
+          echo "/usr/lib/llvm-18/bin" >> $GITHUB_PATH
+
+      - name: Build Odin
+        run: ./build_odin.sh release
+
+      - name: Odin version
+        run: ./odin version
+
+      - name: Normal Core library tests
+        run: |
+          ./odin build tests/core/normal.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
+          kcov kcov-out ./tests .
+
+      - name: Optimized Core library tests
+        run: |
+          ./odin build tests/core/speed.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
+
+      - name: Internals tests
+        run: |
+          ./odin build tests/internal -build-mode:test -debug -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
+
+      - name: Report
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: bash <(curl -s https://codecov.io/bash) -s kcov-out
