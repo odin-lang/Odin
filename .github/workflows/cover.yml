@@ -30,20 +30,20 @@ jobs:
       - name: Normal Core library tests
         run: |
           ./odin build tests/core/normal.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
-          kcov kcov-out-normal ./normal.bin .
+          kcov --exclude-path=tests kcov-out ./normal.bin .
 
       - name: Optimized Core library tests
         run: |
           ./odin build tests/core/speed.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
-          kcov kcov-out-speed ./speed.bin .
+          kcov --exclude-path=tests kcov-out ./speed.bin .
 
       - name: Internals tests
         run: |
           ./odin build tests/internal -build-mode:test -debug -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
-          kcov kcov-out-internal ./internal .
+          kcov --exclude-path=tests kcov-out ./internal .
 
       - name: Report
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
-          bash <(curl -s https://codecov.io/bash) -s kcov-out-*
+          bash <(curl -s https://codecov.io/bash) -s kcov-out
