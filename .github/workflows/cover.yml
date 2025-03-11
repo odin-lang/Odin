@@ -3,7 +3,7 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_linux_amd64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     name: Linux AMD64 Test Coverage
     timeout-minutes: 60
     steps:
