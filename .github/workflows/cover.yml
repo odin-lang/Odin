@@ -30,7 +30,7 @@ jobs:
       - name: Normal Core library tests
         run: |
           ./odin build tests/core/normal.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
-          kcov kcov-out ./tests .
+          kcov kcov-out ./core .
 
       - name: Optimized Core library tests
         run: |
