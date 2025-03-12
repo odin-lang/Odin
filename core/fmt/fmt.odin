@@ -545,7 +545,7 @@ _nprint_stream_create :: proc "contextless"() -> io.Stream {
 @(require_results)
 nprint :: proc(args: ..any, sep := " ") -> int {
 	stream := _nprint_stream_create()
-	return wprint(stream, ...args, sep = sep, flush = false)
+	return wprint(stream, ..args, sep = sep, flush = false)
 }
 // Returns the number of bytes required to write the arguments using the default print settings with a newline character at the end.
 //
@@ -577,13 +577,13 @@ nprintf :: proc(fmt: string, args: ..any, newline := false) -> int {
 // Returns the number of bytes required to write the arguments according to the specified format string, followed by a newline.
 //
 // Inputs:
-// - format: The format string
+// - fmt: The format string
 // - args: A variadic list of arguments to be formatted
 //
 // Returns: The number of bytes required
 //
 @(require_results)
-nprintfln :: proc(format: string, args: ..any) -> int {
+nprintfln :: proc(fmt: string, args: ..any) -> int {
 	stream := _nprint_stream_create()
 	return wprintfln(stream, fmt, ..args, flush = false)
 }
