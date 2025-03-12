@@ -531,7 +531,7 @@ _nprint_stream_create :: proc "contextless"() -> io.Stream {
 				return io.query_utility({.Write})
 			}
 			return i64(len(p)), nil
-		}
+		},
 	}
 }
 // Returns the number of bytes required to write the arguments using the default print settings.
