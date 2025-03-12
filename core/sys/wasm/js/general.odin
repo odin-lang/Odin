@@ -9,4 +9,5 @@ foreign odin_env {
 	abort    :: proc() -> ! ---
 	alert    :: proc(msg: string) ---
 	evaluate :: proc(str: string) ---
+	open     :: proc(url: string, name := "", specs := "") ---
 }
