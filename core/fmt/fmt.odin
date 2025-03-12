@@ -512,6 +512,81 @@ sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any, newline := fal
 sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string {
 	return sbprintf(buf, format, ..args, newline=true)
 }
+// This proc creates a helper stream for the nprint family of procs that just helps with counting the written bytes via the wprint procs.
+@(private)
+_nprint_stream_create :: proc "contextless"() -> io.Stream {
+	return io.Stream {procedure = 
+		proc(
+			stream_data: rawptr,
+			mode: io.Stream_Mode,
+			p: []byte,
+			offset: i64,
+			whence: io.Seek_From,
+		) -> (
+			n: i64,
+			err: io.Error,
+		) {
+			#partial switch mode {
+			case .Query:
+				return io.query_utility({.Write})
+			}
+			return i64(len(p)), nil
+		}
+	}
+}
+// Returns the number of bytes required to write the arguments using the default print settings.
+//
+// Inputs:
+// - args: A variadic list of arguments to be formatted
+// - sep: An optional separator string (default is a single space)
+//
+// Returns: The number of bytes required
+//
+@(require_results)
+nprint :: proc(args: ..any, sep := " ") -> int {
+	stream := _nprint_stream_create()
+	return wprint(stream, ...args, sep = sep, flush = false)
+}
+// Returns the number of bytes required to write the arguments using the default print settings with a newline character at the end.
+//
+// Inputs:
+// - args: A variadic list of arguments to be formatted
+// - sep: An optional separator string (default is a single space)
+//
+// Returns: The number of bytes required
+//
+@(require_results)
+nprintln :: proc(args: ..any, sep := " ") -> int {
+	stream := _nprint_stream_create()
+	return wprintln(stream, ..args, sep = sep, flush = false)
+}
+// Returns the number of bytes required to write the arguments according to the specified format string.
+//
+// Inputs:
+// - fmt: The format string
+// - args: A variadic list of arguments to be formatted
+// - newline: Whether a trailing newline should be written. (See `nprintfln`)
+//
+// Returns: The number of bytes required
+//
+@(require_results)
+nprintf :: proc(fmt: string, args: ..any, newline := false) -> int {
+	stream := _nprint_stream_create()
+	return wprintf(stream, fmt, ..args, flush = false)
+}
+// Returns the number of bytes required to write the arguments according to the specified format string, followed by a newline.
+//
+// Inputs:
+// - format: The format string
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: The number of bytes required
+//
+@(require_results)
+nprintfln :: proc(format: string, args: ..any) -> int {
+	stream := _nprint_stream_create()
+	return wprintfln(stream, fmt, ..args, flush = false)
+}
 // Formats and writes to an io.Writer using the default print settings
 //
 // Inputs:
