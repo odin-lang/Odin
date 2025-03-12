@@ -29,7 +29,7 @@ CreateProgramFromStrings :: proc(vs_sources, fs_sources: []string) -> (program: 
 	}
 
 	program = CreateProgram()
-	defer if !ok do DeleteProgram(program)
+	defer if !ok { DeleteProgram(program) }
 
 	AttachShader(program, vs)
 	AttachShader(program, fs)
