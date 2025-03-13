@@ -1431,6 +1431,13 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 			abort: () => { Module.abort() },
 			evaluate: (str_ptr, str_len) => { eval.call(null, wasmMemoryInterface.loadString(str_ptr, str_len)); },
 
+			open: (url_ptr, url_len, name_ptr, name_len, specs_ptr, specs_len) => {
+				const url = wasmMemoryInterface.loadString(url_ptr, url_len);
+				const name = wasmMemoryInterface.loadString(name_ptr, name_len);
+				const specs = wasmMemoryInterface.loadString(specs_ptr, specs_len);
+				window.open(url, name, specs);
+			},
+
 			// return a bigint to be converted to i64
 			time_now: () => BigInt(Date.now()),
 			tick_now: () => performance.now(),
