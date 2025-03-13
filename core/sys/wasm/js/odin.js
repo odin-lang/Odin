@@ -1543,6 +1543,29 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					wmi.storeI16(off(2), e.button);
 					wmi.storeU16(off(2), e.buttons);
+
+					if (e instanceof PointerEvent) {
+						wmi.storeF64(off(8), e.altitudeAngle);
+						wmi.storeF64(off(8), e.azimuthAngle);
+						wmi.storeInt(off(W), e.persistentDeviceId);
+						wmi.storeInt(off(W), e.pointerId);
+						wmi.storeInt(off(W), e.width);
+						wmi.storeInt(off(W), e.height);
+						wmi.storeF64(off(8), e.pressure);
+						wmi.storeF64(off(8), e.tangentialPressure);
+						wmi.storeF64(off(8), e.tiltX);
+						wmi.storeF64(off(8), e.tiltY);
+						wmi.storeF64(off(8), e.twist);
+						if (e.pointerType == "pen") {
+							wmi.storeU8(off(1), 1);
+						} else if (e.pointerType == "touch") {
+							wmi.storeU8(off(1), 2);
+						} else {
+							wmi.storeU8(off(1), 0);
+						}
+						wmi.storeU8(off(1), !!e.isPrimary);
+					}
+
 				} else if (e instanceof KeyboardEvent) {
 					// Note: those strings are constructed
 					// on the native side from buffers that
@@ -1558,6 +1581,8 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					wmi.storeU8(off(1), !!e.metaKey);
 
 					wmi.storeU8(off(1), !!e.repeat);
+
+					wmi.storeI32(off(4), e.charCode);
 
 					wmi.storeInt(off(W, W), e.key.length)
 					wmi.storeInt(off(W, W), e.code.length)

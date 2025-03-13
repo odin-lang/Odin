@@ -239,6 +239,12 @@ Gamepad_State :: struct {
 	_mapping_buf: [GAMEPAD_MAX_MAPPING_SIZE]byte `fmt:"-"`,
 }
 
+Pointer_Type :: enum u8 {
+	Mouse,
+	Pen,
+	Touch,
+}
+
 Event :: struct {
 	kind:                 Event_Kind,
 	target_kind:          Event_Target_Kind,
@@ -275,6 +281,8 @@ Event :: struct {
 
 			repeat: bool,
 
+			char:   rune,
+
 			_key_len:  int                         `fmt:"-"`,
 			_code_len: int                         `fmt:"-"`,
 			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte `fmt:"-"`,
@@ -295,6 +303,21 @@ Event :: struct {
 
 			button:  i16,
 			buttons: bit_set[0..<16; u16],
+
+			pointer: struct {
+				altitude_angle:       f64,
+				azimuth_angle:        f64,
+				persistent_device_id: int,
+				pointer_id:           int,
+				width:                int,
+				height:               int,
+				pressure:             f64,
+				tangential_pressure:  f64,
+				tilt:                 [2]f64,
+				twist:                f64,
+				pointer_type:         Pointer_Type,
+				is_primary:           bool,
+			},
 		},
 
 		gamepad: Gamepad_State,
