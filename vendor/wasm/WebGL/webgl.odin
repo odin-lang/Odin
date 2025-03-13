@@ -46,16 +46,17 @@ foreign webgl {
 	
 	IsExtensionSupported :: proc(name: string) -> bool ---
 
-	ActiveTexture      :: proc(x: Enum) ---
-	AttachShader       :: proc(program: Program, shader: Shader) ---
-	BindAttribLocation :: proc(program: Program, index: i32, name: string) ---
-	BindBuffer         :: proc(target: Enum, buffer: Buffer) ---
-	BindFramebuffer    :: proc(target: Enum, framebuffer: Framebuffer) ---
-	BindTexture        :: proc(target: Enum, texture: Texture) ---
-	BlendColor         :: proc(red, green, blue, alpha: f32) ---
-	BlendEquation      :: proc(mode: Enum) ---
-	BlendFunc          :: proc(sfactor, dfactor: Enum) ---
-	BlendFuncSeparate  :: proc(srcRGB, dstRGB, srcAlpha, dstAlpha: Enum) ---
+	ActiveTexture         :: proc(x: Enum) ---
+	AttachShader          :: proc(program: Program, shader: Shader) ---
+	BindAttribLocation    :: proc(program: Program, index: i32, name: string) ---
+	BindBuffer            :: proc(target: Enum, buffer: Buffer) ---
+	BindFramebuffer       :: proc(target: Enum, framebuffer: Framebuffer) ---
+	BindTexture           :: proc(target: Enum, texture: Texture) ---
+	BlendColor            :: proc(red, green, blue, alpha: f32) ---
+	BlendEquation         :: proc(mode: Enum) ---
+	BlendEquationSeparate :: proc(modeRGB: Enum, modeAlpha: Enum) ---
+	BlendFunc             :: proc(sfactor, dfactor: Enum) ---
+	BlendFuncSeparate     :: proc(srcRGB, dstRGB, srcAlpha, dstAlpha: Enum) ---
 	
 	BufferData    :: proc(target: Enum, size: int, data: rawptr, usage: Enum) ---
 	BufferSubData :: proc(target: Enum, offset: uintptr, size: int, data: rawptr) ---
@@ -113,6 +114,7 @@ foreign webgl {
 	GetVertexAttribOffset :: proc(index: i32, pname: Enum) -> uintptr ---
 	GetProgramParameter   :: proc(program: Program, pname: Enum) -> i32 ---
 	GetParameter          :: proc(pname: Enum) -> i32 ---
+	GetParameter4i        :: proc(pname: Enum, v0, v1, v2, v4: ^i32) ---
 
 	Hint :: proc(target: Enum, mode: Enum) ---
 	

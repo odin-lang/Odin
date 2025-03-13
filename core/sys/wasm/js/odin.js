@@ -402,6 +402,9 @@ class WebGLInterface {
 			BlendEquation: (mode) => {
 				this.ctx.blendEquation(mode);
 			},
+			BlendEquationSeparate: (modeRGB, modeAlpha) => {
+				this.ctx.blendEquationSeparate(modeRGB, modeAlpha);
+			},
 			BlendFunc: (sfactor, dfactor) => {
 				this.ctx.blendFunc(sfactor, dfactor);
 			},
@@ -632,6 +635,13 @@ class WebGLInterface {
 
 			GetParameter: (pname) => {
 				return this.ctx.getParameter(pname);
+			},
+			GetParameter4i: (pname, v0, v1, v2, v3) => {
+				const i4 = this.ctx.getParameter(pname);
+				this.mem.storeI32(v0, i4[0]);
+				this.mem.storeI32(v1, i4[1]);
+				this.mem.storeI32(v2, i4[2]);
+				this.mem.storeI32(v3, i4[3]);
 			},
 			GetProgramParameter: (program, pname) => {
 				return this.ctx.getProgramParameter(this.programs[program], pname)
