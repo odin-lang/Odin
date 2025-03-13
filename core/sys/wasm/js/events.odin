@@ -189,7 +189,7 @@ Key_Location :: enum u8 {
 KEYBOARD_MAX_KEY_SIZE  :: 32
 KEYBOARD_MAX_CODE_SIZE :: 32
 
-GAMEPAD_MAX_ID_SIZE      :: 64
+GAMEPAD_MAX_ID_SIZE      :: 96
 GAMEPAD_MAX_MAPPING_SIZE :: 64
 
 GAMEPAD_MAX_BUTTONS :: 64
@@ -384,7 +384,14 @@ get_gamepad_state :: proc "contextless" (index: int, s: ^Gamepad_State) -> bool 
 	if s == nil {
 		return false
 	}
-	return _get_gamepad_state(index, s)
+
+	if !_get_gamepad_state(index, s) {
+		return false
+	}
+
+	s.id = string(s._id_buf[:s._id_len])
+	s.mapping = string(s._mapping_buf[:s._mapping_len])
+	return true
 }
 
 

@@ -1588,10 +1588,24 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 						}
 					}
 
-					wmi.storeInt(off(W, W), e.gamepad.id.length)
-					wmi.storeInt(off(W, W), e.gamepad.mapping.length)
-					wmi.storeString(off(64, 1), e.gamepad.id);
-					wmi.storeString(off(64, 1), e.gamepad.mapping);
+					let idLength = e.gamepad.id.length;
+					let id = e.gamepad.id;
+					if (idLength > 96) {
+						idLength = 96;
+						id = id.slice(0, 93) + '...';
+					}
+
+					let mappingLength = e.gamepad.mapping.length;
+					let mapping = e.gamepad.mapping;
+					if (mappingLength > 64) {
+						mappingLength = 61;
+						mapping = mapping.slice(0, 61) + '...';
+					}
+
+					wmi.storeInt(off(W, W), idLength);
+					wmi.storeInt(off(W, W), mappingLength);
+					wmi.storeString(off(96, 1), id);
+					wmi.storeString(off(64, 1), mapping);
 				}
 			},
 
@@ -1756,10 +1770,24 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 						}
 					}
 
-					wmi.storeInt(off(W, W), gamepad.id.length)
-					wmi.storeInt(off(W, W), gamepad.mapping.length)
-					wmi.storeString(off(64, 1), gamepad.id);
-					wmi.storeString(off(64, 1), gamepad.mapping);
+					let idLength = gamepad.id.length;
+					let id = gamepad.id;
+					if (idLength > 96) {
+						idLength = 96;
+						id = id.slice(0, 93) + '...';
+					}
+
+					let mappingLength = gamepad.mapping.length;
+					let mapping = gamepad.mapping;
+					if (mappingLength > 64) {
+						mappingLength = 61;
+						mapping = mapping.slice(0, 61) + '...';
+					}
+
+					wmi.storeInt(off(W, W), idLength);
+					wmi.storeInt(off(W, W), mappingLength);
+					wmi.storeString(off(96, 1), id);
+					wmi.storeString(off(64, 1), mapping);
 
 					return true;
 				}
