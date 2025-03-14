@@ -1450,12 +1450,12 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 vertical_flip :: proc(img: ^Image) {
 	assert(img.depth > 0 && (img.depth % 8  == 0), "Image bit depth must be multiple of 8, currently either 8 or 16 bit!")
 	pixels := img.pixels.buf[:]
-	bpp := img.depth/8 * img.channels
-	bytes_per_line := img.width * bpp
+	bytes_per_pixel := img.depth/8 * img.channels
+	stride := img.width * bytes_per_pixel
 	for y in 0..<img.height / 2 {
-		top := y * bytes_per_line
-		bot := (img.height - y - 1) * bytes_per_line
-		slice.ptr_swap_non_overlapping(&pixels[top], &pixels[bot], bytes_per_line)
+		top := y * stride
+		bot := (img.height - y - 1) * stride
+		slice.ptr_swap_non_overlapping(&pixels[top], &pixels[bot], stride)
 	}
 }
 
