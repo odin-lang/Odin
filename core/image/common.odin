@@ -135,6 +135,10 @@ Image_Option:
 		color. As this negates the use for an alpha channel, we'll drop it _unless_
 		you also specify `.alpha_add_if_missing`.
 
+	`.vertical_flip`
+		Does an inplace vertical flip of the pixels of the given image on load.
+		This option only supports images with 8 or 16 bit channels!
+
 	Options that don't apply to an image format will be ignored by their loader.
 */
 
@@ -148,7 +152,7 @@ Option :: enum {
 	alpha_drop_if_present,         // Unimplemented for QOI. Returns error.
 	alpha_premultiply,             // Unimplemented for QOI. Returns error.
 	blend_background,              // Ignored for non-PNG formats
-	vertical_flip,                 // flip image vertically on load
+	vertical_flip,                 // Flip image vertically on load
 
 	// Unimplemented
 	do_not_expand_grayscale,
@@ -1441,15 +1445,18 @@ expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bo
 	return true
 }
 
+// Does an inplace vertical flip of the pixels of the given image.
+// Vertical flip is only supported for images with 8 or 16 bit channels!
 vertical_flip :: proc(img: ^Image) {
-    pixels := img.pixels.buf[:]
-    bpp := img.depth/8 * img.channels
-    bytes_per_line := img.width * bpp
-    for y in 0..<img.height / 2 {
-        top := y * bytes_per_line
-        bot := (img.height - y - 1) * bytes_per_line
-        slice.ptr_swap_non_overlapping(&pixels[top], &pixels[bot], bytes_per_line)
-    }
+	assert(img.depth > 0 && (img.depth % 8  == 0), "Image bit depth must be multiple of 8, currently either 8 or 16 bit!")
+	pixels := img.pixels.buf[:]
+	bpp := img.depth/8 * img.channels
+	bytes_per_line := img.width * bpp
+	for y in 0..<img.height / 2 {
+		top := y * bytes_per_line
+		bot := (img.height - y - 1) * bytes_per_line
+		slice.ptr_swap_non_overlapping(&pixels[top], &pixels[bot], bytes_per_line)
+	}
 }
 
 /*
