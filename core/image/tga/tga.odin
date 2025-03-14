@@ -304,8 +304,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	pixel: RGBA_Pixel
 
+	// is flipped XOR user wants to flip
+	do_read_from_top := bool(int(origin_is_top) ~ int(.vertical_flip in options))
+
 	stride := img.width * dest_channels
-	line   := 0 if origin_is_top else img.height - 1
+	line   := 0 if do_read_from_top else img.height - 1
 
 	for _ in 0..<img.height {
 		offset := line * stride + (0 if origin_is_left else (stride - dest_channels))
@@ -369,10 +372,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			offset += dest_channels if origin_is_left else -dest_channels
 			rle_repetition_count -= 1
 		}
-		line += 1 if origin_is_top else -1
-	}
-	if .vertical_flip in options {
-		image.vertical_flip(img)
+		line += 1 if do_read_from_top else -1
 	}
 	return img, nil
 }
