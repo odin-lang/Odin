@@ -18,6 +18,8 @@ BLAKE2S_SIZE :: 32
 BLAKE2B_BLOCK_SIZE :: 128
 BLAKE2B_SIZE :: 64
 
+MAX_SIZE :: 255
+
 Blake2s_Context :: struct {
 	h:            [8]u32,
 	t:            [2]u32,
@@ -68,13 +70,13 @@ Blake2_Tree :: struct {
 	is_last_node:    bool,
 }
 
-@(private)
+@(private, rodata)
 BLAKE2S_IV := [8]u32 {
 	0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
 	0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 }
 
-@(private)
+@(private, rodata)
 BLAKE2B_IV := [8]u64 {
 	0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
 	0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
@@ -82,16 +84,13 @@ BLAKE2B_IV := [8]u64 {
 	0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,
 }
 
-init :: proc(ctx: ^$T, cfg: ^Blake2_Config) {
+init :: proc "contextless" (ctx: ^$T, cfg: ^Blake2_Config) {
 	when T == Blake2s_Context {
 		max_size :: BLAKE2S_SIZE
 	} else when T == Blake2b_Context {
 		max_size :: BLAKE2B_SIZE
 	}
-
-	if cfg.size > max_size {
-		panic("blake2: requested output size exceeeds algorithm max")
-	}
+	ensure_contextless(cfg.size <= max_size, "blake2: requested output size exceeeds algorithm max")
 
 	// To save having to allocate a scratch buffer, use the internal
 	// data buffer (`ctx.x`), as it is exactly the correct size.
@@ -167,8 +166,8 @@ init :: proc(ctx: ^$T, cfg: ^Blake2_Config) {
 	ctx.is_initialized = true
 }
 
-update :: proc(ctx: ^$T, p: []byte) {
-	assert(ctx.is_initialized)
+update :: proc "contextless" (ctx: ^$T, p: []byte) {
+	ensure_contextless(ctx.is_initialized)
 
 	p := p
 	when T == Blake2s_Context {
@@ -195,8 +194,8 @@ update :: proc(ctx: ^$T, p: []byte) {
 	ctx.nx += copy(ctx.x[ctx.nx:], p)
 }
 
-final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
-	assert(ctx.is_initialized)
+final :: proc "contextless" (ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
+	ensure_contextless(ctx.is_initialized)
 
 	ctx := ctx
 	if finalize_clone {
@@ -206,24 +205,19 @@ final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
 	}
 	defer(reset(ctx))
 
+	ensure_contextless(len(hash) >= int(ctx.size), "crypto/blake2: invalid destination digest size")
 	when T == Blake2s_Context {
-		if len(hash) < int(ctx.size) {
-			panic("crypto/blake2s: invalid destination digest size")
-		}
 		blake2s_final(ctx, hash)
 	} else when T == Blake2b_Context {
-		if len(hash) < int(ctx.size) {
-			panic("crypto/blake2b: invalid destination digest size")
-		}
 		blake2b_final(ctx, hash)
 	}
 }
 
-clone :: proc(ctx, other: ^$T) {
+clone :: proc "contextless" (ctx, other: ^$T) {
 	ctx^ = other^
 }
 
-reset :: proc(ctx: ^$T) {
+reset :: proc "contextless" (ctx: ^$T) {
 	if !ctx.is_initialized {
 		return
 	}
