@@ -52,7 +52,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          pkg install -y gmake git bash python3 libxml2 llvm20
+          pkg install -y gmake git bash python3 libxml2 llvm18
         run: |
           # `set -e` is needed for test failures to register. https://github.com/vmactions/freebsd-vm/issues/72
           set -e -x
