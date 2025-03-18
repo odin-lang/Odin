@@ -2958,13 +2958,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		LLVMInitializeWebAssemblyAsmParser();
 		LLVMInitializeWebAssemblyDisassembler();
 		break;
+	case TargetArch_riscv64:
+		LLVMInitializeRISCVTargetInfo();
+		LLVMInitializeRISCVTarget();
+		LLVMInitializeRISCVTargetMC();
+		LLVMInitializeRISCVAsmPrinter();
+		LLVMInitializeRISCVAsmParser();
+		LLVMInitializeRISCVDisassembler();
+		break;
 	default:
-		LLVMInitializeAllTargetInfos();
-		LLVMInitializeAllTargets();
-		LLVMInitializeAllTargetMCs();
-		LLVMInitializeAllAsmPrinters();
-		LLVMInitializeAllAsmParsers();
-		LLVMInitializeAllDisassemblers();
+		GB_PANIC("Unimplemented LLVM target initialization");
 		break;
 	}
 
