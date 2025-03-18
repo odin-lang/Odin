@@ -657,7 +657,7 @@ function(
 verify
 )");
 #else
-	append(&ppases, u8R"(
+	array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
 inferattrs,
