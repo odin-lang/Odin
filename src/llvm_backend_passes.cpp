@@ -715,7 +715,7 @@ cgscc(
 				indvars,
 				extra-simple-loop-unswitch-passes,
 				loop-deletion,
-				loop-unroll-full#
+				loop-unroll-full
 			),
 			sroa<modify-cfg>,
 			vector-combine,
