@@ -256,8 +256,10 @@ gb_internal i64 lb_sizeof(LLVMTypeRef type) {
 		}
 		break;
 
+#if LLVM_VERSION_MAJOR < 20
 	case LLVMX86_MMXTypeKind:
 		return 8;
+#endif
 	case LLVMVectorTypeKind:
 		{
 			LLVMTypeRef elem = OdinLLVMGetVectorElementType(type);
@@ -310,8 +312,10 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	case LLVMArrayTypeKind:
 		return lb_alignof(OdinLLVMGetArrayElementType(type));
 
+#if LLVM_VERSION_MAJOR < 20
 	case LLVMX86_MMXTypeKind:
 		return 8;
+#endif
 	case LLVMVectorTypeKind:
 		{
 			// TODO(bill): This appears to be correct but LLVM isn't necessarily "great" with regards to documentation

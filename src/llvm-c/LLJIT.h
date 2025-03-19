@@ -24,10 +24,10 @@
 #ifndef LLVM_C_LLJIT_H
 #define LLVM_C_LLJIT_H
 
-#include "Error.h"
-#include "Orc.h"
-#include "TargetMachine.h"
-#include "Types.h"
+#include "llvm-c/Error.h"
+#include "llvm-c/Orc.h"
+#include "llvm-c/TargetMachine.h"
+#include "llvm-c/Types.h"
 
 LLVM_C_EXTERN_C_BEGIN
 

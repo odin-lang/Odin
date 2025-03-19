@@ -1085,7 +1085,12 @@ gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, T
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
+
+#if LLVM_VERSION_MAJOR <= 18
 	LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
+#else
+	LLVMDIBuilderInsertDbgValueRecordAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
+#endif
 }
 
 gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block) {
