@@ -109,6 +109,12 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("riscv64"),
 };
 
+#if defined(GB_SYSTEM_WINDOWS)
+	#include <llvm-c/Config/llvm-config.h>
+#else
+	#include <llvm/Config/llvm-config.h>
+#endif
+
 #include "build_settings_microarch.cpp"
 
 gb_global String target_endian_names[TargetEndian_COUNT] = {
@@ -543,12 +549,6 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	}
 	return build_context.max_error_count;
 }
-
-#if defined(GB_SYSTEM_WINDOWS)
-	#include <llvm-c/Config/llvm-config.h>
-#else
-	#include <llvm/Config/llvm-config.h>
-#endif
 
 // NOTE: AMD64 targets had their alignment on 128 bit ints bumped from 8 to 16 (undocumented of course).
 #if LLVM_VERSION_MAJOR >= 18

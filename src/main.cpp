@@ -87,13 +87,6 @@ gb_global Timings global_timings = {0};
 
 #include "llvm_backend.cpp"
 
-#if defined(GB_SYSTEM_OSX)
-	#include <llvm/Config/llvm-config.h>
-	#if LLVM_VERSION_MAJOR < 11 || (LLVM_VERSION_MAJOR > 14 && LLVM_VERSION_MAJOR < 17) || LLVM_VERSION_MAJOR > 19
-	#error LLVM Version 11..=14 or 17..=19 is required => "brew install llvm@14"
-	#endif
-#endif
-
 #include "bug_report.cpp"
 
 // NOTE(bill): 'name' is used in debugging and profiling modes

@@ -2176,6 +2176,14 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		LLVMInitializeRISCVAsmParser();
 		LLVMInitializeRISCVDisassembler();
 		break;
+	case TargetArch_arm32:
+		LLVMInitializeARMTargetInfo();
+		LLVMInitializeARMTarget();
+		LLVMInitializeARMTargetMC();
+		LLVMInitializeARMAsmPrinter();
+		LLVMInitializeARMAsmParser();
+		LLVMInitializeARMDisassembler();
+		break;
 	default:
 		GB_PANIC("Unimplemented LLVM target initialization");
 		break;
