@@ -1938,7 +1938,11 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			lb_add_entity(p->module, case_entity, ptr);
 			lb_add_debug_local_variable(p, ptr.value, case_entity->type, case_entity->token);
 		} else {
-			lb_store_type_case_implicit(p, clause, parent_value, false);
+			if (by_reference) {
+				lb_store_type_case_implicit(p, clause, parent_ptr, false);
+			} else {
+				lb_store_type_case_implicit(p, clause, parent_value, false);
+			}
 		}
 
 		lb_type_case_body(p, ss->label, clause, body, done);

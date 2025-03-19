@@ -3670,6 +3670,11 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 }
 
 gb_internal bool check_binary_array_expr(CheckerContext *c, Token op, Operand *x, Operand *y) {
+	if (is_type_array_like(x->type) || is_type_array_like(y->type)) {
+		if (op.kind == Token_CmpAnd || op.kind == Token_CmpOr) {
+			error(op, "Array programming is not allowed with the operator '%.*s'", LIT(op.string));
+		}
+	}
 	if (is_type_array(x->type) && !is_type_array(y->type)) {
 		if (check_is_assignable_to(c, y, x->type)) {
 			if (check_binary_op(c, x, op)) {
@@ -4508,8 +4513,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		} else {
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
-				if (!is_type_boolean(target_type) &&
-				    !is_type_integer(target_type)) {
+				if (!is_type_boolean(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
 					return;

@@ -3621,6 +3621,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(ce->args.count == 1);
 		lbValue x = lb_build_expr(p, ce->args[0]);
 		lbValue y = lb_emit_conv(p, x, tv.type);
+		y.type = tv.type;
 		return y;
 	}
 

@@ -52,7 +52,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          pkg install -y gmake git bash python3 libxml2 llvm17
+          pkg install -y gmake git bash python3 libxml2 llvm18
         run: |
           # `set -e` is needed for test failures to register. https://github.com/vmactions/freebsd-vm/issues/72
           set -e -x
@@ -87,20 +87,20 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 17
-          echo "/usr/lib/llvm-17/bin" >> $GITHUB_PATH
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS Intel)
         if: matrix.os == 'macos-13'
         run: |
-          brew install llvm@17 lua@5.4
-          echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
+          brew install llvm@18 lua@5.4
+          echo "/usr/local/opt/llvm@18/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
-          brew install llvm@17 wasmtime lua@5.4
-          echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
+          brew install llvm@18 wasmtime lua@5.4
+          echo "/opt/homebrew/opt/llvm@18/bin" >> $GITHUB_PATH
 
       - name: Build Odin
         run: ./build_odin.sh release
@@ -167,7 +167,7 @@ jobs:
 
       - name: Run demo on WASI WASM32
         run: |
-          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -disallow-do -out:demo.wasm
+          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -disallow-do -out:demo
           wasmtime ./demo.wasm
         if: matrix.os == 'macos-14'
 

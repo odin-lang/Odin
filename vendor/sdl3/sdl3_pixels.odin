@@ -550,7 +550,7 @@ PixelFormatDetails :: struct {
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
-	GetPixelFormatName     :: proc(format: PixelFormat) -> rawptr ---
+	GetPixelFormatName     :: proc(format: PixelFormat) -> cstring ---
 	GetMasksForPixelFormat :: proc(format: PixelFormat, bpp: ^c.int, Rmask, Gmask, Bmask, Amask: ^Uint32) -> bool ---
 	GetPixelFormatForMasks :: proc(bpp: c.int, Rmask, Gmask, Bmask, Amask: Uint32) -> PixelFormat ---
 	GetPixelFormatDetails  :: proc(format: PixelFormat) -> ^PixelFormatDetails ---
