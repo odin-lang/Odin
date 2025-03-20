@@ -351,21 +351,3 @@ _volume_name_len :: proc(path: string) -> int {
 	}
 	return 0
 }
-
-_is_abs :: proc(path: string) -> bool {
-	if _is_reserved_name(path) {
-		return true
-	}
-	l := _volume_name_len(path)
-	if l == 0 {
-		return false
-	}
-
-	path := path
-	path = path[l:]
-	if path == "" {
-		return false
-	}
-	return is_path_separator(path[0])
-}
-
