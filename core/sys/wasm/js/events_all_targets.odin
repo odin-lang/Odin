@@ -263,7 +263,7 @@ add_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, call
 	panic("vendor:wasm/js not supported on non JS targets")
 }
 
-remove_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	panic("vendor:wasm/js not supported on non JS targets")
 }
 
@@ -271,7 +271,7 @@ add_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback:
 	panic("vendor:wasm/js not supported on non JS targets")
 }
 
-remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	panic("vendor:wasm/js not supported on non JS targets")
 }
 
@@ -282,6 +282,6 @@ remove_event_listener_from_event :: proc(e: Event) -> bool {
 add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	panic("vendor:wasm/js not supported on non JS targets")
 }
-remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	panic("vendor:wasm/js not supported on non JS targets")
 }

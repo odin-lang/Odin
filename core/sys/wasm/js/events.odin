@@ -346,13 +346,13 @@ add_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, call
 	return _add_event_listener(id, event_kind_string[kind], kind, user_data, callback, use_capture)
 }
 
-remove_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	@(default_calling_convention="contextless")
 	foreign dom_lib {
 		@(link_name="remove_event_listener")
-		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
 	}
-	return _remove_event_listener(id, event_kind_string[kind], user_data, callback)
+	return _remove_event_listener(id, event_kind_string[kind], user_data, callback, use_capture)
 }
 
 add_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
@@ -364,20 +364,26 @@ add_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback:
 	return _add_window_event_listener(event_kind_string[kind], kind, user_data, callback, use_capture)
 }
 
-remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	@(default_calling_convention="contextless")
 	foreign dom_lib {
 		@(link_name="remove_window_event_listener")
-		_remove_window_event_listener :: proc(name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+		_remove_window_event_listener :: proc(name: string, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
 	}
-	return _remove_window_event_listener(event_kind_string[kind], user_data, callback)
+	return _remove_window_event_listener(event_kind_string[kind], user_data, callback, use_capture)
 }
 
 remove_event_listener_from_event :: proc(e: Event) -> bool {
+  from_use_capture_false: bool
+  from_use_capture_true: bool
 	if e.id == "" {
-		return remove_window_event_listener(e.kind, e.user_data, e.callback)
-	}
-	return remove_event_listener(e.id, e.kind, e.user_data, e.callback)
+    from_use_capture_false = remove_window_event_listener(e.kind, e.user_data, e.callback, false)
+    from_use_capture_true = remove_window_event_listener(e.kind, e.user_data, e.callback, true)
+	} else {
+    from_use_capture_false = remove_event_listener(e.id, e.kind, e.user_data, e.callback, false)
+    from_use_capture_true = remove_event_listener(e.id, e.kind, e.user_data, e.callback, true)
+  }
+  return from_use_capture_false || from_use_capture_true
 }
 
 add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
@@ -388,13 +394,13 @@ add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, c
 	}
 	return _add_event_listener(id, name, .Custom, user_data, callback, use_capture)
 }
-remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	@(default_calling_convention="contextless")
 	foreign dom_lib {
 		@(link_name="remove_event_listener")
-		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
 	}
-	return _remove_event_listener(id, name, user_data, callback)
+	return _remove_event_listener(id, name, user_data, callback, use_capture)
 }
 
 get_gamepad_state :: proc "contextless" (index: int, s: ^Gamepad_State) -> bool {
