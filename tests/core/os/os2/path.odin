@@ -2,7 +2,6 @@ package tests_core_os_os2
 
 import os "core:os/os2"
 import    "core:log"
-import    "core:path/filepath"
 import    "core:testing"
 import    "core:strings"
 
@@ -17,6 +16,7 @@ test_executable :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, err, nil)
 	testing.expect(t, len(path) > 0)
-	testing.expect(t, filepath.is_abs(path))
-	testing.expectf(t, strings.contains(path, filepath.base(os.args[0])), "expected the executable path to contain the base of os.args[0] which is %q", filepath.base(os.args[0]))
+	testing.expect(t, os.is_absolute_path(path))
+	_, filename := os.split_path(os.args[0])
+	testing.expectf(t, strings.contains(path, filename), "expected the executable path to contain the base of os.args[0] which is %q", filename)
 }

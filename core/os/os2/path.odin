@@ -3,7 +3,6 @@ package os2
 import "base:intrinsics"
 import "base:runtime"
 
-import "core:path/filepath"
 import "core:strings"
 
 Path_Separator        :: _Path_Separator        // OS-Specific
@@ -91,7 +90,7 @@ Get the directory for the currently running executable.
 */
 get_executable_directory :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
 	path = _get_executable_path(allocator) or_return
-	path, _ = filepath.split(path)
+	path, _ = split_path(path)
 	return
 }
 

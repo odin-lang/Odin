@@ -6,7 +6,6 @@ import "base:runtime"
 
 import "core:time"
 import "core:strings"
-import "core:path/filepath"
 
 import kq "core:sys/kqueue"
 import    "core:sys/posix"
@@ -62,7 +61,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	exe_name    := desc.command[0]
 	if strings.index_byte(exe_name, '/') < 0 {
 		path_env  := get_env("PATH", temp_allocator())
-		path_dirs := filepath.split_list(path_env, temp_allocator())
+		path_dirs := split_path_list(path_env, temp_allocator()) or_return
 
 		found: bool
 		for dir in path_dirs {
