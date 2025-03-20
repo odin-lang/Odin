@@ -1,6 +1,7 @@
 package test_core_mem
 
 import "core:mem/tlsf"
+import "core:mem/virtual"
 import "core:testing"
 
 @test
@@ -38,4 +39,18 @@ test_tlsf_bitscan :: proc(t: ^testing.T) {
 			testing.expectf(t, res == test.exp, "Expected tlsf.fls_uint(0x%16x) == %v, got %v", test.v, test.exp, res)
 		}
 	}
+}
+
+@(test)
+test_align_bumping_block_limit :: proc(t: ^testing.T) {
+	a: virtual.Arena
+	defer virtual.arena_destroy(&a)
+
+	data, err := virtual.arena_alloc(&a, 4193371, 1)
+	testing.expect_value(t, err, nil)
+	testing.expect(t, len(data) == 4193371)
+
+	data, err = virtual.arena_alloc(&a, 896, 64)
+	testing.expect_value(t, err, nil)
+	testing.expect(t, len(data) == 896)
 }
