@@ -8,6 +8,8 @@ Path_Separator        :: _Path_Separator        // OS-Specific
 Path_Separator_String :: _Path_Separator_String // OS-Specific
 Path_List_Separator   :: _Path_List_Separator   // OS-Specific
 
+#assert(_Path_Separator <= rune(0x7F), "The system-specific path separator rune is expected to be within the 7-bit ASCII character set.")
+
 @(require_results)
 is_path_separator :: proc(c: byte) -> bool {
 	return _is_path_separator(c)
