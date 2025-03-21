@@ -79,6 +79,7 @@ Get the path for the currently running executable.
 
 *Allocates Using Provided Allocator*
 */
+@(require_results)
 get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
 	return _get_executable_path(allocator)
 }
@@ -88,6 +89,7 @@ Get the directory for the currently running executable.
 
 *Allocates Using Provided Allocator*
 */
+@(require_results)
 get_executable_directory :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
 	path = _get_executable_path(allocator) or_return
 	path, _ = split_path(path)
