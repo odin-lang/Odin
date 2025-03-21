@@ -374,16 +374,16 @@ remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callba
 }
 
 remove_event_listener_from_event :: proc(e: Event) -> bool {
-  from_use_capture_false: bool
-  from_use_capture_true: bool
+	from_use_capture_false: bool
+	from_use_capture_true: bool
 	if e.id == "" {
-    from_use_capture_false = remove_window_event_listener(e.kind, e.user_data, e.callback, false)
-    from_use_capture_true = remove_window_event_listener(e.kind, e.user_data, e.callback, true)
+		from_use_capture_false = remove_window_event_listener(e.kind, e.user_data, e.callback, false)
+		from_use_capture_true = remove_window_event_listener(e.kind, e.user_data, e.callback, true)
 	} else {
-    from_use_capture_false = remove_event_listener(e.id, e.kind, e.user_data, e.callback, false)
-    from_use_capture_true = remove_event_listener(e.id, e.kind, e.user_data, e.callback, true)
-  }
-  return from_use_capture_false || from_use_capture_true
+		from_use_capture_false = remove_event_listener(e.id, e.kind, e.user_data, e.callback, false)
+		from_use_capture_true = remove_event_listener(e.id, e.kind, e.user_data, e.callback, true)
+	}
+	return from_use_capture_false || from_use_capture_true
 }
 
 add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
