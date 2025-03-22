@@ -2,11 +2,13 @@ package tests_core_os_os2
 
 import os "core:os/os2"
 import    "core:testing"
-import    "core:path/filepath"
 
 @(test)
 test_clone :: proc(t: ^testing.T) {
-	f, err := os.open(filepath.join({#directory, "file.odin"}, context.temp_allocator))
+	joined, err := os.join_path({#directory, "file.odin"}, context.temp_allocator)
+	testing.expect_value(t, err, nil)
+	f: ^os.File
+	f, err = os.open(joined)
 	testing.expect_value(t, err, nil)
 	testing.expect(t, f != nil)
 

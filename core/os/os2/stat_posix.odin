@@ -4,13 +4,12 @@ package os2
 
 import "base:runtime"
 
-import "core:path/filepath"
 import "core:sys/posix"
 import "core:time"
 
 internal_stat :: proc(stat: posix.stat_t, fullpath: string) -> (fi: File_Info) {
 	fi.fullpath = fullpath
-	fi.name = filepath.base(fi.fullpath)
+	_, fi.name = split_path(fi.fullpath)
 
 	fi.inode = u128(stat.st_ino)
 	fi.size = i64(stat.st_size)
@@ -104,7 +103,7 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, er
 	// NOTE: This might not be correct when given "/symlink/foo.txt",
 	// you would want that to resolve "/symlink", but not resolve "foo.txt".
 
-	fullpath := filepath.clean(name, temp_allocator())
+	fullpath := clean_path(name, temp_allocator()) or_return
 	assert(len(fullpath) > 0)
 	switch {
 	case fullpath[0] == '/':

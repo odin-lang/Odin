@@ -2,27 +2,27 @@ package tests_core_os_os2
 
 import os "core:os/os2"
 import    "core:log"
-import    "core:path/filepath"
 import    "core:slice"
 import    "core:testing"
 import    "core:strings"
 
 @(test)
 test_read_dir :: proc(t: ^testing.T) {
-	path := filepath.join({#directory, "../dir"})
+	path, err_join := os.join_path({#directory, "../dir"}, context.allocator)
 	defer delete(path)
 
-	fis, err := os.read_all_directory_by_path(path, context.allocator)
+	fis, err_read := os.read_all_directory_by_path(path, context.allocator)
 	defer os.file_info_slice_delete(fis, context.allocator)
 
 	slice.sort_by_key(fis, proc(fi: os.File_Info) -> string { return fi.name })
 
-	if err == .Unsupported {
+	if err_read == .Unsupported {
 		log.warn("os2 directory functionality is unsupported, skipping test")
 		return
 	}
 
-	testing.expect_value(t, err, nil)
+	testing.expect_value(t, err_join, nil)
+	testing.expect_value(t, err_read, nil)
 	testing.expect_value(t, len(fis), 2)
 
 	testing.expect_value(t, fis[0].name, "b.txt")
@@ -34,8 +34,9 @@ test_read_dir :: proc(t: ^testing.T) {
 
 @(test)
 test_walker :: proc(t: ^testing.T) {
-	path := filepath.join({#directory, "../dir"})
+	path, err := os.join_path({#directory, "../dir"}, context.allocator)
 	defer delete(path)
+	testing.expect_value(t, err, nil)
 
 	w := os.walker_create(path)
 	defer os.walker_destroy(&w)
@@ -45,11 +46,12 @@ test_walker :: proc(t: ^testing.T) {
 
 @(test)
 test_walker_file :: proc(t: ^testing.T) {
-	path := filepath.join({#directory, "../dir"})
+	path, err_join := os.join_path({#directory, "../dir"}, context.allocator)
 	defer delete(path)
+	testing.expect_value(t, err_join, nil)
 
-	f, err := os.open(path)
-	testing.expect_value(t, err, nil)
+	f, err_open := os.open(path)
+	testing.expect_value(t, err_open, nil)
 	defer os.close(f)
 
 	w := os.walker_create(f)
@@ -64,10 +66,18 @@ test_walker_internal :: proc(t: ^testing.T, w: ^os.Walker) {
 		path: string,
 	}
 
+	joined_1, err_joined_1 := os.join_path({"dir", "b.txt"}, context.allocator)
+	joined_2, err_joined_2 := os.join_path({"dir", "sub"}, context.allocator)
+	joined_3, err_joined_3 := os.join_path({"dir", "sub", ".gitkeep"}, context.allocator)
+
+	testing.expect_value(t, err_joined_1, nil)
+	testing.expect_value(t, err_joined_2, nil)
+	testing.expect_value(t, err_joined_3, nil)
+
 	expected := [?]Seen{
-		{.Regular,   filepath.join({"dir", "b.txt"})},
-		{.Directory, filepath.join({"dir", "sub"})},
-		{.Regular,   filepath.join({"dir", "sub", ".gitkeep"})},
+		{.Regular,   joined_1},
+		{.Directory, joined_2},
+		{.Regular,   joined_3},
 	}
 
 	seen: [dynamic]Seen

@@ -3,7 +3,6 @@
 package os2
 
 import "base:runtime"
-import "core:path/filepath"
 
 import "core:sys/posix"
 
@@ -35,11 +34,11 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		return .Exist
 	}
 
-	clean_path := filepath.clean(path, temp_allocator())
+	clean_path := clean_path(path, temp_allocator()) or_return
 	return internal_mkdir_all(clean_path, perm)
 
 	internal_mkdir_all :: proc(path: string, perm: int) -> Error {
-		dir, file := filepath.split(path)
+		dir, file := split_path(path)
 		if file != path && dir != "/" {
 			if len(dir) > 1 && dir[len(dir) - 1] == '/' {
 				dir = dir[:len(dir) - 1]

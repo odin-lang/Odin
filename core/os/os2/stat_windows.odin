@@ -315,57 +315,37 @@ _is_UNC :: proc(path: string) -> bool {
 }
 
 _volume_name_len :: proc(path: string) -> int {
-	if ODIN_OS == .Windows {
-		if len(path) < 2 {
-			return 0
+	if len(path) < 2 {
+		return 0
+	}
+	c := path[0]
+	if path[1] == ':' {
+		switch c {
+		case 'a'..='z', 'A'..='Z':
+			return 2
 		}
-		c := path[0]
-		if path[1] == ':' {
-			switch c {
-			case 'a'..='z', 'A'..='Z':
-				return 2
-			}
-		}
+	}
 
-		// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-		if l := len(path); l >= 5 && _is_path_separator(path[0]) && _is_path_separator(path[1]) &&
-			!_is_path_separator(path[2]) && path[2] != '.' {
-			for n := 3; n < l-1; n += 1 {
-				if _is_path_separator(path[n]) {
-					n += 1
-					if !_is_path_separator(path[n]) {
-						if path[n] == '.' {
-							break
-						}
+	// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+	if l := len(path); l >= 5 && _is_path_separator(path[0]) && _is_path_separator(path[1]) &&
+		!_is_path_separator(path[2]) && path[2] != '.' {
+		for n := 3; n < l-1; n += 1 {
+			if _is_path_separator(path[n]) {
+				n += 1
+				if !_is_path_separator(path[n]) {
+					if path[n] == '.' {
+						break
 					}
-					for ; n < l; n += 1 {
-						if _is_path_separator(path[n]) {
-							break
-						}
-					}
-					return n
 				}
-				break
+				for ; n < l; n += 1 {
+					if _is_path_separator(path[n]) {
+						break
+					}
+				}
+				return n
 			}
+			break
 		}
 	}
 	return 0
 }
-
-_is_abs :: proc(path: string) -> bool {
-	if _is_reserved_name(path) {
-		return true
-	}
-	l := _volume_name_len(path)
-	if l == 0 {
-		return false
-	}
-
-	path := path
-	path = path[l:]
-	if path == "" {
-		return false
-	}
-	return is_path_separator(path[0])
-}
-

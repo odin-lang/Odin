@@ -4,7 +4,6 @@ package os2
 import "core:time"
 import "base:runtime"
 import "core:sys/linux"
-import "core:path/filepath"
 
 _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
 	impl := (^File_Impl)(f.impl)
@@ -42,7 +41,7 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fi: File
 		creation_time     = time.Time{i64(s.ctime.time_sec) * i64(time.Second) + i64(s.ctime.time_nsec)}, // regular stat does not provide this
 	}
 	fi.creation_time = fi.modification_time
-	fi.name = filepath.base(fi.fullpath)
+	_, fi.name = split_path(fi.fullpath)
 	return
 }
 
