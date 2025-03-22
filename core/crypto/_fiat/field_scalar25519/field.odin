@@ -1,18 +1,17 @@
 package field_scalar25519
 
-import "base:intrinsics"
 import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
 
-@(private)
+@(private, rodata)
 _TWO_168 := Montgomery_Domain_Field_Element {
 	0x5b8ab432eac74798,
 	0x38afddd6de59d5d7,
 	0xa2c131b399411b7c,
 	0x6329a7ed9ce5a30,
 }
-@(private)
+@(private, rodata)
 _TWO_336 := Montgomery_Domain_Field_Element {
 	0xbd3d108e2b35ecc5,
 	0x5c3a3718bdf9c90b,
@@ -95,9 +94,8 @@ fe_from_bytes_wide :: proc "contextless" (
 @(private)
 _fe_from_bytes_short :: proc "contextless" (out1: ^Montgomery_Domain_Field_Element, arg1: []byte) {
 	// INVARIANT: len(arg1) < 32.
-	if len(arg1) >= 32 {
-		intrinsics.trap()
-	}
+	ensure_contextless(len(arg1) < 32, "edwards25519: oversized short scalar")
+
 	tmp: [32]byte
 	copy(tmp[:], arg1)
 
@@ -106,9 +104,7 @@ _fe_from_bytes_short :: proc "contextless" (out1: ^Montgomery_Domain_Field_Eleme
 }
 
 fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_Element) {
-	if len(out1) != 32 {
-		intrinsics.trap()
-	}
+	ensure_contextless(len(out1) == 32, "edwards25519: oversized scalar output buffer")
 
 	tmp: Non_Montgomery_Domain_Field_Element
 	fe_from_montgomery(&tmp, arg1)
