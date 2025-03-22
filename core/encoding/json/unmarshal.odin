@@ -406,6 +406,9 @@ unmarshal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_loca
 	return prev
 }
 
+// Struct tags can include not only the name of the JSON key, but also a tag such as `omitempty`.
+// Example: `json:"key_name,omitempty"`
+// This returns the first field as `json_name`, and the rest are returned as `extra`.
 @(private)
 json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
 	json_name = value
@@ -441,12 +444,6 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			defer delete(key, p.allocator)
 			
 			unmarshal_expect_token(p, .Colon)						
-			
-			field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
-				prev_set := field_used[offset/8] & byte(offset&7) != 0
-				field_used[offset/8] |= byte(offset&7)
-				return prev_set
-			}
 
 			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
 			field_used := intrinsics.alloca(field_used_bytes + 1, 1) // + 1 to not overflow on size_of 0 types.
@@ -465,7 +462,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			if use_field_idx < 0 {
 				for field, field_idx in fields {
-					if key == field.name {
+					tag_value := reflect.struct_tag_get(field.tag, "json")
+					json_name, _ := json_name_from_tag_value(tag_value)
+					if json_name == "" && key == field.name {
 						use_field_idx = field_idx
 						break
 					}
@@ -486,7 +485,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 						}
 					}
 
-					if field.name == key || (field.tag != "" && reflect.struct_tag_get(field.tag, "json") == key) {
+					tag_value := reflect.struct_tag_get(field.tag, "json")
+					json_name, _ := json_name_from_tag_value(tag_value)
+					if (json_name == "" && field.name == key) || json_name == key {
 						offset = field.offset
 						type = field.type
 						found = true
@@ -508,6 +509,11 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 
 			if field_found {
+				field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
+					prev_set := field_used[offset/8] & byte(offset&7) != 0
+					field_used[offset/8] |= byte(offset&7)
+					return prev_set
+				}
 				if field_test(field_used, offset) {
 					return .Multiple_Use_Field
 				}
