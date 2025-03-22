@@ -1,5 +1,10 @@
 package linux
 
+import "base:intrinsics"
+
+@(private)
+log2 :: intrinsics.constant_log2
+
 
 /*
 	Represents an error returned by most of syscalls
@@ -1839,22 +1844,23 @@ EPoll_Flags_Bits :: enum {
 }
 
 EPoll_Event_Kind :: enum u32 {
-	IN        = 0x001,
-	PRI       = 0x002,
-	OUT       = 0x004,
-	RDNORM    = 0x040,
-	RDBAND    = 0x080,
-	WRNORM    = 0x100,
-	WRBAND    = 0x200,
-	MSG       = 0x400,
-	ERR       = 0x008,
-	HUP       = 0x010,
-	RDHUP     = 0x2000,
-	EXCLUSIVE = 1<<28,
-	WAKEUP    = 1<<29,
-	ONESHOT   = 1<<30,
-	ET        = 1<<31,
+	IN        = log2(0x001),
+	PRI       = log2(0x002),
+	OUT       = log2(0x004),
+	RDNORM    = log2(0x040),
+	RDBAND    = log2(0x080),
+	WRNORM    = log2(0x100),
+	WRBAND    = log2(0x200),
+	MSG       = log2(0x400),
+	ERR       = log2(0x008),
+	HUP       = log2(0x010),
+	RDHUP     = log2(0x2000),
+	EXCLUSIVE = log2(1<<28),
+	WAKEUP    = log2(1<<29),
+	ONESHOT   = log2(1<<30),
+	ET        = log2(1<<31),
 }
+EPoll_Event_Set :: bit_set[EPoll_Event_Kind; u32]
 
 EPoll_Ctl_Opcode :: enum i32 {
 	ADD = 1,
