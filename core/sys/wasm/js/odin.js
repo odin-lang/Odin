@@ -1662,6 +1662,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				if (element == undefined) {
 					return false;
 				}
+				let key = listener_key(id, name, data, callback, !!use_capture);
+				if (wasmMemoryInterface.listenerMap.has(key)) {
+					return false;
+				}
 
 				let listener = (e) => {
 					let event_data = {};
@@ -1672,7 +1676,6 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					onEventReceived(event_data, data, callback);
 				};
-				let key = listener_key(id, name, data, callback, !!use_capture);
 				wasmMemoryInterface.listenerMap.set(key, listener);
 				element.addEventListener(name, listener, !!use_capture);
 				return true;
@@ -1681,6 +1684,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
+				let key = listener_key('window', name, data, callback, !!use_capture);
+				if (wasmMemoryInterface.listenerMap.has(key)) {
+					return false;
+				}
+
 				let listener = (e) => {
 					let event_data = {};
 					event_data.id_ptr = 0;
@@ -1690,7 +1698,6 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					onEventReceived(event_data, data, callback);
 				};
-				let key = listener_key('window', name, data, callback, !!use_capture);
 				wasmMemoryInterface.listenerMap.set(key, listener);
 				element.addEventListener(name, listener, !!use_capture);
 				return true;

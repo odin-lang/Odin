@@ -2812,15 +2812,11 @@ gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lb
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
-	u8 *str = cast(u8 *)gb_alloc_array(temporary_allocator(), u8, name.len);
-	memcpy(str, name.text, name.len);
-	str[name.len] = 0;
-
 	Scope *scope = nullptr;
 	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
 	lbValue g = {};
 	g.type = alloc_type_pointer(type);
-	g.value = LLVMAddGlobal(m->mod, lb_type(m, type), cast(char const *)str);
+	g.value = LLVMAddGlobal(m->mod, lb_type(m, type), alloc_cstring(temporary_allocator(), name));
 	if (value.value != nullptr) {
 		GB_ASSERT_MSG(LLVMIsConstant(value.value), LLVMPrintValueToString(value.value));
 		LLVMSetInitializer(g.value, value.value);

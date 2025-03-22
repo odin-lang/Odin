@@ -565,7 +565,7 @@ when ODIN_OS == .Darwin {
 	SS_ONSTACK :: 0x0001
 	SS_DISABLE :: 0x0004
 
-	when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm32 {
+	when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 {
 		MINSIGSTKSZ :: 1024 * 4
 	} else when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
 		MINSIGSTKSZ :: 512 * 4
