@@ -954,6 +954,22 @@ make_dynamic_array_len_cap :: proc(
 }
 
 /*
+Create a map with no initial allocation.
+
+This procedure creates a map of type `T` with no initial allocation, which will
+use the allocator specified by `allocator` as its backing allocator when it
+allocates.
+*/
+@(require_results)
+make_map :: proc(
+	$T: typeid/map[$K]$E,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (m: T) {
+	return runtime.make_map(T, allocator, loc)
+}
+
+/*
 Allocate a map.
 
 This procedure creates a map of type `T` with initial capacity specified by
@@ -961,13 +977,13 @@ This procedure creates a map of type `T` with initial capacity specified by
 allocator.
 */
 @(require_results)
-make_map :: proc(
+make_map_cap :: proc(
 	$T: typeid/map[$K]$E,
-	#any_int cap: int = 1<<runtime.MAP_MIN_LOG2_CAPACITY,
+	#any_int cap: int,
 	allocator := context.allocator,
 	loc := #caller_location,
 ) -> (m: T, err: Allocator_Error) {
-	return runtime.make_map(T, cap, allocator, loc)
+	return runtime.make_map_cap(T, cap, allocator, loc)
 }
 
 /*
@@ -1060,6 +1076,7 @@ make :: proc{
 	make_dynamic_array_len,
 	make_dynamic_array_len_cap,
 	make_map,
+	make_map_cap,
 	make_multi_pointer,
 	make_soa_slice,
 	make_soa_dynamic_array,
