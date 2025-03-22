@@ -1450,7 +1450,7 @@ EPoll_Data :: struct #raw_union {
 }
 
 EPoll_Event :: struct #packed {
-	events: EPoll_Event_Kind,
+	events: EPoll_Event_Set,
 	data:   EPoll_Data,
 }
 
