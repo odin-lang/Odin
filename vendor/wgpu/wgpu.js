@@ -2588,7 +2588,12 @@ class WebGPUInterface {
 				}
 
 				dynamicOffsetCount = this.unwrapBigInt(dynamicOffsetCount);
-				const dynamicOffsets = this.array(dynamicOffsetCount, dynamicOffsetsPtr, this.mem.loadU32, 4);	
+				const dynamicOffsets = this.array(
+					dynamicOffsetCount,
+					dynamicOffsetsPtr,
+					(ptr) => this.mem.loadU32(ptr),
+					4
+				);
 
 				renderBundleEncoder.setBindGroup(groupIndex, group, dynamicOffsets);
 			},
@@ -2780,7 +2785,12 @@ class WebGPUInterface {
 				}
 
 				dynamicOffsetCount = this.unwrapBigInt(dynamicOffsetCount);
-				const dynamicOffsets = this.array(dynamicOffsetCount, dynamicOffsetsPtr, this.mem.loadU32, 4);	
+				const dynamicOffsets = this.array(
+					dynamicOffsetCount,
+					dynamicOffsetsPtr,
+					(ptr) => this.mem.loadU32(ptr),
+					4
+				);	
 
 				renderPassEncoder.setBindGroup(groupIndex, group, dynamicOffsets);
 			},
@@ -3087,7 +3097,7 @@ class WebGPUInterface {
 			 * @param {number} surfaceCapabilitiesPtr
 			 */
 			wgpuSurfaceCapabilitiesFreeMembers: (surfaceCapabilitiesPtr) => {
-				const off = this.struct(capabilitiesPtr);
+				const off = this.struct(surfaceCapabilitiesPtr);
 				off(4); // nextInChain
 				off(8); // usages
 				off(this.mem.intSize); // formatCount
