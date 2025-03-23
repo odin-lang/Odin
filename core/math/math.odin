@@ -4,6 +4,9 @@ import "base:intrinsics"
 import "base:builtin"
 _ :: intrinsics
 
+/*
+`Float_Class enum` is a representation of _special values_ accordin to [[IEEE Standard for Floating-Point Arithmetic (IEEE 754);https://en.wikipedia.org/wiki/IEEE_754#Special_values]]
+*/
 Float_Class :: enum {
 	Normal,    // an ordinary nonzero floating point value
 	Subnormal, // a subnormal floating point value
@@ -48,6 +51,10 @@ clamp :: builtin.clamp
 @(require_results) sqrt_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(sqrt_f32(f32(x))) }
 @(require_results) sqrt_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(sqrt_f64(f64(x))) }
 @(require_results) sqrt_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(sqrt_f64(f64(x))) }
+/*
+Square root.
+Return square root of given input
+*/
 sqrt :: proc{
 	sqrt_f16, sqrt_f16le, sqrt_f16be,
 	sqrt_f32, sqrt_f32le, sqrt_f32be,
