@@ -25,4 +25,5 @@ GHASH_BLOCK_SIZE :: 16
 GHASH_TAG_SIZE :: 16
 
 // RCON is the AES keyschedule round constants.
+@(rodata)
 RCON := [10]byte{0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36}

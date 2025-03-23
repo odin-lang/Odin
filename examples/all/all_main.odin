@@ -26,12 +26,14 @@ import topological_sort "core:container/topological_sort"
 
 import crypto           "core:crypto"
 import aead             "core:crypto/aead"
+import aegis            "core:crypto/aegis"
 import aes              "core:crypto/aes"
 import blake2b          "core:crypto/blake2b"
 import blake2s          "core:crypto/blake2s"
 import chacha20         "core:crypto/chacha20"
 import chacha20poly1305 "core:crypto/chacha20poly1305"
 import crypto_hash      "core:crypto/hash"
+import deoxysii         "core:crypto/deoxysii"
 import ed25519          "core:crypto/ed25519"
 import hkdf             "core:crypto/hkdf"
 import hmac             "core:crypto/hmac"
@@ -48,6 +50,7 @@ import shake            "core:crypto/shake"
 import sm3              "core:crypto/sm3"
 import tuplehash        "core:crypto/tuplehash"
 import x25519           "core:crypto/x25519"
+import x448             "core:crypto/x448"
 
 import pe               "core:debug/pe"
 import trace            "core:debug/trace"
@@ -169,11 +172,13 @@ _ :: topological_sort
 _ :: crypto
 _ :: crypto_hash
 _ :: aead
+_ :: aegis
 _ :: aes
 _ :: blake2b
 _ :: blake2s
 _ :: chacha20
 _ :: chacha20poly1305
+_ :: deoxysii
 _ :: ed25519
 _ :: hmac
 _ :: hkdf
@@ -190,6 +195,7 @@ _ :: shake
 _ :: sm3
 _ :: tuplehash
 _ :: x25519
+_ :: x448
 _ :: pe
 _ :: trace
 _ :: dynlib

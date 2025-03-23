@@ -21,9 +21,7 @@ Context_CTR :: struct {
 
 // init_ctr initializes a Context_CTR with the provided key and IV.
 init_ctr :: proc(ctx: ^Context_CTR, key, iv: []byte, impl := DEFAULT_IMPLEMENTATION) {
-	if len(iv) != CTR_IV_SIZE {
-		panic("crypto/aes: invalid CTR IV size")
-	}
+	ensure(len(iv) == CTR_IV_SIZE, "crypto/aes: invalid CTR IV size")
 
 	init_impl(&ctx._impl, key, impl)
 	ctx._off = BLOCK_SIZE
@@ -36,16 +34,14 @@ init_ctr :: proc(ctx: ^Context_CTR, key, iv: []byte, impl := DEFAULT_IMPLEMENTAT
 // keystream, and writes the resulting output to dst.  dst and src MUST
 // alias exactly or not at all.
 xor_bytes_ctr :: proc(ctx: ^Context_CTR, dst, src: []byte) {
-	assert(ctx._is_initialized)
+	ensure(ctx._is_initialized)
 
 	src, dst := src, dst
 	if dst_len := len(dst); dst_len < len(src) {
 		src = src[:dst_len]
 	}
 
-	if bytes.alias_inexactly(dst, src) {
-		panic("crypto/aes: dst and src alias inexactly")
-	}
+	ensure(!bytes.alias_inexactly(dst, src), "crypto/aes: dst and src alias inexactly")
 
 	#no_bounds_check for remaining := len(src); remaining > 0; {
 		// Process multiple blocks at once
@@ -82,7 +78,7 @@ xor_bytes_ctr :: proc(ctx: ^Context_CTR, dst, src: []byte) {
 
 // keystream_bytes_ctr fills dst with the raw AES-CTR keystream output.
 keystream_bytes_ctr :: proc(ctx: ^Context_CTR, dst: []byte) {
-	assert(ctx._is_initialized)
+	ensure(ctx._is_initialized)
 
 	dst := dst
 	#no_bounds_check for remaining := len(dst); remaining > 0; {

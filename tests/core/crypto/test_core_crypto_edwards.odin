@@ -7,6 +7,7 @@ import field "core:crypto/_fiat/field_curve25519"
 import "core:crypto/ed25519"
 import "core:crypto/ristretto255"
 import "core:crypto/x25519"
+import "core:crypto/x448"
 
 @(test)
 test_sqrt_ratio_m1 :: proc(t: ^testing.T) {
@@ -671,6 +672,68 @@ test_x25519 :: proc(t: ^testing.T) {
 		p1, p2: [x25519.POINT_SIZE]byte
 		x25519.scalarmult_basepoint(p1[:], scalar[:])
 		x25519.scalarmult(p2[:], scalar[:], _BASE_POINT[:])
+		p1_str := string(hex.encode(p1[:], context.temp_allocator))
+		p2_str := string(hex.encode(p2[:], context.temp_allocator))
+		testing.expectf(
+			t,
+			p1_str == p2_str,
+			"Expected %s for %s * basepoint, but got %s instead",
+			p2_str,
+			v.scalar,
+			p1_str,
+		)
+	}
+}
+
+@(test)
+test_x448 :: proc(t: ^testing.T) {
+	// Local copy of this so that the base point doesn't need to be exported.
+	_BASE_POINT: [56]byte = {
+		5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+	}
+
+	test_vectors := []struct {
+		scalar:  string,
+		point:   string,
+		product: string,
+	} {
+		// Test vectors from RFC 7748
+		{
+			"3d262fddf9ec8e88495266fea19a34d28882acef045104d0d1aae121700a779c984c24f8cdd78fbff44943eba368f54b29259a4f1c600ad3",
+			"06fce640fa3487bfda5f6cf2d5263f8aad88334cbd07437f020f08f9814dc031ddbdc38c19c6da2583fa5429db94ada18aa7a7fb4ef8a086",
+			"ce3e4ff95a60dc6697da1db1d85e6afbdf79b50a2412d7546d5f239fe14fbaadeb445fc66a01b0779d98223961111e21766282f73dd96b6f",
+		},
+		{
+			"203d494428b8399352665ddca42f9de8fef600908e0d461cb021f8c538345dd77c3e4806e25f46d3315c44e0a5b4371282dd2c8d5be3095f",
+			"0fbcc2f993cd56d3305b0b7d9e55d4c1a8fb5dbb52f8e9a1e9b6201b165d015894e56c4d3570bee52fe205e28a78b91cdfbde71ce8d157db",
+			"884a02576239ff7a2f2f63b2db6a9ff37047ac13568e1e30fe63c4a7ad1b3ee3a5700df34321d62077e63633c575c1c954514e99da7c179d",
+		},
+	}
+	for v, _ in test_vectors {
+		scalar, _ := hex.decode(transmute([]byte)(v.scalar), context.temp_allocator)
+		point, _ := hex.decode(transmute([]byte)(v.point), context.temp_allocator)
+
+		derived_point: [x448.POINT_SIZE]byte
+		x448.scalarmult(derived_point[:], scalar[:], point[:])
+		derived_point_str := string(hex.encode(derived_point[:], context.temp_allocator))
+
+		testing.expectf(
+			t,
+			derived_point_str == v.product,
+			"Expected %s for %s * %s, but got %s instead",
+			v.product,
+			v.scalar,
+			v.point,
+			derived_point_str,
+			)
+
+		// Abuse the test vectors to sanity-check the scalar-basepoint multiply.
+		p1, p2: [x448.POINT_SIZE]byte
+		x448.scalarmult_basepoint(p1[:], scalar[:])
+		x448.scalarmult(p2[:], scalar[:], _BASE_POINT[:])
 		p1_str := string(hex.encode(p1[:], context.temp_allocator))
 		p2_str := string(hex.encode(p2[:], context.temp_allocator))
 		testing.expectf(

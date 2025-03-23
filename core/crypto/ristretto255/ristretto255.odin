@@ -16,7 +16,7 @@ ELEMENT_SIZE :: 32
 // group element.
 WIDE_ELEMENT_SIZE :: 64
 
-@(private)
+@(private, rodata)
 FE_NEG_ONE := field.Tight_Field_Element {
 	2251799813685228,
 	2251799813685247,
@@ -24,7 +24,7 @@ FE_NEG_ONE := field.Tight_Field_Element {
 	2251799813685247,
 	2251799813685247,
 }
-@(private)
+@(private, rodata)
 FE_INVSQRT_A_MINUS_D := field.Tight_Field_Element {
 	278908739862762,
 	821645201101625,
@@ -32,7 +32,7 @@ FE_INVSQRT_A_MINUS_D := field.Tight_Field_Element {
 	1777959178193151,
 	2118520810568447,
 }
-@(private)
+@(private, rodata)
 FE_ONE_MINUS_D_SQ := field.Tight_Field_Element {
 	1136626929484150,
 	1998550399581263,
@@ -40,7 +40,7 @@ FE_ONE_MINUS_D_SQ := field.Tight_Field_Element {
 	118527312129759,
 	45110755273534,
 }
-@(private)
+@(private, rodata)
 FE_D_MINUS_ONE_SQUARED := field.Tight_Field_Element {
 	1507062230895904,
 	1572317787530805,
@@ -48,7 +48,7 @@ FE_D_MINUS_ONE_SQUARED := field.Tight_Field_Element {
 	317374165784489,
 	1572899562415810,
 }
-@(private)
+@(private, rodata)
 FE_SQRT_AD_MINUS_ONE := field.Tight_Field_Element {
 	2241493124984347,
 	425987919032274,
@@ -76,7 +76,7 @@ ge_clear :: proc "contextless" (ge: ^Group_Element) {
 
 // ge_set sets `ge = a`.
 ge_set :: proc(ge, a: ^Group_Element) {
-	_ge_assert_initialized([]^Group_Element{a})
+	_ge_ensure_initialized([]^Group_Element{a})
 
 	grp.ge_set(&ge._p, &a._p)
 	ge._is_initialized = true
@@ -199,9 +199,7 @@ ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
 // ge_set_wide_bytes sets ge to the result of deriving a ristretto255
 // group element, from a wide (512-bit) byte string.
 ge_set_wide_bytes :: proc(ge: ^Group_Element, b: []byte) {
-	if len(b) != WIDE_ELEMENT_SIZE {
-		panic("crypto/ristretto255: invalid wide input size")
-	}
+	ensure(len(b) == WIDE_ELEMENT_SIZE, "crypto/ristretto255: invalid wide input size")
 
 	// The element derivation function on an input string b proceeds as
 	// follows:
@@ -222,10 +220,8 @@ ge_set_wide_bytes :: proc(ge: ^Group_Element, b: []byte) {
 
 // ge_bytes sets dst to the canonical encoding of ge.
 ge_bytes :: proc(ge: ^Group_Element, dst: []byte) {
-	_ge_assert_initialized([]^Group_Element{ge})
-	if len(dst) != ELEMENT_SIZE {
-		panic("crypto/ristretto255: invalid destination size")
-	}
+	_ge_ensure_initialized([]^Group_Element{ge})
+	ensure(len(dst) == ELEMENT_SIZE, "crypto/ristretto255: invalid destination size")
 
 	x0, y0, z0, t0 := &ge._p.x, &ge._p.y, &ge._p.z, &ge._p.t
 
@@ -306,7 +302,7 @@ ge_bytes :: proc(ge: ^Group_Element, dst: []byte) {
 
 // ge_add sets `ge = a + b`.
 ge_add :: proc(ge, a, b: ^Group_Element) {
-	_ge_assert_initialized([]^Group_Element{a, b})
+	_ge_ensure_initialized([]^Group_Element{a, b})
 
 	grp.ge_add(&ge._p, &a._p, &b._p)
 	ge._is_initialized = true
@@ -314,7 +310,7 @@ ge_add :: proc(ge, a, b: ^Group_Element) {
 
 // ge_double sets `ge = a + a`.
 ge_double :: proc(ge, a: ^Group_Element) {
-	_ge_assert_initialized([]^Group_Element{a})
+	_ge_ensure_initialized([]^Group_Element{a})
 
 	grp.ge_double(&ge._p, &a._p)
 	ge._is_initialized = true
@@ -322,7 +318,7 @@ ge_double :: proc(ge, a: ^Group_Element) {
 
 // ge_negate sets `ge = -a`.
 ge_negate :: proc(ge, a: ^Group_Element) {
-	_ge_assert_initialized([]^Group_Element{a})
+	_ge_ensure_initialized([]^Group_Element{a})
 
 	grp.ge_negate(&ge._p, &a._p)
 	ge._is_initialized = true
@@ -330,7 +326,7 @@ ge_negate :: proc(ge, a: ^Group_Element) {
 
 // ge_scalarmult sets `ge = A * sc`.
 ge_scalarmult :: proc(ge, A: ^Group_Element, sc: ^Scalar) {
-	_ge_assert_initialized([]^Group_Element{A})
+	_ge_ensure_initialized([]^Group_Element{A})
 
 	grp.ge_scalarmult(&ge._p, &A._p, sc)
 	ge._is_initialized = true
@@ -344,7 +340,7 @@ ge_scalarmult_generator :: proc "contextless" (ge: ^Group_Element, sc: ^Scalar) 
 
 // ge_scalarmult_vartime sets `ge = A * sc` in variable time.
 ge_scalarmult_vartime :: proc(ge, A: ^Group_Element, sc: ^Scalar) {
-	_ge_assert_initialized([]^Group_Element{A})
+	_ge_ensure_initialized([]^Group_Element{A})
 
 	grp.ge_scalarmult_vartime(&ge._p, &A._p, sc)
 	ge._is_initialized = true
@@ -358,7 +354,7 @@ ge_double_scalarmult_generator_vartime :: proc(
 	A: ^Group_Element,
 	b: ^Scalar,
 ) {
-	_ge_assert_initialized([]^Group_Element{A})
+	_ge_ensure_initialized([]^Group_Element{A})
 
 	grp.ge_double_scalarmult_basepoint_vartime(&ge._p, a, &A._p, b)
 	ge._is_initialized = true
@@ -367,7 +363,7 @@ ge_double_scalarmult_generator_vartime :: proc(
 // ge_cond_negate sets `ge = a` iff `ctrl == 0` and `ge = -a` iff `ctrl == 1`.
 // Behavior for all other values of ctrl are undefined,
 ge_cond_negate :: proc(ge, a: ^Group_Element, ctrl: int) {
-	_ge_assert_initialized([]^Group_Element{a})
+	_ge_ensure_initialized([]^Group_Element{a})
 
 	grp.ge_cond_negate(&ge._p, &a._p, ctrl)
 	ge._is_initialized = true
@@ -376,7 +372,7 @@ ge_cond_negate :: proc(ge, a: ^Group_Element, ctrl: int) {
 // ge_cond_assign sets `ge = ge` iff `ctrl == 0` and `ge = a` iff `ctrl == 1`.
 // Behavior for all other values of ctrl are undefined,
 ge_cond_assign :: proc(ge, a: ^Group_Element, ctrl: int) {
-	_ge_assert_initialized([]^Group_Element{ge, a})
+	_ge_ensure_initialized([]^Group_Element{ge, a})
 
 	grp.ge_cond_assign(&ge._p, &a._p, ctrl)
 }
@@ -384,7 +380,7 @@ ge_cond_assign :: proc(ge, a: ^Group_Element, ctrl: int) {
 // ge_cond_select sets `ge = a` iff `ctrl == 0` and `ge = b` iff `ctrl == 1`.
 // Behavior for all other values of ctrl are undefined,
 ge_cond_select :: proc(ge, a, b: ^Group_Element, ctrl: int) {
-	_ge_assert_initialized([]^Group_Element{a, b})
+	_ge_ensure_initialized([]^Group_Element{a, b})
 
 	grp.ge_cond_select(&ge._p, &a._p, &b._p, ctrl)
 	ge._is_initialized = true
@@ -393,7 +389,7 @@ ge_cond_select :: proc(ge, a, b: ^Group_Element, ctrl: int) {
 // ge_equal returns 1 iff `a == b`, and 0 otherwise.
 @(require_results)
 ge_equal :: proc(a, b: ^Group_Element) -> int {
-	_ge_assert_initialized([]^Group_Element{a, b})
+	_ge_ensure_initialized([]^Group_Element{a, b})
 
 	// CT_EQ(x1 * y2, y1 * x2) | CT_EQ(y1 * y2, x1 * x2)
 	ax_by, ay_bx, ay_by, ax_bx: field.Tight_Field_Element = ---, ---, ---, ---
@@ -501,10 +497,8 @@ ge_map :: proc "contextless" (ge: ^Group_Element, b: []byte) {
 }
 
 @(private)
-_ge_assert_initialized :: proc(ges: []^Group_Element) {
+_ge_ensure_initialized :: proc(ges: []^Group_Element) {
 	for ge in ges {
-		if !ge._is_initialized {
-			panic("crypto/ristretto255: uninitialized group element")
-		}
+		ensure(ge._is_initialized, "crypto/ristretto255: uninitialized group element")
 	}
 }
