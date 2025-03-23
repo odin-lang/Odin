@@ -647,11 +647,65 @@ copy_sign :: proc{
 @(require_results) to_degrees_f64   :: proc "contextless" (radians: f64)   -> f64   { return radians * DEG_PER_RAD }
 @(require_results) to_degrees_f64le :: proc "contextless" (radians: f64le) -> f64le { return radians * DEG_PER_RAD }
 @(require_results) to_degrees_f64be :: proc "contextless" (radians: f64be) -> f64be { return radians * DEG_PER_RAD }
+/*
+Convert given input to radians.
+
+**Only accept floats**.
+
+Convertion is implemented by multipication of input and constant `math.RAD_PER_DEG`.
+
+`math.RAD_PER_DEG` = 0.017453292519943295.
+
+Inputs:
+- degrees: input value of type floats.
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        math.to_radians(f16(30.0))
+        math.to_radians(f64(30.0))
+        math.to_radians(f16(60.0))
+        math.to_radians(f64(60.0))
+
+Output:
+        0.5239 // `f16`
+        0.5235987755982988 // `f64`
+        1.0479 // `f16`
+        1.0471975511965976 // `f64`
+*/
 to_radians :: proc{
 	to_radians_f16, to_radians_f16le, to_radians_f16be,
 	to_radians_f32, to_radians_f32le, to_radians_f32be,
 	to_radians_f64, to_radians_f64le, to_radians_f64be,
 }
+/*
+Convert given input to degrees.
+
+**Only accept floats**.
+
+Convertion is implemented by multipication of input and constant `math.DEG_PER_RAD`.
+
+`math.DEG_PER_RAD` = 57.29577951308232.
+
+Inputs:
+- radians: input value of type floats.
+
+Output:
+- x: ouput value that with same type of the input in degrees
+
+Example:
+        math.to_degrees(f16(0.523598))
+        math.to_degrees(f64(0.523598))
+        math.to_degrees(f16(1.047197))
+        math.to_degrees(f64(1.047197))
+
+Output:
+        29.98 // `f16`
+        29.999955561490879 // `f64`
+        59.97 // `f16`
+        59.99996841876126 // `f64`
+*/
 to_degrees :: proc{
 	to_degrees_f16, to_degrees_f16le, to_degrees_f16be,
 	to_degrees_f32, to_degrees_f32le, to_degrees_f32be,
