@@ -52,8 +52,33 @@ clamp :: builtin.clamp
 @(require_results) sqrt_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(sqrt_f64(f64(x))) }
 @(require_results) sqrt_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(sqrt_f64(f64(x))) }
 /*
-Square root.
-Return square root of given input
+Will return square root of given input.
+
+**Only accept floats**
+
+Example:
+        x_float :      = 4.0    ;    sqrt_x_float   := math.sqrt(x_float) // using default type of f16
+        x_f16   :f16   = 30.90  ;    sqrt_x_f16     := math.sqrt(x_f16)
+        x_f16le :f16le = 50.0   ;    sqrt_x_f16le   := math.sqrt(x_f16le)
+        x_f16be :f16be = 100    ;    sqrt_x_f16be   := math.sqrt(x_f16be)
+        x_f32   :f32   = 4.89   ;    sqrt_x_f32     := math.sqrt(x_f32)
+        x_f32le :f32le = 3.14   ;    sqrt_x_f32le   := math.sqrt(x_f32le)
+        x_f32be :f32be = 2.0    ;    sqrt_x_f32be   := math.sqrt(x_f32be)
+        x_f64   :f64   = 0.0578 ;    sqrt_x_f64     := math.sqrt(x_f64)
+        x_f64le :f64le = 1000.6 ;    sqrt_x_f64le   := math.sqrt(x_f64le)
+        x_f64be :f64be = 89.98  ;    sqrt_x_f64be   := math.sqrt(x_f64be)
+
+Output:
+        2 // `f64`
+        5.559 // `f16`
+        7.07 // `f16le`
+        10 // `f16be`
+        2.2113345 // `f32`
+        1.77200449 // `f32le`
+        1.4142135 // `f32be`
+        0.24041630560342614 // `f64`
+        31.6322620120661 // `f64le`
+        9.485778829384543 // `f64be`
 */
 sqrt :: proc{
 	sqrt_f16, sqrt_f16le, sqrt_f16be,
