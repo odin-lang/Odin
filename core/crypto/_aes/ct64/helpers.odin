@@ -4,7 +4,7 @@ import "core:crypto/_aes"
 import "core:encoding/endian"
 
 @(require_results)
-load_interleaved :: proc "contextless" (src: []byte) -> (u64, u64) {
+load_interleaved :: proc "contextless" (src: []byte) -> (u64, u64) #no_bounds_check {
 	w0 := endian.unchecked_get_u32le(src[0:])
 	w1 := endian.unchecked_get_u32le(src[4:])
 	w2 := endian.unchecked_get_u32le(src[8:])
@@ -12,7 +12,7 @@ load_interleaved :: proc "contextless" (src: []byte) -> (u64, u64) {
 	return interleave_in(w0, w1, w2, w3)
 }
 
-store_interleaved :: proc "contextless" (dst: []byte, a0, a1: u64) {
+store_interleaved :: proc "contextless" (dst: []byte, a0, a1: u64) #no_bounds_check {
 	w0, w1, w2, w3 := interleave_out(a0, a1)
 	endian.unchecked_put_u32le(dst[0:], w0)
 	endian.unchecked_put_u32le(dst[4:], w1)
