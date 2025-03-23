@@ -99,7 +99,31 @@ sqrt :: proc{
 @(require_results) sin_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(sin_f32(f32(θ))) }
 @(require_results) sin_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(sin_f64(f64(θ))) }
 @(require_results) sin_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(sin_f64(f64(θ))) }
-// Return the sine of θ in radians.
+/*
+Return sine of given input in radian.
+
+**Only accept floats**
+
+math.sin assumes input in radians.
+
+Inputs:
+- θ: input value of type floats in radians
+
+Output:
+- θ: ouput value that with same type of the input in radians
+
+Example:
+        math.sin(f16(30.0))
+        math.sin(math.to_radians(f64(30.0)))
+        math.sin(f16(90.0))
+        math.sin(math.to_radians(f64(90.0)))
+
+Output:
+        -0.9878 // `f16`
+        0.49999999999999994 // `f64`
+        0.894 // `f16`
+        1 // `f64`
+*/
 sin :: proc{
 	sin_f16, sin_f16le, sin_f16be,
 	sin_f32, sin_f32le, sin_f32be,
@@ -112,7 +136,31 @@ sin :: proc{
 @(require_results) cos_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(cos_f32(f32(θ))) }
 @(require_results) cos_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(cos_f64(f64(θ))) }
 @(require_results) cos_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(cos_f64(f64(θ))) }
-// Return the cosine of θ in radians.
+/*
+Return cosine of given input in radian.
+
+**Only accept floats**
+
+math.cos assumes input in radians.
+
+Inputs:
+- θ: input value of type floats in radians
+
+Output:
+- θ: ouput value that with same type of the input in radians
+
+Example:
+        math.cos(f16(30.0))
+        math.cos(math.to_radians(f64(30.0)))
+        math.cos(f16(60.0))
+        math.cos(math.to_radians(f64(60.0)))
+
+Output:
+        0.1543 // `f16`
+        0.8660254037844387 // `f64`
+        -0.9526 // `f16`
+        0.5000000000000001 // `f64`
+*/
 cos :: proc{
 	cos_f16, cos_f16le, cos_f16be,
 	cos_f32, cos_f32le, cos_f32be,
@@ -419,7 +467,31 @@ log10 :: proc{
 @(require_results) tan_f64   :: proc "contextless" (θ: f64)   -> f64   { return sin(θ)/cos(θ) }
 @(require_results) tan_f64le :: proc "contextless" (θ: f64le) -> f64le { return f64le(tan_f64(f64(θ))) }
 @(require_results) tan_f64be :: proc "contextless" (θ: f64be) -> f64be { return f64be(tan_f64(f64(θ))) }
-// Return the tangent of θ in radians.
+/*
+Return tangent of given input in radian.
+
+**Only accept floats**
+
+math.tan assumes input in radians.
+
+Inputs:
+- θ: input value of type floats in radians
+
+Output:
+- θ: ouput value that with same type of the input in radians
+
+Example:
+        math.tan(f16(30.0))
+        math.tan(math.to_radians(f64(30.0)))
+        math.tan(f16(60.0))
+        math.tan(math.to_radians(f64(60.0)))
+
+Output:
+        -6.402 // `f16`
+        0.5773502691896256 // `f64`
+        0.32 // `f16`
+        1.7320508075688767 // `f64`
+*/
 tan :: proc{
 	tan_f16, tan_f16le, tan_f16be,
 	tan_f32, tan_f32le, tan_f32be,
