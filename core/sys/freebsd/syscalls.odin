@@ -212,8 +212,7 @@ getsockname_or_peername :: proc "contextless" (s: Fd, sockaddr: ^$T, is_peer: bo
         is_peer ? SYS_getpeername : SYS_getsockname,
         cast(uintptr)s,
         cast(uintptr)sockaddr,
-        cast(uintptr)&addrlen
-    )
+        cast(uintptr)&addrlen)
 
     if !ok {
             return cast(Errno)result
