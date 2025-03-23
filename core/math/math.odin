@@ -52,9 +52,15 @@ clamp :: builtin.clamp
 @(require_results) sqrt_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(sqrt_f64(f64(x))) }
 @(require_results) sqrt_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(sqrt_f64(f64(x))) }
 /*
-Will return square root of given input.
+Return square root of given input.
 
 **Only accept floats**
+
+Inputs:
+- x: input value of type floats
+
+Output:
+- x: ouput value that with same type of the input
 
 Example:
         x_float :      = 4.0    ;    sqrt_x_float   := math.sqrt(x_float) // using default type of f16
@@ -67,6 +73,7 @@ Example:
         x_f64   :f64   = 0.0578 ;    sqrt_x_f64     := math.sqrt(x_f64)
         x_f64le :f64le = 1000.6 ;    sqrt_x_f64le   := math.sqrt(x_f64le)
         x_f64be :f64be = 89.98  ;    sqrt_x_f64be   := math.sqrt(x_f64be)
+
 
 Output:
         2 // `f64`
