@@ -1891,6 +1891,48 @@ index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
 	return
 }
 /*
+Finds the last occurrence of any substring in `substrs` within `s`
+
+Inputs:
+- s: The string to search in
+- substrs: The substrings to look for
+
+Returns:
+- idx: the index of the last matching substring
+- width: the length of the found substring
+*/
+last_index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
+	idx = -1
+	if s == "" || len(substrs) <= 0 {
+		return
+	}
+	// disallow "" substr
+	for substr in substrs {
+		if len(substr) == 0 {
+			return
+		}
+	}
+
+	highest_index := -1
+	found := false
+	for substr in substrs {
+        haystack_slice_start := max( 0 , highest_index )
+		haystack := s[haystack_slice_start:]
+		if i := last_index(haystack, substr); i >= 0 {
+			if i + haystack_slice_start > highest_index {
+				highest_index = haystack_slice_start + i
+				width = len(substr)
+				found = true
+			}
+		}
+	}
+
+	if found {
+		idx = highest_index
+	}
+	return
+}
+/*
 Counts the number of non-overlapping occurrences of `substr` in `s`
 
 Inputs:
