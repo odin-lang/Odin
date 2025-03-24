@@ -671,6 +671,8 @@ Convertion is implemented by multipication of input and constant `math.RAD_PER_D
 
 `math.RAD_PER_DEG` = 0.017453292519943295.
 
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
 Inputs:
 - degrees: input value of type floats.
 
@@ -683,11 +685,29 @@ Example:
         math.to_radians(f16(60.0))
         math.to_radians(f64(60.0))
 
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             rad_y_f64_pos_zero := math.to_radians(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             rad_y_f32_neg_zero := math.to_radians(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); rad_y_f16_pos_inf  := math.to_radians(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  rad_y_f32_zero_inf := math.to_radians(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); rad_y_f64_neg_inf  := math.to_radians(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); rad_y_f64be_nan    := math.to_radians(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); rad_y_f16le_nan    := math.to_radians(y_f16le_nan)    // NaN
+
 Output:
         0.5239 // `f16`
         0.5235987755982988 // `f64`
         1.0479 // `f16`
         1.0471975511965976 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        +Inf // `f16`
+        +Inf // `f32`
+        -Inf // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
 */
 to_radians :: proc{
 	to_radians_f16, to_radians_f16le, to_radians_f16be,
