@@ -524,7 +524,6 @@ heap_cache_register_superpage :: proc "contextless" (superpage: ^Heap_Superpage)
 				heap_cache_add_slab(slab, heap_bin_size_to_rank(slab.bin_size))
 			}
 
-			i += 1
 			heap_debug_cover(.Superpage_Registered_With_Slab_In_Use)
 		}
 	}
