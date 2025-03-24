@@ -645,6 +645,13 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				break;
 			}
 
+			if (!are_types_identical(x.type, y.type)) {
+				gbString tx = type_to_string(x.type);
+				gbString ty = type_to_string(y.type);
+				error(call, "Mismatched types to '%.*s', '%s' vs '%s'", LIT(builtin_name), tx, ty);
+				gb_string_free(ty);
+				gb_string_free(tx);
+			}
 
 			Type *vt = base_type(x.type);
 			GB_ASSERT(vt->kind == Type_SimdVector);
@@ -1675,12 +1682,16 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		if (ce->args.count > 0) {
 			Ast *arg = ce->args[0];
-			Operand o = {};
-			Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
-			if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
-				error(ce->args[0], "'#caller_expression' expected a valid earlier parameter name");
+			if (arg->kind != Ast_Ident) {
+				error(arg, "'#caller_expression' expected an identifier");
+			} else {
+				Operand o = {};
+				Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
+				if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
+					error(arg, "'#caller_expression' expected a valid earlier parameter name");
+				}
+				arg->Ident.entity = e;
 			}
-			arg->Ident.entity = e;
 		}
 
 		operand->type = t_string;
