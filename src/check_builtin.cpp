@@ -1675,12 +1675,16 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		if (ce->args.count > 0) {
 			Ast *arg = ce->args[0];
-			Operand o = {};
-			Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
-			if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
-				error(ce->args[0], "'#caller_expression' expected a valid earlier parameter name");
+			if (arg->kind != Ast_Ident) {
+				error(arg, "'#caller_expression' expected an identifier");
+			} else {
+				Operand o = {};
+				Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
+				if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
+					error(arg, "'#caller_expression' expected a valid earlier parameter name");
+				}
+				arg->Ident.entity = e;
 			}
-			arg->Ident.entity = e;
 		}
 
 		operand->type = t_string;
