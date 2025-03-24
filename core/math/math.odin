@@ -703,6 +703,8 @@ Convertion is implemented by multipication of input and constant `math.DEG_PER_R
 
 `math.DEG_PER_RAD` = 57.29577951308232.
 
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
 Inputs:
 - radians: input value of type floats.
 
@@ -715,11 +717,29 @@ Example:
         math.to_degrees(f16(1.047197))
         math.to_degrees(f64(1.047197))
 
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             deg_y_f64_pos_zero := math.to_degrees(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             deg_y_f32_neg_zero := math.to_degrees(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); deg_y_f16_pos_inf  := math.to_degrees(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  deg_y_f32_zero_inf := math.to_degrees(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); deg_y_f64_neg_inf  := math.to_degrees(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); deg_y_f64be_nan    := math.to_degrees(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); deg_y_f16le_nan    := math.to_degrees(y_f16le_nan)    // NaN
+
 Output:
         29.98 // `f16`
         29.999955561490879 // `f64`
         59.97 // `f16`
         59.99996841876126 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        +Inf // `f16`
+        +Inf // `f32`
+        -Inf // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
 */
 to_degrees :: proc{
 	to_degrees_f16, to_degrees_f16le, to_degrees_f16be,
