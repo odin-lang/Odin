@@ -5,7 +5,7 @@ import "base:builtin"
 _ :: intrinsics
 
 /*
-`Float_Class enum` is a representation of _special values_ accordin to [[IEEE Standard for Floating-Point Arithmetic (IEEE 754);https://en.wikipedia.org/wiki/IEEE_754#Special_values]]
+`Float_Class enum` is a representation of _special values_ according to [[IEEE Standard for Floating-Point Arithmetic (IEEE 754);https://en.wikipedia.org/wiki/IEEE_754#Special_values]]
 */
 Float_Class :: enum {
 	Normal,    // an ordinary nonzero floating point value
