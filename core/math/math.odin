@@ -63,17 +63,24 @@ Output:
 - x: ouput value that with same type of the input
 
 Example:
-        x_float :      = 4.0    ;    sqrt_x_float   := math.sqrt(x_float) // using default type of f16
-        x_f16   :f16   = 30.90  ;    sqrt_x_f16     := math.sqrt(x_f16)
-        x_f16le :f16le = 50.0   ;    sqrt_x_f16le   := math.sqrt(x_f16le)
-        x_f16be :f16be = 100    ;    sqrt_x_f16be   := math.sqrt(x_f16be)
-        x_f32   :f32   = 4.89   ;    sqrt_x_f32     := math.sqrt(x_f32)
-        x_f32le :f32le = 3.14   ;    sqrt_x_f32le   := math.sqrt(x_f32le)
-        x_f32be :f32be = 2.0    ;    sqrt_x_f32be   := math.sqrt(x_f32be)
-        x_f64   :f64   = 0.0578 ;    sqrt_x_f64     := math.sqrt(x_f64)
-        x_f64le :f64le = 1000.6 ;    sqrt_x_f64le   := math.sqrt(x_f64le)
-        x_f64be :f64be = 89.98  ;    sqrt_x_f64be   := math.sqrt(x_f64be)
+        x_float: f64   = 4.0;    sqrt_x_float := math.sqrt(x_float) // using default type of f64
+        x_f16:   f16   = 30.90;  sqrt_x_f16   := math.sqrt(x_f16)
+        x_f16le: f16le = 50.0;   sqrt_x_f16le := math.sqrt(x_f16le)
+        x_f16be: f16be = 100;    sqrt_x_f16be := math.sqrt(x_f16be)
+        x_f32:   f32   = 4.89;   sqrt_x_f32   := math.sqrt(x_f32)
+        x_f32le: f32le = 3.14;   sqrt_x_f32le := math.sqrt(x_f32le)
+        x_f32be: f32be = 2.0;    sqrt_x_f32be := math.sqrt(x_f32be)
+        x_f64le: f64le = 1000.0; sqrt_x_f64le := math.sqrt(x_f64le)
+        x_f64be: f64be = 89.98;  sqrt_x_f64be := math.sqrt(x_f64be)
 
+        // special cases, (see Float_Class and math.classfiy)
+        y_f64_pos_zero: f64 = +0.0;             sqrt_y_f64_pos_zero := math.sqrt(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             sqrt_y_f32_neg_zero := math.sqrt(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); sqrt_y_f16_pos_inf  := math.sqrt(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  sqrt_y_f32_zero_inf := math.sqrt(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); sqrt_y_f64_neg_inf  := math.sqrt(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); sqrt_y_f64be_nan    := math.sqrt(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); sqrt_y_f16le_nan    := math.sqrt(y_f16le_nan)    // NaN
 
 Output:
         2 // `f64`
@@ -83,9 +90,17 @@ Output:
         2.2113345 // `f32`
         1.77200449 // `f32le`
         1.4142135 // `f32be`
-        0.24041630560342614 // `f64`
-        31.6322620120661 // `f64le`
+        31.622776601683793 // `f64le`
         9.485778829384543 // `f64be`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        +Inf // `f16`
+        +Inf // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
 */
 sqrt :: proc{
 	sqrt_f16, sqrt_f16le, sqrt_f16be,
