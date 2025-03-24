@@ -489,11 +489,13 @@ Return tangent of given input in radian.
 
 math.tan assumes input in radians.
 
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
 Inputs:
-- θ: input value of type floats in radians
+- x: input value of type floats in radians
 
 Output:
-- θ: ouput value that with same type of the input in radians
+- x: ouput value that with same type of the input in radians
 
 Example:
         math.tan(f16(30.0))
@@ -501,11 +503,29 @@ Example:
         math.tan(f16(60.0))
         math.tan(math.to_radians(f64(60.0)))
 
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             tan_y_f64_pos_zero := math.tan(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             tan_y_f32_neg_zero := math.tan(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); tan_y_f16_pos_inf  := math.tan(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  tan_y_f32_zero_inf := math.tan(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); tan_y_f64_neg_inf  := math.tan(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); tan_y_f64be_nan    := math.tan(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); tan_y_f16le_nan    := math.tan(y_f16le_nan)    // NaN
+
 Output:
         -6.402 // `f16`
         0.5773502691896256 // `f64`
         0.32 // `f16`
         1.7320508075688767 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
 */
 tan :: proc{
 	tan_f16, tan_f16le, tan_f16be,
