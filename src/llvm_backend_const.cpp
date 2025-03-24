@@ -1125,7 +1125,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 							visited[index] = true;
 						} else {
 							if (!visited[index]) {
-								values[index]  = lb_const_value(m, f->type, {}, allow_local, is_rodata).value;
+								values[index]  = lb_const_value(m, f->type, {}, /*allow_local*/false, is_rodata).value;
 								visited[index] = true;
 							}
 
@@ -1169,6 +1169,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 									if (LLVMIsConstant(elem_value) && LLVMIsConstant(values[index])) {
 										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
 									} else if (is_local) {
+									#if 1
 										lbProcedure *p = m->curr_procedure;
 										GB_ASSERT(p != nullptr);
 										if (LLVMIsConstant(values[index])) {
@@ -1190,14 +1191,16 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 										ptr = LLVMBuildGEP2(p->builder, lb_type(m, f->type), ptr, indices, idx_list_len, "");
 										ptr = LLVMBuildPointerCast(p->builder, ptr, lb_type(m, alloc_type_pointer(tav.type)), "");
 
-										// if (LLVMIsALoadInst(elem_value)) {
-										// 	i64 sz = type_size_of(tav.type);
-										// 	LLVMValueRef src = LLVMGetOperand(elem_value, 0);
-										// 	lb_mem_copy_non_overlapping(p, {ptr, t_rawptr}, {src, t_rawptr}, lb_const_int(m, t_int, sz), false);
-										// } else {
+										if (LLVMIsALoadInst(elem_value)) {
+											i64 sz = type_size_of(tav.type);
+											LLVMValueRef src = LLVMGetOperand(elem_value, 0);
+											lb_mem_copy_non_overlapping(p, {ptr, t_rawptr}, {src, t_rawptr}, lb_const_int(m, t_int, sz), false);
+										} else {
 											LLVMBuildStore(p->builder, elem_value, ptr);
-										// }
-
+										}
+									#endif
+										is_constant = false;
+									} else {
 										is_constant = false;
 									}
 								}
@@ -1268,15 +1271,15 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					LLVMValueRef val = old_values[i];
 					if (!LLVMIsConstant(val)) {
 						LLVMValueRef dst = LLVMBuildStructGEP2(p->builder, llvm_addr_type(p->module, v.addr), v.addr.value, cast(unsigned)i, "");
-						if (LLVMIsALoadInst(val)) {
-							Type *ptr_type = v.addr.type;
-							i64 sz = type_size_of(type_deref(ptr_type));
+						// if (LLVMIsALoadInst(val)) {
+						// 	Type *ptr_type = v.addr.type;
+						// 	i64 sz = type_size_of(type_deref(ptr_type));
 
-							LLVMValueRef src = LLVMGetOperand(val, 0);
-							lb_mem_copy_non_overlapping(p, {dst, ptr_type}, {src, ptr_type}, lb_const_int(m, t_int, sz), false);
-						} else {
-							LLVMBuildStore(p->builder, val, dst);
-						}
+						// 	LLVMValueRef src = LLVMGetOperand(val, 0);
+						// 	lb_mem_copy_non_overlapping(p, {dst, ptr_type}, {src, ptr_type}, lb_const_int(m, t_int, sz), false);
+						// } else {
+						LLVMBuildStore(p->builder, val, dst);
+						// }
 					}
 				}
 				return lb_addr_load(p, v);
