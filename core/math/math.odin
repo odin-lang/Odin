@@ -37,8 +37,8 @@ MAX_F64_PRECISION :: 16 // Maximum number of meaningful digits after the decimal
 MAX_F32_PRECISION ::  8 // Maximum number of meaningful digits after the decimal point for 'f32'
 MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal point for 'f16'
 
-RAD_PER_DEG :: TAU/360.0
-DEG_PER_RAD :: 360.0/TAU
+RAD_PER_DEG :: TAU/360.0 // Being used to convert degrees to radians. (see `math.to_radians`)
+DEG_PER_RAD :: 360.0/TAU // Being used to convert radians to degrees. (see `math.to_degrees`)
 
 abs :: builtin.abs
 min :: builtin.min
