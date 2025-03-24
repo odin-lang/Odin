@@ -1190,13 +1190,13 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 										ptr = LLVMBuildGEP2(p->builder, lb_type(m, f->type), ptr, indices, idx_list_len, "");
 										ptr = LLVMBuildPointerCast(p->builder, ptr, lb_type(m, alloc_type_pointer(tav.type)), "");
 
-										if (LLVMIsALoadInst(elem_value)) {
-											i64 sz = type_size_of(tav.type);
-											LLVMValueRef src = LLVMGetOperand(elem_value, 0);
-											lb_mem_copy_non_overlapping(p, {ptr, t_rawptr}, {src, t_rawptr}, lb_const_int(m, t_int, sz), false);
-										} else {
+										// if (LLVMIsALoadInst(elem_value)) {
+										// 	i64 sz = type_size_of(tav.type);
+										// 	LLVMValueRef src = LLVMGetOperand(elem_value, 0);
+										// 	lb_mem_copy_non_overlapping(p, {ptr, t_rawptr}, {src, t_rawptr}, lb_const_int(m, t_int, sz), false);
+										// } else {
 											LLVMBuildStore(p->builder, elem_value, ptr);
-										}
+										// }
 
 										is_constant = false;
 									}
