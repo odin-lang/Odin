@@ -1,6 +1,5 @@
 package os2
 
-import "base:intrinsics"
 import "base:runtime"
 
 import "core:strings"
@@ -163,7 +162,7 @@ clean_path :: proc(path: string, allocator: runtime.Allocator) -> (cleaned: stri
 				}
 			case:
 				// Copy the path element verbatim and add a separator.
-				intrinsics.mem_copy_non_overlapping(raw_data(buffer[buffer_i:]), raw_data(elem), len(elem))
+				copy(buffer[buffer_i:], elem)
 				buffer_i += len(elem)
 				buffer[buffer_i] = _Path_Separator
 				buffer_i += 1
@@ -182,7 +181,7 @@ clean_path :: proc(path: string, allocator: runtime.Allocator) -> (cleaned: stri
 	}
 
 	compact := make([]u8, buffer_i, allocator) or_return
-	intrinsics.mem_copy_non_overlapping(raw_data(compact), raw_data(buffer), buffer_i)
+	copy(compact, buffer) // NOTE(bill): buffer[:buffer_i] is redundant here
 	return string(compact), nil
 }
 
@@ -298,7 +297,7 @@ get_relative_path :: proc(base, target: string, allocator: runtime.Allocator) ->
 			buf[n] = _Path_Separator
 			n += 1
 		}
-		runtime.mem_copy_non_overlapping(raw_data(buf[n:]), raw_data(trailing), len(trailing))
+		copy(buf[n:], trailing)
 	}
 
 	path = string(buf)
@@ -389,17 +388,16 @@ For example, `join_filename("foo", "tar.gz")` will result in `"foo.tar.gz"`.
 */
 @(require_results)
 join_filename :: proc(base: string, ext: string, allocator: runtime.Allocator) -> (joined: string, err: Error) {
-	len_base := len(base)
-	if len_base == 0 {
+	if len(base) == 0 {
 		return strings.clone(ext, allocator)
 	} else if len(ext) == 0 {
 		return strings.clone(base, allocator)
 	}
 
-	buf := make([]u8, len_base + 1 + len(ext), allocator) or_return
-	intrinsics.mem_copy_non_overlapping(raw_data(buf), raw_data(base), len_base)
-	buf[len_base] = '.'
-	intrinsics.mem_copy_non_overlapping(raw_data(buf[1+len_base:]), raw_data(ext), len(ext))
+	buf := make([]u8, len(base) + 1 + len(ext), allocator) or_return
+	copy(buf, base)
+	buf[len(base)] = '.'
+	copy(buf[1+len(base):], ext)
 
 	return string(buf), nil
 }

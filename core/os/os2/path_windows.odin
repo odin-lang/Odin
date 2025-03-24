@@ -1,7 +1,6 @@
 #+private
 package os2
 
-import "base:intrinsics"
 import "base:runtime"
 import "core:strings"
 import win32 "core:sys/windows"
@@ -271,7 +270,7 @@ _clean_path_handle_start :: proc(path: string, buffer: []u8) -> (rooted: bool, s
 			// Take `C:` to `C:\`.
 			start += 1
 		}
-		intrinsics.mem_copy_non_overlapping(raw_data(buffer), raw_data(path), start)
+		copy(buffer, path[:start])
 	}
 	return
 }
