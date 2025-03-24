@@ -645,6 +645,13 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				break;
 			}
 
+			if (!are_types_identical(x.type, y.type)) {
+				gbString tx = type_to_string(x.type);
+				gbString ty = type_to_string(y.type);
+				error(call, "Mismatched types to '%.*s', '%s' vs '%s'", LIT(builtin_name), tx, ty);
+				gb_string_free(ty);
+				gb_string_free(tx);
+			}
 
 			Type *vt = base_type(x.type);
 			GB_ASSERT(vt->kind == Type_SimdVector);
