@@ -1125,9 +1125,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 							visited[index] = true;
 						} else {
 							if (!visited[index]) {
-								values[index]  = lb_const_value(m, f->type, {}, false).value;
+								values[index]  = lb_const_value(m, f->type, {}, allow_local, is_rodata).value;
 								visited[index] = true;
 							}
+
 
 							unsigned idx_list_len = cast(unsigned)sel.index.count-1;
 							unsigned *idx_list = gb_alloc_array(temporary_allocator(), unsigned, idx_list_len);
@@ -1138,6 +1139,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 								for (isize j = 1; j < sel.index.count; j++) {
 									i32 index = sel.index[j];
 									Type *cvt = base_type(cv_type);
+
 
 									if (cvt->kind == Type_Struct) {
 										if (cvt->Struct.is_raw_union) {
@@ -1164,9 +1166,38 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 								}
 								if (is_constant) {
 									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local, is_rodata).value;
-									if (LLVMIsConstant(elem_value)) {
+									if (LLVMIsConstant(elem_value) && LLVMIsConstant(values[index])) {
 										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
-									} else {
+									} else if (is_local) {
+										lbProcedure *p = m->curr_procedure;
+										GB_ASSERT(p != nullptr);
+										if (LLVMIsConstant(values[index])) {
+											lbAddr addr = lb_add_local_generated(p, f->type, false);
+											lb_addr_store(p, addr, lbValue{values[index], f->type});
+											values[index] = lb_addr_load(p, addr).value;
+										}
+
+										GB_ASSERT(LLVMIsALoadInst(values[index]));
+
+										LLVMValueRef ptr = LLVMGetOperand(values[index], 0);
+
+										LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, idx_list_len);
+										LLVMTypeRef lt_u32 = lb_type(m, t_u32);
+										for (unsigned i = 0; i < idx_list_len; i++) {
+											indices[i] = LLVMConstInt(lt_u32, idx_list[i], false);
+										}
+
+										ptr = LLVMBuildGEP2(p->builder, lb_type(m, f->type), ptr, indices, idx_list_len, "");
+										ptr = LLVMBuildPointerCast(p->builder, ptr, lb_type(m, alloc_type_pointer(tav.type)), "");
+
+										if (LLVMIsALoadInst(elem_value)) {
+											i64 sz = type_size_of(tav.type);
+											LLVMValueRef src = LLVMGetOperand(elem_value, 0);
+											lb_mem_copy_non_overlapping(p, {ptr, t_rawptr}, {src, t_rawptr}, lb_const_int(m, t_int, sz), false);
+										} else {
+											LLVMBuildStore(p->builder, elem_value, ptr);
+										}
+
 										is_constant = false;
 									}
 								}
@@ -1205,7 +1236,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				LLVMValueRef val = values[i];
 				if (!LLVMIsConstant(val)) {
 					GB_ASSERT(is_local);
-					GB_ASSERT(LLVMGetInstructionOpcode(val) == LLVMLoad);
+					GB_ASSERT(LLVMIsALoadInst(val));
 					is_constant = false;
 				}
 			}
@@ -1237,7 +1268,15 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					LLVMValueRef val = old_values[i];
 					if (!LLVMIsConstant(val)) {
 						LLVMValueRef dst = LLVMBuildStructGEP2(p->builder, llvm_addr_type(p->module, v.addr), v.addr.value, cast(unsigned)i, "");
-						LLVMBuildStore(p->builder, val, dst);
+						if (LLVMIsALoadInst(val)) {
+							Type *ptr_type = v.addr.type;
+							i64 sz = type_size_of(type_deref(ptr_type));
+
+							LLVMValueRef src = LLVMGetOperand(val, 0);
+							lb_mem_copy_non_overlapping(p, {dst, ptr_type}, {src, ptr_type}, lb_const_int(m, t_int, sz), false);
+						} else {
+							LLVMBuildStore(p->builder, val, dst);
+						}
 					}
 				}
 				return lb_addr_load(p, v);
