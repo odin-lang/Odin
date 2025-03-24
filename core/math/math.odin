@@ -121,6 +121,31 @@ Return sine of given input in radian.
 
 math.sin assumes input in radians.
 
+Inputs:
+- θ: input value of type floats in radians
+
+Output:
+- θ: ouput value that with same type of the input in radians
+
+Example:
+        math.sin(f16(30.0))
+        math.sin(math.to_radians(f64(30.0)))
+        math.sin(f16(90.0))
+        math.sin(math.to_radians(f64(90.0)))
+
+Output:
+        -0.9878 // `f16`
+        0.49999999999999994 // `f64`
+        0.894 // `f16`
+        1 // `f64`
+*/
+*
+Return sine of given input in radian.
+
+**Only accept floats**
+
+math.sin assumes input in radians.
+
 Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
 
 Inputs:
