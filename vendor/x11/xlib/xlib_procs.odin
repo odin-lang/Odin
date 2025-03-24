@@ -217,6 +217,11 @@ foreign xlib {
 		window:  Window,
 		width:   u32,
 		) ---
+	SetWindowBorder :: proc(
+		display: ^Display,
+		window: Window,
+		pixel: uint,
+		) ---
 	// Window: changing stacking order
 	RaiseWindow :: proc(display: ^Display, window: Window) ---
 	LowerWindow :: proc(display: ^Display, window: Window) ---
