@@ -121,11 +121,13 @@ Return sine of given input in radian.
 
 math.sin assumes input in radians.
 
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
 Inputs:
-- θ: input value of type floats in radians
+- x: input value of type floats in radians
 
 Output:
-- θ: ouput value that with same type of the input in radians
+- x: ouput value that with same type of the input in radians
 
 Example:
         math.sin(f16(30.0))
@@ -133,11 +135,30 @@ Example:
         math.sin(f16(90.0))
         math.sin(math.to_radians(f64(90.0)))
 
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             sin_y_f64_pos_zero := math.sin(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             sin_y_f32_neg_zero := math.sin(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); sin_y_f16_pos_inf  := math.sin(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  sin_y_f32_zero_inf := math.sin(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); sin_y_f64_neg_inf  := math.sin(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); sin_y_f64be_nan    := math.sin(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); sin_y_f16le_nan    := math.sin(y_f16le_nan)    // NaN
+
+
 Output:
         -0.9878 // `f16`
         0.49999999999999994 // `f64`
         0.894 // `f16`
         1 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
 */
 sin :: proc{
 	sin_f16, sin_f16le, sin_f16be,
