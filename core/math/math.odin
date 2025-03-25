@@ -2183,7 +2183,98 @@ asin_f16le :: proc "contextless" (x: f16le) -> f16le {
 asin_f16be :: proc "contextless" (x: f16be) -> f16be {
 	return f16be(asin_f64(f64(x)))
 }
-// Return the arc sine of x, in radians. Defined on the domain of [-1, 1] with a range of [-π/2, π/2]
+/*
+Return inverse of sine (arcsin) of given input in radians.
+
+**Only accept floats**
+
+Relation with math.sin:
+
+    x = sin(y)
+    y = asin(x)
+
+    For real result, x should be in domain of [-1, 1],
+    resulting single value that lies in following range(s)
+
+        [  -π/2,   π/2] (in radians)
+        [-90°/2, 90°/2] (in degrees)
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
+Note:
+   Implmentation of asin was developed at SunSoft, a Sun Microsystems, Inc. (1993).
+   For detail implementation, see source code, at `asin_f64` procedure.
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        x30_f32:     f32 = 30.0;                     sin_x30_f32     := math.sin(x30_f32);     asin_x30_f32     := math.asin(sin_x30_f32)     // without converting to radians
+        x30_f32_rad: f32 = math.to_radians(x30_f32); sin_x30_f32_rad := math.sin(x30_f32_rad); asin_x30_f32_rad := math.asin(sin_x30_f32_rad) // convert to radians first
+
+            // convert asin() back to degrees
+            invers_asin_x30:       f32 = math.to_degrees(asin_x30_f32)
+            invers_asin_x30_rad:   f32 = math.to_degrees(asin_x30_f32_rad)
+
+        x60_f64le:     f64le = 60.0;                       sin_x60_f64le     := math.sin(x60_f64le);     asin_x60_f64le     := math.asin(sin_x60_f64le)     // without converting to radians
+        x60_f64le_rad: f64le = math.to_radians(x60_f64le); sin_x60_f64le_rad := math.sin(x60_f64le_rad); asin_x60_f64le_rad := math.asin(sin_x60_f64le_rad) // convert to radians first
+
+            // convert asin() back to degrees
+            invers_asin_x60:     f64le = math.to_degrees(asin_x60_f64le)
+            invers_asin_x60_rad: f64le = math.to_degrees(asin_x60_f64le_rad)
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             asin_y_f64_pos_zero := math.asin(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             asin_y_f32_neg_zero := math.asin(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); asin_y_f16_pos_inf  := math.asin(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  asin_y_f32_zero_inf := math.asin(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); asin_y_f64_neg_inf  := math.asin(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); asin_y_f64be_nan    := math.asin(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); asin_y_f16le_nan    := math.asin(y_f16le_nan)    // NaN
+
+
+// x: 30
+// x in radians: 0.52359879
+
+// Without converting to radians
+
+        sin(x)=-0.9880316
+        asin(sin_deg)=-1.41592658
+        math.to_degrees(asin(sin_deg))=-81.126617
+
+// Converting to radians
+
+        sin(x_rad)=0.5
+        asin(sin_deg)=0.52359879
+        math.to_degrees(asin(sin_deg))=30.000002
+
+Output:
+        30; -0.9880316; -1.41592658 // `f32`; `f32`; `f32`
+        0.52359879; 0.5; 0.52359879 // `f32`; `f32`; `f32`
+
+                // convert asin() back to degrees
+                -81.126617 // `f32`
+                30.000002 // `f32`
+
+        60; -0.30481062110221668; -0.30973958179392846 // `f64le`; `f64le`; `f64le`
+        1.0471975511965976; 0.8660254037844386; 1.0471975511965976 // `f64le`; `f64le`; `f64le`
+
+                // convert asin() back to degrees
+                -17.746770784939255 // `f64le`
+                59.99999999999999 // `f64le`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 asin :: proc{
 	asin_f64, asin_f32, asin_f16,
 	asin_f64le, asin_f64be,
