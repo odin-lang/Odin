@@ -2202,7 +2202,7 @@ Relation with math.sin:
 Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
 
 Note:
-   Implmentation of asin was developed at SunSoft, a Sun Microsystems, Inc. (1993).
+   Implementation of asin was developed at SunSoft, a Sun Microsystems, Inc. (1993).
    For detail implementation, see source code, at `asin_f64` procedure.
 
 Inputs:
