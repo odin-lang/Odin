@@ -30,6 +30,8 @@ SQRT_FIVE    :: 2.23606797749978969640917366873127623
 LN2          :: 0.693147180559945309417232121458176568
 LN10         :: 2.30258509299404568401799145468436421
 
+GOLDEN_RATIO :: 1.618033988749894848204586834365638117
+
 MAX_F64_PRECISION :: 16 // Maximum number of meaningful digits after the decimal point for 'f64'
 MAX_F32_PRECISION ::  8 // Maximum number of meaningful digits after the decimal point for 'f32'
 MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal point for 'f16'
