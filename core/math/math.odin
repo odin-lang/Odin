@@ -2373,7 +2373,80 @@ acos_f16le :: proc "contextless" (x: f16le) -> f16le {
 acos_f16be :: proc "contextless" (x: f16be) -> f16be {
 	return f16be(acos_f64(f64(x)))
 }
-// Return the arc cosine of x, in radians. Defined on the domain of [-1, 1] with a range of [0, π].
+/*
+Return inverse of cosine (arccos) of given input.
+
+**Only accept floats**
+
+Relation with math.cos:
+
+    x = cos(y)
+    y = acos(x)
+
+    For real result, x should be in domain of [-1, 1],
+    resulting single value that lies in following range(s)
+
+        [ 0,   π] (in radians)
+        [ 0, 180] (in degrees)
+
+Note:
+   Implementation of asin was developed at SunSoft, a Sun Microsystems, Inc. (1993).
+   For detail implementation, see source code, at acos_f64 procedure.
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        x30_f32:     f32 = 30.0;                     cos_x30_f32     := math.cos(x30_f32);     acos_x30_f32     := math.acos(cos_x30_f32)     // without converting to radians
+        x30_f32_rad: f32 = math.to_radians(x30_f32); cos_x30_f32_rad := math.cos(x30_f32_rad); acos_x30_f32_rad := math.acos(cos_x30_f32_rad) // convert to radians first
+
+            // convert acos() back to degrees
+            invers_acos_x30:       f32 = math.to_degrees(acos_x30_f32)
+            invers_acos_x30_rad:   f32 = math.to_degrees(acos_x30_f32_rad)
+
+        x60_f64le:     f64le = 60.0;                       cos_x60_f64le     := math.cos(x60_f64le);     acos_x60_f64le     := math.acos(cos_x60_f64le)     // without converting to radians
+        x60_f64le_rad: f64le = math.to_radians(x60_f64le); cos_x60_f64le_rad := math.cos(x60_f64le_rad); acos_x60_f64le_rad := math.acos(cos_x60_f64le_rad) // convert to radians first
+
+            // convert acos() back to degrees
+            invers_acos_x60:     f64le = math.to_degrees(acos_x60_f64le)
+            invers_acos_x60_rad: f64le = math.to_degrees(acos_x60_f64le_rad)
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             acos_y_f64_pos_zero := math.acos(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             acos_y_f32_neg_zero := math.acos(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); acos_y_f16_pos_inf  := math.acos(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  acos_y_f32_zero_inf := math.acos(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); acos_y_f64_neg_inf  := math.acos(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); acos_y_f64be_nan    := math.acos(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); acos_y_f16le_nan    := math.acos(y_f16le_nan)    // NaN
+
+Output:
+        30; 0.15425146; 1.41592658 // `f32`; `f32`; `f32`
+        0.52359879; 0.86602539; 0.52359879 // `f32`; `f32`; `f32`
+
+                // convert acos() back to degrees
+                81.126617 // `f32`
+                30.000002 // `f32`
+
+        60; -0.9524129804151563; 2.831853071795865 // `f64le`; `f64le`; `f64le`
+        1.0471975511965976; 0.5000000000000001; 1.0471975511965976 // `f64le`; `f64le`; `f64le`
+
+                // convert acos() back to degrees
+                162.25322921506077 // `f64le`
+                59.99999999999999 // `f64le`
+
+        // special cases, (see Float_Class and math.classfiy)
+        1.5707963267948966 // `f64`
+        1.57079637 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 acos :: proc{
 	acos_f64, acos_f32, acos_f16,
 	acos_f64le, acos_f64be,
