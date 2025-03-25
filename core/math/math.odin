@@ -2235,22 +2235,6 @@ Example:
         y_f64be_nan:  f64be = math.nan_f64be(); asin_y_f64be_nan    := math.asin(y_f64be_nan)    // NaN
         y_f16le_nan:  f16le = math.nan_f16le(); asin_y_f16le_nan    := math.asin(y_f16le_nan)    // NaN
 
-
-// x: 30
-// x in radians: 0.52359879
-
-// Without converting to radians
-
-        sin(x)=-0.9880316
-        asin(sin_deg)=-1.41592658
-        math.to_degrees(asin(sin_deg))=-81.126617
-
-// Converting to radians
-
-        sin(x_rad)=0.5
-        asin(sin_deg)=0.52359879
-        math.to_degrees(asin(sin_deg))=30.000002
-
 Output:
         30; -0.9880316; -1.41592658 // `f32`; `f32`; `f32`
         0.52359879; 0.5; 0.52359879 // `f32`; `f32`; `f32`
