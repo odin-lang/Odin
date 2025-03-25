@@ -2071,7 +2071,91 @@ atan2 :: proc{
 	atan2_f16le, atan2_f16be,
 }
 
-// Return the arc tangent of x, in radians. Defined on the domain of [-∞, ∞] with a range of [-π/2, π/2]
+/*
+Return inverse of tangent (arctan) of given input.
+
+**Only accept floats**
+
+Relation with math.tan:
+
+    x = tan(y)
+    y = atan(x)
+
+    For real result, x could be any real numbers,
+    resulting single value that lies in following range(s)
+
+        [-π/2, π/2] (in radians)
+        [ -90,  90] (in degrees)
+
+Note:
+    Implementation of math.atan using math.atan2(y,x) where y is the input value,
+    and x is set to 1. See math.atan2 for detail.
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+For special cases related math.atan2(x, 1)
+
+    atan2(  0, 1) = 0
+    atan2( -0, 1) = - 0
+    atan2(  ∞, 1) = π/2
+    atan2( +∞, 1) = + π/2
+    atan2( -∞, 1) = - π/2
+    atan2(NaN, 1) = NaN
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        x30_f32:     f32 = 30.0;                     tan_x30_f32     := math.tan(x30_f32);     atan_x30_f32     := math.atan(tan_x30_f32)     // without converting to radians
+        x30_f32_rad: f32 = math.to_radians(x30_f32); tan_x30_f32_rad := math.tan(x30_f32_rad); atan_x30_f32_rad := math.atan(tan_x30_f32_rad) // convert to radians first
+
+            // convert atan() back to degrees
+            invers_atan_x30:       f32 = math.to_degrees(atan_x30_f32)
+            invers_atan_x30_rad:   f32 = math.to_degrees(atan_x30_f32_rad)
+
+        x60_f64le:     f64le = 60.0;                       tan_x60_f64le     := math.tan(x60_f64le);     atan_x60_f64le     := math.atan(tan_x60_f64le)     // without converting to radians
+        x60_f64le_rad: f64le = math.to_radians(x60_f64le); tan_x60_f64le_rad := math.tan(x60_f64le_rad); atan_x60_f64le_rad := math.atan(tan_x60_f64le_rad) // convert to radians first
+
+            // convert atan() back to degrees
+            invers_atan_x60:     f64le = math.to_degrees(atan_x60_f64le)
+            invers_atan_x60_rad: f64le = math.to_degrees(atan_x60_f64le_rad)
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             atan_y_f64_pos_zero := math.atan(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             atan_y_f32_neg_zero := math.atan(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); atan_y_f16_pos_inf  := math.atan(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  atan_y_f32_zero_inf := math.atan(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); atan_y_f64_neg_inf  := math.atan(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); atan_y_f64be_nan    := math.atan(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); atan_y_f16le_nan    := math.atan(y_f16le_nan)    // NaN
+
+
+Output:
+        30; -6.405331; -1.41592658 // `f32`; `f32`; `f32`
+        0.52359879; 0.57735026; 0.52359879 // `f32`; `f32`; `f32`
+
+                // convert atan() back to degrees
+                -81.126617 // `f32`
+                30.000002 // `f32`
+
+        60; 0.3200403893795629; 0.3097395817939284 // `f64le`; `f64le`; `f64le`
+        1.0471975511965976; 1.7320508075688767; 1.0471975511965976 // `f64le`; `f64le`; `f64le`
+
+                // convert atan() back to degrees
+                17.74677078493925 // `f64le`
+                59.99999999999999 // `f64le`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        1.57 // `f16`
+        1.57079637 // `f32`
+        -1.5707963267948966 // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 @(require_results)
 atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return atan2(x, 1)
