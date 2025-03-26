@@ -418,43 +418,13 @@ try_cross_linking:;
 		} else {
 			timings_start_section(timings, str_lit("ld-link"));
 
-			String ODIN_ANDROID_NDK_PATH           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK_PATH", permanent_allocator())), NIX_SEPARATOR_STRING);
-			String ODIN_ANDROID_NDK_TOOLCHAIN_PATH = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK_TOOLCHAIN_PATH", permanent_allocator())), NIX_SEPARATOR_STRING);
+			int const ODIN_ANDROID_API_LEVEL = build_context.ODIN_ANDROID_API_LEVEL;
 
-			int ODIN_ANDROID_API_LEVEL = 34;
-			if (char const *found = gb_get_env("ODIN_ANDROID_API_LEVEL", permanent_allocator())) {
-				int new_level = atoi(found);
-				if (new_level >= 34) {
-					ODIN_ANDROID_API_LEVEL = new_level;
-				} else {
-					gb_printf_err("Warning: Invalid ODIN_ANDROID_API_LEVEL '%s', defaulting to %d\n", found, ODIN_ANDROID_API_LEVEL);
-				}
-			}
-
-			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_PATH = {};
-			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH = {};
-			String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH = {};
-
-			if (is_android) {
-				if (ODIN_ANDROID_NDK_PATH.len == 0)  {
-					gb_printf_err("Error: ODIN_ANDROID_NDK_PATH not set");
-					return 1;
-				}
-
-				if (ODIN_ANDROID_NDK_TOOLCHAIN_PATH.len == 0)  {
-					gb_printf_err("Error: ODIN_ANDROID_NDK_PATH not set");
-					return 1;
-				}
-
-				ODIN_ANDROID_NDK_TOOLCHAIN_LIB_PATH = concatenate_strings(permanent_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN_PATH, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
-
-				char buf[32] = {};
-				gb_snprintf(buf, gb_size_of(buf), "%d/", ODIN_ANDROID_API_LEVEL);
-				ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH = concatenate_strings(permanent_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN_LIB_PATH, make_string_c(buf));
-
-				ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH = concatenate_strings(permanent_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN_PATH, str_lit("sysroot/"));
-			}
-
+			String ODIN_ANDROID_NDK_PATH                     = build_context.ODIN_ANDROID_NDK_PATH;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_PATH           = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_PATH;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_PATH       = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_PATH;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH   = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH;
 
 			// Link using `clang`, unless overridden by `ODIN_CLANG_PATH` environment variable.
 			const char* clang_path = gb_get_env("ODIN_CLANG_PATH", permanent_allocator());
