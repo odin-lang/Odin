@@ -420,11 +420,11 @@ try_cross_linking:;
 
 			int const ODIN_ANDROID_API_LEVEL = build_context.ODIN_ANDROID_API_LEVEL;
 
-			String ODIN_ANDROID_NDK_PATH                     = build_context.ODIN_ANDROID_NDK_PATH;
-			String ODIN_ANDROID_NDK_TOOLCHAIN_PATH           = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_PATH;
-			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_PATH       = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_PATH;
-			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH;
-			String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH   = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH;
+			String ODIN_ANDROID_NDK                     = build_context.ODIN_ANDROID_NDK;
+			String ODIN_ANDROID_NDK_TOOLCHAIN           = build_context.ODIN_ANDROID_NDK_TOOLCHAIN;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB       = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT   = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT;
 
 			// Link using `clang`, unless overridden by `ODIN_CLANG_PATH` environment variable.
 			const char* clang_path = gb_get_env("ODIN_CLANG_PATH", permanent_allocator());
@@ -648,7 +648,7 @@ try_cross_linking:;
 
 				glue = gb_string_append_fmt(glue, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
 				glue = gb_string_appendc(glue, "-c \"");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_PATH.text, ODIN_ANDROID_NDK_PATH.len);
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK.text, ODIN_ANDROID_NDK.len);
 				glue = gb_string_appendc(glue, "sources/android/native_app_glue/android_native_app_glue.c");
 				glue = gb_string_appendc(glue, "\" ");
 				glue = gb_string_appendc(glue, "-o \"");
@@ -656,12 +656,12 @@ try_cross_linking:;
 				glue = gb_string_appendc(glue, "\" ");
 
 				glue = gb_string_appendc(glue, "\"-I");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN_PATH.text, ODIN_ANDROID_NDK_TOOLCHAIN_PATH.len);
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
 				glue = gb_string_appendc(glue, "sysroot/usr/include/");
 				glue = gb_string_appendc(glue, "\" ");
 
 				glue = gb_string_appendc(glue, "\"-I");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN_PATH.text, ODIN_ANDROID_NDK_TOOLCHAIN_PATH.len);
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
 				glue = gb_string_appendc(glue, "sysroot/usr/include/aarch64-linux-android/");
 				glue = gb_string_appendc(glue, "\" ");
 
@@ -675,7 +675,7 @@ try_cross_linking:;
 
 				TIME_SECTION("Android Native App Glue ar");
 
-				gbString ar = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN_PATH.text, ODIN_ANDROID_NDK_TOOLCHAIN_PATH.len);
+				gbString ar = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
 				defer (gb_string_free(ar));
 
 				ar = gb_string_appendc(ar, "bin/llvm-ar");
@@ -786,16 +786,16 @@ try_cross_linking:;
 			}
 
 			if (is_android) {
-				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_LIB_PATH.len != 0);
-				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH.len != 0);
-				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH.len != 0);
+				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_LIB.len != 0);
+				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.len != 0);
+				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len != 0);
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\"-L");
-				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL_PATH.len);
+				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.len);
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\"--sysroot=");
-				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT_PATH.len);
+				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
 
 				link_settings = gb_string_appendc(link_settings, "-u ANativeActivity_onCreate ");
