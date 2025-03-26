@@ -408,6 +408,10 @@ enum BuildFlagKind {
 	BuildFlag_Subsystem,
 #endif
 
+	BuildFlag_AndroidKeystore,
+	BuildFlag_AndroidKeystoreAlias,
+	BuildFlag_AndroidManifest,
+
 	BuildFlag_COUNT,
 };
 
@@ -623,6 +627,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_WindowsPdbName,          str_lit("pdb-name"),                  BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_Subsystem,               str_lit("subsystem"),                 BuildFlagParam_String,  Command__does_build);
 #endif
+
+	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command__does_build);
 
 
 	GB_ASSERT(args.count >= 3);
@@ -1638,6 +1646,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 					#endif
 
+						case BuildFlag_AndroidKeystore:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_keystore = value.value_string;
+							break;
+
+						case BuildFlag_AndroidKeystoreAlias:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_keystore_alias = value.value_string;
+							break;
+
+						case BuildFlag_AndroidManifest:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_manifest = value.value_string;
+							break;
 						}
 					}
 

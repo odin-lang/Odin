@@ -543,8 +543,9 @@ struct BuildContext {
 	String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
 	String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT;
 
-	String ANDROID_JAR_SIGNER;
+	String ODIN_ANDROID_JAR_SIGNER;
 	String android_keystore;
+	String android_keystore_alias;
 	String android_manifest;
 };
 
@@ -1816,6 +1817,32 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB, make_string_c(buf));
 
 		bc->ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/"));
+
+
+		bc->ODIN_ANDROID_JAR_SIGNER = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_JAR_SIGNER", permanent_allocator())), NIX_SEPARATOR_STRING);
+		if (bc->build_mode == BuildMode_Executable) {
+			if (bc->ODIN_ANDROID_SDK.len == 0)  {
+				gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
+				gb_exit(1);
+			}
+			if (bc->ODIN_ANDROID_JAR_SIGNER.len == 0) {
+				gb_printf_err("Error: ODIN_ANDROID_JAR_SIGNER not set, which is required for -build-mode:executable for -subtarget:android");
+				gb_exit(1);
+			}
+			if (bc->android_keystore.len == 0) {
+				gb_printf_err("Error: -android-keystore:<string> has not been set\n");
+				gb_exit(1);
+			}
+			if (bc->android_keystore_alias.len == 0) {
+				gb_printf_err("Error: -android-keystore_alias:<string> has not been set\n");
+				gb_exit(1);
+			}
+			if (bc->android_manifest.len == 0) {
+				gb_printf_err("Error: -android-manifest:<string> has not been set\n");
+				gb_exit(1);
+			}
+		}
+
 	}
 
 	if (!bc->custom_optimization_level) {
@@ -1862,16 +1889,18 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (subtarget == Subtarget_Android) {
 		switch (build_context.build_mode) {
+		case BuildMode_Executable:
 		case BuildMode_DynamicLibrary:
 		case BuildMode_Object:
 		case BuildMode_Assembly:
 		case BuildMode_LLVM_IR:
 			break;
-		case BuildMode_Executable:
+		default:
 		case BuildMode_StaticLibrary:
 			if ((build_context.command_kind & Command__does_build) != 0) {
 				gb_printf_err("Unsupported -build-mode for -subtarget:android\n");
 				gb_printf_err("\tCurrently only supporting: \n");
+				gb_printf_err("\t\texe\n");
 				gb_printf_err("\t\tshared\n");
 				gb_printf_err("\t\tobject\n");
 				gb_printf_err("\t\tassembly\n");
@@ -2080,7 +2109,8 @@ gb_internal bool init_build_paths(String init_filename) {
 		String const single_file_extension = str_lit(".odin");
 
 		if (selected_subtarget == Subtarget_Android) {
-			output_extension = STR_LIT("bin");
+			// NOTE(bill): It's always shared!
+			output_extension = STR_LIT("so");
 		} else if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
 		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
