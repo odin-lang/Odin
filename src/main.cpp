@@ -1105,8 +1105,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								String str = value.value_string;
 								bool found = false;
 
-								if (selected_target_metrics->metrics->os != TargetOs_darwin) {
-									gb_printf_err("-subtarget can only be used with darwin based targets at the moment\n");
+								if (selected_target_metrics->metrics->os != TargetOs_darwin &&
+								    selected_target_metrics->metrics->os != TargetOs_linux ) {
+									gb_printf_err("-subtarget can only be used with darwin and linux based targets at the moment\n");
 									bad_flags = true;
 									break;
 								}

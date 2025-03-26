@@ -171,6 +171,7 @@ struct TargetMetrics {
 enum Subtarget : u32 {
 	Subtarget_Default,
 	Subtarget_iOS,
+	Subtarget_Android,
 
 	Subtarget_COUNT,
 };
@@ -178,6 +179,7 @@ enum Subtarget : u32 {
 gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit(""),
 	str_lit("ios"),
+	str_lit("android"),
 };
 
 
@@ -946,6 +948,14 @@ gb_internal bool is_arch_x86(void) {
 gb_global String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 gb_global String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 
+gb_global String const SEPARATOR_STRING =
+#if defined(GB_SYSTEM_WINDOWS)
+	WIN32_SEPARATOR_STRING;
+#else
+	NIX_SEPARATOR_STRING;
+#endif
+
+
 gb_global String const WASM_MODULE_NAME_SEPARATOR = str_lit("..");
 
 gb_internal String internal_odin_root_dir(void);
@@ -1652,6 +1662,15 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		default:
 			GB_PANIC("Unknown architecture for darwin");
 		}
+	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+			bc->metrics.target_triplet = str_lit("aarch64-none-linux-android");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		default:
+			GB_PANIC("Unknown architecture for darwin");
+		}
 	}
 
 	if (bc->metrics.os == TargetOs_windows) {
@@ -1748,6 +1767,22 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (bc->metrics.os == TargetOs_freestanding) {
 		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+	}
+
+	if (subtarget == Subtarget_Android) {
+		switch (build_context.build_mode) {
+		case BuildMode_DynamicLibrary:
+			break;
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+		case BuildMode_Object:
+		case BuildMode_Assembly:
+		case BuildMode_LLVM_IR:
+			gb_printf_err("Unsupported -build-mode for -target:android\n");
+			gb_printf_err("\tCurrently only supporting -build-mode:shared\n");
+			gb_exit(1);
+			break;
+		}
 	}
 }
 
@@ -1947,7 +1982,9 @@ gb_internal bool init_build_paths(String init_filename) {
 		output_extension = make_string(nullptr, 0);
 		String const single_file_extension = str_lit(".odin");
 
-		if (build_context.metrics.os == TargetOs_windows) {
+		if (selected_subtarget == Subtarget_Android) {
+			output_extension = STR_LIT("bin");
+		} else if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
 		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 			// Do nothing: we don't want the .bin extension
