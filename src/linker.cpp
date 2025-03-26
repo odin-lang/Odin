@@ -7,19 +7,15 @@ struct LinkerData {
 	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
-#if defined(GB_SYSTEM_OSX)
-	b8       needs_system_library_linked;
-#endif
+	bool     needs_system_library_linked;
 };
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
 gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output);
 
-#if defined(GB_SYSTEM_OSX)
 gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
-	ld->needs_system_library_linked = 1;
+	ld->needs_system_library_linked = true;
 }
-#endif
 
 gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String const &init_fullpath) {
 	gbAllocator ha = heap_allocator();
@@ -28,9 +24,7 @@ gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String cons
 	array_init(&ld->foreign_libraries,   ha, 0, 1024);
 	ptr_set_init(&ld->foreign_libraries_set, 1024);
 
-#if defined(GB_SYSTEM_OSX)
-	ld->needs_system_library_linked = 0;
-#endif 
+	ld->needs_system_library_linked = false;
 
 	if (build_context.out_filepath.len == 0) {
 		ld->output_name = remove_directory_from_path(init_fullpath);
@@ -154,16 +148,12 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 		build_context.keep_object_files = true;
 	} else {
 	#if defined(GB_SYSTEM_WINDOWS)
-		bool is_windows = true;
+		bool is_windows = build_context.metrics.os == TargetOs_windows;
 	#else
 		bool is_windows = false;
 	#endif
-	#if defined(GB_SYSTEM_OSX)
-		bool is_osx = true;
-	#else
-		bool is_osx = false;
-	#endif
 
+		bool is_osx = build_context.metrics.os == TargetOs_darwin;
 
 		if (is_windows) {
 			String section_name = str_lit("msvc-link");
@@ -420,13 +410,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				clang_path = "clang";
 			}
 
-			// NOTE(vassvik): get cwd, for used for local shared libs linking, since those have to be relative to the exe
-			char cwd[256];
-			#if !defined(GB_SYSTEM_WINDOWS)
-			getcwd(&cwd[0], 256);
-			#endif
-			//printf("%s\n", cwd);
-
 			// NOTE(vassvik): needs to add the root to the library search paths, so that the full filenames of the library
 			//                files can be passed with -l:
 			gbString lib_str = gb_string_make(heap_allocator(), "-L/");
@@ -496,19 +479,20 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						}
 
 						String obj_format;
-					#if defined(GB_ARCH_64_BIT)
-						if (is_osx) {
-							obj_format = str_lit("macho64");
+						if (build_context.metrics.ptr_size == 8) {
+							if (is_osx) {
+								obj_format = str_lit("macho64");
+							} else {
+								obj_format = str_lit("elf64");
+							}
 						} else {
-							obj_format = str_lit("elf64");
+							GB_ASSERT(build_context.metrics.ptr_size == 4);
+							if (is_osx) {
+								obj_format = str_lit("macho32");
+							} else {
+								obj_format = str_lit("elf32");
+							}
 						}
-					#elif defined(GB_ARCH_32_BIT)
-						if (is_osx) {
-							obj_format = str_lit("macho32");
-						} else {
-							obj_format = str_lit("elf32");
-						}
-					#endif // GB_ARCH_*_BIT
 
 						if (build_context.metrics.arch == TargetArch_riscv64) {
 							result = system_exec_command_line_app("clang",
