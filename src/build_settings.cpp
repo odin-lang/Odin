@@ -1669,7 +1669,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		default:
-			GB_PANIC("Unknown architecture for darwin");
+			GB_PANIC("Unknown architecture for -subtarget:android");
 		}
 	}
 
@@ -1779,7 +1779,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		case BuildMode_Executable:
 		case BuildMode_StaticLibrary:
 			if ((build_context.command_kind & Command__does_build) != 0) {
-				gb_printf_err("Unsupported -build-mode for -target:android\n");
+				gb_printf_err("Unsupported -build-mode for -subtarget:android\n");
 				gb_printf_err("\tCurrently only supporting: \n");
 				gb_printf_err("\t\tshared\n");
 				gb_printf_err("\t\tobject\n");
