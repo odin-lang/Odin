@@ -972,12 +972,14 @@ try_cross_linking:;
 
 				TIME_SECTION("Android aapt");
 
+				String output_apk = path_remove_extension(output_filename);
+
 				cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
 				cmd = gb_string_appendc(cmd, "aapt");
 				cmd = gb_string_appendc(cmd, " package -f");
 				cmd = gb_string_append_fmt(cmd, " -M \"%.*s\"", LIT(build_context.android_manifest));
 				cmd = gb_string_append_fmt(cmd, " -I \"%.*sandroid.jar\"", LIT(android_sdk_platforms));
-				cmd = gb_string_append_fmt(cmd, " -F \"%.*s.apk-build\"", LIT(output_filename));
+				cmd = gb_string_append_fmt(cmd, " -F \"%.*s.apk-build\"", LIT(output_apk));
 
 				result = system_exec_command_line_app("android-aapt", cmd);
 				if (result) {
@@ -990,7 +992,7 @@ try_cross_linking:;
 				cmd = gb_string_append_length(cmd, build_context.ODIN_ANDROID_JAR_SIGNER.text, build_context.ODIN_ANDROID_JAR_SIGNER.len);
 				cmd = gb_string_append_fmt(cmd, " -storepass android -keystore \"%.*s\" \"%.*s.apk-build\" \"%.*s\"",
 					LIT(build_context.android_keystore),
-					LIT(output_filename),
+					LIT(output_apk),
 					LIT(build_context.android_keystore_alias)
 				);
 				result = system_exec_command_line_app("android-jarsigner", cmd);
@@ -1004,7 +1006,7 @@ try_cross_linking:;
 				cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
 				cmd = gb_string_appendc(cmd, "zipalign");
 				cmd = gb_string_appendc(cmd, " -f 4");
-				cmd = gb_string_append_fmt(cmd, " \"%.*s.apk-build\" \"%.*s.apk\"", LIT(output_filename), LIT(output_filename));
+				cmd = gb_string_append_fmt(cmd, " \"%.*s.apk-build\" \"%.*s.apk\"", LIT(output_apk), LIT(output_apk));
 
 
 				result = system_exec_command_line_app("android-zipalign", cmd);
