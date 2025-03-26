@@ -209,15 +209,15 @@ enum BuildModeKind {
 enum CommandKind : u32 {
 	Command_run             = 1<<0,
 	Command_build           = 1<<1,
-	Command_check           = 1<<3,
-	Command_doc             = 1<<5,
-	Command_version         = 1<<6,
-	Command_test            = 1<<7,
+	Command_check           = 1<<2,
+	Command_doc             = 1<<3,
+	Command_version         = 1<<4,
+	Command_test            = 1<<5,
 	
-	Command_strip_semicolon = 1<<8,
-	Command_bug_report      = 1<<9,
+	Command_strip_semicolon = 1<<6,
+	Command_bug_report      = 1<<7,
 
-	Command_pkg_android     = 1<<16,
+	Command_package_android = 1<<8,
 
 	Command__does_check = Command_run|Command_build|Command_check|Command_doc|Command_test|Command_strip_semicolon,
 	Command__does_build = Command_run|Command_build|Command_test,
@@ -232,6 +232,8 @@ gb_global char const *odin_command_strings[32] = {
 	"version",
 	"test",
 	"strip-semicolon",
+	"",
+	"package-android",
 };
 
 
@@ -1489,6 +1491,107 @@ gb_internal bool has_ansi_terminal_colours(void) {
 	return build_context.has_ansi_terminal_colours && !json_errors();
 }
 
+gb_internal void init_android_values(bool with_sdk) {
+	auto *bc = &build_context;
+	{ // Android SDK/API Level
+		String default_level = str_lit("34");
+		if (!bc->minimum_os_version_string_given) {
+			bc->minimum_os_version_string = default_level;
+		}
+		BigInt level = {};
+		bool success = false;
+		big_int_from_string(&level, bc->minimum_os_version_string, &success);
+		if (!success) {
+			gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
+			bc->minimum_os_version_string = default_level;
+			big_int_from_string(&level, bc->minimum_os_version_string, &success);
+			GB_ASSERT(success);
+		}
+
+		i64 new_level = big_int_to_i64(&level);
+
+		if (new_level >= 21) {
+			bc->ODIN_ANDROID_API_LEVEL = cast(int)new_level;
+		} else {
+			gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
+			bc->ODIN_ANDROID_API_LEVEL = atoi(cast(char const *)default_level.text);
+		}
+	}
+	bc->ODIN_ANDROID_NDK           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK", permanent_allocator())), NIX_SEPARATOR_STRING);
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK_TOOLCHAIN", permanent_allocator())), NIX_SEPARATOR_STRING);
+	bc->ODIN_ANDROID_SDK           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_SDK", permanent_allocator())), NIX_SEPARATOR_STRING);
+
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (bc->ODIN_ANDROID_SDK.len == 0) {
+			bc->ODIN_ANDROID_SDK = normalize_path(permanent_allocator(),
+				path_to_fullpath(permanent_allocator(), str_lit("%LocalAppData%/Android/Sdk"), nullptr),
+				NIX_SEPARATOR_STRING);
+		}
+	#endif
+
+	if (bc->ODIN_ANDROID_NDK.len != 0 && bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0) {
+		String arch = str_lit("x86_64");
+		#if defined (GB_CPU_ARM)
+			// TODO(bill): this is a complete guess
+			arch = str_lit("aarch64");
+		#endif
+		#if defined(GB_SYSTEM_WINDOWS)
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("windows-"), arch);
+		#elif defined(GB_SYSTEM_OSX)
+			// TODO(bill): is this name even correct?
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("darwin-"), arch);
+		#elif defined(GB_SYSTEM_LINUX)
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("linux-"), arch);
+		#endif
+
+		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, NIX_SEPARATOR_STRING);
+	}
+
+	if (bc->ODIN_ANDROID_NDK.len == 0)  {
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_exit(1);
+
+	}
+
+	if (bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0)  {
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_exit(1);
+	}
+
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
+
+	char buf[32] = {};
+	gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_API_LEVEL);
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB, make_string_c(buf));
+
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/"));
+
+
+	bc->ODIN_ANDROID_JAR_SIGNER = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_JAR_SIGNER", permanent_allocator())), NIX_SEPARATOR_STRING);
+	if (with_sdk) {
+		if (bc->ODIN_ANDROID_SDK.len == 0)  {
+			gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
+			gb_exit(1);
+		}
+		if (bc->ODIN_ANDROID_JAR_SIGNER.len == 0) {
+			gb_printf_err("Error: ODIN_ANDROID_JAR_SIGNER not set, which is required for -build-mode:executable for -subtarget:android");
+			gb_exit(1);
+		}
+		if (bc->android_keystore.len == 0) {
+			gb_printf_err("Error: -android-keystore:<string> has not been set\n");
+			gb_exit(1);
+		}
+		if (bc->android_keystore_alias.len == 0) {
+			gb_printf_err("Error: -android-keystore_alias:<string> has not been set\n");
+			gb_exit(1);
+		}
+		if (bc->android_manifest.len == 0) {
+			gb_printf_err("Error: -android-manifest:<string> has not been set\n");
+			gb_exit(1);
+		}
+	}
+}
+
 gb_internal bool has_asm_extension(String const &path) {
 	String ext = path_extension(path);
 	if (ext == ".asm") {
@@ -1744,105 +1847,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
 		}
 	} else if (selected_subtarget == Subtarget_Android) {
-
-		{ // Android SDK/API Level
-			String default_level = str_lit("34");
-			if (!bc->minimum_os_version_string_given) {
-				bc->minimum_os_version_string = default_level;
-			}
-			BigInt level = {};
-			bool success = false;
-			big_int_from_string(&level, bc->minimum_os_version_string, &success);
-			if (!success) {
-				gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
-				bc->minimum_os_version_string = default_level;
-				big_int_from_string(&level, bc->minimum_os_version_string, &success);
-				GB_ASSERT(success);
-			}
-
-			i64 new_level = big_int_to_i64(&level);
-
-			if (new_level >= 21) {
-				bc->ODIN_ANDROID_API_LEVEL = cast(int)new_level;
-			} else {
-				gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
-				bc->ODIN_ANDROID_API_LEVEL = atoi(cast(char const *)default_level.text);
-			}
-		}
-		bc->ODIN_ANDROID_NDK           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK", permanent_allocator())), NIX_SEPARATOR_STRING);
-		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK_TOOLCHAIN", permanent_allocator())), NIX_SEPARATOR_STRING);
-		bc->ODIN_ANDROID_SDK           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_SDK", permanent_allocator())), NIX_SEPARATOR_STRING);
-
-		#if defined(GB_SYSTEM_WINDOWS)
-			if (bc->ODIN_ANDROID_SDK.len == 0) {
-				bc->ODIN_ANDROID_SDK = normalize_path(permanent_allocator(),
-					path_to_fullpath(permanent_allocator(), str_lit("%LocalAppData%/Android/Sdk"), nullptr),
-					NIX_SEPARATOR_STRING);
-			}
-		#endif
-
-		if (bc->ODIN_ANDROID_NDK.len != 0 && bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0) {
-			String arch = str_lit("x86_64");
-			#if defined (GB_CPU_ARM)
-				// TODO(bill): this is a complete guess
-				arch = str_lit("aarch64");
-			#endif
-			#if defined(GB_SYSTEM_WINDOWS)
-				bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("windows-"), arch);
-			#elif defined(GB_SYSTEM_OSX)
-				// TODO(bill): is this name even correct?
-				bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("darwin-"), arch);
-			#elif defined(GB_SYSTEM_LINUX)
-				bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("linux-"), arch);
-			#endif
-
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, NIX_SEPARATOR_STRING);
-		}
-
-		if (bc->ODIN_ANDROID_NDK.len == 0)  {
-			gb_printf_err("Error: ODIN_ANDROID_NDK not set");
-			gb_exit(1);
-
-		}
-
-		if (bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0)  {
-			gb_printf_err("Error: ODIN_ANDROID_NDK not set");
-			gb_exit(1);
-		}
-
-		bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
-
-		char buf[32] = {};
-		gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_API_LEVEL);
-		bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB, make_string_c(buf));
-
-		bc->ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/"));
-
-
-		bc->ODIN_ANDROID_JAR_SIGNER = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_JAR_SIGNER", permanent_allocator())), NIX_SEPARATOR_STRING);
-		if (bc->build_mode == BuildMode_Executable) {
-			if (bc->ODIN_ANDROID_SDK.len == 0)  {
-				gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
-				gb_exit(1);
-			}
-			if (bc->ODIN_ANDROID_JAR_SIGNER.len == 0) {
-				gb_printf_err("Error: ODIN_ANDROID_JAR_SIGNER not set, which is required for -build-mode:executable for -subtarget:android");
-				gb_exit(1);
-			}
-			if (bc->android_keystore.len == 0) {
-				gb_printf_err("Error: -android-keystore:<string> has not been set\n");
-				gb_exit(1);
-			}
-			if (bc->android_keystore_alias.len == 0) {
-				gb_printf_err("Error: -android-keystore_alias:<string> has not been set\n");
-				gb_exit(1);
-			}
-			if (bc->android_manifest.len == 0) {
-				gb_printf_err("Error: -android-manifest:<string> has not been set\n");
-				gb_exit(1);
-			}
-		}
-
+		init_android_values(bc->build_mode == BuildMode_Executable);
 	}
 
 	if (!bc->custom_optimization_level) {

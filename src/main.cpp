@@ -74,6 +74,7 @@ gb_global Timings global_timings = {0};
 #include "cached.cpp"
 
 #include "linker.cpp"
+#include "package_android.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS) && defined(ODIN_TILDE_BACKEND)
 #define ALLOW_TILDE 1
@@ -628,9 +629,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Subsystem,               str_lit("subsystem"),                 BuildFlagParam_String,  Command__does_build);
 #endif
 
-	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command__does_build);
-	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command__does_build);
-	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command__does_build | Command_package_android);
+	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command__does_build | Command_package_android);
+	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command__does_build | Command_package_android);
 
 
 	GB_ASSERT(args.count >= 3);
@@ -2259,6 +2260,8 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	} else if (command == "strip-semicolon") {
 		print_usage_line(1, "strip-semicolon");
 		print_usage_line(2, "Parses and type checks .odin file(s) and then removes unneeded semicolons from the entire project.");
+	} else if (command == "package-android")  {
+		print_usage_line(1, "package-android   Packages directory in a specific layout as an APK");
 	}
 
 	bool doc             = command == "doc";
@@ -3322,6 +3325,13 @@ int main(int arg_count, char const **arg_ptr) {
 			print_show_help(args[0], args[1], args[2]);
 			return 0;
 		}
+	} else if (command == "package-android") {
+		if (args.count < 3) {
+			usage(args[0]);
+			return 1;
+		}
+		build_context.command_kind = Command_package_android;
+		init_filename = args[2];
 	} else if (command == "root") {
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
@@ -3360,6 +3370,10 @@ int main(int arg_count, char const **arg_ptr) {
 				if (init_filename == "-file") {
 					gb_printf_err("Did you mean `%.*s %.*s <filename.odin> -file`?\n", LIT(args[0]), LIT(command));
 				} else {
+					if (!gb_file_exists(cast(const char*)init_filename.text)) {
+						gb_printf_err("The file '%.*s' was not found.\n", LIT(init_filename));
+						return 1;
+					}
 					gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
 				}
 
@@ -3391,6 +3405,10 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.show_help) {
 		print_show_help(args[0], command);
 		return 0;
+	}
+
+	if (command == "package-android") {
+		return package_android(args);
 	}
 
 	// NOTE(bill): add 'shared' directory if it is not already set
