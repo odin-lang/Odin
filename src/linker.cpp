@@ -660,6 +660,8 @@ try_cross_linking:;
 
 
 			if (is_android) { // NOTE(bill): glue code needed for Android
+				TIME_SECTION("Android Native App Glue Compile");
+
 				String android_glue_object = {};
 				String android_glue_static_lib = {};
 
@@ -700,6 +702,8 @@ try_cross_linking:;
 				if (result) {
 					return result;
 				}
+
+				TIME_SECTION("Android Native App Glue ar");
 
 				gbString ar = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN_PATH.text, ODIN_ANDROID_NDK_TOOLCHAIN_PATH.len);
 				defer (gb_string_free(ar));
@@ -866,6 +870,11 @@ try_cross_linking:;
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
+
+
+			if (is_android) {
+				TIME_SECTION("Linking");
+			}
 
 			if (build_context.linker_choice == Linker_lld) {
 				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
