@@ -1772,15 +1772,21 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	if (subtarget == Subtarget_Android) {
 		switch (build_context.build_mode) {
 		case BuildMode_DynamicLibrary:
-			break;
-		case BuildMode_Executable:
-		case BuildMode_StaticLibrary:
 		case BuildMode_Object:
 		case BuildMode_Assembly:
 		case BuildMode_LLVM_IR:
-			gb_printf_err("Unsupported -build-mode for -target:android\n");
-			gb_printf_err("\tCurrently only supporting -build-mode:shared\n");
-			gb_exit(1);
+			break;
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+			if ((build_context.command_kind & Command__does_build) != 0) {
+				gb_printf_err("Unsupported -build-mode for -target:android\n");
+				gb_printf_err("\tCurrently only supporting: \n");
+				gb_printf_err("\t\tshared\n");
+				gb_printf_err("\t\tobject\n");
+				gb_printf_err("\t\tassembly\n");
+				gb_printf_err("\t\tllvm-ir\n");
+				gb_exit(1);
+			}
 			break;
 		}
 	}
