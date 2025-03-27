@@ -86,7 +86,7 @@ String get_working_directory(gbAllocator allocator) {
 		array_resize(&buf, size);
 
 		cwd = getcwd(buf.data, buf.count);
-		if (cwd == nullptr && errno() != ERANGE) {
+		if (cwd == nullptr && errno != ERANGE) {
 			return {};
 		}
 	}
