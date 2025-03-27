@@ -124,7 +124,9 @@ i32 package_android(String init_directory) {
 		cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
 		cmd = gb_string_appendc(cmd, "aapt");
 		cmd = gb_string_appendc(cmd, " package -f");
-		cmd = gb_string_append_fmt(cmd, " -M \"%.*s\"", LIT(build_context.android_manifest));
+		if (build_context.android_manifest.len != 0) {
+			cmd = gb_string_append_fmt(cmd, " -M \"%.*s\"", LIT(build_context.android_manifest));
+		}
 		cmd = gb_string_append_fmt(cmd, " -I \"%.*sandroid.jar\"", LIT(android_sdk_platforms));
 		cmd = gb_string_append_fmt(cmd, " -F \"%.*s.apk-build\"", LIT(output_apk));
 
@@ -139,11 +141,15 @@ i32 package_android(String init_directory) {
 		gb_string_clear(cmd);
 
 		cmd = gb_string_append_length(cmd, build_context.ODIN_ANDROID_JAR_SIGNER.text, build_context.ODIN_ANDROID_JAR_SIGNER.len);
-		cmd = gb_string_append_fmt(cmd, " -storepass android -keystore \"%.*s\" \"%.*s.apk-build\" \"%.*s\"",
-			LIT(build_context.android_keystore),
-			LIT(output_apk),
-			LIT(build_context.android_keystore_alias)
-		);
+		cmd = gb_string_append_fmt(cmd, " -storepass android");
+		if (build_context.android_keystore.len != 0) {
+			cmd = gb_string_append_fmt(cmd, " -keystore \"%.*s\"", LIT(build_context.android_keystore));
+		}
+		cmd = gb_string_append_fmt(cmd, " \"%.*s.apk-build\"", LIT(output_apk));
+		if (build_context.android_keystore_alias.len != 0) {
+			cmd = gb_string_append_fmt(cmd, " \"%.*s\"", LIT(build_context.android_keystore_alias));
+		}
+
 		result = system_exec_command_line_app("android-jarsigner", cmd);
 		if (result) {
 			return result;
