@@ -1325,18 +1325,20 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 		} else if (!line.includes("\n")) {
 			currentLine[isError] = currentLine[isError].concat(line);
 		} else {
-			let lines = line.split("\n");
+			let lines = line.trimEnd().split("\n");
 			let printLast = lines.length > 1 && line.endsWith("\n");
 			println(currentLine[isError].concat(lines[0]));
 			currentLine[isError] = "";
 			for (let i = 1; i < lines.length-1; i++) {
 				println(lines[i]);
 			}
-			let last = lines[lines.length-1];
-			if (printLast) {
-				println(last);
-			} else {
-				currentLine[isError] = last;
+			if (lines.length > 1) {
+				let last = lines[lines.length-1];
+				if (printLast) {
+					println(last);
+				} else {
+					currentLine[isError] = last;
+				}
 			}
 		}
 
