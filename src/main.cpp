@@ -431,12 +431,12 @@ struct BuildFlag {
 	BuildFlagKind      kind;
 	String             name;
 	BuildFlagParamKind param_kind;
-	u32                command_support;
+	u64                command_support;
 	bool               allow_multiple;
 };
 
 
-gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_multiple=false) {
+gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u64 command_support, bool allow_multiple=false) {
 	BuildFlag flag = {kind, name, param_kind, command_support, allow_multiple};
 	array_add(build_flags, flag);
 }
@@ -1676,8 +1676,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 			gb_printf_err("'%.*s' is supported with the following commands:\n", LIT(name));
 			gb_printf_err("\t");
 			i32 count = 0;
-			for (u32 i = 0; i < 32; i++) {
-				if (found_bf.command_support & (1<<i)) {
+			for (u64 i = 0; i < 64; i++) {
+				if (found_bf.command_support & (1ull<<i)) {
 					if (count > 0) {
 						gb_printf_err(", ");
 					}

@@ -206,7 +206,7 @@ enum BuildModeKind {
 	BuildMode_COUNT,
 };
 
-enum CommandKind : u32 {
+enum CommandKind : u64 {
 	Command_run             = 1<<0,
 	Command_build           = 1<<1,
 	Command_check           = 1<<2,
