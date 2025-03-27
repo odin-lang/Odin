@@ -427,9 +427,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			#endif
 			//printf("%s\n", cwd);
 
-			// NOTE(vassvik): needs to add the root to the library search paths, so that the full filenames of the library
-			//                files can be passed with -l:
-			gbString lib_str = gb_string_make(heap_allocator(), "-L/");
+			gbString lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(lib_str));
 			
 			StringSet asm_files = {};
@@ -606,7 +604,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 							//                local to the executable (unless the system collection is used, in which case we search
 							//                the system library paths for the library file).
 							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
-								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
+								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
 								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
