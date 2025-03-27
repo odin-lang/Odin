@@ -79,14 +79,14 @@ String get_working_directory(gbAllocator allocator) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	auto buf = array_make<char>(temporary_allocator());
-	size_t size = PATH_MAX:
+	size_t size = PATH_MAX;
 
 	char const *cwd;
 	for (; cwd == nullptr; size *= 2) {
 		array_resize(&buf, size);
 
 		cwd = getcwd(buf.data, buf.count);
-		if cwd == nullptr && errno() != ERANGE {
+		if (cwd == nullptr && errno() != ERANGE) {
 			return {};
 		}
 	}
