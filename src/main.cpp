@@ -572,7 +572,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StrictTargetFeatures,    str_lit("strict-target-features"),    BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build | Command_package_android);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
@@ -634,8 +634,15 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command_package_android);
 
 
-	GB_ASSERT(args.count >= 3);
-	Array<String> flag_args = array_slice(args, 3, args.count);
+	Array<String> flag_args = {};
+
+	if (build_context.command_kind == Command_package_android) {
+		GB_ASSERT(args.count >= 4);
+		flag_args = array_slice(args, 4, args.count);
+	} else {
+		GB_ASSERT(args.count >= 3);
+		flag_args = array_slice(args, 3, args.count);
+	}
 
 	bool set_flags[BuildFlag_COUNT] = {};
 
@@ -2273,6 +2280,7 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	bool strip_semicolon = command == "strip-semicolon";
 	bool check_only      = command == "check" || strip_semicolon;
 	bool check           = run_or_build || check_only;
+	bool is_package      = command == "package";
 
 	if (command == "help") {
 		doc             = true;
@@ -2540,13 +2548,15 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 		}
 	}
 
-	if (run_or_build) {
+	if (run_or_build || is_package) {
 		if (print_flag("-minimum-os-version:<string>")) {
 			print_usage_line(2, "Sets the minimum OS version targeted by the application.");
 			print_usage_line(2, "Default: -minimum-os-version:11.0.0");
 			print_usage_line(2, "Only used when target is Darwin, if given, linking mismatched versions will emit a warning.");
 		}
+	}
 
+	if (run_or_build) {
 		if (print_flag("-no-bounds-check")) {
 			print_usage_line(2, "Disables bounds checking program wide.");
 		}
