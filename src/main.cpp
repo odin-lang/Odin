@@ -74,7 +74,7 @@ gb_global Timings global_timings = {0};
 #include "cached.cpp"
 
 #include "linker.cpp"
-#include "package_android.cpp"
+#include "package_command.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS) && defined(ODIN_TILDE_BACKEND)
 #define ALLOW_TILDE 1
@@ -629,9 +629,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Subsystem,               str_lit("subsystem"),                 BuildFlagParam_String,  Command__does_build);
 #endif
 
-	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command__does_build | Command_package_android);
-	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command__does_build | Command_package_android);
-	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command__does_build | Command_package_android);
+	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command_package_android);
+	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_package_android);
+	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command_package_android);
 
 
 	GB_ASSERT(args.count >= 3);
@@ -2260,8 +2260,10 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	} else if (command == "strip-semicolon") {
 		print_usage_line(1, "strip-semicolon");
 		print_usage_line(2, "Parses and type checks .odin file(s) and then removes unneeded semicolons from the entire project.");
-	} else if (command == "package-android")  {
-		print_usage_line(1, "package-android   Packages directory in a specific layout as an APK");
+	} else if (command == "package")  {
+		print_usage_line(1, "package <platform>   Packages directory in a specific layout for that platform");
+		print_usage_line(2, "Supported platforms:");
+		print_usage_line(3, "android");
 	}
 
 	bool doc             = command == "doc";
@@ -3325,13 +3327,19 @@ int main(int arg_count, char const **arg_ptr) {
 			print_show_help(args[0], args[1], args[2]);
 			return 0;
 		}
-	} else if (command == "package-android") {
-		if (args.count < 3) {
+	} else if (command == "package") {
+		if (args.count < 4) {
 			usage(args[0]);
 			return 1;
 		}
-		build_context.command_kind = Command_package_android;
-		init_filename = args[2];
+		if (args[2] == "android") {
+			build_context.command_kind = Command_package_android;
+		} else {
+			gb_printf_err("Unknown package command: '%.*s'\n", LIT(args[2]));
+			usage(args[0]);
+			return 1;
+		}
+		init_filename = args[3];
 	} else if (command == "root") {
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
@@ -3366,7 +3374,7 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 
 			if (!single_file_package) {
-				gb_printf_err("ERROR: `%.*s %.*s` takes a package as its first argument.\n", LIT(args[0]), LIT(command));
+				gb_printf_err("ERROR: `%.*s %.*s` takes a package/directory as its first argument.\n", LIT(args[0]), LIT(command));
 				if (init_filename == "-file") {
 					gb_printf_err("Did you mean `%.*s %.*s <filename.odin> -file`?\n", LIT(args[0]), LIT(command));
 				} else {
@@ -3407,8 +3415,8 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
-	if (command == "package-android") {
-		return package_android(args);
+	if (command == "package") {
+		return package(init_filename);
 	}
 
 	// NOTE(bill): add 'shared' directory if it is not already set

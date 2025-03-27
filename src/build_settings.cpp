@@ -1547,13 +1547,13 @@ gb_internal void init_android_values(bool with_sdk) {
 		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, NIX_SEPARATOR_STRING);
 	}
 
-	if (bc->ODIN_ANDROID_NDK.len == 0)  {
+	if (bc->ODIN_ANDROID_NDK.len == 0 && !with_sdk)  {
 		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
 		gb_exit(1);
 
 	}
 
-	if (bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0)  {
+	if (bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0 && !with_sdk)  {
 		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
 		gb_exit(1);
 	}

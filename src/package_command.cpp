@@ -1,16 +1,21 @@
-i32 package_android(Array<String> args) {
+i32 package_android(String init_directory);
+
+i32 package(String init_directory) {
+	switch (build_context.command_kind) {
+	case Command_package_android:
+		return package_android(init_directory);
+	}
+	gb_printf_err("Unknown odin package <platform>\n");
+	return 1;
+}
+
+
+i32 package_android(String init_directory) {
 	i32 result = 0;
 
 	init_android_values(/*with_sdk*/true);
 
 	int const ODIN_ANDROID_API_LEVEL = build_context.ODIN_ANDROID_API_LEVEL;
-
-	String ODIN_ANDROID_NDK                     = build_context.ODIN_ANDROID_NDK;
-	String ODIN_ANDROID_NDK_TOOLCHAIN           = build_context.ODIN_ANDROID_NDK_TOOLCHAIN;
-	String ODIN_ANDROID_NDK_TOOLCHAIN_LIB       = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB;
-	String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
-	String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT   = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT;
-
 
 	String android_sdk_build_tools = concatenate3_strings(temporary_allocator(),
 		build_context.ODIN_ANDROID_SDK, str_lit("build-tools"), NIX_SEPARATOR_STRING);
@@ -105,58 +110,59 @@ i32 package_android(Array<String> args) {
 		make_string_c(gb_bprintf("platforms/android-%d/", dir_numbers[closest_number_idx]))
 	);
 
-
-
 	android_sdk_build_tools = normalize_path(temporary_allocator(), android_sdk_build_tools, NIX_SEPARATOR_STRING);
 	android_sdk_platforms   = normalize_path(temporary_allocator(), android_sdk_platforms,   NIX_SEPARATOR_STRING);
 
 	gbString cmd = gb_string_make(heap_allocator(), "");
 	defer (gb_string_free(cmd));
 
-	TIME_SECTION("Android aapt");
-
 	String output_filename = str_lit("test");
-
 	String output_apk = path_remove_extension(output_filename);
 
-	cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
-	cmd = gb_string_appendc(cmd, "aapt");
-	cmd = gb_string_appendc(cmd, " package -f");
-	cmd = gb_string_append_fmt(cmd, " -M \"%.*s\"", LIT(build_context.android_manifest));
-	cmd = gb_string_append_fmt(cmd, " -I \"%.*sandroid.jar\"", LIT(android_sdk_platforms));
-	cmd = gb_string_append_fmt(cmd, " -F \"%.*s.apk-build\"", LIT(output_apk));
+	TIME_SECTION("Android aapt");
+	{
+		cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
+		cmd = gb_string_appendc(cmd, "aapt");
+		cmd = gb_string_appendc(cmd, " package -f");
+		cmd = gb_string_append_fmt(cmd, " -M \"%.*s\"", LIT(build_context.android_manifest));
+		cmd = gb_string_append_fmt(cmd, " -I \"%.*sandroid.jar\"", LIT(android_sdk_platforms));
+		cmd = gb_string_append_fmt(cmd, " -F \"%.*s.apk-build\"", LIT(output_apk));
 
-	result = system_exec_command_line_app("android-aapt", cmd);
-	if (result) {
-		return result;
+		result = system_exec_command_line_app("android-aapt", cmd);
+		if (result) {
+			return result;
+		}
 	}
 
 	TIME_SECTION("Android jarsigner");
-	gb_string_clear(cmd);
+	{
+		gb_string_clear(cmd);
 
-	cmd = gb_string_append_length(cmd, build_context.ODIN_ANDROID_JAR_SIGNER.text, build_context.ODIN_ANDROID_JAR_SIGNER.len);
-	cmd = gb_string_append_fmt(cmd, " -storepass android -keystore \"%.*s\" \"%.*s.apk-build\" \"%.*s\"",
-		LIT(build_context.android_keystore),
-		LIT(output_apk),
-		LIT(build_context.android_keystore_alias)
-	);
-	result = system_exec_command_line_app("android-jarsigner", cmd);
-	if (result) {
-		return result;
+		cmd = gb_string_append_length(cmd, build_context.ODIN_ANDROID_JAR_SIGNER.text, build_context.ODIN_ANDROID_JAR_SIGNER.len);
+		cmd = gb_string_append_fmt(cmd, " -storepass android -keystore \"%.*s\" \"%.*s.apk-build\" \"%.*s\"",
+			LIT(build_context.android_keystore),
+			LIT(output_apk),
+			LIT(build_context.android_keystore_alias)
+		);
+		result = system_exec_command_line_app("android-jarsigner", cmd);
+		if (result) {
+			return result;
+		}
 	}
 
 	TIME_SECTION("Android zipalign");
-	gb_string_clear(cmd);
+	{
+		gb_string_clear(cmd);
 
-	cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
-	cmd = gb_string_appendc(cmd, "zipalign");
-	cmd = gb_string_appendc(cmd, " -f 4");
-	cmd = gb_string_append_fmt(cmd, " \"%.*s.apk-build\" \"%.*s.apk\"", LIT(output_apk), LIT(output_apk));
+		cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
+		cmd = gb_string_appendc(cmd, "zipalign");
+		cmd = gb_string_appendc(cmd, " -f 4");
+		cmd = gb_string_append_fmt(cmd, " \"%.*s.apk-build\" \"%.*s.apk\"", LIT(output_apk), LIT(output_apk));
 
-
-	result = system_exec_command_line_app("android-zipalign", cmd);
-	if (result) {
-		return result;
+		result = system_exec_command_line_app("android-zipalign", cmd);
+		if (result) {
+			return result;
+		}
 	}
 
 	return 0;
