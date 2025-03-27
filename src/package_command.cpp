@@ -10,10 +10,19 @@ i32 package(String init_directory) {
 }
 
 
-i32 package_android(String init_directory) {
-	i32 result = 0;
+i32 package_android(String original_init_directory) {
+	TEMPORARY_ALLOCATOR_GUARD();
 
+	i32 result = 0;
 	init_android_values(/*with_sdk*/true);
+
+	bool init_directory_ok = false;
+	String init_directory = path_to_fullpath(temporary_allocator(), original_init_directory, &init_directory_ok);
+	if (!init_directory_ok) {
+		gb_printf_err("Error: '%.*s' is not a valid directory", LIT(original_init_directory));
+		return 1;
+	}
+	init_directory = normalize_path(temporary_allocator(), init_directory, NIX_SEPARATOR_STRING);
 
 	int const ODIN_ANDROID_API_LEVEL = build_context.ODIN_ANDROID_API_LEVEL;
 
@@ -116,16 +125,37 @@ i32 package_android(String init_directory) {
 	gbString cmd = gb_string_make(heap_allocator(), "");
 	defer (gb_string_free(cmd));
 
+
+	String current_directory = normalize_path(temporary_allocator(), get_working_directory(temporary_allocator()), NIX_SEPARATOR_STRING);
+	defer (set_working_directory(current_directory));
+
+	if (current_directory.len != 0) {
+		bool ok = set_working_directory(init_directory);
+		if (!ok) {
+			gb_printf_err("Error: Unable to currectly set the current working directory to '%.*s'\n", LIT(init_directory));
+		}
+	}
+
 	String output_filename = str_lit("test");
 	String output_apk = path_remove_extension(output_filename);
 
 	TIME_SECTION("Android aapt");
 	{
+		TEMPORARY_ALLOCATOR_GUARD();
+		gb_string_clear(cmd);
+
+		String manifest = {};
+		if (build_context.android_manifest.len != 0) {
+			manifest = concatenate_strings(temporary_allocator(), current_directory, build_context.android_manifest);
+		} else {
+			manifest = concatenate_strings(temporary_allocator(), init_directory, str_lit("AndroidManifest.xml"));
+		}
+
 		cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
 		cmd = gb_string_appendc(cmd, "aapt");
 		cmd = gb_string_appendc(cmd, " package -f");
-		if (build_context.android_manifest.len != 0) {
-			cmd = gb_string_append_fmt(cmd, " -M \"%.*s\"", LIT(build_context.android_manifest));
+		if (manifest.len != 0) {
+			cmd = gb_string_append_fmt(cmd, " -M \"%.*s\"", LIT(manifest));
 		}
 		cmd = gb_string_append_fmt(cmd, " -I \"%.*sandroid.jar\"", LIT(android_sdk_platforms));
 		cmd = gb_string_append_fmt(cmd, " -F \"%.*s.apk-build\"", LIT(output_apk));
@@ -138,16 +168,19 @@ i32 package_android(String init_directory) {
 
 	TIME_SECTION("Android jarsigner");
 	{
+		TEMPORARY_ALLOCATOR_GUARD();
 		gb_string_clear(cmd);
 
 		cmd = gb_string_append_length(cmd, build_context.ODIN_ANDROID_JAR_SIGNER.text, build_context.ODIN_ANDROID_JAR_SIGNER.len);
 		cmd = gb_string_append_fmt(cmd, " -storepass android");
 		if (build_context.android_keystore.len != 0) {
-			cmd = gb_string_append_fmt(cmd, " -keystore \"%.*s\"", LIT(build_context.android_keystore));
+			String keystore = concatenate_strings(temporary_allocator(), current_directory, build_context.android_keystore);
+			cmd = gb_string_append_fmt(cmd, " -keystore \"%.*s\"", LIT(keystore));
 		}
 		cmd = gb_string_append_fmt(cmd, " \"%.*s.apk-build\"", LIT(output_apk));
 		if (build_context.android_keystore_alias.len != 0) {
-			cmd = gb_string_append_fmt(cmd, " \"%.*s\"", LIT(build_context.android_keystore_alias));
+			String keystore_alias = build_context.android_keystore_alias;
+			cmd = gb_string_append_fmt(cmd, " \"%.*s\"", LIT(keystore_alias));
 		}
 
 		result = system_exec_command_line_app("android-jarsigner", cmd);
@@ -158,6 +191,7 @@ i32 package_android(String init_directory) {
 
 	TIME_SECTION("Android zipalign");
 	{
+		TEMPORARY_ALLOCATOR_GUARD();
 		gb_string_clear(cmd);
 
 		cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);

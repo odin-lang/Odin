@@ -1585,10 +1585,6 @@ gb_internal void init_android_values(bool with_sdk) {
 			gb_printf_err("Error: -android-keystore_alias:<string> has not been set\n");
 			gb_exit(1);
 		}
-		if (bc->android_manifest.len == 0) {
-			gb_printf_err("Error: -android-manifest:<string> has not been set\n");
-			gb_exit(1);
-		}
 	}
 }
 
