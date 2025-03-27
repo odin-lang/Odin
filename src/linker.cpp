@@ -701,6 +701,13 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					// This points the linker to where the entry point is
 					link_settings = gb_string_appendc(link_settings, "-e _main ");
 				}
+			} else if (build_context.metrics.os == TargetOs_openbsd) {
+				// OpenBSD ports install shared libraries in /usr/local/lib. Also, we must explicitly link libpthread.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-lpthread -Wl,-L/usr/local/lib ");
+				// Until the LLVM back-end can be adapted to emit endbr64 instructions on amd64, we
+				// need to pass -z nobtcfi in order to allow the resulting program to run under
+				// OpenBSD 7.4 and newer. Once support is added at compile time, this can be dropped.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-z,nobtcfi ");
 			}
 
 			if (!build_context.no_rpath) {
