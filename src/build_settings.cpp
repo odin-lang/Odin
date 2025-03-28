@@ -217,7 +217,10 @@ enum CommandKind : u64 {
 	Command_strip_semicolon = 1<<6,
 	Command_bug_report      = 1<<7,
 
-	Command_package_android = 1<<8,
+	Command_bundle_android = 1<<8,
+	Command_bundle_macos   = 1<<9,
+	Command_bundle_ios     = 1<<10,
+	Command_bundle_orca    = 1<<11,
 
 	Command__does_check = Command_run|Command_build|Command_check|Command_doc|Command_test|Command_strip_semicolon,
 	Command__does_build = Command_run|Command_build|Command_test,
@@ -233,7 +236,10 @@ gb_global char const *odin_command_strings[32] = {
 	"test",
 	"strip-semicolon",
 	"",
-	"package-android",
+	"bundle android",
+	"bundle macos",
+	"bundle ios",
+	"bundle orca",
 };
 
 

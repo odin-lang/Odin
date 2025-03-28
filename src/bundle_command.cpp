@@ -1,16 +1,16 @@
-i32 package_android(String init_directory);
+i32 bundle_android(String init_directory);
 
-i32 package(String init_directory) {
+i32 bundle(String init_directory) {
 	switch (build_context.command_kind) {
-	case Command_package_android:
-		return package_android(init_directory);
+	case Command_bundle_android:
+		return bundle_android(init_directory);
 	}
 	gb_printf_err("Unknown odin package <platform>\n");
 	return 1;
 }
 
 
-i32 package_android(String original_init_directory) {
+i32 bundle_android(String original_init_directory) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	i32 result = 0;
