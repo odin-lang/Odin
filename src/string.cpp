@@ -273,6 +273,15 @@ gb_internal String path_extension(String const &str, bool include_dot = true) {
 	return substring(str, include_dot ? pos : pos + 1, str.len);
 }
 
+
+gb_internal String path_remove_extension(String const &str) {
+	isize pos = string_extension_position(str);
+	if (pos < 0) {
+		return str;
+	}
+	return substring(str, 0, pos);
+}
+
 gb_internal String string_trim_whitespace(String str) {
 	while (str.len > 0 && rune_is_whitespace(str[str.len-1])) {
 		str.len--;
