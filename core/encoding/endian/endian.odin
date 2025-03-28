@@ -6,6 +6,7 @@ import "core:math/bits"
 Byte_Order :: enum u8 {
 	Little,
 	Big,
+	Platform = Little when ODIN_ENDIAN == .Little else Big,
 }
 
 PLATFORM_BYTE_ORDER :: Byte_Order.Little when ODIN_ENDIAN == .Little else Byte_Order.Big
