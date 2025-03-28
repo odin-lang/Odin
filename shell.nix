@@ -4,9 +4,9 @@ pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
     git
     which
-    clang_17
-    llvmPackages_17.llvm
-    llvmPackages_17.bintools
+    clang_20
+    llvmPackages_20.llvm
+    llvmPackages_20.bintools
   ];
   shellHook="CXX=clang++";
 }
