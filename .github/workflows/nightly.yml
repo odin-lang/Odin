@@ -53,8 +53,8 @@ jobs:
       - name: (Linux) Download LLVM
         run: |
           apk add --no-cache \
-          musl-dev llvm20-dev clang20 git mold lz4 \
-          libxml2-static llvm20-static zlib-static zstd-static \
+          musl-dev llvm18-dev clang18 git mold lz4 \
+          libxml2-static llvm18-static zlib-static zstd-static \
           make
         shell: alpine.sh --root {0}
       - name: build odin

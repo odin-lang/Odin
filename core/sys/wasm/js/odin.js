@@ -17,7 +17,7 @@ class WasmMemoryInterface {
 	constructor() {
 		this.memory = null;
 		this.exports = null;
-		this.listenerMap = {};
+		this.listenerMap = new Map();
 
 		// Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
 		this.intSize = 4;
@@ -1325,18 +1325,20 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 		} else if (!line.includes("\n")) {
 			currentLine[isError] = currentLine[isError].concat(line);
 		} else {
-			let lines = line.split("\n");
+			let lines = line.trimEnd().split("\n");
 			let printLast = lines.length > 1 && line.endsWith("\n");
 			println(currentLine[isError].concat(lines[0]));
 			currentLine[isError] = "";
 			for (let i = 1; i < lines.length-1; i++) {
 				println(lines[i]);
 			}
-			let last = lines[lines.length-1];
-			if (printLast) {
-				println(last);
-			} else {
-				currentLine[isError] = last;
+			if (lines.length > 1) {
+				let last = lines[lines.length-1];
+				if (printLast) {
+					println(last);
+				} else {
+					currentLine[isError] = last;
+				}
 			}
 		}
 
@@ -1401,6 +1403,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 		let info = consoleElement;
 		info.innerHTML = data;
 		info.scrollTop = info.scrollHeight;
+	};
+
+	const listener_key = (id, name, data, callback, useCapture) => {
+		return `${id}-${name}-data:${data}-callback:${callback}-useCapture:${useCapture}`;
 	};
 
 	let webglContext = new WebGLInterface(wasmMemoryInterface);
@@ -1658,6 +1664,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				if (element == undefined) {
 					return false;
 				}
+				let key = listener_key(id, name, data, callback, !!use_capture);
+				if (wasmMemoryInterface.listenerMap.has(key)) {
+					return false;
+				}
 
 				let listener = (e) => {
 					let event_data = {};
@@ -1668,7 +1678,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					onEventReceived(event_data, data, callback);
 				};
-				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
+				wasmMemoryInterface.listenerMap.set(key, listener);
 				element.addEventListener(name, listener, !!use_capture);
 				return true;
 			},
@@ -1676,6 +1686,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
+				let key = listener_key('window', name, data, callback, !!use_capture);
+				if (wasmMemoryInterface.listenerMap.has(key)) {
+					return false;
+				}
+
 				let listener = (e) => {
 					let event_data = {};
 					event_data.id_ptr = 0;
@@ -1685,12 +1700,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					onEventReceived(event_data, data, callback);
 				};
-				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
+				wasmMemoryInterface.listenerMap.set(key, listener);
 				element.addEventListener(name, listener, !!use_capture);
 				return true;
 			},
 
-			remove_event_listener: (id_ptr, id_len, name_ptr, name_len, data, callback) => {
+			remove_event_listener: (id_ptr, id_len, name_ptr, name_len, data, callback, use_capture) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = getElement(id);
@@ -1698,24 +1713,28 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					return false;
 				}
 
-				let listener = wasmMemoryInterface.listenerMap[{data: data, callback: callback}];
-				if (listener == undefined) {
+				let key = listener_key(id, name, data, callback, !!use_capture);
+				let listener = wasmMemoryInterface.listenerMap.get(key);
+				if (listener === undefined) {
 					return false;
 				}
-				element.removeEventListener(name, listener);
+				wasmMemoryInterface.listenerMap.delete(key);
+
+				element.removeEventListener(name, listener, !!use_capture);
 				return true;
 			},
-			remove_window_event_listener: (name_ptr, name_len, data, callback) => {
+			remove_window_event_listener: (name_ptr, name_len, data, callback, use_capture) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
-				let key = {data: data, callback: callback};
-				let listener = wasmMemoryInterface.listenerMap[key];
-				if (!listener) {
+
+				let key = listener_key('window', name, data, callback, !!use_capture);
+				let listener = wasmMemoryInterface.listenerMap.get(key);
+				if (listener === undefined) {
 					return false;
 				}
-				wasmMemoryInterface.listenerMap[key] = undefined;
+				wasmMemoryInterface.listenerMap.delete(key);
 
-				element.removeEventListener(name, listener);
+				element.removeEventListener(name, listener, !!use_capture);
 				return true;
 			},
 

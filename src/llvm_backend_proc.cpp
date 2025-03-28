@@ -2972,6 +2972,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 						constraints = gb_string_appendc(constraints, "}");
 					}
 
+					constraints = gb_string_appendc(constraints, ",~{memory}");
+
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
@@ -3034,6 +3036,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 						constraints = gb_string_appendc(constraints, "}");
 					}
 
+					constraints = gb_string_appendc(constraints, ",~{memory}");
+
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
@@ -3059,6 +3063,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 							constraints = gb_string_appendc(constraints, "}");
 						}
 
+						constraints = gb_string_appendc(constraints, ",~{memory}");
+
 						inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 					} else {
 						char asm_string[] = "svc #0";
@@ -3077,6 +3083,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 							constraints = gb_string_appendc(constraints, regs[i]);
 							constraints = gb_string_appendc(constraints, "}");
 						}
+
+						constraints = gb_string_appendc(constraints, ",~{memory}");
 
 						inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 					}
@@ -3103,6 +3111,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 						constraints = gb_string_appendc(constraints, regs[i]);
 						constraints = gb_string_appendc(constraints, "}");
 					}
+
+					constraints = gb_string_appendc(constraints, ",~{memory}");
 
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}

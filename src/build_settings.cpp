@@ -109,6 +109,12 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("riscv64"),
 };
 
+#if defined(GB_SYSTEM_WINDOWS)
+	#include <llvm-c/Config/llvm-config.h>
+#else
+	#include <llvm/Config/llvm-config.h>
+#endif
+
 #include "build_settings_microarch.cpp"
 
 gb_global String target_endian_names[TargetEndian_COUNT] = {
@@ -165,6 +171,7 @@ struct TargetMetrics {
 enum Subtarget : u32 {
 	Subtarget_Default,
 	Subtarget_iOS,
+	Subtarget_Android,
 
 	Subtarget_COUNT,
 };
@@ -172,6 +179,7 @@ enum Subtarget : u32 {
 gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit(""),
 	str_lit("ios"),
+	str_lit("android"),
 };
 
 
@@ -198,20 +206,25 @@ enum BuildModeKind {
 	BuildMode_COUNT,
 };
 
-enum CommandKind : u32 {
+enum CommandKind : u64 {
 	Command_run             = 1<<0,
 	Command_build           = 1<<1,
-	Command_check           = 1<<3,
-	Command_doc             = 1<<5,
-	Command_version         = 1<<6,
-	Command_test            = 1<<7,
+	Command_check           = 1<<2,
+	Command_doc             = 1<<3,
+	Command_version         = 1<<4,
+	Command_test            = 1<<5,
 	
-	Command_strip_semicolon = 1<<8,
-	Command_bug_report      = 1<<9,
+	Command_strip_semicolon = 1<<6,
+	Command_bug_report      = 1<<7,
+
+	Command_bundle_android = 1<<8,
+	Command_bundle_macos   = 1<<9,
+	Command_bundle_ios     = 1<<10,
+	Command_bundle_orca    = 1<<11,
 
 	Command__does_check = Command_run|Command_build|Command_check|Command_doc|Command_test|Command_strip_semicolon,
 	Command__does_build = Command_run|Command_build|Command_test,
-	Command_all = ~(u32)0,
+	Command_all = ~(CommandKind)0,
 };
 
 gb_global char const *odin_command_strings[32] = {
@@ -222,6 +235,11 @@ gb_global char const *odin_command_strings[32] = {
 	"version",
 	"test",
 	"strip-semicolon",
+	"",
+	"bundle android",
+	"bundle macos",
+	"bundle ios",
+	"bundle orca",
 };
 
 
@@ -521,6 +539,22 @@ struct BuildContext {
 
 	String minimum_os_version_string;
 	bool   minimum_os_version_string_given;
+
+
+	int    ODIN_ANDROID_API_LEVEL;
+
+	String ODIN_ANDROID_SDK;
+
+	String ODIN_ANDROID_NDK;
+	String ODIN_ANDROID_NDK_TOOLCHAIN;
+	String ODIN_ANDROID_NDK_TOOLCHAIN_LIB;
+	String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
+	String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT;
+
+	String ODIN_ANDROID_JAR_SIGNER;
+	String android_keystore;
+	String android_keystore_alias;
+	String android_manifest;
 };
 
 gb_global BuildContext build_context = {0};
@@ -543,12 +577,6 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	}
 	return build_context.max_error_count;
 }
-
-#if defined(GB_SYSTEM_WINDOWS)
-	#include <llvm-c/Config/llvm-config.h>
-#else
-	#include <llvm/Config/llvm-config.h>
-#endif
 
 // NOTE: AMD64 targets had their alignment on 128 bit ints bumped from 8 to 16 (undocumented of course).
 #if LLVM_VERSION_MAJOR >= 18
@@ -945,6 +973,14 @@ gb_internal bool is_arch_x86(void) {
 
 gb_global String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 gb_global String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
+
+gb_global String const SEPARATOR_STRING =
+#if defined(GB_SYSTEM_WINDOWS)
+	WIN32_SEPARATOR_STRING;
+#else
+	NIX_SEPARATOR_STRING;
+#endif
+
 
 gb_global String const WASM_MODULE_NAME_SEPARATOR = str_lit("..");
 
@@ -1461,6 +1497,103 @@ gb_internal bool has_ansi_terminal_colours(void) {
 	return build_context.has_ansi_terminal_colours && !json_errors();
 }
 
+gb_internal void init_android_values(bool with_sdk) {
+	auto *bc = &build_context;
+	{ // Android SDK/API Level
+		String default_level = str_lit("34");
+		if (!bc->minimum_os_version_string_given) {
+			bc->minimum_os_version_string = default_level;
+		}
+		BigInt level = {};
+		bool success = false;
+		big_int_from_string(&level, bc->minimum_os_version_string, &success);
+		if (!success) {
+			gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
+			bc->minimum_os_version_string = default_level;
+			big_int_from_string(&level, bc->minimum_os_version_string, &success);
+			GB_ASSERT(success);
+		}
+
+		i64 new_level = big_int_to_i64(&level);
+
+		if (new_level >= 21) {
+			bc->ODIN_ANDROID_API_LEVEL = cast(int)new_level;
+		} else {
+			gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
+			bc->ODIN_ANDROID_API_LEVEL = atoi(cast(char const *)default_level.text);
+		}
+	}
+	bc->ODIN_ANDROID_NDK           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK", permanent_allocator())), NIX_SEPARATOR_STRING);
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK_TOOLCHAIN", permanent_allocator())), NIX_SEPARATOR_STRING);
+	bc->ODIN_ANDROID_SDK           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_SDK", permanent_allocator())), NIX_SEPARATOR_STRING);
+
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (bc->ODIN_ANDROID_SDK.len == 0) {
+			bc->ODIN_ANDROID_SDK = normalize_path(permanent_allocator(),
+				path_to_fullpath(permanent_allocator(), str_lit("%LocalAppData%/Android/Sdk"), nullptr),
+				NIX_SEPARATOR_STRING);
+		}
+	#endif
+
+	if (bc->ODIN_ANDROID_NDK.len != 0 && bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0) {
+		String arch = str_lit("x86_64");
+		#if defined (GB_CPU_ARM)
+			// TODO(bill): this is a complete guess
+			arch = str_lit("aarch64");
+		#endif
+		#if defined(GB_SYSTEM_WINDOWS)
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("windows-"), arch);
+		#elif defined(GB_SYSTEM_OSX)
+			// TODO(bill): is this name even correct?
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("darwin-"), arch);
+		#elif defined(GB_SYSTEM_LINUX)
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("linux-"), arch);
+		#endif
+
+		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, NIX_SEPARATOR_STRING);
+	}
+
+	if (bc->ODIN_ANDROID_NDK.len == 0 && !with_sdk)  {
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_exit(1);
+
+	}
+
+	if (bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0 && !with_sdk)  {
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_exit(1);
+	}
+
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
+
+	char buf[32] = {};
+	gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_API_LEVEL);
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB, make_string_c(buf));
+
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/"));
+
+
+	bc->ODIN_ANDROID_JAR_SIGNER = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_JAR_SIGNER", permanent_allocator())), NIX_SEPARATOR_STRING);
+	if (with_sdk) {
+		if (bc->ODIN_ANDROID_SDK.len == 0)  {
+			gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
+			gb_exit(1);
+		}
+		if (bc->ODIN_ANDROID_JAR_SIGNER.len == 0) {
+			gb_printf_err("Error: ODIN_ANDROID_JAR_SIGNER not set, which is required for -build-mode:executable for -subtarget:android");
+			gb_exit(1);
+		}
+		if (bc->android_keystore.len == 0) {
+			gb_printf_err("Error: -android-keystore:<string> has not been set\n");
+			gb_exit(1);
+		}
+		if (bc->android_keystore_alias.len == 0) {
+			gb_printf_err("Error: -android-keystore_alias:<string> has not been set\n");
+			gb_exit(1);
+		}
+	}
+}
+
 gb_internal bool has_asm_extension(String const &path) {
 	String ext = path_extension(path);
 	if (ext == ".asm") {
@@ -1652,6 +1785,15 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		default:
 			GB_PANIC("Unknown architecture for darwin");
 		}
+	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+			bc->metrics.target_triplet = str_lit("aarch64-none-linux-android");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		default:
+			GB_PANIC("Unknown architecture for -subtarget:android");
+		}
 	}
 
 	if (bc->metrics.os == TargetOs_windows) {
@@ -1706,6 +1848,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		if (subtarget == Subtarget_Default) {
 			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
 		}
+	} else if (selected_subtarget == Subtarget_Android) {
+		init_android_values(bc->build_mode == BuildMode_Executable);
 	}
 
 	if (!bc->custom_optimization_level) {
@@ -1748,6 +1892,30 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (bc->metrics.os == TargetOs_freestanding) {
 		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
+	}
+
+	if (subtarget == Subtarget_Android) {
+		switch (build_context.build_mode) {
+		case BuildMode_DynamicLibrary:
+		case BuildMode_Object:
+		case BuildMode_Assembly:
+		case BuildMode_LLVM_IR:
+			break;
+		default:
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+			if ((build_context.command_kind & Command__does_build) != 0) {
+				gb_printf_err("Unsupported -build-mode for -subtarget:android\n");
+				gb_printf_err("\tCurrently only supporting: \n");
+				// gb_printf_err("\t\texe\n");
+				gb_printf_err("\t\tshared\n");
+				gb_printf_err("\t\tobject\n");
+				gb_printf_err("\t\tassembly\n");
+				gb_printf_err("\t\tllvm-ir\n");
+				gb_exit(1);
+			}
+			break;
+		}
 	}
 }
 
@@ -1947,7 +2115,10 @@ gb_internal bool init_build_paths(String init_filename) {
 		output_extension = make_string(nullptr, 0);
 		String const single_file_extension = str_lit(".odin");
 
-		if (build_context.metrics.os == TargetOs_windows) {
+		if (selected_subtarget == Subtarget_Android) {
+			// NOTE(bill): It's always shared!
+			output_extension = STR_LIT("so");
+		} else if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
 		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 			// Do nothing: we don't want the .bin extension

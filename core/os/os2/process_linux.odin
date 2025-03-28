@@ -10,7 +10,6 @@ import "core:slice"
 import "core:strings"
 import "core:strconv"
 import "core:sys/linux"
-import "core:path/filepath"
 
 PIDFD_UNASSIGNED  :: ~uintptr(0)
 
@@ -205,7 +204,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				info.executable_path = strings.clone(cmdline[:terminator], allocator) or_return
 				info.fields += {.Executable_Path}
 			} else if cwd_err == nil {
-				info.executable_path = filepath.join({ cwd, cmdline[:terminator] }, allocator) or_return
+				info.executable_path = join_path({ cwd, cmdline[:terminator] }, allocator) or_return
 				info.fields += {.Executable_Path}
 			} else {
 				break cmdline_if
@@ -407,7 +406,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	executable_name := desc.command[0]
 	if strings.index_byte(executable_name, '/') < 0 {
 		path_env := get_env("PATH", temp_allocator())
-		path_dirs := filepath.split_list(path_env, temp_allocator()) or_return
+		path_dirs := split_path_list(path_env, temp_allocator()) or_return
 
 		exe_builder := strings.builder_make(temp_allocator()) or_return
 

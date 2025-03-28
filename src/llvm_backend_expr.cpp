@@ -3493,7 +3493,8 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Short on constant values
-		return lb_const_value(p->module, type, tv.value);
+		bool allow_local = true;
+		return lb_const_value(p->module, type, tv.value, allow_local);
 	} else if (tv.mode == Addressing_Type) {
 		// NOTE(bill, 2023-01-16): is this correct? I hope so at least
 		return lb_typeid(m, tv.type);
