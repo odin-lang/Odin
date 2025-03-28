@@ -1822,6 +1822,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 			}
 			superpage.next_free_slab_index = min(superpage.next_free_slab_index, slab.index + contiguous_new)
 			superpage.free_slabs += contiguous_old - contiguous_new
+			slab.bin_size = new_size
 			if previously_full_superpage {
 				heap_cache_add_superpage_with_free_slabs(superpage)
 				heap_debug_cover(.Superpage_Added_To_Open_Cache_By_Resizing_Wide_Slab)
@@ -1847,6 +1848,10 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 					heap_slab_clear_data(next_slab)
 				}
 			}
+			// We must update the slab's `bin_size` before calling
+			// `heap_update_next_free_slab`, as that procedure will need to
+			// iterate over the slabs.
+			slab.bin_size = new_size
 			superpage.free_slabs += contiguous_old - contiguous_new
 			if superpage.free_slabs == 0 {
 				heap_cache_remove_superpage_with_free_slabs(superpage)
@@ -1857,7 +1862,6 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 		}
 
 		// The slab-wide allocation has been resized in-place.
-		slab.bin_size = new_size
 
 		return old_ptr
 	}
