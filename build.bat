@@ -4,12 +4,12 @@ setlocal EnableDelayedExpansion
 
 where /Q cl.exe || (
 	set __VSCMD_ARG_NO_LOGO=1
-	for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.VisualStudio.Workload.NativeDesktop -property installationPath') do set VS=%%i
+	for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set VS=%%i
 	if "!VS!" equ "" (
-		echo ERROR: Visual Studio installation not found
+		echo ERROR: MSVC installation not found
 		exit /b 1
 	)
-	call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64 || exit /b 1
+	call "!VS!\Common7\Tools\vsdevcmd.bat" -arch=x64 -host_arch=x64 || exit /b 1
 )
 
 if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (

@@ -74,6 +74,7 @@ gb_global Timings global_timings = {0};
 #include "cached.cpp"
 
 #include "linker.cpp"
+#include "bundle_command.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS) && defined(ODIN_TILDE_BACKEND)
 #define ALLOW_TILDE 1
@@ -408,6 +409,10 @@ enum BuildFlagKind {
 	BuildFlag_Subsystem,
 #endif
 
+	BuildFlag_AndroidKeystore,
+	BuildFlag_AndroidKeystoreAlias,
+	BuildFlag_AndroidManifest,
+
 	BuildFlag_COUNT,
 };
 
@@ -426,12 +431,12 @@ struct BuildFlag {
 	BuildFlagKind      kind;
 	String             name;
 	BuildFlagParamKind param_kind;
-	u32                command_support;
+	u64                command_support;
 	bool               allow_multiple;
 };
 
 
-gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_multiple=false) {
+gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u64 command_support, bool allow_multiple=false) {
 	BuildFlag flag = {kind, name, param_kind, command_support, allow_multiple};
 	array_add(build_flags, flag);
 }
@@ -567,7 +572,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StrictTargetFeatures,    str_lit("strict-target-features"),    BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build | Command_bundle_android);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
@@ -624,9 +629,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Subsystem,               str_lit("subsystem"),                 BuildFlagParam_String,  Command__does_build);
 #endif
 
+	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command_bundle_android);
+	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_bundle_android);
+	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command_bundle_android);
 
-	GB_ASSERT(args.count >= 3);
-	Array<String> flag_args = array_slice(args, 3, args.count);
+
+	Array<String> flag_args = {};
+
+	if (build_context.command_kind == Command_bundle_android) {
+		GB_ASSERT(args.count >= 4);
+		flag_args = array_slice(args, 4, args.count);
+	} else {
+		GB_ASSERT(args.count >= 3);
+		flag_args = array_slice(args, 3, args.count);
+	}
 
 	bool set_flags[BuildFlag_COUNT] = {};
 
@@ -1105,8 +1121,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								String str = value.value_string;
 								bool found = false;
 
-								if (selected_target_metrics->metrics->os != TargetOs_darwin) {
-									gb_printf_err("-subtarget can only be used with darwin based targets at the moment\n");
+								if (selected_target_metrics->metrics->os != TargetOs_darwin &&
+								    selected_target_metrics->metrics->os != TargetOs_linux ) {
+									gb_printf_err("-subtarget can only be used with darwin and linux based targets at the moment\n");
 									bad_flags = true;
 									break;
 								}
@@ -1637,6 +1654,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 					#endif
 
+						case BuildFlag_AndroidKeystore:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_keystore = value.value_string;
+							break;
+
+						case BuildFlag_AndroidKeystoreAlias:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_keystore_alias = value.value_string;
+							break;
+
+						case BuildFlag_AndroidManifest:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_manifest = value.value_string;
+							break;
 						}
 					}
 
@@ -1652,8 +1683,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 			gb_printf_err("'%.*s' is supported with the following commands:\n", LIT(name));
 			gb_printf_err("\t");
 			i32 count = 0;
-			for (u32 i = 0; i < 32; i++) {
-				if (found_bf.command_support & (1<<i)) {
+			for (u64 i = 0; i < 64; i++) {
+				if (found_bf.command_support & (1ull<<i)) {
 					if (count > 0) {
 						gb_printf_err(", ");
 					}
@@ -2236,6 +2267,10 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	} else if (command == "strip-semicolon") {
 		print_usage_line(1, "strip-semicolon");
 		print_usage_line(2, "Parses and type checks .odin file(s) and then removes unneeded semicolons from the entire project.");
+	} else if (command == "bundle")  {
+		print_usage_line(1, "bundle <platform>   Bundles a directory in a specific layout for that platform");
+		print_usage_line(2, "Supported platforms:");
+		print_usage_line(3, "android");
 	}
 
 	bool doc             = command == "doc";
@@ -2245,6 +2280,7 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	bool strip_semicolon = command == "strip-semicolon";
 	bool check_only      = command == "check" || strip_semicolon;
 	bool check           = run_or_build || check_only;
+	bool bundle          = command == "bundle";
 
 	if (command == "help") {
 		doc             = true;
@@ -2512,13 +2548,15 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 		}
 	}
 
-	if (run_or_build) {
+	if (run_or_build || bundle) {
 		if (print_flag("-minimum-os-version:<string>")) {
 			print_usage_line(2, "Sets the minimum OS version targeted by the application.");
 			print_usage_line(2, "Default: -minimum-os-version:11.0.0");
 			print_usage_line(2, "Only used when target is Darwin, if given, linking mismatched versions will emit a warning.");
 		}
+	}
 
+	if (run_or_build) {
 		if (print_flag("-no-bounds-check")) {
 			print_usage_line(2, "Disables bounds checking program wide.");
 		}
@@ -3299,6 +3337,19 @@ int main(int arg_count, char const **arg_ptr) {
 			print_show_help(args[0], args[1], args[2]);
 			return 0;
 		}
+	} else if (command == "bundle") {
+		if (args.count < 4) {
+			usage(args[0]);
+			return 1;
+		}
+		if (args[2] == "android") {
+			build_context.command_kind = Command_bundle_android;
+		} else {
+			gb_printf_err("Unknown package command: '%.*s'\n", LIT(args[2]));
+			usage(args[0]);
+			return 1;
+		}
+		init_filename = args[3];
 	} else if (command == "root") {
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
@@ -3333,10 +3384,14 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 
 			if (!single_file_package) {
-				gb_printf_err("ERROR: `%.*s %.*s` takes a package as its first argument.\n", LIT(args[0]), LIT(command));
+				gb_printf_err("ERROR: `%.*s %.*s` takes a package/directory as its first argument.\n", LIT(args[0]), LIT(command));
 				if (init_filename == "-file") {
 					gb_printf_err("Did you mean `%.*s %.*s <filename.odin> -file`?\n", LIT(args[0]), LIT(command));
 				} else {
+					if (!gb_file_exists(cast(const char*)init_filename.text)) {
+						gb_printf_err("The file '%.*s' was not found.\n", LIT(init_filename));
+						return 1;
+					}
 					gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
 				}
 
@@ -3368,6 +3423,10 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.show_help) {
 		print_show_help(args[0], command);
 		return 0;
+	}
+
+	if (command == "bundle") {
+		return bundle(init_filename);
 	}
 
 	// NOTE(bill): add 'shared' directory if it is not already set

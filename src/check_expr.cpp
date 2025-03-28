@@ -8977,8 +8977,14 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 		o->expr = node;
 		return Expr_Expr;
 	}
+
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	check_or_else_split_types(c, &x, name, &left_type, &right_type);
+	add_type_and_value(c, arg, x.mode, x.type, x.value);
+
 	bool y_is_diverging = false;
-	check_expr_base(c, &y, default_value, x.type);
+	check_expr_base(c, &y, default_value, left_type);
 	switch (y.mode) {
 	case Addressing_NoValue:
 		if (is_diverging_expr(y.expr)) {
@@ -9002,11 +9008,6 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 		o->expr = node;
 		return Expr_Expr;
 	}
-
-	Type *left_type = nullptr;
-	Type *right_type = nullptr;
-	check_or_else_split_types(c, &x, name, &left_type, &right_type);
-	add_type_and_value(c, arg, x.mode, x.type, x.value);
 
 	if (left_type != nullptr) {
 		if (!y_is_diverging) {
