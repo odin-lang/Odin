@@ -1834,7 +1834,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 				if heap_superpage_index_slab(superpage, i).bin_size != 0 {
 					// Contiguous space is unavailable.
 					new_ptr = heap_alloc(new_size, zero_memory)
-					intrinsics.mem_copy_non_overlapping(new_ptr, old_ptr, min(old_size, new_size))
+					intrinsics.mem_copy_non_overlapping(new_ptr, old_ptr, old_size)
 					heap_free(old_ptr)
 					heap_debug_cover(.Resize_Wide_Slab_Failed_To_Find_Contiguous_Expansion)
 					return
