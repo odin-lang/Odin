@@ -21,44 +21,45 @@ package net
 */
 
 import "core:c"
-import "core:os"
 import "core:sys/posix"
 import "core:time"
 
 Socket_Option :: enum c.int {
-	Broadcast                 = c.int(os.SO_BROADCAST),
-	Reuse_Address             = c.int(os.SO_REUSEADDR),
-	Keep_Alive                = c.int(os.SO_KEEPALIVE),
-	Out_Of_Bounds_Data_Inline = c.int(os.SO_OOBINLINE),
-	TCP_Nodelay               = c.int(os.TCP_NODELAY),
-	Linger                    = c.int(os.SO_LINGER),
-	Receive_Buffer_Size       = c.int(os.SO_RCVBUF),
-	Send_Buffer_Size          = c.int(os.SO_SNDBUF),
-	Receive_Timeout           = c.int(os.SO_RCVTIMEO),
-	Send_Timeout              = c.int(os.SO_SNDTIMEO),
+	Broadcast                 = c.int(posix.Sock_Option.BROADCAST),
+	Reuse_Address             = c.int(posix.Sock_Option.REUSEADDR),
+	Keep_Alive                = c.int(posix.Sock_Option.KEEPALIVE),
+	Out_Of_Bounds_Data_Inline = c.int(posix.Sock_Option.OOBINLINE),
+	TCP_Nodelay               = c.int(posix.TCP_NODELAY),
+	Linger                    = c.int(posix.Sock_Option.LINGER),
+	Receive_Buffer_Size       = c.int(posix.Sock_Option.RCVBUF),
+	Send_Buffer_Size          = c.int(posix.Sock_Option.SNDBUF),
+	Receive_Timeout           = c.int(posix.Sock_Option.RCVTIMEO),
+	Send_Timeout              = c.int(posix.Sock_Option.SNDTIMEO),
 }
 
 @(private)
 _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
-	c_type, c_protocol, c_family: int
+	c_type: posix.Sock
+	c_protocol: posix.Protocol
+	c_family: posix.AF
 
 	switch family {
-	case .IP4:  c_family = os.AF_INET
-	case .IP6:  c_family = os.AF_INET6
+	case .IP4:  c_family = .INET
+	case .IP6:  c_family = .INET6
 	case:
 		unreachable()
 	}
 
 	switch protocol {
-	case .TCP:  c_type = os.SOCK_STREAM; c_protocol = os.IPPROTO_TCP
-	case .UDP:  c_type = os.SOCK_DGRAM;  c_protocol = os.IPPROTO_UDP
+	case .TCP:  c_type = .STREAM; c_protocol = .TCP
+	case .UDP:  c_type = .DGRAM;  c_protocol = .UDP
 	case:
 		unreachable()
 	}
 
-	sock, sock_err := os.socket(c_family, c_type, c_protocol)
-	if sock_err != nil {
-		err = Create_Socket_Error(os.is_platform_error(sock_err) or_else -1)
+	sock := posix.socket(c_family, c_type, c_protocol)
+	if sock < 0 {
+		err = Create_Socket_Error(posix.errno())
 		return
 	}
 
@@ -86,10 +87,10 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr := _endpoint_to_sockaddr(endpoint)
-	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
-	if res != nil {
+	if posix.connect(posix.FD(skt), (^posix.sockaddr)(&sockaddr), posix.socklen_t(sockaddr.ss_len)) != .OK {
+		errno := posix.errno()
 		close(skt)
-		return {}, Dial_Error(os.is_platform_error(res) or_else -1)
+		return {}, Dial_Error(errno)
 	}
 
 	return
@@ -102,14 +103,15 @@ MAX_PRIVILEGED_PORT :: 1023
 _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
-	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), i32(sockaddr.len))
-	if res != nil {
-		if res == os.EACCES && ep.port <= MAX_PRIVILEGED_PORT {
+	if posix.bind(posix.FD(s), (^posix.sockaddr)(&sockaddr), posix.socklen_t(sockaddr.ss_len)) != .OK {
+		errno := posix.errno()
+		if errno == .EACCES && ep.port <= MAX_PRIVILEGED_PORT {
 			err = .Privileged_Port_Without_Root
 		} else {
-			err = Bind_Error(os.is_platform_error(res) or_else -1)
+			err = Bind_Error(errno)
 		}
 	}
+
 	return
 }
 
@@ -131,9 +133,8 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_
 
 	bind(sock, interface_endpoint) or_return
 
-	res := os.listen(os.Socket(skt), backlog)
-	if res != nil {
-		err = Listen_Error(os.is_platform_error(res) or_else -1)
+	if posix.listen(posix.FD(skt), i32(backlog)) != .OK {
+		err = Listen_Error(posix.errno())
 		return
 	}
 
@@ -144,34 +145,34 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_
 _bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
 	addr: posix.sockaddr_storage
 	addr_len := posix.socklen_t(size_of(addr))
-	res := posix.getsockname(posix.FD(any_socket_to_socket(sock)), (^posix.sockaddr)(&addr), &addr_len)
-	if res != .OK {
+	if posix.getsockname(posix.FD(any_socket_to_socket(sock)), (^posix.sockaddr)(&addr), &addr_len) != .OK {
 		err = Listen_Error(posix.errno())
 		return
 	}
-	ep = _sockaddr_to_endpoint((^os.SOCKADDR_STORAGE_LH)(&addr))
+
+	ep = _sockaddr_to_endpoint(&addr)
 	return
 }
 
 @(private)
 _accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
-	sockaddr: os.SOCKADDR_STORAGE_LH
-	sockaddrlen := c.int(size_of(sockaddr))
-
-	client_sock, client_sock_err := os.accept(os.Socket(sock), cast(^os.SOCKADDR) &sockaddr, &sockaddrlen)
-	if client_sock_err != nil {
-		err = Accept_Error(os.is_platform_error(client_sock_err) or_else -1)
+	addr: posix.sockaddr_storage
+	addr_len := posix.socklen_t(size_of(addr))
+	client_sock := posix.accept(posix.FD(sock), (^posix.sockaddr)(&addr), &addr_len)
+	if client_sock < 0 {
+		err = Accept_Error(posix.errno())
 		return
 	}
+
 	client = TCP_Socket(client_sock)
-	source = _sockaddr_to_endpoint(&sockaddr)
+	source = _sockaddr_to_endpoint(&addr)
 	return
 }
 
 @(private)
 _close :: proc(skt: Any_Socket) {
 	s := any_socket_to_socket(skt)
-	os.close(os.Handle(os.Socket(s)))
+	posix.close(posix.FD(s))
 }
 
 @(private)
@@ -179,11 +180,13 @@ _recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Networ
 	if len(buf) <= 0 {
 		return
 	}
-	res, res_err := os.recv(os.Socket(skt), buf, 0)
-	if res_err != nil {
-		err = TCP_Recv_Error(os.is_platform_error(res_err) or_else -1)
+
+	res := posix.recv(posix.FD(skt), raw_data(buf), len(buf), {})
+	if res < 0 {
+		err = TCP_Recv_Error(posix.errno())
 		return
 	}
+
 	return int(res), nil
 }
 
@@ -193,11 +196,11 @@ _recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endp
 		return
 	}
 
-	from: os.SOCKADDR_STORAGE_LH
-	fromsize := c.int(size_of(from))
-	res, res_err := os.recvfrom(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, &fromsize)
-	if res_err != nil {
-		err = UDP_Recv_Error(os.is_platform_error(res_err) or_else -1)
+	from: posix.sockaddr_storage
+	fromsize := posix.socklen_t(size_of(from))
+	res := posix.recvfrom(posix.FD(skt), raw_data(buf), len(buf), {}, (^posix.sockaddr)(&from), &fromsize)
+	if res < 0 {
+		err = UDP_Recv_Error(posix.errno())
 		return
 	}
 
@@ -211,15 +214,19 @@ _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Net
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, res_err := os.send(os.Socket(skt), remaining, os.MSG_NOSIGNAL)
-		if res_err == os.EPIPE {
-			// EPIPE arises if the socket has been closed remotely.
-			err = TCP_Send_Error.Connection_Closed
-			return
-		} else if res_err != nil {
-			err = TCP_Send_Error(os.is_platform_error(res_err) or_else -1)
+		res := posix.send(posix.FD(skt), raw_data(remaining), len(remaining), {.NOSIGNAL})
+		if res < 0 {
+			errno := posix.errno()
+			if errno == .EPIPE {
+				// EPIPE arises if the socket has been closed remotely.
+				err = TCP_Send_Error.Connection_Closed
+				return
+			}
+
+			err = TCP_Send_Error(errno)
 			return
 		}
+
 		bytes_written += int(res)
 	}
 	return
@@ -231,15 +238,19 @@ _send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written:
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, res_err := os.sendto(os.Socket(skt), remaining, os.MSG_NOSIGNAL, cast(^os.SOCKADDR)&toaddr, i32(toaddr.len))
-		if res_err == os.EPIPE {
-			// EPIPE arises if the socket has been closed remotely.
-			err = UDP_Send_Error.Not_Socket
-			return
-		} else if res_err != nil {
-			err = UDP_Send_Error(os.is_platform_error(res_err) or_else -1)
+		res := posix.sendto(posix.FD(skt), raw_data(remaining), len(remaining), {.NOSIGNAL}, (^posix.sockaddr)(&toaddr), posix.socklen_t(toaddr.ss_len))
+		if res < 0 {
+			errno := posix.errno()
+			if errno == .EPIPE {
+				// EPIPE arises if the socket has been closed remotely.
+				err = UDP_Send_Error.Not_Socket
+				return
+			}
+
+			err = UDP_Send_Error(errno)
 			return
 		}
+
 		bytes_written += int(res)
 	}
 	return
@@ -248,26 +259,25 @@ _send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written:
 @(private)
 _shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	s := any_socket_to_socket(skt)
-	res := os.shutdown(os.Socket(s), int(manner))
-	if res != nil {
-		return Shutdown_Error(os.is_platform_error(res) or_else -1)
+	if posix.shutdown(posix.FD(s), posix.Shut(manner)) != .OK {
+		err = Shutdown_Error(posix.errno())
 	}
 	return
 }
 
 @(private)
 _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
-	level := os.SOL_SOCKET if option != .TCP_Nodelay else os.IPPROTO_TCP
+	level := posix.SOL_SOCKET if option != .TCP_Nodelay else posix.IPPROTO_TCP
 
 	// NOTE(tetra, 2022-02-15): On Linux, you cannot merely give a single byte for a bool;
 	//  it _has_ to be a b32.
 	//  I haven't tested if you can give more than that.
 	bool_value: b32
-	int_value: i32
-	timeval_value: os.Timeval
+	int_value: posix.socklen_t
+	timeval_value: posix.timeval
 
 	ptr: rawptr
-	len: os.socklen_t
+	len: posix.socklen_t
 
 	switch option {
 	case
@@ -302,8 +312,8 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
 
 			micros := i64(time.duration_microseconds(t))
-			timeval_value.microseconds = int(micros % 1e6)
-			timeval_value.seconds = (micros - i64(timeval_value.microseconds)) / 1e6
+			timeval_value.tv_usec = posix.suseconds_t(micros % 1e6)
+			timeval_value.tv_sec  = posix.time_t(micros - i64(timeval_value.tv_usec)) / 1e6
 
 			ptr = &timeval_value
 			len = size_of(timeval_value)
@@ -312,12 +322,12 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 		.Send_Buffer_Size:
 			// TODO: check for out of range values and return .Value_Out_Of_Range?
 			switch i in value {
-			case i8, u8:   i2 := i; int_value = os.socklen_t((^u8)(&i2)^)
-			case i16, u16: i2 := i; int_value = os.socklen_t((^u16)(&i2)^)
-			case i32, u32: i2 := i; int_value = os.socklen_t((^u32)(&i2)^)
-			case i64, u64: i2 := i; int_value = os.socklen_t((^u64)(&i2)^)
-			case i128, u128: i2 := i; int_value = os.socklen_t((^u128)(&i2)^)
-			case int, uint: i2 := i; int_value = os.socklen_t((^uint)(&i2)^)
+			case i8, u8:   i2 := i; int_value = posix.socklen_t((^u8)(&i2)^)
+			case i16, u16: i2 := i; int_value = posix.socklen_t((^u16)(&i2)^)
+			case i32, u32: i2 := i; int_value = posix.socklen_t((^u32)(&i2)^)
+			case i64, u64: i2 := i; int_value = posix.socklen_t((^u64)(&i2)^)
+			case i128, u128: i2 := i; int_value = posix.socklen_t((^u128)(&i2)^)
+			case int, uint: i2 := i; int_value = posix.socklen_t((^uint)(&i2)^)
 			case:
 				panic("set_option() value must be an integer here", loc)
 			}
@@ -326,9 +336,8 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 	}
 
 	skt := any_socket_to_socket(s)
-	res := os.setsockopt(os.Socket(skt), int(level), int(option), ptr, len)
-	if res != nil {
-		return Socket_Option_Error(os.is_platform_error(res) or_else -1)
+	if posix.setsockopt(posix.FD(skt), i32(level), posix.Sock_Option(option), ptr, len) != .OK {
+		return Socket_Option_Error(posix.errno())
 	}
 
 	return nil
@@ -338,42 +347,42 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
 	socket := any_socket_to_socket(socket)
 
-	flags, getfl_err := os.fcntl(int(socket), os.F_GETFL, 0)
-	if getfl_err != nil {
-		return Set_Blocking_Error(os.is_platform_error(getfl_err) or_else -1)
+	flags_ := posix.fcntl(posix.FD(socket), .GETFL, 0)
+	if flags_ < 0 {
+		return Set_Blocking_Error(posix.errno())
 	}
+	flags := transmute(posix.O_Flags)flags_
 
 	if should_block {
-		flags &~= int(os.O_NONBLOCK)
+		flags -= {.NONBLOCK}
 	} else {
-		flags |= int(os.O_NONBLOCK)
+		flags += {.NONBLOCK}
 	}
 
-	_, setfl_err := os.fcntl(int(socket), os.F_SETFL, flags)
-	if setfl_err != nil {
-		return Set_Blocking_Error(os.is_platform_error(setfl_err) or_else -1)
+	if posix.fcntl(posix.FD(socket), .SETFL, flags) < 0 {
+		return Set_Blocking_Error(posix.errno())
 	}
 
 	return nil
 }
 
 @private
-_endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: os.SOCKADDR_STORAGE_LH) {
+_endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: posix.sockaddr_storage) {
 	switch a in ep.address {
 	case IP4_Address:
-		(^os.sockaddr_in)(&sockaddr)^ = os.sockaddr_in {
+		(^posix.sockaddr_in)(&sockaddr)^ = posix.sockaddr_in {
 			sin_port = u16be(ep.port),
-			sin_addr = transmute(os.in_addr) a,
-			sin_family = u8(os.AF_INET),
-			sin_len = size_of(os.sockaddr_in),
+			sin_addr = transmute(posix.in_addr)a,
+			sin_family = .INET,
+			sin_len = size_of(posix.sockaddr_in),
 		}
 		return
 	case IP6_Address:
-		(^os.sockaddr_in6)(&sockaddr)^ = os.sockaddr_in6 {
+		(^posix.sockaddr_in6)(&sockaddr)^ = posix.sockaddr_in6 {
 			sin6_port = u16be(ep.port),
-			sin6_addr = transmute(os.in6_addr) a,
-			sin6_family = u8(os.AF_INET6),
-			sin6_len = size_of(os.sockaddr_in6),
+			sin6_addr = transmute(posix.in6_addr)a,
+			sin6_family = .INET6,
+			sin6_len = size_of(posix.sockaddr_in6),
 		}
 		return
 	}
@@ -381,21 +390,21 @@ _endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: os.SOCKADDR_STORAGE_LH
 }
 
 @private
-_sockaddr_to_endpoint :: proc(native_addr: ^os.SOCKADDR_STORAGE_LH) -> (ep: Endpoint) {
-	switch native_addr.family {
-	case u8(os.AF_INET):
-		addr := cast(^os.sockaddr_in) native_addr
+_sockaddr_to_endpoint :: proc(native_addr: ^posix.sockaddr_storage) -> (ep: Endpoint) {
+	#partial switch native_addr.ss_family {
+	case .INET:
+		addr := cast(^posix.sockaddr_in)native_addr
 		port := int(addr.sin_port)
 		ep = Endpoint {
-			address = IP4_Address(transmute([4]byte) addr.sin_addr),
-			port = port,
+			address = IP4_Address(transmute([4]byte)addr.sin_addr),
+			port    = port,
 		}
-	case u8(os.AF_INET6):
-		addr := cast(^os.sockaddr_in6) native_addr
+	case .INET6:
+		addr := cast(^posix.sockaddr_in6)native_addr
 		port := int(addr.sin6_port)
 		ep = Endpoint {
-			address = IP6_Address(transmute([8]u16be) addr.sin6_addr),
-			port = port,
+			address = IP6_Address(transmute([8]u16be)addr.sin6_addr),
+			port    = port,
 		}
 	case:
 		panic("native_addr is neither IP4 or IP6 address")
@@ -404,21 +413,21 @@ _sockaddr_to_endpoint :: proc(native_addr: ^os.SOCKADDR_STORAGE_LH) -> (ep: Endp
 }
 
 @(private)
-_sockaddr_basic_to_endpoint :: proc(native_addr: ^os.SOCKADDR) -> (ep: Endpoint) {
-	switch u16(native_addr.family) {
-	case u16(os.AF_INET):
-		addr := cast(^os.sockaddr_in) native_addr
+_sockaddr_basic_to_endpoint :: proc(native_addr: ^posix.sockaddr) -> (ep: Endpoint) {
+	#partial switch native_addr.sa_family {
+	case .INET:
+		addr := cast(^posix.sockaddr_in)native_addr
 		port := int(addr.sin_port)
 		ep = Endpoint {
-			address = IP4_Address(transmute([4]byte) addr.sin_addr),
-			port = port,
+			address = IP4_Address(transmute([4]byte)addr.sin_addr),
+			port    = port,
 		}
-	case u16(os.AF_INET6):
-		addr := cast(^os.sockaddr_in6) native_addr
+	case .INET6:
+		addr := cast(^posix.sockaddr_in6)native_addr
 		port := int(addr.sin6_port)
 		ep = Endpoint {
-			address = IP6_Address(transmute([8]u16be) addr.sin6_addr),
-			port = port,
+			address = IP6_Address(transmute([8]u16be)addr.sin6_addr),
+			port    = port,
 		}
 	case:
 		panic("native_addr is neither IP4 or IP6 address")

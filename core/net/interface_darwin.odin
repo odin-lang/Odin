@@ -20,60 +20,57 @@ package net
 		Feoramund:       FreeBSD platform code
 */
 
-import "core:os"
 import "core:strings"
+import "core:sys/posix"
+
+foreign import lib "system:System.framework"
 
 @(private)
 _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
 	context.allocator = allocator
 
-	head: ^os.ifaddrs
-
-	if res := os._getifaddrs(&head); res < 0 {
+	head: ^ifaddrs
+	if getifaddrs(&head) != .OK {
 		return {}, .Unable_To_Enumerate_Network_Interfaces
 	}
+	defer freeifaddrs(head)
 
-	/*
-		Unlike Windows, *nix regrettably doesn't return all it knows about an interface in one big struct.
-		We're going to have to iterate over a list and coalesce information as we go.
-	*/
-	ifaces: map[string]^Network_Interface
+	ifaces: map[string]Network_Interface
 	defer delete(ifaces)
 
 	for ifaddr := head; ifaddr != nil; ifaddr = ifaddr.next {
 		adapter_name := string(ifaddr.name)
 
-		/*
-			Check if we have seen this interface name before so we can reuse the `Network_Interface`.
-			Else, create a new one.
-		*/
-		if adapter_name not_in ifaces {
-			ifaces[adapter_name] = new(Network_Interface)
-			ifaces[adapter_name].adapter_name = strings.clone(adapter_name)
+		key_ptr, iface, inserted, mem_err := map_entry(&ifaces, adapter_name)
+		if mem_err == nil && inserted {
+			key_ptr^, mem_err = strings.clone(adapter_name)
+			iface.adapter_name = key_ptr^
 		}
-		iface := ifaces[adapter_name]
+		if mem_err != nil {
+			return {}, .Unable_To_Enumerate_Network_Interfaces
+		}
 
 		address: Address
 		netmask: Netmask
 
-		if ifaddr.address != nil {
-			switch int(ifaddr.address.family) {
-			case os.AF_INET, os.AF_INET6:
-				address = _sockaddr_basic_to_endpoint(ifaddr.address).address
+		if ifaddr.addr != nil {
+			#partial switch ifaddr.addr.sa_family {
+			case .INET, .INET6:
+				address = _sockaddr_basic_to_endpoint(ifaddr.addr).address
 			}
 		}
 
 		if ifaddr.netmask != nil {
-			switch int(ifaddr.netmask.family) {
-			case os.AF_INET, os.AF_INET6:
+			#partial switch ifaddr.netmask.sa_family {
+			case .INET, .INET6:
 				netmask = Netmask(_sockaddr_basic_to_endpoint(ifaddr.netmask).address)
 			}
 		}
 
-		if ifaddr.broadcast_or_dest != nil && .BROADCAST in ifaddr.flags {
-			switch int(ifaddr.broadcast_or_dest.family) {
-			case os.AF_INET, os.AF_INET6:
-				broadcast := _sockaddr_basic_to_endpoint(ifaddr.broadcast_or_dest).address
+		if ifaddr.dstaddr != nil && .BROADCAST in ifaddr.flags {
+			#partial switch ifaddr.dstaddr.sa_family {
+			case .INET, .INET6:
+				broadcast := _sockaddr_basic_to_endpoint(ifaddr.dstaddr).address
 				append(&iface.multicast, broadcast)
 			}
 		}
@@ -105,18 +102,51 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
 		iface.link.state = state
 	}
 
-	/*
-		Free the OS structures.
-	*/
-	os._freeifaddrs(head)
-
-	/*
-		Turn the map into a slice to return.
-	*/
-	_interfaces := make([dynamic]Network_Interface, 0, allocator)
+	interfaces = make([]Network_Interface, len(ifaces))
+	i: int
 	for _, iface in ifaces {
-		append(&_interfaces, iface^)
-		free(iface)
+		interfaces[i] = iface
+		i += 1
 	}
-	return _interfaces[:], {}
+	return interfaces, nil
+}
+
+@(private)
+IF_Flag :: enum u32 {
+	UP,
+	BROADCAST,
+	DEBUG,
+	LOOPBACK,
+	POINTTOPOINT,
+	NOTRAILERS,
+	RUNNING,
+	NOARP,
+	PROMISC,
+	ALLMULTI,
+	OACTIVE,
+	SIMPLEX,
+	LINK0,
+	LINK1,
+	LINK2,
+	MULTICAST,
+}
+
+@(private)
+IF_Flags :: bit_set[IF_Flag; u32]
+
+@(private)
+ifaddrs :: struct {
+	next:    ^ifaddrs,
+	name:    cstring,
+	flags:   IF_Flags,
+	addr:    ^posix.sockaddr,
+	netmask: ^posix.sockaddr,
+	dstaddr: ^posix.sockaddr,
+	data:    rawptr,
+}
+
+@(private)
+foreign lib {
+	getifaddrs  :: proc(ifap: ^^ifaddrs) -> posix.result ---
+	freeifaddrs :: proc(ifp: ^ifaddrs) ---
 }
