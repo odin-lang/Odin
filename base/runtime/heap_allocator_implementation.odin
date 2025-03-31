@@ -760,8 +760,10 @@ heap_free_wide_slab :: proc "contextless" (superpage: ^Heap_Superpage, slab: ^He
 	assert_contextless(slab.bin_size > HEAP_MAX_BIN_SIZE, "The heap allocator tried to wide-free a non-wide slab.")
 	// There is only one bit for a Slab-wide allocation, so this will be easy.
 	contiguous := heap_slabs_needed_for_size(slab.bin_size)
-	previously_full_superpage := superpage.free_slabs == 0
-	superpage.free_slabs += contiguous
+	if superpage.free_slabs == 0 {
+		heap_cache_add_superpage_with_free_slabs(superpage)
+		heap_debug_cover(.Superpage_Added_To_Open_Cache_By_Freeing_Wide_Slab)
+	}
 
 	for i in slab.index..<slab.index+contiguous {
 		// Rewrite the index into place in case it was overwritten, then mark
@@ -772,16 +774,9 @@ heap_free_wide_slab :: proc "contextless" (superpage: ^Heap_Superpage, slab: ^He
 		next_slab.bin_size = 0
 	}
 
+	superpage.free_slabs += contiguous
+	assert_contextless(superpage.free_slabs <= HEAP_SLAB_COUNT)
 	superpage.next_free_slab_index = min(superpage.next_free_slab_index, slab.index)
-	if superpage.free_slabs == HEAP_SLAB_COUNT && !superpage.cache_block.in_use {
-		heap_free_superpage(superpage)
-		heap_debug_cover(.Superpage_Freed_By_Wide_Slab)
-		return
-	}
-	if previously_full_superpage {
-		heap_cache_add_superpage_with_free_slabs(superpage)
-		heap_debug_cover(.Superpage_Added_To_Open_Cache_By_Freeing_Wide_Slab)
-	}
 }
 
 /*
@@ -797,6 +792,18 @@ heap_free_slab :: proc "contextless" (superpage: ^Heap_Superpage, slab: ^Heap_Sl
 	superpage.free_slabs += 1
 	assert_contextless(superpage.free_slabs <= HEAP_SLAB_COUNT)
 	superpage.next_free_slab_index = min(superpage.next_free_slab_index, slab.index)
+}
+
+/*
+If the Superpage has no slabs in use and is not used by the local heap's cache,
+free it from the heap and return true.
+*/
+heap_free_superpage_if_empty_and_unused :: proc "contextless" (superpage: ^Heap_Superpage) -> (freed: bool) {
+	if superpage.free_slabs == HEAP_SLAB_COUNT && !superpage.cache_block.in_use {
+		heap_free_superpage(superpage)
+		freed = true
+	}
+	return
 }
 
 /*
@@ -1396,7 +1403,7 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 				intrinsics.atomic_store_explicit(&superpage.remote_free_set, false, .Seq_Cst)
 				should_reschedule := false
 
-				for j := 0; j < HEAP_SLAB_COUNT; /**/ {
+				slab_loop: for j := 0; j < HEAP_SLAB_COUNT; /**/ {
 					slab := heap_superpage_index_slab(superpage, j)
 					bin_size := slab.bin_size
 					// We only bother to merge if the slab is in use, full, and
@@ -1417,9 +1424,17 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 
 						if bin_size > HEAP_MAX_BIN_SIZE {
 							heap_free_wide_slab(superpage, slab)
+							if heap_free_superpage_if_empty_and_unused(superpage) {
+								assert_contextless(should_reschedule == false, "The heap allocator has freed a superpage and intends to reschedule it for remote free collection.")
+								break slab_loop
+							}
 						} else {
 							if slab.free_bins == slab.max_bins {
 								heap_free_slab(superpage, slab)
+								if heap_free_superpage_if_empty_and_unused(superpage) {
+									assert_contextless(should_reschedule == false, "The heap allocator has freed a superpage and intends to reschedule it for remote free collection.")
+									break slab_loop
+								}
 							} else {
 								heap_cache_add_slab(slab, heap_bin_size_to_rank(bin_size))
 							}
@@ -1582,6 +1597,7 @@ heap_free :: proc "contextless" (ptr: rawptr) {
 	if slab.bin_size > HEAP_MAX_BIN_SIZE {
 		if intrinsics.atomic_load_explicit(&superpage.owner, .Acquire) == get_current_thread_id() {
 			heap_free_wide_slab(superpage, slab)
+			heap_free_superpage_if_empty_and_unused(superpage)
 			heap_debug_cover(.Freed_Wide_Slab)
 		} else {
 			// Atomically let the owner know there's a free slab.
@@ -1636,11 +1652,7 @@ heap_free :: proc "contextless" (ptr: rawptr) {
 			slab.next_free_sector = min(slab.next_free_sector, sector)
 			heap_debug_cover(.Freed_Bin_Updated_Slab_Next_Free_Sector)
 		}
-		// Free the entire superpage if it's empty.
-		if superpage.free_slabs == HEAP_SLAB_COUNT && !superpage.cache_block.in_use {
-			heap_free_superpage(superpage)
-			heap_debug_cover(.Freed_Bin_Freed_Superpage)
-		}
+		heap_free_superpage_if_empty_and_unused(superpage)
 	} else {
 		// Atomically let the owner know there's a free bin.
 
