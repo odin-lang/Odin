@@ -1,4 +1,4 @@
-package mem
+#package mem
 
 import "base:runtime"
 import "base:intrinsics"
@@ -171,16 +171,15 @@ If the return value is:
 
 The comparison is performed as follows:
 1. Each byte, upto `min(len(a), len(b))` bytes is compared between `a` and `b`.
-  - If the byte in slice `a` is smaller than a byte in slice `b`, then comparison
-  stops and this procedure returns `-1`.
-  - If the byte in slice `a` is bigger than a byte in slice `b`, then comparison
-  stops and this procedure returns `+1`.
-  - Otherwise the comparison continues until `min(len(a), len(b))` are compared.
-2. If all the bytes in the range are equal, then the lengths of the slices are
-  compared.
-  - If the length of slice `a` is smaller than the length of slice `b`, then `-1` is returned.
-  - If the length of slice `b` is smaller than the length of slice `b`, then `+1` is returned.
-  - Otherwise `0` is returned.
+	- If the byte in slice `a` is smaller than a byte in slice `b`, then comparison
+	  stops and this procedure returns `-1`.
+	- If the byte in slice `a` is bigger than a byte in slice `b`, then comparison
+	  stops and this procedure returns `+1`.
+	- Otherwise the comparison continues until `min(len(a), len(b))` are compared.
+2. If all the bytes in the range are equal, then the lengths of the slices are compared.
+	- If the length of slice `a` is smaller than the length of slice `b`, then `-1` is returned.
+	- If the length of slice `b` is smaller than the length of slice `b`, then `+1` is returned.
+	- Otherwise `0` is returned.
 */
 @(require_results)
 compare :: proc "contextless" (a, b: []byte) -> int {
@@ -207,11 +206,11 @@ If the return value is:
 
 The comparison is performed as follows:
 1. Each byte, upto `n` bytes is compared between `a` and `b`.
-  - If the byte in `a` is smaller than a byte in `b`, then comparison stops
-  and this procedure returns `-1`.
-  - If the byte in `a` is bigger than a byte in `b`, then comparison stops
-  and this procedure returns `+1`.
-  - Otherwise the comparison continues until `n` bytes are compared.
+	- If the byte in `a` is smaller than a byte in `b`, then comparison stops
+	  and this procedure returns `-1`.
+	- If the byte in `a` is bigger than a byte in `b`, then comparison stops
+	  and this procedure returns `+1`.
+	- Otherwise the comparison continues until `n` bytes are compared.
 2. If all the bytes in the range are equal, this procedure returns `0`.
 */
 @(require_results)
@@ -233,11 +232,11 @@ If the return value is:
 
 The comparison is performed as follows:
 1. Each byte, upto `n` bytes is compared between `a` and `b`.
-  - If the byte in `a` is smaller than a byte in `b`, then comparison stops
-  and this procedure returns `-1`.
-  - If the byte in `a` is bigger than a byte in `b`, then comparison stops
-  and this procedure returns `+1`.
-  - Otherwise the comparison continues until `n` bytes are compared.
+	- If the byte in `a` is smaller than a byte in `b`, then comparison stops
+	  and this procedure returns `-1`.
+	- If the byte in `a` is bigger than a byte in `b`, then comparison stops
+	  and this procedure returns `+1`.
+	- Otherwise the comparison continues until `n` bytes are compared.
 2. If all the bytes in the range are equal, this procedure returns `0`.
 */
 @(require_results)
