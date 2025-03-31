@@ -1,4 +1,4 @@
-#package mem
+package mem
 
 import "base:runtime"
 import "base:intrinsics"
