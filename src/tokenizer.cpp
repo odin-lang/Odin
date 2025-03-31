@@ -33,6 +33,7 @@ TOKEN_KIND(Token__OperatorBegin, ""), \
 	TOKEN_KIND(Token_AndNot,   "&~"), \
 	TOKEN_KIND(Token_Shl,      "<<"), \
 	TOKEN_KIND(Token_Shr,      ">>"), \
+	TOKEN_KIND(Token_Concat,   "##"), \
 	TOKEN_KIND(Token_CmpAnd,   "&&"), \
 	TOKEN_KIND(Token_CmpOr,    "||"), \
 \
@@ -49,6 +50,7 @@ TOKEN_KIND(Token__AssignOpBegin, ""), \
 	TOKEN_KIND(Token_AndNotEq, "&~="), \
 	TOKEN_KIND(Token_ShlEq,    "<<="), \
 	TOKEN_KIND(Token_ShrEq,    ">>="), \
+	TOKEN_KIND(Token_ConcatEq, "##="), \
 	TOKEN_KIND(Token_CmpAndEq, "&&="), \
 	TOKEN_KIND(Token_CmpOrEq,  "||="), \
 TOKEN_KIND(Token__AssignOpEnd, ""), \
@@ -937,7 +939,14 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			break;
 		case '#':
 			token->kind = Token_Hash;
-			if (t->curr_rune == '!') {
+			if (t->curr_rune == '#') {
+				advance_to_next_rune(t);
+				token->kind = Token_Concat;
+				if (t->curr_rune == '=') {
+					advance_to_next_rune(t);
+					token->kind = Token_ConcatEq;
+				}
+			} else if (t->curr_rune == '!') {
 				token->kind = Token_Comment;
 				tokenizer_skip_line(t);
 			} else if (t->curr_rune == '+') {

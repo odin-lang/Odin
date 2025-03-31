@@ -1427,6 +1427,38 @@ handle_op:;
 			return res;
 		}
 		break;
+
+
+	case Token_Concat:
+		{
+			lbValue left  = lb_emit_conv(p, lhs, type);
+			lbValue right = lb_emit_conv(p, rhs, type);
+
+			lbValue ten = lb_const_int(p->module, type, 10);
+			lbAddr pow = lb_add_local_generated(p, type, false);
+			lb_addr_store(p, pow, ten);
+
+			lbBlock *loop = lb_create_block(p, "concat.loop");
+			lbBlock *body = lb_create_block(p, "concat.body");
+			lbBlock *done = lb_create_block(p, "concat.done");
+
+			lb_emit_jump(p, loop);
+			lb_start_block(p, loop);
+
+			lbValue cond = lb_emit_comp(p, Token_GtEq, right, lb_addr_load(p, pow));
+
+			lb_emit_if(p, cond, body, done);
+			lb_start_block(p, body);
+
+			lbValue pow_10 = lb_emit_arith(p, Token_Mul, lb_addr_load(p, pow), ten, type);
+			lb_addr_store(p, pow, pow_10);
+
+			lb_emit_jump(p, loop);
+			lb_start_block(p, done);
+
+			lbValue x = lb_emit_arith(p, Token_Mul, left, lb_addr_load(p, pow), type);
+			return lb_emit_arith(p, Token_Add, x, right, type);
+		}
 	}
 
 	GB_PANIC("unhandled operator of lb_emit_arith");
@@ -1517,7 +1549,9 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_And:
 	case Token_Or:
 	case Token_Xor:
-	case Token_AndNot: {
+	case Token_AndNot:
+	case Token_Concat:
+	case Token_ConcatEq: {
 		Type *type = default_type(tv.type);
 		lbValue left = lb_build_expr(p, be->left);
 		lbValue right = lb_build_expr(p, be->right);
@@ -1604,6 +1638,7 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			lbValue right = lb_build_expr(p, be->right);
 			return lb_build_binary_in(p, left, right, be->op.kind);
 		}
+
 	default:
 		GB_PANIC("Invalid binary expression");
 		break;

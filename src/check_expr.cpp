@@ -1995,6 +1995,12 @@ gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 			return false;
 		}
 		break;
+	case Token_Concat:
+	case Token_ConcatEq:
+		if (!is_type_integer(type)) {
+			error(op, "Operator '%.*s' is only allowed with integer expressions", LIT(op.string));
+		}
+		break;
 
 	case Token_Add:
 		if (is_type_string(type)) {

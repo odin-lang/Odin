@@ -3490,6 +3490,7 @@ gb_internal i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_AndNot:
 	case Token_Shl:
 	case Token_Shr:
+	case Token_Concat:
 		return 7;
 	}
 	return 0;
@@ -3778,6 +3779,7 @@ gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 	case Token_AndNotEq:
 	case Token_CmpAndEq:
 	case Token_CmpOrEq:
+	case Token_ConcatEq:
 	{
 		if (f->curr_proc == nullptr) {
 			syntax_error(f->curr_token, "You cannot use a simple statement in the file scope");
