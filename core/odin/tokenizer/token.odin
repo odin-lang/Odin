@@ -64,6 +64,8 @@ Token_Kind :: enum u32 {
 		Shl,      // <<
 		Shr,      // >>
 
+		Concat,   // ##
+
 		Cmp_And,  // &&
 		Cmp_Or,   // ||
 
@@ -80,6 +82,9 @@ Token_Kind :: enum u32 {
 		And_Not_Eq, // &~=
 		Shl_Eq,     // <<=
 		Shr_Eq,     // >>=
+
+		Concat_Eq,  // ##=
+
 		Cmp_And_Eq, // &&=
 		Cmp_Or_Eq,  // ||=
 	B_Assign_Op_End,
@@ -199,6 +204,8 @@ tokens := [Token_Kind.COUNT]string {
 	"<<",
 	">>",
 
+	"##",
+
 	"&&",
 	"||",
 
@@ -215,6 +222,9 @@ tokens := [Token_Kind.COUNT]string {
 	"&~=",
 	"<<=",
 	">>=",
+
+	"##=",
+
 	"&&=",
 	"||=",
 	"",

@@ -1627,7 +1627,8 @@ token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	case .Mul, .Quo,
 	     .Mod, .Mod_Mod,
 	     .And, .And_Not,
-	     .Shl, .Shr:
+	     .Shl, .Shr,
+	     .Concat:
 		return 7
 	}
 	return 0

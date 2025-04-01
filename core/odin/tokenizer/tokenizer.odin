@@ -650,7 +650,15 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			}
 		case '#':
 			kind = .Hash
-			if t.ch == '!' {
+
+			if t.ch == '#' {
+				advance_rune(t)
+				kind = .Concat
+				if t.ch == '=' {
+					advance_rune(t)
+					kind = .Concat_Eq
+				}
+			} else if t.ch == '!' {
 				kind = .Comment
 				lit = scan_comment(t)
 			} else if t.ch == '+' {
