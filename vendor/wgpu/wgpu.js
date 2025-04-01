@@ -528,7 +528,7 @@ class WebGPUInterface {
 			return undefined;
 		}
 
-		const off = this.struct(ptr);
+		const off = this.struct(start);
 
 		return {
 			view:              this.textureViews.get(this.mem.loadPtr(off(4))),
