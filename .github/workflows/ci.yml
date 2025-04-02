@@ -93,14 +93,14 @@ jobs:
       - name: Download LLVM (MacOS Intel)
         if: matrix.os == 'macos-13'
         run: |
-          brew install llvm@18 lua@5.4
-          echo "/usr/local/opt/llvm@18/bin" >> $GITHUB_PATH
+          brew update
+          brew install llvm@20 lua@5.4 lld
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
-          brew install llvm@18 wasmtime lua@5.4
-          echo "/opt/homebrew/opt/llvm@18/bin" >> $GITHUB_PATH
+          brew update
+          brew install llvm@20 wasmtime lua@5.4 lld
 
       - name: Build Odin
         run: ./build_odin.sh release
