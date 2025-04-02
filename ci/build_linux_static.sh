@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 # Intended for use in Alpine containers, see the "nightly" Github action for a list of dependencies
 
-CXX="clang++-18"
-LLVM_CONFIG="llvm-config-18"
+CXX="clang++-20"
+LLVM_CONFIG="llvm-config-20"
 
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 
