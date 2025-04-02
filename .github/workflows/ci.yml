@@ -94,15 +94,13 @@ jobs:
         if: matrix.os == 'macos-13'
         run: |
           brew update
-          brew install llvm lua@5.4 lld
-          brew --prefix llvm@20 # Verifies it is LLVM 20
+          brew install llvm@20 lua@5.4 lld
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
           brew update
-          brew install llvm wasmtime lua@5.4 lld
-          brew --prefix llvm@20 # Verifies it is LLVM 20
+          brew install llvm@20 wasmtime lua@5.4 lld
 
       - name: Build Odin
         run: ./build_odin.sh release

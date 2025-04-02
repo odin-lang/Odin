@@ -94,8 +94,7 @@ jobs:
       - name: Download LLVM and setup PATH
         run: |
           brew update
-          brew install llvm dylibbundler lld
-          brew --prefix llvm@20 # Verifies it is LLVM 20
+          brew install llvm@20 dylibbundler lld
 
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
@@ -133,8 +132,7 @@ jobs:
       - name: Download LLVM and setup PATH
         run: |
           brew update
-          brew install llvm dylibbundler lld
-          brew --prefix llvm@20 # Verifies it is LLVM 20
+          brew install llvm@20 dylibbundler lld
 
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
