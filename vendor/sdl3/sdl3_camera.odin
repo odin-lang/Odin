@@ -27,7 +27,7 @@ foreign lib {
 	GetCameraDriver           :: proc(index: c.int) -> cstring ---
 	GetCurrentCameraDriver    :: proc() -> cstring ---
 	GetCameras                :: proc(count: ^c.int) -> [^]CameraID ---
-	GetCameraSupportedFormats :: proc(devid: CameraID, count: ^c.int) -> [^]^CameraSpec ---
+	GetCameraSupportedFormats :: proc(instance_id: CameraID, count: ^c.int) -> [^]^CameraSpec ---
 	GetCameraName             :: proc(instance_id: CameraID) -> cstring ---
 	GetCameraPosition         :: proc(instance_id: CameraID) -> CameraPosition ---
 	OpenCamera                :: proc(instance_id: CameraID, spec: ^CameraSpec) -> ^Camera ---
