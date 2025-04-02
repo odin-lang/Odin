@@ -93,12 +93,14 @@ jobs:
       - name: Download LLVM (MacOS Intel)
         if: matrix.os == 'macos-13'
         run: |
+          brew update
           brew install llvm lua@5.4 lld
           brew --prefix llvm@20 # Verifies it is LLVM 20
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
+          brew update
           brew install llvm wasmtime lua@5.4 lld
           brew --prefix llvm@20 # Verifies it is LLVM 20
 
