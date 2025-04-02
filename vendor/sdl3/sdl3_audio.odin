@@ -83,9 +83,9 @@ foreign lib {
 	OpenAudioDevice                :: proc(devid: AudioDeviceID, spec: ^AudioSpec) -> AudioDeviceID ---
 	IsAudioDevicePhysical          :: proc(devid: AudioDeviceID) -> bool ---
 	IsAudioDevicePlayback          :: proc(devid: AudioDeviceID) -> bool ---
-	PauseAudioDevice               :: proc(dev:  AudioDeviceID) -> bool ---
-	ResumeAudioDevice              :: proc(dev:  AudioDeviceID) -> bool ---
-	AudioDevicePaused              :: proc(dev:  AudioDeviceID) -> bool ---
+	PauseAudioDevice               :: proc(devid: AudioDeviceID) -> bool ---
+	ResumeAudioDevice              :: proc(devid: AudioDeviceID) -> bool ---
+	AudioDevicePaused              :: proc(devid: AudioDeviceID) -> bool ---
 	GetAudioDeviceGain             :: proc(devid: AudioDeviceID) -> f32 ---
 	SetAudioDeviceGain             :: proc(devid: AudioDeviceID, gain: f32) -> bool ---
 	CloseAudioDevice               :: proc(devid: AudioDeviceID) ---

@@ -516,7 +516,7 @@ GPUVertexBufferDescription :: struct {
 	slot:               Uint32,              /**< The binding slot of the vertex buffer. */
 	pitch:              Uint32,              /**< The byte pitch between consecutive elements of the vertex buffer. */
 	input_rate:         GPUVertexInputRate,  /**< Whether attribute addressing is a function of the vertex index or instance index. */
-	instance_step_rate: Uint32,              /**< The number of instances to draw using the same per-instance data before advancing in the instance buffer by one element. Ignored unless input_rate is GPU_VERTEXINPUTRATE_INSTANCE */
+	instance_step_rate: Uint32,              /**< Reserved for future use. Must be set to 0. */
 }
 
 GPUVertexAttribute :: struct {
@@ -611,8 +611,8 @@ GPURasterizerState :: struct {
 
 GPUMultisampleState :: struct {
 	sample_count: GPUSampleCount,  /**< The number of samples to be used in rasterization. */
-	sample_mask:  Uint32,          /**< Determines which samples get updated in the render targets. Treated as 0xFFFFFFFF if enable_mask is false. */
-	enable_mask:  bool,            /**< Enables sample masking. */
+	sample_mask:  Uint32,          /**< Reserved for future use. Must be set to 0. */
+	enable_mask:  bool,            /**< Reserved for future use. Must be set to false. */
 	_: Uint8,
 	_: Uint8,
 	_: Uint8,

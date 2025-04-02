@@ -22,6 +22,7 @@ MUSTLOCK :: proc "c" (S: ^Surface) -> bool {
 }
 
 ScaleMode :: enum c.int {
+	INVALID = -1,
 	NEAREST, /**< nearest pixel sampling */
 	LINEAR,  /**< linear filtering */
 }
@@ -45,6 +46,11 @@ Surface :: struct {
 	reserved: rawptr,       /**< Reserved for internal use */
 }
 
+PROP_SURFACE_SDR_WHITE_POINT_FLOAT   :: "SDL.surface.SDR_white_point"
+PROP_SURFACE_HDR_HEADROOM_FLOAT      :: "SDL.surface.HDR_headroom"
+PROP_SURFACE_TONEMAP_OPERATOR_STRING :: "SDL.surface.tonemap"
+PROP_SURFACE_HOTSPOT_X_NUMBER        :: "SDL.surface.hotspot.x"
+PROP_SURFACE_HOTSPOT_Y_NUMBER        :: "SDL.surface.hotspot.y"
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -96,6 +102,7 @@ foreign lib {
 	BlitSurfaceUnchecked         :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
 	BlitSurfaceScaled            :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect), scaleMode: ScaleMode) -> bool ---
 	BlitSurfaceUncheckedScaled   :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect), scaleMode: ScaleMode) -> bool ---
+	StretchSurface               :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect), scaleMode: ScaleMode) -> bool ---
 	BlitSurfaceTiled             :: proc(src: ^Surface, srcrect: Maybe(^Rect), dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
 	BlitSurfaceTiledWithScale    :: proc(src: ^Surface, srcrect: Maybe(^Rect), scale: f32, scaleMode: ScaleMode, dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
 	BlitSurface9Grid             :: proc(src: ^Surface, srcrect: Maybe(^Rect), left_width, right_width, top_height, bottom_height: c.int, scale: f32, scaleMode: ScaleMode, dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
