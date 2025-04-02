@@ -33,7 +33,7 @@ gb_internal bool lb_is_elem_const(Ast *elem, Type *elem_type) {
 
 gb_internal bool lb_is_const_nil(lbValue value) {
 	LLVMValueRef v = value.value;
-	if (LLVMIsConstant(v)) {
+	if (v != nullptr && LLVMIsConstant(v)) {
 		if (LLVMIsAConstantAggregateZero(v)) {
 			return true;
 		} else if (LLVMIsAConstantPointerNull(v)) {
