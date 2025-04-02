@@ -93,8 +93,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@20 dylibbundler lld
-          echo "/usr/local/opt/llvm@20/bin" >> $GITHUB_PATH
+          brew install llvm dylibbundler lld
+          brew --prefix llvm@20 # Verifies it is LLVM 20
+
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
         # not link with libunwind bundled with LLVM but link with libunwind on the system.
@@ -130,8 +131,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@20 dylibbundler lld
-          echo "/opt/homebrew/opt/llvm@20/bin" >> $GITHUB_PATH
+          brew install llvm dylibbundler lld
+          brew --prefix llvm@20 # Verifies it is LLVM 20
+
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
         # not link with libunwind bundled with LLVM but link with libunwind on the system.
