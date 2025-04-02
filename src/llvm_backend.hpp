@@ -165,7 +165,6 @@ struct lbModule {
 	PtrMap<u64/*type hash*/, LLVMTypeRef>  func_raw_types;         // mutex: func_raw_types_mutex
 	RecursiveMutex types_mutex;
 	RecursiveMutex func_raw_types_mutex;
-	RecursiveMutex objc_selectors_mutex;
 	i32 internal_type_level;
 
 	RwMutex values_mutex;
@@ -198,6 +197,10 @@ struct lbModule {
 
 	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
+
+
+	RecursiveMutex objc_classes_mutex;
+	RecursiveMutex objc_selectors_mutex;
 
 	StringMap<lbObjcRef> objc_classes;
 	StringMap<lbObjcRef> objc_selectors;

@@ -2165,6 +2165,9 @@ gb_internal lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) 
 }
 
 gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
+	mutex_lock(&p->module->objc_classes_mutex);
+	defer (mutex_unlock(&p->module->objc_classes_mutex));
+
 	lbObjcRef *found = string_map_get(&p->module->objc_classes, name);
 	if (found) {
 		return found->local_module_addr;
@@ -2187,7 +2190,10 @@ gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String 
 		lbAddr default_addr = lb_add_global_generated_with_name(default_module, t_objc_Class, {},
 			make_string(cast(u8 const *)global_name, gb_string_length(global_name)),
 			&entity);
+
+		mutex_lock(&default_module->objc_classes_mutex);
 		string_map_set(&default_module->objc_classes, name, lbObjcRef{entity, default_addr});
+		mutex_unlock(&default_module->objc_classes_mutex);
 	}
 
 	lbValue ptr = lb_find_value_from_entity(p->module, entity);
