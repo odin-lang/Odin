@@ -628,6 +628,10 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 				Operand x = {};
 				x.type = entity->type;
 				x.mode = Addressing_Variable;
+				if (entity->kind == Entity_Constant) {
+					x.mode  = Addressing_Constant;
+					x.value = entity->Constant.value;
+				}
 				if (!check_is_assignable_to(ctx, &x, e->type)) {
 					gbString expr_str = expr_to_string(init);
 					gbString op_type_str = type_to_string(entity->type);
