@@ -1013,7 +1013,7 @@ foreign xlib {
 	// Events
 	SelectInput   :: proc(display: ^Display, window: Window, mask: EventMask) ---
 	Flush         :: proc(display: ^Display) -> i32 ---
-	Sync          :: proc(display: ^Display, discard: Bool) -> i32 ---
+	Sync          :: proc(display: ^Display, discard: bool) -> i32 ---
 	EventsQueued  :: proc(display: ^Display, mode: EventQueueMode) -> i32 ---
 	Pending       :: proc(display: ^Display) -> i32 ---
 	NextEvent     :: proc(display: ^Display, event: ^XEvent) ---
