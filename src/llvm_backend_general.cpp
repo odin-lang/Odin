@@ -171,6 +171,8 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	}
 
 	mpsc_init(&gen->entities_to_correct_linkage, heap_allocator());
+	mpsc_init(&gen->objc_selectors, heap_allocator());
+	mpsc_init(&gen->objc_classes, heap_allocator());
 
 	return true;
 }

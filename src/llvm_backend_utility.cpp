@@ -2094,48 +2094,71 @@ gb_internal void lb_set_wasm_export_attributes(LLVMValueRef value, String export
 }
 
 
-
 gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, String const &name) {
-	mutex_lock(&p->module->objc_selectors_mutex);
-	defer (mutex_unlock(&p->module->objc_selectors_mutex));
-
-	lbObjcRef *found = string_map_get(&p->module->objc_selectors, name);
-
+	lbModule *m = p->module;
+	lbAddr *found = string_map_get(&m->objc_selectors, name);
 	if (found) {
-		return found->local_module_addr;
+		return *found;
 	}
 
 	lbModule *default_module = &p->module->gen->default_module;
-	Entity *entity = {};
 
-	if (default_module != p->module) {
-		found = string_map_get(&default_module->objc_selectors, name);
-		if (found) {
-			entity = found->entity;
-		}
+
+	gbString global_name = gb_string_make(permanent_allocator(), "__$objc_SEL::");
+	global_name = gb_string_append_length(global_name, name.text, name.len);
+
+	LLVMTypeRef t = lb_type(m, t_objc_SEL);
+	lbValue g = {};
+	g.value = LLVMAddGlobal(m->mod, t, global_name);
+	g.type = alloc_type_pointer(t_objc_SEL);
+
+	if (default_module == m) {
+		LLVMSetInitializer(g.value, LLVMConstNull(t));
+		lb_add_member(m, make_string_c(global_name), g);
+	} else {
+		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 	}
 
-	if (!entity) {
-		gbString global_name = gb_string_make(permanent_allocator(), "__$objc_SEL::");
-		global_name = gb_string_append_length(global_name, name.text, name.len);
+	mpsc_enqueue(&m->gen->objc_selectors, lbObjCGlobal{m, global_name, name, t_objc_SEL});
 
-		lbAddr default_addr = lb_add_global_generated_with_name(default_module, t_objc_SEL, {},
-			make_string(cast(u8 const *)global_name, gb_string_length(global_name)),
-			&entity);
+	lbAddr addr = lb_addr(g);
 
-		mutex_lock(&default_module->objc_selectors_mutex);
-		string_map_set(&default_module->objc_selectors, name, lbObjcRef{entity, default_addr});
-		mutex_unlock(&default_module->objc_selectors_mutex);
+	string_map_set(&m->objc_selectors, name, addr);
+
+	return addr;
+}
+
+gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
+	lbModule *m = p->module;
+	lbAddr *found = string_map_get(&m->objc_classes, name);
+	if (found) {
+		return *found;
 	}
 
-	lbValue ptr = lb_find_value_from_entity(p->module, entity);
-	lbAddr local_addr = lb_addr(ptr);
+	lbModule *default_module = &p->module->gen->default_module;
 
-	if (default_module != p->module) {
-		string_map_set(&p->module->objc_selectors, name, lbObjcRef{entity, local_addr});
+
+	gbString global_name = gb_string_make(permanent_allocator(), "__$objc_Class::");
+	global_name = gb_string_append_length(global_name, name.text, name.len);
+
+	LLVMTypeRef t = lb_type(m, t_objc_Class);
+	lbValue g = {};
+	g.value = LLVMAddGlobal(m->mod, t, global_name);
+	g.type = alloc_type_pointer(t_objc_Class);
+
+	if (default_module == m) {
+		LLVMSetInitializer(g.value, LLVMConstNull(t));
+		lb_add_member(m, make_string_c(global_name), g);
+	} else {
+		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 	}
+	mpsc_enqueue(&m->gen->objc_classes, lbObjCGlobal{m, global_name, name, t_objc_Class});
 
-	return local_addr;
+	lbAddr addr = lb_addr(g);
+
+	string_map_set(&m->objc_classes, name, addr);
+
+	return addr;
 }
 
 gb_internal lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
@@ -2164,47 +2187,6 @@ gb_internal lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) 
 	return lb_addr_load(p, dst);
 }
 
-gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
-	mutex_lock(&p->module->objc_classes_mutex);
-	defer (mutex_unlock(&p->module->objc_classes_mutex));
-
-	lbObjcRef *found = string_map_get(&p->module->objc_classes, name);
-	if (found) {
-		return found->local_module_addr;
-	}
-
-	lbModule *default_module = &p->module->gen->default_module;
-	Entity *entity = {};
-
-	if (default_module != p->module) {
-		found = string_map_get(&default_module->objc_classes, name);
-		if (found) {
-			entity = found->entity;
-		}
-	}
-
-	if (!entity) {
-		gbString global_name = gb_string_make(permanent_allocator(), "__$objc_Class::");
-		global_name = gb_string_append_length(global_name, name.text, name.len);
-
-		lbAddr default_addr = lb_add_global_generated_with_name(default_module, t_objc_Class, {},
-			make_string(cast(u8 const *)global_name, gb_string_length(global_name)),
-			&entity);
-
-		mutex_lock(&default_module->objc_classes_mutex);
-		string_map_set(&default_module->objc_classes, name, lbObjcRef{entity, default_addr});
-		mutex_unlock(&default_module->objc_classes_mutex);
-	}
-
-	lbValue ptr = lb_find_value_from_entity(p->module, entity);
-	lbAddr local_addr = lb_addr(ptr);
-
-	if (default_module != p->module) {
-		string_map_set(&p->module->objc_classes, name, lbObjcRef{entity, local_addr});
-	}
-
-	return local_addr;
-}
 
 gb_internal lbValue lb_handle_objc_find_class(lbProcedure *p, Ast *expr) {
 	ast_node(ce, CallExpr, expr);

@@ -1126,30 +1126,51 @@ gb_internal lbProcedure *lb_create_objc_names(lbModule *main_module) {
 	return p;
 }
 
-gb_internal void lb_finalize_objc_names(lbProcedure *p) {
+gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	if (p == nullptr) {
 		return;
 	}
 	lbModule *m = p->module;
+	GB_ASSERT(m == &p->module->gen->default_module);
 
 	TEMPORARY_ALLOCATOR_GUARD();
+
+	StringSet handled = {};
+	string_set_init(&handled);
+	defer (string_set_destroy(&handled));
 
 	auto args = array_make<lbValue>(temporary_allocator(), 1);
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_begin_procedure_body(p);
-	for (auto const &entry : m->objc_classes) {
-		String name = entry.key;
-		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
-		lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
-		lb_addr_store(p, entry.value.local_module_addr, ptr);
+
+	auto register_thing = [&handled, &m, &args](lbProcedure *p, lbObjCGlobal const &g, char const *call) {
+		if (!string_set_update(&handled, g.name)) {
+			lbAddr addr = {};
+			lbValue *found = string_map_get(&m->members, g.global_name);
+			if (found) {
+				addr = lb_addr(*found);
+			} else {
+				lbValue v = {};
+				LLVMTypeRef t = lb_type(m, g.type);
+				v.value = LLVMAddGlobal(m->mod, t, g.global_name);
+				v.type = alloc_type_pointer(g.type);
+				addr = lb_addr(v);
+				LLVMSetInitializer(v.value, LLVMConstNull(t));
+			}
+
+			args[0] = lb_const_value(m, t_cstring, exact_value_string(g.name));
+			lbValue ptr = lb_emit_runtime_call(p, call, args);
+			lb_addr_store(p, addr, ptr);
+		}
+	};
+
+	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_classes, &g); /**/) {
+		register_thing(p, g, "objc_lookUpClass");
 	}
 
-	for (auto const &entry : m->objc_selectors) {
-		String name = entry.key;
-		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
-		lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
-		lb_addr_store(p, entry.value.local_module_addr, ptr);
+	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_selectors, &g); /**/) {
+		register_thing(p, g, "sel_registerName");
 	}
 
 	lb_end_procedure_body(p);
@@ -2637,7 +2658,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	if (gen->objc_names) {
 		TIME_SECTION("Finalize objc names");
-		lb_finalize_objc_names(gen->objc_names);
+		lb_finalize_objc_names(gen, gen->objc_names);
 	}
 
 	if (build_context.ODIN_DEBUG) {
