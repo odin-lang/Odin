@@ -2094,9 +2094,9 @@ gb_internal void lb_set_wasm_export_attributes(LLVMValueRef value, String export
 }
 
 
-gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, String const &name) {
+gb_internal lbAddr lb_handle_objc_find_or_register_internal(lbProcedure *p, StringMap<lbAddr> *objc_map, String const &name, char const *prefix, Type *type) {
 	lbModule *m = p->module;
-	lbAddr *found = string_map_get(&m->objc_selectors, name);
+	lbAddr *found = string_map_get(objc_map, name);
 	if (found) {
 		return *found;
 	}
@@ -2104,13 +2104,13 @@ gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, Stri
 	lbModule *default_module = &p->module->gen->default_module;
 
 
-	gbString global_name = gb_string_make(permanent_allocator(), "__$objc_SEL::");
+	gbString global_name = gb_string_make(permanent_allocator(), prefix);
 	global_name = gb_string_append_length(global_name, name.text, name.len);
 
-	LLVMTypeRef t = lb_type(m, t_objc_SEL);
+	LLVMTypeRef t = lb_type(m, type);
 	lbValue g = {};
 	g.value = LLVMAddGlobal(m->mod, t, global_name);
-	g.type = alloc_type_pointer(t_objc_SEL);
+	g.type = alloc_type_pointer(type);
 
 	if (default_module == m) {
 		LLVMSetInitializer(g.value, LLVMConstNull(t));
@@ -2119,46 +2119,21 @@ gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, Stri
 		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 	}
 
-	mpsc_enqueue(&m->gen->objc_selectors, lbObjCGlobal{m, global_name, name, t_objc_SEL});
+	mpsc_enqueue(&m->gen->objc_selectors, lbObjCGlobal{m, global_name, name, type});
 
 	lbAddr addr = lb_addr(g);
 
-	string_map_set(&m->objc_selectors, name, addr);
+	string_map_set(objc_map, name, addr);
 
 	return addr;
 }
 
+gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, String const &name) {
+	return lb_handle_objc_find_or_register_internal(p, &p->module->objc_selectors, name, "__$objc_SEL::",   t_objc_SEL);
+}
+
 gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
-	lbModule *m = p->module;
-	lbAddr *found = string_map_get(&m->objc_classes, name);
-	if (found) {
-		return *found;
-	}
-
-	lbModule *default_module = &p->module->gen->default_module;
-
-
-	gbString global_name = gb_string_make(permanent_allocator(), "__$objc_Class::");
-	global_name = gb_string_append_length(global_name, name.text, name.len);
-
-	LLVMTypeRef t = lb_type(m, t_objc_Class);
-	lbValue g = {};
-	g.value = LLVMAddGlobal(m->mod, t, global_name);
-	g.type = alloc_type_pointer(t_objc_Class);
-
-	if (default_module == m) {
-		LLVMSetInitializer(g.value, LLVMConstNull(t));
-		lb_add_member(m, make_string_c(global_name), g);
-	} else {
-		LLVMSetLinkage(g.value, LLVMExternalLinkage);
-	}
-	mpsc_enqueue(&m->gen->objc_classes, lbObjCGlobal{m, global_name, name, t_objc_Class});
-
-	lbAddr addr = lb_addr(g);
-
-	string_map_set(&m->objc_classes, name, addr);
-
-	return addr;
+	return lb_handle_objc_find_or_register_internal(p, &p->module->objc_classes,   name, "__$objc_Class::", t_objc_Class);
 }
 
 gb_internal lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
