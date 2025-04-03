@@ -1089,7 +1089,7 @@ gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, T
 #if LLVM_VERSION_MAJOR <= 18
 	LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
 #else
-	LLVMDIBuilderInsertDbgValueRecordAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
+	LLVMDIBuilderInsertDeclareRecordAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
 #endif
 }
 
