@@ -15,7 +15,7 @@ static void *const MAP_TOMBSTONE = (void *)~(uintptr)0;
 template <typename K, typename V>
 struct PtrMapEntry {
 	static_assert(sizeof(K) == sizeof(void *), "Key size must be pointer size");
-	
+
 	K key;
 	V value;
 };
@@ -374,7 +374,7 @@ struct PtrMapIterator {
 	}
 
 	bool operator==(PtrMapIterator<K, V> const &other) const noexcept {
-		return this->map == other->map && this->index == other->index;
+		return this->map == other.map && this->index == other.index;
 	}
 
 	operator PtrMapEntry<K, V> *() const {
