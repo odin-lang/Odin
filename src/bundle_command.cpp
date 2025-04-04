@@ -172,7 +172,7 @@ i32 bundle_android(String original_init_directory) {
 		gb_string_clear(cmd);
 
 		cmd = gb_string_append_length(cmd, build_context.ODIN_ANDROID_JAR_SIGNER.text, build_context.ODIN_ANDROID_JAR_SIGNER.len);
-		cmd = gb_string_append_fmt(cmd, " -storepass android");
+		cmd = gb_string_append_fmt(cmd, " -storepass \"%.*s\"", LIT(build_context.android_keystore_password));
 		if (build_context.android_keystore.len != 0) {
 			String keystore = normalize_path(temporary_allocator(), build_context.android_keystore, NIX_SEPARATOR_STRING);
 			keystore = substring(keystore, 0, keystore.len - 1);

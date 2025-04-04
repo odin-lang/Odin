@@ -277,6 +277,7 @@ gb_internal void usage(String argv0, String argv1 = {}) {
 	print_usage_line(1, "build             Compiles directory of .odin files, as an executable.");
 	print_usage_line(1, "                  One must contain the program's entry point, all must be in the same package.");
 	print_usage_line(1, "run               Same as 'build', but also then runs the newly compiled executable.");
+	print_usage_line(1, "bundle            Bundles a directory in a specific layout for that platform.");
 	print_usage_line(1, "check             Parses, and type checks a directory of .odin files.");
 	print_usage_line(1, "strip-semicolon   Parses, type checks, and removes unneeded semicolons from the entire program.");
 	print_usage_line(1, "test              Builds and runs procedures with the attribute @(test) in the initial package.");
@@ -411,6 +412,7 @@ enum BuildFlagKind {
 
 	BuildFlag_AndroidKeystore,
 	BuildFlag_AndroidKeystoreAlias,
+	BuildFlag_AndroidKeystorePassword,
 	BuildFlag_AndroidManifest,
 
 	BuildFlag_COUNT,
@@ -631,6 +633,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_bundle_android);
+	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command_bundle_android);
 
 
@@ -1662,6 +1665,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_AndroidKeystoreAlias:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.android_keystore_alias = value.value_string;
+							break;
+
+						case BuildFlag_AndroidKeystorePassword:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_keystore_password = value.value_string;
 							break;
 
 						case BuildFlag_AndroidManifest:
