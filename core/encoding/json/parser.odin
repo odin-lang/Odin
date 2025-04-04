@@ -176,6 +176,97 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 	return
 }
 
+skip_value :: proc(p: ^Parser) -> (err: Error) {
+	err = .None
+	token := p.curr_token
+	#partial switch token.kind {
+	case .Null:
+		advance_token(p)
+		return
+	case .False:
+		advance_token(p)
+		return
+	case .True:
+		advance_token(p)
+		return
+
+	case .Integer:
+		advance_token(p)
+		return
+	case .Float:
+		advance_token(p)
+		return
+
+	case .Ident:
+		if p.spec == .MJSON {
+			advance_token(p)
+			return
+		}
+
+	case .String:
+		advance_token(p)
+		return
+
+	case .Open_Brace:
+		num_braces := 1
+
+		for num_braces > 0 {
+			advance_token(p)
+
+			ct := p.curr_token
+
+			if ct.kind == .Invalid || ct.kind == .EOF {
+				break
+			}
+
+			if ct.kind == .Open_Brace {
+				num_braces += 1
+			} else if ct.kind == .Close_Brace {
+				num_braces -= 1
+			}
+		}
+
+		advance_token(p)
+		return
+
+	case .Open_Bracket:
+		num_brackets := 1
+
+		for num_brackets > 0 {
+			advance_token(p)
+
+			ct := p.curr_token
+
+			if ct.kind == .Invalid || ct.kind == .EOF {
+				break
+			}
+
+			if ct.kind == .Open_Bracket {
+				num_brackets += 1
+			} else if ct.kind == .Close_Bracket {
+				num_brackets -= 1
+			}
+		}
+
+		advance_token(p)
+		return
+
+	case:
+		if p.spec != .JSON {
+			switch {
+			case allow_token(p, .Infinity):
+				return
+			case allow_token(p, .NaN):
+				return
+			}
+		}
+	}
+
+	err = .Unexpected_Token
+	advance_token(p)
+	return
+}
+
 parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None
 	expect_token(p, .Open_Bracket) or_return
