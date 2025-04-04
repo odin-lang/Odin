@@ -132,7 +132,7 @@ i32 bundle_android(String original_init_directory) {
 	if (current_directory.len != 0) {
 		bool ok = set_working_directory(init_directory);
 		if (!ok) {
-			gb_printf_err("Error: Unable to currectly set the current working directory to '%.*s'\n", LIT(init_directory));
+			gb_printf_err("Error: Unable to correctly set the current working directory to '%.*s'\n", LIT(init_directory));
 		}
 	}
 
@@ -174,7 +174,8 @@ i32 bundle_android(String original_init_directory) {
 		cmd = gb_string_append_length(cmd, build_context.ODIN_ANDROID_JAR_SIGNER.text, build_context.ODIN_ANDROID_JAR_SIGNER.len);
 		cmd = gb_string_append_fmt(cmd, " -storepass android");
 		if (build_context.android_keystore.len != 0) {
-			String keystore = concatenate_strings(temporary_allocator(), current_directory, build_context.android_keystore);
+			String keystore = normalize_path(temporary_allocator(), build_context.android_keystore, NIX_SEPARATOR_STRING);
+			keystore = substring(keystore, 0, keystore.len - 1);
 			cmd = gb_string_append_fmt(cmd, " -keystore \"%.*s\"", LIT(keystore));
 		}
 		cmd = gb_string_append_fmt(cmd, " \"%.*s.apk-build\"", LIT(output_apk));

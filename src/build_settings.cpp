@@ -1574,6 +1574,8 @@ gb_internal void init_android_values(bool with_sdk) {
 
 
 	bc->ODIN_ANDROID_JAR_SIGNER = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_JAR_SIGNER", permanent_allocator())), NIX_SEPARATOR_STRING);
+	// Strip trailing slash so system() call doesn't fail.
+	bc->ODIN_ANDROID_JAR_SIGNER = substring(bc->ODIN_ANDROID_JAR_SIGNER, 0, bc->ODIN_ANDROID_JAR_SIGNER.len - 1);
 	if (with_sdk) {
 		if (bc->ODIN_ANDROID_SDK.len == 0)  {
 			gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
