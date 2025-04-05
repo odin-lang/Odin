@@ -54,8 +54,14 @@ Socket_Option :: enum c.int {
 	Receive_Timeout           = cast(c.int)freebsd.Socket_Option.RCVTIMEO,
 }
 
+Shutdown_Manner :: enum c.int {
+	Receive = cast(c.int)freebsd.Shutdown_Method.RD,
+	Send    = cast(c.int)freebsd.Shutdown_Method.WR,
+	Both    = cast(c.int)freebsd.Shutdown_Method.RDWR,
+}
+
 @(private)
-_create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
+_create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
 	sys_family:      freebsd.Protocol_Family = ---
 	sys_protocol:    freebsd.Protocol        = ---
 	sys_socket_type: freebsd.Socket_Type     = ---
@@ -72,24 +78,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 
 	new_socket, errno := freebsd.socket(sys_family, sys_socket_type, sys_protocol)
 	if errno != nil {
-		err = cast(Create_Socket_Error)errno
-		return
-	}
-
-	// NOTE(Feoramund): By default, FreeBSD will generate SIGPIPE if an EPIPE
-	// error is raised during the writing of a socket that may be closed.
-	// This behavior is unlikely to be expected by general users.
-	//
-	// There are two workarounds. One is to apply the .NOSIGNAL flag when using
-	// the `sendto` syscall. However, that would prevent users of this library
-	// from re-enabling the SIGPIPE-raising functionality, if they really
-	// wanted it.
-	//
-	// So I have disabled it here with this socket option for all sockets.
-	truth: b32 = true
-	errno = freebsd.setsockopt(new_socket, .SOCKET, .NOSIGPIPE, &truth, size_of(truth))
-	if errno != nil {
-		err = cast(Socket_Option_Error)errno
+		err = _create_socket_error(errno)
 		return
 	}
 
@@ -115,19 +104,19 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	errno := freebsd.connect(cast(Fd)socket, &sockaddr, cast(freebsd.socklen_t)sockaddr.len)
 	if errno != nil {
 		close(socket)
-		return {}, cast(Dial_Error)errno
+		return {}, _dial_error(errno)
 	}
 
 	return
 }
 
 @(private)
-_bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
+_bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	real_socket := any_socket_to_socket(socket)
 	errno := freebsd.bind(cast(Fd)real_socket, &sockaddr, cast(freebsd.socklen_t)sockaddr.len)
 	if errno != nil {
-		err = cast(Bind_Error)errno
+		err = _bind_error(errno)
 	}
 	return
 }
@@ -143,7 +132,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 
 	errno := freebsd.listen(cast(Fd)socket, backlog)
 	if errno != nil {
-		err = cast(Listen_Error)errno
+		err = _listen_error(errno)
 		return
 	}
 
@@ -151,12 +140,12 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 }
 
 @(private)
-_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
 	sockaddr: freebsd.Socket_Address_Storage
 
 	errno := freebsd.getsockname(cast(Fd)any_socket_to_socket(sock), &sockaddr)
 	if errno != nil {
-		err = cast(Listen_Error)errno
+		err = _listen_error(errno)
 		return
 	}
 
@@ -165,12 +154,12 @@ _bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) 
 }
 
 @(private)
-_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
+_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
 	sockaddr: freebsd.Socket_Address_Storage
 
 	result, errno := freebsd.accept(cast(Fd)sock, &sockaddr)
 	if errno != nil {
-		err = cast(Accept_Error)errno
+		err = _accept_error(errno)
 		return
 	}
 
@@ -187,20 +176,20 @@ _close :: proc(socket: Any_Socket) {
 }
 
 @(private)
-_recv_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+_recv_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_read: int, err: TCP_Recv_Error) {
 	if len(buf) == 0 {
 		return
 	}
 	result, errno := freebsd.recv(cast(Fd)socket, buf, .NONE)
 	if errno != nil {
-		err = cast(TCP_Recv_Error)errno
+		err = _tcp_recv_error(errno)
 		return
 	}
 	return result, nil
 }
 
 @(private)
-_recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
+_recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: UDP_Recv_Error) {
 	if len(buf) == 0 {
 		return
 	}
@@ -208,21 +197,21 @@ _recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_e
 
 	result, errno := freebsd.recvfrom(cast(Fd)socket, buf, .NONE, &from)
 	if errno != nil {
-		err = cast(UDP_Recv_Error)errno
+		err = _udp_recv_error(errno)
 		return
 	}
 	return result, _sockaddr_to_endpoint(&from), nil
 }
 
 @(private)
-_send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+_send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: TCP_Send_Error) {
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
 
-		result, errno := freebsd.send(cast(Fd)socket, remaining, .NONE)
+		result, errno := freebsd.send(cast(Fd)socket, remaining, .NOSIGNAL)
 		if errno != nil {
-			err = cast(TCP_Send_Error)errno
+			err = _tcp_send_error(errno)
 			return
 		}
 		bytes_written += result
@@ -231,15 +220,15 @@ _send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: 
 }
 
 @(private)
-_send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
+_send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: UDP_Send_Error) {
 	toaddr := _endpoint_to_sockaddr(to)
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
 
-		result, errno := freebsd.sendto(cast(Fd)socket, remaining, .NONE, &toaddr)
+		result, errno := freebsd.sendto(cast(Fd)socket, remaining, .NOSIGNAL, &toaddr)
 		if errno != nil {
-			err = cast(UDP_Send_Error)errno
+			err = _udp_send_error(errno)
 			return
 		}
 		bytes_written += result
@@ -248,17 +237,17 @@ _send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_writt
 }
 
 @(private)
-_shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
+_shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Shutdown_Error) {
 	real_socket := cast(Fd)any_socket_to_socket(socket)
 	errno := freebsd.shutdown(real_socket, cast(freebsd.Shutdown_Method)manner)
 	if errno != nil {
-		return cast(Shutdown_Error)errno
+		return _shutdown_error(errno)
 	}
 	return
 }
 
 @(private)
-_set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
+_set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Socket_Option_Error {
 	// NOTE(Feoramund): I found that FreeBSD, like Linux, requires at least 32
 	// bits for a boolean socket option value. Nothing less will work.
 	bool_value: b32
@@ -315,25 +304,25 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 			case  u16: int_value = cast(i32)real
 			case  i32: int_value = real
 			case  u32:
-				if real > u32(max(i32)) { return .Value_Out_Of_Range }
+				if real > u32(max(i32)) { return .Invalid_Value }
 				int_value = cast(i32)real
 			case  i64:
-				if real > i64(max(i32)) || real < i64(min(i32)) { return .Value_Out_Of_Range }
+				if real > i64(max(i32)) || real < i64(min(i32)) { return .Invalid_Value }
 				int_value = cast(i32)real
 			case  u64:
-				if real > u64(max(i32)) { return .Value_Out_Of_Range }
+				if real > u64(max(i32)) { return .Invalid_Value }
 				int_value = cast(i32)real
 			case i128:
-				if real > i128(max(i32)) || real < i128(min(i32)) { return .Value_Out_Of_Range }
+				if real > i128(max(i32)) || real < i128(min(i32)) { return .Invalid_Value }
 				int_value = cast(i32)real
 			case u128:
-				if real > u128(max(i32)) { return .Value_Out_Of_Range }
+				if real > u128(max(i32)) { return .Invalid_Value }
 				int_value = cast(i32)real
 			case  int:
-				if real > int(max(i32)) || real < int(min(i32)) { return .Value_Out_Of_Range }
+				if real > int(max(i32)) || real < int(min(i32)) { return .Invalid_Value }
 				int_value = cast(i32)real
 			case uint:
-				if real > uint(max(i32)) { return .Value_Out_Of_Range }
+				if real > uint(max(i32)) { return .Invalid_Value }
 				int_value = cast(i32)real
 			case:
 				panic("set_option() value must be an integer here", loc)
@@ -347,19 +336,19 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 	real_socket := any_socket_to_socket(socket)
 	errno := freebsd.setsockopt(cast(Fd)real_socket, .SOCKET, cast(freebsd.Socket_Option)option, ptr, len)
 	if errno != nil {
-		return cast(Socket_Option_Error)errno
+		return _socket_option_error(errno)
 	}
 
 	return nil
 }
 
 @(private)
-_set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
+_set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Set_Blocking_Error) {
 	real_socket := any_socket_to_socket(socket)
 
 	flags, errno := freebsd.fcntl_getfl(cast(freebsd.Fd)real_socket)
 	if errno != nil {
-		return cast(Set_Blocking_Error)errno
+		return _set_blocking_error(errno)
 	}
 
 	if should_block {
@@ -370,7 +359,7 @@ _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_E
 
 	errno = freebsd.fcntl_setfl(cast(freebsd.Fd)real_socket, flags)
 	if errno != nil {
-		return cast(Set_Blocking_Error)errno
+		return _set_blocking_error(errno)
 	}
 
 	return

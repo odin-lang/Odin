@@ -53,8 +53,6 @@ ODIN_NET_TCP_NODELAY_DEFAULT :: #config(ODIN_NET_TCP_NODELAY_DEFAULT, true)
 Maybe :: runtime.Maybe
 
 Network_Error :: union #shared_nil {
-	General_Error,
-	Platform_Error,
 	Create_Socket_Error,
 	Dial_Error,
 	Listen_Error,
@@ -65,6 +63,7 @@ Network_Error :: union #shared_nil {
 	TCP_Recv_Error,
 	UDP_Recv_Error,
 	Shutdown_Error,
+	Interfaces_Error,
 	Socket_Option_Error,
 	Set_Blocking_Error,
 	Parse_Endpoint_Error,
@@ -74,13 +73,12 @@ Network_Error :: union #shared_nil {
 
 #assert(size_of(Network_Error) == 8)
 
-General_Error :: enum u32 {
-	None = 0,
-	Unable_To_Enumerate_Network_Interfaces = 1,
+Interfaces_Error :: enum u32 {
+	None,
+	Unable_To_Enumerate_Network_Interfaces,
+	Allocation_Failure,
+	Unknown,
 }
-
-// `Platform_Error` is used to wrap errors returned by the different platforms that don't fit a common error.
-Platform_Error :: enum u32 {}
 
 Parse_Endpoint_Error :: enum u32 {
 	None          = 0,

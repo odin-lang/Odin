@@ -35,6 +35,8 @@ any_socket_to_socket :: proc "contextless" (socket: Any_Socket) -> Socket {
     `a.host.name:9999`, or as `1.2.3.4:9999`, or IP6 equivalent.
 
     Calls `parse_hostname_or_endpoint` and `dial_tcp_from_host_or_endpoint`.
+
+	Errors that can be returned: `Parse_Endpoint_Error`, `Resolve_Error`, `DNS_Error`, `Create_Socket_Error`, or `Dial_Error`
 */
 dial_tcp_from_hostname_and_port_string :: proc(hostname_and_port: string, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname_and_port) or_return
@@ -47,6 +49,8 @@ dial_tcp_from_hostname_and_port_string :: proc(hostname_and_port: string, option
     `parse_hostname_or_endpoint` is called and the `hostname` will be resolved into an IP.
 
     If a `hostname` of form `a.host.name:9999` is given, the port will be ignored in favor of the explicit `port` param.
+
+	Errors that can be returned: `Parse_Endpoint_Error`, `Resolve_Error`, `DNS_Error`, `Create_Socket_Error`, or `Dial_Error`
 */
 dial_tcp_from_hostname_with_port_override :: proc(hostname: string, port: int, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname) or_return
@@ -62,6 +66,8 @@ dial_tcp_from_hostname_with_port_override :: proc(hostname: string, port: int, o
 
 /*
     Expects the `host` as Host.
+
+	Errors that can be returned: `Resolve_Error`, `DNS_Error`, `Create_Socket_Error`, or `Dial_Error`
 */
 dial_tcp_from_host :: proc(host: Host, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	if host.port == 0 {
@@ -76,6 +82,8 @@ dial_tcp_from_host :: proc(host: Host, options := default_tcp_options) -> (socke
 /*
     Expects the `target` as a Host_OrEndpoint.
     Unwraps the underlying type and calls `dial_tcp_from_host` or `dial_tcp_from_endpoint`.
+
+	Errors that can be returned: `Parse_Endpoint_Error`, `Resolve_Error`, `DNS_Error`, `Create_Socket_Error`, or `Dial_Error`
 */
 dial_tcp_from_host_or_endpoint :: proc(target: Host_Or_Endpoint, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	switch t in target {
@@ -87,11 +95,20 @@ dial_tcp_from_host_or_endpoint :: proc(target: Host_Or_Endpoint, options := defa
 	unreachable()
 }
 
-// Dial from an Address
+/*
+	Dial from an Address.
+
+	Errors that can be returned: `Create_Socket_Error`, or `Dial_Error`
+*/
 dial_tcp_from_address_and_port :: proc(address: Address, port: int, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	return dial_tcp_from_endpoint({address, port}, options)
 }
 
+/*
+	Dial from an Endpoint.
+
+	Errors that can be returned: `Create_Socket_Error`, or `Dial_Error`
+*/
 dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	return _dial_tcp_from_endpoint(endpoint, options)
 }
@@ -105,11 +122,11 @@ dial_tcp :: proc{
 	dial_tcp_from_host_or_endpoint,
 }
 
-create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
+create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
 	return _create_socket(family, protocol)
 }
 
-bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
+bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	return _bind(socket, ep)
 }
 
@@ -119,7 +136,7 @@ bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 
 	This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
 */
-make_unbound_udp_socket :: proc(family: Address_Family) -> (socket: UDP_Socket, err: Network_Error) {
+make_unbound_udp_socket :: proc(family: Address_Family) -> (socket: UDP_Socket, err: Create_Socket_Error) {
 	sock := create_socket(family, .UDP) or_return
 	socket = sock.(UDP_Socket)
 	return
@@ -131,6 +148,8 @@ make_unbound_udp_socket :: proc(family: Address_Family) -> (socket: UDP_Socket, 
 
 	This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
 	The `bound_address` is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
+
+	Errors that can be returned: `Parse_Endpoint_Error`, `Create_Socket_Error`, or `Bind_Error`
 */
 make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (socket: UDP_Socket, err: Network_Error) {
 	if bound_address == nil {
@@ -141,6 +160,11 @@ make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (socket: UDP
 	return
 }
 
+/*
+	Creates a TCP socket and starts listening on the given endpoint.
+
+	Errors that can be returned: `Create_Socket_Error`, `Bind_Error`, or `Listen_Error`
+*/
 listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && backlog < int(max(i32)))
 
@@ -150,11 +174,11 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TC
 /*
 	Returns the endpoint that the given socket is listening / bound on.
 */
-bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Network_Error) {
+bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Listen_Error) {
 	return _bound_endpoint(socket)
 }
 
-accept_tcp :: proc(socket: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
+accept_tcp :: proc(socket: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
 	return _accept_tcp(socket, options)
 }
 
@@ -162,11 +186,11 @@ close :: proc(socket: Any_Socket) {
 	_close(socket)
 }
 
-recv_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+recv_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_read: int, err: TCP_Recv_Error) {
 	return _recv_tcp(socket, buf)
 }
 
-recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
+recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: UDP_Recv_Error) {
 	return _recv_udp(socket, buf)
 }
 
@@ -175,6 +199,8 @@ recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_en
 
 	Note: `remote_endpoint` parameter is non-nil only if the socket type is UDP. On TCP sockets it
 	will always return `nil`.
+
+	Errors that can be returned: `TCP_Recv_Error`, or `UDP_Recv_Error`
 */
 recv_any :: proc(socket: Any_Socket, buf: []byte) -> (
 	bytes_read: int,
@@ -197,7 +223,7 @@ recv :: proc{recv_tcp, recv_udp, recv_any}
 	Repeatedly sends data until the entire buffer is sent.
 	If a send fails before all data is sent, returns the amount sent up to that point.
 */
-send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: TCP_Send_Error) {
 	return _send_tcp(socket, buf)
 }
 
@@ -207,10 +233,15 @@ send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: N
 	Datagrams are limited in size; attempting to send more than this limit at once will result in a Message_Too_Long error.
 	UDP packets are not guarenteed to be received in order.
 */
-send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
+send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: UDP_Send_Error) {
 	return _send_udp(socket, buf, to)
 }
 
+/*
+	Sends data over the socket.
+
+	Errors that can be returned: `TCP_Send_Error`, or `UDP_Send_Error`
+*/
 send_any :: proc(socket: Any_Socket, buf: []byte, to: Maybe(Endpoint) = nil) -> (
 	bytes_written: int,
 	err: Network_Error,
@@ -226,14 +257,14 @@ send_any :: proc(socket: Any_Socket, buf: []byte, to: Maybe(Endpoint) = nil) -> 
 
 send :: proc{send_tcp, send_udp, send_any}
 
-shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
+shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Shutdown_Error) {
 	return _shutdown(socket, manner)
 }
 
-set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
+set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Socket_Option_Error {
 	return _set_option(socket, option, value, loc)
 }
 
-set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
+set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Set_Blocking_Error) {
 	return _set_blocking(socket, should_block)
 }

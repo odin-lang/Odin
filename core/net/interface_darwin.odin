@@ -26,7 +26,7 @@ import "core:sys/posix"
 foreign import lib "system:System.framework"
 
 @(private)
-_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Interfaces_Error) {
 	context.allocator = allocator
 
 	head: ^ifaddrs
@@ -47,7 +47,7 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
 			iface.adapter_name = key_ptr^
 		}
 		if mem_err != nil {
-			return {}, .Unable_To_Enumerate_Network_Interfaces
+			return {}, .Allocation_Failure
 		}
 
 		address: Address
