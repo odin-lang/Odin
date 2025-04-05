@@ -954,6 +954,10 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
+		if (isnan(a) || isnan(b)) {
+			return false; // Fixes #5004
+		}
+
 		switch (op) {
 		case Token_CmpEq: return cmp_f64(a, b) == 0;
 		case Token_NotEq: return cmp_f64(a, b) != 0;
