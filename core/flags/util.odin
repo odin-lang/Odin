@@ -95,7 +95,7 @@ Example:
 	import "core:flags"
 	import "core:fmt"
 
-	subtag_example :: proc() {
+	get_subtag_example :: proc() {
 		args_tag := "precision=3,signed"
 
 		precision, has_precision := flags.get_subtag(args_tag, "precision")

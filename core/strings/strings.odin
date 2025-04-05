@@ -787,7 +787,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	cut_example :: proc() {
+	cut_clone_example :: proc() {
 		fmt.println(strings.cut_clone("some example text", 0, 4)) // -> "some"
 		fmt.println(strings.cut_clone("some example text", 2, 2)) // -> "me"
 		fmt.println(strings.cut_clone("some example text", 5, 7)) // -> "example"

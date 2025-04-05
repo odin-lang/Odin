@@ -33,7 +33,7 @@ Example:
 	import "core:math/rand"
 	import "core:fmt"
 
-	set_global_seed_example :: proc() {
+	reset_example :: proc() {
 		rand.reset(1)
 		fmt.println(rand.uint64())
 	}
