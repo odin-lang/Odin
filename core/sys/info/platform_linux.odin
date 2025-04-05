@@ -5,7 +5,6 @@ import "base:intrinsics"
 import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
-import "core:fmt"
 
 @(private)
 version_string_buf: [1024]u8
