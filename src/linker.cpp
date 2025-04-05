@@ -143,7 +143,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			LIT(target_arch_names[build_context.metrics.arch])
 		);
 #endif
-	} else if (build_context.cross_compiling) {
+	} else if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
 		switch (selected_subtarget) {
 		case Subtarget_Android:
 			is_cross_linking = true;
