@@ -2848,6 +2848,25 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 			print_usage_line(2, "Treats warning messages as error messages.");
 		}
 	}
+
+	if (bundle) {
+		print_usage_line(0, "");
+		print_usage_line(1, "Android-specific flags");
+		print_usage_line(0, "");
+		if (print_flag("-android-keystore:<string>")) {
+			print_usage_line(2, "Specifies the keystore file to use to sign the apk.");
+		}
+
+		if (print_flag("-android-keystore-alias:<string>")) {
+			print_usage_line(2, "Specifies the key alias to use when signing the apk");
+			print_usage_line(2, "Can be omitted if the keystore only contains one key");
+		}
+
+		if (print_flag("-android-keystore-password:<string>")) {
+			print_usage_line(2, "Sets the password to use to unlock the keystore");
+			print_usage_line(2, "If this is omitted, the terminal will prompt you to provide it.");
+		}
+	}
 }
 
 gb_internal void print_show_unused(Checker *c) {
