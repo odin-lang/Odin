@@ -655,6 +655,11 @@ try_cross_linking:;
 				glue = gb_string_append_length(glue, android_glue_object.text, android_glue_object.len);
 				glue = gb_string_appendc(glue, "\" ");
 
+				glue = gb_string_appendc(glue, "--sysroot \"");
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				glue = gb_string_appendc(glue, "sysroot");
+				glue = gb_string_appendc(glue, "\" ");
+
 				glue = gb_string_appendc(glue, "\"-I");
 				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
 				glue = gb_string_appendc(glue, "sysroot/usr/include/");
