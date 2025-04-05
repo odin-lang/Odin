@@ -1328,13 +1328,18 @@ Example:
 	// to load valid positions of the `ptrs` array, and the array of defaults which
 	// will have `127` in each position as the default value.
 
-	v1 := [4] f32 {1, 2, 3, 4};
-	v2 := [4] f32 {9, 10,11,12};
-	ptrs := #simd [4]rawptr { &v1[1], nil, &v2[1], nil }
-	mask := #simd [4]bool { true, false, true, false }
-	defaults := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
-	res := simd.gather(ptrs, defaults, mask)
-	fmt.println(res)
+	import "core:fmt"
+	import "core:simd"
+
+	simd_gather_example :: proc() {
+		v1 := [4] f32 {1, 2, 3, 4};
+		v2 := [4] f32 {9, 10,11,12};
+		ptrs := #simd [4]rawptr { &v1[1], nil, &v2[1], nil }
+		mask := #simd [4]bool { true, false, true, false }
+		defaults := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
+		res := simd.gather(ptrs, defaults, mask)
+		fmt.println(res)
+	}
 
 Output:
 
@@ -1396,14 +1401,19 @@ Example:
 	// vectors. The addresses of store destinations are written to the first and the
 	// third argument of the `ptr` vector, and the `mask` is set accordingly.
 
-	v1 := [4] f32 {1, 2, 3, 4};
-	v2 := [4] f32 {5, 6, 7, 8};
-	ptrs := #simd [4]rawptr { &v1[1], nil, &v2[1], nil }
-	mask := #simd [4]bool { true, false, true, false }
-	vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
-	simd.scatter(ptrs, vals, mask)
-	fmt.println(v1)
-	fmt.println(v2)
+	import "core:fmt"
+	import "core:simd"
+
+	simd_scatter_example :: proc() {
+		v1 := [4] f32 {1, 2, 3, 4};
+		v2 := [4] f32 {5, 6, 7, 8};
+		ptrs := #simd [4]rawptr { &v1[1], nil, &v2[1], nil }
+		mask := #simd [4]bool { true, false, true, false }
+		vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
+		simd.scatter(ptrs, vals, mask)
+		fmt.println(v1)
+		fmt.println(v2)
+	}
 
 Output:
 
@@ -1467,11 +1477,16 @@ Example:
 	// third value (selected by the mask). The masked-off values are given the value
 	// of 127 (`0x7f`).
 
-	src := [4] f32 {1, 2, 3, 4};
-	mask := #simd [4]bool { true, false, true, false }
-	vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
-	res := simd.masked_load(&src, vals, mask)
-	fmt.println(res)
+	import "core:fmt"
+	import "core:simd"
+
+	simd_masked_load_example :: proc() {
+		src := [4] f32 {1, 2, 3, 4};
+		mask := #simd [4]bool { true, false, true, false }
+		vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
+		res := simd.masked_load(&src, vals, mask)
+		fmt.println(res)
+	}
 
 Output:
 
@@ -1526,11 +1541,16 @@ Example:
 	// Example below stores the value 127 into the first and the third slot of the
 	// vector `v`.
 
-	v := [4] f32 {1, 2, 3, 4};
-	mask := #simd [4]bool { true, false, true, false }
-	vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
-	simd.masked_store(&v, vals, mask)
-	fmt.println(v)
+	import "core:fmt"
+	import "core:simd"
+
+	simd_masked_store_example :: proc() {
+		v := [4] f32 {1, 2, 3, 4};
+		mask := #simd [4]bool { true, false, true, false }
+		vals := #simd [4]f32 { 0x7f, 0x7f, 0x7f, 0x7f }
+		simd.masked_store(&v, vals, mask)
+		fmt.println(v)
+	}
 
 Output:
 
@@ -1600,11 +1620,16 @@ Example:
 	// the third lane of the result vector. All the other lanes of the result vector
 	// will be initialized to the default value `127`.
 
-	v := [2] f64 {1, 2};
-	mask := #simd [4]bool { true, false, true, false }
-	vals := #simd [4]f64 { 0x7f, 0x7f, 0x7f, 0x7f }
-	res := simd.masked_expand_load(&v, vals, mask)
-	fmt.println(res)
+	import "core:fmt"
+	import "core:simd"
+
+	simd_masked_expand_load_example :: proc() {
+		v := [2] f64 {1, 2};
+		mask := #simd [4]bool { true, false, true, false }
+		vals := #simd [4]f64 { 0x7f, 0x7f, 0x7f, 0x7f }
+		res := simd.masked_expand_load(&v, vals, mask)
+		fmt.println(res)
+	}
 
 Output:
 
@@ -1661,11 +1686,16 @@ Example:
 	// vector, the first and the third value. The items in the mask are set to `true`
 	// in those lanes.
 
-	v := [2] f64 { };
-	mask := #simd [4]bool { true, false, true, false }
-	vals := #simd [4]f64 { 1, 2, 3, 4 }
-	simd.masked_compress_store(&v, vals, mask)
-	fmt.println(v)
+	import "core:fmt"
+	import "core:simd"
+
+	simd_masked_compress_store_example :: proc() {
+		v := [2] f64 { };
+		mask := #simd [4]bool { true, false, true, false }
+		vals := #simd [4]f64 { 1, 2, 3, 4 }
+		simd.masked_compress_store(&v, vals, mask)
+		fmt.println(v)
+	}
 
 Output:
 
@@ -1949,14 +1979,19 @@ Example:
 
 	// The example below shows how the indices are used to determine which lanes of the
 	// input vector get written into the result vector.
-	
-	x := #simd [4]f32 { 1.5, 2.5, 3.5, 4.5 }
-	res := simd.swizzle(x, 0, 3, 1, 1)
-	fmt.println("res")
+
+	import "core:fmt"
+	import "core:simd"
+
+	swizzle_example :: proc() {
+		x := #simd [4]f32 { 1.5, 2.5, 3.5, 4.5 }
+		res := simd.swizzle(x, 0, 3, 1, 1)
+		fmt.println(res)
+	}
 
 Output:
 
-	[ 1.5, 3.5, 2.5, 2.5 ]
+	<1.5, 4.5, 2.5, 2.5>
 
 The graphical representation of the operation is as follows. The `idx` vector in
 the picture represents the `indices` parameter:
@@ -2013,8 +2048,14 @@ Example:
 
 	// Since lanes 0, 1, 4, 7 contain negative numbers, the most significant
 	// bits for them will be set.
-	v := #simd [8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
-	fmt.println(simd.extract_msbs(v))
+
+	import "core:fmt"
+	import "core:simd"
+
+	simd_extract_msbs_example :: proc() {
+		v := #simd [8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
+		fmt.println(simd.extract_msbs(v))
+	}
 
 Output:
 
@@ -2052,8 +2093,14 @@ Example:
 
 	// Since lanes 0, 2, 4, 6 contain odd integers, the least significant bits
 	// for these lanes are set.
-	v := #simd [8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
-	fmt.println(simd.extract_lsbs(v))
+
+	import "core:fmt"
+	import "core:simd"
+
+	simd_extract_lsbs_example :: proc() {
+		v := #simd [8]i32 { -1, -2, +3, +4, -5, +6, +7, -8 }
+		fmt.println(simd.extract_lsbs(v))
+	}
 
 Output:
 
@@ -2097,15 +2144,20 @@ Example:
 
 	// The example below shows how the indices are used to determine lanes of the
 	// input vector that are shuffled into the result vector.
-	
-	a := #simd [4]f32 { 1, 2, 3, 4 }
-	b := #simd [4]f32 { 5, 6, 7, 8 }
-	res := simd.shuffle(a, b, 0, 4, 2, 5)
-	fmt.println("res")
+
+	import "core:fmt"
+	import "core:simd"
+
+	simd_shuffle_example :: proc() {
+		a := #simd [4]f32 { 1, 2, 3, 4 }
+		b := #simd [4]f32 { 5, 6, 7, 8 }
+		res := simd.shuffle(a, b, 0, 4, 2, 5)
+		fmt.println(res)
+	}
 
 Output:
 
-	[ 1, 5, 3, 6 ]
+	<1, 5, 3, 6>
 
 The graphical representation of the operation is as follows. The `idx` vector in
 the picture represents the `indices` parameter:
@@ -2163,14 +2215,20 @@ Example:
 
 	// The following example selects values from the two input vectors, `a` and `b`
 	// into a single vector.
-	a := #simd [4] f64 { 1,2,3,4 }
-	b := #simd [4] f64 { 5,6,7,8 }
-	cond := #simd[4] int { 1, 0, 1, 0 }
-	fmt.println(simd.select(cond,a,b))
+
+	import "core:fmt"
+	import "core:simd"
+
+	simd_select_example :: proc() {
+		a := #simd [4] f64 { 1,2,3,4 }
+		b := #simd [4] f64 { 5,6,7,8 }
+		cond := #simd[4] int { 1, 0, 1, 0 }
+		fmt.println(simd.select(cond,a,b))
+	}
 
 Output:
 	
-	[ 1, 6, 3, 8 ]
+	<1, 6, 3, 8>
 
 Graphically, the operation looks as follows. The `t` and `f` represent the
 `true` and `false` vectors respectively:
