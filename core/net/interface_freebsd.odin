@@ -25,7 +25,7 @@ import "core:strings"
 import "core:sys/freebsd"
 
 @(private)
-_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Interfaces_Error) {
 	// This is a simplified implementation of `getifaddrs` from the FreeBSD
 	// libc using only Odin and syscalls.
 	context.allocator = allocator
@@ -50,7 +50,7 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
 	// Allocate and get the entries.
 	buf, alloc_err := make([]byte, needed)
 	if alloc_err != nil {
-		return nil, .Unable_To_Enumerate_Network_Interfaces
+		return nil, .Allocation_Failure
 	}
 	defer delete(buf)
 

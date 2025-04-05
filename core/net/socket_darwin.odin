@@ -37,8 +37,14 @@ Socket_Option :: enum c.int {
 	Send_Timeout              = c.int(posix.Sock_Option.SNDTIMEO),
 }
 
+Shutdown_Manner :: enum c.int {
+	Receive = c.int(posix.SHUT_RD),
+	Send    = c.int(posix.SHUT_WR),
+	Both    = c.int(posix.SHUT_RDWR),
+}
+
 @(private)
-_create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
+_create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
 	c_type: posix.Sock
 	c_protocol: posix.Protocol
 	c_family: posix.AF
@@ -59,7 +65,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 
 	sock := posix.socket(c_family, c_type, c_protocol)
 	if sock < 0 {
-		err = Create_Socket_Error(posix.errno())
+		err = _create_socket_error()
 		return
 	}
 
@@ -88,28 +94,19 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	if posix.connect(posix.FD(skt), (^posix.sockaddr)(&sockaddr), posix.socklen_t(sockaddr.ss_len)) != .OK {
-		errno := posix.errno()
+		err = _dial_error()
 		close(skt)
-		return {}, Dial_Error(errno)
 	}
 
 	return
 }
 
-// On Darwin, any port below 1024 is 'privileged' - which means that you need root access in order to use it.
-MAX_PRIVILEGED_PORT :: 1023
-
 @(private)
-_bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
+_bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
 	if posix.bind(posix.FD(s), (^posix.sockaddr)(&sockaddr), posix.socklen_t(sockaddr.ss_len)) != .OK {
-		errno := posix.errno()
-		if errno == .EACCES && ep.port <= MAX_PRIVILEGED_PORT {
-			err = .Privileged_Port_Without_Root
-		} else {
-			err = Bind_Error(errno)
-		}
+		err = _bind_error()
 	}
 
 	return
@@ -128,25 +125,23 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_
 	// bypass the cooldown period, and allow the next run of the program to
 	// use the same address immediately.
 	//
-	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the address!
-	set_option(sock, .Reuse_Address, true) or_return
+	_ = set_option(sock, .Reuse_Address, true)
 
 	bind(sock, interface_endpoint) or_return
 
 	if posix.listen(posix.FD(skt), i32(backlog)) != .OK {
-		err = Listen_Error(posix.errno())
-		return
+		err = _listen_error()
 	}
 
 	return
 }
 
 @(private)
-_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
 	addr: posix.sockaddr_storage
 	addr_len := posix.socklen_t(size_of(addr))
 	if posix.getsockname(posix.FD(any_socket_to_socket(sock)), (^posix.sockaddr)(&addr), &addr_len) != .OK {
-		err = Listen_Error(posix.errno())
+		err = _listen_error()
 		return
 	}
 
@@ -155,12 +150,12 @@ _bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) 
 }
 
 @(private)
-_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
+_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
 	addr: posix.sockaddr_storage
 	addr_len := posix.socklen_t(size_of(addr))
 	client_sock := posix.accept(posix.FD(sock), (^posix.sockaddr)(&addr), &addr_len)
 	if client_sock < 0 {
-		err = Accept_Error(posix.errno())
+		err = _accept_error()
 		return
 	}
 
@@ -176,14 +171,14 @@ _close :: proc(skt: Any_Socket) {
 }
 
 @(private)
-_recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+_recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: TCP_Recv_Error) {
 	if len(buf) <= 0 {
 		return
 	}
 
 	res := posix.recv(posix.FD(skt), raw_data(buf), len(buf), {})
 	if res < 0 {
-		err = TCP_Recv_Error(posix.errno())
+		err = _tcp_recv_error()
 		return
 	}
 
@@ -191,7 +186,7 @@ _recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Networ
 }
 
 @(private)
-_recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
+_recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: UDP_Recv_Error) {
 	if len(buf) <= 0 {
 		return
 	}
@@ -200,7 +195,7 @@ _recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endp
 	fromsize := posix.socklen_t(size_of(from))
 	res := posix.recvfrom(posix.FD(skt), raw_data(buf), len(buf), {}, (^posix.sockaddr)(&from), &fromsize)
 	if res < 0 {
-		err = UDP_Recv_Error(posix.errno())
+		err = _udp_recv_error()
 		return
 	}
 
@@ -210,20 +205,13 @@ _recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endp
 }
 
 @(private)
-_send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+_send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: TCP_Send_Error) {
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
 		res := posix.send(posix.FD(skt), raw_data(remaining), len(remaining), {.NOSIGNAL})
 		if res < 0 {
-			errno := posix.errno()
-			if errno == .EPIPE {
-				// EPIPE arises if the socket has been closed remotely.
-				err = TCP_Send_Error.Connection_Closed
-				return
-			}
-
-			err = TCP_Send_Error(errno)
+			err = _tcp_send_error()
 			return
 		}
 
@@ -233,21 +221,14 @@ _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Net
 }
 
 @(private)
-_send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
+_send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: UDP_Send_Error) {
 	toaddr := _endpoint_to_sockaddr(to)
 	for bytes_written < len(buf) {
 		limit := min(1<<31, len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
 		res := posix.sendto(posix.FD(skt), raw_data(remaining), len(remaining), {.NOSIGNAL}, (^posix.sockaddr)(&toaddr), posix.socklen_t(toaddr.ss_len))
 		if res < 0 {
-			errno := posix.errno()
-			if errno == .EPIPE {
-				// EPIPE arises if the socket has been closed remotely.
-				err = UDP_Send_Error.Not_Socket
-				return
-			}
-
-			err = UDP_Send_Error(errno)
+			err = _udp_send_error()
 			return
 		}
 
@@ -257,16 +238,16 @@ _send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written:
 }
 
 @(private)
-_shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
+_shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Shutdown_Error) {
 	s := any_socket_to_socket(skt)
 	if posix.shutdown(posix.FD(s), posix.Shut(manner)) != .OK {
-		err = Shutdown_Error(posix.errno())
+		err = _shutdown_error()
 	}
 	return
 }
 
 @(private)
-_set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
+_set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Socket_Option_Error {
 	level := posix.SOL_SOCKET if option != .TCP_Nodelay else posix.IPPROTO_TCP
 
 	// NOTE(tetra, 2022-02-15): On Linux, you cannot merely give a single byte for a bool;
@@ -337,19 +318,19 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 
 	skt := any_socket_to_socket(s)
 	if posix.setsockopt(posix.FD(skt), i32(level), posix.Sock_Option(option), ptr, len) != .OK {
-		return Socket_Option_Error(posix.errno())
+		return _socket_option_error()
 	}
 
 	return nil
 }
 
 @(private)
-_set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
+_set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Set_Blocking_Error) {
 	socket := any_socket_to_socket(socket)
 
 	flags_ := posix.fcntl(posix.FD(socket), .GETFL, 0)
 	if flags_ < 0 {
-		return Set_Blocking_Error(posix.errno())
+		return _set_blocking_error()
 	}
 	flags := transmute(posix.O_Flags)flags_
 
@@ -360,7 +341,7 @@ _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_E
 	}
 
 	if posix.fcntl(posix.FD(socket), .SETFL, flags) < 0 {
-		return Set_Blocking_Error(posix.errno())
+		return _set_blocking_error()
 	}
 
 	return nil

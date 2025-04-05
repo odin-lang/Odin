@@ -38,15 +38,21 @@ Socket_Option :: enum c.int {
 	Broadcast                 = c.int(linux.Socket_Option.BROADCAST),
 }
 
+Shutdown_Manner :: enum c.int {
+	Receive = c.int(linux.Shutdown_How.RD),
+	Send    = c.int(linux.Shutdown_How.WR),
+	Both    = c.int(linux.Shutdown_How.RDWR),
+}
+
 // Wrappers and unwrappers for system-native types
 
 @(private="file")
-_unwrap_os_socket :: proc "contextless" (sock: Any_Socket)->linux.Fd {
+_unwrap_os_socket :: proc "contextless" (sock: Any_Socket) -> linux.Fd {
 	return linux.Fd(any_socket_to_socket(sock))
 }
 
 @(private="file")
-_wrap_os_socket :: proc "contextless" (sock: linux.Fd, protocol: Socket_Protocol)->Any_Socket {
+_wrap_os_socket :: proc "contextless" (sock: linux.Fd, protocol: Socket_Protocol) -> Any_Socket {
 	switch protocol {
 	case .TCP:  return TCP_Socket(Socket(sock))
 	case .UDP:  return UDP_Socket(Socket(sock))
@@ -56,7 +62,7 @@ _wrap_os_socket :: proc "contextless" (sock: linux.Fd, protocol: Socket_Protocol
 }
 
 @(private="file")
-_unwrap_os_family :: proc "contextless" (family: Address_Family)->linux.Address_Family {
+_unwrap_os_family :: proc "contextless" (family: Address_Family) -> linux.Address_Family {
 	switch family {
 	case .IP4:  return .INET
 	case .IP6:  return .INET6
@@ -66,7 +72,7 @@ _unwrap_os_family :: proc "contextless" (family: Address_Family)->linux.Address_
 }
 
 @(private="file")
-_unwrap_os_proto_socktype :: proc "contextless" (protocol: Socket_Protocol)->(linux.Protocol, linux.Socket_Type) {
+_unwrap_os_proto_socktype :: proc "contextless" (protocol: Socket_Protocol) -> (linux.Protocol, linux.Socket_Type) {
 	switch protocol {
 	case .TCP:  return .TCP, .STREAM
 	case .UDP:  return .UDP, .DGRAM
@@ -76,7 +82,7 @@ _unwrap_os_proto_socktype :: proc "contextless" (protocol: Socket_Protocol)->(li
 }
 
 @(private="file")
-_unwrap_os_addr :: proc "contextless" (endpoint: Endpoint)->(linux.Sock_Addr_Any) {
+_unwrap_os_addr :: proc "contextless" (endpoint: Endpoint) -> linux.Sock_Addr_Any {
 	switch address in endpoint.address {
 	case IP4_Address:
 		return {
@@ -100,7 +106,7 @@ _unwrap_os_addr :: proc "contextless" (endpoint: Endpoint)->(linux.Sock_Addr_Any
 }
 
 @(private="file")
-_wrap_os_addr :: proc "contextless" (addr: linux.Sock_Addr_Any)->(Endpoint) {
+_wrap_os_addr :: proc "contextless" (addr: linux.Sock_Addr_Any) -> Endpoint {
 	#partial switch addr.family {
 	case .INET:
 		return {
@@ -117,12 +123,12 @@ _wrap_os_addr :: proc "contextless" (addr: linux.Sock_Addr_Any)->(Endpoint) {
 	}
 }
 
-_create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (Any_Socket, Network_Error) {
+_create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (Any_Socket, Create_Socket_Error) {
 	family := _unwrap_os_family(family)
 	proto, socktype := _unwrap_os_proto_socktype(protocol)
 	sock, errno := linux.socket(family, socktype, {.CLOEXEC}, proto)
 	if errno != .NONE {
-		return {}, Create_Socket_Error(errno)
+		return {}, _create_socket_error(errno)
 	}
 	return _wrap_os_socket(sock, protocol), nil
 }
@@ -138,7 +144,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	os_sock, errno = linux.socket(_unwrap_os_family(family_from_endpoint(endpoint)), .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
 		// TODO(flysand): should return invalid file descriptor here casted as TCP_Socket
-		return {}, Create_Socket_Error(errno)
+		return {}, _create_socket_error(errno)
 	}
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
@@ -149,7 +155,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 	errno = linux.connect(linux.Fd(os_sock), &addr)
 	if errno != .NONE {
 		close(cast(TCP_Socket) os_sock)
-		return {}, Dial_Error(errno)
+		return {}, _dial_error(errno)
 	}
 	// NOTE(tetra): Not vital to succeed; error ignored
 	no_delay: b32 = cast(b32) options.no_delay
@@ -158,11 +164,11 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 }
 
 @(private)
-_bind :: proc(sock: Any_Socket, endpoint: Endpoint) -> (Network_Error) {
+_bind :: proc(sock: Any_Socket, endpoint: Endpoint) -> (Bind_Error) {
 	addr := _unwrap_os_addr(endpoint)
 	errno := linux.bind(_unwrap_os_socket(sock), &addr)
 	if errno != .NONE {
-		return Bind_Error(errno)
+		return _bind_error(errno)
 	}
 	return nil
 }
@@ -180,7 +186,7 @@ _listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket,
 	os_sock: linux.Fd
 	os_sock, errno = linux.socket(ep_family, .STREAM, {.CLOEXEC}, .TCP)
 	if errno != .NONE {
-		err = Create_Socket_Error(errno)
+		err = _create_socket_error(errno)
 		return
 	}
 	socket = cast(TCP_Socket)os_sock
@@ -193,31 +199,30 @@ _listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket,
 	// TODO(tetra, 2022-02-15): Confirm that this doesn't mean other processes can hijack the address!
 	do_reuse_addr: b32 = true
 	if errno = linux.setsockopt(os_sock, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &do_reuse_addr); errno != .NONE {
-		err = Listen_Error(errno)
+		err = _listen_error(errno)
 		return
 	}
 
 	// Bind the socket to endpoint address
 	if errno = linux.bind(os_sock, &ep_address); errno != .NONE {
-		err = Bind_Error(errno)
+		err = _bind_error(errno)
 		return
 	}
 
 	// Listen on bound socket
 	if errno = linux.listen(os_sock, cast(i32) backlog); errno != .NONE {
-		err = Listen_Error(errno)
-		return
+		err = _listen_error(errno)
 	}
 
 	return
 }
 
 @(private)
-_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) {
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
 	addr: linux.Sock_Addr_Any
 	errno := linux.getsockname(_unwrap_os_socket(sock), &addr)
 	if errno != .NONE {
-		err = Listen_Error(errno)
+		err = _listen_error(errno)
 		return
 	}
 
@@ -226,11 +231,11 @@ _bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Network_Error) 
 }
 
 @(private)
-_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (tcp_client: TCP_Socket, endpoint: Endpoint, err: Network_Error) {
+_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (tcp_client: TCP_Socket, endpoint: Endpoint, err: Accept_Error) {
 	addr: linux.Sock_Addr_Any
 	client_sock, errno := linux.accept(linux.Fd(sock), &addr)
 	if errno != .NONE {
-		return {}, {}, Accept_Error(errno)
+		return {}, {}, _accept_error(errno)
 	}
 	// NOTE(tetra): Not vital to succeed; error ignored
 	val: b32 = cast(b32) options.no_delay
@@ -244,19 +249,19 @@ _close :: proc(sock: Any_Socket) {
 }
 
 @(private)
-_recv_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
+_recv_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, TCP_Recv_Error) {
 	if len(buf) <= 0 {
 		return 0, nil
 	}
 	bytes_read, errno := linux.recv(linux.Fd(tcp_sock), buf, {})
 	if errno != .NONE {
-		return 0, TCP_Recv_Error(errno)
+		return 0, _tcp_recv_error(errno)
 	}
 	return int(bytes_read), nil
 }
 
 @(private)
-_recv_udp :: proc(udp_sock: UDP_Socket, buf: []byte) -> (int, Endpoint, Network_Error) {
+_recv_udp :: proc(udp_sock: UDP_Socket, buf: []byte) -> (int, Endpoint, UDP_Recv_Error) {
 	if len(buf) <= 0 {
 		// NOTE(flysand): It was returning no error, I didn't change anything
 		return 0, {}, {}
@@ -268,28 +273,24 @@ _recv_udp :: proc(udp_sock: UDP_Socket, buf: []byte) -> (int, Endpoint, Network_
 	from_addr: linux.Sock_Addr_Any
 	bytes_read, errno := linux.recvfrom(linux.Fd(udp_sock), buf, {.TRUNC}, &from_addr)
 	if errno != .NONE {
-		return 0, {}, UDP_Recv_Error(errno)
+		return 0, {}, _udp_recv_error(errno)
 	}
 	if bytes_read > len(buf) {
 		// NOTE(tetra): The buffer has been filled, with a partial message.
-		return len(buf), {}, .Buffer_Too_Small
+		return len(buf), {}, .Excess_Truncated
 	}
 	return bytes_read, _wrap_os_addr(from_addr), nil
 }
 
 @(private)
-_send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
+_send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, TCP_Send_Error) {
 	total_written := 0
 	for total_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - total_written)
 		remaining := buf[total_written:][:limit]
 		res, errno := linux.send(linux.Fd(tcp_sock), remaining, {.NOSIGNAL})
-		if errno == .EPIPE {
-			// If the peer is disconnected when we are trying to send we will get an `EPIPE` error,
-			// so we turn that into a clearer error
-			return total_written, TCP_Send_Error.Connection_Closed
-		} else if errno != .NONE {
-			return total_written, TCP_Send_Error(errno)
+		if errno != .NONE {
+			return total_written, _tcp_send_error(errno)
 		}
 		total_written += int(res)
 	}
@@ -297,28 +298,28 @@ _send_tcp :: proc(tcp_sock: TCP_Socket, buf: []byte) -> (int, Network_Error) {
 }
 
 @(private)
-_send_udp :: proc(udp_sock: UDP_Socket, buf: []byte, to: Endpoint) -> (int, Network_Error) {
+_send_udp :: proc(udp_sock: UDP_Socket, buf: []byte, to: Endpoint) -> (int, UDP_Send_Error) {
 	to_addr := _unwrap_os_addr(to)
 	bytes_written, errno := linux.sendto(linux.Fd(udp_sock), buf, {}, &to_addr)
 	if errno != .NONE {
-		return bytes_written, UDP_Send_Error(errno)
+		return bytes_written, _udp_send_error(errno)
 	}
 	return int(bytes_written), nil
 }
 
 @(private)
-_shutdown :: proc(sock: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
+_shutdown :: proc(sock: Any_Socket, manner: Shutdown_Manner) -> (err: Shutdown_Error) {
 	os_sock := _unwrap_os_socket(sock)
 	errno := linux.shutdown(os_sock, cast(linux.Shutdown_How) manner)
 	if errno != .NONE {
-		return Shutdown_Error(errno)
+		return _shutdown_error(errno)
 	}
 	return nil
 }
 
 // TODO(flysand): Figure out what we want to do with this on core:sys/ level.
 @(private)
-_set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
+_set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Socket_Option_Error {
 	level: int
 	if option == .TCP_Nodelay {
 		level = int(linux.SOL_TCP)
@@ -388,19 +389,19 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 			errno = linux.setsockopt(os_sock, level, int(option), &int_value)
 	}
 	if errno != .NONE {
-		return Socket_Option_Error(errno)
+		return _socket_option_error(errno)
 	}
 	return nil
 }
 
 @(private)
-_set_blocking :: proc(sock: Any_Socket, should_block: bool) -> (err: Network_Error) {
+_set_blocking :: proc(sock: Any_Socket, should_block: bool) -> (err: Set_Blocking_Error) {
 	errno: linux.Errno
 	flags: linux.Open_Flags
 	os_sock := _unwrap_os_socket(sock)
 	flags, errno = linux.fcntl(os_sock, linux.F_GETFL)
 	if errno != .NONE {
-		return Set_Blocking_Error(errno)
+		return _set_blocking_error(errno)
 	}
 	if should_block {
 		flags -= {.NONBLOCK}
@@ -409,7 +410,7 @@ _set_blocking :: proc(sock: Any_Socket, should_block: bool) -> (err: Network_Err
 	}
 	errno = linux.fcntl(os_sock, linux.F_SETFL, flags)
 	if errno != .NONE {
-		return Set_Blocking_Error(errno)
+		return _set_blocking_error(errno)
 	}
 	return nil
 }

@@ -27,7 +27,7 @@ MAX_INTERFACE_ENUMERATION_TRIES :: 3
 /*
 	`enumerate_interfaces` retrieves a list of network interfaces with their associated properties.
 */
-enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Interfaces_Error) {
 	return _enumerate_interfaces(allocator)
 }
 
