@@ -1781,6 +1781,30 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
 	}
 
+	if (subtarget == Subtarget_Android) {
+		switch (build_context.build_mode) {
+		case BuildMode_DynamicLibrary:
+		case BuildMode_Object:
+		case BuildMode_Assembly:
+		case BuildMode_LLVM_IR:
+			break;
+		default:
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+			if ((build_context.command_kind & Command__does_build) != 0) {
+				gb_printf_err("Unsupported -build-mode for -subtarget:android\n");
+				gb_printf_err("\tCurrently only supporting: \n");
+				// gb_printf_err("\t\texe\n");
+				gb_printf_err("\t\tshared\n");
+				gb_printf_err("\t\tobject\n");
+				gb_printf_err("\t\tassembly\n");
+				gb_printf_err("\t\tllvm-ir\n");
+				gb_exit(1);
+			}
+			break;
+		}
+	}
+
 	if (metrics->os == TargetOs_darwin && subtarget == Subtarget_iOS) {
 		switch (metrics->arch) {
 		case TargetArch_arm64:
@@ -1899,30 +1923,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (bc->metrics.os == TargetOs_freestanding) {
 		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
-	}
-
-	if (subtarget == Subtarget_Android) {
-		switch (build_context.build_mode) {
-		case BuildMode_DynamicLibrary:
-		case BuildMode_Object:
-		case BuildMode_Assembly:
-		case BuildMode_LLVM_IR:
-			break;
-		default:
-		case BuildMode_Executable:
-		case BuildMode_StaticLibrary:
-			if ((build_context.command_kind & Command__does_build) != 0) {
-				gb_printf_err("Unsupported -build-mode for -subtarget:android\n");
-				gb_printf_err("\tCurrently only supporting: \n");
-				// gb_printf_err("\t\texe\n");
-				gb_printf_err("\t\tshared\n");
-				gb_printf_err("\t\tobject\n");
-				gb_printf_err("\t\tassembly\n");
-				gb_printf_err("\t\tllvm-ir\n");
-				gb_exit(1);
-			}
-			break;
-		}
 	}
 }
 

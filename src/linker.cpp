@@ -143,7 +143,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			LIT(target_arch_names[build_context.metrics.arch])
 		);
 #endif
-	} else if (build_context.cross_compiling && build_context.different_os) {
+	} else if (build_context.cross_compiling) {
 		switch (selected_subtarget) {
 		case Subtarget_Android:
 			is_cross_linking = true;
@@ -840,6 +840,7 @@ try_cross_linking:;
 
 			if (is_android) {
 				link_command_line = gb_string_append_fmt(link_command_line, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
+				link_command_line = gb_string_appendc(link_command_line, " -nodefaultlibs");
 			}
 			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
 			link_command_line = gb_string_appendc(link_command_line, object_files);
