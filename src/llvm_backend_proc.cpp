@@ -3226,11 +3226,28 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				{
 					GB_ASSERT(arg_count <= 7);
 
-					char asm_string[] = "svc #0; cset x8, cc";
-					gbString constraints = gb_string_make(heap_allocator(), "={x0},={x8}");
-					for (unsigned i = 0; i < arg_count; i++) {
-						constraints = gb_string_appendc(constraints, ",{");
-						static char const *regs[] = {
+					char const *asm_string;
+					char const **regs;
+					gbString constraints;
+
+					if (build_context.metrics.os == TargetOs_netbsd) {
+						asm_string = "svc #0; cset x17, cc";
+						constraints = gb_string_make(heap_allocator(), "={x0},={x17}");
+						static char const *_regs[] = {
+							"x17",
+							"x0",
+							"x1",
+							"x2",
+							"x3",
+							"x4",
+							"x5",
+						};
+						regs = _regs;
+					} else {
+						// FreeBSD (tested), OpenBSD (untested).
+						asm_string = "svc #0; cset x8, cc";
+						constraints = gb_string_make(heap_allocator(), "={x0},={x8}");
+						static char const *_regs[] = {
 							"x8",
 							"x0",
 							"x1",
@@ -3239,13 +3256,19 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 							"x4",
 							"x5",
 						};
+						regs = _regs;
+
+						// FreeBSD clobbered x1 on a call to sysctl.
+						constraints = gb_string_appendc(constraints, ",~{x1}");
+					}
+
+					for (unsigned i = 0; i < arg_count; i++) {
+						constraints = gb_string_appendc(constraints, ",{");
 						constraints = gb_string_appendc(constraints, regs[i]);
 						constraints = gb_string_appendc(constraints, "}");
 					}
 
-					// FreeBSD clobbered x1 on a call to sysctl.
-					constraints = gb_string_appendc(constraints, ",~{x1},~{cc},~{memory}");
-
+					constraints = gb_string_appendc(constraints, ",~{cc},~{memory}");
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
