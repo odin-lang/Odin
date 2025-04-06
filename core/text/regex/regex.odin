@@ -73,6 +73,7 @@ Match_Iterator :: struct {
 	offset:   int,
 	regex:    Regular_Expression,
 	capture:  Capture,
+	idx:      int,
 	temp:     runtime.Allocator,
 }
 
@@ -442,7 +443,7 @@ Returns:
 - result: `Capture` for this iteration.
 - ok:     A bool indicating if there was a match, stopping the iteration on `false`.
 */
-match_iterator :: proc(it: ^Match_Iterator) -> (result: Capture, ok: bool) {
+match_iterator :: proc(it: ^Match_Iterator) -> (result: Capture, index: int, ok: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	num_groups: int
 	num_groups, ok = match_with_preallocated_capture(
@@ -452,6 +453,10 @@ match_iterator :: proc(it: ^Match_Iterator) -> (result: Capture, ok: bool) {
 		it.temp,
 	)
 
+	defer if ok {
+		it.idx += 1
+	}
+
 	if num_groups > 0 {
 		for i in 0..<num_groups {
 			it.capture.pos[i] += it.offset
@@ -459,13 +464,18 @@ match_iterator :: proc(it: ^Match_Iterator) -> (result: Capture, ok: bool) {
 		it.offset = it.capture.pos[0][1]
 		result = {it.capture.pos[:num_groups], it.capture.groups[:num_groups]}
 	}
-	return
+	return result, it.idx, ok
 }
 
 match :: proc {
 	match_and_allocate_capture,
 	match_with_preallocated_capture,
 	match_iterator,
+}
+
+reset :: proc(it: ^Match_Iterator) {
+	it.offset = 0
+	it.idx    = 0
 }
 
 /*
