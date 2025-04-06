@@ -1114,7 +1114,7 @@ iterator_vectors := []Iterator_Test{
 			{pos = {{2,  8},  {3,  4},  {6,  8}}, groups = {"foobar", "o", "ar"}},
 			{pos = {{9, 15}, {10, 11}, {13, 15}}, groups = {"foobar", "o", "ar"}},
 		},
-	}
+	},
 }
 
 @test
