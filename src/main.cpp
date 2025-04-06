@@ -413,7 +413,6 @@ enum BuildFlagKind {
 	BuildFlag_AndroidKeystore,
 	BuildFlag_AndroidKeystoreAlias,
 	BuildFlag_AndroidKeystorePassword,
-	BuildFlag_AndroidManifest,
 
 	BuildFlag_COUNT,
 };
@@ -634,7 +633,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
-	add_flag(&build_flags, BuildFlag_AndroidManifest,         str_lit("android-manifest"),          BuildFlagParam_String,  Command_bundle_android);
 
 
 	Array<String> flag_args = {};
@@ -1671,11 +1669,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.android_keystore_password = value.value_string;
 							break;
-
-						case BuildFlag_AndroidManifest:
-							GB_ASSERT(value.kind == ExactValue_String);
-							build_context.android_manifest = value.value_string;
-							break;
 						}
 					}
 
@@ -2208,7 +2201,7 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 		return;
 	}
 
-	TIME_SECTION("remove keep temp files");
+	TIME_SECTION("remove temp files");
 
 	for (String const &path : gen->output_temp_paths) {
 		gb_file_remove(cast(char const *)path.text);
@@ -2560,7 +2553,7 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 		if (print_flag("-minimum-os-version:<string>")) {
 			print_usage_line(2, "Sets the minimum OS version targeted by the application.");
 			print_usage_line(2, "Default: -minimum-os-version:11.0.0");
-			print_usage_line(2, "Only used when target is Darwin, if given, linking mismatched versions will emit a warning.");
+			print_usage_line(2, "Only used when target is Darwin or subtarget is Android, if given, linking mismatched versions will emit a warning.");
 		}
 	}
 
@@ -2853,6 +2846,25 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 	if (check) {
 		if (print_flag("-warnings-as-errors")) {
 			print_usage_line(2, "Treats warning messages as error messages.");
+		}
+	}
+
+	if (bundle) {
+		print_usage_line(0, "");
+		print_usage_line(1, "Android-specific flags");
+		print_usage_line(0, "");
+		if (print_flag("-android-keystore:<string>")) {
+			print_usage_line(2, "Specifies the keystore file to use to sign the apk.");
+		}
+
+		if (print_flag("-android-keystore-alias:<string>")) {
+			print_usage_line(2, "Specifies the key alias to use when signing the apk");
+			print_usage_line(2, "Can be omitted if the keystore only contains one key");
+		}
+
+		if (print_flag("-android-keystore-password:<string>")) {
+			print_usage_line(2, "Sets the password to use to unlock the keystore");
+			print_usage_line(2, "If this is omitted, the terminal will prompt you to provide it.");
 		}
 	}
 }

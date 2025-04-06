@@ -551,11 +551,9 @@ struct BuildContext {
 	String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
 	String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT;
 
-	String ODIN_ANDROID_JAR_SIGNER;
 	String android_keystore;
 	String android_keystore_alias;
 	String android_keystore_password;
-	String android_manifest;
 };
 
 gb_global BuildContext build_context = {0};
@@ -1574,28 +1572,13 @@ gb_internal void init_android_values(bool with_sdk) {
 	bc->ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/"));
 
 
-	bc->ODIN_ANDROID_JAR_SIGNER = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_JAR_SIGNER", permanent_allocator())), NIX_SEPARATOR_STRING);
-	// Strip trailing slash so system() call doesn't fail.
-	bc->ODIN_ANDROID_JAR_SIGNER = substring(bc->ODIN_ANDROID_JAR_SIGNER, 0, bc->ODIN_ANDROID_JAR_SIGNER.len - 1);
 	if (with_sdk) {
 		if (bc->ODIN_ANDROID_SDK.len == 0)  {
 			gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
 			gb_exit(1);
 		}
-		if (bc->ODIN_ANDROID_JAR_SIGNER.len == 0) {
-			gb_printf_err("Error: ODIN_ANDROID_JAR_SIGNER not set, which is required for -build-mode:executable for -subtarget:android");
-			gb_exit(1);
-		}
 		if (bc->android_keystore.len == 0) {
 			gb_printf_err("Error: -android-keystore:<string> has not been set\n");
-			gb_exit(1);
-		}
-		if (bc->android_keystore_alias.len == 0) {
-			gb_printf_err("Error: -android-keystore_alias:<string> has not been set\n");
-			gb_exit(1);
-		}
-		if (bc->android_keystore_password.len == 0) {
-			gb_printf_err("Error: -android-keystore-password:<string> has not been set\n");
 			gb_exit(1);
 		}
 	}
@@ -1781,6 +1764,30 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
 	}
 
+	if (subtarget == Subtarget_Android) {
+		switch (build_context.build_mode) {
+		case BuildMode_DynamicLibrary:
+		case BuildMode_Object:
+		case BuildMode_Assembly:
+		case BuildMode_LLVM_IR:
+			break;
+		default:
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+			if ((build_context.command_kind & Command__does_build) != 0) {
+				gb_printf_err("Unsupported -build-mode for -subtarget:android\n");
+				gb_printf_err("\tCurrently only supporting: \n");
+				// gb_printf_err("\t\texe\n");
+				gb_printf_err("\t\tshared\n");
+				gb_printf_err("\t\tobject\n");
+				gb_printf_err("\t\tassembly\n");
+				gb_printf_err("\t\tllvm-ir\n");
+				gb_exit(1);
+			}
+			break;
+		}
+	}
+
 	if (metrics->os == TargetOs_darwin && subtarget == Subtarget_iOS) {
 		switch (metrics->arch) {
 		case TargetArch_arm64:
@@ -1899,30 +1906,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (bc->metrics.os == TargetOs_freestanding) {
 		bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR = !bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR;
-	}
-
-	if (subtarget == Subtarget_Android) {
-		switch (build_context.build_mode) {
-		case BuildMode_DynamicLibrary:
-		case BuildMode_Object:
-		case BuildMode_Assembly:
-		case BuildMode_LLVM_IR:
-			break;
-		default:
-		case BuildMode_Executable:
-		case BuildMode_StaticLibrary:
-			if ((build_context.command_kind & Command__does_build) != 0) {
-				gb_printf_err("Unsupported -build-mode for -subtarget:android\n");
-				gb_printf_err("\tCurrently only supporting: \n");
-				// gb_printf_err("\t\texe\n");
-				gb_printf_err("\t\tshared\n");
-				gb_printf_err("\t\tobject\n");
-				gb_printf_err("\t\tassembly\n");
-				gb_printf_err("\t\tllvm-ir\n");
-				gb_exit(1);
-			}
-			break;
-		}
 	}
 }
 
