@@ -72,6 +72,18 @@ expect_error :: proc(t: ^testing.T, pattern: string, expected_error: typeid, fla
 	testing.expect_value(t, variant_ti, expected_ti, loc = loc)
 }
 
+check_capture :: proc(t: ^testing.T, got, expected: regex.Capture, loc := #caller_location) {
+	testing.expect_value(t, len(got.pos),    len(got.groups),      loc = loc)
+	testing.expect_value(t, len(got.pos),    len(expected.pos),    loc = loc)
+	testing.expect_value(t, len(got.groups), len(expected.groups), loc = loc)
+
+	if len(got.pos) == len(expected.pos) {
+		for i in 0..<len(got.pos) {
+			testing.expect_value(t, got.pos[i],    expected.pos[i],    loc = loc)
+			testing.expect_value(t, got.groups[i], expected.groups[i], loc = loc)
+		}
+	}
+}
 
 @test
 test_concatenation :: proc(t: ^testing.T) {
@@ -1078,5 +1090,50 @@ test_preallocated_capture :: proc(t: ^testing.T) {
 	testing.expect_value(t, capture.groups[2], "ar")
 	for groups in capture.groups[3:] {
 		testing.expect_value(t, groups, "")
+	}
+}
+
+Iterator_Test :: struct {
+	haystack: string,
+	pattern:  string,
+	flags:    regex.Flags,
+	expected: []regex.Capture,
+}
+
+iterator_vectors := []Iterator_Test{
+	{
+		`xxab32ab52xx`, `(ab\d{1})`, {.Global},
+		{
+			{pos = {{2, 5}, {2, 5}}, groups = {"ab3", "ab3"}},
+			{pos = {{6, 9}, {6, 9}}, groups = {"ab5", "ab5"}},
+		},
+	},
+	{
+		`xxfoobarxfoobarxx`, `f(o)ob(ar)`, {.Global},
+		{
+			{pos = {{2,  8},  {3,  4},  {6,  8}}, groups = {"foobar", "o", "ar"}},
+			{pos = {{9, 15}, {10, 11}, {13, 15}}, groups = {"foobar", "o", "ar"}},
+		},
+	}
+}
+
+@test
+test_match_iterator :: proc(t: ^testing.T) {
+	for test in iterator_vectors {
+		it, err := regex.create_iterator(test.haystack, test.pattern, test.flags)
+		defer regex.destroy(it)
+
+		testing.expect_value(t, err, nil)
+		(err == nil) or_continue
+
+		count: int
+		for capture in regex.match(&it) {
+			if count > len(test.expected) {
+				break
+			}
+			check_capture(t, capture, test.expected[count])
+			count += 1
+		}
+		testing.expect_value(t, count, len(test.expected))
 	}
 }
