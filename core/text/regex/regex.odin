@@ -279,6 +279,8 @@ create_iterator :: proc(
 	permanent_allocator := context.allocator,
 	temporary_allocator := context.temp_allocator,
 ) -> (result: Match_Iterator, err: Error) {
+	flags := flags
+	flags += {.Global} // We're iterating over a string, so the next match could start anywhere
 
 	result.haystack = str
 	result.regex    = create(pattern, flags, permanent_allocator, temporary_allocator) or_return

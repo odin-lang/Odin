@@ -1102,7 +1102,7 @@ Iterator_Test :: struct {
 
 iterator_vectors := []Iterator_Test{
 	{
-		`xxab32ab52xx`, `(ab\d{1})`, {.Global},
+		`xxab32ab52xx`, `(ab\d{1})`, {}, // {.Global} implicitly added by the iterator
 		{
 			{pos = {{2, 5}, {2, 5}}, groups = {"ab3", "ab3"}},
 			{pos = {{6, 9}, {6, 9}}, groups = {"ab5", "ab5"}},
