@@ -8,6 +8,7 @@ package regex
 		Feoramund: Initial implementation.
 */
 
+import "base:runtime"
 import "core:text/regex/common"
 import "core:text/regex/compiler"
 import "core:text/regex/optimizer"
@@ -51,7 +52,7 @@ This struct corresponds to a set of string captures from a RegEx match.
 such that `str[pos[0][0]:pos[0][1]] == groups[0]`.
 */
 Capture :: struct {
-	pos: [][2]int,
+	pos:    [][2]int,
 	groups: []string,
 }
 
@@ -59,11 +60,21 @@ Capture :: struct {
 A compiled Regular Expression value, to be used with the `match_*` procedures.
 */
 Regular_Expression :: struct {
-	flags: Flags `fmt:"-"`,
+	flags:      Flags `fmt:"-"`,
 	class_data: []virtual_machine.Rune_Class_Data `fmt:"-"`,
-	program: []virtual_machine.Opcode `fmt:"-"`,
+	program:    []virtual_machine.Opcode `fmt:"-"`,
 }
 
+/*
+An iterator to repeatedly match a pattern against a string, to be used with `*_iterator` procedures.
+*/
+Match_Iterator :: struct {
+	haystack: string,
+	offset:   int,
+	regex:    Regular_Expression,
+	capture:  Capture,
+	temp:     runtime.Allocator,
+}
 
 /*
 Create a regular expression from a string pattern and a set of flags.
@@ -246,6 +257,38 @@ create_by_user :: proc(
 }
 
 /*
+Create a `Match_Iterator` using a string to search, a regular expression to match against it, and a set of flags.
+
+*Allocates Using Provided Allocators*
+
+Inputs:
+- str:     The string to iterate over.
+- pattern: The pattern to match.
+- flags: A `bit_set` of RegEx flags.
+- permanent_allocator: The allocator to use for the compiled regular expression. (default: context.allocator)
+- temporary_allocator: The allocator to use for the intermediate compilation and iteration stages. (default: context.temp_allocator)
+
+Returns:
+- result: The `Match_Iterator`.
+- err: An error, if one occurred.
+*/
+create_iterator :: proc(
+	str: string,
+	pattern: string,
+	flags: Flags = {},
+	permanent_allocator := context.allocator,
+	temporary_allocator := context.temp_allocator,
+) -> (result: Match_Iterator, err: Error) {
+
+	result.haystack = str
+	result.regex    = create(pattern, flags, permanent_allocator, temporary_allocator) or_return
+	result.capture  = preallocate_capture()
+	result.temp     = temporary_allocator
+
+	return
+}
+
+/*
 Match a regular expression against a string and allocate the results into the
 returned `capture` structure.
 
@@ -387,9 +430,40 @@ match_with_preallocated_capture :: proc(
 	return
 }
 
+/*
+Iterate over a `Match_Iterator` and return successive captures.
+
+Inputs:
+- it: Pointer to the `Match_Iterator` to iterate over.
+
+Returns:
+- result: `Capture` for this iteration.
+- ok:     A bool indicating if there was a match, stopping the iteration on `false`.
+*/
+match_iterator :: proc(it: ^Match_Iterator) -> (result: Capture, ok: bool) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	num_groups: int
+	num_groups, ok = match_with_preallocated_capture(
+		it.regex,
+		it.haystack[it.offset:],
+		&it.capture,
+		it.temp,
+	)
+
+	if num_groups > 0 {
+		for i in 0..<num_groups {
+			it.capture.pos[i] += it.offset
+		}
+		it.offset = it.capture.pos[0][1]
+		result = {it.capture.pos[:num_groups], it.capture.groups[:num_groups]}
+	}
+	return
+}
+
 match :: proc {
 	match_and_allocate_capture,
 	match_with_preallocated_capture,
+	match_iterator,
 }
 
 /*
@@ -406,7 +480,7 @@ Returns:
 @require_results
 preallocate_capture :: proc(allocator := context.allocator) -> (result: Capture) {
 	context.allocator = allocator
-	result.pos = make([][2]int, common.MAX_CAPTURE_GROUPS)
+	result.pos    = make([][2]int, common.MAX_CAPTURE_GROUPS)
 	result.groups = make([]string, common.MAX_CAPTURE_GROUPS)
 	return
 }
@@ -436,7 +510,7 @@ Free all data allocated by the `match_and_allocate_capture` procedure.
 *Frees Using Provided Allocator*
 
 Inputs:
-- capture: A Capture.
+- capture: A `Capture`.
 - allocator: (default: context.allocator)
 */
 destroy_capture :: proc(capture: Capture, allocator := context.allocator) {
@@ -445,7 +519,23 @@ destroy_capture :: proc(capture: Capture, allocator := context.allocator) {
 	delete(capture.pos)
 }
 
+/*
+Free all data allocated by the `create_iterator` procedure.
+
+*Frees Using Provided Allocator*
+
+Inputs:
+- it: A `Match_Iterator`
+- allocator: (default: context.allocator)
+*/
+destroy_iterator :: proc(it: Match_Iterator, allocator := context.allocator) {
+	context.allocator = allocator
+	destroy(it.regex)
+	destroy(it.capture)
+}
+
 destroy :: proc {
 	destroy_regex,
 	destroy_capture,
+	destroy_iterator,
 }
