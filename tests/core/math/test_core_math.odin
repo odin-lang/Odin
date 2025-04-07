@@ -1264,3 +1264,192 @@ test_count_digits :: proc(t: ^testing.T) {
 	_run_test(t, 15)
 	_run_test(t, 16)
 }
+
+@test
+test_nextafter :: proc(t: ^testing.T) {
+	Datum :: struct($F: typeid) {
+		x, y, r: F,
+	}
+
+	@static f16_data := [?]Datum(f16) {
+		{0h3c00, 0h7c42, 0h7e00}, // +1 -> +NaN = +canonical NaN
+		{0h3c00, 0hfc42, 0h7e00}, // +1 -> -NaN = +canonical NaN
+		{0hbc00, 0h7c42, 0h7e00}, // -1 -> +NaN = +canonical NaN
+		{0hbc00, 0hfc42, 0h7e00}, // -1 -> -NaN = +canonical NaN
+
+		{0h7c42, 0h3c00, 0h7e00}, // +NaN -> +1 = +canonical NaN
+		{0hfc42, 0h3c00, 0h7e00}, // -NaN -> +1 = +canonical NaN
+		{0h7c42, 0hbc00, 0h7e00}, // +NaN -> -1 = +canonical NaN
+		{0hfc42, 0hbc00, 0h7e00}, // -NaN -> -1 = +canonical NaN
+
+		{0h0000, 0h8000, 0h0000}, // +0 -> -0 = +0
+		{0h0000,     +1, 0h0001}, // +0 -> +1 = +smallest subnormal
+		{0h0000,     -1, 0h8001}, // +0 -> -1 = -smallest subnormal
+
+		{0h0000, 0h0000, 0h0000}, // +0 -> +0 = +0
+		{0h0000, 0h8000, 0h0000}, // +0 -> -0 = +0
+		{0h0000,     +1, 0h0001}, // +0 -> +1 = +smallest subnormal
+		{0h0000,     -1, 0h8001}, // +0 -> -1 = -smallest subnormal
+
+		{0h8000, 0h0000, 0h8000}, // -0 -> +0 = -0
+		{0h8000, 0h8000, 0h8000}, // -0 -> -0 = -0
+		{0h8000,     +1, 0h0001}, // -0 -> +1 = +smallest subnormal
+		{0h8000,     -1, 0h8001}, // -0 -> -1 = -smallest subnormal
+
+		{0h0001,     -1, 0h0000}, // +smallest subnormal -> -1 = +0
+		{0h8001,     +1, 0h8000}, // -smallest subnormal -> +1 = -0
+
+		{0h03ff,     +1, 0h0400}, // +largest subnormal -> +1 = +smallest normal
+		{0h0400,     -1, 0h03ff}, // +smallest normal   -> -1 = +largest subnormal
+		{0h83ff,     -1, 0h8400}, // -largest subnormal -> -1 = -smallest normal
+		{0h8400,     +1, 0h83ff}, // -smallest normal   -> +1 = -largest subnormal
+
+		{0h3c00,      0, 0h3bff}, // +1 ->  0 = +1-ulp
+		{0h3c00,     +1, 0h3c00}, // +1 -> +1 = +1
+		{0h3c00,     +2, 0h3c01}, // +1 -> +2 = +1+ulp
+
+		{0hbc00,      0, 0hbbff}, // -1 ->  0 = -1+ulp
+		{0hbc00,     -1, 0hbc00}, // -1 -> -1 = -1
+		{0hbc00,     -2, 0hbc01}, // -1 -> +2 = -1-ulp
+
+		{0h3c00, 0hfc00, 0h3bff}, // +1 -> -inf = +1-ulp
+		{0hbc00, 0h7c00, 0hbbff}, // -1 -> +inf = -1+ulp
+
+		{0h7bff, 0h7c00, 0h7c00}, // +max -> +inf = +inf
+		{0h7c00, 0h7c00, 0h7c00}, // +inf -> +inf = +inf
+		{0h7c00,      0, 0h7bff}, // +inf -> 0 = +max
+
+		{0hfbff, 0hfc00, 0hfc00}, // -max -> -inf = -inf
+		{0hfc00, 0hfc00, 0hfc00}, // -inf -> -inf = -inf
+		{0hfc00,      0, 0hfbff}, // -inf -> 0 = -max
+	}
+
+	for datum in f16_data {
+		r := math.nextafter_f16(datum.x, datum.y)
+		testing.expectf(t,
+			transmute(u16)r == transmute(u16)datum.r,
+			"%h, %h -> %h != %h", datum.x, datum.y, r, datum.r)
+	}
+
+	@(static, rodata)
+	f32_data := [?]Datum(f32) {
+		{      +1, 0h7f842000, 0h7fc00000}, // +1 -> +NaN = +canonical NaN
+		{      +1, 0hff842000, 0h7fc00000}, // +1 -> -NaN = +canonical NaN
+		{      -1, 0h7f842000, 0h7fc00000}, // -1 -> +NaN = +canonical NaN
+		{      -1, 0hff842000, 0h7fc00000}, // -1 -> -NaN = +canonical NaN
+
+		{0h7f842000,         +1, 0h7fc00000}, // +NaN -> +1 = +canonical NaN
+		{0hff842000,         +1, 0h7fc00000}, // -NaN -> +1 = +canonical NaN
+		{0h7f842000,         -1, 0h7fc00000}, // +NaN -> -1 = +canonical NaN
+		{0hff842000,         -1, 0h7fc00000}, // -NaN -> -1 = +canonical NaN
+
+		{0h00000000, 0h80000000, 0h00000000}, // +0 -> -0 = +0
+		{0h00000000,         +1, 0h00000001}, // +0 -> +1 = +smallest subnormal
+		{0h00000000,         -1, 0h80000001}, // +0 -> -1 = -smallest subnormal
+
+		{0h00000000, 0h00000000, 0h00000000}, // +0 -> +0 = +0
+		{0h00000000, 0h80000000, 0h00000000}, // +0 -> -0 = +0
+		{0h00000000,         +1, 0h00000001}, // +0 -> +1 = +smallest subnormal
+		{0h00000000,         -1, 0h80000001}, // +0 -> -1 = -smallest subnormal
+
+		{0h80000000, 0h00000000, 0h80000000}, // -0 -> +0 = -0
+		{0h80000000, 0h80000000, 0h80000000}, // -0 -> -0 = -0
+		{0h80000000,         +1, 0h00000001}, // -0 -> +1 = +smallest subnormal
+		{0h80000000,         -1, 0h80000001}, // -0 -> -1 = -smallest subnormal
+
+		{0h00000001,         -1, 0h00000000}, // +smallest subnormal -> -1 = +0
+		{0h80000001,         +1, 0h80000000}, // -smallest subnormal -> +1 = -0
+
+		{0h03ffffff,     +1, 0h04000000}, // +largest subnormal -> +1 = +smallest normal
+		{0h04000000,     -1, 0h03ffffff}, // +smallest normal   -> -1 = +largest subnormal
+		{0h83ffffff,     -1, 0h84000000}, // -largest subnormal -> -1 = -smallest normal
+		{0h84000000,     +1, 0h83ffffff}, // -smallest normal   -> +1 = -largest subnormal
+
+		{0h3f800000,      0, 0h3f7fffff}, // +1 ->  0 = +1-ulp
+		{0h3f800000,     +1, 0h3f800000}, // +1 -> +1 = +1
+		{0h3f800000,     +2, 0h3f800001}, // +1 -> +2 = +1+ulp
+
+		{0hbf800000,      0, 0hbf7fffff}, // -1 ->  0 = -1+ulp
+		{0hbf800000,     -1, 0hbf800000}, // -1 -> -1 = -1
+		{0hbf800000,     -2, 0hbf800001}, // -1 -> +2 = -1-ulp
+
+		{0h3c000000, 0hfc000000, 0h3bffffff}, // +1 -> -inf = +1-ulp
+		{0hbc000000, 0h7c000000, 0hbbffffff}, // -1 -> +inf = -1+ulp
+
+		{0h7bffffff, 0h7c000000, 0h7c000000}, // +max -> +inf = +inf
+		{0h7c000000, 0h7c000000, 0h7c000000}, // +inf -> +inf = +inf
+		{0h7c000000,          0, 0h7bffffff}, // +inf -> 0 = +max
+
+		{0hfbffffff, 0hfc000000, 0hfc000000}, // -max -> -inf = -inf
+		{0hfc000000, 0hfc000000, 0hfc000000}, // -inf -> -inf = -inf
+		{0hfc000000,          0, 0hfbffffff}, // -inf -> 0 = -max
+	}
+
+	for datum in f32_data {
+		r := math.nextafter_f32(datum.x, datum.y)
+		testing.expectf(t,
+			transmute(u32)r == transmute(u32)datum.r,
+			"%h, %h -> %h != %h", datum.x, datum.y, r, datum.r)
+	}
+
+	@(static, rodata)
+	f64_data := [?]Datum(f64) {
+		{0h3c00000000000000, 0h7ff4200000000000, 0h7ff8000000000001}, // +1 -> +NaN = +canonical NaN
+		{0h3c00000000000000, 0hfff4200000000000, 0h7ff8000000000001}, // +1 -> -NaN = +canonical NaN
+		{0hbc00000000000000, 0h7ff4200000000000, 0h7ff8000000000001}, // -1 -> +NaN = +canonical NaN
+		{0hbc00000000000000, 0hfff4200000000000, 0h7ff8000000000001}, // -1 -> -NaN = +canonical NaN
+
+		{0h7ff4200000000000, 0h3c00000000000000, 0h7ff8000000000001}, // +NaN -> +1 = +canonical NaN
+		{0hfff4200000000000, 0h3c00000000000000, 0h7ff8000000000001}, // -NaN -> +1 = +canonical NaN
+		{0h7ff4200000000000, 0hbc00000000000000, 0h7ff8000000000001}, // +NaN -> -1 = +canonical NaN
+		{0hfff4200000000000, 0hbc00000000000000, 0h7ff8000000000001}, // -NaN -> -1 = +canonical NaN
+
+		{0h0000000000000000, 0h8000000000000000, 0h0000000000000000}, // +0 -> -0 = +0
+		{0h0000000000000000,                 +1, 0h0000000000000001}, // +0 -> +1 = +smallest subnormal
+		{0h0000000000000000,                 -1, 0h8000000000000001}, // +0 -> -1 = -smallest subnormal
+
+		{0h0000000000000000, 0h0000000000000000, 0h0000000000000000}, // +0 -> +0 = +0
+		{0h0000000000000000, 0h8000000000000000, 0h0000000000000000}, // +0 -> -0 = +0
+		{0h0000000000000000,                 +1, 0h0000000000000001}, // +0 -> +1 = +smallest subnormal
+		{0h0000000000000000,                 -1, 0h8000000000000001}, // +0 -> -1 = -smallest subnormal
+
+		{0h8000000000000000, 0h0000000000000000, 0h8000000000000000}, // -0 -> +0 = -0
+		{0h8000000000000000, 0h8000000000000000, 0h8000000000000000}, // -0 -> -0 = -0
+		{0h8000000000000000,                 +1, 0h0000000000000001}, // -0 -> +1 = +smallest subnormal
+		{0h8000000000000000,                 -1, 0h8000000000000001}, // -0 -> -1 = -smallest subnormal
+
+		{0h0000000000000001,                 -1, 0h0000000000000000}, // +smallest subnormal -> -1 = +0
+		{0h8000000000000001,                 +1, 0h8000000000000000}, // -smallest subnormal -> +1 = -0
+
+		{0h03ffffffffffffff,                 +1, 0h0400000000000000}, // +largest subnormal -> +1 = +smallest normal
+		{0h0400000000000000,                 -1, 0h03ffffffffffffff}, // +smallest normal   -> -1 = +largest subnormal
+		{0h83ffffffffffffff,                 -1, 0h8400000000000000}, // -largest subnormal -> -1 = -smallest normal
+		{0h8400000000000000,                 +1, 0h83ffffffffffffff}, // -smallest normal   -> +1 = -largest subnormal
+
+		{0h3ff0000000000000,                  0, 0h3fefffffffffffff}, // +1 ->  0 = +1-ulp
+		{0h3ff0000000000000,                 +1, 0h3ff0000000000000}, // +1 -> +1 = +1
+		{0h3ff0000000000000,                 +2, 0h3ff0000000000001}, // +1 -> +2 = +1+ulp
+
+		{0hbff0000000000000,                  0, 0hbfefffffffffffff}, // -1 ->  0 = -1+ulp
+		{0hbff0000000000000,                 -1, 0hbff0000000000000}, // -1 -> -1 = -1
+		{0hbff0000000000000,                 -2, 0hbff0000000000001}, // -1 -> +2 = -1-ulp
+
+		{0h3ff0000000000000, 0hfff0000000000000, 0h3fefffffffffffff}, // +1 -> -inf = +1-ulp
+		{0hbff0000000000000, 0h7ff0000000000000, 0hbfefffffffffffff}, // -1 -> +inf = -1+ulp
+
+		{0h7fefffffffffffff, 0h7ff0000000000000, 0h7ff0000000000000}, // +max -> +inf = +inf
+		{0h7ff0000000000000, 0h7ff0000000000000, 0h7ff0000000000000}, // +inf -> +inf = +inf
+		{0h7ff0000000000000,                  0, 0h7fefffffffffffff}, // +inf -> 0 = +max
+
+		{0hffefffffffffffff, 0hfff0000000000000, 0hfff0000000000000}, // -max -> -inf = -inf
+		{0hfff0000000000000, 0hfff0000000000000, 0hfff0000000000000}, // -inf -> -inf = -inf
+		{0hfff0000000000000,                  0, 0hffefffffffffffff}, // -inf -> 0 = -max
+	}
+
+	for datum in f64_data {
+		r := math.nextafter_f64(datum.x, datum.y)
+		testing.expectf(t,
+			transmute(u64)r == transmute(u64)datum.r,
+			"%h, %h -> %h != %h", datum.x, datum.y, r, datum.r)
+	}
+}
