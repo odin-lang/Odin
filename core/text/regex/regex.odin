@@ -69,7 +69,6 @@ Regular_Expression :: struct {
 An iterator to repeatedly match a pattern against a string, to be used with `*_iterator` procedures.
 */
 Match_Iterator :: struct {
-	haystack: string,
 	regex:    Regular_Expression,
 	capture:  Capture,
 	vm:       virtual_machine.Machine,
