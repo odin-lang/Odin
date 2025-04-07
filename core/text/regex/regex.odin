@@ -28,6 +28,8 @@ Creation_Error :: enum {
 	Expected_Delimiter,
 	// An unknown letter was supplied to `create_by_user` after the last delimiter.
 	Unknown_Flag,
+	// An unsupported flag was supplied.
+	Unsupported_Flag,
 }
 
 Error :: union #shared_nil {
@@ -67,6 +69,7 @@ Regular_Expression :: struct {
 
 /*
 An iterator to repeatedly match a pattern against a string, to be used with `*_iterator` procedures.
+Note: Does not handle `.Multiline` properly.
 */
 Match_Iterator :: struct {
 	regex:    Regular_Expression,
@@ -282,6 +285,10 @@ create_iterator :: proc(
 	flags := flags
 	flags += {.Global} // We're iterating over a string, so the next match could start anywhere
 
+	if .Multiline in flags {
+		return {}, .Unsupported_Flag
+	}
+
 	result.regex         = create(pattern, flags, permanent_allocator, temporary_allocator) or_return
 	result.capture       = preallocate_capture()
 	result.temp          = temporary_allocator
@@ -435,6 +442,7 @@ match_with_preallocated_capture :: proc(
 
 /*
 Iterate over a `Match_Iterator` and return successive captures.
+Note: Does not handle `.Multiline` properly.
 
 Inputs:
 - it: Pointer to the `Match_Iterator` to iterate over.
