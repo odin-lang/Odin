@@ -2755,6 +2755,47 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			if (ctx->decl) {
 				ctx->decl->defer_used += 1;
 			}
+
+			// NOTE(bill): Handling errors/warnings
+
+			Ast *stmt = ds->stmt;
+			Ast *original_stmt = stmt;
+
+			bool is_singular = true;
+			while (is_singular && stmt->kind == Ast_BlockStmt) {
+				Ast *inner_stmt = nullptr;
+				for (Ast *s : stmt->BlockStmt.stmts) {
+					if (s->kind == Ast_EmptyStmt) {
+						continue;
+					}
+					if (inner_stmt != nullptr) {
+						is_singular = false;
+						break;
+					}
+					inner_stmt = s;
+				}
+
+				if (inner_stmt != nullptr) {
+					stmt = inner_stmt;
+				}
+			}
+			if (!is_singular) {
+				stmt = original_stmt;
+			}
+
+			switch (stmt->kind) {
+			case_ast_node(as, AssignStmt, stmt);
+				if (as->op.kind != Token_Eq) {
+					break;
+				}
+				for (Ast *lhs : as->lhs) {
+					Entity *e = entity_of_node(lhs);
+					if (e && e->flags & EntityFlag_Result) {
+						error(lhs, "Assignments to named return values within 'defer' will not affect the value that is returned");
+					}
+				}
+			case_end;
+			}
 		}
 	case_end;
 
