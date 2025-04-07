@@ -1126,9 +1126,8 @@ test_match_iterator :: proc(t: ^testing.T) {
 		testing.expect_value(t, err, nil)
 		(err == nil) or_continue
 
-		count: int
 		for capture, idx in regex.match(&it) {
-			if count > len(test.expected) {
+			if idx >= len(test.expected) {
 				break
 			}
 			check_capture(t, capture, test.expected[idx])
