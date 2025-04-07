@@ -810,6 +810,7 @@ try_cross_linking:;
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-landroid ");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-llog ");
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\"--sysroot=");
 				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
