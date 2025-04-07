@@ -207,6 +207,9 @@ It is always the lowest index possible.
 `remote_free` tracks which bins have been freed by other threads.
 It is atomic.
 
+`cached_at` and `cached_index` store where this slab is with regards to the
+heap's slab map.
+
 `data` points to the first bin and is used for calculating bin positions.
 */
 Heap_Slab :: struct {
@@ -232,6 +235,9 @@ Heap_Slab :: struct {
 	//
 	// Atomically accessing memory that is not aligned to the register size
 	// may cause an issue on some systems.
+
+	cached_at: ^Heap_Cache_Block,
+	cached_index: int,
 
 	data:                       uintptr,
 
@@ -340,7 +346,7 @@ this struct. This indicates that the superpage should not be freed.
 its available space for tracking information.
 
 
-_The next three fields are only used in the `Heap_Superpage` pointed to by `local_heap`._
+_The next four fields are only used in the `Heap_Superpage` pointed to by `local_heap`._
 
 `length` is how many `Heap_Cache_Block` structs are in use across the local
 thread's heap.
@@ -350,6 +356,9 @@ heap.
 
 `remote_free_count` is an estimate of how many superpages have slabs with
 remote frees available to merge.
+
+`slab_map_length_by_rank` counts how many entries are in each slab array within
+the slab map.
 
 
 _The next three fields constitute the main data used in this struct, and each
@@ -380,6 +389,8 @@ Heap_Cache_Block :: struct {
 	length:            int,
 	owned_superpages:  int,
 	remote_free_count: int, // atomic
+
+	slab_map_length_by_rank: [HEAP_BIN_RANKS]int,
 	// }
 
 	slab_map:                     [HEAP_CACHE_SLAB_MAP_STRIDE*HEAP_BIN_RANKS]^Heap_Slab,
@@ -994,19 +1005,23 @@ Add a slab to the heap's cache, keyed to the bin size rank of `rank`.
 */
 heap_cache_add_slab :: proc "contextless" (slab: ^Heap_Slab, rank: int) {
 	assert_contextless(slab != nil)
+	assert_contextless(slab.cached_at == nil)
+	assert_contextless(slab.bin_size == 1 << (HEAP_MIN_BIN_SHIFT + uint(rank)))
+
 	cache := local_heap_cache
-	for {
-		start := rank * HEAP_CACHE_SLAB_MAP_STRIDE
-		for i := start; i < start+HEAP_CACHE_SLAB_MAP_STRIDE; i += 1 {
-			assert_contextless(cache.slab_map[i] != slab, "The heap allocator found a duplicate entry in its slab map.")
-			if cache.slab_map[i] == nil {
-				cache.slab_map[i] = slab
-				return
-			}
-		}
-		assert_contextless(cache.next_cache_block != nil)
+
+	// Go to the tail of the cache for this rank.
+	m := local_heap_cache.slab_map_length_by_rank[rank]
+	for /**/ ; m >= HEAP_CACHE_SLAB_MAP_STRIDE; m -= HEAP_CACHE_SLAB_MAP_STRIDE {
 		cache = cache.next_cache_block
 	}
+	index := rank * HEAP_CACHE_SLAB_MAP_STRIDE + m
+
+	assert_contextless(cache.slab_map[index] == nil)
+	cache.slab_map[index] = slab
+	slab.cached_at = cache
+	slab.cached_index = index
+	local_heap_cache.slab_map_length_by_rank[rank] += 1
 }
 
 /*
@@ -1035,49 +1050,39 @@ heap_cache_get_slab :: proc "contextless" (rounded_size: int) -> (slab: ^Heap_Sl
 Remove a slab with the corresponding bin rank from the heap's cache.
 */
 heap_cache_remove_slab :: proc "contextless" (slab: ^Heap_Slab, rank: int) {
-	cache := local_heap_cache
-	assert_contextless(cache.in_use)
+	assert_contextless(slab != nil)
+	assert_contextless(slab.cached_at != nil)
 	assert_contextless(slab.bin_size == 1 << (HEAP_MIN_BIN_SHIFT + uint(rank)))
-	for {
-		assert_contextless(cache != nil)
-		start := rank * HEAP_CACHE_SLAB_MAP_STRIDE
-		for i := start; i < start+HEAP_CACHE_SLAB_MAP_STRIDE; i += 1 {
-			if cache.slab_map[i] == slab {
-				// Swap with the tail.
-				source_i := i
-				target_cache := cache
-				i += 1
-				for {
-					for j := i; j < start+HEAP_CACHE_SLAB_MAP_STRIDE; j += 1 {
-						if target_cache.slab_map[j] == nil {
-							cache.slab_map[source_i] = target_cache.slab_map[j-1]
-							target_cache.slab_map[j-1] = nil
-							return
-						}
-					}
-					if target_cache.next_cache_block == nil {
-						// The entry is at the end of the stride and we have
-						// run out of space to search.
-						cache.slab_map[source_i] = nil
-						assert_contextless(source_i % (HEAP_CACHE_SLAB_MAP_STRIDE-1) == 0, "The heap allocator tried to remove a non-terminal slab map entry when it should have swapped it with the tail.")
-						return
-					} else if target_cache.next_cache_block.slab_map[start] == nil {
-						// The starting bucket in the next cache block is empty,
-						// so we terminate on the current stride's final bucket.
-						cache.slab_map[source_i] = target_cache.slab_map[start+HEAP_CACHE_SLAB_MAP_STRIDE-1]
-						target_cache.slab_map[start+HEAP_CACHE_SLAB_MAP_STRIDE-1] = nil
-						return
-					}
-					target_cache = target_cache.next_cache_block
-					// Reset `i` after the first iteration.
-					i = start
-				}
-			}
-		}
-		// Entry must be in the expanded cache blocks.
-		assert_contextless(cache.next_cache_block != nil)
-		cache = cache.next_cache_block
+
+	source_cache := slab.cached_at
+	source_index := slab.cached_index
+	assert_contextless(source_cache.in_use)
+	assert_contextless(source_cache.slab_map[source_index] == slab)
+
+	target_cache := local_heap_cache
+
+	// Get the tail of the slab array for this rank.
+	m := local_heap_cache.slab_map_length_by_rank[rank] - 1
+	assert_contextless(m >= 0)
+	for /**/ ; m >= HEAP_CACHE_SLAB_MAP_STRIDE; m -= HEAP_CACHE_SLAB_MAP_STRIDE {
+		target_cache = target_cache.next_cache_block
 	}
+	target_index := rank * HEAP_CACHE_SLAB_MAP_STRIDE + m
+
+	// Swap the slab being removed with the tail.
+	replacement_slab := target_cache.slab_map[target_index]
+	assert_contextless(replacement_slab != nil)
+
+	source_cache.slab_map[source_index] = replacement_slab
+	target_cache.slab_map[target_index] = nil
+	
+	replacement_slab.cached_at = source_cache
+	replacement_slab.cached_index = source_index
+
+	slab.cached_at = nil
+	slab.cached_index = 0
+
+	local_heap_cache.slab_map_length_by_rank[rank] -= 1
 }
 
 /*
@@ -1296,6 +1301,11 @@ setup_superpage_orphanage :: proc "contextless" () {
 			// update it when the thread's heap is being broken down.
 			for i := 0; i < HEAP_SLAB_COUNT; /**/ {
 				slab := heap_superpage_index_slab(superpage, i)
+
+				// Clearing the cache fields is not strictly necessary, but it
+				// is good for debugging.
+				slab.cached_at = nil
+				slab.cached_index = 0
 
 				if slab.bin_size > HEAP_MAX_BIN_SIZE {
 					// Skip contiguous slabs.
