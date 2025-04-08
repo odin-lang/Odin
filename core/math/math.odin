@@ -2296,7 +2296,7 @@ nextafter_f16 :: proc "contextless" (x, y: f16) -> (r: f16) {
 	case x == y:
 		r = x
 	case x == 0:
-		r = copy_sign_f16(1, y)
+		r = copy_sign_f16(transmute(f16)u16(1), y)
 	case (y > x) == (x > 0):
 		r = transmute(f16)(transmute(u16)x + 1)
 	case:
@@ -2312,7 +2312,7 @@ nextafter_f32 :: proc "contextless" (x, y: f32) -> (r: f32) {
 	case x == y:
 		r = x
 	case x == 0:
-		r = copy_sign_f32(1, y)
+		r = copy_sign_f32(transmute(f32)u32(1), y)
 	case (y > x) == (x > 0):
 		r = transmute(f32)(transmute(u32)x + 1)
 	case:
@@ -2328,7 +2328,7 @@ nextafter_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
 	case x == y:
 		r = x
 	case x == 0:
-		r = copy_sign_f64(1, y)
+		r = copy_sign_f64(transmute(f64)u64(1), y)
 	case (y > x) == (x > 0):
 		r = transmute(f64)(transmute(u64)x + 1)
 	case:
