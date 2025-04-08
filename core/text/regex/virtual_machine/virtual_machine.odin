@@ -627,8 +627,9 @@ opcode_count :: proc(code: Program) -> (opcodes: int) {
 	return
 }
 
-create :: proc(code: Program, str: string) -> (vm: Machine) {
+create :: proc(code: Program, str: string, allocator := context.allocator) -> (vm: Machine) {
 	assert(len(code) > 0, "RegEx VM has no instructions.")
+	context.allocator = allocator
 
 	vm.memory = str
 	vm.code = code
@@ -643,4 +644,12 @@ create :: proc(code: Program, str: string) -> (vm: Machine) {
 	vm.next_threads = make([^]Thread, max_possible_threads)
 
 	return
+}
+
+destroy :: proc(vm: Machine, allocator := context.allocator) {
+	context.allocator = allocator
+
+	delete(vm.busy_map)
+	free(vm.threads)
+	free(vm.next_threads)
 }

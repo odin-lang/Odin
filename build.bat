@@ -138,6 +138,7 @@ del *.ilk > NUL 2> NUL
 
 rc %rc_flags% %odin_rc%
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
+if %errorlevel% neq 0 goto end_of_build
 mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
 if %errorlevel% neq 0 goto end_of_build
 

@@ -79,7 +79,6 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 	read_meta :: proc(r: ^Reader, capacity: u32le, allocator := context.allocator, loc := #caller_location) -> (meta_data: []Meta, err: Read_Error) {
 		meta_data = make([]Meta, int(capacity), allocator=allocator)
 		count := 0
-		defer meta_data = meta_data[:count]
 		for &m in meta_data {
 			m.name = read_name(r) or_return
 
@@ -105,6 +104,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 
 			count += 1
 		}
+		meta_data = meta_data[:count]
 		return
 	}
 
@@ -112,7 +112,6 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		stack_count := read_value(r, u32le) or_return
 		layer_count := 0
 		layers = make(Layer_Stack, stack_count, allocator=allocator, loc=loc)
-		defer layers = layers[:layer_count]
 		for &layer in layers {
 			layer.name = read_name(r) or_return
 			layer.components = read_value(r, u8) or_return
@@ -136,6 +135,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 			layer_count += 1
 		}
 
+		layers = layers[:layer_count]
 		return
 	}
 
