@@ -356,7 +356,7 @@ gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, 
 
 
 gb_internal LLVMValueRef llvm_cstring(lbModule *m, String const &str) {
-	lbValue v = lb_find_or_add_entity_string(m, str);
+	lbValue v = lb_find_or_add_entity_string(m, str, false);
 	unsigned indices[1] = {0};
 	return llvm_const_extract_value(m, v.value, indices, gb_count_of(indices));
 }
@@ -568,7 +568,7 @@ gb_internal void lb_set_file_line_col(lbProcedure *p, Array<lbValue> arr, TokenP
 		col  = obfuscate_i32(col);
 	}
 
-	arr[0] = lb_find_or_add_entity_string(p->module, file);
+	arr[0] = lb_find_or_add_entity_string(p->module, file, false);
 	arr[1] = lb_const_int(p->module, t_i32, line);
 	arr[2] = lb_const_int(p->module, t_i32, col);
 }
@@ -2543,9 +2543,14 @@ general_end:;
 
 
 
-gb_internal LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
-	StringHashKey key = string_hash_string(str);
-	LLVMValueRef *found = string_map_get(&m->const_strings, key);
+gb_internal LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str, bool custom_link_section) {
+	StringHashKey key = {};
+	LLVMValueRef *found = nullptr;
+
+	if (!custom_link_section) {
+		key = string_hash_string(str);
+		found = string_map_get(&m->const_strings, key);
+	}
 	if (found != nullptr) {
 		return *found;
 	} else {
@@ -2568,15 +2573,17 @@ gb_internal LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String co
 		LLVMSetAlignment(global_data, 1);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
-		string_map_set(&m->const_strings, key, ptr);
+		if (!custom_link_section) {
+			string_map_set(&m->const_strings, key, ptr);
+		}
 		return ptr;
 	}
 }
 
-gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
+gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str, bool custom_link_section) {
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
-		ptr = lb_find_or_add_entity_string_ptr(m, str);
+		ptr = lb_find_or_add_entity_string_ptr(m, str, custom_link_section);
 	} else {
 		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
 	}

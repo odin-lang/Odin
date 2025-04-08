@@ -1963,8 +1963,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
 			          ast_value->tav.mode == Addressing_Invalid);
 
-			bool allow_local = false;
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, allow_local);
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
 		}
 
 		Ast *ident = vd->names[i];

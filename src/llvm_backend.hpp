@@ -415,9 +415,19 @@ gb_internal LLVMTypeRef llvm_get_element_type(LLVMTypeRef type);
 
 gb_internal lbBlock *lb_create_block(lbProcedure *p, char const *name, bool append=false);
 
+struct lbConstContext {
+	bool   allow_local;
+	bool   is_rodata;
+	String link_section;
+};
+
+static lbConstContext const LB_CONST_CONTEXT_DEFAULT = {true, false, {}};
+static lbConstContext const LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL = {true, false, {}};
+static lbConstContext const LB_CONST_CONTEXT_DEFAULT_NO_LOCAL = {false, false, {}};
+
 gb_internal lbValue lb_const_nil(lbModule *m, Type *type);
 gb_internal lbValue lb_const_undef(lbModule *m, Type *type);
-gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local=true, bool is_rodata=false);
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc = LB_CONST_CONTEXT_DEFAULT);
 gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value);
 gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 
@@ -514,7 +524,7 @@ gb_internal void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base
 
 gb_internal lbValue lb_type_info(lbProcedure *p, Type *type);
 
-gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str);
+gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str, bool custom_link_section);
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr);
 
 gb_internal bool lb_is_const(lbValue value);

@@ -2056,8 +2056,8 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 			if (testing_proc->pkg != nullptr) {
 				pkg_name = testing_proc->pkg->name;
 			}
-			lbValue v_pkg  = lb_find_or_add_entity_string(m, pkg_name);
-			lbValue v_name = lb_find_or_add_entity_string(m, name);
+			lbValue v_pkg  = lb_find_or_add_entity_string(m, pkg_name, false);
+			lbValue v_name = lb_find_or_add_entity_string(m, name,     false);
 			lbValue v_proc = lb_find_procedure_value_from_entity(m, testing_proc);
 
 			indices[1] = LLVMConstInt(lb_type(m, t_int), testing_proc_index++, false);
@@ -2565,12 +2565,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			if (!is_type_any(e->type) && !is_type_union(e->type)) {
 				if (tav.mode != Addressing_Invalid) {
 					if (tav.value.kind != ExactValue_Invalid) {
-						bool is_rodata = e->kind == Entity_Variable && e->Variable.is_rodata;
+						auto cc = LB_CONST_CONTEXT_DEFAULT;
+						cc.is_rodata = e->kind == Entity_Variable && e->Variable.is_rodata;
+						cc.allow_local = false;
+						cc.link_section = e->Variable.link_section;
+
 						ExactValue v = tav.value;
-						lbValue init = lb_const_value(m, tav.type, v, false, is_rodata);
+						lbValue init = lb_const_value(m, tav.type, v, cc);
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
-						if (is_rodata) {
+						if (cc.is_rodata) {
 							LLVMSetGlobalConstant(g.value, true);
 						}
 					}
@@ -2585,6 +2589,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		} else if (e->kind == Entity_Variable && e->Variable.is_rodata) {
 			LLVMSetGlobalConstant(g.value, true);
 		}
+
+		if (e->flags & EntityFlag_Require) {
+			lb_append_to_compiler_used(m, g.value);
+		}
+
 		array_add(&global_variables, var);
 
 		lb_add_entity(m, e, g);
