@@ -5838,18 +5838,25 @@ gb_inline isize gb_printf_err_va(char const *fmt, va_list va) {
 
 gb_inline isize gb_fprintf_va(struct gbFile *f, char const *fmt, va_list va) {
 	char buf[4096];
-	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
+	va_list va_save;
+	va_copy(va_save, va);
+	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va_save);
+	va_end(va_save);
 	char *new_buf = NULL;
 	isize n = gb_size_of(buf);
 	while (len < 0) {
+		va_copy(va_save, va);
+		defer (va_end(va_save));
 		n <<= 1;
 		gb_free(gb_heap_allocator(), new_buf);
 		new_buf = gb_alloc_array(gb_heap_allocator(), char, n);;
-		len = gb_snprintf_va(new_buf, n, fmt, va);
+		len = gb_snprintf_va(new_buf, n, fmt, va_save);
 	}
-	gb_file_write(f, buf, len-1); // NOTE(bill): prevent extra whitespace
 	if (new_buf != NULL) {
+		gb_file_write(f, new_buf, len-1); // NOTE(bill): prevent extra whitespace
 		gb_free(gb_heap_allocator(), new_buf);
+	} else {
+		gb_file_write(f, buf, len-1); // NOTE(bill): prevent extra whitespace
 	}
 	return len;
 }
@@ -5912,7 +5919,7 @@ gb_internal isize gb__print_string(char *text, isize max_len, gbprivFmtInfo *inf
 			len = info->precision < len ? info->precision : len;
 		}
 
-		res += gb_strlcpy(text, str, len);
+		res += gb_strlcpy(text, str, gb_min(len, remaining));
 
 		if (info->width > res) {
 			isize padding = info->width - len;
@@ -5930,7 +5937,7 @@ gb_internal isize gb__print_string(char *text, isize max_len, gbprivFmtInfo *inf
 			}
 		}
 
-		res += gb_strlcpy(text, str, len);
+		res += gb_strlcpy(text, str, gb_min(len, remaining));
 	}
 
 
@@ -6066,15 +6073,16 @@ gb_internal isize gb__print_f64(char *text, isize max_len, gbprivFmtInfo *info, 
 
 gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va_list va) {
 	char const *text_begin = text;
-	isize remaining = max_len, res;
+	isize remaining = max_len - 1, res;
 
-	while (*fmt) {
+	while (*fmt && remaining > 0) {
 		gbprivFmtInfo info = {0};
 		isize len = 0;
 		info.precision = -1;
 
-		while (*fmt && *fmt != '%' && remaining) {
+		while (remaining > 0 && *fmt && *fmt != '%') {
 			*text++ = *fmt++;
+			remaining--;
 		}
 
 		if (*fmt == '%') {
@@ -6240,7 +6248,7 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 
 		text += len;
 		if (len >= remaining) {
-			remaining = gb_min(remaining, 1);
+			remaining = 0;
 		} else {
 			remaining -= len;
 		}
