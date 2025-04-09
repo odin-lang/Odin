@@ -147,6 +147,19 @@ get_local_heap_info :: proc "contextless" () -> (info: Heap_Info) {
 			info.total_memory_used_for_book_keeping += HEAP_SLAB_SIZE
 			info.total_slabs += HEAP_SLAB_COUNT
 		}
+		when !ODIN_DISABLE_ASSERT {
+			contiguous_counter := superpage.contiguous_free_slabs[0]
+			total_contiguous_slabs := contiguous_counter
+			for i in 1..<HEAP_SLAB_COUNT {
+				cfs := superpage.contiguous_free_slabs[i]
+				assert_contextless(cfs == 0 || cfs == contiguous_counter - 1 || contiguous_counter == 0)
+				if cfs != 0 && contiguous_counter == 0 {
+					total_contiguous_slabs += cfs
+				}
+				contiguous_counter = cfs
+			}
+			assert_contextless(total_contiguous_slabs == superpage.free_slabs)
+		}
 		superpage = superpage.next
 	}
 

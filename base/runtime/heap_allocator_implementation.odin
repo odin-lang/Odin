@@ -307,6 +307,9 @@ Heap_Superpage :: struct {
 	free_slabs: int,
 	next_free_slab_index: int,
 
+	longest_contiguous_free_slab: int,
+	contiguous_free_slabs: [HEAP_SLAB_COUNT]int,
+
 	cached_at: ^Heap_Cache_Block,
 	cached_index: int,
 
@@ -436,6 +439,8 @@ heap_make_superpage :: proc "contextless" () -> (superpage: ^Heap_Superpage) {
 		assert_contextless(base == uintptr(find_slab_from_pointer(slab)), "Reverse lookup from slab base pointer failed.")
 		assert_contextless(base - uintptr(superpage) + HEAP_SLAB_SIZE - 1 < SUPERPAGE_SIZE, "A slab was setup beyond the superpage boundary.")
 		base += HEAP_SLAB_SIZE
+		superpage.contiguous_free_slabs[i] = HEAP_SLAB_COUNT-i
+		superpage.longest_contiguous_free_slab = HEAP_SLAB_COUNT
 	}
 
 	return superpage
@@ -633,72 +638,78 @@ Make an allocation that is at least one entire Slab wide from the provided super
 This will return false if the Superpage lacks enough contiguous Slabs to fit the size.
 */
 @(require_results)
-heap_make_slab_sized_allocation :: proc "contextless" (superpage: ^Heap_Superpage, size: int) -> (ptr: rawptr, ok: bool) {
+heap_make_slab_sized_allocation :: proc "contextless" (superpage: ^Heap_Superpage, size: int) -> (ptr: rawptr) {
 	assert_contextless(0 <= superpage.next_free_slab_index && superpage.next_free_slab_index < HEAP_SLAB_COUNT, "Invalid next_free_slab_index.")
 	contiguous := heap_slabs_needed_for_size(size)
 
-	find_run: for start := superpage.next_free_slab_index; start < HEAP_SLAB_COUNT-contiguous+1; /**/ {
-		n := contiguous
-
-		for i := start; i < HEAP_SLAB_COUNT; /**/ {
-			bin_size := heap_superpage_index_slab(superpage, i).bin_size
-			if bin_size > HEAP_MAX_BIN_SIZE {
-				// Skip contiguous slabs.
-				start = i + heap_slabs_needed_for_size(bin_size)
-				continue find_run
-			} else if bin_size != 0 {
-				start = i + 1
-				continue find_run
-			}
-			n -= 1
-			if n > 0 {
-				i += 1
-				continue
-			}
-			// Setup the Slab header.
-			// This will be a single-sector Slab that may span several Slabs.
-			slab := heap_superpage_index_slab(superpage, start)
-
-			// Setup slab.
-			if slab.is_dirty {
-				heap_slab_clear_data(slab)
-			}
-			slab.bin_size = size
-			slab.is_full = true
-			slab.max_bins = 1
-			slab.dirty_bins = 1
-			slab.sectors = 1
-			slab.local_free  = cast([^]uint)(uintptr(slab) + size_of(Heap_Slab))
-			slab.remote_free = cast([^]uint)(uintptr(slab) + size_of(Heap_Slab) + 1 * size_of(uint))
-			data := uintptr(slab) + HEAP_SLAB_ALLOCATION_BOOK_KEEPING
-			ptr = rawptr(data - data & (HEAP_MAX_ALIGNMENT-1))
-			slab.data = uintptr(ptr)
-			assert_contextless(uintptr(ptr) & (HEAP_MAX_ALIGNMENT-1) == 0, "Slab-wide allocation's data pointer is not correctly aligned.")
-			assert_contextless(int(uintptr(ptr) - uintptr(superpage)) + size < SUPERPAGE_SIZE, "Incorrectly calculated Slab-wide allocation exceeds Superpage end boundary.")
-
-			// Wipe any non-zero data from slabs ahead of the header.
-			for x in start+1..=i {
-				next_slab := heap_superpage_index_slab(superpage, x)
-				next_slab.index = 0
-				if next_slab.is_dirty {
-					heap_slab_clear_data(next_slab)
-				}
-			}
-
-			// Update statistics.
-			superpage.free_slabs -= contiguous
-			assert_contextless(superpage.free_slabs >= 0, "The heap allocator caused a superpage's free_slabs to go negative.")
-			if superpage.free_slabs == 0 {
-				heap_cache_remove_superpage_with_free_slabs(superpage)
-			}
-			// NOTE: Start from zero again, because we may have skipped a non-contiguous block.
-			heap_update_next_free_slab_index(superpage, 0)
-
-			return ptr, true
+	for start := superpage.next_free_slab_index; start < HEAP_SLAB_COUNT-contiguous+1; /**/ {
+		if superpage.contiguous_free_slabs[start] < contiguous {
+			// Because this array stores the number of contiguous free slabs,
+			// we can make good use of that number to jump ahead to the next
+			// run of free slabs.
+			start += superpage.contiguous_free_slabs[start] + 1
+			continue
 		}
+
+		// Setup the Slab header.
+		// This will be a single-sector Slab that may span several Slabs.
+		slab := heap_superpage_index_slab(superpage, start)
+
+		// Setup slab.
+		if slab.is_dirty {
+			heap_slab_clear_data(slab)
+		}
+		slab.bin_size = size
+		slab.is_full = true
+		slab.max_bins = 1
+		slab.dirty_bins = 1
+		slab.sectors = 1
+		slab.local_free  = cast([^]uint)(uintptr(slab) + size_of(Heap_Slab))
+		slab.remote_free = cast([^]uint)(uintptr(slab) + size_of(Heap_Slab) + 1 * size_of(uint))
+		data := uintptr(slab) + HEAP_SLAB_ALLOCATION_BOOK_KEEPING
+		ptr = rawptr(data - data & (HEAP_MAX_ALIGNMENT-1))
+		slab.data = uintptr(ptr)
+		assert_contextless(uintptr(ptr) & (HEAP_MAX_ALIGNMENT-1) == 0, "Slab-wide allocation's data pointer is not correctly aligned.")
+		assert_contextless(int(uintptr(ptr) - uintptr(superpage)) + size < SUPERPAGE_SIZE, "Incorrectly calculated Slab-wide allocation exceeds Superpage end boundary.")
+
+		// Wipe any non-zero data from slabs ahead of the header.
+		for x in start+1..<start+contiguous {
+			next_slab := heap_superpage_index_slab(superpage, x)
+			next_slab.index = 0
+			if next_slab.is_dirty {
+				heap_slab_clear_data(next_slab)
+			}
+		}
+
+		// Update statistics.
+		superpage.free_slabs -= contiguous
+		assert_contextless(superpage.free_slabs >= 0, "The heap allocator caused a superpage's free_slabs to go negative.")
+		if superpage.free_slabs == 0 {
+			heap_cache_remove_superpage_with_free_slabs(superpage)
+		}
+		// NOTE: Start from zero again, because we may have skipped a non-contiguous block.
+		heap_update_next_free_slab_index(superpage, 0)
+
+		// Cascade contiguous free slab count backwards.
+		for i := start + contiguous - 1; i > start; i -= 1 {
+			// Clear out the spots this slab will hold.
+			superpage.contiguous_free_slabs[i] = 0
+		}
+		j := 0
+		for i := start; i >= 0; i -= 1 {
+			// Rewrite the count behind this slab until it hits a slab in use.
+			if superpage.contiguous_free_slabs[i] == 0 {
+				break
+			}
+			superpage.contiguous_free_slabs[i] = j
+			j += 1
+		}
+		heap_update_longest_contiguous_free_slab(superpage)
+
+		return ptr
 	}
 
-	return
+	panic_contextless("The heap allocator failed to find a contiguous run of slabs when one of a sufficient length was cached.")
 }
 
 //
@@ -719,9 +730,6 @@ heap_slab_setup :: proc "contextless" (superpage: ^Heap_Superpage, rounded_size:
 	assert_contextless(superpage.free_slabs >= 0, "The heap allocator caused a Superpage's free_slabs to go negative.")
 
 	slab = heap_superpage_index_slab(superpage, superpage.next_free_slab_index)
-	if slab.is_dirty {
-		heap_slab_clear_data(slab)
-	}
 	slab.bin_size = rounded_size
 
 	// The book-keeping structures compete for the same space as the data,
@@ -741,6 +749,14 @@ heap_slab_setup :: proc "contextless" (superpage: ^Heap_Superpage, rounded_size:
 	slab.sectors = sectors
 	slab.free_bins = bins
 	slab.max_bins = bins
+	if slab.is_dirty {
+		// Clear only the needed fields.
+		slab.dirty_bins = bins
+		slab.next_free_sector = 0
+		slab.is_full = false
+		slab.remote_free_bins_scheduled = 0
+		slab.cached_at = nil
+	}
 
 	base_alignment := uintptr(min(HEAP_MAX_ALIGNMENT, rounded_size))
 
@@ -769,7 +785,26 @@ heap_slab_setup :: proc "contextless" (superpage: ^Heap_Superpage, rounded_size:
 			slab.local_free[sectors-1] = (1 << uint(bins % INTEGER_BITS)) - 1
 			heap_debug_cover(.Slab_Adjusted_For_Partial_Sector)
 		}
+		if slab.is_dirty {
+			for i in 0..<full_sectors {
+				slab.remote_free[i] = 0
+			}
+			if partial_sector > 0 {
+				slab.remote_free[sectors-1] = 0
+			}
+		}
 	}
+
+	// Cascade contiguous free slab count backwards.
+	for i, j := superpage.next_free_slab_index, 0; i >= 0; i -= 1 {
+		// Rewrite the count behind this slab until it hits a slab in use.
+		if superpage.contiguous_free_slabs[i] == 0 {
+			break
+		}
+		superpage.contiguous_free_slabs[i] = j
+		j += 1
+	}
+	heap_update_longest_contiguous_free_slab(superpage)
 
 	// Update the next free slab.
 	heap_update_next_free_slab_index(superpage, superpage.next_free_slab_index + 1)
@@ -816,6 +851,28 @@ heap_free_wide_slab :: proc "contextless" (superpage: ^Heap_Superpage, slab: ^He
 	superpage.free_slabs += contiguous
 	assert_contextless(superpage.free_slabs <= HEAP_SLAB_COUNT)
 	superpage.next_free_slab_index = min(superpage.next_free_slab_index, slab.index)
+
+	// Cascade contiguous free slab count backwards.
+	j := 1
+	index_end := slab.index + contiguous - 1
+	if index_end + 1 < HEAP_SLAB_COUNT {
+		// Connect this run with the run ahead.
+		j += superpage.contiguous_free_slabs[index_end + 1]
+	}
+	for i := index_end; i >= slab.index; i -= 1 {
+		// Overwrite the spots this wide slab held.
+		superpage.contiguous_free_slabs[i] = j
+		j += 1
+	}
+	for i := slab.index - 1; i >= 0; i -= 1 {
+		// Expand behind the start until a break is found.
+		if superpage.contiguous_free_slabs[i] == 0 {
+			break
+		}
+		superpage.contiguous_free_slabs[i] = j
+		j += 1
+	}
+	heap_update_longest_contiguous_free_slab(superpage)
 }
 
 /*
@@ -831,6 +888,21 @@ heap_free_slab :: proc "contextless" (superpage: ^Heap_Superpage, slab: ^Heap_Sl
 	superpage.free_slabs += 1
 	assert_contextless(superpage.free_slabs <= HEAP_SLAB_COUNT)
 	superpage.next_free_slab_index = min(superpage.next_free_slab_index, slab.index)
+
+	// Cascade contiguous free slab count backwards.
+	j := 1
+	if slab.index + 1 < HEAP_SLAB_COUNT {
+		j += superpage.contiguous_free_slabs[slab.index + 1]
+	}
+	superpage.contiguous_free_slabs[slab.index] = j
+	for i := slab.index - 1; i >= 0; i -= 1 {
+		if superpage.contiguous_free_slabs[i] == 0 {
+			break
+		}
+		j += 1
+		superpage.contiguous_free_slabs[i] = j
+	}
+	heap_update_longest_contiguous_free_slab(superpage)
 }
 
 /*
@@ -920,6 +992,21 @@ heap_update_next_free_slab_index :: proc "contextless" (superpage: ^Heap_Superpa
 	}
 
 	panic_contextless("The heap allocator was unable to find a free slab in a superpage with free_slabs > 0.")
+}
+
+heap_update_longest_contiguous_free_slab :: proc "contextless" (superpage: ^Heap_Superpage) {
+	longest := 0
+	for i := 0; i < HEAP_SLAB_COUNT; /**/ {
+		run := superpage.contiguous_free_slabs[i]
+		when !ODIN_DISABLE_ASSERT {
+			if run > 0 {
+				assert_contextless(heap_superpage_index_slab(superpage, i).bin_size == 0)
+			}
+		}
+		longest = max(run, longest)
+		i += run + 1
+	}
+	superpage.longest_contiguous_free_slab = longest
 }
 
 //
@@ -1114,21 +1201,15 @@ heap_cache_get_contiguous_slabs :: proc "contextless" (size: int) -> (ptr: rawpt
 					superpage := heap_get_superpage()
 					heap_link_superpage(superpage)
 					heap_cache_register_superpage(superpage)
-					if superpage.free_slabs >= contiguous {
-						alloc, ok := heap_make_slab_sized_allocation(superpage, size)
-						if ok {
-							return alloc
-						}
+					if superpage.longest_contiguous_free_slab >= contiguous {
+						return heap_make_slab_sized_allocation(superpage, size)
 					}
 				}
 			} else {
 				heap_debug_cover(.Alloc_Slab_Wide_Used_Available_Superpage)
 				superpage := cache.superpages_with_free_slabs[i]
-				if superpage.free_slabs >= contiguous {
-					alloc, ok := heap_make_slab_sized_allocation(superpage, size)
-					if ok {
-						return alloc
-					}
+				if superpage.longest_contiguous_free_slab >= contiguous {
+					return heap_make_slab_sized_allocation(superpage, size)
 				}
 			}
 		}
@@ -1865,6 +1946,17 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 				heap_debug_cover(.Superpage_Added_To_Open_Cache_By_Resizing_Wide_Slab)
 			}
 			heap_debug_cover(.Resize_Wide_Slab_Shrunk_In_Place)
+
+			// Cascade contiguous free slab count backwards.
+			j := 1
+			if slab.index + contiguous_old < HEAP_SLAB_COUNT {
+				j += superpage.contiguous_free_slabs[slab.index + contiguous_old]
+			}
+			for i := slab.index + contiguous_old - 1; i >= slab.index + contiguous_new; i -= 1 {
+				superpage.contiguous_free_slabs[i] = j
+				j += 1
+			}
+			heap_update_longest_contiguous_free_slab(superpage)
 		} else {
 			// NOTE: We've already guarded against going beyond `HEAP_SLAB_COUNT` in the section above.
 			for i := slab.index + contiguous_old; i < slab.index + contiguous_new; i += 1 {
@@ -1896,6 +1988,12 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 				heap_update_next_free_slab_index(superpage, 0)
 			}
 			heap_debug_cover(.Resize_Wide_Slab_Expanded_In_Place)
+
+			// Expand contiguous free slab count forwards.
+			for i := slab.index + contiguous_old; i < slab.index + contiguous_new; i += 1 {
+				superpage.contiguous_free_slabs[i] = 0
+			}
+			heap_update_longest_contiguous_free_slab(superpage)
 		}
 
 		// The slab-wide allocation has been resized in-place.
