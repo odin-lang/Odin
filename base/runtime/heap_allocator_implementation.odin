@@ -1502,7 +1502,9 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 			assert_contextless(cache.next_cache_block != nil)
 			cache = cache.next_cache_block
 		}
-		intrinsics.atomic_sub_explicit(&local_heap_cache.remote_free_count, removed, .Release)
+		if removed > 0 {
+			intrinsics.atomic_sub_explicit(&local_heap_cache.remote_free_count, removed, .Release)
+		}
 		heap_debug_cover(.Alloc_Collected_Remote_Frees)
 	}
 
