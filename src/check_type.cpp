@@ -3504,6 +3504,16 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			elem = o.type;
 		}
 
+		if (!ctx->in_polymorphic_specialization && ctx->disallow_polymorphic_return_types) {
+			Type *t = base_type(elem);
+			if (t != nullptr &&
+			    is_type_polymorphic_record_unspecialized(t)) {
+				gbString err_str = expr_to_string(e);
+				error(e, "Invalid use of a non-specialized polymorphic type '%s'", err_str);
+				gb_string_free(err_str);
+			}
+		}
+
 
 		if (pt->tag != nullptr) {
 			GB_ASSERT(pt->tag->kind == Ast_BasicDirective);
