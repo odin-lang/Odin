@@ -751,7 +751,7 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 			array_add(&vetted_entities, ve_unused);
 		} else if (is_shadowed) {
 			array_add(&vetted_entities, ve_shadowed);
-		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static)) == 0 && !e->Variable.is_global) {
+		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static|EntityFlag_Field)) == 0 && !e->Variable.is_global) {
 			i64 sz = type_size_of(e->type);
 			// TODO(bill): When is a good size warn?
 			// Is >256 KiB good enough?
