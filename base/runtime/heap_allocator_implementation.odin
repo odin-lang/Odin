@@ -287,6 +287,9 @@ superpage. This field is used to help synchronize remote freeing.
 `next_free_slab_index` is the lowest index of a free slab.
 A value of `HEAP_SLAB_COUNT` means there are no free slabs.
 
+`cached_at` and `cached_index` store where this superpage is with regards to
+the heap's list of superpages with free slabs.
+
 `cache_block` is the space where data for the heap's cache is stored, if this
 superpage has been claimed by the heap. It should otherwise be all zero.
 */
@@ -303,6 +306,9 @@ Heap_Superpage :: struct {
 
 	free_slabs: int,
 	next_free_slab_index: int,
+
+	cached_at: ^Heap_Cache_Block,
+	cached_index: int,
 
 	cache_block: Heap_Cache_Block,
 }
@@ -346,7 +352,7 @@ this struct. This indicates that the superpage should not be freed.
 its available space for tracking information.
 
 
-_The next four fields are only used in the `Heap_Superpage` pointed to by `local_heap`._
+_The next five fields are only used in the `Heap_Superpage` pointed to by `local_heap`._
 
 `length` is how many `Heap_Cache_Block` structs are in use across the local
 thread's heap.
@@ -359,6 +365,9 @@ remote frees available to merge.
 
 `slab_map_length_by_rank` counts how many entries are in each slab array within
 the slab map.
+
+`superpages_with_free_slabs_length` counts how many entries are in `superpages_with_free_slabs`
+across the entire heap cache.
 
 
 _The next three fields constitute the main data used in this struct, and each
@@ -391,6 +400,7 @@ Heap_Cache_Block :: struct {
 	remote_free_count: int, // atomic
 
 	slab_map_length_by_rank: [HEAP_BIN_RANKS]int,
+	superpages_with_free_slabs_length: int,
 	// }
 
 	slab_map:                     [HEAP_CACHE_SLAB_MAP_STRIDE*HEAP_BIN_RANKS]^Heap_Slab,
@@ -1132,61 +1142,44 @@ Add a superpage with free slabs to the heap's cache.
 */
 heap_cache_add_superpage_with_free_slabs :: proc "contextless" (superpage: ^Heap_Superpage) {
 	assert_contextless(intrinsics.atomic_load_explicit(&superpage.owner, .Acquire) == get_current_thread_id(), "The heap allocator tried to cache a superpage that does not belong to it.")
-	cache := local_heap_cache
 
-	for {
-		for i := 0; i < len(cache.superpages_with_free_slabs); i += 1 {
-			if cache.superpages_with_free_slabs[i] == nil {
-				cache.superpages_with_free_slabs[i] = superpage
-				return
-			}
-		}
-		assert_contextless(cache.next_cache_block != nil)
+	m := local_heap_cache.superpages_with_free_slabs_length
+	cache := local_heap_cache
+	for m >= HEAP_SUPERPAGE_CACHE_RATIO {
+		m -= HEAP_SUPERPAGE_CACHE_RATIO
 		cache = cache.next_cache_block
 	}
+	assert_contextless(cache.superpages_with_free_slabs[m] == nil)
+
+	cache.superpages_with_free_slabs[m] = superpage
+	superpage.cached_at = cache
+	superpage.cached_index = m
+	local_heap_cache.superpages_with_free_slabs_length += 1
 }
 
 /*
 Remove a superpage from the heap's cache for superpages with free slabs.
 */
 heap_cache_remove_superpage_with_free_slabs :: proc "contextless" (superpage: ^Heap_Superpage) {
+	m := local_heap_cache.superpages_with_free_slabs_length - 1
 	cache := local_heap_cache
-	for {
-		for i := 0; i < len(cache.superpages_with_free_slabs); i += 1 {
-			if cache.superpages_with_free_slabs[i] == superpage {
-				// Swap with the tail.
-				source_i := i
-				target_cache := cache
-				i += 1
-				for {
-					for j := i; j < len(cache.superpages_with_free_slabs); j += 1 {
-						if target_cache.superpages_with_free_slabs[j] == nil {
-							cache.superpages_with_free_slabs[source_i] = target_cache.superpages_with_free_slabs[j-1]
-							target_cache.superpages_with_free_slabs[j-1] = nil
-							return
-						}
-					}
-					if target_cache.next_cache_block == nil {
-						// The entry is at the end of the list and we have run
-						// out of space to search.
-						cache.superpages_with_free_slabs[source_i] = nil
-						assert_contextless(source_i == len(cache.superpages_with_free_slabs), "The heap allocator tried to remove a non-terminal superpage with free slabs entry when it should have swapped it with the tail.")
-						return
-					} else if target_cache.next_cache_block.superpages_with_free_slabs[0] == nil {
-						// The next list section is empty, so we have to end here.
-						cache.superpages_with_free_slabs[source_i] = target_cache.superpages_with_free_slabs[len(cache.superpages_with_free_slabs)-1]
-						target_cache.superpages_with_free_slabs[len(cache.superpages_with_free_slabs)-1] = nil
-						return
-					}
-					target_cache = target_cache.next_cache_block
-					// Reset `i` after the first iteration.
-					i = 0
-				}
-			}
-		}
-		assert_contextless(cache.next_cache_block != nil)
+	for m >= HEAP_SUPERPAGE_CACHE_RATIO {
+		m -= HEAP_SUPERPAGE_CACHE_RATIO
 		cache = cache.next_cache_block
 	}
+	assert_contextless(cache.superpages_with_free_slabs[m] != nil)
+
+	replacement_superpage := cache.superpages_with_free_slabs[m]
+	superpage.cached_at.superpages_with_free_slabs[superpage.cached_index] = replacement_superpage
+
+	replacement_superpage.cached_at = superpage.cached_at
+	replacement_superpage.cached_index = superpage.cached_index
+
+	cache.superpages_with_free_slabs[m] = nil
+	local_heap_cache.superpages_with_free_slabs_length -= 1
+
+	superpage.cached_at = nil
+	superpage.cached_index = 0
 }
 
 //
