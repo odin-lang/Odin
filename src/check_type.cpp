@@ -3507,6 +3507,7 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		if (!ctx->in_polymorphic_specialization && ctx->disallow_polymorphic_return_types) {
 			Type *t = base_type(elem);
 			if (t != nullptr &&
+			    unparen_expr(pt->type)->kind == Ast_Ident &&
 			    is_type_polymorphic_record_unspecialized(t)) {
 				gbString err_str = expr_to_string(e);
 				error(e, "Invalid use of a non-specialized polymorphic type '%s'", err_str);
