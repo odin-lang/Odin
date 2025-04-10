@@ -527,7 +527,7 @@ gb_internal void report_os_info() {
 
 	#elif defined(GB_SYSTEM_OSX)
 		gbString sw_vers = gb_string_make(heap_allocator(), "");
-		if (!system_exec_command_line_app_output("sw_vers --productVersion", &sw_vers)) {
+		if (!system_exec_command_line_app_output("sw_vers -productVersion", &sw_vers)) {
 			gb_printf("macOS Unknown\n");
 			return;
 		}
