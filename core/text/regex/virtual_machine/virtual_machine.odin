@@ -25,28 +25,29 @@ Rune_Class_Data :: struct {
 }
 
 Opcode :: enum u8 {
-	                                    // | [ operands ]
-	Match                       = 0x00, // |
-	Match_And_Exit              = 0x01, // |
-	Byte                        = 0x02, // | u8
-	Rune                        = 0x03, // | i32
-	Rune_Class                  = 0x04, // | u8
-	Rune_Class_Negated          = 0x05, // | u8
-	Wildcard                    = 0x06, // |
-	Jump                        = 0x07, // | u16
-	Split                       = 0x08, // | u16, u16
-	Save                        = 0x09, // | u8
-	Assert_Start                = 0x0A, // |
-	Assert_End                  = 0x0B, // |
-	Assert_Word_Boundary        = 0x0C, // |
-	Assert_Non_Word_Boundary    = 0x0D, // |
-	Multiline_Open              = 0x0E, // |
-	Multiline_Close             = 0x0F, // |
-	Wait_For_Byte               = 0x10, // | u8
-	Wait_For_Rune               = 0x11, // | i32
-	Wait_For_Rune_Class         = 0x12, // | u8
-	Wait_For_Rune_Class_Negated = 0x13, // | u8
-	Match_All_And_Escape        = 0x14, // |
+	                                          // | [ operands ]
+	Match                             = 0x00, // |
+	Match_And_Exit                    = 0x01, // |
+	Byte                              = 0x02, // | u8
+	Rune                              = 0x03, // | i32
+	Rune_Class                        = 0x04, // | u8
+	Rune_Class_Negated                = 0x05, // | u8
+	Wildcard                          = 0x06, // |
+	Jump                              = 0x07, // | u16
+	Split                             = 0x08, // | u16, u16
+	Save                              = 0x09, // | u8
+	Assert_Start                      = 0x0A, // |
+	Assert_End                        = 0x0B, // |
+	Assert_Word_Boundary              = 0x0C, // |
+	Assert_Non_Word_Boundary          = 0x0D, // |
+	Multiline_Start_Open              = 0x0E, // |
+	Multiline_Start_Close             = 0x0F, // |
+	Wait_For_Byte                     = 0x10, // | u8
+	Wait_For_Rune                     = 0x11, // | i32
+	Wait_For_Rune_Class               = 0x12, // | u8
+	Wait_For_Rune_Class_Negated       = 0x13, // | u8
+	Match_All_And_Escape              = 0x14, // |
+	Assert_Multiline_End              = 0x15  // |
 }
 
 Thread :: struct {
@@ -175,9 +176,9 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 				pc += size_of(Opcode)
 				continue
 			}
-		case .Multiline_Open:
+		case .Multiline_Start_Open:
 			sp := vm.string_pointer+vm.current_rune_size
-			if sp == 0 || sp == len(vm.memory) {
+			if sp == 0 {
 				if vm.next_rune == '\r' || vm.next_rune == '\n' {
 					// The VM is currently on a newline at the string boundary,
 					// so consume the newline next frame.
@@ -203,6 +204,16 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 				}
 				vm.next_threads[vm.top_thread] = Thread{ pc = pc, saved = saved }
 				vm.top_thread += 1
+			}
+		case .Assert_Multiline_End:
+			sp := vm.string_pointer+vm.current_rune_size
+			if sp == len(vm.memory) || vm.next_rune == '\r' || vm.next_rune == '\n' {
+				pc += size_of(Opcode)
+				// Special case where we don't want to progress the string pointer
+				// Because we want to leave a potential `\r` or `\n` to be consumed
+				// by a potential `^` in potential future iterations.
+				vm.string_pointer -= vm.current_rune_size
+				continue
 			}
 		case .Assert_Word_Boundary:
 			sp := vm.string_pointer+vm.current_rune_size
@@ -328,6 +339,14 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 }
 
 run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, ok: bool) #no_bounds_check {
+	when common.ODIN_DEBUG_REGEX {
+		io.write_string(common.debug_stream, "Whole program::\n")
+		for op in vm.code {
+			io.write_string(common.debug_stream, opcode_to_name(op))
+			io.write_byte(common.debug_stream, '\n')
+		}
+	}
+
 	when UNICODE_MODE {
 		vm.next_rune, vm.next_rune_size = utf8.decode_rune_in_string(vm.memory)
 	} else {
@@ -458,7 +477,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 			case .Wildcard:
 				add_thread(vm, t.saved, t.pc + size_of(Opcode))
 
-			case .Multiline_Open:
+			case .Multiline_Start_Open:
 				if current_rune == '\n' {
 					// UNIX newline.
 					add_thread(vm, t.saved, t.pc + 2 * size_of(Opcode))
@@ -471,7 +490,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 						add_thread(vm, t.saved, t.pc + 2 * size_of(Opcode))
 					}
 				}
-			case .Multiline_Close:
+			case .Multiline_Start_Close:
 				if current_rune == '\n' {
 					// Windows newline. (2/2)
 					add_thread(vm, t.saved, t.pc + size_of(Opcode))
