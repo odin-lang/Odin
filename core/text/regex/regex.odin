@@ -285,10 +285,6 @@ create_iterator :: proc(
 	flags := flags
 	flags += {.Global} // We're iterating over a string, so the next match could start anywhere
 
-	if .Multiline in flags {
-		return {}, .Unsupported_Flag
-	}
-
 	result.regex         = create(pattern, flags, permanent_allocator, temporary_allocator) or_return
 	result.capture       = preallocate_capture()
 	result.temp          = temporary_allocator
