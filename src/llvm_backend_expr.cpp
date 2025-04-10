@@ -222,6 +222,7 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		return lb_emit_byte_swap(p, res, type);
 	}
 
+	Type* bt = base_type(type);
 	lbValue res = {};
 
 	switch (op) {
@@ -232,6 +233,8 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		return res;
 	case Token_Sub: // Number negation
 		if (is_type_integer(x.type)) {
+			res.value = LLVMBuildNeg(p->builder, x.value, "");
+		} else if (op == Token_Sub && bt->kind == Type_Enum && is_type_integer(bt->Enum.base_type)) {
 			res.value = LLVMBuildNeg(p->builder, x.value, "");
 		} else if (is_type_float(x.type)) {
 			res.value = LLVMBuildFNeg(p->builder, x.value, "");
