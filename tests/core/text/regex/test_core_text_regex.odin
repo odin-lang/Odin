@@ -691,11 +691,11 @@ test_case_insensitive :: proc(t: ^testing.T) {
 @test
 test_multiline :: proc(t: ^testing.T) {
 	{
-		EXPR :: `^hellope$world$`
-		check_expression(t, EXPR, "\nhellope\nworld\n", "\nhellope\nworld\n", extra_flags = { .Multiline })
-		check_expression(t, EXPR, "hellope\nworld", "hellope\nworld", extra_flags = { .Multiline })
-		check_expression(t, EXPR, "hellope\rworld", "hellope\rworld", extra_flags = { .Multiline })
-		check_expression(t, EXPR, "hellope\r\nworld", "hellope\r\nworld", extra_flags = { .Multiline })
+		EXPR :: `^hellope$world$` // This should never match
+		check_expression(t, EXPR, "\nhellope\nworld\n", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "hellope\nworld", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "hellope\rworld", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "hellope\r\nworld", extra_flags = { .Multiline })
 	}
 	{
 		EXPR :: `^?.$`
@@ -704,12 +704,12 @@ test_multiline :: proc(t: ^testing.T) {
 	}
 	{
 		EXPR :: `^$`
-		check_expression(t, EXPR, "\n", "\n", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "\n", "", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "", "", extra_flags = { .Multiline })
 	}
 	{
 		EXPR :: `$`
-		check_expression(t, EXPR, "\n", "\n", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "\n", "", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "", "", extra_flags = { .Multiline })
 	}
 }
@@ -1134,4 +1134,18 @@ test_match_iterator :: proc(t: ^testing.T) {
 		}
 		testing.expect_value(t, it.idx, len(test.expected))
 	}
+}
+
+@test
+test_match_iterator_multiline :: proc(t: ^testing.T) {
+	expected_matches := [?]string{"foo1", "foo2", "foo3", "foo4"}
+
+    it, err := regex.create_iterator("foo1\nfoo2\nfoo3\nfoo4", `^foo\d$`, {.Multiline})
+	defer regex.destroy(it)
+
+	testing.expect_value(t, err, nil)
+
+    for match, idx in regex.match(&it) {
+		testing.expect_value(t, match.groups[0], expected_matches[idx])
+    }
 }
