@@ -47,7 +47,7 @@ Opcode :: enum u8 {
 	Wait_For_Rune_Class               = 0x12, // | u8
 	Wait_For_Rune_Class_Negated       = 0x13, // | u8
 	Match_All_And_Escape              = 0x14, // |
-	Assert_Multiline_End              = 0x15  // |
+	Assert_Multiline_End              = 0x15, // |
 }
 
 Thread :: struct {
