@@ -234,7 +234,7 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 	case Token_Sub: // Number negation
 		if (is_type_integer(x.type)) {
 			res.value = LLVMBuildNeg(p->builder, x.value, "");
-		} else if (op == Token_Sub && bt->kind == Type_Enum && is_type_integer(bt->Enum.base_type)) {
+		} else if (bt->kind == Type_Enum && is_type_integer(bt->Enum.base_type)) {
 			res.value = LLVMBuildNeg(p->builder, x.value, "");
 		} else if (is_type_float(x.type)) {
 			res.value = LLVMBuildFNeg(p->builder, x.value, "");
