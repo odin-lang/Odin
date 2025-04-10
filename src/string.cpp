@@ -336,6 +336,83 @@ gb_internal Array<String> split_lines_from_array(Array<u8> const &array, gbAlloc
 	return lines;
 }
 
+enum : u32 { PRIME_RABIN_KARP = 16777619u };
+
+gb_internal u32 hash_str_rabin_karp(String const &s, u32 *pow_) {
+	u32 hash = 0;
+	u32 pow = 1;
+	for (isize i = 0; i < s.len; i++) {
+		hash = hash*PRIME_RABIN_KARP + cast(u32)s.text[i];
+	}
+	u32 sq = PRIME_RABIN_KARP;
+	for (isize i = s.len; i > 0; i >>= 1) {
+		if ((i & 1) != 0) {
+			pow *= sq;
+		}
+		sq *= sq;
+	}
+	if (pow_) *pow_ = pow;
+	return hash;
+
+}
+
+
+gb_internal isize string_index(String const &s, String const &substr) {
+	isize n = substr.len;
+	if (n == 0) {
+		return 0;
+	} else if (n == 1) {
+		return string_index_byte(s, substr[0]);
+	} else if (n == s.len) {
+		if (s == substr) {
+			return 0;
+		}
+		return -1;
+	} else if (n > s.len) {
+		return -1;
+	}
+	u32 pow = 1;
+	u32 hash = hash_str_rabin_karp(s, &pow);
+	u32 h = 0;
+	for (isize i = 0; i < n; i++) {
+		h = h*PRIME_RABIN_KARP + cast(u32)s.text[i];
+	}
+	if (h == hash && substring(s, 0, n) == substr) {
+		return 0;
+	}
+	for (isize i = n; i < s.len; /**/) {
+		h *= PRIME_RABIN_KARP;
+		h += cast(u32)s.text[i];
+		h -= pow * u32(s.text[i-n]);
+		i += 1;
+		if (h == hash && substring(s, i-n, i) == substr) {
+			return i - n;
+		}
+	}
+	return -1;
+}
+
+
+struct StringPartition {
+	String head;
+	String match;
+	String tail;
+};
+
+gb_internal StringPartition string_partition(String const &str, String const &sep) {
+	StringPartition res = {};
+	isize i = string_index(str, sep);
+	if (i < 0) {
+		res.head = str;
+		return res;
+	}
+
+	res.head  = substring(str, 0, i);
+	res.match = substring(str, i, i+sep.len);
+	res.tail  = substring(str, i+sep.len, str.len);
+	return res;
+}
+
 gb_internal bool string_contains_char(String const &s, u8 c) {
 	isize i;
 	for (i = 0; i < s.len; i++) {

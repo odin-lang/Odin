@@ -6157,7 +6157,7 @@ gb_internal String build_tag_get_token(String s, String *out) {
 		isize width = utf8_decode(&s[n], s.len-n, &rune);
 		if (n == 0 && rune == '!') {
 
-		} else if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != ':') {
 			isize k = gb_max(gb_max(n, width), 1);
 			*out = substring(s, k, s.len);
 			return substring(s, 0, k);
@@ -6209,7 +6209,9 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				continue;
 			}
 
-			TargetOsKind   os   = get_target_os_from_string(p);
+			Subtarget subtarget = Subtarget_Default;
+
+			TargetOsKind   os   = get_target_os_from_string(p, &subtarget);
 			TargetArchKind arch = get_target_arch_from_string(p);
 			num_tokens += 1;
 
@@ -6223,11 +6225,13 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			if (os != TargetOs_Invalid) {
 				this_kind_os_seen = true;
 
+				bool same_subtarget = (subtarget == Subtarget_Default) || (subtarget == selected_subtarget);
+
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
-					this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
+					this_kind_correct = this_kind_correct && (os != build_context.metrics.os || !same_subtarget);
 				} else {
-					this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
+					this_kind_correct = this_kind_correct && (os == build_context.metrics.os && same_subtarget);
 				}
 			} else if (arch != TargetArch_Invalid) {
 				this_kind_arch_seen = true;

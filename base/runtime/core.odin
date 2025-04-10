@@ -559,9 +559,13 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	Odin_Platform_Subtarget_Type :: enum int {
 		Default,
 		iOS,
+		Android,
 	}
 */
 Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
+
+Odin_Platform_Subtarget_Types :: bit_set[Odin_Platform_Subtarget_Type]
+
 
 /*
 	// Defined internally by the compiler
