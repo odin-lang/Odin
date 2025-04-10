@@ -340,8 +340,8 @@ class WebGPUInterface {
 
 		return STATUS_SUCCESS;
 	}
-	
-	genericAdapterInfo(infoPtr) {
+
+	genericGetAdapterInfo(infoPtr) {
 		this.assert(infoPtr != 0);
 
 		const off = this.struct(infoPtr);
