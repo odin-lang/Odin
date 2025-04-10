@@ -16,7 +16,7 @@ _error_string :: proc(errno: i32) -> string {
 
 	err := runtime.Type_Info_Enum_Value(e)
 
-	ti := &runtime.type_info_base(type_info_of(wasi.errno_t)).variant.(runtime.Type_Info_Enum)
+	ti := &runtime.type_info_base(type_info_of(wasi.errno_t)).variant.(^runtime.Type_Info_Enum)
 	if idx, ok := slice.binary_search(ti.values, err); ok {
 		return ti.names[idx]
 	}
