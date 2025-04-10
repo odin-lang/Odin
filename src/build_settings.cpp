@@ -1863,7 +1863,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
 		}
 	} else if (selected_subtarget == Subtarget_Android) {
-		init_android_values(bc->build_mode == BuildMode_Executable);
+		init_android_values(bc->build_mode == BuildMode_Executable && (bc->command_kind & Command__does_build) != 0);
 	}
 
 	if (!bc->custom_optimization_level) {
