@@ -171,7 +171,7 @@ For more information, see: https://swtch.com/~rsc/regexp/regexp2.html
 	Be aware, this opcode is not compiled in if the `Multiline` flag is on, as
 	the meaning of `$` changes with that flag.
 
-	(0x15) Assert_Multiline_end
+	(0x15) Assert_Multiline_End
 
 	This opcode is compiled in only when the `Multiline` flag is present, and
 	it replaces the `$` text anchor.

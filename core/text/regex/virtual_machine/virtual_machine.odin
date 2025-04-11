@@ -339,14 +339,6 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 }
 
 run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, ok: bool) #no_bounds_check {
-	when common.ODIN_DEBUG_REGEX {
-		io.write_string(common.debug_stream, "Whole program::\n")
-		for op in vm.code {
-			io.write_string(common.debug_stream, opcode_to_name(op))
-			io.write_byte(common.debug_stream, '\n')
-		}
-	}
-
 	when UNICODE_MODE {
 		vm.next_rune, vm.next_rune_size = utf8.decode_rune_in_string(vm.memory)
 	} else {
