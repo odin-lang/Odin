@@ -2026,6 +2026,22 @@ gb_internal bool check_target_feature_is_superset_of(String const &superset, Str
 	return true;
 }
 
+gb_internal bool target_supports_f32() {
+	switch (build_context.metrics.arch) {
+	case TargetArch_riscv64:
+		return check_target_feature_is_enabled(str_lit("f"), nullptr);
+	}
+	return true;
+}
+
+gb_internal bool target_supports_f64() {
+	switch (build_context.metrics.arch) {
+	case TargetArch_riscv64:
+		return check_target_feature_is_enabled(str_lit("d"), nullptr);
+	}
+	return true;
+}
+
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
 // We've previously called `parse_build_flags`, so `out_filepath` should be set.
 gb_internal bool init_build_paths(String init_filename) {
