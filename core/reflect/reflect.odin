@@ -176,6 +176,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 	case Type_Info_Enumerated_Array: return v.elem.id
 	case Type_Info_Slice:            return v.elem.id
 	case Type_Info_Dynamic_Array:    return v.elem.id
+	case Type_Info_Simd_Vector:      return v.elem.id
 	}
 	return id
 }
