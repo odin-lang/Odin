@@ -261,7 +261,11 @@ length :: proc(val: any) -> int {
 		} else {
 			return (^runtime.Raw_String)(val.data).len
 		}
+
+	case Type_Info_Simd_Vector:
+		return a.count
 	}
+
 	return 0
 }
 
@@ -287,7 +291,11 @@ capacity :: proc(val: any) -> int {
 
 	case Type_Info_Map:
 		return runtime.map_cap((^runtime.Raw_Map)(val.data)^)
+
+	case Type_Info_Simd_Vector:
+		return a.count
 	}
+
 	return 0
 }
 
