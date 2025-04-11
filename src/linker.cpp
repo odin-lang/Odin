@@ -439,6 +439,23 @@ try_cross_linking:;
 			#if !defined(GB_SYSTEM_WINDOWS)
 				lib_str = gb_string_appendc(lib_str, "-L/ ");
 			#endif
+
+			// Check if Odin is called inside Nix build environment.
+			bool nix_build = false;
+			#if defined(GB_SYSTEM_LINUX)
+				__uid_t uid = getuid();
+				passwd *passw = getpwuid(uid);
+				if (passw != NULL) {
+					int groups_len = 0;
+					getgrouplist(passw->pw_name, passw->pw_gid, NULL, &groups_len);
+					if (groups_len == 1) {
+						__gid_t groups[2];
+						getgrouplist(passw->pw_name, passw->pw_gid, groups, &groups_len);
+						const char *gr_name = getgrgid(groups[0])->gr_name;
+						nix_build = gb_strcmp(gr_name, "nixbld") == 0;
+					}
+				}
+			#endif
 			
 			StringSet asm_files = {};
 			string_set_init(&asm_files, 64);
@@ -615,7 +632,12 @@ try_cross_linking:;
 							//                local to the executable (unless the system collection is used, in which case we search
 							//                the system library paths for the library file).
 							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
-								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
+								// Inside Nix build environment, the linker will not be able to find the libraries if `-l:` is specified.
+								if (nix_build) {
+									lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
+								} else {
+									lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
+								}
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
 								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
