@@ -124,21 +124,21 @@ For more information, see: https://swtch.com/~rsc/regexp/regexp2.html
 
 	A modified version of Assert_Word_Boundary that returns the opposite value.
 
-	(0x0E) Multiline_Open
+	(0x0E) Multiline_Start_Open
 
 	This opcode is compiled in only when the `Multiline` flag is present, and
-	it replaces both `^` and `$` text anchors.
+	it replaces the `^` text anchor.
 
-	It asserts that either the current thread is on one of the string
-	boundaries, or it consumes a `\n` or `\r` character.
+	It asserts that either the current thread is on the string
+	boundary, or it consumes a `\n` or `\r` character.
 
 	If a `\r` character is consumed, the PC will be advanced to the sibling
-	`Multiline_Close` opcode to optionally consume a `\n` character on the next
+	`Multiline_Start_Close` opcode to optionally consume a `\n` character on the next
 	frame.
 
-	(0x0F) Multiline_Close
+	(0x0F) Multiline_Start_Close
 
-	This opcode is always present after `Multiline_Open`.
+	This opcode is always present after `Multiline_Start_Open`.
 
 	It handles consuming the second half of a complete newline, if necessary.
 	For example, Windows newlines are represented by the characters `\r\n`,
@@ -171,5 +171,17 @@ For more information, see: https://swtch.com/~rsc/regexp/regexp2.html
 	Be aware, this opcode is not compiled in if the `Multiline` flag is on, as
 	the meaning of `$` changes with that flag.
 
+	(0x15) Assert_Multiline_end
+
+	This opcode is compiled in only when the `Multiline` flag is present, and
+	it replaces the `$` text anchor.
+
+	It asserts that either the current thread is on the string
+	boundary, or the thread is on a `\n` or `\r` character.
+	
+	Unlike Multiline_Start_Open and Multiline_Start_Close it does not consume
+	the current character, instead it stops the character from being consumed,
+	potentially allowing the `\n` or `\r` it found to be used for `^` in later
+	matches.
 */
 package regex_vm
