@@ -176,6 +176,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 	case Type_Info_Enumerated_Array: return v.elem.id
 	case Type_Info_Slice:            return v.elem.id
 	case Type_Info_Dynamic_Array:    return v.elem.id
+	case Type_Info_Simd_Vector:      return v.elem.id
 	}
 	return id
 }
@@ -260,7 +261,11 @@ length :: proc(val: any) -> int {
 		} else {
 			return (^runtime.Raw_String)(val.data).len
 		}
+
+	case Type_Info_Simd_Vector:
+		return a.count
 	}
+
 	return 0
 }
 
@@ -286,7 +291,11 @@ capacity :: proc(val: any) -> int {
 
 	case Type_Info_Map:
 		return runtime.map_cap((^runtime.Raw_Map)(val.data)^)
+
+	case Type_Info_Simd_Vector:
+		return a.count
 	}
+
 	return 0
 }
 

@@ -5550,6 +5550,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			case Type_EnumeratedArray: operand->type = bt->EnumeratedArray.elem; break;
 			case Type_Slice:           operand->type = bt->Slice.elem;           break;
 			case Type_DynamicArray:    operand->type = bt->DynamicArray.elem;    break;
+			case Type_SimdVector:      operand->type = bt->SimdVector.elem;      break;
 			}
 		}
 		operand->mode = Addressing_Type;
