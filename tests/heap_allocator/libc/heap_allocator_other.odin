@@ -1,6 +1,6 @@
 #+build js, wasi, freestanding, essence
 #+private
-package runtime
+package tests_heap_allocator_libc
 
 _heap_alloc :: proc "contextless" (size: int, zero_memory := true) -> rawptr {
 	context = default_context()
