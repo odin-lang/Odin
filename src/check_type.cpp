@@ -1155,8 +1155,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		}
 	}
 
-
-
+	#if 0 // Reconsider at a later date
 	if (bit_sizes.count > 0 && is_type_integer(backing_type)) {
 		bool all_booleans = is_type_boolean(fields[0]->type);
 		bool all_ones = bit_sizes[0] == 1;
@@ -1182,7 +1181,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			}
 		}
 	}
-
+	#endif
 
 	bit_field_type->BitField.fields      = slice_from_array(fields);
 	bit_field_type->BitField.bit_sizes   = slice_from_array(bit_sizes);
