@@ -78,6 +78,7 @@ Machine :: struct {
 	current_rune_size: int,
 	next_rune: rune,
 	next_rune_size: int,
+	previous_rune: rune,
 }
 
 
@@ -194,7 +195,7 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 					pc += 2 * size_of(Opcode)
 					continue
 				}
-			} else {
+			} else if vm.next_rune == '\r' || vm.next_rune == '\n' {
 				// Not on a string boundary.
 				// Try to consume a newline next frame in the other opcode loop.
 				when common.ODIN_DEBUG_REGEX {
@@ -204,15 +205,14 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 				}
 				vm.next_threads[vm.top_thread] = Thread{ pc = pc, saved = saved }
 				vm.top_thread += 1
+			} else if vm.previous_rune == '\r' || vm.previous_rune == '\n' {
+				pc += 2 * size_of(Opcode)
+				continue
 			}
 		case .Assert_Multiline_End:
 			sp := vm.string_pointer+vm.current_rune_size
 			if sp == len(vm.memory) || vm.next_rune == '\r' || vm.next_rune == '\n' {
 				pc += size_of(Opcode)
-				// Special case where we don't want to progress the string pointer
-				// Because we want to leave a potential `\r` or `\n` to be consumed
-				// by a potential `^` in potential future iterations.
-				vm.string_pointer -= vm.current_rune_size
 				continue
 			}
 		case .Assert_Word_Boundary:
@@ -347,6 +347,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 			vm.next_rune_size = 1
 		}
 	}
+	vm.previous_rune = 0
 
 	when common.ODIN_DEBUG_REGEX {
 		io.write_string(common.debug_stream, "### Adding initial thread.\n")
@@ -373,6 +374,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 
 		assert(vm.string_pointer <= len(vm.memory), "VM string pointer went out of bounds.")
 
+		vm.previous_rune = vm.current_rune
 		current_rune := vm.next_rune
 		vm.current_rune = current_rune
 		vm.current_rune_size = vm.next_rune_size

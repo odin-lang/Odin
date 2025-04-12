@@ -467,20 +467,12 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 
 	if .No_Capture not_in flags {
 		// `(` <generated code>
-		if pc_open < len(code) && code[pc_open] == Opcode.Multiline_Start_Open {
-			pc_open += 2
-		}
 		inject_at(&code, pc_open, Opcode.Save)
 		inject_at(&code, pc_open + size_of(byte), Opcode(0x00))
 
 		// `)`
-		if code[len(code) - 1] == Opcode.Assert_Multiline_End {
-			inject_at(&code, len(code)-1, Opcode.Save)
-			inject_at(&code, len(code)-1, Opcode(0x01))
-		} else {
-			append(&code, Opcode.Save)
-			append(&code, Opcode(0x01))
-		}
+		append(&code, Opcode.Save)
+		append(&code, Opcode(0x01))
 
 		append(&code, Opcode.Match)
 	} else {

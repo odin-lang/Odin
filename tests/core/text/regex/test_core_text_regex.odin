@@ -704,7 +704,7 @@ test_multiline :: proc(t: ^testing.T) {
 	}
 	{
 		EXPR :: `^$`
-		check_expression(t, EXPR, "\n", "", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "\n", "\n", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "", "", extra_flags = { .Multiline })
 	}
 	{
@@ -1115,6 +1115,38 @@ iterator_vectors := []Iterator_Test{
 			{pos = {{9, 15}, {10, 11}, {13, 15}}, groups = {"foobar", "o", "ar"}},
 		},
 	},
+	{
+		"foo1\nfoo2\nfoo3\nfoo4", `^foo\d$`, {.Multiline},
+		{
+			{pos = {{0, 4}}, groups = {"foo1"}},
+			{pos = {{5, 9}}, groups = {"foo2"}},
+			{pos = {{10, 14}}, groups = {"foo3"}},
+			{pos = {{15, 19}}, groups = {"foo4"}},
+		},
+	},
+	{
+		"a\nb\na\nb", `^a$|^b$`, {.Multiline},
+		{
+			{pos = {{0, 1}}, groups = {"a"}},
+			{pos = {{2, 3}}, groups = {"b"}},
+			{pos = {{4, 5}}, groups = {"a"}},
+			{pos = {{6, 7}}, groups = {"b"}},
+		},
+	},
+	{
+		"a\nb\na\nb", `^a(b|$)`, {.Multiline},
+		{
+			{pos = {{0, 1}, {1, 1}}, groups = {"a", ""}},
+			{pos = {{3, 5}, {5, 5}}, groups = {"\na", ""}},
+		},
+	},
+	{
+		"a\nb\n\r", `^$`, {.Multiline},
+		{
+			{pos = {{3, 4}}, groups = {"\n"}},
+			{pos = {{5, 5}}, groups = {""}},
+		},
+	},
 }
 
 @test
@@ -1134,18 +1166,4 @@ test_match_iterator :: proc(t: ^testing.T) {
 		}
 		testing.expect_value(t, it.idx, len(test.expected))
 	}
-}
-
-@test
-test_match_iterator_multiline :: proc(t: ^testing.T) {
-	expected_matches := [?]string{"foo1", "foo2", "foo3", "foo4"}
-
-    it, err := regex.create_iterator("foo1\nfoo2\nfoo3\nfoo4", `^foo\d$`, {.Multiline})
-	defer regex.destroy(it)
-
-	testing.expect_value(t, err, nil)
-
-    for match, idx in regex.match(&it) {
-		testing.expect_value(t, match.groups[0], expected_matches[idx])
-    }
 }

@@ -178,10 +178,5 @@ For more information, see: https://swtch.com/~rsc/regexp/regexp2.html
 
 	It asserts that either the current thread is on the string
 	boundary, or the thread is on a `\n` or `\r` character.
-	
-	Unlike Multiline_Start_Open and Multiline_Start_Close it does not consume
-	the current character, instead it stops the character from being consumed,
-	potentially allowing the `\n` or `\r` it found to be used for `^` in later
-	matches.
 */
 package regex_vm
