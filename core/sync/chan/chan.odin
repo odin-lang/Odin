@@ -235,7 +235,6 @@ size and alignment.
 Example:
 
 	import "core:sync/chan"
-	import "base:runtime"
 
 	create_raw_unbuffered_example :: proc() {
 		unbuffered, err := chan.create_raw(size_of(int), align_of(int), context.allocator)
