@@ -165,6 +165,8 @@ Creates a buffered version of the specified `Chan` type.
 
 Example:
 
+	import "core:sync/chan"
+
 	create_buffered_example :: proc() {
 		c, err := chan.create_buffered(chan.Chan(int), 10, context.allocator)
 		assert(err == .None)
