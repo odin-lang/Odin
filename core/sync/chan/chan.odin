@@ -1037,139 +1037,6 @@ is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	return bool(c.closed)
 }
 
-
-
-/*
-`Raw_Queue` is a non-thread-safe queue implementation designed to store messages
-of fixed size and alignment.
-
-Note: For most use cases, it is recommended to use `core:container/queue` instead,
-as `Raw_Queue` is used internally by `Raw_Chan` and may not provide the desired
-level of convenience for typical applications.
-*/
-Raw_Queue :: struct {
-	data: [^]byte,
-	len:  int,
-	cap:  int,
-	next: int,
-	size: int, // element size
-}
-
-/*
-Initializes a `Raw_Queue`
-
-**Inputs**
-- `q`: A pointert to the `Raw_Queue` to initialize
-- `data`: The pointer to backing slice storing the messages
-- `cap`: The capacity of the queue
-- `size`: The size of a message
-
-Example:
-
-	import "core:sync/chan"
-
-	raw_queue_init_example :: proc() {
-		// use a stack allocated array as backing storage
-		storage: [100]int
-
-		rq: chan.Raw_Queue
-		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
-	}
-*/
-raw_queue_init :: proc "contextless" (q: ^Raw_Queue, data: rawptr, cap: int, size: int) {
-	q.data = ([^]byte)(data)
-	q.len  = 0
-	q.cap  = cap
-	q.next = 0
-	q.size = size
-}
-
-/*
-Add an element to the queue.
-
-Note: The message referenced by `data` must match the size
-and alignment used when the `Raw_Queue` was initialized.
-
-**Inputs**
-- `q`: A pointert to the `Raw_Queue`
-- `data`: The pointer to message to add
-
-**Returns**
-- `true` if the element was added, `false` when the queue is already full
-
-Example:
-
-	import "core:sync/chan"
-
-	raw_queue_push_example :: proc() {
-		storage: [100]int
-		rq: chan.Raw_Queue
-		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
-
-		value := 2
-		assert(chan.raw_queue_push(&rq, &value), "there was enough space")
-	}
-*/
-@(require_results)
-raw_queue_push :: proc "contextless" (q: ^Raw_Queue, data: rawptr) -> bool {
-	if q.len == q.cap {
-		return false
-	}
-	pos := q.next + q.len
-	if pos >= q.cap {
-		pos -= q.cap
-	}
-
-	val_ptr := q.data[pos*q.size:]
-	mem.copy(val_ptr, data, q.size)
-	q.len += 1
-	return true
-}
-
-/*
-Removes and returns the first element of the queue.
-
-Note: The returned element is only guaranteed to be valid until the next
-`raw_queue_push` operation. Accessing it after that point may result in
-undefined behavior.
-
-**Inputs**
-- `c`: A pointer to the `Raw_Queue`.
-
-**Returns**
-- A pointer to the first element in the queue, or `nil` if the queue is empty.
-
-Example:
-
-	import "core:sync/chan"
-
-	raw_queue_pop_example :: proc() {
-		storage: [100]int
-		rq: chan.Raw_Queue
-		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
-
-		assert(chan.raw_queue_pop(&rq) == nil, "queue was empty")
-
-		// add an element to the queue
-		value := 2
-		assert(chan.raw_queue_push(&rq, &value), "there was enough space")
-
-		assert((cast(^int)chan.raw_queue_pop(&rq))^ == 2, "retrieved the element")
-	}
-*/
-@(require_results)
-raw_queue_pop :: proc "contextless" (q: ^Raw_Queue) -> (data: rawptr) {
-	if q.len > 0 {
-		data = q.data[q.next*q.size:]
-		q.next += 1
-		q.len -= 1
-		if q.next >= q.cap {
-			q.next -= q.cap
-		}
-	}
-	return
-}
-
 /*
 Returns whether a message is ready to be read, i.e.,
 if a call to `recv` or `recv_raw` would block
@@ -1344,6 +1211,140 @@ select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []
 		ok = recv_raw(recvs[sel.idx], recv_out)
 	} else {
 		ok = send_raw(sends[sel.idx], send_msgs[sel.idx])
+	}
+	return
+}
+
+
+/*
+`Raw_Queue` is a non-thread-safe queue implementation designed to store messages
+of fixed size and alignment.
+
+Note: For most use cases, it is recommended to use `core:container/queue` instead,
+as `Raw_Queue` is used internally by `Raw_Chan` and may not provide the desired
+level of convenience for typical applications.
+*/
+@(private)
+Raw_Queue :: struct {
+	data: [^]byte,
+	len:  int,
+	cap:  int,
+	next: int,
+	size: int, // element size
+}
+
+/*
+Initializes a `Raw_Queue`
+
+**Inputs**
+- `q`: A pointert to the `Raw_Queue` to initialize
+- `data`: The pointer to backing slice storing the messages
+- `cap`: The capacity of the queue
+- `size`: The size of a message
+
+Example:
+
+	import "core:sync/chan"
+
+	raw_queue_init_example :: proc() {
+		// use a stack allocated array as backing storage
+		storage: [100]int
+
+		rq: chan.Raw_Queue
+		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
+	}
+*/
+@(private)
+raw_queue_init :: proc "contextless" (q: ^Raw_Queue, data: rawptr, cap: int, size: int) {
+	q.data = ([^]byte)(data)
+	q.len  = 0
+	q.cap  = cap
+	q.next = 0
+	q.size = size
+}
+
+/*
+Add an element to the queue.
+
+Note: The message referenced by `data` must match the size
+and alignment used when the `Raw_Queue` was initialized.
+
+**Inputs**
+- `q`: A pointert to the `Raw_Queue`
+- `data`: The pointer to message to add
+
+**Returns**
+- `true` if the element was added, `false` when the queue is already full
+
+Example:
+
+	import "core:sync/chan"
+
+	raw_queue_push_example :: proc() {
+		storage: [100]int
+		rq: chan.Raw_Queue
+		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
+
+		value := 2
+		assert(chan.raw_queue_push(&rq, &value), "there was enough space")
+	}
+*/
+@(private, require_results)
+raw_queue_push :: proc "contextless" (q: ^Raw_Queue, data: rawptr) -> bool {
+	if q.len == q.cap {
+		return false
+	}
+	pos := q.next + q.len
+	if pos >= q.cap {
+		pos -= q.cap
+	}
+
+	val_ptr := q.data[pos*q.size:]
+	mem.copy(val_ptr, data, q.size)
+	q.len += 1
+	return true
+}
+
+/*
+Removes and returns the first element of the queue.
+
+Note: The returned element is only guaranteed to be valid until the next
+`raw_queue_push` operation. Accessing it after that point may result in
+undefined behavior.
+
+**Inputs**
+- `c`: A pointer to the `Raw_Queue`.
+
+**Returns**
+- A pointer to the first element in the queue, or `nil` if the queue is empty.
+
+Example:
+
+	import "core:sync/chan"
+
+	raw_queue_pop_example :: proc() {
+		storage: [100]int
+		rq: chan.Raw_Queue
+		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
+
+		assert(chan.raw_queue_pop(&rq) == nil, "queue was empty")
+
+		// add an element to the queue
+		value := 2
+		assert(chan.raw_queue_push(&rq, &value), "there was enough space")
+
+		assert((cast(^int)chan.raw_queue_pop(&rq))^ == 2, "retrieved the element")
+	}
+*/
+@(private, require_results)
+raw_queue_pop :: proc "contextless" (q: ^Raw_Queue) -> (data: rawptr) {
+	if q.len > 0 {
+		data = q.data[q.next*q.size:]
+		q.next += 1
+		q.len -= 1
+		if q.next >= q.cap {
+			q.next -= q.cap
+		}
 	}
 	return
 }
