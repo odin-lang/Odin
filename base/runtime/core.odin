@@ -110,7 +110,6 @@ Type_Info_Parameters :: struct { // Only used for procedures parameters and resu
 	types:        []^Type_Info,
 	names:        []string,
 }
-Type_Info_Tuple :: Type_Info_Parameters // Will be removed eventually
 
 Type_Info_Struct_Flags :: distinct bit_set[Type_Info_Struct_Flag; u8]
 Type_Info_Struct_Flag :: enum u8 {
