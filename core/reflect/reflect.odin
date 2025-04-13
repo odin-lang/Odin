@@ -24,7 +24,6 @@ Type_Info_Enumerated_Array       :: runtime.Type_Info_Enumerated_Array
 Type_Info_Dynamic_Array          :: runtime.Type_Info_Dynamic_Array
 Type_Info_Slice                  :: runtime.Type_Info_Slice
 Type_Info_Parameters             :: runtime.Type_Info_Parameters
-Type_Info_Tuple                  :: runtime.Type_Info_Parameters
 Type_Info_Struct                 :: runtime.Type_Info_Struct
 Type_Info_Union                  :: runtime.Type_Info_Union
 Type_Info_Enum                   :: runtime.Type_Info_Enum
@@ -58,7 +57,7 @@ Type_Kind :: enum {
 	Enumerated_Array,
 	Dynamic_Array,
 	Slice,
-	Tuple,
+	Parameters,
 	Struct,
 	Union,
 	Enum,
@@ -93,7 +92,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Enumerated_Array: return .Enumerated_Array
 		case Type_Info_Dynamic_Array:    return .Dynamic_Array
 		case Type_Info_Slice:            return .Slice
-		case Type_Info_Parameters:       return .Tuple
+		case Type_Info_Parameters:       return .Parameters
 		case Type_Info_Struct:           return .Struct
 		case Type_Info_Union:            return .Union
 		case Type_Info_Enum:             return .Enum
