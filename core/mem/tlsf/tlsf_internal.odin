@@ -12,7 +12,6 @@ package mem_tlsf
 
 import "base:intrinsics"
 import "base:runtime"
-// import "core:fmt"
 
 // log2 of number of linear subdivisions of block sizes.
 // Larger values require more memory in the control structure.
@@ -58,7 +57,6 @@ Pool :: struct {
 	next:      ^Pool,
 }
 
-
 /*
 Block header structure.
 
@@ -95,6 +93,7 @@ The `prev_phys_block` field is stored *inside* the previous free block.
 BLOCK_HEADER_OVERHEAD :: uint(size_of(uint))
 
 POOL_OVERHEAD :: 2 * BLOCK_HEADER_OVERHEAD
+INITIAL_POOL_OVERHEAD :: 48
 
 // User data starts directly after the size field in a used block.
 BLOCK_START_OFFSET :: offset_of(Block_Header, size) + size_of(Block_Header{}.size)
@@ -114,7 +113,7 @@ BLOCK_SIZE_MAX :: uint(1) << FL_INDEX_MAX
 	queries using bitmasks and architecture-specific bit-manipulation
 	routines.
 
-	NOTE: TLSF spec relies on ffs/fls returning value 0..31.
+	NOTE: TLSF spec relies on ffs/fls returning a value in the range 0..31.
 */
 
 @(require_results)

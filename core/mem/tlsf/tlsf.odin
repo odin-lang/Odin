@@ -39,11 +39,13 @@ Allocator :: struct {
 	// statistics like how much memory is still available,
 	// fragmentation, etc.
 	pool: Pool,
+
+	// If we're expected to grow when we run out of memory,
+	// how much should we ask the backing allocator for?
+	new_pool_size: int,
+
 }
 #assert(size_of(Allocator) % ALIGN_SIZE == 0)
-
-
-
 
 @(require_results)
 allocator :: proc(t: ^Allocator) -> runtime.Allocator {
@@ -60,11 +62,16 @@ init_from_buffer :: proc(control: ^Allocator, buf: []byte) -> Error {
 		return .Invalid_Alignment
 	}
 
-	pool_bytes := align_down(len(buf) - POOL_OVERHEAD, ALIGN_SIZE)
+	pool_bytes := align_down(len(buf), ALIGN_SIZE) - INITIAL_POOL_OVERHEAD
 	if pool_bytes < BLOCK_SIZE_MIN {
 		return .Backing_Buffer_Too_Small
 	} else if pool_bytes > BLOCK_SIZE_MAX {
 		return .Backing_Buffer_Too_Large
+	}
+
+	control.pool = Pool{
+		data      = buf,
+		allocator = {},
 	}
 
 	clear(control)
@@ -74,7 +81,7 @@ init_from_buffer :: proc(control: ^Allocator, buf: []byte) -> Error {
 @(require_results)
 init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, initial_pool_size: int, new_pool_size := 0) -> Error {
 	assert(control != nil)
-	pool_bytes := align_up(uint(initial_pool_size) + POOL_OVERHEAD, ALIGN_SIZE)
+	pool_bytes := align_up(uint(initial_pool_size), ALIGN_SIZE) + INITIAL_POOL_OVERHEAD
 	if pool_bytes < BLOCK_SIZE_MIN {
 		return .Backing_Buffer_Too_Small
 	} else if pool_bytes > BLOCK_SIZE_MAX {
@@ -85,12 +92,14 @@ init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, ini
 	if backing_err != nil {
 		return .Backing_Allocator_Error
 	}
-	err := init_from_buffer(control, buf)
+
 	control.pool = Pool{
 		data      = buf,
 		allocator = backing,
 	}
-	return err
+
+	clear(control)
+	return pool_add(control, buf[:])
 }
 init :: proc{init_from_buffer, init_from_allocator}
 
