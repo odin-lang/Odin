@@ -496,7 +496,7 @@ until the channel is being written to. `recv` will return
 
 Example:
 
-  import "core:sync/chan"
+	import "core:sync/chan"
 
 	recv_example :: proc() {
 		c, err := chan.create(chan.Chan(int), 1, context.allocator)
@@ -536,7 +536,7 @@ Tries reading a message from the channel in a non-blocking fashion.
 
 Example:
 
-  import "core:sync/chan"
+	import "core:sync/chan"
 
 	try_recv_example :: proc() {
 		c, err := chan.create(chan.Chan(int), context.allocator)
@@ -649,7 +649,7 @@ and alignment used when the `Raw_Chan` was created.
 
 Example:
 
-  import "core:sync/chan"
+	import "core:sync/chan"
 
 	recv_raw_example :: proc() {
 		c, err := chan.create_raw(size_of(int), align_of(int), 1, context.allocator)
@@ -801,7 +801,7 @@ and alignment used when the `Raw_Chan` was created.
 
 Example:
 
-  import "core:sync/chan"
+	import "core:sync/chan"
 
 	try_recv_raw_example :: proc() {
 		c, err := chan.create_raw(size_of(int), align_of(int), context.allocator)
@@ -1141,7 +1141,7 @@ undefined behavior.
 
 Example:
 
-  import "core:sync/chan"
+	import "core:sync/chan"
 
 	raw_queue_pop_example :: proc() {
 		storage: [100]int
@@ -1182,7 +1182,7 @@ if a call to `recv` or `recv_raw` would block
 
 Example:
 
-  import "core:sync/chan"
+	import "core:sync/chan"
 
 	can_recv_example :: proc() {
 		c, err := chan.create(chan.Chan(int), 1, context.allocator)
@@ -1217,7 +1217,7 @@ or if there is already a reader waiting for a message.
 
 Example:
 
-  import "core:sync/chan"
+	import "core:sync/chan"
 
 	can_send_example :: proc() {
 		c, err := chan.create(chan.Chan(int), 1, context.allocator)
@@ -1260,7 +1260,7 @@ Note: Each message in `send_msgs` corresponds to the send channel at the same in
 
 Example:
 
-  import "core:sync/chan"
+	import "core:sync/chan"
 	import "core:fmt"
 
 	select_raw_example :: proc() {
