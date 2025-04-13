@@ -289,6 +289,8 @@ Heap_Superpage :: struct {
 	prev: ^Heap_Superpage,
 	next: ^Heap_Superpage, // atomic in orphanage, otherwise non-atomic
 
+	has_ever_been_remotely_freed: bool,
+
 	remote_free_set:    bool,              // atomic
 	owner:              int,               // atomic
 	master_cache_block: ^Heap_Cache_Block, // atomic
@@ -436,7 +438,21 @@ heap_free_superpage :: proc "contextless" (superpage: ^Heap_Superpage) {
 	//
 	// The rest are put to a global orphanage so that the memory is ready to be
 	// used as soon as needed.
-	if intrinsics.atomic_add_explicit(&heap_orphanage_count, 1, .Acq_Rel) >= HEAP_MAX_EMPTY_ORPHANED_SUPERPAGES {
+	//
+	// The one exception is Superpages that have had a free operation done on
+	// them by another thread: Because each heap has a cache for those
+	// superpages and it is possible for the remote thread to be pre-empted
+	// after it has freed the final bin but before it has added it to the
+	// owning thread's cache, we cannot ever return that memory to the
+	// operating system, as it would eventually lead to an access violation.
+	//
+	// It is impossible to safely prove that no other threads are busy with the
+	// superpage. Even if we were to use a counter on the superpage, the
+	// superpage could end up being freed before the remote thread has a chance
+	// to decrement it.
+	if superpage.has_ever_been_remotely_freed {
+		heap_push_orphan(superpage)
+	} else if intrinsics.atomic_add_explicit(&heap_orphanage_count, 1, .Acq_Rel) >= HEAP_MAX_EMPTY_ORPHANED_SUPERPAGES {
 		intrinsics.atomic_sub_explicit(&heap_orphanage_count, 1, .Relaxed)
 		free_virtual_memory(superpage, SUPERPAGE_SIZE)
 		heap_debug_cover(.Superpage_Freed_On_Full_Orphanage)
@@ -504,6 +520,8 @@ heap_cache_register_superpage :: proc "contextless" (superpage: ^Heap_Superpage)
 			// possible for another thread to remotely free memory while
 			// the thread which owned it is in limbo.
 			if intrinsics.atomic_load_explicit(&slab.remote_free_bins_scheduled, .Acquire) > 0 {
+				superpage.has_ever_been_remotely_freed = true
+
 				heap_merge_remote_frees(slab)
 
 				if slab.free_bins > 0 {
@@ -1385,6 +1403,8 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 				if superpage == nil {
 					continue consume_loop
 				}
+
+				superpage.has_ever_been_remotely_freed = true
 
 				// First, we will remove the cache entry, to avoid issues with
 				// freeing operations that happen simultaneously while we're
