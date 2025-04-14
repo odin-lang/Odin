@@ -113,8 +113,6 @@ init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, ini
 
 	control.new_pool_size = uint(new_pool_size)
 
-	// TODO(Jeroen): Add automatically growing the pools from the backing allocator
-
 	return free_all(control)
 }
 init :: proc{init_from_buffer, init_from_allocator}
