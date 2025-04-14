@@ -22,7 +22,6 @@ Error :: enum byte {
 	Backing_Allocator_Error   = 5,
 }
 
-
 Allocator :: struct {
 	// Empty lists point at this block to indicate they are free.
 	block_null: Block_Header,
@@ -44,7 +43,6 @@ Allocator :: struct {
 	// If we're expected to grow when we run out of memory,
 	// how much should we ask the backing allocator for?
 	new_pool_size: uint,
-
 }
 #assert(size_of(Allocator) % ALIGN_SIZE == 0)
 
@@ -56,6 +54,21 @@ allocator :: proc(t: ^Allocator) -> runtime.Allocator {
 	}
 }
 
+// Tries to estimate a pool size sufficient for `count` allocations, each of `size` and with `alignment`.
+estimate_pool_from_size_alignment :: proc(count: int, size: int, alignment: int) -> (pool_size: int) {
+	per_allocation := align_up(uint(size + alignment) + BLOCK_HEADER_OVERHEAD, ALIGN_SIZE)
+	return count * int(per_allocation) + int(INITIAL_POOL_OVERHEAD)
+}
+
+// Tries to estimate a pool size sufficient for `count` allocations of `type`.
+estimate_pool_from_typeid :: proc(count: int, type: typeid) -> (pool_size: int) {
+	ti := type_info_of(type)
+	return estimate_pool_size(count, ti.size, ti.align)
+}
+
+estimate_pool_size :: proc{estimate_pool_from_size_alignment, estimate_pool_from_typeid}
+
+
 @(require_results)
 init_from_buffer :: proc(control: ^Allocator, buf: []byte) -> Error {
 	assert(control != nil)
@@ -63,7 +76,7 @@ init_from_buffer :: proc(control: ^Allocator, buf: []byte) -> Error {
 		return .Invalid_Alignment
 	}
 
-	pool_bytes := align_down(len(buf), ALIGN_SIZE) - INITIAL_POOL_OVERHEAD
+	pool_bytes := align_down(len(buf) - INITIAL_POOL_OVERHEAD, ALIGN_SIZE)
 	if pool_bytes < BLOCK_SIZE_MIN {
 		return .Backing_Buffer_Too_Small
 	} else if pool_bytes > BLOCK_SIZE_MAX {
@@ -79,9 +92,9 @@ init_from_buffer :: proc(control: ^Allocator, buf: []byte) -> Error {
 }
 
 @(require_results)
-init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, initial_pool_size: int) -> Error {
+init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, initial_pool_size: int, new_pool_size := 0) -> Error {
 	assert(control != nil)
-	pool_bytes := align_up(uint(initial_pool_size), ALIGN_SIZE) + INITIAL_POOL_OVERHEAD
+	pool_bytes := uint(estimate_pool_size(1, initial_pool_size, ALIGN_SIZE))
 	if pool_bytes < BLOCK_SIZE_MIN {
 		return .Backing_Buffer_Too_Small
 	} else if pool_bytes > BLOCK_SIZE_MAX {
@@ -97,6 +110,8 @@ init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, ini
 		data      = buf,
 		allocator = backing,
 	}
+
+	control.new_pool_size = uint(new_pool_size)
 
 	// TODO(Jeroen): Add automatically growing the pools from the backing allocator
 

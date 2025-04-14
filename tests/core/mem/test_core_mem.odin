@@ -82,7 +82,47 @@ tlsf_test_overlap_and_zero :: proc(t: ^testing.T) {
 		append(&allocations, s)
 	}
 
-	slice.sort_by(allocations[:len(allocations)], proc(a, b: []byte) -> bool {
+	slice.sort_by(allocations[:], proc(a, b: []byte) -> bool {
+		return uintptr(raw_data(a)) < uintptr(raw_data((b)))
+	})
+
+	for i in 0..<len(allocations) - 1 {
+		fail_if_allocations_overlap(t, allocations[i], allocations[i + 1])
+		fail_if_not_zeroed(t, allocations[i])
+	}
+}
+
+@(test)
+tlsf_test_grow_pools :: proc(t: ^testing.T) {
+	default_allocator := context.allocator
+	alloc: tlsf.Allocator
+	defer tlsf.destroy(&alloc)
+
+	NUM_ALLOCATIONS    :: 10
+	ALLOC_SIZE         :: mem.Megabyte
+	BACKING_SIZE_INIT  := tlsf.estimate_pool_size(1, ALLOC_SIZE, 64)
+	BACKING_SIZE_GROW  := tlsf.estimate_pool_size(1, ALLOC_SIZE, 64)
+
+	allocations := make([dynamic][]byte, 0, NUM_ALLOCATIONS, default_allocator)
+	defer delete(allocations)
+
+	if err := tlsf.init_from_allocator(&alloc, default_allocator, BACKING_SIZE_INIT, BACKING_SIZE_GROW); err != .None {
+		testing.fail_now(t, "TLSF init error")
+	}
+	context.allocator = tlsf.allocator(&alloc)
+
+	err: mem.Allocator_Error
+	s:   []byte
+
+	for err == .None && len(allocations) < NUM_ALLOCATIONS {
+		s, err = make([]byte, ALLOC_SIZE)
+		testing.expect_value(t, len(s), ALLOC_SIZE)
+		append(&allocations, s)
+	}
+
+	testing.expect_value(t, len(allocations), NUM_ALLOCATIONS)
+
+	slice.sort_by(allocations[:], proc(a, b: []byte) -> bool {
 		return uintptr(raw_data(a)) < uintptr(raw_data((b)))
 	})
 

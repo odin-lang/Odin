@@ -185,7 +185,40 @@ alloc_bytes_non_zeroed :: proc(control: ^Allocator, size: uint, align: uint) -> 
 
 	block := block_locate_free(control, aligned_size)
 	if block == nil {
-		return nil, .Out_Of_Memory
+		// OOM: Couldn't find block of `aligned_size` bytes.
+		if control.new_pool_size > 0 && control.pool.allocator.procedure != nil {
+			// TLSF is configured to grow. Trying to allocate a new pool of `control.new_pool_size` bytes.
+
+			new_pool_buf := runtime.make_aligned([]byte, control.new_pool_size, ALIGN_SIZE, control.pool.allocator) or_return
+
+			// Add new pool to control structure
+			if pool_add_err := pool_add(control, new_pool_buf); pool_add_err != .None {
+				delete(new_pool_buf, control.pool.allocator)
+				return nil, .Out_Of_Memory
+			}
+
+			// Allocate a new link in the `control.pool` tracking structure.
+			new_pool := new_clone(Pool{
+				data      = new_pool_buf,
+				allocator = control.pool.allocator,
+				next      = nil,
+			}, control.pool.allocator) or_return
+
+			p := &control.pool
+			for p.next != nil {
+				p = p.next
+			}
+			p.next = new_pool
+
+			// Try again to find free block
+			block = block_locate_free(control, aligned_size)
+			if block == nil {
+				return nil, .Out_Of_Memory
+			}
+		} else {
+			// TLSF is non-growing. We're done.
+			return nil, .Out_Of_Memory
+		}
 	}
 	ptr := block_to_ptr(block)
 	aligned := align_ptr(ptr, align)
