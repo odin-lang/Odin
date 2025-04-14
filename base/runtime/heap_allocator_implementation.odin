@@ -298,6 +298,7 @@ Heap_Superpage :: struct {
 	prev: ^Heap_Superpage,
 	next: ^Heap_Superpage, // atomic in orphanage, otherwise non-atomic
 
+	fully_used_once: bool,
 	has_ever_been_remotely_freed: bool,
 
 	remote_free_set:    bool,              // atomic
@@ -495,6 +496,7 @@ heap_cache_unregister_superpage :: proc "contextless" (superpage: ^Heap_Superpag
 	if superpage.cache_block.in_use {
 		return
 	}
+	superpage.fully_used_once = false
 	local_heap_cache.owned_superpages -= 1
 	intrinsics.atomic_store_explicit(&superpage.master_cache_block, nil, .Release)
 	heap_debug_cover(.Superpage_Unregistered)
@@ -685,6 +687,7 @@ heap_make_slab_sized_allocation :: proc "contextless" (superpage: ^Heap_Superpag
 		superpage.free_slabs -= contiguous
 		assert_contextless(superpage.free_slabs >= 0, "The heap allocator caused a superpage's free_slabs to go negative.")
 		if superpage.free_slabs == 0 {
+			superpage.fully_used_once = true
 			heap_cache_remove_superpage_with_free_slabs(superpage)
 		}
 
@@ -813,6 +816,7 @@ heap_slab_setup :: proc "contextless" (superpage: ^Heap_Superpage, rounded_size:
 	heap_cache_add_slab(slab, heap_bin_size_to_rank(rounded_size))
 
 	if superpage.free_slabs == 0 {
+		superpage.fully_used_once = true
 		heap_cache_remove_superpage_with_free_slabs(superpage)
 		heap_debug_cover(.Superpage_Removed_From_Open_Cache_By_Slab)
 	}
@@ -910,7 +914,7 @@ If the Superpage has no slabs in use and is not used by the local heap's cache,
 free it from the heap and return true.
 */
 heap_free_superpage_if_empty_and_unused :: proc "contextless" (superpage: ^Heap_Superpage) -> (freed: bool) {
-	if superpage.free_slabs == HEAP_SLAB_COUNT && !superpage.cache_block.in_use {
+	if superpage.free_slabs == HEAP_SLAB_COUNT && superpage.fully_used_once && !superpage.cache_block.in_use {
 		heap_free_superpage(superpage)
 		freed = true
 	}
@@ -1991,6 +1995,7 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 			heap_update_longest_contiguous_free_slab(superpage)
 
 			if superpage.free_slabs == 0 {
+				superpage.fully_used_once = true
 				heap_cache_remove_superpage_with_free_slabs(superpage)
 			} else {
 				heap_update_next_free_slab_index(superpage, 0)
