@@ -111,11 +111,8 @@ tlsf_test_grow_pools :: proc(t: ^testing.T) {
 	}
 	context.allocator = tlsf.allocator(&alloc)
 
-	err: mem.Allocator_Error
-	s:   []byte
-
-	for err == .None && len(allocations) < NUM_ALLOCATIONS {
-		s, err = make([]byte, ALLOC_SIZE)
+	for len(allocations) < NUM_ALLOCATIONS {
+		s := make([]byte, ALLOC_SIZE) or_break
 		testing.expect_value(t, len(s), ALLOC_SIZE)
 		append(&allocations, s)
 	}

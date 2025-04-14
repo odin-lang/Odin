@@ -187,8 +187,20 @@ alloc_bytes_non_zeroed :: proc(control: ^Allocator, size: uint, align: uint) -> 
 	if block == nil {
 		// OOM: Couldn't find block of `aligned_size` bytes.
 		if control.new_pool_size > 0 && control.pool.allocator.procedure != nil {
-			// TLSF is configured to grow. Trying to allocate a new pool of `control.new_pool_size` bytes.
+			// TLSF is configured to grow.
 
+			/*
+			This implementation doesn't allow for out-of-band allocations to be passed through, as it's not designed to
+			track those. Nor is it able to signal those allocations then need to be freed on the backing allocator,
+			as opposed to regular allocations handled for you when you `destroy` the TLSF instance.
+
+			So if we're asked for more than we're configured to grow by, we can fail with an OOM error early, without adding a new pool.
+			*/
+			if aligned_size > control.new_pool_size {
+				return nil, .Out_Of_Memory
+			}
+
+			// Trying to allocate a new pool of `control.new_pool_size` bytes.
 			new_pool_buf := runtime.make_aligned([]byte, control.new_pool_size, ALIGN_SIZE, control.pool.allocator) or_return
 
 			// Add new pool to control structure
