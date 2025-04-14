@@ -10,6 +10,7 @@
 // package mem_tlsf implements a Two Level Segregated Fit memory allocator.
 package mem_tlsf
 
+import "base:intrinsics"
 import "base:runtime"
 
 Error :: enum byte {
@@ -39,11 +40,13 @@ Allocator :: struct {
 	// statistics like how much memory is still available,
 	// fragmentation, etc.
 	pool: Pool,
+
+	// If we're expected to grow when we run out of memory,
+	// how much should we ask the backing allocator for?
+	new_pool_size: uint,
+
 }
 #assert(size_of(Allocator) % ALIGN_SIZE == 0)
-
-
-
 
 @(require_results)
 allocator :: proc(t: ^Allocator) -> runtime.Allocator {
@@ -60,21 +63,25 @@ init_from_buffer :: proc(control: ^Allocator, buf: []byte) -> Error {
 		return .Invalid_Alignment
 	}
 
-	pool_bytes := align_down(len(buf) - POOL_OVERHEAD, ALIGN_SIZE)
+	pool_bytes := align_down(len(buf), ALIGN_SIZE) - INITIAL_POOL_OVERHEAD
 	if pool_bytes < BLOCK_SIZE_MIN {
 		return .Backing_Buffer_Too_Small
 	} else if pool_bytes > BLOCK_SIZE_MAX {
 		return .Backing_Buffer_Too_Large
 	}
 
-	clear(control)
-	return pool_add(control, buf[:])
+	control.pool = Pool{
+		data      = buf,
+		allocator = {},
+	}
+
+	return free_all(control)
 }
 
 @(require_results)
-init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, initial_pool_size: int, new_pool_size := 0) -> Error {
+init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, initial_pool_size: int) -> Error {
 	assert(control != nil)
-	pool_bytes := align_up(uint(initial_pool_size) + POOL_OVERHEAD, ALIGN_SIZE)
+	pool_bytes := align_up(uint(initial_pool_size), ALIGN_SIZE) + INITIAL_POOL_OVERHEAD
 	if pool_bytes < BLOCK_SIZE_MIN {
 		return .Backing_Buffer_Too_Small
 	} else if pool_bytes > BLOCK_SIZE_MAX {
@@ -85,12 +92,15 @@ init_from_allocator :: proc(control: ^Allocator, backing: runtime.Allocator, ini
 	if backing_err != nil {
 		return .Backing_Allocator_Error
 	}
-	err := init_from_buffer(control, buf)
+
 	control.pool = Pool{
 		data      = buf,
 		allocator = backing,
 	}
-	return err
+
+	// TODO(Jeroen): Add automatically growing the pools from the backing allocator
+
+	return free_all(control)
 }
 init :: proc{init_from_buffer, init_from_allocator}
 
@@ -103,8 +113,6 @@ destroy :: proc(control: ^Allocator) {
 
 	// No need to call `pool_remove` or anything, as they're they're embedded in the backing memory.
 	// We do however need to free the `Pool` tracking entities and the backing memory itself.
-	// As `Allocator` is embedded in the first backing slice, the `control` pointer will be
-	// invalid after this call.
 	for p := control.pool.next; p != nil; {
 		next := p.next
 
@@ -136,9 +144,8 @@ allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		return nil, nil
 
 	case .Free_All:
-		// NOTE: this doesn't work right at the moment, Jeroen has it on his to-do list :)
-		// clear(control)
-		return nil, .Mode_Not_Implemented
+		free_all(control)
+		return nil, nil
 
 	case .Resize:
 		return resize(control, old_memory, uint(old_size), uint(size), uint(alignment))
@@ -158,4 +165,24 @@ allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 	}
 
 	return nil, nil
+}
+
+// Exported solely to facilitate testing
+@(require_results)
+ffs :: proc "contextless" (word: u32) -> (bit: i32) {
+	return -1 if word == 0 else i32(intrinsics.count_trailing_zeros(word))
+}
+
+// Exported solely to facilitate testing
+@(require_results)
+fls :: proc "contextless" (word: u32) -> (bit: i32) {
+	N :: (size_of(u32) * 8) - 1
+	return i32(N - intrinsics.count_leading_zeros(word))
+}
+
+// Exported solely to facilitate testing
+@(require_results)
+fls_uint :: proc "contextless" (size: uint) -> (bit: i32) {
+	N :: (size_of(uint) * 8) - 1
+	return i32(N - intrinsics.count_leading_zeros(size))
 }
