@@ -687,8 +687,6 @@ heap_make_slab_sized_allocation :: proc "contextless" (superpage: ^Heap_Superpag
 		if superpage.free_slabs == 0 {
 			heap_cache_remove_superpage_with_free_slabs(superpage)
 		}
-		// NOTE: Start from zero again, because we may have skipped a non-contiguous block.
-		heap_update_next_free_slab_index(superpage, 0)
 
 		// Cascade contiguous free slab count backwards.
 		for i := start + contiguous - 1; i > start; i -= 1 {
@@ -706,6 +704,8 @@ heap_make_slab_sized_allocation :: proc "contextless" (superpage: ^Heap_Superpag
 		}
 		heap_update_longest_contiguous_free_slab(superpage)
 
+		// NOTE: Start from zero again, because we may have skipped a non-contiguous block.
+		heap_update_next_free_slab_index(superpage, 0)
 		return ptr
 	}
 
@@ -978,14 +978,11 @@ heap_update_next_free_slab_index :: proc "contextless" (superpage: ^Heap_Superpa
 
 	// Find a free slab.
 	for i := start_at; i < HEAP_SLAB_COUNT; /**/ {
-		bin_size := heap_superpage_index_slab(superpage, i).bin_size
-		if bin_size == 0 {
+		if superpage.contiguous_free_slabs[i] > 0 {
+			assert_contextless(heap_superpage_index_slab(superpage, i).bin_size == 0)
 			superpage.next_free_slab_index = i
 			heap_debug_cover(.Superpage_Updated_Next_Free_Slab_Index)
 			return
-		} else if bin_size > HEAP_MAX_BIN_SIZE {
-			// Skip contiguous slabs.
-			i += heap_slabs_needed_for_size(bin_size)
 		} else {
 			i += 1
 		}
@@ -1985,11 +1982,6 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 			// iterate over the slabs.
 			slab.bin_size = new_size
 			superpage.free_slabs += contiguous_old - contiguous_new
-			if superpage.free_slabs == 0 {
-				heap_cache_remove_superpage_with_free_slabs(superpage)
-			} else {
-				heap_update_next_free_slab_index(superpage, 0)
-			}
 			heap_debug_cover(.Resize_Wide_Slab_Expanded_In_Place)
 
 			// Expand contiguous free slab count forwards.
@@ -1997,6 +1989,12 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 				superpage.contiguous_free_slabs[i] = 0
 			}
 			heap_update_longest_contiguous_free_slab(superpage)
+
+			if superpage.free_slabs == 0 {
+				heap_cache_remove_superpage_with_free_slabs(superpage)
+			} else {
+				heap_update_next_free_slab_index(superpage, 0)
+			}
 		}
 
 		// The slab-wide allocation has been resized in-place.
