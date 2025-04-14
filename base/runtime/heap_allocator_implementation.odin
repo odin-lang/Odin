@@ -1846,8 +1846,11 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 
 	if new_category != old_category {
 		// A change in size category cannot be optimized.
-		new_ptr = heap_alloc(new_size, zero_memory)
+		new_ptr = heap_alloc(new_size, false)
 		intrinsics.mem_copy_non_overlapping(new_ptr, old_ptr, min(old_size, new_size))
+		if zero_memory && new_size > old_size {
+			intrinsics.mem_zero_volatile(rawptr(uintptr(new_ptr) + uintptr(old_size)), new_size - old_size)
+		}
 		heap_free(old_ptr)
 		heap_debug_cover(.Resize_Crossed_Size_Categories)
 		return
