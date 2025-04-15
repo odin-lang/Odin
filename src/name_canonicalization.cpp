@@ -724,7 +724,11 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		if (is_in_doc_writer()) {
 			type_writer_appendc(w, "$");
 			type_writer_append(w, type->Generic.name.text, type->Generic.name.len);
-			type_writer_append_fmt(w, "%lld", cast(long long)type->Generic.id);
+			type_writer_append_fmt(w, "-%lld", cast(long long)type->Generic.id);
+			if (type->Generic.specialized) {
+				type_writer_appendc(w, "/");
+				write_type_to_canonical_string(w, type->Generic.specialized);
+			}
 		} else {
 			GB_PANIC("Type_Generic should never be hit");
 		}
