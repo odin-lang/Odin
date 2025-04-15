@@ -397,7 +397,7 @@ foreign lib {
 	GetWindowKeyboardGrab           :: proc(window: ^Window) -> bool ---
 	GetWindowMouseGrab              :: proc(window: ^Window) -> bool ---
 	GetGrabbedWindow                :: proc() -> ^Window ---
-	SetWindowMouseRect              :: proc(window: ^Window, #by_ptr rect: Rect) -> bool ---
+	SetWindowMouseRect              :: proc(window: ^Window, rect: ^Rect) -> bool ---
 	GetWindowMouseRect              :: proc(window: ^Window) -> ^Rect ---
 	SetWindowOpacity                :: proc(window: ^Window, opacity: f32) -> bool ---
 	GetWindowOpacity                :: proc(window: ^Window) -> f32 ---
