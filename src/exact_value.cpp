@@ -955,7 +955,7 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 		f64 a = x.value_float;
 		f64 b = y.value_float;
 		if (isnan(a) || isnan(b)) {
-			return false; // Fixes #5004
+			return op == Token_NotEq;
 		}
 
 		switch (op) {
