@@ -159,7 +159,7 @@ _tcp_recv_error :: proc(errno: linux.Errno) -> TCP_Recv_Error {
 		return .Invalid_Argument
 	case .ENOTCONN:
 		return .Not_Connected
-	case .ECONNREFUSED:
+	case .ECONNREFUSED, .ECONNRESET:
 		return .Connection_Closed
 	case .ETIMEDOUT:
 		return .Timeout
@@ -179,7 +179,7 @@ _udp_recv_error :: proc(errno: linux.Errno) -> UDP_Recv_Error {
 	#partial switch errno {
 	case .EBADF, .ENOTSOCK, .EFAULT:
 		return .Invalid_Argument
-	case .ECONNREFUSED, .ENOTCONN:
+	case .ECONNREFUSED, .ENOTCONN, .ECONNRESET:
 		return .Connection_Refused
 	case .ETIMEDOUT:
 		return .Timeout
