@@ -1,3 +1,5 @@
+gb_internal bool is_in_doc_writer(void);
+
 gb_internal GB_COMPARE_PROC(type_info_pair_cmp) {
 	TypeInfoPair *x = cast(TypeInfoPair *)a;
 	TypeInfoPair *y = cast(TypeInfoPair *)b;
@@ -284,6 +286,23 @@ gb_internal void write_canonical_params(TypeWriter *w, Type *params) {
 			} else {
 				write_type_to_canonical_string(w, v->type);
 			}
+			if (is_in_doc_writer()) {
+				// NOTE(bill): This just exists to make sure the entities default values exist when
+				// writing to the odin doc format
+				Ast *expr = v->Variable.init_expr;
+				if (expr == nullptr) {
+					expr = v->Variable.param_value.original_ast_expr;
+				}
+				if (expr != nullptr) {
+					type_writer_appendc(w, "=");
+					gbString s = write_expr_to_string( // Minor leak
+						gb_string_make(temporary_allocator(), ""),
+						expr,
+						build_context.cmd_doc_flags & CmdDocFlag_Short
+					);
+					type_writer_append(w, s, gb_string_length(s));
+				}
+			}
 			break;
 		case Entity_TypeName:
 			type_writer_appendc(w, CANONICAL_PARAM_TYPEID);
@@ -520,7 +539,6 @@ write_base_name:
 	return;
 }
 
-gb_internal bool is_in_doc_writer(void);
 
 // NOTE(bill): This exists so that we deterministically hash a type by serializing it to a canonical string
 gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
