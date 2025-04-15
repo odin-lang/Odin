@@ -1012,7 +1012,7 @@ alike :: proc(t: ^testing.T, a, b: f64, loc := #caller_location) -> bool {
 	case math.is_nan(a) && math.is_nan(b):
 		ok = true
 	case a == b:
-		ok = math.signbit(a) == math.signbit(b)
+		ok = math.sign_bit(a) == math.sign_bit(b)
 	}
 	testing.expectf(t, ok, "%.15g is not alike to %.15g", a, b, loc=loc)
 	return ok
