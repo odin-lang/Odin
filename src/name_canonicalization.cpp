@@ -649,6 +649,10 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 	case Type_Union:
 		type_writer_appendc(w, "union");
 
+		if (is_in_doc_writer() && type->Union.polymorphic_params) {
+			write_canonical_params(w, type->Union.polymorphic_params);
+		}
+
 		switch (type->Union.kind) {
 		case UnionType_no_nil:     type_writer_appendc(w, "#no_nil");     break;
 		case UnionType_shared_nil: type_writer_appendc(w, "#shared_nil"); break;
@@ -676,6 +680,11 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		}
 
 		type_writer_appendc(w, "struct");
+
+		if (is_in_doc_writer() && type->Struct.polymorphic_params) {
+			write_canonical_params(w, type->Struct.polymorphic_params);
+		}
+
 		if (type->Struct.is_packed)    type_writer_appendc(w, "#packed");
 		if (type->Struct.is_raw_union) type_writer_appendc(w, "#raw_union");
 		if (type->Struct.is_no_copy)   type_writer_appendc(w, "#no_copy");
