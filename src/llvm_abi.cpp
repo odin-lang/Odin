@@ -573,7 +573,9 @@ namespace lbAbiAmd64SysV {
 
 	gb_internal void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off);
 	gb_internal void fixup(LLVMTypeRef t, Array<RegClass> *cls);
-	gb_internal lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention);
+	gb_internal lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention,
+	                                 bool is_arg,
+	                                 i32 *int_regs, i32 *sse_regs);
 	gb_internal Array<RegClass> classify(LLVMTypeRef t);
 	gb_internal LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes, LLVMTypeRef type);
 
@@ -583,7 +585,9 @@ namespace lbAbiAmd64SysV {
 		}
 		LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
 
-		return amd64_type(c, return_type, Amd64TypeAttribute_StructRect, ft->calling_convention);
+		return amd64_type(c, return_type, Amd64TypeAttribute_StructRect, ft->calling_convention,
+		                  false,
+		                  nullptr, nullptr);
 	}
 
 	gb_internal LB_ABI_INFO(abi_info) {
@@ -592,10 +596,16 @@ namespace lbAbiAmd64SysV {
 		ft->ctx = c;
 		ft->calling_convention = calling_convention;
 
+		i32 int_regs = 6; // rdi, rsi, rdx, rcx, r8, r9
+		i32 sse_regs = 8; // xmm0-xmm7
+
 		ft->args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 		for (unsigned i = 0; i < arg_count; i++) {
-			ft->args[i] = amd64_type(c, arg_types[i], Amd64TypeAttribute_ByVal, calling_convention);
+			ft->args[i] = amd64_type(c, arg_types[i], Amd64TypeAttribute_ByVal, calling_convention,
+			                         true,
+			                         &int_regs, &sse_regs);
 		}
+
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 
 		return ft;
@@ -654,17 +664,79 @@ namespace lbAbiAmd64SysV {
 
 	}
 
-	gb_internal lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention) {
+
+	gb_internal bool is_aggregate(LLVMTypeRef type) {
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		switch (kind) {
+		case LLVMStructTypeKind:
+			if (LLVMCountStructElementTypes(type) == 1) {
+				return is_aggregate(LLVMStructGetTypeAtIndex(type, 0));
+			}
+			return true;
+		case LLVMArrayTypeKind:
+			if (LLVMGetArrayLength(type) == 1) {
+				return is_aggregate(LLVMGetElementType(type));
+			}
+			return true;
+		}
+		return false;
+	};
+
+	gb_internal lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention,
+	                                 bool is_arg,
+	                                 i32 *int_regs, i32 *sse_regs) {
+		auto cls = classify(type);
+		i32 needed_int = 0;
+		i32 needed_sse = 0;
+		for (auto c : cls) {
+			switch (c) {
+			case RegClass_Int:
+				needed_int += 1;
+				break;
+			case RegClass_SSEFs:
+			case RegClass_SSEFv:
+			case RegClass_SSEDs:
+			case RegClass_SSEDv:
+			case RegClass_SSEInt8:
+			case RegClass_SSEInt16:
+			case RegClass_SSEInt32:
+			case RegClass_SSEInt64:
+			case RegClass_SSEInt128:
+			case RegClass_SSEUp:
+				needed_sse += 1;
+				break;
+			}
+		}
+
+		bool ran_out_of_regs = false;
+		if (int_regs && sse_regs) {
+			*int_regs -= needed_int;
+			*sse_regs -= needed_sse;
+			bool int_ok = *int_regs >= 0;
+			bool sse_ok = *sse_regs >= 0;
+
+			*int_regs = gb_max(*int_regs, 0);
+			*sse_regs = gb_max(*sse_regs, 0);
+
+			if ((!int_ok || !sse_ok) && is_aggregate(type)) {
+				ran_out_of_regs = true;
+			}
+		}
+
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (type == LLVMInt1TypeInContext(c)) {
 				attribute = lb_create_enum_attribute(c, "zeroext");
 			}
 			return lb_arg_type_direct(type, nullptr, nullptr, attribute);
-		}
-
-		auto cls = classify(type);
-		if (is_mem_cls(cls, attribute_kind)) {
+		} else if (ran_out_of_regs) {
+			if (is_arg) {
+				return lb_arg_type_indirect_byval(c, type);
+			} else {
+				LLVMAttributeRef attribute = lb_create_enum_attribute_with_type(c, "sret", type);
+				return lb_arg_type_indirect(type, attribute);
+			}
+		} else if (is_mem_cls(cls, attribute_kind)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (attribute_kind == Amd64TypeAttribute_ByVal) {
 				if (is_calling_convention_odin(calling_convention)) {
@@ -1818,7 +1890,8 @@ gb_internal LB_ABI_INFO(lb_get_abi_info) {
 		return_type, return_is_defined,
 		ALLOW_SPLIT_MULTI_RETURNS && return_is_tuple && is_calling_convention_odin(calling_convention),
 		calling_convention,
-		base_type(original_type));
+		base_type(original_type)
+	);
 
 
 	// NOTE(bill): this is handled here rather than when developing the type in `lb_type_internal_for_procedures_raw`
