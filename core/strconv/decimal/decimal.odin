@@ -399,7 +399,7 @@ shift_left :: proc(a: ^Decimal, k: uint) #no_bounds_check {
 
 	a.decimal_point += delta
 
-	a.count = clamp(a.count, 0, len(a.digits))
+	a.count = clamp(a.count+delta, 0, len(a.digits))
 	trim(a)
 }
 /*
@@ -562,4 +562,3 @@ rounded_integer :: proc(a: ^Decimal) -> u64 {
 	}
 	return n
 }
-

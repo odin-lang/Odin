@@ -339,45 +339,37 @@ Converts a decimal number to its floating-point representation with the given fo
 - b: The bits representing the floating-point number
 - overflow: A boolean indicating whether an overflow occurred during conversion
 */
-@(private)
 decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64, overflow: bool) {
-	end :: proc "contextless" (d: ^decimal.Decimal, mant: u64, exp: int, info: ^Float_Info) -> (bits: u64) {
+	overflow_end :: proc "contextless" (d: ^decimal.Decimal, info: ^Float_Info) -> (u64, bool) {
+		mant: u64 = 0
+		exp:  int = 1<<info.expbits - 1 + info.bias
+		return end(d, mant, exp, info, true)
+	}
+	end :: proc "contextless" (d: ^decimal.Decimal, mant: u64, exp: int, info: ^Float_Info, is_overflow: bool) -> (bits: u64, overflow: bool) {
 		bits = mant & (u64(1)<<info.mantbits - 1)
 		bits |= u64((exp-info.bias) & (1<<info.expbits - 1)) << info.mantbits
 		if d.neg {
-			bits |= 1<< info.mantbits << info.expbits
+			bits |= 1 << info.mantbits << info.expbits
 		}
+		overflow = is_overflow
 		return
-	}
-	set_overflow :: proc "contextless" (mant: ^u64, exp: ^int, info: ^Float_Info) -> bool {
-		mant^ = 0
-		exp^ = 1<<info.expbits - 1 + info.bias
-		return true
 	}
 
-	mant: u64
-	exp: int
 	if d.count == 0 {
-		mant = 0
-		exp = info.bias
-		b = end(d, mant, exp, info)
-		return
+		return end(d, 0, info.bias, info, false)
 	}
+
 
 	if d.decimal_point > 310 {
-		set_overflow(&mant, &exp, info)
-		b = end(d, mant, exp, info)
-		return
+		return overflow_end(d, info)
 	} else if d.decimal_point < -330 {
-		mant = 0
-		exp = info.bias
-		b = end(d, mant, exp, info)
-		return
+		return end(d, 0, info.bias, info, false)
 	}
 
 	@(static, rodata) power_table := [?]int{1, 3, 6, 9, 13, 16, 19, 23, 26}
 
-	exp = 0
+
+	exp := 0
 	for d.decimal_point > 0 {
 		n := 27 if d.decimal_point >= len(power_table) else power_table[d.decimal_point]
 		decimal.shift(d, -n)
@@ -392,35 +384,34 @@ decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64
 	// go from [0.5, 1) to [1, 2)
 	exp -= 1
 
+	// Min rep exp is 1+bias
 	if exp < info.bias + 1 {
 		n := info.bias + 1 - exp
-		decimal.shift(d, n)
+		decimal.shift(d, -n)
 		exp += n
 	}
 
 	if (exp-info.bias) >= (1<<info.expbits - 1) {
-		set_overflow(&mant, &exp, info)
-		b = end(d, mant, exp, info)
-		return
+		return overflow_end(d, info)
 	}
 
+	// Extract 1 + mantbits
 	decimal.shift(d, int(1 + info.mantbits))
-	mant = decimal.rounded_integer(d)
+	mant := decimal.rounded_integer(d)
 
+	// Rounding for shift down
 	if mant == 2<<info.mantbits {
 		mant >>= 1
 		exp += 1
 		if (exp-info.bias) >= (1<<info.expbits - 1) {
-			set_overflow(&mant, &exp, info)
-			b = end(d, mant, exp, info)
-			return
+			return overflow_end(d, info)
 		}
 	}
 
+	// Check for denormalized mantissa
 	if mant & (1<<info.mantbits) == 0 {
 		exp = info.bias
 	}
 
-	b = end(d, mant, exp, info)
-	return
+	return end(d, mant, exp, info, false)
 }
