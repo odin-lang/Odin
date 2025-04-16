@@ -563,6 +563,53 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_string", args);
 		lb_add_callsite_force_inline(p, res);
 		LLVMBuildRet(p->builder, res.value);
+	} else if (is_type_float(type)) {
+		lbValue ptr = lb_emit_conv(p, data, pt);
+		lbValue v = lb_emit_load(p, ptr);
+		v = lb_emit_conv(p, v, t_f64);
+
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
+		args[0] = v;
+		args[1] = seed;
+		lbValue res = lb_emit_runtime_call(p, "default_hasher_f64", args);
+		lb_add_callsite_force_inline(p, res);
+		LLVMBuildRet(p->builder, res.value);
+	} else if (is_type_complex(type)) {
+		lbValue ptr = lb_emit_conv(p, data, pt);
+		lbValue xp = lb_emit_struct_ep(p, ptr, 0);
+		lbValue yp = lb_emit_struct_ep(p, ptr, 1);
+
+		lbValue x = lb_emit_conv(p, lb_emit_load(p, xp), t_f64);
+		lbValue y = lb_emit_conv(p, lb_emit_load(p, yp), t_f64);
+
+		auto args = array_make<lbValue>(temporary_allocator(), 3);
+		args[0] = x;
+		args[1] = y;
+		args[2] = seed;
+		lbValue res = lb_emit_runtime_call(p, "default_hasher_complex128", args);
+		lb_add_callsite_force_inline(p, res);
+		LLVMBuildRet(p->builder, res.value);
+	} else if (is_type_quaternion(type)) {
+		lbValue ptr = lb_emit_conv(p, data, pt);
+		lbValue xp = lb_emit_struct_ep(p, ptr, 0);
+		lbValue yp = lb_emit_struct_ep(p, ptr, 1);
+		lbValue zp = lb_emit_struct_ep(p, ptr, 2);
+		lbValue wp = lb_emit_struct_ep(p, ptr, 3);
+
+		lbValue x = lb_emit_conv(p, lb_emit_load(p, xp), t_f64);
+		lbValue y = lb_emit_conv(p, lb_emit_load(p, yp), t_f64);
+		lbValue z = lb_emit_conv(p, lb_emit_load(p, zp), t_f64);
+		lbValue w = lb_emit_conv(p, lb_emit_load(p, wp), t_f64);
+
+		auto args = array_make<lbValue>(temporary_allocator(), 5);
+		args[0] = x;
+		args[1] = y;
+		args[2] = z;
+		args[3] = w;
+		args[4] = seed;
+		lbValue res = lb_emit_runtime_call(p, "default_hasher_quaternion256", args);
+		lb_add_callsite_force_inline(p, res);
+		LLVMBuildRet(p->builder, res.value);
 	} else {
 		GB_PANIC("Unhandled type for hasher: %s", type_to_string(type));
 	}

@@ -2774,6 +2774,21 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 			return;
 		}
 
+		if (key->kind == Type_Basic) {
+			if (key->Basic.flags & BasicFlag_Quaternion) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				add_package_dependency(ctx, "runtime", "default_hasher_quaternion256");
+				return;
+			} else if (key->Basic.flags & BasicFlag_Complex) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				add_package_dependency(ctx, "runtime", "default_hasher_complex128");
+				return;
+			} else if (key->Basic.flags & BasicFlag_Float) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				return;
+			}
+		}
+
 		if (key->kind == Type_Struct) {
 			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Struct.fields) {
