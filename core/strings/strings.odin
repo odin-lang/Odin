@@ -3044,7 +3044,6 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	pad_len := rune_count(pad)
 
 	b: Builder
-	builder_init(&b, allocator)
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator) or_return
 
 	w := to_writer(&b)
@@ -3079,7 +3078,6 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	pad_len := rune_count(pad)
 
 	b: Builder
-	builder_init(&b, allocator)
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator) or_return
 
 	w := to_writer(&b)
