@@ -188,6 +188,10 @@ BodyDef :: struct {
 	// Triggers whenever a shape is add/removed/changed. Default is true.
 	automaticMass: bool,
 
+	// This allows this body to bypass rotational speed limits. Should only be used
+	// for circular objects, like wheels.
+	allowFastRotation: bool,
+
 	// Used internally to detect a valid definition. DO NOT SET.
 	internalValue: i32,
 }
