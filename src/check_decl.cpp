@@ -468,6 +468,10 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	}
 	e->type = named;
 
+	if (!is_distinct) {
+		e->TypeName.is_type_alias = true;
+	}
+
 	check_type_path_push(ctx, e);
 	Type *bt = check_type_expr(ctx, te, named);
 	check_type_path_pop(ctx);
@@ -502,9 +506,9 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	if (!is_distinct) {
 		e->type = bt;
 		named->Named.base = bt;
-		e->TypeName.is_type_alias = true;
 	}
 
+	e->TypeName.is_type_alias = !is_distinct;
 
 	if (decl->type_expr != nullptr) {
 		Type *t = check_type(ctx, decl->type_expr);
