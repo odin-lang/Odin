@@ -513,8 +513,10 @@ _select_context_for_thread :: proc(init_context: Maybe(runtime.Context)) -> runt
 			Ensure that the temp allocator is thread-safe when the user provides a specific initial context to use.
 			Without this, the thread will use the same temp allocator state as the parent thread, and thus, bork it up.
 	*/
-	if ctx.temp_allocator.procedure == runtime.default_temp_allocator_proc {
-		ctx.temp_allocator.data = &runtime.global_default_temp_allocator_data
+	when !ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+		if ctx.temp_allocator.procedure == runtime.default_temp_allocator_proc {
+			ctx.temp_allocator.data = &runtime.global_default_temp_allocator_data
+		}
 	}
 	return ctx
 }
