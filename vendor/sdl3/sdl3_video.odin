@@ -336,7 +336,7 @@ foreign lib {
 	GetNaturalDisplayOrientation    :: proc(displayID: DisplayID) -> DisplayOrientation ---
 	GetCurrentDisplayOrientation    :: proc(displayID: DisplayID) -> DisplayOrientation ---
 	GetDisplayContentScale          :: proc(displayID: DisplayID) -> f32 ---
-	GetFullscreenDisplayModes       :: proc(displayID: DisplayID, count: c.int) -> [^]^DisplayMode ---
+	GetFullscreenDisplayModes       :: proc(displayID: DisplayID, count: ^c.int) -> [^]^DisplayMode ---
 	GetClosestFullscreenDisplayMode :: proc(displayID: DisplayID, w, h: c.int, refresh_rate: f32, include_high_density_modes: bool, closest: ^DisplayMode) -> bool ---
 	GetDesktopDisplayMode           :: proc(displayID: DisplayID) -> ^DisplayMode ---
 	GetCurrentDisplayMode           :: proc(displayID: DisplayID) -> ^DisplayMode ---
