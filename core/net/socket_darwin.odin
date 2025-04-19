@@ -150,7 +150,7 @@ _bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
 }
 
 @(private)
-_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
+_accept_tcp :: proc(sock: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
 	addr: posix.sockaddr_storage
 	addr_len := posix.socklen_t(size_of(addr))
 	client_sock := posix.accept(posix.FD(sock), (^posix.sockaddr)(&addr), &addr_len)
