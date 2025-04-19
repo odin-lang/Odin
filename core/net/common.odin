@@ -107,7 +107,7 @@ TCP_Options :: struct {
 	no_delay: bool,
 }
 
-default_tcp_options := TCP_Options {
+DEFAULT_TCP_OPTIONS :: TCP_Options {
 	no_delay = ODIN_NET_TCP_NODELAY_DEFAULT,
 }
 
