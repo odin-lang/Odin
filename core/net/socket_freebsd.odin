@@ -91,7 +91,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 }
 
 @(private)
-_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
+_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
 	if endpoint.port == 0 {
 		return 0, .Port_Required
 	}
@@ -154,7 +154,7 @@ _bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
 }
 
 @(private)
-_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
+_accept_tcp :: proc(sock: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
 	sockaddr: freebsd.Socket_Address_Storage
 
 	result, errno := freebsd.accept(cast(Fd)sock, &sockaddr)
