@@ -235,6 +235,9 @@ struct Entity {
 			Type * type_parameter_specialization;
 			String ir_mangled_name;
 			bool   is_type_alias;
+            bool   objc_is_implementation;
+            Type*  objc_superclass;
+            Type*  objc_ivar;
 			String objc_class_name;
 			TypeNameObjCMetadata *objc_metadata;
 		} TypeName;

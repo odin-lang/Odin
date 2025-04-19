@@ -2125,7 +2125,7 @@ gb_internal lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, Stri
 	return addr;
 }
 
-gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name) {
+gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String const &name, Type *class_impl_type) {
 	lbModule *m = p->module;
 	lbAddr *found = string_map_get(&m->objc_classes, name);
 	if (found) {
@@ -2148,11 +2148,70 @@ gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String 
 	} else {
 		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 	}
-	mpsc_enqueue(&m->gen->objc_classes, lbObjCGlobal{m, global_name, name, t_objc_Class});
+	mpsc_enqueue(&m->gen->objc_classes, lbObjCGlobal{m, global_name, name, t_objc_Class, class_impl_type});
 
 	lbAddr addr = lb_addr(g);
 	string_map_set(&m->objc_classes, name, addr);
 	return addr;
+}
+
+gb_internal lbAddr lb_handle_objc_find_or_register_ivar(lbModule *m, Type *self_type) {
+
+    String name = self_type->Named.type_name->TypeName.objc_class_name;
+    GB_ASSERT(name != "");
+
+	lbAddr *found = string_map_get(&m->objc_ivars, name);
+	if (found) {
+		return *found;
+	}
+
+
+	lbModule *default_module = &m->gen->default_module;
+
+	gbString global_name = gb_string_make(permanent_allocator(), "__$objc_ivar::");
+	global_name = gb_string_append_length(global_name, name.text, name.len);
+
+    // Create a global variable to store offset of the ivar in an instance of an object
+    Type *p_ivar_offset = alloc_type_pointer(t_u32);
+
+	LLVMTypeRef t = lb_type(m, p_ivar_offset);
+	lbValue g = {};
+	g.value = LLVMAddGlobal(m->mod, t, global_name);
+	g.type  = p_ivar_offset;
+
+	if (default_module == m) {
+		LLVMSetInitializer(g.value, LLVMConstNull(t));
+		lb_add_member(m, make_string_c(global_name), g);
+	} else {
+		LLVMSetLinkage(g.value, LLVMExternalLinkage);
+	}
+
+	mpsc_enqueue(&m->gen->objc_ivars, lbObjCGlobal{m, global_name, name, self_type});
+
+	lbAddr addr = lb_addr(g);
+	string_map_set(&m->objc_ivars, name, addr);
+	return addr;
+}
+
+gb_internal lbValue lb_handle_objc_ivar_get(lbProcedure *p, Ast *expr) {
+    ast_node(ce, CallExpr, expr);
+    lbModule *m = p->module;
+
+    GB_ASSERT(ce->args[0]->tav.type->kind == Type_Pointer);
+    Type *self_type = ce->args[0]->tav.type->Pointer.elem;
+    Type *ivar_type = self_type->Named.type_name->TypeName.objc_ivar;
+
+    Type* p_ivar = alloc_type_pointer(ivar_type);
+
+    lbValue ivar_offset      = lb_addr_load(p, lb_handle_objc_find_or_register_ivar(m, self_type));
+    lbValue ivar_offset_uptr = lb_emit_conv(p, ivar_offset, t_uintptr);
+
+    lbValue self        = lb_build_expr(p, ce->args[0]);
+    lbValue self_uptr   = lb_emit_conv(p, self, t_uintptr);
+
+    lbValue ivar_uptr = lb_emit_arith(p, Token_Add, self_uptr, ivar_offset_uptr, t_uintptr);
+
+    return lb_emit_conv(p, ivar_uptr, p_ivar);
 }
 
 gb_internal lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
@@ -2188,7 +2247,7 @@ gb_internal lbValue lb_handle_objc_find_class(lbProcedure *p, Ast *expr) {
 	auto tav = ce->args[0]->tav;
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
-	return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name));
+	return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name, nullptr));
 }
 
 gb_internal lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
@@ -2198,7 +2257,7 @@ gb_internal lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
 	auto tav = ce->args[0]->tav;
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
-	lbAddr dst = lb_handle_objc_find_or_register_class(p, name);
+	lbAddr dst = lb_handle_objc_find_or_register_class(p, name, nullptr);
 
 	auto args = array_make<lbValue>(permanent_allocator(), 3);
 	args[0] = lb_const_nil(m, t_objc_Class);
@@ -2220,7 +2279,9 @@ gb_internal lbValue lb_handle_objc_id(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(e->kind == Entity_TypeName);
 		String name = e->TypeName.objc_class_name;
 
-		return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name));
+        Type *class_impl_type = e->TypeName.objc_is_implementation ? type : nullptr;
+
+		return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name, class_impl_type));
 	}
 
 	return lb_build_expr(p, expr);
@@ -2265,9 +2326,6 @@ gb_internal lbValue lb_handle_objc_send(lbProcedure *p, Ast *expr) {
 
 	return lb_emit_call(p, the_proc, args);
 }
-
-
-
 
 gb_internal LLVMAtomicOrdering llvm_atomic_ordering_from_odin(ExactValue const &value) {
 	GB_ASSERT(value.kind == ExactValue_Integer);

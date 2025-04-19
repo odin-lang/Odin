@@ -526,6 +526,54 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 		check_decl_attributes(ctx, decl->attributes, type_decl_attribute, &ac);
 		if (e->kind == Entity_TypeName && ac.objc_class != "") {
 			e->TypeName.objc_class_name = ac.objc_class;
+            e->TypeName.objc_superclass = ac.objc_superclass;
+            e->TypeName.objc_ivar       = ac.objc_ivar;
+
+            if (ac.objc_is_implementation) {
+                e->TypeName.objc_is_implementation = true;
+                mpsc_enqueue(&ctx->info->objc_class_implementations, e);    // TODO(harold): Don't need this for anything. Remove.
+
+                GB_ASSERT(e->TypeName.objc_ivar == nullptr || e->TypeName.objc_ivar->kind == Type_Named);
+
+                // Ensure superclass hierarchy are all Objective-C classes and does not cycle
+                Type *super = ac.objc_superclass;
+                if (super != nullptr) {
+                    TypeSet super_set{};
+                    type_set_init(&super_set, 8);
+                    defer (type_set_destroy(&super_set));
+
+                    type_set_update(&super_set, e->type);
+
+                    for (;;) {
+                        if (type_set_update(&super_set, super)) {
+                            error(e->token, "@(objc_superclass) Superclass hierarchy cycle encountered");
+                            break;
+                        }
+
+                        if (super->kind != Type_Named) {
+                            error(e->token, "@(objc_superclass) References type must be a named struct.");
+                            break;
+                        }
+
+                        Type* named_type = base_type(super->Named.type_name->type);
+                        if (!is_type_objc_object(named_type)) {
+                            error(e->token, "@(objc_superclass) Superclass must be an Objective-C class.");
+                            break;
+                        }
+
+                        super = super->Named.type_name->TypeName.objc_superclass;
+                        if (super == nullptr) {
+                            break;
+                        }
+
+                        // TODO(harold): Is this the right way to do this??? The referenced entity must be already resolved
+                        //               so that we can access its objc_superclass attribute
+                        check_single_global_entity(ctx->checker, super->Named.type_name, super->Named.type_name->decl_info);
+                    }
+                }
+            } else if (e->TypeName.objc_superclass != nullptr) {
+                error(e->token, "@(objc_superclass) can only be applied when the obj_implement attribute is also applied");
+            }
 
 			if (type_size_of(e->type) > 0) {
 				error(e->token, "@(objc_class) marked type must be of zero size");
@@ -942,6 +990,31 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 			if (tn->scope != e->scope) {
 				error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
 			} else {
+
+                if (ac.objc_is_implementation) {
+                    GB_ASSERT(e->kind == Entity_Procedure);
+
+                    CheckerInfo *info = ctx->info;
+                    mutex_lock(&info->objc_method_mutex);
+                    defer (mutex_unlock(&info->objc_method_mutex));
+
+                    auto method = ObjcMethodData{ ac, e };
+
+                    if (ac.objc_selector == "") {
+                        method.ac.objc_selector = ac.objc_name;
+                    }
+
+                    Array<ObjcMethodData>* method_list = map_get(&info->objc_method_implementations, t);
+                    if (method_list) {
+                        array_add(method_list, method);
+                    } else {
+                        auto list = array_make<ObjcMethodData>(permanent_allocator(), 1, 8);
+                        list[0] = method;
+
+                        map_set(&info->objc_method_implementations, t, list);
+                    }
+                }
+
 				mutex_lock(&global_type_name_objc_metadata_mutex);
 				defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
 

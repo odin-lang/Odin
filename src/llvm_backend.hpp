@@ -196,6 +196,7 @@ struct lbModule {
 
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
+    StringMap<lbAddr> objc_ivars;
 
 	PtrMap<u64/*type hash*/, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
@@ -219,6 +220,7 @@ struct lbObjCGlobal {
 	gbString  global_name;
 	String    name;
 	Type *    type;
+    Type *    class_impl_type;  // This is set when the class has the objc_implement attribute set to true.
 };
 
 struct lbGenerator : LinkerData {
@@ -240,6 +242,7 @@ struct lbGenerator : LinkerData {
 	MPSCQueue<lbEntityCorrection> entities_to_correct_linkage;
 	MPSCQueue<lbObjCGlobal> objc_selectors;
 	MPSCQueue<lbObjCGlobal> objc_classes;
+    MPSCQueue<lbObjCGlobal> objc_ivars;
 };
 
 

@@ -353,15 +353,18 @@ x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 objc_object   :: struct{}
 objc_selector :: struct{}
 objc_class    :: struct{}
+objc_ivar     :: struct{}
+
 objc_id    :: ^objc_object
 objc_SEL   :: ^objc_selector
 objc_Class :: ^objc_class
+objc_Ivar  :: ^objc_ivar
 
 objc_find_selector     :: proc($name: string) -> objc_SEL   ---
 objc_register_selector :: proc($name: string) -> objc_SEL   ---
 objc_find_class        :: proc($name: string) -> objc_Class ---
 objc_register_class    :: proc($name: string) -> objc_Class ---
-
+ivar_get			   :: proc(self: ^$T, $U: typeid) -> ^U ---
 
 valgrind_client_request :: proc(default: uintptr, request: uintptr, a0, a1, a2, a3, a4: uintptr) -> uintptr ---
 

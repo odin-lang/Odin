@@ -387,6 +387,80 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		try_to_add_package_dependency(c, "runtime", "objc_allocateClassPair");
 		return true;
 	} break;
+
+    case BuiltinProc_objc_ivar_get:
+    {
+        Type *self_type = nullptr;
+        Type *ivar_type = nullptr;
+
+        Operand self {};
+        check_expr_or_type(c, &self, ce->args[0]);
+
+        if (!is_operand_value(self) || !check_is_assignable_to(c, &self, t_objc_id)) {
+            gbString e = expr_to_string(self.expr);
+            gbString t = type_to_string(self.type);
+            error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
+            gb_string_free(t);
+            gb_string_free(e);
+            return false;
+        }
+        else if (!is_type_pointer(self.type)) {
+            gbString e = expr_to_string(self.expr);
+            gbString t = type_to_string(self.type);
+            error(self.expr, "'%.*s' expected a pointer of a value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
+            gb_string_free(t);
+            gb_string_free(e);
+            return false;
+        }
+
+        self_type = type_deref(self.type);
+
+        if (!(self_type->kind == Type_Named &&
+            self_type->Named.type_name != nullptr &&
+                self_type->Named.type_name->TypeName.objc_class_name != "")) {
+            gbString t = type_to_string(self_type);
+            error(self.expr, "'%.*s' expected a named type with the attribute @(obj_class=<string>) , got type %s", LIT(builtin_name), t);
+            gb_string_free(t);
+            return false;
+        }
+
+        if (self_type->Named.type_name->TypeName.objc_ivar == nullptr) {
+            gbString t = type_to_string(self_type);
+            error(self.expr, "'%.*s' requires that type %s have the attribute @(obj_ivar=<ivar_type_name>).", LIT(builtin_name), t);
+            gb_string_free(t);
+            return false;
+        }
+
+        Operand ivar {};
+        check_expr_or_type(c, &ivar, ce->args[1]);
+        if (ivar.mode == Addressing_Type) {
+            ivar_type = ivar.type;
+        } else {
+            return false;
+        }
+
+        if (self_type->Named.type_name->TypeName.objc_ivar != ivar_type) {
+            gbString name_self     = type_to_string(self_type);
+            gbString name_expected = type_to_string(self_type->Named.type_name->TypeName.objc_ivar);
+            gbString name_given    = type_to_string(ivar_type);
+            error(self.expr, "'%.*s' ivar type %s does not match @obj_ivar type %s on Objective-C class %s.",
+                  LIT(builtin_name), name_given, name_expected, name_self);
+            gb_string_free(name_self);
+            gb_string_free(name_expected);
+            gb_string_free(name_given);
+            return false;
+        }
+
+        if (type_hint != nullptr && type_hint->kind == Type_Pointer && type_hint->Pointer.elem == ivar_type) {
+            operand->type = type_hint;
+        } else {
+            operand->type = alloc_type_pointer(ivar_type);
+        }
+
+        operand->mode = Addressing_Value;
+
+        return true;
+    } break;
 	}
 }
 
@@ -2132,7 +2206,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_find_selector: 
 	case BuiltinProc_objc_find_class: 
 	case BuiltinProc_objc_register_selector: 
-	case BuiltinProc_objc_register_class: 
+	case BuiltinProc_objc_register_class:
+    case BuiltinProc_objc_ivar_get:
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:
