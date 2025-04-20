@@ -691,11 +691,11 @@ test_case_insensitive :: proc(t: ^testing.T) {
 @test
 test_multiline :: proc(t: ^testing.T) {
 	{
-		EXPR :: `^hellope$world$`
-		check_expression(t, EXPR, "\nhellope\nworld\n", "\nhellope\nworld\n", extra_flags = { .Multiline })
-		check_expression(t, EXPR, "hellope\nworld", "hellope\nworld", extra_flags = { .Multiline })
-		check_expression(t, EXPR, "hellope\rworld", "hellope\rworld", extra_flags = { .Multiline })
-		check_expression(t, EXPR, "hellope\r\nworld", "hellope\r\nworld", extra_flags = { .Multiline })
+		EXPR :: `^hellope$world$` // This should never match
+		check_expression(t, EXPR, "\nhellope\nworld\n", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "hellope\nworld", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "hellope\rworld", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "hellope\r\nworld", extra_flags = { .Multiline })
 	}
 	{
 		EXPR :: `^?.$`
@@ -709,7 +709,7 @@ test_multiline :: proc(t: ^testing.T) {
 	}
 	{
 		EXPR :: `$`
-		check_expression(t, EXPR, "\n", "\n", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "\n", "", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "", "", extra_flags = { .Multiline })
 	}
 }
@@ -1113,6 +1113,38 @@ iterator_vectors := []Iterator_Test{
 		{
 			{pos = {{2,  8},  {3,  4},  {6,  8}}, groups = {"foobar", "o", "ar"}},
 			{pos = {{9, 15}, {10, 11}, {13, 15}}, groups = {"foobar", "o", "ar"}},
+		},
+	},
+	{
+		"foo1\nfoo2\nfoo3\nfoo4", `^foo\d$`, {.Multiline},
+		{
+			{pos = {{0, 4}}, groups = {"foo1"}},
+			{pos = {{5, 9}}, groups = {"foo2"}},
+			{pos = {{10, 14}}, groups = {"foo3"}},
+			{pos = {{15, 19}}, groups = {"foo4"}},
+		},
+	},
+	{
+		"a\nb\na\nb", `^a$|^b$`, {.Multiline},
+		{
+			{pos = {{0, 1}}, groups = {"a"}},
+			{pos = {{2, 3}}, groups = {"b"}},
+			{pos = {{4, 5}}, groups = {"a"}},
+			{pos = {{6, 7}}, groups = {"b"}},
+		},
+	},
+	{
+		"a\nb\na\nb", `^a(b|$)`, {.Multiline},
+		{
+			{pos = {{0, 1}, {1, 1}}, groups = {"a", ""}},
+			{pos = {{3, 5}, {5, 5}}, groups = {"\na", ""}},
+		},
+	},
+	{
+		"a\nb\n\r", `^$`, {.Multiline},
+		{
+			{pos = {{3, 4}}, groups = {"\n"}},
+			{pos = {{5, 5}}, groups = {""}},
 		},
 	},
 }

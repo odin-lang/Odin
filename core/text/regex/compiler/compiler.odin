@@ -195,8 +195,12 @@ generate_code :: proc(c: ^Compiler, node: Node) -> (code: Program) {
 
 	case ^Node_Anchor:
 		if .Multiline in c.flags {
-			append(&code, Opcode.Multiline_Open)
-			append(&code, Opcode.Multiline_Close)
+			if specific.start {
+				append(&code, Opcode.Multiline_Start_Open)
+				append(&code, Opcode.Multiline_Start_Close)
+			} else {
+				append(&code, Opcode.Assert_Multiline_End)
+			}
 		} else {
 			if specific.start {
 				append(&code, Opcode.Assert_Start)
@@ -467,7 +471,8 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 		inject_at(&code, pc_open + size_of(byte), Opcode(0x00))
 
 		// `)`
-		append(&code, Opcode.Save); append(&code, Opcode(0x01))
+		append(&code, Opcode.Save)
+		append(&code, Opcode(0x01))
 
 		append(&code, Opcode.Match)
 	} else {
