@@ -345,6 +345,7 @@ enum BuildFlagKind {
 	BuildFlag_VetSemicolon,
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
+	BuildFlag_VetPedantic,
 	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
@@ -564,6 +565,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetPedantic,             str_lit("vet-pedantic"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
@@ -1286,6 +1288,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetSemicolon:       build_context.vet_flags |= VetFlag_Semicolon;       break;
 						case BuildFlag_VetCast:            build_context.vet_flags |= VetFlag_Cast;            break;
 						case BuildFlag_VetTabs:            build_context.vet_flags |= VetFlag_Tabs;            break;
+						case BuildFlag_VetPedantic:        build_context.vet_flags |= VetFlag_Pedantic;        break;
 						case BuildFlag_VetUnusedProcedures:
 							build_context.vet_flags |= VetFlag_UnusedProcedures;
 							if (!set_flags[BuildFlag_VetPackages]) {
@@ -2782,6 +2785,15 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 			print_usage_line(3, "-vet-unused-imports");
 			print_usage_line(3, "-vet-shadowing");
 			print_usage_line(3, "-vet-using-stmt");
+		}
+
+		if (print_flag("-vet-pedantic")) {
+			print_usage_line(2, "Does extra pedantic checks on the code.");
+			print_usage_line(2, "Extra pedantic checks include everything in '-vet' plus:");
+			print_usage_line(3, "-vet-cast");
+			print_usage_line(3, "-vet-semicolon");
+			print_usage_line(3, "-vet-style");
+			print_usage_line(3, "-vet-using-param");
 		}
 
 		if (print_flag("-vet-cast")) {

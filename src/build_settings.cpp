@@ -311,6 +311,9 @@ enum VetFlags : u64 {
 	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
+
+	VetFlag_Pedantic = VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_UsingParam|VetFlag_Style|VetFlag_Semicolon|
+	                   VetFlag_UnusedVariables|VetFlag_UnusedImports|VetFlag_Deprecated|VetFlag_Cast,
 };
 
 u64 get_vet_flag_from_name(String const &name) {
@@ -336,6 +339,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Cast;
 	} else if (name == "tabs") {
 		return VetFlag_Tabs;
+	} else if (name == "pedantic") {
+		return VetFlag_Pedantic;
 	} else if (name == "unused-procedures") {
 		return VetFlag_UnusedProcedures;
 	}
