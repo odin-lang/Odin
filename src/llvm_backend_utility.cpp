@@ -2165,28 +2165,26 @@ gb_internal lbAddr lb_handle_objc_find_or_register_ivar(lbModule *m, Type *self_
 		return *found;
 	}
 
-
 	lbModule *default_module = &m->gen->default_module;
 
 	gbString global_name = gb_string_make(permanent_allocator(), "__$objc_ivar::");
 	global_name = gb_string_append_length(global_name, name.text, name.len);
 
     // Create a global variable to store offset of the ivar in an instance of an object
-    Type *p_ivar_offset = alloc_type_pointer(t_u32);
+	LLVMTypeRef t = lb_type(m, t_u32);
 
-	LLVMTypeRef t = lb_type(m, p_ivar_offset);
 	lbValue g = {};
 	g.value = LLVMAddGlobal(m->mod, t, global_name);
-	g.type  = p_ivar_offset;
+	g.type  = alloc_type_pointer(t_u32);
 
 	if (default_module == m) {
-		LLVMSetInitializer(g.value, LLVMConstNull(t));
+		LLVMSetInitializer(g.value, LLVMConstInt(t, 0, true));
 		lb_add_member(m, make_string_c(global_name), g);
 	} else {
 		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 	}
 
-	mpsc_enqueue(&m->gen->objc_ivars, lbObjCGlobal{m, global_name, name, self_type});
+	mpsc_enqueue(&m->gen->objc_ivars, lbObjCGlobal{m, global_name, name, t_u32, self_type});
 
 	lbAddr addr = lb_addr(g);
 	string_map_set(&m->objc_ivars, name, addr);
@@ -2206,8 +2204,8 @@ gb_internal lbValue lb_handle_objc_ivar_get(lbProcedure *p, Ast *expr) {
     lbValue ivar_offset      = lb_addr_load(p, lb_handle_objc_find_or_register_ivar(m, self_type));
     lbValue ivar_offset_uptr = lb_emit_conv(p, ivar_offset, t_uintptr);
 
-    lbValue self        = lb_build_expr(p, ce->args[0]);
-    lbValue self_uptr   = lb_emit_conv(p, self, t_uintptr);
+    lbValue self      = lb_build_expr(p, ce->args[0]);
+    lbValue self_uptr = lb_emit_conv(p, self, t_uintptr);
 
     lbValue ivar_uptr = lb_emit_arith(p, Token_Add, self_uptr, ivar_offset_uptr, t_uintptr);
 

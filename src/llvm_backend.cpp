@@ -1588,6 +1588,13 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
     // Emit method wrapper implementations and registration
     auto wrapper_args = array_make<Type *>(temporary_allocator(), 2, 8);
 
+	PtrMap<Type *, lbObjCGlobal> ivar_map{};
+	map_init(&ivar_map, gen->objc_ivars.count);
+
+	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_ivars, &g); /**/) {
+		map_set(&ivar_map, g.class_impl_type, g);
+	}
+
     for (const auto& cd : class_impls) {
         auto& g = cd.g;
         Type *class_type = g.class_impl_type;
@@ -1700,7 +1707,9 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
         // Add ivar if we have one
         Type *ivar_type = class_type->Named.type_name->TypeName.objc_ivar;
-        if (ivar_type != nullptr) {
+    	lbObjCGlobal *g_ivar = map_get(&ivar_map, class_type);
+
+        if (ivar_type != nullptr && g_ivar != nullptr) {
             // Register a single ivar for this class
             Type *ivar_base = ivar_type->Named.base;
             // TODO(harold): No idea if I can use this, but I assume so?
@@ -1723,27 +1732,45 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
         args.count = 1;
         args[0] = class_value;
         lb_emit_runtime_call(p, "objc_registerClassPair", args);
-
-        // If we have an ivar, store its offset globally for an intrinsic
-        // TODO(harold): Only do this for types that had ivar_get calls registered!
-        if (ivar_type != nullptr) {
-            args.count = 2;
-            args[0] = class_value;
-            args[1] = lb_const_value(m, t_cstring, exact_value_string(str_lit("__$ivar")));
-            lbValue ivar = lb_emit_runtime_call(p, "class_getInstanceVariable", args);
-
-            args.count = 1;
-            args[0] = ivar;
-            lbValue ivar_offset     = lb_emit_runtime_call(p, "ivar_getOffset", args);
-            lbValue ivar_offset_u32 = lb_emit_conv(p, ivar_offset, t_u32);
-
-            String class_name = class_type->Named.type_name->TypeName.objc_class_name;
-            // TODO(harold): Oops! This is wrong, that map is there to prevent re-entry.
-            //               Simply emit from referred ivars. For now use a single module only.
-            lbAddr ivar_addr = string_map_must_get(&m->objc_ivars, class_name);
-            lb_addr_store(p, ivar_addr, ivar_offset_u32);
-        }
     }
+
+	// Register ivars
+	Type *ptr_u32 = alloc_type_pointer(t_u32);
+	for (auto const& kv : ivar_map) {
+		lbObjCGlobal const& g = kv.value;
+		lbAddr ivar_addr = {};
+		lbValue *found = string_map_get(&m->members, g.global_name);
+
+		if (found) {
+			ivar_addr = lb_addr(*found);
+		} else {
+			// Defined in an external package, must define now
+			LLVMTypeRef t = lb_type(m, t_u32);
+
+			lbValue global{};
+			global.value = LLVMAddGlobal(m->mod, t, g.global_name);
+			global.type  = ptr_u32;
+
+			LLVMSetInitializer(global.value, LLVMConstInt(t, 0, true));
+
+			ivar_addr = lb_addr(global);
+		}
+
+		String class_name = g.class_impl_type->Named.type_name->TypeName.objc_class_name;
+		lbValue class_value = string_map_must_get(&global_class_map, class_name).class_value;
+
+		args.count = 2;
+		args[0] = class_value;
+		args[1] = lb_const_value(m, t_cstring, exact_value_string(str_lit("__$ivar")));
+		lbValue ivar = lb_emit_runtime_call(p, "class_getInstanceVariable", args);
+
+		args.count = 1;
+		args[0] = ivar;
+		lbValue ivar_offset     = lb_emit_runtime_call(p, "ivar_getOffset", args);
+		lbValue ivar_offset_u32 = lb_emit_conv(p, ivar_offset, t_u32);
+
+		lb_addr_store(p, ivar_addr, ivar_offset_u32);
+	}
 
 	lb_end_procedure_body(p);
 }
