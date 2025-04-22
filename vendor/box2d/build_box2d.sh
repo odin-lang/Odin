@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-VERSION="3.0.0"
+VERSION="3.1.0"
 RELEASE="https://github.com/erincatto/box2d/archive/refs/tags/v$VERSION.tar.gz"
 
 cd "$(odin root)"/vendor/box2d
@@ -75,5 +75,5 @@ if [[ $? -ne 0 ]]; then
 fi
 set -e
 
-rm -rf v3.0.0.tar.gz
-rm -rf box2d-3.0.0
+rm -rf "v$VERSION.tar.gz"
+rm -rf box2d-"$VERSION"
