@@ -1449,9 +1449,12 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		_fmt_float_as(fi, v, bit_size, verb, 'g', -1)
 	case 'f', 'F':
 		_fmt_float_as(fi, v, bit_size, verb, 'f', 3)
-	case 'e', 'E':
+	case 'e':
 		// BUG(): "%.3e" returns "3.000e+00"
 		_fmt_float_as(fi, v, bit_size, verb, 'e', 6)
+	case 'E':
+		// BUG(): "%.3E" returns "3.000E+00"
+		_fmt_float_as(fi, v, bit_size, verb, 'E', 6)
 
 	case 'h', 'H':
 		prev_fi := fi^
