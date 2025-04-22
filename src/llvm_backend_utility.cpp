@@ -2191,25 +2191,30 @@ gb_internal lbAddr lb_handle_objc_find_or_register_ivar(lbModule *m, Type *self_
 	return addr;
 }
 
+gb_internal lbValue lb_handle_objc_ivar_for_objc_object_pointer(lbProcedure *p, lbValue self) {
+	GB_ASSERT(self.type->kind == Type_Pointer && self.type->Pointer.elem->kind == Type_Named);
+
+	Type *self_type = self.type->Pointer.elem;
+
+	lbValue self_uptr = lb_emit_conv(p, self, t_uintptr);
+
+	lbValue ivar_offset      = lb_addr_load(p, lb_handle_objc_find_or_register_ivar(p->module, self_type));
+	lbValue ivar_offset_uptr = lb_emit_conv(p, ivar_offset, t_uintptr);
+
+
+	lbValue ivar_uptr = lb_emit_arith(p, Token_Add, self_uptr, ivar_offset_uptr, t_uintptr);
+
+	Type *ivar_type = self_type->Named.type_name->TypeName.objc_ivar;
+	return lb_emit_conv(p, ivar_uptr, alloc_type_pointer(ivar_type));
+}
+
 gb_internal lbValue lb_handle_objc_ivar_get(lbProcedure *p, Ast *expr) {
     ast_node(ce, CallExpr, expr);
-    lbModule *m = p->module;
 
     GB_ASSERT(ce->args[0]->tav.type->kind == Type_Pointer);
-    Type *self_type = ce->args[0]->tav.type->Pointer.elem;
-    Type *ivar_type = self_type->Named.type_name->TypeName.objc_ivar;
+    lbValue self = lb_build_expr(p, ce->args[0]);
 
-    Type* p_ivar = alloc_type_pointer(ivar_type);
-
-    lbValue ivar_offset      = lb_addr_load(p, lb_handle_objc_find_or_register_ivar(m, self_type));
-    lbValue ivar_offset_uptr = lb_emit_conv(p, ivar_offset, t_uintptr);
-
-    lbValue self      = lb_build_expr(p, ce->args[0]);
-    lbValue self_uptr = lb_emit_conv(p, self, t_uintptr);
-
-    lbValue ivar_uptr = lb_emit_arith(p, Token_Add, self_uptr, ivar_offset_uptr, t_uintptr);
-
-    return lb_emit_conv(p, ivar_uptr, p_ivar);
+	return lb_handle_objc_ivar_for_objc_object_pointer(p, self);
 }
 
 gb_internal lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {

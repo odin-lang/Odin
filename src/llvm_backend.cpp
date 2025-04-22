@@ -1707,9 +1707,8 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
         // Add ivar if we have one
         Type *ivar_type = class_type->Named.type_name->TypeName.objc_ivar;
-    	lbObjCGlobal *g_ivar = map_get(&ivar_map, class_type);
 
-        if (ivar_type != nullptr && g_ivar != nullptr) {
+        if (ivar_type != nullptr) {
             // Register a single ivar for this class
             Type *ivar_base = ivar_type->Named.base;
             // TODO(harold): No idea if I can use this, but I assume so?
@@ -1734,7 +1733,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
         lb_emit_runtime_call(p, "objc_registerClassPair", args);
     }
 
-	// Register ivars
+	// Register ivar offsets for any `objc_ivar_get` expressions emitted.
 	Type *ptr_u32 = alloc_type_pointer(t_u32);
 	for (auto const& kv : ivar_map) {
 		lbObjCGlobal const& g = kv.value;

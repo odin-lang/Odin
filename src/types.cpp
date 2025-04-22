@@ -3329,6 +3329,15 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 					}
 				}
 			}
+
+			Type *objc_ivar_type = e->TypeName.objc_ivar;
+			if (objc_ivar_type != nullptr) {
+				sel = lookup_field_with_selection(objc_ivar_type, field_name, false, sel, allow_blank_ident);
+				if (sel.entity != nullptr) {
+					sel.pseudo_field = true;
+					return sel;
+				}
+			}
 		}
 
 		if (is_type_polymorphic(type)) {
