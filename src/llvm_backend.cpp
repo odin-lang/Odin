@@ -1336,7 +1336,7 @@ String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_d
             s = gb_string_append_length(s, "=", 1);
 
             if (!is_union) {
-                for( auto& f : t->Struct.fields ) {
+                for( auto& f : base->Struct.fields ) {
                     String field_type = lb_get_objc_type_encoding(f->type, allocator, pointer_depth);
                     s = gb_string_append_length(s, field_type.text, field_type.len);
                 }
@@ -1717,7 +1717,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
             // TODO(harold): Checker: Alignment must be compatible with ivar rules. Or we should increase the alignment if needed.
 
             String ivar_name  = str_lit("__$ivar");
-            String ivar_types = str_lit("{= }");
+            String ivar_types = str_lit("{= }");	//lb_get_objc_type_encoding(ivar_type, temporary_allocator());// str_lit("{= }");
             args.count = 5;
             args[0] = class_value;
             args[1] = lb_const_value(m, t_cstring, exact_value_string(ivar_name));
