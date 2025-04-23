@@ -5192,7 +5192,13 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				// If it's a deep pointer, dereference it first
 				// TODO(harold): Ensure this is save to do here. lb_emit_deep_field_gep() has several derefs, once per index.
 				//				 Not sure what multiple indices represent...
-				Type* type = tav.type;
+				Type* type = type_deref(addr.addr.type);
+
+				// TODO(harold): Checker: Must NOT allow ivar dereferencing on non-pointer types.
+				//					      this would access memory outside the size of the value.
+				//						  In fact, locals/globals of Objective-C types ought not be allowed at all.
+				GB_ASSERT(is_type_pointer(type));
+
 				if (is_type_pointer(type)) {
 					type = type_deref(type);
 					addr = lb_addr(lb_emit_load(p, addr.addr));
