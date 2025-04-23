@@ -1502,6 +1502,8 @@ gb_internal void init_checker(Checker *c) {
 
 	TIME_SECTION("init proc queues");
 	mpsc_init(&c->procs_with_deferred_to_check, a); //, 1<<10);
+	mpsc_init(&c->procs_with_objc_context_provider_to_check, a);
+
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
@@ -3974,6 +3976,23 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
             error(value, "'%.*s' expected a named type", LIT(name));
         }
         return true;
+    } else if (name == "objc_context_provider") {
+    	Operand o = {};
+    	check_expr(c, &o, value);
+    	Entity *e = entity_of_node(o.expr);
+
+    	if (e != nullptr) {
+    		if (ac->objc_context_provider != nullptr) {
+    			error(elem, "Previous usage of a 'objc_context_provider' attribute");
+    		}
+    		if (e->kind != Entity_Procedure) {
+    			error(elem, "'objc_context_provider' must refer to a procedure");
+    		} else {
+    			ac->objc_context_provider = e;
+    		}
+
+    		return true;
+    	}
     }
     return false;
 }
@@ -6462,6 +6481,47 @@ gb_internal void check_deferred_procedures(Checker *c) {
 
 }
 
+gb_internal void check_objc_context_provider_procedures(Checker *c) {
+	for (Entity *e = nullptr; mpsc_dequeue(&c->procs_with_objc_context_provider_to_check, &e); /**/) {
+		GB_ASSERT(e->kind == Entity_TypeName);
+
+		Entity *proc_entity = e->TypeName.objc_context_provider;
+		GB_ASSERT(proc_entity->kind == Entity_Procedure);
+
+		Type *proc_type = proc_entity->type;
+
+		// TODO(harold): Give better errors here (specify exactly what's wrong)
+		const char* signature_error = "The procedure for @(objc_context_provider) has an incorrect signature.";
+
+		if (proc_type->Proc.param_count != 1 || proc_type->Proc.result_count != 1) {
+			error(proc_entity->token, signature_error);
+		} else {
+			Type *self_param  = base_type(proc_type->Proc.params->Tuple.variables[0]->type);
+			Type *return_type = base_named_type(proc_type->Proc.results->Tuple.variables[0]->type);
+
+			if (self_param->kind != Type_Pointer) {
+				error(proc_entity->token, signature_error);
+				continue;
+			}
+
+			self_param = base_named_type(self_param->Pointer.elem);
+
+			if (return_type != t_context) {
+				error(e->token, signature_error);
+			} else if (!internal_check_is_assignable_to(self_param, e->type) &&
+				(e->TypeName.objc_ivar && !internal_check_is_assignable_to(self_param, e->TypeName.objc_ivar))
+			) {
+				error(e->token, signature_error);
+			} else if (proc_type->Proc.calling_convention != ProcCC_CDecl &&
+					   proc_type->Proc.calling_convention != ProcCC_Contextless) {
+				error(e->token, signature_error);
+			} else if (proc_type->Proc.is_polymorphic) {
+				error(e->token, signature_error);
+		   	}
+		}
+	}
+}
+
 gb_internal void check_unique_package_names(Checker *c) {
 	ERROR_BLOCK();
 
@@ -6609,6 +6669,7 @@ gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
 	}
 }
 
+
 gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("map full filepaths to scope");
 	add_type_info_type(&c->builtin_ctx, t_invalid);
@@ -6717,6 +6778,9 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check deferred procedures");
 	check_deferred_procedures(c);
+
+	TIME_SECTION("check objc context provider procedures");
+	check_objc_context_provider_procedures(c);
 
 	TIME_SECTION("calculate global init order");
 	calculate_global_init_order(c);

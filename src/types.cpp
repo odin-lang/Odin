@@ -874,6 +874,29 @@ gb_internal Type *base_type(Type *t) {
 	return t;
 }
 
+gb_internal Type *base_named_type(Type *t) {
+	if (t->kind != Type_Named) {
+		return t_invalid;
+	}
+
+	Type *prev_named = t;
+	t = t->Named.base;
+	for (;;) {
+		if (t == nullptr) {
+			break;
+		}
+		if (t->kind != Type_Named) {
+			break;
+		}
+		if (t == t->Named.base) {
+			return t_invalid;
+		}
+		prev_named = t;
+		t = t->Named.base;
+	}
+	return prev_named;
+}
+
 gb_internal Type *base_enum_type(Type *t) {
 	Type *bt = base_type(t);
 	if (bt != nullptr &&

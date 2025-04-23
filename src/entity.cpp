@@ -238,6 +238,7 @@ struct Entity {
             bool   objc_is_implementation;
             Type*  objc_superclass;
             Type*  objc_ivar;
+			Entity*objc_context_provider;
 			String objc_class_name;
 			TypeNameObjCMetadata *objc_metadata;
 		} TypeName;

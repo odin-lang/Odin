@@ -152,6 +152,7 @@ struct AttributeContext {
 	Type *  objc_type;
     Type *  objc_superclass;
     Type *  objc_ivar;
+	Entity *objc_context_provider;
 	bool    objc_is_class_method   : 1;
     bool    objc_is_implementation : 1;     // This struct or proc provides a class/method implementation, not a binding to an existing type.
 
@@ -570,6 +571,7 @@ struct Checker {
 	CheckerContext builtin_ctx;
 
 	MPSCQueue<Entity *> procs_with_deferred_to_check;
+	MPSCQueue<Entity *> procs_with_objc_context_provider_to_check;
 	Array<ProcInfo *> procs_to_check;
 
 	BlockingMutex nested_proc_lits_mutex;

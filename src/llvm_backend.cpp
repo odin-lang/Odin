@@ -1586,7 +1586,9 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 
     // Emit method wrapper implementations and registration
-    auto wrapper_args = array_make<Type *>(temporary_allocator(), 2, 8);
+    auto wrapper_args     = array_make<Type *>(temporary_allocator(), 2, 8);
+	auto get_context_args = array_make<lbValue>(temporary_allocator(), 1);
+
 
 	PtrMap<Type *, lbObjCGlobal> ivar_map{};
 	map_init(&ivar_map, gen->objc_ivars.count);
@@ -1598,6 +1600,13 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
     for (const auto& cd : class_impls) {
         auto& g = cd.g;
         Type *class_type = g.class_impl_type;
+
+    	Entity *context_provider = class_type->Named.type_name->TypeName.objc_context_provider;
+    	lbValue context_provider_proc_value{};
+    	if (context_provider) {
+    		context_provider_proc_value = lb_find_procedure_value_from_entity(m, context_provider);
+    	}
+
 
         Array<ObjcMethodData>* methods = map_get(&m->info->objc_method_implementations, class_type);
         if (!methods) {
@@ -1645,6 +1654,31 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
             LLVMSetLinkage(wrapper_proc->value, LLVMExternalLinkage);
             lb_begin_procedure_body(wrapper_proc);
             {
+            	if (method_type->Proc.calling_convention == ProcCC_Odin) {
+            		GB_ASSERT(context_provider);
+
+            		// Emit the get odin context call
+
+            		// TODO(harold): Get these values at the top, at the start of the method loop for a class
+            		Type *ctx_provider_proc = context_provider->type;
+
+            		Type *self_param_ptr_type = base_type(ctx_provider_proc->Proc.params->Tuple.variables[0]->type);
+            		GB_ASSERT(self_param_ptr_type->kind == Type_Pointer);
+
+            		// TODO(harold): Set the arg type to the ivar's type, if the context provider takes the ivar's type.
+            		// Type *self_param_type = base_named_type(type_deref(self_param_ptr_type));
+
+            		get_context_args[0] = lbValue {
+            			wrapper_proc->raw_input_parameters[0],
+						self_param_ptr_type,
+					};
+
+            		lbValue context	     = lb_emit_call(wrapper_proc, context_provider_proc_value, get_context_args);
+            		lbAddr  context_addr = lb_addr(lb_address_from_load_or_generate_local(wrapper_proc, context));
+            		lb_push_context_onto_stack(wrapper_proc, context_addr);
+            	}
+
+
                 auto method_call_args = array_make<lbValue>(temporary_allocator(), method_param_count + (isize)method_param_offset);
 
                 if (!md.ac.objc_is_class_method) {
@@ -1711,11 +1745,12 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
         if (ivar_type != nullptr) {
             // Register a single ivar for this class
             Type *ivar_base = ivar_type->Named.base;
-            // TODO(harold): No idea if I can use this, but I assume so?
-            const i64 size      = ivar_base->cached_size;
-            const i64 alignment = ivar_base->cached_align;
+
+            const i64 size      = type_size_of(ivar_base);
+            const i64 alignment = type_align_of(ivar_base);
             // TODO(harold): Checker: Alignment must be compatible with ivar rules. Or we should increase the alignment if needed.
 
+        	// TODO(harold): Should we pass the actual type encoding? Might not be ideal for obfuscation.
             String ivar_name  = str_lit("__$ivar");
             String ivar_types = str_lit("{= }");	//lb_get_objc_type_encoding(ivar_type, temporary_allocator());// str_lit("{= }");
             args.count = 5;
