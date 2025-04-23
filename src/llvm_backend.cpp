@@ -1600,11 +1600,25 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
     for (const auto& cd : class_impls) {
         auto& g = cd.g;
         Type *class_type = g.class_impl_type;
+    	Type *class_ptr_type = alloc_type_pointer(class_type);
+    	lbValue class_value = cd.class_value;
+
+    	Type *ivar_type = class_type->Named.type_name->TypeName.objc_ivar;
 
     	Entity *context_provider = class_type->Named.type_name->TypeName.objc_context_provider;
+    	Type *contex_provider_self_ptr_type = nullptr;
+    	Type *contex_provider_self_named_type = nullptr;
+    	bool is_context_provider_ivar = false;
     	lbValue context_provider_proc_value{};
+
     	if (context_provider) {
     		context_provider_proc_value = lb_find_procedure_value_from_entity(m, context_provider);
+
+    		contex_provider_self_ptr_type = base_type(context_provider->type->Proc.params->Tuple.variables[0]->type);
+    		GB_ASSERT(contex_provider_self_ptr_type->kind == Type_Pointer);
+    		contex_provider_self_named_type = base_named_type(type_deref(contex_provider_self_ptr_type));
+
+    		is_context_provider_ivar = ivar_type != nullptr && internal_check_is_assignable_to(contex_provider_self_named_type, ivar_type);
     	}
 
 
@@ -1612,9 +1626,6 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
         if (!methods) {
             continue;
         }
-
-        Type *class_ptr_type = alloc_type_pointer(class_type);
-        lbValue class_value = cd.class_value;
 
         for (const ObjcMethodData& md : *methods) {
             GB_ASSERT( md.proc_entity->kind == Entity_Procedure);
@@ -1659,19 +1670,20 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
             		// Emit the get odin context call
 
-            		// TODO(harold): Get these values at the top, at the start of the method loop for a class
-            		Type *ctx_provider_proc = context_provider->type;
-
-            		Type *self_param_ptr_type = base_type(ctx_provider_proc->Proc.params->Tuple.variables[0]->type);
-            		GB_ASSERT(self_param_ptr_type->kind == Type_Pointer);
-
-            		// TODO(harold): Set the arg type to the ivar's type, if the context provider takes the ivar's type.
-            		// Type *self_param_type = base_named_type(type_deref(self_param_ptr_type));
-
             		get_context_args[0] = lbValue {
             			wrapper_proc->raw_input_parameters[0],
-						self_param_ptr_type,
+						contex_provider_self_ptr_type,
 					};
+
+            		if (is_context_provider_ivar) {
+            			// The context provider takes the ivar's type.
+            			// Emit an obj_ivar_get call and use that pointer for 'self' instead.
+            			lbValue real_self {
+            				wrapper_proc->raw_input_parameters[0],
+            				class_ptr_type
+            			};
+            			get_context_args[0] = lb_handle_objc_ivar_for_objc_object_pointer(wrapper_proc, real_self);
+            		}
 
             		lbValue context	     = lb_emit_call(wrapper_proc, context_provider_proc_value, get_context_args);
             		lbAddr  context_addr = lb_addr(lb_address_from_load_or_generate_local(wrapper_proc, context));
@@ -1740,8 +1752,6 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
         } // End methods
 
         // Add ivar if we have one
-        Type *ivar_type = class_type->Named.type_name->TypeName.objc_ivar;
-
         if (ivar_type != nullptr) {
             // Register a single ivar for this class
             Type *ivar_base = ivar_type->Named.base;
