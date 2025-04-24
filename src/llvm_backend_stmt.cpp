@@ -1984,6 +1984,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		char *c_name = alloc_cstring(permanent_allocator(), mangled_name);
 
 		LLVMValueRef global = LLVMAddGlobal(p->module->mod, lb_type(p->module, e->type), c_name);
+		LLVMSetAlignment(global, type_align_of(e->type));
 		LLVMSetInitializer(global, LLVMConstNull(lb_type(p->module, e->type)));
 		if (value.value != nullptr) {
 			LLVMSetInitializer(global, value.value);
