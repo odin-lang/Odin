@@ -1,7 +1,9 @@
 #+no-instrumentation
-package runtime
+package sanitizer
 
-Asan_Death_Callback :: #type proc "c" (pc: rawptr, bp: rawptr, sp: rawptr, addr: rawptr, is_write: i32, access_size: uint)
+import "base:runtime"
+
+Address_Death_Callback :: #type proc "c" (pc: rawptr, bp: rawptr, sp: rawptr, addr: rawptr, is_write: i32, access_size: uint)
 
 @(private="file")
 ASAN_ENABLED :: .Address in ODIN_SANITIZER_FLAGS
@@ -11,7 +13,7 @@ ASAN_ENABLED :: .Address in ODIN_SANITIZER_FLAGS
 foreign {
 	__asan_poison_memory_region      :: proc(address: rawptr, size: uint) ---
 	__asan_unpoison_memory_region    :: proc(address: rawptr, size: uint) ---
-	__sanitizer_set_death_callback   :: proc(callback: Asan_Death_Callback) ---
+	__sanitizer_set_death_callback   :: proc(callback: Address_Death_Callback) ---
 	__asan_region_is_poisoned        :: proc(begin: rawptr, size: uint) -> rawptr ---
 	__asan_address_is_poisoned       :: proc(addr: rawptr) -> i32 ---
 	__asan_describe_address          :: proc(addr: rawptr) ---
@@ -34,79 +36,79 @@ foreign {
 	__asan_update_allocation_context :: proc(addr: rawptr) -> i32 ---
 }
 
-Asan_Access_Type :: enum {
+Address_Access_Type :: enum {
 	none,
 	read,
 	write,
 }
 
-Asan_Located_Address_String :: struct {
+Address_Located_Address_String :: struct {
 	category: string,
 	name: string,
 }
 
-Asan_Shadow_Mapping :: struct {
+Address_Shadow_Mapping :: struct {
 	scale: uint,
 	offset: uint,
 }
 
-asan_poison_slice :: proc "contextless" (region: $T/[]$E) {
+address_poison_slice :: proc "contextless" (region: $T/[]$E) {
 	when ASAN_ENABLED {
 		__asan_poison_memory_region(raw_data(region), size_of(E) * len(region))
 	}
 }
 
-asan_unpoison_slice :: proc "contextless" (region: $T/[]$E) {
+address_unpoison_slice :: proc "contextless" (region: $T/[]$E) {
 	when ASAN_ENABLED {
 		__asan_unpoison_memory_region(raw_data(region), size_of(E) * len(region))
 	}
 }
 
-asan_poison_ptr :: proc "contextless" (ptr: ^$T) {
+address_poison_ptr :: proc "contextless" (ptr: ^$T) {
 	when ASAN_ENABLED {
 		__asan_poison_memory_region(ptr, size_of(T))
 	}
 }
 
-asan_unpoison_ptr :: proc "contextless" (ptr: ^$T) {
+address_unpoison_ptr :: proc "contextless" (ptr: ^$T) {
 	when ASAN_ENABLED {
 		__asan_unpoison_memory_region(ptr, size_of(T))
 	}
 }
 
-asan_poison_rawptr :: proc "contextless" (ptr: rawptr, len: int) {
+address_poison_rawptr :: proc "contextless" (ptr: rawptr, len: int) {
 	when ASAN_ENABLED {
 		assert_contextless(len >= 0)
 		__asan_poison_memory_region(ptr, uint(len))
 	}
 }
 
-asan_unpoison_rawptr :: proc "contextless" (ptr: rawptr, len: int) {
+address_unpoison_rawptr :: proc "contextless" (ptr: rawptr, len: int) {
 	when ASAN_ENABLED {
 		assert_contextless(len >= 0)
 		__asan_unpoison_memory_region(ptr, uint(len))
 	}
 }
 
-asan_poison :: proc {
-	asan_poison_slice,
-	asan_poison_ptr,
-	asan_poison_rawptr,
+address_poison :: proc {
+	address_poison_slice,
+	address_poison_ptr,
+	address_poison_rawptr,
 }
 
-asan_unpoison :: proc {
-	asan_unpoison_slice,
-	asan_unpoison_ptr,
-	asan_unpoison_rawptr,
+address_unpoison :: proc {
+	address_unpoison_slice,
+	address_unpoison_ptr,
+	address_unpoison_rawptr,
 }
 
-asan_set_death_callback :: proc "contextless" (callback: Asan_Death_Callback) {
+address_set_death_callback :: proc "contextless" (callback: Address_Death_Callback) {
 	when ASAN_ENABLED {
 		__sanitizer_set_death_callback(callback)
 	}
 }
 
-asan_region_is_poisoned_slice :: proc "contextless" (region: []$T/$E) -> rawptr {
+address_region_is_poisoned_slice :: proc "contextless" (region: []$T/$E) -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_region_is_poisoned(raw_data(region), size_of(E) * len(region))
 	} else {
@@ -114,7 +116,7 @@ asan_region_is_poisoned_slice :: proc "contextless" (region: []$T/$E) -> rawptr 
 	}
 }
 
-asan_region_is_poisoned_ptr :: proc "contextless" (ptr: ^$T) -> rawptr {
+address_region_is_poisoned_ptr :: proc "contextless" (ptr: ^$T) -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_region_is_poisoned(ptr, size_of(T))
 	} else {
@@ -122,7 +124,7 @@ asan_region_is_poisoned_ptr :: proc "contextless" (ptr: ^$T) -> rawptr {
 	}
 }
 
-asan_region_is_poisoned_rawptr :: proc "contextless" (region: rawptr, len: int) -> rawptr {
+address_region_is_poisoned_rawptr :: proc "contextless" (region: rawptr, len: int) -> rawptr {
 	when ASAN_ENABLED {
 		assert_contextless(len >= 0)
 		return __asan_region_is_poisoned(region, uint(len))
@@ -131,13 +133,13 @@ asan_region_is_poisoned_rawptr :: proc "contextless" (region: rawptr, len: int) 
 	}
 }
 
-asan_region_is_poisoned :: proc {
-	asan_region_is_poisoned_slice,
-	asan_region_is_poisoned_ptr,
-	asan_region_is_poisoned_rawptr,
+address_region_is_poisoned :: proc {
+	address_region_is_poisoned_slice,
+	address_region_is_poisoned_ptr,
+	address_region_is_poisoned_rawptr,
 }
 
-asan_address_is_poisoned :: proc "contextless" (address: rawptr) -> bool {
+address_address_is_poisoned :: proc "contextless" (address: rawptr) -> bool {
 	when ASAN_ENABLED {
 		return __asan_address_is_poisoned(address) != 0
 	} else {
@@ -145,13 +147,13 @@ asan_address_is_poisoned :: proc "contextless" (address: rawptr) -> bool {
 	}
 }
 
-asan_describe_address :: proc "contextless" (address: rawptr) {
+address_describe_address :: proc "contextless" (address: rawptr) {
 	when ASAN_ENABLED {
 		__asan_describe_address(address)
 	}
 }
 
-asan_report_present :: proc "contextless" () -> bool {
+address_report_present :: proc "contextless" () -> bool {
 	when ASAN_ENABLED {
 		return __asan_report_present() != 0
 	} else {
@@ -159,7 +161,7 @@ asan_report_present :: proc "contextless" () -> bool {
 	}
 }
 
-asan_get_report_pc :: proc "contextless" () -> rawptr {
+address_get_report_pc :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_report_pc()
 	} else {
@@ -167,7 +169,7 @@ asan_get_report_pc :: proc "contextless" () -> rawptr {
 	}
 }
 
-asan_get_report_bp :: proc "contextless" () -> rawptr {
+address_get_report_bp :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_report_bp()
 	} else {
@@ -175,7 +177,7 @@ asan_get_report_bp :: proc "contextless" () -> rawptr {
 	}
 }
 
-asan_get_report_sp :: proc "contextless" () -> rawptr {
+address_get_report_sp :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_report_sp()
 	} else {
@@ -183,7 +185,7 @@ asan_get_report_sp :: proc "contextless" () -> rawptr {
 	}
 }
 
-asan_get_report_address :: proc "contextless" () -> rawptr {
+address_get_report_address :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_report_address()
 	} else {
@@ -191,7 +193,7 @@ asan_get_report_address :: proc "contextless" () -> rawptr {
 	}
 }
 
-asan_get_report_access_type :: proc "contextless" () -> Asan_Access_Type {
+address_get_report_access_type :: proc "contextless" () -> Address_Access_Type {
 	when ASAN_ENABLED {
 		return __asan_get_report_access_type() == 0 ? .read : .write
 	} else {
@@ -199,7 +201,7 @@ asan_get_report_access_type :: proc "contextless" () -> Asan_Access_Type {
 	}
 }
 
-asan_get_report_access_size :: proc "contextless" () -> uint {
+address_get_report_access_size :: proc "contextless" () -> uint {
 	when ASAN_ENABLED {
 		return __asan_get_report_access_size()
 	} else {
@@ -207,7 +209,7 @@ asan_get_report_access_size :: proc "contextless" () -> uint {
 	}
 }
 
-asan_get_report_description :: proc "contextless" () -> string {
+address_get_report_description :: proc "contextless" () -> string {
 	when ASAN_ENABLED {
 		return string(__asan_get_report_description())
 	} else {
@@ -215,7 +217,7 @@ asan_get_report_description :: proc "contextless" () -> string {
 	}
 }
 
-asan_locate_address :: proc (addr: rawptr, allocator: Allocator, string_alloc_size := 64) -> (Asan_Located_Address_String, []byte, Allocator_Error) {
+address_locate_address :: proc (addr: rawptr, allocator: runtime.Allocator, string_alloc_size := 64) -> (Address_Located_Address_String, []byte, runtime.Allocator_Error) {
 	when ASAN_ENABLED {
 		data, err := make([]byte, string_alloc_size, allocator)
 		if err != nil {
@@ -230,7 +232,7 @@ asan_locate_address :: proc (addr: rawptr, allocator: Allocator, string_alloc_si
 	}
 }
 
-asan_get_alloc_stack_trace :: proc (addr: rawptr, allocator: Allocator, stack_alloc_size := 32) -> ([]rawptr, int, Allocator_Error) {
+address_get_alloc_stack_trace :: proc (addr: rawptr, allocator: runtime.Allocator, stack_alloc_size := 32) -> ([]rawptr, int, runtime.Allocator_Error) {
 	when ASAN_ENABLED {
 		data, err := make([]rawptr, stack_alloc_size, allocator)
 		if err != nil {
@@ -244,7 +246,7 @@ asan_get_alloc_stack_trace :: proc (addr: rawptr, allocator: Allocator, stack_al
 	}
 }
 
-asan_get_free_stack_trace :: proc (addr: rawptr, allocator: Allocator, stack_alloc_size := 32) -> ([]rawptr, int, Allocator_Error) {
+address_get_free_stack_trace :: proc (addr: rawptr, allocator: runtime.Allocator, stack_alloc_size := 32) -> ([]rawptr, int, runtime.Allocator_Error) {
 	when ASAN_ENABLED {
 		data, err := make([]rawptr, stack_alloc_size, allocator)
 		if err != nil {
@@ -258,9 +260,9 @@ asan_get_free_stack_trace :: proc (addr: rawptr, allocator: Allocator, stack_all
 	}
 }
 
-asan_get_shadow_mapping :: proc "contextless" () -> Asan_Shadow_Mapping {
+address_get_shadow_mapping :: proc "contextless" () -> Address_Shadow_Mapping {
 	when ASAN_ENABLED {
-		result: Asan_Shadow_Mapping
+		result: Address_Shadow_Mapping
 		__asan_get_shadow_mapping(&result.scale, &result.offset)
 		return result
 	} else {
@@ -268,13 +270,13 @@ asan_get_shadow_mapping :: proc "contextless" () -> Asan_Shadow_Mapping {
 	}
 }
 
-asan_print_accumulated_stats :: proc "contextless" () {
+address_print_accumulated_stats :: proc "contextless" () {
 	when ASAN_ENABLED {
 		__asan_print_accumulated_stats()
 	}
 }
 
-asan_get_current_fake_stack :: proc "contextless" () -> rawptr {
+address_get_current_fake_stack :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_current_fake_stack()
 	} else {
@@ -282,7 +284,7 @@ asan_get_current_fake_stack :: proc "contextless" () -> rawptr {
 	}
 }
 
-asan_is_in_fake_stack :: proc "contextless" (fake_stack: rawptr, addr: rawptr) -> ([]byte, bool) {
+address_is_in_fake_stack :: proc "contextless" (fake_stack: rawptr, addr: rawptr) -> ([]byte, bool) {
 	when ASAN_ENABLED {
 		begin: rawptr
 		end: rawptr
@@ -295,13 +297,13 @@ asan_is_in_fake_stack :: proc "contextless" (fake_stack: rawptr, addr: rawptr) -
 	}
 }
 
-asan_handle_no_return :: proc "contextless" () {
+address_handle_no_return :: proc "contextless" () {
 	when ASAN_ENABLED {
 		__asan_handle_no_return()
 	}
 }
 
-asan_update_allocation_context :: proc "contextless" (addr: rawptr) -> bool {
+address_update_allocation_context :: proc "contextless" (addr: rawptr) -> bool {
 	when ASAN_ENABLED {
 		return __asan_update_allocation_context(addr) != 0
 	} else {
