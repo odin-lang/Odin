@@ -1,8 +1,6 @@
 #+no-instrumentation
 package sanitizer
 
-import "base:runtime"
-
 Address_Death_Callback :: #type proc "c" (pc: rawptr, bp: rawptr, sp: rawptr, addr: rawptr, is_write: i32, access_size: uint)
 
 @(private="file")
@@ -217,46 +215,34 @@ address_get_report_description :: proc "contextless" () -> string {
 	}
 }
 
-address_locate_address :: proc (addr: rawptr, allocator: runtime.Allocator, string_alloc_size := 64) -> (Address_Located_Address_String, []byte, runtime.Allocator_Error) {
+address_locate_address :: proc "contextless" (addr: rawptr, data: []byte) -> (Address_Located_Address_String, []byte) {
 	when ASAN_ENABLED {
-		data, err := make([]byte, string_alloc_size, allocator)
-		if err != nil {
-			return { "", "" }, {}, err
-		}
 		out_addr: rawptr
 		out_size: uint
 		str := __asan_locate_address(addr, raw_data(data), len(data), &out_addr, &out_size)
-		return { string(str), string(cstring(raw_data(data))) }, (cast([^]byte)out_addr)[:out_size], nil
+		return { string(str), string(cstring(raw_data(data))) }, (cast([^]byte)out_addr)[:out_size]
 	} else {
-		return { "", "" }, {}, nil
+		return { "", "" }, {}
 	}
 }
 
-address_get_alloc_stack_trace :: proc (addr: rawptr, allocator: runtime.Allocator, stack_alloc_size := 32) -> ([]rawptr, int, runtime.Allocator_Error) {
+address_get_alloc_stack_trace :: proc "contextless" (addr: rawptr, data: []rawptr) -> ([]rawptr, int) {
 	when ASAN_ENABLED {
-		data, err := make([]rawptr, stack_alloc_size, allocator)
-		if err != nil {
-			return {}, 0, err
-		}
 		out_thread: i32
 		__asan_get_alloc_stack(addr, raw_data(data), len(data), &out_thread)
-		return data, int(out_thread), nil
+		return data, int(out_thread)
 	} else {
-		return {}, 0, nil
+		return {}, 0
 	}
 }
 
-address_get_free_stack_trace :: proc (addr: rawptr, allocator: runtime.Allocator, stack_alloc_size := 32) -> ([]rawptr, int, runtime.Allocator_Error) {
+address_get_free_stack_trace :: proc "contextless" (addr: rawptr, data: []rawptr) -> ([]rawptr, int) {
 	when ASAN_ENABLED {
-		data, err := make([]rawptr, stack_alloc_size, allocator)
-		if err != nil {
-			return {}, 0, err
-		}
 		out_thread: i32
 		__asan_get_free_stack(addr, raw_data(data), len(data), &out_thread)
-		return data, int(out_thread), nil
+		return data, int(out_thread)
 	} else {
-		return {}, 0, nil
+		return {}, 0
 	}
 }
 
