@@ -46,7 +46,8 @@ Asan_Located_Address_String :: struct {
 }
 
 Asan_Shadow_Mapping :: struct {
-	scale, offset: uint
+	scale: uint,
+	offset: uint,
 }
 
 asan_poison_slice :: proc(region: $T/[]$E) {
@@ -285,8 +286,7 @@ asan_is_in_fake_stack :: proc(fake_stack: rawptr, addr: rawptr) -> ([]byte, bool
 	when ASAN_ENABLED {
 		begin: rawptr
 		end: rawptr
-		addr := __asan_addr_is_in_fake_stack(fake_stack, addr, &begin, &end)
-		if addr == nil {
+		if __asan_addr_is_in_fake_stack(fake_stack, addr, &begin, &end) == nil {
 			return {}, false
 		}
 		return ((cast([^]byte)begin)[:uintptr(end)-uintptr(begin)]), true
