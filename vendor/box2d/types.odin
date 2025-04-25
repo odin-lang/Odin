@@ -1118,7 +1118,7 @@ CastResultFcn :: #type proc "c" (shapeId: ShapeId, point: Vec2, normal: Vec2, fr
 
 // Used to collect collision planes for character movers.
 // Return true to continue gathering planes.
-PlaneResultFcn :: #type proc "c" (shapeId: ShapeId, plane: ^PlaneResult, ctx: rawptr)
+PlaneResultFcn :: #type proc "c" (shapeId: ShapeId, plane: ^PlaneResult, ctx: rawptr) -> bool
 
 // These colors are used for debug draw and mostly match the named SVG colors.
 // See https://www.rapidtables.com/web/color/index.html

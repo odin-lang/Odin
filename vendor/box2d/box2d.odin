@@ -574,7 +574,7 @@ foreign lib {
 
 	// Collide a capsule mover with the world, gathering collision planes that can be fed to b2SolvePlanes. Useful for
 	// kinematic character movement.
-	World_CollideMover            :: proc(worldId: WorldId, #by_ptr mover: Capsule, filter: QueryFilter, fcn: CastResultFcn, ctx: rawptr) ---
+	World_CollideMover            :: proc(worldId: WorldId, #by_ptr mover: Capsule, filter: QueryFilter, fcn: PlaneResultFcn, ctx: rawptr) ---
 
 	// Enable/disable sleep. If your application does not need sleeping, you can gain some performance
 	//	by disabling sleep completely at the world level.
