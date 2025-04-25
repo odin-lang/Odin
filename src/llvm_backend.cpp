@@ -2598,6 +2598,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
 		}
 		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
+		LLVMSetAlignment(g.value, cast(u32)type_align_of(e->type));
 		
 		if (e->Variable.link_section.len > 0) {
 			LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
