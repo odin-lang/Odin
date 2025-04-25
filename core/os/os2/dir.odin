@@ -192,3 +192,30 @@ read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info,
 
 	return _read_directory_iterator(it)
 }
+
+// Recursively copies a directory to `dst` from `src`
+copy_directory :: proc(dst, src: string, dst_perm := 0o755) -> Error {
+	switch err := make_directory_all(dst, dst_perm); err {
+	case nil, .Exist:
+		// okay
+	case:
+		return err
+	}
+
+	TEMP_ALLOCATOR_GUARD()
+
+	file_infos := read_all_directory_by_path(src, temp_allocator()) or_return
+	for fi in file_infos {
+		TEMP_ALLOCATOR_GUARD()
+
+		dst_path := join_path({dst, fi.name}, temp_allocator()) or_return
+		src_path := fi.fullpath
+
+		if fi.type == .Directory {
+			copy_directory(dst_path, src_path) or_return
+		} else {
+			copy_file(dst_path, src_path) or_return
+		}
+	}
+	return nil
+}
