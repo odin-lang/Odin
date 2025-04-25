@@ -2,6 +2,7 @@ package mem
 
 import "base:intrinsics"
 import "base:runtime"
+import "base:sanitizer"
 
 /*
 Nil allocator.
@@ -138,6 +139,7 @@ arena_init :: proc(a: ^Arena, data: []byte) {
 	a.offset     = 0
 	a.peak_used  = 0
 	a.temp_count = 0
+	sanitizer.address_poison(a.data)
 }
 
 /*
@@ -224,7 +226,9 @@ arena_alloc_bytes_non_zeroed :: proc(
 	}
 	a.offset += total_size
 	a.peak_used = max(a.peak_used, a.offset)
-	return byte_slice(ptr, size), nil
+	result := byte_slice(ptr, size)
+	sanitizer.address_unpoison(result)
+	return result, nil
 }
 
 /*
@@ -232,6 +236,7 @@ Free all memory to an arena.
 */
 arena_free_all :: proc(a: ^Arena) {
 	a.offset = 0
+	sanitizer.address_poison(a.data)
 }
 
 arena_allocator_proc :: proc(
@@ -309,6 +314,7 @@ allocations *inside* the temporary memory region will be freed to the arena.
 end_arena_temp_memory :: proc(tmp: Arena_Temp_Memory) {
 	assert(tmp.arena.offset >= tmp.prev_offset)
 	assert(tmp.arena.temp_count > 0)
+	sanitizer.address_poison(tmp.arena.data[tmp.prev_offset:tmp.arena.offset])
 	tmp.arena.offset = tmp.prev_offset
 	tmp.arena.temp_count -= 1
 }
@@ -363,6 +369,7 @@ scratch_init :: proc(s: ^Scratch, size: int, backup_allocator := context.allocat
 	s.prev_allocation = nil
 	s.backup_allocator = backup_allocator
 	s.leaked_allocations.allocator = backup_allocator
+	sanitizer.address_poison(s.data)
 	return nil
 }
 
@@ -377,6 +384,7 @@ scratch_destroy :: proc(s: ^Scratch) {
 		free_bytes(ptr, s.backup_allocator)
 	}
 	delete(s.leaked_allocations)
+	sanitizer.address_unpoison(s.data)
 	delete(s.data, s.backup_allocator)
 	s^ = {}
 }
@@ -472,7 +480,9 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		ptr   := align_forward_uintptr(offset+start, uintptr(alignment))
 		s.prev_allocation = rawptr(ptr)
 		s.curr_offset = int(offset) + size
-		return byte_slice(rawptr(ptr), size), nil
+		result := byte_slice(rawptr(ptr), size)
+		sanitizer.address_unpoison(result)
+		return result, nil
 	} else {
 		a := s.backup_allocator
 		if a.procedure == nil {
@@ -516,6 +526,7 @@ scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Alloc
 	old_ptr := uintptr(ptr)
 	if s.prev_allocation == ptr {
 		s.curr_offset = int(uintptr(s.prev_allocation) - start)
+		sanitizer.address_poison(s.data[s.curr_offset:])
 		s.prev_allocation = nil
 		return nil
 	}
@@ -546,6 +557,7 @@ scratch_free_all :: proc(s: ^Scratch, loc := #caller_location) {
 		free_bytes(ptr, s.backup_allocator, loc)
 	}
 	clear(&s.leaked_allocations)
+	sanitizer.address_poison(s.data)
 }
 
 /*
@@ -675,7 +687,9 @@ scratch_resize_bytes_non_zeroed :: proc(
 	old_ptr := uintptr(old_memory)
 	if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
 		s.curr_offset = int(old_ptr-begin)+size
-		return byte_slice(old_memory, size), nil
+		result := byte_slice(old_memory, size)
+		sanitizer.address_unpoison(result)
+		return result, nil
 	}
 	data, err := scratch_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	if err != nil {
@@ -776,6 +790,7 @@ stack_init :: proc(s: ^Stack, data: []byte) {
 	s.prev_offset = 0
 	s.curr_offset = 0
 	s.peak_used   = 0
+	sanitizer.address_poison(data)
 }
 
 /*
@@ -861,15 +876,19 @@ stack_alloc_bytes_non_zeroed :: proc(
 	if s.curr_offset + padding + size > len(s.data) {
 		return nil, .Out_Of_Memory
 	}
+	old_offset := s.prev_offset
 	s.prev_offset = s.curr_offset
 	s.curr_offset += padding
 	next_addr := curr_addr + uintptr(padding)
 	header := (^Stack_Allocation_Header)(next_addr - size_of(Stack_Allocation_Header))
+	sanitizer.address_unpoison(header)
 	header.padding = padding
-	header.prev_offset = s.prev_offset
+	header.prev_offset = old_offset
 	s.curr_offset += size
 	s.peak_used = max(s.peak_used, s.curr_offset)
-	return byte_slice(rawptr(next_addr), size), nil
+	result := byte_slice(rawptr(next_addr), size)
+	sanitizer.address_unpoison(result)
+	return result, nil
 }
 
 /*
@@ -902,12 +921,15 @@ stack_free :: proc(
 	}
 	header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header))
 	old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
-	if old_offset != header.prev_offset {
+	if old_offset != s.prev_offset {
 		// panic("Out of order stack allocator free");
 		return .Invalid_Pointer
 	}
-	s.curr_offset = old_offset
+
 	s.prev_offset = header.prev_offset
+	sanitizer.address_poison(s.data[old_offset:s.curr_offset])
+	s.curr_offset = old_offset
+
 	return nil
 }
 
@@ -917,6 +939,7 @@ Free all allocations to the stack.
 stack_free_all :: proc(s: ^Stack, loc := #caller_location) {
 	s.prev_offset = 0
 	s.curr_offset = 0
+	sanitizer.address_poison(s.data)
 }
 
 /*
@@ -1076,7 +1099,9 @@ stack_resize_bytes_non_zeroed :: proc(
 	if diff > 0 {
 		zero(rawptr(curr_addr + uintptr(diff)), diff)
 	}
-	return byte_slice(old_memory, size), nil
+	result := byte_slice(old_memory, size)
+	sanitizer.address_unpoison(result)
+	return result, nil
 }
 
 stack_allocator_proc :: proc(
@@ -1144,6 +1169,7 @@ small_stack_init :: proc(s: ^Small_Stack, data: []byte) {
 	s.data      = data
 	s.offset    = 0
 	s.peak_used = 0
+	sanitizer.address_poison(data)
 }
 
 /*
@@ -1252,10 +1278,13 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 	s.offset += padding
 	next_addr := curr_addr + uintptr(padding)
 	header := (^Small_Stack_Allocation_Header)(next_addr - size_of(Small_Stack_Allocation_Header))
+	sanitizer.address_unpoison(header)
 	header.padding = auto_cast padding
 	s.offset += size
 	s.peak_used = max(s.peak_used, s.offset)
-	return byte_slice(rawptr(next_addr), size), nil
+	result := byte_slice(rawptr(next_addr), size)
+	sanitizer.address_unpoison(result)
+	return result, nil
 }
 
 /*
@@ -1289,6 +1318,7 @@ small_stack_free :: proc(
 	}
 	header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header))
 	old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
+	sanitizer.address_poison(s.data[old_offset:s.offset])
 	s.offset = old_offset
 	return nil
 }
@@ -1298,6 +1328,7 @@ Free all memory to small stack.
 */
 small_stack_free_all :: proc(s: ^Small_Stack) {
 	s.offset = 0
+	sanitizer.address_poison(s.data)
 }
 
 /*
@@ -1442,7 +1473,9 @@ small_stack_resize_bytes_non_zeroed :: proc(
 		return nil, nil
 	}
 	if old_size == size {
-		return byte_slice(old_memory, size), nil
+		result := byte_slice(old_memory, size)
+		sanitizer.address_unpoison(result)
+		return result, nil
 	}
 	data, err := small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	if err == nil {

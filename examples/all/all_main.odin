@@ -118,6 +118,7 @@ import relative         "core:relative"
 
 import reflect          "core:reflect"
 import runtime          "base:runtime"
+import sanitizer        "base:sanitizer"
 import simd             "core:simd"
 import x86              "core:simd/x86"
 import slice            "core:slice"
@@ -275,3 +276,4 @@ _ :: uuid_legacy
 _ :: utf8
 _ :: utf8string
 _ :: utf16
+_ :: sanitizer
