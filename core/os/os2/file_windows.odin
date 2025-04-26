@@ -506,10 +506,15 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	length: win32.LARGE_INTEGER
-	if f.kind == .Pipe {
-		return 0, .No_Size
-	}
 	handle := _handle(&f.file)
+	if f.kind == .Pipe {
+		bytesAvail: u32
+		if win32.PeekNamedPipe(handle, nil, 0, nil, &bytesAvail, nil) {
+			return i64(bytesAvail), nil
+		} else {
+			return 0, .No_Size
+		}
+	}
 	if !win32.GetFileSizeEx(handle, &length) {
 		err = _get_platform_error()
 	}
