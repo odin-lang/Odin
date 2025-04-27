@@ -6423,6 +6423,19 @@ gb_internal void check_unique_package_names(Checker *c) {
 		           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
 		           "\tA package name is required for link name prefixing to have a consistent ABI\n");
 		error_line("%s found at previous location\n", token_pos_to_string(ast_token(prev).pos));
+
+		// NOTE(Jeroen): Check if the conflicting imports are the same case-folded directory
+		//               See https://github.com/odin-lang/Odin/issues/5080
+		#if defined(GB_SYSTEM_WINDOWS)
+		String dir_a = pkg->files[0]->directory;
+		String dir_b = (*found)->files[0]->directory;
+
+		if (str_eq_ignore_case(dir_a, dir_b)) {
+			error_line("\tRemember that Windows case-folds paths, and so %.*s and %.*s are the same directory.\n", LIT(dir_a), LIT(dir_b));
+			// Could also perform a FS lookup to check which of the two is the actual directory and suggest it, but this should be enough.
+		}
+		#endif
+
 		end_error_block();
 	}
 }
