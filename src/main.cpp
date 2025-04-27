@@ -346,6 +346,7 @@ enum BuildFlagKind {
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
 	BuildFlag_VetPackages,
+	BuildFlag_VetExplicitAllocators,
 
 	BuildFlag_CustomAttribute,
 	BuildFlag_IgnoreUnknownAttributes,
@@ -565,6 +566,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetExplicitAllocators,   str_lit("vet-explicit-allocators"),   BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -1276,16 +1278,17 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.vet_flags |= VetFlag_All;
 							break;
 
-						case BuildFlag_VetUnusedVariables: build_context.vet_flags |= VetFlag_UnusedVariables; break;
-						case BuildFlag_VetUnusedImports:   build_context.vet_flags |= VetFlag_UnusedImports;   break;
-						case BuildFlag_VetUnused:          build_context.vet_flags |= VetFlag_Unused;          break;
-						case BuildFlag_VetShadowing:       build_context.vet_flags |= VetFlag_Shadowing;       break;
-						case BuildFlag_VetUsingStmt:       build_context.vet_flags |= VetFlag_UsingStmt;       break;
-						case BuildFlag_VetUsingParam:      build_context.vet_flags |= VetFlag_UsingParam;      break;
-						case BuildFlag_VetStyle:           build_context.vet_flags |= VetFlag_Style;           break;
-						case BuildFlag_VetSemicolon:       build_context.vet_flags |= VetFlag_Semicolon;       break;
-						case BuildFlag_VetCast:            build_context.vet_flags |= VetFlag_Cast;            break;
-						case BuildFlag_VetTabs:            build_context.vet_flags |= VetFlag_Tabs;            break;
+						case BuildFlag_VetUnusedVariables: build_context.vet_flags |= VetFlag_UnusedVariables;    break;
+						case BuildFlag_VetUnusedImports:      build_context.vet_flags |= VetFlag_UnusedImports;      break;
+						case BuildFlag_VetUnused:             build_context.vet_flags |= VetFlag_Unused;             break;
+						case BuildFlag_VetShadowing:          build_context.vet_flags |= VetFlag_Shadowing;          break;
+						case BuildFlag_VetUsingStmt:          build_context.vet_flags |= VetFlag_UsingStmt;          break;
+						case BuildFlag_VetUsingParam:         build_context.vet_flags |= VetFlag_UsingParam;         break;
+						case BuildFlag_VetStyle:              build_context.vet_flags |= VetFlag_Style;              break;
+						case BuildFlag_VetSemicolon:          build_context.vet_flags |= VetFlag_Semicolon;          break;
+						case BuildFlag_VetCast:               build_context.vet_flags |= VetFlag_Cast;               break;
+						case BuildFlag_VetTabs:               build_context.vet_flags |= VetFlag_Tabs;               break;
+						case BuildFlag_VetExplicitAllocators: build_context.vet_flags |= VetFlag_ExplicitAllocators; break;
 						case BuildFlag_VetUnusedProcedures:
 							build_context.vet_flags |= VetFlag_UnusedProcedures;
 							if (!set_flags[BuildFlag_VetPackages]) {
@@ -2840,6 +2843,9 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 		if (print_flag("-vet-using-stmt")) {
 			print_usage_line(2, "Checks for the use of 'using' as a statement.");
 			print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
+		}
+		if (print_flag("-vet-explicit-allocators")) {
+			print_usage_line(2, "Checks for the use of allocators being explicitely passed to a procedure.");
 		}
 	}
 

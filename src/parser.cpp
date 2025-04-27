@@ -33,6 +33,10 @@ gb_internal bool ast_file_vet_deprecated(AstFile *f) {
 	return (ast_file_vet_flags(f) & VetFlag_Deprecated) != 0;
 }
 
+gb_internal bool ast_file_vet_explicit_allocators(AstFile *f) {
+	return (ast_file_vet_flags(f) & VetFlag_ExplicitAllocators) != 0;
+}
+
 gb_internal bool file_allow_newline(AstFile *f) {
 	bool is_strict = build_context.strict_style || ast_file_vet_style(f);
 	return !is_strict;
@@ -6325,6 +6329,7 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			error_line("\textra\n");
 			error_line("\tcast\n");
 			error_line("\ttabs\n");
+			error_line("\texplicit-allocators\n");
 			return build_context.vet_flags;
 		}
 	}
