@@ -348,10 +348,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->RangeStmt.body  = clone_ast(n->RangeStmt.body, f);
 		break;
 	case Ast_UnrollRangeStmt:
-		n->UnrollRangeStmt.val0  = clone_ast(n->UnrollRangeStmt.val0, f);
-		n->UnrollRangeStmt.val1  = clone_ast(n->UnrollRangeStmt.val1, f);
-		n->UnrollRangeStmt.expr  = clone_ast(n->UnrollRangeStmt.expr, f);
-		n->UnrollRangeStmt.body  = clone_ast(n->UnrollRangeStmt.body, f);
+		n->UnrollRangeStmt.args = clone_ast_array(n->UnrollRangeStmt.args, f);
+		n->UnrollRangeStmt.val0 = clone_ast(n->UnrollRangeStmt.val0, f);
+		n->UnrollRangeStmt.val1 = clone_ast(n->UnrollRangeStmt.val1, f);
+		n->UnrollRangeStmt.expr = clone_ast(n->UnrollRangeStmt.expr, f);
+		n->UnrollRangeStmt.body = clone_ast(n->UnrollRangeStmt.body, f);
 		break;
 	case Ast_CaseClause:
 		n->CaseClause.list  = clone_ast_array(n->CaseClause.list, f);
@@ -1037,15 +1038,16 @@ gb_internal Ast *ast_range_stmt(AstFile *f, Token token, Slice<Ast *> vals, Toke
 	return result;
 }
 
-gb_internal Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
+gb_internal Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Slice<Ast *> args, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
 	Ast *result = alloc_ast_node(f, Ast_UnrollRangeStmt);
 	result->UnrollRangeStmt.unroll_token = unroll_token;
+	result->UnrollRangeStmt.args      = args;
 	result->UnrollRangeStmt.for_token = for_token;
-	result->UnrollRangeStmt.val0 = val0;
-	result->UnrollRangeStmt.val1 = val1;
-	result->UnrollRangeStmt.in_token = in_token;
-	result->UnrollRangeStmt.expr  = expr;
-	result->UnrollRangeStmt.body  = body;
+	result->UnrollRangeStmt.val0      = val0;
+	result->UnrollRangeStmt.val1      = val1;
+	result->UnrollRangeStmt.in_token  = in_token;
+	result->UnrollRangeStmt.expr      = expr;
+	result->UnrollRangeStmt.body      = body;
 	return result;
 }
 
@@ -3014,9 +3016,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			syntax_error(token, "Expected a type or range, got nothing");
 		}
 
-		if (allow_token(f, Token_Semicolon)) {
+		if (f->curr_token.kind == Token_Semicolon && f->curr_token.string == ";") {
+			expect_token(f, Token_Semicolon);
 			underlying = parse_type(f);
-		} else if (allow_token(f, Token_Comma)) {
+		} else if (allow_token(f, Token_Comma) || allow_token(f, Token_Semicolon)) {
 			String p = token_to_string(f->prev_token);
 			syntax_error(token_end_of_line(f, f->prev_token), "Expected a semicolon, got a %.*s", LIT(p));
 
@@ -4340,30 +4343,132 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 	}
 
 
-	if (f->curr_token.kind == Token_Colon) {
-		Array<Ast *> names = convert_to_ident_list(f, list, true, allow_poly_names); // Copy for semantic reasons
+	if (f->curr_token.kind != Token_Colon) {
+		// NOTE(bill): proc(Type, Type, Type)
+		for (AstAndFlags const &item : list) {
+			Ast *type = item.node;
+			Token token = blank_token;
+			if (allowed_flags&FieldFlag_Results) {
+				// NOTE(bill): Make this nothing and not `_`
+				token.string = str_lit("");
+			}
+
+			auto names = array_make<Ast *>(ast_allocator(f), 1);
+			token.pos = ast_token(type).pos;
+			names[0] = ast_ident(f, token);
+			u32 flags = check_field_prefixes(f, list.count, allowed_flags, item.flags);
+			Token tag = {};
+			Ast *param = ast_field(f, names, item.node, nullptr, flags, tag, docs, f->line_comment);
+			array_add(&params, param);
+		}
+
+		if (name_count_) *name_count_ = total_name_count;
+		return ast_field_list(f, start_token, params);
+	}
+
+	// NOTE(bill): proc(ident, ident, ident: Type)
+
+	if (f->prev_token.kind == Token_Comma) {
+		syntax_error(f->prev_token, "Trailing comma before a colon is not allowed");
+	}
+	Array<Ast *> names = convert_to_ident_list(f, list, true, allow_poly_names); // Copy for semantic reasons
+	if (names.count == 0) {
+		syntax_error(f->curr_token, "Empty field declaration");
+	}
+	bool any_polymorphic_names = check_procedure_name_list(names);
+	u32 set_flags = 0;
+	if (list.count > 0) {
+		set_flags = list[0].flags;
+	}
+	set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
+	total_name_count += names.count;
+
+	Ast *type = nullptr;
+	Ast *default_value = nullptr;
+	Token tag = {};
+
+	expect_token_after(f, Token_Colon, "field list");
+	if (f->curr_token.kind != Token_Eq) {
+		type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
+		Ast *tt = unparen_expr(type);
+		if (tt == nullptr) {
+			syntax_error(f->prev_token, "Invalid type expression in field list");
+		} else if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+			syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
+		}
+	}
+
+	if (allow_token(f, Token_Eq)) {
+		default_value = parse_expr(f, false);
+		if (!allow_default_parameters) {
+			syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
+			default_value = nullptr;
+		}
+	}
+
+	if (default_value != nullptr && names.count > 1) {
+		syntax_error(f->curr_token, "Default parameters can only be applied to single values");
+	}
+
+	if (allowed_flags == FieldFlag_Struct && default_value != nullptr) {
+		syntax_error(default_value, "Default parameters are not allowed for structs");
+		default_value = nullptr;
+	}
+
+	if (type != nullptr && type->kind == Ast_Ellipsis) {
+		if (seen_ellipsis) syntax_error(type, "Extra variadic parameter after ellipsis");
+		seen_ellipsis = true;
+		if (names.count != 1) {
+			syntax_error(type, "Variadic parameters can only have one field name");
+		}
+	} else if (seen_ellipsis && default_value == nullptr) {
+		syntax_error(f->curr_token, "Extra parameter after ellipsis without a default value");
+	}
+
+	if (type != nullptr && default_value == nullptr) {
+		if (f->curr_token.kind == Token_String) {
+			tag = expect_token(f, Token_String);
+			if ((allowed_flags & FieldFlag_Tags) == 0) {
+				syntax_error(tag, "Field tags are only allowed within structures");
+			}
+		}
+	}
+
+	bool more_fields = allow_field_separator(f);
+	Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
+	array_add(&params, param);
+
+	if (!more_fields) {
+		if (name_count_) *name_count_ = total_name_count;
+		return ast_field_list(f, start_token, params);
+	}
+
+	while (f->curr_token.kind != follow &&
+	       f->curr_token.kind != Token_EOF &&
+	       f->curr_token.kind != Token_Semicolon) {
+		CommentGroup *docs = f->lead_comment;
+
+		if (!is_signature) parse_enforce_tabs(f);
+		u32 set_flags = parse_field_prefixes(f);
+		Token tag = {};
+		Array<Ast *> names = parse_ident_list(f, allow_poly_names);
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
+			break;
 		}
 		bool any_polymorphic_names = check_procedure_name_list(names);
-		u32 set_flags = 0;
-		if (list.count > 0) {
-			set_flags = list[0].flags;
-		}
 		set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
 		total_name_count += names.count;
 
 		Ast *type = nullptr;
 		Ast *default_value = nullptr;
-		Token tag = {};
-
 		expect_token_after(f, Token_Colon, "field list");
 		if (f->curr_token.kind != Token_Eq) {
 			type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 			Ast *tt = unparen_expr(type);
-			if (tt == nullptr) {
-				syntax_error(f->prev_token, "Invalid type expression in field list");
-			} else if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+			if (is_signature && !any_polymorphic_names &&
+			    tt != nullptr &&
+			    tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 				syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 			}
 		}
@@ -4378,11 +4483,6 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 
 		if (default_value != nullptr && names.count > 1) {
 			syntax_error(f->curr_token, "Default parameters can only be applied to single values");
-		}
-
-		if (allowed_flags == FieldFlag_Struct && default_value != nullptr) {
-			syntax_error(default_value, "Default parameters are not allowed for structs");
-			default_value = nullptr;
 		}
 
 		if (type != nullptr && type->kind == Ast_Ellipsis) {
@@ -4404,105 +4504,14 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 			}
 		}
 
-		bool more_fields = allow_field_separator(f);
+
+		bool ok = allow_field_separator(f);
 		Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
 		array_add(&params, param);
 
-		if (!more_fields) {
-			if (name_count_) *name_count_ = total_name_count;
-			return ast_field_list(f, start_token, params);
+		if (!ok) {
+			break;
 		}
-
-		while (f->curr_token.kind != follow &&
-		       f->curr_token.kind != Token_EOF &&
-		       f->curr_token.kind != Token_Semicolon) {
-			CommentGroup *docs = f->lead_comment;
-
-			if (!is_signature) parse_enforce_tabs(f);
-			u32 set_flags = parse_field_prefixes(f);
-			Token tag = {};
-			Array<Ast *> names = parse_ident_list(f, allow_poly_names);
-			if (names.count == 0) {
-				syntax_error(f->curr_token, "Empty field declaration");
-				break;
-			}
-			bool any_polymorphic_names = check_procedure_name_list(names);
-			set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
-			total_name_count += names.count;
-
-			Ast *type = nullptr;
-			Ast *default_value = nullptr;
-			expect_token_after(f, Token_Colon, "field list");
-			if (f->curr_token.kind != Token_Eq) {
-				type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
-				Ast *tt = unparen_expr(type);
-				if (is_signature && !any_polymorphic_names &&
-				    tt != nullptr &&
-				    tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
-					syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
-				}
-			}
-
-			if (allow_token(f, Token_Eq)) {
-				default_value = parse_expr(f, false);
-				if (!allow_default_parameters) {
-					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
-					default_value = nullptr;
-				}
-			}
-
-			if (default_value != nullptr && names.count > 1) {
-				syntax_error(f->curr_token, "Default parameters can only be applied to single values");
-			}
-
-			if (type != nullptr && type->kind == Ast_Ellipsis) {
-				if (seen_ellipsis) syntax_error(type, "Extra variadic parameter after ellipsis");
-				seen_ellipsis = true;
-				if (names.count != 1) {
-					syntax_error(type, "Variadic parameters can only have one field name");
-				}
-			} else if (seen_ellipsis && default_value == nullptr) {
-				syntax_error(f->curr_token, "Extra parameter after ellipsis without a default value");
-			}
-
-			if (type != nullptr && default_value == nullptr) {
-				if (f->curr_token.kind == Token_String) {
-					tag = expect_token(f, Token_String);
-					if ((allowed_flags & FieldFlag_Tags) == 0) {
-						syntax_error(tag, "Field tags are only allowed within structures");
-					}
-				}
-			}
-
-
-			bool ok = allow_field_separator(f);
-			Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
-			array_add(&params, param);
-
-			if (!ok) {
-				break;
-			}
-		}
-
-		if (name_count_) *name_count_ = total_name_count;
-		return ast_field_list(f, start_token, params);
-	}
-
-	for (AstAndFlags const &item : list) {
-		Ast *type = item.node;
-		Token token = blank_token;
-		if (allowed_flags&FieldFlag_Results) {
-			// NOTE(bill): Make this nothing and not `_`
-			token.string = str_lit("");
-		}
-
-		auto names = array_make<Ast *>(ast_allocator(f), 1);
-		token.pos = ast_token(type).pos;
-		names[0] = ast_ident(f, token);
-		u32 flags = check_field_prefixes(f, list.count, allowed_flags, item.flags);
-		Token tag = {};
-		Ast *param = ast_field(f, names, item.node, nullptr, flags, tag, docs, f->line_comment);
-		array_add(&params, param);
 	}
 
 	if (name_count_) *name_count_ = total_name_count;
@@ -4570,6 +4579,9 @@ gb_internal Ast *parse_do_body(AstFile *f, Token const &token, char const *msg) 
 gb_internal bool parse_control_statement_semicolon_separator(AstFile *f) {
 	Token tok = peek_token(f);
 	if (tok.kind != Token_OpenBrace) {
+		if (f->curr_token.kind == Token_Semicolon && f->curr_token.string != ";")  {
+			syntax_error(token_end_of_line(f, f->prev_token), "Expected ';', got newline");
+		}
 		return allow_token(f, Token_Semicolon);
 	}
 	if (f->curr_token.string == ";") {
@@ -5137,6 +5149,40 @@ gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, T
 
 
 gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
+	Array<Ast *> args = {};
+
+	if (allow_token(f, Token_OpenParen)) {
+		f->expr_level++;
+		if (f->curr_token.kind == Token_CloseParen) {
+			syntax_error(f->curr_token, "#unroll expected at least 1 argument, got 0");
+		} else {
+			args = array_make<Ast *>(ast_allocator(f));
+			while (f->curr_token.kind != Token_CloseParen &&
+			       f->curr_token.kind != Token_EOF) {
+				Ast *arg = nullptr;
+				arg = parse_value(f);
+
+				if (f->curr_token.kind == Token_Eq) {
+					Token eq = expect_token(f, Token_Eq);
+					if (arg != nullptr && arg->kind != Ast_Ident) {
+						syntax_error(arg, "Expected an identifier for 'key=value'");
+					}
+					Ast *value = parse_value(f);
+					arg = ast_field_value(f, arg, value, eq);
+				}
+
+				array_add(&args, arg);
+
+				if (!allow_field_separator(f)) {
+					break;
+				}
+			}
+		}
+		f->expr_level--;
+		Token close = expect_closing(f, Token_CloseParen, str_lit("#unroll"));
+		gb_unused(close);
+	}
+
 	Token for_token = expect_token(f, Token_for);
 	Ast *val0 = nullptr;
 	Ast *val1 = nullptr;
@@ -5180,7 +5226,7 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	if (bad_stmt) {
 		return ast_bad_stmt(f, unroll_token, f->curr_token);
 	}
-	return ast_unroll_range_stmt(f, unroll_token, for_token, val0, val1, in_token, expr, body);
+	return ast_unroll_range_stmt(f, unroll_token, slice_from_array(args), for_token, val0, val1, in_token, expr, body);
 }
 
 gb_internal Ast *parse_stmt(AstFile *f) {
@@ -6111,7 +6157,7 @@ gb_internal String build_tag_get_token(String s, String *out) {
 		isize width = utf8_decode(&s[n], s.len-n, &rune);
 		if (n == 0 && rune == '!') {
 
-		} else if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != ':') {
 			isize k = gb_max(gb_max(n, width), 1);
 			*out = substring(s, k, s.len);
 			return substring(s, 0, k);
@@ -6163,7 +6209,9 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				continue;
 			}
 
-			TargetOsKind   os   = get_target_os_from_string(p);
+			Subtarget subtarget = Subtarget_Default;
+
+			TargetOsKind   os   = get_target_os_from_string(p, &subtarget);
 			TargetArchKind arch = get_target_arch_from_string(p);
 			num_tokens += 1;
 
@@ -6177,11 +6225,13 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			if (os != TargetOs_Invalid) {
 				this_kind_os_seen = true;
 
+				bool same_subtarget = (subtarget == Subtarget_Default) || (subtarget == selected_subtarget);
+
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
-					this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
+					this_kind_correct = this_kind_correct && (os != build_context.metrics.os || !same_subtarget);
 				} else {
-					this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
+					this_kind_correct = this_kind_correct && (os == build_context.metrics.os && same_subtarget);
 				}
 			} else if (arch != TargetArch_Invalid) {
 				this_kind_arch_seen = true;
@@ -6265,10 +6315,16 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			syntax_error(token_for_pos, "Invalid vet flag name: %.*s", LIT(p));
 			error_line("\tExpected one of the following\n");
 			error_line("\tunused\n");
+			error_line("\tunused-variables\n");
+			error_line("\tunused-imports\n");
+			error_line("\tunused-procedures\n");
 			error_line("\tshadowing\n");
 			error_line("\tusing-stmt\n");
 			error_line("\tusing-param\n");
+			error_line("\tstyle\n");
 			error_line("\textra\n");
+			error_line("\tcast\n");
+			error_line("\ttabs\n");
 			return build_context.vet_flags;
 		}
 	}
@@ -6284,6 +6340,63 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 	}
 	GB_ASSERT(vet_flags != 0 && vet_not_flags != 0);
 	return vet_flags &~ vet_not_flags;
+}
+
+gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
+	String const prefix = str_lit("feature");
+	GB_ASSERT(string_starts_with(s, prefix));
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	if (s.len == 0) {
+		return OptInFeatureFlag_NONE;
+	}
+
+	u64 feature_flags = 0;
+	u64 feature_not_flags = 0;
+
+	while (s.len > 0) {
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s));
+		if (p.len == 0) {
+			break;
+		}
+
+		bool is_notted = false;
+		if (p[0] == '!') {
+			is_notted = true;
+			p = substring(p, 1, p.len);
+			if (p.len == 0) {
+				syntax_error(token_for_pos, "Expected a feature flag name after '!'");
+				return OptInFeatureFlag_NONE;
+			}
+		}
+
+		u64 flag = get_feature_flag_from_name(p);
+		if (flag != OptInFeatureFlag_NONE) {
+			if (is_notted) {
+				feature_not_flags |= flag;
+			} else {
+				feature_flags     |= flag;
+			}
+		} else {
+			ERROR_BLOCK();
+			syntax_error(token_for_pos, "Invalid feature flag name: %.*s", LIT(p));
+			error_line("\tExpected one of the following\n");
+			error_line("\tdynamic-literals\n");
+			return OptInFeatureFlag_NONE;
+		}
+	}
+
+	if (feature_flags == 0 && feature_not_flags == 0) {
+		return OptInFeatureFlag_NONE;
+	}
+	if (feature_flags == 0 && feature_not_flags != 0) {
+		return OptInFeatureFlag_NONE &~ feature_not_flags;
+	}
+	if (feature_flags != 0 && feature_not_flags == 0) {
+		return feature_flags;
+	}
+	GB_ASSERT(feature_flags != 0 && feature_not_flags != 0);
+	return feature_flags &~ feature_not_flags;
 }
 
 gb_internal String dir_from_path(String path) {
@@ -6399,6 +6512,9 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 		} else if (command == "file") {
 			f->flags |= AstFile_IsPrivateFile;
 		}
+	} else if (string_starts_with(lc, str_lit("feature"))) {
+		f->feature_flags |= parse_feature_tag(tok, lc);
+		f->feature_flags_set = true;
 	} else if (lc == "lazy") {
 		if (build_context.ignore_lazy) {
 			// Ignore
@@ -6493,9 +6609,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
-	// TODO: Shouldn't single file only matter for build tags? no-instrumentation for example
-	// should be respected even when in single file mode.
-	if (!f->pkg->is_single_file) {
+	{
 		if (docs != nullptr && docs->list.count > 0) {
 			for (Token const &tok : docs->list) {
 				GB_ASSERT(tok.kind == Token_Comment);

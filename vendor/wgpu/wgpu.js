@@ -1,5 +1,55 @@
 (function() {
 
+const STATUS_SUCCESS = 1;
+const STATUS_ERROR   = 2;
+
+const ENUMS = {
+	FeatureName: [undefined, "depth-clip-control", "depth32float-stencil8", "timestamp-query", "texture-compression-bc", "texture-compression-bc-sliced-3d", "texture-compression-etc2", "texture-compression-astc", "texture-compression-astc-sliced-3d", "indirect-first-instance", "shader-f16", "rg11b10ufloat-renderable", "bgra8unorm-storage", "float32-filterable", "float32-blendable", "clip-distances", "dual-source-blending" ],
+	StoreOp: [undefined, "store", "discard", ],
+	LoadOp: [undefined, "load", "clear", ],
+	BufferBindingType: [null, undefined, "uniform", "storage", "read-only-storage", ],
+	SamplerBindingType: [null, undefined, "filtering", "non-filtering", "comparison", ],
+	TextureSampleType: [null, undefined, "float", "unfilterable-float", "depth", "sint", "uint", ],
+	TextureViewDimension: [undefined, "1d", "2d", "2d-array", "cube", "cube-array", "3d", ],
+	StorageTextureAccess: [null, undefined, "write-only", "read-only", "read-write", ],
+	TextureFormat: [undefined, "r8unorm", "r8snorm", "r8uint", "r8sint", "r16uint", "r16sint", "r16float", "rg8unorm", "rg8snorm", "rg8uint", "rg8sint", "r32float", "r32uint", "r32sint", "rg16uint", "rg16sint", "rg16float", "rgba8unorm", "rgba8unorm-srgb", "rgba8snorm", "rgba8uint", "rgba8sint", "bgra8unorm", "bgra8unorm-srgb", "rgb10a2uint", "rgb10a2unorm", "rg11b10ufloat", "rgb9e5ufloat", "rg32float", "rg32uint", "rg32sint", "rgba16uint", "rgba16sint", "rgba16float", "rgba32float", "rgba32uint", "rgba32sint", "stencil8", "depth16unorm", "depth24plus", "depth24plus-stencil8", "depth32float", "depth32float-stencil8", "bc1-rgba-unorm", "bc1-rgba-unorm-srgb", "bc2-rgba-unorm", "bc2-rgba-unorm-srgb", "bc3-rgba-unorm", "bc3-rgba-unorm-srgb", "bc4-r-unorm", "bc4-r-snorm", "bc5-rg-unorm", "bc5-rg-snorm", "bc6h-rgb-ufloat", "bc6h-rgb-float", "bc7-rgba-unorm", "bc7-rgba-unorm-srgb", "etc2-rgb8unorm", "etc2-rgb8unorm-srgb", "etc2-rgb8a1unorm", "etc2-rgb8a1unorm-srgb", "etc2-rgba8unorm", "etc2-rgba8unorm-srgb", "eac-r11unorm", "eac-r11snorm", "eac-rg11unorm", "eac-rg11snorm", "astc-4x4-unorm", "astc-4x4-unorm-srgb", "astc-5x4-unorm", "astc-5x4-unorm-srgb", "astc-5x5-unorm", "astc-5x5-unorm-srgb", "astc-6x5-unorm", "astc-6x5-unorm-srgb", "astc-6x6-unorm", "astc-6x6-unorm-srgb", "astc-8x5-unorm", "astc-8x5-unorm-srgb", "astc-8x6-unorm", "astc-8x6-unorm-srgb", "astc-8x8-unorm", "astc-8x8-unorm-srgb", "astc-10x5-unorm", "astc-10x5-unorm-srgb", "astc-10x6-unorm", "astc-10x6-unorm-srgb", "astc-10x8-unorm", "astc-10x8-unorm-srgb", "astc-10x10-unorm", "astc-10x10-unorm-srgb", "astc-12x10-unorm", "astc-12x10-unorm-srgb", "astc-12x12-unorm", "astc-12x12-unorm-srgb", ],
+	QueryType: [undefined, "occlusion", "timestamp", ],
+	VertexStepMode: [null, undefined, "vertex", "instance", ],
+	VertexFormat: [undefined, "uint8", "uint8x2", "uint8x4", "sint8", "sint8x2", "sint8x4", "unorm8", "unorm8x2", "unorm8x4", "snorm8", "snorm8x2", "snorm8x4", "uint16", "uint16x2", "uint16x4", "sint16", "sint16x2", "sint16x4", "unorm16", "unorm16x2", "unorm16x4", "snorm16", "snorm16x2", "snorm16x4", "float16", "float16x2", "float16x4", "float32", "float32x2", "float32x3", "float32x4", "uint32", "uint32x2", "uint32x3", "uint32x4", "sint32", "sint32x2", "sint32x3", "sint32x4", "unorm10-10-2", "unorm8x4-bgra" ],
+	PrimitiveTopology: [undefined, "point-list", "line-list", "line-strip", "triangle-list", "triangle-strip", ],
+	IndexFormat: [undefined, "uint16", "uint32", ],
+	FrontFace: [undefined, "ccw", "cw", ],
+	CullMode: [undefined, "none", "front", "back", ],
+	AddressMode: [undefined, "clamp-to-edge", "repeat", "mirror-repeat", ],
+	FilterMode: [undefined, "nearest", "linear", ],
+	MipmapFilterMode: [undefined, "nearest", "linear", ],
+	CompareFunction: [undefined, "never", "less", "equal", "less-equal", "greater", "not-equal", "greater-equal", "always", ],
+	TextureDimension: [undefined, "1d", "2d", "3d", ],
+	ErrorType: [undefined, "no-error", "validation", "out-of-memory", "internal", "unknown", ],
+	WGSLLanguageFeatureName: [undefined, "readonly_and_readwrite_storage_textures", "packed_4x8_integer_dot_product", "unrestricted_pointer_parameters", "pointer_composite_access", ],
+	PowerPreference: [undefined, "low-power", "high-performance", ],
+	CompositeAlphaMode: ["auto", "opaque", "premultiplied", "unpremultiplied", "inherit", ],
+	StencilOperation: [undefined, "keep", "zero", "replace", "invert", "increment-clamp", "decrement-clamp", "increment-wrap", "decrement-wrap", ],
+	BlendOperation: ["add", "subtract", "reverse-subtract", "min", "max", ],
+	BlendFactor: [undefined, "zero", "one", "src", "one-minus-src", "src-alpha", "one-minus-src-alpha", "dst", "one-minus-dst", "dst-alpha", "one-minus-dst-alpha", "src-alpha-saturated", "constant", "one-minus-constant", "src1", "one-minus-src1", "src1-alpha", "one-minus-src1-alpha" ],
+	PresentMode: [undefined, "fifo", "fifo-relaxed", "immediate", "mailbox", ],
+	TextureAspect: [undefined, "all", "stencil-only", "depth-only"],
+	DeviceLostReason: [undefined, "unknown", "destroyed", "instance-dropped", "failed-creation"],
+	BufferMapState: [undefined, "unmapped", "pending", "mapped"],
+	OptionalBool: [false, true, undefined],
+
+	// WARN: used with indexOf to pass to WASM, if we would pass to JS, this needs to use official naming convention (not like Odin enums) like the ones above.
+	BackendType: [undefined, null, "WebGPU", "D3D11", "D3D12", "Metal", "Vulkan", "OpenGL", "OpenGLES"],
+	AdapterType: [undefined, "DiscreteGPU", "IntegratedGPU", "CPU", "Unknown"],
+	RequestDeviceStatus: [undefined, "Success", "InstanceDropped", "Error", "Unknown"],
+	MapAsyncStatus: [undefined, "Success", "InstanceDropped", "Error", "Aborted", "Unknown"],
+	CreatePipelineAsyncStatus: [undefined, "Success", "InstanceDropped", "ValidationError", "InternalError", "Unknown"],
+	PopErrorScopeStatus: [undefined, "Success", "InstanceDropped", "EmptyStack"],
+	RequestAdapterStatus: [undefined, "Success", "InstanceDropped", "Unavailable", "Error", "Unknown"],
+	QueueWorkDoneStatus: [undefined, "Success", "InstanceDropped", "Error", "Unknown"],
+	CompilationInfoRequestStatus: [undefined, "Success", "InstanceDropped", "Error", "Unknown"],
+};
+
 /**
  * Assumptions:
  * - Ability to allocate memory, set the context to allocate with using the global `wgpu.g_context`
@@ -13,38 +63,33 @@ class WebGPUInterface {
 	constructor(mem) {
 		this.mem = mem;
 
-		this.enums = {
-			FeatureName: [undefined, "depth-clip-control", "depth32float-stencil8", "timestamp-query", "texture-compression-bc", "texture-compression-etc2", "texture-compression-astc", "indirect-first-instance", "shader-f16", "rg11b10ufloat-renderable", "bgra8unorm-storage", "float32-filterable", ],
-			StoreOp: [undefined, "store", "discard", ],
-			LoadOp: [undefined, "clear", "load", ],
-			BufferBindingType: [undefined, "uniform", "storage", "read-only-storage", ],
-			SamplerBindingType: [undefined, "filtering", "non-filtering", "comparison", ],
-			TextureSampleType: [undefined, "float", "unfilterable-float", "depth", "sint", "uint", ],
-			TextureViewDimension: [undefined, "1d", "2d", "2d-array", "cube", "cube-array", "3d", ],
-			StorageTextureAccess: [undefined, "write-only", "read-only", "read-write", ],
-			TextureFormat: [undefined, "r8unorm", "r8snorm", "r8uint", "r8sint", "r16uint", "r16sint", "r16float", "rg8unorm", "rg8snorm", "rg8uint", "rg8sint", "r32float", "r32uint", "r32sint", "rg16uint", "rg16sint", "rg16float", "rgba8unorm", "rgba8unorm-srgb", "rgba8snorm", "rgba8uint", "rgba8sint", "bgra8unorm", "bgra8unorm-srgb", "rgb10a2uint", "rgb10a2unorm", "rg11b10ufloat", "rgb9e5ufloat", "rg32float", "rg32uint", "rg32sint", "rgba16uint", "rgba16sint", "rgba16float", "rgba32float", "rgba32uint", "rgba32sint", "stencil8", "depth16unorm", "depth24plus", "depth24plus-stencil8", "depth32float", "depth32float-stencil8", "bc1-rgba-unorm", "bc1-rgba-unorm-srgb", "bc2-rgba-unorm", "bc2-rgba-unorm-srgb", "bc3-rgba-unorm", "bc3-rgba-unorm-srgb", "bc4-r-unorm", "bc4-r-snorm", "bc5-rg-unorm", "bc5-rg-snorm", "bc6h-rgb-ufloat", "bc6h-rgb-float", "bc7-rgba-unorm", "bc7-rgba-unorm-srgb", "etc2-rgb8unorm", "etc2-rgb8unorm-srgb", "etc2-rgb8a1unorm", "etc2-rgb8a1unorm-srgb", "etc2-rgba8unorm", "etc2-rgba8unorm-srgb", "eac-r11unorm", "eac-r11snorm", "eac-rg11unorm", "eac-rg11snorm", "astc-4x4-unorm", "astc-4x4-unorm-srgb", "astc-5x4-unorm", "astc-5x4-unorm-srgb", "astc-5x5-unorm", "astc-5x5-unorm-srgb", "astc-6x5-unorm", "astc-6x5-unorm-srgb", "astc-6x6-unorm", "astc-6x6-unorm-srgb", "astc-8x5-unorm", "astc-8x5-unorm-srgb", "astc-8x6-unorm", "astc-8x6-unorm-srgb", "astc-8x8-unorm", "astc-8x8-unorm-srgb", "astc-10x5-unorm", "astc-10x5-unorm-srgb", "astc-10x6-unorm", "astc-10x6-unorm-srgb", "astc-10x8-unorm", "astc-10x8-unorm-srgb", "astc-10x10-unorm", "astc-10x10-unorm-srgb", "astc-12x10-unorm", "astc-12x10-unorm-srgb", "astc-12x12-unorm", "astc-12x12-unorm-srgb", ],
-			QueryType: ["occlusion", "timestamp", ],
-			VertexStepMode: ["vertex", "instance", "vertex-buffer-not-used", ],
-			VertexFormat: [undefined, "uint8x2", "uint8x4", "sint8x2", "sint8x4", "unorm8x2", "unorm8x4", "snorm8x2", "snorm8x4", "uint16x2", "uint16x4", "sint16x2", "sint16x4", "unorm16x2", "unorm16x4", "snorm16x2", "snorm16x4", "float16x2", "float16x4", "float32", "float32x2", "float32x3", "float32x4", "uint32", "uint32x2", "uint32x3", "uint32x4", "sint32", "sint32x2", "sint32x3", "sint32x4", ],
-			PrimitiveTopology: ["point-list", "line-list", "line-strip", "triangle-list", "triangle-strip", ],
-			IndexFormat: [undefined, "uint16", "uint32", ],
-			FrontFace: ["ccw", "cw", ],
-			CullMode: ["none", "front", "back", ],
-			AddressMode: ["repeat", "mirror-repeat", "clamp-to-edge", ],
-			FilterMode: ["nearest", "linear", ],
-			MipmapFilterMode: ["nearest", "linear", ],
-			CompareFunction: [undefined, "never", "less", "less-equal", "greater", "greater-equal", "equal", "not-equal", "always", ],
-			TextureDimension: ["1d", "2d", "3d", ],
-			ErrorType: ["no-error", "validation", "out-of-memory", "internal", "unknown", "device-lost", ],
-			WGSLFeatureName: [undefined, "readonly_and_readwrite_storage_textures", "packed_4x8_integer_dot_product", "unrestricted_pointer_parameters", "pointer_composite_access", ],
-			PowerPreference: [undefined, "low-power", "high-performance", ],
-			CompositeAlphaMode: ["auto", "opaque", "premultiplied", "unpremultiplied", "inherit", ],
-			StencilOperation: ["keep", "zero", "replace", "invert", "increment-clamp", "decrement-clamp", "increment-wrap", "decrement-wrap", ],
-			BlendOperation: ["add", "subtract", "reverse-subtract", "min", "max", ],
-			BlendFactor: ["zero", "one", "src", "one-minus-src", "src-alpha", "one-minus-src-alpha", "dst", "one-minus-dst", "dst-alpha", "one-minus-dst-alpha", "src-alpha-saturated", "constant", "one-minus-constant", ],
-			PresentMode: ["fifo", "fifo-relaxed", "immediate", "mailbox", ],
-			TextureAspect: ["all", "stencil-only", "depth-only"],
-			DeviceLostReason: [undefined, "unknown", "destroyed"],
+		this.sizes = {
+			Color: [32, 8],
+			BufferBindingLayout: [24, 8],
+			SamplerBindingLayout: [8, 4],
+			TextureBindingLayout: [16, 4],
+			StorageTextureBindingLayout: [16, 4],
+			StringView: [2*this.mem.intSize, this.mem.intSize],
+			ConstantEntry: [this.mem.intSize === 8 ? 32 : 24, 8],
+			ProgrammableStageDescriptor: [8 + this.mem.intSize*4, this.mem.intSize],
+			VertexBufferLayout: [16 + this.mem.intSize*2, 8],
+			VertexAttribute: [24, 8],
+			VertexState: [8 + this.mem.intSize*6, this.mem.intSize],
+			PrimitiveState: [24, 4],
+			MultisampleState: [16, 4],
+			StencilFaceState: [16, 4],
+			ColorTargetState: [24, 8],
+			BlendComponent: [12, 4],
+			TexelCopyBufferLayout: [16, 8],
+			Origin3D: [12, 4],
+			QueueDescriptor: [this.mem.intSize*3, this.mem.intSize],
+			CallbackInfo: [20, 4],
+			UncapturedErrorCallbackInfo: [16, 4],
+			RenderPassColorAttachment: [56, 8],
+			BindGroupEntry: [40, 8],
+			BindGroupLayoutEntry: [80, 8],
+			Extent3D: [12, 4],
+			CompilationMessage: [this.mem.intSize == 8 ? 64 : 48, 8],
 		};
 
 		/** @type {WebGPUObjectManager<{}>} */
@@ -112,6 +157,29 @@ class WebGPUInterface {
 
 		/** @type {WebGPUObjectManager<GPUTextureView>} */
 		this.textureViews = new WebGPUObjectManager("TextureView", this.mem);
+
+		this.zeroMessageAddr = 0;
+	}
+
+	struct(start) {
+		let offset = start;
+
+		return (size, alignment = null) => {
+			if (alignment === null) {
+				if (Array.isArray(size)) {
+					[size, alignment] = size;
+				} else {
+					alignment = size;
+				}
+			}
+
+			// Align the offset to the required boundary
+			offset = Math.ceil(offset / alignment) * alignment;
+			let currentOffset = offset;
+			offset += size;
+
+			return currentOffset;
+		};
 	}
 
 	/**
@@ -189,18 +257,18 @@ class WebGPUInterface {
 	 */
 	enumeration(name, ptr) {
 		const int = this.mem.loadI32(ptr);
-		this.assert(this.enums[name], `Unknown enumeration "${name}"`);
-		return this.enums[name][int];
+		return ENUMS[name][int];
 	}
 
 	/**
 	 * @param {GPUSupportedFeatures} features
 	 * @param {number} ptr
-	 * @returns {BigInt|number}
 	 */
-	genericEnumerateFeatures(features, ptr) {
+	genericGetFeatures(features, ptr) {
+		this.assert(ptr != 0);
+
 		const availableFeatures = [];
-		this.enums.FeatureName.forEach((feature, value) => {
+		ENUMS.FeatureName.forEach((feature, value) => {
 			if (!feature) {
 				return;
 			}
@@ -210,57 +278,86 @@ class WebGPUInterface {
 			}
 		});
 
-		if (ptr != 0) {
-			for (let i = 0; i < availableFeatures.length; i += 1) {
-				this.mem.storeI32(ptr + (i * 4), availableFeatures[i]);
-			}
+		if (availableFeatures.length === 0) {
+			return;
 		}
 
-		return this.uint(availableFeatures.length);
+		const featuresAddr = this.mem.exports.wgpu_alloc(availableFeatures.length * 4);
+		this.assert(featuresAddr != 0);
+
+		let off = this.struct(ptr);
+		this.mem.storeUint(off(this.mem.intSize), availableFeatures.length);
+		this.mem.storeI32(off(4), featuresAddr);
+
+		off = this.struct(featuresAddr);	
+		for (let i = 0; i < availableFeatures.length; i += 1) {
+			this.mem.storeI32(off(4), availableFeatures[i]);
+		}
 	}
 
 	/**
 	 * @param {GPUSupportedLimits} limits
 	 * @param {number} ptr
+	 * @returns {number}
 	 */
 	genericGetLimits(limits, supportedLimitsPtr) {
 		this.assert(supportedLimitsPtr != 0);
-		const limitsPtr = supportedLimitsPtr + 8;
 
-		this.mem.storeU32(limitsPtr + 0,   limits.maxTextureDimension1D);
-		this.mem.storeU32(limitsPtr + 4,   limits.maxTextureDimension2D);
-		this.mem.storeU32(limitsPtr + 8,   limits.maxTextureDimension3D);
-		this.mem.storeU32(limitsPtr + 12,  limits.maxTextureArrayLayers);
-		this.mem.storeU32(limitsPtr + 16,  limits.maxBindGroups);
-		this.mem.storeU32(limitsPtr + 20,  limits.maxBindGroupsPlusVertexBuffers);
-		this.mem.storeU32(limitsPtr + 24,  limits.maxBindingsPerBindGroup);
-		this.mem.storeU32(limitsPtr + 28,  limits.maxDynamicUniformBuffersPerPipelineLayout);
-		this.mem.storeU32(limitsPtr + 32,  limits.maxDynamicStorageBuffersPerPipelineLayout);
-		this.mem.storeU32(limitsPtr + 36,  limits.maxSampledTexturesPerShaderStage);
-		this.mem.storeU32(limitsPtr + 40,  limits.maxSamplersPerShaderStage);
-		this.mem.storeU32(limitsPtr + 44,  limits.maxStorageBuffersPerShaderStage);
-		this.mem.storeU32(limitsPtr + 48,  limits.maxStorageTexturesPerShaderStage);
-		this.mem.storeU32(limitsPtr + 52,  limits.maxUniformBuffersPerShaderStage);
-		this.mem.storeU64(limitsPtr + 56,  limits.maxUniformBufferBindingSize);
-		this.mem.storeU64(limitsPtr + 64,  limits.maxStorageBufferBindingSize);
-		this.mem.storeU32(limitsPtr + 72,  limits.minUniformBufferOffsetAlignment);
-		this.mem.storeU32(limitsPtr + 76,  limits.minStorageBufferOffsetAlignment);
-		this.mem.storeU32(limitsPtr + 80,  limits.maxVertexBuffers);
-		this.mem.storeU64(limitsPtr + 88,  limits.maxBufferSize);
-		this.mem.storeU32(limitsPtr + 96,  limits.maxVertexAttributes);
-		this.mem.storeU32(limitsPtr + 100, limits.maxVertexBufferArrayStride);
-		this.mem.storeU32(limitsPtr + 104, limits.maxInterStageShaderComponents);
-		this.mem.storeU32(limitsPtr + 108, limits.maxInterStageShaderVariables);
-		this.mem.storeU32(limitsPtr + 112, limits.maxColorAttachments);
-		this.mem.storeU32(limitsPtr + 116, limits.maxColorAttachmentBytesPerSample);
-		this.mem.storeU32(limitsPtr + 120, limits.maxComputeWorkgroupStorageSize);
-		this.mem.storeU32(limitsPtr + 124, limits.maxComputeInvocationsPerWorkgroup);
-		this.mem.storeU32(limitsPtr + 128, limits.maxComputeWorkgroupSizeX);
-		this.mem.storeU32(limitsPtr + 132, limits.maxComputeWorkgroupSizeY);
-		this.mem.storeU32(limitsPtr + 136, limits.maxComputeWorkgroupSizeZ);
-		this.mem.storeU32(limitsPtr + 140, limits.maxComputeWorkgroupsPerDimension);
+		const off = this.struct(supportedLimitsPtr);
+		off(4);
 
-		return true;
+		this.mem.storeU32(off(4), limits.maxTextureDimension1D);
+		this.mem.storeU32(off(4), limits.maxTextureDimension2D);
+		this.mem.storeU32(off(4), limits.maxTextureDimension3D);
+		this.mem.storeU32(off(4), limits.maxTextureArrayLayers);
+		this.mem.storeU32(off(4), limits.maxBindGroups);
+		this.mem.storeU32(off(4), limits.maxBindGroupsPlusVertexBuffers);
+		this.mem.storeU32(off(4), limits.maxBindingsPerBindGroup);
+		this.mem.storeU32(off(4), limits.maxDynamicUniformBuffersPerPipelineLayout);
+		this.mem.storeU32(off(4), limits.maxDynamicStorageBuffersPerPipelineLayout);
+		this.mem.storeU32(off(4), limits.maxSampledTexturesPerShaderStage);
+		this.mem.storeU32(off(4), limits.maxSamplersPerShaderStage);
+		this.mem.storeU32(off(4), limits.maxStorageBuffersPerShaderStage);
+		this.mem.storeU32(off(4), limits.maxStorageTexturesPerShaderStage);
+		this.mem.storeU32(off(4), limits.maxUniformBuffersPerShaderStage);
+		this.mem.storeU64(off(8), limits.maxUniformBufferBindingSize);
+		this.mem.storeU64(off(8), limits.maxStorageBufferBindingSize);
+		this.mem.storeU32(off(4), limits.minUniformBufferOffsetAlignment);
+		this.mem.storeU32(off(4), limits.minStorageBufferOffsetAlignment);
+		this.mem.storeU32(off(4), limits.maxVertexBuffers);
+		this.mem.storeU64(off(8), limits.maxBufferSize);
+		this.mem.storeU32(off(4), limits.maxVertexAttributes);
+		this.mem.storeU32(off(4), limits.maxVertexBufferArrayStride);
+		this.mem.storeU32(off(4), limits.maxInterStageShaderVariables);
+		this.mem.storeU32(off(4), limits.maxColorAttachments);
+		this.mem.storeU32(off(4), limits.maxColorAttachmentBytesPerSample);
+		this.mem.storeU32(off(4), limits.maxComputeWorkgroupStorageSize);
+		this.mem.storeU32(off(4), limits.maxComputeInvocationsPerWorkgroup);
+		this.mem.storeU32(off(4), limits.maxComputeWorkgroupSizeX);
+		this.mem.storeU32(off(4), limits.maxComputeWorkgroupSizeY);
+		this.mem.storeU32(off(4), limits.maxComputeWorkgroupSizeZ);
+		this.mem.storeU32(off(4), limits.maxComputeWorkgroupsPerDimension);
+
+		return STATUS_SUCCESS;
+	}
+
+	genericGetAdapterInfo(infoPtr) {
+		this.assert(infoPtr != 0);
+
+		const off = this.struct(infoPtr);
+		off(4); // nextInChain
+		off(this.sizes.StringView); // vendor
+		off(this.sizes.StringView); // architecture
+		off(this.sizes.StringView); // device
+		off(this.sizes.StringView); // description
+
+		this.mem.storeI32(off(4), ENUMS.BackendType.indexOf("WebGPU"));
+		this.mem.storeI32(off(4), ENUMS.AdapterType.indexOf("Unknown"));
+
+		// NOTE: I don't think getting the other fields in this struct is possible.
+		// `adapter.requestAdapterInfo` is deprecated.
+
+		return STATUS_SUCCESS;
 	}
 
 	/**
@@ -276,7 +373,7 @@ class WebGPUInterface {
 	 * @returns {GPUFeatureName}
 	 */
 	FeatureName(featureInt) {
-		return this.enums.FeatureName[featureInt];
+		return ENUMS.FeatureName[featureInt];
 	}
 
 	/**
@@ -314,39 +411,41 @@ class WebGPUInterface {
 			return undefined;
 		};
 
+		const off = this.struct(start);
+		off(4);
+
 		return {
-			maxTextureDimension1D:                     limitU32(start + 0),
-			maxTextureDimension2D:                     limitU32(start + 4),
-			maxTextureDimension3D:                     limitU32(start + 8),
-			maxTextureArrayLayers:                     limitU32(start + 12),
-			maxBindGroups:                             limitU32(start + 16),
-			maxBindGroupsPlusVertexBuffers:            limitU32(start + 20),
-			maxBindingsPerBindGroup:                   limitU32(start + 24),
-			maxDynamicUniformBuffersPerPipelineLayout: limitU32(start + 28),
-			maxDynamicStorageBuffersPerPipelineLayout: limitU32(start + 32),
-			maxSampledTexturesPerShaderStage:          limitU32(start + 36),
-			maxSamplersPerShaderStage:                 limitU32(start + 40),
-			maxStorageBuffersPerShaderStage:           limitU32(start + 44),
-			maxStorageTexturesPerShaderStage:          limitU32(start + 48),
-			maxUniformBuffersPerShaderStage:           limitU32(start + 52),
-			maxUniformBufferBindingSize:               limitU64(start + 56),
-			maxStorageBufferBindingSize:               limitU64(start + 64),
-			minUniformBufferOffsetAlignment:           limitU32(start + 72),
-			minStorageBufferOffsetAlignment:           limitU32(start + 76),
-			maxVertexBuffers:                          limitU32(start + 80),
-			maxBufferSize:                             limitU64(start + 88),
-			maxVertexAttributes:                       limitU32(start + 96),
-			maxVertexBufferArrayStride:                limitU32(start + 100),
-			maxInterStageShaderComponents:             limitU32(start + 104),
-			maxInterStageShaderVariables:              limitU32(start + 108),
-			maxColorAttachments:                       limitU32(start + 112),
-			maxColorAttachmentBytesPerSample:          limitU32(start + 116),
-			maxComputeWorkgroupStorageSize:            limitU32(start + 120),
-			maxComputeInvocationsPerWorkgroup:         limitU32(start + 124),
-			maxComputeWorkgroupSizeX:                  limitU32(start + 128),
-			maxComputeWorkgroupSizeY:                  limitU32(start + 132),
-			maxComputeWorkgroupSizeZ:                  limitU32(start + 136),
-			maxComputeWorkgroupsPerDimension:          limitU32(start + 140),
+			maxTextureDimension1D:                     limitU32(off(4)),
+			maxTextureDimension2D:                     limitU32(off(4)),
+			maxTextureDimension3D:                     limitU32(off(4)),
+			maxTextureArrayLayers:                     limitU32(off(4)),
+			maxBindGroups:                             limitU32(off(4)),
+			maxBindGroupsPlusVertexBuffers:            limitU32(off(4)),
+			maxBindingsPerBindGroup:                   limitU32(off(4)),
+			maxDynamicUniformBuffersPerPipelineLayout: limitU32(off(4)),
+			maxDynamicStorageBuffersPerPipelineLayout: limitU32(off(4)),
+			maxSampledTexturesPerShaderStage:          limitU32(off(4)),
+			maxSamplersPerShaderStage:                 limitU32(off(4)),
+			maxStorageBuffersPerShaderStage:           limitU32(off(4)),
+			maxStorageTexturesPerShaderStage:          limitU32(off(4)),
+			maxUniformBuffersPerShaderStage:           limitU32(off(4)),
+			maxUniformBufferBindingSize:               limitU64(off(8)),
+			maxStorageBufferBindingSize:               limitU64(off(8)),
+			minUniformBufferOffsetAlignment:           limitU32(off(4)),
+			minStorageBufferOffsetAlignment:           limitU32(off(4)),
+			maxVertexBuffers:                          limitU32(off(4)),
+			maxBufferSize:                             limitU64(off(8)),
+			maxVertexAttributes:                       limitU32(off(4)),
+			maxVertexBufferArrayStride:                limitU32(off(4)),
+			maxInterStageShaderVariables:              limitU32(off(4)),
+			maxColorAttachments:                       limitU32(off(4)),
+			maxColorAttachmentBytesPerSample:          limitU32(off(4)),
+			maxComputeWorkgroupStorageSize:            limitU32(off(4)),
+			maxComputeInvocationsPerWorkgroup:         limitU32(off(4)),
+			maxComputeWorkgroupSizeX:                  limitU32(off(4)),
+			maxComputeWorkgroupSizeY:                  limitU32(off(4)),
+			maxComputeWorkgroupSizeZ:                  limitU32(off(4)),
+			maxComputeWorkgroupsPerDimension:          limitU32(off(4)),
 		};
 	}
 
@@ -356,7 +455,7 @@ class WebGPUInterface {
 	 */
 	QueueDescriptor(start) {
 		return {
-			label: this.mem.loadCstring(start + 4),
+			label: this.StringView(start + 4),
 		};
 	}
 
@@ -370,10 +469,11 @@ class WebGPUInterface {
 			return undefined;
 		}
 
+		const off = this.struct(start);
 		return {
-			querySet:                  this.querySets.get(this.mem.loadPtr(start + 0)),
-			beginningOfPassWriteIndex: this.mem.loadU32(start + 4),
-			endOfPassWriteIndex:       this.mem.loadU32(start + 8),
+			querySet:                  this.querySets.get(this.mem.loadPtr(off(4))),
+			beginningOfPassWriteIndex: this.mem.loadU32(off(4)),
+			endOfPassWriteIndex:       this.mem.loadU32(off(4)),
 		};
 	}
 
@@ -382,21 +482,25 @@ class WebGPUInterface {
 	 * @returns {GPURenderPassColorAttachment}
 	 */
 	RenderPassColorAttachment(start) {
-		const viewIdx = this.mem.loadPtr(start + 4);
-		const resolveTargetIdx = this.mem.loadPtr(start + 12);
+		const off = this.struct(start);
+		off(4);
 
-		let depthSlice = this.mem.loadU32(start + 8);
+		const viewIdx = this.mem.loadPtr(off(4));
+
+		let depthSlice = this.mem.loadU32(off(4));
 		if (depthSlice == 0xFFFFFFFF) { // DEPTH_SLICE_UNDEFINED.
 			depthSlice = undefined;
 		}
+
+		const resolveTargetIdx = this.mem.loadPtr(off(4));
 
 		return {
 			view: viewIdx > 0 ? this.textureViews.get(viewIdx) : undefined,
 			resolveTarget: resolveTargetIdx > 0 ? this.textureViews.get(resolveTargetIdx) : undefined,
 			depthSlice: depthSlice,
-			loadOp: this.enumeration("LoadOp", start + 16),
-			storeOp: this.enumeration("StoreOp", start + 20),
-			clearValue: this.Color(start + 24),
+			loadOp: this.enumeration("LoadOp", off(4)),
+			storeOp: this.enumeration("StoreOp", off(4)),
+			clearValue: this.Color(off(this.sizes.Color)),
 		};
 	}
 
@@ -405,11 +509,12 @@ class WebGPUInterface {
 	 * @returns {GPUColor}
 	 */
 	Color(start) {
+		const off = this.struct(start);
 		return {
-			r: this.mem.loadF64(start + 0),
-			g: this.mem.loadF64(start + 8),
-			b: this.mem.loadF64(start + 16),
-			a: this.mem.loadF64(start + 24),
+			r: this.mem.loadF64(off(8)),
+			g: this.mem.loadF64(off(8)),
+			b: this.mem.loadF64(off(8)),
+			a: this.mem.loadF64(off(8)),
 		};
 	}
 
@@ -423,16 +528,18 @@ class WebGPUInterface {
 			return undefined;
 		}
 
+		const off = this.struct(start);
+
 		return {
-			view:              this.textureViews.get(this.mem.loadPtr(start + 0)),
-			depthLoadOp:       this.enumeration("LoadOp", start + 4),
-			depthStoreOp:      this.enumeration("StoreOp", start + 8),
-			depthClearValue:   this.mem.loadF32(start + 12),
-			depthReadOnly:     this.mem.loadB32(start + 16),
-			stencilLoadOp:     this.enumeration("LoadOp", start + 20),
-			stencilStoreOp:    this.enumeration("StoreOp", start + 24),
-			stencilClearValue: this.mem.loadF32(start + 28),
-			stencilReadOnly:   this.mem.loadB32(start + 32),
+			view:              this.textureViews.get(this.mem.loadPtr(off(4))),
+			depthLoadOp:       this.enumeration("LoadOp", off(4)),
+			depthStoreOp:      this.enumeration("StoreOp", off(4)),
+			depthClearValue:   this.mem.loadF32(off(4)),
+			depthReadOnly:     this.mem.loadB32(off(4)),
+			stencilLoadOp:     this.enumeration("LoadOp", off(4)),
+			stencilStoreOp:    this.enumeration("StoreOp", off(4)),
+			stencilClearValue: this.mem.loadF32(off(4)),
+			stencilReadOnly:   this.mem.loadB32(off(4)),
 		};
 	}
 
@@ -457,42 +564,6 @@ class WebGPUInterface {
 		return this.ComputePassTimestampWritesPtr(ptr);
 	}
 	
-	/**
-	 * @param {number} start
-	 * @returns {GPUImageDataLayout}
-	 */
-	TextureDataLayout(start) {
-		return {
-			offset: this.mem.loadU64(start + 8),
-			bytesPerRow: this.mem.loadU32(start + 16),
-			rowsPerImage: this.mem.loadU32(start + 20),
-		};
-	}
-
-	/**
-	 * @param {number} start
-	 * @returns {GPUImageCopyBuffer}
-	 */
-	ImageCopyBuffer(start) {
-		return {
-			...this.TextureDataLayout(start + 8),
-			buffer: this.buffers.get(this.mem.loadPtr(start + 32)).buffer,
-		};
-	}
-
-	/**
-	 * @param {number} start
-	 * @returns {GPUImageCopyTexture}
-	 */
-	ImageCopyTexture(start) {
-		return {
-			texture: this.textures.get(this.mem.loadPtr(start + 4)),
-			mipLevel: this.mem.loadU32(start + 8),
-			origin: this.Origin3D(start + 12),
-			aspect: this.enumeration("TextureAspect", start + 24),
-		};
-	}
-
 	/**
 	 * @param {number} start
 	 * @returns {GPUOrigin3D}
@@ -551,13 +622,16 @@ class WebGPUInterface {
 	 * @returns {GPUBindGroupLayoutEntry}
 	 */
 	BindGroupLayoutEntry(start) {
+		const off = this.struct(start);
+		off(4);
+
 		const entry = {
-			binding:        this.mem.loadU32(start + 4),
-			visibility:     this.mem.loadU32(start + 8),
-			buffer:         this.BufferBindingLayout(start + 16),
-			sampler:        this.SamplerBindingLayout(start + 40),
-			texture:        this.TextureBindingLayout(start + 48),
-			storageTexture: this.StorageTextureBindingLayout(start + 64),
+			binding:        this.mem.loadU32(off(4)),
+			visibility:     this.mem.loadU64(off(8)),
+			buffer:         this.BufferBindingLayout(off(this.sizes.BufferBindingLayout)),
+			sampler:        this.SamplerBindingLayout(off(this.sizes.SamplerBindingLayout)),
+			texture:        this.TextureBindingLayout(off(this.sizes.TextureBindingLayout)),
+			storageTexture: this.StorageTextureBindingLayout(off(this.sizes.StorageTextureBindingLayout)),
 		};
 		if (!entry.buffer.type) {
 			entry.buffer = undefined;
@@ -625,15 +699,22 @@ class WebGPUInterface {
 	 * @returns {GPUProgrammableStage}
 	 */
 	ProgrammableStageDescriptor(start) {
+		const off = this.struct(start);
+		off(4);
+
+		const shaderModule = this.shaderModules.get(this.mem.loadPtr(off(4)));
+		const entryPoint = this.StringView(off(this.sizes.StringView));
+
 		const constantsArray = this.array(
-			this.mem.loadUint(start + 8 + this.mem.intSize),
-			this.mem.loadPtr(start + 8 + this.mem.intSize*2),
+			this.mem.loadUint(off(this.mem.intSize)),
+			this.mem.loadPtr(off(4)),
 			this.ConstantEntry,
-			16,
+			this.sizes.ConstantEntry[0],
 		);
+
 		return {
-			module:     this.shaderModules.get(this.mem.loadPtr(start + 4)),
-			entryPoint: this.mem.loadCstring(start + 8),
+			module:     shaderModule,
+			entryPoint: entryPoint,
 			constants:  constantsArray.reduce((prev, curr) => {
 				prev[curr.key] = curr.value;
 				return prev;
@@ -646,9 +727,12 @@ class WebGPUInterface {
 	 * @returns {{ key: string, value: number }}
 	 */
 	ConstantEntry(start) {
+		const off = this.struct(start);
+		off(4);
+
 		return {
-			key:   this.mem.loadCstring(start + 4),
-			value: this.mem.loadF64(start + 8),
+			key:   this.StringView(off(this.sizes.StringView)),
+			value: this.mem.loadF64(off(8)),
 		};
 	}
 
@@ -657,11 +741,15 @@ class WebGPUInterface {
 	 * @returns {GPUComputePipelineDescriptor}
 	 */
 	ComputePipelineDescriptor(start) {
-		const layoutIdx = this.mem.loadPtr(start + 8)
+		const off = this.struct(start);
+		off(4);
+
+		const label = this.StringView(off(this.sizes.StringView));
+		const layoutIdx = this.mem.loadPtr(off(4));
 		return {
-			label: this.mem.loadCstring(start + 4),
-			layout: layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : undefined,
-			compute: this.ProgrammableStageDescriptor(start + 8 + this.mem.intSize),
+			label: label,
+			layout: layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : "auto",
+			compute: this.ProgrammableStageDescriptor(off(this.sizes.ProgrammableStageDescriptor)),
 		};
 	}
 
@@ -670,28 +758,31 @@ class WebGPUInterface {
 	 * @returns {GPUVertexState}
 	 */
 	VertexState(start) {
-		let off = 8 + this.mem.intSize;
+		const off = this.struct(start);
+		off(4);
+
+		const shaderModuleIdx = this.mem.loadPtr(off(4));
+		const entryPoint = this.StringView(off(this.sizes.StringView));
+
 		const constantsArray = this.array(
-			this.mem.loadUint(start + off),
-			this.mem.loadPtr(start + off + this.mem.intSize),
+			this.mem.loadUint(off(this.mem.intSize)),
+			this.mem.loadPtr(off(4)),
 			this.ConstantEntry,
-			16,
+			this.sizes.ConstantEntry[0],
 		);
 
-		off += this.mem.intSize * 2;
-
 		return {
-			module: this.shaderModules.get(this.mem.loadPtr(start + 4)),
-			entryPoint: this.mem.loadCstring(start + 8),
+			module: this.shaderModules.get(shaderModuleIdx),
+			entryPoint: entryPoint,
 			constants: constantsArray.reduce((prev, curr) => {
 				prev[curr.key] = curr.value;
 				return prev;
 			}, {}),
 			buffers: this.array(
-				this.mem.loadUint(start + off),
-				this.mem.loadPtr(start + off + this.mem.intSize),
+				this.mem.loadUint(off(this.mem.intSize)),
+				this.mem.loadPtr(off(4)),
 				this.VertexBufferLayout,
-				this.mem.intSize == 8 ? 32 : 24,
+				this.sizes.VertexBufferLayout[0],
 			),
 		};
 	}
@@ -701,18 +792,21 @@ class WebGPUInterface {
 	 * @returns {?GPUVertexBufferLayout}
 	 */
 	VertexBufferLayout(start) {
-		const stepMode = this.enumeration("VertexStepMode", start + 8);
-		if (stepMode == "vertex-buffer-not-used") {
+		const off = this.struct(start);
+
+		const stepMode = this.enumeration("VertexStepMode", off(4));
+		if (stepMode == null) {
 			return null;
 		}
+
 		return {
-			arrayStride: this.mem.loadU64(start + 0),
+			arrayStride: this.mem.loadU64(off(8)),
 			stepMode: stepMode,
 			attributes: this.array(
-				this.mem.loadUint(start + 8 + this.mem.intSize),
-				this.mem.loadPtr(start + 8 + this.mem.intSize*2),
+				this.mem.loadUint(off(this.mem.intSize)),
+				this.mem.loadPtr(off(4)),
 				this.VertexAttribute,
-				24,
+				this.sizes.VertexAttribute[0],
 			),
 		};
 	}
@@ -722,10 +816,11 @@ class WebGPUInterface {
 	 * @returns {GPUVertexAttribute}
 	 */
 	VertexAttribute(start) {
+		const off = this.struct(start);
 		return {
-			format:         this.enumeration("VertexFormat", start + 0),
-			offset:         this.mem.loadU64(start + 8),
-			shaderLocation: this.mem.loadU32(start + 16),
+			format:         this.enumeration("VertexFormat", off(4)),
+			offset:         this.mem.loadU64(off(8)),
+			shaderLocation: this.mem.loadU32(off(4)),
 		};
 	}
 
@@ -734,22 +829,15 @@ class WebGPUInterface {
 	 * @returns {GPUPrimitiveState}
 	 */
 	PrimitiveState(start) {
-		let unclippedDepth = undefined;
-		const nextInChain = this.mem.loadPtr(start);
-		if (nextInChain != 0) {
-			const nextInChainType = this.mem.loadI32(nextInChain + 4);
-    		// PrimitiveDepthClipControl = 0x00000007,
-			if (nextInChainType == 7) {
-				unclippedDepth = this.mem.loadB32(nextInChain + 8);
-			}
-		}
+		const off = this.struct(start);
+		off(4);
 
 		return {
-			topology:         this.enumeration("PrimitiveTopology", start + 4),
-			stripIndexFormat: this.enumeration("IndexFormat", start + 8),
-			frontFace:        this.enumeration("FrontFace", start + 12),
-			cullMode:         this.enumeration("CullMode", start + 16),
-			unclippedDepth:   unclippedDepth,
+			topology:         this.enumeration("PrimitiveTopology", off(4)),
+			stripIndexFormat: this.enumeration("IndexFormat", off(4)),
+			frontFace:        this.enumeration("FrontFace", off(4)),
+			cullMode:         this.enumeration("CullMode", off(4)),
+			unclippedDepth:   this.mem.loadB32(off(4)),
 		};
 	}
 
@@ -758,27 +846,19 @@ class WebGPUInterface {
 	 * @returns {GPURenderPipelineDescriptor}
 	 */
 	RenderPipelineDescriptor(start) {
-		const layoutIdx = this.mem.loadPtr(start + 8);
-		const offs = this.mem.intSize == 8 ? [64, 84, 88, 104] : [40, 60, 64, 80];
-		return {
-			label:        this.mem.loadCstring(start + 4),
-			layout:       layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : undefined,
-			vertex:       this.VertexState(start + 8 + this.mem.intSize),
-			primitive:    this.PrimitiveState(start + offs[0]),
-			depthStencil: this.DepthStencilStatePtr(start + offs[1]),
-			multisample:  this.MultisampleState(start + offs[2]),
-			fragment:     this.FragmentStatePtr(start + offs[3]),
-		};
-	}
+		const off = this.struct(start);
+		off(4);
 
-	/**
-	 * @param {number} start
-	 * @returns {GPUShaderModuleCompilationHint}
-	 */
-	ShaderModuleCompilationHint(start) {
+		const label = this.StringView(off(this.sizes.StringView));
+		const layoutIdx = this.mem.loadPtr(off(4));
 		return {
-			entryPoint: this.mem.loadCstring(start + 4),
-			layout: this.pipelineLayouts.get(this.mem.loadPtr(start + 8)),
+			label:        label,
+			layout:       layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : "auto",
+			vertex:       this.VertexState(off(this.sizes.VertexState)),
+			primitive:    this.PrimitiveState(off(this.sizes.PrimitiveState)),
+			depthStencil: this.DepthStencilStatePtr(off(4)),
+			multisample:  this.MultisampleState(off(this.sizes.MultisampleState)),
+			fragment:     this.FragmentStatePtr(off(4)),
 		};
 	}
 
@@ -792,17 +872,20 @@ class WebGPUInterface {
 			return undefined;
 		}
 
+		const off = this.struct(start);
+		off(4);
+
 		return {
-			format:              this.enumeration("TextureFormat", start + 4),
-			depthWriteEnabled:   this.mem.loadB32(start + 8),
-			depthCompare:        this.enumeration("CompareFunction", start + 12),
-			stencilFront:        this.StencilFaceState(start + 16),
-			stencilBack:         this.StencilFaceState(start + 32),
-			stencilReadMask:     this.mem.loadU32(start + 48),
-			stencilWriteMask:    this.mem.loadU32(start + 52),
-			depthBias:           this.mem.loadI32(start + 56),
-			depthBiasSlopeScale: this.mem.loadF32(start + 60),
-			depthBiasClamp:      this.mem.loadF32(start + 64),
+			format:              this.enumeration("TextureFormat", off(4)),
+			depthWriteEnabled:   this.enumeration("OptionalBool", off(4)),
+			depthCompare:        this.enumeration("CompareFunction", off(4)),
+			stencilFront:        this.StencilFaceState(off(this.sizes.StencilFaceState)),
+			stencilBack:         this.StencilFaceState(off(this.sizes.StencilFaceState)),
+			stencilReadMask:     this.mem.loadU32(off(4)),
+			stencilWriteMask:    this.mem.loadU32(off(4)),
+			depthBias:           this.mem.loadI32(off(4)),
+			depthBiasSlopeScale: this.mem.loadF32(off(4)),
+			depthBiasClamp:      this.mem.loadF32(off(4)),
 		};
 	}
 
@@ -841,29 +924,31 @@ class WebGPUInterface {
 			return undefined;
 		}
 
-		let off = 8 + this.mem.intSize;
+		const off = this.struct(start);
+		off(4);
+
+		const shaderModule = this.shaderModules.get(this.mem.loadPtr(off(4)));
+		const entryPoint = this.StringView(off(this.sizes.StringView));
 
 		const constantsArray = this.array(
-			this.mem.loadUint(start + off),
-			this.mem.loadPtr(start + off + this.mem.intSize),
+			this.mem.loadUint(off(this.mem.intSize)),
+			this.mem.loadPtr(off(4)),
 			this.ConstantEntry,
-			16,
+			this.sizes.ConstantEntry[0],
 		);
 
-		off += this.mem.intSize * 2;
-
 		return {
-			module:     this.shaderModules.get(this.mem.loadPtr(start + 4)),
-			entryPoint: this.mem.loadCstring(start + 8),
+			module:     shaderModule,
+			entryPoint: entryPoint,
 			constants: constantsArray.reduce((prev, curr) => {
 				prev[curr.key] = curr.value;
 				return prev;
 			}, {}),
 			targets: this.array(
-				this.mem.loadUint(start + off),
-				this.mem.loadPtr(start + off + this.mem.intSize),
+				this.mem.loadUint(off(this.mem.intSize)),
+				this.mem.loadPtr(off(4)),
 				this.ColorTargetState,
-				16,
+				this.sizes.ColorTargetState[0],
 			),
 		};
 	}
@@ -873,10 +958,12 @@ class WebGPUInterface {
 	 * @returns {GPUColorTargetState}
 	 */
 	ColorTargetState(start) {
+		const off = this.struct(start);
+		off(4);
 		return {
-			format:    this.enumeration("TextureFormat", start + 4),
-			blend:     this.BlendStatePtr(start + 8),
-			writeMask: this.mem.loadU32(start + 12),
+			format:    this.enumeration("TextureFormat", off(4)),
+			blend:     this.BlendStatePtr(off(4)),
+			writeMask: this.mem.loadU64(off(8)),
 		};
 	}
 
@@ -890,9 +977,11 @@ class WebGPUInterface {
 			return undefined;
 		}
 
+		const off = this.struct(start);
+
 		return {
-			color: this.BlendComponent(start + 0),
-			alpha: this.BlendComponent(start + 12),
+			color: this.BlendComponent(off(this.sizes.BlendComponent)),
+			alpha: this.BlendComponent(off(this.sizes.BlendComponent)),
 		};
 	}
 
@@ -908,6 +997,108 @@ class WebGPUInterface {
 		};
 	}
 
+	TexelCopyBufferInfo(start) {
+		const off = this.struct(start);
+		const layout = this.TexelCopyBufferLayout(off(this.sizes.TexelCopyBufferLayout));
+		const bufferIdx = this.mem.loadPtr(off(4));
+		return {
+			buffer: this.buffers.get(bufferIdx).buffer,
+			offset: layout.offset,
+			bytesPerRow: layout.bytesPerRow,
+			rowsPerImage: layout.rowsPerImage,
+		};
+	}
+
+	TexelCopyBufferLayout(start) {
+		const off = this.struct(start);
+		return {
+			offset: this.mem.loadU64(off(8)),
+			bytesPerRow: this.mem.loadU32(off(4)),
+			rowsPerImage: this.mem.loadU32(off(4)),
+		};
+	}
+
+	TexelCopyTextureInfo(start) {
+		const off = this.struct(start);
+		return {
+			texture: this.textures.get(this.mem.loadPtr(off(4))),
+			mipLevel: this.mem.loadU32(off(4)),
+			origin: this.Origin3D(off(this.sizes.Origin3D)),
+			aspect: this.enumeration("TextureAspect", off(4)),
+		};
+	}
+
+	StringView(start) {
+		const data = this.mem.loadPtr(start);
+		return this.mem.loadString(data, this.mem.loadUint(start + this.mem.intSize));
+	}
+
+	CallbackInfoPtr(ptr) {
+		const start = this.mem.loadPtr(ptr);
+		if (start === 0) {
+			return null;
+		}
+
+		return CallbackInfo(start);
+	}
+
+	CallbackInfo(start) {
+		const off = this.struct(start);
+		off(4);
+		// TODO: callback mode?
+		off(4);
+		return {
+			callback: this.mem.exports.__indirect_function_table.get(this.mem.loadPtr(off(4))),
+			userdata1: this.mem.loadPtr(off(4)),
+			userdata2: this.mem.loadPtr(off(4)),
+		};
+	}
+
+	UncapturedErrorCallbackInfo(start) {
+		const off = this.struct(start);
+		off(4);
+		return {
+			callback: this.mem.exports.__indirect_function_table.get(this.mem.loadPtr(off(4))),
+			userdata1: this.mem.loadPtr(off(4)),
+			userdata2: this.mem.loadPtr(off(4)),
+		};
+	}
+
+	callCallback(callback, args) {
+		args.push(callback.userdata1);
+		args.push(callback.userdata2);
+		callback.callback(...args);
+	}
+
+	zeroMessageArg() {
+		if (this.zeroMessageAddr > 0) {
+			return this.zeroMessageAddr;
+		}
+
+		this.zeroMessageAddr = this.mem.exports.wgpu_alloc(this.sizes.StringView[0]);
+		return this.zeroMessageAddr;
+	}
+
+	makeMessageArg(message) {
+			if (message.length == 0) {
+				return this.zeroMessageArg();
+			}
+
+			const messageLength = new TextEncoder().encode(message).length;
+			const stringSize = this.sizes.StringView[0];
+
+			const addr = this.mem.exports.wgpu_alloc(stringSize + messageLength);
+
+			const messageAddr = addr + stringSize;
+
+			this.mem.storeI32(addr, messageAddr);
+			this.mem.storeUint(addr + this.mem.intSize, messageLength);
+
+			this.mem.storeString(messageAddr, message);
+
+			return addr;
+	}
+
 	getInterface() {
 		return {
 			/**
@@ -920,15 +1111,26 @@ class WebGPUInterface {
 					return 0;
 				}
 
+				// TODO: instance capabilities for futures?
+
 				return this.instances.create({});
 			},
 
 			/**
-			 * @param {number} deviceIdx
-			 * @param {number} procNamePtr
+			 * @param {number} capabilitiesPtr
 			 * @returns {number}
 			 */
-			wgpuGetProcAddress: (deviceIdx, procNamePtr) => {
+			wgpuGetInstanceCapabilities: (capabilitiesPtr) => {
+				// TODO: implement (futures).
+				return STATUS_ERROR;
+			},
+
+			/**
+			 * @param {number} procNamePtr
+			 * @param {number} procNameLen
+			 * @returns {number}
+			 */
+			wgpuGetProcAddress: (procNamePtr, procNameLen) => {
 				console.error(`unimplemented: wgpuGetProcAddress`);
 				return 0;
 			},
@@ -938,44 +1140,29 @@ class WebGPUInterface {
 			/**
 			 * @param {number} adapterIdx
 			 * @param {number} featuresPtr
-			 * @returns {number|BigInt}
 			 */
-			wgpuAdapterEnumerateFeatures: (adapterIdx, featuresPtr) => {
+			wgpuAdapterGetFeatures: (adapterIdx, featuresPtr) => {
 				const adapter = this.adapters.get(adapterIdx);
-				return this.genericEnumerateFeatures(adapter.features, featuresPtr);
-			},
-
-			/**
-			 * @param {number} adapterIdx
-			 * @param {number} supportedLimitsPtr
-			 * @returns {boolean}
-			 */
-			wgpuAdapterGetLimits: (adapterIdx, supportedLimitsPtr) => {
-				const adapter = this.adapters.get(adapterIdx);
-				return this.genericGetLimits(adapter.limits, supportedLimitsPtr);
+				this.genericGetFeatures(adapter.features, featuresPtr);
 			},
 
 			/**
 			 * @param {number} adapterIdx
 			 * @param {number} infoPtr
+			 * @returns {number}
 			 */
 			wgpuAdapterGetInfo: (adapterIdx, infoPtr) => {
-				this.assert(infoPtr != 0);
-
-				// WebGPU backend.
-				this.mem.storeI32(infoPtr + 20, 2);
- 				// Unknown adapter.
-				this.mem.storeI32(infoPtr + 24, 3);
-
-				// NOTE: I don't think getting the other fields in this struct is possible.
-				// `adapter.requestAdapterInfo` is deprecated.
+				return this.genericGetAdapterInfo(infoPtr);
 			},
 
 			/**
-			 * @param {number} infoPtr
+			 * @param {number} adapterIdx
+			 * @param {number} limitsPtr
+			 * @returns {number}
 			 */
-			wgpuAdapterInfoFreeMembers: (infoPtr) => {
-				// NOTE: nothing to free.
+			wgpuAdapterGetLimits: (adapterIdx, limitsPtr) => {
+				const adapter = this.adapters.get(adapterIdx);
+				return this.genericGetLimits(adapter.limits, limitsPtr);
 			},
 
 			/**
@@ -985,104 +1172,100 @@ class WebGPUInterface {
 			 */
 			wgpuAdapterHasFeature: (adapterIdx, featureInt) => {
 				const adapter = this.adapters.get(adapterIdx);
-				return adapter.features.has(this.enums.FeatureName[featureInt]);
+				return adapter.features.has(ENUMS.FeatureName[featureInt]);
 			},
 
 			/**
 			 * @param {number} adapterIdx
 			 * @param {0|number} descriptorPtr
-			 * @param {number} callbackPtr
-			 * @param {0|number} userdata
+			 * @param {number} callbackInfoPtr
+			 * @return {number}
 			 */
-			wgpuAdapterRequestDevice: async (adapterIdx, descriptorPtr, callbackPtr, userdata) => {
+			wgpuAdapterRequestDevice: (adapterIdx, descriptorPtr, callbackInfoPtr) => {
 				const adapter  = this.adapters.get(adapterIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
+
+				const off = this.struct(descriptorPtr);
+				off(4);
 
 				/** @type {GPUDeviceDescriptor} */
 				let descriptor;
 				if (descriptorPtr != 0) {
 					descriptor = {
-						label: this.mem.loadCstring(descriptorPtr + 4),
+						label: this.StringView(off(this.sizes.StringView)),
 						requiredFeatures: this.array(
-							this.mem.loadUint(descriptorPtr + 8),
-							this.mem.loadPtr(descriptorPtr  + 8 + this.mem.intSize),
+							this.mem.loadUint(off(this.mem.intSize)),
+							this.mem.loadPtr(off(4)),
 							this.FeatureNamePtr,
 							4,
 						),
-						requiredLimits: this.RequiredLimitsPtr(descriptorPtr + 8 + this.mem.intSize + 4),
-						defaultQueue:   this.QueueDescriptor(  descriptorPtr + 8 + this.mem.intSize + 4 + 4),
+						requiredLimits: this.RequiredLimitsPtr(off(4)),
+						defaultQueue:   this.QueueDescriptor(off(this.sizes.QueueDescriptor)),
 					};
 				}
 
-				let device;
-				let deviceIdx;
-				try {
-					device = await adapter.requestDevice(descriptor);
-					deviceIdx = this.devices.create(device);
-					// NOTE: don't callback here, any errors that happen later will then be caught by the catch here.
-				} catch (e) {
-					const messageLength = new TextEncoder().encode(e.message).length;
-					const messageAddr = this.mem.exports.wgpu_alloc(messageLength + 1);
-					this.mem.storeString(messageAddr, e.message);
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
 
-					callback(1, null, messageAddr, userdata);
+				const deviceLostCallbackInfo = this.CallbackInfo(off(this.sizes.CallbackInfo));
+				const uncapturedErrorCallbackInfo = this.UncapturedErrorCallbackInfo(off(this.sizes.UncapturedErrorCallbackInfo));
 
-					this.mem.exports.wgpu_free(messageAddr);
-				}
-
-				let callbacksPtr = descriptorPtr + 24 + this.mem.intSize;
-
-				const deviceLostCallbackPtr = this.mem.loadPtr(callbacksPtr);
-				if (deviceLostCallbackPtr != 0) {
-					const deviceLostUserData = this.mem.loadPtr(callbacksPtr) + 4;
-					const deviceLostCallback = this.mem.exports.__indirect_function_table.get(deviceLostCallbackPtr);
-
-					device.lost.then((info) => {
-						const reason = this.enums.DeviceLostReason.indexOf(info.reason);
-
-						const messageLength = new TextEncoder().encode(info.message).length;
-						const messageAddr = this.mem.exports.wgpu_alloc(messageLength + 1);
-						this.mem.storeString(messageAddr, info.message);
-
-						deviceLostCallback(reason, messageAddr, deviceLostUserData);
-
+				adapter.requestDevice(descriptor)
+					.catch((e) => {
+						const messageAddr = this.makeMessageArg(e.message);
+						this.callCallback(callbackInfo, [ENUMS.RequestDeviceStatus.indexOf("Error"), messageAddr]);
 						this.mem.exports.wgpu_free(messageAddr);
-					});
-				}
-				callbacksPtr += 8;
+					})
+					.then((device) => {
+						const deviceIdx = this.devices.create(device);
 
-				// Skip over `nextInChain`.
-				callbacksPtr += 4;
+						if (deviceLostCallbackInfo.callback !== null) {
+							device.lost.then((info) => {
+								const reason = ENUMS.DeviceLostReason.indexOf(info.reason);
 
-				const uncapturedErrorCallbackPtr = this.mem.loadPtr(callbacksPtr);
-				if (uncapturedErrorCallbackPtr != 0) {
-					const uncapturedErrorUserData = this.mem.loadPtr(callbacksPtr + 4);
-					const uncapturedErrorCallback = this.mem.exports.__indirect_function_table.get(uncapturedErrorCallbackPtr);
+								const devicePtr = this.mem.exports.wgpu_alloc(4);
+								this.mem.storeI32(devicePtr, deviceIdx);
 
-					device.onuncapturederror = (ev) => {
-						let status = 4; // Unknown
-						if (ev.error instanceof GPUValidationError) {
-							status = 1; // Validation
-						} else if (ev.error instanceof GPUOutOfMemoryError) {
-							status = 2; // OutOfMemory
-						} else if (ev.error instanceof GPUInternalError) {
-							status = 3; // Internal
+								const messageAddr = this.makeMessageArg(info.message);
+								this.callCallback(deviceLostCallbackInfo, [devicePtr, reason, messageAddr]);
+
+								this.mem.exports.wgpu_free(devicePtr);
+								this.mem.exports.wgpu_free(messageAddr);
+							});
 						}
 
-						const messageLength = new TextEncoder().encode(ev.error.message).length;
-						const messageAddr = this.mem.exports.wgpu_alloc(messageLength + 1);
-						this.mem.storeString(messageAddr, ev.error.message);
+						if (uncapturedErrorCallbackInfo.callback !== null) {
+							device.onuncapturederror = (ev) => {
+								let status;
+								if (ev.error instanceof GPUValidationError) {
+									status = ENUMS.ErrorType.indexOf("validation");
+								} else if (ev.error instanceof GPUOutOfMemoryError) {
+									status = ENUMS.ErrorType.indexOf("out-of-memory");
+								} else if (ev.error instanceof GPUInternalError) {
+									status = ENUMS.ErrorType.indexOf("internal");
+								} else {
+									status = ENUMS.ErrorType.indexOf("unknown");
+								}
 
-						uncapturedErrorCallback(status, messageAddr, uncapturedErrorUserData);
+								const messageAddr = this.makeMessageArg(ev.error.message);
+								this.callCallback(uncapturedErrorCallbackInfo, [deviceIdx, status, messageAddr]);
+								this.mem.exports.wgpu_free(messageAddr);
+							};
+						}
 
-						this.mem.exports.wgpu_free(messageAddr);
-					};
-				}
+						this.callCallback(callbackInfo, [ENUMS.ErrorType.indexOf("no-error"), deviceIdx, this.zeroMessageArg()]);
+					});
 
-				callback(0, deviceIdx, null, userdata);
+				// TODO: returning a future? WARN that requires refactor removing await
+				return BigInt(0);
 			},
 
 			...this.adapters.interface(),
+
+			/**
+			 * @param {number} infoPtr
+			 */
+			wgpuAdapterInfoFreeMembers: (infoPtr) => {
+				// NOTE: nothing to free.
+			},
 
 			/* ---------------------- BindGroup ---------------------- */
 
@@ -1106,6 +1289,41 @@ class WebGPUInterface {
 			 * @param {number|BigInt} size
 			 * @returns {number}
 			 */
+			wgpuBufferGetConstMappedRange: (bufferIdx, offset, size) => {
+				const buffer = this.buffers.get(bufferIdx);
+				offset = this.unwrapBigInt(offset);
+				size   = this.unwrapBigInt(size);
+
+				// TODO: does constMappedRange need to do something else?
+
+				this.assert(!buffer.mapping, "buffer already mapped");
+
+				const range = buffer.buffer.getMappedRange(offset, size);
+
+				const ptr = this.mem.exports.wgpu_alloc(range.byteLength);
+
+				const mapping = new Uint8Array(this.mem.memory.buffer, ptr, size);
+				mapping.set(new Uint8Array(range));
+
+				buffer.mapping = { range: range, ptr: ptr, size: range.byteLength };
+				return ptr;
+			},
+
+			/**
+			 * @param {number} bufferIdx
+			 * @return {number}
+			 */
+			wgpuBufferGetMapState: (bufferIdx) => {
+				const buffer = this.buffers.get(bufferIdx);
+				return ENUMS.BufferMapState.indexOf(buffer.mapState);
+			},
+
+			/**
+			 * @param {number} bufferIdx
+			 * @param {number|BigInt} offset
+			 * @param {number|BigInt} size
+			 * @returns {number}
+			 */
 			wgpuBufferGetMappedRange: (bufferIdx, offset, size) => {
 				const buffer = this.buffers.get(bufferIdx);
 				offset = this.unwrapBigInt(offset);
@@ -1116,6 +1334,9 @@ class WebGPUInterface {
 				const range = buffer.buffer.getMappedRange(offset, size);
 
 				const ptr = this.mem.exports.wgpu_alloc(range.byteLength);
+
+				const mapping = new Uint8Array(this.mem.memory.buffer, ptr, size);
+				mapping.set(new Uint8Array(range));
 
 				buffer.mapping = { range: range, ptr: ptr, size: range.byteLength };
 				return ptr;
@@ -1144,44 +1365,38 @@ class WebGPUInterface {
 			 * @param {number} mode
 			 * @param {number|BigInt} offset
 			 * @param {number|BigInt} size
-			 * @param {number} callbackPtr
-			 * @param {0|number} userdata
+			 * @param {number} callbackInfo
+			 * @return {number}
 			 */
-			wgpuBufferMapAsync: async (bufferIdx, mode, offset, size, callbackPtr, userdata) => {
+			wgpuBufferMapAsync: (bufferIdx, mode, offset, size, callbackInfoPtr) => {
 				const buffer = this.buffers.get(bufferIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
+				mode   = this.unwrapBigInt(mode);
 				offset = this.unwrapBigInt(offset);
 				size   = this.unwrapBigInt(size);
 
-				if (buffer.buffer.mapState == "pending") {
-					callback(this.enums.BufferMapAsyncStatus.MappingAlreadyPending, userdata);
-				} else {
-					let result;
-					try {
-						await buffer.buffer.mapAsync(mode, offset, size);
-						result = 0; // Success.
-					} catch(e) {
-						console.warn(e);
-						result = 2; // Unknown error.
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);	
+				buffer.buffer.mapAsync(mode, offset, size)
+					.catch((e) => {
+						const messageAddr = this.makeMessageArg(e.message);
+						this.callCallback(callbackInfo, [ENUMS.MapAsyncStatus.indexOf("Error"), messageAddr]);
+						this.mem.exports.wgpu_free(messageAddr);
+					})
+					.then(() => {
+						this.callCallback(callbackInfo, [ENUMS.MapAsyncStatus.indexOf("Success"), this.zeroMessageArg()]);
+					});
 
-						if (e instanceof DomException) {
-							if (e.name == "OperationError") {
-								result = 1; // Validation error.
-							}
-						}
-					}
-
-					callback(result, userdata);
-				}
+				// TODO: returning a future? WARN that requires refactor removing await
+				return BigInt(0);
 			},
 
 			/**
 			 * @param {number} bufferIdx
 			 * @param {number} labelPtr
+			 * @param {number} labelLen
 			 */
-			wgpuBufferSetLabel: (bufferIdx, labelPtr) => {
+			wgpuBufferSetLabel: (bufferIdx, labelPtr, labelLen) => {
 				const buffer = this.buffers.get(bufferIdx);
-				buffer.buffer.label = this.mem.loadCstring(labelPtr);
+				buffer.buffer.label = this.mem.loadString(labelPtr, labelLen);
 			},
 
 			/**
@@ -1219,9 +1434,11 @@ class WebGPUInterface {
 				/** @type {?GPUComputePassDescriptor} */
 				let descriptor;
 				if (descriptorPtr != 0) {
+					const off = this.struct(descriptorPtr);
+					off(4);
 					descriptor = {
-						label:           this.mem.loadCstring(descriptorPtr + 4),
-						timestampWrites: this.ComputePassTimestampWritesPtr(descriptorPtr + 8),
+						label:           this.StringView(off(this.sizes.StringView)),
+						timestampWrites: this.ComputePassTimestampWritesPtr(off(4)),
 					};
 				}
 
@@ -1238,28 +1455,30 @@ class WebGPUInterface {
 				const commandEncoder = this.commandEncoders.get(commandEncoderIdx);
 				this.assert(descriptorPtr != 0);
 
+				const off = this.struct(descriptorPtr);
+
 				let maxDrawCount = undefined;
-				const nextInChain = this.mem.loadPtr(descriptorPtr);
+				const nextInChain = this.mem.loadPtr(off(4));
 				if (nextInChain != 0) {
 					const nextInChainType = this.mem.loadI32(nextInChain + 4);
-					// RenderPassDescriptorMaxDrawCount = 0x0000000F,
-					if (nextInChainType == 0x0000000F) {
+					// RenderPassMaxDrawCount = 0x00000003,
+					if (nextInChainType == 0x00000003) {
 						maxDrawCount = this.mem.loadU64(nextInChain + 8);
 					}
 				}
 
 				/** @type {GPURenderPassDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
+					label: this.StringView(off(this.sizes.StringView)),
 					colorAttachments: this.array(
-						this.mem.loadUint(descriptorPtr + 8),
-						this.mem.loadPtr(descriptorPtr + 8 + this.mem.intSize),
+						this.mem.loadUint(off(this.mem.intSize)),
+						this.mem.loadPtr(off(4)),
 						this.RenderPassColorAttachment,
-						56,
+						this.sizes.RenderPassColorAttachment[0],
 					),
-					depthStencilAttachment: this.RenderPassDepthStencilAttachmentPtr(descriptorPtr + 8 + this.mem.intSize + 4),
-					occlusionQuerySet: this.QuerySet(descriptorPtr + 8 + this.mem.intSize + 4 + 4),
-					timestampWrites: this.RenderPassTimestampWritesPtr(descriptorPtr + 8 + this.mem.intSize + 4 + 4),
+					depthStencilAttachment: this.RenderPassDepthStencilAttachmentPtr(off(4)),
+					occlusionQuerySet: this.QuerySet(off(4)),
+					timestampWrites: this.RenderPassTimestampWritesPtr(off(4)),
 					maxDrawCount: maxDrawCount,
 				};
 
@@ -1308,8 +1527,8 @@ class WebGPUInterface {
 			wgpuCommandEncoderCopyBufferToTexture: (commandEncoderIdx, sourcePtr, destinationPtr, copySizePtr) => {
 				const commandEncoder = this.commandEncoders.get(commandEncoderIdx);
 				commandEncoder.copyBufferToTexture(
-					this.ImageCopyBuffer(sourcePtr),
-					this.ImageCopyTexture(destinationPtr),
+					this.TexelCopyBufferInfo(sourcePtr),
+					this.TexelCopyTextureInfo(destinationPtr),
 					this.Extent3D(copySizePtr),
 				);
 			},
@@ -1323,8 +1542,8 @@ class WebGPUInterface {
 			wgpuCommandEncoderCopyTextureToBuffer: (commandEncoderIdx, sourcePtr, destinationPtr, copySizePtr) => {
 				const commandEncoder = this.commandEncoders.get(commandEncoderIdx);
 				commandEncoder.copyTextureToBuffer(
-					this.ImageCopyTexture(sourcePtr),
-					this.ImageCopyBuffer(destinationPtr),
+					this.TexelCopyTextureInfo(sourcePtr),
+					this.TexelCopyBufferInfo(destinationPtr),
 					this.Extent3D(copySizePtr),
 				);
 			},
@@ -1338,8 +1557,8 @@ class WebGPUInterface {
 			wgpuCommandEncoderCopyTextureToTexture: (commandEncoderIdx, sourcePtr, destinationPtr, copySizePtr) => {
 				const commandEncoder = this.commandEncoders.get(commandEncoderIdx);
 				commandEncoder.copyTextureToTexture(
-					this.ImageCopyTexture(sourcePtr),
-					this.ImageCopyTexture(destinationPtr),
+					this.TexelCopyTextureInfo(sourcePtr),
+					this.TexelCopyTextureInfo(destinationPtr),
 					this.Extent3D(copySizePtr),
 				);
 			},
@@ -1356,7 +1575,7 @@ class WebGPUInterface {
 				let descriptor;
 				if (descriptorPtr != 0) {
 					descriptor = {
-						label: this.mem.loadCstring(descriptorPtr + 4),
+						label: this.StringView(descriptorPtr + 4),
 					};
 				}
 
@@ -1367,10 +1586,11 @@ class WebGPUInterface {
 			/**
 			 * @param {number} commandEncoderIdx
 			 * @param {number} markerLabelPtr
+			 * @param {number} markerLabelLen
 			 */
-			wgpuCommandEncoderInsertDebugMarker: (commandEncoderIdx, markerLabelPtr) => {
+			wgpuCommandEncoderInsertDebugMarker: (commandEncoderIdx, markerLabelPtr, markerLabelLen) => {
 				const commandEncoder = this.commandEncoders.get(commandEncoderIdx);
-				commandEncoder.insertDebugMarker(this.mem.loadCstring(markerLabelPtr));
+				commandEncoder.insertDebugMarker(this.mem.loadString(markerLabelPtr, markerLabelLen));
 			},
 
 			/**
@@ -1383,11 +1603,12 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} commandEncoderIdx
-			 * @param {number} markerLabelPtr
+			 * @param {number} groupLabelPtr
+			 * @param {number} groupLabelLen
 			 */
-			wgpuCommandEncoderPushDebugGroup: (commandEncoderIdx, groupLabelPtr) => {
+			wgpuCommandEncoderPushDebugGroup: (commandEncoderIdx, groupLabelPtr, groupLabelLen) => {
 				const commandEncoder = this.commandEncoders.get(commandEncoderIdx);
-				commandEncoder.pushDebugGroup(this.mem.loadCstring(groupLabelPtr));
+				commandEncoder.pushDebugGroup(this.mem.loadString(groupLabelPtr, groupLabelLen));
 			},
 
 			/**
@@ -1428,7 +1649,7 @@ class WebGPUInterface {
 			 * @param {number} workgroupCountY
 			 * @param {number} workgroupCountZ
 			 */
-			wgpuComputePassEncoderDispachWorkgroups: (computePassEncoderIdx, workgroupCountX, workgroupCountY, workgroupCountZ) => {
+			wgpuComputePassEncoderDispatchWorkgroups: (computePassEncoderIdx, workgroupCountX, workgroupCountY, workgroupCountZ) => {
 				const computePassEncoder = this.computePassEncoders.get(computePassEncoderIdx);
 				computePassEncoder.dispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
 			},
@@ -1438,7 +1659,7 @@ class WebGPUInterface {
 			 * @param {number} indirectBufferIdx
 			 * @param {BigInt} indirectOffset
 			 */
-			wgpuComputePassEncoderDispachWorkgroupsIndirect: (computePassEncoderIdx, indirectBufferIdx, indirectOffset) => {
+			wgpuComputePassEncoderDispatchWorkgroupsIndirect: (computePassEncoderIdx, indirectBufferIdx, indirectOffset) => {
 				const computePassEncoder = this.computePassEncoders.get(computePassEncoderIdx);
 				const indirectBuffer = this.buffers.get(indirectBufferIdx);
 				indirectOffset = this.unwrapBigInt(indirectOffset);
@@ -1456,10 +1677,11 @@ class WebGPUInterface {
 			/**
 			 * @param {number} computePassEncoderIdx
 			 * @param {number} markerLabelPtr
+			 * @param {number} markerLabelLen
 			 */
-			wgpuComputePassEncoderInsertDebugMarker: (computePassEncoderIdx, markerLabelPtr) => {
+			wgpuComputePassEncoderInsertDebugMarker: (computePassEncoderIdx, markerLabelPtr, markerLabelLen) => {
 				const computePassEncoder = this.computePassEncoders.get(computePassEncoderIdx);
-				computePassEncoder.insertDebugMarker(this.mem.loadCstring(markerLabelPtr));
+				computePassEncoder.insertDebugMarker(this.mem.loadString(markerLabelPtr, markerLabelLen));
 			},
 
 			/**
@@ -1472,11 +1694,12 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} computePassEncoderIdx
-			 * @param {number} markerLabelPtr
+			 * @param {number} groupLabelPtr
+			 * @param {number} groupLabelLen
 			 */
-			wgpuComputePassEncoderPushDebugGroup: (computePassEncoderIdx, groupLabelPtr) => {
+			wgpuComputePassEncoderPushDebugGroup: (computePassEncoderIdx, groupLabelPtr, groupLabelLen) => {
 				const computePassEncoder = this.computePassEncoders.get(computePassEncoderIdx);
-				computePassEncoder.pushDebugGroup(this.mem.loadCstring(groupLabelPtr));
+				computePassEncoder.pushDebugGroup(this.mem.loadString(groupLabelPtr, groupLabelLen));
 			},
 
 			/**
@@ -1542,15 +1765,18 @@ class WebGPUInterface {
 				const device = this.devices.get(deviceIdx);
 				this.assert(descriptorPtr != 0);
 
+				const off = this.struct(descriptorPtr);
+				off(4);
+
 				/** @type {GPUBindGroupDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
-					layout: this.bindGroupLayouts.get(this.mem.loadPtr(descriptorPtr + 8)),
+					label: this.StringView(off(this.sizes.StringView)),
+					layout: this.bindGroupLayouts.get(this.mem.loadPtr(off(4))),
 					entries: this.array(
-						this.mem.loadUint(descriptorPtr + 8 + this.mem.intSize),
-						this.mem.loadPtr(descriptorPtr + 8 + this.mem.intSize * 2),
+						this.mem.loadUint(off(this.mem.intSize)),
+						this.mem.loadPtr(off(4)),
 						this.BindGroupEntry,
-						40,
+						this.sizes.BindGroupEntry[0],
 					),
 				};
 			
@@ -1567,14 +1793,17 @@ class WebGPUInterface {
 				const device = this.devices.get(deviceIdx);
 				this.assert(descriptorPtr != 0);
 
+				const off = this.struct(descriptorPtr);
+				off(4);
+
 				/** @type {GPUBindGroupLayoutDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
+					label: this.StringView(off(this.sizes.StringView)),
 					entries: this.array(
-						this.mem.loadUint(descriptorPtr + 8),
-						this.mem.loadPtr(descriptorPtr + 8 + this.mem.intSize),
+						this.mem.loadUint(off(this.mem.intSize)),
+						this.mem.loadPtr(off(4)),
 						this.BindGroupLayoutEntry,
-						80,
+						this.sizes.BindGroupLayoutEntry[0],
 					),
 				};
 
@@ -1591,12 +1820,15 @@ class WebGPUInterface {
 				const device = this.devices.get(deviceIdx);
 				this.assert(descriptorPtr != 0);
 
+				const off = this.struct(descriptorPtr);
+				off(4);
+
 				/** @type {GPUBufferDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
-					usage: this.mem.loadU32(descriptorPtr + 8),
-					size: this.mem.loadU64(descriptorPtr + 16),
-					mappedAtCreation: this.mem.loadB32(descriptorPtr + 24),
+					label: this.StringView(off(this.sizes.StringView)),
+					usage: this.mem.loadU64(off(8)),
+					size: this.mem.loadU64(off(8)),
+					mappedAtCreation: this.mem.loadB32(off(4)),
 				};
 
 				const buffer = device.createBuffer(descriptor);
@@ -1615,7 +1847,7 @@ class WebGPUInterface {
 				let descriptor;
 				if (descriptor != 0) {
 					descriptor = {
-						label: this.mem.loadCstring(descriptorPtr + 4),
+						label: this.StringView(descriptorPtr + 4),
 					};
 				}
 
@@ -1638,27 +1870,27 @@ class WebGPUInterface {
 			/**
 			 * @param {number} deviceIdx
 			 * @param {number} descriptorPtr
-			 * @param {number} callbackPtr
-			 * @param {number} userdata
+			 * @param {number} callbackInfo
 			 */
-			wgpuDeviceCreateComputePipelineAsync: async (deviceIdx, descriptorPtr, callbackPtr, userdata) => {
+			wgpuDeviceCreateComputePipelineAsync: (deviceIdx, descriptorPtr, callbackInfoPtr) => {
 				const device = this.devices.get(deviceIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
+
 				this.assert(descriptorPtr != 0);
 
-				let result;
-				let resultIdx;
-				try {
-					const computePipeline = await device.createComputePipelineAsync(this.ComputePipelineDescriptor(descriptorPtr));
-					resultIdx = this.computePipelines.create(computePipeline);
-					result = 0; /* Success */
-					// NOTE: don't callback here, any errors that happen later will then be caught by the catch here.
-				} catch (e) {
-					console.warn(e);
-					result = 5; /* Unknown error */
-				}
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
+				device.createComputePipelineAsync(this.ComputePipelineDescriptor(descriptorPtr))
+					.catch((e) => {
+						const messageAddr = this.makeMessageArg(e.message);
+						this.callCallback(callbackInfo, [ENUMS.CreatePipelineAsyncStatus.indexOf("Unknown"), 0, messageAddr]);
+						this.mem.exports.wgpu_free(messageAddr);
+					})
+					.then((computePipeline) => {
+						const pipelineIdx = this.computePipelines.create(computePipeline);
+						this.callCallback(callbackInfo, [ENUMS.CreatePipelineAsyncStatus.indexOf("Success"), pipelineIdx, this.zeroMessageArg()]);
+					});
 
-				callback(result, resultIdx, null, userdata);
+				// TODO: returning futures?
+				return BigInt(0);
 			},
 
 			/**
@@ -1670,12 +1902,15 @@ class WebGPUInterface {
 				const device = this.devices.get(deviceIdx);
 				this.assert(descriptorPtr != 0);
 
+				const off = this.struct(descriptorPtr);
+				off(4);
+
 				/** @type {GPUPipelineLayoutDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
+					label: this.StringView(off(this.sizes.StringView)),
 					bindGroupLayouts: this.array(
-						this.mem.loadUint(descriptorPtr + 8),
-						this.mem.loadPtr(descriptorPtr + 8 + this.mem.intSize),
+						this.mem.loadUint(off(this.mem.intSize)),
+						this.mem.loadPtr(off(4)),
 						(ptr) => this.bindGroupLayouts.get(this.mem.loadPtr(ptr)),
 						4,
 					),
@@ -1694,11 +1929,14 @@ class WebGPUInterface {
 				const device = this.devices.get(deviceIdx);
 				this.assert(descriptorPtr != 0);
 
+				const off = this.struct(descriptorPtr);
+				off(4);
+
 				/** @type {GPUQuerySetDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
-					type:  this.QueryType(descriptorPtr + 8),
-					count: this.mem.loadU32(descriptorPtr + 12),
+					label: this.StringView(off(this.sizes.StringView)),
+					type:  this.enumeration("QueryType", off(4)),
+					count: this.mem.loadU32(off(4)),
 				};
 
 				const querySet = device.createQuerySet(descriptor);
@@ -1714,19 +1952,22 @@ class WebGPUInterface {
 				const device = this.devices.get(deviceIdx);
 				this.assert(descriptorPtr != 0);
 
+				const off = this.struct(descriptorPtr);
+				off(4);
+
 				/** @type {GPURenderBundleEncoderDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
+					label: this.StringView(off(this.sizes.StringView)),
 					colorFormats: this.array(
-						this.mem.loadUint(descriptorPtr + 8),
-						this.mem.loadPtr(descriptorPtr + 8 + this.mem.intSize),
+						this.mem.loadUint(off(this.mem.intSize)),
+						this.mem.loadPtr(off(4)),
 						this.TextureFormat,
 						4,
 					),
-					depthStencilFormat: this.enumeration("TextureFormat", descriptorPtr + 8 + this.mem.intSize + 4),
-					sampleCount:        this.mem.loadU32(descriptorPtr + 8 + this.mem.intSize + 8),
-					depthReadOnly:      this.mem.loadB32(descriptorPtr + 8 + this.mem.intSize + 12),
-					stencilReadOnly:    this.mem.loadB32(descriptorPtr + 8 + this.mem.intSize + 16),
+					depthStencilFormat: this.enumeration("TextureFormat", off(4)),
+					sampleCount:        this.mem.loadU32(off(4)),
+					depthReadOnly:      this.mem.loadB32(off(4)),
+					stencilReadOnly:    this.mem.loadB32(off(4)),
 				};
 
 				const renderBundleEncoder = device.createRenderBundleEncoder(descriptor);
@@ -1750,27 +1991,26 @@ class WebGPUInterface {
 			/**
 			 * @param {number} deviceIdx
 			 * @param {number} descriptorPtr
-			 * @param {number} callbackPtr
-			 * @param {number} userdata
+			 * @param {number} callbackInfo
 			 */
-			wgpuDeviceCreateRenderPipelineAsync: async (deviceIdx, descriptorPtr, callbackPtr, userdata) => {
+			wgpuDeviceCreateRenderPipelineAsync: (deviceIdx, descriptorPtr, callbackInfoPtr) => {
 				const device = this.devices.get(deviceIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
 				this.assert(descriptorPtr != 0);
 
-				let result;
-				let resultIdx;
-				try {
-					const renderPipeline = await device.createRenderPipelineAsync(this.RenderPipelineDescriptor(descriptorPtr));
-					resultIdx = this.renderPipelines.create(renderPipeline);
-					result = 0; /* Success */
-					// NOTE: don't callback here, any errors that happen later will then be caught by the catch here.
-				} catch (e) {
-					console.warn(e);
-					result = 5; /* Unknown error */
-				}
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
+				device.createRenderPipelineAsync(this.RenderPipelineDescriptor(descriptorPtr))
+					.catch((e) => {
+						const messageAddr = this.makeMessageArg(e.message);
+						this.callCallback(callbackInfo, [ENUMS.CreatePipelineAsyncStatus.indexOf("Unknown"), 0, messageAddr]);
+						this.mem.exports.wgpu_free(messageAddr);
+					})
+					.then((renderPipeline) => {
+						const renderPipelineIdx = this.renderPipelines.create(renderPipeline);
+						this.callCallback(callbackInfo, [ENUMS.CreatePipelineAsyncStatus.indexOf("Success"), renderPipelineIdx, this.zeroMessageArg()]);
+					});
 
-				callback(result, resultIdx, null, userdata);
+				// TODO: returning futures?
+				return BigInt(0);
 			},
 
 			/**
@@ -1784,18 +2024,20 @@ class WebGPUInterface {
 				/** @type {?GPUSamplerDescriptor} */
 				let descriptor;
 				if (descriptorPtr != 0) {
+					const off = this.struct(descriptorPtr);
+					off(4);
 					descriptor = {
-						label:         this.mem.loadCstring(descriptorPtr + 4),
-						addressModeU:  this.enumeration("AddressMode", descriptorPtr + 8),
-						addressModeV:  this.enumeration("AddressMode", descriptorPtr + 12),
-						addressModeW:  this.enumeration("AddressMode", descriptorPtr + 16),
-						magFilter:     this.enumeration("FilterMode", descriptorPtr + 20),
-						minFilter:     this.enumeration("FilterMode", descriptorPtr + 24),
-						mipMapFilter:  this.enumeration("MipmapFilterMode", descriptorPtr + 28),
-						lodMinClamp:   this.mem.loadF32(descriptorPtr + 32),
-						lodMaxClamp:   this.mem.loadF32(descriptorPtr + 36),
-						compare:       this.enumeration("CompareFunction", descriptorPtr + 40),
-						maxAnisotropy: this.mem.loadU16(descriptorPtr + 44),
+						label:         this.StringView(off(this.sizes.StringView)),
+						addressModeU:  this.enumeration("AddressMode", off(4)),
+						addressModeV:  this.enumeration("AddressMode", off(4)),
+						addressModeW:  this.enumeration("AddressMode", off(4)),
+						magFilter:     this.enumeration("FilterMode", off(4)),
+						minFilter:     this.enumeration("FilterMode", off(4)),
+						mipMapFilter:  this.enumeration("MipmapFilterMode", off(4)),
+						lodMinClamp:   this.mem.loadF32(off(4)),
+						lodMaxClamp:   this.mem.loadF32(off(4)),
+						compare:       this.enumeration("CompareFunction", off(4)),
+						maxAnisotropy: this.mem.loadU16(off(2)),
 					};
 				}
 
@@ -1812,24 +2054,24 @@ class WebGPUInterface {
 				const device = this.devices.get(deviceIdx);
 				this.assert(descriptorPtr != 0);
 
-				const nextInChain = this.mem.loadPtr(descriptorPtr);
-				const nextInChainType = this.mem.loadI32(nextInChain + 4);
+				const off = this.struct(descriptorPtr);
 
-				// ShaderModuleWGSLDescriptor = 0x00000006,
-				if (nextInChainType != 6) {
-					throw new TypeError(`Descriptor type should be 'ShaderModuleWGSLDescriptor', got ${nextInChainType}`);
+				const nextInChain = this.mem.loadPtr(off(4));
+
+				const chainOff = this.struct(nextInChain);
+				chainOff(4);
+
+				const nextInChainType = this.mem.loadI32(chainOff(4));
+
+				// ShaderSourceWGSL = 0x00000002,
+				if (nextInChainType != 2) {
+					throw new TypeError(`Descriptor type should be 'ShaderSourceWGSL', got ${nextInChainType}`);
 				}
 
 				/** @type {GPUShaderModuleDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
-					code: this.mem.loadCstring(nextInChain + 8),
-					compilationHints: this.array(
-						this.mem.loadUint(descriptorPtr + 8),
-						this.mem.loadPtr(descriptorPtr + 8 + this.mem.intSize),
-						this.ShaderModuleCompilationHint,
-						12,
-					),
+					label: this.StringView(off(this.sizes.StringView)),
+					code: this.StringView(chainOff(this.sizes.StringView)),
 				};
 
 				const shaderModule = device.createShaderModule(descriptor);
@@ -1845,18 +2087,21 @@ class WebGPUInterface {
 				const device = this.devices.get(deviceIdx);
 				this.assert(descriptorPtr != 0);
 
+				const off = this.struct(descriptorPtr);
+				off(4);
+
 				/** @type {GPUTextureDescriptor} */
 				const descriptor = {
-					label: this.mem.loadCstring(descriptorPtr + 4),
-					usage: this.mem.loadU32(descriptorPtr + 8),
-					dimension: this.enumeration("TextureDimension", descriptorPtr + 12),
-					size: this.Extent3D(descriptorPtr + 16),
-					format: this.enumeration("TextureFormat", descriptorPtr + 28),
-					mipLevelCount: this.mem.loadU32(descriptorPtr + 32),
-					sampleCount: this.mem.loadU32(descriptorPtr + 36),
+					label: this.StringView(off(this.sizes.StringView)),
+					usage: this.mem.loadU64(off(8)),
+					dimension: this.enumeration("TextureDimension", off(4)),
+					size: this.Extent3D(off(this.sizes.Extent3D)),
+					format: this.enumeration("TextureFormat", off(4)),
+					mipLevelCount: this.mem.loadU32(off(4)),
+					sampleCount: this.mem.loadU32(off(4)),
 					viewFormats: this.array(
-						this.mem.loadUint(descriptorPtr + 40),
-						this.mem.loadPtr(descriptorPtr + 40 + this.mem.intSize),
+						this.mem.loadUint(off(this.mem.intSize)),
+						this.mem.loadPtr(off(4)),
 						(ptr) => this.enumeration("TextureFormat", ptr),
 						4,
 					),
@@ -1876,22 +2121,39 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} deviceIdx
-			 * @param {number} featuresPtr
-			 * @returns {number|BigInt}
+			 * @param {number} infoPtr
+			 * @returns {number}
 			 */
-			wgpuDeviceEnumerateFeatures: (deviceIdx, featuresPtr) => {
+			wgpuDeviceGetAdapterInfo: (deviceIdx, infoPtr) => {
+				return this.genericGetAdapterInfo(infoPtr);
+			},
+
+			/**
+			 * @param {number} deviceIdx
+			 * @param {number} featuresPtr
+			 */
+			wgpuDeviceGetFeatures: (deviceIdx, featuresPtr) => {
 				const device = this.devices.get(deviceIdx);
-				return this.genericEnumerateFeatures(device.features, featuresPtr);
+				return this.genericGetFeatures(device.features, featuresPtr);
 			},
 
 			/**
 			 * @param {number} deviceIdx
 			 * @param {number} limitsPtr
-			 * @returns {boolean}
+			 * @returns {number}
 			 */
 			wgpuDeviceGetLimits: (deviceIdx, limitsPtr) => {
 				const device = this.devices.get(deviceIdx);
 				return this.genericGetLimits(device.limits, limitsPtr);
+			},
+
+			/**
+			 * @param {number} deviceIdx
+			 * @returns {number}
+			 */
+			wgpuDeviceGetLostFuture: (deviceIdx) => {
+				// TODO: futures?
+				return BigInt(0);
 			},
 
 			/**
@@ -1910,32 +2172,43 @@ class WebGPUInterface {
 			 */
 			wgpuDeviceHasFeature: (deviceIdx, featureInt) => {
 				const device = this.devices.get(deviceIdx);
-				return device.features.has(this.enums.FeatureName[featureInt]);
+				return device.features.has(ENUMS.FeatureName[featureInt]);
 			},
 
 			/**
 			 * @param {number} deviceIdx
-			 * @param {number} callbackPtr
-			 * @param {number} userdata
+			 * @param {number} callbackInfo
+			 * @returns {number}
 			 */
-			wgpuDevicePopErrorScope: async (deviceIdx, callbackPtr, userdata) => {
+			wgpuDevicePopErrorScope: (deviceIdx, callbackInfoPtr) => {
 				const device = this.devices.get(deviceIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
-				const error = await device.popErrorScope();
-				if (!error) {
-					callback(0, null, userdata);
-					return;
-				}
-				console.warn(error);
-				let status = 4;
-				if (error instanceof GPUValidationError) {
-					status = 1;
-				} else if (error instanceof GPUOutOfMemoryError) {
-					status = 2;
-				} else if (error instanceof GPUInternalError) {
-					status = 3;
-				}
-				callback(status, null, userdata);
+
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
+				device.popErrorScope()
+					.then((error) => {
+						if (!error) {
+							this.callCallback(callbackInfo, [ENUMS.PopErrorScopeStatus.indexOf("Success"), ENUMS.ErrorType.indexOf("no-error"), this.zeroMessageArg()]);
+							return;
+						}
+
+						let status;
+						if (error instanceof GPUValidationError) {
+							status = ENUMS.ErrorType.indexOf("validation");
+						} else if (error instanceof GPUOutOfMemoryError) {
+							status = ENUMS.ErrorType.indexOf("out-of-memory");
+						} else if (error instanceof GPUInternalError) {
+							status = ENUMS.ErrorType.indexOf("internal");
+						} else {
+							status = ENUMS.ErrorType.indexOf("unknown");
+						}
+
+						const messageAddr = error.message;
+						this.callCallback(callbackInfo, [ENUMS.PopErrorScopeStatus.indexOf("Success"), status, messageAddr]);
+						this.mem.exports.wgpu_free(messageAddr);
+					});
+
+				// TODO: futures?
+				return BigInt(0);
 			},
 
 			/**
@@ -1944,7 +2217,7 @@ class WebGPUInterface {
 			 */
 			wgpuDevicePushErrorScope: (deviceIdx, filterInt) => {
 				const device = this.devices.get(deviceIdx);
-				device.pushErrorScope(this.enums.ErrorFilter[filterInt]);
+				device.pushErrorScope(ENUMS.ErrorFilter[filterInt]);
 			},
 
 			...this.devices.interface(true),
@@ -1959,15 +2232,21 @@ class WebGPUInterface {
 				this.assert(instanceIdx > 0);
 				this.assert(descriptorPtr != 0);
 
-				const nextInChain = this.mem.loadPtr(descriptorPtr);
-				const nextInChainType = this.mem.loadI32(nextInChain + 4);
+				const off = this.struct(descriptorPtr);
 
-    			// SurfaceDescriptorFromCanvasHTMLSelector = 0x00000004,
-				if (nextInChainType != 4) {
-					throw new TypeError(`Descriptor type should be 'SurfaceDescriptorFromCanvasHTMLSelector', got ${nextInChainType}`);
+				const nextInChain = this.mem.loadPtr(off(4));
+
+				const chainOff = this.struct(nextInChain);
+				chainOff(4);
+
+				const nextInChainType = this.mem.loadI32(chainOff(4));
+
+				// SurfaceSourceCanvasHTMLSelector = 0x00040001,
+				if (nextInChainType != 0x00040001) {
+					throw new TypeError(`Descriptor type should be 'SurfaceSourceCanvasHTMLSelector', got ${nextInChainType}`);
 				}
 
-				const selector = this.mem.loadCstring(nextInChain + 8);
+				const selector = this.StringView(chainOff(this.sizes.StringView));
 				const surface = document.querySelector(selector);
 				if (!surface) {
 					throw new Error(`Selector '${selector}' did not match any element`);
@@ -1981,11 +2260,49 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} instanceIdx
+			 * @param {number} featurePtr
+			 * @returns {number}
+			 */
+			wgpuInstanceGetWGSLLanguageFeatures: (instanceIdx, featuresPtr) => {
+				this.assert(featuresPtr != 0);
+
+				const availableFeatures = [];
+				ENUMS.WGSLLanguageFeatureName.forEach((feature, value) => {
+					if (!feature) {
+						return;
+					}
+
+					if (navigator.gpu.wgslLanguageFeatures.has(feature)) {
+						availableFeatures.push(value);
+					}
+				});
+
+				if (availableFeatures.length === 0) {
+					return;
+				}
+
+				const featuresAddr = this.mem.exports.wgpu_alloc(availableFeatures.length * 4);
+				this.assert(featuresAddr != 0);
+
+				let off = this.struct(featuresPtr);
+				this.mem.storeUint(off(this.mem.intSize), availableFeatures.length);
+				this.mem.storeI32(off(4), featuresAddr);
+
+				off = this.struct(featuresAddr);	
+				for (let i = 0; i < availableFeatures.length; i += 1) {
+					this.mem.storeI32(off(4), availableFeatures[i]);
+				}
+
+				return STATUS_SUCCESS;
+			},
+
+			/**
+			 * @param {number} instanceIdx
 			 * @param {number} featureInt
 			 * @returns {boolean}
 			 */
 			wgpuInstanceHasWGSLLanguageFeature: (instanceIdx, featureInt) => {
-				return navigator.gpu.wgslLanguageFeatures.has(this.enums.WGSLFeatureName[featureInt]);
+				return navigator.gpu.wgslLanguageFeatures.has(ENUMS.WGSLLanguageFeatureName[featureInt]);
 			},
 
 			/**
@@ -1998,33 +2315,45 @@ class WebGPUInterface {
 			/**
 			 * @param {number} instanceIdx
 			 * @param {0|number} optionsPtr
-			 * @param {number} callbackPtr
-			 * @param {number} userdata
+			 * @param {number} callbackInfo
+			 * @returns {number}
 			 */
-			wgpuInstanceRequestAdapter: async (instanceIdx, optionsPtr, callbackPtr, userdata) => {
+			wgpuInstanceRequestAdapter: (instanceIdx, optionsPtr, callbackInfoPtr) => {
 				this.assert(instanceIdx > 0);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
 
 				/** @type {GPURequestAdapterOptions} */
 				let options;
 				if (optionsPtr != 0) {
+					const off = this.struct(optionsPtr);
+					off(4); // nextInChain
+					off(4); // featureLevel
 					options = {
-						powerPreference: this.enumeration("PowerPreference", optionsPtr + 8),
-						forceFallbackAdapter: this.mem.loadB32(optionsPtr + 16),
+						powerPreference: this.enumeration("PowerPreference", off(4)),
+						forceFallbackAdapter: this.mem.loadB32(off(4)),
 					};
 				}
 
-				let adapterIdx;
-				try {
-					const adapter = await navigator.gpu.requestAdapter(options);
-					adapterIdx = this.adapters.create(adapter);
-					// NOTE: don't callback here, any errors that happen later will then be caught by the catch here.
-				} catch(e) {
-					console.warn(e);
-					callback(2, null, null, userdata);
-				}
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
+				navigator.gpu.requestAdapter(options)
+					.catch((e) => {
+						const messageAddr = this.makeMessageArg(e.message);
+						this.callCallback(callbackInfo, [ENUMS.RequestAdapterStatus.indexOf("Error"), null, messageAddr]);
+						this.mem.exports.wgpu_free(messageAddr);
+					})
+					.then((adapter) => {
+						const adapterIdx = this.adapters.create(adapter);
 
-				callback(0, adapterIdx, null, userdata);
+						this.callCallback(callbackInfo, [ENUMS.RequestAdapterStatus.indexOf("Success"), adapterIdx, this.zeroMessageArg()]);
+					});
+
+				// TODO: futures?
+				return BigInt(0);
+			},
+
+			wgpuInstanceWaitAny: (instanceIdx, futureCount, futuresPtr, timeoutNS) => {
+				// TODO: futures?
+				console.warn("unimplemented: wgpuInstanceProcessEvents");
+				return BigInt(0);
 			},
 
 			...this.instances.interface(false),
@@ -2058,7 +2387,7 @@ class WebGPUInterface {
 			 */
 			wgpuQuerySetGetType: (querySetIdx) => {
 				const querySet = this.querySets.get(querySetIdx);
-				return this.enums.QueryType.indexOf(querySet.type);
+				return ENUMS.QueryType.indexOf(querySet.type);
 			},
 
 			...this.querySets.interface(true),
@@ -2067,21 +2396,23 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} queueIdx
-			 * @param {number} callbackPtr
-			 * @param {number} userdata
+			 * @param {number} callbackInfo
 			 */
-			wgpuQueueOnSubmittedWorkDone: async (queueIdx, callbackPtr, userdata) => {
+			wgpuQueueOnSubmittedWorkDone: (queueIdx, callbackInfoPtr) => {
 				const queue = this.queues.get(queueIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
-				let result;
-				try {
-					await queue.onSubmittedWorkDone();
-					result = 0;
-				} catch(e) {
-					console.warn(e);
-					result = 1;
-				}
-				callback(result, userdata);
+
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
+				queue.onSubmittedWorkDone()
+					.catch((e) => {
+						console.warn(e);
+						this.callCallback(callbackInfo, [ENUMS.QueueWorkDoneStatus.indexOf("Error")]);
+					})
+					.then(() => {
+						this.callCallback(callbackInfo, [ENUMS.QueueWorkDoneStatus.indexOf("Success")]);
+					});
+
+				// TODO: futures?
+				return BigInt(0);
 			},
 
 			/**
@@ -2125,9 +2456,9 @@ class WebGPUInterface {
 			 */
 			wgpuQueueWriteTexture: (queueIdx, destinationPtr, dataPtr, dataSize, dataLayoutPtr, writeSizePtr) => {
 				const queue = this.queues.get(queueIdx);
-				const destination = this.ImageCopyTexture(destinationPtr);
+				const destination = this.TexelCopyTextureInfo(destinationPtr);
 				dataSize = this.unwrapBigInt(dataSize);
-				const dataLayout = this.TextureDataLayout(dataLayoutPtr);
+				const dataLayout = this.TexelCopyBufferLayout(dataLayoutPtr);
 				const writeSize = this.Extent3D(writeSizePtr);
 				queue.writeTexture(destination, this.mem.loadBytes(dataPtr, dataSize), dataLayout, writeSize);
 			},
@@ -2201,7 +2532,7 @@ class WebGPUInterface {
 				let descriptor;
 				if (descriptorPtr != 0) {
 					descriptor = {
-						label: this.mem.loadCstring(descriptorPtr + 4),
+						label: this.StringView(descriptorPtr + 4),
 					};
 				}
 
@@ -2212,11 +2543,12 @@ class WebGPUInterface {
 			/**
 			 * @param {number} renderBundleEncoderIdx
 			 * @param {number} markerLabelPtr
+			 * @param {number} markerLabelLen
 			 */
-			wgpuRenderBundleEncoderInsertDebugMarker: (renderBundleEncoderIdx, markerLabelPtr) => {
+			wgpuRenderBundleEncoderInsertDebugMarker: (renderBundleEncoderIdx, markerLabelPtr, markerLabelLen) => {
 				const renderBundleEncoder = this.renderBundleEncoders.get(renderBundleEncoderIdx);
 				this.assert(markerLabelPtr != 0);
-				const markerLabel = this.mem.loadCstring(markerLabelPtr);
+				const markerLabel = this.mem.loadString(markerLabelPtr, markerLabelLen);
 				renderBundleEncoder.insertDebugMarker(markerLabel);
 			},
 
@@ -2231,11 +2563,12 @@ class WebGPUInterface {
 			/**
 			 * @param {number} renderBundleEncoderIdx
 			 * @param {number} groupLabelPtr
+			 * @param {number} grouplabelLen
 			 */
-			wgpuRenderBundleEncoderPushDebugGroup: (renderBundleEncoderIdx, groupLabelPtr) => {
+			wgpuRenderBundleEncoderPushDebugGroup: (renderBundleEncoderIdx, groupLabelPtr, grouplabelLen) => {
 				const renderBundleEncoder = this.renderBundleEncoders.get(renderBundleEncoderIdx);
 				this.assert(groupLabelPtr!= 0);
-				const groupLabel = this.mem.loadCstring(groupLabelPtr);
+				const groupLabel = this.mem.loadString(groupLabelPtr, groupLabelLen);
 				renderBundleEncoder.pushDebugGroup(groupLabel);
 			},
 
@@ -2255,7 +2588,12 @@ class WebGPUInterface {
 				}
 
 				dynamicOffsetCount = this.unwrapBigInt(dynamicOffsetCount);
-				const dynamicOffsets = this.array(dynamicOffsetCount, dynamicOffsetsPtr, this.mem.loadU32, 4);	
+				const dynamicOffsets = this.array(
+					dynamicOffsetCount,
+					dynamicOffsetsPtr,
+					(ptr) => this.mem.loadU32(ptr),
+					4
+				);
 
 				renderBundleEncoder.setBindGroup(groupIndex, group, dynamicOffsets);
 			},
@@ -2270,7 +2608,7 @@ class WebGPUInterface {
 			wgpuRenderBundleEncoderSetIndexBuffer: (renderBundleEncoderIdx, bufferIdx, formatInt, offset, size) => {
 				const renderBundleEncoder = this.renderBundleEncoders.get(renderBundleEncoderIdx);
 				const buffer = this.buffers.get(bufferIdx);
-				const format = this.enums.IndexFormat[formatInt];
+				const format = ENUMS.IndexFormat[formatInt];
 				offset = this.unwrapBigInt(offset);
 				size = this.unwrapBigInt(size);
 				renderBundleEncoder.setIndexBuffer(buffer.buffer, format, offset, size);
@@ -2404,10 +2742,11 @@ class WebGPUInterface {
 			/**
 			 * @param {number} renderPassEncoderIdx
 			 * @param {number} markerLabelPtr
+			 * @param {number} markerLabelLen
 			 */
-			wgpuRenderPassEncoderInsertDebugMarker: (renderPassEncoderIdx, markerLabelPtr) => {
+			wgpuRenderPassEncoderInsertDebugMarker: (renderPassEncoderIdx, markerLabelPtr, markerLabelLen) => {
 				const renderPassEncoder = this.renderPassEncoders.get(renderPassEncoderIdx);
-				const markerLabel = this.mem.loadCstring(markerLabelPtr);
+				const markerLabel = this.mem.loadString(markerLabelPtr, markerLabelLen);
 				renderPassEncoder.insertDebugMarker(markerLabel);
 			},
 
@@ -2422,10 +2761,11 @@ class WebGPUInterface {
 			/**
 			 * @param {number} renderPassEncoderIdx
 			 * @param {number} groupLabelPtr
+			 * @param {number} groupLabelLen
 			 */
-			wgpuRenderPassEncoderPushDebugGroup: (renderPassEncoderIdx, groupLabelPtr) => {
+			wgpuRenderPassEncoderPushDebugGroup: (renderPassEncoderIdx, groupLabelPtr, groupLabelLen) => {
 				const renderPassEncoder = this.renderPassEncoders.get(renderPassEncoderIdx);
-				const groupLabel = this.mem.loadCstring(groupLabelPtr);
+				const groupLabel = this.mem.loadString(groupLabelPtr, groupLabelLen);
 				renderPassEncoder.pushDebugGroup(groupLabel);
 			},
 
@@ -2445,7 +2785,12 @@ class WebGPUInterface {
 				}
 
 				dynamicOffsetCount = this.unwrapBigInt(dynamicOffsetCount);
-				const dynamicOffsets = this.array(dynamicOffsetCount, dynamicOffsetsPtr, this.mem.loadU32, 4);	
+				const dynamicOffsets = this.array(
+					dynamicOffsetCount,
+					dynamicOffsetsPtr,
+					(ptr) => this.mem.loadU32(ptr),
+					4
+				);	
 
 				renderPassEncoder.setBindGroup(groupIndex, group, dynamicOffsets);
 			},
@@ -2470,7 +2815,7 @@ class WebGPUInterface {
 			wgpuRenderPassEncoderSetIndexBuffer: (renderPassEncoderIdx, bufferIdx, formatInt, offset, size) => {
 				const renderPassEncoder = this.renderPassEncoders.get(renderPassEncoderIdx);
 				const buffer = this.buffers.get(bufferIdx);
-				const format = this.enums.IndexFormat[formatInt];
+				const format = ENUMS.IndexFormat[formatInt];
 				offset = this.unwrapBigInt(offset);
 				size = this.unwrapBigInt(size);
 				renderPassEncoder.setIndexBuffer(buffer.buffer, format, offset, size);
@@ -2566,59 +2911,75 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} shaderModuleIdx
-			 * @param {number} callbackPtr
-			 * @param {number} userdata
+			 * @param {number} callbackInfo
 			 */
-			wgpuShaderModuleGetCompilationInfo: async (shaderModuleIdx, callbackPtr, userdata) => {
+			wgpuShaderModuleGetCompilationInfo: (shaderModuleIdx, callbackInfoPtr) => {
 				const shaderModule = this.shaderModules.get(shaderModuleIdx);
-				const callback = this.mem.exports.__indirect_function_table.get(callbackPtr);
 
-				let status = 0;
-				let retAddr = 0;
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
+				shaderModule.getCompilationInfo()
+					.catch((e) => {
+						console.warn(e);
+						this.callCallback(callbackInfo, [ENUMS.CompilationInfoRequestStatus.indexOf("Error"), null]);
+					})
+					.then((compilationInfo) => {
+						const ptrsToFree = [];
 
-				const ptrsToFree = [];
+						const compilationMessageSize = this.sizes.CompilationMessage[0];
 
-				try {
-					const compilationInfo = await shaderModule.getCompilationInfo();
+						const size = compilationInfo.messages.length * compilationMessageSize;
 
-					const size = compilationInfo.messages.length * 72;
-					const addr = this.mem.exports.wgpu_alloc(size);
-					ptrsToFree.push(addr);
-					compilationInfo.messages.forEach((message, i) => {
-						const messageLength = new TextEncoder().encode(message.message).length;
-						const messageAddr = this.mem.exports.wgpu_alloc(messageLength);
-						ptrsToFree.push(messageAddr);
-						this.mem.storeString(messageAddr, message.message);
-						this.mem.storeI32(addr + (i * size) + 4);
+						const addr = this.mem.exports.wgpu_alloc(size);
+						ptrsToFree.push(addr);
 
-						this.mem.storeI32(addr + (i * size) + 8, this.enums.CompilationMessageType.indexOf(message.type));
+						compilationInfo.messages.forEach((message, i) => {
+							const messageLength = new TextEncoder().encode(message.message).length;
+							const messageAddr = this.mem.exports.wgpu_alloc(messageLength);
+							ptrsToFree.push(messageAddr);
+							this.mem.storeString(messageAddr, message.message);
 
-						this.mem.storeU64(addr + (i * size) + 16, message.lineNum);
-						this.mem.storeU64(addr + (i * size) + 24, message.linePos);
-						this.mem.storeU64(addr + (i * size) + 32, message.offset);
-						this.mem.storeU64(addr + (i * size) + 40, message.length);
+							const off = this.struct(addr + (i * compilationMessageSize));
+							off(4);
 
-						// TODO: UTF16 units.
-						this.mem.storeU64(addr + (i * size) + 48, message.linePos);
-						this.mem.storeU64(addr + (i * size) + 56, message.offset);
-						this.mem.storeU64(addr + (i * size) + 64, message.length);
+							const messageStart = off(this.sizes.StringView);
+							this.mem.storeI32(messageStart, messageAddr);
+							this.mem.storeUint(messageStart + this.mem.intSize, messageLength);
+
+							this.mem.storeI32(off(4), ENUMS.CompilationMessageType.indexOf(message.type));
+
+							this.mem.storeU64(off(8), message.lineNum);
+							this.mem.storeU64(off(8), message.linePos);
+							this.mem.storeU64(off(8), message.offset);
+							this.mem.storeU64(off(8), message.length);
+						});
+
+						const retAddr = this.mem.exports.wgpu_alloc(3*this.mem.intSize);
+						ptrsToFree.push(retAddr);
+						this.mem.storeUint(retAddr + this.mem.intSize, compilationInfo.messages.length);
+						this.mem.storeI32(retAddr + this.mem.intSize*2, addr);
+
+						this.callCallback(callbackInfo, [ENUMS.CompilationInfoRequestStatus.indexOf("Success"), retAddr]);
+
+						ptrsToFree.forEach(ptr => this.mem.exports.wgpu_free(ptr));
 					});
 
-					retAddr = this.mem.exports.wgpu_alloc(3*this.mem.intSize);
-					ptrsToFree.push(retAddr);
-					this.mem.storeUint(retAddr + this.mem.intSize, compilationInfo.messages.length);
-					this.mem.storeI32(retAddr + this.mem.intSize*2, addr);
-				} catch (e) {
-					console.warn(e);
-					status = 1;
-				}
-
-				callback(status, retAddr, userdata);
-
-				ptrsToFree.forEach(ptr => this.mem.exports.wgpu_free(ptr));
+				// TODO: futures?
+				return BigInt(0);
 			},
 
 			...this.shaderModules.interface(true),
+
+			/* ---------------------- SupportedFeatures ---------------------- */
+
+			wgpuSupportedFeaturesFreeMembers: (supportedFeaturesCount, supportedFeaturesPtr) => {
+				this.mem.exports.wgpu_free(supportedFeaturesPtr);
+			},
+
+			/* ---------------------- SupportedWGSLLanguageFeatures ---------------------- */
+
+			wgpuSupportedWGSLLanguageFeaturesFreeMembers: (supportedFeaturesCount, supportedFeaturesPtr) => {
+				this.mem.exports.wgpu_free(supportedFeaturesPtr);
+			},
 
 			/* ---------------------- Surface ---------------------- */
 
@@ -2628,26 +2989,36 @@ class WebGPUInterface {
 			 */
 			wgpuSurfaceConfigure: (surfaceIdx, configPtr) => {
 				const surface = this.surfaces.get(surfaceIdx);
-				const context = surface.getContext('webgpu');
+				const context = surface.getContext("webgpu");
 
-				const widthOff = 16 + this.mem.intSize + 8;
-				surface.width  = this.mem.loadU32(configPtr + widthOff);
-				surface.height = this.mem.loadU32(configPtr + widthOff + 4);
+				const off = this.struct(configPtr);
+				off(4);
+				const device = this.devices.get(this.mem.loadPtr(off(4)));
+				const format = this.enumeration("TextureFormat", off(4));
+				const usage = this.mem.loadU64(off(8));
+				const width = this.mem.loadU32(off(4));
+				const height = this.mem.loadU32(off(4));
+		                const viewFormats = this.array(
+					this.mem.loadUint(off(this.mem.intSize)),
+					this.mem.loadPtr(off(4)),
+					(ptr) => this.enumeration("TextureFormat", ptr),
+					4,
+				);
+				const alphaMode = this.enumeration("CompositeAlphaMode", off(4));
+				// NOTE: present mode seems unused.
+				const presentMode = this.enumeration("PresentMode", off(4));
+
+				surface.width  = width;
+				surface.height = height;
 
 				/** @type {GPUCanvasConfiguration} */
 				const config = {
-					device: this.devices.get(this.mem.loadPtr(configPtr + 4)),
-					format: this.enumeration("TextureFormat", configPtr + 8),
-					usage: this.mem.loadU32(configPtr + 12),
-					viewFormats: this.array(
-						this.mem.loadUint(configPtr + 16),
-						this.mem.loadPtr(configPtr + 16 + this.mem.intSize),
-						(ptr) => this.enumeration("TextureFormat", ptr),
-						4,
-					),
-					alphaMode: this.enumeration("CompositeAlphaMode", configPtr + widthOff - 4),
-					// // NOTE: present mode seems unused.
-					presentMode: this.enumeration("PresentMode", configPtr + widthOff + 4),
+					device: device,
+					format: format,
+					usage: usage,
+					viewFormats: viewFormats,
+					alphaMode: alphaMode,
+					presentMode: presentMode,
 				};
 
 				context.configure(config);
@@ -2657,28 +3028,35 @@ class WebGPUInterface {
 			 * @param {number} surfaceIdx
 			 * @param {number} adapterIdx
 			 * @param {number} capabilitiesPtr
+			 * @return {number}
 			 */
 			wgpuSurfaceGetCapabilities: (surfaceIdx, adapterIdx, capabilitiesPtr) => {
-				const formatStr = navigator.gpu.getPreferredCanvasFormat();
-				const format = this.enums.TextureFormat.indexOf(formatStr);
+				const off = this.struct(capabilitiesPtr);
+				off(4); // nextInChain
+				off(8); // usages TODO: can we pass this?
 
-				this.mem.storeUint(capabilitiesPtr + 8, 1);
+				const formatStr = navigator.gpu.getPreferredCanvasFormat();
+				const format = ENUMS.TextureFormat.indexOf(formatStr);
+
+				this.mem.storeUint(off(this.mem.intSize), 1);
 				const formatAddr = this.mem.exports.wgpu_alloc(4);
 				this.mem.storeI32(formatAddr, format);
-				this.mem.storeI32(capabilitiesPtr + 8 + this.mem.intSize, formatAddr);
+				this.mem.storeI32(off(4), formatAddr);
 
 				// NOTE: present modes don't seem to actually do anything in JS, we can just give back a default FIFO though.
-				this.mem.storeUint(capabilitiesPtr + 8 + this.mem.intSize*2, 1);
+				this.mem.storeUint(off(this.mem.intSize), 1);
 				const presentModesAddr = this.mem.exports.wgpu_alloc(4);
-				this.mem.storeI32(presentModesAddr, 0);
-				this.mem.storeI32(capabilitiesPtr + 8 + this.mem.intSize*3, presentModesAddr);
+				this.mem.storeI32(presentModesAddr, ENUMS.PresentMode.indexOf("fifo"));
+				this.mem.storeI32(off(4), presentModesAddr);
 
-				// Browser seems to support opaque (1) and premultiplied (2).
-				this.mem.storeUint(capabilitiesPtr + 8 + this.mem.intSize*4, 2);
+				// Browser seems to support opaque and premultiplied.
+				this.mem.storeUint(off(this.mem.intSize), 2);
 				const alphaModesAddr = this.mem.exports.wgpu_alloc(8);
-				this.mem.storeI32(alphaModesAddr + 0, 1); // Opaque.
-				this.mem.storeI32(alphaModesAddr + 4, 2); // premultiplied.
-				this.mem.storeI32(capabilitiesPtr + 8 + this.mem.intSize*5, alphaModesAddr);
+				this.mem.storeI32(alphaModesAddr + 0, ENUMS.CompositeAlphaMode.indexOf("opaque"));
+				this.mem.storeI32(alphaModesAddr + 4, ENUMS.CompositeAlphaMode.indexOf("premultiplied"));
+				this.mem.storeI32(off(4), alphaModesAddr);
+
+				return STATUS_SUCCESS;
 			},
 
 			/**
@@ -2691,7 +3069,7 @@ class WebGPUInterface {
 				const texture = context.getCurrentTexture();
 
 				const textureIdx = this.textures.create(texture);
-				this.mem.storeI32(texturePtr, textureIdx);
+				this.mem.storeI32(texturePtr + 4, textureIdx);
 
 				// TODO: determine suboptimal and/or status.
 			},
@@ -2719,13 +3097,22 @@ class WebGPUInterface {
 			 * @param {number} surfaceCapabilitiesPtr
 			 */
 			wgpuSurfaceCapabilitiesFreeMembers: (surfaceCapabilitiesPtr) => {
-				const formatsAddr = this.mem.loadI32(surfaceCapabilitiesPtr + this.mem.intSize*2);
+				const off = this.struct(surfaceCapabilitiesPtr);
+				off(4); // nextInChain
+				off(8); // usages
+				off(this.mem.intSize); // formatCount
+
+				const formatsAddr = this.mem.loadPtr(off(4));
 				this.mem.exports.wgpu_free(formatsAddr);
 
-				const presentModesAddr = this.mem.loadI32(surfaceCapabilitiesPtr + this.mem.intSize*4);
+				off(this.mem.intSize); // presentModeCount
+
+				const presentModesAddr = this.mem.loadPtr(off(4));
 				this.mem.exports.wgpu_free(presentModesAddr);
 
-				const alphaModesAddr = this.mem.loadI32(surfaceCapabilitiesPtr + this.mem.intSize*6);
+				off(this.mem.intSize); // alphaModeCount
+
+				const alphaModesAddr = this.mem.loadPtr(off(4));
 				this.mem.exports.wgpu_free(alphaModesAddr);
 			},
 
@@ -2742,15 +3129,18 @@ class WebGPUInterface {
 				/** @type {?GPUTextureViewDescriptor} */
 				let descriptor;
 				if (descriptorPtr != 0) {
+					const off = this.struct(descriptorPtr);
+					off(4);
 					descriptor = {
-						label:           this.mem.loadCstring(descriptorPtr + 4),
-						format:          this.enumeration("TextureFormat", descriptorPtr + 8),
-						dimension:       this.enumeration("TextureViewDimension", descriptorPtr + 12),
-						baseMipLevel:    this.mem.loadU32(descriptorPtr + 16),
-						mipLevelCount:   this.mem.loadU32(descriptorPtr + 20),
-						baseArrayLayer:  this.mem.loadU32(descriptorPtr + 24),
-						arrayLayerCount: this.mem.loadU32(descriptorPtr + 28),
-						aspect:          this.enumeration("TextureAspect", descriptorPtr + 32),
+						label:           this.StringView(off(this.sizes.StringView)),
+						format:          this.enumeration("TextureFormat", off(4)),
+						dimension:       this.enumeration("TextureViewDimension", off(4)),
+						baseMipLevel:    this.mem.loadU32(off(4)),
+						mipLevelCount:   this.mem.loadU32(off(4)),
+						baseArrayLayer:  this.mem.loadU32(off(4)),
+						arrayLayerCount: this.mem.loadU32(off(4)),
+						aspect:          this.enumeration("TextureAspect", off(4)),
+						usage:           this.mem.loadU64(off(8)),
 					};
 					if (descriptor.arrayLayerCount == 0xFFFFFFFF) {
 						descriptor.arrayLayerCount = undefined;
@@ -2787,7 +3177,7 @@ class WebGPUInterface {
 			 */
 			wgpuTextureGetDimension: (textureIdx) => {
 				const texture = this.textures.get(textureIdx);
-				return this.enums.TextureDimension.indexOf(texture.dimension);
+				return ENUMS.TextureDimension.indexOf(texture.dimension);
 			},
 
 			/**
@@ -2796,7 +3186,7 @@ class WebGPUInterface {
 			 */
 			wgpuTextureGetFormat: (textureIdx) => {
 				const texture = this.textures.get(textureIdx);
-				return this.enums.TextureFormat.indexOf(texture.format);
+				return ENUMS.TextureFormat.indexOf(texture.format);
 			},
 
 			/**
@@ -2881,11 +3271,11 @@ class WebGPUObjectManager {
 	}
 
 	/**
-	 * @param {number} idx
+	 * @param {?number} idx
 	 * @returns {T}
 	 */
 	get(idx) {
-		return this.objects[idx-1].object;
+		return this.objects[idx-1]?.object;
 	}
 
 	/** @param {number} idx */
@@ -2903,12 +3293,12 @@ class WebGPUObjectManager {
 	
 	interface(withLabelSetter = false) {
 		const inter = {};
-		inter[`wgpu${this.name}Reference`] = this.reference.bind(this);
+		inter[`wgpu${this.name}AddRef`] = this.reference.bind(this);
 		inter[`wgpu${this.name}Release`] = this.release.bind(this);
 		if (withLabelSetter) {
-			inter[`wgpu${this.name}SetLabel`] = (idx, labelPtr) => {
+			inter[`wgpu${this.name}SetLabel`] = (idx, labelPtr, labelLen) => {
 				const obj = this.get(idx);
-				obj.label = this.mem.loadCstring(labelPtr);
+				obj.label = this.mem.loadString(labelPtr, labelLen);
 			};
 		}
 		return inter;

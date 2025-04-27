@@ -1,6 +1,7 @@
 package container_priority_queue
 
 import "base:builtin"
+import "base:runtime"
 
 Priority_Queue :: struct($T: typeid) {
 	queue: [dynamic]T,
@@ -17,13 +18,14 @@ default_swap_proc :: proc($T: typeid) -> proc(q: []T, i, j: int) {
 	}
 }
 
-init :: proc(pq: ^$Q/Priority_Queue($T), less: proc(a, b: T) -> bool, swap: proc(q: []T, i, j: int), capacity := DEFAULT_CAPACITY, allocator := context.allocator) {
+init :: proc(pq: ^$Q/Priority_Queue($T), less: proc(a, b: T) -> bool, swap: proc(q: []T, i, j: int), capacity := DEFAULT_CAPACITY, allocator := context.allocator) -> (err: runtime.Allocator_Error) {
 	if pq.queue.allocator.procedure == nil {
 		pq.queue.allocator = allocator
 	}
-	reserve(pq, capacity)
+	reserve(pq, capacity) or_return
 	pq.less = less
 	pq.swap = swap
+	return .None
 }
 
 init_from_dynamic_array :: proc(pq: ^$Q/Priority_Queue($T), queue: [dynamic]T, less: proc(a, b: T) -> bool, swap: proc(q: []T, i, j: int)) {
@@ -41,8 +43,8 @@ destroy :: proc(pq: ^$Q/Priority_Queue($T)) {
 	delete(pq.queue)
 }
 
-reserve :: proc(pq: ^$Q/Priority_Queue($T), capacity: int) {
-	builtin.reserve(&pq.queue, capacity)
+reserve :: proc(pq: ^$Q/Priority_Queue($T), capacity: int) -> (err: runtime.Allocator_Error) {
+	return builtin.reserve(&pq.queue, capacity)
 }
 clear :: proc(pq: ^$Q/Priority_Queue($T)) {
 	builtin.clear(&pq.queue)
@@ -103,9 +105,10 @@ fix :: proc(pq: ^$Q/Priority_Queue($T), i: int) {
 	}
 }
 
-push :: proc(pq: ^$Q/Priority_Queue($T), value: T) {
-	append(&pq.queue, value)
+push :: proc(pq: ^$Q/Priority_Queue($T), value: T) -> (err: runtime.Allocator_Error) {
+	append(&pq.queue, value) or_return
 	_shift_up(pq, builtin.len(pq.queue)-1)
+	return .None
 }
 
 pop :: proc(pq: ^$Q/Priority_Queue($T), loc := #caller_location) -> (value: T) {

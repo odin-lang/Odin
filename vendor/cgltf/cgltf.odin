@@ -105,6 +105,7 @@ type :: enum c.int {
 }
 
 primitive_type :: enum c.int {
+	invalid,
 	points,
 	lines,
 	line_loop,
@@ -222,15 +223,6 @@ accessor_sparse :: struct {
 	indices_component_type:   component_type,
 	values_buffer_view:       ^buffer_view,
 	values_byte_offset:       uint,
-	extras:                   extras_t,
-	indices_extras:           extras_t,
-	values_extras:            extras_t,
-	extensions_count:         uint,
-	extensions:               [^]extension `fmt:"v,extensions_count"`,
-	indices_extensions_count: uint,
-	indices_extensions:       [^]extension `fmt:"v,indices_extensions_count"`,
-	values_extensions_count:  uint,
-	values_extensions:        [^]extension `fmt:"v,values_extensions_count"`,
 }
 
 accessor :: struct {
@@ -306,9 +298,6 @@ texture_view :: struct {
 	scale:            f32, /* equivalent to strength for occlusion_texture */
 	has_transform:    b32,
 	transform:        texture_transform,
-	extras:           extras_t,
-	extensions_count: uint,
-	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
 pbr_metallic_roughness :: struct {
@@ -381,6 +370,16 @@ iridescence :: struct {
 	iridescence_thickness_texture: texture_view,
 }
 
+anisotropy :: struct {
+	anisotropy_strength: f32,
+	anisotropy_rotation: f32,
+	anisotropy_texture:  texture_view,
+}
+
+dispersion :: struct {
+	dispersion: f32,
+}
+
 material :: struct {
 	name: cstring,
 	has_pbr_metallic_roughness:  b32,
@@ -393,6 +392,8 @@ material :: struct {
 	has_sheen:                   b32,
 	has_emissive_strength:       b32,
 	has_iridescence:             b32,
+	has_anisotropy:              b32,
+	has_dispersion:              b32,
 	pbr_metallic_roughness:      pbr_metallic_roughness,
 	pbr_specular_glossiness:     pbr_specular_glossiness,
 	clearcoat:                   clearcoat,
@@ -403,6 +404,8 @@ material :: struct {
 	volume:                      volume,
 	emissive_strength:           emissive_strength,
 	iridescence:                 iridescence,
+	anisotropy:                  anisotropy,
+	dispersion:                  dispersion,
 	normal_texture:              texture_view,
 	occlusion_texture:           texture_view,
 	emissive_texture:            texture_view,
@@ -432,7 +435,6 @@ draco_mesh_compression :: struct {
 }
 
 mesh_gpu_instancing :: struct {
-	buffer_view: ^buffer_view,
 	attributes:  []attribute,
 }
 
@@ -684,6 +686,9 @@ foreign lib {
 	node_transform_world :: proc(node: ^node, out_matrix: [^]f32) ---
 
 	@(require_results)
+	buffer_view_data :: proc(view: ^/*const*/buffer_view) -> [^]byte ---
+
+	@(require_results)
 	accessor_read_float :: proc(accessor: ^/*const*/accessor, index: uint, out: [^]f32,    element_size: uint) -> b32 ---
 	@(require_results)
 	accessor_read_uint  :: proc(accessor: ^/*const*/accessor, index: uint, out: [^]c.uint, element_size: uint) -> b32 ---
@@ -694,12 +699,52 @@ foreign lib {
 	num_components :: proc(type: type) -> uint ---
 
 	@(require_results)
+	component_size :: proc(component_type: component_type) -> uint ---
+	@(require_results)
+	calc_size :: proc(type: type, component_type: component_type) -> uint ---
+
+	@(require_results)
 	accessor_unpack_floats :: proc(accessor: ^/*const*/accessor, out: [^]f32, float_count: uint) -> uint ---
+	@(require_results)
+	accessor_unpack_indices :: proc(accessor: ^/*const*/accessor , out: rawptr, out_component_size: uint, index_count: uint) -> uint ---
 
 	/* this function is deprecated and will be removed in the future; use cgltf_extras::data instead */
 	@(require_results)
 	copy_extras_json :: proc(data: ^data, extras: ^extras_t, dest: [^]byte, dest_size: ^uint) -> result ---
 
+	@(require_results)
+	mesh_index        :: proc(data: ^/*const*/data, object: ^/*const*/mesh) -> uint ---
+	@(require_results)
+	material_index    :: proc(data: ^/*const*/data, object: ^/*const*/material) -> uint ---
+	@(require_results)
+	accessor_index    :: proc(data: ^/*const*/data, object: ^/*const*/accessor) -> uint ---
+	@(require_results)
+	buffer_view_index :: proc(data: ^/*const*/data, object: ^/*const*/buffer_view) -> uint ---
+	@(require_results)
+	buffer_index      :: proc(data: ^/*const*/data, object: ^/*const*/buffer) -> uint ---
+	@(require_results)
+	image_index       :: proc(data: ^/*const*/data, object: ^/*const*/image) -> uint ---
+	@(require_results)
+	texture_index     :: proc(data: ^/*const*/data, object: ^/*const*/texture) -> uint ---
+	@(require_results)
+	sampler_index     :: proc(data: ^/*const*/data, object: ^/*const*/sampler) -> uint ---
+	@(require_results)
+	skin_index        :: proc(data: ^/*const*/data, object: ^/*const*/skin) -> uint ---
+	@(require_results)
+	camera_index      :: proc(data: ^/*const*/data, object: ^/*const*/camera) -> uint ---
+	@(require_results)
+	light_index       :: proc(data: ^/*const*/data, object: ^/*const*/light) -> uint ---
+	@(require_results)
+	node_index        :: proc(data: ^/*const*/data, object: ^/*const*/node) -> uint ---
+	@(require_results)
+	scene_index       :: proc(data: ^/*const*/data, object: ^/*const*/scene) -> uint ---
+	@(require_results)
+	animation_index   :: proc(data: ^/*const*/data, object: ^/*const*/animation) -> uint ---
+	@(require_results)
+	animation_sampler_index :: proc(animation: ^/*const*/animation, object: ^/*const*/animation_sampler) -> uint ---
+	@(require_results)
+	animation_channel_index :: proc(animation: ^/*const*/animation, object: ^/*const*/animation_channel) -> uint ---
+	
 	@(require_results)
 	write_file :: proc(#by_ptr options: options, path:   cstring,             data: ^data) -> result ---
 	@(require_results)

@@ -256,6 +256,8 @@ struct Entity {
 			bool    entry_point_only           : 1;
 			bool    has_instrumentation        : 1;
 			bool    is_memcpy_like             : 1;
+			bool    uses_branch_location       : 1;
+			bool    is_anonymous               : 1;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;
@@ -273,6 +275,7 @@ struct Entity {
 			Slice<String> paths;
 			String name;
 			i64 priority_index;
+			bool ignore_duplicates;
 			String extra_linker_flags;
 		} LibraryName;
 		i32 Nil;

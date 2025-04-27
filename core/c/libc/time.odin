@@ -95,7 +95,7 @@ when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS =
 
 	time_t :: distinct i64
 
-	when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+	when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku {
 		clock_t :: distinct int32_t
 	} else {
 		clock_t :: distinct long

@@ -74,6 +74,7 @@ gb_global Timings global_timings = {0};
 #include "cached.cpp"
 
 #include "linker.cpp"
+#include "bundle_command.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS) && defined(ODIN_TILDE_BACKEND)
 #define ALLOW_TILDE 1
@@ -86,13 +87,6 @@ gb_global Timings global_timings = {0};
 #endif
 
 #include "llvm_backend.cpp"
-
-#if defined(GB_SYSTEM_OSX)
-	#include <llvm/Config/llvm-config.h>
-	#if LLVM_VERSION_MAJOR < 11 || (LLVM_VERSION_MAJOR > 14 && LLVM_VERSION_MAJOR < 17) || LLVM_VERSION_MAJOR > 18
-	#error LLVM Version 11..=14 or =18 is required => "brew install llvm@14"
-	#endif
-#endif
 
 #include "bug_report.cpp"
 
@@ -283,6 +277,7 @@ gb_internal void usage(String argv0, String argv1 = {}) {
 	print_usage_line(1, "build             Compiles directory of .odin files, as an executable.");
 	print_usage_line(1, "                  One must contain the program's entry point, all must be in the same package.");
 	print_usage_line(1, "run               Same as 'build', but also then runs the newly compiled executable.");
+	print_usage_line(1, "bundle            Bundles a directory in a specific layout for that platform.");
 	print_usage_line(1, "check             Parses, and type checks a directory of .odin files.");
 	print_usage_line(1, "strip-semicolon   Parses, type checks, and removes unneeded semicolons from the entire program.");
 	print_usage_line(1, "test              Builds and runs procedures with the attribute @(test) in the initial package.");
@@ -331,6 +326,7 @@ enum BuildFlagKind {
 	BuildFlag_UseRADLink,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
+	BuildFlag_UseSingleModule,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 
@@ -401,6 +397,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalModulePerFile,
 	BuildFlag_InternalCached,
 	BuildFlag_InternalNoInline,
+	BuildFlag_InternalByValue,
 
 	BuildFlag_Tilde,
 
@@ -412,6 +409,10 @@ enum BuildFlagKind {
 	BuildFlag_WindowsPdbName,
 	BuildFlag_Subsystem,
 #endif
+
+	BuildFlag_AndroidKeystore,
+	BuildFlag_AndroidKeystoreAlias,
+	BuildFlag_AndroidKeystorePassword,
 
 	BuildFlag_COUNT,
 };
@@ -431,12 +432,12 @@ struct BuildFlag {
 	BuildFlagKind      kind;
 	String             name;
 	BuildFlagParamKind param_kind;
-	u32                command_support;
+	u64                command_support;
 	bool               allow_multiple;
 };
 
 
-gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_multiple=false) {
+gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u64 command_support, bool allow_multiple=false) {
 	BuildFlag flag = {kind, name, param_kind, command_support, allow_multiple};
 	array_add(build_flags, flag);
 }
@@ -544,6 +545,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseRADLink,              str_lit("radlink"),                   BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
 
@@ -571,7 +573,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StrictTargetFeatures,    str_lit("strict-target-features"),    BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build | Command_bundle_android);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
@@ -612,6 +614,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalModulePerFile,   str_lit("internal-module-per-file"),  BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalCached,          str_lit("internal-cached"),           BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalNoInline,        str_lit("internal-no-inline"),        BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
@@ -627,9 +630,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Subsystem,               str_lit("subsystem"),                 BuildFlagParam_String,  Command__does_build);
 #endif
 
+	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command_bundle_android);
+	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_bundle_android);
+	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
 
-	GB_ASSERT(args.count >= 3);
-	Array<String> flag_args = array_slice(args, 3, args.count);
+
+	Array<String> flag_args = {};
+
+	if (build_context.command_kind == Command_bundle_android) {
+		GB_ASSERT(args.count >= 4);
+		flag_args = array_slice(args, 4, args.count);
+	} else {
+		GB_ASSERT(args.count >= 3);
+		flag_args = array_slice(args, 3, args.count);
+	}
 
 	bool set_flags[BuildFlag_COUNT] = {};
 
@@ -1108,8 +1122,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								String str = value.value_string;
 								bool found = false;
 
-								if (selected_target_metrics->metrics->os != TargetOs_darwin) {
-									gb_printf_err("-subtarget can only be used with darwin based targets at the moment\n");
+								if (selected_target_metrics->metrics->os != TargetOs_darwin &&
+								    selected_target_metrics->metrics->os != TargetOs_linux ) {
+									gb_printf_err("-subtarget can only be used with darwin and linux based targets at the moment\n");
 									bad_flags = true;
 									break;
 								}
@@ -1190,7 +1205,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_type_assert = true;
 							break;
 						case BuildFlag_NoDynamicLiterals:
-							build_context.no_dynamic_literals = true;
+							gb_printf_err("Warning: Use of -no-dynamic-literals is now redundant\n");
 							break;
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
@@ -1238,7 +1253,18 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 
 						case BuildFlag_UseSeparateModules:
+							if (build_context.use_single_module) {
+								gb_printf_err("-use-separate-modules cannot be used with -use-single-module\n");
+								bad_flags = true;
+							}
 							build_context.use_separate_modules = true;
+							break;
+						case BuildFlag_UseSingleModule:
+							if (build_context.use_separate_modules) {
+								gb_printf_err("-use-single-module cannot be used with -use-separate-modules\n");
+								bad_flags = true;
+							}
+							build_context.use_single_module = true;
 							break;
 						case BuildFlag_NoThreadedChecker:
 							build_context.no_threaded_checker = true;
@@ -1508,6 +1534,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalNoInline:
 							build_context.internal_no_inline = true;
 							break;
+						case BuildFlag_InternalByValue:
+							build_context.internal_by_value = true;
+							break;
 
 						case BuildFlag_Tilde:
 							build_context.tilde_backend = true;
@@ -1626,6 +1655,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 					#endif
 
+						case BuildFlag_AndroidKeystore:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_keystore = value.value_string;
+							break;
+
+						case BuildFlag_AndroidKeystoreAlias:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_keystore_alias = value.value_string;
+							break;
+
+						case BuildFlag_AndroidKeystorePassword:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.android_keystore_password = value.value_string;
+							break;
 						}
 					}
 
@@ -1641,8 +1684,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 			gb_printf_err("'%.*s' is supported with the following commands:\n", LIT(name));
 			gb_printf_err("\t");
 			i32 count = 0;
-			for (u32 i = 0; i < 32; i++) {
-				if (found_bf.command_support & (1<<i)) {
+			for (u64 i = 0; i < 64; i++) {
+				if (found_bf.command_support & (1ull<<i)) {
 					if (count > 0) {
 						gb_printf_err(", ");
 					}
@@ -1796,7 +1839,10 @@ gb_internal void check_defines(BuildContext *bc, Checker *c) {
 		if (!found) {
 			ERROR_BLOCK();
 			warning(nullptr, "given -define:%.*s is unused in the project", LIT(name));
-			error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
+
+			if (!global_ignore_warnings()) {
+				error_line("\tSuggestion: use the -show-defineables flag for an overview of the possible defines\n");
+			}
 		}
 	}
 }
@@ -2115,7 +2161,7 @@ gb_internal void export_dependencies(Checker *c) {
 		for_array(i, files) {
 			AstFile *file = files[i];
 			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(file->fullpath));
-			if (i+1 == files.count) {
+			if (i+1 < files.count) {
 				gb_fprintf(&f, ",");
 			}
 			gb_fprintf(&f, "\n");
@@ -2128,7 +2174,7 @@ gb_internal void export_dependencies(Checker *c) {
 		for_array(i, load_files) {
 			LoadFileCache *cache = load_files[i];
 			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(cache->path));
-			if (i+1 == load_files.count) {
+			if (i+1 < load_files.count) {
 				gb_fprintf(&f, ",");
 			}
 			gb_fprintf(&f, "\n");
@@ -2155,7 +2201,7 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 		return;
 	}
 
-	TIME_SECTION("remove keep temp files");
+	TIME_SECTION("remove temp files");
 
 	for (String const &path : gen->output_temp_paths) {
 		gb_file_remove(cast(char const *)path.text);
@@ -2175,12 +2221,18 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 }
 
 
-gb_internal void print_show_help(String const arg0, String const &command, String optional_flag = {}) {
+gb_internal void print_show_help(String const arg0, String command, String optional_flag = {}) {
+	if (command == "help" && optional_flag.len != 0 && optional_flag[0] != '-') {
+		command = optional_flag;
+		optional_flag = {};
+	}
+
 	print_usage_line(0, "%.*s is a tool for managing Odin source code.", LIT(arg0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
 	print_usage_line(0, "");
 	defer (print_usage_line(0, ""));
+
 
 	if (command == "build") {
 		print_usage_line(1, "build   Compiles directory of .odin files as an executable.");
@@ -2216,6 +2268,10 @@ gb_internal void print_show_help(String const arg0, String const &command, Strin
 	} else if (command == "strip-semicolon") {
 		print_usage_line(1, "strip-semicolon");
 		print_usage_line(2, "Parses and type checks .odin file(s) and then removes unneeded semicolons from the entire project.");
+	} else if (command == "bundle")  {
+		print_usage_line(1, "bundle <platform>   Bundles a directory in a specific layout for that platform");
+		print_usage_line(2, "Supported platforms:");
+		print_usage_line(3, "android");
 	}
 
 	bool doc             = command == "doc";
@@ -2225,6 +2281,7 @@ gb_internal void print_show_help(String const arg0, String const &command, Strin
 	bool strip_semicolon = command == "strip-semicolon";
 	bool check_only      = command == "check" || strip_semicolon;
 	bool check           = run_or_build || check_only;
+	bool bundle          = command == "bundle";
 
 	if (command == "help") {
 		doc             = true;
@@ -2318,6 +2375,10 @@ gb_internal void print_show_help(String const arg0, String const &command, Strin
 	if (check) {
 		if (print_flag("-default-to-nil-allocator")) {
 			print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing.");
+		}
+
+		if (print_flag("-default-to-panic-allocator")) {
+			print_usage_line(2, "Sets the default allocator to be the panic_allocator, an allocator which calls panic() on any allocation attempt.");
 		}
 
 		if (print_flag("-define:<name>=<value>")) {
@@ -2488,13 +2549,15 @@ gb_internal void print_show_help(String const arg0, String const &command, Strin
 		}
 	}
 
-	if (run_or_build) {
+	if (run_or_build || bundle) {
 		if (print_flag("-minimum-os-version:<string>")) {
 			print_usage_line(2, "Sets the minimum OS version targeted by the application.");
 			print_usage_line(2, "Default: -minimum-os-version:11.0.0");
-			print_usage_line(2, "Only used when target is Darwin, if given, linking mismatched versions will emit a warning.");
+			print_usage_line(2, "Only used when target is Darwin or subtarget is Android, if given, linking mismatched versions will emit a warning.");
 		}
+	}
 
+	if (run_or_build) {
 		if (print_flag("-no-bounds-check")) {
 			print_usage_line(2, "Disables bounds checking program wide.");
 		}
@@ -2699,8 +2762,12 @@ gb_internal void print_show_help(String const arg0, String const &command, Strin
 	if (run_or_build) {
 		if (print_flag("-use-separate-modules")) {
 			print_usage_line(2, "The backend generates multiple build units which are then linked together.");
-			print_usage_line(2, "Normally, a single build unit is generated for a standard project.");
-			print_usage_line(2, "This is the default behaviour on Windows for '-o:none' and '-o:minimal' builds.");
+			print_usage_line(2, "This is the default behaviour for '-o:none' and '-o:minimal' builds.");
+			print_usage_line(2, "Normally, a single build unit is generated for a standard project for '-o:speed' or '-o:size'.");
+		}
+		if (print_flag("-use-single-module")) {
+			print_usage_line(2, "The backend generates only a single build unit.");
+			print_usage_line(2, "This is the default behaviour for '-o:speed' or '-o:size'.");
 		}
 
 	}
@@ -2779,6 +2846,25 @@ gb_internal void print_show_help(String const arg0, String const &command, Strin
 	if (check) {
 		if (print_flag("-warnings-as-errors")) {
 			print_usage_line(2, "Treats warning messages as error messages.");
+		}
+	}
+
+	if (bundle) {
+		print_usage_line(0, "");
+		print_usage_line(1, "Android-specific flags");
+		print_usage_line(0, "");
+		if (print_flag("-android-keystore:<string>")) {
+			print_usage_line(2, "Specifies the keystore file to use to sign the apk.");
+		}
+
+		if (print_flag("-android-keystore-alias:<string>")) {
+			print_usage_line(2, "Specifies the key alias to use when signing the apk");
+			print_usage_line(2, "Can be omitted if the keystore only contains one key");
+		}
+
+		if (print_flag("-android-keystore-password:<string>")) {
+			print_usage_line(2, "Sets the password to use to unlock the keystore");
+			print_usage_line(2, "If this is omitted, the terminal will prompt you to provide it.");
 		}
 	}
 }
@@ -3271,6 +3357,19 @@ int main(int arg_count, char const **arg_ptr) {
 			print_show_help(args[0], args[1], args[2]);
 			return 0;
 		}
+	} else if (command == "bundle") {
+		if (args.count < 4) {
+			usage(args[0]);
+			return 1;
+		}
+		if (args[2] == "android") {
+			build_context.command_kind = Command_bundle_android;
+		} else {
+			gb_printf_err("Unknown package command: '%.*s'\n", LIT(args[2]));
+			usage(args[0]);
+			return 1;
+		}
+		init_filename = args[3];
 	} else if (command == "root") {
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
@@ -3305,10 +3404,14 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 
 			if (!single_file_package) {
-				gb_printf_err("ERROR: `%.*s %.*s` takes a package as its first argument.\n", LIT(args[0]), LIT(command));
+				gb_printf_err("ERROR: `%.*s %.*s` takes a package/directory as its first argument.\n", LIT(args[0]), LIT(command));
 				if (init_filename == "-file") {
 					gb_printf_err("Did you mean `%.*s %.*s <filename.odin> -file`?\n", LIT(args[0]), LIT(command));
 				} else {
+					if (!gb_file_exists(cast(const char*)init_filename.text)) {
+						gb_printf_err("The file '%.*s' was not found.\n", LIT(init_filename));
+						return 1;
+					}
 					gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
 				}
 
@@ -3340,6 +3443,10 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.show_help) {
 		print_show_help(args[0], command);
 		return 0;
+	}
+
+	if (command == "bundle") {
+		return bundle(init_filename);
 	}
 
 	// NOTE(bill): add 'shared' directory if it is not already set
@@ -3558,10 +3665,15 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.generate_docs) {
+		MAIN_TIME_SECTION("generate documentation");
 		if (global_error_collector.count != 0) {
 			return 1;
 		}
 		generate_documentation(checker);
+
+		if (build_context.show_timings) {
+			show_timings(checker, &global_timings);
+		}
 		return 0;
 	}
 

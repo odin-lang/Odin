@@ -26,13 +26,15 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	return
 }
 
-_set_env :: proc(key, value: string) -> (ok: bool) {
+_set_env :: proc(key, value: string) -> (err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
-	ckey := strings.clone_to_cstring(key, temp_allocator())
-	cval := strings.clone_to_cstring(key, temp_allocator())
+	ckey := strings.clone_to_cstring(key, temp_allocator()) or_return
+	cval := strings.clone_to_cstring(key, temp_allocator()) or_return
 
-	ok = posix.setenv(ckey, cval, true) == .OK
+	if posix.setenv(ckey, cval, true) != nil {
+		err = _get_platform_error_from_errno()
+	}
 	return
 }
 
@@ -54,23 +56,23 @@ _clear_env :: proc() {
 	}
 }
 
-_environ :: proc(allocator: runtime.Allocator) -> (environ: []string) {
-	n := 0	
+_environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
+	n := 0
 	for entry := posix.environ[0]; entry != nil; n, entry = n+1, posix.environ[n] {}
 
-	err: runtime.Allocator_Error
-	if environ, err = make([]string, n, allocator); err != nil {
-		// NOTE(laytan): is the environment empty or did allocation fail, how does the user know?
-		return
+	r := make([dynamic]string, 0, n, allocator) or_return
+	defer if err != nil {
+		for e in r {
+			delete(e, allocator)
+		}
+		delete(r)
 	}
 
 	for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
-		if environ[i], err = strings.clone(string(entry), allocator); err != nil {
-			// NOTE(laytan): is the entire environment returned or did allocation fail, how does the user know?
-			return
-		}
+		append(&r, strings.clone(string(entry), allocator) or_return)
 	}
 
+	environ = r[:]
 	return
 }
 

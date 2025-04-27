@@ -7,6 +7,10 @@ import "core:c"
 
 import win32 "core:sys/windows"
 _ :: win32
+
+import "vendor:x11/xlib"
+_ :: xlib
+
 when ODIN_OS == .Windows {
 	HINSTANCE           :: win32.HINSTANCE
 	HWND                :: win32.HWND
@@ -32,7 +36,19 @@ when ODIN_OS == .Windows {
 	}
 }
 
-CAMetalLayer :: struct {}
+when xlib.IS_SUPPORTED {
+	XlibDisplay  :: xlib.Display
+	XlibWindow   :: xlib.Window
+	XlibVisualID :: xlib.VisualID
+} else {
+	XlibDisplay  :: struct {} // Opaque struct defined by Xlib
+	XlibWindow   :: c.ulong
+	XlibVisualID :: c.ulong
+}
+
+xcb_visualid_t :: u32
+xcb_window_t   :: u32
+CAMetalLayer   :: struct {}
 
 MTLBuffer_id       :: rawptr
 MTLTexture_id      :: rawptr
@@ -2707,6 +2723,444 @@ DeviceImageMemoryRequirements :: struct {
 	planeAspect: ImageAspectFlags,
 }
 
+PhysicalDeviceVulkan14Features :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	globalPriorityQuery:                    b32,
+	shaderSubgroupRotate:                   b32,
+	shaderSubgroupRotateClustered:          b32,
+	shaderFloatControls2:                   b32,
+	shaderExpectAssume:                     b32,
+	rectangularLines:                       b32,
+	bresenhamLines:                         b32,
+	smoothLines:                            b32,
+	stippledRectangularLines:               b32,
+	stippledBresenhamLines:                 b32,
+	stippledSmoothLines:                    b32,
+	vertexAttributeInstanceRateDivisor:     b32,
+	vertexAttributeInstanceRateZeroDivisor: b32,
+	indexTypeUint8:                         b32,
+	dynamicRenderingLocalRead:              b32,
+	maintenance5:                           b32,
+	maintenance6:                           b32,
+	pipelineProtectedAccess:                b32,
+	pipelineRobustness:                     b32,
+	hostImageCopy:                          b32,
+	pushDescriptor:                         b32,
+}
+
+PhysicalDeviceVulkan14Properties :: struct {
+	sType:                                               StructureType,
+	pNext:                                               rawptr,
+	lineSubPixelPrecisionBits:                           u32,
+	maxVertexAttribDivisor:                              u32,
+	supportsNonZeroFirstInstance:                        b32,
+	maxPushDescriptors:                                  u32,
+	dynamicRenderingLocalReadDepthStencilAttachments:    b32,
+	dynamicRenderingLocalReadMultisampledAttachments:    b32,
+	earlyFragmentMultisampleCoverageAfterSampleCounting: b32,
+	earlyFragmentSampleMaskTestBeforeSampleCounting:     b32,
+	depthStencilSwizzleOneSupport:                       b32,
+	polygonModePointSize:                                b32,
+	nonStrictSinglePixelWideLinesUseParallelogram:       b32,
+	nonStrictWideLinesUseParallelogram:                  b32,
+	blockTexelViewCompatibleMultipleLayers:              b32,
+	maxCombinedImageSamplerDescriptorCount:              u32,
+	fragmentShadingRateClampCombinerInputs:              b32,
+	defaultRobustnessStorageBuffers:                     PipelineRobustnessBufferBehavior,
+	defaultRobustnessUniformBuffers:                     PipelineRobustnessBufferBehavior,
+	defaultRobustnessVertexInputs:                       PipelineRobustnessBufferBehavior,
+	defaultRobustnessImages:                             PipelineRobustnessImageBehavior,
+	copySrcLayoutCount:                                  u32,
+	pCopySrcLayouts:                                     [^]ImageLayout,
+	copyDstLayoutCount:                                  u32,
+	pCopyDstLayouts:                                     [^]ImageLayout,
+	optimalTilingLayoutUUID:                             [UUID_SIZE]u8,
+	identicalMemoryTypeRequirements:                     b32,
+}
+
+DeviceQueueGlobalPriorityCreateInfo :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	globalPriority: QueueGlobalPriority,
+}
+
+PhysicalDeviceGlobalPriorityQueryFeatures :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	globalPriorityQuery: b32,
+}
+
+QueueFamilyGlobalPriorityProperties :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	priorityCount: u32,
+	priorities:    [MAX_GLOBAL_PRIORITY_SIZE]QueueGlobalPriority,
+}
+
+PhysicalDeviceShaderSubgroupRotateFeatures :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	shaderSubgroupRotate:          b32,
+	shaderSubgroupRotateClustered: b32,
+}
+
+PhysicalDeviceShaderFloatControls2Features :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	shaderFloatControls2: b32,
+}
+
+PhysicalDeviceShaderExpectAssumeFeatures :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	shaderExpectAssume: b32,
+}
+
+PhysicalDeviceLineRasterizationFeatures :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	rectangularLines:         b32,
+	bresenhamLines:           b32,
+	smoothLines:              b32,
+	stippledRectangularLines: b32,
+	stippledBresenhamLines:   b32,
+	stippledSmoothLines:      b32,
+}
+
+PhysicalDeviceLineRasterizationProperties :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	lineSubPixelPrecisionBits: u32,
+}
+
+PipelineRasterizationLineStateCreateInfo :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	lineRasterizationMode: LineRasterizationMode,
+	stippledLineEnable:    b32,
+	lineStippleFactor:     u32,
+	lineStipplePattern:    u16,
+}
+
+PhysicalDeviceVertexAttributeDivisorProperties :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	maxVertexAttribDivisor:       u32,
+	supportsNonZeroFirstInstance: b32,
+}
+
+VertexInputBindingDivisorDescription :: struct {
+	binding: u32,
+	divisor: u32,
+}
+
+PipelineVertexInputDivisorStateCreateInfo :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	vertexBindingDivisorCount: u32,
+	pVertexBindingDivisors:    [^]VertexInputBindingDivisorDescription,
+}
+
+PhysicalDeviceVertexAttributeDivisorFeatures :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	vertexAttributeInstanceRateDivisor:     b32,
+	vertexAttributeInstanceRateZeroDivisor: b32,
+}
+
+PhysicalDeviceIndexTypeUint8Features :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	indexTypeUint8: b32,
+}
+
+MemoryMapInfo :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  MemoryMapFlags,
+	memory: DeviceMemory,
+	offset: DeviceSize,
+	size:   DeviceSize,
+}
+
+MemoryUnmapInfo :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  MemoryUnmapFlags,
+	memory: DeviceMemory,
+}
+
+PhysicalDeviceMaintenance5Features :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	maintenance5: b32,
+}
+
+PhysicalDeviceMaintenance5Properties :: struct {
+	sType:                                               StructureType,
+	pNext:                                               rawptr,
+	earlyFragmentMultisampleCoverageAfterSampleCounting: b32,
+	earlyFragmentSampleMaskTestBeforeSampleCounting:     b32,
+	depthStencilSwizzleOneSupport:                       b32,
+	polygonModePointSize:                                b32,
+	nonStrictSinglePixelWideLinesUseParallelogram:       b32,
+	nonStrictWideLinesUseParallelogram:                  b32,
+}
+
+RenderingAreaInfo :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	viewMask:                u32,
+	colorAttachmentCount:    u32,
+	pColorAttachmentFormats: [^]Format,
+	depthAttachmentFormat:   Format,
+	stencilAttachmentFormat: Format,
+}
+
+ImageSubresource2 :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	imageSubresource: ImageSubresource,
+}
+
+DeviceImageSubresourceInfo :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	pCreateInfo:  ^ImageCreateInfo,
+	pSubresource: ^ImageSubresource2,
+}
+
+SubresourceLayout2 :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	subresourceLayout: SubresourceLayout,
+}
+
+PipelineCreateFlags2CreateInfo :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: PipelineCreateFlags2,
+}
+
+BufferUsageFlags2CreateInfo :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	usage: BufferUsageFlags2,
+}
+
+PhysicalDevicePushDescriptorProperties :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	maxPushDescriptors: u32,
+}
+
+PhysicalDeviceDynamicRenderingLocalReadFeatures :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	dynamicRenderingLocalRead: b32,
+}
+
+RenderingAttachmentLocationInfo :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	colorAttachmentCount:      u32,
+	pColorAttachmentLocations: [^]u32,
+}
+
+RenderingInputAttachmentIndexInfo :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	colorAttachmentCount:         u32,
+	pColorAttachmentInputIndices: [^]u32,
+	pDepthInputAttachmentIndex:   ^u32,
+	pStencilInputAttachmentIndex: ^u32,
+}
+
+PhysicalDeviceMaintenance6Features :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	maintenance6: b32,
+}
+
+PhysicalDeviceMaintenance6Properties :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	blockTexelViewCompatibleMultipleLayers: b32,
+	maxCombinedImageSamplerDescriptorCount: u32,
+	fragmentShadingRateClampCombinerInputs: b32,
+}
+
+BindMemoryStatus :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	pResult: ^Result,
+}
+
+BindDescriptorSetsInfo :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	stageFlags:         ShaderStageFlags,
+	layout:             PipelineLayout,
+	firstSet:           u32,
+	descriptorSetCount: u32,
+	pDescriptorSets:    [^]DescriptorSet,
+	dynamicOffsetCount: u32,
+	pDynamicOffsets:    [^]u32,
+}
+
+PushConstantsInfo :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	layout:     PipelineLayout,
+	stageFlags: ShaderStageFlags,
+	offset:     u32,
+	size:       u32,
+	pValues:    rawptr,
+}
+
+PushDescriptorSetInfo :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	stageFlags:           ShaderStageFlags,
+	layout:               PipelineLayout,
+	set:                  u32,
+	descriptorWriteCount: u32,
+	pDescriptorWrites:    [^]WriteDescriptorSet,
+}
+
+PushDescriptorSetWithTemplateInfo :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	descriptorUpdateTemplate: DescriptorUpdateTemplate,
+	layout:                   PipelineLayout,
+	set:                      u32,
+	pData:                    rawptr,
+}
+
+PhysicalDevicePipelineProtectedAccessFeatures :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	pipelineProtectedAccess: b32,
+}
+
+PhysicalDevicePipelineRobustnessFeatures :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	pipelineRobustness: b32,
+}
+
+PhysicalDevicePipelineRobustnessProperties :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	defaultRobustnessStorageBuffers: PipelineRobustnessBufferBehavior,
+	defaultRobustnessUniformBuffers: PipelineRobustnessBufferBehavior,
+	defaultRobustnessVertexInputs:   PipelineRobustnessBufferBehavior,
+	defaultRobustnessImages:         PipelineRobustnessImageBehavior,
+}
+
+PipelineRobustnessCreateInfo :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	storageBuffers: PipelineRobustnessBufferBehavior,
+	uniformBuffers: PipelineRobustnessBufferBehavior,
+	vertexInputs:   PipelineRobustnessBufferBehavior,
+	images:         PipelineRobustnessImageBehavior,
+}
+
+PhysicalDeviceHostImageCopyFeatures :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	hostImageCopy: b32,
+}
+
+PhysicalDeviceHostImageCopyProperties :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	copySrcLayoutCount:              u32,
+	pCopySrcLayouts:                 [^]ImageLayout,
+	copyDstLayoutCount:              u32,
+	pCopyDstLayouts:                 [^]ImageLayout,
+	optimalTilingLayoutUUID:         [UUID_SIZE]u8,
+	identicalMemoryTypeRequirements: b32,
+}
+
+MemoryToImageCopy :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	pHostPointer:      rawptr,
+	memoryRowLength:   u32,
+	memoryImageHeight: u32,
+	imageSubresource:  ImageSubresourceLayers,
+	imageOffset:       Offset3D,
+	imageExtent:       Extent3D,
+}
+
+ImageToMemoryCopy :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	pHostPointer:      rawptr,
+	memoryRowLength:   u32,
+	memoryImageHeight: u32,
+	imageSubresource:  ImageSubresourceLayers,
+	imageOffset:       Offset3D,
+	imageExtent:       Extent3D,
+}
+
+CopyMemoryToImageInfo :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	flags:          HostImageCopyFlags,
+	dstImage:       Image,
+	dstImageLayout: ImageLayout,
+	regionCount:    u32,
+	pRegions:       [^]MemoryToImageCopy,
+}
+
+CopyImageToMemoryInfo :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	flags:          HostImageCopyFlags,
+	srcImage:       Image,
+	srcImageLayout: ImageLayout,
+	regionCount:    u32,
+	pRegions:       [^]ImageToMemoryCopy,
+}
+
+CopyImageToImageInfo :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	flags:          HostImageCopyFlags,
+	srcImage:       Image,
+	srcImageLayout: ImageLayout,
+	dstImage:       Image,
+	dstImageLayout: ImageLayout,
+	regionCount:    u32,
+	pRegions:       [^]ImageCopy2,
+}
+
+HostImageLayoutTransitionInfo :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	image:            Image,
+	oldLayout:        ImageLayout,
+	newLayout:        ImageLayout,
+	subresourceRange: ImageSubresourceRange,
+}
+
+SubresourceHostMemcpySize :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	size:  DeviceSize,
+}
+
+HostImageCopyDevicePerformanceQuery :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	optimalDeviceAccess:   b32,
+	identicalMemoryLayout: b32,
+}
+
 SurfaceCapabilitiesKHR :: struct {
 	minImageCount:           u32,
 	maxImageCount:           u32,
@@ -3368,36 +3822,6 @@ VideoDecodeH264DpbSlotInfoKHR :: struct {
 	pStdReferenceInfo: ^VideoDecodeH264ReferenceInfo,
 }
 
-RenderingFragmentShadingRateAttachmentInfoKHR :: struct {
-	sType:                          StructureType,
-	pNext:                          rawptr,
-	imageView:                      ImageView,
-	imageLayout:                    ImageLayout,
-	shadingRateAttachmentTexelSize: Extent2D,
-}
-
-RenderingFragmentDensityMapAttachmentInfoEXT :: struct {
-	sType:       StructureType,
-	pNext:       rawptr,
-	imageView:   ImageView,
-	imageLayout: ImageLayout,
-}
-
-AttachmentSampleCountInfoAMD :: struct {
-	sType:                         StructureType,
-	pNext:                         rawptr,
-	colorAttachmentCount:          u32,
-	pColorAttachmentSamples:       [^]SampleCountFlags,
-	depthStencilAttachmentSamples: SampleCountFlags,
-}
-
-MultiviewPerViewAttributesInfoNVX :: struct {
-	sType:                          StructureType,
-	pNext:                          rawptr,
-	perViewAttributes:              b32,
-	perViewAttributesPositionXOnly: b32,
-}
-
 ImportMemoryFdInfoKHR :: struct {
 	sType:      StructureType,
 	pNext:      rawptr,
@@ -3432,12 +3856,6 @@ SemaphoreGetFdInfoKHR :: struct {
 	pNext:      rawptr,
 	semaphore:  Semaphore,
 	handleType: ExternalSemaphoreHandleTypeFlags,
-}
-
-PhysicalDevicePushDescriptorPropertiesKHR :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	maxPushDescriptors: u32,
 }
 
 RectLayerKHR :: struct {
@@ -3643,25 +4061,6 @@ VideoDecodeH265DpbSlotInfoKHR :: struct {
 	pStdReferenceInfo: ^VideoDecodeH265ReferenceInfo,
 }
 
-DeviceQueueGlobalPriorityCreateInfoKHR :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	globalPriority: QueueGlobalPriorityKHR,
-}
-
-PhysicalDeviceGlobalPriorityQueryFeaturesKHR :: struct {
-	sType:               StructureType,
-	pNext:               rawptr,
-	globalPriorityQuery: b32,
-}
-
-QueueFamilyGlobalPriorityPropertiesKHR :: struct {
-	sType:         StructureType,
-	pNext:         rawptr,
-	priorityCount: u32,
-	priorities:    [MAX_GLOBAL_PRIORITY_SIZE_KHR]QueueGlobalPriorityKHR,
-}
-
 FragmentShadingRateAttachmentInfoKHR :: struct {
 	sType:                          StructureType,
 	pNext:                          rawptr,
@@ -3713,26 +4112,12 @@ PhysicalDeviceFragmentShadingRateKHR :: struct {
 	fragmentSize: Extent2D,
 }
 
-PhysicalDeviceDynamicRenderingLocalReadFeaturesKHR :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	dynamicRenderingLocalRead: b32,
-}
-
-RenderingAttachmentLocationInfoKHR :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	colorAttachmentCount:      u32,
-	pColorAttachmentLocations: [^]u32,
-}
-
-RenderingInputAttachmentIndexInfoKHR :: struct {
-	sType:                        StructureType,
-	pNext:                        rawptr,
-	colorAttachmentCount:         u32,
-	pColorAttachmentInputIndices: [^]u32,
-	pDepthInputAttachmentIndex:   ^u32,
-	pStencilInputAttachmentIndex: ^u32,
+RenderingFragmentShadingRateAttachmentInfoKHR :: struct {
+	sType:                          StructureType,
+	pNext:                          rawptr,
+	imageView:                      ImageView,
+	imageLayout:                    ImageLayout,
+	shadingRateAttachmentTexelSize: Extent2D,
 }
 
 PhysicalDeviceShaderQuadControlFeaturesKHR :: struct {
@@ -3805,22 +4190,6 @@ PipelineExecutableInternalRepresentationKHR :: struct {
 	isText:      b32,
 	dataSize:    int,
 	pData:       rawptr,
-}
-
-MemoryMapInfoKHR :: struct {
-	sType:  StructureType,
-	pNext:  rawptr,
-	flags:  MemoryMapFlags,
-	memory: DeviceMemory,
-	offset: DeviceSize,
-	size:   DeviceSize,
-}
-
-MemoryUnmapInfoKHR :: struct {
-	sType:  StructureType,
-	pNext:  rawptr,
-	flags:  MemoryUnmapFlagsKHR,
-	memory: DeviceMemory,
 }
 
 PipelineLibraryCreateInfoKHR :: struct {
@@ -3935,19 +4304,6 @@ VideoEncodeSessionParametersFeedbackInfoKHR :: struct {
 	hasOverrides: b32,
 }
 
-QueueFamilyCheckpointProperties2NV :: struct {
-	sType:                        StructureType,
-	pNext:                        rawptr,
-	checkpointExecutionStageMask: PipelineStageFlags2,
-}
-
-CheckpointData2NV :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	stage:             PipelineStageFlags2,
-	pCheckpointMarker: rawptr,
-}
-
 PhysicalDeviceFragmentShaderBarycentricFeaturesKHR :: struct {
 	sType:                     StructureType,
 	pNext:                     rawptr,
@@ -3999,75 +4355,10 @@ TraceRaysIndirectCommand2KHR :: struct {
 	depth:                             u32,
 }
 
-PhysicalDeviceShaderSubgroupRotateFeaturesKHR :: struct {
-	sType:                         StructureType,
-	pNext:                         rawptr,
-	shaderSubgroupRotate:          b32,
-	shaderSubgroupRotateClustered: b32,
-}
-
 PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR :: struct {
 	sType:                      StructureType,
 	pNext:                      rawptr,
 	shaderMaximalReconvergence: b32,
-}
-
-PhysicalDeviceMaintenance5FeaturesKHR :: struct {
-	sType:        StructureType,
-	pNext:        rawptr,
-	maintenance5: b32,
-}
-
-PhysicalDeviceMaintenance5PropertiesKHR :: struct {
-	sType:                                               StructureType,
-	pNext:                                               rawptr,
-	earlyFragmentMultisampleCoverageAfterSampleCounting: b32,
-	earlyFragmentSampleMaskTestBeforeSampleCounting:     b32,
-	depthStencilSwizzleOneSupport:                       b32,
-	polygonModePointSize:                                b32,
-	nonStrictSinglePixelWideLinesUseParallelogram:       b32,
-	nonStrictWideLinesUseParallelogram:                  b32,
-}
-
-RenderingAreaInfoKHR :: struct {
-	sType:                   StructureType,
-	pNext:                   rawptr,
-	viewMask:                u32,
-	colorAttachmentCount:    u32,
-	pColorAttachmentFormats: [^]Format,
-	depthAttachmentFormat:   Format,
-	stencilAttachmentFormat: Format,
-}
-
-ImageSubresource2KHR :: struct {
-	sType:            StructureType,
-	pNext:            rawptr,
-	imageSubresource: ImageSubresource,
-}
-
-DeviceImageSubresourceInfoKHR :: struct {
-	sType:        StructureType,
-	pNext:        rawptr,
-	pCreateInfo:  ^ImageCreateInfo,
-	pSubresource: ^ImageSubresource2KHR,
-}
-
-SubresourceLayout2KHR :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	subresourceLayout: SubresourceLayout,
-}
-
-PipelineCreateFlags2CreateInfoKHR :: struct {
-	sType: StructureType,
-	pNext: rawptr,
-	flags: PipelineCreateFlags2KHR,
-}
-
-BufferUsageFlags2CreateInfoKHR :: struct {
-	sType: StructureType,
-	pNext: rawptr,
-	usage: BufferUsageFlags2KHR,
 }
 
 PhysicalDeviceRayTracingPositionFetchFeaturesKHR :: struct {
@@ -4231,6 +4522,143 @@ VideoDecodeAV1DpbSlotInfoKHR :: struct {
 	pStdReferenceInfo: ^VideoDecodeAV1ReferenceInfo,
 }
 
+PhysicalDeviceVideoEncodeAV1FeaturesKHR :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	videoEncodeAV1: b32,
+}
+
+VideoEncodeAV1CapabilitiesKHR :: struct {
+	sType:                                         StructureType,
+	pNext:                                         rawptr,
+	flags:                                         VideoEncodeAV1CapabilityFlagsKHR,
+	maxLevel:                                      VideoAV1Level,
+	codedPictureAlignment:                         Extent2D,
+	maxTiles:                                      Extent2D,
+	minTileSize:                                   Extent2D,
+	maxTileSize:                                   Extent2D,
+	superblockSizes:                               VideoEncodeAV1SuperblockSizeFlagsKHR,
+	maxSingleReferenceCount:                       u32,
+	singleReferenceNameMask:                       u32,
+	maxUnidirectionalCompoundReferenceCount:       u32,
+	maxUnidirectionalCompoundGroup1ReferenceCount: u32,
+	unidirectionalCompoundReferenceNameMask:       u32,
+	maxBidirectionalCompoundReferenceCount:        u32,
+	maxBidirectionalCompoundGroup1ReferenceCount:  u32,
+	maxBidirectionalCompoundGroup2ReferenceCount:  u32,
+	bidirectionalCompoundReferenceNameMask:        u32,
+	maxTemporalLayerCount:                         u32,
+	maxSpatialLayerCount:                          u32,
+	maxOperatingPoints:                            u32,
+	minQIndex:                                     u32,
+	maxQIndex:                                     u32,
+	prefersGopRemainingFrames:                     b32,
+	requiresGopRemainingFrames:                    b32,
+	stdSyntaxFlags:                                VideoEncodeAV1StdFlagsKHR,
+}
+
+VideoEncodeAV1QIndexKHR :: struct {
+	intraQIndex:        u32,
+	predictiveQIndex:   u32,
+	bipredictiveQIndex: u32,
+}
+
+VideoEncodeAV1QualityLevelPropertiesKHR :: struct {
+	sType:                                                  StructureType,
+	pNext:                                                  rawptr,
+	preferredRateControlFlags:                              VideoEncodeAV1RateControlFlagsKHR,
+	preferredGopFrameCount:                                 u32,
+	preferredKeyFramePeriod:                                u32,
+	preferredConsecutiveBipredictiveFrameCount:             u32,
+	preferredTemporalLayerCount:                            u32,
+	preferredConstantQIndex:                                VideoEncodeAV1QIndexKHR,
+	preferredMaxSingleReferenceCount:                       u32,
+	preferredSingleReferenceNameMask:                       u32,
+	preferredMaxUnidirectionalCompoundReferenceCount:       u32,
+	preferredMaxUnidirectionalCompoundGroup1ReferenceCount: u32,
+	preferredUnidirectionalCompoundReferenceNameMask:       u32,
+	preferredMaxBidirectionalCompoundReferenceCount:        u32,
+	preferredMaxBidirectionalCompoundGroup1ReferenceCount:  u32,
+	preferredMaxBidirectionalCompoundGroup2ReferenceCount:  u32,
+	preferredBidirectionalCompoundReferenceNameMask:        u32,
+}
+
+VideoEncodeAV1SessionCreateInfoKHR :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	useMaxLevel: b32,
+	maxLevel:    VideoAV1Level,
+}
+
+VideoEncodeAV1SessionParametersCreateInfoKHR :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	pStdSequenceHeader:     ^VideoAV1SequenceHeader,
+	pStdDecoderModelInfo:   ^VideoEncodeAV1DecoderModelInfo,
+	stdOperatingPointCount: u32,
+	pStdOperatingPoints:    [^]VideoEncodeAV1OperatingPointInfo,
+}
+
+VideoEncodeAV1PictureInfoKHR :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	predictionMode:             VideoEncodeAV1PredictionModeKHR,
+	rateControlGroup:           VideoEncodeAV1RateControlGroupKHR,
+	constantQIndex:             u32,
+	pStdPictureInfo:            ^VideoEncodeAV1PictureInfo,
+	referenceNameSlotIndices:   [MAX_VIDEO_AV1_REFERENCES_PER_FRAME_KHR]i32,
+	primaryReferenceCdfOnly:    b32,
+	generateObuExtensionHeader: b32,
+}
+
+VideoEncodeAV1DpbSlotInfoKHR :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	pStdReferenceInfo: ^VideoEncodeAV1ReferenceInfo,
+}
+
+VideoEncodeAV1ProfileInfoKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	stdProfile: VideoAV1Profile,
+}
+
+VideoEncodeAV1FrameSizeKHR :: struct {
+	intraFrameSize:        u32,
+	predictiveFrameSize:   u32,
+	bipredictiveFrameSize: u32,
+}
+
+VideoEncodeAV1GopRemainingFrameInfoKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	useGopRemainingFrames:    b32,
+	gopRemainingIntra:        u32,
+	gopRemainingPredictive:   u32,
+	gopRemainingBipredictive: u32,
+}
+
+VideoEncodeAV1RateControlInfoKHR :: struct {
+	sType:                             StructureType,
+	pNext:                             rawptr,
+	flags:                             VideoEncodeAV1RateControlFlagsKHR,
+	gopFrameCount:                     u32,
+	keyFramePeriod:                    u32,
+	consecutiveBipredictiveFrameCount: u32,
+	temporalLayerCount:                u32,
+}
+
+VideoEncodeAV1RateControlLayerInfoKHR :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	useMinQIndex:    b32,
+	minQIndex:       VideoEncodeAV1QIndexKHR,
+	useMaxQIndex:    b32,
+	maxQIndex:       VideoEncodeAV1QIndexKHR,
+	useMaxFrameSize: b32,
+	maxFrameSize:    VideoEncodeAV1FrameSizeKHR,
+}
+
 PhysicalDeviceVideoMaintenance1FeaturesKHR :: struct {
 	sType:             StructureType,
 	pNext:             rawptr,
@@ -4245,141 +4673,10 @@ VideoInlineQueryInfoKHR :: struct {
 	queryCount: u32,
 }
 
-PhysicalDeviceVertexAttributeDivisorPropertiesKHR :: struct {
-	sType:                        StructureType,
-	pNext:                        rawptr,
-	maxVertexAttribDivisor:       u32,
-	supportsNonZeroFirstInstance: b32,
-}
-
-VertexInputBindingDivisorDescriptionKHR :: struct {
-	binding: u32,
-	divisor: u32,
-}
-
-PipelineVertexInputDivisorStateCreateInfoKHR :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	vertexBindingDivisorCount: u32,
-	pVertexBindingDivisors:    [^]VertexInputBindingDivisorDescriptionKHR,
-}
-
-PhysicalDeviceVertexAttributeDivisorFeaturesKHR :: struct {
-	sType:                                  StructureType,
-	pNext:                                  rawptr,
-	vertexAttributeInstanceRateDivisor:     b32,
-	vertexAttributeInstanceRateZeroDivisor: b32,
-}
-
-PhysicalDeviceShaderFloatControls2FeaturesKHR :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	shaderFloatControls2: b32,
-}
-
-PhysicalDeviceIndexTypeUint8FeaturesKHR :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	indexTypeUint8: b32,
-}
-
-PhysicalDeviceLineRasterizationFeaturesKHR :: struct {
-	sType:                    StructureType,
-	pNext:                    rawptr,
-	rectangularLines:         b32,
-	bresenhamLines:           b32,
-	smoothLines:              b32,
-	stippledRectangularLines: b32,
-	stippledBresenhamLines:   b32,
-	stippledSmoothLines:      b32,
-}
-
-PhysicalDeviceLineRasterizationPropertiesKHR :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	lineSubPixelPrecisionBits: u32,
-}
-
-PipelineRasterizationLineStateCreateInfoKHR :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	lineRasterizationMode: LineRasterizationModeKHR,
-	stippledLineEnable:    b32,
-	lineStippleFactor:     u32,
-	lineStipplePattern:    u16,
-}
-
 CalibratedTimestampInfoKHR :: struct {
 	sType:      StructureType,
 	pNext:      rawptr,
 	timeDomain: TimeDomainKHR,
-}
-
-PhysicalDeviceShaderExpectAssumeFeaturesKHR :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	shaderExpectAssume: b32,
-}
-
-PhysicalDeviceMaintenance6FeaturesKHR :: struct {
-	sType:        StructureType,
-	pNext:        rawptr,
-	maintenance6: b32,
-}
-
-PhysicalDeviceMaintenance6PropertiesKHR :: struct {
-	sType:                                  StructureType,
-	pNext:                                  rawptr,
-	blockTexelViewCompatibleMultipleLayers: b32,
-	maxCombinedImageSamplerDescriptorCount: u32,
-	fragmentShadingRateClampCombinerInputs: b32,
-}
-
-BindMemoryStatusKHR :: struct {
-	sType:   StructureType,
-	pNext:   rawptr,
-	pResult: ^Result,
-}
-
-BindDescriptorSetsInfoKHR :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	stageFlags:         ShaderStageFlags,
-	layout:             PipelineLayout,
-	firstSet:           u32,
-	descriptorSetCount: u32,
-	pDescriptorSets:    [^]DescriptorSet,
-	dynamicOffsetCount: u32,
-	pDynamicOffsets:    [^]u32,
-}
-
-PushConstantsInfoKHR :: struct {
-	sType:      StructureType,
-	pNext:      rawptr,
-	layout:     PipelineLayout,
-	stageFlags: ShaderStageFlags,
-	offset:     u32,
-	size:       u32,
-	pValues:    rawptr,
-}
-
-PushDescriptorSetInfoKHR :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	stageFlags:           ShaderStageFlags,
-	layout:               PipelineLayout,
-	set:                  u32,
-	descriptorWriteCount: u32,
-	pDescriptorWrites:    [^]WriteDescriptorSet,
-}
-
-PushDescriptorSetWithTemplateInfoKHR :: struct {
-	sType:                    StructureType,
-	pNext:                    rawptr,
-	descriptorUpdateTemplate: DescriptorUpdateTemplate,
-	layout:                   PipelineLayout,
-	set:                      u32,
-	pData:                    rawptr,
 }
 
 SetDescriptorBufferOffsetsInfoEXT :: struct {
@@ -4399,6 +4696,70 @@ BindDescriptorBufferEmbeddedSamplersInfoEXT :: struct {
 	stageFlags: ShaderStageFlags,
 	layout:     PipelineLayout,
 	set:        u32,
+}
+
+VideoEncodeQuantizationMapCapabilitiesKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	maxQuantizationMapExtent: Extent2D,
+}
+
+VideoFormatQuantizationMapPropertiesKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	quantizationMapTexelSize: Extent2D,
+}
+
+VideoEncodeQuantizationMapInfoKHR :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	quantizationMap:       ImageView,
+	quantizationMapExtent: Extent2D,
+}
+
+VideoEncodeQuantizationMapSessionParametersCreateInfoKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	quantizationMapTexelSize: Extent2D,
+}
+
+PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	videoEncodeQuantizationMap: b32,
+}
+
+VideoEncodeH264QuantizationMapCapabilitiesKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	minQpDelta: i32,
+	maxQpDelta: i32,
+}
+
+VideoEncodeH265QuantizationMapCapabilitiesKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	minQpDelta: i32,
+	maxQpDelta: i32,
+}
+
+VideoFormatH265QuantizationMapPropertiesKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	compatibleCtbSizes: VideoEncodeH265CtbSizeFlagsKHR,
+}
+
+VideoEncodeAV1QuantizationMapCapabilitiesKHR :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	minQIndexDelta: i32,
+	maxQIndexDelta: i32,
+}
+
+VideoFormatAV1QuantizationMapPropertiesKHR :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	compatibleSuperblockSizes: VideoEncodeAV1SuperblockSizeFlagsKHR,
 }
 
 PhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR :: struct {
@@ -4446,6 +4807,52 @@ PhysicalDeviceLayeredApiVulkanPropertiesKHR :: struct {
 	sType:      StructureType,
 	pNext:      rawptr,
 	properties: PhysicalDeviceProperties2,
+}
+
+PhysicalDeviceMaintenance8FeaturesKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	maintenance8: b32,
+}
+
+MemoryBarrierAccessFlags3KHR :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	srcAccessMask3: AccessFlags3KHR,
+	dstAccessMask3: AccessFlags3KHR,
+}
+
+PhysicalDeviceVideoMaintenance2FeaturesKHR :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	videoMaintenance2: b32,
+}
+
+VideoDecodeH264InlineSessionParametersInfoKHR :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	pStdSPS: ^VideoH264SequenceParameterSet,
+	pStdPPS: ^VideoH264PictureParameterSet,
+}
+
+VideoDecodeH265InlineSessionParametersInfoKHR :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	pStdVPS: ^VideoH265VideoParameterSet,
+	pStdSPS: ^VideoH265SequenceParameterSet,
+	pStdPPS: ^VideoH265PictureParameterSet,
+}
+
+VideoDecodeAV1InlineSessionParametersInfoKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	pStdSequenceHeader: ^VideoAV1SequenceHeader,
+}
+
+PhysicalDeviceDepthClampZeroOneFeaturesKHR :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	depthClampZeroOne: b32,
 }
 
 DebugReportCallbackCreateInfoEXT :: struct {
@@ -4540,6 +4947,12 @@ CuModuleCreateInfoNVX :: struct {
 	pNext:    rawptr,
 	dataSize: int,
 	pData:    rawptr,
+}
+
+CuModuleTexturingModeCreateInfoNVX :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	use64bitTexturing: b32,
 }
 
 CuFunctionCreateInfoNVX :: struct {
@@ -4649,30 +5062,6 @@ PhysicalDeviceASTCDecodeFeaturesEXT :: struct {
 	decodeModeSharedExponent: b32,
 }
 
-PhysicalDevicePipelineRobustnessFeaturesEXT :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	pipelineRobustness: b32,
-}
-
-PhysicalDevicePipelineRobustnessPropertiesEXT :: struct {
-	sType:                           StructureType,
-	pNext:                           rawptr,
-	defaultRobustnessStorageBuffers: PipelineRobustnessBufferBehaviorEXT,
-	defaultRobustnessUniformBuffers: PipelineRobustnessBufferBehaviorEXT,
-	defaultRobustnessVertexInputs:   PipelineRobustnessBufferBehaviorEXT,
-	defaultRobustnessImages:         PipelineRobustnessImageBehaviorEXT,
-}
-
-PipelineRobustnessCreateInfoEXT :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	storageBuffers: PipelineRobustnessBufferBehaviorEXT,
-	uniformBuffers: PipelineRobustnessBufferBehaviorEXT,
-	vertexInputs:   PipelineRobustnessBufferBehaviorEXT,
-	images:         PipelineRobustnessImageBehaviorEXT,
-}
-
 ConditionalRenderingBeginInfoEXT :: struct {
 	sType:  StructureType,
 	pNext:  rawptr,
@@ -4775,6 +5164,13 @@ PhysicalDeviceMultiviewPerViewAttributesPropertiesNVX :: struct {
 	sType:                        StructureType,
 	pNext:                        rawptr,
 	perViewPositionAllComponents: b32,
+}
+
+MultiviewPerViewAttributesInfoNVX :: struct {
+	sType:                          StructureType,
+	pNext:                          rawptr,
+	perViewAttributes:              b32,
+	perViewAttributesPositionXOnly: b32,
 }
 
 ViewportSwizzleNV :: struct {
@@ -4914,6 +5310,14 @@ DebugUtilsObjectTagInfoEXT :: struct {
 	tagName:      u64,
 	tagSize:      int,
 	pTag:         rawptr,
+}
+
+AttachmentSampleCountInfoAMD :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	colorAttachmentCount:          u32,
+	pColorAttachmentSamples:       [^]SampleCountFlags,
+	depthStencilAttachmentSamples: SampleCountFlags,
 }
 
 SampleLocationEXT :: struct {
@@ -5277,10 +5681,16 @@ AabbPositionsKHR :: struct {
 }
 
 AccelerationStructureInstanceKHR :: struct {
-	transform:                                      TransformMatrixKHR,
-	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
-	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
-	accelerationStructureReference:                 u64,
+	transform:                      TransformMatrixKHR,
+	using _: bit_field u32 {
+		instanceCustomIndex: u32 | 24,
+		mask:                u32 | 8,
+	},
+	using _: bit_field u32 {
+		instanceShaderBindingTableRecordOffset: u32                      | 24,
+		flags:                                  GeometryInstanceFlagKHR  | 8,
+	},
+	accelerationStructureReference: u64,
 }
 
 PhysicalDeviceRepresentativeFragmentTestFeaturesNV :: struct {
@@ -5426,6 +5836,19 @@ CheckpointDataNV :: struct {
 	pCheckpointMarker: rawptr,
 }
 
+QueueFamilyCheckpointProperties2NV :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	checkpointExecutionStageMask: PipelineStageFlags2,
+}
+
+CheckpointData2NV :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	stage:             PipelineStageFlags2,
+	pCheckpointMarker: rawptr,
+}
+
 PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL :: struct {
 	sType:                   StructureType,
 	pNext:                   rawptr,
@@ -5524,6 +5947,13 @@ RenderPassFragmentDensityMapCreateInfoEXT :: struct {
 	sType:                        StructureType,
 	pNext:                        rawptr,
 	fragmentDensityMapAttachment: AttachmentReference,
+}
+
+RenderingFragmentDensityMapAttachmentInfoEXT :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	imageView:   ImageView,
+	imageLayout: ImageLayout,
 }
 
 PhysicalDeviceShaderCoreProperties2AMD :: struct {
@@ -5703,99 +6133,6 @@ PhysicalDeviceExtendedDynamicStateFeaturesEXT :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
 	extendedDynamicState: b32,
-}
-
-PhysicalDeviceHostImageCopyFeaturesEXT :: struct {
-	sType:         StructureType,
-	pNext:         rawptr,
-	hostImageCopy: b32,
-}
-
-PhysicalDeviceHostImageCopyPropertiesEXT :: struct {
-	sType:                           StructureType,
-	pNext:                           rawptr,
-	copySrcLayoutCount:              u32,
-	pCopySrcLayouts:                 [^]ImageLayout,
-	copyDstLayoutCount:              u32,
-	pCopyDstLayouts:                 [^]ImageLayout,
-	optimalTilingLayoutUUID:         [UUID_SIZE]u8,
-	identicalMemoryTypeRequirements: b32,
-}
-
-MemoryToImageCopyEXT :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	pHostPointer:      rawptr,
-	memoryRowLength:   u32,
-	memoryImageHeight: u32,
-	imageSubresource:  ImageSubresourceLayers,
-	imageOffset:       Offset3D,
-	imageExtent:       Extent3D,
-}
-
-ImageToMemoryCopyEXT :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	pHostPointer:      rawptr,
-	memoryRowLength:   u32,
-	memoryImageHeight: u32,
-	imageSubresource:  ImageSubresourceLayers,
-	imageOffset:       Offset3D,
-	imageExtent:       Extent3D,
-}
-
-CopyMemoryToImageInfoEXT :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	flags:          HostImageCopyFlagsEXT,
-	dstImage:       Image,
-	dstImageLayout: ImageLayout,
-	regionCount:    u32,
-	pRegions:       [^]MemoryToImageCopyEXT,
-}
-
-CopyImageToMemoryInfoEXT :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	flags:          HostImageCopyFlagsEXT,
-	srcImage:       Image,
-	srcImageLayout: ImageLayout,
-	regionCount:    u32,
-	pRegions:       [^]ImageToMemoryCopyEXT,
-}
-
-CopyImageToImageInfoEXT :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	flags:          HostImageCopyFlagsEXT,
-	srcImage:       Image,
-	srcImageLayout: ImageLayout,
-	dstImage:       Image,
-	dstImageLayout: ImageLayout,
-	regionCount:    u32,
-	pRegions:       [^]ImageCopy2,
-}
-
-HostImageLayoutTransitionInfoEXT :: struct {
-	sType:            StructureType,
-	pNext:            rawptr,
-	image:            Image,
-	oldLayout:        ImageLayout,
-	newLayout:        ImageLayout,
-	subresourceRange: ImageSubresourceRange,
-}
-
-SubresourceHostMemcpySizeEXT :: struct {
-	sType: StructureType,
-	pNext: rawptr,
-	size:  DeviceSize,
-}
-
-HostImageCopyDevicePerformanceQueryEXT :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	optimalDeviceAccess:   b32,
-	identicalMemoryLayout: b32,
 }
 
 PhysicalDeviceMapMemoryPlacedFeaturesEXT :: struct {
@@ -6415,11 +6752,17 @@ AccelerationStructureMotionInfoNV :: struct {
 }
 
 AccelerationStructureMatrixMotionInstanceNV :: struct {
-	transformT0:                                    TransformMatrixKHR,
-	transformT1:                                    TransformMatrixKHR,
-	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
-	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
-	accelerationStructureReference:                 u64,
+	transformT0:                    TransformMatrixKHR,
+	transformT1:                    TransformMatrixKHR,
+	using _: bit_field u32 {
+		instanceCustomIndex: u32 | 24,
+		mask:                u32 | 8,
+	},
+	using _: bit_field u32 {
+		instanceShaderBindingTableRecordOffset: u32                      | 24,
+		flags:                                  GeometryInstanceFlagKHR  | 8,
+	},
+	accelerationStructureReference: u64,
 }
 
 SRTDataNV :: struct {
@@ -6442,11 +6785,17 @@ SRTDataNV :: struct {
 }
 
 AccelerationStructureSRTMotionInstanceNV :: struct {
-	transformT0:                                    SRTDataNV,
-	transformT1:                                    SRTDataNV,
-	instanceCustomIndexAndMask:                     u32, // Most significant byte is mask
-	instanceShaderBindingTableRecordOffsetAndFlags: u32, // Most significant byte is flags
-	accelerationStructureReference:                 u64,
+	transformT0:                    SRTDataNV,
+	transformT1:                    SRTDataNV,
+	using _: bit_field u32 {
+		instanceCustomIndex: u32 | 24,
+		mask:                u32 | 8,
+	},
+	using _: bit_field u32 {
+		instanceShaderBindingTableRecordOffset: u32                      | 24,
+		flags:                                  GeometryInstanceFlagKHR  | 8,
+	},
+	accelerationStructureReference: u64,
 }
 
 AccelerationStructureMotionInstanceDataNV :: struct #raw_union {
@@ -6678,6 +7027,12 @@ PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT :: struct {
 	pNext:                             rawptr,
 	primitiveTopologyListRestart:      b32,
 	primitiveTopologyPatchListRestart: b32,
+}
+
+PhysicalDevicePresentModeFifoLatestReadyFeaturesEXT :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	presentModeFifoLatestReady: b32,
 }
 
 SubpassShadingPipelineCreateInfoHUAWEI :: struct {
@@ -7067,12 +7422,6 @@ DescriptorSetLayoutHostMappingInfoVALVE :: struct {
 	descriptorSize:   u32,
 }
 
-PhysicalDeviceDepthClampZeroOneFeaturesEXT :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	depthClampZeroOne: b32,
-}
-
 PhysicalDeviceNonSeamlessCubeMapFeaturesEXT :: struct {
 	sType:              StructureType,
 	pNext:              rawptr,
@@ -7204,6 +7553,43 @@ PipelineIndirectDeviceAddressInfoNV :: struct {
 
 BindPipelineIndirectCommandNV :: struct {
 	pipelineAddress: DeviceAddress,
+}
+
+PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	spheres:            b32,
+	linearSweptSpheres: b32,
+}
+
+AccelerationStructureGeometryLinearSweptSpheresDataNV :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	vertexFormat: Format,
+	vertexData:   DeviceOrHostAddressConstKHR,
+	vertexStride: DeviceSize,
+	radiusFormat: Format,
+	radiusData:   DeviceOrHostAddressConstKHR,
+	radiusStride: DeviceSize,
+	indexType:    IndexType,
+	indexData:    DeviceOrHostAddressConstKHR,
+	indexStride:  DeviceSize,
+	indexingMode: RayTracingLssIndexingModeNV,
+	endCapsMode:  RayTracingLssPrimitiveEndCapsModeNV,
+}
+
+AccelerationStructureGeometrySpheresDataNV :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	vertexFormat: Format,
+	vertexData:   DeviceOrHostAddressConstKHR,
+	vertexStride: DeviceSize,
+	radiusFormat: Format,
+	radiusData:   DeviceOrHostAddressConstKHR,
+	radiusStride: DeviceSize,
+	indexType:    IndexType,
+	indexData:    DeviceOrHostAddressConstKHR,
+	indexStride:  DeviceSize,
 }
 
 PhysicalDeviceLinearColorAttachmentFeaturesNV :: struct {
@@ -7467,12 +7853,6 @@ PhysicalDeviceLegacyDitheringFeaturesEXT :: struct {
 	legacyDithering: b32,
 }
 
-PhysicalDevicePipelineProtectedAccessFeaturesEXT :: struct {
-	sType:                   StructureType,
-	pNext:                   rawptr,
-	pipelineProtectedAccess: b32,
-}
-
 PhysicalDeviceAntiLagFeaturesAMD :: struct {
 	sType:   StructureType,
 	pNext:   rawptr,
@@ -7572,6 +7952,50 @@ PhysicalDeviceRayTracingInvocationReorderFeaturesNV :: struct {
 	sType:                       StructureType,
 	pNext:                       rawptr,
 	rayTracingInvocationReorder: b32,
+}
+
+PhysicalDeviceCooperativeVectorPropertiesNV :: struct {
+	sType:                                        StructureType,
+	pNext:                                        rawptr,
+	cooperativeVectorSupportedStages:             ShaderStageFlags,
+	cooperativeVectorTrainingFloat16Accumulation: b32,
+	cooperativeVectorTrainingFloat32Accumulation: b32,
+	maxCooperativeVectorComponents:               u32,
+}
+
+PhysicalDeviceCooperativeVectorFeaturesNV :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	cooperativeVector:         b32,
+	cooperativeVectorTraining: b32,
+}
+
+CooperativeVectorPropertiesNV :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	inputType:            ComponentTypeKHR,
+	inputInterpretation:  ComponentTypeKHR,
+	matrixInterpretation: ComponentTypeKHR,
+	biasInterpretation:   ComponentTypeKHR,
+	resultType:           ComponentTypeKHR,
+	transpose:            b32,
+}
+
+ConvertCooperativeVectorMatrixInfoNV :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	srcSize:          int,
+	srcData:          DeviceOrHostAddressConstKHR,
+	pDstSize:         ^int,
+	dstData:          DeviceOrHostAddressKHR,
+	srcComponentType: ComponentTypeKHR,
+	dstComponentType: ComponentTypeKHR,
+	numRows:          u32,
+	numColumns:       u32,
+	srcLayout:        CooperativeVectorMatrixLayoutNV,
+	srcStride:        int,
+	dstLayout:        CooperativeVectorMatrixLayoutNV,
+	dstStride:        int,
 }
 
 PhysicalDeviceExtendedSparseAddressSpaceFeaturesNV :: struct {
@@ -7808,6 +8232,18 @@ PhysicalDeviceDescriptorPoolOverallocationFeaturesNV :: struct {
 	descriptorPoolOverallocation: b32,
 }
 
+DisplaySurfaceStereoCreateInfoNV :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	stereoType: DisplaySurfaceStereoTypeNV,
+}
+
+DisplayModeStereoPropertiesNV :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	hdmi3DSupported: b32,
+}
+
 PhysicalDeviceRawAccessChainsFeaturesNV :: struct {
 	sType:                 StructureType,
 	pNext:                 rawptr,
@@ -7836,6 +8272,253 @@ PhysicalDeviceRayTracingValidationFeaturesNV :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
 	rayTracingValidation: b32,
+}
+
+PhysicalDeviceClusterAccelerationStructureFeaturesNV :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	clusterAccelerationStructure: b32,
+}
+
+PhysicalDeviceClusterAccelerationStructurePropertiesNV :: struct {
+	sType:                              StructureType,
+	pNext:                              rawptr,
+	maxVerticesPerCluster:              u32,
+	maxTrianglesPerCluster:             u32,
+	clusterScratchByteAlignment:        u32,
+	clusterByteAlignment:               u32,
+	clusterTemplateByteAlignment:       u32,
+	clusterBottomLevelByteAlignment:    u32,
+	clusterTemplateBoundsByteAlignment: u32,
+	maxClusterGeometryIndex:            u32,
+}
+
+ClusterAccelerationStructureClustersBottomLevelInputNV :: struct {
+	sType:                                   StructureType,
+	pNext:                                   rawptr,
+	maxTotalClusterCount:                    u32,
+	maxClusterCountPerAccelerationStructure: u32,
+}
+
+ClusterAccelerationStructureTriangleClusterInputNV :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	vertexFormat:                  Format,
+	maxGeometryIndexValue:         u32,
+	maxClusterUniqueGeometryCount: u32,
+	maxClusterTriangleCount:       u32,
+	maxClusterVertexCount:         u32,
+	maxTotalTriangleCount:         u32,
+	maxTotalVertexCount:           u32,
+	minPositionTruncateBitCount:   u32,
+}
+
+ClusterAccelerationStructureMoveObjectsInputNV :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	type:          ClusterAccelerationStructureTypeNV,
+	noMoveOverlap: b32,
+	maxMovedBytes: DeviceSize,
+}
+
+ClusterAccelerationStructureOpInputNV :: struct #raw_union {
+	pClustersBottomLevel: ^ClusterAccelerationStructureClustersBottomLevelInputNV,
+	pTriangleClusters:    [^]ClusterAccelerationStructureTriangleClusterInputNV,
+	pMoveObjects:         [^]ClusterAccelerationStructureMoveObjectsInputNV,
+}
+
+ClusterAccelerationStructureInputInfoNV :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	maxAccelerationStructureCount: u32,
+	flags:                         BuildAccelerationStructureFlagsKHR,
+	opType:                        ClusterAccelerationStructureOpTypeNV,
+	opMode:                        ClusterAccelerationStructureOpModeNV,
+	opInput:                       ClusterAccelerationStructureOpInputNV,
+}
+
+StridedDeviceAddressRegionKHR :: struct {
+	deviceAddress: DeviceAddress,
+	stride:        DeviceSize,
+	size:          DeviceSize,
+}
+
+ClusterAccelerationStructureCommandsInfoNV :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	input:                  ClusterAccelerationStructureInputInfoNV,
+	dstImplicitData:        DeviceAddress,
+	scratchData:            DeviceAddress,
+	dstAddressesArray:      StridedDeviceAddressRegionKHR,
+	dstSizesArray:          StridedDeviceAddressRegionKHR,
+	srcInfosArray:          StridedDeviceAddressRegionKHR,
+	srcInfosCount:          DeviceAddress,
+	addressResolutionFlags: ClusterAccelerationStructureAddressResolutionFlagsNV,
+}
+
+StridedDeviceAddressNV :: struct {
+	startAddress:  DeviceAddress,
+	strideInBytes: DeviceSize,
+}
+
+ClusterAccelerationStructureGeometryIndexAndGeometryFlagsNV :: bit_field u32 {
+	geometryIndex: u32 | 24,
+	reserved:      u32 | 5,
+	geometryFlags: u32 | 3,
+}
+
+ClusterAccelerationStructureMoveObjectsInfoNV :: struct {
+	srcAccelerationStructure: DeviceAddress,
+}
+
+ClusterAccelerationStructureBuildClustersBottomLevelInfoNV :: struct {
+	clusterReferencesCount:  u32,
+	clusterReferencesStride: u32,
+	clusterReferences:       DeviceAddress,
+}
+
+ClusterAccelerationStructureBuildTriangleClusterInfoNV :: struct {
+	clusterID:                         u32,
+	clusterFlags:                      ClusterAccelerationStructureClusterFlagsNV,
+	using _: bit_field u32 {
+		triangleCount:            u32 | 9,
+		vertexCount:              u32 | 9,
+		positionTruncateBitCount: u32 | 6,
+		indexType:                u32 | 4,
+		opacityMicromapIndexType: u32 | 4,
+	},
+	baseGeometryIndexAndGeometryFlags: ClusterAccelerationStructureGeometryIndexAndGeometryFlagsNV,
+	indexBufferStride:                 u16,
+	vertexBufferStride:                u16,
+	geometryIndexAndFlagsBufferStride: u16,
+	opacityMicromapIndexBufferStride:  u16,
+	indexBuffer:                       DeviceAddress,
+	vertexBuffer:                      DeviceAddress,
+	geometryIndexAndFlagsBuffer:       DeviceAddress,
+	opacityMicromapArray:              DeviceAddress,
+	opacityMicromapIndexBuffer:        DeviceAddress,
+}
+
+ClusterAccelerationStructureBuildTriangleClusterTemplateInfoNV :: struct {
+	clusterID:                         u32,
+	clusterFlags:                      ClusterAccelerationStructureClusterFlagsNV,
+	using _: bit_field u32 {
+		triangleCount:            u32 | 9,
+		vertexCount:              u32 | 9,
+		positionTruncateBitCount: u32 | 6,
+		indexType:                u32 | 4,
+		opacityMicromapIndexType: u32 | 4,
+	},
+	baseGeometryIndexAndGeometryFlags: ClusterAccelerationStructureGeometryIndexAndGeometryFlagsNV,
+	indexBufferStride:                 u16,
+	vertexBufferStride:                u16,
+	geometryIndexAndFlagsBufferStride: u16,
+	opacityMicromapIndexBufferStride:  u16,
+	indexBuffer:                       DeviceAddress,
+	vertexBuffer:                      DeviceAddress,
+	geometryIndexAndFlagsBuffer:       DeviceAddress,
+	opacityMicromapArray:              DeviceAddress,
+	opacityMicromapIndexBuffer:        DeviceAddress,
+	instantiationBoundingBoxLimit:     DeviceAddress,
+}
+
+ClusterAccelerationStructureInstantiateClusterInfoNV :: struct {
+	clusterIdOffset:        u32,
+	using _: bit_field u32 {
+		geometryIndexOffset: u32 | 24,
+		reserved:            u32 | 8,
+	},
+	clusterTemplateAddress: DeviceAddress,
+	vertexBuffer:           StridedDeviceAddressNV,
+}
+
+AccelerationStructureBuildSizesInfoKHR :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	accelerationStructureSize: DeviceSize,
+	updateScratchSize:         DeviceSize,
+	buildScratchSize:          DeviceSize,
+}
+
+RayTracingPipelineClusterAccelerationStructureCreateInfoNV :: struct {
+	sType:                             StructureType,
+	pNext:                             rawptr,
+	allowClusterAccelerationStructure: b32,
+}
+
+PhysicalDevicePartitionedAccelerationStructureFeaturesNV :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	partitionedAccelerationStructure: b32,
+}
+
+PhysicalDevicePartitionedAccelerationStructurePropertiesNV :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	maxPartitionCount: u32,
+}
+
+PartitionedAccelerationStructureFlagsNV :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	enablePartitionTranslation: b32,
+}
+
+BuildPartitionedAccelerationStructureIndirectCommandNV :: struct {
+	opType:   PartitionedAccelerationStructureOpTypeNV,
+	argCount: u32,
+	argData:  StridedDeviceAddressNV,
+}
+
+PartitionedAccelerationStructureWriteInstanceDataNV :: struct {
+	transform:                           TransformMatrixKHR,
+	explicitAABB:                        [6]f32,
+	instanceID:                          u32,
+	instanceMask:                        u32,
+	instanceContributionToHitGroupIndex: u32,
+	instanceFlags:                       PartitionedAccelerationStructureInstanceFlagsNV,
+	instanceIndex:                       u32,
+	partitionIndex:                      u32,
+	accelerationStructure:               DeviceAddress,
+}
+
+PartitionedAccelerationStructureUpdateInstanceDataNV :: struct {
+	instanceIndex:                       u32,
+	instanceContributionToHitGroupIndex: u32,
+	accelerationStructure:               DeviceAddress,
+}
+
+PartitionedAccelerationStructureWritePartitionTranslationDataNV :: struct {
+	partitionIndex:       u32,
+	partitionTranslation: [3]f32,
+}
+
+WriteDescriptorSetPartitionedAccelerationStructureNV :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	accelerationStructureCount: u32,
+	pAccelerationStructures:    [^]DeviceAddress,
+}
+
+PartitionedAccelerationStructureInstancesInputNV :: struct {
+	sType:                             StructureType,
+	pNext:                             rawptr,
+	flags:                             BuildAccelerationStructureFlagsKHR,
+	instanceCount:                     u32,
+	maxInstancePerPartitionCount:      u32,
+	partitionCount:                    u32,
+	maxInstanceInGlobalPartitionCount: u32,
+}
+
+BuildPartitionedAccelerationStructureInfoNV :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	input:                        PartitionedAccelerationStructureInstancesInputNV,
+	srcAccelerationStructureData: DeviceAddress,
+	dstAccelerationStructureData: DeviceAddress,
+	scratchData:                  DeviceAddress,
+	srcInfos:                     DeviceAddress,
+	srcInfosCount:                DeviceAddress,
 }
 
 PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT :: struct {
@@ -8042,6 +8725,79 @@ PipelineViewportDepthClampControlCreateInfoEXT :: struct {
 	pDepthClampRange: ^DepthClampRangeEXT,
 }
 
+PhysicalDeviceHdrVividFeaturesHUAWEI :: struct {
+	sType:    StructureType,
+	pNext:    rawptr,
+	hdrVivid: b32,
+}
+
+HdrVividDynamicMetadataHUAWEI :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	dynamicMetadataSize: int,
+	pDynamicMetadata:    rawptr,
+}
+
+CooperativeMatrixFlexibleDimensionsPropertiesNV :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	MGranularity:           u32,
+	NGranularity:           u32,
+	KGranularity:           u32,
+	AType:                  ComponentTypeKHR,
+	BType:                  ComponentTypeKHR,
+	CType:                  ComponentTypeKHR,
+	ResultType:             ComponentTypeKHR,
+	saturatingAccumulation: b32,
+	scope:                  ScopeKHR,
+	workgroupInvocations:   u32,
+}
+
+PhysicalDeviceCooperativeMatrix2FeaturesNV :: struct {
+	sType:                                 StructureType,
+	pNext:                                 rawptr,
+	cooperativeMatrixWorkgroupScope:       b32,
+	cooperativeMatrixFlexibleDimensions:   b32,
+	cooperativeMatrixReductions:           b32,
+	cooperativeMatrixConversions:          b32,
+	cooperativeMatrixPerElementOperations: b32,
+	cooperativeMatrixTensorAddressing:     b32,
+	cooperativeMatrixBlockLoads:           b32,
+}
+
+PhysicalDeviceCooperativeMatrix2PropertiesNV :: struct {
+	sType:                                               StructureType,
+	pNext:                                               rawptr,
+	cooperativeMatrixWorkgroupScopeMaxWorkgroupSize:     u32,
+	cooperativeMatrixFlexibleDimensionsMaxDimension:     u32,
+	cooperativeMatrixWorkgroupScopeReservedSharedMemory: u32,
+}
+
+PhysicalDevicePipelineOpacityMicromapFeaturesARM :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	pipelineOpacityMicromap: b32,
+}
+
+PhysicalDeviceVertexAttributeRobustnessFeaturesEXT :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	vertexAttributeRobustness: b32,
+}
+
+SetPresentConfigNV :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	numFramesPerBatch:     u32,
+	presentConfigFeedback: u32,
+}
+
+PhysicalDevicePresentMeteringFeaturesNV :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	presentMetering: b32,
+}
+
 AccelerationStructureBuildRangeInfoKHR :: struct {
 	primitiveCount:  u32,
 	primitiveOffset: u32,
@@ -8180,14 +8936,6 @@ CopyAccelerationStructureInfoKHR :: struct {
 	mode:  CopyAccelerationStructureModeKHR,
 }
 
-AccelerationStructureBuildSizesInfoKHR :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	accelerationStructureSize: DeviceSize,
-	updateScratchSize:         DeviceSize,
-	buildScratchSize:          DeviceSize,
-}
-
 RayTracingShaderGroupCreateInfoKHR :: struct {
 	sType:                           StructureType,
 	pNext:                           rawptr,
@@ -8244,12 +8992,6 @@ PhysicalDeviceRayTracingPipelinePropertiesKHR :: struct {
 	maxRayDispatchInvocationCount:      u32,
 	shaderGroupHandleAlignment:         u32,
 	maxRayHitAttributeSize:             u32,
-}
-
-StridedDeviceAddressRegionKHR :: struct {
-	deviceAddress: DeviceAddress,
-	stride:        DeviceSize,
-	size:          DeviceSize,
 }
 
 TraceRaysIndirectCommandKHR :: struct {
@@ -8553,6 +9295,26 @@ ImportMetalSharedEventInfoEXT :: struct {
 	mtlSharedEvent: MTLSharedEvent_id,
 }
 
+ImportMemoryMetalHandleInfoEXT :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	handleType: ExternalMemoryHandleTypeFlags,
+	handle:     rawptr,
+}
+
+MemoryMetalHandlePropertiesEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	memoryTypeBits: u32,
+}
+
+MemoryGetMetalHandleInfoEXT :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	memory:     DeviceMemory,
+	handleType: ExternalMemoryHandleTypeFlags,
+}
+
 MacOSSurfaceCreateInfoMVK :: struct {
 	sType: StructureType,
 	pNext: rawptr,
@@ -8575,8 +9337,151 @@ WaylandSurfaceCreateInfoKHR :: struct {
 	surface: ^wl_surface,
 }
 
-VideoAV1ColorConfigFlags :: struct {
-	bitfield: u32,
+XlibSurfaceCreateInfoKHR :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  XlibSurfaceCreateFlagsKHR,
+	dpy:    ^XlibDisplay,
+	window: XlibWindow,
+}
+
+XcbSurfaceCreateInfoKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	flags:      XcbSurfaceCreateFlagsKHR,
+	connection: ^xcb_connection_t,
+	window:     xcb_window_t,
+}
+
+PhysicalDevicePortabilitySubsetFeaturesKHR :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	constantAlphaColorBlendFactors:         b32,
+	events:                                 b32,
+	imageViewFormatReinterpretation:        b32,
+	imageViewFormatSwizzle:                 b32,
+	imageView2DOn3DImage:                   b32,
+	multisampleArrayImage:                  b32,
+	mutableComparisonSamplers:              b32,
+	pointPolygons:                          b32,
+	samplerMipLodBias:                      b32,
+	separateStencilMaskRef:                 b32,
+	shaderSampleRateInterpolationFunctions: b32,
+	tessellationIsolines:                   b32,
+	tessellationPointMode:                  b32,
+	triangleFans:                           b32,
+	vertexAttributeAccessBeyondStride:      b32,
+}
+
+PhysicalDevicePortabilitySubsetPropertiesKHR :: struct {
+	sType:                                StructureType,
+	pNext:                                rawptr,
+	minVertexInputBindingStrideAlignment: u32,
+}
+
+PhysicalDeviceShaderEnqueueFeaturesAMDX :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	shaderEnqueue:     b32,
+	shaderMeshEnqueue: b32,
+}
+
+PhysicalDeviceShaderEnqueuePropertiesAMDX :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	maxExecutionGraphDepth:                 u32,
+	maxExecutionGraphShaderOutputNodes:     u32,
+	maxExecutionGraphShaderPayloadSize:     u32,
+	maxExecutionGraphShaderPayloadCount:    u32,
+	executionGraphDispatchAddressAlignment: u32,
+	maxExecutionGraphWorkgroupCount:        [3]u32,
+	maxExecutionGraphWorkgroups:            u32,
+}
+
+ExecutionGraphPipelineScratchSizeAMDX :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	minSize:         DeviceSize,
+	maxSize:         DeviceSize,
+	sizeGranularity: DeviceSize,
+}
+
+ExecutionGraphPipelineCreateInfoAMDX :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	flags:              PipelineCreateFlags,
+	stageCount:         u32,
+	pStages:            [^]PipelineShaderStageCreateInfo,
+	pLibraryInfo:       ^PipelineLibraryCreateInfoKHR,
+	layout:             PipelineLayout,
+	basePipelineHandle: Pipeline,
+	basePipelineIndex:  i32,
+}
+
+DeviceOrHostAddressConstAMDX :: struct #raw_union {
+	deviceAddress: DeviceAddress,
+	hostAddress:   rawptr,
+}
+
+DispatchGraphInfoAMDX :: struct {
+	nodeIndex:     u32,
+	payloadCount:  u32,
+	payloads:      DeviceOrHostAddressConstAMDX,
+	payloadStride: u64,
+}
+
+DispatchGraphCountInfoAMDX :: struct {
+	count:  u32,
+	infos:  DeviceOrHostAddressConstAMDX,
+	stride: u64,
+}
+
+PipelineShaderStageNodeCreateInfoAMDX :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	pName: cstring,
+	index: u32,
+}
+
+PhysicalDeviceDisplacementMicromapFeaturesNV :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	displacementMicromap: b32,
+}
+
+PhysicalDeviceDisplacementMicromapPropertiesNV :: struct {
+	sType:                                   StructureType,
+	pNext:                                   rawptr,
+	maxDisplacementMicromapSubdivisionLevel: u32,
+}
+
+AccelerationStructureTrianglesDisplacementMicromapNV :: struct {
+	sType:                                 StructureType,
+	pNext:                                 rawptr,
+	displacementBiasAndScaleFormat:        Format,
+	displacementVectorFormat:              Format,
+	displacementBiasAndScaleBuffer:        DeviceOrHostAddressConstKHR,
+	displacementBiasAndScaleStride:        DeviceSize,
+	displacementVectorBuffer:              DeviceOrHostAddressConstKHR,
+	displacementVectorStride:              DeviceSize,
+	displacedMicromapPrimitiveFlags:       DeviceOrHostAddressConstKHR,
+	displacedMicromapPrimitiveFlagsStride: DeviceSize,
+	indexType:                             IndexType,
+	indexBuffer:                           DeviceOrHostAddressConstKHR,
+	indexStride:                           DeviceSize,
+	baseTriangle:                          u32,
+	usageCountsCount:                      u32,
+	pUsageCounts:                          [^]MicromapUsageEXT,
+	ppUsageCounts:                         ^[^]MicromapUsageEXT,
+	micromap:                              MicromapEXT,
+}
+
+VideoAV1ColorConfigFlags :: distinct bit_set[VideoAV1ColorConfigFlag; u32]
+VideoAV1ColorConfigFlag :: enum u32 {
+	mono_chrome,
+	color_range,
+	separate_uv_delta_q,
+	color_description_present_flag,
 }
 
 VideoAV1ColorConfig :: struct {
@@ -8591,8 +9496,9 @@ VideoAV1ColorConfig :: struct {
 	chroma_sample_position:   VideoAV1ChromaSamplePosition,
 }
 
-VideoAV1TimingInfoFlags :: struct {
-	bitfield: u32,
+VideoAV1TimingInfoFlags :: distinct bit_set[VideoAV1TimingInfoFlag; u32]
+VideoAV1TimingInfoFlag :: enum u32 {
+	equal_picture_interval,
 }
 
 VideoAV1TimingInfo :: struct {
@@ -8602,8 +9508,10 @@ VideoAV1TimingInfo :: struct {
 	num_ticks_per_picture_minus_1: u32,
 }
 
-VideoAV1LoopFilterFlags :: struct {
-	bitfield: u32,
+VideoAV1LoopFilterFlags :: distinct bit_set[VideoAV1LoopFilterFlag; u32]
+VideoAV1LoopFilterFlag :: enum u32 {
+	loop_filter_delta_enabled,
+	loop_filter_delta_update,
 }
 
 VideoAV1LoopFilter :: struct {
@@ -8616,8 +9524,10 @@ VideoAV1LoopFilter :: struct {
 	loop_filter_mode_deltas: [VIDEO_AV1_LOOP_FILTER_ADJUSTMENTS]i8,
 }
 
-VideoAV1QuantizationFlags :: struct {
-	bitfield: u32,
+VideoAV1QuantizationFlags :: distinct bit_set[VideoAV1QuantizationFlag; u32]
+VideoAV1QuantizationFlag :: enum u32 {
+	using_qmatrix,
+	diff_uv_delta,
 }
 
 VideoAV1Quantization :: struct {
@@ -8638,8 +9548,9 @@ VideoAV1Segmentation :: struct {
 	FeatureData:    [VIDEO_AV1_MAX_SEGMENTS][VIDEO_AV1_SEG_LVL_MAX]i16,
 }
 
-VideoAV1TileInfoFlags :: struct {
-	bitfield: u32,
+VideoAV1TileInfoFlags :: distinct bit_set[VideoAV1TileInfoFlag; u32]
+VideoAV1TileInfoFlag :: enum u32 {
+	uniform_tile_spacing_flag,
 }
 
 VideoAV1TileInfo :: struct {
@@ -8674,8 +9585,12 @@ VideoAV1GlobalMotion :: struct {
 	gm_params: [VIDEO_AV1_NUM_REF_FRAMES][VIDEO_AV1_GLOBAL_MOTION_PARAMS]i32,
 }
 
-VideoAV1FilmGrainFlags :: struct {
-	bitfield: u32,
+VideoAV1FilmGrainFlags :: distinct bit_set[VideoAV1FilmGrainFlag; u32]
+VideoAV1FilmGrainFlag :: enum u32 {
+	chroma_scaling_from_luma,
+	overlap_flag,
+	clip_to_restricted_range,
+	update_grain,
 }
 
 VideoAV1FilmGrain :: struct {
@@ -8706,8 +9621,27 @@ VideoAV1FilmGrain :: struct {
 	cr_offset:                 u16,
 }
 
-VideoAV1SequenceHeaderFlags :: struct {
-	bitfield: u32,
+VideoAV1SequenceHeaderFlags :: distinct bit_set[VideoAV1SequenceHeaderFlag; u32]
+VideoAV1SequenceHeaderFlag :: enum u32 {
+	still_picture,
+	reduced_still_picture_header,
+	use_128x128_superblock,
+	enable_filter_intra,
+	enable_intra_edge_filter,
+	enable_interintra_compound,
+	enable_masked_compound,
+	enable_warped_motion,
+	enable_dual_filter,
+	enable_order_hint,
+	enable_jnt_comp,
+	enable_ref_frame_mvs,
+	frame_id_numbers_present_flag,
+	enable_superres,
+	enable_cdef,
+	enable_restoration,
+	film_grain_params_present,
+	timing_info_present_flag,
+	initial_display_delay_present_flag,
 }
 
 VideoAV1SequenceHeader :: struct {
@@ -8727,8 +9661,202 @@ VideoAV1SequenceHeader :: struct {
 	pTimingInfo:                        ^VideoAV1TimingInfo,
 }
 
-VideoH264SpsVuiFlags :: struct {
-	bitfield: u32,
+VideoDecodeAV1PictureInfoFlags :: distinct bit_set[VideoDecodeAV1PictureInfoFlag; u32]
+VideoDecodeAV1PictureInfoFlag :: enum u32 {
+	error_resilient_mode,
+	disable_cdf_update,
+	use_superres,
+	render_and_frame_size_different,
+	allow_screen_content_tools,
+	is_filter_switchable,
+	force_integer_mv,
+	frame_size_override_flag,
+	buffer_removal_time_present_flag,
+	allow_intrabc,
+	frame_refs_short_signaling,
+	allow_high_precision_mv,
+	is_motion_mode_switchable,
+	use_ref_frame_mvs,
+	disable_frame_end_update_cdf,
+	allow_warped_motion,
+	reduced_tx_set,
+	reference_select,
+	skip_mode_present,
+	delta_q_present,
+	delta_lf_present,
+	delta_lf_multi,
+	segmentation_enabled,
+	segmentation_update_map,
+	segmentation_temporal_update,
+	segmentation_update_data,
+	UsesLr,
+	usesChromaLr,
+	apply_grain,
+}
+
+VideoDecodeAV1PictureInfo :: struct {
+	flags:                VideoDecodeAV1PictureInfoFlags,
+	frame_type:           VideoAV1FrameType,
+	current_frame_id:     u32,
+	OrderHint:            u8,
+	primary_ref_frame:    u8,
+	refresh_frame_flags:  u8,
+	reserved1:            u8,
+	interpolation_filter: VideoAV1InterpolationFilter,
+	TxMode:               VideoAV1TxMode,
+	delta_q_res:          u8,
+	delta_lf_res:         u8,
+	SkipModeFrame:        [VIDEO_AV1_SKIP_MODE_FRAMES]u8,
+	coded_denom:          u8,
+	reserved2:            [3]u8,
+	OrderHints:           [VIDEO_AV1_NUM_REF_FRAMES]u8,
+	expectedFrameId:      [VIDEO_AV1_NUM_REF_FRAMES]u32,
+	pTileInfo:            ^VideoAV1TileInfo,
+	pQuantization:        ^VideoAV1Quantization,
+	pSegmentation:        ^VideoAV1Segmentation,
+	pLoopFilter:          ^VideoAV1LoopFilter,
+	pCDEF:                ^VideoAV1CDEF,
+	pLoopRestoration:     ^VideoAV1LoopRestoration,
+	pGlobalMotion:        ^VideoAV1GlobalMotion,
+	pFilmGrain:           ^VideoAV1FilmGrain,
+}
+
+VideoDecodeAV1ReferenceInfoFlags :: distinct bit_set[VideoDecodeAV1ReferenceInfoFlag; u32]
+VideoDecodeAV1ReferenceInfoFlag :: enum u32 {
+	disable_frame_end_update_cdf,
+	segmentation_enabled,
+}
+
+VideoDecodeAV1ReferenceInfo :: struct {
+	flags:            VideoDecodeAV1ReferenceInfoFlags,
+	frame_type:       u8,
+	RefFrameSignBias: u8,
+	OrderHint:        u8,
+	SavedOrderHints:  [VIDEO_AV1_NUM_REF_FRAMES]u8,
+}
+
+VideoEncodeAV1DecoderModelInfo :: struct {
+	buffer_delay_length_minus_1:            u8,
+	buffer_removal_time_length_minus_1:     u8,
+	frame_presentation_time_length_minus_1: u8,
+	reserved1:                              u8,
+	num_units_in_decoding_tick:             u32,
+}
+
+VideoEncodeAV1ExtensionHeader :: struct {
+	temporal_id: u8,
+	spatial_id:  u8,
+}
+
+VideoEncodeAV1OperatingPointInfoFlags :: distinct bit_set[VideoEncodeAV1OperatingPointInfoFlag; u32]
+VideoEncodeAV1OperatingPointInfoFlag :: enum u32 {
+	decoder_model_present_for_this_op,
+	low_delay_mode_flag,
+	initial_display_delay_present_for_this_op,
+}
+
+VideoEncodeAV1OperatingPointInfo :: struct {
+	flags:                         VideoEncodeAV1OperatingPointInfoFlags,
+	operating_point_idc:           u16,
+	seq_level_idx:                 u8,
+	seq_tier:                      u8,
+	decoder_buffer_delay:          u32,
+	encoder_buffer_delay:          u32,
+	initial_display_delay_minus_1: u8,
+}
+
+VideoEncodeAV1PictureInfoFlags :: distinct bit_set[VideoEncodeAV1PictureInfoFlag; u32]
+VideoEncodeAV1PictureInfoFlag :: enum u32 {
+	error_resilient_mode,
+	disable_cdf_update,
+	use_superres,
+	render_and_frame_size_different,
+	allow_screen_content_tools,
+	is_filter_switchable,
+	force_integer_mv,
+	frame_size_override_flag,
+	buffer_removal_time_present_flag,
+	allow_intrabc,
+	frame_refs_short_signaling,
+	allow_high_precision_mv,
+	is_motion_mode_switchable,
+	use_ref_frame_mvs,
+	disable_frame_end_update_cdf,
+	allow_warped_motion,
+	reduced_tx_set,
+	skip_mode_present,
+	delta_q_present,
+	delta_lf_present,
+	delta_lf_multi,
+	segmentation_enabled,
+	segmentation_update_map,
+	segmentation_temporal_update,
+	segmentation_update_data,
+	UsesLr,
+	usesChromaLr,
+	show_frame,
+	showable_frame,
+}
+
+VideoEncodeAV1PictureInfo :: struct {
+	flags:                   VideoEncodeAV1PictureInfoFlags,
+	frame_type:              VideoAV1FrameType,
+	frame_presentation_time: u32,
+	current_frame_id:        u32,
+	order_hint:              u8,
+	primary_ref_frame:       u8,
+	refresh_frame_flags:     u8,
+	coded_denom:             u8,
+	render_width_minus_1:    u16,
+	render_height_minus_1:   u16,
+	interpolation_filter:    VideoAV1InterpolationFilter,
+	TxMode:                  VideoAV1TxMode,
+	delta_q_res:             u8,
+	delta_lf_res:            u8,
+	ref_order_hint:          [VIDEO_AV1_NUM_REF_FRAMES]u8,
+	ref_frame_idx:           [VIDEO_AV1_REFS_PER_FRAME]i8,
+	reserved1:               [3]u8,
+	delta_frame_id_minus_1:  [VIDEO_AV1_REFS_PER_FRAME]u32,
+	pTileInfo:               ^VideoAV1TileInfo,
+	pQuantization:           ^VideoAV1Quantization,
+	pSegmentation:           ^VideoAV1Segmentation,
+	pLoopFilter:             ^VideoAV1LoopFilter,
+	pCDEF:                   ^VideoAV1CDEF,
+	pLoopRestoration:        ^VideoAV1LoopRestoration,
+	pGlobalMotion:           ^VideoAV1GlobalMotion,
+	pExtensionHeader:        ^VideoEncodeAV1ExtensionHeader,
+	pBufferRemovalTimes:     [^]u32,
+}
+
+VideoEncodeAV1ReferenceInfoFlags :: distinct bit_set[VideoEncodeAV1ReferenceInfoFlag; u32]
+VideoEncodeAV1ReferenceInfoFlag :: enum u32 {
+	disable_frame_end_update_cdf,
+	segmentation_enabled,
+}
+
+VideoEncodeAV1ReferenceInfo :: struct {
+	flags:            VideoEncodeAV1ReferenceInfoFlags,
+	RefFrameId:       u32,
+	frame_type:       VideoAV1FrameType,
+	OrderHint:        u8,
+	reserved1:        [3]u8,
+	pExtensionHeader: ^VideoEncodeAV1ExtensionHeader,
+}
+
+VideoH264SpsVuiFlags :: distinct bit_set[VideoH264SpsVuiFlag; u32]
+VideoH264SpsVuiFlag :: enum u32 {
+	aspect_ratio_info_present_flag,
+	overscan_info_present_flag,
+	overscan_appropriate_flag,
+	video_signal_type_present_flag,
+	video_full_range_flag,
+	color_description_present_flag,
+	chroma_loc_info_present_flag,
+	timing_info_present_flag,
+	fixed_frame_rate_flag,
+	bitstream_restriction_flag,
+	nal_hrd_parameters_present_flag,
+	vcl_hrd_parameters_present_flag,
 }
 
 VideoH264HrdParameters :: struct {
@@ -8764,8 +9892,24 @@ VideoH264SequenceParameterSetVui :: struct {
 	pHrdParameters:                      [^]VideoH264HrdParameters,
 }
 
-VideoH264SpsFlags :: struct {
-	bitfield: u32,
+VideoH264SpsFlags :: distinct bit_set[VideoH264SpsFlag; u32]
+VideoH264SpsFlag :: enum u32 {
+	constraint_set0_flag,
+	constraint_set1_flag,
+	constraint_set2_flag,
+	constraint_set3_flag,
+	constraint_set4_flag,
+	constraint_set5_flag,
+	direct_8x8_inference_flag,
+	mb_adaptive_frame_field_flag,
+	frame_mbs_only_flag,
+	delta_pic_order_always_zero_flag,
+	separate_colour_plane_flag,
+	gaps_in_frame_num_value_allowed_flag,
+	qpprime_y_zero_transform_bypass_flag,
+	frame_cropping_flag,
+	seq_scaling_matrix_present_flag,
+	vui_parameters_present_flag,
 }
 
 VideoH264ScalingLists :: struct {
@@ -8803,8 +9947,16 @@ VideoH264SequenceParameterSet :: struct {
 	pSequenceParameterSetVui:              ^VideoH264SequenceParameterSetVui,
 }
 
-VideoH264PpsFlags :: struct {
-	bitfield: u32,
+VideoH264PpsFlags :: distinct bit_set[VideoH264PpsFlag; u32]
+VideoH264PpsFlag :: enum u32 {
+	transform_8x8_mode_flag,
+	redundant_pic_cnt_present_flag,
+	constrained_intra_pred_flag,
+	deblocking_filter_control_present_flag,
+	weighted_pred_flag,
+	bottom_field_pic_order_in_frame_present_flag,
+	entropy_coding_mode_flag,
+	pic_scaling_matrix_present_flag,
 }
 
 VideoH264PictureParameterSet :: struct {
@@ -8821,277 +9973,14 @@ VideoH264PictureParameterSet :: struct {
 	pScalingLists:                        [^]VideoH264ScalingLists,
 }
 
-VideoH265DecPicBufMgr :: struct {
-	max_latency_increase_plus1:   [VIDEO_H265_SUBLAYERS_LIST_SIZE]u32,
-	max_dec_pic_buffering_minus1: [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
-	max_num_reorder_pics:         [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
-}
-
-VideoH265SubLayerHrdParameters :: struct {
-	bit_rate_value_minus1:    [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
-	cpb_size_value_minus1:    [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
-	cpb_size_du_value_minus1: [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
-	bit_rate_du_value_minus1: [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
-	cbr_flag:                 u32,
-}
-
-VideoH265HrdFlags :: struct {
-	bitfield: u32,
-}
-
-VideoH265HrdParameters :: struct {
-	flags:                                        VideoH265HrdFlags,
-	tick_divisor_minus2:                          u8,
-	du_cpb_removal_delay_increment_length_minus1: u8,
-	dpb_output_delay_du_length_minus1:            u8,
-	bit_rate_scale:                               u8,
-	cpb_size_scale:                               u8,
-	cpb_size_du_scale:                            u8,
-	initial_cpb_removal_delay_length_minus1:      u8,
-	au_cpb_removal_delay_length_minus1:           u8,
-	dpb_output_delay_length_minus1:               u8,
-	cpb_cnt_minus1:                               [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
-	elemental_duration_in_tc_minus1:              [VIDEO_H265_SUBLAYERS_LIST_SIZE]u16,
-	reserved:                                     [3]u16,
-	pSubLayerHrdParametersNal:                    ^VideoH265SubLayerHrdParameters,
-	pSubLayerHrdParametersVcl:                    ^VideoH265SubLayerHrdParameters,
-}
-
-VideoH265VpsFlags :: struct {
-	bitfield: u32,
-}
-
-VideoH265ProfileTierLevelFlags :: struct {
-	bitfield: u32,
-}
-
-VideoH265ProfileTierLevel :: struct {
-	flags:               VideoH265ProfileTierLevelFlags,
-	general_profile_idc: VideoH265ProfileIdc,
-	general_level_idc:   VideoH265LevelIdc,
-}
-
-VideoH265VideoParameterSet :: struct {
-	flags:                             VideoH265VpsFlags,
-	vps_video_parameter_set_id:        u8,
-	vps_max_sub_layers_minus1:         u8,
-	reserved1:                         u8,
-	reserved2:                         u8,
-	vps_num_units_in_tick:             u32,
-	vps_time_scale:                    u32,
-	vps_num_ticks_poc_diff_one_minus1: u32,
-	reserved3:                         u32,
-	pDecPicBufMgr:                     ^VideoH265DecPicBufMgr,
-	pHrdParameters:                    [^]VideoH265HrdParameters,
-	pProfileTierLevel:                 ^VideoH265ProfileTierLevel,
-}
-
-VideoH265ScalingLists :: struct {
-	ScalingList4x4:         [VIDEO_H265_SCALING_LIST_4X4_NUM_LISTS][VIDEO_H265_SCALING_LIST_4X4_NUM_ELEMENTS]u8,
-	ScalingList8x8:         [VIDEO_H265_SCALING_LIST_8X8_NUM_LISTS][VIDEO_H265_SCALING_LIST_8X8_NUM_ELEMENTS]u8,
-	ScalingList16x16:       [VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS][VIDEO_H265_SCALING_LIST_16X16_NUM_ELEMENTS]u8,
-	ScalingList32x32:       [VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS][VIDEO_H265_SCALING_LIST_32X32_NUM_ELEMENTS]u8,
-	ScalingListDCCoef16x16: [VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS]u8,
-	ScalingListDCCoef32x32: [VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS]u8,
-}
-
-VideoH265SpsVuiFlags :: struct {
-	bitfield: u32,
-}
-
-VideoH265SequenceParameterSetVui :: struct {
-	flags:                               VideoH265SpsVuiFlags,
-	aspect_ratio_idc:                    VideoH265AspectRatioIdc,
-	sar_width:                           u16,
-	sar_height:                          u16,
-	video_format:                        u8,
-	colour_primaries:                    u8,
-	transfer_characteristics:            u8,
-	matrix_coeffs:                       u8,
-	chroma_sample_loc_type_top_field:    u8,
-	chroma_sample_loc_type_bottom_field: u8,
-	reserved1:                           u8,
-	reserved2:                           u8,
-	def_disp_win_left_offset:            u16,
-	def_disp_win_right_offset:           u16,
-	def_disp_win_top_offset:             u16,
-	def_disp_win_bottom_offset:          u16,
-	vui_num_units_in_tick:               u32,
-	vui_time_scale:                      u32,
-	vui_num_ticks_poc_diff_one_minus1:   u32,
-	min_spatial_segmentation_idc:        u16,
-	reserved3:                           u16,
-	max_bytes_per_pic_denom:             u8,
-	max_bits_per_min_cu_denom:           u8,
-	log2_max_mv_length_horizontal:       u8,
-	log2_max_mv_length_vertical:         u8,
-	pHrdParameters:                      [^]VideoH265HrdParameters,
-}
-
-VideoH265PredictorPaletteEntries :: struct {
-	PredictorPaletteEntries: [VIDEO_H265_PREDICTOR_PALETTE_COMPONENTS_LIST_SIZE][VIDEO_H265_PREDICTOR_PALETTE_COMP_ENTRIES_LIST_SIZE]u16,
-}
-
-VideoH265SpsFlags :: struct {
-	bitfield: u32,
-}
-
-VideoH265ShortTermRefPicSetFlags :: struct {
-	bitfield: u32,
-}
-
-VideoH265ShortTermRefPicSet :: struct {
-	flags:                    VideoH265ShortTermRefPicSetFlags,
-	delta_idx_minus1:         u32,
-	use_delta_flag:           u16,
-	abs_delta_rps_minus1:     u16,
-	used_by_curr_pic_flag:    u16,
-	used_by_curr_pic_s0_flag: u16,
-	used_by_curr_pic_s1_flag: u16,
-	reserved1:                u16,
-	reserved2:                u8,
-	reserved3:                u8,
-	num_negative_pics:        u8,
-	num_positive_pics:        u8,
-	delta_poc_s0_minus1:      [VIDEO_H265_MAX_DPB_SIZE]u16,
-	delta_poc_s1_minus1:      [VIDEO_H265_MAX_DPB_SIZE]u16,
-}
-
-VideoH265LongTermRefPicsSps :: struct {
-	used_by_curr_pic_lt_sps_flag: u32,
-	lt_ref_pic_poc_lsb_sps:       [VIDEO_H265_MAX_LONG_TERM_REF_PICS_SPS]u32,
-}
-
-VideoH265SequenceParameterSet :: struct {
-	flags:                                         VideoH265SpsFlags,
-	chroma_format_idc:                             VideoH265ChromaFormatIdc,
-	pic_width_in_luma_samples:                     u32,
-	pic_height_in_luma_samples:                    u32,
-	sps_video_parameter_set_id:                    u8,
-	sps_max_sub_layers_minus1:                     u8,
-	sps_seq_parameter_set_id:                      u8,
-	bit_depth_luma_minus8:                         u8,
-	bit_depth_chroma_minus8:                       u8,
-	log2_max_pic_order_cnt_lsb_minus4:             u8,
-	log2_min_luma_coding_block_size_minus3:        u8,
-	log2_diff_max_min_luma_coding_block_size:      u8,
-	log2_min_luma_transform_block_size_minus2:     u8,
-	log2_diff_max_min_luma_transform_block_size:   u8,
-	max_transform_hierarchy_depth_inter:           u8,
-	max_transform_hierarchy_depth_intra:           u8,
-	num_short_term_ref_pic_sets:                   u8,
-	num_long_term_ref_pics_sps:                    u8,
-	pcm_sample_bit_depth_luma_minus1:              u8,
-	pcm_sample_bit_depth_chroma_minus1:            u8,
-	log2_min_pcm_luma_coding_block_size_minus3:    u8,
-	log2_diff_max_min_pcm_luma_coding_block_size:  u8,
-	reserved1:                                     u8,
-	reserved2:                                     u8,
-	palette_max_size:                              u8,
-	delta_palette_max_predictor_size:              u8,
-	motion_vector_resolution_control_idc:          u8,
-	sps_num_palette_predictor_initializers_minus1: u8,
-	conf_win_left_offset:                          u32,
-	conf_win_right_offset:                         u32,
-	conf_win_top_offset:                           u32,
-	conf_win_bottom_offset:                        u32,
-	pProfileTierLevel:                             ^VideoH265ProfileTierLevel,
-	pDecPicBufMgr:                                 ^VideoH265DecPicBufMgr,
-	pScalingLists:                                 [^]VideoH265ScalingLists,
-	pShortTermRefPicSet:                           ^VideoH265ShortTermRefPicSet,
-	pLongTermRefPicsSps:                           [^]VideoH265LongTermRefPicsSps,
-	pSequenceParameterSetVui:                      ^VideoH265SequenceParameterSetVui,
-	pPredictorPaletteEntries:                      [^]VideoH265PredictorPaletteEntries,
-}
-
-VideoH265PpsFlags :: struct {
-	bitfield: u32,
-}
-
-VideoH265PictureParameterSet :: struct {
-	flags:                                     VideoH265PpsFlags,
-	pps_pic_parameter_set_id:                  u8,
-	pps_seq_parameter_set_id:                  u8,
-	sps_video_parameter_set_id:                u8,
-	num_extra_slice_header_bits:               u8,
-	num_ref_idx_l0_default_active_minus1:      u8,
-	num_ref_idx_l1_default_active_minus1:      u8,
-	init_qp_minus26:                           i8,
-	diff_cu_qp_delta_depth:                    u8,
-	pps_cb_qp_offset:                          i8,
-	pps_cr_qp_offset:                          i8,
-	pps_beta_offset_div2:                      i8,
-	pps_tc_offset_div2:                        i8,
-	log2_parallel_merge_level_minus2:          u8,
-	log2_max_transform_skip_block_size_minus2: u8,
-	diff_cu_chroma_qp_offset_depth:            u8,
-	chroma_qp_offset_list_len_minus1:          u8,
-	cb_qp_offset_list:                         [VIDEO_H265_CHROMA_QP_OFFSET_LIST_SIZE]i8,
-	cr_qp_offset_list:                         [VIDEO_H265_CHROMA_QP_OFFSET_LIST_SIZE]i8,
-	log2_sao_offset_scale_luma:                u8,
-	log2_sao_offset_scale_chroma:              u8,
-	pps_act_y_qp_offset_plus5:                 i8,
-	pps_act_cb_qp_offset_plus5:                i8,
-	pps_act_cr_qp_offset_plus3:                i8,
-	pps_num_palette_predictor_initializers:    u8,
-	luma_bit_depth_entry_minus8:               u8,
-	chroma_bit_depth_entry_minus8:             u8,
-	num_tile_columns_minus1:                   u8,
-	num_tile_rows_minus1:                      u8,
-	reserved1:                                 u8,
-	reserved2:                                 u8,
-	column_width_minus1:                       [VIDEO_H265_CHROMA_QP_OFFSET_TILE_COLS_LIST_SIZE]u16,
-	row_height_minus1:                         [VIDEO_H265_CHROMA_QP_OFFSET_TILE_ROWS_LIST_SIZE]u16,
-	reserved3:                                 u32,
-	pScalingLists:                             [^]VideoH265ScalingLists,
-	pPredictorPaletteEntries:                  [^]VideoH265PredictorPaletteEntries,
-}
-
-VideoDecodeAV1PictureInfoFlags :: struct {
-	bitfield: u32,
-}
-
-VideoDecodeAV1PictureInfo :: struct {
-	flags:                VideoDecodeAV1PictureInfoFlags,
-	frame_type:           VideoAV1FrameType,
-	current_frame_id:     u32,
-	OrderHint:            u8,
-	primary_ref_frame:    u8,
-	refresh_frame_flags:  u8,
-	reserved1:            u8,
-	interpolation_filter: VideoAV1InterpolationFilter,
-	TxMode:               VideoAV1TxMode,
-	delta_q_res:          u8,
-	delta_lf_res:         u8,
-	SkipModeFrame:        [VIDEO_AV1_SKIP_MODE_FRAMES]u8,
-	coded_denom:          u8,
-	reserved2:            [3]u8,
-	OrderHints:           [VIDEO_AV1_NUM_REF_FRAMES]u8,
-	expectedFrameId:      [VIDEO_AV1_NUM_REF_FRAMES]u32,
-	pTileInfo:            ^VideoAV1TileInfo,
-	pQuantization:        ^VideoAV1Quantization,
-	pSegmentation:        ^VideoAV1Segmentation,
-	pLoopFilter:          ^VideoAV1LoopFilter,
-	pCDEF:                ^VideoAV1CDEF,
-	pLoopRestoration:     ^VideoAV1LoopRestoration,
-	pGlobalMotion:        ^VideoAV1GlobalMotion,
-	pFilmGrain:           ^VideoAV1FilmGrain,
-}
-
-VideoDecodeAV1ReferenceInfoFlags :: struct {
-	bitfield: u32,
-}
-
-VideoDecodeAV1ReferenceInfo :: struct {
-	flags:            VideoDecodeAV1ReferenceInfoFlags,
-	frame_type:       u8,
-	RefFrameSignBias: u8,
-	OrderHint:        u8,
-	SavedOrderHints:  [VIDEO_AV1_NUM_REF_FRAMES]u8,
-}
-
-VideoDecodeH264PictureInfoFlags :: struct {
-	bitfield: u32,
+VideoDecodeH264PictureInfoFlags :: distinct bit_set[VideoDecodeH264PictureInfoFlag; u32]
+VideoDecodeH264PictureInfoFlag :: enum u32 {
+	field_pic_flag,
+	is_intra,
+	IdrPicFlag,
+	bottom_field_flag,
+	is_reference,
+	complementary_field_pair,
 }
 
 VideoDecodeH264PictureInfo :: struct {
@@ -9105,8 +9994,12 @@ VideoDecodeH264PictureInfo :: struct {
 	PicOrderCnt:          [VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE]i32,
 }
 
-VideoDecodeH264ReferenceInfoFlags :: struct {
-	bitfield: u32,
+VideoDecodeH264ReferenceInfoFlags :: distinct bit_set[VideoDecodeH264ReferenceInfoFlag; u32]
+VideoDecodeH264ReferenceInfoFlag :: enum u32 {
+	top_field_flag,
+	bottom_field_flag,
+	used_for_long_term_reference,
+	is_non_existing,
 }
 
 VideoDecodeH264ReferenceInfo :: struct {
@@ -9114,33 +10007,6 @@ VideoDecodeH264ReferenceInfo :: struct {
 	FrameNum:    u16,
 	reserved:    u16,
 	PicOrderCnt: [VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE]i32,
-}
-
-VideoDecodeH265PictureInfoFlags :: struct {
-	bitfield: u32,
-}
-
-VideoDecodeH265PictureInfo :: struct {
-	flags:                        VideoDecodeH265PictureInfoFlags,
-	sps_video_parameter_set_id:   u8,
-	pps_seq_parameter_set_id:     u8,
-	pps_pic_parameter_set_id:     u8,
-	NumDeltaPocsOfRefRpsIdx:      u8,
-	PicOrderCntVal:               i32,
-	NumBitsForSTRefPicSetInSlice: u16,
-	reserved:                     u16,
-	RefPicSetStCurrBefore:        [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
-	RefPicSetStCurrAfter:         [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
-	RefPicSetLtCurr:              [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
-}
-
-VideoDecodeH265ReferenceInfoFlags :: struct {
-	bitfield: u32,
-}
-
-VideoDecodeH265ReferenceInfo :: struct {
-	flags:          VideoDecodeH265ReferenceInfoFlags,
-	PicOrderCntVal: i32,
 }
 
 VideoEncodeH264WeightTableFlags :: struct {
@@ -9164,20 +10030,30 @@ VideoEncodeH264WeightTable :: struct {
 	chroma_offset_l1:         [VIDEO_H264_MAX_NUM_LIST_REF][VIDEO_H264_MAX_CHROMA_PLANES]i8,
 }
 
-VideoEncodeH264SliceHeaderFlags :: struct {
-	bitfield: u32,
+VideoEncodeH264SliceHeaderFlags :: distinct bit_set[VideoEncodeH264SliceHeaderFlag; u32]
+VideoEncodeH264SliceHeaderFlag :: enum u32 {
+	direct_spatial_mv_pred_flag,
+	num_ref_idx_active_override_flag,
 }
 
-VideoEncodeH264PictureInfoFlags :: struct {
-	bitfield: u32,
+VideoEncodeH264PictureInfoFlags :: distinct bit_set[VideoEncodeH264PictureInfoFlag; u32]
+VideoEncodeH264PictureInfoFlag :: enum u32 {
+	IdrPicFlag,
+	is_reference,
+	no_output_of_prior_pics_flag,
+	long_term_reference_flag,
+	adaptive_ref_pic_marking_mode_flag,
 }
 
-VideoEncodeH264ReferenceInfoFlags :: struct {
-	bitfield: u32,
+VideoEncodeH264ReferenceInfoFlags :: distinct bit_set[VideoEncodeH264ReferenceInfoFlag; u32]
+VideoEncodeH264ReferenceInfoFlag :: enum u32 {
+	used_for_long_term_reference,
 }
 
-VideoEncodeH264ReferenceListsInfoFlags :: struct {
-	bitfield: u32,
+VideoEncodeH264ReferenceListsInfoFlags :: distinct bit_set[VideoEncodeH264ReferenceListsInfoFlag; u32]
+VideoEncodeH264ReferenceListsInfoFlag :: enum u32 {
+	ref_pic_list_modification_flag_l0,
+	ref_pic_list_modification_flag_l1,
 }
 
 VideoEncodeH264RefListModEntry :: struct {
@@ -9245,6 +10121,361 @@ VideoEncodeH264SliceHeader :: struct {
 	pWeightTable:                  [^]VideoEncodeH264WeightTable,
 }
 
+VideoH265DecPicBufMgr :: struct {
+	max_latency_increase_plus1:   [VIDEO_H265_SUBLAYERS_LIST_SIZE]u32,
+	max_dec_pic_buffering_minus1: [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
+	max_num_reorder_pics:         [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
+}
+
+VideoH265SubLayerHrdParameters :: struct {
+	bit_rate_value_minus1:    [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
+	cpb_size_value_minus1:    [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
+	cpb_size_du_value_minus1: [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
+	bit_rate_du_value_minus1: [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
+	cbr_flag:                 u32,
+}
+
+VideoH265HrdFlags :: bit_field u32 {
+	nal_hrd_parameters_present_flag:           u32 | 1,
+	vcl_hrd_parameters_present_flag:           u32 | 1,
+	sub_pic_hrd_params_present_flag:           u32 | 1,
+	sub_pic_cpb_params_in_pic_timing_sei_flag: u32 | 1,
+	fixed_pic_rate_general_flag:               u32 | 8,
+	fixed_pic_rate_within_cvs_flag:            u32 | 8,
+	low_delay_hrd_flag:                        u32 | 8,
+}
+
+VideoH265HrdParameters :: struct {
+	flags:                                        VideoH265HrdFlags,
+	tick_divisor_minus2:                          u8,
+	du_cpb_removal_delay_increment_length_minus1: u8,
+	dpb_output_delay_du_length_minus1:            u8,
+	bit_rate_scale:                               u8,
+	cpb_size_scale:                               u8,
+	cpb_size_du_scale:                            u8,
+	initial_cpb_removal_delay_length_minus1:      u8,
+	au_cpb_removal_delay_length_minus1:           u8,
+	dpb_output_delay_length_minus1:               u8,
+	cpb_cnt_minus1:                               [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
+	elemental_duration_in_tc_minus1:              [VIDEO_H265_SUBLAYERS_LIST_SIZE]u16,
+	reserved:                                     [3]u16,
+	pSubLayerHrdParametersNal:                    ^VideoH265SubLayerHrdParameters,
+	pSubLayerHrdParametersVcl:                    ^VideoH265SubLayerHrdParameters,
+}
+
+VideoH265VpsFlags :: distinct bit_set[VideoH265VpsFlag; u32]
+VideoH265VpsFlag :: enum u32 {
+	vps_temporal_id_nesting_flag,
+	vps_sub_layer_ordering_info_present_flag,
+	vps_timing_info_present_flag,
+	vps_poc_proportional_to_timing_flag,
+}
+
+VideoH265ProfileTierLevelFlags :: distinct bit_set[VideoH265ProfileTierLevelFlag; u32]
+VideoH265ProfileTierLevelFlag :: enum u32 {
+	general_tier_flag,
+	general_progressive_source_flag,
+	general_interlaced_source_flag,
+	general_non_packed_constraint_flag,
+	general_frame_only_constraint_flag,
+}
+
+VideoH265ProfileTierLevel :: struct {
+	flags:               VideoH265ProfileTierLevelFlags,
+	general_profile_idc: VideoH265ProfileIdc,
+	general_level_idc:   VideoH265LevelIdc,
+}
+
+VideoH265VideoParameterSet :: struct {
+	flags:                             VideoH265VpsFlags,
+	vps_video_parameter_set_id:        u8,
+	vps_max_sub_layers_minus1:         u8,
+	reserved1:                         u8,
+	reserved2:                         u8,
+	vps_num_units_in_tick:             u32,
+	vps_time_scale:                    u32,
+	vps_num_ticks_poc_diff_one_minus1: u32,
+	reserved3:                         u32,
+	pDecPicBufMgr:                     ^VideoH265DecPicBufMgr,
+	pHrdParameters:                    [^]VideoH265HrdParameters,
+	pProfileTierLevel:                 ^VideoH265ProfileTierLevel,
+}
+
+VideoH265ScalingLists :: struct {
+	ScalingList4x4:         [VIDEO_H265_SCALING_LIST_4X4_NUM_LISTS][VIDEO_H265_SCALING_LIST_4X4_NUM_ELEMENTS]u8,
+	ScalingList8x8:         [VIDEO_H265_SCALING_LIST_8X8_NUM_LISTS][VIDEO_H265_SCALING_LIST_8X8_NUM_ELEMENTS]u8,
+	ScalingList16x16:       [VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS][VIDEO_H265_SCALING_LIST_16X16_NUM_ELEMENTS]u8,
+	ScalingList32x32:       [VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS][VIDEO_H265_SCALING_LIST_32X32_NUM_ELEMENTS]u8,
+	ScalingListDCCoef16x16: [VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS]u8,
+	ScalingListDCCoef32x32: [VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS]u8,
+}
+
+VideoH265SpsVuiFlags :: distinct bit_set[VideoH265SpsVuiFlag; u32]
+VideoH265SpsVuiFlag :: enum u32 {
+	aspect_ratio_info_present_flag,
+	overscan_info_present_flag,
+	overscan_appropriate_flag,
+	video_signal_type_present_flag,
+	video_full_range_flag,
+	colour_description_present_flag,
+	chroma_loc_info_present_flag,
+	neutral_chroma_indication_flag,
+	field_seq_flag,
+	frame_field_info_present_flag,
+	default_display_window_flag,
+	vui_timing_info_present_flag,
+	vui_poc_proportional_to_timing_flag,
+	vui_hrd_parameters_present_flag,
+	bitstream_restriction_flag,
+	tiles_fixed_structure_flag,
+	motion_vectors_over_pic_boundaries_flag,
+	restricted_ref_pic_lists_flag,
+}
+
+VideoH265SequenceParameterSetVui :: struct {
+	flags:                               VideoH265SpsVuiFlags,
+	aspect_ratio_idc:                    VideoH265AspectRatioIdc,
+	sar_width:                           u16,
+	sar_height:                          u16,
+	video_format:                        u8,
+	colour_primaries:                    u8,
+	transfer_characteristics:            u8,
+	matrix_coeffs:                       u8,
+	chroma_sample_loc_type_top_field:    u8,
+	chroma_sample_loc_type_bottom_field: u8,
+	reserved1:                           u8,
+	reserved2:                           u8,
+	def_disp_win_left_offset:            u16,
+	def_disp_win_right_offset:           u16,
+	def_disp_win_top_offset:             u16,
+	def_disp_win_bottom_offset:          u16,
+	vui_num_units_in_tick:               u32,
+	vui_time_scale:                      u32,
+	vui_num_ticks_poc_diff_one_minus1:   u32,
+	min_spatial_segmentation_idc:        u16,
+	reserved3:                           u16,
+	max_bytes_per_pic_denom:             u8,
+	max_bits_per_min_cu_denom:           u8,
+	log2_max_mv_length_horizontal:       u8,
+	log2_max_mv_length_vertical:         u8,
+	pHrdParameters:                      [^]VideoH265HrdParameters,
+}
+
+VideoH265PredictorPaletteEntries :: struct {
+	PredictorPaletteEntries: [VIDEO_H265_PREDICTOR_PALETTE_COMPONENTS_LIST_SIZE][VIDEO_H265_PREDICTOR_PALETTE_COMP_ENTRIES_LIST_SIZE]u16,
+}
+
+VideoH265SpsFlags :: distinct bit_set[VideoH265SpsFlag; u32]
+VideoH265SpsFlag :: enum u32 {
+	sps_temporal_id_nesting_flag,
+	separate_colour_plane_flag,
+	conformance_window_flag,
+	sps_sub_layer_ordering_info_present_flag,
+	scaling_list_enabled_flag,
+	sps_scaling_list_data_present_flag,
+	amp_enabled_flag,
+	sample_adaptive_offset_enabled_flag,
+	pcm_enabled_flag,
+	pcm_loop_filter_disabled_flag,
+	long_term_ref_pics_present_flag,
+	sps_temporal_mvp_enabled_flag,
+	strong_intra_smoothing_enabled_flag,
+	vui_parameters_present_flag,
+	sps_extension_present_flag,
+	sps_range_extension_flag,
+	transform_skip_rotation_enabled_flag,
+	transform_skip_context_enabled_flag,
+	implicit_rdpcm_enabled_flag,
+	explicit_rdpcm_enabled_flag,
+	extended_precision_processing_flag,
+	intra_smoothing_disabled_flag,
+	high_precision_offsets_enabled_flag,
+	persistent_rice_adaptation_enabled_flag,
+	cabac_bypass_alignment_enabled_flag,
+	sps_scc_extension_flag,
+	sps_curr_pic_ref_enabled_flag,
+	palette_mode_enabled_flag,
+	sps_palette_predictor_initializers_present_flag,
+	intra_boundary_filtering_disabled_flag,
+}
+
+VideoH265ShortTermRefPicSetFlags :: distinct bit_set[VideoH265ShortTermRefPicSetFlag; u32]
+VideoH265ShortTermRefPicSetFlag :: enum u32 {
+	inter_ref_pic_set_prediction_flag,
+	delta_rps_sign,
+}
+
+VideoH265ShortTermRefPicSet :: struct {
+	flags:                    VideoH265ShortTermRefPicSetFlags,
+	delta_idx_minus1:         u32,
+	use_delta_flag:           u16,
+	abs_delta_rps_minus1:     u16,
+	used_by_curr_pic_flag:    u16,
+	used_by_curr_pic_s0_flag: u16,
+	used_by_curr_pic_s1_flag: u16,
+	reserved1:                u16,
+	reserved2:                u8,
+	reserved3:                u8,
+	num_negative_pics:        u8,
+	num_positive_pics:        u8,
+	delta_poc_s0_minus1:      [VIDEO_H265_MAX_DPB_SIZE]u16,
+	delta_poc_s1_minus1:      [VIDEO_H265_MAX_DPB_SIZE]u16,
+}
+
+VideoH265LongTermRefPicsSps :: struct {
+	used_by_curr_pic_lt_sps_flag: u32,
+	lt_ref_pic_poc_lsb_sps:       [VIDEO_H265_MAX_LONG_TERM_REF_PICS_SPS]u32,
+}
+
+VideoH265SequenceParameterSet :: struct {
+	flags:                                         VideoH265SpsFlags,
+	chroma_format_idc:                             VideoH265ChromaFormatIdc,
+	pic_width_in_luma_samples:                     u32,
+	pic_height_in_luma_samples:                    u32,
+	sps_video_parameter_set_id:                    u8,
+	sps_max_sub_layers_minus1:                     u8,
+	sps_seq_parameter_set_id:                      u8,
+	bit_depth_luma_minus8:                         u8,
+	bit_depth_chroma_minus8:                       u8,
+	log2_max_pic_order_cnt_lsb_minus4:             u8,
+	log2_min_luma_coding_block_size_minus3:        u8,
+	log2_diff_max_min_luma_coding_block_size:      u8,
+	log2_min_luma_transform_block_size_minus2:     u8,
+	log2_diff_max_min_luma_transform_block_size:   u8,
+	max_transform_hierarchy_depth_inter:           u8,
+	max_transform_hierarchy_depth_intra:           u8,
+	num_short_term_ref_pic_sets:                   u8,
+	num_long_term_ref_pics_sps:                    u8,
+	pcm_sample_bit_depth_luma_minus1:              u8,
+	pcm_sample_bit_depth_chroma_minus1:            u8,
+	log2_min_pcm_luma_coding_block_size_minus3:    u8,
+	log2_diff_max_min_pcm_luma_coding_block_size:  u8,
+	reserved1:                                     u8,
+	reserved2:                                     u8,
+	palette_max_size:                              u8,
+	delta_palette_max_predictor_size:              u8,
+	motion_vector_resolution_control_idc:          u8,
+	sps_num_palette_predictor_initializers_minus1: u8,
+	conf_win_left_offset:                          u32,
+	conf_win_right_offset:                         u32,
+	conf_win_top_offset:                           u32,
+	conf_win_bottom_offset:                        u32,
+	pProfileTierLevel:                             ^VideoH265ProfileTierLevel,
+	pDecPicBufMgr:                                 ^VideoH265DecPicBufMgr,
+	pScalingLists:                                 [^]VideoH265ScalingLists,
+	pShortTermRefPicSet:                           ^VideoH265ShortTermRefPicSet,
+	pLongTermRefPicsSps:                           [^]VideoH265LongTermRefPicsSps,
+	pSequenceParameterSetVui:                      ^VideoH265SequenceParameterSetVui,
+	pPredictorPaletteEntries:                      [^]VideoH265PredictorPaletteEntries,
+}
+
+VideoH265PpsFlags :: distinct bit_set[VideoH265PpsFlag; u32]
+VideoH265PpsFlag :: enum u32 {
+	dependent_slice_segments_enabled_flag,
+	output_flag_present_flag,
+	sign_data_hiding_enabled_flag,
+	cabac_init_present_flag,
+	constrained_intra_pred_flag,
+	transform_skip_enabled_flag,
+	cu_qp_delta_enabled_flag,
+	pps_slice_chroma_qp_offsets_present_flag,
+	weighted_pred_flag,
+	weighted_bipred_flag,
+	transquant_bypass_enabled_flag,
+	tiles_enabled_flag,
+	entropy_coding_sync_enabled_flag,
+	uniform_spacing_flag,
+	loop_filter_across_tiles_enabled_flag,
+	pps_loop_filter_across_slices_enabled_flag,
+	deblocking_filter_control_present_flag,
+	deblocking_filter_override_enabled_flag,
+	pps_deblocking_filter_disabled_flag,
+	pps_scaling_list_data_present_flag,
+	lists_modification_present_flag,
+	slice_segment_header_extension_present_flag,
+	pps_extension_present_flag,
+	cross_component_prediction_enabled_flag,
+	chroma_qp_offset_list_enabled_flag,
+	pps_curr_pic_ref_enabled_flag,
+	residual_adaptive_colour_transform_enabled_flag,
+	pps_slice_act_qp_offsets_present_flag,
+	pps_palette_predictor_initializers_present_flag,
+	monochrome_palette_flag,
+	pps_range_extension_flag,
+}
+
+VideoH265PictureParameterSet :: struct {
+	flags:                                     VideoH265PpsFlags,
+	pps_pic_parameter_set_id:                  u8,
+	pps_seq_parameter_set_id:                  u8,
+	sps_video_parameter_set_id:                u8,
+	num_extra_slice_header_bits:               u8,
+	num_ref_idx_l0_default_active_minus1:      u8,
+	num_ref_idx_l1_default_active_minus1:      u8,
+	init_qp_minus26:                           i8,
+	diff_cu_qp_delta_depth:                    u8,
+	pps_cb_qp_offset:                          i8,
+	pps_cr_qp_offset:                          i8,
+	pps_beta_offset_div2:                      i8,
+	pps_tc_offset_div2:                        i8,
+	log2_parallel_merge_level_minus2:          u8,
+	log2_max_transform_skip_block_size_minus2: u8,
+	diff_cu_chroma_qp_offset_depth:            u8,
+	chroma_qp_offset_list_len_minus1:          u8,
+	cb_qp_offset_list:                         [VIDEO_H265_CHROMA_QP_OFFSET_LIST_SIZE]i8,
+	cr_qp_offset_list:                         [VIDEO_H265_CHROMA_QP_OFFSET_LIST_SIZE]i8,
+	log2_sao_offset_scale_luma:                u8,
+	log2_sao_offset_scale_chroma:              u8,
+	pps_act_y_qp_offset_plus5:                 i8,
+	pps_act_cb_qp_offset_plus5:                i8,
+	pps_act_cr_qp_offset_plus3:                i8,
+	pps_num_palette_predictor_initializers:    u8,
+	luma_bit_depth_entry_minus8:               u8,
+	chroma_bit_depth_entry_minus8:             u8,
+	num_tile_columns_minus1:                   u8,
+	num_tile_rows_minus1:                      u8,
+	reserved1:                                 u8,
+	reserved2:                                 u8,
+	column_width_minus1:                       [VIDEO_H265_CHROMA_QP_OFFSET_TILE_COLS_LIST_SIZE]u16,
+	row_height_minus1:                         [VIDEO_H265_CHROMA_QP_OFFSET_TILE_ROWS_LIST_SIZE]u16,
+	reserved3:                                 u32,
+	pScalingLists:                             [^]VideoH265ScalingLists,
+	pPredictorPaletteEntries:                  [^]VideoH265PredictorPaletteEntries,
+}
+
+VideoDecodeH265PictureInfoFlags :: distinct bit_set[VideoDecodeH265PictureInfoFlag; u32]
+VideoDecodeH265PictureInfoFlag :: enum u32 {
+	IrapPicFlag,
+	IdrPicFlag,
+	IsReference,
+	short_term_ref_pic_set_sps_flag,
+}
+
+VideoDecodeH265PictureInfo :: struct {
+	flags:                        VideoDecodeH265PictureInfoFlags,
+	sps_video_parameter_set_id:   u8,
+	pps_seq_parameter_set_id:     u8,
+	pps_pic_parameter_set_id:     u8,
+	NumDeltaPocsOfRefRpsIdx:      u8,
+	PicOrderCntVal:               i32,
+	NumBitsForSTRefPicSetInSlice: u16,
+	reserved:                     u16,
+	RefPicSetStCurrBefore:        [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
+	RefPicSetStCurrAfter:         [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
+	RefPicSetLtCurr:              [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
+}
+
+VideoDecodeH265ReferenceInfoFlags :: distinct bit_set[VideoDecodeH265ReferenceInfoFlag; u32]
+VideoDecodeH265ReferenceInfoFlag :: enum u32 {
+	used_for_long_term_reference,
+	unused_for_reference,
+}
+
+VideoDecodeH265ReferenceInfo :: struct {
+	flags:          VideoDecodeH265ReferenceInfoFlags,
+	PicOrderCntVal: i32,
+}
+
 VideoEncodeH265WeightTableFlags :: struct {
 	luma_weight_l0_flag:   u16,
 	chroma_weight_l0_flag: u16,
@@ -9266,8 +10497,20 @@ VideoEncodeH265WeightTable :: struct {
 	delta_chroma_offset_l1:         [VIDEO_H265_MAX_NUM_LIST_REF][VIDEO_H265_MAX_CHROMA_PLANES]i8,
 }
 
-VideoEncodeH265SliceSegmentHeaderFlags :: struct {
-	bitfield: u32,
+VideoEncodeH265SliceSegmentHeaderFlags :: distinct bit_set[VideoEncodeH265SliceSegmentHeaderFlag; u32]
+VideoEncodeH265SliceSegmentHeaderFlag :: enum u32 {
+	first_slice_segment_in_pic_flag,
+	dependent_slice_segment_flag,
+	slice_sao_luma_flag,
+	slice_sao_chroma_flag,
+	num_ref_idx_active_override_flag,
+	mvd_l1_zero_flag,
+	cabac_init_flag,
+	cu_chroma_qp_offset_enabled_flag,
+	deblocking_filter_override_flag,
+	slice_deblocking_filter_disabled_flag,
+	collocated_from_l0_flag,
+	slice_loop_filter_across_slices_enabled_flag,
 }
 
 VideoEncodeH265SliceSegmentHeader :: struct {
@@ -9288,8 +10531,10 @@ VideoEncodeH265SliceSegmentHeader :: struct {
 	pWeightTable:           [^]VideoEncodeH265WeightTable,
 }
 
-VideoEncodeH265ReferenceListsInfoFlags :: struct {
-	bitfield: u32,
+VideoEncodeH265ReferenceListsInfoFlags :: distinct bit_set[VideoEncodeH265ReferenceListsInfoFlag; u32]
+VideoEncodeH265ReferenceListsInfoFlag :: enum u32 {
+	ref_pic_list_modification_flag_l0,
+	ref_pic_list_modification_flag_l1,
 }
 
 VideoEncodeH265ReferenceListsInfo :: struct {
@@ -9302,8 +10547,17 @@ VideoEncodeH265ReferenceListsInfo :: struct {
 	list_entry_l1:                [VIDEO_H265_MAX_NUM_LIST_REF]u8,
 }
 
-VideoEncodeH265PictureInfoFlags :: struct {
-	bitfield: u32,
+VideoEncodeH265PictureInfoFlags :: distinct bit_set[VideoEncodeH265PictureInfoFlag; u32]
+VideoEncodeH265PictureInfoFlag :: enum u32 {
+	is_reference,
+	IrapPicFlag,
+	used_for_long_term_reference,
+	discardable_flag,
+	cross_layer_bla_flag,
+	pic_output_flag,
+	no_output_of_prior_pics_flag,
+	short_term_ref_pic_set_sps_flag,
+	slice_temporal_mvp_enabled_flag,
 }
 
 VideoEncodeH265LongTermRefPics :: struct {
@@ -9331,8 +10585,10 @@ VideoEncodeH265PictureInfo :: struct {
 	pLongTermRefPics:           [^]VideoEncodeH265LongTermRefPics,
 }
 
-VideoEncodeH265ReferenceInfoFlags :: struct {
-	bitfield: u32,
+VideoEncodeH265ReferenceInfoFlags :: distinct bit_set[VideoEncodeH265ReferenceInfoFlag; u32]
+VideoEncodeH265ReferenceInfoFlag :: enum u32 {
+	used_for_long_term_reference,
+	unused_for_reference,
 }
 
 VideoEncodeH265ReferenceInfo :: struct {
@@ -9344,9 +10600,10 @@ VideoEncodeH265ReferenceInfo :: struct {
 
 // Opaque structs
 
-wl_surface   :: struct {} // Opaque struct defined by Wayland
-wl_display   :: struct {} // Opaque struct defined by Wayland
-IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
+wl_surface       :: struct {} // Opaque struct defined by Wayland
+wl_display       :: struct {} // Opaque struct defined by Wayland
+xcb_connection_t :: struct {} // Opaque struct defined by xcb
+IOSurfaceRef     :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
 // Aliases
 PhysicalDeviceVariablePointerFeatures                       :: PhysicalDeviceVariablePointersFeatures
 PhysicalDeviceShaderDrawParameterFeatures                   :: PhysicalDeviceShaderDrawParametersFeatures
@@ -9357,7 +10614,6 @@ RenderingAttachmentInfoKHR                                  :: RenderingAttachme
 PipelineRenderingCreateInfoKHR                              :: PipelineRenderingCreateInfo
 PhysicalDeviceDynamicRenderingFeaturesKHR                   :: PhysicalDeviceDynamicRenderingFeatures
 CommandBufferInheritanceRenderingInfoKHR                    :: CommandBufferInheritanceRenderingInfo
-AttachmentSampleCountInfoNV                                 :: AttachmentSampleCountInfoAMD
 RenderPassMultiviewCreateInfoKHR                            :: RenderPassMultiviewCreateInfo
 PhysicalDeviceMultiviewFeaturesKHR                          :: PhysicalDeviceMultiviewFeatures
 PhysicalDeviceMultiviewPropertiesKHR                        :: PhysicalDeviceMultiviewProperties
@@ -9406,6 +10662,7 @@ ExternalSemaphorePropertiesKHR                              :: ExternalSemaphore
 SemaphoreImportFlagsKHR                                     :: SemaphoreImportFlags
 SemaphoreImportFlagKHR                                      :: SemaphoreImportFlag
 ExportSemaphoreCreateInfoKHR                                :: ExportSemaphoreCreateInfo
+PhysicalDevicePushDescriptorPropertiesKHR                   :: PhysicalDevicePushDescriptorProperties
 PhysicalDeviceShaderFloat16Int8FeaturesKHR                  :: PhysicalDeviceShaderFloat16Int8Features
 PhysicalDeviceFloat16Int8FeaturesKHR                        :: PhysicalDeviceShaderFloat16Int8Features
 PhysicalDevice16BitStorageFeaturesKHR                       :: PhysicalDevice16BitStorageFeatures
@@ -9468,6 +10725,10 @@ DescriptorSetLayoutSupportKHR                               :: DescriptorSetLayo
 PhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR        :: PhysicalDeviceShaderSubgroupExtendedTypesFeatures
 PhysicalDevice8BitStorageFeaturesKHR                        :: PhysicalDevice8BitStorageFeatures
 PhysicalDeviceShaderAtomicInt64FeaturesKHR                  :: PhysicalDeviceShaderAtomicInt64Features
+QueueGlobalPriorityKHR                                      :: QueueGlobalPriority
+DeviceQueueGlobalPriorityCreateInfoKHR                      :: DeviceQueueGlobalPriorityCreateInfo
+PhysicalDeviceGlobalPriorityQueryFeaturesKHR                :: PhysicalDeviceGlobalPriorityQueryFeatures
+QueueFamilyGlobalPriorityPropertiesKHR                      :: QueueFamilyGlobalPriorityProperties
 DriverIdKHR                                                 :: DriverId
 ConformanceVersionKHR                                       :: ConformanceVersion
 PhysicalDeviceDriverPropertiesKHR                           :: PhysicalDeviceDriverProperties
@@ -9488,6 +10749,9 @@ SemaphoreWaitInfoKHR                                        :: SemaphoreWaitInfo
 SemaphoreSignalInfoKHR                                      :: SemaphoreSignalInfo
 PhysicalDeviceVulkanMemoryModelFeaturesKHR                  :: PhysicalDeviceVulkanMemoryModelFeatures
 PhysicalDeviceShaderTerminateInvocationFeaturesKHR          :: PhysicalDeviceShaderTerminateInvocationFeatures
+PhysicalDeviceDynamicRenderingLocalReadFeaturesKHR          :: PhysicalDeviceDynamicRenderingLocalReadFeatures
+RenderingAttachmentLocationInfoKHR                          :: RenderingAttachmentLocationInfo
+RenderingInputAttachmentIndexInfoKHR                        :: RenderingInputAttachmentIndexInfo
 PhysicalDeviceSeparateDepthStencilLayoutsFeaturesKHR        :: PhysicalDeviceSeparateDepthStencilLayoutsFeatures
 AttachmentReferenceStencilLayoutKHR                         :: AttachmentReferenceStencilLayout
 AttachmentDescriptionStencilLayoutKHR                       :: AttachmentDescriptionStencilLayout
@@ -9497,6 +10761,10 @@ BufferDeviceAddressInfoKHR                                  :: BufferDeviceAddre
 BufferOpaqueCaptureAddressCreateInfoKHR                     :: BufferOpaqueCaptureAddressCreateInfo
 MemoryOpaqueCaptureAddressAllocateInfoKHR                   :: MemoryOpaqueCaptureAddressAllocateInfo
 DeviceMemoryOpaqueCaptureAddressInfoKHR                     :: DeviceMemoryOpaqueCaptureAddressInfo
+MemoryUnmapFlagKHR                                          :: MemoryUnmapFlag
+MemoryUnmapFlagsKHR                                         :: MemoryUnmapFlags
+MemoryMapInfoKHR                                            :: MemoryMapInfo
+MemoryUnmapInfoKHR                                          :: MemoryUnmapInfo
 PhysicalDeviceShaderIntegerDotProductFeaturesKHR            :: PhysicalDeviceShaderIntegerDotProductFeatures
 PhysicalDeviceShaderIntegerDotProductPropertiesKHR          :: PhysicalDeviceShaderIntegerDotProductProperties
 PipelineStageFlags2KHR                                      :: PipelineStageFlags2
@@ -9532,11 +10800,45 @@ PhysicalDeviceMaintenance4FeaturesKHR                       :: PhysicalDeviceMai
 PhysicalDeviceMaintenance4PropertiesKHR                     :: PhysicalDeviceMaintenance4Properties
 DeviceBufferMemoryRequirementsKHR                           :: DeviceBufferMemoryRequirements
 DeviceImageMemoryRequirementsKHR                            :: DeviceImageMemoryRequirements
-PipelineCreateFlags2KHR                                     :: Flags64
-PipelineCreateFlag2KHR                                      :: Flags64
-BufferUsageFlags2KHR                                        :: Flags64
-BufferUsageFlag2KHR                                         :: Flags64
+PhysicalDeviceShaderSubgroupRotateFeaturesKHR               :: PhysicalDeviceShaderSubgroupRotateFeatures
+PipelineCreateFlags2KHR                                     :: PipelineCreateFlags2
+PipelineCreateFlag2KHR                                      :: PipelineCreateFlag2
+BufferUsageFlags2KHR                                        :: BufferUsageFlags2
+BufferUsageFlag2KHR                                         :: BufferUsageFlag2
+PhysicalDeviceMaintenance5FeaturesKHR                       :: PhysicalDeviceMaintenance5Features
+PhysicalDeviceMaintenance5PropertiesKHR                     :: PhysicalDeviceMaintenance5Properties
+RenderingAreaInfoKHR                                        :: RenderingAreaInfo
+DeviceImageSubresourceInfoKHR                               :: DeviceImageSubresourceInfo
+ImageSubresource2KHR                                        :: ImageSubresource2
+SubresourceLayout2KHR                                       :: SubresourceLayout2
+PipelineCreateFlags2CreateInfoKHR                           :: PipelineCreateFlags2CreateInfo
+BufferUsageFlags2CreateInfoKHR                              :: BufferUsageFlags2CreateInfo
+PhysicalDeviceVertexAttributeDivisorPropertiesKHR           :: PhysicalDeviceVertexAttributeDivisorProperties
+VertexInputBindingDivisorDescriptionKHR                     :: VertexInputBindingDivisorDescription
+PipelineVertexInputDivisorStateCreateInfoKHR                :: PipelineVertexInputDivisorStateCreateInfo
+PhysicalDeviceVertexAttributeDivisorFeaturesKHR             :: PhysicalDeviceVertexAttributeDivisorFeatures
+PhysicalDeviceShaderFloatControls2FeaturesKHR               :: PhysicalDeviceShaderFloatControls2Features
+PhysicalDeviceIndexTypeUint8FeaturesKHR                     :: PhysicalDeviceIndexTypeUint8Features
+LineRasterizationModeKHR                                    :: LineRasterizationMode
+PhysicalDeviceLineRasterizationFeaturesKHR                  :: PhysicalDeviceLineRasterizationFeatures
+PhysicalDeviceLineRasterizationPropertiesKHR                :: PhysicalDeviceLineRasterizationProperties
+PipelineRasterizationLineStateCreateInfoKHR                 :: PipelineRasterizationLineStateCreateInfo
+PhysicalDeviceShaderExpectAssumeFeaturesKHR                 :: PhysicalDeviceShaderExpectAssumeFeatures
+PhysicalDeviceMaintenance6FeaturesKHR                       :: PhysicalDeviceMaintenance6Features
+PhysicalDeviceMaintenance6PropertiesKHR                     :: PhysicalDeviceMaintenance6Properties
+BindMemoryStatusKHR                                         :: BindMemoryStatus
+BindDescriptorSetsInfoKHR                                   :: BindDescriptorSetsInfo
+PushConstantsInfoKHR                                        :: PushConstantsInfo
+PushDescriptorSetInfoKHR                                    :: PushDescriptorSetInfo
+PushDescriptorSetWithTemplateInfoKHR                        :: PushDescriptorSetWithTemplateInfo
+AccessFlags3KHR                                             :: Flags64
+AccessFlag3KHR                                              :: Flags64
 PhysicalDeviceTextureCompressionASTCHDRFeaturesEXT          :: PhysicalDeviceTextureCompressionASTCHDRFeatures
+PipelineRobustnessBufferBehaviorEXT                         :: PipelineRobustnessBufferBehavior
+PipelineRobustnessImageBehaviorEXT                          :: PipelineRobustnessImageBehavior
+PhysicalDevicePipelineRobustnessFeaturesEXT                 :: PhysicalDevicePipelineRobustnessFeatures
+PhysicalDevicePipelineRobustnessPropertiesEXT               :: PhysicalDevicePipelineRobustnessProperties
+PipelineRobustnessCreateInfoEXT                             :: PipelineRobustnessCreateInfo
 SamplerReductionModeEXT                                     :: SamplerReductionMode
 SamplerReductionModeCreateInfoEXT                           :: SamplerReductionModeCreateInfo
 PhysicalDeviceSamplerFilterMinmaxPropertiesEXT              :: PhysicalDeviceSamplerFilterMinmaxProperties
@@ -9544,6 +10846,7 @@ PhysicalDeviceInlineUniformBlockFeaturesEXT                 :: PhysicalDeviceInl
 PhysicalDeviceInlineUniformBlockPropertiesEXT               :: PhysicalDeviceInlineUniformBlockProperties
 WriteDescriptorSetInlineUniformBlockEXT                     :: WriteDescriptorSetInlineUniformBlock
 DescriptorPoolInlineUniformBlockCreateInfoEXT               :: DescriptorPoolInlineUniformBlockCreateInfo
+AttachmentSampleCountInfoNV                                 :: AttachmentSampleCountInfoAMD
 DescriptorBindingFlagEXT                                    :: DescriptorBindingFlag
 DescriptorBindingFlagsEXT                                   :: DescriptorBindingFlags
 DescriptorSetLayoutBindingFlagsCreateInfoEXT                :: DescriptorSetLayoutBindingFlagsCreateInfo
@@ -9564,13 +10867,13 @@ BuildAccelerationStructureFlagNV                            :: BuildAcceleration
 TransformMatrixNV                                           :: TransformMatrixKHR
 AabbPositionsNV                                             :: AabbPositionsKHR
 AccelerationStructureInstanceNV                             :: AccelerationStructureInstanceKHR
-QueueGlobalPriorityEXT                                      :: QueueGlobalPriorityKHR
-DeviceQueueGlobalPriorityCreateInfoEXT                      :: DeviceQueueGlobalPriorityCreateInfoKHR
+QueueGlobalPriorityEXT                                      :: QueueGlobalPriority
+DeviceQueueGlobalPriorityCreateInfoEXT                      :: DeviceQueueGlobalPriorityCreateInfo
 TimeDomainEXT                                               :: TimeDomainKHR
 CalibratedTimestampInfoEXT                                  :: CalibratedTimestampInfoKHR
-VertexInputBindingDivisorDescriptionEXT                     :: VertexInputBindingDivisorDescriptionKHR
-PipelineVertexInputDivisorStateCreateInfoEXT                :: PipelineVertexInputDivisorStateCreateInfoKHR
-PhysicalDeviceVertexAttributeDivisorFeaturesEXT             :: PhysicalDeviceVertexAttributeDivisorFeaturesKHR
+VertexInputBindingDivisorDescriptionEXT                     :: VertexInputBindingDivisorDescription
+PipelineVertexInputDivisorStateCreateInfoEXT                :: PipelineVertexInputDivisorStateCreateInfo
+PhysicalDeviceVertexAttributeDivisorFeaturesEXT             :: PhysicalDeviceVertexAttributeDivisorFeatures
 PipelineCreationFeedbackFlagEXT                             :: PipelineCreationFeedbackFlag
 PipelineCreationFeedbackFlagsEXT                            :: PipelineCreationFeedbackFlags
 PipelineCreationFeedbackCreateInfoEXT                       :: PipelineCreationFeedbackCreateInfo
@@ -9590,14 +10893,26 @@ PhysicalDeviceToolPropertiesEXT                             :: PhysicalDeviceToo
 ImageStencilUsageCreateInfoEXT                              :: ImageStencilUsageCreateInfo
 ComponentTypeNV                                             :: ComponentTypeKHR
 ScopeNV                                                     :: ScopeKHR
-LineRasterizationModeEXT                                    :: LineRasterizationModeKHR
-PhysicalDeviceLineRasterizationFeaturesEXT                  :: PhysicalDeviceLineRasterizationFeaturesKHR
-PhysicalDeviceLineRasterizationPropertiesEXT                :: PhysicalDeviceLineRasterizationPropertiesKHR
-PipelineRasterizationLineStateCreateInfoEXT                 :: PipelineRasterizationLineStateCreateInfoKHR
+LineRasterizationModeEXT                                    :: LineRasterizationMode
+PhysicalDeviceLineRasterizationFeaturesEXT                  :: PhysicalDeviceLineRasterizationFeatures
+PhysicalDeviceLineRasterizationPropertiesEXT                :: PhysicalDeviceLineRasterizationProperties
+PipelineRasterizationLineStateCreateInfoEXT                 :: PipelineRasterizationLineStateCreateInfo
 PhysicalDeviceHostQueryResetFeaturesEXT                     :: PhysicalDeviceHostQueryResetFeatures
-PhysicalDeviceIndexTypeUint8FeaturesEXT                     :: PhysicalDeviceIndexTypeUint8FeaturesKHR
-SubresourceLayout2EXT                                       :: SubresourceLayout2KHR
-ImageSubresource2EXT                                        :: ImageSubresource2KHR
+PhysicalDeviceIndexTypeUint8FeaturesEXT                     :: PhysicalDeviceIndexTypeUint8Features
+HostImageCopyFlagEXT                                        :: HostImageCopyFlag
+HostImageCopyFlagsEXT                                       :: HostImageCopyFlags
+PhysicalDeviceHostImageCopyFeaturesEXT                      :: PhysicalDeviceHostImageCopyFeatures
+PhysicalDeviceHostImageCopyPropertiesEXT                    :: PhysicalDeviceHostImageCopyProperties
+MemoryToImageCopyEXT                                        :: MemoryToImageCopy
+ImageToMemoryCopyEXT                                        :: ImageToMemoryCopy
+CopyMemoryToImageInfoEXT                                    :: CopyMemoryToImageInfo
+CopyImageToMemoryInfoEXT                                    :: CopyImageToMemoryInfo
+CopyImageToImageInfoEXT                                     :: CopyImageToImageInfo
+HostImageLayoutTransitionInfoEXT                            :: HostImageLayoutTransitionInfo
+SubresourceHostMemcpySizeEXT                                :: SubresourceHostMemcpySize
+HostImageCopyDevicePerformanceQueryEXT                      :: HostImageCopyDevicePerformanceQuery
+SubresourceLayout2EXT                                       :: SubresourceLayout2
+ImageSubresource2EXT                                        :: ImageSubresource2
 PhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT     :: PhysicalDeviceShaderDemoteToHelperInvocationFeatures
 PhysicalDeviceTexelBufferAlignmentPropertiesEXT             :: PhysicalDeviceTexelBufferAlignmentProperties
 PrivateDataSlotEXT                                          :: PrivateDataSlot
@@ -9612,12 +10927,14 @@ PhysicalDeviceMutableDescriptorTypeFeaturesVALVE            :: PhysicalDeviceMut
 MutableDescriptorTypeListVALVE                              :: MutableDescriptorTypeListEXT
 MutableDescriptorTypeCreateInfoVALVE                        :: MutableDescriptorTypeCreateInfoEXT
 PipelineInfoEXT                                             :: PipelineInfoKHR
-PhysicalDeviceGlobalPriorityQueryFeaturesEXT                :: PhysicalDeviceGlobalPriorityQueryFeaturesKHR
-QueueFamilyGlobalPriorityPropertiesEXT                      :: QueueFamilyGlobalPriorityPropertiesKHR
+PhysicalDeviceGlobalPriorityQueryFeaturesEXT                :: PhysicalDeviceGlobalPriorityQueryFeatures
+QueueFamilyGlobalPriorityPropertiesEXT                      :: QueueFamilyGlobalPriorityProperties
 PhysicalDeviceSchedulingControlsFlagsARM                    :: Flags64
 PhysicalDeviceSchedulingControlsFlagARM                     :: Flags64
+PhysicalDeviceDepthClampZeroOneFeaturesEXT                  :: PhysicalDeviceDepthClampZeroOneFeaturesKHR
 MemoryDecompressionMethodFlagNV                             :: Flags64
 MemoryDecompressionMethodFlagsNV                            :: Flags64
+PhysicalDevicePipelineProtectedAccessFeaturesEXT            :: PhysicalDevicePipelineProtectedAccessFeatures
 ShaderRequiredSubgroupSizeCreateInfoEXT                     :: PipelineShaderStageRequiredSubgroupSizeCreateInfo
 
 

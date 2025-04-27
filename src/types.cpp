@@ -1,5 +1,5 @@
-struct Scope;
 struct Ast;
+struct Scope;
 struct Entity;
 
 enum BasicKind {
@@ -111,7 +111,7 @@ enum BasicFlag {
 	BasicFlag_Ordered        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 	BasicFlag_OrderedNumeric = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Rune,
 	BasicFlag_ConstantType   = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
-	BasicFlag_SimpleCompare  = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_Pointer | BasicFlag_Rune,
+	BasicFlag_SimpleCompare  = BasicFlag_Boolean | BasicFlag_Integer | BasicFlag_Pointer | BasicFlag_Rune,
 };
 
 struct BasicType {
@@ -161,10 +161,10 @@ struct TypeStruct {
 
 struct TypeUnion {
 	Slice<Type *> variants;
-	
+
 	Ast *         node;
 	Scope *       scope;
-	
+
 	i64           variant_block_size;
 	i64           custom_align;
 	Type *        polymorphic_params; // Type_Tuple
@@ -503,9 +503,9 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_rawptr,            BasicFlag_Pointer,                         -1, STR_LIT("rawptr")}},
 	{Type_Basic, {Basic_string,            BasicFlag_String,                          -1, STR_LIT("string")}},
 	{Type_Basic, {Basic_cstring,           BasicFlag_String,                          -1, STR_LIT("cstring")}},
-	{Type_Basic, {Basic_any,               0,                                         -1, STR_LIT("any")}},
+	{Type_Basic, {Basic_any,               0,                                         16, STR_LIT("any")}},
 
-	{Type_Basic, {Basic_typeid,            0,                                         -1, STR_LIT("typeid")}},
+	{Type_Basic, {Basic_typeid,            0,                                          8, STR_LIT("typeid")}},
 
 	// Endian
 	{Type_Basic, {Basic_i16le,  BasicFlag_Integer |                      BasicFlag_EndianLittle,  2, STR_LIT("i16le")}},
@@ -855,40 +855,6 @@ gb_internal void type_path_pop(TypePath *tp) {
 
 #define FAILURE_SIZE      0
 #define FAILURE_ALIGNMENT 0
-
-gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t);
-
-gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
-	if (t == nullptr) {
-		return true;
-	}
-	if (type_ptr_set_exists(s, t)) {
-		return true;
-	}
-	ptr_set_add(s, t);
-	return false;
-}
-
-gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
-	if (t == nullptr) {
-		return true;
-	}
-
-	if (ptr_set_exists(s, t)) {
-		return true;
-	}
-
-	// TODO(bill, 2019-10-05): This is very slow and it's probably a lot
-	// faster to cache types correctly
-	for (Type *f : *s) {
-		if (are_types_identical(t, f)) {
-			ptr_set_add(s, t);
-			return true;
-		}
-	}
-
-	return false;
-}
 
 gb_internal Type *base_type(Type *t) {
 	for (;;) {
@@ -1438,7 +1404,7 @@ gb_internal bool is_type_matrix(Type *t) {
 gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
-	
+
 	Type *elem = t->Matrix.elem;
 	i64 row_count = gb_max(t->Matrix.row_count, 1);
 	i64 column_count = gb_max(t->Matrix.column_count, 1);
@@ -1450,15 +1416,15 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 
 	i64 elem_align = type_align_of_internal(elem, tp);
 	if (pop) type_path_pop(tp);
-	
+
 	i64 elem_size = type_size_of(elem);
-	
+
 
 	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
 	// It would be better for performance to pad each column so that each column
 	// could be maximally aligned but as a compromise, having no padding will be
 	// beneficial to third libraries that assume no padding
-	
+
 	i64 total_expected_size = row_count*column_count*elem_size;
 	// i64 min_alignment = prev_pow2(elem_align * row_count);
 	i64 min_alignment = prev_pow2(total_expected_size);
@@ -1466,7 +1432,7 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 		min_alignment >>= 1;
 	}
 	min_alignment = gb_max(min_alignment, elem_align);
-	
+
 	i64 align = gb_min(min_alignment, build_context.max_simd_align);
 	return align;
 }
@@ -1480,7 +1446,7 @@ gb_internal i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	} else if (t->Matrix.row_count == 0) {
 		return 0;
 	}
-	
+
 	i64 elem_size;
 	if (tp != nullptr) {
 		elem_size = type_size_of_internal(t->Matrix.elem, tp);
@@ -1489,7 +1455,7 @@ gb_internal i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	}
 
 	i64 stride_in_bytes = 0;
-	
+
 	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
 	// It would be better for performance to pad each column/row so that each column/row
 	// could be maximally aligned but as a compromise, having no padding will be
@@ -1545,7 +1511,7 @@ gb_internal i64 matrix_row_major_index_to_offset(Type *t, i64 index) {
 gb_internal i64 matrix_column_major_index_to_offset(Type *t, i64 index) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
-	
+
 	i64 row_index    = index%t->Matrix.row_count;
 	i64 column_index = index/t->Matrix.row_count;
 	return matrix_indices_to_offset(t, row_index, column_index);
@@ -1566,7 +1532,7 @@ gb_internal bool is_type_valid_for_matrix_elems(Type *t) {
 		return true;
 	} else if (is_type_complex(t)) {
 		return true;
-	} 
+	}
 	if (t->kind == Type_Generic) {
 		return true;
 	}
@@ -1800,6 +1766,27 @@ gb_internal bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 	return false;
 }
 
+
+enum TypeEndianKind {
+	TypeEndian_Platform,
+	TypeEndian_Little,
+	TypeEndian_Big,
+};
+
+gb_internal TypeEndianKind type_endian_kind_of(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		if (t->Basic.flags & BasicFlag_EndianLittle) {
+			return TypeEndian_Little;
+		}
+		if (t->Basic.flags & BasicFlag_EndianBig) {
+			return TypeEndian_Big;
+		}
+	} else if (t->kind == Type_BitSet) {
+		return type_endian_kind_of(bit_set_to_int(t));
+	}
+	return TypeEndian_Platform;
+}
 
 
 gb_internal bool is_type_endian_big(Type *t) {
@@ -2098,6 +2085,26 @@ gb_internal bool is_type_sliceable(Type *t) {
 	return false;
 }
 
+gb_internal Entity *type_get_polymorphic_parent(Type *t, Type **params_) {
+	t = base_type(t);
+	if (t == nullptr) {
+		return nullptr;
+	}
+	Type *parent = nullptr;
+	if (t->kind == Type_Struct) {
+		parent = t->Struct.polymorphic_parent;
+		if (params_) *params_ = t->Struct.polymorphic_params;
+	} else if (t->kind == Type_Union) {
+		parent = t->Union.polymorphic_parent;
+		if (params_) *params_ = t->Union.polymorphic_params;
+	}
+	if (parent != nullptr) {
+		GB_ASSERT(parent->kind == Type_Named);
+
+		return parent->Named.type_name;
+	}
+	return nullptr;
+}
 
 gb_internal bool is_type_polymorphic_record(Type *t) {
 	t = base_type(t);
@@ -2464,7 +2471,7 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	case Type_Proc:
 	case Type_BitSet:
 		return true;
-		
+
 	case Type_Matrix:
 		return is_type_simple_compare(t->Matrix.elem);
 
@@ -2711,7 +2718,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	case Type_Array:
 		return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
-		
+
 	case Type_Matrix:
 		return x->Matrix.row_count == y->Matrix.row_count &&
 		       x->Matrix.column_count == y->Matrix.column_count &&
@@ -2736,7 +2743,37 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 
 	case Type_Enum:
-		return x == y; // NOTE(bill): All enums are unique
+		if (x == y) {
+			return true;
+		}
+		if (x->Enum.fields.count != y->Enum.fields.count) {
+			return false;
+		}
+		if (!are_types_identical(x->Enum.base_type, y->Enum.base_type)) {
+			return false;
+		}
+		if (x->Enum.min_value_index != y->Enum.min_value_index) {
+			return false;
+		}
+		if (x->Enum.max_value_index != y->Enum.max_value_index) {
+			return false;
+		}
+
+		for (isize i = 0; i < x->Enum.fields.count; i++) {
+			Entity *a = x->Enum.fields[i];
+			Entity *b = y->Enum.fields[i];
+			if (a->token.string != b->token.string) {
+				return false;
+			}
+			GB_ASSERT(a->kind == b->kind);
+			GB_ASSERT(a->kind == Entity_Constant);
+			bool same = compare_exact_values(Token_CmpEq, a->Constant.value, b->Constant.value);
+			if (!same) {
+				return false;
+			}
+		}
+
+		return true;
 
 	case Type_Union:
 		if (x->Union.variants.count == y->Union.variants.count &&
@@ -2794,7 +2831,9 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 					return false;
 				}
 			}
-			return are_types_identical(x->Struct.polymorphic_params, y->Struct.polymorphic_params);
+			// TODO(bill): Which is the correct logic here?
+			// return are_types_identical(x->Struct.polymorphic_params, y->Struct.polymorphic_params);
+			return true;
 		}
 		break;
 
@@ -3571,7 +3610,7 @@ gb_internal bool are_struct_fields_reordered(Type *type) {
 		return false;
 	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
-	
+
 	i64 prev_offset = 0;
 	for_array(i, type->Struct.fields) {
 		i64 offset = type->Struct.offsets[i];
@@ -3592,9 +3631,9 @@ gb_internal Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allo
 		return {};
 	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
-	
+
 	auto indices = slice_make<i32>(allocator, type->Struct.fields.count);
-	
+
 	i64 prev_offset = 0;
 	bool is_ordered = true;
 	for_array(i, indices) {
@@ -3609,14 +3648,14 @@ gb_internal Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allo
 		isize n = indices.count;
 		for (isize i = 1; i < n; i++) {
 			isize j = i;
-			
+
 			while (j > 0 && type->Struct.offsets[indices[j-1]] > type->Struct.offsets[indices[j]]) {
 				gb_swap(i32, indices[j-1], indices[j]);
 				j -= 1;
-			}				
+			}
 		}
 	}
-	
+
 	return indices;
 }
 
@@ -3664,8 +3703,8 @@ gb_internal i64 type_size_of(Type *t) {
 		switch (t->Basic.kind) {
 		case Basic_string:  size = 2*build_context.int_size; break;
 		case Basic_cstring: size = build_context.ptr_size;   break;
-		case Basic_any:     size = 2*build_context.ptr_size; break;
-		case Basic_typeid:  size = build_context.ptr_size;   break;
+		case Basic_any:     size = 16;                       break;
+		case Basic_typeid:  size = 8;                        break;
 
 		case Basic_int: case Basic_uint:
 			size = build_context.int_size;
@@ -3727,8 +3766,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		switch (t->Basic.kind) {
 		case Basic_string:  return build_context.int_size;
 		case Basic_cstring: return build_context.ptr_size;
-		case Basic_any:     return build_context.ptr_size;
-		case Basic_typeid:  return build_context.ptr_size;
+		case Basic_any:     return 8;
+		case Basic_typeid:  return 8;
 
 		case Basic_int: case Basic_uint:
 			return build_context.int_size;
@@ -3866,8 +3905,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
 		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align*2);
 	}
-	
-	case Type_Matrix: 
+
+	case Type_Matrix:
 		return matrix_align_of(t, path);
 
 	case Type_SoaPointer:
@@ -3888,6 +3927,10 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 		min_field_align = 1;
 	}
 
+	TypePath path{};
+	type_path_init(&path);
+	defer (type_path_free(&path));
+
 	if (is_raw_union) {
 		for_array(i, fields) {
 			offsets[i] = 0;
@@ -3897,7 +3940,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 			if (fields[i]->kind != Entity_Variable) {
 				offsets[i] = -1;
 			} else {
-				i64 size = type_size_of(fields[i]->type);
+				i64 size = type_size_of_internal(fields[i]->type, &path);
 				offsets[i] = curr_offset;
 				curr_offset += size;
 			}
@@ -3908,11 +3951,11 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 				offsets[i] = -1;
 			} else {
 				Type *t = fields[i]->type;
-				i64 align = gb_max(type_align_of(t), min_field_align);
+				i64 align = gb_max(type_align_of_internal(t, &path), min_field_align);
 				if (max_field_align > min_field_align) {
 					align = gb_min(align, max_field_align);
 				}
-				i64 size  = gb_max(type_size_of( t), 0);
+				i64 size  = gb_max(type_size_of_internal(t, &path), 0);
 				curr_offset = align_formula(curr_offset, align);
 				offsets[i] = curr_offset;
 				curr_offset += size;
@@ -3974,8 +4017,8 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		switch (kind) {
 		case Basic_string:  return 2*build_context.int_size;
 		case Basic_cstring: return build_context.ptr_size;
-		case Basic_any:     return 2*build_context.ptr_size;
-		case Basic_typeid:  return build_context.ptr_size;
+		case Basic_any:     return 16;
+		case Basic_typeid:  return 8;
 
 		case Basic_int: case Basic_uint:
 			return build_context.int_size;
@@ -4150,7 +4193,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		Type *elem = t->SimdVector.elem;
 		return count * type_size_of_internal(elem, path);
 	}
-	
+
 	case Type_Matrix: {
 		i64 stride_in_bytes = matrix_type_stride_in_bytes(t, path);
 		if (t->Matrix.is_row_major) {
@@ -4211,7 +4254,7 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 				return 0;                      // data
 			case 1:
 				if (field_type_) *field_type_ = t_typeid;
-				return build_context.ptr_size; // id
+				return 8; // id
 			}
 		}
 		break;
@@ -4282,8 +4325,8 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 					}
 				} else if (t->Basic.kind == Basic_any) {
 					switch (index) {
-					case 0: t = t_type_info_ptr; break;
-					case 1: t = t_rawptr;        break;
+					case 0: t = t_rawptr; break;
+					case 1: t = t_typeid; break;
 					}
 				}
 				break;
@@ -4499,7 +4542,7 @@ gb_internal Type *alloc_type_proc_from_types(Type **param_types, unsigned param_
 // 	return type;
 // }
 
-gb_internal gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
+gb_internal gbString write_type_to_string(gbString str, Type *type, bool shorthand=false, bool allow_polymorphic=false) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
 	}
@@ -4524,24 +4567,24 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			str = gb_string_append_length(str, name.text, name.len);
 			if (type->Generic.specialized != nullptr) {
 				str = gb_string_append_rune(str, '/');
-				str = write_type_to_string(str, type->Generic.specialized);
+				str = write_type_to_string(str, type->Generic.specialized, shorthand, allow_polymorphic);
 			}
 		}
 		break;
 
 	case Type_Pointer:
 		str = gb_string_append_rune(str, '^');
-		str = write_type_to_string(str, type->Pointer.elem);
+		str = write_type_to_string(str, type->Pointer.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_SoaPointer:
 		str = gb_string_appendc(str, "#soa ^");
-		str = write_type_to_string(str, type->SoaPointer.elem);
+		str = write_type_to_string(str, type->SoaPointer.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_MultiPointer:
 		str = gb_string_appendc(str, "[^]");
-		str = write_type_to_string(str, type->Pointer.elem);
+		str = write_type_to_string(str, type->Pointer.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_EnumeratedArray:
@@ -4549,31 +4592,31 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			str = gb_string_appendc(str, "#sparse");
 		}
 		str = gb_string_append_rune(str, '[');
-		str = write_type_to_string(str, type->EnumeratedArray.index);
+		str = write_type_to_string(str, type->EnumeratedArray.index, shorthand, allow_polymorphic);
 		str = gb_string_append_rune(str, ']');
-		str = write_type_to_string(str, type->EnumeratedArray.elem);
+		str = write_type_to_string(str, type->EnumeratedArray.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_Array:
-		str = gb_string_appendc(str, gb_bprintf("[%d]", cast(int)type->Array.count));
-		str = write_type_to_string(str, type->Array.elem);
+		str = gb_string_appendc(str, gb_bprintf("[%lld]", cast(long long)type->Array.count));
+		str = write_type_to_string(str, type->Array.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_Slice:
 		str = gb_string_appendc(str, "[]");
-		str = write_type_to_string(str, type->Array.elem);
+		str = write_type_to_string(str, type->Array.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_DynamicArray:
 		str = gb_string_appendc(str, "[dynamic]");
-		str = write_type_to_string(str, type->DynamicArray.elem);
+		str = write_type_to_string(str, type->DynamicArray.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_Enum:
 		str = gb_string_appendc(str, "enum");
 		if (type->Enum.base_type != nullptr) {
 			str = gb_string_appendc(str, " ");
-			str = write_type_to_string(str, type->Enum.base_type);
+			str = write_type_to_string(str, type->Enum.base_type, shorthand, allow_polymorphic);
 		}
 		str = gb_string_appendc(str, " {");
 		for_array(i, type->Enum.fields) {
@@ -4590,6 +4633,13 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 
 	case Type_Union:
 		str = gb_string_appendc(str, "union");
+
+		if (allow_polymorphic && type->Struct.polymorphic_params) {
+			str = gb_string_appendc(str, "(");
+			str = write_type_to_string(str, type->Struct.polymorphic_params, shorthand, allow_polymorphic);
+			str = gb_string_appendc(str, ")");
+		}
+
 		switch (type->Union.kind) {
 		case UnionType_no_nil:     str = gb_string_appendc(str, " #no_nil");     break;
 		case UnionType_shared_nil: str = gb_string_appendc(str, " #shared_nil"); break;
@@ -4599,7 +4649,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		for_array(i, type->Union.variants) {
 			Type *t = type->Union.variants[i];
 			if (i > 0) str = gb_string_appendc(str, ", ");
-			str = write_type_to_string(str, t);
+			str = write_type_to_string(str, t, shorthand, allow_polymorphic);
 		}
 		str = gb_string_append_rune(str, '}');
 		break;
@@ -4612,17 +4662,24 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			case StructSoa_Dynamic: str = gb_string_appendc(str,    "#soa[dynamic]");                             break;
 			default: GB_PANIC("Unknown StructSoaKind"); break;
 			}
-			str = write_type_to_string(str, type->Struct.soa_elem);
+			str = write_type_to_string(str, type->Struct.soa_elem, shorthand, allow_polymorphic);
 			break;
 		}
 
 		str = gb_string_appendc(str, "struct");
+
+		if (allow_polymorphic && type->Struct.polymorphic_params) {
+			str = gb_string_appendc(str, "(");
+			str = write_type_to_string(str, type->Struct.polymorphic_params, shorthand, allow_polymorphic);
+			str = gb_string_appendc(str, ")");
+		}
+
 		if (type->Struct.is_packed)    str = gb_string_appendc(str, " #packed");
 		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
 		if (type->Struct.is_no_copy)   str = gb_string_appendc(str, " #no_copy");
 		if (type->Struct.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Struct.custom_align);
-		str = gb_string_appendc(str, " {");
 
+		str = gb_string_appendc(str, " {");
 
 		if (shorthand && type->Struct.fields.count > 16) {
 			str = gb_string_append_fmt(str, "%lld fields...", cast(long long)type->Struct.fields.count);
@@ -4635,7 +4692,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 				}
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
-				str = write_type_to_string(str, f->type);
+				str = write_type_to_string(str, f->type, shorthand, allow_polymorphic);
 			}
 		}
 		str = gb_string_append_rune(str, '}');
@@ -4643,9 +4700,9 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 
 	case Type_Map: {
 		str = gb_string_appendc(str, "map[");
-		str = write_type_to_string(str, type->Map.key);
+		str = write_type_to_string(str, type->Map.key, shorthand, allow_polymorphic);
 		str = gb_string_append_rune(str, ']');
-		str = write_type_to_string(str, type->Map.value);
+		str = write_type_to_string(str, type->Map.value, shorthand, allow_polymorphic);
 	} break;
 
 	case Type_Named:
@@ -4675,9 +4732,11 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 					str = gb_string_append_length(str, name.text, name.len);
 					if (!is_type_untyped(var->type)) {
 						str = gb_string_appendc(str, ": ");
-						str = write_type_to_string(str, var->type);
-						str = gb_string_appendc(str, " = ");
-						str = write_exact_value_to_string(str, var->Constant.value);
+						str = write_type_to_string(str, var->type, shorthand, allow_polymorphic);
+						if (var->Constant.value.kind) {
+							str = gb_string_appendc(str, " = ");
+							str = write_exact_value_to_string(str, var->Constant.value);
+						}
 					} else {
 						str = gb_string_appendc(str, " := ");
 						str = write_exact_value_to_string(str, var->Constant.value);
@@ -4693,20 +4752,31 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 						Type *slice = base_type(var->type);
 						str = gb_string_appendc(str, "..");
 						GB_ASSERT(var->type->kind == Type_Slice);
-						str = write_type_to_string(str, slice->Slice.elem);
+						str = write_type_to_string(str, slice->Slice.elem, shorthand, allow_polymorphic);
 					} else {
-						str = write_type_to_string(str, var->type);
+						str = write_type_to_string(str, var->type, shorthand, allow_polymorphic);
 					}
 				} else {
 					GB_ASSERT(var->kind == Entity_TypeName);
 					if (var->type->kind == Type_Generic) {
-						str = gb_string_appendc(str, "typeid/");
-						str = write_type_to_string(str, var->type);
+						if (var->token.string.len != 0) {
+							String name = var->token.string;
+							str = gb_string_appendc(str, "$");
+							str = gb_string_append_length(str, name.text, name.len);
+							str = gb_string_appendc(str, ": typeid");
+							if (var->type->Generic.specialized) {
+								str = gb_string_appendc(str, "/");
+								str = write_type_to_string(str, var->type->Generic.specialized, shorthand, allow_polymorphic);
+							}
+						} else {
+							str = gb_string_appendc(str, "typeid/");
+							str = write_type_to_string(str, var->type, shorthand, allow_polymorphic);
+						}
 					} else {
 						str = gb_string_appendc(str, "$");
 						str = gb_string_append_length(str, name.text, name.len);
 						str = gb_string_appendc(str, "=");
-						str = write_type_to_string(str, var->type);
+						str = write_type_to_string(str, var->type, shorthand, allow_polymorphic);
 					}
 				}
 			}
@@ -4728,10 +4798,10 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			}
 			break;
 		case ProcCC_CDecl:
-			str = gb_string_appendc(str, " \"cdecl\" ");
+			str = gb_string_appendc(str, " \"c\" ");
 			break;
 		case ProcCC_StdCall:
-			str = gb_string_appendc(str, " \"stdcall\" ");
+			str = gb_string_appendc(str, " \"std\" ");
 			break;
 		case ProcCC_FastCall:
 			str = gb_string_appendc(str, " \"fastcall\" ");
@@ -4752,7 +4822,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		}
 		str = gb_string_appendc(str, "(");
 		if (type->Proc.params) {
-			str = write_type_to_string(str, type->Proc.params);
+			str = write_type_to_string(str, type->Proc.params, shorthand, allow_polymorphic);
 		}
 		str = gb_string_appendc(str, ")");
 		if (type->Proc.results) {
@@ -4760,7 +4830,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			if (type->Proc.results->Tuple.variables.count > 1) {
 				str = gb_string_appendc(str, "(");
 			}
-			str = write_type_to_string(str, type->Proc.results);
+			str = write_type_to_string(str, type->Proc.results, shorthand, allow_polymorphic);
 			if (type->Proc.results->Tuple.variables.count > 1) {
 				str = gb_string_appendc(str, ")");
 			}
@@ -4769,8 +4839,10 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 
 	case Type_BitSet:
 		str = gb_string_appendc(str, "bit_set[");
-		if (is_type_enum(type->BitSet.elem)) {
-			str = write_type_to_string(str, type->BitSet.elem);
+		if (type->BitSet.elem == nullptr) {
+			str = gb_string_appendc(str, "<unresolved>");
+		} else if (is_type_enum(type->BitSet.elem)) {
+			str = write_type_to_string(str, type->BitSet.elem, shorthand, allow_polymorphic);
 		} else {
 			str = gb_string_append_fmt(str, "%lld", type->BitSet.lower);
 			str = gb_string_append_fmt(str, "..=");
@@ -4778,27 +4850,27 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		}
 		if (type->BitSet.underlying != nullptr) {
 			str = gb_string_appendc(str, "; ");
-			str = write_type_to_string(str, type->BitSet.underlying);
+			str = write_type_to_string(str, type->BitSet.underlying, shorthand, allow_polymorphic);
 		}
 		str = gb_string_appendc(str, "]");
 		break;
 
 	case Type_SimdVector:
 		str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
-		str = write_type_to_string(str, type->SimdVector.elem);
+		str = write_type_to_string(str, type->SimdVector.elem, shorthand, allow_polymorphic);
 		break;
-		
+
 	case Type_Matrix:
 		if (type->Matrix.is_row_major) {
 			str = gb_string_appendc(str, "#row_major ");
 		}
 		str = gb_string_appendc(str, gb_bprintf("matrix[%d, %d]", cast(int)type->Matrix.row_count, cast(int)type->Matrix.column_count));
-		str = write_type_to_string(str, type->Matrix.elem);
+		str = write_type_to_string(str, type->Matrix.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_BitField:
 		str = gb_string_appendc(str, "bit_field ");
-		str = write_type_to_string(str, type->BitField.backing_type);
+		str = write_type_to_string(str, type->BitField.backing_type, shorthand, allow_polymorphic);
 		str = gb_string_appendc(str, " {");
 		for (isize i = 0; i < type->BitField.fields.count; i++) {
 			Entity *f = type->BitField.fields[i];
@@ -4807,7 +4879,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			}
 			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 			str = gb_string_appendc(str, ": ");
-			str = write_type_to_string(str, f->type);
+			str = write_type_to_string(str, f->type, shorthand, allow_polymorphic);
 			str = gb_string_append_fmt(str, " | %u", type->BitField.bit_sizes[i]);
 		}
 		str = gb_string_appendc(str, " }");
@@ -4825,9 +4897,11 @@ gb_internal gbString type_to_string(Type *type, bool shorthand) {
 	return write_type_to_string(gb_string_make(heap_allocator(), ""), type, shorthand);
 }
 
-gb_internal gbString type_to_string_shorthand(Type *type) {
-	return type_to_string(type, true);
+gb_internal gbString type_to_string_polymorphic(Type *type) {
+	return write_type_to_string(gb_string_make(heap_allocator(), ""), type, false, true);
 }
 
 
-
+gb_internal gbString type_to_string_shorthand(Type *type) {
+	return type_to_string(type, true);
+}

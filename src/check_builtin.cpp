@@ -645,6 +645,13 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				break;
 			}
 
+			if (!are_types_identical(x.type, y.type)) {
+				gbString tx = type_to_string(x.type);
+				gbString ty = type_to_string(y.type);
+				error(call, "Mismatched types to '%.*s', '%s' vs '%s'", LIT(builtin_name), tx, ty);
+				gb_string_free(ty);
+				gb_string_free(tx);
+			}
 
 			Type *vt = base_type(x.type);
 			GB_ASSERT(vt->kind == Type_SimdVector);
@@ -885,6 +892,39 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 			operand->mode = Addressing_Value;
 			operand->type = t_untyped_bool;
+			return true;
+		}
+
+	case BuiltinProc_simd_extract_lsbs:
+	case BuiltinProc_simd_extract_msbs:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+
+			if (!is_type_simd_vector(x.type)) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a simd vector type, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				return false;
+			}
+
+			Type *elem = base_array_type(x.type);
+			if (!is_type_integer_like(elem)) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a #simd type with integer or boolean elements, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				return false;
+			}
+
+			i64 num_elems = get_array_type_count(x.type);
+
+			Type *result_type = alloc_type_bit_set();
+			result_type->BitSet.elem = t_int;
+			result_type->BitSet.lower = 0;
+			result_type->BitSet.upper = num_elems - 1;
+
+			operand->mode = Addressing_Value;
+			operand->type = result_type;
 			return true;
 		}
 
@@ -1642,12 +1682,16 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		if (ce->args.count > 0) {
 			Ast *arg = ce->args[0];
-			Operand o = {};
-			Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
-			if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
-				error(ce->args[0], "'#caller_expression' expected a valid earlier parameter name");
+			if (arg->kind != Ast_Ident) {
+				error(arg, "'#caller_expression' expected an identifier");
+			} else {
+				Operand o = {};
+				Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
+				if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
+					error(arg, "'#caller_expression' expected a valid earlier parameter name");
+				}
+				arg->Ident.entity = e;
 			}
-			arg->Ident.entity = e;
 		}
 
 		operand->type = t_string;
@@ -2551,6 +2595,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_swizzle: {
 		// swizzle :: proc(v: [N]T, ..int) -> [M]T
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *original_type = operand->type;
 		Type *type = base_type(original_type);
 		i64 max_count = 0;
@@ -2908,6 +2956,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// imag :: proc(x: type) -> float_type
 
 		Operand *x = operand;
+		if (!x->type) {
+			return false;
+		}
+
 		if (is_type_untyped(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				if (is_type_numeric(x->type)) {
@@ -2968,6 +3020,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// kmag :: proc(x: type) -> float_type
 
 		Operand *x = operand;
+		if (!x->type) {
+			return false;
+		}
+
 		if (is_type_untyped(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				if (is_type_numeric(x->type)) {
@@ -3017,6 +3073,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_conj: {
 		// conj :: proc(x: type) -> type
 		Operand *x = operand;
+		if (!x->type) {
+			return false;
+		}
+
 		Type *t = x->type;
 		Type *elem = core_array_type(t);
 		
@@ -3057,10 +3117,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	}
 
 	case BuiltinProc_expand_values: {
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *type = base_type(operand->type);
 		if (!is_type_struct(type) && !is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected a struct or array type, got '%s'", type_str);
+			error(call, "Expected a struct or array type to 'expand_values', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3096,8 +3160,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		check_multi_expr_or_type(c, operand, ce->args[0]);
 
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
+
 		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
 			// Okay
 		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
@@ -3267,6 +3336,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// max :: proc(a: ..ordered) -> ordered
 
 		check_multi_expr_or_type(c, operand, ce->args[0]);
+
+		if (!operand->type) {
+			return false;
+		}
 
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
@@ -3443,6 +3516,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_abs: {
 		// abs :: proc(n: numeric) -> numeric
+		if (!operand->type) {
+			return false;
+		}
+
 		if (!(is_type_numeric(operand->type) && !is_type_array(operand->type))) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a numeric type to 'abs', got '%s'", type_str);
@@ -3455,9 +3532,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			case ExactValue_Integer:
 				mp_abs(&operand->value.value_integer, &operand->value.value_integer);
 				break;
-			case ExactValue_Float:
-				operand->value.value_float = gb_abs(operand->value.value_float);
+			case ExactValue_Float: {
+				u64 abs = bit_cast<u64>(operand->value.value_float);
+				abs &= 0x7FFFFFFFFFFFFFFF;
+				operand->value.value_float = bit_cast<f64>(abs);
 				break;
+			}
 			case ExactValue_Complex: {
 				f64 r = operand->value.value_complex->real;
 				f64 i = operand->value.value_complex->imag;
@@ -3498,6 +3578,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_clamp: {
 		// clamp :: proc(a, min, max: ordered) -> ordered
+		if (!operand->type) {
+			return false;
+		}
+
 		Type *type = operand->type;
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
@@ -5466,6 +5550,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			case Type_EnumeratedArray: operand->type = bt->EnumeratedArray.elem; break;
 			case Type_Slice:           operand->type = bt->Slice.elem;           break;
 			case Type_DynamicArray:    operand->type = bt->DynamicArray.elem;    break;
+			case Type_SimdVector:      operand->type = bt->SimdVector.elem;      break;
 			}
 		}
 		operand->mode = Addressing_Type;
@@ -5507,6 +5592,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			// NOTE(bill): Is this even correct?
 			new_type->Union.node = operand->expr;
 			new_type->Union.scope = bt->Union.scope;
+			if (bt->Union.kind == UnionType_no_nil) {
+				new_type->Union.kind = UnionType_no_nil;
+			}
 
 			operand->type = new_type;
 		}

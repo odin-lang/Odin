@@ -264,12 +264,14 @@ flag is specified.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread {
+create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread) {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc())t.data
 		fn()
 	}
-	t := create(thread_proc, priority)
+	if t = create(thread_proc, priority); t == nil {
+		return
+	}
 	t.data = rawptr(fn)
 	if self_cleanup {
 		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
@@ -295,14 +297,16 @@ flag is specified.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread {
+create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread) {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(rawptr))t.data
 		assert(t.user_index >= 1)
 		data := t.user_args[0]
 		fn(data)
 	}
-	t := create(thread_proc, priority)
+	if t = create(thread_proc, priority); t == nil {
+		return
+	}
 	t.data = rawptr(fn)
 	t.user_index = 1
 	t.user_args[0] = data
@@ -330,7 +334,7 @@ flag is specified.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
+create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread)
 	where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T))t.data
@@ -338,7 +342,9 @@ create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_contex
 		data := (^T)(&t.user_args[0])^
 		fn(data)
 	}
-	t := create(thread_proc, priority)
+	if t = create(thread_proc, priority); t == nil {
+		return
+	}
 	t.data = rawptr(fn)
 	t.user_index = 1
 
@@ -371,7 +377,7 @@ flag is specified.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
+create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2))t.data
@@ -383,7 +389,9 @@ create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2),
 
 		fn(arg1, arg2)
 	}
-	t := create(thread_proc, priority)
+	if t = create(thread_proc, priority); t == nil {
+		return
+	}
 	t.data = rawptr(fn)
 	t.user_index = 2
 
@@ -418,7 +426,7 @@ flag is specified.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
+create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2, T3))t.data
@@ -431,7 +439,9 @@ create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: pr
 
 		fn(arg1, arg2, arg3)
 	}
-	t := create(thread_proc, priority)
+	if t = create(thread_proc, priority); t == nil {
+		return
+	}
 	t.data = rawptr(fn)
 	t.user_index = 3
 
@@ -467,7 +477,7 @@ flag is specified.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> ^Thread
+create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) + size_of(T3) + size_of(T4) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2, T3, T4))t.data
@@ -481,7 +491,9 @@ create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: 
 
 		fn(arg1, arg2, arg3, arg4)
 	}
-	t := create(thread_proc, priority)
+	if t = create(thread_proc, priority); t == nil {
+		return
+	}
 	t.data = rawptr(fn)
 	t.user_index = 4
 
@@ -513,8 +525,10 @@ _select_context_for_thread :: proc(init_context: Maybe(runtime.Context)) -> runt
 			Ensure that the temp allocator is thread-safe when the user provides a specific initial context to use.
 			Without this, the thread will use the same temp allocator state as the parent thread, and thus, bork it up.
 	*/
-	if ctx.temp_allocator.procedure == runtime.default_temp_allocator_proc {
-		ctx.temp_allocator.data = &runtime.global_default_temp_allocator_data
+	when !ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+		if ctx.temp_allocator.procedure == runtime.default_temp_allocator_proc {
+			ctx.temp_allocator.data = &runtime.global_default_temp_allocator_data
+		}
 	}
 	return ctx
 }

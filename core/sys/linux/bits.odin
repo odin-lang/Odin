@@ -1,5 +1,10 @@
 package linux
 
+import "base:intrinsics"
+
+@(private)
+log2 :: intrinsics.constant_log2
+
 
 /*
 	Represents an error returned by most of syscalls
@@ -152,43 +157,65 @@ Errno :: enum i32 {
 	RDONLY flag is not present, because it has the value of 0, i.e. it is the
 	default, unless WRONLY or RDWR is specified.
 */
-Open_Flags_Bits :: enum {
-	WRONLY    = 0,
-	RDWR      = 1,
-	CREAT     = 6,
-	EXCL      = 7,
-	NOCTTY    = 8,
-	TRUNC     = 9,
-	APPEND    = 10,
-	NONBLOCK  = 11,
-	DSYNC     = 12,
-	ASYNC     = 13,
-	DIRECT    = 14,
-	LARGEFILE = 15,
-	DIRECTORY = 16,
-	NOFOLLOW  = 17,
-	NOATIME   = 18,
-	CLOEXEC   = 19,
-	PATH      = 21,
+when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECT    = 14,
+		LARGEFILE = 15,
+		DIRECTORY = 16,
+		NOFOLLOW  = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
+	// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
+	#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
+	#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
+	#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
+	#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
+	#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
+	#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
+	#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
+	#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
+	#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
+	#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
+	#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
+	#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
+	#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
+	#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
+	#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
+} else {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECTORY = 14,
+		NOFOLLOW  = 15,
+		DIRECT    = 16,
+		LARGEFILE = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
 }
-// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
-#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
-#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
-#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
-#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
-#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
-#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
-#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
-#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
-#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
-#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
-#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
-#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
-#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
-#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
-#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
-#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
-#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
 
 /*
 	Bits for FD_Flags bitset
@@ -1307,6 +1334,7 @@ Socket_Option :: enum {
 	ACCEPTCONN                    = 30,
 	PEERSEC                       = 31,
 	PASSSEC                       = 34,
+	IP_ADD_MEMBERSHIP             = 35,
 	MARK                          = 36,
 	PROTOCOL                      = 38,
 	DOMAIN                        = 39,
@@ -1816,22 +1844,23 @@ EPoll_Flags_Bits :: enum {
 }
 
 EPoll_Event_Kind :: enum u32 {
-	IN        = 0x001,
-	PRI       = 0x002,
-	OUT       = 0x004,
-	RDNORM    = 0x040,
-	RDBAND    = 0x080,
-	WRNORM    = 0x100,
-	WRBAND    = 0x200,
-	MSG       = 0x400,
-	ERR       = 0x008,
-	HUP       = 0x010,
-	RDHUP     = 0x2000,
-	EXCLUSIVE = 1<<28,
-	WAKEUP    = 1<<29,
-	ONESHOT   = 1<<30,
-	ET        = 1<<31,
+	IN        = log2(0x001),
+	PRI       = log2(0x002),
+	OUT       = log2(0x004),
+	RDNORM    = log2(0x040),
+	RDBAND    = log2(0x080),
+	WRNORM    = log2(0x100),
+	WRBAND    = log2(0x200),
+	MSG       = log2(0x400),
+	ERR       = log2(0x008),
+	HUP       = log2(0x010),
+	RDHUP     = log2(0x2000),
+	EXCLUSIVE = log2(1<<28),
+	WAKEUP    = log2(1<<29),
+	ONESHOT   = log2(1<<30),
+	ET        = log2(1<<31),
 }
+EPoll_Event_Set :: bit_set[EPoll_Event_Kind; u32]
 
 EPoll_Ctl_Opcode :: enum i32 {
 	ADD = 1,

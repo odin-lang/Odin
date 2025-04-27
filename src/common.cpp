@@ -134,9 +134,9 @@ gb_internal u32 fnv32a(void const *data, isize len) {
 	return h;
 }
 
-gb_internal u64 fnv64a(void const *data, isize len) {
+gb_internal u64 fnv64a(void const *data, isize len, u64 seed=0xcbf29ce484222325ull) {
 	u8 const *bytes = cast(u8 const *)data;
-	u64 h = 0xcbf29ce484222325ull;
+	u64 h = seed;
 	
 	for (; len >= 8; len -= 8, bytes += 8) {
 		h = (h ^ bytes[0]) * 0x100000001b3ull;

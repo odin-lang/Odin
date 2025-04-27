@@ -42,7 +42,7 @@ gb_internal void ptr_set_destroy(PtrSet<T> *s) {
 
 template <typename T>
 gb_internal isize ptr_set__find(PtrSet<T> *s, T ptr) {
-	GB_ASSERT(ptr != nullptr);
+	GB_ASSERT(ptr != 0);
 	if (s->count != 0) {
 	#if 0
 		for (usize i = 0; i < s->capacity; i++) {
@@ -58,7 +58,7 @@ gb_internal isize ptr_set__find(PtrSet<T> *s, T ptr) {
 			T key = s->keys[hash_index];
 			if (key == ptr) {
 				return hash_index;
-			} else if (key == nullptr) {
+			} else if (key == 0) {
 				return -1;
 			}
 			hash_index = (hash_index+1)&mask;
@@ -122,7 +122,7 @@ gb_internal bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it pre
 	for (usize i = 0; i < s->capacity; i++) {
 		T *key = &s->keys[hash_index];
 		GB_ASSERT(*key != ptr);
-		if (*key == (T)PtrSet<T>::TOMBSTONE || *key == nullptr) {
+		if (*key == (T)PtrSet<T>::TOMBSTONE || *key == 0) {
 			*key = ptr;
 			s->count++;
 			return false;
@@ -169,7 +169,7 @@ struct PtrSetIterator {
 				return *this;
 			}
 			T key = set->keys[index];
-			if (key != nullptr && key != (T)PtrSet<T>::TOMBSTONE) {
+			if (key != 0 && key != (T)PtrSet<T>::TOMBSTONE) {
 				return *this;
 			}
 		}
@@ -191,7 +191,7 @@ gb_internal PtrSetIterator<T> begin(PtrSet<T> &set) noexcept {
 	usize index = 0;
 	while (index < set.capacity) {
 		T key = set.keys[index];
-		if (key != nullptr && key != (T)PtrSet<T>::TOMBSTONE) {
+		if (key != 0 && key != (T)PtrSet<T>::TOMBSTONE) {
 			break;
 		}
 		index++;

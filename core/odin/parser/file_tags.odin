@@ -17,6 +17,9 @@ Build_Kind :: struct {
 	arch: runtime.Odin_Arch_Types,
 }
 
+// empty build kind acts as a marker for separating multiple lines with build tags
+BUILD_KIND_NEWLINE_MARKER :: Build_Kind{}
+
 File_Tags :: struct {
 	build_project_name: [][]string,
 	build:              []Build_Kind,
@@ -27,14 +30,27 @@ File_Tags :: struct {
 }
 
 @require_results
-get_build_os_from_string :: proc(str: string) -> runtime.Odin_OS_Type {
+get_build_os_from_string :: proc(str: string) -> (found_os: runtime.Odin_OS_Type, found_subtarget: runtime.Odin_Platform_Subtarget_Type) {
+	str_os, _, str_subtarget := strings.partition(str, ":")
+
 	fields := reflect.enum_fields_zipped(runtime.Odin_OS_Type)
 	for os in fields {
-		if strings.equal_fold(os.name, str) {
-			return runtime.Odin_OS_Type(os.value)
+		if strings.equal_fold(os.name, str_os) {
+			found_os = runtime.Odin_OS_Type(os.value)
+			break
 		}
 	}
-	return .Unknown
+	if str_subtarget != "" {
+		st_fields := reflect.enum_fields_zipped(runtime.Odin_Platform_Subtarget_Type)
+		for subtarget in st_fields {
+			if strings.equal_fold(subtarget.name, str_subtarget) {
+				found_subtarget = runtime.Odin_Platform_Subtarget_Type(subtarget.value)
+				break
+			}
+		}
+	}
+
+	return
 }
 @require_results
 get_build_arch_from_string :: proc(str: string) -> runtime.Odin_Arch_Type {
@@ -147,6 +163,11 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 					append(build_project_names, build_project_name_strings[index_start:])
 				}
 			case "build":
+
+				if len(build_kinds) > 0 {
+					append(build_kinds, BUILD_KIND_NEWLINE_MARKER)
+				}
+
 				kinds_loop: for {
 					os_positive: runtime.Odin_OS_Types
 					os_negative: runtime.Odin_OS_Types
@@ -179,7 +200,8 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 
 						if value == "ignore" {
 							tags.ignore = true
-						} else if os := get_build_os_from_string(value); os != .Unknown {
+						} else if os, subtarget := get_build_os_from_string(value); os != .Unknown {
+							_ = subtarget // TODO(bill): figure out how to handle the subtarget logic
 							if is_notted {
 								os_negative += {os}
 							} else {
@@ -248,10 +270,20 @@ match_build_tags :: proc(file_tags: File_Tags, target: Build_Target) -> bool {
 		project_name_correct ||= group_correct
 	}
 
-	os_and_arch_correct := len(file_tags.build) == 0
+	os_and_arch_correct := true
 
-	for kind in file_tags.build {
-		os_and_arch_correct ||= target.os in kind.os && target.arch in kind.arch
+	if len(file_tags.build) > 0 {
+		os_and_arch_correct_line := false
+
+		for kind in file_tags.build {
+			if kind == BUILD_KIND_NEWLINE_MARKER {
+				os_and_arch_correct &&= os_and_arch_correct_line
+				os_and_arch_correct_line = false
+			} else {
+				os_and_arch_correct_line ||= target.os in kind.os && target.arch in kind.arch
+			}
+		}
+		os_and_arch_correct &&= os_and_arch_correct_line
 	}
 
 	return !file_tags.ignore && project_name_correct && os_and_arch_correct

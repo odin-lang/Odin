@@ -60,7 +60,7 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 				error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
 			}
 			if (e->type == nullptr) {
-				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type does not have a default type\n", LIT(e->token.string));
+				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type and does not have a default type\n", LIT(e->token.string));
 			}
 			e->type = operand->type;
 			return nullptr;
@@ -94,12 +94,14 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 				return nullptr;
 			}
 			if (e2->state.load() != EntityState_Resolved) {
-				gbString str = type_to_string(t);
-				defer (gb_string_free(str));
-				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
-				e->type = t_invalid;
+				e->type = t;
 				return nullptr;
 			}
+			gbString str = type_to_string(t);
+			defer (gb_string_free(str));
+			error(operand->expr, "Invalid use of a non-specialized polymorphic type '%s' in %.*s", str, LIT(context_name));
+			e->type = t_invalid;
+			return nullptr;
 		} else if (is_type_empty_union(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
@@ -466,6 +468,10 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	}
 	e->type = named;
 
+	if (!is_distinct) {
+		e->TypeName.is_type_alias = true;
+	}
+
 	check_type_path_push(ctx, e);
 	Type *bt = check_type_expr(ctx, te, named);
 	check_type_path_pop(ctx);
@@ -500,9 +506,9 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	if (!is_distinct) {
 		e->type = bt;
 		named->Named.base = bt;
-		e->TypeName.is_type_alias = true;
 	}
 
+	e->TypeName.is_type_alias = !is_distinct;
 
 	if (decl->type_expr != nullptr) {
 		Type *t = check_type(ctx, decl->type_expr);
@@ -626,6 +632,10 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 				Operand x = {};
 				x.type = entity->type;
 				x.mode = Addressing_Variable;
+				if (entity->kind == Entity_Constant) {
+					x.mode  = Addressing_Constant;
+					x.value = entity->Constant.value;
+				}
 				if (!check_is_assignable_to(ctx, &x, e->type)) {
 					gbString expr_str = expr_to_string(init);
 					gbString op_type_str = type_to_string(entity->type);
@@ -855,6 +865,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	} else {
 		String name = ident->Ident.token.string;
 		Entity *found = scope_lookup(ctx->scope, name);
+
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
 				// NOTE(bill): link against nothing
@@ -969,6 +980,43 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 			}
 		}
 	}
+}
+
+gb_internal void check_foreign_procedure(CheckerContext *ctx, Entity *e, DeclInfo *d) {
+	GB_ASSERT(e != nullptr);
+	GB_ASSERT(e->kind == Entity_Procedure);
+	String name = e->Procedure.link_name;
+
+	mutex_lock(&ctx->info->foreign_mutex);
+
+	auto *fp = &ctx->info->foreigns;
+	StringHashKey key = string_hash_string(name);
+	Entity **found = string_map_get(fp, key);
+	if (found && e != *found) {
+		Entity *f = *found;
+		TokenPos pos = f->token.pos;
+		Type *this_type = base_type(e->type);
+		Type *other_type = base_type(f->type);
+		if (is_type_proc(this_type) && is_type_proc(other_type)) {
+			if (!are_signatures_similar_enough(this_type, other_type)) {
+				error(d->proc_lit,
+				      "Redeclaration of foreign procedure '%.*s' with different type signatures\n"
+				      "\tat %s",
+				      LIT(name), token_pos_to_string(pos));
+			}
+		} else if (!signature_parameter_similar_enough(this_type, other_type)) {
+			error(d->proc_lit,
+			      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
+			      "\tat %s",
+			      LIT(name), token_pos_to_string(pos));
+		}
+	} else if (name == "main") {
+		error(d->proc_lit, "The link name 'main' is reserved for internal use");
+	} else {
+		string_map_set(fp, key, e);
+	}
+
+	mutex_unlock(&ctx->info->foreign_mutex);
 }
 
 gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
@@ -1307,57 +1355,16 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			name = e->Procedure.link_name;
 		}
 		Entity *foreign_library = init_entity_foreign_library(ctx, e);
-		
-		if (is_arch_wasm() && foreign_library != nullptr) {
-			String module_name = str_lit("env");
-			GB_ASSERT (foreign_library->kind == Entity_LibraryName);
-			if (foreign_library->LibraryName.paths.count != 1) {
-				error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
-				      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
-			}
-
-			if (foreign_library->LibraryName.paths.count >= 1) {
-				module_name = foreign_library->LibraryName.paths[0];
-			}
-
-			if (!string_ends_with(module_name, str_lit(".o"))) {
-				name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
-			}
-		}
-
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
+		e->Procedure.foreign_library = foreign_library;
 
-		mutex_lock(&ctx->info->foreign_mutex);
-
-		auto *fp = &ctx->info->foreigns;
-		StringHashKey key = string_hash_string(name);
-		Entity **found = string_map_get(fp, key);
-		if (found && e != *found) {
-			Entity *f = *found;
-			TokenPos pos = f->token.pos;
-			Type *this_type = base_type(e->type);
-			Type *other_type = base_type(f->type);
-			if (is_type_proc(this_type) && is_type_proc(other_type)) {
-				if (!are_signatures_similar_enough(this_type, other_type)) {
-					error(d->proc_lit,
-					      "Redeclaration of foreign procedure '%.*s' with different type signatures\n"
-					      "\tat %s",
-					      LIT(name), token_pos_to_string(pos));
-				}
-			} else if (!signature_parameter_similar_enough(this_type, other_type)) {
-				error(d->proc_lit,
-				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-				      "\tat %s",
-				      LIT(name), token_pos_to_string(pos));
-			}
-		} else if (name == "main") {
-			error(d->proc_lit, "The link name 'main' is reserved for internal use");
+		if (is_arch_wasm() && foreign_library != nullptr) {
+			// NOTE(bill): this must be delayed because the foreign import paths might not be evaluated yet until much later
+			mpsc_enqueue(&ctx->info->foreign_decls_to_check, e);
 		} else {
-			string_map_set(fp, key, e);
+			check_foreign_procedure(ctx, e, d);
 		}
-
-		mutex_unlock(&ctx->info->foreign_mutex);
 	} else {
 		String name = e->token.string;
 		if (e->Procedure.link_name.len > 0) {
@@ -1743,8 +1750,8 @@ gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
 			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
 			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
 
-			for (Type *t : decl->type_info_deps) {
-				ptr_set_add(&decl->parent->type_info_deps, t);
+			for (auto const &tt : decl->type_info_deps) {
+				type_set_add(&decl->parent->type_info_deps, tt);
 			}
 
 			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
@@ -1784,6 +1791,10 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_decl = decl;
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
+
+	if (decl->parent && decl->entity && decl->parent->entity) {
+		decl->entity->parent_proc_decl = decl->parent;
+	}
 
 	if (ctx->pkg->name != "runtime") {
 		switch (type->Proc.calling_convention) {
@@ -1874,6 +1885,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	check_open_scope(ctx, body);
 	{
+		ctx->scope->decl_info = decl;
+
 		for (auto const &entry : using_entities) {
 			Entity *uvar = entry.uvar;
 			Entity *prev = scope_insert(ctx->scope, uvar);

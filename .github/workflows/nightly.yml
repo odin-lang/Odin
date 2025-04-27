@@ -49,12 +49,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: jirutka/setup-alpine@v1
         with:
-          branch: v3.20
+          branch: edge
       - name: (Linux) Download LLVM
         run: |
           apk add --no-cache \
-          musl-dev llvm18-dev clang18 git mold lz4 \
-          libxml2-static llvm18-static zlib-static zstd-static \
+          musl-dev llvm20-dev clang20 git mold lz4 \
+          libxml2-static llvm20-static zlib-static zstd-static \
           make
         shell: alpine.sh --root {0}
       - name: build odin
@@ -93,8 +93,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@18 dylibbundler
-          echo "/usr/local/opt/llvm@18/bin" >> $GITHUB_PATH
+          brew update
+          brew install llvm@20 dylibbundler lld
+
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
         # not link with libunwind bundled with LLVM but link with libunwind on the system.
@@ -130,8 +131,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@18 dylibbundler
-          echo "/opt/homebrew/opt/llvm@18/bin" >> $GITHUB_PATH
+          brew update
+          brew install llvm@20 dylibbundler lld
+
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
         # not link with libunwind bundled with LLVM but link with libunwind on the system.

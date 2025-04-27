@@ -6,11 +6,13 @@ when ODIN_OS == .Windows {
 	when OPENEXRCORE_SHARED {
 		#panic("Dynamic linking is not supported for OpenEXRCore yet")
 	} else {
-		foreign import lib "OpenEXRCore-3_1.lib"
+		foreign import lib_ "OpenEXRCore-3_3.lib"
 	}
 } else {
-	foreign import lib "system:OpenEXRCore-3_1"
+	foreign import lib_ "system:OpenEXRCore-3_3"
 }
+
+lib :: lib_
 
 import "core:c"
 

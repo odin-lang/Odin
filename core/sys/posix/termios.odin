@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -138,17 +138,30 @@ CLocal_Flag_Bits :: enum tcflag_t {
 }
 CLocal_Flags :: bit_set[CLocal_Flag_Bits; tcflag_t]
 
-CControl_Flag_Bits :: enum tcflag_t {
-	// CS5    = log2(CS5), /* 5 bits (pseudo) (default) */
-	CS6    = log2(CS6),    /* 6 bits */
-	CS7    = log2(CS7),    /* 7 bits */
-	CS8    = log2(CS8),    /* 8 bits */
-	CSTOPB = log2(CSTOPB), /* send 2 stop bits */
-	CREAD  = log2(CREAD),  /* enable receiver */
-	PARENB = log2(PARENB), /* parity enable */
-	PARODD = log2(PARODD), /* odd parity, else even */
-	HUPCL  = log2(HUPCL),  /* hang up on last close */
-	CLOCAL = log2(CLOCAL), /* ignore modem status lines */
+when ODIN_OS == .Haiku {
+	CControl_Flag_Bits :: enum tcflag_t {
+		// CS7    = log2(CS7),    /* 7 bits (default) */
+		CS8    = log2(CS8),    /* 8 bits */
+		CSTOPB = log2(CSTOPB), /* send 2 stop bits */
+		CREAD  = log2(CREAD),  /* enable receiver */
+		PARENB = log2(PARENB), /* parity enable */
+		PARODD = log2(PARODD), /* odd parity, else even */
+		HUPCL  = log2(HUPCL),  /* hang up on last close */
+		CLOCAL = log2(CLOCAL), /* ignore modem status lines */
+	}	
+} else {
+	CControl_Flag_Bits :: enum tcflag_t {
+		// CS5    = log2(CS5), /* 5 bits (pseudo) (default) */
+		CS6    = log2(CS6),    /* 6 bits */
+		CS7    = log2(CS7),    /* 7 bits */
+		CS8    = log2(CS8),    /* 8 bits */
+		CSTOPB = log2(CSTOPB), /* send 2 stop bits */
+		CREAD  = log2(CREAD),  /* enable receiver */
+		PARENB = log2(PARENB), /* parity enable */
+		PARODD = log2(PARODD), /* odd parity, else even */
+		HUPCL  = log2(HUPCL),  /* hang up on last close */
+		CLOCAL = log2(CLOCAL), /* ignore modem status lines */
+	}
 }
 CControl_Flags :: bit_set[CControl_Flag_Bits; tcflag_t]
 
@@ -596,5 +609,152 @@ when ODIN_OS == .Darwin {
 	TCION  :: 3
 	TCOOFF :: 0
 	TCOON  :: 1
+
+} else when ODIN_OS == .Haiku {
+
+	cc_t      :: distinct c.uchar
+	_speed_t  :: distinct c.uint32_t
+	tcflag_t  :: distinct c.uint16_t
+
+	// Same as speed_t, but 16-bit.
+	CSpeed :: enum tcflag_t {
+		B0     = B0,
+		B50    = B50,
+		B75    = B75,
+		B110   = B110,
+		B134   = B134,
+		B150   = B150,
+		B200   = B200,
+		B300   = B300,
+		B600   = B600,
+		B1200  = B1200,
+		B1800  = B1800,
+		B2400  = B2400,
+		B4800  = B4800,
+		B9600  = B9600,
+		B19200 = B19200,
+		B38400 = B38400,
+	}
+
+	termios :: struct {
+		c_iflag:       CInput_Flags,   /* [XBD] input flags */
+		c_ispeed:      CSpeed,         /* input speed */
+		c_oflag:       COutput_Flags,  /* [XBD] output flags */
+		c_ospeed:      CSpeed,         /* output speed */
+		c_cflag:       CControl_Flags, /* [XBD] control flags */
+		c_ispeed_high: tcflag_t,       /* high word of input baudrate */
+		c_lflag:       CLocal_Flags,   /* [XBD] local flag */
+		c_ospeed_high: tcflag_t,       /* high word of output baudrate */
+		c_line:        c.char,
+		_padding:      c.uchar,
+		_padding2:     c.uchar,
+		c_cc:          [NCCS]cc_t,
+	}
+
+	NCCS :: 11
+
+	VINTR  :: 0
+	VQUIT  :: 1
+	VERASE :: 2
+	VKILL  :: 3
+	VEOF   :: 4
+	VEOL   :: 5
+	VMIN   :: 4
+	VTIME  :: 5
+	VEOL2  :: 6
+	VSWTCH :: 7
+	VSTART :: 8
+	VSTOP  :: 9
+	VSUSP  :: 10
+
+	IGNBRK :: 0x01   /* ignore break condition */
+	BRKINT :: 0x02   /* break sends interrupt */
+	IGNPAR :: 0x04   /* ignore characters with parity errors */
+	PARMRK :: 0x08   /* mark parity errors */
+	INPCK  :: 0x10   /* enable input parity checking */
+	ISTRIP :: 0x20   /* strip high bit from characters */
+	INLCR  :: 0x40   /* maps newline to CR on input */
+	IGNCR  :: 0x80   /* ignore carriage returns */
+	ICRNL  :: 0x100  /* map CR to newline on input */
+	IXON   :: 0x400  /* enable input SW flow control */
+	IXANY  :: 0x800  /* any character will restart input */
+	IXOFF  :: 0x1000 /* enable output SW flow control */
+
+	OPOST   :: 0x01  /* enable postprocessing of output */
+	ONLCR   :: 0x04  /* map NL to CR-NL on output */
+	OCRNL   :: 0x08  /* map CR to NL on output */
+	ONOCR   :: 0x10  /* no CR output when at column 0 */
+	ONLRET  :: 0x20  /* newline performs CR function */
+	OFILL   :: 0x40  /* use fill characters for delays */
+	OFDEL   :: 0x80  /* Fills are DEL, otherwise NUL */
+	_NLDLY  :: 0x100 /* Newline delays: */
+	NL0     :: 0x000
+	NL1     :: 0x100
+	_CRDLY  :: 0x600 /* Carriage return delays: */
+	CR0     :: 0x000
+	CR1     :: 0x200
+	CR2     :: 0x400
+	CR3     :: 0x600
+	_TABDLY :: 0x1800 /* Tab delays: */
+	TAB0    :: 0x0000
+	TAB1    :: 0x0800
+	TAB3    :: 0x1800
+	_BSDLY  :: 0x2000 /* Backspace delays: */
+	BS0     :: 0x0000
+	BS1     :: 0x2000
+	_VTDLY  :: 0x4000 /* Vertical tab delays: */
+	VT0     :: 0x0000
+	VT1     :: 0x4000
+	_FFDLY  :: 0x8000 /* Form feed delays: */
+	FF0     :: 0x0000
+	FF1     :: 0x8000
+
+	B0     :: 0x00 /* hang up */
+	B50    :: 0x01 /* 50 baud */
+	B75    :: 0x02
+	B110   :: 0x03
+	B134   :: 0x04
+	B150   :: 0x05
+	B200   :: 0x06
+	B300   :: 0x07
+	B600   :: 0x08
+	B1200  :: 0x09
+	B1800  :: 0x0A
+	B2400  :: 0x0B
+	B4800  :: 0x0C
+	B9600  :: 0x0D
+	B19200 :: 0x0E
+	B38400 :: 0x0F
+
+	_CSIZE  :: 0x20  /* character size */
+	//CS5    :: 0x00  /* only 7 and 8 bits supported */
+	//CS6    :: 0x00  /* Note, it was not very wise to set all of these */
+	//CS7    :: 0x00  /* to zero, but there is not much we can do about it*/
+	CS8    :: 0x20
+	CSTOPB :: 0x40  /* send 2 stop bits, not 1 */
+	CREAD  :: 0x80  /* enable receiver */
+	PARENB :: 0x100 /* parity enable */
+	PARODD :: 0x200 /* odd parity, else even */
+	HUPCL  :: 0x400 /* hangs up on last close */
+	CLOCAL :: 0x800 /* indicates local line */
+
+	ISIG   :: 0x01  /* enable signals */
+	ICANON :: 0x02  /* Canonical input */
+	ECHO   :: 0x08  /* Enable echo */
+	ECHOE  :: 0x10  /* Echo erase as bs-sp-bs */
+	ECHOK  :: 0x20  /* Echo nl after kill */
+	ECHONL :: 0x40  /* Echo nl */
+	NOFLSH :: 0x80  /* Disable flush after int or quit */
+	TOSTOP :: 0x100 /* stop bg processes that write to tty */
+	IEXTEN :: 0x200 /* implementation defined extensions */
+
+	TCIFLUSH  :: 1
+	TCOFLUSH  :: 2
+	TCIOFLUSH :: 3
+
+	TCIOFF :: 0x04
+	TCION  :: 0x08
+	TCOOFF :: 0x01
+	TCOON  :: 0x02
 
 }

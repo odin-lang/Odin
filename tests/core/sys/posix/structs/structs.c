@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <glob.h>
@@ -10,7 +11,11 @@
 #include <netdb.h>
 #include <poll.h>
 #include <pwd.h>
+
+#ifndef __HAIKU__
 #include <sys/shm.h>
+#endif
+
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/un.h>
@@ -25,7 +30,11 @@
 #include <sys/statvfs.h>
 #include <sys/time.h>
 #include <utime.h>
+
+#ifndef __HAIKU__
 #include <wordexp.h>
+#endif
+
 #include <sys/socket.h>
 
 int main(int argc, char *argv[])
@@ -62,12 +71,16 @@ int main(int argc, char *argv[])
 	printf("protoent %zu %zu\n", sizeof(struct protoent), _Alignof(struct protoent));
 	printf("servent %zu %zu\n", sizeof(struct servent), _Alignof(struct servent));
 	printf("addrinfo %zu %zu\n", sizeof(struct addrinfo), _Alignof(struct addrinfo));
+	printf("ai_canonname %zu\n", offsetof(struct addrinfo, ai_canonname));
 
 	printf("pollfd %zu %zu\n", sizeof(struct pollfd), _Alignof(struct pollfd));
 
 	printf("passwd %zu %zu\n", sizeof(struct passwd), _Alignof(struct passwd));
 
+#ifndef __HAIKU__
 	printf("shmid_ds %zu %zu\n", sizeof(struct shmid_ds), _Alignof(struct shmid_ds));
+#endif
+
 	printf("ipc_perm %zu %zu\n", sizeof(struct ipc_perm), _Alignof(struct ipc_perm));
 	printf("msqid_ds %zu %zu\n", sizeof(struct msqid_ds), _Alignof(struct msqid_ds));
 
@@ -95,7 +108,9 @@ int main(int argc, char *argv[])
 
 	printf("utimbuf %zu %zu\n", sizeof(struct utimbuf), _Alignof(struct utimbuf));
 
+#ifndef __HAIKU__
 	printf("wordexp_t %zu %zu\n", sizeof(wordexp_t), _Alignof(wordexp_t));
+#endif
 
 	printf("time_t %zu %zu\n", sizeof(time_t), _Alignof(time_t));
 	printf("timespec %zu %zu\n", sizeof(struct timespec), _Alignof(struct timespec));

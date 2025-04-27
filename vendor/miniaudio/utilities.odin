@@ -119,7 +119,12 @@ offset_pcm_frames_const_ptr_f32 :: #force_inline proc "c" (p: [^]f32, offsetInFr
 
 data_source :: struct {}
 
-DATA_SOURCE_SELF_MANAGED_RANGE_AND_LOOP_POINT :: 0x00000001
+data_source_flag :: enum c.int {
+	SELF_MANAGED_RANGE_AND_LOOP_POINT = 0,
+}
+
+data_source_flags :: bit_set[data_source_flag; u32]
+
 
 data_source_vtable :: struct {
 	onRead:          proc "c" (pDataSource: ^data_source, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result,
@@ -128,7 +133,7 @@ data_source_vtable :: struct {
 	onGetCursor:     proc "c" (pDataSource: ^data_source, pCursor: ^u64) -> result,
 	onGetLength:     proc "c" (pDataSource: ^data_source, pLength: ^u64) -> result,
 	onSetLooping:    proc "c" (pDataSource: ^data_source, isLooping: b32) -> result,
-	flags:           u32,
+	flags:           data_source_flags,
 } 
 
 data_source_get_next_proc :: proc "c" (pDataSource: ^data_source) -> ^data_source

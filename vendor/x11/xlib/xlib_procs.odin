@@ -190,8 +190,8 @@ foreign xlib {
 		display: ^Display,
 		window:  Window,
 		mask:    WindowChangesMask,
-		values:  XWindowChanges,
-		) ---
+		changes: ^XWindowChanges,
+		) -> i32 ---
 	MoveWindow :: proc(
 		display: ^Display,
 		window:  Window,
@@ -216,6 +216,11 @@ foreign xlib {
 		display: ^Display,
 		window:  Window,
 		width:   u32,
+		) ---
+	SetWindowBorder :: proc(
+		display: ^Display,
+		window: Window,
+		pixel: uint,
 		) ---
 	// Window: changing stacking order
 	RaiseWindow :: proc(display: ^Display, window: Window) ---
@@ -250,11 +255,11 @@ foreign xlib {
 		display:   ^Display,
 		window:    Window,
 		cursor:    Cursor,
-		) ---
+		) -> i32 ---
 	UndefineCursor :: proc(
 		display:   ^Display,
 		window:    Window,
-		) ---
+		) -> i32 ---
 	// Windows: querying information
 	QueryTree :: proc(
 		display:   ^Display,
@@ -268,7 +273,7 @@ foreign xlib {
 		display: ^Display,
 		window:  Window,
 		attr:    ^XWindowAttributes,
-		) ---
+		) -> i32 ---
 	GetGeometry :: proc(
 		display:   ^Display,
 		drawable:  Drawable,
@@ -352,19 +357,19 @@ foreign xlib {
 		mode:        i32,
 		data:        rawptr,
 		count:       i32,
-		) ---
+		) -> i32 ---
 	RotateWindowProperties :: proc(
 		display:     ^Display,
 		window:      Window,
 		props:       [^]Atom,
 		nprops:      i32,
 		npos:        i32,
-		) ---
+		) -> i32 ---
 	DeleteProperty :: proc(
 		display:     ^Display,
 		window:      Window,
 		prop:        Atom,
-		) ---
+		) -> i32 ---
 	// Selections
 	SetSelectionOwner :: proc(
 		display:     ^Display,
@@ -1007,8 +1012,8 @@ foreign xlib {
 	DisableAccessControl :: proc(display: ^Display) ---
 	// Events
 	SelectInput   :: proc(display: ^Display, window: Window, mask: EventMask) ---
-	Flush         :: proc(display: ^Display) ---
-	Sync          :: proc(display: ^Display) ---
+	Flush         :: proc(display: ^Display) -> i32 ---
+	Sync          :: proc(display: ^Display, discard: bool) -> i32 ---
 	EventsQueued  :: proc(display: ^Display, mode: EventQueueMode) -> i32 ---
 	Pending       :: proc(display: ^Display) -> i32 ---
 	NextEvent     :: proc(display: ^Display, event: ^XEvent) ---

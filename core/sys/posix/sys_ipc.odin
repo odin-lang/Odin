@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -99,6 +99,29 @@ when ODIN_OS == .Darwin {
 		__ipc_perm_seq: c.int,
 		__pad1:         c.long,
 		__pad2:         c.long,
+	}
+
+	IPC_CREAT  :: 0o01000
+	IPC_EXCL   :: 0o02000
+	IPC_NOWAIT :: 0o04000
+
+	IPC_PRIVATE :: key_t(0)
+
+	IPC_RMID :: 0
+	IPC_SET  :: 1
+	IPC_STAT :: 2
+
+} else when ODIN_OS == .Haiku {
+
+	key_t :: distinct c.int32_t
+
+	ipc_perm :: struct {
+		key:  key_t,
+		uid:  uid_t,     /* [PSX] owner's user ID */
+		gid:  gid_t,     /* [PSX] owner's group ID */
+		cuid: uid_t,     /* [PSX] creator's user ID */
+		cgid: gid_t,     /* [PSX] creator's group ID */
+		mode: mode_t,    /* [PSX] read/write perms */
 	}
 
 	IPC_CREAT  :: 0o01000

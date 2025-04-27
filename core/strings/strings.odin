@@ -25,7 +25,7 @@ Returns:
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	c := make([]byte, len(s), allocator, loc) or_return
 	copy(c, s)
-	return string(c[:len(s)]), nil
+	return string(c), nil
 }
 /*
 Clones a string safely (returns early with an allocation error on failure)
@@ -787,7 +787,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	cut_example :: proc() {
+	cut_clone_example :: proc() {
 		fmt.println(strings.cut_clone("some example text", 0, 4)) // -> "some"
 		fmt.println(strings.cut_clone("some example text", 2, 2)) // -> "me"
 		fmt.println(strings.cut_clone("some example text", 5, 7)) // -> "example"
@@ -1031,14 +1031,17 @@ Returns:
 */
 @private
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
+	m: int
 	if sep == "" {
-		res = s[:]
-		ok = true
-		s^ = s[len(s):]
-		return
+		if len(s) == 0 {
+			m = -1
+		} else {
+			_, w := utf8.decode_rune_in_string(s^)
+			m = w
+		}
+	} else {
+		m = index(s^, sep)
 	}
-
-	m := index(s^, sep)
 	if m < 0 {
 		// not found
 		res = s[:]
@@ -1872,7 +1875,8 @@ index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
 	lowest_index := len(s)
 	found := false
 	for substr in substrs {
-		if i := index(s, substr); i >= 0 {
+		haystack := s[:min(len(s), lowest_index + len(substr))]
+		if i := index(haystack, substr); i >= 0 {
 			if i < lowest_index {
 				lowest_index = i
 				width = len(substr)
@@ -3040,7 +3044,6 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	pad_len := rune_count(pad)
 
 	b: Builder
-	builder_init(&b, allocator)
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator) or_return
 
 	w := to_writer(&b)
@@ -3075,7 +3078,6 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	pad_len := rune_count(pad)
 
 	b: Builder
-	builder_init(&b, allocator)
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator) or_return
 
 	w := to_writer(&b)

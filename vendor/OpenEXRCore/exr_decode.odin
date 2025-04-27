@@ -1,11 +1,5 @@
 package vendor_openexr
 
-when ODIN_OS == .Windows {
-	foreign import lib "OpenEXRCore-3_1.lib"
-} else {
-	foreign import lib "system:OpenEXRCore-3_1"
-}
-
 import "core:c"
 
 /** Can be bit-wise or'ed into the decode_flags in the decode pipeline.
@@ -55,6 +49,12 @@ DECODE_SAMPLE_DATA_ONLY :: u16(1 << 2)
  * the same context concurrently.
  */
 decode_pipeline_t :: struct {
+	/** Used for versioning the decode pipeline in the future.
+	 *
+	 * \ref EXR_DECODE_PIPELINE_INITIALIZER
+	 */
+	pipe_size: c.size_t,
+
 	/** The output channel information for this chunk.
 	 *
 	 * User is expected to fill the channel pointers for the desired
@@ -78,6 +78,20 @@ decode_pipeline_t :: struct {
 	part_index: c.int,
 	ctx: const_context_t,
 	chunk: chunk_info_t,
+
+	/** How many lines of the chunk to skip filling, assumes the
+	 * pointer is at the beginning of data (i.e. includes this
+	 * skip so does not need to be adjusted
+	 */
+	user_line_begin_skip: i32,
+
+	/** How many lines of the chunk to ignore at the end, assumes the
+	 * output is meant to be N lines smaller
+	 */
+	user_line_end_ignore: i32,
+
+	/** How many bytes were actually decoded when items compressed */
+	bytes_decompressed: u64,
 
 	/** Can be used by the user to pass custom context data through
 	 * the decode pipeline.
@@ -236,7 +250,7 @@ decode_pipeline_t :: struct {
 	_quick_chan_store: [5]coding_channel_info_t,
 }
 
-DECODE_PIPELINE_INITIALIZER :: decode_pipeline_t{}
+DECODE_PIPELINE_INITIALIZER :: decode_pipeline_t{ pipe_size = size_of(decode_pipeline_t) }
 
 
 @(link_prefix="exr_", default_calling_convention="c")

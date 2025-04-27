@@ -67,7 +67,7 @@ main :: proc() {
 ```
 
 Writing to memory:
-```c
+```odin
 package main
 
 import "vendor:cgltf"

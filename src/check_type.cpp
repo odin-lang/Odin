@@ -685,7 +685,8 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	ST_ALIGN(min_field_align);
 	ST_ALIGN(max_field_align);
 	ST_ALIGN(align);
-	if (struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
+	if (struct_type->Struct.custom_align != 0 &&
+		struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
 		error(st->align, "#align(%lld) is defined to be less than #min_field_align(%lld)",
 		      cast(long long)struct_type->Struct.custom_align,
 		      cast(long long)struct_type->Struct.custom_min_field_align);
@@ -1154,8 +1155,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		}
 	}
 
-
-
+	#if 0 // Reconsider at a later date
 	if (bit_sizes.count > 0 && is_type_integer(backing_type)) {
 		bool all_booleans = is_type_boolean(fields[0]->type);
 		bool all_ones = bit_sizes[0] == 1;
@@ -1181,7 +1181,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			}
 		}
 	}
-
+	#endif
 
 	bit_field_type->BitField.fields      = slice_from_array(fields);
 	bit_field_type->BitField.bit_sizes   = slice_from_array(bit_sizes);
@@ -2081,7 +2081,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type, allow_array_programming)) {
 						bool ok = true;
 						if (p->flags&FieldFlag_any_int) {
-							if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
+							if (op.type == nullptr) {
+								ok = false;
+							} else if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
 								ok = false;
 							} else if (!check_is_castable_to(ctx, &op, type)) {
 								ok = false;
@@ -2366,8 +2368,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 }
 
 gb_internal void check_procedure_param_polymorphic_type(CheckerContext *ctx, Type *type, Ast *type_expr) {
-	GB_ASSERT_NOT_NULL(type_expr);
-	if (type == nullptr || ctx->in_polymorphic_specialization) { return; }
+	if (type == nullptr || type_expr == nullptr || ctx->in_polymorphic_specialization) { return; }
 	if (!is_type_polymorphic_record_unspecialized(type)) { return; }
 
 	bool invalid_polymorpic_type_use = false;
@@ -2441,8 +2442,12 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	bool success = true;
 	isize specialization_count = 0;
 	Type *params  = check_get_params(c, c->scope, pt->params, &variadic, &variadic_index, &success, &specialization_count, operands);
-	Type *results = check_get_results(c, c->scope, pt->results);
 
+	bool no_poly_return = c->disallow_polymorphic_return_types;
+	c->disallow_polymorphic_return_types = c->scope == c->polymorphic_scope;
+	// NOTE(zen3ger): if the parapoly scope is the current proc's scope, then the return types shall not declare new poly vars
+	Type *results = check_get_results(c, c->scope, pt->results);
+	c->disallow_polymorphic_return_types = no_poly_return;
 
 	isize param_count = 0;
 	isize result_count = 0;
@@ -2769,6 +2774,21 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 			return;
 		}
 
+		if (key->kind == Type_Basic) {
+			if (key->Basic.flags & BasicFlag_Quaternion) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				add_package_dependency(ctx, "runtime", "default_hasher_quaternion256");
+				return;
+			} else if (key->Basic.flags & BasicFlag_Complex) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				add_package_dependency(ctx, "runtime", "default_hasher_complex128");
+				return;
+			} else if (key->Basic.flags & BasicFlag_Float) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				return;
+			}
+		}
+
 		if (key->kind == Type_Struct) {
 			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Struct.fields) {
@@ -2855,15 +2875,23 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 	}
 	
 	if (generic_row == nullptr && row_count < MATRIX_ELEMENT_COUNT_MIN) {
-		gbString s = expr_to_string(row.expr);
-		error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
-		gb_string_free(s);
+		if (row.expr == nullptr) {
+			error(node, "Invalid matrix row count, got nothing");
+		} else {
+			gbString s = expr_to_string(row.expr);
+			error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			gb_string_free(s);
+		}
 	}
 	
 	if (generic_column == nullptr && column_count < MATRIX_ELEMENT_COUNT_MIN) {
-		gbString s = expr_to_string(column.expr);
-		error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
-		gb_string_free(s);
+		if (column.expr == nullptr) {
+			error(node, "Invalid matrix column count, got nothing");
+		} else {
+			gbString s = expr_to_string(column.expr);
+			error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			gb_string_free(s);
+		}
 	}
 	
 	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
@@ -3384,6 +3412,9 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		}
 		Type *t = alloc_type_generic(ctx->scope, 0, token.string, specific);
 		if (ctx->allow_polymorphic_types) {
+			if (ctx->disallow_polymorphic_return_types) {
+				error(ident, "Undeclared polymorphic parameter '%.*s' in return type", LIT(token.string));
+			}
 			Scope *ps = ctx->polymorphic_scope;
 			Scope *s = ctx->scope;
 			Scope *entity_scope = s;
@@ -3485,6 +3516,17 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			}
 		} else {
 			elem = o.type;
+		}
+
+		if (!ctx->in_polymorphic_specialization && ctx->disallow_polymorphic_return_types) {
+			Type *t = base_type(elem);
+			if (t != nullptr &&
+			    unparen_expr(pt->type)->kind == Ast_Ident &&
+			    is_type_polymorphic_record_unspecialized(t)) {
+				gbString err_str = expr_to_string(e);
+				error(e, "Invalid use of a non-specialized polymorphic type '%s'", err_str);
+				gb_string_free(err_str);
+			}
 		}
 
 

@@ -91,6 +91,7 @@ foreign ws2_32 {
 	WSACleanup :: proc() -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsagetlasterror)
 	WSAGetLastError :: proc() -> c_int ---
+	WSASetLastError :: proc(err: c_int) ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsapoll)
 	WSAPoll :: proc(fdArray: ^WSA_POLLFD, fds: c_ulong, timeout: c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaduplicatesocketw)

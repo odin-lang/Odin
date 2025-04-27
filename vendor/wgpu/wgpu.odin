@@ -10,12 +10,13 @@ WGPU_DEBUG  :: #config(WGPU_DEBUG,  false)
 when ODIN_OS == .Windows {
 	@(private) ARCH :: "x86_64"   when ODIN_ARCH == .amd64 else "x86_64" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
 	@(private) EXT  :: ".dll.lib" when WGPU_SHARED else ".lib"
-	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-" + TYPE + "/wgpu_native" + EXT
+	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-msvc-" + TYPE + "/lib/wgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v24.0.0.2, make sure to read the README at '" + #directory + "README.md'")
 	}
 
+	@(export)
 	foreign import libwgpu {
 		LIB,
 		"system:d3dcompiler.lib",
@@ -29,16 +30,19 @@ when ODIN_OS == .Windows {
 		"system:gdi32.lib",
 		"system:ole32.lib",
 		"system:oleaut32.lib",
+		"system:propsys.lib",
+		"system:runtimeobject.lib",
 	}
 } else when ODIN_OS == .Darwin {
 	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
 	@(private) EXT  :: ".dylib" when WGPU_SHARED else ".a"
-	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/libwgpu_native" + EXT
+	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v24.0.0.2, make sure to read the README at '" + #directory + "README.md'")
 	}
 
+	@(export)
 	foreign import libwgpu {
 		LIB,
 		"system:CoreFoundation.framework",
@@ -48,18 +52,20 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Linux {
 	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
 	@(private) EXT  :: ".so"    when WGPU_SHARED else ".a"
-	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/libwgpu_native" + EXT
+	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v22.1.0.1, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v24.0.0.2, make sure to read the README at '" + #directory + "README.md'")
 	}
 
+	@(export)
 	foreign import libwgpu {
 		LIB,
 		"system:dl",
 		"system:m",
 	}
 } else when ODIN_OS == .JS {
+	@(export)
 	foreign import libwgpu "wgpu"
 }
 
@@ -73,7 +79,11 @@ QUERY_SET_INDEX_UNDEFINED :: max(u32)
 WHOLE_MAP_SIZE :: max(uint)
 WHOLE_SIZE :: max(u64)
 
-Flags :: u32
+Flags :: u64
+
+StringView :: string
+
+STRLEN :: transmute(int)(max(uint))
 
 Adapter :: distinct rawptr
 BindGroup :: distinct rawptr
@@ -99,16 +109,17 @@ Texture :: distinct rawptr
 TextureView :: distinct rawptr
 
 AdapterType :: enum i32 {
-	DiscreteGPU = 0x00000000,
-	IntegratedGPU = 0x00000001,
-	CPU = 0x00000002,
-	Unknown = 0x00000003,
+	DiscreteGPU = 0x00000001,
+	IntegratedGPU = 0x00000002,
+	CPU = 0x00000003,
+	Unknown = 0x00000004,
 }
 
 AddressMode :: enum i32 {
-	Repeat = 0x00000000,
-	MirrorRepeat = 0x00000001,
-	ClampToEdge = 0x00000002,
+	Undefined = 0x00000000,
+	ClampToEdge = 0x00000001,
+	Repeat = 0x00000002,
+	MirrorRepeat = 0x00000003,
 }
 
 BackendType :: enum i32 {
@@ -124,19 +135,24 @@ BackendType :: enum i32 {
 }
 
 BlendFactor :: enum i32 {
-	Zero = 0x00000000,
-	One = 0x00000001,
-	Src = 0x00000002,
-	OneMinusSrc = 0x00000003,
-	SrcAlpha = 0x00000004,
-	OneMinusSrcAlpha = 0x00000005,
-	Dst = 0x00000006,
-	OneMinusDst = 0x00000007,
-	DstAlpha = 0x00000008,
-	OneMinusDstAlpha = 0x00000009,
-	SrcAlphaSaturated = 0x0000000A,
-	Constant = 0x0000000B,
-	OneMinusConstant = 0x0000000C,
+	Undefined = 0x00000000,
+	Zero = 0x00000001,
+	One = 0x00000002,
+	Src = 0x00000003,
+	OneMinusSrc = 0x00000004,
+	SrcAlpha = 0x00000005,
+	OneMinusSrcAlpha = 0x00000006,
+	Dst = 0x00000007,
+	OneMinusDst = 0x00000008,
+	DstAlpha = 0x00000009,
+	OneMinusDstAlpha = 0x0000000A,
+	SrcAlphaSaturated = 0x0000000B,
+	Constant = 0x0000000C,
+	OneMinusConstant = 0x0000000D,
+	Src1 = 0x0000000E,
+	OneMinusSrc1 = 0x0000000F,
+	Src1Alpha = 0x00000010,
+	OneMinusSrc1Alpha = 0x00000011,
 }
 
 BlendOperation :: enum i32 {
@@ -148,53 +164,48 @@ BlendOperation :: enum i32 {
 }
 
 BufferBindingType :: enum i32 {
-	Undefined = 0x00000000,
-	Uniform = 0x00000001,
-	Storage = 0x00000002,
-	ReadOnlyStorage = 0x00000003,
-}
-
-BufferMapAsyncStatus :: enum i32 {
-	Success = 0x00000000,
-	ValidationError = 0x00000001,
-	Unknown = 0x00000002,
-	DeviceLost = 0x00000003,
-	DestroyedBeforeCallback = 0x00000004,
-	UnmappedBeforeCallback = 0x00000005,
-	MappingAlreadyPending = 0x00000006,
-	OffsetOutOfRange = 0x00000007,
-	SizeOutOfRange = 0x00000008,
+	BindingNotUsed = 0x00000000,
+	Undefined = 0x00000001,
+	Uniform = 0x00000002,
+	Storage = 0x00000003,
+	ReadOnlyStorage = 0x00000004,
 }
 
 BufferMapState :: enum i32 {
-	Unmapped = 0x00000000,
-	Pending = 0x00000001,
-	Mapped = 0x00000002,
+	Unmapped = 0x00000001,
+	Pending = 0x00000002,
+	Mapped = 0x00000003,
+}
+
+CallbackMode :: enum i32 {
+	WaitAnyOnly = 0x00000001,
+	AllowProcessEvents = 0x00000002,
+	AllowSpontaneos = 0x00000003,
 }
 
 CompareFunction :: enum i32 {
 	Undefined = 0x00000000,
 	Never = 0x00000001,
 	Less = 0x00000002,
-	LessEqual = 0x00000003,
-	Greater = 0x00000004,
-	GreaterEqual = 0x00000005,
-	Equal = 0x00000006,
-	NotEqual = 0x00000007,
+	Equal = 0x00000003,
+	LessEqual = 0x00000004,
+	Greater = 0x00000005,
+	NotEqual = 0x00000006,
+	GreaterEqual = 0x00000007,
 	Always = 0x00000008,
 }
 
 CompilationInfoRequestStatus :: enum i32 {
-	Success = 0x00000000,
-	Error = 0x00000001,
-	DeviceLost = 0x00000002,
-	Unknown = 0x00000003,
+	Success = 0x00000001,
+	InstanceDropped = 0x00000002,
+	Error = 0x00000003,
+	Unknown = 0x00000004,
 }
 
 CompilationMessageType :: enum i32 {
-	Error = 0x00000000,
-	Warning = 0x00000001,
-	Info = 0x00000002,
+	Error = 0x00000001,
+	Warning = 0x00000002,
+	Info = 0x00000003,
 }
 
 CompositeAlphaMode :: enum i32 {
@@ -206,39 +217,45 @@ CompositeAlphaMode :: enum i32 {
 }
 
 CreatePipelineAsyncStatus :: enum i32 {
-	Success = 0x00000000,
-	ValidationError = 0x00000001,
-	InternalError = 0x00000002,
-	DeviceLost = 0x00000003,
-	DeviceDestroyed = 0x00000004,
+	Success = 0x00000001,
+	InstanceDropped = 0x00000002,
+	ValidationError = 0x00000003,
+	InternalError = 0x00000004,
 	Unknown = 0x00000005,
 }
 
 CullMode :: enum i32 {
-	None = 0x00000000,
-	Front = 0x00000001,
-	Back = 0x00000002,
+	Undefined = 0x00000000,
+	None = 0x00000001,
+	Front = 0x00000002,
+	Back = 0x00000003,
 }
 
 DeviceLostReason :: enum i32 {
 	Undefined = 0x00000000,
 	Unknown   = 0x00000001,
 	Destroyed = 0x00000002,
+	InstanceDropped = 0x00000003,
+	FailedCreation = 0x00000004,
 }
 
 ErrorFilter :: enum i32 {
-	Validation = 0x00000000,
-	OutOfMemory = 0x00000001,
-	Internal = 0x00000002,
-}
-
-ErrorType :: enum i32 {
-	NoError = 0x00000000,
 	Validation = 0x00000001,
 	OutOfMemory = 0x00000002,
 	Internal = 0x00000003,
-	Unknown = 0x00000004,
-	DeviceLost = 0x00000005,
+}
+
+ErrorType :: enum i32 {
+	NoError = 0x00000001,
+	Validation = 0x00000002,
+	OutOfMemory = 0x00000003,
+	Internal = 0x00000004,
+	Unknown = 0x00000005,
+}
+
+FeatureLevel :: enum i32 {
+	Compatibility = 0x00000001,
+	Core = 0x00000002,
 }
 
 FeatureName :: enum i32 {
@@ -248,13 +265,18 @@ FeatureName :: enum i32 {
 	Depth32FloatStencil8 = 0x00000002,
 	TimestampQuery = 0x00000003,
 	TextureCompressionBC = 0x00000004,
-	TextureCompressionETC2 = 0x00000005,
-	TextureCompressionASTC = 0x00000006,
-	IndirectFirstInstance = 0x00000007,
-	ShaderF16 = 0x00000008,
-	RG11B10UfloatRenderable = 0x00000009,
-	BGRA8UnormStorage = 0x0000000A,
-	Float32Filterable = 0x0000000B,
+	TextureCompressionBCSliced3D = 0x00000005,
+	TextureCompressionETC2 = 0x00000006,
+	TextureCompressionASTC = 0x00000007,
+	TextureCompressionASTCSliced3D = 0x00000008,
+	IndirectFirstInstance = 0x00000009,
+	ShaderF16 = 0x0000000A,
+	RG11B10UfloatRenderable = 0x0000000B,
+	BGRA8UnormStorage = 0x0000000C,
+	Float32Filterable = 0x0000000D,
+	Float32Blendable = 0x0000000E,
+	ClipDistances = 0x0000000F,
+	DualSourceBlending = 0x00000010,
 
 	// Native.
 	PushConstants = 0x00030001,
@@ -269,8 +291,6 @@ FeatureName :: enum i32 {
 	PartiallyBoundBindingArray,
 	TextureFormat16bitNorm,
 	TextureCompressionAstcHdr,
-	// TODO: requires wgpu.h api change
-	// TimestampQueryInsidePasses,
 	MappablePrimaryBuffers = 0x0003000E,
 	BufferBindingArray,
 	UniformBufferAndStorageTextureArrayNonUniformIndexing,
@@ -281,7 +301,7 @@ FeatureName :: enum i32 {
 	// PolygonModePoint,
 	// ConservativeRasterization,
 	// ClearTexture,
-	// SprivShaderPassThrough,
+	SpirvShaderPassthrough = 0x00030017,
 	// MultiView,
 	VertexAttribute64bit = 0x00030019,
 	TextureFormatNv12,
@@ -291,16 +311,23 @@ FeatureName :: enum i32 {
 	ShaderI16,
 	ShaderPrimitiveIndex,
 	ShaderEarlyDepthTest,
+	Subgroup,
+	SubgroupVertex,
+	SubgroupBarrier,
+	TimestampQueryInsideEncoders,
+	TimestampQueryInsidePasses,
 }
 
 FilterMode :: enum i32 {
-	Nearest = 0x00000000,
-	Linear = 0x00000001,
+	Undefined = 0x00000000,
+	Nearest = 0x00000001,
+	Linear = 0x00000002,
 }
 
 FrontFace :: enum i32 {
-	CCW = 0x00000000,
-	CW = 0x00000001,
+	Undefined = 0x00000000,
+	CCW = 0x00000001,
+	CW = 0x00000002,
 }
 
 IndexFormat :: enum i32 {
@@ -311,13 +338,34 @@ IndexFormat :: enum i32 {
 
 LoadOp :: enum i32 {
 	Undefined = 0x00000000,
-	Clear = 0x00000001,
-	Load = 0x00000002,
+	Load = 0x00000001,
+	Clear = 0x00000002,
+}
+
+MapAsyncStatus :: enum i32 {
+	Success = 0x00000001,
+	InstanceDropped = 0x00000002,
+	Error = 0x00000003,
+	Aborted = 0x00000004,
+	Unknown = 0x00000005,
 }
 
 MipmapFilterMode :: enum i32 {
-	Nearest = 0x00000000,
-	Linear = 0x00000001,
+	Undefined = 0x00000000,
+	Nearest = 0x00000001,
+	Linear = 0x00000002,
+}
+
+OptionalBool :: enum i32 {
+	False = 0x00000000,
+	True = 0x00000001,
+	Undefined = 0x00000002,
+}
+
+PopErrorScopeStatus :: enum i32 {
+	Success = 0x00000001,
+	InstanceDropped = 0x00000002,
+	EmptyStack = 0x00000003,
 }
 
 PowerPreference :: enum i32 {
@@ -327,67 +375,68 @@ PowerPreference :: enum i32 {
 }
 
 PresentMode :: enum i32 {
-	Fifo = 0x00000000,
-	FifoRelaxed = 0x00000001,
-	Immediate = 0x00000002,
-	Mailbox = 0x00000003,
+	Undefined = 0x00000000,
+	Fifo = 0x00000001,
+	FifoRelaxed = 0x00000002,
+	Immediate = 0x00000003,
+	Mailbox = 0x00000004,
 }
 
 PrimitiveTopology :: enum i32 {
-	PointList = 0x00000000,
-	LineList = 0x00000001,
-	LineStrip = 0x00000002,
-	TriangleList = 0x00000003,
-	TriangleStrip = 0x00000004,
+	Undefined = 0x00000000,
+	PointList = 0x00000001,
+	LineList = 0x00000002,
+	LineStrip = 0x00000003,
+	TriangleList = 0x00000004,
+	TriangleStrip = 0x00000005,
 }
 
 QueryType :: enum i32 {
 	// WebGPU.
-	Occlusion = 0x00000000,
-	Timestamp = 0x00000001,
+	Occlusion = 0x00000001,
+	Timestamp = 0x00000002,
 
 	// Native.
 	PipelineStatistics = 0x00030000,
 }
 
 QueueWorkDoneStatus :: enum i32 {
-	Success = 0x00000000,
-	Error = 0x00000001,
-	Unknown = 0x00000002,
-	DeviceLost = 0x00000003,
+	Success = 0x00000001,
+	InstanceDropped = 0x00000002,
+	Error = 0x00000003,
+	Unknown = 0x00000004,
 }
 
 RequestAdapterStatus :: enum i32 {
-	Success = 0x00000000,
-	Unavailable = 0x00000001,
-	Error = 0x00000002,
-	Unknown = 0x00000003,
+	Success = 0x00000001,
+	InstanceDropped = 0x00000002,
+	Unavailable = 0x00000003,
+	Error = 0x00000004,
+	Unknown = 0x00000005,
 }
 
 RequestDeviceStatus :: enum i32 {
-	Success = 0x00000000,
-	Error = 0x00000001,
-	Unknown = 0x00000002,
+	Success = 0x00000001,
+	InstanceDropped = 0x00000002,
+	Error = 0x00000003,
+	Unknown = 0x00000004,
 }
 
 SType :: enum i32 {
 	// WebGPU.
-	Invalid = 0x00000000,
-	SurfaceDescriptorFromMetalLayer = 0x00000001,
-	SurfaceDescriptorFromWindowsHWND = 0x00000002,
-	SurfaceDescriptorFromXlibWindow = 0x00000003,
-	SurfaceDescriptorFromCanvasHTMLSelector = 0x00000004,
-	ShaderModuleSPIRVDescriptor = 0x00000005,
-	ShaderModuleWGSLDescriptor = 0x00000006,
-	PrimitiveDepthClipControl = 0x00000007,
-	SurfaceDescriptorFromWaylandSurface = 0x00000008,
-	SurfaceDescriptorFromAndroidNativeWindow = 0x00000009,
-	SurfaceDescriptorFromXcbWindow = 0x0000000A,
-	RenderPassDescriptorMaxDrawCount = 0x0000000F,
+	ShaderSourceSPIRV = 0x00000001,
+	ShaderSourceWGSL = 0x00000002,
+	RenderPassMaxDrawCount = 0x00000003,
+	SurfaceSourceMetalLayer = 0x00000004,
+	SurfaceSourceWindowsHWND = 0x00000005,
+	SurfaceSourceXlibWindow = 0x00000006,
+	SurfaceSourceWaylandSurface = 0x00000007,
+	SurfaceSourceAndroidNativeWindow = 0x00000008,
+	SurfaceSourceXCBWindow = 0x00000009,
 
 	// Native.
 	DeviceExtras = 0x00030001,
-	RequiredLimitsExtras,
+	NativeLimits,
 	PipelineLayoutExtras,
 	ShaderModuleGLSLDescriptor,
 	SupportedLimitsExtras,
@@ -396,31 +445,42 @@ SType :: enum i32 {
 	BindGroupLayoutEntryExtras,
 	QuerySetDescriptorExtras,
 	SurfaceConfigurationExtras,
+
+	// Odin.
+	SurfaceSourceCanvasHTMLSelector = 0x00040001,
 }
 
 SamplerBindingType :: enum i32 {
-	Undefined = 0x00000000,
-	Filtering = 0x00000001,
-	NonFiltering = 0x00000002,
-	Comparison = 0x00000003,
+	BindingNotUsed = 0x00000000,
+	Undefined = 0x00000001,
+	Filtering = 0x00000002,
+	NonFiltering = 0x00000003,
+	Comparison = 0x00000004,
+}
+
+Status :: enum i32 {
+	Success = 0x00000001,
+	Error = 0x00000002,
 }
 
 StencilOperation :: enum i32 {
-	Keep = 0x00000000,
-	Zero = 0x00000001,
-	Replace = 0x00000002,
-	Invert = 0x00000003,
-	IncrementClamp = 0x00000004,
-	DecrementClamp = 0x00000005,
-	IncrementWrap = 0x00000006,
-	DecrementWrap = 0x00000007,
+	Undefined = 0x00000000,
+	Keep = 0x00000001,
+	Zero = 0x00000002,
+	Replace = 0x00000003,
+	Invert = 0x00000004,
+	IncrementClamp = 0x00000005,
+	DecrementClamp = 0x00000006,
+	IncrementWrap = 0x00000007,
+	DecrementWrap = 0x00000008,
 }
 
 StorageTextureAccess :: enum i32 {
-	Undefined = 0x00000000,
-	WriteOnly = 0x00000001,
-	ReadOnly = 0x00000002,
-	ReadWrite = 0x00000003,
+	BindingNotUsed = 0x00000000,
+	Undefined = 0x00000001,
+	WriteOnly = 0x00000002,
+	ReadOnly = 0x00000003,
+	ReadWrite = 0x00000004,
 }
 
 StoreOp :: enum i32 {
@@ -430,24 +490,28 @@ StoreOp :: enum i32 {
 }
 
 SurfaceGetCurrentTextureStatus :: enum i32 {
-	Success = 0x00000000,
-	Timeout = 0x00000001,
-	Outdated = 0x00000002,
-	Lost = 0x00000003,
-	OutOfMemory = 0x00000004,
-	DeviceLost = 0x00000005,
+	SuccessOptimal = 0x00000001,
+	SuccessSuboptimal = 0x00000002,
+	Timeout = 0x00000003,
+	Outdated = 0x00000004,
+	Lost = 0x00000005,
+	OutOfMemory = 0x00000006,
+	DeviceLost = 0x00000007,
+	Error = 0x00000008,
 }
 
 TextureAspect :: enum i32 {
-	All = 0x00000000,
-	StencilOnly = 0x00000001,
-	DepthOnly = 0x00000002,
+	Undefined = 0x00000000,
+	All = 0x00000001,
+	StencilOnly = 0x00000002,
+	DepthOnly = 0x00000003,
 }
 
 TextureDimension :: enum i32 {
-	_1D = 0x00000000,
-	_2D = 0x00000001,
-	_3D = 0x00000002,
+	Undefined = 0x00000000,
+	_1D = 0x00000001,
+	_2D = 0x00000002,
+	_3D = 0x00000003,
 }
 
 TextureFormat :: enum i32 {
@@ -562,12 +626,13 @@ TextureFormat :: enum i32 {
 }
 
 TextureSampleType :: enum i32 {
-	Undefined = 0x00000000,
-	Float = 0x00000001,
-	UnfilterableFloat = 0x00000002,
-	Depth = 0x00000003,
-	Sint = 0x00000004,
-	Uint = 0x00000005,
+	BindingNotUsed = 0x00000000,
+	Undefined = 0x00000001,
+	Float = 0x00000002,
+	UnfilterableFloat = 0x00000003,
+	Depth = 0x00000004,
+	Sint = 0x00000005,
+	Uint = 0x00000006,
 }
 
 TextureViewDimension :: enum i32 {
@@ -581,51 +646,69 @@ TextureViewDimension :: enum i32 {
 }
 
 VertexFormat :: enum i32 {
-	Undefined = 0x00000000,
-	Uint8x2 = 0x00000001,
-	Uint8x4 = 0x00000002,
-	Sint8x2 = 0x00000003,
-	Sint8x4 = 0x00000004,
-	Unorm8x2 = 0x00000005,
-	Unorm8x4 = 0x00000006,
-	Snorm8x2 = 0x00000007,
-	Snorm8x4 = 0x00000008,
-	Uint16x2 = 0x00000009,
-	Uint16x4 = 0x0000000A,
-	Sint16x2 = 0x0000000B,
-	Sint16x4 = 0x0000000C,
-	Unorm16x2 = 0x0000000D,
-	Unorm16x4 = 0x0000000E,
-	Snorm16x2 = 0x0000000F,
-	Snorm16x4 = 0x00000010,
-	Float16x2 = 0x00000011,
-	Float16x4 = 0x00000012,
-	Float32 = 0x00000013,
-	Float32x2 = 0x00000014,
-	Float32x3 = 0x00000015,
-	Float32x4 = 0x00000016,
-	Uint32 = 0x00000017,
-	Uint32x2 = 0x00000018,
-	Uint32x3 = 0x00000019,
-	Uint32x4 = 0x0000001A,
-	Sint32 = 0x0000001B,
-	Sint32x2 = 0x0000001C,
-	Sint32x3 = 0x0000001D,
-	Sint32x4 = 0x0000001E,
+	Uint8 = 0x00000001,
+	Uint8x2 = 0x00000002,
+	Uint8x4 = 0x00000003,
+	Sint8 = 0x00000004,
+	Sint8x2 = 0x00000005,
+	Sint8x4 = 0x00000006,
+	Unorm8 = 0x00000007,
+	Unorm8x2 = 0x00000008,
+	Unorm8x4 = 0x00000009,
+	Snorm8 = 0x0000000A,
+	Snorm8x2 = 0x0000000B,
+	Snorm8x4 = 0x0000000C,
+	Uint16 = 0x0000000D,
+	Uint16x2 = 0x0000000E,
+	Uint16x4 = 0x0000000F,
+	Sint16 = 0x00000010,
+	Sint16x2 = 0x00000011,
+	Sint16x4 = 0x00000012,
+	Unorm16 = 0x00000013,
+	Unorm16x2 = 0x00000014,
+	Unorm16x4 = 0x00000015,
+	Snorm16 = 0x00000016,
+	Snorm16x2 = 0x00000017,
+	Snorm16x4 = 0x00000018,
+	Float16 = 0x00000019,
+	Float16x2 = 0x0000001A,
+	Float16x4 = 0x0000001B,
+	Float32 = 0x0000001C,
+	Float32x2 = 0x0000001D,
+	Float32x3 = 0x0000001E,
+	Float32x4 = 0x0000001F,
+	Uint32 = 0x00000020,
+	Uint32x2 = 0x00000021,
+	Uint32x3 = 0x00000022,
+	Uint32x4 = 0x00000023,
+	Sint32 = 0x00000024,
+	Sint32x2 = 0x00000025,
+	Sint32x3 = 0x00000026,
+	Sint32x4 = 0x00000027,
+	Unorm10_10_10_2 = 0x00000028,
+	Unorm8x4BGRA = 0x00000029,
 }
 
 VertexStepMode :: enum i32 {
-	Vertex = 0x00000000,
-	Instance = 0x00000001,
-	VertexBufferNotUsed = 0x00000002,
+	VertexBufferNotUsed = 0x00000000,
+	Undefined = 0x00000001,
+	Vertex = 0x00000002,
+	Instance = 0x00000003,
 }
 
-WGSLFeatureName :: enum i32 {
-	Undefined = 0x00000000,
+WGSLLanguageFeatureName :: enum i32 {
 	ReadonlyAndReadwriteStorageTextures = 0x00000001,
 	Packed4x8IntegerDotProduct = 0x00000002,
 	UnrestrictedPointerParameters = 0x00000003,
 	PointerCompositeAccess = 0x00000004,
+}
+
+WaitStatus :: enum i32 {
+	Success = 0x00000001,
+	TimedOut = 0x00000002,
+	UnsupportedTimeout = 0x00000003,
+	UnsupportedCount = 0x00000004,
+	UnsupportedMixedSource = 0x00000005,
 }
 
 BufferUsage :: enum i32 {
@@ -675,44 +758,116 @@ TextureUsageFlags :: bit_set[TextureUsage; Flags]
 
 Proc :: distinct rawptr
 
-DeviceLostCallback :: #type proc "c" (reason: DeviceLostReason, message: cstring, userdata: rawptr)
-ErrorCallback :: #type proc "c" (type: ErrorType, message: cstring, userdata: rawptr)
-
-AdapterRequestDeviceCallback :: #type proc "c" (status: RequestDeviceStatus, device: Device, message: cstring, /* NULLABLE */ userdata: rawptr)
-BufferMapAsyncCallback :: #type proc "c" (status: BufferMapAsyncStatus, /* NULLABLE */ userdata: rawptr)
-DeviceCreateComputePipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: ComputePipeline, message: cstring, /* NULLABLE */ userdata: rawptr)
-DeviceCreateRenderPipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: RenderPipeline, message: cstring, /* NULLABLE */ userdata: rawptr)
-InstanceRequestAdapterCallback :: #type proc "c" (status: RequestAdapterStatus, adapter: Adapter, message: cstring, /* NULLABLE */ userdata: rawptr)
-QueueOnSubmittedWorkDoneCallback :: #type proc "c" (status: QueueWorkDoneStatus, /* NULLABLE */ userdata: rawptr)
-ShaderModuleGetCompilationInfoCallback :: #type proc "c" (status: CompilationInfoRequestStatus, compilationInfo: ^CompilationInfo, /* NULLABLE */ userdata: rawptr)
+BufferMapCallback :: #type proc "c" (status: MapAsyncStatus, message: StringView, userdata1: rawptr, userdata2: rawptr)
+CompilationInfoCallback :: #type proc "c" (status: CompilationInfoRequestStatus, compilationInfo: ^CompilationInfo, userdata1: rawptr, userdata2: rawptr)
+CreateComputePipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: ComputePipeline, message: StringView, userdata1: rawptr, userdata2: rawptr)
+CreateRenderPipelineAsyncCallback :: #type proc "c" (status: CreatePipelineAsyncStatus, pipeline: RenderPipeline, message: StringView, userdata1: rawptr, userdata2: rawptr)
+DeviceLostCallback :: #type proc "c" (device: ^Device, reason: DeviceLostReason, message: StringView, userdata1: rawptr, userdata2: rawptr)
+PopErrorScopeCallback :: #type proc "c" (status: PopErrorScopeStatus, type: ErrorType, message: StringView, userdata1: rawptr, userdata2: rawptr)
+QueueWorkDoneCallback :: #type proc "c" (status: QueueWorkDoneStatus, userdata1: rawptr, userdata2: rawptr)
+RequestAdapterCallback :: #type proc "c" (status: RequestAdapterStatus, adapter: Adapter, message: StringView, userdata1: rawptr, userdata2: rawptr)
+RequestDeviceCallback :: #type proc "c" (status: RequestDeviceStatus, adapter: Device, message: StringView, userdata1: rawptr, userdata2: rawptr)
+UncapturedErrorCallback :: #type proc "c" (device: ^Device, type: ErrorType, message: StringView, userdata1: rawptr, userdata2: rawptr)
 
 ChainedStruct :: struct {
-	next:  ^ChainedStruct,
+	next: ^ChainedStruct,
 	sType: SType,
 }
 
 ChainedStructOut :: struct {
-	next:  ^ChainedStructOut,
+	next: ^ChainedStructOut,
 	sType: SType,
+}
+
+BufferMapCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: BufferMapCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+CompilationInfoCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: CompilationInfoCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+CreateComputePipelineAsyncCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: CreateComputePipelineAsyncCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+CreateRenderPipelineAsyncCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: CreateRenderPipelineAsyncCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+DeviceLostCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: DeviceLostCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+PopErrorScopeCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: PopErrorScopeCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+QueueWorkDoneCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: QueueWorkDoneCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+RequestAdapterCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: RequestAdapterCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+RequestDeviceCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	mode: CallbackMode,
+	callback: RequestDeviceCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
+}
+
+UncapturedErrorCallbackInfo :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	callback: UncapturedErrorCallback,
+	userdata1: /* NULLABLE */ rawptr,
+	userdata2: /* NULLABLE */ rawptr,
 }
 
 AdapterInfo :: struct {
 	nextInChain: ^ChainedStructOut,
-	vendor: cstring,
-	architecture: cstring,
-	device: cstring,
-	description: cstring,
+	vendor: StringView,
+	architecture: StringView,
+	device: StringView,
+	description: StringView,
 	backendType: BackendType,
 	adapterType: AdapterType,
 	vendorID: u32,
 	deviceID: u32,
-}
-when ODIN_OS == .JS {
-	#assert(int(BackendType.WebGPU) == 2)
-	#assert(offset_of(AdapterInfo, backendType) == 20)
-
-	#assert(int(AdapterType.Unknown) == 3)
-	#assert(offset_of(AdapterInfo, adapterType) == 24)
 }
 
 BindGroupEntry :: struct {
@@ -739,8 +894,8 @@ BufferBindingLayout :: struct {
 }
 
 BufferDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	usage: BufferUsageFlags,
 	size: u64,
 	mappedAtCreation: b32,
@@ -749,26 +904,23 @@ BufferDescriptor :: struct {
 Color :: [4]f64
 
 CommandBufferDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 }
 
 CommandEncoderDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 }
 
 CompilationMessage :: struct {
 	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ message: cstring,
+	message: StringView,
 	type: CompilationMessageType,
 	lineNum: u64,
 	linePos: u64,
 	offset: u64,
 	length: u64,
-	utf16LinePos: u64,
-	utf16Offset: u64,
-	utf16Length: u64,
 }
 
 ComputePassTimestampWrites :: struct {
@@ -778,8 +930,8 @@ ComputePassTimestampWrites :: struct {
 }
 
 ConstantEntry :: struct {
-	nextInChain: ^ChainedStruct,
-	key: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	key: StringView,
 	value: f64,
 }
 
@@ -789,11 +941,18 @@ Extent3D :: struct {
 	depthOrArrayLayers: u32,
 }
 
-InstanceDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+Future :: struct {
+	id: u64,
+}
+
+InstanceCapabilities :: struct {
+	nextInChain: ^ChainedStructOut,
+	timedWaitAnyEnable: b32,
+	timedWaitAnyMaxCount: uint,
 }
 
 Limits :: struct {
+	nextInChain: ^ChainedStructOut,
 	maxTextureDimension1D: u32,
 	maxTextureDimension2D: u32,
 	maxTextureDimension3D: u32,
@@ -816,7 +975,6 @@ Limits :: struct {
 	maxBufferSize: u64,
 	maxVertexAttributes: u32,
 	maxVertexBufferArrayStride: u32,
-	maxInterStageShaderComponents: u32,
 	maxInterStageShaderVariables: u32,
 	maxColorAttachments: u32,
 	maxColorAttachmentBytesPerSample: u32,
@@ -829,7 +987,7 @@ Limits :: struct {
 }
 
 MultisampleState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	count: u32,
 	mask: u32,
 	alphaToCoverageEnabled: b32,
@@ -842,47 +1000,43 @@ Origin3D :: struct {
 }
 
 PipelineLayoutDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	bindGroupLayoutCount: uint,
 	bindGroupLayouts: [^]BindGroupLayout `fmt:"v,bindGroupLayoutCount"`,
 }
 
-PrimitiveDepthClipControl :: struct {
-	using chain: ChainedStruct,
-	unclippedDepth: b32,
-}
-
 PrimitiveState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	topology: PrimitiveTopology,
 	stripIndexFormat: IndexFormat,
 	frontFace: FrontFace,
 	cullMode: CullMode,
+	unclippedDepth: b32,
 }
 
 QuerySetDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	type: QueryType,
 	count: u32,
 }
 
 QueueDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 }
 
 RenderBundleDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 }
 
 RenderBundleEncoderDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	colorFormatCount: uint,
-	colorFormats: [^]TextureFormat `fmt:"v,colorFormatCount"`,
+	colorFormats: /* const */ [^]TextureFormat `fmt:"v,colorFormatCount"`,
 	depthStencilFormat: TextureFormat,
 	sampleCount: u32,
 	depthReadOnly: b32,
@@ -901,7 +1055,7 @@ RenderPassDepthStencilAttachment :: struct {
 	stencilReadOnly: b32,
 }
 
-RenderPassDescriptorMaxDrawCount :: struct {
+RenderPassMaxDrawCount :: struct {
 	using chain: ChainedStruct,
 	maxDrawCount: u64,
 }
@@ -913,21 +1067,22 @@ RenderPassTimestampWrites :: struct {
 }
 
 RequestAdapterOptions :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ compatibleSurface: Surface,
+	nextInChain: /* const */ ^ChainedStruct,
+	featureLevel: FeatureLevel,
 	powerPreference: PowerPreference,
-	backendType: BackendType,
 	forceFallbackAdapter: b32,
+	backendType: BackendType,
+	/* NULLABLE */ compatibleSurface: Surface,
 }
 
 SamplerBindingLayout :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	type: SamplerBindingType,
 }
 
 SamplerDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	addressModeU: AddressMode,
 	addressModeV: AddressMode,
 	addressModeW: AddressMode,
@@ -940,21 +1095,20 @@ SamplerDescriptor :: struct {
 	maxAnisotropy: u16,
 }
 
-ShaderModuleCompilationHint :: struct {
-	nextInChain: ^ChainedStruct,
-	entryPoint: cstring,
-	layout: PipelineLayout,
+ShaderModuleDescriptor :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 }
 
-ShaderModuleSPIRVDescriptor :: struct {
+ShaderSourceSPIRV :: struct {
 	using chain: ChainedStruct,
 	codeSize: u32,
 	code: /* const */ [^]u32 `fmt:"v,codeSize"`,
 }
 
-ShaderModuleWGSLDescriptor :: struct {
+ShaderSourceWGSL :: struct {
 	using chain: ChainedStruct,
-	code: cstring,
+	code: StringView,
 }
 
 StencilFaceState :: struct {
@@ -965,10 +1119,20 @@ StencilFaceState :: struct {
 }
 
 StorageTextureBindingLayout :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	access: StorageTextureAccess,
 	format: TextureFormat,
 	viewDimension: TextureViewDimension,
+}
+
+SupportedFeatures :: struct {
+	featureCount: uint,
+	features: /* const */ [^]FeatureName `fmt:"v,featureCount"`,
+}
+
+SupportedWGSLLanguageFeatures :: struct {
+	featureCount: uint,
+	features: /* const */ [^]WGSLLanguageFeatureName `fmt:"v,featureCount"`,
 }
 
 SurfaceCapabilities :: struct {
@@ -981,97 +1145,86 @@ SurfaceCapabilities :: struct {
 	alphaModeCount: uint,
 	alphaModes: /* const */ [^]CompositeAlphaMode `fmt:"v,alphaModeCount"`,
 }
-when ODIN_OS == .JS {
-	#assert(offset_of(SurfaceCapabilities, formatCount) == 8)
-	#assert(offset_of(SurfaceCapabilities, formats) == 8 + 1*size_of(int))
-
-	#assert(offset_of(SurfaceCapabilities, presentModeCount) == 8 + 2*size_of(int))
-	#assert(offset_of(SurfaceCapabilities, presentModes) == 8 + 3*size_of(int))
-
-	#assert(offset_of(SurfaceCapabilities, alphaModeCount) == 8 + 4*size_of(int))
-	#assert(offset_of(SurfaceCapabilities, alphaModes) == 8 + 5*size_of(int))
-}
 
 SurfaceConfiguration :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	device: Device,
 	format: TextureFormat,
 	usage: TextureUsageFlags,
-	viewFormatCount: uint,
-	viewFormats: [^]TextureFormat `fmt:"v,viewFormatCount"`,
-	alphaMode: CompositeAlphaMode,
 	width: u32,
 	height: u32,
+	viewFormatCount: uint,
+	viewFormats: /* const */ [^]TextureFormat `fmt:"v,viewFormatCount"`,
+	alphaMode: CompositeAlphaMode,
 	presentMode: PresentMode,
 }
 
 SurfaceDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 }
 
-SurfaceDescriptorFromAndroidNativeWindow :: struct {
+SurfaceSourceAndroidNativeWindow :: struct {
 	using chain: ChainedStruct,
 	window: rawptr,
 }
 
-SurfaceDescriptorFromCanvasHTMLSelector :: struct {
+SurfaceSourceCanvasHTMLSelector :: struct {
 	using chain: ChainedStruct,
-	selector: cstring,
+	selector: StringView,
 }
 
-SurfaceDescriptorFromMetalLayer :: struct {
+SurfaceSourceMetalLayer :: struct {
 	using chain: ChainedStruct,
 	layer: rawptr,
 }
 
-SurfaceDescriptorFromWaylandSurface :: struct {
+SurfaceSourceWaylandSurface :: struct {
 	using chain: ChainedStruct,
 	display: rawptr,
 	surface: rawptr,
 }
 
-SurfaceDescriptorFromWindowsHWND :: struct {
+SurfaceSourceWindowsHWND :: struct {
 	using chain: ChainedStruct,
 	hinstance: rawptr,
 	hwnd: rawptr,
 }
 
-SurfaceDescriptorFromXcbWindow :: struct {
+SurfaceSourceXcbWindow :: struct {
 	using chain: ChainedStruct,
 	connection: rawptr,
 	window: u32,
 }
 
-SurfaceDescriptorFromXlibWindow :: struct {
+SurfaceSourceXlibWindow :: struct {
 	using chain: ChainedStruct,
 	display: rawptr,
 	window: u64,
 }
 
 SurfaceTexture :: struct {
+	nextInChain: ^ChainedStructOut,
 	texture: Texture,
-	suboptimal: b32,
 	status: SurfaceGetCurrentTextureStatus,
 }
 
-TextureBindingLayout :: struct {
-	nextInChain: ^ChainedStruct,
-	sampleType: TextureSampleType,
-	viewDimension: TextureViewDimension,
-	multisampled: b32,
-}
-
-TextureDataLayout :: struct {
-	nextInChain: ^ChainedStruct,
+TexelCopyBufferLayout :: struct {
 	offset: u64,
 	bytesPerRow: u32,
 	rowsPerImage: u32,
 }
 
+TextureBindingLayout :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	sampleType: TextureSampleType,
+	viewDimension: TextureViewDimension,
+	multisampled: b32,
+}
+
 TextureViewDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	format: TextureFormat,
 	dimension: TextureViewDimension,
 	baseMipLevel: u32,
@@ -1079,12 +1232,7 @@ TextureViewDescriptor :: struct {
 	baseArrayLayer: u32,
 	arrayLayerCount: u32,
 	aspect: TextureAspect,
-}
-
-UncapturedErrorCallbackInfo :: struct {
-	nextInChain: ^ChainedStruct,
-	callback: ErrorCallback,
-	userdata: rawptr,
+	usage: TextureUsageFlags,
 }
 
 VertexAttribute :: struct {
@@ -1094,15 +1242,15 @@ VertexAttribute :: struct {
 }
 
 BindGroupDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	layout: BindGroupLayout,
 	entryCount: uint,
-	entries: [^]BindGroupEntry `fmt:"v,entryCount"`,
+	entries: /* const */ [^]BindGroupEntry `fmt:"v,entryCount"`,
 }
 
 BindGroupLayoutEntry :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	binding: u32,
 	visibility: ShaderStageFlags,
 	buffer: BufferBindingLayout,
@@ -1117,21 +1265,21 @@ BlendState :: struct {
 }
 
 CompilationInfo :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	messageCount: uint,
-	messages: [^]CompilationMessage `fmt:"v,messageCount"`,
+	messages: /* const */ [^]CompilationMessage `fmt:"v,messageCount"`,
 }
 
 ComputePassDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	/* NULLABLE */ timestampWrites: /* const */ ^ComputePassTimestampWrites,
 }
 
 DepthStencilState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	format: TextureFormat,
-	depthWriteEnabled: b32,
+	depthWriteEnabled: OptionalBool,
 	depthCompare: CompareFunction,
 	stencilFront: StencilFaceState,
 	stencilBack: StencilFaceState,
@@ -1142,30 +1290,37 @@ DepthStencilState :: struct {
 	depthBiasClamp: f32,
 }
 
-ImageCopyBuffer :: struct {
-	nextInChain: ^ChainedStruct,
-	layout: TextureDataLayout,
-	buffer: Buffer,
+DeviceDescriptor :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
+	requiredFeatureCount: uint,
+	requiredFeatures: /* const */ [^]FeatureName `fmt:"v,requiredFeatureCount"`,
+	/* NULLABLE */ requiredLimits: /* const */ ^Limits,
+	defaultQueue: QueueDescriptor,
+	deviceLostCallbackInfo: DeviceLostCallbackInfo,
+	uncapturedErrorCallbackInfo: UncapturedErrorCallbackInfo,
 }
 
-ImageCopyTexture :: struct {
-	nextInChain: ^ChainedStruct,
-	texture: Texture,
-	mipLevel: u32,
-	origin: Origin3D,
-	aspect: TextureAspect,
+FutureWaitInfo :: struct {
+	future: Future,
+	completed: b32,
+}
+
+InstanceDescriptor :: struct {
+	nextInChain: /* const */ ^ChainedStruct,
+	features: InstanceCapabilities,
 }
 
 ProgrammableStageDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	module: ShaderModule,
-	/* NULLABLE */ entryPoint: cstring,
+	entryPoint: StringView,
 	constantCount: uint,
 	constants: [^]ConstantEntry `fmt:"v,constantCount"`,
 }
 
 RenderPassColorAttachment :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	/* NULLABLE */ view: TextureView,
 	depthSlice: u32,
 	/* NULLABLE */ resolveTarget: TextureView,
@@ -1173,36 +1328,22 @@ RenderPassColorAttachment :: struct {
 	storeOp: StoreOp,
 	clearValue: Color,
 }
-when ODIN_OS == .JS {
-	#assert(size_of(RenderPassColorAttachment) == 56)
-	#assert(offset_of(RenderPassColorAttachment, view) == 4)
-	#assert(offset_of(RenderPassColorAttachment, depthSlice) == 8)
-	#assert(offset_of(RenderPassColorAttachment, resolveTarget) == 12)
-	#assert(offset_of(RenderPassColorAttachment, loadOp) == 16)
-	#assert(offset_of(RenderPassColorAttachment, storeOp) == 20)
-	#assert(offset_of(RenderPassColorAttachment, clearValue) == 24)
+
+TexelCopyBufferInfo :: struct {
+	layout: TexelCopyBufferLayout,
+	buffer: Buffer,
 }
 
-RequiredLimits :: struct {
-	nextInChain: ^ChainedStruct,
-	limits: Limits,
-}
-
-ShaderModuleDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
-	hintCount: uint,
-	hints: [^]ShaderModuleCompilationHint `fmt:"v,hintCount"`,
-}
-
-SupportedLimits :: struct {
-	nextInChain: ^ChainedStructOut,
-	limits: Limits,
+TexelCopyTextureInfo :: struct {
+	texture: Texture,
+	mipLevel: u32,
+	origin: Origin3D,
+	aspect: TextureAspect,
 }
 
 TextureDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	usage: TextureUsageFlags,
 	dimension: TextureDimension,
 	size: Extent3D,
@@ -1210,21 +1351,21 @@ TextureDescriptor :: struct {
 	mipLevelCount: u32,
 	sampleCount: u32,
 	viewFormatCount: uint,
-	viewFormats: [^]TextureFormat `fmt:"v,viewFormatCount"`,
+	viewFormats: /* const */ [^]TextureFormat `fmt:"v,viewFormatCount"`,
 }
 
 VertexBufferLayout :: struct {
-	arrayStride: u64,
 	stepMode: VertexStepMode,
+	arrayStride: u64,
 	attributeCount: uint,
-	attributes: [^]VertexAttribute `fmt:"v,attributeCount"`,
+	attributes: /* const */ [^]VertexAttribute `fmt:"v,attributeCount"`,
 }
 
 BindGroupLayoutDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	entryCount: uint,
-	entries: [^]BindGroupLayoutEntry `fmt:"v,entryCount"`,
+	entries: /* const */ [^]BindGroupLayoutEntry `fmt:"v,entryCount"`,
 }
 
 ColorTargetState :: struct {
@@ -1235,60 +1376,45 @@ ColorTargetState :: struct {
 }
 
 ComputePipelineDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	/* NULLABLE */ layout: PipelineLayout,
 	compute: ProgrammableStageDescriptor,
 }
 
-DeviceDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
-	requiredFeatureCount: uint,
-	requiredFeatures: [^]FeatureName `fmt:"v,requiredFeatureCount"`,
-	/* NULLABLE */ requiredLimits: /* const */ ^RequiredLimits,
-	defaultQueue: QueueDescriptor,
-	deviceLostCallback: DeviceLostCallback,
-	deviceLostUserdata: rawptr,
-	uncapturedErrorCallbackInfo: UncapturedErrorCallbackInfo,
-}
-when ODIN_OS == .JS {
-	#assert(offset_of(DeviceDescriptor, deviceLostCallback) == 24 + size_of(int))
-}
-
 RenderPassDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	colorAttachmentCount: uint,
-	colorAttachments: [^]RenderPassColorAttachment `fmt:"v,colorAttachmentCount"`,
+	colorAttachments: /* const */ [^]RenderPassColorAttachment `fmt:"v,colorAttachmentCount"`,
 	/* NULLABLE */ depthStencilAttachment: /* const */ ^RenderPassDepthStencilAttachment,
 	/* NULLABLE */ occlusionQuerySet: QuerySet,
 	/* NULLABLE */ timestampWrites: /* const */ ^RenderPassTimestampWrites,
 }
 
 VertexState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	module: ShaderModule,
-	/* NULLABLE */ entryPoint: cstring,
+	entryPoint: StringView,
 	constantCount: uint,
-	constants: [^]ConstantEntry `fmt:"v,constantCount"`,
+	constants: /* const */ [^]ConstantEntry `fmt:"v,constantCount"`,
 	bufferCount: uint,
-	buffers: [^]VertexBufferLayout `fmt:"v,bufferCount"`,
+	buffers: /* const */ [^]VertexBufferLayout `fmt:"v,bufferCount"`,
 }
 
 FragmentState :: struct {
-	nextInChain: ^ChainedStruct,
+	nextInChain: /* const */ ^ChainedStruct,
 	module: ShaderModule,
-	/* NULLABLE */ entryPoint: cstring,
+	entryPoint: StringView,
 	constantCount: uint,
-	constants: [^]ConstantEntry `fmt:"v,constantCount"`,
+	constants: /* const */ [^]ConstantEntry `fmt:"v,constantCount"`,
 	targetCount: uint,
-	targets: [^]ColorTargetState `fmt:"v,targetCount"`,
+	targets: /* const */ [^]ColorTargetState `fmt:"v,targetCount"`,
 }
 
 RenderPipelineDescriptor :: struct {
-	nextInChain: ^ChainedStruct,
-	/* NULLABLE */ label: cstring,
+	nextInChain: /* const */ ^ChainedStruct,
+	label: StringView,
 	/* NULLABLE */ layout: PipelineLayout,
 	vertex: VertexState,
 	primitive: PrimitiveState,
@@ -1301,31 +1427,33 @@ RenderPipelineDescriptor :: struct {
 foreign libwgpu {
 	@(link_name="wgpuCreateInstance")
 	RawCreateInstance :: proc(/* NULLABLE */ descriptor: /* const */ ^InstanceDescriptor = nil) -> Instance ---
-	GetProcAddress :: proc(device: Device, procName: cstring) -> Proc ---
+	@(link_name="wgpuGetInstanceCapabilities")
+	RawGetInstanceCapabilities :: proc(capabilities: ^InstanceCapabilities) -> Status ---
+	GetProcAddress :: proc(procName: StringView) -> Proc ---
 
 	// Methods of Adapter
-	@(link_name="wgpuAdapterEnumerateFeatures")
-	RawAdapterEnumerateFeatures :: proc(adapter: Adapter, features: [^]FeatureName) -> uint ---
+	@(link_name="wgpuAdapterGetFeatures")
+	RawAdapterGetFeatures :: proc(adapter: Adapter, features: ^SupportedFeatures) ---
 	@(link_name="wgpuAdapterGetInfo")
-	RawAdapterGetInfo :: proc(adapter: Adapter, info: ^AdapterInfo) ---
+	RawAdapterGetInfo :: proc(adapter: Adapter, info: ^AdapterInfo) -> Status ---
 	@(link_name="wgpuAdapterGetLimits")
-	RawAdapterGetLimits :: proc(adapter: Adapter, limits: ^SupportedLimits) -> b32 ---
+	RawAdapterGetLimits :: proc(adapter: Adapter, limits: ^Limits) -> Status ---
 	AdapterHasFeature :: proc(adapter: Adapter, feature: FeatureName) -> b32 ---
-	AdapterRequestDevice :: proc(adapter: Adapter, /* NULLABLE */ descriptor: /* const */ ^DeviceDescriptor, callback: AdapterRequestDeviceCallback, /* NULLABLE */ userdata: rawptr = nil) ---
-	AdapterReference :: proc(adapter: Adapter) ---
+	AdapterRequestDevice :: proc(adapter: Adapter, /* NULLABLE */ descriptor: /* const */ ^DeviceDescriptor, callbackInfo: RequestDeviceCallbackInfo) -> Future ---
+	AdapterAddRef :: proc(adapter: Adapter) ---
 	AdapterRelease :: proc(adapter: Adapter) ---
 
 	// Procs of AdapterInfo
 	AdapterInfoFreeMembers :: proc(adapterInfo: AdapterInfo) ---
 
 	// Methods of BindGroup
-	BindGroupSetLabel :: proc(bindGroup: BindGroup, label: cstring) ---
-	BindGroupReference :: proc(bindGroup: BindGroup) ---
+	BindGroupSetLabel :: proc(bindGroup: BindGroup, label: StringView) ---
+	BindGroupAddRef :: proc(bindGroup: BindGroup) ---
 	BindGroupRelease :: proc(bindGroup: BindGroup) ---
 
 	// Methods of BindGroupLayout
 	BindGroupLayoutSetLabel :: proc(bindGroupLayout: BindGroupLayout, label: cstring) ---
-	BindGroupLayoutReference :: proc(bindGroupLayout: BindGroupLayout) ---
+	BindGroupLayoutAddRef :: proc(bindGroupLayout: BindGroupLayout) ---
 	BindGroupLayoutRelease :: proc(bindGroupLayout: BindGroupLayout) ---
 
 	// Methods of Buffer
@@ -1337,15 +1465,15 @@ foreign libwgpu {
 	RawBufferGetMappedRange :: proc(buffer: Buffer, offset: uint, size: uint) -> rawptr ---
 	BufferGetSize :: proc(buffer: Buffer) -> u64 ---
 	BufferGetUsage :: proc(buffer: Buffer) -> BufferUsageFlags ---
-	BufferMapAsync :: proc(buffer: Buffer, mode: MapModeFlags, offset: uint, size: uint, callback: BufferMapAsyncCallback, /* NULLABLE */ userdata: rawptr = nil) ---
-	BufferSetLabel :: proc(buffer: Buffer, label: cstring) ---
+	BufferMapAsync :: proc(buffer: Buffer, mode: MapModeFlags, offset: uint, size: uint, callbackInfo: BufferMapCallbackInfo) -> Future ---
+	BufferSetLabel :: proc(buffer: Buffer, label: StringView) ---
 	BufferUnmap :: proc(buffer: Buffer) ---
-	BufferReference :: proc(buffer: Buffer) ---
+	BufferAddRef :: proc(buffer: Buffer) ---
 	BufferRelease :: proc(buffer: Buffer) ---
 
 	// Methods of CommandBuffer
-	CommandBufferSetLabel :: proc(commandBuffer: CommandBuffer, label: cstring) ---
-	CommandBufferReference :: proc(commandBuffer: CommandBuffer) ---
+	CommandBufferSetLabel :: proc(commandBuffer: CommandBuffer, label: StringView) ---
+	CommandBufferAddRef :: proc(commandBuffer: CommandBuffer) ---
 	CommandBufferRelease :: proc(commandBuffer: CommandBuffer) ---
 
 	// Methods of CommandEncoder
@@ -1353,37 +1481,37 @@ foreign libwgpu {
 	CommandEncoderBeginRenderPass :: proc(commandEncoder: CommandEncoder, descriptor: /* const */ ^RenderPassDescriptor) -> RenderPassEncoder ---
 	CommandEncoderClearBuffer :: proc(commandEncoder: CommandEncoder, buffer: Buffer, offset: u64, size: u64) ---
 	CommandEncoderCopyBufferToBuffer :: proc(commandEncoder: CommandEncoder, source: Buffer, sourceOffset: u64, destination: Buffer, destinationOffset: u64, size: u64) ---
-	CommandEncoderCopyBufferToTexture :: proc(commandEncoder: CommandEncoder, source: /* const */ ^ImageCopyBuffer, destination: /* const */ ^ImageCopyTexture, copySize: /* const */ ^Extent3D) ---
-	CommandEncoderCopyTextureToBuffer :: proc(commandEncoder: CommandEncoder, source: /* const */ ^ImageCopyTexture, destination: /* const */ ^ImageCopyBuffer, copySize: /* const */ ^Extent3D) ---
-	CommandEncoderCopyTextureToTexture :: proc(commandEncoder: CommandEncoder, source: /* const */ ^ImageCopyTexture, destination: /* const */ ^ImageCopyTexture, copySize: /* const */ ^Extent3D) ---
+	CommandEncoderCopyBufferToTexture :: proc(commandEncoder: CommandEncoder, source: /* const */ ^TexelCopyBufferInfo, destination: /* const */ ^TexelCopyTextureInfo, copySize: /* const */ ^Extent3D) ---
+	CommandEncoderCopyTextureToBuffer :: proc(commandEncoder: CommandEncoder, source: /* const */ ^TexelCopyTextureInfo, destination: /* const */ ^TexelCopyBufferInfo, copySize: /* const */ ^Extent3D) ---
+	CommandEncoderCopyTextureToTexture :: proc(commandEncoder: CommandEncoder, source: /* const */ ^TexelCopyTextureInfo, destination: /* const */ ^TexelCopyTextureInfo, copySize: /* const */ ^Extent3D) ---
 	CommandEncoderFinish :: proc(commandEncoder: CommandEncoder, /* NULLABLE */ descriptor: /* const */ ^CommandBufferDescriptor = nil) -> CommandBuffer ---
-	CommandEncoderInsertDebugMarker :: proc(commandEncoder: CommandEncoder, markerLabel: cstring) ---
+	CommandEncoderInsertDebugMarker :: proc(commandEncoder: CommandEncoder, markerLabel: StringView) ---
 	CommandEncoderPopDebugGroup :: proc(commandEncoder: CommandEncoder) ---
-	CommandEncoderPushDebugGroup :: proc(commandEncoder: CommandEncoder, groupLabel: cstring) ---
+	CommandEncoderPushDebugGroup :: proc(commandEncoder: CommandEncoder, groupLabel: StringView) ---
 	CommandEncoderResolveQuerySet :: proc(commandEncoder: CommandEncoder, querySet: QuerySet, firstQuery: u32, queryCount: u32, destination: Buffer, destinationOffset: u64) ---
-	CommandEncoderSetLabel :: proc(commandEncoder: CommandEncoder, label: cstring) ---
+	CommandEncoderSetLabel :: proc(commandEncoder: CommandEncoder, label: StringView) ---
 	CommandEncoderWriteTimestamp :: proc(commandEncoder: CommandEncoder, querySet: QuerySet, queryIndex: u32) ---
-	CommandEncoderReference :: proc(commandEncoder: CommandEncoder) ---
+	CommandEncoderAddRef :: proc(commandEncoder: CommandEncoder) ---
 	CommandEncoderRelease :: proc(commandEncoder: CommandEncoder) ---
 
 	// Methods of ComputePassEncoder
 	ComputePassEncoderDispatchWorkgroups :: proc(computePassEncoder: ComputePassEncoder, workgroupCountX: u32, workgroupCountY: u32, workgroupCountZ: u32) ---
 	ComputePassEncoderDispatchWorkgroupsIndirect :: proc(computePassEncoder: ComputePassEncoder, indirectBuffer: Buffer, indirectOffset: u64) ---
 	ComputePassEncoderEnd :: proc(computePassEncoder: ComputePassEncoder) ---
-	ComputePassEncoderInsertDebugMarker :: proc(computePassEncoder: ComputePassEncoder, markerLabel: cstring) ---
+	ComputePassEncoderInsertDebugMarker :: proc(computePassEncoder: ComputePassEncoder, markerLabel: StringView) ---
 	ComputePassEncoderPopDebugGroup :: proc(computePassEncoder: ComputePassEncoder) ---
-	ComputePassEncoderPushDebugGroup :: proc(computePassEncoder: ComputePassEncoder, groupLabel: cstring) ---
+	ComputePassEncoderPushDebugGroup :: proc(computePassEncoder: ComputePassEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuComputePassEncoderSetBindGroup")
-	RawComputePassEncoderSetBindGroup :: proc(computePassEncoder: ComputePassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: [^]u32) ---
-	ComputePassEncoderSetLabel :: proc(computePassEncoder: ComputePassEncoder, label: cstring) ---
+	RawComputePassEncoderSetBindGroup :: proc(computePassEncoder: ComputePassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
+	ComputePassEncoderSetLabel :: proc(computePassEncoder: ComputePassEncoder, label: StringView) ---
 	ComputePassEncoderSetPipeline :: proc(computePassEncoder: ComputePassEncoder, pipeline: ComputePipeline) ---
-	ComputePassEncoderReference :: proc(computePassEncoder: ComputePassEncoder) ---
+	ComputePassEncoderAddRef :: proc(computePassEncoder: ComputePassEncoder) ---
 	ComputePassEncoderRelease :: proc(computePassEncoder: ComputePassEncoder) ---
 
 	// Methods of ComputePipeline
 	ComputePipelineGetBindGroupLayout :: proc(computePipeline: ComputePipeline, groupIndex: u32) -> BindGroupLayout ---
-	ComputePipelineSetLabel :: proc(computePipeline: ComputePipeline, label: cstring) ---
-	ComputePipelineReference :: proc(computePipeline: ComputePipeline) ---
+	ComputePipelineSetLabel :: proc(computePipeline: ComputePipeline, label: StringView) ---
+	ComputePipelineAddRef :: proc(computePipeline: ComputePipeline) ---
 	ComputePipelineRelease :: proc(computePipeline: ComputePipeline) ---
 
 	// Methods of Device
@@ -1392,62 +1520,68 @@ foreign libwgpu {
 	DeviceCreateBuffer :: proc(device: Device, descriptor: /* const */ ^BufferDescriptor) -> Buffer ---
 	DeviceCreateCommandEncoder :: proc(device: Device, /* NULLABLE */ descriptor: /* const */ ^CommandEncoderDescriptor = nil) -> CommandEncoder ---
 	DeviceCreateComputePipeline :: proc(device: Device, descriptor: /* const */ ^ComputePipelineDescriptor) -> ComputePipeline ---
-	DeviceCreateComputePipelineAsync :: proc(device: Device, descriptor: /* const */ ^ComputePipelineDescriptor, callback: DeviceCreateComputePipelineAsyncCallback, /* NULLABLE */ userdata: rawptr = nil) ---
+	DeviceCreateComputePipelineAsync :: proc(device: Device, descriptor: /* const */ ^ComputePipelineDescriptor, callbackInfo: CreateComputePipelineAsyncCallbackInfo) -> Future ---
 	DeviceCreatePipelineLayout :: proc(device: Device, descriptor: /* const */ ^PipelineLayoutDescriptor) -> PipelineLayout ---
 	DeviceCreateQuerySet :: proc(device: Device, descriptor: /* const */ ^QuerySetDescriptor) -> QuerySet ---
 	DeviceCreateRenderBundleEncoder :: proc(device: Device, descriptor: /* const */ ^RenderBundleEncoderDescriptor) -> RenderBundleEncoder ---
 	DeviceCreateRenderPipeline :: proc(device: Device, descriptor: /* const */ ^RenderPipelineDescriptor) -> RenderPipeline ---
-	DeviceCreateRenderPipelineAsync :: proc(device: Device, descriptor: /* const */ ^RenderPipelineDescriptor, callback: DeviceCreateRenderPipelineAsyncCallback, /* NULLABLE */ userdata: rawptr = nil) ---
+	DeviceCreateRenderPipelineAsync :: proc(device: Device, descriptor: /* const */ ^RenderPipelineDescriptor, callbackInfo: CreateRenderPipelineAsyncCallbackInfo) -> Future ---
 	DeviceCreateSampler :: proc(device: Device, /* NULLABLE */ descriptor: /* const */ ^SamplerDescriptor = nil) -> Sampler ---
 	DeviceCreateShaderModule :: proc(device: Device, descriptor: /* const */ ^ShaderModuleDescriptor) -> ShaderModule ---
 	DeviceCreateTexture :: proc(device: Device, descriptor: /* const */ ^TextureDescriptor) -> Texture ---
 	DeviceDestroy :: proc(device: Device) ---
-	@(link_name="wgpuDeviceEnumerateFeatures")
-	RawDeviceEnumerateFeatures :: proc(device: Device, features: ^FeatureName) -> uint ---
+	@(link_name="wgpuDeviceGetAdapterInfo")
+	RawDeviceGetAdapterInfo :: proc(device: Device, info: ^AdapterInfo) -> Status ---
+	@(link_name="wgpuDeviceGetFeatures")
+	RawDeviceGetFeatures :: proc(device: Device, features: ^SupportedFeatures) ---
 	@(link_name="wgpuDeviceGetLimits")
-	RawDeviceGetLimits :: proc(device: Device, limits: ^SupportedLimits) -> b32 ---
+	RawDeviceGetLimits :: proc(device: Device, limits: ^Limits) -> Status ---
+	DeviceGetLostFuture :: proc(device: Device) -> Future ---
 	DeviceGetQueue :: proc(device: Device) -> Queue ---
 	DeviceHasFeature :: proc(device: Device, feature: FeatureName) -> b32 ---
-	DevicePopErrorScope :: proc(device: Device, callback: ErrorCallback, userdata: rawptr) ---
+	DevicePopErrorScope :: proc(device: Device, callbackInfo: PopErrorScopeCallbackInfo) -> Future ---
 	DevicePushErrorScope :: proc(device: Device, filter: ErrorFilter) ---
-	DeviceSetLabel :: proc(device: Device, label: cstring) ---
-	DeviceReference :: proc(device: Device) ---
+	DeviceSetLabel :: proc(device: Device, label: StringView) ---
+	DeviceAddRef :: proc(device: Device) ---
 	DeviceRelease :: proc(device: Device) ---
 
 	// Methods of Instance
 	InstanceCreateSurface :: proc(instance: Instance, descriptor: /* const */ ^SurfaceDescriptor) -> Surface ---
-	InstanceHasWGSLLanguageFeature :: proc(instance: Instance, feature: WGSLFeatureName) -> b32 ---
+	@(link_name="wgpuInstanceGetWGSLLanguageFeatures")
+	RawInstanceGetWGSLLanguageFeatures :: proc(instance: Instance, features: ^SupportedWGSLLanguageFeatures) -> Status ---
+	InstanceHasWGSLLanguageFeature :: proc(instance: Instance, feature: WGSLLanguageFeatureName) -> b32 ---
 	InstanceProcessEvents :: proc(instance: Instance) ---
-	InstanceRequestAdapter :: proc(instance: Instance, /* NULLABLE */ options: /* const */ ^RequestAdapterOptions, callback: InstanceRequestAdapterCallback, /* NULLABLE */ userdata: rawptr = nil) ---
-	InstanceReference :: proc(instance: Instance) ---
+	InstanceRequestAdapter :: proc(instance: Instance, /* NULLABLE */ options: /* const */ ^RequestAdapterOptions, callbackInfo: RequestAdapterCallbackInfo) -> Future ---
+	InstanceWaitAny :: proc(instance: Instance, futureCount: uint, futures: [^]FutureWaitInfo, timeoutNS: u64) -> WaitStatus ---
+	InstanceAddRef :: proc(instance: Instance) ---
 	InstanceRelease :: proc(instance: Instance) ---
 
 	// Methods of PipelineLayout
-	PipelineLayoutSetLabel :: proc(pipelineLayout: PipelineLayout, label: cstring) ---
-	PipelineLayoutReference :: proc(pipelineLayout: PipelineLayout) ---
+	PipelineLayoutSetLabel :: proc(pipelineLayout: PipelineLayout, label: StringView) ---
+	PipelineLayoutAddRef :: proc(pipelineLayout: PipelineLayout) ---
 	PipelineLayoutRelease :: proc(pipelineLayout: PipelineLayout) ---
 
 	// Methods of QuerySet
 	QuerySetDestroy :: proc(querySet: QuerySet) ---
 	QuerySetGetCount :: proc(querySet: QuerySet) -> u32 ---
 	QuerySetGetType :: proc(querySet: QuerySet) -> QueryType ---
-	QuerySetSetLabel :: proc(querySet: QuerySet, label: cstring) ---
-	QuerySetReference :: proc(querySet: QuerySet) ---
+	QuerySetSetLabel :: proc(querySet: QuerySet, label: StringView) ---
+	QuerySetAddRef :: proc(querySet: QuerySet) ---
 	QuerySetRelease :: proc(querySet: QuerySet) ---
 
 	// Methods of Queue
-	QueueOnSubmittedWorkDone :: proc(queue: Queue, callback: QueueOnSubmittedWorkDoneCallback, /* NULLABLE */ userdata: rawptr = nil) ---
-	QueueSetLabel :: proc(queue: Queue, label: cstring) ---
+	QueueOnSubmittedWorkDone :: proc(queue: Queue, callbackInfo: QueueWorkDoneCallbackInfo) -> Future ---
+	QueueSetLabel :: proc(queue: Queue, label: StringView) ---
 	@(link_name="wgpuQueueSubmit")
-	RawQueueSubmit :: proc(queue: Queue, commandCount: uint, commands: [^]CommandBuffer) ---
+	RawQueueSubmit :: proc(queue: Queue, commandCount: uint, commands: /* const */ [^]CommandBuffer) ---
 	QueueWriteBuffer :: proc(queue: Queue, buffer: Buffer, bufferOffset: u64, data: /* const */ rawptr, size: uint) ---
-	QueueWriteTexture :: proc(queue: Queue, destination: /* const */ ^ImageCopyTexture, data: /* const */ rawptr, dataSize: uint, dataLayout: /* const */ ^TextureDataLayout, writeSize: /* const */ ^Extent3D) ---
-	QueueReference :: proc(queue: Queue) ---
+	QueueWriteTexture :: proc(queue: Queue, destination: /* const */ ^TexelCopyTextureInfo, data: /* const */ rawptr, dataSize: uint, dataLayout: /* const */ ^TexelCopyBufferLayout, writeSize: /* const */ ^Extent3D) ---
+	QueueAddRef :: proc(queue: Queue) ---
 	QueueRelease :: proc(queue: Queue) ---
 
 	// Methods of RenderBundle
-	RenderBundleSetLabel :: proc(renderBundle: RenderBundle, label: cstring) ---
-	RenderBundleReference :: proc(renderBundle: RenderBundle) ---
+	RenderBundleSetLabel :: proc(renderBundle: RenderBundle, label: StringView) ---
+	RenderBundleAddRef :: proc(renderBundle: RenderBundle) ---
 	RenderBundleRelease :: proc(renderBundle: RenderBundle) ---
 
 	// Methods of RenderBundleEncoder
@@ -1456,16 +1590,16 @@ foreign libwgpu {
 	RenderBundleEncoderDrawIndexedIndirect :: proc(renderBundleEncoder: RenderBundleEncoder, indirectBuffer: Buffer, indirectOffset: u64) ---
 	RenderBundleEncoderDrawIndirect :: proc(renderBundleEncoder: RenderBundleEncoder, indirectBuffer: Buffer, indirectOffset: u64) ---
 	RenderBundleEncoderFinish :: proc(renderBundleEncoder: RenderBundleEncoder, /* NULLABLE */ descriptor: /* const */ ^RenderBundleDescriptor = nil) -> RenderBundle ---
-	RenderBundleEncoderInsertDebugMarker :: proc(renderBundleEncoder: RenderBundleEncoder, markerLabel: cstring) ---
+	RenderBundleEncoderInsertDebugMarker :: proc(renderBundleEncoder: RenderBundleEncoder, markerLabel: StringView) ---
 	RenderBundleEncoderPopDebugGroup :: proc(renderBundleEncoder: RenderBundleEncoder) ---
-	RenderBundleEncoderPushDebugGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupLabel: cstring) ---
+	RenderBundleEncoderPushDebugGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuRenderBundleEncoderSetBindGroup")
-	RawRenderBundleEncoderSetBindGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: [^]u32) ---
+	RawRenderBundleEncoderSetBindGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
 	RenderBundleEncoderSetIndexBuffer :: proc(renderBundleEncoder: RenderBundleEncoder, buffer: Buffer, format: IndexFormat, offset: u64, size: u64) ---
-	RenderBundleEncoderSetLabel :: proc(renderBundleEncoder: RenderBundleEncoder, label: cstring) ---
+	RenderBundleEncoderSetLabel :: proc(renderBundleEncoder: RenderBundleEncoder, label: StringView) ---
 	RenderBundleEncoderSetPipeline :: proc(renderBundleEncoder: RenderBundleEncoder, pipeline: RenderPipeline) ---
 	RenderBundleEncoderSetVertexBuffer :: proc(renderBundleEncoder: RenderBundleEncoder, slot: u32, /* NULLABLE */ buffer: Buffer, offset: u64, size: u64) ---
-	RenderBundleEncoderReference :: proc(renderBundleEncoder: RenderBundleEncoder) ---
+	RenderBundleEncoderAddRef :: proc(renderBundleEncoder: RenderBundleEncoder) ---
 	RenderBundleEncoderRelease :: proc(renderBundleEncoder: RenderBundleEncoder) ---
 
 	// Methods of RenderPassEncoder
@@ -1477,50 +1611,56 @@ foreign libwgpu {
 	RenderPassEncoderEnd :: proc(renderPassEncoder: RenderPassEncoder) ---
 	RenderPassEncoderEndOcclusionQuery :: proc(renderPassEncoder: RenderPassEncoder) ---
 	@(link_name="wgpuRenderPassEncoderExecuteBundles")
-	RawRenderPassEncoderExecuteBundles :: proc(renderPassEncoder: RenderPassEncoder, bundleCount: uint, bundles: [^]RenderBundle) ---
-	RenderPassEncoderInsertDebugMarker :: proc(renderPassEncoder: RenderPassEncoder, markerLabel: cstring) ---
+	RawRenderPassEncoderExecuteBundles :: proc(renderPassEncoder: RenderPassEncoder, bundleCount: uint, bundles: /* const */ [^]RenderBundle) ---
+	RenderPassEncoderInsertDebugMarker :: proc(renderPassEncoder: RenderPassEncoder, markerLabel: StringView) ---
 	RenderPassEncoderPopDebugGroup :: proc(renderPassEncoder: RenderPassEncoder) ---
-	RenderPassEncoderPushDebugGroup :: proc(renderPassEncoder: RenderPassEncoder, groupLabel: cstring) ---
+	RenderPassEncoderPushDebugGroup :: proc(renderPassEncoder: RenderPassEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuRenderPassEncoderSetBindGroup")
-	RawRenderPassEncoderSetBindGroup :: proc(renderPassEncoder: RenderPassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: [^]u32) ---
+	RawRenderPassEncoderSetBindGroup :: proc(renderPassEncoder: RenderPassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
 	RenderPassEncoderSetBlendConstant :: proc(renderPassEncoder: RenderPassEncoder, color: /* const */ ^Color) ---
 	RenderPassEncoderSetIndexBuffer :: proc(renderPassEncoder: RenderPassEncoder, buffer: Buffer, format: IndexFormat, offset: u64, size: u64) ---
-	RenderPassEncoderSetLabel :: proc(renderPassEncoder: RenderPassEncoder, label: cstring) ---
+	RenderPassEncoderSetLabel :: proc(renderPassEncoder: RenderPassEncoder, label: StringView) ---
 	RenderPassEncoderSetPipeline :: proc(renderPassEncoder: RenderPassEncoder, pipeline: RenderPipeline) ---
 	RenderPassEncoderSetScissorRect :: proc(renderPassEncoder: RenderPassEncoder, x: u32, y: u32, width: u32, height: u32) ---
 	RenderPassEncoderSetStencilReference :: proc(renderPassEncoder: RenderPassEncoder, reference: u32) ---
 	RenderPassEncoderSetVertexBuffer :: proc(renderPassEncoder: RenderPassEncoder, slot: u32, /* NULLABLE */ buffer: Buffer, offset: u64, size: u64) ---
 	RenderPassEncoderSetViewport :: proc(renderPassEncoder: RenderPassEncoder, x: f32, y: f32, width: f32, height: f32, minDepth: f32, maxDepth: f32) ---
-	RenderPassEncoderReference :: proc(renderPassEncoder: RenderPassEncoder) ---
+	RenderPassEncoderAddRef :: proc(renderPassEncoder: RenderPassEncoder) ---
 	RenderPassEncoderRelease :: proc(renderPassEncoder: RenderPassEncoder) ---
 
 	// Methods of RenderPipeline
 	RenderPipelineGetBindGroupLayout :: proc(renderPipeline: RenderPipeline, groupIndex: u32) -> BindGroupLayout ---
-	RenderPipelineSetLabel :: proc(renderPipeline: RenderPipeline, label: cstring) ---
-	RenderPipelineReference :: proc(renderPipeline: RenderPipeline) ---
+	RenderPipelineSetLabel :: proc(renderPipeline: RenderPipeline, label: StringView) ---
+	RenderPipelineAddRef :: proc(renderPipeline: RenderPipeline) ---
 	RenderPipelineRelease :: proc(renderPipeline: RenderPipeline) ---
 
 	// Methods of Sampler
-	SamplerSetLabel :: proc(sampler: Sampler, label: cstring) ---
-	SamplerReference :: proc(sampler: Sampler) ---
+	SamplerSetLabel :: proc(sampler: Sampler, label: StringView) ---
+	SamplerAddRef :: proc(sampler: Sampler) ---
 	SamplerRelease :: proc(sampler: Sampler) ---
 
 	// Methods of ShaderModule
-	ShaderModuleGetCompilationInfo :: proc(shaderModule: ShaderModule, callback: ShaderModuleGetCompilationInfoCallback, /* NULLABLE */ userdata: rawptr = nil) ---
-	ShaderModuleSetLabel :: proc(shaderModule: ShaderModule, label: cstring) ---
-	ShaderModuleReference :: proc(shaderModule: ShaderModule) ---
+	ShaderModuleGetCompilationInfo :: proc(shaderModule: ShaderModule, callbackInfo: CompilationInfoCallbackInfo) -> Future ---
+	ShaderModuleSetLabel :: proc(shaderModule: ShaderModule, label: StringView) ---
+	ShaderModuleAddRef :: proc(shaderModule: ShaderModule) ---
 	ShaderModuleRelease :: proc(shaderModule: ShaderModule) ---
+
+	// Methods of SupportedFeatures
+	SupportedFeaturesFreeMembers :: proc(supportedFeatures: SupportedFeatures) ---
+
+	// Methods of SupportedWGSLLanguageFeatures
+	SupportedWGSLLanguageFeaturesFreeMembers :: proc(supportedWGSLLanguageFeatures: SupportedWGSLLanguageFeatures) ---
 
 	// Methods of Surface
 	SurfaceConfigure :: proc(surface: Surface, config: /* const */ ^SurfaceConfiguration) ---
 	@(link_name="wgpuSurfaceGetCapabilities")
-	RawSurfaceGetCapabilities :: proc(surface: Surface, adapter: Adapter, capabilities: ^SurfaceCapabilities) ---
+	RawSurfaceGetCapabilities :: proc(surface: Surface, adapter: Adapter, capabilities: ^SurfaceCapabilities) -> Status ---
 	@(link_name="wgpuSurfaceGetCurrentTexture")
 	RawSurfaceGetCurrentTexture :: proc(surface: Surface, surfaceTexture: ^SurfaceTexture) ---
-	SurfacePresent :: proc(surface: Surface) ---
-	SurfaceSetLabel :: proc(surface: Surface, label: cstring) ---
+	SurfacePresent :: proc(surface: Surface) -> Status ---
+	SurfaceSetLabel :: proc(surface: Surface, label: StringView) ---
 	SurfaceUnconfigure :: proc(surface: Surface) ---
-	SurfaceReference :: proc(surface: Surface) ---
+	SurfaceAddRef :: proc(surface: Surface) ---
 	SurfaceRelease :: proc(surface: Surface) ---
 
 	// Methods of SurfaceCapabilities
@@ -1537,13 +1677,13 @@ foreign libwgpu {
 	TextureGetSampleCount :: proc(texture: Texture) -> u32 ---
 	TextureGetUsage :: proc(texture: Texture) -> TextureUsageFlags ---
 	TextureGetWidth :: proc(texture: Texture) -> u32 ---
-	TextureSetLabel :: proc(texture: Texture, label: cstring) ---
-	TextureReference :: proc(texture: Texture) ---
+	TextureSetLabel :: proc(texture: Texture, label: StringView) ---
+	TextureAddRef :: proc(texture: Texture) ---
 	TextureRelease :: proc(texture: Texture) ---
 
 	// Methods of TextureView
-	TextureViewSetLabel :: proc(textureView: TextureView, label: cstring) ---
-	TextureViewReference :: proc(textureView: TextureView) ---
+	TextureViewSetLabel :: proc(textureView: TextureView, label: StringView) ---
+	TextureViewAddRef :: proc(textureView: TextureView) ---
 	TextureViewRelease :: proc(textureView: TextureView) ---
 }
 
@@ -1551,28 +1691,45 @@ foreign libwgpu {
 
 CreateInstance :: proc "c" (/* NULLABLE */ descriptor: /* const */ ^InstanceDescriptor = nil) -> Instance {
 	when ODIN_OS != .JS {
-		wgpu_native_version_check()
+		v := (transmute([4]u8)GetVersion()).wzyx
+
+		if v.xyz != BINDINGS_VERSION.xyz {
+			buf: [1024]byte
+			n := copy(buf[:],  "wgpu-native version mismatch: ")
+			n += copy(buf[n:], "bindings are for version ")
+			n += copy(buf[n:], BINDINGS_VERSION_STRING)
+			n += copy(buf[n:], ", but a different version is linked")
+			panic_contextless(string(buf[:n]))
+		}
 	}
 
 	return RawCreateInstance(descriptor)
 }
 
-// Wrappers of Adapter
-
-AdapterEnumerateFeatures :: proc(adapter: Adapter, allocator := context.allocator) -> []FeatureName {
-	count := RawAdapterEnumerateFeatures(adapter, nil)
-	features := make([]FeatureName, count, allocator)
-	RawAdapterEnumerateFeatures(adapter, raw_data(features))
-	return features
-}
-
-AdapterGetLimits :: proc "c" (adapter: Adapter) -> (limits: SupportedLimits, ok: bool) {
-	ok = bool(RawAdapterGetLimits(adapter, &limits))
+GetInstanceCapabilities :: proc "c" () -> (capabilities: InstanceCapabilities, status: Status) {
+	status = RawGetInstanceCapabilities(&capabilities)
 	return
 }
 
-AdapterGetInfo :: proc "c" (adapter: Adapter) -> (info: AdapterInfo) {
-	RawAdapterGetInfo(adapter, &info)
+InstanceGetWGSLLanguageFeatures :: proc "c" (instance: Instance) -> (features: SupportedWGSLLanguageFeatures, status: Status) {
+	status = RawInstanceGetWGSLLanguageFeatures(instance, &features)
+	return
+}
+
+// Wrappers of Adapter
+
+AdapterGetLimits :: proc "c" (adapter: Adapter) -> (limits: Limits, status: Status) {
+	status = RawAdapterGetLimits(adapter, &limits)
+	return
+}
+
+AdapterGetInfo :: proc "c" (adapter: Adapter) -> (info: AdapterInfo, status: Status) {
+	status = RawAdapterGetInfo(adapter, &info)
+	return
+}
+
+AdapterGetFeatures :: proc "c" (adapter: Adapter) -> (features: SupportedFeatures) {
+	RawAdapterGetFeatures(adapter, &features)
 	return
 }
 
@@ -1614,20 +1771,23 @@ ComputePassEncoderSetBindGroup :: proc "c" (computePassEncoder: ComputePassEncod
 
 // Wrappers of Device
 
-DeviceEnumerateFeatures :: proc(device: Device, allocator := context.allocator) -> []FeatureName {
-	count := RawDeviceEnumerateFeatures(device, nil)
-	features := make([]FeatureName, count, allocator)
-	RawDeviceEnumerateFeatures(device, raw_data(features))
-	return features
+DeviceGetLimits :: proc "c" (device: Device) -> (limits: Limits, status: Status) {
+	status = RawDeviceGetLimits(device, &limits)
+	return
 }
 
-DeviceGetLimits :: proc "c" (device: Device) -> (limits: SupportedLimits, ok: bool) {
-	ok = bool(RawDeviceGetLimits(device, &limits))
+DeviceGetAdapterInfo :: proc "c" (device: Device) -> (info: AdapterInfo, status: Status) {
+	status = RawDeviceGetAdapterInfo(device, &info)
+	return
+}
+
+DeviceGetFeatures :: proc "c" (device: Device) -> (features: SupportedFeatures) {
+	RawDeviceGetFeatures(device, &features)
 	return
 }
 
 BufferWithDataDescriptor :: struct {
-	/* NULLABLE */ label: cstring,
+	/* NULLABLE */ label: StringView,
 	usage: BufferUsageFlags,
 }
 
@@ -1693,82 +1853,12 @@ RenderPassEncoderSetBindGroup :: proc "c" (renderPassEncoder: RenderPassEncoder,
 
 // Wrappers of Surface
 
-SurfaceGetCapabilities :: proc "c" (surface: Surface, adapter: Adapter) -> (capabilities: SurfaceCapabilities) {
-	RawSurfaceGetCapabilities(surface, adapter, &capabilities)
+SurfaceGetCapabilities :: proc "c" (surface: Surface, adapter: Adapter) -> (capabilities: SurfaceCapabilities, status: Status) {
+	status = RawSurfaceGetCapabilities(surface, adapter, &capabilities)
 	return
 }
 
 SurfaceGetCurrentTexture :: proc "c" (surface: Surface) -> (surface_texture: SurfaceTexture) {
 	RawSurfaceGetCurrentTexture(surface, &surface_texture)
 	return
-}
-
-// WGPU Native bindings
-
-BINDINGS_VERSION        :: [4]u8{22, 1, 0, 1}
-BINDINGS_VERSION_STRING :: "22.1.0.1"
-
-when ODIN_OS != .JS {
-	@(private="file")
-	wgpu_native_version_check :: proc "c" () {
-		v := (transmute([4]u8)GetVersion()).wzyx
-
-		if v != BINDINGS_VERSION {
-			buf: [1024]byte
-			n := copy(buf[:],  "wgpu-native version mismatch: ")
-			n += copy(buf[n:], "bindings are for version ")
-			n += copy(buf[n:], BINDINGS_VERSION_STRING)
-			n += copy(buf[n:], ", but a different version is linked")
-			panic_contextless(string(buf[:n]))
-		}
-	}
-
-	@(link_prefix="wgpu")
-	foreign libwgpu {
-		@(link_name="wgpuGenerateReport")
-		RawGenerateReport :: proc(instance: Instance, report: ^GlobalReport) ---
-		@(link_name="wgpuInstanceEnumerateAdapters")
-		RawInstanceEnumerateAdapters :: proc(instance: Instance, /* NULLABLE */ options: /* const */ ^InstanceEnumerateAdapterOptions, adapters: [^]Adapter) -> uint ---
-
-		@(link_name="wgpuQueueSubmitForIndex")
-		RawQueueSubmitForIndex :: proc(queue: Queue, commandCount: uint, commands: [^]CommandBuffer) -> SubmissionIndex ---
-
-		// Returns true if the queue is empty, or false if there are more queue submissions still in flight.
-		DevicePoll :: proc(device: Device, wait: b32, /* NULLABLE */ wrappedSubmissionIndex: /* const */ ^WrappedSubmissionIndex = nil) -> b32 ---
-
-		SetLogCallback :: proc(callback: LogCallback, userdata: rawptr) ---
-
-		SetLogLevel :: proc(level: LogLevel) ---
-
-		GetVersion :: proc() -> u32 ---
-
-		RenderPassEncoderSetPushConstants :: proc(encoder: RenderPassEncoder, stages: ShaderStageFlags, offset: u32, sizeBytes: u32, data: rawptr) ---
-
-		RenderPassEncoderMultiDrawIndirect :: proc(encoder: RenderPassEncoder, buffer: Buffer, offset: u64, count: u32) ---
-		RenderPassEncoderMultiDrawIndexedIndirect :: proc(encoder: RenderPassEncoder, buffer: Buffer, offset: u64, count: u32) ---
-
-		RenderPassEncoderMultiDrawIndirectCount :: proc(encoder: RenderPassEncoder, buffer: Buffer, offset: u64, count_buffer: Buffer, count_buffer_offset: u64, max_count: u32) ---
-		RenderPassEncoderMultiDrawIndexedIndirectCount :: proc(encoder: RenderPassEncoder, buffer: Buffer, offset: u64, count_buffer: Buffer, count_buffer_offset: u64, max_count: u32) ---
-
-		ComputePassEncoderBeginPipelineStatisticsQuery :: proc(computePassEncoder: ComputePassEncoder, querySet: QuerySet, queryIndex: u32) ---
-		ComputePassEncoderEndPipelineStatisticsQuery :: proc(computePassEncoder: ComputePassEncoder) ---
-		RenderPassEncoderBeginPipelineStatisticsQuery :: proc(renderPassEncoder: RenderPassEncoder, querySet: QuerySet, queryIndex: u32) ---
-		RenderPassEncoderEndPipelineStatisticsQuery :: proc(renderPassEncoder: RenderPassEncoder) ---
-	}
-
-	GenerateReport :: proc "c" (instance: Instance) -> (report: GlobalReport) {
-		RawGenerateReport(instance, &report)
-		return
-	}
-
-	InstanceEnumerateAdapters :: proc(instance: Instance, options: ^InstanceEnumerateAdapterOptions = nil, allocator := context.allocator) -> (adapters: []Adapter) {
-		count := RawInstanceEnumerateAdapters(instance, options, nil)
-		adapters = make([]Adapter, count, allocator)
-		RawInstanceEnumerateAdapters(instance, options, raw_data(adapters))
-		return
-	}
-
-	QueueSubmitForIndex :: proc "c" (queue: Queue, commands: []CommandBuffer) -> SubmissionIndex {
-		return RawQueueSubmitForIndex(queue, len(commands), raw_data(commands))
-	}
 }

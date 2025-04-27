@@ -108,7 +108,9 @@ struct AstFile {
 	String       package_name;
 
 	u64          vet_flags;
+	u64          feature_flags;
 	bool         vet_flags_set;
+	bool         feature_flags_set;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
@@ -561,6 +563,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
 		Scope *scope; \
 		Token unroll_token; \
+		Slice<Ast *> args; \
 		Token for_token; \
 		Ast *val0; \
 		Ast *val1; \

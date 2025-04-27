@@ -4,12 +4,12 @@ setlocal EnableDelayedExpansion
 
 where /Q cl.exe || (
 	set __VSCMD_ARG_NO_LOGO=1
-	for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.VisualStudio.Workload.NativeDesktop -property installationPath') do set VS=%%i
+	for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set VS=%%i
 	if "!VS!" equ "" (
-		echo ERROR: Visual Studio installation not found
+		echo ERROR: MSVC installation not found
 		exit /b 1
 	)
-	call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64 || exit /b 1
+	call "!VS!\Common7\Tools\vsdevcmd.bat" -arch=x64 -host_arch=x64 || exit /b 1
 )
 
 if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
@@ -19,7 +19,11 @@ if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
 	)
 )
 
-for /f %%i in ('powershell get-date -format "{yyyyMMdd}"') do (
+pushd misc
+cl /nologo get-date.c
+popd
+
+for /f %%i in ('misc\get-date') do (
 	set CURR_DATE_TIME=%%i
 )
 set curr_year=%CURR_DATE_TIME:~0,4%
@@ -57,7 +61,6 @@ if %release_mode% equ 0 (
 set V4=0
 set odin_version_full="%V1%.%V2%.%V3%.%V4%"
 set odin_version_raw="dev-%V1%-%V2%"
-
 
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
 rem Parse source code as utf-8 even on shift-jis and other codepages
@@ -135,6 +138,7 @@ del *.ilk > NUL 2> NUL
 
 rc %rc_flags% %odin_rc%
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
+if %errorlevel% neq 0 goto end_of_build
 mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
 if %errorlevel% neq 0 goto end_of_build
 

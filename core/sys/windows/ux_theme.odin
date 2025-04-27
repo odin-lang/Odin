@@ -9,4 +9,5 @@ PMARGINS :: ^MARGINS
 @(default_calling_convention="system")
 foreign uxtheme {
     IsThemeActive :: proc() -> BOOL ---
+    SetWindowTheme :: proc(hWnd: HWND, pszSubAppName, pszSubIdList: LPCWSTR) -> HRESULT ---
 }

@@ -1,9 +1,10 @@
 #+private
 package os2
 
+import "base:runtime"
+
 import "core:strings"
 import "core:strconv"
-import "base:runtime"
 import "core:sys/linux"
 
 _Path_Separator        :: '/'
@@ -13,7 +14,7 @@ _Path_List_Separator   :: ':'
 _OPENDIR_FLAGS : linux.Open_Flags : {.NONBLOCK, .DIRECTORY, .LARGEFILE, .CLOEXEC}
 
 _is_path_separator :: proc(c: byte) -> bool {
-	return c == '/'
+	return c == _Path_Separator
 }
 
 _mkdir :: proc(path: string, perm: int) -> Error {
@@ -77,8 +78,6 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 }
 
 _remove_all :: proc(path: string) -> Error {
-	DT_DIR :: 4
-
 	remove_all_dir :: proc(dfd: linux.Fd) -> Error {
 		n := 64
 		buf := make([]u8, n)
@@ -171,6 +170,25 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (string, Error) 
 _set_working_directory :: proc(dir: string) -> Error {
 	dir_cstr := temp_cstring(dir) or_return
 	return _get_platform_error(linux.chdir(dir_cstr))
+}
+
+_get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
+	TEMP_ALLOCATOR_GUARD()
+
+	buf := make([dynamic]byte, 1024, temp_allocator()) or_return
+	for {
+		n, errno := linux.readlink("/proc/self/exe", buf[:])
+		if errno != .NONE {
+			err = _get_platform_error(errno)
+			return
+		}
+
+		if n < len(buf) {
+			return clone_string(string(buf[:n]), allocator)
+		}
+
+		resize(&buf, len(buf)*2) or_return
+	}
 }
 
 _get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fullpath: string, err: Error) {

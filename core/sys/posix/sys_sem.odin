@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -146,6 +146,32 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		sem_nsems: c.ulong, // [PSX] number of semaphores in set
 		__glibc_reserved3: c.ulong,
 		__glibc_reserved4: c.ulong,
+	}
+
+	sembuf :: struct {
+		sem_num: c.ushort, /* [PSX] semaphore number */
+		sem_op:  c.short,  /* [PSX] semaphore operation */
+		sem_flg: c.short,  /* [PSX] operation flags */
+	}
+
+} else when ODIN_OS == .Haiku {
+
+	SEM_UNDO :: 10 // undo the operation on exit
+
+	// Commands for `semctl'.
+	GETPID  :: 3
+	GETVAL  :: 4
+	GETALL  :: 5
+	GETNCNT :: 6
+	GETZCNT :: 7
+	SETVAL  :: 8
+	SETALL  :: 9
+
+	semid_ds :: struct {
+		sem_perm:  ipc_perm,  // [PSX] operation permission structure
+		sem_nsems: c.ushort, // [PSX] number of semaphores in set
+		sem_otime: time_t,    // [PSX] last semop()
+		sem_ctime: time_t,    // [PSX] last time changed by semctl()
 	}
 
 	sembuf :: struct {

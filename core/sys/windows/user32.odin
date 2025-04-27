@@ -2,6 +2,7 @@
 package sys_windows
 
 import "base:intrinsics"
+import "core:c"
 foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="system")
@@ -32,6 +33,8 @@ foreign user32 {
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
 
+	RegisterHotKey :: proc(hnwd: HWND, id: c.int, fsModifiers: UINT, vk: UINT) -> BOOL ---
+
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
 		lpClassName: LPCWSTR,
@@ -51,6 +54,7 @@ foreign user32 {
 	IsWindowVisible :: proc(hwnd: HWND) -> BOOL ---
 	IsWindowEnabled :: proc(hwnd: HWND) -> BOOL ---
 	IsIconic :: proc(hwnd: HWND) -> BOOL ---
+	IsZoomed :: proc(hwnd: HWND) -> BOOL ---
 	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
 	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
 	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---
@@ -59,6 +63,8 @@ foreign user32 {
 	UpdateWindow :: proc(hWnd: HWND) -> BOOL ---
 	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
 	GetActiveWindow :: proc() -> HWND ---
+	SetFocus :: proc(hWnd: HWND) -> HWND ---
+	GetFocus :: proc() -> HWND ---
 	RedrawWindow :: proc(hwnd: HWND, lprcUpdate: LPRECT, hrgnUpdate: HRGN, flags: RedrawWindowFlags) -> BOOL ---
 	SetParent :: proc(hWndChild: HWND, hWndNewParent: HWND) -> HWND ---
 	SetPropW :: proc(hWnd: HWND, lpString: LPCWSTR, hData: HANDLE) -> BOOL ---
@@ -207,6 +213,7 @@ foreign user32 {
 	EnumDisplayMonitors :: proc(hdc: HDC, lprcClip: LPRECT, lpfnEnum: Monitor_Enum_Proc, dwData: LPARAM) -> BOOL ---
 
 	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
+	EnumChildWindows :: proc(hWndParent: HWND, lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
 
 	IsProcessDPIAware :: proc() -> BOOL ---
 	SetProcessDPIAware :: proc() -> BOOL ---
@@ -548,11 +555,11 @@ RI_KEY_TERMSRV_SHADOW :: 0x10
 MOUSE_MOVE_RELATIVE :: 0x00
 MOUSE_MOVE_ABSOLUTE :: 0x01
 MOUSE_VIRTUAL_DESKTOP :: 0x02
-MOUSE_ATTRIUBTTES_CHANGED :: 0x04
+MOUSE_ATTRIBUTES_CHANGED :: 0x04
 MOUSE_MOVE_NOCOALESCE :: 0x08
 
 RI_MOUSE_BUTTON_1_DOWN :: 0x0001
-RI_MOUSE_LEFT_BUTTON_DOWNS :: RI_MOUSE_BUTTON_1_DOWN
+RI_MOUSE_LEFT_BUTTON_DOWN :: RI_MOUSE_BUTTON_1_DOWN
 RI_MOUSE_BUTTON_1_UP :: 0x0002
 RI_MOUSE_LEFT_BUTTON_UP :: RI_MOUSE_BUTTON_1_UP
 RI_MOUSE_BUTTON_2_DOWN :: 0x0004
@@ -842,3 +849,23 @@ FKF_CONFIRMHOTKEY :: 0x8
 FKF_HOTKEYSOUND   :: 0x10
 FKF_INDICATOR     :: 0x20
 FKF_CLICKON       :: 0x40
+
+NONCLIENTMETRICSW :: struct {
+	cbSize: UINT,
+	iBorderWidth: i32,
+	iScrollWidth: i32,
+	iScrollHeight: i32,
+	iCaptionWidth: i32,
+	iCaptionHeight: i32,
+	lfCaptionFont: LOGFONTW,
+	iSmCaptionWidth: i32,
+	iSmCaptionHeight: i32,
+	lfSmCaptionFont: LOGFONTW,
+	iMenuWidth: i32,
+	iMenuHeight: i32,
+	lfMenuFont: LOGFONTW,
+	lfStatusFont: LOGFONTW,
+	lfMessageFont: LOGFONTW,
+	iPaddedBorderWidth: i32,
+}
+LPNONCLIENTMETRICSW :: ^NONCLIENTMETRICSW

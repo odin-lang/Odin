@@ -20,7 +20,7 @@ create_temp_file :: proc(dir, pattern: string) -> (f: ^File, err: Error) {
 	prefix, suffix := _prefix_and_suffix(pattern) or_return
 	prefix = temp_join_path(dir, prefix) or_return
 
-	rand_buf: [32]byte
+	rand_buf: [10]byte
 	name_buf := make([]byte, len(prefix)+len(rand_buf)+len(suffix), temp_allocator())
 
 	attempts := 0
@@ -52,7 +52,7 @@ make_directory_temp :: proc(dir, pattern: string, allocator: runtime.Allocator) 
 	prefix, suffix := _prefix_and_suffix(pattern) or_return
 	prefix = temp_join_path(dir, prefix) or_return
 
-	rand_buf: [32]byte
+	rand_buf: [10]byte
 	name_buf := make([]byte, len(prefix)+len(rand_buf)+len(suffix), temp_allocator())
 
 	attempts := 0

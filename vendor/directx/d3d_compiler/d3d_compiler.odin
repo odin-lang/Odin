@@ -39,7 +39,7 @@ foreign d3dcompiler {
 	SetBlobPart                    :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Part: BLOB_PART, Flags: u32, pPart: rawptr, PartSize: SIZE_T, ppNewShader: ^^ID3DBlob) -> HRESULT ---
 	CreateBlob                     :: proc(Size: SIZE_T, ppBlob: ^^ID3DBlob) -> HRESULT ---
 	CompressShaders                :: proc(uNumShaders: u32, pShaderData: ^SHADER_DATA, uFlags: u32, ppCompressedData: ^^ID3DBlob) -> HRESULT ---
-	DecompressShaders              :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, uNumShaders: u32, uStartIndex: u32, pIndices: ^u32, uFlags: u32, ppShaders: ^^ID3DBlob, pTotalShaders: ^u32) -> HRESULT ---
+	DecompressShaders              :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, uNumShaders: u32, uStartIndex: u32, pIndices: ^u32, uFlags: u32, ppShaders: [^]^ID3DBlob, pTotalShaders: ^u32) -> HRESULT ---
 	Disassemble10Effect            :: proc(pEffect: ^ID3D10Effect, Flags: u32, ppDisassembly: ^^ID3DBlob) -> HRESULT ---
 }
 

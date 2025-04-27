@@ -71,6 +71,7 @@ foreign glfw {
 	GetPrimaryMonitor      :: proc() -> MonitorHandle ---
 	GetMonitors            :: proc(count: ^c.int) -> [^]MonitorHandle ---
 	GetMonitorPos          :: proc(monitor: MonitorHandle, xpos, ypos: ^c.int) ---
+	GetMonitorWorkarea     :: proc(monitor: MonitorHandle, xpos, ypos, width, height: ^c.int) ---
 	GetMonitorPhysicalSize :: proc(monitor: MonitorHandle, widthMM, heightMM: ^c.int) ---
 	GetMonitorContentScale :: proc(monitor: MonitorHandle, xscale, yscale: ^f32) ---
 
@@ -192,7 +193,6 @@ foreign glfw {
 	SetWindowPosCallback          :: proc(window: WindowHandle, cbfun: WindowPosProc)          -> WindowPosProc ---
 	SetFramebufferSizeCallback    :: proc(window: WindowHandle, cbfun: FramebufferSizeProc)    -> FramebufferSizeProc ---
 	SetDropCallback               :: proc(window: WindowHandle, cbfun: DropProc)               -> DropProc ---
-	SetMonitorCallback            :: proc(window: WindowHandle, cbfun: MonitorProc)            -> MonitorProc ---
 	SetWindowMaximizeCallback     :: proc(window: WindowHandle, cbfun: WindowMaximizeProc)     -> WindowMaximizeProc ---
 	SetWindowContentScaleCallback :: proc(window: WindowHandle, cbfun: WindowContentScaleProc) -> WindowContentScaleProc ---
 
@@ -203,7 +203,9 @@ foreign glfw {
 	SetCharCallback        :: proc(window: WindowHandle, cbfun: CharProc)        -> CharProc ---
 	SetCharModsCallback    :: proc(window: WindowHandle, cbfun: CharModsProc)    -> CharModsProc ---
 	SetCursorEnterCallback :: proc(window: WindowHandle, cbfun: CursorEnterProc) -> CursorEnterProc ---
-	SetJoystickCallback    :: proc(cbfun: JoystickProc)    -> JoystickProc ---
+
+	SetMonitorCallback  :: proc(cbfun: MonitorProc)  -> MonitorProc ---
+	SetJoystickCallback :: proc(cbfun: JoystickProc) -> JoystickProc ---
 
 	SetErrorCallback :: proc(cbfun: ErrorProc) -> ErrorProc ---
 

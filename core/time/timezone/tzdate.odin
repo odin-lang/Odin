@@ -168,7 +168,7 @@ process_rrule :: proc(rrule: datetime.TZ_RRule, tm: time.Time) -> (out: datetime
 		},
 	}
 	record_sort_proc :: proc(i, j: datetime.TZ_Record) -> bool {
-		return i.time > j.time
+		return i.time < j.time
 	}
 	slice.sort_by(records, record_sort_proc)
 
@@ -179,7 +179,7 @@ process_rrule :: proc(rrule: datetime.TZ_RRule, tm: time.Time) -> (out: datetime
 		}
 	}
 
-	return records[len(records)-1], true
+	return records[0], true
 }
 
 datetime_to_utc :: proc(dt: datetime.DateTime) -> (out: datetime.DateTime, success: bool) #optional_ok {
@@ -224,7 +224,7 @@ datetime_to_tz :: proc(dt: datetime.DateTime, tz: ^datetime.TZ_Region) -> (out: 
 	record := region_get_nearest(tz, tm) or_return
 
 	secs := time.time_to_unix(tm)
-	adj_time := time.unix(secs + record.utc_offset, 0)
+	adj_time := time.unix(secs + record.utc_offset, i64(dt.nano))
 	adj_dt := time.time_to_datetime(adj_time) or_return
 	adj_dt.tz = tz
 

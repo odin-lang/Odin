@@ -1,3 +1,9 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#pragma once
+
 #ifdef NDEBUG
 #define	assert(e)	((void)0)
 #else
@@ -14,3 +20,9 @@ void __odin_libc_assert_fail(const char *, const char *, int, const char *);
     (__builtin_expect(!(e), 0) ? __odin_libc_assert_fail(__func__, __ASSERT_FILE_NAME, __LINE__, #e) : (void)0)
 
 #endif /* NDEBUG */
+
+#define static_assert _Static_assert
+
+#ifdef __cplusplus
+}
+#endif

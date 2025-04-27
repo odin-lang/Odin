@@ -345,7 +345,7 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 	check_collect_entities(c, nodes);
 
 	for (auto const &entry : s->elements) {
-		Entity *e = entry.value;
+		Entity *e = entry.value;\
 		switch (e->kind) {
 		case Entity_Constant:
 		case Entity_TypeName:
@@ -863,6 +863,11 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			if (are_types_identical(vt, s)) {
 				return 1;
 			}
+			if (is_type_proc(vt)) {
+				if (are_types_identical(base_type(vt), src)) {
+					return 1;
+				}
+			}
 		}
 
 		if (dst->Union.variants.count == 1) {
@@ -1044,7 +1049,7 @@ gb_internal AstPackage *get_package_of_type(Type *type) {
 }
 
 
-// NOTE(bill): 'content_name' is for debugging and error messages
+// NOTE(bill): 'context_name' is for debugging and error messages
 gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *type, String context_name) {
 	check_not_tuple(c, operand);
 	if (operand->mode == Addressing_Invalid) {
@@ -1973,10 +1978,10 @@ gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_Quo:
 	case Token_QuoEq:
 		if (is_type_matrix(main_type)) {
-			error(op, "Operator '%.*s' is only allowed with matrix types", LIT(op.string));
+			error(op, "Operator '%.*s' is not allowed with matrix types", LIT(op.string));
 			return false;
 		} else if (is_type_simd_vector(main_type) && is_type_integer(type)) {
-			error(op, "Operator '%.*s' is only allowed with #simd types with integer elements", LIT(op.string));
+			error(op, "Operator '%.*s' is not allowed with #simd types with integer elements", LIT(op.string));
 			return false;
 		}
 		/*fallthrough*/
@@ -2023,14 +2028,14 @@ gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_ModEq:
 	case Token_ModModEq:
 		if (is_type_matrix(main_type)) {
-			error(op, "Operator '%.*s' is only allowed with matrix types", LIT(op.string));
+			error(op, "Operator '%.*s' is not allowed with matrix types", LIT(op.string));
 			return false;
 		}
 		if (!is_type_integer(type)) {
 			error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
 			return false;
 		} else if (is_type_simd_vector(main_type)) {
-			error(op, "Operator '%.*s' is only allowed with #simd types with integer elements", LIT(op.string));
+			error(op, "Operator '%.*s' is not allowed with #simd types with integer elements", LIT(op.string));
 			return false;
 		}
 		break;
@@ -2599,9 +2604,8 @@ gb_internal ExactValue exact_bit_set_all_set_mask(Type *type) {
 					continue;
 				}
 
-				BigInt shift_amount = f->Constant.value.value_integer;
-				big_int_sub_eq(&shift_amount, &b_lower_base);
-
+				BigInt shift_amount = {};
+				big_int_sub(&shift_amount, &f->Constant.value.value_integer, &b_lower_base);
 
 				BigInt value = {};
 				big_int_shl(&value, &one, &shift_amount);
@@ -3541,6 +3545,8 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		return false;
 	}
 
+	Operand src = *o;
+
 	Type *src_t = o->type;
 	Type *dst_t = t;
 	Type *src_bt = base_type(src_t);
@@ -3629,7 +3635,8 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		// identical casts that cannot be foreseen or otherwise
 		// forbidden, so just skip them.
 		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
-		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig))) {
+		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig)) &&
+		    check_is_castable_to(c, &src, dst_t)) {
 			if (are_types_identical(src_t, dst_t)) {
 				gbString oper_str = expr_to_string(o->expr);
 				gbString to_type  = type_to_string(dst_t);
@@ -3646,7 +3653,8 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 				gb_string_free(oper_str);
 				gb_string_free(to_type);
 			} else if (is_type_integer(src_t) && is_type_integer(dst_t) &&
-			           types_have_same_internal_endian(src_t, dst_t)) {
+			           types_have_same_internal_endian(src_t, dst_t) &&
+			           type_endian_kind_of(src_t) == type_endian_kind_of(dst_t)) {
 				gbString oper_type = type_to_string(src_t);
 				gbString to_type   = type_to_string(dst_t);
 				error(o->expr, "Use of 'transmute' where 'cast' would be preferred since both are integers of the same endianness, from '%s' to '%s'", oper_type, to_type);
@@ -3662,7 +3670,19 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 }
 
 gb_internal bool check_binary_array_expr(CheckerContext *c, Token op, Operand *x, Operand *y) {
+	if (is_type_array_like(x->type) || is_type_array_like(y->type)) {
+		if (op.kind == Token_CmpAnd || op.kind == Token_CmpOr) {
+			error(op, "Array programming is not allowed with the operator '%.*s'", LIT(op.string));
+		}
+	}
 	if (is_type_array(x->type) && !is_type_array(y->type)) {
+		if (check_is_assignable_to(c, y, x->type)) {
+			if (check_binary_op(c, x, op)) {
+				return true;
+			}
+		}
+	}
+	if (is_type_simd_vector(x->type) && !is_type_simd_vector(y->type)) {
 		if (check_is_assignable_to(c, y, x->type)) {
 			if (check_binary_op(c, x, op)) {
 				return true;
@@ -4451,8 +4471,8 @@ gb_internal ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 }
 
 gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
-	GB_ASSERT_NOT_NULL(target_type);
-	if (operand->mode == Addressing_Invalid ||
+	// GB_ASSERT_NOT_NULL(target_type);
+	if (target_type == nullptr || operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
 	    is_type_typed(operand->type) ||
 	    target_type == t_invalid) {
@@ -4493,8 +4513,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		} else {
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
-				if (!is_type_boolean(target_type) &&
-				    !is_type_integer(target_type)) {
+				if (!is_type_boolean(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
 					return;
@@ -4545,6 +4564,19 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 					}
 				}
 			}
+			operand->mode = Addressing_Invalid;
+			convert_untyped_error(c, operand, target_type);
+			return;
+		}
+
+		break;
+	}
+	
+	case Type_SimdVector: {
+		Type *elem = base_array_type(t);
+		if (check_is_assignable_to(c, operand, elem)) {
+			operand->mode = Addressing_Value;
+		} else {
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
@@ -4977,8 +5009,12 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
 				return tav.value;
+			} else if (is_type_proc(tav.type)) {
+				if (success_) *success_ = true;
+				if (finish_) *finish_ = false;
+				return tav.value;
 			} else {
-				GB_ASSERT(is_type_untyped_nil(tav.type));
+				GB_ASSERT_MSG(is_type_untyped_nil(tav.type), "%s", type_to_string(tav.type));
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
 				return tav.value;
@@ -5480,6 +5516,11 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			case Addressing_SoaVariable:
 			case Addressing_SwizzleVariable:
 				operand->mode = Addressing_SwizzleVariable;
+				break;
+			case Addressing_Value:
+				if (is_type_pointer(original_type)) {
+					operand->mode = Addressing_SwizzleVariable;
+				}
 				break;
 			}
 
@@ -8718,6 +8759,18 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		error(node, "#caller_expression may only be used as a default argument parameter");
 		o->type = t_string;
 		o->mode = Addressing_Value;
+	} else if (name == "branch_location") {
+		if (!c->in_defer) {
+			error(node, "#branch_location may only be used within a 'defer' statement");
+		} else if (c->curr_proc_decl) {
+			Entity *e = c->curr_proc_decl->entity;
+			if (e != nullptr) {
+				GB_ASSERT(e->kind == Entity_Procedure);
+				e->Procedure.uses_branch_location = true;
+			}
+		}
+		o->type = t_source_code_location;
+		o->mode = Addressing_Value;
 	} else {
 		if (name == "location") {
 			init_core_source_code_location(c->checker);
@@ -8924,8 +8977,14 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 		o->expr = node;
 		return Expr_Expr;
 	}
+
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	check_or_else_split_types(c, &x, name, &left_type, &right_type);
+	add_type_and_value(c, arg, x.mode, x.type, x.value);
+
 	bool y_is_diverging = false;
-	check_expr_base(c, &y, default_value, x.type);
+	check_expr_base(c, &y, default_value, left_type);
 	switch (y.mode) {
 	case Addressing_NoValue:
 		if (is_diverging_expr(y.expr)) {
@@ -8949,11 +9008,6 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 		o->expr = node;
 		return Expr_Expr;
 	}
-
-	Type *left_type = nullptr;
-	Type *right_type = nullptr;
-	check_or_else_split_types(c, &x, name, &left_type, &right_type);
-	add_type_and_value(c, arg, x.mode, x.type, x.value);
 
 	if (left_type != nullptr) {
 		if (!y_is_diverging) {
@@ -9332,6 +9386,23 @@ gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
 	return false;
 }
 
+gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCompoundLit *cl) {
+	if (cl->elems.count > 0 && (check_feature_flags(c, node) & OptInFeatureFlag_DynamicLiterals) == 0) {
+		ERROR_BLOCK();
+		error(node, "Compound literals of dynamic types are disabled by default");
+		error_line("\tSuggestion: If you want to enable them for this specific file, add '#+feature dynamic-literals' at the top of the file\n");
+		error_line("\tWarning: Please understand that dynamic literals will implicitly allocate using the current 'context.allocator' in that scope\n");
+		if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+			error_line("\tWarning: As '-default-to-panic-allocator' has been set, the dynamic compound literal may not be initialized as expected\n");
+		} else if (build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
+			error_line("\tWarning: As '-default-to-panic-allocator' has been set, the dynamic compound literal may not be initialized as expected\n");
+		}
+		return false;
+	}
+
+	return cl->elems.count > 0;
+}
+
 gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	ast_node(cl, CompoundLit, node);
@@ -9532,11 +9603,6 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			elem_type = t->DynamicArray.elem;
 			context_name = str_lit("dynamic array literal");
 			is_constant = false;
-
-			if (!build_context.no_dynamic_literals) {
-				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
-				add_package_dependency(c, "runtime", "__dynamic_array_append");
-			}
 		} else if (t->kind == Type_SimdVector) {
 			elem_type = t->SimdVector.elem;
 			context_name = str_lit("simd vector literal");
@@ -9711,8 +9777,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 
 		if (t->kind == Type_DynamicArray) {
-			if (build_context.no_dynamic_literals && cl->elems.count) {
-				error(node, "Compound literals of dynamic types have been disabled");
+			if (check_for_dynamic_literals(c, node, cl)) {
+				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
+				add_package_dependency(c, "runtime", "__dynamic_array_append");
 			}
 		}
 
@@ -10101,9 +10168,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			}
 		}
 
-		if (build_context.no_dynamic_literals && cl->elems.count) {
-			error(node, "Compound literals of dynamic types have been disabled");
-		} else {
+		if (check_for_dynamic_literals(c, node, cl)) {
 			add_map_reserve_dependencies(c);
 			add_map_set_dependencies(c);
 		}
@@ -10325,7 +10390,7 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 				add_type_info_type(c, o->type);
 				o->type = type_hint;
 				o->mode = Addressing_OptionalOk;
-				return kind;
+				goto end;
 			}
 		}
 
@@ -10389,6 +10454,8 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 			return kind;
 		}
 	}
+
+end:;
 
 	if ((c->state_flags & StateFlag_no_type_assert) == 0) {
 		add_package_dependency(c, "runtime", "type_assertion_check");

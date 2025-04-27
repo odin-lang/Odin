@@ -55,12 +55,12 @@ BEGIN
         BLOCK "0409FDE9"
         BEGIN
             VALUE "CompanyName", "https://odin-lang.org/"
-            VALUE "FileDescription", "Odin general-purpose programming language." // note this is shown in the task manager
+            VALUE "FileDescription", "Odin" // note this is shown in the task manager
             VALUE "FileVersion", QUOTE(VF)
             VALUE "InternalName", "odin.exe"
             VALUE "LegalCopyright", "Copyright (c) 2016-2024 Ginger Bill. All rights reserved."
             VALUE "OriginalFilename", "odin.exe"
-            VALUE "ProductName", "The Odin Programming Language"
+            VALUE "ProductName", "Odin Programming Language"
             VALUE "ProductVersion", QUOTE(VP)
             VALUE "Comments", QUOTE(git-sha: GIT_SHA)
 			// custom values

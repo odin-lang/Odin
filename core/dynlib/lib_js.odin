@@ -4,6 +4,8 @@ package dynlib
 
 import "base:runtime"
 
+_LIBRARY_FILE_EXTENSION :: ""
+
 _load_library :: proc(path: string, global_symbols: bool, allocator: runtime.Allocator) -> (Library, bool) {
 	return nil, false
 }

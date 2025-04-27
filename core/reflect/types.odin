@@ -348,12 +348,6 @@ is_parameters :: proc(info: ^Type_Info) -> bool {
 	_, ok := type_info_base(info).variant.(Type_Info_Parameters)
 	return ok
 }
-@(require_results, deprecated="prefer is_parameters")
-is_tuple :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false }
-	_, ok := type_info_base(info).variant.(Type_Info_Parameters)
-	return ok
-}
 @(require_results)
 is_struct :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }

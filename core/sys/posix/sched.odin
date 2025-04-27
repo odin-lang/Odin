@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
@@ -100,5 +100,12 @@ when ODIN_OS == .Darwin {
 	SCHED_OTHER    :: 0
 	SCHED_FIFO     :: 1
 	SCHED_RR       :: 2
+
+} else when ODIN_OS == .Haiku {
+
+	SCHED_FIFO     :: 1
+	SCHED_RR       :: 2
+	// SCHED_SPORADIC :: 3 NOTE: not a thing on freebsd, netbsd and probably others, leaving it out
+	SCHED_OTHER    :: 4
 
 }
