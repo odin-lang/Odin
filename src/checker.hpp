@@ -148,13 +148,13 @@ struct AttributeContext {
 
 	String  objc_class;
 	String  objc_name;
-    String  objc_selector;
+	String  objc_selector;
 	Type *  objc_type;
-    Type *  objc_superclass;
-    Type *  objc_ivar;
+	Type *  objc_superclass;
+	Type *  objc_ivar;
 	Entity *objc_context_provider;
 	bool    objc_is_class_method   : 1;
-    bool    objc_is_implementation : 1;     // This struct or proc provides a class/method implementation, not a binding to an existing type.
+	bool    objc_is_implementation : 1;     // This struct or proc provides a class/method implementation, not a binding to an existing type.
 
 	String require_target_feature; // required by the target micro-architecture
 	String enable_target_feature;  // will be enabled for the procedure only
@@ -371,8 +371,8 @@ struct ObjcMsgData {
 };
 
 struct ObjcMethodData {
-    AttributeContext ac;
-    Entity *proc_entity;
+	AttributeContext ac;
+	Entity *proc_entity;
 };
 
 enum LoadFileTier {
@@ -489,10 +489,10 @@ struct CheckerInfo {
 	BlockingMutex objc_types_mutex;
 	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
 
-    MPSCQueue<Entity *> objc_class_implementations;
+	MPSCQueue<Entity *> objc_class_implementations;
 
-    BlockingMutex objc_method_mutex;
-    PtrMap<Type *, Array<ObjcMethodData>> objc_method_implementations;
+	BlockingMutex objc_method_mutex;
+	PtrMap<Type *, Array<ObjcMethodData>> objc_method_implementations;
 
 
 	BlockingMutex load_file_mutex;

@@ -101,7 +101,7 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 
 	string_map_init(&m->objc_classes);
 	string_map_init(&m->objc_selectors);
-    string_map_init(&m->objc_ivars);
+	string_map_init(&m->objc_ivars);
 
 	map_init(&m->map_info_map, 0);
 	map_init(&m->map_cell_info_map, 0);
@@ -174,7 +174,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	mpsc_init(&gen->entities_to_correct_linkage, heap_allocator());
 	mpsc_init(&gen->objc_selectors, heap_allocator());
 	mpsc_init(&gen->objc_classes, heap_allocator());
-    mpsc_init(&gen->objc_ivars, heap_allocator());
+	mpsc_init(&gen->objc_ivars, heap_allocator());
 
 	return true;
 }

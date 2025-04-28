@@ -1176,327 +1176,327 @@ gb_internal lbProcedure *lb_create_objc_names(lbModule *main_module) {
 // TODO(harold): Move this out of here and into a more suitable place.
 // TODO(harold): Should not take an allocator, but always use temp, as we return string literals as well.
 String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_depth = 0) {
-    // NOTE(harold): See https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html#//apple_ref/doc/uid/TP40008048-CH100
+	// NOTE(harold): See https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html#//apple_ref/doc/uid/TP40008048-CH100
 
-    // NOTE(harold): Darwin targets are always 64-bit. Should we drop this and assume "q" always?
-    #define INT_SIZE_ENCODING (build_context.metrics.ptr_size == 4 ? "i" : "q")
-    switch (t->kind) {
-    case Type_Basic: {
-        switch (t->Basic.kind) {
-        case Basic_Invalid:
-            return str_lit("?");
+	// NOTE(harold): Darwin targets are always 64-bit. Should we drop this and assume "q" always?
+	#define INT_SIZE_ENCODING (build_context.metrics.ptr_size == 4 ? "i" : "q")
+	switch (t->kind) {
+	case Type_Basic: {
+		switch (t->Basic.kind) {
+		case Basic_Invalid:
+			return str_lit("?");
 
-        case Basic_llvm_bool:
-        case Basic_bool:
-        case Basic_b8:
-            return str_lit("B");
+		case Basic_llvm_bool:
+		case Basic_bool:
+		case Basic_b8:
+			return str_lit("B");
 
-        case Basic_b16:
-            return str_lit("C");
-        case Basic_b32:
-            return str_lit("I");
-        case Basic_b64:
-            return str_lit("q");
-        case Basic_i8:
-            return str_lit("c");
-        case Basic_u8:
-            return str_lit("C");
-        case Basic_i16:
-        case Basic_i16le:
-        case Basic_i16be:
-            return str_lit("s");
-        case Basic_u16:
-        case Basic_u16le:
-        case Basic_u16be:
-            return str_lit("S");
-        case Basic_i32:
-        case Basic_i32le:
-        case Basic_i32be:
-            return str_lit("i");
-        case Basic_u32le:
-        case Basic_u32:
-        case Basic_u32be:
-            return str_lit("I");
-        case Basic_i64:
-        case Basic_i64le:
-        case Basic_i64be:
-            return str_lit("q");
-        case Basic_u64:
-        case Basic_u64le:
-        case Basic_u64be:
-            return str_lit("Q");
-        case Basic_i128:
-        case Basic_i128le:
-        case Basic_i128be:
-            return str_lit("t");
-        case Basic_u128:
-        case Basic_u128le:
-        case Basic_u128be:
-            return str_lit("T");
-        case Basic_rune:
-            return str_lit("I");
-        case Basic_f16:
-        case Basic_f16le:
-        case Basic_f16be:
-            return str_lit("s");    // @harold: Closest we've got?
-        case Basic_f32:
-        case Basic_f32le:
-        case Basic_f32be:
-            return str_lit("f");
-        case Basic_f64:
-        case Basic_f64le:
-        case Basic_f64be:
-            return str_lit("d");
+		case Basic_b16:
+			return str_lit("C");
+		case Basic_b32:
+			return str_lit("I");
+		case Basic_b64:
+			return str_lit("q");
+		case Basic_i8:
+			return str_lit("c");
+		case Basic_u8:
+			return str_lit("C");
+		case Basic_i16:
+		case Basic_i16le:
+		case Basic_i16be:
+			return str_lit("s");
+		case Basic_u16:
+		case Basic_u16le:
+		case Basic_u16be:
+			return str_lit("S");
+		case Basic_i32:
+		case Basic_i32le:
+		case Basic_i32be:
+			return str_lit("i");
+		case Basic_u32le:
+		case Basic_u32:
+		case Basic_u32be:
+			return str_lit("I");
+		case Basic_i64:
+		case Basic_i64le:
+		case Basic_i64be:
+			return str_lit("q");
+		case Basic_u64:
+		case Basic_u64le:
+		case Basic_u64be:
+			return str_lit("Q");
+		case Basic_i128:
+		case Basic_i128le:
+		case Basic_i128be:
+			return str_lit("t");
+		case Basic_u128:
+		case Basic_u128le:
+		case Basic_u128be:
+			return str_lit("T");
+		case Basic_rune:
+			return str_lit("I");
+		case Basic_f16:
+		case Basic_f16le:
+		case Basic_f16be:
+			return str_lit("s");    // @harold: Closest we've got?
+		case Basic_f32:
+		case Basic_f32le:
+		case Basic_f32be:
+			return str_lit("f");
+		case Basic_f64:
+		case Basic_f64le:
+		case Basic_f64be:
+			return str_lit("d");
 
-        // TODO(harold) These:
-        case Basic_complex32:
-        case Basic_complex64:
-        case Basic_complex128:
-        case Basic_quaternion64:
-        case Basic_quaternion128:
-        case Basic_quaternion256:
-                return str_lit("?");
+		// TODO(harold) These:
+		case Basic_complex32:
+		case Basic_complex64:
+		case Basic_complex128:
+		case Basic_quaternion64:
+		case Basic_quaternion128:
+		case Basic_quaternion256:
+				return str_lit("?");
 
-        case Basic_int:
-            return str_lit(INT_SIZE_ENCODING);
-        case Basic_uint:
-            return build_context.metrics.ptr_size == 4 ? str_lit("I") : str_lit("Q");
-        case Basic_uintptr:
-        case Basic_rawptr:
-            return str_lit("^v");
+		case Basic_int:
+			return str_lit(INT_SIZE_ENCODING);
+		case Basic_uint:
+			return build_context.metrics.ptr_size == 4 ? str_lit("I") : str_lit("Q");
+		case Basic_uintptr:
+		case Basic_rawptr:
+			return str_lit("^v");
 
-        case Basic_string:
-            return build_context.metrics.ptr_size == 4 ? str_lit("{string=*i}") : str_lit("{string=*q}");
+		case Basic_string:
+			return build_context.metrics.ptr_size == 4 ? str_lit("{string=*i}") : str_lit("{string=*q}");
 
-        case Basic_cstring: return str_lit("*");
-        case Basic_any:     return str_lit("{any=^v^v");  // rawptr + ^Type_Info
+		case Basic_cstring: return str_lit("*");
+		case Basic_any:     return str_lit("{any=^v^v");  // rawptr + ^Type_Info
 
-        case Basic_typeid:
-            GB_ASSERT(t->Basic.size == 8);
-            return str_lit("q");
+		case Basic_typeid:
+			GB_ASSERT(t->Basic.size == 8);
+			return str_lit("q");
 
-        // Untyped types
-        case Basic_UntypedBool:
-        case Basic_UntypedInteger:
-        case Basic_UntypedFloat:
-        case Basic_UntypedComplex:
-        case Basic_UntypedQuaternion:
-        case Basic_UntypedString:
-        case Basic_UntypedRune:
-        case Basic_UntypedNil:
-        case Basic_UntypedUninit:
-            GB_PANIC("Untyped types cannot be @encoded()");
-            return str_lit("?");
-        }
-        break;
-    }
+		// Untyped types
+		case Basic_UntypedBool:
+		case Basic_UntypedInteger:
+		case Basic_UntypedFloat:
+		case Basic_UntypedComplex:
+		case Basic_UntypedQuaternion:
+		case Basic_UntypedString:
+		case Basic_UntypedRune:
+		case Basic_UntypedNil:
+		case Basic_UntypedUninit:
+			GB_PANIC("Untyped types cannot be @encoded()");
+			return str_lit("?");
+		}
+		break;
+	}
 
-    case Type_Named:
-    case Type_Struct:
-    case Type_Union: {
-        Type* base = t;
-        if (base->kind == Type_Named) {
-            base = base_type(base);
-            if(base->kind != Type_Struct && base->kind != Type_Union) {
-                return lb_get_objc_type_encoding(base, allocator, pointer_depth);
-            }
-        }
+	case Type_Named:
+	case Type_Struct:
+	case Type_Union: {
+		Type* base = t;
+		if (base->kind == Type_Named) {
+			base = base_type(base);
+			if(base->kind != Type_Struct && base->kind != Type_Union) {
+				return lb_get_objc_type_encoding(base, allocator, pointer_depth);
+			}
+		}
 
-        const bool is_union = base->kind == Type_Union;
-        if (!is_union) {
-            // Check for objc_SEL
-            if (internal_check_is_assignable_to(base, t_objc_SEL)) {
-                return str_lit(":");
-            }
+		const bool is_union = base->kind == Type_Union;
+		if (!is_union) {
+			// Check for objc_SEL
+			if (internal_check_is_assignable_to(base, t_objc_SEL)) {
+				return str_lit(":");
+			}
 
-            // Check for objc_Class
-            if (internal_check_is_assignable_to(base, t_objc_SEL)) {
-                return str_lit("#");
-            }
+			// Check for objc_Class
+			if (internal_check_is_assignable_to(base, t_objc_SEL)) {
+				return str_lit("#");
+			}
 
-            // Treat struct as an Objective-C Class?
-            if (has_type_got_objc_class_attribute(base) && pointer_depth == 0) {
-                return str_lit("#");
-            }
-        }
+			// Treat struct as an Objective-C Class?
+			if (has_type_got_objc_class_attribute(base) && pointer_depth == 0) {
+				return str_lit("#");
+			}
+		}
 
-        if (is_type_objc_object(base)) {
-            return str_lit("@");
-        }
+		if (is_type_objc_object(base)) {
+			return str_lit("@");
+		}
 
 
-        gbString s = gb_string_make_reserve(allocator, 16);
-        s = gb_string_append_length(s, is_union ? "(" :"{", 1);
-        if (t->kind == Type_Named) {
-            s = gb_string_append_length(s, t->Named.name.text, t->Named.name.len);
-        }
+		gbString s = gb_string_make_reserve(allocator, 16);
+		s = gb_string_append_length(s, is_union ? "(" :"{", 1);
+		if (t->kind == Type_Named) {
+			s = gb_string_append_length(s, t->Named.name.text, t->Named.name.len);
+		}
 
-        // Write fields
-        if (pointer_depth < 2) {
-            s = gb_string_append_length(s, "=", 1);
+		// Write fields
+		if (pointer_depth < 2) {
+			s = gb_string_append_length(s, "=", 1);
 
-            if (!is_union) {
-                for( auto& f : base->Struct.fields ) {
-                    String field_type = lb_get_objc_type_encoding(f->type, allocator, pointer_depth);
-                    s = gb_string_append_length(s, field_type.text, field_type.len);
-                }
-            } else {
-                // #TODO(harold): Encode fields
-            }
-        }
+			if (!is_union) {
+				for( auto& f : base->Struct.fields ) {
+					String field_type = lb_get_objc_type_encoding(f->type, allocator, pointer_depth);
+					s = gb_string_append_length(s, field_type.text, field_type.len);
+				}
+			} else {
+				// #TODO(harold): Encode fields
+			}
+		}
 
-        s = gb_string_append_length(s, is_union ? ")" :"}", 1);
+		s = gb_string_append_length(s, is_union ? ")" :"}", 1);
 
-        return make_string_c(s);
-    }
+		return make_string_c(s);
+	}
 
-    case Type_Generic:
-        GB_PANIC("Generic types cannot be @encoded()");
-        return str_lit("?");
+	case Type_Generic:
+		GB_PANIC("Generic types cannot be @encoded()");
+		return str_lit("?");
 
-    case Type_Pointer: {
-        String pointee = lb_get_objc_type_encoding(t->Pointer.elem, allocator, pointer_depth +1);
-        // Special case for Objective-C Objects
-        if (pointer_depth == 0 && pointee == "@") {
-            return pointee;
-        }
+	case Type_Pointer: {
+		String pointee = lb_get_objc_type_encoding(t->Pointer.elem, allocator, pointer_depth +1);
+		// Special case for Objective-C Objects
+		if (pointer_depth == 0 && pointee == "@") {
+			return pointee;
+		}
 
-        return concatenate_strings(allocator, str_lit("^"), pointee);
-    }
+		return concatenate_strings(allocator, str_lit("^"), pointee);
+	}
 
-    case Type_MultiPointer:
-        return concatenate_strings(allocator, str_lit("^"), lb_get_objc_type_encoding(t->Pointer.elem, allocator, pointer_depth +1));
+	case Type_MultiPointer:
+		return concatenate_strings(allocator, str_lit("^"), lb_get_objc_type_encoding(t->Pointer.elem, allocator, pointer_depth +1));
 
-    case Type_Array: {
-        String type_str = lb_get_objc_type_encoding(t->Array.elem, allocator, pointer_depth);
+	case Type_Array: {
+		String type_str = lb_get_objc_type_encoding(t->Array.elem, allocator, pointer_depth);
 
-        gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
-        s = gb_string_append_fmt(s, "[%lld%s]", t->Array.count, type_str.text);
-        return make_string_c(s);
-    }
+		gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
+		s = gb_string_append_fmt(s, "[%lld%s]", t->Array.count, type_str.text);
+		return make_string_c(s);
+	}
 
-    case Type_EnumeratedArray: {
-        String type_str = lb_get_objc_type_encoding(t->EnumeratedArray.elem, allocator, pointer_depth);
+	case Type_EnumeratedArray: {
+		String type_str = lb_get_objc_type_encoding(t->EnumeratedArray.elem, allocator, pointer_depth);
 
-        gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
-        s = gb_string_append_fmt(s, "[%lld%s]", t->EnumeratedArray.count, type_str.text);
-        return make_string_c(s);
-    }
+		gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
+		s = gb_string_append_fmt(s, "[%lld%s]", t->EnumeratedArray.count, type_str.text);
+		return make_string_c(s);
+	}
 
-    case Type_Slice: {
-        String type_str = lb_get_objc_type_encoding(t->Slice.elem, allocator, pointer_depth);
-        gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
-        s = gb_string_append_fmt(s, "{slice=^%s%s}", type_str, INT_SIZE_ENCODING);
-        return make_string_c(s);
-    }
+	case Type_Slice: {
+		String type_str = lb_get_objc_type_encoding(t->Slice.elem, allocator, pointer_depth);
+		gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
+		s = gb_string_append_fmt(s, "{slice=^%s%s}", type_str, INT_SIZE_ENCODING);
+		return make_string_c(s);
+	}
 
-    case Type_DynamicArray: {
-        String type_str = lb_get_objc_type_encoding(t->DynamicArray.elem, allocator, pointer_depth);
-        gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
-        s = gb_string_append_fmt(s, "{dynamic=^%s%s%sAllocator={?^v}}", type_str, INT_SIZE_ENCODING, INT_SIZE_ENCODING);
-        return make_string_c(s);
-    }
+	case Type_DynamicArray: {
+		String type_str = lb_get_objc_type_encoding(t->DynamicArray.elem, allocator, pointer_depth);
+		gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
+		s = gb_string_append_fmt(s, "{dynamic=^%s%s%sAllocator={?^v}}", type_str, INT_SIZE_ENCODING, INT_SIZE_ENCODING);
+		return make_string_c(s);
+	}
 
-    case Type_Map:
-        return str_lit("{^v^v{Allocator=?^v}}");
-    case Type_Enum:
-        return lb_get_objc_type_encoding(t->Enum.base_type, allocator, pointer_depth);
-    case Type_Tuple:
-        // NOTE(harold): Is this allowed here?
-        return str_lit("?");
-    case Type_Proc:
-        return str_lit("?");
-    case Type_BitSet:
-        return lb_get_objc_type_encoding(t->BitSet.underlying, allocator, pointer_depth);
-    case Type_SimdVector:
-        break;
-    case Type_Matrix:
-        break;
-    case Type_BitField:
-        return lb_get_objc_type_encoding(t->BitField.backing_type, allocator, pointer_depth);
-    case Type_SoaPointer: {
-        gbString s = gb_string_make_reserve(allocator, 8);
-        s = gb_string_append_fmt(s, "{=^v%s}", INT_SIZE_ENCODING);
-        return make_string_c(s);
-    }
+	case Type_Map:
+		return str_lit("{^v^v{Allocator=?^v}}");
+	case Type_Enum:
+		return lb_get_objc_type_encoding(t->Enum.base_type, allocator, pointer_depth);
+	case Type_Tuple:
+		// NOTE(harold): Is this allowed here?
+		return str_lit("?");
+	case Type_Proc:
+		return str_lit("?");
+	case Type_BitSet:
+		return lb_get_objc_type_encoding(t->BitSet.underlying, allocator, pointer_depth);
+	case Type_SimdVector:
+		break;
+	case Type_Matrix:
+		break;
+	case Type_BitField:
+		return lb_get_objc_type_encoding(t->BitField.backing_type, allocator, pointer_depth);
+	case Type_SoaPointer: {
+		gbString s = gb_string_make_reserve(allocator, 8);
+		s = gb_string_append_fmt(s, "{=^v%s}", INT_SIZE_ENCODING);
+		return make_string_c(s);
+	}
 
-    } // End switch t->kind
-    #undef INT_SIZE_ENCODING
+	} // End switch t->kind
+	#undef INT_SIZE_ENCODING
 
-    GB_PANIC("Unreachable");
+	GB_PANIC("Unreachable");
 }
 
 struct lbObjCGlobalClass {
-    lbObjCGlobal g;
-    lbValue      class_value;    // Local registered class value
+	lbObjCGlobal g;
+	lbValue      class_value;    // Local registered class value
 };
 
 gb_internal void lb_register_objc_thing(
-    StringSet &handled,
-    lbModule *m,
-    Array<lbValue> &args,
-    Array<lbObjCGlobalClass> &class_impls,
-    StringMap<lbObjCGlobalClass> &class_map,
-    lbProcedure *p,
-    lbObjCGlobal const &g,
-    char const *call
+	StringSet &handled,
+	lbModule *m,
+	Array<lbValue> &args,
+	Array<lbObjCGlobalClass> &class_impls,
+	StringMap<lbObjCGlobalClass> &class_map,
+	lbProcedure *p,
+	lbObjCGlobal const &g,
+	char const *call
 ) {
-    if (string_set_update(&handled, g.name)) {
-        return;
-    }
+	if (string_set_update(&handled, g.name)) {
+		return;
+	}
 
-    lbAddr addr = {};
-    lbValue *found = string_map_get(&m->members, g.global_name);
-    if (found) {
-        addr = lb_addr(*found);
-    } else {
-        lbValue v = {};
-        LLVMTypeRef t = lb_type(m, g.type);
-        v.value = LLVMAddGlobal(m->mod, t, g.global_name);
-        v.type = alloc_type_pointer(g.type);
-        addr = lb_addr(v);
-        LLVMSetInitializer(v.value, LLVMConstNull(t));
-    }
+	lbAddr addr = {};
+	lbValue *found = string_map_get(&m->members, g.global_name);
+	if (found) {
+		addr = lb_addr(*found);
+	} else {
+		lbValue v = {};
+		LLVMTypeRef t = lb_type(m, g.type);
+		v.value = LLVMAddGlobal(m->mod, t, g.global_name);
+		v.type = alloc_type_pointer(g.type);
+		addr = lb_addr(v);
+		LLVMSetInitializer(v.value, LLVMConstNull(t));
+	}
 
-    lbValue class_ptr{};
-    lbValue class_name = lb_const_value(m, t_cstring, exact_value_string(g.name));
+	lbValue class_ptr{};
+	lbValue class_name = lb_const_value(m, t_cstring, exact_value_string(g.name));
 
-    // If this class requires an implementation, save it for registration below.
-    if (g.class_impl_type != nullptr) {
+	// If this class requires an implementation, save it for registration below.
+	if (g.class_impl_type != nullptr) {
 
-        // Make sure the superclass has been initialized before us
-        lbValue superclass_value{};
+		// Make sure the superclass has been initialized before us
+		lbValue superclass_value{};
 
-        auto& tn = g.class_impl_type->Named.type_name->TypeName;
-        Type *superclass = tn.objc_superclass;
-        if (superclass != nullptr) {
-            auto& superclass_global = string_map_must_get(&class_map, superclass->Named.type_name->TypeName.objc_class_name);
-            lb_register_objc_thing(handled, m, args, class_impls, class_map, p, superclass_global.g, call);
-            GB_ASSERT(superclass_global.class_value.value);
+		auto& tn = g.class_impl_type->Named.type_name->TypeName;
+		Type *superclass = tn.objc_superclass;
+		if (superclass != nullptr) {
+			auto& superclass_global = string_map_must_get(&class_map, superclass->Named.type_name->TypeName.objc_class_name);
+			lb_register_objc_thing(handled, m, args, class_impls, class_map, p, superclass_global.g, call);
+			GB_ASSERT(superclass_global.class_value.value);
 
-            superclass_value = superclass_global.class_value;
-        }
+			superclass_value = superclass_global.class_value;
+		}
 
-        args.count = 3;
-        args[0] = superclass == nullptr ? lb_const_nil(m, t_objc_Class) : superclass_value;
-        args[1] = class_name;
-        args[2] = lb_const_int(m, t_uint, 0);
-        class_ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
+		args.count = 3;
+		args[0] = superclass == nullptr ? lb_const_nil(m, t_objc_Class) : superclass_value;
+		args[1] = class_name;
+		args[2] = lb_const_int(m, t_uint, 0);
+		class_ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
 
-        array_add(&class_impls, lbObjCGlobalClass{g, class_ptr});
-    }
-    else {
-        args.count = 1;
-        args[0] = class_name;
-        class_ptr = lb_emit_runtime_call(p, call, args);
-    }
+		array_add(&class_impls, lbObjCGlobalClass{g, class_ptr});
+	}
+	else {
+		args.count = 1;
+		args[0] = class_name;
+		class_ptr = lb_emit_runtime_call(p, call, args);
+	}
 
-    lb_addr_store(p, addr, class_ptr);
+	lb_addr_store(p, addr, class_ptr);
 
-    lbObjCGlobalClass* class_global = string_map_get(&class_map, g.name);
-    if (class_global != nullptr) {
-        class_global->class_value = class_ptr;
-    }
+	lbObjCGlobalClass* class_global = string_map_get(&class_map, g.name);
+	if (class_global != nullptr) {
+		class_global->class_value = class_ptr;
+	}
 }
 
 gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
@@ -1513,80 +1513,80 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	defer (string_set_destroy(&handled));
 
 	auto args        = array_make<lbValue>(temporary_allocator(), 3, 8);
-    auto class_impls = array_make<lbObjCGlobalClass>(temporary_allocator(), 0, 16);
+	auto class_impls = array_make<lbObjCGlobalClass>(temporary_allocator(), 0, 16);
 
-    // Ensure classes that have been implicitly referenced through
-    // the objc_superclass attribute have a global variable available for them.
-    TypeSet class_set{};
-    type_set_init(&class_set, gen->objc_classes.count+16);
-    defer (type_set_destroy(&class_set));
+	// Ensure classes that have been implicitly referenced through
+	// the objc_superclass attribute have a global variable available for them.
+	TypeSet class_set{};
+	type_set_init(&class_set, gen->objc_classes.count+16);
+	defer (type_set_destroy(&class_set));
 
-    auto referenced_classes = array_make<lbObjCGlobal>(temporary_allocator());
-    for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_classes, &g); /**/) {
-        array_add( &referenced_classes, g);
+	auto referenced_classes = array_make<lbObjCGlobal>(temporary_allocator());
+	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_classes, &g); /**/) {
+		array_add( &referenced_classes, g);
 
-        Type *cls = g.class_impl_type;
-        while (cls) {
-            if (type_set_update(&class_set, cls)) {
-                break;
-            }
-            GB_ASSERT(cls->kind == Type_Named);
+		Type *cls = g.class_impl_type;
+		while (cls) {
+			if (type_set_update(&class_set, cls)) {
+				break;
+			}
+			GB_ASSERT(cls->kind == Type_Named);
 
-            cls = cls->Named.type_name->TypeName.objc_superclass;
-        }
-    }
+			cls = cls->Named.type_name->TypeName.objc_superclass;
+		}
+	}
 
-    for (auto pair : class_set) {
-        auto& tn = pair.type->Named.type_name->TypeName;
-        Type *class_impl = !tn.objc_is_implementation ? nullptr : pair.type;
-        lb_handle_objc_find_or_register_class(p, tn.objc_class_name, class_impl);
-    }
-    for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_classes, &g); /**/) {
-        array_add( &referenced_classes, g );
-    }
+	for (auto pair : class_set) {
+		auto& tn = pair.type->Named.type_name->TypeName;
+		Type *class_impl = !tn.objc_is_implementation ? nullptr : pair.type;
+		lb_handle_objc_find_or_register_class(p, tn.objc_class_name, class_impl);
+	}
+	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_classes, &g); /**/) {
+		array_add( &referenced_classes, g );
+	}
 
-    // Add all class globals to a map so that we can look them up dynamically
-    // in order to resolve out-of-order because classes that are being implemented
-    // need their superclasses to have been registered before them.
-    StringMap<lbObjCGlobalClass> global_class_map{};
-    string_map_init(&global_class_map, (usize)gen->objc_classes.count);
-    defer (string_map_destroy(&global_class_map));
+	// Add all class globals to a map so that we can look them up dynamically
+	// in order to resolve out-of-order because classes that are being implemented
+	// need their superclasses to have been registered before them.
+	StringMap<lbObjCGlobalClass> global_class_map{};
+	string_map_init(&global_class_map, (usize)gen->objc_classes.count);
+	defer (string_map_destroy(&global_class_map));
 
-    for (lbObjCGlobal g :referenced_classes) {
-        string_map_set(&global_class_map, g.name, lbObjCGlobalClass{g});
-    }
+	for (lbObjCGlobal g :referenced_classes) {
+		string_map_set(&global_class_map, g.name, lbObjCGlobalClass{g});
+	}
 
-    LLVMSetLinkage(p->value, LLVMInternalLinkage);
-    lb_begin_procedure_body(p);
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
+	lb_begin_procedure_body(p);
 
-    // Register class globals, gathering classes that must be implemented
-    for (auto& kv : global_class_map) {
-        lb_register_objc_thing(handled, m, args, class_impls, global_class_map, p, kv.value.g, "objc_lookUpClass");
-    }
+	// Register class globals, gathering classes that must be implemented
+	for (auto& kv : global_class_map) {
+		lb_register_objc_thing(handled, m, args, class_impls, global_class_map, p, kv.value.g, "objc_lookUpClass");
+	}
 
-    // Prefetch selectors for implemented methods so that they can also be registered.
-    for (const auto& cd : class_impls) {
-        auto& g = cd.g;
-        Type *class_type = g.class_impl_type;
+	// Prefetch selectors for implemented methods so that they can also be registered.
+	for (const auto& cd : class_impls) {
+		auto& g = cd.g;
+		Type *class_type = g.class_impl_type;
 
-        Array<ObjcMethodData>* methods = map_get(&m->info->objc_method_implementations, class_type);
-        if (!methods) {
-            continue;
-        }
+		Array<ObjcMethodData>* methods = map_get(&m->info->objc_method_implementations, class_type);
+		if (!methods) {
+			continue;
+		}
 
-        for (const ObjcMethodData& md : *methods) {
-            lb_handle_objc_find_or_register_selector(p, md.ac.objc_selector);
-        }
-    }
+		for (const ObjcMethodData& md : *methods) {
+			lb_handle_objc_find_or_register_selector(p, md.ac.objc_selector);
+		}
+	}
 
-    // Now we can register all referenced selectors
-    for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_selectors, &g); /**/) {
-        lb_register_objc_thing(handled, m, args, class_impls, global_class_map, p, g, "sel_registerName");
-    }
+	// Now we can register all referenced selectors
+	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_selectors, &g); /**/) {
+		lb_register_objc_thing(handled, m, args, class_impls, global_class_map, p, g, "sel_registerName");
+	}
 
 
-    // Emit method wrapper implementations and registration
-    auto wrapper_args     = array_make<Type *>(temporary_allocator(), 2, 8);
+	// Emit method wrapper implementations and registration
+	auto wrapper_args     = array_make<Type *>(temporary_allocator(), 2, 8);
 	auto get_context_args = array_make<lbValue>(temporary_allocator(), 1);
 
 
@@ -1597,186 +1597,200 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 		map_set(&ivar_map, g.class_impl_type, g);
 	}
 
-    for (const auto& cd : class_impls) {
-        auto& g = cd.g;
-        Type *class_type = g.class_impl_type;
-    	Type *class_ptr_type = alloc_type_pointer(class_type);
-    	lbValue class_value = cd.class_value;
+	for (const auto& cd : class_impls) {
+		auto& g = cd.g;
+		Type *class_type = g.class_impl_type;
+		Type *class_ptr_type = alloc_type_pointer(class_type);
+		lbValue class_value = cd.class_value;
 
-    	Type *ivar_type = class_type->Named.type_name->TypeName.objc_ivar;
+		Type *ivar_type = class_type->Named.type_name->TypeName.objc_ivar;
 
-    	Entity *context_provider = class_type->Named.type_name->TypeName.objc_context_provider;
-    	Type *contex_provider_self_ptr_type = nullptr;
-    	Type *contex_provider_self_named_type = nullptr;
-    	bool is_context_provider_ivar = false;
-    	lbValue context_provider_proc_value{};
+		Entity *context_provider = class_type->Named.type_name->TypeName.objc_context_provider;
+		Type *contex_provider_self_ptr_type = nullptr;
+		Type *contex_provider_self_named_type = nullptr;
+		bool is_context_provider_ivar = false;
+		lbValue context_provider_proc_value{};
 
-    	if (context_provider) {
-    		context_provider_proc_value = lb_find_procedure_value_from_entity(m, context_provider);
+		if (context_provider) {
+			context_provider_proc_value = lb_find_procedure_value_from_entity(m, context_provider);
 
-    		contex_provider_self_ptr_type = base_type(context_provider->type->Proc.params->Tuple.variables[0]->type);
-    		GB_ASSERT(contex_provider_self_ptr_type->kind == Type_Pointer);
-    		contex_provider_self_named_type = base_named_type(type_deref(contex_provider_self_ptr_type));
+			contex_provider_self_ptr_type = base_type(context_provider->type->Proc.params->Tuple.variables[0]->type);
+			GB_ASSERT(contex_provider_self_ptr_type->kind == Type_Pointer);
+			contex_provider_self_named_type = base_named_type(type_deref(contex_provider_self_ptr_type));
 
-    		is_context_provider_ivar = ivar_type != nullptr && internal_check_is_assignable_to(contex_provider_self_named_type, ivar_type);
-    	}
+			is_context_provider_ivar = ivar_type != nullptr && internal_check_is_assignable_to(contex_provider_self_named_type, ivar_type);
+		}
 
 
-        Array<ObjcMethodData>* methods = map_get(&m->info->objc_method_implementations, class_type);
-        if (!methods) {
-            continue;
-        }
+		Array<ObjcMethodData>* methods = map_get(&m->info->objc_method_implementations, class_type);
+		if (!methods) {
+			continue;
+		}
 
-        for (const ObjcMethodData& md : *methods) {
-            GB_ASSERT( md.proc_entity->kind == Entity_Procedure);
-            Type *method_type = md.proc_entity->type;
+		for (const ObjcMethodData& md : *methods) {
+			GB_ASSERT( md.proc_entity->kind == Entity_Procedure);
+			Type *method_type = md.proc_entity->type;
 
-            String proc_name = make_string_c("__$objc_method::");
-            proc_name = concatenate_strings(temporary_allocator(), proc_name, g.name);
-            proc_name = concatenate_strings(temporary_allocator(), proc_name, str_lit("::"));
-            proc_name = concatenate_strings( permanent_allocator(), proc_name, md.ac.objc_name);
+			String proc_name = make_string_c("__$objc_method::");
+			proc_name = concatenate_strings(temporary_allocator(), proc_name, g.name);
+			proc_name = concatenate_strings(temporary_allocator(), proc_name, str_lit("::"));
+			proc_name = concatenate_strings( permanent_allocator(), proc_name, md.ac.objc_name);
 
-            wrapper_args.count = 2;
-            wrapper_args[0] = md.ac.objc_is_class_method ? t_objc_Class : class_ptr_type;
-            wrapper_args[1] = t_objc_SEL;
+			wrapper_args.count = 2;
+			wrapper_args[0] = md.ac.objc_is_class_method ? t_objc_Class : class_ptr_type;
+			wrapper_args[1] = t_objc_SEL;
 
-            auto method_param_count  = (isize)method_type->Proc.param_count;
-            i32  method_param_offset = 0;
+			auto method_param_count  = (isize)method_type->Proc.param_count;
+			i32  method_param_offset = 0;
 
-            // TODO(harold): Need to make sure (at checker stage) that the non-class method has the self parameter already.
-            //               (Maybe this is already accounted for?.)
-            if (!md.ac.objc_is_class_method) {
-                GB_ASSERT(method_param_count >= 1);
-                method_param_count -= 1;
-                method_param_offset = 1;
-            }
+			// TODO(harold): Need to make sure (at checker stage) that the non-class method has the self parameter already.
+			//               (Maybe this is already accounted for?.)
+			if (!md.ac.objc_is_class_method) {
+				GB_ASSERT(method_param_count >= 1);
+				method_param_count -= 1;
+				method_param_offset = 1;
+			}
 
-            for (i32 i = 0; i < method_param_count; i++) {
-                array_add(&wrapper_args, method_type->Proc.params->Tuple.variables[method_param_offset+i]->type);
-            }
+			for (i32 i = 0; i < method_param_count; i++) {
+				array_add(&wrapper_args, method_type->Proc.params->Tuple.variables[method_param_offset+i]->type);
+			}
 
-            Type *wrapper_args_tuple = alloc_type_tuple_from_field_types(wrapper_args.data, wrapper_args.count, false, true);
-            Type *wrapper_proc_type = alloc_type_proc(nullptr, wrapper_args_tuple, (isize)wrapper_args_tuple->Tuple.variables.count, nullptr, 0, false, ProcCC_CDecl);
+			Type *wrapper_args_tuple = alloc_type_tuple_from_field_types(wrapper_args.data, wrapper_args.count, false, true);
+			Type *wrapper_results_tuple = nullptr;
 
-            lbProcedure *wrapper_proc = lb_create_dummy_procedure(m, proc_name, wrapper_proc_type);
-            lb_add_attribute_to_proc(wrapper_proc->module, wrapper_proc->value, "nounwind");
+			if (method_type->Proc.result_count > 0) {
+				GB_ASSERT(method_type->Proc.result_count == 1);
+				wrapper_results_tuple = alloc_type_tuple_from_field_types(&method_type->Proc.results->Tuple.variables[0]->type, 1, false, true);
+			}
 
-            // Emit the wrapper
-            LLVMSetLinkage(wrapper_proc->value, LLVMExternalLinkage);
-            lb_begin_procedure_body(wrapper_proc);
-            {
-            	if (method_type->Proc.calling_convention == ProcCC_Odin) {
-            		GB_ASSERT(context_provider);
+			Type *wrapper_proc_type = alloc_type_proc(nullptr, wrapper_args_tuple, wrapper_args_tuple->Tuple.variables.count,
+														wrapper_results_tuple, method_type->Proc.result_count, false, ProcCC_CDecl);
 
-            		// Emit the get odin context call
+			lbProcedure *wrapper_proc = lb_create_dummy_procedure(m, proc_name, wrapper_proc_type);
+			lb_add_attribute_to_proc(wrapper_proc->module, wrapper_proc->value, "nounwind");
 
-            		get_context_args[0] = lbValue {
-            			wrapper_proc->raw_input_parameters[0],
+			// Emit the wrapper
+			LLVMSetLinkage(wrapper_proc->value, LLVMExternalLinkage);
+			lb_begin_procedure_body(wrapper_proc);
+			{
+				if (method_type->Proc.calling_convention == ProcCC_Odin) {
+					GB_ASSERT(context_provider);
+
+					// Emit the get odin context call
+
+					get_context_args[0] = lbValue {
+						wrapper_proc->raw_input_parameters[0],
 						contex_provider_self_ptr_type,
 					};
 
-            		if (is_context_provider_ivar) {
-            			// The context provider takes the ivar's type.
-            			// Emit an obj_ivar_get call and use that pointer for 'self' instead.
-            			lbValue real_self {
-            				wrapper_proc->raw_input_parameters[0],
-            				class_ptr_type
-            			};
-            			get_context_args[0] = lb_handle_objc_ivar_for_objc_object_pointer(wrapper_proc, real_self);
-            		}
+					if (is_context_provider_ivar) {
+						// The context provider takes the ivar's type.
+						// Emit an obj_ivar_get call and use that pointer for 'self' instead.
+						lbValue real_self {
+							wrapper_proc->raw_input_parameters[0],
+							class_ptr_type
+						};
+						get_context_args[0] = lb_handle_objc_ivar_for_objc_object_pointer(wrapper_proc, real_self);
+					}
 
-            		lbValue context	     = lb_emit_call(wrapper_proc, context_provider_proc_value, get_context_args);
-            		lbAddr  context_addr = lb_addr(lb_address_from_load_or_generate_local(wrapper_proc, context));
-            		lb_push_context_onto_stack(wrapper_proc, context_addr);
-            	}
-
-
-                auto method_call_args = array_make<lbValue>(temporary_allocator(), method_param_count + (isize)method_param_offset);
-
-                if (!md.ac.objc_is_class_method) {
-                    method_call_args[0] = lbValue {
-                        wrapper_proc->raw_input_parameters[0],
-                        class_ptr_type,
-                    };
-                }
-
-                for (isize i = 0; i < method_param_count; i++) {
-                    method_call_args[i+method_param_offset] = lbValue {
-                        wrapper_proc->raw_input_parameters[i+2],
-                        method_type->Proc.params->Tuple.variables[i+method_param_offset]->type,
-                    };
-                }
-                lbValue method_proc_value = lb_find_procedure_value_from_entity(m, md.proc_entity);
-
-                // Call real procedure for method from here, passing the parameters expected, if any.
-                lb_emit_call(wrapper_proc, method_proc_value, method_call_args);
-            }
-            lb_end_procedure_body(wrapper_proc);
+					lbValue context	     = lb_emit_call(wrapper_proc, context_provider_proc_value, get_context_args);
+					lbAddr  context_addr = lb_addr(lb_address_from_load_or_generate_local(wrapper_proc, context));
+					lb_push_context_onto_stack(wrapper_proc, context_addr);
+				}
 
 
-            // Add the method to the class
-            String method_encoding = str_lit("v");
-            // TODO (harold): Checker must ensure that objc_methods have a single return value or none!
-            GB_ASSERT(method_type->Proc.result_count <= 1);
-            if (method_type->Proc.result_count != 0) {
-                method_encoding = lb_get_objc_type_encoding(method_type->Proc.results->Tuple.variables[0]->type, temporary_allocator());
-            }
+				auto method_call_args = array_make<lbValue>(temporary_allocator(), method_param_count + (isize)method_param_offset);
 
-            if (!md.ac.objc_is_class_method) {
-                method_encoding = concatenate_strings(temporary_allocator(), method_encoding, str_lit("@:"));
-            } else {
-                method_encoding = concatenate_strings(temporary_allocator(), method_encoding, str_lit("#:"));
-            }
+				if (!md.ac.objc_is_class_method) {
+					method_call_args[0] = lbValue {
+						wrapper_proc->raw_input_parameters[0],
+						class_ptr_type,
+					};
+				}
 
-            for (i32 i = method_param_offset; i < method_param_count; i++) {
-                Type *param_type = method_type->Proc.params->Tuple.variables[i]->type;
-                String param_encoding = lb_get_objc_type_encoding(param_type, temporary_allocator());
+				for (isize i = 0; i < method_param_count; i++) {
+					method_call_args[i+method_param_offset] = lbValue {
+						wrapper_proc->raw_input_parameters[i+2],
+						method_type->Proc.params->Tuple.variables[i+method_param_offset]->type,
+					};
+				}
+				lbValue method_proc_value = lb_find_procedure_value_from_entity(m, md.proc_entity);
 
-                method_encoding = concatenate_strings(temporary_allocator(), method_encoding, param_encoding);
-            }
+				// Call real procedure for method from here, passing the parameters expected, if any.
+				lbValue return_value = lb_emit_call(wrapper_proc, method_proc_value, method_call_args);
 
-            // Emit method registration
-            lbAddr* sel_address = string_map_get(&m->objc_selectors, md.ac.objc_selector);
-            GB_ASSERT(sel_address);
-            lbValue selector_value = lb_addr_load(p, *sel_address);
+				if (wrapper_results_tuple != nullptr) {
+					auto &result_var = method_type->Proc.results->Tuple.variables[0];
+					return_value = lb_emit_conv(wrapper_proc, return_value, result_var->type);
+					lb_build_return_stmt_internal(wrapper_proc, return_value, result_var->token.pos);
+				}
+			}
+			lb_end_procedure_body(wrapper_proc);
 
-            args.count = 4;
-            args[0] = class_value;    // Class
-            args[1] = selector_value; // SEL
-            args[2] = lbValue { wrapper_proc->value, wrapper_proc->type };
-            args[3] = lb_const_value(m, t_cstring, exact_value_string(method_encoding));
 
-            // TODO(harold): Emit check BOOL result and panic if false.
-            lb_emit_runtime_call(p, "class_addMethod", args);
+			// Add the method to the class
+			String method_encoding = str_lit("v");
+			// TODO (harold): Checker must ensure that objc_methods have a single return value or none!
+			GB_ASSERT(method_type->Proc.result_count <= 1);
+			if (method_type->Proc.result_count != 0) {
+				method_encoding = lb_get_objc_type_encoding(method_type->Proc.results->Tuple.variables[0]->type, temporary_allocator());
+			}
 
-        } // End methods
+			if (!md.ac.objc_is_class_method) {
+				method_encoding = concatenate_strings(temporary_allocator(), method_encoding, str_lit("@:"));
+			} else {
+				method_encoding = concatenate_strings(temporary_allocator(), method_encoding, str_lit("#:"));
+			}
 
-        // Add ivar if we have one
-        if (ivar_type != nullptr) {
-            // Register a single ivar for this class
-            Type *ivar_base = ivar_type->Named.base;
+			for (i32 i = method_param_offset; i < method_param_count; i++) {
+				Type *param_type = method_type->Proc.params->Tuple.variables[i]->type;
+				String param_encoding = lb_get_objc_type_encoding(param_type, temporary_allocator());
 
-            const i64 size      = type_size_of(ivar_base);
-            const i64 alignment = type_align_of(ivar_base);
-            // TODO(harold): Checker: Alignment must be compatible with ivar rules. Or we should increase the alignment if needed.
+				method_encoding = concatenate_strings(temporary_allocator(), method_encoding, param_encoding);
+			}
 
-        	// TODO(harold): Should we pass the actual type encoding? Might not be ideal for obfuscation.
-            String ivar_name  = str_lit("__$ivar");
-            String ivar_types = str_lit("{= }");	//lb_get_objc_type_encoding(ivar_type, temporary_allocator());// str_lit("{= }");
-            args.count = 5;
-            args[0] = class_value;
-            args[1] = lb_const_value(m, t_cstring, exact_value_string(ivar_name));
-            args[2] = lb_const_value(m, t_uint, exact_value_u64((u64)size));
-            args[3] = lb_const_value(m, t_u8, exact_value_u64((u64)alignment));
-            args[4] = lb_const_value(m, t_cstring, exact_value_string(ivar_types));
-            lb_emit_runtime_call(p, "class_addIvar", args);
-        }
+			// Emit method registration
+			lbAddr* sel_address = string_map_get(&m->objc_selectors, md.ac.objc_selector);
+			GB_ASSERT(sel_address);
+			lbValue selector_value = lb_addr_load(p, *sel_address);
 
-        // Complete the class registration
-        args.count = 1;
-        args[0] = class_value;
-        lb_emit_runtime_call(p, "objc_registerClassPair", args);
-    }
+			args.count = 4;
+			args[0] = class_value;    // Class
+			args[1] = selector_value; // SEL
+			args[2] = lbValue { wrapper_proc->value, wrapper_proc->type };
+			args[3] = lb_const_value(m, t_cstring, exact_value_string(method_encoding));
+
+			// TODO(harold): Emit check BOOL result and panic if false.
+			lb_emit_runtime_call(p, "class_addMethod", args);
+
+		} // End methods
+
+		// Add ivar if we have one
+		if (ivar_type != nullptr) {
+			// Register a single ivar for this class
+			Type *ivar_base = ivar_type->Named.base;
+
+			const i64 size      = type_size_of(ivar_base);
+			const i64 alignment = type_align_of(ivar_base);
+			// TODO(harold): Checker: Alignment must be compatible with ivar rules. Or we should increase the alignment if needed.
+
+			// TODO(harold): Should we pass the actual type encoding? Might not be ideal for obfuscation.
+			String ivar_name  = str_lit("__$ivar");
+			String ivar_types = str_lit("{= }");	//lb_get_objc_type_encoding(ivar_type, temporary_allocator());// str_lit("{= }");
+			args.count = 5;
+			args[0] = class_value;
+			args[1] = lb_const_value(m, t_cstring, exact_value_string(ivar_name));
+			args[2] = lb_const_value(m, t_uint, exact_value_u64((u64)size));
+			args[3] = lb_const_value(m, t_u8, exact_value_u64((u64)alignment));
+			args[4] = lb_const_value(m, t_cstring, exact_value_string(ivar_types));
+			lb_emit_runtime_call(p, "class_addIvar", args);
+		}
+
+		// Complete the class registration
+		args.count = 1;
+		args[0] = class_value;
+		lb_emit_runtime_call(p, "objc_registerClassPair", args);
+	}
 
 	// Register ivar offsets for any `objc_ivar_get` expressions emitted.
 	Type *ptr_u32 = alloc_type_pointer(t_u32);

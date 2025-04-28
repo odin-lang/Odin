@@ -2157,8 +2157,8 @@ gb_internal lbAddr lb_handle_objc_find_or_register_class(lbProcedure *p, String 
 
 gb_internal lbAddr lb_handle_objc_find_or_register_ivar(lbModule *m, Type *self_type) {
 
-    String name = self_type->Named.type_name->TypeName.objc_class_name;
-    GB_ASSERT(name != "");
+	String name = self_type->Named.type_name->TypeName.objc_class_name;
+	GB_ASSERT(name != "");
 
 	lbAddr *found = string_map_get(&m->objc_ivars, name);
 	if (found) {
@@ -2170,7 +2170,7 @@ gb_internal lbAddr lb_handle_objc_find_or_register_ivar(lbModule *m, Type *self_
 	gbString global_name = gb_string_make(permanent_allocator(), "__$objc_ivar::");
 	global_name = gb_string_append_length(global_name, name.text, name.len);
 
-    // Create a global variable to store offset of the ivar in an instance of an object
+	// Create a global variable to store offset of the ivar in an instance of an object
 	LLVMTypeRef t = lb_type(m, t_u32);
 
 	lbValue g = {};
@@ -2209,10 +2209,10 @@ gb_internal lbValue lb_handle_objc_ivar_for_objc_object_pointer(lbProcedure *p, 
 }
 
 gb_internal lbValue lb_handle_objc_ivar_get(lbProcedure *p, Ast *expr) {
-    ast_node(ce, CallExpr, expr);
+	ast_node(ce, CallExpr, expr);
 
-    GB_ASSERT(ce->args[0]->tav.type->kind == Type_Pointer);
-    lbValue self = lb_build_expr(p, ce->args[0]);
+	GB_ASSERT(ce->args[0]->tav.type->kind == Type_Pointer);
+	lbValue self = lb_build_expr(p, ce->args[0]);
 
 	return lb_handle_objc_ivar_for_objc_object_pointer(p, self);
 }
@@ -2282,7 +2282,7 @@ gb_internal lbValue lb_handle_objc_id(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(e->kind == Entity_TypeName);
 		String name = e->TypeName.objc_class_name;
 
-        Type *class_impl_type = e->TypeName.objc_is_implementation ? type : nullptr;
+		Type *class_impl_type = e->TypeName.objc_is_implementation ? type : nullptr;
 
 		return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name, class_impl_type));
 	}

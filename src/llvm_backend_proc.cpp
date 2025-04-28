@@ -3290,7 +3290,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_objc_find_class:        return lb_handle_objc_find_class(p, expr);
 	case BuiltinProc_objc_register_selector: return lb_handle_objc_register_selector(p, expr);
 	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
-    case BuiltinProc_objc_ivar_get:          return lb_handle_objc_ivar_get(p, expr);
+	case BuiltinProc_objc_ivar_get:          return lb_handle_objc_ivar_get(p, expr);
 
 
 	case BuiltinProc_constant_utf16_cstring:

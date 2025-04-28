@@ -1351,12 +1351,12 @@ gb_internal void init_universal(void) {
 		t_objc_object   = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_object"),   alloc_type_struct_complete());
 		t_objc_selector = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_selector"), alloc_type_struct_complete());
 		t_objc_class    = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_class"),    alloc_type_struct_complete());
-        t_objc_ivar     = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_ivar"),     alloc_type_struct_complete());
+		t_objc_ivar     = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_ivar"),     alloc_type_struct_complete());
 
 		t_objc_id       = alloc_type_pointer(t_objc_object);
 		t_objc_SEL      = alloc_type_pointer(t_objc_selector);
 		t_objc_Class    = alloc_type_pointer(t_objc_class);
-        t_objc_Ivar     = alloc_type_pointer(t_objc_ivar);
+		t_objc_Ivar     = alloc_type_pointer(t_objc_ivar);
 	}
 }
 
@@ -1389,8 +1389,8 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->defineables, a);
 
 	map_init(&i->objc_msgSend_types);
-    mpsc_init(&i->objc_class_implementations, a);
-    map_init(&i->objc_method_implementations);
+	mpsc_init(&i->objc_class_implementations, a);
+	map_init(&i->objc_method_implementations);
 
 	string_map_init(&i->load_file_cache);
 	array_init(&i->all_procedures, heap_allocator());
@@ -3352,10 +3352,10 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		ac->test = true;
 		return true;
 	} else if (name == "export") {
-        if (ac->objc_is_implementation) {
-            error(value, "Setting @(export) explicitly is not allowed when @(objc_implement) is set. It is exported implicitly.");
-            return false;
-        }
+		if (ac->objc_is_implementation) {
+			error(value, "Setting @(export) explicitly is not allowed when @(objc_implement) is set. It is exported implicitly.");
+			return false;
+		}
 
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_Invalid) {
@@ -3369,10 +3369,10 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		return true;
 	} else if (name == "linkage") {
 
-        if (ac->objc_is_implementation) {
-            error(value, "Explicit linkage not allowed when @(objc_implement) is set. It is set implicitly");
-            return false;
-        }
+		if (ac->objc_is_implementation) {
+			error(value, "Explicit linkage not allowed when @(objc_implement) is set. It is set implicitly");
+			return false;
+		}
 
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind != ExactValue_String) {
@@ -3681,23 +3681,23 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		return true;
 	} else if (name == "objc_implement") {
-        ExactValue ev = check_decl_attribute_value(c, value);
-        if (ev.kind == ExactValue_Bool) {
-            ac->objc_is_implementation = ev.value_bool;
-        } else if (ev.kind == ExactValue_Invalid) {
-            ac->objc_is_implementation = true;
-        } else {
-            error(elem, "Expected a boolean value, or no value, for '%.*s'", LIT(name));
-        }
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_implementation = ev.value_bool;
+		} else if (ev.kind == ExactValue_Invalid) {
+			ac->objc_is_implementation = true;
+		} else {
+			error(elem, "Expected a boolean value, or no value, for '%.*s'", LIT(name));
+		}
 
-        // This implies exported, strongly linked
-        if (ac->objc_is_implementation) {
-            ac->is_export = true;
-            ac->linkage   = str_lit("strong");
-        }
+		// This implies exported, strongly linked
+		if (ac->objc_is_implementation) {
+			ac->is_export = true;
+			ac->linkage   = str_lit("strong");
+		}
 
-        return true;
-    } else if (name == "objc_selector") {
+		return true;
+	} else if (name == "objc_selector") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
 			if (string_is_valid_identifier(ev.value_string)) {
@@ -3949,52 +3949,52 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 		}
 		return true;
 	} else if (name == "objc_implement") {
-        ExactValue ev = check_decl_attribute_value(c, value);
-        if (ev.kind == ExactValue_Bool) {
-            ac->objc_is_implementation = ev.value_bool;
-        } else if (ev.kind == ExactValue_Invalid) {
-            ac->objc_is_implementation = true;
-        } else {
-            error(elem, "Expected a boolean value, or no value, for '%.*s'", LIT(name));
-        }
-        return true;
-    } else if (name == "objc_superclass") {
-        Type *objc_superclass = check_type(c, value);
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_implementation = ev.value_bool;
+		} else if (ev.kind == ExactValue_Invalid) {
+			ac->objc_is_implementation = true;
+		} else {
+			error(elem, "Expected a boolean value, or no value, for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_superclass") {
+		Type *objc_superclass = check_type(c, value);
 
-        if (objc_superclass != nullptr) {
-            ac->objc_superclass = objc_superclass;
-        } else {
-            error(value, "'%.*s' expected a named type", LIT(name));
-        }
-        return true;
-    } else if (name == "objc_ivar") {
-        Type *objc_ivar = check_type(c, value);
+		if (objc_superclass != nullptr) {
+			ac->objc_superclass = objc_superclass;
+		} else {
+			error(value, "'%.*s' expected a named type", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_ivar") {
+		Type *objc_ivar = check_type(c, value);
 
-        if (objc_ivar != nullptr) {
-            ac->objc_ivar = objc_ivar;
-        } else {
-            error(value, "'%.*s' expected a named type", LIT(name));
-        }
-        return true;
-    } else if (name == "objc_context_provider") {
-    	Operand o = {};
-    	check_expr(c, &o, value);
-    	Entity *e = entity_of_node(o.expr);
+		if (objc_ivar != nullptr) {
+			ac->objc_ivar = objc_ivar;
+		} else {
+			error(value, "'%.*s' expected a named type", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_context_provider") {
+		Operand o = {};
+		check_expr(c, &o, value);
+		Entity *e = entity_of_node(o.expr);
 
-    	if (e != nullptr) {
-    		if (ac->objc_context_provider != nullptr) {
-    			error(elem, "Previous usage of a 'objc_context_provider' attribute");
-    		}
-    		if (e->kind != Entity_Procedure) {
-    			error(elem, "'objc_context_provider' must refer to a procedure");
-    		} else {
-    			ac->objc_context_provider = e;
-    		}
+		if (e != nullptr) {
+			if (ac->objc_context_provider != nullptr) {
+				error(elem, "Previous usage of a 'objc_context_provider' attribute");
+			}
+			if (e->kind != Entity_Procedure) {
+				error(elem, "'objc_context_provider' must refer to a procedure");
+			} else {
+				ac->objc_context_provider = e;
+			}
 
-    		return true;
-    	}
-    }
-    return false;
+			return true;
+		}
+	}
+	return false;
 }
 
 
