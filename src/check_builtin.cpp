@@ -388,12 +388,12 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		return true;
 	} break;
 
-    case BuiltinProc_objc_ivar_get:
+	case BuiltinProc_objc_ivar_get:
     {
         Type *self_type = nullptr;
         Type *ivar_type = nullptr;
 
-        Operand self {};
+        Operand self = {};
         check_expr_or_type(c, &self, ce->args[0]);
 
         if (!is_operand_value(self) || !check_is_assignable_to(c, &self, t_objc_id)) {
@@ -403,8 +403,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
             gb_string_free(t);
             gb_string_free(e);
             return false;
-        }
-        else if (!is_type_pointer(self.type)) {
+        } else if (!is_type_pointer(self.type)) {
             gbString e = expr_to_string(self.expr);
             gbString t = type_to_string(self.type);
             error(self.expr, "'%.*s' expected a pointer of a value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
@@ -431,7 +430,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
             return false;
         }
 
-        Operand ivar {};
+        Operand ivar = {};
         check_expr_or_type(c, &ivar, ce->args[1]);
         if (ivar.mode == Addressing_Type) {
             ivar_type = ivar.type;
