@@ -29,6 +29,7 @@ an input.
 unmarshal :: proc {
 	unmarshal_from_reader,
 	unmarshal_from_string,
+	unmarshal_from_bytes,
 }
 
 unmarshal_from_reader :: proc(r: io.Reader, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
@@ -49,6 +50,11 @@ unmarshal_from_string :: proc(s: string, ptr: ^$T, flags := Decoder_Flags{}, all
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
 	if err == .EOF { err = .Unexpected_EOF }
 	return
+}
+
+// Unmarshals from a slice of bytes, see docs on the proc group `Unmarshal` for more info.
+unmarshal_from_bytes :: proc(bytes: []byte, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
+	return unmarshal_from_string(string(bytes), ptr, flags, allocator, temp_allocator, loc)
 }
 
 unmarshal_from_decoder :: proc(d: Decoder, ptr: ^$T, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
