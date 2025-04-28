@@ -6491,7 +6491,7 @@ gb_internal void check_objc_context_provider_procedures(Checker *c) {
 		Type *proc_type = proc_entity->type;
 
 		// TODO(harold): Give better errors here (specify exactly what's wrong)
-		const char* signature_error = "The procedure for @(objc_context_provider) has an incorrect signature.";
+		const char *signature_error = "The procedure for @(objc_context_provider) has an incorrect signature.";
 
 		if (proc_type->Proc.param_count != 1 || proc_type->Proc.result_count != 1) {
 			error(proc_entity->token, signature_error);

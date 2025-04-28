@@ -1269,7 +1269,7 @@ String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_d
 			return build_context.metrics.ptr_size == 4 ? str_lit("{string=*i}") : str_lit("{string=*q}");
 
 		case Basic_cstring: return str_lit("*");
-		case Basic_any:     return str_lit("{any=^v^v");  // rawptr + ^Type_Info
+		case Basic_any:     return str_lit("{any=^v^v}");  // rawptr + ^Type_Info
 
 		case Basic_typeid:
 			GB_ASSERT(t->Basic.size == 8);
@@ -1458,16 +1458,16 @@ gb_internal void lb_register_objc_thing(
 		LLVMSetInitializer(v.value, LLVMConstNull(t));
 	}
 
-	lbValue class_ptr{};
+	lbValue class_ptr  = {};
 	lbValue class_name = lb_const_value(m, t_cstring, exact_value_string(g.name));
 
 	// If this class requires an implementation, save it for registration below.
 	if (g.class_impl_type != nullptr) {
 
 		// Make sure the superclass has been initialized before us
-		lbValue superclass_value{};
+		lbValue superclass_value = lb_const_nil(m, t_objc_Class);
 
-		auto& tn = g.class_impl_type->Named.type_name->TypeName;
+		auto &tn = g.class_impl_type->Named.type_name->TypeName;
 		Type *superclass = tn.objc_superclass;
 		if (superclass != nullptr) {
 			auto& superclass_global = string_map_must_get(&class_map, superclass->Named.type_name->TypeName.objc_class_name);
@@ -1478,7 +1478,7 @@ gb_internal void lb_register_objc_thing(
 		}
 
 		args.count = 3;
-		args[0] = superclass == nullptr ? lb_const_nil(m, t_objc_Class) : superclass_value;
+		args[0] = superclass_value;
 		args[1] = class_name;
 		args[2] = lb_const_int(m, t_uint, 0);
 		class_ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
@@ -1627,7 +1627,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			continue;
 		}
 
-		for (const ObjcMethodData& md : *methods) {
+		for (const ObjcMethodData &md : *methods) {
 			GB_ASSERT( md.proc_entity->kind == Entity_Procedure);
 			Type *method_type = md.proc_entity->type;
 
@@ -1640,8 +1640,8 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			wrapper_args[0] = md.ac.objc_is_class_method ? t_objc_Class : class_ptr_type;
 			wrapper_args[1] = t_objc_SEL;
 
-			auto method_param_count  = (isize)method_type->Proc.param_count;
-			i32  method_param_offset = 0;
+			isize method_param_count  = method_type->Proc.param_count;
+			i32   method_param_offset = 0;
 
 			// TODO(harold): Need to make sure (at checker stage) that the non-class method has the self parameter already.
 			//               (Maybe this is already accounted for?.)

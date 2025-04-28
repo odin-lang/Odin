@@ -153,8 +153,8 @@ struct AttributeContext {
 	Type *  objc_superclass;
 	Type *  objc_ivar;
 	Entity *objc_context_provider;
-	bool    objc_is_class_method   : 1;
-	bool    objc_is_implementation : 1;     // This struct or proc provides a class/method implementation, not a binding to an existing type.
+	bool    objc_is_class_method;
+	bool    objc_is_implementation; // This struct or proc provides a class/method implementation, not a binding to an existing type.
 
 	String require_target_feature; // required by the target micro-architecture
 	String enable_target_feature;  // will be enabled for the procedure only
