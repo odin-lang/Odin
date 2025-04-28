@@ -1685,7 +1685,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 					if (is_context_provider_ivar) {
 						// The context provider takes the ivar's type.
-						// Emit an obj_ivar_get call and use that pointer for 'self' instead.
+						// Emit an objc_ivar_get call and use that pointer for 'self' instead.
 						lbValue real_self {
 							wrapper_proc->raw_input_parameters[0],
 							class_ptr_type

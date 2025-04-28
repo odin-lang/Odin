@@ -418,14 +418,14 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 			self_type->Named.type_name != nullptr &&
 				self_type->Named.type_name->TypeName.objc_class_name != "")) {
 			gbString t = type_to_string(self_type);
-			error(self.expr, "'%.*s' expected a named type with the attribute @(obj_class=<string>) , got type %s", LIT(builtin_name), t);
+			error(self.expr, "'%.*s' expected a named type with the attribute @(objc_class=<string>) , got type %s", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
 
 		if (self_type->Named.type_name->TypeName.objc_ivar == nullptr) {
 			gbString t = type_to_string(self_type);
-			error(self.expr, "'%.*s' requires that type %s have the attribute @(obj_ivar=<ivar_type_name>).", LIT(builtin_name), t);
+			error(self.expr, "'%.*s' requires that type %s have the attribute @(objc_ivar=<ivar_type_name>).", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
@@ -442,7 +442,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 			gbString name_self     = type_to_string(self_type);
 			gbString name_expected = type_to_string(self_type->Named.type_name->TypeName.objc_ivar);
 			gbString name_given    = type_to_string(ivar_type);
-			error(self.expr, "'%.*s' ivar type %s does not match @obj_ivar type %s on Objective-C class %s.",
+			error(self.expr, "'%.*s' ivar type %s does not match @objc_ivar type %s on Objective-C class %s.",
 				  LIT(builtin_name), name_given, name_expected, name_self);
 			gb_string_free(name_self);
 			gb_string_free(name_expected);
