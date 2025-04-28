@@ -101,7 +101,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 	}
 
-	scan_espace :: proc(t: ^Tokenizer) -> bool {
+	scan_escape :: proc(t: ^Tokenizer) -> bool {
 		switch t.r {
 		case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
 			next_rune(t)
@@ -310,7 +310,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 				break
 			}
 			if r == '\\' {
-				scan_espace(t)
+				scan_escape(t)
 			}
 		}
 
