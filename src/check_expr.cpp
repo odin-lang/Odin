@@ -9011,7 +9011,19 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 
 	if (left_type != nullptr) {
 		if (!y_is_diverging) {
-			check_assignment(c, &y, left_type, name);
+			if (is_type_tuple(left_type)) {
+				if (!is_type_tuple(y.type)) {
+					error(y.expr, "Found a single value where a %td-valued expression was expected", left_type->Tuple.variables.count);
+				} else if (!are_types_identical(left_type, y.type)) {
+					gbString xt = type_to_string(left_type);
+					gbString yt = type_to_string(y.type);
+					error(y.expr, "Mismatched types, expected (%s), got (%s)", xt, yt);
+					gb_string_free(yt);
+					gb_string_free(xt);
+				}
+			} else {
+				check_assignment(c, &y, left_type, name);
+			}
 		}
 	} else {
 		check_or_else_expr_no_value_error(c, name, x, type_hint);

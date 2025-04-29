@@ -493,7 +493,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		data := mem.alloc_bytes_non_zeroed(t.elem.size * scap, t.elem.align, allocator=allocator, loc=loc) or_return
 		defer if err != nil { mem.free_bytes(data, allocator=allocator, loc=loc) }
 
-		da := mem.Raw_Dynamic_Array{raw_data(data), 0, length, context.allocator }
+		da := mem.Raw_Dynamic_Array{raw_data(data), 0, scap, context.allocator }
 
 		assign_array(d, &da, t.elem, length) or_return
 
