@@ -64,7 +64,7 @@ foreign webgl {
 	Clear         :: proc(bits: u32) ---
 	ClearColor    :: proc(r, g, b, a: f32) ---
 	ClearDepth    :: proc(x: f32) ---
-	ClearStencil  :: proc(x: int) ---
+	ClearStencil  :: proc(x: i32) ---
 	ColorMask     :: proc(r, g, b, a: bool) ---
 	CompileShader :: proc(shader: Shader) ---
 	
