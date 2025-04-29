@@ -2628,13 +2628,26 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 				gb_free(a, str.text);
 				return 0;
 			}
+
 			switch (count.used) {
 			case 0: return 0;
-			case 1: return big_int_to_u64(&count);
-			}
-			gbAllocator a = heap_allocator();
-			String str = big_int_to_string(a, &count);
-			error(e, "Array count too large, %.*s", LIT(str));
+			case 1: return big_int_to_i64(&count);
+			default:
+				static BigInt max = big_int_make_i64(I64_MAX);
+				if (big_int_cmp(&max, &count) >= 0) {
+					i64 res = big_int_to_i64(&count);
+					GB_ASSERT(res >= 0);
+					return res;
+				}
+				break;
+ 			}
+
+			ERROR_BLOCK();
+
+ 			gbAllocator a = heap_allocator();
+ 			String str = big_int_to_string(a, &count);
+ 			error(e, "Array count too large, %.*s", LIT(str));
+			error_line("\tNote: The maximum array count is %td\n", I64_MAX);
 			gb_free(a, str.text);
 			return 0;
 		}
