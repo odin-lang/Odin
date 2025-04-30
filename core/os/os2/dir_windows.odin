@@ -14,7 +14,7 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 	if d.cFileName[0] == '.' && d.cFileName[1] == '.' && d.cFileName[2] == 0 {
 		return
 	}
-	path := concatenate({base_path, `\`, win32_utf16_to_utf8(d.cFileName[:], temp_allocator()) or_else ""}, allocator) or_return
+	path := concatenate({base_path, `\`, win32_wstring_to_utf8(raw_data(d.cFileName[:]), temp_allocator()) or_else ""}, allocator) or_return
 
 	handle := win32.HANDLE(_open_internal(path, {.Read}, 0o666) or_else 0)
 	defer win32.CloseHandle(handle)
