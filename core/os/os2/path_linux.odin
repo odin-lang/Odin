@@ -168,6 +168,8 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (string, Error) 
 }
 
 _set_working_directory :: proc(dir: string) -> Error {
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+
 	dir_cstr := clone_to_cstring(dir, temp_allocator) or_return
 	return _get_platform_error(linux.chdir(dir_cstr))
 }
