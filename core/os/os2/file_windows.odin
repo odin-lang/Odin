@@ -508,11 +508,12 @@ _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	length: win32.LARGE_INTEGER
 	handle := _handle(&f.file)
 	if f.kind == .Pipe {
-		bytesAvail: u32
-		if win32.PeekNamedPipe(handle, nil, 0, nil, &bytesAvail, nil) {
-			return i64(bytesAvail), nil
+		bytes_available: u32
+		if win32.PeekNamedPipe(handle, nil, 0, nil, &bytes_available, nil) {
+			return i64(bytes_available), nil
 		} else {
-			return 0, .No_Size
+			err = _get_platform_error()
+			return
 		}
 	}
 	if !win32.GetFileSizeEx(handle, &length) {
