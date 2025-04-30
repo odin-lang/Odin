@@ -526,17 +526,18 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 		check_decl_attributes(ctx, decl->attributes, type_decl_attribute, &ac);
 		if (e->kind == Entity_TypeName && ac.objc_class != "") {
 			e->TypeName.objc_class_name = ac.objc_class;
-			e->TypeName.objc_superclass = ac.objc_superclass;
-			e->TypeName.objc_ivar       = ac.objc_ivar;
-			e->TypeName.objc_context_provider = ac.objc_context_provider;
 
 			if (ac.objc_is_implementation) {
-				e->TypeName.objc_is_implementation = true;
-				mpsc_enqueue(&ctx->info->objc_class_implementations, e);    // TODO(harold): Don't need this for anything? See if needed when using explicit @export
+				e->TypeName.objc_is_implementation = ac.objc_is_implementation;
+				e->TypeName.objc_superclass        = ac.objc_superclass;
+				e->TypeName.objc_ivar              = ac.objc_ivar;
+				e->TypeName.objc_context_provider  = ac.objc_context_provider;
+
+				mpsc_enqueue(&ctx->info->objc_class_implementations, e);
 
 				GB_ASSERT(e->TypeName.objc_ivar == nullptr || e->TypeName.objc_ivar->kind == Type_Named);
 
-				// Enqueue the proc to be checked when resolved
+				// Enqueue the contex_provider proc to be checked after it is resolved
 				if (e->TypeName.objc_context_provider != nullptr) {
 					mpsc_enqueue(&ctx->checker->procs_with_objc_context_provider_to_check, e);
 				}
@@ -544,47 +545,44 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 				// @TODO(harold): I think there's a Check elsewhere in the checker for checking cycles.
 				//					See about moving this to the right location.
 				// Ensure superclass hierarchy are all Objective-C classes and does not cycle
+
+				// NOTE(harold): We check for superclass unconditionally (before checking if super is null)
+				//				 because this should be the case 99.99% of the time. Not subclassing something that
+				//				 is, or is the child of, NSObject means the objc runtime messaging will not properly work on this type.
+				TypeSet super_set{};
+				type_set_init(&super_set, 8);
+				defer (type_set_destroy(&super_set));
+
+				type_set_update(&super_set, e->type);
+
 				Type *super = ac.objc_superclass;
-				if (super != nullptr) {
-					TypeSet super_set{};
-					type_set_init(&super_set, 8);
-					defer (type_set_destroy(&super_set));
-
-					type_set_update(&super_set, e->type);
-
-					for (;;) {
-						if (type_set_update(&super_set, super)) {
-							error(e->token, "@(objc_superclass) Superclass hierarchy cycle encountered");
-							break;
-						}
-
-						if (super->kind != Type_Named) {
-							error(e->token, "@(objc_superclass) References type must be a named struct.");
-							break;
-						}
-
-						Type* named_type = base_type(super->Named.type_name->type);
-						if (!is_type_objc_object(named_type)) {
-							error(e->token, "@(objc_superclass) Superclass must be an Objective-C class.");
-							break;
-						}
-
-						super = super->Named.type_name->TypeName.objc_superclass;
-						if (super == nullptr) {
-							break;
-						}
-
-						// TODO(harold): Is this the right way to do this??? The referenced entity must be already resolved
-						//               so that we can access its objc_superclass attribute
-						check_single_global_entity(ctx->checker, super->Named.type_name, super->Named.type_name->decl_info);
+				while (super != nullptr) {
+					if (type_set_update(&super_set, super)) {
+						error(e->token, "@(objc_superclass) Superclass hierarchy cycle encountered");
+						break;
 					}
+
+					check_single_global_entity(ctx->checker, super->Named.type_name, super->Named.type_name->decl_info);
+
+					if (super->kind != Type_Named) {
+						error(e->token, "@(objc_superclass) Referenced type must be a named struct");
+						break;
+					}
+
+					Type* named_type = base_type(super->Named.type_name->type);
+					if (!is_type_objc_object(named_type)) {
+						error(e->token, "@(objc_superclass) Superclass must be an Objective-C class");
+						break;
+					}
+
+					super = super->Named.type_name->TypeName.objc_superclass;
 				}
 			} else {
-				if (e->TypeName.objc_superclass != nullptr) {
+				if (ac.objc_superclass != nullptr) {
 					error(e->token, "@(objc_superclass) can only be applied when the @(obj_implement) attribute is also applied");
-				} else if (e->TypeName.objc_ivar != nullptr) {
+				} else if (ac.objc_ivar != nullptr) {
 					error(e->token, "@(objc_ivar) can only be applied when the @(obj_implement) attribute is also applied");
-				} else if (e->TypeName.objc_context_provider != nullptr) {
+				} else if (ac.objc_context_provider != nullptr) {
 					error(e->token, "@(objc_context_provider) can only be applied when the @(obj_implement) attribute is also applied");
 				}
 			}
