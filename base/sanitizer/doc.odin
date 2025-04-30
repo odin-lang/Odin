@@ -14,12 +14,14 @@ related bugs. Typically asan interacts with libc but Odin code can be marked up 
 with the asan runtime to extend the memory error detection outside of libc using this package.
 For more information about asan see: https://clang.llvm.org/docs/AddressSanitizer.html
 
+Procedures can be made exempt from asan when marked up with @(no_sanitize_address)
+
 ## Memory
 
 Enabled with `-sanitize:memory` when building an odin project.
 
 The memory sanitizer is another runtime memory error detector with the sole purpose to catch the
-use of uninitialized memory. This is not a very common bug in Odin as be default everything is
+use of uninitialized memory. This is not a very common bug in Odin as by default everything is
 set to zero when initialised (ZII).
 For more information about the memory sanitizer see: https://clang.llvm.org/docs/MemorySanitizer.html
 

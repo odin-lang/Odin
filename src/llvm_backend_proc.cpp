@@ -115,12 +115,13 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->is_entry_point = false;
 
 	gbAllocator a = heap_allocator();
-	p->children.allocator      = a;
-	p->defer_stmts.allocator   = a;
-	p->blocks.allocator        = a;
-	p->branch_blocks.allocator = a;
-	p->context_stack.allocator = a;
-	p->scope_stack.allocator   = a;
+	p->children.allocator          = a;
+	p->defer_stmts.allocator       = a;
+	p->blocks.allocator            = a;
+	p->branch_blocks.allocator     = a;
+	p->context_stack.allocator     = a;
+	p->scope_stack.allocator       = a;
+	p->asan_stack_locals.allocator = a;
 	// map_init(&p->selector_values,  0);
 	// map_init(&p->selector_addr,    0);
 	// map_init(&p->tuple_fix_map,    0);
@@ -385,11 +386,12 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->is_entry_point = false;
 
 	gbAllocator a = permanent_allocator();
-	p->children.allocator      = a;
-	p->defer_stmts.allocator   = a;
-	p->blocks.allocator        = a;
-	p->branch_blocks.allocator = a;
-	p->context_stack.allocator = a;
+	p->children.allocator          = a;
+	p->defer_stmts.allocator       = a;
+	p->blocks.allocator            = a;
+	p->branch_blocks.allocator     = a;
+	p->context_stack.allocator     = a;
+	p->asan_stack_locals.allocator = a;
 	map_init(&p->tuple_fix_map, 0);
 
 

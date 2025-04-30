@@ -10,6 +10,7 @@
 package mem_tlsf
 
 import "base:intrinsics"
+import "base:sanitizer"
 import "base:runtime"
 
 // log2 of number of linear subdivisions of block sizes.
@@ -209,6 +210,8 @@ alloc_bytes_non_zeroed :: proc(control: ^Allocator, size: uint, align: uint) -> 
 				return nil, .Out_Of_Memory
 			}
 
+			sanitizer.address_poison(new_pool_buf)
+
 			// Allocate a new link in the `control.pool` tracking structure.
 			new_pool := new_clone(Pool{
 				data      = new_pool_buf,
@@ -254,7 +257,7 @@ alloc_bytes_non_zeroed :: proc(control: ^Allocator, size: uint, align: uint) -> 
 	return block_prepare_used(control, block, adjust)
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 alloc_bytes :: proc(control: ^Allocator, size: uint, align: uint) -> (res: []byte, err: runtime.Allocator_Error) {
 	res, err = alloc_bytes_non_zeroed(control, size, align)
 	if err == nil {
@@ -273,6 +276,7 @@ free_with_size :: proc(control: ^Allocator, ptr: rawptr, size: uint) {
 
 	block := block_from_ptr(ptr)
 	assert(!block_is_free(block), "block already marked as free") // double free
+	sanitizer.address_poison(ptr, block.size)
 	block_mark_as_free(block)
 	block = block_merge_prev(control, block)
 	block = block_merge_next(control, block)
@@ -316,6 +320,7 @@ resize :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: uint, align
 
 	block_trim_used(control, block, adjust)
 	res = ([^]byte)(ptr)[:new_size]
+	sanitizer.address_unpoison(res)
 
 	if min_size < new_size {
 		to_zero := ([^]byte)(ptr)[min_size:new_size]
@@ -374,95 +379,96 @@ resize_non_zeroed :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: 
 	NOTE: TLSF spec relies on ffs/fls returning a value in the range 0..31.
 */
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_size :: proc "contextless" (block: ^Block_Header) -> (size: uint) {
 	return block.size &~ (BLOCK_HEADER_FREE | BLOCK_HEADER_PREV_FREE)
 }
 
-@(private)
+@(private, no_sanitize_address)
 block_set_size :: proc "contextless" (block: ^Block_Header, size: uint) {
 	old_size := block.size
 	block.size = size | (old_size & (BLOCK_HEADER_FREE | BLOCK_HEADER_PREV_FREE))
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_is_last :: proc "contextless" (block: ^Block_Header) -> (is_last: bool) {
 	return block_size(block) == 0
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_is_free :: proc "contextless" (block: ^Block_Header) -> (is_free: bool) {
 	return (block.size & BLOCK_HEADER_FREE) == BLOCK_HEADER_FREE
 }
 
-@(private)
+@(private, no_sanitize_address)
 block_set_free :: proc "contextless" (block: ^Block_Header) {
 	block.size |= BLOCK_HEADER_FREE
 }
 
-@(private)
+@(private, no_sanitize_address)
 block_set_used :: proc "contextless" (block: ^Block_Header) {
 	block.size &~= BLOCK_HEADER_FREE
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_is_prev_free :: proc "contextless" (block: ^Block_Header) -> (is_prev_free: bool) {
 	return (block.size & BLOCK_HEADER_PREV_FREE) == BLOCK_HEADER_PREV_FREE
 }
 
-@(private)
+@(private, no_sanitize_address)
 block_set_prev_free :: proc "contextless" (block: ^Block_Header) {
 	block.size |= BLOCK_HEADER_PREV_FREE
 }
 
-@(private)
+@(private, no_sanitize_address)
 block_set_prev_used :: proc "contextless" (block: ^Block_Header) {
 	block.size &~= BLOCK_HEADER_PREV_FREE
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_from_ptr :: proc(ptr: rawptr) -> (block_ptr: ^Block_Header) {
 	return (^Block_Header)(uintptr(ptr) - BLOCK_START_OFFSET)
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_to_ptr   :: proc(block: ^Block_Header) -> (ptr: rawptr) {
 	return rawptr(uintptr(block) + BLOCK_START_OFFSET)
 }
 
 // Return location of next block after block of given size.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 offset_to_block :: proc(ptr: rawptr, size: uint) -> (block: ^Block_Header) {
 	return (^Block_Header)(uintptr(ptr) + uintptr(size))
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 offset_to_block_backwards :: proc(ptr: rawptr, size: uint) -> (block: ^Block_Header) {
 	return (^Block_Header)(uintptr(ptr) - uintptr(size))
 }
 
 // Return location of previous block.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_prev :: proc(block: ^Block_Header) -> (prev: ^Block_Header) {
 	assert(block_is_prev_free(block), "previous block must be free")
+
 	return block.prev_phys_block
 }
 
 // Return location of next existing block.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_next :: proc(block: ^Block_Header) -> (next: ^Block_Header) {
 	return offset_to_block(block_to_ptr(block), block_size(block) - BLOCK_HEADER_OVERHEAD)
 }
 
 // Link a new block with its physical neighbor, return the neighbor.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_link_next :: proc(block: ^Block_Header) -> (next: ^Block_Header) {
 	next = block_next(block)
 	next.prev_phys_block = block
 	return
 }
 
-@(private)
+@(private, no_sanitize_address)
 block_mark_as_free :: proc(block: ^Block_Header) {
 	// Link the block to the next block, first.
 	next := block_link_next(block)
@@ -470,26 +476,26 @@ block_mark_as_free :: proc(block: ^Block_Header) {
 	block_set_free(block)
 }
 
-@(private)
-block_mark_as_used :: proc(block: ^Block_Header) {
+@(private, no_sanitize_address)
+block_mark_as_used :: proc(block: ^Block_Header, ) {
 	next := block_next(block)
 	block_set_prev_used(next)
 	block_set_used(block)
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 align_up :: proc(x, align: uint) -> (aligned: uint) {
 	assert(0 == (align & (align - 1)), "must align to a power of two")
 	return (x + (align - 1)) &~ (align - 1)
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 align_down :: proc(x, align: uint) -> (aligned: uint) {
 	assert(0 == (align & (align - 1)), "must align to a power of two")
 	return x - (x & (align - 1))
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 align_ptr :: proc(ptr: rawptr, align: uint) -> (aligned: rawptr) {
 	assert(0 == (align & (align - 1)), "must align to a power of two")
 	align_mask := uintptr(align) - 1
@@ -499,7 +505,7 @@ align_ptr :: proc(ptr: rawptr, align: uint) -> (aligned: rawptr) {
 }
 
 // Adjust an allocation size to be aligned to word size, and no smaller than internal minimum.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 adjust_request_size :: proc(size, align: uint) -> (adjusted: uint) {
 	if size == 0 {
 		return 0
@@ -513,7 +519,7 @@ adjust_request_size :: proc(size, align: uint) -> (adjusted: uint) {
 }
 
 // Adjust an allocation size to be aligned to word size, and no smaller than internal minimum.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 adjust_request_size_with_err :: proc(size, align: uint) -> (adjusted: uint, err: runtime.Allocator_Error) {
 	if size == 0 {
 		return 0, nil
@@ -531,7 +537,7 @@ adjust_request_size_with_err :: proc(size, align: uint) -> (adjusted: uint, err:
 // TLSF utility functions. In most cases these are direct translations of
 // the documentation in the research paper.
 
-@(optimization_mode="favor_size", private, require_results)
+@(optimization_mode="favor_size", private, require_results, no_sanitize_address)
 mapping_insert :: proc(size: uint) -> (fl, sl: i32) {
 	if size < SMALL_BLOCK_SIZE {
 		// Store small blocks in first list.
@@ -544,7 +550,7 @@ mapping_insert :: proc(size: uint) -> (fl, sl: i32) {
 	return
 }
 
-@(optimization_mode="favor_size", private, require_results)
+@(optimization_mode="favor_size", private, require_results, no_sanitize_address)
 mapping_round :: #force_inline proc(size: uint) -> (rounded: uint) {
 	rounded = size
 	if size >= SMALL_BLOCK_SIZE {
@@ -555,12 +561,12 @@ mapping_round :: #force_inline proc(size: uint) -> (rounded: uint) {
 }
 
 // This version rounds up to the next block size (for allocations)
-@(optimization_mode="favor_size", private, require_results)
+@(optimization_mode="favor_size", private, require_results, no_sanitize_address)
 mapping_search :: proc(size: uint) -> (fl, sl: i32) {
 	return mapping_insert(mapping_round(size))
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 search_suitable_block :: proc(control: ^Allocator, fli, sli: ^i32) -> (block: ^Block_Header) {
 	// First, search for a block in the list associated with the given fl/sl index.
 	fl := fli^; sl := sli^
@@ -587,7 +593,7 @@ search_suitable_block :: proc(control: ^Allocator, fli, sli: ^i32) -> (block: ^B
 }
 
 // Remove a free block from the free list.
-@(private)
+@(private, no_sanitize_address)
 remove_free_block :: proc(control: ^Allocator, block: ^Block_Header, fl: i32, sl: i32) {
 	prev := block.prev_free
 	next := block.next_free
@@ -613,7 +619,7 @@ remove_free_block :: proc(control: ^Allocator, block: ^Block_Header, fl: i32, sl
 }
 
 // Insert a free block into the free block list.
-@(private)
+@(private, no_sanitize_address)
 insert_free_block :: proc(control: ^Allocator, block: ^Block_Header, fl: i32, sl: i32) {
 	current := control.blocks[fl][sl]
 	assert(current != nil, "free lists cannot have a nil entry")
@@ -631,26 +637,26 @@ insert_free_block :: proc(control: ^Allocator, block: ^Block_Header, fl: i32, sl
 }
 
 // Remove a given block from the free list.
-@(private)
+@(private, no_sanitize_address)
 block_remove :: proc(control: ^Allocator, block: ^Block_Header) {
 	fl, sl := mapping_insert(block_size(block))
 	remove_free_block(control, block, fl, sl)
 }
 
 // Insert a given block into the free list.
-@(private)
+@(private, no_sanitize_address)
 block_insert :: proc(control: ^Allocator, block: ^Block_Header) {
 	fl, sl := mapping_insert(block_size(block))
 	insert_free_block(control, block, fl, sl)
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_can_split :: proc(block: ^Block_Header, size: uint) -> (can_split: bool) {
 	return block_size(block) >= size_of(Block_Header) + size
 }
 
 // Split a block into two, the second of which is free.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_split :: proc(block: ^Block_Header, size: uint) -> (remaining: ^Block_Header) {
 	// Calculate the amount of space left in the remaining block.
 	remaining = offset_to_block(block_to_ptr(block), size - BLOCK_HEADER_OVERHEAD)
@@ -671,9 +677,10 @@ block_split :: proc(block: ^Block_Header, size: uint) -> (remaining: ^Block_Head
 }
 
 // Absorb a free block's storage into an adjacent previous free block.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_absorb :: proc(prev: ^Block_Header, block: ^Block_Header) -> (absorbed: ^Block_Header) {
 	assert(!block_is_last(prev), "previous block can't be last")
+
 	// Note: Leaves flags untouched.
 	prev.size += block_size(block) + BLOCK_HEADER_OVERHEAD
 	_ = block_link_next(prev)
@@ -681,7 +688,7 @@ block_absorb :: proc(prev: ^Block_Header, block: ^Block_Header) -> (absorbed: ^B
 }
 
 // Merge a just-freed block with an adjacent previous free block.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_merge_prev :: proc(control: ^Allocator, block: ^Block_Header) -> (merged: ^Block_Header) {
 	merged = block
 	if (block_is_prev_free(block)) {
@@ -695,7 +702,7 @@ block_merge_prev :: proc(control: ^Allocator, block: ^Block_Header) -> (merged: 
 }
 
 // Merge a just-freed block with an adjacent free block.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_merge_next :: proc(control: ^Allocator, block: ^Block_Header) -> (merged: ^Block_Header) {
 	merged = block
 	next  := block_next(block)
@@ -710,7 +717,7 @@ block_merge_next :: proc(control: ^Allocator, block: ^Block_Header) -> (merged: 
 }
 
 // Trim any trailing block space off the end of a free block, return to pool.
-@(private)
+@(private, no_sanitize_address)
 block_trim_free :: proc(control: ^Allocator, block: ^Block_Header, size: uint) {
 	assert(block_is_free(block), "block must be free")
 	if (block_can_split(block, size)) {
@@ -722,7 +729,7 @@ block_trim_free :: proc(control: ^Allocator, block: ^Block_Header, size: uint) {
 }
 
 // Trim any trailing block space off the end of a used block, return to pool.
-@(private)
+@(private, no_sanitize_address)
 block_trim_used :: proc(control: ^Allocator, block: ^Block_Header, size: uint) {
 	assert(!block_is_free(block), "Block must be used")
 	if (block_can_split(block, size)) {
@@ -736,7 +743,7 @@ block_trim_used :: proc(control: ^Allocator, block: ^Block_Header, size: uint) {
 }
 
 // Trim leading block space, return to pool.
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_trim_free_leading :: proc(control: ^Allocator, block: ^Block_Header, size: uint) -> (remaining: ^Block_Header) {
 	remaining = block
 	if block_can_split(block, size) {
@@ -750,7 +757,7 @@ block_trim_free_leading :: proc(control: ^Allocator, block: ^Block_Header, size:
 	return remaining
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_locate_free :: proc(control: ^Allocator, size: uint) -> (block: ^Block_Header) {
 	fl, sl: i32
 	if size != 0 {
@@ -774,13 +781,14 @@ block_locate_free :: proc(control: ^Allocator, size: uint) -> (block: ^Block_Hea
 	return block
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_address)
 block_prepare_used :: proc(control: ^Allocator, block: ^Block_Header, size: uint) -> (res: []byte, err: runtime.Allocator_Error) {
 	if block != nil {
 		assert(size != 0, "Size must be non-zero")
 		block_trim_free(control, block, size)
 		block_mark_as_used(block)
 		res = ([^]byte)(block_to_ptr(block))[:size]
+		sanitizer.address_unpoison(res)
 	}
 	return
 }
