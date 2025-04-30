@@ -24,6 +24,8 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+$ODIN build ../test_issue_5043.odin $COMMON
+$ODIN build ../test_issue_5097.odin $COMMON
 
 set +x
 
