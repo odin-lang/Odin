@@ -18,12 +18,12 @@ read_directory :: proc(f: ^File, n: int, allocator: runtime.Allocator) -> (files
 		size = 100
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
 
 	it := read_directory_iterator_create(f)
 	defer _read_directory_iterator_destroy(&it)
 
-	dfi := make([dynamic]File_Info, 0, size, temp_allocator())
+	dfi := make([dynamic]File_Info, 0, size, temp_allocator)
 	defer if err != nil {
 		for fi in dfi {
 			file_info_delete(fi, allocator)
@@ -202,13 +202,13 @@ copy_directory :: proc(dst, src: string, dst_perm := 0o755) -> Error {
 		return err
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
 
-	file_infos := read_all_directory_by_path(src, temp_allocator()) or_return
+	file_infos := read_all_directory_by_path(src, temp_allocator) or_return
 	for fi in file_infos {
-		TEMP_ALLOCATOR_GUARD()
+		temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
 
-		dst_path := join_path({dst, fi.name}, temp_allocator()) or_return
+		dst_path := join_path({dst, fi.name}, temp_allocator) or_return
 		src_path := fi.fullpath
 
 		if fi.type == .Directory {

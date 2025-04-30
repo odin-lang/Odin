@@ -45,15 +45,15 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 		name = "."
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
 
-	p := win32_utf8_to_utf16(name, temp_allocator()) or_return
+	p := win32_utf8_to_utf16(name, temp_allocator) or_return
 
 	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
 	if n == 0 {
 		return "", _get_platform_error()
 	}
-	buf := make([]u16, n+1, temp_allocator())
+	buf := make([]u16, n+1, temp_allocator)
 	n = win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
 	if n == 0 {
 		return "", _get_platform_error()
@@ -65,9 +65,9 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 	if len(name) == 0 {
 		return {}, .Not_Exist
 	}
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
 
-	wname := _fix_long_path(name, temp_allocator()) or_return
+	wname := _fix_long_path(name, temp_allocator) or_return
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
 	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa)
 	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
@@ -137,9 +137,9 @@ _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (strin
 		return "", _get_platform_error()
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
 
-	buf := make([]u16, max(n, 260)+1, temp_allocator())
+	buf := make([]u16, max(n, 260)+1, temp_allocator)
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
 	return _cleanpath_from_buf(buf[:n], allocator)
 }
@@ -155,9 +155,9 @@ _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 		return nil, _get_platform_error()
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
 
-	buf := make([]u16, max(n, 260)+1, temp_allocator())
+	buf := make([]u16, max(n, 260)+1, temp_allocator)
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
 	return _cleanpath_strip_prefix(buf[:n]), nil
 }

@@ -15,8 +15,8 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(name: string, perm: int) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	cname := clone_to_cstring(name, temp_allocator)
 	if posix.mkdir(cname, transmute(posix.mode_t)posix._mode_t(perm)) != .OK {
 		return _get_platform_error()
 	}
@@ -28,13 +28,13 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		return .Invalid_Path
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
 
 	if exists(path) {
 		return .Exist
 	}
 
-	clean_path := clean_path(path, temp_allocator()) or_return
+	clean_path := clean_path(path, temp_allocator) or_return
 	return internal_mkdir_all(clean_path, perm)
 
 	internal_mkdir_all :: proc(path: string, perm: int) -> Error {
@@ -53,8 +53,8 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 }
 
 _remove_all :: proc(path: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cpath := temp_cstring(path)
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	cpath := clone_to_cstring(path, temp_allocator)
 
 	dir := posix.opendir(cpath)
 	if dir == nil {
@@ -78,7 +78,7 @@ _remove_all :: proc(path: string) -> Error {
 			continue
 		}
 
-		fullpath, _ := concatenate({path, "/", string(cname), "\x00"}, temp_allocator())
+		fullpath, _ := concatenate({path, "/", string(cname), "\x00"}, temp_allocator)
 		if entry.d_type == .DIR {
 			_remove_all(fullpath[:len(fullpath)-1]) or_return
 		} else {
@@ -95,10 +95,10 @@ _remove_all :: proc(path: string) -> Error {
 }
 
 _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
 
 	buf: [dynamic]byte
-	buf.allocator = temp_allocator()
+	buf.allocator = temp_allocator
 	size := uint(posix.PATH_MAX)
 
 	cwd: cstring
@@ -116,8 +116,8 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, er
 }
 
 _set_working_directory :: proc(dir: string) -> (err: Error) {
-	TEMP_ALLOCATOR_GUARD()
-	cdir := temp_cstring(dir)
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	cdir := clone_to_cstring(dir, temp_allocator)
 	if posix.chdir(cdir) != .OK {
 		err = _get_platform_error()
 	}

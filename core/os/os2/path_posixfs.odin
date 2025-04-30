@@ -31,8 +31,8 @@ _get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absol
 	if rel == "" {
 		rel = "."
 	}
-	TEMP_ALLOCATOR_GUARD()
-	rel_cstr := strings.clone_to_cstring(rel, temp_allocator())
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	rel_cstr := strings.clone_to_cstring(rel, temp_allocator)
 	path_ptr := posix.realpath(rel_cstr, nil)
 	if path_ptr == nil {
 		return "", Platform_Error(posix.errno())
