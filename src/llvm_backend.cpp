@@ -1247,12 +1247,12 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		case Basic_f64be:
 			return str_lit("d");
 
-		case Basic_complex32:		return str_lit("{Raw_Complex32=ss}");	// No f16 encoding, so fallback to i16, as above in Basic_f16*
-		case Basic_complex64:		return str_lit("{Raw_Complex64=ff}");
-		case Basic_complex128:		return str_lit("{Raw_Complex128=dd}");
-		case Basic_quaternion64:    return str_lit("{Raw_Quaternion64=ssss}");
-		case Basic_quaternion128:   return str_lit("{Raw_Quaternion128=ffff}");
-		case Basic_quaternion256:   return str_lit("{Raw_Quaternion256=dddd}");
+		case Basic_complex32:		return str_lit("{complex32=ss}");	// No f16 encoding, so fallback to i16, as above in Basic_f16*
+		case Basic_complex64:		return str_lit("{complex64=ff}");
+		case Basic_complex128:		return str_lit("{complex128=dd}");
+		case Basic_quaternion64:    return str_lit("{quaternion64=ssss}");
+		case Basic_quaternion128:   return str_lit("{quaternion128=ffff}");
+		case Basic_quaternion256:   return str_lit("{quaternion256=dddd}");
 
 		case Basic_int:
 			return str_lit(INT_SIZE_ENCODING);
