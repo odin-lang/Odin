@@ -52,7 +52,7 @@ TEMP_ALLOCATOR_GUARD :: #force_inline proc(collisions: []runtime.Allocator, loc 
 
 Temp_Allocator :: struct {
 	using arena: ^runtime.Arena,
-	using allocator: runtime.Allocator
+	using allocator: runtime.Allocator,
 }
 
 get_temp_allocator :: proc(tmp: runtime.Arena_Temp, _: runtime.Source_Code_Location) -> Temp_Allocator {

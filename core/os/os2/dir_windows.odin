@@ -51,8 +51,6 @@ Read_Directory_Iterator_Impl :: struct {
 
 @(require_results)
 _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info, index: int, ok: bool) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
-
 	for !it.impl.no_more_files {
 		err: Error
 		file_info_delete(it.impl.prev_fi, file_allocator())

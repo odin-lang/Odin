@@ -206,7 +206,7 @@ copy_directory :: proc(dst, src: string, dst_perm := 0o755) -> Error {
 
 	file_infos := read_all_directory_by_path(src, temp_allocator) or_return
 	for fi in file_infos {
-		temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+		temp_allocator_scope(temp_allocator)
 
 		dst_path := join_path({dst, fi.name}, temp_allocator) or_return
 		src_path := fi.fullpath
