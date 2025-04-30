@@ -1173,9 +1173,8 @@ gb_internal lbProcedure *lb_create_objc_names(lbModule *main_module) {
 	return p;
 }
 
-// TODO(harold): Move this out of here and into a more suitable place.
-// TODO(harold): Should not take an allocator, but always use temp, as we return string literals as well.
-String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_depth = 0) {
+// TODO(harold): Perhaps move this out of here and into a more suitable place?
+String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 	// NOTE(harold): See https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html#//apple_ref/doc/uid/TP40008048-CH100
 
 	// NOTE(harold): Darwin targets are always 64-bit. Should we drop this and assume "q" always?
@@ -1248,14 +1247,12 @@ String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_d
 		case Basic_f64be:
 			return str_lit("d");
 
-		// TODO(harold) These:
-		case Basic_complex32:
-		case Basic_complex64:
-		case Basic_complex128:
-		case Basic_quaternion64:
-		case Basic_quaternion128:
-		case Basic_quaternion256:
-				return str_lit("?");
+		case Basic_complex32:		return str_lit("{Raw_Complex32=ss}");	// No f16 encoding, so fallback to i16, as above in Basic_f16*
+		case Basic_complex64:		return str_lit("{Raw_Complex64=ff}");
+		case Basic_complex128:		return str_lit("{Raw_Complex128=dd}");
+		case Basic_quaternion64:    return str_lit("{Raw_Quaternion64=ssss}");
+		case Basic_quaternion128:   return str_lit("{Raw_Quaternion128=ffff}");
+		case Basic_quaternion256:   return str_lit("{Raw_Quaternion256=dddd}");
 
 		case Basic_int:
 			return str_lit(INT_SIZE_ENCODING);
@@ -1298,7 +1295,7 @@ String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_d
 		if (base->kind == Type_Named) {
 			base = base_type(base);
 			if(base->kind != Type_Struct && base->kind != Type_Union) {
-				return lb_get_objc_type_encoding(base, allocator, pointer_depth);
+				return lb_get_objc_type_encoding(base, pointer_depth);
 			}
 		}
 
@@ -1325,7 +1322,7 @@ String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_d
 		}
 
 
-		gbString s = gb_string_make_reserve(allocator, 16);
+		gbString s = gb_string_make_reserve(temporary_allocator(), 16);
 		s = gb_string_append_length(s, is_union ? "(" :"{", 1);
 		if (t->kind == Type_Named) {
 			s = gb_string_append_length(s, t->Named.name.text, t->Named.name.len);
@@ -1337,11 +1334,14 @@ String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_d
 
 			if (!is_union) {
 				for( auto& f : base->Struct.fields ) {
-					String field_type = lb_get_objc_type_encoding(f->type, allocator, pointer_depth);
+					String field_type = lb_get_objc_type_encoding(f->type, pointer_depth);
 					s = gb_string_append_length(s, field_type.text, field_type.len);
 				}
 			} else {
-				// #TODO(harold): Encode fields
+				for( auto& v : base->Union.variants ) {
+					String variant_type = lb_get_objc_type_encoding(v, pointer_depth);
+					s = gb_string_append_length(s, variant_type.text, variant_type.len);
+				}
 			}
 		}
 
@@ -1355,44 +1355,44 @@ String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_d
 		return str_lit("?");
 
 	case Type_Pointer: {
-		String pointee = lb_get_objc_type_encoding(t->Pointer.elem, allocator, pointer_depth +1);
+		String pointee = lb_get_objc_type_encoding(t->Pointer.elem, pointer_depth +1);
 		// Special case for Objective-C Objects
 		if (pointer_depth == 0 && pointee == "@") {
 			return pointee;
 		}
 
-		return concatenate_strings(allocator, str_lit("^"), pointee);
+		return concatenate_strings(temporary_allocator(), str_lit("^"), pointee);
 	}
 
 	case Type_MultiPointer:
-		return concatenate_strings(allocator, str_lit("^"), lb_get_objc_type_encoding(t->Pointer.elem, allocator, pointer_depth +1));
+		return concatenate_strings(temporary_allocator(), str_lit("^"), lb_get_objc_type_encoding(t->Pointer.elem, pointer_depth +1));
 
 	case Type_Array: {
-		String type_str = lb_get_objc_type_encoding(t->Array.elem, allocator, pointer_depth);
+		String type_str = lb_get_objc_type_encoding(t->Array.elem, pointer_depth);
 
-		gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
+		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 8);
 		s = gb_string_append_fmt(s, "[%lld%s]", t->Array.count, type_str.text);
 		return make_string_c(s);
 	}
 
 	case Type_EnumeratedArray: {
-		String type_str = lb_get_objc_type_encoding(t->EnumeratedArray.elem, allocator, pointer_depth);
+		String type_str = lb_get_objc_type_encoding(t->EnumeratedArray.elem, pointer_depth);
 
-		gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
+		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 8);
 		s = gb_string_append_fmt(s, "[%lld%s]", t->EnumeratedArray.count, type_str.text);
 		return make_string_c(s);
 	}
 
 	case Type_Slice: {
-		String type_str = lb_get_objc_type_encoding(t->Slice.elem, allocator, pointer_depth);
-		gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
+		String type_str = lb_get_objc_type_encoding(t->Slice.elem, pointer_depth);
+		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 8);
 		s = gb_string_append_fmt(s, "{slice=^%s%s}", type_str, INT_SIZE_ENCODING);
 		return make_string_c(s);
 	}
 
 	case Type_DynamicArray: {
-		String type_str = lb_get_objc_type_encoding(t->DynamicArray.elem, allocator, pointer_depth);
-		gbString s = gb_string_make_reserve(allocator, type_str.len + 8);
+		String type_str = lb_get_objc_type_encoding(t->DynamicArray.elem, pointer_depth);
+		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 8);
 		s = gb_string_append_fmt(s, "{dynamic=^%s%s%sAllocator={?^v}}", type_str, INT_SIZE_ENCODING, INT_SIZE_ENCODING);
 		return make_string_c(s);
 	}
@@ -1400,22 +1400,22 @@ String lb_get_objc_type_encoding(Type *t, gbAllocator allocator, isize pointer_d
 	case Type_Map:
 		return str_lit("{^v^v{Allocator=?^v}}");
 	case Type_Enum:
-		return lb_get_objc_type_encoding(t->Enum.base_type, allocator, pointer_depth);
+		return lb_get_objc_type_encoding(t->Enum.base_type, pointer_depth);
 	case Type_Tuple:
-		// NOTE(harold): Is this allowed here?
+		// NOTE(harold): Is this type allowed here?
 		return str_lit("?");
 	case Type_Proc:
 		return str_lit("?");
 	case Type_BitSet:
-		return lb_get_objc_type_encoding(t->BitSet.underlying, allocator, pointer_depth);
+		return lb_get_objc_type_encoding(t->BitSet.underlying, pointer_depth);
 	case Type_SimdVector:
 		break;
 	case Type_Matrix:
 		break;
 	case Type_BitField:
-		return lb_get_objc_type_encoding(t->BitField.backing_type, allocator, pointer_depth);
+		return lb_get_objc_type_encoding(t->BitField.backing_type, pointer_depth);
 	case Type_SoaPointer: {
-		gbString s = gb_string_make_reserve(allocator, 8);
+		gbString s = gb_string_make_reserve(temporary_allocator(), 8);
 		s = gb_string_append_fmt(s, "{=^v%s}", INT_SIZE_ENCODING);
 		return make_string_c(s);
 	}
@@ -1733,7 +1733,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			// TODO (harold): Checker must ensure that objc_methods have a single return value or none!
 			GB_ASSERT(method_type->Proc.result_count <= 1);
 			if (method_type->Proc.result_count != 0) {
-				method_encoding = lb_get_objc_type_encoding(method_type->Proc.results->Tuple.variables[0]->type, temporary_allocator());
+				method_encoding = lb_get_objc_type_encoding(method_type->Proc.results->Tuple.variables[0]->type);
 			}
 
 			if (!md.ac.objc_is_class_method) {
@@ -1744,7 +1744,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 			for (i32 i = method_param_offset; i < method_param_count; i++) {
 				Type *param_type = method_type->Proc.params->Tuple.variables[i]->type;
-				String param_encoding = lb_get_objc_type_encoding(param_type, temporary_allocator());
+				String param_encoding = lb_get_objc_type_encoding(param_type);
 
 				method_encoding = concatenate_strings(temporary_allocator(), method_encoding, param_encoding);
 			}
