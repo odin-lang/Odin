@@ -61,10 +61,10 @@ foreign webgl {
 	BufferData    :: proc(target: Enum, size: int, data: rawptr, usage: Enum) ---
 	BufferSubData :: proc(target: Enum, offset: uintptr, size: int, data: rawptr) ---
 
-	Clear         :: proc(bits: Enum) ---
+	Clear         :: proc(bits: u32) ---
 	ClearColor    :: proc(r, g, b, a: f32) ---
-	ClearDepth    :: proc(x: Enum) ---
-	ClearStencil  :: proc(x: Enum) ---
+	ClearDepth    :: proc(x: f32) ---
+	ClearStencil  :: proc(x: i32) ---
 	ColorMask     :: proc(r, g, b, a: bool) ---
 	CompileShader :: proc(shader: Shader) ---
 	
