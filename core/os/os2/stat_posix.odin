@@ -122,7 +122,8 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, er
 	}
 
 	stat: posix.stat_t
-	if posix.lstat(clone_to_cstring(fullpath), &stat, temp_allocator) != .OK {
+	c_fullpath := clone_to_cstring(fullpath, temp_allocator) or_return
+	if posix.lstat(c_fullpath, &stat) != .OK {
 		err = _get_platform_error()
 		return
 	}

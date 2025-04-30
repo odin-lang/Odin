@@ -14,9 +14,9 @@ _is_path_separator :: proc(c: byte) -> bool {
 	return c == _Path_Separator
 }
 
-_mkdir :: proc(name: string, perm: int) -> Error {
+_mkdir :: proc(name: string, perm: int) -> (err: Error) {
 	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
-	cname := clone_to_cstring(name, temp_allocator)
+	cname := clone_to_cstring(name, temp_allocator) or_return
 	if posix.mkdir(cname, transmute(posix.mode_t)posix._mode_t(perm)) != .OK {
 		return _get_platform_error()
 	}
@@ -52,9 +52,9 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 	}
 }
 
-_remove_all :: proc(path: string) -> Error {
+_remove_all :: proc(path: string) -> (err: Error) {
 	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
-	cpath := clone_to_cstring(path, temp_allocator)
+	cpath := clone_to_cstring(path, temp_allocator) or_return
 
 	dir := posix.opendir(cpath)
 	if dir == nil {
@@ -117,7 +117,7 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, er
 
 _set_working_directory :: proc(dir: string) -> (err: Error) {
 	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
-	cdir := clone_to_cstring(dir, temp_allocator)
+	cdir := clone_to_cstring(dir, temp_allocator) or_return
 	if posix.chdir(cdir) != .OK {
 		err = _get_platform_error()
 	}

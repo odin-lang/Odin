@@ -50,6 +50,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	}
 
 
+	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
 	info.pid = pid
 
 	// Thought on errors is: allocation failures return immediately (also why the non-allocation stuff is done first),
