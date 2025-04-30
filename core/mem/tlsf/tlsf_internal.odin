@@ -10,6 +10,7 @@
 package mem_tlsf
 
 import "base:intrinsics"
+import "base:sanitizer"
 import "base:runtime"
 
 // log2 of number of linear subdivisions of block sizes.
@@ -154,6 +155,8 @@ pool_add :: proc(control: ^Allocator, pool: []u8) -> (err: Error) {
 	block_set_size(next, 0)
 	block_set_used(next)
 	block_set_prev_free(next)
+
+	sanitizer.address_poison(pool)
 
 	return
 }
@@ -376,47 +379,74 @@ resize_non_zeroed :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: 
 
 @(private, require_results)
 block_size :: proc "contextless" (block: ^Block_Header) -> (size: uint) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	return block.size &~ (BLOCK_HEADER_FREE | BLOCK_HEADER_PREV_FREE)
 }
 
 @(private)
 block_set_size :: proc "contextless" (block: ^Block_Header, size: uint) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	old_size := block.size
 	block.size = size | (old_size & (BLOCK_HEADER_FREE | BLOCK_HEADER_PREV_FREE))
 }
 
 @(private, require_results)
 block_is_last :: proc "contextless" (block: ^Block_Header) -> (is_last: bool) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	return block_size(block) == 0
 }
 
 @(private, require_results)
 block_is_free :: proc "contextless" (block: ^Block_Header) -> (is_free: bool) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	return (block.size & BLOCK_HEADER_FREE) == BLOCK_HEADER_FREE
 }
 
 @(private)
 block_set_free :: proc "contextless" (block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	block.size |= BLOCK_HEADER_FREE
 }
 
 @(private)
 block_set_used :: proc "contextless" (block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	block.size &~= BLOCK_HEADER_FREE
 }
 
 @(private, require_results)
 block_is_prev_free :: proc "contextless" (block: ^Block_Header) -> (is_prev_free: bool) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	return (block.size & BLOCK_HEADER_PREV_FREE) == BLOCK_HEADER_PREV_FREE
 }
 
 @(private)
 block_set_prev_free :: proc "contextless" (block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	block.size |= BLOCK_HEADER_PREV_FREE
 }
 
 @(private)
 block_set_prev_used :: proc "contextless" (block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	block.size &~= BLOCK_HEADER_PREV_FREE
 }
 
@@ -445,25 +475,41 @@ offset_to_block_backwards :: proc(ptr: rawptr, size: uint) -> (block: ^Block_Hea
 @(private, require_results)
 block_prev :: proc(block: ^Block_Header) -> (prev: ^Block_Header) {
 	assert(block_is_prev_free(block), "previous block must be free")
+
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	return block.prev_phys_block
 }
 
 // Return location of next existing block.
 @(private, require_results)
 block_next :: proc(block: ^Block_Header) -> (next: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	return offset_to_block(block_to_ptr(block), block_size(block) - BLOCK_HEADER_OVERHEAD)
 }
 
 // Link a new block with its physical neighbor, return the neighbor.
 @(private, require_results)
 block_link_next :: proc(block: ^Block_Header) -> (next: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	next = block_next(block)
+	sanitizer.address_unpoison(next)
+	defer sanitizer.address_poison(next)
+
 	next.prev_phys_block = block
 	return
 }
 
 @(private)
 block_mark_as_free :: proc(block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	// Link the block to the next block, first.
 	next := block_link_next(block)
 	block_set_prev_free(next)
@@ -472,6 +518,9 @@ block_mark_as_free :: proc(block: ^Block_Header) {
 
 @(private)
 block_mark_as_used :: proc(block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	next := block_next(block)
 	block_set_prev_used(next)
 	block_set_used(block)
@@ -562,6 +611,9 @@ mapping_search :: proc(size: uint) -> (fl, sl: i32) {
 
 @(private, require_results)
 search_suitable_block :: proc(control: ^Allocator, fli, sli: ^i32) -> (block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	// First, search for a block in the list associated with the given fl/sl index.
 	fl := fli^; sl := sli^
 
@@ -589,6 +641,9 @@ search_suitable_block :: proc(control: ^Allocator, fli, sli: ^i32) -> (block: ^B
 // Remove a free block from the free list.
 @(private)
 remove_free_block :: proc(control: ^Allocator, block: ^Block_Header, fl: i32, sl: i32) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	prev := block.prev_free
 	next := block.next_free
 	assert(prev != nil, "prev_free can not be nil")
@@ -615,6 +670,9 @@ remove_free_block :: proc(control: ^Allocator, block: ^Block_Header, fl: i32, sl
 // Insert a free block into the free block list.
 @(private)
 insert_free_block :: proc(control: ^Allocator, block: ^Block_Header, fl: i32, sl: i32) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	current := control.blocks[fl][sl]
 	assert(current != nil, "free lists cannot have a nil entry")
 	assert(block   != nil, "cannot insert a nil entry into the free list")
@@ -633,6 +691,9 @@ insert_free_block :: proc(control: ^Allocator, block: ^Block_Header, fl: i32, sl
 // Remove a given block from the free list.
 @(private)
 block_remove :: proc(control: ^Allocator, block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	fl, sl := mapping_insert(block_size(block))
 	remove_free_block(control, block, fl, sl)
 }
@@ -640,18 +701,27 @@ block_remove :: proc(control: ^Allocator, block: ^Block_Header) {
 // Insert a given block into the free list.
 @(private)
 block_insert :: proc(control: ^Allocator, block: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	fl, sl := mapping_insert(block_size(block))
 	insert_free_block(control, block, fl, sl)
 }
 
 @(private, require_results)
 block_can_split :: proc(block: ^Block_Header, size: uint) -> (can_split: bool) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	return block_size(block) >= size_of(Block_Header) + size
 }
 
 // Split a block into two, the second of which is free.
 @(private, require_results)
 block_split :: proc(block: ^Block_Header, size: uint) -> (remaining: ^Block_Header) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	// Calculate the amount of space left in the remaining block.
 	remaining = offset_to_block(block_to_ptr(block), size - BLOCK_HEADER_OVERHEAD)
 
@@ -674,6 +744,10 @@ block_split :: proc(block: ^Block_Header, size: uint) -> (remaining: ^Block_Head
 @(private, require_results)
 block_absorb :: proc(prev: ^Block_Header, block: ^Block_Header) -> (absorbed: ^Block_Header) {
 	assert(!block_is_last(prev), "previous block can't be last")
+
+	sanitizer.address_unpoison(prev)
+	defer sanitizer.address_poison(prev)
+
 	// Note: Leaves flags untouched.
 	prev.size += block_size(block) + BLOCK_HEADER_OVERHEAD
 	_ = block_link_next(prev)
@@ -712,6 +786,9 @@ block_merge_next :: proc(control: ^Allocator, block: ^Block_Header) -> (merged: 
 // Trim any trailing block space off the end of a free block, return to pool.
 @(private)
 block_trim_free :: proc(control: ^Allocator, block: ^Block_Header, size: uint) {
+	sanitizer.address_unpoison(block)
+	defer sanitizer.address_poison(block)
+
 	assert(block_is_free(block), "block must be free")
 	if (block_can_split(block, size)) {
 		remaining_block := block_split(block, size)
@@ -781,6 +858,7 @@ block_prepare_used :: proc(control: ^Allocator, block: ^Block_Header, size: uint
 		block_trim_free(control, block, size)
 		block_mark_as_used(block)
 		res = ([^]byte)(block_to_ptr(block))[:size]
+		sanitizer.address_unpoison(res)
 	}
 	return
 }
