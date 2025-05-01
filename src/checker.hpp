@@ -139,6 +139,7 @@ struct AttributeContext {
 	bool    entry_point_only      : 1;
 	bool    instrumentation_enter : 1;
 	bool    instrumentation_exit  : 1;
+	bool    no_sanitize_address   : 1;
 	bool    rodata                : 1;
 	bool    ignore_duplicates     : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
