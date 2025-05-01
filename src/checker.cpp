@@ -3711,6 +3711,12 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		ac->instrumentation_exit = true;
 		return true;
+	} else if (name == "no_sanitize_address") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->no_sanitize_address = true;
+		return true;
 	}
 	return false;
 }
