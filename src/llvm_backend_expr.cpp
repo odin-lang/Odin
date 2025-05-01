@@ -5175,7 +5175,6 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 			Selection sel = lookup_field(tav.type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
 			if (sel.pseudo_field && (sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup)) {
-				// GB_ASSERT(sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup);
 				Entity *e = entity_of_node(sel_node);
 				GB_ASSERT(e->kind == Entity_Procedure);
 				return lb_addr(lb_find_value_from_entity(p->module, e));
@@ -5183,26 +5182,13 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 			lbAddr addr = lb_build_addr(p, se->expr);
 
-			// TODO(harold): Ensure objc_ivar is always null when objc_implement is not set!
-			Type *d_type = type_deref(tav.type); //base_type(tav.type);
-			if (d_type->kind == Type_Named && d_type->Named.type_name->TypeName.objc_ivar) {
+			// NOTE(harold): Only allow ivar pseudo field access on indirect selectors.
+			//				 It is incoherent otherwise as Objective-C objects are zero-sized.
+			Type *deref_type = type_deref(tav.type);
+			if (tav.type->kind == Type_Pointer && deref_type->kind == Type_Named && deref_type->Named.type_name->TypeName.objc_ivar) {
 				// NOTE(harold): We need to load the ivar from the current address and
 				//				 replace addr with the loaded ivar addr to apply the selector load properly.
-
-				// If it's a deep pointer, dereference it first
-				// TODO(harold): Ensure this is save to do here. lb_emit_deep_field_gep() has several derefs, once per index.
-				//				 Not sure what multiple indices represent...
-				Type* type = type_deref(addr.addr.type);
-
-				// TODO(harold): Checker: Must NOT allow ivar dereferencing on non-pointer types.
-				//					      this would access memory outside the size of the value.
-				//						  In fact, locals/globals of Objective-C types ought not be allowed at all.
-				GB_ASSERT(is_type_pointer(type));
-
-				if (is_type_pointer(type)) {
-					type = type_deref(type);
-					addr = lb_addr(lb_emit_load(p, addr.addr));
-				}
+				addr = lb_addr(lb_emit_load(p, addr.addr));
 
 				lbValue ivar_ptr = lb_handle_objc_ivar_for_objc_object_pointer(p, addr.addr);
 				addr = lb_addr(ivar_ptr);

@@ -575,7 +575,7 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 						break;
 					}
 
-					super = super->Named.type_name->TypeName.objc_superclass;
+					super = named_type->Named.type_name->TypeName.objc_superclass;
 				}
 			} else {
 				if (ac.objc_superclass != nullptr) {
