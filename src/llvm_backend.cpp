@@ -1770,13 +1770,13 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			// Register a single ivar for this class
 			Type *ivar_base = ivar_type->Named.base;
 
+			// @note(harold): The alignment is supposed to be passed as log2(alignment): https://developer.apple.com/documentation/objectivec/class_addivar(_:_:_:_:_:)?language=objc
 			const i64 size      = type_size_of(ivar_base);
-			const i64 alignment = type_align_of(ivar_base);
-			// TODO(harold): Checker: Alignment must be compatible with ivar rules. Or we should increase the alignment if needed.
+			const i64 alignment = (i64)floor_log2((u64)type_align_of(ivar_base));
 
 			// TODO(harold): Should we pass the actual type encoding? Might not be ideal for obfuscation.
 			String ivar_name  = str_lit("__$ivar");
-			String ivar_types = str_lit("{= }");	//lb_get_objc_type_encoding(ivar_type, temporary_allocator());// str_lit("{= }");
+			String ivar_types = str_lit("{= }");	//lb_get_objc_type_encoding(ivar_type);
 			args.count = 5;
 			args[0] = class_value;
 			args[1] = lb_const_value(m, t_cstring, exact_value_string(ivar_name));
