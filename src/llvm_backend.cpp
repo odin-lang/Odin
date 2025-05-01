@@ -1597,8 +1597,8 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 		map_set(&ivar_map, g.class_impl_type, g);
 	}
 
-	for (const auto& cd : class_impls) {
-		auto& g = cd.g;
+	for (const auto &cd : class_impls) {
+		auto &g = cd.g;
 		Type *class_type = g.class_impl_type;
 		Type *class_ptr_type = alloc_type_pointer(class_type);
 		lbValue class_value = cd.class_value;
@@ -1622,7 +1622,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 		}
 
 
-		Array<ObjcMethodData>* methods = map_get(&m->info->objc_method_implementations, class_type);
+		Array<ObjcMethodData> *methods = map_get(&m->info->objc_method_implementations, class_type);
 		if (!methods) {
 			continue;
 		}
@@ -1641,7 +1641,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			wrapper_args[1] = t_objc_SEL;
 
 			isize method_param_count  = method_type->Proc.param_count;
-			i32   method_param_offset = 0;
+			isize method_param_offset = 0;
 
 			// TODO(harold): Need to make sure (at checker stage) that the non-class method has the self parameter already.
 			//               (Maybe this is already accounted for?.)
@@ -1651,7 +1651,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 				method_param_offset = 1;
 			}
 
-			for (i32 i = 0; i < method_param_count; i++) {
+			for (isize i = 0; i < method_param_count; i++) {
 				array_add(&wrapper_args, method_type->Proc.params->Tuple.variables[method_param_offset+i]->type);
 			}
 
@@ -1699,7 +1699,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 				}
 
 
-				auto method_call_args = array_make<lbValue>(temporary_allocator(), method_param_count + (isize)method_param_offset);
+				auto method_call_args = array_make<lbValue>(temporary_allocator(), method_param_count + method_param_offset);
 
 				if (!md.ac.objc_is_class_method) {
 					method_call_args[0] = lbValue {
@@ -1742,7 +1742,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 				method_encoding = concatenate_strings(temporary_allocator(), method_encoding, str_lit("#:"));
 			}
 
-			for (i32 i = method_param_offset; i < method_param_count; i++) {
+			for (isize i = method_param_offset; i < method_param_count; i++) {
 				Type *param_type = method_type->Proc.params->Tuple.variables[i]->type;
 				String param_encoding = lb_get_objc_type_encoding(param_type);
 
