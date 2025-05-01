@@ -1793,7 +1793,6 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	}
 
 	// Register ivar offsets for any `objc_ivar_get` expressions emitted.
-	Type *ptr_u32 = alloc_type_pointer(t_u32);
 	for (auto const& kv : ivar_map) {
 		lbObjCGlobal const& g = kv.value;
 		lbAddr ivar_addr = {};
@@ -1801,13 +1800,14 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 		if (found) {
 			ivar_addr = lb_addr(*found);
+			GB_ASSERT(ivar_addr.addr.type == t_int_ptr);
 		} else {
-			// Defined in an external package, must define now
-			LLVMTypeRef t = lb_type(m, t_u32);
+			// Defined in an external package, define it now in the main package
+			LLVMTypeRef t = lb_type(m, t_int);
 
 			lbValue global{};
 			global.value = LLVMAddGlobal(m->mod, t, g.global_name);
-			global.type  = ptr_u32;
+			global.type  = t_int_ptr;
 
 			LLVMSetInitializer(global.value, LLVMConstInt(t, 0, true));
 
@@ -1825,9 +1825,9 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 		args.count = 1;
 		args[0] = ivar;
 		lbValue ivar_offset     = lb_emit_runtime_call(p, "ivar_getOffset", args);
-		lbValue ivar_offset_u32 = lb_emit_conv(p, ivar_offset, t_u32);
+		lbValue ivar_offset_int = lb_emit_conv(p, ivar_offset, t_int);
 
-		lb_addr_store(p, ivar_addr, ivar_offset_u32);
+		lb_addr_store(p, ivar_addr, ivar_offset_int);
 	}
 
 	lb_end_procedure_body(p);

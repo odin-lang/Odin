@@ -2171,11 +2171,11 @@ gb_internal lbAddr lb_handle_objc_find_or_register_ivar(lbModule *m, Type *self_
 	global_name = gb_string_append_length(global_name, name.text, name.len);
 
 	// Create a global variable to store offset of the ivar in an instance of an object
-	LLVMTypeRef t = lb_type(m, t_u32);
+	LLVMTypeRef t = lb_type(m, t_int);
 
 	lbValue g = {};
 	g.value = LLVMAddGlobal(m->mod, t, global_name);
-	g.type  = alloc_type_pointer(t_u32);
+	g.type  = t_int_ptr;
 
 	if (default_module == m) {
 		LLVMSetInitializer(g.value, LLVMConstInt(t, 0, true));
@@ -2184,7 +2184,7 @@ gb_internal lbAddr lb_handle_objc_find_or_register_ivar(lbModule *m, Type *self_
 		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 	}
 
-	mpsc_enqueue(&m->gen->objc_ivars, lbObjCGlobal{m, global_name, name, t_u32, self_type});
+	mpsc_enqueue(&m->gen->objc_ivars, lbObjCGlobal{m, global_name, name, t_int, self_type});
 
 	lbAddr addr = lb_addr(g);
 	string_map_set(&m->objc_ivars, name, addr);
