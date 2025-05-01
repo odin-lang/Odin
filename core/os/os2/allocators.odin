@@ -36,7 +36,7 @@ TEMP_ALLOCATOR_GUARD_END :: proc(temp: Temp_Allocator) {
 
 @(deferred_out=TEMP_ALLOCATOR_GUARD_END)
 TEMP_ALLOCATOR_GUARD :: #force_inline proc(collisions: []runtime.Allocator, loc := #caller_location) -> Temp_Allocator {
-	assert(len(collisions) <= MAX_TEMP_ARENA_COLLISIONS)
+	assert(len(collisions) <= MAX_TEMP_ARENA_COLLISIONS, "Maximum collision count exceeded. MAX_TEMP_ARENA_COUNT must be increased!")
 	good_arena: ^runtime.Arena
 	for i in 0..<MAX_TEMP_ARENA_COUNT {
 		good_arena = &global_default_temp_allocator_arenas[i]
