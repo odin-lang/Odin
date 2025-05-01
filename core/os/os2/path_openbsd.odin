@@ -35,7 +35,7 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 		return real(arg, allocator)
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	buf := strings.builder_make(temp_allocator)
 

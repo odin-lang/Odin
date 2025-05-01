@@ -52,7 +52,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		return
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	// search PATH if just a plain name is provided.
 	exe_builder := strings.builder_make(temp_allocator)

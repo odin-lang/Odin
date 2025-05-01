@@ -14,7 +14,7 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(name: string, perm: int) -> Error {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	if !win32.CreateDirectoryW(_fix_long_path(name, temp_allocator) or_return, nil) {
 		return _get_platform_error()
 	}
@@ -33,7 +33,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		return p, false, nil
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	dir_stat, err := stat(path, temp_allocator)
 	if err == nil {
@@ -82,7 +82,7 @@ _remove_all :: proc(path: string) -> Error {
 		return nil
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	dir := win32_utf8_to_wstring(path, temp_allocator) or_return
 
 	empty: [1]u16
@@ -109,7 +109,7 @@ _remove_all :: proc(path: string) -> Error {
 _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	win32.AcquireSRWLockExclusive(&cwd_lock)
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	sz_utf16 := win32.GetCurrentDirectoryW(0, nil)
 	dir_buf_wstr := make([]u16, sz_utf16, temp_allocator) or_return
@@ -123,7 +123,7 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, er
 }
 
 _set_working_directory :: proc(dir: string) -> (err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	wstr := win32_utf8_to_wstring(dir, temp_allocator) or_return
 
 	win32.AcquireSRWLockExclusive(&cwd_lock)
@@ -138,7 +138,7 @@ _set_working_directory :: proc(dir: string) -> (err: Error) {
 }
 
 _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	buf := make([dynamic]u16, 512, temp_allocator) or_return
 	for {
@@ -222,7 +222,7 @@ _fix_long_path_internal :: proc(path: string) -> string {
 		return path
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	PREFIX :: `\\?`
 	path_buf := make([]byte, len(PREFIX)+len(path)+1, temp_allocator)
@@ -297,7 +297,7 @@ _get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absol
 	if rel == "" {
 		rel = "."
 	}
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	rel_utf16 := win32.utf8_to_utf16(rel, temp_allocator)
 	n := win32.GetFullPathNameW(raw_data(rel_utf16), 0, nil, nil)
 	if n == 0 {

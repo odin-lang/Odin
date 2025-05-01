@@ -39,7 +39,7 @@ build_env :: proc() -> (err: Error) {
 	g_env_buf = make([]byte, size_of_envs, file_allocator()) or_return
 	defer if err != nil { delete(g_env_buf, file_allocator()) }
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	envs := make([]cstring, num_envs, temp_allocator) or_return
 

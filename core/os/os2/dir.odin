@@ -18,7 +18,7 @@ read_directory :: proc(f: ^File, n: int, allocator: runtime.Allocator) -> (files
 		size = 100
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	it := read_directory_iterator_create(f)
 	defer _read_directory_iterator_destroy(&it)
@@ -202,7 +202,7 @@ copy_directory :: proc(dst, src: string, dst_perm := 0o755) -> Error {
 		return err
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	file_infos := read_all_directory_by_path(src, temp_allocator) or_return
 	for fi in file_infos {

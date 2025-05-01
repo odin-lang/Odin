@@ -28,7 +28,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		return .Invalid_Path
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	if exists(path) {
 		return .Exist

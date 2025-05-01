@@ -7,7 +7,7 @@ import "base:runtime"
 import "core:sys/posix"
 
 _posix_absolute_path :: proc(fd: posix.FD, name: string, allocator: runtime.Allocator) -> (path: cstring, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	cname := clone_to_cstring(name, temp_allocator)
 
 	buf: [posix.PATH_MAX]byte

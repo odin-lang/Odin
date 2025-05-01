@@ -5,7 +5,7 @@ import "base:runtime"
 import "core:sys/posix"
 
 _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	buf := make([dynamic]byte, 1024, temp_allocator) or_return
 	for {

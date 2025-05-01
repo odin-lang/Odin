@@ -4,7 +4,7 @@ import "base:runtime"
 
 @(require_results)
 user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	#partial switch ODIN_OS {
 	case .Windows:
@@ -35,7 +35,7 @@ user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error
 
 @(require_results)
 user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	#partial switch ODIN_OS {
 	case .Windows:

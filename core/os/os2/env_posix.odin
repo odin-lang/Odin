@@ -12,7 +12,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 		return
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	ckey := strings.clone_to_cstring(key, temp_allocator)
 	cval := posix.getenv(ckey)
@@ -27,7 +27,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 }
 
 _set_env :: proc(key, value: string) -> (err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	ckey := strings.clone_to_cstring(key, temp_allocator) or_return
 	cval := strings.clone_to_cstring(value, temp_allocator) or_return
@@ -39,7 +39,7 @@ _set_env :: proc(key, value: string) -> (err: Error) {
 }
 
 _unset_env :: proc(key: string) -> (ok: bool) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	ckey := strings.clone_to_cstring(key, temp_allocator)
 

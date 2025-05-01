@@ -162,7 +162,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		if err != nil {
 			break read_peb
 		}
-		temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+		temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 		if selection >= {.Command_Line, .Command_Args} {
 			temp_allocator_scope(temp_allocator)
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator) or_return
@@ -273,7 +273,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		if err != nil {
 			break read_peb
 		}
-		temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+		temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 		if selection >= {.Command_Line, .Command_Args} {
 			temp_allocator_scope(temp_allocator)
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator) or_return
@@ -421,7 +421,7 @@ _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process,
 
 @(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	command_line   := _build_command_line(desc.command, temp_allocator)
 	command_line_w := win32_utf8_to_wstring(command_line, temp_allocator) or_return
 	environment := desc.env
@@ -614,7 +614,7 @@ _process_exe_by_pid :: proc(pid: int, allocator: runtime.Allocator) -> (exe_path
 }
 
 _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Allocator) -> (full_username: string, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	token_handle: win32.HANDLE
 	if !win32.OpenProcessToken(process_handle, win32.TOKEN_QUERY, &token_handle) {
 		err = _get_platform_error()

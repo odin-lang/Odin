@@ -50,7 +50,7 @@ _get_ppid :: proc() -> int {
 
 @(private="package")
 _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	dir_fd, errno := linux.open("/proc/", _OPENDIR_FLAGS)
 	#partial switch errno {
@@ -100,7 +100,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 
 @(private="package")
 _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	info.pid = pid
 
@@ -392,7 +392,7 @@ _process_open :: proc(pid: int, _: Process_Open_Flags) -> (process: Process, err
 
 @(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	if len(desc.command) == 0 {
 		return process, .Invalid_Command
@@ -593,7 +593,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 }
 
 _process_state_update_times :: proc(state: ^Process_State) -> (err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	stat_path_buf: [48]u8
 	path_builder := strings.builder_from_bytes(stat_path_buf[:])

@@ -18,7 +18,7 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(path: string, perm: int) -> Error {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	path_cstr := clone_to_cstring(path, temp_allocator) or_return
 	return _get_platform_error(linux.mkdir(path_cstr, transmute(linux.Mode)u32(perm)))
 }
@@ -52,7 +52,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		}
 		return _get_platform_error(errno)
 	}
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	// need something we can edit, and use to generate cstrings
 	path_bytes := make([]u8, len(path) + 1, temp_allocator)
 
@@ -129,7 +129,7 @@ _remove_all :: proc(path: string) -> Error {
 		return nil
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	path_cstr := clone_to_cstring(path, temp_allocator) or_return
 
 	fd, errno := linux.open(path_cstr, _OPENDIR_FLAGS)
@@ -168,14 +168,14 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (string, Error) 
 }
 
 _set_working_directory :: proc(dir: string) -> Error {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	dir_cstr := clone_to_cstring(dir, temp_allocator) or_return
 	return _get_platform_error(linux.chdir(dir_cstr))
 }
 
 _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	buf := make([dynamic]byte, 1024, temp_allocator) or_return
 	for {

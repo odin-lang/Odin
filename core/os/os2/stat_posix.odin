@@ -69,7 +69,7 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 		return
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	cname := clone_to_cstring(name, temp_allocator) or_return
 
 	fd := posix.open(cname, {})
@@ -96,7 +96,7 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, er
 		return
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	// NOTE: can't use realpath or open (+ fcntl F_GETPATH) here because it tries to resolve symlinks.
 

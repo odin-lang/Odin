@@ -15,7 +15,7 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 		return
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	path := concatenate({base_path, `\`, win32_wstring_to_utf8(raw_data(d.cFileName[:]), temp_allocator) or_else ""}, allocator) or_return
 
 	handle := win32.HANDLE(_open_internal(path, {.Read}, 0o666) or_else 0)
@@ -116,7 +116,7 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 		wpath = impl.wname[:i]
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	wpath_search := make([]u16, len(wpath)+3, temp_allocator)
 	copy(wpath_search, wpath)

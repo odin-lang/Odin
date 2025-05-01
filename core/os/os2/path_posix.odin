@@ -15,7 +15,7 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(name: string, perm: int) -> (err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cname := clone_to_cstring(name, temp_allocator) or_return
 	if posix.mkdir(cname, transmute(posix.mode_t)posix._mode_t(perm)) != .OK {
 		return _get_platform_error()
@@ -28,7 +28,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		return .Invalid_Path
 	}
 
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	if exists(path) {
 		return .Exist
@@ -53,7 +53,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 }
 
 _remove_all :: proc(path: string) -> (err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cpath := clone_to_cstring(path, temp_allocator) or_return
 
 	dir := posix.opendir(cpath)
@@ -95,7 +95,7 @@ _remove_all :: proc(path: string) -> (err: Error) {
 }
 
 _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	buf: [dynamic]byte
 	buf.allocator = temp_allocator
@@ -116,7 +116,7 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, er
 }
 
 _set_working_directory :: proc(dir: string) -> (err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cdir := clone_to_cstring(dir, temp_allocator) or_return
 	if posix.chdir(cdir) != .OK {
 		err = _get_platform_error()

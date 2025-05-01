@@ -15,7 +15,7 @@ MAX_ATTEMPTS :: 1<<13 // Should be enough for everyone, right?
 // The caller must `close` the file once finished with.
 @(require_results)
 create_temp_file :: proc(dir, pattern: string) -> (f: ^File, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	dir := dir if dir != "" else temp_directory(temp_allocator) or_return
 	prefix, suffix := _prefix_and_suffix(pattern) or_return
 	prefix = temp_join_path(dir, prefix) or_return
@@ -47,7 +47,7 @@ mkdir_temp :: make_directory_temp
 // If `dir` is an empty tring, `temp_directory()` will be used.
 @(require_results)
 make_directory_temp :: proc(dir, pattern: string, allocator: runtime.Allocator) -> (temp_path: string, err: Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({ allocator }))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	dir := dir if dir != "" else temp_directory(temp_allocator) or_return
 	prefix, suffix := _prefix_and_suffix(pattern) or_return
 	prefix = temp_join_path(dir, prefix) or_return
@@ -89,7 +89,7 @@ temp_directory :: proc(allocator: runtime.Allocator) -> (string, Error) {
 
 @(private="file")
 temp_join_path :: proc(dir, name: string) -> (string, runtime.Allocator_Error) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	if len(dir) > 0 && is_path_separator(dir[len(dir)-1]) {
 		return concatenate({dir, name}, temp_allocator,)

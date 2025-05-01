@@ -23,12 +23,19 @@ temp_allocator_fini :: proc() {
 	global_default_temp_allocator_arenas = {}
 }
 
-TEMP_ALLOCATOR_GUARD_END :: proc(temp: runtime.Arena_Temp, loc := #caller_location) {
-	runtime.arena_temp_end(temp, loc)
+Temp_Allocator :: struct {
+	using arena: ^runtime.Arena,
+	using allocator: runtime.Allocator,
+	tmp: runtime.Arena_Temp,
+	loc: runtime.Source_Code_Location,
+}
+	
+TEMP_ALLOCATOR_GUARD_END :: proc(temp: Temp_Allocator) {
+	runtime.arena_temp_end(temp.tmp, temp.loc)
 }
 
 @(deferred_out=TEMP_ALLOCATOR_GUARD_END)
-TEMP_ALLOCATOR_GUARD :: #force_inline proc(collisions: []runtime.Allocator, loc := #caller_location) -> (runtime.Arena_Temp, runtime.Source_Code_Location) {
+TEMP_ALLOCATOR_GUARD :: #force_inline proc(collisions: []runtime.Allocator, loc := #caller_location) -> Temp_Allocator {
 	assert(len(collisions) <= MAX_TEMP_ARENA_COLLISIONS)
 	good_arena: ^runtime.Arena
 	for i in 0..<MAX_TEMP_ARENA_COUNT {
@@ -47,16 +54,7 @@ TEMP_ALLOCATOR_GUARD :: #force_inline proc(collisions: []runtime.Allocator, loc 
 		good_arena.backing_allocator = heap_allocator()
 	}
 	tmp := runtime.arena_temp_begin(good_arena, loc)
-	return tmp, loc
-}
-
-Temp_Allocator :: struct {
-	using arena: ^runtime.Arena,
-	using allocator: runtime.Allocator,
-}
-
-get_temp_allocator :: proc(tmp: runtime.Arena_Temp, _: runtime.Source_Code_Location) -> Temp_Allocator {
-	return { tmp.arena, runtime.arena_allocator(tmp.arena) }
+	return { good_arena, runtime.arena_allocator(good_arena), tmp, loc }
 }
 
 temp_allocator_begin :: runtime.arena_temp_begin
@@ -69,7 +67,6 @@ temp_allocator_scope :: proc(tmp: Temp_Allocator) -> (runtime.Arena_Temp) {
 _temp_allocator_end :: proc(tmp: runtime.Arena_Temp) {
 	temp_allocator_end(tmp)
 }
-
 
 @(init, private)
 init_thread_local_cleaner :: proc() {

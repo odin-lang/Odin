@@ -108,7 +108,7 @@ error_string :: proc(ferr: Error) -> string {
 }
 
 print_error :: proc(f: ^File, ferr: Error, msg: string) {
-	temp_allocator := get_temp_allocator(TEMP_ALLOCATOR_GUARD({}))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	err_str := error_string(ferr)
 
 	// msg + ": " + err_str + '\n'
