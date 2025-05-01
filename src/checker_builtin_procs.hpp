@@ -674,7 +674,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("objc_find_class"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
-	{STR_LIT("ivar_get"),               2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("objc_ivar_get"),          2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
