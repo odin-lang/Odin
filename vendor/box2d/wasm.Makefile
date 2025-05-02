@@ -14,7 +14,7 @@ OBJS      = $(SRCS:.c=.o)
 SYSROOT   = $(shell odin root)/vendor/libc
 CFLAGS    = -Ibox2d-$(VERSION)/include --target=wasm32 -D__EMSCRIPTEN__ -DNDEBUG -O3 --sysroot=$(SYSROOT)
 
-all: lib/box2d_wasm.o lib/box2d_wasm_simd.o clean
+all: lib/box2d_wasm.o lib/box2d_wasm_simd.o
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) -DBOX2D_DISABLE_SIMD $< -o $@
