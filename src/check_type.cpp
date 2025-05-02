@@ -3297,8 +3297,11 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 				if (generic_type != nullptr) {
 					// Ignore
 				} else if (count < 1 || !is_power_of_two(count)) {
-					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
 					*type = alloc_type_array(elem, count, generic_type);
+					if (ctx->disallow_polymorphic_return_types && count == 0) {
+						return;
+					}
+					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
 					return;
 				}
 
