@@ -2944,7 +2944,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		case Token_GtEq:  pred = LLVMRealOGE; break;
 		case Token_Lt:    pred = LLVMRealOLT; break;
 		case Token_LtEq:  pred = LLVMRealOLE; break;
-		case Token_NotEq: pred = LLVMRealONE; break;
+		case Token_NotEq: pred = LLVMRealUNE; break;
 		}
 
 		if (is_type_different_to_arch_endianness(left.type)) {
@@ -2972,7 +2972,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			LLVMRealPredicate pred = {};
 			switch (op_kind) {
 			case Token_CmpEq: pred = LLVMRealOEQ; break;
-			case Token_NotEq: pred = LLVMRealONE; break;
+			case Token_NotEq: pred = LLVMRealUNE; break;
 			}
 			mask = LLVMBuildFCmp(p->builder, pred, left.value, right.value, "");
 		} else {

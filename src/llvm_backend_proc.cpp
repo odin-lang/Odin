@@ -1442,7 +1442,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			LLVMRealPredicate pred = cast(LLVMRealPredicate)0;
 			switch (builtin_id) {
 			case BuiltinProc_simd_lanes_eq: pred = LLVMRealOEQ; break;
-			case BuiltinProc_simd_lanes_ne: pred = LLVMRealONE; break;
+			case BuiltinProc_simd_lanes_ne: pred = LLVMRealUNE; break;
 			case BuiltinProc_simd_lanes_lt: pred = LLVMRealOLT; break;
 			case BuiltinProc_simd_lanes_le: pred = LLVMRealOLE; break;
 			case BuiltinProc_simd_lanes_gt: pred = LLVMRealOGT; break;
