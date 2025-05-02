@@ -1296,84 +1296,9 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 	}
 }
 
-// NOTE(tf2spi):
-// LLVM-C used to not have an official API to emit DILabel but now they do.
-// That being said, it was a recent addition, so we need to use the C++ APIs
-// on POSIX systems so that older solibs that don't have the C API still work.
-#ifndef _WIN32
-
-typedef LLVMMetadataRef (*LLVMDIBuilderCreateLabelPosixCPP)(
-	LLVMDIBuilderRef Builder,
-	LLVMMetadataRef Scope,
-	// Using String here is not technically proper to do, but it's ABI
-	// compatible for the ABIs and older solib versions that we care about.
-	String Name,
-	LLVMMetadataRef File,
-	unsigned int LineNo,
-	bool AlwaysPreserve);
-typedef LLVMMetadataRef (*LLVMDIBuilderCreateLabelPosixC)(
-	LLVMDIBuilderRef Builder, LLVMMetadataRef Context, const char *Name, size_t NameLen,
-	LLVMMetadataRef File, unsigned LineNo, LLVMBool AlwaysPreserve);
-static inline LLVMMetadataRef LLVMDIBuilderCreateLabelPosix(
-	LLVMDIBuilderRef Builder, LLVMMetadataRef Context, const char *Name, size_t NameLen,
-	LLVMMetadataRef File, unsigned LineNo, LLVMBool AlwaysPreserve) {
-	static LLVMDIBuilderCreateLabelPosixC capi = nullptr;
-	static LLVMDIBuilderCreateLabelPosixCPP cppapi = nullptr;
-	if (capi == nullptr && cppapi == nullptr) {
-		capi = (LLVMDIBuilderCreateLabelPosixC)dlsym(RTLD_NEXT,
-			"LLVMDIBuilderCreateLabel");
-
-		// Mangled name of "llvm::DIBuilder::createLabel(DIScope, StringRef, DIFile, unsigned, bool)"
-		if (capi == nullptr)
-			cppapi = (LLVMDIBuilderCreateLabelPosixCPP)dlsym(RTLD_NEXT,
-				"_ZN4llvm9DIBuilder11createLabelEPNS_7DIScopeENS_9StringRefEPNS_6DIFileEjb");
-	}
-	if (capi != nullptr)
-		return capi(Builder, Context, Name, NameLen, File, LineNo, AlwaysPreserve);
-	if (cppapi != nullptr)
-		return cppapi(Builder, Context, String{(u8 *)Name, (isize)NameLen}, File, LineNo, AlwaysPreserve);
-	return nullptr;
-}
-
-typedef LLVMMetadataRef (*LLVMDIBuilderInsertLabelAtEndPosixCPP)(
-	LLVMDIBuilderRef Builder,
-	LLVMMetadataRef Label,
-	LLVMMetadataRef Location,
-	LLVMBasicBlockRef Block);
-typedef LLVMMetadataRef (*LLVMDIBuilderInsertLabelAtEndPosixC)(
-	LLVMDIBuilderRef Builder,
-	LLVMMetadataRef Label,
-	LLVMMetadataRef Location,
-	LLVMBasicBlockRef Block);
-static inline LLVMMetadataRef LLVMDIBuilderInsertLabelAtEndPosix(
-	LLVMDIBuilderRef Builder, LLVMMetadataRef LabelInfo,
-	LLVMMetadataRef Location, LLVMBasicBlockRef InsertAtEnd) {
-	static LLVMDIBuilderInsertLabelAtEndPosixC capi = nullptr;
-	static LLVMDIBuilderInsertLabelAtEndPosixCPP cppapi = nullptr;
-	if (capi == nullptr && cppapi == nullptr) {
-		capi = (LLVMDIBuilderInsertLabelAtEndPosixC)dlsym(RTLD_NEXT,
-			"LLVMDIBuilderInsertLabelAtEnd");
-
-		// Mangled name of "llvm::DIBuilder::insertLabel(DILabel, DILocation, BasicBlock)"
-		if (capi == nullptr)
-			cppapi = (LLVMDIBuilderInsertLabelAtEndPosixCPP)dlsym(RTLD_NEXT,
-				"_ZN4llvm9DIBuilder11insertLabelEPNS_7DILabelEPKNS_10DILocationEPNS_10BasicBlockE");
-	}
-	if (capi != nullptr)
-		return capi(Builder, LabelInfo, Location, InsertAtEnd);
-	if (cppapi != nullptr)
-		return cppapi(Builder, LabelInfo, Location, InsertAtEnd);
-	return nullptr;
-}
-
-#define LLVMDIBuilderCreateLabel(Builder, Context, Name, NameLen, File, LineNo, AlwaysPreserve) \
-	LLVMDIBuilderCreateLabelPosix(Builder, Context, Name, NameLen, File, LineNo, AlwaysPreserve)
-
-#define LLVMDIBuilderInsertLabelAtEnd(Builder, LabelInfo, Location, InsertAtEnd) \
-	LLVMDIBuilderInsertLabelAtEndPosix(Builder, LabelInfo, Location, InsertAtEnd)
-
-#endif
 gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target) {
+// NOTE(tf2spi): LLVM-C DILabel API used only existed for major versions 20+
+#if LLVM_VERSION_MAJOR >= 20
 	if (p == nullptr || p->debug_info == nullptr) {
 		return;
 	}
@@ -1405,7 +1330,6 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target)
 	if (llvm_block == nullptr || llvm_debug_loc == nullptr) {
 		return;
 	}
-
 	LLVMMetadataRef llvm_label = LLVMDIBuilderCreateLabel(
 		m->debug_builder,
 		llvm_scope,
@@ -1425,4 +1349,5 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target)
 		llvm_debug_loc,
 		llvm_block
 	);
+#endif
 }
