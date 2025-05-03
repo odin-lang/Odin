@@ -1283,6 +1283,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		break;
 	}
 
+	// NOTE(harold): For Objective-C method implementations, this must happen after
+	//				 check_objc_methods() is called as it re-sets ac.is_export to true unconditionally.
+	//				 The same is true for the linkage, set below.
 	e->Procedure.entry_point_only = ac.entry_point_only;
 	e->Procedure.is_export = ac.is_export;
 
@@ -1382,6 +1385,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
+	// NOTE(harold): See export/linkage note above(where is_export is assigned) regarding Objective-C method implementations
 	bool is_foreign = e->Procedure.is_foreign;
 	bool is_export  = e->Procedure.is_export;
 	

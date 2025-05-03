@@ -1649,8 +1649,6 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			isize method_param_count  = method_type->Proc.param_count;
 			isize method_param_offset = 0;
 
-			// TODO(harold): Need to make sure (at checker stage) that the non-class method has the self parameter already.
-			//               (Maybe this is already accounted for?.)
 			if (!md.ac.objc_is_class_method) {
 				GB_ASSERT(method_param_count >= 1);
 				method_param_count -= 1;
