@@ -2910,9 +2910,20 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 		if (!defined) {
 			gbString xs = type_to_string(x->type, temporary_allocator());
 			gbString ys = type_to_string(y->type, temporary_allocator());
-			err_str = gb_string_make(temporary_allocator(),
-				gb_bprintf("operator '%.*s' not defined between the types '%s' and '%s'", LIT(token_strings[op]), xs, ys)
-			);
+
+			if (!is_type_comparable(x->type)) {
+				err_str = gb_string_make(temporary_allocator(),
+					gb_bprintf("Type '%s' is not simply comparable, so operator '%.*s' is not defined for it", xs, LIT(token_strings[op]))
+				);
+			} else if (!is_type_comparable(y->type)) {
+				err_str = gb_string_make(temporary_allocator(),
+					gb_bprintf("Type '%s' is not simply comparable, so operator '%.*s' is not defined for it", ys, LIT(token_strings[op]))
+				);
+			} else {
+				err_str = gb_string_make(temporary_allocator(),
+					gb_bprintf("Operator '%.*s' not defined between the types '%s' and '%s'", LIT(token_strings[op]), xs, ys)
+				);
+			}
 		} else {
 			Type *comparison_type = x->type;
 			if (x->type == err_type && is_operand_nil(*x)) {
@@ -2933,11 +2944,11 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 		} else {
 			yt = type_to_string(y->type);
 		}
-		err_str = gb_string_make(temporary_allocator(), gb_bprintf("mismatched types '%s' and '%s'", xt, yt));
+		err_str = gb_string_make(temporary_allocator(), gb_bprintf("Mismatched types '%s' and '%s'", xt, yt));
 	}
 
 	if (err_str != nullptr) {
-		error(node, "Cannot compare expression, %s", err_str);
+		error(node, "Cannot compare expression. %s.", err_str);
 		x->type = t_untyped_bool;
 	} else {
 		if (x->mode == Addressing_Constant &&
