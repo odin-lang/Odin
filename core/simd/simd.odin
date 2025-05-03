@@ -2522,7 +2522,7 @@ Result:
 
 **Operation**:
 
->	for i in 0 ..< N {
+	for i in 0 ..< N {
 		res[i] = i
 	}
 */
