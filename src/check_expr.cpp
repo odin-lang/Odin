@@ -8143,7 +8143,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			type = pt;
 		}
 		type = base_type(type);
-		if (type->kind == Type_Proc && type->Proc.optional_ok) {
+		if (type->kind == Type_Proc && type->Proc.optional_ok && type->Proc.result_count > 0) {
 			operand->mode = Addressing_OptionalOk;
 			operand->type = type->Proc.results->Tuple.variables[0]->type;
 			if (operand->expr != nullptr && operand->expr->kind == Ast_CallExpr) {
