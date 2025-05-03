@@ -3352,7 +3352,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		ac->test = true;
 		return true;
 	} else if (name == "export") {
-		if (ac->objc_is_implementation) {
+		if (ac->objc_is_implementation) { // TODO(harold): Remove from here, this needs to be checked after all attributes are set.
 			error(value, "Setting @(export) explicitly is not allowed when @(objc_implement) is set. It is exported implicitly.");
 			return false;
 		}
@@ -3369,7 +3369,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		return true;
 	} else if (name == "linkage") {
 
-		if (ac->objc_is_implementation) {
+		if (ac->objc_is_implementation) {	// TODO(harold): Remove from here, this needs to be checked after all attributes are set.
 			error(value, "Explicit linkage not allowed when @(objc_implement) is set. It is set implicitly");
 			return false;
 		}
@@ -3684,6 +3684,10 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_Bool) {
 			ac->objc_is_implementation = ev.value_bool;
+
+			if (!ac->objc_is_implementation) {
+				ac->objc_is_disabled_implement = true;
+			}
 		} else if (ev.kind == ExactValue_Invalid) {
 			ac->objc_is_implementation = true;
 		} else {
@@ -3970,7 +3974,7 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 	} else if (name == "objc_ivar") {
 		Type *objc_ivar = check_type(c, value);
 
-		if (objc_ivar != nullptr) {
+		if (objc_ivar != nullptr && objc_ivar->kind == Type_Named) {
 			ac->objc_ivar = objc_ivar;
 		} else {
 			error(value, "'%.*s' expected a named type", LIT(name));
@@ -6488,36 +6492,33 @@ gb_internal void check_objc_context_provider_procedures(Checker *c) {
 		Entity *proc_entity = e->TypeName.objc_context_provider;
 		GB_ASSERT(proc_entity->kind == Entity_Procedure);
 
-		Type *proc_type = proc_entity->type;
+		auto &proc = proc_entity->type->Proc;
 
-		// TODO(harold): Give better errors here (specify exactly what's wrong)
-		const char *signature_error = "The procedure for @(objc_context_provider) has an incorrect signature.";
+		Type *return_type = proc.result_count != 1 ? t_untyped_nil : base_named_type(proc.results->Tuple.variables[0]->type);
+		if (return_type != t_context) {
+			error(proc_entity->token, "The @(objc_context_provider) procedure must only return a context.");
+		}
 
-		if (proc_type->Proc.param_count != 1 || proc_type->Proc.result_count != 1) {
-			error(proc_entity->token, signature_error);
-		} else {
-			Type *self_param  = base_type(proc_type->Proc.params->Tuple.variables[0]->type);
-			Type *return_type = base_named_type(proc_type->Proc.results->Tuple.variables[0]->type);
+		const char *self_param_err = "The @(objc_context_provider) procedure must take as a parameter a single pointer to the @(objc_type) value.";
+		if (proc.param_count != 1) {
+			error(proc_entity->token, self_param_err);
+		}
 
-			if (self_param->kind != Type_Pointer) {
-				error(proc_entity->token, signature_error);
-				continue;
-			}
+		Type *self_param = base_type(proc.params->Tuple.variables[0]->type);
+		if (self_param->kind == Type_Pointer) {
+			error(proc_entity->token, self_param_err);
+		}
 
-			self_param = base_named_type(self_param->Pointer.elem);
-
-			if (return_type != t_context) {
-				error(e->token, signature_error);
-			} else if (!internal_check_is_assignable_to(self_param, e->type) &&
-				(e->TypeName.objc_ivar && !internal_check_is_assignable_to(self_param, e->TypeName.objc_ivar))
-			) {
-				error(e->token, signature_error);
-			} else if (proc_type->Proc.calling_convention != ProcCC_CDecl &&
-					   proc_type->Proc.calling_convention != ProcCC_Contextless) {
-				error(e->token, signature_error);
-			} else if (proc_type->Proc.is_polymorphic) {
-				error(e->token, signature_error);
-		   	}
+		Type *self_type = base_named_type(self_param->Pointer.elem);
+		if (!internal_check_is_assignable_to(self_type, e->type) &&
+			!(e->TypeName.objc_ivar && internal_check_is_assignable_to(self_type, e->TypeName.objc_ivar))) {
+			error(proc_entity->token, self_param_err);
+		}
+		if (proc.calling_convention != ProcCC_CDecl && proc.calling_convention != ProcCC_Contextless) {
+			error(e->token, self_param_err);
+		}
+		if (proc.is_polymorphic) {
+			error(e->token, self_param_err);
 		}
 	}
 }

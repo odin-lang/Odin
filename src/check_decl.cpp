@@ -565,13 +565,21 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 					check_single_global_entity(ctx->checker, super->Named.type_name, super->Named.type_name->decl_info);
 
 					if (super->kind != Type_Named) {
+						// TODO(harold): Show the current superclass token too
 						error(e->token, "@(objc_superclass) Referenced type must be a named struct");
 						break;
 					}
 
 					Type* named_type = base_type(super->Named.type_name->type);
 					if (!is_type_objc_object(named_type)) {
+						// TODO(harold): Show the current superclass token too
 						error(e->token, "@(objc_superclass) Superclass must be an Objective-C class");
+						break;
+					}
+
+					if (named_type->Named.type_name->TypeName.objc_class_name == "") {
+						// TODO(harold): Show the current superclass token too
+						error(e->token, "@(objc_superclass) Superclass must be have a valid @(objc_class) attribute");
 						break;
 					}
 
@@ -579,17 +587,19 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 				}
 			} else {
 				if (ac.objc_superclass != nullptr) {
-					error(e->token, "@(objc_superclass) can only be applied when the @(obj_implement) attribute is also applied");
+					error(e->token, "@(objc_superclass) may only be applied when the @(obj_implement) attribute is also applied");
 				} else if (ac.objc_ivar != nullptr) {
-					error(e->token, "@(objc_ivar) can only be applied when the @(obj_implement) attribute is also applied");
+					error(e->token, "@(objc_ivar) may only be applied when the @(obj_implement) attribute is also applied");
 				} else if (ac.objc_context_provider != nullptr) {
-					error(e->token, "@(objc_context_provider) can only be applied when the @(obj_implement) attribute is also applied");
+					error(e->token, "@(objc_context_provider) may only be applied when the @(obj_implement) attribute is also applied");
 				}
 			}
 
 			if (type_size_of(e->type) > 0) {
 				error(e->token, "@(objc_class) marked type must be of zero size");
 			}
+		} else if (ac.objc_is_implementation) {
+			error(e->token, "@(objc_implement) may only be applied when the @(objc_class) attribute is also applied");
 		}
 	}
 
@@ -994,7 +1004,7 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 		error(e->token, "@(objc_name) is required with @(objc_type)");
 	} else {
 		Type *t = ac.objc_type;
-		if (t->kind == Type_Named) {
+		if (t->kind == Type_Named) {	// TODO(harold): Shouldn't this be an error otherwise? Or is it checked elsehwere?
 			Entity *tn = t->Named.type_name;
 
 			GB_ASSERT(tn->kind == Entity_TypeName);
@@ -1003,20 +1013,32 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 				error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
 			} else {
 
-				if (ac.objc_is_implementation) {
+				// Enable implementation by default if the class is an implementer too and
+				// @objc_implement was not set to false explicitly in this proc.
+				bool implement = tn->TypeName.objc_is_implementation;
+				if (ac.objc_is_disabled_implement) {
+					implement = false;
+				}
+
+				if (implement) {
 					GB_ASSERT(e->kind == Entity_Procedure);
 
-					Type *proc_type = e->type;
+					auto &proc = e->type->Proc;
+					Type &first_param = proc.param_count > 0 ? proc.params[0] : *t_untyped_nil;
 
 					if (!tn->TypeName.objc_is_implementation) {
 						error(e->token, "@(objc_is_implement) attribute may only be applied to procedures whose class also have @(objc_is_implement) applied");
-					} else if (proc_type->Proc.calling_convention == ProcCC_Odin && !tn->TypeName.objc_context_provider) {
+					} else if (!ac.objc_is_class_method && !(first_param.kind == Type_Pointer && first_param.Pointer.elem == t)) {
+						error(e->token, "Objective-C instance methods implementations require the first parameter to be a pointer to the class type set by @(objc_type)");
+					} else if (proc.calling_convention == ProcCC_Odin && !tn->TypeName.objc_context_provider) {
 						error(e->token, "Objective-C methods with Odin calling convention can only be used with classes that have @(objc_context_provider) set");
-					} else if (ac.objc_is_class_method && proc_type->Proc.calling_convention != ProcCC_CDecl) {
+					} else if (ac.objc_is_class_method && proc.calling_convention != ProcCC_CDecl) {
 						error(e->token, "Objective-C class methods (objc_is_class_method=true) that have @objc_is_implementation can only use \"c\" calling convention");
+					} else if (proc.result_count > 1) {
+						error(e->token, "Objective-C method implementations may return at most 1 value");
 					} else {
 
-	                    auto method = ObjcMethodData{ ac, e };
+						auto method = ObjcMethodData{ ac, e };
 						method.ac.objc_selector = ac.objc_selector != "" ? ac.objc_selector : ac.objc_name;
 
 						CheckerInfo *info = ctx->info;
@@ -1033,6 +1055,8 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 							map_set(&info->objc_method_implementations, t, list);
 						}
 					}
+				} else if (ac.objc_selector != "") {
+					error(e->token, "@(objc_selector) may only be applied to procedures that are Objective-C implementations.");
 				}
 
 				mutex_lock(&global_type_name_objc_metadata_mutex);

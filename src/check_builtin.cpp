@@ -391,7 +391,6 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 	case BuiltinProc_objc_ivar_get:
 	{
 		Type *self_type = nullptr;
-		Type *ivar_type = nullptr;
 
 		Operand self = {};
 		check_expr_or_type(c, &self, ce->args[0]);
@@ -416,37 +415,18 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 
 		if (!(self_type->kind == Type_Named &&
 			self_type->Named.type_name != nullptr &&
-				self_type->Named.type_name->TypeName.objc_class_name != "")) {
+			self_type->Named.type_name->TypeName.objc_class_name != "")) {
 			gbString t = type_to_string(self_type);
 			error(self.expr, "'%.*s' expected a named type with the attribute @(objc_class=<string>) , got type %s", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
 
-		if (self_type->Named.type_name->TypeName.objc_ivar == nullptr) {
+		Type *ivar_type = self_type->Named.type_name->TypeName.objc_ivar;
+		if (ivar_type == nullptr) {
 			gbString t = type_to_string(self_type);
 			error(self.expr, "'%.*s' requires that type %s have the attribute @(objc_ivar=<ivar_type_name>).", LIT(builtin_name), t);
 			gb_string_free(t);
-			return false;
-		}
-
-		Operand ivar = {};
-		check_expr_or_type(c, &ivar, ce->args[1]);
-		if (ivar.mode == Addressing_Type) {
-			ivar_type = ivar.type;
-		} else {
-			return false;
-		}
-
-		if (self_type->Named.type_name->TypeName.objc_ivar != ivar_type) {
-			gbString name_self     = type_to_string(self_type);
-			gbString name_expected = type_to_string(self_type->Named.type_name->TypeName.objc_ivar);
-			gbString name_given    = type_to_string(ivar_type);
-			error(self.expr, "'%.*s' ivar type %s does not match @objc_ivar type %s on Objective-C class %s.",
-				  LIT(builtin_name), name_given, name_expected, name_self);
-			gb_string_free(name_self);
-			gb_string_free(name_expected);
-			gb_string_free(name_given);
 			return false;
 		}
 
@@ -457,8 +437,8 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		}
 
 		operand->mode = Addressing_Value;
-
 		return true;
+
 	} break;
 	}
 }
