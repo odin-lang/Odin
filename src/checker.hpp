@@ -487,9 +487,11 @@ struct CheckerInfo {
 
 	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 
-	BlockingMutex objc_types_mutex;
+	BlockingMutex objc_objc_msgSend_mutex;
 	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
 
+	BlockingMutex objc_class_name_mutex;
+	StringSet obcj_class_name_set;
 	MPSCQueue<Entity *> objc_class_implementations;
 
 	BlockingMutex objc_method_mutex;

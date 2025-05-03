@@ -223,9 +223,9 @@ gb_internal void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_t
 	data.kind = kind;
 	data.proc_type = alloc_type_proc(scope, params, param_types.count, results, results->Tuple.variables.count, false, ProcCC_CDecl);
 
-	mutex_lock(&c->info->objc_types_mutex);
+	mutex_lock(&c->info->objc_objc_msgSend_mutex);
 	map_set(&c->info->objc_msgSend_types, call, data);
-	mutex_unlock(&c->info->objc_types_mutex);
+	mutex_unlock(&c->info->objc_objc_msgSend_mutex);
 
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");

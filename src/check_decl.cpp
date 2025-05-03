@@ -524,7 +524,16 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	if (decl != nullptr) {
 		AttributeContext ac = {};
 		check_decl_attributes(ctx, decl->attributes, type_decl_attribute, &ac);
+
 		if (e->kind == Entity_TypeName && ac.objc_class != "") {
+
+			mutex_lock(&ctx->info->objc_class_name_mutex);
+			bool class_exists = string_set_update(&ctx->info->obcj_class_name_set, ac.objc_class);
+			mutex_unlock(&ctx->info->objc_class_name_mutex);
+			if (class_exists) {
+				error(e->token, "@(objc_class) '%s' has already been used elsewhere", ac.objc_class);
+			}
+
 			e->TypeName.objc_class_name = ac.objc_class;
 
 			if (ac.objc_is_implementation) {

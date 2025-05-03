@@ -1390,6 +1390,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 
 	map_init(&i->objc_msgSend_types);
 	mpsc_init(&i->objc_class_implementations, a);
+	string_set_init(&i->obcj_class_name_set, 0);
 	map_init(&i->objc_method_implementations);
 
 	string_map_init(&i->load_file_cache);
