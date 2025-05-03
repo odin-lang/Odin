@@ -1515,6 +1515,12 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	auto args        = array_make<lbValue>(temporary_allocator(), 3, 8);
 	auto class_impls = array_make<lbObjCGlobalClass>(temporary_allocator(), 0, 16);
 
+	// Register all class implementations unconditionally, even if not statically referenced
+	for (Entity *e = {}; mpsc_dequeue(&gen->info->objc_class_implementations, &e); /**/) {
+		GB_ASSERT(e->kind == Entity_TypeName && e->TypeName.objc_is_implementation);
+		lb_handle_objc_find_or_register_class(p, e->TypeName.objc_class_name, e->type);
+	}
+
 	// Ensure classes that have been implicitly referenced through
 	// the objc_superclass attribute have a global variable available for them.
 	TypeSet class_set{};
@@ -1523,7 +1529,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 	auto referenced_classes = array_make<lbObjCGlobal>(temporary_allocator());
 	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_classes, &g); /**/) {
-		array_add( &referenced_classes, g);
+		array_add(&referenced_classes, g);
 
 		Type *cls = g.class_impl_type;
 		while (cls) {
@@ -1547,7 +1553,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 	// Add all class globals to a map so that we can look them up dynamically
 	// in order to resolve out-of-order because classes that are being implemented
-	// need their superclasses to have been registered before them.
+	// require their superclasses to be registered before them.
 	StringMap<lbObjCGlobalClass> global_class_map{};
 	string_map_init(&global_class_map, (usize)gen->objc_classes.count);
 	defer (string_map_destroy(&global_class_map));
