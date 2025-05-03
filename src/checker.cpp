@@ -3353,11 +3353,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		ac->test = true;
 		return true;
 	} else if (name == "export") {
-		if (ac->objc_is_implementation) { // TODO(harold): Remove from here, this needs to be checked after all attributes are set.
-			error(value, "Setting @(export) explicitly is not allowed when @(objc_implement) is set. It is exported implicitly.");
-			return false;
-		}
-
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_Invalid) {
 			ac->is_export = true;
@@ -3369,12 +3364,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		return true;
 	} else if (name == "linkage") {
-
-		if (ac->objc_is_implementation) {	// TODO(harold): Remove from here, this needs to be checked after all attributes are set.
-			error(value, "Explicit linkage not allowed when @(objc_implement) is set. It is set implicitly");
-			return false;
-		}
-
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind != ExactValue_String) {
 			error(value, "Expected either a string 'linkage'");
@@ -3693,12 +3682,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			ac->objc_is_implementation = true;
 		} else {
 			error(elem, "Expected a boolean value, or no value, for '%.*s'", LIT(name));
-		}
-
-		// This implies exported, strongly linked
-		if (ac->objc_is_implementation) {
-			ac->is_export = true;
-			ac->linkage   = str_lit("strong");
 		}
 
 		return true;

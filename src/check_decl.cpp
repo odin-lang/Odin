@@ -1000,7 +1000,7 @@ gb_internal String handle_link_name(CheckerContext *ctx, Token token, String lin
 }
 
 
-gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeContext const &ac) {
+gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeContext &ac) {
 	if (!(ac.objc_name.len || ac.objc_is_class_method || ac.objc_type)) {
 		return;
 	}
@@ -1046,6 +1046,18 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 					} else if (proc.result_count > 1) {
 						error(e->token, "Objective-C method implementations may return at most 1 value");
 					} else {
+						// Always export unconditionally
+						// NOTE(harold): This means check_objc_methods() MUST be called before
+						//				 e->Procedure.is_export is set in check_proc_decl()!
+						if (ac.is_export) {
+							error(e->token, "Explicit export not allowed when @(objc_implement) is set. It set exported implicitly");
+						}
+						if (ac.link_name != "") {
+							error(e->token, "Explicit linkage not allowed when @(objc_implement) is set. It set to \"strong\" implicitly");
+						}
+
+						ac.is_export = true;
+						ac.linkage   = STR_LIT("strong");
 
 						auto method = ObjcMethodData{ ac, e };
 						method.ac.objc_selector = ac.objc_selector != "" ? ac.objc_selector : ac.objc_name;
