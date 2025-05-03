@@ -1173,7 +1173,6 @@ gb_internal lbProcedure *lb_create_objc_names(lbModule *main_module) {
 	return p;
 }
 
-// TODO(harold): Perhaps move this out of here and into a more suitable place?
 String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 	// NOTE(harold): See https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html#//apple_ref/doc/uid/TP40008048-CH100
 
@@ -1424,6 +1423,7 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 	#undef INT_SIZE_ENCODING
 
 	GB_PANIC("Unreachable");
+	return str_lit("");
 }
 
 struct lbObjCGlobalClass {
@@ -1778,7 +1778,10 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			const i64 size      = type_size_of(ivar_base);
 			const i64 alignment = (i64)floor_log2((u64)type_align_of(ivar_base));
 
-			// TODO(harold): Should we pass the actual type encoding? Might not be ideal for obfuscation.
+			// NOTE(harold): I've opted to not emit the type encoding for ivars in order to keep the data private.
+			//               If there is desire in the future to emit the type encoding for introspection through the Obj-C runtime,
+			//               then perhaps an option can be added for it then.
+			// Should we pass the actual type encoding? Might not be ideal for obfuscation.
 			String ivar_name  = str_lit("__$ivar");
 			String ivar_types = str_lit("{= }");	//lb_get_objc_type_encoding(ivar_type);
 			args.count = 5;
