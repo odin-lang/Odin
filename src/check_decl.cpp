@@ -527,13 +527,6 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 
 		if (e->kind == Entity_TypeName && ac.objc_class != "") {
 
-			mutex_lock(&ctx->info->objc_class_name_mutex);
-			bool class_exists = string_set_update(&ctx->info->obcj_class_name_set, ac.objc_class);
-			mutex_unlock(&ctx->info->objc_class_name_mutex);
-			if (class_exists) {
-				error(e->token, "@(objc_class) '%s' has already been used elsewhere", ac.objc_class);
-			}
-
 			e->TypeName.objc_class_name = ac.objc_class;
 
 			if (ac.objc_is_implementation) {
@@ -541,6 +534,13 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 				e->TypeName.objc_superclass        = ac.objc_superclass;
 				e->TypeName.objc_ivar              = ac.objc_ivar;
 				e->TypeName.objc_context_provider  = ac.objc_context_provider;
+
+				mutex_lock(&ctx->info->objc_class_name_mutex);
+				bool class_exists = string_set_update(&ctx->info->obcj_class_name_set, ac.objc_class);
+				mutex_unlock(&ctx->info->objc_class_name_mutex);
+				if (class_exists) {
+					error(e->token, "@(objc_class) name '%.*s' has already been used elsewhere", LIT(ac.objc_class));
+				}
 
 				mpsc_enqueue(&ctx->info->objc_class_implementations, e);
 
@@ -574,21 +574,20 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 					check_single_global_entity(ctx->checker, super->Named.type_name, super->Named.type_name->decl_info);
 
 					if (super->kind != Type_Named) {
-						// TODO(harold): Show the current superclass token too
 						error(e->token, "@(objc_superclass) Referenced type must be a named struct");
 						break;
 					}
 
-					Type* named_type = base_type(super->Named.type_name->type);
+					Type* named_type = base_named_type(super);
+					GB_ASSERT(named_type->kind == Type_Named);
+
 					if (!is_type_objc_object(named_type)) {
-						// TODO(harold): Show the current superclass token too
-						error(e->token, "@(objc_superclass) Superclass must be an Objective-C class");
+						error(e->token, "@(objc_superclass) Superclass '%.*s' must be an Objective-C class", LIT(named_type->Named.name));
 						break;
 					}
 
 					if (named_type->Named.type_name->TypeName.objc_class_name == "") {
-						// TODO(harold): Show the current superclass token too
-						error(e->token, "@(objc_superclass) Superclass must be have a valid @(objc_class) attribute");
+						error(e->token, "@(objc_superclass) Superclass '%.*s' must have a valid @(objc_class) attribute", LIT(named_type->Named.name));
 						break;
 					}
 
@@ -1013,6 +1012,7 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 		error(e->token, "@(objc_name) is required with @(objc_type)");
 	} else {
 		Type *t = ac.objc_type;
+
 		if (t->kind == Type_Named) {	// TODO(harold): Shouldn't this be an error otherwise? Or is it checked elsehwere?
 			Entity *tn = t->Named.type_name;
 
@@ -1033,11 +1033,11 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 					GB_ASSERT(e->kind == Entity_Procedure);
 
 					auto &proc = e->type->Proc;
-					Type &first_param = proc.param_count > 0 ? proc.params[0] : *t_untyped_nil;
+					Type *first_param = proc.param_count > 0 ? proc.params->Tuple.variables[0]->type : t_untyped_nil;
 
 					if (!tn->TypeName.objc_is_implementation) {
 						error(e->token, "@(objc_is_implement) attribute may only be applied to procedures whose class also have @(objc_is_implement) applied");
-					} else if (!ac.objc_is_class_method && !(first_param.kind == Type_Pointer && first_param.Pointer.elem == t)) {
+					} else if (!ac.objc_is_class_method && !(first_param->kind == Type_Pointer && internal_check_is_assignable_to(t, first_param->Pointer.elem))) {
 						error(e->token, "Objective-C instance methods implementations require the first parameter to be a pointer to the class type set by @(objc_type)");
 					} else if (proc.calling_convention == ProcCC_Odin && !tn->TypeName.objc_context_provider) {
 						error(e->token, "Objective-C methods with Odin calling convention can only be used with classes that have @(objc_context_provider) set");

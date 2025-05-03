@@ -6506,7 +6506,7 @@ gb_internal void check_objc_context_provider_procedures(Checker *c) {
 		}
 
 		Type *self_param = base_type(proc.params->Tuple.variables[0]->type);
-		if (self_param->kind == Type_Pointer) {
+		if (self_param->kind != Type_Pointer) {
 			error(proc_entity->token, self_param_err);
 		}
 
