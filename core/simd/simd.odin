@@ -2618,7 +2618,7 @@ reduce_add_pairs :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
 			17, 19, 21, 23, 25, 27, 29, 31,
 			33, 35, 37, 39, 41, 43, 45, 47,
 			49, 51, 53, 55, 57, 59, 61, 63)
-		v32 := x32 * y32
+		v32 := x32 + y32
 	}
 
 	when N >= 32 {
@@ -2628,29 +2628,29 @@ reduce_add_pairs :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
 		y16 := swizzle(v32,
 			1,  3,  5,  7,  9,  11, 13, 15,
 			17, 19, 21, 23, 25, 27, 29, 31)
-		v16 := x16 * y16
+		v16 := x16 + y16
 	}
 
 	when N >= 16 {
 		x8 := swizzle(v16, 0, 2, 4, 6, 8, 10, 12, 14)
 		y8 := swizzle(v16, 1, 3, 5, 7, 9, 11, 13, 15)
-		v8 := x8 * y8
+		v8 := x8 + y8
 	}
 
 	when N >= 8 {
 		x4 := swizzle(v8, 0, 2, 4, 6)
 		y4 := swizzle(v8, 1, 3, 5, 7)
-		v4 := x4 * y4
+		v4 := x4 + y4
 	}
 
 	when N >= 4 {
 		x2 := swizzle(v4, 0, 2)
 		y2 := swizzle(v4, 1, 3)
-		v2 := x2 * y2
+		v2 := x2 + y2
 	}
 
 	when N >= 2 {
-		return extract(v2, 0) * extract(v2, 1)
+		return extract(v2, 0) + extract(v2, 1)
 	} else {
 		return extract(v, 0)
 	}
