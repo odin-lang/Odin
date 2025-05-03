@@ -200,15 +200,36 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		}
 
 		if .Executable_Path in selection {
-			if cmdline[0] == '/' {
-				info.executable_path = strings.clone(cmdline[:terminator], allocator) or_return
-				info.fields += {.Executable_Path}
-			} else if cwd_err == nil {
-				info.executable_path = join_path({ cwd, cmdline[:terminator] }, allocator) or_return
+			if cwd_err == nil {
+				info.executable_path = strings.clone(command_line_exec, allocator) or_return
 				info.fields += {.Executable_Path}
 			} else {
 				break cmdline_if
 			}
+			/*
+			NOTE(Jeroen):
+
+			This old version returns the wrong executable path for things like `bash` or `sh`,
+			for whom `/proc/<pid>/cmdline` will just report "bash" or "sh",
+			resulting in misleading paths like `$PWD/sh`, even though that executable doesn't exist there.
+
+			A way to "fix" this would be to invoke `which <name>` or scour the $PATH variable, but a better way
+			would be preferred.
+
+			To be fair, `htop` also suffers from this problem and will list `bash`, `tmux`, `xfce4-panel` as just their
+			executable name in the command line column. So I think we shouldn't prepend the current directory when an executable is
+			found in the $PATH, which is what seems to be happening here.
+
+			if command_line_exec[0] == '/' {
+				info.executable_path = strings.clone(command_line_exec, allocator) or_return
+				info.fields += {.Executable_Path}
+			} else if cwd_err == nil {
+				info.executable_path = join_path({cwd, command_line_exec}, allocator) or_return
+				info.fields += {.Executable_Path}
+			} else {
+				break cmdline_if
+			}
+			*/
 		}
 
 		if selection & {.Command_Line, .Command_Args} != {} {
