@@ -19,16 +19,6 @@ X_OK  :: c.int((1 << 0))  /* test for execute or search permission */
 W_OK  :: c.int((1 << 1))  /* test for write permission */
 R_OK  :: c.int((1 << 2))  /* test for read permission */
 
-/* copyfile flags */
-COPYFILE_ACL   :: (1 << 0)
-COPYFILE_STAT  :: (1 << 1)
-COPYFILE_XATTR :: (1 << 2)
-COPYFILE_DATA  :: (1 << 3)
-
-COPYFILE_SECURITY :: (COPYFILE_STAT | COPYFILE_ACL)
-COPYFILE_METADATA :: (COPYFILE_SECURITY | COPYFILE_XATTR)
-COPYFILE_ALL	  :: (COPYFILE_METADATA | COPYFILE_DATA)
-
 /* syslimits.h */
 PATH_MAX	:: 1024	/* max bytes in pathname */
 

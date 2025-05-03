@@ -313,6 +313,15 @@ is_directory :: proc(path: string) -> bool {
 
 
 copy_file :: proc(dst_path, src_path: string) -> Error {
+	when #defined(_copy_file_native) {
+		return _copy_file_native(dst_path, src_path)
+	} else {
+		return _copy_file(dst_path, src_path)
+	}
+}
+
+@(private)
+_copy_file :: proc(dst_path, src_path: string) -> Error {
 	src := open(src_path) or_return
 	defer close(src)
 
