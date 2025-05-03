@@ -2512,7 +2512,7 @@ recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where int
 }
 
 /*
-Creates a vector where each lane contains the index of that lane.
+Create a vector where each lane contains the index of that lane.
 
 Inputs:
 - `V`: The type of the vector to create.
@@ -2558,10 +2558,10 @@ indices :: #force_inline proc "contextless" ($V: typeid/#simd[$N]$E) -> V where 
 Reduce a vector to a scalar by adding up all the lanes in a pairwise fashion.
 
 This procedure returns a scalar that is the sum of all lanes, calculated by
-adding each even-numbered element with the following odd-numbered element. This
-is repeated until only a single element remains. This order is supported by
-hardware instructions for some types/architectures (e.g. i16/i32/f32/f64 on x86
-SSE, i8/i16/i32/f32 on ARM NEON).
+adding each even-indexed element with the following odd-indexed element to
+produce N/2 values. This is repeated until only a single element remains. This
+order is supported by hardware instructions for some types/architectures (e.g.
+i16/i32/f32/f64 on x86 SSE, i8/i16/i32/f32 on ARM NEON).
 
 The order of the sum may be important for accounting for precision errors in
 floating-point computation, as floating-point addition is not associative, that
@@ -2657,13 +2657,14 @@ reduce_add_pairs :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
 }
 
 /*
-Reduce a vector to a scalar by adding up all the lanes in a binary fashion.
+Reduce a vector to a scalar by adding up all the lanes in a bisecting fashion.
 
 This procedure returns a scalar that is the sum of all lanes, calculated by
-splitting the vector in two parts and adding the two halves together
-element-wise. This is repeated until only a single element remains. This order
-will typically be faster to compute than the ordered sum for floats, as it can
-be better parallelized.
+bisecting the vector into two parts, where the first contains lanes [0, N/2)
+and the second contains lanes [N/2, N), and adding the two halves element-wise
+to produce N/2 values. This is repeated until only a single element remains.
+This order may be faster to compute than the ordered sum for floats, as it can
+often be better parallelized.
 
 The order of the sum may be important for accounting for precision errors in
 floating-point computation, as floating-point addition is not associative, that
@@ -2701,7 +2702,7 @@ Graphical representation of the operation for N=4:
 	result: | y0  |
 	        +-----+
 */
-reduce_add_split :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
+reduce_add_bisect :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
 	where intrinsics.type_is_numeric(E) {
 	when N == 64 { v64 := v }
 	when N == 32 { v32 := v }
@@ -2763,10 +2764,12 @@ reduce_add_split :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
 Reduce a vector to a scalar by multiplying all the lanes in a pairwise fashion.
 
 This procedure returns a scalar that is the product of all lanes, calculated by
-multiplying each even-numbered element with the following odd-numbered element.
-This is repeated until only a single element remains. This order may be faster
-to compute than the ordered product for floats, as it can be better
-parallelized.
+bisecting the vector into two parts, where the first contains lanes [0, N/2)
+and the second contains lanes [N/2, N), and multiplying the two halves together
+multiplying each even-indexed element with the following odd-indexed element to
+produce N/2 values. This is repeated until only a single element remains. This
+order may be faster to compute than the ordered product for floats, as it can
+often be better parallelized.
 
 The order of the product may be important for accounting for precision errors
 in floating-point computation, as floating-point multiplication is not
@@ -2862,13 +2865,14 @@ reduce_mul_pairs :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
 }
 
 /*
-Reduce a vector to a scalar by multiplying up all the lanes in a binary fashion.
+Reduce a vector to a scalar by multiplying up all the lanes in a bisecting fashion.
 
 This procedure returns a scalar that is the product of all lanes, calculated by
-splitting the vector in two parts and multiplying the two halves together
-element-wise until only a single element remains. This is repeated until only a
+bisecting the vector into two parts, where the first contains indices [0, N/2)
+and the second contains indices [N/2, N), and multiplying the two halves
+together element-wise to produce N/2 values. This is repeated until only a
 single element remains. This order may be faster to compute than the ordered
-product for floats, as it can be better parallelized.
+product for floats, as it can often be better parallelized.
 
 The order of the product may be important for accounting for precision errors
 in floating-point computation, as floating-point multiplication is not
@@ -2906,7 +2910,7 @@ Graphical representation of the operation for N=4:
 	result: | y0  |
 	        +-----+
 */
-reduce_mul_split :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
+reduce_mul_bisect :: #force_inline proc "contextless" (v: #simd[$N]$E) -> E
 	where intrinsics.type_is_numeric(E) {
 	when N == 64 { v64 := v }
 	when N == 32 { v32 := v }
