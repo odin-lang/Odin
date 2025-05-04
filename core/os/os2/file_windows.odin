@@ -813,18 +813,10 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	defer close(f)
 	return _fchtimes(f, atime, mtime)
 }
+
 _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	if f == nil || f.impl == nil {
 		return nil
-	}
-	d: win32.BY_HANDLE_FILE_INFORMATION
-	if !win32.GetFileInformationByHandle(_handle(f), &d) {
-		return _get_platform_error()
-	}
-
-	to_windows_time :: #force_inline proc(t: time.Time) -> win32.LARGE_INTEGER {
-		// a 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 (UTC)
-		return win32.LARGE_INTEGER(time.time_to_unix_nano(t) * 100 + 116444736000000000)
 	}
 
 	atime, mtime := atime, mtime
@@ -833,9 +825,9 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	}
 
 	info: win32.FILE_BASIC_INFO
-	info.LastAccessTime = to_windows_time(atime)
-	info.LastWriteTime  = to_windows_time(mtime)
-	if !win32.SetFileInformationByHandle(_handle(f), .FileBasicInfo, &info, size_of(d)) {
+	info.LastAccessTime = time_as_filetime(atime)
+	info.LastWriteTime  = time_as_filetime(mtime)
+	if !win32.SetFileInformationByHandle(_handle(f), .FileBasicInfo, &info, size_of(info)) {
 		return _get_platform_error()
 	}
 	return nil
