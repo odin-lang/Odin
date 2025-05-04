@@ -212,11 +212,15 @@ _file_type_from_create_file :: proc(wname: win32.wstring, create_file_attributes
 }
 
 _file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (type: File_Type, mode: int) {
-	if file_attributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
-		mode |= 0o444
-	} else {
-		mode |= 0o666
-	}
+	// NOTE(Jeroen): We don't translate mode flags for Linux when given to `chmod`.
+	//               Let's not do so for Windows for `chmod` or `read_directory_iterator` either.
+	//               They're *not* portable between Windows and non-Windows platforms.
+	//
+	//               It also leads to information loss as flags like Archive, Hidden and System have no equivalent there.
+	//               We can of course parse them so we can set the `.Symlink` and `.Directory` type, but we shouldn't pretend
+	//               that 0o644 is meaningful when returned as a mode.
+	//               `C:\bootmgr` as an example has attributes read only, hidden, system, archive. In no way is it sensible to replace that with 0o444.
+	mode = int(file_attributes)
 
 	is_sym := false
 	if file_attributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
@@ -229,7 +233,6 @@ _file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: wi
 		type = .Symlink
 	} else if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
 		type = .Directory
-		mode |= 0o111
 	} else if h != nil {
 		type = file_type(h)
 	}

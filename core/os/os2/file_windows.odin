@@ -12,7 +12,30 @@ import win32 "core:sys/windows"
 
 INVALID_HANDLE :: ~uintptr(0)
 
-S_IWRITE :: 0o200
+// NOTE(Jeroen): We don't translate mode flags for Linux when given to `chmod`.
+//               Let's not do so for Windows for `chmod` or `read_directory_iterator` either.
+//               They're *not* portable between Windows and non-Windows platforms.
+//
+//               It also leads to information loss as flags like Archive, Hidden and System have no equivalent there.
+//               We can of course parse them so we can set the `.Symlink` and `.Directory` type, but we shouldn't pretend
+//               that 0o644 is meaningful when returned as a mode.
+//               `C:\bootmgr` as an example has attributes read only, hidden, system, archive. In no way is it sensible to replace that with 0o444.
+FILE_ATTRIBUTE_READONLY            :: win32.FILE_ATTRIBUTE_READONLY            // 0x00000001
+FILE_ATTRIBUTE_HIDDEN              :: win32.FILE_ATTRIBUTE_HIDDEN              // 0x00000002
+FILE_ATTRIBUTE_SYSTEM              :: win32.FILE_ATTRIBUTE_SYSTEM              // 0x00000004
+FILE_ATTRIBUTE_DIRECTORY           :: win32.FILE_ATTRIBUTE_DIRECTORY           // 0x00000010
+FILE_ATTRIBUTE_ARCHIVE             :: win32.FILE_ATTRIBUTE_ARCHIVE             // 0x00000020
+FILE_ATTRIBUTE_DEVICE              :: win32.FILE_ATTRIBUTE_DEVICE              // 0x00000040
+FILE_ATTRIBUTE_NORMAL              :: win32.FILE_ATTRIBUTE_NORMAL              // 0x00000080
+FILE_ATTRIBUTE_TEMPORARY           :: win32.FILE_ATTRIBUTE_TEMPORARY           // 0x00000100
+FILE_ATTRIBUTE_SPARSE_FILE         :: win32.FILE_ATTRIBUTE_SPARSE_FILE         // 0x00000200
+FILE_ATTRIBUTE_REPARSE_Point       :: win32.FILE_ATTRIBUTE_REPARSE_Point       // 0x00000400
+FILE_ATTRIBUTE_REPARSE_POINT       :: win32.FILE_ATTRIBUTE_REPARSE_POINT       // 0x00000400
+FILE_ATTRIBUTE_COMPRESSED          :: win32.FILE_ATTRIBUTE_COMPRESSED          // 0x00000800
+FILE_ATTRIBUTE_OFFLINE             :: win32.FILE_ATTRIBUTE_OFFLINE             // 0x00001000
+FILE_ATTRIBUTE_NOT_CONTENT_INDEXED :: win32.FILE_ATTRIBUTE_NOT_CONTENT_INDEXED // 0x00002000
+FILE_ATTRIBUTE_ENCRYPTED           :: win32.FILE_ATTRIBUTE_ENCRYPTED           // 0x00004000
+
 _ERROR_BAD_NETPATH :: 53
 MAX_RW :: 1<<30
 
@@ -122,7 +145,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 	}
 
 	attrs: u32 = win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS
-	if perm & S_IWRITE == 0 {
+	if u32(perm) & FILE_ATTRIBUTE_NORMAL == 0 {
 		attrs = win32.FILE_ATTRIBUTE_READONLY
 		if create_mode == win32.CREATE_ALWAYS {
 			// NOTE(bill): Open has just asked to create a file in read-only mode.
@@ -748,20 +771,10 @@ _fchmod :: proc(f: ^File, mode: int) -> Error {
 	if f == nil || f.impl == nil {
 		return nil
 	}
-	d: win32.BY_HANDLE_FILE_INFORMATION
-	if !win32.GetFileInformationByHandle(_handle(f), &d) {
-		return _get_platform_error()
-	}
-	attrs := d.dwFileAttributes
-	if mode & S_IWRITE != 0 {
-		attrs &~= win32.FILE_ATTRIBUTE_READONLY
-	} else {
-		attrs |= win32.FILE_ATTRIBUTE_READONLY
-	}
 
 	info: win32.FILE_BASIC_INFO
-	info.FileAttributes = attrs
-	if !win32.SetFileInformationByHandle(_handle(f), .FileBasicInfo, &info, size_of(d)) {
+	info.FileAttributes = win32.DWORD(mode)
+	if !win32.SetFileInformationByHandle(_handle(f), .FileBasicInfo, &info, size_of(info)) {
 		return _get_platform_error()
 	}
 	return nil
