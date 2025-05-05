@@ -6,7 +6,20 @@ import "base:runtime"
 _ :: intrinsics
 _ :: runtime
 
-map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K, err: runtime.Allocator_Error) {
+/*
+Return all keys of a map.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- `m`: The map to inspect
+- `allocator`: Allocator to use for the resulting slice (default is context.allocator)
+
+Returns:
+- `keys`: The keys of the map
+- `err`: An `Allocator_Error`, if allocation failed
+*/
+map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K, err: runtime.Allocator_Error) #optional_allocator_error {
 	keys = make(type_of(keys), len(m), allocator) or_return
 	i := 0
 	for key in m {
@@ -15,7 +28,21 @@ map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K,
 	}
 	return
 }
-map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (values: []V, err: runtime.Allocator_Error) {
+
+/*
+Return all values of a map.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- `m`: The map to inspect
+- `allocator`: Allocator to use for the resulting slice (default is context.allocator)
+
+Returns:
+- `values`: The values of the map
+- `err`: An `Allocator_Error`, if allocation failed
+*/
+map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (values: []V, err: runtime.Allocator_Error) #optional_allocator_error {
 	values = make(type_of(values), len(m), allocator) or_return
 	i := 0
 	for _, value in m {
@@ -25,19 +52,37 @@ map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (values: 
 	return
 }
 
+/*
+A map entry including a key and a value.
+*/
 Map_Entry :: struct($Key, $Value: typeid) {
 	key:   Key,
 	value: Value,
 }
 
+/*
+Similar to `Map_Entry` but also includes the hash of the key.
+*/
 Map_Entry_Info :: struct($Key, $Value: typeid) {
 	hash:  uintptr,
 	key:   Key,
 	value: Value,
 }
 
+/*
+Return entries of a map.
 
-map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry(K, V), err: runtime.Allocator_Error) {
+*Allocates Using Provided Allocator*
+
+Inputs:
+- `m`: The map to inspect
+- `allocator`: Allocator to use for the resulting slice (default is context.allocator)
+
+Returns:
+- `entries`: The entries of the map
+- `err`: An `Allocator_Error`, if allocation failed
+*/
+map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry(K, V), err: runtime.Allocator_Error) #optional_allocator_error {
 	entries = make(type_of(entries), len(m), allocator) or_return
 	i := 0
 	for key, value in m {
@@ -48,7 +93,20 @@ map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries
 	return
 }
 
-map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V), err: runtime.Allocator_Error) #no_bounds_check {
+/*
+Return entries (including hashes) of a map.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- `m`: The map to inspect
+- `allocator`: Allocator to use for the resulting slice (default is context.allocator)
+
+Returns:
+- `entries`: The entries of the map
+- `err`: An `Allocator_Error`, if allocation failed
+*/
+map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V), err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	m := m
 	rm := (^runtime.Raw_Map)(&m)
 
