@@ -24,13 +24,21 @@ Specifies additional data present in the log output.
 Defined in `package runtime` as it is used in the `context`. This is to prevent an import definition cycle.
 
 	Option :: enum {
+		// The log level, e.g. "[DEBUG] ---"
 		Level,
+		// The date, e.g. [2025-01-02]
 		Date,
+		// The time, e.g. [12:34:56]
 		Time,
+		// Just the filename, e.g. [main.odin]
 		Short_File_Path,
+		// Full file path, e.g. [/tmp/project/main.odin]
 		Long_File_Path,
+		// File line of the log statement, e.g. [8]
 		Line,
+		// Calling procedure, e.g. [main()]
 		Procedure,
+		// Enables colored output
 		Terminal_Color
 	}
 */

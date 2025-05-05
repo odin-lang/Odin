@@ -75,7 +75,7 @@ Create a logger that outputs to a file.
 
 When no longer needed can be destroyed with `destroy_file_logger`.
 
-Input:
+Inputs:
 - `h`: A handle to the output file
 - `lowest`: Log level to use
 - `opt`: Specifies additional data present in the log output
@@ -105,7 +105,7 @@ Create a logger that outputs to the terminal.
 
 When no longer needed can be destroyed with `destroy_console_logger`.
 
-Input:
+Inputs:
 - `lowest`: Log level to use
 - `opt`: Specifies additional data present in the log output
 - `ident`: Identifier to include in the output

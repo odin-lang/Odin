@@ -7,9 +7,9 @@ import "core:fmt"
 Format to use when logging allocations.
 */
 Log_Allocator_Format :: enum {
-	// Actual number of bytes.
+	// Actual number of bytes
 	Bytes,
-	// Bytes in human units like bytes, kibibytes, etc. as appropriate.
+	// Bytes in human units like bytes, kibibytes, etc. as appropriate
 	Human,
 }
 
