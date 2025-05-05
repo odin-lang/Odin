@@ -4108,10 +4108,10 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		}
 
 		i64 max = 0;
-		i64 field_size = 0;
 
 		for_array(i, t->Union.variants) {
 			Type *variant_type = t->Union.variants[i];
+
 			i64 size = type_size_of_internal(variant_type, path);
 			if (max < size) {
 				max = size;
@@ -4130,7 +4130,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 			size = align_formula(max, tag_size);
 			// NOTE(bill): Calculate the padding between the common fields and the tag
 			t->Union.tag_size = cast(i16)tag_size;
-			t->Union.variant_block_size = size - field_size;
+			t->Union.variant_block_size = size;
 
 			size += tag_size;
 		}
