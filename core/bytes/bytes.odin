@@ -67,7 +67,7 @@ truncate_to_rune :: proc(str: []byte, r: rune) -> []byte {
 }
 
 /*
-Compares two strings, returning a value representing which one comes first lexiographically.
+Compare two strings, returning a value representing which one comes first lexiographically.
 
 Returns:
 - `-1` if `a` comes first
@@ -1161,7 +1161,7 @@ split_multi_iterator :: proc(s: ^[]byte, substrs: [][]byte, skip_empty := false)
 }
 
 /*
-Scrubs invalid utf-8 characters and replaces them with the replacement string.
+Scrub invalid utf-8 characters and replaces them with the replacement string.
 
 Adjacent invalid bytes are only replaced once.
 */
@@ -1270,7 +1270,7 @@ partition :: proc(str, sep: []byte) -> (head, match, tail: []byte) {
 center_justify :: centre_justify // NOTE(bill): Because Americans exist
 
 /*
-Returns a byte slice with a pad byte slice at boths sides if the str's rune length is smaller than length.
+Return a byte slice with a pad byte slice at boths sides if the str's rune length is smaller than length.
 */
 centre_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str)
@@ -1292,7 +1292,7 @@ centre_justify :: proc(str: []byte, length: int, pad: []byte, allocator := conte
 }
 
 /*
-Returns a byte slice with a pad byte slice at left side if the str's rune length is smaller than length.
+Return a byte slice with a pad byte slice at left side if the str's rune length is smaller than length.
 */
 left_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str)
@@ -1313,7 +1313,7 @@ left_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context
 }
 
 /*
-Returns a byte slice with a pad byte slice at right side if the str's rune length is smaller than length.
+Return a byte slice with a pad byte slice at right side if the str's rune length is smaller than length.
 */
 right_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str)
@@ -1352,7 +1352,7 @@ write_pad_string :: proc(b: ^Buffer, pad: []byte, pad_len, remains: int) {
 }
 
 /*
-Splits the byte slice s around each instance of one or more consecutive white space character, defined by `unicode.is_space`
+Split the byte slice s around each instance of one or more consecutive white space character, defined by `unicode.is_space`
 returning a slice of subslices of `s` or an empty slice if `s` only contains white space.
 */
 fields :: proc(s: []byte, allocator := context.allocator) -> [][]byte #no_bounds_check {
@@ -1405,7 +1405,7 @@ fields :: proc(s: []byte, allocator := context.allocator) -> [][]byte #no_bounds
 }
 
 /*
-Splits the byte slice `s` at each run of unicode code points `ch` satisfying `f(ch)`
+Split the byte slice `s` at each run of unicode code points `ch` satisfying `f(ch)`
 returns a slice of subslices of `s`.
 
 If all code points in `s` satisfy `f(ch)` or string is empty, an empty slice is returned.
@@ -1441,7 +1441,7 @@ fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.alloc
 }
 
 /*
-Returns `true` if and only if `a` and `b` have a non-zero length, and any part of `a` overlaps with `b`.
+Return `true` if and only if `a` and `b` have a non-zero length, and any part of `a` overlaps with `b`.
 */
 alias :: proc "contextless" (a, b: []byte) -> bool {
 	a_len, b_len := len(a), len(b)
@@ -1456,7 +1456,7 @@ alias :: proc "contextless" (a, b: []byte) -> bool {
 }
 
 /*
-Returns `true` if and only if `a` and `b` have a non-zero length, the base pointers of `a` and `b` are NOT equal, and
+Return `true` if and only if `a` and `b` have a non-zero length, the base pointers of `a` and `b` are NOT equal, and
 any part of `a` overlaps with `b` (ie: `alias(a, b)` with an exception that returns `false` for `a == b`,
 `b = a[:len(a)-69]` and similar conditions).
 */

@@ -77,7 +77,7 @@ Node :: struct {
 }
 
 /*
-Inserts a new element at the front of the list with *O(1)* time complexity.
+Insert a new element at the front of the list with *O(1)* time complexity.
 
 Inputs:
 - `list`: The container list
@@ -95,7 +95,7 @@ push_front :: proc "contextless" (list: ^List, node: ^Node) {
 }
 
 /*
-Inserts a new element at the back of the list with *O(1)* time complexity.
+Insert a new element at the back of the list with *O(1)* time complexity.
 
 Inputs:
 - `list`: The container list
@@ -113,7 +113,7 @@ push_back :: proc "contextless" (list: ^List, node: ^Node) {
 }
 
 /*
-Removes an element from a list with *O(1)* time complexity.
+Remove an element from a list with *O(1)* time complexity.
 
 Inputs:
 - list: The container list
@@ -137,7 +137,7 @@ remove :: proc "contextless" (list: ^List, node: ^Node) {
 }
 
 /*
-Removes from the given list all elements that satisfy a condition with *O(N)* time complexity.
+Remove from the given list all elements that satisfy a condition with *O(N)* time complexity.
 
 Inputs:
 - `list`: The container list
@@ -165,7 +165,7 @@ remove_by_proc :: proc(list: ^List, to_erase: proc(^Node) -> bool) {
 }
 
 /*
-Removes from the given list all elements that satisfy a condition with *O(N)* time complexity.
+Remove from the given list all elements that satisfy a condition with *O(N)* time complexity.
 
 Inputs:
 - `list`: The container list
@@ -193,7 +193,7 @@ remove_by_proc_contextless :: proc(list: ^List, to_erase: proc "contextless" (^N
 }
 
 /*
-Checks whether the given list does not contain any element.
+Check whether the given list does not contain any element.
 
 Inputs:
 - `list`: The container list
@@ -206,7 +206,7 @@ is_empty :: proc "contextless" (list: ^List) -> bool {
 }
 
 /*
-Removes and returns the element at the front of the list with *O(1)* time complexity.
+Remove and returns the element at the front of the list with *O(1)* time complexity.
 
 Inputs:
 - `list`: The container list
@@ -236,7 +236,7 @@ pop_front :: proc "contextless" (list: ^List) -> ^Node {
 }
 
 /*
-Removes and returns the element at the back of the list with *O(1)* time complexity.
+Remove and returns the element at the back of the list with *O(1)* time complexity.
 
 Inputs:
 - `list`: The container list
@@ -270,7 +270,7 @@ Iterator :: struct($T: typeid) {
 }
 
 /*
-Creates an iterator pointing at the head of the given list. For an example, see `iterate_next`.
+Create an iterator pointing at the head of the given list. For an example, see `iterate_next`.
 
 Inputs:
 - `list`: The container list
@@ -287,7 +287,7 @@ iterator_head :: proc "contextless" (list: List, $T: typeid, $field_name: string
 }
 
 /*
-Creates an iterator pointing at the tail of the given list. For an example, see `iterate_prev`.
+Create an iterator pointing at the tail of the given list. For an example, see `iterate_prev`.
 
 Inputs:
 - `list`: The container list
@@ -304,7 +304,7 @@ iterator_tail :: proc "contextless" (list: List, $T: typeid, $field_name: string
 }
 
 /*
-Creates an iterator pointing at the specified node of a list.
+Create an iterator pointing at the specified node of a list.
 
 Inputs:
 - `node`: a list node
@@ -321,7 +321,7 @@ iterator_from_node :: proc "contextless" (node: ^Node, $T: typeid, $field_name: 
 }
 
 /*
-Retrieves the next element in a list and advances the iterator.
+Retrieve the next element in a list and advances the iterator.
 
 Inputs:
 - `it`: The iterator
@@ -372,7 +372,7 @@ iterate_next :: proc "contextless" (it: ^Iterator($T)) -> (ptr: ^T, ok: bool) {
 }
 
 /*
-Retrieves the previous element in a list and recede the iterator.
+Retrieve the previous element in a list and recede the iterator.
 
 Inputs:
 - it: The iterator

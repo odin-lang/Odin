@@ -3,7 +3,7 @@ package bufio
 import "core:io"
 
 /*
-Stores pointers to a `Reader` and a `Writer`
+Pointers to a `Reader` and a `Writer`
 */
 Read_Writer :: struct {
 	r: ^Reader,

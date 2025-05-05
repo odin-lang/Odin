@@ -697,7 +697,7 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := fals
 }
 
 /*
-Decompresses a ZLIB stream passed in as a `[]u8` or `io.Stream`.
+Decompress a ZLIB stream passed in as a `[]u8` or `io.Stream`.
 
 Returns:
 - Error

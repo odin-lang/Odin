@@ -33,7 +33,7 @@ Cache :: struct($Key, $Value: typeid) where intrinsics.type_is_valid_map_key(Key
 }
 
 /*
-Initializes a Cache.
+Initialize a Cache.
 */
 init :: proc(c: ^$C/Cache($Key, $Value), capacity: int, entries_allocator := context.allocator, node_allocator := context.allocator) {
 	c.entries.allocator = entries_allocator
@@ -42,7 +42,7 @@ init :: proc(c: ^$C/Cache($Key, $Value), capacity: int, entries_allocator := con
 }
 
 /*
-Deinitializes a Cache.
+Deinitialize a Cache.
 */
 destroy :: proc(c: ^$C/Cache($Key, $Value), call_on_remove: bool) {
 	clear(c, call_on_remove)
@@ -109,7 +109,7 @@ get :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: Value, ok: bool) #o
 }
 
 /*
-Gets the pointer to a value the cache from a given key. This operation updates the usage of the item.
+Get the pointer to a value the cache from a given key. This operation updates the usage of the item.
 */
 get_ptr :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: ^Value, ok: bool) #optional_ok {
 	e: ^Node(Key, Value)
@@ -123,7 +123,7 @@ get_ptr :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: ^Value, ok: boo
 }
 
 /*
-Peek gets the value from the cache from a given key without updating the recent usage.
+Get the value from the cache from a given key without updating the recent usage.
 */
 peek :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: Value, ok: bool) #optional_ok {
 	e: ^Node(Key, Value)
@@ -135,14 +135,14 @@ peek :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: Value, ok: bool) #
 }
 
 /*
-Checks for the existence of a value from a given key without updating the recent usage.
+Check for the existence of a value from a given key without updating the recent usage.
 */
 exists :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> bool {
 	return key in c.entries
 }
 
 /*
-Removes an item from the cache.
+Remove an item from the cache.
 */
 remove :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> bool {
 	e, ok := c.entries[key]

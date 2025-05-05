@@ -74,7 +74,7 @@ Iterator :: struct($Key: typeid, $Value: typeid) {
 }
 
 /*
-Initializes a tree.
+Initialize a tree.
 */
 init :: proc {
 	init_ordered,
@@ -82,7 +82,7 @@ init :: proc {
 }
 
 /*
-Initializes a tree.
+Initialize a tree.
 */
 init_cmp :: proc(t: ^$T/Tree($Key, $Value), cmp_fn: proc(a, b: Key) -> Ordering, node_allocator := context.allocator) {
 	t._root   = nil
@@ -92,7 +92,7 @@ init_cmp :: proc(t: ^$T/Tree($Key, $Value), cmp_fn: proc(a, b: Key) -> Ordering,
 }
 
 /*
-Initializes a tree containing ordered keys, with a comparison function that results in an ascending order sort.
+Initialize a tree containing ordered keys, with a comparison function that results in an ascending order sort.
 */
 init_ordered :: proc(t: ^$T/Tree($Key, $Value), node_allocator := context.allocator) where intrinsics.type_is_ordered(Key) {
 	init_cmp(t, slice.cmp_proc(Key), node_allocator)
@@ -113,21 +113,21 @@ len :: proc "contextless" (t: ^$T/Tree($Key, $Value)) -> (node_count: int) {
 }
 
 /*
-Returns the first node in the tree (in-order) or nil if and only if the tree is empty.
+Return the first node in the tree (in-order) or nil if and only if the tree is empty.
 */
 first :: proc "contextless" (t: ^$T/Tree($Key, $Value)) -> ^Node(Key, Value) {
 	return tree_first_or_last_in_order(t, Direction.Backward)
 }
 
 /*
-Returns the last element in the tree (in-order) or nil if and only if the tree is empty.
+Return the last element in the tree (in-order) or nil if and only if the tree is empty.
 */
 last :: proc "contextless" (t: ^$T/Tree($Key, $Value)) -> ^Node(Key, Value) {
 	return tree_first_or_last_in_order(t, Direction.Forward)
 }
 
 /*
-Finds the key in the tree, and returns the corresponding node, or nil if and only if the value is not present.
+Find the key in the tree, and return the corresponding node, or nil if and only if the value is not present.
 */
 find :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (node: ^Node(Key, Value)) {
 	node = t._root
@@ -142,7 +142,7 @@ find :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (node: ^Node(Key, Value)) {
 }
 
 /*
-Finds the key in the tree, and returns the corresponding value, or nil if and only if the value is not present.
+Find the key in the tree, and return the corresponding value, or nil if and only if the value is not present.
 */
 find_value :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (value: Value, ok: bool) #optional_ok {
 	if n := find(t, key); n != nil {
@@ -152,7 +152,7 @@ find_value :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (value: Value, ok: bo
 }
 
 /*
-Attempts to insert the value into the tree.
+Attempt to insert the value into the tree.
 
 If the value is already present, the existing node is updated.
 
@@ -184,7 +184,7 @@ find_or_insert :: proc(t: ^$T/Tree($Key, $Value), key: Key, value: Value) -> (n:
 }
 
 /*
-Removes a node or value from the tree, and returns true if and only if the removal was successful.
+Remove a node or value from the tree, and return true if and only if the removal was successful.
 
 While the node's value will be left intact, the node itself will be freed via the tree's node allocator.
 */
@@ -194,7 +194,7 @@ remove :: proc {
 }
 
 /*
-Removes a value from the tree, and returns true if and only if the removal was successful. 
+Remove a value from the tree, and return true if and only if the removal was successful. 
 
 While the node's key + value will be left intact, the node itself will be freed via the tree's node allocator.
 */
@@ -207,7 +207,7 @@ remove_key :: proc(t: ^$T/Tree($Key, $Value), key: Key, call_on_remove := true) 
 }
 
 /*
-Removes a node from the tree, and returns true if and only if the removal was successful.
+Remove a node from the tree, and return true if and only if the removal was successful.
 
 While the node's key + value will be left intact, the node itself will be freed via the tree's node allocator.
 */
@@ -243,7 +243,7 @@ remove_node :: proc(t: ^$T/Tree($Key, $Value), node: ^$N/Node(Key, Value), call_
 }
 
 /*
-Returns a tree iterator in the specified direction.
+Return a tree iterator in the specified direction.
 */
 iterator :: proc "contextless" (t: ^$T/Tree($Key, $Value), direction: Direction) -> Iterator(Key, Value) {
 	it: Iterator(Key, Value)
@@ -256,7 +256,7 @@ iterator :: proc "contextless" (t: ^$T/Tree($Key, $Value), direction: Direction)
 }
 
 /*
-Returns a tree iterator in the specified direction, spanning the range `[pos, last]` (inclusive).
+Return a tree iterator in the specified direction, spanning the range `[pos, last]` (inclusive).
 */
 iterator_from_pos :: proc "contextless" (t: ^$T/Tree($Key, $Value), pos: ^Node(Key, Value), direction: Direction) -> Iterator(Key, Value) {
 	it: Iterator(Key, Value)
@@ -273,7 +273,7 @@ iterator_from_pos :: proc "contextless" (t: ^$T/Tree($Key, $Value), pos: ^Node(K
 }
 
 /*
-Returns the node currently pointed to by the iterator or `nil` if and only if the node has been removed, the tree is
+Return the node currently pointed to by the iterator or `nil` if and only if the node has been removed, the tree is
 empty, or the end of the tree has been reached.
 */
 iterator_get :: proc "contextless" (it: ^$I/Iterator($Key, $Value)) -> ^Node(Key, Value) {
@@ -281,7 +281,7 @@ iterator_get :: proc "contextless" (it: ^$I/Iterator($Key, $Value)) -> ^Node(Key
 }
 
 /*
-Removes the node currently pointed to by the iterator and returns true if and only if the removal was successful.
+Remove the node currently pointed to by the iterator and return true if and only if the removal was successful.
 
 Semantics are the same as the Tree remove.
 */
@@ -299,7 +299,7 @@ iterator_remove :: proc(it: ^$I/Iterator($Key, $Value), call_on_remove: bool = t
 }
 
 /*
-Advances the iterator and returns the `(node, true)` or `(nil, false)` if and only if the end of the tree has been reached.
+Advance the iterator and return the `(node, true)` or `(nil, false)` if and only if the end of the tree has been reached.
 
 Note: The first call to this procedure will return the first node instead of advancing the iterator.
 */

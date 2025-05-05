@@ -24,7 +24,7 @@ Scanner_Error :: union #shared_nil {
 }
 
 /*
-The signature of the split procedure used to tokenize the input.
+Signature of the split procedure used to tokenize the input.
 */
 Split_Proc :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool)
 
@@ -70,7 +70,7 @@ scanner_destroy :: proc(s: ^Scanner) {
 }
 
 /*
-Returns the first non-EOF error that was encountered by the scanner.
+Return the first non-EOF error that was encountered by the scanner.
 */
 scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 	switch s._err {
@@ -81,7 +81,7 @@ scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 }
 
 /*
-Returns the most recent token created by `scanner_scan`.
+Return the most recent token created by `scanner_scan`.
 
 The underlying array may point to data that may be overwritten by another call to `scanner_scan`. Treat the returned
 value as if it is immutable.
@@ -91,7 +91,7 @@ scanner_bytes :: proc(s: ^Scanner) -> []byte {
 }
 
 /*
-Returns the most recent token created by `scanner_scan`.
+Return the most recent token created by `scanner_scan`.
 
 The underlying array may point to data that may be overwritten by another call to `scanner_scan`. Treat the returned
 value as if it is immutable.
@@ -101,7 +101,7 @@ scanner_text :: proc(s: ^Scanner) -> string {
 }
 
 /*
-Advances the scanner.
+Advance the scanner.
 */
 scanner_scan :: proc(s: ^Scanner) -> bool {
 	set_err :: proc(s: ^Scanner, err: Scanner_Error) {

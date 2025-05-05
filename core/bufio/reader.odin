@@ -49,7 +49,7 @@ reader_init_with_buf :: proc(b: ^Reader, rd: io.Reader, buf: []byte) {
 }
 
 /*
-Destroys the underlying buffer with its associated allocator if and only if that allocator has been set.
+Destroy the underlying buffer with its associated allocator if and only if that allocator has been set.
 */
 reader_destroy :: proc(b: ^Reader) {
 	delete(b.buf, b.buf_allocator)
@@ -111,7 +111,7 @@ _reader_consume_err :: proc(b: ^Reader) -> io.Error {
 }
 
 /*
-Returns the next `n` bytes without advancing the reader.
+Return the next `n` bytes without advancing the reader.
 
 The bytes stop being valid on the next read call. If reader_peek returns fewer than `n` bytes, it also return an error
 explaining why the read is short. The error will be `.Buffer_Full` if `n` is larger than the internal buffer size.
@@ -145,14 +145,14 @@ reader_peek :: proc(b: ^Reader, n: int) -> (data: []byte, err: io.Error) {
 }
 
 /*
-Returns the number of bytes that can be read from the current buffer.
+Return the number of bytes that can be read from the current buffer.
 */
 reader_buffered :: proc(b: ^Reader) -> int {
 	return b.w - b.r
 }
 
 /*
-Skips the next `n` bytes, and returns the number of bytes that were discarded.
+Skip the next `n` bytes, and returns the number of bytes that were discarded.
 */
 reader_discard :: proc(b: ^Reader, n: int) -> (discarded: int, err: io.Error) {
 	if n < 0 {
@@ -184,7 +184,7 @@ reader_discard :: proc(b: ^Reader, n: int) -> (discarded: int, err: io.Error) {
 }
 
 /*
-Reads data into `p`.
+Read data into `p`.
 
 The bytes are taken from at most one read on the underlying `Reader`, which means `n` may be less than `len(p)`.
 */
@@ -233,7 +233,7 @@ reader_read :: proc(b: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 }
 
 /*
-Reads and returns a single byte.
+Read and return a single byte.
 
 If no bytes are available, it returns an error.
 */
@@ -252,7 +252,7 @@ reader_read_byte :: proc(b: ^Reader) -> (c: byte, err: io.Error) {
 }
 
 /*
-Unreads the last byte.
+Unread the last byte.
 
 Only the most recently read byte can be unread.
 */
@@ -273,7 +273,7 @@ reader_unread_byte :: proc(b: ^Reader) -> io.Error {
 }
 
 /*
-Reads a single UTF-8 encoded unicode character.
+Read a single UTF-8 encoded unicode character.
 
 Returns the rune and its size in bytes. If the encoded rune is invalid, it consumes one byte and returns
 `utf8.RUNE_ERROR (U+FFFD)` with a size of `1`.
@@ -301,7 +301,7 @@ reader_read_rune :: proc(b: ^Reader) -> (r: rune, size: int, err: io.Error) {
 }
 
 /*
-Unreads the last rune.
+Unread the last rune.
 
 Only the most recently read rune can be unread.
 */
@@ -350,7 +350,7 @@ reader_write_to :: proc(b: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 }
 
 /*
-Converts a `Reader` into an `io.Stream`.
+Convert a `Reader` into an `io.Stream`.
 */
 reader_to_stream :: proc(b: ^Reader) -> (s: io.Stream) {
 	s.data = b
@@ -378,7 +378,7 @@ _reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 //
 
 /*
-Reads until the first occurrence of `delim` from the reader.
+Read until the first occurrence of `delim` from the reader.
 
 It returns a slice pointing at the bytes in the buffer. The bytes stop being valid at the next read. If it encounters an
 error before finding a delimiter it fails with error `.Buffer_Full` if the buffer fills without a `delim`.
@@ -426,7 +426,7 @@ reader_read_slice :: proc(b: ^Reader, delim: byte) -> (line: []byte, err: io.Err
 }
 
 /*
-Reads until the first occurrence of delim from the `Reader`.
+Read until the first occurrence of delim from the `Reader`.
 
 It returns an allocated slice containing the data up to and including the delimiter.
 */
@@ -453,7 +453,7 @@ reader_read_bytes :: proc(b: ^Reader, delim: byte, allocator := context.allocato
 }
 
 /*
-Reads until the first occurrence of delim from the Reader.
+Read until the first occurrence of delim from the Reader.
 
 It returns an allocated string containing the data up to and including the delimiter.
 */

@@ -3,7 +3,7 @@ package bufio
 import "core:io"
 
 /*
-Provides io lookahead.
+Data for io lookahead.
 
 This is useful for tokenizers/parsers. It is similar to `bufio.Reader`, but unlike `bufio.Reader`, `Lookahead_Reader`'s
 buffer size will EXACTLY match the specified size, whereas `bufio.Reader`'s buffer size may differ from the specified
@@ -27,7 +27,7 @@ lookahead_reader_buffer :: proc(lr: ^Lookahead_Reader) -> []byte {
 }
 
 /*
-Returns a slice of the `Lookahead_Reader` which holds `n` bytes.
+Return a slice of the `Lookahead_Reader` which holds `n` bytes.
 
 If the `Lookahead_Reader` cannot hold enough bytes, it will read from the underlying reader to populate the rest.
 
@@ -61,7 +61,7 @@ lookahead_reader_peek :: proc(lr: ^Lookahead_Reader, n: int) -> ([]byte, io.Erro
 }
 
 /*
-Returns a slice of the `Lookahead_Reader` populating the full buffer.
+Return a slice of the `Lookahead_Reader` populating the full buffer.
 
 If the `Lookahead_Reader` cannot hold enough bytes, it will read from the underlying reader to populate the rest.
 
@@ -72,7 +72,7 @@ lookahead_reader_peek_all :: proc(lr: ^Lookahead_Reader) -> ([]byte, io.Error) {
 }
 
 /*
-Drops the first `n` populated bytes from the `Lookahead_Reader`.
+Drop the first `n` populated bytes from the `Lookahead_Reader`.
 */
 lookahead_reader_consume :: proc(lr: ^Lookahead_Reader, n: int) -> io.Error {
 	switch {

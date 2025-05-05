@@ -81,7 +81,7 @@ Bit_Array_Iterator :: struct {
 }
 
 /*
-Wraps a `Bit_Array` into an Iterator.
+Wrap a `Bit_Array` into an Iterator.
 
 Inputs:
 - `ba`: Pointer to the `Bit_Array`
@@ -94,7 +94,7 @@ make_iterator :: proc (ba: ^Bit_Array) -> (it: Bit_Array_Iterator) {
 }
 
 /*
-Returns the next bit, including its set-state. `ok=false` once exhausted.
+Return the next bit, including its set-state. `ok=false` once exhausted.
 
 Inputs:
 - `it`: The iterator that holds the state.
@@ -121,7 +121,7 @@ iterate_by_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: 
 }
 
 /*
-Returns the next Set Bit, for example if `0b1010`, then the iterator will return `index={1, 3}` over two calls.
+Return the next Set Bit, for example if `0b1010`, then the iterator will return `index={1, 3}` over two calls.
 
 Inputs:
 - `it`: The iterator that holds the state.
@@ -135,7 +135,7 @@ iterate_by_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 }
 
 /*
-Returns the next Unset Bit, for example if `0b1010`, then the iterator will return `index={0, 2}` over two calls.
+Return the next Unset Bit, for example if `0b1010`, then the iterator will return `index={0, 2}` over two calls.
 
 Inputs:
 - `it`: The iterator that holds the state.
@@ -149,7 +149,7 @@ iterate_by_unset:: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 }
 
 /*
-Iterates through set/unset bits.
+Iterate through set/unset bits.
 
 *Private*
 
@@ -196,7 +196,7 @@ iterate_internal_ :: proc (it: ^Bit_Array_Iterator, $ITERATE_SET_BITS: bool) -> 
 }
 
 /*
-Gets the state of a bit in the bit-array.
+Get the state of a bit in the bit-array.
 
 Inputs:
 - `ba`: Pointer to the `Bit_Array`
@@ -227,7 +227,7 @@ get :: proc(ba: ^Bit_Array, #any_int index: uint) -> (res: bool, ok: bool) #opti
 }
 
 /*
-Gets the state of a bit in the bit-array.
+Get the state of a bit in the bit-array.
 
 *Bypasses all Checks*
 
@@ -243,7 +243,7 @@ unsafe_get :: #force_inline proc(ba: ^Bit_Array, #any_int index: uint) -> bool #
 }
 
 /*
-Sets the state of a bit in the bit-array.
+Set the state of a bit in the bit-array.
 
 *Conditionally Allocates (Resizes backing data when `index > len(ba.bits)`)*
 
@@ -280,7 +280,7 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, set_to: bool = true, allocator
 }
 
 /*
-Sets the state of a bit in the bit-array.
+Set the state of a bit in the bit-array.
 
 *Bypasses all checks*
 
@@ -293,7 +293,7 @@ unsafe_set :: proc(ba: ^Bit_Array, bit: int) #no_bounds_check {
 }
 
 /*
-Unsets the state of a bit in the bit-array. (Convienence wrapper for `set`).
+Unset the state of a bit in the bit-array. (Convienence wrapper for `set`).
 
 *Conditionally Allocates (Resizes backing data when `index > len(ba.bits)`)*
 
@@ -310,7 +310,7 @@ unset :: #force_inline proc(ba: ^Bit_Array, #any_int index: uint, allocator := c
 }
 
 /*
-Unsets the state of a bit in the bit-array.
+Unset the state of a bit in the bit-array.
 
 *Bypasses all Checks*
 
@@ -384,7 +384,7 @@ init :: proc(res: ^Bit_Array, max_index: int, min_index: int = 0, allocator := c
 }
 
 /*
-Sets all values in the `Bit_Array` to zero.
+Set all values in the `Bit_Array` to zero.
 
 Inputs:
 - `ba`: The target `Bit_Array`
@@ -395,7 +395,7 @@ clear :: proc(ba: ^Bit_Array) {
 }
 
 /*
-Gets the length of set and unset valid bits in the `Bit_Array`.
+Get the length of set and unset valid bits in the `Bit_Array`.
 
 Inputs:
 - `ba`: The target `Bit_Array`
@@ -409,7 +409,7 @@ len :: proc(ba: ^Bit_Array) -> (length: int) {
 }
 
 /*
-Shrinks the `Bit_Array`'s backing storage to the smallest possible size.
+Shrink the `Bit_Array`'s backing storage to the smallest possible size.
 
 Inputs:
 - `ba`: The target `Bit_Array`
@@ -439,7 +439,7 @@ shrink :: proc(ba: ^Bit_Array) #no_bounds_check {
 }
 
 /*
-Deallocates the `Bit_Array` and its backing storage.
+Deallocate the `Bit_Array` and its backing storage.
 
 Inputs:
 - `ba`: The target `Bit_Array`
@@ -453,7 +453,7 @@ destroy :: proc(ba: ^Bit_Array) {
 }
 
 /*
-Resizes the Bit Array. For internal use. Provisions needed capacity+1
+Resize the Bit Array. For internal use. Provisions needed capacity+1
 If you want to reserve the memory for a given-sized Bit Array up front, you can use `create`.
 */
 @(private="file")

@@ -89,7 +89,7 @@ validate_model :: proc(model: Shoco_Model) -> (int, compress.Error) {
 }
 
 /*
-Decompresses into provided buffer.
+Decompress into provided buffer.
 */
 decompress_slice_to_output_buffer :: proc(input: []u8, output: []u8, model := DEFAULT_MODEL) -> (size: int, err: compress.Error) {
 	inp, inp_end := 0, len(input)

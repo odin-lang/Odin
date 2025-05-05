@@ -35,7 +35,7 @@ writer_init_with_buf :: proc(b: ^Writer, wr: io.Writer, buf: []byte) {
 }
 
 /*
-Destroys the underlying buffer with its associated allocator if and only if that allocator has been set.
+Destroy the underlying buffer with its associated allocator if and only if that allocator has been set.
 */
 writer_destroy :: proc(b: ^Writer) {
 	delete(b.buf, b.buf_allocator)
@@ -43,7 +43,7 @@ writer_destroy :: proc(b: ^Writer) {
 }
 
 /*
-Returns the size of underlying buffer in bytes.
+Return the size of underlying buffer in bytes.
 */
 writer_size :: proc(b: ^Writer) -> int {
 	return len(b.buf)
@@ -56,7 +56,7 @@ writer_reset :: proc(b: ^Writer, w: io.Writer) {
 }
 
 /*
-Writes any buffered data into the underlying `io.Writer`.
+Write any buffered data into the underlying `io.Writer`.
 */
 writer_flush :: proc(b: ^Writer) -> io.Error {
 	if b.err != nil {
@@ -83,21 +83,21 @@ writer_flush :: proc(b: ^Writer) -> io.Error {
 }
 
 /*
-Returns how many bytes are unused in the buffer.
+Return the number of bytes that are unused in the buffer.
 */
 writer_available :: proc(b: ^Writer) -> int {
 	return len(b.buf) - b.n
 }
 
 /*
-Returns the number of bytes that have been writted into the current buffer.
+Return the number of bytes that have been writted into the current buffer.
 */
 writer_buffered :: proc(b: ^Writer) -> int {
 	return b.n
 }
 
 /*
-Writes the contents of `p` into the buffer.
+Write the contents of `p` into the buffer.
 
 It returns the number of bytes written. If `n < len(p)`, it will return an error explaining why the write is short.
 */
@@ -129,7 +129,7 @@ writer_write :: proc(b: ^Writer, p: []byte) -> (n: int, err: io.Error) {
 }
 
 /*
-Writes a single byte.
+Write a single byte.
 */
 writer_write_byte :: proc(b: ^Writer, c: byte) -> io.Error {
 	if b.err != nil {
@@ -144,7 +144,7 @@ writer_write_byte :: proc(b: ^Writer, c: byte) -> io.Error {
 }
 
 /*
-Writes a single unicode code point, and returns the number of bytes written with any error.
+Write a single unicode code point, and returns the number of bytes written with any error.
 */
 writer_write_rune :: proc(b: ^Writer, r: rune) -> (size: int, err: io.Error) {
 	if r < utf8.RUNE_SELF {
@@ -180,7 +180,7 @@ writer_write_rune :: proc(b: ^Writer, r: rune) -> (size: int, err: io.Error) {
 }
 
 /*
-Writes a string into the buffer.
+Write a string into the buffer.
 
 It returns the number of bytes written. If `n < len(p)`, it will return an error explaining why the write is short.
 */
@@ -189,7 +189,7 @@ writer_write_string :: proc(b: ^Writer, s: string) -> (int, io.Error) {
 }
 
 /*
-Supports `io.Reader_From` types.
+Support for `io.Reader_From` types.
 
 If the underlying writer supports the `io`, `read_from`, and `b` has no buffered data yet, this procedure calls the
 underlying `read_from` implementation without buffering.
@@ -236,7 +236,7 @@ writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 }
 
 /*
-Converts a `Writer` into an `io.Stream`.
+Convert a `Writer` into an `io.Stream`.
 */
 writer_to_stream :: proc(b: ^Writer) -> (s: io.Stream) {
 	s.data = b

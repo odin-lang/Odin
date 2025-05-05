@@ -77,7 +77,7 @@ Small_Array :: struct($N: int, $T: typeid) where N >= 0 {
 }
 
 /*
-Returns the amount of items in the small-array.
+Return the amount of items in the small-array.
 
 Inputs:
 - `a`: The small-array
@@ -90,7 +90,7 @@ len :: proc "contextless" (a: $A/Small_Array) -> int {
 }
 
 /*
-Returns the capacity of the small-array.
+Return the capacity of the small-array.
 
 Inputs:
 - `a`: The small-array
@@ -103,7 +103,7 @@ cap :: proc "contextless" (a: $A/Small_Array) -> int {
 }
 
 /*
-Returns how many more items the small-array could fit.
+Return how many more items the small-array could fit.
 
 Inputs:
 - `a`: The small-array
@@ -116,7 +116,7 @@ space :: proc "contextless" (a: $A/Small_Array) -> int {
 }
 
 /*
-Returns a slice of the data.
+Return a slice of the data.
 
 Inputs:
 - `a`: The pointer to the small-array
@@ -303,7 +303,7 @@ set :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, item: T) {
 }
 
 /*
-Tries to resize the small-array to the specified length.
+Try to resize the small-array to the specified length.
 
 The new length will be:
 	- `length` if `length` <= capacity
@@ -343,7 +343,7 @@ resize :: proc "contextless" (a: ^$A/Small_Array, length: int) {
 }
 
 /*
-Attempts to add the given element to the end.
+Attempt to add the given element to the end.
 
 Inputs:
 - `a`: A pointer to the small-array
@@ -381,7 +381,7 @@ push_back :: proc "contextless" (a: ^$A/Small_Array($N, $T), item: T) -> bool {
 }
 
 /*
-Attempts to add the given element at the beginning.
+Attempt to add the given element at the beginning.
 
 This operation assumes that the small-array is not empty.
 
@@ -426,7 +426,7 @@ push_front :: proc "contextless" (a: ^$A/Small_Array($N, $T), item: T) -> bool {
 }
 
 /*
-Removes and returns the last element of the small-array.
+Remove and return the last element of the small-array.
 
 This operation assumes that the small-array is not empty.
 
@@ -463,7 +463,7 @@ pop_back :: proc "odin" (a: ^$A/Small_Array($N, $T), loc := #caller_location) ->
 }
 
 /*
-Removes and returns the first element of the small-array.
+Remove and return the first element of the small-array.
 
 This operation assumes that the small-array is not empty.
 
@@ -505,7 +505,7 @@ pop_front :: proc "odin" (a: ^$A/Small_Array($N, $T), loc := #caller_location) -
 }
 
 /*
-Attempts to remove and return the last element of the small array.
+Attempt to remove and return the last element of the small array.
 
 Unlike `pop_back`, it does not assume that the array is non-empty.
 
@@ -541,7 +541,7 @@ pop_back_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T)) -> (item: T, ok
 }
 
 /*
-Attempts to remove and return the first element of the small array.
+Attempt to remove and return the first element of the small array.
 
 Unlike `pop_front`, it does not assume that the array is non-empty.
 
@@ -582,7 +582,7 @@ pop_front_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T)) -> (item: T, o
 }
 
 /*
-Decreases the length of the small-array by the given amount.
+Decrease the length of the small-array by the given amount.
 
 The elements are therefore not really removed and can be
 recovered by calling `resize`.
@@ -618,7 +618,7 @@ consume :: proc "odin" (a: ^$A/Small_Array($N, $T), count: int, loc := #caller_l
 }
 
 /*
-Removes the element at the specified index while retaining order.
+Remove the element at the specified index while retaining order.
 
 Note: Performing this operation will cause pointers obtained
 through get_ptr(_save) to reference incorrect elements.
@@ -655,7 +655,7 @@ ordered_remove :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, lo
 }
 
 /*
-Removes the element at the specified index without retaining order.
+Remove the element at the specified index without retaining order.
 
 Inputs:
 - `a`: A pointer to the small-array
@@ -690,7 +690,7 @@ unordered_remove :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, 
 }
 
 /*
-Sets the length of the small-array to 0.
+Set the length of the small-array to 0.
 
 Inputs:
 - `a`: A pointer to the small-array
@@ -720,7 +720,7 @@ clear :: proc "contextless" (a: ^$A/Small_Array($N, $T)) {
 }
 
 /*
-Attempts to append all elements to the small-array returning
+Attempt to append all elements to the small-array returning
 false if there is not enough space to fit all of them.
 
 Inputs:
@@ -756,7 +756,7 @@ push_back_elems :: proc "contextless" (a: ^$A/Small_Array($N, $T), items: ..T) -
 }
 
 /*
-Tries to insert an element at the specified position.
+Try to insert an element at the specified position.
 
 Note: Performing this operation will cause pointers obtained
 through get_ptr(_save) to reference incorrect elements.
@@ -808,7 +808,7 @@ Alias for `push_back_elems`.
 append_elems :: push_back_elems
 
 /*
-Tries to append the element(s) to the small-array.
+Try to append the element(s) to the small-array.
 
 Inputs:
 - `a`: A pointer to the small-array
