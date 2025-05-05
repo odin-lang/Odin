@@ -102,7 +102,7 @@ the lock is released.
 This procedure always returns `true`. This makes it easy to define a critical
 section by putting the function inside the `if` statement.
 
-**Example**:
+Example:
 
 	if mutex_guard(&m) {
 		...
@@ -251,7 +251,7 @@ with the same read-write mutex, until the exclusive lock is released.
 This procedure always returns `true`, which makes it easy to define a critical
 section by running this procedure inside an `if` statement.
 
-**Example**:
+Example:
 
 	if rw_mutex_guard(&m) {
 		...
@@ -278,7 +278,7 @@ same read-write mutex, until all shared locks are released.
 This procedure always returns `true`, which makes it easy to define a critical
 section by running this procedure inside an `if` statement.
 
-**Example**:
+Example:
 
 	if rw_mutex_guard(&m) {
 		...
@@ -373,7 +373,7 @@ until the lock is released.
 This procedure always returns `true`, which makes it easy to define a critical
 section by calling this procedure inside an `if` statement.
 
-**Example**:
+Example:
 
 	if recursive_mutex_guard(&m) {
 		...
