@@ -7,8 +7,6 @@
 
 	An implementation of [shoco](https://github.com/Ed-von-Schleck/shoco) by Christian Schramm.
 */
-
-// package shoco is an implementation of the shoco short string compressor.
 package compress_shoco
 
 import "base:intrinsics"
@@ -90,7 +88,9 @@ validate_model :: proc(model: Shoco_Model) -> (int, compress.Error) {
 	return 0, nil
 }
 
-// Decompresses into provided buffer.
+/*
+Decompresses into provided buffer.
+*/
 decompress_slice_to_output_buffer :: proc(input: []u8, output: []u8, model := DEFAULT_MODEL) -> (size: int, err: compress.Error) {
 	inp, inp_end := 0, len(input)
 	out, out_end := 0, len(output)

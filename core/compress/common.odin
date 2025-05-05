@@ -6,8 +6,9 @@
 		Jeroen van Rijn: Initial implementation, optimization.
 */
 
-
-// package compress is a collection of utilities to aid with other compression packages
+/*
+A collection of utilities to aid with other compression packages.
+*/
 package compress
 
 import "core:io"
@@ -19,7 +20,6 @@ import "base:runtime"
 	If streaming their output, these are unnecessary and will be ignored.
 
 */
-
 
 // When a decompression routine doesn't stream its output, but writes to a buffer,
 // we pre-allocate an output buffer to speed up decompression. The default is 1 MiB.
@@ -42,7 +42,6 @@ when size_of(uintptr) == 8 {
 	// For 32-bit platforms, we set the default max buffer size to 512 MiB.
 	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 29))
 }
-
 
 Error :: union #shared_nil {
 	General_Error,
@@ -123,7 +122,9 @@ Deflate_Error :: enum {
 	BType_3,
 }
 
-// General I/O context for ZLIB, LZW, etc.
+/*
+General I/O context for ZLIB, LZW, etc.
+*/
 Context_Memory_Input :: struct #packed {
 	input_data:        []u8,
 	output:            ^bytes.Buffer,
@@ -240,8 +241,9 @@ read_u8_from_stream :: #force_inline proc(z: ^Context_Stream_Input) -> (res: u8,
 
 read_u8 :: proc{read_u8_from_memory, read_u8_from_stream}
 
-// You would typically only use this at the end of Inflate, to drain bits from the code buffer
-// preferentially.
+/*
+You would typically only use this at the end of Inflate, to drain bits from the code buffer preferentially.
+*/
 @(optimization_mode="favor_size")
 read_u8_prefer_code_buffer_lsb :: #force_inline proc(z: ^$C) -> (res: u8, err: io.Error) {
 	if z.num_bits >= 8 {
@@ -349,16 +351,18 @@ peek_data_at_offset_from_stream :: #force_inline proc(z: ^Context_Stream_Input, 
 
 peek_data :: proc{peek_data_from_memory, peek_data_from_stream, peek_data_at_offset_from_memory, peek_data_at_offset_from_stream}
 
-
-
-// Sliding window read back
+/*
+Sliding window read back.
+*/
 @(optimization_mode="favor_size")
 peek_back_byte :: #force_inline proc(z: ^$C, offset: i64) -> (res: u8, err: io.Error) {
 	// Look back into the sliding window.
 	return z.output.buf[z.bytes_written - offset], .None
 }
 
-// Generalized bit reader LSB
+/*
+Generalized bit reader LSB.
+*/
 @(optimization_mode="favor_size")
 refill_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width := i8(48)) {
 	refill := u64(width)
@@ -384,7 +388,9 @@ refill_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width := 
 	}
 }
 
-// Generalized bit reader LSB
+/*
+Generalized bit reader LSB.
+*/
 @(optimization_mode="favor_size")
 refill_lsb_from_stream :: proc(z: ^Context_Stream_Input, width := i8(24)) {
 	refill := u64(width)
@@ -412,7 +418,6 @@ refill_lsb_from_stream :: proc(z: ^Context_Stream_Input, width := i8(24)) {
 }
 
 refill_lsb :: proc{refill_lsb_from_memory, refill_lsb_from_stream}
-
 
 @(optimization_mode="favor_size")
 consume_bits_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width: u8) {
@@ -492,13 +497,11 @@ read_bits_no_refill_lsb_from_stream :: #force_inline proc(z: ^Context_Stream_Inp
 
 read_bits_no_refill_lsb :: proc{read_bits_no_refill_lsb_from_memory, read_bits_no_refill_lsb_from_stream}
 
-
 @(optimization_mode="favor_size")
 discard_to_next_byte_lsb_from_memory :: proc(z: ^Context_Memory_Input) {
 	discard := u8(z.num_bits & 7)
 	#force_inline consume_bits_lsb(z, discard)
 }
-
 
 @(optimization_mode="favor_size")
 discard_to_next_byte_lsb_from_stream :: proc(z: ^Context_Stream_Input) {
