@@ -6,7 +6,9 @@ import "core:mem"
 import "core:unicode/utf8"
 import "base:intrinsics"
 
-// Extra errors returns by scanning procedures
+/*
+Extra errors returns by scanning procedures.
+*/
 Scanner_Extra_Error :: enum i32 {
 	None,
 	Negative_Advance,
@@ -21,7 +23,9 @@ Scanner_Error :: union #shared_nil {
 	Scanner_Extra_Error,
 }
 
-// Split_Proc is the signature of the split procedure used to tokenize the input.
+/*
+The signature of the split procedure used to tokenize the input.
+*/
 Split_Proc :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool)
 
 Scanner :: struct {
@@ -65,8 +69,9 @@ scanner_destroy :: proc(s: ^Scanner) {
 	delete(s.buf)
 }
 
-
-// Returns the first non-EOF error that was encountered by the scanner
+/*
+Returns the first non-EOF error that was encountered by the scanner.
+*/
 scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 	switch s._err {
 	case .EOF, nil:
@@ -75,23 +80,29 @@ scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 	return s._err
 }
 
-// Returns the most recent token created by scanner_scan.
-// The underlying array may point to data that may be overwritten
-// by another call to scanner_scan.
-// Treat the returned value as if it is immutable.
+/*
+Returns the most recent token created by `scanner_scan`.
+
+The underlying array may point to data that may be overwritten by another call to `scanner_scan`. Treat the returned
+value as if it is immutable.
+*/
 scanner_bytes :: proc(s: ^Scanner) -> []byte {
 	return s.token
 }
 
-// Returns the most recent token created by scanner_scan.
-// The underlying array may point to data that may be overwritten
-// by another call to scanner_scan.
-// Treat the returned value as if it is immutable.
+/*
+Returns the most recent token created by `scanner_scan`.
+
+The underlying array may point to data that may be overwritten by another call to `scanner_scan`. Treat the returned
+value as if it is immutable.
+*/
 scanner_text :: proc(s: ^Scanner) -> string {
 	return string(s.token)
 }
 
-// scanner_scan advances the scanner
+/*
+Advances the scanner.
+*/
 scanner_scan :: proc(s: ^Scanner) -> bool {
 	set_err :: proc(s: ^Scanner, err: Scanner_Error) {
 		switch s._err {

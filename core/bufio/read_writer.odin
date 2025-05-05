@@ -2,12 +2,13 @@ package bufio
 
 import "core:io"
 
-// Read_Writer stores pointers to a Reader and a Writer
+/*
+Stores pointers to a `Reader` and a `Writer`
+*/
 Read_Writer :: struct {
 	r: ^Reader,
 	w: ^Writer,
 }
-
 
 read_writer_init :: proc(rw: ^Read_Writer, r: ^Reader, w: ^Writer) {
 	rw.r, rw.w = r, w

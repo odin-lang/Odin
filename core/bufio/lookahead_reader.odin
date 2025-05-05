@@ -2,11 +2,13 @@ package bufio
 
 import "core:io"
 
-// Lookahead_Reader provides io lookahead.
-// This is useful for tokenizers/parsers.
-// Lookahead_Reader is similar to bufio.Reader, but unlike bufio.Reader, Lookahead_Reader's buffer size
-// will EXACTLY match the specified size, whereas bufio.Reader's buffer size may differ from the specified size.
-// This makes sure that the buffer will not be accidentally read beyond the expected size.
+/*
+Provides io lookahead.
+
+This is useful for tokenizers/parsers. It is similar to `bufio.Reader`, but unlike `bufio.Reader`, `Lookahead_Reader`'s
+buffer size will EXACTLY match the specified size, whereas `bufio.Reader`'s buffer size may differ from the specified
+size. This makes sure that the buffer will not be accidentally read beyond the expected size.
+*/
 Lookahead_Reader :: struct {
 	r:   io.Reader,
 	buf: []byte,
@@ -24,10 +26,13 @@ lookahead_reader_buffer :: proc(lr: ^Lookahead_Reader) -> []byte {
 	return lr.buf[:lr.n]
 }
 
+/*
+Returns a slice of the `Lookahead_Reader` which holds `n` bytes.
 
-// lookahead_reader_peek returns a slice of the Lookahead_Reader which holds n bytes
-// If the Lookahead_Reader cannot hold enough bytes, it will read from the underlying reader to populate the rest.
-// NOTE: The returned buffer is not a copy of the underlying buffer
+If the `Lookahead_Reader` cannot hold enough bytes, it will read from the underlying reader to populate the rest.
+
+Note: The returned buffer is not a copy of the underlying buffer.
+*/
 lookahead_reader_peek :: proc(lr: ^Lookahead_Reader, n: int) -> ([]byte, io.Error) {
 	switch {
 	case n < 0:
@@ -55,15 +60,20 @@ lookahead_reader_peek :: proc(lr: ^Lookahead_Reader, n: int) -> ([]byte, io.Erro
 	return lr.buf[:n], err
 }
 
-// lookahead_reader_peek_all returns a slice of the Lookahead_Reader populating the full buffer
-// If the Lookahead_Reader cannot hold enough bytes, it will read from the underlying reader to populate the rest.
-// NOTE: The returned buffer is not a copy of the underlying buffer
+/*
+Returns a slice of the `Lookahead_Reader` populating the full buffer.
+
+If the `Lookahead_Reader` cannot hold enough bytes, it will read from the underlying reader to populate the rest.
+
+Note: The returned buffer is not a copy of the underlying buffer.
+*/
 lookahead_reader_peek_all :: proc(lr: ^Lookahead_Reader) -> ([]byte, io.Error) {
 	return lookahead_reader_peek(lr, len(lr.buf))
 }
 
-
-// lookahead_reader_consume drops the first n populated bytes from the Lookahead_Reader.
+/*
+Drops the first `n` populated bytes from the `Lookahead_Reader`.
+*/
 lookahead_reader_consume :: proc(lr: ^Lookahead_Reader, n: int) -> io.Error {
 	switch {
 	case n == 0:
