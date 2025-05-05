@@ -1,13 +1,15 @@
-// The following is a generic O(V+E) topological sorter implementation.
-// This is the fastest known method for topological sorting and Odin's
-// map type is being used to accelerate lookups.
+/*
+A generic O(V+E) topological sorter implementation.
+
+This is the fastest known method for topological sorting and Odin's
+map type is being used to accelerate lookups.
+*/
 package container_topological_sort
 
 import "base:intrinsics"
 import "base:runtime"
 _ :: intrinsics
 _ :: runtime
-
 
 Relations :: struct($K: typeid) where intrinsics.type_is_valid_map_key(K) {
 	dependents:   map[K]bool,
@@ -24,7 +26,6 @@ make_relations :: proc(sorter: ^$S/Sorter($K)) -> (r: Relations(K)) {
 	r.dependents.allocator = sorter.dependents_allocator
 	return
 }
-
 
 init :: proc(sorter: ^$S/Sorter($K)) {
 	sorter.relations = make(map[K]Relations(K))

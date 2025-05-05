@@ -11,9 +11,12 @@ Node :: struct($Key, $Value: typeid) where intrinsics.type_is_valid_map_key(Key)
 	value: Value,
 }
 
-// Cache is an LRU cache. It automatically removes entries as new entries are
-// added if the capacity is reached. Entries are removed based on how recently
-// they were used where the oldest entries are removed first.
+/*
+An LRU cache.
+
+It automatically removes entries as new entries are added if the capacity is reached. Entries are removed based on how
+recently they were used where the oldest entries are removed first.
+*/
 Cache :: struct($Key, $Value: typeid) where intrinsics.type_is_valid_map_key(Key) {
 	head: ^Node(Key, Value),
 	tail: ^Node(Key, Value),
@@ -29,20 +32,26 @@ Cache :: struct($Key, $Value: typeid) where intrinsics.type_is_valid_map_key(Key
 	on_remove_user_data: rawptr,
 }
 
-// init initializes a Cache
+/*
+Initializes a Cache.
+*/
 init :: proc(c: ^$C/Cache($Key, $Value), capacity: int, entries_allocator := context.allocator, node_allocator := context.allocator) {
 	c.entries.allocator = entries_allocator
 	c.node_allocator = node_allocator
 	c.capacity = capacity
 }
 
-// destroy deinitializes a Cachem
+/*
+Deinitializes a Cache.
+*/
 destroy :: proc(c: ^$C/Cache($Key, $Value), call_on_remove: bool) {
 	clear(c, call_on_remove)
 	delete(c.entries)
 }
 
-// clear the contents of a Cache
+/*
+Clear the contents of a Cache.
+*/
 clear :: proc(c: ^$C/Cache($Key, $Value), call_on_remove: bool) {
 	for _, node in c.entries {
 		if call_on_remove {
@@ -56,7 +65,9 @@ clear :: proc(c: ^$C/Cache($Key, $Value), call_on_remove: bool) {
 	c.count = 0
 }
 
-// set the given key value pair. This operation updates the recent usage of the item.
+/*
+Set the given key value pair. This operation updates the recent usage of the item.
+*/
 set :: proc(c: ^$C/Cache($Key, $Value), key: Key, value: Value) -> runtime.Allocator_Error {
 	if e, ok := c.entries[key]; ok {
 		e.value = value
@@ -83,7 +94,9 @@ set :: proc(c: ^$C/Cache($Key, $Value), key: Key, value: Value) -> runtime.Alloc
 	return nil
 }
 
-// get a value from the cache from a given key. This operation updates the usage of the item.
+/*
+Get a value from the cache from a given key. This operation updates the usage of the item.
+*/
 get :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: Value, ok: bool) #optional_ok {
 	e: ^Node(Key, Value)
 	e, ok = c.entries[key]
@@ -95,7 +108,9 @@ get :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: Value, ok: bool) #o
 	return e.value, true
 }
 
-// get_ptr gets the pointer to a value the cache from a given key. This operation updates the usage of the item.
+/*
+Gets the pointer to a value the cache from a given key. This operation updates the usage of the item.
+*/
 get_ptr :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: ^Value, ok: bool) #optional_ok {
 	e: ^Node(Key, Value)
 	e, ok = c.entries[key]
@@ -107,7 +122,9 @@ get_ptr :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: ^Value, ok: boo
 	return &e.value, true
 }
 
-// peek gets the value from the cache from a given key without updating the recent usage.
+/*
+Peek gets the value from the cache from a given key without updating the recent usage.
+*/
 peek :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: Value, ok: bool) #optional_ok {
 	e: ^Node(Key, Value)
 	e, ok = c.entries[key]
@@ -117,12 +134,16 @@ peek :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: Value, ok: bool) #
 	return e.value, true
 }
 
-// exists checks for the existence of a value from a given key without updating the recent usage.
+/*
+Checks for the existence of a value from a given key without updating the recent usage.
+*/
 exists :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> bool {
 	return key in c.entries
 }
 
-// remove removes an item from the cache.
+/*
+Removes an item from the cache.
+*/
 remove :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> bool {
 	e, ok := c.entries[key]
 	if !ok {
@@ -133,7 +154,6 @@ remove :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> bool {
 	c.count -= 1
 	return true
 }
-
 
 @(private)
 _remove_node :: proc(c: ^$C/Cache($Key, $Value), node: ^Node(Key, Value)) {

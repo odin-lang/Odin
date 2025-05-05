@@ -46,12 +46,15 @@ destroy :: proc(pq: ^$Q/Priority_Queue($T)) {
 reserve :: proc(pq: ^$Q/Priority_Queue($T), capacity: int) -> (err: runtime.Allocator_Error) {
 	return builtin.reserve(&pq.queue, capacity)
 }
+
 clear :: proc(pq: ^$Q/Priority_Queue($T)) {
 	builtin.clear(&pq.queue)
 }
+
 len :: proc(pq: $Q/Priority_Queue($T)) -> int {
 	return builtin.len(pq.queue)
 }
+
 cap :: proc(pq: $Q/Priority_Queue($T)) -> int {
 	return builtin.cap(pq.queue)
 }
