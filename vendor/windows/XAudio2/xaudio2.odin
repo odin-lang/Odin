@@ -16,7 +16,7 @@ foreign import xa2 "system:xaudio2.lib"
 HRESULT :: win.HRESULT
 IUnknown :: win.IUnknown
 IUnknown_VTable :: win.IUnknown_VTable
-IID :: win.IID
+WAVEFORMATEX :: win.WAVEFORMATEX
 
 /**************************************************************************
  *
@@ -82,10 +82,10 @@ QUANTUM_DENOMINATOR :: 100               //  in 10ms chunks (= 1/100 seconds)
 QUANTUM_MS          :: (1000.0 * QUANTUM_NUMERATOR / QUANTUM_DENOMINATOR)
 
 // XAudio2 error codes
-INVALID_CALL         :: HRESULT(-0x7769FFFF)    // An API call or one of its arguments was illegal
-XMA_DECODER_ERROR    :: HRESULT(-0x7769FFFE)    // The XMA hardware suffered an unrecoverable error
-XAPO_CREATION_FAILED :: HRESULT(-0x7769FFFD)    // XAudio2 failed to initialize an XAPO effect
-DEVICE_INVALIDATED   :: HRESULT(-0x7769FFFC)    // An audio device became unusable (unplugged, etc)
+INVALID_CALL         :: HRESULT(-2003435519)    // 0x88960001 An API call or one of its arguments was illegal
+XMA_DECODER_ERROR    :: HRESULT(-2003435518)    // 0x88960002 The XMA hardware suffered an unrecoverable error
+XAPO_CREATION_FAILED :: HRESULT(-2003435517)    // 0x88960003 XAudio2 failed to initialize an XAPO effect
+DEVICE_INVALIDATED   :: HRESULT(-2003435516)    // 0x88960004 An audio device became unusable (unplugged, etc)
 
 
 /**************************************************************************
@@ -134,7 +134,7 @@ PROCESOR_FLAG :: enum u32 {
 USE_DEFAULT_PROCESSOR :: PROCESSOR_FLAGS{}
 
 // Returned by IXAudio2Voice.GetVoiceDetails
-VOICE_DETAILS :: struct {
+VOICE_DETAILS :: struct #packed {
 	CreatingFlags:   FLAGS,
 	ActiveFlags:     FLAGS,
 	InputChannels:   u32,
@@ -142,26 +142,26 @@ VOICE_DETAILS :: struct {
 }
 
 // Used in VOICE_SENDS below
-SEND_DESCRIPTOR :: struct {
+SEND_DESCRIPTOR :: struct #packed {
 	Flags:        FLAGS,              // Either 0 or SEND_USEFILTER.
 	pOutputVoice: ^IXAudio2Voice,     // This send's destination voice.
 }
 
 // Used in the voice creation functions and in IXAudio2Voice.SetOutputVoices
-VOICE_SENDS :: struct {
+VOICE_SENDS :: struct #packed {
 	SendCount: u32,                  // Number of sends from this voice.
 	pSends:    [^]SEND_DESCRIPTOR,   // Array of SendCount send descriptors.
 }
 
 // Used in EFFECT_CHAIN below
-EFFECT_DESCRIPTOR :: struct {
+EFFECT_DESCRIPTOR :: struct #packed {
 	pEffect:        ^IUnknown,      // Pointer to the effect object's IUnknown interface.
-	InitialState:   bool,           // TRUE if the effect should begin in the enabled state.
+	InitialState:   b32,            // TRUE if the effect should begin in the enabled state.
 	OutputChannels: u32,            // How many output channels the effect should produce.
 }
 
 // Used in the voice creation functions and in IXAudio2Voice.SetEffectChain
-EFFECT_CHAIN :: struct {
+EFFECT_CHAIN :: struct #packed {
 	EffectCount:        u32,                    // Number of effects in this voice's effect chain.
 	pEffectDescriptors: [^]EFFECT_DESCRIPTOR,   // Array of effect descriptors.
 }
@@ -177,14 +177,14 @@ FILTER_TYPE :: enum i32 {
 }
 
 // Used in IXAudio2Voice.Set/GetFilterParameters and Set/GetOutputFilterParameters
-FILTER_PARAMETERS :: struct {
+FILTER_PARAMETERS :: struct #packed {
 	Type:      FILTER_TYPE,         // Filter type.
 	Frequency: f32,                 // Filter coefficient. Must be >= 0 and <= MAX_FILTER_FREQUENCY. See CutoffFrequencyToRadians() for state-variable filter types and CutoffFrequencyToOnePoleCoefficient() for one-pole filter types.
 	OneOverQ:  f32,                 // Reciprocal of the filter's quality factor Q; must be > 0 and <= MAX_FILTER_ONEOVERQ. Has no effect for one-pole filters.
 }
 
 // Used in IXAudio2SourceVoice.SubmitSourceBuffer
-BUFFER :: struct {
+BUFFER :: struct #packed {
 	Flags:      FLAGS,              // Either 0 or END_OF_STREAM.
 	AudioBytes: u32,                // Size of the audio data buffer in bytes.
 	pAudioData: [^]byte,            // Pointer to the audio data buffer.
@@ -199,20 +199,20 @@ BUFFER :: struct {
 // Used in IXAudio2SourceVoice.SubmitSourceBuffer when submitting XWMA data.
 // NOTE: If an XWMA sound is submitted in more than one buffer, each buffer's pDecodedPacketCumulativeBytes[PacketCount-1] value must be subtracted from all the entries in the next buffer's pDecodedPacketCumulativeBytes array.
 // And whether a sound is submitted in more than one buffer or not, the final buffer of the sound should use the END_OF_STREAM flag, or else the client must call IXAudio2SourceVoice.Discontinuity after submitting it.
-BUFFER_WMA :: struct {
+BUFFER_WMA :: struct #packed {
 	pDecodedPacketCumulativeBytes: [^]u32,  // Decoded packet's cumulative size array. Each element is the number of bytes accumulated when the corresponding XWMA packet is decoded in order.  The array must have PacketCount elements.
 	PacketCount:                   u32,     // Number of XWMA packets submitted. Must be >= 1 and divide evenly into BUFFER.AudioBytes.
 }
 
 // Returned by IXAudio2SourceVoice.GetState
-VOICE_STATE :: struct {
+VOICE_STATE :: struct #packed {
 	pCurrentBufferContext: rawptr,      // The pContext value provided in the BUFFER that is currently being processed, or NULL if there are no buffers in the queue.
 	BuffersQueued:         u32,         // Number of buffers currently queued on the voice (including the one that is being processed).
 	SamplesPlayed:         u64,         // Total number of samples produced by the voice since it began processing the current audio stream. If VOICE_NOSAMPLESPLAYED is specified in the call to IXAudio2SourceVoice.GetState, this member will not be calculated, saving CPU.
 }
 
 // Returned by IXAudio2.GetPerformanceData
-PERFORMANCE_DATA :: struct {
+PERFORMANCE_DATA :: struct #packed {
 	// CPU usage information
 	AudioCyclesSinceLastQuery: u64,     // CPU cycles spent on audio processing since the last call to StartEngine or GetPerformanceData.
 	TotalCyclesSinceLastQuery: u64,     // Total CPU cycles elapsed since the last call (only counts the CPU XAudio2 is running on).
@@ -240,13 +240,13 @@ PERFORMANCE_DATA :: struct {
 }
 
 // Used in IXAudio2.SetDebugConfiguration
-DEBUG_CONFIGURATION :: struct {
+DEBUG_CONFIGURATION :: struct #packed {
 	TraceMask:       DEBUG_CONFIG_FLAGS,      // Bitmap of enabled debug message types.
 	BreakMask:       DEBUG_CONFIG_FLAGS,      // Message types that will break into the debugger.
-	LogThreadID:     bool,			  // Whether to log the thread ID with each message.
-	LogFileline:     bool,			  // Whether to log the source file and line number.
-	LogFunctionName: bool,			  // Whether to log the function name.
-	LogTiming:       bool,			  // Whether to log message timestamps.
+	LogThreadID:     b32,			  // Whether to log the thread ID with each message.
+	LogFileline:     b32,			  // Whether to log the source file and line number.
+	LogFunctionName: b32,			  // Whether to log the function name.
+	LogTiming:       b32,			  // Whether to log message timestamps.
 }
 
 // Values for the TraceMask and BreakMask bitmaps. Only ERRORS and WARNINGS are valid in BreakMask.
@@ -273,7 +273,7 @@ DEBUG_CONFIG_FLAG :: enum u32 {
  **************************************************************************/
 
 IXAudio2_UUID_STRING :: "2B02E3CF-2E0B-4ec3-BE45-1B2A3FE7210D"
-IXAudio2_UUID := &IID{0x2B02E3CF, 0x2E0B, 0x4ec3, {0xBE, 0x45, 0x1B, 0x2A, 0x3F, 0xE7, 0x21, 0x0D}}
+IXAudio2_UUID := &win.IID{0x2B02E3CF, 0x2E0B, 0x4ec3, {0xBE, 0x45, 0x1B, 0x2A, 0x3F, 0xE7, 0x21, 0x0D}}
 IXAudio2 :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using ixaudio2_vtable: ^IXAudio2_VTable,
@@ -303,7 +303,7 @@ IXAudio2_VTable :: struct {
 	//  pCallback - Optional pointer to a client-provided callback interface.
 	//  pSendList - Optional list of voices this voice should send audio to.
 	//  pEffectChain - Optional list of effects to apply to the audio data.
-	CreateSourceVoice: proc "system" (this: ^IXAudio2, ppSourceVoice: ^^IXAudio2SourceVoice, pSourceFormat: ^win.WAVEFORMATEX, Flags: FLAGS = {}, MaxFrequencyRatio: f32 = DEFAULT_FREQ_RATIO, pCallback: ^IXAudio2VoiceCallback = nil, pSendList: [^]VOICE_SENDS = nil, pEffectChain: [^]EFFECT_CHAIN = nil) -> HRESULT,
+	CreateSourceVoice: proc "system" (this: ^IXAudio2, ppSourceVoice: ^^IXAudio2SourceVoice, pSourceFormat: ^WAVEFORMATEX, Flags: FLAGS = {}, MaxFrequencyRatio: f32 = DEFAULT_FREQ_RATIO, pCallback: ^IXAudio2VoiceCallback = nil, pSendList: [^]VOICE_SENDS = nil, pEffectChain: [^]EFFECT_CHAIN = nil) -> HRESULT,
 
 	// NAME: IXAudio2.CreateSubmixVoice
 	// DESCRIPTION: Creates and configures a submix voice.
@@ -361,7 +361,7 @@ IXAudio2_VTable :: struct {
 // This interface extends IXAudio2 with additional functionality.
 // Use IXAudio2.QueryInterface to obtain a pointer to this interface.
 IXAudio2Extension_UUID_STRING :: "84ac29bb-d619-44d2-b197-e4acf7df3ed6"
-IXAudio2Extension_UUID := &IID{0x84ac29bb, 0xd619, 0x44d2, {0xb1, 0x97, 0xe4, 0xac, 0xf7, 0xdf, 0x3e, 0xd6}}
+IXAudio2Extension_UUID := &win.IID{0x84ac29bb, 0xd619, 0x44d2, {0xb1, 0x97, 0xe4, 0xac, 0xf7, 0xdf, 0x3e, 0xd6}}
 IXAudio2Extension :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using ixaudio2extension_vtable: ^IXAudio2Extension_VTable,
@@ -432,7 +432,7 @@ IXAudio2Voice_VTable :: struct {
 	// ARGUMENTS:
 	//  EffectIndex - Index of an effect within this voice's effect chain.
 	//  pEnabled - Returns the enabled/disabled state of the given effect.
-	GetEffectState: proc "system" (this: ^IXAudio2Voice, EffectIndex: u32, pEnabled: ^bool),
+	GetEffectState: proc "system" (this: ^IXAudio2Voice, EffectIndex: u32, pEnabled: ^b32),
 
 	// NAME: IXAudio2Voice.SetEffectParameters
 	// DESCRIPTION: Sets effect-specific parameters.
@@ -717,12 +717,32 @@ IXAudio2VoiceCallback_VTable :: struct {
  *
  **************************************************************************/
 
-// We're an xaudio2 client
-@(default_calling_convention="system", link_prefix="XAudio2")
-foreign xa2 {
-	Create :: proc(ppXAudio2: ^^IXAudio2, Flags: FLAGS = {}, XAudio2Processor: PROCESSOR_FLAGS = USE_DEFAULT_PROCESSOR) -> HRESULT ---
-}
+Create :: proc "stdcall" (ppXAudio2: ^^IXAudio2, Flags: FLAGS = {}, XAudio2Processor: PROCESSOR_FLAGS = {.Processor1}) -> HRESULT {
+	CreateWithVersionInfoFunc :: #type proc "c" (a0: ^^IXAudio2, a1: FLAGS, a2: PROCESSOR_FLAGS, a3: win.DWORD) -> HRESULT
+	CreateInfoFunc :: #type proc "c" (a0: ^^IXAudio2, a1: FLAGS, a2: PROCESSOR_FLAGS) -> HRESULT
 
+	dll_Instance: win.HMODULE
+	create_with_version_info: CreateWithVersionInfoFunc
+	create_info: CreateInfoFunc
+
+	if dll_Instance == nil {
+		dll_Instance = win.LoadLibraryExW(win.L("xaudio2_9.dll"), nil, {.LOAD_LIBRARY_SEARCH_SYSTEM32})
+		if dll_Instance == nil {
+			return HRESULT(win.GetLastError())
+		}
+		create_with_version_info = cast(CreateWithVersionInfoFunc)win.GetProcAddress(dll_Instance, "XAudio2CreateWithVersionInfo")
+		if create_with_version_info == nil {
+			create_info = cast(CreateInfoFunc)win.GetProcAddress(dll_Instance, "XAudio2Create")
+			if create_info == nil {
+				return HRESULT(win.GetLastError())
+			}
+		}
+	}
+	if create_with_version_info != nil {
+		return create_with_version_info(ppXAudio2, Flags, XAudio2Processor, 0x0A000010)
+	}
+	return create_info(ppXAudio2, Flags, XAudio2Processor)
+}
 
 /**************************************************************************
  *

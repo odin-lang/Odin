@@ -100,14 +100,14 @@ CALCULATE_FLAG :: enum u32 {
 }
 
 //--------------<D-A-T-A---T-Y-P-E-S>---------------------------------------//
-VECTOR :: [3]f32 // float 3D vector
+VECTOR :: distinct [3]f32 // float 3D vector
 
 // instance handle of precalculated constants
-HANDLE :: [HANDLE_BYTESIZE]byte
+HANDLE :: distinct [HANDLE_BYTESIZE]byte
 
 // Distance curve point:
 // Defines a DSP setting at a given normalized distance.
-DISTANCE_CURVE_POINT :: struct {
+DISTANCE_CURVE_POINT :: struct #packed {
 	Distance:   f32,   // normalized distance, must be within [0.0f, 1.0f]
 	DSPSetting: f32,   // DSP setting
 }
@@ -122,14 +122,14 @@ DISTANCE_CURVE_POINT :: struct {
 // All distance curve spans must be such that:
 //      pPoints[k-1].DSPSetting + ((pPoints[k].DSPSetting-pPoints[k-1].DSPSetting) / (pPoints[k].Distance-pPoints[k-1].Distance)) * (pPoints[k].Distance-pPoints[k-1].Distance) != NAN or infinite values
 // For all points in the distance curve where 1 <= k < PointCount.
-DISTANCE_CURVE :: struct {
+DISTANCE_CURVE :: struct #packed {
 	pPoints:    [^]DISTANCE_CURVE_POINT,    // distance curve point array, must have at least PointCount elements with no duplicates and be sorted in ascending order with respect to Distance
 	PointCount: u32,                        // number of distance curve points, must be >= 2 as all distance curves must have at least two endpoints, defining DSP settings at 0.0f and 1.0f normalized distance
 }
 Default_LinearCurvePoints := [2]DISTANCE_CURVE_POINT{{0.0, 1.0}, {1.0, 0.0}}
 Default_LinearCurve       := DISTANCE_CURVE{&Default_LinearCurvePoints[0], 2}
 
-CONE :: struct {
+CONE :: struct #packed {
 	InnerAngle:  f32,   // inner cone angle in radians, must be within [0.0f, TAU]
 	OuterAngle:  f32,   // outer cone angle in radians, must be within [InnerAngle, TAU]
 
@@ -146,7 +146,7 @@ Default_DirectionalCone := CONE{math.PI / 2, math.PI, 1.0, 0.708, 0.0, 0.25, 0.7
 // Defines a point of 3D audio reception.
 //
 // The cone is directed by the listener's front orientation.
-LISTENER :: struct {
+LISTENER :: struct #packed {
 	OrientFront: VECTOR,   // orientation of front direction, used only for matrix and delay calculations or listeners with cones for matrix, LPF (both direct and reverb paths), and reverb calculations, must be normalized when used
 	OrientTop:   VECTOR,   // orientation of top direction, used only for matrix and delay calculations, must be orthonormal with OrientFront when used
 
@@ -175,7 +175,7 @@ LISTENER :: struct {
 // For example, doppler shift is always calculated with respect to the emitter base position and so is constant for all its channel points.
 // Distance curve calculations are also with respect to the emitter base position, with the curves being calculated independently of each other.
 // For instance, volume and LFE calculations do not affect one another.
-EMITTER :: struct {
+EMITTER :: struct #packed {
 	pCone: ^CONE,   // sound cone, used only with single-channel emitters for matrix, LPF (both direct and reverb paths), and reverb calculations, NULL specifies omnidirectionality
 
 	OrientFront: VECTOR,   // orientation of front direction, used only for emitter angle calculations or with multi-channel emitters for matrix calculations or single-channel emitters with cones for matrix, LPF (both direct and reverb paths), and reverb calculations, must be normalized when used
@@ -205,7 +205,7 @@ EMITTER :: struct {
 // Receives results from a call to Calculate to be sent to the low-level audio rendering API for 3D signal processing.
 //
 // The user is responsible for allocating the matrix coefficient table, delay time array, and initializing the channel counts when used.
-DSP_SETTINGS :: struct {
+DSP_SETTINGS :: struct #packed {
 	pMatrixCoefficients: [^]f32,  // [inout] matrix coefficient table, receives an array representing the volume level used to send from source channel S to destination channel D, stored as pMatrixCoefficients[SrcChannelCount * D + S], must have at least SrcChannelCount*DstChannelCount elements
 	pDelayTimes:         [^]f32,  // [inout] delay time array, receives delays for each destination channel in milliseconds, must have at least DstChannelCount elements (stereo final mix only)
 	SrcChannelCount:     u32,     // [in] number of source channels, must equal number of channels in respective emitter
@@ -223,11 +223,11 @@ DSP_SETTINGS :: struct {
 }
 
 //--------------<F-U-N-C-T-I-O-N-S>-----------------------------------------//
-@(default_calling_convention="system", link_prefix="X3DAudio")
+@(default_calling_convention="cdecl", link_prefix="X3DAudio")
 foreign xa2 {
 	// initializes instance handle
 	Initialize :: proc(SpeakerChannelMask: SPEAKER_FLAGS, SpeedOfSound: f32, Instance: HANDLE) -> HRESULT ---
 
 	// calculates DSP settings with respect to 3D parameters
-	Calculate :: proc(Instance: HANDLE, pListener: ^LISTENER, pEmitter: ^EMITTER, Flags: CALCULATE_FLAGS, pDSPSettings: ^DSP_SETTINGS) ---
+	Calculate :: proc(Instance: HANDLE, #by_ptr pListener: LISTENER, #by_ptr pEmitter: EMITTER, Flags: CALCULATE_FLAGS, pDSPSettings: ^DSP_SETTINGS) ---
 }

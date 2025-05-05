@@ -6,12 +6,6 @@ import "core:math"
 
 foreign import xa2 "system:xaudio2.lib"
 
-CLSID_AudioVolumeMeter_UUID_STRING :: "4FC3B166-972A-40CF-BC37-7DB03DB2FBA3"
-CLSID_AudioVolumeMeter_UUID := &IID{0x4FC3B166, 0x972A, 0x40CF, {0xBC, 0x37, 0x7D, 0xB0, 0x3D, 0xB2, 0xFB, 0xA3}}
-
-CLSID_AudioReverb_UUID_STRING :: "C2633B16-471B-4498-B8C5-4F0959E2EC09"
-CLSID_AudioReverb_UUID := &IID{0xC2633B16, 0x471B, 0x4498, {0xB8, 0xC5, 0x4F, 0x09, 0x59, 0xE2, 0xEC, 0x09}}
-
 /**************************************************************************
  *
  * Effect creation functions.
@@ -21,7 +15,7 @@ CLSID_AudioReverb_UUID := &IID{0xC2633B16, 0x471B, 0x4498, {0xB8, 0xC5, 0x4F, 0x
  *
  **************************************************************************/
 
- @(default_calling_convention="system", link_prefix="XAudio2")
+@(default_calling_convention="system")
 foreign xa2 {
 	CreateAudioVolumeMeter :: proc(ppApo: ^^IUnknown) -> HRESULT ---
 	CreateAudioReverb      :: proc(ppApo: ^^IUnknown) -> HRESULT ---
@@ -37,7 +31,7 @@ foreign xa2 {
 // VOLUMEMETER_LEVELS: Receives results from GetEffectParameters().
 // The user is responsible for allocating pPeakLevels, pRMSLevels, and initializing ChannelCount accordingly.
 // The volume meter does not support SetEffectParameters().
-VOLUMEMETER_LEVELS :: struct {
+VOLUMEMETER_LEVELS :: struct #packed {
 	pPeakLevels:  [^]f32,   // Peak levels table: receives maximum absolute level for each channel over a processing pass, may be NULL if pRMSLevls != NULL, otherwise must have at least ChannelCount elements.
 	pRMSLevels:   [^]f32,   // Root mean square levels table: receives RMS level for each channel over a processing pass, may be NULL if pPeakLevels != NULL, otherwise must have at least ChannelCount elements.
 	ChannelCount: u32, 	    // Number of channels being processed by the volume meter APO
@@ -64,7 +58,7 @@ REVERB_MAX_FRAMERATE :: 48000
 
 // REVERB_PARAMETERS: Native parameter set for the reverb effect
 
-REVERB_PARAMETERS :: struct {
+REVERB_PARAMETERS :: struct #packed {
 	// ratio of wet (processed) signal to dry (original) signal
 	WetDryMix: f32,               // [0, 100] (percentage)
 	// Delay times
@@ -93,7 +87,7 @@ REVERB_PARAMETERS :: struct {
 	Density:         f32,         // [0, 100] (percentage)
 	RoomSize:        f32,         // [1, 100] in feet
 	// component control
-	DisableLateField: bool,       // TRUE to disable late field reflections
+	DisableLateField: b32,        // TRUE to disable late field reflections
 }
 
 // Maximum, minimum and default values for the parameters above
@@ -160,11 +154,12 @@ REVERB_DEFAULT_REVERB_GAIN        :: 0.0
 REVERB_DEFAULT_DECAY_TIME         :: 1.0
 REVERB_DEFAULT_DENSITY            :: 100.0
 REVERB_DEFAULT_ROOM_SIZE          :: 100.0
-REVERB_DEFAULT_DISABLE_LATE_FIELD :: false
+
+REVERB_DEFAULT_DISABLE_LATE_FIELD: b32 : false
 
 // REVERB_I3DL2_PARAMETERS: Parameter set compliant with the I3DL2 standard
 
-REVERB_I3DL2_PARAMETERS :: struct {
+REVERB_I3DL2_PARAMETERS :: struct #packed {
 	// ratio of wet (processed) signal to dry (original) signal
 	WetDryMix: f32,            // [0, 100] (percentage)
 
@@ -222,7 +217,7 @@ I3DL2_PRESET_PLATE           := REVERB_I3DL2_PARAMETERS{100.0, -1000, -200,0.0, 
 
 // ReverbConvertI3DL2ToNative: Utility function to map from I3DL2 to native parameters
 
-ReverbConvertI3DL2ToNative :: proc "contextless" (pI3DL2: ^REVERB_I3DL2_PARAMETERS, pNative: ^REVERB_PARAMETERS, sevenDotOneReverb: bool = true) {
+ReverbConvertI3DL2ToNative :: proc "contextless" (pI3DL2: ^REVERB_I3DL2_PARAMETERS, pNative: ^REVERB_PARAMETERS, sevenDotOneReverb: b32 = true) {
 	reflectionsDelay: f32
 	reverbDelay:      f32
 
