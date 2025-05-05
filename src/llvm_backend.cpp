@@ -1177,7 +1177,7 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 	// NOTE(harold): See https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html#//apple_ref/doc/uid/TP40008048-CH100
 
 	// NOTE(harold): Darwin targets are always 64-bit. Should we drop this and assume "q" always?
-	#define INT_SIZE_ENCODING (build_context.metrics.ptr_size == 4 ? "i" : "q")
+	#define INT_SIZE_ENCODING (build_context.metrics.int_size == 4 ? "i" : "q")
 	switch (t->kind) {
 	case Type_Basic: {
 		switch (t->Basic.kind) {
@@ -1256,13 +1256,13 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		case Basic_int:
 			return str_lit(INT_SIZE_ENCODING);
 		case Basic_uint:
-			return build_context.metrics.ptr_size == 4 ? str_lit("I") : str_lit("Q");
+			return build_context.metrics.int_size == 4 ? str_lit("I") : str_lit("Q");
 		case Basic_uintptr:
 		case Basic_rawptr:
 			return str_lit("^v");
 
 		case Basic_string:
-			return build_context.metrics.ptr_size == 4 ? str_lit("{string=*i}") : str_lit("{string=*q}");
+			return build_context.metrics.int_size == 4 ? str_lit("{string=*i}") : str_lit("{string=*q}");
 
 		case Basic_cstring: return str_lit("*");
 		case Basic_any:     return str_lit("{any=^v^v}");  // rawptr + ^Type_Info
@@ -1370,7 +1370,7 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		String type_str = lb_get_objc_type_encoding(t->Array.elem, pointer_depth);
 
 		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 8);
-		s = gb_string_append_fmt(s, "[%lld%s]", t->Array.count, type_str.text);
+		s = gb_string_append_fmt(s, "[%lld%.*s]", t->Array.count, LIT(type_str));
 		return make_string_c(s);
 	}
 
@@ -1378,21 +1378,21 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		String type_str = lb_get_objc_type_encoding(t->EnumeratedArray.elem, pointer_depth);
 
 		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 8);
-		s = gb_string_append_fmt(s, "[%lld%s]", t->EnumeratedArray.count, type_str.text);
+		s = gb_string_append_fmt(s, "[%lld%.*s]", t->EnumeratedArray.count, LIT(type_str));
 		return make_string_c(s);
 	}
 
 	case Type_Slice: {
 		String type_str = lb_get_objc_type_encoding(t->Slice.elem, pointer_depth);
 		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 8);
-		s = gb_string_append_fmt(s, "{slice=^%s%s}", type_str, INT_SIZE_ENCODING);
+		s = gb_string_append_fmt(s, "{slice=^%.*s%s}", LIT(type_str), INT_SIZE_ENCODING);
 		return make_string_c(s);
 	}
 
 	case Type_DynamicArray: {
 		String type_str = lb_get_objc_type_encoding(t->DynamicArray.elem, pointer_depth);
 		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 8);
-		s = gb_string_append_fmt(s, "{dynamic=^%s%s%sAllocator={?^v}}", type_str, INT_SIZE_ENCODING, INT_SIZE_ENCODING);
+		s = gb_string_append_fmt(s, "{dynamic=^%.*s%s%sAllocator={?^v}}", LIT(type_str), INT_SIZE_ENCODING, INT_SIZE_ENCODING);
 		return make_string_c(s);
 	}
 
@@ -1407,10 +1407,22 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		return str_lit("?");
 	case Type_BitSet:
 		return lb_get_objc_type_encoding(t->BitSet.underlying, pointer_depth);
-	case Type_SimdVector:
-		break;
-	case Type_Matrix:
-		break;
+
+	case Type_SimdVector: {
+		String type_str = lb_get_objc_type_encoding(t->SimdVector.elem, pointer_depth);
+		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 5);
+		gb_string_append_fmt(s, "[%lld%.*s]", t->SimdVector.count, LIT(type_str));
+		return make_string_c(s);
+	}
+
+	case Type_Matrix: {
+		String type_str = lb_get_objc_type_encoding(t->Matrix.elem, pointer_depth);
+		gbString s = gb_string_make_reserve(temporary_allocator(), type_str.len + 5);
+		i64 element_count = t->Matrix.column_count * t->Matrix.row_count;
+		gb_string_append_fmt(s, "[%lld%.*s]", element_count, LIT(type_str));
+		return make_string_c(s);
+	}
+
 	case Type_BitField:
 		return lb_get_objc_type_encoding(t->BitField.backing_type, pointer_depth);
 	case Type_SoaPointer: {
