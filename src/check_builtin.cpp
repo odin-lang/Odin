@@ -760,6 +760,36 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
+	case BuiltinProc_simd_indices:
+		{
+			Operand x = {};
+			check_expr_or_type(c, &x, ce->args[0], nullptr);
+			if (x.mode == Addressing_Invalid) return false;
+			if (x.mode != Addressing_Type) {
+				gbString s = expr_to_string(x.expr);
+				error(x.expr, "'%.*s' expected a simd vector type, got '%s'", LIT(builtin_name), s);
+				gb_string_free(s);
+				return false;
+			}
+			if (!is_type_simd_vector(x.type)) {
+				gbString s = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a simd vector type, got '%s'", LIT(builtin_name), s);
+				gb_string_free(s);
+				return false;
+			}
+
+			Type *elem = base_array_type(x.type);
+			if (!is_type_numeric(elem)) {
+				gbString s = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a simd vector type with a numeric element type, got '%s'", LIT(builtin_name), s);
+				gb_string_free(s);
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+			return true;
+		}
+
 	case BuiltinProc_simd_extract:
 		{
 			Operand x = {};
@@ -2059,6 +2089,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_atomic_type_is_lock_free:
 	case BuiltinProc_has_target_feature:
 	case BuiltinProc_procedure_of:
+	case BuiltinProc_simd_indices:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -6001,12 +6032,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			
 			// NOTE(jakubtomsu): forces calculation of variant_block_size
 			type_size_of(u);
-			i64 tag_offset = u->Union.variant_block_size;
-			GB_ASSERT(tag_offset > 0);
+			// NOTE(Jeroen): A tag offset of zero is perfectly fine if all members of the union are empty structs.
+			//               What matters is that the tag size is > 0.
+			GB_ASSERT(u->Union.tag_size > 0);
 			
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
-			operand->value = exact_value_i64(tag_offset);
+			operand->value = exact_value_i64(u->Union.variant_block_size);
 		}
 		break;
 

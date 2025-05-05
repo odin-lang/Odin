@@ -162,7 +162,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		}
 	}
 
-	cmdline_if: if selection & {.Working_Dir, .Command_Line, .Command_Args, .Executable_Path} != {} {
+	cmdline_if: if selection & {.Working_Dir, .Command_Line, .Command_Args} != {} {
 		strings.builder_reset(&path_builder)
 		strings.write_string(&path_builder, "/proc/")
 		strings.write_int(&path_builder, pid)
@@ -178,12 +178,12 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		terminator := strings.index_byte(cmdline, 0)
 		assert(terminator > 0)
 
-		command_line_exec := cmdline[:terminator]
+		// command_line_exec := cmdline[:terminator]
 
 		// Still need cwd if the execution on the command line is relative.
 		cwd: string
 		cwd_err: Error
-		if .Working_Dir in selection || (.Executable_Path in selection && command_line_exec[0] != '/') {
+		if .Working_Dir in selection {
 			strings.builder_reset(&path_builder)
 			strings.write_string(&path_builder, "/proc/")
 			strings.write_int(&path_builder, pid)
@@ -195,18 +195,6 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				info.fields += {.Working_Dir}
 			} else if cwd_err != nil {
 				err = cwd_err
-				break cmdline_if
-			}
-		}
-
-		if .Executable_Path in selection {
-			if cmdline[0] == '/' {
-				info.executable_path = strings.clone(cmdline[:terminator], allocator) or_return
-				info.fields += {.Executable_Path}
-			} else if cwd_err == nil {
-				info.executable_path = join_path({ cwd, cmdline[:terminator] }, allocator) or_return
-				info.fields += {.Executable_Path}
-			} else {
 				break cmdline_if
 			}
 		}
@@ -320,6 +308,30 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				err = .Invalid_File
 				break stat_if
 			}
+		}
+	}
+
+	if .Executable_Path in selection {
+		/*
+		NOTE(Jeroen):
+
+		The old version returned the wrong executable path for things like `bash` or `sh`,
+		for whom `/proc/<pid>/cmdline` will just report "bash" or "sh",
+		resulting in misleading paths like `$PWD/sh`, even though that executable doesn't exist there.
+
+		Thanks to Yawning for suggesting `/proc/self/exe`.
+		*/
+
+		strings.builder_reset(&path_builder)
+		strings.write_string(&path_builder, "/proc/")
+		strings.write_int(&path_builder, pid)
+		strings.write_string(&path_builder, "/exe")
+
+		if exe_bytes, exe_err := _read_link(strings.to_string(path_builder), temp_allocator()); exe_err == nil {
+			info.executable_path = strings.clone(string(exe_bytes), allocator) or_return
+			info.fields += {.Executable_Path}
+		} else {
+			err = exe_err
 		}
 	}
 

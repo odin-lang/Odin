@@ -212,11 +212,15 @@ _file_type_from_create_file :: proc(wname: win32.wstring, create_file_attributes
 }
 
 _file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (type: File_Type, mode: int) {
-	if file_attributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
-		mode |= 0o444
-	} else {
-		mode |= 0o666
-	}
+	// NOTE(Jeroen): We don't translate mode flags for Linux when given to `chmod`.
+	//               Let's not do so for Windows for `chmod` or `read_directory_iterator` either.
+	//               They're *not* portable between Windows and non-Windows platforms.
+	//
+	//               It also leads to information loss as flags like Archive, Hidden and System have no equivalent there.
+	//               We can of course parse them so we can set the `.Symlink` and `.Directory` type, but we shouldn't pretend
+	//               that 0o644 is meaningful when returned as a mode.
+	//               `C:\bootmgr` as an example has attributes read only, hidden, system, archive. In no way is it sensible to replace that with 0o444.
+	mode = int(file_attributes)
 
 	is_sym := false
 	if file_attributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
@@ -229,21 +233,36 @@ _file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: wi
 		type = .Symlink
 	} else if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
 		type = .Directory
-		mode |= 0o111
 	} else if h != nil {
 		type = file_type(h)
 	}
 	return
 }
 
+// a 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 (UTC)
+time_as_filetime :: #force_inline proc(t: time.Time) -> (ft: win32.LARGE_INTEGER) {
+	win := u64(t._nsec / 100) + 116444736000000000
+	return win32.LARGE_INTEGER(win)
+}
+
+filetime_as_time_li :: #force_inline proc(ft: win32.LARGE_INTEGER) -> (t: time.Time) {
+	return {_nsec=(i64(ft) - 116444736000000000) * 100}
+}
+
+filetime_as_time_ft :: #force_inline proc(ft: win32.FILETIME) -> (t: time.Time) {
+	return filetime_as_time_li(win32.LARGE_INTEGER(ft.dwLowDateTime) + win32.LARGE_INTEGER(ft.dwHighDateTime) << 32)
+}
+
+filetime_as_time :: proc{filetime_as_time_ft, filetime_as_time_li}
+
 _file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.type = type
 	fi.mode |= mode
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+	fi.creation_time     = filetime_as_time(d.ftCreationTime)
+	fi.modification_time = filetime_as_time(d.ftLastWriteTime)
+	fi.access_time       = filetime_as_time(d.ftLastAccessTime)
 	fi.fullpath, e = full_path_from_name(name, allocator)
 	fi.name = basename(fi.fullpath)
 	return
@@ -254,9 +273,9 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.type = type
 	fi.mode |= mode
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+	fi.creation_time     = filetime_as_time(d.ftCreationTime)
+	fi.modification_time = filetime_as_time(d.ftLastWriteTime)
+	fi.access_time       = filetime_as_time(d.ftLastAccessTime)
 	fi.fullpath, e = full_path_from_name(name, allocator)
 	fi.name = basename(fi.fullpath)
 	return
@@ -286,9 +305,9 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, h, 0)
 	fi.type = type
 	fi.mode |= mode
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+	fi.creation_time     = filetime_as_time(d.ftCreationTime)
+	fi.modification_time = filetime_as_time(d.ftLastWriteTime)
+	fi.access_time       = filetime_as_time(d.ftLastAccessTime)
 	return fi, nil
 }
 

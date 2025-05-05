@@ -1293,6 +1293,23 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 	lbValue res = {};
 	res.type = tv.type;
 
+	switch (builtin_id) {
+	case BuiltinProc_simd_indices: {
+		Type *type = base_type(res.type);
+		GB_ASSERT(type->kind == Type_SimdVector);
+		Type *elem = type->SimdVector.elem;
+
+		i64 count = type->SimdVector.count;
+		LLVMValueRef *scalars = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+		for (i64 i = 0; i < count; i++) {
+			scalars[i] = lb_const_value(m, elem, exact_value_i64(i)).value;
+		}
+
+		res.value = LLVMConstVector(scalars, cast(unsigned)count);
+		return res;
+	}
+	}
+
 	lbValue arg0 = {}; if (ce->args.count > 0) arg0 = lb_build_expr(p, ce->args[0]);
 	lbValue arg1 = {}; if (ce->args.count > 1) arg1 = lb_build_expr(p, ce->args[1]);
 	lbValue arg2 = {}; if (ce->args.count > 2) arg2 = lb_build_expr(p, ce->args[2]);
