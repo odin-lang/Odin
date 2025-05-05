@@ -205,6 +205,9 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_masked_expand_load,
 	BuiltinProc_simd_masked_compress_store,
 
+	BuiltinProc_simd_indices,
+
+
 	// Platform specific SIMD intrinsics
 	BuiltinProc_simd_x86__MM_SHUFFLE,
 BuiltinProc__simd_end,
@@ -550,6 +553,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_masked_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_masked_expand_load"),    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_masked_compress_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_indices"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_x86__MM_SHUFFLE"), 4, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
