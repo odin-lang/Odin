@@ -139,6 +139,9 @@ nil_logger_proc :: runtime.default_logger_proc
 
 /*
 Create a logger that does nothing.
+
+Returns:
+- A logger that does nothing
 */
 nil_logger :: proc() -> Logger {
 	return Logger{nil_logger_proc, nil, Level.Debug, nil}

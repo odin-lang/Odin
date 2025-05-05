@@ -30,6 +30,10 @@ create_multi_logger :: proc(logs: ..Logger, allocator := context.allocator) -> L
 
 /*
 Destroy a logger created with `create_multi_logger`.
+
+Inputs:
+- `log`: Logger created with `create_multi_logger`
+- `allocator`: Allocator passed to `create_multi_logger`
 */
 destroy_multi_logger :: proc(log: Logger, allocator := context.allocator) {
 	data := (^Multi_Logger_Data)(log.data)

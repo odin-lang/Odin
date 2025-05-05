@@ -91,6 +91,10 @@ create_file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_F
 
 /*
 Destroy a logger created with `create_file_logger` and close the file handle.
+
+Inputs:
+- `log`: Logger created with `create_file_logger`
+- `allocator`: Allocator passed to `create_file_logger`
 */
 destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
 	data := cast(^File_Console_Logger_Data)log.data
@@ -120,6 +124,10 @@ create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logg
 
 /*
 Destroy a logger created with `create_console_logger`.
+
+Inputs:
+- `log`: Logger created with `create_console_logger`
+- `allocator`: Allocator passed to `create_console_logger`
 */
 destroy_console_logger :: proc(log: Logger, allocator := context.allocator) {
 	free(log.data, allocator)
