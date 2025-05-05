@@ -533,7 +533,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			Entity *e = entity_from_expr(expr);
 			res = lb_find_procedure_value_from_entity(m, e);
 		}
-		GB_ASSERT(res.value != nullptr);
+		if (res.value == nullptr) {
+			// This is an unspecialized polymorphic procedure, return nil or dummy value
+			return lb_const_nil(m, original_type);
+		}
 		GB_ASSERT(LLVMGetValueKind(res.value) == LLVMFunctionValueKind);
 
 		if (LLVMGetIntrinsicID(res.value) == 0) {

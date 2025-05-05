@@ -67,6 +67,14 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
+	// Skip codegen for unspecialized polymorphic procedures
+	if (is_type_polymorphic(entity->type) && !entity->Procedure.is_foreign) {
+		Type *bt = base_type(entity->type);
+		if (bt->kind == Type_Proc && bt->Proc.is_polymorphic && !bt->Proc.is_poly_specialized) {
+			// Do not generate code for unspecialized polymorphic procedures
+			return nullptr;
+		}
+	}
 	if (!entity->Procedure.is_foreign) {
 		if ((entity->flags & EntityFlag_ProcBodyChecked) == 0) {
 			GB_PANIC("%.*s :: %s (was parapoly: %d %d)", LIT(entity->token.string), type_to_string(entity->type), is_type_polymorphic(entity->type, true), is_type_polymorphic(entity->type, false));
@@ -815,6 +823,10 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 	e->Procedure.link_name = name;
 
 	lbProcedure *nested_proc = lb_create_procedure(p->module, e);
+	if (nested_proc == nullptr) {
+		// This is an unspecialized polymorphic procedure, skip codegen
+		return;
+	}
 	e->code_gen_procedure = nested_proc;
 
 	lbValue value = {};
