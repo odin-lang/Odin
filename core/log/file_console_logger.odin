@@ -73,14 +73,16 @@ File_Console_Logger_Data :: struct {
 /*
 Create a logger that outputs to a file.
 
+*Allocates Using Provided Allocator*
+
 When no longer needed can be destroyed with `destroy_file_logger`.
 
 Inputs:
 - `h`: A handle to the output file
-- `lowest`: Log level to use
-- `opt`: Specifies additional data present in the log output
-- `ident`: Identifier to include in the output
-- `allocator`: Allocator to use for data backing the logger
+- `lowest`: Log level to use (default is `.Debug`)
+- `opt`: Specifies additional data present in the log output (default is `log.Default_File_Logger_Opts`)
+- `ident`: Identifier to include in the output (default is `""`)
+- `allocator`: Allocator to use for data backing the logger (default is `context.allocator`)
 */
 create_file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
@@ -90,11 +92,11 @@ create_file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_F
 }
 
 /*
-Destroy a logger created with `create_file_logger` and close the file handle.
+Free the state allocated with `create_file_logger` and close the file handle.
 
 Inputs:
 - `log`: Logger created with `create_file_logger`
-- `allocator`: Allocator passed to `create_file_logger`
+- `allocator`: Allocator passed to `create_file_logger` (default is `context.allocator`)
 */
 destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
 	data := cast(^File_Console_Logger_Data)log.data
@@ -107,13 +109,15 @@ destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
 /*
 Create a logger that outputs to the terminal.
 
+*Allocates Using Provided Allocator*
+
 When no longer needed can be destroyed with `destroy_console_logger`.
 
 Inputs:
-- `lowest`: Log level to use
-- `opt`: Specifies additional data present in the log output
-- `ident`: Identifier to include in the output
-- `allocator`: Allocator to use for data backing the logger
+- `lowest`: Log level to use (default is `.Debug`)
+- `opt`: Specifies additional data present in the log output (default is `log.Default_Console_Logger_Opts`)
+- `ident`: Identifier to include in the output (default is `""`)
+- `allocator`: Allocator to use for data backing the logger (default is `context.allocator`)
 */
 create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
@@ -123,11 +127,11 @@ create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logg
 }
 
 /*
-Destroy a logger created with `create_console_logger`.
+Free the state allocated with `create_console_logger`.
 
 Inputs:
 - `log`: Logger created with `create_console_logger`
-- `allocator`: Allocator passed to `create_console_logger`
+- `allocator`: Allocator passed to `create_console_logger` (default is `context.allocator`)
 */
 destroy_console_logger :: proc(log: Logger, allocator := context.allocator) {
 	free(log.data, allocator)

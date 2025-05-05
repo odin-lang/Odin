@@ -153,7 +153,7 @@ Log a formatted message at the `Debug` level.
 Inputs:
 - `fmt_str`: A format string, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `location`: Location of the caller
+- `location`: Location of the caller (default is #caller_location)
 */
 debugf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
 	logf(.Debug,   fmt_str, ..args, location=location)
@@ -165,7 +165,7 @@ Log a formatted message at the `Info` level.
 Inputs:
 - `fmt_str`: A format string, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `location`: Location of the caller
+- `location`: Location of the caller (default is #caller_location)
 */
 infof  :: proc(fmt_str: string, args: ..any, location := #caller_location) {
 	logf(.Info,    fmt_str, ..args, location=location)
@@ -177,7 +177,7 @@ Log a formatted message at the `Warn` level.
 Inputs:
 - `fmt_str`: A format string, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `location`: Location of the caller
+- `location`: Location of the caller (default is #caller_location)
 */
 warnf  :: proc(fmt_str: string, args: ..any, location := #caller_location) {
 	logf(.Warning, fmt_str, ..args, location=location)
@@ -189,7 +189,7 @@ Log a formatted message at the `Error` level.
 Inputs:
 - `fmt_str`: A format string, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `location`: Location of the caller
+- `location`: Location of the caller (default is #caller_location)
 */
 errorf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
 	logf(.Error,   fmt_str, ..args, location=location)
@@ -201,7 +201,7 @@ Log a formatted message at the `Fatal` level.
 Inputs:
 - `fmt_str`: A format string, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `location`: Location of the caller
+- `location`: Location of the caller (default is #caller_location)
 */
 fatalf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
 	logf(.Fatal,   fmt_str, ..args, location=location)
@@ -212,8 +212,8 @@ Log a message at the `Debug` level.
 
 Inputs:
 - `args`: values to be concatenated into the output
-- `sep`: separator to use when concatenating
-- `location`: Location of the caller
+- `sep`: separator to use when concatenating (default is `" "`)
+- `location`: Location of the caller (default is #caller_location)
 */
 debug :: proc(args: ..any, sep := " ", location := #caller_location) {
 	log(.Debug,   ..args, sep=sep, location=location)
@@ -224,8 +224,8 @@ Log a message at the `Info` level.
 
 Inputs:
 - `args`: values to be concatenated into the output
-- `sep`: separator to use when concatenating
-- `location`: Location of the caller
+- `sep`: separator to use when concatenating (default is `" "`)
+- `location`: Location of the caller (default is #caller_location)
 */
 info  :: proc(args: ..any, sep := " ", location := #caller_location) {
 	log(.Info,    ..args, sep=sep, location=location)
@@ -236,8 +236,8 @@ Log a message at the `Warn` level.
 
 Inputs:
 - `args`: values to be concatenated into the output
-- `sep`: separator to use when concatenating
-- `location`: Location of the caller
+- `sep`: separator to use when concatenating (default is `" "`)
+- `location`: Location of the caller (default is #caller_location)
 */
 warn  :: proc(args: ..any, sep := " ", location := #caller_location) {
 	log(.Warning, ..args, sep=sep, location=location)
@@ -248,8 +248,8 @@ Log a message at the `Error` level.
 
 Inputs:
 - `args`: values to be concatenated into the output
-- `sep`: separator to use when concatenating
-- `location`: Location of the caller
+- `sep`: separator to use when concatenating (default is `" "`)
+- `location`: Location of the caller (default is #caller_location)
 */
 error :: proc(args: ..any, sep := " ", location := #caller_location) {
 	log(.Error,   ..args, sep=sep, location=location)
@@ -260,8 +260,8 @@ Log a message at the `Fatal` level.
 
 Inputs:
 - `args`: values to be concatenated into the output
-- `sep`: separator to use when concatenating
-- `location`: Location of the caller
+- `sep`: separator to use when concatenating (default is `" "`)
+- `location`: Location of the caller (default is #caller_location)
 */
 fatal :: proc(args: ..any, sep := " ", location := #caller_location) {
 	log(.Fatal,   ..args, sep=sep, location=location)
@@ -272,7 +272,7 @@ Log a message at the `Fatal` level and abort the program.
 
 Inputs:
 - `args`: values to be concatenated into the output
-- `location`: Location of the caller
+- `location`: Location of the caller (default is #caller_location)
 */
 panic :: proc(args: ..any, location := #caller_location) -> ! {
 	log(.Fatal, ..args, location=location)
@@ -285,7 +285,7 @@ Log a formatted message at the `Fatal` level and abort the program.
 Inputs:
 - `fmt_str`: A format string, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `location`: Location of the caller
+- `location`: Location of the caller (default is #caller_location)
 */
 panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! {
 	logf(.Fatal, fmt_str, ..args, location=location)
@@ -299,8 +299,8 @@ Can be disabled using `ODIN_DISABLE_ASSERT`.
 
 Inputs:
 - `condition`: A boolean to check
-- `message`: Message to log when condition is false
-- `loc`: Location of the caller
+- `message`: Message to log when condition is false (a default is provided)
+- `loc`: Location of the caller (default is #caller_location)
 */
 @(disabled=ODIN_DISABLE_ASSERT)
 assert :: proc(condition: bool, message := #caller_expression(condition), loc := #caller_location) {
@@ -327,7 +327,7 @@ Inputs:
 - `condition`: A boolean to check
 - `fmt_str`: A format string to use when condition is false, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `loc`: Location of the caller
+- `loc`: Location of the caller (default is #caller_location)
 */
 @(disabled=ODIN_DISABLE_ASSERT)
 assertf :: proc(condition: bool, fmt_str: string, args: ..any, loc := #caller_location) {
@@ -357,8 +357,8 @@ Unlike `assert` this procedure cannot be disabled with `ODIN_DISABLE_ASSERT` and
 
 Inputs:
 - `condition`: A boolean to check
-- `message`: Message to log when condition is false
-- `loc`: Location of the caller
+- `message`: Message to log when condition is false (a default is provided)
+- `loc`: Location of the caller (default is #caller_location)
 */
 ensure :: proc(condition: bool, message := #caller_expression(condition), loc := #caller_location) {
 	if !condition {
@@ -384,7 +384,7 @@ Inputs:
 - `condition`: A boolean to check
 - `fmt_str`: A format string to use when condition is false, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `loc`: Location of the caller
+- `loc`: Location of the caller (default is #caller_location)
 */
 ensuref :: proc(condition: bool, fmt_str: string, args: ..any, loc := #caller_location) {
 	if !condition {
@@ -408,8 +408,8 @@ Log a message at the desired level.
 Inputs:
 - `level`: The level of the message
 - `args`: values to be concatenated into the output
-- `sep`: separator to use when concatenating
-- `location`: Location of the caller
+- `sep`: separator to use when concatenating (default is `" "`)
+- `location`: Location of the caller (default is #caller_location)
 */
 log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location) {
 	logger := context.logger
@@ -431,7 +431,7 @@ Inputs:
 - `level`: The level of the message
 - `fmt_str`: A format string, e.g. `"a: %v, b: %v"
 - `args`: Arguments for the format string
-- `location`: Location of the caller
+- `location`: Location of the caller (default is #caller_location)
 */
 logf :: proc(level: Level, fmt_str: string, args: ..any, location := #caller_location) {
 	logger := context.logger

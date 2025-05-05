@@ -35,9 +35,9 @@ Initialize the backing data for the allocator that logs all allocations.
 Inputs:
 - `la`: Pointer to the data structure to initialize
 - `level`: Log level to use for allocations
-- `size_fmt`: Format to use when logging allocations
-- `allocator`: Wrapped allocator
-- `prefix`: Prefix to use in log messages
+- `size_fmt`: Format to use when logging allocations (default is `.Bytes`)
+- `allocator`: Wrapped allocator (default is `context.allocator`)
+- `prefix`: Prefix to use in log messages (default is `""`)
 */
 log_allocator_init :: proc(la: ^Log_Allocator, level: Level, size_fmt := Log_Allocator_Format.Bytes,
                            allocator := context.allocator, prefix := "") {
