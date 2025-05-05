@@ -2510,3 +2510,17 @@ Example:
 recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
 	return T(1) / v
 }
+
+
+/*
+Create a vector where each lane contains the index of that lane.
+Inputs:
+- `V`: The type of the vector to create.
+Result:
+- A vector of the given type, where each lane contains the index of that lane.
+**Operation**:
+	for i in 0 ..< N {
+		res[i] = i
+	}
+*/
+indices :: intrinsics.simd_indices
