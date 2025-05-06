@@ -853,8 +853,12 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 		}
 		break;
 
+	case BuiltinProc_simd_reduce_add_bisect:
+	case BuiltinProc_simd_reduce_mul_bisect:
 	case BuiltinProc_simd_reduce_add_ordered:
 	case BuiltinProc_simd_reduce_mul_ordered:
+	case BuiltinProc_simd_reduce_add_pairs:
+	case BuiltinProc_simd_reduce_mul_pairs:
 	case BuiltinProc_simd_reduce_min:
 	case BuiltinProc_simd_reduce_max:
 		{

@@ -274,8 +274,12 @@ simd_lanes_ge :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
 simd_extract :: proc(a: #simd[N]T, idx: uint) -> T ---
 simd_replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T ---
 
+simd_reduce_add_bisect  :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_mul_bisect  :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
 simd_reduce_add_ordered :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
 simd_reduce_mul_ordered :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_add_pairs   :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
+simd_reduce_mul_pairs   :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
 simd_reduce_min         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
 simd_reduce_max         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---
 simd_reduce_and         :: proc(a: #simd[N]T) -> T where type_is_integer(T) || type_is_float(T)---

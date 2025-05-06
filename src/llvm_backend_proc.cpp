@@ -1495,6 +1495,38 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		res.value = LLVMBuildInsertElement(p->builder, arg0.value, arg2.value, arg1.value, "");
 		return res;
 
+	case BuiltinProc_simd_reduce_add_bisect:
+	case BuiltinProc_simd_reduce_mul_bisect:
+		{
+			GB_ASSERT(arg0.type->kind == Type_SimdVector);
+			i64 num_elems = arg0.type->SimdVector.count;
+
+			LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, num_elems);
+			for (i64 i = 0; i < num_elems; i++) {
+				indices[i] = lb_const_int(m, t_uint, cast(u64)i).value;
+			}
+
+			switch (builtin_id) {
+			case BuiltinProc_simd_reduce_add_bisect: op_code = is_float ? LLVMFAdd : LLVMAdd; break;
+			case BuiltinProc_simd_reduce_mul_bisect: op_code = is_float ? LLVMFMul : LLVMMul; break;
+			}
+
+			LLVMValueRef remaining = arg0.value;
+			i64 num_remaining = num_elems;
+
+			while (num_remaining > 1) {
+				num_remaining /= 2;
+				LLVMValueRef left_indices = LLVMConstVector(&indices[0], cast(unsigned)num_remaining);
+				LLVMValueRef left_value = LLVMBuildShuffleVector(p->builder, remaining, remaining, left_indices, "");
+				LLVMValueRef right_indices = LLVMConstVector(&indices[num_remaining], cast(unsigned)num_remaining);
+				LLVMValueRef right_value = LLVMBuildShuffleVector(p->builder, remaining, remaining, right_indices, "");
+				remaining = LLVMBuildBinOp(p->builder, op_code, left_value, right_value, "");
+			}
+
+			res.value = LLVMBuildExtractElement(p->builder, remaining, indices[0], "");
+			return res;
+		}
+
 	case BuiltinProc_simd_reduce_add_ordered:
 	case BuiltinProc_simd_reduce_mul_ordered:
 		{
@@ -1527,6 +1559,40 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			res.value = lb_call_intrinsic(p, name, args, cast(unsigned)args_count, types, gb_count_of(types));
 			return res;
 		}
+
+	case BuiltinProc_simd_reduce_add_pairs:
+	case BuiltinProc_simd_reduce_mul_pairs:
+		{
+			GB_ASSERT(arg0.type->kind == Type_SimdVector);
+			i64 num_elems = arg0.type->SimdVector.count;
+
+			LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, num_elems);
+			for (i64 i = 0; i < num_elems/2; i++) {
+				indices[i] = lb_const_int(m, t_uint, cast(u64)(2*i)).value;
+				indices[i+num_elems/2] = lb_const_int(m, t_uint, cast(u64)(2*i+1)).value;
+			}
+
+			switch (builtin_id) {
+			case BuiltinProc_simd_reduce_add_pairs: op_code = is_float ? LLVMFAdd : LLVMAdd; break;
+			case BuiltinProc_simd_reduce_mul_pairs: op_code = is_float ? LLVMFMul : LLVMMul; break;
+			}
+
+			LLVMValueRef remaining = arg0.value;
+			i64 num_remaining = num_elems;
+
+			while (num_remaining > 1) {
+				num_remaining /= 2;
+				LLVMValueRef left_indices = LLVMConstVector(&indices[0], cast(unsigned)num_remaining);
+				LLVMValueRef left_value = LLVMBuildShuffleVector(p->builder, remaining, remaining, left_indices, "");
+				LLVMValueRef right_indices = LLVMConstVector(&indices[num_elems/2], cast(unsigned)num_remaining);
+				LLVMValueRef right_value = LLVMBuildShuffleVector(p->builder, remaining, remaining, right_indices, "");
+				remaining = LLVMBuildBinOp(p->builder, op_code, left_value, right_value, "");
+			}
+
+			res.value = LLVMBuildExtractElement(p->builder, remaining, indices[0], "");
+			return res;
+		}
+
 	case BuiltinProc_simd_reduce_min:
 	case BuiltinProc_simd_reduce_max:
 	case BuiltinProc_simd_reduce_and:
