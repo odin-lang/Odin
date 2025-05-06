@@ -137,7 +137,7 @@ Example:
 	sort_by_indices_allocate_example :: proc() {
 		array := []rune{'A', 'B', 'C'}
 		indices := []int{2, 0, 1}
-		sorted := sort_by_indices_allocate(array, indices)
+		sorted := slice.sort_by_indices_allocate(array, indices)
 		defer delete(sorted)
 		fmt.println(sorted)
 	}
