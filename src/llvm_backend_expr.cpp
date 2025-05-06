@@ -3146,6 +3146,18 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 			}
 		}
 		break;
+	
+	case Type_SoaPointer:
+		{
+			// NOTE(bill): An SoaPointer is essentially just a pointer for nil comparison
+			lbValue ptr = lb_emit_struct_ev(p, x, 0); // Extract the base pointer component (field 0)
+			if (op_kind == Token_CmpEq) {
+				res.value = LLVMBuildIsNull(p->builder, ptr.value, "");
+			} else if (op_kind == Token_NotEq) {
+				res.value = LLVMBuildIsNotNull(p->builder, ptr.value, "");
+			}
+			return res;
+		}
 
 	case Type_Union:
 		{
