@@ -418,9 +418,6 @@ _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process,
 }
 
 @(private="package")
-_Sys_Process_Attributes :: struct {}
-
-@(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 	command_line   := _build_command_line(desc.command, temp_allocator())
@@ -431,17 +428,49 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	}
 	environment_block   := _build_environment_block(environment, temp_allocator())
 	environment_block_w := win32_utf8_to_utf16(environment_block, temp_allocator()) or_return
-	stderr_handle       := win32.GetStdHandle(win32.STD_ERROR_HANDLE)
-	stdout_handle       := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
-	stdin_handle        := win32.GetStdHandle(win32.STD_INPUT_HANDLE)
 
-	if desc.stdout != nil {
+	stderr_handle: win32.HANDLE	
+	stdout_handle: win32.HANDLE	
+	stdin_handle:  win32.HANDLE	
+
+	null_handle: win32.HANDLE
+	if desc.stdout == nil || desc.stderr == nil || desc.stdin == nil {
+		null_handle = win32.CreateFileW(
+			win32.L("NUL"),
+			win32.GENERIC_READ|win32.GENERIC_WRITE,
+			win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE,
+			&win32.SECURITY_ATTRIBUTES{
+				nLength        = size_of(win32.SECURITY_ATTRIBUTES),
+				bInheritHandle = true,
+			},
+			win32.OPEN_EXISTING,
+			win32.FILE_ATTRIBUTE_NORMAL,
+			nil,
+		)
+		// Opening NUL should always succeed.
+		assert(null_handle != nil)
+	}
+	// NOTE(laytan): I believe it is fine to close this handle right after CreateProcess,
+	// and we don't have to hold onto this until the process exits.
+	defer if null_handle != nil {
+		win32.CloseHandle(null_handle)
+	}
+
+	if desc.stdout == nil {
+		stdout_handle = null_handle
+	} else {
 		stdout_handle = win32.HANDLE((^File_Impl)(desc.stdout.impl).fd)
 	}
-	if desc.stderr != nil {
+
+	if desc.stderr == nil {
+		stderr_handle = null_handle
+	} else {
 		stderr_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
 	}
-	if desc.stdin != nil {
+
+	if desc.stdin == nil {
+		stdin_handle = null_handle
+	} else {
 		stdin_handle = win32.HANDLE((^File_Impl)(desc.stdin.impl).fd)
 	}
 

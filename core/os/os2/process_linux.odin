@@ -391,9 +391,6 @@ _process_open :: proc(pid: int, _: Process_Open_Flags) -> (process: Process, err
 }
 
 @(private="package")
-_Sys_Process_Attributes :: struct {}
-
-@(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	TEMP_ALLOCATOR_GUARD()
 
