@@ -20,7 +20,7 @@ heap_allocator_proc :: proc(
 	old_size: int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-	assert(alignment <= HEAP_MAX_ALIGNMENT, "Heap allocation alignment beyond HEAP_MAX_ALIGNMENT bytes is not supported.", loc = loc)
+	assert(alignment <= ODIN_HEAP_MAX_ALIGNMENT, "Heap allocation alignment beyond ODIN_HEAP_MAX_ALIGNMENT bytes is not supported.", loc = loc)
 	assert(alignment >= 0, "Alignment must be greater than or equal to zero.", loc = loc)
 	switch mode {
 	case .Alloc:

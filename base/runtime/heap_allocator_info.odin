@@ -4,169 +4,159 @@
 package runtime
 
 import "base:intrinsics"
+import "base:runtime"
 
 /*
 Heap_Info provides metrics on a single thread's heap memory usage.
+
+`total_memory_allocated_from_system`
+  = `total_memory_used_for_book_keeping`
+  + `total_memory_in_use`
+  + `total_memory_free`
+
+NOTE: `total_memory_used_by_huge_segments` highlights how much memory is used
+by the Huge class of allocations and is not part of any equation.
 */
 Heap_Info :: struct {
 	total_memory_allocated_from_system: int `fmt:"M"`,
 	total_memory_used_for_book_keeping: int `fmt:"M"`,
+	total_memory_used_by_huge_segments: int `fmt:"M"`,
 	total_memory_in_use:                int `fmt:"M"`,
 	total_memory_free:                  int `fmt:"M"`,
 	total_memory_dirty:                 int `fmt:"M"`,
-	total_memory_remotely_free:         int `fmt:"M"`,
 
-	total_superpages:                         int,
-	total_superpages_dedicated_to_heap_cache: int,
-	total_huge_allocations:                   int,
-	total_slabs:                              int,
-	total_slabs_in_use:                       int,
+	total_segments:       int,
+	total_small_segments: int,
+	total_large_segments: int,
+	total_huge_segments:  int,
 
-	total_dirty_bins:  int,
-	total_free_bins:   int,
-	total_bins_in_use: int,
-	total_remote_free_bins: int,
+	total_heap_remote_frees: int,
+	total_slabs:             int,
 
-	heap_slab_map_entries:           int,
-	heap_superpages_with_free_slabs: int,
-	heap_slabs_with_remote_frees:    int,
+	total_free_slabs_by_class: [1+int(max(Heap_Slab_Class))]int,
+	
+	slabs_by_rank: [runtime.ODIN_HEAP_BIN_RANKS]struct {
+		total_memory_in_use: int `fmt:"M"`,
+
+		total_slabs:         int,
+		total_bins_in_use:   int,
+		total_free_bins:     int,
+		total_dirty_bins:    int,
+		total_bins:          int,
+	},
+
+	peak_memory: int `fmt:"M"`,
 }
 
 /*
 Get information about the current thread's heap.
-
-This will do additional sanity checking on the heap if assertions are enabled.
 */
 @(require_results)
 get_local_heap_info :: proc "contextless" () -> (info: Heap_Info) {
-	if local_heap_cache != nil {
-		cache := local_heap_cache
-		slab_map_terminated: [HEAP_BIN_RANKS]bool
+	exists_in_list :: proc "contextless" (list: ^Heap_Slab, value: ^Heap_Slab) -> bool {
+		for slab := list; slab != nil; slab = slab.next_slab {
+			if slab == value {
+				return true
+			}
+		}
+		return false
+	}
 
-		for {
-			for rank := 0; rank < HEAP_BIN_RANKS; rank += 1 {
-				for i := 0; i < HEAP_CACHE_SLAB_MAP_STRIDE; i += 1 {
-					slab := cache.slab_map[rank * HEAP_CACHE_SLAB_MAP_STRIDE + i]
-					if slab_map_terminated[rank] {
-						assert_contextless(slab == nil, "The heap allocator has a gap in its slab map.")
-					} else if slab == nil {
-						slab_map_terminated[rank] = true
-					} else {
-						info.heap_slab_map_entries += 1
-						assert_contextless(slab.bin_size != 0, "The heap allocator has an empty slab in its slab map.")
-						assert_contextless(slab.bin_size == 1 << (HEAP_MIN_BIN_SHIFT + uint(rank)), "The heap allocator has a slab in the wrong sub-array of the slab map.")
-					}
+	if local_heap == nil {
+		return
+	}
+
+	for ptr := heap_take_free_list(&local_heap.remote_free_list); ptr != nil; /**/ {
+		when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
+			ptr = cast(^uintptr)(uintptr(u64(uintptr(ptr)) ~ global_heap_xor_key))
+		}
+		next := ptr^
+		info.total_heap_remote_frees += 1
+		// Merge the remote frees, as putting them back would be complicated.
+		heap_free(ptr)
+		ptr = cast(^uintptr)next
+	}
+
+	total_slabs_seen: int
+
+	// Get info on the segments.
+	for segment := local_heap.segments; segment != nil; segment = segment.next_segment {
+		assert_contextless(intrinsics.atomic_load_explicit(&segment.owner, .Acquire) == get_current_thread_id(), "A segment has been found in this thread's heap that does not belong to it.")
+		assert_contextless(intrinsics.atomic_load_explicit(&segment.heap, .Acquire) == local_heap, "A segment has been found in this heap that has not been assigned to it.")
+
+		info.total_slabs += len(segment.slabs)
+		info.total_memory_allocated_from_system += segment.size
+		info.total_memory_used_for_book_keeping += int(uintptr(segment.slabs[0].data) - uintptr(segment))
+		info.total_segments += 1
+
+		switch segment.slab_size_class {
+		case .Small:
+			info.total_small_segments += 1
+		case .Large:
+			info.total_large_segments += 1
+		case .Huge:
+			total_slabs_seen += 1
+			info.total_huge_segments += 1
+			info.total_memory_in_use += segment.slabs[0].bin_size
+			info.total_memory_dirty  += segment.slabs[0].bin_size
+			info.total_memory_used_for_book_keeping += ODIN_HEAP_MAX_ALIGNMENT - segment.padding
+			info.total_memory_used_by_huge_segments += segment.slabs[0].bin_size
+		}
+
+		// This block is merely for sanity checking.
+		for &slab in segment.slabs {
+			if slab.bin_size == 0 {
+				assert_contextless(exists_in_list(local_heap.free_slabs[segment.slab_size_class], &slab))
+			} else {
+				switch segment.slab_size_class {
+				case .Small, .Large:
+					rank := heap_bin_size_to_rank(slab.bin_size)
+					assert_contextless(exists_in_list(local_heap.slabs_by_rank[rank], &slab))
+				case .Huge:
+					break
 				}
 			}
-			for superpage in cache.superpages_with_free_slabs {
-				if superpage != nil {
-					info.heap_superpages_with_free_slabs += 1
-				}
-			}
-			for i in 0..<len(cache.superpages_with_remote_frees) {
-				if intrinsics.atomic_load_explicit(&cache.superpages_with_remote_frees[i], .Seq_Cst) != nil {
-					info.heap_slabs_with_remote_frees += 1
-				}
-			}
-			if cache.next_cache_block == nil {
-				break
-			}
-			cache = cache.next_cache_block
 		}
 	}
 
-	superpage := local_heap
-	for {
-		if superpage == nil {
-			break
+	// Get info on the free slabs.
+	for head, class in local_heap.free_slabs {
+		for slab := head; slab != nil; slab = slab.next_slab {
+			info.total_free_slabs_by_class[class] += 1
+			info.total_memory_free += slab.capacity
+			total_slabs_seen += 1
 		}
-		assert_contextless(superpage.owner == get_current_thread_id(), "The heap allocator for this thread has a superpage that belongs to another thread.")
-		info.total_superpages += 1
-		if superpage.huge_size > 0 {
-			info.total_huge_allocations += 1
-			info.total_memory_allocated_from_system += superpage.huge_size
-			info.total_memory_in_use += superpage.huge_size - HEAP_HUGE_ALLOCATION_BOOK_KEEPING
-			info.total_memory_used_for_book_keeping += HEAP_HUGE_ALLOCATION_BOOK_KEEPING
-		} else {
-			if superpage.cache_block.in_use {
-				info.total_superpages_dedicated_to_heap_cache += 1
-			}
-			info.total_memory_allocated_from_system += SUPERPAGE_SIZE
-			for i := 0; i < HEAP_SLAB_COUNT; /**/ {
-				slab := heap_superpage_index_slab(superpage, i)
-
-				if slab.bin_size != 0 {
-					info.total_slabs_in_use += 1
-					info.total_memory_in_use += slab.bin_size * (slab.max_bins - slab.free_bins)
-					info.total_memory_free   += slab.bin_size * slab.free_bins
-					info.total_memory_dirty  += slab.bin_size * slab.dirty_bins
-					info.total_bins_in_use   += slab.max_bins - slab.free_bins
-					info.total_free_bins     += slab.free_bins
-					info.total_dirty_bins    += slab.dirty_bins
-					assert_contextless(slab.dirty_bins >= slab.max_bins - slab.free_bins, "A slab of the heap allocator has a number of dirty bins which is not equivalent to the number of its total bins minus the number of free bins.")
-					// Account for the bitmaps used by the Slab.
-					info.total_memory_used_for_book_keeping += int(slab.data - uintptr(slab))
-					// Account for the space not used by the bins or the bitmaps.
-					n := int(slab.data - uintptr(slab) + uintptr(slab.max_bins * slab.bin_size))
-					if slab.bin_size > HEAP_MAX_BIN_SIZE {
-						info.total_memory_used_for_book_keeping += heap_slabs_needed_for_size(slab.bin_size) * HEAP_SLAB_SIZE - n
-					} else {
-						info.total_memory_used_for_book_keeping += HEAP_SLAB_SIZE - n
-					}
-					remote_free_bins := 0
-					for j in 0..<slab.sectors {
-						remote_free_bins += int(intrinsics.count_ones(intrinsics.atomic_load_explicit(&slab.remote_free[j], .Seq_Cst)))
-					}
-					info.total_remote_free_bins += remote_free_bins
-					info.total_memory_remotely_free += slab.bin_size * remote_free_bins
-				} else {
-					// When the slab is allocated, the book-keeping bitmaps and
-					// the Slab struct itself will take some of this space, so
-					// it's only an approximation of what is possible.
-					info.total_memory_free += HEAP_SLAB_SIZE
-					when !ODIN_DISABLE_ASSERT {
-						if !slab.is_dirty {
-							// Verify that the slab is actually zeroed out ahead of its index field.
-							ptr := cast([^]u8)rawptr(uintptr(slab) + size_of(int))
-							for k in 0..<HEAP_SLAB_SIZE - size_of(int) {
-								assert_contextless(ptr[k] == 0)
-							}
-						}
-					}
-				}
-
-				if slab.bin_size > HEAP_MAX_BIN_SIZE {
-					// Skip contiguous slabs.
-					i += heap_slabs_needed_for_size(slab.bin_size)
-				} else {
-					i += 1
-				}
-			}
-			// Every superpage has to sacrifice one Slab's worth of space so
-			// that they're all aligned.
-			info.total_memory_used_for_book_keeping += HEAP_SLAB_SIZE
-			info.total_slabs += HEAP_SLAB_COUNT
-		}
-		when !ODIN_DISABLE_ASSERT {
-			contiguous_counter := superpage.contiguous_free_slabs[0]
-			total_contiguous_slabs := contiguous_counter
-			for i in 1..<HEAP_SLAB_COUNT {
-				cfs := superpage.contiguous_free_slabs[i]
-				assert_contextless(cfs == 0 || cfs == contiguous_counter - 1 || contiguous_counter == 0)
-				if cfs != 0 && contiguous_counter == 0 {
-					total_contiguous_slabs += cfs
-				}
-				contiguous_counter = cfs
-			}
-			assert_contextless(total_contiguous_slabs == superpage.free_slabs)
-		}
-		superpage = superpage.next
 	}
 
-	assert_contextless(info.total_memory_allocated_from_system == info.total_memory_used_for_book_keeping + info.total_memory_in_use + info.total_memory_free, "The heap allocator's metrics for total memory in use, free, and used for book-keeping do not add up to the total memory allocated from the operating system.")
+	// Get info on the slabs that are ready for allocation.
+	for head, rank in local_heap.slabs_by_rank {
+		for slab := head; slab != nil; slab = slab.next_slab {
+			assert_contextless(slab.bin_rank == rank, "A ranked slab has been found with the wrong rank.")
+			in_use := slab.max_bins - slab.free_bins
+			total_slabs_seen += 1
 
-	if local_heap_cache != nil {
-		assert_contextless(info.total_superpages == local_heap_cache.owned_superpages)
+			info.total_memory_in_use += in_use * slab.bin_size
+			info.total_memory_free   += slab.capacity - in_use * slab.bin_size
+
+			info.slabs_by_rank[rank].total_memory_in_use += in_use * slab.bin_size
+
+			info.slabs_by_rank[rank].total_slabs       += 1
+			info.slabs_by_rank[rank].total_bins_in_use += in_use
+			info.slabs_by_rank[rank].total_free_bins   += slab.free_bins
+			info.slabs_by_rank[rank].total_dirty_bins  += slab.used_bins
+			info.slabs_by_rank[rank].total_bins        += slab.max_bins
+
+			remote_free_list := transmute(Tagged_Pointer)intrinsics.atomic_load_explicit(cast(^u64)&slab.remote_free_list, .Acquire)
+			assert_contextless(remote_free_list.pointer &  HEAP_FREE_LIST_CLOSED != 0, "A ranked and owned slab has been found which has its remote free list open.")
+			assert_contextless(remote_free_list.pointer &~ HEAP_FREE_LIST_CLOSED == 0, "A ranked and owned slab has a non-empty remote free list.")
+		}
 	}
+
+	info.peak_memory = local_heap.peak_memory
+
+	assert_contextless(info.total_memory_allocated_from_system == info.total_memory_used_for_book_keeping + info.total_memory_in_use + info.total_memory_free,
+		"The heap allocator's metrics for total memory in use, free, and used for book-keeping do not add up to the total memory allocated from the operating system for this thread.")
+	assert_contextless(info.total_slabs == total_slabs_seen, "There is a discrepancy between the number of slabs seen during iteration and the number that should be there based on the segments iterated.")
+
 	return
 }

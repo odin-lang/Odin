@@ -19,9 +19,6 @@ import libc_allocator "libc"
 
 ODIN_DEBUG_HEAP :: runtime.ODIN_DEBUG_HEAP
 
-INTEGER_BITS :: 8 * size_of(int)
-SECTOR_BITS  :: 8 * size_of(uint)
-
 // The tests are specific to feoramalloc, but the benchmarks are general-purpose.
 
 //
@@ -113,79 +110,6 @@ randomize_bytes :: proc {
 	randomize_bytes_ptr,
 }
 
-dump_slabs :: proc() {
-	intrinsics.atomic_thread_fence(.Seq_Cst)
-	superpage := runtime.local_heap
-	for {
-		if superpage == nil {
-			return
-		}
-		log.infof("+++ Superpage at %p", superpage)
-		log.infof(" -  Free slabs: %i", superpage.free_slabs)
-		log.infof(" -  Next free slab index: %i", superpage.next_free_slab_index)
-		for i := 0; i < runtime.HEAP_SLAB_COUNT; /**/ {
-			slab := runtime.heap_superpage_index_slab(superpage, i)
-			if slab.bin_size == 0 {
-				// log.infof("Slab %i unused.", slab.index)
-				expect(i == slab.index)
-			} else {
-				log.infof("%#v", slab)
-				if slab.free_bins == 0 {
-					expect(intrinsics.atomic_load(&slab.is_full))
-				}
-			}
-			if slab.bin_size > runtime.HEAP_MAX_BIN_SIZE {
-				// Skip contiguous slabs.
-				i += runtime.heap_slabs_needed_for_size(slab.bin_size)
-			} else {
-				i += 1
-			}
-		}
-		log.info("")
-		superpage = superpage.next
-	}
-}
-
-validate_cache :: proc() {
-	cache := runtime.local_heap_cache
-	slab_map_terminated: [runtime.HEAP_BIN_RANKS]bool
-	superpages_with_free_slabs_terminated: bool
-	for {
-		// Validate the slab map.
-		for rank in 0..<runtime.HEAP_BIN_RANKS {
-			start := rank * runtime.HEAP_CACHE_SLAB_MAP_STRIDE
-			for i := start; i < start+runtime.HEAP_CACHE_SLAB_MAP_STRIDE; i += 1 {
-				slab := cache.slab_map[i]
-				if slab_map_terminated[rank] {
-					expect(slab == nil)
-				} else if slab == nil {
-					slab_map_terminated[rank] = true
-				} else {
-					expect(rank == runtime.heap_bin_size_to_rank(slab.bin_size))
-				}
-			}
-		}
-
-		// Validate the list of superpages with free slabs.
-		for i := 0; i < len(cache.superpages_with_free_slabs); i += 1 {
-			superpage := cache.superpages_with_free_slabs[i]
-			if superpages_with_free_slabs_terminated {
-				expect(superpage == nil)
-			} else if superpage == nil {
-				superpages_with_free_slabs_terminated = true
-			} else {
-				expect(superpage.free_slabs > 0)
-			}
-		}
-
-		next_cache := intrinsics.atomic_load_explicit(&cache.next_cache_block, .Acquire)
-		if next_cache == nil {
-			break
-		}
-		cache = next_cache
-	}
-}
-
 //
 // Allocation API Testing
 //
@@ -239,7 +163,7 @@ test_alloc_write_free :: proc(
 
 	for o in 1..=u64(object_count) {
 		seed := u64(intrinsics.read_cycle_counter()) * o
-		alignment := min(size, runtime.HEAP_MAX_ALIGNMENT)
+		alignment := min(size, runtime.ODIN_HEAP_MAX_ALIGNMENT)
 
 		bytes, alloc_err := allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0)
 		expect(alloc_err == nil)
@@ -296,9 +220,9 @@ test_alloc_write_free :: proc(
 		}
 
 
-		if o % max(1, u64(object_count / 20)) == 0 {
-			validate_cache()
-		}
+		// if o % max(1, u64(object_count / 20)) == 0 {
+			// validate_cache()
+		// }
 	}
 
 	if end_index - start_index != 0 || free_strategy == .At_The_End {
@@ -319,7 +243,7 @@ test_continuous_allocation_of_size_n :: proc(count: int, max_size: int) {
 	allocator := context.allocator
 	base_seed := u64(intrinsics.read_cycle_counter())
 	for size in 0..<max_size {
-		alignment := min(size, runtime.HEAP_MAX_ALIGNMENT)
+		alignment := min(size, runtime.ODIN_HEAP_MAX_ALIGNMENT)
 		seed := base_seed * (1+u64(size))
 
 		for i in 0..<count {
@@ -352,10 +276,10 @@ test_individual_allocation_and_free :: proc(count: int) {
 	allocator := context.allocator
 	different_pointers := 0
 	for size in 0..<count {
-		if size > 0 && size % (runtime.HEAP_MAX_BIN_SIZE/8) == 0 {
+		if size > 0 && size % (runtime.ODIN_HEAP_MAX_BIN_SIZE/8) == 0 {
 			log.infof("... %i ...", size)
 		}
-		alignment := min(size, runtime.HEAP_MAX_ALIGNMENT)
+		alignment := min(size, runtime.ODIN_HEAP_MAX_ALIGNMENT)
 
 		// Allocate and free twice to make sure that the memory is truly zeroed.
 		//
@@ -393,7 +317,7 @@ test_single_alloc_and_resize :: proc(start, target: int) {
 	allocator := context.allocator
 	base_seed := u64(intrinsics.read_cycle_counter())
 
-	alignment := min(start, runtime.HEAP_MAX_ALIGNMENT)
+	alignment := min(start, runtime.ODIN_HEAP_MAX_ALIGNMENT)
 	seed := base_seed * (1+u64(start))
 
 	bytes, alloc_err := allocator.procedure(allocator.data, .Alloc, start, alignment, nil, 0)
@@ -408,6 +332,7 @@ test_single_alloc_and_resize :: proc(start, target: int) {
 	verify_integrity(resized_bytes_1[:min(start, target)], seed)
 	if target > start {
 		verify_zeroed(resized_bytes_1[start:])
+		randomize_bytes(resized_bytes_1[start:], seed)
 	}
 
 	resized_bytes_2, resize_2_err := allocator.procedure(allocator.data, .Resize, start, alignment, raw_data(resized_bytes_1), target)
@@ -485,10 +410,10 @@ test_parallel_pointer_passing :: proc(thread_count: int) {
 }
 
 /*
-This test makes sure that a Superpage is reused when abandoned by a thread and
+This test makes sure that a Segment is reused when abandoned by a thread and
 picked up by a different one.
 */
-test_superpage_abandonment_and_reuse :: proc() {
+test_segment_abandonment_and_reuse :: proc() {
 	Alloc_Data :: struct {
 		thread: ^thread.Thread,
 		slice: []int,
@@ -498,10 +423,10 @@ test_superpage_abandonment_and_reuse :: proc() {
 
 	alloc_task :: proc(t: ^thread.Thread) {
 		// In this first thread, we allocate a small chunk of memory in a new
-		// superpage and mark where it came from.
+		// segment and mark where it came from.
 		data := cast(^Alloc_Data)t.data
-		data.slice = make([]int, 4096)
-		data.signature = runtime.find_superpage_from_pointer(raw_data(data.slice))
+		data.slice = make([]int, 256)
+		data.signature = runtime.find_segment_from_pointer(raw_data(data.slice))
 		for &v, i in data.slice {
 			v = i
 		}
@@ -518,15 +443,16 @@ test_superpage_abandonment_and_reuse :: proc() {
 		}
 		// Delete the data and allocate a new integer. If everything works as
 		// expected, this thread will have remotely freed the old chunk of
-		// memory, then adopted the superpage with the new operation.
+		// memory, then adopted the segment with the new operation.
 		//
 		// Upon adoption, the remote free should be acknowledged.
 		delete(data.slice)
-		x := new(int)
-		free(x)
+		x := make([]int, 256)
+		defer delete(x)
 		// This is where we check to make sure the new pointer comes from the
 		// same place as the old data.
-		expect(runtime.find_superpage_from_pointer(x) == data.signature)
+		signature := runtime.find_segment_from_pointer(raw_data(x))
+		expect(signature == data.signature)
 		sync.post(&data.done)
 	}
 
@@ -539,7 +465,7 @@ test_superpage_abandonment_and_reuse :: proc() {
 
 	sync.wait(&data.done)
 
-	// It will take an infinitesimal amount of time for the superpage to be
+	// It will take an infinitesimal amount of time for the segment to be
 	// pushed to the orphanage, so let's wait a (rather long) moment.
 	time.sleep(1 * time.Millisecond)
 
@@ -555,7 +481,7 @@ test_superpage_abandonment_and_reuse :: proc() {
 	thread.join(reuser)
 	thread.destroy(allocer)
 	thread.destroy(reuser)
-	log.info("Superpage abandonment and reuse test succeeded.")
+	log.info("Segment abandonment and reuse test succeeded.")
 }
 
 /*
@@ -590,9 +516,9 @@ test_parallel_pointer_resizing :: proc(thread_count: int) {
 		resized_ptr, resize_err := allocator.procedure(allocator.data, .Resize, new_len, 1, data.ptr^, old_len)
 		expect(resize_err == nil)
 
-		// If we're dealing with sub-slab sizes, the pointer should stay the
+		// If we're dealing with Small/Large sizes, the pointer should stay the
 		// same if the bin rank did not change.
-		if new_len <= runtime.HEAP_SLAB_SIZE {
+		if new_len <= runtime.ODIN_HEAP_MAX_BIN_SIZE {
 			old_rank := runtime.heap_bin_size_to_rank(runtime.heap_round_to_bin_size(old_len))
 			new_rank := runtime.heap_bin_size_to_rank(runtime.heap_round_to_bin_size(new_len))
 
@@ -650,7 +576,7 @@ test_parallel_pointer_resizing :: proc(thread_count: int) {
 	log.info("Parallel pointer resize test succeeded.")
 }
 
-test_orphaned_superpage_with_remote_frees :: proc() {
+test_orphaned_segment_with_remote_frees :: proc() {
 	Data :: struct {
 		thread: ^thread.Thread,
 		ptr: ^int,
@@ -678,66 +604,14 @@ test_orphaned_superpage_with_remote_frees :: proc() {
 
 	thread.join(data.thread)
 	thread.destroy(data.thread)
-	log.info("Oprhaned superpage with remote free test succeeded.")
-}
-
-test_orphanage_overflow :: proc(thread_count: int) {
-	Data :: struct {
-		thread: ^thread.Thread,
-		barrier: ^sync.Barrier,
-		wg: ^sync.Wait_Group,
-	}
-
-	task :: proc(t: ^thread.Thread) {
-		data := cast(^Data)t.data
-
-		x := new(int)
-		intrinsics.mem_zero_volatile(x, size_of(int))
-		sync.barrier_wait(data.barrier)
-
-		free(x)
-
-		sync.wait_group_done(data.wg)
-	}
-
-	tasks := make([]Data, thread_count, context.temp_allocator)
-
-	barrier: sync.Barrier
-	sync.barrier_init(&barrier, thread_count)
-
-	wg: sync.Wait_Group
-	sync.wait_group_add(&wg, thread_count)
-	
-	for i in 0..<thread_count {
-		tasks[i].barrier = &barrier
-		tasks[i].wg = &wg
-		tasks[i].thread = thread.create(task)
-		tasks[i].thread.data = &tasks[i]
-		tasks[i].thread.init_context = context
-		thread.start(tasks[i].thread)
-	}
-
-	sync.wait_group_wait(&wg)
-
-	for i in 0..<thread_count {
-		thread.join(tasks[i].thread)
-		thread.destroy(tasks[i].thread)
-	}
-
-	time.sleep(1 * time.Millisecond)
-
-	count := intrinsics.atomic_load_explicit(&runtime.heap_orphanage_count, .Acquire)
-	log.debug(count, runtime.HEAP_MAX_EMPTY_ORPHANED_SUPERPAGES)
-	expect(count == runtime.HEAP_MAX_EMPTY_ORPHANED_SUPERPAGES)
-
-	log.info("Orphanage overflow test succeeded.")
+	log.info("Orphaned segment with remote free test succeeded.")
 }
 
 test_single_alloc_and_resize_incremental :: proc(start, target: int) {
 	log.infof("Testing allocation of %i bytes, resizing by increments of one until %i is reached.", start, target)
 	allocator := context.allocator
 
-	alignment := min(start, runtime.HEAP_MAX_ALIGNMENT)
+	alignment := min(start, runtime.ODIN_HEAP_MAX_ALIGNMENT)
 	seed := u64(intrinsics.read_cycle_counter()) * (1+u64(start))
 
 	bytes, alloc_err := allocator.procedure(allocator.data, .Alloc, start, alignment, nil, 0)
@@ -759,51 +633,6 @@ test_single_alloc_and_resize_incremental :: proc(start, target: int) {
 
 	_, free_err := allocator.procedure(allocator.data, .Free, 0, 0, o, 0)
 	expect(free_err == nil)
-}
-
-test_serial_bin_sanity :: proc() {
-	log.info("Testing bitmap sanity.")
-	o := new(int)
-	slab := runtime.find_slab_from_pointer(o)
-	log.infof("The slab being tested: %#v", slab)
-	expect(slab.dirty_bins == 1)
-	expect(slab.free_bins != 0)
-	// expect(slab.is_dirty)
-	expect(slab.max_bins > 0)
-	expect(slab.bin_size > 0)
-	expect(intrinsics.atomic_load_explicit(&slab.remote_free_bins_scheduled, .Acquire) == 0)
-
-	list := make([]^int, slab.max_bins)
-	list[0] = o
-
-	for i in 0..<slab.max_bins-1 {
-		list[i + 1] = new(int)
-		expect(slab.dirty_bins == i + 2)
-	}
-
-	expect(slab.free_bins == 0)
-	expect(slab.dirty_bins == slab.max_bins)
-
-	for sector in 0..<slab.sectors {
-		expect(slab.local_free[sector] == 0)
-		expect(intrinsics.atomic_load_explicit(&slab.remote_free[sector], .Acquire) == 0)
-	}
-	expect(intrinsics.atomic_load_explicit(&slab.is_full, .Acquire))
-
-	for ptr in list {
-		bin_number := int(uintptr(ptr) - slab.data) / slab.bin_size
-		sector := bin_number / INTEGER_BITS
-		index := uint(bin_number) % INTEGER_BITS
-		expect(slab.local_free[sector] & (1 << index) == 0)
-		free(ptr)
-		expect(slab.local_free[sector] & (1 << index) != 0)
-	}
-
-	for sector in 0..<slab.sectors {
-		expect(slab.local_free[sector] != 0)
-		expect(intrinsics.atomic_load_explicit(&slab.remote_free[sector], .Acquire) == 0)
-	}
-	log.info("Done.")
 }
 
 //
@@ -1054,6 +883,10 @@ main :: proc() {
 		os.exit(1)
 	}
 
+	// tracker: mem.Tracking_Allocator
+	// mem.tracking_allocator_init(&tracker, allocator, context.temp_allocator)
+	// allocator = mem.tracking_allocator(&tracker)
+
 	{
 		rand.reset(0x1337CAFE)
 		context.allocator = allocator
@@ -1111,29 +944,26 @@ main :: proc() {
 			log.info("--- Multi-threaded tests ---")
 			// This test must run first in order to guarantee that the
 			// orphanage hasn't been touched yet.
-			test_superpage_abandonment_and_reuse()
-
-			test_orphanage_overflow(runtime.HEAP_MAX_EMPTY_ORPHANED_SUPERPAGES * 3)
+			test_segment_abandonment_and_reuse()
 
 			test_parallel_pointer_passing(4)
 			if opt.long {
-				test_parallel_pointer_resizing(22)
+				test_parallel_pointer_resizing(9)
 			} else {
-				test_parallel_pointer_resizing(17)
+				test_parallel_pointer_resizing(9)
 			}
 
-			test_orphaned_superpage_with_remote_frees()
+			test_orphaned_segment_with_remote_frees()
 
 			// Reset the heap, removing any of the dirty slabs before the next tests.
-			runtime.compact_heap()
+			runtime.compact_local_heap()
 		}
 
 		if opt.serial_tests {
 			log.info("--- Single-threaded tests ---")
 
-			// Test the Resize_Wide_Slab_Expanded_In_Place code path.
 			{
-				N :: runtime.HEAP_SLAB_SIZE
+				N :: runtime.ODIN_HEAP_MAX_BIN_SIZE
 				o1, err1 := allocator.procedure(allocator.data, .Alloc, N, 1, nil, 0)
 				expect(err1 == nil)
 				o2, err2 := allocator.procedure(allocator.data, .Resize, N*2, 1, raw_data(o1), N)
@@ -1145,132 +975,35 @@ main :: proc() {
 				}
 			}
 
-			// Test the Resize_Wide_Slab_Shrunk_In_Place code path.
-			{
-				N :: runtime.HEAP_SLAB_SIZE * 2
-				o1, err1 := allocator.procedure(allocator.data, .Alloc, N, 1, nil, 0)
-				expect(err1 == nil)
-				o2, err2 := allocator.procedure(allocator.data, .Resize, N/2, 1, raw_data(o1), N)
-				expect(err2 == nil)
-				_, err3 := allocator.procedure(allocator.data, .Free, 0, 0, raw_data(o2), 0)
-				expect(err3 == nil)
-				when ODIN_DEBUG_HEAP {
-					expect(intrinsics.atomic_load(&runtime.heap_global_code_coverage[.Resize_Wide_Slab_Shrunk_In_Place]) == 1)
-				}
-			}
-
-			// Test the Superpage_Added_To_Open_Cache_By_Resizing_Wide_Slab code path.
-			{
-				N :: runtime.HEAP_SLAB_SIZE - runtime.HEAP_SLAB_ALLOCATION_BOOK_KEEPING
-				M :: runtime.HEAP_SLAB_SIZE * 3 - runtime.HEAP_SLAB_ALLOCATION_BOOK_KEEPING
-
-				// Take a large slab-wide allocation that we can resize down later.
-				o1, err1 := allocator.procedure(allocator.data, .Alloc, M, 1, nil, 0)
-				expect(err1 == nil)
-
-				// Fill the rest of the superpage.
-				list := make([dynamic]rawptr, context.temp_allocator)
-				for _ in 0..<runtime.HEAP_SLAB_COUNT - 3 {
-					o, err2 := allocator.procedure(allocator.data, .Alloc, N, 1, nil, 0)
-					expect(err2 == nil)
-					append(&list, raw_data(o))
-				}
-
-				o2, err3 := allocator.procedure(allocator.data, .Resize, N, 1, raw_data(o1), M)
-				expect(err3 == nil)
-
-				free(raw_data(o2))
-				for ptr in list {
-					free(ptr)
-				}
-				when ODIN_DEBUG_HEAP {
-					expect(intrinsics.atomic_load(&runtime.heap_global_code_coverage[.Superpage_Added_To_Open_Cache_By_Resizing_Wide_Slab]) == 1)
-				}
-			}
-
-			// Test the Resize_Wide_Slab_Failed_To_Find_Contiguous_Expansion code path.
-			{
-				N :: runtime.HEAP_SLAB_SIZE - runtime.HEAP_SLAB_ALLOCATION_BOOK_KEEPING
-				M :: runtime.HEAP_SLAB_SIZE * 3 - runtime.HEAP_SLAB_ALLOCATION_BOOK_KEEPING
-
-				// Fill the superpage.
-				list := make([dynamic]rawptr, context.temp_allocator)
-				for _ in 0..<runtime.HEAP_SLAB_COUNT {
-					o, err := allocator.procedure(allocator.data, .Alloc, N, 1, nil, 0)
-					expect(err == nil)
-					append(&list, raw_data(o))
-				}
-
-				// Create a situation where we have enough free slabs but not
-				// enough contiguous free slabs.
-				free(list[0])
-				free(list[2])
-				free(list[3])
-
-				o1, err1 := allocator.procedure(allocator.data, .Alloc, N, 1, nil, 0)
-				expect(err1 == nil)
-				o2, err2 := allocator.procedure(allocator.data, .Resize, M, 1, raw_data(o1), N)
-				expect(err2 == nil)
-				_, err3 := allocator.procedure(allocator.data, .Free, 0, 0, raw_data(o2), 0)
-				expect(err3 == nil)
-
-				free(list[1])
-				for i in 4..<runtime.HEAP_SLAB_COUNT {
-					free(list[i])
-				}
-				when ODIN_DEBUG_HEAP {
-					// TODO(Feoramund): This test will fail if feoramalloc is
-					// the default allocator due to allocations that Odin core
-					// makes throughout a couple global variables such as
-					// `os.args`, which will upset the expectation of a clean
-					// slate, but I've tested it to work correctly when libc was
-					// the default allocator.
-
-					// expect(intrinsics.atomic_load(&runtime.heap_global_code_coverage[.Resize_Wide_Slab_Failed_To_Find_Contiguous_Expansion]) == 1)
-				}
-			}
-
 			// Inter-bin tests.
-			test_single_alloc_and_resize(0, 8)
-			test_single_alloc_and_resize(8, 0)
+			test_single_alloc_and_resize(0, runtime.ODIN_HEAP_MIN_BIN_SIZE)
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MIN_BIN_SIZE, 0)
 
-			test_single_alloc_and_resize(4, 8)
-			test_single_alloc_and_resize(8, 4)
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MIN_BIN_SIZE, runtime.ODIN_HEAP_MIN_BIN_SIZE-1)
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MIN_BIN_SIZE-1, runtime.ODIN_HEAP_MIN_BIN_SIZE)
 
 			// Cross-bin tests.
-			test_single_alloc_and_resize(64, 8)
-			test_single_alloc_and_resize(8, 64)
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MIN_BIN_SIZE, runtime.ODIN_HEAP_MIN_BIN_SIZE * 2)
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MIN_BIN_SIZE * 2, runtime.ODIN_HEAP_MIN_BIN_SIZE)
 
-			test_single_alloc_and_resize(runtime.HEAP_MAX_BIN_SIZE, runtime.HEAP_MAX_BIN_SIZE / 2)
-			test_single_alloc_and_resize(runtime.HEAP_MAX_BIN_SIZE / 2, runtime.HEAP_MAX_BIN_SIZE * 2)
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MAX_BIN_SIZE, runtime.ODIN_HEAP_MAX_BIN_SIZE / 2)
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MAX_BIN_SIZE / 2, runtime.ODIN_HEAP_MAX_BIN_SIZE * 2)
 
-			// Inter-slab tests.
-			test_single_alloc_and_resize(runtime.HEAP_SLAB_SIZE - 1, runtime.HEAP_SLAB_SIZE)
+			// Small <-> Large
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MIN_BIN_SIZE, 1 + runtime.ODIN_HEAP_SMALL_BIN_MAX)
+			test_single_alloc_and_resize(1 + runtime.ODIN_HEAP_SMALL_BIN_MAX, runtime.ODIN_HEAP_MIN_BIN_SIZE)
 
-			// Cross-category tests.
-			// Bin <-> Slab
-			test_single_alloc_and_resize(runtime.HEAP_MAX_BIN_SIZE, runtime.HEAP_SLAB_SIZE)
-			test_single_alloc_and_resize(runtime.HEAP_SLAB_SIZE, runtime.HEAP_MAX_BIN_SIZE)
+			// Small <-> Huge
+			test_single_alloc_and_resize(runtime.ODIN_HEAP_MIN_BIN_SIZE, 1 + runtime.ODIN_HEAP_MAX_BIN_SIZE)
+			test_single_alloc_and_resize(1 + runtime.ODIN_HEAP_MAX_BIN_SIZE, runtime.ODIN_HEAP_MIN_BIN_SIZE)
 
-			// Bin <-> Huge
-			test_single_alloc_and_resize(runtime.HEAP_MAX_BIN_SIZE, runtime.HEAP_HUGE_ALLOCATION_THRESHOLD)
-			test_single_alloc_and_resize(runtime.HEAP_HUGE_ALLOCATION_THRESHOLD, runtime.HEAP_MAX_BIN_SIZE)
-
-			// Slab <-> Huge
-			test_single_alloc_and_resize(runtime.HEAP_MAX_BIN_SIZE + 1, runtime.HEAP_HUGE_ALLOCATION_THRESHOLD)
-			test_single_alloc_and_resize(runtime.HEAP_HUGE_ALLOCATION_THRESHOLD, runtime.HEAP_MAX_BIN_SIZE + 1)
-
-			// Inter-huge tests.
-			test_single_alloc_and_resize(runtime.HEAP_HUGE_ALLOCATION_THRESHOLD + 2, runtime.HEAP_HUGE_ALLOCATION_THRESHOLD + 1)
-			test_single_alloc_and_resize(runtime.HEAP_HUGE_ALLOCATION_THRESHOLD + 1, runtime.SUPERPAGE_SIZE)
-
-			// Larger-than-superpage tests.
-			test_single_alloc_and_resize(runtime.SUPERPAGE_SIZE, runtime.SUPERPAGE_SIZE * 3)
-			test_single_alloc_and_resize(runtime.SUPERPAGE_SIZE * 3, runtime.SUPERPAGE_SIZE)
+			// Large <-> Huge
+			test_single_alloc_and_resize(1 + runtime.ODIN_HEAP_MAX_BIN_SIZE, 1 + runtime.ODIN_HEAP_SMALL_BIN_MAX)
+			test_single_alloc_and_resize(1 + runtime.ODIN_HEAP_SMALL_BIN_MAX, 1 + runtime.ODIN_HEAP_MAX_BIN_SIZE)
 
 			// Brute-force tests.
-			test_individual_allocation_and_free(runtime.HEAP_MAX_BIN_SIZE if opt.long else 1024)
-			test_continuous_allocation_of_size_n(16, runtime.HEAP_MAX_BIN_SIZE if opt.long else 1024)
+			test_individual_allocation_and_free(runtime.ODIN_HEAP_MAX_BIN_SIZE if opt.long else 1024)
+			test_continuous_allocation_of_size_n(16, runtime.ODIN_HEAP_MAX_BIN_SIZE if opt.long else 1024)
 
 			test_alloc_write_free(
 				object_count = 400,
@@ -1342,36 +1075,12 @@ main :: proc() {
 				free_direction = .Forward,
 			)
 
-			test_alloc_write_free(
-				object_count = runtime.HEAP_SLAB_COUNT*2,
-				starting_size = runtime.HEAP_SLAB_SIZE/2, final_size = runtime.HEAP_SLAB_SIZE*4,
-				size_strategy = .Multiplying, size_operand = 2,
-				allocs_per_free_operation = 1,
-				free_operations_at_once = 1,
-				free_strategy = .At_The_End,
-				free_direction = .Forward,
-			)
-
-			test_alloc_write_free(
-				object_count = 2,
-				starting_size = runtime.SUPERPAGE_SIZE/2, final_size = runtime.SUPERPAGE_SIZE*4,
-				size_strategy = .Multiplying, size_operand = 2,
-				allocs_per_free_operation = 1,
-				free_operations_at_once = 1,
-				free_strategy = .At_The_End,
-				free_direction = .Forward,
-			)
-
 			// This is a lengthy test and won't tell us much more than any other test will.
 			if opt.long {
-				test_single_alloc_and_resize_incremental(0, runtime.HEAP_SLAB_SIZE)
+				test_single_alloc_and_resize_incremental(0, runtime.ODIN_HEAP_MAX_BIN_SIZE)
 			}
 
-			runtime.compact_heap()
-
-			test_serial_bin_sanity()
-
-			runtime.compact_heap()
+			runtime.compact_local_heap()
 		}
 
 		if opt.serial_benchmarks {
@@ -1384,8 +1093,9 @@ main :: proc() {
 			bench_alloc_n_then_free_n(10_000_000, Struct_64)
 			bench_alloc_n_then_free_n(10_000_000, Struct_512)
 			bench_alloc_n_then_free_n(100_000, [8192]u8)
-			bench_alloc_n_then_free_n(10_000, [runtime.HEAP_SLAB_SIZE/4]u8)
-			bench_alloc_n_then_free_n(10_000, [runtime.HEAP_SLAB_SIZE*4]u8)
+			bench_alloc_n_then_free_n(100_000, [4096*4]u8)
+			bench_alloc_n_then_free_n(10_000, [65536/4]u8)
+			bench_alloc_n_then_free_n(10_000, [65536*4]u8)
 			bench_alloc_n_then_free_n(100, [runtime.SUPERPAGE_SIZE]u8)
 
 			log.info("* Freeing backwards ...")
@@ -1395,8 +1105,8 @@ main :: proc() {
 			bench_alloc_n_then_free_n_backwards(10_000_000, Struct_64)
 			bench_alloc_n_then_free_n_backwards(10_000_000, Struct_512)
 			bench_alloc_n_then_free_n_backwards(100_000, [8192]u8)
-			bench_alloc_n_then_free_n_backwards(10_000, [runtime.HEAP_SLAB_SIZE/4]u8)
-			bench_alloc_n_then_free_n_backwards(10_000, [runtime.HEAP_SLAB_SIZE*4]u8)
+			bench_alloc_n_then_free_n_backwards(10_000, [65536/4]u8)
+			bench_alloc_n_then_free_n_backwards(10_000, [65536*4]u8)
 			bench_alloc_n_then_free_n_backwards(100, [runtime.SUPERPAGE_SIZE]u8)
 
 			log.info("* Freeing randomly ...")
@@ -1406,10 +1116,9 @@ main :: proc() {
 			bench_alloc_n_then_free_n_randomly(10_000_000, Struct_64)
 			bench_alloc_n_then_free_n_randomly(10_000_000, Struct_512)
 			bench_alloc_n_then_free_n_randomly(100_000, [8192]u8)
-			bench_alloc_n_then_free_n_randomly(100_000, [runtime.HEAP_SLAB_SIZE/4]u8)
-			bench_alloc_n_then_free_n_randomly(100_000, [runtime.HEAP_SLAB_SIZE-runtime.HEAP_SLAB_ALLOCATION_BOOK_KEEPING]u8)
-			bench_alloc_n_then_free_n_randomly(100_000, [runtime.HEAP_SLAB_SIZE]u8)
-			bench_alloc_n_then_free_n_randomly(100_000, [runtime.HEAP_SLAB_SIZE*2]u8)
+			bench_alloc_n_then_free_n_randomly(100_000, [65536/4]u8)
+			bench_alloc_n_then_free_n_randomly(100_000, [65536]u8)
+			bench_alloc_n_then_free_n_randomly(100_000, [65536*2]u8)
 			bench_alloc_n_then_free_n_randomly(100, [runtime.SUPERPAGE_SIZE]u8)
 
 			log.info("* Allocating and freeing repeatedly ...")
@@ -1444,7 +1153,7 @@ main :: proc() {
 			bench_1_producer_n_consumer_for_m_alloc(2, 10_000, [8192]u8)
 			bench_1_producer_n_consumer_for_m_alloc(4, 10_000, [8192]u8)
 
-			bench_1_producer_n_consumer_for_m_alloc(4, 100, [runtime.HEAP_SLAB_SIZE]u8)
+			bench_1_producer_n_consumer_for_m_alloc(4, 100, [65536]u8)
 
 			when .Thread not_in ODIN_SANITIZER_FLAGS {
 				// NOTE: TSan doesn't work well with excessive thread counts,
@@ -1460,7 +1169,7 @@ main :: proc() {
 	log.info("Tests complete.")
 
 	if opt.compact {
-		runtime.compact_heap()
+		runtime.compact_local_heap()
 		log.info("The main thread's heap has been compacted.")
 	}
 
@@ -1478,14 +1187,17 @@ main :: proc() {
 		}
 	}
 
+	// for ptr, entry in tracker.allocation_map {
+	// 	log.infof("%p -- %v", ptr, entry)
+	// }
+	// mem.tracking_allocator_destroy(&tracker)
+
+	runtime.heap_release_empty_orphans()
+
 	if opt.info {
 		heap_info := runtime.get_local_heap_info()
 		log.infof("%#v", heap_info)
 	}
-
-	// if .Dump_Slabs in params {
-	// 	dump_slabs()
-	// }
 
 	if opt.trap {
 		intrinsics.debug_trap()
