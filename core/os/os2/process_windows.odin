@@ -437,7 +437,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	stdin_handle:  win32.HANDLE	
 
 	null_handle: win32.HANDLE
-	if desc.stdout != nil || desc.stderr != nil || desc.stdin != nil {
+	if desc.stdout == nil || desc.stderr == nil || desc.stdin == nil {
 		null_handle := win32.CreateFileW(
 			win32.L("NUL"),
 			win32.GENERIC_READ|win32.GENERIC_WRITE,
