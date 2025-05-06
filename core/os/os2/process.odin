@@ -266,8 +266,6 @@ specific process, even after it has died.
 Process :: struct {
 	pid:    int,
 	handle: uintptr,
-	// Implementation specific state/data.
-	_impl:  _Process,
 }
 
 Process_Open_Flags :: bit_set[Process_Open_Flag]

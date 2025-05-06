@@ -363,9 +363,6 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 }
 
 @(private="package")
-_Process :: struct {}
-
-@(private="package")
 _process_open :: proc(pid: int, _: Process_Open_Flags) -> (process: Process, err: Error) {
 	process.pid = pid
 	process.handle = PIDFD_UNASSIGNED
