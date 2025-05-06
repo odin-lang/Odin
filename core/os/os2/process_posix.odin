@@ -46,7 +46,7 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	return _process_info_by_pid(_get_pid(), selection, allocator)
 }
 
-_Sys_Process_Attributes :: struct {}
+_Process :: struct {}
 
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	if len(desc.command) == 0 {

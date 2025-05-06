@@ -418,7 +418,9 @@ _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process,
 }
 
 @(private="package")
-_Sys_Process_Attributes :: struct {}
+_Process :: struct {
+	null_handle: win32.HANDLE,
+}
 
 @(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
@@ -436,9 +438,8 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	stdout_handle: win32.HANDLE	
 	stdin_handle:  win32.HANDLE	
 
-	null_handle: win32.HANDLE
 	if desc.stdout == nil || desc.stderr == nil || desc.stdin == nil {
-		null_handle := win32.CreateFileW(
+		process._impl.null_handle = win32.CreateFileW(
 			win32.L("NUL"),
 			win32.GENERIC_READ|win32.GENERIC_WRITE,
 			win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE,
@@ -450,23 +451,23 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			win32.FILE_ATTRIBUTE_NORMAL,
 			nil,
 		)
-		assert(null_handle != nil)
+		assert(process._impl.null_handle != nil)
 	}
 
 	if desc.stdout == nil {
-		stdout_handle = null_handle
+		stdout_handle = process._impl.null_handle
 	} else {
 		stdout_handle = win32.HANDLE((^File_Impl)(desc.stdout.impl).fd)
 	}
 
 	if desc.stderr == nil {
-		stderr_handle = null_handle
+		stderr_handle = process._impl.null_handle
 	} else {
 		stderr_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
 	}
 
 	if desc.stdin == nil {
-		stdin_handle = null_handle
+		stdin_handle = process._impl.null_handle
 	} else {
 		stdin_handle = win32.HANDLE((^File_Impl)(desc.stdin.impl).fd)
 	}
@@ -506,6 +507,10 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 
 	switch win32.WaitForSingleObject(handle, timeout_ms) {
 	case win32.WAIT_OBJECT_0:
+		if process._impl.null_handle != nil {
+			win32.CloseHandle(process._impl.null_handle)
+		}
+
 		exit_code: u32
 		if !win32.GetExitCodeProcess(handle, &exit_code) {
 			err =_get_platform_error()
@@ -532,6 +537,10 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 		err = General_Error.Timeout
 		return
 	case:
+		if process._impl.null_handle != nil {
+			win32.CloseHandle(process._impl.null_handle)
+		}
+
 		err = _get_platform_error()
 		return
 	}
