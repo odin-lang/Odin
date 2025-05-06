@@ -2517,7 +2517,7 @@ gb_internal lbValue lb_emit_c_vararg(lbProcedure *p, lbValue arg, Type *type) {
 }
 
 gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right, Type *type) {
-	GB_ASSERT((is_type_struct(type) || is_type_union(type)) && is_type_comparable(type));
+	GB_ASSERT((is_type_struct(type) || is_type_soa_pointer(type) || is_type_union(type)) && is_type_comparable(type));
 	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
 	lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
 	lbValue res = {};
@@ -2902,6 +2902,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	    is_type_proc(a) ||
 	    is_type_enum(a)) {
 		LLVMIntPredicate pred = {};
+
 		if (is_type_unsigned(left.type)) {
 			switch (op_kind) {
 			case Token_Gt:   pred = LLVMIntUGT; break;
@@ -3025,6 +3026,9 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 
 		return res;
 
+	} else if (is_type_soa_pointer(a)) {
+		// NOTE(Jeroen): Compare data pointer and index tag as if it were a simple struct.
+		return lb_compare_records(p, op_kind, left, right, a);
 	} else {
 		GB_PANIC("Unhandled comparison kind %s (%s) %.*s %s (%s)", type_to_string(left.type), type_to_string(base_type(left.type)), LIT(token_strings[op_kind]), type_to_string(right.type), type_to_string(base_type(right.type)));
 	}
