@@ -520,16 +520,34 @@ try_cross_linking:;
 						}
 
 						if (build_context.metrics.arch == TargetArch_riscv64) {
+							gbString clang_march = gb_string_make(heap_allocator(), "rv64i");
+							if (check_target_feature_is_enabled(str_lit("m"), nullptr)) {
+								clang_march = gb_string_appendc(clang_march, "m");
+							}
+							if (check_target_feature_is_enabled(str_lit("a"), nullptr)) {
+								clang_march = gb_string_appendc(clang_march, "a");
+							}
+							if (check_target_feature_is_enabled(str_lit("f"), nullptr)) {
+								clang_march = gb_string_appendc(clang_march, "f");
+							}
+							if (check_target_feature_is_enabled(str_lit("d"), nullptr)) {
+								clang_march = gb_string_appendc(clang_march, "d");
+							}
+							if (check_target_feature_is_enabled(str_lit("c"), nullptr)) {
+								clang_march = gb_string_appendc(clang_march, "c");
+							}
+
 							result = system_exec_command_line_app("clang",
 								"%s \"%.*s\" "
 								"-c -o \"%.*s\" "
-								"-target %.*s -march=rv64gc "
+								"-target %.*s -march=%s "
 								"%.*s "
 								"",
 								clang_path,
 								LIT(asm_file),
 								LIT(obj_file),
 								LIT(build_context.metrics.target_triplet),
+								clang_march,
 								LIT(build_context.extra_assembler_flags)
 							);
 						} else if (is_osx) {

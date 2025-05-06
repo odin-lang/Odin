@@ -3572,7 +3572,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// NOTE(laytan): on riscv64 we want to enforce some features.
 	if (build_context.metrics.arch == TargetArch_riscv64) {
 		String disabled;
-		if (!check_target_feature_is_enabled(str_lit("64bit,f,d,m"), &disabled)) { // 64bit, floats, doubles, integer multiplication.
+		if (!check_target_feature_is_enabled(str_lit("64bit,m"), &disabled)) { // 64bit, integer multiplication.
 			gb_printf_err("missing required target feature: \"%.*s\", enable it by setting a different -microarch or explicitly adding it through -target-features\n", LIT(disabled));
 			gb_exit(1);
 		}
