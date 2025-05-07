@@ -2694,7 +2694,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			lb_add_debug_info_for_global_constant_from_entity(gen, e);
 		}
 
-		{ // Custom `.raddbg` section for its debugger
+		// Custom `.raddbg` section for its debugger
+		if (build_context.metrics.os == TargetOs_windows) {
 			LLVMModuleRef m = default_module->mod;
 			LLVMContextRef c = default_module->ctx;
 
