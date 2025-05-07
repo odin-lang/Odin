@@ -2761,6 +2761,23 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			add_string1("type_view: {type: \"matrix[15, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
 			add_string1("type_view: {type: \"matrix[16, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
 
+			// row major matrices
+			add_string1("type_view: {type: \"#row_major matrix[?, 1]?\",  expr: \"table($.data, $[0])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 2]?\",  expr: \"table($.data, $[0], $[1])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 3]?\",  expr: \"table($.data, $[0], $[1], $[2])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 4]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 5]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 6]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 7]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 8]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 9]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 10]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 11]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 12]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 13]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 14]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 15]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
+			add_string1("type_view: {type: \"#row_major matrix[?, 16]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
 		}
 	}
 
