@@ -1107,11 +1107,9 @@ __read_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uin
 	}
 }
 
-@(no_sanitize_address)
-__asan_unpoison_memory_region :: #force_inline proc "contextless" (address: rawptr, size: uint) {
+when .Address in ODIN_SANITIZER_FLAGS {
 	foreign {
 		__asan_unpoison_memory_region :: proc "system" (address: rawptr, size: uint) ---
 	}
-	__asan_unpoison_memory_region(address, size)
 }
 
