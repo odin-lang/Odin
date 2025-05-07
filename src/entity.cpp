@@ -85,6 +85,8 @@ enum EntityFlag : u64 {
 	EntityFlag_Require = 1ull<<50,
 	EntityFlag_ByPtr   = 1ull<<51, // enforce parameter is passed by pointer
 
+	EntityFlag_ForcePublic = 1ull<<52, // used for passing @(public) to `is_entity_exported`
+
 	EntityFlag_Overridden    = 1ull<<63,
 };
 
@@ -308,7 +310,7 @@ gb_internal bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
-	if (e->file != nullptr && (e->file->flags & (AstFile_IsPrivatePkg|AstFile_IsPrivateFile)) != 0) {
+	if (e->file != nullptr && (e->file->flags & (AstFile_IsPrivatePkg|AstFile_IsPrivateFile)) != 0 && (e->flags & EntityFlag_ForcePublic) == 0) {
 		return false;
 	}
 

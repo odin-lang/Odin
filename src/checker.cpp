@@ -3866,7 +3866,7 @@ gb_internal DECL_ATTRIBUTE_PROC(const_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
-	} else if (name == "private") {
+	} else if (name == "private" || name == "public") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	} else if (name == "static" ||
@@ -3890,7 +3890,7 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
-	} else if (name == "private") {
+	} else if (name == "private" || name == "public") {
 		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	} else if (name == "objc_class") {
@@ -4178,6 +4178,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	ast_node(vd, ValueDecl, decl);
 
 	EntityVisiblityKind entity_visibility_kind = c->foreign_context.visibility_kind;
+	bool force_public = false;
 	bool is_test = false;
 	bool is_init = false;
 	bool is_fini = false;
@@ -4239,6 +4240,14 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 				slice_unordered_remove(elems, j);
 				j -= 1;
+			} else if (name == "public") {
+				if (value != nullptr) {
+					error(value, "'%.*s' expects no parameter", LIT(name));
+				}
+				entity_visibility_kind = EntityVisiblity_Public;
+				force_public = true;
+				slice_unordered_remove(elems, j);
+				j -= 1;
 			} else if (name == "test") {
 				is_test = true;
 			} else if (name == "init") {
@@ -4254,7 +4263,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 		return;
 	}
 
-	if (entity_visibility_kind == EntityVisiblity_Public &&
+	if (!force_public && entity_visibility_kind == EntityVisiblity_Public &&
 	    (c->scope->flags&ScopeFlag_File) &&
 	    c->scope->file) {
 	    	if (c->scope->file->flags & AstFile_IsPrivateFile) {
@@ -4267,7 +4276,6 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	if (entity_visibility_kind != EntityVisiblity_Public && !(c->scope->flags&ScopeFlag_File)) {
 		error(decl, "Attribute 'private' is not allowed on a non file scope entity");
 	}
-
 
 	if (vd->is_mutable) {
 		if (!(c->scope->flags&ScopeFlag_File)) {
@@ -4292,6 +4300,10 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			if (entity_visibility_kind != EntityVisiblity_Public) {
 				e->flags |= EntityFlag_NotExported;
+			}
+
+			if (force_public) {
+				e->flags |= EntityFlag_ForcePublic;
 			}
 
 			if (vd->is_using) {
@@ -4414,6 +4426,11 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			if (entity_visibility_kind != EntityVisiblity_Public) {
 				e->flags |= EntityFlag_NotExported;
 			}
+
+			if (force_public) {
+				e->flags |= EntityFlag_ForcePublic;
+			}
+
 			add_entity_flags_from_file(c, e, c->scope);
 
 			if (vd->is_using) {
