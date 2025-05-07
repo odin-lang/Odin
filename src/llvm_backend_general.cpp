@@ -3070,6 +3070,13 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 	if (e != nullptr) {
 		lb_add_entity(p->module, e, val);
 		lb_add_debug_local_variable(p, ptr, type, e->token);
+
+		// NOTE(lucas): In LLVM 20 and below we do not have the option to have asan cleanup poisoned stack
+		// locals ourselves. So we need to manually track and unpoison these locals on proc return.
+		// LLVM 21 adds the 'use-after-scope' asan option which does this for us.
+		if (build_context.sanitizer_flags & SanitizerFlag_Address && !p->entity->Procedure.no_sanitize_address) {
+			array_add(&p->asan_stack_locals, val);
+		}
 	}
 
 	if (zero_init) {

@@ -383,6 +383,8 @@ struct lbProcedure {
 	PtrMap<Ast *, lbValue> selector_values;
 	PtrMap<Ast *, lbAddr>  selector_addr;
 	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
+
+	Array<lbValue> asan_stack_locals;
 };
 
 
