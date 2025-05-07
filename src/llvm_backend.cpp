@@ -2739,9 +2739,27 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				char const *str = alloc_cstring(temporary_allocator(), mangled_name);
 				add_string3("entry_point: \"", str, "\"");
 			}
+
 			add_string1("type_view: {type: \"[]?\", expr: \"array(data, len)\"}");
 			add_string1("type_view: {type: \"string\", expr: \"array(data, len)\"}");
-			// add_string1("type_view: {type: \"[dynamic]?\", expr: \"array(data, len)\"}");
+
+			// column major matrices
+			add_string1("type_view: {type: \"matrix[1, ?]?\",  expr: \"table($.data, $[0])\"}");
+			add_string1("type_view: {type: \"matrix[2, ?]?\",  expr: \"table($.data, $[0], $[1])\"}");
+			add_string1("type_view: {type: \"matrix[3, ?]?\",  expr: \"table($.data, $[0], $[1], $[2])\"}");
+			add_string1("type_view: {type: \"matrix[4, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3])\"}");
+			add_string1("type_view: {type: \"matrix[5, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4])\"}");
+			add_string1("type_view: {type: \"matrix[6, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}");
+			add_string1("type_view: {type: \"matrix[7, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}");
+			add_string1("type_view: {type: \"matrix[8, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}");
+			add_string1("type_view: {type: \"matrix[9, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}");
+			add_string1("type_view: {type: \"matrix[10, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}");
+			add_string1("type_view: {type: \"matrix[11, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}");
+			add_string1("type_view: {type: \"matrix[12, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}");
+			add_string1("type_view: {type: \"matrix[13, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}");
+			add_string1("type_view: {type: \"matrix[14, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}");
+			add_string1("type_view: {type: \"matrix[15, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
+			add_string1("type_view: {type: \"matrix[16, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
 
 		}
 	}

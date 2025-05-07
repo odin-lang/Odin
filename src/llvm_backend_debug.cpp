@@ -564,22 +564,21 @@ gb_internal LLVMMetadataRef lb_debug_bitfield(lbModule *m, Type *type, String na
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-    unsigned element_count = cast(unsigned)bt->BitField.fields.count;
-    LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
+	unsigned element_count = cast(unsigned)bt->BitField.fields.count;
+	LLVMMetadataRef *elements = gb_alloc_array(permanent_allocator(), LLVMMetadataRef, element_count);
 
-    u64 offset_in_bits = 0;
-    for (unsigned i = 0; i < element_count; i++) {
-        Entity *f = bt->BitField.fields[i];
-        u8 bit_size = bt->BitField.bit_sizes[i];
-        GB_ASSERT(f->kind == Entity_Variable);
-        String name = f->token.string;
-        elements[i] = LLVMDIBuilderCreateBitFieldMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, line,
-            bit_size, offset_in_bits, 0,
-            LLVMDIFlagZero, lb_debug_type(m, f->type)
-        );
-
-        offset_in_bits += bit_size;
-    }
+	u64 offset_in_bits = 0;
+	for (unsigned i = 0; i < element_count; i++) {
+		Entity *f = bt->BitField.fields[i];
+		u8 bit_size = bt->BitField.bit_sizes[i];
+		GB_ASSERT(f->kind == Entity_Variable);
+		String name = f->token.string;
+		elements[i] = LLVMDIBuilderCreateBitFieldMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, line,
+		                                                    bit_size, offset_in_bits, 0,
+		                                                    LLVMDIFlagZero, lb_debug_type(m, f->type)
+		);
+		offset_in_bits += bit_size;
+	}
 
 	LLVMMetadataRef final_decl = LLVMDIBuilderCreateStructType(
 		m->debug_builder, scope,
@@ -924,6 +923,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Matrix: {
+	#if 0
 		LLVMMetadataRef subscripts[1] = {};
 		subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,
 			0ll,
@@ -935,6 +935,66 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			8*cast(unsigned)type_align_of(type),
 			lb_debug_type(m, type->Matrix.elem),
 			subscripts, gb_count_of(subscripts));
+	#else
+		LLVMMetadataRef subscripts[2] = {};
+		subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder, 0ll, type->Matrix.row_count);
+		subscripts[1] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder, 0ll, type->Matrix.column_count);
+
+		LLVMMetadataRef scope = nullptr;
+		LLVMMetadataRef array_type = nullptr;
+
+		uint64_t size_in_bits = 8*cast(uint64_t)(type_size_of(type));
+		unsigned align_in_bits = 8*cast(unsigned)(type_align_of(type));
+
+		if (type->Matrix.is_row_major) {
+			LLVMMetadataRef base = LLVMDIBuilderCreateArrayType(m->debug_builder,
+				8*cast(uint64_t)(type_size_of(type->Matrix.elem) * type->Matrix.column_count),
+				8*cast(unsigned)type_align_of(type->Matrix.elem),
+				lb_debug_type(m, type->Matrix.elem),
+				subscripts+1, 1);
+			array_type = LLVMDIBuilderCreateArrayType(m->debug_builder,
+				size_in_bits,
+				align_in_bits,
+				base,
+				subscripts+0, 1);
+		} else {
+			LLVMMetadataRef base = LLVMDIBuilderCreateArrayType(m->debug_builder,
+				8*cast(uint64_t)(type_size_of(type->Matrix.elem) * type->Matrix.row_count),
+				8*cast(unsigned)type_align_of(type->Matrix.elem),
+				lb_debug_type(m, type->Matrix.elem),
+				subscripts+0, 1);
+			array_type = LLVMDIBuilderCreateArrayType(m->debug_builder,
+				size_in_bits,
+				align_in_bits,
+				base,
+				subscripts+1, 1);
+		}
+
+		LLVMMetadataRef elements[1] = {};
+		elements[0] = LLVMDIBuilderCreateMemberType(m->debug_builder, scope,
+			"data", 4,
+			nullptr, 0,
+			size_in_bits, align_in_bits, 0, LLVMDIFlagZero,
+			array_type
+		);
+
+		gbString name = temp_canonical_string(type);
+
+		LLVMMetadataRef final_decl = LLVMDIBuilderCreateStructType(
+			m->debug_builder, scope,
+			name, gb_string_length(name),
+			nullptr, 0,
+			size_in_bits, align_in_bits,
+			LLVMDIFlagZero,
+			nullptr,
+			elements, 1,
+			0,
+			nullptr,
+			"", 0
+		);
+
+		return final_decl;
+	#endif
 	}
 	}
 
