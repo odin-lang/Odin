@@ -783,8 +783,7 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 
 	p->curr_block = nullptr;
 	p->state_flags = 0;
-}
-gb_internal void lb_end_procedure(lbProcedure *p) {
+
 	LLVMDisposeBuilder(p->builder);
 }
 

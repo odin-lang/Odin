@@ -2185,7 +2185,6 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 		p->is_done = true;
 		m->curr_procedure = nullptr;
 	}
-	lb_end_procedure(p);
 
 	// Add Flags
 	if (p->entity && p->entity->kind == Entity_Procedure && p->entity->Procedure.is_memcpy_like) {

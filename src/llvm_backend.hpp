@@ -409,7 +409,6 @@ gb_internal LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef c
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
 gb_internal lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_body=false);
-gb_internal void lb_end_procedure(lbProcedure *p);
 
 
 gb_internal LLVMTypeRef lb_type(lbModule *m, Type *type);
