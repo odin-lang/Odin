@@ -1461,7 +1461,7 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 			break;
 		case Entity_Constant:
 			if (build_context.ODIN_DEBUG) {
-				add_debug_info_for_global_constant_from_entity(gen, e);
+				lb_add_debug_info_for_global_constant_from_entity(gen, e);
 			}
 			break;
 		}
@@ -2691,7 +2691,57 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	if (build_context.ODIN_DEBUG) {
 		for (auto const &entry : builtin_pkg->scope->elements) {
 			Entity *e = entry.value;
-			add_debug_info_for_global_constant_from_entity(gen, e);
+			lb_add_debug_info_for_global_constant_from_entity(gen, e);
+		}
+
+		{ // Custom `.raddbg` section for its debugger
+			LLVMModuleRef m = default_module->mod;
+			LLVMContextRef c = default_module->ctx;
+
+			{
+				LLVMTypeRef type = LLVMArrayType(LLVMInt8TypeInContext(c), 1);
+				LLVMValueRef global = LLVMAddGlobal(m, type, "raddbg_is_attached_byte_marker");
+				LLVMSetInitializer(global, LLVMConstNull(type));
+				LLVMSetSection(global, ".raddbg");
+			}
+
+			TEMPORARY_ALLOCATOR_GUARD();
+
+			u32 index = 0;
+			auto const add_string = [m, c, &index](String const &str) {
+				LLVMValueRef data = LLVMConstStringInContext(c, cast(char const *)str.text, cast(unsigned)str.len, false);
+				LLVMTypeRef type = LLVMTypeOf(data);
+
+				gbString global_name = gb_string_make(temporary_allocator(), "raddbg_data__");
+				global_name = gb_string_append_fmt(global_name, "%u", index);
+				index += 1;
+
+				LLVMValueRef global = LLVMAddGlobal(m, type, global_name);
+
+				LLVMSetInitializer(global, data);
+				LLVMSetAlignment(global, 1);
+
+				LLVMSetSection(global, ".raddbg");
+			};
+
+			auto const add_string1 = [add_string](char const *a) {
+				add_string(make_string_c(a));
+			};
+			auto const add_string3 = [add_string](char const *a, char const *b, char const *c) {
+				add_string(concatenate3_strings(temporary_allocator(), make_string_c(a), make_string_c(b), make_string_c(c)));
+			};
+
+
+
+			if (gen->info->entry_point) {
+				String mangled_name = lb_get_entity_name(default_module, gen->info->entry_point);
+				char const *str = alloc_cstring(temporary_allocator(), mangled_name);
+				add_string3("entry_point: \"", str, "\"");
+			}
+			add_string1("type_view: {type: \"[]?\", expr: \"array(data, len)\"}");
+			add_string1("type_view: {type: \"string\", expr: \"array(data, len)\"}");
+			// add_string1("type_view: {type: \"[dynamic]?\", expr: \"array(data, len)\"}");
+
 		}
 	}
 

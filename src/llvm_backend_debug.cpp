@@ -1186,7 +1186,7 @@ gb_internal void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx
 }
 
 
-gb_internal String debug_info_mangle_constant_name(Entity *e, gbAllocator const &allocator, bool *did_allocate_) {
+gb_internal String lb_debug_info_mangle_constant_name(Entity *e, gbAllocator const &allocator, bool *did_allocate_) {
 	String name = e->token.string;
 	if (e->pkg && e->pkg->name.len > 0) {
 		gbString s = string_canonical_entity_name(allocator, e);
@@ -1196,7 +1196,7 @@ gb_internal String debug_info_mangle_constant_name(Entity *e, gbAllocator const 
 	return name;
 }
 
-gb_internal void add_debug_info_global_variable_expr(lbModule *m, String const &name, LLVMMetadataRef dtype, LLVMMetadataRef expr) {
+gb_internal void lb_add_debug_info_global_variable_expr(lbModule *m, String const &name, LLVMMetadataRef dtype, LLVMMetadataRef expr) {
 	LLVMMetadataRef scope = nullptr;
 	LLVMMetadataRef file = nullptr;
 	unsigned line = 0;
@@ -1212,20 +1212,20 @@ gb_internal void add_debug_info_global_variable_expr(lbModule *m, String const &
 		expr, decl, 8/*AlignInBits*/);
 }
 
-gb_internal void add_debug_info_for_global_constant_internal_i64(lbModule *m, Entity *e, LLVMMetadataRef dtype, i64 v) {
+gb_internal void lb_add_debug_info_for_global_constant_internal_i64(lbModule *m, Entity *e, LLVMMetadataRef dtype, i64 v) {
 	LLVMMetadataRef expr = LLVMDIBuilderCreateConstantValueExpression(m->debug_builder, v);
 
 	TEMPORARY_ALLOCATOR_GUARD();
-	String name = debug_info_mangle_constant_name(e, temporary_allocator(), nullptr);
+	String name = lb_debug_info_mangle_constant_name(e, temporary_allocator(), nullptr);
 
-	add_debug_info_global_variable_expr(m, name, dtype, expr);
+	lb_add_debug_info_global_variable_expr(m, name, dtype, expr);
 	if ((e->pkg && e->pkg->kind == Package_Init) ||
 	    (e->scope && (e->scope->flags & ScopeFlag_Global))) {
-		add_debug_info_global_variable_expr(m, e->token.string, dtype, expr);
+		lb_add_debug_info_global_variable_expr(m, e->token.string, dtype, expr);
 	}
 }
 
-gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen, Entity *e) {
+gb_internal void lb_add_debug_info_for_global_constant_from_entity(lbGenerator *gen, Entity *e) {
 	if (e == nullptr || e->kind != Entity_Constant) {
 		return;
 	}
@@ -1256,14 +1256,14 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 				dtype = lb_debug_type(m, e->type);
 			}
 
-			add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
+			lb_add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
 		}
 	} else if (is_type_rune(e->type)) {
 		ExactValue const &value = e->Constant.value;
 		if (value.kind == ExactValue_Integer) {
 			LLVMMetadataRef dtype = lb_debug_type(m, t_rune);
 			i64 v = exact_value_to_i64(value);
-			add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
+			lb_add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
 		}
 	} else if (is_type_boolean(e->type)) {
 		ExactValue const &value = e->Constant.value;
@@ -1271,7 +1271,7 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 			LLVMMetadataRef dtype = lb_debug_type(m, default_type(e->type));
 			i64 v = cast(i64)value.value_bool;
 
-			add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
+			lb_add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
 		}
 	} else if (is_type_enum(e->type)) {
 		ExactValue const &value = e->Constant.value;
@@ -1284,14 +1284,14 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 				v = cast(i64)exact_value_to_u64(value);
 			}
 
-			add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
+			lb_add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
 		}
 	} else if (is_type_pointer(e->type)) {
 		ExactValue const &value = e->Constant.value;
 		if (value.kind == ExactValue_Integer) {
 			LLVMMetadataRef dtype = lb_debug_type(m, default_type(e->type));
 			i64 v = cast(i64)exact_value_to_u64(value);
-			add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
+			lb_add_debug_info_for_global_constant_internal_i64(m, e, dtype, v);
 		}
 	}
 }
