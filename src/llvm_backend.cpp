@@ -2678,6 +2678,28 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	if (build_context.ODIN_DEBUG) {
+		// Custom `.raddbg` section for its debugger
+		if (build_context.metrics.os == TargetOs_windows) {
+			lbModule *m = default_module;
+			LLVMModuleRef mod = m->mod;
+			LLVMContextRef ctx = m->ctx;
+
+			{
+				LLVMTypeRef type = LLVMArrayType(LLVMInt8TypeInContext(ctx), 1);
+				LLVMValueRef global = LLVMAddGlobal(mod, type, "raddbg_is_attached_byte_marker");
+				LLVMSetInitializer(global, LLVMConstNull(type));
+				LLVMSetSection(global, ".raddbg");
+			}
+
+			if (gen->info->entry_point) {
+				String mangled_name = lb_get_entity_name(m, gen->info->entry_point);
+				char const *str = alloc_cstring(temporary_allocator(), mangled_name);
+				lb_add_raddbg_string(m, "entry_point: \"", str, "\"");
+			}
+		}
+	}
+
 	TIME_SECTION("LLVM Runtime Objective-C Names Creation");
 	gen->objc_names = lb_create_objc_names(default_module);
 
@@ -2692,92 +2714,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		for (auto const &entry : builtin_pkg->scope->elements) {
 			Entity *e = entry.value;
 			lb_add_debug_info_for_global_constant_from_entity(gen, e);
-		}
-
-		// Custom `.raddbg` section for its debugger
-		if (build_context.metrics.os == TargetOs_windows) {
-			LLVMModuleRef m = default_module->mod;
-			LLVMContextRef c = default_module->ctx;
-
-			{
-				LLVMTypeRef type = LLVMArrayType(LLVMInt8TypeInContext(c), 1);
-				LLVMValueRef global = LLVMAddGlobal(m, type, "raddbg_is_attached_byte_marker");
-				LLVMSetInitializer(global, LLVMConstNull(type));
-				LLVMSetSection(global, ".raddbg");
-			}
-
-			TEMPORARY_ALLOCATOR_GUARD();
-
-			u32 index = 0;
-			auto const add_string = [m, c, &index](String const &str) {
-				LLVMValueRef data = LLVMConstStringInContext(c, cast(char const *)str.text, cast(unsigned)str.len, false);
-				LLVMTypeRef type = LLVMTypeOf(data);
-
-				gbString global_name = gb_string_make(temporary_allocator(), "raddbg_data__");
-				global_name = gb_string_append_fmt(global_name, "%u", index);
-				index += 1;
-
-				LLVMValueRef global = LLVMAddGlobal(m, type, global_name);
-
-				LLVMSetInitializer(global, data);
-				LLVMSetAlignment(global, 1);
-
-				LLVMSetSection(global, ".raddbg");
-			};
-
-			auto const add_string1 = [add_string](char const *a) {
-				add_string(make_string_c(a));
-			};
-			auto const add_string3 = [add_string](char const *a, char const *b, char const *c) {
-				add_string(concatenate3_strings(temporary_allocator(), make_string_c(a), make_string_c(b), make_string_c(c)));
-			};
-
-
-
-			if (gen->info->entry_point) {
-				String mangled_name = lb_get_entity_name(default_module, gen->info->entry_point);
-				char const *str = alloc_cstring(temporary_allocator(), mangled_name);
-				add_string3("entry_point: \"", str, "\"");
-			}
-
-			add_string1("type_view: {type: \"[]?\", expr: \"array(data, len)\"}");
-			add_string1("type_view: {type: \"string\", expr: \"array(data, len)\"}");
-
-			// column major matrices
-			add_string1("type_view: {type: \"matrix[1, ?]?\",  expr: \"table($.data, $[0])\"}");
-			add_string1("type_view: {type: \"matrix[2, ?]?\",  expr: \"table($.data, $[0], $[1])\"}");
-			add_string1("type_view: {type: \"matrix[3, ?]?\",  expr: \"table($.data, $[0], $[1], $[2])\"}");
-			add_string1("type_view: {type: \"matrix[4, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3])\"}");
-			add_string1("type_view: {type: \"matrix[5, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4])\"}");
-			add_string1("type_view: {type: \"matrix[6, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}");
-			add_string1("type_view: {type: \"matrix[7, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}");
-			add_string1("type_view: {type: \"matrix[8, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}");
-			add_string1("type_view: {type: \"matrix[9, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}");
-			add_string1("type_view: {type: \"matrix[10, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}");
-			add_string1("type_view: {type: \"matrix[11, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}");
-			add_string1("type_view: {type: \"matrix[12, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}");
-			add_string1("type_view: {type: \"matrix[13, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}");
-			add_string1("type_view: {type: \"matrix[14, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}");
-			add_string1("type_view: {type: \"matrix[15, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
-			add_string1("type_view: {type: \"matrix[16, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
-
-			// row major matrices
-			add_string1("type_view: {type: \"#row_major matrix[?, 1]?\",  expr: \"table($.data, $[0])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 2]?\",  expr: \"table($.data, $[0], $[1])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 3]?\",  expr: \"table($.data, $[0], $[1], $[2])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 4]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 5]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 6]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 7]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 8]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 9]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 10]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 11]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 12]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 13]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 14]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 15]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
-			add_string1("type_view: {type: \"#row_major matrix[?, 16]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
 		}
 	}
 
@@ -2807,6 +2743,72 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	if (build_context.ODIN_DEBUG) {
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
 		lb_debug_info_complete_types_and_finalize(gen);
+
+		// Custom `.raddbg` section for its debugger
+		if (build_context.metrics.os == TargetOs_windows) {
+			lbModule *m = default_module;
+			LLVMModuleRef mod = m->mod;
+			LLVMContextRef ctx = m->ctx;
+
+			lb_add_raddbg_string(m, "type_view: {type: \"[]?\", expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"string\", expr: \"array(data, len)\"}");
+
+			// column major matrices
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[1, ?]?\",  expr: \"table($.data, $[0])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[2, ?]?\",  expr: \"table($.data, $[0], $[1])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[3, ?]?\",  expr: \"table($.data, $[0], $[1], $[2])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[4, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[5, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[6, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[7, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[8, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[9, ?]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[10, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[11, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[12, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[13, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[14, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[15, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"matrix[16, ?]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
+
+			// row major matrices
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 1]?\",  expr: \"table($.data, $[0])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 2]?\",  expr: \"table($.data, $[0], $[1])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 3]?\",  expr: \"table($.data, $[0], $[1], $[2])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 4]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 5]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 6]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 7]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 8]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 9]?\",  expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 10]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 11]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 12]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 13]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 14]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 15]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 16]?\", expr: \"table($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
+
+
+			TEMPORARY_ALLOCATOR_GUARD();
+
+			u32 global_name_index = 0;
+			for (String str = {}; mpsc_dequeue(&gen->raddebug_section_strings, &str); /**/) {
+				LLVMValueRef data = LLVMConstStringInContext(ctx, cast(char const *)str.text, cast(unsigned)str.len, false);
+				LLVMTypeRef type = LLVMTypeOf(data);
+
+				gbString global_name = gb_string_make(temporary_allocator(), "raddbg_data__");
+				global_name = gb_string_append_fmt(global_name, "%u", global_name_index);
+				global_name_index += 1;
+
+				LLVMValueRef global = LLVMAddGlobal(mod, type, global_name);
+
+				LLVMSetInitializer(global, data);
+				LLVMSetAlignment(global, 1);
+
+				LLVMSetSection(global, ".raddbg");
+			}
+		}
 	}
 
 	if (do_threading) {

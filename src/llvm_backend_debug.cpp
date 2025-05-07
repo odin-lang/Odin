@@ -18,6 +18,25 @@ gb_internal void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef va
 	}
 }
 
+gb_internal void lb_add_raddbg_string(lbModule *m, String const &str) {
+	mpsc_enqueue(&m->gen->raddebug_section_strings, copy_string(permanent_allocator(), str));
+}
+
+gb_internal void lb_add_raddbg_string(lbModule *m, char const *cstr) {
+	mpsc_enqueue(&m->gen->raddebug_section_strings, copy_string(permanent_allocator(), make_string_c(cstr)));
+}
+
+gb_internal void lb_add_raddbg_string(lbModule *m, char const *a, char const *b) {
+	String str = concatenate_strings(permanent_allocator(), make_string_c(a), make_string_c(b));
+	mpsc_enqueue(&m->gen->raddebug_section_strings, str);
+}
+
+gb_internal void lb_add_raddbg_string(lbModule *m, char const *a, char const *b, char const *c) {
+	String str = concatenate3_strings(permanent_allocator(), make_string_c(a), make_string_c(b), make_string_c(c));
+	mpsc_enqueue(&m->gen->raddebug_section_strings, str);
+}
+
+
 
 gb_internal LLVMMetadataRef lb_get_current_debug_scope(lbProcedure *p) {
 	GB_ASSERT_MSG(p->debug_info != nullptr, "missing debug information for %.*s", LIT(p->name));
