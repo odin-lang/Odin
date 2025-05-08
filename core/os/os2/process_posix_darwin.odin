@@ -50,6 +50,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	}
 
 
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	info.pid = pid
 
 	// Thought on errors is: allocation failures return immediately (also why the non-allocation stuff is done first),
@@ -127,7 +128,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			break args
 		}
 
-		buf := runtime.make_aligned([]byte, length, 4, temp_allocator())
+		buf := runtime.make_aligned([]byte, length, 4, temp_allocator)
 		if sysctl(raw_data(mib), 3, raw_data(buf), &length, nil, 0) != .OK {
 			if err == nil {
 				err = _get_platform_error()
@@ -239,9 +240,9 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 		return
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	buffer := make([]i32, ret, temp_allocator())
+	buffer := make([]i32, ret, temp_allocator)
 	ret = darwin.proc_listallpids(raw_data(buffer), ret*size_of(i32))
 	if ret < 0 {
 		err = _get_platform_error()

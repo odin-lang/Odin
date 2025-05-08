@@ -119,11 +119,11 @@ clean_path :: proc(path: string, allocator: runtime.Allocator) -> (cleaned: stri
 		return strings.clone(".", allocator)
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	// The extra byte is to simplify appending path elements by letting the
 	// loop to end each with a separator. We'll trim the last one when we're done.
-	buffer := make([]u8, len(path) + 1, temp_allocator()) or_return
+	buffer := make([]u8, len(path) + 1, temp_allocator) or_return
 
 	// This is the only point where Windows and POSIX differ, as Windows has
 	// alphabet-based volumes for root paths.
@@ -326,8 +326,8 @@ For example, `join_path({"/home", "foo", "bar.txt"})` will result in `"/home/foo
 join_path :: proc(elems: []string, allocator: runtime.Allocator) -> (joined: string, err: Error) {
 	for e, i in elems {
 		if e != "" {
-			TEMP_ALLOCATOR_GUARD()
-			p := strings.join(elems[i:], Path_Separator_String, temp_allocator()) or_return
+			temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+			p := strings.join(elems[i:], Path_Separator_String, temp_allocator) or_return
 			return clean_path(p, allocator)
 		}
 	}

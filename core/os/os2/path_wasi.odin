@@ -28,13 +28,13 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		return .Invalid_Path
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	if exists(path) {
 		return .Exist
 	}
 
-	clean_path := clean_path(path, temp_allocator())
+	clean_path := clean_path(path, temp_allocator)
 	return internal_mkdir_all(clean_path)
 
 	internal_mkdir_all :: proc(path: string) -> Error {

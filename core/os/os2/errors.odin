@@ -108,12 +108,12 @@ error_string :: proc(ferr: Error) -> string {
 }
 
 print_error :: proc(f: ^File, ferr: Error, msg: string) {
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	err_str := error_string(ferr)
 
 	// msg + ": " + err_str + '\n'
 	length := len(msg) + 2 + len(err_str) + 1
-	buf := make([]u8, length, temp_allocator())
+	buf := make([]u8, length, temp_allocator)
 
 	copy(buf, msg)
 	buf[len(msg)] = ':'
