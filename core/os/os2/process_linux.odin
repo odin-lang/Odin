@@ -327,7 +327,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		strings.write_int(&path_builder, pid)
 		strings.write_string(&path_builder, "/exe")
 
-		if exe_bytes, exe_err := _read_link(strings.to_string(path_builder), temp_allocator()); exe_err == nil {
+		if exe_bytes, exe_err := _read_link(strings.to_string(path_builder), temp_allocator); exe_err == nil {
 			info.executable_path = strings.clone(string(exe_bytes), allocator) or_return
 			info.fields += {.Executable_Path}
 		} else {
