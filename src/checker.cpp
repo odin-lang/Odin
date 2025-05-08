@@ -4303,6 +4303,10 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 
 			if (force_public) {
+				if (e->file != nullptr && (e->file->flags & (AstFile_IsPrivatePkg|AstFile_IsPrivateFile)) == 0) {
+					error(name, "@(public) can only be used in files tagged with `#+private package` or `#+private file`.");
+				}
+
 				e->flags |= EntityFlag_ForcePublic;
 			}
 
@@ -4428,6 +4432,10 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 
 			if (force_public) {
+				if (e->file != nullptr && (e->file->flags & (AstFile_IsPrivatePkg|AstFile_IsPrivateFile)) == 0) {
+					error(name, "@(public) can only be used in files tagged with `#+private package` or `#+private file`.");
+				}
+
 				e->flags |= EntityFlag_ForcePublic;
 			}
 
