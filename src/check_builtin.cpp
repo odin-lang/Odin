@@ -223,9 +223,9 @@ gb_internal void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_t
 	data.kind = kind;
 	data.proc_type = alloc_type_proc(scope, params, param_types.count, results, results->Tuple.variables.count, false, ProcCC_CDecl);
 
-	mutex_lock(&c->info->objc_types_mutex);
+	mutex_lock(&c->info->objc_objc_msgSend_mutex);
 	map_set(&c->info->objc_msgSend_types, call, data);
-	mutex_unlock(&c->info->objc_types_mutex);
+	mutex_unlock(&c->info->objc_objc_msgSend_mutex);
 
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
@@ -386,6 +386,59 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		try_to_add_package_dependency(c, "runtime", "sel_registerName");
 		try_to_add_package_dependency(c, "runtime", "objc_allocateClassPair");
 		return true;
+	} break;
+
+	case BuiltinProc_objc_ivar_get:
+	{
+		Type *self_type = nullptr;
+
+		Operand self = {};
+		check_expr_or_type(c, &self, ce->args[0]);
+
+		if (!is_operand_value(self) || !check_is_assignable_to(c, &self, t_objc_id)) {
+			gbString e = expr_to_string(self.expr);
+			gbString t = type_to_string(self.type);
+			error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		} else if (!is_type_pointer(self.type)) {
+			gbString e = expr_to_string(self.expr);
+			gbString t = type_to_string(self.type);
+			error(self.expr, "'%.*s' expected a pointer of a value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		}
+
+		self_type = type_deref(self.type);
+
+		if (!(self_type->kind == Type_Named &&
+			self_type->Named.type_name != nullptr &&
+			self_type->Named.type_name->TypeName.objc_class_name != "")) {
+			gbString t = type_to_string(self_type);
+			error(self.expr, "'%.*s' expected a named type with the attribute @(objc_class=<string>) , got type %s", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		Type *ivar_type = self_type->Named.type_name->TypeName.objc_ivar;
+		if (ivar_type == nullptr) {
+			gbString t = type_to_string(self_type);
+			error(self.expr, "'%.*s' requires that type %s have the attribute @(objc_ivar=<ivar_type_name>).", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		if (type_hint != nullptr && type_hint->kind == Type_Pointer && type_hint->Pointer.elem == ivar_type) {
+			operand->type = type_hint;
+		} else {
+			operand->type = alloc_type_pointer(ivar_type);
+		}
+
+		operand->mode = Addressing_Value;
+		return true;
+
 	} break;
 	}
 }
@@ -2167,7 +2220,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_find_selector: 
 	case BuiltinProc_objc_find_class: 
 	case BuiltinProc_objc_register_selector: 
-	case BuiltinProc_objc_register_class: 
+	case BuiltinProc_objc_register_class:
+	case BuiltinProc_objc_ivar_get:
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:
