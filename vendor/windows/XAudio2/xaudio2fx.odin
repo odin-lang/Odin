@@ -32,9 +32,9 @@ foreign xa2 {
 // The user is responsible for allocating pPeakLevels, pRMSLevels, and initializing ChannelCount accordingly.
 // The volume meter does not support SetEffectParameters().
 VOLUMEMETER_LEVELS :: struct #packed {
-	pPeakLevels:  [^]f32,   // Peak levels table: receives maximum absolute level for each channel over a processing pass, may be NULL if pRMSLevls != NULL, otherwise must have at least ChannelCount elements.
-	pRMSLevels:   [^]f32,   // Root mean square levels table: receives RMS level for each channel over a processing pass, may be NULL if pPeakLevels != NULL, otherwise must have at least ChannelCount elements.
-	ChannelCount: u32, 	    // Number of channels being processed by the volume meter APO
+	pPeakLevels:  [^]f32 `fmt:"v,ChannelCount"`, // Peak levels table: receives maximum absolute level for each channel over a processing pass, may be NULL if pRMSLevls != NULL, otherwise must have at least ChannelCount elements.
+	pRMSLevels:   [^]f32 `fmt:"v,ChannelCount"`, // Root mean square levels table: receives RMS level for each channel over a processing pass, may be NULL if pPeakLevels != NULL, otherwise must have at least ChannelCount elements.
+	ChannelCount: u32,                           // Number of channels being processed by the volume meter APO
 }
 
 /**************************************************************************

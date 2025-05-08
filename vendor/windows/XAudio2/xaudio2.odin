@@ -11,12 +11,10 @@ package windows_xaudio2
 import win "core:sys/windows"
 import "core:math"
 
-foreign import xa2 "system:xaudio2.lib"
-
-HRESULT :: win.HRESULT
-IUnknown :: win.IUnknown
+HRESULT         :: win.HRESULT
+IUnknown        :: win.IUnknown
 IUnknown_VTable :: win.IUnknown_VTable
-WAVEFORMATEX :: win.WAVEFORMATEX
+WAVEFORMATEX    :: win.WAVEFORMATEX
 
 /**************************************************************************
  *

@@ -1,7 +1,7 @@
 #+build windows
 
 /* NOTES:
-    1.  Definition of terms:
+	1.  Definition of terms:
 	    DSP: Digital Signal Processing.
 
 	    CBR: Constant BitRate -- DSP that consumes a constant number of
@@ -27,7 +27,7 @@
 		      However, an XAPO may not perform format conversion
 		      when processing in-place.
 
-    2.  XAPO member variables are divided into three classifications:
+	2.  XAPO member variables are divided into three classifications:
 	    Immutable: Set once via IXAPO.Initialize and remain
 		       constant during the lifespan of the XAPO.
 
@@ -48,27 +48,27 @@
 	That is, one should strive to minimize XAPO state changes for
 	best performance, maintainability, and ease of use.
 
-    3.  To minimize glitches, the realtime audio processing thread must
+	3.  To minimize glitches, the realtime audio processing thread must
 	not block.  XAPO methods called by the realtime thread are commented
 	as non-blocking and therefore should not use blocking synchronization,
 	allocate memory, access the disk, etc.  The XAPO interfaces were
 	designed to allow an effect implementer to move such operations
 	into other methods called on an application controlled thread.
 
-    4.  Extending functionality is accomplished through the addition of new
+	4.  Extending functionality is accomplished through the addition of new
 	COM interfaces.  For example, if a new member is added to a parameter
 	structure, a new interface using the new structure should be added,
 	leaving the original interface unchanged.
 	This ensures consistent communication between future versions of
 	XAudio2 and various versions of XAPOs that may exist in an application.
 
-    5.  All audio data is interleaved in XAudio2.
+	5.  All audio data is interleaved in XAudio2.
 	The default audio format for an effect chain is WAVE_FORMAT_IEEE_FLOAT.
 
-    6.  User-defined XAPOs should assume all input and output buffers are
+	6.  User-defined XAPOs should assume all input and output buffers are
 	16-byte aligned.
 
-    7.  See XAPOBase.odin for an XAPO base class which provides a default
+	7.  See XAPOBase.odin for an XAPO base class which provides a default
 	implementation for most of the interface methods defined below.     */
 
 package windows_xaudio2

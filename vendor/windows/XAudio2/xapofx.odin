@@ -110,7 +110,7 @@ FXMASTERINGLIMITER_PARAMETERS :: struct #packed {
 FXREVERB_PARAMETERS :: struct #packed {
 	Diffusion: f32,  // diffusion
 	RoomSize:  f32,  // room size
-};
+}
 
 
 // Echo initialization data, used with CreateFX:
