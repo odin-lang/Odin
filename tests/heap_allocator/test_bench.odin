@@ -17,8 +17,6 @@ import "core:mem"
 
 import libc_allocator "libc"
 
-ODIN_DEBUG_HEAP :: runtime.ODIN_DEBUG_HEAP
-
 // The tests are specific to feoramalloc, but the benchmarks are general-purpose.
 
 //
@@ -851,7 +849,6 @@ main :: proc() {
 		compact:             bool `usage:"Compact the heap at the end."`,
 		info:                bool `usage:"Show heap info at the end."`,
 		trap:                bool `usage:"Trigger a debug trap at the end."`,
-		coverage:            bool `usage:"Check code coverage."`,
 	}
 
 	opt: Options
@@ -970,9 +967,6 @@ main :: proc() {
 				expect(err2 == nil)
 				_, err3 := allocator.procedure(allocator.data, .Free, 0, 0, raw_data(o2), 0)
 				expect(err3 == nil)
-				when ODIN_DEBUG_HEAP {
-					expect(intrinsics.atomic_load(&runtime.heap_global_code_coverage[.Resize_Wide_Slab_Expanded_In_Place]) == 1)
-				}
 			}
 
 			// Inter-bin tests.
@@ -1171,20 +1165,6 @@ main :: proc() {
 	if opt.compact {
 		runtime.compact_local_heap()
 		log.info("The main thread's heap has been compacted.")
-	}
-
-	if opt.coverage {
-		when runtime.ODIN_DEBUG_HEAP {
-			log.info("--- Code coverage report ---")
-			for key in runtime.Heap_Code_Coverage_Type {
-				value := intrinsics.atomic_load_explicit(&runtime.heap_global_code_coverage[key], .Acquire)
-				log.infof("%s%v: %v", ">>> " if value == 0 else "", key, value)
-			}
-
-			log.infof("Full code coverage: %v", runtime._check_heap_code_coverage())
-		} else {
-			log.error("ODIN_DEBUG_HEAP is not enabled, thus coverage cannot be calculated.")
-		}
 	}
 
 	// for ptr, entry in tracker.allocation_map {
