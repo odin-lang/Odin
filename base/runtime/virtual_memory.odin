@@ -65,7 +65,19 @@ allocate_virtual_memory_aligned :: proc "contextless" (size: int, alignment: int
 Free virtual memory allocated by any of the `allocate_*` procs.
 */
 free_virtual_memory :: proc "contextless" (ptr: rawptr, size: int) {
-	_free_virtual_memory(ptr, size)
+	// TODO: There is currently no good way to tell ThreadSanitizer that we're
+	// done with a region of memory and to clear any information it has about
+	// it, so that when it's enabled, we simply do not release any memory back
+	// to the operating system.
+	//
+	// This prevents all false positive warnings when one thread inevitably
+	// gives up some of its memory that is then re-assigned to a different
+	// thread by the operating system.
+	//
+	// This is a workaround for the time being.
+	when .Thread not_in ODIN_SANITIZER_FLAGS {
+		_free_virtual_memory(ptr, size)
+	}
 }
 
 /*
