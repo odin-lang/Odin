@@ -2525,10 +2525,13 @@ general_end:;
 		}
 	}
 
-	src_size = align_formula(src_size, src_align);
-	dst_size = align_formula(dst_size, dst_align);
+	// NOTE(laytan): even though this logic seems sound, the Address Sanitizer does not
+	// want you to load/store the space of a value that is there for alignment.
+#if 0
+	i64 aligned_src_size = align_formula(src_size, src_align);
+	i64 aligned_dst_size = align_formula(dst_size, dst_align);
 
-	if (LLVMIsALoadInst(val) && (src_size >= dst_size && src_align >= dst_align)) {
+	if (LLVMIsALoadInst(val) && (aligned_src_size >= aligned_dst_size && src_align >= dst_align)) {
 		LLVMValueRef val_ptr = LLVMGetOperand(val, 0);
 		val_ptr = LLVMBuildPointerCast(p->builder, val_ptr, LLVMPointerType(dst_type, 0), "");
 		LLVMValueRef loaded_val = OdinLLVMBuildLoad(p, dst_type, val_ptr);
@@ -2536,8 +2539,57 @@ general_end:;
 		// LLVMSetAlignment(loaded_val, gb_min(src_align, dst_align));
 
 		return loaded_val;
+	}
+#endif
+
+	if (src_size > dst_size) {
+		GB_ASSERT(p->decl_block != p->curr_block);
+		// NOTE(laytan): src is bigger than dst, need to memcpy the part of src we want.
+
+		LLVMValueRef val_ptr; 
+		if (LLVMIsALoadInst(val)) {
+			val_ptr = LLVMGetOperand(val, 0);
+		} else if (LLVMIsAAllocaInst(val)) {
+			val_ptr = LLVMBuildPointerCast(p->builder, val, LLVMPointerType(src_type, 0), "");
+		} else {
+			// NOTE(laytan): we need a pointer to memcpy from.
+			LLVMValueRef val_copy = llvm_alloca(p, src_type, src_align);
+			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, LLVMPointerType(src_type, 0), "");
+			LLVMBuildStore(p->builder, val, val_ptr);
+		}
+
+		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
+		max_align = gb_max(max_align, 16);
+
+		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
+		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(dst_type, 0), "");
+
+		LLVMTypeRef types[3] = {
+			lb_type(p->module, t_rawptr),
+			lb_type(p->module, t_rawptr),
+			lb_type(p->module, t_int)
+		};
+
+		LLVMValueRef args[4] = {
+			nptr,
+			val_ptr,
+			LLVMConstInt(LLVMIntTypeInContext(p->module->ctx, 8*cast(unsigned)build_context.int_size), dst_size, 0),
+			LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, 0),
+		};
+
+		lb_call_intrinsic(
+			p,
+			"llvm.memcpy.inline",
+			args,
+			gb_count_of(args),
+			types,
+			gb_count_of(types)
+		);
+
+		return OdinLLVMBuildLoad(p, dst_type, ptr);
 	} else {
 		GB_ASSERT(p->decl_block != p->curr_block);
+		GB_ASSERT(dst_size >= src_size);
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
 		max_align = gb_max(max_align, 16);
