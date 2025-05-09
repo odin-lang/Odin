@@ -67,9 +67,6 @@ get_local_heap_info :: proc "contextless" () -> (info: Heap_Info) {
 	}
 
 	for ptr := heap_take_free_list(&local_heap.remote_free_list); ptr != nil; /**/ {
-		when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-			ptr = cast(^uintptr)(uintptr(u64(uintptr(ptr)) ~ global_heap_xor_key))
-		}
 		next := ptr^
 		info.total_heap_remote_frees += 1
 		// Merge the remote frees, as putting them back would be complicated.

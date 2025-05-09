@@ -4,6 +4,7 @@
 package runtime
 
 import "base:intrinsics"
+import "base:sanitizer"
 
 /*
 This is the dynamic heap allocator for the Odin runtime.
@@ -24,8 +25,25 @@ This is the dynamic heap allocator for the Odin runtime.
   allocation consumes no extra space, and as a result of being tightly packed,
   performance is enhanced with cache locality for programs.
 
-- Double-Free Checking: In debug mode, the allocator will take extra memory to
-  keep track of double frees in a per-Slab bitmap.
+
+**Debugging Features**
+
+The following guards are present when AddressSanitizer (`-sanitize:address`)
+is enabled. When one of these events is caught, the program will panic with a
+descriptive message and produce a core dump.
+
+- Double Free: Memory that is going to be freed will be checked if it was marked previously.
+
+- Invalid Free: Pointers will be checked upon freeing to see if they address
+  an area marked by the sanitizer to prevent freeing invalid memory.
+
+- Use-After-Free: Most importantly, memory that has been freed will be marked
+  with the sanitizer, preventing its re-use. This also prevents any free list
+  corruption of the heap allocator.
+
+- Buffer Overflows: All allocations will be boxed off into marked sections,
+  causing a warning if any read or write access happens beyond the specific range
+  of memory allotted.
 
 
 **Terminology**
@@ -82,7 +100,7 @@ and the higher the level, the slower the program will run.
 */
 ODIN_HEAP_DEBUG_LEVEL :: Heap_Debug_Level(HEAP_DEBUG_LEVEL)
 @(private="file")
-HEAP_DEBUG_LEVEL :: #config(ODIN_HEAP_DEBUG_LEVEL, 3 when ODIN_DEBUG else 0)
+HEAP_DEBUG_LEVEL :: #config(ODIN_HEAP_DEBUG_LEVEL, 3 when .Address in ODIN_SANITIZER_FLAGS else 2 when ODIN_DEBUG else 0)
 
 /*
 `ODIN_HEAP_MIN_BIN_SIZE` and `ODIN_HEAP_MAX_BIN_SIZE` control the range of the size of
@@ -128,53 +146,46 @@ HEAP_FREE_LIST_CLOSED :: 0x01
 
 Heap_Debug_Level :: enum {
 	// No extra work is done beyond the sanity checking in the assertion statements.
-	None                 = 0,
+	None          = 0,
 
 	// Some allocation statistics are monitored in real-time.
-	Statistics           = 1,
-
-	// This level causes an extra bitmap to be allocated outside of the space
-	// used for the heap and its slabs. Freed bins will be tracked there to
-	// ensure no double frees occur.
-	Double_Free          = 2,
-
-	// This level does extra checking using the `double_free_tracker` bitmap to
-	// make sure that addresses pulled from a slab's free list exist within the
-	// slab and are truly free.
-	//
-	// Additionally, all addresses are XOR'd by a key that is specific to the
-	// slab that owns it or a global key for remote frees. This is to prevent
-	// overwriting a free list entry with an address that would be a valid
-	// pointer but was not meant to be in the free list.
-	//
-	// NOTE: This is the default level when `ODIN_DEBUG` is on.
-	Free_List_Corruption = 3,
+	Statistics    = 1,
 
 	// This level makes sure that each new allocation on an untouched slab is
 	// completely zero.
-	Ensure_Zero          = 4,
+	Ensure_Zero   = 2,
 
-	// This level is very slow, as it has to take a lock and check every
-	// segment currently allocated to see if the address being freed exists
-	// within the space of any of them.
+	// This level forbids allocations from residing next to each other,
+	// allowing the address sanitizer to detect buffer overflows and underflows
+	// by virtue of its memory poisoning feature.
 	//
-	// Additionally, every heap that exits without freeing all of its memory
-	// will remain active indefinitely so that the allocator can scan it later
-	// for valid addresses.
+	// This works by spacing out each allocation by `[size..=ODIN_HEAP_MAX_ALIGNMENT]`
+	// bytes and having the sanitizer keep the boundaries between allocations poisoned.
 	//
-	// NOTE: The allocator is no longer lock-free at this stage.
-	Invalid_Free         = 5,
+	// A simple diagram for an 8 byte slab is as follows:
+	//
+	// [0x00 :: bin 1] [0x08 :: POISONED] [0x10 :: bin 2] [0x18 :: POISONED]
+	//
+	// Normally the poisoned areas would be used for extra bins, thus this
+	// level consumes some extra amount of memory per slab. However, no more
+	// than `ODIN_HEAP_MAX_ALIGNMENT` bytes will be used to pad out the
+	// allocations, as this is our guaranteed alignment.
+	//
+	// NOTE: `-sanitize:address` must be passed for this to be effective.
+	Buffer_Overflow = 3,
 }
 
 //
 // Sanity checking
 //
 
+#assert(ODIN_HEAP_DEBUG_LEVEL < .Buffer_Overflow || .Address in ODIN_SANITIZER_FLAGS, "AddressSanitizer must be enabled if ODIN_HEAP_DEBUG_LEVEL is set to the Buffer_Overflow level.")
 #assert(ODIN_HEAP_SEGMENT_SIZE_OVERRIDE & (ODIN_HEAP_SEGMENT_SIZE_OVERRIDE-1) == 0, "ODIN_HEAP_SEGMENT_SIZE_OVERRIDE must be a power of two.")
 #assert(ODIN_HEAP_SEGMENT_SIZE_OVERRIDE == 0 || ODIN_HEAP_SEGMENT_SIZE_OVERRIDE > ODIN_HEAP_ORPHANAGE_COUNT_BITS, "ODIN_HEAP_SEGMENT_SIZE_OVERRIDE must be larger than ODIN_HEAP_ORPHANAGE_COUNT_BITS.")
 #assert(ODIN_HEAP_MIN_BIN_SIZE & (ODIN_HEAP_MIN_BIN_SIZE-1) == 0, "ODIN_HEAP_MIN_BIN_SIZE must be a power of two.")
 #assert(ODIN_HEAP_MAX_BIN_SIZE & (ODIN_HEAP_MAX_BIN_SIZE-1) == 0, "ODIN_HEAP_MAX_BIN_SIZE must be a power of two.")
 #assert(ODIN_HEAP_MIN_BIN_SIZE >= size_of(rawptr), "ODIN_HEAP_MIN_BIN_SIZE must be large enough to hold a pointer for the free lists.")
+#assert(ODIN_HEAP_MIN_BIN_SIZE >= 8 || .Address not_in ODIN_SANITIZER_FLAGS, "ODIN_HEAP_MIN_BIN_SIZE must be large enough to satisfy AddressSanitizer's alignment requirement.")
 #assert(ODIN_HEAP_MAX_BIN_SIZE >= ODIN_HEAP_MIN_BIN_SIZE, "ODIN_HEAP_MAX_BIN_SIZE must be greater than or equal to ODIN_HEAP_MIN_BIN_SIZE.")
 #assert(ODIN_HEAP_MAX_EMPTY_ORPHANED_SEGMENTS >= 0, "ODIN_HEAP_MAX_EMPTY_ORPHANED_SEGMENTS must be positive.")
 #assert(ODIN_HEAP_MAX_EMPTY_ORPHANED_SEGMENTS < ODIN_HEAP_ORPHANAGE_COUNT_BITS, "ODIN_HEAP_MAX_EMPTY_ORPHANED_SEGMENTS is too great.")
@@ -311,25 +322,11 @@ find_segment_from_pointer :: #force_inline proc "contextless" (ptr: rawptr) -> ^
 }
 
 /*
-Derive the bin index from an address.
-
-This is used only in debugging.
-*/
-@(require_results)
-heap_find_bitmapping_from_pointer :: #force_inline proc "contextless" (slab: ^Heap_Slab, ptr: rawptr) -> (sector, index: uint) {
-	number := uint((uintptr(ptr) - uintptr(slab.data)) / uintptr(slab.bin_size))
-	assert_contextless(int(number) < slab.max_bins, "The heap allocator miscalculated the bin number for an address.")
-	sector = number / (8 /* bits */ * size_of(uint))
-	index  = number % (8 /* bits */ * size_of(uint))
-	return
-}
-
-/*
 Atomically push a pointer into `list`'s location and simultaneously move the
 old value of `list` to `old_head_destination`. This is used for atomic
 linked lists.
 */
-@(private="file")
+@(private="file", no_sanitize_address)
 atomic_pop_push_pointer :: proc "contextless" (list: ^Tagged_Pointer, ptr: rawptr, old_head_destination: ^uintptr) {
 	old_head := transmute(Tagged_Pointer)intrinsics.atomic_load_explicit(cast(^u64)list, .Relaxed)
 	for {
@@ -398,13 +395,6 @@ It makes an inclusive range of `0..=n`.
 `capacity` is how much space the Slab was given by the Segment when allocated.
 
 
-`double_free_tracker` is a slice that is used only in debug mode. Its raw data
-will point to space outside of the segment and contain a bitmap of flags
-signalling whether or not a particular bin is free.
-
-`xor_key` is used only in debug mode to help check for free list corruption.
-
-
 `free_list` is either nil or points to one of the free bins, which itself may
 point to another freed bin, creating a linked list within the Slab space.
 
@@ -426,9 +416,6 @@ Heap_Slab :: struct {
 	bin_rank: int,
 
 	capacity: int,
-
-	double_free_tracker: []uint,
-	xor_key: uintptr,
 
 	free_list: ^uintptr,
 	remote_free_list: Tagged_Pointer, // atomic
@@ -543,11 +530,6 @@ freed by other threads which belong to this heap.
 
 `peak_memory` is the most amount of memory that the heap has ever held.
 Both of these values are only updated under debug mode.
-
-
-`prev_heap` and `next_heap` establish the program-wide `global_heap` in debug
-mode to detect invalid frees. They are both guarded by `global_heap_lock` and
-are not atomic.
 */
 Heap :: struct {
 	segments: ^Heap_Segment,
@@ -560,9 +542,6 @@ Heap :: struct {
 
 	current_memory: int,
 	peak_memory:    int,
-
-	prev_heap: ^Heap,
-	next_heap: ^Heap,
 }
 
 //
@@ -594,6 +573,7 @@ _pop_slab :: proc "contextless" (list_head: ^^Heap_Slab) -> (slab: ^Heap_Slab) {
 }
 
 // Remove a free slab from the heap, no matter where it is.
+@(no_sanitize_address)
 heap_remove_free_slab :: proc "contextless" (slab: ^Heap_Slab) {
 	assert_contextless(slab.bin_size == 0, "The heap allocator tried to remove a slab that is in use from one of the free slab lists.")
 	for list, index in local_heap.free_slabs {
@@ -616,6 +596,7 @@ heap_remove_free_slab :: proc "contextless" (slab: ^Heap_Slab) {
 /*
 Add a `slab` that has been configured for allocation to the heap.
 */
+@(no_sanitize_address)
 heap_add_ranked_slab :: proc "contextless" (slab: ^Heap_Slab) {
 	assert_contextless(slab.free_bins > 0, "The heap allocator tried to add a full slab to the ranked lists.")
 	assert_contextless(slab.bin_size > 0, "The heap allocator tried to add a freed slab to the ranked lists.")
@@ -634,6 +615,7 @@ heap_add_ranked_slab :: proc "contextless" (slab: ^Heap_Slab) {
 /*
 Remove a full or free `slab` from the ranked lists.
 */
+@(no_sanitize_address)
 heap_remove_ranked_slab :: proc "contextless" (slab: ^Heap_Slab) {
 	assert_contextless(
 		slab.max_bins > 0 && ((slab.free_bins == 0) || /* is full */ (slab.free_bins == slab.max_bins)) /* is empty */,
@@ -665,6 +647,7 @@ operating system and do any initialization work.
 An old, empty segment may be passed in `replacement` to convert it to the
 requested size class.
 */
+@(no_sanitize_address)
 heap_make_segment :: proc "contextless" (bin_size: int, replacement: ^Heap_Segment = nil) -> (segment: ^Heap_Segment) {
 	class := heap_get_size_class(bin_size)
 
@@ -680,7 +663,9 @@ heap_make_segment :: proc "contextless" (bin_size: int, replacement: ^Heap_Segme
 			segment = heap_allocate_segment()
 		} else {
 			// Clean the old memory.
-			intrinsics.mem_zero_volatile(replacement, heap_get_segment_size())
+			sanitizer.address_unpoison_rawptr(replacement, replacement.size)
+			intrinsics.mem_zero_volatile(replacement, replacement.size)
+			sanitizer.address_poison_rawptr(replacement, replacement.size)
 			segment = replacement
 		}
 		capacity = heap_get_segment_size()
@@ -764,12 +749,16 @@ heap_make_segment :: proc "contextless" (bin_size: int, replacement: ^Heap_Segme
 
 	heap_add_segment(segment)
 
+	// Keep the program from touching the heap metadata.
+	sanitizer.address_poison_rawptr(segment, segment.size)
+
 	return
 }
 
 /*
 Configure a Slab that can support an allocation of `bin_size`.
 */
+@(no_sanitize_address)
 heap_make_slab :: proc "contextless" (bin_size: int) -> (slab: ^Heap_Slab) {
 	// Get a slab that can fulfill the size request.
 	class := heap_get_size_class(bin_size)
@@ -817,6 +806,14 @@ heap_make_slab :: proc "contextless" (bin_size: int) -> (slab: ^Heap_Slab) {
 	bins := slab.capacity / bin_size
 	assert_contextless(bins > 0, "The heap allocator miscalculated the number of bins for a new slab.")
 
+	when ODIN_HEAP_DEBUG_LEVEL >= .Buffer_Overflow {
+		if bins > 1 {
+			// Reserve some of the bins for persistent poisoning.
+			poison_cost := min(slab.bin_size, ODIN_HEAP_MAX_ALIGNMENT)
+			bins = slab.capacity / (bin_size + poison_cost)
+		}
+	}
+
 	slab.free_bins = bins
 	slab.max_bins = bins
 
@@ -825,7 +822,16 @@ heap_make_slab :: proc "contextless" (bin_size: int) -> (slab: ^Heap_Slab) {
 		// Tidy up the slab for re-use.
 		slab.used_bins = 0
 		slab.free_list = nil
-		intrinsics.mem_zero_volatile(rawptr(slab.data), slab.bin_size * slab.max_bins)
+		// NOTE: `mem_zero_volatile` is not immune to the address sanitizer, for good reason.
+		when ODIN_HEAP_DEBUG_LEVEL < .Buffer_Overflow {
+			zero_size := bins * bin_size
+		} else {
+			poison_cost := min(slab.bin_size, ODIN_HEAP_MAX_ALIGNMENT)
+			zero_size := bins * (bin_size + poison_cost)
+		}
+		sanitizer.address_unpoison_rawptr(rawptr(slab.data), zero_size)
+		intrinsics.mem_zero_volatile(rawptr(slab.data), zero_size)
+		sanitizer.address_poison_rawptr(rawptr(slab.data), zero_size)
 	}
 
 	// We're taking control of this slab, so any remote frees will be
@@ -842,32 +848,13 @@ heap_make_slab :: proc "contextless" (bin_size: int) -> (slab: ^Heap_Slab) {
 		slab.bin_rank = max(int)
 	}
 
-	when ODIN_HEAP_DEBUG_LEVEL >= .Double_Free {
-		// Setup the double free tracker.
-		//
-		// NOTE: This will use newly allocated memory outside of the scope of
-		// the heap which is freed when the slab is. This is acceptable for
-		// debug mode.
-		length := bins / (8 /* bits */ * size_of(uint))
-		if bins % (8 /* bits */ * size_of(uint)) != 0 {
-			length += 1
-		}
-		slab.double_free_tracker = transmute([]uint)Raw_Slice{
-			allocate_virtual_memory(length * size_of(uint)),
-			length,
-		}
-	}
-
-	when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-		slab.xor_key = uintptr(intrinsics.read_cycle_counter()) * 66_600_049
-	}
-
 	return
 }
 
 /*
 Get a slab that can fulfill the `size` request.
 */
+@(no_sanitize_address)
 heap_get_slab :: proc "contextless" (size: int) -> (slab: ^Heap_Slab) {
 	if size <= ODIN_HEAP_MAX_BIN_SIZE {
 		bin_size, rank := heap_calculate_sizes(size)
@@ -891,6 +878,7 @@ heap_get_slab :: proc "contextless" (size: int) -> (slab: ^Heap_Slab) {
 /*
 Make a new bin-sized allocation, optionally zeroing the memory.
 */
+@(no_sanitize_address)
 heap_make_bin :: proc "contextless" (size: int, zero_memory: bool) -> (ptr: rawptr) {
 	// Get a slab that can fulfill the size request.
 	slab := heap_get_slab(size)
@@ -905,7 +893,20 @@ heap_make_bin :: proc "contextless" (size: int, zero_memory: bool) -> (ptr: rawp
 		assert_contextless(slab.used_bins <= slab.max_bins, "The heap allocator has exceeded the amount of used bins on one of its slabs.")
 
 		// Fetch a new address.
-		ptr = rawptr(slab.data + uintptr(slab.used_bins * slab.bin_size))
+		when ODIN_HEAP_DEBUG_LEVEL < .Buffer_Overflow {
+			ptr = rawptr(slab.data + uintptr(slab.used_bins * slab.bin_size))
+		} else {
+			poison_cost := min(slab.bin_size, ODIN_HEAP_MAX_ALIGNMENT)
+			ptr = rawptr(slab.data + uintptr(slab.used_bins * (slab.bin_size + poison_cost)))
+		}
+
+		// Ensure the instrumented parts of the program can use the memory
+		// without triggering any of the sanitizer warnings.
+		//
+		// NOTE: The address sanitizer has an 8-byte alignment requirement
+		// and does not seem to register any size < 8 bytes.
+		sanitizer.address_unpoison(ptr, max(ODIN_HEAP_MIN_BIN_SIZE, size))
+
 		slab.used_bins += 1
 
 		when ODIN_HEAP_DEBUG_LEVEL >= .Ensure_Zero {
@@ -918,17 +919,7 @@ heap_make_bin :: proc "contextless" (size: int, zero_memory: bool) -> (ptr: rawp
 		// Pop the pointer off the free list.
 		ptr = slab.free_list
 
-		when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-			// Decode the pointer using the slab's key.
-			ptr = rawptr(uintptr(ptr) ~ slab.xor_key)
-
-			// Derive the bin index.
-			sector, index := heap_find_bitmapping_from_pointer(slab, ptr)
-
-			// Ensure this address is actually free.
-			ensure_contextless(slab.data <= uintptr(ptr) && uintptr(ptr) < slab.data + uintptr(slab.capacity), "The heap allocator has detected free list corruption with an address outside of the slab space.")
-			ensure_contextless(slab.double_free_tracker[sector] & (1 << index) != 0, "The heap allocator has detected free list corruption.")
-		}
+		sanitizer.address_unpoison(ptr, max(ODIN_HEAP_MIN_BIN_SIZE, size))
 
 		slab.free_list = (cast(^^uintptr)ptr)^
 
@@ -955,14 +946,6 @@ heap_make_bin :: proc "contextless" (size: int, zero_memory: bool) -> (ptr: rawp
 		assert_contextless(slab.prev_slab == nil && slab.next_slab == nil, "The heap allocator failed to ensure a full slab was unlinked.")
 	}
 
-	when ODIN_HEAP_DEBUG_LEVEL >= .Double_Free {
-		// Derive the bin index.
-		sector, index := heap_find_bitmapping_from_pointer(slab, ptr)
-
-		// Clear the free bit.
-		slab.double_free_tracker[sector] &~= 1 << index
-	}
-
 	return
 }
 
@@ -974,17 +957,17 @@ heap_make_bin :: proc "contextless" (size: int, zero_memory: bool) -> (ptr: rawp
 // order to receive remote frees in the absence of a heap that can accept them.
 // It is otherwise closed.
 
-@(require_results, private="file")
+@(require_results, private="file", no_sanitize_address)
 is_free_list_closed :: #force_inline proc "contextless" (ptr: Tagged_Pointer) -> bool {
 	return ptr.pointer & HEAP_FREE_LIST_CLOSED == HEAP_FREE_LIST_CLOSED
 }
 
-@(private="file")
+@(private="file", no_sanitize_address)
 close_free_list :: #force_inline proc "contextless" (ptr: ^Tagged_Pointer) {
 	intrinsics.atomic_or_explicit(cast(^u64)ptr, HEAP_FREE_LIST_CLOSED, .Release)
 }
 
-@(private="file")
+@(private="file", no_sanitize_address)
 open_free_list :: #force_inline proc "contextless" (ptr: ^Tagged_Pointer) {
 	intrinsics.atomic_and_explicit(cast(^u64)ptr, ~u64(HEAP_FREE_LIST_CLOSED), .Release)
 }
@@ -992,7 +975,7 @@ open_free_list :: #force_inline proc "contextless" (ptr: ^Tagged_Pointer) {
 /*
 Atomically replace a free list's head with nil and return the entire chain.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 heap_take_free_list :: proc "contextless" (list: ^Tagged_Pointer) -> ^uintptr {
 	old_head := transmute(Tagged_Pointer)intrinsics.atomic_load_explicit(cast(^u64)list, .Relaxed)
 	for {
@@ -1016,33 +999,23 @@ heap_take_free_list :: proc "contextless" (list: ^Tagged_Pointer) -> ^uintptr {
 
 // If `list` is open, `ptr` will be pushed onto it. Otherwise, `ptr` will be
 // pushed to the remote free list that is on the heap that owns `segment`.
-@(private="file")
+@(private="file", no_sanitize_address)
 push_onto_remote_free_list :: proc "contextless" (segment: ^Heap_Segment, list: ^Tagged_Pointer, ptr: rawptr) {
-	when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-		ptr := ptr
-		encoded_ptr := rawptr(uintptr(u64(uintptr(ptr)) ~ global_heap_xor_key))
-	}
 	old_head := transmute(Tagged_Pointer)intrinsics.atomic_load_explicit(cast(^u64)list, .Relaxed)
 	for {
 		if is_free_list_closed(old_head) {
 			// The list is closed; we must redirect the pointer to the heap.
 			target_heap := intrinsics.atomic_load_explicit(&segment.heap, .Acquire)
 			assert_contextless(target_heap != nil, "The heap allocator failed to find the owning heap for a segment which had a closed free list.")
-			when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-				atomic_pop_push_pointer(&target_heap.remote_free_list, encoded_ptr, cast(^uintptr)ptr)
-			} else {
-				atomic_pop_push_pointer(&target_heap.remote_free_list, ptr, cast(^uintptr)ptr)
-			}
+			atomic_pop_push_pointer(&target_heap.remote_free_list, ptr, cast(^uintptr)ptr)
 			return
 		}
 
 		// Write the next address to this pointer, continuing the linked list.
 		(cast(^uintptr)ptr)^ = uintptr(old_head.pointer) & ~uintptr(HEAP_FREE_LIST_CLOSED)
 
-		when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-			// Swap to the encoded pointer and push that instead.
-			ptr = encoded_ptr
-		}
+		// Make sure the memory at the address isn't touched again by the program.
+		sanitizer.address_poison_rawptr(ptr, size_of(^uintptr))
 
 		new_head := Tagged_Pointer{
 			pointer = i64(uintptr(ptr)) | (old_head.pointer & HEAP_FREE_LIST_CLOSED), // Persist the closed state.
@@ -1057,13 +1030,10 @@ push_onto_remote_free_list :: proc "contextless" (segment: ^Heap_Segment, list: 
 	}
 }
 
-@(private="file")
+@(private="file", no_sanitize_address)
 merge_slab_remote_free_list :: proc "contextless" (segment: ^Heap_Segment, slab: ^Heap_Slab) {
 	assert_contextless(slab.bin_size > 0, "The heap allocator tried to merge the remote frees of a slab which is not in use.")
 	for ptr := heap_take_free_list(&slab.remote_free_list); ptr != nil; /**/ {
-		when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-			ptr = cast(^uintptr)(uintptr(u64(uintptr(ptr)) ~ global_heap_xor_key))
-		}
 		next := ptr^
 		heap_free_bin(segment, slab, ptr)
 		ptr = cast(^uintptr)next
@@ -1073,13 +1043,16 @@ merge_slab_remote_free_list :: proc "contextless" (segment: ^Heap_Segment, slab:
 /*
 Merge any remote frees on the thread's heap.
 */
+@(no_sanitize_address)
 heap_merge_remote_free_list :: proc "contextless" () {
 	for ptr := heap_take_free_list(&local_heap.remote_free_list); ptr != nil; /**/ {
-		when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-			ptr = cast(^uintptr)(uintptr(u64(uintptr(ptr)) ~ global_heap_xor_key))
-		}
 		next := ptr^
-		heap_free(ptr)
+		// We bypass `heap_free` here in order to not trigger the sanitizer
+		// guards, as remote frees poison the memory in order to protect the
+		// free list entries.
+		segment := find_segment_from_pointer(ptr)
+		slab := &segment.slabs[(uintptr(ptr) - uintptr(segment)) >> segment.slab_shift]
+		heap_free_bin(segment, slab, ptr)
 		ptr = cast(^uintptr)next
 	}
 }
@@ -1088,6 +1061,7 @@ heap_merge_remote_free_list :: proc "contextless" () {
 // Freeing
 //
 
+@(no_sanitize_address)
 heap_free_segment :: proc "contextless" (segment: ^Heap_Segment) {
 	// Remove all slabs belonging to this segment from the heap.
 	for &slab in segment.slabs {
@@ -1104,15 +1078,10 @@ heap_free_segment :: proc "contextless" (segment: ^Heap_Segment) {
 	}
 }
 
+@(no_sanitize_address)
 heap_free_slab :: proc "contextless" (segment: ^Heap_Segment, slab: ^Heap_Slab) {
 	segment.free_slabs += 1
 	assert_contextless(segment.free_slabs <= len(segment.slabs), "The heap allocator freed a slab and caused an overflow of the free slab counter.")
-
-	when ODIN_HEAP_DEBUG_LEVEL >= .Double_Free {
-		// Return the memory specifically allocated for this bitmap back to the operating system.
-		free_virtual_memory(raw_data(slab.double_free_tracker), len(slab.double_free_tracker) * size_of(uint))
-		slab.double_free_tracker = {}
-	}
 
 	if slab.bin_size <= ODIN_HEAP_MAX_BIN_SIZE {
 		// Remove the slab from the array of ranked lists so that it is no
@@ -1131,19 +1100,9 @@ heap_free_slab :: proc "contextless" (segment: ^Heap_Segment, slab: ^Heap_Slab) 
 	}
 }
 
+@(no_sanitize_address)
 heap_free_bin :: proc "contextless" (segment: ^Heap_Segment, slab: ^Heap_Slab, ptr: rawptr) {
 	slab.free_bins += 1
-
-	when ODIN_HEAP_DEBUG_LEVEL >= .Double_Free {
-		// Derive the bin index.
-		sector, index := heap_find_bitmapping_from_pointer(slab, ptr)
-
-		// Panic if a double free has occurred.
-		ensure_contextless(slab.double_free_tracker[sector] & (1 << index) == 0, "The heap allocator caught a double free.")
-
-		// Set the free bit.
-		slab.double_free_tracker[sector] |= 1 << index
-	}
 
 	assert_contextless(slab.bin_size > 0, "The heap allocator tried to free a pointer belonging to an empty slab.")
 	assert_contextless(slab.free_bins <= slab.max_bins, "The heap allocator freed a bin and caused an overflow of the free bin counter.")
@@ -1151,13 +1110,10 @@ heap_free_bin :: proc "contextless" (segment: ^Heap_Segment, slab: ^Heap_Slab, p
 	// Push onto the head of the free list.
 	(cast(^^uintptr)ptr)^ = slab.free_list
 
-	when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-		// Encode the pointer with the heap's key.
-		xor_key := intrinsics.atomic_load_explicit(&slab.xor_key, .Acquire)
-		slab.free_list = cast(^uintptr)(uintptr(ptr) ~ xor_key)
-	} else {
-		slab.free_list = cast(^uintptr)ptr
-	}
+	// Prevent the program from using the freed memory when the address sanitizer is enabled.
+	sanitizer.address_poison_rawptr(ptr, slab.bin_size)
+
+	slab.free_list = cast(^uintptr)ptr
 
 	if slab.free_bins == 1 && slab.bin_size <= ODIN_HEAP_MAX_BIN_SIZE {
 		// The slab has free bins again, which means we can place it back
@@ -1190,6 +1146,7 @@ Tagged_Pointer :: bit_field u64 {
 /*
 Push an empty Segment into the global orphanage.
 */
+@(no_sanitize_address)
 heap_orphan_empty_segment :: proc "contextless" (segment: ^Heap_Segment) -> (accepted: bool) {
 	when ODIN_HEAP_MAX_EMPTY_ORPHANED_SEGMENTS > 0 {
 		old_head := transmute(Tagged_Pointer)intrinsics.atomic_load_explicit(cast(^u64)&heap_orphanage.empty, .Relaxed)
@@ -1224,6 +1181,7 @@ heap_orphan_empty_segment :: proc "contextless" (segment: ^Heap_Segment) -> (acc
 /*
 Push a non-empty Segment into the global orphanage.
 */
+@(no_sanitize_address)
 heap_orphan_segment :: proc "contextless" (segment: ^Heap_Segment) {
 	intrinsics.atomic_store_explicit(&segment.owner, 0, .Release)
 	old_head := transmute(Tagged_Pointer)intrinsics.atomic_load_explicit(cast(^u64)&heap_orphanage.in_use, .Relaxed)
@@ -1247,14 +1205,9 @@ heap_orphan_segment :: proc "contextless" (segment: ^Heap_Segment) {
 /*
 Push `segment` onto the heap's list.
 */
+@(no_sanitize_address)
 heap_add_segment :: proc "contextless" (segment: ^Heap_Segment) {
 	assert_contextless(segment.prev_segment == nil, "The heap allocator tried to add a segment to its heap which has a non-nil `prev_segment`. This indicates a failure to clear this value.")
-
-	when ODIN_HEAP_DEBUG_LEVEL >= .Invalid_Free {
-		// We must guard the global heap to prevent another thread from
-		// interacting with `segments` during this time.
-		guard_global_heap()
-	}
 
 	intrinsics.atomic_store_explicit(&segment.owner, get_current_thread_id(), .Release)
 	intrinsics.atomic_store_explicit(&segment.heap, local_heap, .Release)
@@ -1273,13 +1226,8 @@ heap_add_segment :: proc "contextless" (segment: ^Heap_Segment) {
 /*
 Remove `segment` from the heap.
 */
+@(no_sanitize_address)
 heap_remove_segment :: proc "contextless" (segment: ^Heap_Segment) {
-	when ODIN_HEAP_DEBUG_LEVEL >= .Invalid_Free {
-		// We must guard the global heap to prevent another thread from
-		// interacting with `segments` during this time.
-		guard_global_heap()
-	}
-
 	intrinsics.atomic_store_explicit(&segment.owner, 0, .Release)
 	intrinsics.atomic_store_explicit(&segment.heap, nil, .Release)
 	if segment == local_heap.segments {
@@ -1305,7 +1253,7 @@ Take the first segment from the orphanage.
 If the first one available happens to be an in-use segment, the request for
 `bin_size` and `class` are likely to not be satisfied.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 heap_adopt_orphan :: proc "contextless" (bin_size: int, class: Heap_Slab_Class) -> (segment: ^Heap_Segment) {
 	// First try to get an in-use segment.
 	{
@@ -1416,7 +1364,7 @@ when VIRTUAL_MEMORY_SUPPORTED {
 	//
 	// Note that this will not run for the main thread, as no thread-local
 	// cleaner procedures do.
-	@(private="file")
+	@(private="file", no_sanitize_address)
 	heap_local_cleanup :: proc "odin" () {
 		if local_heap == nil {
 			// A thread without a heap could not have caused any dynamic memory
@@ -1446,31 +1394,9 @@ when VIRTUAL_MEMORY_SUPPORTED {
 		// It's time to merge all of the heap's remote frees, free it, then exit.
 		heap_merge_remote_free_list()
 
-		when ODIN_HEAP_DEBUG_LEVEL >= .Invalid_Free {
-			// Remove this heap from the global heap, iff it has no more active
-			// allocations. Otherwise, we need to keep the metadata around for
-			// the duration of the program to monitor the valid space.
-			if local_heap.segments == nil {
-				guard_global_heap()
-
-				// Remove this heap from the global heap.
-				if local_heap == global_heap {
-					global_heap = local_heap.next_heap
-				}
-				if local_heap.prev_heap != nil {
-					local_heap.prev_heap.next_heap = local_heap.next_heap
-				}
-				if local_heap.next_heap != nil {
-					local_heap.next_heap.prev_heap = local_heap.prev_heap
-				}
-
-				free_virtual_memory(local_heap, size_of(Heap))
-			}
-		} else {
-			// The heap itself is an allocation brought about by the very first
-			// allocation in a thread, thus we free it at the thread's exit.
-			free_virtual_memory(local_heap, size_of(Heap))
-		}
+		// The heap itself is an allocation brought about by the very first
+		// allocation in a thread, thus we free it at the thread's exit.
+		free_virtual_memory(local_heap, size_of(Heap))
 	}
 
 	@(init, private="file")
@@ -1499,56 +1425,6 @@ heap_orphanage: struct {
 // This is the Heap for the current thread.
 @(thread_local) local_heap: ^Heap
 
-when ODIN_HEAP_DEBUG_LEVEL >= .Free_List_Corruption {
-	// Set only once but may be read from any thread.
-	@(private)
-	global_heap_xor_key: u64
-
-	@(init, private="file")
-	init_heap_global_xor_key :: proc "contextless" () {
-		// NOTE: This mask takes into account the upper bits that would be used
-		// for the version on a `Tagged_Pointer`, the sign bit, as well as the
-		// bit for `HEAP_FREE_LIST_CLOSED`.
-		//
-		// This allows the xor key to be used without interfering with the rest
-		// of the state on the tagged pointer.
-		MASK :: 0x00FF_FFFF_FFFF_FFFE
-		global_heap_xor_key = (u64(intrinsics.read_cycle_counter()) * 66_600_049) & MASK
-	}
-}
-
-when ODIN_HEAP_DEBUG_LEVEL >= .Invalid_Free {
-	// For detecting invalid frees, we put all of the heaps on a global list
-	// protected by a mutex for the sake of simplicity. As this is only enabled
-	// for this specific debug level and higher, we retain our lock-free
-	// guarantee on the release mode build of the allocator.
-	global_heap: ^Heap
-	global_heap_lock: enum u64 {
-		Unlocked = 0,
-		Locked   = 1,
-	}
-
-	lock_global_heap :: proc "contextless" () {
-		// This is a simple spin lock.
-		for {
-			_, swapped := intrinsics.atomic_compare_exchange_weak_explicit(&global_heap_lock, .Unlocked, .Locked, .Acq_Rel, .Relaxed)
-			if swapped {
-				break
-			}
-			intrinsics.cpu_relax()
-		}
-	}
-	unlock_global_heap :: proc "contextless" () {
-		_, swapped := intrinsics.atomic_compare_exchange_strong_explicit(&global_heap_lock, .Locked, .Unlocked, .Acq_Rel, .Relaxed)
-		ensure_contextless(swapped, "A thread tried to unlock the global heap, but it was not locked to begin with.")
-	}
-	@(deferred_in=unlock_global_heap)
-	guard_global_heap :: proc "contextless" () -> bool {
-		lock_global_heap()
-		return true
-	}
-}
-
 //
 // API
 //
@@ -1556,7 +1432,7 @@ when ODIN_HEAP_DEBUG_LEVEL >= .Invalid_Free {
 /*
 Allocate an arbitrary amount of memory from the heap and optionally zero it.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: rawptr) {
 	assert_contextless(size >= 0, "The heap allocator was given a negative size to allocate.")
 
@@ -1566,16 +1442,6 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 		if intrinsics.expect(local_heap == nil, false) {
 			// The operating system may be out of memory.
 			return nil
-		}
-		when ODIN_HEAP_DEBUG_LEVEL >= .Invalid_Free {
-			if guard_global_heap() {
-				// Add this heap to the global heap.
-				local_heap.next_heap = global_heap
-				if global_heap != nil {
-					global_heap.prev_heap = local_heap
-				}
-				global_heap = local_heap
-			}
 		}
 	}
 
@@ -1591,6 +1457,7 @@ heap_alloc :: proc "contextless" (size: int, zero_memory: bool = true) -> (ptr: 
 /*
 Free memory returned by `heap_alloc`.
 */
+@(no_sanitize_address)
 heap_free :: proc "contextless" (ptr: rawptr) {
 	segment := find_segment_from_pointer(ptr)
 
@@ -1599,20 +1466,11 @@ heap_free :: proc "contextless" (ptr: rawptr) {
 		return
 	}
 
-	when ODIN_HEAP_DEBUG_LEVEL >= .Invalid_Free {
-		// Sweep through every heap and every segment to see if this one is valid.
-		pass := false
-		if guard_global_heap() {
-			heap_sweep: for heap := global_heap; heap != nil; heap = heap.next_heap {
-				for heap_segment := heap.segments; heap_segment != nil; heap_segment = heap_segment.next_segment {
-					if segment == heap_segment {
-						pass = true
-						break heap_sweep
-					}
-				}
-			}
-		}
-		ensure_contextless(pass, "An invalid free has been detected.")
+	// NOTE: These guards won't protect us if someone uses the heap `free` on
+	// the poisoned space of another allocator.
+	when .Address in ODIN_SANITIZER_FLAGS {
+		ensure_contextless(!sanitizer.address_is_poisoned(ptr), "The heap allocator tried to free a memory address poisoned by the sanitizer. This is either a double free or an invalid address within the heap space.")
+		ensure_contextless(sanitizer.address_is_poisoned(segment), "The heap allocator tried to access the segment for a pointer being freed, and the segment was not poisoned by the address sanitizer. This is likely a free operation pointing to memory outside the scope of the heap.")
 	}
 
 	slab := &segment.slabs[(uintptr(ptr) - uintptr(segment)) >> segment.slab_shift]
@@ -1634,7 +1492,7 @@ heap_free :: proc "contextless" (ptr: rawptr) {
 /*
 Resize memory returned by `heap_alloc`.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int, zero_memory: bool = true) -> (new_ptr: rawptr) {
 	// Handle `nil` as if it was a new allocation.
 	// This is the behavior seen in C's `realloc`.
@@ -1650,7 +1508,15 @@ heap_resize :: proc "contextless" (old_ptr: rawptr, old_size: int, new_size: int
 		same_rank = rounded_old_size == rounded_new_size
 	}
 
+	when .Address in ODIN_SANITIZER_FLAGS {
+		segment := find_segment_from_pointer(old_ptr)
+		ensure_contextless(sanitizer.address_region_is_poisoned(old_ptr, max(ODIN_HEAP_MIN_BIN_SIZE, old_size)) == nil, "The heap allocator tried to resize a memory region poisoned by the sanitizer. This indicates an invalid pointer that may have never been heap allocated or has already been freed.")
+		ensure_contextless(sanitizer.address_is_poisoned(segment), "The heap allocator tried to access the segment for a pointer being resized, and the segment address was not poisoned by the address sanitizer. This indicates an invalid heap pointer.")
+	}
+
 	if same_rank {
+		sanitizer.address_unpoison(old_ptr, max(ODIN_HEAP_MIN_BIN_SIZE, new_size))
+
 		// We can re-use the same bin.
 		if zero_memory && new_size > old_size {
 			// Zero any old, dirty memory in the expanded region.
