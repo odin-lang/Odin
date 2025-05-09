@@ -1,6 +1,6 @@
 package tests_heap_allocator_libc
 
-import "../sanitizer"
+import "base:sanitizer"
 
 foreign import kernel32 "system:Kernel32.lib"
 
