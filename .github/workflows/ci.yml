@@ -75,9 +75,9 @@ jobs:
       fail-fast: false
       matrix:
         # MacOS 13 runs on Intel, 14 runs on ARM
-        os: [macos-13, macos-14]
+        os: [macos-13, macos-14, ubuntu-latest]
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel') }} Build, Check, and Test
+    name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
     timeout-minutes: 15
     steps:
 
@@ -95,52 +95,8 @@ jobs:
           brew update
           brew install llvm@20 wasmtime lua@5.4 lld
 
-      - name: Build Odin
-        run: ./build_odin.sh release
-      - name: Odin version
-        run: ./odin version
-      - name: Odin report
-        run: ./odin report
-      - name: Compile needed Vendor
-        run: |
-          make -C vendor/stb/src
-          make -C vendor/cgltf/src
-          make -C vendor/miniaudio/src
-      - name: Odin check
-        run: ./odin check examples/demo -vet
-      - name: Odin run
-        run: ./odin run examples/demo
-      - name: Odin run -debug
-        run: ./odin run examples/demo -debug
-      - name: Odin check examples/all
-        run: ./odin check examples/all -strict-style -vet -disallow-do
-      - name: Odin check vendor/sdl3
-        run: ./odin check vendor/sdl3  -strict-style -vet -disallow-do -no-entry-point
-      - name: Normal Core library tests
-        run: ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-      - name: Optimized Core library tests
-        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-      - name: Vendor library tests
-        run: ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-      - name: Internals tests
-        run: ./odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-      - name: GitHub Issue tests
-        run: |
-          cd tests/issues
-          ./run.sh
-
-      - name: Run demo on WASI WASM32
-        run: |
-          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -disallow-do -out:demo
-          wasmtime ./demo.wasm
-        if: matrix.os == 'macos-14'
-
-  build_ubuntu:
-    name: Ubuntu Build, Check, and Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download LLVM
+      - name: Download LLVM (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -175,30 +131,44 @@ jobs:
       - name: Vendor library tests
         run: ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Internals tests
-        run: ./odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+        run: ./odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: GitHub Issue tests
         run: |
           cd tests/issues
           ./run.sh
 
+      - name: Run demo on WASI WASM32
+        run: |
+          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -disallow-do -out:demo
+          wasmtime ./demo.wasm
+        if: matrix.os == 'macos-14'
+
       - name: Check benchmarks
         run: ./odin check tests/benchmark -vet -strict-style -no-entry-point
       - name: Odin check examples/all for Linux i386
+        if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -strict-style -disallow-do -target:linux_i386
       - name: Odin check examples/all for Linux arm64
+        if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -strict-style -disallow-do -target:linux_arm64
       - name: Odin check examples/all for FreeBSD amd64
+        if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -strict-style -disallow-do -target:freebsd_amd64
       - name: Odin check examples/all for OpenBSD amd64
+        if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -strict-style -disallow-do -target:openbsd_amd64
 
       - name: Odin check vendor/sdl3 for Linux i386
+        if: matrix.os == 'ubuntu-latest'
         run: ./odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point -target:linux_i386
       - name: Odin check vendor/sdl3 for Linux arm64
+        if: matrix.os == 'ubuntu-latest'
         run: ./odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point -target:linux_arm64
       - name: Odin check vendor/sdl3 for FreeBSD amd64
+        if: matrix.os == 'ubuntu-latest'
         run: ./odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point -target:freebsd_amd64
       - name: Odin check vendor/sdl3 for OpenBSD amd64
+        if: matrix.os == 'ubuntu-latest'
         run: ./odin check vendor/sdl3 -vet -strict-style -disallow-do -no-entry-point -target:openbsd_amd64
 
   build_windows:
