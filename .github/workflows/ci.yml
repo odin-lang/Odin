@@ -88,12 +88,14 @@ jobs:
         run: |
           brew update
           brew install llvm@20 lua@5.4 lld
+          echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
           brew update
           brew install llvm@20 wasmtime lua@5.4 lld
+          echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
