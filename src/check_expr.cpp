@@ -643,7 +643,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 gb_internal bool check_polymorphic_procedure_assignment(CheckerContext *c, Operand *operand, Type *type, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	if (operand->expr == nullptr) return false;
-	Entity *base_entity = entity_of_node(operand->expr);
+	Entity *base_entity = entity_from_expr(operand->expr);
 	if (base_entity == nullptr) return false;
 	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_def_node, poly_proc_data);
 }
@@ -995,14 +995,34 @@ gb_internal i64 assign_score_function(i64 distance, bool is_variadic=false) {
 
 
 gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type *type, i64 *score_, bool is_variadic=false, bool allow_array_programming=true) {
-	i64 score = 0;
-	i64 distance = check_distance_between_types(c, operand, type, allow_array_programming);
-	bool ok = distance >= 0;
-	if (ok) {
-		score = assign_score_function(distance, is_variadic);
+	if (c == nullptr) {
+		GB_ASSERT(operand->mode == Addressing_Value);
+		GB_ASSERT(is_type_typed(operand->type));
 	}
-	if (score_) *score_ = score;
-	return ok;
+	if (operand->mode == Addressing_Invalid || type == t_invalid) {
+		if (score_) *score_ = 0;
+		return false;
+	}
+
+	// Handle polymorphic procedure used as default parameter
+	if (operand->mode == Addressing_Value && is_type_proc(type) && is_type_proc(operand->type)) {
+		Entity *e = entity_from_expr(operand->expr);
+		if (e != nullptr && e->kind == Entity_Procedure && is_type_polymorphic(e->type) && !is_type_polymorphic(type)) {
+			// Special case: Allow a polymorphic procedure to be used as default value for concrete proc type
+			// during the initial check. It will be properly instantiated when actually used.
+			if (score_) *score_ = assign_score_function(1);
+			return true;
+		}
+	}
+
+	i64 score = check_distance_between_types(c, operand, type, allow_array_programming);
+	if (score >= 0) {
+		if (score_) *score_ = assign_score_function(score, is_variadic);
+		return true;
+	}
+
+	if (score_) *score_ = 0;
+	return false;
 }
 
 
@@ -10996,7 +11016,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return kind;
 	case_end;
 
-	case_ast_node(i, Implicit, node)
+	case_ast_node(i, Implicit, node);
 		switch (i->kind) {
 		case Token_context:
 			{

@@ -887,8 +887,8 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			Type *t = base_type(type_deref(addr.addr.type));
 			GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
 			lbValue len = lb_soa_struct_len(p, addr.addr);
-			if (addr.soa.index_expr != nullptr) {
-				lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), index, len);
+			if (addr.soa.index_expr != nullptr && (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed)) {
+				lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 			}
 		}
 
@@ -2214,6 +2214,14 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_BitField:
 		return lb_type_internal(m, type->BitField.backing_type);
+        
+	case Type_Generic:
+		if (type->Generic.specialized) {
+			return lb_type_internal(m, type->Generic.specialized);
+		} else {
+			// For unspecialized generics, use a pointer type as a placeholder
+			return LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0);
+		}
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));
@@ -2730,6 +2738,14 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	ignore_body = other_module != m;
 
 	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
+	if (missing_proc == nullptr) {
+		// This is an unspecialized polymorphic procedure, which should not be codegen'd
+		lbValue dummy = {};
+		dummy.value = nullptr;
+		dummy.type = nullptr;
+		return dummy;
+	}
+
 	if (ignore_body) {
 		mutex_lock(&gen->anonymous_proc_lits_mutex);
 		defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));

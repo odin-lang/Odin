@@ -2957,6 +2957,10 @@ gb_internal Type *default_type(Type *type) {
 		case Basic_UntypedString:     return t_string;
 		case Basic_UntypedRune:       return t_rune;
 		}
+	} else if (type->kind == Type_Generic) {
+		if (type->Generic.specialized) {
+			return default_type(type->Generic.specialized);
+		}
 	}
 	return type;
 }
