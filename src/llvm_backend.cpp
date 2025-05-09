@@ -3122,6 +3122,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
 				LLVMSetLinkage(g, LLVMInternalLinkage);
 				lb_make_global_private_const(g);
+				lb_set_odin_rtti_section(g);
 				return lb_addr({g, alloc_type_pointer(t)});
 			};
 
