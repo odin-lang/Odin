@@ -133,7 +133,7 @@ completed the previous threads, no thread is allowed to start work on the next
 stage. In this case, after each stage, a `barrier_wait` shall be inserted in the
 thread procedure.
 
-**Example**:
+Example:
 
 	THREAD_COUNT :: 4
 	threads: [THREAD_COUNT]^thread.Thread
@@ -314,7 +314,7 @@ until the lock is released.
 This procedure always returns `true`. This makes it easy to define a critical
 section by putting the function inside the `if` statement.
 
-**Example**:
+Example:
 
 	if ticket_mutex_guard(&m) {
 		...
@@ -403,7 +403,7 @@ until the lock is released.
 This procedure always returns `true`. This makes it easy to define a critical
 section by putting the function inside the `if` statement.
 
-**Example**:
+Example:
 
 	if benaphore_guard(&m) {
 		...
@@ -524,7 +524,7 @@ until the lock is released.
 This procedure always returns `true`, which makes it easy to define a critical
 section by calling this procedure inside an `if` statement.
 
-**Example**:
+Example:
 
 	if recursive_benaphore_guard(&m) {
 		...

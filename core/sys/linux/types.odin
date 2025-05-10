@@ -92,7 +92,7 @@ FD_Flags :: bit_set[FD_Flags_Bits; i32]
 
 /*
 	Represents file's permission and status bits
-**Example:**
+Example:
 	When you're passing a value of this type the recommended usage is:
 
 	```

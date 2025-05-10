@@ -23,13 +23,12 @@ _f64_info := Float_Info{52, 11, -1023}
 /*
 Converts a floating-point number to a string with the specified format and precision.
 
-**Inputs**  
-
-buf: A byte slice to store the resulting string
-val: The floating-point value to be converted
-fmt: The formatting byte, accepted values are 'e', 'E', 'f', 'F', 'g', 'G'
-precision: The number of decimal places to round to
-bit_size: The size of the floating-point number in bits, valid values are 16, 32, 64
+Inputs:
+- `buf`: A byte slice to store the resulting string
+- `val`: The floating-point value to be converted
+- `fmt`: The formatting byte, accepted values are 'e', 'E', 'f', 'F', 'g', 'G'
+- `precision`: The number of decimal places to round to
+- `bit_size`: The size of the floating-point number in bits, valid values are 16, 32, 64
 
 Example:
 
@@ -40,7 +39,7 @@ Example:
 	bit_size := 64
 	result := strconv.generic_ftoa(buf[:], val, fmt, precision, bit_size) -> "3.14"
 
-**Returns**  
+Returns:
 - A byte slice containing the formatted string
 */
 generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int) -> []byte {
@@ -122,7 +121,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 /*
 Converts a decimal floating-point number into a byte buffer with the given format
 
-**Inputs**  
+Inputs:
 - buf: The byte buffer to store the formatted number
 - shortest: If true, generates the shortest representation of the number
 - neg: If true, the number is negative
@@ -130,7 +129,7 @@ Converts a decimal floating-point number into a byte buffer with the given forma
 - precision: The number of digits after the decimal point
 - fmt: The format specifier (accepted values: 'f', 'F', 'e', 'E', 'g', 'G')
 
-**Returns**  
+Returns:
 - A byte slice containing the formatted decimal floating-point number
 */
 format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte) -> []byte {
@@ -256,7 +255,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 /*
 Rounds the given decimal number to its shortest representation, considering the provided floating-point format
 
-**Inputs**  
+Inputs:
 - d: The decimal number to round
 - mant: The mantissa of the floating-point number
 - exp: The exponent of the floating-point number
@@ -331,11 +330,11 @@ round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Inf
 /*
 Converts a decimal number to its floating-point representation with the given format and returns the resulting bits
 
-**Inputs**  
+Inputs:
 - d: Pointer to the decimal number to convert
 - info: Pointer to the Float_Info structure containing information about the floating-point format
 
-**Returns**  
+Returns:
 - b: The bits representing the floating-point number
 - overflow: A boolean indicating whether an overflow occurred during conversion
 */

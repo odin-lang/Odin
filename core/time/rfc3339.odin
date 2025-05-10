@@ -17,12 +17,12 @@ YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
 And returns the time that was represented by the RFC 3339 string, with the UTC
 offset applied to it.
 
-**Inputs**:
+Inputs:
 - `rfc_datetime`: An RFC 3339 string to parse.
 - `is_leap`: Optional output parameter specifying whether the moment was a leap
   second.
 
-**Returns**:
+Returns:
 - `res`: The time, with UTC offset applied, that was parsed from the RFC 3339
   string.
 - `consumed`: The number of bytes consumed by parsing the RFC 3339 string.
@@ -52,12 +52,12 @@ YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
 And returns the time, in UTC and a UTC offset, in minutes, that were represented
 by the RFC 3339 string.
 
-**Inputs**:
+Inputs:
 - `rfc_datetime`: The RFC 3339 string to be parsed.
 - `is_leap`: Optional output parameter specifying whether the moment was a
   leap second.
 
-**Returns**:
+Returns:
 - `res`: The time, in UTC, that was parsed from the RFC 3339 string.
 - `utc_offset`: The UTC offset, in minutes, that was parsed from the RFC 3339
   string.
@@ -97,10 +97,10 @@ YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
 And returns the datetime, in UTC and the UTC offset, in minutes, that were
 represented by the RFC 3339 string.
 
-**Inputs**:
+Inputs:
 - `rfc_datetime`: The RFC 3339 string to parse.
 
-**Returns**:
+Returns:
 - `res`: The datetime, in UTC, that was parsed from the RFC 3339 string.
 - `utc_offset`: The UTC offset, in minutes, that was parsed from the RFC 3339
   string.
@@ -194,7 +194,7 @@ Serialize the timestamp as a RFC 3339 string.
 
 The boolean `ok` is false if the `time` is not a valid datetime, or if allocating the result string fails.
 
-**Inputs**:
+Inputs:
 - `utc_offset`: offset in minutes wrt UTC (ie. the timezone)
 - `include_nanos`: whether to include nanoseconds in the result.
 */

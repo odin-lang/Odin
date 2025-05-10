@@ -5,13 +5,13 @@ import "decimal"
 /*
 Parses a boolean value from the input string
 
-**Inputs**  
+Inputs:
 - s: The input string  
 	- true: "1", "t", "T", "true", "TRUE", "True"
 	- false: "0", "f", "F", "false", "FALSE", "False"
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
-**Returns**
+Returns:
 - result: The parsed boolean value (default: false)
 - ok: A boolean indicating whether the parsing was successful
 */
@@ -29,10 +29,11 @@ parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool)
 /*
 Finds the integer value of the given rune
 
-**Inputs**
+Inputs:
 - r: The input rune to find the integer value of
 
-**Returns**   The integer value of the given rune
+Returns:
+- The integer value of the given rune
 */
 _digit_value :: proc(r: rune) -> int {
 	ri := int(r)
@@ -47,7 +48,7 @@ _digit_value :: proc(r: rune) -> int {
 /*
 Parses an integer value from the input string in the given base, without a prefix
 
-**Inputs**
+Inputs:
 - str: The input string to parse the integer value from
 - base: The base of the integer value to be parsed (must be between 1 and 16)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
@@ -65,7 +66,7 @@ Output:
 
 	-1234 false
 
-**Returns**
+Returns:
 - value: Parses an integer value from a string, in the given base, without a prefix.
 - ok: ok=false if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
@@ -117,7 +118,7 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 /*
 Parses an integer value from the input string in base 10, unless there's a prefix
 
-**Inputs**
+Inputs:
 - str: The input string to parse the integer value from
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
@@ -138,7 +139,7 @@ Output:
 	1234 true
 	61166 true
 
-**Returns**
+Returns:
 - value: The parsed integer value
 - ok: ok=false if a valid integer could not be found, or if the input string contained more than just the number.
 */
@@ -200,7 +201,7 @@ parse_i64 :: proc{parse_i64_maybe_prefixed, parse_i64_of_base}
 /*
 Parses an unsigned 64-bit integer value from the input string without a prefix, using the specified base
 
-**Inputs**
+Inputs:
 - str: The input string to parse
 - base: The base of the number system to use for parsing
 	- Must be between 1 and 16 (inclusive)
@@ -223,7 +224,7 @@ Output:
 	1234 false
 	90672878 true
 
-**Returns**
+Returns:
 - value: The parsed uint64 value
 - ok: A boolean indicating whether the parsing was successful
 */
@@ -261,7 +262,7 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 /*
 Parses an unsigned 64-bit integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**
+Inputs:
 - str: The input string to parse
 - base: The base of the number system to use for parsing (default: 0)
 	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
@@ -285,7 +286,7 @@ Output:
 	1234 true
 	238 true
 
-**Returns**
+Returns:
 - value: The parsed uint64 value
 - ok: ok=false if a valid integer could not be found, if the value was negative, or if the input string contained more than just the number.
 */
@@ -336,7 +337,7 @@ parse_u64 :: proc{parse_u64_maybe_prefixed, parse_u64_of_base}
 /*
 Parses a signed integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**
+Inputs:
 - s: The input string to parse
 - base: The base of the number system to use for parsing (default: 0)
 	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
@@ -363,7 +364,7 @@ Output:
 	65535 true
 	65535 true
 
-**Returns**
+Returns:
 - value: The parsed int value
 - ok: `false` if no appropriate value could be found, or if the input string contained more than just the number.
 */
@@ -379,7 +380,7 @@ parse_int :: proc(s: string, base := 0, n: ^int = nil) -> (value: int, ok: bool)
 /*
 Parses an unsigned integer value from the input string, using the specified base or inferring the base from a prefix
 
-**Inputs**
+Inputs:
 - s: The input string to parse
 - base: The base of the number system to use for parsing (default: 0, inferred)
 	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
@@ -406,10 +407,9 @@ Output:
 	65535 true
 	65535 true
 
-**Returns**  
-
-value: The parsed uint value
-ok: `false` if no appropriate value could be found; the value was negative; he input string contained more than just the number
+Returns:
+- value: The parsed uint value
+- ok: `false` if no appropriate value could be found; the value was negative; he input string contained more than just the number
 */
 parse_uint :: proc(s: string, base := 0, n: ^int = nil) -> (value: uint, ok: bool) {
 	v: u64 = ---
@@ -423,7 +423,7 @@ parse_uint :: proc(s: string, base := 0, n: ^int = nil) -> (value: uint, ok: boo
 /*
 Parses an integer value from a string in the given base, without any prefix
 
-**Inputs**  
+Inputs:
 - str: The input string containing the integer value
 - base: The base (radix) to use for parsing the integer (1-16)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
@@ -441,7 +441,7 @@ Output:
 
 	-1234 false
 
-**Returns**  
+Returns:
 - value: The parsed i128 value
 - ok: false if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
@@ -491,7 +491,7 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 /*
 Parses an integer value from a string in base 10, unless there's a prefix
 
-**Inputs**  
+Inputs:
 - str: The input string containing the integer value
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
@@ -512,7 +512,7 @@ Output:
 	1234 true
 	61166 true
 	
-**Returns**  
+Returns:
 - value: The parsed i128 value
 - ok: `false` if a valid integer could not be found, or if the input string contained more than just the number.
 */
@@ -574,7 +574,7 @@ parse_i128 :: proc{parse_i128_maybe_prefixed, parse_i128_of_base}
 /*
 Parses an unsigned integer value from a string in the given base, without any prefix
 
-**Inputs**  
+Inputs:
 - str: The input string containing the integer value
 - base: The base (radix) to use for parsing the integer (1-16)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
@@ -596,7 +596,7 @@ Output:
 	1234 false
 	1450766062 true
 	
-**Returns**  
+Returns:
 - value: The parsed u128 value
 - ok: `false` if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
@@ -634,7 +634,7 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 /*
 Parses an unsigned integer value from a string in base 10, unless there's a prefix
 
-**Inputs**  
+Inputs:
 - str: The input string containing the integer value
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
@@ -655,7 +655,7 @@ Output:
 	1234 true
 	5678 false
 	
-**Returns**  
+Returns:
 - value: The parsed u128 value
 - ok: false if a valid integer could not be found, if the value was negative, or if the input string contained more than just the number.
 */
@@ -706,10 +706,10 @@ parse_u128 :: proc{parse_u128_maybe_prefixed, parse_u128_of_base}
 /*
 Converts a byte to lowercase
 
-**Inputs**  
+Inputs:
 - ch: A byte character to be converted to lowercase.
 
-**Returns**  
+Returns:
 - A lowercase byte character.
 */
 @(private)
@@ -717,7 +717,7 @@ lower :: #force_inline proc "contextless" (ch: byte) -> byte { return ('a' - 'A'
 /*
 Parses a 32-bit floating point number from a string
 
-**Inputs**  
+Inputs:
 - s: The input string containing a 32-bit floating point number.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
@@ -738,7 +738,7 @@ Output:
 	0.000 false
 	567800.000 true
 	
-**Returns**  
+Returns:
 - value: The parsed 32-bit floating point number.
 - ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
@@ -750,7 +750,7 @@ parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
 /*
 Parses a 64-bit floating point number from a string
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 64-bit floating point number.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
@@ -771,7 +771,7 @@ Output:
 	0.000 false
 	567800.000 true
 	
-**Returns**  
+Returns:
 - value: The parsed 64-bit floating point number.
 - ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
@@ -787,7 +787,7 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 /*
 Parses a 32-bit floating point number from a string and returns the parsed number, the length of the parsed substring, and a boolean indicating whether the parsing was successful
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 32-bit floating point number.
 
 Example:
@@ -808,7 +808,7 @@ Output:
 	567800.000 true
 	
 
-**Returns**  
+Returns:
 - value: The parsed 32-bit floating point number.
 - nr: The length of the parsed substring.
 - ok: A boolean indicating whether the parsing was successful.
@@ -822,7 +822,7 @@ parse_f32_prefix :: proc(str: string) -> (value: f32, nr: int, ok: bool) {
 /*
 Parses a 64-bit floating point number from a string and returns the parsed number, the length of the parsed substring, and a boolean indicating whether the parsing was successful
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 64-bit floating point number.
 
 Example:
@@ -846,7 +846,7 @@ Output:
 	1234.000 true
 	13.370 true
 
-**Returns**  
+Returns:
 - value: The parsed 64-bit floating point number.
 - nr: The length of the parsed substring.
 - ok: `false` if a base 10 float could not be found
@@ -1184,7 +1184,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 /*
 Parses a 128-bit complex number from a string
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 128-bit complex number.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
@@ -1206,7 +1206,7 @@ Output:
 	3+1i 4 true
 	5+7i 4 false
 	
-**Returns**  
+Returns:
 - value: The parsed 128-bit complex number.
 - ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
 */
@@ -1237,7 +1237,7 @@ parse_complex128 :: proc(str: string, n: ^int = nil) -> (value: complex128, ok: 
 /*
 Parses a 64-bit complex number from a string
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 64-bit complex number.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
@@ -1259,7 +1259,7 @@ Output:
 	3+1i 4 true
 	5+7i 4 false
 	
-**Returns**  
+Returns:
 - value: The parsed 64-bit complex number.
 - ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
 */
@@ -1271,7 +1271,7 @@ parse_complex64 :: proc(str: string, n: ^int = nil) -> (value: complex64, ok: bo
 /*
 Parses a 32-bit complex number from a string
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 32-bit complex number.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
@@ -1293,7 +1293,7 @@ Output:
 	3+1i 4 true
 	5+7i 4 false
 	
-**Returns**  
+Returns:
 - value: The parsed 32-bit complex number.
 - ok: `false` if a complex number could not be found, or if the input string contained more than just the number.
 */
@@ -1305,7 +1305,7 @@ parse_complex32 :: proc(str: string, n: ^int = nil) -> (value: complex32, ok: bo
 /*
 Parses a 256-bit quaternion from a string
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 256-bit quaternion.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
@@ -1327,7 +1327,7 @@ Output:
 	1+2i+3j+4k 10 true
 	1+2i+3j+4k 10 false
 	
-**Returns**  
+Returns:
 - value: The parsed 256-bit quaternion.
 - ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
 */
@@ -1385,7 +1385,7 @@ parse_quaternion256 :: proc(str: string, n: ^int = nil) -> (value: quaternion256
 /*
 Parses a 128-bit quaternion from a string
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 128-bit quaternion.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
@@ -1407,7 +1407,7 @@ Output:
 	1+2i+3j+4k 10 true
 	1+2i+3j+4k 10 false
 	
-**Returns**  
+Returns:
 - value: The parsed 128-bit quaternion.
 - ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
 */
@@ -1419,7 +1419,7 @@ parse_quaternion128 :: proc(str: string, n: ^int = nil) -> (value: quaternion128
 /*
 Parses a 64-bit quaternion from a string
 
-**Inputs**  
+Inputs:
 - str: The input string containing a 64-bit quaternion.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
@@ -1441,7 +1441,7 @@ Output:
 	1+2i+3j+4k 10 true
 	1+2i+3j+4k 10 false
 	
-**Returns**  
+Returns:
 - value: The parsed 64-bit quaternion.
 - ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
 */
@@ -1453,7 +1453,7 @@ parse_quaternion64 :: proc(str: string, n: ^int = nil) -> (value: quaternion64, 
 /* 
 Appends a boolean value as a string to the given buffer
 
-**Inputs**  
+Inputs:
 - buf: The buffer to append the boolean value to
 - b: The boolean value to be appended
 
@@ -1471,7 +1471,7 @@ Output:
 
 	true [116, 114, 117, 101, 0, 0]
 
-**Returns**  
+Returns:
 - The resulting string after appending the boolean value
 */
 append_bool :: proc(buf: []byte, b: bool) -> string {
@@ -1486,7 +1486,7 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 /* 
 Appends an unsigned integer value as a string to the given buffer with the specified base
 
-**Inputs**  
+Inputs:
 - buf: The buffer to append the unsigned integer value to
 - u: The unsigned integer value to be appended
 - base: The base to use for converting the integer value
@@ -1505,7 +1505,7 @@ Output:
 
 	2a [50, 97, 0, 0]
 
-**Returns**  
+Returns:
 - The resulting string after appending the unsigned integer value
 */
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
@@ -1514,7 +1514,7 @@ append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
 /* 
 Appends a signed integer value as a string to the given buffer with the specified base
 
-**Inputs**  
+Inputs:
 - buf: The buffer to append the signed integer value to
 - i: The signed integer value to be appended
 - base: The base to use for converting the integer value
@@ -1533,7 +1533,7 @@ Output:
 
 	-42 [45, 52, 50, 0]
 
-**Returns**  
+Returns:
 - The resulting string after appending the signed integer value
 */
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
@@ -1549,7 +1549,7 @@ append_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
 /* 
 Converts an integer value to a string and stores it in the given buffer
 
-**Inputs**  
+Inputs:
 - buf: The buffer to store the resulting string
 - i: The integer value to be converted
 
@@ -1567,7 +1567,7 @@ Output:
 
 	42 [52, 50, 0, 0]
 
-**Returns**  
+Returns:
 - The resulting string after converting the integer value
 */
 itoa :: proc(buf: []byte, i: int) -> string {
@@ -1576,7 +1576,7 @@ itoa :: proc(buf: []byte, i: int) -> string {
 /*
 Converts a string to an integer value
 
-**Inputs**  
+Inputs:
 - s: The string to be converted
 
 Example:
@@ -1591,7 +1591,7 @@ Output:
 
 	42
 
-**Returns**  
+Returns:
 - The resulting integer value
 */
 atoi :: proc(s: string) -> int {
@@ -1601,7 +1601,7 @@ atoi :: proc(s: string) -> int {
 /* 
 Converts a string to a float64 value
 
-**Inputs**  
+Inputs:
 - s: The string to be converted
 
 Example:
@@ -1616,7 +1616,7 @@ Output:
 
 	3.140
 
-**Returns**  
+Returns:
 - The resulting float64 value after converting the string
 */
 atof :: proc(s: string) -> f64 {
@@ -1628,7 +1628,7 @@ ftoa :: append_float
 /* 
 Appends a float64 value as a string to the given buffer with the specified format and precision
 
-**Inputs**  
+Inputs:
 - buf: The buffer to append the float64 value to
 - f: The float64 value to be appended
 - fmt: The byte specifying the format to use for the conversion
@@ -1649,7 +1649,7 @@ Output:
 
 	+3.14 [43, 51, 46, 49, 52, 0, 0, 0]
 
-**Returns**  
+Returns:
 - The resulting string after appending the float
 */
 append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
@@ -1658,7 +1658,7 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 /*
 Appends a quoted string representation of the input string to a given byte slice and returns the result as a string
 
-**Inputs**  
+Inputs:
 - buf: The byte slice to which the quoted string will be appended
 - str: The input string to be quoted
 
@@ -1678,7 +1678,7 @@ Output:
 
 	"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]
 
-**Returns**  
+Returns:
 - The resulting string after appending the quoted string representation
 */
 quote :: proc(buf: []byte, str: string) -> string {
@@ -1721,7 +1721,7 @@ quote :: proc(buf: []byte, str: string) -> string {
 /*
 Appends a quoted rune representation of the input rune to a given byte slice and returns the result as a string
 
-**Inputs**  
+Inputs:
 - buf: The byte slice to which the quoted rune will be appended
 - r: The input rune to be quoted
 
@@ -1739,7 +1739,7 @@ Output:
 
 	'A' [39, 65, 39, 0]
 
-**Returns**  
+Returns:
 - The resulting string after appending the quoted rune representation
 */
 quote_rune :: proc(buf: []byte, r: rune) -> string {
@@ -1800,7 +1800,7 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 /*
 Unquotes a single character from the input string, considering the given quote character
 
-**Inputs**  
+Inputs:
 - str: The input string containing the character to unquote
 - quote: The quote character to consider (e.g., '"')
 
@@ -1820,7 +1820,7 @@ Output:
 	Source: 'The' raven
 	r: <'>, multiple_bytes:false, tail_string:<The' raven>, success:true
 
-**Returns**  
+Returns:
 - r: The unquoted rune
 - multiple_bytes: A boolean indicating if the rune has multiple bytes
 - tail_string: The remaining portion of the input string after unquoting the character
@@ -1923,7 +1923,7 @@ unquote_char :: proc(str: string, quote: byte) -> (r: rune, multiple_bytes: bool
 /*
 Unquotes the input string considering any type of quote character and returns the unquoted string
 
-**Inputs**  
+Inputs:
 - lit: The input string to unquote
 - allocator: (default: context.allocator)
 
@@ -1961,7 +1961,7 @@ Output:
 	The raven 'Huginn' is black.
 	Unquoted: <he raven 'Huginn' is black>, alloc:false, ok:true
 
-**Returns**  
+Returns:
 - res: The resulting unquoted string
 - allocated: A boolean indicating if the resulting string was allocated using the provided allocator
 - success: A boolean indicating whether the unquoting was successful

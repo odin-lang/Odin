@@ -22,7 +22,7 @@ preferably.
 
 Note: all procedures accepting `Raw_Chan` also accept `Chan`.
 
-**Inputs**
+Inputs:
 - `$T`: The type of the messages
 - `Direction`: what `Direction` the channel supports
 
@@ -87,12 +87,12 @@ Creates a buffered or unbuffered `Chan` instance.
 
 *Allocates Using Provided Allocator*
 
-**Inputs**
+Inputs:
 - `$C`: Type of `Chan` to create
 - [`cap`: The capacity of the channel] omit for creating unbuffered channels
 - `allocator`: The allocator to use
 
-**Returns**:
+Returns:
 - The initialized `Chan`
 - An `Allocator_Error`
 
@@ -124,11 +124,11 @@ Creates an unbuffered version of the specified `Chan` type.
 
 *Allocates Using Provided Allocator*
 
-**Inputs**
+Inputs:
 - `$C`: Type of `Chan` to create
 - `allocator`: The allocator to use
 
-**Returns**:
+Returns:
 - The initialized `Chan`
 - An `Allocator_Error`
 
@@ -154,12 +154,12 @@ Creates a buffered version of the specified `Chan` type.
 
 *Allocates Using Provided Allocator*
 
-**Inputs**
+Inputs:
 - `$C`: Type of `Chan` to create
 - `cap`: The capacity of the channel
 - `allocator`: The allocator to use
 
-**Returns**:
+Returns:
 - The initialized `Chan`
 - An `Allocator_Error`
 
@@ -186,13 +186,13 @@ size and alignment.
 
 *Allocates Using Provided Allocator*
 
-**Inputs**
+Inputs:
 - `msg_size`: The size of the messages the messages being sent
 - `msg_alignment`: The alignment of the messages being sent
 - [`cap`: The capacity of the channel] omit for creating unbuffered channels
 - `allocator`: The allocator to use
 
-**Returns**:
+Returns:
 - The initialized `Raw_Chan`
 - An `Allocator_Error`
 
@@ -225,12 +225,12 @@ size and alignment.
 
 *Allocates Using Provided Allocator*
 
-**Inputs**
+Inputs:
 - `msg_size`: The size of the messages the messages being sent
 - `msg_alignment`: The alignment of the messages being sent
 - `allocator`: The allocator to use
 
-**Returns**:
+Returns:
 - The initialized `Raw_Chan`
 - An `Allocator_Error`
 
@@ -269,13 +269,13 @@ size and alignment.
 
 *Allocates Using Provided Allocator*
 
-**Inputs**
+Inputs:
 - `msg_size`: The size of the messages the messages being sent
 - `msg_alignment`: The alignment of the messages being sent
 - `cap`: The capacity of the channel
 - `allocator`: The allocator to use
 
-**Returns**:
+Returns:
 - The initialized `Raw_Chan`
 - An `Allocator_Error`
 
@@ -323,10 +323,10 @@ create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap:
 /*
 Destroys the Channel.
 
-**Inputs**
+Inputs:
 - `c`: The channel to destroy
 
-**Returns**:
+Returns:
 - An `Allocator_Error`
 */
 destroy :: proc(c: ^Raw_Chan) -> (err: runtime.Allocator_Error) {
@@ -341,10 +341,10 @@ destroy :: proc(c: ^Raw_Chan) -> (err: runtime.Allocator_Error) {
 Creates a version of a channel that can only be used for sending
 not receiving.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**:
+Returns:
 - An `Allocator_Error`
 
 Example:
@@ -377,10 +377,10 @@ as_send :: #force_inline proc "contextless" (c: $C/Chan($T, $D)) -> (s: Chan(T, 
 Creates a version of a channel that can only be used for receiving
 not sending.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**:
+Returns:
 - An `Allocator_Error`
 
 Example:
@@ -415,11 +415,11 @@ Sends the specified message, blocking the current thread if:
 until the channel is being read from. `send` will return
 `false` when attempting to send on an already closed channel.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 - `data`: The message to send
 
-**Returns**
+Returns:
 - `true` if the message was sent, `false` when the channel was already closed
 
 Example:
@@ -452,11 +452,11 @@ Tries sending the specified message which is:
 - blocking: given the channel is unbuffered
 - non-blocking: given the channel is buffered
 
-**Inputs**
+Inputs:
 - `c`: The channel
 - `data`: The message to send
 
-**Returns**
+Returns:
 - `true` if the message was sent, `false` when the channel was
 already closed or the channel's buffer was full
 
@@ -487,10 +487,10 @@ Reads a message from the channel, blocking the current thread if:
 until the channel is being written to. `recv` will return
 `false` when attempting to receive a message on an already closed channel.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**
+Returns:
 - The message
 - `true` if a message was received, `false` when the channel was already closed
 
@@ -527,10 +527,10 @@ recv :: proc "contextless" (c: $C/Chan($T)) -> (data: T, ok: bool) where C.D >= 
 /*
 Tries reading a message from the channel in a non-blocking fashion.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**
+Returns:
 - The message
 - `true` if a message was received, `false` when the channel was already closed or no message was available
 
@@ -564,11 +564,11 @@ until the channel is being read from. `send_raw` will return
 Note: The message referenced by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 - `msg_out`: Pointer to the data to send
 
-**Returns**
+Returns:
 - `true` if the message was sent, `false` when the channel was already closed
 
 Example:
@@ -640,11 +640,11 @@ until the channel is being written to. `recv_raw` will return
 Note: The location pointed to by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 - `msg_out`: Pointer to where the message should be stored
 
-**Returns**
+Returns:
 - `true` if a message was received, `false` when the channel was already closed
 
 Example:
@@ -727,11 +727,11 @@ Tries sending the specified message which is:
 Note: The message referenced by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
 
-**Inputs**
+Inputs:
 - `c`: the channel
 - `msg_out`: pointer to the data to send
 
-**Returns**
+Returns:
 - `true` if the message was sent, `false` when the channel was
 already closed or the channel's buffer was full
 
@@ -792,11 +792,11 @@ Reads a message from the channel if one is available.
 Note: The location pointed to by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 - `msg_out`: Pointer to where the message should be stored
 
-**Returns**
+Returns:
 - `true` if a message was received, `false` when the channel was already closed or no message was available
 
 Example:
@@ -853,10 +853,10 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 /*
 Checks if the given channel is buffered.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**:
+Returns:
 - `true` if the channel is buffered, `false` otherwise
 
 Example:
@@ -877,10 +877,10 @@ is_buffered :: proc "contextless" (c: ^Raw_Chan) -> bool {
 /*
 Checks if the given channel is unbuffered.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**:
+Returns:
 - `true` if the channel is unbuffered, `false` otherwise
 
 Example:
@@ -904,10 +904,10 @@ Returns the number of elements currently in the channel.
 Note: Unbuffered channels will always return `0`
 because they cannot hold elements.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**:
+Returns:
 - Number of elements
 
 Example:
@@ -944,10 +944,10 @@ Returns the number of elements the channel could hold.
 Note: Unbuffered channels will always return `0`
 because they cannot hold elements.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**:
+Returns:
 - Number of elements
 
 Example:
@@ -978,10 +978,10 @@ cap :: proc "contextless" (c: ^Raw_Chan) -> int {
 /*
 Closes the channel, preventing new messages from being added.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**:
+Returns:
 - `true` if the channel was closed by this operation, `false` if it was already closed
 
 Example:
@@ -1022,10 +1022,10 @@ close :: proc "contextless" (c: ^Raw_Chan) -> bool {
 /*
 Returns if the channel is closed or not
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**:
+Returns:
 - `true` if the channel is closed, `false` otherwise
 */
 @(require_results)
@@ -1041,10 +1041,10 @@ is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 Returns whether a message is ready to be read, i.e.,
 if a call to `recv` or `recv_raw` would block
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**
+Returns:
 - `true` if a message can be read, `false` otherwise
 
 Example:
@@ -1076,10 +1076,10 @@ Returns whether a message can be sent without blocking the current
 thread. Specifically, it checks if the channel is buffered and not full,
 or if there is already a reader waiting for a message.
 
-**Inputs**
+Inputs:
 - `c`: The channel
 
-**Returns**
+Returns:
 - `true` if a message can be send, `false` otherwise
 
 Example:
@@ -1115,13 +1115,13 @@ and which are available for sending. It then randomly selects one operation
 
 Note: Each message in `send_msgs` corresponds to the send channel at the same index in `sends`.
 
-**Inputs**
+Inputs:
 - `recv`: A slice of channels to read from
 - `sends`: A slice of channels to send messages on
 - `send_msgs`: A slice of messages to send
 - `recv_out`: A pointer to the location where, when receiving, the message should be stored
 
-**Returns**
+Returns:
 - Position of the available channel which was used for receiving or sending
 - `true` if sending/receiving was successfull, `false` if the channel was closed or no channel was available
 
@@ -1236,7 +1236,7 @@ Raw_Queue :: struct {
 /*
 Initializes a `Raw_Queue`
 
-**Inputs**
+Inputs:
 - `q`: A pointert to the `Raw_Queue` to initialize
 - `data`: The pointer to backing slice storing the messages
 - `cap`: The capacity of the queue
@@ -1269,11 +1269,11 @@ Add an element to the queue.
 Note: The message referenced by `data` must match the size
 and alignment used when the `Raw_Queue` was initialized.
 
-**Inputs**
+Inputs:
 - `q`: A pointert to the `Raw_Queue`
 - `data`: The pointer to message to add
 
-**Returns**
+Returns:
 - `true` if the element was added, `false` when the queue is already full
 
 Example:
@@ -1312,10 +1312,10 @@ Note: The returned element is only guaranteed to be valid until the next
 `raw_queue_push` operation. Accessing it after that point may result in
 undefined behavior.
 
-**Inputs**
+Inputs:
 - `c`: A pointer to the `Raw_Queue`.
 
-**Returns**
+Returns:
 - A pointer to the first element in the queue, or `nil` if the queue is empty.
 
 Example:

@@ -4,9 +4,12 @@ import "core:io"
 import "core:unicode/utf8"
 
 Reader :: struct {
-	s:         []byte, // read-only buffer
-	i:         i64,    // current reading index
-	prev_rune: int,    // previous reading index of rune or < 0
+	// read-only buffer
+	s:         []byte,
+	// current reading index
+	i:         i64,
+	// previous reading index of rune or < 0
+	prev_rune: int,
 }
 
 reader_init :: proc(r: ^Reader, s: []byte) -> io.Stream {
@@ -45,6 +48,7 @@ reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	r.i += i64(n)
 	return
 }
+
 reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
 	if len(p) == 0 {
 		return 0, nil
@@ -61,6 +65,7 @@ reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Erro
 	}
 	return
 }
+
 reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
 	r.prev_rune = -1
 	if r.i >= i64(len(r.s)) {
@@ -70,6 +75,7 @@ reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
 	r.i += 1
 	return b, nil
 }
+
 reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
 		return .Invalid_Unread
@@ -78,6 +84,7 @@ reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	r.i -= 1
 	return nil
 }
+
 reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		r.prev_rune = -1
@@ -92,6 +99,7 @@ reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
 	r.i += i64(size)
 	return
 }
+
 reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
 		return .Invalid_Unread
@@ -103,6 +111,7 @@ reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	r.prev_rune = -1
 	return nil
 }
+
 reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
 	abs: i64
 	switch whence {
@@ -123,6 +132,7 @@ reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.E
 	r.prev_rune = -1
 	return abs, nil
 }
+
 reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	r.prev_rune = -1
 	if r.i >= i64(len(r.s)) {
@@ -141,7 +151,6 @@ reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	}
 	return
 }
-
 
 @(private)
 _reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {

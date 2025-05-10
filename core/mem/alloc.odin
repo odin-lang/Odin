@@ -133,7 +133,7 @@ apply:
 Allocates a memory region of size `size`, aligned on a boundary specified by
 `alignment`.
 
-**Inputs**:
+Inputs:
 - `allocator_data`: Pointer to the allocator data.
 - `mode`: `.Alloc` or `.Alloc_Non_Zeroed`.
 - `size`: The desired size of the memory region.
@@ -141,7 +141,7 @@ Allocates a memory region of size `size`, aligned on a boundary specified by
 - `old_memory`: Unused, should  be `nil`.
 - `old_size`: Unused, should be 0.
 
-**Returns**:
+Returns:
 1. The memory region, if allocated successfully, or `nil` otherwise.
 2. An error, if allocation failed.
 
@@ -157,7 +157,7 @@ Frees a memory region located at the address specified by `old_memory`. If the
 allocator does not track sizes of allocations, the size should be specified in
 the `old_size` parameter.
 
-**Inputs**:
+Inputs:
 - `allocator_data`: Pointer to the allocator data.
 - `mode`: `.Free`.
 - `size`: Unused, should be 0.
@@ -166,7 +166,7 @@ the `old_size` parameter.
 - `old_size`: The size of the memory region to free. This parameter is optional
 	if the allocator keeps track of the sizes of allocations.
 
-**Returns**:
+Returns:
 1. `nil`
 2. Error, if freeing failed.
 
@@ -175,7 +175,7 @@ the `old_size` parameter.
 Frees all allocations, associated with the allocator, making it available for
 further allocations using the same backing buffers.
 
-**Inputs**:
+Inputs:
 - `allocator_data`: Pointer to the allocator data.
 - `mode`: `.Free_All`.
 - `size`: Unused, should be 0.
@@ -183,7 +183,7 @@ further allocations using the same backing buffers.
 - `old_memory`: Unused, should be `nil`.
 - `old_size`: Unused, should be `0`.
 
-**Returns**:
+Returns:
 1. `nil`.
 2. Error, if freeing failed.
 
@@ -208,7 +208,7 @@ If the `old_memory` pointer is not aligned to the boundary specified by
 `alignment`, the procedure relocates the buffer such that the reallocated
 buffer is aligned to the boundary specified by `alignment`.
 
-**Inputs**:
+Inputs:
 - `allocator_data`: Pointer to the allocator data.
 - `mode`: `.Resize` or `.Resize_All`.
 - `size`: The desired new size of the memory region.
@@ -217,7 +217,7 @@ buffer is aligned to the boundary specified by `alignment`.
 - `old_size`: The size of the memory region to resize. If the allocator
 	keeps track of the sizes of allocations, this parameter is optional.
 
-**Returns**:
+Returns:
 1. The slice of the  memory region after resize operation, if successfull,
 	`nil` otherwise.
 2. An error, if the resize failed.
@@ -272,12 +272,12 @@ by `alignment` using the allocator specified by `allocator`.
 
 If the `size` parameter is `0`, the operation is a no-op.
 
-**Inputs**:
+Inputs:
 - `size`: The desired size of the allocated memory region.
 - `alignment`: The desired alignment of the allocated memory region.
 - `allocator`: The allocator to allocate from.
 
-**Returns**:
+Returns:
 1. Pointer to the allocated memory, or `nil` if allocation failed.
 2. Error, if the allocation failed.
 
@@ -306,12 +306,12 @@ Allocate memory.
 This function allocates `size` bytes of memory, aligned to a boundary specified
 by `alignment` using the allocator specified by `allocator`.
 
-**Inputs**:
+Inputs:
 - `size`: The desired size of the allocated memory region.
 - `alignment`: The desired alignment of the allocated memory region.
 - `allocator`: The allocator to allocate from.
 
-**Returns**:
+Returns:
 1. Slice of the allocated memory region, or `nil` if allocation failed.
 2. Error, if the allocation failed.
 
@@ -340,12 +340,12 @@ This function allocates `size` bytes of memory, aligned to a boundary specified
 by `alignment` using the allocator specified by `allocator`. This procedure
 does not explicitly zero-initialize allocated memory region.
 
-**Inputs**:
+Inputs:
 - `size`: The desired size of the allocated memory region.
 - `alignment`: The desired alignment of the allocated memory region.
 - `allocator`: The allocator to allocate from.
 
-**Returns**:
+Returns:
 1. Slice of the allocated memory region, or `nil` if allocation failed.
 2. Error, if the allocation failed.
 
@@ -373,11 +373,11 @@ Free memory.
 This procedure frees memory region located at the address, specified by `ptr`,
 allocated from the allocator specified by `allocator`.
 
-**Inputs**:
+Inputs:
 - `ptr`: Pointer to the memory region to free.
 - `allocator`: The allocator to free to.
 
-**Returns**:
+Returns:
 - The error, if freeing failed.
 
 **Errors**:
@@ -403,12 +403,12 @@ specified by `ptr`, allocated from the allocator specified by `allocator`.
 
 If the `size` parameter is `0`, this call is equivalent to `free()`.
 
-**Inputs**:
+Inputs:
 - `ptr`: Pointer to the memory region to free.
 - `size`: The size of the memory region to free.
 - `allocator`: The allocator to free to.
 
-**Returns**:
+Returns:
 - The error, if freeing failed.
 
 **Errors**:
@@ -436,11 +436,11 @@ allocator specified by `allocator`.
 If the length of the specified slice is zero, the `.Invalid_Argument` error
 is returned.
 
-**Inputs**:
+Inputs:
 - `bytes`: The memory region to free.
 - `allocator`: The allocator to free to.
 
-**Returns**:
+Returns:
 - The error, if freeing failed.
 
 **Errors**:
@@ -464,7 +464,7 @@ Free all allocations.
 This procedure frees all allocations made on the allocator specified by
 `allocator` to that allocator, making it available for further allocations.
 
-**Inputs**:
+Inputs:
 - `allocator`: The allocator to free to.
 
 **Errors**:
@@ -494,14 +494,14 @@ If the `old_memory` pointer is not aligned to the boundary specified by
 `alignment`, the procedure relocates the buffer such that the reallocated
 buffer is aligned to the boundary specified by `alignment`.
 
-**Inputs**:
+Inputs:
 - `ptr`: Pointer to the memory region to resize.
 - `old_size`: Size of the memory region to resize.
 - `new_size`: The desired size of the resized memory region.
 - `alignment`: The desired alignment of the resized memory region.
 - `allocator`: The owner of the memory region to resize.
 
-**Returns**:
+Returns:
 1. The pointer to the resized memory region, if successfull, `nil` otherwise.
 2. Error, if resize failed.
 
@@ -554,14 +554,14 @@ buffer is aligned to the boundary specified by `alignment`.
 Unlike `resize()`, this procedure does not explicitly zero-initialize any new
 memory.
 
-**Inputs**:
+Inputs:
 - `ptr`: Pointer to the memory region to resize.
 - `old_size`: Size of the memory region to resize.
 - `new_size`: The desired size of the resized memory region.
 - `alignment`: The desired alignment of the resized memory region.
 - `allocator`: The owner of the memory region to resize.
 
-**Returns**:
+Returns:
 1. The pointer to the resized memory region, if successfull, `nil` otherwise.
 2. Error, if resize failed.
 
@@ -611,13 +611,13 @@ If the `old_memory` pointer is not aligned to the boundary specified by
 `alignment`, the procedure relocates the buffer such that the reallocated
 buffer is aligned to the boundary specified by `alignment`.
 
-**Inputs**:
+Inputs:
 - `old_data`: Pointer to the memory region to resize.
 - `new_size`: The desired size of the resized memory region.
 - `alignment`: The desired alignment of the resized memory region.
 - `allocator`: The owner of the memory region to resize.
 
-**Returns**:
+Returns:
 1. The resized memory region, if successfull, `nil` otherwise.
 2. Error, if resize failed.
 
@@ -668,13 +668,13 @@ buffer is aligned to the boundary specified by `alignment`.
 Unlike `resize_bytes()`, this procedure does not explicitly zero-initialize
 any new memory.
 
-**Inputs**:
+Inputs:
 - `old_data`: Pointer to the memory region to resize.
 - `new_size`: The desired size of the resized memory region.
 - `alignment`: The desired alignment of the resized memory region.
 - `allocator`: The owner of the memory region to resize.
 
-**Returns**:
+Returns:
 1. The resized memory region, if successfull, `nil` otherwise.
 2. Error, if resize failed.
 

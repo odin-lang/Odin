@@ -8,8 +8,11 @@ MIN_READ :: 512
 @(private)
 SMALL_BUFFER_SIZE :: 64
 
-// A Buffer is a variable-sized buffer of bytes with a io.Stream interface
-// The zero value for Buffer is an empty buffer ready to use.
+/*
+A variable-sized buffer of bytes with an `io.Stream` interface.
+
+The zero value for Buffer is an empty buffer ready to use.
+*/
 Buffer :: struct {
 	buf: [dynamic]byte,
 	off: int,
@@ -25,7 +28,6 @@ Read_Op :: enum i8 {
 	Read_Rune3 =  3,
 	Read_Rune4 =  4,
 }
-
 
 buffer_init :: proc(b: ^Buffer, buf: []byte, loc := #caller_location) {
 	resize(&b.buf, len(buf), loc=loc)
@@ -81,7 +83,6 @@ buffer_reset :: proc(b: ^Buffer) {
 	b.off = 0
 	b.last_read = .Invalid
 }
-
 
 buffer_truncate :: proc(b: ^Buffer, n: int) {
 	if n == 0 {
@@ -161,7 +162,6 @@ buffer_write_at :: proc(b: ^Buffer, p: []byte, offset: int, loc := #caller_locat
 	}
 	return copy(b.buf[offset:], p), nil
 }
-
 
 buffer_write :: proc(b: ^Buffer, p: []byte, loc := #caller_location) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid
@@ -264,7 +264,6 @@ buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.E
 	}
 	return
 }
-
 
 buffer_read_byte :: proc(b: ^Buffer) -> (byte, io.Error) {
 	if buffer_is_empty(b) {
@@ -402,7 +401,6 @@ buffer_read_from :: proc(b: ^Buffer, r: io.Reader) -> (n: i64, err: io.Error) #n
 	}
 	return
 }
-
 
 buffer_to_stream :: proc(b: ^Buffer) -> (s: io.Stream) {
 	s.data = b

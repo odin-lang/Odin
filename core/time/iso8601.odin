@@ -15,11 +15,11 @@ YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
 And returns time, in UTC represented by that string. In case the timezone offset
 is specified in the string, that timezone is applied to time.
 
-**Inputs**:
+Inputs:
 - `iso_datetime`: The string to be parsed.
 - `is_leap`: Optional output parameter, specifying if the moment was a leap second.
 
-**Returns**:
+Returns:
 - `res`: The time represented by `iso_datetime`, with UTC offset applied.
 - `consumed`: Number of bytes consumed by parsing the string.
 
@@ -46,11 +46,11 @@ YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
 And returns time, in UTC represented by that string, and the UTC offset, in
 minutes.
 
-**Inputs**:
+Inputs:
 - `iso_datetime`: The string to be parsed.
 - `is_leap`: Optional output parameter, specifying if the moment was a leap second.
 
-**Returns**:
+Returns:
 - `res`: The time in UTC.
 - `utc_offset`: The UTC offset of the time, in minutes.
 - `consumed`: Number of bytes consumed by parsing the string.
@@ -88,10 +88,10 @@ YYYY-MM-DD[Tt]HH:mm:ss[.nn][Zz][+-]HH:mm
 And returns datetime, in UTC represented by that string, and the UTC offset, in
 minutes.
 
-**Inputs**:
+Inputs:
 - `iso_datetime`: The string to be parsed
 
-**Returns**:
+Returns:
 - `res`: The parsed datetime, in UTC.
 - `utc_offset`: The UTC offset, in minutes.
 - `is_leap`: Specifies whether the moment was a leap second.
