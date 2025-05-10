@@ -133,6 +133,7 @@ ODIN_HEAP_SMALL_BIN_MAX   :: #config(ODIN_HEAP_SMALL_BIN_MAX, 8 * Kilobyte) // [
 // Constants
 //
 
+ODIN_HEAP_SEGMENT_SIZE  :: 4 * Megabyte
 ODIN_HEAP_MIN_BIN_SHIFT :: intrinsics.constant_log2(ODIN_HEAP_MIN_BIN_SIZE)
 ODIN_HEAP_MAX_BIN_SHIFT :: intrinsics.constant_log2(ODIN_HEAP_MAX_BIN_SIZE)
 ODIN_HEAP_BIN_RANKS     :: 1 + ODIN_HEAP_MAX_BIN_SHIFT - ODIN_HEAP_MIN_BIN_SHIFT
@@ -197,7 +198,7 @@ Heap_Debug_Level :: enum {
 
 Heap_Slab_Class :: enum {
 	Small, // Slabs are `ODIN_HEAP_SMALL_SLAB_SIZE` (64KiB) each.
-	Large, // One segment-wide (~2MiB) slab.
+	Large, // One segment-wide (platform-dependent size) slab.
 	Huge,  // One slab for one allocation, sized specifically for the request.
 }
 
@@ -221,7 +222,12 @@ Allocate a new Segment that may be used to store either Small or Large slabs.
 @(require_results)
 heap_allocate_segment :: #force_inline proc "contextless" () -> ^Heap_Segment {
 	when ODIN_HEAP_SEGMENT_SIZE_OVERRIDE == 0 {
-		return cast(^Heap_Segment)allocate_virtual_memory_superpage()
+		if superpage_size != 0 {
+			return cast(^Heap_Segment)allocate_virtual_memory_superpage()
+		} else {
+			// Use the default segment value.
+			return cast(^Heap_Segment)allocate_virtual_memory_aligned(ODIN_HEAP_SEGMENT_SIZE, ODIN_HEAP_SEGMENT_SIZE)
+		}
 	} else {
 		return cast(^Heap_Segment)allocate_virtual_memory_aligned(ODIN_HEAP_SEGMENT_SIZE_OVERRIDE, ODIN_HEAP_SEGMENT_SIZE_OVERRIDE)
 	}
@@ -233,8 +239,11 @@ Get the constant size for all segments. This size also dictates each segment's a
 @(require_results)
 heap_get_segment_size :: #force_inline proc "contextless" () -> int {
 	when ODIN_HEAP_SEGMENT_SIZE_OVERRIDE == 0 {
-		// TODO: Derive from the OS config.
-		return SUPERPAGE_SIZE
+		if size := superpage_size; size != 0 {
+			return size
+		} else {
+			return ODIN_HEAP_SEGMENT_SIZE
+		}
 	} else {
 		return ODIN_HEAP_SEGMENT_SIZE_OVERRIDE
 	}
@@ -425,8 +434,6 @@ Heap_Slab :: struct {
 The **Segment** is a single contiguous allocation from the operating system's
 virtual memory subsystem, subdivided into Slabs. All metadata lives at the head
 of the allocation.
-
-On almost every platform, this structure will be 2MiB by default.
 
 Depending on the operating system, addresses within the space occupied by the
 Segment (and hence its allocations) may also have faster access times due to

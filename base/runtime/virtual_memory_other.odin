@@ -9,6 +9,8 @@ package runtime
 
 VIRTUAL_MEMORY_SUPPORTED :: false
 
+_init_virtual_memory :: proc "contextless" () { }
+
 _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 	unimplemented_contextless("Virtual memory is not supported on this platform.")
 }

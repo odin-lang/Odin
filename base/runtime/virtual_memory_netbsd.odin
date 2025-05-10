@@ -23,6 +23,26 @@ MAP_ANONYMOUS :: 0x1000
 // #define MAP_ALIGNED(n) ((int)((unsigned int)(n) << MAP_ALIGNMENT_SHIFT))
 MAP_ALIGNMENT_SHIFT :: 24
 
+_init_virtual_memory :: proc "contextless" () {
+	page_size = _get_page_size()
+}
+
+_get_page_size :: proc "contextless" () -> int {
+	// This is a fallback value if the auxiliary vector does not supply it.
+	DEFAULT_PAGE_SIZE :: 4096
+
+	if value, found := _get_auxiliary(.AT_PAGESZ); found {
+		return int(value.a_val)
+	} else {
+		return DEFAULT_PAGE_SIZE
+	}
+}
+
+_get_superpage_size :: proc "contextless" () -> int {
+	// NOTE(Feoramund): I am uncertain if NetBSD has direct support for superpages.
+	return 0
+}
+
 _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 	result, ok := intrinsics.syscall_bsd(SYS_mmap, 0, uintptr(size), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, ~uintptr(0), 0)
 	if !ok {
@@ -32,9 +52,7 @@ _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 }
 
 _allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
-	// NOTE(Feoramund): I am uncertain if NetBSD has direct support for
-	// superpages, so we just use the aligned allocate procedure here.
-	return _allocate_virtual_memory_aligned(SUPERPAGE_SIZE, SUPERPAGE_SIZE)
+	return nil
 }
 
 _allocate_virtual_memory_aligned :: proc "contextless" (size: int, alignment: int) -> rawptr {

@@ -1,20 +1,25 @@
 package runtime
 
+import "base:intrinsics"
+
 ODIN_VIRTUAL_MEMORY_SUPPORTED :: VIRTUAL_MEMORY_SUPPORTED
 
-// Virtually all MMUs supported by Odin should have a 4KiB page size.
-PAGE_SIZE :: 4 * Kilobyte
+/*
+The page size of the operating system, used for virtual memory allocations.
+*/
+page_size: int
 
-when ODIN_ARCH == .arm32 {
-	SUPERPAGE_SIZE :: 1 * Megabyte
-} else {
-	// All other architectures should have support for 2MiB pages.
-	// i386 supports it in PAE mode.
-	// amd64, arm64, and riscv64 support it by default.
-	SUPERPAGE_SIZE :: 2 * Megabyte
+/*
+The superpage size of the operating system.
+
+This may be zero if unavailable.
+*/
+superpage_size: int
+
+@(init, private)
+init_virtual_memory :: proc "contextless" () {
+	_init_virtual_memory()
 }
-
-#assert(SUPERPAGE_SIZE & (SUPERPAGE_SIZE-1) == 0, "SUPERPAGE_SIZE must be a power of two.")
 
 /*
 Allocate virtual memory from the operating system.
@@ -35,14 +40,20 @@ This is a contiguous block of memory larger than what is normally distributed
 by the operating system, sometimes with special performance properties related
 to the Translation Lookaside Buffer.
 
-The address will be a multiple of the `SUPERPAGE_SIZE` constant, and the memory
-pointed to will be at least as long as that very same constant.
+The address will be a multiple of `superpage_size`, and the memory
+pointed to will be at least as long as that.
 
 The name derives from the superpage concept on the *BSD operating systems,
 where it is known as huge pages on Linux and large pages on Windows.
+
+This may return nil if a superpage size was unable to be retrieved from the
+operating system or if the feature is otherwise unavailable.
 */
 @(require_results)
 allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
+	if superpage_size == 0 {
+		return nil
+	}
 	return _allocate_virtual_memory_superpage()
 }
 

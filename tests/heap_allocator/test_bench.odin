@@ -890,7 +890,7 @@ main :: proc() {
 
 		if opt.vmem_tests {
 			log.info("Testing virtual memory allocation ...")
-			time.sleep(1 * time.Second)
+			log.infof("base:runtime reports OS page size is %M and superpage size is %M", runtime.page_size, runtime.superpage_size)
 			for size in 12..<uint(22) {
 				size := 1 << size
 				for shift in 0..<uint(22) {
@@ -917,24 +917,23 @@ main :: proc() {
 					runtime.free_virtual_memory(v, size+1)
 				}
 			}
-			{
+			if size := runtime.superpage_size; size > 0 {
 				log.debugf("Testing superpage allocation and alignment ...")
 				v := runtime.allocate_virtual_memory_superpage()
-				expect(uintptr(v) % runtime.SUPERPAGE_SIZE == 0)
+				expect(uintptr(v) % uintptr(size) == 0)
 				va := cast([^]u8)v
-				for i in 0..<runtime.SUPERPAGE_SIZE {
+				for i in 0..<size {
 					expect(va[i] == 0)
 				}
-				for i in 0..<runtime.SUPERPAGE_SIZE {
+				for i in 0..<size {
 					va[i] = 0xAA
 				}
-				for i in 0..<runtime.SUPERPAGE_SIZE {
+				for i in 0..<size {
 					expect(va[i] == 0xAA)
 				}
-				runtime.free_virtual_memory(v, runtime.SUPERPAGE_SIZE)
+				runtime.free_virtual_memory(v, size)
 			}
 			log.info("Done.")
-			time.sleep(3 * time.Second)
 		}
 
 		if opt.parallel_tests {
@@ -1090,7 +1089,6 @@ main :: proc() {
 			bench_alloc_n_then_free_n(100_000, [4096*4]u8)
 			bench_alloc_n_then_free_n(10_000, [65536/4]u8)
 			bench_alloc_n_then_free_n(10_000, [65536*4]u8)
-			bench_alloc_n_then_free_n(100, [runtime.SUPERPAGE_SIZE]u8)
 
 			log.info("* Freeing backwards ...")
 			bench_alloc_n_then_free_n_backwards(10_000_000, int)
@@ -1101,7 +1099,6 @@ main :: proc() {
 			bench_alloc_n_then_free_n_backwards(100_000, [8192]u8)
 			bench_alloc_n_then_free_n_backwards(10_000, [65536/4]u8)
 			bench_alloc_n_then_free_n_backwards(10_000, [65536*4]u8)
-			bench_alloc_n_then_free_n_backwards(100, [runtime.SUPERPAGE_SIZE]u8)
 
 			log.info("* Freeing randomly ...")
 			bench_alloc_n_then_free_n_randomly(10_000_000, int)
@@ -1113,7 +1110,6 @@ main :: proc() {
 			bench_alloc_n_then_free_n_randomly(100_000, [65536/4]u8)
 			bench_alloc_n_then_free_n_randomly(100_000, [65536]u8)
 			bench_alloc_n_then_free_n_randomly(100_000, [65536*2]u8)
-			bench_alloc_n_then_free_n_randomly(100, [runtime.SUPERPAGE_SIZE]u8)
 
 			log.info("* Allocating and freeing repeatedly ...")
 			bench_alloc_1_then_free_1_repeatedly(100_000, int)

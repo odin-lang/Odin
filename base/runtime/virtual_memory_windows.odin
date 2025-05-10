@@ -81,11 +81,26 @@ MEM_RELEASE    :: 0x00008000
 
 PAGE_READWRITE :: 0x04
 
+_allocation_granularity: int
+
+_init_virtual_memory :: proc "contextless" () {
+	sys_info: SYSTEM_INFO
+	GetSystemInfo(&sys_info)
+
+	page_size = int(sys_info.dwPageSize)
+	_allocation_granularity = int(sys_info.dwAllocationGranularity)
+}
+
+_get_superpage_size :: proc "contextless" () -> int {
+	// TODO: Windows has support for Large Pages, but its usage requires privilege escalation.
+	return 0
+}
+
 _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 	// `Size` must be a multiple of the page size.
 	rounded_size := size
-	if rounded_size % PAGE_SIZE != 0 {
-		rounded_size = (size / PAGE_SIZE + 1) * PAGE_SIZE
+	if rounded_size % page_size != 0 {
+		rounded_size = (size / page_size + 1) * page_size
 	}
 	result := VirtualAlloc(nil, uint(rounded_size), MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)
 	if result == nil {
@@ -95,14 +110,11 @@ _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 }
 
 _allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
-	// TODO: Windows has support for Large Pages, but its usage requires privilege escalation.
-	return _allocate_virtual_memory_aligned(SUPERPAGE_SIZE, SUPERPAGE_SIZE)
+	return nil
 }
 
 _allocate_virtual_memory_aligned :: proc "contextless" (size: int, alignment: int) -> rawptr {
-	sys_info: SYSTEM_INFO
-	GetSystemInfo(&sys_info)
-	if alignment <= int(sys_info.dwAllocationGranularity) {
+	if alignment <= _allocation_granularity {
 		// The alignment is less than or equal to the allocation granularity,
 		// which means it will automatically be aligned and any request for
 		// alignment less than the allocation granularity will result in
@@ -120,8 +132,8 @@ _allocate_virtual_memory_aligned :: proc "contextless" (size: int, alignment: in
 	}
 	// `Size` must be a multiple of the page size.
 	rounded_size := size
-	if rounded_size % PAGE_SIZE != 0 {
-		rounded_size = (size / PAGE_SIZE + 1) * PAGE_SIZE
+	if rounded_size % page_size != 0 {
+		rounded_size = (size / page_size + 1) * page_size
 	}
 	result := VirtualAlloc2(nil, nil, uint(rounded_size), MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE, &param, 1)
 	if result == nil {

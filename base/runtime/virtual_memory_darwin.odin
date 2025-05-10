@@ -8,6 +8,7 @@ VIRTUAL_MEMORY_SUPPORTED :: true
 foreign import lib "system:System.framework"
 
 foreign lib {
+	vm_page_size: uintptr
 	mach_task_self_: u32
 	mach_vm_allocate :: proc(target: u32, address: ^u64, size: u64, flags: i32) -> i32 ---
 	mach_vm_deallocate :: proc(target: u32, address: u64, size: u64) -> i32 ---
@@ -55,6 +56,25 @@ VM_PROT_READ  :: 0x01
 VM_PROT_WRITE :: 0x02
 VM_INHERIT_COPY :: 1
 
+_init_virtual_memory :: proc "contextless" () {
+	page_size = _get_page_size()
+	superpage_size = _get_superpage_size()
+}
+
+_get_page_size :: proc "contextless" () -> int {
+	return int(vm_page_size)
+}
+
+_get_superpage_size :: proc "contextless" () -> int {
+	when ODIN_ARCH == .amd64 {
+		// NOTE(Feoramund): As far as we are aware, Darwin only supports
+		// explicit superpage allocation on AMD64 with a 2MiB parameter.
+		return 2 * Megabyte
+	} else {
+		return 0
+	}
+}
+
 _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 	address: u64
 	result := mach_vm_map(mach_task_self_, &address, u64(size), 0, VM_FLAGS_ANYWHERE, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
@@ -66,22 +86,14 @@ _allocate_virtual_memory :: proc "contextless" (size: int) -> rawptr {
 
 _allocate_virtual_memory_superpage :: proc "contextless" () -> rawptr {
 	address: u64
-	flags: i32 = VM_FLAGS_ANYWHERE
-	when ODIN_ARCH == .amd64 {
-		// NOTE(Feoramund): As far as we are aware, Darwin only supports
-		// explicit superpage allocation on AMD64 with a 2MiB parameter.
-		when SUPERPAGE_SIZE == 2 * Megabyte {
-			flags |= VM_FLAGS_SUPERPAGE_SIZE_2MB
-		} else {
-			#panic("An unsupported superpage size has been configured for AMD64 Darwin; only 2MB is supported.")
-		}
-	}
-	alignment_mask: u64 = SUPERPAGE_SIZE - 1 // Assumes a power of two size, ensured by an assertion in `virtual_memory.odin`.
-	result := mach_vm_map(mach_task_self_, &address, SUPERPAGE_SIZE, alignment_mask, flags, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
+	flags: i32 = VM_FLAGS_ANYWHERE | VM_FLAGS_SUPERPAGE_SIZE_2MB
+	assert_contextless(superpage_size & (superpage_size-1) == 0, "The superpage size is not a power of two.")
+	alignment_mask: u64 = u64(superpage_size) - 1
+	result := mach_vm_map(mach_task_self_, &address, 2 * Megabyte, alignment_mask, flags, MEMORY_OBJECT_NULL, 0, false, VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE, VM_INHERIT_COPY)
 	if result != 0 {
 		return nil
 	}
-	assert_contextless(address % SUPERPAGE_SIZE == 0)
+	assert_contextless(address % u64(superpage_size) == 0)
 	return rawptr(uintptr(address))
 }
 
