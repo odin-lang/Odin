@@ -3,19 +3,42 @@ package log
 import "base:runtime"
 import "core:fmt"
 
+/*
+Format to use when logging allocations.
+*/
 Log_Allocator_Format :: enum {
-	Bytes, // Actual number of bytes.
-	Human, // Bytes in human units like bytes, kibibytes, etc. as appropriate.
+	// Actual number of bytes
+	Bytes,
+	// Bytes in human units like bytes, kibibytes, etc. as appropriate
+	Human,
 }
 
+/*
+Data backing the allocator that logs all allocations.
+*/
 Log_Allocator :: struct {
+	// Wrapped allocator
 	allocator: runtime.Allocator,
+	// Log level to use for allocations
 	level:     Level,
+	// Prefix to use in log messages
 	prefix:    string,
+	// Setting this to true disables logging
 	locked:    bool,
+	// Format to use when logging allocations
 	size_fmt:  Log_Allocator_Format,
 }
 
+/*
+Initialize the backing data for the allocator that logs all allocations.
+
+Inputs:
+- `la`: Pointer to the data structure to initialize
+- `level`: Log level to use for allocations
+- `size_fmt`: Format to use when logging allocations (default is `.Bytes`)
+- `allocator`: Wrapped allocator (default is `context.allocator`)
+- `prefix`: Prefix to use in log messages (default is `""`)
+*/
 log_allocator_init :: proc(la: ^Log_Allocator, level: Level, size_fmt := Log_Allocator_Format.Bytes,
                            allocator := context.allocator, prefix := "") {
 	la.allocator = allocator
@@ -25,7 +48,15 @@ log_allocator_init :: proc(la: ^Log_Allocator, level: Level, size_fmt := Log_All
 	la.size_fmt = size_fmt
 }
 
+/*
+Create an allocator that logs all allocations.
 
+Inputs:
+- `la`: Pointer to the data structure backing the allocator
+
+Returns:
+- An allocator that logs all allocations
+*/
 log_allocator :: proc(la: ^Log_Allocator) -> runtime.Allocator {
 	return runtime.Allocator{
 		procedure = log_allocator_proc,
@@ -33,6 +64,9 @@ log_allocator :: proc(la: ^Log_Allocator) -> runtime.Allocator {
 	}
 }
 
+/*
+Backing procedure for allocator that logs all allocations.
+*/
 log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
                            size, alignment: int,
                            old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, runtime.Allocator_Error)  {
