@@ -3,13 +3,75 @@ package slice
 import "base:builtin"
 import "base:runtime"
 
+/*
+Add to a pointer.
+
+**WARNING: No bounds checking is performed!**
+
+Inputs:
+- `p`: The pointer to add to
+- `x`: The element count to offset the pointer by
+
+Example:
+
+	import "core:slice"
+	import "core:fmt"
+
+	ptr_add_example :: proc() {
+		data := []rune{'A', 'B', 'C', 'D', 'E'}
+		ptr := &data[1]
+		next := slice.ptr_add(ptr, 2)^
+		fmt.println(next)
+	}
+
+Outputs:
+
+	D
+*/
 ptr_add :: proc(p: $P/^$T, x: int) -> ^T {
 	return ([^]T)(p)[x:]
 }
+
+/*
+Subtract from a pointer.
+
+**WARNING: No bounds checking is performed!**
+
+Inputs:
+- `p`: The pointer to from to
+- `x`: The element count to offset the pointer by
+
+Example:
+
+	import "core:slice"
+	import "core:fmt"
+
+	ptr_add_example :: proc() {
+		data := []rune{'A', 'B', 'C', 'D', 'E'}
+		ptr := &data[3]
+		prev := slice.ptr_sub(ptr, 2)^
+		fmt.println(prev)
+	}
+
+Outputs:
+
+	B
+*/
 ptr_sub :: proc(p: $P/^$T, x: int) -> ^T {
 	return ([^]T)(p)[-x:]
 }
 
+/*
+Swap the memory at the pointer addresses.
+
+This function assumes that the data ranges do not overlap.
+
+**WARNING: No bounds checking is performed!**
+
+Inputs:
+- `x`, `y`: pointers to the memory to swap
+- `len`: number of bytes to swap
+*/
 ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
 	if len <= 0 {
 		return
@@ -44,6 +106,17 @@ ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
 	}
 }
 
+/*
+Swap the memory at the pointer addresses.
+
+This function allows the data to overlap.
+
+**WARNING: No bounds checking is performed!**
+
+Inputs:
+- `x`, `y`: pointers to the memory to swap
+- `len`: number of bytes to swap
+*/
 ptr_swap_overlapping :: proc(x, y: rawptr, len: int) {
 	if len <= 0 {
 		return
@@ -67,7 +140,15 @@ ptr_swap_overlapping :: proc(x, y: rawptr, len: int) {
 	}
 }
 
+/*
+Shift elements so that what was at position mid becomes the new start, and everything else wraps around while
+maintaining relative ordering.
 
+Inputs:
+- `left`: The number of elements to the left of `mid`
+- `mid`: A pointer to the middle element (the new first element after rotation)
+- `right`: The number of elements to the right of `mid` (inclusive of `mid`)
+*/
 ptr_rotate :: proc(left: int, mid: ^$T, right: int) {
 	when size_of(T) != 0 {
 		left, mid, right := left, mid, right
