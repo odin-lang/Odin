@@ -1095,6 +1095,39 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		return transmute(f64)bits, ok
 	}
 
+	if len(str) > 2 && str[0] == '0' && str[1] == 'h' {
+		nr = 2
+
+		as_int: u64
+		digits: int
+		for r in str[2:] {
+			if r == '_' {
+				nr += 1
+				continue
+			}
+			v := u64(_digit_value(r))
+			if v >= 16 {
+				break
+			}
+			as_int *= 16
+			as_int += v
+			digits += 1
+		}
+		nr += digits
+		ok = len(str) == nr
+
+		switch digits {
+		case 4:
+			value = cast(f64)transmute(f16)cast(u16)as_int
+		case 8:
+			value = cast(f64)transmute(f32)cast(u32)as_int
+		case 16:
+			value = transmute(f64)as_int
+		case:
+			ok = false
+		}
+		return
+	}
 
 	if value, nr, ok = check_special(str); ok {
 		return
