@@ -10,36 +10,36 @@ when ODIN_OS == .Windows {
 }
 
 
-PROP_FONT_CREATE_FILENAME_STRING 						:: "SDL_ttf.font.create.filename"
-PROP_FONT_CREATE_IOSTREAM_POINTER	 					:: "SDL_ttf.font.create.iostream"
-PROP_FONT_CREATE_IOSTREAM_OFFSET_NUMBER 		:: "SDL_ttf.font.create.iostream.offset"
+PROP_FONT_CREATE_FILENAME_STRING :: "SDL_ttf.font.create.filename"
+PROP_FONT_CREATE_IOSTREAM_POINTER :: "SDL_ttf.font.create.iostream"
+PROP_FONT_CREATE_IOSTREAM_OFFSET_NUMBER :: "SDL_ttf.font.create.iostream.offset"
 PROP_FONT_CREATE_IOSTREAM_AUTOCLOSE_BOOLEAN :: "SDL_ttf.font.create.iostream.autoclose"
-PROP_FONT_CREATE_SIZE_FLOAT 								:: "SDL_ttf.font.create.size"
-PROP_FONT_CREATE_FACE_NUMBER 								:: "SDL_ttf.font.create.face"
-PROP_FONT_CREATE_HORIZONTAL_DPI_NUMBER 			:: "SDL_ttf.font.create.hdpi"
-PROP_FONT_CREATE_VERTICAL_DPI_NUMBER 				:: "SDL_ttf.font.create.vdpi"
-PROP_FONT_CREATE_EXISTING_FONT 							:: "SDL_ttf.font.create.existing_font"
+PROP_FONT_CREATE_SIZE_FLOAT :: "SDL_ttf.font.create.size"
+PROP_FONT_CREATE_FACE_NUMBER :: "SDL_ttf.font.create.face"
+PROP_FONT_CREATE_HORIZONTAL_DPI_NUMBER :: "SDL_ttf.font.create.hdpi"
+PROP_FONT_CREATE_VERTICAL_DPI_NUMBER :: "SDL_ttf.font.create.vdpi"
+PROP_FONT_CREATE_EXISTING_FONT :: "SDL_ttf.font.create.existing_font"
 
-FONT_WEIGHT_THIN				:: 100 /**< Thin (100) named font weight value */
+FONT_WEIGHT_THIN :: 100 /**< Thin (100) named font weight value */
 FONT_WEIGHT_EXTRA_LIGHT :: 200 /**< ExtraLight (200) named font weight value */
-FONT_WEIGHT_LIGHT 			:: 300 /**< Light (300) named font weight value */
-FONT_WEIGHT_NORMAL 			:: 400 /**< Normal (400) named font weight value */
-FONT_WEIGHT_MEDIUM 			:: 500 /**< Medium (500) named font weight value */
-FONT_WEIGHT_SEMI_BOLD 	:: 600 /**< SemiBold (600) named font weight value */
-FONT_WEIGHT_BOLD 				:: 700 /**< Bold (700) named font weight value */
-FONT_WEIGHT_EXTRA_BOLD 	:: 800 /**< ExtraBold (800) named font weight value */
-FONT_WEIGHT_BLACK 			:: 900 /**< Black (900) named font weight value */
+FONT_WEIGHT_LIGHT :: 300 /**< Light (300) named font weight value */
+FONT_WEIGHT_NORMAL :: 400 /**< Normal (400) named font weight value */
+FONT_WEIGHT_MEDIUM :: 500 /**< Medium (500) named font weight value */
+FONT_WEIGHT_SEMI_BOLD :: 600 /**< SemiBold (600) named font weight value */
+FONT_WEIGHT_BOLD :: 700 /**< Bold (700) named font weight value */
+FONT_WEIGHT_EXTRA_BOLD :: 800 /**< ExtraBold (800) named font weight value */
+FONT_WEIGHT_BLACK :: 900 /**< Black (900) named font weight value */
 FONT_WEIGHT_EXTRA_BLACK :: 950 /**< ExtraBlack (950) named font weight value */
 
-PROP_RENDERER_TEXT_ENGINE_RENDERER 						:: "SDL_ttf.renderer_text_engine.create.renderer"
-PROP_RENDERER_TEXT_ENGINE_ATLAS_TEXTURE_SIZE 	:: "SDL_ttf.renderer_text_engine.create.atlas_texture_size"
+PROP_RENDERER_TEXT_ENGINE_RENDERER :: "SDL_ttf.renderer_text_engine.create.renderer"
+PROP_RENDERER_TEXT_ENGINE_ATLAS_TEXTURE_SIZE :: "SDL_ttf.renderer_text_engine.create.atlas_texture_size"
 
-PROP_GPU_TEXT_ENGINE_DEVICE 						:: "SDL_ttf.gpu_text_engine.create.device"
+PROP_GPU_TEXT_ENGINE_DEVICE :: "SDL_ttf.gpu_text_engine.create.device"
 PROP_GPU_TEXT_ENGINE_ATLAS_TEXTURE_SIZE :: "SDL_ttf.gpu_text_engine.create.atlas_texture_size"
 
 MAJOR_VERSION :: 3
 MINOR_VERSION :: 2
-PATCHLEVEL 		:: 2
+PATCHLEVEL :: 2
 
 Font :: struct {
 }
@@ -110,23 +110,12 @@ GPUTextEngineWinding :: enum c.int {
 	COUNTER_CLOCKWISE,
 }
 
-// NOTE: Unsure how to translate this as it is a bitset but also has a mask component 
-// so bit_set isnt really suitable
-/*
-typedef Uint32 TTF_SubStringFlags;
-
-#define TTF_SUBSTRING_DIRECTION_MASK    0x000000FF  /**< The mask for the flow direction for this substring */
-#define TTF_SUBSTRING_TEXT_START        0x00000100  /**< This substring contains the beginning of the text */
-#define TTF_SUBSTRING_LINE_START        0x00000200  /**< This substring contains the beginning of line `line_index` */
-#define TTF_SUBSTRING_LINE_END          0x00000400  /**< This substring contains the end of line `line_index` */
-#define TTF_SUBSTRING_TEXT_END          0x00000800  /**< This substring contains the end of the text */
-*/
-SubStringFlags :: enum SDL.Uint32 {
-	DIRECTION_MASK = 0xFF,
-	TEXT_START     = 0x100,
-	LINE_START     = 0x200,
-	LINE_END       = 0x400,
-	TEXT_END       = 0x800,
+SubStringFlags :: bit_field SDL.Uint32 {
+	direction:  u8   | 8,
+	text_start: bool | 1,
+	line_start: bool | 1,
+	line_end:   bool | 1,
+	text_end:   bool | 1,
 }
 
 SubString :: struct {
