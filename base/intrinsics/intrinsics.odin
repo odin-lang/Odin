@@ -364,6 +364,8 @@ objc_SEL   :: ^objc_selector
 objc_Class :: ^objc_class
 objc_Ivar  :: ^objc_ivar
 
+objc_send :: proc(args: ..any) -> T ---
+
 objc_find_selector     :: proc($name: string) -> objc_SEL   ---
 objc_register_selector :: proc($name: string) -> objc_SEL   ---
 objc_find_class        :: proc($name: string) -> objc_Class ---
