@@ -1295,3 +1295,59 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 		}
 	}
 }
+
+gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target) {
+// NOTE(tf2spi): LLVM-C DILabel API used only existed for major versions 20+
+#if LLVM_VERSION_MAJOR >= 20
+	if (p == nullptr || p->debug_info == nullptr) {
+		return;
+	}
+	if (target == nullptr || label == nullptr || label->kind != Ast_Label) {
+		return;
+	}
+	Token label_token = label->Label.token;
+	if (is_blank_ident(label_token.string)) {
+		return;
+	}
+	lbModule *m = p->module;
+	if (m == nullptr) {
+		return;
+	}
+
+	AstFile *file = label->file();
+	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	if (llvm_file == nullptr) {
+		debugf("llvm file not found for label\n");
+		return;
+	}
+	LLVMMetadataRef llvm_scope = p->debug_info;
+	if(llvm_scope == nullptr) {
+		debugf("llvm scope not found for label\n");
+		return;
+	}
+	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, label_token.pos);
+	LLVMBasicBlockRef llvm_block = target->block;
+	if (llvm_block == nullptr || llvm_debug_loc == nullptr) {
+		return;
+	}
+	LLVMMetadataRef llvm_label = LLVMDIBuilderCreateLabel(
+		m->debug_builder,
+		llvm_scope,
+		(const char *)label_token.string.text,
+		(size_t)label_token.string.len,
+		llvm_file,
+		label_token.pos.line,
+
+		// NOTE(tf2spi): Defaults to false in LLVM API, but I'd rather not take chances
+		//               Always preserve the label no matter what when debugging
+		true
+	);
+	GB_ASSERT(llvm_label != nullptr);
+	(void)LLVMDIBuilderInsertLabelAtEnd(
+		m->debug_builder,
+		llvm_label,
+		llvm_debug_loc,
+		llvm_block
+	);
+#endif
+}
