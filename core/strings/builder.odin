@@ -311,7 +311,7 @@ Returns:
 - res: A cstring of the Builder's buffer upon success
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-to_cstring :: proc(b: ^Builder) -> (res: cstring, err: mem.Allocator_Error) {
+to_cstring :: proc(b: ^Builder) -> (res: cstring, err: mem.Allocator_Error) #optional_allocator_error {
 	n := append(&b.buf, 0) or_return
 	if n != 1 {
 		return nil, .Out_Of_Memory
