@@ -187,7 +187,6 @@ init_long_path_support :: proc() {
 	if value == 1 {
 		can_use_long_paths = true
 	}
-
 }
 
 @(require_results)
@@ -271,6 +270,11 @@ _clean_path_handle_start :: proc(path: string, buffer: []u8) -> (rooted: bool, s
 			start += 1
 		}
 		copy(buffer, path[:start])
+		for n in 0..<start {
+			if _is_path_separator(buffer[n]) {
+				buffer[n] = _Path_Separator
+			}
+		}
 	}
 	return
 }
