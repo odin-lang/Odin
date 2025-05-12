@@ -368,6 +368,8 @@ Mem_Protection :: bit_set[Mem_Protection_Bits; i32]
 
 /*
 	Flags for mmap.
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags :: bit_set[Map_Flags_Bits; i32]
 
