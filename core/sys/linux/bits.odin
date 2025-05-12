@@ -594,6 +594,8 @@ Mem_Protection_Bits :: enum {
 
 /*
 	Bits for Map_Flags
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags_Bits :: enum {
 	SHARED          = 0,
@@ -618,10 +620,6 @@ Map_Flags_Bits :: enum {
 	FIXED_NOREPLACE = 20,
 	UNINITIALIZED   = 26,
 }
-
-// Not actually flags, but a shift and mask for when HUGETLB is defined
-MAP_HUGE_SHIFT :: 26
-MAP_HUGE_MASK  :: 63
 
 /*
 	Bits for MLock_Flags

@@ -368,23 +368,10 @@ Mem_Protection :: bit_set[Mem_Protection_Bits; i32]
 
 /*
 	Flags for mmap.
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags :: bit_set[Map_Flags_Bits; i32]
-
-Map_Shared_Validate :: Map_Flags{.SHARED, .PRIVATE}
-Map_Huge_16KB       :: transmute(Map_Flags)(u32(14) << MAP_HUGE_SHIFT)
-Map_Huge_64KB       :: transmute(Map_Flags)(u32(16) << MAP_HUGE_SHIFT)
-Map_Huge_512KB      :: transmute(Map_Flags)(u32(19) << MAP_HUGE_SHIFT)
-Map_Huge_1MB        :: transmute(Map_Flags)(u32(20) << MAP_HUGE_SHIFT)
-Map_Huge_2MB        :: transmute(Map_Flags)(u32(21) << MAP_HUGE_SHIFT)
-Map_Huge_8MB        :: transmute(Map_Flags)(u32(23) << MAP_HUGE_SHIFT)
-Map_Huge_16MB       :: transmute(Map_Flags)(u32(24) << MAP_HUGE_SHIFT)
-Map_Huge_32MB       :: transmute(Map_Flags)(u32(25) << MAP_HUGE_SHIFT)
-Map_Huge_256MB      :: transmute(Map_Flags)(u32(28) << MAP_HUGE_SHIFT)
-Map_Huge_512MB      :: transmute(Map_Flags)(u32(29) << MAP_HUGE_SHIFT)
-Map_Huge_1GB        :: transmute(Map_Flags)(u32(30) << MAP_HUGE_SHIFT)
-Map_Huge_2GB        :: transmute(Map_Flags)(u32(31) << MAP_HUGE_SHIFT)
-Map_Huge_16GB       :: transmute(Map_Flags)(u32(34) << MAP_HUGE_SHIFT)
 
 /*
 	Flags for mlock(2).
