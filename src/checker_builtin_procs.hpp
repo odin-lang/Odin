@@ -26,6 +26,7 @@ enum BuiltinProcId {
 	BuiltinProc_conj,
 
 	BuiltinProc_expand_values,
+	BuiltinProc_compress_values,
 
 	BuiltinProc_min,
 	BuiltinProc_max,
@@ -376,6 +377,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("conj"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("expand_values"),    1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("compress_values"),  1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("min"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("max"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},

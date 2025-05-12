@@ -2246,6 +2246,68 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		return lb_emit_load(p, tuple);
 	}
 
+	case BuiltinProc_compress_values: {
+		isize value_count = 0;
+		for (Ast *arg : ce->args) {
+			Type *t = arg->tav.type;
+			if (is_type_tuple(t)) {
+				value_count += t->Tuple.variables.count;
+			} else {
+				value_count += 1;
+			}
+		}
+
+		if (value_count == 1) {
+			lbValue x = lb_build_expr(p, ce->args[0]);
+			x = lb_emit_conv(p, x, tv.type);
+			return x;
+		}
+
+		Type *dt = base_type(tv.type);
+		lbAddr addr = lb_add_local_generated(p, tv.type, true);
+		if (is_type_struct(dt) || is_type_tuple(dt)) {
+			i32 index = 0;
+			for (Ast *arg : ce->args) {
+				lbValue x = lb_build_expr(p, arg);
+				if (is_type_tuple(x.type)) {
+					for (isize i = 0; i < x.type->Tuple.variables.count; i++) {
+						lbValue y = lb_emit_tuple_ev(p, x, cast(i32)i);
+						lbValue ptr = lb_emit_struct_ep(p, addr.addr, index++);
+						y = lb_emit_conv(p, y, type_deref(ptr.type));
+						lb_emit_store(p, ptr, y);
+					}
+				} else {
+					lbValue ptr = lb_emit_struct_ep(p, addr.addr, index++);
+					x = lb_emit_conv(p, x, type_deref(ptr.type));
+					lb_emit_store(p, ptr, x);
+				}
+			}
+			GB_ASSERT(index == value_count);
+		} else if (is_type_array_like(dt)) {
+			i32 index = 0;
+			for (Ast *arg : ce->args) {
+				lbValue x = lb_build_expr(p, arg);
+				if (is_type_tuple(x.type)) {
+					for (isize i = 0; i < x.type->Tuple.variables.count; i++) {
+						lbValue y = lb_emit_tuple_ev(p, x, cast(i32)i);
+						lbValue ptr = lb_emit_array_epi(p, addr.addr, index++);
+						y = lb_emit_conv(p, y, type_deref(ptr.type));
+						lb_emit_store(p, ptr, y);
+					}
+				} else {
+					lbValue ptr = lb_emit_array_epi(p, addr.addr, index++);
+					x = lb_emit_conv(p, x, type_deref(ptr.type));
+					lb_emit_store(p, ptr, x);
+				}
+			}
+			GB_ASSERT(index == value_count);
+		} else {
+			GB_PANIC("TODO(bill): compress_values -> %s", type_to_string(tv.type));
+		}
+
+		return lb_addr_load(p, addr);
+	}
+
 	case BuiltinProc_min: {
 		Type *t = type_of_expr(expr);
 		if (ce->args.count == 2) {

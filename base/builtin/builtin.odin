@@ -119,7 +119,8 @@ jmag       :: proc(value: Quaternion) -> Float ---
 kmag       :: proc(value: Quaternion) -> Float ---
 conj       :: proc(value: Complex_Or_Quaternion) -> Complex_Or_Quaternion ---
 
-expand_values :: proc(value: Struct_Or_Array) -> (A, B, C, ...) ---
+expand_values   :: proc(value: Struct_Or_Array) -> (A, B, C, ...) ---
+compress_values :: proc(values: ...) -> Struct_Or_Array_Like_Type ---
 
 min   :: proc(values: ..T) -> T ---
 max   :: proc(values: ..T) -> T ---
