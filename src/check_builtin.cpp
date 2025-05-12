@@ -3363,7 +3363,15 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 
 		if (all_types_the_same) {
-			operand->type = alloc_type_array(last_type, value_count);
+			Type *elem_type = default_type(last_type);
+			if (is_type_untyped(elem_type)) {
+				gbString s = expr_to_string(call);
+				error(call, "Invalid use of '%s' in '%.*s'", s, LIT(builtin_name));
+				gb_string_free(s);
+				return false;
+			}
+
+			operand->type = alloc_type_array(elem_type, value_count);
 			operand->mode = Addressing_Value;
 		} else {
 			Type *st = alloc_type_struct_complete();
