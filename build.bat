@@ -19,16 +19,27 @@ if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
 	)
 )
 
+where /Q git.exe || goto skip_git_hash
+if not exist .git\ goto skip_git_hash
+for /f "tokens=1,2" %%i IN ('git show "--pretty=%%cd %%h" "--date=format:%%Y-%%m-%%d" --no-patch --no-notes HEAD') do (
+	set CURR_DATE_TIME=%%i
+	set GIT_SHA=%%j
+)
+if %ERRORLEVEL% equ 0 (
+	goto have_git_hash_and_date
+)
+:skip_git_hash
 pushd misc
 cl /nologo get-date.c
-popd
-
-for /f %%i in ('misc\get-date') do (
+for /f %%i in ('get-date') do (
 	set CURR_DATE_TIME=%%i
+	rem Don't set GIT_SHA
 )
+popd
+:have_git_hash_and_date
 set curr_year=%CURR_DATE_TIME:~0,4%
-set curr_month=%CURR_DATE_TIME:~4,2%
-set curr_day=%CURR_DATE_TIME:~6,2%
+set curr_month=%CURR_DATE_TIME:~5,2%
+set curr_day=%CURR_DATE_TIME:~8,2%
 
 :: Make sure this is a decent name and not generic
 set exe_name=odin.exe
@@ -61,31 +72,14 @@ if %release_mode% equ 0 (
 set V4=0
 set odin_version_full="%V1%.%V2%.%V3%.%V4%"
 set odin_version_raw="dev-%V1%-%V2%"
-
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
 rem Parse source code as utf-8 even on shift-jis and other codepages
 rem See https://learn.microsoft.com/en-us/cpp/build/reference/utf-8-set-source-and-executable-character-sets-to-utf-8?view=msvc-170
 set compiler_flags= %compiler_flags% /utf-8
-set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
+set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\" -DGIT_SHA=\"%GIT_SHA%\"
 
 rem fileversion is defined as {Major,Minor,Build,Private: u16} so a bit limited
-set rc_flags=-nologo ^
--DV1=%V1% -DV2=%V2% -DV3=%V3% -DV4=%V4% ^
--DVF=%odin_version_full% -DNIGHTLY=%nightly%
-
-where /Q git.exe || goto skip_git_hash
-if not exist .git\ goto skip_git_hash
-for /f "tokens=1,2" %%i IN ('git show "--pretty=%%cd %%h" "--date=format:%%Y-%%m" --no-patch --no-notes HEAD') do (
-	set odin_version_raw=dev-%%i
-	set GIT_SHA=%%j
-)
-if %ERRORLEVEL% equ 0 (
-	set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
-	set rc_flags=%rc_flags% -DGIT_SHA=%GIT_SHA% -DVP=%odin_version_raw%:%GIT_SHA%
-) else (
-	set rc_flags=%rc_flags% -DVP=%odin_version_raw%
-)
-:skip_git_hash
+set rc_flags="-DGIT_SHA=%GIT_SHA% -DVP=dev-%V1%-%V2%:%GIT_SHA% nologo -DV1=%V1% -DV2=%V2% -DV3=%V3% -DV4=%V4% -DVF=%odin_version_full% -DNIGHTLY=%nightly%"
 
 if %nightly% equ 1 set compiler_defines=%compiler_defines% -DNIGHTLY
 
