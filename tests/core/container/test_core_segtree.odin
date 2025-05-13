@@ -2,7 +2,6 @@ package test_core_container
 
 import "core:testing"
 import "core:container/segtree"
-import "core:fmt"
 
 add_ints :: proc "contextless" (x, y: int) -> int { 
 	return x + y 
