@@ -3,6 +3,7 @@ package container_segtree
 
 import "base:runtime"
 import "base:intrinsics"
+import "core:math"
 
 // Reference(s): https://github.com/atcoder/ac-library/blob/master/atcoder/segtree.hpp
 //               https://cp-algorithms.com/data_structures/segment_tree.html
@@ -26,7 +27,7 @@ init :: proc(tree: ^$T/Segtree($E), id: E, op: proc "contextless" (x, y: E) -> E
 	tree._allocator = allocator
 	tree.id   = id
 	tree.op   = op
-	tree.size = _bit_ceil(size)
+	tree.size = math.next_power_of_two(size)
 	tree.log  = intrinsics.count_trailing_zeros(tree.size)
 	// FIXME: Is there a better way to make a slice and fill each element with a value
 	err: runtime.Allocator_Error = ---
@@ -192,17 +193,6 @@ min_left :: proc(tree: ^$T/Segtree($E), #any_int right_idx: int, f: proc "contex
 	}
 
 	return 0
-}
-
-// FIXME: Move to core:math/bits?
-@(private)
-_bit_ceil :: proc(#any_int x: int) -> uint {
-	if x <= 1 {
-		return 1
-	}
-	u := uint(x)
-	n := size_of(u) * 8 - uint(intrinsics.count_leading_zeros(u - 1))
-	return 1 << n
 }
 
 @(private)
