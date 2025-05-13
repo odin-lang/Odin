@@ -63,7 +63,9 @@ init_from_slice :: proc(tree: ^$T/Segtree($E), id: E, op: proc "contextless" (x,
 	err: runtime.Allocator_Error = ---
 	tree.data, err = make([]E, tree.size * 2, allocator)
 
-	if err != .None do return err
+	if err != .None {
+		return err
+	}
 
 	if id != {} {
 		for &elem in tree.data {
@@ -72,10 +74,10 @@ init_from_slice :: proc(tree: ^$T/Segtree($E), id: E, op: proc "contextless" (x,
 	}
 
 	for i := uint(0); i < size; i += 1 {
-		tree.data[size + i] = src[i]
+		tree.data[tree.size + i] = src[i]
 	}
 
-	for i := size - 1; i >= 1; i -= 1 {
+	for i := tree.size - 1; i >= 1; i -= 1 {
 		_update(tree, i)
 	}
 
@@ -83,27 +85,28 @@ init_from_slice :: proc(tree: ^$T/Segtree($E), id: E, op: proc "contextless" (x,
 }
 
 set :: proc(tree: ^$T/Segtree($E), #any_int idx: int, v: E) {
-	p := idx + tree.size
+	p := uint(idx) + tree.size
 	tree.data[p] = v
-	for i := 1; i <= tree.log; i += 1 {
-		_update(p >> i)
+	for i := uint(1); i <= tree.log; i += 1 {
+		_update(tree, p >> i)
 	}
 }
 
 prod :: proc(tree: ^$T/Segtree($E), #any_int left_idx, right_idx: int) -> E {
-	pl, pr := tree.id
-	l := left_idx + tree.size
-	r := right_idx + tree.size
+	pl := tree.id
+	pr := tree.id
+	l := uint(left_idx) + tree.size
+	r := uint(right_idx) + tree.size
 
 	for l < r {
-		if l & 1 {
-			pl = op(pl, tree.data[l])
+		if l & 1 == 1 {
+			pl = tree.op(pl, tree.data[l])
 			l += 1
 		}
 
-		if r & 1 {
+		if r & 1 == 1 {
 			r -= 1
-			pr = op(tree.data[r], pr)
+			pr = tree.op(tree.data[r], pr)
 		}
 
 		l >>= 1
@@ -119,19 +122,23 @@ prod_all :: proc(tree: ^$T/Segtree($E)) -> E {
 
 
 get :: proc(tree: ^$T/Segtree($E), #any_int p: int) -> E {
-	return tree.data[p + tree.size]
+	return tree.data[uint(p) + tree.size]
 }
 
 max_right :: proc(tree: ^$T/Segtree($E), #any_int left_idx: int, f: proc "contextless" (x: E) -> bool, loc := #caller_location) -> int {
 	assert(condition=f(tree.id), loc=loc)
 	n := len(tree.data)
-	if left_idx == n do return n
+	if left_idx == n {
+		return n
+	}
 
 	l := uint(left_idx) + tree.size
 	sum := tree.id
 
 	for {
-		for l % 2 == 0 do l >>= 1
+		for l % 2 == 0 {
+			l >>= 1			
+		}
 		if !f(tree.op(sum, tree.data[l])) {
 			for l < tree.size {
 				l *= 2
@@ -145,7 +152,9 @@ max_right :: proc(tree: ^$T/Segtree($E), #any_int left_idx: int, f: proc "contex
 		}
 		sum = tree.op(sum, tree.data[l])
 		l += 1
-		if (l & -l) == l do break
+		if (l & -l) == l {
+			break
+		}
 	}
 
 	return n
@@ -153,14 +162,18 @@ max_right :: proc(tree: ^$T/Segtree($E), #any_int left_idx: int, f: proc "contex
 
 min_left :: proc(tree: ^$T/Segtree($E), #any_int right_idx: int, f: proc "contextless" (x: E) -> bool, loc := #caller_location) -> int {
 	assert(condition=f(tree.id), loc=loc)
-	if right_idx == 0 do return 0
+	if right_idx == 0 {
+		return 0
+	}
 
 	r := uint(right_idx) + tree.size
 	sum := tree.id
 
 	for {
 		r -= 1
-		for r > 1 && r % 2 != 0 do r >>= 1
+		for r > 1 && r % 2 != 0 {
+			r >>= 1
+		}
 		if !f(tree.op(tree.data[r], sum)) {
 			for r < tree.size {
 				r = 2*r + 1
@@ -173,7 +186,9 @@ min_left :: proc(tree: ^$T/Segtree($E), #any_int right_idx: int, f: proc "contex
 			return int(r) + 1 - int(tree.size)
 		}
 		sum = tree.op(tree.data[r], sum)
-		if (r & -r) == r do break
+		if (r & -r) == r {
+			break
+		}
 	}
 
 	return 0
@@ -182,7 +197,9 @@ min_left :: proc(tree: ^$T/Segtree($E), #any_int right_idx: int, f: proc "contex
 // FIXME: Move to core:math/bits?
 @(private)
 _bit_ceil :: proc(#any_int x: int) -> uint {
-	if x <= 1 do return 1
+	if x <= 1 {
+		return 1
+	}
 	u := uint(x)
 	n := size_of(u) * 8 - uint(intrinsics.count_leading_zeros(u - 1))
 	return 1 << n

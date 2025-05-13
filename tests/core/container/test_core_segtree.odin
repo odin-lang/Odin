@@ -2,6 +2,7 @@ package test_core_container
 
 import "core:testing"
 import "core:container/segtree"
+import "core:fmt"
 
 add_ints :: proc "contextless" (x, y: int) -> int { 
 	return x + y 
@@ -9,6 +10,10 @@ add_ints :: proc "contextless" (x, y: int) -> int {
 
 mul_f64s :: proc "contextless" (x,y: f64) -> f64 { 
 	return x * y
+}
+
+xor_ints :: proc "contextless" (x, y: int) -> int {
+	return x ~ y
 }
 
 /*
@@ -19,6 +24,24 @@ test_segtree_bit_ceil :: proc(t: ^testing.T) {
 	testing.expect_value(t, segtree._bit_ceil(-1), 1)
 }*/
 
+@test
+test_segtree_get_set_int :: proc(t: ^testing.T) {
+	tree: segtree.Segtree(int)
+	segtree.init(&tree, 3, add_ints, 5)
+	defer segtree.destroy(&tree)
+	testing.expect_value(t, segtree.get(&tree, 2), 3)
+	segtree.set(&tree, 2, 10)
+	testing.expect_value(t, segtree.get(&tree, 2), 10)
+}
+
+@test
+test_segtree_prod_range_int_xor :: proc(t: ^testing.T) {
+	tree: segtree.Segtree(int)
+	slice := []int{ 5,234,42,69,420,11,0,0,22,31 }
+	segtree.init_from_slice(&tree, 1, xor_ints, slice)
+	defer segtree.destroy(&tree)
+	testing.expect_value(t, segtree.prod(&tree, 2, 7), 448)
+}
 
 @test
 test_segtree_prod_all_int_sum :: proc(t: ^testing.T) {
@@ -36,8 +59,8 @@ test_segtree_prod_all_f64_mul :: proc(t: ^testing.T) {
 	slice := []f64{1,2,3,4,5,6,7,8}
 	segtree.init_from_slice(&tree, id, mul_f64s, slice)
 	defer segtree.destroy(&tree)
-	fact := segtree.prod_all(&tree)
-	testing.expect_value(t, fact, 40320.0)
+	prod := segtree.prod_all(&tree)
+	testing.expect_value(t, prod, 40320.0)
 }
 
 @test
