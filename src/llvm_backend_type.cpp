@@ -1,7 +1,7 @@
 
 gb_internal void lb_set_odin_rtti_section(LLVMValueRef value) {
 	if (build_context.metrics.os != TargetOs_darwin) {
-		LLVMSetSection(value, ".odin-rtti");
+		LLVMSetSection(value, ".odinti");
 	}
 }
 
