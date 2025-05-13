@@ -1579,18 +1579,13 @@ is_power_of_two :: proc "contextless" (x: int) -> bool {
 }
 
 @(require_results)
-next_power_of_two :: proc "contextless" (x: int) -> int {
-	k := x -1
-	when size_of(int) == 8 {
-		k = k | (k >> 32)
+next_power_of_two :: proc "contextless" (#any_int x: int) -> uint {
+	if x <= 1 {
+		return 1
 	}
-	k = k | (k >> 16)
-	k = k | (k >> 8)
-	k = k | (k >> 4)
-	k = k | (k >> 2)
-	k = k | (k >> 1)
-	k += 1 + int(x <= 0)
-	return k
+	u := uint(x)
+	n := size_of(u) * 8 - uint(intrinsics.count_leading_zeros(u - 1))
+	return 1 << n
 }
 
 @(require_results)
