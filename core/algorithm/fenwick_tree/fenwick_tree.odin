@@ -1,11 +1,20 @@
 // This package implements fenwick tree operations over a slice
 package algorithm_fenwick_tree
 
-import "base:intrinsics"
+// Reference(s): https://cp-algorithms.com/data_structures/fenwick.html
 
-add :: proc(tree: $Slice_Type/[]$Elem_Type, p: int, v: Elem_Type)
-	where intrinsics.type_is_unsigned(Elem_Type) {
+init_from_slice :: proc(tree: $S/[]$E, src: $A/[]E) {
+	n := len(tree)
+	for i := 0; i < n; i += 1 {
+        tree[i] += src[i]
+        r := i | (i + 1)
+        if r < n {
+        	tree[r] += tree[i]
+        }
+	}
+}
 
+add :: proc(tree: $S/[]$E, #any_int p: int, v: E) {
 	p += 1;
 	for p <= len(tree) {
 		tree[p - 1] += v;
@@ -13,9 +22,7 @@ add :: proc(tree: $Slice_Type/[]$Elem_Type, p: int, v: Elem_Type)
 	}
 }
 
-sum :: proc(tree: $Slice_Type/[]$Elem_Type, r: int) 
-	where intrinsics.type_is_unsigned(Elem_Type) {
-
+sum :: proc(tree: $S/[]$E, #any_int r: int) {
 	sum := 0
 	for r > 0 {
 		sum += tree[r - 1]
@@ -24,9 +31,6 @@ sum :: proc(tree: $Slice_Type/[]$Elem_Type, r: int)
 	return sum
 }
 
-range_sum :: proc(tree: $Slice_Type/[]$Elem_Type, l: int, r: int)
-	where intrinsics.type_is_unsigned(Elem_Type) {
-
+range_sum :: proc(tree: $S/[]$E, #any_int l: int, #any_int r: int) {
 	return sum(tree, r) - sum(tree, l)
 }
-
