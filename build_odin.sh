@@ -161,8 +161,7 @@ build_odin() {
 }
 
 run_demo() {
-	#./odin run examples/demo -vet -strict-style -- Hellope World
-	./odin report
+	./odin run examples/demo -vet -strict-style -- Hellope World
 }
 
 if [ $# -eq 0 ]; then
