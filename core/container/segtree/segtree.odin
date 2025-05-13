@@ -27,7 +27,7 @@ init :: proc(tree: ^$T/Segtree($E), id: E, op: proc "contextless" (x, y: E) -> E
 	tree._allocator = allocator
 	tree.id   = id
 	tree.op   = op
-	tree.size = math.next_power_of_two(size)
+	tree.size = uint(math.next_power_of_two(int(size)))
 	tree.log  = intrinsics.count_trailing_zeros(tree.size)
 	// FIXME: Is there a better way to make a slice and fill each element with a value
 	err: runtime.Allocator_Error = ---
@@ -59,7 +59,7 @@ init_from_slice :: proc(tree: ^$T/Segtree($E), id: E, op: proc "contextless" (x,
 	tree._allocator = allocator
 	tree.id   = id
 	tree.op   = op
-	tree.size = _bit_ceil(size)
+	tree.size = uint(math.next_power_of_two(int(size)))
 	tree.log  = intrinsics.count_trailing_zeros(tree.size)
 	err: runtime.Allocator_Error = ---
 	tree.data, err = make([]E, tree.size * 2, allocator)
