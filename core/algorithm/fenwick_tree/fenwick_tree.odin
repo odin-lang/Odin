@@ -3,10 +3,9 @@ package algorithm_fenwick_tree
 
 // Reference(s): https://cp-algorithms.com/data_structures/fenwick.html
 
-init_from_slice :: proc(tree: $S/[]$E, src: $A/[]E) {
+init :: proc(tree: $S/[]$E) {
 	n := len(tree)
 	for i := 0; i < n; i += 1 {
-        tree[i] += src[i]
         r := i | (i + 1)
         if r < n {
         	tree[r] += tree[i]
