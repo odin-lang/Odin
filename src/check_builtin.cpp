@@ -5904,8 +5904,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			if ((bt->Basic.flags & BasicFlag_Untyped) != 0) {
 				gbString t = type_to_string(operand->type);
-				// NOTE: What should this error message be?
-				error(operand->expr, "Expected a typed integer for '%.*s', got %s", LIT(builtin_name), t);
+				error(operand->expr, "Expected a non-untyped integer type for '%.*s', got %s", LIT(builtin_name), t);
 				gb_string_free(t);
 				return false;
 			}
@@ -5942,16 +5941,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			if ((bt->Basic.flags & BasicFlag_Untyped) != 0) {
 				gbString t = type_to_string(operand->type);
-				// NOTE: What should this error message be?
-				error(operand->expr, "Expected a typed integer for '%.*s', got %s", LIT(builtin_name), t);
+				error(operand->expr, "Expected a non-untyped integer type for '%.*s', got %s", LIT(builtin_name), t);
 				gb_string_free(t);
 				return false;
 			}
 
 			if (bt->Basic.kind == Basic_uintptr) {
 				gbString t = type_to_string(operand->type);
-				// TODO: Robust error message for uintptr does not have a signed integer representation
-				error(operand->expr, "Expected a signed integer type for '%.*s', got %s", LIT(builtin_name), t);
+				error(operand->expr, "Type %s does not have a signed integer mapping for '%.*s'", t, LIT(builtin_name));
 				gb_string_free(t);
 				return false;
 			}
