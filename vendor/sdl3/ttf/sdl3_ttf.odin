@@ -96,9 +96,9 @@ ImageType :: enum c.int {
 
 GPUAtlasDrawSequence :: struct {
 	atlas_texture: ^SDL.GPUTexture,
-	xy, uv:        ^SDL.FPoint,
+	xy, uv:        [^]SDL.FPoint,
 	num_vertices:  c.int,
-	indices:       ^c.int,
+	indices:       [^]c.int,
 	num_indices:   c.int,
 	image_type:    ImageType,
 	next:          ^GPUAtlasDrawSequence,
