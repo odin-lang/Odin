@@ -1205,28 +1205,28 @@ FEATURE_DATA_OPTIONS9 :: struct {
 	WaveMMATier:                                       WAVE_MMA_TIER,
 }
 
-FEATURE_DATA_OPTIONS10 :: struct	{
+FEATURE_DATA_OPTIONS10 :: struct {
 	VariableRateShadingSumCombinerSupported:    BOOL,
 	MeshShaderPerPrimitiveShadingRateSupported: BOOL,
 }
 
-FEATURE_DATA_OPTIONS11 :: struct	{
+FEATURE_DATA_OPTIONS11 :: struct {
 	AtomicInt64OnDescriptorHeapResourceSupported: BOOL,
 }
 
-TRI_STATE :: enum	i32	{
-	UNKNOWN	=	-1,
-	FALSE	=	0,
-	TRUE	=	1
+TRI_STATE :: enum i32 {
+	UNKNOWN	= -1,
+	FALSE   = 0,
+	TRUE    = 1
 }		
 
-FEATURE_DATA_OPTIONS12 :: struct	{
+FEATURE_DATA_OPTIONS12 :: struct {
 	MSPrimitivesPipelineStatisticIncludesCulledPrimitives: TRI_STATE,
 	EnhancedBarriersSupported:                             BOOL,
 	RelaxedFormatCastingSupported:                         BOOL,
 }
 
-FEATURE_DATA_OPTIONS13 :: struct	{
+FEATURE_DATA_OPTIONS13 :: struct {
 	UnrestrictedBufferTextureCopyPitchSupported: BOOL,
 	UnrestrictedVertexElementAlignmentSupported: BOOL,
 	InvertedViewportHeightFlipsYSupported:       BOOL,
@@ -1235,32 +1235,32 @@ FEATURE_DATA_OPTIONS13 :: struct	{
 	AlphaBlendFactorSupported:                   BOOL,
 }
 
-FEATURE_DATA_OPTIONS14 :: struct	{
+FEATURE_DATA_OPTIONS14 :: struct {
 	AdvancedTextureOpsSupported:                    BOOL,
 	WriteableMSAATexturesSupported:                 BOOL,
 	IndependentFrontAndBackStencilRefMaskSupported: BOOL,
 }
 
-FEATURE_DATA_OPTIONS15 :: struct	{
+FEATURE_DATA_OPTIONS15 :: struct {
 	TriangleFanSupported:                BOOL,
 	DynamicIndexBufferStripCutSupported: BOOL,
 }
 
-FEATURE_DATA_OPTIONS16 :: struct	{
+FEATURE_DATA_OPTIONS16 :: struct {
 	DynamicDepthBiasSupported: BOOL,
 	GPUUploadHeapSupported:    BOOL,
 }
 
-FEATURE_DATA_OPTIONS17 :: struct	{
+FEATURE_DATA_OPTIONS17 :: struct {
 	NonNormalizedCoordinateSamplersSupported: BOOL,
 	ManualWriteTrackingResourceSupported:     BOOL,
 }
 
-FEATURE_DATA_OPTIONS18 :: struct	{
+FEATURE_DATA_OPTIONS18 :: struct {
 	RenderPassesValid: BOOL,
 }
 
-FEATURE_DATA_OPTIONS19 :: struct	{
+FEATURE_DATA_OPTIONS19 :: struct {
 	MismatchingOutputDimensionsSupported:           BOOL,
 	SupportedSampleCountsWithNoOutputs:             u32,
 	PointSamplingAddressesNeverRoundUp:             BOOL,
