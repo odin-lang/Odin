@@ -1373,6 +1373,34 @@ not :: proc{
 
 @(require_results) identity :: proc "c" ($M: typeid/matrix[$N, N]$T) -> M { return 1 }
 
+
+// NOTE: vkguide, in chapter 3, subchapter "Mesh Loading" uses a view and 
+// projection matrix in order to render "Suzanne", the monkey head.
+// this module advertises itself as being a replacement, at least to some
+// extent of the popular "glm" c++ math library. As such, I tried to use
+// the `mat4Perspective` function in order to do perspective projection,
+// exactly how vkguide does it, and was disappointed to see nothing rendered.
+// If, from that point, you pass in the near & far parameters to 
+// `mat4Perspective` in the reverse order, you will see the monkey head, 
+// but perspective will be reversed: things farther away will be LARGER
+// and things closer will be smaller.
+// vkguide does the reverse-z depth buffer trick to increase rendering accuracy
+// of far-away objects, which is why this occurs.
+// looking at glm and vkguide source code, you find out that vkguide ends up 
+// calling the `perspectiveRH_ZO` function to do projection, which ends up
+// translated in odin as displayed below. Using this function, 3d objects
+// will render as vkguide intended them to.
+// @(require_results)
+// glm_like_perspective_rh_zo :: proc "c" (fovy, aspect, near, far: f32) -> (m: mat4) {
+// 	tan_half_fovy := tan(0.5 * fovy)
+// 	m[0, 0] = 1 / (aspect*tan_half_fovy)
+// 	m[1, 1] = 1 / (tan_half_fovy)
+// 	m[2, 2] = far / (near - far)
+// 	m[3, 2] = -1
+// 	m[2, 3] = -(far*near) / (far - near)
+// 	return
+// }
+
 @(require_results)
 mat4Perspective :: proc "c" (fovy, aspect, near, far: f32) -> (m: mat4) {
 	tan_half_fovy := tan(0.5 * fovy)
