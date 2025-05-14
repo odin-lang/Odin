@@ -1217,7 +1217,7 @@ FEATURE_DATA_OPTIONS11 :: struct {
 TRI_STATE :: enum i32 {
 	UNKNOWN	= -1,
 	FALSE   = 0,
-	TRUE    = 1
+	TRUE    = 1,
 }		
 
 FEATURE_DATA_OPTIONS12 :: struct {
