@@ -628,6 +628,18 @@ try_cross_linking:;
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
 
+			gbString android_target_arch = gb_string_make(heap_allocator(), "");;
+			defer (gb_string_free(android_target_arch));
+			switch (build_context.metrics.arch) {
+				case TargetArch_arm64:
+					android_target_arch = gb_string_appendc(android_target_arch, "aarch64");
+					break;
+				case TargetArch_amd64:
+					android_target_arch = gb_string_appendc(android_target_arch, "x86_64");
+					break;
+				default:
+					GB_PANIC("Unknown architecture for linking stage");
+			}
 
 			if (is_android) { // NOTE(bill): glue code needed for Android
 				TIME_SECTION("Android Native App Glue Compile");
@@ -647,7 +659,7 @@ try_cross_linking:;
 				defer (gb_string_free(glue));
 
 				glue = gb_string_append_fmt(glue, "bin/clang");
-				glue = gb_string_append_fmt(glue, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
+				glue = gb_string_append_fmt(glue, " --target=%s-linux-android%d ", android_target_arch, ODIN_ANDROID_API_LEVEL);
 				glue = gb_string_appendc(glue, "-c \"");
 				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK.text, ODIN_ANDROID_NDK.len);
 				glue = gb_string_appendc(glue, "sources/android/native_app_glue/android_native_app_glue.c");
@@ -668,7 +680,7 @@ try_cross_linking:;
 
 				glue = gb_string_appendc(glue, "\"-I");
 				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				glue = gb_string_appendc(glue, "sysroot/usr/include/aarch64-linux-android/");
+				glue = gb_string_append_fmt(glue, "sysroot/usr/include/%s-linux-android/", android_target_arch);
 				glue = gb_string_appendc(glue, "\" ");
 
 
@@ -851,7 +863,7 @@ try_cross_linking:;
 				gbString ndk_bin_directory = gb_string_make_length(temporary_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
 				link_command_line = gb_string_appendc(link_command_line, ndk_bin_directory);
 				link_command_line = gb_string_appendc(link_command_line, "bin/clang");
-				link_command_line = gb_string_append_fmt(link_command_line, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
+				link_command_line = gb_string_append_fmt(link_command_line, " --target=%s-linux-android%d ", android_target_arch, ODIN_ANDROID_API_LEVEL);
 			} else {
 				link_command_line = gb_string_appendc(link_command_line, clang_path);
 			}

@@ -1589,7 +1589,16 @@ gb_internal void init_android_values(bool with_sdk) {
 		gb_exit(1);
 	}
 
-	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
+	switch (bc->metrics.arch) {
+	case TargetArch_arm64:
+		bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
+		break;
+	case TargetArch_amd64:
+		bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/x86_64-linux-android/"));
+			break;
+	default:
+		GB_PANIC("Unknown architecture for android NDK libraries.");
+	}
 
 	char buf[32] = {};
 	gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_API_LEVEL);
@@ -1829,6 +1838,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		switch (metrics->arch) {
 		case TargetArch_arm64:
 			bc->metrics.target_triplet = str_lit("aarch64-none-linux-android");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		case TargetArch_amd64:
+			bc->metrics.target_triplet = str_lit("x86_64-none-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		default:
