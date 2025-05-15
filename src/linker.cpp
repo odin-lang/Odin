@@ -631,7 +631,7 @@ try_cross_linking:;
 			gbString android_target_arch = gb_string_make(heap_allocator(), "");;
 			defer (gb_string_free(android_target_arch));
 			switch (build_context.metrics.arch) {
-				case TargetArch_arm64:
+				case TargetArch_arm64, TargetArch_riscv64:
 					android_target_arch = gb_string_appendc(android_target_arch, "aarch64");
 					break;
 				case TargetArch_amd64:

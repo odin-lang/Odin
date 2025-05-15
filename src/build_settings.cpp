@@ -1590,7 +1590,7 @@ gb_internal void init_android_values(bool with_sdk) {
 	}
 
 	switch (bc->metrics.arch) {
-	case TargetArch_arm64:
+	case TargetArch_arm64, TargetArch_riscv64:
 		bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
 		break;
 	case TargetArch_amd64:
