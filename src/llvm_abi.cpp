@@ -1246,7 +1246,7 @@ namespace lbAbiArm64 {
 				cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
 			} else {
 				LLVMTypeRef llvm_i64 = LLVMIntTypeInContext(c, 64);
-				cast_type = LLVMArrayType2(llvm_i64, 2);
+				cast_type = llvm_array_type(llvm_i64, 2);
 			}
 			return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 		}
