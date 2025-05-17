@@ -288,7 +288,7 @@ Rename_Flags :: bit_set[Rename_Flags_Bits; u32]
 
 /*
 	Directory entry record.
-	Recommended iterate these with `dirent_iterator()`,
+	Recommended to iterate these with `dirent_iterate_buf()`,
 	and obtain the name via `dirent_name()`.
 */
 Dirent :: struct {
