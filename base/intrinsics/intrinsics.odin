@@ -221,6 +221,9 @@ type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
 type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
 
+type_integer_to_unsigned :: proc($T: typeid) -> type where type_is_integer(T), !type_is_unsigned(T) ---
+type_integer_to_signed   :: proc($T: typeid) -> type where type_is_integer(T), type_is_unsigned(T) ---
+
 type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---

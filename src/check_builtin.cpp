@@ -5877,6 +5877,87 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		operand->mode = Addressing_Type;
 		break;
+	case BuiltinProc_type_integer_to_unsigned:
+		if (operand->mode != Addressing_Type) {
+			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+			return false;
+		} 
+
+		if (is_type_polymorphic(operand->type)) {
+			gbString t = type_to_string(operand->type);
+			error(operand->expr, "Expected a non-polymorphic type for '%.*s', got %s", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		{
+			Type *bt = base_type(operand->type);
+
+			if (bt->kind != Type_Basic || 
+				(bt->Basic.flags & BasicFlag_Unsigned) != 0 || 
+				(bt->Basic.flags & BasicFlag_Integer) == 0) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a signed integer type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			if ((bt->Basic.flags & BasicFlag_Untyped) != 0) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a non-untyped integer type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			Type *u_type = &basic_types[bt->Basic.kind + 1];
+
+			operand->type = u_type;
+		}
+		break;
+	case BuiltinProc_type_integer_to_signed:
+		if (operand->mode != Addressing_Type) {
+			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+			return false;
+		} 
+
+		if (is_type_polymorphic(operand->type)) {
+			gbString t = type_to_string(operand->type);
+			error(operand->expr, "Expected a non-polymorphic type for '%.*s', got %s", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		{
+			Type *bt = base_type(operand->type);
+
+			if (bt->kind != Type_Basic || 
+				(bt->Basic.flags & BasicFlag_Unsigned) == 0 || 
+				(bt->Basic.flags & BasicFlag_Integer) == 0) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected an unsigned integer type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			if ((bt->Basic.flags & BasicFlag_Untyped) != 0) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a non-untyped integer type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			if (bt->Basic.kind == Basic_uintptr) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Type %s does not have a signed integer mapping for '%.*s'", t, LIT(builtin_name));
+				gb_string_free(t);
+				return false;
+			}
+
+			Type *u_type = &basic_types[bt->Basic.kind - 1];
+
+			operand->type = u_type;
+		}
+		break;
 	case BuiltinProc_type_merge:
 		{
 			operand->mode = Addressing_Type;
