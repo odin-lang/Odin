@@ -837,6 +837,16 @@ FEATURE :: enum i32 {
 	OPTIONS8                              = 36,
 	OPTIONS9                              = 37,
 	WAVE_MMA                              = 38,
+	OPTIONS10                             = 39,
+	OPTIONS11                             = 40,
+	OPTIONS12                             = 41,
+	OPTIONS13                             = 42,
+	OPTIONS14                             = 43,
+	OPTIONS15                             = 44,
+	OPTIONS16                             = 45,
+	OPTIONS17                             = 46,
+	OPTIONS18                             = 47,
+	OPTIONS19                             = 48,
 }
 
 SHADER_MIN_PRECISION_SUPPORT :: enum i32 {
@@ -1193,6 +1203,74 @@ FEATURE_DATA_OPTIONS9 :: struct {
 	AtomicInt64OnGroupSharedSupported:                 BOOL,
 	DerivativesInMeshAndAmplificationShadersSupported: BOOL,
 	WaveMMATier:                                       WAVE_MMA_TIER,
+}
+
+FEATURE_DATA_OPTIONS10 :: struct {
+	VariableRateShadingSumCombinerSupported:    BOOL,
+	MeshShaderPerPrimitiveShadingRateSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS11 :: struct {
+	AtomicInt64OnDescriptorHeapResourceSupported: BOOL,
+}
+
+TRI_STATE :: enum i32 {
+	UNKNOWN	= -1,
+	FALSE   = 0,
+	TRUE    = 1,
+}		
+
+FEATURE_DATA_OPTIONS12 :: struct {
+	MSPrimitivesPipelineStatisticIncludesCulledPrimitives: TRI_STATE,
+	EnhancedBarriersSupported:                             BOOL,
+	RelaxedFormatCastingSupported:                         BOOL,
+}
+
+FEATURE_DATA_OPTIONS13 :: struct {
+	UnrestrictedBufferTextureCopyPitchSupported: BOOL,
+	UnrestrictedVertexElementAlignmentSupported: BOOL,
+	InvertedViewportHeightFlipsYSupported:       BOOL,
+	InvertedViewportDepthFlipsZSupported:        BOOL,
+	TextureCopyBetweenDimensionsSupported:       BOOL,
+	AlphaBlendFactorSupported:                   BOOL,
+}
+
+FEATURE_DATA_OPTIONS14 :: struct {
+	AdvancedTextureOpsSupported:                    BOOL,
+	WriteableMSAATexturesSupported:                 BOOL,
+	IndependentFrontAndBackStencilRefMaskSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS15 :: struct {
+	TriangleFanSupported:                BOOL,
+	DynamicIndexBufferStripCutSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS16 :: struct {
+	DynamicDepthBiasSupported: BOOL,
+	GPUUploadHeapSupported:    BOOL,
+}
+
+FEATURE_DATA_OPTIONS17 :: struct {
+	NonNormalizedCoordinateSamplersSupported: BOOL,
+	ManualWriteTrackingResourceSupported:     BOOL,
+}
+
+FEATURE_DATA_OPTIONS18 :: struct {
+	RenderPassesValid: BOOL,
+}
+
+FEATURE_DATA_OPTIONS19 :: struct {
+	MismatchingOutputDimensionsSupported:           BOOL,
+	SupportedSampleCountsWithNoOutputs:             u32,
+	PointSamplingAddressesNeverRoundUp:             BOOL,
+	RasterizerDesc2Supported:                       BOOL,
+	NarrowQuadrilateralLinesSupported:              BOOL,
+	AnisoFilterWithPointMipSupported:               BOOL,
+	MaxSamplerDescriptorHeapSize:                   u32,
+	MaxSamplerDescriptorHeapSizeWithStaticSamplers: u32,
+	MaxViewDescriptorHeapSize:                      u32,
+	ComputeOnlyCustomHeapSupported:                 BOOL,
 }
 
 WAVE_MMA_INPUT_DATATYPE :: enum i32 {
