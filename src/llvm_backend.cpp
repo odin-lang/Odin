@@ -1973,14 +1973,14 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 				gbString var_name = gb_string_make(permanent_allocator(), "__$global_any::");
 				gbString e_str = string_canonical_entity_name(temporary_allocator(), e);
 				var_name = gb_string_append_length(var_name, e_str, gb_strlen(e_str));
-				lbAddr g = lb_add_global_generated_with_name(main_module, var_type, var.init, make_string_c(var_name));
+				lbAddr g = lb_add_global_generated_with_name(main_module, var_type, {}, make_string_c(var_name));
 				lb_addr_store(p, g, var.init);
 				lbValue gp = lb_addr_get_ptr(p, g);
 
 				lbValue data = lb_emit_struct_ep(p, var.var, 0);
 				lbValue ti   = lb_emit_struct_ep(p, var.var, 1);
 				lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
-				lb_emit_store(p, ti,   lb_type_info(p, var_type));
+				lb_emit_store(p, ti,   lb_typeid(p->module, var_type));
 			} else {
 				LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
 				lbValue src0 = lb_emit_conv(p, var.init, t);
@@ -3194,24 +3194,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbValue g = {};
 		g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
 		g.type = alloc_type_pointer(e->type);
-		if (e->Variable.thread_local_model != "") {
-			LLVMSetThreadLocal(g.value, true);
 
-			String m = e->Variable.thread_local_model;
-			LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
-			if (m == "default") {
-				mode = LLVMGeneralDynamicTLSModel;
-			} else if (m == "localdynamic") {
-				mode = LLVMLocalDynamicTLSModel;
-			} else if (m == "initialexec") {
-				mode = LLVMInitialExecTLSModel;
-			} else if (m == "localexec") {
-				mode = LLVMLocalExecTLSModel;
-			} else {
-				GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
-			}
-			LLVMSetThreadLocalMode(g.value, mode);
-		}
+		lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
+
 		if (is_foreign) {
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);

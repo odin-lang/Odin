@@ -2022,33 +2022,43 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		LLVMValueRef global = LLVMAddGlobal(p->module->mod, lb_type(p->module, e->type), c_name);
 		LLVMSetAlignment(global, cast(u32)type_align_of(e->type));
 		LLVMSetInitializer(global, LLVMConstNull(lb_type(p->module, e->type)));
-		if (value.value != nullptr) {
-			LLVMSetInitializer(global, value.value);
-		}
+
 		if (e->Variable.is_rodata) {
 			LLVMSetGlobalConstant(global, true);
 		}
-		if (e->Variable.thread_local_model != "") {
-			LLVMSetThreadLocal(global, true);
 
-			String m = e->Variable.thread_local_model;
-			LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
-			if (m == "default") {
-				mode = LLVMGeneralDynamicTLSModel;
-			} else if (m == "localdynamic") {
-				mode = LLVMLocalDynamicTLSModel;
-			} else if (m == "initialexec") {
-				mode = LLVMInitialExecTLSModel;
-			} else if (m == "localexec") {
-				mode = LLVMLocalExecTLSModel;
-			} else {
-				GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
-			}
-			LLVMSetThreadLocalMode(global, mode);
-		} else {
+		if (!lb_apply_thread_local_model(global, e->Variable.thread_local_model)) {
 			LLVMSetLinkage(global, LLVMInternalLinkage);
 		}
 
+		if (value.value != nullptr) {
+			if (is_type_any(e->type)) {
+				Type *var_type = default_type(value.type);
+
+				gbString var_name = gb_string_make(temporary_allocator(), "__$static_any::");
+				var_name = gb_string_append_length(var_name, mangled_name.text, mangled_name.len);
+
+				lbAddr var_global = lb_add_global_generated_with_name(p->module, var_type, value, make_string_c(var_name), nullptr);
+				LLVMValueRef var_global_ref = var_global.addr.value;
+
+				if (e->Variable.is_rodata) {
+					LLVMSetGlobalConstant(var_global_ref, true);
+				}
+				
+				if (!lb_apply_thread_local_model(var_global_ref, e->Variable.thread_local_model)) {
+					LLVMSetLinkage(var_global_ref, LLVMInternalLinkage);
+				}
+
+				LLVMValueRef vals[2] = {
+					lb_emit_conv(p, var_global.addr, t_rawptr).value,
+					lb_typeid(p->module, var_type).value,
+				};
+				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals, gb_count_of(vals));
+				LLVMSetInitializer(global, init);
+			} else {
+				LLVMSetInitializer(global, value.value);
+			}
+		}
 
 		lbValue global_val = {global, alloc_type_pointer(e->type)};
 		lb_add_entity(p->module, e, global_val);
