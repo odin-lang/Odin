@@ -50,11 +50,12 @@ Unimplemented headers:
 package posix
 
 import "base:intrinsics"
+import "base:runtime"
 
 import "core:c"
 
 result :: enum c.int {
- 	// Use `errno` and `strerror` for more information.
+	// Use `errno` and `strerror` for more information.
 	FAIL = -1,
 	// Operation succeeded.
 	OK = 0,
@@ -71,5 +72,14 @@ when ODIN_OS == .Darwin && ODIN_ARCH == .amd64 {
 } else {
 	@(private)
 	INODE_SUFFIX :: ""
+}
+
+ALL_VALID_OS_TYPES :: bit_set[runtime.Odin_OS_Type] {
+	.Linux,
+	.Darwin,
+	.FreeBSD,
+	.OpenBSD,
+	.NetBSD,
+	.Haiku,
 }
 
