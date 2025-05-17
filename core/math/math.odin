@@ -1579,11 +1579,12 @@ is_power_of_two :: proc "contextless" (x: int) -> bool {
 }
 
 @(require_results)
-next_power_of_two :: proc "contextless" (#any_int x: int) -> uint {
+next_power_of_two :: proc "contextless" (#any_int x: int) -> intrinsics.type_integer_to_unsigned(type_of(x)) {
 	if x <= 1 {
 		return 1
 	}
-	u := uint(x)
+	U :: intrinsics.type_integer_to_unsigned(type_of(x))
+	u := U(x)
 	n := size_of(u) * 8 - uint(intrinsics.count_leading_zeros(u - 1))
 	return 1 << n
 }
