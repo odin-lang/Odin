@@ -728,11 +728,16 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 		bool is_unused = false;
 		if (vet_unused && check_vet_unused(c, e, &ve_unused)) {
 			is_unused = true;
-		} else if (vet_unused_procedures &&
-		           e->kind == Entity_Procedure) {
+		} else if (vet_unused_procedures && e->kind == Entity_Procedure) {
 			if (e->flags&EntityFlag_Used) {
 				is_unused = false;
 			} else if (e->flags & EntityFlag_Require) {
+				is_unused = false;
+			} else if (e->flags & EntityFlag_Init) {
+				is_unused = false;
+			} else if (e->flags & EntityFlag_Fini) {
+				is_unused = false;
+			} else if (e->Procedure.is_export) {
 				is_unused = false;
 			} else if (e->pkg && e->pkg->kind == Package_Init && e->token.string == "main") {
 				is_unused = false;
