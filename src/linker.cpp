@@ -769,12 +769,15 @@ try_cross_linking:;
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk ");
 
-				// Homebrew's default library path, checking if it exists to avoid linking warnings.
+				// Arm64 Homebrew's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/homebrew/lib")) {
 					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/homebrew/lib ");
 				}
+
+				// Standard library path and Intel Homebrew's default library path
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-L/usr/local/lib ");
 
 				// MacPort's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/local/lib")) {
