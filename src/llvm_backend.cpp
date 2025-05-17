@@ -1907,6 +1907,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	lb_add_attribute_to_proc(p->module, p->value, "optnone");
 	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
+	// Make sure shared libraries call their own runtime startup on Linux but
+	// still allow it to be visible to other objects.
+	LLVMSetVisibility(p->value, LLVMProtectedVisibility);
+
 	lb_begin_procedure_body(p);
 
 	lb_setup_type_info_data(main_module);
@@ -2015,6 +2019,10 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 	p->is_startup = true;
 	lb_add_attribute_to_proc(p->module, p->value, "optnone");
 	lb_add_attribute_to_proc(p->module, p->value, "noinline");
+
+	// Make sure shared libraries call their own runtime cleanup on Linux but
+	// still allow it to be visible to other objects.
+	LLVMSetVisibility(p->value, LLVMProtectedVisibility);
 
 	lb_begin_procedure_body(p);
 
