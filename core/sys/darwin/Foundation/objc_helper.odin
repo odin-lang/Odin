@@ -79,7 +79,6 @@ register_subclass :: proc(
 
 	objc_registerClassPair(cls)
 	meta_cls    := class_get_metaclass(cls)
-	class_size1 := uint(class_getInstanceSize(cls))
 	meta_size   := uint(class_getInstanceSize(meta_cls))
 
 	// Offsets are always aligned to 8-byte boundary

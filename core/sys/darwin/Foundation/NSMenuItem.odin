@@ -2,7 +2,6 @@ package objc_Foundation
 
 import "base:builtin"
 import "base:intrinsics"
-import "core:c"
 
 KeyEquivalentModifierFlag :: EventModifierFlag
 KeyEquivalentModifierMask :: EventModifierFlags
