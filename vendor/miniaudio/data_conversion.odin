@@ -194,7 +194,7 @@ foreign lib {
 	resampler_get_expected_output_frame_count :: proc(pResampler: ^resampler, inputFrameCount: u64, pOutputFrameCount: ^u64) -> result ---
 
 	/*
-	Resets the resampler's timer and clears it's internal cache.
+	Resets the resampler's timer and clears its internal cache.
 	*/
 	resampler_reset :: proc(pResampler: ^resampler) -> result ---
 }
@@ -421,7 +421,7 @@ foreign lib {
 	/*
 	Copies a channel map.
 
-	Both input and output channel map buffers must have a capacity of at at least `channels`.
+	Both input and output channel map buffers must have a capacity of at least `channels`.
 	*/
 	channel_map_copy :: proc(pOut: [^]channel, pIn: [^]channel, channels: u32) ---
 
