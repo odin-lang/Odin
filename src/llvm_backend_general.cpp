@@ -2387,6 +2387,29 @@ gb_internal void lb_add_attribute_to_proc_with_string(lbModule *m, LLVMValueRef 
 }
 
 
+gb_internal bool lb_apply_thread_local_model(LLVMValueRef value, String model) {
+	if (model != "") {
+		LLVMSetThreadLocal(value, true);
+
+		LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
+		if (model == "default") {
+			mode = LLVMGeneralDynamicTLSModel;
+		} else if (model == "localdynamic") {
+			mode = LLVMLocalDynamicTLSModel;
+		} else if (model == "initialexec") {
+			mode = LLVMInitialExecTLSModel;
+		} else if (model == "localexec") {
+			mode = LLVMLocalExecTLSModel;
+		} else {
+			GB_PANIC("Unhandled thread local mode %.*s", LIT(model));
+		}
+		LLVMSetThreadLocalMode(value, mode);
+		return true;
+	}
+
+	return false;
+}
+
 
 gb_internal void lb_add_edge(lbBlock *from, lbBlock *to) {
 	LLVMValueRef instr = LLVMGetLastInstruction(from->block);
@@ -2990,25 +3013,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 
 			lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
 
-			if (e->Variable.thread_local_model != "") {
-				LLVMSetThreadLocal(g.value, true);
-
-				String m = e->Variable.thread_local_model;
-				LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
-				if (m == "default") {
-					mode = LLVMGeneralDynamicTLSModel;
-				} else if (m == "localdynamic") {
-					mode = LLVMLocalDynamicTLSModel;
-				} else if (m == "initialexec") {
-					mode = LLVMInitialExecTLSModel;
-				} else if (m == "localexec") {
-					mode = LLVMLocalExecTLSModel;
-				} else {
-					GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
-				}
-				LLVMSetThreadLocalMode(g.value, mode);
-			}
-
+			lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
 
 			return g;
 		}
