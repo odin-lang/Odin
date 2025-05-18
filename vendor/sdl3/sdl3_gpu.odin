@@ -46,7 +46,7 @@ GPUIndexElementSize :: enum c.int {
 GPUTextureFormat :: enum c.int {
 	INVALID,
 
-    /* Unsigned Normalized Float Color Formats */
+	/* Unsigned Normalized Float Color Formats */
 	A8_UNORM,
 	R8_UNORM,
 	R8G8_UNORM,
@@ -59,34 +59,41 @@ GPUTextureFormat :: enum c.int {
 	B5G5R5A1_UNORM,
 	B4G4R4A4_UNORM,
 	B8G8R8A8_UNORM,
-    /* Compressed Unsigned Normalized Float Color Formats */
+
+	/* Compressed Unsigned Normalized Float Color Formats */
 	BC1_RGBA_UNORM,
 	BC2_RGBA_UNORM,
 	BC3_RGBA_UNORM,
 	BC4_R_UNORM,
 	BC5_RG_UNORM,
 	BC7_RGBA_UNORM,
-    /* Compressed Signed Float Color Formats */
+
+	/* Compressed Signed Float Color Formats */
 	BC6H_RGB_FLOAT,
-    /* Compressed Unsigned Float Color Formats */
+
+	/* Compressed Unsigned Float Color Formats */
 	BC6H_RGB_UFLOAT,
-    /* Signed Normalized Float Color Formats  */
+
+	/* Signed Normalized Float Color Formats  */
 	R8_SNORM,
 	R8G8_SNORM,
 	R8G8B8A8_SNORM,
 	R16_SNORM,
 	R16G16_SNORM,
 	R16G16B16A16_SNORM,
-    /* Signed Float Color Formats */
+
+	/* Signed Float Color Formats */
 	R16_FLOAT,
 	R16G16_FLOAT,
 	R16G16B16A16_FLOAT,
 	R32_FLOAT,
 	R32G32_FLOAT,
 	R32G32B32A32_FLOAT,
-    /* Unsigned Float Color Formats */
+
+	/* Unsigned Float Color Formats */
 	R11G11B10_UFLOAT,
-    /* Unsigned Integer Color Formats */
+
+	/* Unsigned Integer Color Formats */
 	R8_UINT,
 	R8G8_UINT,
 	R8G8B8A8_UINT,
@@ -96,7 +103,8 @@ GPUTextureFormat :: enum c.int {
 	R32_UINT,
 	R32G32_UINT,
 	R32G32B32A32_UINT,
-    /* Signed Integer Color Formats */
+
+	/* Signed Integer Color Formats */
 	R8_INT,
 	R8G8_INT,
 	R8G8B8A8_INT,
@@ -106,21 +114,25 @@ GPUTextureFormat :: enum c.int {
 	R32_INT,
 	R32G32_INT,
 	R32G32B32A32_INT,
-    /* SRGB Unsigned Normalized Color Formats */
+
+	/* SRGB Unsigned Normalized Color Formats */
 	R8G8B8A8_UNORM_SRGB,
 	B8G8R8A8_UNORM_SRGB,
-    /* Compressed SRGB Unsigned Normalized Color Formats */
+
+	/* Compressed SRGB Unsigned Normalized Color Formats */
 	BC1_RGBA_UNORM_SRGB,
 	BC2_RGBA_UNORM_SRGB,
 	BC3_RGBA_UNORM_SRGB,
 	BC7_RGBA_UNORM_SRGB,
-    /* Depth Formats */
+
+	/* Depth Formats */
 	D16_UNORM,
 	D24_UNORM,
 	D32_FLOAT,
 	D24_UNORM_S8_UINT,
 	D32_FLOAT_S8_UINT,
-    /* Compressed ASTC Normalized Float Color Formats*/
+
+	/* Compressed ASTC Normalized Float Color Formats*/
 	ASTC_4x4_UNORM,
 	ASTC_5x4_UNORM,
 	ASTC_5x5_UNORM,
@@ -135,7 +147,8 @@ GPUTextureFormat :: enum c.int {
 	ASTC_10x10_UNORM,
 	ASTC_12x10_UNORM,
 	ASTC_12x12_UNORM,
-    /* Compressed SRGB ASTC Normalized Float Color Formats*/
+
+	/* Compressed SRGB ASTC Normalized Float Color Formats*/
 	ASTC_4x4_UNORM_SRGB,
 	ASTC_5x4_UNORM_SRGB,
 	ASTC_5x5_UNORM_SRGB,
@@ -150,7 +163,8 @@ GPUTextureFormat :: enum c.int {
 	ASTC_10x10_UNORM_SRGB,
 	ASTC_12x10_UNORM_SRGB,
 	ASTC_12x12_UNORM_SRGB,
-    /* Compressed ASTC Signed Float Color Formats*/
+
+	/* Compressed ASTC Signed Float Color Formats*/
 	ASTC_4x4_FLOAT,
 	ASTC_5x4_FLOAT,
 	ASTC_5x5_FLOAT,
