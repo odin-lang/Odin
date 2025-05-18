@@ -62,15 +62,15 @@ This procedure extracts a directory entry from `buf` at the offset `offs`.
 in `buf`. The procedure only iterates as much data as loaded in the buffer and
 does not automatically make a request for the buffer to be refilled.
 
-**Inputs**:
-- `buf` - byte buffer with data from `getdents()`
-- `offs` - offset to the next possible directory entry in `buf`
+Inputs:
+- buf: A byte buffer with data from `getdents()`
+- offs: An offset to the next possible directory entry in `buf`
 
-**Returns**:
-- A pointer to a directory entry in `buf`, or `nil`.
-- A bool value denoting if a valid directory entry is returned.
+Returns:
+- A pointer to a directory entry in `buf`, or `nil`
+- A bool value denoting if a valid directory entry is returned
 
-**Example**:
+Example:
 
     import "core:fmt"
     import "core:sys/linux"
@@ -110,10 +110,10 @@ Obtain the name of dirent as a string.
 
 The lifetime of the returned string is bound to the lifetime of the provided dirent structure.
 
-**Inputs**:
-- `dirent` - directory entry
+Inputs:
+- dirent: A directory entry
 
-**Returns**:
+Returns:
 - A name of the entry
 */
 dirent_name :: proc "contextless" (dirent: ^Dirent) -> string #no_bounds_check {
