@@ -724,7 +724,7 @@ Create :: proc "stdcall" (ppXAudio2: ^^IXAudio2, Flags: FLAGS = {}, XAudio2Proce
 	create_info: CreateInfoFunc
 
 	if dll_Instance == nil {
-		dll_Instance = win.LoadLibraryExW(win.L("xaudio2_9.dll"), nil, {.LOAD_LIBRARY_SEARCH_SYSTEM32})
+		dll_Instance = win.LoadLibraryExW(win.L("xaudio2_9.dll"), nil, {.LOAD_LIBRARY_SEARCH_DEFAULT_DIRS})
 		if dll_Instance == nil {
 			return HRESULT(win.GetLastError())
 		}
