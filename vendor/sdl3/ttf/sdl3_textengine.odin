@@ -18,7 +18,7 @@ CopyOperation :: struct {
 	cmd:         DrawCommand,
 	text_offset: c.int,
 	glyph_font:  ^Font,
-	glyph_index: SDL.Uint32,
+	glyph_index: u32,
 	src:         SDL.Rect,
 	dst:         SDL.Rect,
 	reserved:    rawptr,
@@ -30,8 +30,7 @@ DrawOperation :: struct #raw_union {
 	copy: CopyOperation,
 }
 
-TextLayout :: struct {
-}
+TextLayout :: struct {}
 
 TextData :: struct {
 	font:                ^Font,
@@ -41,9 +40,9 @@ TextData :: struct {
 	x, y:                c.int,
 	w, h:                c.int,
 	num_ops:             c.int,
-	ops:                 [^]DrawOperation,
+	ops:                 [^]DrawOperation `fmt:"v,num_ops"`,
 	num_clusters:        c.int,
-	clusters:            [^]SubString,
+	clusters:            [^]SubString     `fmt:"v,num_clusters"`,
 	props:               SDL.PropertiesID,
 	needs_engine_update: bool,
 	engine:              ^TextEngine,
@@ -51,7 +50,7 @@ TextData :: struct {
 }
 
 TextEngine :: struct {
-	version:     SDL.Uint32,
+	version:     u32,
 	userdata:    rawptr,
 	CreateText:  proc "c" (userdata: rawptr, text: ^Text) -> bool,
 	DestroyText: proc "c" (userdata: rawptr, Textext: ^Text),
