@@ -769,7 +769,17 @@ try_cross_linking:;
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
+				// Get the MacOSX SDK path.
+				gbString darwin_sdk_path = gb_string_make(temporary_allocator(), "");
+				if (!system_exec_command_line_app_output("xcrun --sdk macosx --show-sdk-path", &darwin_sdk_path)) {
+					darwin_sdk_path = gb_string_set(darwin_sdk_path, "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk");
+				} else {
+					// Trim the trailing newline.
+					darwin_sdk_path = gb_string_trim_space(darwin_sdk_path);
+				}
+				platform_lib_str = gb_string_append_fmt(platform_lib_str, "--sysroot %s ", darwin_sdk_path);
+
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-L/usr/local/lib ");
 
 				// Homebrew's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/homebrew/lib")) {
