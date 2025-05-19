@@ -2289,6 +2289,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		print_usage_line(1, "bundle <platform>   Bundles a directory in a specific layout for that platform");
 		print_usage_line(2, "Supported platforms:");
 		print_usage_line(3, "android");
+	} else if (command == "report") {
+		print_usage_header_once();
+		print_usage_line(1, "report  Prints information useful to reporting a bug.");
+	} else if (command == "root") {
+		print_usage_header_once();
+		print_usage_line(1, "root    Prints the root path where Odin looks for the builtin collections.");
 	}
 
 	bool doc             = command == "doc";
