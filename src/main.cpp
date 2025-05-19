@@ -2221,20 +2221,30 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 }
 
 
-gb_internal void print_show_help(String const arg0, String command, String optional_flag = {}) {
+gb_internal int print_show_help(String const arg0, String command, String optional_flag = {}) {
+	bool help_resolved = false;
+	bool printed_usage_header = false;
+	bool printed_flags_header = false;
+
 	if (command == "help" && optional_flag.len != 0 && optional_flag[0] != '-') {
 		command = optional_flag;
 		optional_flag = {};
 	}
 
-	print_usage_line(0, "%.*s is a tool for managing Odin source code.", LIT(arg0));
-	print_usage_line(0, "Usage:");
-	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
-	print_usage_line(0, "");
-	defer (print_usage_line(0, ""));
-
+	auto const print_usage_header_once = [&help_resolved, &printed_usage_header, arg0, command]() {
+		if (printed_usage_header) {
+			return;
+		}
+		print_usage_line(0, "%.*s is a tool for managing Odin source code.", LIT(arg0));
+		print_usage_line(0, "Usage:");
+		print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
+		print_usage_line(0, "");
+		help_resolved = true;
+		printed_usage_header = true;
+	};
 
 	if (command == "build") {
+		print_usage_header_once();
 		print_usage_line(1, "build   Compiles directory of .odin files as an executable.");
 		print_usage_line(2, "One must contain the program's entry point, all must be in the same package.");
 		print_usage_line(2, "Use `-file` to build a single file instead.");
@@ -2243,6 +2253,7 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 		print_usage_line(3, "odin build <dir>                 Builds package in <dir>.");
 		print_usage_line(3, "odin build filename.odin -file   Builds single-file package, must contain entry point.");
 	} else if (command == "run") {
+		print_usage_header_once();
 		print_usage_line(1, "run     Same as 'build', but also then runs the newly compiled executable.");
 		print_usage_line(2, "Append an empty flag and then the args, '-- <args>', to specify args for the output.");
 		print_usage_line(2, "Examples:");
@@ -2250,25 +2261,31 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 		print_usage_line(3, "odin run <dir>                 Builds and runs package in <dir>.");
 		print_usage_line(3, "odin run filename.odin -file   Builds and runs single-file package, must contain entry point.");
 	} else if (command == "check") {
+		print_usage_header_once();
 		print_usage_line(1, "check   Parses and type checks directory of .odin files.");
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "odin check .                     Type checks package in current directory.");
 		print_usage_line(3, "odin check <dir>                 Type checks package in <dir>.");
 		print_usage_line(3, "odin check filename.odin -file   Type checks single-file package, must contain entry point.");
 	} else if (command == "test") {
+		print_usage_header_once();
 		print_usage_line(1, "test    Builds and runs procedures with the attribute @(test) in the initial package.");
 	} else if (command == "doc") {
+		print_usage_header_once();
 		print_usage_line(1, "doc     Generates documentation from a directory of .odin files.");
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "odin doc .                     Generates documentation on package in current directory.");
 		print_usage_line(3, "odin doc <dir>                 Generates documentation on package in <dir>.");
 		print_usage_line(3, "odin doc filename.odin -file   Generates documentation on single-file package.");
 	} else if (command == "version") {
+		print_usage_header_once();
 		print_usage_line(1, "version   Prints version.");
 	} else if (command == "strip-semicolon") {
+		print_usage_header_once();
 		print_usage_line(1, "strip-semicolon");
 		print_usage_line(2, "Parses and type checks .odin file(s) and then removes unneeded semicolons from the entire project.");
 	} else if (command == "bundle")  {
+		print_usage_header_once();
 		print_usage_line(1, "bundle <platform>   Bundles a directory in a specific layout for that platform");
 		print_usage_line(2, "Supported platforms:");
 		print_usage_line(3, "android");
@@ -2293,13 +2310,10 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 		check           = true;
 	}
 
-	print_usage_line(0, "");
-	print_usage_line(1, "Flags");
-	print_usage_line(0, "");
 
 
 
-	auto const print_flag = [&optional_flag](char const *flag) -> bool {
+	auto const print_flag = [&optional_flag, &help_resolved, &printed_flags_header, print_usage_header_once](char const *flag) -> bool {
 		if (optional_flag.len != 0) {
 			String f = make_string_c(flag);
 			isize i = string_index_byte(f, ':');
@@ -2310,6 +2324,14 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 				return false;
 			}
 		}
+		print_usage_header_once();
+		if (!printed_flags_header) {
+			print_usage_line(0, "");
+			print_usage_line(1, "Flags");
+			print_usage_line(0, "");
+			printed_flags_header = true;
+		}
+		help_resolved = true;
 		print_usage_line(0, "");
 		print_usage_line(1, flag);
 		return true;
@@ -2867,6 +2889,21 @@ gb_internal void print_show_help(String const arg0, String command, String optio
 			print_usage_line(2, "If this is omitted, the terminal will prompt you to provide it.");
 		}
 	}
+
+	if (!help_resolved) {
+		usage(arg0);
+		print_usage_line(0, "");
+		if (command == "help") {
+			print_usage_line(0, "'%.*s' is not a recognized flag.", LIT(optional_flag));
+		} else {
+			print_usage_line(0, "'%.*s' is not a recognized command.", LIT(command));
+		}
+		return 1;
+	}
+
+	print_usage_line(0, "");
+
+	return 0;
 }
 
 gb_internal void print_show_unused(Checker *c) {
@@ -3354,8 +3391,7 @@ int main(int arg_count, char const **arg_ptr) {
 			usage(args[0]);
 			return 1;
 		} else {
-			print_show_help(args[0], args[1], args[2]);
-			return 0;
+			return print_show_help(args[0], args[1], args[2]);
 		}
 	} else if (command == "bundle") {
 		if (args.count < 4) {
@@ -3441,8 +3477,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.show_help) {
-		print_show_help(args[0], command);
-		return 0;
+		return print_show_help(args[0], command);
 	}
 
 	if (command == "bundle") {
