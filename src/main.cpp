@@ -278,10 +278,10 @@ gb_internal void usage(String argv0, String argv1 = {}) {
 	print_usage_line(1, "                  One must contain the program's entry point, all must be in the same package.");
 	print_usage_line(1, "run               Same as 'build', but also then runs the newly compiled executable.");
 	print_usage_line(1, "bundle            Bundles a directory in a specific layout for that platform.");
-	print_usage_line(1, "check             Parses, and type checks a directory of .odin files.");
+	print_usage_line(1, "check             Parses and type checks a directory of .odin files.");
 	print_usage_line(1, "strip-semicolon   Parses, type checks, and removes unneeded semicolons from the entire program.");
 	print_usage_line(1, "test              Builds and runs procedures with the attribute @(test) in the initial package.");
-	print_usage_line(1, "doc               Generates documentation on a directory of .odin files.");
+	print_usage_line(1, "doc               Generates documentation from a directory of .odin files.");
 	print_usage_line(1, "version           Prints version.");
 	print_usage_line(1, "report            Prints information useful to reporting a bug.");
 	print_usage_line(1, "root              Prints the root path where Odin looks for the builtin collections.");
