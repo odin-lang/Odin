@@ -1915,12 +1915,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 
-	// TODO: Static map calls are bugged on `amd64sysv` abi.
-	if (bc->metrics.os != TargetOs_windows && bc->metrics.arch == TargetArch_amd64) {
-		// ENFORCE DYNAMIC MAP CALLS
-		bc->dynamic_map_calls = true;
-	}
-
 	bc->ODIN_VALGRIND_SUPPORT = false;
 	if (build_context.metrics.os != TargetOs_windows) {
 		switch (bc->metrics.arch) {
