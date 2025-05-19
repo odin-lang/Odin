@@ -3385,6 +3385,10 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 		#endif
 	} else if (command == "version") {
+		if (args.count != 2) {
+			usage(args[0]);
+			return 1;
+		}
 		build_context.command_kind = Command_version;
 		gb_printf("%.*s version %.*s", LIT(args[0]), LIT(ODIN_VERSION));
 
@@ -3399,6 +3403,10 @@ int main(int arg_count, char const **arg_ptr) {
 		gb_printf("\n");
 		return 0;
 	} else if (command == "report") {
+		if (args.count != 2) {
+			usage(args[0]);
+			return 1;
+		}
 		build_context.command_kind = Command_bug_report;
 		print_bug_report_help();
 		return 0;
@@ -3423,6 +3431,10 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 		init_filename = args[3];
 	} else if (command == "root") {
+		if (args.count != 2) {
+			usage(args[0]);
+			return 1;
+		}
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
 	} else if (command == "clear-cache") {
