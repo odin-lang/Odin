@@ -3282,6 +3282,16 @@ int main(int arg_count, char const **arg_ptr) {
 	String run_args_string = {};
 	isize  last_non_run_arg = args.count;
 
+	for_array(i, args) {
+		if (args[i] == "--") {
+			break;
+		}
+		if (args[i] == "-help" || args[i] == "--help") {
+			build_context.show_help = true;
+			return print_show_help(args[0], command);
+		}
+	}
+
 	bool run_output = false;
 	if (command == "run" || command == "test") {
 		if (args.count < 3) {
@@ -3427,11 +3437,6 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	init_filename = copy_string(permanent_allocator(), init_filename);
-
-	if (init_filename == "-help" ||
-	    init_filename == "--help") {
-		build_context.show_help = true;
-	}
 
 	if (init_filename.len > 0 && !build_context.show_help) {
 		// The command must be build, run, test, check, or another that takes a directory or filename.
