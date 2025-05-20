@@ -647,6 +647,19 @@ gb_internal bool parse_build_flags(Array<String> args) {
 		flag_args = array_slice(args, 3, args.count);
 	}
 
+	if (build_context.command_kind & Command__does_build) {
+		String env_flags = make_string_c(gb_get_env("ODIN_BUILD_FLAGS", heap_allocator()));
+		if (env_flags != "") {
+			flag_args.allocator = heap_allocator();
+			String_Iterator env_flag_it = {env_flags, 0};
+			for (;;) {
+				String env_flag = string_split_iterator(&env_flag_it, ' ');
+				if (env_flag == "") break;
+				array_add(&flag_args, env_flag);
+			}
+		}
+	}
+
 	bool set_flags[BuildFlag_COUNT] = {};
 
 	bool bad_flags = false;
