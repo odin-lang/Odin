@@ -3,11 +3,11 @@
 package log
 
 import "base:runtime"
-import "core:encoding/ansi"
 import "core:fmt"
 import "core:strings"
 import "core:os"
 import "core:terminal"
+import "core:terminal/ansi"
 import "core:time"
 
 Level_Headers := [?]string{

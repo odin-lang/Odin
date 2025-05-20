@@ -12,9 +12,9 @@ package testing
 
 import "base:intrinsics"
 import "core:c/libc"
-import "core:encoding/ansi"
-import "core:sync"
 import "core:os"
+import "core:sync"
+import "core:terminal/ansi"
 
 @(private="file") stop_runner_flag: libc.sig_atomic_t
 

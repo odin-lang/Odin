@@ -58,7 +58,6 @@ import trace            "core:debug/trace"
 import dynlib           "core:dynlib"
 import net              "core:net"
 
-import ansi             "core:encoding/ansi"
 import base32           "core:encoding/base32"
 import base64           "core:encoding/base64"
 import cbor             "core:encoding/cbor"
@@ -130,6 +129,7 @@ import sync             "core:sync"
 import testing          "core:testing"
 
 import terminal         "core:terminal"
+import ansi             "core:terminal/ansi"
 
 import edit             "core:text/edit"
 import i18n             "core:text/i18n"
@@ -203,7 +203,6 @@ _ :: pe
 _ :: trace
 _ :: dynlib
 _ :: net
-_ :: ansi
 _ :: base32
 _ :: base64
 _ :: csv
@@ -260,6 +259,7 @@ _ :: strings
 _ :: sync
 _ :: testing
 _ :: terminal
+_ :: ansi
 _ :: scanner
 _ :: i18n
 _ :: match
