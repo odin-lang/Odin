@@ -949,5 +949,9 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 		fmt.assertf(err == nil, "Error writing JSON report: %v", err)
 	}
 
+	when ODIN_OS == .Windows {
+		console_ansi_fini()
+	}
+
 	return total_success_count == total_test_count
 }
