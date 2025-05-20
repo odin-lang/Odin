@@ -17,21 +17,39 @@ import "core:strings"
 import "core:sync/chan"
 import "core:time"
 
-when USING_SHORT_LOGS {
-	Default_Test_Logger_Opts :: runtime.Logger_Options {
-		.Level,
-		.Terminal_Color,
-		.Short_File_Path,
-		.Line,
+when PLAIN_TEXT {
+	when USING_SHORT_LOGS {
+		Default_Test_Logger_Opts :: runtime.Logger_Options {
+			.Level,
+			.Short_File_Path,
+			.Line,
+		}
+	} else {
+		Default_Test_Logger_Opts :: runtime.Logger_Options {
+			.Level,
+			.Short_File_Path,
+			.Line,
+			.Procedure,
+			.Date, .Time,
+		}
 	}
 } else {
-	Default_Test_Logger_Opts :: runtime.Logger_Options {
-		.Level,
-		.Terminal_Color,
-		.Short_File_Path,
-		.Line,
-		.Procedure,
-		.Date, .Time,
+	when USING_SHORT_LOGS {
+		Default_Test_Logger_Opts :: runtime.Logger_Options {
+			.Level,
+			.Terminal_Color,
+			.Short_File_Path,
+			.Line,
+		}
+	} else {
+		Default_Test_Logger_Opts :: runtime.Logger_Options {
+			.Level,
+			.Terminal_Color,
+			.Short_File_Path,
+			.Line,
+			.Procedure,
+			.Date, .Time,
+		}
 	}
 }
 

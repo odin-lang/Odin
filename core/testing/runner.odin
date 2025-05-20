@@ -43,10 +43,12 @@ PER_THREAD_MEMORY     : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_S
 // This may be useful when running tests on multiple packages with `-all-packages`.
 // The format is: `package.test_name,test_name_only,...`
 TEST_NAMES            : string : #config(ODIN_TEST_NAMES, "")
+// Don't use any ANSI sequences, for example when redirected to your editor's build output tab
+PLAIN_TEXT            : bool   : #config(ODIN_TEST_PLAIN_TEXT, false)
 // Show the fancy animated progress report.
-FANCY_OUTPUT          : bool   : #config(ODIN_TEST_FANCY, true)
+FANCY_OUTPUT          : bool   : #config(ODIN_TEST_FANCY, true) && !PLAIN_TEXT
 // Copy failed tests to the clipboard when done.
-USE_CLIPBOARD         : bool   : #config(ODIN_TEST_CLIPBOARD, false)
+USE_CLIPBOARD         : bool   : #config(ODIN_TEST_CLIPBOARD, false)  && !PLAIN_TEXT
 // How many test results to show at a time per package.
 PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
 // This is the random seed that will be sent to each test.
@@ -192,7 +194,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	ERROR_STRING_TIMEOUT : string : "Test timed out."
 	ERROR_STRING_UNKNOWN : string : "Test failed for unknown reasons."
-	OSC_WINDOW_TITLE     : string : ansi.OSC + ansi.WINDOW_TITLE + ";Odin test runner (%i/%i)" + ansi.ST
+	OSC_WINDOW_TITLE     : string : ansi.OSC + ";Odin test runner (%i/%i)" + ansi.ST
 
 	safe_delete_string :: proc(s: string, allocator := context.allocator) {
 		// Guard against bad frees on static strings.
@@ -481,7 +483,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	setup_signal_handler()
 
-	fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_HIDE)
+	when !PLAIN_TEXT {
+		fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_HIDE)
+	}
 
 	when FANCY_OUTPUT {
 		signals_were_raised := false
@@ -776,7 +780,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			}
 		} else {
 			if total_done_count != last_done_count {
-				fmt.wprintf(stdout, OSC_WINDOW_TITLE, total_done_count, total_test_count)
+				when !PLAIN_TEXT {
+					fmt.wprintf(stdout, OSC_WINDOW_TITLE, total_done_count, total_test_count)
+				}
 				last_done_count = total_done_count
 			}
 
@@ -907,7 +913,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
-	fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_SHOW)
+	when !PLAIN_TEXT {
+		fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_SHOW)
+	}
 
 	when FANCY_OUTPUT {
 		if signals_were_raised {
@@ -947,6 +955,10 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 
 		err := json.marshal_to_writer(os.stream_from_handle(json_fd), json_report, &{ pretty = true })
 		fmt.assertf(err == nil, "Error writing JSON report: %v", err)
+	}
+
+	when ODIN_OS == .Windows {
+		console_ansi_fini()
 	}
 
 	return total_success_count == total_test_count

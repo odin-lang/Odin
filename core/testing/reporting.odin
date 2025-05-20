@@ -18,11 +18,19 @@ import "core:path/filepath"
 import "core:strings"
 
 // Definitions of colors for use in the test runner.
-SGR_RESET   :: ansi.CSI + ansi.RESET           + ansi.SGR
-SGR_READY   :: ansi.CSI + ansi.FG_BRIGHT_BLACK + ansi.SGR
-SGR_RUNNING :: ansi.CSI + ansi.FG_YELLOW       + ansi.SGR
-SGR_SUCCESS :: ansi.CSI + ansi.FG_GREEN        + ansi.SGR
-SGR_FAILED  :: ansi.CSI + ansi.FG_RED          + ansi.SGR
+when PLAIN_TEXT {
+	SGR_RESET   :: ""
+	SGR_READY   :: ""
+	SGR_RUNNING :: ""
+	SGR_SUCCESS :: ""
+	SGR_FAILED  :: ""
+} else {
+	SGR_RESET   :: ansi.CSI + ansi.RESET           + ansi.SGR
+	SGR_READY   :: ansi.CSI + ansi.FG_BRIGHT_BLACK + ansi.SGR
+	SGR_RUNNING :: ansi.CSI + ansi.FG_YELLOW       + ansi.SGR
+	SGR_SUCCESS :: ansi.CSI + ansi.FG_GREEN        + ansi.SGR
+	SGR_FAILED  :: ansi.CSI + ansi.FG_RED          + ansi.SGR
+}
 
 MAX_PROGRESS_WIDTH :: 100
 
