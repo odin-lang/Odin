@@ -1316,10 +1316,11 @@ RESOURCE_ALLOCATION_INFO1 :: struct {
 }
 
 HEAP_TYPE :: enum i32 {
-	DEFAULT  = 1,
-	UPLOAD   = 2,
-	READBACK = 3,
-	CUSTOM   = 4,
+	DEFAULT    = 1,
+	UPLOAD     = 2,
+	READBACK   = 3,
+	CUSTOM     = 4,
+	GPU_UPLOAD = 5,
 }
 
 CPU_PAGE_PROPERTY :: enum i32 {
