@@ -6325,6 +6325,12 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
+		if (dst->flags & EntityFlag_Disabled) {
+			// Prevent procedures that have been disabled from acting as deferrals.
+			src->Procedure.deferred_procedure = {};
+			continue;
+		}
+
 		GB_ASSERT(is_type_proc(src->type));
 		GB_ASSERT(is_type_proc(dst->type));
 		Type *src_params = base_type(src->type)->Proc.params;
