@@ -24,6 +24,7 @@ import "core:os"
 import "core:slice"
 @require import "core:strings"
 import "core:sync/chan"
+import "core:terminal"
 import "core:terminal/ansi"
 import "core:thread"
 import "core:time"
@@ -69,6 +70,8 @@ get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 		#panic("Unknown `ODIN_TEST_LOG_LEVEL`: \"" + LOG_LEVEL + "\", possible levels are: \"debug\", \"info\", \"warning\", \"error\", or \"fatal\".")
 	}
 }
+
+@(private) global_log_colors_disabled: bool
 
 JSON :: struct {
 	total:    int,
@@ -129,11 +132,16 @@ run_test_task :: proc(task: thread.Task) {
 	
 	context.assertion_failure_proc = test_assertion_failure_proc
 
+	logger_options := Default_Test_Logger_Opts
+	if global_log_colors_disabled {
+		logger_options -= {.Terminal_Color}
+	}
+
 	context.logger = {
 		procedure = test_logger_proc,
 		data = &data.t,
 		lowest_level = get_log_level(),
-		options = Default_Test_Logger_Opts,
+		options = logger_options,
 	}
 
 	random_generator_state: runtime.Default_Random_State
@@ -210,6 +218,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	stdout := io.to_writer(os.stream_from_handle(os.stdout))
 	stderr := io.to_writer(os.stream_from_handle(os.stderr))
+
+	global_log_colors_disabled = !terminal.color_enabled || !terminal.is_terminal(os.stderr)
 
 	// -- Prepare test data.
 
@@ -442,11 +452,16 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	// digging through the source to divine everywhere it is used for that.
 	shared_log_allocator := context.allocator
 
+	logger_options := Default_Test_Logger_Opts - {.Short_File_Path, .Line, .Procedure}
+	if global_log_colors_disabled {
+		logger_options -= {.Terminal_Color}
+	}
+
 	context.logger = {
 		procedure = runner_logger_proc,
 		data = &log_messages,
 		lowest_level = get_log_level(),
-		options = Default_Test_Logger_Opts - {.Short_File_Path, .Line, .Procedure},
+		options = logger_options,
 	}
 
 	run_index: int
