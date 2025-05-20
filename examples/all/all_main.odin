@@ -129,6 +129,8 @@ import strings          "core:strings"
 import sync             "core:sync"
 import testing          "core:testing"
 
+import terminal         "core:terminal"
+
 import edit             "core:text/edit"
 import i18n             "core:text/i18n"
 import match            "core:text/match"
@@ -257,6 +259,7 @@ _ :: strconv
 _ :: strings
 _ :: sync
 _ :: testing
+_ :: terminal
 _ :: scanner
 _ :: i18n
 _ :: match
