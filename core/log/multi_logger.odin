@@ -1,10 +1,28 @@
 package log
 
-
+/*
+A container backing a multi logger.
+*/
 Multi_Logger_Data :: struct {
 	loggers: []Logger,
 }
 
+/*
+Create a logger that logs to all backing loggers.
+
+*Allocates Using Provided Allocator*
+
+When no longer needed can be destroyed with `destroy_multi_logger`.
+
+Note: Logs using a multi logger take both the multi logger and the backing loggers' log levels into account.
+
+Inputs:
+- `logs` - Backing loggers passed as multiple arguments
+- `allocator` - An allocator used to allocate data to store backing loggers (default is `context.allocator`)
+
+Returns:
+- A multi logger
+*/
 create_multi_logger :: proc(logs: ..Logger, allocator := context.allocator) -> Logger {
 	data := new(Multi_Logger_Data, allocator)
 	data.loggers = make([]Logger, len(logs), allocator)
@@ -12,12 +30,22 @@ create_multi_logger :: proc(logs: ..Logger, allocator := context.allocator) -> L
 	return Logger{multi_logger_proc, data, Level.Debug, nil}
 }
 
+/*
+Free the state allocated with `create_multi_logger`.
+
+Inputs:
+- `log`: Logger created with `create_multi_logger`
+- `allocator`: Allocator passed to `create_multi_logger` (default is `context.allocator`)
+*/
 destroy_multi_logger :: proc(log: Logger, allocator := context.allocator) {
 	data := (^Multi_Logger_Data)(log.data)
 	delete(data.loggers, allocator)
 	free(data, allocator)
 }
 
+/*
+Backing procedure for the multi logger.
+*/
 multi_logger_proc :: proc(logger_data: rawptr, level: Level, text: string,
                           options: Options, location := #caller_location) {
 	data := cast(^Multi_Logger_Data)logger_data
