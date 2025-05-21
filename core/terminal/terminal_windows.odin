@@ -27,12 +27,12 @@ _init_terminal :: proc() {
 			return
 		}
 		if windows.GetConsoleMode(handle, &v.mode) {
-			windows.SetConsoleMode(handle, v.mode | windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+			windows.SetConsoleMode(handle, v.mode | windows.ENABLE_PROCESSED_OUTPUT | windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
 
 			new_mode: windows.DWORD
 			windows.GetConsoleMode(handle, &new_mode)
 
-			if new_mode & windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING != 0 {
+			if new_mode & (windows.ENABLE_PROCESSED_OUTPUT | windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0 {
 				vtp_enabled = true
 			}
 		}
