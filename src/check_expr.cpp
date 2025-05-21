@@ -5461,6 +5461,16 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		}
 	}
 
+	if (operand->type && is_type_simd_vector(type_deref(operand->type))) {
+		String field_name = selector->Ident.token.string;
+		if (field_name.len == 1) {
+			error(op_expr, "Extracting an element from a #simd array using .%.*s syntax is disallowed, prefer `simd.extract`", LIT(field_name));
+		} else {
+			error(op_expr, "Extracting elements from a #simd array using .%.*s syntax is disallowed, prefer `swizzle`", LIT(field_name));
+		}
+		return nullptr;
+	}
+
 	if (entity == nullptr && selector->kind == Ast_Ident && operand->type != nullptr &&
 	    (is_type_array(type_deref(operand->type)) || is_type_simd_vector(type_deref(operand->type)))) {
 		String field_name = selector->Ident.token.string;
