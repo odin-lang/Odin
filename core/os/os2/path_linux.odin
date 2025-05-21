@@ -207,3 +207,21 @@ _get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fullpath:
 	}
 	return
 }
+
+_get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absolute_path: string, err: Error) {
+	rel := path
+	if rel == "" {
+		rel = "."
+	}
+
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+
+	fd, errno := linux.open(clone_to_cstring(path, temp_allocator) or_return, {})
+	if errno != nil {
+		err = _get_platform_error(errno)
+		return
+	}
+	defer linux.close(fd)
+
+	return _get_full_path(fd, allocator)
+}
