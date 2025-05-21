@@ -2770,7 +2770,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (build) {
-		if (print_flag("-subtarget")) {
+		if (print_flag("-subtarget:<subtarget>")) {
 			print_usage_line(2, "[Darwin and Linux only]");
 			print_usage_line(2, "Available subtargets:");
 			String prefix = str_lit("-subtarget:");
