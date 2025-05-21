@@ -5472,7 +5472,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 	}
 
 	if (entity == nullptr && selector->kind == Ast_Ident && operand->type != nullptr &&
-	    (is_type_array(type_deref(operand->type)) || is_type_simd_vector(type_deref(operand->type)))) {
+	    (is_type_array(type_deref(operand->type)))) {
 		String field_name = selector->Ident.token.string;
 		if (1 < field_name.len && field_name.len <= 4) {
 			u8 swizzles_xyzw[4] = {'x', 'y', 'z', 'w'};
@@ -5527,7 +5527,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 			Type *original_type = operand->type;
 			Type *array_type = base_type(type_deref(original_type));
-			GB_ASSERT(array_type->kind == Type_Array || array_type->kind == Type_SimdVector);
+			GB_ASSERT(array_type->kind == Type_Array);
 
 			i64 array_count = get_array_type_count(array_type);
 
@@ -5566,10 +5566,6 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 					operand->mode = Addressing_SwizzleVariable;
 				}
 				break;
-			}
-
-			if (array_type->kind == Type_SimdVector) {
-				operand->mode = Addressing_Value;
 			}
 
 			Entity *swizzle_entity = alloc_entity_variable(nullptr, make_token_ident(field_name), operand->type, EntityState_Resolved);
