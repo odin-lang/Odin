@@ -133,12 +133,10 @@ pop_safe :: proc(pq: ^$Q/Priority_Queue($T), loc := #caller_location) -> (value:
 remove :: proc(pq: ^$Q/Priority_Queue($T), i: int) -> (value: T, ok: bool) {
 	n := builtin.len(pq.queue)
 	if 0 <= i && i < n {
-		if n != i {
-			pq.swap(pq.queue[:], i, n)
-			_shift_down(pq, i, n)
-			_shift_up(pq, i)
-		}
-		value, ok = builtin.pop_safe(&pq.queue)
+		pq.swap(pq.queue[:], i, n-1)
+		_shift_down(pq, i, n-1)
+		_shift_up(pq, i)
+		value, ok = builtin.pop(&pq.queue), true
 	}
 	return
 }
