@@ -441,6 +441,7 @@ struct BuildContext {
 	String extra_assembler_flags;
 	String microarch;
 	BuildModeKind build_mode;
+	bool   build_only;
 	bool   generate_docs;
 	bool   custom_optimization_level;
 	i32    optimization_level;
