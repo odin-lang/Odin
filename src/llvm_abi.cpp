@@ -977,7 +977,7 @@ namespace lbAbiAmd64SysV {
 			return types[0];
 		}
 
-		return LLVMStructTypeInContext(c, types.data, cast(unsigned)types.count, sz == 0);
+		return LLVMStructTypeInContext(c, types.data, cast(unsigned)types.count, false);
 	}
 
 	gb_internal void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off) {
@@ -1231,38 +1231,24 @@ namespace lbAbiArm64 {
 			}
 		} else {
 			i64 size = lb_sizeof(return_type);
-			if (size <= 16) {
-				LLVMTypeRef cast_type = nullptr;
-
-				if (size == 0) {
-					cast_type = LLVMStructTypeInContext(c, nullptr, 0, false);
-				} else if (size <= 8) {
-					cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
-				} else {
-					unsigned count = cast(unsigned)((size+7)/8);
-
-					LLVMTypeRef llvm_i64 = LLVMIntTypeInContext(c, 64);
-					LLVMTypeRef *types = gb_alloc_array(temporary_allocator(), LLVMTypeRef, count);
-
-					i64 size_copy = size;
-					for (unsigned i = 0; i < count; i++) {
-						if (size_copy >= 8) {
-							types[i] = llvm_i64;
-						} else {
-							types[i] = LLVMIntTypeInContext(c, 8*cast(unsigned)size_copy);
-						}
-						size_copy -= 8;
-					}
-					GB_ASSERT(size_copy <= 0);
-					cast_type = LLVMStructTypeInContext(c, types, count, true);
-				}
-				return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
-			} else {
+			if (size > 16) {
 				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
 
 				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 				return lb_arg_type_indirect(return_type, attr);
 			}
+
+			GB_ASSERT(size <= 16);
+			LLVMTypeRef cast_type = nullptr;
+			if (size == 0) {
+				cast_type = LLVMStructTypeInContext(c, nullptr, 0, false);
+			} else if (size <= 8) {
+				cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
+			} else {
+				LLVMTypeRef llvm_i64 = LLVMIntTypeInContext(c, 64);
+				cast_type = llvm_array_type(llvm_i64, 2);
+			}
+			return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 		}
 	}
     

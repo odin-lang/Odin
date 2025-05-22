@@ -99,7 +99,7 @@ Application_setTitle :: proc "c" (self: ^Application, title: ^String) {
 }
 
 @(objc_type=Application, objc_name="mainMenu")
-Window_mainMenu :: proc "c" (self: ^Application) -> ^Menu {
+Application_mainMenu :: proc "c" (self: ^Application) -> ^Menu {
 	return msgSend(^Menu, self, "mainMenu")
 }
 

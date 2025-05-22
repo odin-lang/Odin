@@ -2,6 +2,7 @@ package os2
 
 import "base:runtime"
 import "core:slice"
+import "core:strings"
 
 read_dir :: read_directory
 
@@ -18,12 +19,12 @@ read_directory :: proc(f: ^File, n: int, allocator: runtime.Allocator) -> (files
 		size = 100
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	it := read_directory_iterator_create(f)
 	defer _read_directory_iterator_destroy(&it)
 
-	dfi := make([dynamic]File_Info, 0, size, temp_allocator())
+	dfi := make([dynamic]File_Info, 0, size, temp_allocator)
 	defer if err != nil {
 		for fi in dfi {
 			file_info_delete(fi, allocator)
@@ -194,28 +195,54 @@ read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info,
 }
 
 // Recursively copies a directory to `dst` from `src`
-copy_directory :: proc(dst, src: string, dst_perm := 0o755) -> Error {
-	switch err := make_directory_all(dst, dst_perm); err {
-	case nil, .Exist:
-		// okay
-	case:
+copy_directory_all :: proc(dst, src: string, dst_perm := 0o755) -> Error {
+	when #defined(_copy_directory_all_native) {
+		return _copy_directory_all_native(dst, src, dst_perm)
+	} else {
+		return _copy_directory_all(dst, src, dst_perm)
+	}
+}
+
+@(private)
+_copy_directory_all :: proc(dst, src: string, dst_perm := 0o755) -> Error {
+	err := make_directory(dst, dst_perm)
+	if err != nil && err != .Exist {
 		return err
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
-	file_infos := read_all_directory_by_path(src, temp_allocator()) or_return
-	for fi in file_infos {
-		TEMP_ALLOCATOR_GUARD()
+	abs_src := get_absolute_path(src, temp_allocator) or_return
+	abs_dst := get_absolute_path(dst, temp_allocator) or_return
 
-		dst_path := join_path({dst, fi.name}, temp_allocator()) or_return
-		src_path := fi.fullpath
+	dst_buf := make([dynamic]byte, 0, len(abs_dst) + 256, temp_allocator) or_return
 
-		if fi.type == .Directory {
-			copy_directory(dst_path, src_path) or_return
+	w: Walker
+	walker_init_path(&w, src)
+	defer walker_destroy(&w)
+
+	for info in walker_walk(&w) {
+		_ = walker_error(&w) or_break
+
+		rel := strings.trim_prefix(info.fullpath, abs_src)
+
+		non_zero_resize(&dst_buf, 0)
+		reserve(&dst_buf, len(abs_dst) + len(Path_Separator_String) + len(rel)) or_return
+		append(&dst_buf, abs_dst)
+		append(&dst_buf, Path_Separator_String)
+		append(&dst_buf, rel)
+
+		if info.type == .Directory {
+			err = make_directory(string(dst_buf[:]), dst_perm)
+			if err != nil && err != .Exist {
+				return err
+			}
 		} else {
-			copy_file(dst_path, src_path) or_return
+			copy_file(string(dst_buf[:]), info.fullpath) or_return
 		}
 	}
+
+	_ = walker_error(&w) or_return
+
 	return nil
 }

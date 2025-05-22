@@ -295,7 +295,7 @@ avoids the same sound being loaded multiple times.
 
 The node graph is used for mixing and effect processing. The idea is that you connect a number of
 nodes into the graph by connecting each node's outputs to another node's inputs. Each node can
-implement it's own effect. By chaining nodes together, advanced mixing and effect processing can
+implement its own effect. By chaining nodes together, advanced mixing and effect processing can
 be achieved.
 
 The engine encapsulates both the resource manager and the node graph to create a simple, easy to
@@ -400,7 +400,7 @@ the be started and/or stopped at a specific time. This can be done with the foll
     ```
 
 The start/stop time needs to be specified based on the absolute timer which is controlled by the
-engine. The current global time time in PCM frames can be retrieved with
+engine. The current global time in PCM frames can be retrieved with
 `ma_engine_get_time_in_pcm_frames()`. The engine's global time can be changed with
 `ma_engine_set_time_in_pcm_frames()` for synchronization purposes if required. Note that scheduling
 a start time still requires an explicit call to `ma_sound_start()` before anything will play:
@@ -432,11 +432,11 @@ Sounds and sound groups are nodes in the engine's node graph and can be plugged 
 API. This makes it possible to connect sounds and sound groups to effect nodes to produce complex
 effect chains.
 
-A sound can have it's volume changed with `ma_sound_set_volume()`. If you prefer decibel volume
+A sound can have its volume changed with `ma_sound_set_volume()`. If you prefer decibel volume
 control you can use `ma_volume_db_to_linear()` to convert from decibel representation to linear.
 
 Panning and pitching is supported with `ma_sound_set_pan()` and `ma_sound_set_pitch()`. If you know
-a sound will never have it's pitch changed with `ma_sound_set_pitch()` or via the doppler effect,
+a sound will never have its pitch changed with `ma_sound_set_pitch()` or via the doppler effect,
 you can specify the `MA_SOUND_FLAG_NO_PITCH` flag when initializing the sound for an optimization.
 
 By default, sounds and sound groups have spatialization enabled. If you don't ever want to
@@ -485,21 +485,12 @@ link the relevant frameworks but should compile cleanly out of the box with Xcod
 through the command line requires linking to `-lpthread` and `-lm`.
 
 Due to the way miniaudio links to frameworks at runtime, your application may not pass Apple's
-notarization process. To fix this there are two options. The first is to use the
-`MA_NO_RUNTIME_LINKING` option, like so:
-
-    ```c
-    #ifdef __APPLE__
-        #define MA_NO_RUNTIME_LINKING
-    #endif
-    #define MINIAUDIO_IMPLEMENTATION
-    #include "miniaudio.h"
-    ```
-
-This will require linking with `-framework CoreFoundation -framework CoreAudio -framework AudioToolbox`.
-If you get errors about AudioToolbox, try with `-framework AudioUnit` instead. You may get this when
-using older versions of iOS. Alternatively, if you would rather keep using runtime linking you can
-add the following to your entitlements.xcent file:
+notarization process. To fix this there are two options. The first is to compile with
+`-DMA_NO_RUNTIME_LINKING` which in turn will require linking with
+`-framework CoreFoundation -framework CoreAudio -framework AudioToolbox`. If you get errors about
+AudioToolbox, try with `-framework AudioUnit` instead. You may get this when using older versions
+of iOS. Alternatively, if you would rather keep using runtime linking you can add the following to
+your entitlements.xcent file:
 
     ```
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
@@ -557,7 +548,7 @@ To run locally, you'll need to use emrun:
 
 2.7. Build Options
 ------------------
-`#define` these options before including miniaudio.h.
+`#define` these options before including miniaudio.c, or pass them as compiler flags:
 
     +----------------------------------+--------------------------------------------------------------------+
     | Option                           | Description                                                        |
@@ -587,6 +578,8 @@ To run locally, you'll need to use emrun:
     | MA_NO_OPENSL                     | Disables the OpenSL|ES backend.                                    |
     +----------------------------------+--------------------------------------------------------------------+
     | MA_NO_WEBAUDIO                   | Disables the Web Audio backend.                                    |
+    +----------------------------------+--------------------------------------------------------------------+
+    | MA_NO_CUSTOM                     | Disables support for custom backends.                              |
     +----------------------------------+--------------------------------------------------------------------+
     | MA_NO_NULL                       | Disables the null backend.                                         |
     +----------------------------------+--------------------------------------------------------------------+
@@ -631,6 +624,9 @@ To run locally, you'll need to use emrun:
     +----------------------------------+--------------------------------------------------------------------+
     | MA_ENABLE_WEBAUDIO               | Used in conjunction with MA_ENABLE_ONLY_SPECIFIC_BACKENDS to       |
     |                                  | enable the Web Audio backend.                                      |
+    +----------------------------------+--------------------------------------------------------------------+
+    | MA_ENABLE_CUSTOM                 | Used in conjunction with MA_ENABLE_ONLY_SPECIFIC_BACKENDS to       |
+    |                                  | enable custom backends.                                            |
     +----------------------------------+--------------------------------------------------------------------+
     | MA_ENABLE_NULL                   | Used in conjunction with MA_ENABLE_ONLY_SPECIFIC_BACKENDS to       |
     |                                  | enable the null backend.                                           |
@@ -695,10 +691,29 @@ To run locally, you'll need to use emrun:
     |                                  | You may need to enable this if your target platform does not allow |
     |                                  | runtime linking via `dlopen()`.                                    |
     +----------------------------------+--------------------------------------------------------------------+
+    | MA_USE_STDINT                    | (Pass this in a compiler flag. Do not #define this before          |
+	|                                  | miniaudio.c) Forces the use of stdint.h for sized types.           |
+    +----------------------------------+--------------------------------------------------------------------+
     | MA_DEBUG_OUTPUT                  | Enable `printf()` output of debug logs (`MA_LOG_LEVEL_DEBUG`).     |
     +----------------------------------+--------------------------------------------------------------------+
     | MA_COINIT_VALUE                  | Windows only. The value to pass to internal calls to               |
     |                                  | `CoInitializeEx()`. Defaults to `COINIT_MULTITHREADED`.            |
+    +----------------------------------+--------------------------------------------------------------------+
+    | MA_FORCE_UWP                     | Windows only. Affects only the WASAPI backend. Will force the      |
+    |                                  | WASAPI backend to use the UWP code path instead of the regular     |
+    |                                  | desktop path. This is normally auto-detected and should rarely be  |
+    |                                  | needed to be used explicitly, but can be useful for debugging.     |
+    +----------------------------------+--------------------------------------------------------------------+
+    | MA_ON_THREAD_ENTRY               | Defines some code that will be executed as soon as an internal     |
+    |                                  | miniaudio-managed thread is created. This will be the first thing  |
+    |                                  | to be executed by the thread entry point.                          |
+    +----------------------------------+--------------------------------------------------------------------+
+    | MA_ON_THREAD_EXIT                | Defines some code that will be executed from the entry point of an |
+    |                                  | internal miniaudio-managed thread upon exit. This will be the last |
+    |                                  | thing to be executed before the thread's entry point exits.        |
+    +----------------------------------+--------------------------------------------------------------------+
+    | MA_THREAD_DEFAULT_STACK_SIZE     | If set, specifies the default stack size used by miniaudio-managed |
+    |                                  | threads.                                                           |
     +----------------------------------+--------------------------------------------------------------------+
     | MA_API                           | Controls how public APIs should be decorated. Default is `extern`. |
     +----------------------------------+--------------------------------------------------------------------+
@@ -1311,7 +1326,7 @@ only works for sounds that were initialized with `ma_sound_init_from_file()` and
 
 When you initialize a sound, if you specify a sound group the sound will be attached to that group
 automatically. If you set it to NULL, it will be automatically attached to the engine's endpoint.
-If you would instead rather leave the sound unattached by default, you can can specify the
+If you would instead rather leave the sound unattached by default, you can specify the
 `MA_SOUND_FLAG_NO_DEFAULT_ATTACHMENT` flag. This is useful if you want to set up a complex node
 graph.
 
@@ -1688,6 +1703,7 @@ combination of the following flags:
     MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE
     MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_ASYNC
     MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_WAIT_INIT
+    MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_LOOPING
     ```
 
 When no flags are specified (set to 0), the sound will be fully loaded into memory, but not
@@ -1708,6 +1724,14 @@ can instead stream audio data which you can do by specifying the
 second pages. When a new page needs to be decoded, a job will be posted to the job queue and then
 subsequently processed in a job thread.
 
+The `MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_LOOPING` flag can be used so that the sound will loop
+when it reaches the end by default. It's recommended you use this flag when you want to have a
+looping streaming sound. If you try loading a very short sound as a stream, you will get a glitch.
+This is because the resource manager needs to pre-fill the initial buffer at initialization time,
+and if you don't specify the `MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_LOOPING` flag, the resource
+manager will assume the sound is not looping and will stop filling the buffer when it reaches the
+end, therefore resulting in a discontinuous buffer.
+
 For in-memory sounds, reference counting is used to ensure the data is loaded only once. This means
 multiple calls to `ma_resource_manager_data_source_init()` with the same file path will result in
 the file data only being loaded once. Each call to `ma_resource_manager_data_source_init()` must be
@@ -1722,7 +1746,7 @@ actual file paths. When `ma_resource_manager_data_source_init()` is called (with
 `MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_STREAM` flag), the resource manager will look for these
 explicitly registered data buffers and, if found, will use it as the backing data for the data
 source. Note that the resource manager does *not* make a copy of this data so it is up to the
-caller to ensure the pointer stays valid for it's lifetime. Use
+caller to ensure the pointer stays valid for its lifetime. Use
 `ma_resource_manager_unregister_data()` to unregister the self-managed data. You can also use
 `ma_resource_manager_register_file()` and `ma_resource_manager_unregister_file()` to register and
 unregister a file. It does not make sense to use the `MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_STREAM`
@@ -2033,7 +2057,7 @@ In the above graph, it starts with two data sources whose outputs are attached t
 splitter node. It's at this point that the two data sources are mixed. After mixing, the splitter
 performs it's processing routine and produces two outputs which is simply a duplication of the
 input stream. One output is attached to a low pass filter, whereas the other output is attached to
-a echo/delay. The outputs of the the low pass filter and the echo are attached to the endpoint, and
+a echo/delay. The outputs of the low pass filter and the echo are attached to the endpoint, and
 since they're both connected to the same input bus, they'll be mixed.
 
 Each input bus must be configured to accept the same number of channels, but the number of channels
@@ -2074,7 +2098,7 @@ data from the graph:
     ```
 
 When you read audio data, miniaudio starts at the node graph's endpoint node which then pulls in
-data from it's input attachments, which in turn recursively pull in data from their inputs, and so
+data from its input attachments, which in turn recursively pull in data from their inputs, and so
 on. At the start of the graph there will be some kind of data source node which will have zero
 inputs and will instead read directly from a data source. The base nodes don't literally need to
 read from a `ma_data_source` object, but they will always have some kind of underlying object that
@@ -2320,7 +2344,7 @@ You can start and stop a node with the following:
 
 By default the node is in a started state, but since it won't be connected to anything won't
 actually be invoked by the node graph until it's connected. When you stop a node, data will not be
-read from any of it's input connections. You can use this property to stop a group of sounds
+read from any of its input connections. You can use this property to stop a group of sounds
 atomically.
 
 You can configure the initial state of a node in it's config:
@@ -2413,29 +2437,29 @@ audio thread is finished so that control is not handed back to the caller thereb
 chance to free the node's memory.
 
 When the audio thread is processing a node, it does so by reading from each of the output buses of
-the node. In order for a node to process data for one of it's output buses, it needs to read from
-each of it's input buses, and so on an so forth. It follows that once all output buses of a node
+the node. In order for a node to process data for one of its output buses, it needs to read from
+each of its input buses, and so on an so forth. It follows that once all output buses of a node
 are detached, the node as a whole will be disconnected and no further processing will occur unless
 it's output buses are reattached, which won't be happening when the node is being uninitialized.
 By having `ma_node_detach_output_bus()` wait until the audio thread is finished with it, we can
 simplify a few things, at the expense of making `ma_node_detach_output_bus()` a bit slower. By
 doing this, the implementation of `ma_node_uninit()` becomes trivial - just detach all output
-nodes, followed by each of the attachments to each of it's input nodes, and then do any final clean
+nodes, followed by each of the attachments to each of its input nodes, and then do any final clean
 up.
 
 With the above design, the worst-case scenario is `ma_node_detach_output_bus()` taking as long as
 it takes to process the output bus being detached. This will happen if it's called at just the
 wrong moment where the audio thread has just iterated it and has just started processing. The
 caller of `ma_node_detach_output_bus()` will stall until the audio thread is finished, which
-includes the cost of recursively processing it's inputs. This is the biggest compromise made with
-the approach taken by miniaudio for it's lock-free processing system. The cost of detaching nodes
+includes the cost of recursively processing its inputs. This is the biggest compromise made with
+the approach taken by miniaudio for its lock-free processing system. The cost of detaching nodes
 earlier in the pipeline (data sources, for example) will be cheaper than the cost of detaching
 higher level nodes, such as some kind of final post-processing endpoint. If you need to do mass
 detachments, detach starting from the lowest level nodes and work your way towards the final
 endpoint node (but don't try detaching the node graph's endpoint). If the audio thread is not
 running, detachment will be fast and detachment in any order will be the same. The reason nodes
 need to wait for their input attachments to complete is due to the potential for desyncs between
-data sources. If the node was to terminate processing mid way through processing it's inputs,
+data sources. If the node was to terminate processing mid way through processing its inputs,
 there's a chance that some of the underlying data sources will have been read, but then others not.
 That will then result in a potential desynchronization when detaching and reattaching higher-level
 nodes. A possible solution to this is to have an option when detaching to terminate processing
@@ -2806,7 +2830,7 @@ weights. Custom weights can be passed in as the last parameter of
 `ma_channel_converter_config_init()`.
 
 Predefined channel maps can be retrieved with `ma_channel_map_init_standard()`. This takes a
-`ma_standard_channel_map` enum as it's first parameter, which can be one of the following:
+`ma_standard_channel_map` enum as its first parameter, which can be one of the following:
 
     +-----------------------------------+-----------------------------------------------------------+
     | Name                              | Description                                               |
@@ -2892,7 +2916,7 @@ like the following:
         ma_resample_algorithm_linear);
 
     ma_resampler resampler;
-    ma_result result = ma_resampler_init(&config, &resampler);
+    ma_result result = ma_resampler_init(&config, NULL, &resampler);
     if (result != MA_SUCCESS) {
         // An error occurred...
     }
@@ -3134,7 +3158,7 @@ Biquad filtering is achieved with the `ma_biquad` API. Example:
 
     ```c
     ma_biquad_config config = ma_biquad_config_init(ma_format_f32, channels, b0, b1, b2, a0, a1, a2);
-    ma_result result = ma_biquad_init(&config, &biquad);
+    ma_result result = ma_biquad_init(&config, NULL, &biquad);
     if (result != MA_SUCCESS) {
         // Error.
     }

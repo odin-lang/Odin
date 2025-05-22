@@ -6,7 +6,6 @@ set -eu
 : ${LDFLAGS=}
 : ${LLVM_CONFIG=}
 
-CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 LDFLAGS="$LDFLAGS -pthread -lm"
@@ -15,8 +14,12 @@ OS_NAME="$(uname -s)"
 
 if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
 	GIT_SHA=$(git show --pretty='%h' --no-patch --no-notes HEAD)
+	GIT_DATE=$(git show "--pretty=%cd" "--date=format:%Y-%m" --no-patch --no-notes HEAD)
 	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
+else
+	GIT_DATE=$(date +"%Y-%m")
 fi
+CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$GIT_DATE\""
 
 error() {
 	printf "ERROR: %s\n" "$1"

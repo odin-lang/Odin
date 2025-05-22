@@ -4844,7 +4844,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		if (cl->elems.count == 0) {
 			break;
 		}
-		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals);
+		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals || build_context.dynamic_literals);
 
 		lbValue err = lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
 		gb_unused(err);
@@ -5154,8 +5154,6 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_build_addr(p, unparen_expr(se->selector));
 			}
 
-
-			Type *type = base_type(tav.type);
 			if (tav.mode == Addressing_Type) { // Addressing_Type
 				Selection sel = lookup_field(tav.type, selector, true);
 				if (sel.pseudo_field) {
@@ -5190,18 +5188,29 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_addr_swizzle(a, type, swizzle_count, swizzle_indices);
 			}
 
-			Selection sel = lookup_field(type, selector, false);
+			Selection sel = lookup_field(tav.type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
-			if (sel.pseudo_field) {
-				GB_ASSERT(sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup);
+			if (sel.pseudo_field && (sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup)) {
 				Entity *e = entity_of_node(sel_node);
 				GB_ASSERT(e->kind == Entity_Procedure);
 				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
-			if (sel.is_bit_field) {
-				lbAddr addr = lb_build_addr(p, se->expr);
+			lbAddr addr = lb_build_addr(p, se->expr);
 
+			// NOTE(harold): Only allow ivar pseudo field access on indirect selectors.
+			//				 It is incoherent otherwise as Objective-C objects are zero-sized.
+			Type *deref_type = type_deref(tav.type);
+			if (tav.type->kind == Type_Pointer && deref_type->kind == Type_Named && deref_type->Named.type_name->TypeName.objc_ivar) {
+				// NOTE(harold): We need to load the ivar from the current address and
+				//				 replace addr with the loaded ivar addr to apply the selector load properly.
+				addr = lb_addr(lb_emit_load(p, addr.addr));
+
+				lbValue ivar_ptr = lb_handle_objc_ivar_for_objc_object_pointer(p, addr.addr);
+				addr = lb_addr(ivar_ptr);
+			}
+
+			if (sel.is_bit_field) {
 				Selection sub_sel = sel;
 				sub_sel.index.count -= 1;
 
@@ -5227,7 +5236,6 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 			}
 
 			{
-				lbAddr addr = lb_build_addr(p, se->expr);
 				if (addr.kind == lbAddr_Map) {
 					lbValue v = lb_addr_load(p, addr);
 					lbValue a = lb_address_from_load_or_generate_local(p, v);

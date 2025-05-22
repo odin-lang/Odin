@@ -221,6 +221,9 @@ type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
 type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
 
+type_integer_to_unsigned :: proc($T: typeid) -> type where type_is_integer(T), !type_is_unsigned(T) ---
+type_integer_to_signed   :: proc($T: typeid) -> type where type_is_integer(T), type_is_unsigned(T) ---
+
 type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
@@ -357,15 +360,18 @@ x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 objc_object   :: struct{}
 objc_selector :: struct{}
 objc_class    :: struct{}
+objc_ivar     :: struct{}
+
 objc_id    :: ^objc_object
 objc_SEL   :: ^objc_selector
 objc_Class :: ^objc_class
+objc_Ivar  :: ^objc_ivar
 
 objc_find_selector     :: proc($name: string) -> objc_SEL   ---
 objc_register_selector :: proc($name: string) -> objc_SEL   ---
 objc_find_class        :: proc($name: string) -> objc_Class ---
 objc_register_class    :: proc($name: string) -> objc_Class ---
-
+objc_ivar_get          :: proc(self: ^$T) -> ^$U ---
 
 valgrind_client_request :: proc(default: uintptr, request: uintptr, a0, a1, a2, a3, a4: uintptr) -> uintptr ---
 

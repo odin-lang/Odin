@@ -73,14 +73,14 @@ last_write_time_by_name :: modification_time_by_path
 
 @(require_results)
 modification_time :: proc(f: ^File) -> (time.Time, Error) {
-	TEMP_ALLOCATOR_GUARD()
-	fi, err := fstat(f, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	fi, err := fstat(f, temp_allocator)
 	return fi.modification_time, err
 }
 
 @(require_results)
 modification_time_by_path :: proc(path: string) -> (time.Time, Error) {
-	TEMP_ALLOCATOR_GUARD()
-	fi, err := stat(path, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	fi, err := stat(path, temp_allocator)
 	return fi.modification_time, err
 }

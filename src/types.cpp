@@ -729,10 +729,12 @@ gb_global Type *t_map_set_proc = nullptr;
 gb_global Type *t_objc_object   = nullptr;
 gb_global Type *t_objc_selector = nullptr;
 gb_global Type *t_objc_class    = nullptr;
+gb_global Type *t_objc_ivar     = nullptr;
 
 gb_global Type *t_objc_id    = nullptr;
 gb_global Type *t_objc_SEL   = nullptr;
 gb_global Type *t_objc_Class = nullptr;
+gb_global Type *t_objc_Ivar  = nullptr;
 
 enum OdinAtomicMemoryOrder : i32 {
 	OdinAtomicMemoryOrder_relaxed = 0, // unordered
@@ -870,6 +872,29 @@ gb_internal Type *base_type(Type *t) {
 		t = t->Named.base;
 	}
 	return t;
+}
+
+gb_internal Type *base_named_type(Type *t) {
+	if (t->kind != Type_Named) {
+		return t_invalid;
+	}
+
+	Type *prev_named = t;
+	t = t->Named.base;
+	for (;;) {
+		if (t == nullptr) {
+			break;
+		}
+		if (t->kind != Type_Named) {
+			break;
+		}
+		if (t == t->Named.base) {
+			return t_invalid;
+		}
+		prev_named = t;
+		t = t->Named.base;
+	}
+	return prev_named;
 }
 
 gb_internal Type *base_enum_type(Type *t) {
@@ -2932,6 +2957,10 @@ gb_internal Type *default_type(Type *type) {
 		case Basic_UntypedString:     return t_string;
 		case Basic_UntypedRune:       return t_rune;
 		}
+	} else if (type->kind == Type_Generic) {
+		if (type->Generic.specialized) {
+			return default_type(type->Generic.specialized);
+		}
 	}
 	return type;
 }
@@ -3325,6 +3354,15 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 						sel.pseudo_field = true;
 						return sel;
 					}
+				}
+			}
+
+			Type *objc_ivar_type = e->TypeName.objc_ivar;
+			if (objc_ivar_type != nullptr) {
+				sel = lookup_field_with_selection(objc_ivar_type, field_name, false, sel, allow_blank_ident);
+				if (sel.entity != nullptr) {
+					sel.pseudo_field = true;
+					return sel;
 				}
 			}
 		}

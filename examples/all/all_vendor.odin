@@ -28,8 +28,6 @@ import nvg       "vendor:nanovg"
 import nvg_gl    "vendor:nanovg/gl"
 import fontstash "vendor:fontstash"
 
-import xlib       "vendor:x11/xlib"
-
 _ :: cgltf
 // _ :: commonmark
 _ :: ENet
@@ -56,8 +54,6 @@ _ :: lua_5_4
 _ :: nvg
 _ :: nvg_gl
 _ :: fontstash
-
-_ :: xlib
 
 
 // NOTE: needed for doc generator

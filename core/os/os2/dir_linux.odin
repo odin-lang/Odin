@@ -78,7 +78,8 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 	it.impl.prev_fi = fi
 
 	if err != nil {
-		path, _ := _get_full_path(entry_fd, temp_allocator())
+		temp_allocator := TEMP_ALLOCATOR_GUARD({})
+		path, _ := _get_full_path(entry_fd, temp_allocator)
 		read_directory_iterator_set_error(it, path, err)
 	}
 

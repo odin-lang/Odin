@@ -26,6 +26,7 @@ enum BuiltinProcId {
 	BuiltinProc_conj,
 
 	BuiltinProc_expand_values,
+	BuiltinProc_compress_values,
 
 	BuiltinProc_min,
 	BuiltinProc_max,
@@ -234,6 +235,9 @@ BuiltinProc__type_begin,
 	BuiltinProc_type_convert_variants_to_pointers,
 	BuiltinProc_type_merge,
 
+	BuiltinProc_type_integer_to_unsigned,
+	BuiltinProc_type_integer_to_signed,
+
 BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_boolean,
 	BuiltinProc_type_is_integer,
@@ -338,6 +342,7 @@ BuiltinProc__type_end,
 	BuiltinProc_objc_find_class,
 	BuiltinProc_objc_register_selector,
 	BuiltinProc_objc_register_class,
+	BuiltinProc_objc_ivar_get,
 
 	BuiltinProc_constant_utf16_cstring,
 
@@ -375,6 +380,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("conj"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("expand_values"),    1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("compress_values"),  1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("min"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("max"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},
@@ -582,6 +588,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_convert_variants_to_pointers"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_merge"),                2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_integer_to_unsigned"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_integer_to_signed"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_boolean"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_integer"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -686,6 +695,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("objc_find_class"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("objc_ivar_get"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

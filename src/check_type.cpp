@@ -1910,9 +1910,18 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			case ParameterValue_Location:
 			case ParameterValue_Expression:
 			case ParameterValue_Value:
+				// Special case for polymorphic procedures as default values
+				if (param_value.ast_value != nullptr) {
+					Entity *e = entity_from_expr(param_value.ast_value);
+					if (e != nullptr && e->kind == Entity_Procedure && is_type_polymorphic(e->type)) {
+						// Allow polymorphic procedures as default parameter values
+						// The type will be correctly determined at call site
+						break;
+					}
+				}
 				gbString str = type_to_string(type);
 				error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);
-				gb_string_free(str);
+					gb_string_free(str);
 				break;
 			}
 		}

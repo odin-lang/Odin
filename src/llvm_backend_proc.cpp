@@ -67,6 +67,14 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
+	// Skip codegen for unspecialized polymorphic procedures
+	if (is_type_polymorphic(entity->type) && !entity->Procedure.is_foreign) {
+		Type *bt = base_type(entity->type);
+		if (bt->kind == Type_Proc && bt->Proc.is_polymorphic && !bt->Proc.is_poly_specialized) {
+			// Do not generate code for unspecialized polymorphic procedures
+			return nullptr;
+		}
+	}
 	if (!entity->Procedure.is_foreign) {
 		if ((entity->flags & EntityFlag_ProcBodyChecked) == 0) {
 			GB_PANIC("%.*s :: %s (was parapoly: %d %d)", LIT(entity->token.string), type_to_string(entity->type), is_type_polymorphic(entity->type, true), is_type_polymorphic(entity->type, false));
@@ -783,8 +791,7 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 
 	p->curr_block = nullptr;
 	p->state_flags = 0;
-}
-gb_internal void lb_end_procedure(lbProcedure *p) {
+
 	LLVMDisposeBuilder(p->builder);
 }
 
@@ -817,6 +824,10 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 	e->Procedure.link_name = name;
 
 	lbProcedure *nested_proc = lb_create_procedure(p->module, e);
+	if (nested_proc == nullptr) {
+		// This is an unspecialized polymorphic procedure, skip codegen
+		return;
+	}
 	e->code_gen_procedure = nested_proc;
 
 	lbValue value = {};
@@ -2235,6 +2246,68 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		return lb_emit_load(p, tuple);
 	}
 
+	case BuiltinProc_compress_values: {
+		isize value_count = 0;
+		for (Ast *arg : ce->args) {
+			Type *t = arg->tav.type;
+			if (is_type_tuple(t)) {
+				value_count += t->Tuple.variables.count;
+			} else {
+				value_count += 1;
+			}
+		}
+
+		if (value_count == 1) {
+			lbValue x = lb_build_expr(p, ce->args[0]);
+			x = lb_emit_conv(p, x, tv.type);
+			return x;
+		}
+
+		Type *dt = base_type(tv.type);
+		lbAddr addr = lb_add_local_generated(p, tv.type, true);
+		if (is_type_struct(dt) || is_type_tuple(dt)) {
+			i32 index = 0;
+			for (Ast *arg : ce->args) {
+				lbValue x = lb_build_expr(p, arg);
+				if (is_type_tuple(x.type)) {
+					for (isize i = 0; i < x.type->Tuple.variables.count; i++) {
+						lbValue y = lb_emit_tuple_ev(p, x, cast(i32)i);
+						lbValue ptr = lb_emit_struct_ep(p, addr.addr, index++);
+						y = lb_emit_conv(p, y, type_deref(ptr.type));
+						lb_emit_store(p, ptr, y);
+					}
+				} else {
+					lbValue ptr = lb_emit_struct_ep(p, addr.addr, index++);
+					x = lb_emit_conv(p, x, type_deref(ptr.type));
+					lb_emit_store(p, ptr, x);
+				}
+			}
+			GB_ASSERT(index == value_count);
+		} else if (is_type_array_like(dt)) {
+			i32 index = 0;
+			for (Ast *arg : ce->args) {
+				lbValue x = lb_build_expr(p, arg);
+				if (is_type_tuple(x.type)) {
+					for (isize i = 0; i < x.type->Tuple.variables.count; i++) {
+						lbValue y = lb_emit_tuple_ev(p, x, cast(i32)i);
+						lbValue ptr = lb_emit_array_epi(p, addr.addr, index++);
+						y = lb_emit_conv(p, y, type_deref(ptr.type));
+						lb_emit_store(p, ptr, y);
+					}
+				} else {
+					lbValue ptr = lb_emit_array_epi(p, addr.addr, index++);
+					x = lb_emit_conv(p, x, type_deref(ptr.type));
+					lb_emit_store(p, ptr, x);
+				}
+			}
+			GB_ASSERT(index == value_count);
+		} else {
+			GB_PANIC("TODO(bill): compress_values -> %s", type_to_string(tv.type));
+		}
+
+		return lb_addr_load(p, addr);
+	}
+
 	case BuiltinProc_min: {
 		Type *t = type_of_expr(expr);
 		if (ce->args.count == 2) {
@@ -3375,6 +3448,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_objc_find_class:        return lb_handle_objc_find_class(p, expr);
 	case BuiltinProc_objc_register_selector: return lb_handle_objc_register_selector(p, expr);
 	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
+	case BuiltinProc_objc_ivar_get:          return lb_handle_objc_ivar_get(p, expr);
 
 
 	case BuiltinProc_constant_utf16_cstring:
