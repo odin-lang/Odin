@@ -313,6 +313,7 @@ enum BuildFlagKind {
 	BuildFlag_Define,
 	BuildFlag_BuildMode,
 	BuildFlag_BuildOnly,
+	BuildFlag_KeepTestExecutable,
 	BuildFlag_Target,
 	BuildFlag_Subtarget,
 	BuildFlag_Debug,
@@ -533,6 +534,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Define,                  str_lit("define"),                    BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,               str_lit("build-mode"),                BuildFlagParam_String,  Command__does_build); // Commands_build is not used to allow for a better error message
 	add_flag(&build_flags, BuildFlag_BuildOnly,               str_lit("build-only"),                BuildFlagParam_None,    Command_test);
+	add_flag(&build_flags, BuildFlag_KeepTestExecutable,      str_lit("keep-test-executable"),      BuildFlagParam_None,    Command_test);
 	add_flag(&build_flags, BuildFlag_Target,                  str_lit("target"),                    BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Subtarget,               str_lit("subtarget"),                 BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
@@ -1196,7 +1198,22 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						}
 						case BuildFlag_BuildOnly:
-							build_context.build_only = true;
+							if (build_context.keep_test_executable) {
+								gb_printf_err("`-keep-test-executable` is mutually exclusive with `-build-only`.\n");
+								gb_printf_err("We either only build or run the test and optionally keep the executable.\n");
+								bad_flags = true;
+							} else {
+								build_context.build_only = true;
+							}
+							break;
+						case BuildFlag_KeepTestExecutable:
+							if (build_context.build_only) {
+								gb_printf_err("`-build-only` is mutually exclusive with `-keep-test-executable`.\n");
+								gb_printf_err("We either only build or run the test and optionally keep the executable.\n");
+								bad_flags = true;
+							} else {
+								build_context.keep_test_executable = true;
+							}
 							break;
 
 						case BuildFlag_Debug:
@@ -2554,6 +2571,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (test_only) {
+		if (print_flag("-keep-test-executable")) {
+			print_usage_line(2, "Keep the test executable after running it instead of deleting it normally.");
+		}
+	}
+
 	if (run_or_build) {
 		if (print_flag("-linker:<string>")) {
 			print_usage_line(2, "Specify the linker to use.");
@@ -3877,6 +3900,11 @@ end_of_code_gen:;
 		defer (gb_free(heap_allocator(), exe_name.text));
 
 		system_must_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
+
+		if (build_context.command_kind == Command_test && !build_context.keep_test_executable) {
+			char const *filename = cast(char const *)exe_name.text;
+			gb_file_remove(filename);
+		}
 	}
 	return 0;
 }
