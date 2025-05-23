@@ -449,7 +449,7 @@ scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 	ch := advance(s)
 	for ch != quote {
 		if ch == '\n' || ch < 0 {
-			error(s, "literal no terminated")
+			error(s, "literal not terminated")
 			return
 		}
 		if ch == '\\' {
