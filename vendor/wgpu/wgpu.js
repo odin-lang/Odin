@@ -2033,7 +2033,7 @@ class WebGPUInterface {
 						addressModeW:  this.enumeration("AddressMode", off(4)),
 						magFilter:     this.enumeration("FilterMode", off(4)),
 						minFilter:     this.enumeration("FilterMode", off(4)),
-						mipMapFilter:  this.enumeration("MipmapFilterMode", off(4)),
+						mipmapFilter:  this.enumeration("MipmapFilterMode", off(4)),
 						lodMinClamp:   this.mem.loadF32(off(4)),
 						lodMaxClamp:   this.mem.loadF32(off(4)),
 						compare:       this.enumeration("CompareFunction", off(4)),
