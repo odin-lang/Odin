@@ -2303,9 +2303,10 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_windows:
 		case TargetOs_linux:
 		case TargetOs_darwin:
+		case TargetOs_freebsd:
 			break;
 		default:
-			gb_printf_err("-sanitize:address is only supported on windows, linux, and darwin\n");
+			gb_printf_err("-sanitize:address is only supported on Windows, Linux, Darwin, and FreeBSD\n");
 			return false;
 		}
 	}
@@ -2313,12 +2314,10 @@ gb_internal bool init_build_paths(String init_filename) {
 	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
 		switch (build_context.metrics.os) {
 		case TargetOs_linux:
+		case TargetOs_freebsd:
 			break;
 		default:
-			gb_printf_err("-sanitize:memory is only supported on linux\n");
-			return false;
-		}
-		if (build_context.metrics.os != TargetOs_linux) {
+			gb_printf_err("-sanitize:memory is only supported on Linux and FreeBSD\n");
 			return false;
 		}
 	}
@@ -2327,9 +2326,10 @@ gb_internal bool init_build_paths(String init_filename) {
 		switch (build_context.metrics.os) {
 		case TargetOs_linux:
 		case TargetOs_darwin:
+		case TargetOs_freebsd:
 			break;
 		default:
-			gb_printf_err("-sanitize:thread is only supported on linux and darwin\n");
+			gb_printf_err("-sanitize:thread is only supported on Linux, Darwin, and FreeBSD\n");
 			return false;
 		}
 	}
