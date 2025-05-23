@@ -2557,7 +2557,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (test_only) {
 		if (print_flag("-keep-test-executable")) {
 			print_usage_line(2, "Keep the test executable after running it with `odin test`, instead of deleting it after the test completes.");
-			print_usage_line(2, "If you build your your tests using `odin build <package> -build-mode:test`, the compiler does not execute");
+			print_usage_line(2, "If you build your tests using `odin build <package> -build-mode:test`, the compiler does not execute");
 			print_usage_line(2, "the resulting test program, and this option is not applicable.");
 		}
 	}
