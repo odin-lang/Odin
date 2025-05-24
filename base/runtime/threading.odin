@@ -5,6 +5,20 @@ Thread_Local_Cleaner :: #type proc "odin" ()
 @(private="file")
 thread_local_cleaners: [8]Thread_Local_Cleaner
 
+// The thread ID is cached here to save time from making syscalls with every
+// call.
+@(thread_local) local_thread_id: int
+
+// Return the current thread ID.
+@(require_results)
+get_current_thread_id :: proc "contextless" () -> int {
+	if local_thread_id == 0 {
+		local_thread_id = _get_current_thread_id()
+		assert_contextless(local_thread_id != 0, "_get_current_thread_id returned 0.")
+	}
+	return local_thread_id
+}
+
 // Add a procedure that will be run at the end of a thread for the purpose of
 // deallocating state marked as `thread_local`.
 //
