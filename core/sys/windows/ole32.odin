@@ -52,6 +52,8 @@ foreign Ole32 {
 		ppv: ^LPVOID,
 	) -> HRESULT ---
 
+	CoTaskMemAlloc :: proc(cb: SIZE_T) -> rawptr ---
+	CoTaskMemRealloc :: proc(pv: rawptr, cb: SIZE_T) -> rawptr ---
 	CoTaskMemFree :: proc(pv: rawptr) ---
 
 	CLSIDFromProgID :: proc(lpszProgID: LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
