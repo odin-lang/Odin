@@ -885,11 +885,16 @@ _processor_core_count :: proc() -> int {
 	return int(_sysconf(_SC_NPROCESSORS_ONLN))
 }
 
-@(require_results)
+@(private, require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for arg, i in runtime.args__ {
 		res[i] = string(arg)
 	}
 	return res
+}
+
+@(private, fini)
+_delete_command_line_arguments :: proc() {
+	delete(args)
 }
