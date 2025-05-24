@@ -329,10 +329,10 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 
 run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, ok: bool) #no_bounds_check {
 	when UNICODE_MODE {
-		vm.next_rune, vm.next_rune_size = utf8.decode_rune_in_string(vm.memory)
+		vm.next_rune, vm.next_rune_size = utf8.decode_rune_in_string(vm.memory[vm.string_pointer:])
 	} else {
 		if len(vm.memory) > 0 {
-			vm.next_rune = cast(rune)vm.memory[0]
+			vm.next_rune = cast(rune)vm.memory[vm.string_pointer]
 			vm.next_rune_size = 1
 		}
 	}
