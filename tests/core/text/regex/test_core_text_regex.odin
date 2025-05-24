@@ -1119,7 +1119,7 @@ iterator_vectors := []Iterator_Test{
 
 @test
 test_match_iterator :: proc(t: ^testing.T) {
-	for test in iterator_vectors {
+	vector: for test in iterator_vectors {
 		it, err := regex.create_iterator(test.haystack, test.pattern, test.flags)
 		defer regex.destroy(it)
 
@@ -1128,7 +1128,8 @@ test_match_iterator :: proc(t: ^testing.T) {
 
 		for capture, idx in regex.match(&it) {
 			if idx >= len(test.expected) {
-				break
+				log.errorf("got more than expected number of captures for matching string %q against pattern %q\n\tidx %i = %v", test.haystack, test.pattern, idx, capture)
+				continue vector
 			}
 			check_capture(t, capture, test.expected[idx])
 		}
