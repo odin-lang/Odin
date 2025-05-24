@@ -72,17 +72,18 @@ expect_error :: proc(t: ^testing.T, pattern: string, expected_error: typeid, fla
 	testing.expect_value(t, variant_ti, expected_ti, loc = loc)
 }
 
-check_capture :: proc(t: ^testing.T, got, expected: regex.Capture, loc := #caller_location) {
-	testing.expect_value(t, len(got.pos),    len(got.groups),      loc = loc)
-	testing.expect_value(t, len(got.pos),    len(expected.pos),    loc = loc)
-	testing.expect_value(t, len(got.groups), len(expected.groups), loc = loc)
+check_capture :: proc(t: ^testing.T, got, expected: regex.Capture, loc := #caller_location) -> (ok: bool) {
+	testing.expect_value(t, len(got.pos),    len(got.groups),      loc = loc) or_return
+	testing.expect_value(t, len(got.pos),    len(expected.pos),    loc = loc) or_return
+	testing.expect_value(t, len(got.groups), len(expected.groups), loc = loc) or_return
 
 	if len(got.pos) == len(expected.pos) {
 		for i in 0..<len(got.pos) {
-			testing.expect_value(t, got.pos[i],    expected.pos[i],    loc = loc)
-			testing.expect_value(t, got.groups[i], expected.groups[i], loc = loc)
+			testing.expect_value(t, got.pos[i],    expected.pos[i],    loc = loc) or_return
+			testing.expect_value(t, got.groups[i], expected.groups[i], loc = loc) or_return
 		}
 	}
+	return true
 }
 
 @test
@@ -210,6 +211,12 @@ test_alternation :: proc(t: ^testing.T) {
 	check_expression(t, EXPR, "aa", "aa")
 	check_expression(t, EXPR, "bb", "bb")
 	check_expression(t, EXPR, "cc", "cc")
+}
+
+@test
+test_alternation_order :: proc(t: ^testing.T) {
+	check_expression(t, "a|ab", "ab", "a")
+	check_expression(t, "ab|a", "ab", "ab")
 }
 
 @test
@@ -1115,6 +1122,103 @@ iterator_vectors := []Iterator_Test{
 			{pos = {{9, 15}, {10, 11}, {13, 15}}, groups = {"foobar", "o", "ar"}},
 		},
 	},
+	{
+		`aaa`, `a`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{1,  2}}, groups = {"a"}},
+			{pos = {{2,  3}}, groups = {"a"}},
+		},
+	},
+	{
+		`aaa`, `\w`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{1,  2}}, groups = {"a"}},
+			{pos = {{2,  3}}, groups = {"a"}},
+		},
+	},
+	{
+		`aかか`, `.`, {.Unicode},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{1,  4}}, groups = {"か"}},
+			{pos = {{4,  7}}, groups = {"か"}},
+		},
+	},
+	{
+		`ゆめ.`, `.`, {.Unicode},
+		{
+			{pos = {{0,  3}}, groups = {"ゆ"}},
+			{pos = {{3,  6}}, groups = {"め"}},
+			{pos = {{6,  7}}, groups = {"."}},
+		},
+	},
+	// This pattern is not anchored, so this is valid per the new behavior.
+	{
+		`ababa`, `(?:a|ab)`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{2,  3}}, groups = {"a"}},
+			{pos = {{4,  5}}, groups = {"a"}},
+		},
+	},
+	// Ensure alternation follows expected ordering of left-higher priority.
+	{
+		`ababa`, `(?:ab|a)`, {},
+		{
+			{pos = {{0,  2}}, groups = {"ab"}},
+			{pos = {{2,  4}}, groups = {"ab"}},
+			{pos = {{4,  5}}, groups = {"a"}},
+		},
+	},
+	// This one is anchored, so only one match.
+	//
+	// This test ensures the behavior of `Assert_Start` is checking against the
+	// start of the string and we haven't just slid the memory string itself.
+	{
+		`ababa`, `^(?:a|b)`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+		},
+	},
+	{
+		`ababa`, `a$`, {},
+		{
+			{pos = {{4,  5}}, groups = {"a"}},
+		},
+	},
+	// A blank pattern on a blank string is valid and must not loop infinitely.
+	{
+		``, ``, {},
+		{
+			{pos = {{0,  0}}, groups = {""}},
+		},
+	},
+	// These too are valid.
+	//
+	// The iterator must bail out when it encounters any situation which would
+	// loop infinitely, but only after giving at least one valid match if one
+	// exists, as this would accord with attempting to singularly match the
+	// pattern against the string and provide a positive result.
+	{
+		`a`, ``, {},
+		{
+			{pos = {{0,  0}}, groups = {""}},
+		},
+	},
+	{
+		``, `$`, {},
+		{
+			{pos = {{0,  0}}, groups = {""}},
+		},
+	},
+	{
+		`aaa`, `$`, {},
+		{
+			{pos = {{3,  3}}, groups = {""}},
+		},
+	},
 }
 
 @test
@@ -1131,8 +1235,58 @@ test_match_iterator :: proc(t: ^testing.T) {
 				log.errorf("got more than expected number of captures for matching string %q against pattern %q\n\tidx %i = %v", test.haystack, test.pattern, idx, capture)
 				continue vector
 			}
+			if !check_capture(t, capture, test.expected[idx]) {
+				log.errorf("capture check failed on string %q against pattern %q", test.haystack, test.pattern)
+			}
+		}
+		testing.expectf(t, it.idx == len(test.expected), "expected idx to be %i, got %i on string %q against pattern %q", len(test.expected), it.idx, test.haystack, test.pattern)
+	}
+}
+
+@test
+test_iterator_reset :: proc(t: ^testing.T) {
+	test := Iterator_Test{
+		`aaa`, `a`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{1,  2}}, groups = {"a"}},
+			{pos = {{2,  3}}, groups = {"a"}},
+		},
+	}
+
+	out: {
+		it, err := regex.create_iterator(`aaa`, `a`)
+		defer regex.destroy(it)
+
+		testing.expect_value(t, err, nil)
+		(err == nil) or_break out
+
+		for capture, idx in regex.match(&it) {
+			if idx >= len(test.expected) {
+				log.errorf("got more than expected number of captures for matching string %q against pattern %q\n\tidx %i = %v", test.haystack, test.pattern, idx, capture)
+				break
+			}
 			check_capture(t, capture, test.expected[idx])
 		}
 		testing.expect_value(t, it.idx, len(test.expected))
+
+		// Do it again.
+		iterations := 0
+		regex.reset(&it)
+
+		// Mind that this loop can do nothing if it wasn't reset but leave us
+		// with the expected `idx` state.
+		//
+		// That's why we count iterations this time around.
+		for capture, idx in regex.match(&it) {
+			iterations += 1
+			if idx >= len(test.expected) {
+				log.errorf("got more than expected number of captures for matching string %q against pattern %q\n\tidx %i = %v", test.haystack, test.pattern, idx, capture)
+				break
+			}
+			check_capture(t, capture, test.expected[idx])
+		}
+		testing.expect_value(t, it.idx, len(test.expected))
+		testing.expect_value(t, iterations, len(test.expected))
 	}
 }
