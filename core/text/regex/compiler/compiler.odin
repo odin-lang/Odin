@@ -401,7 +401,7 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 
 	pc_open := 0
 
-	add_global: if .Global in flags {
+	optimize_opening: {
 		// Check if the opening to the pattern is predictable.
 		// If so, use one of the optimized Wait opcodes.
 		iter := virtual_machine.Opcode_Iterator{ code[:], 0 }
@@ -412,7 +412,7 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 				pc_open += size_of(Opcode)
 				inject_at(&code, pc_open, Opcode(code[pc + size_of(Opcode) + pc_open]))
 				pc_open += size_of(u8)
-				break add_global
+				break optimize_opening
 
 			case .Rune:
 				operand := intrinsics.unaligned_load(cast(^rune)&code[pc+1])
@@ -420,24 +420,28 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 				pc_open += size_of(Opcode)
 				inject_raw(&code, pc_open, operand)
 				pc_open += size_of(rune)
-				break add_global
+				break optimize_opening
 
 			case .Rune_Class:
 				inject_at(&code, pc_open, Opcode.Wait_For_Rune_Class)
 				pc_open += size_of(Opcode)
 				inject_at(&code, pc_open, Opcode(code[pc + size_of(Opcode) + pc_open]))
 				pc_open += size_of(u8)
-				break add_global
+				break optimize_opening
 
 			case .Rune_Class_Negated:
 				inject_at(&code, pc_open, Opcode.Wait_For_Rune_Class_Negated)
 				pc_open += size_of(Opcode)
 				inject_at(&code, pc_open, Opcode(code[pc + size_of(Opcode) + pc_open]))
 				pc_open += size_of(u8)
-				break add_global
+				break optimize_opening
 
 			case .Save:
 				continue
+
+			case .Assert_Start:
+				break optimize_opening
+
 			case:
 				break seek_loop
 			}

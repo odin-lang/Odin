@@ -51,13 +51,13 @@ check_expression_with_flags :: proc(t: ^testing.T, pattern: string, flags: regex
 }
 
 check_expression :: proc(t: ^testing.T, pattern, haystack: string, needles: ..string, extra_flags := regex.Flags{}, loc := #caller_location) {
-	check_expression_with_flags(t, pattern, { .Global } + extra_flags,
+	check_expression_with_flags(t, pattern, extra_flags,
 		haystack, ..needles, loc = loc)
-	check_expression_with_flags(t, pattern, { .Global, .No_Optimization } + extra_flags,
+	check_expression_with_flags(t, pattern, { .No_Optimization } + extra_flags,
 		haystack, ..needles, loc = loc)
-	check_expression_with_flags(t, pattern, { .Global, .Unicode } + extra_flags,
+	check_expression_with_flags(t, pattern, { .Unicode } + extra_flags,
 		haystack, ..needles, loc = loc)
-	check_expression_with_flags(t, pattern, { .Global, .Unicode, .No_Optimization } + extra_flags,
+	check_expression_with_flags(t, pattern, { .Unicode, .No_Optimization } + extra_flags,
 		haystack, ..needles, loc = loc)
 }
 
@@ -516,7 +516,7 @@ test_pos_index_explicitly :: proc(t: ^testing.T) {
 	STR :: "This is an island."
 	EXPR :: `\bis\b`
 
-	rex, err := regex.create(EXPR, { .Global })
+	rex, err := regex.create(EXPR)
 	if !testing.expect_value(t, err, nil) {
 		return
 	}
@@ -642,9 +642,9 @@ test_unicode_explicitly :: proc(t: ^testing.T) {
 	}
 	{
 		EXPR :: "こにちは!"
-		check_expression_with_flags(t, EXPR, { .Global, .Unicode },
+		check_expression_with_flags(t, EXPR, { .Unicode },
 			"Hello こにちは!", "こにちは!")
-		check_expression_with_flags(t, EXPR, { .Global, .Unicode, .No_Optimization },
+		check_expression_with_flags(t, EXPR, { .Unicode, .No_Optimization },
 			"Hello こにちは!", "こにちは!")
 	}
 }
@@ -901,12 +901,12 @@ test_everything_at_once :: proc(t: ^testing.T) {
 @test
 test_creation_from_user_string :: proc(t: ^testing.T) {
 	{
-		USER_EXPR :: `/^hellope$/gmixun-`
+		USER_EXPR :: `/^hellope$/mixun-`
 		STR :: "hellope"
 		rex, err := regex.create_by_user(USER_EXPR)
 		defer regex.destroy(rex)
 		testing.expect_value(t, err, nil)
-		testing.expect_value(t, rex.flags, regex.Flags{ .Global, .Multiline, .Case_Insensitive, .Ignore_Whitespace, .Unicode, .No_Capture, .No_Optimization })
+		testing.expect_value(t, rex.flags, regex.Flags{ .Multiline, .Case_Insensitive, .Ignore_Whitespace, .Unicode, .No_Capture, .No_Optimization })
 
 		_, ok := regex.match(rex, STR)
 		testing.expectf(t, ok, "expected user-provided RegEx %v to match %q", rex, STR)
@@ -1102,14 +1102,14 @@ Iterator_Test :: struct {
 
 iterator_vectors := []Iterator_Test{
 	{
-		`xxab32ab52xx`, `(ab\d{1})`, {}, // {.Global} implicitly added by the iterator
+		`xxab32ab52xx`, `(ab\d{1})`, {},
 		{
 			{pos = {{2, 5}, {2, 5}}, groups = {"ab3", "ab3"}},
 			{pos = {{6, 9}, {6, 9}}, groups = {"ab5", "ab5"}},
 		},
 	},
 	{
-		`xxfoobarxfoobarxx`, `f(o)ob(ar)`, {.Global},
+		`xxfoobarxfoobarxx`, `f(o)ob(ar)`, {},
 		{
 			{pos = {{2,  8},  {3,  4},  {6,  8}}, groups = {"foobar", "o", "ar"}},
 			{pos = {{9, 15}, {10, 11}, {13, 15}}, groups = {"foobar", "o", "ar"}},

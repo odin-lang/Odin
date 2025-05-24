@@ -167,7 +167,6 @@ to escape the delimiter if found in the middle of the string.
 
 All runes after the closing delimiter will be parsed as flags:
 
-- 'g': Global
 - 'm': Multiline
 - 'i': Case_Insensitive
 - 'x': Ignore_Whitespace
@@ -244,7 +243,6 @@ create_by_user :: proc(
 	// to `end` here.
 	for r in pattern[start + end:] {
 		switch r {
-		case 'g': flags += { .Global }
 		case 'm': flags += { .Multiline }
 		case 'i': flags += { .Case_Insensitive }
 		case 'x': flags += { .Ignore_Whitespace }
@@ -283,8 +281,6 @@ create_iterator :: proc(
 	permanent_allocator := context.allocator,
 	temporary_allocator := context.temp_allocator,
 ) -> (result: Match_Iterator, err: Error) {
-	flags := flags
-	flags += {.Global} // We're iterating over a string, so the next match could start anywhere
 
 	if .Multiline in flags {
 		return {}, .Unsupported_Flag
