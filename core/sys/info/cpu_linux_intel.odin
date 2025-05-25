@@ -5,7 +5,6 @@ package sysinfo
 import "core:sys/linux"
 import "core:strings"
 import "core:strconv"
-import "core:fmt"
 
 @(init, private)
 init_cpu_core_count :: proc() {
@@ -25,14 +24,14 @@ init_cpu_core_count :: proc() {
 		value = strings.trim_space(value)
 
 		if key == "cpu cores" {
-			if n, ok := strconv.parse_int(value); ok {
-				cpu.physical_cores = n
+			if num_physical_cores, ok := strconv.parse_int(value); ok {
+				cpu.physical_cores = num_physical_cores
 			}
 		}
 
 		if key == "siblings" {
-			if n, ok := strconv.parse_int(value); ok {
-				cpu.logical_cores = n
+			if num_logical_cores, ok := strconv.parse_int(value); ok {
+				cpu.logical_cores = num_logical_cores
 			}
 		}
 	}
