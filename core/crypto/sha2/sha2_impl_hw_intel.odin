@@ -52,7 +52,7 @@ K_15 :: simd.u64x2{0xa4506ceb90befffa, 0xc67178f2bef9a3f7}
 // is_hardware_accelerated_256 returns true iff hardware accelerated
 // SHA-224/SHA-256 is supported.
 is_hardware_accelerated_256 :: proc "contextless" () -> bool {
-	features, ok := info.cpu_features.?
+	features, ok := info.cpu.features.?
 	if !ok {
 		return false
 	}

@@ -5,7 +5,7 @@ import "core:sys/unix"
 @(init, private)
 init_cpu_features :: proc "contextless" () {
 	@(static) features: CPU_Features
-	defer cpu_features = features
+	defer cpu.features = features
 
 	try_set :: proc "contextless" (name: cstring, feature: CPU_Feature) -> (ok: bool) {
 		support: b32
