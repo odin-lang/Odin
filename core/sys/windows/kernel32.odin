@@ -857,7 +857,6 @@ MEMORY_RESOURCE_NOTIFICATION_TYPE :: enum c_int {
 LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryResourceNotification
 HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification
 
-
 @(default_calling_convention="system")
 foreign kernel32 {
 	CreateMemoryResourceNotification :: proc(
@@ -1194,7 +1193,7 @@ DUMMYUNIONNAME_u :: struct #raw_union {
 SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	ProcessorMask: ULONG_PTR,
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
-	DummyUnion: DUMMYUNIONNAME_u,
+	using DummyUnion: DUMMYUNIONNAME_u,
 }
 
 SYSTEM_POWER_STATUS :: struct {
