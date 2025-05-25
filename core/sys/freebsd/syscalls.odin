@@ -204,21 +204,21 @@ accept_nil :: proc "contextless" (s: Fd) -> (Fd, Errno) {
 accept :: proc { accept_T, accept_nil }
 
 getsockname_or_peername :: proc "contextless" (s: Fd, sockaddr: ^$T, is_peer: bool) -> Errno {
-    // sockaddr must contain a valid pointer, or this will segfault because
-    // we're telling the syscall that there's memory available to write to.
-    addrlen: socklen_t = size_of(T)
+	// sockaddr must contain a valid pointer, or this will segfault because
+	// we're telling the syscall that there's memory available to write to.
+	addrlen: socklen_t = size_of(T)
 
-    result, ok := intrinsics.syscall_bsd(
-        is_peer ? SYS_getpeername : SYS_getsockname,
-        cast(uintptr)s,
-        cast(uintptr)sockaddr,
-        cast(uintptr)&addrlen)
+	result, ok := intrinsics.syscall_bsd(
+		is_peer ? SYS_getpeername : SYS_getsockname,
+		cast(uintptr)s,
+		cast(uintptr)sockaddr,
+		cast(uintptr)&addrlen)
 
-    if !ok {
-            return cast(Errno)result
-    }
+	if !ok {
+			return cast(Errno)result
+	}
 
-    return nil
+	return nil
 }
 
 // Get name of connected peer
