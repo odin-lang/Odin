@@ -69,6 +69,25 @@ Socket_Option :: enum c.int {
 
 	// bool: Allow sending to, receiving from, and binding to, a broadcast address.
 	Broadcast                 = win.SO_BROADCAST, 
+
+	// Address: Set the interface to use for multicast packets.
+	Multicast_Interface       = win.IP_MULTICAST_IF,
+
+	// bool: When true, multicast packets will be looped back to the local socket.
+	Multicast_Loop            = win.IP_MULTICAST_LOOP,
+
+	// int: Limit or extend the hop count limit for multicast packets.
+	Multicast_TTL             = win.IP_MULTICAST_TTL,
+
+	// Multicast_Group_Request: Join a multicast group.
+	//   address: The multicast group to join.
+	//   interface: The interface address to use for the multicast group.
+	Join_Multicast_Group      = win.IP_ADD_MEMBERSHIP,
+
+	// Multicast_Group_Request: Leave a multicast group.
+	//   address: The multicast group to leave.
+	//   interface_index: The interface index to use for the multicast group.
+	Leave_Multicast_Group     = win.IP_DROP_MEMBERSHIP,
 }
 
 
@@ -299,7 +318,15 @@ _shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Shutdown
 
 @(private)
 _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Socket_Option_Error {
-	level := win.SOL_SOCKET if option != .TCP_Nodelay else win.IPPROTO_TCP
+	level := win.SOL_SOCKET
+	#partial switch option {
+	case .TCP_Nodelay:
+		level = win.IPPROTO_TCP
+	case .Multicast_Interface, .Multicast_Loop, .Multicast_TTL, .Join_Multicast_Group, .Leave_Multicast_Group:
+		level = win.IPPROTO_IP
+	case:
+		level = win.SOL_SOCKET
+	}
 
 	bool_value: b32
 	int_value: i32
@@ -369,6 +396,52 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			}
 			ptr = &int_value
 			len = size_of(int_value)
+	case .Multicast_Interface:
+		address := value.(^Address) or_else panic("set_option() value must be an Address here", loc)
+		switch a in address^ {	
+		case IP4_Address:
+			in_addr_value := transmute(win.in_addr) a
+			ptr = &in_addr_value
+			len = size_of(in_addr_value)
+		case IP6_Address:
+			in6_addr_value := transmute(win.in6_addr) a
+			ptr = &in6_addr_value
+			len = size_of(in6_addr_value)
+		}
+	case .Multicast_Loop:
+		b := value.(bool) or_else panic("set_option() value must be a boolean here", loc)
+		bool_value = b32((^bool)(&b)^)
+		ptr = &bool_value
+		len = size_of(bool_value)
+	case .Multicast_TTL:
+		i := value.(int) or_else panic("set_option() value must be an integer here", loc)
+		int_value = c.int(i)
+		ptr = &int_value
+		len = size_of(int_value)
+	case
+		.Join_Multicast_Group,
+		.Leave_Multicast_Group:
+			r := value.(^Multicast_Group_Request) or_else panic("set_option() value must be a ^Multicast_Group_Request here", loc)
+			multicast_group_request_value := r^
+			switch a in multicast_group_request_value.address {
+			case IP4_Address:
+				ip_mreq := win.ip_mreq {
+					imr_multiaddr = transmute(win.in_addr) multicast_group_request_value.address.(IP4_Address),
+					imr_interface = transmute(win.in_addr) multicast_group_request_value.interface.(IP4_Address),
+				}
+
+				ptr = &ip_mreq
+				len = size_of(ip_mreq)
+
+			case IP6_Address:
+				ip6_mreq := win.ipv6_mreq {
+					ipv6mr_multiaddr = transmute(win.in6_addr) multicast_group_request_value.address.(IP6_Address),
+					ipv6mr_interface = multicast_group_request_value.interface_index,
+				}
+
+				ptr = &ip6_mreq
+				len = size_of(ip6_mreq)
+			}
 	}
 
 	socket := any_socket_to_socket(s)
