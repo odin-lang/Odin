@@ -313,7 +313,7 @@ MMVERSION :: UINT
 
 // Input is four characters string
 // Output is little-endian u32 representation
-MAKEFOURCC :: #force_inline proc "contextless" (s: [4]BYTE) -> DWORD {
+MAKEFOURCC :: #force_inline proc "contextless" (s: [4]byte) -> DWORD {
 	return (DWORD(s[0])) | (DWORD(s[1]) << 8) | (DWORD(s[2]) << 16) | (DWORD(s[3]) << 24 )
 }
 
