@@ -1627,9 +1627,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String subsystem = value.value_string;
 							bool subsystem_found = false;
-							for (int i = 0; i < Windows_Subsystem_COUNT; i++) {
+							for (int i = 1; i < Windows_Subsystem_COUNT; i++) {
 								if (str_eq_ignore_case(subsystem, windows_subsystem_names[i])) {
-									build_context.ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[i];
+									build_context.ODIN_WINDOWS_SUBSYSTEM = Windows_Subsystem(i);
 									subsystem_found = true;
 									break;
 								}
@@ -1638,7 +1638,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							// WINDOW is a hidden alias for WINDOWS. Check it.
 							String subsystem_windows_alias = str_lit("WINDOW");
 							if (!subsystem_found && str_eq_ignore_case(subsystem, subsystem_windows_alias)) {
-								build_context.ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_WINDOWS];
+								build_context.ODIN_WINDOWS_SUBSYSTEM = Windows_Subsystem_WINDOWS;
 								subsystem_found = true;
 								break;
 							}
@@ -1646,8 +1646,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							if (!subsystem_found) {
 								gb_printf_err("Invalid -subsystem string, got %.*s. Expected one of:\n", LIT(subsystem));
 								gb_printf_err("\t");
-								for (int i = 0; i < Windows_Subsystem_COUNT; i++) {
-									if (i > 0) {
+								for (int i = 1; i < Windows_Subsystem_COUNT; i++) {
+									if (i > 1) {
 										gb_printf_err(", ");
 									}
 									gb_printf_err("%.*s", LIT(windows_subsystem_names[i]));

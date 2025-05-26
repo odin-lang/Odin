@@ -1078,11 +1078,30 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("true",  true);
 	add_global_bool_constant("false", false);
 
-	add_global_string_constant("ODIN_VENDOR",             bc->ODIN_VENDOR);
-	add_global_string_constant("ODIN_VERSION",            bc->ODIN_VERSION);
-	add_global_string_constant("ODIN_ROOT",               bc->ODIN_ROOT);
-	add_global_string_constant("ODIN_BUILD_PROJECT_NAME", bc->ODIN_BUILD_PROJECT_NAME);
-	add_global_string_constant("ODIN_WINDOWS_SUBSYSTEM",  bc->ODIN_WINDOWS_SUBSYSTEM);
+	add_global_string_constant("ODIN_VENDOR",                   bc->ODIN_VENDOR);
+	add_global_string_constant("ODIN_VERSION",                  bc->ODIN_VERSION);
+	add_global_string_constant("ODIN_ROOT",                     bc->ODIN_ROOT);
+	add_global_string_constant("ODIN_BUILD_PROJECT_NAME",       bc->ODIN_BUILD_PROJECT_NAME);
+
+	{
+		GlobalEnumValue values[Windows_Subsystem_COUNT] = {
+			{"Unknown",                 Windows_Subsystem_UNKNOWN},
+		 	{"Boot_Application",        Windows_Subsystem_BOOT_APPLICATION},
+			{"Console",                 Windows_Subsystem_CONSOLE},
+			{"EFI_Application",         Windows_Subsystem_EFI_APPLICATION},
+			{"EFI_Boot_Service_Driver", Windows_Subsystem_EFI_BOOT_SERVICE_DRIVER},
+			{"EFI_Rom",                 Windows_Subsystem_EFI_ROM},
+			{"EFI_Runtime_Driver",      Windows_Subsystem_EFI_RUNTIME_DRIVER},
+			{"Native",                  Windows_Subsystem_NATIVE},
+			{"Posix",                   Windows_Subsystem_POSIX},
+			{"Windows",                 Windows_Subsystem_WINDOWS},
+			{"Windows_CE",              Windows_Subsystem_WINDOWSCE},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Windows_Subsystem_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_WINDOWS_SUBSYSTEM",  bc->ODIN_WINDOWS_SUBSYSTEM);
+		add_global_string_constant("ODIN_WINDOWS_SUBSYSTEM_STRING", windows_subsystem_names[bc->ODIN_WINDOWS_SUBSYSTEM]);
+	}
 
 	{
 		GlobalEnumValue values[TargetOs_COUNT] = {
@@ -1102,7 +1121,7 @@ gb_internal void init_universal(void) {
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_OS_Type"), values, gb_count_of(values));
-		add_global_enum_constant(fields, "ODIN_OS", bc->metrics.os);
+		add_global_enum_constant(fields, "ODIN_OS",  bc->metrics.os);
 		add_global_string_constant("ODIN_OS_STRING", target_os_names[bc->metrics.os]);
 	}
 

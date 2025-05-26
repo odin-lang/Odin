@@ -321,7 +321,7 @@ try_cross_linking:;
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -341,7 +341,7 @@ try_cross_linking:;
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -404,7 +404,7 @@ try_cross_linking:;
 					"",
 					LIT(vs_exe_path), LIT(linker_name), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
