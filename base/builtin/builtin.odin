@@ -127,6 +127,9 @@ ODIN_NO_TYPE_ASSERT             :: ODIN_NO_TYPE_ASSERT
 /*
 	An `enum` value indicating the optimization level selected using the `-o` command line switch.
 	Possible values are: `.None`, `.Minimal`, `.Size`, `.Speed`, and `.Aggressive`.
+
+	If `ODIN_OPTIMIZATION_MODE` is anything other than `.None` or `.Minimal`, the compiler will also perform a unity build,
+	and `ODIN_USE_SEPARATE_MODULES` will be set to `false` as a result.
 */
 ODIN_OPTIMIZATION_MODE          :: ODIN_OPTIMIZATION_MODE
 
@@ -169,8 +172,11 @@ ODIN_TEST                       :: ODIN_TEST
 ODIN_TILDE                      :: ODIN_TILDE
 
 /*
-	`true` by default, false if the `-use-single-module` command line switch to force a unity build is provided.
-	By default each package is built into its own object file, and then linked together, instead of performing a unity build.
+	`true` by default, meaning each each package is built into its own object file, and then linked together.
+	`false` if the `-use-single-module` command line switch to force a unity build is provided.
+
+	If `ODIN_OPTIMIZATION_MODE` is anything other than `.None` or `.Minimal`, the compiler will also perform a unity build,
+	and this constant will also be set to `false`.
 */
 ODIN_USE_SEPARATE_MODULES       :: ODIN_USE_SEPARATE_MODULES
 
