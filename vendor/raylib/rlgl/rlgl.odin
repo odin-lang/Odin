@@ -538,7 +538,7 @@ foreign lib {
 	ReadScreenPixels    :: proc(width, height: c.int) -> [^]byte ---                                                        // Read screen pixel data (color buffer)
 
 	// Framebuffer management (fbo)
-	LoadFramebuffer     :: proc(width, height: c.int) -> c.uint ---                                           // Load an empty framebuffer
+	LoadFramebuffer     :: proc() -> c.uint ---                                           // Load an empty framebuffer
 	FramebufferAttach   :: proc(fboId, texId: c.uint, attachType: c.int, texType: c.int, mipLevel: c.int) --- // Attach texture/renderbuffer to a framebuffer
 	FramebufferComplete :: proc(id: c.uint) -> bool ---                                                       // Verify framebuffer is complete
 	UnloadFramebuffer   :: proc(id: c.uint) ---                                                               // Delete framebuffer from GPU
