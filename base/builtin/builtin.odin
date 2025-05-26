@@ -10,13 +10,13 @@ true  :: 0==0
 // The following constants are added in `checker.cpp`'s `init_universal` procedure.
 
 /*
-	An `enum` value indicating what the CPU architecture of the target is.
+	An `enum` value indicating the target's CPU architecture.
 	Possible values are: `.amd64`, `.i386`, `.arm32`, `.arm64`, `.wasm32`, `.wasm64p32`, and `.riscv64`.
 */
 ODIN_ARCH                       :: ODIN_ARCH
 
 /*
-	A `string` indicating what the CPU architecture of the target is.
+	A `string` indicating the target's CPU architecture.
 	Possible values are: "amd64", "i386", "arm32", "arm64", "wasm32", "wasm64p32", "riscv64".
 */
 ODIN_ARCH_STRING                :: ODIN_ARCH_STRING
@@ -69,7 +69,7 @@ ODIN_DISABLE_ASSERT             :: ODIN_DISABLE_ASSERT
 ODIN_ENDIAN                     :: ODIN_ENDIAN
 
 /*
-	An `enum` value indicating the endianness of the target.
+	An `string` indicating the endianness of the target.
 	Possible values are: "little" and "big".
 */
 ODIN_ENDIAN_STRING              :: ODIN_ENDIAN_STRING
