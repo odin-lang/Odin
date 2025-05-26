@@ -31,6 +31,24 @@ enum TargetOsKind : u16 {
 	TargetOs_COUNT,
 };
 
+gb_global String target_os_names[TargetOs_COUNT] = {
+	str_lit(""),
+	str_lit("windows"),
+	str_lit("darwin"),
+	str_lit("linux"),
+	str_lit("essence"),
+	str_lit("freebsd"),
+	str_lit("openbsd"),
+	str_lit("netbsd"),
+	str_lit("haiku"),
+
+	str_lit("wasi"),
+	str_lit("js"),
+	str_lit("orca"),
+
+	str_lit("freestanding"),
+};
+
 enum TargetArchKind : u16 {
 	TargetArch_Invalid,
 
@@ -45,11 +63,27 @@ enum TargetArchKind : u16 {
 	TargetArch_COUNT,
 };
 
+gb_global String target_arch_names[TargetArch_COUNT] = {
+	str_lit(""),
+	str_lit("amd64"),
+	str_lit("i386"),
+	str_lit("arm32"),
+	str_lit("arm64"),
+	str_lit("wasm32"),
+	str_lit("wasm64p32"),
+	str_lit("riscv64"),
+};
+
 enum TargetEndianKind : u8 {
 	TargetEndian_Little,
 	TargetEndian_Big,
 
 	TargetEndian_COUNT,
+};
+
+gb_global String target_endian_names[TargetEndian_COUNT] = {
+	str_lit("little"),
+	str_lit("big"),
 };
 
 enum TargetABIKind : u16 {
@@ -61,7 +95,14 @@ enum TargetABIKind : u16 {
 	TargetABI_COUNT,
 };
 
+gb_global String target_abi_names[TargetABI_COUNT] = {
+	str_lit(""),
+	str_lit("win64"),
+	str_lit("sysv"),
+};
+
 enum Windows_Subsystem : u8 {
+	Windows_Subsystem_UNKNOWN,
  	Windows_Subsystem_BOOT_APPLICATION,
 	Windows_Subsystem_CONSOLE,                 // Default,
 	Windows_Subsystem_EFI_APPLICATION,
@@ -75,38 +116,23 @@ enum Windows_Subsystem : u8 {
 	Windows_Subsystem_COUNT,
 };
 
+gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
+	str_lit(""),
+	str_lit("BOOT_APPLICATION"),
+	str_lit("CONSOLE"), // Default
+	str_lit("EFI_APPLICATION"),
+	str_lit("EFI_BOOT_SERVICE_DRIVER"),
+	str_lit("EFI_ROM"),
+	str_lit("EFI_RUNTIME_DRIVER"),
+	str_lit("NATIVE"),
+	str_lit("POSIX"),
+	str_lit("WINDOWS"),
+	str_lit("WINDOWSCE"),
+};
+
 struct MicroarchFeatureList {
 	String microarch;
 	String features;
-};
-
-gb_global String target_os_names[TargetOs_COUNT] = {
-	str_lit(""),
-	str_lit("windows"),
-	str_lit("darwin"),
-	str_lit("linux"),
-	str_lit("essence"),
-	str_lit("freebsd"),
-	str_lit("openbsd"),
-	str_lit("netbsd"),
-	str_lit("haiku"),
-	
-	str_lit("wasi"),
-	str_lit("js"),
-	str_lit("orca"),
-
-	str_lit("freestanding"),
-};
-
-gb_global String target_arch_names[TargetArch_COUNT] = {
-	str_lit(""),
-	str_lit("amd64"),
-	str_lit("i386"),
-	str_lit("arm32"),
-	str_lit("arm64"),
-	str_lit("wasm32"),
-	str_lit("wasm64p32"),
-	str_lit("riscv64"),
 };
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -114,19 +140,7 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 #else
 	#include <llvm/Config/llvm-config.h>
 #endif
-
 #include "build_settings_microarch.cpp"
-
-gb_global String target_endian_names[TargetEndian_COUNT] = {
-	str_lit("little"),
-	str_lit("big"),
-};
-
-gb_global String target_abi_names[TargetABI_COUNT] = {
-	str_lit(""),
-	str_lit("win64"),
-	str_lit("sysv"),
-};
 
 gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
@@ -136,19 +150,6 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
-};
-
-gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
-	str_lit("BOOT_APPLICATION"),
-	str_lit("CONSOLE"),                 // Default
-	str_lit("EFI_APPLICATION"),
-	str_lit("EFI_BOOT_SERVICE_DRIVER"),
-	str_lit("EFI_ROM"),
-	str_lit("EFI_RUNTIME_DRIVER"),
-	str_lit("NATIVE"),
-	str_lit("POSIX"),
-	str_lit("WINDOWS"),
-	str_lit("WINDOWSCE"),
 };
 
 #ifndef ODIN_VERSION_RAW
@@ -393,17 +394,17 @@ String linker_choices[Linker_COUNT] = {
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
-	String ODIN_OS;                       // Target operating system
-	String ODIN_ARCH;                     // Target architecture
-	String ODIN_VENDOR;                   // Compiler vendor
-	String ODIN_VERSION;                  // Compiler version
-	String ODIN_ROOT;                     // Odin ROOT
-	String ODIN_BUILD_PROJECT_NAME;       // Odin main/initial package's directory name
-	String ODIN_WINDOWS_SUBSYSTEM;        // Empty string for non-Windows targets
-	bool   ODIN_DEBUG;                    // Odin in debug mode
-	bool   ODIN_DISABLE_ASSERT;           // Whether the default 'assert' et al is disabled in code or not
-	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
-	bool   ODIN_DEFAULT_TO_PANIC_ALLOCATOR; // Whether the default allocator is a "panic" allocator or not (i.e. panics on any call to it)
+	String ODIN_OS;                           // Target operating system
+	String ODIN_ARCH;                         // Target architecture
+	String ODIN_VENDOR;                       // Compiler vendor
+	String ODIN_VERSION;                      // Compiler version
+	String ODIN_ROOT;                         // Odin ROOT
+	String ODIN_BUILD_PROJECT_NAME;           // Odin main/initial package's directory name
+	Windows_Subsystem ODIN_WINDOWS_SUBSYSTEM; // .Console, .Windows
+	bool   ODIN_DEBUG;                        // Odin in debug mode
+	bool   ODIN_DISABLE_ASSERT;               // Whether the default 'assert' et al is disabled in code or not
+	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR;     // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_DEFAULT_TO_PANIC_ALLOCATOR;   // Whether the default allocator is a "panic" allocator or not (i.e. panics on any call to it)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 	bool   ODIN_VALGRIND_SUPPORT;
 
@@ -1788,8 +1789,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	// Default to subsystem:CONSOLE on Windows targets
-	if (bc->ODIN_WINDOWS_SUBSYSTEM == "" && bc->metrics.os == TargetOs_windows) {
-		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
+	if (bc->ODIN_WINDOWS_SUBSYSTEM == Windows_Subsystem_UNKNOWN && bc->metrics.os == TargetOs_windows) {
+		bc->ODIN_WINDOWS_SUBSYSTEM = Windows_Subsystem_CONSOLE;
 	}
 
 	if (subtarget == Subtarget_Android) {
