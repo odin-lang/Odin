@@ -11,6 +11,8 @@ package windows_xaudio2
 import win "core:sys/windows"
 import "core:math"
 
+foreign import xa2 "system:xaudio2.lib"
+
 HRESULT         :: win.HRESULT
 IUnknown        :: win.IUnknown
 IUnknown_VTable :: win.IUnknown_VTable
@@ -93,8 +95,8 @@ DEVICE_INVALIDATED   :: HRESULT(-2003435516)    // 0x88960004 An audio device be
  **************************************************************************/
 
 // Used in Create, specifies which CPU(s) to use.
-PROCESSOR_FLAGS :: distinct bit_set[PROCESOR_FLAG; u32]
-PROCESOR_FLAG :: enum u32 {
+PROCESSOR_FLAGS :: distinct bit_set[PROCESSOR_FLAG; u32]
+PROCESSOR_FLAG :: enum u32 {
 	Processor1  = 0,
 	Processor2  = 1,
 	Processor3  = 2,
@@ -128,7 +130,7 @@ PROCESOR_FLAG :: enum u32 {
 	Processor31 = 30,
 	Processor32 = 31,
 }
-
+//ANY_PROCESSOR :: 0xffffffff
 USE_DEFAULT_PROCESSOR :: PROCESSOR_FLAGS{}
 
 // Returned by IXAudio2Voice.GetVoiceDetails
@@ -147,8 +149,8 @@ SEND_DESCRIPTOR :: struct #packed {
 
 // Used in the voice creation functions and in IXAudio2Voice.SetOutputVoices
 VOICE_SENDS :: struct #packed {
-	SendCount: u32,                  // Number of sends from this voice.
-	pSends:    [^]SEND_DESCRIPTOR,   // Array of SendCount send descriptors.
+	SendCount: u32,                                      // Number of sends from this voice.
+	pSends:    [^]SEND_DESCRIPTOR `fmt:"v,SendCount"`,   // Array of SendCount send descriptors.
 }
 
 // Used in EFFECT_CHAIN below
@@ -160,8 +162,8 @@ EFFECT_DESCRIPTOR :: struct #packed {
 
 // Used in the voice creation functions and in IXAudio2Voice.SetEffectChain
 EFFECT_CHAIN :: struct #packed {
-	EffectCount:        u32,                    // Number of effects in this voice's effect chain.
-	pEffectDescriptors: [^]EFFECT_DESCRIPTOR,   // Array of effect descriptors.
+	EffectCount:        u32,                                          // Number of effects in this voice's effect chain.
+	pEffectDescriptors: [^]EFFECT_DESCRIPTOR `fmt:"v,EffectCount"`,   // Array of effect descriptors.
 }
 
 // Used in FILTER_PARAMETERS below
@@ -183,28 +185,28 @@ FILTER_PARAMETERS :: struct #packed {
 
 // Used in IXAudio2SourceVoice.SubmitSourceBuffer
 BUFFER :: struct #packed {
-	Flags:      FLAGS,              // Either 0 or END_OF_STREAM.
-	AudioBytes: u32,                // Size of the audio data buffer in bytes.
-	pAudioData: [^]byte,            // Pointer to the audio data buffer.
-	PlayBegin:  u32,                // First sample in this buffer to be played.
-	PlayLength: u32,                // Length of the region to be played in samples, or 0 to play the whole buffer.
-	LoopBegin:  u32,                // First sample of the region to be looped.
-	LoopLength: u32,                // Length of the desired loop region in samples, or 0 to loop the entire buffer.
-	LoopCount:  u32,                // Number of times to repeat the loop region, or LOOP_INFINITE to loop forever.
-	pContext:   rawptr,             // Context value to be passed back in callbacks.
+	Flags:      FLAGS,                                  // Either 0 or END_OF_STREAM.
+	AudioBytes: u32,                                    // Size of the audio data buffer in bytes.
+	pAudioData: [^]byte `fmt:"v,AudioBytes"`,           // Pointer to the audio data buffer.
+	PlayBegin:  u32,                                    // First sample in this buffer to be played.
+	PlayLength: u32,                                    // Length of the region to be played in samples, or 0 to play the whole buffer.
+	LoopBegin:  u32,                                    // First sample of the region to be looped.
+	LoopLength: u32,                                    // Length of the desired loop region in samples, or 0 to loop the entire buffer.
+	LoopCount:  u32,                                    // Number of times to repeat the loop region, or LOOP_INFINITE to loop forever.
+	pContext:   rawptr,                                 // Context value to be passed back in callbacks.
 }
 
 // Used in IXAudio2SourceVoice.SubmitSourceBuffer when submitting XWMA data.
 // NOTE: If an XWMA sound is submitted in more than one buffer, each buffer's pDecodedPacketCumulativeBytes[PacketCount-1] value must be subtracted from all the entries in the next buffer's pDecodedPacketCumulativeBytes array.
 // And whether a sound is submitted in more than one buffer or not, the final buffer of the sound should use the END_OF_STREAM flag, or else the client must call IXAudio2SourceVoice.Discontinuity after submitting it.
 BUFFER_WMA :: struct #packed {
-	pDecodedPacketCumulativeBytes: [^]u32,  // Decoded packet's cumulative size array. Each element is the number of bytes accumulated when the corresponding XWMA packet is decoded in order.  The array must have PacketCount elements.
-	PacketCount:                   u32,     // Number of XWMA packets submitted. Must be >= 1 and divide evenly into BUFFER.AudioBytes.
+	pDecodedPacketCumulativeBytes: [^]u32 `fmt:"v,PacketCount"`,  // Decoded packet's cumulative size array. Each element is the number of bytes accumulated when the corresponding XWMA packet is decoded in order.  The array must have PacketCount elements.
+	PacketCount:                   u32,                           // Number of XWMA packets submitted. Must be >= 1 and divide evenly into BUFFER.AudioBytes.
 }
 
 // Returned by IXAudio2SourceVoice.GetState
 VOICE_STATE :: struct #packed {
-	pCurrentBufferContext: rawptr,      // The pContext value provided in the BUFFER that is currently being processed, or NULL if there are no buffers in the queue.
+	pCurrentBufferContext: rawptr,      // The pContext value provided in the BUFFER that is currently being processed, or nil if there are no buffers in the queue.
 	BuffersQueued:         u32,         // Number of buffers currently queued on the voice (including the one that is being processed).
 	SamplesPlayed:         u64,         // Total number of samples produced by the voice since it began processing the current audio stream. If VOICE_NOSAMPLESPLAYED is specified in the call to IXAudio2SourceVoice.GetState, this member will not be calculated, saving CPU.
 }
@@ -336,8 +338,7 @@ IXAudio2_VTable :: struct {
 	StopEngine: proc "system" (this: ^IXAudio2),
 
 	// NAME: IXAudio2.CommitChanges
-	// DESCRIPTION: Atomically applies a set of operations previously tagged
-	//              with a given identifier.
+	// DESCRIPTION: Atomically applies a set of operations previously tagged with a given identifier.
 	// ARGUMENTS:
 	//  OperationSet - Identifier of the set of operations to be applied.
 	CommitChanges: proc "system" (this: ^IXAudio2, OperationSet: u32) -> HRESULT,
@@ -352,7 +353,7 @@ IXAudio2_VTable :: struct {
 	// DESCRIPTION: Configures XAudio2's debug output (in debug builds only).
 	// ARGUMENTS:
 	//  pDebugConfiguration - Structure describing the debug output behavior.
-	//  pReserved - Optional parameter; must be NULL.
+	//  pReserved - Optional parameter; must be nil.
 	SetDebugConfiguration: proc "system" (this: ^IXAudio2, pDebugConfiguration: ^DEBUG_CONFIGURATION, pReserved: rawptr = nil),
 }
 
@@ -399,8 +400,7 @@ IXAudio2Voice_VTable :: struct {
 	GetVoiceDetails: proc "system" (this: ^IXAudio2Voice, pVoiceDetails: ^VOICE_DETAILS),
 
 	// NAME: IXAudio2Voice.SetOutputVoices
-	// DESCRIPTION: Replaces the set of submix/mastering voices that receive
-	//              this voice's output.
+	// DESCRIPTION: Replaces the set of submix/mastering voices that receive this voice's output.
 	// ARGUMENTS:
 	//  pSendList - Optional list of voices this voice should send audio to.
 	SetOutputVoices: proc "system" (this: ^IXAudio2Voice, pSendList: [^]VOICE_SENDS) -> HRESULT,
@@ -709,37 +709,15 @@ IXAudio2VoiceCallback_VTable :: struct {
  *
  *  Flags - Flags specifying the XAudio2 object's behavior.
  *
- *  XAudio2Processor - A PROCESSOR_FLAGS value that specifies the hardware threads (Xbox) or processors (Windows) that XAudio2 will use.
+ *  Processor - A PROCESSOR_FLAGS value that specifies the hardware threads (Xbox) or processors (Windows) that XAudio2 will use.
  *          Note that XAudio2 supports concurrent processing on multiple threads, using any combination of PROCESSOR_FLAGS flags.
  *          The values are platform-specific; platform-independent code can use USE_DEFAULT_PROCESSOR to use the default on each platform.
  *
  **************************************************************************/
 
-Create :: proc "stdcall" (ppXAudio2: ^^IXAudio2, Flags: FLAGS = {}, XAudio2Processor: PROCESSOR_FLAGS = {.Processor1}) -> HRESULT {
-	CreateWithVersionInfoFunc :: #type proc "c" (a0: ^^IXAudio2, a1: FLAGS, a2: PROCESSOR_FLAGS, a3: win.DWORD) -> HRESULT
-	CreateInfoFunc :: #type proc "c" (a0: ^^IXAudio2, a1: FLAGS, a2: PROCESSOR_FLAGS) -> HRESULT
-
-	dll_Instance: win.HMODULE
-	create_with_version_info: CreateWithVersionInfoFunc
-	create_info: CreateInfoFunc
-
-	if dll_Instance == nil {
-		dll_Instance = win.LoadLibraryExW(win.L("xaudio2_9.dll"), nil, {.LOAD_LIBRARY_SEARCH_DEFAULT_DIRS})
-		if dll_Instance == nil {
-			return HRESULT(win.GetLastError())
-		}
-		create_with_version_info = cast(CreateWithVersionInfoFunc)win.GetProcAddress(dll_Instance, "XAudio2CreateWithVersionInfo")
-		if create_with_version_info == nil {
-			create_info = cast(CreateInfoFunc)win.GetProcAddress(dll_Instance, "XAudio2Create")
-			if create_info == nil {
-				return HRESULT(win.GetLastError())
-			}
-		}
-	}
-	if create_with_version_info != nil {
-		return create_with_version_info(ppXAudio2, Flags, XAudio2Processor, 0x0A000010)
-	}
-	return create_info(ppXAudio2, Flags, XAudio2Processor)
+@(default_calling_convention="system", link_prefix="XAudio2")
+foreign xa2 {
+	Create :: proc(ppXaudio2: ^^IXAudio2, Flags: FLAGS = {}, Processor: PROCESSOR_FLAGS = {.Processor1}) -> HRESULT ---
 }
 
 /**************************************************************************
@@ -749,12 +727,12 @@ Create :: proc "stdcall" (ppXAudio2: ^^IXAudio2, Flags: FLAGS = {}, XAudio2Proce
  **************************************************************************/
 
 // Calculate the argument to SetVolume from a decibel value
-DecibelsToAmplitudeRatio :: proc "contextless" (Decibels: f32) -> f32 {
+DecibelsToAmplitudeRatio :: #force_inline proc "contextless" (Decibels: f32) -> f32 {
 	return math.pow_f32(10.0, Decibels / 20.0)
 }
 
 // Recover a volume in decibels from an amplitude factor
-AmplitudeRatioToDecibels :: proc "contextless" (Volume: f32) -> f32 {
+AmplitudeRatioToDecibels :: #force_inline proc "contextless" (Volume: f32) -> f32 {
 	if Volume == 0 {
 		return min(f32)
 	}
@@ -762,14 +740,14 @@ AmplitudeRatioToDecibels :: proc "contextless" (Volume: f32) -> f32 {
 }
 
 // Calculate the argument to SetFrequencyRatio from a semitone value
-SemitonesToFrequencyRatio :: proc "contextless" (Semitones: f32) -> f32 {
+SemitonesToFrequencyRatio :: #force_inline proc "contextless" (Semitones: f32) -> f32 {
 	// FrequencyRatio = 2 ^ Octaves
 	//                = 2 ^ (Semitones / 12)
 	return math.pow_f32(2.0, Semitones / 12.0)
 }
 
 // Recover a pitch in semitones from a frequency ratio
-FrequencyRatioToSemitones :: proc "contextless" (FrequencyRatio: f32) -> f32 {
+FrequencyRatioToSemitones :: #force_inline proc "contextless" (FrequencyRatio: f32) -> f32 {
 	// Semitones = 12 * log2(FrequencyRatio)
 	//           = 12 * log2(10) * log10(FrequencyRatio)
 	return 12.0 * math.log2_f32(FrequencyRatio)
@@ -779,7 +757,7 @@ FrequencyRatioToSemitones :: proc "contextless" (FrequencyRatio: f32) -> f32 {
 // Use CutoffFrequencyToOnePoleCoefficient() for one-pole filter types.
 // Note that the highest CutoffFrequency supported is SampleRate/6.
 // Higher values of CutoffFrequency will return MAX_FILTER_FREQUENCY.
-CutoffFrequencyToRadians :: proc "contextless" (CutoffFrequency: f32, SampleRate: u32) -> f32 {
+CutoffFrequencyToRadians :: #force_inline proc "contextless" (CutoffFrequency: f32, SampleRate: u32) -> f32 {
 	if u32(CutoffFrequency * 6.0) >= SampleRate {
 		return MAX_FILTER_FREQUENCY
 	}
@@ -787,14 +765,14 @@ CutoffFrequencyToRadians :: proc "contextless" (CutoffFrequency: f32, SampleRate
 }
 
 // Convert from radian frequencies back to absolute frequencies in Hertz
-RadiansToCutoffFrequency :: proc "contextless" (Radians: f32, SampleRate: f32) -> f32 {
+RadiansToCutoffFrequency :: #force_inline proc "contextless" (Radians: f32, SampleRate: f32) -> f32 {
 	return SampleRate * math.asin_f32(Radians / 2.0) / math.PI
 }
 
 // Convert from filter cutoff frequencies expressed in Hertz to the filter coefficients used with FILTER_PARAMETERS.Frequency,
 // LowPassOnePoleFilter and HighPassOnePoleFilter filter types only.
 // Use CutoffFrequencyToRadians() for state-variable filter types.
-CutoffFrequencyToOnePoleCoefficient :: proc "contextless" (CutoffFrequency: f32, SampleRate: u32) -> f32 {
+CutoffFrequencyToOnePoleCoefficient :: #force_inline proc "contextless" (CutoffFrequency: f32, SampleRate: u32) -> f32 {
 	if u32(CutoffFrequency) >= SampleRate {
 		return MAX_FILTER_FREQUENCY
 	}

@@ -1,7 +1,7 @@
 #+build windows
 
 /* NOTES:
-	1.  Definition of terms:
+    1.  Definition of terms:
 	    LFE: Low Frequency Effect -- always omnidirectional.
 	    LPF: Low Pass Filter, divided into two classifications:
 		 Direct -- Applied to the direct signal path,
@@ -9,15 +9,15 @@
 		 Reverb -- Applied to the reverb signal path,
 			   used for occlusion effects only.
 
-	2.  Volume level is expressed as a linear amplitude scaler:
-	1.0f represents no attenuation applied to the original signal,
-	0.5f denotes an attenuation of 6dB, and 0.0f results in silence.
-	Amplification (volume > 1.0f) is also allowed, and is not clamped.
+    2.  Volume level is expressed as a linear amplitude scaler:
+	1.0 represents no attenuation applied to the original signal,
+	0.5 denotes an attenuation of 6dB, and 0.0 results in silence.
+	Amplification (volume > 1.0) is also allowed, and is not clamped.
 
-	LPF values range from 1.0f representing all frequencies pass through,
-	to 0.0f which results in silence as all frequencies are filtered out.
+	LPF values range from 1.0 representing all frequencies pass through,
+	to 0.0 which results in silence as all frequencies are filtered out.
 
-	3.  X3DAudio uses a left-handed Cartesian coordinate system with values
+    3.  X3DAudio uses a left-handed Cartesian coordinate system with values
 	on the x-axis increasing from left to right, on the y-axis from
 	bottom to top, and on the z-axis from near to far.
 	Azimuths are measured clockwise from a given reference direction.
@@ -29,7 +29,7 @@
 	Metric constants are supplied only as a convenience.
 	Distance is calculated using the Euclidean norm formula.
 
-	4.  Only real values are permissible with functions using 32-bit
+    4.  Only real values are permissible with functions using 32-bit
 	float parameters -- NAN and infinite values are not accepted.
 	All computation occurs in 32-bit precision mode.                    */
 
@@ -37,34 +37,13 @@
 package windows_xaudio2
 
 import "core:math"
+import win "core:sys/windows"
 
 foreign import xa2 "system:xaudio2.lib"
 
+SPEAKER_FLAGS :: win.SPEAKER_FLAGS
+
 //--------------<D-E-F-I-N-I-T-I-O-N-S>-------------------------------------//
-// speaker geometry configuration flags, specifies assignment of channels to speaker positions, defined as per WAVEFORMATEXTENSIBLE.dwChannelMask
-SPEAKER_FLAGS :: distinct bit_set[SPEAKER_FLAG; u32]
-SPEAKER_FLAG :: enum u32 {
-	FRONT_LEFT            = 0,
-	FRONT_RIGHT           = 1,
-	FRONT_CENTER          = 2,
-	LOW_FREQUENCY         = 3,
-	BACK_LEFT             = 4,
-	BACK_RIGHT            = 5,
-	FRONT_LEFT_OF_CENTER  = 6,
-	FRONT_RIGHT_OF_CENTER = 7,
-	BACK_CENTER           = 8,
-	SIDE_LEFT             = 9,
-	SIDE_RIGHT            = 10,
-	TOP_CENTER            = 11,
-	TOP_FRONT_LEFT        = 12,
-	TOP_FRONT_CENTER      = 13,
-	TOP_FRONT_RIGHT       = 14,
-	TOP_BACK_LEFT         = 15,
-	TOP_BACK_CENTER       = 16,
-	TOP_BACK_RIGHT        = 17,
-	//RESERVED            = 0x7FFC0000, // bit mask locations reserved for future use
-	ALL                   = 31,         // used to specify that any possible permutation of speaker configurations
-}
 
 // standard speaker geometry configurations, used with Initialize
 SPEAKER_MONO             :: SPEAKER_FLAGS{.FRONT_CENTER}
@@ -100,7 +79,7 @@ CALCULATE_FLAG :: enum u32 {
 }
 
 //--------------<D-A-T-A---T-Y-P-E-S>---------------------------------------//
-VECTOR :: [3]f32 // float 3D vector
+VECTOR :: distinct [3]f32 // float 3D vector
 
 // instance handle of precalculated constants
 HANDLE :: distinct [HANDLE_BYTESIZE]byte
@@ -108,75 +87,74 @@ HANDLE :: distinct [HANDLE_BYTESIZE]byte
 // Distance curve point:
 // Defines a DSP setting at a given normalized distance.
 DISTANCE_CURVE_POINT :: struct #packed {
-	Distance:   f32,   // normalized distance, must be within [0.0f, 1.0f]
+	Distance:   f32,   // normalized distance, must be within [0.0, 1.0]
 	DSPSetting: f32,   // DSP setting
 }
 
 // Distance curve:
 // A piecewise curve made up of linear segments used to define DSP behaviour with respect to normalized distance.
 //
-// Note that curve point distances are normalized within [0.0f, 1.0f].
+// Note that curve point distances are normalized within [0.0, 1.0].
 // EMITTER.CurveDistanceScaler must be used to scale the normalized distances to user-defined world units.
-// For distances beyond CurveDistanceScaler * 1.0f, pPoints[PointCount-1].DSPSetting is used as the DSP setting.
+// For distances beyond CurveDistanceScaler * 1.0, pPoints[PointCount-1].DSPSetting is used as the DSP setting.
 //
 // All distance curve spans must be such that:
 //      pPoints[k-1].DSPSetting + ((pPoints[k].DSPSetting-pPoints[k-1].DSPSetting) / (pPoints[k].Distance-pPoints[k-1].Distance)) * (pPoints[k].Distance-pPoints[k-1].Distance) != NAN or infinite values
 // For all points in the distance curve where 1 <= k < PointCount.
 DISTANCE_CURVE :: struct #packed {
-	pPoints:    [^]DISTANCE_CURVE_POINT `fmt:"v,PointCount"`, // distance curve point array, must have at least PointCount elements with no duplicates and be sorted in ascending order with respect to Distance
-	PointCount: u32,                                          // number of distance curve points, must be >= 2 as all distance curves must have at least two endpoints, defining DSP settings at 0.0f and 1.0f normalized distance
+	pPoints:    [^]DISTANCE_CURVE_POINT `fmt:"v,PointCount"`,    // distance curve point array, must have at least PointCount elements with no duplicates and be sorted in ascending order with respect to Distance
+	PointCount: u32,                                             // number of distance curve points, must be >= 2 as all distance curves must have at least two endpoints, defining DSP settings at 0.0 and 1.0 normalized distance
 }
 Default_LinearCurvePoints := [2]DISTANCE_CURVE_POINT{{0.0, 1.0}, {1.0, 0.0}}
 Default_LinearCurve       := DISTANCE_CURVE{&Default_LinearCurvePoints[0], 2}
 
+// Cone:
+// Specifies directionality for a listener or single-channel emitter by modifying DSP behaviour with respect to its front orientation.
+// This is modeled using two sound cones: an inner cone and an outer cone. On/within the inner cone, DSP settings are scaled by the inner values.
+// On/beyond the outer cone, DSP settings are scaled by the outer values. If on both the cones, DSP settings are scaled by the inner values only.
+// Between the two cones, the scaler is linearly interpolated between the inner and outer values.  Set both cone angles to 0 or TAU for omnidirectionality using only the outer or inner values respectively.
 CONE :: struct #packed {
-	InnerAngle:  f32, // inner cone angle in radians, must be within [0.0f, TAU]
-	OuterAngle:  f32, // outer cone angle in radians, must be within [InnerAngle, TAU]
+	InnerAngle:  f32,   // inner cone angle in radians, must be within [0.0, TAU]
+	OuterAngle:  f32,   // outer cone angle in radians, must be within [InnerAngle, TAU]
 
-	InnerVolume: f32, // volume level scaler on/within inner cone, used only for matrix calculations, must be within [0.0f, 2.0f] when used
-	OuterVolume: f32, // volume level scaler on/beyond outer cone, used only for matrix calculations, must be within [0.0f, 2.0f] when used
-	InnerLPF:    f32, // LPF (both direct and reverb paths) coefficient subtrahend on/within inner cone, used only for LPF (both direct and reverb paths) calculations, must be within [0.0f, 1.0f] when used
-	OuterLPF:    f32, // LPF (both direct and reverb paths) coefficient subtrahend on/beyond outer cone, used only for LPF (both direct and reverb paths) calculations, must be within [0.0f, 1.0f] when used
-	InnerReverb: f32, // reverb send level scaler on/within inner cone, used only for reverb calculations, must be within [0.0f, 2.0f] when used
-	OuterReverb: f32, // reverb send level scaler on/beyond outer cone, used only for reverb calculations, must be within [0.0f, 2.0f] when used
+	InnerVolume: f32,   // volume level scaler on/within inner cone, used only for matrix calculations, must be within [0.0, 2.0] when used
+	OuterVolume: f32,   // volume level scaler on/beyond outer cone, used only for matrix calculations, must be within [0.0, 2.0] when used
+	InnerLPF:    f32,   // LPF (both direct and reverb paths) coefficient subtrahend on/within inner cone, used only for LPF (both direct and reverb paths) calculations, must be within [0.0, 1.0] when used
+	OuterLPF:    f32,   // LPF (both direct and reverb paths) coefficient subtrahend on/beyond outer cone, used only for LPF (both direct and reverb paths) calculations, must be within [0.0, 1.0] when used
+	InnerReverb: f32,   // reverb send level scaler on/within inner cone, used only for reverb calculations, must be within [0.0, 2.0] when used
+	OuterReverb: f32,   // reverb send level scaler on/beyond outer cone, used only for reverb calculations, must be within [0.0, 2.0] when used
 }
 Default_DirectionalCone := CONE{math.PI / 2, math.PI, 1.0, 0.708, 0.0, 0.25, 0.708, 1.0}
 
 // Listener:
 // Defines a point of 3D audio reception.
-//
 // The cone is directed by the listener's front orientation.
 LISTENER :: struct #packed {
-	OrientFront: VECTOR, // orientation of front direction, used only for matrix and delay calculations or listeners with cones for matrix, LPF (both direct and reverb paths), and reverb calculations, must be normalized when used
-	OrientTop:   VECTOR, // orientation of top direction, used only for matrix and delay calculations, must be orthonormal with OrientFront when used
+	OrientFront: VECTOR,   // orientation of front direction, used only for matrix and delay calculations or listeners with cones for matrix, LPF (both direct and reverb paths), and reverb calculations, must be normalized when used
+	OrientTop:   VECTOR,   // orientation of top direction, used only for matrix and delay calculations, must be orthonormal with OrientFront when used
 
-	Position:    VECTOR, // position in user-defined world units, does not affect Velocity
-	Velocity:    VECTOR, // velocity vector in user-defined world units/second, used only for doppler calculations, does not affect Position
+	Position: VECTOR,      // position in user-defined world units, does not affect Velocity
+	Velocity: VECTOR,      // velocity vector in user-defined world units/second, used only for doppler calculations, does not affect Position
 
-	pCone:       ^CONE,  // sound cone, used only for matrix, LPF (both direct and reverb paths), and reverb calculations, NULL specifies omnidirectionality
+	pCone: ^CONE,          // sound cone, used only for matrix, LPF (both direct and reverb paths), and reverb calculations, nil specifies omnidirectionality
 }
 
 // Emitter:
 // Defines a 3D audio source, divided into two classifications:
-//
 // Single-point -- For use with single-channel sounds.
 //                 Positioned at the emitter base, i.e. the channel radius and azimuth are ignored if the number of channels == 1.
-//
 //                 May be omnidirectional or directional using a cone.
 //                 The cone originates from the emitter base position, and is directed by the emitter's front orientation.
-//
 // Multi-point  -- For use with multi-channel sounds.
 //                 Each non-LFE channel is positioned using an azimuth along the channel radius with respect to the front orientation vector in the plane orthogonal to the top orientation vector.
 //                 An azimuth of TAU specifies a channel is an LFE. Such channels are positioned at the emitter base and are calculated with respect to pLFECurve only, never pVolumeCurve.
-//
 //                 Multi-point emitters are always omnidirectional, i.e. the cone is ignored if the number of channels > 1.
-//
 // Note that many properties are shared among all channel points, locking certain behaviour with respect to the emitter base position.
 // For example, doppler shift is always calculated with respect to the emitter base position and so is constant for all its channel points.
 // Distance curve calculations are also with respect to the emitter base position, with the curves being calculated independently of each other.
 // For instance, volume and LFE calculations do not affect one another.
 EMITTER :: struct #packed {
-	pCone: ^CONE,   // sound cone, used only with single-channel emitters for matrix, LPF (both direct and reverb paths), and reverb calculations, NULL specifies omnidirectionality
+	pCone: ^CONE,   // sound cone, used only with single-channel emitters for matrix, LPF (both direct and reverb paths), and reverb calculations, nil specifies omnidirectionality
 
 	OrientFront: VECTOR,   // orientation of front direction, used only for emitter angle calculations or with multi-channel emitters for matrix calculations or single-channel emitters with cones for matrix, LPF (both direct and reverb paths), and reverb calculations, must be normalized when used
 	OrientTop:   VECTOR,   // orientation of top direction, used only with multi-channel emitters for matrix calculations, must be orthonormal with OrientFront when used
@@ -184,26 +162,25 @@ EMITTER :: struct #packed {
 	Position: VECTOR,   // position in user-defined world units, does not affect Velocity
 	Velocity: VECTOR,   // velocity vector in user-defined world units/second, used only for doppler calculations, does not affect Position
 
-	InnerRadius:      f32,    // inner radius, must be within [0.0f, max(f32)]
-	InnerRadiusAngle: f32,    // inner radius angle, must be within [0.0f, PI/4.0)
+	InnerRadius:      f32,    // inner radius, must be within [0.0, max(f32)]
+	InnerRadiusAngle: f32,    // inner radius angle, must be within [0.0, PI/4.0)
 
-	ChannelCount:     u32,                           // number of sound channels, must be > 0
-	ChannelRadius:    f32,                           // channel radius, used only with multi-channel emitters for matrix calculations, must be >= 0.0f when used
-	pChannelAzimuths: [^]f32 `fmt:"v,ChannelCount"`, // channel azimuth array, used only with multi-channel emitters for matrix calculations, contains positions of each channel expressed in radians along the channel radius with respect to the front orientation vector in the plane orthogonal to the top orientation vector, or TAU to specify an LFE channel, must have at least ChannelCount elements, all within [0.0f, TAU] when used
+	ChannelCount:     u32,                              // number of sound channels, must be > 0
+	ChannelRadius:    f32,                              // channel radius, used only with multi-channel emitters for matrix calculations, must be >= 0.0 when used
+	pChannelAzimuths: [^]f32 `fmt:"v,ChannelCount"`,    // channel azimuth array, used only with multi-channel emitters for matrix calculations, contains positions of each channel expressed in radians along the channel radius with respect to the front orientation vector in the plane orthogonal to the top orientation vector, or TAU to specify an LFE channel, must have at least ChannelCount elements, all within [0.0, TAU] when used
 
-	pVolumeCurve:    ^DISTANCE_CURVE,    // volume level distance curve, used only for matrix calculations, NULL specifies a default curve that conforms to the inverse square law, calculated in user-defined world units with distances <= CurveDistanceScaler clamped to no attenuation
-	pLFECurve:       ^DISTANCE_CURVE,    // LFE level distance curve, used only for matrix calculations, NULL specifies a default curve that conforms to the inverse square law, calculated in user-defined world units with distances <= CurveDistanceScaler clamped to no attenuation
-	pLPFDirectCurve: ^DISTANCE_CURVE,    // LPF direct-path coefficient distance curve, used only for LPF direct-path calculations, NULL specifies the default curve: [0.0f,1.0f], [1.0f,0.75f]
-	pLPFReverbCurve: ^DISTANCE_CURVE,    // LPF reverb-path coefficient distance curve, used only for LPF reverb-path calculations, NULL specifies the default curve: [0.0f,0.75f], [1.0f,0.75f]
-	pReverbCurve:    ^DISTANCE_CURVE,    // reverb send level distance curve, used only for reverb calculations, NULL specifies the default curve: [0.0f,1.0f], [1.0f,0.0f]
+	pVolumeCurve:    ^DISTANCE_CURVE,    // volume level distance curve, used only for matrix calculations, nil specifies a default curve that conforms to the inverse square law, calculated in user-defined world units with distances <= CurveDistanceScaler clamped to no attenuation
+	pLFECurve:       ^DISTANCE_CURVE,    // LFE level distance curve, used only for matrix calculations, nil specifies a default curve that conforms to the inverse square law, calculated in user-defined world units with distances <= CurveDistanceScaler clamped to no attenuation
+	pLPFDirectCurve: ^DISTANCE_CURVE,    // LPF direct-path coefficient distance curve, used only for LPF direct-path calculations, nil specifies the default curve: [0.0,1.0], [1.0,0.75]
+	pLPFReverbCurve: ^DISTANCE_CURVE,    // LPF reverb-path coefficient distance curve, used only for LPF reverb-path calculations, nil specifies the default curve: [0.0,0.75], [1.0,0.75]
+	pReverbCurve:    ^DISTANCE_CURVE,    // reverb send level distance curve, used only for reverb calculations, nil specifies the default curve: [0.0,1.0], [1.0,0.0]
 
 	CurveDistanceScaler: f32,   // curve distance scaler, used to scale normalized distance curves to user-defined world units and/or exaggerate their effect, used only for matrix, LPF (both direct and reverb paths), and reverb calculations, must be within [min(f32), max(f32)] when used
-	DopplerScaler:       f32,   // doppler shift scaler, used to exaggerate doppler shift effect, used only for doppler calculations, must be within [0.0f, max(f32)] when used
+	DopplerScaler:       f32,   // doppler shift scaler, used to exaggerate doppler shift effect, used only for doppler calculations, must be within [0.0, max(f32)] when used
 }
 
 // DSP settings:
 // Receives results from a call to Calculate to be sent to the low-level audio rendering API for 3D signal processing.
-//
 // The user is responsible for allocating the matrix coefficient table, delay time array, and initializing the channel counts when used.
 DSP_SETTINGS :: struct #packed {
 	pMatrixCoefficients: [^]f32,  // [inout] matrix coefficient table, receives an array representing the volume level used to send from source channel S to destination channel D, stored as pMatrixCoefficients[SrcChannelCount * D + S], must have at least SrcChannelCount*DstChannelCount elements

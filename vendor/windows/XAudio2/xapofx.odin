@@ -132,7 +132,7 @@ FXECHO_PARAMETERS :: struct #packed {
 @(default_calling_convention="cdecl")
 foreign xa2 {
 	// creates instance of requested XAPO, use Release to free instance
-    	//  pInitData        - [in] effect-specific initialization parameters, may be NULL if InitDataByteSize == 0
-    	//  InitDataByteSize - [in] size of pInitData in bytes, may be 0 if pInitData is NULL
+    	//  pInitData        - [in] effect-specific initialization parameters, may be nil if InitDataByteSize == 0
+    	//  InitDataByteSize - [in] size of pInitData in bytes, may be 0 if pInitData is nil
 	CreateFX :: proc(clsid: win.REFCLSID, pEffect: ^^IUnknown, pInitDat: rawptr = nil, InitDataByteSize: u32 = 0) -> HRESULT ---
 }

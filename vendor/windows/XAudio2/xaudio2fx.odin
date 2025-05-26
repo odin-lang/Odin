@@ -10,8 +10,7 @@ foreign import xa2 "system:xaudio2.lib"
  *
  * Effect creation functions.
  *
- * On Xbox the application can link with the debug library to use the debug
- * functionality.
+ * On Xbox the application can link with the debug library to use the debug functionality.
  *
  **************************************************************************/
 
@@ -32,9 +31,9 @@ foreign xa2 {
 // The user is responsible for allocating pPeakLevels, pRMSLevels, and initializing ChannelCount accordingly.
 // The volume meter does not support SetEffectParameters().
 VOLUMEMETER_LEVELS :: struct #packed {
-	pPeakLevels:  [^]f32 `fmt:"v,ChannelCount"`, // Peak levels table: receives maximum absolute level for each channel over a processing pass, may be NULL if pRMSLevls != NULL, otherwise must have at least ChannelCount elements.
-	pRMSLevels:   [^]f32 `fmt:"v,ChannelCount"`, // Root mean square levels table: receives RMS level for each channel over a processing pass, may be NULL if pPeakLevels != NULL, otherwise must have at least ChannelCount elements.
-	ChannelCount: u32,                           // Number of channels being processed by the volume meter APO
+	pPeakLevels:  [^]f32 `fmt:"v,ChannelCount"`,   // Peak levels table: receives maximum absolute level for each channel over a processing pass, may be nil if pRMSLevls != nil, otherwise must have at least ChannelCount elements.
+	pRMSLevels:   [^]f32 `fmt:"v,ChannelCount"`,   // Root mean square levels table: receives RMS level for each channel over a processing pass, may be nil if pPeakLevels != nil, otherwise must have at least ChannelCount elements.
+	ChannelCount: u32, 	                           // Number of channels being processed by the volume meter APO
 }
 
 /**************************************************************************
@@ -87,7 +86,7 @@ REVERB_PARAMETERS :: struct #packed {
 	Density:         f32,         // [0, 100] (percentage)
 	RoomSize:        f32,         // [1, 100] in feet
 	// component control
-	DisableLateField: b32,        // TRUE to disable late field reflections
+	DisableLateField: b32,        // true to disable late field reflections
 }
 
 // Maximum, minimum and default values for the parameters above
@@ -244,13 +243,13 @@ ReverbConvertI3DL2ToNative :: proc "contextless" (pI3DL2: ^REVERB_I3DL2_PARAMETE
 
 	if pI3DL2.DecayHFRatio >= 1.0 {
 		index := i32(-4.0 * math.log10_f32(pI3DL2.DecayHFRatio))
-		if index < -8 { index = -8 }
+		if index < -8 {index = -8}
 		pNative.LowEQGain  = byte((index < 0) ? index + 8 : 8)
 		pNative.HighEQGain = 8
 		pNative.DecayTime  = pI3DL2.DecayTime * pI3DL2.DecayHFRatio
 	} else {
 		index := i32(4.0 * math.log10_f32(pI3DL2.DecayHFRatio))
-		if index < -8 { index = -8 }
+		if index < -8 {index = -8}
 		pNative.LowEQGain  = 8
 		pNative.HighEQGain = byte((index < 0) ? index + 8 : 8)
 		pNative.DecayTime  = pI3DL2.DecayTime
