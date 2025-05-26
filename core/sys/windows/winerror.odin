@@ -275,7 +275,7 @@ MAKE_HRESULT :: #force_inline proc "contextless" (#any_int sev: int, #any_int fa
 }
 
 HRESULT_FROM_WIN32 :: #force_inline proc "contextless" (#any_int code: int) -> HRESULT {
-	return HRESULT(code) <= 0 ? HRESULT(code) : HRESULT((code & 0x0000FFFF) | (int(FACILITY.WIN32) << 16) | 0x80000000)
+	return HRESULT(code) <= 0 ? HRESULT(code) : HRESULT(uint(code & 0x0000FFFF) | (uint(FACILITY.WIN32) << 16) | 0x80000000)
 }
 
 DECODE_HRESULT :: #force_inline proc "contextless" (#any_int hr: int) -> (SEVERITY, FACILITY, int) {

@@ -610,7 +610,7 @@ WAVEFORMATEXTENSIBLE :: struct {
 		wSamplesPerBlock:    WORD,      /* valid if wBitsPerSample==0 */
 		wReserved:           WORD,      /* If neither applies, set to zero. */
 	},
-	dwChannelMask: SPEAKER_FLAGS,           /* which channels are present in stream  */
+	dwChannelMask: SPEAKER_FLAGS,       /* which channels are present in stream  */
 	SubFormat:     GUID,
 }
 
