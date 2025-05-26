@@ -243,13 +243,13 @@ ReverbConvertI3DL2ToNative :: proc "contextless" (pI3DL2: ^REVERB_I3DL2_PARAMETE
 
 	if pI3DL2.DecayHFRatio >= 1.0 {
 		index := i32(-4.0 * math.log10_f32(pI3DL2.DecayHFRatio))
-		if index < -8 do index = -8
+		if index < -8 {index = -8}
 		pNative.LowEQGain  = byte((index < 0) ? index + 8 : 8)
 		pNative.HighEQGain = 8
 		pNative.DecayTime  = pI3DL2.DecayTime * pI3DL2.DecayHFRatio
 	} else {
 		index := i32(4.0 * math.log10_f32(pI3DL2.DecayHFRatio))
-		if index < -8 do index = -8
+		if index < -8 {index = -8}
 		pNative.LowEQGain  = 8
 		pNative.HighEQGain = byte((index < 0) ? index + 8 : 8)
 		pNative.DecayTime  = pI3DL2.DecayTime
