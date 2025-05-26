@@ -699,15 +699,15 @@ test_case_insensitive :: proc(t: ^testing.T) {
 test_multiline :: proc(t: ^testing.T) {
 	{
 		EXPR :: `^hellope$world$`
-		check_expression(t, EXPR, "\nhellope\nworld\n", "\nhellope\nworld\n", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "hellope\nworld\n", "hellope\nworld\n", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "hellope\nworld", "hellope\nworld", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "hellope\rworld", "hellope\rworld", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "hellope\r\nworld", "hellope\r\nworld", extra_flags = { .Multiline })
 	}
 	{
-		EXPR :: `^?.$`
-		check_expression(t, EXPR, "\nh", "\nh", extra_flags = { .Multiline })
+		EXPR :: `^.$`
 		check_expression(t, EXPR, "h", "h", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "h\n", "h\n", extra_flags = { .Multiline })
 	}
 	{
 		EXPR :: `^$`
@@ -1217,6 +1217,57 @@ iterator_vectors := []Iterator_Test{
 		`aaa`, `$`, {},
 		{
 			{pos = {{3,  3}}, groups = {""}},
+		},
+	},
+	// Multiline iteration is supported, but it must follow the `^...$` scheme.
+	//
+	// Any usage outside of this strict syntax will produce predictable but
+	// unusual outputs, as `^` is defined to assert the start of a string or
+	// that a newline sequence was previously consumed, and `$` consumes a
+	// newline sequence or asserts the end of the string.
+	{
+		"foo1\nfoo2\r\nfoo3\rfoo4", `^foo.$`, {.Multiline},
+		{
+			{pos = {{0,  5}}, groups = {"foo1\n"}},
+			{pos = {{5,  11}}, groups = {"foo2\r\n"}},
+			{pos = {{11, 16}}, groups = {"foo3\r"}},
+			{pos = {{16, 20}}, groups = {"foo4"}},
+		},
+	},
+	{
+		"a\nb\n\r", `^$`, {.Multiline},
+		{},
+	},
+	{
+		"a\nb\n", `^$`, {.Multiline},
+		{},
+	},
+	{
+		"a\nb", `^$`, {.Multiline},
+		{},
+	},
+	// Multiline anchors must work within groups, as people are going to end up
+	// using them in there and we do not forbid it.
+	{
+		"a\nb\na\nb", `(?:^a$|^b$)`, {.Multiline},
+		{
+			{pos = {{0, 2}}, groups = {"a\n"}},
+			{pos = {{2, 4}}, groups = {"b\n"}},
+			{pos = {{4, 6}}, groups = {"a\n"}},
+			{pos = {{6, 7}}, groups = {"b"}},
+		},
+	},
+	// The following patterns are valid uses of optional anchors and must match.
+	{
+		"a\nb\na\nb", `^a(?:b|$)`, {.Multiline},
+		{
+			{pos = {{0, 2}}, groups = {"a\n"}},
+		},
+	},
+	{
+		"a\nb\na\nb", `^ab?$?`, {.Multiline},
+		{
+			{pos = {{0, 2}}, groups = {"a\n"}},
 		},
 	},
 }

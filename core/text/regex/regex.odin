@@ -282,10 +282,6 @@ create_iterator :: proc(
 	temporary_allocator := context.temp_allocator,
 ) -> (result: Match_Iterator, err: Error) {
 
-	if .Multiline in flags {
-		return {}, .Unsupported_Flag
-	}
-
 	result.regex         = create(pattern, flags, permanent_allocator, temporary_allocator) or_return
 	result.capture       = preallocate_capture()
 	result.temp          = temporary_allocator
@@ -555,6 +551,7 @@ reset :: proc(it: ^Match_Iterator) {
 	it.vm.top_thread        = 0
 	it.vm.current_rune      = rune(0)
 	it.vm.current_rune_size = 0
+	it.vm.last_rune         = rune(0)
 	for i in 0..<it.threads {
 		it.vm.threads[i]      = {}
 		it.vm.next_threads[i] = {}
