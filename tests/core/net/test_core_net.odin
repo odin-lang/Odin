@@ -663,8 +663,16 @@ test_multicast_ttl :: proc(t: ^testing.T) {
 	}
 }
 
-@test
+@(test)
 test_multicast_join_and_leave :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		test_multicast_join_and_leave_windows(t)
+	} else {
+		// TODO: Add support for other platforms
+	}
+}
+
+test_multicast_join_and_leave_windows :: proc(t: ^testing.T) {
 	Testing_Interface :: struct {
 		address: net.Address,
 		physical_address: string,
@@ -809,6 +817,7 @@ test_multicast_join_and_leave :: proc(t: ^testing.T) {
 	testing_interface = find_testing_interface(testing_interface)
 	testing.expect(t, !has_joined_multicast_group(testing_interface, multicast_address), "multicast address not left")
 }
+
 
 @(private)
 address_to_binstr :: proc(address: net.Address) -> (binstr: string) {
