@@ -95,7 +95,7 @@ ODIN_MICROARCH_STRING           :: ODIN_MICROARCH_STRING
 
 /*
 	An `int` value representing the minimum OS version given to the linker, calculated as `major * 10_000 + minor * 100 + revision`.
-	If not set using the `-minimum-os-version` command line switch, it defaults to `0`.
+	If not set using the `-minimum-os-version` command line switch, it defaults to `0`, except on Darwin, where it's `11_00_00`.
 */
 ODIN_MINIMUM_OS_VERSION         :: ODIN_MINIMUM_OS_VERSION
 
@@ -169,8 +169,8 @@ ODIN_TEST                       :: ODIN_TEST
 ODIN_TILDE                      :: ODIN_TILDE
 
 /*
-	`true` if the `-use-separate-modules` command line switch is passed,
-	which builds each package into its own object file, and then links them together, instead of performing a unity build.
+	`true` by default, false if the `-use-single-module` command line switch to force a unity build is provided.
+	By default each package is built into its own object file, and then linked together, instead of performing a unity build.
 */
 ODIN_USE_SEPARATE_MODULES       :: ODIN_USE_SEPARATE_MODULES
 
