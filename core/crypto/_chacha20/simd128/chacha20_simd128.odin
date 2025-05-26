@@ -227,7 +227,7 @@ is_performant :: proc "contextless" () -> bool {
 			req_features :: info.CPU_Features{.V}
 		}
 
-		features, ok := info.cpu_features.?
+		features, ok := info.cpu.features.?
 		if !ok {
 			return false
 		}

@@ -312,6 +312,7 @@ enum BuildFlagKind {
 	BuildFlag_Collection,
 	BuildFlag_Define,
 	BuildFlag_BuildMode,
+	BuildFlag_KeepExecutable,
 	BuildFlag_Target,
 	BuildFlag_Subtarget,
 	BuildFlag_Debug,
@@ -531,6 +532,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Collection,              str_lit("collection"),                BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Define,                  str_lit("define"),                    BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,               str_lit("build-mode"),                BuildFlagParam_String,  Command__does_build); // Commands_build is not used to allow for a better error message
+	add_flag(&build_flags, BuildFlag_KeepExecutable,          str_lit("keep-executable"),           BuildFlagParam_None,    Command__does_build | Command_test);
 	add_flag(&build_flags, BuildFlag_Target,                  str_lit("target"),                    BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Subtarget,               str_lit("subtarget"),                 BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
@@ -1193,6 +1195,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 							break;
 						}
+						case BuildFlag_KeepExecutable:
+							build_context.keep_executable = true;
+							break;
 
 						case BuildFlag_Debug:
 							build_context.ODIN_DEBUG = true;
@@ -2364,20 +2369,26 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-build-mode:<mode>")) {
 			print_usage_line(2, "Sets the build mode.");
 			print_usage_line(2, "Available options:");
-			print_usage_line(3, "-build-mode:exe         Builds as an executable.");
-			print_usage_line(3, "-build-mode:test        Builds as an executable that executes tests.");
-			print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
-			print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
-			print_usage_line(3, "-build-mode:dynamic     Builds as a dynamically linked library.");
-			print_usage_line(3, "-build-mode:lib         Builds as a statically linked library.");
-			print_usage_line(3, "-build-mode:static      Builds as a statically linked library.");
-			print_usage_line(3, "-build-mode:obj         Builds as an object file.");
-			print_usage_line(3, "-build-mode:object      Builds as an object file.");
-			print_usage_line(3, "-build-mode:assembly    Builds as an assembly file.");
-			print_usage_line(3, "-build-mode:assembler   Builds as an assembly file.");
-			print_usage_line(3, "-build-mode:asm         Builds as an assembly file.");
-			print_usage_line(3, "-build-mode:llvm-ir     Builds as an LLVM IR file.");
-			print_usage_line(3, "-build-mode:llvm        Builds as an LLVM IR file.");
+				print_usage_line(3, "-build-mode:exe         Builds as an executable.");
+				print_usage_line(3, "-build-mode:test        Builds as an executable that executes tests.");
+				print_usage_line(3, "-build-mode:dll         Builds as a dynamically linked library.");
+				print_usage_line(3, "-build-mode:shared      Builds as a dynamically linked library.");
+				print_usage_line(3, "-build-mode:dynamic     Builds as a dynamically linked library.");
+				print_usage_line(3, "-build-mode:lib         Builds as a statically linked library.");
+				print_usage_line(3, "-build-mode:static      Builds as a statically linked library.");
+				print_usage_line(3, "-build-mode:obj         Builds as an object file.");
+				print_usage_line(3, "-build-mode:object      Builds as an object file.");
+				print_usage_line(3, "-build-mode:assembly    Builds as an assembly file.");
+				print_usage_line(3, "-build-mode:assembler   Builds as an assembly file.");
+				print_usage_line(3, "-build-mode:asm         Builds as an assembly file.");
+				print_usage_line(3, "-build-mode:llvm-ir     Builds as an LLVM IR file.");
+				print_usage_line(3, "-build-mode:llvm        Builds as an LLVM IR file.");
+		}
+	}
+
+	if (test_only) {
+		if (print_flag("-build-only")) {
+			print_usage_line(2, "Only builds the test executable; does not automatically run it afterwards.");
 		}
 	}
 
@@ -2386,16 +2397,16 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Defines a library collection used for imports.");
 			print_usage_line(2, "Example: -collection:shared=dir/to/shared");
 			print_usage_line(2, "Usage in Code:");
-			print_usage_line(3, "import \"shared:foo\"");
+				print_usage_line(3, "import \"shared:foo\"");
 		}
 
 		if (print_flag("-custom-attribute:<string>")) {
 			print_usage_line(2, "Add a custom attribute which will be ignored if it is unknown.");
 			print_usage_line(2, "This can be used with metaprogramming tools.");
 			print_usage_line(2, "Examples:");
-			print_usage_line(3, "-custom-attribute:my_tag");
-			print_usage_line(3, "-custom-attribute:my_tag,the_other_thing");
-			print_usage_line(3, "-custom-attribute:my_tag -custom-attribute:the_other_thing");
+				print_usage_line(3, "-custom-attribute:my_tag");
+				print_usage_line(3, "-custom-attribute:my_tag,the_other_thing");
+				print_usage_line(3, "-custom-attribute:my_tag -custom-attribute:the_other_thing");
 		}
 	}
 
@@ -2418,7 +2429,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Defines a scalar boolean, integer or string as global constant.");
 			print_usage_line(2, "Example: -define:SPAM=123");
 			print_usage_line(2, "Usage in code:");
-			print_usage_line(3, "#config(SPAM, default_value)");
+				print_usage_line(3, "#config(SPAM, default_value)");
 		}
 	}
 
@@ -2453,9 +2464,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (check) {
 		if (print_flag("-error-pos-style:<string>")) {
 			print_usage_line(2, "Available options:");
-			print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
-			print_usage_line(3, "-error-pos-style:odin      file/path(45:3)");
-			print_usage_line(3, "-error-pos-style:default   (Defaults to 'odin'.)");
+				print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
+				print_usage_line(3, "-error-pos-style:odin      file/path(45:3)");
+				print_usage_line(3, "-error-pos-style:default   (Defaults to 'odin'.)");
 		}
 
 		if (print_flag("-export-defineables:<filename>")) {
@@ -2466,8 +2477,8 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-export-dependencies:<format>")) {
 			print_usage_line(2, "Exports dependencies to one of a few formats. Requires `-export-dependencies-file`.");
 			print_usage_line(2, "Available options:");
-			print_usage_line(3, "-export-dependencies:make   Exports in Makefile format");
-			print_usage_line(3, "-export-dependencies:json   Exports in JSON format");
+				print_usage_line(3, "-export-dependencies:make   Exports in Makefile format");
+				print_usage_line(3, "-export-dependencies:json   Exports in JSON format");
 		}
 
 		if (print_flag("-export-dependencies-file:<filename>")) {
@@ -2478,8 +2489,8 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-export-timings:<format>")) {
 			print_usage_line(2, "Exports timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
 			print_usage_line(2, "Available options:");
-			print_usage_line(3, "-export-timings:json   Exports compile time stats to JSON.");
-			print_usage_line(3, "-export-timings:csv    Exports compile time stats to CSV.");
+				print_usage_line(3, "-export-timings:json   Exports compile time stats to JSON.");
+				print_usage_line(3, "-export-timings:csv    Exports compile time stats to CSV.");
 		}
 
 		if (print_flag("-export-timings-file:<filename>")) {
@@ -2543,6 +2554,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (test_only || run_or_build) {
+		if (print_flag("-keep-executable")) {
+			print_usage_line(2, "Keep the executable generated by `odin test` or `odin run` after running it. We clean it up by default.");
+			print_usage_line(2, "If you build your program or test using `odin build`, the compiler does not automatically execute");
+			print_usage_line(2, "the resulting program, and this option is not applicable.");
+		}
+	}
+
 	if (run_or_build) {
 		if (print_flag("-linker:<string>")) {
 			print_usage_line(2, "Specify the linker to use.");
@@ -2569,9 +2588,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-microarch:<string>")) {
 			print_usage_line(2, "Specifies the specific micro-architecture for the build in a string.");
 			print_usage_line(2, "Examples:");
-			print_usage_line(3, "-microarch:sandybridge");
-			print_usage_line(3, "-microarch:native");
-			print_usage_line(3, "-microarch:\"?\" for a list");
+				print_usage_line(3, "-microarch:sandybridge");
+				print_usage_line(3, "-microarch:native");
+				print_usage_line(3, "-microarch:\"?\" for a list");
 		}
 	}
 
@@ -2628,10 +2647,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-o:<string>")) {
 			print_usage_line(2, "Sets the optimization mode for compilation.");
 			print_usage_line(2, "Available options:");
-			print_usage_line(3, "-o:none");
-			print_usage_line(3, "-o:minimal");
-			print_usage_line(3, "-o:size");
-			print_usage_line(3, "-o:speed");
+				print_usage_line(3, "-o:none");
+				print_usage_line(3, "-o:minimal");
+				print_usage_line(3, "-o:size");
+				print_usage_line(3, "-o:speed");
 			if (LB_USE_NEW_PASS_SYSTEM) {
 				print_usage_line(3, "-o:aggressive (use this with caution)");
 			}
@@ -2682,10 +2701,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-reloc-mode:<string>")) {
 			print_usage_line(2, "Specifies the reloc mode.");
 			print_usage_line(2, "Available options:");
-			print_usage_line(3, "-reloc-mode:default");
-			print_usage_line(3, "-reloc-mode:static");
-			print_usage_line(3, "-reloc-mode:pic");
-			print_usage_line(3, "-reloc-mode:dynamic-no-pic");
+				print_usage_line(3, "-reloc-mode:default");
+				print_usage_line(3, "-reloc-mode:static");
+				print_usage_line(3, "-reloc-mode:pic");
+				print_usage_line(3, "-reloc-mode:dynamic-no-pic");
 		}
 
 	#if defined(GB_SYSTEM_WINDOWS)
@@ -2700,9 +2719,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-sanitize:<string>")) {
 			print_usage_line(2, "Enables sanitization analysis.");
 			print_usage_line(2, "Available options:");
-			print_usage_line(3, "-sanitize:address");
-			print_usage_line(3, "-sanitize:memory");
-			print_usage_line(3, "-sanitize:thread");
+				print_usage_line(3, "-sanitize:address");
+				print_usage_line(3, "-sanitize:memory");
+				print_usage_line(3, "-sanitize:thread");
 			print_usage_line(2, "NOTE: This flag can be used multiple times.");
 		}
 	}
@@ -2763,17 +2782,32 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "[Windows only]");
 			print_usage_line(2, "Defines the subsystem for the application.");
 			print_usage_line(2, "Available options:");
-		print_usage_line(3, "-subsystem:console");
-		print_usage_line(3, "-subsystem:windows");
+				print_usage_line(3, "-subsystem:console");
+				print_usage_line(3, "-subsystem:windows");
 		}
 	#endif
+	}
 
+	if (build) {
+		if (print_flag("-subtarget:<subtarget>")) {
+			print_usage_line(2, "[Darwin and Linux only]");
+			print_usage_line(2, "Available subtargets:");
+			String prefix = str_lit("-subtarget:");
+			for (u32 i = 1; i < Subtarget_COUNT; i++) {
+				String name   = subtarget_strings[i];
+				String help_string = concatenate_strings(temporary_allocator(), prefix, name);
+				print_usage_line(3, (const char *)help_string.text);
+			}
+		}
+	}
+
+	if (run_or_build) {
 		if (print_flag("-target-features:<string>")) {
 			print_usage_line(2, "Specifies CPU features to enable on top of the enabled features implied by -microarch.");
 			print_usage_line(2, "Examples:");
-			print_usage_line(3, "-target-features:atomics");
-			print_usage_line(3, "-target-features:\"sse2,aes\"");
-			print_usage_line(3, "-target-features:\"?\" for a list");
+				print_usage_line(3, "-target-features:atomics");
+				print_usage_line(3, "-target-features:\"sse2,aes\"");
+				print_usage_line(3, "-target-features:\"?\" for a list");
 		}
 	}
 
@@ -2810,11 +2844,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-vet")) {
 			print_usage_line(2, "Does extra checks on the code.");
 			print_usage_line(2, "Extra checks include:");
-			print_usage_line(3, "-vet-unused");
-			print_usage_line(3, "-vet-unused-variables");
-			print_usage_line(3, "-vet-unused-imports");
-			print_usage_line(3, "-vet-shadowing");
-			print_usage_line(3, "-vet-using-stmt");
+				print_usage_line(3, "-vet-unused");
+				print_usage_line(3, "-vet-unused-variables");
+				print_usage_line(3, "-vet-unused-imports");
+				print_usage_line(3, "-vet-shadowing");
+				print_usage_line(3, "-vet-using-stmt");
 		}
 
 		if (print_flag("-vet-cast")) {
@@ -3851,6 +3885,11 @@ end_of_code_gen:;
 		defer (gb_free(heap_allocator(), exe_name.text));
 
 		system_must_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
+
+		if (!build_context.keep_executable) {
+			char const *filename = cast(char const *)exe_name.text;
+			gb_file_remove(filename);
+		}
 	}
 	return 0;
 }

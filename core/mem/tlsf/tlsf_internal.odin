@@ -477,7 +477,7 @@ block_mark_as_free :: proc(block: ^Block_Header) {
 }
 
 @(private, no_sanitize_address)
-block_mark_as_used :: proc(block: ^Block_Header, ) {
+block_mark_as_used :: proc(block: ^Block_Header) {
 	next := block_next(block)
 	block_set_prev_used(next)
 	block_set_used(block)

@@ -123,3 +123,20 @@ _set_working_directory :: proc(dir: string) -> (err: Error) {
 	}
 	return
 }
+
+_get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absolute_path: string, err: Error) {
+	rel := path
+	if rel == "" {
+		rel = "."
+	}
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	rel_cstr := clone_to_cstring(rel, temp_allocator) or_return
+	path_ptr := posix.realpath(rel_cstr, nil)
+	if path_ptr == nil {
+		return "", Platform_Error(posix.errno())
+	}
+	defer posix.free(path_ptr)
+
+	path_str := clone_string(string(path_ptr), allocator) or_return
+	return path_str, nil
+}

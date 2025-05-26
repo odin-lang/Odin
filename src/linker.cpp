@@ -801,6 +801,21 @@ try_cross_linking:;
 					// This points the linker to where the entry point is
 					link_settings = gb_string_appendc(link_settings, "-e _main ");
 				}
+			} else if (build_context.metrics.os == TargetOs_freebsd) {
+				if (build_context.sanitizer_flags & (SanitizerFlag_Address | SanitizerFlag_Memory)) {
+					// It's imperative that `pthread` is linked before `libc`,
+					// otherwise ASan/MSan will be unable to call `pthread_key_create`
+					// because FreeBSD's `libthr` implementation of `pthread`
+					// needs to replace the relevant stubs first.
+					//
+					// (Presumably TSan implements its own `pthread` interface,
+					//  which is why it isn't required.)
+					//
+					// See: https://reviews.llvm.org/D39254
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-lpthread ");
+				}
+				// FreeBSD pkg installs third-party shared libraries in /usr/local/lib.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-L/usr/local/lib ");
 			} else if (build_context.metrics.os == TargetOs_openbsd) {
 				// OpenBSD ports install shared libraries in /usr/local/lib. Also, we must explicitly link libpthread.
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-lpthread -Wl,-L/usr/local/lib ");
