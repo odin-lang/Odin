@@ -163,9 +163,9 @@ foreign glfw {
 	SetJoystickUserPointer :: proc(jid: c.int, pointer: rawptr) ---
 	GetJoystickUserPointer :: proc(jid: c.int) -> rawptr ---
 	JoystickIsGamepad      :: proc(jid: c.int) -> b32 ---
-	UpdateGamepadMappings  :: proc(str: cstring) -> c.int ---
+	UpdateGamepadMappings  :: proc(str: cstring) -> b32 ---
 	GetGamepadName         :: proc(jid: c.int) -> cstring ---
-	GetGamepadState        :: proc(jid: c.int, state: ^GamepadState) -> c.int ---
+	GetGamepadState        :: proc(jid: c.int, state: ^GamepadState) -> b32 ---
 
 	SetClipboardString :: proc(window: WindowHandle, str: cstring) ---
 	
@@ -177,12 +177,12 @@ foreign glfw {
 	MakeContextCurrent :: proc(window: WindowHandle) ---
 	GetCurrentContext  :: proc() -> WindowHandle ---
 	GetProcAddress     :: proc(name: cstring) -> rawptr ---
-	ExtensionSupported :: proc(extension: cstring) -> c.int ---
+	ExtensionSupported :: proc(extension: cstring) -> b32 ---
 
 	VulkanSupported                      :: proc() -> b32 ---
 	GetRequiredInstanceExtensions        :: proc(count: ^u32) -> [^]cstring ---
 	GetInstanceProcAddress               :: proc(instance: vk.Instance, procname: cstring) -> rawptr ---
-	GetPhysicalDevicePresentationSupport :: proc(instance: vk.Instance, device: vk.PhysicalDevice, queuefamily: u32) -> c.int ---
+	GetPhysicalDevicePresentationSupport :: proc(instance: vk.Instance, device: vk.PhysicalDevice, queuefamily: u32) -> b32 ---
 	CreateWindowSurface                  :: proc(instance: vk.Instance, window: WindowHandle, allocator: ^vk.AllocationCallbacks, surface: ^vk.SurfaceKHR) -> vk.Result ---
 	
 	SetWindowIconifyCallback      :: proc(window: WindowHandle, cbfun: WindowIconifyProc)      -> WindowIconifyProc ---
