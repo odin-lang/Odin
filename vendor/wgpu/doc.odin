@@ -12,8 +12,8 @@ You can find a number of examples on [[Odin's official examples repository; http
 **Getting the wgpu-native libraries**
 
 For native support (not the browser), some libraries are required. Fortunately this is
-extremely easy, just download them from the [[releases on GitHub; https://github.com/gfx-rs/wgpu-native/releases/tag/v24.0.0.2]].
-the bindings are for v24.0.0.2 at the moment.
+extremely easy, just download them from the [[releases on GitHub; https://github.com/gfx-rs/wgpu-native/releases/tag/v25.0.2.1]].
+the bindings are for v25.0.2.1 at the moment.
 
 These are expected in the `lib` folder under the same name as they are released (just unzipped).
 By default it will look for a static release version (`wgpu-OS-ARCH-release.a|lib`),
