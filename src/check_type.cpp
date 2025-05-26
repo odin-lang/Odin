@@ -3805,7 +3805,11 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 		#if 0
 		error(e, "Invalid type definition of '%.*s'", LIT(type->Named.name));
 		#endif
-		type->Named.base = t_invalid;
+		if (type->Named.type_name->TypeName.is_type_alias) {
+			// NOTE(laytan): keep it null, type declaration is a mini "cycle" to be filled later.
+		} else {
+			type->Named.base = t_invalid;
+		}
 	}
 
 	if (is_type_polymorphic(type)) {
@@ -3823,7 +3827,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 	}
 	#endif
 
-	if (is_type_typed(type)) {
+	if (type->kind == Type_Named && type->Named.base == nullptr || is_type_typed(type)) {
 		add_type_and_value(ctx, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);

@@ -26,6 +26,7 @@ else
 fi
 $ODIN build ../test_issue_5043.odin $COMMON
 $ODIN build ../test_issue_5097.odin $COMMON
+$ODIN build ../test_issue_5097-2.odin $COMMON
 
 set +x
 
