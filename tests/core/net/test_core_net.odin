@@ -625,8 +625,19 @@ test_nonblocking_option :: proc(t: ^testing.T) {
 	}
 }
 
-@test
-test_multicast_loop :: proc(t: ^testing.T) {
+@(test)
+test_multicast :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		_test_multicast_ttl_windows(t)
+		_test_multicast_loop_windows(t)
+		_test_multicast_interface_windows(t)
+		_test_join_and_leave_multicast_group_windows(t)
+	} 
+
+	// TODO: Add support for other platforms
+}
+
+_test_multicast_loop_windows :: proc(t: ^testing.T) {
 	server, make_server_err := net.make_unbound_udp_socket(.IP4)
 	if !testing.expect_value(t, make_server_err, nil) {
 		return
@@ -634,18 +645,24 @@ test_multicast_loop :: proc(t: ^testing.T) {
 	defer net.close(server)
 
 	sockopt_err: net.Socket_Option_Error
-	values := []bool{true, false}
+	values := []bool{false, true, false}
+	out_value: bool
 
 	for value in values {
 		sockopt_err = net.set_option(server, .Multicast_Loop, value)
 		if !testing.expect_value(t, sockopt_err, nil) {
 			return
 		}
+
+		sockopt_err = net.get_option(server, .Multicast_Loop, &out_value)
+		if !testing.expect_value(t, sockopt_err, nil) {
+			return
+		}
+		testing.expect_value(t, out_value, value)
 	}
 }
 
-@test
-test_multicast_ttl :: proc(t: ^testing.T) {
+_test_multicast_ttl_windows :: proc(t: ^testing.T) {
 	server, make_server_err := net.make_unbound_udp_socket(.IP4)
 	if !testing.expect_value(t, make_server_err, nil) {
 		return
@@ -653,132 +670,58 @@ test_multicast_ttl :: proc(t: ^testing.T) {
 	defer net.close(server)
 
 	sockopt_err: net.Socket_Option_Error
-	values := []int{0, 1, 64}
+	values := []int{0, 1, 64, 255}
+	out_value: int
 
 	for value in values {
 		sockopt_err = net.set_option(server, .Multicast_TTL, value)
 		if !testing.expect_value(t, sockopt_err, nil) {
 			return
 		}
+
+		sockopt_err = net.get_option(server, .Multicast_TTL, &out_value)
+		if !testing.expect_value(t, sockopt_err, nil) {
+			return
+		}
+		testing.expect_value(t, out_value, value)
 	}
 }
 
-@(test)
-test_multicast_join_and_leave :: proc(t: ^testing.T) {
-	when ODIN_OS == .Windows {
-		test_multicast_join_and_leave_windows(t)
-	} else {
-		// TODO: Add support for other platforms
+_test_multicast_interface_windows :: proc(t: ^testing.T) {
+	server, make_server_err := net.make_unbound_udp_socket(.IP4)
+	if !testing.expect_value(t, make_server_err, nil) {
+		return
 	}
-}
+	defer net.close(server)
 
-test_multicast_join_and_leave_windows :: proc(t: ^testing.T) {
-	Testing_Interface :: struct {
-		address: net.Address,
-		physical_address: string,
-		unicast_addresses: [dynamic]net.Address,
-		multicast_addresses: [dynamic]net.Address,
-	}
+	sockopt_err: net.Socket_Option_Error
+	out_value: net.Address
 
-	delete_testing_interface :: proc(testing_interface: ^Testing_Interface) {
-		delete(testing_interface.unicast_addresses)
-		delete(testing_interface.multicast_addresses)
-		free(testing_interface)
-	}
-
-	find_testing_interface :: proc(testing_interface: ^Testing_Interface) -> ^Testing_Interface {
-		interfaces, err := net.enumerate_interfaces()
-		if err != nil {
-			log.errorf("failed to enumerate interfaces")
-			return nil
-		}
-		defer net.destroy_interfaces(interfaces)
-
-		if testing_interface == nil {
-			for &interface in interfaces {
-				if interface.link.state & {.Up} == {.Up} {
-					private_address := get_private_address(&interface)
-					if private_address != nil {
-						return network_interface_to_testing_interface(&interface)
-					}
-				}
-			}
-		} else {
-			for &interface in interfaces {
-				if strings.contains(interface.physical_address, testing_interface.physical_address) {
-					delete_testing_interface(testing_interface)
-					return network_interface_to_testing_interface(&interface)
-				}
-			}
-		}
-
-		return nil
-	}
-
-	network_interface_to_testing_interface :: proc(interface: ^net.Network_Interface) -> ^Testing_Interface {
-		testing_interface := new(Testing_Interface)
-		testing_interface.address = get_private_address(interface)
-		testing_interface.physical_address = interface.physical_address
-
-		for lease in interface.unicast {
-			append(&testing_interface.unicast_addresses, lease.address)
-		}
-		for address in interface.multicast {
-			append(&testing_interface.multicast_addresses, address)
-		}
-
-		return testing_interface
-	}
-
-	has_joined_multicast_group :: proc(testing_interface: ^Testing_Interface, mutlicast_address: net.Address) -> bool {
-		for address in testing_interface.multicast_addresses {
-			if address == mutlicast_address {
-				return true
-			}
-		}
-		return false
-	}
-
-	get_private_address :: proc(interface: ^net.Network_Interface) -> net.Address {
-		for lease in interface.unicast {
-			if _is_private_address(lease.address) {
-				if _, ok := lease.address.(net.IP4_Address); ok {
-					return lease.address
-				}
-			}
-		}
-		return nil
-	}
-
-	find_unused_multicast_address :: proc(interface: ^Testing_Interface) -> net.Address {
-		for value in 23..<102 {
-			address := net.IP4_Address{224, 0, 0, cast(u8)value}
-			if !has_joined_multicast_group(interface, address) {
-				return address
-			}
-		}
-		return nil
-	}
-
-	list_unicast_addresses :: proc(t: ^testing.T, interface: ^net.Network_Interface) {
-		for lease in interface.unicast {
-			log.info(lease.address)
-		}
-	}
-	
-	list_multicast_groups :: proc(t: ^testing.T, interface: ^net.Network_Interface) {
-		for address in interface.multicast {
-			log.info(address)
-		}
-	}
-
-	testing_interface := find_testing_interface(nil)
+	testing_interface := _find_testing_interface(nil)
 	testing.expect(t, testing_interface != nil, "testing interface not found")
-	defer delete_testing_interface(testing_interface)
+	defer _delete_testing_interface(testing_interface)
 
-	multicast_address := find_unused_multicast_address(testing_interface)
+	sockopt_err = net.set_option(server, .Multicast_Interface, &testing_interface.address)
+	if !testing.expect_value(t, sockopt_err, nil) {
+		return
+	}
+
+	sockopt_err = net.get_option(server, .Multicast_Interface, &out_value)
+	if !testing.expect_value(t, sockopt_err, nil) {
+		return
+	}
+	testing.expect_value(t, out_value, testing_interface.address)
+}
+
+_test_join_and_leave_multicast_group_windows :: proc(t: ^testing.T) {
+	sockopt_err: net.Socket_Option_Error
+	testing_interface := _find_testing_interface(nil)
+	testing.expect(t, testing_interface != nil, "testing interface not found")
+	defer _delete_testing_interface(testing_interface)
+
+	multicast_address := _find_unused_multicast_address(testing_interface)
 	testing.expect(t, multicast_address != nil, "no unused multicast address found")
-	testing.expect(t, !has_joined_multicast_group(testing_interface, multicast_address), "multicast address already joined")
+	testing.expect(t, !_has_joined_multicast_group(testing_interface, multicast_address), "multicast address already joined")
 
 	server, make_server_err := net.make_bound_udp_socket(testing_interface.address, 0)
 	if !testing.expect_value(t, make_server_err, nil) {
@@ -786,38 +729,29 @@ test_multicast_join_and_leave_windows :: proc(t: ^testing.T) {
 	}
 	defer net.close(server)
 
-	sockopt_err: net.Socket_Option_Error
-
-	sockopt_err = net.set_option(server, .Multicast_Interface, &testing_interface.address)
-	if !testing.expect_value(t, sockopt_err, nil) {
-		return
+	multicast_group_request := net.Multicast_Group_Request{
+		address=multicast_address, 
+		interface=testing_interface.address
 	}
 
-	sockopt_err = net.set_option(server, .Multicast_Loop, true)
-	if !testing.expect_value(t, sockopt_err, nil) {
-		return
-	}
-
-	multicast_group_request := net.Multicast_Group_Request{address=multicast_address, interface=testing_interface.address}
 	sockopt_err = net.set_option(server, .Join_Multicast_Group, &multicast_group_request)
 	if !testing.expect_value(t, sockopt_err, nil) {
 		return
 	}
 
-	testing_interface = find_testing_interface(testing_interface)
-	testing.expect(t, has_joined_multicast_group(testing_interface, multicast_address), "multicast address not joined")
+	testing_interface = _find_testing_interface(testing_interface)
+	testing.expect(t, _has_joined_multicast_group(testing_interface, multicast_address), "multicast address not joined")
 
 	sockopt_err = net.set_option(server, .Leave_Multicast_Group, &multicast_group_request)
 	if !testing.expect_value(t, sockopt_err, nil) {
 		return
-	}	
+	}
 
-	// It can take a while for the interface to leave the multicast group, so we have to wait a bit to make sure 
+	// It can take a while for the interface to leave the multicast group
 	time.sleep(500 * time.Millisecond)
-	testing_interface = find_testing_interface(testing_interface)
-	testing.expect(t, !has_joined_multicast_group(testing_interface, multicast_address), "multicast address not left")
+	testing_interface = _find_testing_interface(testing_interface)
+	testing.expect(t, !_has_joined_multicast_group(testing_interface, multicast_address), "multicast address not left")
 }
-
 
 @(private)
 address_to_binstr :: proc(address: net.Address) -> (binstr: string) {
@@ -894,6 +828,101 @@ _is_private_address :: proc(address: net.Address) -> bool {
 		}
 
 		if a[0] & 0xffc0 == 0xfe80 {
+			return true
+		}
+	}
+	return false
+}
+
+@(private)
+_get_private_address :: proc(interface: ^net.Network_Interface) -> net.Address {
+	for lease in interface.unicast {
+		if _is_private_address(lease.address) {
+			if _, ok := lease.address.(net.IP4_Address); ok {
+				return lease.address
+			}
+		}
+	}
+	return nil
+}
+
+Testing_Interface :: struct {
+	address: net.Address,
+	physical_address: string,
+	unicast_addresses: [dynamic]net.Address,
+	multicast_addresses: [dynamic]net.Address,
+}
+
+@(private)
+_find_testing_interface :: proc(testing_interface: ^Testing_Interface) -> ^Testing_Interface {
+	interfaces, err := net.enumerate_interfaces()
+	if err != nil {
+		log.errorf("failed to enumerate interfaces")
+		return nil
+	}
+	defer net.destroy_interfaces(interfaces)
+
+	if testing_interface == nil {
+		for &interface in interfaces {
+			if interface.link.state & {.Up} == {.Up} {
+				private_address := _get_private_address(&interface)
+				if private_address != nil {
+					return _network_interface_to_testing_interface(&interface)
+				}
+			}
+		}
+	} else {
+		for &interface in interfaces {
+			if strings.contains(interface.physical_address, testing_interface.physical_address) {
+				_delete_testing_interface(testing_interface)
+				return _network_interface_to_testing_interface(&interface)
+			}
+		}
+	}
+
+	return nil
+}
+
+
+@(private)
+_delete_testing_interface :: proc(testing_interface: ^Testing_Interface) {
+	delete(testing_interface.unicast_addresses)
+	delete(testing_interface.multicast_addresses)
+	free(testing_interface)
+}
+
+@(private)
+_network_interface_to_testing_interface :: proc(interface: ^net.Network_Interface) -> ^Testing_Interface {
+	testing_interface := new(Testing_Interface)
+	testing_interface.address = _get_private_address(interface)
+	testing_interface.physical_address = interface.physical_address
+
+	for lease in interface.unicast {
+		append(&testing_interface.unicast_addresses, lease.address)
+	}
+	for address in interface.multicast {
+		append(&testing_interface.multicast_addresses, address)
+	}
+
+	return testing_interface
+}
+
+
+@(private)
+_find_unused_multicast_address :: proc(interface: ^Testing_Interface) -> net.Address {
+	for value in 1..=253 {
+		address := net.IP4_Address{224, 0, 0, cast(u8)value}
+		if !_has_joined_multicast_group(interface, address) {
+			return address
+		}
+	}
+	return nil
+}
+
+@(private)
+_has_joined_multicast_group :: proc(testing_interface: ^Testing_Interface, mutlicast_address: net.Address) -> bool {
+	for address in testing_interface.multicast_addresses {
+		if address == mutlicast_address {
 			return true
 		}
 	}

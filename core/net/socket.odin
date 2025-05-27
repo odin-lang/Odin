@@ -268,3 +268,7 @@ set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :=
 set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Set_Blocking_Error) {
 	return _set_blocking(socket, should_block)
 }
+
+get_option :: proc(socket: Any_Socket, option: Socket_Option, out_value: $T) -> Socket_Option_Error {
+	return _get_option(socket, option, out_value)
+}
