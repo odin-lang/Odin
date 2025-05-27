@@ -341,7 +341,7 @@ Example:
 
 	ptr_sub_example :: proc() {
 		arr: [2]int
-		print(mem.ptr_sub(&arr[1], &arr[0]))
+		fmt.println(mem.ptr_sub(&arr[1], &arr[0]))
 	}
 
 Output:
