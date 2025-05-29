@@ -4,6 +4,7 @@ package test_core_runtime
 import "base:intrinsics"
 import "core:mem"
 import "base:runtime"
+import "core:slice"
 import "core:testing"
 
 // Tests that having space for the allocation, but not for the allocation and alignment
@@ -175,5 +176,80 @@ test_map_get :: proc(t: ^testing.T) {
 		}
 		defer delete(m)
 		check(t, m)
+	}
+}
+
+@(test)
+test_memory_equal :: proc(t: ^testing.T) {
+	data: [256]u8
+	cmp: [256]u8
+
+	slice.fill(data[:], 0xAA)
+	slice.fill(cmp[:], 0xAA)
+
+	for offset in 0..<len(data) {
+		subdata := data[offset:]
+		subcmp := cmp[offset:]
+		for idx in 0..<len(subdata) {
+			if !testing.expect_value(t, runtime.memory_equal(&subdata[0], &subcmp[0], len(subdata)), true) {
+				return
+			}
+
+			subcmp[idx] = 0x55
+			if !testing.expect_value(t, runtime.memory_equal(&subdata[0], &subcmp[0], len(subdata)), false) {
+				return
+			}
+			subcmp[idx] = 0xAA
+		}
+	}
+}
+
+@(test)
+test_memory_compare :: proc(t: ^testing.T) {
+	data: [256]u8
+	cmp: [256]u8
+
+	for offset in 0..<len(data) {
+		subdata := data[offset:]
+		subcmp := cmp[offset:]
+		for idx in 0..<len(subdata) {
+			if !testing.expect_value(t, runtime.memory_compare(&subdata[0], &subcmp[0], len(subdata)), 0) {
+				return
+			}
+
+			subdata[idx] = 0x7F
+			subcmp[idx] = 0xFF
+			if !testing.expect_value(t, runtime.memory_compare(&subdata[0], &subcmp[0], len(subdata)), -1) {
+				return
+			}
+
+			subdata[idx] = 0xFF
+			subcmp[idx] = 0x7F
+			if !testing.expect_value(t, runtime.memory_compare(&subdata[0], &subcmp[0], len(subdata)), 1) {
+				return
+			}
+
+			subdata[idx] = 0
+			subcmp[idx] = 0
+		}
+	}
+}
+
+@(test)
+test_memory_compare_zero :: proc(t: ^testing.T) {
+	data: [256]u8
+
+	for offset in 0..<len(data) {
+		subdata := data[offset:]
+		for idx in 0..<len(subdata) {
+			if !testing.expect_value(t, runtime.memory_compare_zero(&subdata[0], len(subdata)), 0) {
+				return
+			}
+			subdata[idx] = 0xFF
+			if !testing.expect_value(t, runtime.memory_compare_zero(&subdata[0], len(subdata)), 1) {
+				return
+			}
+			subdata[idx] = 0
+		}
 	}
 }
