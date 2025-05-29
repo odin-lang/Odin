@@ -26,12 +26,12 @@ import "base:runtime"
 /*
 Check if SIMD is software-emulated on a target platform.
 
-This value is `false`, when the compile-time target has the hardware support for
-at 128-bit (or wider) SIMD. If the compile-time target lacks the hardware support
-for 128-bit SIMD, this value is `true`, and all SIMD operations will likely be
+This value is `true`, when the compile-time target has the hardware support for
+at least 128-bit (or wider) SIMD. If the compile-time target lacks the hardware support
+for 128-bit SIMD, this value is `false`, and all SIMD operations will likely be
 emulated.
 */
-IS_EMULATED :: runtime.SIMD_IS_EMULATED
+HAS_HARDWARE_SIMD :: runtime.HAS_HARDWARE_SIMD
 
 /*
 Vector of 16 `u8` lanes (128 bits).

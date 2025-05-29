@@ -16,11 +16,12 @@ RUNTIME_REQUIRE :: false // !ODIN_TILDE
 @(private)
 __float16 :: f16 when __ODIN_LLVM_F16_SUPPORTED else u16
 
-SIMD_IS_EMULATED :: true when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !intrinsics.has_target_feature("sse2") else
-	true when (ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32) && !intrinsics.has_target_feature("neon") else
-	true when (ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm32) && !intrinsics.has_target_feature("simd128") else
-	true when (ODIN_ARCH == .riscv64) && !intrinsics.has_target_feature("v") else
-	false
+HAS_HARDWARE_SIMD :: false when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !intrinsics.has_target_feature("sse2") else
+	false when (ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32) && !intrinsics.has_target_feature("neon") else
+	false when (ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm32) && !intrinsics.has_target_feature("simd128") else
+	false when (ODIN_ARCH == .riscv64) && !intrinsics.has_target_feature("v") else
+	true
+
 
 @(private)
 byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {
@@ -241,7 +242,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 	m := uint(0)
 
 	if n >= 8 {
-		when !SIMD_IS_EMULATED {
+		when HAS_HARDWARE_SIMD {
 			// Avoid using 256-bit SIMD on platforms where its emulation is
 			// likely to be less than ideal.
 			when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
@@ -295,7 +296,7 @@ memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_ch
 	i := uint(0)
 	m := uint(0)
 
-	when !SIMD_IS_EMULATED {
+	when HAS_HARDWARE_SIMD {
 		when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
 			m = n / 32 * 32
 			for /**/; i < m; i += 32 {
@@ -364,7 +365,7 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 	bytes := ([^]u8)(a)
 
 	if n >= 8 {
-		when !SIMD_IS_EMULATED {
+		when HAS_HARDWARE_SIMD {
 			when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
 				scanner32: #simd[32]u8
 				m = n / 32 * 32
