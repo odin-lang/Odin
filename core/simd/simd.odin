@@ -21,6 +21,7 @@ package simd
 
 import "base:builtin"
 import "base:intrinsics"
+import "base:runtime"
 
 /*
 Check if SIMD is software-emulated on a target platform.
@@ -30,11 +31,7 @@ at 128-bit (or wider) SIMD. If the compile-time target lacks the hardware suppor
 for 128-bit SIMD, this value is `true`, and all SIMD operations will likely be
 emulated.
 */
-IS_EMULATED :: true when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !intrinsics.has_target_feature("sse2") else
-	true when (ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32) && !intrinsics.has_target_feature("neon") else
-	true when (ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm32) && !intrinsics.has_target_feature("simd128") else
-	true when (ODIN_ARCH == .riscv64) && !intrinsics.has_target_feature("v") else
-	false
+IS_EMULATED :: runtime.SIMD_IS_EMULATED
 
 /*
 Vector of 16 `u8` lanes (128 bits).
