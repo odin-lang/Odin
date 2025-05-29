@@ -848,6 +848,200 @@ Window_setLevel :: proc "c" (self: ^Window, level: WindowLevel) {
 	msgSend(nil, self, "setLevel:", level)
 }
 
+// Managing Key Status
+@(objc_type=Window, objc_name="isKeyWindow")
+Window_isKeyWindow :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isKeyWindow")
+}
+@(objc_type=Window, objc_name="canBecomeKeyWindow")
+Window_canBecomeKeyWindow :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "canBecomeKeyWindow")
+}
+@(objc_type=Window, objc_name="makeKeyWindow")
+Window_makeKeyWindow :: proc "c" (self: ^Window) {
+	msgSend(nil, self, "makeKeyWindow")
+}
+@(objc_type=Window, objc_name="makeKeyAndOrderFront")
+Window_makeKeyAndOrderFront :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "makeKeyAndOrderFront:", sender)
+}
+
+// Managing Main Status
+@(objc_type=Window, objc_name="isMainWindow")
+Window_isMainWindow :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isMainWindow")
+}
+@(objc_type=Window, objc_name="canBecomeMainWindow")
+Window_canBecomeMainWindow :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "canBecomeMainWindow")
+}
+@(objc_type=Window, objc_name="makeMainWindow")
+Window_makeMainWindow :: proc "c" (self: ^Window) {
+	msgSend(nil, self, "makeMainWindow")
+}
+
+// Managing Toolbars
+@(objc_type=Window, objc_name="toolbar")
+Window_toolbar :: proc "c" (self: ^Window) -> ^Toolbar {
+	return msgSend(^Toolbar, self, "toolbar")
+}
+@(objc_type=Window, objc_name="setToolbar")
+Window_setToolbar :: proc "c" (self: ^Window, toolbar: ^Toolbar) {
+	msgSend(nil, self, "setToolbar:", toolbar)
+}
+@(objc_type=Window, objc_name="toggleToolbarShown")
+Window_toggleToolbarShown :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "toggleToolbarShown:", sender)
+}
+@(objc_type=Window, objc_name="runToolbarCustomizationPalette")
+Window_runToolbarCustomizationPalette :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "runToolbarCustomizationPalette:", sender)
+}
+
+// Managing Attached Windows
+@(objc_type=Window, objc_name="childWindows")
+Window_childWindows :: proc "c" (self: ^Window) -> ^Array {
+	return msgSend(^Array, self, "childWindows")
+}
+@(objc_type=Window, objc_name="addChildWindowOrdered")
+Window_addChildWindowOrdered :: proc "c" (self: ^Window, child: ^Window, place: WindowOrderingMode) {
+	msgSend(nil, self, "addChildWindow:ordered:", child, place)
+}
+@(objc_type=Window, objc_name="removeChildWindow")
+Window_removeChildWindow :: proc "c" (self: ^Window, child: ^Window) {
+	msgSend(nil, self, "removeChildWindow:", child)
+}
+@(objc_type=Window, objc_name="parentWindow")
+Window_parentWindow :: proc "c" (self: ^Window) -> ^Window {
+	return msgSend(^Window, self, "parentWindow")
+}
+// There is a setter for parentWindow, but omitting due to the documentation:
+// This property should be set from a subclass when it is overridden by a subclass’s implementation. It should not be set otherwise.
+
+// Managing Titles
+@(objc_type=Window, objc_name="title")
+Window_title :: proc "c" (self: ^Window) -> ^String {
+	return msgSend(^String, self, "title")
+}
+@(objc_type=Window, objc_name="setTitle")
+Window_setTitle :: proc "c" (self: ^Window, title: ^String) {
+	msgSend(nil, self, "setTitle:", title)
+}
+@(objc_type=Window, objc_name="subtitle")
+Window_subtitle :: proc "c" (self: ^Window) -> ^String {
+	return msgSend(^String, self, "subtitle")
+}
+@(objc_type=Window, objc_name="setSubtitle")
+Window_setSubtitle :: proc "c" (self: ^Window, subtitle: ^String) {
+	msgSend(nil, self, "setSubtitle:", subtitle)
+}
+WindowTitleVisibility :: enum Integer {
+	Visible = 0,
+	Hidden  = 1,
+}
+@(objc_type=Window, objc_name="titleVisibility")
+Window_titleVisibility :: proc "c" (self: ^Window) -> WindowTitleVisibility {
+	return msgSend(WindowTitleVisibility, self, "titleVisibility")
+}
+@(objc_type=Window, objc_name="setTitleVisibility")
+Window_setTitleVisibility :: proc "c" (self: ^Window, visibility: WindowTitleVisibility) {
+	msgSend(nil, self, "setTitleVisibility:", visibility)
+}
+@(objc_type=Window, objc_name="setTitleWithRepresentedFilename")
+Window_setTitleWithRepresentedFilename :: proc "c" (self: ^Window, filename: ^String) {
+	msgSend(nil, self, "setTitleWithRepresentedFilename:", filename)
+}
+@(objc_type=Window, objc_name="representedFilename")
+Window_representedFilename :: proc "c" (self: ^Window) -> ^String {
+	return msgSend(^String, self, "representedFilename")
+}
+@(objc_type=Window, objc_name="setRepresentedFilename")
+Window_setRepresentedFilename :: proc "c" (self: ^Window, filename: ^String) {
+	msgSend(nil, self, "setRepresentedFilename:", filename)
+}
+@(objc_type=Window, objc_name="representedURL")
+Window_representedURL :: proc "c" (self: ^Window) -> ^URL {
+	return msgSend(^URL, self, "representedURL")
+}
+@(objc_type=Window, objc_name="setRepresentedURL")
+Window_setRepresentedURL :: proc "c" (self: ^Window, url: ^URL) {
+	msgSend(nil, self, "setRepresentedURL:", url)
+}
+
+// Moving Windows
+@(objc_type=Window, objc_name="isMovableByWindowBackground")
+Window_isMovableByWindowBackground :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isMovableByWindowBackground")
+}
+@(objc_type=Window, objc_name="setMovableByWindowBackground")
+Window_setMovableByWindowBackground :: proc "c" (self: ^Window, movable: BOOL) {
+	msgSend(nil, self, "setMovableByWindowBackground:", movable)
+}
+@(objc_type=Window, objc_name="isMovable")
+Window_isMovable :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isMovable")
+}
+@(objc_type=Window, objc_name="setMovable")
+Window_setMovable :: proc "c" (self: ^Window, movable: BOOL) {
+	msgSend(nil, self, "setMovable:", movable)
+}
+@(objc_type=Window, objc_name="center")
+Window_center :: proc "c" (self: ^Window) {
+	msgSend(nil, self, "center")
+}
+
+// Closing Windows
+@(objc_type=Window, objc_name="performClose")
+Window_performClose :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "performClose:", sender)
+}
+@(objc_type=Window, objc_name="close")
+Window_close :: proc "c" (self: ^Window) {
+	msgSend(nil, self, "close")
+}
+@(objc_type=Window, objc_name="isReleasedWhenClosed")
+Window_isReleasedWhenClosed :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isReleasedWhenClosed")
+}
+@(objc_type=Window, objc_name="setReleasedWhenClosed")
+Window_setReleasedWhenClosed :: proc "c" (self: ^Window, release: BOOL) {
+	msgSend(BOOL, self, "setReleasedWhenClosed:", release)
+}
+
+// Minimizing Windows
+@(objc_type=Window, objc_name="isMiniaturized")
+Window_isMiniaturized :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isMiniaturized")
+}
+@(objc_type=Window, objc_name="performMiniaturize")
+Window_performMiniaturize :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "performMiniaturize:", sender)
+}
+@(objc_type=Window, objc_name="miniaturize")
+Window_miniaturize :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "miniaturize:", sender)
+}
+@(objc_type=Window, objc_name="deminiaturize")
+Window_deminiaturize :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "deminiaturize:", sender)
+}
+@(objc_type=Window, objc_name="miniwindowImage")
+Window_miniwindowImage :: proc "c" (self: ^Window) -> ^Image {
+	return msgSend(^Image, self, "miniwindowImage")
+}
+@(objc_type=Window, objc_name="setMiniwindowImage")
+Window_setMiniwindowImage :: proc "c" (self: ^Window, image: ^Image) {
+	msgSend(nil, self, "setMiniwindowImage:", image)
+}
+@(objc_type=Window, objc_name="miniwindowTitle")
+Window_miniwindowTitle :: proc "c" (self: ^Window) -> ^String {
+	return msgSend(^String, self, "miniwindowTitle")
+}
+@(objc_type=Window, objc_name="setMiniwindowTitle")
+Window_setMiniwindowTitle :: proc "c" (self: ^Window, title: ^String) {
+	msgSend(nil, self, "setMiniwindowTitle:", title)
+}
+
 @(objc_type=Window, objc_name="opaque")
 Window_opaque :: proc "c" (self: ^Window) -> BOOL {
 	return msgSend(BOOL, self, "opaque")
@@ -864,33 +1058,13 @@ Window_backgroundColor :: proc "c" (self: ^Window) -> ^Color {
 Window_setBackgroundColor :: proc "c" (self: ^Window, color: ^Color) {
 	msgSend(nil, self, "setBackgroundColor:", color)
 }
-@(objc_type=Window, objc_name="makeKeyAndOrderFront")
-Window_makeKeyAndOrderFront :: proc "c" (self: ^Window, key: ^Object) {
-	msgSend(nil, self, "makeKeyAndOrderFront:", key)
-}
-@(objc_type=Window, objc_name="setTitle")
-Window_setTitle :: proc "c" (self: ^Window, title: ^String) {
-	msgSend(nil, self, "setTitle:", title)
-}
 @(objc_type=Window, objc_name="setTitlebarAppearsTransparent")
 Window_setTitlebarAppearsTransparent :: proc "c" (self: ^Window, ok: BOOL) {
 	msgSend(nil, self, "setTitlebarAppearsTransparent:", ok)
 }
-@(objc_type=Window, objc_name="setMovable")
-Window_setMovable :: proc "c" (self: ^Window, ok: BOOL) {
-	msgSend(nil, self, "setMovable:", ok)
-}
-@(objc_type=Window, objc_name="setMovableByWindowBackground")
-Window_setMovableByWindowBackground :: proc "c" (self: ^Window, ok: BOOL) {
-	msgSend(nil, self, "setMovableByWindowBackground:", ok)
-}
 @(objc_type=Window, objc_name="setStyleMask")
 Window_setStyleMask :: proc "c" (self: ^Window, style_mask: WindowStyleMask) {
 	msgSend(nil, self, "setStyleMask:", style_mask)
-}
-@(objc_type=Window, objc_name="close")
-Window_close :: proc "c" (self: ^Window) {
-	msgSend(nil, self, "close")
 }
 @(objc_type=Window, objc_name="setDelegate")
 Window_setDelegate :: proc "c" (self: ^Window, delegate: ^WindowDelegate) {
@@ -948,10 +1122,6 @@ Window_hasTitleBar :: proc "c" (self: ^Window) -> BOOL {
 Window_orderedIndex :: proc "c" (self: ^Window) -> Integer {
 	return msgSend(Integer, self, "orderedIndex")
 }
-@(objc_type=Window, objc_name="setTitleVisibility")
-Window_setTitleVisibility :: proc "c" (self: ^Window, visibility: Window_Title_Visibility) {
-	msgSend(nil, self, "setTitleVisibility:", visibility)
-}
 @(objc_type=Window, objc_name="setFrameAutosaveName")
 NSWindow_setFrameAutosaveName :: proc "c" (self: ^Window, name: ^String) {
 	msgSend(nil, self, "setFrameAutosaveName:", name)
@@ -959,8 +1129,4 @@ NSWindow_setFrameAutosaveName :: proc "c" (self: ^Window, name: ^String) {
 @(objc_type=Window, objc_name="performWindowDragWithEvent")
 Window_performWindowDragWithEvent :: proc "c" (self: ^Window, event: ^Event) {
 	msgSend(nil, self, "performWindowDragWithEvent:", event)
-}
-@(objc_type=Window, objc_name="setToolbar")
-Window_setToolbar :: proc "c" (self: ^Window, toolbar: ^Toolbar) {
-	msgSend(nil, self, "setToolbar:", toolbar)
 }
