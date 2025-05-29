@@ -2066,10 +2066,6 @@ gb_internal bool init_build_paths(String init_filename) {
 			}
 		}
 
-		if (bc->pdb_filepath.len > 0) {
-			bc->build_paths[BuildPath_PDB]     = path_from_string(ha, bc->pdb_filepath);
-		}
-
 		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
 			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
 			Find_Result find_result = find_visual_studio_and_windows_sdk();
@@ -2266,6 +2262,18 @@ gb_internal bool init_build_paths(String init_filename) {
 		output_path.ext  = copy_string(ha, output_extension);
 
 		bc->build_paths[BuildPath_Output] = output_path;
+	}
+
+	if (build_context.metrics.os == TargetOs_windows && build_context.ODIN_DEBUG) {
+		if (bc->pdb_filepath.len > 0) {
+			bc->build_paths[BuildPath_PDB] = path_from_string(ha, bc->pdb_filepath);
+		} else {
+			Path pdb_path;
+			pdb_path.basename = copy_string(ha, bc->build_paths[BuildPath_Output].basename);
+			pdb_path.name     = copy_string(ha, bc->build_paths[BuildPath_Output].name);
+			pdb_path.ext      = copy_string(ha, STR_LIT("pdb"));
+			bc->build_paths[BuildPath_PDB] = pdb_path;
+		}
 	}
 
 	// Do we have an extension? We might not if the output filename was supplied.
