@@ -3274,6 +3274,8 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 		case Token_OpenBracket: {
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = false;
+			defer (f->allow_range = prev_allow_range);
+
 
 			Token open = {}, close = {}, interval = {};
 			Ast *indices[2] = {};
@@ -3281,6 +3283,13 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
+
+			if (f->curr_token.kind == Token_CloseBracket) {
+				error(f->curr_token, "Expected an operand, got ]");
+				close = expect_token(f, Token_CloseBracket);
+				operand = ast_index_expr(f, operand, nullptr, open, close);
+				break;
+			}
 
 			switch (f->curr_token.kind) {
 			case Token_Ellipsis:
@@ -3331,7 +3340,6 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}
 
-			f->allow_range = prev_allow_range;
 		} break;
 
 		case Token_Pointer: // Deference
