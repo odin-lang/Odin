@@ -361,18 +361,19 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			}
 			ptr = &bool_value
 			len = size_of(bool_value)
-	case .Linger:
-		t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
+	case 
+		.Linger:
+			t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
 
-		num_secs := i64(time.duration_seconds(t))
-		if num_secs > i64(max(u16)) {
-			return .Invalid_Value
-		}
-		linger_value.l_onoff = 1
-		linger_value.l_linger = c.ushort(num_secs)
+			num_secs := i64(time.duration_seconds(t))
+			if num_secs > i64(max(u16)) {
+				return .Invalid_Value
+			}
+			linger_value.l_onoff = 1
+			linger_value.l_linger = c.ushort(num_secs)
 
-		ptr = &linger_value
-		len = size_of(linger_value)
+			ptr = &linger_value
+			len = size_of(linger_value)
 	case
 		.Receive_Timeout,
 		.Send_Timeout:
@@ -397,52 +398,46 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			}
 			ptr = &int_value
 			len = size_of(int_value)
-	case .Multicast_Interface:
-		address := value.(^Address) or_else panic("set_option() value must be a ^Address here", loc)
-		switch a in address^ {	
-		case IP4_Address:
-			in_addr_value := transmute(win.in_addr) a
-			ptr = &in_addr_value
-			len = size_of(in_addr_value)
-		case IP6_Address:
-			in6_addr_value := transmute(win.in6_addr) a
-			ptr = &in6_addr_value
-			len = size_of(in6_addr_value)
-		}
-	case .Multicast_Loop:
-		b := value.(bool) or_else panic("set_option() value must be a boolean here", loc)
-		bool_value = b32((^bool)(&b)^)
-		ptr = &bool_value
-		len = size_of(bool_value)
-	case .Multicast_TTL:
-		i := value.(int) or_else panic("set_option() value must be an integer here", loc)
-		int_value = c.int(i)
-		ptr = &int_value
-		len = size_of(int_value)
+	case 
+		.Multicast_Interface:
+			address := value.(^Address) or_else panic("set_option() value must be a ^Address here", loc)
+			switch a in address^ {	
+			case IP4_Address:
+				in_addr_value := transmute(win.in_addr) a
+				ptr = &in_addr_value
+				len = size_of(in_addr_value)
+			case IP6_Address:
+				in6_addr_value := transmute(win.in6_addr) a
+				ptr = &in6_addr_value
+				len = size_of(in6_addr_value)
+			}
+	case 
+		.Multicast_Loop:
+			b := value.(bool) or_else panic("set_option() value must be a boolean here", loc)
+			bool_value = b32((^bool)(&b)^)
+			ptr = &bool_value
+			len = size_of(bool_value)
+	case 
+		.Multicast_TTL:
+			i := value.(int) or_else panic("set_option() value must be an integer here", loc)
+			int_value = c.int(i)
+			ptr = &int_value
+			len = size_of(int_value)
 	case
 		.Join_Multicast_Group,
 		.Leave_Multicast_Group:
 			r := value.(^Multicast_Group_Request) or_else panic("set_option() value must be a ^Multicast_Group_Request here", loc)
+
 			multicast_group_request_value := r^
-			switch a in multicast_group_request_value.address {
-			case IP4_Address:
-				ip_mreq := win.ip_mreq {
-					imr_multiaddr = transmute(win.in_addr) multicast_group_request_value.address.(IP4_Address),
-					imr_interface = transmute(win.in_addr) multicast_group_request_value.interface.(IP4_Address),
-				}
+			mutlicast_address := multicast_group_request_value.address.(IP4_Address) or_else panic("set_option() value must be an IP4_Address here", loc)
+			mutlicast_interface := multicast_group_request_value.interface.(IP4_Address) or_else panic("set_option() value must be an IP4_Address here", loc)
 
-				ptr = &ip_mreq
-				len = size_of(ip_mreq)
-
-			case IP6_Address:
-				ip6_mreq := win.ipv6_mreq {
-					ipv6mr_multiaddr = transmute(win.in6_addr) multicast_group_request_value.address.(IP6_Address),
-					ipv6mr_interface = multicast_group_request_value.interface_index,
-				}
-
-				ptr = &ip6_mreq
-				len = size_of(ip6_mreq)
+			ip_mreq := win.ip_mreq {
+				imr_multiaddr = transmute(win.in_addr) mutlicast_address,
+				imr_interface = transmute(win.in_addr) mutlicast_interface,
 			}
+			ptr = &ip_mreq
+			len = size_of(ip_mreq)
 	}
 
 	socket := any_socket_to_socket(s)
@@ -458,10 +453,16 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 _get_option :: proc(s: Any_Socket, option: Socket_Option, out_value: ^$T, loc := #caller_location) -> Socket_Option_Error {
 	level := win.SOL_SOCKET
 	#partial switch option {
-	case .TCP_Nodelay:
-		level = win.IPPROTO_TCP
-	case .Multicast_Interface, .Multicast_Loop, .Multicast_TTL, .Join_Multicast_Group, .Leave_Multicast_Group:
-		level = win.IPPROTO_IP
+	case 
+		.TCP_Nodelay:
+			level = win.IPPROTO_TCP
+	case 
+		.Multicast_Interface, 
+		.Multicast_Loop, 
+		.Multicast_TTL, 
+		.Join_Multicast_Group, 
+		.Leave_Multicast_Group:
+			level = win.IPPROTO_IP
 	case:
 		level = win.SOL_SOCKET
 	}
@@ -475,25 +476,28 @@ _get_option :: proc(s: Any_Socket, option: Socket_Option, out_value: ^$T, loc :=
 	res: c.int
 
 	#partial switch option {
-	case .Multicast_Interface:
-		when T != Address {
-			panic(fmt.tprintf("Multicast_Interface option requires ^Address output type, got %v", typeid_of(T)), loc)
-		}
-		ptr = cast(^u8)&in_addr_value
-		len = size_of(in_addr_value)
-	case .Multicast_Loop:
-		when T != bool && T != b8 && T != b16 && T != b32 && T != b64 {
-			panic(fmt.tprintf("Multicast_Loop option requires bool output type, got %v", typeid_of(T)), loc)
-		} 
-		ptr = cast(^u8)&bool_value
-		len = size_of(bool_value)
-	case .Multicast_TTL:
-		when T != i8 && T != i16 && T != i32 && T != i64 && T != int &&
-		     T != u8 && T != u16 && T != u32 && T != u64 && T != uint {
-			panic(fmt.tprintf("Multicast_TTL option requires integer output type, got %v", typeid_of(T)), loc)
-		}
-		ptr = cast(^u8)&int_value
-		len = size_of(int_value)
+	case 
+		.Multicast_Interface:
+			when T != Address {
+				panic(fmt.tprintf("%v option requires ^Address output type, got %v", option, typeid_of(T)), loc)
+			}
+			ptr = cast(^u8)&in_addr_value
+			len = size_of(in_addr_value)
+	case 
+		.Multicast_Loop:
+			when T != bool && T != b8 && T != b16 && T != b32 && T != b64 {
+				panic(fmt.tprintf("%v option requires bool output type, got %v", option, typeid_of(T)), loc)
+			} 
+			ptr = cast(^u8)&bool_value
+			len = size_of(bool_value)
+	case 
+		.Multicast_TTL:
+			when T != i8 && T != i16 && T != i32 && T != i64 && T != int &&
+				T != u8 && T != u16 && T != u32 && T != u64 && T != uint {
+				panic(fmt.tprintf("%v option requires integer output type, got %v", option, typeid_of(T)), loc)
+			}
+			ptr = cast(^u8)&int_value
+			len = size_of(int_value)
 	case:
 		panic(fmt.tprintf("Unsupported option for get_option(): %v", option), loc)
 	}
@@ -521,15 +525,8 @@ _get_option :: proc(s: Any_Socket, option: Socket_Option, out_value: ^$T, loc :=
 				 T == uint || T == u8 || T == u16 || T == u32 || T == u64 {
 				out_value^ = cast(T)int_value
 			}
-	case 
-		.Join_Multicast_Group, 
-		.Leave_Multicast_Group:
-			when T == ^Multicast_Group_Request {
-				out_value^ = Multicast_Group_Request{
-					address = IP4_Address(transmute([4]u8)ip_mreq_value.imr_multiaddr),
-					interface = IP4_Address(transmute([4]u8)ip_mreq_value.imr_interface),
-				}
-			}
+	case:
+		panic(fmt.tprintf("Unsupported option for get_option(): %v", option), loc)
 	}
 
 	return nil
