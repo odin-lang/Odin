@@ -2855,6 +2855,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			case Ast_BlockStmt:
 			case Ast_IfStmt:
 			case Ast_SwitchStmt:
+			case Ast_TypeSwitchStmt:
 				if (token.kind != Token_break) {
 					error(bs->label, "Label '%.*s' can only be used with 'break'", LIT(e->token.string));
 				}
