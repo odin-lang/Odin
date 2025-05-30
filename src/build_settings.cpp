@@ -2181,7 +2181,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			} else if (bc->build_paths[BuildPath_Output].ext.len == 0) {
 				gb_printf_err("Output path %.*s must have an appropriate extension.\n", LIT(output_file));
-				return false;				
+				return false;
 			}
 		}
 	} else {
