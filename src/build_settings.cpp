@@ -2023,6 +2023,39 @@ gb_internal bool check_target_feature_is_superset_of(String const &superset, Str
 	return true;
 }
 
+gb_internal String infer_object_extension_from_build_context() {
+	String output_extension = {};
+	if (is_arch_wasm()) {
+		output_extension = STR_LIT("wasm.o");
+	} else {
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+			output_extension = STR_LIT("obj");
+			break;
+		default:
+		case TargetOs_darwin:
+		case TargetOs_linux:
+		case TargetOs_essence:
+			output_extension = STR_LIT("o");
+			break;
+
+		case TargetOs_freestanding:
+			switch (build_context.metrics.abi) {
+			default:
+			case TargetABI_Default:
+			case TargetABI_SysV:
+				output_extension = STR_LIT("o");
+				break;
+			case TargetABI_Win64:
+				output_extension = STR_LIT("obj");
+				break;
+			}
+			break;
+		}
+	}
+	return output_extension;
+}
+
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
 // We've previously called `parse_build_flags`, so `out_filepath` should be set.
 gb_internal bool init_build_paths(String init_filename) {
@@ -2155,13 +2188,8 @@ gb_internal bool init_build_paths(String init_filename) {
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("lib");
 		}
-	}else if (build_context.build_mode == BuildMode_Object) {
-		// By default use a .o object extension.
-		output_extension = STR_LIT("o");
-
-		if (build_context.metrics.os == TargetOs_windows) {
-			output_extension = STR_LIT("obj");
-		}
+	} else if (build_context.build_mode == BuildMode_Object) {
+		output_extension = infer_object_extension_from_build_context();
 	} else if (build_context.build_mode == BuildMode_Assembly) {
 		// By default use a .S asm extension.
 		output_extension = STR_LIT("S");

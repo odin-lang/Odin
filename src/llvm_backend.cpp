@@ -2527,38 +2527,15 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	String ext = {};
 
 	if (build_context.build_mode == BuildMode_Assembly) {
-		ext = STR_LIT(".S");
+		ext = STR_LIT("S");
+	} else if (build_context.build_mode == BuildMode_Object) {
+		// Allow a user override for the object extension.
+		ext = build_context.build_paths[BuildPath_Output].ext;
 	} else {
-		if (is_arch_wasm()) {
-			ext = STR_LIT(".wasm.o");
-		} else {
-			switch (build_context.metrics.os) {
-			case TargetOs_windows:
-				ext = STR_LIT(".obj");
-				break;
-			default:
-			case TargetOs_darwin:
-			case TargetOs_linux:
-			case TargetOs_essence:
-				ext = STR_LIT(".o");
-				break;
-
-			case TargetOs_freestanding:
-				switch (build_context.metrics.abi) {
-				default:
-				case TargetABI_Default:
-				case TargetABI_SysV:
-					ext = STR_LIT(".o");
-					break;
-				case TargetABI_Win64:
-					ext = STR_LIT(".obj");
-					break;
-				}
-				break;
-			}
-		}
+		ext = infer_object_extension_from_build_context();
 	}
 
+	path = gb_string_append_length(path, ".", 1);
 	path = gb_string_append_length(path, ext.text, ext.len);
 
 	return make_string(cast(u8 *)path, gb_string_length(path));
