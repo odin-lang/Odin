@@ -2504,7 +2504,6 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
 	path = gb_string_appendc(path, "/");
-	path = gb_string_append_length(path, name.text, name.len);
 
 	if (USE_SEPARATE_MODULES) {
 		GB_ASSERT(m->module_name != nullptr);
@@ -2516,6 +2515,8 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 		}
 
 		path = gb_string_append_length(path, s.text, s.len);
+	} else {
+		path = gb_string_append_length(path, name.text, name.len);
 	}
 
 	if (use_temporary_directory) {
