@@ -1,7 +1,6 @@
 package benchmark_strings
 
 import "base:intrinsics"
-import "base:runtime"
 import "core:fmt"
 import "core:log"
 import "core:testing"
