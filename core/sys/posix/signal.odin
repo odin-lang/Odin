@@ -50,7 +50,7 @@ foreign lib {
 
 	/*
 	Send a signal to a thread.
-	
+
 	As with kill, if sig is 0, only validation (of the pthread_t given) is done and no signal is sent.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_kill.html ]]
@@ -124,7 +124,7 @@ foreign lib {
 	sigignore :: proc(sig: Signal) -> result ---
 
 	/*
-	Removes sig from the signal mask of the calling process and suspend the calling process until 
+	Removes sig from the signal mask of the calling process and suspend the calling process until
 	a signal is received.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html ]]
@@ -166,7 +166,7 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/sigpending.html ]]
 	*/
 	@(link_name=LSIGPENDING)
-	sigpending :: proc(set: ^sigset_t) -> result --- 
+	sigpending :: proc(set: ^sigset_t) -> result ---
 
 	/*
 	Wait for one of the given signals.
@@ -333,7 +333,7 @@ SS_Flag_Bits :: enum c.int {
 SS_Flags :: bit_set[SS_Flag_Bits; c.int]
 
 Sig :: enum c.int {
-	// Resulting set is the union of the current set and the signal set and the complement of 
+	// Resulting set is the union of the current set and the signal set and the complement of
 	// the signal set pointed to by the argument.
 	BLOCK   = SIG_BLOCK,
 	// Resulting set is the intersection of the current set and the complement of the signal set
@@ -395,6 +395,7 @@ when ODIN_OS == .Darwin {
 	SIGXFSZ   :: 25
 	SIGVTALRM :: 26
 	SIGPROF   :: 27
+	SIGWINCH  :: 28
 	SIGUSR1   :: 30
 	SIGUSR2   :: 31
 
@@ -535,6 +536,7 @@ when ODIN_OS == .Darwin {
 	SIGXFSZ   :: 25
 	SIGVTALRM :: 26
 	SIGPROF   :: 27
+	SIGWINCH  :: 28
 	SIGUSR1   :: 30
 	SIGUSR2   :: 31
 
@@ -699,6 +701,7 @@ when ODIN_OS == .Darwin {
 	SIGXFSZ   :: 25
 	SIGVTALRM :: 26
 	SIGPROF   :: 27
+	SIGWINCH  :: 28
 	SIGUSR1   :: 30
 	SIGUSR2   :: 31
 
@@ -876,6 +879,7 @@ when ODIN_OS == .Darwin {
 	SIGXFSZ   :: 25
 	SIGVTALRM :: 26
 	SIGPROF   :: 27
+	SIGWINCH  :: 28
 	SIGUSR1   :: 30
 	SIGUSR2   :: 31
 
@@ -1036,6 +1040,7 @@ when ODIN_OS == .Darwin {
 	SIGXFSZ   :: 25
 	SIGVTALRM :: 26
 	SIGPROF   :: 27
+	SIGWINCH  :: 28
 	SIGPOLL   :: 29
 	SIGSYS    :: 31
 
@@ -1084,7 +1089,7 @@ when ODIN_OS == .Darwin {
 	@(private)
 	__SI_MAX_SIZE :: 128
 
-	when size_of(int) == 8 { 
+	when size_of(int) == 8 {
 		@(private)
 		_pad0 :: struct {
 			_pad0: c.int,
