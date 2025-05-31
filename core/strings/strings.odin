@@ -527,15 +527,14 @@ Example:
 		fmt.println(strings.common_prefix("testing", "test"))
 		fmt.println(strings.common_prefix("testing", "te"))
 		fmt.println(strings.common_prefix("telephone", "te"))
-		fmt.println(strings.common_prefix("testing", "est"))
 	}
 
 Output:
 
-	"test"
-	"te"
-	"te"
-	""
+	test
+	te
+	te
+
 
 */
 common_prefix :: proc(a, b: string) -> string {
