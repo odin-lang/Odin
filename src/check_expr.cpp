@@ -7960,7 +7960,27 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			default:
 				{
 					gbString str = type_to_string(t);
-					error(call, "Too many arguments in conversion to '%s'", str);
+					if (t->kind == Type_Basic) {
+						ERROR_BLOCK();
+						switch (t->Basic.kind) {
+						case Basic_complex32:
+						case Basic_complex64:
+						case Basic_complex128:
+							error(call, "Too many arguments in conversion to '%s'", str);
+							error_line("\tSuggestion: %s(1+2i) or construct with 'complex'\n", str);
+							break;
+						case Basic_quaternion64:
+						case Basic_quaternion128:
+						case Basic_quaternion256:
+							error(call, "Too many arguments in conversion to '%s'", str);
+							error_line("\tSuggestion: %s(1+2i+3j+4k) or construct with 'quaternion'\n", str);
+							break;
+						default:
+							error(call, "Too many arguments in conversion to '%s'", str);
+						}
+					} else {
+						error(call, "Too many arguments in conversion to '%s'", str);
+					}
 					gb_string_free(str);
 				} break;
 			case 1: {
