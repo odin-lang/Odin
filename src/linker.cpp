@@ -532,7 +532,7 @@ try_cross_linking:;
 								LIT(build_context.metrics.target_triplet),
 								LIT(build_context.extra_assembler_flags)
 							);
-						} else if (is_osx) {
+						} else if (is_osx || !is_arch_x86()) {
 							// `as` comes with MacOS.
 							result = system_exec_command_line_app("as",
 								"as \"%.*s\" "
@@ -544,6 +544,7 @@ try_cross_linking:;
 								LIT(build_context.extra_assembler_flags)
 							);
 						} else {
+							// `nasm` only compiles x86 assembly.
 							// Note(bumbread): I'm assuming nasm is installed on the host machine.
 							// Shipping binaries on unix-likes gets into the weird territorry of
 							// "which version of glibc" is it linked with.

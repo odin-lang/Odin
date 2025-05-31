@@ -1,3 +1,4 @@
+#+build !orca
 #+build wasm32, wasm64p32
 package runtime
 
@@ -868,4 +869,23 @@ aligned_realloc :: proc(a: ^WASM_Allocator, ptr: rawptr, alignment, size: uint, 
 	}
 
 	return newptr
+}
+
+heap_allocator :: default_wasm_allocator
+heap_allocator_proc :: wasm_allocator_proc
+
+@(require_results)
+heap_alloc :: proc(size: int, zero_memory: bool = true) -> (ptr: rawptr) {
+	bytes, _ := wasm_allocator_proc(&global_default_wasm_allocator_data, .Alloc if zero_memory else .Alloc_Non_Zeroed, size, 0, nil, 0)
+	return raw_data(bytes)
+}
+
+@(require_results)
+heap_resize :: proc(old_ptr: rawptr, old_size: int, new_size: int, zero_memory: bool = true) -> (new_ptr: rawptr) {
+	bytes, _ := wasm_allocator_proc(&global_default_wasm_allocator_data, .Resize if zero_memory else .Resize_Non_Zeroed, new_size, 0, old_ptr, old_size)
+	return raw_data(bytes)
+}
+
+heap_free :: proc(ptr: rawptr) {
+	wasm_allocator_proc(&global_default_wasm_allocator_data, .Free, 0, 0, ptr, 0)
 }
