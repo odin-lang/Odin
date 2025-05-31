@@ -2,6 +2,7 @@
 package strings
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:bytes"
 import "core:io"
 import "core:mem"
@@ -458,6 +459,7 @@ equal_fold :: proc(u, v: string) -> (res: bool) {
 
 	return s == t
 }
+
 /*
 Returns the prefix length common between strings `a` and `b`
 
@@ -488,28 +490,55 @@ Output:
 	0
 
 */
-prefix_length :: proc(a, b: string) -> (n: int) {
-	_len := min(len(a), len(b))
+prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
+	RUNE_ERROR :: '\ufffd'
+	RUNE_SELF  :: 0x80
+	UTF_MAX    :: 4
 
-	// Scan for matches including partial codepoints.
-	#no_bounds_check for n < _len && a[n] == b[n] {
-		n += 1
-	}
-
-	// Now scan to ignore partial codepoints.
-	if n > 0 {
-		s := a[:n]
-		n = 0
-		for {
-			r0, w := utf8.decode_rune(s[n:])
-			if r0 != utf8.RUNE_ERROR {
-				n += w
-			} else {
-				break
+	n    = runtime.memory_prefix_length(raw_data(a), raw_data(b), min(len(a), len(b)))
+	lim := max(n - UTF_MAX + 1, 0)
+	for l := n; l > lim; l -= 1 {
+		r, _ := runtime.string_decode_rune(a[l - 1:])
+		if r != RUNE_ERROR {
+			if l > 0 && (a[l - 1] & 0xc0 == 0xc0) {
+				return l - 1
 			}
+			return l
 		}
 	}
 	return
+}
+/*
+Returns the common prefix between strings `a` and `b`
+
+Inputs:
+- a: The first input string
+- b: The second input string
+
+Returns:
+- n: The string prefix common between strings `a` and `b`
+
+Example:
+
+	import "core:fmt"
+	import "core:strings"
+
+	common_prefix_example :: proc() {
+		fmt.println(strings.common_prefix("testing", "test"))
+		fmt.println(strings.common_prefix("testing", "te"))
+		fmt.println(strings.common_prefix("telephone", "te"))
+	}
+
+Output:
+
+	test
+	te
+	te
+
+
+*/
+common_prefix :: proc(a, b: string) -> string {
+	return a[:prefix_length(a, b)]
 }
 /*
 Determines if a string `s` starts with a given `prefix`
