@@ -3890,12 +3890,14 @@ end_of_code_gen:;
 			char const *filename = cast(char const *)exe_name.text;
 			gb_file_remove(filename);
 
-			if (build_context.metrics.os == TargetOs_windows && build_context.ODIN_DEBUG) {
-				String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-				defer (gb_free(heap_allocator(), pdb_path.text));
+			if (build_context.ODIN_DEBUG) {
+				if (build_context.metrics.os == TargetOs_windows || build_context.metrics.os == TargetOs_darwin) {
+					String symbol_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Symbols]);
+					defer (gb_free(heap_allocator(), symbol_path.text));
 
-				filename = cast(char const *)pdb_path.text;
-				gb_file_remove(filename);
+					filename = cast(char const *)symbol_path.text;
+					gb_file_remove(filename);
+				}
 			}
 		}
 	}

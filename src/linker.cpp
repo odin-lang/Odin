@@ -281,9 +281,9 @@ try_cross_linking:;
 				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
 			}
 
-			if (build_context.build_paths[BuildPath_PDB].name != "") {
-				String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(pdb_path));
+			if (build_context.build_paths[BuildPath_Symbols].name != "") {
+				String symbol_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Symbols]);
+				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(symbol_path));
 			}
 
 			if (build_context.build_mode != BuildMode_StaticLibrary) {

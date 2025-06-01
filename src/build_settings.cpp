@@ -288,7 +288,7 @@ enum BuildPath : u8 {
 	BuildPath_VS_LIB,           // vs_library_path
 
 	BuildPath_Output,           // Output Path for .exe, .dll, .so, etc. Can be overridden with `-out:`.
-	BuildPath_PDB,              // Output Path for .pdb file, can be overridden with `-pdb-name:`.
+	BuildPath_Symbols,          // Output Path for .pdb or .dSym file, can be overridden with `-pdb-name:`.
 
 	BuildPathCOUNT,
 };
@@ -2292,15 +2292,23 @@ gb_internal bool init_build_paths(String init_filename) {
 		bc->build_paths[BuildPath_Output] = output_path;
 	}
 
-	if (build_context.metrics.os == TargetOs_windows && build_context.ODIN_DEBUG) {
-		if (bc->pdb_filepath.len > 0) {
-			bc->build_paths[BuildPath_PDB] = path_from_string(ha, bc->pdb_filepath);
-		} else {
-			Path pdb_path;
-			pdb_path.basename = copy_string(ha, bc->build_paths[BuildPath_Output].basename);
-			pdb_path.name     = copy_string(ha, bc->build_paths[BuildPath_Output].name);
-			pdb_path.ext      = copy_string(ha, STR_LIT("pdb"));
-			bc->build_paths[BuildPath_PDB] = pdb_path;
+	if (build_context.ODIN_DEBUG) {
+		if (build_context.metrics.os == TargetOs_windows) {
+			if (bc->pdb_filepath.len > 0) {
+				bc->build_paths[BuildPath_Symbols] = path_from_string(ha, bc->pdb_filepath);
+			} else {
+				Path symbol_path;
+				symbol_path.basename = copy_string(ha, bc->build_paths[BuildPath_Output].basename);
+				symbol_path.name     = copy_string(ha, bc->build_paths[BuildPath_Output].name);
+				symbol_path.ext      = copy_string(ha, STR_LIT("pdb"));
+				bc->build_paths[BuildPath_Symbols] = symbol_path;
+			}
+		} else if (build_context.metrics.os == TargetOs_darwin) {
+			Path symbol_path;
+			symbol_path.basename = copy_string(ha, bc->build_paths[BuildPath_Output].basename);
+			symbol_path.name     = copy_string(ha, bc->build_paths[BuildPath_Output].name);
+			symbol_path.ext      = copy_string(ha, STR_LIT("dSym"));
+			bc->build_paths[BuildPath_Symbols] = symbol_path;
 		}
 	}
 
