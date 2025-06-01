@@ -2307,7 +2307,7 @@ gb_internal bool init_build_paths(String init_filename) {
 			Path symbol_path;
 			symbol_path.basename = copy_string(ha, bc->build_paths[BuildPath_Output].basename);
 			symbol_path.name     = copy_string(ha, bc->build_paths[BuildPath_Output].name);
-			symbol_path.ext      = copy_string(ha, STR_LIT("dSym"));
+			symbol_path.ext      = copy_string(ha, STR_LIT("dSYM"));
 			bc->build_paths[BuildPath_Symbols] = symbol_path;
 		}
 	}
