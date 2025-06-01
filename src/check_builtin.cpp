@@ -2871,8 +2871,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// quaternion :: proc(imag, jmag, kmag, real: float_type) -> complex_type
 		Operand xyzw[4] = {};
 
-		u32 first_index = 0;
-
 		// NOTE(bill): Invalid will be the default till fixed
 		operand->type = t_invalid;
 		operand->mode = Addressing_Invalid;
@@ -2917,6 +2915,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 				if (fields_set[*index]) {
 					error(field->field, "Previously assigned field: '%.*s'", LIT(name));
+					return false;
 				}
 				fields_set[*index] = style;
 
@@ -2933,7 +2932,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				if (!ok || index < 0) {
 					return false;
 				}
-				first_index = cast(u32)index;
 				*refs[index] = o;
 			}
 
@@ -2958,12 +2956,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 
 
-		for (u32 i = 0; i < 4; i++ ){
-			u32 j = (i + first_index) % 4;
-			if (j == first_index) {
-				convert_to_typed(c, &xyzw[j], xyzw[(first_index+1)%4].type); if (xyzw[j].mode == Addressing_Invalid) return false;
-			} else {
-				convert_to_typed(c, &xyzw[j], xyzw[first_index].type); if (xyzw[j].mode == Addressing_Invalid) return false;
+		// The first typed value found, if any exist, will dictate the type for all untyped values.
+		for (u32 i = 0; i < 4; i++) {
+			if (is_type_typed(xyzw[i].type)) {
+				for (u32 j = 0; j < 4; j++) {
+					// `convert_to_typed` should check if it is typed already.
+					convert_to_typed(c, &xyzw[j], xyzw[i].type);
+					if (xyzw[j].mode == Addressing_Invalid) {
+						return false;
+					}
+				}
+				break;
 			}
 		}
 		if (xyzw[0].mode == Addressing_Constant &&
@@ -2987,7 +2990,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gbString ty = type_to_string(xyzw[1].type);
 			gbString tz = type_to_string(xyzw[2].type);
 			gbString tw = type_to_string(xyzw[3].type);
-			error(call, "Mismatched types to 'quaternion', 'x=%s' vs 'y=%s' vs 'z=%s' vs 'w=%s'", tx, ty, tz, tw);
+			error(call, "Mismatched types to 'quaternion', 'w=%s' vs 'x=%s' vs 'y=%s' vs 'z=%s'", tw, tx, ty, tz);
 			gb_string_free(tw);
 			gb_string_free(tz);
 			gb_string_free(ty);
@@ -3023,7 +3026,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Constant;
 		}
 
-		BasicKind kind = core_type(xyzw[first_index].type)->Basic.kind;
+		BasicKind kind = core_type(xyzw[0].type)->Basic.kind;
 		switch (kind) {
 		case Basic_f16:          operand->type = t_quaternion64;       break;
 		case Basic_f32:          operand->type = t_quaternion128;      break;
