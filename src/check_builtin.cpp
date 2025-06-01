@@ -2990,7 +2990,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gbString ty = type_to_string(xyzw[1].type);
 			gbString tz = type_to_string(xyzw[2].type);
 			gbString tw = type_to_string(xyzw[3].type);
-			error(call, "Mismatched types to 'quaternion', 'x=%s' vs 'y=%s' vs 'z=%s' vs 'w=%s'", tx, ty, tz, tw);
+			error(call, "Mismatched types to 'quaternion', 'w=%s' vs 'x=%s' vs 'y=%s' vs 'z=%s'", tw, tx, ty, tz);
 			gb_string_free(tw);
 			gb_string_free(tz);
 			gb_string_free(ty);
