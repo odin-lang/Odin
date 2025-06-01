@@ -2917,6 +2917,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 				if (fields_set[*index]) {
 					error(field->field, "Previously assigned field: '%.*s'", LIT(name));
+					return false;
 				}
 				fields_set[*index] = style;
 
