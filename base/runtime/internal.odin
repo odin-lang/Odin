@@ -429,7 +429,7 @@ memory_prefix_length :: proc "contextless" (x, y: rawptr, n: int) -> (idx: int) 
 					indices := intrinsics.simd_indices(#simd[32]u8)
 					index_select := intrinsics.simd_select(comparison, indices, sentinel)
 					index_reduce := cast(uint)intrinsics.simd_reduce_min(index_select)
-					return i + index_reduce
+					return int(i + index_reduce)
 				}
 			}
 		}
