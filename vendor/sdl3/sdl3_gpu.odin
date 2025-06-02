@@ -193,9 +193,9 @@ GPUTextureUsageFlag :: enum Uint32 {
 }
 
 GPUTextureType :: enum c.int {
-	D2,         /**< The texture is a 2-dimensional image. */
-	D2_ARRAY,   /**< The texture is a 2-dimensional array image. */
-	D3,         /**< The texture is a 3-dimensional image. */
+	2D,         /**< The texture is a 2-dimensional image. */
+	2D_ARRAY,   /**< The texture is a 2-dimensional array image. */
+	3D,         /**< The texture is a 3-dimensional image. */
 	CUBE,       /**< The texture is a cube image. */
 	CUBE_ARRAY, /**< The texture is a cube array image. */
 }
