@@ -5394,37 +5394,6 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				return entity;
 			}
 			GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
-
-			if (entity->kind == Entity_ProcGroup) {
-				Array<Entity *> procs = entity->ProcGroup.entities;
-				bool skip = false;
-				for (Entity *p : procs) {
-					Type *t = base_type(p->type);
-					if (t == t_invalid) {
-						continue;
-					}
-
-					Operand x = {};
-					x.mode = Addressing_Value;
-					x.type = t;
-					if (type_hint != nullptr) {
-						if (check_is_assignable_to(c, &x, type_hint)) {
-							entity = p;
-							skip = true;
-							break;
-						}
-					}
-				}
-
-				if (!skip) {
-					GB_ASSERT(entity != nullptr);
-					operand->mode       = Addressing_ProcGroup;
-					operand->type       = t_invalid;
-					operand->expr       = node;
-					operand->proc_group = entity;
-					return entity;
-				}
-			}
 		}
 	}
 
