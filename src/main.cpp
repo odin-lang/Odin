@@ -2671,7 +2671,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (doc) {
 		if (print_flag("-out:<filepath>")) {
-			print_usage_line(2, "Sets the base name of the resultig .odin-doc file.");
+			print_usage_line(2, "Sets the base name of the resulting .odin-doc file.");
 			print_usage_line(2, "The extension can be optionally included; the resulting file will always have an extension of '.odin-doc'.");
 			print_usage_line(2, "Example: -out:foo");
 		}
