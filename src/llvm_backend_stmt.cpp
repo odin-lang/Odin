@@ -1072,10 +1072,22 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			break;
 		}
 		case Type_Array: {
-			lbValue array = lb_build_addr_ptr(p, expr);
-			if (is_type_pointer(type_deref(array.type))) {
-				array = lb_emit_load(p, array);
+			lbValue array;
+			lbAddr addr = lb_build_addr(p, expr);
+			switch (addr.kind) {
+			case lbAddr_Swizzle:
+			case lbAddr_SwizzleLarge:
+				// NOTE(laytan): apply the swizzle.
+				array = lb_address_from_load(p, lb_addr_load(p, addr));
+				break;
+			default:
+				array = lb_addr_get_ptr(p, addr);
+				if (is_type_pointer(type_deref(array.type))) {
+					array = lb_emit_load(p, array);
+				}
+				break;
 			}
+
 			lbAddr count_ptr = lb_add_local_generated(p, t_int, false);
 			lb_addr_store(p, count_ptr, lb_const_int(p->module, t_int, et->Array.count));
 			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
