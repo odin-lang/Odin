@@ -263,6 +263,9 @@ gb_internal void check_did_you_mean_scope(String const &name, Scope *scope, char
 
 gb_internal Entity *entity_from_expr(Ast *expr) {
 	expr = unparen_expr(expr);
+	if (expr == nullptr) {
+		return nullptr;
+	}
 	switch (expr->kind) {
 	case Ast_Ident:
 		return expr->Ident.entity;
