@@ -5592,7 +5592,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 
 			if (sz >= 64) {
-				if (is_type_unsigned(x.type)) {
+				if (is_type_unsigned(x.type) || is_type_unsigned(y.type)) {
 					add_package_dependency(c, "runtime", "umodti3", true);
 					add_package_dependency(c, "runtime", "udivti3", true);
 				} else {

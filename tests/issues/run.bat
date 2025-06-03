@@ -21,6 +21,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style
 ..\..\..\odin build ..\test_issue_5043.odin %COMMON% || exit /b
 ..\..\..\odin build ..\test_issue_5097.odin %COMMON% || exit /b
 ..\..\..\odin build ..\test_issue_5097-2.odin %COMMON% || exit /b
+..\..\..\odin build ..\test_issue_5265.odin %COMMON% || exit /b
 
 @echo off
 
