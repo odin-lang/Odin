@@ -1,3 +1,4 @@
+#+build !js
 package all
 
 // Imports every package
@@ -152,9 +153,6 @@ import utf8             "core:unicode/utf8"
 import utf8string       "core:unicode/utf8/utf8string"
 import utf16            "core:unicode/utf16"
 
-main :: proc(){}
-
-
 _ :: bufio
 _ :: bytes
 _ :: c
@@ -280,3 +278,5 @@ _ :: utf8
 _ :: utf8string
 _ :: utf16
 _ :: sanitizer
+
+main :: proc() {}
