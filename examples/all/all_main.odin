@@ -81,6 +81,7 @@ import netpbm           "core:image/netpbm"
 import png              "core:image/png"
 import qoi              "core:image/qoi"
 import tga              "core:image/tga"
+import jpeg             "core:image/jpeg"
 
 import io               "core:io"
 import log              "core:log"
@@ -222,6 +223,7 @@ _ :: netpbm
 _ :: png
 _ :: qoi
 _ :: tga
+_ :: jpeg
 _ :: io
 _ :: log
 _ :: math
