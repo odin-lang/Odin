@@ -5378,16 +5378,6 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				return nullptr;
 			}
 
-			check_entity_decl(c, entity, nullptr, nullptr);
-			if (entity->kind == Entity_ProcGroup) {
-				operand->mode = Addressing_ProcGroup;
-				operand->proc_group = entity;
-
-				add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
-				return entity;
-			}
-			GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
-
 			if (!is_entity_exported(entity, allow_builtin)) {
 				gbString sel_str = expr_to_string(selector);
 				error(node, "'%s' is not exported by '%.*s'", sel_str, LIT(import_name));
@@ -5398,36 +5388,15 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				// return nullptr;
 			}
 
+			check_entity_decl(c, entity, nullptr, nullptr);
 			if (entity->kind == Entity_ProcGroup) {
-				Array<Entity *> procs = entity->ProcGroup.entities;
-				bool skip = false;
-				for (Entity *p : procs) {
-					Type *t = base_type(p->type);
-					if (t == t_invalid) {
-						continue;
-					}
+				operand->mode = Addressing_ProcGroup;
+				operand->proc_group = entity;
 
-					Operand x = {};
-					x.mode = Addressing_Value;
-					x.type = t;
-					if (type_hint != nullptr) {
-						if (check_is_assignable_to(c, &x, type_hint)) {
-							entity = p;
-							skip = true;
-							break;
-						}
-					}
-				}
-
-				if (!skip) {
-					GB_ASSERT(entity != nullptr);
-					operand->mode       = Addressing_ProcGroup;
-					operand->type       = t_invalid;
-					operand->expr       = node;
-					operand->proc_group = entity;
-					return entity;
-				}
+				add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
+				return entity;
 			}
+			GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
 		}
 	}
 
