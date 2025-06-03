@@ -1,5 +1,3 @@
-#include <iostream>
-
 enum CallArgumentError {
 	CallArgumentError_None,
 	CallArgumentError_NoneProcedureType,
