@@ -51,7 +51,6 @@ Text :: struct {
 }
 
 FontStyle :: enum u32 {
-	NORMAL,
 	BOLD,
 	ITALIC,
 	UNDERLINE,
