@@ -214,7 +214,7 @@ foreign lib {
 	RenderText_Shaded_Wrapped  :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
 	RenderGlyph_Shaded         :: proc(font: ^Font, ch: u32, fg, bg: SDL.Color) -> ^SDL.Surface ---
 	RenderText_Blended         :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color) -> ^SDL.Surface ---
-	RnederText_Blended_Wrapped :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
+	RenderText_Blended_Wrapped :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
 	RenderGlyph_Blended        :: proc(font: ^Font, ch: u32, fg: SDL.Color) -> ^SDL.Surface ---
 	RenderText_LCD             :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color) -> ^SDL.Surface ---
 	RenderText_LCD_Wrapped     :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
