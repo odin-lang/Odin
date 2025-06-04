@@ -648,6 +648,9 @@ append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (n: i
 
 @builtin
 inject_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcast arg: E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}
@@ -666,6 +669,9 @@ inject_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcas
 
 @builtin
 inject_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}
@@ -689,6 +695,9 @@ inject_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadca
 
 @builtin
 inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, arg: string, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}
