@@ -4845,6 +4845,12 @@ SOMAXCONN    :: 128 // The number of messages that can be queued in memory after
 SOCKET_ERROR :: -1
 
 // Networking errors
+WSA_INVALID_HANDLE     :: 6     // Specified event object handle is invalid.
+WSA_NOT_ENOUGH_MEMORY  :: 8     // Insufficient memory available.
+WSA_INVALID_PARAMETER  :: 87    // One or more parameters are invalid.
+WSA_OPERATION_ABORTED  :: 995   // Overlapped operation aborted.
+WSA_IO_INCOMPLETE      :: 996   // Overlapped I/O event object not in signaled state.
+WSA_IO_PENDING         :: 997   // Overlapped operations will complete later.
 WSAEINTR               :: 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
 WSAEACCES              :: 10013 // If you try to bind a Udp socket to the broadcast address without the socket option set.
 WSAEFAULT              :: 10014 // A pointer that was passed to a WSA function is invalid, such as a buffer size is smaller than you said it was

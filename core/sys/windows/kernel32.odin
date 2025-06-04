@@ -372,6 +372,12 @@ foreign kernel32 {
 		bInitialState: BOOL,
 		lpName: LPCWSTR,
 	) -> HANDLE ---
+	CreateEventExW :: proc(
+		lpEventAttributes: LPSECURITY_ATTRIBUTES,
+		lpName: LPCWSTR,
+		dwFlags: DWORD,
+		dwDesiredAccess: DWORD,
+	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(

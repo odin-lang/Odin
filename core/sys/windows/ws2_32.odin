@@ -131,6 +131,10 @@ foreign ws2_32 {
 	) -> SOCKET ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaioctl)
 	WSAIoctl :: proc(s: SOCKET, dwIoControlCode: DWORD, lpvInBuffer: rawptr, cbInBuffer: DWORD, lpvOutBuffer: rawptr, cbOutBuffer: DWORD, lpcbBytesReturned: ^DWORD, lpOverlapped: ^OVERLAPPED, lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsacreateevent)
+	WSACreateEvent :: proc() -> WSAEVENT ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsacloseevent)
+	WSACloseEvent :: proc(hEvent: WSAEVENT) -> bool ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaeventselect)
 	WSAEventSelect :: proc(s: SOCKET, hEventObject: WSAEVENT, lNetworkEvents: i32) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsawaitformultipleevents)
