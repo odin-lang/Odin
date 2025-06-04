@@ -630,6 +630,24 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 			_marshal_into_encoder(e, any{rawptr(data), info.elem.id}, elem_ti) or_return
 		}
 		return
+
+	case runtime.Type_Info_Simd_Vector:
+		err_conv(_encode_u64(e, u64(info.count), .Array)) or_return
+
+		if impl, ok := _tag_implementations_type[info.elem.id]; ok {
+			for i in 0..<info.count {
+				data := uintptr(v.data) + uintptr(i*info.elem_size)
+				impl->marshal(e, any{rawptr(data), info.elem.id}) or_return
+			}
+			return
+		}
+
+		elem_ti := runtime.type_info_core(type_info_of(info.elem.id))
+		for i in 0..<info.count {
+			data := uintptr(v.data) + uintptr(i*info.elem_size)
+			_marshal_into_encoder(e, any{rawptr(data), info.elem.id}, elem_ti) or_return
+		}
+		return
 	}
 
 	return _unsupported(v.id, nil)
