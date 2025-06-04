@@ -1555,6 +1555,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_Sanitize:
 							GB_ASSERT(value.kind == ExactValue_String);
 
+							if (build_context.sanitizer_flags != 0) {
+								gb_printf_err("-sanitize:<string> may only be used once\n");
+								bad_flags = true;
+							}
+
 							if (str_eq_ignore_case(value.value_string, str_lit("address"))) {
 								build_context.sanitizer_flags |= SanitizerFlag_Address;
 							} else if (str_eq_ignore_case(value.value_string, str_lit("memory"))) {
@@ -2728,7 +2733,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "-sanitize:address");
 				print_usage_line(3, "-sanitize:memory");
 				print_usage_line(3, "-sanitize:thread");
-			print_usage_line(2, "NOTE: This flag can be used multiple times.");
 		}
 	}
 
