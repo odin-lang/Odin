@@ -43,6 +43,7 @@ Foo :: struct {
 	biggest: big.Int,
 	smallest: big.Int,
 	ignore_this: ^Foo `cbor:"-"`,
+	mat: matrix[4, 4]f32,
 }
 
 FooBar :: enum {
@@ -95,6 +96,7 @@ test_marshalling :: proc(t: ^testing.T) {
 			onetwenty = i128(12345),
 			small_onetwenty = -i128(max(u64)),
 			ignore_this = &Foo{},
+			mat = 1,
 		}
 
 		big.atoi(&f.biggest, "1234567891011121314151617181920")
@@ -120,6 +122,24 @@ test_marshalling :: proc(t: ^testing.T) {
 		defer delete(diagnosis)
 		testing.expect_value(t, diagnosis, `{
 	"no": null,
+	"mat": [
+		1.0000,
+		0.0000,
+		0.0000,
+		0.0000,
+		0.0000,
+		1.0000,
+		0.0000,
+		0.0000,
+		0.0000,
+		0.0000,
+		1.0000,
+		0.0000,
+		0.0000,
+		0.0000,
+		0.0000,
+		1.0000
+	],
 	"neg": -69,
 	"nos": undefined,
 	"now": 1(1701117968),
