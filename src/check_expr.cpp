@@ -9464,6 +9464,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 	}
 	bool is_to_be_determined_array_count = false;
 	bool is_constant = true;
+	bool is_soa = false;
 
 	Ast *type_expr = cl->type;
 
@@ -9496,8 +9497,14 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					GB_ASSERT(tag->kind == Ast_BasicDirective);
 					String name = tag->BasicDirective.name.string;
 					if (name == "soa") {
-						error(node, "#soa arrays are not supported for compound literals");
-						return kind;
+						is_soa = true;
+						if (count == nullptr) {
+							error(node, "#soa slices are not supported for compound literals");
+							return kind;
+						} else if (count->kind == Ast_UnaryExpr &&
+						           count->UnaryExpr.op.kind == Token_Question) {
+							error(node, "#soa fixed length arrays must specify their length and cannot use ?");
+						}
 					}
 				}
 			}
@@ -9507,7 +9514,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				GB_ASSERT(tag->kind == Ast_BasicDirective);
 				String name = tag->BasicDirective.name.string;
 				if (name == "soa") {
-					error(node, "#soa arrays are not supported for compound literals");
+					is_soa = true;
+					error(node, "#soa dynamic arrays are not supported for compound literals");
 					return kind;
 				}
 			}
@@ -9536,101 +9544,101 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 
 	switch (t->kind) {
-	case Type_Struct: {
+	case Type_Struct:
 		if (cl->elems.count == 0) {
 			break; // NOTE(bill): No need to init
 		}
 
-		if (t->Struct.soa_kind != StructSoa_None) {
-			error(node, "#soa arrays are not supported for compound literals");
-			break;
-		}
+		if (t->Struct.soa_kind == StructSoa_None) {
+			if (t->Struct.is_raw_union) {
+				if (cl->elems.count > 0) {
+					// NOTE: unions cannot be constant
+					is_constant = false;
 
-		if (t->Struct.is_raw_union) {
-			if (cl->elems.count > 0) {
-				// NOTE: unions cannot be constant
-				is_constant = false;
-
-				if (cl->elems[0]->kind != Ast_FieldValue) {
-					gbString type_str = type_to_string(type);
-					error(node, "%s ('struct #raw_union') compound literals are only allowed to contain 'field = value' elements", type_str);
-					gb_string_free(type_str);
-				} else {
-					if (cl->elems.count != 1) {
+					if (cl->elems[0]->kind != Ast_FieldValue) {
 						gbString type_str = type_to_string(type);
-						error(node, "%s ('struct #raw_union') compound literals are only allowed to contain up to 1 'field = value' element, got %td", type_str, cl->elems.count);
+						error(node, "%s ('struct #raw_union') compound literals are only allowed to contain 'field = value' elements", type_str);
 						gb_string_free(type_str);
 					} else {
-						check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
+						if (cl->elems.count != 1) {
+							gbString type_str = type_to_string(type);
+							error(node, "%s ('struct #raw_union') compound literals are only allowed to contain up to 1 'field = value' element, got %td", type_str, cl->elems.count);
+							gb_string_free(type_str);
+						} else {
+							check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
+						}
+					}
+				}
+				break;
+			}
+
+			wait_signal_until_available(&t->Struct.fields_wait_signal);
+			isize field_count = t->Struct.fields.count;
+			isize min_field_count = t->Struct.fields.count;
+			for (isize i = min_field_count-1; i >= 0; i--) {
+				Entity *e = t->Struct.fields[i];
+				GB_ASSERT(e->kind == Entity_Variable);
+				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+					min_field_count--;
+				} else {
+					break;
+				}
+			}
+
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
+			} else {
+				bool seen_field_value = false;
+
+				for_array(index, cl->elems) {
+					Entity *field = nullptr;
+					Ast *elem = cl->elems[index];
+					if (elem->kind == Ast_FieldValue) {
+						seen_field_value = true;
+						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+						continue;
+					} else if (seen_field_value) {
+						error(elem, "Value elements cannot be used after a 'field = value'");
+						continue;
+					}
+					if (index >= field_count) {
+						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						break;
+					}
+
+					if (field == nullptr) {
+						field = t->Struct.fields[index];
+					}
+
+					Operand o = {};
+					check_expr_or_type(c, &o, elem, field->type);
+
+					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
+						is_constant = false;
+					}
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &o);
+					}
+
+					check_assignment(c, &o, field->type, str_lit("structure literal"));
+				}
+				if (cl->elems.count < field_count) {
+					if (min_field_count < field_count) {
+					    if (cl->elems.count < min_field_count) {
+							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
+					    }
+					} else {
+						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 					}
 				}
 			}
+
+			break;
+		} else if (t->Struct.soa_kind != StructSoa_Fixed) {
+			error(node, "#soa slices and dynamic arrays are not supported for compound literals");
 			break;
 		}
-
-		wait_signal_until_available(&t->Struct.fields_wait_signal);
-		isize field_count = t->Struct.fields.count;
-		isize min_field_count = t->Struct.fields.count;
-		for (isize i = min_field_count-1; i >= 0; i--) {
-			Entity *e = t->Struct.fields[i];
-			GB_ASSERT(e->kind == Entity_Variable);
-			if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-				min_field_count--;
-			} else {
-				break;
-			}
-		}
-
-		if (cl->elems[0]->kind == Ast_FieldValue) {
-			check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
-		} else {
-			bool seen_field_value = false;
-
-			for_array(index, cl->elems) {
-				Entity *field = nullptr;
-				Ast *elem = cl->elems[index];
-				if (elem->kind == Ast_FieldValue) {
-					seen_field_value = true;
-					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
-					continue;
-				} else if (seen_field_value) {
-					error(elem, "Value elements cannot be used after a 'field = value'");
-					continue;
-				}
-				if (index >= field_count) {
-					error(elem, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
-					break;
-				}
-
-				if (field == nullptr) {
-					field = t->Struct.fields[index];
-				}
-
-				Operand o = {};
-				check_expr_or_type(c, &o, elem, field->type);
-
-				if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
-					is_constant = false;
-				}
-				if (is_constant) {
-					is_constant = check_is_operand_compound_lit_constant(c, &o);
-				}
-
-				check_assignment(c, &o, field->type, str_lit("structure literal"));
-			}
-			if (cl->elems.count < field_count) {
-				if (min_field_count < field_count) {
-				    if (cl->elems.count < min_field_count) {
-						error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
-				    }
-				} else {
-					error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
-				}
-			}
-		}
-
-		break;
-	}
+		/*fallthrough*/
 
 	case Type_Slice:
 	case Type_Array:
@@ -9641,9 +9649,22 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		Type *elem_type = nullptr;
 		String context_name = {};
 		i64 max_type_count = -1;
-		if (t->kind == Type_Slice) {
+		if (t->kind == Type_Struct) {
+			GB_ASSERT(t->Struct.soa_kind == StructSoa_Fixed);
+			elem_type = t->Struct.soa_elem;
+			context_name = str_lit("#soa array literal");
+			if (!is_to_be_determined_array_count) {
+				max_type_count = t->Struct.soa_count;
+			}
+		} else if (t->kind == Type_Slice) {
 			elem_type = t->Slice.elem;
 			context_name = str_lit("slice literal");
+		} else if (t->kind == Type_Array) {
+			elem_type = t->Array.elem;
+			context_name = str_lit("array literal");
+			if (!is_to_be_determined_array_count) {
+				max_type_count = t->Array.count;
+			}
 		} else if (t->kind == Type_Array) {
 			elem_type = t->Array.elem;
 			context_name = str_lit("array literal");
@@ -9815,6 +9836,15 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
 				if (0 < max && max < t->Array.count) {
 					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+				}
+			}
+		} else if (t->kind == Type_Struct) {
+			GB_ASSERT(t->Struct.soa_kind == StructSoa_Fixed);
+			if (is_to_be_determined_array_count) {
+				t->Struct.soa_count = cast(i32)max;
+			} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
+				if (0 < max && max < t->Struct.soa_count) {
+					error(node, "Expected %lld values for this #soa array literal, got %lld", cast(long long)t->Struct.soa_count, cast(long long)max);
 				}
 			}
 		}
