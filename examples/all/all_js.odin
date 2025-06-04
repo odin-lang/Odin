@@ -1,14 +1,12 @@
-#+build !js
+#+build js
 package all
 
-// Imports every package
+// Imports "every" package
 // This is useful for knowing what exists and producing documentation with `odin doc`
 
 @(require) import "core:bufio"
 @(require) import "core:bytes"
-
 @(require) import "core:c"
-@(require) import "core:c/libc"
 
 @(require) import "core:compress"
 @(require) import "core:compress/shoco"
@@ -104,15 +102,10 @@ package all
 
 @(require) import "core:odin/ast"
 @(require) import doc_format "core:odin/doc-format"
-@(require) import "core:odin/parser"
+
 @(require) import "core:odin/tokenizer"
-
-@(require) import "core:prof/spall"
-
 @(require) import "core:os"
-
 @(require) import "core:path/slashpath"
-@(require) import "core:path/filepath"
 
 @(require) import "core:relative"
 
@@ -127,7 +120,6 @@ package all
 @(require) import "core:strconv"
 @(require) import "core:strings"
 @(require) import "core:sync"
-@(require) import "core:testing"
 
 @(require) import "core:terminal"
 @(require) import "core:terminal/ansi"
@@ -143,7 +135,7 @@ package all
 @(require) import "core:time"
 @(require) import "core:time/datetime"
 @(require) import "core:time/timezone"
-@(require) import "core:flags"
+
 
 @(require) import "core:sys/orca"
 @(require) import "core:sys/info"
