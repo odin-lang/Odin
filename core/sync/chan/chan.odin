@@ -1105,6 +1105,15 @@ can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	return c.w_waiting == 0
 }
 
+/*
+Specifies the direction of the selected channel.
+*/
+Select_Status :: enum {
+	None,
+	Recv,
+	Send,
+}
+
 
 /*
 Attempts to either send or receive messages on the specified channels.
@@ -1170,7 +1179,7 @@ Output:
 
 */
 @(require_results)
-select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, ok: bool) #no_bounds_check {
+select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
 	Select_Op :: struct {
 		idx:     int, // local to the slice that was given
 		is_recv: bool,
@@ -1204,15 +1213,22 @@ select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []
 		return
 	}
 
-	select_idx = rand.int_max(count) if count > 0 else 0
+	candidate_idx := rand.int_max(count) if count > 0 else 0
 
-	sel := candidates[select_idx]
+	sel := candidates[candidate_idx]
 	if sel.is_recv {
-		ok = recv_raw(recvs[sel.idx], recv_out)
+		status = .Recv
+		if !recv_raw(recvs[sel.idx], recv_out) {
+			return -1, .None
+		}
 	} else {
-		ok = send_raw(sends[sel.idx], send_msgs[sel.idx])
+		status = .Send
+		if !send_raw(sends[sel.idx], send_msgs[sel.idx]) {
+			return -1, .None
+		}
 	}
-	return
+
+	return sel.idx, status
 }
 
 
