@@ -1233,50 +1233,52 @@ try_select_raw :: proc "odin" (
 	candidates := ([^]Select_Op)(
 		intrinsics.alloca(candidate_count * size_of(Select_Op), align_of(Select_Op)),
 	)
-	count := 0
 
-	for c, i in recvs {
-		if can_recv(c) {
-			candidates[count] = {
-				is_recv = true,
-				idx     = i,
+	for {
+		count := 0
+
+		for c, i in recvs {
+			if can_recv(c) {
+				candidates[count] = {
+					is_recv = true,
+					idx     = i,
+				}
+				count += 1
 			}
-			count += 1
 		}
-	}
 
-	for c, i in sends {
-		if can_send(c) {
-			candidates[count] = {
-				is_recv = false,
-				idx     = i,
+		for c, i in sends {
+			if can_send(c) {
+				candidates[count] = {
+					is_recv = false,
+					idx     = i,
+				}
+				count += 1
 			}
-			count += 1
 		}
-	}
 
-	if count == 0 {
-		return
-	}
-
-	candidate_idx := rand.int_max(count) if count > 0 else 0
-
-	sel := candidates[candidate_idx]
-	if sel.is_recv {
-		status = .Recv
-		if !recv_raw(recvs[sel.idx], recv_out) {
+		if count == 0 {
 			return -1, .None
 		}
-	} else {
-		status = .Send
-		if !send_raw(sends[sel.idx], send_msgs[sel.idx]) {
-			return -1, .None
-		}
-	}
 
-	return sel.idx, status
+		candidate_idx := rand.int_max(count) if count > 0 else 0
+
+		sel := candidates[candidate_idx]
+		if sel.is_recv {
+			status = .Recv
+			if !try_recv_raw(recvs[sel.idx], recv_out) {
+				continue
+			}
+		} else {
+			status = .Send
+			if !try_send_raw(sends[sel.idx], send_msgs[sel.idx]) {
+				continue
+			}
+		}
+
+		return sel.idx, status
+	}
 }
-
 
 /*
 `Raw_Queue` is a non-thread-safe queue implementation designed to store messages
