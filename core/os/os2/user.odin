@@ -10,12 +10,12 @@ user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error
 	case .Windows:
 		dir = get_env("LocalAppData", temp_allocator)
 		if dir != "" {
-			dir = clone_string(dir, temp_allocator) or_return
+			dir = clone_string(dir, allocator) or_return
 		}
 	case .Darwin:
 		dir = get_env("HOME", temp_allocator)
 		if dir != "" {
-			dir = concatenate({dir, "/Library/Caches"}, temp_allocator) or_return
+			dir = concatenate({dir, "/Library/Caches"}, allocator) or_return
 		}
 	case: // All other UNIX systems
 		dir = get_env("XDG_CACHE_HOME", allocator)
@@ -24,7 +24,7 @@ user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error
 			if dir == "" {
 				return
 			}
-			dir = concatenate({dir, "/.cache"}, temp_allocator) or_return
+			dir = concatenate({dir, "/.cache"}, allocator) or_return
 		}
 	}
 	if dir == "" {
@@ -49,7 +49,7 @@ user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 			dir = concatenate({dir, "/.config"}, allocator) or_return
 		}
 	case: // All other UNIX systems
-		dir = get_env("XDG_CONFIG_HOME", allocator)
+		dir = get_env("XDG_CONFIG_HOME", temp_allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
