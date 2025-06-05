@@ -1116,11 +1116,13 @@ Select_Status :: enum {
 
 
 /*
-Attempts to either send or receive messages on the specified channels.
+Attempts to either send or receive messages on the specified channels without blocking.
 
 `select_raw` first identifies which channels have messages ready to be received
 and which are available for sending. It then randomly selects one operation
 (either a send or receive) to perform.
+
+If no channels have messages ready, the procedure is a noop.
 
 Note: Each message in `send_msgs` corresponds to the send channel at the same index in `sends`.
 
@@ -1154,18 +1156,18 @@ Example:
 		// where the value from the read should be stored
 		received_value: int
 
-		idx, ok := chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok := chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 		fmt.println("RECEIVED VALUE ", received_value)
 
-		idx, ok = chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok = chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 		fmt.println("RECEIVED VALUE ", received_value)
 
 		// closing of a channel also affects the select operation
 		chan.close(c)
 
-		idx, ok = chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok = chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 	}
 
@@ -1179,7 +1181,7 @@ Output:
 
 */
 @(require_results)
-select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
+try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
 	Select_Op :: struct {
 		idx:     int, // local to the slice that was given
 		is_recv: bool,
