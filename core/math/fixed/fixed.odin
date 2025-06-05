@@ -124,16 +124,16 @@ append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 
 		when size_of(Backing) < 16 {
 			T :: u64
-			append_uint :: strconv.append_uint
+			write_uint :: strconv.write_uint
 		} else {
 			T :: u128
-			append_uint :: strconv.append_u128
+			write_uint :: strconv.write_u128
 		}
 
 		integer := T(x.i) >> Fraction_Width
 		fraction := T(x.i) & (1<<Fraction_Width - 1)
 
-		s := append_uint(buf[i:], integer, 10)
+		s := write_uint(buf[i:], integer, 10)
 		i += len(s)
 		if fraction != 0 {
 			buf[i] = '.'

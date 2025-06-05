@@ -1122,7 +1122,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
 	if fi.plus                           { flags += {.Plus}   }
-	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
+	s := strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
 	prev_zero := fi.zero
 	defer fi.zero = prev_zero
 	fi.zero = false
@@ -1207,7 +1207,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
 	if fi.plus                           { flags += {.Plus}   }
-	s := strconv.append_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
+	s := strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
 		c: byte = 0
@@ -1272,7 +1272,7 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 	}
 
 	buf: [256]byte
-	str := strconv.append_float(buf[:], amt, 'f', prec, 64)
+	str := strconv.write_float(buf[:], amt, 'f', prec, 64)
 
 	// Add the unit at the end.
 	copy(buf[len(str):], units[off:off+unit_len])
@@ -1424,7 +1424,7 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 	buf: [386]byte
 
 	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
-	str := strconv.append_float(buf[:], v, float_fmt, prec, bit_size)
+	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size)
 
 	if !fi.plus {
 		// Strip sign from "+<value>" but not "+Inf".

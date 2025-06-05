@@ -48,7 +48,7 @@ is_integer_negative :: proc(x: u64, is_signed: bool, bit_size: int) -> (u: u64, 
 	return
 }
 /*
-Appends the string representation of an integer to a buffer with specified base, flags, and digit set.
+Writes the string representation of an integer to a buffer with specified base, flags, and digit set.
 
 **Inputs**  
 - buf: The buffer to append the integer representation to
@@ -62,9 +62,9 @@ Appends the string representation of an integer to a buffer with specified base,
 **Returns**  
 - The string containing the integer representation appended to the buffer
 */
-append_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+write_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
 	if base < 2 || base > MAX_BASE {
-		panic("strconv: illegal base passed to append_bits")
+		panic("strconv: illegal base passed to write_bits")
 	}
 
 	a: [129]byte
@@ -146,7 +146,7 @@ is_integer_negative_128 :: proc(x: u128, is_signed: bool, bit_size: int) -> (u: 
 	return
 }
 /*
-Appends the string representation of a 128-bit integer to a buffer with specified base, flags, and digit set.
+Writes the string representation of a 128-bit integer to a buffer with specified base, flags, and digit set.
 
 **Inputs**  
 - buf: The buffer to append the integer representation to
@@ -158,11 +158,11 @@ Appends the string representation of a 128-bit integer to a buffer with specifie
 - flags: The Int_Flags bit set to control integer formatting
 
 **Returns**  
-- The string containing the integer representation appended to the buffer
+- The string containing the integer representation written to the buffer
 */
-append_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
 	if base < 2 || base > MAX_BASE {
-		panic("strconv: illegal base passed to append_bits")
+		panic("strconv: illegal base passed to write_bits")
 	}
 
 	a: [140]byte

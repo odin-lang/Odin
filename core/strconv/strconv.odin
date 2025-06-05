@@ -1451,19 +1451,19 @@ parse_quaternion64 :: proc(str: string, n: ^int = nil) -> (value: quaternion64, 
 	return cast(quaternion64)v, ok
 }
 /* 
-Appends a boolean value as a string to the given buffer
+Writes a boolean value as a string to the given buffer
 
 **Inputs**  
-- buf: The buffer to append the boolean value to
-- b: The boolean value to be appended
+- buf: The buffer to write the boolean value to
+- b: The boolean value to be written
 
 Example:
 
 	import "core:fmt"
 	import "core:strconv"
-	append_bool_example :: proc() {
+	write_bool_example :: proc() {
 		buf: [6]byte
-		result := strconv.append_bool(buf[:], true)
+		result := strconv.write_bool(buf[:], true)
 		fmt.println(result, buf)
 	}
 
@@ -1472,9 +1472,9 @@ Output:
 	true [116, 114, 117, 101, 0, 0]
 
 **Returns**  
-- The resulting string after appending the boolean value
+- The resulting string after writing the boolean value
 */
-append_bool :: proc(buf: []byte, b: bool) -> string {
+write_bool :: proc(buf: []byte, b: bool) -> string {
 	n := 0
 	if b {
 		n = copy(buf, "true")
@@ -1484,20 +1484,20 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 	return string(buf[:n])
 }
 /* 
-Appends an unsigned integer value as a string to the given buffer with the specified base
+Writes an unsigned integer value as a string to the given buffer with the specified base
 
 **Inputs**  
-- buf: The buffer to append the unsigned integer value to
-- u: The unsigned integer value to be appended
+- buf: The buffer to write the unsigned integer value to
+- u: The unsigned integer value to be written
 - base: The base to use for converting the integer value
 
 Example:
 
 	import "core:fmt"
 	import "core:strconv"
-	append_uint_example :: proc() {
+	write_uint_example :: proc() {
 		buf: [4]byte
-		result := strconv.append_uint(buf[:], 42, 16)
+		result := strconv.write_uint(buf[:], 42, 16)
 		fmt.println(result, buf)
 	}
 
@@ -1506,26 +1506,26 @@ Output:
 	2a [50, 97, 0, 0]
 
 **Returns**  
-- The resulting string after appending the unsigned integer value
+- The resulting string after writing the unsigned integer value
 */
-append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
-	return append_bits(buf, u, base, false, 8*size_of(uint), digits, nil)
+write_uint :: proc(buf: []byte, u: u64, base: int) -> string {
+	return write_bits(buf, u, base, false, 8*size_of(uint), digits, nil)
 }
 /* 
-Appends a signed integer value as a string to the given buffer with the specified base
+Writes a signed integer value as a string to the given buffer with the specified base
 
 **Inputs**  
-- buf: The buffer to append the signed integer value to
-- i: The signed integer value to be appended
+- buf: The buffer to write the signed integer value to
+- i: The signed integer value to be written
 - base: The base to use for converting the integer value
 
 Example:
 
 	import "core:fmt"
 	import "core:strconv"
-	append_int_example :: proc() {
+	write_int_example :: proc() {
 		buf: [4]byte
-		result := strconv.append_int(buf[:], -42, 10)
+		result := strconv.write_int(buf[:], -42, 10)
 		fmt.println(result, buf)
 	}
 
@@ -1534,16 +1534,16 @@ Output:
 	-42 [45, 52, 50, 0]
 
 **Returns**  
-- The resulting string after appending the signed integer value
+- The resulting string after writing the signed integer value
 */
-append_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil)
+write_int :: proc(buf: []byte, i: i64, base: int) -> string {
+	return write_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil)
 }
 
 
 
-append_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
-	return append_bits_128(buf, u, base, false, 8*size_of(uint), digits, nil)
+write_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
+	return write_bits_128(buf, u, base, false, 8*size_of(uint), digits, nil)
 }
 
 /* 
@@ -1571,7 +1571,7 @@ Output:
 - The resulting string after converting the integer value
 */
 itoa :: proc(buf: []byte, i: int) -> string {
-	return append_int(buf, i64(i), 10)
+	return write_int(buf, i64(i), 10)
 }
 /*
 Converts a string to an integer value
@@ -1623,14 +1623,14 @@ atof :: proc(s: string) -> f64 {
 	v, _  := parse_f64(s)
 	return v
 }
-// Alias to `append_float`
-ftoa :: append_float
+// Alias to `write_float`
+ftoa :: write_float
 /* 
-Appends a float64 value as a string to the given buffer with the specified format and precision
+Writes a float64 value as a string to the given buffer with the specified format and precision
 
 **Inputs**  
-- buf: The buffer to append the float64 value to
-- f: The float64 value to be appended
+- buf: The buffer to write the float64 value to
+- f: The float64 value to be written
 - fmt: The byte specifying the format to use for the conversion
 - prec: The precision to use for the conversion
 - bit_size: The size of the float in bits (32 or 64)
@@ -1639,9 +1639,9 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-	append_float_example :: proc() {
+	write_float_example :: proc() {
 		buf: [8]byte
-		result := strconv.append_float(buf[:], 3.14159, 'f', 2, 64)
+		result := strconv.write_float(buf[:], 3.14159, 'f', 2, 64)
 		fmt.println(result, buf)
 	}
 
@@ -1650,16 +1650,16 @@ Output:
 	+3.14 [43, 51, 46, 49, 52, 0, 0, 0]
 
 **Returns**  
-- The resulting string after appending the float
+- The resulting string after writing the float
 */
-append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
+write_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size))
 }
 /*
-Appends a quoted string representation of the input string to a given byte slice and returns the result as a string
+Writes a quoted string representation of the input string to a given byte slice and returns the result as a string
 
 **Inputs**  
-- buf: The byte slice to which the quoted string will be appended
+- buf: The byte slice to which the quoted string will be written
 - str: The input string to be quoted
 
 !! ISSUE !! NOT EXPECTED -- "\"hello\"" was expected  
@@ -1679,7 +1679,7 @@ Output:
 	"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]
 
 **Returns**  
-- The resulting string after appending the quoted string representation
+- The resulting string after writing the quoted string representation
 */
 quote :: proc(buf: []byte, str: string) -> string {
 	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
@@ -1719,10 +1719,10 @@ quote :: proc(buf: []byte, str: string) -> string {
 	return string(buf[:i])
 }
 /*
-Appends a quoted rune representation of the input rune to a given byte slice and returns the result as a string
+Writes a quoted rune representation of the input rune to a given byte slice and returns the result as a string
 
 **Inputs**  
-- buf: The byte slice to which the quoted rune will be appended
+- buf: The byte slice to which the quoted rune will be written
 - r: The input rune to be quoted
 
 Example:
@@ -1740,7 +1740,7 @@ Output:
 	'A' [39, 65, 39, 0]
 
 **Returns**  
-- The resulting string after appending the quoted rune representation
+- The resulting string after writing the quoted rune representation
 */
 quote_rune :: proc(buf: []byte, r: rune) -> string {
 	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
@@ -1783,7 +1783,7 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 		if r < 32 {
 			write_string(buf, &i, "\\x")
 			b: [2]byte
-			s := append_bits(b[:], u64(r), 16, true, 64, digits, nil)
+			s := write_bits(b[:], u64(r), 16, true, 64, digits, nil)
 			switch len(s) {
 			case 0: write_string(buf, &i, "00")
 			case 1: write_rune(buf, &i, '0')
