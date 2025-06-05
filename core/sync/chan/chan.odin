@@ -3,16 +3,16 @@ package sync_chan
 import "base:builtin"
 import "base:intrinsics"
 import "base:runtime"
+import "core:math/rand"
 import "core:mem"
 import "core:sync"
-import "core:math/rand"
 
 /*
 Determines what operations `Chan` supports.
 */
 Direction :: enum {
 	Send = -1,
-	Both =  0,
+	Both = 0,
 	Recv = +1,
 }
 
@@ -72,11 +72,11 @@ Raw_Chan :: struct {
 	mutex:           sync.Mutex,
 	r_cond:          sync.Cond,
 	w_cond:          sync.Cond,
-	r_waiting:       int,  // guarded by `mutex`
-	w_waiting:       int,  // guarded by `mutex`
+	r_waiting:       int, // guarded by `mutex`
+	w_waiting:       int, // guarded by `mutex`
 
 	// Buffered
-	queue: ^Raw_Queue,
+	queue:           ^Raw_Queue,
 
 	// Unbuffered
 	unbuffered_data: rawptr,
@@ -114,7 +114,7 @@ Example:
 		defer chan.destroy(buffered)
 	}
 */
-create :: proc{
+create :: proc {
 	create_unbuffered,
 	create_buffered,
 }
@@ -143,8 +143,14 @@ Example:
 	}
 */
 @(require_results)
-create_unbuffered :: proc($C: typeid/Chan($T), allocator: runtime.Allocator) -> (c: C, err: runtime.Allocator_Error)
-	where size_of(T) <= int(max(u16)) {
+create_unbuffered :: proc(
+	$C: typeid/Chan($T),
+	allocator: runtime.Allocator,
+) -> (
+	c: C,
+	err: runtime.Allocator_Error,
+) where size_of(T) <=
+	int(max(u16)) {
 	c.impl, err = create_raw_unbuffered(size_of(T), align_of(T), allocator)
 	return
 }
@@ -174,8 +180,15 @@ Example:
 	}
 */
 @(require_results)
-create_buffered :: proc($C: typeid/Chan($T), #any_int cap: int, allocator: runtime.Allocator) -> (c: C, err: runtime.Allocator_Error)
-	where size_of(T) <= int(max(u16)) {
+create_buffered :: proc(
+	$C: typeid/Chan($T),
+	#any_int cap: int,
+	allocator: runtime.Allocator,
+) -> (
+	c: C,
+	err: runtime.Allocator_Error,
+) where size_of(T) <=
+	int(max(u16)) {
 	c.impl, err = create_raw_buffered(size_of(T), align_of(T), cap, allocator)
 	return
 }
@@ -214,7 +227,7 @@ Example:
 		defer chan.destroy(buffered)
 	}
 */
-create_raw :: proc{
+create_raw :: proc {
 	create_raw_unbuffered,
 	create_raw_buffered,
 }
@@ -245,7 +258,13 @@ Example:
 	}
 */
 @(require_results)
-create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: runtime.Allocator) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
+create_raw_unbuffered :: proc(
+	#any_int msg_size, msg_alignment: int,
+	allocator: runtime.Allocator,
+) -> (
+	c: ^Raw_Chan,
+	err: runtime.Allocator_Error,
+) {
 	assert(msg_size <= int(max(u16)))
 	align := max(align_of(Raw_Chan), msg_alignment)
 
@@ -290,7 +309,14 @@ Example:
 	}
 */
 @(require_results)
-create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap: int, allocator: runtime.Allocator) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
+create_raw_buffered :: proc(
+	#any_int msg_size, msg_alignment: int,
+	#any_int cap: int,
+	allocator: runtime.Allocator,
+) -> (
+	c: ^Raw_Chan,
+	err: runtime.Allocator_Error,
+) {
 	assert(msg_size <= int(max(u16)))
 	if cap <= 0 {
 		return create_raw_unbuffered(msg_size, msg_alignment, allocator)
@@ -369,7 +395,12 @@ Example:
 	}
 */
 @(require_results)
-as_send :: #force_inline proc "contextless" (c: $C/Chan($T, $D)) -> (s: Chan(T, .Send)) where C.D <= .Both {
+as_send :: #force_inline proc "contextless" (
+	c: $C/Chan($T, $D),
+) -> (
+	s: Chan(T, .Send),
+) where C.D <=
+	.Both {
 	return transmute(type_of(s))c
 }
 
@@ -404,7 +435,12 @@ Example:
 	}
 */
 @(require_results)
-as_recv :: #force_inline proc "contextless" (c: $C/Chan($T, $D)) -> (r: Chan(T, .Recv)) where C.D >= .Both {
+as_recv :: #force_inline proc "contextless" (
+	c: $C/Chan($T, $D),
+) -> (
+	r: Chan(T, .Recv),
+) where C.D >=
+	.Both {
 	return transmute(type_of(r))c
 }
 
@@ -596,7 +632,7 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 	if c == nil {
 		return
 	}
-	if c.queue != nil { // buffered
+	if c.queue != nil { 	// buffered
 		sync.guard(&c.mutex)
 		for !c.closed && c.queue.len == c.queue.cap {
 			c.w_waiting += 1
@@ -612,7 +648,7 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
 		}
-	} else if c.unbuffered_data != nil { // unbuffered
+	} else if c.unbuffered_data != nil { 	// unbuffered
 		sync.guard(&c.mutex)
 
 		if c.closed {
@@ -674,7 +710,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 	if c == nil {
 		return
 	}
-	if c.queue != nil { // buffered
+	if c.queue != nil { 	// buffered
 		sync.guard(&c.mutex)
 		for c.queue.len == 0 {
 			if c.closed {
@@ -695,11 +731,10 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 			sync.signal(&c.w_cond)
 		}
 		ok = true
-	} else if c.unbuffered_data != nil { // unbuffered
+	} else if c.unbuffered_data != nil { 	// unbuffered
 		sync.guard(&c.mutex)
 
-		for !c.closed &&
-			c.w_waiting == 0 {
+		for !c.closed && c.w_waiting == 0 {
 			c.r_waiting += 1
 			sync.wait(&c.r_cond, &c.mutex)
 			c.r_waiting -= 1
@@ -754,7 +789,7 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 	if c == nil {
 		return false
 	}
-	if c.queue != nil { // buffered
+	if c.queue != nil { 	// buffered
 		sync.guard(&c.mutex)
 		if c.queue.len == c.queue.cap {
 			return false
@@ -768,7 +803,7 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
 		}
-	} else if c.unbuffered_data != nil { // unbuffered
+	} else if c.unbuffered_data != nil { 	// unbuffered
 		sync.guard(&c.mutex)
 
 		if c.closed {
@@ -817,7 +852,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 	if c == nil {
 		return false
 	}
-	if c.queue != nil { // buffered
+	if c.queue != nil { 	// buffered
 		sync.guard(&c.mutex)
 		if c.queue.len == 0 {
 			return false
@@ -832,7 +867,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 			sync.signal(&c.w_cond)
 		}
 		return true
-	} else if c.unbuffered_data != nil { // unbuffered
+	} else if c.unbuffered_data != nil { 	// unbuffered
 		sync.guard(&c.mutex)
 
 		if c.closed || c.w_waiting == 0 {
@@ -847,7 +882,6 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 	}
 	return false
 }
-
 
 
 /*
@@ -1170,14 +1204,24 @@ Output:
 
 */
 @(require_results)
-select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, ok: bool) #no_bounds_check {
+select_raw :: proc "odin" (
+	recvs: []^Raw_Chan,
+	sends: []^Raw_Chan,
+	send_msgs: []rawptr,
+	recv_out: rawptr,
+) -> (
+	select_idx: int,
+	ok: bool,
+) #no_bounds_check {
 	Select_Op :: struct {
 		idx:     int, // local to the slice that was given
 		is_recv: bool,
 	}
 
-	candidate_count := builtin.len(recvs)+builtin.len(sends)
-	candidates := ([^]Select_Op)(intrinsics.alloca(candidate_count*size_of(Select_Op), align_of(Select_Op)))
+	candidate_count := builtin.len(recvs) + builtin.len(sends)
+	candidates := ([^]Select_Op)(
+		intrinsics.alloca(candidate_count * size_of(Select_Op), align_of(Select_Op)),
+	)
 	count := 0
 
 	for c, i in recvs {
@@ -1257,8 +1301,8 @@ Example:
 @(private)
 raw_queue_init :: proc "contextless" (q: ^Raw_Queue, data: rawptr, cap: int, size: int) {
 	q.data = ([^]byte)(data)
-	q.len  = 0
-	q.cap  = cap
+	q.len = 0
+	q.cap = cap
 	q.next = 0
 	q.size = size
 }
@@ -1299,7 +1343,7 @@ raw_queue_push :: proc "contextless" (q: ^Raw_Queue, data: rawptr) -> bool {
 		pos -= q.cap
 	}
 
-	val_ptr := q.data[pos*q.size:]
+	val_ptr := q.data[pos * q.size:]
 	mem.copy(val_ptr, data, q.size)
 	q.len += 1
 	return true
@@ -1339,7 +1383,7 @@ Example:
 @(private, require_results)
 raw_queue_pop :: proc "contextless" (q: ^Raw_Queue) -> (data: rawptr) {
 	if q.len > 0 {
-		data = q.data[q.next*q.size:]
+		data = q.data[q.next * q.size:]
 		q.next += 1
 		q.len -= 1
 		if q.next >= q.cap {
@@ -1348,3 +1392,4 @@ raw_queue_pop :: proc "contextless" (q: ^Raw_Queue) -> (data: rawptr) {
 	}
 	return
 }
+
