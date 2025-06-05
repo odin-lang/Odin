@@ -103,7 +103,7 @@ round :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 }
 
 @(require_results)
-append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
+write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 	Integer_Width :: 8*size_of(Backing) - Fraction_Width
 
 	x := x
@@ -155,7 +155,7 @@ append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 @(require_results)
 to_string :: proc(x: $T/Fixed($Backing, $Fraction_Width), allocator := context.allocator) -> string {
 	buf: [48]byte
-	s := append(buf[:], x)
+	s := write(buf[:], x)
 	str := make([]byte, len(s), allocator)
 	copy(str, s)
 	return string(str)
