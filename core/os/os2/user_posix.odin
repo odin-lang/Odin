@@ -37,7 +37,7 @@ _user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Err
 		}
 		dir = concatenate({dir, "/.config"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_CONFIG_HOME", temp_allocator)
+		dir = get_env("XDG_CONFIG_HOME", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -60,7 +60,7 @@ _user_state_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 		}
 		dir = concatenate({dir, "/.local/state"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_STATE_HOME", temp_allocator)
+		dir = get_env("XDG_STATE_HOME", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -83,7 +83,7 @@ _user_data_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error
 		}
 		dir = concatenate({dir, "/.local/share"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_DATA_HOME", temp_allocator)
+		dir = get_env("XDG_DATA_HOME", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -106,7 +106,7 @@ _user_music_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Erro
 		}
 		dir = concatenate({dir, "/Music"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_MUSIC_DIR", temp_allocator)
+		dir = get_env("XDG_MUSIC_DIR", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -129,7 +129,7 @@ _user_desktop_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Er
 		}
 		dir = concatenate({dir, "/Desktop"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_DESKTOP_DIR", temp_allocator)
+		dir = get_env("XDG_DESKTOP_DIR", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -152,7 +152,7 @@ _user_documents_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: 
 		}
 		dir = concatenate({dir, "/Documents"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_DOCUMENTS_DIR", temp_allocator)
+		dir = get_env("XDG_DOCUMENTS_DIR", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -175,7 +175,7 @@ _user_downloads_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: 
 		}
 		dir = concatenate({dir, "/Downloads"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_DOWNLOAD_DIR", temp_allocator)
+		dir = get_env("XDG_DOWNLOAD_DIR", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -198,7 +198,7 @@ _user_pictures_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: E
 		}
 		dir = concatenate({dir, "/Pictures"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_PICTURES_DIR", temp_allocator)
+		dir = get_env("XDG_PICTURES_DIR", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -221,7 +221,7 @@ _user_public_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Err
 		}
 		dir = concatenate({dir, "/Public"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_PUBLIC_DIR", temp_allocator)
+		dir = get_env("XDG_PUBLIC_DIR", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
@@ -244,7 +244,7 @@ _user_videos_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Err
 		}
 		dir = concatenate({dir, "/Movies"}, allocator) or_return
 	case: // All other UNIX systems
-		dir = get_env("XDG_VIDEOS_DIR", temp_allocator)
+		dir = get_env("XDG_VIDEOS_DIR", allocator)
 		if dir == "" {
 			dir = get_env("HOME", temp_allocator)
 			if dir == "" {
