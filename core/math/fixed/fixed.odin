@@ -294,3 +294,8 @@ _power_of_two_table := [129]string{
 	"85070591730234615865843651857942052864",
 	"170141183460469231731687303715884105728",
 }
+
+@(deprecated="Use write instead")
+append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
+	return write(dst, x)
+}
