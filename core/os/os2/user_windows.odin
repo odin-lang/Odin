@@ -4,6 +4,24 @@ import "base:runtime"
 @(require) import win32 "core:sys/windows"
 
 @(require_results)
+user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+	guid := win32.FOLDERID_LocalAppData
+	return _get_known_folder_path(&guid, allocator)
+}
+
+@(require_results)
+user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+	guid := win32.FOLDERID_RoamingAppData
+	return _get_known_folder_path(&guid, allocator)
+}
+
+@(require_results)
+user_home_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+	guid := win32.FOLDERID_Profile
+	return _get_known_folder_path(&guid, allocator)
+}
+
+@(require_results)
 _get_known_folder_path :: proc(rfid: win32.REFKNOWNFOLDERID, allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	// https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath
 	// See also `known_folders.odin` in `core:sys/windows` for the GUIDs.
