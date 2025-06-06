@@ -4,7 +4,6 @@ package os2
 import "base:runtime"
 import "core:strings"
 import "core:sys/posix"
-import "core:fmt" //remove
 
 _user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	#partial switch ODIN_OS {
