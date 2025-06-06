@@ -240,6 +240,7 @@ BuiltinProc__type_begin,
 
 BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_boolean,
+	BuiltinProc_type_is_bit_field,
 	BuiltinProc_type_is_integer,
 	BuiltinProc_type_is_rune,
 	BuiltinProc_type_is_float,
@@ -630,6 +631,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_enum"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_proc"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_bit_set"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_bit_field"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_matrix"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
