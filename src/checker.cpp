@@ -2054,7 +2054,7 @@ gb_internal void add_type_info_type(CheckerContext *c, Type *t) {
 }
 
 gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
-	if (t == nullptr) {
+	if (t == nullptr || c == nullptr) {
 		return;
 	}
 
