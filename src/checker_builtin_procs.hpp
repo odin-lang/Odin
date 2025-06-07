@@ -336,6 +336,7 @@ BuiltinProc__type_end,
 
 	BuiltinProc_procedure_of,
 
+	BuiltinProc___default_context,
 	BuiltinProc___entry_point,
 
 	BuiltinProc_objc_send,
@@ -689,6 +690,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("procedure_of"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("__default_context"), 1, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("__entry_point"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("objc_send"),   3, true,  Expr_Expr, BuiltinProcPkg_intrinsics, false, true},

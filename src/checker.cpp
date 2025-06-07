@@ -3737,6 +3737,15 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "default_context") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		if (build_context.build_mode != BuildMode_Executable) {
+			error(elem, "'%.*s' is only allowed in executable builds", LIT(name));
+		}
+		ac->default_context = true;
+		return true;
 	} else if (name == "entry_point_only") {
 		if (value != nullptr) {
 			error(value, "'%.*s' expects no parameter", LIT(name));
