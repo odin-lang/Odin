@@ -3,24 +3,30 @@ package os2
 import "base:runtime"
 @(require) import win32 "core:sys/windows"
 
-_user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+_local_appdata :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	guid := win32.FOLDERID_LocalAppData
 	return _get_known_folder_path(&guid, allocator)
 }
 
-_user_config_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
-	guid := win32.FOLDERID_RoamingAppData
+_local_appdata_or_roaming :: proc(allocator: runtime.Allocator, roaming: bool) -> (dir: string, err: Error) {
+	guid := win32.FOLDERID_LocalAppData
+	if roaming {
+		guid = win32.FOLDERID_RoamingAppData
+	}
 	return _get_known_folder_path(&guid, allocator)
 }
+
+_user_config_dir :: _local_appdata_or_roaming
+_user_data_dir :: _local_appdata_or_roaming
+
+_user_state_dir :: _local_appdata
+_user_log_dir :: _local_appdata
+_user_cache_dir :: _local_appdata
 
 _user_home_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	guid := win32.FOLDERID_Profile
 	return _get_known_folder_path(&guid, allocator)
 }
-
-_user_data_dir :: _user_config_dir
-
-_user_state_dir :: _user_cache_dir
 
 _user_music_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	guid := win32.FOLDERID_Music

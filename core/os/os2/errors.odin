@@ -27,6 +27,8 @@ General_Error :: enum u32 {
 
 	Pattern_Has_Separator,
 
+	No_HOME_Variable,
+
 	Unsupported,
 }
 
@@ -73,6 +75,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Invalid_Command:   return "invalid command"
 		case .Unsupported:       return "unsupported"
 		case .Pattern_Has_Separator: return "pattern has separator"
+		case .No_HOME_Variable:  return "no $HOME variable"
 		}
 	case io.Error:
 		switch e {
