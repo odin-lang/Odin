@@ -37,6 +37,7 @@ jobs:
           ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/core/speed.odin -file -all-packages -vet -strict-style -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          (cd tests/default_context; ./run.sh)
           (cd tests/issues; ./run.sh)
           ./odin check tests/benchmark -vet -strict-style -no-entry-point
 
@@ -68,6 +69,7 @@ jobs:
           ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/core/speed.odin -file -all-packages -vet -strict-style -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          (cd tests/default_context; ./run.sh)
           (cd tests/issues; ./run.sh)
           ./odin check tests/benchmark -vet -strict-style -no-entry-point
   ci:
@@ -134,6 +136,10 @@ jobs:
         run: ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Internals tests
         run: ./odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+      - name: Default Context test
+        run: |
+          cd tests/default_context
+          ./run.sh
       - name: GitHub Issue tests
         run: |
           cd tests/issues
@@ -240,6 +246,12 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+      - name: Default Context test
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests/default_context
+          call run.bat
       - name: Check issues
         shell: cmd
         run: |
