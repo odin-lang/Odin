@@ -724,7 +724,7 @@ last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
 	return File_Time(modified), nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -736,7 +736,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -750,7 +750,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	s: OS_Stat = ---
 	result := _unix_fstat(fd, &s)

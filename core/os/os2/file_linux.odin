@@ -269,6 +269,7 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (nt: i64, err: Error
 	return
 }
 
+@(no_sanitize_memory)
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	// TODO: Identify 0-sized "pseudo" files and return No_Size. This would
 	//       eliminate the need for the _read_entire_pseudo_file procs.
