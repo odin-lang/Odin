@@ -27,7 +27,7 @@ shared_init_by_return :: proc() -> int {
 shared_global_user_context: userctx.User_Context
 
 @export
-shared_context :: proc(c: ^runtime.Context) {
+shared_context :: proc "contextless" (c: ^runtime.Context) {
 	@static alert: bool
 
 	c.user_ptr = &shared_global_user_context
