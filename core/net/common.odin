@@ -140,6 +140,12 @@ IP4_Address :: distinct [4]u8
 IP6_Address :: distinct [8]u16be
 Address :: union {IP4_Address, IP6_Address}
 
+Multicast_Group_Request :: struct {
+	address:   		 Address,
+	interface: 		 Address,
+	interface_index: u32, 		// Only used for IPv6
+}
+
 IP4_Loopback :: IP4_Address{127, 0, 0, 1}
 IP6_Loopback :: IP6_Address{0, 0, 0, 0, 0, 0, 0, 1}
 
