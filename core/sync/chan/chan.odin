@@ -7,6 +7,14 @@ import "core:mem"
 import "core:sync"
 import "core:math/rand"
 
+when ODIN_TEST {
+/*
+Hook for testing _try_select_raw allowing the test harness to manipulate the
+channels prior to the select actually operating on them.
+*/
+__try_select_raw_pause : proc() = nil
+}
+
 /*
 Determines what operations `Chan` supports.
 */
@@ -1219,6 +1227,12 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 
 		if count == 0 {
 			return -1, .None
+		}
+
+		when ODIN_TEST {
+			if __try_select_raw_pause != nil {
+				__try_select_raw_pause()
+			}
 		}
 
 		candidate_idx := rand.int_max(count) if count > 0 else 0
