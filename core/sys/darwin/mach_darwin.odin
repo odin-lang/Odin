@@ -123,7 +123,7 @@ x86_thread_state32_t :: struct {
 }
 X86_THREAD_STATE32_COUNT :: size_of(x86_thread_state32_t) / size_of(u32)
 
-x86_thread_state64_t :: struct {
+x86_thread_state64_t :: struct #packed {
 	rax: u64,
 	rbx: u64,
 	rcx: u64,
@@ -148,7 +148,7 @@ x86_thread_state64_t :: struct {
 }
 X86_THREAD_STATE64_COUNT :: size_of(x86_thread_state64_t) / size_of(u32)
 
-arm_thread_state64_t :: struct {
+arm_thread_state64_t :: struct #packed {
 	x: [29]u64,
 	fp: u64,
 	lr: u64,
