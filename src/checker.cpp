@@ -6672,7 +6672,7 @@ gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 gb_internal void add_type_info_for_type_definitions(Checker *c) {
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
+		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
 			i64 align = type_align_of(e->type);
 			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
 				add_type_info_type(&c->builtin_ctx, e->type);
@@ -6794,7 +6794,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
+		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
 			(void)type_align_of(e->type);
 		} else if (e->kind == Entity_Procedure) {
 			DeclInfo *decl = e->decl_info;
