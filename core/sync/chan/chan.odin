@@ -1125,6 +1125,7 @@ and which are available for sending. It then randomly selects one operation
 If no channels have messages ready, the procedure is a noop.
 
 Note: Each message in `send_msgs` corresponds to the send channel at the same index in `sends`.
+If the message is nil, corresponding send channel will be skipped.
 
 **Inputs**
 - `recv`: A slice of channels to read from
@@ -1190,7 +1191,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 	candidate_count := builtin.len(recvs)+builtin.len(sends)
 	candidates := ([^]Select_Op)(intrinsics.alloca(candidate_count*size_of(Select_Op), align_of(Select_Op)))
 
-	for {
+	try_loop: for {
 		count := 0
 
 		for c, i in recvs {
@@ -1223,12 +1224,12 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 		if sel.is_recv {
 			status = .Recv
 			if !try_recv_raw(recvs[sel.idx], recv_out) {
-				continue
+				continue try_loop
 			}
 		} else {
 			status = .Send
 			if !try_send_raw(sends[sel.idx], send_msgs[sel.idx]) {
-				continue
+				continue try_loop
 			}
 		}
 
