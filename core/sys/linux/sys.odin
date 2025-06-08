@@ -1413,7 +1413,8 @@ umask :: proc "contextless" (mask: Mode) -> Mode {
 	Available since Linux 1.0.
 */
 gettimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
-	ret := syscall(SYS_gettimeofday, tv, nil)
+	null: uintptr
+	ret := syscall(SYS_gettimeofday, tv, null)
 	return Errno(-ret)
 }
 
