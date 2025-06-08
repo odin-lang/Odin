@@ -2,6 +2,7 @@
 package os2
 
 import "base:runtime"
+import "core:encoding/ini"
 import "core:strings"
 import "core:sys/posix"
 
@@ -153,53 +154,30 @@ _xdg_lookup :: proc(xdg_key: string, fallback_suffix: string, allocator: runtime
 // If `<config-dir>/user-dirs.dirs` doesn't exist, or `xdg_key` can't be found there: returns `""`
 _xdg_user_dirs_lookup :: proc(xdg_key: string, allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	temp_allocator  := TEMP_ALLOCATOR_GUARD({ allocator })
+	config_dir      := user_config_dir(temp_allocator) or_return
+	user_dirs_path  := concatenate({config_dir, "/user-dirs.dirs"}, temp_allocator) or_return
+	content         := read_entire_file(user_dirs_path, temp_allocator) or_return
 
-	config_dir := user_config_dir(temp_allocator) or_return
-
-	user_dirs_path := concatenate({config_dir, "/user-dirs.dirs"}, temp_allocator) or_return
-	user_dirs_content_bytes, read_err := read_entire_file(user_dirs_path, temp_allocator)
-	if read_err == .Not_Exist {
-		return
-	} else if read_err != nil {
-		err = read_err
-		return
-	}
-	user_dirs_content := string(user_dirs_content_bytes)
-
-	lines := strings.split_lines(user_dirs_content, temp_allocator) or_return
-
-	home_env := get_env("HOME", temp_allocator)
-	if home_env == "" {
-		err = .No_HOME_Variable
-		return
+	it := ini.Iterator{
+		section = "",
+		_src    = string(content),
+		options = ini.Options{
+			comment        = "#",
+			key_lower_case = false,
+		},
 	}
 
-	for line in lines {
-		ss := strings.split_n(line, "=", 2, temp_allocator) or_return
-		(len(ss) == 2) or_continue
-		sl := strings.trim_space(ss[0])
-		sr := ss[1]
+	for k, v in ini.iterate(&it) {
+		if k == xdg_key {
+			we: posix.wordexp_t
+			defer posix.wordfree(&we)
 
-		(sl == xdg_key) or_continue
+			if _err := posix.wordexp(strings.clone_to_cstring(v, temp_allocator), &we, nil); _err != nil || we.we_wordc != 1 {
+				return "", .Wordexp_Failed
+			}
 
-		(len(sr) > 2) or_continue
-
-		lq := strings.index_byte(sr, '"')
-		(lq != -1) or_continue
-		rq := strings.index_byte(sr[lq+1:], '"') + lq+1
-		(rq != -1) or_continue
-
-		sr = sr[lq+1:rq]
-
-		we: posix.wordexp_t
-		we_err := posix.wordexp(strings.clone_to_cstring(sr, temp_allocator), &we, nil)
-		(we_err == nil) or_continue
-		defer posix.wordfree(&we)
-
-		(we.we_wordc == 1) or_continue
-
-		dir = strings.clone_from_cstring(we.we_wordv[0], allocator) or_return
-		return
+			return strings.clone_from_cstring(we.we_wordv[0], allocator)
+		}
 	}
 	return
 }

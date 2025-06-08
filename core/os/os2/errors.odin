@@ -28,6 +28,7 @@ General_Error :: enum u32 {
 	Pattern_Has_Separator,
 
 	No_HOME_Variable,
+	Wordexp_Failed,
 
 	Unsupported,
 }
@@ -61,21 +62,22 @@ error_string :: proc(ferr: Error) -> string {
 	case General_Error:
 		switch e {
 		case .None: return ""
-		case .Permission_Denied: return "permission denied"
-		case .Exist:             return "file already exists"
-		case .Not_Exist:         return "file does not exist"
-		case .Closed:            return "file already closed"
-		case .Timeout:           return "i/o timeout"
-		case .Broken_Pipe:       return "Broken pipe"
-		case .No_Size:           return "file has no definite size"
-		case .Invalid_File:      return "invalid file"
-		case .Invalid_Dir:       return "invalid directory"
-		case .Invalid_Path:      return "invalid path"
-		case .Invalid_Callback:  return "invalid callback"
-		case .Invalid_Command:   return "invalid command"
-		case .Unsupported:       return "unsupported"
-		case .Pattern_Has_Separator: return "pattern has separator"
-		case .No_HOME_Variable:  return "no $HOME variable"
+		case .Permission_Denied:      return "permission denied"
+		case .Exist:                  return "file already exists"
+		case .Not_Exist:              return "file does not exist"
+		case .Closed:                 return "file already closed"
+		case .Timeout:                return "i/o timeout"
+		case .Broken_Pipe:            return "Broken pipe"
+		case .No_Size:                return "file has no definite size"
+		case .Invalid_File:           return "invalid file"
+		case .Invalid_Dir:            return "invalid directory"
+		case .Invalid_Path:           return "invalid path"
+		case .Invalid_Callback:       return "invalid callback"
+		case .Invalid_Command:        return "invalid command"
+		case .Unsupported:            return "unsupported"
+		case .Pattern_Has_Separator:  return "pattern has separator"
+		case .No_HOME_Variable:       return "no $HOME variable"
+		case .Wordexp_Failed:         return "posix.wordexp was unable to expand"
 		}
 	case io.Error:
 		switch e {
