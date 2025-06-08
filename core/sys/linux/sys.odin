@@ -1412,8 +1412,8 @@ umask :: proc "contextless" (mask: Mode) -> Mode {
 	Get current time.
 	Available since Linux 1.0.
 */
-gettimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
-	ret := syscall(SYS_gettimeofday, tv)
+gettimeofday :: proc "contextless" (tv: ^Time_Val, tz: ^Time_Zone) -> (Errno) {
+	ret := syscall(SYS_gettimeofday, tv, tz)
 	return Errno(-ret)
 }
 
