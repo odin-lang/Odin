@@ -73,14 +73,6 @@ Time_Val :: struct {
 }
 
 /*
-	Represents a time zone.
-*/
-Time_Zone :: struct {
-	minutes_west: int,
-	dst_time:     int,
-}
-
-/*
 	Access and modification times for files
 */
 UTim_Buf :: struct {
