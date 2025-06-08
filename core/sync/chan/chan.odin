@@ -1205,7 +1205,10 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 		}
 
 		for c, i in sends {
-			if can_send(c) {
+			if i > builtin.len(send_msgs)-1 || send_msgs[i] == nil {
+				continue
+			}
+			if can_send(c)  {
 				candidates[count] = {
 					is_recv = false,
 					idx     = i,
