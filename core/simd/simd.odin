@@ -21,20 +21,17 @@ package simd
 
 import "base:builtin"
 import "base:intrinsics"
+import "base:runtime"
 
 /*
 Check if SIMD is software-emulated on a target platform.
 
-This value is `false`, when the compile-time target has the hardware support for
-at 128-bit (or wider) SIMD. If the compile-time target lacks the hardware support
-for 128-bit SIMD, this value is `true`, and all SIMD operations will likely be
+This value is `true`, when the compile-time target has the hardware support for
+at least 128-bit (or wider) SIMD. If the compile-time target lacks the hardware support
+for 128-bit SIMD, this value is `false`, and all SIMD operations will likely be
 emulated.
 */
-IS_EMULATED :: true when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !intrinsics.has_target_feature("sse2") else
-	true when (ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32) && !intrinsics.has_target_feature("neon") else
-	true when (ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm32) && !intrinsics.has_target_feature("simd128") else
-	true when (ODIN_ARCH == .riscv64) && !intrinsics.has_target_feature("v") else
-	false
+HAS_HARDWARE_SIMD :: runtime.HAS_HARDWARE_SIMD
 
 /*
 Vector of 16 `u8` lanes (128 bits).
@@ -1759,7 +1756,103 @@ Returns:
 replace :: intrinsics.simd_replace
 
 /*
-Reduce a vector to a scalar by adding up all the lanes.
+Reduce a vector to a scalar by adding up all the lanes in a bisecting fashion.
+
+This procedure returns a scalar that is the sum of all lanes, calculated by
+bisecting the vector into two parts, where the first contains lanes [0, N/2)
+and the second contains lanes [N/2, N), and adding the two halves element-wise
+to produce N/2 values. This is repeated until only a single element remains.
+This order may be faster to compute than the ordered sum for floats, as it can
+often be better parallelized.
+
+The order of the sum may be important for accounting for precision errors in
+floating-point computation, as floating-point addition is not associative, that
+is `(a+b)+c` may not be equal to `a+(b+c)`.
+
+Inputs:
+- `v`: The vector to reduce.
+
+Result:
+- Sum of all lanes, as a scalar.
+
+**Operation**:
+
+	for n > 1 {
+		n = n / 2
+		for i in 0 ..< n {
+			a[i] += a[i+n]
+		}
+	}
+	res := a[0]
+
+Graphical representation of the operation for N=4:
+
+	     +-----------------------+
+	     | v0  | v1  | v2  | v3  |
+	     +-----------------------+
+	        |     |     |     |
+	       [+]<-- | ---'      |
+	        |    [+]<--------'
+	        |     |
+	        `>[+]<'
+	           |
+	           v
+	        +-----+
+	result: | y0  |
+	        +-----+
+*/
+reduce_add_bisect :: intrinsics.simd_reduce_add_bisect
+
+/*
+Reduce a vector to a scalar by multiplying up all the lanes in a bisecting fashion.
+
+This procedure returns a scalar that is the product of all lanes, calculated by
+bisecting the vector into two parts, where the first contains indices [0, N/2)
+and the second contains indices [N/2, N), and multiplying the two halves
+together element-wise to produce N/2 values. This is repeated until only a
+single element remains. This order may be faster to compute than the ordered
+product for floats, as it can often be better parallelized.
+
+The order of the product may be important for accounting for precision errors
+in floating-point computation, as floating-point multiplication is not
+associative, that is `(a*b)*c` may not be equal to `a*(b*c)`.
+
+Inputs:
+- `v`: The vector to reduce.
+
+Result:
+- Product of all lanes, as a scalar.
+
+**Operation**:
+
+	for n > 1 {
+		n = n / 2
+		for i in 0 ..< n {
+			a[i] *= a[i+n]
+		}
+	}
+	res := a[0]
+
+Graphical representation of the operation for N=4:
+
+	     +-----------------------+
+	     | v0  | v1  | v2  | v3  |
+	     +-----------------------+
+	        |     |     |     |
+	       [x]<-- | ---'      |
+	        |    [x]<--------'
+	        |     |
+	        `>[x]<'
+	           |
+	           v
+	        +-----+
+	result: | y0  |
+	        +-----+
+*/
+reduce_mul_bisect :: intrinsics.simd_reduce_mul_bisect
+
+/*
+Reduce a vector to a scalar by adding up all the lanes in an ordered fashion.
 
 This procedure returns a scalar that is the ordered sum of all lanes. The
 ordered sum may be important for accounting for precision errors in
@@ -1782,7 +1875,7 @@ Result:
 reduce_add_ordered :: intrinsics.simd_reduce_add_ordered
 
 /*
-Reduce a vector to a scalar by multiplying all the lanes.
+Reduce a vector to a scalar by multiplying all the lanes in an ordered fashion.
 
 This procedure returns a scalar that is the ordered product of all lanes.
 The ordered product may be important for accounting for precision errors in
@@ -1803,6 +1896,100 @@ Result:
 	}
 */
 reduce_mul_ordered :: intrinsics.simd_reduce_mul_ordered
+
+/*
+Reduce a vector to a scalar by adding up all the lanes in a pairwise fashion.
+
+This procedure returns a scalar that is the sum of all lanes, calculated by
+adding each even-indexed element with the following odd-indexed element to
+produce N/2 values. This is repeated until only a single element remains. This
+order is supported by hardware instructions for some types/architectures (e.g.
+i16/i32/f32/f64 on x86 SSE, i8/i16/i32/f32 on ARM NEON).
+
+The order of the sum may be important for accounting for precision errors in
+floating-point computation, as floating-point addition is not associative, that
+is `(a+b)+c` may not be equal to `a+(b+c)`.
+
+Inputs:
+- `v`: The vector to reduce.
+
+Result:
+- Sum of all lanes, as a scalar.
+
+**Operation**:
+
+	for n > 1 {
+		n = n / 2
+		for i in 0 ..< n {
+			a[i] = a[2*i+0] + a[2*i+1]
+		}
+	}
+	res := a[0]
+
+Graphical representation of the operation for N=4:
+
+	   +-----------------------+
+	v: | v0  | v1  | v2  | v3  |
+	   +-----------------------+
+	      |     |     |     |
+	      `>[+]<'     `>[+]<'
+	         |           |
+	         `--->[+]<--'
+	               |
+	               v
+	            +-----+
+	    result: | y0  |
+	            +-----+
+*/
+reduce_add_pairs :: intrinsics.simd_reduce_add_pairs
+
+/*
+Reduce a vector to a scalar by multiplying all the lanes in a pairwise fashion.
+
+This procedure returns a scalar that is the product of all lanes, calculated by
+bisecting the vector into two parts, where the first contains lanes [0, N/2)
+and the second contains lanes [N/2, N), and multiplying the two halves together
+multiplying each even-indexed element with the following odd-indexed element to
+produce N/2 values. This is repeated until only a single element remains. This
+order may be faster to compute than the ordered product for floats, as it can
+often be better parallelized.
+
+The order of the product may be important for accounting for precision errors
+in floating-point computation, as floating-point multiplication is not
+associative, that is `(a*b)*c` may not be equal to `a*(b*c)`.
+
+Inputs:
+- `v`: The vector to reduce.
+
+Result:
+- Product of all lanes, as a scalar.
+
+**Operation**:
+
+	for n > 1 {
+		n = n / 2
+		for i in 0 ..< n {
+			a[i] = a[2*i+0] * a[2*i+1]
+		}
+	}
+	res := a[0]
+
+Graphical representation of the operation for N=4:
+
+	   +-----------------------+
+	v: | v0  | v1  | v2  | v3  |
+	   +-----------------------+
+	      |     |     |     |
+	      `>[x]<'     `>[x]<'
+	         |           |
+	         `--->[x]<--'
+	               |
+	               v
+	            +-----+
+	    result: | y0  |
+	            +-----+
+*/
+reduce_mul_pairs :: intrinsics.simd_reduce_mul_pairs
 
 /*
 Reduce a vector to a scalar by finding the minimum value between all of the lanes.
@@ -2510,3 +2697,17 @@ Example:
 recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
 	return T(1) / v
 }
+
+
+/*
+Create a vector where each lane contains the index of that lane.
+Inputs:
+- `V`: The type of the vector to create.
+Result:
+- A vector of the given type, where each lane contains the index of that lane.
+**Operation**:
+	for i in 0 ..< N {
+		res[i] = i
+	}
+*/
+indices :: intrinsics.simd_indices

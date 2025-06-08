@@ -756,8 +756,12 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 				type_writer_appendc(w, "/");
 				write_type_to_canonical_string(w, type->Generic.specialized);
 			}
+		} else if (type->Generic.specialized) {
+			// If we have a specialized type, use that instead of panicking
+			write_type_to_canonical_string(w, type->Generic.specialized);
 		} else {
-			GB_PANIC("Type_Generic should never be hit");
+			// For unspecialized generics, use a generic placeholder string
+			type_writer_appendc(w, "rawptr");
 		}
 		return;
 

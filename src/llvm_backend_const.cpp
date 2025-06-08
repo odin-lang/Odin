@@ -533,7 +533,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			Entity *e = entity_from_expr(expr);
 			res = lb_find_procedure_value_from_entity(m, e);
 		}
-		GB_ASSERT(res.value != nullptr);
+		if (res.value == nullptr) {
+			// This is an unspecialized polymorphic procedure, return nil or dummy value
+			return lb_const_nil(m, original_type);
+		}
 		GB_ASSERT(LLVMGetValueKind(res.value) == LLVMFunctionValueKind);
 
 		if (LLVMGetIntrinsicID(res.value) == 0) {
@@ -848,6 +851,148 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 	case ExactValue_Compound:
 		if (is_type_slice(type)) {
 			return lb_const_value(m, type, value, cc);
+		} else if (is_type_soa_struct(type)) {
+			GB_ASSERT(type->kind == Type_Struct);
+			GB_ASSERT(type->Struct.soa_kind == StructSoa_Fixed);
+			ast_node(cl, CompoundLit, value.value_compound);
+			Type *elem_type = type->Struct.soa_elem;
+			isize elem_count = cl->elems.count;
+			if (elem_count == 0 || !elem_type_can_be_constant(elem_type)) {
+				return lb_const_nil(m, original_type);
+			}
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				TEMPORARY_ALLOCATOR_GUARD();
+
+				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
+
+				isize elem_count = cast(isize)type->Struct.soa_count;
+
+				LLVMValueRef *aos_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, elem_count);
+
+				isize value_index = 0;
+				for (i64 i = 0; i < elem_count; i++) {
+					bool found = false;
+
+					for (isize j = 0; j < elem_count; j++) {
+						Ast *elem = cl->elems[j];
+						ast_node(fv, FieldValue, elem);
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op != Token_RangeHalf) {
+								hi += 1;
+							}
+							if (lo == i) {
+								TypeAndValue tav = fv->value->tav;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc).value;
+								for (i64 k = lo; k < hi; k++) {
+									aos_values[value_index++] = val;
+								}
+
+								found = true;
+								i += (hi-lo-1);
+								break;
+							}
+						} else {
+							TypeAndValue index_tav = fv->field->tav;
+							GB_ASSERT(index_tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(index_tav.value);
+							if (index == i) {
+								TypeAndValue tav = fv->value->tav;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc).value;
+								aos_values[value_index++] = val;
+								found = true;
+								break;
+							}
+						}
+					}
+
+					if (!found) {
+						aos_values[value_index++] = nullptr;
+					}
+				}
+
+
+				isize field_count = type->Struct.fields.count;
+				LLVMValueRef *soa_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, field_count);
+
+				for (isize i = 0; i < field_count; i++) {
+					TEMPORARY_ALLOCATOR_GUARD();
+
+					LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, elem_count);
+
+					Entity *f = type->Struct.fields[i];
+					Type *array_type = f->type;
+					GB_ASSERT(array_type->kind == Type_Array);
+					Type *field_type = array_type->Array.elem;
+
+					for (isize j = 0; j < elem_count; j++) {
+						LLVMValueRef v = aos_values[j];
+						if (v != nullptr) {
+							values[j] = llvm_const_extract_value(m, v, cast(unsigned)i);
+						} else {
+							values[j] = LLVMConstNull(lb_type(m, field_type));
+						}
+					}
+
+					soa_values[i] = lb_build_constant_array_values(m, array_type, field_type, elem_count, values, cc);
+				}
+
+				res.value = llvm_const_named_struct(m, type, soa_values, field_count);
+				return res;
+			} else {
+				GB_ASSERT_MSG(elem_count == type->Struct.soa_count, "%td != %td", elem_count, type->Struct.soa_count);
+
+				TEMPORARY_ALLOCATOR_GUARD();
+
+				isize elem_count = cast(isize)type->Struct.soa_count;
+
+				LLVMValueRef *aos_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, elem_count);
+
+				for (isize i = 0; i < elem_count; i++) {
+					TypeAndValue tav = cl->elems[i]->tav;
+					GB_ASSERT(tav.mode != Addressing_Invalid);
+					aos_values[i] = lb_const_value(m, elem_type, tav.value, cc).value;
+				}
+				for (isize i = elem_count; i < type->Struct.soa_count; i++) {
+					aos_values[i] = nullptr;
+				}
+
+				isize field_count = type->Struct.fields.count;
+				LLVMValueRef *soa_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, field_count);
+
+				for (isize i = 0; i < field_count; i++) {
+					TEMPORARY_ALLOCATOR_GUARD();
+
+					LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, elem_count);
+
+					Entity *f = type->Struct.fields[i];
+					Type *array_type = f->type;
+					GB_ASSERT(array_type->kind == Type_Array);
+					Type *field_type = array_type->Array.elem;
+
+					for (isize j = 0; j < elem_count; j++) {
+						LLVMValueRef v = aos_values[j];
+						if (v != nullptr) {
+							values[j] = llvm_const_extract_value(m, v, cast(unsigned)i);
+						} else {
+							values[j] = LLVMConstNull(lb_type(m, field_type));
+						}
+					}
+
+					soa_values[i] = lb_build_constant_array_values(m, array_type, field_type, elem_count, values, cc);
+				}
+
+				res.value = llvm_const_named_struct(m, type, soa_values, field_count);
+				return res;
+			}
 		} else if (is_type_array(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
 			Type *elem_type = type->Array.elem;
@@ -911,7 +1056,18 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
 				return res;
+			} else if (value.value_compound->tav.type == elem_type) {
+				// Compound is of array item type; expand its value to all items in array.
+				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
+
+				for (isize i = 0; i < type->Array.count; i++) {
+					values[i] = lb_const_value(m, elem_type, value, cc).value;
+				}
+
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
+				return res;
 			} else {
+				// Assume that compound value is an array literal
 				GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
 
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);

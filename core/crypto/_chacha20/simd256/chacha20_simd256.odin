@@ -41,7 +41,7 @@ _VEC_TWO: simd.u64x4 : {2, 0, 2, 0}
 is_performant :: proc "contextless" () -> bool {
 	req_features :: info.CPU_Features{.avx, .avx2}
 
-	features, ok := info.cpu_features.?
+	features, ok := info.cpu.features.?
 	if !ok {
 		return false
 	}

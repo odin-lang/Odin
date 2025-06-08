@@ -2,6 +2,7 @@
 package strings
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:bytes"
 import "core:io"
 import "core:mem"
@@ -27,24 +28,7 @@ clone :: proc(s: string, allocator := context.allocator, loc := #caller_location
 	copy(c, s)
 	return string(c), nil
 }
-/*
-Clones a string safely (returns early with an allocation error on failure)
 
-*Allocates Using Provided Allocator*
-
-Inputs:
-- s: The string to be cloned
-- allocator: (default: context.allocator)
-- loc: The caller location for debugging purposes (default: #caller_location)
-
-Returns:
-- res: The cloned string
-- err: An allocator error if one occured, `nil` otherwise
-*/
-@(deprecated="Prefer clone. It now returns an optional allocator error")
-clone_safe :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) {
-	return clone(s, allocator, loc)
-}
 /*
 Clones a string and appends a null-byte to make it a cstring
 
@@ -65,6 +49,7 @@ clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #call
 	c[len(s)] = 0
 	return cstring(&c[0]), nil
 }
+
 /*
 Transmutes a raw pointer into a string. Non-allocating.
 
@@ -80,6 +65,7 @@ Returns:
 string_from_ptr :: proc(ptr: ^byte, len: int) -> (res: string) {
 	return transmute(string)mem.Raw_String{ptr, len}
 }
+
 /*
 Transmutes a raw pointer (null-terminated) into a string. Non-allocating. Searches for a null-byte from `0..<len`, otherwise `len` will be the end size
 
@@ -98,20 +84,7 @@ string_from_null_terminated_ptr :: proc "contextless" (ptr: [^]byte, len: int) -
 	s = truncate_to_byte(s, 0)
 	return s
 }
-/*
-Gets the raw byte pointer for the start of a string `str`
 
-Inputs:
-- str: The input string
-
-Returns:
-- res: A pointer to the start of the string's bytes
-*/
-@(deprecated="Prefer the builtin raw_data.")
-ptr_from_string :: proc(str: string) -> (res: ^byte) {
-	d := transmute(mem.Raw_String)str
-	return d.data
-}
 /*
 Converts a string `str` to a cstring
 
@@ -127,6 +100,7 @@ unsafe_string_to_cstring :: proc(str: string) -> (res: cstring) {
 	d := transmute(mem.Raw_String)str
 	return cstring(d.data)
 }
+
 /*
 Truncates a string `str` at the first occurrence of char/byte `b`
 
@@ -146,6 +120,7 @@ truncate_to_byte :: proc "contextless" (str: string, b: byte) -> (res: string) {
 	}
 	return str[:n]
 }
+
 /*
 Truncates a string `str` at the first occurrence of rune `r` as a slice of the original, entire string if not found
 
@@ -163,6 +138,7 @@ truncate_to_rune :: proc(str: string, r: rune) -> (res: string) {
 	}
 	return str[:n]
 }
+
 /*
 Clones a byte array `s` and appends a null-byte
 
@@ -183,6 +159,7 @@ clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #call
 	c[len(s)] = 0
 	return string(c[:len(s)]), nil
 }
+
 /*
 Clones a cstring `s` as a string
 
@@ -200,6 +177,7 @@ Returns:
 clone_from_cstring :: proc(s: cstring, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	return clone(string(s), allocator, loc)
 }
+
 /*
 Clones a string from a byte pointer `ptr` and a byte length `len`
 
@@ -221,6 +199,7 @@ clone_from_ptr :: proc(ptr: ^byte, len: int, allocator := context.allocator, loc
 	s := string_from_ptr(ptr, len)
 	return clone(s, allocator, loc)
 }
+
 // Overloaded procedure to clone from a string, `[]byte`, `cstring` or a `^byte` + length
 clone_from :: proc{
 	clone,
@@ -228,6 +207,7 @@ clone_from :: proc{
 	clone_from_cstring,
 	clone_from_ptr,
 }
+
 /*
 Clones a string from a null-terminated cstring `ptr` and a byte length `len`
 
@@ -250,6 +230,7 @@ clone_from_cstring_bounded :: proc(ptr: cstring, len: int, allocator := context.
 	s = truncate_to_byte(s, 0)
 	return clone(s, allocator, loc)
 }
+
 /*
 Compares two strings, returning a value representing which one comes first lexicographically.
 -1 for `lhs`; 1 for `rhs`, or 0 if they are equal.
@@ -264,6 +245,7 @@ Returns:
 compare :: proc "contextless" (lhs, rhs: string) -> (result: int) {
 	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs)
 }
+
 /*
 Checks if rune `r` in the string `s`
 
@@ -282,6 +264,7 @@ contains_rune :: proc(s: string, r: rune) -> (result: bool) {
 	}
 	return false
 }
+
 /*
 Returns true when the string `substr` is contained inside the string `s`
 
@@ -313,6 +296,7 @@ Output:
 contains :: proc(s, substr: string) -> (res: bool) {
 	return index(s, substr) >= 0
 }
+
 /*
 Returns `true` when the string `s` contains any of the characters inside the string `chars`
 
@@ -385,6 +369,7 @@ Output:
 rune_count :: proc(s: string) -> (res: int) {
 	return utf8.rune_count_in_string(s)
 }
+
 /*
 Returns whether the strings `u` and `v` are the same alpha characters, ignoring different casings
 Works with UTF-8 string content
@@ -458,6 +443,7 @@ equal_fold :: proc(u, v: string) -> (res: bool) {
 
 	return s == t
 }
+
 /*
 Returns the prefix length common between strings `a` and `b`
 
@@ -488,29 +474,58 @@ Output:
 	0
 
 */
-prefix_length :: proc(a, b: string) -> (n: int) {
-	_len := min(len(a), len(b))
+prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
+	RUNE_ERROR :: '\ufffd'
+	RUNE_SELF  :: 0x80
+	UTF_MAX    :: 4
 
-	// Scan for matches including partial codepoints.
-	#no_bounds_check for n < _len && a[n] == b[n] {
-		n += 1
-	}
-
-	// Now scan to ignore partial codepoints.
-	if n > 0 {
-		s := a[:n]
-		n = 0
-		for {
-			r0, w := utf8.decode_rune(s[n:])
-			if r0 != utf8.RUNE_ERROR {
-				n += w
-			} else {
-				break
+	n    = runtime.memory_prefix_length(raw_data(a), raw_data(b), min(len(a), len(b)))
+	lim := max(n - UTF_MAX + 1, 0)
+	for l := n; l > lim; l -= 1 {
+		r, _ := runtime.string_decode_rune(a[l - 1:])
+		if r != RUNE_ERROR {
+			if l > 0 && (a[l - 1] & 0xc0 == 0xc0) {
+				return l - 1
 			}
+			return l
 		}
 	}
 	return
 }
+
+/*
+Returns the common prefix between strings `a` and `b`
+
+Inputs:
+- a: The first input string
+- b: The second input string
+
+Returns:
+- n: The string prefix common between strings `a` and `b`
+
+Example:
+
+	import "core:fmt"
+	import "core:strings"
+
+	common_prefix_example :: proc() {
+		fmt.println(strings.common_prefix("testing", "test"))
+		fmt.println(strings.common_prefix("testing", "te"))
+		fmt.println(strings.common_prefix("telephone", "te"))
+	}
+
+Output:
+
+	test
+	te
+	te
+
+
+*/
+common_prefix :: proc(a, b: string) -> string {
+	return a[:prefix_length(a, b)]
+}
+
 /*
 Determines if a string `s` starts with a given `prefix`
 
@@ -632,24 +647,7 @@ join :: proc(a: []string, sep: string, allocator := context.allocator, loc := #c
 	}
 	return string(b), nil
 }
-/*
-Joins a slice of strings `a` with a `sep` string, returns an error on allocation failure
 
-*Allocates Using Provided Allocator*
-
-Inputs:
-- a: A slice of strings to join
-- sep: The separator string
-- allocator: (default is context.allocator)
-
-Returns:
-- str: A combined string from the slice of strings `a` separated with the `sep` string
-- err: An allocator error if one occured, `nil` otherwise
-*/
-@(deprecated="Prefer join. It now returns an optional allocator error")
-join_safe :: proc(a: []string, sep: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
-	return join(a, sep, allocator)
-}
 /*
 Returns a combined string from the slice of strings `a` without a separator
 
@@ -693,22 +691,6 @@ concatenate :: proc(a: []string, allocator := context.allocator, loc := #caller_
 		i += copy(b[i:], s)
 	}
 	return string(b), nil
-}
-/*
-Returns a combined string from the slice of strings `a` without a separator, or an error if allocation fails
-
-*Allocates Using Provided Allocator*
-
-Inputs:
-- a: A slice of strings to concatenate
-- allocator: (default is context.allocator)
-
-Returns:
-The concatenated string, and an error if allocation fails
-*/
-@(deprecated="Prefer concatenate. It now returns an optional allocator error")
-concatenate_safe :: proc(a: []string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
-	return concatenate(a, allocator)
 }
 
 /*
@@ -872,6 +854,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 
 	return res[:i+1], nil
 }
+
 /*
 Splits a string into parts based on a separator.
 
@@ -907,6 +890,7 @@ Output:
 split :: proc(s, sep: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	return _split(s, sep, 0, -1, allocator)
 }
+
 /*
 Splits a string into parts based on a separator. If n < count of seperators, the remainder of the string is returned in the last entry.
 
@@ -943,6 +927,7 @@ Output:
 split_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	return _split(s, sep, 0, n, allocator)
 }
+
 /*
 Splits a string into parts after the separator, retaining it in the substrings.
 
@@ -978,6 +963,7 @@ Output:
 split_after :: proc(s, sep: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	return _split(s, sep, len(sep), -1, allocator)
 }
+
 /*
 Splits a string into a total of `n` parts after the separator.
 
@@ -1014,6 +1000,7 @@ Output:
 split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	return _split(s, sep, len(sep), n, allocator)
 }
+
 /*
 Searches for the first occurrence of `sep` in the given string and returns the substring
 up to (but not including) the separator, as well as a boolean indicating success.
@@ -1054,6 +1041,7 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 	}
 	return
 }
+
 /*
 Splits the input string by the byte separator in an iterator fashion.
 
@@ -1100,6 +1088,7 @@ split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
 	}
 	return
 }
+
 /*
 Splits the input string by the separator string in an iterator fashion.
 
@@ -1135,6 +1124,7 @@ Output:
 split_iterator :: proc(s: ^string, sep: string) -> (res: string, ok: bool) {
 	return _split_iterator(s, sep, 0)
 }
+
 /*
 Splits the input string after every separator string in an iterator fashion.
 
@@ -1170,6 +1160,7 @@ Output:
 split_after_iterator :: proc(s: ^string, sep: string) -> (res: string, ok: bool) {
 	return _split_iterator(s, sep, len(sep))
 }
+
 /*
 Trims the carriage return character from the end of the input string.
 
@@ -1191,6 +1182,7 @@ _trim_cr :: proc(s: string) -> (res: string) {
 	}
 	return s
 }
+
 /*
 Splits the input string at every line break `\n`.
 
@@ -1228,6 +1220,7 @@ split_lines :: proc(s: string, allocator := context.allocator) -> (res: []string
 	}
 	return lines, nil
 }
+
 /*
 Splits the input string at every line break `\n` for `n` parts.
 
@@ -1268,6 +1261,7 @@ split_lines_n :: proc(s: string, n: int, allocator := context.allocator) -> (res
 	}
 	return lines, nil
 }
+
 /*
 Splits the input string at every line break `\n` leaving the `\n` in the resulting strings.
 
@@ -1307,6 +1301,7 @@ split_lines_after :: proc(s: string, allocator := context.allocator) -> (res: []
 	}
 	return lines, nil
 }
+
 /*
 Splits the input string at every line break `\n` leaving the `\n` in the resulting strings.
 Only runs for n parts.
@@ -1348,6 +1343,7 @@ split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator) -
 	}
 	return lines, nil
 }
+
 /*
 Splits the input string at every line break `\n`.
 Returns the current split string every iteration until the string is consumed.
@@ -1382,6 +1378,7 @@ split_lines_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	line = _split_iterator(s, sep, 0) or_return
 	return _trim_cr(line), true
 }
+
 /*
 Splits the input string at every line break `\n`.
 Returns the current split string with line breaks included every iteration until the string is consumed.
@@ -1419,6 +1416,7 @@ split_lines_after_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	line = _split_iterator(s, sep, len(sep)) or_return
 	return _trim_cr(line), true
 }
+
 /*
 Returns the byte offset of the first byte `c` in the string s it finds, -1 when not found.
 NOTE: Can't find UTF-8 based runes.
@@ -1453,6 +1451,7 @@ Output:
 index_byte :: proc "contextless" (s: string, c: byte) -> (res: int) {
 	return #force_inline bytes.index_byte(transmute([]u8)s, c)
 }
+
 /*
 Returns the byte offset of the last byte `c` in the string `s`, -1 when not found.
 
@@ -1488,6 +1487,7 @@ Output:
 last_index_byte :: proc "contextless" (s: string, c: byte) -> (res: int) {
 	return #force_inline bytes.last_index_byte(transmute([]u8)s, c)
 }
+
 /*
 Returns the byte offset of the first rune `r` in the string `s` it finds, -1 when not found.
 Invalid runes return -1
@@ -1628,6 +1628,7 @@ index :: proc "contextless" (s, substr: string) -> (res: int) {
 	}
 	return -1
 }
+
 /*
 Returns the last byte offset of the string `substr` in the string `s`, -1 when not found.
 
@@ -1705,6 +1706,7 @@ last_index :: proc(s, substr: string) -> (res: int) {
 	}
 	return -1
 }
+
 /*
 Returns the index of any first char of `chars` found in `s`, -1 if not found.
 
@@ -1768,6 +1770,7 @@ index_any :: proc(s, chars: string) -> (res: int) {
 	}
 	return -1
 }
+
 /*
 Finds the last occurrence of any character in `chars` within `s`. Iterates in reverse.
 
@@ -1849,6 +1852,7 @@ last_index_any :: proc(s, chars: string) -> (res: int) {
 	}
 	return -1
 }
+
 /*
 Finds the first occurrence of any substring in `substrs` within `s`
 
@@ -1890,6 +1894,7 @@ index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
 	}
 	return
 }
+
 /*
 Counts the number of non-overlapping occurrences of `substr` in `s`
 
@@ -1956,6 +1961,7 @@ count :: proc(s, substr: string) -> (res: int) {
 	}
 	return n
 }
+
 /*
 Repeats the string `s` `count` times, concatenating the result
 
@@ -2001,6 +2007,7 @@ repeat :: proc(s: string, count: int, allocator := context.allocator, loc := #ca
 	}
 	return string(b), nil
 }
+
 /*
 Replaces all occurrences of `old` in `s` with `new`
 
@@ -2034,9 +2041,11 @@ Output:
 	zzzz true
 
 */
+
 replace_all :: proc(s, old, new: string, allocator := context.allocator) -> (output: string, was_allocation: bool) {
 	return replace(s, old, new, -1, allocator)
 }
+
 /*
 Replaces n instances of old in the string s with the new string
 
@@ -2115,6 +2124,7 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator, loc
 	output = string(t[0:w])
 	return
 }
+
 /*
 Removes the key string `n` times from the `s` string
 
@@ -2153,6 +2163,7 @@ Output:
 remove :: proc(s, key: string, n: int, allocator := context.allocator) -> (output: string, was_allocation: bool) {
 	return replace(s, key, "", n, allocator)
 }
+
 /*
 Removes all the `key` string instances from the `s` string
 
@@ -2188,6 +2199,7 @@ Output:
 remove_all :: proc(s, key: string, allocator := context.allocator) -> (output: string, was_allocation: bool) {
 	return remove(s, key, -1, allocator)
 }
+
 // Returns true if is an ASCII space character ('\t', '\n', '\v', '\f', '\r', ' ')
 @(private) _ascii_space := [256]bool{'\t' = true, '\n' = true, '\v' = true, '\f' = true, '\r' = true, ' ' = true}
 
@@ -2291,6 +2303,7 @@ index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> (res: int
 	}
 	return -1
 }
+
 // Same as `index_proc`, but the procedure p takes a raw pointer for state
 index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> (res: int) {
 	for r, i in s {
@@ -2300,6 +2313,7 @@ index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: r
 	}
 	return -1
 }
+
 // Finds the index of the *last* rune in the string s for which the procedure p returns the same value as truth
 last_index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> (res: int) {
 	// TODO(bill): Probably use Rabin-Karp Search
@@ -2312,6 +2326,7 @@ last_index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> (res
 	}
 	return -1
 }
+
 // Same as `index_proc_with_state`, runs through the string in reverse
 last_index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> (res: int) {
 	// TODO(bill): Probably use Rabin-Karp Search
@@ -2324,6 +2339,7 @@ last_index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 	}
 	return -1
 }
+
 /*
 Trims the input string `s` from the left until the procedure `p` returns false
 
@@ -2358,6 +2374,7 @@ trim_left_proc :: proc(s: string, p: proc(rune) -> bool) -> (res: string) {
 	}
 	return s[i:]
 }
+
 /*
 Trims the input string `s` from the left until the procedure `p` with state returns false
 
@@ -2376,6 +2393,7 @@ trim_left_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, stat
 	}
 	return s[i:]
 }
+
 /*
 Trims the input string `s` from the right until the procedure `p` returns `false`
 
@@ -2413,6 +2431,7 @@ trim_right_proc :: proc(s: string, p: proc(rune) -> bool) -> (res: string) {
 	}
 	return s[0:i]
 }
+
 /*
 Trims the input string `s` from the right until the procedure `p` with state returns `false`
 
@@ -2434,6 +2453,7 @@ trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 	}
 	return s[0:i]
 }
+
 // Procedure for `trim_*_proc` variants, which has a string rawptr cast + rune comparison
 is_in_cutset :: proc(state: rawptr, r: rune) -> (res: bool) {
 	cutset := (^string)(state)^
@@ -2444,6 +2464,7 @@ is_in_cutset :: proc(state: rawptr, r: rune) -> (res: bool) {
 	}
 	return false
 }
+
 /*
 Trims the cutset string from the `s` string
 
@@ -2461,6 +2482,7 @@ trim_left :: proc(s: string, cutset: string) -> (res: string) {
 	state := cutset
 	return trim_left_proc_with_state(s, is_in_cutset, &state)
 }
+
 /*
 Trims the cutset string from the `s` string from the right
 
@@ -2478,6 +2500,7 @@ trim_right :: proc(s: string, cutset: string) -> (res: string) {
 	state := cutset
 	return trim_right_proc_with_state(s, is_in_cutset, &state)
 }
+
 /*
 Trims the cutset string from the `s` string, both from left and right
 
@@ -2491,6 +2514,7 @@ Returns:
 trim :: proc(s: string, cutset: string) -> (res: string) {
 	return trim_right(trim_left(s, cutset), cutset)
 }
+
 /*
 Trims until a valid non-space rune from the left, "\t\txyz\t\t" -> "xyz\t\t"
 
@@ -2503,6 +2527,7 @@ Returns:
 trim_left_space :: proc(s: string) -> (res: string) {
 	return trim_left_proc(s, is_space)
 }
+
 /*
 Trims from the right until a valid non-space rune, "\t\txyz\t\t" -> "\t\txyz"
 
@@ -2515,6 +2540,7 @@ Returns:
 trim_right_space :: proc(s: string) -> (res: string) {
 	return trim_right_proc(s, is_space)
 }
+
 /*
 Trims from both sides until a valid non-space rune, "\t\txyz\t\t" -> "xyz"
 
@@ -2527,6 +2553,7 @@ Returns:
 trim_space :: proc(s: string) -> (res: string) {
 	return trim_right_space(trim_left_space(s))
 }
+
 /*
 Trims null runes from the left, "\x00\x00testing\x00\x00" -> "testing\x00\x00"
 
@@ -2539,6 +2566,7 @@ Returns:
 trim_left_null :: proc(s: string) -> (res: string) {
 	return trim_left_proc(s, is_null)
 }
+
 /*
 Trims null runes from the right, "\x00\x00testing\x00\x00" -> "\x00\x00testing"
 
@@ -2551,6 +2579,7 @@ Returns:
 trim_right_null :: proc(s: string) -> (res: string) {
 	return trim_right_proc(s, is_null)
 }
+
 /*
 Trims null runes from both sides, "\x00\x00testing\x00\x00" -> "testing"
 
@@ -2562,6 +2591,7 @@ Returns:
 trim_null :: proc(s: string) -> (res: string) {
 	return trim_right_null(trim_left_null(s))
 }
+
 /*
 Trims a `prefix` string from the start of the `s` string and returns the trimmed string
 
@@ -2594,6 +2624,7 @@ trim_prefix :: proc(s, prefix: string) -> (res: string) {
 	}
 	return s
 }
+
 /*
 Trims a `suffix` string from the end of the `s` string and returns the trimmed string
 
@@ -2626,6 +2657,7 @@ trim_suffix :: proc(s, suffix: string) -> (res: string) {
 	}
 	return s
 }
+
 /*
 Splits the input string `s` by all possible `substrs` and returns an allocated array of strings
 
@@ -2698,6 +2730,7 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 	assert(len(results) == n)
 	return results[:], nil
 }
+
 /*
 Splits the input string `s` by all possible `substrs` in an iterator fashion. The full string is returned if no match.
 
@@ -2757,6 +2790,7 @@ split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok:
 	ok = true
 	return
 }
+
 /*
 Replaces invalid UTF-8 characters in the input string with a specified replacement string. Adjacent invalid bytes are only replaced once.
 
@@ -2817,6 +2851,7 @@ scrub :: proc(s: string, replacement: string, allocator := context.allocator) ->
 
 	return to_string(b), nil
 }
+
 /*
 Reverses the input string `s`
 
@@ -2860,6 +2895,7 @@ reverse :: proc(s: string, allocator := context.allocator, loc := #caller_locati
 	}
 	return string(buf), nil
 }
+
 /*
 Expands the input string by replacing tab characters with spaces to align to a specified tab size
 
@@ -2891,6 +2927,7 @@ Output:
 	abc1    abc2    abc3
 
 */
+
 expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	if tab_size <= 0 {
 		panic("tab size must be positive")
@@ -2932,6 +2969,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 
 	return to_string(b), nil
 }
+
 /*
 Splits the input string `str` by the separator `sep` string and returns 3 parts. The values are slices of the original string.
 
@@ -2982,8 +3020,10 @@ partition :: proc(str, sep: string) -> (head, match, tail: string) {
 	tail = str[i+len(sep):]
 	return
 }
+
 // Alias for centre_justify
 center_justify :: centre_justify // NOTE(bill): Because Americans exist
+
 /*
 Centers the input string within a field of specified length by adding pad string on both sides, if its length is less than the target length.
 
@@ -3019,6 +3059,7 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 
 	return to_string(b), nil
 }
+
 /*
 Left-justifies the input string within a field of specified length by adding pad string on the right side, if its length is less than the target length.
 
@@ -3053,6 +3094,7 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 
 	return to_string(b), nil
 }
+
 /*
 Right-justifies the input string within a field of specified length by adding pad string on the left side, if its length is less than the target length.
 
@@ -3087,6 +3129,7 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 
 	return to_string(b), nil
 }
+
 /*
 Writes a given pad string a specified number of times to an `io.Writer`
 
@@ -3113,6 +3156,7 @@ write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
 		p = p[width:]
 	}
 }
+
 /*
 Splits a string into a slice of substrings at each instance of one or more consecutive white space characters, as defined by `unicode.is_space`
 
@@ -3174,6 +3218,7 @@ fields :: proc(s: string, allocator := context.allocator, loc := #caller_locatio
 	}
 	return a, nil
 }
+
 /*
 Splits a string into a slice of substrings at each run of unicode code points `r` satisfying the predicate `f(r)`
 
@@ -3216,6 +3261,7 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 
 	return substrings[:], nil
 }
+
 /*
 Retrieves the first non-space substring from a mutable string reference and advances the reference. `s` is advanced from any space after the substring, or be an empty string if the substring was the remaining characters
 
@@ -3254,6 +3300,7 @@ fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
 	s^ = s[len(s):]
 	return
 }
+
 /*
 Computes the Levenshtein edit distance between two strings
 

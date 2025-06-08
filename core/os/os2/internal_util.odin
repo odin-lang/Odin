@@ -44,11 +44,6 @@ clone_to_cstring :: proc(s: string, allocator: runtime.Allocator) -> (res: cstri
 }
 
 @(require_results)
-temp_cstring :: proc(s: string) -> (cstring, runtime.Allocator_Error) #optional_allocator_error {
-	return clone_to_cstring(s, temp_allocator())
-}
-
-@(require_results)
 string_from_null_terminated_bytes :: proc(b: []byte) -> (res: string) {
 	s := string(b)
 	i := 0

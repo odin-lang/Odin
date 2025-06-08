@@ -234,7 +234,7 @@ foreign xlib {
 		display:   ^Display,
 		window:    Window,
 		attr_mask: WindowAttributeMask,
-		attr:      XWindowAttributes,
+		attr:      ^XWindowAttributes,
 		) ---
 	SetWindowBackground :: proc(
 		display:   ^Display,

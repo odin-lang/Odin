@@ -139,6 +139,7 @@ struct AttributeContext {
 	bool    entry_point_only      : 1;
 	bool    instrumentation_enter : 1;
 	bool    instrumentation_exit  : 1;
+	bool    no_sanitize_address   : 1;
 	bool    rodata                : 1;
 	bool    ignore_duplicates     : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
@@ -148,8 +149,14 @@ struct AttributeContext {
 
 	String  objc_class;
 	String  objc_name;
-	bool    objc_is_class_method;
+	String  objc_selector;
 	Type *  objc_type;
+	Type *  objc_superclass;
+	Type *  objc_ivar;
+	Entity *objc_context_provider;
+	bool    objc_is_class_method;
+	bool    objc_is_implementation;     // This struct or proc provides a class/method implementation, not a binding to an existing type.
+	bool    objc_is_disabled_implement; // This means the method explicitly set @objc_implement to false so it won't be inferred from the class' attribute.
 
 	String require_target_feature; // required by the target micro-architecture
 	String enable_target_feature;  // will be enabled for the procedure only
@@ -365,6 +372,11 @@ struct ObjcMsgData {
 	Type *proc_type;
 };
 
+struct ObjcMethodData {
+	AttributeContext ac;
+	Entity *proc_entity;
+};
+
 enum LoadFileTier {
 	LoadFileTier_Invalid,
 	LoadFileTier_Exists,
@@ -476,8 +488,16 @@ struct CheckerInfo {
 
 	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 
-	BlockingMutex objc_types_mutex;
+	BlockingMutex objc_objc_msgSend_mutex;
 	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
+
+	BlockingMutex objc_class_name_mutex;
+	StringSet obcj_class_name_set;
+	MPSCQueue<Entity *> objc_class_implementations;
+
+	BlockingMutex objc_method_mutex;
+	PtrMap<Type *, Array<ObjcMethodData>> objc_method_implementations;
+
 
 	BlockingMutex load_file_mutex;
 	StringMap<LoadFileCache *> load_file_cache;
@@ -555,6 +575,7 @@ struct Checker {
 	CheckerContext builtin_ctx;
 
 	MPSCQueue<Entity *> procs_with_deferred_to_check;
+	MPSCQueue<Entity *> procs_with_objc_context_provider_to_check;
 	Array<ProcInfo *> procs_to_check;
 
 	BlockingMutex nested_proc_lits_mutex;

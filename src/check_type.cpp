@@ -1910,9 +1910,18 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			case ParameterValue_Location:
 			case ParameterValue_Expression:
 			case ParameterValue_Value:
+				// Special case for polymorphic procedures as default values
+				if (param_value.ast_value != nullptr) {
+					Entity *e = entity_from_expr(param_value.ast_value);
+					if (e != nullptr && e->kind == Entity_Procedure && is_type_polymorphic(e->type)) {
+						// Allow polymorphic procedures as default parameter values
+						// The type will be correctly determined at call site
+						break;
+					}
+				}
 				gbString str = type_to_string(type);
 				error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);
-				gb_string_free(str);
+					gb_string_free(str);
 				break;
 			}
 		}
@@ -3297,8 +3306,11 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 				if (generic_type != nullptr) {
 					// Ignore
 				} else if (count < 1 || !is_power_of_two(count)) {
-					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
 					*type = alloc_type_array(elem, count, generic_type);
+					if (ctx->disallow_polymorphic_return_types && count == 0) {
+						return;
+					}
+					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
 					return;
 				}
 
@@ -3793,7 +3805,11 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 		#if 0
 		error(e, "Invalid type definition of '%.*s'", LIT(type->Named.name));
 		#endif
-		type->Named.base = t_invalid;
+		if (type->Named.type_name->TypeName.is_type_alias) {
+			// NOTE(laytan): keep it null, type declaration is a mini "cycle" to be filled later.
+		} else {
+			type->Named.base = t_invalid;
+		}
 	}
 
 	if (is_type_polymorphic(type)) {
@@ -3811,7 +3827,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 	}
 	#endif
 
-	if (is_type_typed(type)) {
+	if (type->kind == Type_Named && type->Named.base == nullptr || is_type_typed(type)) {
 		add_type_and_value(ctx, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);

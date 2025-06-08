@@ -36,47 +36,58 @@ posix_to_dos_path :: proc(path: string) -> string {
 @(test)
 test_clean_path :: proc(t: ^testing.T) {
 	Test_Case :: struct{
-		path: string,
+		path:     string,
 		expected: string,
 	}
 
-	test_cases := [?]Test_Case {
-		{`../../foo/../../`,      `../../..`},
-		{`../../foo/..`,          `../..`},
-		{`../../foo`,             `../../foo`},
-		{`../..`,                 `../..`},
-		{`.././foo`,              `../foo`},
-		{`..`,                    `..`},
-		{`.`,                     `.`},
-		{`.foo`,                  `.foo`},
-		{`/../../foo/../../`,     `/`},
-		{`/../`,                  `/`},
-		{`/..`,                   `/`},
-		{`/`,                     `/`},
-		{`//home/foo/bar/../../`, `/home`},
-		{`/a/../..`,              `/`},
-		{`/a/../`,                `/`},
-		{`/a/あ`,                 `/a/あ`},
-		{`/a/あ/..`,              `/a`},
-		{`/あ/a/..`,              `/あ`},
-		{`/あ/a/../あ`,           `/あ/あ`},
-		{`/home/../`,             `/`},
-		{`/home/..`,              `/`},
-		{`/home/foo/../../usr`,   `/usr`},
-		{`/home/foo/../..`,       `/`},
-		{`/home/foo/../`,         `/home`},
-		{``,                      `.`},
-		{`a/..`,                  `.`},
-		{`a`,                     `a`},
-		{`abc//.//../foo`,        `foo`},
-		{`foo`,                   `foo`},
-		{`home/foo/bar/../../`,   `home`},
-	}
-
 	when ODIN_OS == .Windows {
-		for &tc in test_cases {
-			tc.path = posix_to_dos_path(tc.path)
-			tc.expected = posix_to_dos_path(tc.expected)
+		test_cases := [?]Test_Case {
+			{`W:/odin\examples\demo/demo.odin`,    `W:\odin\examples\demo\demo.odin`},
+			{`\\server\share\path\file.ext`,       `\\server\share\path\file.ext`},
+			{`//server\share/path\file.ext`,       `\\server\share\path\file.ext`},
+			{`/\192.168.0.10\share/path\file.ext`, `\\192.168.0.10\share\path\file.ext`},
+			{`\\?\C:/Users/Foo/path\file.ext`,     `\\?\C:\Users\Foo\path\file.ext`},
+			{`\\?\\localhost\share\file.ext`,      `\\?\\localhost\share\file.ext`},
+			{`//?\/192.168.0.10\share\file.ext`,   `\\?\\192.168.0.10\share\file.ext`},
+			{`\\.\PhysicalDrive3`,                 `\\.\PhysicalDrive3`},
+			{`/\./PhysicalDrive3`,                 `\\.\PhysicalDrive3`},
+			{`C:\a\..\..`,                         `C:\`},
+			{`C:\a\..`,                            `C:\`},
+			{`C:\あ/a/..`,                          `C:\あ`},
+			{`C:\あ/a/../あ`,                       `C:\あ\あ`},
+		}
+	} else {
+		test_cases := [?]Test_Case {
+			{`../../foo/../../`,      `../../..`},
+			{`../../foo/..`,          `../..`},
+			{`../../foo`,             `../../foo`},
+			{`../..`,                 `../..`},
+			{`.././foo`,              `../foo`},
+			{`..`,                    `..`},
+			{`.`,                     `.`},
+			{`.foo`,                  `.foo`},
+			{`/../../foo/../../`,     `/`},
+			{`/../`,                  `/`},
+			{`/..`,                   `/`},
+			{`/`,                     `/`},
+			{`//home/foo/bar/../../`, `/home`},
+			{`/a/../..`,              `/`},
+			{`/a/../`,                `/`},
+			{`/a/あ`,                 `/a/あ`},
+			{`/a/あ/..`,              `/a`},
+			{`/あ/a/..`,              `/あ`},
+			{`/あ/a/../あ`,           `/あ/あ`},
+			{`/home/../`,             `/`},
+			{`/home/..`,              `/`},
+			{`/home/foo/../../usr`,   `/usr`},
+			{`/home/foo/../..`,       `/`},
+			{`/home/foo/../`,         `/home`},
+			{``,                      `.`},
+			{`a/..`,                  `.`},
+			{`a`,                     `a`},
+			{`abc//.//../foo`,        `foo`},
+			{`foo`,                   `foo`},
+			{`home/foo/bar/../../`,   `home`},
 		}
 	}
 

@@ -162,9 +162,10 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		if err != nil {
 			break read_peb
 		}
+		temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 		if selection >= {.Command_Line, .Command_Args} {
-			TEMP_ALLOCATOR_GUARD()
-			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
+			temp_allocator_scope(temp_allocator)
+			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator) or_return
 			_, err = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w)
 			if err != nil {
 				break read_peb
@@ -179,9 +180,9 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			}
 		}
 		if .Environment in selection {
-			TEMP_ALLOCATOR_GUARD()
+			temp_allocator_scope(temp_allocator)
 			env_len := process_params.EnvironmentSize / 2
-			envs_w := make([]u16, env_len, temp_allocator()) or_return
+			envs_w := make([]u16, env_len, temp_allocator) or_return
 			_, err = read_memory_as_slice(ph, process_params.Environment, envs_w)
 			if err != nil {
 				break read_peb
@@ -190,8 +191,8 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			info.fields += {.Environment}
 		}
 		if .Working_Dir in selection {
-			TEMP_ALLOCATOR_GUARD()
-			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
+			temp_allocator_scope(temp_allocator)
+			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator) or_return
 			_, err = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w)
 			if err != nil {
 				break read_peb
@@ -272,9 +273,10 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		if err != nil {
 			break read_peb
 		}
+		temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 		if selection >= {.Command_Line, .Command_Args} {
-			TEMP_ALLOCATOR_GUARD()
-			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator()) or_return
+			temp_allocator_scope(temp_allocator)
+			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator) or_return
 			_, err = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w)
 			if err != nil {
 				break read_peb
@@ -289,9 +291,9 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			}
 		}
 		if .Environment in selection {
-			TEMP_ALLOCATOR_GUARD()
+			temp_allocator_scope(temp_allocator)
 			env_len := process_params.EnvironmentSize / 2
-			envs_w := make([]u16, env_len, temp_allocator()) or_return
+			envs_w := make([]u16, env_len, temp_allocator) or_return
 			_, err = read_memory_as_slice(ph, process_params.Environment, envs_w)
 			if err != nil {
 				break read_peb
@@ -300,8 +302,8 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			info.fields += {.Environment}
 		}
 		if .Working_Dir in selection {
-			TEMP_ALLOCATOR_GUARD()
-			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator()) or_return
+			temp_allocator_scope(temp_allocator)
+			cwd_w := make([]u16, process_params.CurrentDirectoryPath.Length, temp_allocator) or_return
 			_, err = read_memory_as_slice(ph, process_params.CurrentDirectoryPath.Buffer, cwd_w)
 			if err != nil {
 				break read_peb
@@ -418,34 +420,63 @@ _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process,
 }
 
 @(private="package")
-_Sys_Process_Attributes :: struct {}
-
-@(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
-	TEMP_ALLOCATOR_GUARD()
-	command_line   := _build_command_line(desc.command, temp_allocator())
-	command_line_w := win32_utf8_to_wstring(command_line, temp_allocator()) or_return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	command_line   := _build_command_line(desc.command, temp_allocator)
+	command_line_w := win32_utf8_to_wstring(command_line, temp_allocator) or_return
 	environment := desc.env
 	if desc.env == nil {
-		environment = environ(temp_allocator()) or_return
+		environment = environ(temp_allocator) or_return
 	}
-	environment_block   := _build_environment_block(environment, temp_allocator())
-	environment_block_w := win32_utf8_to_utf16(environment_block, temp_allocator()) or_return
-	stderr_handle       := win32.GetStdHandle(win32.STD_ERROR_HANDLE)
-	stdout_handle       := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
-	stdin_handle        := win32.GetStdHandle(win32.STD_INPUT_HANDLE)
+	environment_block   := _build_environment_block(environment, temp_allocator)
+	environment_block_w := win32_utf8_to_utf16(environment_block, temp_allocator) or_return
 
-	if desc.stdout != nil {
+	stderr_handle: win32.HANDLE	
+	stdout_handle: win32.HANDLE	
+	stdin_handle:  win32.HANDLE	
+
+	null_handle: win32.HANDLE
+	if desc.stdout == nil || desc.stderr == nil || desc.stdin == nil {
+		null_handle = win32.CreateFileW(
+			win32.L("NUL"),
+			win32.GENERIC_READ|win32.GENERIC_WRITE,
+			win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE,
+			&win32.SECURITY_ATTRIBUTES{
+				nLength        = size_of(win32.SECURITY_ATTRIBUTES),
+				bInheritHandle = true,
+			},
+			win32.OPEN_EXISTING,
+			win32.FILE_ATTRIBUTE_NORMAL,
+			nil,
+		)
+		// Opening NUL should always succeed.
+		assert(null_handle != nil)
+	}
+	// NOTE(laytan): I believe it is fine to close this handle right after CreateProcess,
+	// and we don't have to hold onto this until the process exits.
+	defer if null_handle != nil {
+		win32.CloseHandle(null_handle)
+	}
+
+	if desc.stdout == nil {
+		stdout_handle = null_handle
+	} else {
 		stdout_handle = win32.HANDLE((^File_Impl)(desc.stdout.impl).fd)
 	}
-	if desc.stderr != nil {
+
+	if desc.stderr == nil {
+		stderr_handle = null_handle
+	} else {
 		stderr_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
 	}
-	if desc.stdin != nil {
+
+	if desc.stdin == nil {
+		stdin_handle = null_handle
+	} else {
 		stdin_handle = win32.HANDLE((^File_Impl)(desc.stdin.impl).fd)
 	}
 
-	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator()) or_else nil) if len(desc.working_dir) > 0 else nil
+	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator) or_else nil) if len(desc.working_dir) > 0 else nil
 	process_info: win32.PROCESS_INFORMATION
 	ok := win32.CreateProcessW(
 		nil,
@@ -583,7 +614,7 @@ _process_exe_by_pid :: proc(pid: int, allocator: runtime.Allocator) -> (exe_path
 }
 
 _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Allocator) -> (full_username: string, err: Error) {
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	token_handle: win32.HANDLE
 	if !win32.OpenProcessToken(process_handle, win32.TOKEN_QUERY, &token_handle) {
 		err = _get_platform_error()
@@ -598,7 +629,7 @@ _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Alloc
 		}
 		err = nil
 	}
-	token_user := (^win32.TOKEN_USER)(raw_data(make([]u8, token_user_size, temp_allocator()) or_return))
+	token_user := (^win32.TOKEN_USER)(raw_data(make([]u8, token_user_size, temp_allocator) or_return))
 	if !win32.GetTokenInformation(token_handle, .TokenUser, token_user, token_user_size, &token_user_size) {
 		err = _get_platform_error()
 		return
@@ -614,8 +645,8 @@ _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Alloc
 		err = _get_platform_error()
 		return
 	}
-	username := win32_utf16_to_utf8(username_w[:username_chrs], temp_allocator()) or_return
-	domain   := win32_utf16_to_utf8(domain_w[:domain_chrs], temp_allocator()) or_return
+	username := win32_utf16_to_utf8(username_w[:username_chrs], temp_allocator) or_return
+	domain   := win32_utf16_to_utf8(domain_w[:domain_chrs], temp_allocator) or_return
 	return strings.concatenate({domain, "\\", username}, allocator)
 }
 

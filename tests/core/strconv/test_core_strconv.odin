@@ -30,6 +30,43 @@ test_float :: proc(t: ^testing.T) {
 	testing.expect_value(t, n, 0)
 	testing.expect_value(t, ok, false)
 
+	f, ok = strconv.parse_f64("0", &n)
+	testing.expect_value(t, f, 0)
+	testing.expect_value(t, n, 1)
+	testing.expect_value(t, ok, true)
+
+	f, ok = strconv.parse_f64("0h", &n)
+	testing.expect_value(t, f, 0)
+	testing.expect_value(t, n, 1)
+	testing.expect_value(t, ok, false)
+
+	f, ok = strconv.parse_f64("0h1", &n)
+	testing.expect_value(t, f, 0)
+	testing.expect_value(t, n, 3)
+	testing.expect_value(t, ok, false)
+
+	f, ok = strconv.parse_f64("0h0000_0001", &n)
+	testing.expect_value(t, f, 0h0000_0001)
+	testing.expect_value(t, n, 11)
+	testing.expect_value(t, ok, true)
+
+	f, ok = strconv.parse_f64("0h4c60", &n)
+	testing.expect_value(t, f, 0h4c60)
+	testing.expect_value(t, f, 17.5)
+	testing.expect_value(t, n, 6)
+	testing.expect_value(t, ok, true)
+
+	f, ok = strconv.parse_f64("0h418c0000", &n)
+	testing.expect_value(t, f, 0h418c0000)
+	testing.expect_value(t, f, 17.5)
+	testing.expect_value(t, n, 10)
+	testing.expect_value(t, ok, true)
+
+	f, ok = strconv.parse_f64("0h4031_8000_0000_0000", &n)
+	testing.expect_value(t, f, 0h4031800000000000)
+	testing.expect_value(t, f, f64(17.5))
+	testing.expect_value(t, n, 21)
+	testing.expect_value(t, ok, true)
 }
 
 @(test)

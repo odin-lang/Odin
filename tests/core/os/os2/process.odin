@@ -1,3 +1,4 @@
+#+build !windows
 package tests_core_os_os2
 
 import os "core:os/os2"

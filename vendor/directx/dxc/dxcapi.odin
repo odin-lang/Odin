@@ -194,7 +194,7 @@ ICompiler_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	Compile: proc "system" (
 		this: ^ICompiler, 
-		pSource: ^Buffer, 
+		pSource: ^IBlob,
 		pSourceName: wstring,
 		pEntryPoint: wstring,
 		pTargetProfile: wstring,
@@ -206,7 +206,7 @@ ICompiler_VTable :: struct {
 		ppResult: ^^IOperationResult) -> HRESULT,
 	Preprocess: proc "system" (
 		this: ^ICompiler, 
-		pSource: ^Buffer, 
+		pSource: ^IBlob,
 		pSourceName: wstring,
 		pArguments: [^]wstring,
 		argCount: u32,
@@ -227,7 +227,7 @@ ICompiler2_VTable :: struct {
 	using idxccompiler_vtable: ^ICompiler_VTable,
 	CompileWithDebug: proc "system" (
 		this: ^ICompiler2,
-		pSource: ^Buffer, 
+		pSource: ^IBlob,
 		pSourceName: wstring,
 		pEntryPoint: wstring,
 		pTargetProfile: wstring,

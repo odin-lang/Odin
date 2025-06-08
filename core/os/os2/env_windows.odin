@@ -8,8 +8,8 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	if key == "" {
 		return
 	}
-	TEMP_ALLOCATOR_GUARD()
-	wkey, _ := win32_utf8_to_wstring(key, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	wkey, _ := win32_utf8_to_wstring(key, temp_allocator)
 
 	n := win32.GetEnvironmentVariableW(wkey, nil, 0)
 	if n == 0 {
@@ -20,7 +20,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 		return "", true
 	}
 
-	b := make([]u16, n+1, temp_allocator())
+	b := make([]u16, n+1, temp_allocator)
 
 	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
 	if n == 0 {
@@ -37,9 +37,9 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 }
 
 _set_env :: proc(key, value: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	k := win32_utf8_to_wstring(key,   temp_allocator()) or_return
-	v := win32_utf8_to_wstring(value, temp_allocator()) or_return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	k := win32_utf8_to_wstring(key,   temp_allocator) or_return
+	v := win32_utf8_to_wstring(value, temp_allocator) or_return
 
 	if !win32.SetEnvironmentVariableW(k, v) {
 		return _get_platform_error()
@@ -48,14 +48,14 @@ _set_env :: proc(key, value: string) -> Error {
 }
 
 _unset_env :: proc(key: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	k, _ := win32_utf8_to_wstring(key, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	k, _ := win32_utf8_to_wstring(key, temp_allocator)
 	return bool(win32.SetEnvironmentVariableW(k, nil))
 }
 
 _clear_env :: proc() {
-	TEMP_ALLOCATOR_GUARD()
-	envs, _ := environ(temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	envs, _ := environ(temp_allocator)
 	for env in envs {
 		for j in 1..<len(env) {
 			if env[j] == '=' {

@@ -40,9 +40,10 @@ Address_Access_Type :: enum {
 	write,
 }
 
-Address_Located_Address_String :: struct {
+Address_Located_Address :: struct {
 	category: string,
 	name: string,
+	region: []byte,
 }
 
 Address_Shadow_Mapping :: struct {
@@ -50,30 +51,81 @@ Address_Shadow_Mapping :: struct {
 	offset: uint,
 }
 
+/*
+Marks a slice as unaddressable
+
+Code instrumented with `-sanitize:address` is forbidden from accessing any address
+within the slice. This procedure is not thread-safe because no two threads can
+poison or unpoison memory in the same memory region region simultaneously.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_poison_slice :: proc "contextless" (region: $T/[]$E) {
 	when ASAN_ENABLED {
 		__asan_poison_memory_region(raw_data(region), size_of(E) * len(region))
 	}
 }
 
+/*
+Marks a slice as addressable
+
+Code instrumented with `-sanitize:address` is allowed to access any address
+within the slice again. This procedure is not thread-safe because no two threads
+can poison or unpoison memory in the same memory region region simultaneously.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_unpoison_slice :: proc "contextless" (region: $T/[]$E) {
 	when ASAN_ENABLED {
 		__asan_unpoison_memory_region(raw_data(region), size_of(E) * len(region))
 	}
 }
 
+/*
+Marks a pointer as unaddressable
+
+Code instrumented with `-sanitize:address` is forbidden from accessing any address
+within the region the pointer points to. This procedure is not thread-safe because no
+two threads can poison or unpoison memory in the same memory region region simultaneously.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_poison_ptr :: proc "contextless" (ptr: ^$T) {
 	when ASAN_ENABLED {
 		__asan_poison_memory_region(ptr, size_of(T))
 	}
 }
 
+/*
+Marks a pointer as addressable
+
+Code instrumented with `-sanitize:address` is allowed to access any address
+within the region the pointer points to again. This procedure is not thread-safe
+because no two threads can poison or unpoison memory in the same memory region
+region simultaneously.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_unpoison_ptr :: proc "contextless" (ptr: ^$T) {
 	when ASAN_ENABLED {
 		__asan_unpoison_memory_region(ptr, size_of(T))
 	}
 }
 
+/*
+Marks the region covering `[ptr, ptr+len)` as unaddressable
+
+Code instrumented with `-sanitize:address` is forbidden from accessing any address
+within the region. This procedure is not thread-safe because no two threads can
+poison or unpoison memory in the same memory region region simultaneously.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_poison_rawptr :: proc "contextless" (ptr: rawptr, len: int) {
 	when ASAN_ENABLED {
 		assert_contextless(len >= 0)
@@ -81,6 +133,32 @@ address_poison_rawptr :: proc "contextless" (ptr: rawptr, len: int) {
 	}
 }
 
+/*
+Marks the region covering `[ptr, ptr+len)` as unaddressable
+
+Code instrumented with `-sanitize:address` is forbidden from accessing any address
+within the region. This procedure is not thread-safe because no two threads can
+poison or unpoison memory in the same memory region region simultaneously.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
+address_poison_rawptr_uint :: proc "contextless" (ptr: rawptr, len: uint) {
+	when ASAN_ENABLED {
+		__asan_poison_memory_region(ptr, len)
+	}
+}
+
+/*
+Marks the region covering `[ptr, ptr+len)` as addressable
+
+Code instrumented with `-sanitize:address` is allowed to access any address
+within the region again. This procedure is not thread-safe because no two
+threads can poison or unpoison memory in the same memory region region simultaneously.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_unpoison_rawptr :: proc "contextless" (ptr: rawptr, len: int) {
 	when ASAN_ENABLED {
 		assert_contextless(len >= 0)
@@ -88,25 +166,61 @@ address_unpoison_rawptr :: proc "contextless" (ptr: rawptr, len: int) {
 	}
 }
 
+/*
+Marks the region covering `[ptr, ptr+len)` as addressable
+
+Code instrumented with `-sanitize:address` is allowed to access any address
+within the region again. This procedure is not thread-safe because no two
+threads can poison or unpoison memory in the same memory region region simultaneously.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
+address_unpoison_rawptr_uint :: proc "contextless" (ptr: rawptr, len: uint) {
+	when ASAN_ENABLED {
+		__asan_unpoison_memory_region(ptr, len)
+	}
+}
+
 address_poison :: proc {
 	address_poison_slice,
 	address_poison_ptr,
 	address_poison_rawptr,
+	address_poison_rawptr_uint,
 }
 
 address_unpoison :: proc {
 	address_unpoison_slice,
 	address_unpoison_ptr,
 	address_unpoison_rawptr,
+	address_unpoison_rawptr_uint,
 }
 
+/*
+Registers a callback to be run when asan detects a memory error right before terminating
+the process.
+
+This can be used for logging and/or debugging purposes.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_set_death_callback :: proc "contextless" (callback: Address_Death_Callback) {
 	when ASAN_ENABLED {
 		__sanitizer_set_death_callback(callback)
 	}
 }
 
-address_region_is_poisoned_slice :: proc "contextless" (region: []$T/$E) -> rawptr {
+/*
+Checks if the memory region covered by the slice is poisoned.
+
+If it is poisoned this procedure returns the address which would result
+in an asan error.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
+address_region_is_poisoned_slice :: proc "contextless" (region: $T/[]$E) -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_region_is_poisoned(raw_data(region), size_of(E) * len(region))
 	} else {
@@ -114,6 +228,15 @@ address_region_is_poisoned_slice :: proc "contextless" (region: []$T/$E) -> rawp
 	}
 }
 
+/*
+Checks if the memory region pointed to by the pointer is poisoned.
+
+If it is poisoned this procedure returns the address which would result
+in an asan error.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
 address_region_is_poisoned_ptr :: proc "contextless" (ptr: ^$T) -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_region_is_poisoned(ptr, size_of(T))
@@ -122,6 +245,15 @@ address_region_is_poisoned_ptr :: proc "contextless" (ptr: ^$T) -> rawptr {
 	}
 }
 
+/*
+Checks if the memory region covered by `[ptr, ptr+len)` is poisoned.
+
+If it is poisoned this procedure returns the address which would result
+in an asan error.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
 address_region_is_poisoned_rawptr :: proc "contextless" (region: rawptr, len: int) -> rawptr {
 	when ASAN_ENABLED {
 		assert_contextless(len >= 0)
@@ -131,13 +263,41 @@ address_region_is_poisoned_rawptr :: proc "contextless" (region: rawptr, len: in
 	}
 }
 
+/*
+Checks if the memory region covered by `[ptr, ptr+len)` is poisoned.
+
+If it is poisoned this procedure returns the address which would result
+in an asan error.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
+address_region_is_poisoned_rawptr_uint :: proc "contextless" (region: rawptr, len: uint) -> rawptr {
+	when ASAN_ENABLED {
+		return __asan_region_is_poisoned(region, len)
+	} else {
+		return nil
+	}
+}
+
+
 address_region_is_poisoned :: proc {
 	address_region_is_poisoned_slice,
 	address_region_is_poisoned_ptr,
 	address_region_is_poisoned_rawptr,
+	address_region_is_poisoned_rawptr_uint,
 }
 
-address_address_is_poisoned :: proc "contextless" (address: rawptr) -> bool {
+/*
+Checks if the address is poisoned.
+
+If it is poisoned this procedure returns `true`, otherwise it returns
+`false`.
+
+When asan is not enabled this procedure returns `false`.
+*/
+@(no_sanitize_address)
+address_is_poisoned :: proc "contextless" (address: rawptr) -> bool {
 	when ASAN_ENABLED {
 		return __asan_address_is_poisoned(address) != 0
 	} else {
@@ -145,12 +305,27 @@ address_address_is_poisoned :: proc "contextless" (address: rawptr) -> bool {
 	}
 }
 
+/*
+Describes the sanitizer state for an address.
+
+This procedure prints the description out to `stdout`.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_describe_address :: proc "contextless" (address: rawptr) {
 	when ASAN_ENABLED {
 		__asan_describe_address(address)
 	}
 }
 
+/*
+Returns `true` if an asan error has occured, otherwise it returns
+`false`.
+
+When asan is not enabled this procedure returns `false`.
+*/
+@(no_sanitize_address)
 address_report_present :: proc "contextless" () -> bool {
 	when ASAN_ENABLED {
 		return __asan_report_present() != 0
@@ -159,6 +334,14 @@ address_report_present :: proc "contextless" () -> bool {
 	}
 }
 
+/*
+Returns the program counter register value of an asan error.
+
+If no asan error has occurd `nil` is returned.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
 address_get_report_pc :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_report_pc()
@@ -167,6 +350,14 @@ address_get_report_pc :: proc "contextless" () -> rawptr {
 	}
 }
 
+/*
+Returns the base pointer register value of an asan error.
+
+If no asan error has occurd `nil` is returned.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
 address_get_report_bp :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_report_bp()
@@ -175,6 +366,14 @@ address_get_report_bp :: proc "contextless" () -> rawptr {
 	}
 }
 
+/*
+Returns the stack pointer register value of an asan error.
+
+If no asan error has occurd `nil` is returned.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
 address_get_report_sp :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_report_sp()
@@ -183,6 +382,14 @@ address_get_report_sp :: proc "contextless" () -> rawptr {
 	}
 }
 
+/*
+Returns the report buffer address of an asan error.
+
+If no asan error has occurd `nil` is returned.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
 address_get_report_address :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_report_address()
@@ -191,14 +398,33 @@ address_get_report_address :: proc "contextless" () -> rawptr {
 	}
 }
 
+/*
+Returns the address access type of an asan error.
+
+If no asan error has occurd `.none` is returned.
+
+When asan is not enabled this procedure returns `.none`.
+*/
+@(no_sanitize_address)
 address_get_report_access_type :: proc "contextless" () -> Address_Access_Type {
 	when ASAN_ENABLED {
+		if ! address_report_present() {
+			return .none
+		}
 		return __asan_get_report_access_type() == 0 ? .read : .write
 	} else {
 		return .none
 	}
 }
 
+/*
+Returns the access size of an asan error.
+
+If no asan error has occurd `0` is returned.
+
+When asan is not enabled this procedure returns `0`.
+*/
+@(no_sanitize_address)
 address_get_report_access_size :: proc "contextless" () -> uint {
 	when ASAN_ENABLED {
 		return __asan_get_report_access_size()
@@ -207,25 +433,52 @@ address_get_report_access_size :: proc "contextless" () -> uint {
 	}
 }
 
+/*
+Returns the bug description of an asan error.
+
+If no asan error has occurd an empty string is returned.
+
+When asan is not enabled this procedure returns an empty string.
+*/
+@(no_sanitize_address)
 address_get_report_description :: proc "contextless" () -> string {
 	when ASAN_ENABLED {
 		return string(__asan_get_report_description())
 	} else {
-		return "unknown"
+		return ""
 	}
 }
 
-address_locate_address :: proc "contextless" (addr: rawptr, data: []byte) -> (Address_Located_Address_String, []byte) {
+/*
+Returns asan information about the address provided, writing the category into `data`.
+
+The information provided include:
+* The category of the address, i.e. stack, global, heap, etc.
+* The name of the variable this address belongs to
+* The memory region of the address
+
+When asan is not enabled this procedure returns zero initialised values.
+*/
+@(no_sanitize_address)
+address_locate_address :: proc "contextless" (addr: rawptr, data: []byte) -> Address_Located_Address {
 	when ASAN_ENABLED {
 		out_addr: rawptr
 		out_size: uint
 		str := __asan_locate_address(addr, raw_data(data), len(data), &out_addr, &out_size)
-		return { string(str), string(cstring(raw_data(data))) }, (cast([^]byte)out_addr)[:out_size]
+		return { string(str), string(cstring(raw_data(data))), (cast([^]byte)out_addr)[:out_size] }, 
 	} else {
-		return { "", "" }, {}
+		return { "", "", {} }
 	}
 }
 
+/*
+Returns the allocation stack trace and thread id for a heap address.
+
+The stack trace is filled into the `data` slice.
+
+When asan is not enabled this procedure returns a zero initialised value.
+*/
+@(no_sanitize_address)
 address_get_alloc_stack_trace :: proc "contextless" (addr: rawptr, data: []rawptr) -> ([]rawptr, int) {
 	when ASAN_ENABLED {
 		out_thread: i32
@@ -236,6 +489,14 @@ address_get_alloc_stack_trace :: proc "contextless" (addr: rawptr, data: []rawpt
 	}
 }
 
+/*
+Returns the free stack trace and thread id for a heap address.
+
+The stack trace is filled into the `data` slice.
+
+When asan is not enabled this procedure returns zero initialised values.
+*/
+@(no_sanitize_address)
 address_get_free_stack_trace :: proc "contextless" (addr: rawptr, data: []rawptr) -> ([]rawptr, int) {
 	when ASAN_ENABLED {
 		out_thread: i32
@@ -246,6 +507,12 @@ address_get_free_stack_trace :: proc "contextless" (addr: rawptr, data: []rawptr
 	}
 }
 
+/*
+Returns the current asan shadow memory mapping.
+
+When asan is not enabled this procedure returns a zero initialised value.
+*/
+@(no_sanitize_address)
 address_get_shadow_mapping :: proc "contextless" () -> Address_Shadow_Mapping {
 	when ASAN_ENABLED {
 		result: Address_Shadow_Mapping
@@ -256,12 +523,26 @@ address_get_shadow_mapping :: proc "contextless" () -> Address_Shadow_Mapping {
 	}
 }
 
+/*
+Prints asan statistics to `stderr`
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_print_accumulated_stats :: proc "contextless" () {
 	when ASAN_ENABLED {
 		__asan_print_accumulated_stats()
 	}
 }
 
+/*
+Returns the address of the current fake stack used by asan.
+
+This pointer can be then used for `address_is_in_fake_stack`.
+
+When asan is not enabled this procedure returns `nil`.
+*/
+@(no_sanitize_address)
 address_get_current_fake_stack :: proc "contextless" () -> rawptr {
 	when ASAN_ENABLED {
 		return __asan_get_current_fake_stack()
@@ -270,6 +551,12 @@ address_get_current_fake_stack :: proc "contextless" () -> rawptr {
 	}
 }
 
+/*
+Returns if an address belongs to a given fake stack and if so the region of the fake frame.
+
+When asan is not enabled this procedure returns zero initialised values.
+*/
+@(no_sanitize_address)
 address_is_in_fake_stack :: proc "contextless" (fake_stack: rawptr, addr: rawptr) -> ([]byte, bool) {
 	when ASAN_ENABLED {
 		begin: rawptr
@@ -283,12 +570,27 @@ address_is_in_fake_stack :: proc "contextless" (fake_stack: rawptr, addr: rawptr
 	}
 }
 
+/*
+Performs shadow memory cleanup for the current thread before a procedure with no return is called
+i.e. a procedure such as `panic` and `os.exit`.
+
+When asan is not enabled this procedure does nothing.
+*/
+@(no_sanitize_address)
 address_handle_no_return :: proc "contextless" () {
 	when ASAN_ENABLED {
 		__asan_handle_no_return()
 	}
 }
 
+/*
+Updates the allocation stack trace for the given address.
+
+Returns `true` if successful, otherwise it returns `false`.
+
+When asan is not enabled this procedure returns `false`.
+*/
+@(no_sanitize_address)
 address_update_allocation_context :: proc "contextless" (addr: rawptr) -> bool {
 	when ASAN_ENABLED {
 		return __asan_update_allocation_context(addr) != 0

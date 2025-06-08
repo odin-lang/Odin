@@ -77,6 +77,8 @@ Match_Iterator :: struct {
 	vm:       virtual_machine.Machine,
 	idx:      int,
 	temp:     runtime.Allocator,
+	threads:  int,
+	done:     bool,
 }
 
 /*
@@ -101,7 +103,6 @@ create :: proc(
 	permanent_allocator := context.allocator,
 	temporary_allocator := context.temp_allocator,
 ) -> (result: Regular_Expression, err: Error) {
-
 	// For the sake of speed and simplicity, we first run all the intermediate
 	// processes such as parsing and compilation through the temporary
 	// allocator.
@@ -166,7 +167,6 @@ to escape the delimiter if found in the middle of the string.
 
 All runes after the closing delimiter will be parsed as flags:
 
-- 'g': Global
 - 'm': Multiline
 - 'i': Case_Insensitive
 - 'x': Ignore_Whitespace
@@ -243,7 +243,6 @@ create_by_user :: proc(
 	// to `end` here.
 	for r in pattern[start + end:] {
 		switch r {
-		case 'g': flags += { .Global }
 		case 'm': flags += { .Multiline }
 		case 'i': flags += { .Case_Insensitive }
 		case 'x': flags += { .Ignore_Whitespace }
@@ -282,18 +281,13 @@ create_iterator :: proc(
 	permanent_allocator := context.allocator,
 	temporary_allocator := context.temp_allocator,
 ) -> (result: Match_Iterator, err: Error) {
-	flags := flags
-	flags += {.Global} // We're iterating over a string, so the next match could start anywhere
-
-	if .Multiline in flags {
-		return {}, .Unsupported_Flag
-	}
 
 	result.regex         = create(pattern, flags, permanent_allocator, temporary_allocator) or_return
 	result.capture       = preallocate_capture()
 	result.temp          = temporary_allocator
 	result.vm            = virtual_machine.create(result.regex.program, str)
 	result.vm.class_data = result.regex.class_data
+	result.threads       = max(1, virtual_machine.opcode_count(result.vm.code) - 1)
 
 	return
 }
@@ -457,7 +451,26 @@ match_iterator :: proc(it: ^Match_Iterator) -> (result: Capture, index: int, ok:
 	assert(len(it.capture.pos) >= common.MAX_CAPTURE_GROUPS,
 		"Pre-allocated RegEx capture `pos` must be at least 10 elements long.")
 
+	// Guard against situations in which the iterator should finish.
+	if it.done {
+		return
+	}
+
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	if it.idx > 0 {
+		// Reset the state needed to `virtual_machine.run` again.
+		it.vm.top_thread        = 0
+		it.vm.current_rune      = rune(0)
+		it.vm.current_rune_size = 0
+		for i in 0..<it.threads {
+			it.vm.threads[i]      = {}
+			it.vm.next_threads[i] = {}
+		}
+	}
+
+	// Take note of where the string pointer is before we start.
+	sp_before := it.vm.string_pointer
 
 	saved: ^[2 * common.MAX_CAPTURE_GROUPS]int
 	{
@@ -467,6 +480,28 @@ match_iterator :: proc(it: ^Match_Iterator) -> (result: Capture, index: int, ok:
 		} else {
 			saved, ok = virtual_machine.run(&it.vm, false)
 		}
+	}
+
+	if !ok {
+		// Match failed, bail out.
+		return
+	}
+
+	if it.vm.string_pointer == sp_before {
+		// The string pointer did not move, but there was a match.
+		//
+		// At this point, the pattern supplied to the iterator will infinitely
+		// loop if we do not intervene.
+		it.done = true
+	}
+	if it.vm.string_pointer == len(it.vm.memory) {
+		// The VM hit the end of the string.
+		//
+		// We do not check at the start, because a match of pattern `$`
+		// against string "" is valid and must return a match.
+		//
+		// This check prevents a double-match of `$` against a non-empty string.
+		it.done = true
 	}
 
 	str := string(it.vm.memory)
@@ -488,9 +523,7 @@ match_iterator :: proc(it: ^Match_Iterator) -> (result: Capture, index: int, ok:
 		num_groups = n
 	}
 
-	defer if ok {
-		it.idx += 1
-	}
+	defer it.idx += 1
 
 	if num_groups > 0 {
 		result = {it.capture.pos[:num_groups], it.capture.groups[:num_groups]}
@@ -504,8 +537,25 @@ match :: proc {
 	match_iterator,
 }
 
+/*
+Reset an iterator, allowing it to be run again as if new.
+
+Inputs:
+- it: The iterator to reset.
+*/
 reset :: proc(it: ^Match_Iterator) {
-	it.idx    = 0
+	it.done                 = false
+	it.idx                  = 0
+	it.vm.string_pointer    = 0
+
+	it.vm.top_thread        = 0
+	it.vm.current_rune      = rune(0)
+	it.vm.current_rune_size = 0
+	it.vm.last_rune         = rune(0)
+	for i in 0..<it.threads {
+		it.vm.threads[i]      = {}
+		it.vm.next_threads[i] = {}
+	}
 }
 
 /*

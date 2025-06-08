@@ -12,7 +12,7 @@ foreign libwgpu {
 	RawQueueSubmitForIndex :: proc(queue: Queue, commandCount: uint, commands: [^]CommandBuffer) -> SubmissionIndex ---
 
 	// Returns true if the queue is empty, or false if there are more queue submissions still in flight.
-	DevicePoll :: proc(device: Device, wait: b32, /* NULLABLE */ wrappedSubmissionIndex: /* const */ ^SubmissionIndex = nil) -> b32 ---
+	DevicePoll :: proc(device: Device, wait: b32, /* NULLABLE */ submissionIndex: /* const */ ^SubmissionIndex = nil) -> b32 ---
 	DeviceCreateShaderModuleSpirV :: proc(device: Device, descriptor: ^ShaderModuleDescriptorSpirV) -> ShaderModule ---
 
 	SetLogCallback :: proc(callback: LogCallback, userdata: rawptr) ---

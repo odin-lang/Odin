@@ -18,7 +18,8 @@ sound_flag :: enum c.int {
 	ASYNC                 = 2,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_ASYNC */
 	WAIT_INIT             = 3,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_WAIT_INIT */
 	UNKNOWN_LENGTH        = 4,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_UNKNOWN_LENGTH */
-	
+	LOOPING               = 5,   /* MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_LOOPING */
+
 	/* ma_sound specific flags. */
 	NO_DEFAULT_ATTACHMENT = 12,  /* Do not attach to the endpoint by default. Useful for when setting up nodes in a complex graph system. */
 	NO_PITCH              = 13,  /* Disable pitch shifting with ma_sound_set_pitch() and ma_sound_group_set_pitch(). This is an optimization. */
@@ -51,7 +52,7 @@ engine_node_config :: struct {
 
 /* Base node object for both ma_sound and ma_sound_group. */
 engine_node :: struct {
-	baseNode:                    node_base,           /* Must be the first member for compatiblity with the ma_node API. */
+	baseNode:                    node_base,           /* Must be the first member for compatibility with the ma_node API. */
 	pEngine:                     ^engine,             /* A pointer to the engine. Set based on the value from the config. */
 	sampleRate:                  u32,                 /* The sample rate of the input data. For sounds backed by a data source, this will be the data source's sample rate. Otherwise it'll be the engine's sample rate. */
 	volumeSmoothTimeInPCMFrames: u32,
@@ -113,7 +114,6 @@ sound_config :: struct {
 	rangeEndInPCMFrames:            u64,
 	loopPointBegInPCMFrames:        u64,
 	loopPointEndInPCMFrames:        u64,
-	isLooping:                      b32,
 
 	endCallback:          sound_end_proc, /* Fired when the sound reaches the end. Will be fired from the audio thread. Do not restart, uninitialize or otherwise change the state of the sound from here. Instead fire an event or set a variable to indicate to a different thread to change the start of the sound. Will not be fired in response to a scheduled stop with ma_sound_set_stop_time_*(). */
 	pEndCallbackUserData: rawptr,
@@ -121,6 +121,8 @@ sound_config :: struct {
 	initNotifications: resource_manager_pipeline_notifications,
 
 	pDoneFence: ^fence, /* Deprecated. Use initNotifications instead. Released when the resource manager has finished decoding the entire sound. Not used with streams. */
+
+	isLooping: b32, /* Deprecated. Use the MA_SOUND_FLAG_LOOPING in `flags` instead. */
 }
 
 sound :: struct {
@@ -226,6 +228,7 @@ foreign lib {
 	sound_is_looping                         :: proc(pSound: ^sound) -> b32 ---
 	sound_at_end                             :: proc(pSound: ^sound) -> b32 ---
 	sound_seek_to_pcm_frame                  :: proc(pSound: ^sound, frameIndex: u64) -> result --- /* Just a wrapper around ma_data_source_seek_to_pcm_frame(). */
+	sound_seek_to_second                     :: proc(pSound: ^sound, seekPointInSeconds: f32) -> result --- /* Abstraction to ma_sound_seek_to_pcm_frame() */
 	sound_get_data_format                    :: proc(pSound: ^sound, pFormat: ^format, pChannels, pSampleRate: ^u32, pChannelMap: ^channel, channelMapCap: c.size_t) -> result ---
 	sound_get_cursor_in_pcm_frames           :: proc(pSound: ^sound, pCursor: ^u64) -> result ---
 	sound_get_length_in_pcm_frames           :: proc(pSound: ^sound, pLength: ^u64) -> result ---
@@ -323,6 +326,7 @@ engine_config :: struct {
 	gainSmoothTimeInMilliseconds: u32,                    /* When set to 0, gainSmoothTimeInFrames will be used. If both are set to 0, a default value will be used. */
 
 	defaultVolumeSmoothTimeInPCMFrames: u32,              /* Defaults to 0. Controls the default amount of smoothing to apply to volume changes to sounds. High values means more smoothing at the expense of high latency (will take longer to reach the new volume). */
+	preMixStackSizeInBytes:             u32,              /* A stack is used for internal processing in the node graph. This allows you to configure the size of this stack. Smaller values will reduce the maximum depth of your node graph. You should rarely need to modify this. */
 
 	allocationCallbacks:          allocation_callbacks,
 	noAutoStart:                  b32,                    /* When set to true, requires an explicit call to ma_engine_start(). This is false by default, meaning the engine will be started automatically in ma_engine_init(). */
@@ -344,7 +348,7 @@ engine :: struct {
 	allocationCallbacks:    allocation_callbacks,
 	ownsResourceManager:    b8,
 	ownsDevice:             b8,
-	inlinedSoundLock:       spinlock,                     /* For synchronizing access so the inlined sound list. */
+	inlinedSoundLock:       spinlock,                     /* For synchronizing access to the inlined sound list. */
 	pInlinedSoundHead:      ^sound_inlined,               /* The first inlined sound. Inlined sounds are tracked in a linked list. */
 	inlinedSoundCount:      u32, /*atomic*/               /* The total number of allocated inlined sound objects. Used for debugging. */
 	gainSmoothTimeInFrames: u32,                          /* The number of frames to interpolate the gain of spatialized sounds across. */

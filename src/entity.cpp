@@ -235,6 +235,10 @@ struct Entity {
 			Type * type_parameter_specialization;
 			String ir_mangled_name;
 			bool   is_type_alias;
+			bool   objc_is_implementation;
+			Type*  objc_superclass;
+			Type*  objc_ivar;
+			Entity*objc_context_provider;
 			String objc_class_name;
 			TypeNameObjCMetadata *objc_metadata;
 		} TypeName;
@@ -258,6 +262,7 @@ struct Entity {
 			bool    is_memcpy_like             : 1;
 			bool    uses_branch_location       : 1;
 			bool    is_anonymous               : 1;
+			bool    no_sanitize_address        : 1;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;

@@ -51,13 +51,13 @@ check_expression_with_flags :: proc(t: ^testing.T, pattern: string, flags: regex
 }
 
 check_expression :: proc(t: ^testing.T, pattern, haystack: string, needles: ..string, extra_flags := regex.Flags{}, loc := #caller_location) {
-	check_expression_with_flags(t, pattern, { .Global } + extra_flags,
+	check_expression_with_flags(t, pattern, extra_flags,
 		haystack, ..needles, loc = loc)
-	check_expression_with_flags(t, pattern, { .Global, .No_Optimization } + extra_flags,
+	check_expression_with_flags(t, pattern, { .No_Optimization } + extra_flags,
 		haystack, ..needles, loc = loc)
-	check_expression_with_flags(t, pattern, { .Global, .Unicode } + extra_flags,
+	check_expression_with_flags(t, pattern, { .Unicode } + extra_flags,
 		haystack, ..needles, loc = loc)
-	check_expression_with_flags(t, pattern, { .Global, .Unicode, .No_Optimization } + extra_flags,
+	check_expression_with_flags(t, pattern, { .Unicode, .No_Optimization } + extra_flags,
 		haystack, ..needles, loc = loc)
 }
 
@@ -72,17 +72,18 @@ expect_error :: proc(t: ^testing.T, pattern: string, expected_error: typeid, fla
 	testing.expect_value(t, variant_ti, expected_ti, loc = loc)
 }
 
-check_capture :: proc(t: ^testing.T, got, expected: regex.Capture, loc := #caller_location) {
-	testing.expect_value(t, len(got.pos),    len(got.groups),      loc = loc)
-	testing.expect_value(t, len(got.pos),    len(expected.pos),    loc = loc)
-	testing.expect_value(t, len(got.groups), len(expected.groups), loc = loc)
+check_capture :: proc(t: ^testing.T, got, expected: regex.Capture, loc := #caller_location) -> (ok: bool) {
+	testing.expect_value(t, len(got.pos),    len(got.groups),      loc = loc) or_return
+	testing.expect_value(t, len(got.pos),    len(expected.pos),    loc = loc) or_return
+	testing.expect_value(t, len(got.groups), len(expected.groups), loc = loc) or_return
 
 	if len(got.pos) == len(expected.pos) {
 		for i in 0..<len(got.pos) {
-			testing.expect_value(t, got.pos[i],    expected.pos[i],    loc = loc)
-			testing.expect_value(t, got.groups[i], expected.groups[i], loc = loc)
+			testing.expect_value(t, got.pos[i],    expected.pos[i],    loc = loc) or_return
+			testing.expect_value(t, got.groups[i], expected.groups[i], loc = loc) or_return
 		}
 	}
+	return true
 }
 
 @test
@@ -210,6 +211,12 @@ test_alternation :: proc(t: ^testing.T) {
 	check_expression(t, EXPR, "aa", "aa")
 	check_expression(t, EXPR, "bb", "bb")
 	check_expression(t, EXPR, "cc", "cc")
+}
+
+@test
+test_alternation_order :: proc(t: ^testing.T) {
+	check_expression(t, "a|ab", "ab", "a")
+	check_expression(t, "ab|a", "ab", "ab")
 }
 
 @test
@@ -516,7 +523,7 @@ test_pos_index_explicitly :: proc(t: ^testing.T) {
 	STR :: "This is an island."
 	EXPR :: `\bis\b`
 
-	rex, err := regex.create(EXPR, { .Global })
+	rex, err := regex.create(EXPR)
 	if !testing.expect_value(t, err, nil) {
 		return
 	}
@@ -642,9 +649,9 @@ test_unicode_explicitly :: proc(t: ^testing.T) {
 	}
 	{
 		EXPR :: "こにちは!"
-		check_expression_with_flags(t, EXPR, { .Global, .Unicode },
+		check_expression_with_flags(t, EXPR, { .Unicode },
 			"Hello こにちは!", "こにちは!")
-		check_expression_with_flags(t, EXPR, { .Global, .Unicode, .No_Optimization },
+		check_expression_with_flags(t, EXPR, { .Unicode, .No_Optimization },
 			"Hello こにちは!", "こにちは!")
 	}
 }
@@ -692,15 +699,15 @@ test_case_insensitive :: proc(t: ^testing.T) {
 test_multiline :: proc(t: ^testing.T) {
 	{
 		EXPR :: `^hellope$world$`
-		check_expression(t, EXPR, "\nhellope\nworld\n", "\nhellope\nworld\n", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "hellope\nworld\n", "hellope\nworld\n", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "hellope\nworld", "hellope\nworld", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "hellope\rworld", "hellope\rworld", extra_flags = { .Multiline })
 		check_expression(t, EXPR, "hellope\r\nworld", "hellope\r\nworld", extra_flags = { .Multiline })
 	}
 	{
-		EXPR :: `^?.$`
-		check_expression(t, EXPR, "\nh", "\nh", extra_flags = { .Multiline })
+		EXPR :: `^.$`
 		check_expression(t, EXPR, "h", "h", extra_flags = { .Multiline })
+		check_expression(t, EXPR, "h\n", "h\n", extra_flags = { .Multiline })
 	}
 	{
 		EXPR :: `^$`
@@ -901,12 +908,12 @@ test_everything_at_once :: proc(t: ^testing.T) {
 @test
 test_creation_from_user_string :: proc(t: ^testing.T) {
 	{
-		USER_EXPR :: `/^hellope$/gmixun-`
+		USER_EXPR :: `/^hellope$/mixun-`
 		STR :: "hellope"
 		rex, err := regex.create_by_user(USER_EXPR)
 		defer regex.destroy(rex)
 		testing.expect_value(t, err, nil)
-		testing.expect_value(t, rex.flags, regex.Flags{ .Global, .Multiline, .Case_Insensitive, .Ignore_Whitespace, .Unicode, .No_Capture, .No_Optimization })
+		testing.expect_value(t, rex.flags, regex.Flags{ .Multiline, .Case_Insensitive, .Ignore_Whitespace, .Unicode, .No_Capture, .No_Optimization })
 
 		_, ok := regex.match(rex, STR)
 		testing.expectf(t, ok, "expected user-provided RegEx %v to match %q", rex, STR)
@@ -1102,24 +1109,172 @@ Iterator_Test :: struct {
 
 iterator_vectors := []Iterator_Test{
 	{
-		`xxab32ab52xx`, `(ab\d{1})`, {}, // {.Global} implicitly added by the iterator
+		`xxab32ab52xx`, `(ab\d{1})`, {},
 		{
 			{pos = {{2, 5}, {2, 5}}, groups = {"ab3", "ab3"}},
 			{pos = {{6, 9}, {6, 9}}, groups = {"ab5", "ab5"}},
 		},
 	},
 	{
-		`xxfoobarxfoobarxx`, `f(o)ob(ar)`, {.Global},
+		`xxfoobarxfoobarxx`, `f(o)ob(ar)`, {},
 		{
 			{pos = {{2,  8},  {3,  4},  {6,  8}}, groups = {"foobar", "o", "ar"}},
 			{pos = {{9, 15}, {10, 11}, {13, 15}}, groups = {"foobar", "o", "ar"}},
+		},
+	},
+	{
+		`aaa`, `a`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{1,  2}}, groups = {"a"}},
+			{pos = {{2,  3}}, groups = {"a"}},
+		},
+	},
+	{
+		`aaa`, `\w`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{1,  2}}, groups = {"a"}},
+			{pos = {{2,  3}}, groups = {"a"}},
+		},
+	},
+	{
+		`aかか`, `.`, {.Unicode},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{1,  4}}, groups = {"か"}},
+			{pos = {{4,  7}}, groups = {"か"}},
+		},
+	},
+	{
+		`ゆめ.`, `.`, {.Unicode},
+		{
+			{pos = {{0,  3}}, groups = {"ゆ"}},
+			{pos = {{3,  6}}, groups = {"め"}},
+			{pos = {{6,  7}}, groups = {"."}},
+		},
+	},
+	// This pattern is not anchored, so this is valid per the new behavior.
+	{
+		`ababa`, `(?:a|ab)`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{2,  3}}, groups = {"a"}},
+			{pos = {{4,  5}}, groups = {"a"}},
+		},
+	},
+	// Ensure alternation follows expected ordering of left-higher priority.
+	{
+		`ababa`, `(?:ab|a)`, {},
+		{
+			{pos = {{0,  2}}, groups = {"ab"}},
+			{pos = {{2,  4}}, groups = {"ab"}},
+			{pos = {{4,  5}}, groups = {"a"}},
+		},
+	},
+	// This one is anchored, so only one match.
+	//
+	// This test ensures the behavior of `Assert_Start` is checking against the
+	// start of the string and we haven't just slid the memory string itself.
+	{
+		`ababa`, `^(?:a|b)`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+		},
+	},
+	{
+		`ababa`, `a$`, {},
+		{
+			{pos = {{4,  5}}, groups = {"a"}},
+		},
+	},
+	// A blank pattern on a blank string is valid and must not loop infinitely.
+	{
+		``, ``, {},
+		{
+			{pos = {{0,  0}}, groups = {""}},
+		},
+	},
+	// These too are valid.
+	//
+	// The iterator must bail out when it encounters any situation which would
+	// loop infinitely, but only after giving at least one valid match if one
+	// exists, as this would accord with attempting to singularly match the
+	// pattern against the string and provide a positive result.
+	{
+		`a`, ``, {},
+		{
+			{pos = {{0,  0}}, groups = {""}},
+		},
+	},
+	{
+		``, `$`, {},
+		{
+			{pos = {{0,  0}}, groups = {""}},
+		},
+	},
+	{
+		`aaa`, `$`, {},
+		{
+			{pos = {{3,  3}}, groups = {""}},
+		},
+	},
+	// Multiline iteration is supported, but it must follow the `^...$` scheme.
+	//
+	// Any usage outside of this strict syntax will produce predictable but
+	// unusual outputs, as `^` is defined to assert the start of a string or
+	// that a newline sequence was previously consumed, and `$` consumes a
+	// newline sequence or asserts the end of the string.
+	{
+		"foo1\nfoo2\r\nfoo3\rfoo4", `^foo.$`, {.Multiline},
+		{
+			{pos = {{0,  5}}, groups = {"foo1\n"}},
+			{pos = {{5,  11}}, groups = {"foo2\r\n"}},
+			{pos = {{11, 16}}, groups = {"foo3\r"}},
+			{pos = {{16, 20}}, groups = {"foo4"}},
+		},
+	},
+	{
+		"a\nb\n\r", `^$`, {.Multiline},
+		{},
+	},
+	{
+		"a\nb\n", `^$`, {.Multiline},
+		{},
+	},
+	{
+		"a\nb", `^$`, {.Multiline},
+		{},
+	},
+	// Multiline anchors must work within groups, as people are going to end up
+	// using them in there and we do not forbid it.
+	{
+		"a\nb\na\nb", `(?:^a$|^b$)`, {.Multiline},
+		{
+			{pos = {{0, 2}}, groups = {"a\n"}},
+			{pos = {{2, 4}}, groups = {"b\n"}},
+			{pos = {{4, 6}}, groups = {"a\n"}},
+			{pos = {{6, 7}}, groups = {"b"}},
+		},
+	},
+	// The following patterns are valid uses of optional anchors and must match.
+	{
+		"a\nb\na\nb", `^a(?:b|$)`, {.Multiline},
+		{
+			{pos = {{0, 2}}, groups = {"a\n"}},
+		},
+	},
+	{
+		"a\nb\na\nb", `^ab?$?`, {.Multiline},
+		{
+			{pos = {{0, 2}}, groups = {"a\n"}},
 		},
 	},
 }
 
 @test
 test_match_iterator :: proc(t: ^testing.T) {
-	for test in iterator_vectors {
+	vector: for test in iterator_vectors {
 		it, err := regex.create_iterator(test.haystack, test.pattern, test.flags)
 		defer regex.destroy(it)
 
@@ -1128,10 +1283,61 @@ test_match_iterator :: proc(t: ^testing.T) {
 
 		for capture, idx in regex.match(&it) {
 			if idx >= len(test.expected) {
+				log.errorf("got more than expected number of captures for matching string %q against pattern %q\n\tidx %i = %v", test.haystack, test.pattern, idx, capture)
+				continue vector
+			}
+			if !check_capture(t, capture, test.expected[idx]) {
+				log.errorf("capture check failed on string %q against pattern %q", test.haystack, test.pattern)
+			}
+		}
+		testing.expectf(t, it.idx == len(test.expected), "expected idx to be %i, got %i on string %q against pattern %q", len(test.expected), it.idx, test.haystack, test.pattern)
+	}
+}
+
+@test
+test_iterator_reset :: proc(t: ^testing.T) {
+	test := Iterator_Test{
+		`aaa`, `a`, {},
+		{
+			{pos = {{0,  1}}, groups = {"a"}},
+			{pos = {{1,  2}}, groups = {"a"}},
+			{pos = {{2,  3}}, groups = {"a"}},
+		},
+	}
+
+	out: {
+		it, err := regex.create_iterator(`aaa`, `a`)
+		defer regex.destroy(it)
+
+		testing.expect_value(t, err, nil)
+		(err == nil) or_break out
+
+		for capture, idx in regex.match(&it) {
+			if idx >= len(test.expected) {
+				log.errorf("got more than expected number of captures for matching string %q against pattern %q\n\tidx %i = %v", test.haystack, test.pattern, idx, capture)
 				break
 			}
 			check_capture(t, capture, test.expected[idx])
 		}
 		testing.expect_value(t, it.idx, len(test.expected))
+
+		// Do it again.
+		iterations := 0
+		regex.reset(&it)
+
+		// Mind that this loop can do nothing if it wasn't reset but leave us
+		// with the expected `idx` state.
+		//
+		// That's why we count iterations this time around.
+		for capture, idx in regex.match(&it) {
+			iterations += 1
+			if idx >= len(test.expected) {
+				log.errorf("got more than expected number of captures for matching string %q against pattern %q\n\tidx %i = %v", test.haystack, test.pattern, idx, capture)
+				break
+			}
+			check_capture(t, capture, test.expected[idx])
+		}
+		testing.expect_value(t, it.idx, len(test.expected))
+		testing.expect_value(t, iterations, len(test.expected))
 	}
 }

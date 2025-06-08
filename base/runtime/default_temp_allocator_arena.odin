@@ -1,6 +1,7 @@
 package runtime
 
 import "base:intrinsics"
+import "base:sanitizer"
 
 DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE :: uint(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE)
 
@@ -43,6 +44,8 @@ memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint
 	block.base = ([^]byte)(uintptr(block) + base_offset)
 	block.capacity = uint(end - uintptr(block.base))
 
+	sanitizer.address_poison(block.base, block.capacity)
+
 	// Should be zeroed
 	assert(block.used == 0)
 	assert(block.prev == nil)
@@ -52,6 +55,7 @@ memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint
 memory_block_dealloc :: proc(block_to_free: ^Memory_Block, loc := #caller_location) {
 	if block_to_free != nil {
 		allocator := block_to_free.allocator
+		sanitizer.address_unpoison(block_to_free.base, block_to_free.capacity)
 		mem_free(block_to_free, allocator, loc)
 	}
 }
@@ -83,6 +87,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 		return
 	}
 	data = block.base[block.used+alignment_offset:][:min_size]
+	sanitizer.address_unpoison(block.base[block.used:block.used+size])
 	block.used += size
 	return
 }
@@ -162,6 +167,7 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 	if arena.curr_block != nil {
 		intrinsics.mem_zero(arena.curr_block.base, arena.curr_block.used)
 		arena.curr_block.used = 0
+		sanitizer.address_poison(arena.curr_block.base, arena.curr_block.capacity)
 	}
 	arena.total_used = 0
 }
@@ -226,6 +232,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 					// grow data in-place, adjusting next allocation
 					block.used = uint(new_end)
 					data = block.base[start:new_end]
+					sanitizer.address_unpoison(data)
 					return
 				}
 			}
@@ -299,6 +306,7 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 			assert(block.used >= temp.used, "out of order use of arena_temp_end", loc)
 			amount_to_zero := block.used-temp.used
 			intrinsics.mem_zero(block.base[temp.used:], amount_to_zero)
+			sanitizer.address_poison(block.base[temp.used:block.capacity])
 			block.used = temp.used
 			arena.total_used -= amount_to_zero
 		}
