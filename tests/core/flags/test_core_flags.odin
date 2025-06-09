@@ -1013,6 +1013,110 @@ test_unix_manifold_limited :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_unix_two_manifold_limited :: proc(t: ^testing.T) {
+	S :: struct {
+		a: [dynamic]int `args:"manifold=2"`,
+		b: [dynamic]int `args:"manifold=2"`,
+		c: int,
+	}
+	s: S
+
+	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+
+	result := flags.parse(&s, args[:], .Unix)
+	defer {
+		delete(s.a)
+		delete(s.b)
+	}
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, len(s.a), 2)
+	testing.expect_value(t, len(s.b), 2)
+
+	if len(s.a) < 2 || len(s.b) < 2 {
+		return
+	}
+
+	testing.expect_value(t, s.a[0], 11)
+	testing.expect_value(t, s.a[1], 101)
+	testing.expect_value(t, s.b[0], 3)
+	testing.expect_value(t, s.b[1], 7)
+	testing.expect_value(t, s.c, 9)
+}
+
+@(test)
+test_unix_two_manifold_string :: proc(t: ^testing.T) {
+	// The expected behavior of a manifold flag is to consume all arguments as
+	// fitting for the element type.
+	S :: struct {
+		a: [dynamic]string `args:"manifold"`,
+		b: [dynamic]string `args:"manifold"`,
+		c: int,
+	}
+	s: S
+
+	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+
+	result := flags.parse(&s, args[:], .Unix)
+	defer {
+		delete(s.a)
+		delete(s.b)
+	}
+
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, len(s.a), 7)
+	testing.expect_value(t, len(s.b), 0)
+
+	if len(s.a) != 7 {
+		return
+	}
+
+	testing.expect_value(t, s.a[0], "11")
+	testing.expect_value(t, s.a[1], "101")
+	testing.expect_value(t, s.a[2], "-b")
+	testing.expect_value(t, s.a[3], "3")
+	testing.expect_value(t, s.a[4], "7")
+	testing.expect_value(t, s.a[5], "-c")
+	testing.expect_value(t, s.a[6], "9")
+}
+
+@(test)
+test_unix_two_manifold_int :: proc(t: ^testing.T) {
+	// If a manifold flag encounters an argument that it cannot convert to the
+	// element type, then this is an error.
+	S :: struct {
+		a: [dynamic]int `args:"manifold"`,
+		b: [dynamic]int `args:"manifold"`,
+		c: int,
+	}
+	s: S
+
+	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+
+	result := flags.parse(&s, args[:], .Unix)
+	defer {
+		delete(s.a)
+		delete(s.b)
+	}
+
+	err, ok := result.(flags.Parse_Error)
+	testing.expectf(t, ok, "unexpected result: %v", result)
+	if ok {
+		testing.expect_value(t, err.reason, flags.Parse_Error_Reason.Bad_Value)
+	}
+
+	// It is expected that arguments which pass will still be available.
+	testing.expect_value(t, len(s.a), 2)
+	testing.expect_value(t, len(s.b), 0)
+
+	if len(s.a) != 2 {
+		return
+	}
+
+	testing.expect_value(t, s.a[0], 11)
+	testing.expect_value(t, s.a[1], 101)
+}
+
+@(test)
 test_unix_positional :: proc(t: ^testing.T) {
 	S :: struct {
 		a: int `args:"pos=1"`,
