@@ -59,7 +59,8 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			}
 		}
 
-		if pos_str, has_pos := get_struct_subtag(args_tag, SUBTAG_POS); has_pos {
+		pos_str, has_pos := get_struct_subtag(args_tag, SUBTAG_POS)
+		if has_pos {
 			#partial switch specific_type_info in field.type.variant {
 			case runtime.Type_Info_Map:
 				fmt.panicf("%T.%s has `%s` defined, and this does not make sense on a map type.",
@@ -110,6 +111,10 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 		}
 
 		if length, is_manifold := get_struct_subtag(args_tag, SUBTAG_MANIFOLD); is_manifold {
+			fmt.assertf(!has_pos,
+				"%T.%s has both `%s` and `%s` defined. This is disallowed.\n\tSuggestion: Use a dynamic array field named `%s` to accept unspecified positional arguments.",
+				model_type, field.name, SUBTAG_POS, SUBTAG_MANIFOLD, INTERNAL_VARIADIC_FLAG, loc = loc)
+
 			if value, parse_ok := strconv.parse_u64_of_base(length, 10); parse_ok {
 				fmt.assertf(value > 0,
 					"%T.%s has `%s` set to %i. It must be greater than zero.",
