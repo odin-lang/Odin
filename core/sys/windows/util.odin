@@ -75,14 +75,6 @@ LANGIDFROMLCID :: #force_inline proc "contextless" (lcid: LCID) -> LANGID {
 	return LANGID(lcid)
 }
 
-// this one gave me trouble as it do not mask the values.
-// the _ in the name is also off comparing to the c code
-// i can't find any usage in the odin repo
-@(deprecated = "use MAKEWORD")
-MAKE_WORD :: #force_inline proc "contextless" (x, y: WORD) -> WORD {
-	return x << 8 | y
-}
-
 utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	if len(s) < 1 {
 		return nil

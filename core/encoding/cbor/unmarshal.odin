@@ -591,6 +591,31 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
+	case reflect.Type_Info_Matrix:
+		count := t.column_count * t.elem_stride
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
+		if length > count {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, allocator }
+
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case reflect.Type_Info_Simd_Vector:
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
+		if length > t.count {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, allocator }
+
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
 	case: return _unsupported(v, hdr)
 	}
 }

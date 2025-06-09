@@ -1238,7 +1238,7 @@ test_count_digits :: proc(t: ^testing.T) {
 		buf: [64]u8
 		for n in 0..<i64(base*base*base) {
 			count := math.count_digits_of_base(n, base)
-			str := strconv.append_int(buf[:], n, base)
+			str := strconv.write_int(buf[:], n, base)
 			if !testing.expectf(t,
 				len(str) == count,
 				"decimal %i in base-%i digit count is %i, does not match length %i of %q",

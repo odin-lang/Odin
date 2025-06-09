@@ -169,6 +169,7 @@ type_is_union            :: proc($T: typeid) -> bool ---
 type_is_enum             :: proc($T: typeid) -> bool ---
 type_is_proc             :: proc($T: typeid) -> bool ---
 type_is_bit_set          :: proc($T: typeid) -> bool ---
+type_is_bit_field        :: proc($T: typeid) -> bool ---
 type_is_simd_vector      :: proc($T: typeid) -> bool ---
 type_is_matrix           :: proc($T: typeid) -> bool ---
 
