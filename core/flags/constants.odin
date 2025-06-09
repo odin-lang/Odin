@@ -28,7 +28,7 @@ TAG_USAGE         :: "usage"
 
 UNDOCUMENTED_FLAG :: "<This flag has not been documented yet.>"
 
-INTERNAL_VARIADIC_FLAG   :: "varg"
+INTERNAL_OVERFLOW_FLAG   :: #config(ODIN_CORE_FLAGS_OVERFLOW_FLAG, "overflow")
 
 RESERVED_HELP_FLAG       :: "help"
 RESERVED_HELP_FLAG_SHORT :: "h"

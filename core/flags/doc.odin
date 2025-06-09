@@ -22,9 +22,13 @@ The format is similar to the Odin binary's way of handling compiler flags.
 
 Unhandled Arguments:
 
-All unhandled positional arguments are placed into the `varg` field on a
+All unhandled positional arguments are placed into the `overflow` field on a
 struct, if it exists. In UNIX-style parsing, the existence of a `--` on the
 command line will also pass all arguments afterwards into this field.
+
+If desired, the name of the field may be changed from `overflow` to any string
+by setting the `ODIN_CORE_FLAGS_OVERFLOW_FLAG` compile-time config option with
+`-define:ODIN_CORE_FLAGS_OVERFLOW_FLAG=<name>`.
 
 
 Struct Tags:

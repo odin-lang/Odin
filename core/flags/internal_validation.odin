@@ -80,7 +80,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			fmt.assertf(!reflect.is_boolean(field.type), "%T.%s is a required boolean. This is disallowed.",
 				model_type, field.name, loc = loc)
 
-			fmt.assertf(field.name != INTERNAL_VARIADIC_FLAG, "%T.%s is defined as required. This is disallowed.",
+			fmt.assertf(field.name != INTERNAL_OVERFLOW_FLAG, "%T.%s is defined as required. This is disallowed.",
 				model_type, field.name, loc = loc)
 
 			if len(requirement) > 0 {
@@ -113,7 +113,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 		if length, is_manifold := get_struct_subtag(args_tag, SUBTAG_MANIFOLD); is_manifold {
 			fmt.assertf(!has_pos,
 				"%T.%s has both `%s` and `%s` defined. This is disallowed.\n\tSuggestion: Use a dynamic array field named `%s` to accept unspecified positional arguments.",
-				model_type, field.name, SUBTAG_POS, SUBTAG_MANIFOLD, INTERNAL_VARIADIC_FLAG, loc = loc)
+				model_type, field.name, SUBTAG_POS, SUBTAG_MANIFOLD, INTERNAL_OVERFLOW_FLAG, loc = loc)
 
 			if value, parse_ok := strconv.parse_u64_of_base(length, 10); parse_ok {
 				fmt.assertf(value > 0,

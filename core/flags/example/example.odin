@@ -114,7 +114,7 @@ main :: proc() {
 		verbose: bool `usage:"Show verbose output."`,
 		debug: bool `args:"hidden" usage:"print debug info"`,
 
-		varg: [dynamic]string `usage:"Any extra arguments go here."`,
+		overflow: [dynamic]string `usage:"Any extra arguments go here."`,
 	}
 
 	opt: Options
