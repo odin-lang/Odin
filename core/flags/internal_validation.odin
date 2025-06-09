@@ -109,24 +109,24 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			}
 		}
 
-		if length, is_variadic := get_struct_subtag(args_tag, SUBTAG_VARIADIC); is_variadic {
+		if length, is_manifold := get_struct_subtag(args_tag, SUBTAG_MANIFOLD); is_manifold {
 			if value, parse_ok := strconv.parse_u64_of_base(length, 10); parse_ok {
 				fmt.assertf(value > 0,
 					"%T.%s has `%s` set to %i. It must be greater than zero.",
-					model_type, field.name, value, SUBTAG_VARIADIC, loc = loc)
+					model_type, field.name, value, SUBTAG_MANIFOLD, loc = loc)
 				fmt.assertf(value != 1,
-					"%T.%s has `%s` set to 1. This has no effect.",
-					model_type, field.name, SUBTAG_VARIADIC, loc = loc)
+					"%T.%s has `%s` set to 1. This is equivalent to not defining `%s`.",
+					model_type, field.name, SUBTAG_MANIFOLD, SUBTAG_MANIFOLD, loc = loc)
 			}
 
 			#partial switch specific_type_info in field.type.variant {
 			case runtime.Type_Info_Dynamic_Array:
 				fmt.assertf(style != .Odin,
 					"%T.%s has `%s` defined, but this only makes sense in UNIX-style parsing mode.",
-					model_type, field.name, SUBTAG_VARIADIC, loc = loc)
+					model_type, field.name, SUBTAG_MANIFOLD, loc = loc)
 			case:
 				fmt.panicf("%T.%s has `%s` defined, but this only makes sense on dynamic arrays.",
-					model_type, field.name, SUBTAG_VARIADIC, loc = loc)
+					model_type, field.name, SUBTAG_MANIFOLD, loc = loc)
 			}
 		}
 

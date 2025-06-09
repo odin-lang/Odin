@@ -966,9 +966,9 @@ test_unix :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_unix_variadic :: proc(t: ^testing.T) {
+test_unix_manifold :: proc(t: ^testing.T) {
 	S :: struct {
-		a: [dynamic]int `args:"variadic"`,
+		a: [dynamic]int `args:"manifold"`,
 	}
 	s: S
 
@@ -989,9 +989,9 @@ test_unix_variadic :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_unix_variadic_limited :: proc(t: ^testing.T) {
+test_unix_manifold_limited :: proc(t: ^testing.T) {
 	S :: struct {
-		a: [dynamic]int `args:"variadic=2"`,
+		a: [dynamic]int `args:"manifold=2"`,
 		b: int,
 	}
 	s: S
@@ -1029,10 +1029,10 @@ test_unix_positional :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_unix_positional_with_variadic :: proc(t: ^testing.T) {
+test_unix_positional_with_manifold :: proc(t: ^testing.T) {
 	S :: struct {
 		varg: [dynamic]int,
-		v: [dynamic]int `args:"variadic"`,
+		v: [dynamic]int `args:"manifold"`,
 	}
 	s: S
 
@@ -1049,7 +1049,7 @@ test_unix_positional_with_variadic :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_unix_double_dash_variadic :: proc(t: ^testing.T) {
+test_unix_double_dash_varargs :: proc(t: ^testing.T) {
 	S :: struct {
 		varg: [dynamic]string,
 		i: int,
@@ -1337,7 +1337,7 @@ very nicely.
 @(test)
 test_usage_write_unix :: proc(t: ^testing.T) {
 	Expected_Output :: `Usage:
-	varg required-number [number] [name] --bars --bots --foos --gadgets --variadic-flag --widgets [--array] [--count] [--greek] [--verbose] ...
+	varg required-number [number] [name] --bars --bots --foos --gadgets --manifold-flag --widgets [--array] [--count] [--greek] [--verbose] ...
 Flags:
 	--required-number <int>, required       | some number
 	--number <int>                          | some other number
@@ -1349,7 +1349,7 @@ Flags:
 	--bots <string>, at least 1             | <This flag has not been documented yet.>
 	--foos <string>, between 2 and 3        | <This flag has not been documented yet.>
 	--gadgets <string>, at least 1          | <This flag has not been documented yet.>
-	--variadic-flag <int, ...>, at least 2  | <This flag has not been documented yet.>
+	--manifold-flag <int, ...>, at least 2  | <This flag has not been documented yet.>
 	--widgets <string>, at most 2           | <This flag has not been documented yet.>
 	                                        |
 	--array <rune>, multiple                | <This flag has not been documented yet.>
@@ -1378,7 +1378,7 @@ very nicely.
 		greek: Custom_Enum,
 
 		array: [dynamic]rune,
-		variadic_flag: [dynamic]int `args:"variadic,required=2"`,
+		manifold_flag: [dynamic]int `args:"manifold,required=2"`,
 
 		gadgets: [dynamic]string `args:"required=1"`,
 		widgets: [dynamic]string `args:"required=<3"`,
