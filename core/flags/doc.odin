@@ -20,6 +20,13 @@ The format is similar to the Odin binary's way of handling compiler flags.
 	-<map>:<key>=<value>  set map[key] to value
 
 
+Unhandled Arguments:
+
+All unhandled positional arguments are placed into the `varg` field on a
+struct, if it exists. In UNIX-style parsing, the existence of a `--` on the
+command line will also pass all arguments afterwards into this field.
+
+
 Struct Tags:
 
 Users of the `core:encoding/json` package may be familiar with using tags to
