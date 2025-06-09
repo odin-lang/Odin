@@ -325,7 +325,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return res
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -339,7 +339,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -353,7 +353,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	// deliberately uninitialized
 	s: OS_Stat = ---
