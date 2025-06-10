@@ -13,4 +13,4 @@ echo ---
 %PATH_TO_ODIN% build . %COMMON% -o:speed -out:%OUT_NAME%
 python3 test.py %TEST_ARGS%
 
-odin test test_core_math_big.odin -file
+%PATH_TO_ODIN% test test_core_math_big.odin -file
