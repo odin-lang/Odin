@@ -277,6 +277,9 @@ try_cross_linking:;
 
 			if (build_context.build_mode == BuildMode_DynamicLibrary) {
 				link_settings = gb_string_append_fmt(link_settings, " /DLL");
+				if (build_context.no_entry_point) {
+					link_settings = gb_string_append_fmt(link_settings, " /NOENTRY");
+				}
 			} else {
 				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
 			}
