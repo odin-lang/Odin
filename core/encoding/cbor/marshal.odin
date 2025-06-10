@@ -612,7 +612,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 		case:
 			panic("unknown bit_size size")
 		}
-	case runtime.Type_Info_Matrix:
+	case ^runtime.Type_Info_Matrix:
 		count := info.column_count * info.elem_stride
 		err_conv(_encode_u64(e, u64(count), .Array)) or_return
 
@@ -631,7 +631,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 		}
 		return
 
-	case runtime.Type_Info_Simd_Vector:
+	case ^runtime.Type_Info_Simd_Vector:
 		err_conv(_encode_u64(e, u64(info.count), .Array)) or_return
 
 		if impl, ok := _tag_implementations_type[info.elem.id]; ok {

@@ -261,7 +261,7 @@ length :: proc(val: any) -> int {
 			return (^runtime.Raw_String)(val.data).len
 		}
 
-	case Type_Info_Simd_Vector:
+	case ^Type_Info_Simd_Vector:
 		return a.count
 	}
 
@@ -291,7 +291,7 @@ capacity :: proc(val: any) -> int {
 	case ^Type_Info_Map:
 		return runtime.map_cap((^runtime.Raw_Map)(val.data)^)
 
-	case Type_Info_Simd_Vector:
+	case ^Type_Info_Simd_Vector:
 		return a.count
 	}
 
@@ -1656,11 +1656,11 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return equal(va, vb, including_indirect_array_recursion, recursion_level+1) 
 	case ^Type_Info_Map:
 		return false
-	case Type_Info_Float:
+	case ^Type_Info_Float:
 		x, _ := as_f64(a)
 		y, _ := as_f64(b)
 		return x == y
-	case Type_Info_Complex:
+	case ^Type_Info_Complex:
 		switch x in a {
 		case complex32:
 			#no_type_assert y := b.(complex32)
@@ -1673,7 +1673,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 			return x == y
 		}
 		return false
-	case Type_Info_Quaternion:
+	case ^Type_Info_Quaternion:
 		switch x in a {
 		case quaternion64:
 			#no_type_assert y := b.(quaternion64)

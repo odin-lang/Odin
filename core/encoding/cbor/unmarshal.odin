@@ -591,7 +591,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
-	case reflect.Type_Info_Matrix:
+	case ^reflect.Type_Info_Matrix:
 		count := t.column_count * t.elem_stride
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > count {
@@ -604,7 +604,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
-	case reflect.Type_Info_Simd_Vector:
+	case ^reflect.Type_Info_Simd_Vector:
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > t.count {
 			return _unsupported(v, hdr)

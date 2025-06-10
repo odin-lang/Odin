@@ -123,7 +123,7 @@ assign_int :: proc(val: any, i: $T) -> bool {
 			}
 			t := runtime.type_info_base(ti)
 			#partial switch info in t.variant {
-			case runtime.Type_Info_Integer:
+			case ^runtime.Type_Info_Integer:
 				switch info.endianness {
 				case .Platform: return false
 				case .Little:   return ODIN_ENDIAN != .Little

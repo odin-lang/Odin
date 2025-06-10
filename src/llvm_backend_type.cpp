@@ -594,29 +594,13 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 				lbValue v_count = lb_const_int(m, t_int, fields.count);
 
-				vals[1] = llvm_const_slice(m, lbValue{name_array.value,  alloc_type_pointer(t_string)},               v_count);
-				vals[2] = llvm_const_slice(m, lbValue{value_array.value, alloc_type_pointer(t_type_info_enum_value)}, v_count);
-			 else {
-				vals[1] = LLVMConstNull(lb_type(m, base_type(t_type_info_enum)->Struct.fields[1]->type));
-				vals[2] = LLVMConstNull(lb_type(m, base_type(t_type_info_enum)->Struct.fields[2]->type));
+				vals[2] = llvm_const_slice(m, lbValue{name_array.value,  alloc_type_pointer(t_string)},               v_count);
+				vals[3] = llvm_const_slice(m, lbValue{value_array.value, alloc_type_pointer(t_type_info_enum_value)}, v_count);
+			} else {
+				vals[2] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 2));
+				vals[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 3));
 			}
-
-			LLVMValueRef name_init  = llvm_const_array(lb_type(m, t_string),               name_values,  cast(unsigned)fields.count);
-			LLVMValueRef value_init = llvm_const_array(lb_type(m, t_type_info_enum_value), value_values, cast(unsigned)fields.count);
-			LLVMSetInitializer(name_array.value,  name_init);
-			LLVMSetInitializer(value_array.value, value_init);
-			LLVMSetGlobalConstant(name_array.value, true);
-			LLVMSetGlobalConstant(value_array.value, true);
-
-			lbValue v_count = lb_const_int(m, t_int, fields.count);
-
-			vals[2] = llvm_const_slice(m, lbValue{name_array.value,  alloc_type_pointer(t_string)},               v_count);
-			vals[3] = llvm_const_slice(m, lbValue{value_array.value, alloc_type_pointer(t_type_info_enum_value)}, v_count);
-		} else {
-			vals[2] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 2));
-			vals[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 3));
-		}
-		break;
+			break;
 
 		case Type_Union: {
 			tag_type = t_type_info_union;
