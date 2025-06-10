@@ -222,6 +222,7 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		return lb_emit_byte_swap(p, res, type);
 	}
 
+	Type* bt = base_type(type);
 	lbValue res = {};
 
 	switch (op) {
@@ -232,6 +233,8 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		return res;
 	case Token_Sub: // Number negation
 		if (is_type_integer(x.type)) {
+			res.value = LLVMBuildNeg(p->builder, x.value, "");
+		} else if (bt->kind == Type_Enum && is_type_integer(bt->Enum.base_type)) {
 			res.value = LLVMBuildNeg(p->builder, x.value, "");
 		} else if (is_type_float(x.type)) {
 			res.value = LLVMBuildFNeg(p->builder, x.value, "");
@@ -2352,7 +2355,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		Type *elem = base_array_type(dst);
 		lbValue e = lb_emit_conv(p, value, elem);
 		lbAddr v = lb_add_local_generated(p, t, false);
-		lbValue zero = lb_const_value(p->module, elem, exact_value_i64(0), true);
+		lbValue zero = lb_const_value(p->module, elem, exact_value_i64(0), LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 		for (i64 j = 0; j < dst->Matrix.column_count; j++) {
 			for (i64 i = 0; i < dst->Matrix.row_count; i++) {
 				lbValue ptr = lb_emit_matrix_epi(p, v.addr, i, j);
@@ -2389,7 +2392,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 						lb_emit_store(p, d, s);
 					} else if (i == j) {
 						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
-						lbValue s = lb_const_value(p->module, dst->Matrix.elem, exact_value_i64(1), true);
+						lbValue s = lb_const_value(p->module, dst->Matrix.elem, exact_value_i64(1), LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 						lb_emit_store(p, d, s);
 					}
 				}
@@ -2514,7 +2517,7 @@ gb_internal lbValue lb_emit_c_vararg(lbProcedure *p, lbValue arg, Type *type) {
 }
 
 gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right, Type *type) {
-	GB_ASSERT((is_type_struct(type) || is_type_union(type)) && is_type_comparable(type));
+	GB_ASSERT((is_type_struct(type) || is_type_soa_pointer(type) || is_type_union(type)) && is_type_comparable(type));
 	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
 	lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
 	lbValue res = {};
@@ -2899,6 +2902,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	    is_type_proc(a) ||
 	    is_type_enum(a)) {
 		LLVMIntPredicate pred = {};
+
 		if (is_type_unsigned(left.type)) {
 			switch (op_kind) {
 			case Token_Gt:   pred = LLVMIntUGT; break;
@@ -2941,7 +2945,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		case Token_GtEq:  pred = LLVMRealOGE; break;
 		case Token_Lt:    pred = LLVMRealOLT; break;
 		case Token_LtEq:  pred = LLVMRealOLE; break;
-		case Token_NotEq: pred = LLVMRealONE; break;
+		case Token_NotEq: pred = LLVMRealUNE; break;
 		}
 
 		if (is_type_different_to_arch_endianness(left.type)) {
@@ -2969,7 +2973,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			LLVMRealPredicate pred = {};
 			switch (op_kind) {
 			case Token_CmpEq: pred = LLVMRealOEQ; break;
-			case Token_NotEq: pred = LLVMRealONE; break;
+			case Token_NotEq: pred = LLVMRealUNE; break;
 			}
 			mask = LLVMBuildFCmp(p->builder, pred, left.value, right.value, "");
 		} else {
@@ -3022,6 +3026,9 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 
 		return res;
 
+	} else if (is_type_soa_pointer(a)) {
+		// NOTE(Jeroen): Compare data pointer and index tag as if it were a simple struct.
+		return lb_compare_records(p, op_kind, left, right, a);
 	} else {
 		GB_PANIC("Unhandled comparison kind %s (%s) %.*s %s (%s)", type_to_string(left.type), type_to_string(base_type(left.type)), LIT(token_strings[op_kind]), type_to_string(right.type), type_to_string(base_type(right.type)));
 	}
@@ -3143,6 +3150,18 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 			}
 		}
 		break;
+	
+	case Type_SoaPointer:
+		{
+			// NOTE(bill): An SoaPointer is essentially just a pointer for nil comparison
+			lbValue ptr = lb_emit_struct_ev(p, x, 0); // Extract the base pointer component (field 0)
+			if (op_kind == Token_CmpEq) {
+				res.value = LLVMBuildIsNull(p->builder, ptr.value, "");
+			} else if (op_kind == Token_NotEq) {
+				res.value = LLVMBuildIsNotNull(p->builder, ptr.value, "");
+			}
+			return res;
+		}
 
 	case Type_Union:
 		{
@@ -3493,8 +3512,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Short on constant values
-		bool allow_local = true;
-		return lb_const_value(p->module, type, tv.value, allow_local);
+		return lb_const_value(p->module, type, tv.value, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 	} else if (tv.mode == Addressing_Type) {
 		// NOTE(bill, 2023-01-16): is this correct? I hope so at least
 		return lb_typeid(m, tv.type);
@@ -4826,7 +4844,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		if (cl->elems.count == 0) {
 			break;
 		}
-		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals);
+		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals || build_context.dynamic_literals);
 
 		lbValue err = lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
 		gb_unused(err);
@@ -4915,7 +4933,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		if (cl->elems.count == 0) {
 			break;
 		}
-		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals);
+		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals || build_context.dynamic_literals);
 
 		Type *et = bt->DynamicArray.elem;
 		lbValue size  = lb_const_int(p->module, t_int, type_size_of(et));
@@ -5136,8 +5154,6 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_build_addr(p, unparen_expr(se->selector));
 			}
 
-
-			Type *type = base_type(tav.type);
 			if (tav.mode == Addressing_Type) { // Addressing_Type
 				Selection sel = lookup_field(tav.type, selector, true);
 				if (sel.pseudo_field) {
@@ -5172,18 +5188,29 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_addr_swizzle(a, type, swizzle_count, swizzle_indices);
 			}
 
-			Selection sel = lookup_field(type, selector, false);
+			Selection sel = lookup_field(tav.type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
-			if (sel.pseudo_field) {
-				GB_ASSERT(sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup);
+			if (sel.pseudo_field && (sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup)) {
 				Entity *e = entity_of_node(sel_node);
 				GB_ASSERT(e->kind == Entity_Procedure);
 				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
-			if (sel.is_bit_field) {
-				lbAddr addr = lb_build_addr(p, se->expr);
+			lbAddr addr = lb_build_addr(p, se->expr);
 
+			// NOTE(harold): Only allow ivar pseudo field access on indirect selectors.
+			//				 It is incoherent otherwise as Objective-C objects are zero-sized.
+			Type *deref_type = type_deref(tav.type);
+			if (tav.type->kind == Type_Pointer && deref_type->kind == Type_Named && deref_type->Named.type_name->TypeName.objc_ivar) {
+				// NOTE(harold): We need to load the ivar from the current address and
+				//				 replace addr with the loaded ivar addr to apply the selector load properly.
+				addr = lb_addr(lb_emit_load(p, addr.addr));
+
+				lbValue ivar_ptr = lb_handle_objc_ivar_for_objc_object_pointer(p, addr.addr);
+				addr = lb_addr(ivar_ptr);
+			}
+
+			if (sel.is_bit_field) {
 				Selection sub_sel = sel;
 				sub_sel.index.count -= 1;
 
@@ -5209,7 +5236,6 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 			}
 
 			{
-				lbAddr addr = lb_build_addr(p, se->expr);
 				if (addr.kind == lbAddr_Map) {
 					lbValue v = lb_addr_load(p, addr);
 					lbValue a = lb_address_from_load_or_generate_local(p, v);

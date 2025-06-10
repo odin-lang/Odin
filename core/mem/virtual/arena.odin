@@ -3,6 +3,8 @@ package mem_virtual
 import "core:mem"
 import "core:sync"
 
+import "base:sanitizer"
+
 Arena_Kind :: enum uint {
 	Growing = 0, // Chained memory blocks (singly linked list).
 	Static  = 1, // Fixed reservation sized.
@@ -43,7 +45,7 @@ DEFAULT_ARENA_STATIC_RESERVE_SIZE :: mem.Gigabyte when size_of(uintptr) == 8 els
 
 // Initialization of an `Arena` to be a `.Growing` variant.
 // A growing arena is a linked list of `Memory_Block`s allocated with virtual memory.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (err: Allocator_Error) {
 	arena.kind           = .Growing
 	arena.curr_block     = memory_block_alloc(0, reserved, {}) or_return
@@ -53,24 +55,26 @@ arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING
 	if arena.minimum_block_size == 0 {
 		arena.minimum_block_size = reserved
 	}
+	sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 	return
 }
 
 
 // Initialization of an `Arena` to be a `.Static` variant.
 // A static arena contains a single `Memory_Block` allocated with virtual memory.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_init_static :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_STATIC_RESERVE_SIZE, commit_size: uint = DEFAULT_ARENA_STATIC_COMMIT_SIZE) -> (err: Allocator_Error) {
 	arena.kind           = .Static
 	arena.curr_block     = memory_block_alloc(commit_size, reserved, {}) or_return
 	arena.total_used     = 0
 	arena.total_reserved = arena.curr_block.reserved
+	sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 	return
 }
 
 // Initialization of an `Arena` to be a `.Buffer` variant.
 // A buffer arena contains single `Memory_Block` created from a user provided []byte.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_init_buffer :: proc(arena: ^Arena, buffer: []byte) -> (err: Allocator_Error) {
 	if len(buffer) < size_of(Memory_Block) {
 		return .Out_Of_Memory
@@ -78,7 +82,7 @@ arena_init_buffer :: proc(arena: ^Arena, buffer: []byte) -> (err: Allocator_Erro
 
 	arena.kind = .Buffer
 
-	mem.zero_slice(buffer)
+	sanitizer.address_poison(buffer[:])
 
 	block_base := raw_data(buffer)
 	block := (^Memory_Block)(block_base)
@@ -94,7 +98,7 @@ arena_init_buffer :: proc(arena: ^Arena, buffer: []byte) -> (err: Allocator_Erro
 }
 
 // Allocates memory from the provided arena.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	assert(alignment & (alignment-1) == 0, "non-power of two alignment", loc)
 
@@ -158,10 +162,13 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 		data, err = alloc_from_memory_block(arena.curr_block, size, alignment, default_commit_size=0)
 		arena.total_used = arena.curr_block.used
 	}
+
+	sanitizer.address_unpoison(data)
 	return
 }
 
 // Resets the memory of a Static or Buffer arena to a specific `position` (offset) and zeroes the previously used memory.
+@(no_sanitize_address)
 arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location) -> bool {
 	sync.mutex_guard(&arena.mutex)
 
@@ -175,6 +182,7 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 			mem.zero_slice(arena.curr_block.base[arena.curr_block.used:][:prev_pos-pos])
 		}
 		arena.total_used = arena.curr_block.used
+		sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 		return true
 	} else if pos == 0 {
 		arena.total_used = 0
@@ -184,6 +192,7 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 }
 
 // Frees the last memory block of a Growing Arena
+@(no_sanitize_address)
 arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
 	if free_block := arena.curr_block; free_block != nil {
 		assert(arena.kind == .Growing, "expected a .Growing arena", loc)
@@ -191,11 +200,13 @@ arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_locat
 		arena.total_reserved -= free_block.reserved
 
 		arena.curr_block = free_block.prev
+		sanitizer.address_poison(free_block.base[:free_block.committed])
 		memory_block_dealloc(free_block)
 	}
 }
 
 // Deallocates all but the first memory block of the arena and resets the allocator's usage to 0.
+@(no_sanitize_address)
 arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 	switch arena.kind {
 	case .Growing:
@@ -208,7 +219,9 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 		if arena.curr_block != nil {
 			curr_block_used := int(arena.curr_block.used)
 			arena.curr_block.used = 0
+			sanitizer.address_unpoison(arena.curr_block.base[:curr_block_used])
 			mem.zero(arena.curr_block.base, curr_block_used)
+			sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 		}
 		arena.total_used = 0
 	case .Static, .Buffer:
@@ -219,6 +232,7 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 
 // Frees all of the memory allocated by the arena and zeros all of the values of an arena.
 // A buffer based arena does not `delete` the provided `[]byte` bufffer.
+@(no_sanitize_address)
 arena_destroy :: proc(arena: ^Arena, loc := #caller_location) {
 	sync.mutex_guard(&arena.mutex)
 	switch arena.kind {
@@ -250,7 +264,7 @@ arena_static_bootstrap_new :: proc{
 }
 
 // Ability to bootstrap allocate a struct with an arena within the struct itself using the growing variant strategy.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_growing_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Arena
 	bootstrap.kind = .Growing
@@ -266,13 +280,13 @@ arena_growing_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintp
 }
 
 // Ability to bootstrap allocate a struct with an arena within the struct itself using the growing variant strategy.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_growing_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, minimum_block_size: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	return arena_growing_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), minimum_block_size)
 }
 
 // Ability to bootstrap allocate a struct with an arena within the struct itself using the static variant strategy.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_static_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Arena
 	bootstrap.kind = .Static
@@ -288,19 +302,20 @@ arena_static_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintpt
 }
 
 // Ability to bootstrap allocate a struct with an arena within the struct itself using the static variant strategy.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_static_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
 	return arena_static_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), reserved)
 }
 
 
 // Create an `Allocator` from the provided `Arena`
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 	return mem.Allocator{arena_allocator_proc, arena}
 }
 
 // The allocator procedure used by an `Allocator` produced by `arena_allocator`
+@(no_sanitize_address)
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int,
@@ -334,6 +349,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 			if size < old_size {
 				// shrink data in-place
 				data = old_data[:size]
+				sanitizer.address_poison(old_data[size:old_size])
 				return
 			}
 
@@ -347,6 +363,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 					_ = alloc_from_memory_block(block, new_end - old_end, 1, default_commit_size=arena.default_commit_size) or_return
 					arena.total_used += block.used - prev_used
 					data = block.base[start:new_end]
+					sanitizer.address_unpoison(data)
 					return
 				}
 			}
@@ -357,6 +374,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 			return
 		}
 		copy(new_memory, old_data[:old_size])
+		sanitizer.address_poison(old_data[:old_size])
 		return new_memory, nil
 	case .Query_Features:
 		set := (^mem.Allocator_Mode_Set)(old_memory)
@@ -382,7 +400,7 @@ Arena_Temp :: struct {
 }
 
 // Begins the section of temporary arena memory.
-@(require_results)
+@(require_results, no_sanitize_address)
 arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena_Temp) {
 	assert(arena != nil, "nil arena", loc)
 	sync.mutex_guard(&arena.mutex)
@@ -397,6 +415,7 @@ arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena
 }
 
 // Ends the section of temporary arena memory by resetting the memory to the stored position.
+@(no_sanitize_address)
 arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 	assert(temp.arena != nil, "nil arena", loc)
 	arena := temp.arena
@@ -432,6 +451,7 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 }
 
 // Ignore the use of a `arena_temp_begin` entirely by __not__ resetting to the stored position.
+@(no_sanitize_address)
 arena_temp_ignore :: proc(temp: Arena_Temp, loc := #caller_location) {
 	assert(temp.arena != nil, "nil arena", loc)
 	arena := temp.arena
@@ -442,6 +462,7 @@ arena_temp_ignore :: proc(temp: Arena_Temp, loc := #caller_location) {
 }
 
 // Asserts that all uses of `Arena_Temp` has been used by an `Arena`
+@(no_sanitize_address)
 arena_check_temp :: proc(arena: ^Arena, loc := #caller_location) {
 	assert(arena.temp_count == 0, "Arena_Temp not been ended", loc)
 }

@@ -888,6 +888,34 @@ make_aligned :: proc(
 	return runtime.make_aligned(T, len, alignment, allocator, loc)
 }
 
+
+/*
+Allocate a new slice with alignment for allocators that might not support the
+specified alignment requirement.
+
+This procedure allocates a new slice of type `T` with length `len`, aligned
+on a boundary specified by `alignment` from an allocator specified by
+`allocator`, and returns the allocated slice.
+
+The user should `delete` the return `original_data` slice not the typed `slice`.
+*/
+@(require_results)
+make_over_aligned :: proc(
+	$T: typeid/[]$E,
+	#any_int len: int,
+	alignment: int,
+	allocator: runtime.Allocator,
+	loc := #caller_location,
+) -> (slice: T, original_data: []byte, err: Allocator_Error) {
+	size := size_of(E)*len + alignment-1
+	original_data, err = runtime.make([]byte, size, allocator, loc)
+	if err == nil {
+		ptr := align_forward(raw_data(original_data), uintptr(alignment))
+		slice = ([^]E)(ptr)[:len]
+	}
+	return
+}
+
 /*
 Allocate a new slice.
 

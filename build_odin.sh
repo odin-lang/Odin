@@ -6,7 +6,6 @@ set -eu
 : ${LDFLAGS=}
 : ${LLVM_CONFIG=}
 
-CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 LDFLAGS="$LDFLAGS -pthread -lm"
@@ -15,8 +14,12 @@ OS_NAME="$(uname -s)"
 
 if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
 	GIT_SHA=$(git show --pretty='%h' --no-patch --no-notes HEAD)
+	GIT_DATE=$(git show "--pretty=%cd" "--date=format:%Y-%m" --no-patch --no-notes HEAD)
 	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
+else
+	GIT_DATE=$(date +"%Y-%m")
 fi
+CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$GIT_DATE\""
 
 error() {
 	printf "ERROR: %s\n" "$1"
@@ -25,7 +28,7 @@ error() {
 
 # Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
 if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
-    if   [ -n "$(command -v $(brew --prefix llvm)/bin/llvm-config)"    ]; then LLVM_CONFIG="$(brew --prefix llvm)/bin/llvm-config"
+    if   [ -n "$(command -v $(brew --prefix llvm@20)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@20)/bin/llvm-config"
     elif [ -n "$(command -v $(brew --prefix llvm@19)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@19)/bin/llvm-config"
     elif [ -n "$(command -v $(brew --prefix llvm@18)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@18)/bin/llvm-config"
     elif [ -n "$(command -v $(brew --prefix llvm@17)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@17)/bin/llvm-config"

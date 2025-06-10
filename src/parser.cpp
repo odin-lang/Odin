@@ -3274,6 +3274,8 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 		case Token_OpenBracket: {
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = false;
+			defer (f->allow_range = prev_allow_range);
+
 
 			Token open = {}, close = {}, interval = {};
 			Ast *indices[2] = {};
@@ -3281,6 +3283,13 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
+
+			if (f->curr_token.kind == Token_CloseBracket) {
+				error(f->curr_token, "Expected an operand, got ]");
+				close = expect_token(f, Token_CloseBracket);
+				operand = ast_index_expr(f, operand, nullptr, open, close);
+				break;
+			}
 
 			switch (f->curr_token.kind) {
 			case Token_Ellipsis:
@@ -3331,7 +3340,6 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}
 
-			f->allow_range = prev_allow_range;
 		} break;
 
 		case Token_Pointer: // Deference
@@ -5786,7 +5794,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT) {
+		if (ext == FILE_EXT && !path_is_directory(name)) {
 			files_with_ext += 1;
 		}
 		if (ext == FILE_EXT && !is_excluded_target_filename(name)) {
@@ -5811,7 +5819,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT) {
+		if (ext == FILE_EXT && !path_is_directory(name)) {
 			if (is_excluded_target_filename(name)) {
 				continue;
 			}
@@ -6157,7 +6165,7 @@ gb_internal String build_tag_get_token(String s, String *out) {
 		isize width = utf8_decode(&s[n], s.len-n, &rune);
 		if (n == 0 && rune == '!') {
 
-		} else if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != ':') {
 			isize k = gb_max(gb_max(n, width), 1);
 			*out = substring(s, k, s.len);
 			return substring(s, 0, k);
@@ -6209,7 +6217,9 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				continue;
 			}
 
-			TargetOsKind   os   = get_target_os_from_string(p);
+			Subtarget subtarget = Subtarget_Default;
+
+			TargetOsKind   os   = get_target_os_from_string(p, &subtarget);
 			TargetArchKind arch = get_target_arch_from_string(p);
 			num_tokens += 1;
 
@@ -6223,11 +6233,13 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			if (os != TargetOs_Invalid) {
 				this_kind_os_seen = true;
 
+				bool same_subtarget = (subtarget == Subtarget_Default) || (subtarget == selected_subtarget);
+
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
-					this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
+					this_kind_correct = this_kind_correct && (os != build_context.metrics.os || !same_subtarget);
 				} else {
-					this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
+					this_kind_correct = this_kind_correct && (os == build_context.metrics.os && same_subtarget);
 				}
 			} else if (arch != TargetArch_Invalid) {
 				this_kind_arch_seen = true;

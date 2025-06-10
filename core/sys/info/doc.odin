@@ -26,13 +26,15 @@ Example:
 	import si "core:sys/info"
 
 	main :: proc() {
-		fmt.printfln("Odin:  %v",    ODIN_VERSION)
-		fmt.printfln("OS:    %v",    si.os_version.as_string)
-		fmt.printfln("OS:    %#v",   si.os_version)
-		fmt.printfln("CPU:   %v",    si.cpu_name)
-		fmt.printfln("RAM:   %#.1M", si.ram.total_ram)
+		fmt.printfln("Odin:      %v",      ODIN_VERSION)
+		fmt.printfln("OS:        %v",      si.os_version.as_string)
+		fmt.printfln("OS:        %#v",     si.os_version)
+		fmt.printfln("CPU:       %v",      si.cpu.name)
+		fmt.printfln("CPU:       %v",      si.cpu.name)
+		fmt.printfln("CPU cores: %vc/%vt", si.cpu.physical_cores, si.cpu.logical_cores)
+		fmt.printfln("RAM:       %#.1M",   si.ram.total_ram)
 
-		// fmt.printfln("Features: %v",      si.cpu_features)
+		// fmt.printfln("Features: %v",      si.cpu.features)
 		// fmt.printfln("MacOS version: %v", si.macos_version)
 
 		fmt.println()

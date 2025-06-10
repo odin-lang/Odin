@@ -2,10 +2,12 @@
 #+build !orca
 package log
 
-import "core:encoding/ansi"
+import "base:runtime"
 import "core:fmt"
 import "core:strings"
 import "core:os"
+import "core:terminal"
+import "core:terminal/ansi"
 import "core:time"
 
 Level_Headers := [?]string{
@@ -37,11 +39,36 @@ File_Console_Logger_Data :: struct {
 	ident: string,
 }
 
+@(private) global_subtract_stdout_options: Options
+@(private) global_subtract_stderr_options: Options
+
+@(init, private)
+init_standard_stream_status :: proc() {
+	// NOTE(Feoramund): While it is technically possible for these streams to
+	// be redirected during the runtime of the program, the cost of checking on
+	// every single log message is not worth it to support such an
+	// uncommonly-used feature.
+	if terminal.color_enabled {
+		// This is done this way because it's possible that only one of these
+		// streams could be redirected to a file.
+		if !terminal.is_terminal(os.stdout) {
+			global_subtract_stdout_options = {.Terminal_Color}
+		}
+		if !terminal.is_terminal(os.stderr) {
+			global_subtract_stderr_options = {.Terminal_Color}
+		}
+	} else {
+		// Override any terminal coloring.
+		global_subtract_stdout_options = {.Terminal_Color}
+		global_subtract_stderr_options = {.Terminal_Color}
+	}
+}
+
 create_file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
 	data.file_handle = h
 	data.ident = ident
-	return Logger{file_console_logger_proc, data, lowest, opt}
+	return Logger{file_logger_proc, data, lowest, opt}
 }
 
 destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
@@ -56,19 +83,15 @@ create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logg
 	data := new(File_Console_Logger_Data, allocator)
 	data.file_handle = os.INVALID_HANDLE
 	data.ident = ident
-	return Logger{file_console_logger_proc, data, lowest, opt}
+	return Logger{console_logger_proc, data, lowest, opt}
 }
 
 destroy_console_logger :: proc(log: Logger, allocator := context.allocator) {
 	free(log.data, allocator)
 }
 
-file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
-	data := cast(^File_Console_Logger_Data)logger_data
-	h: os.Handle = os.stdout if level <= Level.Error else os.stderr
-	if data.file_handle != os.INVALID_HANDLE {
-		h = data.file_handle
-	}
+@(private)
+_file_console_logger_proc :: proc(h: os.Handle, ident: string, level: Level, text: string, options: Options, location: runtime.Source_Code_Location) {
 	backing: [1024]byte //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
 	buf := strings.builder_from_bytes(backing[:])
 
@@ -86,11 +109,30 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 		fmt.sbprintf(&buf, "[{}] ", os.current_thread_id())
 	}
 
-	if data.ident != "" {
-		fmt.sbprintf(&buf, "[%s] ", data.ident)
+	if ident != "" {
+		fmt.sbprintf(&buf, "[%s] ", ident)
 	}
 	//TODO(Hoej): When we have better atomics and such, make this thread-safe
 	fmt.fprintf(h, "%s%s\n", strings.to_string(buf), text)
+}
+
+file_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
+	data := cast(^File_Console_Logger_Data)logger_data
+	_file_console_logger_proc(data.file_handle, data.ident, level, text, options, location)
+}
+
+console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
+	options := options
+	data := cast(^File_Console_Logger_Data)logger_data
+	h: os.Handle = ---
+	if level < Level.Error {
+		h = os.stdout
+		options -= global_subtract_stdout_options
+	} else {
+		h = os.stderr
+		options -= global_subtract_stderr_options
+	}
+	_file_console_logger_proc(h, data.ident, level, text, options, location)
 }
 
 do_level_header :: proc(opts: Options, str: ^strings.Builder, level: Level) {

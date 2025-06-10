@@ -110,16 +110,12 @@ class WasmMemoryInterface {
 	}
 
 	loadCstring(ptr) {
-		return this.loadCstringDirect(this.loadPtr(ptr));
-	}
-
-	loadCstringDirect(start) {
-		if (start == 0) {
+		if (ptr == 0) {
 			return null;
 		}
 		let len = 0;
-		for (; this.mem.getUint8(start+len) != 0; len += 1) {}
-		return this.loadString(start, len);
+		for (; this.mem.getUint8(ptr+len) != 0; len += 1) {}
+		return this.loadString(ptr, len);
 	}
 
 	storeU8(addr, value)  { this.mem.setUint8  (addr, value); }

@@ -39,7 +39,7 @@ when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 {
 
 // Some targets lack runtime feature detection, and will flat out refuse
 // to load binaries that have unknown instructions.  This is distinct from
-// `simd.IS_EMULATED` as actually good designs support runtime feature
+// `simd.HAS_HARDWARE_SIMD` as actually good designs support runtime feature
 // detection and that constant establishes a baseline.
 //
 // See:
@@ -227,7 +227,7 @@ is_performant :: proc "contextless" () -> bool {
 			req_features :: info.CPU_Features{.V}
 		}
 
-		features, ok := info.cpu_features.?
+		features, ok := info.cpu.features.?
 		if !ok {
 			return false
 		}

@@ -47,19 +47,19 @@ bool __isnanf(float);
 bool __isnand(double);
 #define isnan(x)                                           \
     ( sizeof(x) == sizeof(float)  ? __isnanf((float)(x))   \
-    :                             : __isnand((double)(x)))
+                                  : __isnand((double)(x)))
 
 bool __isinff(float);
 bool __isinfd(double);
 #define isinf(x)                                           \
     ( sizeof(x) == sizeof(float)  ? __isinff((float)(x))   \
-    :                             : __isinfd((double)(x)))
+                                  : __isinfd((double)(x)))
 
 bool __isfinitef(float);
 bool __isfinited(double);
 #define isfinite(x)                                           \
     ( sizeof(x) == sizeof(float)  ? __isfinitef((float)(x))   \
-    :                             : __isfinited((double)(x)))
+                                  : __isfinited((double)(x)))
 
 #ifdef __cplusplus
 }

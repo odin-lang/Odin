@@ -581,9 +581,9 @@ once_do_without_data :: proc(o: ^Once, fn: proc()) {
 /*
 Call a contextless function with no data once.
 */
-once_do_without_data_contextless :: proc(o: ^Once, fn: proc "contextless" ()) {
+once_do_without_data_contextless :: proc "contextless" (o: ^Once, fn: proc "contextless" ()) {
 	@(cold)
-	do_slow :: proc(o: ^Once, fn: proc "contextless" ()) {
+	do_slow :: proc "contextless" (o: ^Once, fn: proc "contextless" ()) {
 		guard(&o.m)
 		if !o.done {
 			fn()

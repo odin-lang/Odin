@@ -17,7 +17,7 @@ init_cpu_features :: proc() {
 	if rerr != .NONE || n == 0 { return }
 
 	features: CPU_Features
-	defer cpu_features = features
+	defer cpu.features = features
 
 	str := string(buf[:n])
 	for line in strings.split_lines_iterator(&str) {

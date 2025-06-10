@@ -143,7 +143,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			LIT(target_arch_names[build_context.metrics.arch])
 		);
 #endif
-	} else if (build_context.cross_compiling && build_context.different_os) {
+	} else if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
 		switch (selected_subtarget) {
 		case Subtarget_Android:
 			is_cross_linking = true;
@@ -281,9 +281,9 @@ try_cross_linking:;
 				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
 			}
 
-			if (build_context.pdb_filepath != "") {
-				String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(pdb_path));
+			if (build_context.build_paths[BuildPath_Symbols].name != "") {
+				String symbol_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Symbols]);
+				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(symbol_path));
 			}
 
 			if (build_context.build_mode != BuildMode_StaticLibrary) {
@@ -321,7 +321,7 @@ try_cross_linking:;
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -341,7 +341,7 @@ try_cross_linking:;
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -404,7 +404,7 @@ try_cross_linking:;
 					"",
 					LIT(vs_exe_path), LIT(linker_name), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -603,7 +603,7 @@ try_cross_linking:;
 								// object
 								// dynamic lib
 								// static libs, absolute full path relative to the file in which the lib was imported from
-								lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
+								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
 								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
@@ -643,9 +643,10 @@ try_cross_linking:;
 				android_glue_object = concatenate4_strings(temporary_allocator(), temp_dir, str_lit("android_native_app_glue-"), hash, str_lit(".o"));
 				android_glue_static_lib = concatenate4_strings(permanent_allocator(), temp_dir, str_lit("libandroid_native_app_glue-"), hash, str_lit(".a"));
 
-				gbString glue = gb_string_make(heap_allocator(), clang_path);
+				gbString glue = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
 				defer (gb_string_free(glue));
 
+				glue = gb_string_append_fmt(glue, "bin/clang");
 				glue = gb_string_append_fmt(glue, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
 				glue = gb_string_appendc(glue, "-c \"");
 				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK.text, ODIN_ANDROID_NDK.len);
@@ -653,6 +654,11 @@ try_cross_linking:;
 				glue = gb_string_appendc(glue, "\" ");
 				glue = gb_string_appendc(glue, "-o \"");
 				glue = gb_string_append_length(glue, android_glue_object.text, android_glue_object.len);
+				glue = gb_string_appendc(glue, "\" ");
+
+				glue = gb_string_appendc(glue, "--sysroot \"");
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				glue = gb_string_appendc(glue, "sysroot");
 				glue = gb_string_appendc(glue, "\" ");
 
 				glue = gb_string_appendc(glue, "\"-I");
@@ -763,7 +769,17 @@ try_cross_linking:;
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
+				// Get the MacOSX SDK path.
+				gbString darwin_sdk_path = gb_string_make(temporary_allocator(), "");
+				if (!system_exec_command_line_app_output("xcrun --sdk macosx --show-sdk-path", &darwin_sdk_path)) {
+					darwin_sdk_path = gb_string_set(darwin_sdk_path, "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk");
+				} else {
+					// Trim the trailing newline.
+					darwin_sdk_path = gb_string_trim_space(darwin_sdk_path);
+				}
+				platform_lib_str = gb_string_append_fmt(platform_lib_str, "--sysroot %s ", darwin_sdk_path);
+
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-L/usr/local/lib ");
 
 				// Homebrew's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/homebrew/lib")) {
@@ -785,6 +801,21 @@ try_cross_linking:;
 					// This points the linker to where the entry point is
 					link_settings = gb_string_appendc(link_settings, "-e _main ");
 				}
+			} else if (build_context.metrics.os == TargetOs_freebsd) {
+				if (build_context.sanitizer_flags & (SanitizerFlag_Address | SanitizerFlag_Memory)) {
+					// It's imperative that `pthread` is linked before `libc`,
+					// otherwise ASan/MSan will be unable to call `pthread_key_create`
+					// because FreeBSD's `libthr` implementation of `pthread`
+					// needs to replace the relevant stubs first.
+					//
+					// (Presumably TSan implements its own `pthread` interface,
+					//  which is why it isn't required.)
+					//
+					// See: https://reviews.llvm.org/D39254
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-lpthread ");
+				}
+				// FreeBSD pkg installs third-party shared libraries in /usr/local/lib.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-L/usr/local/lib ");
 			} else if (build_context.metrics.os == TargetOs_openbsd) {
 				// OpenBSD ports install shared libraries in /usr/local/lib. Also, we must explicitly link libpthread.
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-lpthread -Wl,-L/usr/local/lib ");
@@ -802,6 +833,9 @@ try_cross_linking:;
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\"-L");
 				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.len);
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
+
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-landroid ");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-llog ");
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\"--sysroot=");
 				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
@@ -835,11 +869,16 @@ try_cross_linking:;
 				}
 			}
 
-			gbString link_command_line = gb_string_make(heap_allocator(), clang_path);
+			gbString link_command_line = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(link_command_line));
 
 			if (is_android) {
+				gbString ndk_bin_directory = gb_string_make_length(temporary_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				link_command_line = gb_string_appendc(link_command_line, ndk_bin_directory);
+				link_command_line = gb_string_appendc(link_command_line, "bin/clang");
 				link_command_line = gb_string_append_fmt(link_command_line, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
+			} else {
+				link_command_line = gb_string_appendc(link_command_line, clang_path);
 			}
 			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
 			link_command_line = gb_string_appendc(link_command_line, object_files);

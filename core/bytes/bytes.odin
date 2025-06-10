@@ -350,7 +350,7 @@ index_byte :: proc "contextless" (s: []byte, c: byte) -> (index: int) #no_bounds
 	}
 
 	c_vec: simd.u8x16 = c
-	when !simd.IS_EMULATED {
+	when simd.HAS_HARDWARE_SIMD {
 		// Note: While this is something that could also logically take
 		// advantage of AVX512, the various downclocking and power
 		// consumption related woes make premature to have a dedicated
@@ -485,7 +485,7 @@ last_index_byte :: proc "contextless" (s: []byte, c: byte) -> int #no_bounds_che
 	}
 
 	c_vec: simd.u8x16 = c
-	when !simd.IS_EMULATED {
+	when simd.HAS_HARDWARE_SIMD {
 		// Note: While this is something that could also logically take
 		// advantage of AVX512, the various downclocking and power
 		// consumption related woes make premature to have a dedicated

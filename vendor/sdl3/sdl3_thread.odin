@@ -49,7 +49,7 @@ PROP_THREAD_CREATE_STACKSIZE_NUMBER       :: "SDL.thread.create.stacksize"
 BeginThreadFunction :: proc "c" () -> FunctionPointer {
 	when ODIN_OS == .Windows {
 		foreign {
-			_beginthreadx :: proc "c" (
+			_beginthreadex :: proc "c" (
 			        security: rawptr,
 			        stack_size: c.uint,
 				start_address: proc "c" (rawptr),
@@ -58,7 +58,7 @@ BeginThreadFunction :: proc "c" () -> FunctionPointer {
 				thraddr: ^c.uint,
 			) -> uintptr ---
 		}
-		return FunctionPointer(_beginthreadx)
+		return FunctionPointer(_beginthreadex)
 	} else {
 		return nil
 	}

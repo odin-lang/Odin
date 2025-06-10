@@ -56,7 +56,7 @@ Option_Flag :: enum {
 Option_Flags :: bit_set[Option_Flag; u16]
 
 Document :: struct {
-	elements:      [dynamic]Element,
+	elements:      [dynamic]Element `fmt:"v,element_count"`,
 	element_count: Element_ID,
 
 	prologue: Attributes,
@@ -70,15 +70,15 @@ Document :: struct {
 
 	// If we encounter comments before the root node, and the option to intern comments is given, this is where they'll live.
 	// Otherwise they'll be in the element tree.
-	comments: [dynamic]string,
+	comments: [dynamic]string        `fmt:"-"`,
 
 	// Internal
-	tokenizer: ^Tokenizer,
-	allocator: mem.Allocator,
+	tokenizer: ^Tokenizer            `fmt:"-"`,
+	allocator: mem.Allocator         `fmt:"-"`,
 
 	// Input. Either the original buffer, or a copy if `.Input_May_Be_Modified` isn't specified.
-	input:           []u8,
-	strings_to_free: [dynamic]string,
+	input:           []u8            `fmt:"-"`,
+	strings_to_free: [dynamic]string `fmt:"-"`,
 }
 
 Element :: struct {
@@ -175,7 +175,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 		data = bytes.clone(data)
 	}
 
-	t := &Tokenizer{}
+	t := new(Tokenizer)
 	init(t, string(data), path, error_handler)
 
 	doc = new(Document)
@@ -195,7 +195,6 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 	loop: for {
 		skip_whitespace(t)
-		// NOTE(Jeroen): This is faster as a switch.
 		switch t.ch {
 		case '<':
 			// Consume peeked `<`
@@ -306,9 +305,17 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 						}
 					}
 
+				case .Open_Bracket:
+					// This could be a CDATA tag part of a tag's body. Unread the `<![`
+					t.offset -= 3
+
+					// Instead of calling `parse_body` here, we could also `continue loop`
+					// and fall through to the `case:` at the bottom of the outer loop.
+					// This makes the intent clearer.
+					parse_body(doc, element, opts) or_return
+
 				case:
-					error(t, t.offset, "Invalid Token after <!. Expected .Ident, got %#v\n", next)
-					return
+					error(t, t.offset, "Unexpected Token after <!: %#v", next)
 				}
 
 			} else if open.kind == .Question {
@@ -341,38 +348,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 		case:
 			// This should be a tag's body text.
-			body_text        := scan_string(t, t.offset) or_return
-			needs_processing := .Unbox_CDATA          in opts.flags
-			needs_processing |= .Decode_SGML_Entities in opts.flags
-
-			if !needs_processing {
-				append(&doc.elements[element].value, body_text)
-				continue
-			}
-
-			decode_opts := entity.XML_Decode_Options{}
-			if .Keep_Tag_Body_Comments not_in opts.flags {
-				decode_opts += { .Comment_Strip }
-			}
-
-			if .Decode_SGML_Entities not_in opts.flags {
-				decode_opts += { .No_Entity_Decode }
-			}
-
-			if .Unbox_CDATA in opts.flags {
-				decode_opts += { .Unbox_CDATA }
-				if .Decode_SGML_Entities in opts.flags {
-					decode_opts += { .Decode_CDATA }
-				}
-			}
-
-			decoded, decode_err := entity.decode_xml(body_text, decode_opts)
-			if decode_err == .None {
-				append(&doc.elements[element].value, decoded)
-				append(&doc.strings_to_free, decoded)
-			} else {
-				append(&doc.elements[element].value, body_text)
-			}
+			parse_body(doc, element, opts) or_return
 		}
 	}
 
@@ -427,6 +403,7 @@ destroy :: proc(doc: ^Document) {
 	}
 	delete(doc.strings_to_free)
 
+	free(doc.tokenizer)
 	free(doc)
 }
 
@@ -457,8 +434,6 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 	t := doc.tokenizer
 
 	key    := expect(t, .Ident)  or_return
-	offset  = t.offset - len(key.text)
-
 	_       = expect(t, .Eq)     or_return
 	value  := expect(t, .String, multiline_string=true) or_return
 
@@ -589,6 +564,47 @@ parse_doctype :: proc(doc: ^Document) -> (err: Error) {
 	// 	-1 because the current offset is that of the closing tag, so the rest of the DOCTYPE tag ends just before it.
 	doc.doctype.rest = string(t.src[offset : t.offset - 1])
 	return .None
+}
+
+parse_body :: proc(doc: ^Document, element: Element_ID, opts: Options) -> (err: Error) {
+	assert(doc != nil)
+	context.allocator = doc.allocator
+	t := doc.tokenizer
+
+	body_text        := scan_string(t, t.offset) or_return
+	needs_processing := .Unbox_CDATA          in opts.flags
+	needs_processing |= .Decode_SGML_Entities in opts.flags
+
+	if !needs_processing {
+		append(&doc.elements[element].value, body_text)
+		return
+	}
+
+	decode_opts := entity.XML_Decode_Options{}
+	if .Keep_Tag_Body_Comments not_in opts.flags {
+		decode_opts += { .Comment_Strip }
+	}
+
+	if .Decode_SGML_Entities not_in opts.flags {
+		decode_opts += { .No_Entity_Decode }
+	}
+
+	if .Unbox_CDATA in opts.flags {
+		decode_opts += { .Unbox_CDATA }
+		if .Decode_SGML_Entities in opts.flags {
+			decode_opts += { .Decode_CDATA }
+		}
+	}
+
+	decoded, decode_err := entity.decode_xml(body_text, decode_opts)
+	if decode_err == .None {
+		append(&doc.elements[element].value, decoded)
+		append(&doc.strings_to_free, decoded)
+	} else {
+		append(&doc.elements[element].value, body_text)
+	}
+
+	return
 }
 
 Element_ID :: u32

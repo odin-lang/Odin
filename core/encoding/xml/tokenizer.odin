@@ -16,6 +16,7 @@ package encoding_xml
 import "core:fmt"
 import "core:unicode"
 import "core:unicode/utf8"
+import "core:strings"
 
 Error_Handler :: #type proc(pos: Pos, fmt: string, args: ..any)
 
@@ -121,7 +122,7 @@ default_error_handler :: proc(pos: Pos, msg: string, args: ..any) {
 error :: proc(t: ^Tokenizer, offset: int, msg: string, args: ..any) {
 	pos := offset_to_pos(t, offset)
 	if t.err != nil {
-		t.err(pos, msg, ..args)
+		t.err(pos=pos, fmt=msg, args=args)
 	}
 	t.error_count += 1
 }
@@ -268,32 +269,27 @@ scan_comment :: proc(t: ^Tokenizer) -> (comment: string, err: Error) {
 
 // Skip CDATA
 skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
-	if t.read_offset + len(CDATA_START) >= len(t.src) {
-		// Can't be the start of a CDATA tag.
+	if s := string(t.src[t.offset:]); !strings.has_prefix(s, CDATA_START) {
 		return .None
 	}
 
-	if string(t.src[t.offset:][:len(CDATA_START)]) == CDATA_START {
-		t.read_offset += len(CDATA_START)
-		offset := t.offset
+	t.read_offset += len(CDATA_START)
+	offset := t.offset
 
-		cdata_scan: for {
-			advance_rune(t)
-			if t.ch < 0 {
-				error(t, offset, "[scan_string] CDATA was not terminated\n")
-				return .Premature_EOF
-			}
+	cdata_scan: for {
+		advance_rune(t)
+		if t.ch < 0 {
+			error(t, offset, "[scan_string] CDATA was not terminated\n")
+			return .Premature_EOF
+		}
 
-			// Scan until the end of a CDATA tag.
-			if t.read_offset + len(CDATA_END) < len(t.src) {
-				if string(t.src[t.offset:][:len(CDATA_END)]) == CDATA_END {
-					t.read_offset += len(CDATA_END)
-					break cdata_scan
-				}
-			}
+		// Scan until the end of a CDATA tag.
+		if s := string(t.src[t.read_offset:]); strings.has_prefix(s, CDATA_END) {
+			t.read_offset += len(CDATA_END)
+			break cdata_scan
 		}
 	}
-	return
+	return .None
 }
 
 @(optimization_mode="favor_size")
@@ -393,6 +389,8 @@ scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 		case '/': kind = .Slash
 		case '-': kind = .Dash
 		case ':': kind = .Colon
+		case '[': kind = .Open_Bracket
+		case ']': kind = .Close_Bracket
 
 		case '"', '\'':
 			kind = .Invalid

@@ -5,9 +5,9 @@ import "core:c"
 
 // The maximum number of vertices on a convex polygon. Changing this affects performance even if you
 //	don't use more vertices.
-maxPolygonVertices :: 8
+MAX_POLYGON_VERTICES :: 8
 
-// Low level ray-cast input data
+// Low level ray cast input data
 RayCastInput :: struct {
 	// Start point of the ray cast
 	origin:      Vec2,
@@ -19,27 +19,37 @@ RayCastInput :: struct {
 	maxFraction: f32,
 }
 
+// A distance proxy is used by the GJK algorithm. It encapsulates any shape.
+// You can provide between 1 and MAX_POLYGON_VERTICES and a radius.
+ShapeProxy :: struct {
+	// The point cloud
+	points: [MAX_POLYGON_VERTICES]Vec2 `fmt:"v,count"`,
+
+	// The number of points. Must be greater than 0.
+	count:  c.int,
+
+	// The external radius of the point cloud. May be zero.
+	radius: f32,
+}
+
 // Low level shape cast input in generic form. This allows casting an arbitrary point
-//	cloud wrap with a radius. For example, a circle is a single point with a non-zero radius.
-//	A capsule is two points with a non-zero radius. A box is four points with a zero radius.
+// cloud wrap with a radius. For example, a circle is a single point with a non-zero radius.
+// A capsule is two points with a non-zero radius. A box is four points with a zero radius.
 ShapeCastInput :: struct {
-	// A point cloud to cast
-	points:      [maxPolygonVertices]Vec2 `fmt:"v,count"`,
-
-	// The number of points
-	count:       i32,
-
-	// The radius around the point cloud
-	radius:      f32,
+	// A generic shape
+	proxy:       ShapeProxy,
 
 	// The translation of the shape cast
 	translation: Vec2,
 
 	// The maximum fraction of the translation to consider, typically 1
 	maxFraction: f32,
+
+	// Allow shape cast to encroach when initially touching. This only works if the radius is greater than zero.
+	canEncroach: bool,
 }
 
-// Low level ray-cast or shape-cast output data
+// Low level ray cast or shape-cast output data
 CastOutput :: struct {
 	// The surface normal at the hit point
 	normal:     Vec2,
@@ -51,7 +61,7 @@ CastOutput :: struct {
 	fraction:   f32,
 
 	// The number of iterations used
-	iterations: i32,
+	iterations: c.int,
 
 	// Did the cast hit?
 	hit:        bool,
@@ -93,16 +103,16 @@ Capsule :: struct {
 
 // A solid convex polygon. It is assumed that the interior of the polygon is to
 // the left of each edge.
-// Polygons have a maximum number of vertices equal to maxPolygonVertices.
+// Polygons have a maximum number of vertices equal to MAX_POLYGON_VERTICES.
 // In most cases you should not need many vertices for a convex polygon.
-//	@warning DO NOT fill this out manually, instead use a helper function like
-//	b2MakePolygon or b2MakeBox.
+// @warning DO NOT fill this out manually, instead use a helper function like
+// b2MakePolygon or b2MakeBox.
 Polygon :: struct {
 	// The polygon vertices
-	vertices: [maxPolygonVertices]Vec2 `fmt:"v,count"`,
+	vertices: [MAX_POLYGON_VERTICES]Vec2 `fmt:"v,count"`,
 
 	// The outward normal vectors of the polygon sides
-	normals:  [maxPolygonVertices]Vec2 `fmt:"v,count"`,
+	normals:  [MAX_POLYGON_VERTICES]Vec2 `fmt:"v,count"`,
 
 	// The centroid of the polygon
 	centroid: Vec2,
@@ -111,7 +121,7 @@ Polygon :: struct {
 	radius:   f32,
 
 	// The number of polygon vertices
-	count:    i32,
+	count:    c.int,
 }
 
 // A line segment with two-sided collision.
@@ -123,10 +133,10 @@ Segment :: struct {
 	point2: Vec2,
 }
 
-// A smooth line segment with one-sided collision. Only collides on the right side.
+// A line segment with one-sided collision. Only collides on the right side.
 // Several of these are generated for a chain shape.
 // ghost1 -> point1 -> point2 -> ghost2
-SmoothSegment :: struct {
+ChainSegment :: struct {
 	// The tail ghost vertex
 	ghost1:  Vec2,
 
@@ -137,7 +147,7 @@ SmoothSegment :: struct {
 	ghost2:  Vec2,
 
 	// The owning chain shape index (internal usage only)
-	chainId: i32,
+	chainId: c.int,
 }
 
 
@@ -145,10 +155,10 @@ SmoothSegment :: struct {
 //	@warning Do not modify these values directly, instead use b2ComputeHull()
 Hull :: struct {
 	// The final points of the hull
-	points: [maxPolygonVertices]Vec2 `fmt:"v,count"`,
+	points: [MAX_POLYGON_VERTICES]Vec2 `fmt:"v,count"`,
 
 	// The number of points
-	count:  i32,
+	count:  c.int,
 }
 
 /**
@@ -178,21 +188,11 @@ SegmentDistanceResult :: struct {
 	distanceSquared: f32,
 }
 
-// A distance proxy is used by the GJK algorithm. It encapsulates any shape.
-DistanceProxy :: struct {
-	// The point cloud
-	points: [maxPolygonVertices]Vec2 `fmt:"v,count"`,
-
-	// The number of points
-	count:  i32,
-
-	// The external radius of the point cloud
-	radius: f32,
-}
-
-// Used to warm start b2Distance. Set count to zero on first call or
-//	use zero initialization.
-DistanceCache :: struct {
+// Used to warm start the GJK simplex. If you call this function multiple times with nearby
+// transforms this might improve performance. Otherwise you can zero initialize this.
+// The distance cache must be initialized to zero on the first call.
+// Users should generally just zero initialize this structure for each call.
+SimplexCache :: struct {
 	// The number of stored simplex points
 	count: u16,
 
@@ -203,15 +203,15 @@ DistanceCache :: struct {
 	indexB: [3]u8 `fmt:"v,count"`,
 }
 
-emptyDistanceCache :: DistanceCache{}
+emptySimplexCache :: SimplexCache{}
 
 // Input for b2ShapeDistance
 DistanceInput :: struct {
 	// The proxy for shape A
-	proxyA: DistanceProxy,
+	proxyA: ShapeProxy,
 
 	// The proxy for shape B
-	proxyB: DistanceProxy,
+	proxyB: ShapeProxy,
 
 	// The world transform for shape A
 	transformA: Transform,
@@ -227,6 +227,7 @@ DistanceInput :: struct {
 DistanceOutput :: struct {
 	pointA:       Vec2, // Closest point on shapeA
 	pointB:       Vec2, // Closest point on shapeB
+	normal:       Vec2, // Normal vector that points from A to B
 	distance:     f32,  // The final distance, zero if overlapped
 	iterations:   i32,  // Number of GJK iterations used
 	simplexCount: i32,  // The number of simplexes stored in the simplex array
@@ -234,28 +235,29 @@ DistanceOutput :: struct {
 
 // Simplex vertex for debugging the GJK algorithm
 SimplexVertex :: struct {
-	wA:     Vec2, // support point in proxyA
-	wB:     Vec2, // support point in proxyB
-	w:      Vec2, // wB - wA
-	a:      f32,  // barycentric coordinate for closest point
-	indexA: i32,  // wA index
-	indexB: i32,  // wB index
+	wA:     Vec2,  // support point in proxyA
+	wB:     Vec2,  // support point in proxyB
+	w:      Vec2,  // wB - wA
+	a:      f32,   // barycentric coordinate for closest point
+	indexA: c.int, // wA index
+	indexB: c.int, // wB index
 }
 
 // Simplex from the GJK algorithm
 Simplex :: struct {
 	v1, v2, v3: SimplexVertex `fmt:"v,count"`, // vertices
-	count: i32, // number of valid vertices
+	count: c.int, // number of valid vertices
 }
 
 // Input parameters for b2ShapeCast
 ShapeCastPairInput :: struct {
-	proxyA:       DistanceProxy, // The proxy for shape A
-	proxyB:       DistanceProxy, // The proxy for shape B
+	proxyA:       ShapeProxy, // The proxy for shape A
+	proxyB:       ShapeProxy, // The proxy for shape B
 	transformA:   Transform, // The world transform for shape A
 	transformB:   Transform, // The world transform for shape B
 	translationB: Vec2, // The translation of shape B
 	maxFraction:  f32, // The fraction of the translation to consider, typically 1
+	canEncroach:  bool, // Allows shapes with a radius to move slightly closer if already touching
 }
 
 
@@ -272,11 +274,11 @@ Sweep :: struct {
 
 // Input parameters for b2TimeOfImpact
 TOIInput :: struct {
-	proxyA: DistanceProxy, // The proxy for shape A
-	proxyB: DistanceProxy, // The proxy for shape B
-	sweepA: Sweep,         // The movement of shape A
-	sweepB: Sweep,         // The movement of shape B
-	tMax:   f32,           // Defines the sweep interval [0, tMax]
+	proxyA:      ShapeProxy, // The proxy for shape A
+	proxyB:      ShapeProxy, // The proxy for shape B
+	sweepA:      Sweep,      // The movement of shape A
+	sweepB:      Sweep,      // The movement of shape B
+	maxFraction: f32,        // Defines the sweep interval [0, maxFraction]
 }
 
 // Describes the TOI output
@@ -290,8 +292,8 @@ TOIState :: enum c.int {
 
 // Output parameters for b2TimeOfImpact.
 TOIOutput :: struct {
-	state: TOIState, // The type of result
-	t:     f32,      // The time of the collision
+	state:    TOIState, // The type of result
+	fraction: f32,      // The sweep time of the collision
 }
 
 
@@ -301,26 +303,30 @@ TOIOutput :: struct {
  * @brief Functions for colliding pairs of shapes
  */
 
-// A manifold point is a contact point belonging to a contact
-// manifold. It holds details related to the geometry and dynamics
-// of the contact points.
+// A manifold point is a contact point belonging to a contact manifold.
+// It holds details related to the geometry and dynamics of the contact points.
+// Box2D uses speculative collision so some contact points may be separated.
+// You may use the totalNormalImpulse to determine if there was an interaction during
+// the time step.
 ManifoldPoint :: struct {
 	// Location of the contact point in world space. Subject to precision loss at large coordinates.
 	//	@note Should only be used for debugging.
 	point:            Vec2,
 
-	// Location of the contact point relative to bodyA's origin in world space
-	//	@note When used internally to the Box2D solver, these are relative to the center of mass.
+	// Location of the contact point relative to shapeA's origin in world space
+	//	@note When used internally to the Box2D solver, this is relative to the body center of mass.
 	anchorA:          Vec2,
 
-	// Location of the contact point relative to bodyB's origin in world space
+	// Location of the contact point relative to shapeB's origin in world space
+	// @note When used internally to the Box2D solver, this is relative to the body center of mass.
 	anchorB:          Vec2,
 
 	// The separation of the contact point, negative if penetrating
 	separation:       f32,
 
-	// The impulse along the manifold normal vector.
-	normalImpulse:    f32,
+	// The total normal impulse applied across sub-stepping and restitution. This is important
+	// to identify speculative contact points that had an interaction in the time step.
+	totalNormalImpulse: f32,
 
 	// The friction impulse
 	tangentImpulse:   f32,
@@ -340,16 +346,21 @@ ManifoldPoint :: struct {
 	persisted:        bool,
 }
 
-// A contact manifold describes the contact points between colliding shapes
+// A contact manifold describes the contact points between colliding shapes.
+// @note Box2D uses speculative collision so some contact points may be separated.
 Manifold :: struct {
-	// The manifold points, up to two are possible in 2D
-	points:     [2]ManifoldPoint,
-
 	// The unit normal vector in world space, points from shape A to bodyB
-	normal:     Vec2,
+	normal:         Vec2,
+
+	// Angular impulse applied for rolling resistance. N * m * s = kg * m^2 / s
+	rollingImpulse: f32,
+
+	// The manifold points, up to two are possible in 2D
+	points:         [2]ManifoldPoint,
+
 
 	// The number of contacts points, will be 0, 1, or 2
-	pointCount: i32,
+	pointCount:     c.int,
 }
 
 
@@ -364,63 +375,17 @@ Manifold :: struct {
  * A dynamic AABB tree broad-phase, inspired by Nathanael Presson's btDbvt.
  * A dynamic tree arranges data in a binary tree to accelerate
  * queries such as AABB queries and ray casts. Leaf nodes are proxies
- * with an AABB. These are used to hold a user collision object, such as a reference to a b2Shape.
+ * with an AABB. These are used to hold a user collision object.
  * Nodes are pooled and relocatable, so I use node indices rather than pointers.
  * The dynamic tree is made available for advanced users that would like to use it to organize
  * spatial game data besides rigid bodies.
- *
- * @note This is an advanced feature and normally not used by applications directly.
  */
-
-// The default category bit for a tree proxy. Used for collision filtering.
-defaultCategoryBits :: 0x00000001
-
-// Convenience mask bits to use when you don't need collision filtering and just want
-//	all results.
-defaultMaskBits :: 0xFFFFFFFF
-
-// A node in the dynamic tree. This is private data placed here for performance reasons.
-// 16 + 16 + 8 + pad(8)
-TreeNode :: struct {
-	// The node bounding box
-	aabb: AABB, // 16
-
-	// Category bits for collision filtering
-	categoryBits: u32, // 4
-
-	using _: struct #raw_union {
-		// The node parent index
-		parent: i32,
-
-		// The node freelist next index
-		next:   i32,
-	}, // 4
-
-	// Child 1 index
-	child1: i32, // 4
-
-	// Child 2 index
-	child2: i32, // 4
-
-	// User data
-	// todo could be union with child index
-	userData: i32, // 4
-
-	// Leaf = 0, free node = -1
-	height: i16, // 2
-
-	// Has the AABB been enlarged?
-	enlarged: bool, // 1
-
-	// Padding for clarity
-	_: [9]byte,
-}
 
 // The dynamic tree structure. This should be considered private data.
 // It is placed here for performance reasons.
 DynamicTree :: struct {
 	// The tree nodes
-	nodes:           [^]TreeNode `fmt"v,nodeCount"`,
+	nodes:           rawptr,
 
 	// The root index
 	root:            i32,
@@ -453,16 +418,25 @@ DynamicTree :: struct {
 	rebuildCapacity: i32,
 }
 
+// These are performance results returned by dynamic tree queries.
+TreeStats :: struct {
+	// Number of internal nodes visited during the query
+	nodeVisits: c.int,
+
+	// Number of leaf nodes visited during the query
+	leafVisits: c.int,
+}
+
 // This function receives proxies found in the AABB query.
 // @return true if the query should continue
-TreeQueryCallbackFcn     :: #type proc "c" (proxyId: i32, userData: i32, ctx: rawptr) -> bool
+TreeQueryCallbackFcn     :: #type proc "c" (proxyId: i32, userData: u64, ctx: rawptr) -> bool
 
-// This function receives clipped ray-cast input for a proxy. The function
+// This function receives clipped ray cast input for a proxy. The function
 // returns the new ray fraction.
-// - return a value of 0 to terminate the ray-cast
+// - return a value of 0 to terminate the ray cast
 // - return a value less than input->maxFraction to clip the ray
 // - return a value of input->maxFraction to continue the ray cast without clipping
-TreeShapeCastCallbackFcn :: #type proc "c" (#by_ptr input: ShapeCastInput, proxyId: i32, userData: i32, ctx: rawptr) -> f32
+TreeShapeCastCallbackFcn :: #type proc "c" (#by_ptr input: ShapeCastInput, proxyId: i32, userData: u64, ctx: rawptr) -> f32
 
 
 // This function receives clipped raycast input for a proxy. The function
@@ -470,4 +444,47 @@ TreeShapeCastCallbackFcn :: #type proc "c" (#by_ptr input: ShapeCastInput, proxy
 // - return a value of 0 to terminate the ray cast
 // - return a value less than input->maxFraction to clip the ray
 // - return a value of input->maxFraction to continue the ray cast without clipping
-TreeRayCastCallbackFcn   :: #type proc "c" (#by_ptr input: RayCastInput, proxyId: i32, userData: i32, ctx: rawptr) -> f32
+TreeRayCastCallbackFcn   :: #type proc "c" (#by_ptr input: RayCastInput, proxyId: i32, userData: u64, ctx: rawptr) -> f32
+
+/**@}*/
+
+/**
+ * @defgroup character Character mover
+ * Character movement solver
+ * @{
+ */
+
+/// These are the collision planes returned from b2World_CollideMover
+PlaneResult :: struct {
+	// The collision plane between the mover and convex shape
+	plane: Plane,
+
+	// Did the collision register a hit? If not this plane should be ignored.
+	hit:   bool,
+}
+
+// These are collision planes that can be fed to b2SolvePlanes. Normally
+// this is assembled by the user from plane results in b2PlaneResult
+CollisionPlane :: struct {
+	// The collision plane between the mover and some shape
+	plane:        Plane,
+
+	// Setting this to FLT_MAX makes the plane as rigid as possible. Lower values can
+	// make the plane collision soft. Usually in meters.
+	pushLimit:    f32,
+
+	// The push on the mover determined by b2SolvePlanes. Usually in meters.
+	push:         f32,
+
+	// Indicates if b2ClipVector should clip against this plane. Should be false for soft collision.
+	clipVelocity: bool,
+}
+
+// Result returned by b2SolvePlanes
+PlaneSolverResult :: struct {
+	// The final position of the mover
+	position:       Vec2,
+
+	// The number of iterations used by the plane solver. For diagnostics.
+	iterationCount: i32,
+}

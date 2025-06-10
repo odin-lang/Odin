@@ -30,14 +30,27 @@ File_Tags :: struct {
 }
 
 @require_results
-get_build_os_from_string :: proc(str: string) -> runtime.Odin_OS_Type {
+get_build_os_from_string :: proc(str: string) -> (found_os: runtime.Odin_OS_Type, found_subtarget: runtime.Odin_Platform_Subtarget_Type) {
+	str_os, _, str_subtarget := strings.partition(str, ":")
+
 	fields := reflect.enum_fields_zipped(runtime.Odin_OS_Type)
 	for os in fields {
-		if strings.equal_fold(os.name, str) {
-			return runtime.Odin_OS_Type(os.value)
+		if strings.equal_fold(os.name, str_os) {
+			found_os = runtime.Odin_OS_Type(os.value)
+			break
 		}
 	}
-	return .Unknown
+	if str_subtarget != "" {
+		st_fields := reflect.enum_fields_zipped(runtime.Odin_Platform_Subtarget_Type)
+		for subtarget in st_fields {
+			if strings.equal_fold(subtarget.name, str_subtarget) {
+				found_subtarget = runtime.Odin_Platform_Subtarget_Type(subtarget.value)
+				break
+			}
+		}
+	}
+
+	return
 }
 @require_results
 get_build_arch_from_string :: proc(str: string) -> runtime.Odin_Arch_Type {
@@ -187,7 +200,8 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 
 						if value == "ignore" {
 							tags.ignore = true
-						} else if os := get_build_os_from_string(value); os != .Unknown {
+						} else if os, subtarget := get_build_os_from_string(value); os != .Unknown {
+							_ = subtarget // TODO(bill): figure out how to handle the subtarget logic
 							if is_notted {
 								os_negative += {os}
 							} else {

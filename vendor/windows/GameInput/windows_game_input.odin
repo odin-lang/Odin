@@ -7,15 +7,115 @@
 */
 package windows_game_input
 
-foreign import wgi {
-	"system:gameinput.lib",
+foreign import wgi "system:gameinput.lib"
+
+import win "core:sys/windows"
+
+HRESULT :: win.HRESULT
+HANDLE  :: win.HANDLE
+IUnknown	:: win.IUnknown
+IUnknown_VTable :: win.IUnknown_VTable
+IID		:: win.IID
+
+APP_LOCAL_DEVICE_ID :: distinct [32]byte
+
+Kind :: distinct bit_set[KindFlag; u32]
+KindFlag :: enum u32 {
+	RawDeviceReport  = 0,
+	ControllerAxis   = 1,
+	ControllerButton = 2,
+	ControllerSwitch = 3,
+	Keyboard         = 4,
+	Mouse            = 5,
+	Touch            = 8,
+	Motion           = 12,
+	ArcadeStick      = 16,
+	FlightStick      = 17,
+	Gamepad          = 18,
+	RacingWheel      = 19,
+	UiNavigation     = 20,
+}
+KindUnknown :: Kind{}
+KindController :: Kind{ .ControllerAxis, .ControllerButton, .ControllerSwitch }
+
+EnumerationKind :: enum i32 {
+	NoEnumeration       = 0,
+	AsyncEnumeration    = 1,
+	BlockingEnumeration = 2,
 }
 
-import "core:c"
-import "core:sys/windows"
+FocusPolicy :: distinct bit_set[FocusPolicyFlag; u32]
+FocusPolicyFlag :: enum u32 {
+	DisableBackgroundInput         = 0,
+	ExclusiveForegroundInput       = 1,
+	DisableBackgroundGuideButton   = 2,
+	ExclusiveForegroundGuideButton = 3,
+	DisableBackgroundShareButton   = 4,
+	ExclusiveForegroundShareButton = 5,
+}
+DefaultFocusPolicy :: FocusPolicy{}
 
-// Enums
-ArcadeStickButtonsFlag :: enum c.int {
+SwitchKind :: enum i32 {
+	UnknownSwitchKind = -1,
+	TwoWaySwitch      = 0,
+	FourWaySwitch     = 1,
+	EightWaySwitch    = 2,
+}
+
+SwitchPosition :: enum i32 {
+	Center    = 0,
+	Up        = 1,
+	UpRight   = 2,
+	Right     = 3,
+	DownRight = 4,
+	Down      = 5,
+	DownLeft  = 6,
+	Left      = 7,
+	UpLeft    = 8,
+}
+
+KeyboardKind :: enum i32 {
+	UnknownKeyboard = -1,
+	AnsiKeyboard    = 0,
+	IsoKeyboard     = 1,
+	KsKeyboard      = 2,
+	AbntKeyboard    = 3,
+	JisKeyboard     = 4,
+}
+
+MouseButtons :: distinct bit_set[MouseButtonsFlag; u32]
+MouseButtonsFlag :: enum u32 {
+	LeftButton     = 0,
+	RightButton    = 1,
+	MiddleButton   = 2,
+	Button4        = 3,
+	Button5        = 4,
+	WheelTiltLeft  = 5,
+	WheelTiltRight = 6,
+}
+MouseNone :: MouseButtons{}
+
+TouchShape :: enum i32 {
+	Unknown       = -1,
+	Point         = 0,
+	Linear1D      = 1,
+	Radial1D      = 2,
+	Irregular1D   = 3,
+	Rectangular2D = 4,
+	Elliptical2D  = 5,
+	Irregular2D   = 6,
+}
+
+MotionAccuracy :: enum i32 {
+	AccuracyUnknown = -1,
+	Unavailable     = 0,
+	Unreliable      = 1,
+	Approximate     = 2,
+	Accurate        = 3,
+}
+
+ArcadeStickButtons :: distinct bit_set[ArcadeStickButtonsFlag; u32]
+ArcadeStickButtonsFlag :: enum u32 {
 	Menu     = 0,
 	View     = 1,
 	Up       = 2,
@@ -31,104 +131,19 @@ ArcadeStickButtonsFlag :: enum c.int {
 	Special1 = 12,
 	Special2 = 13,
 }
-ArcadeStickButtons :: distinct bit_set[ArcadeStickButtonsFlag; c.int]
+ArcadeStickNone :: ArcadeStickButtons{}
 
-BatteryStatus :: enum c.int {
-	Unknown     = -1,
-	NotPresent  = 0,
-	Discharging = 1,
-	Idle        = 2,
-	Charging    = 3,
+FlightStickButtons :: distinct bit_set[FlightStickButtonsFlag; u32]
+FlightStickButtonsFlag :: enum u32 {
+	Menu          = 0,
+	View          = 1,
+	FirePrimary   = 2,
+	FireSecondary = 3,
 }
+FlightStickNone :: FlightStickButtons{}
 
-DeviceCapabilitiesFlag :: enum c.int {
-	Audio           = 0,
-	PluginModule    = 1,
-	PowerOff        = 2,
-	Synchronization = 3,
-	Wireless        = 4,
-}
-DeviceCapabilities :: distinct bit_set[DeviceCapabilitiesFlag; c.int]
-
-DeviceFamily :: enum c.int {
-	Virtual   = -1,
-	Aggregate = 0,
-	XboxOne   = 1,
-	Xbox360   = 2,
-	Hid       = 3,
-	I8042     = 4,
-}
-
-DeviceStatusFlag :: enum c.int {
-	Connected     = 0,
-	InputEnabled  = 1,
-	OutputEnabled = 2,
-	RawIoEnabled  = 3,
-	AudioCapture  = 4,
-	AudioRender   = 5,
-	Synchronized  = 6,
-	Wireless      = 7,
-	UserIdle      = 20,
-}
-DeviceStatus :: distinct bit_set[DeviceStatusFlag; c.int]
-
-EnumerationKind :: enum c.int {
-	NoEnumeration       = 0,
-	AsyncEnumeration    = 1,
-	BlockingEnumeration = 2,
-}
-
-FeedbackAxesFlag :: enum c.int {
-	LinearX  = 0,
-	LinearY  = 1,
-	LinearZ  = 2,
-	AngularX = 3,
-	AngularY = 4,
-	AngularZ = 5,
-	Normal   = 6,
-}
-FeedbackAxes :: distinct bit_set[FeedbackAxesFlag; c.int]
-
-FeedbackEffectState :: enum c.int {
-	Stopped = 0,
-	Running = 1,
-	Paused  = 2,
-}
-
-FlightStickButtonsFlag :: enum c.int {
-	None          = 0,
-	Menu          = 1,
-	View          = 2,
-	FirePrimary   = 3,
-	FireSecondary = 4,
-}
-FlightStickButtons :: distinct bit_set[FlightStickButtonsFlag; c.int]
-
-FocusPolicyFlag :: enum c.int {
-	DisableBackgroundInput         = 0,
-	ExclusiveForegroundInput       = 1,
-	DisableBackgroundGuideButton   = 2,
-	ExclusiveForegroundGuideButton = 3,
-	DisableBackgroundShareButton   = 4,
-	ExclusiveForegroundShareButton = 5,
-}
-FocusPolicy :: distinct bit_set[FocusPolicyFlag; c.int]
-
-ForceFeedbackEffectKind :: enum c.int {
-	Constant         = 0,
-	Ramp             = 1,
-	SineWave         = 2,
-	SquareWave       = 3,
-	TriangleWave     = 4,
-	SawtoothUpWave   = 5,
-	SawtoothDownWave = 6,
-	Spring           = 7,
-	Friction         = 8,
-	Damper           = 9,
-	Inertia          = 10,
-}
-
-GamepadButtonsFlag :: enum c.int {
+GamepadButtons :: distinct bit_set[GamepadButtonsFlag; u32]
+GamepadButtonsFlag :: enum u32 {
 	Menu            = 0,
 	View            = 1,
 	A               = 2,
@@ -144,36 +159,156 @@ GamepadButtonsFlag :: enum c.int {
 	LeftThumbstick  = 12,
 	RightThumbstick = 13,
 }
-GamepadButtons :: distinct bit_set[GamepadButtonsFlag; c.int]
+GamepadNone :: GamepadButtons{}
 
-KeyboardKind :: enum c.int {
-	UnknownKeyboard = -1,
-	AnsiKeyboard    = 0,
-	IsoKeyboard     = 1,
-	KsKeyboard      = 2,
-	AbntKeyboard    = 3,
-	JisKeyboard     = 4,
+RacingWheelButtons :: distinct bit_set[RacingWheelButtonsFlag; u32]
+RacingWheelButtonsFlag :: enum u32 {
+	Menu         = 0,
+	View         = 1,
+	PreviousGear = 2,
+	NextGear     = 3,
+	DpadUp       = 4,
+	DpadDown     = 5,
+	DpadLeft     = 6,
+	DpadRight    = 7,
+}
+RacingWheelNone :: RacingWheelButtons{}
+
+UiNavigationButtons :: distinct bit_set[UiNavigationButtonsFlag; u32]
+UiNavigationButtonsFlag :: enum u32 {
+	Menu        = 0,
+	View        = 1,
+	Accept      = 2,
+	Cancel      = 3,
+	Up          = 4,
+	Down        = 5,
+	Left        = 6,
+	Right       = 7,
+	Context1    = 8,
+	Context2    = 9,
+	Context3    = 10,
+	Context4    = 11,
+	PageUp      = 12,
+	PageDown    = 13,
+	PageLeft    = 14,
+	PageRight   = 15,
+	ScrollUp    = 16,
+	ScrollDown  = 17,
+	ScrollLeft  = 18,
+	ScrollRight = 19,
+}
+UiNavigationNone :: UiNavigationButtons{}
+
+SystemButtons :: distinct bit_set[SystemButtonsFlag; u32]
+SystemButtonsFlag :: enum u32 {
+	Guide = 0,
+	Share = 1,
+}
+SystemButtonNone :: SystemButtons{}
+
+DeviceStatus :: distinct bit_set[DeviceStatusFlag; u32]
+DeviceStatusFlag :: enum u32 {
+	Connected     = 0,
+	InputEnabled  = 1,
+	OutputEnabled = 2,
+	RawIoEnabled  = 3,
+	AudioCapture  = 4,
+	AudioRender   = 5,
+	Synchronized  = 6,
+	Wireless      = 7,
+	UserIdle      = 20,
+}
+DeviceNoStatus :: DeviceStatus{}
+//DeviceAnyStatus :: 0x00FFFFFF
+
+BatteryStatus :: enum i32 {
+	Unknown     = -1,
+	NotPresent  = 0,
+	Discharging = 1,
+	Idle        = 2,
+	Charging    = 3,
 }
 
-KindFlag :: enum c.int {
-	RawDeviceReport  = 0,
-	ControllerAxis   = 1,
-	ControllerButton = 2,
-	ControllerSwitch = 3,
-	Keyboard         = 4,
-	Mouse            = 5,
-	Touch            = 8,
-	Motion           = 12,
-	ArcadeStick      = 16,
-	FlightStick      = 17,
-	Gamepad          = 18,
-	RacingWheel      = 19,
-	UiNavigation     = 20,
+DeviceFamily :: enum i32 {
+	Virtual   = -1,
+	Aggregate = 0,
+	XboxOne   = 1,
+	Xbox360   = 2,
+	Hid       = 3,
+	I8042     = 4,
 }
-Kind :: distinct bit_set[KindFlag; c.int]
-Kind_Controller : Kind : { .ControllerAxis, .ControllerButton, .ControllerSwitch }
 
-Label :: enum c.int {
+DeviceCapabilities :: distinct bit_set[DeviceCapabilitiesFlag; u32]
+DeviceCapabilitiesFlag :: enum u32 {
+	Audio           = 0,
+	PluginModule    = 1,
+	PowerOff        = 2,
+	Synchronization = 3,
+	Wireless        = 4,
+}
+DeviceCapabilityNone :: DeviceCapabilities{}
+
+RawDeviceReportKind :: enum i32 {
+	InputReport   = 0,
+	OutputReport  = 1,
+	FeatureReport = 2,
+}
+
+RawDeviceReportItemFlags :: distinct bit_set[RawDeviceReportItemFlag; u32]
+RawDeviceReportItemFlag :: enum u32 {
+	ConstantItem   = 0,
+	ArrayItem      = 1,
+	RelativeItem   = 2,
+	WraparoundItem = 3,
+	NonlinearItem  = 4,
+	StableItem     = 5,
+	NullableItem   = 6,
+	VolatileItem   = 7,
+	BufferedItem   = 8,
+}
+RawDeviceDefaultItem :: RawDeviceReportItemFlags{}
+
+RawDeviceItemCollectionKind :: enum i32 {
+	UnknownItemCollection       = -1,
+	PhysicalItemCollection      = 0,
+	ApplicationItemCollection   = 1,
+	LogicalItemCollection       = 2,
+	ReportItemCollection        = 3,
+	NamedArrayItemCollection    = 4,
+	UsageSwitchItemCollection   = 5,
+	UsageModifierItemCollection = 6,
+}
+
+RawDevicePhysicalUnitKind :: enum i32 {
+	Unknown             = -1,
+	None                = 0,
+	Time                = 1,
+	Frequency           = 2,
+	Length              = 3,
+	Velocity            = 4,
+	Acceleration        = 5,
+	Mass                = 6,
+	Momentum            = 7,
+	Force               = 8,
+	Pressure            = 9,
+	Angle               = 10,
+	AngularVelocity     = 11,
+	AngularAcceleration = 12,
+	AngularMass         = 13,
+	AngularMomentum     = 14,
+	AngularTorque       = 15,
+	ElectricCurrent     = 16,
+	ElectricCharge      = 17,
+	ElectricPotential   = 18,
+	Energy              = 19,
+	Power               = 20,
+	Temperature         = 21,
+	LuminousIntensity   = 22,
+	LuminousFlux        = 23,
+	Illuminance         = 24,
+}
+
+Label :: enum i32 {
 	Unknown                  = -1,
 	None                     = 0,
 	XboxGuide                = 1,
@@ -301,7 +436,7 @@ Label :: enum c.int {
 	P4                       = 124,
 }
 
-Location :: enum c.int {
+Location :: enum i32 {
 	Unknown  = -1,
 	Chassis  = 0,
 	Display  = 1,
@@ -312,187 +447,140 @@ Location :: enum c.int {
 	TouchPad = 6,
 }
 
-MotionAccuracy :: enum c.int {
-	AccuracyUnknown = -1,
-	Unavailable     = 0,
-	Unreliable      = 1,
-	Approximate     = 2,
-	Accurate        = 3,
+FeedbackAxes :: distinct bit_set[FeedbackAxesFlag; u32]
+FeedbackAxesFlag :: enum u32 {
+	LinearX  = 0,
+	LinearY  = 1,
+	LinearZ  = 2,
+	AngularX = 3,
+	AngularY = 4,
+	AngularZ = 5,
+	Normal   = 6,
+}
+FeedbackAxisNone :: FeedbackAxes{}
+
+FeedbackEffectState :: enum i32 {
+	Stopped = 0,
+	Running = 1,
+	Paused  = 2,
 }
 
-MouseButtonsFlag :: enum c.int {
-	LeftButton     = 0,
-	RightButton    = 1,
-	MiddleButton   = 2,
-	Button4        = 3,
-	Button5        = 4,
-	WheelTiltLeft  = 5,
-	WheelTiltRight = 6,
-}
-MouseButtons :: distinct bit_set[MouseButtonsFlag; c.int]
-
-RacingWheelButtonsFlag :: enum c.int {
-	Menu         = 0,
-	View         = 1,
-	PreviousGear = 2,
-	NextGear     = 3,
-	DpadUp       = 4,
-	DpadDown     = 5,
-	DpadLeft     = 6,
-	DpadRight    = 7,
-}
-RacingWheelButtons :: distinct bit_set[RacingWheelButtonsFlag; c.int]
-
-RawDeviceItemCollectionKind :: enum c.int {
-	UnknownItemCollection       = -1,
-	PhysicalItemCollection      = 0,
-	ApplicationItemCollection   = 1,
-	LogicalItemCollection       = 2,
-	ReportItemCollection        = 3,
-	NamedArrayItemCollection    = 4,
-	UsageSwitchItemCollection   = 5,
-	UsageModifierItemCollection = 6,
+ForceFeedbackEffectKind :: enum i32 {
+	Constant         = 0,
+	Ramp             = 1,
+	SineWave         = 2,
+	SquareWave       = 3,
+	TriangleWave     = 4,
+	SawtoothUpWave   = 5,
+	SawtoothDownWave = 6,
+	Spring           = 7,
+	Friction         = 8,
+	Damper           = 9,
+	Inertia          = 10,
 }
 
-RawDevicePhysicalUnitKind :: enum c.int {
-	Unknown             = -1,
-	None                = 0,
-	Time                = 1,
-	Frequency           = 2,
-	Length              = 3,
-	Velocity            = 4,
-	Acceleration        = 5,
-	Mass                = 6,
-	Momentum            = 7,
-	Force               = 8,
-	Pressure            = 9,
-	Angle               = 10,
-	AngularVelocity     = 11,
-	AngularAcceleration = 12,
-	AngularMass         = 13,
-	AngularMomentum     = 14,
-	AngularTorque       = 15,
-	ElectricCurrent     = 16,
-	ElectricCharge      = 17,
-	ElectricPotential   = 18,
-	Energy              = 19,
-	Power               = 20,
-	Temperature         = 21,
-	LuminousIntensity   = 22,
-	LuminousFlux        = 23,
-	Illuminance         = 24,
-}
-
-RawDeviceReportItemFlag :: enum c.int {
-	ConstantItem   = 0,
-	ArrayItem      = 1,
-	RelativeItem   = 2,
-	WraparoundItem = 3,
-	NonlinearItem  = 4,
-	StableItem     = 5,
-	NullableItem   = 6,
-	VolatileItem   = 7,
-	BufferedItem   = 8,
-}
-RawDeviceReportItemFlags :: distinct bit_set[RawDeviceReportItemFlag; c.int]
-
-RawDeviceReportKind :: enum c.int {
-	InputReport   = 0,
-	OutputReport  = 1,
-	FeatureReport = 2,
-}
-
-RumbleMotorsFlag :: enum c.int {
+RumbleMotors :: distinct bit_set[RumbleMotorsFlag; u32]
+RumbleMotorsFlag :: enum u32 {
 	LowFrequency  = 0,
 	HighFrequency = 1,
 	LeftTrigger   = 2,
 	RightTrigger  = 3,
 }
-RumbleMotors :: distinct bit_set[RumbleMotorsFlag; c.int]
+RumbleNone :: RumbleMotors{}
 
-SwitchKind :: enum c.int {
-	UnknownSwitchKind = -1,
-	TwoWaySwitch      = 0,
-	FourWaySwitch     = 1,
-	EightWaySwitch    = 2,
+CallbackToken :: distinct u64
+
+CURRENT_CALLBACK_TOKEN_VALUE :: CallbackToken(0xFFFFFFFFFFFFFFFF)
+INVALID_CALLBACK_TOKEN_VALUE :: CallbackToken(0x0000000000000000)
+
+ReadingCallback        :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, reading: ^IGameInputReading, hasOverrunOccured: bool)
+DeviceCallback         :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentStatus: DeviceStatus, previousStatus: DeviceStatus)
+SystemButtonCallback   :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentButtons: SystemButtons, previousButtons: SystemButtons)
+KeyboardLayoutCallback :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentLayout: u32, previousLayout: u32)
+
+KeyState :: struct {
+	scanCode:   u32,
+	codePoint:  u32,
+	virtualKey: u8,
+	isDeadKey:  bool,
 }
 
-SwitchPosition :: enum c.int {
-	Center    = 0,
-	Up        = 1,
-	UpRight   = 2,
-	Right     = 3,
-	DownRight = 4,
-	Down      = 5,
-	DownLeft  = 6,
-	Left      = 7,
-	UpLeft    = 8,
+MouseState :: struct {
+	buttons:   MouseButtons,
+	positionX: i64,
+	positionY: i64,
+	wheelX:    i64,
+	wheelY:    i64,
 }
 
-SystemButtonsFlag :: enum c.int {
-	Guide = 0,
-	Share = 1 ,
-}
-SystemButtons :: distinct bit_set[SystemButtonsFlag; c.int]
-
-TouchShape :: enum c.int {
-	Unknown            = -1,
-	Point              = 0,
-	Shape1DLinear      = 1,
-	Shape1DRadial      = 2,
-	Shape1DIrregular   = 3,
-	Shape2DRectangular = 4,
-	Shape2DElliptical  = 5,
-	Shape2DIrregular   = 6,
+TouchState :: struct {
+	touchId:           u64,
+	sensorIndex:       u32,
+	positionX:         f32,
+	positionY:         f32,
+	pressure:          f32,
+	proximity:         f32,
+	contactRectTop:    f32,
+	contactRectLeft:   f32,
+	contactRectRight:  f32,
+	contactRectBottom: f32,
 }
 
-UiNavigationButtonsFlag :: enum c.int {
-	Menu        = 0,
-	View        = 1,
-	Accept      = 2,
-	Cancel      = 3,
-	Up          = 4,
-	Down        = 5,
-	Left        = 6,
-	Right       = 7,
-	Context1    = 8,
-	Context2    = 9,
-	Context3    = 10,
-	Context4    = 11,
-	PageUp      = 12,
-	PageDown    = 13,
-	PageLeft    = 14,
-	PageRight   = 15,
-	ScrollUp    = 16,
-	ScrollDown  = 17,
-	ScrollLeft  = 18,
-	ScrollRight = 19,
-}
-UiNavigationButtons :: distinct bit_set[UiNavigationButtonsFlag; c.int]
-
-// Structs
-
-APP_LOCAL_DEVICE_ID :: distinct [32]byte
-
-ArcadeStickInfo :: struct {
-	menuButtonLabel:     Label,
-	viewButtonLabel:     Label,
-	stickUpLabel:        Label,
-	stickDownLabel:      Label,
-	stickLeftLabel:      Label,
-	stickRightLabel:     Label,
-	actionButton1Label:  Label,
-	actionButton2Label:  Label,
-	actionButton3Label:  Label,
-	actionButton4Label:  Label,
-	actionButton5Label:  Label,
-	actionButton6Label:  Label,
-	specialButton1Label: Label,
-	specialButton2Label: Label,
+MotionState :: struct {
+	accelerationX:         f32,
+	accelerationY:         f32,
+	accelerationZ:         f32,
+	angularVelocityX:      f32,
+	angularVelocityY:      f32,
+	angularVelocityZ:      f32,
+	magneticFieldX:        f32,
+	magneticFieldY:        f32,
+	magneticFieldZ:        f32,
+	orientationW:          f32,
+	orientationX:          f32,
+	orientationY:          f32,
+	orientationZ:          f32,
+	accelerometerAccuracy: MotionAccuracy,
+	gyroscopeAccuracy:     MotionAccuracy,
+	magnetometerAccuracy:  MotionAccuracy,
+	orientationAccuracy:   MotionAccuracy,
 }
 
 ArcadeStickState :: struct {
 	buttons: ArcadeStickButtons,
+}
+
+FlightStickState :: struct {
+	buttons:   FlightStickButtons,
+	hatSwitch: SwitchPosition,
+	roll:      f32,
+	pitch:     f32,
+	yaw:       f32,
+	throttle:  f32,
+}
+
+GamepadState :: struct {
+	buttons:          GamepadButtons,
+	leftTrigger:      f32,
+	rightTrigger:     f32,
+	leftThumbstickX:  f32,
+	leftThumbstickY:  f32,
+	rightThumbstickX: f32,
+	rightThumbstickY: f32,
+}
+
+RacingWheelState :: struct {
+	buttons:            RacingWheelButtons,
+	patternShifterGear: i32,
+	wheel:              f32,
+	throttle:           f32,
+	brake:              f32,
+	clutch:             f32,
+	handbrake:          f32,
+}
+
+UiNavigationState :: struct {
+	buttons: UiNavigationButtons,
 }
 
 BatteryState :: struct {
@@ -501,6 +589,64 @@ BatteryState :: struct {
 	remainingCapacity:  f32,
 	fullChargeCapacity: f32,
 	status:             BatteryStatus,
+}
+
+String :: struct {
+	sizeInBytes:    u32,
+	codePointCount: u32,
+	data:           [^]byte,
+}
+
+Usage :: struct {
+	page: u16,
+	id:   u16,
+}
+
+Version :: struct {
+	major:    u16,
+	minor:    u16,
+	build:    u16,
+	revision: u16,
+}
+
+RawDeviceItemCollectionInfo :: struct {
+	kind:            RawDeviceItemCollectionKind,
+	childCount:      u32,
+	siblingCount:    u32,
+	usageCount:      u32,
+	usages:          [^]Usage `fmt:"v,usageCount"`,
+	parent:          ^RawDeviceItemCollectionInfo,
+	firstSibling:    ^RawDeviceItemCollectionInfo,
+	previousSibling: ^RawDeviceItemCollectionInfo,
+	nextSibling:     ^RawDeviceItemCollectionInfo,
+	lastSibling:     ^RawDeviceItemCollectionInfo,
+	firstChild:      ^RawDeviceItemCollectionInfo,
+	lastChild:       ^RawDeviceItemCollectionInfo,
+}
+
+RawDeviceReportItemInfo :: struct {
+	bitOffset:                u32,
+	bitSize:                  u32,
+	logicalMin:               i64,
+	logicalMax:               i64,
+	physicalMin:              f64,
+	physicalMax:              f64,
+	physicalUnits:            RawDevicePhysicalUnitKind,
+	rawPhysicalUnits:         u32,
+	rawPhysicalUnitsExponent: i32,
+	flags:                    RawDeviceReportItemFlags,
+	usageCount:               u32,
+	usages:                   [^]Usage `fmt:"v,usageCount"`,
+	collection:               ^RawDeviceItemCollectionInfo,
+	itemString:               ^String,
+}
+
+RawDeviceReportInfo :: struct {
+	kind:      RawDeviceReportKind,
+	id:        u32,
+	size:      u32,
+	itemCount: u32,
+	items:     [^]RawDeviceReportItemInfo `fmt:"v,itemCount"`,
 }
 
 ControllerAxisInfo :: struct {
@@ -541,6 +687,166 @@ ControllerSwitchInfo :: struct {
 	inputReportItem:   ^RawDeviceReportItemInfo,
 }
 
+KeyboardInfo :: struct {
+	kind:                KeyboardKind,
+	layout:              u32,
+	keyCount:            u32,
+	functionKeyCount:    u32,
+	maxSimultaneousKeys: u32,
+	platformType:        u32,
+	platformSubtype:     u32,
+	nativeLanguage:      ^String,
+}
+
+MouseInfo :: struct {
+	supportedButtons: MouseButtons,
+	sampleRate:       u32,
+	sensorDpi:        u32,
+	hasWheelX:        bool,
+	hasWheelY:        bool,
+}
+
+TouchSensorInfo :: struct {
+	mappedInputKinds: Kind,
+	label:            Label,
+	location:         Location,
+	locationId:       u32,
+	resolutionX:      u64,
+	resolutionY:      u64,
+	shape:            TouchShape,
+	aspectRatio:      f32,
+	orientation:      f32,
+	physicalWidth:    f32,
+	physicalHeight:   f32,
+	maxPressure:      f32,
+	maxProximity:     f32,
+	maxTouchPoints:   u32,
+}
+
+MotionInfo :: struct {
+	maxAcceleration:          f32,
+	maxAngularVelocity:       f32,
+	maxMagneticFieldStrength: f32,
+}
+
+ArcadeStickInfo :: struct {
+	menuButtonLabel:     Label,
+	viewButtonLabel:     Label,
+	stickUpLabel:        Label,
+	stickDownLabel:      Label,
+	stickLeftLabel:      Label,
+	stickRightLabel:     Label,
+	actionButton1Label:  Label,
+	actionButton2Label:  Label,
+	actionButton3Label:  Label,
+	actionButton4Label:  Label,
+	actionButton5Label:  Label,
+	actionButton6Label:  Label,
+	specialButton1Label: Label,
+	specialButton2Label: Label,
+}
+
+FlightStickInfo :: struct {
+	menuButtonLabel:          Label,
+	viewButtonLabel:          Label,
+	firePrimaryButtonLabel:   Label,
+	fireSecondaryButtonLabel: Label,
+	hatSwitchKind:            SwitchKind,
+}
+
+GamepadInfo :: struct {
+	menuButtonLabel:            Label,
+	viewButtonLabel:            Label,
+	aButtonLabel:               Label,
+	bButtonLabel:               Label,
+	xButtonLabel:               Label,
+	yButtonLabel:               Label,
+	dpadUpLabel:                Label,
+	dpadDownLabel:              Label,
+	dpadLeftLabel:              Label,
+	dpadRightLabel:             Label,
+	leftShoulderButtonLabel:    Label,
+	rightShoulderButtonLabel:   Label,
+	leftThumbstickButtonLabel:  Label,
+	rightThumbstickButtonLabel: Label,
+}
+
+RacingWheelInfo :: struct {
+	menuButtonLabel:         Label,
+	viewButtonLabel:         Label,
+	previousGearButtonLabel: Label,
+	nextGearButtonLabel:     Label,
+	dpadUpLabel:             Label,
+	dpadDownLabel:           Label,
+	dpadLeftLabel:           Label,
+	dpadRightLabel:          Label,
+	hasClutch:               bool,
+	hasHandbrake:            bool,
+	hasPatternShifter:       bool,
+	minPatternShifterGear:   i32,
+	maxPatternShifterGear:   i32,
+	maxWheelAngle:           f32,
+}
+
+UiNavigationInfo :: struct {
+	menuButtonLabel:        Label,
+	viewButtonLabel:        Label,
+	acceptButtonLabel:      Label,
+	cancelButtonLabel:      Label,
+	upButtonLabel:          Label,
+	downButtonLabel:        Label,
+	leftButtonLabel:        Label,
+	rightButtonLabel:       Label,
+	contextButton1Label:    Label,
+	contextButton2Label:    Label,
+	contextButton3Label:    Label,
+	contextButton4Label:    Label,
+	pageUpButtonLabel:      Label,
+	pageDownButtonLabel:    Label,
+	pageLeftButtonLabel:    Label,
+	pageRightButtonLabel:   Label,
+	scrollUpButtonLabel:    Label,
+	scrollDownButtonLabel:  Label,
+	scrollLeftButtonLabel:  Label,
+	scrollRightButtonLabel: Label,
+	guideButtonLabel:       Label,
+}
+
+ForceFeedbackMotorInfo :: struct {
+	supportedAxes:                     FeedbackAxes,
+	location:                          Location,
+	locationId:                        u32,
+	maxSimultaneousEffects:            u32,
+	isConstantEffectSupported:         bool,
+	isRampEffectSupported:             bool,
+	isSineWaveEffectSupported:         bool,
+	isSquareWaveEffectSupported:       bool,
+	isTriangleWaveEffectSupported:     bool,
+	isSawtoothUpWaveEffectSupported:   bool,
+	isSawtoothDownWaveEffectSupported: bool,
+	isSpringEffectSupported:           bool,
+	isFrictionEffectSupported:         bool,
+	isDamperEffectSupported:           bool,
+	isInertiaEffectSupported:          bool,
+}
+
+HapticWaveformInfo :: struct {
+	usage:                  Usage,
+	isDurationSupported:    bool,
+	isIntensitySupported:   bool,
+	isRepeatSupported:      bool,
+	isRepeatDelaySupported: bool,
+	defaultDuration:        u64,
+}
+
+HapticFeedbackMotorInfo :: struct {
+	mappedRumbleMotor: RumbleMotors,
+	location:          Location,
+	locationId:        u32,
+	waveformCount:     u32,
+	waveformInfo:      [^]HapticWaveformInfo `fmt:"v,waveformCount"`,
+}
+
 DeviceInfo :: struct {
 	infoSize:                 u32,
 	vendorId:                 u16,
@@ -569,58 +875,26 @@ DeviceInfo :: struct {
 	hapticFeedbackMotorCount: u32,
 	deviceStringCount:        u32,
 	deviceDescriptorSize:     u32,
-	inputReportInfo:          ^RawDeviceReportInfo,
-	outputReportInfo:         ^RawDeviceReportInfo,
-	featureReportInfo:        ^RawDeviceReportInfo,
-	controllerAxisInfo:       ^ControllerAxisInfo,
-	controllerButtonInfo:     ^ControllerButtonInfo,
-	controllerSwitchInfo:     ^ControllerSwitchInfo,
+	inputReportInfo:          [^]RawDeviceReportInfo `fmt:"v,inputReportCount"`,
+	outputReportInfo:         [^]RawDeviceReportInfo `fmt:"v,outputReportCount"`,
+	featureReportInfo:        [^]RawDeviceReportInfo `fmt:"v,featureReportCount"`,
+	controllerAxisInfo:       [^]ControllerAxisInfo `fmt:"v,controllerAxisCount"`,
+	controllerButtonInfo:     [^]ControllerButtonInfo `fmt:"v,controllerButtonCount"`,
+	controllerSwitchInfo:     [^]ControllerSwitchInfo `fmt:"v,controllerSwitchCount"`,
 	keyboardInfo:             ^KeyboardInfo,
 	mouseInfo:                ^MouseInfo,
-	touchSensorInfo:          ^TouchSensorInfo,
+	touchSensorInfo:          [^]TouchSensorInfo `fmt:"v,touchSensorCount"`,
 	motionInfo:               ^MotionInfo,
 	arcadeStickInfo:          ^ArcadeStickInfo,
 	flightStickInfo:          ^FlightStickInfo,
 	gamepadInfo:              ^GamepadInfo,
 	racingWheelInfo:          ^RacingWheelInfo,
 	uiNavigationInfo:         ^UiNavigationInfo,
-	forceFeedbackMotorInfo:   ^ForceFeedbackMotorInfo,
-	hapticFeedbackMotorInfo:  ^HapticFeedbackMotorInfo,
+	forceFeedbackMotorInfo:   [^]ForceFeedbackMotorInfo `fmt:"v,forceFeedbackMotorCount"`,
+	hapticFeedbackMotorInfo:  [^]HapticFeedbackMotorInfo `fmt:"v,hapticFeedbackMotorCount"`,
 	displayName:              ^String,
-	deviceStrings:            ^String,
+	deviceStrings:            [^]String `fmt:"v,deviceStringCount"`,
 	deviceDescriptorData:     rawptr,
-}
-
-FlightStickInfo :: struct {
-	menuButtonLabel:          Label,
-	viewButtonLabel:          Label,
-	firePrimaryButtonLabel:   Label,
-	fireSecondaryButtonLabel: Label,
-	hatSwitchKind:            SwitchKind,
-}
-
-FlightStickState :: struct {
-	buttons:   FlightStickButtons,
-	hatSwitch: SwitchPosition,
-	roll:      f32,
-	pitch:     f32,
-	yaw:       f32,
-	throttle:  f32,
-}
-
-ForceFeedbackConditionParams :: struct {
-	magnitude:            ForceFeedbackMagnitude,
-	positiveCoefficient:  f32,
-	negativeCoefficient:  f32,
-	maxPositiveMagnitude: f32,
-	maxNegativeMagnitude: f32,
-	deadZone:             f32,
-	bias:                 f32,
-}
-
-ForceFeedbackConstantParams :: struct {
-	envelope:  ForceFeedbackEnvelope,
-	magnitude: ForceFeedbackMagnitude,
 }
 
 ForceFeedbackEnvelope :: struct {
@@ -644,39 +918,19 @@ ForceFeedbackMagnitude :: struct {
 	normal:   f32,
 }
 
-ForceFeedbackMotorInfo :: struct {
-	supportedAxes:                     FeedbackAxes,
-	location:                          Location,
-	locationId:                        u32,
-	maxSimultaneousEffects:            u32,
-	isConstantEffectSupported:         bool,
-	isRampEffectSupported:             bool,
-	isSineWaveEffectSupported:         bool,
-	isSquareWaveEffectSupported:       bool,
-	isTriangleWaveEffectSupported:     bool,
-	isSawtoothUpWaveEffectSupported:   bool,
-	isSawtoothDownWaveEffectSupported: bool,
-	isSpringEffectSupported:           bool,
-	isFrictionEffectSupported:         bool,
-	isDamperEffectSupported:           bool,
-	isInertiaEffectSupported:          bool,
+ForceFeedbackConditionParams :: struct {
+	magnitude:            ForceFeedbackMagnitude,
+	positiveCoefficient:  f32,
+	negativeCoefficient:  f32,
+	maxPositiveMagnitude: f32,
+	maxNegativeMagnitude: f32,
+	deadZone:             f32,
+	bias:                 f32,
 }
 
-ForceFeedbackParams :: struct {
-	kind: ForceFeedbackEffectKind,
-	using _: struct #raw_union {  
-		constant:         ForceFeedbackConstantParams,
-		ramp:             ForceFeedbackRampParams,
-		sineWave:         ForceFeedbackPeriodicParams,
-		squareWave:       ForceFeedbackPeriodicParams,
-		triangleWave:     ForceFeedbackPeriodicParams,
-		sawtoothUpWave:   ForceFeedbackPeriodicParams,
-		sawtoothDownWave: ForceFeedbackPeriodicParams,
-		spring:           ForceFeedbackConditionParams,
-		friction:         ForceFeedbackConditionParams,
-		damper:           ForceFeedbackConditionParams,
-		inertia:          ForceFeedbackConditionParams,
-	},
+ForceFeedbackConstantParams :: struct {
+	envelope:  ForceFeedbackEnvelope,
+	magnitude: ForceFeedbackMagnitude,
 }
 
 ForceFeedbackPeriodicParams :: struct {
@@ -693,39 +947,21 @@ ForceFeedbackRampParams :: struct {
 	endMagnitude:   ForceFeedbackMagnitude,
 }
 
-GamepadInfo :: struct {
-	menuButtonLabel:            Label,
-	viewButtonLabel:            Label,
-	aButtonLabel:               Label,
-	bButtonLabel:               Label,
-	xButtonLabel:               Label,
-	yButtonLabel:               Label,
-	dpadUpLabel:                Label,
-	dpadDownLabel:              Label,
-	dpadLeftLabel:              Label,
-	dpadRightLabel:             Label,
-	leftShoulderButtonLabel:    Label,
-	rightShoulderButtonLabel:   Label,
-	leftThumbstickButtonLabel:  Label,
-	rightThumbstickButtonLabel: Label,
-}
-
-GamepadState :: struct {
-	buttons:          GamepadButtons,
-	leftTrigger:      f32,
-	rightTrigger:     f32,
-	leftThumbstickX:  f32,
-	leftThumbstickY:  f32,
-	rightThumbstickX: f32,
-	rightThumbstickY: f32,
-}
-
-HapticFeedbackMotorInfo :: struct {
-	mappedRumbleMotor: RumbleMotors,
-	location:          Location,
-	locationId:        u32,
-	waveformCount:     u32,
-	waveformInfo:      [^]HapticWaveformInfo `fmt:"v,waveformCount"`,
+ForceFeedbackParams :: struct {
+	kind: ForceFeedbackEffectKind,
+	using data: struct #raw_union {
+		constant:         ForceFeedbackConstantParams,
+		ramp:             ForceFeedbackRampParams,
+		sineWave:         ForceFeedbackPeriodicParams,
+		squareWave:       ForceFeedbackPeriodicParams,
+		triangleWave:     ForceFeedbackPeriodicParams,
+		sawtoothUpWave:   ForceFeedbackPeriodicParams,
+		sawtoothDownWave: ForceFeedbackPeriodicParams,
+		spring:           ForceFeedbackConditionParams,
+		friction:         ForceFeedbackConditionParams,
+		damper:           ForceFeedbackConditionParams,
+		inertia:          ForceFeedbackConditionParams,
+	},
 }
 
 HapticFeedbackParams :: struct {
@@ -736,230 +972,12 @@ HapticFeedbackParams :: struct {
 	repeatDelay:   u64,
 }
 
-HapticWaveformInfo :: struct {
-	usage:                  Usage,
-	isDurationSupported:    bool,
-	isIntensitySupported:   bool,
-	isRepeatSupported:      bool,
-	isRepeatDelaySupported: bool,
-	defaultDuration:        u64,
-}
-
-KeyboardInfo :: struct {
-	kind:                KeyboardKind,
-	layout:              u32,
-	keyCount:            u32,
-	functionKeyCount:    u32,
-	maxSimultaneousKeys: u32,
-	platformType:        u32,
-	platformSubtype:     u32,
-	nativeLanguage:      ^String,
-}
-
-KeyState :: struct {
-	scanCode:   u32,
-	codePoint:  u32,
-	virtualKey: u8,
-	isDeadKey:  bool,
-}
-
-MotionInfo :: struct {
-	maxAcceleration:          f32,
-	maxAngularVelocity:       f32,
-	maxMagneticFieldStrength: f32,
-}
-
-MotionState :: struct {
-	accelerationX:         f32,
-	accelerationY:         f32,
-	accelerationZ:         f32,
-	angularVelocityX:      f32,
-	angularVelocityY:      f32,
-	angularVelocityZ:      f32,
-	magneticFieldX:        f32,
-	magneticFieldY:        f32,
-	magneticFieldZ:        f32,
-	orientationW:          f32,
-	orientationX:          f32,
-	orientationY:          f32,
-	orientationZ:          f32,
-	accelerometerAccuracy: MotionAccuracy,
-	gyroscopeAccuracy:     MotionAccuracy,
-	magnetometerAccuracy:  MotionAccuracy,
-	orientationAccuracy:   MotionAccuracy,
-}
-
-MouseInfo :: struct {
-	supportedButtons: MouseButtons,
-	sampleRate:       u32,
-	sensorDpi:        u32,
-	hasWheelX:        bool,
-	hasWheelY:        bool,
-}
-
-MouseState :: struct {
-	buttons:   MouseButtons,
-	positionX: i64,
-	positionY: i64,
-	wheelX:    i64,
-	wheelY:    i64,
-}
-
-RacingWheelInfo :: struct {
-	menuButtonLabel:         Label,
-	viewButtonLabel:         Label,
-	previousGearButtonLabel: Label,
-	nextGearButtonLabel:     Label,
-	dpadUpLabel:             Label,
-	dpadDownLabel:           Label,
-	dpadLeftLabel:           Label,
-	dpadRightLabel:          Label,
-	hasClutch:               bool,
-	hasHandbrake:            bool,
-	hasPatternShifter:       bool,
-	minPatternShifterGear:   i32,
-	maxPatternShifterGear:   i32,
-	maxWheelAngle:           f32,
-}
-
-RacingWheelState :: struct {
-	buttons:            RacingWheelButtons,
-	patternShifterGear: i32,
-	wheel:              f32,
-	throttle:           f32,
-	brake:              f32,
-	clutch:             f32,
-	handbrake:          f32,
-}
-
-RawDeviceItemCollectionInfo :: struct {
-	kind:            RawDeviceItemCollectionKind,
-	childCount:      u32,
-	siblingCount:    u32,
-	usageCount:      u32,
-	usages:          [^]Usage `fmt:v,usageCount`,
-	parent:          ^RawDeviceItemCollectionInfo,
-	firstSibling:    ^RawDeviceItemCollectionInfo,
-	previousSibling: ^RawDeviceItemCollectionInfo,
-	nextSibling:     ^RawDeviceItemCollectionInfo,
-	lastSibling:     ^RawDeviceItemCollectionInfo,
-	firstChild:      ^RawDeviceItemCollectionInfo,
-	lastChild:       ^RawDeviceItemCollectionInfo,
-}
-
-RawDeviceReportInfo :: struct {
-	kind:      RawDeviceReportKind,
-	id:        u32,
-	size:      u32,
-	itemCount: u32,
-	items:     [^]RawDeviceReportItemInfo `fmt:"v,itemCount"`,
-}
-
-RawDeviceReportItemInfo :: struct {
-	bitOffset:                u32,
-	bitSize:                  u32,
-	logicalMin:               i64,
-	logicalMax:               i64,
-	physicalMin:              f64,
-	physicalMax:              f64,
-	physicalUnits:            RawDevicePhysicalUnitKind,
-	rawPhysicalUnits:         u32,
-	rawPhysicalUnitsExponent: i32,
-	flags:                    RawDeviceReportItemFlags,
-	usageCount:               u32,
-	usages:                   [^]Usage `fmt:"v,usageCount"`,
-	collection:               ^RawDeviceItemCollectionInfo,
-	itemString:               ^String,
-}
-
 RumbleParams :: struct {
 	lowFrequency:  f32,
 	highFrequency: f32,
 	leftTrigger:   f32,
 	rightTrigger:  f32,
 }
-
-String :: struct {
-	sizeInBytes:    u32,
-	codePointCount: u32,
-	data:           [^]byte,
-}
-
-TouchSensorInfo :: struct {
-	mappedInputKinds: Kind,
-	label:            Label,
-	location:         Location,
-	locationId:       u32,
-	resolutionX:      u64,
-	resolutionY:      u64,
-	shape:            TouchShape,
-	aspectRatio:      f32,
-	orientation:      f32,
-	physicalWidth:    f32,
-	physicalHeight:   f32,
-	maxPressure:      f32,
-	maxProximity:     f32,
-	maxTouchPoints:   u32,
-}
-
-TouchState :: struct {
-	touchId:           u64,
-	sensorIndex:       u32,
-	positionX:         f32,
-	positionY:         f32,
-	pressure:          f32,
-	proximity:         f32,
-	contactRectTop:    f32,
-	contactRectLeft:   f32,
-	contactRectRight:  f32,
-	contactRectBottom: f32,
-}
-
-UiNavigationInfo :: struct {
-	menuButtonLabel:        Label,
-	viewButtonLabel:        Label,
-	acceptButtonLabel:      Label,
-	cancelButtonLabel:      Label,
-	upButtonLabel:          Label,
-	downButtonLabel:        Label,
-	leftButtonLabel:        Label,
-	rightButtonLabel:       Label,
-	contextButton1Label:    Label,
-	contextButton2Label:    Label,
-	contextButton3Label:    Label,
-	contextButton4Label:    Label,
-	pageUpButtonLabel:      Label,
-	pageDownButtonLabel:    Label,
-	pageLeftButtonLabel:    Label,
-	pageRightButtonLabel:   Label,
-	scrollUpButtonLabel:    Label,
-	scrollDownButtonLabel:  Label,
-	scrollLeftButtonLabel:  Label,
-	scrollRightButtonLabel: Label,
-	guideButtonLabel:       Label,
-}
-
-UiNavigationState :: struct {
-	buttons: UiNavigationButtons,
-}
-
-Usage :: struct {
-	page: u16,
-	id:   u16,
-}
-
-Version :: struct {
-	major:    u16,
-	minor:    u16,
-	build:    u16,
-	revision: u16,
-}
-
-// COM Interfaces
-
-IUnknown	:: windows.IUnknown
-IUnknown_VTable :: windows.IUnknown_VTable
-IID		:: windows.GUID
 
 IGameInput_UUID_STRING :: "11BE2A7E-4254-445A-9C09-FFC40F006918"
 IGameInput_UUID := &IID{0x11BE2A7E, 0x4254, 0x445A, {0x9C, 0x09, 0xFF, 0xC4, 0x0F, 0x00, 0x69, 0x18}}
@@ -985,7 +1003,7 @@ IGameInput_VTable :: struct {
 	FindDeviceFromId:               proc "system" (this: ^IGameInput, value: ^APP_LOCAL_DEVICE_ID, device: ^^IGameInputDevice) -> HRESULT,
 	FindDeviceFromObject:           proc "system" (this: ^IGameInput, value: ^IUnknown, device: ^^IGameInputDevice) -> HRESULT,
 	FindDeviceFromPlatformHandle:   proc "system" (this: ^IGameInput, value: HANDLE, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromPlatformString:   proc "system" (this: ^IGameInput, value: windows.LPCWSTR, device: ^^IGameInputDevice) -> HRESULT,
+	FindDeviceFromPlatformString:   proc "system" (this: ^IGameInput, value: win.LPCWSTR, device: ^^IGameInputDevice) -> HRESULT,
 	EnableOemDeviceSupport:         proc "system" (this: ^IGameInput, vendorId: u16, productId: u16, interfaceNumber: u8, collectionNumber: u8) -> HRESULT,
 	SetFocusPolicy:                 proc "system" (this: ^IGameInput, policy: FocusPolicy),
 }
@@ -999,7 +1017,7 @@ IGameInputReading :: struct #raw_union {
 IGameInputReading_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	GetInputKind:             proc "system" (this: ^IGameInputReading) -> Kind,
-	GetSequenceNumber:        proc "system" (this: ^IGameInputReading) -> u64,
+	GetSequenceNumber:        proc "system" (this: ^IGameInputReading, inputKind: Kind) -> u64,
 	GetTimestamp:             proc "system" (this: ^IGameInputReading) -> u64,
 	GetDevice:                proc "system" (this: ^IGameInputReading, device: ^^IGameInputDevice),
 	GetRawReport:             proc "system" (this: ^IGameInputReading, report: ^^IGameInputRawDeviceReport) -> bool,
@@ -1046,7 +1064,7 @@ IGameInputDevice_Vtable :: struct {
 	SetRawDeviceFeature:             proc "system" (this: ^IGameInputDevice, report: ^IGameInputRawDeviceReport) -> HRESULT,
 	SendRawDeviceOutput:             proc "system" (this: ^IGameInputDevice, report: ^IGameInputRawDeviceReport) -> HRESULT,
 	SendRawDeviceOutputWithResponse: proc "system" (this: ^IGameInputDevice, requestReport: ^IGameInputRawDeviceReport, responseReport: ^^IGameInputRawDeviceReport) -> HRESULT,
-	ExecuteRawDeviceIoControl:       proc "system" (this: ^IGameInputDevice, controlCode: u32, inputBufferSize: c.size_t, inputBuffer: rawptr, outputBufferSize: c.size_t, outputBuffer: rawptr, outputSize: ^c.size_t) -> HRESULT,
+	ExecuteRawDeviceIoControl:       proc "system" (this: ^IGameInputDevice, controlCode: u32, inputBufferSize: win.SIZE_T, inputBuffer: rawptr, outputBufferSize: win.SIZE_T, outputBuffer: rawptr, outputSize: ^win.SIZE_T) -> HRESULT,
 	AcquireExclusiveRawDeviceAccess: proc "system" (this: ^IGameInputDevice, timeoutInMicroseconds: u64) -> bool,
 	ReleaseExclusiveRawDeviceAccess: proc "system" (this: ^IGameInputDevice),
 }
@@ -1091,18 +1109,19 @@ IGameInputRawDeviceReport_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	GetDevice:      proc "system" (this: ^IGameInputRawDeviceReport, device: ^^IGameInputDevice),
 	GetReportInfo:  proc "system" (this: ^IGameInputRawDeviceReport) -> ^RawDeviceReportInfo,
-	GetRawDataSize: proc "system" (this: ^IGameInputRawDeviceReport) -> c.size_t,
-	GetRawData:     proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: c.size_t, buffer: rawptr) -> c.size_t,
-	SetRawData:     proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: c.size_t, buffer: rawptr) -> bool,
+	GetRawDataSize: proc "system" (this: ^IGameInputRawDeviceReport) -> win.SIZE_T,
+	GetRawData:     proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: win.SIZE_T, buffer: rawptr) -> win.SIZE_T,
+	SetRawData:     proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: win.SIZE_T, buffer: rawptr) -> bool,
 	GetItemValue:   proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32, value: ^u64) -> bool,
 	SetItemValue:   proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32, value: u64) -> bool,
 	ResetItemValue: proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32) -> bool,
 	ResetAllItems:  proc "system" (this: ^IGameInputRawDeviceReport) -> bool,
 }
 
-// Functions
-HRESULT :: windows.HRESULT
-HANDLE  :: windows.HANDLE
+@(default_calling_convention="system", link_prefix="GameInput")
+foreign wgi {
+	Create :: proc(gameInput: ^^IGameInput) -> HRESULT ---
+}
 
 DEVICE_DISCONNECTED                   :: HRESULT(-0x7C75FFFF)
 DEVICE_NOT_FOUND                      :: HRESULT(-0x7C75FFFE)
@@ -1110,20 +1129,3 @@ READING_NOT_FOUND                     :: HRESULT(-0x7C75FFFD)
 REFERENCE_READING_TOO_OLD             :: HRESULT(-0x7C75FFFC)
 TIMESTAMP_OUT_OF_RANGE                :: HRESULT(-0x7C75FFFB)
 INSUFFICIENT_FORCE_FEEDBACK_RESOURCES :: HRESULT(-0x7C75FFFA)
-
-CallbackToken :: distinct u64
-
-CURRENT_CALLBACK_TOKEN_VALUE :: CallbackToken(0xFFFFFFFFFFFFFFFF)
-INVALID_CALLBACK_TOKEN_VALUE :: CallbackToken(0x0000000000000000)
-
-@(default_calling_convention="system", link_prefix="GameInput")
-foreign wgi {
-	Create :: proc(gameInput: ^^IGameInput) -> HRESULT ---
-}
-
-DeviceCallback         :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentState: DeviceStatus, previousState: DeviceStatus)
-GuideButtonCallback    :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, isPressed: bool)
-SystemButtonCallback   :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentState: DeviceStatus, previousState: DeviceStatus)
-ReadingCallback        :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, reading: ^IGameInputReading, hasOverrunOccured: bool)
-KeyboardLayoutCallback :: #type proc "system" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentState: DeviceStatus, previousState: DeviceStatus)
-

@@ -7,6 +7,7 @@ Platform_Memory_Block :: struct {
 	reserved:   uint,
 } 
 
+@(no_sanitize_address)
 platform_memory_alloc :: proc "contextless" (to_commit, to_reserve: uint) -> (block: ^Platform_Memory_Block, err: Allocator_Error) {
 	to_commit, to_reserve := to_commit, to_reserve
 	to_reserve = max(to_commit, to_reserve)
@@ -26,12 +27,14 @@ platform_memory_alloc :: proc "contextless" (to_commit, to_reserve: uint) -> (bl
 }
 
 
+@(no_sanitize_address)
 platform_memory_free :: proc "contextless" (block: ^Platform_Memory_Block) {
 	if block != nil {
 		release(block, block.reserved)
 	}
 }
 
+@(no_sanitize_address)
 platform_memory_commit :: proc "contextless" (block: ^Platform_Memory_Block, to_commit: uint) -> (err: Allocator_Error) {
 	if to_commit < block.committed {
 		return nil

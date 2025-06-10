@@ -41,6 +41,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_enum,
 	is_type_proc,
 	is_type_bit_set,
+	is_type_bit_field,
 	is_type_simd_vector,
 	is_type_matrix,
 
@@ -223,9 +224,9 @@ gb_internal void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_t
 	data.kind = kind;
 	data.proc_type = alloc_type_proc(scope, params, param_types.count, results, results->Tuple.variables.count, false, ProcCC_CDecl);
 
-	mutex_lock(&c->info->objc_types_mutex);
+	mutex_lock(&c->info->objc_objc_msgSend_mutex);
 	map_set(&c->info->objc_msgSend_types, call, data);
-	mutex_unlock(&c->info->objc_types_mutex);
+	mutex_unlock(&c->info->objc_objc_msgSend_mutex);
 
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
@@ -386,6 +387,59 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		try_to_add_package_dependency(c, "runtime", "sel_registerName");
 		try_to_add_package_dependency(c, "runtime", "objc_allocateClassPair");
 		return true;
+	} break;
+
+	case BuiltinProc_objc_ivar_get:
+	{
+		Type *self_type = nullptr;
+
+		Operand self = {};
+		check_expr_or_type(c, &self, ce->args[0]);
+
+		if (!is_operand_value(self) || !check_is_assignable_to(c, &self, t_objc_id)) {
+			gbString e = expr_to_string(self.expr);
+			gbString t = type_to_string(self.type);
+			error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		} else if (!is_type_pointer(self.type)) {
+			gbString e = expr_to_string(self.expr);
+			gbString t = type_to_string(self.type);
+			error(self.expr, "'%.*s' expected a pointer of a value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		}
+
+		self_type = type_deref(self.type);
+
+		if (!(self_type->kind == Type_Named &&
+			self_type->Named.type_name != nullptr &&
+			self_type->Named.type_name->TypeName.objc_class_name != "")) {
+			gbString t = type_to_string(self_type);
+			error(self.expr, "'%.*s' expected a named type with the attribute @(objc_class=<string>) , got type %s", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		Type *ivar_type = self_type->Named.type_name->TypeName.objc_ivar;
+		if (ivar_type == nullptr) {
+			gbString t = type_to_string(self_type);
+			error(self.expr, "'%.*s' requires that type %s have the attribute @(objc_ivar=<ivar_type_name>).", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		if (type_hint != nullptr && type_hint->kind == Type_Pointer && type_hint->Pointer.elem == ivar_type) {
+			operand->type = type_hint;
+		} else {
+			operand->type = alloc_type_pointer(ivar_type);
+		}
+
+		operand->mode = Addressing_Value;
+		return true;
+
 	} break;
 	}
 }
@@ -760,6 +814,36 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
+	case BuiltinProc_simd_indices:
+		{
+			Operand x = {};
+			check_expr_or_type(c, &x, ce->args[0], nullptr);
+			if (x.mode == Addressing_Invalid) return false;
+			if (x.mode != Addressing_Type) {
+				gbString s = expr_to_string(x.expr);
+				error(x.expr, "'%.*s' expected a simd vector type, got '%s'", LIT(builtin_name), s);
+				gb_string_free(s);
+				return false;
+			}
+			if (!is_type_simd_vector(x.type)) {
+				gbString s = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a simd vector type, got '%s'", LIT(builtin_name), s);
+				gb_string_free(s);
+				return false;
+			}
+
+			Type *elem = base_array_type(x.type);
+			if (!is_type_numeric(elem)) {
+				gbString s = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a simd vector type with a numeric element type, got '%s'", LIT(builtin_name), s);
+				gb_string_free(s);
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+			return true;
+		}
+
 	case BuiltinProc_simd_extract:
 		{
 			Operand x = {};
@@ -823,8 +907,12 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 		}
 		break;
 
+	case BuiltinProc_simd_reduce_add_bisect:
+	case BuiltinProc_simd_reduce_mul_bisect:
 	case BuiltinProc_simd_reduce_add_ordered:
 	case BuiltinProc_simd_reduce_mul_ordered:
+	case BuiltinProc_simd_reduce_add_pairs:
+	case BuiltinProc_simd_reduce_mul_pairs:
 	case BuiltinProc_simd_reduce_min:
 	case BuiltinProc_simd_reduce_max:
 		{
@@ -2059,6 +2147,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_atomic_type_is_lock_free:
 	case BuiltinProc_has_target_feature:
 	case BuiltinProc_procedure_of:
+	case BuiltinProc_simd_indices:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -2132,7 +2221,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_find_selector: 
 	case BuiltinProc_objc_find_class: 
 	case BuiltinProc_objc_register_selector: 
-	case BuiltinProc_objc_register_class: 
+	case BuiltinProc_objc_register_class:
+	case BuiltinProc_objc_ivar_get:
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:
@@ -2782,8 +2872,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// quaternion :: proc(imag, jmag, kmag, real: float_type) -> complex_type
 		Operand xyzw[4] = {};
 
-		u32 first_index = 0;
-
 		// NOTE(bill): Invalid will be the default till fixed
 		operand->type = t_invalid;
 		operand->mode = Addressing_Invalid;
@@ -2828,6 +2916,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 				if (fields_set[*index]) {
 					error(field->field, "Previously assigned field: '%.*s'", LIT(name));
+					return false;
 				}
 				fields_set[*index] = style;
 
@@ -2844,7 +2933,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				if (!ok || index < 0) {
 					return false;
 				}
-				first_index = cast(u32)index;
 				*refs[index] = o;
 			}
 
@@ -2869,12 +2957,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 
 
-		for (u32 i = 0; i < 4; i++ ){
-			u32 j = (i + first_index) % 4;
-			if (j == first_index) {
-				convert_to_typed(c, &xyzw[j], xyzw[(first_index+1)%4].type); if (xyzw[j].mode == Addressing_Invalid) return false;
-			} else {
-				convert_to_typed(c, &xyzw[j], xyzw[first_index].type); if (xyzw[j].mode == Addressing_Invalid) return false;
+		// The first typed value found, if any exist, will dictate the type for all untyped values.
+		for (u32 i = 0; i < 4; i++) {
+			if (is_type_typed(xyzw[i].type)) {
+				for (u32 j = 0; j < 4; j++) {
+					// `convert_to_typed` should check if it is typed already.
+					convert_to_typed(c, &xyzw[j], xyzw[i].type);
+					if (xyzw[j].mode == Addressing_Invalid) {
+						return false;
+					}
+				}
+				break;
 			}
 		}
 		if (xyzw[0].mode == Addressing_Constant &&
@@ -2898,7 +2991,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gbString ty = type_to_string(xyzw[1].type);
 			gbString tz = type_to_string(xyzw[2].type);
 			gbString tw = type_to_string(xyzw[3].type);
-			error(call, "Mismatched types to 'quaternion', 'x=%s' vs 'y=%s' vs 'z=%s' vs 'w=%s'", tx, ty, tz, tw);
+			error(call, "Mismatched types to 'quaternion', 'w=%s' vs 'x=%s' vs 'y=%s' vs 'z=%s'", tw, tx, ty, tz);
 			gb_string_free(tw);
 			gb_string_free(tz);
 			gb_string_free(ty);
@@ -2934,7 +3027,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Constant;
 		}
 
-		BasicKind kind = core_type(xyzw[first_index].type)->Basic.kind;
+		BasicKind kind = core_type(xyzw[0].type)->Basic.kind;
 		switch (kind) {
 		case Basic_f16:          operand->type = t_quaternion64;       break;
 		case Basic_f32:          operand->type = t_quaternion128;      break;
@@ -3153,6 +3246,194 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		break;
 	}
+
+	case BuiltinProc_compress_values: {
+		Operand *ops = gb_alloc_array(temporary_allocator(), Operand, ce->args.count);
+
+		isize value_count = 0;
+
+		for_array(i, ce->args) {
+			Ast *arg = ce->args[i];
+			Operand *op = &ops[i];
+			check_multi_expr(c, op, arg);
+			if (op->mode == Addressing_Invalid) {
+				return false;
+			}
+
+			if (op->type == nullptr || op->type == t_invalid) {
+				gbString s = expr_to_string(op->expr);
+				error(op->expr, "Invalid expression to '%.*s', got %s", LIT(builtin_name), s);
+				gb_string_free(s);
+			}
+			if (is_type_tuple(op->type)) {
+				value_count += op->type->Tuple.variables.count;
+			} else {
+				value_count += 1;
+			}
+		}
+
+		GB_ASSERT(value_count >= 1);
+
+		if (value_count == 1) {
+			*operand = ops[0];
+			break;
+		}
+
+		if (type_hint != nullptr) {
+			Type *th = base_type(type_hint);
+			if (th->kind == Type_Struct) {
+				if (value_count == th->Struct.fields.count) {
+					isize index = 0;
+					for_array(i, ce->args) {
+						Operand *op = &ops[i];
+						if (is_type_tuple(op->type)) {
+							for (Entity *v : op->type->Tuple.variables) {
+								Operand x = {};
+								x.mode = Addressing_Value;
+								x.type = v->type;
+								check_assignment(c, &x, th->Struct.fields[index++]->type, builtin_name);
+								if (x.mode == Addressing_Invalid) {
+									return false;
+								}
+							}
+						} else {
+							check_assignment(c, op, th->Struct.fields[index++]->type, builtin_name);
+							if (op->mode == Addressing_Invalid) {
+								return false;
+							}
+						}
+					}
+
+					operand->type = type_hint;
+					operand->mode = Addressing_Value;
+					break;
+				}
+			} else if (is_type_array_like(th)) {
+				if (cast(i64)value_count == get_array_type_count(th)) {
+					Type *elem = base_array_type(th);
+					for_array(i, ce->args) {
+						Operand *op = &ops[i];
+						if (is_type_tuple(op->type)) {
+							for (Entity *v : op->type->Tuple.variables) {
+								Operand x = {};
+								x.mode = Addressing_Value;
+								x.type = v->type;
+								check_assignment(c, &x, elem, builtin_name);
+								if (x.mode == Addressing_Invalid) {
+									return false;
+								}
+							}
+						} else {
+							check_assignment(c, op, elem, builtin_name);
+							if (op->mode == Addressing_Invalid) {
+								return false;
+							}
+						}
+					}
+
+					operand->type = type_hint;
+					operand->mode = Addressing_Value;
+					break;
+				}
+			}
+		}
+
+		bool all_types_the_same = true;
+		Type *last_type = nullptr;
+		for_array(i, ce->args) {
+			Operand *op = &ops[i];
+			if (is_type_tuple(op->type)) {
+				if (last_type == nullptr) {
+					op->type->Tuple.variables[0]->type;
+				}
+				for (Entity *v : op->type->Tuple.variables) {
+					if (!are_types_identical(last_type, v->type)) {
+						all_types_the_same = false;
+						break;
+					}
+					last_type = v->type;
+				}
+			} else {
+				if (last_type == nullptr) {
+					last_type = op->type;
+				} else {
+					if (!are_types_identical(last_type, op->type)) {
+						all_types_the_same = false;
+						break;
+					}
+					last_type = op->type;
+				}
+			}
+		}
+
+		if (all_types_the_same) {
+			Type *elem_type = default_type(last_type);
+			if (is_type_untyped(elem_type)) {
+				gbString s = expr_to_string(call);
+				error(call, "Invalid use of '%s' in '%.*s'", s, LIT(builtin_name));
+				gb_string_free(s);
+				return false;
+			}
+
+			operand->type = alloc_type_array(elem_type, value_count);
+			operand->mode = Addressing_Value;
+		} else {
+			Type *st = alloc_type_struct_complete();
+			st->Struct.fields = slice_make<Entity *>(permanent_allocator(), value_count);
+			st->Struct.tags = gb_alloc_array(permanent_allocator(), String, value_count);
+			st->Struct.offsets = gb_alloc_array(permanent_allocator(), i64, value_count);
+
+			Scope *scope = create_scope(c->info, nullptr);
+
+			Token token = {};
+			token.kind = Token_Ident;
+			token.pos = ast_token(call).pos;
+
+			isize index = 0;
+			for_array(i, ce->args) {
+				Operand *op = &ops[i];
+				if (is_type_tuple(op->type)) {
+					for (Entity *v : op->type->Tuple.variables) {
+						Type *t = default_type(v->type);
+						if (is_type_untyped(t)) {
+							gbString s = expr_to_string(op->expr);
+							error(op->expr, "Invalid use of '%s' in '%.*s'", s, LIT(builtin_name));
+							gb_string_free(s);
+							return false;
+						}
+
+						gbString s = gb_string_make_reserve(permanent_allocator(), 32);
+						s = gb_string_append_fmt(s, "v%lld", cast(long long)index);
+						token.string = make_string_c(s);
+						Entity *e = alloc_entity_field(scope, token, t, false, cast(i32)index, EntityState_Resolved);
+						st->Struct.fields[index++] = e;
+					}
+				} else {
+					Type *t = default_type(op->type);
+					if (is_type_untyped(t)) {
+						gbString s = expr_to_string(op->expr);
+						error(op->expr, "Invalid use of '%s' in '%.*s'", s, LIT(builtin_name));
+						gb_string_free(s);
+						return false;
+					}
+
+					gbString s = gb_string_make_reserve(permanent_allocator(), 32);
+					s = gb_string_append_fmt(s, "v%lld", cast(long long)index);
+					token.string = make_string_c(s);
+					Entity *e = alloc_entity_field(scope, token, t, false, cast(i32)index, EntityState_Resolved);
+					st->Struct.fields[index++] = e;
+				}
+			}
+
+
+			gb_unused(type_size_of(st));
+
+			operand->type = st;
+			operand->mode = Addressing_Value;
+		}
+		break;
+	}
+
 
 	case BuiltinProc_min: {
 		// min :: proc($T: typeid) -> ordered
@@ -5312,7 +5593,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 
 			if (sz >= 64) {
-				if (is_type_unsigned(x.type)) {
+				if (is_type_unsigned(x.type) || is_type_unsigned(y.type)) {
 					add_package_dependency(c, "runtime", "umodti3", true);
 					add_package_dependency(c, "runtime", "udivti3", true);
 				} else {
@@ -5550,6 +5831,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			case Type_EnumeratedArray: operand->type = bt->EnumeratedArray.elem; break;
 			case Type_Slice:           operand->type = bt->Slice.elem;           break;
 			case Type_DynamicArray:    operand->type = bt->DynamicArray.elem;    break;
+			case Type_SimdVector:      operand->type = bt->SimdVector.elem;      break;
 			}
 		}
 		operand->mode = Addressing_Type;
@@ -5598,6 +5880,87 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = new_type;
 		}
 		operand->mode = Addressing_Type;
+		break;
+	case BuiltinProc_type_integer_to_unsigned:
+		if (operand->mode != Addressing_Type) {
+			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+			return false;
+		} 
+
+		if (is_type_polymorphic(operand->type)) {
+			gbString t = type_to_string(operand->type);
+			error(operand->expr, "Expected a non-polymorphic type for '%.*s', got %s", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		{
+			Type *bt = base_type(operand->type);
+
+			if (bt->kind != Type_Basic || 
+				(bt->Basic.flags & BasicFlag_Unsigned) != 0 || 
+				(bt->Basic.flags & BasicFlag_Integer) == 0) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a signed integer type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			if ((bt->Basic.flags & BasicFlag_Untyped) != 0) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a non-untyped integer type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			Type *u_type = &basic_types[bt->Basic.kind + 1];
+
+			operand->type = u_type;
+		}
+		break;
+	case BuiltinProc_type_integer_to_signed:
+		if (operand->mode != Addressing_Type) {
+			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+			return false;
+		} 
+
+		if (is_type_polymorphic(operand->type)) {
+			gbString t = type_to_string(operand->type);
+			error(operand->expr, "Expected a non-polymorphic type for '%.*s', got %s", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		{
+			Type *bt = base_type(operand->type);
+
+			if (bt->kind != Type_Basic || 
+				(bt->Basic.flags & BasicFlag_Unsigned) == 0 || 
+				(bt->Basic.flags & BasicFlag_Integer) == 0) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected an unsigned integer type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			if ((bt->Basic.flags & BasicFlag_Untyped) != 0) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a non-untyped integer type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			if (bt->Basic.kind == Basic_uintptr) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Type %s does not have a signed integer mapping for '%.*s'", t, LIT(builtin_name));
+				gb_string_free(t);
+				return false;
+			}
+
+			Type *u_type = &basic_types[bt->Basic.kind - 1];
+
+			operand->type = u_type;
+		}
 		break;
 	case BuiltinProc_type_merge:
 		{
@@ -5719,6 +6082,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_enum:
 	case BuiltinProc_type_is_proc:
 	case BuiltinProc_type_is_bit_set:
+	case BuiltinProc_type_is_bit_field:
 	case BuiltinProc_type_is_simd_vector:
 	case BuiltinProc_type_is_matrix:
 	case BuiltinProc_type_is_specialized_polymorphic_record:
@@ -6000,12 +6364,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			
 			// NOTE(jakubtomsu): forces calculation of variant_block_size
 			type_size_of(u);
-			i64 tag_offset = u->Union.variant_block_size;
-			GB_ASSERT(tag_offset > 0);
+			// NOTE(Jeroen): A tag offset of zero is perfectly fine if all members of the union are empty structs.
+			//               What matters is that the tag size is > 0.
+			GB_ASSERT(u->Union.tag_size > 0);
 			
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
-			operand->value = exact_value_i64(tag_offset);
+			operand->value = exact_value_i64(u->Union.variant_block_size);
 		}
 		break;
 

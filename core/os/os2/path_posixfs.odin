@@ -4,10 +4,6 @@ package os2
 
 // This implementation is for all systems that have POSIX-compliant filesystem paths.
 
-import "base:runtime"
-import "core:strings"
-import "core:sys/posix"
-
 _are_paths_identical :: proc(a, b: string) -> (identical: bool) {
 	return a == b
 }
@@ -24,23 +20,6 @@ _clean_path_handle_start :: proc(path: string, buffer: []u8) -> (rooted: bool, s
 
 _is_absolute_path :: proc(path: string) -> bool {
 	return len(path) > 0 && _is_path_separator(path[0])
-}
-
-_get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absolute_path: string, err: Error) {
-	rel := path
-	if rel == "" {
-		rel = "."
-	}
-	TEMP_ALLOCATOR_GUARD()
-	rel_cstr := strings.clone_to_cstring(rel, temp_allocator())
-	path_ptr := posix.realpath(rel_cstr, nil)
-	if path_ptr == nil {
-		return "", Platform_Error(posix.errno())
-	}
-	defer posix.free(path_ptr)
-
-	path_str := strings.clone(string(path_ptr), allocator)
-	return path_str, nil
 }
 
 _get_relative_path_handle_start :: proc(base, target: string) -> bool {

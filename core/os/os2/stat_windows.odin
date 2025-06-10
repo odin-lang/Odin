@@ -45,15 +45,15 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 		name = "."
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	p := win32_utf8_to_utf16(name, temp_allocator()) or_return
+	p := win32_utf8_to_utf16(name, temp_allocator) or_return
 
 	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
 	if n == 0 {
 		return "", _get_platform_error()
 	}
-	buf := make([]u16, n+1, temp_allocator())
+	buf := make([]u16, n+1, temp_allocator)
 	n = win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
 	if n == 0 {
 		return "", _get_platform_error()
@@ -65,9 +65,9 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 	if len(name) == 0 {
 		return {}, .Not_Exist
 	}
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	wname := _fix_long_path(name, temp_allocator()) or_return
+	wname := _fix_long_path(name, temp_allocator) or_return
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
 	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa)
 	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
@@ -137,9 +137,9 @@ _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (strin
 		return "", _get_platform_error()
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	buf := make([]u16, max(n, 260)+1, temp_allocator())
+	buf := make([]u16, max(n, 260)+1, temp_allocator)
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
 	return _cleanpath_from_buf(buf[:n], allocator)
 }
@@ -155,9 +155,9 @@ _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 		return nil, _get_platform_error()
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
-	buf := make([]u16, max(n, 260)+1, temp_allocator())
+	buf := make([]u16, max(n, 260)+1, temp_allocator)
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
 	return _cleanpath_strip_prefix(buf[:n]), nil
 }
@@ -236,14 +236,30 @@ _file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: wi
 	return
 }
 
+// a 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 (UTC)
+time_as_filetime :: #force_inline proc(t: time.Time) -> (ft: win32.LARGE_INTEGER) {
+	win := u64(t._nsec / 100) + 116444736000000000
+	return win32.LARGE_INTEGER(win)
+}
+
+filetime_as_time_li :: #force_inline proc(ft: win32.LARGE_INTEGER) -> (t: time.Time) {
+	return {_nsec=(i64(ft) - 116444736000000000) * 100}
+}
+
+filetime_as_time_ft :: #force_inline proc(ft: win32.FILETIME) -> (t: time.Time) {
+	return filetime_as_time_li(win32.LARGE_INTEGER(ft.dwLowDateTime) + win32.LARGE_INTEGER(ft.dwHighDateTime) << 32)
+}
+
+filetime_as_time :: proc{filetime_as_time_ft, filetime_as_time_li}
+
 _file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.type = type
 	fi.mode |= mode
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+	fi.creation_time     = filetime_as_time(d.ftCreationTime)
+	fi.modification_time = filetime_as_time(d.ftLastWriteTime)
+	fi.access_time       = filetime_as_time(d.ftLastAccessTime)
 	fi.fullpath, e = full_path_from_name(name, allocator)
 	fi.name = basename(fi.fullpath)
 	return
@@ -254,9 +270,9 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.type = type
 	fi.mode |= mode
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+	fi.creation_time     = filetime_as_time(d.ftCreationTime)
+	fi.modification_time = filetime_as_time(d.ftLastWriteTime)
+	fi.access_time       = filetime_as_time(d.ftLastAccessTime)
 	fi.fullpath, e = full_path_from_name(name, allocator)
 	fi.name = basename(fi.fullpath)
 	return
@@ -286,9 +302,9 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, h, 0)
 	fi.type = type
 	fi.mode |= mode
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+	fi.creation_time     = filetime_as_time(d.ftCreationTime)
+	fi.modification_time = filetime_as_time(d.ftLastWriteTime)
+	fi.access_time       = filetime_as_time(d.ftLastAccessTime)
 	return fi, nil
 }
 
@@ -310,42 +326,68 @@ _is_reserved_name :: proc(path: string) -> bool {
 	return false
 }
 
-_is_UNC :: proc(path: string) -> bool {
-	return _volume_name_len(path) > 2
-}
-
-_volume_name_len :: proc(path: string) -> int {
+_volume_name_len :: proc(path: string) -> (length: int) {
 	if len(path) < 2 {
 		return 0
 	}
-	c := path[0]
+
 	if path[1] == ':' {
-		switch c {
+		switch path[0] {
 		case 'a'..='z', 'A'..='Z':
 			return 2
 		}
 	}
 
-	// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-	if l := len(path); l >= 5 && _is_path_separator(path[0]) && _is_path_separator(path[1]) &&
-		!_is_path_separator(path[2]) && path[2] != '.' {
-		for n := 3; n < l-1; n += 1 {
-			if _is_path_separator(path[n]) {
-				n += 1
-				if !_is_path_separator(path[n]) {
-					if path[n] == '.' {
-						break
-					}
-				}
-				for ; n < l; n += 1 {
-					if _is_path_separator(path[n]) {
-						break
-					}
-				}
-				return n
+	/*
+		See: URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+		Further allowed paths can be of the form of:
+		- \\server\share or \\server\share\more\path
+		- \\?\C:\...
+		- \\.\PhysicalDriveX
+	*/
+	// Any remaining kind of path has to start with two slashes.
+	if !_is_path_separator(path[0]) || !_is_path_separator(path[1]) {
+		return 0
+	}
+
+	// Device path. The volume name is the whole string
+	if len(path) >= 5 && path[2] == '.' && _is_path_separator(path[3]) {
+		return len(path)
+	}
+
+	// We're a UNC share `\\host\share`, file namespace `\\?\C:` or UNC in file namespace `\\?\\host\share`
+	prefix := 2
+
+	// File namespace.
+	if len(path) >= 5 && path[2] == '?' && _is_path_separator(path[3]) {
+		if _is_path_separator(path[4]) {
+			// `\\?\\` UNC path in file namespace
+			prefix = 5
+		}
+
+		if len(path) >= 6 && path[5] == ':' {
+			switch path[4] {
+			case 'a'..='z', 'A'..='Z':
+				return 6
+			case:
+				return 0
 			}
-			break
 		}
 	}
-	return 0
+
+	// UNC path, minimum version of the volume is `\\h\s` for host, share.
+	// Can also contain an IP address in the host position.
+	slash_count := 0
+	for i in prefix..<len(path) {
+		// Host needs to be at least 1 character
+		if _is_path_separator(path[i]) && i > 0 {
+			slash_count += 1
+
+			if slash_count == 2 {
+				return i
+			}
+		}
+	}
+
+	return len(path)
 }

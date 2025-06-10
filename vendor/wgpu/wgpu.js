@@ -340,8 +340,8 @@ class WebGPUInterface {
 
 		return STATUS_SUCCESS;
 	}
-	
-	genericAdapterInfo(infoPtr) {
+
+	genericGetAdapterInfo(infoPtr) {
 		this.assert(infoPtr != 0);
 
 		const off = this.struct(infoPtr);
@@ -528,7 +528,7 @@ class WebGPUInterface {
 			return undefined;
 		}
 
-		const off = this.struct(ptr);
+		const off = this.struct(start);
 
 		return {
 			view:              this.textureViews.get(this.mem.loadPtr(off(4))),
@@ -2033,7 +2033,7 @@ class WebGPUInterface {
 						addressModeW:  this.enumeration("AddressMode", off(4)),
 						magFilter:     this.enumeration("FilterMode", off(4)),
 						minFilter:     this.enumeration("FilterMode", off(4)),
-						mipMapFilter:  this.enumeration("MipmapFilterMode", off(4)),
+						mipmapFilter:  this.enumeration("MipmapFilterMode", off(4)),
 						lodMinClamp:   this.mem.loadF32(off(4)),
 						lodMaxClamp:   this.mem.loadF32(off(4)),
 						compare:       this.enumeration("CompareFunction", off(4)),

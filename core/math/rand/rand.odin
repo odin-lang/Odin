@@ -33,7 +33,7 @@ Example:
 	import "core:math/rand"
 	import "core:fmt"
 
-	set_global_seed_example :: proc() {
+	reset_example :: proc() {
 		rand.reset(1)
 		fmt.println(rand.uint64())
 	}
@@ -350,7 +350,7 @@ Example:
 Possible Output:
 
 	6
-	500
+	13
 
 */
 @(require_results)
@@ -432,7 +432,7 @@ Example:
 Possible Output:
 
 	15.312
-	673.130
+	273.15
 
 */
 @(require_results) float64_range :: proc(low, high: f64, gen := context.random_generator) -> (val: f64) {
@@ -467,7 +467,7 @@ Example:
 Possible Output:
 
 	15.312
-	273.130
+	273.15
 
 */
 @(require_results) float32_range :: proc(low, high: f32, gen := context.random_generator) -> (val: f32) {

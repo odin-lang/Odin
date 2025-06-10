@@ -139,9 +139,6 @@ Context_Memory_Input :: struct #packed {
 }
 when size_of(rawptr) == 8 {
 	#assert(size_of(Context_Memory_Input) == 64)
-} else {
-	// e.g. `-target:windows_i386`
-	#assert(size_of(Context_Memory_Input) == 52)
 }
 
 Context_Stream_Input :: struct #packed {

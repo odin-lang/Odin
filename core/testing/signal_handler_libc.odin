@@ -12,9 +12,9 @@ package testing
 
 import "base:intrinsics"
 import "core:c/libc"
-import "core:encoding/ansi"
-import "core:sync"
 import "core:os"
+import "core:sync"
+import "core:terminal/ansi"
 
 @(private="file") stop_runner_flag: libc.sig_atomic_t
 
@@ -63,9 +63,11 @@ stop_test_callback :: proc "c" (sig: libc.int) {
 		// NOTE(Feoramund): Using these write calls in a signal handler is
 		// undefined behavior in C99 but possibly tolerated in POSIX 2008.
 		// Either way, we may as well try to salvage what we can.
-		show_cursor := ansi.CSI + ansi.DECTCEM_SHOW
-		libc.fwrite(raw_data(show_cursor), size_of(byte), len(show_cursor), libc.stdout)
-		libc.fflush(libc.stdout)
+		if !global_ansi_disabled {
+			show_cursor := ansi.CSI + ansi.DECTCEM_SHOW
+			libc.fwrite(raw_data(show_cursor), size_of(byte), len(show_cursor), libc.stdout)
+			libc.fflush(libc.stdout)
+		}
 
 		// This is an attempt at being compliant by avoiding printf.
 		sigbuf: [8]byte

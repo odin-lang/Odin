@@ -81,7 +81,7 @@ String get_working_directory(gbAllocator allocator) {
 	auto buf = array_make<char>(temporary_allocator());
 	size_t size = PATH_MAX;
 
-	char const *cwd;
+	char const *cwd = nullptr;
 	for (; cwd == nullptr; size *= 2) {
 		array_resize(&buf, size);
 

@@ -277,6 +277,8 @@ PixelFormat :: enum c.int {
         /* SDL_DEFINE_PIXELFOURCC('P', '0', '1', '0'), */
 	EXTERNAL_OES = 0x2053454f,     /**< Android video texture format */
         /* SDL_DEFINE_PIXELFOURCC('O', 'E', 'S', ' ') */
+	MJPG = 0x47504a4d,      /**< Motion JPEG */
+        /* SDL_DEFINE_PIXELFOURCC('M', 'J', 'P', 'G') */
 
 	/* Aliases for RGBA byte arrays of color data, for the current platform */
 	RGBA32 = RGBA8888 when BYTEORDER == BIG_ENDIAN else ABGR8888,

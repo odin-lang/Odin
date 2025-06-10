@@ -579,7 +579,7 @@ Inotify_Event_Bits :: enum u32 {
 /*
 	Bits for Mem_Protection bitfield
 */
-Mem_Protection_Bits :: enum{
+Mem_Protection_Bits :: enum {
 	READ      = 0,
 	WRITE     = 1,
 	EXEC      = 2,
@@ -594,11 +594,13 @@ Mem_Protection_Bits :: enum{
 
 /*
 	Bits for Map_Flags
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags_Bits :: enum {
 	SHARED          = 0,
 	PRIVATE         = 1,
-	SHARED_VALIDATE = 2,
+	DROPPABLE       = 3,
 	FIXED           = 4,
 	ANONYMOUS       = 5,
 	// platform-dependent section start

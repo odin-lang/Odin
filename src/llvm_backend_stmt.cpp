@@ -136,7 +136,6 @@ gb_internal lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident) {
 	return empty;
 }
 
-
 gb_internal lbTargetList *lb_push_target_list(lbProcedure *p, Ast *label, lbBlock *break_, lbBlock *continue_, lbBlock *fallthrough_) {
 	lbTargetList *tl = gb_alloc_item(permanent_allocator(), lbTargetList);
 	tl->prev = p->target_list;
@@ -688,6 +687,18 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 	lbBlock *body = lb_create_block(p, "for.interval.body");
 	lbBlock *done = lb_create_block(p, "for.interval.done");
 
+	// TODO(tf2spi): This is inlined in more than several places.
+	//               Putting this in a function might be preferred.
+	//               LLVMSetCurrentDebugLocation2 has side effects,
+	//               so I didn't want to hide that before it got reviewed.
+	if (rs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.interval.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
+		lb_add_debug_label(p, rs->label, label);
+	}
 	lb_emit_jump(p, loop);
 	lb_start_block(p, loop);
 
@@ -893,6 +904,14 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 
 	lbAddr index = lb_add_local_generated(p, t_int, false);
 
+	if (rs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.soa.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
+		lb_add_debug_label(p, rs->label, label);
+	}
 	if (!is_reverse) {
 		/*
 			for x, i in array {
@@ -970,7 +989,6 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 		lb_store_range_stmt_val(p, val1, lb_addr_load(p, index));
 	}
 
-
 	lb_push_target_list(p, rs->label, done, loop, nullptr);
 
 	lb_build_stmt(p, rs->body);
@@ -1029,6 +1047,15 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 	lbBlock *done = nullptr;
 	bool is_map = false;
 
+	if (rs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.range.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
+		lb_add_debug_label(p, rs->label, label);
+	}
+
 	if (tav.mode == Addressing_Type) {
 		lb_build_range_enum(p, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
 	} else {
@@ -1045,10 +1072,22 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			break;
 		}
 		case Type_Array: {
-			lbValue array = lb_build_addr_ptr(p, expr);
-			if (is_type_pointer(type_deref(array.type))) {
-				array = lb_emit_load(p, array);
+			lbValue array;
+			lbAddr addr = lb_build_addr(p, expr);
+			switch (addr.kind) {
+			case lbAddr_Swizzle:
+			case lbAddr_SwizzleLarge:
+				// NOTE(laytan): apply the swizzle.
+				array = lb_address_from_load(p, lb_addr_load(p, addr));
+				break;
+			default:
+				array = lb_addr_get_ptr(p, addr);
+				if (is_type_pointer(type_deref(array.type))) {
+					array = lb_emit_load(p, array);
+				}
+				break;
 			}
+
 			lbAddr count_ptr = lb_add_local_generated(p, t_int, false);
 			lb_addr_store(p, count_ptr, lb_const_int(p->module, t_int, et->Array.count));
 			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
@@ -1530,6 +1569,14 @@ gb_internal bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, boo
 gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	lb_open_scope(p, scope);
 
+	if (ss->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "switch.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, ss->label));
+		lb_add_debug_label(p, ss->label, label);
+	}
 	if (ss->init != nullptr) {
 		lb_build_stmt(p, ss->init);
 	}
@@ -1736,6 +1783,7 @@ gb_internal lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValu
 gb_internal void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBlock *body, lbBlock *done) {
 	ast_node(cc, CaseClause, clause);
 
+	// NOTE(tf2spi): Debug info for label not generated here on purpose
 	lb_push_target_list(p, label, done, nullptr, nullptr);
 	lb_build_stmt_list(p, cc->stmts);
 	lb_close_scope(p, lbDeferExit_Default, body, clause);
@@ -1963,8 +2011,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
 			          ast_value->tav.mode == Addressing_Invalid);
 
-			bool allow_local = false;
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, allow_local);
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
 		}
 
 		Ast *ident = vd->names[i];
@@ -1985,34 +2032,45 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		char *c_name = alloc_cstring(permanent_allocator(), mangled_name);
 
 		LLVMValueRef global = LLVMAddGlobal(p->module->mod, lb_type(p->module, e->type), c_name);
+		LLVMSetAlignment(global, cast(u32)type_align_of(e->type));
 		LLVMSetInitializer(global, LLVMConstNull(lb_type(p->module, e->type)));
-		if (value.value != nullptr) {
-			LLVMSetInitializer(global, value.value);
-		}
+
 		if (e->Variable.is_rodata) {
 			LLVMSetGlobalConstant(global, true);
 		}
-		if (e->Variable.thread_local_model != "") {
-			LLVMSetThreadLocal(global, true);
 
-			String m = e->Variable.thread_local_model;
-			LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
-			if (m == "default") {
-				mode = LLVMGeneralDynamicTLSModel;
-			} else if (m == "localdynamic") {
-				mode = LLVMLocalDynamicTLSModel;
-			} else if (m == "initialexec") {
-				mode = LLVMInitialExecTLSModel;
-			} else if (m == "localexec") {
-				mode = LLVMLocalExecTLSModel;
-			} else {
-				GB_PANIC("Unhandled thread local mode %.*s", LIT(m));
-			}
-			LLVMSetThreadLocalMode(global, mode);
-		} else {
+		if (!lb_apply_thread_local_model(global, e->Variable.thread_local_model)) {
 			LLVMSetLinkage(global, LLVMInternalLinkage);
 		}
 
+		if (value.value != nullptr) {
+			if (is_type_any(e->type)) {
+				Type *var_type = default_type(value.type);
+
+				gbString var_name = gb_string_make(temporary_allocator(), "__$static_any::");
+				var_name = gb_string_append_length(var_name, mangled_name.text, mangled_name.len);
+
+				lbAddr var_global = lb_add_global_generated_with_name(p->module, var_type, value, make_string_c(var_name), nullptr);
+				LLVMValueRef var_global_ref = var_global.addr.value;
+
+				if (e->Variable.is_rodata) {
+					LLVMSetGlobalConstant(var_global_ref, true);
+				}
+				
+				if (!lb_apply_thread_local_model(var_global_ref, e->Variable.thread_local_model)) {
+					LLVMSetLinkage(var_global_ref, LLVMInternalLinkage);
+				}
+
+				LLVMValueRef vals[2] = {
+					lb_emit_conv(p, var_global.addr, t_rawptr).value,
+					lb_typeid(p->module, var_type).value,
+				};
+				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals, gb_count_of(vals));
+				LLVMSetInitializer(global, init);
+			} else {
+				LLVMSetInitializer(global, value.value);
+			}
+		}
 
 		lbValue global_val = {global, alloc_type_pointer(e->type)};
 		lb_add_entity(p->module, e, global_val);
@@ -2307,6 +2365,14 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 		else_ = lb_create_block(p, "if.else");
 	}
 	if (is->label != nullptr) {
+		if (p->debug_info != nullptr) {
+			lbBlock *label = lb_create_block(p, "if.label");
+			lb_emit_jump(p, label);
+			lb_start_block(p, label);
+
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, is->label));
+			lb_add_debug_label(p, is->label, label);
+		}
 		lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
 		tl->is_block = true;
 	}
@@ -2399,12 +2465,19 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 
 	lb_push_target_list(p, fs->label, done, post, nullptr);
 
+	if (fs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, fs->label));
+		lb_add_debug_label(p, fs->label, label);
+	}
 	if (fs->init != nullptr) {
-	#if 1
 		lbBlock *init = lb_create_block(p, "for.init");
 		lb_emit_jump(p, init);
 		lb_start_block(p, init);
-	#endif
+
 		lb_build_stmt(p, fs->init);
 	}
 
@@ -2419,7 +2492,6 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 		lb_build_cond(p, fs->cond, body, done);
 		lb_start_block(p, body);
 	}
-
 
 	lb_build_stmt(p, fs->body);
 
@@ -2694,9 +2766,21 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 
 	case_ast_node(bs, BlockStmt, node);
+		lbBlock *body = nullptr;
 		lbBlock *done = nullptr;
 		if (bs->label != nullptr) {
+			if (p->debug_info != nullptr) {
+				lbBlock *label = lb_create_block(p, "block.label");
+				lb_emit_jump(p, label);
+				lb_start_block(p, label);
+
+				LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, bs->label));
+				lb_add_debug_label(p, bs->label, label);
+			}
+			body = lb_create_block(p, "block.body");
 			done = lb_create_block(p, "block.done");
+			lb_emit_jump(p, body);
+			lb_start_block(p, body);
 			lbTargetList *tl = lb_push_target_list(p, bs->label, done, nullptr, nullptr);
 			tl->is_block = true;
 		}
@@ -2916,6 +3000,18 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 		p->branch_location_pos = pos;
 	}
 	defer (p->branch_location_pos = prev_token_pos);
+
+	// TODO(lucas): In LLVM 21 use the 'use-after-scope' asan option which does this for us.
+	if (kind == lbDeferExit_Return) {
+		for_array(i, p->asan_stack_locals) {
+			lbValue local = p->asan_stack_locals[i];
+
+			auto args = array_make<lbValue>(temporary_allocator(), 2);
+			args[0] = lb_emit_conv(p, local, t_rawptr);
+			args[1] = lb_const_int(p->module, t_int, type_size_of(local.type->Pointer.elem));
+			lb_emit_runtime_call(p, "__asan_unpoison_memory_region", args);
+		}
+	}
 
 	isize count = p->defer_stmts.count;
 	isize i = count;
