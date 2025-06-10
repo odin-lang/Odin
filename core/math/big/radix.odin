@@ -310,7 +310,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 		res.sign = sign
 	}
 
-	return nil
+	return internal_clamp(res)
 }
 
 

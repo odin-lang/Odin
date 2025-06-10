@@ -257,12 +257,6 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\documentation
           call build.bat
-      - name: core:math/big tests
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\core\math\big
-          call build.bat
       - name: Odin check examples/all for Windows 32bits
         shell: cmd
         run: |

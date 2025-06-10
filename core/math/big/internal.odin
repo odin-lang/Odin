@@ -1660,13 +1660,13 @@ internal_int_sqrt :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
 
 		if internal_gte(y, x) {
 			internal_swap(dest, x)
-			return nil
+			return internal_clamp(dest)
 		}
 		internal_swap(x, y)
 	}
 
 	internal_swap(dest, x)
-	return err
+	return internal_clamp(dest)
 }
 internal_sqrt :: proc { internal_int_sqrt, }
 
