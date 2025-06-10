@@ -6497,7 +6497,7 @@ gb_internal Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_
 	Entity **lhs = nullptr;
 	isize lhs_count = -1;
 
-	if (proc_type == nullptr) {
+	if (proc_type == nullptr || proc_type == t_invalid) {
 		return nullptr;
 	}
 
@@ -6697,6 +6697,9 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 
 	GB_ASSERT(proc_type != nullptr);
 	proc_type = base_type(proc_type);
+	if (proc_type == t_invalid) {
+		return false;
+	}
 	GB_ASSERT(proc_type->kind == Type_Proc);
 
 	CallArgumentError err = check_call_arguments_internal(c, call, e, proc_type, positional_operands, named_operands, show_error_mode, data);
