@@ -21,7 +21,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install binutils-dev build-essential cmake libssl-dev libcurl4-openssl-dev libelf-dev libstdc++-12-dev zlib1g-dev libdw-dev libiberty-dev
-          git clone git@github.com:SimonKagstrom/kcov.git
+          git clone https://github.com/SimonKagstrom/kcov.git
           mkdir kcov/build
           cd kcov/build
           cmake ..
