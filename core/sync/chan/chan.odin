@@ -1126,7 +1126,7 @@ Select_Status :: enum {
 /*
 Attempts to either send or receive messages on the specified channels without blocking.
 
-`select_raw` first identifies which channels have messages ready to be received
+`try_select_raw` first identifies which channels have messages ready to be received
 and which are available for sending. It then randomly selects one operation
 (either a send or receive) to perform.
 
