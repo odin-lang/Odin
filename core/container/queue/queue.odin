@@ -80,36 +80,48 @@ reserve :: proc(q: ^$Q/Queue($T), capacity: int) -> runtime.Allocator_Error {
 
 
 get :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> T {
-	runtime.bounds_check_error_loc(loc, i, builtin.len(q.data))
+	runtime.bounds_check_error_loc(loc, i, int(q.len))
 
 	idx := (uint(i)+q.offset)%builtin.len(q.data)
 	return q.data[idx]
 }
 
-front :: proc(q: ^$Q/Queue($T)) -> T {
+front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> T {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(q.len > 0, "Queue is empty.", loc)
+	}
 	return q.data[q.offset]
 }
-front_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
+front_ptr :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(q.len > 0, "Queue is empty.", loc)
+	}
 	return &q.data[q.offset]
 }
 
-back :: proc(q: ^$Q/Queue($T)) -> T {
+back :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> T {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(q.len > 0, "Queue is empty.", loc)
+	}
 	idx := (q.offset+uint(q.len - 1))%builtin.len(q.data)
 	return q.data[idx]
 }
-back_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
+back_ptr :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(q.len > 0, "Queue is empty.", loc)
+	}
 	idx := (q.offset+uint(q.len - 1))%builtin.len(q.data)
 	return &q.data[idx]
 }
 
 set :: proc(q: ^$Q/Queue($T), #any_int i: int, val: T, loc := #caller_location) {
-	runtime.bounds_check_error_loc(loc, i, builtin.len(q.data))
+	runtime.bounds_check_error_loc(loc, i, int(q.len))
 	
 	idx := (uint(i)+q.offset)%builtin.len(q.data)
 	q.data[idx] = val
 }
 get_ptr :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> ^T {
-	runtime.bounds_check_error_loc(loc, i, builtin.len(q.data))
+	runtime.bounds_check_error_loc(loc, i, int(q.len))
 	
 	idx := (uint(i)+q.offset)%builtin.len(q.data)
 	return &q.data[idx]
@@ -152,7 +164,9 @@ push_front :: proc(q: ^$Q/Queue($T), elem: T) -> (ok: bool, err: runtime.Allocat
 
 // Pop an element from the back of the queue
 pop_back :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> (elem: T) {
-	assert(condition=q.len > 0, loc=loc)
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(q.len > 0, "Queue is empty.", loc)
+	}
 	q.len -= 1
 	idx := (q.offset+uint(q.len))%builtin.len(q.data)
 	elem = q.data[idx]
@@ -171,7 +185,9 @@ pop_back_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 
 // Pop an element from the front of the queue
 pop_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> (elem: T) {
-	assert(condition=q.len > 0, loc=loc)
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(q.len > 0, "Queue is empty.", loc)
+	}
 	elem = q.data[q.offset]
 	q.offset = (q.offset+1)%builtin.len(q.data)
 	q.len -= 1
@@ -209,7 +225,9 @@ push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T) -> (ok: bool, err: runtime
 
 // Consume `n` elements from the front of the queue
 consume_front :: proc(q: ^$Q/Queue($T), n: int, loc := #caller_location) {
-	assert(condition=int(q.len) >= n, loc=loc)
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(q.len >= uint(n), "Queue does not have enough elements to consume.", loc)
+	}
 	if n > 0 {
 		nu := uint(n)
 		q.offset = (q.offset + nu) % builtin.len(q.data)
@@ -219,7 +237,9 @@ consume_front :: proc(q: ^$Q/Queue($T), n: int, loc := #caller_location) {
 
 // Consume `n` elements from the back of the queue
 consume_back :: proc(q: ^$Q/Queue($T), n: int, loc := #caller_location) {
-	assert(condition=int(q.len) >= n, loc=loc)
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(q.len >= uint(n), "Queue does not have enough elements to consume.", loc)
+	}
 	if n > 0 {
 		q.len -= uint(n)
 	}
