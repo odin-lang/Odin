@@ -8,7 +8,10 @@ when ODIN_OS == .Darwin {
 } else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
 	foreign import lib "system:dl"
 } else {
-	foreign import lib "system:c"
+	foreign import lib {
+		"system:c",
+		"system:dl",
+	}
 }
 
 // dlfcn.h - dynamic linking
