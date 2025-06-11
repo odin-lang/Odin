@@ -150,6 +150,19 @@ _bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
 }
 
 @(private)
+_peer_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: TCP_Recv_Error) {
+	addr: posix.sockaddr_storage
+	addr_len := posix.socklen_t(size_of(addr))
+	if posix.getpeername(posix.FD(any_socket_to_socket(sock)), (^posix.sockaddr)(&addr), &addr_len) != .OK {
+		err = _tcp_recv_error()
+		return
+	}
+
+	ep = _sockaddr_to_endpoint(&addr)
+	return
+}
+
+@(private)
 _accept_tcp :: proc(sock: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
 	addr: posix.sockaddr_storage
 	addr_len := posix.socklen_t(size_of(addr))
