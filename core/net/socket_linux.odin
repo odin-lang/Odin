@@ -231,6 +231,19 @@ _bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
 }
 
 @(private)
+_peer_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: TCP_Recv_Error) {
+	addr: linux.Sock_Addr_Any
+	errno := linux.getpeername(_unwrap_os_socket(sock), &addr)
+	if errno != .NONE {
+		err = _tcp_recv_error(errno)
+		return
+	}
+
+	ep = _wrap_os_addr(addr)
+	return
+}
+
+@(private)
 _accept_tcp :: proc(sock: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (tcp_client: TCP_Socket, endpoint: Endpoint, err: Accept_Error) {
 	addr: linux.Sock_Addr_Any
 	client_sock, errno := linux.accept(linux.Fd(sock), &addr)
