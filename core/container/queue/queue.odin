@@ -116,7 +116,7 @@ This may return an error if allocation failed.
 */
 reserve :: proc(q: ^$Q/Queue($T), capacity: int) -> runtime.Allocator_Error {
 	if capacity > space(q^) {
-		return _grow(q, uint(capacity)) 
+		return _grow(q, uint(capacity))
 	}
 	return nil
 }
@@ -167,7 +167,7 @@ This will raise a bounds checking error if `i` is an invalid index.
 */
 get_ptr :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> ^T {
 	runtime.bounds_check_error_loc(loc, i, int(q.len))
-	
+
 	idx := (uint(i)+q.offset)%builtin.len(q.data)
 	return &q.data[idx]
 }
@@ -179,7 +179,7 @@ This will raise a bounds checking error if `i` is an invalid index.
 */
 set :: proc(q: ^$Q/Queue($T), #any_int i: int, val: T, loc := #caller_location) {
 	runtime.bounds_check_error_loc(loc, i, int(q.len))
-	
+
 	idx := (uint(i)+q.offset)%builtin.len(q.data)
 	q.data[idx] = val
 }
@@ -306,7 +306,7 @@ Example:
 push_front :: proc(q: ^$Q/Queue($T), elem: T) -> (ok: bool, err: runtime.Allocator_Error)  {
 	if space(q^) == 0 {
 		_grow(q) or_return
-	}	
+	}
 	q.offset = uint(q.offset - 1 + builtin.len(q.data)) % builtin.len(q.data)
 	q.len += 1
 	q.data[q.offset] = elem
@@ -401,7 +401,7 @@ push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T) -> (ok: bool, err: runtime
 	if space(q^) < int(n) {
 		_grow(q, q.len + n) or_return
 	}
-	
+
 	sz := uint(builtin.len(q.data))
 	insert_from := (q.offset + q.len) % sz
 	insert_to := n
@@ -426,7 +426,7 @@ consume_front :: proc(q: ^$Q/Queue($T), n: int, loc := #caller_location) {
 	if n > 0 {
 		nu := uint(n)
 		q.offset = (q.offset + nu) % builtin.len(q.data)
-		q.len -= nu	
+		q.len -= nu
 	}
 }
 
