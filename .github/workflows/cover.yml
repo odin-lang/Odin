@@ -28,7 +28,7 @@ jobs:
           sudo make
           sudo make install
           cd ../..
-          kcov
+          kcov --version
 
       - name: Build Odin
         run: ./build_odin.sh release
