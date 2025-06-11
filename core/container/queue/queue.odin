@@ -23,10 +23,13 @@ DEFAULT_CAPACITY :: 16
 Initialize a `Queue` with a starting `capacity` and an `allocator`.
 */
 init :: proc(q: ^$Q/Queue($T), capacity := DEFAULT_CAPACITY, allocator := context.allocator) -> runtime.Allocator_Error {
-	if q.data.allocator.procedure == nil {
-		q.data.allocator = allocator
-	}
 	clear(q)
+	q.data = transmute([dynamic]T)runtime.Raw_Dynamic_Array{
+		data = nil,
+		len = 0,
+		cap = 0,
+		allocator = allocator,
+	}
 	return reserve(q, capacity)
 }
 
