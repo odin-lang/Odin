@@ -3,7 +3,7 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_linux_amd64:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     name: Linux AMD64 Test Coverage
     timeout-minutes: 60
     steps:
@@ -21,14 +21,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install binutils-dev build-essential cmake libssl-dev libcurl4-openssl-dev libelf-dev libstdc++-12-dev zlib1g-dev libdw-dev libiberty-dev
-          git clone git@github.com:SimonKagstrom/kcov.git
+          git clone https://github.com/SimonKagstrom/kcov.git
           mkdir kcov/build
           cd kcov/build
           cmake ..
           sudo make
           sudo make install
           cd ../..
-          kcov
+          kcov --version
 
       - name: Build Odin
         run: ./build_odin.sh release
@@ -52,8 +52,9 @@ jobs:
           ./odin build tests/internal -build-mode:test -debug -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
           kcov --exclude-path=tests --exclude-path=/usr kcov-out ./internal .
 
-      - name: Report
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          bash <(curl -s https://codecov.io/bash) -s kcov-out
+      - uses: codecov/codecov-action@v5
+        with:
+          name: Ubuntu Coverage # optional
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true # optional (default = false
+          directory: kcov-out/kcov-merged
