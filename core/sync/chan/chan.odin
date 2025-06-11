@@ -1254,6 +1254,11 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 	}
 }
 
+@(require_results, deprecated = "use try_select_raw")
+select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
+	return try_select_raw(recvs, sends, send_msgs, recv_out)
+}
+
 /*
 `Raw_Queue` is a non-thread-safe queue implementation designed to store messages
 of fixed size and alignment.
