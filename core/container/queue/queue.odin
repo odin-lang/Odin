@@ -420,6 +420,8 @@ append_elem  :: push_back
 append_elems :: push_back_elems
 push   :: proc{push_back, push_back_elems}
 append :: proc{push_back, push_back_elems}
+enqueue :: push_back
+dequeue :: pop_front
 
 
 /*
