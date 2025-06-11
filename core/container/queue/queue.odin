@@ -122,6 +122,33 @@ reserve :: proc(q: ^$Q/Queue($T), capacity: int) -> runtime.Allocator_Error {
 }
 
 /*
+Shrink a queue's dynamically allocated array.
+
+This has no effect if the queue was initialized with a backing slice.
+*/
+shrink :: proc(q: ^$Q/Queue($T), temp_allocator := context.temp_allocator, loc := #caller_location) {
+	if q.data.allocator.procedure == runtime.nil_allocator_proc {
+		return
+	}
+
+	if q.len > 0 && q.offset > 0 {
+		// Make the array contiguous again.
+		buffer := make([]T, q.len, temp_allocator)
+		defer delete(buffer, temp_allocator)
+
+		right := uint(builtin.len(q.data)) - q.offset
+		copy(buffer[:],      q.data[q.offset:])
+		copy(buffer[right:], q.data[:q.offset])
+
+		copy(q.data[:], buffer[:])
+
+		q.offset = 0
+	}
+
+	builtin.shrink(&q.data, q.len, loc)
+}
+
+/*
 Get the element at index `i`.
 
 This will raise a bounds checking error if `i` is an invalid index.
