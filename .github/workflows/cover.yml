@@ -40,17 +40,17 @@ jobs:
         run: |
           ./odin build tests/core/normal.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
           mkdir kcov-out
-          kcov --exclude-path=tests --exclude-path=/usr kcov-out ./normal.bin .
+          kcov --exclude-path=tests,/usr kcov-out ./normal.bin .
 
       - name: Optimized Core library tests
         run: |
           ./odin build tests/core/speed.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
-          kcov --exclude-path=tests --exclude-path=/usr kcov-out ./speed.bin .
+          kcov --exclude-path=tests,/usr kcov-out ./speed.bin .
 
       - name: Internals tests
         run: |
           ./odin build tests/internal -build-mode:test -debug -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
-          kcov --exclude-path=tests --exclude-path=/usr kcov-out ./internal .
+          kcov --exclude-path=tests,/usr kcov-out ./internal .
 
       - uses: codecov/codecov-action@v5
         with:
