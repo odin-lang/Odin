@@ -86,12 +86,27 @@ get :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> T {
 	return q.data[idx]
 }
 
+get_ptr :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> ^T {
+	runtime.bounds_check_error_loc(loc, i, int(q.len))
+	
+	idx := (uint(i)+q.offset)%builtin.len(q.data)
+	return &q.data[idx]
+}
+
+set :: proc(q: ^$Q/Queue($T), #any_int i: int, val: T, loc := #caller_location) {
+	runtime.bounds_check_error_loc(loc, i, int(q.len))
+	
+	idx := (uint(i)+q.offset)%builtin.len(q.data)
+	q.data[idx] = val
+}
+
 front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> T {
 	when !ODIN_NO_BOUNDS_CHECK {
 		ensure(q.len > 0, "Queue is empty.", loc)
 	}
 	return q.data[q.offset]
 }
+
 front_ptr :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
 	when !ODIN_NO_BOUNDS_CHECK {
 		ensure(q.len > 0, "Queue is empty.", loc)
@@ -114,18 +129,6 @@ back_ptr :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
 	return &q.data[idx]
 }
 
-set :: proc(q: ^$Q/Queue($T), #any_int i: int, val: T, loc := #caller_location) {
-	runtime.bounds_check_error_loc(loc, i, int(q.len))
-	
-	idx := (uint(i)+q.offset)%builtin.len(q.data)
-	q.data[idx] = val
-}
-get_ptr :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> ^T {
-	runtime.bounds_check_error_loc(loc, i, int(q.len))
-	
-	idx := (uint(i)+q.offset)%builtin.len(q.data)
-	return &q.data[idx]
-}
 
 @(deprecated="Use `front_ptr` instead")
 peek_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
