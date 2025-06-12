@@ -35,8 +35,6 @@ MAX_RAND    :: 32
 FAIL_TIME   :: 1 * time.Second
 SLEEP_TIME  :: 1 * time.Millisecond
 
-__global_context_for_test: rawptr
-
 comm_client :: proc(th: ^thread.Thread) {
 	data := cast(^Comm)th.data
 	manual_buffering := data.manual_buffering
@@ -383,6 +381,9 @@ test_try_select_raw_no_toctou :: proc(t: ^testing.T) {
 
 	assert(trigger_err == nil, "allocation failed")
 	defer chan.destroy(trigger)
+
+	@(static)
+	__global_context_for_test: rawptr
 
 	__global_context_for_test = &trigger
 	defer __global_context_for_test = nil
