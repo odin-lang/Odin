@@ -35,6 +35,10 @@ MAX_RAND    :: 32
 FAIL_TIME   :: 1 * time.Second
 SLEEP_TIME  :: 1 * time.Millisecond
 
+// Synchronizes try_select tests that require access to global state.
+test_lock: sync.Mutex
+__global_context_for_test: rawptr
+
 comm_client :: proc(th: ^thread.Thread) {
 	data := cast(^Comm)th.data
 	manual_buffering := data.manual_buffering
@@ -277,6 +281,7 @@ test_accept_message_from_closed_buffered_chan :: proc(t: ^testing.T) {
 // operation will process it.
 @test
 test_try_select_raw_happy :: proc(t: ^testing.T) {
+	sync.guard(&test_lock)
 	testing.set_fail_timeout(t, FAIL_TIME)
 
 	recv1, recv1_err := chan.create(chan.Chan(int), context.allocator)
@@ -348,6 +353,7 @@ test_try_select_raw_happy :: proc(t: ^testing.T) {
 // try_select_raw operation does not block.
 @test
 test_try_select_raw_default_state :: proc(t: ^testing.T) {
+	sync.guard(&test_lock)
 	testing.set_fail_timeout(t, FAIL_TIME)
 
 	recv1, recv1_err := chan.create(chan.Chan(int), context.allocator)
@@ -374,6 +380,7 @@ test_try_select_raw_default_state :: proc(t: ^testing.T) {
 // thread between calls to can_{send,recv} and try_{send,recv}_raw.
 @test
 test_try_select_raw_no_toctou :: proc(t: ^testing.T) {
+	sync.guard(&test_lock)
 	testing.set_fail_timeout(t, FAIL_TIME)
 
 	// Trigger will be used to coordinate between the thief and the try_select.
@@ -381,9 +388,6 @@ test_try_select_raw_no_toctou :: proc(t: ^testing.T) {
 
 	assert(trigger_err == nil, "allocation failed")
 	defer chan.destroy(trigger)
-
-	@(static)
-	__global_context_for_test: rawptr
 
 	__global_context_for_test = &trigger
 	defer __global_context_for_test = nil
