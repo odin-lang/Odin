@@ -31,8 +31,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			return 0
 		}
 
-		t.id = sync.current_thread_id()
-
 		{
 			init_context := t.init_context
 
@@ -76,6 +74,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	thread.procedure       = procedure
 	thread.win32_thread    = win32_thread
 	thread.win32_thread_id = win32_thread_id
+	thread.id              = int(win32_thread_id)
 
 	ok := win32.SetThreadPriority(win32_thread, _thread_priority_map[priority])
 	assert(ok == true)
