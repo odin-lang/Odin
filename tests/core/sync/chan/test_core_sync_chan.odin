@@ -228,6 +228,50 @@ test_full_buffered_closed_chan_deadlock :: proc(t: ^testing.T) {
 	testing.expect(t, !chan.send(ch, 32))
 }
 
+// Ensures that if a thread is doing a blocking send and the channel
+// is closed, it will report false to indicate a failure to complete.
+@test
+test_fail_blocking_send_on_close :: proc(t: ^testing.T) {
+	ch, ch_alloc_err := chan.create(chan.Chan(int), context.allocator)
+	assert(ch_alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	sender := thread.create_and_start_with_poly_data(ch, proc(ch: chan.Chan(int)) {
+		assert(!chan.send(ch, 42))
+	})
+
+	for !chan.can_recv(ch) {
+		thread.yield()
+	}
+
+	testing.expect(t, chan.close(ch))
+	thread.join(sender)
+	thread.destroy(sender)
+}
+
+// Ensures that if a thread is doing a blocking read and the channel
+// is closed, it will report false to indicate a failure to complete.
+@test
+test_fail_blocking_recv_on_close :: proc(t: ^testing.T) {
+	ch, ch_alloc_err := chan.create(chan.Chan(int), context.allocator)
+	assert(ch_alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	reader := thread.create_and_start_with_poly_data(ch, proc(ch: chan.Chan(int)) {
+		v, ok := chan.recv(ch)
+		assert(!ok)
+		assert(v == 0)
+	})
+
+	for !chan.can_send(ch) {
+		thread.yield()
+	}
+
+	testing.expect(t, chan.close(ch))
+	thread.join(reader)
+	thread.destroy(reader)
+}
+
 // Ensures that try_send for unbuffered channels works as expected.
 // If 1 reader of a channel, and 3 try_senders, only one of the senders
 // will succeed and none of them will block.

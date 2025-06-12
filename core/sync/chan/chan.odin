@@ -420,8 +420,8 @@ as_recv :: #force_inline proc "contextless" (c: $C/Chan($T, $D)) -> (r: Chan(T, 
 Sends the specified message, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is full
-until the channel is being read from. `send` will return
-`false` when attempting to send on an already closed channel.
+until the channel is being read from or the channel is closed. `send` will
+return `false` when attempting to send on an already closed channel.
 
 **Inputs**
 - `c`: The channel
@@ -492,8 +492,9 @@ try_send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where
 Reads a message from the channel, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is empty
-until the channel is being written to. `recv` will return
-`false` when attempting to receive a message on an already closed channel.
+until the channel is being written to or the channel is closed. `recv` will
+return `false` when attempting to receive a message on an already closed
+channel.
 
 **Inputs**
 - `c`: The channel
@@ -566,8 +567,8 @@ try_recv :: proc "contextless" (c: $C/Chan($T)) -> (data: T, ok: bool) where C.D
 Sends the specified message, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is full
-until the channel is being read from. `send_raw` will return
-`false` when attempting to send on an already closed channel.
+until the channel is being read from or the channel is closed. `send_raw` will
+return `false` when attempting to send on an already closed channel.
 
 Note: The message referenced by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
@@ -633,6 +634,11 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 			sync.signal(&c.r_cond)
 		}
 		sync.wait(&c.w_cond, &c.mutex)
+
+		if c.closed {
+			return false
+		}
+
 		ok = true
 	}
 	return
@@ -642,8 +648,9 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 Reads a message from the channel, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is empty
-until the channel is being written to. `recv_raw` will return
-`false` when attempting to receive a message on an already closed channel.
+until the channel is being written to or the channel is closed. `recv_raw`
+will return `false` when attempting to receive a message on an already closed
+channel.
 
 Note: The location pointed to by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
