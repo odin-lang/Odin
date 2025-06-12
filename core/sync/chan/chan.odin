@@ -7,6 +7,14 @@ import "core:mem"
 import "core:sync"
 import "core:math/rand"
 
+when ODIN_TEST {
+/*
+Hook for testing _try_select_raw allowing the test harness to manipulate the
+channels prior to the select actually operating on them.
+*/
+__try_select_raw_pause : proc() = nil
+}
+
 /*
 Determines what operations `Chan` supports.
 */
@@ -1105,15 +1113,27 @@ can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	return c.w_waiting == 0
 }
 
+/*
+Specifies the direction of the selected channel.
+*/
+Select_Status :: enum {
+	None,
+	Recv,
+	Send,
+}
+
 
 /*
-Attempts to either send or receive messages on the specified channels.
+Attempts to either send or receive messages on the specified channels without blocking.
 
-`select_raw` first identifies which channels have messages ready to be received
+`try_select_raw` first identifies which channels have messages ready to be received
 and which are available for sending. It then randomly selects one operation
 (either a send or receive) to perform.
 
+If no channels have messages ready, the procedure is a noop.
+
 Note: Each message in `send_msgs` corresponds to the send channel at the same index in `sends`.
+If the message is nil, corresponding send channel will be skipped.
 
 **Inputs**
 - `recv`: A slice of channels to read from
@@ -1145,18 +1165,18 @@ Example:
 		// where the value from the read should be stored
 		received_value: int
 
-		idx, ok := chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok := chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 		fmt.println("RECEIVED VALUE ", received_value)
 
-		idx, ok = chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok = chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 		fmt.println("RECEIVED VALUE ", received_value)
 
 		// closing of a channel also affects the select operation
 		chan.close(c)
 
-		idx, ok = chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok = chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 	}
 
@@ -1170,7 +1190,7 @@ Output:
 
 */
 @(require_results)
-select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, ok: bool) #no_bounds_check {
+try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
 	Select_Op :: struct {
 		idx:     int, // local to the slice that was given
 		is_recv: bool,
@@ -1178,43 +1198,66 @@ select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []
 
 	candidate_count := builtin.len(recvs)+builtin.len(sends)
 	candidates := ([^]Select_Op)(intrinsics.alloca(candidate_count*size_of(Select_Op), align_of(Select_Op)))
-	count := 0
 
-	for c, i in recvs {
-		if can_recv(c) {
-			candidates[count] = {
-				is_recv = true,
-				idx     = i,
+	try_loop: for {
+		count := 0
+
+		for c, i in recvs {
+			if can_recv(c) {
+				candidates[count] = {
+					is_recv = true,
+					idx     = i,
+				}
+				count += 1
 			}
-			count += 1
 		}
-	}
 
-	for c, i in sends {
-		if can_send(c) {
-			candidates[count] = {
-				is_recv = false,
-				idx     = i,
+		for c, i in sends {
+			if i > builtin.len(send_msgs)-1 || send_msgs[i] == nil {
+				continue
 			}
-			count += 1
+			if can_send(c)  {
+				candidates[count] = {
+					is_recv = false,
+					idx     = i,
+				}
+				count += 1
+			}
 		}
-	}
 
-	if count == 0 {
-		return
-	}
+		if count == 0 {
+			return -1, .None
+		}
 
-	select_idx = rand.int_max(count) if count > 0 else 0
+		when ODIN_TEST {
+			if __try_select_raw_pause != nil {
+				__try_select_raw_pause()
+			}
+		}
 
-	sel := candidates[select_idx]
-	if sel.is_recv {
-		ok = recv_raw(recvs[sel.idx], recv_out)
-	} else {
-		ok = send_raw(sends[sel.idx], send_msgs[sel.idx])
+		candidate_idx := rand.int_max(count) if count > 0 else 0
+
+		sel := candidates[candidate_idx]
+		if sel.is_recv {
+			status = .Recv
+			if !try_recv_raw(recvs[sel.idx], recv_out) {
+				continue try_loop
+			}
+		} else {
+			status = .Send
+			if !try_send_raw(sends[sel.idx], send_msgs[sel.idx]) {
+				continue try_loop
+			}
+		}
+
+		return sel.idx, status
 	}
-	return
 }
 
+@(require_results, deprecated = "use try_select_raw")
+select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
+	return try_select_raw(recvs, sends, send_msgs, recv_out)
+}
 
 /*
 `Raw_Queue` is a non-thread-safe queue implementation designed to store messages
