@@ -3,7 +3,6 @@
 package thread
 
 import "base:runtime"
-import "core:c"
 import "core:sync"
 import "core:sys/posix"
 
