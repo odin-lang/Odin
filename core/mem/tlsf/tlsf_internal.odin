@@ -257,7 +257,7 @@ alloc_bytes_non_zeroed :: proc(control: ^Allocator, size: uint, align: uint) -> 
 	return block_prepare_used(control, block, adjust)
 }
 
-@(private, require_results, no_sanitize_address)
+@(private, require_results)
 alloc_bytes :: proc(control: ^Allocator, size: uint, align: uint) -> (res: []byte, err: runtime.Allocator_Error) {
 	res, err = alloc_bytes_non_zeroed(control, size, align)
 	if err == nil {
@@ -267,6 +267,7 @@ alloc_bytes :: proc(control: ^Allocator, size: uint, align: uint) -> (res: []byt
 }
 
 
+@(no_sanitize_address)
 free_with_size :: proc(control: ^Allocator, ptr: rawptr, size: uint) {
 	assert(control != nil)
 	// `size` is currently ignored
@@ -483,19 +484,19 @@ block_mark_as_used :: proc(block: ^Block_Header) {
 	block_set_used(block)
 }
 
-@(private, require_results, no_sanitize_address)
+@(private, require_results)
 align_up :: proc(x, align: uint) -> (aligned: uint) {
 	assert(0 == (align & (align - 1)), "must align to a power of two")
 	return (x + (align - 1)) &~ (align - 1)
 }
 
-@(private, require_results, no_sanitize_address)
+@(private, require_results)
 align_down :: proc(x, align: uint) -> (aligned: uint) {
 	assert(0 == (align & (align - 1)), "must align to a power of two")
 	return x - (x & (align - 1))
 }
 
-@(private, require_results, no_sanitize_address)
+@(private, require_results)
 align_ptr :: proc(ptr: rawptr, align: uint) -> (aligned: rawptr) {
 	assert(0 == (align & (align - 1)), "must align to a power of two")
 	align_mask := uintptr(align) - 1
@@ -505,7 +506,7 @@ align_ptr :: proc(ptr: rawptr, align: uint) -> (aligned: rawptr) {
 }
 
 // Adjust an allocation size to be aligned to word size, and no smaller than internal minimum.
-@(private, require_results, no_sanitize_address)
+@(private, require_results)
 adjust_request_size :: proc(size, align: uint) -> (adjusted: uint) {
 	if size == 0 {
 		return 0
@@ -519,7 +520,7 @@ adjust_request_size :: proc(size, align: uint) -> (adjusted: uint) {
 }
 
 // Adjust an allocation size to be aligned to word size, and no smaller than internal minimum.
-@(private, require_results, no_sanitize_address)
+@(private, require_results)
 adjust_request_size_with_err :: proc(size, align: uint) -> (adjusted: uint, err: runtime.Allocator_Error) {
 	if size == 0 {
 		return 0, nil
@@ -537,7 +538,7 @@ adjust_request_size_with_err :: proc(size, align: uint) -> (adjusted: uint, err:
 // TLSF utility functions. In most cases these are direct translations of
 // the documentation in the research paper.
 
-@(optimization_mode="favor_size", private, require_results, no_sanitize_address)
+@(optimization_mode="favor_size", private, require_results)
 mapping_insert :: proc(size: uint) -> (fl, sl: i32) {
 	if size < SMALL_BLOCK_SIZE {
 		// Store small blocks in first list.
@@ -550,7 +551,7 @@ mapping_insert :: proc(size: uint) -> (fl, sl: i32) {
 	return
 }
 
-@(optimization_mode="favor_size", private, require_results, no_sanitize_address)
+@(optimization_mode="favor_size", private, require_results)
 mapping_round :: #force_inline proc(size: uint) -> (rounded: uint) {
 	rounded = size
 	if size >= SMALL_BLOCK_SIZE {
@@ -561,7 +562,7 @@ mapping_round :: #force_inline proc(size: uint) -> (rounded: uint) {
 }
 
 // This version rounds up to the next block size (for allocations)
-@(optimization_mode="favor_size", private, require_results, no_sanitize_address)
+@(optimization_mode="favor_size", private, require_results)
 mapping_search :: proc(size: uint) -> (fl, sl: i32) {
 	return mapping_insert(mapping_round(size))
 }
