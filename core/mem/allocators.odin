@@ -2296,7 +2296,7 @@ buddy_allocator_proc :: proc(
 // on the old size to work.
 //
 // The overhead of this allocator is an extra max(alignment, size_of(Header)) bytes allocated for each allocation, these bytes are
-// used to store the size and original pointer.
+// used to store the size and alignment.
 Compat_Allocator :: struct {
 	parent: Allocator,
 }
@@ -2316,51 +2316,87 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int,
                              location := #caller_location) -> (data: []byte, err: Allocator_Error) {
-	size, old_size := size, old_size
-
 	Header :: struct {
-		size: int,
-		ptr:  rawptr,
+		size:      int,
+		alignment: int,
+	}
+
+	@(no_sanitize_address)
+	get_unpoisoned_header :: #force_inline proc(ptr: rawptr) -> Header {
+		header := ([^]Header)(ptr)[-1]
+		a      := max(header.alignment, size_of(Header))
+		sanitizer.address_unpoison(rawptr(uintptr(ptr)-uintptr(a)), a)
+		return header
 	}
 
 	rra := (^Compat_Allocator)(allocator_data)
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		a    := max(alignment, size_of(Header))
-		size += a
-		assert(size >= 0, "overflow")
+		a        := max(alignment, size_of(Header))
+		req_size := size + a
+		assert(req_size >= 0, "overflow")
 
-		allocation := rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
+		allocation := rra.parent.procedure(rra.parent.data, mode, req_size, alignment, old_memory, old_size, location) or_return
 		#no_bounds_check data = allocation[a:]
 
 		([^]Header)(raw_data(data))[-1] = {
-			size = size,
-			ptr  = raw_data(allocation),
+			size      = size,
+			alignment = alignment,
 		}
+
+		sanitizer.address_poison(raw_data(allocation), a)
 		return
 
 	case .Free:
-		header := ([^]Header)(old_memory)[-1]
-		return rra.parent.procedure(rra.parent.data, mode, size, alignment, header.ptr, header.size, location)
+		header    := get_unpoisoned_header(old_memory)
+		a         := max(header.alignment, size_of(Header))
+		orig_ptr  := rawptr(uintptr(old_memory)-uintptr(a))
+		orig_size := header.size + a
+
+		return rra.parent.procedure(rra.parent.data, mode, orig_size, header.alignment, orig_ptr, orig_size, location)
 
 	case .Resize, .Resize_Non_Zeroed:
-		header := ([^]Header)(old_memory)[-1]
+		header    := get_unpoisoned_header(old_memory)
+		orig_a    := max(header.alignment, size_of(Header))
+		orig_ptr  := rawptr(uintptr(old_memory)-uintptr(orig_a))
+		orig_size := header.size + orig_a
 
-		a    := max(alignment, size_of(header))
-		size += a
+		new_alignment := max(header.alignment, alignment)
+
+		a        := max(new_alignment, size_of(header))
+		req_size := size + a
 		assert(size >= 0, "overflow")
 
-		allocation := rra.parent.procedure(rra.parent.data, mode, size, alignment, header.ptr, header.size, location) or_return
+		allocation := rra.parent.procedure(rra.parent.data, mode, req_size, new_alignment, orig_ptr, orig_size, location) or_return
 		#no_bounds_check data = allocation[a:]
 
 		([^]Header)(raw_data(data))[-1] = {
-			size = size,
-			ptr  = raw_data(allocation),
+			size      = size,
+			alignment = new_alignment,
+		}
+
+		sanitizer.address_poison(raw_data(allocation), a)
+		return
+
+	case .Free_All:
+		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
+
+	case .Query_Info:
+		info := (^Allocator_Query_Info)(old_memory)
+		if info != nil && info.pointer != nil {
+			header := get_unpoisoned_header(info.pointer)
+			info.size      = header.size
+			info.alignment = header.alignment
 		}
 		return
 
-	case .Free_All, .Query_Info, .Query_Features:
-		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
+	case .Query_Features:
+		data, err = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
+		if err != nil {
+			set := (^Allocator_Mode_Set)(old_memory)
+			set^ += {.Query_Info}
+		}
+		return
 
 	case: unreachable()
 	}
