@@ -39,7 +39,8 @@ Type representing a thread handle and the associated with that thread data.
 Thread :: struct {
 	using specific: Thread_Os_Specific,
 	flags: bit_set[Thread_State; u8],
-	// Thread ID.
+	// Thread ID. Depending on the platform, may start out as 0 (zero) until the thread
+	// has had a chance to run.
 	id: int,
 	// The thread procedure.
 	procedure: Thread_Proc,
