@@ -33,7 +33,6 @@ Comm :: struct {
 BUFFER_SIZE :: 8
 MAX_RAND    :: 32
 FAIL_TIME   :: 1 * time.Second
-SLEEP_TIME  :: 1 * time.Millisecond
 
 // Synchronizes try_select tests that require access to global state.
 test_lock: sync.Mutex
@@ -41,13 +40,8 @@ __global_context_for_test: rawptr
 
 comm_client :: proc(th: ^thread.Thread) {
 	data := cast(^Comm)th.data
-	manual_buffering := data.manual_buffering
 
 	n: i64
-
-	for manual_buffering && !chan.can_recv(data.host) {
-		thread.yield()
-	}
 
 	recv_loop: for msg in chan.recv(data.host) {
 		#partial switch msg.type {
@@ -60,14 +54,6 @@ comm_client :: proc(th: ^thread.Thread) {
 		case:
 			panic("Unknown message type for client.")
 		}
-
-		for manual_buffering && !chan.can_recv(data.host) {
-			thread.yield()
-		}
-	}
-
-	for manual_buffering && !chan.can_send(data.host) {
-		thread.yield()
 	}
 
 	chan.send(data.client, Message{.Result, n})
@@ -76,9 +62,6 @@ comm_client :: proc(th: ^thread.Thread) {
 
 send_messages :: proc(t: ^testing.T, host: chan.Chan(Message), manual_buffering: bool = false) -> (expected: i64) {
 	expected = 1
-	for manual_buffering && !chan.can_send(host) {
-		thread.yield()
-	}
 	chan.send(host, Message{.Add, 1})
 	log.debug(Message{.Add, 1})
 
@@ -100,9 +83,6 @@ send_messages :: proc(t: ^testing.T, host: chan.Chan(Message), manual_buffering:
 			expected /= msg.i
 		}
 
-		for manual_buffering && !chan.can_send(host) {
-			thread.yield()
-		}
 		if manual_buffering {
 			testing.expect(t, chan.len(host) == 0)
 		}
@@ -111,9 +91,6 @@ send_messages :: proc(t: ^testing.T, host: chan.Chan(Message), manual_buffering:
 		log.debug(msg)
 	}
 
-	for manual_buffering && !chan.can_send(host) {
-		thread.yield()
-	}
 	chan.send(host, Message{.End, 0})
 	log.debug(Message{.End, 0})
 	chan.close(host)
@@ -152,18 +129,15 @@ test_chan_buffered :: proc(t: ^testing.T) {
 
 	expected := send_messages(t, comm.host, manual_buffering = false)
 
-	// Sleep so we can give the other thread enough time to buffer its message.
-	time.sleep(SLEEP_TIME)
-
-	testing.expect_value(t, chan.len(comm.client), 1)
-	result, ok := chan.try_recv(comm.client)
-
-	// One more sleep to ensure it has enough time to close.
-	time.sleep(SLEEP_TIME)
-
-	testing.expect_value(t, chan.is_closed(comm.client), true)
+	result, ok := chan.recv(comm.client)
 	testing.expect_value(t, ok, true)
 	testing.expect_value(t, result.i, expected)
+
+	// Wait for channel to close.
+	_, ok = chan.recv(comm.client)
+	testing.expect(t, !ok, "channel should have been closed")
+
+	testing.expect_value(t, chan.is_closed(comm.client), true)
 	log.debug(result, expected)
 
 	// Make sure sending to closed channels fails.
@@ -175,6 +149,8 @@ test_chan_buffered :: proc(t: ^testing.T) {
 	_, ok = chan.recv(comm.client);     testing.expect_value(t, ok, false)
 	_, ok = chan.try_recv(comm.host);   testing.expect_value(t, ok, false)
 	_, ok = chan.try_recv(comm.client); testing.expect_value(t, ok, false)
+
+	thread.join(reckoner)
 }
 
 @test
@@ -197,6 +173,10 @@ test_chan_unbuffered :: proc(t: ^testing.T) {
 	testing.expect(t, !chan.is_buffered(comm.client))
 	testing.expect(t, chan.is_unbuffered(comm.host))
 	testing.expect(t, chan.is_unbuffered(comm.client))
+	testing.expect(t, !chan.can_send(comm.host))
+	testing.expect(t, !chan.can_send(comm.client))
+	testing.expect(t, !chan.can_recv(comm.host))
+	testing.expect(t, !chan.can_recv(comm.client))
 	testing.expect_value(t, chan.len(comm.host), 0)
 	testing.expect_value(t, chan.len(comm.client), 0)
 	testing.expect_value(t, chan.cap(comm.host), 0)
@@ -207,25 +187,16 @@ test_chan_unbuffered :: proc(t: ^testing.T) {
 	reckoner.data = &comm
 	thread.start(reckoner)
 
-	for !chan.can_send(comm.client) {
-		thread.yield()
-	}
-
 	expected := send_messages(t, comm.host)
 	testing.expect_value(t, chan.is_closed(comm.host), true)
 
-	for !chan.can_recv(comm.client) {
-		thread.yield()
-	}
-
-	result, ok := chan.try_recv(comm.client)
+	result, ok := chan.recv(comm.client)
 	testing.expect_value(t, ok, true)
 	testing.expect_value(t, result.i, expected)
 	log.debug(result, expected)
 
-	// Sleep so we can give the other thread enough time to close its side
-	// after we've received its message.
-	time.sleep(SLEEP_TIME)
+	_, ok2 := chan.recv(comm.client)
+	testing.expect(t, !ok2, "read of closed channel should return false")
 
 	testing.expect_value(t, chan.is_closed(comm.client), true)
 
@@ -238,6 +209,8 @@ test_chan_unbuffered :: proc(t: ^testing.T) {
 	_, ok = chan.recv(comm.client);     testing.expect_value(t, ok, false)
 	_, ok = chan.try_recv(comm.host);   testing.expect_value(t, ok, false)
 	_, ok = chan.try_recv(comm.client); testing.expect_value(t, ok, false)
+
+	thread.join(reckoner)
 }
 
 @test

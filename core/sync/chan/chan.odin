@@ -779,7 +779,7 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		if c.closed {
+		if c.closed || c.r_waiting - c.w_waiting <= 0 {
 			return false
 		}
 
@@ -843,7 +843,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		if c.closed || c.w_waiting == 0 {
+		if c.closed || c.w_waiting - c.r_waiting <= 0 {
 			return false
 		}
 
@@ -1046,8 +1046,9 @@ is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 }
 
 /*
-Returns whether a message is ready to be read, i.e.,
-if a call to `recv` or `recv_raw` would block
+Returns whether a message can be read without blocking the current
+thread. Specifically, it checks if the channel is buffered and not full,
+or if there is already a writer attempting to send a message.
 
 **Inputs**
 - `c`: The channel
@@ -1075,7 +1076,7 @@ can_recv :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if is_buffered(c) {
 		return c.queue.len > 0
 	}
-	return c.w_waiting > 0
+	return c.w_waiting - c.r_waiting > 0
 }
 
 
@@ -1088,7 +1089,7 @@ or if there is already a reader waiting for a message.
 - `c`: The channel
 
 **Returns**
-- `true` if a message can be send, `false` otherwise
+- `true` if a message can be sent, `false` otherwise
 
 Example:
 
@@ -1110,7 +1111,7 @@ can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if is_buffered(c) {
 		return c.queue.len < c.queue.cap
 	}
-	return c.w_waiting == 0
+	return c.r_waiting - c.w_waiting > 0
 }
 
 /*
