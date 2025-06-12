@@ -125,9 +125,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 
 	when size_of(posix.pthread_t) == size_of(i64) {
-		thread.id = int(transmute(i64)thread.unix_thread)
+		thread.id = int((^i64)(&thread.unix_thread)^)
 	} else {
-		thread.id = int(transmute(i32)thread.unix_thread)
+		thread.id = int((^i32)(&thread.unix_thread)^)
 	}
 	return thread
 }
