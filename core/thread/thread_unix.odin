@@ -3,6 +3,7 @@
 package thread
 
 import "base:runtime"
+import "core:c"
 import "core:sync"
 import "core:sys/posix"
 
@@ -26,8 +27,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		// NOTE(laytan): setting to .DISABLE on darwin, with .ENABLE pthread_cancel would deadlock
 		// most of the time, don't ask me why.
 		can_set_thread_cancel_state := posix.pthread_setcancelstate(.DISABLE when ODIN_OS == .Darwin else .ENABLE, nil) == nil
-
-		t.id = sync.current_thread_id()
 
 		if .Started not_in sync.atomic_load(&t.flags) {
 			sync.wait(&t.start_ok)
@@ -125,6 +124,12 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		return nil
 	}
 
+
+	when size_of(posix.pthread_t) == size_of(i64) {
+		thread.id = int(transmute(i64)thread.unix_thread)
+	} else {
+		thread.id = int(transmute(i32)thread.unix_thread)
+	}
 	return thread
 }
 
