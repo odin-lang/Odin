@@ -328,11 +328,12 @@ scratch_allocator_destroy :: scratch_destroy
 Scratch allocator data.
 */
 Scratch :: struct {
-	data:               []byte,
-	curr_offset:        int,
-	prev_allocation:    rawptr,
-	backup_allocator:   Allocator,
-	leaked_allocations: [dynamic][]byte,
+	data:                 []byte,
+	curr_offset:          int,
+	prev_allocation:      rawptr,
+	prev_allocation_root: rawptr,
+	backup_allocator:     Allocator,
+	leaked_allocations:   [dynamic][]byte,
 }
 
 /*
@@ -349,6 +350,10 @@ previous allocations will become invalidated. If the allocation doesn't fit
 into the backing buffer as a whole, it will be allocated using a backing
 allocator, and pointer to the allocated memory region will be put into the
 `leaked_allocations` array.
+
+Allocations which are resized will be resized in-place if they were the last
+allocation. Otherwise, they are re-allocated to avoid overwriting previous
+allocations.
 
 The `leaked_allocations` array is managed by the `context` allocator.
 */
@@ -367,6 +372,7 @@ scratch_init :: proc(s: ^Scratch, size: int, backup_allocator := context.allocat
 	s.data = make_aligned([]byte, size, 2*align_of(rawptr), backup_allocator) or_return
 	s.curr_offset = 0
 	s.prev_allocation = nil
+	s.prev_allocation_root = nil
 	s.backup_allocator = backup_allocator
 	s.leaked_allocations.allocator = backup_allocator
 	sanitizer.address_poison(s.data)
@@ -467,23 +473,37 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		}
 		scratch_init(s, DEFAULT_BACKING_SIZE)
 	}
-	size := size
-	size = align_forward_int(size, alignment)
-	if size <= len(s.data) {
+	aligned_size := size
+	if alignment > 1 {
+		// It is possible to do this with less bytes, but this is the
+		// mathematically simpler solution, and this being a Scratch allocator,
+		// we don't need to be so strict about every byte.
+		aligned_size += alignment - 1
+	}
+	if aligned_size <= len(s.data) {
 		offset := uintptr(0)
-		if s.curr_offset+size <= len(s.data) {
+		if s.curr_offset+aligned_size <= len(s.data) {
 			offset = uintptr(s.curr_offset)
 		} else {
+			// The allocation will cause an overflow past the boundary of the
+			// space available, so reset to the starting offset.
 			offset = 0
 		}
 		start := uintptr(raw_data(s.data))
-		ptr   := align_forward_uintptr(offset+start, uintptr(alignment))
-		s.prev_allocation = rawptr(ptr)
-		s.curr_offset = int(offset) + size
-		result := byte_slice(rawptr(ptr), size)
+		ptr := rawptr(offset+start)
+		// We keep track of the original base pointer without extra alignment
+		// in order to later allow the free operation to work from that point.
+		s.prev_allocation_root = ptr
+		if !is_aligned(ptr, alignment) {
+			ptr = align_forward(ptr, uintptr(alignment))
+		}
+		s.prev_allocation = ptr
+		s.curr_offset = int(offset) + aligned_size
+		result := byte_slice(ptr, size)
 		sanitizer.address_unpoison(result)
 		return result, nil
 	} else {
+		// NOTE: No need to use `aligned_size` here, as the backup allocator will handle alignment for us.
 		a := s.backup_allocator
 		if a.procedure == nil {
 			a = context.allocator
@@ -525,9 +545,10 @@ scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Alloc
 	end := start + uintptr(len(s.data))
 	old_ptr := uintptr(ptr)
 	if s.prev_allocation == ptr {
-		s.curr_offset = int(uintptr(s.prev_allocation) - start)
+		s.curr_offset = int(uintptr(s.prev_allocation_root) - start)
 		sanitizer.address_poison(s.data[s.curr_offset:])
 		s.prev_allocation = nil
+		s.prev_allocation_root = nil
 		return nil
 	}
 	if start <= old_ptr && old_ptr < end {
@@ -685,7 +706,13 @@ scratch_resize_bytes_non_zeroed :: proc(
 	begin   := uintptr(raw_data(s.data))
 	end     := begin + uintptr(len(s.data))
 	old_ptr := uintptr(old_memory)
-	if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
+	// We can only sanely resize the last allocation; to do otherwise may
+	// overwrite memory that could very well just have been allocated.
+	//
+	// Also, the alignments must match, otherwise we must re-allocate to
+	// guarantee the user's request.
+	if s.prev_allocation == old_memory && is_aligned(old_memory, alignment) && old_ptr+uintptr(size) < end {
+		sanitizer.address_poison(old_memory)
 		s.curr_offset = int(old_ptr-begin)+size
 		result := byte_slice(old_memory, size)
 		sanitizer.address_unpoison(result)
