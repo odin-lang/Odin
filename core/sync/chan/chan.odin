@@ -83,6 +83,8 @@ Raw_Chan :: struct {
 	r_waiting:       int,  // guarded by `mutex`
 	w_waiting:       int,  // guarded by `mutex`
 
+	did_read: bool, // lets a sender know if the value was read
+
 	// Buffered
 	queue: ^Raw_Queue,
 
@@ -420,8 +422,8 @@ as_recv :: #force_inline proc "contextless" (c: $C/Chan($T, $D)) -> (r: Chan(T, 
 Sends the specified message, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is full
-until the channel is being read from. `send` will return
-`false` when attempting to send on an already closed channel.
+until the channel is being read from or the channel is closed. `send` will
+return `false` when attempting to send on an already closed channel.
 
 **Inputs**
 - `c`: The channel
@@ -492,8 +494,9 @@ try_send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where
 Reads a message from the channel, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is empty
-until the channel is being written to. `recv` will return
-`false` when attempting to receive a message on an already closed channel.
+until the channel is being written to or the channel is closed. `recv` will
+return `false` when attempting to receive a message on an already closed
+channel.
 
 **Inputs**
 - `c`: The channel
@@ -566,8 +569,8 @@ try_recv :: proc "contextless" (c: $C/Chan($T)) -> (data: T, ok: bool) where C.D
 Sends the specified message, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is full
-until the channel is being read from. `send_raw` will return
-`false` when attempting to send on an already closed channel.
+until the channel is being read from or the channel is closed. `send_raw` will
+return `false` when attempting to send on an already closed channel.
 
 Note: The message referenced by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
@@ -627,12 +630,23 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 			return false
 		}
 
+		c.did_read = false
+		defer c.did_read = false
+
 		mem.copy(c.unbuffered_data, msg_in, int(c.msg_size))
+
 		c.w_waiting += 1
+
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
 		}
+
 		sync.wait(&c.w_cond, &c.mutex)
+
+		if c.closed && !c.did_read {
+			return false
+		}
+
 		ok = true
 	}
 	return
@@ -642,8 +656,9 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 Reads a message from the channel, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is empty
-until the channel is being written to. `recv_raw` will return
-`false` when attempting to receive a message on an already closed channel.
+until the channel is being written to or the channel is closed. `recv_raw`
+will return `false` when attempting to receive a message on an already closed
+channel.
 
 Note: The location pointed to by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
@@ -706,8 +721,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		for !c.closed &&
-			c.w_waiting == 0 {
+		for !c.closed && c.w_waiting == 0 {
 			c.r_waiting += 1
 			sync.wait(&c.r_cond, &c.mutex)
 			c.r_waiting -= 1
@@ -720,6 +734,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 		mem.copy(msg_out, c.unbuffered_data, int(c.msg_size))
 		c.w_waiting -= 1
 
+		c.did_read = true
 		sync.signal(&c.w_cond)
 		ok = true
 	}
@@ -779,7 +794,7 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		if c.closed {
+		if c.closed || c.r_waiting - c.w_waiting <= 0 {
 			return false
 		}
 
@@ -843,7 +858,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		if c.closed || c.w_waiting == 0 {
+		if c.closed || c.w_waiting - c.r_waiting <= 0 {
 			return false
 		}
 
@@ -1046,8 +1061,9 @@ is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 }
 
 /*
-Returns whether a message is ready to be read, i.e.,
-if a call to `recv` or `recv_raw` would block
+Returns whether a message can be read without blocking the current
+thread. Specifically, it checks if the channel is buffered and not full,
+or if there is already a writer attempting to send a message.
 
 **Inputs**
 - `c`: The channel
@@ -1075,7 +1091,7 @@ can_recv :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if is_buffered(c) {
 		return c.queue.len > 0
 	}
-	return c.w_waiting > 0
+	return c.w_waiting - c.r_waiting > 0
 }
 
 
@@ -1088,7 +1104,7 @@ or if there is already a reader waiting for a message.
 - `c`: The channel
 
 **Returns**
-- `true` if a message can be send, `false` otherwise
+- `true` if a message can be sent, `false` otherwise
 
 Example:
 
@@ -1110,7 +1126,7 @@ can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if is_buffered(c) {
 		return c.queue.len < c.queue.cap
 	}
-	return c.w_waiting == 0
+	return c.r_waiting - c.w_waiting > 0
 }
 
 /*
