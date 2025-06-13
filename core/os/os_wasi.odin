@@ -239,3 +239,12 @@ exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	wasi.proc_exit(wasi.exitcode_t(code))
 }
+
+lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	return "", false
+}
+
+get_env :: proc(key: string, allocator := context.allocator) -> string {
+	value, _ := lookup_env(key, allocator)
+	return value
+}
