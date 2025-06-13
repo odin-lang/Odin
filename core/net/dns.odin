@@ -49,8 +49,8 @@ init_dns_configuration :: proc() {
 	/*
 		Resolve %ENVIRONMENT% placeholders in their paths.
 	*/
-	dns_configuration.resolv_conf, _ = replace_environment_path(dns_configuration.resolv_conf)
-	dns_configuration.hosts_file,  _ = replace_environment_path(dns_configuration.hosts_file)
+	dns_configuration.resolv_conf = os.replace_environment_placeholders(dns_configuration.resolv_conf)
+	dns_configuration.hosts_file  = os.replace_environment_placeholders(dns_configuration.hosts_file)
 }
 
 @(fini, private)
@@ -62,28 +62,6 @@ destroy_dns_configuration :: proc() {
 }
 
 dns_configuration := DEFAULT_DNS_CONFIGURATION
-
-// Always allocates for consistency.
-replace_environment_path :: proc(path: string, allocator := context.allocator) -> (res: string, ok: bool) {
-	// Nothing to replace. Return a clone of the original.
-	if strings.count(path, "%") != 2 {
-		return strings.clone(path, allocator), true
-	}
-
-	left  := strings.index(path, "%") + 1
-	assert(left > 0 && left <= len(path)) // should be covered by there being two %
-
-	right := strings.index(path[left:], "%") + 1
-	assert(right > 0 && right <= len(path)) // should be covered by there being two %
-
-	env_key := path[left: right]
-	env_val := os.get_env(env_key, allocator)
-	defer delete(env_val)
-
-	res, _ = strings.replace(path, path[left - 1: right + 1], env_val, 1, allocator)
-	return res, true
-}
-
 
 /*
 	Resolves a hostname to exactly one IP4 and IP6 endpoint.
