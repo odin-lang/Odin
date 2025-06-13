@@ -619,3 +619,58 @@ test_try_select_raw_no_toctou :: proc(t: ^testing.T) {
 	thread.join(thief)
 	thread.destroy(thief)
 }
+
+// Ensures that a sender will always report correctly whether the value was received
+// or not in the event of channel closure.
+//
+// 1. send thread does a blocking send
+// 2. recv and close threads race
+// 3. send returns false if close won and reports true if recv won
+//
+// We know if recv won by whether it sends us the original value on the results channel.
+// This test is non-deterministic.
+@test
+test_send_close_read :: proc(t: ^testing.T) {
+	trigger, trigger_err := chan.create(chan.Chan(int), context.allocator)
+	assert(trigger_err == nil, "allocation failed")
+	defer chan.destroy(trigger)
+
+	ch, alloc_err := chan.create(chan.Chan(int), context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	results, results_err := chan.create(chan.Chan(int), 1, context.allocator)
+	assert(results_err == nil, "allocation failed")
+	defer chan.destroy(results)
+
+	receiver := thread.create_and_start_with_poly_data3(trigger, results, ch, proc(trigger, results, ch: chan.Chan(int)) {
+		_, _ = chan.recv(trigger)
+		v, _ := chan.recv(ch)
+		assert(chan.send(results, v))
+	})
+
+	closer := thread.create_and_start_with_poly_data2(trigger, ch, proc(trigger, ch: chan.Chan(int)) {
+		_, _ = chan.recv(trigger)
+		ok := chan.close(ch)
+		assert(ok)
+	})
+
+	testing.expect(t, chan.close(trigger))
+
+	did_send := chan.send(ch, 42)
+
+	v, ok := chan.recv(results)
+	testing.expect(t, ok)
+
+	if v == 42 {
+		testing.expect(t, did_send)
+	} else {
+		testing.expect(t, !did_send)
+	}
+
+	thread.join_multiple(receiver, closer)
+	thread.destroy(receiver)
+	thread.destroy(closer)
+}
+
+
