@@ -83,6 +83,8 @@ Raw_Chan :: struct {
 	r_waiting:       int,  // guarded by `mutex`
 	w_waiting:       int,  // guarded by `mutex`
 
+	did_read: bool, // lets a sender know if the value was read
+
 	// Buffered
 	queue: ^Raw_Queue,
 
@@ -628,14 +630,20 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 			return false
 		}
 
+		c.did_read = false
+		defer c.did_read = false
+
 		mem.copy(c.unbuffered_data, msg_in, int(c.msg_size))
+
 		c.w_waiting += 1
+
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
 		}
+
 		sync.wait(&c.w_cond, &c.mutex)
 
-		if c.closed {
+		if c.closed && !c.did_read {
 			return false
 		}
 
@@ -713,8 +721,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		for !c.closed &&
-			c.w_waiting == 0 {
+		for !c.closed && c.w_waiting == 0 {
 			c.r_waiting += 1
 			sync.wait(&c.r_cond, &c.mutex)
 			c.r_waiting -= 1
@@ -727,6 +734,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 		mem.copy(msg_out, c.unbuffered_data, int(c.msg_size))
 		c.w_waiting -= 1
 
+		c.did_read = true
 		sync.signal(&c.w_cond)
 		ok = true
 	}
