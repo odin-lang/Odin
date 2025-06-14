@@ -979,7 +979,6 @@ stack_free :: proc(
 	header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header))
 	old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
 	if old_offset != s.prev_offset {
-		// panic("Out of order stack allocator free");
 		return .Invalid_Pointer
 	}
 
