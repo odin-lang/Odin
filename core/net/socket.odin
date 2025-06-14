@@ -178,6 +178,13 @@ bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Listen_E
 	return _bound_endpoint(socket)
 }
 
+/*
+	Returns the endpoint that the given socket is connected to. (Peer's endpoint)
+*/
+peer_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: TCP_Recv_Error) {
+	return _peer_endpoint(socket)
+}
+
 accept_tcp :: proc(socket: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
 	return _accept_tcp(socket, options)
 }
