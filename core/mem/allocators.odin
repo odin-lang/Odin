@@ -541,10 +541,6 @@ scratch_alloc_bytes_non_zeroed :: proc(
 	} else {
 		// NOTE: No need to use `aligned_size` here, as the backup allocator will handle alignment for us.
 		a := s.backup_allocator
-		if a.procedure == nil {
-			a = context.allocator
-			s.backup_allocator = a
-		}
 		ptr, err := alloc_bytes_non_zeroed(size, alignment, a, loc)
 		if err != nil {
 			return ptr, err
