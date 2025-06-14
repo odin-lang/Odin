@@ -1537,7 +1537,7 @@ small_stack_resize_bytes_non_zeroed :: proc(
 		return small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	}
 	if size == 0 {
-		return nil, nil
+		return nil, small_stack_free(s, old_memory, loc)
 	}
 	start     := uintptr(raw_data(s.data))
 	end       := start + uintptr(len(s.data))
