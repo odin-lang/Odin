@@ -1387,8 +1387,7 @@ small_stack_free :: proc(
 	end := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
-		// panic("Out of bounds memory address passed to stack allocator (free)");
-		return .Invalid_Pointer
+		panic("Out of bounds memory address passed to small stack allocator (free)", loc)
 	}
 	if curr_addr >= start+uintptr(s.offset) {
 		// NOTE(bill): Allow double frees
@@ -1543,8 +1542,7 @@ small_stack_resize_bytes_non_zeroed :: proc(
 	end       := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
-		// panic("Out of bounds memory address passed to stack allocator (resize)");
-		return nil, .Invalid_Pointer
+		panic("Out of bounds memory address passed to small stack allocator (resize)", loc)
 	}
 	if curr_addr >= start+uintptr(s.offset) {
 		// NOTE(bill): Treat as a double free
