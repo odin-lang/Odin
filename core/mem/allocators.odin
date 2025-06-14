@@ -1156,6 +1156,7 @@ stack_resize_bytes_non_zeroed :: proc(
 		data, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 		if err == nil {
 			runtime.copy(data, byte_slice(old_memory, old_size))
+			sanitizer.address_poison(old_memory)
 		}
 		return data, err
 	}
@@ -1165,6 +1166,8 @@ stack_resize_bytes_non_zeroed :: proc(
 	s.curr_offset += diff // works for smaller sizes too
 	if diff > 0 {
 		zero(rawptr(curr_addr + uintptr(diff)), diff)
+	} else {
+		sanitizer.address_poison(old_data[size:])
 	}
 	result := byte_slice(old_memory, size)
 	ensure_poisoned(result)
