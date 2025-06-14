@@ -1133,7 +1133,7 @@ stack_resize_bytes_non_zeroed :: proc(
 		return stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	}
 	if size == 0 {
-		return nil, nil
+		return nil, stack_free(s, old_memory, loc)
 	}
 	start     := uintptr(raw_data(s.data))
 	end       := start + uintptr(len(s.data))
