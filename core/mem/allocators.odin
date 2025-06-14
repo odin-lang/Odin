@@ -1329,7 +1329,7 @@ This procedure allocates `size` bytes of memory aligned to a boundary specified
 by `alignment`. The allocated memory is not explicitly zero-initialized. This
 procedure returns a slice of the allocated memory region.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 small_stack_alloc_bytes_non_zeroed :: proc(
 	s:    ^Small_Stack,
 	size: int,
@@ -1349,8 +1349,10 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 	s.offset += padding
 	next_addr := curr_addr + uintptr(padding)
 	header := (^Small_Stack_Allocation_Header)(next_addr - size_of(Small_Stack_Allocation_Header))
-	sanitizer.address_unpoison(header)
 	header.padding = auto_cast padding
+	// We must poison the header, no matter what its state is, because there
+	// may have been an out-of-order free before this point.
+	sanitizer.address_poison(header)
 	s.offset += size
 	s.peak_used = max(s.peak_used, s.offset)
 	result := byte_slice(rawptr(next_addr), size)
