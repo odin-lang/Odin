@@ -1349,7 +1349,7 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 	s.offset += padding
 	next_addr := curr_addr + uintptr(padding)
 	header := (^Small_Stack_Allocation_Header)(next_addr - size_of(Small_Stack_Allocation_Header))
-	header.padding = auto_cast padding
+	header.padding = cast(u8)padding
 	// We must poison the header, no matter what its state is, because there
 	// may have been an out-of-order free before this point.
 	sanitizer.address_poison(header)
