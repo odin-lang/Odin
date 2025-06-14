@@ -17,6 +17,7 @@ $ODIN test ../test_issue_2466.odin $COMMON
 $ODIN test ../test_issue_2615.odin $COMMON
 $ODIN test ../test_issue_2637.odin $COMMON
 $ODIN test ../test_issue_2666.odin $COMMON
+$ODIN test ../test_issue_2694.odin $COMMON
 $ODIN test ../test_issue_4210.odin $COMMON
 $ODIN test ../test_issue_4364.odin $COMMON
 $ODIN test ../test_issue_4584.odin $COMMON
