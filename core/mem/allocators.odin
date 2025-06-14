@@ -2327,7 +2327,7 @@ buddy_allocator_free_all :: proc(b: ^Buddy_Allocator) {
 	head := ([^]byte)(b.head)
 	tail := ([^]byte)(b.tail)
 	data := head[:ptr_sub(tail, head)]
-	buddy_allocator_init(b, data, alignment)	
+	buddy_allocator_init(b, data, alignment)
 }
 
 buddy_allocator_proc :: proc(
