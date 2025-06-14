@@ -921,7 +921,7 @@ This procedure allocates `size` bytes of memory, aligned to the boundary
 specified by `alignment`. The allocated memory is not explicitly
 zero-initialized. This procedure returns the slice of the allocated memory.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 stack_alloc_bytes_non_zeroed :: proc(
 	s:    ^Stack,
 	size: int,
@@ -945,7 +945,6 @@ stack_alloc_bytes_non_zeroed :: proc(
 	s.curr_offset += padding
 	next_addr := curr_addr + uintptr(padding)
 	header := (^Stack_Allocation_Header)(next_addr - size_of(Stack_Allocation_Header))
-	sanitizer.address_unpoison(header)
 	header.padding = padding
 	header.prev_offset = old_offset
 	s.curr_offset += size
