@@ -1872,9 +1872,6 @@ If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
 by `alignment`.
 
-If `size` is 0, this procedure acts just like `dynamic_arena_free()`, freeing
-the memory region located at an address specified by `old_memory`.
-
 This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
@@ -1899,9 +1896,6 @@ zero-initialized.
 If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
 by `alignment`.
-
-If `size` is 0, this procedure acts just like `dynamic_arena_free()`, freeing the
-memory region located at an address specified by `old_memory`.
 
 This procedure returns the slice of the resized memory region.
 */
@@ -1934,9 +1928,6 @@ If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
 by `alignment`.
 
-If `size` is 0, this procedure acts just like `dynamic_arena_free()`, freeing the
-memory region located at an address specified by `old_memory`.
-
 This procedure returns the pointer to the resized memory region.
 */
 @(require_results)
@@ -1961,9 +1952,6 @@ explicitly zero-initialized.
 If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
 by `alignment`.
-
-If `size` is 0, this procedure acts just like `dynamic_arena_free()`, freeing
-the memory region located at an address specified by `old_memory`.
 
 This procedure returns the slice of the resized memory region.
 */
