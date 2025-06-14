@@ -1119,7 +1119,7 @@ stack_resize_bytes_non_zeroed :: proc(
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
 	if s.data == nil {
-		panic("Stack free all on an uninitialized stack allocator", loc)
+		panic("Stack resize on an uninitialized stack allocator", loc)
 	}
 	if old_memory == nil {
 		return stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
