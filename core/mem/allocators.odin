@@ -1719,7 +1719,7 @@ dynamic_arena_destroy :: proc(a: ^Dynamic_Arena) {
 @(private="file")
 _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, loc := #caller_location) -> (err: Allocator_Error) {
 	if a.block_allocator.procedure == nil {
-		panic("You must call arena_init on a Pool before using it", loc)
+		panic("You must call `dynamic_arena_init` on a Dynamic Arena before using it.", loc)
 	}
 	if a.current_block != nil {
 		append(&a.used_blocks, a.current_block, loc=loc)
