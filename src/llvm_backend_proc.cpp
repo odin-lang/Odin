@@ -3079,6 +3079,19 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return res;
 		}
 
+	case BuiltinProc___default_context:
+		if (p->module->info->default_context) {
+			auto args = array_make<lbValue>(temporary_allocator(), 1);
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_rawptr);
+
+			lbValue default_context = lb_find_procedure_value_from_entity(p->module, p->module->info->default_context);
+			GB_ASSERT(default_context.value != nullptr);
+			lb_emit_call(p, default_context, args);
+
+			return lb_const_bool(p->module, t_llvm_bool, true);
+		} else {
+			return lb_const_bool(p->module, t_llvm_bool, false);
+		}
 	case BuiltinProc___entry_point:
 		if (p->module->info->entry_point) {
 			lbValue entry_point = lb_find_procedure_value_from_entity(p->module, p->module->info->entry_point);

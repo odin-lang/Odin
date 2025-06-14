@@ -136,6 +136,7 @@ struct AttributeContext {
 	bool    init                  : 1;
 	bool    fini                  : 1;
 	bool    set_cold              : 1;
+	bool    default_context       : 1;
 	bool    entry_point_only      : 1;
 	bool    instrumentation_enter : 1;
 	bool    instrumentation_exit  : 1;
@@ -439,6 +440,7 @@ struct CheckerInfo {
 	AstPackage *          runtime_package;
 	AstPackage *          init_package;
 	Scope *               init_scope;
+	Entity *              default_context;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
 	BlockingMutex minimum_dependency_type_info_mutex;

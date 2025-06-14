@@ -709,9 +709,19 @@ __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
 	__init_context(c)
 }
 
-@private
+// The linkage here must be weak to permit a main executable to override the
+// default context with a procedure of its choice in optimized builds because
+// of the use of single modules.
+//
+// Mind that this is the precise procedure called internally by the compiler to
+// initialize a context when calling "odin" procedures from builtins and such.
+@(private, linkage="strong" when ODIN_BUILD_MODE == .Executable else "weak")
 __init_context :: proc "contextless" (c: ^Context) {
 	if c == nil {
+		return
+	}
+	// Allow the procedure marked with `@(default_context)` to override us, if one exists.
+	if intrinsics.__default_context(c) {
 		return
 	}
 
