@@ -1248,7 +1248,10 @@ Small stack allocator.
 
 The small stack allocator is just like a stack allocator, with the only
 difference being an extremely small header size. Unlike the stack allocator,
-small stack allows out-of order freeing of memory.
+small stack allows out-of order freeing of memory, with the stipulation that
+all allocations made after the freed allocation will become invalidated upon
+following allocations as they will begin to overwrite the memory formerly used
+by the freed allocation.
 
 The memory is allocated in the backing buffer linearly, from start to end.
 Each subsequent allocation will get the next adjacent memory region.
