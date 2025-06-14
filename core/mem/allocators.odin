@@ -1550,6 +1550,16 @@ small_stack_resize_bytes_non_zeroed :: proc(
 		// NOTE(bill): Treat as a double free
 		return nil, nil
 	}
+	if uintptr(old_memory) & uintptr(alignment-1) != 0 {
+		// A different alignment has been requested and the current address
+		// does not satisfy it.
+		data, err := small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
+		if err == nil {
+			runtime.copy(data, byte_slice(old_memory, old_size))
+			sanitizer.address_poison(old_memory)
+		}
+		return data, err
+	}
 	if old_size == size {
 		result := byte_slice(old_memory, size)
 		sanitizer.address_unpoison(result)
