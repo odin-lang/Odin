@@ -2,7 +2,9 @@ package slice
 
 import "base:runtime"
 
-// An in-place permutation iterator.
+/*
+An in-place permutation iterator.
+*/
 Permutation_Iterator :: struct($T: typeid) {
 	index: int,
 	slice: []T,
@@ -14,17 +16,19 @@ Make an iterator to permute a slice in-place.
 
 *Allocates Using Provided Allocator*
 
+When no longer needed can be destroyed with `destroy_permutation_iterator`.
+
 This procedure allocates some state to assist in permutation and does not make
 a copy of the underlying slice. If you want to permute a slice without altering
 the underlying data, use `clone` to create a copy, then permute that instead.
 
 Inputs:
-- slice: The slice to permute.
-- allocator: (default is context.allocator)
+- `slice`: The slice to permute.
+- `allocator`: (default is context.allocator)
 
 Returns:
-- iter: The iterator, to be passed to `permute`.
-- error: An `Allocator_Error`, if allocation failed.
+- `iter`: The iterator, to be passed to `permute`.
+- `error`: An `Allocator_Error`, if allocation failed.
 */
 make_permutation_iterator :: proc(
 	slice: []$T,
@@ -38,12 +42,13 @@ make_permutation_iterator :: proc(
 
 	return
 }
+
 /*
 Free the state allocated by `make_permutation_iterator`.
 
 Inputs:
-- iter: The iterator created by `make_permutation_iterator`.
-- allocator: The allocator used to create the iterator. (default is context.allocator)
+- `iter`: The iterator created by `make_permutation_iterator`.
+- `allocator`: The allocator used to create the iterator. (default is context.allocator)
 */
 destroy_permutation_iterator :: proc(
 	iter: Permutation_Iterator($T),
@@ -51,16 +56,17 @@ destroy_permutation_iterator :: proc(
 ) {
 	delete(iter.counters, allocator = allocator)
 }
+
 /*
 Permute a slice in-place.
 
 Note that the first iteration will always be the original, unpermuted slice.
 
 Inputs:
-- iter: The iterator created by `make_permutation_iterator`.
+- `iter`: The iterator created by `make_permutation_iterator`.
 
 Returns:
-- ok: True if the permutation succeeded, false if the iteration is complete.
+- `ok`: True if the permutation succeeded, false if the iteration is complete.
 */
 permute :: proc(iter: ^Permutation_Iterator($T)) -> (ok: bool) {
 	// This is an iterative, resumable implementation of Heap's algorithm.
