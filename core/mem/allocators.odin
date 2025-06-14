@@ -959,7 +959,7 @@ stack_alloc_bytes_non_zeroed :: proc(
 Free memory to the stack.
 
 This procedure frees the memory region starting at `old_memory` to the stack.
-If the freeing does is an out of order freeing, the `.Invalid_Pointer` error
+If the freeing is an out of order freeing, the `.Invalid_Pointer` error
 is returned.
 */
 stack_free :: proc(
