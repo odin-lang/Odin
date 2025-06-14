@@ -4,6 +4,40 @@ import "base:intrinsics"
 import "base:runtime"
 import "base:sanitizer"
 
+
+/*
+This procedure checks if a byte slice `range` is poisoned and makes sure the
+root address of the poison range is the base pointer of `range`.
+
+This can help guard against buggy allocators returning memory that they already returned.
+
+This has no effect if `-sanitize:address` is not enabled.
+*/
+@(disabled=.Address not_in ODIN_SANITIZER_FLAGS, private)
+ensure_poisoned :: proc(range: []u8, loc := #caller_location) {
+	cond := sanitizer.address_region_is_poisoned(range) == raw_data(range)
+	// If this fails, we've overlapped an allocation and it's our fault.
+	ensure(cond, `This allocator has sliced a block of memory of which some part is not poisoned before returning.
+This is a bug in the core library and should be reported to the Odin developers with a stack trace and minimal example code if possible.`, loc)
+}
+
+/*
+This procedure checks if a byte slice `range` is not poisoned.
+
+This can help guard against buggy allocators resizing memory that they should not.
+
+This has no effect if `-sanitize:address` is not enabled.
+*/
+@(disabled=.Address not_in ODIN_SANITIZER_FLAGS, private)
+ensure_not_poisoned :: proc(range: []u8, loc := #caller_location) {
+	cond := sanitizer.address_region_is_poisoned(range) == nil
+	// If this fails, we've tried to resize memory that is poisoned, which
+	// could be user error caused by an incorrect `old_memory` pointer.
+	ensure(cond, `This allocator has sliced a block of memory of which some part is poisoned before returning.
+This may be a bug in the core library, or it could be user error due to an invalid pointer passed to a resize operation.
+If after ensuring your own code is not responsible, report the problem to the Odin developers with a stack trace and minimal example code if possible.`, loc)
+}
+
 /*
 Nil allocator.
 
@@ -227,6 +261,7 @@ arena_alloc_bytes_non_zeroed :: proc(
 	a.offset += total_size
 	a.peak_used = max(a.peak_used, a.offset)
 	result := byte_slice(ptr, size)
+	ensure_poisoned(result)
 	sanitizer.address_unpoison(result)
 	return result, nil
 }
@@ -500,6 +535,7 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		s.prev_allocation = ptr
 		s.curr_offset = int(offset) + aligned_size
 		result := byte_slice(ptr, size)
+		ensure_poisoned(result)
 		sanitizer.address_unpoison(result)
 		return result, nil
 	} else {
@@ -712,6 +748,7 @@ scratch_resize_bytes_non_zeroed :: proc(
 	// Also, the alignments must match, otherwise we must re-allocate to
 	// guarantee the user's request.
 	if s.prev_allocation == old_memory && is_aligned(old_memory, alignment) && old_ptr+uintptr(size) < end {
+		ensure_not_poisoned(old_data)
 		sanitizer.address_poison(old_memory)
 		s.curr_offset = int(old_ptr-begin)+size
 		result := byte_slice(old_memory, size)
@@ -914,6 +951,7 @@ stack_alloc_bytes_non_zeroed :: proc(
 	s.curr_offset += size
 	s.peak_used = max(s.peak_used, s.curr_offset)
 	result := byte_slice(rawptr(next_addr), size)
+	ensure_poisoned(result)
 	sanitizer.address_unpoison(result)
 	return result, nil
 }
@@ -1127,6 +1165,7 @@ stack_resize_bytes_non_zeroed :: proc(
 		zero(rawptr(curr_addr + uintptr(diff)), diff)
 	}
 	result := byte_slice(old_memory, size)
+	ensure_poisoned(result)
 	sanitizer.address_unpoison(result)
 	return result, nil
 }
@@ -1310,6 +1349,8 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 	s.offset += size
 	s.peak_used = max(s.peak_used, s.offset)
 	result := byte_slice(rawptr(next_addr), size)
+	// NOTE: We cannot ensure the poison state of this allocation, because this
+	// allocator allows out-of-order frees with overwriting.
 	sanitizer.address_unpoison(result)
 	return result, nil
 }
@@ -1763,7 +1804,8 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc :
 	memory := a.current_pos
 	a.current_pos = ([^]byte)(a.current_pos)[n:]
 	a.bytes_left -= n
-	return ([^]byte)(memory)[:size], nil
+	result := ([^]byte)(memory)[:size]
+	return result, nil
 }
 
 /*
