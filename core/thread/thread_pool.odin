@@ -7,9 +7,9 @@ package thread
 */
 
 import "base:intrinsics"
-import "core:sync"
-import "core:mem"
 import "core:container/queue"
+import "core:mem"
+import "core:sync"
 
 Task_Proc :: #type proc(task: Task)
 
@@ -25,9 +25,9 @@ Task :: struct {
 // Careless access can and will lead to nasty bugs. Once initialized, the
 // pool's memory address is not allowed to change until it is destroyed.
 Pool :: struct {
-	allocator:     mem.Allocator,
-	mutex:         sync.Mutex,
-	sem_available: sync.Sema,
+	allocator:         mem.Allocator,
+	mutex:             sync.Mutex,
+	sem_available:     sync.Sema,
 
 	// the following values are atomic
 	num_waiting:       int,
@@ -35,14 +35,10 @@ Pool :: struct {
 	num_outstanding:   int, // num_waiting + num_in_processing
 	num_done:          int,
 	// end of atomics
-
-	is_running: bool,
-
-	threads: []^Thread,
-
-
-	tasks:      queue.Queue(Task),
-	tasks_done: [dynamic]Task,
+	is_running:        bool,
+	threads:           []^Thread,
+	tasks:             queue.Queue(Task),
+	tasks_done:        [dynamic]Task,
 }
 
 Pool_Thread_Data :: struct {
@@ -50,7 +46,7 @@ Pool_Thread_Data :: struct {
 	task: Task,
 }
 
-@(private="file")
+@(private = "file")
 pool_thread_runner :: proc(t: ^Thread) {
 	data := cast(^Pool_Thread_Data)t.data
 	pool := data.pool
@@ -78,7 +74,7 @@ pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int) {
 	pool.allocator = allocator
 	queue.init(&pool.tasks)
 	pool.tasks_done = make([dynamic]Task)
-	pool.threads    = make([]^Thread, max(thread_count, 1))
+	pool.threads = make([]^Thread, max(thread_count, 1))
 
 	pool.is_running = true
 
@@ -120,6 +116,20 @@ pool_join :: proc(pool: ^Pool) {
 
 	yield()
 
+	unstarted_count: int
+	for t in pool.threads {
+		flags := intrinsics.atomic_load(&t.flags)
+		if .Started not_in flags {
+			unstarted_count += 1
+		}
+	}
+
+	// most likely the user forgot to call `pool_start`
+	// exit here, so we don't hang forever
+	if len(pool.threads) == unstarted_count {
+		return
+	}
+
 	started_count: int
 	for started_count < len(pool.threads) {
 		started_count = 0
@@ -142,15 +152,19 @@ pool_join :: proc(pool: ^Pool) {
 //
 // Each task also needs an allocator which it either owns, or which is thread
 // safe.
-pool_add_task :: proc(pool: ^Pool, allocator: mem.Allocator, procedure: Task_Proc, data: rawptr, user_index: int = 0) {
+pool_add_task :: proc(
+	pool: ^Pool,
+	allocator: mem.Allocator,
+	procedure: Task_Proc,
+	data: rawptr,
+	user_index: int = 0,
+) {
 	sync.guard(&pool.mutex)
 
-	queue.push_back(&pool.tasks, Task{
-		procedure  = procedure,
-		data       = data,
-		user_index = user_index,
-		allocator  = allocator,
-	})
+	queue.push_back(
+		&pool.tasks,
+		Task{procedure = procedure, data = data, user_index = user_index, allocator = allocator},
+	)
 	intrinsics.atomic_add(&pool.num_waiting, 1)
 	intrinsics.atomic_add(&pool.num_outstanding, 1)
 	sync.post(&pool.sem_available, 1)
