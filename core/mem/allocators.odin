@@ -1052,8 +1052,8 @@ stack_resize_bytes :: proc(
 	alignment := DEFAULT_ALIGNMENT,
 	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-	bytes, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
-	if bytes != nil {
+	bytes, err := stack_resize_bytes_non_zeroed(s, old_data, size, alignment, loc)
+	if err == nil {
 		if old_data == nil {
 			zero_slice(bytes)
 		} else if size > len(old_data) {
