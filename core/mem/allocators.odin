@@ -545,9 +545,6 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		if err != nil {
 			return ptr, err
 		}
-		if s.leaked_allocations == nil {
-			s.leaked_allocations, err = make([dynamic][]byte, a)
-		}
 		append(&s.leaked_allocations, ptr)
 		if logger := context.logger; logger.lowest_level <= .Warning {
 			if logger.procedure != nil {
