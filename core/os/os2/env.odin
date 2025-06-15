@@ -1,6 +1,7 @@
 package os2
 
 import "base:runtime"
+import "core:strings"
 
 // get_env retrieves the value of the environment variable named by the key
 // It returns the value, which will be empty if the variable is not present
@@ -45,4 +46,55 @@ environ :: proc(allocator: runtime.Allocator) -> ([]string, Error) {
 	return _environ(allocator)
 }
 
+// Always allocates for consistency.
+replace_environment_placeholders :: proc(path: string, allocator: runtime.Allocator) -> (res: string) {
+	path := path
 
+	sb: strings.Builder
+	strings.builder_init_none(&sb, allocator)
+
+	for len(path) > 0 {
+		switch path[0] {
+		case '%': // Windows
+			when ODIN_OS == .Windows {
+				for r, i in path[1:] {
+					if r == '%' {
+						env_key := path[1:i+1]
+						env_val := get_env(env_key, context.temp_allocator)
+						strings.write_string(&sb, env_val)
+						path = path[i+1:] // % is part of key, so skip 1 character extra
+					}
+				}
+			} else {
+				strings.write_rune(&sb, rune(path[0]))
+			}
+
+		case '$': // Posix
+			when ODIN_OS != .Windows {
+				env_key := ""
+				dollar_loop: for r, i in path[1:] {
+					switch r {
+					case 'A'..='Z', 'a'..='z', '0'..='9', '_': // Part of key ident
+					case:
+						env_key = path[1:i+1]
+						break dollar_loop
+					}
+				}
+				if len(env_key) > 0 {
+					env_val := get_env(env_key, context.temp_allocator)
+					strings.write_string(&sb, env_val)
+					path = path[len(env_key):]
+				}
+
+			} else {
+				strings.write_rune(&sb, rune(path[0]))
+			}
+
+		case:
+			strings.write_rune(&sb, rune(path[0]))
+		}
+
+		path = path[1:]
+	}
+	return strings.to_string(sb)
+}

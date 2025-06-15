@@ -253,3 +253,8 @@ current_thread_id :: proc "contextless" () -> int {
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	return "", false
 }
+
+get_env :: proc(key: string, allocator := context.allocator) -> string {
+	value, _ := lookup_env(key, allocator)
+	return value
+}
