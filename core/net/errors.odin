@@ -246,6 +246,23 @@ Shutdown_Error :: enum i32 {
 	Unknown,
 }
 
+Socket_Info_Error :: enum i32 {
+	None,
+	// No network connection, or the network stack is not initialized.
+	Network_Unreachable,
+	// Not enough space in internal tables/buffers to create a new socket, or an unsupported protocol is given.
+	Insufficient_Resources,
+	// Socket is invalid or not connected, or the manner given is invalid.
+	Invalid_Argument,
+	// The socket is valid, but unsupported by this opperation.
+	Unsupported_Socket,
+	// Connection was closed/aborted/shutdown.
+	Connection_Closed,
+
+	// An error unable to be categorized in above categories, `last_platform_error` may have more info.
+	Unknown,
+}
+
 Socket_Option_Error :: enum i32 {
 	None,
 	// No network connection, or the network stack is not initialized.

@@ -234,6 +234,17 @@ _shutdown_error :: proc() -> Shutdown_Error {
 	}
 }
 
+_socket_info_error :: proc() -> Socket_Info_Error {
+	#partial switch win.System_Error(win.WSAGetLastError()) {
+	case .WSAEFAULT, .WSAEINPROGRESS, .WSAENOTSOCK, .WSAEINVAL:
+		return .Invalid_Argument
+	case .WSANOTINITIALISED, .WSAENETDOWN, .WSAENOTCONN:
+		return .Network_Unreachable
+	case:
+		return .Unknown
+	}
+}
+
 _socket_option_error :: proc() -> Socket_Option_Error {
 	#partial switch win.System_Error(win.WSAGetLastError()) {
 	case .WSAENETDOWN, .WSANOTINITIALISED:

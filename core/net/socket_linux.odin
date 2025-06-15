@@ -218,11 +218,24 @@ _listen_tcp :: proc(endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket,
 }
 
 @(private)
-_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Socket_Info_Error) {
 	addr: linux.Sock_Addr_Any
 	errno := linux.getsockname(_unwrap_os_socket(sock), &addr)
 	if errno != .NONE {
-		err = _listen_error(errno)
+		err = _socket_info_error(errno)
+		return
+	}
+
+	ep = _wrap_os_addr(addr)
+	return
+}
+
+@(private)
+_peer_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Socket_Info_Error) {
+	addr: linux.Sock_Addr_Any
+	errno := linux.getpeername(_unwrap_os_socket(sock), &addr)
+	if errno != .NONE {
+		err = _socket_info_error(errno)
 		return
 	}
 

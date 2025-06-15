@@ -137,11 +137,24 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_
 }
 
 @(private)
-_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Socket_Info_Error) {
 	addr: posix.sockaddr_storage
 	addr_len := posix.socklen_t(size_of(addr))
 	if posix.getsockname(posix.FD(any_socket_to_socket(sock)), (^posix.sockaddr)(&addr), &addr_len) != .OK {
-		err = _listen_error()
+		err = _socket_info_error()
+		return
+	}
+
+	ep = _sockaddr_to_endpoint(&addr)
+	return
+}
+
+@(private)
+_peer_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Socket_Info_Error) {
+	addr: posix.sockaddr_storage
+	addr_len := posix.socklen_t(size_of(addr))
+	if posix.getpeername(posix.FD(any_socket_to_socket(sock)), (^posix.sockaddr)(&addr), &addr_len) != .OK {
+		err = _socket_info_error()
 		return
 	}
 
