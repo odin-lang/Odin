@@ -2042,7 +2042,7 @@ Buddy_Block :: struct #align(align_of(uint)) {
 /*
 Obtain the next buddy block.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 buddy_block_next :: proc(block: ^Buddy_Block) -> ^Buddy_Block {
 	return (^Buddy_Block)(([^]byte)(block)[block.size:])
 }
@@ -2050,7 +2050,7 @@ buddy_block_next :: proc(block: ^Buddy_Block) -> ^Buddy_Block {
 /*
 Split the block into two, by truncating the given block to a given size.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 buddy_block_split :: proc(block: ^Buddy_Block, size: uint) -> ^Buddy_Block {
 	block := block
 	if block != nil && size != 0 {
@@ -2073,6 +2073,7 @@ buddy_block_split :: proc(block: ^Buddy_Block, size: uint) -> ^Buddy_Block {
 /*
 Coalesce contiguous blocks in a range of blocks into one.
 */
+@(no_sanitize_address)
 buddy_block_coalescence :: proc(head, tail: ^Buddy_Block) {
 	for {
 		// Keep looping until there are no more buddies to coalesce
@@ -2109,7 +2110,7 @@ buddy_block_coalescence :: proc(head, tail: ^Buddy_Block) {
 /*
 Find the best block for storing a given size in a range of blocks.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 buddy_block_find_best :: proc(head, tail: ^Buddy_Block, size: uint) -> ^Buddy_Block {
 	assert(size != 0)
 	best_block: ^Buddy_Block
@@ -2215,6 +2216,7 @@ buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint,
 	b.head.is_free = true
 	b.tail = buddy_block_next(b.head)
 	b.alignment = alignment
+	sanitizer.address_poison(data)
 }
 
 /*
@@ -2239,7 +2241,7 @@ This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is zero-initialized. This procedure
 returns a pointer to the allocated memory region.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 buddy_allocator_alloc :: proc(b: ^Buddy_Allocator, size: uint) -> (rawptr, Allocator_Error) {
 	bytes, err := buddy_allocator_alloc_bytes(b, size)
 	return raw_data(bytes), err
@@ -2252,7 +2254,7 @@ This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is zero-initialized. This procedure
 returns a slice of the allocated memory region.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 buddy_allocator_alloc_bytes :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte, Allocator_Error) {
 	bytes, err := buddy_allocator_alloc_bytes_non_zeroed(b, size)
 	if bytes != nil {
@@ -2268,7 +2270,7 @@ This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is not explicitly zero-initialized.
 This procedure returns a pointer to the allocated memory region.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 buddy_allocator_alloc_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) -> (rawptr, Allocator_Error) {
 	bytes, err := buddy_allocator_alloc_bytes_non_zeroed(b, size)
 	return raw_data(bytes), err
@@ -2281,7 +2283,7 @@ This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is not explicitly zero-initialized.
 This procedure returns a slice of the allocated memory region.
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte, Allocator_Error) {
 	if size != 0 {
 		actual_size := buddy_block_size_required(b, size)
@@ -2296,6 +2298,8 @@ buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) 
 		}
 		found.is_free = false
 		data := ([^]byte)(found)[b.alignment:][:size]
+		ensure_poisoned(data)
+		sanitizer.address_unpoison(data)
 		return data, nil
 	}
 	return nil, nil
@@ -2309,12 +2313,14 @@ This procedure frees the memory region allocated at pointer `ptr`.
 If `ptr` is not the latest allocation and is not a leaked allocation, this
 operation is a no-op.
 */
+@(no_sanitize_address)
 buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Error {
 	if ptr != nil {
 		if !(b.head <= ptr && ptr <= b.tail) {
 			return .Invalid_Pointer
 		}
 		block := (^Buddy_Block)(([^]byte)(ptr)[-b.alignment:])
+		sanitizer.address_poison(ptr, block.size)
 		block.is_free = true
 		buddy_block_coalescence(b.head, b.tail)
 	}
@@ -2324,6 +2330,7 @@ buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Erro
 /*
 Free all memory to the buddy allocator.
 */
+@(no_sanitize_address)
 buddy_allocator_free_all :: proc(b: ^Buddy_Allocator) {
 	alignment := b.alignment
 	head := ([^]byte)(b.head)
@@ -2332,6 +2339,7 @@ buddy_allocator_free_all :: proc(b: ^Buddy_Allocator) {
 	buddy_allocator_init(b, data, alignment)
 }
 
+@(no_sanitize_address)
 buddy_allocator_proc :: proc(
 	allocator_data:  rawptr,
 	mode:            Allocator_Mode,
