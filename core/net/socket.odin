@@ -174,7 +174,7 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TC
 /*
 	Returns the endpoint that the given socket is listening / bound on.
 */
-bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Listen_Error) {
+bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Socket_Info_Error) {
 	return _bound_endpoint(socket)
 }
 
