@@ -1734,6 +1734,7 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, loc := #caller_locatio
 			nil,
 			0,
 		)
+		sanitizer.address_poison(data)
 		new_block = raw_data(data)
 	}
 	a.bytes_left    = a.block_size
@@ -1822,6 +1823,8 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc :
 	a.current_pos = ([^]byte)(a.current_pos)[n:]
 	a.bytes_left -= n
 	result := ([^]byte)(memory)[:size]
+	ensure_poisoned(result)
+	sanitizer.address_unpoison(result)
 	return result, nil
 }
 
@@ -1833,10 +1836,12 @@ the unused blocks.
 */
 dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	if a.current_block != nil {
+		sanitizer.address_poison(a.current_block, a.block_size)
 		append(&a.unused_blocks, a.current_block, loc=loc)
 		a.current_block = nil
 	}
 	for block in a.used_blocks {
+		sanitizer.address_poison(block, a.block_size)
 		append(&a.unused_blocks, block, loc=loc)
 	}
 	clear(&a.used_blocks)
@@ -1856,6 +1861,7 @@ the unused blocks.
 dynamic_arena_free_all :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	dynamic_arena_reset(a)
 	for block in a.unused_blocks {
+		sanitizer.address_unpoison(block, a.block_size)
 		free(block, a.block_allocator, loc)
 	}
 	clear(&a.unused_blocks)
@@ -1965,6 +1971,7 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
 	if old_size >= size {
+		sanitizer.address_poison(old_data[size:])
 		return byte_slice(old_memory, size), nil
 	}
 	data, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, loc)
