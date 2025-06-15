@@ -2448,8 +2448,8 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	@(no_sanitize_address)
 	get_unpoisoned_header :: #force_inline proc(ptr: rawptr) -> Header {
 		header := ([^]Header)(ptr)[-1]
-		a      := max(header.alignment, size_of(Header))
-		sanitizer.address_unpoison(rawptr(uintptr(ptr)-uintptr(a)), a)
+		// a      := max(header.alignment, size_of(Header))
+		// sanitizer.address_unpoison(rawptr(uintptr(ptr)-uintptr(a)), a)
 		return header
 	}
 
@@ -2468,7 +2468,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			alignment = alignment,
 		}
 
-		sanitizer.address_poison(raw_data(allocation), a)
+		// sanitizer.address_poison(raw_data(allocation), a)
 		return
 
 	case .Free:
@@ -2499,7 +2499,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			alignment = new_alignment,
 		}
 
-		sanitizer.address_poison(raw_data(allocation), a)
+		// sanitizer.address_poison(raw_data(allocation), a)
 		return
 
 	case .Free_All:
