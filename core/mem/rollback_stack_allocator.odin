@@ -1,7 +1,7 @@
 package mem
 
 import "base:runtime"
-import "base:sanitizer"
+// import "base:sanitizer"
 
 /*
 Rollback stack default block size.
@@ -134,7 +134,7 @@ rb_free_all :: proc(stack: ^Rollback_Stack) {
 	stack.head.next_block = nil
 	stack.head.last_alloc = nil
 	stack.head.offset = 0
-	sanitizer.address_poison(stack.head.buffer)
+	// sanitizer.address_poison(stack.head.buffer)
 }
 
 /*
@@ -241,7 +241,7 @@ rb_alloc_bytes_non_zeroed :: proc(
 			block.offset = cast(uintptr)len(block.buffer)
 		}
 		res := ptr[:size]
-		sanitizer.address_unpoison(res)
+		// sanitizer.address_unpoison(res)
 		return res, nil
 	}
 	return nil, .Out_Of_Memory
@@ -338,7 +338,7 @@ rb_resize_bytes_non_zeroed :: proc(
 					block.offset += cast(uintptr)size - cast(uintptr)old_size
 				}
 				res := (ptr)[:size]
-				sanitizer.address_unpoison(res)
+				// sanitizer.address_unpoison(res)
 				#no_bounds_check return res, nil
 			}
 		}

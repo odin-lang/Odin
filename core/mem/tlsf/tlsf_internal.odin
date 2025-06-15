@@ -10,7 +10,7 @@
 package mem_tlsf
 
 import "base:intrinsics"
-import "base:sanitizer"
+// import "base:sanitizer"
 import "base:runtime"
 
 // log2 of number of linear subdivisions of block sizes.
@@ -210,7 +210,7 @@ alloc_bytes_non_zeroed :: proc(control: ^Allocator, size: uint, align: uint) -> 
 				return nil, .Out_Of_Memory
 			}
 
-			sanitizer.address_poison(new_pool_buf)
+			// sanitizer.address_poison(new_pool_buf)
 
 			// Allocate a new link in the `control.pool` tracking structure.
 			new_pool := new_clone(Pool{
@@ -277,7 +277,7 @@ free_with_size :: proc(control: ^Allocator, ptr: rawptr, size: uint) {
 
 	block := block_from_ptr(ptr)
 	assert(!block_is_free(block), "block already marked as free") // double free
-	sanitizer.address_poison(ptr, block.size)
+	// sanitizer.address_poison(ptr, block.size)
 	block_mark_as_free(block)
 	block = block_merge_prev(control, block)
 	block = block_merge_next(control, block)
@@ -321,7 +321,7 @@ resize :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: uint, align
 
 	block_trim_used(control, block, adjust)
 	res = ([^]byte)(ptr)[:new_size]
-	sanitizer.address_unpoison(res)
+	// sanitizer.address_unpoison(res)
 
 	if min_size < new_size {
 		to_zero := ([^]byte)(ptr)[min_size:new_size]
@@ -789,7 +789,7 @@ block_prepare_used :: proc(control: ^Allocator, block: ^Block_Header, size: uint
 		block_trim_free(control, block, size)
 		block_mark_as_used(block)
 		res = ([^]byte)(block_to_ptr(block))[:size]
-		sanitizer.address_unpoison(res)
+		// sanitizer.address_unpoison(res)
 	}
 	return
 }
