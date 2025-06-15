@@ -1912,6 +1912,10 @@ dynamic_arena_resize_bytes :: proc(
 	size:     int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
+	if size == 0 {
+		// NOTE: This allocator has no Free mode.
+		return nil, nil
+	}
 	bytes, err := dynamic_arena_resize_bytes_non_zeroed(a, old_data, size, loc)
 	if bytes != nil {
 		if old_data == nil {
@@ -1968,6 +1972,10 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 	size:     int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
+	if size == 0 {
+		// NOTE: This allocator has no Free mode.
+		return nil, nil
+	}
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
 	if old_size >= size {
