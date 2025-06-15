@@ -249,7 +249,7 @@ arena_alloc_bytes_non_zeroed :: proc(
 	loc       := #caller_location
 ) -> ([]byte, Allocator_Error) {
 	if a.data == nil {
-		panic("Arena is not initialized", loc)
+		panic("Allocation on uninitialized Arena allocator.", loc)
 	}
 	#no_bounds_check end := &a.data[a.offset]
 	ptr := align_forward(end, uintptr(alignment))
@@ -509,7 +509,7 @@ scratch_alloc_bytes_non_zeroed :: proc(
 	if s.data == nil {
 		DEFAULT_BACKING_SIZE :: 4 * Megabyte
 		if !(context.allocator.procedure != scratch_allocator_proc && context.allocator.data != s) {
-			panic("cyclic initialization of the scratch allocator with itself", loc)
+			panic("Cyclic initialization of the scratch allocator with itself.", loc)
 		}
 		scratch_init(s, DEFAULT_BACKING_SIZE)
 	}
@@ -570,7 +570,7 @@ operation is a no-op.
 */
 scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Allocator_Error {
 	if s.data == nil {
-		panic("Free on an uninitialized scratch allocator", loc)
+		panic("Free on an uninitialized Scratch allocator.", loc)
 	}
 	if ptr == nil {
 		return nil
@@ -733,7 +733,7 @@ scratch_resize_bytes_non_zeroed :: proc(
 	if s.data == nil {
 		DEFAULT_BACKING_SIZE :: 4 * Megabyte
 		if !(context.allocator.procedure != scratch_allocator_proc && context.allocator.data != s) {
-			panic("cyclic initialization of the scratch allocator with itself", loc)
+			panic("Cyclic initialization of the scratch allocator with itself.", loc)
 		}
 		scratch_init(s, DEFAULT_BACKING_SIZE)
 	}
@@ -927,7 +927,7 @@ stack_alloc_bytes_non_zeroed :: proc(
 	loc       := #caller_location
 ) -> ([]byte, Allocator_Error) {
 	if s.data == nil {
-		panic("Stack allocation on an uninitialized stack allocator", loc)
+		panic("Allocation on an uninitialized Stack allocator.", loc)
 	}
 	curr_addr := uintptr(raw_data(s.data)) + uintptr(s.curr_offset)
 	padding := calc_padding_with_header(
@@ -966,7 +966,7 @@ stack_free :: proc(
 	loc := #caller_location,
 ) -> (Allocator_Error) {
 	if s.data == nil {
-		panic("Stack free on an uninitialized stack allocator", loc)
+		panic("Free on an uninitialized Stack allocator.", loc)
 	}
 	if old_memory == nil {
 		return nil
@@ -975,7 +975,7 @@ stack_free :: proc(
 	end := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
-		panic("Out of bounds memory address passed to stack allocator (free)", loc)
+		panic("Out of bounds memory address passed to Stack allocator. (free)", loc)
 	}
 	if curr_addr >= start+uintptr(s.curr_offset) {
 		// NOTE(bill): Allow double frees
@@ -1123,7 +1123,7 @@ stack_resize_bytes_non_zeroed :: proc(
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
 	if s.data == nil {
-		panic("Stack resize on an uninitialized stack allocator", loc)
+		panic("Resize on an uninitialized Stack allocator.", loc)
 	}
 	if old_memory == nil {
 		return stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
@@ -1135,7 +1135,7 @@ stack_resize_bytes_non_zeroed :: proc(
 	end       := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
-		panic("Out of bounds memory address passed to stack allocator (resize)")
+		panic("Out of bounds memory address passed to Stack allocator. (resize)")
 	}
 	if curr_addr >= start+uintptr(s.curr_offset) {
 		// NOTE(bill): Allow double frees
@@ -1344,7 +1344,7 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if s.data == nil {
-		panic("Small stack is not initialized", loc)
+		panic("Allocation on an uninitialized Small Stack allocator.", loc)
 	}
 	alignment := alignment
 	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
@@ -1382,7 +1382,7 @@ small_stack_free :: proc(
 	loc := #caller_location,
 ) -> Allocator_Error {
 	if s.data == nil {
-		panic("Small stack is not initialized", loc)
+		panic("Free on an uninitialized Small Stack allocator.", loc)
 	}
 	if old_memory == nil {
 		return nil
@@ -1391,7 +1391,7 @@ small_stack_free :: proc(
 	end := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
-		panic("Out of bounds memory address passed to small stack allocator (free)", loc)
+		panic("Out of bounds memory address passed to Small Stack allocator. (free)", loc)
 	}
 	if curr_addr >= start+uintptr(s.offset) {
 		// NOTE(bill): Allow double frees
@@ -1530,7 +1530,7 @@ small_stack_resize_bytes_non_zeroed :: proc(
 	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if s.data == nil {
-		panic("Small stack is not initialized", loc)
+		panic("Resize on an uninitialized Small Stack allocator.", loc)
 	}
 	old_memory := raw_data(old_data)
 	old_size   := len(old_data)
@@ -1546,7 +1546,7 @@ small_stack_resize_bytes_non_zeroed :: proc(
 	end       := start + uintptr(len(s.data))
 	curr_addr := uintptr(old_memory)
 	if !(start <= curr_addr && curr_addr < end) {
-		panic("Out of bounds memory address passed to small stack allocator (resize)", loc)
+		panic("Out of bounds memory address passed to Small Stack allocator. (resize)", loc)
 	}
 	if curr_addr >= start+uintptr(s.offset) {
 		// NOTE(bill): Treat as a double free
