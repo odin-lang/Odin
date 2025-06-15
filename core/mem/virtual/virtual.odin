@@ -2,7 +2,7 @@ package mem_virtual
 
 import "core:mem"
 import "base:intrinsics"
-import "base:sanitizer"
+// import "base:sanitizer"
 import "base:runtime"
 _ :: runtime
 
@@ -22,7 +22,7 @@ reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Erro
 
 @(no_sanitize_address)
 commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
-	sanitizer.address_unpoison(data, size)
+	// sanitizer.address_unpoison(data, size)
 	return _commit(data, size)
 }
 
@@ -35,13 +35,13 @@ reserve_and_commit :: proc "contextless" (size: uint) -> (data: []byte, err: All
 
 @(no_sanitize_address)
 decommit :: proc "contextless" (data: rawptr, size: uint) {
-	sanitizer.address_poison(data, size)
+	// sanitizer.address_poison(data, size)
 	_decommit(data, size)
 }
 
 @(no_sanitize_address)
 release :: proc "contextless" (data: rawptr, size: uint) {
-	sanitizer.address_unpoison(data, size)
+	// sanitizer.address_unpoison(data, size)
 	_release(data, size)
 }
 
@@ -179,7 +179,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 
 	data = block.base[block.used+alignment_offset:][:min_size]
 	block.used += size
-	sanitizer.address_unpoison(data)
+	// sanitizer.address_unpoison(data)
 	return
 }
 

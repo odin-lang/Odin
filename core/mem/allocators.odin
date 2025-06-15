@@ -2,7 +2,23 @@ package mem
 
 import "base:intrinsics"
 import "base:runtime"
-import "base:sanitizer"
+
+// NOTE(Feoramund): Sanitizer usage in this package has been temporarily
+// disabled pending a thorough review per allocator, as ASan is particular
+// about the addresses and ranges it receives.
+//
+// In short, it keeps track only of 8-byte blocks. This can cause issues if an
+// allocator poisons an entire range but an allocation for less than 8 bytes is
+// desired or if the next allocation address would not be 8-byte aligned.
+//
+// This must be handled carefully on a per-allocator basis and some allocators
+// may not be able to participate.
+//
+// Please see the following link for more information:
+//
+// https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping
+//
+// import "base:sanitizer"
 
 
 /*
@@ -13,13 +29,13 @@ This can help guard against buggy allocators returning memory that they already 
 
 This has no effect if `-sanitize:address` is not enabled.
 */
-@(disabled=.Address not_in ODIN_SANITIZER_FLAGS, private)
-ensure_poisoned :: proc(range: []u8, loc := #caller_location) {
-	cond := sanitizer.address_region_is_poisoned(range) == raw_data(range)
-	// If this fails, we've overlapped an allocation and it's our fault.
-	ensure(cond, `This allocator has sliced a block of memory of which some part is not poisoned before returning.
-This is a bug in the core library and should be reported to the Odin developers with a stack trace and minimal example code if possible.`, loc)
-}
+// @(disabled=.Address not_in ODIN_SANITIZER_FLAGS, private)
+// ensure_poisoned :: proc(range: []u8, loc := #caller_location) {
+// 	cond := sanitizer.address_region_is_poisoned(range) == raw_data(range)
+// 	// If this fails, we've overlapped an allocation and it's our fault.
+// 	ensure(cond, `This allocator has sliced a block of memory of which some part is not poisoned before returning.
+// This is a bug in the core library and should be reported to the Odin developers with a stack trace and minimal example code if possible.`, loc)
+// }
 
 /*
 This procedure checks if a byte slice `range` is not poisoned.
@@ -28,15 +44,15 @@ This can help guard against buggy allocators resizing memory that they should no
 
 This has no effect if `-sanitize:address` is not enabled.
 */
-@(disabled=.Address not_in ODIN_SANITIZER_FLAGS, private)
-ensure_not_poisoned :: proc(range: []u8, loc := #caller_location) {
-	cond := sanitizer.address_region_is_poisoned(range) == nil
-	// If this fails, we've tried to resize memory that is poisoned, which
-	// could be user error caused by an incorrect `old_memory` pointer.
-	ensure(cond, `This allocator has sliced a block of memory of which some part is poisoned before returning.
-This may be a bug in the core library, or it could be user error due to an invalid pointer passed to a resize operation.
-If after ensuring your own code is not responsible, report the problem to the Odin developers with a stack trace and minimal example code if possible.`, loc)
-}
+// @(disabled=.Address not_in ODIN_SANITIZER_FLAGS, private)
+// ensure_not_poisoned :: proc(range: []u8, loc := #caller_location) {
+// 	cond := sanitizer.address_region_is_poisoned(range) == nil
+// 	// If this fails, we've tried to resize memory that is poisoned, which
+// 	// could be user error caused by an incorrect `old_memory` pointer.
+// 	ensure(cond, `This allocator has sliced a block of memory of which some part is poisoned before returning.
+// This may be a bug in the core library, or it could be user error due to an invalid pointer passed to a resize operation.
+// If after ensuring your own code is not responsible, report the problem to the Odin developers with a stack trace and minimal example code if possible.`, loc)
+// }
 
 /*
 Nil allocator.
@@ -172,7 +188,7 @@ arena_init :: proc(a: ^Arena, data: []byte) {
 	a.offset     = 0
 	a.peak_used  = 0
 	a.temp_count = 0
-	sanitizer.address_poison(a.data)
+	// sanitizer.address_poison(a.data)
 }
 
 /*
@@ -260,8 +276,8 @@ arena_alloc_bytes_non_zeroed :: proc(
 	a.offset += total_size
 	a.peak_used = max(a.peak_used, a.offset)
 	result := byte_slice(ptr, size)
-	ensure_poisoned(result)
-	sanitizer.address_unpoison(result)
+	// ensure_poisoned(result)
+	// sanitizer.address_unpoison(result)
 	return result, nil
 }
 
@@ -270,7 +286,7 @@ Free all memory back to the arena allocator.
 */
 arena_free_all :: proc(a: ^Arena) {
 	a.offset = 0
-	sanitizer.address_poison(a.data)
+	// sanitizer.address_poison(a.data)
 }
 
 arena_allocator_proc :: proc(
@@ -348,7 +364,7 @@ allocations *inside* the temporary memory region will be freed to the arena.
 end_arena_temp_memory :: proc(tmp: Arena_Temp_Memory) {
 	assert(tmp.arena.offset >= tmp.prev_offset)
 	assert(tmp.arena.temp_count > 0)
-	sanitizer.address_poison(tmp.arena.data[tmp.prev_offset:tmp.arena.offset])
+	// sanitizer.address_poison(tmp.arena.data[tmp.prev_offset:tmp.arena.offset])
 	tmp.arena.offset = tmp.prev_offset
 	tmp.arena.temp_count -= 1
 }
@@ -412,7 +428,7 @@ scratch_init :: proc(s: ^Scratch, size: int, backup_allocator := context.allocat
 	s.prev_allocation_root = nil
 	s.backup_allocator = backup_allocator
 	s.leaked_allocations.allocator = backup_allocator
-	sanitizer.address_poison(s.data)
+	// sanitizer.address_poison(s.data)
 	return nil
 }
 
@@ -430,7 +446,7 @@ scratch_destroy :: proc(s: ^Scratch) {
 		free_bytes(ptr, s.backup_allocator)
 	}
 	delete(s.leaked_allocations)
-	sanitizer.address_unpoison(s.data)
+	// sanitizer.address_unpoison(s.data)
 	delete(s.data, s.backup_allocator)
 	s^ = {}
 }
@@ -540,8 +556,8 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		s.prev_allocation = ptr
 		s.curr_offset = int(offset) + aligned_size
 		result := byte_slice(ptr, size)
-		ensure_poisoned(result)
-		sanitizer.address_unpoison(result)
+		// ensure_poisoned(result)
+		// sanitizer.address_unpoison(result)
 		return result, nil
 	} else {
 		// NOTE: No need to use `aligned_size` here, as the backup allocator will handle alignment for us.
@@ -580,7 +596,7 @@ scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Alloc
 	old_ptr := uintptr(ptr)
 	if s.prev_allocation == ptr {
 		s.curr_offset = int(uintptr(s.prev_allocation_root) - start)
-		sanitizer.address_poison(s.data[s.curr_offset:])
+		// sanitizer.address_poison(s.data[s.curr_offset:])
 		s.prev_allocation = nil
 		s.prev_allocation_root = nil
 		return nil
@@ -612,7 +628,7 @@ scratch_free_all :: proc(s: ^Scratch, loc := #caller_location) {
 		free_bytes(ptr, s.backup_allocator, loc)
 	}
 	clear(&s.leaked_allocations)
-	sanitizer.address_poison(s.data)
+	// sanitizer.address_poison(s.data)
 }
 
 /*
@@ -746,11 +762,11 @@ scratch_resize_bytes_non_zeroed :: proc(
 	// Also, the alignments must match, otherwise we must re-allocate to
 	// guarantee the user's request.
 	if s.prev_allocation == old_memory && is_aligned(old_memory, alignment) && old_ptr+uintptr(size) < end {
-		ensure_not_poisoned(old_data)
-		sanitizer.address_poison(old_memory)
+		// ensure_not_poisoned(old_data)
+		// sanitizer.address_poison(old_memory)
 		s.curr_offset = int(old_ptr-begin)+size
 		result := byte_slice(old_memory, size)
-		sanitizer.address_unpoison(result)
+		// sanitizer.address_unpoison(result)
 		return result, nil
 	}
 	data, err := scratch_alloc_bytes_non_zeroed(s, size, alignment, loc)
@@ -852,7 +868,7 @@ stack_init :: proc(s: ^Stack, data: []byte) {
 	s.prev_offset = 0
 	s.curr_offset = 0
 	s.peak_used   = 0
-	sanitizer.address_poison(data)
+	// sanitizer.address_poison(data)
 }
 
 /*
@@ -948,8 +964,8 @@ stack_alloc_bytes_non_zeroed :: proc(
 	s.curr_offset += size
 	s.peak_used = max(s.peak_used, s.curr_offset)
 	result := byte_slice(rawptr(next_addr), size)
-	ensure_poisoned(result)
-	sanitizer.address_unpoison(result)
+	// ensure_poisoned(result)
+	// sanitizer.address_unpoison(result)
 	return result, nil
 }
 
@@ -988,7 +1004,7 @@ stack_free :: proc(
 	}
 
 	s.prev_offset = header.prev_offset
-	sanitizer.address_poison(s.data[old_offset:s.curr_offset])
+	// sanitizer.address_poison(s.data[old_offset:s.curr_offset])
 	s.curr_offset = old_offset
 
 	return nil
@@ -1000,7 +1016,7 @@ Free all memory back to the stack allocator.
 stack_free_all :: proc(s: ^Stack, loc := #caller_location) {
 	s.prev_offset = 0
 	s.curr_offset = 0
-	sanitizer.address_poison(s.data)
+	// sanitizer.address_poison(s.data)
 }
 
 /*
@@ -1147,7 +1163,7 @@ stack_resize_bytes_non_zeroed :: proc(
 		data, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 		if err == nil {
 			runtime.copy(data, byte_slice(old_memory, old_size))
-			sanitizer.address_poison(old_memory)
+			// sanitizer.address_poison(old_memory)
 		}
 		return data, err
 	}
@@ -1160,7 +1176,7 @@ stack_resize_bytes_non_zeroed :: proc(
 		data, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 		if err == nil {
 			runtime.copy(data, byte_slice(old_memory, old_size))
-			sanitizer.address_poison(old_memory)
+			// sanitizer.address_poison(old_memory)
 		}
 		return data, err
 	}
@@ -1171,11 +1187,11 @@ stack_resize_bytes_non_zeroed :: proc(
 	if diff > 0 {
 		zero(rawptr(curr_addr + uintptr(diff)), diff)
 	} else {
-		sanitizer.address_poison(old_data[size:])
+		// sanitizer.address_poison(old_data[size:])
 	}
 	result := byte_slice(old_memory, size)
-	ensure_poisoned(result)
-	sanitizer.address_unpoison(result)
+	// ensure_poisoned(result)
+	// sanitizer.address_unpoison(result)
 	return result, nil
 }
 
@@ -1244,7 +1260,7 @@ small_stack_init :: proc(s: ^Small_Stack, data: []byte) {
 	s.data      = data
 	s.offset    = 0
 	s.peak_used = 0
-	sanitizer.address_poison(data)
+	// sanitizer.address_poison(data)
 }
 
 /*
@@ -1359,13 +1375,13 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 	header.padding = cast(u8)padding
 	// We must poison the header, no matter what its state is, because there
 	// may have been an out-of-order free before this point.
-	sanitizer.address_poison(header)
+	// sanitizer.address_poison(header)
 	s.offset += size
 	s.peak_used = max(s.peak_used, s.offset)
 	result := byte_slice(rawptr(next_addr), size)
 	// NOTE: We cannot ensure the poison state of this allocation, because this
 	// allocator allows out-of-order frees with overwriting.
-	sanitizer.address_unpoison(result)
+	// sanitizer.address_unpoison(result)
 	return result, nil
 }
 
@@ -1399,7 +1415,7 @@ small_stack_free :: proc(
 	}
 	header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header))
 	old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
-	sanitizer.address_poison(s.data[old_offset:s.offset])
+	// sanitizer.address_poison(s.data[old_offset:s.offset])
 	s.offset = old_offset
 	return nil
 }
@@ -1409,7 +1425,7 @@ Free all memory back to the small stack allocator.
 */
 small_stack_free_all :: proc(s: ^Small_Stack) {
 	s.offset = 0
-	sanitizer.address_poison(s.data)
+	// sanitizer.address_poison(s.data)
 }
 
 /*
@@ -1558,13 +1574,13 @@ small_stack_resize_bytes_non_zeroed :: proc(
 		data, err := small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 		if err == nil {
 			runtime.copy(data, byte_slice(old_memory, old_size))
-			sanitizer.address_poison(old_memory)
+			// sanitizer.address_poison(old_memory)
 		}
 		return data, err
 	}
 	if old_size == size {
 		result := byte_slice(old_memory, size)
-		sanitizer.address_unpoison(result)
+		// sanitizer.address_unpoison(result)
 		return result, nil
 	}
 	data, err := small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
@@ -1739,7 +1755,7 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, loc := #caller_locatio
 			nil,
 			0,
 		)
-		sanitizer.address_poison(data)
+		// sanitizer.address_poison(data)
 		new_block = raw_data(data)
 	}
 	a.bytes_left    = a.block_size
@@ -1828,8 +1844,8 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc :
 	a.current_pos = ([^]byte)(a.current_pos)[n:]
 	a.bytes_left -= n
 	result := ([^]byte)(memory)[:size]
-	ensure_poisoned(result)
-	sanitizer.address_unpoison(result)
+	// ensure_poisoned(result)
+	// sanitizer.address_unpoison(result)
 	return result, nil
 }
 
@@ -1841,12 +1857,12 @@ the unused blocks.
 */
 dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	if a.current_block != nil {
-		sanitizer.address_poison(a.current_block, a.block_size)
+		// sanitizer.address_poison(a.current_block, a.block_size)
 		append(&a.unused_blocks, a.current_block, loc=loc)
 		a.current_block = nil
 	}
 	for block in a.used_blocks {
-		sanitizer.address_poison(block, a.block_size)
+		// sanitizer.address_poison(block, a.block_size)
 		append(&a.unused_blocks, block, loc=loc)
 	}
 	clear(&a.used_blocks)
@@ -1866,7 +1882,7 @@ the unused blocks.
 dynamic_arena_free_all :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	dynamic_arena_reset(a)
 	for block in a.unused_blocks {
-		sanitizer.address_unpoison(block, a.block_size)
+		// sanitizer.address_unpoison(block, a.block_size)
 		free(block, a.block_allocator, loc)
 	}
 	clear(&a.unused_blocks)
@@ -1984,7 +2000,7 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
 	if old_size >= size {
-		sanitizer.address_poison(old_data[size:])
+		// sanitizer.address_poison(old_data[size:])
 		return byte_slice(old_memory, size), nil
 	}
 	// No information is kept about allocations in this allocator, thus we
@@ -2223,7 +2239,7 @@ buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint,
 	b.head.is_free = true
 	b.tail = buddy_block_next(b.head)
 	b.alignment = alignment
-	sanitizer.address_poison(data)
+	// sanitizer.address_poison(data)
 }
 
 /*
@@ -2309,8 +2325,8 @@ buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) 
 		}
 		found.is_free = false
 		data := ([^]byte)(found)[b.alignment:][:size]
-		ensure_poisoned(data)
-		sanitizer.address_unpoison(data)
+		// ensure_poisoned(data)
+		// sanitizer.address_unpoison(data)
 		return data, nil
 	}
 	return nil, nil
@@ -2331,7 +2347,7 @@ buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Erro
 			return .Invalid_Pointer
 		}
 		block := (^Buddy_Block)(([^]byte)(ptr)[-b.alignment:])
-		sanitizer.address_poison(ptr, block.size)
+		// sanitizer.address_poison(ptr, block.size)
 		block.is_free = true
 		buddy_block_coalescence(b.head, b.tail)
 	}
