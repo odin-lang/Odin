@@ -142,11 +142,10 @@ The arena allocator (also known as a linear allocator, bump allocator,
 region allocator) is an allocator that uses a single backing buffer for
 allocations.
 
-The buffer is being used contiguously, from start by end. Each subsequent
-allocation occupies the next adjacent region of memory in the buffer. Since
-arena allocator does not keep track of any metadata associated with the
-allocations and their locations, it is impossible to free individual
-allocations.
+The buffer is used contiguously, from start to end. Each subsequent allocation
+occupies the next adjacent region of memory in the buffer. Since the arena
+allocator does not keep track of any metadata associated with the allocations
+and their locations, it is impossible to free individual allocations.
 
 The arena allocator can be used for temporary allocations in frame-based memory
 management. Games are one example of such applications. A global arena can be
@@ -165,7 +164,7 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 /*
 Initialize an arena.
 
-This procedure initializes the arena `a` with memory region `data` as it's
+This procedure initializes the arena `a` with memory region `data` as its
 backing buffer.
 */
 arena_init :: proc(a: ^Arena, data: []byte) {
@@ -267,7 +266,7 @@ arena_alloc_bytes_non_zeroed :: proc(
 }
 
 /*
-Free all memory to an arena.
+Free all memory back to the arena allocator.
 */
 arena_free_all :: proc(a: ^Arena) {
 	a.offset = 0
@@ -310,12 +309,12 @@ arena_allocator_proc :: proc(
 }
 
 /*
-Temporary memory region of arena.
+Temporary memory region of an `Arena` allocator.
 
-Temporary memory regions of arena act as "savepoints" for arena. When one is
-created, the subsequent allocations are done inside the temporary memory
-region. When `end_arena_temp_memory` is called, the arena is rolled back, and
-all of the memory that was allocated from the arena will be freed.
+Temporary memory regions of an arena act as "save-points" for the allocator.
+When one is created, the subsequent allocations are done inside the temporary
+memory region. When `end_arena_temp_memory` is called, the arena is rolled
+back, and all of the memory that was allocated from the arena will be freed.
 
 Multiple temporary memory regions can exist at the same time for an arena.
 */
@@ -375,22 +374,25 @@ Scratch :: struct {
 Scratch allocator.
 
 The scratch allocator works in a similar way to the `Arena` allocator. The
-scratch allocator has a backing buffer, that is being allocated in
-contiguous regions, from start to end.
+scratch allocator has a backing buffer that is allocated in contiguous regions,
+from start to end.
 
 Each subsequent allocation will be the next adjacent region of memory in the
 backing buffer. If the allocation doesn't fit into the remaining space of the
 backing buffer, this allocation is put at the start of the buffer, and all
-previous allocations will become invalidated. If the allocation doesn't fit
-into the backing buffer as a whole, it will be allocated using a backing
-allocator, and pointer to the allocated memory region will be put into the
-`leaked_allocations` array.
+previous allocations will become invalidated.
+
+If the allocation doesn't fit into the backing buffer as a whole, it will be
+allocated using a backing allocator, and the pointer to the allocated memory
+region will be put into the `leaked_allocations` array. A `Warning`-level log
+message will be sent as well.
 
 Allocations which are resized will be resized in-place if they were the last
 allocation. Otherwise, they are re-allocated to avoid overwriting previous
 allocations.
 
-The `leaked_allocations` array is managed by the `context` allocator.
+The `leaked_allocations` array is managed by the `context` allocator if no
+`backup_allocator` is specified in `scratch_init`.
 */
 @(require_results)
 scratch_allocator :: proc(allocator: ^Scratch) -> Allocator {
@@ -401,7 +403,7 @@ scratch_allocator :: proc(allocator: ^Scratch) -> Allocator {
 }
 
 /*
-Initialize scratch allocator.
+Initialize a scratch allocator.
 */
 scratch_init :: proc(s: ^Scratch, size: int, backup_allocator := context.allocator) -> Allocator_Error {
 	s.data = make_aligned([]byte, size, 2*align_of(rawptr), backup_allocator) or_return
@@ -416,6 +418,9 @@ scratch_init :: proc(s: ^Scratch, size: int, backup_allocator := context.allocat
 
 /*
 Free all data associated with a scratch allocator.
+
+This is distinct from `scratch_free_all` in that it deallocates all memory used
+to setup the allocator, as opposed to all allocations made from that space.
 */
 scratch_destroy :: proc(s: ^Scratch) {
 	if s == nil {
@@ -431,7 +436,7 @@ scratch_destroy :: proc(s: ^Scratch) {
 }
 
 /*
-Allocate memory from scratch allocator.
+Allocate memory from a scratch allocator.
 
 This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is zero-initialized. This procedure
@@ -449,7 +454,7 @@ scratch_alloc :: proc(
 }
 
 /*
-Allocate memory from scratch allocator.
+Allocate memory from a scratch allocator.
 
 This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is zero-initialized. This procedure
@@ -470,7 +475,7 @@ scratch_alloc_bytes :: proc(
 }
 
 /*
-Allocate non-initialized memory from scratch allocator.
+Allocate non-initialized memory from a scratch allocator.
 
 This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is not explicitly zero-initialized.
@@ -488,7 +493,7 @@ scratch_alloc_non_zeroed :: proc(
 }
 
 /*
-Allocate non-initialized memory from scratch allocator.
+Allocate non-initialized memory from a scratch allocator.
 
 This procedure allocates `size` bytes of memory aligned on a boundary specified
 by `alignment`. The allocated memory region is not explicitly zero-initialized.
@@ -556,7 +561,7 @@ scratch_alloc_bytes_non_zeroed :: proc(
 }
 
 /*
-Free memory to the scratch allocator.
+Free memory back to the scratch allocator.
 
 This procedure frees the memory region allocated at pointer `ptr`.
 
@@ -598,7 +603,7 @@ scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Alloc
 }
 
 /*
-Free all memory to the scratch allocator.
+Free all memory back to the scratch allocator.
 */
 scratch_free_all :: proc(s: ^Scratch, loc := #caller_location) {
 	s.curr_offset = 0
@@ -611,11 +616,11 @@ scratch_free_all :: proc(s: ^Scratch, loc := #caller_location) {
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a scratch allocator.
 
-This procedure resizes a memory region, defined by its location, `old_memory`,
-and its size, `old_size` to have a size `size` and alignment `alignment`. The
-newly allocated memory, if any is zero-initialized.
+This procedure resizes a memory region defined by its location `old_memory`
+and its size `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any, is zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `scratch_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -640,10 +645,10 @@ scratch_resize :: proc(
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a scratch allocator.
 
-This procedure resizes a memory region, specified by `old_data`, to have a size
-`size` and alignment `alignment`. The newly allocated memory, if any is
+This procedure resizes a memory region specified by `old_data` to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any, is
 zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `scratch_alloc()`,
@@ -671,11 +676,11 @@ scratch_resize_bytes :: proc(
 }
 
 /*
-Resize an allocation without zero-initialization.
+Resize an allocation owned by a scratch allocator, without zero-initialization.
 
-This procedure resizes a memory region, defined by its location, `old_memory`,
-and its size, `old_size` to have a size `size` and alignment `alignment`. The
-newly allocated memory, if any is not explicitly zero-initialized.
+This procedure resizes a memory region defined by its location `old_memory`
+and its size `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any, is not explicitly zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `scratch_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -700,10 +705,10 @@ scratch_resize_non_zeroed :: proc(
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a scratch allocator.
 
-This procedure resizes a memory region, specified by `old_data`, to have a size
-`size` and alignment `alignment`. The newly allocated memory, if any is not
+This procedure resizes a memory region specified by `old_data` to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any, is not
 explicitly zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `scratch_alloc()`,
@@ -837,7 +842,7 @@ stack_allocator :: proc(stack: ^Stack) -> Allocator {
 }
 
 /*
-Initialize the stack allocator.
+Initialize a stack allocator.
 
 This procedure initializes the stack allocator with a backing buffer specified
 by `data` parameter.
@@ -851,7 +856,7 @@ stack_init :: proc(s: ^Stack, data: []byte) {
 }
 
 /*
-Allocate memory from stack.
+Allocate memory from a stack allocator.
 
 This procedure allocates `size` bytes of memory, aligned to the boundary
 specified by `alignment`. The allocated memory is zero-initialized. This
@@ -869,7 +874,7 @@ stack_alloc :: proc(
 }
 
 /*
-Allocate memory from stack.
+Allocate memory from a stack allocator.
 
 This procedure allocates `size` bytes of memory, aligned to the boundary
 specified by `alignment`. The allocated memory is zero-initialized. This
@@ -890,7 +895,7 @@ stack_alloc_bytes :: proc(
 }
 
 /*
-Allocate memory from stack.
+Allocate memory from a stack allocator.
 
 This procedure allocates `size` bytes of memory, aligned to the boundary
 specified by `alignment`. The allocated memory is not explicitly
@@ -908,7 +913,7 @@ stack_alloc_non_zeroed :: proc(
 }
 
 /*
-Allocate memory from stack.
+Allocate memory from a stack allocator.
 
 This procedure allocates `size` bytes of memory, aligned to the boundary
 specified by `alignment`. The allocated memory is not explicitly
@@ -949,7 +954,7 @@ stack_alloc_bytes_non_zeroed :: proc(
 }
 
 /*
-Free memory to the stack.
+Free memory back to the stack allocator.
 
 This procedure frees the memory region starting at `old_memory` to the stack.
 If the freeing is an out of order freeing, the `.Invalid_Pointer` error
@@ -990,7 +995,7 @@ stack_free :: proc(
 }
 
 /*
-Free all allocations to the stack.
+Free all memory back to the stack allocator.
 */
 stack_free_all :: proc(s: ^Stack, loc := #caller_location) {
 	s.prev_offset = 0
@@ -999,11 +1004,11 @@ stack_free_all :: proc(s: ^Stack, loc := #caller_location) {
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a stack allocator.
 
-This procedure resizes a memory region, defined by its location, `old_memory`,
-and its size, `old_size` to have a size `size` and alignment `alignment`. The
-newly allocated memory, if any is zero-initialized.
+This procedure resizes a memory region defined by its location `old_memory`
+and its size `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any, is zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `stack_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1028,11 +1033,11 @@ stack_resize :: proc(
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a stack allocator.
 
-This procedure resizes a memory region, specified by the `old_data` parameter
-to have a size `size` and alignment `alignment`. The newly allocated memory,
-if any is zero-initialized.
+This procedure resizes a memory region specified by `old_data` to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any, is
+zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `stack_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1063,11 +1068,11 @@ stack_resize_bytes :: proc(
 }
 
 /*
-Resize an allocation without zero-initialization.
+Resize an allocation owned by a stack allocator, without zero-initialization.
 
-This procedure resizes a memory region, defined by its location, `old_memory`,
-and its size, `old_size` to have a size `size` and alignment `alignment`. The
-newly allocated memory, if any is not explicitly zero-initialized.
+This procedure resizes a memory region defined by its location `old_memory`
+and its size `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any, is not explicitly zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `stack_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1092,11 +1097,11 @@ stack_resize_non_zeroed :: proc(
 }
 
 /*
-Resize an allocation without zero-initialization.
+Resize an allocation owned by a stack allocator, without zero-initialization.
 
-This procedure resizes a memory region, specified by the `old_data` parameter
-to have a size `size` and alignment `alignment`. The newly allocated memory,
-if any is not explicitly zero-initialized.
+This procedure resizes a memory region specified by `old_data` to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any, is not
+explicitly zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `stack_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1230,7 +1235,7 @@ Small_Stack :: struct {
 }
 
 /*
-Initialize small stack.
+Initialize a small stack allocator.
 
 This procedure initializes the small stack allocator with `data` as its backing
 buffer.
@@ -1245,12 +1250,12 @@ small_stack_init :: proc(s: ^Small_Stack, data: []byte) {
 /*
 Small stack allocator.
 
-The small stack allocator is just like a stack allocator, with the only
+The small stack allocator is just like a `Stack` allocator, with the only
 difference being an extremely small header size. Unlike the stack allocator,
-small stack allows out-of order freeing of memory, with the stipulation that
-all allocations made after the freed allocation will become invalidated upon
-following allocations as they will begin to overwrite the memory formerly used
-by the freed allocation.
+the small stack allows out-of order freeing of memory, with the stipulation
+that all allocations made after the freed allocation will become invalidated
+upon following allocations as they will begin to overwrite the memory formerly
+used by the freed allocation.
 
 The memory is allocated in the backing buffer linearly, from start to end.
 Each subsequent allocation will get the next adjacent memory region.
@@ -1268,7 +1273,7 @@ small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
 }
 
 /*
-Allocate memory from small stack.
+Allocate memory from a small stack allocator.
 
 This procedure allocates `size` bytes of memory aligned to a boundary specified
 by `alignment`. The allocated memory is zero-initialized. This procedure
@@ -1286,7 +1291,7 @@ small_stack_alloc :: proc(
 }
 
 /*
-Allocate memory from small stack.
+Allocate memory from a small stack allocator.
 
 This procedure allocates `size` bytes of memory aligned to a boundary specified
 by `alignment`. The allocated memory is zero-initialized. This procedure
@@ -1307,7 +1312,7 @@ small_stack_alloc_bytes :: proc(
 }
 
 /*
-Allocate memory from small stack.
+Allocate memory from a small stack allocator.
 
 This procedure allocates `size` bytes of memory aligned to a boundary specified
 by `alignment`. The allocated memory is not explicitly zero-initialized. This
@@ -1325,7 +1330,7 @@ small_stack_alloc_non_zeroed :: proc(
 }
 
 /*
-Allocate memory from small stack.
+Allocate memory from a small stack allocator.
 
 This procedure allocates `size` bytes of memory aligned to a boundary specified
 by `alignment`. The allocated memory is not explicitly zero-initialized. This
@@ -1365,7 +1370,7 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 }
 
 /*
-Allocate memory from small stack.
+Allocate memory from a small stack allocator.
 
 This procedure allocates `size` bytes of memory aligned to a boundary specified
 by `alignment`. The allocated memory is not explicitly zero-initialized. This
@@ -1400,7 +1405,7 @@ small_stack_free :: proc(
 }
 
 /*
-Free all memory to small stack.
+Free all memory back to the small stack allocator.
 */
 small_stack_free_all :: proc(s: ^Small_Stack) {
 	s.offset = 0
@@ -1408,11 +1413,11 @@ small_stack_free_all :: proc(s: ^Small_Stack) {
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a small stack allocator.
 
-This procedure resizes a memory region, defined by its location, `old_memory`,
-and its size, `old_size` to have a size `size` and alignment `alignment`. The
-newly allocated memory, if any is zero-initialized.
+This procedure resizes a memory region defined by its location `old_memory`
+and its size `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any, is zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `small_stack_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1437,11 +1442,11 @@ small_stack_resize :: proc(
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a small stack allocator.
 
-This procedure resizes a memory region, specified by the `old_data` parameter
-to have a size `size` and alignment `alignment`. The newly allocated memory,
-if any is zero-initialized.
+This procedure resizes a memory region specified by `old_data` to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any, is
+zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `small_stack_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1472,11 +1477,11 @@ small_stack_resize_bytes :: proc(
 }
 
 /*
-Resize an allocation without zero-initialization.
+Resize an allocation owned by a small stack allocator, without zero-initialization.
 
-This procedure resizes a memory region, defined by its location, `old_memory`,
-and its size, `old_size` to have a size `size` and alignment `alignment`. The
-newly allocated memory, if any is not explicitly zero-initialized.
+This procedure resizes a memory region defined by its location `old_memory`
+and its size `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any, is not explicitly zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `small_stack_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1501,11 +1506,11 @@ small_stack_resize_non_zeroed :: proc(
 }
 
 /*
-Resize an allocation without zero-initialization.
+Resize an allocation owned by a small stack allocator, without zero-initialization.
 
-This procedure resizes a memory region, specified by the `old_data` parameter
-to have a size `size` and alignment `alignment`. The newly allocated memory,
-if any is not explicitly zero-initialized.
+This procedure resizes a memory region specified by `old_data` to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any, is not
+explicitly zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `small_stack_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1677,18 +1682,18 @@ dynamic_arena_init :: proc(
 Dynamic arena allocator.
 
 The dynamic arena allocator uses blocks of a specific size, allocated on-demand
-using the block allocator. This allocator acts similarly to arena. All
+using the block allocator. This allocator acts similarly to `Arena`. All
 allocations in a block happen contiguously, from start to end. If an allocation
-does not fit into the remaining space of the block, and its size is smaller
+does not fit into the remaining space of the block and its size is smaller
 than the specified out-band size, a new block is allocated using the
 `block_allocator` and the allocation is performed from a newly-allocated block.
 
-If an allocation has bigger size than the specified out-band size, a new block
+If an allocation is larger than the specified out-band size, a new block
 is allocated such that the allocation fits into this new block. This is referred
 to as an *out-band allocation*. The out-band blocks are kept separately from
 normal blocks.
 
-Just like arena, the dynamic arena does not support freeing of individual
+Just like `Arena`, the dynamic arena does not support freeing of individual
 objects.
 */
 @(require_results)
@@ -1702,7 +1707,7 @@ dynamic_arena_allocator :: proc(a: ^Dynamic_Arena) -> Allocator {
 /*
 Destroy a dynamic arena.
 
-This procedure frees all allocations, made on a dynamic arena, including the
+This procedure frees all allocations made on a dynamic arena, including the
 unused blocks, as well as the arrays for storing blocks.
 */
 dynamic_arena_destroy :: proc(a: ^Dynamic_Arena) {
@@ -1829,9 +1834,9 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc :
 }
 
 /*
-Reset the dynamic arena.
+Reset a dynamic arena allocator.
 
-This procedure frees all the allocations, owned by the dynamic arena, excluding
+This procedure frees all the allocations owned by the dynamic arena, excluding
 the unused blocks.
 */
 dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
@@ -1853,9 +1858,9 @@ dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 }
 
 /*
-Free all memory from a dynamic arena.
+Free all memory back to the dynamic arena allocator.
 
-This procedure frees all the allocations, owned by the dynamic arena, including
+This procedure frees all the allocations owned by the dynamic arena, including
 the unused blocks.
 */
 dynamic_arena_free_all :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
@@ -1868,11 +1873,11 @@ dynamic_arena_free_all :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a dynamic arena allocator.
 
-This procedure resizes a memory region, defined by its location, `old_memory`,
-and its size, `old_size` to have a size `size` and alignment `alignment`. The
-newly allocated memory, if any is zero-initialized.
+This procedure resizes a memory region defined by its location `old_memory`
+and its size `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any, is zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1893,10 +1898,10 @@ dynamic_arena_resize :: proc(
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a dynamic arena allocator.
 
-This procedure resizes a memory region, specified by `old_data`, to have a size
-`size` and alignment `alignment`. The newly allocated memory, if any is
+This procedure resizes a memory region specified by `old_data` to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any, is
 zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
@@ -1928,11 +1933,11 @@ dynamic_arena_resize_bytes :: proc(
 }
 
 /*
-Resize an allocation without zero-initialization.
+Resize an allocation owned by a dynamic arena allocator, without zero-initialization.
 
-This procedure resizes a memory region, defined by its location, `old_memory`,
-and its size, `old_size` to have a size `size` and alignment `alignment`. The
-newly allocated memory, if any is not explicitly zero-initialized.
+This procedure resizes a memory region defined by its location `old_memory`
+and its size `old_size` to have a size `size` and alignment `alignment`. The
+newly allocated memory, if any, is not explicitly zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
 allocating a memory region `size` bytes in size, aligned on a boundary specified
@@ -1953,10 +1958,10 @@ dynamic_arena_resize_non_zeroed :: proc(
 }
 
 /*
-Resize an allocation.
+Resize an allocation owned by a dynamic arena allocator, without zero-initialization.
 
-This procedure resizes a memory region, specified by `old_data`, to have a size
-`size` and alignment `alignment`. The newly allocated memory, if any is not
+This procedure resizes a memory region specified by `old_data` to have a size
+`size` and alignment `alignment`. The newly allocated memory, if any, is not
 explicitly zero-initialized.
 
 If `old_memory` is `nil`, this procedure acts just like `dynamic_arena_alloc()`,
@@ -1982,6 +1987,8 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 		sanitizer.address_poison(old_data[size:])
 		return byte_slice(old_memory, size), nil
 	}
+	// No information is kept about allocations in this allocator, thus we
+	// cannot truly resize anything and must reallocate.
 	data, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, loc)
 	if err == nil {
 		runtime.copy(data, byte_slice(old_memory, old_size))
@@ -2196,7 +2203,7 @@ buddy_allocator :: proc(b: ^Buddy_Allocator) -> Allocator {
 }
 
 /*
-Initialize the buddy allocator.
+Initialize a buddy allocator.
 
 This procedure initializes the buddy allocator `b` with a backing buffer `data`
 and block alignment specified by `alignment`.
@@ -2237,9 +2244,10 @@ buddy_block_size_required :: proc(b: ^Buddy_Allocator, size: uint) -> uint {
 /*
 Allocate memory from a buddy allocator.
 
-This procedure allocates `size` bytes of memory aligned on a boundary specified
-by `alignment`. The allocated memory region is zero-initialized. This procedure
-returns a pointer to the allocated memory region.
+This procedure allocates `size` bytes of memory. The allocation's alignment is
+fixed to the `alignment` specified at initialization. The allocated memory
+region is zero-initialized. This procedure returns a pointer to the allocated
+memory region.
 */
 @(require_results, no_sanitize_address)
 buddy_allocator_alloc :: proc(b: ^Buddy_Allocator, size: uint) -> (rawptr, Allocator_Error) {
@@ -2250,9 +2258,10 @@ buddy_allocator_alloc :: proc(b: ^Buddy_Allocator, size: uint) -> (rawptr, Alloc
 /*
 Allocate memory from a buddy allocator.
 
-This procedure allocates `size` bytes of memory aligned on a boundary specified
-by `alignment`. The allocated memory region is zero-initialized. This procedure
-returns a slice of the allocated memory region.
+This procedure allocates `size` bytes of memory. The allocation's alignment is
+fixed to the `alignment` specified at initialization. The allocated memory
+region is zero-initialized. This procedure returns a slice of the allocated
+memory region.
 */
 @(require_results, no_sanitize_address)
 buddy_allocator_alloc_bytes :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte, Allocator_Error) {
@@ -2266,9 +2275,10 @@ buddy_allocator_alloc_bytes :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte,
 /*
 Allocate non-initialized memory from a buddy allocator.
 
-This procedure allocates `size` bytes of memory aligned on a boundary specified
-by `alignment`. The allocated memory region is not explicitly zero-initialized.
-This procedure returns a pointer to the allocated memory region.
+This procedure allocates `size` bytes of memory. The allocation's alignment is
+fixed to the `alignment` specified at initialization. The allocated memory
+region is not explicitly zero-initialized. This procedure returns a pointer to
+the allocated memory region.
 */
 @(require_results, no_sanitize_address)
 buddy_allocator_alloc_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) -> (rawptr, Allocator_Error) {
@@ -2279,9 +2289,10 @@ buddy_allocator_alloc_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) -> (ra
 /*
 Allocate non-initialized memory from a buddy allocator.
 
-This procedure allocates `size` bytes of memory aligned on a boundary specified
-by `alignment`. The allocated memory region is not explicitly zero-initialized.
-This procedure returns a slice of the allocated memory region.
+This procedure allocates `size` bytes of memory. The allocation's alignment is
+fixed to the `alignment` specified at initialization. The allocated memory
+region is not explicitly zero-initialized. This procedure returns a slice of
+the allocated memory region.
 */
 @(require_results, no_sanitize_address)
 buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte, Allocator_Error) {
@@ -2306,7 +2317,7 @@ buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) 
 }
 
 /*
-Free memory to the buddy allocator.
+Free memory back to the buddy allocator.
 
 This procedure frees the memory region allocated at pointer `ptr`.
 
@@ -2328,7 +2339,7 @@ buddy_allocator_free :: proc(b: ^Buddy_Allocator, ptr: rawptr) -> Allocator_Erro
 }
 
 /*
-Free all memory to the buddy allocator.
+Free all memory back to the buddy allocator.
 */
 @(no_sanitize_address)
 buddy_allocator_free_all :: proc(b: ^Buddy_Allocator) {
