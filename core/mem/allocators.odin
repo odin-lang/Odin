@@ -1750,7 +1750,7 @@ by `alignment` from a dynamic arena `a`. The allocated memory is
 zero-initialized. This procedure returns a pointer to the newly allocated memory
 region.
 */
-@(private, require_results)
+@(require_results)
 dynamic_arena_alloc :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> (rawptr, Allocator_Error) {
 	data, err := dynamic_arena_alloc_bytes(a, size, loc)
 	return raw_data(data), err
