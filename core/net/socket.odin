@@ -181,7 +181,7 @@ bound_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Socket_I
 /*
 	Returns the endpoint that the given socket is connected to. (Peer's endpoint)
 */
-peer_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: TCP_Recv_Error) {
+peer_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Socket_Info_Error) {
 	return _peer_endpoint(socket)
 }
 
