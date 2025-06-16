@@ -787,9 +787,10 @@ access :: proc(path: string, mask: int) -> (bool, Error) {
 }
 
 @(require_results)
-lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+lookup_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
+	// NOTE(tetra): Lifetime of 'cstr' is unclear, but _unix_free(cstr) segfaults.
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
 		return "", false
@@ -798,10 +799,38 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 }
 
 @(require_results)
-get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+lookup_env_buffer :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	if len(key) + 1 > len(buf) {
+		return "", .Buffer_Full
+	} else {
+		copy(buf, key)
+	}
+
+	if value = string(_unix_getenv(cstring(raw_data(buf)))); value == "" {
+		return "", .Env_Var_Not_Found
+	} else {
+		if len(value) > len(buf) {
+			return "", .Buffer_Full
+		} else {
+			copy(buf, value)
+			return string(buf[:len(value)]), nil
+		}
+	}
+}
+lookup_env :: proc{lookup_env_alloc, lookup_env_buffer}
+
+@(require_results)
+get_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
+
+@(require_results)
+get_env_buf :: proc(buf: []u8, key: string) -> (value: string) {
+	value, _ = lookup_env(buf, key)
+	return
+}
+get_env :: proc{get_env_alloc, get_env_buf}
 
 @(require_results)
 get_current_directory :: proc(allocator := context.allocator) -> string {
