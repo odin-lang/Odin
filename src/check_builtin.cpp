@@ -148,6 +148,11 @@ gb_internal bool does_require_msgSend_stret(Type *return_type) {
 	if (return_type == nullptr) {
 		return false;
 	}
+
+	if (build_context.metrics.os != TargetOs_darwin) {
+		return false;
+	}
+
 	if (build_context.metrics.arch == TargetArch_i386 || build_context.metrics.arch == TargetArch_amd64) {
 		i64 struct_limit = type_size_of(t_uintptr) << 1;
 		return type_size_of(return_type) > struct_limit;
