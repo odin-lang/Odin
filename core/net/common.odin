@@ -64,6 +64,7 @@ Network_Error :: union #shared_nil {
 	UDP_Recv_Error,
 	Shutdown_Error,
 	Interfaces_Error,
+	Socket_Info_Error,
 	Socket_Option_Error,
 	Set_Blocking_Error,
 	Parse_Endpoint_Error,

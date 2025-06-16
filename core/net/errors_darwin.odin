@@ -226,6 +226,23 @@ _shutdown_error :: proc() -> Shutdown_Error {
 	}
 }
 
+_socket_info_error :: proc() -> Socket_Info_Error {
+	#partial switch posix.errno() {
+	case .EBADF, .ENOTSOCK:
+		return .Invalid_Argument
+	case .ENOTCONN:
+		return .Network_Unreachable
+	case .EOPNOTSUPP:
+		return .Unsupported_Socket
+	case .EINVAL:
+		return .Connection_Closed
+	case .ENOBUFS:
+		return .Insufficient_Resources
+	case:
+		return .Unknown
+	}
+}
+
 _socket_option_error :: proc() -> Socket_Option_Error {
 	#partial switch posix.errno() {
 	case .ENOBUFS:
