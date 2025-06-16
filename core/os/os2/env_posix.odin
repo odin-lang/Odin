@@ -37,7 +37,7 @@ _lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, error: Error)
 		copy(buf, key)
 	}
 
-	cval := posix.getenv(ckey)
+	cval := posix.getenv(cstring(raw_data(buf)))
 	if cval == nil {
 		return
 	}
