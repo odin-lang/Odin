@@ -3,24 +3,46 @@ package os2
 import "base:runtime"
 import "core:strings"
 
-// get_env retrieves the value of the environment variable named by the key
+// `get_env` retrieves the value of the environment variable named by the key
 // It returns the value, which will be empty if the variable is not present
 // To distinguish between an empty value and an unset value, use lookup_env
 // NOTE: the value will be allocated with the supplied allocator
 @(require_results)
-get_env :: proc(key: string, allocator: runtime.Allocator) -> string {
+get_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> string {
 	value, _ := lookup_env(key, allocator)
 	return value
 }
 
-// lookup_env gets the value of the environment variable named by the key
+// `get_env` retrieves the value of the environment variable named by the key
+// It returns the value, which will be empty if the variable is not present
+// To distinguish between an empty value and an unset value, use lookup_env
+// NOTE: this version takes a backing buffer for the string value
+@(require_results)
+get_env_buf :: proc(buf: []u8, key: string) -> string {
+	value, _ := lookup_env(buf, key)
+	return value
+}
+
+get_env :: proc{get_env_alloc, get_env_buf}
+
+// `lookup_env` gets the value of the environment variable named by the key
 // If the variable is found in the environment the value (which can be empty) is returned and the boolean is true
 // Otherwise the returned value will be empty and the boolean will be false
 // NOTE: the value will be allocated with the supplied allocator
 @(require_results)
-lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
-	return _lookup_env(key, allocator)
+lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+	return _lookup_env_alloc(key, allocator)
 }
+
+// This version of `lookup_env` doesn't allocate and instead requires the user to provide a buffer.
+// Note that it is limited to environment names and values of 512 utf-16 values each
+// due to the necessary utf-8 <> utf-16 conversion.
+@(require_results)
+lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	return _lookup_env_buf(buf, key)
+}
+
+lookup_env :: proc{lookup_env_alloc, lookup_env_buf}
 
 // set_env sets the value of the environment variable named by the key
 // Returns Error on failure

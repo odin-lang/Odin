@@ -11,17 +11,17 @@ import "core:strings"
 // - [[ https://invisible-island.net/ncurses/terminfo.src.html ]]
 
 get_no_color :: proc() -> bool {
-	if no_color, ok := os.lookup_env("NO_COLOR"); ok {
-		defer delete(no_color)
+	buf: [128]u8
+	if no_color, err := os.lookup_env(buf[:], "NO_COLOR"); err == nil {
 		return no_color != ""
 	}
 	return false
 }
 
 get_environment_color :: proc() -> Color_Depth {
+	buf: [128]u8
 	// `COLORTERM` is non-standard but widespread and unambiguous.
-	if colorterm, ok := os.lookup_env("COLORTERM"); ok {
-		defer delete(colorterm)
+	if colorterm, err := os.lookup_env(buf[:], "COLORTERM"); err == nil {
 		// These are the only values that are typically advertised that have
 		// anything to do with color depth.
 		if colorterm == "truecolor" || colorterm == "24bit" {
@@ -29,8 +29,7 @@ get_environment_color :: proc() -> Color_Depth {
 		}
 	}
 
-	if term, ok := os.lookup_env("TERM"); ok {
-		defer delete(term)
+	if term, err := os.lookup_env(buf[:], "TERM"); err == nil {
 		if strings.contains(term, "-truecolor") {
 			return .True_Color
 		}

@@ -7,7 +7,7 @@ import "base:runtime"
 import "core:strings"
 import "core:sys/posix"
 
-_lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 	if key == "" {
 		return
 	}
@@ -25,6 +25,36 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 
 	return
 }
+
+_lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, error: Error) {
+	if key == "" {
+		return
+	}
+
+	if len(key) + 1 > len(buf) {
+		return "", .Buffer_Full
+	} else {
+		copy(buf, key)
+	}
+
+	cval := posix.getenv(cstring(raw_data(buf)))
+	if cval == nil {
+		return
+	}
+
+	if value = string(cval); value == "" {
+		return "", .Env_Var_Not_Found
+	} else {
+		if len(value) > len(buf) {
+			return "", .Buffer_Full
+		} else {
+			copy(buf, value)
+			return string(buf[:len(value)]), nil
+		}
+	}
+}
+
+_lookup_env :: proc{_lookup_env_alloc, _lookup_env_buf}
 
 _set_env :: proc(key, value: string) -> (err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
