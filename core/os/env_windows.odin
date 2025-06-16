@@ -35,50 +35,27 @@ lookup_env_alloc :: proc(key: string, allocator := context.allocator) -> (value:
 @(require_results)
 lookup_env_buffer :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
 	key_buf: [513]u16
-	n1 := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, raw_data(key), i32(len(key)), nil, 0)
-	if n1 == 0 {
-		return "", nil
+	wkey := win32.utf8_to_wstring(key_buf[:], key)
+	if wkey == nil {
+		return "", .Buffer_Full
 	}
 
-	n1 = win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, raw_data(key), i32(len(key)), raw_data(key_buf[:]), n1)
-	if n1 == 0 {
-		return "", nil
-	}
-
-	n2 := win32.GetEnvironmentVariableW(raw_data(key_buf[:]), nil, 0)
+	n2 := win32.GetEnvironmentVariableW(wkey, nil, 0)
 	if n2 == 0 && get_last_error() == ERROR_ENVVAR_NOT_FOUND {
 		return "", .Env_Var_Not_Found
 	}
 
 	val_buf: [513]u16
-	n2 = win32.GetEnvironmentVariableW(raw_data(key_buf[:]), raw_data(val_buf[:]), u32(len(val_buf[:])))
+	n2 = win32.GetEnvironmentVariableW(wkey, raw_data(val_buf[:]), u32(len(val_buf[:])))
 	if n2 == 0 && get_last_error() == ERROR_ENVVAR_NOT_FOUND {
 		return "", .Env_Var_Not_Found
 	} else if int(n2) > len(buf) {
 		return "", .Buffer_Full
 	}
 
-	n3 := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, raw_data(val_buf[:]), -1, nil, 0, nil, nil)
-	if n3 == 0 {
-		return
-	} else if int(n3) > len(buf) {
-		return "", .Buffer_Full
-	}
+	value = win32.utf16_to_utf8(buf, val_buf[:n2])
 
-	n4 := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, raw_data(val_buf[:]), -1, raw_data(buf), n3, nil, nil)
-	if n4 == 0 {
-		return
-	} else if int(n4) > len(buf) {
-		return "", .Buffer_Full
-	}
-
-	for i in 0..<n3 {
-		if buf[i] == 0 {
-			n3 = i
-			break
-		}
-	}
-	return string(buf[:n3]), nil
+	return value, nil
 }
 lookup_env :: proc{lookup_env_alloc, lookup_env_buffer}
 
