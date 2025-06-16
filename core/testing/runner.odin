@@ -741,7 +741,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 
 		if test_index, reason, ok := should_stop_test(); ok {
-			#no_bounds_check report.all_test_states[test_index] = .Failed
+			passed := reason == .Successful_Stop
+			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
 			#no_bounds_check it := internal_tests[test_index]
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 			pkg.frame_ready = false
@@ -762,7 +763,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			fmt.assertf(task_data != nil, "A signal (%v) was raised to stop test #%i %s.%s, but its task data is missing.",
 				reason, test_index, it.pkg, it.name)
 
-			if !task_data.t._fail_now_called {
+			if !passed && !task_data.t._fail_now_called {
 				if test_index not_in failed_test_reason_map {
 					// We only write a new error message here if there wasn't one
 					// already, because the message we can provide based only on
@@ -780,7 +781,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			end_t(&task_data.t)
 
-			total_failure_count += 1
+			if passed {
+				total_success_count += 1
+			} else {
+				total_failure_count += 1
+			}
 			total_done_count += 1
 		}
 
