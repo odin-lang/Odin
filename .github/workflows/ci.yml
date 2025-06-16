@@ -87,7 +87,7 @@ jobs:
         if: matrix.os == 'macos-13'
         run: |
           brew update
-          brew upgrade
+          rm '/usr/local/bin/idle3'
           brew install llvm@20 lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
@@ -95,7 +95,7 @@ jobs:
         if: matrix.os == 'macos-14'
         run: |
           brew update
-          brew upgrade
+          rm '/usr/local/bin/idle3'
           brew install llvm@20 wasmtime lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
