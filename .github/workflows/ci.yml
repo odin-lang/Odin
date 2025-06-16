@@ -75,7 +75,7 @@ jobs:
       fail-fast: false
       matrix:
         # MacOS 13 runs on Intel, 14 runs on ARM
-        os: [macos-13, macos-14, ubuntu-latest]
+        os: [macos-14, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
     timeout-minutes: 15
@@ -87,14 +87,14 @@ jobs:
         if: matrix.os == 'macos-13'
         run: |
           brew update
-          brew install --overwrite llvm@20 lua@5.4 lld
+          brew install llvm@20 lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
           brew update
-          brew install --overwrite llvm@20 wasmtime lua@5.4 lld
+          brew install llvm@20 wasmtime lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (Ubuntu)
