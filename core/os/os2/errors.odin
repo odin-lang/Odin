@@ -28,7 +28,7 @@ General_Error :: enum u32 {
 	Pattern_Has_Separator,
 
 	No_HOME_Variable,
-	Wordexp_Failed,
+	Env_Var_Not_Found,
 
 	Unsupported,
 }
@@ -77,7 +77,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Unsupported:            return "unsupported"
 		case .Pattern_Has_Separator:  return "pattern has separator"
 		case .No_HOME_Variable:       return "no $HOME variable"
-		case .Wordexp_Failed:         return "posix.wordexp was unable to expand"
+		case .Env_Var_Not_Found:      return "environment variable not found"
 		}
 	case io.Error:
 		switch e {

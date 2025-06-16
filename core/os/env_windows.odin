@@ -41,13 +41,13 @@ lookup_env_buffer :: proc(buf: []u8, key: string) -> (value: string, err: Error)
 	}
 
 	n2 := win32.GetEnvironmentVariableW(wkey, nil, 0)
-	if n2 == 0 && get_last_error() == ERROR_ENVVAR_NOT_FOUND {
+	if n2 == 0 {
 		return "", .Env_Var_Not_Found
 	}
 
 	val_buf: [513]u16
 	n2 = win32.GetEnvironmentVariableW(wkey, raw_data(val_buf[:]), u32(len(val_buf[:])))
-	if n2 == 0 && get_last_error() == ERROR_ENVVAR_NOT_FOUND {
+	if n2 == 0 {
 		return "", .Env_Var_Not_Found
 	} else if int(n2) > len(buf) {
 		return "", .Buffer_Full
