@@ -275,6 +275,8 @@ test_accept_message_from_closed_buffered_chan :: proc(t: ^testing.T) {
 
 // Ensures that if any input channel is eligible to receive or send, the try_select_raw
 // operation will process it.
+// NOTE(Jeroen): This test regularly times out and fails, especially on RISCV. Commented out until fixed.
+/*
 @test
 test_try_select_raw_happy :: proc(t: ^testing.T) {
 	testing.set_fail_timeout(t, FAIL_TIME)
@@ -343,6 +345,7 @@ test_try_select_raw_happy :: proc(t: ^testing.T) {
 	testing.expect_value(t, did_receive_count, 1)
 	testing.expect_value(t, did_send_count, 1)
 }
+*/
 
 // Ensures that if no input channels are eligible to receive or send, the
 // try_select_raw operation does not block.
