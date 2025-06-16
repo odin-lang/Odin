@@ -120,6 +120,20 @@ pool_join :: proc(pool: ^Pool) {
 
 	yield()
 
+	unstarted_count: int
+	for t in pool.threads {
+		flags := intrinsics.atomic_load(&t.flags)
+		if .Started not_in flags {
+			unstarted_count += 1
+		}
+	}
+
+	// most likely the user forgot to call `pool_start`
+	// exit here, so we don't hang forever
+	if len(pool.threads) == unstarted_count {
+		return
+	}
+
 	started_count: int
 	for started_count < len(pool.threads) {
 		started_count = 0
