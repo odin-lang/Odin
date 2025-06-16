@@ -75,7 +75,7 @@ jobs:
       fail-fast: false
       matrix:
         # MacOS 13 runs on Intel, 14 runs on ARM
-        os: [macos-13, macos-14, ubuntu-latest]
+        os: [macos-14, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
     timeout-minutes: 15
