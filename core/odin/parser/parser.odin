@@ -321,9 +321,6 @@ consume_comment :: proc(p: ^Parser) -> (tok: tokenizer.Token, end_line: int) {
 	}
 
 	_ = next_token0(p)
-	if p.curr_tok.pos.line > tok.pos.line {
-		end_line += 1
-	}
 
 	return
 }
@@ -354,7 +351,7 @@ consume_comment_groups :: proc(p: ^Parser, prev: tokenizer.Token) {
 
 		if p.curr_tok.pos.line == prev.pos.line {
 			comment, end_line = consume_comment_group(p, 0)
-			if p.curr_tok.pos.line != end_line || p.curr_tok.kind == .EOF {
+			if p.curr_tok.pos.line != end_line || p.curr_tok.kind == .EOF  || p.curr_tok.pos.line == prev.pos.line + 1 {
 				p.line_comment = comment
 			}
 		}
