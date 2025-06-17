@@ -261,6 +261,9 @@ DNS_Configuration :: struct {
 	resolv_conf: string,
 	hosts_file:  string,
 
+	resolv_conf_buf: [128]u8,
+	hosts_file_buf:  [128]u8,
+
 	// TODO: Allow loading these up with `reload_configuration()` call or the like,
 	// so we don't have to do it each call.
 	name_servers:       []Endpoint,
