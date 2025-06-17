@@ -22,46 +22,42 @@ package net
 		Haesbaert:       Security fixes
 */
 
+@(require) import "base:runtime"
 import "core:mem"
 import "core:strings"
 import "core:time"
 import "core:os"
 import "core:math/rand"
-/*
-	Default configuration for DNS resolution.
-*/
+@(require) import "core:sync"
+
+dns_config_initialized: sync.Once
 when ODIN_OS == .Windows {
-	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
-		resolv_conf        = "",
-		hosts_file         = "%WINDIR%\\system32\\drivers\\etc\\hosts",
+	dns_configuration := DNS_Configuration{
+		resolv_conf = "",
+		hosts_file  = "%WINDIR%\\system32\\drivers\\etc\\hosts",
 	}
 } else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
-	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
-		resolv_conf        = "/etc/resolv.conf",
-		hosts_file         = "/etc/hosts",
+	dns_configuration := DNS_Configuration{
+		resolv_conf = "/etc/resolv.conf",
+		hosts_file  = "/etc/hosts",
 	}
 } else {
 	#panic("Please add a configuration for this OS.")
 }
 
-@(init)
+/*
+	Replaces environment placeholders in `dns_configuration`. Only necessary on Windows.
+	Is automatically called, once, by `get_dns_records_*`.
+*/
+@(private)
 init_dns_configuration :: proc() {
-	/*
-		Resolve %ENVIRONMENT% placeholders in their paths.
-	*/
-	dns_configuration.resolv_conf = os.replace_environment_placeholders(dns_configuration.resolv_conf)
-	dns_configuration.hosts_file  = os.replace_environment_placeholders(dns_configuration.hosts_file)
+	when ODIN_OS == .Windows {
+		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+		val := os.replace_environment_placeholders(dns_configuration.hosts_file, context.temp_allocator)
+		copy(dns_configuration.hosts_file_buf[:], val)
+		dns_configuration.hosts_file = string(dns_configuration.hosts_file_buf[:len(val)])
+	}
 }
-
-@(fini, private)
-destroy_dns_configuration :: proc() {
-	delete(dns_configuration.resolv_conf)
-	dns_configuration.resolv_conf = ""
-	delete(dns_configuration.hosts_file)
-	dns_configuration.hosts_file = ""
-}
-
-dns_configuration := DEFAULT_DNS_CONFIGURATION
 
 /*
 	Resolves a hostname to exactly one IP4 and IP6 endpoint.
@@ -182,6 +178,9 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 	See `destroy_records`.
 */
 get_dns_records_from_os :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
+	when ODIN_OS == .Windows {
+		sync.once_do(&dns_config_initialized, init_dns_configuration)
+	}
 	return _get_dns_records_os(hostname, type, allocator)
 }
 
@@ -197,6 +196,9 @@ get_dns_records_from_os :: proc(hostname: string, type: DNS_Record_Type, allocat
 	See `destroy_records`.
 */
 get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type, name_servers: []Endpoint, host_overrides: []DNS_Record, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
+	when ODIN_OS == .Windows {
+		sync.once_do(&dns_config_initialized, init_dns_configuration)
+	}
 	context.allocator = allocator
 
 	if type != .SRV {
@@ -417,6 +419,8 @@ load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (
 
 		splits := strings.fields(line)
 		defer delete(splits)
+
+		(len(splits) >= 2) or_continue
 
 		ip_str := splits[0]
 		addr := parse_address(ip_str)
