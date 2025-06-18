@@ -589,7 +589,7 @@ WAVE_FORMAT_FLAC                       :: 0xF1AC /* flac.sourceforge.net */
 WAVE_FORMAT_EXTENSIBLE                 :: 0xFFFE /* Microsoft */
 
 
-WAVEFORMATEX :: struct {
+WAVEFORMATEX :: struct #packed {
 	wFormatTag:      WORD,
 	nChannels:       WORD,
 	nSamplesPerSec:  DWORD,
