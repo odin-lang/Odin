@@ -223,6 +223,11 @@ BuiltinProc__simd_end,
 
 	BuiltinProc_x86_cpuid,
 	BuiltinProc_x86_xgetbv,
+	
+	BuiltinProc_x86_readgsbyte,
+	BuiltinProc_x86_readgsword,
+	BuiltinProc_x86_readgsdword,
+	BuiltinProc_x86_readgsqword,
 
 	// Constant type tests
 
@@ -580,6 +585,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("syscall_bsd"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("x86_cpuid"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("x86_xgetbv"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("x86_readgsbyte"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("x86_readgsword"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("x86_readgsdword"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("x86_readgsqword"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},

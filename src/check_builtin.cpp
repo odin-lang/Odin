@@ -7286,6 +7286,35 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		break;
 
+	case BuiltinProc_x86_readgsbyte: case BuiltinProc_x86_readgsword: case BuiltinProc_x86_readgsdword: case BuiltinProc_x86_readgsqword:
+		{
+			if (!is_arch_x86()) {
+				error(call, "'%.*s' is only allowed on x86 targets (i386, amd64)", LIT(builtin_name));
+				return false;
+			}
+
+			Operand cx = {};
+			check_expr_with_type_hint(c, &cx, ce->args[0], t_u32); if (cx.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &cx, t_u32); if (cx.mode == Addressing_Invalid) return false;
+			if (!are_types_identical(cx.type, t_u32)) {
+				gbString str = type_to_string(cx.type);
+				error(cx.expr, "'%.*s' expected a u32, got %s", LIT(builtin_name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			switch (id) {
+				case BuiltinProc_x86_readgsbyte : operand->type = t_u8; break;
+				case BuiltinProc_x86_readgsword : operand->type = t_u16; break;
+				case BuiltinProc_x86_readgsdword: operand->type = t_u32; break;
+				case BuiltinProc_x86_readgsqword: operand->type = t_u64; break;
+			}
+			operand->mode = Addressing_Value;
+			operand->value = {};
+			return true;
+		}
+		break;
+
 	case BuiltinProc_valgrind_client_request:
 		{
 			// NOTE(bill): Check it but make it a no-op for non x86 (i386, amd64) targets
