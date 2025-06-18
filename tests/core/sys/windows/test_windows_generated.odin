@@ -529,6 +529,7 @@ verify_winmm :: proc(t: ^testing.T) {
 	expect_size(t, win32.MMTIME, 12)
 	// mmreg.h
 	expect_size(t, win32.WAVEFORMATEX, 18)
+	expect_size(t, win32.WAVEFORMATEXTENSIBLE, 40)
 	// mmeapi.h
 	expect_size(t, win32.WAVEHDR, 48)
 	expect_size(t, win32.WAVEINCAPSW, 80)

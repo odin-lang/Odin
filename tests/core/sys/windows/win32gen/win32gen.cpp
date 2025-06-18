@@ -705,6 +705,7 @@ static void verify_winmm(ofstream& out) {
 	expect_size(MMTIME);
 	test_proc_comment("mmreg.h");
 	expect_size(WAVEFORMATEX);
+	expect_size(WAVEFORMATEXTENSIBLE);
 	test_proc_comment("mmeapi.h");
 	expect_size(WAVEHDR);
 	expect_size(WAVEINCAPSW);
