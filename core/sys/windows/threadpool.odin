@@ -1,7 +1,6 @@
 #+build windows
 package sys_windows
 
-@(private = "file")
 _ACTIVATION_CONTEXT :: struct {
 	// Opaque.
 }
@@ -24,10 +23,9 @@ TP_CALLBACK_ENVIRON_FLAGS :: enum DWORD {
 	LongFunction,
 	Persistent,
 }
-#assert(size_of(DWORD) == 4)
 
-// There's multiple versions of this!
-// Assume the latest version (aliased to TP_CALLBACK_ENVIRON_V3).
+// Alias to TP_CALLBACK_ENVIRON_V3, valid for Windows 7 and newer.
+// Older versions using TP_CALLBACK_ENVIRON_V1 miss the last couple fields.
 TP_CALLBACK_ENVIRON :: struct {
 	Version:                    TP_VERSION,
 	Pool:                       PTP_POOL,
@@ -37,6 +35,7 @@ TP_CALLBACK_ENVIRON :: struct {
 	ActivationContext:          ^_ACTIVATION_CONTEXT,
 	FinalizationCallback:       PTP_SIMPLE_CALLBACK,
 	Flags:                      bit_set[TP_CALLBACK_ENVIRON_FLAGS;DWORD],
+	// if NTDDI_VERSION >= NTDDI_WIN7
 	CallbackPriority:           TP_CALLBACK_PRIORITY,
 	Size:                       DWORD,
 }
@@ -124,7 +123,7 @@ foreign kernel32 {
 	SetEventWhenCallbackReturns :: proc(pci: PTP_CALLBACK_INSTANCE, evt: HANDLE) ---
 }
 
-TpInitializeCallbackEnviron :: proc(CallbackEnviron: PTP_CALLBACK_ENVIRON) {
+TpInitializeCallbackEnviron :: proc "c" (CallbackEnviron: PTP_CALLBACK_ENVIRON) {
 	CallbackEnviron.Version = 3
 	CallbackEnviron.Pool = nil
 	CallbackEnviron.CleanupGroup = nil
@@ -136,10 +135,10 @@ TpInitializeCallbackEnviron :: proc(CallbackEnviron: PTP_CALLBACK_ENVIRON) {
 	CallbackEnviron.CallbackPriority = .NORMAL
 	CallbackEnviron.Size = size_of(TP_CALLBACK_ENVIRON)
 }
-TpSetCallbackThreadpool :: proc(CallbackEnviron: PTP_CALLBACK_ENVIRON, Pool: PTP_POOL) {
+TpSetCallbackThreadpool :: proc "c" (CallbackEnviron: PTP_CALLBACK_ENVIRON, Pool: PTP_POOL) {
 	CallbackEnviron.Pool = Pool
 }
-TpSetCallbackCleanupGroup :: proc(
+TpSetCallbackCleanupGroup :: proc "c" (
 	CallbackEnviron: PTP_CALLBACK_ENVIRON,
 	CleanupGroup: PTP_CLEANUP_GROUP,
 	CleanupGroupCancelCallback: PTP_CLEANUP_GROUP_CANCEL_CALLBACK,
@@ -147,69 +146,68 @@ TpSetCallbackCleanupGroup :: proc(
 	CallbackEnviron.CleanupGroup = CleanupGroup
 	CallbackEnviron.CleanupGroupCancelCallback = CleanupGroupCancelCallback
 }
-TpSetCallbackActivationContext :: proc(
+TpSetCallbackActivationContext :: proc "c" (
 	CallbackEnviron: PTP_CALLBACK_ENVIRON,
 	ActivationContext: ^_ACTIVATION_CONTEXT,
 ) {
 	CallbackEnviron.ActivationContext = ActivationContext
 }
-TpSetCallbackNoActivationContext :: proc(
+TpSetCallbackNoActivationContext :: proc "c" (
 	CallbackEnviron: PTP_CALLBACK_ENVIRON,
 	ActivationContext: ^_ACTIVATION_CONTEXT,
 ) {
 	CallbackEnviron.ActivationContext = transmute(^_ACTIVATION_CONTEXT)~uintptr(0)
 }
-TpSetCallbackLongFunction :: proc(CallbackEnviron: PTP_CALLBACK_ENVIRON) {
+TpSetCallbackLongFunction :: proc "c" (CallbackEnviron: PTP_CALLBACK_ENVIRON) {
 	CallbackEnviron.Flags |= {.LongFunction}
 }
-TpSetCallbackRaceWithDll :: proc(CallbackEnviron: PTP_CALLBACK_ENVIRON, DllHandle: PVOID) {
+TpSetCallbackRaceWithDll :: proc "c" (CallbackEnviron: PTP_CALLBACK_ENVIRON, DllHandle: PVOID) {
 	CallbackEnviron.RaceDll = DllHandle
 }
-TpSetCallbackFinalizationCallback :: proc(
+TpSetCallbackFinalizationCallback :: proc "c" (
 	CallbackEnviron: PTP_CALLBACK_ENVIRON,
 	FinalizationCallback: PTP_SIMPLE_CALLBACK,
 ) {
 	CallbackEnviron.FinalizationCallback = FinalizationCallback
 }
-TpSetCallbackPriority :: proc(
+TpSetCallbackPriority :: proc "c" (
 	CallbackEnviron: PTP_CALLBACK_ENVIRON,
 	Priority: TP_CALLBACK_PRIORITY,
 ) {
 	CallbackEnviron.CallbackPriority = Priority
 }
-TpSetCallbackPersistent :: proc(CallbackEnviron: PTP_CALLBACK_ENVIRON) {
+TpSetCallbackPersistent :: proc "c" (CallbackEnviron: PTP_CALLBACK_ENVIRON) {
 	CallbackEnviron.Flags |= {.Persistent}
 }
-TpDestroyCallbackEnviron :: proc(CallbackEnviron: PTP_CALLBACK_ENVIRON) {
-	//
-	// For the current version of the callback environment, no actions
-	// need to be taken to tear down an initialized structure.  This
-	// may change in a future release.
-	//
+TpDestroyCallbackEnviron :: proc "c" (CallbackEnviron: PTP_CALLBACK_ENVIRON) {
+
 }
 
-InitializeThreadpoolEnvironment :: proc(pcbe: PTP_CALLBACK_ENVIRON) {
+InitializeThreadpoolEnvironment :: proc "c" (pcbe: PTP_CALLBACK_ENVIRON) {
 	TpInitializeCallbackEnviron(pcbe)
 }
-SetThreadpoolCallbackPool :: proc(pcbe: PTP_CALLBACK_ENVIRON, ptpp: PTP_POOL) {
+SetThreadpoolCallbackPool :: proc "c" (pcbe: PTP_CALLBACK_ENVIRON, ptpp: PTP_POOL) {
 	TpSetCallbackThreadpool(pcbe, ptpp)
 }
-SetThreadpoolCallbackCleanupGroup :: proc(
+SetThreadpoolCallbackCleanupGroup :: proc "c" (
 	pcbe: PTP_CALLBACK_ENVIRON,
 	ptpcg: PTP_CLEANUP_GROUP,
 	pfng: PTP_CLEANUP_GROUP_CANCEL_CALLBACK,
 ) {
 	TpSetCallbackCleanupGroup(pcbe, ptpcg, pfng)
 }
-SetThreadpoolCallbackRunsLong :: proc(pcbe: PTP_CALLBACK_ENVIRON) {
+SetThreadpoolCallbackRunsLong :: proc "c" (pcbe: PTP_CALLBACK_ENVIRON) {
 	TpSetCallbackLongFunction(pcbe)
 }
-SetThreadpoolCallbackLibrary :: proc(pcbe: PTP_CALLBACK_ENVIRON, mod: PVOID) {
+SetThreadpoolCallbackLibrary :: proc "c" (pcbe: PTP_CALLBACK_ENVIRON, mod: PVOID) {
 	TpSetCallbackRaceWithDll(pcbe, mod)
 }
-SetThreadpoolCallbackPriority :: proc(pcbe: PTP_CALLBACK_ENVIRON, priority: TP_CALLBACK_PRIORITY) {
+SetThreadpoolCallbackPriority :: proc "c" (
+	pcbe: PTP_CALLBACK_ENVIRON,
+	priority: TP_CALLBACK_PRIORITY,
+) {
 	TpSetCallbackPriority(pcbe, priority)
 }
-DestroyThreadpoolEnvironment :: proc(pcbe: PTP_CALLBACK_ENVIRON) {
+DestroyThreadpoolEnvironment :: proc "c" (pcbe: PTP_CALLBACK_ENVIRON) {
 	TpDestroyCallbackEnviron(pcbe)
 }
