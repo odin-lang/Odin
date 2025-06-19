@@ -356,12 +356,6 @@ wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_u
 x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebx, ecx, edx: u32) ---
 x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 
-x86_readgsbyte :: proc(offset : u32) -> u8 ---
-x86_readgsword :: proc(offset : u32) -> u16 ---
-x86_readgsdword :: proc(offset : u32) -> u32 ---
-// Used to implement  NtCurrentTeb() since we cant just link against it (only 32bit version of ntdll exposes it).
-x86_readgsqword :: proc(offset : u32) -> u64 ---
-
 
 // Darwin targets only
 objc_object   :: struct{}

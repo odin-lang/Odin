@@ -3631,33 +3631,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return res;
 		}
 
-	case BuiltinProc_x86_readgsbyte: case BuiltinProc_x86_readgsword: case BuiltinProc_x86_readgsdword: case BuiltinProc_x86_readgsqword:
-		{
-			Type *type = alloc_type_proc_from_types(&t_u32, 1, tv.type, false, ProcCC_None);
-			LLVMTypeRef func_type = lb_get_procedure_raw_type(p->module, type);
-			String ass;
-			switch (id) {
-				case BuiltinProc_x86_readgsbyte : ass = str_lit("mov rax,  byte ptr gs:[rdx]"); break;
-				case BuiltinProc_x86_readgsword : ass = str_lit("mov rax,  word ptr gs:[rdx]"); break;
-				case BuiltinProc_x86_readgsdword: ass = str_lit("mov rax, dword ptr gs:[rdx]"); break;
-				case BuiltinProc_x86_readgsqword: ass = str_lit("mov rax, qword ptr gs:[rdx]"); break;
-			}
-			LLVMValueRef the_asm = llvm_get_inline_asm(
-				func_type,
-				ass,
-				str_lit("={rax},{rdx}"),
-				true, false, LLVMInlineAsmDialectIntel
-			);
-			GB_ASSERT(the_asm != nullptr);
-
-			LLVMValueRef args[1] = {};
-			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32).value;
-			lbValue res = {};
-			res.type = tv.type;
-			res.value = LLVMBuildCall2(p->builder, func_type, the_asm, args, gb_count_of(args), "");
-			return res;
-		}
-
 	case BuiltinProc_valgrind_client_request:
 		{
 			lbValue args[7] = {};

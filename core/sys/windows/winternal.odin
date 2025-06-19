@@ -1,14 +1,6 @@
 #+build windows
 package sys_windows
 
-import "base:intrinsics"
-
-when ODIN_ARCH == .amd64 {
-	NtCurrentTeb :: proc() -> ^TEB {
-		return cast(^TEB) cast(uintptr) intrinsics.x86_readgsqword(cast(u32)offset_of(NT_TIB{}.Self))
-	}
-}
-
 NT_TIB :: struct {
 	ExceptionList        : PVOID,
 	StackBase            : PVOID,
