@@ -275,6 +275,10 @@ syscall_lseek :: #force_inline proc "contextless" (fd: c.int, offset: i64, whenc
 	return cast(i64)intrinsics.syscall(unix_offset_syscall(.lseek), uintptr(fd), uintptr(offset), uintptr(whence))
 }
 
+syscall_ioctl :: #force_inline proc "contextless" (fd: c.int, request: u32, arg: rawptr) -> c.int {
+	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.ioctl), uintptr(fd), uintptr(request), uintptr(arg)))
+}
+
 syscall_gettid :: #force_inline proc "contextless" () -> u64 {
 	return cast(u64)intrinsics.syscall(unix_offset_syscall(.gettid))
 }
