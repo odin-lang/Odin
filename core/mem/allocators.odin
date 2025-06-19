@@ -2315,7 +2315,7 @@ buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) 
 	if size != 0 {
 		actual_size := buddy_block_size_required(b, size)
 		found := buddy_block_find_best(b.head, b.tail, actual_size)
-		if found != nil {
+		if found == nil {
 			// Try to coalesce all the free buddy blocks and then search again
 			buddy_block_coalescence(b.head, b.tail)
 			found = buddy_block_find_best(b.head, b.tail, actual_size)
