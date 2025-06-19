@@ -2239,6 +2239,7 @@ buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint,
 	b.head.is_free = true
 	b.tail = buddy_block_next(b.head)
 	b.alignment = alignment
+	assert(uint(len(data)) >= 2 * buddy_block_size_required(b, 1), "The size of the backing buffer must be large enough to hold at least two 1-byte allocations given the alignment requirements, otherwise it cannot split.", loc)
 	// sanitizer.address_poison(data)
 }
 
