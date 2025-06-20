@@ -2196,7 +2196,7 @@ The buddy allocator data.
 */
 Buddy_Allocator :: struct {
 	head:      ^Buddy_Block,
-	tail:      ^Buddy_Block,
+	tail:      ^Buddy_Block `fmt:"-"`,
 	alignment: uint,
 }
 
@@ -2328,6 +2328,7 @@ buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) 
 		}
 		found.is_free = false
 		data := ([^]byte)(found)[b.alignment:][:size]
+		assert(cast(uintptr)raw_data(data)+cast(uintptr)size < cast(uintptr)buddy_block_next(found), "Buddy_Allocator has made an allocation which overlaps a block header.")
 		// ensure_poisoned(data)
 		// sanitizer.address_unpoison(data)
 		return data, nil
