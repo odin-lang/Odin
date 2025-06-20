@@ -206,7 +206,7 @@ language :: enum u32 {
 	DARGWA                        = ('D' | 'A'<<8 | 'R'<<16 | ' '<<24),
 	DARI                          = ('D' | 'R'<<8 | 'I'<<16 | ' '<<24),
 	DAYI                          = ('D' | 'A'<<8 | 'X'<<16 | ' '<<24),
-	DEFAULT                       = ('d' | 'f'<<8 | 'l'<<16 | 't'), // Can be DFLT too.<<24..
+	DEFAULT                       = ('d' | 'f'<<8 | 'l'<<16 | 't'<<24), // Can be DFLT too...
 	DEHONG_DAI                    = ('T' | 'D'<<8 | 'D'<<16 | ' '<<24),
 	DHANGU                        = ('D' | 'H'<<8 | 'G'<<16 | ' '<<24),
 	DHIVEHI                       = ('D' | 'I'<<8 | 'V'<<16 | ' '<<24),
