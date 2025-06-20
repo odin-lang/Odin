@@ -546,6 +546,9 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	GB_ASSERT(p->type != nullptr);
 
 	lb_ensure_abi_function_type(p->module, p);
+	if (p->type->Proc.calling_convention == ProcCC_Odin) {
+		lb_push_context_onto_stack_from_implicit_parameter(p);
+	}
 	{
 		lbFunctionType *ft = p->abi_function_type;
 
@@ -742,9 +745,6 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 			}
 
 		}
-	}
-	if (p->type->Proc.calling_convention == ProcCC_Odin) {
-		lb_push_context_onto_stack_from_implicit_parameter(p);
 	}
 
 	lb_set_debug_position_to_procedure_begin(p);
