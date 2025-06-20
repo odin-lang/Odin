@@ -2196,7 +2196,7 @@ The buddy allocator data.
 */
 Buddy_Allocator :: struct {
 	head:      ^Buddy_Block,
-	tail:      ^Buddy_Block,
+	tail:      ^Buddy_Block `fmt:"-"`,
 	alignment: uint,
 }
 
