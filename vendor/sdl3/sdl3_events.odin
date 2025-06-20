@@ -295,6 +295,8 @@ MouseWheelEvent :: struct {
 	direction: MouseWheelDirection,  /**< Set to one of the SDL_MOUSEWHEEL_* defines. When FLIPPED the values in X and Y will be opposite. Multiply by -1 to change them back */
 	mouse_x:   f32,                  /**< X coordinate, relative to window */
 	mouse_y:   f32,                  /**< Y coordinate, relative to window */
+	integer_x: i32,                  /**< The amount scrolled horizontally, accumulated to whole scroll "ticks" (added in 3.2.12) */
+	integer_y: i32,                  /**< The amount scrolled vertically, accumulated to whole scroll "ticks" (added in 3.2.12) */
 }
 
 JoyAxisEvent :: struct {

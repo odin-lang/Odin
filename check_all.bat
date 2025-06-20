@@ -1,9 +1,9 @@
 @echo off
 
 if "%1" == "" (
-	echo Checking darwin_amd64 - expect vendor:cgtlf panic
+	echo Checking darwin_amd64 - expect vendor:cgltf panic
 	odin check examples\all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:darwin_amd64
-	echo Checking darwin_arm64 - expect vendor:cgtlf panic
+	echo Checking darwin_arm64 - expect vendor:cgltf panic
 	odin check examples\all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:darwin_arm64
 	echo Checking linux_i386
 	odin check examples\all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_i386

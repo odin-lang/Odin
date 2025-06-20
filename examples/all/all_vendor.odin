@@ -46,3 +46,6 @@ package all
 @(require) import "vendor:stb/rect_pack"
 @(require) import "vendor:stb/truetype"
 @(require) import "vendor:stb/vorbis"
+
+
+@(require) import "vendor:kb_text_shape"
