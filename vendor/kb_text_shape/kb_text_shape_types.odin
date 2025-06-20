@@ -1819,22 +1819,52 @@ break_state :: struct {
 	BracketCount: u32,
 	Flags:        break_state_flags,
 
-	FlagState:       u32, // u8(break_flags)x4
+	FlagState: bit_field u32 {
+		_0: u32 | 8, // break_flags
+		_1: u32 | 8, // break_flags
+		_2: u32 | 8, // break_flags
+		_3: u32 | 8, // break_flags
+	},
 	PositionOffset2: i16,
 	PositionOffset3: i16,
 
-	WordBreakHistory:         u32, // u8x4
-	WordBreaks:               u16, // u4x4
-	WordUnbreaks:             u16, // u4x4
+	WordBreakHistory: bit_field u32 {
+		_0: u32 | 8,
+		_1: u32 | 8,
+		_2: u32 | 8,
+		_3: u32 | 8,
+	},
+	WordBreaks,
+	WordUnbreaks: bit_field u16 {
+		_0: u16 | 4,
+		_1: u16 | 4,
+		_2: u16 | 4,
+		_3: u16 | 4,
+	},
 	WordBreak2PositionOffset: i16,
 
-	LineBreaks: u64, // u16x4
+	LineBreaks: bit_field u64 {
+		_0: u64 | 16,
+		_1: u64 | 16,
+		_2: u64 | 16,
+		_3: u64 | 16,
+	},
 	// Instead of staying synchronized with LineBreaks/LineUnbreaks,
 	// this advances every character always.
 	// (This is only needed because ZWJ can create an unbreak while simultaneously being ignored.)
-	LineUnbreaksAsync:        u64, // u16x4
-	LineUnbreaks:             u64, // u16x4
-	LineBreakHistory:         u32, // u8(line_break_class)x4
+	LineUnbreaksAsync,
+	LineUnbreaks: bit_field u64 {
+		_0: u64 | 16,
+		_1: u64 | 16,
+		_2: u64 | 16,
+		_3: u64 | 16,
+	},
+	LineBreakHistory: bit_field u32 {
+		_0: u32 | 8, // break_flags
+		_1: u32 | 8, // break_flags
+		_2: u32 | 8, // break_flags
+		_3: u32 | 8, // break_flags
+	},
 	LineBreak2PositionOffset: i16,
 	LineBreak3PositionOffset: i16,
 
