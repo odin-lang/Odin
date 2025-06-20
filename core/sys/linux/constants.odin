@@ -373,3 +373,6 @@ PTRACE_SECCOMP_GET_FILTER     :: PTrace_Seccomp_Get_Filter_Type(.SECCOMP_GET_FIL
 PTRACE_SECCOMP_GET_METADATA   :: PTrace_Seccomp_Get_Metadata_Type(.SECCOMP_GET_METADATA)
 PTRACE_GET_SYSCALL_INFO       :: PTrace_Get_Syscall_Info_Type(.GET_SYSCALL_INFO)
 PTRACE_GET_RSEQ_CONFIGURATION :: PTrace_Get_RSeq_Configuration_Type(.GET_RSEQ_CONFIGURATION)
+
+/* Get window size */
+TIOCGWINSZ :: 0x5413
