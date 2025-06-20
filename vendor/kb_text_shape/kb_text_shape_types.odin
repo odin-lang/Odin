@@ -1519,14 +1519,14 @@ lookup_subtable_info :: struct {
 }
 
 font :: struct {
-	FileBase: [^]byte,
-	Head: ^head,
-	Cmap: ^u16,
-	Gdef: ^gdef,
-	Cmap14: ^cmap_14,
+	FileBase:      [^]byte,
+	Head:          ^head,
+	Cmap:          ^u16,
+	Gdef:          ^gdef,
+	Cmap14:        ^cmap_14,
 	ShapingTables: [shaping_table]^gsub_gpos,
-	Fvar: rawptr,
-	Maxp: ^maxp,
+	Fvar:          rawptr,
+	Maxp:          ^maxp,
 
 	Hea: [orientation]^hea,
 	Mtx: [orientation]^u16,
@@ -1537,10 +1537,11 @@ font :: struct {
 	LookupCount:   u32,
 	SubtableCount: u32,
 
-	GlyphLookupMatrix:          [^]u32, // [LookupCount * GlyphCount] bitmap
-	GlyphLookupSubtableMatrix:  [^]u32, // [LookupSubtableCount * GlyphCount] bitmap
-	LookupSubtableIndexOffsets: [^]u32, // [LookupCount]
+	GlyphLookupMatrix:          [^]u32,                  // [LookupCount * GlyphCount] bitmap
+	GlyphLookupSubtableMatrix:  [^]u32,                  // [LookupSubtableCount * GlyphCount] bitmap
+	LookupSubtableIndexOffsets: [^]u32,                  // [LookupCount]
 	SubtableInfos:              [^]lookup_subtable_info, // [LookupSubtableCount]
+
 	GposLookupIndexOffset: u32,
 
 	Error: c.int,
@@ -1600,7 +1601,7 @@ glyph :: struct {
 	// Unicode properties filled in by CodepointToGlyph.
 	JoiningType:      unicode_joining_type,
 	Script:           u8,
-	UnicodeFlags:     u8,
+	UnicodeFlags:     unicode_flags,
 	SyllabicClass:    u8,
 	SyllabicPosition: u8,
 	UseClass:         u8,
@@ -1622,10 +1623,17 @@ op_state_normalize :: struct {
 	AboveBaseGlyphCount:        un,
 }
 
+
+skip_flags :: distinct bit_set[skip_flag; u32]
+skip_flag :: enum {
+	ZWNJ = 0,
+	ZWJ  = 1,
+}
+
 op_state_gsub :: struct {
 	LookupIndex: un,
-	GlyphFilter: u32,
-	SkipFlags:   u32,
+	GlyphFilter: glyph_flags,
+	SkipFlags:   skip_flags,
 }
 
 op_state_normalize_hangul :: struct {
@@ -1640,9 +1648,9 @@ op_state_op_specific :: struct #raw_union {
 }
 
 lookup_indices :: struct {
-	FeatureId:   u32,
-	SkipFlags:   u32,
-	GlyphFilter: u32,
+	FeatureId:   feature_id,
+	SkipFlags:   skip_flags,
+	GlyphFilter: glyph_flags,
 	Count:       u32,
 	Indices:     [^]u16 `fmt:"v,Count"`,
 }
@@ -1673,14 +1681,14 @@ op_state :: struct {
 	// LeftoverMemory: [LeftoverMemorySize]u8,
 }
 
-op_list :: struct {
-	Ops: [^]u8,
+op_list :: struct { // TODO(bill): is this actually a slice? e.g. `op_list :: []op_kind`
+	Ops:    [^]op_kind,
 	Length: un,
 }
 
 indic_script_properties :: struct {
 	ViramaCodepoint:        rune,
-	BlwfPostOnly:           u8,
+	BlwfPostOnly:           b8,
 	RephPosition:           reph_position,
 	RephEncoding:           reph_encoding,
 	RightSideMatraPosition: syllabic_position,
@@ -1691,13 +1699,13 @@ indic_script_properties :: struct {
 langsys :: struct {}
 
 shape_config :: struct {
-	Font: ^font,
-	Script: script,
+	Font:     ^font,
+	Script:   script,
 	Language: language,
-	Langsys: [shaping_table]^langsys,
-	OpLists: [4]op_list,
+	Langsys:  [shaping_table]^langsys,
+	OpLists:  [4]op_list,
 
-	Shaper: shaper,
+	Shaper:           shaper,
 	ShaperProperties: ^shaper_properties,
 
 	IndicScriptProperties: indic_script_properties,
@@ -1729,7 +1737,7 @@ shape_state :: struct {
 	GlyphArray:        glyph_array,
 	ClusterGlyphArray: glyph_array,
 
-	DottedCircleInsertIndex:              u32,
+	DottedCircleInsertIndex: u32,
 
 	GlyphCountStartingFromCurrentCluster: u32,
 
@@ -1832,11 +1840,4 @@ break_state :: struct {
 	LastLineBreakClass:                 u8,
 	LastWordBreakClass:                 u8,
 	LastWordBreakClassIncludingIgnored: u8,
-}
-
-decode :: struct {
-	Codepoint: rune,
-
-	SourceCharactersConsumed: u32,
-	Valid:                    b32,
 }

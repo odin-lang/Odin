@@ -52,14 +52,21 @@ PlaceShapeState :: proc "c" (Memory: []byte) -> ^shape_state {
 }
 
 @(require_results)
-DecodeUtf8 :: proc "contextless" (String: string) -> (Codepoint: rune, SourceCharactersConsumed: u32, Valid: b32) {
+DecodeUtf8 :: proc "contextless" (String: string) -> (Codepoint: rune, SourceCharactersConsumed: u32, Valid: bool) {
+	decode :: struct {
+		Codepoint: rune,
+
+		SourceCharactersConsumed: u32,
+		Valid:                    b32,
+	}
+
 	@(default_calling_convention="c", require_results)
 	foreign lib {
 		kbts_DecodeUtf8 :: proc(Utf8: [^]byte, Length: uint) -> decode ---
 	}
 
 	Decode := kbts_DecodeUtf8(raw_data(String), len(String))
-	return Decode.Codepoint, Decode.SourceCharactersConsumed, Decode.Valid
+	return Decode.Codepoint, Decode.SourceCharactersConsumed, bool(Decode.Valid)
 }
 
 
