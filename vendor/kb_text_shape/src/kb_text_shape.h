@@ -22279,8 +22279,8 @@ KBTS_EXPORT kbts_decode kbts_DecodeUtf8(const char *Utf8, size_t Length)
       FollowupCharacterCount = 3;
       Result.Codepoint = First & 7;
       Result.Valid = 1;
-    }
-    break;
+
+}    break;
     }
 
     if(Length > FollowupCharacterCount)

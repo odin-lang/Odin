@@ -1,21 +1,28 @@
 package vendor_kb_text_shape
 
+when ODIN_OS == .Windows {
+	foreign import lib {
+		"lib/kb_text_shape.lib",
+	}
+} else {
+	foreign import lib {
+		"kb_text_shape.a"
+	}
+}
+
 import "core:c"
 
 #assert(size_of(c.int) == size_of(b32))
-#assert(size_of(u32) == size_of(b32))
-
-TEXT_SHAPE_NO_CRT :: #config(KB_TEXT_SHAPE_NO_CRT, false)
+#assert(size_of(u32)   == size_of(b32))
 
 @(default_calling_convention="c", link_prefix="kbts_")
-foreign {
-	when !TEXT_SHAPE_NO_CRT {
-		FontFromFile     :: proc(FileName: cstring) -> font ---
-		FreeFont         :: proc(Font: ^font) ---
-		CreateShapeState :: proc(Font: ^font) -> ^shape_state ---
-		FreeShapeState   :: proc(State: ^shape_state) ---
-	}
-
+foreign lib {
+	// when !TEXT_SHAPE_NO_CRT {
+	FontFromFile     :: proc(FileName: cstring) -> font ---
+	FreeFont         :: proc(Font: ^font) ---
+	CreateShapeState :: proc(Font: ^font) -> ^shape_state ---
+	FreeShapeState   :: proc(State: ^shape_state) ---
+	// }
 
 	FontIsValid            :: proc(Font: ^font) -> int ---
 	ReadFontHeader         :: proc(Font: ^font, Data:    rawptr, Size:        un) -> un ---
