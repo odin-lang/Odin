@@ -1288,6 +1288,44 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.entry_point_only = ac.entry_point_only;
 	e->Procedure.is_export = ac.is_export;
 
+	if (ac.default_context) {
+		// In the event that `t_context_ptr` is not yet resolved:
+		init_core_context(ctx->checker);
+
+		// `proc "contextless" (^runtime.Context)`
+		if (pt->param_count != 1 || pt->result_count != 0 ||
+			pt->calling_convention != ProcCC_Contextless ||
+			!are_types_identical(e->type->Proc.params->Tuple.variables[0]->type, t_context_ptr)
+			) {
+			gbString str = type_to_string(proc_type);
+			error(e->token, "The @(default_context) procedure must have a signature type of 'proc \"contextless\" (^runtime.Context)', got '%s'", str);
+			gb_string_free(str);
+		}
+		// Test signatures only checked when actually testing.
+		if (ac.test) {
+			error(e->token, "The @(default_context) cannot be a testing procedure");
+		}
+		// For sanity's sake, enforce it to be file scope level only, even
+		// though it could work as a nested procedure.
+		if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(e->token, "The @(default_context) must be declared at the file scope");
+		}
+		// Only one default context per build.
+		if (!ac.disabled_proc) {
+			if (ctx->info->default_context == nullptr) {
+				ctx->info->default_context = e;
+
+				// @(default_context) implies @(require).
+				ac.require_declaration = true;
+			} else {
+				TokenPos pos = ctx->info->default_context->token.pos;
+				error(e->token, "Only one procedure may be defined as the @(default_context)\n"
+					"\tprevious procedure at %s",
+					token_pos_to_string(pos));
+			}
+		}
+	}
+
 	bool has_instrumentation = false;
 	if (pl->body == nullptr) {
 		has_instrumentation = false;

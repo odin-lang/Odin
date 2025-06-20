@@ -378,4 +378,5 @@ valgrind_client_request :: proc(default: uintptr, request: uintptr, a0, a1, a2, 
 
 // Internal compiler use only
 
+__default_context :: proc(c: ^runtime.Context) -> bool ---
 __entry_point :: proc() ---

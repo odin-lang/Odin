@@ -2230,6 +2230,26 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_ivar_get:
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
+	case BuiltinProc___default_context:
+	{
+		Operand arg = {};
+		check_expr(c, &arg, ce->args[0]);
+		if (arg.mode == Addressing_Invalid) {
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
+			return false;
+		}
+		if (!are_types_identical(arg.type, t_context_ptr)) {
+			gbString s = expr_to_string(ce->args[0]);
+			error(ce->args[0], "Expected a type of '^runtime.Context' for argument to '__default_context', got '%s'", s);
+			gb_string_free(s);
+			return false;
+		}
+
+		operand->mode = Addressing_Value;
+		operand->type = t_bool;
+		break;
+	}
 	case BuiltinProc___entry_point:
 		operand->mode = Addressing_NoValue;
 		operand->type = nullptr;
