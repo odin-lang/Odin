@@ -10,11 +10,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
-import "core:c"
 import "core:mem"
-
-#assert(size_of(c.int) == size_of(b32))
-#assert(size_of(u32)   == size_of(b32))
 
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
@@ -29,7 +25,7 @@ foreign lib {
 
 	Shape             :: proc(State: ^shape_state, Config: ^shape_config,
 	                          MainDirection, RunDirection: direction,
-	                          Glyphs: [^]glyph, GlyphCount: ^u32, GlyphCapacity: u32) -> c.int ---
+	                          Glyphs: [^]glyph, GlyphCount: ^u32, GlyphCapacity: u32) -> b32 ---
 
 	Cursor            :: proc(Direction: direction) -> cursor  ---
 	BeginBreak        :: proc(State: ^break_state, MainDirection: direction, JapaneseLineBreakStyle: japanese_line_break_style) ---
@@ -153,7 +149,7 @@ PositionGlyph :: proc(Cursor: ^cursor, Glyph: ^glyph) -> (X, Y: i32) {
 @(require_results)
 ShapeDynamic :: proc(State: ^shape_state, Config: ^shape_config,
                      MainDirection, RunDirection: direction,
-                     Glyphs: ^[dynamic]glyph) -> c.int {
+                     Glyphs: ^[dynamic]glyph) -> b32 {
 	GlyphCount    := u32(len(Glyphs^))
 	GlyphCapacity := u32(cap(Glyphs^))
 	Res := Shape(State, Config, MainDirection, RunDirection, raw_data(Glyphs^), &GlyphCount, GlyphCapacity)

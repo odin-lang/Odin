@@ -2,7 +2,9 @@ package vendor_kb_text_shape
 
 import "core:c"
 
-#assert(size_of(b8) == size_of(bool))
+#assert(size_of(b8)  == size_of(bool))
+#assert(size_of(b32) == size_of(u32))
+#assert(size_of(b32) == size_of(c.int))
 
 un :: distinct (
 	uint when (size_of(uintptr) == size_of(uint)) else
