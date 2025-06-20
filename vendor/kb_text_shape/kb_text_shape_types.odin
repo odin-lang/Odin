@@ -1607,7 +1607,9 @@ glyph :: struct {
 
 	// Unicode properties filled in by CodepointToGlyph.
 	JoiningType:      unicode_joining_type,
-	Script:           u8,
+	using _: bit_field u8 {
+		Script: script | 8,
+	},
 	UnicodeFlags:     unicode_flags,
 	SyllabicClass:    u8,
 	SyllabicPosition: u8,
@@ -1783,8 +1785,8 @@ break_type :: struct {
 
 bracket :: struct {
 	Codepoint: rune,
-	Direction: u8,
-	Script:    u8,
+	using _: bit_field u8 { Direction: direction | 8 },
+	using _: bit_field u8 { Script:    script    | 8 },
 }
 
 break_state_flags :: distinct bit_set[break_state_flag; u32]
@@ -1868,13 +1870,15 @@ break_state :: struct {
 	LineBreak2PositionOffset: i16,
 	LineBreak3PositionOffset: i16,
 
-	LastDirection:       u8,
-	BidirectionalClass2: u8,
-	BidirectionalClass1: u8,
+	using LastDirectionBitField: bit_field u8 {
+		LastDirection: direction | 8,
+	},
+	BidirectionalClass2: unicode_bidirectional_class,
+	BidirectionalClass1: unicode_bidirectional_class,
 
 	JapaneseLineBreakStyle:             japanese_line_break_style,
 	GraphemeBreakState:                 u8,
-	LastLineBreakClass:                 u8,
-	LastWordBreakClass:                 u8,
-	LastWordBreakClassIncludingIgnored: u8,
+	LastLineBreakClass:                 line_break_class,
+	LastWordBreakClass:                 word_break_class,
+	LastWordBreakClassIncludingIgnored: word_break_class,
 }
