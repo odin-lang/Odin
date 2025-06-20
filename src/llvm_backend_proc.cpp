@@ -2774,15 +2774,18 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				LLVMSetMetadata(instr, kind_id, LLVMMetadataAsValue(p->module->ctx, node));
 			}
 			break;
-		case BuiltinProc_volatile_store:        LLVMSetVolatile(instr, true);                                        break;
-		case BuiltinProc_atomic_store:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
+		case BuiltinProc_volatile_store:
+			LLVMSetVolatile(instr, true);
+			break;
+		case BuiltinProc_atomic_store:
+			LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);
+			LLVMSetVolatile(instr, true);
+			break;
 		case BuiltinProc_atomic_store_explicit:
 			{
 				auto ordering = llvm_atomic_ordering_from_odin(ce->args[2]);
 				LLVMSetOrdering(instr, ordering);
-				if (ordering == LLVMAtomicOrderingUnordered) {
-					LLVMSetVolatile(instr, true);
-				}
+				LLVMSetVolatile(instr, true);
 			}
 			break;
 		}
@@ -2808,15 +2811,18 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			}
 			break;
 			break;
-		case BuiltinProc_volatile_load:        LLVMSetVolatile(instr, true);                                        break;
-		case BuiltinProc_atomic_load:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
+		case BuiltinProc_volatile_load:
+			LLVMSetVolatile(instr, true);
+			break;
+		case BuiltinProc_atomic_load:
+			LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);
+			LLVMSetVolatile(instr, true);
+			break;
 		case BuiltinProc_atomic_load_explicit:
 			{
 				auto ordering = llvm_atomic_ordering_from_odin(ce->args[1]);
 				LLVMSetOrdering(instr, ordering);
-				if (ordering == LLVMAtomicOrderingUnordered) {
-					LLVMSetVolatile(instr, true);
-				}
+				LLVMSetVolatile(instr, true);
 			}
 			break;
 		}
@@ -2901,9 +2907,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		lbValue res = {};
 		res.value = LLVMBuildAtomicRMW(p->builder, op, dst.value, val.value, ordering, false);
 		res.type = tv.type;
-		if (ordering == LLVMAtomicOrderingUnordered) {
-			LLVMSetVolatile(res.value, true);
-		}
+		LLVMSetVolatile(res.value, true);
 		return res;
 	}
 
@@ -2939,9 +2943,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			single_threaded
 		);
 		LLVMSetWeak(value, weak);
-		if (success_ordering == LLVMAtomicOrderingUnordered || failure_ordering == LLVMAtomicOrderingUnordered) {
-			LLVMSetVolatile(value, true);
-		}
+		LLVMSetVolatile(value, true);
 
 		if (is_type_tuple(tv.type)) {
 			Type *fix_typed = alloc_type_tuple();
