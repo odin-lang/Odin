@@ -2,8 +2,16 @@ package vendor_kb_text_shape
 
 import "core:c"
 
-un :: distinct uintptr
-// sn :: distinct (i32 when size_of(uintptr) == 4 else i64)
+un :: distinct (
+	uint when (size_of(uintptr) == size_of(uint)) else
+	u32  when size_of(uintptr) == 4 else
+	u64
+)
+// sn :: distinct (
+// 	int when (size_of(uintptr) == size_of(int)) else
+// 	i32  when size_of(uintptr) == 4 else
+// 	i64
+// )
 
 joining_feature :: enum u8 {
 	NONE,
@@ -745,7 +753,6 @@ language :: enum u32 {
 }
 
 break_flags :: distinct bit_set[break_flag; u32]
-
 break_flag :: enum u32 {
 	// Direction changes from left-to-right to right-to-left, or vice versa.
 	DIRECTION = 0,
