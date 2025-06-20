@@ -2206,7 +2206,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				field_count = 3;
 			}
 			LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
-			fields[0] = LLVMPointerType(lb_type(m, type->Pointer.elem), 0);
+			fields[0] = LLVMPointerType(lb_type(m, type->SoaPointer.elem), 0);
 			if (bigger_int) {
 				fields[1] = lb_type_padding_filler(m, build_context.ptr_size, build_context.ptr_size);
 				fields[2] = LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);

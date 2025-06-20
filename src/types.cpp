@@ -4614,6 +4614,82 @@ gb_internal Type *alloc_type_proc_from_types(Type **param_types, unsigned param_
 // 	return type;
 // }
 
+// Index a type that is internally a struct or array.
+gb_internal Type *type_internal_index(Type *t, isize index) {
+	Type *bt = base_type(t);
+	if (bt == nullptr) {
+		return nullptr;
+	}
+
+	switch (bt->kind) {
+	case Type_Basic:
+		{
+			switch (bt->Basic.kind) {
+			case Basic_complex32:     return t_f16;
+			case Basic_complex64:     return t_f32;
+			case Basic_complex128:    return t_f64;
+			case Basic_quaternion64:  return t_f16;
+			case Basic_quaternion128: return t_f32;
+			case Basic_quaternion256: return t_f64;
+			case Basic_string:
+				{
+					GB_ASSERT(index == 0 || index == 1);
+					return index == 0 ? t_u8_ptr : t_int;
+				}
+			case Basic_any:
+				{
+					GB_ASSERT(index == 0 || index == 1);
+					return index == 0 ? t_rawptr : t_typeid;
+				}
+			}
+		}
+		break;
+
+	case Type_Array:           return bt->Array.elem;
+	case Type_EnumeratedArray: return bt->EnumeratedArray.elem;
+	case Type_SimdVector:      return bt->SimdVector.elem;
+	case Type_Slice:
+		{
+			GB_ASSERT(index == 0 || index == 1);
+			return index == 0 ? t_rawptr : t_typeid;
+		}
+	case Type_DynamicArray:
+		{
+			switch (index) {
+			case 0:  return t_rawptr;
+			case 1:  return t_int;
+			case 2:  return t_int;
+			case 3:  return t_allocator;
+			default: GB_PANIC("invalid raw dynamic array index");
+			};
+		}
+	case Type_Struct:
+		return get_struct_field_type(bt, index);
+	case Type_Union:
+		if (index < bt->Union.variants.count) {
+			return bt->Union.variants[index];
+		}
+		return union_tag_type(bt);
+	case Type_Tuple:
+		return bt->Tuple.variables[index]->type;
+	case Type_Matrix:
+		return bt->Matrix.elem;
+	case Type_SoaPointer:
+		{
+			GB_ASSERT(index == 0 || index == 1);
+			return index == 0 ? t_rawptr : t_int;
+		}
+	case Type_Map:
+		return type_internal_index(bt->Map.debug_metadata_type, index);
+	case Type_BitField:
+		return type_internal_index(bt->BitField.backing_type, index);
+	case Type_Generic:
+		return type_internal_index(bt->Generic.specialized, index);
+	};
+
+	GB_PANIC("Unhandled type %s", type_to_string(bt));
+};
+
 gb_internal gbString write_type_to_string(gbString str, Type *type, bool shorthand=false, bool allow_polymorphic=false) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
