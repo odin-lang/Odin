@@ -2,6 +2,8 @@ package vendor_kb_text_shape
 
 import "core:c"
 
+#assert(size_of(b8) == size_of(bool))
+
 un :: distinct (
 	uint when (size_of(uintptr) == size_of(uint)) else
 	u32  when size_of(uintptr) == 4 else
@@ -1607,7 +1609,7 @@ glyph :: struct {
 
 	// Unicode properties filled in by CodepointToGlyph.
 	JoiningType:      unicode_joining_type,
-	using _: bit_field u8 {
+	using ScriptBitField: bit_field u8 {
 		Script: script | 8,
 	},
 	UnicodeFlags:     unicode_flags,
@@ -1697,7 +1699,7 @@ op_list :: struct { // TODO(bill): is this actually a slice? e.g. `op_list :: []
 
 indic_script_properties :: struct {
 	ViramaCodepoint:        rune,
-	BlwfPostOnly:           b8,
+	BlwfPostOnly:           bool, // b8
 	RephPosition:           reph_position,
 	RephEncoding:           reph_encoding,
 	RightSideMatraPosition: syllabic_position,
@@ -1785,8 +1787,12 @@ break_type :: struct {
 
 bracket :: struct {
 	Codepoint: rune,
-	using _: bit_field u8 { Direction: direction | 8 },
-	using _: bit_field u8 { Script:    script    | 8 },
+	using DirectionBitField: bit_field u8 {
+		Direction: direction | 8,
+	},
+	using ScriptBitField: bit_field u8 {
+		Script:    script    | 8,
+	},
 }
 
 break_state_flags :: distinct bit_set[break_state_flag; u32]
