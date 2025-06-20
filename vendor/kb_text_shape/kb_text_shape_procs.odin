@@ -11,29 +11,30 @@ when ODIN_OS == .Windows {
 }
 
 import "core:c"
+import "core:mem"
 
 #assert(size_of(c.int) == size_of(b32))
 #assert(size_of(u32)   == size_of(b32))
 
-@(default_calling_convention="c", link_prefix="kbts_")
+@(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
-	// when !TEXT_SHAPE_NO_CRT {
-	FontFromFile     :: proc(FileName: cstring) -> font ---
-	FreeFont         :: proc(Font: ^font) ---
-	CreateShapeState :: proc(Font: ^font) -> ^shape_state ---
-	FreeShapeState   :: proc(State: ^shape_state) ---
-	// }
-
-	FontIsValid            :: proc(Font: ^font) -> int ---
+	FontIsValid            :: proc(Font: ^font) -> b32 ---
 	ReadFontHeader         :: proc(Font: ^font, Data:    rawptr, Size:        un) -> un ---
 	ReadFontData           :: proc(Font: ^font, Scratch: rawptr, ScratchSize: un) -> un ---
-	PostReadFontInitialize :: proc(Font: ^font, Memory:  rawptr, MemorySize:  un) -> int ---
+	PostReadFontInitialize :: proc(Font: ^font, Memory:  rawptr, MemorySize:  un) -> b32 ---
 	SizeOfShapeState       :: proc(Font: ^font) -> un ---
+
 	PlaceShapeState        :: proc(Address: rawptr, Size: un) -> ^shape_state ---
 	ResetShapeState        :: proc(State: ^shape_state) ---
-	ShapeConfig            :: proc(Font: ^font, Script: u32, Language: u32) -> shape_config ---
+
+	ShapeConfig            :: proc(Font: ^font, Script: script, Language: language) -> shape_config ---
 	ShaperIsComplex        :: proc(Shaper: shaper) -> b32 ---
-	Shape                  :: proc(State: ^shape_state, Config: ^shape_config, MainDirection, RunDirection: direction, Glyphs: [^]glyph, GlyphCount: ^u32, GlyphCapacity: u32) -> c.int ---
+	ScriptIsComplex        :: proc(Script: script) -> b32 ---
+
+	Shape                  :: proc(State: ^shape_state, Config: ^shape_config,
+	                               MainDirection, RunDirection: direction,
+	                               Glyphs: [^]glyph, GlyphCount: ^u32, GlyphCapacity: u32) -> c.int ---
+
 	Cursor                 :: proc(Direction: direction) -> cursor  ---
 	PositionGlyph          :: proc(Cursor: ^cursor, Glyph: ^glyph, X, Y: ^i32) ---
 	BeginBreak             :: proc(State: ^break_state, MainDirection: direction, JapaneseLineBreakStyle: japanese_line_break_style) ---
@@ -44,5 +45,70 @@ foreign lib {
 	DecodeUtf8             :: proc(Utf8: [^]byte, Length: uint) -> decode ---
 	CodepointToGlyph       :: proc(Font: ^font, Codepoint: rune) -> glyph ---
 	InferScript            :: proc(Direction: ^direction, Script: ^script, GlyphScript: script) ---
-	ScriptIsComplex        :: proc(Script: script) -> b32 ---
+}
+
+@(require_results)
+PlaceShapeStateFromSlice :: proc "c" (Memory: []byte) -> ^shape_state {
+	return PlaceShapeState(raw_data(Memory), un(len(Memory)))
+}
+
+@(require_results)
+DecodeUtf8String :: proc "c" (String: string) -> decode {
+	return DecodeUtf8(raw_data(String), len(String))
+}
+
+
+@(require_results)
+ReadFontHeaderFromSlice :: proc "c" (Font: ^font, Data: []byte) -> un {
+	return ReadFontHeader(Font, raw_data(Data), un(len(Data)))
+}
+@(require_results)
+ReadFontDataFromSlice :: proc "c" (Font: ^font, Scratch: []byte) -> un {
+	return ReadFontData(Font, raw_data(Scratch), un(len(Scratch)))
+}
+@(require_results)
+PostReadFontInitializeFromSlice :: proc "c" (Font: ^font, Memory: []byte) -> b32 {
+	return PostReadFontInitialize(Font, raw_data(Memory), un(len(Memory)))
+}
+
+@(require_results)
+FontFromMemory :: proc(Data: []byte, allocator: mem.Allocator) -> (Result: font, Err: mem.Allocator_Error) {
+	ClonedData := mem.make_aligned([]byte, len(Data), 16, allocator) or_return
+	defer if Err != nil {
+		delete(ClonedData, allocator)
+	}
+	copy(ClonedData, Data)
+
+	ScratchSize := ReadFontHeaderFromSlice(&Result, ClonedData)
+	Scratch := mem.make_aligned([]byte, ScratchSize, 16, allocator) or_return
+	MemorySize := ReadFontDataFromSlice(&Result, Scratch)
+
+	Memory := Scratch
+	if MemorySize > ScratchSize {
+		delete(Scratch, allocator)
+		Memory = mem.make_aligned([]byte, MemorySize, 16, allocator) or_return
+	}
+	defer if Err != nil {
+		delete(Memory, allocator)
+	}
+
+	PostReadFontInitializeFromSlice(&Result, Memory)
+	return
+
+}
+FreeFont :: proc(Font: ^font, allocator: mem.Allocator) {
+	free(Font.FileBase, allocator)
+	free(Font.GlyphLookupMatrix, allocator)
+	Font^ = {}
+}
+
+@(require_results)
+CreateShapeState :: proc(Font: ^font, allocator: mem.Allocator) -> (Result: ^shape_state, Err: mem.Allocator_Error) {
+	Size := SizeOfShapeState(Font)
+	Memory := mem.make_aligned([]byte, Size, 16, allocator) or_return
+	Result = PlaceShapeStateFromSlice(Memory)
+	return
+}
+FreeShapeState :: proc(State: ^shape_state, allocator: mem.Allocator) {
+	free(State, allocator)
 }

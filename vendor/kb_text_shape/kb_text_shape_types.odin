@@ -3,7 +3,7 @@ package vendor_kb_text_shape
 import "core:c"
 
 un :: distinct uintptr
-sn :: distinct (i32 when size_of(uintptr) == 4 else i64)
+// sn :: distinct (i32 when size_of(uintptr) == 4 else i64)
 
 joining_feature :: enum u8 {
 	NONE,
