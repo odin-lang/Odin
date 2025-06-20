@@ -3,13 +3,12 @@ package os2
 
 import "base:runtime"
 
-import "core:path/filepath"
 import "core:sys/wasm/wasi"
 import "core:time"
 
 internal_stat :: proc(stat: wasi.filestat_t, fullpath: string) -> (fi: File_Info) {
 	fi.fullpath = fullpath
-	fi.name = filepath.base(fi.fullpath)
+	_, fi.name = split_path(fi.fullpath)
 
 	fi.inode = u128(stat.ino)
 	fi.size  = i64(stat.size)

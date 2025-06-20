@@ -189,7 +189,7 @@ Key_Location :: enum u8 {
 KEYBOARD_MAX_KEY_SIZE  :: 32
 KEYBOARD_MAX_CODE_SIZE :: 32
 
-GAMEPAD_MAX_ID_SIZE      :: 64
+GAMEPAD_MAX_ID_SIZE      :: 96
 GAMEPAD_MAX_MAPPING_SIZE :: 64
 
 GAMEPAD_MAX_BUTTONS :: 64
@@ -239,6 +239,12 @@ Gamepad_State :: struct {
 	_mapping_buf: [GAMEPAD_MAX_MAPPING_SIZE]byte `fmt:"-"`,
 }
 
+Pointer_Type :: enum u8 {
+	Mouse,
+	Pen,
+	Touch,
+}
+
 Event :: struct {
 	kind:                 Event_Kind,
 	target_kind:          Event_Target_Kind,
@@ -275,6 +281,8 @@ Event :: struct {
 
 			repeat: bool,
 
+			char:   rune,
+
 			_key_len:  int                         `fmt:"-"`,
 			_code_len: int                         `fmt:"-"`,
 			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte `fmt:"-"`,
@@ -295,6 +303,21 @@ Event :: struct {
 
 			button:  i16,
 			buttons: bit_set[0..<16; u16],
+
+			pointer: struct {
+				altitude_angle:       f64,
+				azimuth_angle:        f64,
+				persistent_device_id: int,
+				pointer_id:           int,
+				width:                int,
+				height:               int,
+				pressure:             f64,
+				tangential_pressure:  f64,
+				tilt:                 [2]f64,
+				twist:                f64,
+				pointer_type:         Pointer_Type,
+				is_primary:           bool,
+			},
 		},
 
 		gamepad: Gamepad_State,
@@ -323,13 +346,13 @@ add_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, call
 	return _add_event_listener(id, event_kind_string[kind], kind, user_data, callback, use_capture)
 }
 
-remove_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	@(default_calling_convention="contextless")
 	foreign dom_lib {
 		@(link_name="remove_event_listener")
-		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
 	}
-	return _remove_event_listener(id, event_kind_string[kind], user_data, callback)
+	return _remove_event_listener(id, event_kind_string[kind], user_data, callback, use_capture)
 }
 
 add_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
@@ -341,20 +364,26 @@ add_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback:
 	return _add_window_event_listener(event_kind_string[kind], kind, user_data, callback, use_capture)
 }
 
-remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	@(default_calling_convention="contextless")
 	foreign dom_lib {
 		@(link_name="remove_window_event_listener")
-		_remove_window_event_listener :: proc(name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+		_remove_window_event_listener :: proc(name: string, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
 	}
-	return _remove_window_event_listener(event_kind_string[kind], user_data, callback)
+	return _remove_window_event_listener(event_kind_string[kind], user_data, callback, use_capture)
 }
 
 remove_event_listener_from_event :: proc(e: Event) -> bool {
+	from_use_capture_false: bool
+	from_use_capture_true: bool
 	if e.id == "" {
-		return remove_window_event_listener(e.kind, e.user_data, e.callback)
+		from_use_capture_false = remove_window_event_listener(e.kind, e.user_data, e.callback, false)
+		from_use_capture_true = remove_window_event_listener(e.kind, e.user_data, e.callback, true)
+	} else {
+		from_use_capture_false = remove_event_listener(e.id, e.kind, e.user_data, e.callback, false)
+		from_use_capture_true = remove_event_listener(e.id, e.kind, e.user_data, e.callback, true)
 	}
-	return remove_event_listener(e.id, e.kind, e.user_data, e.callback)
+	return from_use_capture_false || from_use_capture_true
 }
 
 add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
@@ -365,13 +394,13 @@ add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, c
 	}
 	return _add_event_listener(id, name, .Custom, user_data, callback, use_capture)
 }
-remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event)) -> bool {
+remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
 	@(default_calling_convention="contextless")
 	foreign dom_lib {
 		@(link_name="remove_event_listener")
-		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
 	}
-	return _remove_event_listener(id, name, user_data, callback)
+	return _remove_event_listener(id, name, user_data, callback, use_capture)
 }
 
 get_gamepad_state :: proc "contextless" (index: int, s: ^Gamepad_State) -> bool {
@@ -384,7 +413,14 @@ get_gamepad_state :: proc "contextless" (index: int, s: ^Gamepad_State) -> bool 
 	if s == nil {
 		return false
 	}
-	return _get_gamepad_state(index, s)
+
+	if !_get_gamepad_state(index, s) {
+		return false
+	}
+
+	s.id = string(s._id_buf[:s._id_len])
+	s.mapping = string(s._mapping_buf[:s._mapping_len])
+	return true
 }
 
 

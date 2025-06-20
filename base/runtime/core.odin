@@ -110,7 +110,6 @@ Type_Info_Parameters :: struct { // Only used for procedures parameters and resu
 	types:        []^Type_Info,
 	names:        []string,
 }
-Type_Info_Tuple :: Type_Info_Parameters // Will be removed eventually
 
 Type_Info_Struct_Flags :: distinct bit_set[Type_Info_Struct_Flag; u8]
 Type_Info_Struct_Flag :: enum u8 {
@@ -559,9 +558,13 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	Odin_Platform_Subtarget_Type :: enum int {
 		Default,
 		iOS,
+		Android,
 	}
 */
 Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
+
+Odin_Platform_Subtarget_Types :: bit_set[Odin_Platform_Subtarget_Type]
+
 
 /*
 	// Defined internally by the compiler

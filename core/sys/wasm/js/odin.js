@@ -17,7 +17,7 @@ class WasmMemoryInterface {
 	constructor() {
 		this.memory = null;
 		this.exports = null;
-		this.listenerMap = {};
+		this.listenerMap = new Map();
 
 		// Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
 		this.intSize = 4;
@@ -110,16 +110,12 @@ class WasmMemoryInterface {
 	}
 
 	loadCstring(ptr) {
-		return this.loadCstringDirect(this.loadPtr(ptr));
-	}
-
-	loadCstringDirect(start) {
-		if (start == 0) {
+		if (ptr == 0) {
 			return null;
 		}
 		let len = 0;
-		for (; this.mem.getUint8(start+len) != 0; len += 1) {}
-		return this.loadString(start, len);
+		for (; this.mem.getUint8(ptr+len) != 0; len += 1) {}
+		return this.loadString(ptr, len);
 	}
 
 	storeU8(addr, value)  { this.mem.setUint8  (addr, value); }
@@ -402,6 +398,9 @@ class WebGLInterface {
 			BlendEquation: (mode) => {
 				this.ctx.blendEquation(mode);
 			},
+			BlendEquationSeparate: (modeRGB, modeAlpha) => {
+				this.ctx.blendEquationSeparate(modeRGB, modeAlpha);
+			},
 			BlendFunc: (sfactor, dfactor) => {
 				this.ctx.blendFunc(sfactor, dfactor);
 			},
@@ -632,6 +631,13 @@ class WebGLInterface {
 
 			GetParameter: (pname) => {
 				return this.ctx.getParameter(pname);
+			},
+			GetParameter4i: (pname, v0, v1, v2, v3) => {
+				const i4 = this.ctx.getParameter(pname);
+				this.mem.storeI32(v0, i4[0]);
+				this.mem.storeI32(v1, i4[1]);
+				this.mem.storeI32(v2, i4[2]);
+				this.mem.storeI32(v3, i4[3]);
 			},
 			GetProgramParameter: (program, pname) => {
 				return this.ctx.getProgramParameter(this.programs[program], pname)
@@ -1315,18 +1321,20 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 		} else if (!line.includes("\n")) {
 			currentLine[isError] = currentLine[isError].concat(line);
 		} else {
-			let lines = line.split("\n");
+			let lines = line.trimEnd().split("\n");
 			let printLast = lines.length > 1 && line.endsWith("\n");
 			println(currentLine[isError].concat(lines[0]));
 			currentLine[isError] = "";
 			for (let i = 1; i < lines.length-1; i++) {
 				println(lines[i]);
 			}
-			let last = lines[lines.length-1];
-			if (printLast) {
-				println(last);
-			} else {
-				currentLine[isError] = last;
+			if (lines.length > 1) {
+				let last = lines[lines.length-1];
+				if (printLast) {
+					println(last);
+				} else {
+					currentLine[isError] = last;
+				}
 			}
 		}
 
@@ -1393,6 +1401,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 		info.scrollTop = info.scrollHeight;
 	};
 
+	const listener_key = (id, name, data, callback, useCapture) => {
+		return `${id}-${name}-data:${data}-callback:${callback}-useCapture:${useCapture}`;
+	};
+
 	let webglContext = new WebGLInterface(wasmMemoryInterface);
 
 	const env = {};
@@ -1420,6 +1432,13 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 			alert: (ptr, len) => { alert(wasmMemoryInterface.loadString(ptr, len)) },
 			abort: () => { Module.abort() },
 			evaluate: (str_ptr, str_len) => { eval.call(null, wasmMemoryInterface.loadString(str_ptr, str_len)); },
+
+			open: (url_ptr, url_len, name_ptr, name_len, specs_ptr, specs_len) => {
+				const url = wasmMemoryInterface.loadString(url_ptr, url_len);
+				const name = wasmMemoryInterface.loadString(name_ptr, name_len);
+				const specs = wasmMemoryInterface.loadString(specs_ptr, specs_len);
+				window.open(url, name, specs);
+			},
 
 			// return a bigint to be converted to i64
 			time_now: () => BigInt(Date.now()),
@@ -1533,6 +1552,29 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					wmi.storeI16(off(2), e.button);
 					wmi.storeU16(off(2), e.buttons);
+
+					if (e instanceof PointerEvent) {
+						wmi.storeF64(off(8), e.altitudeAngle);
+						wmi.storeF64(off(8), e.azimuthAngle);
+						wmi.storeInt(off(W), e.persistentDeviceId);
+						wmi.storeInt(off(W), e.pointerId);
+						wmi.storeInt(off(W), e.width);
+						wmi.storeInt(off(W), e.height);
+						wmi.storeF64(off(8), e.pressure);
+						wmi.storeF64(off(8), e.tangentialPressure);
+						wmi.storeF64(off(8), e.tiltX);
+						wmi.storeF64(off(8), e.tiltY);
+						wmi.storeF64(off(8), e.twist);
+						if (e.pointerType == "pen") {
+							wmi.storeU8(off(1), 1);
+						} else if (e.pointerType == "touch") {
+							wmi.storeU8(off(1), 2);
+						} else {
+							wmi.storeU8(off(1), 0);
+						}
+						wmi.storeU8(off(1), !!e.isPrimary);
+					}
+
 				} else if (e instanceof KeyboardEvent) {
 					// Note: those strings are constructed
 					// on the native side from buffers that
@@ -1548,6 +1590,8 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					wmi.storeU8(off(1), !!e.metaKey);
 
 					wmi.storeU8(off(1), !!e.repeat);
+
+					wmi.storeI32(off(4), e.charCode);
 
 					wmi.storeInt(off(W, W), e.key.length)
 					wmi.storeInt(off(W, W), e.code.length)
@@ -1588,10 +1632,24 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 						}
 					}
 
-					wmi.storeInt(off(W, W), e.gamepad.id.length)
-					wmi.storeInt(off(W, W), e.gamepad.mapping.length)
-					wmi.storeString(off(64, 1), e.gamepad.id);
-					wmi.storeString(off(64, 1), e.gamepad.mapping);
+					let idLength = e.gamepad.id.length;
+					let id = e.gamepad.id;
+					if (idLength > 96) {
+						idLength = 96;
+						id = id.slice(0, 93) + '...';
+					}
+
+					let mappingLength = e.gamepad.mapping.length;
+					let mapping = e.gamepad.mapping;
+					if (mappingLength > 64) {
+						mappingLength = 61;
+						mapping = mapping.slice(0, 61) + '...';
+					}
+
+					wmi.storeInt(off(W, W), idLength);
+					wmi.storeInt(off(W, W), mappingLength);
+					wmi.storeString(off(96, 1), id);
+					wmi.storeString(off(64, 1), mapping);
 				}
 			},
 
@@ -1600,6 +1658,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = getElement(id);
 				if (element == undefined) {
+					return false;
+				}
+				let key = listener_key(id, name, data, callback, !!use_capture);
+				if (wasmMemoryInterface.listenerMap.has(key)) {
 					return false;
 				}
 
@@ -1612,7 +1674,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					onEventReceived(event_data, data, callback);
 				};
-				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
+				wasmMemoryInterface.listenerMap.set(key, listener);
 				element.addEventListener(name, listener, !!use_capture);
 				return true;
 			},
@@ -1620,6 +1682,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 			add_window_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
+				let key = listener_key('window', name, data, callback, !!use_capture);
+				if (wasmMemoryInterface.listenerMap.has(key)) {
+					return false;
+				}
+
 				let listener = (e) => {
 					let event_data = {};
 					event_data.id_ptr = 0;
@@ -1629,12 +1696,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 					onEventReceived(event_data, data, callback);
 				};
-				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
+				wasmMemoryInterface.listenerMap.set(key, listener);
 				element.addEventListener(name, listener, !!use_capture);
 				return true;
 			},
 
-			remove_event_listener: (id_ptr, id_len, name_ptr, name_len, data, callback) => {
+			remove_event_listener: (id_ptr, id_len, name_ptr, name_len, data, callback, use_capture) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = getElement(id);
@@ -1642,24 +1709,28 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					return false;
 				}
 
-				let listener = wasmMemoryInterface.listenerMap[{data: data, callback: callback}];
-				if (listener == undefined) {
+				let key = listener_key(id, name, data, callback, !!use_capture);
+				let listener = wasmMemoryInterface.listenerMap.get(key);
+				if (listener === undefined) {
 					return false;
 				}
-				element.removeEventListener(name, listener);
+				wasmMemoryInterface.listenerMap.delete(key);
+
+				element.removeEventListener(name, listener, !!use_capture);
 				return true;
 			},
-			remove_window_event_listener: (name_ptr, name_len, data, callback) => {
+			remove_window_event_listener: (name_ptr, name_len, data, callback, use_capture) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
-				let key = {data: data, callback: callback};
-				let listener = wasmMemoryInterface.listenerMap[key];
-				if (!listener) {
+
+				let key = listener_key('window', name, data, callback, !!use_capture);
+				let listener = wasmMemoryInterface.listenerMap.get(key);
+				if (listener === undefined) {
 					return false;
 				}
-				wasmMemoryInterface.listenerMap[key] = undefined;
+				wasmMemoryInterface.listenerMap.delete(key);
 
-				element.removeEventListener(name, listener);
+				element.removeEventListener(name, listener, !!use_capture);
 				return true;
 			},
 
@@ -1756,10 +1827,24 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 						}
 					}
 
-					wmi.storeInt(off(W, W), gamepad.id.length)
-					wmi.storeInt(off(W, W), gamepad.mapping.length)
-					wmi.storeString(off(64, 1), gamepad.id);
-					wmi.storeString(off(64, 1), gamepad.mapping);
+					let idLength = gamepad.id.length;
+					let id = gamepad.id;
+					if (idLength > 96) {
+						idLength = 96;
+						id = id.slice(0, 93) + '...';
+					}
+
+					let mappingLength = gamepad.mapping.length;
+					let mapping = gamepad.mapping;
+					if (mappingLength > 64) {
+						mappingLength = 61;
+						mapping = mapping.slice(0, 61) + '...';
+					}
+
+					wmi.storeInt(off(W, W), idLength);
+					wmi.storeInt(off(W, W), mappingLength);
+					wmi.storeString(off(96, 1), id);
+					wmi.storeString(off(64, 1), mapping);
 
 					return true;
 				}

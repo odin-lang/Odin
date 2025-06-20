@@ -75,15 +75,7 @@ LANGIDFROMLCID :: #force_inline proc "contextless" (lcid: LCID) -> LANGID {
 	return LANGID(lcid)
 }
 
-// this one gave me trouble as it do not mask the values.
-// the _ in the name is also off comparing to the c code
-// i can't find any usage in the odin repo
-@(deprecated = "use MAKEWORD")
-MAKE_WORD :: #force_inline proc "contextless" (x, y: WORD) -> WORD {
-	return x << 8 | y
-}
-
-utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
+utf8_to_utf16_alloc :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	if len(s) < 1 {
 		return nil
 	}
@@ -109,14 +101,42 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	}
 	return text[:n]
 }
-utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> wstring {
+
+utf8_to_utf16_buf :: proc(buf: []u16, s: string) -> []u16 {
+	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), i32(len(s)), nil, 0)
+	if n1 == 0 {
+		return nil
+	} else if int(n1) > len(buf) {
+		return nil
+	}
+
+	n1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), i32(len(s)), raw_data(buf[:]), n1)
+	if n1 == 0 {
+		return nil
+	} else if int(n1) > len(buf) {
+		return nil
+	}
+	return buf[:n1]
+}
+utf8_to_utf16 :: proc{utf8_to_utf16_alloc, utf8_to_utf16_buf}
+
+utf8_to_wstring_alloc :: proc(s: string, allocator := context.temp_allocator) -> wstring {
 	if res := utf8_to_utf16(s, allocator); len(res) > 0 {
 		return raw_data(res)
 	}
 	return nil
 }
 
-wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
+utf8_to_wstring_buf :: proc(buf: []u16, s: string) -> wstring {
+	if res := utf8_to_utf16(buf, s); len(res) > 0 {
+		return raw_data(res)
+	}
+	return nil
+}
+
+utf8_to_wstring :: proc{utf8_to_wstring_alloc, utf8_to_wstring_buf}
+
+wstring_to_utf8_alloc :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
 	context.allocator = allocator
 
 	if N == 0 {
@@ -150,12 +170,48 @@ wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator)
 	return string(text[:n]), nil
 }
 
-utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
+wstring_to_utf8_buf :: proc(buf: []u8, s: wstring) -> (res: string) {
+	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, -1, nil, 0, nil, nil)
+	if n == 0 {
+		return
+	} else if int(n) > len(buf) {
+		return
+	}
+
+	n2 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, -1, raw_data(buf), n, nil, nil)
+	if n2 == 0 {
+		return
+	} else if int(n2) > len(buf) {
+		return
+	}
+
+	for i in 0..<n2 {
+		if buf[i] == 0 {
+			n2 = i
+			break
+		}
+	}
+	return string(buf[:n2])
+}
+
+wstring_to_utf8 :: proc{wstring_to_utf8_alloc, wstring_to_utf8_buf}
+
+utf16_to_utf8_alloc :: proc(s: []u16, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
 	if len(s) == 0 {
 		return "", nil
 	}
 	return wstring_to_utf8(raw_data(s), len(s), allocator)
 }
+
+utf16_to_utf8_buf :: proc(buf: []u8, s: []u16) -> (res: string) {
+	if len(s) == 0 {
+		return
+	}
+	return wstring_to_utf8(buf, raw_data(s))
+}
+
+utf16_to_utf8 :: proc{utf16_to_utf8_alloc, utf16_to_utf8_buf}
+
 
 // AdvAPI32, NetAPI32 and UserENV helpers.
 

@@ -35,6 +35,9 @@ General_Error :: enum u32 {
 
 	File_Is_Pipe,
 	Not_Dir,
+
+	// Environment variable not found.
+	Env_Var_Not_Found,
 }
 
 
@@ -82,6 +85,7 @@ error_string :: proc "contextless" (ferr: Error) -> string {
 		case .Pattern_Has_Separator: return "pattern has separator"
 		case .File_Is_Pipe:      return "file is pipe"
 		case .Not_Dir:           return "file is not directory"
+		case .Env_Var_Not_Found: return "environment variable not found"
 		}
 	case io.Error:
 		switch e {

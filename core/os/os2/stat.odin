@@ -1,7 +1,6 @@
 package os2
 
 import "base:runtime"
-import "core:path/filepath"
 import "core:strings"
 import "core:time"
 
@@ -25,7 +24,7 @@ File_Info :: struct {
 file_info_clone :: proc(fi: File_Info, allocator: runtime.Allocator) -> (cloned: File_Info, err: runtime.Allocator_Error) {
 	cloned = fi
 	cloned.fullpath = strings.clone(fi.fullpath, allocator) or_return
-	cloned.name = filepath.base(cloned.fullpath)
+	_, cloned.name = split_path(cloned.fullpath)
 	return
 }
 
@@ -74,14 +73,14 @@ last_write_time_by_name :: modification_time_by_path
 
 @(require_results)
 modification_time :: proc(f: ^File) -> (time.Time, Error) {
-	TEMP_ALLOCATOR_GUARD()
-	fi, err := fstat(f, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	fi, err := fstat(f, temp_allocator)
 	return fi.modification_time, err
 }
 
 @(require_results)
 modification_time_by_path :: proc(path: string) -> (time.Time, Error) {
-	TEMP_ALLOCATOR_GUARD()
-	fi, err := stat(path, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	fi, err := stat(path, temp_allocator)
 	return fi.modification_time, err
 }

@@ -62,6 +62,11 @@ when !NO_THREADING {
 	Signals the specified auto-reset event.
 	*/
 	event_signal :: proc(pEvent: ^event) -> result ---
+
+	semaphore_init    :: proc(initialValue: i32, pSemaphore: ^semaphore) -> result ---
+	semaphore_uninit  :: proc(pSemaphore: ^semaphore) ---
+	semaphore_wait    :: proc(pSemaphore: ^semaphore) -> result ---
+	semaphore_release :: proc(pSemaphore: ^semaphore) -> result ---
 } /* NO_THREADING */
 
 }

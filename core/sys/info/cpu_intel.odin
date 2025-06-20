@@ -3,12 +3,6 @@ package sysinfo
 
 import "base:intrinsics"
 
-// cpuid :: proc(ax, cx: u32) -> (eax, ebc, ecx, edx: u32) ---
-cpuid :: intrinsics.x86_cpuid
-
-// xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
-xgetbv :: intrinsics.x86_xgetbv
-
 CPU_Feature :: enum u64 {
 	aes,       // AES hardware implementation (AES NI)
 	adx,       // Multi-precision add-carry instruction extensions
@@ -23,6 +17,7 @@ CPU_Feature :: enum u64 {
 	popcnt,    // Hamming weight instruction POPCNT.
 	rdrand,    // RDRAND instruction (on-chip random number generator)
 	rdseed,    // RDSEED instruction (on-chip random number generator)
+	sha,       // SHA Extensions (SHA-1, SHA-224, SHA-256)
 	sse2,      // Streaming SIMD extension 2 (always available on amd64)
 	sse3,      // Streaming SIMD extension 3
 	ssse3,     // Supplemental streaming SIMD extension 3
@@ -48,9 +43,13 @@ CPU_Feature :: enum u64 {
 }
 
 CPU_Features :: distinct bit_set[CPU_Feature; u64]
-
-cpu_features: Maybe(CPU_Features)
-cpu_name:     Maybe(string)
+CPU :: struct {
+	name:           Maybe(string),
+	features:       Maybe(CPU_Features),
+	physical_cores: int, // Initialized by cpu_<os>.odin
+	logical_cores:  int, // Initialized by cpu_<os>.odin
+}
+cpu: CPU
 
 @(init, private)
 init_cpu_features :: proc "c" () {
@@ -87,7 +86,7 @@ init_cpu_features :: proc "c" () {
 	when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 		// xgetbv is an illegal instruction under FreeBSD 13, OpenBSD 7.1 and NetBSD 10
 		// return before probing further
-		cpu_features = set
+		cpu.features = set
 		return
 	}
 
@@ -115,6 +114,7 @@ init_cpu_features :: proc "c" () {
 
 	_, ebx7, ecx7, edx7 := cpuid(7, 0)
 	try_set(&set, .bmi1, 3, ebx7)
+	try_set(&set, .sha, 29, ebx7)
 	if os_supports_avx {
 		try_set(&set, .avx2, 5, ebx7)
 	}
@@ -149,7 +149,7 @@ init_cpu_features :: proc "c" () {
 	try_set(&set, .rdseed, 18, ebx7)
 	try_set(&set, .adx,    19, ebx7)
 
-	cpu_features = set
+	cpu.features = set
 }
 
 @(private)
@@ -177,5 +177,11 @@ init_cpu_name :: proc "c" () {
 	for len(brand) > 0 && brand[len(brand) - 1] == 0 || brand[len(brand) - 1] == ' ' {
 		brand = brand[:len(brand) - 1]
 	}
-	cpu_name = brand
+	cpu.name = brand
 }
+
+// cpuid :: proc(ax, cx: u32) -> (eax, ebc, ecx, edx: u32) ---
+cpuid :: intrinsics.x86_cpuid
+
+// xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
+xgetbv :: intrinsics.x86_xgetbv

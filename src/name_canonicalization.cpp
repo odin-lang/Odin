@@ -1,3 +1,5 @@
+gb_internal bool is_in_doc_writer(void);
+
 gb_internal GB_COMPARE_PROC(type_info_pair_cmp) {
 	TypeInfoPair *x = cast(TypeInfoPair *)a;
 	TypeInfoPair *y = cast(TypeInfoPair *)b;
@@ -284,6 +286,23 @@ gb_internal void write_canonical_params(TypeWriter *w, Type *params) {
 			} else {
 				write_type_to_canonical_string(w, v->type);
 			}
+			if (is_in_doc_writer()) {
+				// NOTE(bill): This just exists to make sure the entities default values exist when
+				// writing to the odin doc format
+				Ast *expr = v->Variable.init_expr;
+				if (expr == nullptr) {
+					expr = v->Variable.param_value.original_ast_expr;
+				}
+				if (expr != nullptr) {
+					type_writer_appendc(w, "=");
+					gbString s = write_expr_to_string( // Minor leak
+						gb_string_make(temporary_allocator(), ""),
+						expr,
+						build_context.cmd_doc_flags & CmdDocFlag_Short
+					);
+					type_writer_append(w, s, gb_string_length(s));
+				}
+			}
 			break;
 		case Entity_TypeName:
 			type_writer_appendc(w, CANONICAL_PARAM_TYPEID);
@@ -520,7 +539,6 @@ write_base_name:
 	return;
 }
 
-gb_internal bool is_in_doc_writer(void);
 
 // NOTE(bill): This exists so that we deterministically hash a type by serializing it to a canonical string
 gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
@@ -631,6 +649,10 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 	case Type_Union:
 		type_writer_appendc(w, "union");
 
+		if (is_in_doc_writer() && type->Union.polymorphic_params) {
+			write_canonical_params(w, type->Union.polymorphic_params);
+		}
+
 		switch (type->Union.kind) {
 		case UnionType_no_nil:     type_writer_appendc(w, "#no_nil");     break;
 		case UnionType_shared_nil: type_writer_appendc(w, "#shared_nil"); break;
@@ -658,6 +680,11 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		}
 
 		type_writer_appendc(w, "struct");
+
+		if (is_in_doc_writer() && type->Struct.polymorphic_params) {
+			write_canonical_params(w, type->Struct.polymorphic_params);
+		}
+
 		if (type->Struct.is_packed)    type_writer_appendc(w, "#packed");
 		if (type->Struct.is_raw_union) type_writer_appendc(w, "#raw_union");
 		if (type->Struct.is_no_copy)   type_writer_appendc(w, "#no_copy");
@@ -724,9 +751,17 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		if (is_in_doc_writer()) {
 			type_writer_appendc(w, "$");
 			type_writer_append(w, type->Generic.name.text, type->Generic.name.len);
-			type_writer_append_fmt(w, "%lld", cast(long long)type->Generic.id);
+			type_writer_append_fmt(w, "-%lld", cast(long long)type->Generic.id);
+			if (type->Generic.specialized) {
+				type_writer_appendc(w, "/");
+				write_type_to_canonical_string(w, type->Generic.specialized);
+			}
+		} else if (type->Generic.specialized) {
+			// If we have a specialized type, use that instead of panicking
+			write_type_to_canonical_string(w, type->Generic.specialized);
 		} else {
-			GB_PANIC("Type_Generic should never be hit");
+			// For unspecialized generics, use a generic placeholder string
+			type_writer_appendc(w, "rawptr");
 		}
 		return;
 

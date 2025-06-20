@@ -124,7 +124,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
-
 	return thread
 }
 

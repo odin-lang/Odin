@@ -1029,3 +1029,32 @@ default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> ui
 	h &= HASH_MASK
 	return uintptr(h) | uintptr(uintptr(h) == 0)
 }
+
+default_hasher_f64 :: proc "contextless" (f: f64, seed: uintptr) -> uintptr {
+	f := f
+	buf: [size_of(f)]u8
+	if f == 0 {
+		return default_hasher(&buf, seed, size_of(buf))
+	}
+	if f != f {
+		// TODO(bill): What should the logic be for NaNs?
+		return default_hasher(&f, seed, size_of(f))
+	}
+	return default_hasher(&f, seed, size_of(f))
+}
+
+default_hasher_complex128 :: proc "contextless" (x, y: f64, seed: uintptr) -> uintptr {
+	seed := seed
+	seed = default_hasher_f64(x, seed)
+	seed = default_hasher_f64(y, seed)
+	return seed
+}
+
+default_hasher_quaternion256 :: proc "contextless" (x, y, z, w: f64, seed: uintptr) -> uintptr {
+	seed := seed
+	seed = default_hasher_f64(x, seed)
+	seed = default_hasher_f64(y, seed)
+	seed = default_hasher_f64(z, seed)
+	seed = default_hasher_f64(w, seed)
+	return seed
+}

@@ -2,6 +2,7 @@ package mem_virtual
 
 import "core:mem"
 import "base:intrinsics"
+// import "base:sanitizer"
 import "base:runtime"
 _ :: runtime
 
@@ -14,27 +15,33 @@ platform_memory_init :: proc() {
 
 Allocator_Error :: mem.Allocator_Error
 
-@(require_results)
+@(require_results, no_sanitize_address)
 reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	return _reserve(size)
 }
 
+@(no_sanitize_address)
 commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
+	// sanitizer.address_unpoison(data, size)
 	return _commit(data, size)
 }
 
-@(require_results)
+@(require_results, no_sanitize_address)
 reserve_and_commit :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	data = reserve(size) or_return
 	commit(raw_data(data), size) or_return
 	return
 }
 
+@(no_sanitize_address)
 decommit :: proc "contextless" (data: rawptr, size: uint) {
+	// sanitizer.address_poison(data, size)
 	_decommit(data, size)
 }
 
+@(no_sanitize_address)
 release :: proc "contextless" (data: rawptr, size: uint) {
+	// sanitizer.address_unpoison(data, size)
 	_release(data, size)
 }
 
@@ -46,12 +53,10 @@ Protect_Flag :: enum u32 {
 Protect_Flags :: distinct bit_set[Protect_Flag; u32]
 Protect_No_Access :: Protect_Flags{}
 
+@(no_sanitize_address)
 protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	return _protect(data, size, flags)
 }
-
-
-
 
 Memory_Block :: struct {
 	prev: ^Memory_Block,
@@ -66,13 +71,13 @@ Memory_Block_Flag :: enum u32 {
 Memory_Block_Flags :: distinct bit_set[Memory_Block_Flag; u32]
 
 
-@(private="file", require_results)
+@(private="file", require_results, no_sanitize_address)
 align_formula :: #force_inline proc "contextless" (size, align: uint) -> uint {
 	result := size + align-1
 	return result - result%align
 }
 
-@(require_results)
+@(require_results, no_sanitize_address)
 memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags: Memory_Block_Flags = {}) -> (block: ^Memory_Block, err: Allocator_Error) {
 	page_size := DEFAULT_PAGE_SIZE
 	assert(mem.is_power_of_two(uintptr(page_size)))
@@ -116,8 +121,9 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	return &pmblock.block, nil
 }
 
-@(require_results)
+@(require_results, no_sanitize_address)
 alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint, default_commit_size: uint = 0) -> (data: []byte, err: Allocator_Error) {
+	@(no_sanitize_address)
 	calc_alignment_offset :: proc "contextless" (block: ^Memory_Block, alignment: uintptr) -> uint {
 		alignment_offset := uint(0)
 		ptr := uintptr(block.base[block.used:])
@@ -128,6 +134,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 		return alignment_offset
 		
 	}
+	@(no_sanitize_address)
 	do_commit_if_necessary :: proc(block: ^Memory_Block, size: uint, default_commit_size: uint) -> (err: Allocator_Error) {
 		if block.committed - block.used < size {
 			pmblock := (^Platform_Memory_Block)(block)
@@ -172,10 +179,12 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 
 	data = block.base[block.used+alignment_offset:][:min_size]
 	block.used += size
+	// sanitizer.address_unpoison(data)
 	return
 }
 
 
+@(no_sanitize_address)
 memory_block_dealloc :: proc(block_to_free: ^Memory_Block) {
 	if block := (^Platform_Memory_Block)(block_to_free); block != nil {
 		platform_memory_free(block)

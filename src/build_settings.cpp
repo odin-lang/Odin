@@ -31,6 +31,24 @@ enum TargetOsKind : u16 {
 	TargetOs_COUNT,
 };
 
+gb_global String target_os_names[TargetOs_COUNT] = {
+	str_lit(""),
+	str_lit("windows"),
+	str_lit("darwin"),
+	str_lit("linux"),
+	str_lit("essence"),
+	str_lit("freebsd"),
+	str_lit("openbsd"),
+	str_lit("netbsd"),
+	str_lit("haiku"),
+
+	str_lit("wasi"),
+	str_lit("js"),
+	str_lit("orca"),
+
+	str_lit("freestanding"),
+};
+
 enum TargetArchKind : u16 {
 	TargetArch_Invalid,
 
@@ -45,11 +63,27 @@ enum TargetArchKind : u16 {
 	TargetArch_COUNT,
 };
 
+gb_global String target_arch_names[TargetArch_COUNT] = {
+	str_lit(""),
+	str_lit("amd64"),
+	str_lit("i386"),
+	str_lit("arm32"),
+	str_lit("arm64"),
+	str_lit("wasm32"),
+	str_lit("wasm64p32"),
+	str_lit("riscv64"),
+};
+
 enum TargetEndianKind : u8 {
 	TargetEndian_Little,
 	TargetEndian_Big,
 
 	TargetEndian_COUNT,
+};
+
+gb_global String target_endian_names[TargetEndian_COUNT] = {
+	str_lit("little"),
+	str_lit("big"),
 };
 
 enum TargetABIKind : u16 {
@@ -61,7 +95,14 @@ enum TargetABIKind : u16 {
 	TargetABI_COUNT,
 };
 
+gb_global String target_abi_names[TargetABI_COUNT] = {
+	str_lit(""),
+	str_lit("win64"),
+	str_lit("sysv"),
+};
+
 enum Windows_Subsystem : u8 {
+	Windows_Subsystem_UNKNOWN,
  	Windows_Subsystem_BOOT_APPLICATION,
 	Windows_Subsystem_CONSOLE,                 // Default,
 	Windows_Subsystem_EFI_APPLICATION,
@@ -75,52 +116,31 @@ enum Windows_Subsystem : u8 {
 	Windows_Subsystem_COUNT,
 };
 
+gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
+	str_lit(""),
+	str_lit("BOOT_APPLICATION"),
+	str_lit("CONSOLE"), // Default
+	str_lit("EFI_APPLICATION"),
+	str_lit("EFI_BOOT_SERVICE_DRIVER"),
+	str_lit("EFI_ROM"),
+	str_lit("EFI_RUNTIME_DRIVER"),
+	str_lit("NATIVE"),
+	str_lit("POSIX"),
+	str_lit("WINDOWS"),
+	str_lit("WINDOWSCE"),
+};
+
 struct MicroarchFeatureList {
 	String microarch;
 	String features;
 };
 
-gb_global String target_os_names[TargetOs_COUNT] = {
-	str_lit(""),
-	str_lit("windows"),
-	str_lit("darwin"),
-	str_lit("linux"),
-	str_lit("essence"),
-	str_lit("freebsd"),
-	str_lit("openbsd"),
-	str_lit("netbsd"),
-	str_lit("haiku"),
-	
-	str_lit("wasi"),
-	str_lit("js"),
-	str_lit("orca"),
-
-	str_lit("freestanding"),
-};
-
-gb_global String target_arch_names[TargetArch_COUNT] = {
-	str_lit(""),
-	str_lit("amd64"),
-	str_lit("i386"),
-	str_lit("arm32"),
-	str_lit("arm64"),
-	str_lit("wasm32"),
-	str_lit("wasm64p32"),
-	str_lit("riscv64"),
-};
-
+#if defined(GB_SYSTEM_WINDOWS)
+	#include <llvm-c/Config/llvm-config.h>
+#else
+	#include <llvm/Config/llvm-config.h>
+#endif
 #include "build_settings_microarch.cpp"
-
-gb_global String target_endian_names[TargetEndian_COUNT] = {
-	str_lit("little"),
-	str_lit("big"),
-};
-
-gb_global String target_abi_names[TargetABI_COUNT] = {
-	str_lit(""),
-	str_lit("win64"),
-	str_lit("sysv"),
-};
 
 gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
@@ -130,19 +150,6 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
-};
-
-gb_global String windows_subsystem_names[Windows_Subsystem_COUNT] = {
-	str_lit("BOOT_APPLICATION"),
-	str_lit("CONSOLE"),                 // Default
-	str_lit("EFI_APPLICATION"),
-	str_lit("EFI_BOOT_SERVICE_DRIVER"),
-	str_lit("EFI_ROM"),
-	str_lit("EFI_RUNTIME_DRIVER"),
-	str_lit("NATIVE"),
-	str_lit("POSIX"),
-	str_lit("WINDOWS"),
-	str_lit("WINDOWSCE"),
 };
 
 #ifndef ODIN_VERSION_RAW
@@ -165,6 +172,7 @@ struct TargetMetrics {
 enum Subtarget : u32 {
 	Subtarget_Default,
 	Subtarget_iOS,
+	Subtarget_Android,
 
 	Subtarget_COUNT,
 };
@@ -172,6 +180,7 @@ enum Subtarget : u32 {
 gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit(""),
 	str_lit("ios"),
+	str_lit("android"),
 };
 
 
@@ -198,20 +207,25 @@ enum BuildModeKind {
 	BuildMode_COUNT,
 };
 
-enum CommandKind : u32 {
+enum CommandKind : u64 {
 	Command_run             = 1<<0,
 	Command_build           = 1<<1,
-	Command_check           = 1<<3,
-	Command_doc             = 1<<5,
-	Command_version         = 1<<6,
-	Command_test            = 1<<7,
+	Command_check           = 1<<2,
+	Command_doc             = 1<<3,
+	Command_version         = 1<<4,
+	Command_test            = 1<<5,
 	
-	Command_strip_semicolon = 1<<8,
-	Command_bug_report      = 1<<9,
+	Command_strip_semicolon = 1<<6,
+	Command_bug_report      = 1<<7,
+
+	Command_bundle_android = 1<<8,
+	Command_bundle_macos   = 1<<9,
+	Command_bundle_ios     = 1<<10,
+	Command_bundle_orca    = 1<<11,
 
 	Command__does_check = Command_run|Command_build|Command_check|Command_doc|Command_test|Command_strip_semicolon,
 	Command__does_build = Command_run|Command_build|Command_test,
-	Command_all = ~(u32)0,
+	Command_all = ~(CommandKind)0,
 };
 
 gb_global char const *odin_command_strings[32] = {
@@ -222,6 +236,11 @@ gb_global char const *odin_command_strings[32] = {
 	"version",
 	"test",
 	"strip-semicolon",
+	"",
+	"bundle android",
+	"bundle macos",
+	"bundle ios",
+	"bundle orca",
 };
 
 
@@ -269,7 +288,7 @@ enum BuildPath : u8 {
 	BuildPath_VS_LIB,           // vs_library_path
 
 	BuildPath_Output,           // Output Path for .exe, .dll, .so, etc. Can be overridden with `-out:`.
-	BuildPath_PDB,              // Output Path for .pdb file, can be overridden with `-pdb-name:`.
+	BuildPath_Symbols,          // Output Path for .pdb or .dSym file, can be overridden with `-pdb-name:`.
 
 	BuildPathCOUNT,
 };
@@ -375,17 +394,17 @@ String linker_choices[Linker_COUNT] = {
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
-	String ODIN_OS;                       // Target operating system
-	String ODIN_ARCH;                     // Target architecture
-	String ODIN_VENDOR;                   // Compiler vendor
-	String ODIN_VERSION;                  // Compiler version
-	String ODIN_ROOT;                     // Odin ROOT
-	String ODIN_BUILD_PROJECT_NAME;       // Odin main/initial package's directory name
-	String ODIN_WINDOWS_SUBSYSTEM;        // Empty string for non-Windows targets
-	bool   ODIN_DEBUG;                    // Odin in debug mode
-	bool   ODIN_DISABLE_ASSERT;           // Whether the default 'assert' et al is disabled in code or not
-	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
-	bool   ODIN_DEFAULT_TO_PANIC_ALLOCATOR; // Whether the default allocator is a "panic" allocator or not (i.e. panics on any call to it)
+	String ODIN_OS;                           // Target operating system
+	String ODIN_ARCH;                         // Target architecture
+	String ODIN_VENDOR;                       // Compiler vendor
+	String ODIN_VERSION;                      // Compiler version
+	String ODIN_ROOT;                         // Odin ROOT
+	String ODIN_BUILD_PROJECT_NAME;           // Odin main/initial package's directory name
+	Windows_Subsystem ODIN_WINDOWS_SUBSYSTEM; // .Console, .Windows
+	bool   ODIN_DEBUG;                        // Odin in debug mode
+	bool   ODIN_DISABLE_ASSERT;               // Whether the default 'assert' et al is disabled in code or not
+	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR;     // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_DEFAULT_TO_PANIC_ALLOCATOR;   // Whether the default allocator is a "panic" allocator or not (i.e. panics on any call to it)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 	bool   ODIN_VALGRIND_SUPPORT;
 
@@ -423,6 +442,7 @@ struct BuildContext {
 	String extra_assembler_flags;
 	String microarch;
 	BuildModeKind build_mode;
+	bool   keep_executable;
 	bool   generate_docs;
 	bool   custom_optimization_level;
 	i32    optimization_level;
@@ -441,6 +461,7 @@ struct BuildContext {
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
 	bool   no_type_assert;
+	bool   dynamic_literals;  // Opt-in to `#+feature dynamic-literals` project-wide.
 	bool   no_output_files;
 	bool   no_crt;
 	bool   no_rpath;
@@ -521,6 +542,21 @@ struct BuildContext {
 
 	String minimum_os_version_string;
 	bool   minimum_os_version_string_given;
+
+
+	int    ODIN_ANDROID_API_LEVEL;
+
+	String ODIN_ANDROID_SDK;
+
+	String ODIN_ANDROID_NDK;
+	String ODIN_ANDROID_NDK_TOOLCHAIN;
+	String ODIN_ANDROID_NDK_TOOLCHAIN_LIB;
+	String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
+	String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT;
+
+	String android_keystore;
+	String android_keystore_alias;
+	String android_keystore_password;
 };
 
 gb_global BuildContext build_context = {0};
@@ -543,12 +579,6 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	}
 	return build_context.max_error_count;
 }
-
-#if defined(GB_SYSTEM_WINDOWS)
-	#include <llvm-c/Config/llvm-config.h>
-#else
-	#include <llvm/Config/llvm-config.h>
-#endif
 
 // NOTE: AMD64 targets had their alignment on 128 bit ints bumped from 8 to 16 (undocumented of course).
 #if LLVM_VERSION_MAJOR >= 18
@@ -820,13 +850,39 @@ gb_global NamedTargetMetrics *selected_target_metrics;
 gb_global Subtarget selected_subtarget;
 
 
-gb_internal TargetOsKind get_target_os_from_string(String str) {
+gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtarget_ = nullptr) {
+	String os_name = str;
+	String subtarget = {};
+	auto part = string_partition(str, str_lit(":"));
+	if (part.match.len == 1) {
+		os_name = part.head;
+		subtarget = part.tail;
+	}
+
+	TargetOsKind kind = TargetOs_Invalid;
+
 	for (isize i = 0; i < TargetOs_COUNT; i++) {
-		if (str_eq_ignore_case(target_os_names[i], str)) {
-			return cast(TargetOsKind)i;
+		if (str_eq_ignore_case(target_os_names[i], os_name)) {
+			kind = cast(TargetOsKind)i;
+			break;
 		}
 	}
-	return TargetOs_Invalid;
+	if (subtarget_) *subtarget_ = Subtarget_Default;
+
+	if (subtarget.len != 0) {
+		if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
+			if (subtarget_) *subtarget_ = Subtarget_Default;
+		} else {
+			for (isize i = 1; i < Subtarget_COUNT; i++) {
+				if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
+					if (subtarget_) *subtarget_ = cast(Subtarget)i;
+					break;
+				}
+			}
+		}
+	}
+
+	return kind;
 }
 
 gb_internal TargetArchKind get_target_arch_from_string(String str) {
@@ -945,6 +1001,14 @@ gb_internal bool is_arch_x86(void) {
 
 gb_global String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 gb_global String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
+
+gb_global String const SEPARATOR_STRING =
+#if defined(GB_SYSTEM_WINDOWS)
+	WIN32_SEPARATOR_STRING;
+#else
+	NIX_SEPARATOR_STRING;
+#endif
+
 
 gb_global String const WASM_MODULE_NAME_SEPARATOR = str_lit("..");
 
@@ -1461,6 +1525,94 @@ gb_internal bool has_ansi_terminal_colours(void) {
 	return build_context.has_ansi_terminal_colours && !json_errors();
 }
 
+gb_internal void init_android_values(bool with_sdk) {
+	auto *bc = &build_context;
+	{ // Android SDK/API Level
+		String default_level = str_lit("34");
+		if (!bc->minimum_os_version_string_given) {
+			bc->minimum_os_version_string = default_level;
+		}
+		BigInt level = {};
+		bool success = false;
+		big_int_from_string(&level, bc->minimum_os_version_string, &success);
+		if (!success) {
+			gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
+			bc->minimum_os_version_string = default_level;
+			big_int_from_string(&level, bc->minimum_os_version_string, &success);
+			GB_ASSERT(success);
+		}
+
+		i64 new_level = big_int_to_i64(&level);
+
+		if (new_level >= 21) {
+			bc->ODIN_ANDROID_API_LEVEL = cast(int)new_level;
+		} else {
+			gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
+			bc->ODIN_ANDROID_API_LEVEL = atoi(cast(char const *)default_level.text);
+		}
+	}
+	bc->ODIN_ANDROID_NDK           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK", permanent_allocator())), NIX_SEPARATOR_STRING);
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_NDK_TOOLCHAIN", permanent_allocator())), NIX_SEPARATOR_STRING);
+	bc->ODIN_ANDROID_SDK           = normalize_path(permanent_allocator(), make_string_c(gb_get_env("ODIN_ANDROID_SDK", permanent_allocator())), NIX_SEPARATOR_STRING);
+
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (bc->ODIN_ANDROID_SDK.len == 0) {
+			bc->ODIN_ANDROID_SDK = normalize_path(permanent_allocator(),
+				path_to_fullpath(permanent_allocator(), str_lit("%LocalAppData%/Android/Sdk"), nullptr),
+				NIX_SEPARATOR_STRING);
+		}
+	#endif
+
+	if (bc->ODIN_ANDROID_NDK.len != 0 && bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0) {
+		String arch = str_lit("x86_64");
+		#if defined (GB_CPU_ARM)
+			// TODO(bill): this is a complete guess
+			arch = str_lit("aarch64");
+		#endif
+		#if defined(GB_SYSTEM_WINDOWS)
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("windows-"), arch);
+		#elif defined(GB_SYSTEM_OSX)
+			// TODO(bill): is this name even correct?
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("darwin-"), arch);
+		#elif defined(GB_SYSTEM_LINUX)
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("linux-"), arch);
+		#endif
+
+		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, NIX_SEPARATOR_STRING);
+	}
+
+	if (bc->ODIN_ANDROID_NDK.len == 0 && !with_sdk)  {
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_exit(1);
+
+	}
+
+	if (bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0 && !with_sdk)  {
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_exit(1);
+	}
+
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
+
+	char buf[32] = {};
+	gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_API_LEVEL);
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB, make_string_c(buf));
+
+	bc->ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/"));
+
+
+	if (with_sdk) {
+		if (bc->ODIN_ANDROID_SDK.len == 0)  {
+			gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
+			gb_exit(1);
+		}
+		if (bc->android_keystore.len == 0) {
+			gb_printf_err("Error: -android-keystore:<string> has not been set\n");
+			gb_exit(1);
+		}
+	}
+}
+
 gb_internal bool has_asm_extension(String const &path) {
 	String ext = path_extension(path);
 	if (ext == ".asm") {
@@ -1637,8 +1789,32 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	// Default to subsystem:CONSOLE on Windows targets
-	if (bc->ODIN_WINDOWS_SUBSYSTEM == "" && bc->metrics.os == TargetOs_windows) {
-		bc->ODIN_WINDOWS_SUBSYSTEM = windows_subsystem_names[Windows_Subsystem_CONSOLE];
+	if (bc->ODIN_WINDOWS_SUBSYSTEM == Windows_Subsystem_UNKNOWN && bc->metrics.os == TargetOs_windows) {
+		bc->ODIN_WINDOWS_SUBSYSTEM = Windows_Subsystem_CONSOLE;
+	}
+
+	if (subtarget == Subtarget_Android) {
+		switch (build_context.build_mode) {
+		case BuildMode_DynamicLibrary:
+		case BuildMode_Object:
+		case BuildMode_Assembly:
+		case BuildMode_LLVM_IR:
+			break;
+		default:
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+			if ((build_context.command_kind & Command__does_build) != 0) {
+				gb_printf_err("Unsupported -build-mode for -subtarget:android\n");
+				gb_printf_err("\tCurrently only supporting: \n");
+				// gb_printf_err("\t\texe\n");
+				gb_printf_err("\t\tshared\n");
+				gb_printf_err("\t\tobject\n");
+				gb_printf_err("\t\tassembly\n");
+				gb_printf_err("\t\tllvm-ir\n");
+				gb_exit(1);
+			}
+			break;
+		}
 	}
 
 	if (metrics->os == TargetOs_darwin && subtarget == Subtarget_iOS) {
@@ -1651,6 +1827,15 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			break;
 		default:
 			GB_PANIC("Unknown architecture for darwin");
+		}
+	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+			bc->metrics.target_triplet = str_lit("aarch64-none-linux-android");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		default:
+			GB_PANIC("Unknown architecture for -subtarget:android");
 		}
 	}
 
@@ -1706,6 +1891,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		if (subtarget == Subtarget_Default) {
 			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
 		}
+	} else if (selected_subtarget == Subtarget_Android) {
+		init_android_values(bc->build_mode == BuildMode_Executable && (bc->command_kind & Command__does_build) != 0);
 	}
 
 	if (!bc->custom_optimization_level) {
@@ -1730,12 +1917,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->use_separate_modules = false;
 	}
 
-
-	// TODO: Static map calls are bugged on `amd64sysv` abi.
-	if (bc->metrics.os != TargetOs_windows && bc->metrics.arch == TargetArch_amd64) {
-		// ENFORCE DYNAMIC MAP CALLS
-		bc->dynamic_map_calls = true;
-	}
 
 	bc->ODIN_VALGRIND_SUPPORT = false;
 	if (build_context.metrics.os != TargetOs_windows) {
@@ -1842,6 +2023,39 @@ gb_internal bool check_target_feature_is_superset_of(String const &superset, Str
 	return true;
 }
 
+gb_internal String infer_object_extension_from_build_context() {
+	String output_extension = {};
+	if (is_arch_wasm()) {
+		output_extension = STR_LIT("wasm.o");
+	} else {
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+			output_extension = STR_LIT("obj");
+			break;
+		default:
+		case TargetOs_darwin:
+		case TargetOs_linux:
+		case TargetOs_essence:
+			output_extension = STR_LIT("o");
+			break;
+
+		case TargetOs_freestanding:
+			switch (build_context.metrics.abi) {
+			default:
+			case TargetABI_Default:
+			case TargetABI_SysV:
+				output_extension = STR_LIT("o");
+				break;
+			case TargetABI_Win64:
+				output_extension = STR_LIT("obj");
+				break;
+			}
+			break;
+		}
+	}
+	return output_extension;
+}
+
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
 // We've previously called `parse_build_flags`, so `out_filepath` should be set.
 gb_internal bool init_build_paths(String init_filename) {
@@ -1883,10 +2097,6 @@ gb_internal bool init_build_paths(String init_filename) {
 				bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
 				bc->build_paths[BuildPath_RC].ext  = copy_string(ha, STR_LIT("rc"));
 			}
-		}
-
-		if (bc->pdb_filepath.len > 0) {
-			bc->build_paths[BuildPath_PDB]     = path_from_string(ha, bc->pdb_filepath);
 		}
 
 		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
@@ -1947,7 +2157,10 @@ gb_internal bool init_build_paths(String init_filename) {
 		output_extension = make_string(nullptr, 0);
 		String const single_file_extension = str_lit(".odin");
 
-		if (build_context.metrics.os == TargetOs_windows) {
+		if (selected_subtarget == Subtarget_Android) {
+			// NOTE(bill): It's always shared!
+			output_extension = STR_LIT("so");
+		} else if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
 		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 			// Do nothing: we don't want the .bin extension
@@ -1975,13 +2188,8 @@ gb_internal bool init_build_paths(String init_filename) {
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("lib");
 		}
-	}else if (build_context.build_mode == BuildMode_Object) {
-		// By default use a .o object extension.
-		output_extension = STR_LIT("o");
-
-		if (build_context.metrics.os == TargetOs_windows) {
-			output_extension = STR_LIT("obj");
-		}
+	} else if (build_context.build_mode == BuildMode_Object) {
+		output_extension = infer_object_extension_from_build_context();
 	} else if (build_context.build_mode == BuildMode_Assembly) {
 		// By default use a .S asm extension.
 		output_extension = STR_LIT("S");
@@ -2001,7 +2209,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			} else if (bc->build_paths[BuildPath_Output].ext.len == 0) {
 				gb_printf_err("Output path %.*s must have an appropriate extension.\n", LIT(output_file));
-				return false;				
+				return false;
 			}
 		}
 	} else {
@@ -2027,11 +2235,34 @@ gb_internal bool init_build_paths(String init_filename) {
 			while (output_name.len > 0 && (output_name[output_name.len-1] == '/' || output_name[output_name.len-1] == '\\')) {
 				output_name.len -= 1;
 			}
+			// Only trim the extension if it's an Odin source file.
+			// This lets people build folders with extensions or files beginning with dots.
+			if (path_extension(output_name) == ".odin" && !path_is_directory(output_name)) {
+				output_name = remove_extension_from_path(output_name);
+			}
 			output_name = remove_directory_from_path(output_name);
-			output_name = remove_extension_from_path(output_name);
 			output_name = copy_string(ha, string_trim_whitespace(output_name));
-			output_path = path_from_string(ha, output_name);
-			
+			// This is `path_from_string` without the extension trimming.
+			Path res = {};
+			if (output_name.len > 0) {
+				String fullpath = path_to_full_path(ha, output_name);
+				defer (gb_free(ha, fullpath.text));
+
+				res.basename = directory_from_path(fullpath);
+				res.basename = copy_string(ha, res.basename);
+
+				if (path_is_directory(fullpath)) {
+					if (res.basename.len > 0 && res.basename.text[res.basename.len - 1] == '/') {
+						res.basename.len--;
+					}
+				} else {
+					isize name_start = (res.basename.len > 0) ? res.basename.len + 1 : res.basename.len;
+					res.name         = substring(fullpath, name_start, fullpath.len);
+					res.name         = copy_string(ha, res.name);
+				}
+			}
+			output_path = res;
+
 			// Note(Dragos): This is a fix for empty filenames
 			// Turn the trailing folder into the file name
 			if (output_path.name.len == 0) {
@@ -2059,6 +2290,26 @@ gb_internal bool init_build_paths(String init_filename) {
 		output_path.ext  = copy_string(ha, output_extension);
 
 		bc->build_paths[BuildPath_Output] = output_path;
+	}
+
+	if (build_context.ODIN_DEBUG) {
+		if (build_context.metrics.os == TargetOs_windows) {
+			if (bc->pdb_filepath.len > 0) {
+				bc->build_paths[BuildPath_Symbols] = path_from_string(ha, bc->pdb_filepath);
+			} else {
+				Path symbol_path;
+				symbol_path.basename = copy_string(ha, bc->build_paths[BuildPath_Output].basename);
+				symbol_path.name     = copy_string(ha, bc->build_paths[BuildPath_Output].name);
+				symbol_path.ext      = copy_string(ha, STR_LIT("pdb"));
+				bc->build_paths[BuildPath_Symbols] = symbol_path;
+			}
+		} else if (build_context.metrics.os == TargetOs_darwin) {
+			Path symbol_path;
+			symbol_path.basename = copy_string(ha, bc->build_paths[BuildPath_Output].basename);
+			symbol_path.name     = copy_string(ha, bc->build_paths[BuildPath_Output].name);
+			symbol_path.ext      = copy_string(ha, STR_LIT("dSYM"));
+			bc->build_paths[BuildPath_Symbols] = symbol_path;
+		}
 	}
 
 	// Do we have an extension? We might not if the output filename was supplied.
@@ -2096,9 +2347,10 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_windows:
 		case TargetOs_linux:
 		case TargetOs_darwin:
+		case TargetOs_freebsd:
 			break;
 		default:
-			gb_printf_err("-sanitize:address is only supported on windows, linux, and darwin\n");
+			gb_printf_err("-sanitize:address is only supported on Windows, Linux, Darwin, and FreeBSD\n");
 			return false;
 		}
 	}
@@ -2106,12 +2358,10 @@ gb_internal bool init_build_paths(String init_filename) {
 	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
 		switch (build_context.metrics.os) {
 		case TargetOs_linux:
+		case TargetOs_freebsd:
 			break;
 		default:
-			gb_printf_err("-sanitize:memory is only supported on linux\n");
-			return false;
-		}
-		if (build_context.metrics.os != TargetOs_linux) {
+			gb_printf_err("-sanitize:memory is only supported on Linux and FreeBSD\n");
 			return false;
 		}
 	}
@@ -2120,9 +2370,10 @@ gb_internal bool init_build_paths(String init_filename) {
 		switch (build_context.metrics.os) {
 		case TargetOs_linux:
 		case TargetOs_darwin:
+		case TargetOs_freebsd:
 			break;
 		default:
-			gb_printf_err("-sanitize:thread is only supported on linux and darwin\n");
+			gb_printf_err("-sanitize:thread is only supported on Linux, Darwin, and FreeBSD\n");
 			return false;
 		}
 	}

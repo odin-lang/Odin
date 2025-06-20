@@ -53,8 +53,6 @@ ODIN_NET_TCP_NODELAY_DEFAULT :: #config(ODIN_NET_TCP_NODELAY_DEFAULT, true)
 Maybe :: runtime.Maybe
 
 Network_Error :: union #shared_nil {
-	General_Error,
-	Platform_Error,
 	Create_Socket_Error,
 	Dial_Error,
 	Listen_Error,
@@ -65,6 +63,8 @@ Network_Error :: union #shared_nil {
 	TCP_Recv_Error,
 	UDP_Recv_Error,
 	Shutdown_Error,
+	Interfaces_Error,
+	Socket_Info_Error,
 	Socket_Option_Error,
 	Set_Blocking_Error,
 	Parse_Endpoint_Error,
@@ -74,13 +74,12 @@ Network_Error :: union #shared_nil {
 
 #assert(size_of(Network_Error) == 8)
 
-General_Error :: enum u32 {
-	None = 0,
-	Unable_To_Enumerate_Network_Interfaces = 1,
+Interfaces_Error :: enum u32 {
+	None,
+	Unable_To_Enumerate_Network_Interfaces,
+	Allocation_Failure,
+	Unknown,
 }
-
-// `Platform_Error` is used to wrap errors returned by the different platforms that don't fit a common error.
-Platform_Error :: enum u32 {}
 
 Parse_Endpoint_Error :: enum u32 {
 	None          = 0,
@@ -109,7 +108,7 @@ TCP_Options :: struct {
 	no_delay: bool,
 }
 
-default_tcp_options := TCP_Options {
+DEFAULT_TCP_OPTIONS :: TCP_Options {
 	no_delay = ODIN_NET_TCP_NODELAY_DEFAULT,
 }
 
@@ -261,6 +260,9 @@ DNS_Configuration :: struct {
 	// Configuration files.
 	resolv_conf: string,
 	hosts_file:  string,
+
+	resolv_conf_buf: [128]u8,
+	hosts_file_buf:  [128]u8,
 
 	// TODO: Allow loading these up with `reload_configuration()` call or the like,
 	// so we don't have to do it each call.

@@ -14,9 +14,9 @@
 #ifndef LLVM_C_TRANSFORMS_PASSBUILDER_H
 #define LLVM_C_TRANSFORMS_PASSBUILDER_H
 
-#include "../Error.h"
-#include "../TargetMachine.h"
-#include "../Types.h"
+#include "llvm-c/Error.h"
+#include "llvm-c/TargetMachine.h"
+#include "llvm-c/Types.h"
 
 /**
  * @defgroup LLVMCCoreNewPM New Pass Manager
@@ -51,6 +51,16 @@ LLVMErrorRef LLVMRunPasses(LLVMModuleRef M, const char *Passes,
                            LLVMPassBuilderOptionsRef Options);
 
 /**
+ * Construct and run a set of passes over a function.
+ *
+ * This function behaves the same as LLVMRunPasses, but operates on a single
+ * function instead of an entire module.
+ */
+LLVMErrorRef LLVMRunPassesOnFunction(LLVMValueRef F, const char *Passes,
+                                     LLVMTargetMachineRef TM,
+                                     LLVMPassBuilderOptionsRef Options);
+
+/**
  * Create a new set of options for a PassBuilder
  *
  * Ownership of the returned instance is given to the client, and they are
@@ -71,6 +81,14 @@ void LLVMPassBuilderOptionsSetVerifyEach(LLVMPassBuilderOptionsRef Options,
  */
 void LLVMPassBuilderOptionsSetDebugLogging(LLVMPassBuilderOptionsRef Options,
                                            LLVMBool DebugLogging);
+
+/**
+ * Specify a custom alias analysis pipeline for the PassBuilder to be used
+ * instead of the default one. The string argument is not copied; the caller
+ * is responsible for ensuring it outlives the PassBuilderOptions instance.
+ */
+void LLVMPassBuilderOptionsSetAAPipeline(LLVMPassBuilderOptionsRef Options,
+                                         const char *AAPipeline);
 
 void LLVMPassBuilderOptionsSetLoopInterleaving(
     LLVMPassBuilderOptionsRef Options, LLVMBool LoopInterleaving);

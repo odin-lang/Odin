@@ -59,7 +59,7 @@ write_encoded_rune :: proc(f: ^File, r: rune) -> (n: int, err: Error) {
 		if r < 32 {
 			if wrap(write_string(f, "\\x"), &n, &err) { return }
 			b: [2]byte
-			s := strconv.append_bits(b[:], u64(r), 16, true, 64, strconv.digits, nil)
+			s := strconv.write_bits(b[:], u64(r), 16, true, 64, strconv.digits, nil)
 			switch len(s) {
 			case 0: if wrap(write_string(f, "00"), &n, &err) { return }
 			case 1: if wrap(write_rune(f, '0'), &n, &err)    { return }

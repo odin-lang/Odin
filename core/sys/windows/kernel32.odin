@@ -168,6 +168,7 @@ foreign kernel32 {
 	ResumeThread :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---
 	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
+	GetThreadDescription :: proc(hThread: HANDLE, ppszThreadDescription: ^PCWSTR) -> HRESULT ---
 	SetThreadDescription :: proc(hThread: HANDLE, lpThreadDescription: PCWSTR) -> HRESULT ---
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
@@ -371,6 +372,12 @@ foreign kernel32 {
 		bManualReset: BOOL,
 		bInitialState: BOOL,
 		lpName: LPCWSTR,
+	) -> HANDLE ---
+	CreateEventExW :: proc(
+		lpEventAttributes: LPSECURITY_ATTRIBUTES,
+		lpName: LPCWSTR,
+		dwFlags: DWORD,
+		dwDesiredAccess: DWORD,
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
@@ -857,7 +864,6 @@ MEMORY_RESOURCE_NOTIFICATION_TYPE :: enum c_int {
 LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryResourceNotification
 HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification
 
-
 @(default_calling_convention="system")
 foreign kernel32 {
 	CreateMemoryResourceNotification :: proc(
@@ -1194,7 +1200,7 @@ DUMMYUNIONNAME_u :: struct #raw_union {
 SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	ProcessorMask: ULONG_PTR,
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
-	DummyUnion: DUMMYUNIONNAME_u,
+	using DummyUnion: DUMMYUNIONNAME_u,
 }
 
 SYSTEM_POWER_STATUS :: struct {

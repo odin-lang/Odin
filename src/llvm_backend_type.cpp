@@ -1,4 +1,10 @@
 
+gb_internal void lb_set_odin_rtti_section(LLVMValueRef value) {
+	if (build_context.metrics.os != TargetOs_darwin) {
+		LLVMSetSection(value, ".odinti");
+	}
+}
+
 gb_internal isize lb_type_info_index(CheckerInfo *info, TypeInfoPair pair, bool err_on_not_found=true) {
 	isize index = type_info_index(info, pair, err_on_not_found);
 	if (index >= 0) {
@@ -221,6 +227,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		gb_snprintf(name, 63, "__$ti-%lld", cast(long long)index);
 		LLVMValueRef g = LLVMAddGlobal(m->mod, type, name);
 		lb_make_global_private_const(g);
+		lb_set_odin_rtti_section(g);
 		return g;
 	};
 
@@ -716,6 +723,8 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 					LLVMSetInitializer(value_array.value, value_init);
 					LLVMSetGlobalConstant(name_array.value, true);
 					LLVMSetGlobalConstant(value_array.value, true);
+					lb_set_odin_rtti_section(name_array.value);
+					lb_set_odin_rtti_section(value_array.value);
 
 					lbValue v_count = lb_const_int(m, t_int, fields.count);
 
@@ -1056,6 +1065,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	LLVMValueRef giant_array = lb_global_type_info_data_ptr(m).value;
 	LLVMSetInitializer(giant_array, giant_const);
 	lb_make_global_private_const(giant_array);
+	lb_set_odin_rtti_section(giant_array);
 }
 
 

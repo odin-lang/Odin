@@ -517,7 +517,7 @@ typedef enum SDL_PackedLayout
  *   ABGR32, define a platform-independent encoding into bytes in the order
  *   specified. For example, in RGB24 data, each pixel is encoded in 3 bytes
  *   (red, green, blue) in that order, and in ABGR32 data, each pixel is
- *   encoded in 4 bytes alpha, blue, green, red) in that order. Use these
+ *   encoded in 4 bytes (alpha, blue, green, red) in that order. Use these
  *   names if the property of a format that is important to you is the order
  *   of the bytes in memory or on disk.
  * - Names with a bit count per component, such as ARGB8888 and XRGB1555, are
@@ -675,6 +675,9 @@ typedef enum SDL_PixelFormat
         /* SDL_DEFINE_PIXELFOURCC('P', '0', '1', '0'), */
     SDL_PIXELFORMAT_EXTERNAL_OES = 0x2053454fu,     /**< Android video texture format */
         /* SDL_DEFINE_PIXELFOURCC('O', 'E', 'S', ' ') */
+
+    SDL_PIXELFORMAT_MJPG = 0x47504a4du,     /**< Motion JPEG */
+        /* SDL_DEFINE_PIXELFOURCC('M', 'J', 'P', 'G') */
 
     /* Aliases for RGBA byte arrays of color data, for the current platform */
     #if SDL_BYTEORDER == SDL_BIG_ENDIAN

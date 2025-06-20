@@ -30,7 +30,7 @@ package net
 // NOTE(flysand): https://man7.org/linux/man-pages/man7/netlink.7.html
 // apparently musl libc uses this to enumerate network interfaces
 @(private)
-_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Interfaces_Error) {
 	context.allocator = allocator
 
 	// head: ^os.ifaddrs

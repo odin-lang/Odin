@@ -86,9 +86,9 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 		err = .Not_Exist
 		return
 	}
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
-	path := _fix_long_path(name, temp_allocator()) or_return
+	path := _fix_long_path(name, temp_allocator) or_return
 	access: u32
 	switch flags & {.Read, .Write} {
 	case {.Read}:         access = win32.FILE_GENERIC_READ
@@ -506,10 +506,16 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	length: win32.LARGE_INTEGER
-	if f.kind == .Pipe {
-		return 0, .No_Size
-	}
 	handle := _handle(&f.file)
+	if f.kind == .Pipe {
+		bytes_available: u32
+		if win32.PeekNamedPipe(handle, nil, 0, nil, &bytes_available, nil) {
+			return i64(bytes_available), nil
+		} else {
+			err = _get_platform_error()
+			return
+		}
+	}
 	if !win32.GetFileSizeEx(handle, &length) {
 		err = _get_platform_error()
 	}
@@ -551,8 +557,8 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	p := _fix_long_path(name, temp_allocator()) or_return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	p := _fix_long_path(name, temp_allocator) or_return
 	err, err1: Error
 	if !win32.DeleteFileW(p) {
 		err = _get_platform_error()
@@ -589,9 +595,9 @@ _remove :: proc(name: string) -> Error {
 }
 
 _rename :: proc(old_path, new_path: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	from := _fix_long_path(old_path, temp_allocator()) or_return
-	to   := _fix_long_path(new_path, temp_allocator()) or_return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	from := _fix_long_path(old_path, temp_allocator) or_return
+	to   := _fix_long_path(new_path, temp_allocator) or_return
 	if win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
 		return nil
 	}
@@ -600,9 +606,9 @@ _rename :: proc(old_path, new_path: string) -> Error {
 }
 
 _link :: proc(old_name, new_name: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	o := _fix_long_path(old_name, temp_allocator()) or_return
-	n := _fix_long_path(new_name, temp_allocator()) or_return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	o := _fix_long_path(old_name, temp_allocator) or_return
+	n := _fix_long_path(new_name, temp_allocator) or_return
 	if win32.CreateHardLinkW(n, o, nil) {
 		return nil
 	}
@@ -663,9 +669,9 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 		return "", _get_platform_error()
 	}
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	buf := make([]u16, n+1, temp_allocator())
+	buf := make([]u16, n+1, temp_allocator)
 	n = win32.GetFinalPathNameByHandleW(handle, raw_data(buf), u32(len(buf)), win32.VOLUME_NAME_DOS)
 	if n == 0 {
 		return "", _get_platform_error()
@@ -689,9 +695,9 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 	@thread_local
 	rdb_buf: [MAXIMUM_REPARSE_DATA_BUFFER_SIZE]byte
 
-	TEMP_ALLOCATOR_GUARD()
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	p      := _fix_long_path(name, temp_allocator()) or_return
+	p      := _fix_long_path(name, temp_allocator) or_return
 	handle := _open_sym_link(p) or_return
 	defer win32.CloseHandle(handle)
 
@@ -766,8 +772,8 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 }
 
 _chdir :: proc(name: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	p := _fix_long_path(name, temp_allocator()) or_return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	p := _fix_long_path(name, temp_allocator) or_return
 	if !win32.SetCurrentDirectoryW(p) {
 		return _get_platform_error()
 	}
@@ -794,18 +800,10 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	defer close(f)
 	return _fchtimes(f, atime, mtime)
 }
+
 _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	if f == nil || f.impl == nil {
 		return nil
-	}
-	d: win32.BY_HANDLE_FILE_INFORMATION
-	if !win32.GetFileInformationByHandle(_handle(f), &d) {
-		return _get_platform_error()
-	}
-
-	to_windows_time :: #force_inline proc(t: time.Time) -> win32.LARGE_INTEGER {
-		// a 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 (UTC)
-		return win32.LARGE_INTEGER(time.time_to_unix_nano(t) * 100 + 116444736000000000)
 	}
 
 	atime, mtime := atime, mtime
@@ -814,17 +812,17 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 	}
 
 	info: win32.FILE_BASIC_INFO
-	info.LastAccessTime = to_windows_time(atime)
-	info.LastWriteTime  = to_windows_time(mtime)
-	if !win32.SetFileInformationByHandle(_handle(f), .FileBasicInfo, &info, size_of(d)) {
+	info.LastAccessTime = time_as_filetime(atime)
+	info.LastWriteTime  = time_as_filetime(mtime)
+	if !win32.SetFileInformationByHandle(_handle(f), .FileBasicInfo, &info, size_of(info)) {
 		return _get_platform_error()
 	}
 	return nil
 }
 
 _exists :: proc(path: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	wpath, _ := _fix_long_path(path, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	wpath, _ := _fix_long_path(path, temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }

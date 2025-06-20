@@ -21,7 +21,7 @@ _mm_abs_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 _mm_shuffle_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)pshufb128(transmute(u8x16)a, transmute(u8x16)b)
 }
-@(require_results, enable_target_feature="ssse3")
+@(require_results, enable_target_feature="sse2,ssse3")
 _mm_alignr_epi8 :: #force_inline proc "c" (a, b: __m128i, $IMM8: u32) -> __m128i {
 	shift :: IMM8
 

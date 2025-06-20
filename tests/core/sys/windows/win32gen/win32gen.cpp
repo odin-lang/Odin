@@ -1,6 +1,7 @@
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 #include <timeapi.h>
+#include <mmreg.h>
 #include <mmeapi.h>
 #include <windns.h>
 #include <commdlg.h>
@@ -702,8 +703,10 @@ static void verify_winmm(ofstream& out) {
 	test_proc_comment("mmsyscom.h");
 	expect_size(MMVERSION);
 	expect_size(MMTIME);
-	test_proc_comment("mmeapi.h");
+	test_proc_comment("mmreg.h");
 	expect_size(WAVEFORMATEX);
+	expect_size(WAVEFORMATEXTENSIBLE);
+	test_proc_comment("mmeapi.h");
 	expect_size(WAVEHDR);
 	expect_size(WAVEINCAPSW);
 	expect_size(WAVEOUTCAPSW);
