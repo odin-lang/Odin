@@ -145,10 +145,10 @@ EGLAttribArrayCallback :: #type proc "c" (userdata: rawptr) -> ^EGLint
 EGLIntArrayCallback    :: #type proc "c" (userdata: rawptr, display: EGLDisplay, config: EGLConfig) -> [^]EGLint
 
 GLAttr :: enum c.int {
-	RED_SIZE,                    /**< the minimum number of bits for the red channel of the color buffer; defaults to 3. */
-	GREEN_SIZE,                  /**< the minimum number of bits for the green channel of the color buffer; defaults to 3. */
-	BLUE_SIZE,                   /**< the minimum number of bits for the blue channel of the color buffer; defaults to 2. */
-	ALPHA_SIZE,                  /**< the minimum number of bits for the alpha channel of the color buffer; defaults to 0. */
+	RED_SIZE,                    /**< the minimum number of bits for the red channel of the color buffer; defaults to 8. */
+	GREEN_SIZE,                  /**< the minimum number of bits for the green channel of the color buffer; defaults to 8. */
+	BLUE_SIZE,                   /**< the minimum number of bits for the blue channel of the color buffer; defaults to 8. */
+	ALPHA_SIZE,                  /**< the minimum number of bits for the alpha channel of the color buffer; defaults to 8. */
 	BUFFER_SIZE,                 /**< the minimum number of bits for frame buffer size; defaults to 0. */
 	DOUBLEBUFFER,                /**< whether the output is single or double buffered; defaults to double buffering on. */
 	DEPTH_SIZE,                  /**< the minimum number of bits in the depth buffer; defaults to 16. */
