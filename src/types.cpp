@@ -4688,6 +4688,7 @@ gb_internal Type *type_internal_index(Type *t, isize index) {
 	};
 
 	GB_PANIC("Unhandled type %s", type_to_string(bt));
+	return nullptr;
 };
 
 gb_internal gbString write_type_to_string(gbString str, Type *type, bool shorthand=false, bool allow_polymorphic=false) {
