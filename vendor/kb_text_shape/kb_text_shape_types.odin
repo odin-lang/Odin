@@ -840,7 +840,7 @@ glyph_flag :: enum u32 {
 
 	LIGATURE                       = 29,
 	MULTIPLE_SUBSTITUTION          = 30,
-};
+}
 
 GLYPH_FEATURE_MASK :: glyph_flags{.ISOL, .FINA, .FIN2, .FIN3, .MEDI, .MED2, .INIT, .LJMO, .VJMO, .TJMO, .RPHF, .BLWF, .HALF, .PSTF, .ABVF, .PREF, .NUMR, .FRAC, .DNOM, .CFAR}
 
@@ -1782,7 +1782,7 @@ break_state_flag :: enum u32 {
 	SAW_R_AFTER_L    = 3,
 	SAW_AL_AFTER_LR  = 4,
 	LAST_WAS_BRACKET = 5,
-};
+}
 
 // In the worst case, a single call to BreakAddCodepoint would generate 4 breaks.
 // We buffer breaks to reorder them before returning them to the user.
