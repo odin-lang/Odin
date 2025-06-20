@@ -392,3 +392,6 @@ MAP_HUGE_512MB      :: transmute(Map_Flags)(u32(29) << MAP_HUGE_SHIFT)
 MAP_HUGE_1GB        :: transmute(Map_Flags)(u32(30) << MAP_HUGE_SHIFT)
 MAP_HUGE_2GB        :: transmute(Map_Flags)(u32(31) << MAP_HUGE_SHIFT)
 MAP_HUGE_16GB       :: transmute(Map_Flags)(u32(34) << MAP_HUGE_SHIFT)
+
+/* Get window size */
+TIOCGWINSZ :: 0x5413

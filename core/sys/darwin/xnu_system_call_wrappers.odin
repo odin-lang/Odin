@@ -223,6 +223,11 @@ _Proc_Bsdinfo :: struct {
 
 /*--==========================================================================--*/
 
+/* Get window size */
+TIOCGWINSZ :: 0x40087468
+
+/*--==========================================================================--*/
+
 syscall_fsync :: #force_inline proc "contextless" (fildes: c.int) -> bool {
 	return !(cast(bool)intrinsics.syscall(unix_offset_syscall(.fsync), uintptr(fildes)))
 }
