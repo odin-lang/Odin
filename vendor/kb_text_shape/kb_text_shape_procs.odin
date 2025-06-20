@@ -149,3 +149,14 @@ PositionGlyph :: proc(Cursor: ^cursor, Glyph: ^glyph) -> (X, Y: i32) {
 	kbts_PositionGlyph(Cursor, Glyph, &X, &Y)
 	return
 }
+
+@(require_results)
+ShapeDynamic :: proc(State: ^shape_state, Config: ^shape_config,
+                     MainDirection, RunDirection: direction,
+                     Glyphs: ^[dynamic]glyph) -> c.int {
+	GlyphCount    := u32(len(Glyphs^))
+	GlyphCapacity := u32(cap(Glyphs^))
+	Res := Shape(State, Config, MainDirection, RunDirection, raw_data(Glyphs^), &GlyphCount, GlyphCapacity)
+	resize(Glyphs, int(GlyphCount))
+	return Res
+}
