@@ -11090,7 +11090,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_ast_node(u, Uninit, node);
 		o->mode = Addressing_Value;
 		o->type = t_untyped_uninit;
-		error(node, "Use of --- outside of variable declaration");
+		error(node, "Global variables will always be zeroed if left unassigned, --- is disallowed");
 	case_end;
 
 
