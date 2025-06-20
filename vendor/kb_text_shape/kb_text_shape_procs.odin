@@ -34,7 +34,7 @@ foreign lib {
 	Cursor            :: proc(Direction: direction) -> cursor  ---
 	BeginBreak        :: proc(State: ^break_state, MainDirection: direction, JapaneseLineBreakStyle: japanese_line_break_style) ---
 	BreakStateIsValid :: proc(State: ^break_state) -> b32 ---
-	BreakAddCodepoint :: proc(State: ^break_state, Codepoint: rune, PositionIncrement: u32, EndOfText: c.int) ---
+	BreakAddCodepoint :: proc(State: ^break_state, Codepoint: rune, PositionIncrement: u32, EndOfText: b32) ---
 	BreakFlush        :: proc(State: ^break_state) ---
 	Break             :: proc(State: ^break_state, Break: ^break_type) -> b32 ---
 	CodepointToGlyph  :: proc(Font: ^font, Codepoint: rune) -> glyph ---
