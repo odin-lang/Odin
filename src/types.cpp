@@ -3093,11 +3093,15 @@ gb_internal i64 union_tag_size(Type *u) {
 		compiler_error("how many variants do you have?! %lld", cast(long long)u->Union.variants.count);
 	}
 
-	for_array(i, u->Union.variants) {
-		Type *variant_type = u->Union.variants[i];
-		i64 align = type_align_of(variant_type);
-		if (max_align < align) {
-			max_align = align;
+	if (u->Union.custom_align > 0) {
+		max_align = gb_max(max_align, u->Union.custom_align);
+	} else {
+		for_array(i, u->Union.variants) {
+			Type *variant_type = u->Union.variants[i];
+			i64 align = type_align_of(variant_type);
+			if (max_align < align) {
+				max_align = align;
+			}
 		}
 	}
 
