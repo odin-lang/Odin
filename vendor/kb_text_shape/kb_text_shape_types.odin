@@ -1632,7 +1632,7 @@ op_state_normalize :: struct {
 
 
 skip_flags :: distinct bit_set[skip_flag; u32]
-skip_flag :: enum {
+skip_flag :: enum u32 {
 	ZWNJ = 0,
 	ZWJ  = 1,
 }
