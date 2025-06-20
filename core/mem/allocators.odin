@@ -2239,6 +2239,7 @@ buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint,
 	b.head.is_free = true
 	b.tail = buddy_block_next(b.head)
 	b.alignment = alignment
+	assert(uint(len(data)) >= 2 * buddy_block_size_required(b, 1), "The size of the backing buffer must be large enough to hold at least two 1-byte allocations given the alignment requirements, otherwise it cannot split.", loc)
 	// sanitizer.address_poison(data)
 }
 
@@ -2247,12 +2248,14 @@ Get required block size to fit in the allocation as well as the alignment paddin
 */
 @(require_results)
 buddy_block_size_required :: proc(b: ^Buddy_Allocator, size: uint) -> uint {
-	size := size
-	actual_size := b.alignment
-	size += size_of(Buddy_Block)
-	size = align_forward_uint(size, b.alignment)
-	for size > actual_size {
-		actual_size <<= 1
+	assert(size > 0)
+	// NOTE: `size_of(Buddy_Block)` will be accounted for in `b.alignment`.
+	// This calculation is also previously guarded against being given a `size`
+	// 0 by `buddy_allocator_alloc_bytes_non_zeroed` checking for that.
+	actual_size := b.alignment + size
+	if intrinsics.count_ones(actual_size) != 1 {
+		// We're not a power of two. Let's fix that.
+		actual_size = 1 << (size_of(uint) * 8 - intrinsics.count_leading_zeros(actual_size))
 	}
 	return actual_size
 }
@@ -2315,7 +2318,7 @@ buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) 
 	if size != 0 {
 		actual_size := buddy_block_size_required(b, size)
 		found := buddy_block_find_best(b.head, b.tail, actual_size)
-		if found != nil {
+		if found == nil {
 			// Try to coalesce all the free buddy blocks and then search again
 			buddy_block_coalescence(b.head, b.tail)
 			found = buddy_block_find_best(b.head, b.tail, actual_size)
