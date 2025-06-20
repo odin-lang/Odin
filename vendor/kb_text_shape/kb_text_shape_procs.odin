@@ -18,59 +18,77 @@ import "core:mem"
 
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
-	FontIsValid            :: proc(Font: ^font) -> b32 ---
-	ReadFontHeader         :: proc(Font: ^font, Data:    rawptr, Size:        un) -> un ---
-	ReadFontData           :: proc(Font: ^font, Scratch: rawptr, ScratchSize: un) -> un ---
-	PostReadFontInitialize :: proc(Font: ^font, Memory:  rawptr, MemorySize:  un) -> b32 ---
-	SizeOfShapeState       :: proc(Font: ^font) -> un ---
+	FontIsValid       :: proc(Font: ^font) -> b32 ---
+	SizeOfShapeState  :: proc(Font: ^font) -> un ---
 
-	PlaceShapeState        :: proc(Address: rawptr, Size: un) -> ^shape_state ---
-	ResetShapeState        :: proc(State: ^shape_state) ---
+	ResetShapeState   :: proc(State: ^shape_state) ---
 
-	ShapeConfig            :: proc(Font: ^font, Script: script, Language: language) -> shape_config ---
-	ShaperIsComplex        :: proc(Shaper: shaper) -> b32 ---
-	ScriptIsComplex        :: proc(Script: script) -> b32 ---
+	ShapeConfig       :: proc(Font: ^font, Script: script, Language: language) -> shape_config ---
+	ShaperIsComplex   :: proc(Shaper: shaper) -> b32 ---
+	ScriptIsComplex   :: proc(Script: script) -> b32 ---
 
-	Shape                  :: proc(State: ^shape_state, Config: ^shape_config,
-	                               MainDirection, RunDirection: direction,
-	                               Glyphs: [^]glyph, GlyphCount: ^u32, GlyphCapacity: u32) -> c.int ---
+	Shape             :: proc(State: ^shape_state, Config: ^shape_config,
+	                          MainDirection, RunDirection: direction,
+	                          Glyphs: [^]glyph, GlyphCount: ^u32, GlyphCapacity: u32) -> c.int ---
 
-	Cursor                 :: proc(Direction: direction) -> cursor  ---
-	PositionGlyph          :: proc(Cursor: ^cursor, Glyph: ^glyph, X, Y: ^i32) ---
-	BeginBreak             :: proc(State: ^break_state, MainDirection: direction, JapaneseLineBreakStyle: japanese_line_break_style) ---
-	BreakStateIsValid      :: proc(State: ^break_state) -> c.int ---
-	BreakAddCodepoint      :: proc(State: ^break_state, Codepoint: rune, PositionIncrement: u32, EndOfText: c.int) ---
-	BreakFlush             :: proc(State: ^break_state) ---
-	Break                  :: proc(State: ^break_state, Break: ^break_type) -> c.int ---
-	DecodeUtf8             :: proc(Utf8: [^]byte, Length: uint) -> decode ---
-	CodepointToGlyph       :: proc(Font: ^font, Codepoint: rune) -> glyph ---
-	InferScript            :: proc(Direction: ^direction, Script: ^script, GlyphScript: script) ---
+	Cursor            :: proc(Direction: direction) -> cursor  ---
+	BeginBreak        :: proc(State: ^break_state, MainDirection: direction, JapaneseLineBreakStyle: japanese_line_break_style) ---
+	BreakStateIsValid :: proc(State: ^break_state) -> b32 ---
+	BreakAddCodepoint :: proc(State: ^break_state, Codepoint: rune, PositionIncrement: u32, EndOfText: c.int) ---
+	BreakFlush        :: proc(State: ^break_state) ---
+	Break             :: proc(State: ^break_state, Break: ^break_type) -> b32 ---
+	CodepointToGlyph  :: proc(Font: ^font, Codepoint: rune) -> glyph ---
+	InferScript       :: proc(Direction: ^direction, Script: ^script, GlyphScript: script) ---
 }
 
 @(require_results)
-PlaceShapeStateFromSlice :: proc "c" (Memory: []byte) -> ^shape_state {
-	return PlaceShapeState(raw_data(Memory), un(len(Memory)))
+PlaceShapeState :: proc "c" (Memory: []byte) -> ^shape_state {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_PlaceShapeState :: proc(Address: rawptr, Size: un) -> ^shape_state ---
+	}
+
+	return kbts_PlaceShapeState(raw_data(Memory), un(len(Memory)))
 }
 
 @(require_results)
-DecodeUtf8String :: proc "c" (String: string) -> (Codepoint: rune, SourceCharactersConsumed: u32, Valid: b32) {
-	Decode := DecodeUtf8(raw_data(String), len(String))
-	Codepoint, SourceCharactersConsumed, Valid = Decode.Codepoint, Decode.SourceCharactersConsumed, Decode.Valid
-	return
+DecodeUtf8 :: proc "contextless" (String: string) -> (Codepoint: rune, SourceCharactersConsumed: u32, Valid: b32) {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_DecodeUtf8 :: proc(Utf8: [^]byte, Length: uint) -> decode ---
+	}
+
+	Decode := kbts_DecodeUtf8(raw_data(String), len(String))
+	return Decode.Codepoint, Decode.SourceCharactersConsumed, Decode.Valid
 }
 
 
 @(require_results)
-ReadFontHeaderFromSlice :: proc "c" (Font: ^font, Data: []byte) -> un {
-	return ReadFontHeader(Font, raw_data(Data), un(len(Data)))
+ReadFontHeader :: proc "c" (Font: ^font, Data: []byte) -> un {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_ReadFontHeader :: proc(Font: ^font, Data: rawptr, Size: un) -> un ---
+	}
+
+	return kbts_ReadFontHeader(Font, raw_data(Data), un(len(Data)))
 }
 @(require_results)
-ReadFontDataFromSlice :: proc "c" (Font: ^font, Scratch: []byte) -> un {
-	return ReadFontData(Font, raw_data(Scratch), un(len(Scratch)))
+ReadFontData :: proc "c" (Font: ^font, Scratch: []byte) -> un {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_ReadFontData :: proc(Font: ^font, Scratch: rawptr, ScratchSize: un) -> un ---
+	}
+
+	return kbts_ReadFontData(Font, raw_data(Scratch), un(len(Scratch)))
 }
 @(require_results)
-PostReadFontInitializeFromSlice :: proc "c" (Font: ^font, Memory: []byte) -> b32 {
-	return PostReadFontInitialize(Font, raw_data(Memory), un(len(Memory)))
+PostReadFontInitialize :: proc "c" (Font: ^font, Memory: []byte) -> b32 {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_PostReadFontInitialize :: proc(Font: ^font, Memory: rawptr, MemorySize: un) -> b32 ---
+	}
+
+	return kbts_PostReadFontInitialize(Font, raw_data(Memory), un(len(Memory)))
 }
 
 @(require_results)
@@ -81,9 +99,9 @@ FontFromMemory :: proc(Data: []byte, allocator: mem.Allocator) -> (Result: font,
 	}
 	copy(ClonedData, Data)
 
-	ScratchSize := ReadFontHeaderFromSlice(&Result, ClonedData)
+	ScratchSize := ReadFontHeader(&Result, ClonedData)
 	Scratch := mem.make_aligned([]byte, ScratchSize, 16, allocator) or_return
-	MemorySize := ReadFontDataFromSlice(&Result, Scratch)
+	MemorySize := ReadFontData(&Result, Scratch)
 
 	Memory := Scratch
 	if MemorySize > ScratchSize {
@@ -94,7 +112,7 @@ FontFromMemory :: proc(Data: []byte, allocator: mem.Allocator) -> (Result: font,
 		delete(Memory, allocator)
 	}
 
-	_ = PostReadFontInitializeFromSlice(&Result, Memory)
+	_ = PostReadFontInitialize(&Result, Memory)
 	return
 
 }
@@ -108,9 +126,19 @@ FreeFont :: proc(Font: ^font, allocator: mem.Allocator) {
 CreateShapeState :: proc(Font: ^font, allocator: mem.Allocator) -> (Result: ^shape_state, Err: mem.Allocator_Error) {
 	Size := SizeOfShapeState(Font)
 	Memory := mem.make_aligned([]byte, Size, 16, allocator) or_return
-	Result = PlaceShapeStateFromSlice(Memory)
+	Result = PlaceShapeState(Memory)
 	return
 }
 FreeShapeState :: proc(State: ^shape_state, allocator: mem.Allocator) {
 	free(State, allocator)
+}
+
+@(require_results)
+PositionGlyph :: proc(Cursor: ^cursor, Glyph: ^glyph) -> (X, Y: i32) {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_PositionGlyph :: proc(Cursor: ^cursor, Glyph: ^glyph, X, Y: ^i32) ---
+	}
+	kbts_PositionGlyph(Cursor, Glyph, &X, &Y)
+	return
 }
