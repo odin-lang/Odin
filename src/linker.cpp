@@ -704,12 +704,12 @@ try_cross_linking:;
 					return result;
 				}
 
-				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(android_glue_static_lib));
+				object_files = gb_string_append_fmt(object_files, "\'%.*s\' ", LIT(android_glue_static_lib));
 			}
 
 
 			for (String object_path : gen->output_object_paths) {
-				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
+				object_files = gb_string_append_fmt(object_files, "\'%.*s\' ", LIT(object_path));
 			}
 
 			gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
