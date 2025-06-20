@@ -53,8 +53,10 @@ PlaceShapeStateFromSlice :: proc "c" (Memory: []byte) -> ^shape_state {
 }
 
 @(require_results)
-DecodeUtf8String :: proc "c" (String: string) -> decode {
-	return DecodeUtf8(raw_data(String), len(String))
+DecodeUtf8String :: proc "c" (String: string) -> (Codepoint: rune, SourceCharactersConsumed: u32, Valid: b32) {
+	Decode := DecodeUtf8(raw_data(String), len(String))
+	Codepoint, SourceCharactersConsumed, Valid = Decode.Codepoint, Decode.SourceCharactersConsumed, Decode.Valid
+	return
 }
 
 
@@ -92,7 +94,7 @@ FontFromMemory :: proc(Data: []byte, allocator: mem.Allocator) -> (Result: font,
 		delete(Memory, allocator)
 	}
 
-	PostReadFontInitializeFromSlice(&Result, Memory)
+	_ = PostReadFontInitializeFromSlice(&Result, Memory)
 	return
 
 }

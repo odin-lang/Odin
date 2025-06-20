@@ -1838,5 +1838,5 @@ decode :: struct {
 	Codepoint: rune,
 
 	SourceCharactersConsumed: u32,
-	Valid:                    u32,
+	Valid:                    b32,
 }
