@@ -3160,12 +3160,11 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 
 	if (x->mode == Addressing_Constant) {
 		if (x_is_untyped) {
-			Type *def_type = default_type(t_untyped_integer);
 			if (type_hint) {
 				if (is_type_integer(type_hint)) {
 					convert_to_typed(c, x, type_hint);
 				} else if (is_type_any(type_hint)) {
-					convert_to_typed(c, x, def_type);
+					convert_to_typed(c, x, default_type(t_untyped_integer));
 				} else {
 					gbString x_str = expr_to_string(x->expr);
 					gbString type_str = type_to_string(type_hint);
@@ -3176,7 +3175,7 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 					return;
 				}
 			} else {
-				convert_to_typed(c, x, def_type);
+				check_is_expressible(c, x, default_type(t_untyped_integer));
 			}
 			if (x->mode == Addressing_Invalid) {
 				return;
