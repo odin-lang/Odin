@@ -564,7 +564,7 @@ test_try_select_raw_no_toctou :: proc(t: ^testing.T) {
 		trigger := (cast(^chan.Chan(any))(__global_context_for_test))^
 
 		// Notify the thief that we are paused so that it can steal the value.
-		 _ = chan.send(trigger, "signal")
+		_ = chan.send(trigger, "signal")
 
 		// Wait for comfirmation of the burglary.
 		_, _ = chan.recv(trigger)
