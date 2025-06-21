@@ -19,7 +19,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 	check_fields: for field in reflect.struct_fields_zipped(T) {
 		if style == .Unix {
 			#partial switch specific_type_info in field.type.variant {
-			case runtime.Type_Info_Map:
+			case ^runtime.Type_Info_Map:
 				fmt.panicf("%T.%s is a map type, and these are not supported in UNIX-style parsing mode.",
 					model_type, field.name, loc = loc)
 			}
@@ -62,7 +62,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 		pos_str, has_pos := get_struct_subtag(args_tag, SUBTAG_POS)
 		if has_pos {
 			#partial switch specific_type_info in field.type.variant {
-			case runtime.Type_Info_Map:
+			case ^runtime.Type_Info_Map:
 				fmt.panicf("%T.%s has `%s` defined, and this does not make sense on a map type.",
 					model_type, field.name, SUBTAG_POS, loc = loc)
 			}
@@ -86,7 +86,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			if len(requirement) > 0 {
 				if required_min, required_max, ok = parse_requirements(requirement); ok {
 					#partial switch specific_type_info in field.type.variant {
-					case runtime.Type_Info_Dynamic_Array:
+					case ^runtime.Type_Info_Dynamic_Array:
 						fmt.assertf(required_min != required_max, "%T.%s has `%s` defined as %q, but the minimum and maximum are the same. Increase the maximum by 1 for an exact number of arguments: (%i<%i)",
 							model_type,
 							field.name,
@@ -125,7 +125,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			}
 
 			#partial switch specific_type_info in field.type.variant {
-			case runtime.Type_Info_Dynamic_Array:
+			case ^runtime.Type_Info_Dynamic_Array:
 				fmt.assertf(style != .Odin,
 					"%T.%s has `%s` defined, but this only makes sense in UNIX-style parsing mode.",
 					model_type, field.name, SUBTAG_MANIFOLD, loc = loc)
@@ -137,9 +137,9 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 
 		allowed_to_define_file_perms: bool = ---
 		#partial switch specific_type_info in field.type.variant {
-		case runtime.Type_Info_Map:
+		case ^runtime.Type_Info_Map:
 			allowed_to_define_file_perms = specific_type_info.value.id == os.Handle
-		case runtime.Type_Info_Dynamic_Array:
+		case ^runtime.Type_Info_Dynamic_Array:
 			allowed_to_define_file_perms = specific_type_info.elem.id == os.Handle
 		case:
 			allowed_to_define_file_perms = field.type.id == os.Handle
@@ -156,7 +156,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 		}
 
 		#partial switch specific_type_info in field.type.variant {
-		case runtime.Type_Info_Map:
+		case ^runtime.Type_Info_Map:
 			fmt.assertf(reflect.is_string(specific_type_info.key), "%T.%s is defined as a map[%T]. Only string types are currently supported as map keys.",
 				model_type,
 				field.name,
@@ -187,7 +187,7 @@ validate_arguments :: proc(model: ^$T, parser: ^Parser) -> Error {
 			is_required = false
 		}
 
-		if _, is_array := field.type.variant.(runtime.Type_Info_Dynamic_Array); is_array && has_requirements {
+		if _, is_array := field.type.variant.(^runtime.Type_Info_Dynamic_Array); is_array && has_requirements {
 			// If it's an array, make sure it meets the required number of arguments.
 			ptr := cast(^runtime.Raw_Dynamic_Array)(cast(uintptr)model + field.offset)
 			if required_min == required_max - 1 && ptr.len != required_min {
