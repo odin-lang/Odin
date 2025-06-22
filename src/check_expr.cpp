@@ -3113,7 +3113,7 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 	if (y->mode == Addressing_Constant) {
 		if (big_int_is_neg(&y->value.value_integer)) {
 			gbString y_str = expr_to_string(y->expr);
-			error(y->expr, "Shift amount '%s' must be positive", y_str);
+			error(y->expr, "Shift amount '%s' cannot be negative", y_str);
 			gb_string_free(y_str);
 			x->mode = Addressing_Invalid;
 			return;
