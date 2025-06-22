@@ -4105,9 +4105,9 @@ AccelerationStructure_size :: #force_inline proc "c" (self: ^AccelerationStructu
 	return msgSend(NS.UInteger, self, "size")
 }
 
-@(objc_type=AccelerationStructure, objc_name="getResourceID")
-AccelerationStructure_getResourceID :: #force_inline proc "c" (self: ^AccelerationStructure) -> ResourceID {
-	return msgSend(ResourceID, self, "getResourceID")
+@(objc_type=AccelerationStructure, objc_name="gpuResourceID")
+AccelerationStructure_gpuResourceID :: #force_inline proc "c" (self: ^AccelerationStructure) -> ResourceID {
+	return msgSend(ResourceID, self, "gpuResourceID")
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -3086,125 +3086,105 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 	GB_ASSERT(node->kind == Ast_BinaryExpr);
 	ast_node(be, BinaryExpr, node);
 
-	ExactValue x_val = {};
-	if (x->mode == Addressing_Constant) {
-		x_val = exact_value_to_integer(x->value);
-	}
-
-	bool x_is_untyped = is_type_untyped(x->type);
-	if (!(is_type_integer(x->type) || (x_is_untyped && x_val.kind == ExactValue_Integer))) {
-		gbString err_str = expr_to_string(x->expr);
-		error(node, "Shifted operand '%s' must be an integer", err_str);
-		gb_string_free(err_str);
-		x->mode = Addressing_Invalid;
-		return;
-	}
-
-	if (is_type_unsigned(y->type)) {
-
-	} else if (is_type_untyped(y->type)) {
+	bool y_is_untyped = is_type_untyped(y->type);
+	if (y_is_untyped) {
 		convert_to_typed(c, y, t_untyped_integer);
 		if (y->mode == Addressing_Invalid) {
 			x->mode = Addressing_Invalid;
 			return;
 		}
-	} else {
-		gbString err_str = expr_to_string(y->expr);
-		error(node, "Shift amount '%s' must be an unsigned integer", err_str);
-		gb_string_free(err_str);
+	} else if (!is_type_unsigned(y->type)) {
+		gbString y_str = expr_to_string(y->expr);
+		error(y->expr, "Shift amount '%s' must be an unsigned integer", y_str);
+		gb_string_free(y_str);
 		x->mode = Addressing_Invalid;
 		return;
 	}
 
+	bool x_is_untyped = is_type_untyped(x->type);
+	if (!(x_is_untyped || is_type_integer(x->type))) {
+		gbString x_str = expr_to_string(x->expr);
+		error(x->expr, "Shifted operand '%s' must be an integer", x_str);
+		gb_string_free(x_str);
+		x->mode = Addressing_Invalid;
+		return;
+	}
 
-	if (x->mode == Addressing_Constant) {
-		if (y->mode == Addressing_Constant) {
-			ExactValue y_val = exact_value_to_integer(y->value);
-			if (y_val.kind != ExactValue_Integer) {
-				gbString err_str = expr_to_string(y->expr);
-				error(node, "Shift amount '%s' must be an unsigned integer", err_str);
-				gb_string_free(err_str);
-				x->mode = Addressing_Invalid;
+	if (y->mode == Addressing_Constant) {
+		if (big_int_is_neg(&y->value.value_integer)) {
+			gbString y_str = expr_to_string(y->expr);
+			error(y->expr, "Shift amount '%s' cannot be negative", y_str);
+			gb_string_free(y_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		BigInt max_shift = {};
+		big_int_from_u64(&max_shift, MAX_BIG_INT_SHIFT);
+
+		if (big_int_cmp(&y->value.value_integer, &max_shift) > 0) {
+			gbString y_str = expr_to_string(y->expr);
+			error(y->expr, "Shift amount '%s' must be <= %u", y_str, MAX_BIG_INT_SHIFT);
+			gb_string_free(y_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (x->mode == Addressing_Constant) {
+			if (x_is_untyped) {
+				convert_to_typed(c, x, t_untyped_integer);
+				if (x->mode == Addressing_Invalid) {
+					return;
+				}
+
+				x->expr = node;
+				x->value = exact_value_shift(be->op.kind, exact_value_to_integer(x->value), exact_value_to_integer(y->value));
+
 				return;
-			}
-
-			BigInt max_shift = {};
-			big_int_from_u64(&max_shift, MAX_BIG_INT_SHIFT);
-
-			if (big_int_cmp(&y_val.value_integer, &max_shift) > 0) {
-				gbString err_str = expr_to_string(y->expr);
-				error(node, "Shift amount too large: '%s'", err_str);
-				gb_string_free(err_str);
-				x->mode = Addressing_Invalid;
-				return;
-			}
-
-			if (!is_type_integer(x->type)) {
-				// NOTE(bill): It could be an untyped float but still representable
-				// as an integer
-				x->type = t_untyped_integer;
 			}
 
 			x->expr = node;
-			x->value = exact_value_shift(be->op.kind, x_val, y_val);
+			x->value = exact_value_shift(be->op.kind, x->value, y->value);
 
+			check_is_expressible(c, x, x->type);
 
-			if (is_type_typed(x->type)) {
-				check_is_expressible(c, x, x->type);
-			}
 			return;
 		}
 
-		TokenPos pos = ast_token(x->expr).pos;
-		if (x_is_untyped) {
-			if (x->expr != nullptr) {
-				x->expr->tav.is_lhs = true;
-			}
-			x->mode = Addressing_Value;
-			if (type_hint) {
-				if (is_type_integer(type_hint)) {
-					convert_to_typed(c, x, type_hint);
-				} else {
-					gbString x_str = expr_to_string(x->expr);
-					gbString to_type = type_to_string(type_hint);
-					error(node, "Conversion of shifted operand '%s' to '%s' is not allowed", x_str, to_type);
-					gb_string_free(x_str);
-					gb_string_free(to_type);
-					x->mode = Addressing_Invalid;
-				}
-			} else if (!is_type_integer(x->type)) {
-				gbString x_str = expr_to_string(x->expr);
-				error(node, "Non-integer shifted operand '%s' is not allowed", x_str);
-				gb_string_free(x_str);
-				x->mode = Addressing_Invalid;
-			}
-			// x->value = x_val;
-			return;
+		if (y_is_untyped) {
+			convert_to_typed(c, y, t_uint);
 		}
-	}
 
-	if (y->mode == Addressing_Constant && big_int_is_neg(&y->value.value_integer)) {
-		gbString err_str = expr_to_string(y->expr);
-		error(node, "Shift amount cannot be negative: '%s'", err_str);
-		gb_string_free(err_str);
-	}
-
-	if (!is_type_integer(x->type)) {
-		gbString err_str = expr_to_string(x->expr);
-		error(node, "Shift operand '%s' must be an integer", err_str);
-		gb_string_free(err_str);
-		x->mode = Addressing_Invalid;
 		return;
 	}
 
-	if (is_type_untyped(y->type)) {
-		convert_to_typed(c, y, t_uint);
+	if (x->mode == Addressing_Constant) {
+		if (x_is_untyped) {
+			if (type_hint) {
+				if (is_type_integer(type_hint)) {
+					convert_to_typed(c, x, type_hint);
+				} else if (is_type_any(type_hint)) {
+					convert_to_typed(c, x, default_type(t_untyped_integer));
+				} else {
+					gbString x_str = expr_to_string(x->expr);
+					gbString type_str = type_to_string(type_hint);
+					error(x->expr, "Shifted operand '%s' cannot convert to non-integer type '%s'", x_str, type_str);
+					gb_string_free(x_str);
+					gb_string_free(type_str);
+					x->mode = Addressing_Invalid;
+					return;
+				}
+			} else {
+				check_is_expressible(c, x, default_type(t_untyped_integer));
+			}
+			if (x->mode == Addressing_Invalid) {
+				return;
+			}
+		}
+
+		x->mode = Addressing_Value;
 	}
-
-	x->mode = Addressing_Value;
 }
-
-
 
 gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (check_is_assignable_to(c, operand, y)) {

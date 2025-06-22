@@ -53,6 +53,8 @@ import "base:intrinsics"
 
 import "core:c"
 
+IS_SUPPORTED :: _IS_SUPPORTED
+
 result :: enum c.int {
  	// Use `errno` and `strerror` for more information.
 	FAIL = -1,
