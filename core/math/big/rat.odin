@@ -157,6 +157,8 @@ internal_rat_norm :: proc(z: ^Rat, allocator := context.allocator) -> (err: Erro
 		z.b.sign = .Zero_or_Positive
 		
 		f := &Int{}
+		defer internal_int_destroy(f)
+		
 		internal_int_gcd(f, &z.a, &z.b) or_return
 		if !internal_int_equals_digit(f, 1) {
 			f.sign = .Zero_or_Positive
