@@ -274,7 +274,7 @@ Camera3D :: struct {
 	target:   Vector3,            // Camera target it looks-at
 	up:       Vector3,            // Camera up vector (rotation over its axis)
 	fovy:     f32,                // Camera field-of-view apperture in Y (degrees) in perspective, used as near plane width in orthographic
-	projection: CameraProjection, // Camera projection: CAMERA_PERSPECTIVE or CAMERA_ORTHOGRAPHIC
+	projection: CameraProjection, // Camera projection: `.PERSPECTIVE` or `.ORTHOGRAPHIC`
 }
 
 Camera :: Camera3D                    // Camera type fallback, defaults to Camera3D
