@@ -1334,6 +1334,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		has_instrumentation = false;
 		e->flags |= EntityFlag_Require;
 	} else if (ac.instrumentation_enter) {
+		init_core_source_code_location(ctx->checker);
 		if (!is_valid_instrumentation_call(e->type)) {
 			init_core_source_code_location(ctx->checker);
 			gbString s = type_to_string(e->type);
