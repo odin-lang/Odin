@@ -5896,8 +5896,9 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 
 	bool allow_ok    = (flags & UnpackFlag_AllowOk) != 0;
 	bool allow_undef = (flags & UnpackFlag_AllowUndef) != 0;
-	
-	if (variadic_index < 0) {
+
+	bool is_variadic = variadic_index > -1;
+	if (!is_variadic) {
 		variadic_index = lhs_count;
 	}
 
@@ -5916,25 +5917,18 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 
 		Type *type_hint = nullptr;
 
-		if (lhs != nullptr && tuple_index < variadic_index) {
-			// NOTE(bill): override DeclInfo for dependency
-			Entity *e = lhs[tuple_index];
-			if (e != nullptr) {
-				type_hint = e->type;
-				if (e->flags & EntityFlag_Ellipsis) {
-					GB_ASSERT(is_type_slice(e->type));
-					GB_ASSERT(e->type->kind == Type_Slice);
-					type_hint = e->type->Slice.elem;
+		if (lhs != nullptr) {
+			if (tuple_index < variadic_index) {
+				// NOTE(bill): override DeclInfo for dependency
+				Entity *e = lhs[tuple_index];
+				if (e != nullptr) {
+					type_hint = e->type;
 				}
-			}
-		} else if (lhs != nullptr && tuple_index >= variadic_index) {
-			// NOTE(bill): override DeclInfo for dependency
-			Entity *e = lhs[variadic_index];
-			if (e != nullptr) {
-				type_hint = e->type;
-				if (e->flags & EntityFlag_Ellipsis) {
+			} else if (is_variadic) {
+				Entity *e = lhs[variadic_index];
+				if (e != nullptr) {
+					GB_ASSERT(e->flags & EntityFlag_Ellipsis);
 					GB_ASSERT(is_type_slice(e->type));
-					GB_ASSERT(e->type->kind == Type_Slice);
 					type_hint = e->type->Slice.elem;
 				}
 			}
@@ -6822,11 +6816,12 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 	if (procs.count == 1) {
 		Entity *e = procs[0];
-		TypeProc *pt = &base_type(e->type)->Proc;
-		
-		lhs = populate_proc_parameter_list(c, e->type, &lhs_count);
-		if (pt->variadic) {
-			variadic_index = pt->variadic_index;
+		Type *pt = base_type(e->type);
+		if (pt != nullptr && is_type_proc(pt)) {
+			lhs = populate_proc_parameter_list(c, pt, &lhs_count);
+			if (pt->Proc.variadic) {
+				variadic_index = pt->Proc.variadic_index;
+			}
 		}
 		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
 
@@ -6887,6 +6882,25 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 						}
 					}
 					lhs[param_index] = e;
+				}
+
+				for (Entity *p : procs) {
+					Type *pt = base_type(p->type);
+					if (!(pt != nullptr && is_type_proc(pt))) {
+						continue;
+					}
+					
+					if (pt->Proc.is_polymorphic) {
+						if (variadic_index == -1) {
+							variadic_index = pt->Proc.variadic_index;
+						} else if (variadic_index != pt->Proc.variadic_index) {
+							variadic_index = -1;
+							break;
+						}
+					} else {
+						variadic_index = -1;
+						break;
+					}
 				}
 			}
 		}
@@ -7330,8 +7344,8 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 	defer (array_free(&named_operands));
 
 	if (positional_args.count > 0) {
-		isize lhs_count = -1;
 		Entity **lhs =  nullptr;
+		isize lhs_count = -1;
 		i32 variadic_index = -1;
 		if (pt != nullptr)  {
 			lhs = populate_proc_parameter_list(c, proc_type, &lhs_count);
