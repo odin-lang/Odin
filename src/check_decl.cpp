@@ -1334,11 +1334,15 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		has_instrumentation = false;
 		e->flags |= EntityFlag_Require;
 	} else if (ac.instrumentation_enter) {
+		init_core_source_code_location(ctx->checker);
 		if (!is_valid_instrumentation_call(e->type)) {
 			init_core_source_code_location(ctx->checker);
 			gbString s = type_to_string(e->type);
 			error(e->token, "@(instrumentation_enter) procedures must have the type '%s', got %s", instrumentation_proc_type_str, s);
 			gb_string_free(s);
+		}
+		if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(e->token, "@(instrumentation_enter) procedures must be declared at the file scope");
 		}
 		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
 		if (ctx->info->instrumentation_enter_entity != nullptr) {
@@ -1355,6 +1359,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			gbString s = type_to_string(e->type);
 			error(e->token, "@(instrumentation_exit) procedures must have the type '%s', got %s", instrumentation_proc_type_str, s);
 			gb_string_free(s);
+		}
+		if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(e->token, "@(instrumentation_exit) procedures must be declared at the file scope");
 		}
 		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
 		if (ctx->info->instrumentation_exit_entity != nullptr) {
