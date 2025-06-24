@@ -2424,27 +2424,27 @@ gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o
 		Type *s = src->Array.elem;
 		Type *d = dst->Slice.elem;
 		if (are_types_identical(s, d)) {
-			error_line("\tSuggestion: the array expression may be sliced with %s[:]\n", a);
+			error_line("\tSuggestion: The array expression may be sliced with %s[:]\n", a);
 		}
 	} else if (is_type_dynamic_array(src) && is_type_slice(dst)) {
 		Type *s = src->DynamicArray.elem;
 		Type *d = dst->Slice.elem;
 		if (are_types_identical(s, d)) {
-			error_line("\tSuggestion: the dynamic array expression may be sliced with %s[:]\n", a);
+			error_line("\tSuggestion: The dynamic array expression may be sliced with %s[:]\n", a);
 		}
 	}else if (are_types_identical(src, dst) && !are_types_identical(o->type, type)) {
-		error_line("\tSuggestion: the expression may be directly casted to type %s\n", b);
+		error_line("\tSuggestion: The expression may be directly casted to type %s\n", b);
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
-		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
-		error_line("\t            This is an UNSAFE operation as string data is assumed to be immutable, \n");
+		error_line("\tSuggestion: A string may be transmuted to %s\n", b);
+		error_line("\t            This is an UNSAFE operation as string data is assumed to be immutable,\n");
 		error_line("\t            whereas slices in general are assumed to be mutable.\n");
 	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
-		error_line("\tSuggestion: the expression may be casted to %s\n", b);
+		error_line("\tSuggestion: The expression may be casted to %s\n", b);
 	} else if (check_integer_exceed_suggestion(c, o, type, max_bit_size)) {
 		return;
 	} else if (is_expr_inferred_fixed_array(c->type_hint_expr) && is_type_array_like(type) && is_type_array_like(o->type)) {
 		gbString s = expr_to_string(c->type_hint_expr);
-		error_line("\tSuggestion: make sure that `%s` is attached to the compound literal directly\n", s);
+		error_line("\tSuggestion: Make sure that `%s` is attached to the compound literal directly\n", s);
 		gb_string_free(s);
 	} else if (is_type_pointer(type) &&
 	           o->mode == Addressing_Variable &&
