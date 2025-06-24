@@ -6,7 +6,7 @@ _ACTIVATION_CONTEXT :: struct {
 }
 
 TP_WAIT_RESULT :: DWORD // Has value WAIT_OBJECT_0 or WAIT_TIMEOUT.
-TP_CALLBACK_PRIORITY :: enum DWORD {
+TP_CALLBACK_PRIORITY :: enum c_int {
 	HIGH,
 	NORMAL,
 	LOW,
@@ -19,7 +19,7 @@ TP_POOL_STACK_INFORMATION :: struct {
 	StackReserve, StackCommit: SIZE_T,
 }
 TP_VERSION :: DWORD
-TP_CALLBACK_ENVIRON_FLAGS :: enum DWORD {
+TP_CALLBACK_ENVIRON_FLAGS :: enum {
 	LongFunction,
 	Persistent,
 }
@@ -51,7 +51,7 @@ PTP_WORK :: distinct rawptr
 PTP_TIMER :: distinct rawptr
 PTP_WAIT :: distinct rawptr
 PTP_IO :: distinct rawptr
-PTP_WIN32_IO_CALLBACK :: proc "system" (
+PTP_WIN32_IO_CALLBACK :: #type proc "system" (
 	Instance: PTP_CALLBACK_INSTANCE,
 	Context: PVOID,
 	Overlapped: PVOID,
@@ -59,22 +59,22 @@ PTP_WIN32_IO_CALLBACK :: proc "system" (
 	NumberOfBytesTransferred: ULONG_PTR,
 	Io: PTP_IO,
 )
-PTP_CLEANUP_GROUP_CANCEL_CALLBACK :: proc "system" (ObjectContext: PVOID, CleanupContext: PVOID)
-PTP_WAIT_CALLBACK :: proc "system" (
-	instance: PTP_CALLBACK_INSTANCE,
-	parameter: PVOID,
-	wait: PTP_WAIT,
-	waitResult: TP_WAIT_RESULT,
+PTP_CLEANUP_GROUP_CANCEL_CALLBACK :: #type proc "system" (ObjectContext: PVOID, CleanupContext: PVOID)
+PTP_WAIT_CALLBACK :: #type proc "system" (
+	Instance: PTP_CALLBACK_INSTANCE,
+	Parameter: PVOID,
+	Wait: PTP_WAIT,
+	WaitResult: TP_WAIT_RESULT,
 )
-PTP_TIMER_CALLBACK :: proc "system" (
-	instance: PTP_CALLBACK_INSTANCE,
-	parameter: PVOID,
-	timer: PTP_TIMER,
+PTP_TIMER_CALLBACK :: #type proc "system" (
+	Instance: PTP_CALLBACK_INSTANCE,
+	Parameter: PVOID,
+	Timer: PTP_TIMER,
 )
-PTP_WORK_CALLBACK :: proc "system" (
-	instance: PTP_CALLBACK_INSTANCE,
-	parameter: PVOID,
-	work: PTP_WORK,
+PTP_WORK_CALLBACK :: #type proc "system" (
+	Instance: PTP_CALLBACK_INSTANCE,
+	Parameter: PVOID,
+	Work: PTP_WORK,
 )
 
 PCRITICAL_SECTION :: ^CRITICAL_SECTION
@@ -180,7 +180,7 @@ TpSetCallbackPersistent :: proc "c" (CallbackEnviron: PTP_CALLBACK_ENVIRON) {
 	CallbackEnviron.Flags |= {.Persistent}
 }
 TpDestroyCallbackEnviron :: proc "c" (CallbackEnviron: PTP_CALLBACK_ENVIRON) {
-
+	// No-op for TP_CALLBACK_ENVIRON_V3.
 }
 
 InitializeThreadpoolEnvironment :: proc "c" (pcbe: PTP_CALLBACK_ENVIRON) {
