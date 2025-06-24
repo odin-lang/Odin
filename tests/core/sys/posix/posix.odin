@@ -214,7 +214,12 @@ test_stat :: proc(t: ^testing.T) {
 	stat: posix.stat_t
 	testing.expect_value(t, posix.stat(#file, &stat), posix.result.OK)
 	testing.expect(t, posix.S_ISREG(stat.st_mode))
+	// NOTE(Jeroen): This will possibly fail on WSL's `/mnt/<drive letter>` or other "network" mounts.
+	// It can even fail on a stock Ubuntu desktop running on real hardware depending on how the file perms are set,
+	// so this test is commented out.
+	/*
 	testing.expect_value(t, stat.st_mode, posix.mode_t{.IROTH, .IRGRP, .IRUSR, .IWUSR, .IFREG})
+	*/
 
 	CONTENT := #load(#file)
 	testing.expect_value(t, stat.st_size, posix.off_t(len(CONTENT)))
@@ -262,6 +267,11 @@ open_permissions :: proc(t: ^testing.T) {
 	res := posix.fstat(fd, &stat)
 	testing.expectf(t, res == .OK, "failed to stat: %v", posix.strerror())
 
+	// NOTE(Jeroen): This will possibly fail on WSL's `/mnt/<drive letter>` or other "network" mounts.
+	// It can even fail on a stock Ubuntu desktop running on real hardware depending on how the file perms are set,
+	// so this test is commented out.
+	/*
 	stat.st_mode -= posix.S_IFMT
 	testing.expect_value(t, stat.st_mode, in_mode)
+	*/
 }
