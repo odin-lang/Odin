@@ -258,8 +258,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -291,8 +293,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -328,8 +332,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -371,8 +377,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -420,8 +428,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -471,8 +481,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
