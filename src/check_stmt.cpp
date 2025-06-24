@@ -2481,8 +2481,7 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 		check_expr(ctx, &lhs, as->lhs[0]);
 		check_binary_expr(ctx, &rhs, binary_expr, nullptr, true);
 		if (rhs.mode != Addressing_Invalid) {
-			// NOTE(bill): Only use the first one will be used
-			be->op.string = substring(be->op.string, 0, 1);
+			be->op.string = substring(be->op.string, 0, be->op.string.len - 1);
 			rhs.expr = binary_expr;
 			check_assignment_variable(ctx, &lhs, &rhs, str_lit("assignment operation"));
 		}
