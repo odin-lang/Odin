@@ -19,7 +19,7 @@ TP_POOL_STACK_INFORMATION :: struct {
 	StackReserve, StackCommit: SIZE_T,
 }
 TP_VERSION :: DWORD
-TP_CALLBACK_ENVIRON_FLAGS :: enum {
+TP_CALLBACK_ENVIRON_FLAG :: enum {
 	LongFunction,
 	Persistent,
 }
@@ -34,7 +34,7 @@ TP_CALLBACK_ENVIRON :: struct {
 	RaceDll:                    PVOID,
 	ActivationContext:          ^_ACTIVATION_CONTEXT,
 	FinalizationCallback:       PTP_SIMPLE_CALLBACK,
-	Flags:                      bit_set[TP_CALLBACK_ENVIRON_FLAGS;DWORD],
+	Flags:                      bit_set[TP_CALLBACK_ENVIRON_FLAG;DWORD],
 	// if NTDDI_VERSION >= NTDDI_WIN7
 	CallbackPriority:           TP_CALLBACK_PRIORITY,
 	Size:                       DWORD,
