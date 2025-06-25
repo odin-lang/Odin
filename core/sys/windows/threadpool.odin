@@ -59,7 +59,10 @@ PTP_WIN32_IO_CALLBACK :: #type proc "system" (
 	NumberOfBytesTransferred: ULONG_PTR,
 	Io: PTP_IO,
 )
-PTP_CLEANUP_GROUP_CANCEL_CALLBACK :: #type proc "system" (ObjectContext: PVOID, CleanupContext: PVOID)
+PTP_CLEANUP_GROUP_CANCEL_CALLBACK :: #type proc "system" (
+	ObjectContext: PVOID,
+	CleanupContext: PVOID,
+)
 PTP_WAIT_CALLBACK :: #type proc "system" (
 	Instance: PTP_CALLBACK_INSTANCE,
 	Parameter: PVOID,
@@ -207,6 +210,9 @@ SetThreadpoolCallbackPriority :: proc "c" (
 	priority: TP_CALLBACK_PRIORITY,
 ) {
 	TpSetCallbackPriority(pcbe, priority)
+}
+SetThreadpoolCallbackPersistent :: proc "c" (pcbe: PTP_CALLBACK_ENVIRON) {
+	TpSetCallbackPersistent(pcbe)
 }
 DestroyThreadpoolEnvironment :: proc "c" (pcbe: PTP_CALLBACK_ENVIRON) {
 	TpDestroyCallbackEnviron(pcbe)
