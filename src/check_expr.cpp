@@ -8760,23 +8760,52 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 	String name = bd->name.string;
 	if (name == "file") {
 		String file = get_file_path_string(bd->token.pos.file_id);
-		if (build_context.obfuscate_source_code_locations) {
+		switch (build_context.source_code_location_info) {
+		case SourceCodeLocationInfo_Normal:
+			break;
+		case SourceCodeLocationInfo_Obfuscated:
 			file = obfuscate_string(file, "F");
+			break;
+		case SourceCodeLocationInfo_Filename:
+			file = last_path_element(file);
+			break;
+		case SourceCodeLocationInfo_None:
+			file = str_lit("");
+			break;
 		}
 		o->type = t_untyped_string;
 		o->value = exact_value_string(file);
 	} else if (name == "directory") {
 		String file = get_file_path_string(bd->token.pos.file_id);
 		String path = dir_from_path(file);
-		if (build_context.obfuscate_source_code_locations) {
+		switch (build_context.source_code_location_info) {
+		case SourceCodeLocationInfo_Normal:
+			break;
+		case SourceCodeLocationInfo_Obfuscated:
 			path = obfuscate_string(path, "D");
+			break;
+		case SourceCodeLocationInfo_Filename:
+			path = last_path_element(path);
+			break;
+		case SourceCodeLocationInfo_None:
+			path = str_lit("");
+			break;
 		}
 		o->type = t_untyped_string;
 		o->value = exact_value_string(path);
 	} else if (name == "line") {
 		i32 line = bd->token.pos.line;
-		if (build_context.obfuscate_source_code_locations) {
+		switch (build_context.source_code_location_info) {
+		case SourceCodeLocationInfo_Normal:
+			break;
+		case SourceCodeLocationInfo_Obfuscated:
 			line = obfuscate_i32(line);
+			break;
+		case SourceCodeLocationInfo_Filename:
+			break;
+		case SourceCodeLocationInfo_None:
+			line = 0;
+			break;
 		}
 		o->type = t_untyped_integer;
 		o->value = exact_value_i64(line);
@@ -8787,8 +8816,17 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 			o->value = exact_value_string(str_lit(""));
 		} else {
 			String p = c->proc_name;
-			if (build_context.obfuscate_source_code_locations) {
+			switch (build_context.source_code_location_info) {
+			case SourceCodeLocationInfo_Normal:
+				break;
+			case SourceCodeLocationInfo_Obfuscated:
 				p = obfuscate_string(p, "P");
+				break;
+			case SourceCodeLocationInfo_Filename:
+				break;
+			case SourceCodeLocationInfo_None:
+				p = str_lit("");
+				break;
 			}
 			o->type = t_untyped_string;
 			o->value = exact_value_string(p);
