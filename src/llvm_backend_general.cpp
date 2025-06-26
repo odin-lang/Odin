@@ -568,10 +568,22 @@ gb_internal void lb_set_file_line_col(lbProcedure *p, Array<lbValue> arr, TokenP
 	i32 line    = pos.line;
 	i32 col     = pos.column;
 
-	if (build_context.obfuscate_source_code_locations) {
+	switch (build_context.source_code_location_info) {
+	case SourceCodeLocationInfo_Normal:
+		break;
+	case SourceCodeLocationInfo_Obfuscated:
 		file = obfuscate_string(file, "F");
 		line = obfuscate_i32(line);
 		col  = obfuscate_i32(col);
+		break;
+	case SourceCodeLocationInfo_Filename:
+		file = last_path_element(file);
+		break;
+	case SourceCodeLocationInfo_None:
+		file = str_lit("");
+		line = 0;
+		col  = 0;
+		break;
 	}
 
 	arr[0] = lb_find_or_add_entity_string(p->module, file, false);
