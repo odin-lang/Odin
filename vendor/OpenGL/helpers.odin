@@ -149,8 +149,7 @@ create_and_link_program :: proc(shader_ids: []u32, binary_retrievable := false) 
 }
 
 load_compute_file :: proc(filename: string, binary_retrievable := false) -> (program_id: u32, ok: bool) {
-	cs_data := os.read_entire_file(filename) or_return
-	defer delete(cs_data)
+	cs_data := os.read_entire_file(filename, context.temp_allocator) or_return
 
 	// Create the shaders
 	compute_shader_id := compile_shader_from_source(string(cs_data), Shader_Type(COMPUTE_SHADER)) or_return
@@ -164,12 +163,8 @@ load_compute_source :: proc(cs_data: string, binary_retrievable := false) -> (pr
 }
 
 load_shaders_file :: proc(vs_filename, fs_filename: string, binary_retrievable := false) -> (program_id: u32, ok: bool) {
-	vs_data := os.read_entire_file(vs_filename) or_return
-	defer delete(vs_data)
-	
-	fs_data := os.read_entire_file(fs_filename) or_return
-	defer delete(fs_data)
-
+	vs_data := os.read_entire_file(vs_filename, context.temp_allocator) or_return
+	fs_data := os.read_entire_file(fs_filename, context.temp_allocator) or_return
 	return load_shaders_source(string(vs_data), string(fs_data), binary_retrievable)
 }
 
