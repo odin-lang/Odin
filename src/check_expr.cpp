@@ -11326,6 +11326,13 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
+		} else if (o->mode == Addressing_Type) {
+ 			gbString str = expr_to_string(o->expr);
+			error(o->expr, "Cannot dereference '%s' because it is a type", str);
+
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
 		} else {
 			Type *t = base_type(o->type);
 			if (t->kind == Type_Pointer && !is_type_empty_union(t->Pointer.elem)) {
