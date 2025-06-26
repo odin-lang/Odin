@@ -47,6 +47,8 @@ foreign user32 {
 		lpParam: LPVOID,
 	) -> HWND ---
 
+	GetWindowThreadProcessId :: proc(hwnd: HWND, lpdwProcessId: LPDWORD) -> DWORD ---
+
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
 
 	ShowWindow :: proc(hWnd: HWND, nCmdShow: INT) -> BOOL ---
@@ -63,6 +65,8 @@ foreign user32 {
 	UpdateWindow :: proc(hWnd: HWND) -> BOOL ---
 	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
 	GetActiveWindow :: proc() -> HWND ---
+	SetFocus :: proc(hWnd: HWND) -> HWND ---
+	GetFocus :: proc() -> HWND ---
 	RedrawWindow :: proc(hwnd: HWND, lprcUpdate: LPRECT, hrgnUpdate: HRGN, flags: RedrawWindowFlags) -> BOOL ---
 	SetParent :: proc(hWndChild: HWND, hWndNewParent: HWND) -> HWND ---
 	SetPropW :: proc(hWnd: HWND, lpString: LPCWSTR, hData: HANDLE) -> BOOL ---
@@ -211,6 +215,7 @@ foreign user32 {
 	EnumDisplayMonitors :: proc(hdc: HDC, lprcClip: LPRECT, lpfnEnum: Monitor_Enum_Proc, dwData: LPARAM) -> BOOL ---
 
 	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
+	EnumChildWindows :: proc(hWndParent: HWND, lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
 
 	IsProcessDPIAware :: proc() -> BOOL ---
 	SetProcessDPIAware :: proc() -> BOOL ---
@@ -846,3 +851,23 @@ FKF_CONFIRMHOTKEY :: 0x8
 FKF_HOTKEYSOUND   :: 0x10
 FKF_INDICATOR     :: 0x20
 FKF_CLICKON       :: 0x40
+
+NONCLIENTMETRICSW :: struct {
+	cbSize: UINT,
+	iBorderWidth: i32,
+	iScrollWidth: i32,
+	iScrollHeight: i32,
+	iCaptionWidth: i32,
+	iCaptionHeight: i32,
+	lfCaptionFont: LOGFONTW,
+	iSmCaptionWidth: i32,
+	iSmCaptionHeight: i32,
+	lfSmCaptionFont: LOGFONTW,
+	iMenuWidth: i32,
+	iMenuHeight: i32,
+	lfMenuFont: LOGFONTW,
+	lfStatusFont: LOGFONTW,
+	lfMessageFont: LOGFONTW,
+	iPaddedBorderWidth: i32,
+}
+LPNONCLIENTMETRICSW :: ^NONCLIENTMETRICSW

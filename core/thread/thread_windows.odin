@@ -13,6 +13,7 @@ Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
 	win32_thread_id: win32.DWORD,
 	mutex:           sync.Mutex,
+	start_ok:        sync.Sema,
 }
 
 _thread_priority_map := [Thread_Priority]i32{
@@ -27,11 +28,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	__windows_thread_entry_proc :: proc "system" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_)
 
-		if .Joined in sync.atomic_load(&t.flags) {
-			return 0
+		for (.Started not_in sync.atomic_load(&t.flags)) {
+			sync.wait(&t.start_ok)
 		}
-
-		t.id = sync.current_thread_id()
 
 		{
 			init_context := t.init_context
@@ -76,6 +75,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	thread.procedure       = procedure
 	thread.win32_thread    = win32_thread
 	thread.win32_thread_id = win32_thread_id
+	thread.id              = int(win32_thread_id)
 
 	ok := win32.SetThreadPriority(win32_thread, _thread_priority_map[priority])
 	assert(ok == true)
@@ -103,16 +103,15 @@ _join :: proc(t: ^Thread) {
 		return
 	}
 
-	t.flags += {.Joined}
-
-	if .Started not_in t.flags {
-		t.flags += {.Started}
-		win32.ResumeThread(t.win32_thread)
+	for (.Started not_in sync.atomic_load(&t.flags)) {
+		_start(t)
 	}
 
 	win32.WaitForSingleObject(t.win32_thread, win32.INFINITE)
 	win32.CloseHandle(t.win32_thread)
 	t.win32_thread = win32.INVALID_HANDLE
+
+	t.flags += {.Joined}
 }
 
 _join_multiple :: proc(threads: ..^Thread) {
@@ -136,6 +135,7 @@ _join_multiple :: proc(threads: ..^Thread) {
 	for t in threads {
 		win32.CloseHandle(t.win32_thread)
 		t.win32_thread = win32.INVALID_HANDLE
+		t.flags += {.Joined}
 	}
 }
 

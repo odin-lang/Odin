@@ -24,7 +24,6 @@ Type_Info_Enumerated_Array       :: runtime.Type_Info_Enumerated_Array
 Type_Info_Dynamic_Array          :: runtime.Type_Info_Dynamic_Array
 Type_Info_Slice                  :: runtime.Type_Info_Slice
 Type_Info_Parameters             :: runtime.Type_Info_Parameters
-Type_Info_Tuple                  :: runtime.Type_Info_Parameters
 Type_Info_Struct                 :: runtime.Type_Info_Struct
 Type_Info_Union                  :: runtime.Type_Info_Union
 Type_Info_Enum                   :: runtime.Type_Info_Enum
@@ -58,7 +57,7 @@ Type_Kind :: enum {
 	Enumerated_Array,
 	Dynamic_Array,
 	Slice,
-	Tuple,
+	Parameters,
 	Struct,
 	Union,
 	Enum,
@@ -93,7 +92,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Enumerated_Array: return .Enumerated_Array
 		case Type_Info_Dynamic_Array:    return .Dynamic_Array
 		case Type_Info_Slice:            return .Slice
-		case Type_Info_Parameters:       return .Tuple
+		case Type_Info_Parameters:       return .Parameters
 		case Type_Info_Struct:           return .Struct
 		case Type_Info_Union:            return .Union
 		case Type_Info_Enum:             return .Enum
@@ -176,6 +175,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 	case Type_Info_Enumerated_Array: return v.elem.id
 	case Type_Info_Slice:            return v.elem.id
 	case Type_Info_Dynamic_Array:    return v.elem.id
+	case Type_Info_Simd_Vector:      return v.elem.id
 	}
 	return id
 }
@@ -260,7 +260,11 @@ length :: proc(val: any) -> int {
 		} else {
 			return (^runtime.Raw_String)(val.data).len
 		}
+
+	case Type_Info_Simd_Vector:
+		return a.count
 	}
+
 	return 0
 }
 
@@ -286,7 +290,11 @@ capacity :: proc(val: any) -> int {
 
 	case Type_Info_Map:
 		return runtime.map_cap((^runtime.Raw_Map)(val.data)^)
+
+	case Type_Info_Simd_Vector:
+		return a.count
 	}
+
 	return 0
 }
 
@@ -1431,6 +1439,11 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 
 	case Type_Info_Complex:
 		switch v in a {
+		case complex32:
+			if imag(v) == 0 {
+				value = f64(real(v))
+				valid = true
+			}
 		case complex64:
 			if imag(v) == 0 {
 				value = f64(real(v))
@@ -1445,6 +1458,11 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 
 	case Type_Info_Quaternion:
 		switch v in a {
+		case quaternion64:
+			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
+				value = f64(real(v))
+				valid = true
+			}
 		case quaternion128:
 			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
 				value = f64(real(v))
@@ -1638,13 +1656,40 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return equal(va, vb, including_indirect_array_recursion, recursion_level+1) 
 	case Type_Info_Map:
 		return false
+	case Type_Info_Float:
+		x, _ := as_f64(a)
+		y, _ := as_f64(b)
+		return x == y
+	case Type_Info_Complex:
+		switch x in a {
+		case complex32:
+			#no_type_assert y := b.(complex32)
+			return x == y
+		case complex64:
+			#no_type_assert y := b.(complex64)
+			return x == y
+		case complex128:
+			#no_type_assert y := b.(complex128)
+			return x == y
+		}
+		return false
+	case Type_Info_Quaternion:
+		switch x in a {
+		case quaternion64:
+			#no_type_assert y := b.(quaternion64)
+			return x == y
+		case quaternion128:
+			#no_type_assert y := b.(quaternion128)
+			return x == y
+		case quaternion256:
+			#no_type_assert y := b.(quaternion256)
+			return x == y
+		}
+		return false
 	case 
 		Type_Info_Boolean,
 		Type_Info_Integer, 
 		Type_Info_Rune,
-		Type_Info_Float,
-		Type_Info_Complex,
-		Type_Info_Quaternion,
 		Type_Info_Type_Id,
 		Type_Info_Pointer,
 		Type_Info_Multi_Pointer,

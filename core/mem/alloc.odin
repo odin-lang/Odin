@@ -786,6 +786,27 @@ delete_map :: proc(
 }
 
 /*
+Free an SoA slice.
+*/
+delete_soa_slice :: proc(
+	array: $T/#soa[]$E,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> Allocator_Error {
+	return runtime.delete_soa_slice(array, allocator, loc)
+}
+
+/*
+Free an SoA dynamic array.
+*/
+delete_soa_dynamic_array :: proc(
+	array: $T/#soa[dynamic]$E,
+	loc := #caller_location,
+) -> Allocator_Error {
+	return runtime.delete_soa_dynamic_array(array, loc)
+}
+
+/*
 Free.
 */
 delete :: proc{
@@ -794,6 +815,8 @@ delete :: proc{
 	delete_dynamic_array,
 	delete_slice,
 	delete_map,
+	delete_soa_slice,
+	delete_soa_dynamic_array,
 }
 
 /*
@@ -865,6 +888,34 @@ make_aligned :: proc(
 	return runtime.make_aligned(T, len, alignment, allocator, loc)
 }
 
+
+/*
+Allocate a new slice with alignment for allocators that might not support the
+specified alignment requirement.
+
+This procedure allocates a new slice of type `T` with length `len`, aligned
+on a boundary specified by `alignment` from an allocator specified by
+`allocator`, and returns the allocated slice.
+
+The user should `delete` the return `original_data` slice not the typed `slice`.
+*/
+@(require_results)
+make_over_aligned :: proc(
+	$T: typeid/[]$E,
+	#any_int len: int,
+	alignment: int,
+	allocator: runtime.Allocator,
+	loc := #caller_location,
+) -> (slice: T, original_data: []byte, err: Allocator_Error) {
+	size := size_of(E)*len + alignment-1
+	original_data, err = runtime.make([]byte, size, allocator, loc)
+	if err == nil {
+		ptr := align_forward(raw_data(original_data), uintptr(alignment))
+		slice = ([^]E)(ptr)[:len]
+	}
+	return
+}
+
 /*
 Allocate a new slice.
 
@@ -900,8 +951,7 @@ make_dynamic_array :: proc(
 Allocate a dynamic array with initial length.
 
 This procedure creates a dynamic array of type `T`, with `allocator` as its
-backing allocator, and initial capacity of `0`, and initial length specified by
-`len`.
+backing allocator, and initial capacity and length specified by `len`.
 */
 @(require_results)
 make_dynamic_array_len :: proc(
@@ -910,7 +960,7 @@ make_dynamic_array_len :: proc(
 	allocator := context.allocator,
 	loc := #caller_location,
 ) -> (T, Allocator_Error) {
-	return runtime.make_dynamic_array_len_cap(T, len, len, allocator, loc)
+	return runtime.make_dynamic_array_len(T, len, allocator, loc)
 }
 
 /*
@@ -932,6 +982,22 @@ make_dynamic_array_len_cap :: proc(
 }
 
 /*
+Create a map with no initial allocation.
+
+This procedure creates a map of type `T` with no initial allocation, which will
+use the allocator specified by `allocator` as its backing allocator when it
+allocates.
+*/
+@(require_results)
+make_map :: proc(
+	$T: typeid/map[$K]$E,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (m: T) {
+	return runtime.make_map(T, allocator, loc)
+}
+
+/*
 Allocate a map.
 
 This procedure creates a map of type `T` with initial capacity specified by
@@ -939,13 +1005,13 @@ This procedure creates a map of type `T` with initial capacity specified by
 allocator.
 */
 @(require_results)
-make_map :: proc(
+make_map_cap :: proc(
 	$T: typeid/map[$K]$E,
-	#any_int cap: int = 1<<runtime.MAP_MIN_LOG2_CAPACITY,
+	#any_int cap: int,
 	allocator := context.allocator,
 	loc := #caller_location,
 ) -> (m: T, err: Allocator_Error) {
-	return runtime.make_map(T, cap, allocator, loc)
+	return runtime.make_map_cap(T, cap, allocator, loc)
 }
 
 /*
@@ -965,6 +1031,71 @@ make_multi_pointer :: proc(
 }
 
 /*
+Allocate an SoA slice.
+
+This procedure allocates an SoA slice of type `T` with length `len`, from an
+allocator specified by `allocator`, and returns the allocated SoA slice.
+*/
+@(require_results)
+make_soa_slice :: proc(
+	$T: typeid/#soa[]$E,
+	#any_int len: int,
+	allocator := context.allocator,
+	loc := #caller_location
+) -> (array: T, err: Allocator_Error) {
+	return runtime.make_soa_slice(T, len, allocator, loc)
+}
+
+/*
+Allocate an SoA dynamic array.
+
+This procedure creates an SoA dynamic array of type `T`, with `allocator` as
+its backing allocator, and initial length and capacity of `0`.
+*/
+@(require_results)
+make_soa_dynamic_array :: proc(
+	$T: typeid/#soa[dynamic]$E,
+	allocator := context.allocator,
+	loc := #caller_location
+) -> (array: T, err: Allocator_Error) {
+	return runtime.make_soa_dynamic_array(T, allocator, loc)
+}
+
+/*
+Allocate an SoA dynamic array with initial length.
+
+This procedure creates an SoA dynamic array of type `T`, with `allocator` as its
+backing allocator, and initial capacity and length specified by `len`.
+*/
+@(require_results)
+make_soa_dynamic_array_len :: proc(
+	$T: typeid/#soa[dynamic]$E,
+	#any_int len: int,
+	allocator := context.allocator,
+	loc := #caller_location
+) -> (array: T, err: Allocator_Error) {
+	return runtime.make_soa_dynamic_array_len(T, len, allocator, loc)
+}
+
+/*
+Allocate an SoA dynamic array with initial length and capacity.
+
+This procedure creates an SoA dynamic array of type `T`, with `allocator` as its
+backing allocator, and initial capacity specified by `cap`, and initial length
+specified by `len`.
+*/
+@(require_results)
+make_soa_dynamic_array_len_cap :: proc(
+	$T: typeid/#soa[dynamic]$E,
+	#any_int len: int,
+	#any_int cap: int,
+	allocator := context.allocator,
+	loc := #caller_location
+) -> (array: T, err: Allocator_Error) {
+	return runtime.make_soa_dynamic_array_len_cap(T, len, cap, allocator, loc)
+}
+
+/*
 Allocate.
 */
 make :: proc{
@@ -973,7 +1104,12 @@ make :: proc{
 	make_dynamic_array_len,
 	make_dynamic_array_len_cap,
 	make_map,
+	make_map_cap,
 	make_multi_pointer,
+	make_soa_slice,
+	make_soa_dynamic_array,
+	make_soa_dynamic_array_len,
+	make_soa_dynamic_array_len_cap,
 }
 
 /*

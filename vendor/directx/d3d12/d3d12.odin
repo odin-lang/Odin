@@ -837,6 +837,16 @@ FEATURE :: enum i32 {
 	OPTIONS8                              = 36,
 	OPTIONS9                              = 37,
 	WAVE_MMA                              = 38,
+	OPTIONS10                             = 39,
+	OPTIONS11                             = 40,
+	OPTIONS12                             = 41,
+	OPTIONS13                             = 42,
+	OPTIONS14                             = 43,
+	OPTIONS15                             = 44,
+	OPTIONS16                             = 45,
+	OPTIONS17                             = 46,
+	OPTIONS18                             = 47,
+	OPTIONS19                             = 48,
 }
 
 SHADER_MIN_PRECISION_SUPPORT :: enum i32 {
@@ -1195,6 +1205,74 @@ FEATURE_DATA_OPTIONS9 :: struct {
 	WaveMMATier:                                       WAVE_MMA_TIER,
 }
 
+FEATURE_DATA_OPTIONS10 :: struct {
+	VariableRateShadingSumCombinerSupported:    BOOL,
+	MeshShaderPerPrimitiveShadingRateSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS11 :: struct {
+	AtomicInt64OnDescriptorHeapResourceSupported: BOOL,
+}
+
+TRI_STATE :: enum i32 {
+	UNKNOWN	= -1,
+	FALSE   = 0,
+	TRUE    = 1,
+}		
+
+FEATURE_DATA_OPTIONS12 :: struct {
+	MSPrimitivesPipelineStatisticIncludesCulledPrimitives: TRI_STATE,
+	EnhancedBarriersSupported:                             BOOL,
+	RelaxedFormatCastingSupported:                         BOOL,
+}
+
+FEATURE_DATA_OPTIONS13 :: struct {
+	UnrestrictedBufferTextureCopyPitchSupported: BOOL,
+	UnrestrictedVertexElementAlignmentSupported: BOOL,
+	InvertedViewportHeightFlipsYSupported:       BOOL,
+	InvertedViewportDepthFlipsZSupported:        BOOL,
+	TextureCopyBetweenDimensionsSupported:       BOOL,
+	AlphaBlendFactorSupported:                   BOOL,
+}
+
+FEATURE_DATA_OPTIONS14 :: struct {
+	AdvancedTextureOpsSupported:                    BOOL,
+	WriteableMSAATexturesSupported:                 BOOL,
+	IndependentFrontAndBackStencilRefMaskSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS15 :: struct {
+	TriangleFanSupported:                BOOL,
+	DynamicIndexBufferStripCutSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS16 :: struct {
+	DynamicDepthBiasSupported: BOOL,
+	GPUUploadHeapSupported:    BOOL,
+}
+
+FEATURE_DATA_OPTIONS17 :: struct {
+	NonNormalizedCoordinateSamplersSupported: BOOL,
+	ManualWriteTrackingResourceSupported:     BOOL,
+}
+
+FEATURE_DATA_OPTIONS18 :: struct {
+	RenderPassesValid: BOOL,
+}
+
+FEATURE_DATA_OPTIONS19 :: struct {
+	MismatchingOutputDimensionsSupported:           BOOL,
+	SupportedSampleCountsWithNoOutputs:             u32,
+	PointSamplingAddressesNeverRoundUp:             BOOL,
+	RasterizerDesc2Supported:                       BOOL,
+	NarrowQuadrilateralLinesSupported:              BOOL,
+	AnisoFilterWithPointMipSupported:               BOOL,
+	MaxSamplerDescriptorHeapSize:                   u32,
+	MaxSamplerDescriptorHeapSizeWithStaticSamplers: u32,
+	MaxViewDescriptorHeapSize:                      u32,
+	ComputeOnlyCustomHeapSupported:                 BOOL,
+}
+
 WAVE_MMA_INPUT_DATATYPE :: enum i32 {
 	INVALID = 0,
 	BYTE    = 1,
@@ -1238,10 +1316,11 @@ RESOURCE_ALLOCATION_INFO1 :: struct {
 }
 
 HEAP_TYPE :: enum i32 {
-	DEFAULT  = 1,
-	UPLOAD   = 2,
-	READBACK = 3,
-	CUSTOM   = 4,
+	DEFAULT    = 1,
+	UPLOAD     = 2,
+	READBACK   = 3,
+	CUSTOM     = 4,
+	GPU_UPLOAD = 5,
 }
 
 CPU_PAGE_PROPERTY :: enum i32 {
@@ -1473,7 +1552,7 @@ RESOURCE_STATE_GENERIC_READ :: RESOURCE_STATES{
 	.VERTEX_AND_CONSTANT_BUFFER, .INDEX_BUFFER, .NON_PIXEL_SHADER_RESOURCE, .PIXEL_SHADER_RESOURCE, .INDIRECT_ARGUMENT, .COPY_SOURCE,
 }
 RESOURCE_STATE_ALL_SHADER_RESOURCE :: RESOURCE_STATES{
-	.SHADING_RATE_SOURCE, .INDEX_BUFFER,
+	.NON_PIXEL_SHADER_RESOURCE, .PIXEL_SHADER_RESOURCE,
 }
 
 RESOURCE_BARRIER_TYPE :: enum i32 {
@@ -1580,14 +1659,14 @@ SHADER_COMPONENT_MAPPING :: enum u32 {
 	FORCE_VALUE_1           = 5,
 }
 ENCODE_SHADER_4_COMPONENT_MAPPING :: #force_inline proc "contextless" (Src0, Src1, Src2, Src3: u32) -> u32 {
-    return (Src0 & SHADER_COMPONENT_MAPPING_MASK) |
-           ((Src1 & SHADER_COMPONENT_MAPPING_MASK) << SHADER_COMPONENT_MAPPING_SHIFT) |
-           ((Src2 & SHADER_COMPONENT_MAPPING_MASK) << (SHADER_COMPONENT_MAPPING_SHIFT * 2)) |
-           ((Src3 & SHADER_COMPONENT_MAPPING_MASK) << (SHADER_COMPONENT_MAPPING_SHIFT * 3)) |
-           SHADER_COMPONENT_MAPPING_ALWAYS_SET_BIT_AVOIDING_ZEROMEM_MISTAKES
+	return (Src0 & SHADER_COMPONENT_MAPPING_MASK) |
+	       ((Src1 & SHADER_COMPONENT_MAPPING_MASK) << SHADER_COMPONENT_MAPPING_SHIFT) |
+	       ((Src2 & SHADER_COMPONENT_MAPPING_MASK) << (SHADER_COMPONENT_MAPPING_SHIFT * 2)) |
+	       ((Src3 & SHADER_COMPONENT_MAPPING_MASK) << (SHADER_COMPONENT_MAPPING_SHIFT * 3)) |
+	       SHADER_COMPONENT_MAPPING_ALWAYS_SET_BIT_AVOIDING_ZEROMEM_MISTAKES
 }
 DECODE_SHADER_4_COMPONENT_MAPPING :: #force_inline proc "contextless" (ComponentToExtract, Mapping: u32) -> u32 {
-    return Mapping >> (SHADER_COMPONENT_MAPPING_SHIFT * ComponentToExtract) & SHADER_COMPONENT_MAPPING_MASK
+	return Mapping >> (SHADER_COMPONENT_MAPPING_SHIFT * ComponentToExtract) & SHADER_COMPONENT_MAPPING_MASK
 }
 
 BUFFER_SRV_FLAGS :: distinct bit_set[BUFFER_SRV_FLAG; u32]
@@ -2423,7 +2502,7 @@ IFence1 :: struct #raw_union {
 	using id3d12fence1_vtable: ^IFence1_VTable,
 }
 IFence1_VTable :: struct {
-	#subtype id3d12fence_vtable: IFence_VTable,
+	using id3d12fence_vtable: IFence_VTable,
 	GetCreationFlags: proc "system" (this: ^IFence1) -> FENCE_FLAGS,
 }
 
@@ -2456,14 +2535,14 @@ IDescriptorHeap_VTable :: struct {
 IQueryHeap_UUID_STRING :: "0d9658ae-ed45-469e-a61d-970ec583cab4"
 IQueryHeap_UUID := &IID{0x0d9658ae, 0xed45, 0x469e, {0xa6, 0x1d, 0x97, 0x0e, 0xc5, 0x83, 0xca, 0xb4}}
 IQueryHeap :: struct {
-	#subtype id3d12pageable: IPageable,
+	using id3d12pageable: IPageable,
 }
 
 
 ICommandSignature_UUID_STRING :: "c36a797c-ec80-4f0a-8985-a7b2475082d1"
 ICommandSignature_UUID := &IID{0xc36a797c, 0xec80, 0x4f0a, {0x89, 0x85, 0xa7, 0xb2, 0x47, 0x50, 0x82, 0xd1}}
 ICommandSignature :: struct {
-	#subtype id3d12pageable: IPageable,
+	using id3d12pageable: IPageable,
 }
 
 
@@ -2921,7 +3000,7 @@ META_COMMAND_DESC :: struct {
 IStateObject_UUID_STRING :: "47016943-fca8-4594-93ea-af258b55346d"
 IStateObject_UUID := &IID{0x47016943, 0xfca8, 0x4594, {0x93, 0xea, 0xaf, 0x25, 0x8b, 0x55, 0x34, 0x6d}}
 IStateObject :: struct #raw_union {
-	#subtype id3d12pageable: IPageable,
+	using id3d12pageable: IPageable,
 }
 
 

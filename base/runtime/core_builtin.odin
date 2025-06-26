@@ -67,7 +67,7 @@ init_global_temporary_allocator :: proc(size: int, backup_allocator := context.a
 // Prefer the procedure group `copy`.
 @builtin
 copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
-	n := max(0, min(len(dst), len(src)))
+	n := min(len(dst), len(src))
 	if n > 0 {
 		intrinsics.mem_copy(raw_data(dst), raw_data(src), n*size_of(E))
 	}
@@ -80,7 +80,7 @@ copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
 // Prefer the procedure group `copy`.
 @builtin
 copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
-	n := max(0, min(len(dst), len(src)))
+	n := min(len(dst), len(src))
 	if n > 0 {
 		intrinsics.mem_copy(raw_data(dst), raw_data(src), n)
 	}
@@ -648,6 +648,9 @@ append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (n: i
 
 @builtin
 inject_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcast arg: E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}
@@ -666,6 +669,9 @@ inject_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcas
 
 @builtin
 inject_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}
@@ -689,6 +695,9 @@ inject_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadca
 
 @builtin
 inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, arg: string, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}

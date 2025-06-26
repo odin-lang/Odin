@@ -418,7 +418,7 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 
 
-gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs) {
+gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs, String context_name) {
 	if (rhs->mode == Addressing_Invalid) {
 		return nullptr;
 	}
@@ -430,7 +430,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 
 	Ast *node = unparen_expr(lhs->expr);
 
-	check_no_copy_assignment(*rhs, str_lit("assignment"));
+	check_no_copy_assignment(*rhs, context_name);
 
 	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
@@ -630,7 +630,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		ctx->bit_field_bit_size = lhs_e->Variable.bit_field_bit_size;
 	}
 
-	check_assignment(ctx, rhs, assignment_type, str_lit("assignment"));
+	check_assignment(ctx, rhs, assignment_type, context_name);
 
 	ctx->bit_field_bit_size = prev_bit_field_bit_size;
 
@@ -1446,8 +1446,8 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 
 
 	Ast *nil_seen = nullptr;
-	PtrSet<Type *> seen = {};
-	defer (ptr_set_destroy(&seen));
+	TypeSet seen = {};
+	defer (type_set_destroy(&seen));
 
 	for (Ast *stmt : bs->stmts) {
 		if (stmt->kind != Ast_CaseClause) {
@@ -1515,7 +1515,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					GB_PANIC("Unknown type to type switch statement");
 				}
 
-				if (type_ptr_set_update(&seen, y.type)) {
+				if (type_set_update(&seen, y.type)) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
@@ -1569,7 +1569,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		auto unhandled = array_make<Type *>(temporary_allocator(), 0, variants.count);
 
 		for (Type *t : variants) {
-			if (!type_ptr_set_exists(&seen, t)) {
+			if (!type_set_exists(&seen, t)) {
 				array_add(&unhandled, t);
 			}
 		}
@@ -1591,6 +1591,20 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 			}
 			error_line("\n");
 			error_line("\tSuggestion: Was '#partial switch' wanted?\n");
+		}
+	}
+
+	if (build_context.strict_style) {
+		Token stok = ss->token;
+		for_array(i, bs->stmts) {
+			Ast *stmt = bs->stmts[i];
+			if (stmt->kind != Ast_CaseClause) {
+				continue;
+			}
+			Token ctok = stmt->CaseClause.token;
+			if (ctok.pos.column > stok.pos.column) {
+				error(ctok, "With '-strict-style', 'case' statements must share the same column as the 'switch' token");
+			}
 		}
 	}
 }
@@ -2108,10 +2122,12 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		if (init_type == nullptr) {
 			init_type = t_invalid;
 		} else if (is_type_polymorphic(base_type(init_type))) {
+			/* DISABLED: This error seems too aggressive for instantiated generic types.
 			gbString str = type_to_string(init_type);
 			error(vd->type, "Invalid use of a polymorphic type '%s' in variable declaration", str);
 			gb_string_free(str);
 			init_type = t_invalid;
+			*/
 		}
 		if (init_type == t_invalid && entity_count == 1 && (mod_flags & (Stmt_BreakAllowed|Stmt_FallthroughAllowed))) {
 			Entity *e = entities[0];
@@ -2402,7 +2418,7 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 
 		isize lhs_count = as->lhs.count;
 		if (lhs_count == 0) {
-			error(as->op, "Missing lhs in assignment statement");
+			error(as->op, "Missing LHS in assignment statement");
 			return;
 		}
 
@@ -2435,7 +2451,7 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 			if (lhs_to_ignore[i]) {
 				continue;
 			}
-			check_assignment_variable(ctx, &lhs_operands[i], &rhs_operands[i]);
+			check_assignment_variable(ctx, &lhs_operands[i], &rhs_operands[i], str_lit("assignment"));
 		}
 		if (lhs_count != rhs_count) {
 			error(as->lhs[0], "Assignment count mismatch '%td' = '%td'", lhs_count, rhs_count);
@@ -2445,11 +2461,11 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 		// a += 1; // Single-sided
 		Token op = as->op;
 		if (as->lhs.count != 1 || as->rhs.count != 1) {
-			error(op, "Assignment operation '%.*s' requires single-valued expressions", LIT(op.string));
+			error(op, "Assignment operator '%.*s' requires single-valued operands", LIT(op.string));
 			return;
 		}
 		if (!gb_is_between(op.kind, Token__AssignOpBegin+1, Token__AssignOpEnd-1)) {
-			error(op, "Unknown Assignment operation '%.*s'", LIT(op.string));
+			error(op, "Unknown assignment operator '%.*s'", LIT(op.string));
 			return;
 		}
 		Operand lhs = {Addressing_Invalid};
@@ -2458,15 +2474,16 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 		ast_node(be, BinaryExpr, binary_expr);
 		be->op = op;
 		be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
-		 // NOTE(bill): Only use the first one will be used
+		// NOTE(bill): Only use the first one will be used
 		be->left  = as->lhs[0];
 		be->right = as->rhs[0];
 
 		check_expr(ctx, &lhs, as->lhs[0]);
 		check_binary_expr(ctx, &rhs, binary_expr, nullptr, true);
 		if (rhs.mode != Addressing_Invalid) {
-			// NOTE(bill): Only use the first one will be used
-			check_assignment_variable(ctx, &lhs, &rhs);
+			be->op.string = substring(be->op.string, 0, be->op.string.len - 1);
+			rhs.expr = binary_expr;
+			check_assignment_variable(ctx, &lhs, &rhs, str_lit("assignment operation"));
 		}
 	}
 }
@@ -2755,6 +2772,47 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			if (ctx->decl) {
 				ctx->decl->defer_used += 1;
 			}
+
+			// NOTE(bill): Handling errors/warnings
+
+			Ast *stmt = ds->stmt;
+			Ast *original_stmt = stmt;
+
+			bool is_singular = true;
+			while (is_singular && stmt->kind == Ast_BlockStmt) {
+				Ast *inner_stmt = nullptr;
+				for (Ast *s : stmt->BlockStmt.stmts) {
+					if (s->kind == Ast_EmptyStmt) {
+						continue;
+					}
+					if (inner_stmt != nullptr) {
+						is_singular = false;
+						break;
+					}
+					inner_stmt = s;
+				}
+
+				if (inner_stmt != nullptr) {
+					stmt = inner_stmt;
+				}
+			}
+			if (!is_singular) {
+				stmt = original_stmt;
+			}
+
+			switch (stmt->kind) {
+			case_ast_node(as, AssignStmt, stmt);
+				if (as->op.kind != Token_Eq) {
+					break;
+				}
+				for (Ast *lhs : as->lhs) {
+					Entity *e = entity_of_node(lhs);
+					if (e && e->flags & EntityFlag_Result) {
+						error(lhs, "Assignments to named return values within 'defer' will not affect the value that is returned");
+					}
+				}
+			case_end;
+			}
 		}
 	case_end;
 
@@ -2812,6 +2870,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			case Ast_BlockStmt:
 			case Ast_IfStmt:
 			case Ast_SwitchStmt:
+			case Ast_TypeSwitchStmt:
 				if (token.kind != Token_break) {
 					error(bs->label, "Label '%.*s' can only be used with 'break'", LIT(e->token.string));
 				}

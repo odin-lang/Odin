@@ -157,6 +157,8 @@ internal_rat_norm :: proc(z: ^Rat, allocator := context.allocator) -> (err: Erro
 		z.b.sign = .Zero_or_Positive
 		
 		f := &Int{}
+		defer internal_int_destroy(f)
+		
 		internal_int_gcd(f, &z.a, &z.b) or_return
 		if !internal_int_equals_digit(f, 1) {
 			f.sign = .Zero_or_Positive
@@ -378,9 +380,6 @@ internal_rat_to_float :: proc($T: typeid, z: ^Rat, allocator := context.allocato
 	}
 	
 	has_sign := a.sign != b.sign
-	defer if has_sign {
-		f = -builtin.abs(f)
-	}
 	
 	exp := alen - blen
 	a2, b2 := &Int{}, &Int{}
@@ -439,6 +438,9 @@ internal_rat_to_float :: proc($T: typeid, z: ^Rat, allocator := context.allocato
 	f = T(math.ldexp(f64(mantissa), exp-MSIZE1))
 	if math.is_inf(f, 0) {
 		exact = false
+	}
+	if has_sign {
+		f = -builtin.abs(f)
 	}
 	return
 }

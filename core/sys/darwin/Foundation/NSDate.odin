@@ -18,6 +18,11 @@ Date_dateWithTimeIntervalSinceNow :: proc "c" (secs: TimeInterval) -> ^Date {
 	return msgSend(^Date, Date, "dateWithTimeIntervalSinceNow:", secs)
 }
 
+@(objc_type=Date, objc_name="timeIntervalSince1970")
+Date_timeIntervalSince1970 :: proc "c" (self: ^Date) -> f64 {
+	return msgSend(f64, self, "timeIntervalSince1970")
+}
+
 @(objc_type=Date, objc_name="distantFuture", objc_is_class_method=true)
 Date_distantFuture :: proc "c" () -> ^Date {
 	return msgSend(^Date, Date, "distantFuture")

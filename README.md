@@ -15,7 +15,7 @@
         <img src="https://img.shields.io/discord/568138951836172421?logo=discord">
     </a>
     <a href="https://github.com/odin-lang/odin/actions">
-        <img src="https://github.com/odin-lang/odin/workflows/CI/badge.svg?branch=master&event=push">
+        <img src="https://github.com/odin-lang/odin/actions/workflows/ci.yml/badge.svg?branch=master&event=push">
     </a>
 </p>
 
@@ -75,6 +75,10 @@ Answers to common questions about Odin.
 #### [Packages](https://pkg.odin-lang.org/)
 
 Documentation for all the official packages part of the [core](https://pkg.odin-lang.org/core/) and [vendor](https://pkg.odin-lang.org/vendor/) library collections.
+
+#### [Examples](https://github.com/odin-lang/examples)
+
+Examples on how to write idiomatic Odin code. Shows how to accomplish specific tasks in Odin, as well as how to use packages from `core` and `vendor`.
 
 #### [Odin Documentation](https://odin-lang.org/docs/)
 

@@ -71,7 +71,7 @@ VULKAN_VIDEO_CODEC_H265_ENCODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H265_ENCODE_AP
 MAKE_VIDEO_STD_VERSION :: MAKE_VERSION
 
 // General Constants
-HEADER_VERSION       :: 303
+HEADER_VERSION       :: 309
 MAX_DRIVER_NAME_SIZE :: 256
 MAX_DRIVER_INFO_SIZE :: 256
 
@@ -481,6 +481,15 @@ KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME    :: "VK_KHR_shader_rela
 KHR_maintenance7                                          :: 1
 KHR_MAINTENANCE_7_SPEC_VERSION                            :: 1
 KHR_MAINTENANCE_7_EXTENSION_NAME                          :: "VK_KHR_maintenance7"
+KHR_maintenance8                                          :: 1
+KHR_MAINTENANCE_8_SPEC_VERSION                            :: 1
+KHR_MAINTENANCE_8_EXTENSION_NAME                          :: "VK_KHR_maintenance8"
+KHR_video_maintenance2                                    :: 1
+KHR_VIDEO_MAINTENANCE_2_SPEC_VERSION                      :: 1
+KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME                    :: "VK_KHR_video_maintenance2"
+KHR_depth_clamp_zero_one                                  :: 1
+KHR_DEPTH_CLAMP_ZERO_ONE_SPEC_VERSION                     :: 1
+KHR_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME                   :: "VK_KHR_depth_clamp_zero_one"
 EXT_debug_report                                          :: 1
 EXT_DEBUG_REPORT_SPEC_VERSION                             :: 10
 EXT_DEBUG_REPORT_EXTENSION_NAME                           :: "VK_EXT_debug_report"
@@ -1008,6 +1017,9 @@ NV_MEMORY_DECOMPRESSION_EXTENSION_NAME                    :: "VK_NV_memory_decom
 NV_device_generated_commands_compute                      :: 1
 NV_DEVICE_GENERATED_COMMANDS_COMPUTE_SPEC_VERSION         :: 2
 NV_DEVICE_GENERATED_COMMANDS_COMPUTE_EXTENSION_NAME       :: "VK_NV_device_generated_commands_compute"
+NV_ray_tracing_linear_swept_spheres                       :: 1
+NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_SPEC_VERSION          :: 1
+NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME        :: "VK_NV_ray_tracing_linear_swept_spheres"
 NV_linear_color_attachment                                :: 1
 NV_LINEAR_COLOR_ATTACHMENT_SPEC_VERSION                   :: 1
 NV_LINEAR_COLOR_ATTACHMENT_EXTENSION_NAME                 :: "VK_NV_linear_color_attachment"
@@ -1053,6 +1065,9 @@ EXT_SHADER_OBJECT_EXTENSION_NAME                          :: "VK_EXT_shader_obje
 NV_ray_tracing_invocation_reorder                         :: 1
 NV_RAY_TRACING_INVOCATION_REORDER_SPEC_VERSION            :: 1
 NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME          :: "VK_NV_ray_tracing_invocation_reorder"
+NV_cooperative_vector                                     :: 1
+NV_COOPERATIVE_VECTOR_SPEC_VERSION                        :: 4
+NV_COOPERATIVE_VECTOR_EXTENSION_NAME                      :: "VK_NV_cooperative_vector"
 NV_extended_sparse_address_space                          :: 1
 NV_EXTENDED_SPARSE_ADDRESS_SPACE_SPEC_VERSION             :: 1
 NV_EXTENDED_SPARSE_ADDRESS_SPACE_EXTENSION_NAME           :: "VK_NV_extended_sparse_address_space"
@@ -1101,6 +1116,12 @@ EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME           :: "VK_EXT_shader_repl
 NV_ray_tracing_validation                                 :: 1
 NV_RAY_TRACING_VALIDATION_SPEC_VERSION                    :: 1
 NV_RAY_TRACING_VALIDATION_EXTENSION_NAME                  :: "VK_NV_ray_tracing_validation"
+NV_cluster_acceleration_structure                         :: 1
+NV_CLUSTER_ACCELERATION_STRUCTURE_SPEC_VERSION            :: 2
+NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME          :: "VK_NV_cluster_acceleration_structure"
+NV_partitioned_acceleration_structure                     :: 1
+NV_PARTITIONED_ACCELERATION_STRUCTURE_SPEC_VERSION        :: 1
+NV_PARTITIONED_ACCELERATION_STRUCTURE_EXTENSION_NAME      :: "VK_NV_partitioned_acceleration_structure"
 EXT_device_generated_commands                             :: 1
 EXT_DEVICE_GENERATED_COMMANDS_SPEC_VERSION                :: 1
 EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME              :: "VK_EXT_device_generated_commands"
@@ -1113,6 +1134,9 @@ NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME                    :: "VK_NV_cooperative_
 EXT_vertex_attribute_robustness                           :: 1
 EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_SPEC_VERSION              :: 1
 EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME            :: "VK_EXT_vertex_attribute_robustness"
+NV_present_metering                                       :: 1
+NV_PRESENT_METERING_SPEC_VERSION                          :: 1
+NV_PRESENT_METERING_EXTENSION_NAME                        :: "VK_NV_present_metering"
 KHR_acceleration_structure                                :: 1
 KHR_ACCELERATION_STRUCTURE_SPEC_VERSION                   :: 13
 KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME                 :: "VK_KHR_acceleration_structure"
@@ -1158,6 +1182,9 @@ EXT_METAL_SURFACE_EXTENSION_NAME                          :: "VK_EXT_metal_surfa
 EXT_metal_objects                                         :: 1
 EXT_METAL_OBJECTS_SPEC_VERSION                            :: 2
 EXT_METAL_OBJECTS_EXTENSION_NAME                          :: "VK_EXT_metal_objects"
+EXT_external_memory_metal                                 :: 1
+EXT_EXTERNAL_MEMORY_METAL_SPEC_VERSION                    :: 1
+EXT_EXTERNAL_MEMORY_METAL_EXTENSION_NAME                  :: "VK_EXT_external_memory_metal"
 KHR_wayland_surface                                       :: 1
 KHR_WAYLAND_SURFACE_SPEC_VERSION                          :: 6
 KHR_WAYLAND_SURFACE_EXTENSION_NAME                        :: "VK_KHR_wayland_surface"
@@ -1167,6 +1194,15 @@ KHR_XLIB_SURFACE_EXTENSION_NAME                           :: "VK_KHR_xlib_surfac
 KHR_xcb_surface                                           :: 1
 KHR_XCB_SURFACE_SPEC_VERSION                              :: 6
 KHR_XCB_SURFACE_EXTENSION_NAME                            :: "VK_KHR_xcb_surface"
+KHR_portability_subset                                    :: 1
+KHR_PORTABILITY_SUBSET_SPEC_VERSION                       :: 1
+KHR_PORTABILITY_SUBSET_EXTENSION_NAME                     :: "VK_KHR_portability_subset"
+AMDX_shader_enqueue                                       :: 1
+AMDX_SHADER_ENQUEUE_SPEC_VERSION                          :: 2
+AMDX_SHADER_ENQUEUE_EXTENSION_NAME                        :: "VK_AMDX_shader_enqueue"
+NV_displacement_micromap                                  :: 1
+NV_DISPLACEMENT_MICROMAP_SPEC_VERSION                     :: 2
+NV_DISPLACEMENT_MICROMAP_EXTENSION_NAME                   :: "VK_NV_displacement_micromap"
 
 // Handles types
 Instance       :: distinct Handle

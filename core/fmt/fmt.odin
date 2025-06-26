@@ -116,11 +116,12 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 }
 // 	Creates a formatted string
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 // 	- args: A variadic list of arguments to be formatted.
 // 	- sep: An optional separator string (default is a single space).
+// 	- allocator: (default: context.allocator)
 //
 // 	Returns: A formatted string. 
 //
@@ -132,11 +133,12 @@ aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> strin
 }
 // 	Creates a formatted string with a newline character at the end
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 // 	- args: A variadic list of arguments to be formatted.
 // 	- sep: An optional separator string (default is a single space).
+// 	- allocator: (default: context.allocator)
 //
 // 	Returns: A formatted string with a newline character at the end.
 //
@@ -148,11 +150,12 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 }
 // 	Creates a formatted string using a format string and arguments
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 //	- fmt: A format string with placeholders for the provided arguments.
 //	- args: A variadic list of arguments to be formatted.
+//	- allocator: (default: context.allocator)
 //	- newline: Whether the string should end with a newline. (See `aprintfln`.)
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
@@ -165,11 +168,12 @@ aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newlin
 }
 // 	Creates a formatted string using a format string and arguments, followed by a newline.
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 // 	- fmt: A format string with placeholders for the provided arguments.
 // 	- args: A variadic list of arguments to be formatted.
+// 	- allocator: (default: context.allocator)
 //
 // 	Returns: A formatted string. The returned string must be freed accordingly.
 //
@@ -314,7 +318,29 @@ assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_locati
 				p = runtime.default_assertion_failure_proc
 			}
 			message := tprintf(fmt, ..args)
-			p("Runtime assertion", message, loc)
+			p("runtime assertion", message, loc)
+		}
+		internal(loc, fmt, ..args)
+	}
+}
+// Runtime ensure with a formatted message
+//
+// Inputs:
+// - condition: The boolean condition to be asserted
+// - fmt: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+// - loc: The location of the caller
+//
+ensuref :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) {
+	if !condition {
+		@(cold)
+		internal :: proc(loc: runtime.Source_Code_Location, fmt: string, args: ..any) {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = runtime.default_assertion_failure_proc
+			}
+			message := tprintf(fmt, ..args)
+			p("unsatisfied ensure", message, loc)
 		}
 		internal(loc, fmt, ..args)
 	}
@@ -332,16 +358,17 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 		p = runtime.default_assertion_failure_proc
 	}
 	message := tprintf(fmt, ..args)
-	p("Panic", message, loc)
+	p("panic", message, loc)
 }
 
 // 	Creates a formatted C string
 //
-// 	*Allocates Using Context's Allocator*
+// 	*Allocates Using Provided Allocator*
 //
 // 	Inputs:
 // 	- args: A variadic list of arguments to be formatted.
 // 	- sep: An optional separator string (default is a single space).
+// 	- allocator: (default: context.allocator)
 //
 // 	Returns: A formatted C string.
 //
@@ -357,11 +384,12 @@ caprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstr
 
 // Creates a formatted C string
 //
-// *Allocates Using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - format: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
+// - allocator: (default: context.allocator)
 // - newline: Whether the string should end with a newline. (See `caprintfln`.)
 //
 // Returns: A formatted C string
@@ -377,11 +405,12 @@ caprintf :: proc(format: string, args: ..any, allocator := context.allocator, ne
 }
 // Creates a formatted C string, followed by a newline.
 //
-// *Allocates Using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - format: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
+// - allocator: (default: context.allocator)
 //
 // Returns: A formatted C string
 //
@@ -591,6 +620,10 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 			i += 1
 			width_index, _, index_ok := _arg_number(fmt, &i, len(args))
 
+			if !index_ok {
+				width_index, index_ok = error_check_arg(fi, false, unused_args^)
+			}
+
 			if index_ok {
 				unused_args^ -= {width_index}
 
@@ -615,6 +648,10 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 			if i < end && fmt[i] == '*' {
 				i += 1
 				precision_index, _, index_ok := _arg_number(fmt, &i, len(args))
+
+				if !index_ok {
+					precision_index, index_ok = error_check_arg(fi, false, unused_args^)
+				}
 
 				if index_ok {
 					unused_args^ -= {precision_index}
@@ -1085,7 +1122,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
 	if fi.plus                           { flags += {.Plus}   }
-	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
+	s := strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
 	prev_zero := fi.zero
 	defer fi.zero = prev_zero
 	fi.zero = false
@@ -1170,7 +1207,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
 	if fi.plus                           { flags += {.Plus}   }
-	s := strconv.append_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
+	s := strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
 		c: byte = 0
@@ -1235,7 +1272,7 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 	}
 
 	buf: [256]byte
-	str := strconv.append_float(buf[:], amt, 'f', prec, 64)
+	str := strconv.write_float(buf[:], amt, 'f', prec, 64)
 
 	// Add the unit at the end.
 	copy(buf[len(str):], units[off:off+unit_len])
@@ -1267,7 +1304,7 @@ fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	case 'q', 'w':
 		fi.n += io.write_quoted_rune(fi.writer, r)
 	case:
-		fmt_int(fi, u64(r), false, 32, verb)
+		fmt_int(fi, u64(u32(r)), false, 32, verb)
 	}
 }
 // Formats an integer value according to the specified formatting verb.
@@ -1357,9 +1394,9 @@ _pad :: proc(fi: ^Info, s: string) {
 	if fi.minus { // right pad
 		io.write_string(fi.writer, s, &fi.n)
 		fmt_write_padding(fi, width)
-	} else if !fi.space && s != "" && s[0] == '-' {
+	} else if !fi.space && s != "" && (s[0] == '-' || s[0] == '+') {
 		// left pad accounting for zero pad of negative number
-		io.write_byte(fi.writer, '-', &fi.n)
+		io.write_byte(fi.writer, s[0], &fi.n)
 		fmt_write_padding(fi, width)
 		io.write_string(fi.writer, s[1:], &fi.n)
 	} else { // left pad
@@ -1387,7 +1424,7 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 	buf: [386]byte
 
 	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
-	str := strconv.append_float(buf[:], v, float_fmt, prec, bit_size)
+	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size)
 
 	if !fi.plus {
 		// Strip sign from "+<value>" but not "+Inf".
@@ -1412,9 +1449,12 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		_fmt_float_as(fi, v, bit_size, verb, 'g', -1)
 	case 'f', 'F':
 		_fmt_float_as(fi, v, bit_size, verb, 'f', 3)
-	case 'e', 'E':
+	case 'e':
 		// BUG(): "%.3e" returns "3.000e+00"
 		_fmt_float_as(fi, v, bit_size, verb, 'e', 6)
+	case 'E':
+		// BUG(): "%.3E" returns "3.000E+00"
+		_fmt_float_as(fi, v, bit_size, verb, 'E', 6)
 
 	case 'h', 'H':
 		prev_fi := fi^
@@ -1765,11 +1805,8 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 
 		e, is_enum := et.variant.(runtime.Type_Info_Enum)
 		commas := 0
-		loop: for i in 0 ..< bit_size {
-			if bits & (1<<i) == 0 {
-				continue loop
-			}
-
+		loop: for i in transmute(bit_set[0..<128])bits {
+			i := i64(i) + info.lower
 			if commas > 0 {
 				io.write_string(fi.writer, ", ", &fi.n)
 			}
@@ -1792,8 +1829,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 					}
 				}
 			}
-			v := i64(i) + info.lower
-			io.write_i64(fi.writer, v, 10, &fi.n)
+			io.write_i64(fi.writer, i, 10, &fi.n)
 			commas += 1
 		}
 	}

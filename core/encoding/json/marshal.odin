@@ -108,13 +108,13 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) {
 			switch i in a {
 			case u8, u16, u32, u64, u128:
-				s = strconv.append_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
+				s = strconv.write_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
 
 			case:
-				s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+				s = strconv.write_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
 			}
 		} else {
-			s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+			s = strconv.write_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
 		}
 
 		io.write_string(w, s) or_return
@@ -209,13 +209,23 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_end(w, opt, ']') or_return
 		
 	case runtime.Type_Info_Enumerated_Array:
-		opt_write_start(w, opt, '[') or_return
+		index_type := reflect.type_info_base(info.index)
+		enum_type := index_type.variant.(reflect.Type_Info_Enum)
+
+		opt_write_start(w, opt, '{') or_return
 		for i in 0..<info.count {
+			value := cast(runtime.Type_Info_Enum_Value)i
+			index, found := slice.linear_search(enum_type.values, value)
+			if !found {
+				continue
+			}
+
 			opt_write_iteration(w, opt, i == 0) or_return
+			opt_write_key(w, opt, enum_type.names[index]) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
-		opt_write_end(w, opt, ']') or_return
+		opt_write_end(w, opt, '}') or_return
 		
 	case runtime.Type_Info_Dynamic_Array:
 		opt_write_start(w, opt, '[') or_return
@@ -276,7 +286,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 						case runtime.Type_Info_Integer:
 							buf: [40]byte
 							u := cast_any_int_to_u128(ka)
-							name = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
+							name = strconv.write_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
 							
 							opt_write_key(w, opt, name) or_return
 						case: return .Unsupported_Type

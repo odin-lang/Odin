@@ -251,7 +251,10 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			exp *= 10;
 			exp += v;
 		}
-		big_int_exp_u64(dst, &b, exp, success);
+		BigInt tmp = {};
+		mp_init(&tmp);
+		big_int_exp_u64(&tmp, &b, exp, success);
+		big_int_mul_eq(dst, &tmp);
 	}
 
 	if (is_negative) {

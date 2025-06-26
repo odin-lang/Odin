@@ -123,6 +123,7 @@ foreign kernel32 {
 	WaitCommEvent :: proc(handle: HANDLE, lpEvtMask: LPDWORD, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
+	GetTempFileNameW :: proc(lpPathName: LPCWSTR, lpPrefixString: LPCWSTR, uUnique: c_int, lpTempFileName: LPWSTR) -> c_uint ---
 	GetCurrentProcess :: proc() -> HANDLE ---
 	GetCurrentProcessId :: proc() -> DWORD ---
 	GetCurrentThread :: proc() -> HANDLE ---
@@ -167,6 +168,7 @@ foreign kernel32 {
 	ResumeThread :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---
 	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
+	GetThreadDescription :: proc(hThread: HANDLE, ppszThreadDescription: ^PCWSTR) -> HRESULT ---
 	SetThreadDescription :: proc(hThread: HANDLE, lpThreadDescription: PCWSTR) -> HRESULT ---
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
@@ -370,6 +372,12 @@ foreign kernel32 {
 		bManualReset: BOOL,
 		bInitialState: BOOL,
 		lpName: LPCWSTR,
+	) -> HANDLE ---
+	CreateEventExW :: proc(
+		lpEventAttributes: LPSECURITY_ATTRIBUTES,
+		lpName: LPCWSTR,
+		dwFlags: DWORD,
+		dwDesiredAccess: DWORD,
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
@@ -856,7 +864,6 @@ MEMORY_RESOURCE_NOTIFICATION_TYPE :: enum c_int {
 LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryResourceNotification
 HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification
 
-
 @(default_calling_convention="system")
 foreign kernel32 {
 	CreateMemoryResourceNotification :: proc(
@@ -1193,7 +1200,7 @@ DUMMYUNIONNAME_u :: struct #raw_union {
 SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	ProcessorMask: ULONG_PTR,
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
-	DummyUnion: DUMMYUNIONNAME_u,
+	using DummyUnion: DUMMYUNIONNAME_u,
 }
 
 SYSTEM_POWER_STATUS :: struct {
@@ -1240,3 +1247,31 @@ GHND                :: (GMEM_MOVEABLE | GMEM_ZEROINIT)
 GPTR                :: (GMEM_FIXED | GMEM_ZEROINIT)
 
 LPTOP_LEVEL_EXCEPTION_FILTER :: PVECTORED_EXCEPTION_HANDLER
+
+ACTCTXW :: struct {
+	Size:                  ULONG,
+	Flags:                 DWORD,
+	Source:                LPCWSTR,
+	ProcessorArchitecture: USHORT,
+	LangId:                LANGID,
+	AssemblyDirectory:     LPCWSTR,
+	ResourceName:          LPCWSTR,
+	ApplicationName:       LPCWSTR,
+	Module:                HMODULE,
+}
+PACTCTXW  :: ^ACTCTXW
+PCACTCTXW :: ^ACTCTXW
+
+ACTCTX_FLAG_PROCESSOR_ARCHITECTURE_VALID :: 0x001
+ACTCTX_FLAG_LANGID_VALID                 :: 0x002
+ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID     :: 0x004
+ACTCTX_FLAG_RESOURCE_NAME_VALID          :: 0x008
+ACTCTX_FLAG_SET_PROCESS_DEFAULT          :: 0x010
+ACTCTX_FLAG_APPLICATION_NAME_VALID       :: 0x020
+ACTCTX_FLAG_HMODULE_VALID                :: 0x080
+
+@(default_calling_convention="system")
+foreign kernel32 {
+	CreateActCtxW :: proc(pActCtx: ^ACTCTXW) -> HANDLE ---
+	ActivateActCtx :: proc(hActCtx: HANDLE, lpCookie: ^ULONG_PTR) -> BOOL ---
+}

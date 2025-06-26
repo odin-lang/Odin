@@ -3,9 +3,18 @@ package vendor_box2d
 import "core:c"
 import "core:math"
 
-pi :: 3.14159265359
+EPSILON :: 1e-23
 
 Vec2 :: [2]f32
+
+// Cosine and sine pair
+// This uses a custom implementation designed for cross-platform determinism
+CosSin :: struct {
+	// cosine and sine
+	cosine: f32,
+	sine:   f32,
+}
+
 Rot :: struct {
 	c, s: f32, // cosine and sine
 }
@@ -21,10 +30,42 @@ AABB :: struct {
 	upperBound: Vec2,
 }
 
+// separation = dot(normal, point) - offset
+Plane :: struct {
+	normal: Vec2,
+	offset: f32,
+}
+
+PI :: math.PI
+
 Vec2_zero          :: Vec2{0, 0}
 Rot_identity       :: Rot{1, 0}
 Transform_identity :: Transform{{0, 0}, {1, 0}}
 Mat22_zero         :: Mat22{0, 0, 0, 0}
+
+// @return the minimum of two integers
+@(deprecated="Prefer the built-in 'min(a, b)'", require_results)
+MinInt :: proc "c" (a, b: c.int) -> c.int {
+	return min(a, b)
+}
+
+// @return the maximum of two integers
+@(deprecated="Prefer the built-in 'max(a, b)'", require_results)
+MaxInt :: proc "c" (a, b: c.int) -> c.int {
+	return max(a, b)
+}
+
+// @return the absolute value of an integer
+@(deprecated="Prefer the built-in 'abs(a)'", require_results)
+AbsInt :: proc "c" (a: c.int) -> c.int {
+	return abs(a)
+}
+
+// @return an integer clamped between a lower and upper bound
+@(deprecated="Prefer the built-in 'clamp(a, lower, upper)'", require_results)
+ClampInt :: proc "c" (a, lower, upper: c.int) -> c.int {
+	return clamp(a, lower, upper)
+}
 
 
 // @return the minimum of two floats
@@ -51,28 +92,15 @@ ClampFloat :: proc "c" (a, lower, upper: f32) -> f32 {
 	return clamp(a, lower, upper)
 }
 
-// @return the minimum of two integers
-@(deprecated="Prefer the built-in 'min(a, b)'", require_results)
-MinInt :: proc "c" (a, b: c.int) -> c.int {
-	return min(a, b)
+@(require_results)
+Atan2 :: proc "c" (y, x: f32) -> f32 {
+	return math.atan2(y, x)
 }
 
-// @return the maximum of two integers
-@(deprecated="Prefer the built-in 'max(a, b)'", require_results)
-MaxInt :: proc "c" (a, b: c.int) -> c.int {
-	return max(a, b)
-}
-
-// @return the absolute value of an integer
-@(deprecated="Prefer the built-in 'abs(a)'", require_results)
-AbsInt :: proc "c" (a: c.int) -> c.int {
-	return abs(a)
-}
-
-// @return an integer clamped between a lower and upper bound
-@(deprecated="Prefer the built-in 'clamp(a, lower, upper)'", require_results)
-ClampInt :: proc "c" (a, lower, upper: c.int) -> c.int {
-	return clamp(a, lower, upper)
+@(require_results)
+ComputeCosSin :: proc "c" (radians: f32) -> (res: CosSin) {
+	res.sine, res.cosine = math.sincos(radians)
+	return
 }
 
 // Vector dot product
@@ -198,12 +226,6 @@ Length :: proc "c" (v: Vec2) -> f32 {
 	return math.sqrt(v.x * v.x + v.y * v.y)
 }
 
-// Get the length squared of this vector
-@(require_results)
-LengthSquared :: proc "c" (v: Vec2) -> f32 {
-	return v.x * v.x + v.y * v.y
-}
-
 // Get the distance between two points
 @(require_results)
 Distance :: proc "c" (a, b: Vec2) -> f32 {
@@ -212,45 +234,41 @@ Distance :: proc "c" (a, b: Vec2) -> f32 {
 	return math.sqrt(dx * dx + dy * dy)
 }
 
-// Get the distance squared between points
 @(require_results)
-DistanceSquared :: proc "c" (a, b: Vec2) -> f32 {
-	c := Vec2{b.x - a.x, b.y - a.y}
-	return c.x * c.x + c.y * c.y
+Normalize :: proc "c" (v: Vec2) -> Vec2 {
+	length := Length(v)
+	if length < EPSILON {
+		return Vec2_zero
+	}
+	invLength := 1 / length
+	return invLength * v
 }
 
-// Make a rotation using an angle in radians
 @(require_results)
-MakeRot :: proc "c" (angle: f32) -> Rot {
-	// todo determinism
-	return {math.cos(angle), math.sin(angle)}
+IsNormalized :: proc "c" (v: Vec2) -> bool {
+	aa := Dot(v, v)
+	return abs(1. - aa) < 10. * EPSILON
 }
 
-// Normalize rotation
 @(require_results)
-NormalizeRot :: proc "c" (q: Rot) -> Rot {
-	mag := math.sqrt(q.s * q.s + q.c * q.c)
-	invMag := f32(mag > 0.0 ? 1.0 / mag : 0.0)
-	return {q.c * invMag, q.s * invMag}
+NormalizeChecked :: proc "odin" (v: Vec2) -> Vec2 {
+	length := Length(v)
+	if length < 1e-23 {
+		panic("zero-length Vec2")
+	}
+	invLength := 1 / length
+	return invLength * v
 }
 
-// Is this rotation normalized?
 @(require_results)
-IsNormalized :: proc "c" (q: Rot) -> bool {
-	// larger tolerance due to failure on mingw 32-bit
-	qq := q.s * q.s + q.c * q.c
-	return 1.0 - 0.0006 < qq && qq < 1 + 0.0006
-}
-
-// Normalized linear interpolation
-// https://fgiesen.wordpress.com/2012/08/15/linear-interpolation-past-present-and-future/
-@(require_results)
-NLerp :: proc "c" (q1: Rot, q2: Rot, t: f32) -> Rot {
-	omt := 1 - t
-	return NormalizeRot({
-		omt * q1.c + t * q2.c,
-		omt * q1.s + t * q2.s,
-	})
+GetLengthAndNormalize :: proc "c" (v: Vec2) -> (length: f32, vn: Vec2) {
+	length = Length(v)
+	if length < 1e-23 {
+		return
+	}
+	invLength := 1 / length
+	vn = invLength * v
+	return
 }
 
 // Integration rotation from angular velocity
@@ -266,6 +284,63 @@ IntegrateRotation :: proc "c" (q1: Rot, deltaAngle: f32) -> Rot {
 	mag := math.sqrt(q2.s * q2.s + q2.c * q2.c)
 	invMag := f32(mag > 0.0 ? 1 / mag : 0.0)
 	return {q2.c * invMag, q2.s * invMag}
+}
+
+// Get the length squared of this vector
+@(require_results)
+LengthSquared :: proc "c" (v: Vec2) -> f32 {
+	return v.x * v.x + v.y * v.y
+}
+
+// Get the distance squared between points
+@(require_results)
+DistanceSquared :: proc "c" (a, b: Vec2) -> f32 {
+	c := Vec2{b.x - a.x, b.y - a.y}
+	return c.x * c.x + c.y * c.y
+}
+
+// Make a rotation using an angle in radians
+@(require_results)
+MakeRot :: proc "c" (angle: f32) -> Rot {
+	cs := ComputeCosSin(angle)
+	return Rot{c=cs.cosine, s=cs.sine}
+}
+
+// Compute the rotation between two unit vectors
+@(require_results)
+ComputeRotationBetweenUnitVectors :: proc(v1, v2: Vec2) -> Rot {
+	return NormalizeRot({
+		c = Dot(v1, v2),
+		s = Cross(v1, v2),
+	})
+}
+
+// Is this rotation normalized?
+@(require_results)
+IsNormalizedRot :: proc "c" (q: Rot) -> bool {
+	// larger tolerance due to failure on mingw 32-bit
+	qq := q.s * q.s + q.c * q.c
+	return 1.0 - 0.0006 < qq && qq < 1 + 0.0006
+}
+
+// Normalize rotation
+@(require_results)
+NormalizeRot :: proc "c" (q: Rot) -> Rot {
+	mag := math.sqrt(q.s * q.s + q.c * q.c)
+	invMag := f32(mag > 0.0 ? 1.0 / mag : 0.0)
+	return {q.c * invMag, q.s * invMag}
+}
+
+// Normalized linear interpolation
+// https://fgiesen.wordpress.com/2012/08/15/linear-interpolation-past-present-and-future/
+// https://web.archive.org/web/20170825184056/http://number-none.com/product/Understanding%20Slerp,%20Then%20Not%20Using%20It/
+@(require_results)
+NLerp :: proc "c" (q1: Rot, q2: Rot, t: f32) -> Rot {
+	omt := 1 - t
+	return NormalizeRot({
+		omt * q1.c + t * q2.c,
+		omt * q1.s + t * q2.s,
+	})
 }
 
 // Compute the angular velocity necessary to rotate between two rotations over a give time
@@ -291,8 +366,7 @@ ComputeAngularVelocity :: proc "c" (q1: Rot, q2: Rot, inv_h: f32) -> f32 {
 // Get the angle in radians in the range [-pi, pi]
 @(require_results)
 Rot_GetAngle :: proc "c" (q: Rot) -> f32 {
-	// todo determinism
-	return math.atan2(q.s, q.c)
+	return Atan2(q.s, q.c)
 }
 
 // Get the x-axis
@@ -338,18 +412,34 @@ RelativeAngle :: proc "c" (b, a: Rot) -> f32 {
 	// cos(b - a) = bc * ac + bs * as
 	s := b.s * a.c - b.c * a.s
 	c := b.c * a.c + b.s * a.s
-	return math.atan2(s, c)
+	return Atan2(s, c)
 }
 
 // Convert an angle in the range [-2*pi, 2*pi] into the range [-pi, pi]
 @(require_results)
-UnwindAngle :: proc "c" (angle: f32) -> f32 {
-	if angle < -pi {
-		return angle + 2.0 * pi
-	} else if angle > pi {
-		return angle - 2.0 * pi
+UnwindAngle :: proc "c" (radians: f32) -> f32 {
+	if radians < -PI {
+		return radians + 2.0 * PI
+	} else if radians > PI {
+		return radians - 2.0 * PI
 	}
-	return angle
+	return radians
+}
+
+// Convert any into the range [-pi, pi] (slow)
+@(require_results)
+UnwindLargeAngle :: proc "c" (radians: f32) -> f32 {
+	radians := radians
+
+	for radians > PI {
+		radians -= 2. * PI
+	}
+
+	for radians < -PI {
+		radians += 2. * PI
+	}
+
+	return radians
 }
 
 // Rotate a vector
@@ -380,6 +470,9 @@ InvTransformPoint :: proc "c" (t: Transform, p: Vec2) -> Vec2 {
 	return {t.q.c * vx + t.q.s * vy, -t.q.s * vx + t.q.c * vy}
 }
 
+// Multiply two transforms. If the result is applied to a point p local to frame B,
+// the transform would first convert p to a point local to frame A, then into a point
+// in the world frame.
 // v2 = A.q.Rot(B.q.Rot(v1) + B.p) + A.p
 //    = (A.q * B.q).Rot(v1) + A.q.Rot(B.p) + A.p
 @(require_results)
@@ -389,6 +482,7 @@ MulTransforms :: proc "c" (A, B: Transform) -> (C: Transform) {
 	return
 }
 
+// Creates a transform that converts a local point in frame B to a local point in frame A.
 // v2 = A.q' * (B.q * v1 + B.p - A.p)
 //    = A.q' * B.q * v1 + A.q' * (B.p - A.p)
 @(require_results)
@@ -469,54 +563,65 @@ AABB_Union :: proc "c" (a, b: AABB) -> (c: AABB) {
 	return
 }
 
+// Compute the bounding box of an array of circles
 @(require_results)
-Float_IsValid :: proc "c" (a: f32) -> bool {
-	math.is_nan(a) or_return
-	math.is_inf(a) or_return
+MakeAABB :: proc "c" (points: []Vec2, radius: f32) -> AABB {
+	a := AABB{points[0], points[0]}
+	for point in points {
+		a.lowerBound = Min(a.lowerBound, point)
+		a.upperBound = Max(a.upperBound, point)
+	}
+
+	r := Vec2{radius, radius}
+	a.lowerBound = a.lowerBound - r
+	a.upperBound = a.upperBound + r
+
+	return a
+}
+
+// Signed separation of a point from a plane
+@(require_results)
+PlaneSeparation :: proc "c" (plane: Plane, point: Vec2) -> f32 {
+	return Dot(plane.normal, point) - plane.offset
+}
+
+@(require_results)
+IsValidFloat :: proc "c" (a: f32) -> bool {
+	#partial switch math.classify(a) {
+	case .NaN, .Inf, .Neg_Inf: return false
+	case:                      return true
+	}
+}
+
+@(require_results)
+IsValidVec2 :: proc "c" (v: Vec2) -> bool {
+	IsValidFloat(v.x) or_return
+	IsValidFloat(v.y) or_return
 	return true
 }
 
 @(require_results)
-Vec2_IsValid :: proc "c" (v: Vec2) -> bool {
-	(math.is_nan(v.x) || math.is_nan(v.y)) or_return
-	(math.is_inf(v.x) || math.is_inf(v.y)) or_return
+IsValidRotation :: proc "c" (q: Rot) -> bool {
+	IsValidFloat(q.s) or_return
+	IsValidFloat(q.c) or_return
+	return IsNormalizedRot(q)
+}
+
+// Is this a valid bounding box? Not Nan or infinity. Upper bound greater than or equal to lower bound.
+@(require_results)
+IsValidAABB :: proc "c" (aabb: AABB) -> bool {
+	IsValidVec2(aabb.lowerBound) or_return
+	IsValidVec2(aabb.upperBound) or_return
+	(aabb.upperBound.x >= aabb.lowerBound.x) or_return
+	(aabb.upperBound.y >= aabb.lowerBound.y) or_return
 	return true
 }
 
+// Is this a valid plane? Normal is a unit vector. Not Nan or infinity.
 @(require_results)
-Rot_IsValid :: proc "c" (q: Rot) -> bool {
-	(math.is_nan(q.s) || math.is_nan(q.c)) or_return
-	(math.is_inf(q.s) || math.is_inf(q.c)) or_return
-	return IsNormalized(q)
-}
-
-@(require_results)
-Normalize :: proc "c" (v: Vec2) -> Vec2 {
-	length := Length(v)
-	if length < 1e-23 {
-		return Vec2_zero
-	}
-	invLength := 1 / length
-	return invLength * v
-}
-
-@(require_results)
-NormalizeChecked :: proc "odin" (v: Vec2) -> Vec2 {
-	length := Length(v)
-	if length < 1e-23 {
-		panic("zero-length Vec2")
-	}
-	invLength := 1 / length
-	return invLength * v
-}
-
-@(require_results)
-GetLengthAndNormalize :: proc "c" (v: Vec2) -> (length: f32, vn: Vec2) {
-	length = Length(v)
-	if length < 1e-23 {
-		return
-	}
-	invLength := 1 / length
-	vn = invLength * v
-	return
+IsValidPlane :: proc "c" (plane: Plane) -> bool {
+	IsValidFloat(plane.offset) or_return
+	IsValidVec2(plane.normal)  or_return
+	IsNormalized(plane.normal) or_return
+	return true
 }

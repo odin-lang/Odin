@@ -682,11 +682,14 @@ find_aux :: proc(
 
 // iterative matching which returns the 0th/1st match
 // rest has to be used from captures
+// assumes captures is zeroed on first iteration
+// resets captures to zero on last iteration
 gmatch :: proc(
 	haystack: ^string,
 	pattern: string,
 	captures: ^[MAX_CAPTURES]Match,
 ) -> (res: string, ok: bool) {
+	haystack^ = haystack[captures[0].byte_end:]
 	if len(haystack) > 0 {
 		length, err := find_aux(haystack^, pattern, 0, false, captures)
 
@@ -695,10 +698,11 @@ gmatch :: proc(
 			first := length > 1 ? 1 : 0
 			cap := captures[first]
 			res = haystack[cap.byte_start:cap.byte_end]
-			haystack^ = haystack[cap.byte_end:]
 		}
 	} 
-
+	if !ok {
+		captures^ = {}
+	}
 	return
 }
 
@@ -794,11 +798,14 @@ gsub_with :: proc(
 gsub :: proc { gsub_builder, gsub_allocator }
 
 // iterative find with zeroth capture only
+// assumes captures is zeroed on first iteration
+// resets captures to zero on last iteration
 gfind :: proc(
 	haystack: ^string,
 	pattern: string,
 	captures: ^[MAX_CAPTURES]Match,
 ) -> (res: string, ok: bool) {
+	haystack^ = haystack[captures[0].byte_end:]
 	if len(haystack) > 0 {
 		length, err := find_aux(haystack^, pattern, 0, true, captures)
 
@@ -806,10 +813,11 @@ gfind :: proc(
 			ok = true
 			cap := captures[0]
 			res = haystack[cap.byte_start:cap.byte_end]
-			haystack^ = haystack[cap.byte_end:]
 		}
 	} 
-
+	if !ok {
+		captures^ = {}
+	}
 	return
 }
 

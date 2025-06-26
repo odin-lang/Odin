@@ -7,10 +7,11 @@ package net
 */
 
 /*
-	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
-	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
-	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
-	Copyright 2024 Feoramund       <rune@swevencraft.org>.
+	Copyright 2022 Tetralux             <tetraluxonpc@gmail.com>
+	Copyright 2022 Colin Davidson       <colrdavidson@gmail.com>
+	Copyright 2022 Jeroen van Rijn      <nom@duclavier.com>.
+	Copyright 2024 Feoramund            <rune@swevencraft.org>.
+	Copyright 2025 Christiano Haesbaert <haesbaert@haesbaert.org>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
@@ -18,66 +19,45 @@ package net
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 		Feoramund:       FreeBSD platform code
+		Haesbaert:       Security fixes
 */
 
+@(require) import "base:runtime"
 import "core:mem"
 import "core:strings"
 import "core:time"
 import "core:os"
-/*
-	Default configuration for DNS resolution.
-*/
+import "core:math/rand"
+@(require) import "core:sync"
+
+dns_config_initialized: sync.Once
 when ODIN_OS == .Windows {
-	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
-		resolv_conf        = "",
-		hosts_file         = "%WINDIR%\\system32\\drivers\\etc\\hosts",
+	dns_configuration := DNS_Configuration{
+		resolv_conf = "",
+		hosts_file  = "%WINDIR%\\system32\\drivers\\etc\\hosts",
 	}
 } else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
-	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
-		resolv_conf        = "/etc/resolv.conf",
-		hosts_file         = "/etc/hosts",
+	dns_configuration := DNS_Configuration{
+		resolv_conf = "/etc/resolv.conf",
+		hosts_file  = "/etc/hosts",
 	}
 } else {
 	#panic("Please add a configuration for this OS.")
 }
 
-@(init)
+/*
+	Replaces environment placeholders in `dns_configuration`. Only necessary on Windows.
+	Is automatically called, once, by `get_dns_records_*`.
+*/
+@(private)
 init_dns_configuration :: proc() {
-	/*
-		Resolve %ENVIRONMENT% placeholders in their paths.
-	*/
-	dns_configuration.resolv_conf, _ = replace_environment_path(dns_configuration.resolv_conf)
-	dns_configuration.hosts_file,  _ = replace_environment_path(dns_configuration.hosts_file)
-}
-
-destroy_dns_configuration :: proc() {
-	delete(dns_configuration.resolv_conf)
-	delete(dns_configuration.hosts_file)
-}
-
-dns_configuration := DEFAULT_DNS_CONFIGURATION
-
-// Always allocates for consistency.
-replace_environment_path :: proc(path: string, allocator := context.allocator) -> (res: string, ok: bool) {
-	// Nothing to replace. Return a clone of the original.
-	if strings.count(path, "%") != 2 {
-		return strings.clone(path, allocator), true
+	when ODIN_OS == .Windows {
+		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+		val := os.replace_environment_placeholders(dns_configuration.hosts_file, context.temp_allocator)
+		copy(dns_configuration.hosts_file_buf[:], val)
+		dns_configuration.hosts_file = string(dns_configuration.hosts_file_buf[:len(val)])
 	}
-
-	left  := strings.index(path, "%") + 1
-	assert(left > 0 && left <= len(path)) // should be covered by there being two %
-
-	right := strings.index(path[left:], "%") + 1
-	assert(right > 0 && right <= len(path)) // should be covered by there being two %
-
-	env_key := path[left: right]
-	env_val := os.get_env(env_key, allocator)
-	defer delete(env_val)
-
-	res, _ = strings.replace(path, path[left - 1: right + 1], env_val, 1, allocator)
-	return res, true
 }
-
 
 /*
 	Resolves a hostname to exactly one IP4 and IP6 endpoint.
@@ -132,7 +112,14 @@ resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Net
 			return
 		}
 	case Host:
-		recs, _ := get_dns_records_from_os(t.hostname, .IP4, context.temp_allocator)
+		recs: []DNS_Record
+
+		if ODIN_OS != .Windows && strings.has_suffix(t.hostname, ".local") {
+			recs, _ = get_dns_records_from_nameservers(t.hostname, .IP4, {IP4_mDNS_Broadcast}, nil, context.temp_allocator)
+		} else {
+			recs, _ = get_dns_records_from_os(t.hostname, .IP4, context.temp_allocator)
+		}
+
 		if len(recs) == 0 {
 			err = .Unable_To_Resolve
 			return
@@ -159,7 +146,14 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 			return t, nil
 		}
 	case Host:
-		recs, _ := get_dns_records_from_os(t.hostname, .IP6, context.temp_allocator)
+		recs: []DNS_Record
+
+		if ODIN_OS != .Windows && strings.has_suffix(t.hostname, ".local") {
+			recs, _ = get_dns_records_from_nameservers(t.hostname, .IP6, {IP6_mDNS_Broadcast}, nil, context.temp_allocator)
+		} else {
+			recs, _ = get_dns_records_from_os(t.hostname, .IP6, context.temp_allocator)
+		}
+
 		if len(recs) == 0 {
 			err = .Unable_To_Resolve
 			return
@@ -184,6 +178,9 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 	See `destroy_records`.
 */
 get_dns_records_from_os :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
+	when ODIN_OS == .Windows {
+		sync.once_do(&dns_config_initialized, init_dns_configuration)
+	}
 	return _get_dns_records_os(hostname, type, allocator)
 }
 
@@ -199,6 +196,9 @@ get_dns_records_from_os :: proc(hostname: string, type: DNS_Record_Type, allocat
 	See `destroy_records`.
 */
 get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type, name_servers: []Endpoint, host_overrides: []DNS_Record, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
+	when ODIN_OS == .Windows {
+		sync.once_do(&dns_config_initialized, init_dns_configuration)
+	}
 	context.allocator = allocator
 
 	if type != .SRV {
@@ -210,7 +210,7 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	}
 
 	hdr := DNS_Header{
-		id = 0,
+		id = u16be(rand.uint32()),
 		is_response = false,
 		opcode = 0,
 		is_authoritative = false,
@@ -255,22 +255,22 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 			return nil, .Connection_Error
 		}
 
-		// recv_sz, _, recv_err := recv_udp(conn, dns_response_buf[:])
-		// if recv_err == UDP_Recv_Error.Timeout {
-		// 	continue
-		// } else if recv_err != nil {
-		// 	continue
-		// }
-		recv_sz, _ := recv_udp(conn, dns_response_buf[:]) or_continue
+		recv_sz, src := recv_udp(conn, dns_response_buf[:]) or_continue
 		if recv_sz == 0 {
+			continue
+		}
+		if src != name_server {
 			continue
 		}
 
 		dns_response = dns_response_buf[:recv_sz]
 
-		rsp, _ok := parse_response(dns_response, type)
+		rsp, xid, _ok := parse_response(dns_response, type)
 		if !_ok {
 			return nil, .Server_Error
+		}
+		if id != xid {
+			continue
 		}
 
 		if len(rsp) == 0 {
@@ -420,6 +420,8 @@ load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (
 		splits := strings.fields(line)
 		defer delete(splits)
 
+		(len(splits) >= 2) or_continue
+
 		ip_str := splits[0]
 		addr := parse_address(ip_str)
 		if addr == nil {
@@ -525,18 +527,21 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 			return
 		}
 
-		if packet[cur_idx] > 63 && packet[cur_idx] != 0xC0 {
-			return
-		}
+		switch {
 
-		switch packet[cur_idx] {
-
-		// This is a offset to more data in the packet, jump to it
-		case 0xC0:
+		// A pointer is when the two higher bits are set.
+		case packet[cur_idx] & 0xC0 == 0xC0:
+			if len(packet[cur_idx:]) < 2 {
+				return
+			}
 			pkt := packet[cur_idx:cur_idx+2]
 			val := (^u16be)(raw_data(pkt))^
 			offset := int(val & 0x3FFF)
-			if offset > len(packet) {
+			// RFC 9267 a ptr should only point backwards, enough to avoid infinity.
+			// "The offset at which this octet is located must be smaller than the offset
+			// at which the compression pointer is located". Still keep iteration_max to
+			// avoid tiny jumps.
+			if offset > len(packet) || offset >= cur_idx {
 				return
 			}
 
@@ -546,6 +551,10 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 				out_size += 2
 				level += 1
 			}
+
+		// Validate label len
+		case packet[cur_idx] > LABEL_MAX:
+			return
 
 		// This is a label, insert it into the hostname
 		case:
@@ -785,7 +794,7 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 	- Data[]
 */
 
-parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
+parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator := context.allocator) -> (records: []DNS_Record, xid: u16be, ok: bool) {
 	context.allocator = allocator
 
 	HEADER_SIZE_BYTES :: 12
@@ -798,11 +807,13 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 	dns_hdr_chunks := mem.slice_data_cast([]u16be, response[:HEADER_SIZE_BYTES])
 	hdr := unpack_dns_header(dns_hdr_chunks[0], dns_hdr_chunks[1])
 	if !hdr.is_response {
+		delete(_records)
 		return
 	}
 
 	question_count := int(dns_hdr_chunks[2])
 	if question_count != 1 {
+		delete(_records)
 		return
 	}
 	answer_count := int(dns_hdr_chunks[3])
@@ -854,6 +865,7 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 			append(&_records, rec)
 		}
 	}
+	xid = hdr.id
 
-	return _records[:], true
+	return _records[:], xid, true
 }

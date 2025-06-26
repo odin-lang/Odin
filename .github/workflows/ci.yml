@@ -30,11 +30,13 @@ jobs:
           gmake -C vendor/stb/src
           gmake -C vendor/cgltf/src
           gmake -C vendor/miniaudio/src
-          ./odin check examples/all -vet -strict-style -disallow-do -target:netbsd_amd64
-          ./odin check examples/all -vet -strict-style -disallow-do -target:netbsd_arm64
-          ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-          ./odin test tests/core/speed.odin -file -all-packages -vet -strict-style -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-          ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64
+          ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64
+          ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64 -no-entry-point
+          ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64 -no-entry-point
+          ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin test tests/core/speed.odin -file -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           (cd tests/issues; ./run.sh)
           ./odin check tests/benchmark -vet -strict-style -no-entry-point
 
@@ -50,7 +52,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          pkg install -y gmake git bash python3 libxml2 llvm17
+          pkg install -y gmake git bash python3 libxml2 llvm18
         run: |
           # `set -e` is needed for test failures to register. https://github.com/vmactions/freebsd-vm/issues/72
           set -e -x
@@ -61,10 +63,11 @@ jobs:
           gmake -C vendor/stb/src
           gmake -C vendor/cgltf/src
           gmake -C vendor/miniaudio/src
-          ./odin check examples/all -vet -strict-style -disallow-do -target:freebsd_amd64
-          ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-          ./odin test tests/core/speed.odin -file -all-packages -vet -strict-style -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-          ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
+          ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64 -no-entry-point
+          ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin test tests/core/speed.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           (cd tests/issues; ./run.sh)
           ./odin check tests/benchmark -vet -strict-style -no-entry-point
   ci:
@@ -72,32 +75,35 @@ jobs:
       fail-fast: false
       matrix:
         # MacOS 13 runs on Intel, 14 runs on ARM
-        os: [ubuntu-latest, macos-13, macos-14]
+        os: [macos-14, ubuntu-latest]
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel' || 'Ubuntu') }} Build, Check, and Test
+    name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
 
-      - name: Download LLVM (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 17
-          echo "/usr/lib/llvm-17/bin" >> $GITHUB_PATH
+      - uses: actions/checkout@v4
 
       - name: Download LLVM (MacOS Intel)
         if: matrix.os == 'macos-13'
         run: |
-          brew install llvm@17 lua@5.4
-          echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
+          brew update
+          brew install llvm@20 lua@5.4 lld
+          echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-14'
         run: |
-          brew install llvm@17 wasmtime lua@5.4
-          echo "/opt/homebrew/opt/llvm@17/bin" >> $GITHUB_PATH
+          brew update
+          brew install llvm@20 wasmtime lua@5.4 lld
+          echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
+
+      - name: Download LLVM (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Build Odin
         run: ./build_odin.sh release
@@ -117,40 +123,61 @@ jobs:
       - name: Odin run -debug
         run: ./odin run examples/demo -debug
       - name: Odin check examples/all
-        run: ./odin check examples/all -strict-style
+        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
+      - name: Odin check examples/all/sdl3
+        run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
       - name: Normal Core library tests
-        run: ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+        run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Optimized Core library tests
-        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Vendor library tests
-        run: ./odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+        run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Internals tests
-        run: ./odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+        run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: GitHub Issue tests
         run: |
           cd tests/issues
           ./run.sh
 
-      - name: Check benchmarks
-        run: ./odin check tests/benchmark -vet -strict-style -no-entry-point
-      - name: Odin check examples/all for Linux i386
-        run: ./odin check examples/all -vet -strict-style -disallow-do -target:linux_i386
-        if: matrix.os == 'ubuntu-latest'
-      - name: Odin check examples/all for Linux arm64
-        run: ./odin check examples/all -vet -strict-style -disallow-do -target:linux_arm64
-        if: matrix.os == 'ubuntu-latest'
-      - name: Odin check examples/all for FreeBSD amd64
-        run: ./odin check examples/all -vet -strict-style -disallow-do -target:freebsd_amd64
-        if: matrix.os == 'ubuntu-latest'
-      - name: Odin check examples/all for OpenBSD amd64
-        run: ./odin check examples/all -vet -strict-style -disallow-do -target:openbsd_amd64
-        if: matrix.os == 'ubuntu-latest'
-
       - name: Run demo on WASI WASM32
         run: |
-          ./odin build examples/demo -target:wasi_wasm32 -vet -strict-style -disallow-do -out:demo.wasm
+          ./odin build examples/demo -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
           wasmtime ./demo.wasm
         if: matrix.os == 'macos-14'
+
+      - name: Check benchmarks
+        run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
+      - name: Odin check examples/all for Linux i386
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_i386
+      - name: Odin check examples/all for Linux arm64
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_arm64
+      - name: Odin check examples/all for FreeBSD amd64
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
+      - name: Odin check examples/all for OpenBSD amd64
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:openbsd_amd64
+      - name: Odin check examples/all for js_wasm32
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:js_wasm32
+      - name: Odin check examples/all for js_wasm64p32
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:js_wasm64p32
+
+      - name: Odin check examples/all/sdl3 for Linux i386
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:linux_i386
+      - name: Odin check examples/all/sdl3 for Linux arm64
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:linux_arm64
+      - name: Odin check examples/all/sdl3 for FreeBSD amd64
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:freebsd_amd64
+      - name: Odin check examples/all/sdl3 for OpenBSD amd64
+        if: matrix.os == 'ubuntu-latest'
+        run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:openbsd_amd64
 
   build_windows:
     name: Windows Build, Check, and Test
@@ -181,33 +208,38 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin run examples/demo -debug -vet -strict-style -disallow-do
+          odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
       - name: Odin check examples/all
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin check examples/all -vet -strict-style -disallow-do
+          odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
+      - name: Odin check examples/all/sdl3
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
       - name: Core library tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Optimized core library tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin test tests/core/speed.odin -o:speed -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Vendor library tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           copy vendor\lua\5.4\windows\*.dll .
-          odin test tests/vendor -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Odin internals tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Check issues
         shell: cmd
         run: |
@@ -224,12 +256,6 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\documentation
-          call build.bat
-      - name: core:math/big tests
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\core\math\big
           call build.bat
       - name: Odin check examples/all for Windows 32bits
         shell: cmd
@@ -266,23 +292,26 @@ jobs:
           make -C vendor/cgltf/src
           make -C vendor/miniaudio/src
 
-      - name: Odin check
-        run: ./odin check examples/all -target:linux_riscv64 -vet -strict-style -disallow-do
+      - name: Odin check examples/all
+        run: ./odin check examples/all -target:linux_riscv64 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
+
+      - name: Odin check examples/all/sdl3
+        run: ./odin check examples/all/sdl3 -target:linux_riscv64 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
 
       - name: Install riscv64 toolchain and qemu
         run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
 
       - name: Odin run
-        run: ./odin run examples/demo -vet -strict-style -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin run examples/demo -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 
       - name: Odin run -debug
-        run: ./odin run examples/demo -debug -vet -strict-style -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 
       - name: Normal Core library tests
-        run: ./odin test tests/core/normal.odin -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 
       - name: Optimized Core library tests
-        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 
       - name: Internals tests
-        run: ./odin test tests/internal -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath

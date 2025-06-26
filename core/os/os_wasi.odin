@@ -244,3 +244,27 @@ exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	wasi.proc_exit(wasi.exitcode_t(code))
 }
+
+@(require_results)
+lookup_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	return "", false
+}
+
+@(require_results)
+lookup_env_buffer :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	return "", .Env_Var_Not_Found
+}
+lookup_env :: proc{lookup_env_alloc, lookup_env_buffer}
+
+@(require_results)
+get_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	value, _ = lookup_env(key, allocator)
+	return
+}
+
+@(require_results)
+get_env_buf :: proc(buf: []u8, key: string) -> (value: string) {
+	value, _ = lookup_env(buf, key)
+	return
+}
+get_env :: proc{get_env_alloc, get_env_buf}

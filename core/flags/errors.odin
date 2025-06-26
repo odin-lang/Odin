@@ -4,7 +4,7 @@ import "core:os"
 
 Parse_Error_Reason :: enum {
 	None,
-	// An extra positional argument was given, and there is no `varg` field.
+	// An extra positional argument was given, and there is no `overflow` field.
 	Extra_Positional,
 	// The underlying type does not support the string value it is being set to.
 	Bad_Value,

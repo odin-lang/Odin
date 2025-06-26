@@ -19,6 +19,8 @@ BOOL    :: dxgi.BOOL
 UINT    :: dxgi.UINT
 INT     :: dxgi.INT
 
+LPCWSTR  :: [^]u16
+
 RECT :: dxgi.RECT
 SIZE :: dxgi.SIZE
 
@@ -3281,7 +3283,19 @@ IVideoContext_VTable :: struct {
 	VideoProcessorGetStreamRotation:           proc "system" (this: ^IVideoContext, pVideoProcessor: ^IVideoProcessor, StreamIndex: u32, pEnable: ^BOOL, pRotation: ^VIDEO_PROCESSOR_ROTATION),
 }
 
-
+IUserDefinedAnnotation_UUID_STRING :: "B2DAAD8B-03D4-4DBF-95EB-32AB4B63D0AB"
+IUserDefinedAnnotation_UUID := &IID{0xB2DAAD8B, 0x03D4, 0x4DBF, {0x95, 0xEB, 0x32, 0xAB, 0x4B, 0x63, 0xD0, 0xAB}}
+IUserDefinedAnnotation :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using id3d11userdefinedannotation_vtable: ^IUserDefinedAnnotation_VTable,
+}
+IUserDefinedAnnotation_VTable :: struct {
+	using iunknown_vtable : IUnknown_VTable,
+	BeginEvent: proc "system" (this: ^IUserDefinedAnnotation, Name: LPCWSTR) -> i32,
+	EndEvent:   proc "system" (this: ^IUserDefinedAnnotation) -> i32,
+	GetStatus:  proc "system" (this: ^IUserDefinedAnnotation) -> i32,
+	SetMarker:  proc "system" (this: ^IUserDefinedAnnotation, Name: LPCWSTR),
+}
 
 IVideoDevice_UUID_STRING :: "10EC4D5B-975A-4689-B9E4-D0AAC30FE333"
 IVideoDevice_UUID := &IID{0x10EC4D5B, 0x975A, 0x4689, {0xB9, 0xE4, 0xD0, 0xAA, 0xC3, 0x0F, 0xE3, 0x33}}

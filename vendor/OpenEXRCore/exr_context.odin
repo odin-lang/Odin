@@ -1,11 +1,5 @@
 package vendor_openexr
 
-when ODIN_OS == .Windows {
-	foreign import lib "OpenEXRCore-3_1.lib"
-} else {
-	foreign import lib "system:OpenEXRCore-3_1"
-}
-
 import "core:c"
 
 #assert(size_of(c.int) == size_of(b32))
@@ -282,6 +276,8 @@ context_initializer_t :: struct {
 	/** Initialize with a bitwise or of the various context flags
 	 */
 	flags: c.int,
+
+	pad: [4]u8,
 }
 
 /** @brief context flag which will enforce strict header validation
@@ -418,19 +414,42 @@ foreign lib {
 		filename: cstring,
 		ctxtdata: ^context_initializer_t) -> result_t ---
 
+	/** @brief Create a new context for temporary use in memory.
+	*
+	* This is a custom mode that does not supporting writing actual image
+	* data, but one can create one of these, manipulate attributes,
+	* define additional parts, run validation, etc. without any
+	* requirement of actual file i/o.
+	*
+	* Note that this creates an defines an initial part for use, so one
+	* can immediately start definining attributes into part index 0.
+	*
+	* See the initializer context documentation \ref
+	* exr_context_initializer_t to be able to provide allocation
+	* overrides or other controls. The @p ctxtdata parameter is optional,
+	* if `NULL`, default values will be used.
+	*/
+	start_temporary_context :: proc(
+		ctxt:         ^context_t,
+		context_name: [^]c.char,
+		ctxtdata:     ^context_initializer_t) -> result_t ---
+
 	/** @brief Retrieve the file name the context is for as provided
 	 * during the start routine.
 	 *
 	 * Do not free the resulting string.
 	 */
-
 	get_file_name :: proc(ctxt: const_context_t, name: ^cstring) -> result_t ---
+
+	/** @brief Retrieve the file version and flags the context is for as
+	 * parsed during the start routine.
+	 */
+	get_file_version_and_flags :: proc(ctxt: const_context_t, ver: ^u32) -> result_t ---
 
 	/** @brief Query the user data the context was constructed with. This
 	 * is perhaps useful in the error handler callback to jump back into
 	 * an object the user controls.
 	 */
-
 	get_user_data :: proc(ctxt: const_context_t, userdata: ^rawptr) -> result_t ---
 
 	/** Any opaque attribute data entry of the specified type is tagged

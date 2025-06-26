@@ -11,7 +11,6 @@ See:
 - https://www.hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html
 */
 
-import "base:intrinsics"
 import "core:crypto"
 import field "core:crypto/_fiat/field_curve25519"
 import "core:mem"
@@ -32,6 +31,7 @@ import "core:mem"
 // - The group element decoding routine takes the opinionated stance of
 //   rejecting non-canonical encodings.
 
+@(rodata)
 FE_D := field.Tight_Field_Element {
 	929955233495203,
 	466365720129213,
@@ -39,7 +39,7 @@ FE_D := field.Tight_Field_Element {
 	2033849074728123,
 	1442794654840575,
 }
-@(private)
+@(private, rodata)
 FE_A := field.Tight_Field_Element {
 	2251799813685228,
 	2251799813685247,
@@ -47,7 +47,7 @@ FE_A := field.Tight_Field_Element {
 	2251799813685247,
 	2251799813685247,
 }
-@(private)
+@(private, rodata)
 FE_D2 := field.Tight_Field_Element {
 	1859910466990425,
 	932731440258426,
@@ -55,7 +55,7 @@ FE_D2 := field.Tight_Field_Element {
 	1815898335770999,
 	633789495995903,
 }
-@(private)
+@(private, rodata)
 GE_BASEPOINT := Group_Element {
 	field.Tight_Field_Element {
 		1738742601995546,
@@ -80,6 +80,7 @@ GE_BASEPOINT := Group_Element {
 		1821297809914039,
 	},
 }
+@(rodata)
 GE_IDENTITY := Group_Element {
 	field.Tight_Field_Element{0, 0, 0, 0, 0},
 	field.Tight_Field_Element{1, 0, 0, 0, 0},
@@ -107,9 +108,7 @@ ge_set :: proc "contextless" (ge, a: ^Group_Element) {
 
 @(require_results)
 ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
-	if len(b) != 32 {
-		intrinsics.trap()
-	}
+	ensure_contextless(len(b) == 32, "edwards25519: invalid group element size")
 	b_ := (^[32]byte)(raw_data(b))
 
 	// Do the work in a scratch element, so that ge is unchanged on
@@ -166,9 +165,7 @@ ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
 }
 
 ge_bytes :: proc "contextless" (ge: ^Group_Element, dst: []byte) {
-	if len(dst) != 32 {
-		intrinsics.trap()
-	}
+	ensure_contextless(len(dst) == 32, "edwards25519: invalid group element size")
 	dst_ := (^[32]byte)(raw_data(dst))
 
 	// Convert the element to affine (x, y) representation.

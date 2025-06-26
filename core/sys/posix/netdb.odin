@@ -352,15 +352,28 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	// The highest reserved port number.
 	IPPORT_RESERVED :: 1024
 
-	addrinfo :: struct {
-		ai_flags:     Addrinfo_Flags, /* [PSX] input flags */
-		ai_family:    AF,             /* [PSX] address family of socket */
-		ai_socktype:  Sock,           /* [PSX] socket type */
-		ai_protocol:  Protocol,       /* [PSX] protocol of socket */
-		ai_addrlen:   socklen_t,      /* [PSX] length of socket address */
-		ai_canonname: cstring,        /* [PSX] canonical name of service location */
-		ai_addr:      ^sockaddr,      /* [PSX] binary address */
-		ai_next:      ^addrinfo,      /* [PSX] pointer to next in list */
+	when ODIN_OS == .Linux || ODIN_OS == .OpenBSD {
+		addrinfo :: struct {
+			ai_flags:     Addrinfo_Flags, /* [PSX] input flags */
+			ai_family:    AF,             /* [PSX] address family of socket */
+			ai_socktype:  Sock,           /* [PSX] socket type */
+			ai_protocol:  Protocol,       /* [PSX] protocol of socket */
+			ai_addrlen:   socklen_t,      /* [PSX] length of socket address */
+			ai_addr:      ^sockaddr,      /* [PSX] binary address */
+			ai_canonname: cstring,        /* [PSX] canonical name of service location */
+			ai_next:      ^addrinfo,      /* [PSX] pointer to next in list */
+		}
+	} else {
+		addrinfo :: struct {
+			ai_flags:     Addrinfo_Flags, /* [PSX] input flags */
+			ai_family:    AF,             /* [PSX] address family of socket */
+			ai_socktype:  Sock,           /* [PSX] socket type */
+			ai_protocol:  Protocol,       /* [PSX] protocol of socket */
+			ai_addrlen:   socklen_t,      /* [PSX] length of socket address */
+			ai_canonname: cstring,        /* [PSX] canonical name of service location */
+			ai_addr:      ^sockaddr,      /* [PSX] binary address */
+			ai_next:      ^addrinfo,      /* [PSX] pointer to next in list */
+		}
 	}
 
 	when ODIN_OS == .Darwin {

@@ -4,6 +4,7 @@ package test_core_runtime
 import "base:intrinsics"
 import "core:mem"
 import "base:runtime"
+import "core:slice"
 import "core:testing"
 
 // Tests that having space for the allocation, but not for the allocation and alignment
@@ -32,6 +33,21 @@ test_temp_allocator_big_alloc_and_alignment :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_align_bumping_block_limit :: proc(t: ^testing.T) {
+	a: runtime.Arena
+	a.minimum_block_size = 8*mem.Megabyte
+	defer runtime.arena_destroy(&a)
+
+	data, err := runtime.arena_alloc(&a, 4193371, 1)
+	testing.expect_value(t, err, nil)
+	testing.expect(t, len(data) == 4193371)
+
+	data, err = runtime.arena_alloc(&a, 896, 64)
+	testing.expect_value(t, err, nil)
+	testing.expect(t, len(data) == 896)
+}
+
+@(test)
 test_temp_allocator_returns_correct_size :: proc(t: ^testing.T) {
 	arena: runtime.Arena
 	context.allocator = runtime.arena_allocator(&arena)
@@ -44,26 +60,26 @@ test_temp_allocator_returns_correct_size :: proc(t: ^testing.T) {
 
 @(test)
 test_init_cap_map_dynarray :: proc(t: ^testing.T) {
-        m1 := make(map[int]string)
-        defer delete(m1)
-        testing.expect(t, cap(m1) == 0)
-        testing.expect(t, m1.allocator.procedure == context.allocator.procedure)
+	m1 := make(map[int]string)
+	defer delete(m1)
+	testing.expect(t, cap(m1) == 0)
+	testing.expect(t, m1.allocator.procedure == context.allocator.procedure)
 
-        ally := context.temp_allocator
-        m2 := make(map[int]string, ally)
-        defer delete(m2)
-        testing.expect(t, cap(m2) == 0)
-        testing.expect(t, m2.allocator.procedure == ally.procedure)
+	ally := context.temp_allocator
+	m2 := make(map[int]string, ally)
+	defer delete(m2)
+	testing.expect(t, cap(m2) == 0)
+	testing.expect(t, m2.allocator.procedure == ally.procedure)
 
-        d1 := make([dynamic]string)
-        defer delete(d1)
-        testing.expect(t, cap(d1) == 0)
-        testing.expect(t, d1.allocator.procedure == context.allocator.procedure)
+	d1 := make([dynamic]string)
+	defer delete(d1)
+	testing.expect(t, cap(d1) == 0)
+	testing.expect(t, d1.allocator.procedure == context.allocator.procedure)
 
-        d2 := make([dynamic]string, ally)
-        defer delete(d2)
-        testing.expect(t, cap(d2) == 0)
-        testing.expect(t, d2.allocator.procedure == ally.procedure)
+	d2 := make([dynamic]string, ally)
+	defer delete(d2)
+	testing.expect(t, cap(d2) == 0)
+	testing.expect(t, d2.allocator.procedure == ally.procedure)
 }
 
 @(test)
@@ -160,5 +176,80 @@ test_map_get :: proc(t: ^testing.T) {
 		}
 		defer delete(m)
 		check(t, m)
+	}
+}
+
+@(test)
+test_memory_equal :: proc(t: ^testing.T) {
+	data: [256]u8
+	cmp: [256]u8
+
+	slice.fill(data[:], 0xAA)
+	slice.fill(cmp[:], 0xAA)
+
+	for offset in 0..<len(data) {
+		subdata := data[offset:]
+		subcmp := cmp[offset:]
+		for idx in 0..<len(subdata) {
+			if !testing.expect_value(t, runtime.memory_equal(&subdata[0], &subcmp[0], len(subdata)), true) {
+				return
+			}
+
+			subcmp[idx] = 0x55
+			if !testing.expect_value(t, runtime.memory_equal(&subdata[0], &subcmp[0], len(subdata)), false) {
+				return
+			}
+			subcmp[idx] = 0xAA
+		}
+	}
+}
+
+@(test)
+test_memory_compare :: proc(t: ^testing.T) {
+	data: [256]u8
+	cmp: [256]u8
+
+	for offset in 0..<len(data) {
+		subdata := data[offset:]
+		subcmp := cmp[offset:]
+		for idx in 0..<len(subdata) {
+			if !testing.expect_value(t, runtime.memory_compare(&subdata[0], &subcmp[0], len(subdata)), 0) {
+				return
+			}
+
+			subdata[idx] = 0x7F
+			subcmp[idx] = 0xFF
+			if !testing.expect_value(t, runtime.memory_compare(&subdata[0], &subcmp[0], len(subdata)), -1) {
+				return
+			}
+
+			subdata[idx] = 0xFF
+			subcmp[idx] = 0x7F
+			if !testing.expect_value(t, runtime.memory_compare(&subdata[0], &subcmp[0], len(subdata)), 1) {
+				return
+			}
+
+			subdata[idx] = 0
+			subcmp[idx] = 0
+		}
+	}
+}
+
+@(test)
+test_memory_compare_zero :: proc(t: ^testing.T) {
+	data: [256]u8
+
+	for offset in 0..<len(data) {
+		subdata := data[offset:]
+		for idx in 0..<len(subdata) {
+			if !testing.expect_value(t, runtime.memory_compare_zero(&subdata[0], len(subdata)), 0) {
+				return
+			}
+			subdata[idx] = 0xFF
+			if !testing.expect_value(t, runtime.memory_compare_zero(&subdata[0], len(subdata)), 1) {
+				return
+			}
+			subdata[idx] = 0
+		}
 	}
 }

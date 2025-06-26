@@ -29,12 +29,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		t.id = sync.current_thread_id()
 
-		if .Started not_in sync.atomic_load(&t.flags) {
+		for (.Started not_in sync.atomic_load(&t.flags)) {
 			sync.wait(&t.start_ok)
-		}
-
-		if .Joined in sync.atomic_load(&t.flags) {
-			return nil
 		}
 
 		// Enable thread's cancelability.
@@ -124,7 +120,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
-
 	return thread
 }
 
@@ -149,10 +144,13 @@ _join :: proc(t: ^Thread) {
 
 	// Prevent non-started threads from blocking main thread with initial wait
 	// condition.
-	if .Started not_in sync.atomic_load(&t.flags) {
+	for (.Started not_in sync.atomic_load(&t.flags)) {
 		_start(t)
 	}
+
 	posix.pthread_join(t.unix_thread, nil)
+
+	t.flags += {.Joined}
 }
 
 _join_multiple :: proc(threads: ..^Thread) {

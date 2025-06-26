@@ -95,6 +95,10 @@ CPU_Feature :: enum u64 {
 }
 
 CPU_Features :: distinct bit_set[CPU_Feature; u64]
-
-cpu_features: Maybe(CPU_Features)
-cpu_name: Maybe(string)
+CPU :: struct {
+	name:           Maybe(string),
+	features:       Maybe(CPU_Features),
+	physical_cores: int,
+	logical_cores:  int,
+}
+cpu: CPU

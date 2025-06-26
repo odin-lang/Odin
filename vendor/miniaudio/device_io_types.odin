@@ -351,8 +351,11 @@ device_id :: struct #raw_union {
 	nullbackend: c.int,                 /* The null backend uses an integer for device IDs. */
 }
 
+data_format_flag :: enum c.int {
+	EXCLUSIVE_MODE = 1, /* If set, this is supported in exclusive mode. Otherwise not natively supported by exclusive mode. */
+}
 
-DATA_FORMAT_FLAG_EXCLUSIVE_MODE :: 1 << 1    /* If set, this is supported in exclusive mode. Otherwise not natively supported by exclusive mode. */
+data_format_flags :: bit_set[data_format_flag; u32]
 
 MAX_DEVICE_NAME_LENGTH :: 255
 
@@ -364,10 +367,10 @@ device_info :: struct {
 
 	nativeDataFormatCount: u32,
 	nativeDataFormats: [/*len(format_count) * standard_sample_rate.rate_count * MAX_CHANNELS*/ 64]struct { /* Not sure how big to make this. There can be *many* permutations for virtual devices which can support anything. */
-		format:     format, /* Sample format. If set to ma_format_unknown, all sample formats are supported. */
-		channels:   u32,    /* If set to 0, all channels are supported. */
-		sampleRate: u32,    /* If set to 0, all sample rates are supported. */
-		flags:      u32,    /* A combination of MA_DATA_FORMAT_FLAG_* flags. */
+		format:     format,            /* Sample format. If set to ma_format_unknown, all sample formats are supported. */
+		channels:   u32,               /* If set to 0, all channels are supported. */
+		sampleRate: u32,               /* If set to 0, all sample rates are supported. */
+		flags:      data_format_flags, /* A combination of MA_DATA_FORMAT_FLAG_* flags. */
 	},  
 }
 
@@ -424,6 +427,7 @@ device_config :: struct {
 	pulse: struct {
 		pStreamNamePlayback: cstring,
 		pStreamNameCapture:  cstring,
+		channelMap:          i32,
 	},
 	coreaudio: struct {
 		allowNominalSampleRateChange: b32, /* Desktop only. When enabled, allows changing of the sample rate at the operating system level. */
@@ -440,6 +444,7 @@ device_config :: struct {
 		allowedCapturePolicy:           aaudio_allowed_capture_policy,
 		noAutoStartAfterReroute:        b32,
 		enableCompatibilityWorkarounds: b32,
+		allowSetBufferCapacity:         b32,
 	},
 }
 
@@ -511,7 +516,7 @@ and on output returns detailed information about the device in `ma_device_info`.
 case when the device ID is NULL, in which case information about the default device needs to be retrieved.
 
 Once the context has been created and the device ID retrieved (if using anything other than the default device), the device can be created.
-This is a little bit more complicated than initialization of the context due to it's more complicated configuration. When initializing a
+This is a little bit more complicated than initialization of the context due to its more complicated configuration. When initializing a
 device, a duplex device may be requested. This means a separate data format needs to be specified for both playback and capture. On input,
 the data format is set to what the application wants. On output it's set to the native format which should match as closely as possible to
 the requested format. The conversion between the format requested by the application and the device's native format will be handled
@@ -532,10 +537,10 @@ asynchronous reading and writing, `onDeviceStart()` and `onDeviceStop()` should 
 The handling of data delivery between the application and the device is the most complicated part of the process. To make this a bit
 easier, some helper callbacks are available. If the backend uses a blocking read/write style of API, the `onDeviceRead()` and
 `onDeviceWrite()` callbacks can optionally be implemented. These are blocking and work just like reading and writing from a file. If the
-backend uses a callback for data delivery, that callback must call `ma_device_handle_backend_data_callback()` from within it's callback.
+backend uses a callback for data delivery, that callback must call `ma_device_handle_backend_data_callback()` from within its callback.
 This allows miniaudio to then process any necessary data conversion and then pass it to the miniaudio data callback.
 
-If the backend requires absolute flexibility with it's data delivery, it can optionally implement the `onDeviceDataLoop()` callback
+If the backend requires absolute flexibility with its data delivery, it can optionally implement the `onDeviceDataLoop()` callback
 which will allow it to implement the logic that will run on the audio thread. This is much more advanced and is completely optional.
 
 The audio thread should run data delivery logic in a loop while `ma_device_get_state() == ma_device_state_started` and no errors have been
@@ -572,6 +577,9 @@ context_config :: struct {
 	threadStackSize: c.size_t,
 	pUserData: rawptr,
 	allocationCallbacks: allocation_callbacks,
+	dsound: struct {
+		hWnd: handle, /* HWND. Optional window handle to pass into SetCooperativeLevel(). Will default to the foreground window, and if that fails, the desktop window. */
+	},
 	alsa: struct {
 		useVerboseDeviceEnumeration: b32,
 	},
@@ -646,6 +654,7 @@ context_type :: struct {
 		} when SUPPORT_WASAPI else struct {}),
 		
 		dsound: (struct {
+			hWnd:                         handle, /* Can be null. */
 			hDSoundDLL:                   handle,
 			DirectSoundCreate:            proc "system" (),
 			DirectSoundEnumerateA:        proc "system" (),
@@ -1192,6 +1201,7 @@ device :: struct {
 		aaudio: (struct {
 			/*AAudioStream**/ pStreamPlayback: rawptr,
 			/*AAudioStream**/ pStreamCapture: rawptr,
+			rerouteLock: mutex,
 			usage: aaudio_usage,
 			contentType: aaudio_content_type,
 			inputPreset: aaudio_input_preset,

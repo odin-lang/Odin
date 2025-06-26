@@ -454,44 +454,44 @@ test_arrays :: proc(t: ^testing.T) {
 @(test)
 test_varargs :: proc(t: ^testing.T) {
 	S :: struct {
-		varg: [dynamic]string,
+		overflow: [dynamic]string,
 	}
 	s: S
 	args := [?]string { "abc", "foo", "bar" }
 	result := flags.parse(&s, args[:])
-	defer delete(s.varg)
+	defer delete(s.overflow)
 	testing.expect_value(t, result, nil)
-	testing.expect_value(t, len(s.varg), 3)
+	testing.expect_value(t, len(s.overflow), 3)
 
-	if len(s.varg) < 3 {
+	if len(s.overflow) < 3 {
 		return
 	}
 
-	testing.expect_value(t, s.varg[0], "abc")
-	testing.expect_value(t, s.varg[1], "foo")
-	testing.expect_value(t, s.varg[2], "bar")
+	testing.expect_value(t, s.overflow[0], "abc")
+	testing.expect_value(t, s.overflow[1], "foo")
+	testing.expect_value(t, s.overflow[2], "bar")
 }
 
 @(test)
 test_mixed_varargs :: proc(t: ^testing.T) {
 	S :: struct {
 		input: string `args:"pos=0"`,
-		varg: [dynamic]string,
+		overflow: [dynamic]string,
 	}
 	s: S
 	args := [?]string { "abc", "foo", "bar" }
 	result := flags.parse(&s, args[:])
-	defer delete(s.varg)
+	defer delete(s.overflow)
 	testing.expect_value(t, result, nil)
-	testing.expect_value(t, len(s.varg), 2)
+	testing.expect_value(t, len(s.overflow), 2)
 
-	if len(s.varg) < 2 {
+	if len(s.overflow) < 2 {
 		return
 	}
 
 	testing.expect_value(t, s.input, "abc")
-	testing.expect_value(t, s.varg[0], "foo")
-	testing.expect_value(t, s.varg[1], "bar")
+	testing.expect_value(t, s.overflow[0], "foo")
+	testing.expect_value(t, s.overflow[1], "bar")
 }
 
 @(test)
@@ -718,23 +718,23 @@ test_tags_required_limit_max :: proc(t: ^testing.T) {
 test_tags_pos_out_of_order :: proc(t: ^testing.T) {
 	S :: struct {
 		a: int `args:"pos=2"`,
-		varg: [dynamic]int,
+		overflow: [dynamic]int,
 	}
 	s: S
 	args := [?]string { "1", "2", "3", "4" }
 	result := flags.parse(&s, args[:])
-	defer delete(s.varg)
+	defer delete(s.overflow)
 	testing.expect_value(t, result, nil)
-	testing.expect_value(t, len(s.varg), 3)
+	testing.expect_value(t, len(s.overflow), 3)
 
-	if len(s.varg) < 3 {
+	if len(s.overflow) < 3 {
 		return
 	}
 
 	testing.expect_value(t, s.a, 3)
-	testing.expect_value(t, s.varg[0], 1)
-	testing.expect_value(t, s.varg[1], 2)
-	testing.expect_value(t, s.varg[2], 4)
+	testing.expect_value(t, s.overflow[0], 1)
+	testing.expect_value(t, s.overflow[1], 2)
+	testing.expect_value(t, s.overflow[2], 4)
 }
 
 @(test)
@@ -899,7 +899,7 @@ test_pos_nonoverlap :: proc(t: ^testing.T) {
 @(test)
 test_pos_many_args :: proc(t: ^testing.T) {
 	S :: struct {
-		varg: [dynamic]int,
+		overflow: [dynamic]int,
 		a: int `args:"pos=0,required"`,
 		b: int `args:"pos=64,required"`,
 		c: int `args:"pos=66,required"`,
@@ -908,7 +908,7 @@ test_pos_many_args :: proc(t: ^testing.T) {
 	s: S
 
 	args: [dynamic]string
-	defer delete(s.varg)
+	defer delete(s.overflow)
 
 	for i in 0 ..< 130 { append(&args, fmt.aprintf("%i", 1 + i)) }
 	defer {
@@ -922,14 +922,14 @@ test_pos_many_args :: proc(t: ^testing.T) {
 	testing.expect_value(t, result, nil)
 
 	testing.expect_value(t, s.a, 1)
-	for i in 1 ..< 63 { testing.expect_value(t, s.varg[i], 2 + i) }
+	for i in 1 ..< 63 { testing.expect_value(t, s.overflow[i], 2 + i) }
 	testing.expect_value(t, s.b, 65)
-	testing.expect_value(t, s.varg[63], 66)
+	testing.expect_value(t, s.overflow[63], 66)
 	testing.expect_value(t, s.c, 67)
-	testing.expect_value(t, s.varg[64], 68)
-	testing.expect_value(t, s.varg[65], 69)
-	testing.expect_value(t, s.varg[66], 70)
-	for i in 67 ..< 126 { testing.expect_value(t, s.varg[i], 4 + i) }
+	testing.expect_value(t, s.overflow[64], 68)
+	testing.expect_value(t, s.overflow[65], 69)
+	testing.expect_value(t, s.overflow[66], 70)
+	for i in 67 ..< 126 { testing.expect_value(t, s.overflow[i], 4 + i) }
 	testing.expect_value(t, s.d, 130)
 }
 
@@ -966,9 +966,9 @@ test_unix :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_unix_variadic :: proc(t: ^testing.T) {
+test_unix_manifold :: proc(t: ^testing.T) {
 	S :: struct {
-		a: [dynamic]int `args:"variadic"`,
+		a: [dynamic]int `args:"manifold"`,
 	}
 	s: S
 
@@ -989,9 +989,9 @@ test_unix_variadic :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_unix_variadic_limited :: proc(t: ^testing.T) {
+test_unix_manifold_limited :: proc(t: ^testing.T) {
 	S :: struct {
-		a: [dynamic]int `args:"variadic=2"`,
+		a: [dynamic]int `args:"manifold=2"`,
 		b: int,
 	}
 	s: S
@@ -1013,6 +1013,110 @@ test_unix_variadic_limited :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_unix_two_manifold_limited :: proc(t: ^testing.T) {
+	S :: struct {
+		a: [dynamic]int `args:"manifold=2"`,
+		b: [dynamic]int `args:"manifold=2"`,
+		c: int,
+	}
+	s: S
+
+	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+
+	result := flags.parse(&s, args[:], .Unix)
+	defer {
+		delete(s.a)
+		delete(s.b)
+	}
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, len(s.a), 2)
+	testing.expect_value(t, len(s.b), 2)
+
+	if len(s.a) < 2 || len(s.b) < 2 {
+		return
+	}
+
+	testing.expect_value(t, s.a[0], 11)
+	testing.expect_value(t, s.a[1], 101)
+	testing.expect_value(t, s.b[0], 3)
+	testing.expect_value(t, s.b[1], 7)
+	testing.expect_value(t, s.c, 9)
+}
+
+@(test)
+test_unix_two_manifold_string :: proc(t: ^testing.T) {
+	// The expected behavior of a manifold flag is to consume all arguments as
+	// fitting for the element type.
+	S :: struct {
+		a: [dynamic]string `args:"manifold"`,
+		b: [dynamic]string `args:"manifold"`,
+		c: int,
+	}
+	s: S
+
+	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+
+	result := flags.parse(&s, args[:], .Unix)
+	defer {
+		delete(s.a)
+		delete(s.b)
+	}
+
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, len(s.a), 7)
+	testing.expect_value(t, len(s.b), 0)
+
+	if len(s.a) != 7 {
+		return
+	}
+
+	testing.expect_value(t, s.a[0], "11")
+	testing.expect_value(t, s.a[1], "101")
+	testing.expect_value(t, s.a[2], "-b")
+	testing.expect_value(t, s.a[3], "3")
+	testing.expect_value(t, s.a[4], "7")
+	testing.expect_value(t, s.a[5], "-c")
+	testing.expect_value(t, s.a[6], "9")
+}
+
+@(test)
+test_unix_two_manifold_int :: proc(t: ^testing.T) {
+	// If a manifold flag encounters an argument that it cannot convert to the
+	// element type, then this is an error.
+	S :: struct {
+		a: [dynamic]int `args:"manifold"`,
+		b: [dynamic]int `args:"manifold"`,
+		c: int,
+	}
+	s: S
+
+	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+
+	result := flags.parse(&s, args[:], .Unix)
+	defer {
+		delete(s.a)
+		delete(s.b)
+	}
+
+	err, ok := result.(flags.Parse_Error)
+	testing.expectf(t, ok, "unexpected result: %v", result)
+	if ok {
+		testing.expect_value(t, err.reason, flags.Parse_Error_Reason.Bad_Value)
+	}
+
+	// It is expected that arguments which pass will still be available.
+	testing.expect_value(t, len(s.a), 2)
+	testing.expect_value(t, len(s.b), 0)
+
+	if len(s.a) != 2 {
+		return
+	}
+
+	testing.expect_value(t, s.a[0], 11)
+	testing.expect_value(t, s.a[1], 101)
+}
+
+@(test)
 test_unix_positional :: proc(t: ^testing.T) {
 	S :: struct {
 		a: int `args:"pos=1"`,
@@ -1029,10 +1133,10 @@ test_unix_positional :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_unix_positional_with_variadic :: proc(t: ^testing.T) {
+test_unix_positional_with_manifold :: proc(t: ^testing.T) {
 	S :: struct {
-		varg: [dynamic]int,
-		v: [dynamic]int `args:"variadic"`,
+		overflow: [dynamic]int,
+		v: [dynamic]int `args:"manifold"`,
 	}
 	s: S
 
@@ -1040,18 +1144,18 @@ test_unix_positional_with_variadic :: proc(t: ^testing.T) {
 
 	result := flags.parse(&s, args[:], .Unix)
 	defer {
-		delete(s.varg)
+		delete(s.overflow)
 		delete(s.v)
 	}
 	testing.expect_value(t, result, nil)
-	testing.expect_value(t, len(s.varg), 1)
+	testing.expect_value(t, len(s.overflow), 1)
 	testing.expect_value(t, len(s.v), 2)
 }
 
 @(test)
-test_unix_double_dash_variadic :: proc(t: ^testing.T) {
+test_unix_double_dash_varargs :: proc(t: ^testing.T) {
 	S :: struct {
-		varg: [dynamic]string,
+		overflow: [dynamic]string,
 		i: int,
 	}
 	s: S
@@ -1060,19 +1164,19 @@ test_unix_double_dash_variadic :: proc(t: ^testing.T) {
 
 	result := flags.parse(&s, args[:], .Unix)
 	defer {
-		delete(s.varg)
+		delete(s.overflow)
 	}
 	testing.expect_value(t, result, nil)
-	testing.expect_value(t, len(s.varg), 3)
+	testing.expect_value(t, len(s.overflow), 3)
 	testing.expect_value(t, s.i, 3)
 
-	if len(s.varg) != 3 {
+	if len(s.overflow) != 3 {
 		return
 	}
 
-	testing.expect_value(t, s.varg[0], "hellope")
-	testing.expect_value(t, s.varg[1], "-i")
-	testing.expect_value(t, s.varg[2], "5")
+	testing.expect_value(t, s.overflow[0], "hellope")
+	testing.expect_value(t, s.overflow[1], "-i")
+	testing.expect_value(t, s.overflow[2], "5")
 }
 
 @(test)
@@ -1096,17 +1200,17 @@ test_unix_no_value :: proc(t: ^testing.T) {
 @(test)
 test_if_dynamic_cstrings_get_freed :: proc(t: ^testing.T) {
 	S :: struct {
-		varg: [dynamic]cstring,
+		overflow: [dynamic]cstring,
 	}
 	s: S
 
 	args := [?]string { "Hellope", "world!" }
 	result := flags.parse(&s, args[:])
 	defer {
-		for v in s.varg {
+		for v in s.overflow {
 			delete(v)
 		}
-		delete(s.varg)
+		delete(s.overflow)
 	}
 	testing.expect_value(t, result, nil)
 }
@@ -1324,7 +1428,7 @@ very nicely.
 		debug: bool `args:"hidden" usage:"print debug info"`,
 		verbose: bool,
 
-		varg: [dynamic]string,
+		overflow: [dynamic]string,
 	}
 
 	builder := strings.builder_make()
@@ -1337,7 +1441,7 @@ very nicely.
 @(test)
 test_usage_write_unix :: proc(t: ^testing.T) {
 	Expected_Output :: `Usage:
-	varg required-number [number] [name] --bars --bots --foos --gadgets --variadic-flag --widgets [--array] [--count] [--greek] [--verbose] ...
+	overflow required-number [number] [name] --bars --bots --foos --gadgets --manifold-flag --widgets [--array] [--count] [--greek] [--verbose] ...
 Flags:
 	--required-number <int>, required       | some number
 	--number <int>                          | some other number
@@ -1349,7 +1453,7 @@ Flags:
 	--bots <string>, at least 1             | <This flag has not been documented yet.>
 	--foos <string>, between 2 and 3        | <This flag has not been documented yet.>
 	--gadgets <string>, at least 1          | <This flag has not been documented yet.>
-	--variadic-flag <int, ...>, at least 2  | <This flag has not been documented yet.>
+	--manifold-flag <int, ...>, at least 2  | <This flag has not been documented yet.>
 	--widgets <string>, at most 2           | <This flag has not been documented yet.>
 	                                        |
 	--array <rune>, multiple                | <This flag has not been documented yet.>
@@ -1378,7 +1482,7 @@ very nicely.
 		greek: Custom_Enum,
 
 		array: [dynamic]rune,
-		variadic_flag: [dynamic]int `args:"variadic,required=2"`,
+		manifold_flag: [dynamic]int `args:"manifold,required=2"`,
 
 		gadgets: [dynamic]string `args:"required=1"`,
 		widgets: [dynamic]string `args:"required=<3"`,
@@ -1389,12 +1493,12 @@ very nicely.
 		debug: bool `args:"hidden" usage:"print debug info"`,
 		verbose: bool,
 
-		varg: [dynamic]string,
+		overflow: [dynamic]string,
 	}
 
 	builder := strings.builder_make()
 	defer strings.builder_destroy(&builder)
 	writer := strings.to_stream(&builder)
-	flags.write_usage(writer, S, "varg", .Unix)
+	flags.write_usage(writer, S, "overflow", .Unix)
 	testing.expect_value(t, strings.to_string(builder), Expected_Output)
 }

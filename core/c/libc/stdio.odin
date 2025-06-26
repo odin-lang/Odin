@@ -1,5 +1,6 @@
 package libc
 
+import "core:c"
 import "core:io"
 
 when ODIN_OS == .Windows {
@@ -15,7 +16,7 @@ when ODIN_OS == .Windows {
 
 // 7.21 Input/output
 
-FILE :: struct {}
+FILE :: c.FILE
 
 Whence :: enum int {
 	SET = SEEK_SET,

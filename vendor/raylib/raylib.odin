@@ -274,7 +274,7 @@ Camera3D :: struct {
 	target:   Vector3,            // Camera target it looks-at
 	up:       Vector3,            // Camera up vector (rotation over its axis)
 	fovy:     f32,                // Camera field-of-view apperture in Y (degrees) in perspective, used as near plane width in orthographic
-	projection: CameraProjection, // Camera projection: CAMERA_PERSPECTIVE or CAMERA_ORTHOGRAPHIC
+	projection: CameraProjection, // Camera projection: `.PERSPECTIVE` or `.ORTHOGRAPHIC`
 }
 
 Camera :: Camera3D                    // Camera type fallback, defaults to Camera3D
@@ -1205,7 +1205,7 @@ foreign lib {
 
 	CameraMoveForward :: proc(camera: ^Camera, distance: f32, moveInWorldPlane: bool) --- // move the camera in its forward direction
 	CameraMoveUp :: proc(camera: ^Camera, distance: f32) --- // move camera in its up direction
-	CameraMoveRight :: proc(camera: ^Camera, distance: f32, delta: f32) --- // move camera in it's current right direction
+	CameraMoveRight :: proc(camera: ^Camera, distance: f32, moveInWorldPlane: bool) --- // move camera in it's current right direction
 	CameraMoveToTarget :: proc(camera: ^Camera, delta: f32) --- // moves the camera position closer/farther to/from the camera target
 	CameraYaw :: proc(camera: ^Camera, angle: f32, rotateAroundTarget: bool) --- // rotates the camera around its up vector (left and right)
 	CameraPitch :: proc(camera: ^Camera, angle: f32, lockView: bool, rotateAroundTarget: bool, rotateUp: bool) --- // rotates the camera around its right vector (up and down)
@@ -1256,7 +1256,7 @@ foreign lib {
 	DrawRectangleLines          :: proc(posX, posY: c.int, width, height: c.int, color: Color) ---                                                    // Draw rectangle outline
 	DrawRectangleLinesEx        :: proc(rec: Rectangle, lineThick: f32, color: Color) ---                                                             // Draw rectangle outline with extended parameters
 	DrawRectangleRounded        :: proc(rec: Rectangle, roundness: f32, segments: c.int, color: Color) ---                                            // Draw rectangle with rounded edges
-	DrawRectangleRoundedLines   :: proc(rec: Rectangle, roundness: f32, segments: c.int, lineThick: f32, color: Color) ---                            // Draw rectangle lines with rounded edges
+	DrawRectangleRoundedLines   :: proc(rec: Rectangle, roundness: f32, segments: c.int, color: Color) ---                                            // Draw rectangle lines with rounded edges
 	DrawRectangleRoundedLinesEx :: proc(rec: Rectangle, roundness: f32, segments: c.int, lineThick: f32, color: Color) ---                            // Draw rectangle with rounded edges outline
 	DrawTriangle                :: proc(v1, v2, v3: Vector2, color: Color) ---                                                                        // Draw a color-filled triangle (vertex in counter-clockwise order!)
 	DrawTriangleLines           :: proc(v1, v2, v3: Vector2, color: Color) ---                                                                        // Draw triangle outline (vertex in counter-clockwise order!)

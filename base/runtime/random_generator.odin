@@ -119,6 +119,7 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 	}
 }
 
+@(require_results)
 default_random_generator :: proc "contextless" (state: ^Default_Random_State = nil) -> Random_Generator {
 	return {
 		procedure = default_random_generator_proc,

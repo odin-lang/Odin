@@ -1,3 +1,4 @@
+#+build linux
 #+no-instrumentation
 package linux
 
@@ -212,7 +213,7 @@ rt_sigreturn :: proc "c" () -> ! {
 /*
 	Alter an action taken by a process.
 */
-rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action($T), old_sigaction: ^Sig_Action) -> Errno {
+rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action($T), old_sigaction: ^Sig_Action($U)) -> Errno {
 	// NOTE(jason): It appears that the restorer is required for i386 and amd64
 	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
 		sigaction.flags += {.RESTORER}
@@ -1412,7 +1413,7 @@ umask :: proc "contextless" (mask: Mode) -> Mode {
 	Available since Linux 1.0.
 */
 gettimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
-	ret := syscall(SYS_gettimeofday, tv)
+	ret := syscall(SYS_gettimeofday, tv, rawptr(nil))
 	return Errno(-ret)
 }
 
@@ -2010,10 +2011,10 @@ statfs :: proc "contextless" (path: cstring, statfs: ^Stat_FS) -> (Errno) {
 */
 fstatfs :: proc "contextless" (fd: Fd, statfs: ^Stat_FS) -> (Errno) {
 	when size_of(int) == 8 {
-		ret := syscall(SYS_statfs, fd, statfs)
+		ret := syscall(SYS_fstatfs, fd, statfs)
 		return Errno(-ret)
 	} else {
-		ret := syscall(SYS_statfs64, fd, size_of(Stat_FS), statfs)
+		ret := syscall(SYS_fstatfs64, fd, size_of(Stat_FS), statfs)
 		return Errno(-ret)
 	}
 }

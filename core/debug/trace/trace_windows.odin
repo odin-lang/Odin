@@ -49,7 +49,9 @@ _resolve :: proc(ctx: ^Context, frame: Frame, allocator: runtime.Allocator) -> (
 
 	data: [size_of(win32.SYMBOL_INFOW) + size_of([256]win32.WCHAR)]byte
 	symbol := (^win32.SYMBOL_INFOW)(&data[0])
-	symbol.SizeOfStruct = size_of(symbol)
+	// The value of SizeOfStruct must be the size of the whole struct,
+	// not just the size of the pointer
+	symbol.SizeOfStruct = size_of(symbol^)
 	symbol.MaxNameLen = 255
 	if win32.SymFromAddrW(ctx.impl.hProcess, win32.DWORD64(frame), &{}, symbol) {
 		fl.procedure, _ = win32.wstring_to_utf8(&symbol.Name[0], -1, allocator)

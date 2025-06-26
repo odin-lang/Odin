@@ -36,7 +36,7 @@ parse_or_exit :: proc(
 		args = program_args[1:]
 	}
 
-	error := parse(model, args, style)
+	error := parse(model, args, style, true, true, allocator, loc)
 	if error != nil {
 		stderr := os.stream_from_handle(os.stderr)
 
@@ -95,7 +95,7 @@ Example:
 	import "core:flags"
 	import "core:fmt"
 
-	subtag_example :: proc() {
+	get_subtag_example :: proc() {
 		args_tag := "precision=3,signed"
 
 		precision, has_precision := flags.get_subtag(args_tag, "precision")

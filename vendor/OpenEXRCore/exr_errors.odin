@@ -1,11 +1,5 @@
 package vendor_openexr
 
-when ODIN_OS == .Windows {
-	foreign import lib "OpenEXRCore-3_1.lib"
-} else {
-	foreign import lib "system:OpenEXRCore-3_1"
-}
-
 import "core:c"
 
 #assert(size_of(c.int) == size_of(i32))
@@ -37,6 +31,7 @@ result_t :: enum i32 {
 	ALREADY_WROTE_ATTRS,
 	BAD_CHUNK_LEADER,
 	CORRUPT_CHUNK,
+	INCOMPLETE_CHUNK_TABLE,
 	INCORRECT_PART,
 	INCORRECT_CHUNK,
 	USE_SCAN_DEEP_WRITE,

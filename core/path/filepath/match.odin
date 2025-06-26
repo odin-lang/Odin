@@ -1,3 +1,4 @@
+#+build !wasi
 package filepath
 
 import "core:os"

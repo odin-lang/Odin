@@ -1,8 +1,10 @@
 package test_core_strings
 
+import "base:runtime"
+import "core:mem"
 import "core:strings"
 import "core:testing"
-import "base:runtime"
+import "core:unicode/utf8"
 
 @test
 test_index_any_small_string_not_found :: proc(t: ^testing.T) {
@@ -173,5 +175,95 @@ test_substring :: proc(t: ^testing.T) {
 		sub, ok := strings.substring(tc.s, tc.start, tc.end)
 		testing.expectf(t, ok == tc.ok, "expected %v[%v:%v] to return ok: %v", tc.s, tc.start, tc.end, tc.ok)
 		testing.expectf(t, sub == tc.sub, "expected %v[%v:%v] to return sub: %v, got: %v", tc.s, tc.start, tc.end, tc.sub, sub)
+	}
+}
+
+@test
+test_builder_to_cstring_with_nil_allocator :: proc(t: ^testing.T) {
+	b := strings.builder_make_none(mem.nil_allocator())
+
+	cstr, err := strings.to_cstring(&b)
+	testing.expect_value(t, cstr, nil)
+	testing.expect_value(t, err, mem.Allocator_Error.Out_Of_Memory)
+}
+
+@test
+test_builder_to_cstring :: proc(t: ^testing.T) {
+	buf: [8]byte
+	a: mem.Arena
+	mem.arena_init(&a, buf[:])
+
+	b := strings.builder_make_none(mem.arena_allocator(&a))
+
+	{
+		cstr, err := strings.to_cstring(&b)
+		testing.expectf(t, cstr != nil, "expected cstr to not be nil, got %v", cstr)
+		testing.expect_value(t, err, nil)
+	}
+
+	n := strings.write_byte(&b, 'a')
+	testing.expect(t, n == 1)
+
+	{
+		cstr, err := strings.to_cstring(&b)
+		testing.expectf(t, cstr != nil, "expected cstr to not be nil, got %v", cstr)
+		testing.expect_value(t, err, nil)
+	}
+
+	n = strings.write_string(&b, "aaaaaaa")
+	testing.expect(t, n == 7)
+
+	{
+		cstr, err := strings.to_cstring(&b)
+		testing.expect(t, cstr == nil)
+		testing.expect(t, err == .Out_Of_Memory)
+	}
+}
+
+@test
+test_prefix_length :: proc(t: ^testing.T) {
+	prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
+		_len := min(len(a), len(b))
+
+		// Scan for matches including partial codepoints.
+		#no_bounds_check for n < _len && a[n] == b[n] {
+			n += 1
+		}
+
+		// Now scan to ignore partial codepoints.
+		if n > 0 {
+			s := a[:n]
+			n = 0
+			for {
+				r0, w := utf8.decode_rune(s[n:])
+				if r0 != utf8.RUNE_ERROR {
+					n += w
+				} else {
+					break
+				}
+			}
+		}
+		return
+	}
+
+	cases := [][2]string{
+		{"Hellope, there!", "Hellope, world!"},
+		{"Hellope, there!", "Foozle"},
+		{"Hellope, there!", "Hell"},
+		{"Hellope! 🦉",     "Hellope! 🦉"},
+	}
+
+	for v in cases {
+		p_scalar := prefix_length(v[0], v[1])
+		p_simd   := strings.prefix_length(v[0], v[1])
+		testing.expect_value(t, p_simd, p_scalar)
+
+		s := v[0]
+		for len(s) > 0 {
+			p_scalar = prefix_length(v[0], s)
+			p_simd   = strings.prefix_length(v[0], s)
+			testing.expect_value(t, p_simd, p_scalar)
+			s = s[:len(s) - 1]
+		}
 	}
 }

@@ -53,26 +53,7 @@ Version :: struct {
 	revision: i32, // Bug fixes
 }
 
-when ODIN_OS == .Windows {
-	// Timer for profiling. This has platform specific code and may
-	// not work on every platform.
-	Timer :: struct {
-		start: i64,
-	}
-} else when ODIN_OS == .Linux || ODIN_OS == .Darwin {
-	// Timer for profiling. This has platform specific code and may
-	// not work on every platform.
-	Timer :: struct {
-		start_sec:  u64,
-		start_usec: u64,
-	}
-} else {
-	// Timer for profiling. This has platform specific code and may
-	// not work on every platform.
-	Timer :: struct {
-		dummy: i32,
-	}
-}
+HASH_INIT :: 5381
 
 @(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
@@ -85,19 +66,33 @@ foreign lib {
 	//	@param assertFcn a non-null assert callback
 	SetAssertFcn :: proc(assertfcn: AssertFcn) ---
 
-
-	CreateTimer             :: proc() -> Timer ---
-	GetTicks                :: proc(timer: ^Timer) -> i64 ---
-	GetMilliseconds         :: proc(#by_ptr timer: Timer) -> f32 ---
-	GetMillisecondsAndReset :: proc(timer: ^Timer) -> f32 ---
-	SleepMilliseconds       :: proc(milliseconds: c.int)  ---
+	// Get the absolute number of system ticks. The value is platform specific.
+	GetTicks                :: proc() -> u64 ---
+	// Get the milliseconds passed from an initial tick value.
+	GetMilliseconds         :: proc(ticks: u64) -> f32 ---
+	// Get the milliseconds passed from an initial tick value. Resets the passed in
+	// value to the current tick value.
+	GetMillisecondsAndReset :: proc(ticks: ^u64) -> f32 ---
+	// Yield to be used in a busy loop.
 	Yield                   :: proc() ---
 
+	// Simple djb2 hash function for determinism testing.
+	Hash :: proc(hash: u32, data: [^]byte, count: c.int) -> u32 ---
 
 	// Box2D bases all length units on meters, but you may need different units for your game.
 	// You can set this value to use different units. This should be done at application startup
-	//	and only modified once. Default value is 1.
-	//	@warning This must be modified before any calls to Box2D
+	// and only modified once. Default value is 1.
+	// For example, if your game uses pixels for units you can use pixels for all length values
+	// sent to Box2D. There should be no extra cost. However, Box2D has some internal tolerances
+	// and thresholds that have been tuned for meters. By calling this function, Box2D is able
+	// to adjust those tolerances and thresholds to improve accuracy.
+	// A good rule of thumb is to pass the height of your player character to this function. So
+	// if your player character is 32 pixels high, then pass 32 to this function. Then you may
+	// confidently use pixels for all the length values sent to Box2D. All length values returned
+	// from Box2D will also be pixels because Box2D does not do any scaling internally.
+	// However, you are now on the hook for coming up with good values for gravity, density, and
+	// forces.
+	// @warning This must be modified before any calls to Box2D
 	SetLengthUnitsPerMeter :: proc(lengthUnits: f32) ---
 
 	// Get the current length units per meter.
@@ -122,6 +117,10 @@ foreign lib {
 	// @ingroup shape
 	DefaultQueryFilter       :: proc() -> QueryFilter ---
 
+	// Use this to initialize your surface material
+	// @ingroup shape
+	DefaultSurfaceMaterial   :: proc() -> SurfaceMaterial ---
+
 	// Use this to initialize your shape definition
 	// @ingroup shape
 	DefaultShapeDef          :: proc() -> ShapeDef ---
@@ -143,6 +142,10 @@ foreign lib {
 	DefaultMouseJointDef     :: proc() -> MouseJointDef ---
 
 	// Use this to initialize your joint definition
+	// @ingroup filter_joint
+	DefaultFilterJointDef    :: proc() -> FilterJointDef ---
+
+	// Use this to initialize your joint definition
 	// @ingroupd prismatic_joint
 	DefaultPrismaticJointDef :: proc() -> PrismaticJointDef ---
 
@@ -157,6 +160,14 @@ foreign lib {
 	// Use this to initialize your joint definition
 	// @ingroup wheel_joint
 	DefaultWheelJointDef     :: proc() -> WheelJointDef ---
+
+	// Use this to initialize your explosion definition
+	// @ingroup world
+	DefaultExplosionDef      :: proc() -> ExplosionDef ---
+
+	// Use this to initialize your drawing interface. This allows you to implement a sub-set
+	// of the drawing functions.
+	DefaultDebugDraw         :: proc() -> DebugDraw ---
 }
 
 
@@ -164,85 +175,92 @@ foreign lib {
 @(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Validate ray cast input data (NaN, etc)
-	IsValidRay         :: proc(#by_ptr input: RayCastInput) -> bool ---
+	IsValidRay               :: proc(#by_ptr input: RayCastInput) -> bool ---
 
 	// Make a convex polygon from a convex hull. This will assert if the hull is not valid.
 	// @warning Do not manually fill in the hull data, it must come directly from b2ComputeHull
-	MakePolygon        :: proc(#by_ptr hull: Hull, radius: f32) -> Polygon ---
+	MakePolygon              :: proc(#by_ptr hull: Hull, radius: f32) -> Polygon ---
 
 	// Make an offset convex polygon from a convex hull. This will assert if the hull is not valid.
 	// @warning Do not manually fill in the hull data, it must come directly from b2ComputeHull
-	MakeOffsetPolygon  :: proc(#by_ptr hull: Hull, radius: f32, transform: Transform) -> Polygon ---
+	MakeOffsetPolygon        :: proc(#by_ptr hull: Hull, position: Vec2, rotation: Rot) -> Polygon ---
+
+	// Make an offset convex polygon from a convex hull. This will assert if the hull is not valid.
+	// @warning Do not manually fill in the hull data, it must come directly from b2ComputeHull
+	MakeOffsetRoundedPolygon :: proc(#by_ptr hull: Hull, position: Vec2, rotation: Rot, radius: f32) -> Polygon ---
 
 	// Make a square polygon, bypassing the need for a convex hull.
-	MakeSquare         :: proc(h: f32) -> Polygon ---
+	MakeSquare               :: proc(halfWidth: f32) -> Polygon ---
 
 	// Make a box (rectangle) polygon, bypassing the need for a convex hull.
-	MakeBox            :: proc(hx, hy: f32) -> Polygon ---
+	MakeBox                  :: proc(halfWidth, halfHeight: f32) -> Polygon ---
 
 	// Make a rounded box, bypassing the need for a convex hull.
-	MakeRoundedBox     :: proc(hx, hy: f32, radius: f32) -> Polygon ---
+	MakeRoundedBox           :: proc(halfWidth, halfHeight: f32, radius: f32) -> Polygon ---
 
 	// Make an offset box, bypassing the need for a convex hull.
-	MakeOffsetBox      :: proc(hx, hy: f32, center: Vec2, angle: f32) -> Polygon ---
+	MakeOffsetBox            :: proc(halfWidth, halfHeight: f32, center: Vec2, rotation: Rot) -> Polygon ---
+
+	// Make an offset rounded box, bypassing the need for a convex hull.
+	MakeOffsetRoundedBox     :: proc(halfWidth, halfHeight: f32, center: Vec2, rotation: Rot, radius: f32) -> Polygon ---
 
 	// Transform a polygon. This is useful for transferring a shape from one body to another.
-	TransformPolygon   :: proc(transform: Transform, #by_ptr polygon: Polygon) -> Polygon ---
+	TransformPolygon         :: proc(transform: Transform, #by_ptr polygon: Polygon) -> Polygon ---
 
 	// Compute mass properties of a circle
-	ComputeCircleMass  :: proc(#by_ptr shape: Circle, density: f32) -> MassData ---
+	ComputeCircleMass        :: proc(#by_ptr shape: Circle, density: f32) -> MassData ---
 
 	// Compute mass properties of a capsule
-	ComputeCapsuleMass :: proc(#by_ptr shape: Capsule, density: f32) -> MassData ---
+	ComputeCapsuleMass       :: proc(#by_ptr shape: Capsule, density: f32) -> MassData ---
 
 	// Compute mass properties of a polygon
-	ComputePolygonMass :: proc(#by_ptr shape: Polygon, density: f32) -> MassData ---
+	ComputePolygonMass       :: proc(#by_ptr shape: Polygon, density: f32) -> MassData ---
 
 	// Compute the bounding box of a transformed circle
-	ComputeCircleAABB  :: proc(#by_ptr shape: Circle, transform: Transform) -> AABB ---
+	ComputeCircleAABB        :: proc(#by_ptr shape: Circle, transform: Transform) -> AABB ---
 
 	// Compute the bounding box of a transformed capsule
-	ComputeCapsuleAABB :: proc(#by_ptr shape: Capsule, transform: Transform) -> AABB ---
+	ComputeCapsuleAABB       :: proc(#by_ptr shape: Capsule, transform: Transform) -> AABB ---
 
 	// Compute the bounding box of a transformed polygon
-	ComputePolygonAABB :: proc(#by_ptr shape: Polygon, transform: Transform) -> AABB ---
+	ComputePolygonAABB       :: proc(#by_ptr shape: Polygon, transform: Transform) -> AABB ---
 
 	// Compute the bounding box of a transformed line segment
-	ComputeSegmentAABB :: proc(#by_ptr shape: Segment, transform: Transform) -> AABB ---
+	ComputeSegmentAABB       :: proc(#by_ptr shape: Segment, transform: Transform) -> AABB ---
 
 	// Test a point for overlap with a circle in local space
-	PointInCircle      :: proc(point: Vec2, #by_ptr shape: Circle) -> bool ---
+	PointInCircle            :: proc(point: Vec2, #by_ptr shape: Circle) -> bool ---
 
 	// Test a point for overlap with a capsule in local space
-	PointInCapsule     :: proc(point: Vec2, #by_ptr shape: Capsule) -> bool ---
+	PointInCapsule           :: proc(point: Vec2, #by_ptr shape: Capsule) -> bool ---
 
 	// Test a point for overlap with a convex polygon in local space
-	PointInPolygon     :: proc(point: Vec2, #by_ptr shape: Polygon) -> bool ---
+	PointInPolygon           :: proc(point: Vec2, #by_ptr shape: Polygon) -> bool ---
 
 	// Ray cast versus circle in shape local space. Initial overlap is treated as a miss.
-	RayCastCircle      :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Circle) -> CastOutput ---
+	RayCastCircle            :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Circle) -> CastOutput ---
 
 	// Ray cast versus capsule in shape local space. Initial overlap is treated as a miss.
-	RayCastCapsule     :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Capsule) -> CastOutput ---
+	RayCastCapsule           :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Capsule) -> CastOutput ---
 
 	// Ray cast versus segment in shape local space. Optionally treat the segment as one-sided with hits from
 	// the left side being treated as a miss.
-	RayCastSegment     :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Segment, oneSided: bool) -> CastOutput ---
+	RayCastSegment           :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Segment, oneSided: bool) -> CastOutput ---
 
 	// Ray cast versus polygon in shape local space. Initial overlap is treated as a miss.
-	RayCastPolygon     :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Polygon) -> CastOutput ---
+	RayCastPolygon           :: proc(#by_ptr input: RayCastInput, #by_ptr shape: Polygon) -> CastOutput ---
 
 	// Shape cast versus a circle. Initial overlap is treated as a miss.
-	ShapeCastCircle    :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Circle) -> CastOutput ---
+	ShapeCastCircle          :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Circle) -> CastOutput ---
 
 	// Shape cast versus a capsule. Initial overlap is treated as a miss.
-	ShapeCastCapsule   :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Capsule) -> CastOutput ---
+	ShapeCastCapsule         :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Capsule) -> CastOutput ---
 
 	// Shape cast versus a line segment. Initial overlap is treated as a miss.
-	ShapeCastSegment   :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Segment) -> CastOutput ---
+	ShapeCastSegment         :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Segment) -> CastOutput ---
 
 	// Shape cast versus a convex polygon. Initial overlap is treated as a miss.
-	ShapeCastPolygon   :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Polygon) -> CastOutput ---
+	ShapeCastPolygon         :: proc(#by_ptr input: ShapeCastInput, #by_ptr shape: Polygon) -> CastOutput ---
 }
 
 
@@ -251,7 +269,7 @@ foreign lib {
 // - all points very close together
 // - all points on a line
 // - less than 3 points
-// - more than maxPolygonVertices points
+// - more than MAX_POLYGON_VERTICES points
 // This welds close points and removes collinear points.
 //	@warning Do not modify a hull once it has been computed
 @(require_results)
@@ -279,30 +297,40 @@ foreign lib {
 }
 
 // Compute the closest points between two shapes represented as point clouds.
-// DistanceCache cache is input/output. On the first call set DistanceCache.count to zero.
+// SimplexCache cache is input/output. On the first call set SimplexCache.count to zero.
 //	The underlying GJK algorithm may be debugged by passing in debug simplexes and capacity. You may pass in NULL and 0 for these.
 @(require_results)
-ShapeDistance :: proc "c" (cache: ^DistanceCache, #by_ptr input: DistanceInput, simplexes: []Simplex) -> DistanceOutput {
+ShapeDistance :: proc "c" (#by_ptr input: DistanceInput, cache: ^SimplexCache, simplexes: []Simplex) -> DistanceOutput {
 	foreign lib {
-		b2ShapeDistance :: proc "c" (cache: ^DistanceCache, #by_ptr input: DistanceInput, simplexes: [^]Simplex, simplexCapacity: c.int) -> DistanceOutput ---
+		b2ShapeDistance :: proc "c" (#by_ptr input: DistanceInput, cache: ^SimplexCache, simplexes: [^]Simplex, simplexCapacity: c.int) -> DistanceOutput ---
 	}
-	return b2ShapeDistance(cache, input, raw_data(simplexes), i32(len(simplexes)))
+	return b2ShapeDistance(input, cache, raw_data(simplexes), i32(len(simplexes)))
 }
 
 
-// Make a proxy for use in GJK and related functions.
+// Make a proxy for use in overlap, shape cast, and related functions. This is a deep copy of the points.
 @(require_results)
-MakeProxy :: proc "c" (vertices: []Vec2, radius: f32) -> DistanceProxy {
+MakeProxy :: proc "c" (points: []Vec2, radius: f32) -> ShapeProxy {
 	foreign lib {
-		b2MakeProxy :: proc "c" (vertices: [^]Vec2, count: i32, radius: f32) -> DistanceProxy ---
+		b2MakeProxy :: proc "c" (points: [^]Vec2, count: i32, radius: f32) -> ShapeProxy ---
 	}
-	return b2MakeProxy(raw_data(vertices), i32(len(vertices)), radius)
+	return b2MakeProxy(raw_data(points), i32(len(points)), radius)
+}
+
+// Make a proxy with a transform. This is a deep copy of the points.
+@(require_results)
+MakeOffsetProxy :: proc "c" (points: []Vec2, radius: f32, position: Vec2, rotation: Rot) -> ShapeProxy {
+	foreign lib {
+		b2MakeOffsetProxy :: proc "c" (points: [^]Vec2, count: i32, radius: f32, position: Vec2, rotation: Rot) -> ShapeProxy ---
+	}
+	return b2MakeOffsetProxy(raw_data(points), i32(len(points)), radius, position, rotation)
 }
 
 
 @(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Perform a linear shape cast of shape B moving and shape A fixed. Determines the hit point, normal, and translation fraction.
+	// You may optionally supply an array to hold debug data.
 	ShapeCast :: proc(#by_ptr input: ShapeCastPairInput) -> CastOutput ---
 
 	// Evaluate the transform sweep at a specific time.
@@ -344,14 +372,14 @@ foreign lib {
 	// Compute the contact manifold between an segment and a polygon
 	CollideSegmentAndPolygon       :: proc(#by_ptr segmentA: Segment, xfA: Transform, #by_ptr polygonB: Polygon, xfB: Transform) -> Manifold ---
 
-	// Compute the contact manifold between a smooth segment and a circle
-	CollideSmoothSegmentAndCircle  :: proc(#by_ptr smoothSegmentA: SmoothSegment, xfA: Transform, #by_ptr circleB: Circle, xfB: Transform) -> Manifold ---
+	// Compute the contact manifold between a chain segment and a circle
+	CollideChainSegmentAndCircle  :: proc(#by_ptr segmentA: ChainSegment, xfA: Transform, #by_ptr circleB: Circle, xfB: Transform) -> Manifold ---
 
 	// Compute the contact manifold between an segment and a capsule
-	CollideSmoothSegmentAndCapsule :: proc(#by_ptr smoothSegmentA: SmoothSegment, xfA: Transform, #by_ptr capsuleB: Capsule, xfB: Transform, cache: ^DistanceCache) -> Manifold ---
+	CollideChainSegmentAndCapsule :: proc(#by_ptr segmentA: ChainSegment, xfA: Transform, #by_ptr capsuleB: Capsule, xfB: Transform, cache: ^SimplexCache) -> Manifold ---
 
-	// Compute the contact manifold between a smooth segment and a rounded polygon
-	CollideSmoothSegmentAndPolygon :: proc(#by_ptr smoothSegmentA: SmoothSegment, xfA: Transform, #by_ptr polygonB: Polygon, xfB: Transform, cache: ^DistanceCache) -> Manifold ---
+	// Compute the contact manifold between a chain segment and a rounded polygon
+	CollideChainSegmentAndPolygon :: proc(#by_ptr segmentA: ChainSegment, xfA: Transform, #by_ptr polygonB: Polygon, xfB: Transform, cache: ^SimplexCache) -> Manifold ---
 }
 
 
@@ -365,7 +393,7 @@ foreign lib {
 	DynamicTree_Destroy         :: proc(tree: ^DynamicTree) ---
 
 	// Create a proxy. Provide an AABB and a userData value.
-	DynamicTree_CreateProxy     :: proc(tree: ^DynamicTree, aabb: AABB, categoryBits: u32, userData: i32) -> i32 ---
+	DynamicTree_CreateProxy     :: proc(tree: ^DynamicTree, aabb: AABB, categoryBits: u64, userData: u64) -> i32 ---
 
 	// Destroy a proxy. This asserts if the id is invalid.
 	DynamicTree_DestroyProxy    :: proc(tree: ^DynamicTree, proxyId: i32) ---
@@ -376,50 +404,52 @@ foreign lib {
 	// Enlarge a proxy and enlarge ancestors as necessary.
 	DynamicTree_EnlargeProxy    :: proc(tree: ^DynamicTree, proxyId: i32, aabb: AABB) ---
 
-	// Query an AABB for overlapping proxies. The callback class
-	// is called for each proxy that overlaps the supplied AABB.
-	DynamicTree_Query           :: proc(#by_ptr tree: DynamicTree, aabb: AABB, maskBits: u32, callback: TreeQueryCallbackFcn, ctx: rawptr) ---
+	// Modify the category bits on a proxy. This is an expensive operation.
+	DynamicTree_SetCategoryBits :: proc(tree: ^DynamicTree, proxyId: i32, categoryBits: u64) ---
 
-	// Ray-cast against the proxies in the tree. This relies on the callback
-	// to perform a exact ray-cast in the case were the proxy contains a shape.
+	// Get the category bits on a proxy.
+	DynamicTree_GetCategoryBits :: proc(tree: ^DynamicTree, proxyId: i32) ---
+
+	// Query an AABB for overlapping proxies. The callback class is called for each proxy that overlaps the supplied AABB.
+	//	@return performance data
+	DynamicTree_Query           :: proc(#by_ptr tree: DynamicTree, aabb: AABB, maskBits: u64, callback: TreeQueryCallbackFcn, ctx: rawptr) -> TreeStats ---
+
+	// Ray cast against the proxies in the tree. This relies on the callback
+	// to perform a exact ray cast in the case were the proxy contains a shape.
 	// The callback also performs the any collision filtering. This has performance
 	// roughly equal to k * log(n), where k is the number of collisions and n is the
 	// number of proxies in the tree.
-	//	Bit-wise filtering using mask bits can greatly improve performance in some scenarios.
-	//	@param tree the dynamic tree to ray cast
-	// @param input the ray-cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1)
-	//	@param maskBits filter bits: `bool accept = (maskBits & node->categoryBits) != 0 ---`
+	// Bit-wise filtering using mask bits can greatly improve performance in some scenarios.
+	//	However, this filtering may be approximate, so the user should still apply filtering to results.
+	// @param tree the dynamic tree to ray cast
+	// @param input the ray cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1)
+	// @param maskBits mask bit hint: `bool accept = (maskBits & node->categoryBits) != 0;`
 	// @param callback a callback class that is called for each proxy that is hit by the ray
-	//	@param context user context that is passed to the callback
-	DynamicTree_RayCast         :: proc(#by_ptr tree: DynamicTree, #by_ptr input: RayCastInput, maskBits: u32, callback: TreeRayCastCallbackFcn, ctx: rawptr) ---
+	// @param context user context that is passed to the callback
+	//	@return performance data
+	DynamicTree_RayCast         :: proc(#by_ptr tree: DynamicTree, #by_ptr input: RayCastInput, maskBits: u64, callback: TreeRayCastCallbackFcn, ctx: rawptr) -> TreeStats ---
 
-	// Ray-cast against the proxies in the tree. This relies on the callback
-	// to perform a exact ray-cast in the case were the proxy contains a shape.
+	// Ray cast against the proxies in the tree. This relies on the callback
+	// to perform a exact ray cast in the case were the proxy contains a shape.
 	// The callback also performs the any collision filtering. This has performance
 	// roughly equal to k * log(n), where k is the number of collisions and n is the
 	// number of proxies in the tree.
 	//	@param tree the dynamic tree to ray cast
-	// @param input the ray-cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1).
+	// @param input the ray cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1).
 	//	@param maskBits filter bits: `bool accept = (maskBits & node->categoryBits) != 0 ---`
 	// @param callback a callback class that is called for each proxy that is hit by the shape
 	//	@param context user context that is passed to the callback
-	DynamicTree_ShapeCast       :: proc(#by_ptr tree: DynamicTree, #by_ptr input: ShapeCastInput, maskBits: u32, callback: TreeShapeCastCallbackFcn, ctx: rawptr) ---
+	//	@return performance data
+	DynamicTree_ShapeCast       :: proc(#by_ptr tree: DynamicTree, #by_ptr input: ShapeCastInput, maskBits: u32, callback: TreeShapeCastCallbackFcn, ctx: rawptr) -> TreeStats ---
 
-	// Validate this tree. For testing.
-	DynamicTree_Validate        :: proc(#by_ptr tree: DynamicTree) ---
-
-	// Compute the height of the binary tree in O(N) time. Should not be
-	// called often.
+	// Get the height of the binary tree.
 	DynamicTree_GetHeight       :: proc(#by_ptr tree: DynamicTree) -> c.int ---
-
-	// Get the maximum balance of the tree. The balance is the difference in height of the two children of a node.
-	DynamicTree_GetMaxBalance   :: proc(#by_ptr tree: DynamicTree) -> c.int ---
 
 	// Get the ratio of the sum of the node areas to the root area.
 	DynamicTree_GetAreaRatio    :: proc(#by_ptr tree: DynamicTree) -> f32 ---
 
-	// Build an optimal tree. Very expensive. For testing.
-	DynamicTree_RebuildBottomUp :: proc(tree: ^DynamicTree) ---
+	// Get the bounding box that contains the entire tree
+	DynamicTree_GetRootBounds   :: proc(#by_ptr tree: DynamicTree) -> AABB ---
 
 	// Get the number of proxies created
 	DynamicTree_GetProxyCount   :: proc(#by_ptr tree: DynamicTree) -> c.int ---
@@ -427,29 +457,47 @@ foreign lib {
 	// Rebuild the tree while retaining subtrees that haven't changed. Returns the number of boxes sorted.
 	DynamicTree_Rebuild         :: proc(tree: ^DynamicTree, fullBuild: bool) -> c.int ---
 
-	// Shift the world origin. Useful for large worlds.
-	// The shift formula is: position -= newOrigin
-	// @param tree the tree to shift
-	// @param newOrigin the new origin with respect to the old origin
-	DynamicTree_ShiftOrigin     :: proc(tree: ^DynamicTree, newOrigin: Vec2) ---
-
 	// Get the number of bytes used by this tree
 	DynamicTree_GetByteCount    :: proc(#by_ptr tree: DynamicTree) -> c.int ---
+
+	// Get proxy user data
+	DynamicTree_GetUserData     :: proc(#by_ptr tree: DynamicTree, proxyId: c.int) -> u64 ---
+
+	// Get the AABB of a proxy
+	DynamicTree_GetAABB         :: proc(#by_ptr tree: DynamicTree, proxyId: c.int) -> AABB ---
+
+	// Validate this tree. For testing.
+	DynamicTree_Validate           :: proc(#by_ptr tree: DynamicTree) ---
+
+	// Validate this tree has no enlarged AABBs. For testing.
+	DynamicTree_ValidateNoEnlarged :: proc(#by_ptr tree: DynamicTree) ---
 }
 
-// Get proxy user data
-// @return the proxy user data or 0 if the id is invalid
+/**
+ * @defgroup character Character mover
+ * Character movement solver
+ * @{
+ */
+
 @(require_results)
-DynamicTree_GetUserData :: #force_inline proc "contextless" (tree: DynamicTree, proxyId: i32) -> i32 {
-	return tree.nodes[proxyId].userData
+SolvePlanes :: proc(position: Vec2, planes: []CollisionPlane) -> PlaneSolverResult {
+	foreign lib {
+		b2SolvePlanes :: proc "c" (position: Vec2, planes: [^]CollisionPlane, count: i32) -> PlaneSolverResult ---
+	}
+
+	return b2SolvePlanes(position, raw_data(planes), i32(len(planes)))
 }
 
-// Get the AABB of a proxy
 @(require_results)
-DynamicTree_GetAABB :: #force_inline proc "contextless" (tree: DynamicTree, proxyId: i32) -> AABB {
-	return tree.nodes[proxyId].aabb
+ClipVector :: proc(vector: Vec2, planes: []CollisionPlane) -> Vec2 {
+	foreign lib {
+		b2ClipVector :: proc "c" (vector: Vec2, planes: [^]CollisionPlane, count: i32) -> Vec2 ---
+	}
+
+	return b2ClipVector(vector, raw_data(planes), i32(len(planes)))
 }
 
+/**@}*/
 
 
 @(link_prefix="b2", default_calling_convention="c", require_results)
@@ -477,8 +525,8 @@ foreign lib {
 
 	// Simulate a world for one time step. This performs collision detection, integration, and constraint solution.
 	// @param worldId The world to simulate
-	// @param timeStep The amount of time to simulate, this should be a fixed number. Typically 1/60.
-	// @param subStepCount The number of sub-steps, increasing the sub-step count can increase accuracy. Typically 4.
+	// @param timeStep The amount of time to simulate, this should be a fixed number. Usually 1/60.
+	// @param subStepCount The number of sub-steps, increasing the sub-step count can increase accuracy. Usually 4.
 	World_Step                    :: proc(worldId: WorldId, timeStep: f32 , subStepCount: c.int) ---
 
 	// Call this to draw shapes and other debug draw data
@@ -494,46 +542,47 @@ foreign lib {
 	World_GetContactEvents        :: proc(worldId: WorldId) -> ContactEvents ---
 
 	// Overlap test for all shapes that *potentially* overlap the provided AABB
-	World_OverlapAABB             :: proc(worldId: WorldId, aabb: AABB, filter: QueryFilter, fcn: OverlapResultFcn, ctx: rawptr) ---
+	World_OverlapAABB             :: proc(worldId: WorldId, aabb: AABB, filter: QueryFilter, fcn: OverlapResultFcn, ctx: rawptr) -> TreeStats ---
 
-	// Overlap test for for all shapes that overlap the provided circle
-	World_OverlapCircle           :: proc(worldId: WorldId, #by_ptr circle: Circle, transform: Transform, filter: QueryFilter, fcn: OverlapResultFcn, ctx: rawptr) ---
-
-	// Overlap test for all shapes that overlap the provided capsule
-	World_OverlapCapsule          :: proc(worldId: WorldId, #by_ptr capsule: Capsule, transform: Transform, filter: QueryFilter, fcn: OverlapResultFcn, ctx: rawptr) ---
-
-	// Overlap test for all shapes that overlap the provided polygon
-	World_OverlapPolygon          :: proc(worldId: WorldId, #by_ptr polygon: Polygon, transform: Transform, filter: QueryFilter, fcn: OverlapResultFcn, ctx: rawptr) ---
+	// Overlap test for all shapes that overlap the provided shape proxy.
+	World_OverlapShape            :: proc(worldId: WorldId, #by_ptr proxy: ShapeProxy, filter: QueryFilter, fcn: OverlapResultFcn, ctx: rawptr) -> TreeStats ---
 
 	// Cast a ray into the world to collect shapes in the path of the ray.
 	// Your callback function controls whether you get the closest point, any point, or n-points.
 	// The ray-cast ignores shapes that contain the starting point.
+	//	@note The callback function may receive shapes in any order
 	//	@param worldId The world to cast the ray against
 	//	@param origin The start point of the ray
 	//	@param translation The translation of the ray from the start point to the end point
 	//	@param filter Contains bit flags to filter unwanted shapes from the results
-	// @param fcn A user implemented callback function
-	// @param context A user context that is passed along to the callback function
-	//	@note The callback function may receive shapes in any order
-	World_CastRay                 :: proc(worldId: WorldId, origin: Vec2, translation: Vec2, filter: QueryFilter, fcn: CastResultFcn, ctx: rawptr) ---
+	//	@param fcn A user implemented callback function
+	//	@param context A user context that is passed along to the callback function
+	//	@return traversal performance counters
+	World_CastRay                 :: proc(worldId: WorldId, origin: Vec2, translation: Vec2, filter: QueryFilter, fcn: CastResultFcn, ctx: rawptr) -> TreeStats ---
 
 	// Cast a ray into the world to collect the closest hit. This is a convenience function.
 	// This is less general than b2World_CastRay() and does not allow for custom filtering.
 	World_CastRayClosest          :: proc(worldId: WorldId, origin: Vec2, translation: Vec2, filter: QueryFilter) -> RayResult ---
 
-	// Cast a circle through the world. Similar to a cast ray except that a circle is cast instead of a point.
-	World_CastCircle              :: proc(worldId: WorldId, #by_ptr circle: Circle, originTransform: Transform, translation: Vec2, filter: QueryFilter, fcn: CastResultFcn, ctx: rawptr) ---
+	// Cast a shape through the world. Similar to a cast ray except that a shape is cast instead of a point.
+	// @see World_CastRay
+	World_CastShape               :: proc(worldId: WorldId, #by_ptr shape: ShapeProxy, translation: Vec2, filter: QueryFilter, fcn: CastResultFcn, ctx: rawptr) -> TreeStats ---
 
-	// Cast a capsule through the world. Similar to a cast ray except that a capsule is cast instead of a point.
-	World_CastCapsule             :: proc(worldId: WorldId, #by_ptr capsule: Capsule, originTransform: Transform, translation: Vec2, filter: QueryFilter, fcn: CastResultFcn, ctx: rawptr) ---
+	// Cast a capsule mover through the world. This is a special shape cast that handles sliding along other shapes while reducing
+	// clipping.
+	World_CastMover               :: proc(worldId: WorldId, #by_ptr mover: Capsule, translation: Vec2, filter: QueryFilter) -> f32 ---
 
-	// Cast a polygon through the world. Similar to a cast ray except that a polygon is cast instead of a point.
-	World_CastPolygon             :: proc(worldId: WorldId, #by_ptr polygon: Polygon, originTransform: Transform, translation: Vec2, filter: QueryFilter, fcn: CastResultFcn, ctx: rawptr) ---
+	// Collide a capsule mover with the world, gathering collision planes that can be fed to b2SolvePlanes. Useful for
+	// kinematic character movement.
+	World_CollideMover            :: proc(worldId: WorldId, #by_ptr mover: Capsule, filter: QueryFilter, fcn: PlaneResultFcn, ctx: rawptr) ---
 
 	// Enable/disable sleep. If your application does not need sleeping, you can gain some performance
 	//	by disabling sleep completely at the world level.
 	//	@see WorldDef
 	World_EnableSleeping          :: proc(worldId: WorldId, flag: bool) ---
+
+	// Is body sleeping enabled?
+	World_IsSleepingEnabled       :: proc(worldId: WorldId) -> bool ---
 
 	// Enable/disable continuous collision between dynamic and static bodies. Generally you should keep continuous
 	// collision enabled to prevent fast moving objects from going through static objects. The performance gain from
@@ -541,15 +590,24 @@ foreign lib {
 	//	@see WorldDef
 	World_EnableContinuous        :: proc(worldId: WorldId, flag: bool) ---
 
+	// Is continuous collision enabled?
+	World_IsContinuousEnabled     :: proc(worldId: WorldId) -> bool ---
+
 	// Adjust the restitution threshold. It is recommended not to make this value very small
-	//	because it will prevent bodies from sleeping. Typically in meters per second.
+	//	because it will prevent bodies from sleeping. Usually in meters per second.
 	//	@see WorldDef
 	World_SetRestitutionThreshold :: proc(worldId: WorldId, value: f32) ---
 
+	// Get the restitution speed threshold. Usually in meters per second.
+	World_GetRestitutionThreshold :: proc(worldId: WorldId) -> f32 ---
+
 	// Adjust the hit event threshold. This controls the collision velocity needed to generate a b2ContactHitEvent.
-	// Typically in meters per second.
+	// Usually in meters per second.
 	//	@see WorldDef::hitEventThreshold
 	World_SetHitEventThreshold    :: proc(worldId: WorldId, value: f32) ---
+
+	// Get the hit event speed threshold. Usually in meters per second.
+	World_GetHitEventThreshold    :: proc(worldId: WorldId) -> f32 ---
 
 	// Register the custom filter callback. This is optional.
 	World_SetCustomFilterCallback :: proc(worldId: WorldId, fcn: CustomFilterFcn, ctx: rawptr) ---
@@ -558,7 +616,7 @@ foreign lib {
 	World_SetPreSolveCallback     :: proc(worldId: WorldId, fcn: PreSolveFcn, ctx: rawptr) ---
 
 	// Set the gravity vector for the entire world. Box2D has no concept of an up direction and this
-	// is left as a decision for the application. Typically in m/s^2.
+	// is left as a decision for the application. Usually in m/s^2.
 	//	@see WorldDef
 	World_SetGravity              :: proc(worldId: WorldId, gravity: Vec2) ---
 
@@ -567,22 +625,39 @@ foreign lib {
 
 	// Apply a radial explosion
 	//	@param worldId The world id
-	//	@param position The center of the explosion
-	//	@param radius The radius of the explosion
-	//	@param impulse The impulse of the explosion, typically in kg * m / s or N * s.
-	World_Explode                 :: proc(worldId: WorldId, position: Vec2, radius: f32, impulse: f32) ---
+	//	@param explosionDef The explosion definition
+	World_Explode                 :: proc(worldId: WorldId, #by_ptr explosionDef: ExplosionDef) ---
 
 	// Adjust contact tuning parameters
 	//	@param worldId The world id
 	// @param hertz The contact stiffness (cycles per second)
 	// @param dampingRatio The contact bounciness with 1 being critical damping (non-dimensional)
-	// @param pushVelocity The maximum contact constraint push out velocity (meters per second)
+	// @param pushSpeed The maximum contact constraint push out speed (meters per second)
 	//	@note Advanced feature
-	World_SetContactTuning        :: proc(worldId: WorldId, hertz: f32, dampingRatio: f32, pushVelocity: f32) ---
+	World_SetContactTuning        :: proc(worldId: WorldId, hertz: f32, dampingRatio: f32, pushSpeed: f32) ---
+
+	// Adjust joint tuning parameters
+	// @param worldId The world id
+	// @param hertz The contact stiffness (cycles per second)
+	// @param dampingRatio The contact bounciness with 1 being critical damping (non-dimensional)
+	// @note Advanced feature
+	World_SetJointTuning          :: proc(worldId: WorldId, hertz: f32, dampingRatio: f32) ---
+
+	// Set the maximum linear speed. Usually in m/s.
+	World_SetMaximumLinearSpeed   :: proc(worldId: WorldId, maximumLinearSpeed: f32) ---
+
+	// Get the maximum linear speed. Usually in m/s.
+	World_GetMaximumLinearSpeed   :: proc(worldId: WorldId) -> f32 ---
 
 	// Enable/disable constraint warm starting. Advanced feature for testing. Disabling
-	//	sleeping greatly reduces stability and provides no performance gain.
+	//	warm starting greatly reduces stability and provides no performance gain.
 	World_EnableWarmStarting      :: proc(worldId: WorldId, flag: bool) ---
+
+	// Is constraint warm starting enabled?
+	World_IsWarmStartingEnabled   :: proc(worldId: WorldId) -> bool ---
+
+	// Get the number of awake bodies.
+	World_GetAwakeBodyCount       :: proc(worldId: WorldId) -> c.int ---
 
 	// Get the current world performance profile
 	World_GetProfile              :: proc(worldId: WorldId) -> Profile ---
@@ -590,8 +665,26 @@ foreign lib {
 	// Get world counters and sizes
 	World_GetCounters             :: proc(worldId: WorldId) -> Counters ---
 
+	// Set the user data pointer.
+	World_SetUserData             :: proc(worldId: WorldId, userData: rawptr) ---
+
+	// Get the user data pointer.
+	World_GetUserData             :: proc(worldId: WorldId) -> rawptr ---
+
+	// Set the friction callback. Passing nil resets to default.
+	World_SetFrictionCallback     :: proc(worldId: WorldId, callback: FrictionCallback) ---
+
+	// Set the restitution callback. Passing nil resets to default.
+	World_SetRestitutionCallback  :: proc(worldId: WorldId, callback: RestitutionCallback) ---
+
 	// Dump memory stats to box2d_memory.txt
 	World_DumpMemoryStats         :: proc(worldId: WorldId) ---
+
+	// This is for internal testing
+	World_RebuildStaticTree       :: proc(worldId: WorldId) ---
+
+	// This is for internal testing
+	World_EnableSpeculative       :: proc(worldId: WorldId, flag: bool) ---
 }
 
 
@@ -625,6 +718,12 @@ foreign lib {
 	//	properties regardless of the automatic mass setting.
 	Body_SetType                    :: proc(bodyId: BodyId, type: BodyType) ---
 
+	// Set the body name. Up to 32 characters excluding 0 termination.
+	Body_SetName                    :: proc(bodyId: BodyId, name: cstring) ---
+
+	// Get the body name. May be nil.
+	Body_GetName                    :: proc(bodyId: BodyId) -> cstring ---
+
 	// Set the user data for a body
 	Body_SetUserData                :: proc(bodyId: BodyId, userData: rawptr) ---
 
@@ -657,23 +756,34 @@ foreign lib {
 	// Get a world vector on a body given a local vector
 	Body_GetWorldVector             :: proc(bodyId: BodyId, localVector: Vec2) -> Vec2 ---
 
-	// Get the linear velocity of a body's center of mass. Typically in meters per second.
+	// Get the linear velocity of a body's center of mass. Usually in meters per second.
 	Body_GetLinearVelocity          :: proc(bodyId: BodyId) -> Vec2 ---
 
 	// Get the angular velocity of a body in radians per second
 	Body_GetAngularVelocity         :: proc(bodyId: BodyId) -> f32 ---
 
-	// Set the linear velocity of a body. Typically in meters per second.
+	// Set the linear velocity of a body. Usually in meters per second.
 	Body_SetLinearVelocity          :: proc(bodyId: BodyId, linearVelocity: Vec2) ---
 
 	// Set the angular velocity of a body in radians per second
 	Body_SetAngularVelocity         :: proc(bodyId: BodyId, angularVelocity: f32) ---
 
+	// Set the velocity to reach the given transform after a given time step.
+	// The result will be close but maybe not exact. This is meant for kinematic bodies.
+	// This will automatically wake the body if asleep.
+	Body_SetTargetTransform         :: proc(bodyId: BodyId, target: Transform, timeStep: f32) ---
+
+	// Get the linear velocity of a local point attached to a body. Usually in meters per second.
+	Body_GetLocalPointVelocity      :: proc(bodyId: BodyId, localPoint: Vec2) -> Vec2 ---
+
+	// Get the linear velocity of a world point attached to a body. Usually in meters per second.
+	GetWorldPointVelocity           :: proc(bodyId: BodyId, worldPoint: Vec2) -> Vec2 ---
+
 	// Apply a force at a world point. If the force is not applied at the center of mass,
 	// it will generate a torque and affect the angular velocity. This optionally wakes up the body.
 	//	The force is ignored if the body is not awake.
 	//	@param bodyId The body id
-	// @param force The world force vector, typically in newtons (N)
+	// @param force The world force vector, usually in newtons (N)
 	// @param point The world position of the point of application
 	// @param wake Option to wake up the body
 	Body_ApplyForce                 :: proc(bodyId: BodyId, force: Vec2, point: Vec2, wake: bool) ---
@@ -688,7 +798,7 @@ foreign lib {
 	// Apply a torque. This affects the angular velocity without affecting the linear velocity.
 	//	This optionally wakes the body. The torque is ignored if the body is not awake.
 	//	@param bodyId The body id
-	// @param torque about the z-axis (out of the screen), typically in N*m.
+	// @param torque about the z-axis (out of the screen), usually in N*m.
 	// @param wake also wake up the body
 	Body_ApplyTorque                :: proc(bodyId: BodyId, torque: f32, wake: bool) ---
 
@@ -697,7 +807,7 @@ foreign lib {
 	// is not at the center of mass. This optionally wakes the body.
 	// The impulse is ignored if the body is not awake.
 	//	@param bodyId The body id
-	// @param impulse the world impulse vector, typically in N*s or kg*m/s.
+	// @param impulse the world impulse vector, usually in N*s or kg*m/s.
 	// @param point the world position of the point of application.
 	// @param wake also wake up the body
 	//	@warning This should be used for one-shot impulses. If you need a steady force,
@@ -707,7 +817,7 @@ foreign lib {
 	// Apply an impulse to the center of mass. This immediately modifies the velocity.
 	// The impulse is ignored if the body is not awake. This optionally wakes the body.
 	//	@param bodyId The body id
-	// @param impulse the world impulse vector, typically in N*s or kg*m/s.
+	// @param impulse the world impulse vector, usually in N*s or kg*m/s.
 	// @param wake also wake up the body
 	//	@warning This should be used for one-shot impulses. If you need a steady force,
 	// use a force instead, which will work better with the sub-stepping solver.
@@ -716,17 +826,17 @@ foreign lib {
 	// Apply an angular impulse. The impulse is ignored if the body is not awake.
 	// This optionally wakes the body.
 	//	@param bodyId The body id
-	// @param impulse the angular impulse, typically in units of kg*m*m/s
+	// @param impulse the angular impulse, usually in units of kg*m*m/s
 	// @param wake also wake up the body
 	//	@warning This should be used for one-shot impulses. If you need a steady force,
 	// use a force instead, which will work better with the sub-stepping solver.
 	Body_ApplyAngularImpulse        :: proc(bodyId: BodyId, impulse: f32, wake: bool) ---
 
-	// Get the mass of the body, typically in kilograms
+	// Get the mass of the body, usually in kilograms
 	Body_GetMass                    :: proc(bodyId: BodyId) -> f32 ---
 
-	// Get the inertia tensor of the body, typically in kg*m^2
-	Body_GetInertiaTensor           :: proc(bodyId: BodyId) -> f32 ---
+	// Get the rotational inertia of the body, usually in kg*m^2
+	Body_GetRotationalInertia       :: proc(bodyId: BodyId) -> f32 ---
 
 	// Get the center of mass position of the body in local space
 	Body_GetLocalCenterOfMass       :: proc(bodyId: BodyId) -> Vec2 ---
@@ -748,13 +858,6 @@ foreign lib {
 	//	You may also use this when automatic mass computation has been disabled.
 	//	You should call this regardless of body type.
 	Body_ApplyMassFromShapes        :: proc(bodyId: BodyId) ---
-
-	// Set the automatic mass setting. Normally this is set in BodyDef before creation.
-	//	@see BodyDef::automaticMass
-	Body_SetAutomaticMass           :: proc(bodyId: BodyId, automaticMass: bool ) ---
-
-	// Get the automatic mass setting
-	Body_GetAutomaticMass           :: proc(bodyId: BodyId) -> bool ---
 
 	// Adjust the linear damping. Normally this is set in BodyDef before creation.
 	Body_SetLinearDamping           :: proc(bodyId: BodyId, linearDamping: f32) ---
@@ -789,10 +892,10 @@ foreign lib {
 	// Returns true if sleeping is enabled for this body
 	Body_IsSleepEnabled             :: proc(bodyId: BodyId) -> bool ---
 
-	// Set the sleep threshold, typically in meters per second
-	Body_SetSleepThreshold          :: proc(bodyId: BodyId, sleepVelocity: f32) ---
+	// Set the sleep threshold, usually in meters per second
+	Body_SetSleepThreshold          :: proc(bodyId: BodyId, sleepThreshold: f32) ---
 
-	// Get the sleep threshold, typically in meters per second.
+	// Get the sleep threshold, usually in meters per second.
 	Body_GetSleepThreshold          :: proc(bodyId: BodyId) -> f32 ---
 
 	// Returns true if this body is enabled
@@ -817,9 +920,17 @@ foreign lib {
 	// Is this body a bullet?
 	Body_IsBullet                   :: proc(bodyId: BodyId) -> bool ---
 
+	// Enable/disable contact events on all shapes.
+	// @see b2ShapeDef::enableContactEvents
+	// @warning changing this at runtime may cause mismatched begin/end touch events
+	Body_EnableContactEvents        :: proc(bodyId: BodyId, flag: bool) ---
+
 	// Enable/disable hit events on all shapes
 	//	@see b2ShapeDef::enableHitEvents
-	Body_EnableHitEvents            :: proc(bodyId: BodyId, enableHitEvents: bool) ---
+	Body_EnableHitEvents            :: proc(bodyId: BodyId, flag: bool) ---
+
+	// Get the world that owns this body
+	Body_GetWorld                   :: proc(bodyId: BodyId) -> WorldId ---
 
 	// Get the number of shapes on this body
 	Body_GetShapeCount              :: proc(bodyId: BodyId) -> c.int ---
@@ -898,8 +1009,10 @@ foreign lib {
 	//	@return the shape id for accessing the shape
 	CreatePolygonShape             :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr polygon: Polygon) -> ShapeId ---
 
-	// Destroy a shape
-	DestroyShape                   :: proc(shapeId: ShapeId) ---
+	// Destroy a shape. You may defer the body mass update which can improve performance if several shapes on a
+	//	body are destroyed at once.
+	//	@see b2Body_ApplyMassFromShapes
+	DestroyShape                   :: proc(shapeId: ShapeId, updateBodyMass: bool) ---
 
 	// Shape identifier validation. Provides validation for up to 64K allocations.
 	Shape_IsValid                  :: proc(id: ShapeId) -> bool ---
@@ -910,7 +1023,12 @@ foreign lib {
 	// Get the id of the body that a shape is attached to
 	Shape_GetBody                  :: proc(shapeId: ShapeId) -> BodyId ---
 
-	// Returns true If the shape is a sensor
+	// Get the world that owns this shape.
+	Shape_GetWorld                 :: proc(shapeId: ShapeId) -> WorldId ---
+
+	// Returns true if the shape is a sensor. It is not possible to change a shape
+	// from sensor to solid dynamically because this breaks the contract for
+	// sensor events.
 	Shape_IsSensor                 :: proc(shapeId: ShapeId) -> bool ---
 
 	// Set the user data for a shape
@@ -920,12 +1038,12 @@ foreign lib {
 	//	from an event or query.
 	Shape_GetUserData              :: proc(shapeId: ShapeId) -> rawptr ---
 
-	// Set the mass density of a shape, typically in kg/m^2.
-	//	This will not update the mass properties on the parent body.
+	// Set the mass density of a shape, usually in kg/m^2.
+	//	This will optionally update the mass properties on the parent body.
 	//	@see b2ShapeDef::density, b2Body_ApplyMassFromShapes
-	Shape_SetDensity               :: proc(shapeId: ShapeId, density: f32) ---
+	Shape_SetDensity               :: proc(shapeId: ShapeId, density: f32, updateBodyMass: bool) ---
 
-	// Get the density of a shape, typically in kg/m^2
+	// Get the density of a shape, usually in kg/m^2
 	Shape_GetDensity               :: proc(shapeId: ShapeId) -> f32 ---
 
 	// Set the friction on a shape
@@ -942,15 +1060,24 @@ foreign lib {
 	// Get the shape restitution
 	Shape_GetRestitution           :: proc(shapeId: ShapeId) -> f32 ---
 
+	// Set the shape material identifier
+	// @see b2ShapeDef::material
+	Shape_SetMaterial              :: proc(shapeId: ShapeId, material: c.int) ---
+
+	// Get the shape material identifier
+	Shape_GetMaterial              :: proc(shapeId: ShapeId) -> c.int ---
+
 	// Get the shape filter
 	Shape_GetFilter                :: proc(shapeId: ShapeId) -> Filter ---
 
-	// Set the current filter. This is almost as expensive as recreating the shape.
-	//	@see b2ShapeDef::filter
+	// Set the current filter. This is almost as expensive as recreating the shape. This may cause
+	// contacts to be immediately destroyed. However contacts are not created until the next world step.
+	// Sensor overlap state is also not updated until the next world step.
+	// @see b2ShapeDef::filter
 	Shape_SetFilter                :: proc(shapeId: ShapeId, filter: Filter) ---
 
-	// Enable sensor events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors.
-	//	@see b2ShapeDef::isSensor
+	// Enable sensor events for this shape.
+	//	@see b2ShapeDef::enableSensorEvents
 	Shape_EnableSensorEvents       :: proc(shapeId: ShapeId, flag: bool) ---
 
 	// Returns true if sensor events are enabled
@@ -958,6 +1085,7 @@ foreign lib {
 
 	// Enable contact events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors.
 	//	@see b2ShapeDef::enableContactEvents
+	// @warning changing this at run-time may lead to lost begin/end events
 	Shape_EnableContactEvents      :: proc(shapeId: ShapeId, flag: bool) ---
 
 	// Returns true if contact events are enabled
@@ -982,7 +1110,7 @@ foreign lib {
 	Shape_TestPoint                :: proc(shapeId: ShapeId, point: Vec2) -> bool ---
 
 	// Ray cast a shape directly
-	Shape_RayCast                  :: proc(shapeId: ShapeId, origin: Vec2, translation: Vec2) -> CastOutput ---
+	Shape_RayCast                  :: proc(shapeId: ShapeId, #by_ptr input: RayCastInput) -> CastOutput ---
 
 	// Get a copy of the shape's circle. Asserts the type is correct.
 	Shape_GetCircle                :: proc(shapeId: ShapeId) -> Circle ---
@@ -990,9 +1118,9 @@ foreign lib {
 	// Get a copy of the shape's line segment. Asserts the type is correct.
 	Shape_GetSegment               :: proc(shapeId: ShapeId) -> Segment ---
 
-	// Get a copy of the shape's smooth line segment. These come from chain shapes.
+	// Get a copy of the shape's chain segment. These come from chain shapes.
 	// Asserts the type is correct.
-	Shape_GetSmoothSegment         :: proc(shapeId: ShapeId) -> SmoothSegment ---
+	Shape_GetChainSegment          :: proc(shapeId: ShapeId) -> ChainSegment ---
 
 	// Get a copy of the shape's capsule. Asserts the type is correct.
 	Shape_GetCapsule               :: proc(shapeId: ShapeId) -> Capsule ---
@@ -1018,15 +1146,33 @@ foreign lib {
 	//	@see b2Body_ApplyMassFromShapes
 	Shape_SetPolygon               :: proc(shapeId: ShapeId, #by_ptr polygon: Polygon) ---
 
-	// Get the parent chain id if the shape type is b2_smoothSegmentShape, otherwise
+	// Get the parent chain id if the shape type is a chain segment, otherwise
 	// returns b2_nullChainId.
 	Shape_GetParentChain           :: proc(shapeId: ShapeId) -> ChainId ---
 
 	// Get the maximum capacity required for retrieving all the touching contacts on a shape
 	Shape_GetContactCapacity       :: proc(shapeId: ShapeId) -> c.int ---
 
+	// Get the maximum capacity required for retrieving all the overlapped shapes on a sensor shape.
+	// This returns 0 if the provided shape is not a sensor.
+	// @param shapeId the id of a sensor shape
+	// @returns the required capacity to get all the overlaps in b2Shape_GetSensorOverlaps
+	Shape_GetSensorCapacity        :: proc(shapeId: ShapeId) -> c.int ---
+
+	// Get the overlapped shapes for a sensor shape.
+	// @param shapeId the id of a sensor shape
+	// @param overlaps a user allocated array that is filled with the overlapping shapes
+	// @param capacity the capacity of overlappedShapes
+	// @returns the number of elements filled in the provided array
+	// @warning do not ignore the return value, it specifies the valid number of elements
+	// @warning overlaps may contain destroyed shapes so use b2Shape_IsValid to confirm each overlap
+	Shape_GetSensorOverlaps        :: proc(shapeId: ShapeId, overlaps: [^]ShapeId, capacity: c.int) -> c.int ---
+
 	// Get the current world AABB
 	Shape_GetAABB                  :: proc(shapeId: ShapeId) -> AABB ---
+
+	// Get the mass data of a shape
+	Shape_GetMassData              :: proc(shapeId: ShapeId) -> MassData ---
 
 	// Get the closest point on a shape to a target point. Target and result are in world space.
 	Shape_GetClosestPoint          :: proc(shapeId: ShapeId, target: Vec2) -> Vec2 ---
@@ -1049,21 +1195,44 @@ foreign lib {
 
 	// Create a chain shape
 	//	@see b2ChainDef for details
-	CreateChain          :: proc(bodyId: BodyId, #by_ptr def: ChainDef) -> ChainId ---
+	CreateChain           :: proc(bodyId: BodyId, #by_ptr def: ChainDef) -> ChainId ---
 
 	// Destroy a chain shape
-	DestroyChain         :: proc(chainId: ChainId) ---
+	DestroyChain          :: proc(chainId: ChainId) ---
+
+	// Get the world that owns this chain shape
+	Chain_GetWorld        :: proc(chainId: ChainId) -> WorldId ---
+
+	// Get the number of segments on this chain
+	Chain_GetSegmentCount :: proc(chainId: ChainId) -> c.int ---
+
+	// Fill a user array with chain segment shape ids up to the specified capacity. Returns
+	// the actual number of segments returned.
+	Chain_GetSegments     :: proc(chainId: ChainId, segmentArray: [^]ShapeId, capacity: c.int) -> c.int ---
 
 	// Set the chain friction
 	// @see b2ChainDef::friction
-	Chain_SetFriction    :: proc(chainId: ChainId, friction: f32) ---
+	Chain_SetFriction     :: proc(chainId: ChainId, friction: f32) ---
+
+	// Get the chain friction
+	Chain_GetFriction     :: proc(chainId: ChainId) -> f32 ---
 
 	// Set the chain restitution (bounciness)
 	// @see b2ChainDef::restitution
-	Chain_SetRestitution :: proc(chainId: ChainId, restitution: f32) ---
+	Chain_SetRestitution  :: proc(chainId: ChainId, restitution: f32) ---
+
+	// Get the chain restitution
+	Chain_GetRestitution  :: proc(chainId: ChainId) -> f32 ---
+
+	// Set the chain material
+	// @see b2ChainDef::material
+	Chain_SetMaterial     :: proc(chainId: ChainId, material: c.int) ---
+
+	// Get the chain material
+	Chain_GetMaterial     :: proc(chainId: ChainId) -> c.int ---
 
 	// Chain identifier validation. Provides validation for up to 64K allocations.
-	Chain_IsValid        :: proc(id: ChainId) -> bool ---
+	Chain_IsValid         :: proc(id: ChainId) -> bool ---
 
 	/**
 	 * @defgroup joint Joint
@@ -1084,6 +1253,9 @@ foreign lib {
 
 	// Get body B id on a joint
 	Joint_GetBodyB            :: proc(jointId: JointId) -> BodyId ---
+
+	// Get the world that owns this joint
+	Joint_GetWorld            :: proc(jointId: JointId) -> WorldId ---
 
 	// Get the local anchor on bodyA
 	Joint_GetLocalAnchorA     :: proc(jointId: JointId) -> Vec2 ---
@@ -1106,10 +1278,10 @@ foreign lib {
 	// Wake the bodies connect to this joint
 	Joint_WakeBodies          :: proc(jointId: JointId) ---
 
-	// Get the current constraint force for this joint
+	// Get the current constraint force for this joint. Usually in Newtons.
 	Joint_GetConstraintForce  :: proc(jointId: JointId) -> Vec2 ---
 
-	// Get the current constraint torque for this joint
+	// Get the current constraint torque for this joint. Usually in Newton * meters.
 	Joint_GetConstraintTorque :: proc(jointId: JointId) -> f32 ---
 
 	/**
@@ -1142,10 +1314,10 @@ foreign lib {
 	DistanceJoint_SetSpringDampingRatio :: proc(jointId: JointId, dampingRatio: f32) ---
 
 	// Get the spring Hertz
-	DistanceJoint_GetHertz              :: proc(jointId: JointId) -> f32 ---
+	DistanceJoint_GetSpringHertz        :: proc(jointId: JointId) -> f32 ---
 
 	// Get the spring damping ratio
-	DistanceJoint_GetDampingRatio       :: proc(jointId: JointId) -> f32 ---
+	DistanceJoint_GetSpringDampingRatio :: proc(jointId: JointId) -> f32 ---
 
 	// Enable joint limit. The limit only works if the joint spring is enabled. Otherwise the joint is rigid
 	//	and the limit has no effect.
@@ -1172,19 +1344,19 @@ foreign lib {
 	// Is the distance joint motor enabled?
 	DistanceJoint_IsMotorEnabled        :: proc(jointId: JointId) -> bool ---
 
-	// Set the distance joint motor speed, typically in meters per second
+	// Set the distance joint motor speed, usually in meters per second
 	DistanceJoint_SetMotorSpeed         :: proc(jointId: JointId, motorSpeed: f32) ---
 
-	// Get the distance joint motor speed, typically in meters per second
+	// Get the distance joint motor speed, usually in meters per second
 	DistanceJoint_GetMotorSpeed         :: proc(jointId: JointId) -> f32 ---
 
-	// Set the distance joint maximum motor force, typically in newtons
+	// Set the distance joint maximum motor force, usually in newtons
 	DistanceJoint_SetMaxMotorForce      :: proc(jointId: JointId, force: f32) ---
 
-	// Get the distance joint maximum motor force, typically in newtons
+	// Get the distance joint maximum motor force, usually in newtons
 	DistanceJoint_GetMaxMotorForce      :: proc(jointId: JointId) -> f32 ---
 
-	// Get the distance joint current motor force, typically in newtons
+	// Get the distance joint current motor force, usually in newtons
 	DistanceJoint_GetMotorForce         :: proc(jointId: JointId) -> f32 ---
 
 	/**
@@ -1212,22 +1384,22 @@ foreign lib {
 	// Get the motor joint angular offset target in radians
 	MotorJoint_GetAngularOffset    :: proc(jointId: JointId) -> f32 ---
 
-	// Set the motor joint maximum force, typically in newtons
+	// Set the motor joint maximum force, usually in newtons
 	MotorJoint_SetMaxForce         :: proc(jointId: JointId, maxForce: f32) ---
 
-	// Get the motor joint maximum force, typically in newtons
+	// Get the motor joint maximum force, usually in newtons
 	MotorJoint_GetMaxForce         :: proc(jointId: JointId) -> f32 ---
 
-	// Set the motor joint maximum torque, typically in newton-meters
+	// Set the motor joint maximum torque, usually in newton-meters
 	MotorJoint_SetMaxTorque        :: proc(jointId: JointId, maxTorque: f32) ---
 
-	// Get the motor joint maximum torque, typically in newton-meters
+	// Get the motor joint maximum torque, usually in newton-meters
 	MotorJoint_GetMaxTorque        :: proc(jointId: JointId) -> f32 ---
 
-	// Set the motor joint correction factor, typically in [0, 1]
+	// Set the motor joint correction factor, usually in [0, 1]
 	MotorJoint_SetCorrectionFactor :: proc(jointId: JointId, correctionFactor: f32) ---
 
-	// Get the motor joint correction factor, typically in [0, 1]
+	// Get the motor joint correction factor, usually in [0, 1]
 	MotorJoint_GetCorrectionFactor :: proc(jointId: JointId) -> f32 ---
 
 	/**@}*/
@@ -1262,11 +1434,26 @@ foreign lib {
 	// Get the mouse joint damping ratio, non-dimensional
 	MouseJoint_GetSpringDampingRatio :: proc(jointId: JointId) -> f32 ---
 
-	// Set the mouse joint maximum force, typically in newtons
+	// Set the mouse joint maximum force, usually in newtons
 	MouseJoint_SetMaxForce           :: proc(jointId: JointId, maxForce: f32) ---
 
-	// Get the mouse joint maximum force, typically in newtons
+	// Get the mouse joint maximum force, usually in newtons
 	MouseJoint_GetMaxForce           :: proc(jointId: JointId) -> f32 ---
+
+	/**@}*/
+
+	/**
+	 * @defgroup filter_joint Filter Joint
+	 * @brief Functions for the filter joint.
+	 *
+	 * The filter joint is used to disable collision between two bodies. As a side effect of being a joint, it also
+	 * keeps the two bodies in the same simulation island.
+	 * @{
+	 */
+
+	// Create a filter joint.
+	// @see b2FilterJointDef for details
+	CreateFilterJoint :: proc(worldId: WorldId, #by_ptr def: FilterJointDef) -> JointId ---
 
 	/**@}*/
 
@@ -1323,20 +1510,26 @@ foreign lib {
 	// Is the prismatic joint motor enabled?
 	PrismaticJoint_IsMotorEnabled        :: proc(jointId: JointId) -> bool ---
 
-	// Set the prismatic joint motor speed, typically in meters per second
+	// Set the prismatic joint motor speed, usually in meters per second
 	PrismaticJoint_SetMotorSpeed         :: proc(jointId: JointId, motorSpeed: f32) ---
 
-	// Get the prismatic joint motor speed, typically in meters per second
+	// Get the prismatic joint motor speed, usually in meters per second
 	PrismaticJoint_GetMotorSpeed         :: proc(jointId: JointId) -> f32 ---
 
-	// Set the prismatic joint maximum motor force, typically in newtons
+	// Set the prismatic joint maximum motor force, usually in newtons
 	PrismaticJoint_SetMaxMotorForce      :: proc(jointId: JointId, force: f32) ---
 
-	// Get the prismatic joint maximum motor force, typically in newtons
+	// Get the prismatic joint maximum motor force, usually in newtons
 	PrismaticJoint_GetMaxMotorForce      :: proc(jointId: JointId) -> f32 ---
 
-	// Get the prismatic joint current motor force, typically in newtons
+	// Get the prismatic joint current motor force, usually in newtons
 	PrismaticJoint_GetMotorForce         :: proc(jointId: JointId) -> f32 ---
+
+	// Get the current joint translation, usually in meters.
+	PrismaticJoint_GetTranslation        :: proc(jointId: JointId) -> f32 ---
+
+	// Get the current joint translation speed, usually in meters per second.
+	PrismaticJoint_GetSpeed              :: proc(jointId: JointId) -> f32 ---
 
 	/**
 	 * @defgroup revolute_joint Revolute Joint
@@ -1352,6 +1545,9 @@ foreign lib {
 
 	// Enable/disable the revolute joint spring
 	RevoluteJoint_EnableSpring          :: proc(jointId: JointId, enableSpring: bool) ---
+
+	// Is the revolute spring enabled?
+	RevoluteJoint_IsSpringEnabled       :: proc(jointId: JointId) -> bool ---
 
 	// Set the revolute joint spring stiffness in Hertz
 	RevoluteJoint_SetSpringHertz        :: proc(jointId: JointId, hertz: f32) ---
@@ -1381,7 +1577,8 @@ foreign lib {
 	// Get the revolute joint upper limit in radians
 	RevoluteJoint_GetUpperLimit         :: proc(jointId: JointId) -> f32 ---
 
-	// Set the revolute joint limits in radians
+	// Set the revolute joint limits in radians. It is expected that lower <= upper
+	// and that -0.95 * B2_PI <= lower && upper <= -0.95 * B2_PI.
 	RevoluteJoint_SetLimits             :: proc(jointId: JointId, lower, upper: f32) ---
 
 	// Enable/disable a revolute joint motor
@@ -1396,13 +1593,13 @@ foreign lib {
 	// Get the revolute joint motor speed in radians per second
 	RevoluteJoint_GetMotorSpeed         :: proc(jointId: JointId) -> f32 ---
 
-	// Get the revolute joint current motor torque, typically in newton-meters
+	// Get the revolute joint current motor torque, usually in newton-meters
 	RevoluteJoint_GetMotorTorque        :: proc(jointId: JointId) -> f32 ---
 
-	// Set the revolute joint maximum motor torque, typically in newton-meters
+	// Set the revolute joint maximum motor torque, usually in newton-meters
 	RevoluteJoint_SetMaxMotorTorque     :: proc(jointId: JointId, torque: f32) ---
 
-	// Get the revolute joint maximum motor torque, typically in newton-meters
+	// Get the revolute joint maximum motor torque, usually in newton-meters
 	RevoluteJoint_GetMaxMotorTorque     :: proc(jointId: JointId) -> f32 ---
 
 	/**@}*/
@@ -1420,6 +1617,12 @@ foreign lib {
 	// Create a weld joint
 	//	@see b2WeldJointDef for details
 	CreateWeldJoint                  :: proc(worldId: WorldId, #by_ptr def: WeldJointDef) -> JointId ---
+
+	// Get the weld joint reference angle in radians
+	WeldJoint_GetReferenceAngle      :: proc(jointId: JointId) -> f32 ---
+
+	// Set the weld joint reference angle in radians, must be in [-pi,pi].
+	WeldJoint_SetReferenceAngle      :: proc(jointId: JointId, angleInRadians: f32) ---
 
 	// Set the weld joint linear stiffness in Hertz. 0 is rigid.
 	WeldJoint_SetLinearHertz         :: proc(jointId: JointId, hertz: f32) ---
@@ -1503,22 +1706,24 @@ foreign lib {
 	// Get the wheel joint motor speed in radians per second
 	WheelJoint_GetMotorSpeed         :: proc(jointId: JointId) -> f32 ---
 
-	// Set the wheel joint maximum motor torque, typically in newton-meters
+	// Set the wheel joint maximum motor torque, usually in newton-meters
 	WheelJoint_SetMaxMotorTorque     :: proc(jointId: JointId, torque: f32) ---
 
-	// Get the wheel joint maximum motor torque, typically in newton-meters
+	// Get the wheel joint maximum motor torque, usually in newton-meters
 	WheelJoint_GetMaxMotorTorque     :: proc(jointId: JointId) -> f32 ---
 
-	// Get the wheel joint current motor torque, typically in newton-meters
+	// Get the wheel joint current motor torque, usually in newton-meters
 	WheelJoint_GetMotorTorque        :: proc(jointId: JointId) -> f32 ---
 }
 
 
 
 IsValid :: proc{
-	Float_IsValid,
-	Vec2_IsValid,
-	Rot_IsValid,
+	IsValidFloat,
+	IsValidVec2,
+	IsValidRotation,
+	IsValidAABB,
+	IsValidPlane,
 	World_IsValid,
 	Body_IsValid,
 	Shape_IsValid,

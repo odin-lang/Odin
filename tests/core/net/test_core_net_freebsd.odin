@@ -17,9 +17,6 @@ import "core:net"
 import "core:time"
 import "core:testing"
 
-ENDPOINT_DUPLICATE_BINDING := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 11000}
-ENDPOINT_EPIPE_TEST        := net.Endpoint{net.IP4_Address{127, 0, 0, 1}, 11001}
-
 @test
 test_duplicate_binding :: proc(t: ^testing.T) {
 	// FreeBSD has the capacity to permit multiple processes and sockets to
@@ -35,8 +32,13 @@ test_duplicate_binding :: proc(t: ^testing.T) {
 	if !testing.expect_value(t, err_set1, nil) {
 		return
 	}
-	err_bind1 := net.bind(tcp_socket1, ENDPOINT_DUPLICATE_BINDING)
+	err_bind1 := net.bind(tcp_socket1, {net.IP4_Loopback, 0})
 	if !testing.expect_value(t, err_bind1, nil) {
+		return
+	}
+
+	ep, err_bound := net.bound_endpoint(tcp_socket1)
+	if !testing.expect_value(t, err_bound, nil) {
 		return
 	}
 
@@ -50,7 +52,7 @@ test_duplicate_binding :: proc(t: ^testing.T) {
 	if !testing.expect_value(t, err_set2, nil) {
 		return
 	}
-	err_bind2 := net.bind(tcp_socket2, ENDPOINT_DUPLICATE_BINDING)
+	err_bind2 := net.bind(tcp_socket2, ep)
 	if !testing.expect_value(t, err_bind2, nil) {
 		return
 	}
@@ -60,13 +62,18 @@ test_duplicate_binding :: proc(t: ^testing.T) {
 test_sigpipe_bypass :: proc(t: ^testing.T) {
 	// If the internals aren't working as expected, this test will fail by raising SIGPIPE.
 
-	server_socket, listen_err := net.listen_tcp(ENDPOINT_EPIPE_TEST)
+	server_socket, listen_err := net.listen_tcp({net.IP4_Loopback, 0})
 	if !testing.expect_value(t, listen_err, nil) {
 		return
 	}
 	defer net.close(server_socket)
 
-	client_socket, dial_err := net.dial_tcp(ENDPOINT_EPIPE_TEST)
+	ep, bound_err := net.bound_endpoint(server_socket)
+	if !testing.expect_value(t, bound_err, nil) {
+		return
+	}
+
+	client_socket, dial_err := net.dial_tcp(ep)
 	if !testing.expect_value(t, dial_err, nil) {
 		return
 	}
@@ -80,7 +87,7 @@ test_sigpipe_bypass :: proc(t: ^testing.T) {
 
 	data := "Hellope!"
 	bytes_written, err_send := net.send(client_socket, transmute([]u8)data)
-	if !testing.expect_value(t, err_send, net.TCP_Send_Error.Cannot_Send_More_Data) {
+	if !testing.expect_value(t, err_send, net.TCP_Send_Error.Connection_Closed) {
 		return
 	}
 	if !testing.expect_value(t, bytes_written, 0) {

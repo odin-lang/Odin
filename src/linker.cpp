@@ -7,19 +7,15 @@ struct LinkerData {
 	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
-#if defined(GB_SYSTEM_OSX)
-	b8       needs_system_library_linked;
-#endif
+	bool     needs_system_library_linked;
 };
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
 gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output);
 
-#if defined(GB_SYSTEM_OSX)
 gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
-	ld->needs_system_library_linked = 1;
+	ld->needs_system_library_linked = true;
 }
-#endif
 
 gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String const &init_fullpath) {
 	gbAllocator ha = heap_allocator();
@@ -28,9 +24,7 @@ gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String cons
 	array_init(&ld->foreign_libraries,   ha, 0, 1024);
 	ptr_set_init(&ld->foreign_libraries_set, 1024);
 
-#if defined(GB_SYSTEM_OSX)
-	ld->needs_system_library_linked = 0;
-#endif 
+	ld->needs_system_library_linked = false;
 
 	if (build_context.out_filepath.len == 0) {
 		ld->output_name = remove_directory_from_path(init_fullpath);
@@ -136,6 +130,9 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 		return result;
 	}
 
+	bool is_cross_linking = false;
+	bool is_android = false;
+
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 #if defined(GB_SYSTEM_UNIX)
 		result = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
@@ -146,23 +143,30 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			LIT(target_arch_names[build_context.metrics.arch])
 		);
 #endif
-	} else if (build_context.cross_compiling && build_context.different_os) {
-		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
-			LIT(target_os_names[build_context.metrics.os]),
-			LIT(target_arch_names[build_context.metrics.arch])
-		);
-		build_context.keep_object_files = true;
+	} else if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
+		switch (selected_subtarget) {
+		case Subtarget_Android:
+			is_cross_linking = true;
+			is_android = true;
+			goto try_cross_linking;
+		default:
+			gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
+				LIT(target_os_names[build_context.metrics.os]),
+				LIT(target_arch_names[build_context.metrics.arch])
+			);
+			build_context.keep_object_files = true;
+			break;
+		}
 	} else {
+try_cross_linking:;
+
 	#if defined(GB_SYSTEM_WINDOWS)
-		bool is_windows = true;
+		bool is_windows = build_context.metrics.os == TargetOs_windows;
 	#else
 		bool is_windows = false;
 	#endif
-	#if defined(GB_SYSTEM_OSX)
-		bool is_osx = true;
-	#else
-		bool is_osx = false;
-	#endif
+
+		bool is_osx = build_context.metrics.os == TargetOs_darwin;
 
 
 		if (is_windows) {
@@ -273,13 +277,16 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			if (build_context.build_mode == BuildMode_DynamicLibrary) {
 				link_settings = gb_string_append_fmt(link_settings, " /DLL");
+				if (build_context.no_entry_point) {
+					link_settings = gb_string_append_fmt(link_settings, " /NOENTRY");
+				}
 			} else {
 				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
 			}
 
-			if (build_context.pdb_filepath != "") {
-				String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(pdb_path));
+			if (build_context.build_paths[BuildPath_Symbols].name != "") {
+				String symbol_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Symbols]);
+				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(symbol_path));
 			}
 
 			if (build_context.build_mode != BuildMode_StaticLibrary) {
@@ -317,7 +324,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -337,7 +344,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -400,7 +407,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					"",
 					LIT(vs_exe_path), LIT(linker_name), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
-					LIT(build_context.ODIN_WINDOWS_SUBSYSTEM),
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
 					lib_str
@@ -414,23 +421,27 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 		} else {
 			timings_start_section(timings, str_lit("ld-link"));
 
+			int const ODIN_ANDROID_API_LEVEL = build_context.ODIN_ANDROID_API_LEVEL;
+
+			String ODIN_ANDROID_NDK                     = build_context.ODIN_ANDROID_NDK;
+			String ODIN_ANDROID_NDK_TOOLCHAIN           = build_context.ODIN_ANDROID_NDK_TOOLCHAIN;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB       = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
+			String ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT   = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT;
+
 			// Link using `clang`, unless overridden by `ODIN_CLANG_PATH` environment variable.
 			const char* clang_path = gb_get_env("ODIN_CLANG_PATH", permanent_allocator());
 			if (clang_path == NULL) {
 				clang_path = "clang";
 			}
 
-			// NOTE(vassvik): get cwd, for used for local shared libs linking, since those have to be relative to the exe
-			char cwd[256];
-			#if !defined(GB_SYSTEM_WINDOWS)
-			getcwd(&cwd[0], 256);
-			#endif
-			//printf("%s\n", cwd);
-
 			// NOTE(vassvik): needs to add the root to the library search paths, so that the full filenames of the library
 			//                files can be passed with -l:
-			gbString lib_str = gb_string_make(heap_allocator(), "-L/");
+			gbString lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(lib_str));
+			#if !defined(GB_SYSTEM_WINDOWS)
+				lib_str = gb_string_appendc(lib_str, "-L/ ");
+			#endif
 			
 			StringSet asm_files = {};
 			string_set_init(&asm_files, 64);
@@ -449,6 +460,26 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				if (extra_linker_flags.len != 0) {
 					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
 				}
+
+				if (build_context.metrics.os == TargetOs_darwin) {
+					// Print frameworks first
+					for (String lib : e->LibraryName.paths) {
+						lib = string_trim_whitespace(lib);
+						if (lib.len == 0) {
+							continue;
+						}
+						if (string_ends_with(lib, str_lit(".framework"))) {
+							if (string_set_update(&min_libs_set, lib)) {
+								continue;
+							}
+
+							String lib_name = lib;
+							lib_name = remove_extension_from_path(lib_name);
+							lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
+						}
+					}
+				}
+
 				for (String lib : e->LibraryName.paths) {
 					lib = string_trim_whitespace(lib);
 					if (lib.len == 0) {
@@ -476,19 +507,20 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						}
 
 						String obj_format;
-					#if defined(GB_ARCH_64_BIT)
-						if (is_osx) {
-							obj_format = str_lit("macho64");
+						if (build_context.metrics.ptr_size == 8) {
+							if (is_osx) {
+								obj_format = str_lit("macho64");
+							} else {
+								obj_format = str_lit("elf64");
+							}
 						} else {
-							obj_format = str_lit("elf64");
+							GB_ASSERT(build_context.metrics.ptr_size == 4);
+							if (is_osx) {
+								obj_format = str_lit("macho32");
+							} else {
+								obj_format = str_lit("elf32");
+							}
 						}
-					#elif defined(GB_ARCH_32_BIT)
-						if (is_osx) {
-							obj_format = str_lit("macho32");
-						} else {
-							obj_format = str_lit("elf32");
-						}
-					#endif // GB_ARCH_*_BIT
 
 						if (build_context.metrics.arch == TargetArch_riscv64) {
 							result = system_exec_command_line_app("clang",
@@ -536,7 +568,18 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 						}
 						array_add(&gen->output_object_paths, obj_file);
 					} else {
-						if (string_set_update(&min_libs_set, lib) && build_context.min_link_libs) {
+						bool short_circuit = false;
+						if (string_ends_with(lib, str_lit(".framework"))) {
+							short_circuit = true;
+						} else if (string_ends_with(lib, str_lit(".dylib"))) {
+							short_circuit = true;
+						} else if (string_ends_with(lib, str_lit(".so"))) {
+							short_circuit = true;
+						} else if (e->LibraryName.ignore_duplicates) {
+							short_circuit = true;
+						}
+
+						if (string_set_update(&min_libs_set, lib) && (build_context.min_link_libs || short_circuit)) {
 							continue;
 						}
 
@@ -563,7 +606,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 								// object
 								// dynamic lib
 								// static libs, absolute full path relative to the file in which the lib was imported from
-								lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
+								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
 								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
@@ -587,8 +630,86 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
+
+
+			if (is_android) { // NOTE(bill): glue code needed for Android
+				TIME_SECTION("Android Native App Glue Compile");
+
+				String android_glue_object = {};
+				String android_glue_static_lib = {};
+
+				char hash_buf[64] = {};
+				gb_snprintf(hash_buf, gb_size_of(hash_buf), "%p", &hash_buf);
+				String hash = make_string_c(hash_buf);
+
+				String temp_dir = normalize_path(temporary_allocator(), temporary_directory(temporary_allocator()), NIX_SEPARATOR_STRING);
+				android_glue_object = concatenate4_strings(temporary_allocator(), temp_dir, str_lit("android_native_app_glue-"), hash, str_lit(".o"));
+				android_glue_static_lib = concatenate4_strings(permanent_allocator(), temp_dir, str_lit("libandroid_native_app_glue-"), hash, str_lit(".a"));
+
+				gbString glue = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				defer (gb_string_free(glue));
+
+				glue = gb_string_append_fmt(glue, "bin/clang");
+				glue = gb_string_append_fmt(glue, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
+				glue = gb_string_appendc(glue, "-c \"");
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK.text, ODIN_ANDROID_NDK.len);
+				glue = gb_string_appendc(glue, "sources/android/native_app_glue/android_native_app_glue.c");
+				glue = gb_string_appendc(glue, "\" ");
+				glue = gb_string_appendc(glue, "-o \"");
+				glue = gb_string_append_length(glue, android_glue_object.text, android_glue_object.len);
+				glue = gb_string_appendc(glue, "\" ");
+
+				glue = gb_string_appendc(glue, "--sysroot \"");
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				glue = gb_string_appendc(glue, "sysroot");
+				glue = gb_string_appendc(glue, "\" ");
+
+				glue = gb_string_appendc(glue, "\"-I");
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				glue = gb_string_appendc(glue, "sysroot/usr/include/");
+				glue = gb_string_appendc(glue, "\" ");
+
+				glue = gb_string_appendc(glue, "\"-I");
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				glue = gb_string_appendc(glue, "sysroot/usr/include/aarch64-linux-android/");
+				glue = gb_string_appendc(glue, "\" ");
+
+
+				glue = gb_string_appendc(glue, "-Wno-macro-redefined ");
+
+				result = system_exec_command_line_app("android-native-app-glue-compile", glue);
+				if (result) {
+					return result;
+				}
+
+				TIME_SECTION("Android Native App Glue ar");
+
+				gbString ar = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				defer (gb_string_free(ar));
+
+				ar = gb_string_appendc(ar, "bin/llvm-ar");
+
+				ar = gb_string_appendc(ar, " rcs ");
+
+				ar = gb_string_appendc(ar, "\"");
+				ar = gb_string_append_length(ar, android_glue_static_lib.text, android_glue_static_lib.len);
+				ar = gb_string_appendc(ar, "\" ");
+
+				ar = gb_string_appendc(ar, "\"");
+				ar = gb_string_append_length(ar, android_glue_object.text, android_glue_object.len);
+				ar = gb_string_appendc(ar, "\" ");
+
+				result = system_exec_command_line_app("android-native-app-glue-ar", ar);
+				if (result) {
+					return result;
+				}
+
+				object_files = gb_string_append_fmt(object_files, "\'%.*s\' ", LIT(android_glue_static_lib));
+			}
+
+
 			for (String object_path : gen->output_object_paths) {
-				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
+				object_files = gb_string_append_fmt(object_files, "\'%.*s\' ", LIT(object_path));
 			}
 
 			gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
@@ -630,7 +751,9 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
 					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 				}
-
+			} else if (is_android) {
+				// Always shared even in android!
+				link_settings = gb_string_appendc(link_settings, "-shared ");
 			}
 
 			if (build_context.build_mode == BuildMode_Executable && build_context.reloc_mode == RelocMode_PIC) {
@@ -639,6 +762,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				if (build_context.metrics.os != TargetOs_openbsd
 					&& build_context.metrics.os != TargetOs_haiku
 					&& build_context.metrics.arch != TargetArch_riscv64
+					&& !is_android
 				) {
 					// OpenBSD and Haiku default to PIE executable. do not pass -no-pie for it.
 					link_settings = gb_string_appendc(link_settings, "-no-pie ");
@@ -648,7 +772,17 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
+				// Get the MacOSX SDK path.
+				gbString darwin_sdk_path = gb_string_make(temporary_allocator(), "");
+				if (!system_exec_command_line_app_output("xcrun --sdk macosx --show-sdk-path", &darwin_sdk_path)) {
+					darwin_sdk_path = gb_string_set(darwin_sdk_path, "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk");
+				} else {
+					// Trim the trailing newline.
+					darwin_sdk_path = gb_string_trim_space(darwin_sdk_path);
+				}
+				platform_lib_str = gb_string_append_fmt(platform_lib_str, "--sysroot %s ", darwin_sdk_path);
+
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-L/usr/local/lib ");
 
 				// Homebrew's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/homebrew/lib")) {
@@ -670,6 +804,47 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					// This points the linker to where the entry point is
 					link_settings = gb_string_appendc(link_settings, "-e _main ");
 				}
+			} else if (build_context.metrics.os == TargetOs_freebsd) {
+				if (build_context.sanitizer_flags & (SanitizerFlag_Address | SanitizerFlag_Memory)) {
+					// It's imperative that `pthread` is linked before `libc`,
+					// otherwise ASan/MSan will be unable to call `pthread_key_create`
+					// because FreeBSD's `libthr` implementation of `pthread`
+					// needs to replace the relevant stubs first.
+					//
+					// (Presumably TSan implements its own `pthread` interface,
+					//  which is why it isn't required.)
+					//
+					// See: https://reviews.llvm.org/D39254
+					platform_lib_str = gb_string_appendc(platform_lib_str, "-lpthread ");
+				}
+				// FreeBSD pkg installs third-party shared libraries in /usr/local/lib.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-L/usr/local/lib ");
+			} else if (build_context.metrics.os == TargetOs_openbsd) {
+				// OpenBSD ports install shared libraries in /usr/local/lib. Also, we must explicitly link libpthread.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-lpthread -Wl,-L/usr/local/lib ");
+				// Until the LLVM back-end can be adapted to emit endbr64 instructions on amd64, we
+				// need to pass -z nobtcfi in order to allow the resulting program to run under
+				// OpenBSD 7.4 and newer. Once support is added at compile time, this can be dropped.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-z,nobtcfi ");
+			}
+
+			if (is_android) {
+				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_LIB.len != 0);
+				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.len != 0);
+				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len != 0);
+
+				platform_lib_str = gb_string_appendc(platform_lib_str, "\"-L");
+				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.len);
+				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
+
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-landroid ");
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-llog ");
+
+				platform_lib_str = gb_string_appendc(platform_lib_str, "\"--sysroot=");
+				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
+				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
+
+				link_settings = gb_string_appendc(link_settings, "-u ANativeActivity_onCreate ");
 			}
 
 			if (!build_context.no_rpath) {
@@ -678,24 +853,36 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				if (build_context.metrics.os == TargetOs_darwin) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-rpath,@loader_path ");
 				} else {
-					link_settings = gb_string_appendc(link_settings, "-Wl,-rpath,\\$ORIGIN ");
+					if (is_android) {
+						// ignore
+					} else {
+						link_settings = gb_string_appendc(link_settings, "-Wl,-rpath,\\$ORIGIN ");
+					}
 				}
 			}
 
 			if (!build_context.no_crt) {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lm ");
+				lib_str = gb_string_appendc(lib_str, "-lm ");
 				if (build_context.metrics.os == TargetOs_darwin) {
 					// NOTE: adding this causes a warning about duplicate libraries, I think it is
 					// automatically assumed/added by clang when you don't do `-nostdlib`.
-					// platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem ");
+					// lib_str = gb_string_appendc(lib_str, "-lSystem ");
 				} else {
-					platform_lib_str = gb_string_appendc(platform_lib_str, "-lc ");
+					lib_str = gb_string_appendc(lib_str, "-lc ");
 				}
 			}
 
-			gbString link_command_line = gb_string_make(heap_allocator(), clang_path);
+			gbString link_command_line = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(link_command_line));
 
+			if (is_android) {
+				gbString ndk_bin_directory = gb_string_make_length(temporary_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
+				link_command_line = gb_string_appendc(link_command_line, ndk_bin_directory);
+				link_command_line = gb_string_appendc(link_command_line, "bin/clang");
+				link_command_line = gb_string_append_fmt(link_command_line, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
+			} else {
+				link_command_line = gb_string_appendc(link_command_line, clang_path);
+			}
 			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
 			link_command_line = gb_string_appendc(link_command_line, object_files);
 			link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
@@ -704,6 +891,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
+
+
+			if (is_android) {
+				TIME_SECTION("Linking");
+			}
 
 			if (build_context.linker_choice == Linker_lld) {
 				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");

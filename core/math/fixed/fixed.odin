@@ -103,7 +103,7 @@ round :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 }
 
 @(require_results)
-append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
+write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 	Integer_Width :: 8*size_of(Backing) - Fraction_Width
 
 	x := x
@@ -124,16 +124,16 @@ append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 
 		when size_of(Backing) < 16 {
 			T :: u64
-			append_uint :: strconv.append_uint
+			write_uint :: strconv.write_uint
 		} else {
 			T :: u128
-			append_uint :: strconv.append_u128
+			write_uint :: strconv.write_u128
 		}
 
 		integer := T(x.i) >> Fraction_Width
 		fraction := T(x.i) & (1<<Fraction_Width - 1)
 
-		s := append_uint(buf[i:], integer, 10)
+		s := write_uint(buf[i:], integer, 10)
 		i += len(s)
 		if fraction != 0 {
 			buf[i] = '.'
@@ -155,7 +155,7 @@ append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 @(require_results)
 to_string :: proc(x: $T/Fixed($Backing, $Fraction_Width), allocator := context.allocator) -> string {
 	buf: [48]byte
-	s := append(buf[:], x)
+	s := write(buf[:], x)
 	str := make([]byte, len(s), allocator)
 	copy(str, s)
 	return string(str)
@@ -293,4 +293,9 @@ _power_of_two_table := [129]string{
 	"42535295865117307932921825928971026432",
 	"85070591730234615865843651857942052864",
 	"170141183460469231731687303715884105728",
+}
+
+@(deprecated="Use write instead")
+append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
+	return write(dst, x)
 }

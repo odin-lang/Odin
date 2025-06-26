@@ -29,6 +29,7 @@ an input.
 unmarshal :: proc {
 	unmarshal_from_reader,
 	unmarshal_from_string,
+	unmarshal_from_bytes,
 }
 
 unmarshal_from_reader :: proc(r: io.Reader, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
@@ -49,6 +50,11 @@ unmarshal_from_string :: proc(s: string, ptr: ^$T, flags := Decoder_Flags{}, all
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
 	if err == .EOF { err = .Unexpected_EOF }
 	return
+}
+
+// Unmarshals from a slice of bytes, see docs on the proc group `Unmarshal` for more info.
+unmarshal_from_bytes :: proc(bytes: []byte, ptr: ^$T, flags := Decoder_Flags{}, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
+	return unmarshal_from_string(string(bytes), ptr, flags, allocator, temp_allocator, loc)
 }
 
 unmarshal_from_decoder :: proc(d: Decoder, ptr: ^$T, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
@@ -487,7 +493,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		data := mem.alloc_bytes_non_zeroed(t.elem.size * scap, t.elem.align, allocator=allocator, loc=loc) or_return
 		defer if err != nil { mem.free_bytes(data, allocator=allocator, loc=loc) }
 
-		da := mem.Raw_Dynamic_Array{raw_data(data), 0, length, context.allocator }
+		da := mem.Raw_Dynamic_Array{raw_data(data), 0, scap, context.allocator }
 
 		assign_array(d, &da, t.elem, length) or_return
 
@@ -582,6 +588,31 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		}
 
 		out_of_space := assign_array(d, &da, info, 4, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case reflect.Type_Info_Matrix:
+		count := t.column_count * t.elem_stride
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
+		if length > count {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, allocator }
+
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case reflect.Type_Info_Simd_Vector:
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
+		if length > t.count {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, allocator }
+
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 

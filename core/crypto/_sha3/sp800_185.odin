@@ -3,7 +3,7 @@ package _sha3
 import "core:encoding/endian"
 import "core:math/bits"
 
-init_cshake :: proc(ctx: ^Context, n, s: []byte, sec_strength: int) {
+init_cshake :: proc "contextless" (ctx: ^Context, n, s: []byte, sec_strength: int) {
 	ctx.mdlen = sec_strength / 8
 
 	// No domain separator is equivalent to vanilla SHAKE.
@@ -18,7 +18,7 @@ init_cshake :: proc(ctx: ^Context, n, s: []byte, sec_strength: int) {
 	bytepad(ctx, [][]byte{n, s}, rate_cshake(sec_strength))
 }
 
-final_cshake :: proc(ctx: ^Context, dst: []byte, finalize_clone: bool = false) {
+final_cshake :: proc "contextless" (ctx: ^Context, dst: []byte, finalize_clone: bool = false) {
 	ctx := ctx
 	if finalize_clone {
 		tmp_ctx: Context
@@ -32,7 +32,7 @@ final_cshake :: proc(ctx: ^Context, dst: []byte, finalize_clone: bool = false) {
 	shake_out(ctx, dst)
 }
 
-rate_cshake :: #force_inline proc(sec_strength: int) -> int {
+rate_cshake :: #force_inline proc "contextless" (sec_strength: int) -> int {
 	switch sec_strength {
 	case 128:
 		return RATE_128
@@ -40,7 +40,7 @@ rate_cshake :: #force_inline proc(sec_strength: int) -> int {
 		return RATE_256
 	}
 
-	panic("crypto/sha3: invalid security strength")
+	panic_contextless("crypto/sha3: invalid security strength")
 }
 
 // right_encode and left_encode are defined to support 0 <= x < 2^2040
@@ -52,10 +52,10 @@ rate_cshake :: #force_inline proc(sec_strength: int) -> int {
 //
 // Thus we support 0 <= x < 2^128.
 
-@(private)
+@(private, rodata)
 _PAD: [RATE_128]byte // Biggest possible value of w per spec.
 
-bytepad :: proc(ctx: ^Context, x_strings: [][]byte, w: int) {
+bytepad :: proc "contextless" (ctx: ^Context, x_strings: [][]byte, w: int) {
 	// 1. z = left_encode(w) || X.
 	z_hi: u64
 	z_lo := left_right_encode(ctx, 0, u64(w), true)
@@ -70,9 +70,7 @@ bytepad :: proc(ctx: ^Context, x_strings: [][]byte, w: int) {
 
 		// This isn't actually possible, at least with the currently
 		// defined SP 800-185 routines.
-		if carry != 0 {
-			panic("crypto/sha3: bytepad input length overflow")
-		}
+		ensure_contextless(carry == 0, "crypto/sha3: bytepad input length overflow")
 	}
 
 	// We skip this step as we are doing a byte-oriented implementation
@@ -95,7 +93,7 @@ bytepad :: proc(ctx: ^Context, x_strings: [][]byte, w: int) {
 	}
 }
 
-encode_string :: #force_inline proc(ctx: ^Context, s: []byte) -> (u64, u64) {
+encode_string :: #force_inline proc "contextless" (ctx: ^Context, s: []byte) -> (u64, u64) {
 	l := encode_byte_len(ctx, len(s), true) // left_encode
 	update(ctx, s)
 
@@ -104,13 +102,13 @@ encode_string :: #force_inline proc(ctx: ^Context, s: []byte) -> (u64, u64) {
 	return hi, lo
 }
 
-encode_byte_len :: #force_inline proc(ctx: ^Context, l: int, is_left: bool) -> u64 {
+encode_byte_len :: #force_inline proc "contextless" (ctx: ^Context, l: int, is_left: bool) -> u64 {
 	hi, lo := bits.mul_u64(u64(l), 8)
 	return left_right_encode(ctx, hi, lo, is_left)
 }
 
 @(private)
-left_right_encode :: proc(ctx: ^Context, hi, lo: u64, is_left: bool) -> u64 {
+left_right_encode :: proc "contextless" (ctx: ^Context, hi, lo: u64, is_left: bool) -> u64 {
 	HI_OFFSET :: 1
 	LO_OFFSET :: HI_OFFSET + 8
 	RIGHT_OFFSET :: LO_OFFSET + 8
