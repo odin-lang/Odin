@@ -1248,6 +1248,9 @@ gb_internal bool is_type_unsigned(Type *t) {
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	}
+	if (t->kind == Type_Enum) {
+		return (t->Enum.base_type->Basic.flags & BasicFlag_Unsigned) != 0;
+	}
 	return false;
 }
 gb_internal bool is_type_integer_128bit(Type *t) {
