@@ -57,6 +57,8 @@ SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
 // Set the lowest log level for this test run.
 LOG_LEVEL_DEFAULT     : string : "debug" when ODIN_DEBUG else "info"
 LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, LOG_LEVEL_DEFAULT)
+// Report a message at the info level when a test has changed its state.
+LOG_STATE_CHANGES     : bool   : #config(ODIN_TEST_LOG_STATE_CHANGES, false)
 // Show only the most necessary logging information.
 USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
 // Output a report of the tests to the given path.
@@ -631,8 +633,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 						total_done_count += 1
 					}
 
-					when ODIN_DEBUG {
-						log.debugf("Test #%i %s.%s changed state to %v.", task_channel.test_index, it.pkg, it.name, event.new_state)
+					when LOG_STATE_CHANGES {
+						log.infof("Test #%i %s.%s changed state to %v.", task_channel.test_index, it.pkg, it.name, event.new_state)
 					}
 
 					pkg.last_change_state = event.new_state
