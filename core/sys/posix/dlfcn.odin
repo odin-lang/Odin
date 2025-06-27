@@ -124,7 +124,7 @@ when ODIN_OS == .Darwin {
 
 	_RTLD_LOCAL  :: 0
 	RTLD_LOCAL   :: RTLD_Flags{}
-	RTLD_DEEPBIND   :: RRTLD_Flags{RTLD_Flag_Bits(log2(_RTLD_DEEPBIND))}
+	RTLD_DEEPBIND   :: RTLD_Flags{RTLD_Flag_Bits(log2(_RTLD_DEEPBIND))}
 
 }
 
