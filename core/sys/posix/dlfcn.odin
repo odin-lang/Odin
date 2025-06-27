@@ -119,6 +119,7 @@ when ODIN_OS == .Darwin {
 
 	RTLD_LAZY    :: 0x001
 	RTLD_NOW     :: 0x002
+	RTLD_DEEPBIND :: 0x008
 	RTLD_GLOBAL  :: 0x100
 
 	_RTLD_LOCAL  :: 0
