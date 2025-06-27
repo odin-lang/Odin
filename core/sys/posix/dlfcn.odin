@@ -119,11 +119,12 @@ when ODIN_OS == .Darwin {
 
 	RTLD_LAZY    :: 0x001
 	RTLD_NOW     :: 0x002
-	RTLD_DEEPBIND :: 0x008
+	_RTLD_DEEPBIND     :: 0x008
 	RTLD_GLOBAL  :: 0x100
 
 	_RTLD_LOCAL  :: 0
 	RTLD_LOCAL   :: RTLD_Flags{}
+	RTLD_DEEPBIND   :: RRTLD_Flags{RTLD_Flag_Bits(log2(_RTLD_DEEPBIND))}
 
 }
 
