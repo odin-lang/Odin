@@ -72,7 +72,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 		inputs = gb_string_append_fmt(inputs, "\"%.*s.o\"", LIT(output_filename));
 
 
-		gb_string_appendc(inputs, "--stack-first -z stack-size=1048576")
+		inputs = gb_string_appendc(inputs, " --stack-first -z stack-size=1048576");
 
 		for (Entity *e : gen->foreign_libraries) {
 			GB_ASSERT(e->kind == Entity_LibraryName);
