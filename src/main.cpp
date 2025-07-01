@@ -2415,12 +2415,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
-	if (test_only) {
-		if (print_flag("-build-only")) {
-			print_usage_line(2, "Only builds the test executable; does not automatically run it afterwards.");
-		}
-	}
-
 	if (check) {
 		if (print_flag("-collection:<name>=<filepath>")) {
 			print_usage_line(2, "Defines a library collection used for imports.");
