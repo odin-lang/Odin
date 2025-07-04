@@ -2923,6 +2923,8 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		fields: [dynamic]^ast.Bit_Field_Field
 		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
+			docs := p.lead_comment
+
 			name := parse_ident(p)
 			expect_token(p, .Colon)
 			type := parse_type(p)
@@ -2933,6 +2935,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			if p.curr_tok.kind == .String {
 				tag = expect_token(p, .String)
 			}
+			ok := allow_token(p, .Comma)
 
 			field := ast.new(ast.Bit_Field_Field, name.pos, bit_size)
 
@@ -2940,10 +2943,14 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			field.type     = type
 			field.bit_size = bit_size
 			field.tag      = tag
+			field.docs     = docs
+			field.comments = p.line_comment
 
 			append(&fields, field)
 
-			allow_token(p, .Comma) or_break
+			if !ok {
+				break
+			}
 		}
 
 		close := expect_closing_brace_of_field_list(p)
