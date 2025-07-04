@@ -174,7 +174,7 @@ iana_to_windows_tz :: proc(iana_name: string, allocator := context.allocator) ->
 	return wintz_name, true
 }
 
-local_tz_name :: proc(allocator := context.allocator) -> (name: string, success: bool) {
+local_tz_name :: proc(check_env: bool, allocator := context.allocator) -> (name: string, success: bool) {
 	iana_name_buffer: [128]u16
 	status: windows.UError
 
@@ -251,22 +251,9 @@ generate_rrule_from_tzi :: proc(tzi: ^REG_TZI_FORMAT, abbrevs: TZ_Abbrev, alloca
 }
 
 _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_reg: ^datetime.TZ_Region, success: bool) {
-	wintz_name: string
-	iana_name: string
+	wintz_name := iana_to_windows_tz(reg_str, allocator) or_return
+	iana_name := strings.clone(reg_str, allocator)
 
-	if reg_str == "local" {
-		ok := false
-
-		iana_name = local_tz_name(allocator) or_return
-		wintz_name, ok = iana_to_windows_tz(iana_name, allocator)
-		if !ok {
-			delete(iana_name, allocator)
-			return
-		}
-	} else {
-		wintz_name = iana_to_windows_tz(reg_str, allocator) or_return
-		iana_name = strings.clone(reg_str, allocator)
-	}
 	defer delete(wintz_name, allocator)
 	defer delete(iana_name, allocator)
 
