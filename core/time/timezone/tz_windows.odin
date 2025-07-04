@@ -252,9 +252,10 @@ generate_rrule_from_tzi :: proc(tzi: ^REG_TZI_FORMAT, abbrevs: TZ_Abbrev, alloca
 
 _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_reg: ^datetime.TZ_Region, success: bool) {
 	wintz_name := iana_to_windows_tz(reg_str, allocator) or_return
-	iana_name := strings.clone(reg_str, allocator)
-
 	defer delete(wintz_name, allocator)
+
+	iana_name, err := strings.clone(reg_str, allocator)
+	if err != nil { return }
 	defer delete(iana_name, allocator)
 
 	abbrevs: TZ_Abbrev
@@ -295,9 +296,10 @@ _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_re
 
 	rrule := generate_rrule_from_tzi(&tzi, abbrevs, allocator) or_return
 
-	region_name, err := strings.clone(iana_name, allocator)
+	region_name: string
+	region_name, err = strings.clone(iana_name, allocator)
 	if err != nil { return }
-	defer if err != nil { delete(region_name, allocator) }
+	defer delete(region_name, allocator)
 
 	region: ^datetime.TZ_Region
 	region, err = new_clone(datetime.TZ_Region{
