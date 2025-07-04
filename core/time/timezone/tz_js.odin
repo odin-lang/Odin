@@ -4,7 +4,7 @@ package timezone
 
 import "core:time/datetime"
 
-local_tz_name :: proc(allocator := context.allocator) -> (name: string, success: bool) {
+local_tz_name :: proc(check_env: bool, allocator := context.allocator) -> (name: string, success: bool) {
 	return
 }
 
