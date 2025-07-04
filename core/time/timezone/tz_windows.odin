@@ -256,7 +256,11 @@ _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_re
 
 	iana_name, err := strings.clone(reg_str, allocator)
 	if err != nil { return }
-	defer if !success { delete(iana_name, allocator) }
+	defer {
+		if !success {
+			delete(iana_name, allocator)
+		}
+	}
 
 	abbrevs: TZ_Abbrev
 	abbrevs_ok: bool
