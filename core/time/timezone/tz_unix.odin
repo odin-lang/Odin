@@ -10,15 +10,17 @@ import "core:time/datetime"
 local_tz_name :: proc(check_env: bool, allocator := context.allocator) -> (name: string, success: bool) {
 	if check_env {
 		local_str, ok := os.lookup_env("TZ", allocator)
-		if ok && local_str == "" {
-			delete(local_str, allocator)
+		if ok {
+			if local_str == "" {
+				delete(local_str, allocator)
 
-			str, err := strings.clone("UTC", allocator)
-			if err != nil { return }
-			local_str = str
+				str, err := strings.clone("UTC", allocator)
+				if err != nil { return }
+				local_str = str
+			}
+
+			return local_str, true
 		}
-
-		return local_str, true
 	}
 
 	orig_localtime_path := "/etc/localtime"
