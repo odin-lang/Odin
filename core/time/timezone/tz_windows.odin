@@ -256,7 +256,7 @@ _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_re
 
 	iana_name, err := strings.clone(reg_str, allocator)
 	if err != nil { return }
-	defer if err != nil { delete(iana_name, allocator) }
+	defer delete(iana_name, allocator)
 
 	abbrevs: TZ_Abbrev
 	abbrevs_ok: bool
@@ -299,7 +299,7 @@ _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_re
 	region_name: string
 	region_name, err = strings.clone(iana_name, allocator)
 	if err != nil { return }
-	defer delete(region_name, allocator)
+	defer if err != nil { delete(region_name, allocator) }
 
 	region: ^datetime.TZ_Region
 	region, err = new_clone(datetime.TZ_Region{
