@@ -1861,8 +1861,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					// Handle ARM's multi-table intrinsics by splitting the table vector
 					if (build_context.metrics.arch == TargetArch_arm64 && count > 16) {
 						// ARM64 TBL2/TBL3/TBL4: Split table into multiple 16-byte vectors
-						LLVMTypeRef v16i8_type = LLVMVectorType(LLVMInt8TypeInContext(p->module->ctx), 16);
-						int num_tables = count / 16;
+						int num_tables = cast(int)(count / 16);
 						GB_ASSERT_MSG(count % 16 == 0, "ARM64 table size must be multiple of 16 bytes, got %lld bytes", count);
 						GB_ASSERT_MSG(num_tables <= 4, "ARM64 NEON supports maximum 4 tables (tbl4), got %d tables for %lld-byte vector", num_tables, count);
 						
@@ -1890,8 +1889,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						}
 					} else if (build_context.metrics.arch == TargetArch_arm32 && count > 8) {
 						// ARM32 VTBL2/VTBL3/VTBL4: Split table into multiple 8-byte vectors
-						LLVMTypeRef v8i8_type = LLVMVectorType(LLVMInt8TypeInContext(p->module->ctx), 8);
-						int num_tables = count / 8;
+						int num_tables = cast(int)count / 8;
 						GB_ASSERT_MSG(count % 8 == 0, "ARM32 table size must be multiple of 8 bytes, got %lld bytes", count);
 						GB_ASSERT_MSG(num_tables <= 4, "ARM32 NEON supports maximum 4 tables (vtbl4), got %d tables for %lld-byte vector", num_tables, count);
 						
