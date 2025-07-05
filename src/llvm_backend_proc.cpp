@@ -1813,7 +1813,12 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				bool features_enabled = true;
 				if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
 					// x86/x86-64 feature checking
-					if (count == 32) {
+					if (count == 16) {
+						// SSE/SSSE3 for 128-bit vectors
+						if (!check_target_feature_is_enabled(str_lit("ssse3"), nullptr)) {
+							features_enabled = false;
+						}
+					} else if (count == 32) {
 						// AVX2 requires ssse3 + avx2 features
 						if (!check_target_feature_is_enabled(str_lit("ssse3"), nullptr) || 
 							!check_target_feature_is_enabled(str_lit("avx2"), nullptr)) {
@@ -1839,7 +1844,11 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					// Add target features to function attributes for LLVM instruction selection
 					if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
 						// x86/x86-64 function attributes
-						if (count == 32) {
+						if (count == 16) {
+							// SSE/SSSE3 for 128-bit vectors
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+ssse3"));
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("128"));
+						} else if (count == 32) {
 							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+avx,+avx2,+ssse3"));
 							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("256"));
 						} else if (count == 64) {
