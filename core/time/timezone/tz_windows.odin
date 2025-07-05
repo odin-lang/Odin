@@ -257,7 +257,7 @@ _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_re
 	iana_name, err := strings.clone(reg_str, allocator)
 	if err != nil { return }
 	defer {
-		if !success {
+		if !success || out_reg == nil {
 			delete(iana_name, allocator)
 		}
 	}
