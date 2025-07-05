@@ -310,6 +310,7 @@ simd_indices :: proc($T: typeid/#simd[$N]$E) -> T where type_is_numeric(T) ---
 
 simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T ---
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
+simd_table_lookup :: proc(table: #simd[N]T, indices: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
 
 // Lane-wise operations
 simd_ceil    :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
