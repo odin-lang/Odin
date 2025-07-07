@@ -1962,7 +1962,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 				LLVMValueRef values[2] = {};
 				values[0] = lb_const_string(m, file_name).value;
-				values[1] = lb_const_string(m, file->data).value;
+				values[1] = lb_const_value(m, t_u8_slice, exact_value_string(file->data)).value;
 				LLVMValueRef element = llvm_const_named_struct(m, t_load_directory_file, values, gb_count_of(values));
 				elements[i] = element;
 			}
