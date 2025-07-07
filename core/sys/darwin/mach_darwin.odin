@@ -5,10 +5,6 @@ foreign import mach "system:System.framework"
 import "core:c"
 import "base:intrinsics"
 
-// NOTE(tetra): Unclear whether these should be aligned 16 or not.
-// However all other sync primitives are aligned for robustness.
-// I cannot currently align these though.
-// See core/sys/unix/pthread_linux.odin/pthread_t.
 mach_port_t :: distinct c.uint
 task_t :: mach_port_t
 
