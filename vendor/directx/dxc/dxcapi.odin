@@ -286,7 +286,7 @@ IUtils_VTable :: struct {
 	GetBlobAsUtf16:               proc "system" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobUtf16) -> HRESULT,
 	GetDxilContainerPart:         proc "system" (this: ^IUtils, pShader: ^Buffer, Part: u32, ppPartData: rawptr, pPartSizeInBytes: ^u32) -> HRESULT,
 	CreateReflection:             proc "system" (this: ^IUtils, pData: ^Buffer, iid: ^IID, ppvReflection: rawptr) -> HRESULT,
-	BuildArguments:               proc "system" (this: ^IUtils, pSourceName: wstring, pEntryPoint: wstring, pTargetProfile: wstring, pArguments: [^]wstring, argCount: u32, pDefines: [^]Define, defineCount: u32, ppArgs: ^[^]ICompilerArgs) -> HRESULT,
+	BuildArguments:               proc "system" (this: ^IUtils, pSourceName: wstring, pEntryPoint: wstring, pTargetProfile: wstring, pArguments: [^]wstring, argCount: u32, pDefines: [^]Define, defineCount: u32, ppArgs: [^]^ICompilerArgs) -> HRESULT,
 	GetPDBContents:               proc "system" (this: ^IUtils, pPDBBlob: ^IBlob, ppHash: ^^IBlob, ppContainer: ^^IBlob) -> HRESULT,
 }
 

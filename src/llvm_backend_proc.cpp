@@ -345,7 +345,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		if (build_context.sanitizer_flags & SanitizerFlag_Address && !entity->Procedure.no_sanitize_address) {
 			lb_add_attribute_to_proc(m, p->value, "sanitize_address");
 		}
-		if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+		if (build_context.sanitizer_flags & SanitizerFlag_Memory && !entity->Procedure.no_sanitize_memory) {
 			lb_add_attribute_to_proc(m, p->value, "sanitize_memory");
 		}
 		if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
@@ -546,6 +546,9 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	GB_ASSERT(p->type != nullptr);
 
 	lb_ensure_abi_function_type(p->module, p);
+	if (p->type->Proc.calling_convention == ProcCC_Odin) {
+		lb_push_context_onto_stack_from_implicit_parameter(p);
+	}
 	{
 		lbFunctionType *ft = p->abi_function_type;
 
@@ -742,9 +745,6 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 			}
 
 		}
-	}
-	if (p->type->Proc.calling_convention == ProcCC_Odin) {
-		lb_push_context_onto_stack_from_implicit_parameter(p);
 	}
 
 	lb_set_debug_position_to_procedure_begin(p);
@@ -2774,15 +2774,18 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				LLVMSetMetadata(instr, kind_id, LLVMMetadataAsValue(p->module->ctx, node));
 			}
 			break;
-		case BuiltinProc_volatile_store:        LLVMSetVolatile(instr, true);                                        break;
-		case BuiltinProc_atomic_store:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
+		case BuiltinProc_volatile_store:
+			LLVMSetVolatile(instr, true);
+			break;
+		case BuiltinProc_atomic_store:
+			LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);
+			LLVMSetVolatile(instr, true);
+			break;
 		case BuiltinProc_atomic_store_explicit:
 			{
 				auto ordering = llvm_atomic_ordering_from_odin(ce->args[2]);
 				LLVMSetOrdering(instr, ordering);
-				if (ordering == LLVMAtomicOrderingUnordered) {
-					LLVMSetVolatile(instr, true);
-				}
+				LLVMSetVolatile(instr, true);
 			}
 			break;
 		}
@@ -2808,15 +2811,18 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			}
 			break;
 			break;
-		case BuiltinProc_volatile_load:        LLVMSetVolatile(instr, true);                                        break;
-		case BuiltinProc_atomic_load:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
+		case BuiltinProc_volatile_load:
+			LLVMSetVolatile(instr, true);
+			break;
+		case BuiltinProc_atomic_load:
+			LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);
+			LLVMSetVolatile(instr, true);
+			break;
 		case BuiltinProc_atomic_load_explicit:
 			{
 				auto ordering = llvm_atomic_ordering_from_odin(ce->args[1]);
 				LLVMSetOrdering(instr, ordering);
-				if (ordering == LLVMAtomicOrderingUnordered) {
-					LLVMSetVolatile(instr, true);
-				}
+				LLVMSetVolatile(instr, true);
 			}
 			break;
 		}
@@ -2901,9 +2907,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		lbValue res = {};
 		res.value = LLVMBuildAtomicRMW(p->builder, op, dst.value, val.value, ordering, false);
 		res.type = tv.type;
-		if (ordering == LLVMAtomicOrderingUnordered) {
-			LLVMSetVolatile(res.value, true);
-		}
+		LLVMSetVolatile(res.value, true);
 		return res;
 	}
 
@@ -2939,9 +2943,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			single_threaded
 		);
 		LLVMSetWeak(value, weak);
-		if (success_ordering == LLVMAtomicOrderingUnordered || failure_ordering == LLVMAtomicOrderingUnordered) {
-			LLVMSetVolatile(value, true);
-		}
+		LLVMSetVolatile(value, true);
 
 		if (is_type_tuple(tv.type)) {
 			Type *fix_typed = alloc_type_tuple();

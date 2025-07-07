@@ -258,6 +258,22 @@ _shutdown_error :: proc(errno: linux.Errno) -> Shutdown_Error {
 	}
 }
 
+_socket_info_error :: proc(errno: linux.Errno) -> Socket_Info_Error {
+	assert(errno != nil)
+	_last_error = errno
+
+	#partial switch errno {
+	case .EBADF, .ENOTSOCK, .EFAULT, .EINVAL:
+		return .Invalid_Argument
+	case .ENOTCONN:
+		return .Network_Unreachable
+	case .ENOBUFS:
+		return .Insufficient_Resources
+	case:
+		return .Unknown
+	}
+}
+
 _socket_option_error :: proc(errno: linux.Errno) -> Socket_Option_Error {
 	assert(errno != nil)
 	_last_error = errno

@@ -57,6 +57,8 @@ SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
 // Set the lowest log level for this test run.
 LOG_LEVEL_DEFAULT     : string : "debug" when ODIN_DEBUG else "info"
 LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, LOG_LEVEL_DEFAULT)
+// Report a message at the info level when a test has changed its state.
+LOG_STATE_CHANGES     : bool   : #config(ODIN_TEST_LOG_STATE_CHANGES, false)
 // Show only the most necessary logging information.
 USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
 // Output a report of the tests to the given path.
@@ -631,8 +633,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 						total_done_count += 1
 					}
 
-					when ODIN_DEBUG {
-						log.debugf("Test #%i %s.%s changed state to %v.", task_channel.test_index, it.pkg, it.name, event.new_state)
+					when LOG_STATE_CHANGES {
+						log.infof("Test #%i %s.%s changed state to %v.", task_channel.test_index, it.pkg, it.name, event.new_state)
 					}
 
 					pkg.last_change_state = event.new_state
@@ -741,7 +743,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 
 		if test_index, reason, ok := should_stop_test(); ok {
-			#no_bounds_check report.all_test_states[test_index] = .Failed
+			passed := reason == .Successful_Stop
+			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
 			#no_bounds_check it := internal_tests[test_index]
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 			pkg.frame_ready = false
@@ -762,7 +765,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			fmt.assertf(task_data != nil, "A signal (%v) was raised to stop test #%i %s.%s, but its task data is missing.",
 				reason, test_index, it.pkg, it.name)
 
-			if !task_data.t._fail_now_called {
+			if !passed && !task_data.t._fail_now_called {
 				if test_index not_in failed_test_reason_map {
 					// We only write a new error message here if there wasn't one
 					// already, because the message we can provide based only on
@@ -780,7 +783,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			end_t(&task_data.t)
 
-			total_failure_count += 1
+			if passed {
+				total_success_count += 1
+			} else {
+				total_failure_count += 1
+			}
 			total_done_count += 1
 		}
 

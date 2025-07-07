@@ -1618,36 +1618,39 @@ PER_HPUX        :: 0x0010
 PER_MASK        :: 0x00ff
 
 /*
-	Bits for access modes for shared memory
+	Bits for SystemV IPC flags.
+
+	In this enum, access modes are common for any shared memory. Prefixed
+	entries (i.e. `IPC_` or `SHM_`) denote flags, where `IPC_` are common flags
+	for all SystemV IPC primitives, and `SHM_`, `SEM_` and `MSG_` are specific
+	to shared memory segments, semaphores and message queues respectively.
+	
+	These bits overlap, because they are meant to be used within the
+	context of specific procedures. Creation flags, used for `*get` procedures,
+	and usage flags used by all other IPC procedures. Do not mix creation and
+	usage flags, as well as flags prefixed differently (excluding `IPC_`
+	prefix).
 */
-IPC_Mode_Bits :: enum {
+IPC_Flags_Bits :: enum {
+	// Access modes for shared memory.
 	WROTH  = 1,
 	RDOTH  = 2,
 	WRGRP  = 4,
 	RDGRP  = 5,
 	WRUSR  = 7,
 	RDUSR  = 8,
-	DEST   = 9,
-	LOCKED = 10,
-}
-
-/*
-	Shared memory flags bits
-*/
-IPC_Flags_Bits :: enum {
+	// Creation flags for shared memory.
 	IPC_CREAT     = 9,
 	IPC_EXCL      = 10,
-	IPC_NOWAIT    = 11,
-	// Semaphore
-	SEM_UNDO      = 9,
-	// Shared memory
 	SHM_HUGETLB   = 11,
 	SHM_NORESERVE = 12,
+	// Usage flags for shared memory.
+	IPC_NOWAIT    = 11,
+	SEM_UNDO      = 9,
 	SHM_RDONLY    = 12,
 	SHM_RND       = 13,
 	SHM_REMAP     = 14,
 	SHM_EXEC      = 15,
-	// Message queue
 	MSG_NOERROR   = 12,
 	MSG_EXCEPT    = 13,
 	MSG_COPY      = 14,

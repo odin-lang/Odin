@@ -589,7 +589,7 @@ WAVE_FORMAT_FLAC                       :: 0xF1AC /* flac.sourceforge.net */
 WAVE_FORMAT_EXTENSIBLE                 :: 0xFFFE /* Microsoft */
 
 
-WAVEFORMATEX :: struct {
+WAVEFORMATEX :: struct #packed {
 	wFormatTag:      WORD,
 	nChannels:       WORD,
 	nSamplesPerSec:  DWORD,
@@ -603,7 +603,7 @@ LPCWAVEFORMATEX :: ^WAVEFORMATEX
 //  New wave format development should be based on the WAVEFORMATEXTENSIBLE structure.
 //  WAVEFORMATEXTENSIBLE allows you to avoid having to register a new format tag with Microsoft.
 //  Simply define a new GUID value for the WAVEFORMATEXTENSIBLE.SubFormat field and use WAVE_FORMAT_EXTENSIBLE in the WAVEFORMATEXTENSIBLE.Format.wFormatTag field.
-WAVEFORMATEXTENSIBLE :: struct {
+WAVEFORMATEXTENSIBLE :: struct #packed {
 	using Format: WAVEFORMATEX,
 	Samples: struct #raw_union {
 		wValidBitsPerSample: WORD,      /* bits of precision  */

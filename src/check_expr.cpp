@@ -2424,27 +2424,27 @@ gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o
 		Type *s = src->Array.elem;
 		Type *d = dst->Slice.elem;
 		if (are_types_identical(s, d)) {
-			error_line("\tSuggestion: the array expression may be sliced with %s[:]\n", a);
+			error_line("\tSuggestion: The array expression may be sliced with %s[:]\n", a);
 		}
 	} else if (is_type_dynamic_array(src) && is_type_slice(dst)) {
 		Type *s = src->DynamicArray.elem;
 		Type *d = dst->Slice.elem;
 		if (are_types_identical(s, d)) {
-			error_line("\tSuggestion: the dynamic array expression may be sliced with %s[:]\n", a);
+			error_line("\tSuggestion: The dynamic array expression may be sliced with %s[:]\n", a);
 		}
 	}else if (are_types_identical(src, dst) && !are_types_identical(o->type, type)) {
-		error_line("\tSuggestion: the expression may be directly casted to type %s\n", b);
+		error_line("\tSuggestion: The expression may be directly casted to type %s\n", b);
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
-		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
-		error_line("\t            This is an UNSAFE operation as string data is assumed to be immutable, \n");
+		error_line("\tSuggestion: A string may be transmuted to %s\n", b);
+		error_line("\t            This is an UNSAFE operation as string data is assumed to be immutable,\n");
 		error_line("\t            whereas slices in general are assumed to be mutable.\n");
 	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
-		error_line("\tSuggestion: the expression may be casted to %s\n", b);
+		error_line("\tSuggestion: The expression may be casted to %s\n", b);
 	} else if (check_integer_exceed_suggestion(c, o, type, max_bit_size)) {
 		return;
 	} else if (is_expr_inferred_fixed_array(c->type_hint_expr) && is_type_array_like(type) && is_type_array_like(o->type)) {
 		gbString s = expr_to_string(c->type_hint_expr);
-		error_line("\tSuggestion: make sure that `%s` is attached to the compound literal directly\n", s);
+		error_line("\tSuggestion: Make sure that `%s` is attached to the compound literal directly\n", s);
 		gb_string_free(s);
 	} else if (is_type_pointer(type) &&
 	           o->mode == Addressing_Variable &&
@@ -3086,125 +3086,105 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 	GB_ASSERT(node->kind == Ast_BinaryExpr);
 	ast_node(be, BinaryExpr, node);
 
-	ExactValue x_val = {};
-	if (x->mode == Addressing_Constant) {
-		x_val = exact_value_to_integer(x->value);
-	}
-
-	bool x_is_untyped = is_type_untyped(x->type);
-	if (!(is_type_integer(x->type) || (x_is_untyped && x_val.kind == ExactValue_Integer))) {
-		gbString err_str = expr_to_string(x->expr);
-		error(node, "Shifted operand '%s' must be an integer", err_str);
-		gb_string_free(err_str);
-		x->mode = Addressing_Invalid;
-		return;
-	}
-
-	if (is_type_unsigned(y->type)) {
-
-	} else if (is_type_untyped(y->type)) {
+	bool y_is_untyped = is_type_untyped(y->type);
+	if (y_is_untyped) {
 		convert_to_typed(c, y, t_untyped_integer);
 		if (y->mode == Addressing_Invalid) {
 			x->mode = Addressing_Invalid;
 			return;
 		}
-	} else {
-		gbString err_str = expr_to_string(y->expr);
-		error(node, "Shift amount '%s' must be an unsigned integer", err_str);
-		gb_string_free(err_str);
+	} else if (!is_type_unsigned(y->type)) {
+		gbString y_str = expr_to_string(y->expr);
+		error(y->expr, "Shift amount '%s' must be an unsigned integer", y_str);
+		gb_string_free(y_str);
 		x->mode = Addressing_Invalid;
 		return;
 	}
 
+	bool x_is_untyped = is_type_untyped(x->type);
+	if (!(x_is_untyped || is_type_integer(x->type))) {
+		gbString x_str = expr_to_string(x->expr);
+		error(x->expr, "Shifted operand '%s' must be an integer", x_str);
+		gb_string_free(x_str);
+		x->mode = Addressing_Invalid;
+		return;
+	}
 
-	if (x->mode == Addressing_Constant) {
-		if (y->mode == Addressing_Constant) {
-			ExactValue y_val = exact_value_to_integer(y->value);
-			if (y_val.kind != ExactValue_Integer) {
-				gbString err_str = expr_to_string(y->expr);
-				error(node, "Shift amount '%s' must be an unsigned integer", err_str);
-				gb_string_free(err_str);
-				x->mode = Addressing_Invalid;
+	if (y->mode == Addressing_Constant) {
+		if (big_int_is_neg(&y->value.value_integer)) {
+			gbString y_str = expr_to_string(y->expr);
+			error(y->expr, "Shift amount '%s' cannot be negative", y_str);
+			gb_string_free(y_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		BigInt max_shift = {};
+		big_int_from_u64(&max_shift, MAX_BIG_INT_SHIFT);
+
+		if (big_int_cmp(&y->value.value_integer, &max_shift) > 0) {
+			gbString y_str = expr_to_string(y->expr);
+			error(y->expr, "Shift amount '%s' must be <= %u", y_str, MAX_BIG_INT_SHIFT);
+			gb_string_free(y_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (x->mode == Addressing_Constant) {
+			if (x_is_untyped) {
+				convert_to_typed(c, x, t_untyped_integer);
+				if (x->mode == Addressing_Invalid) {
+					return;
+				}
+
+				x->expr = node;
+				x->value = exact_value_shift(be->op.kind, exact_value_to_integer(x->value), exact_value_to_integer(y->value));
+
 				return;
-			}
-
-			BigInt max_shift = {};
-			big_int_from_u64(&max_shift, MAX_BIG_INT_SHIFT);
-
-			if (big_int_cmp(&y_val.value_integer, &max_shift) > 0) {
-				gbString err_str = expr_to_string(y->expr);
-				error(node, "Shift amount too large: '%s'", err_str);
-				gb_string_free(err_str);
-				x->mode = Addressing_Invalid;
-				return;
-			}
-
-			if (!is_type_integer(x->type)) {
-				// NOTE(bill): It could be an untyped float but still representable
-				// as an integer
-				x->type = t_untyped_integer;
 			}
 
 			x->expr = node;
-			x->value = exact_value_shift(be->op.kind, x_val, y_val);
+			x->value = exact_value_shift(be->op.kind, x->value, y->value);
 
+			check_is_expressible(c, x, x->type);
 
-			if (is_type_typed(x->type)) {
-				check_is_expressible(c, x, x->type);
-			}
 			return;
 		}
 
-		TokenPos pos = ast_token(x->expr).pos;
-		if (x_is_untyped) {
-			if (x->expr != nullptr) {
-				x->expr->tav.is_lhs = true;
-			}
-			x->mode = Addressing_Value;
-			if (type_hint) {
-				if (is_type_integer(type_hint)) {
-					convert_to_typed(c, x, type_hint);
-				} else {
-					gbString x_str = expr_to_string(x->expr);
-					gbString to_type = type_to_string(type_hint);
-					error(node, "Conversion of shifted operand '%s' to '%s' is not allowed", x_str, to_type);
-					gb_string_free(x_str);
-					gb_string_free(to_type);
-					x->mode = Addressing_Invalid;
-				}
-			} else if (!is_type_integer(x->type)) {
-				gbString x_str = expr_to_string(x->expr);
-				error(node, "Non-integer shifted operand '%s' is not allowed", x_str);
-				gb_string_free(x_str);
-				x->mode = Addressing_Invalid;
-			}
-			// x->value = x_val;
-			return;
+		if (y_is_untyped) {
+			convert_to_typed(c, y, t_uint);
 		}
-	}
 
-	if (y->mode == Addressing_Constant && big_int_is_neg(&y->value.value_integer)) {
-		gbString err_str = expr_to_string(y->expr);
-		error(node, "Shift amount cannot be negative: '%s'", err_str);
-		gb_string_free(err_str);
-	}
-
-	if (!is_type_integer(x->type)) {
-		gbString err_str = expr_to_string(x->expr);
-		error(node, "Shift operand '%s' must be an integer", err_str);
-		gb_string_free(err_str);
-		x->mode = Addressing_Invalid;
 		return;
 	}
 
-	if (is_type_untyped(y->type)) {
-		convert_to_typed(c, y, t_uint);
+	if (x->mode == Addressing_Constant) {
+		if (x_is_untyped) {
+			if (type_hint) {
+				if (is_type_integer(type_hint)) {
+					convert_to_typed(c, x, type_hint);
+				} else if (is_type_any(type_hint)) {
+					convert_to_typed(c, x, default_type(t_untyped_integer));
+				} else {
+					gbString x_str = expr_to_string(x->expr);
+					gbString type_str = type_to_string(type_hint);
+					error(x->expr, "Shifted operand '%s' cannot convert to non-integer type '%s'", x_str, type_str);
+					gb_string_free(x_str);
+					gb_string_free(type_str);
+					x->mode = Addressing_Invalid;
+					return;
+				}
+			} else {
+				check_is_expressible(c, x, default_type(t_untyped_integer));
+			}
+			if (x->mode == Addressing_Invalid) {
+				return;
+			}
+		}
+
+		x->mode = Addressing_Value;
 	}
-
-	x->mode = Addressing_Value;
 }
-
-
 
 gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (check_is_assignable_to(c, operand, y)) {
@@ -5884,12 +5864,12 @@ typedef u32 UnpackFlags;
 enum UnpackFlag : u32 {
 	UnpackFlag_None       = 0,
 	UnpackFlag_AllowOk    = 1<<0,
-	UnpackFlag_IsVariadic = 1<<1,
-	UnpackFlag_AllowUndef = 1<<2,
+	UnpackFlag_AllowUndef = 1<<1,
 };
 
 
-gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Slice<Ast *> const &rhs_arguments, UnpackFlags flags) {
+gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Slice<Ast *> const &rhs_arguments, UnpackFlags flags,
+	isize variadic_index = -1) {
 	auto const &add_dependencies_from_unpacking = [](CheckerContext *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) -> isize {
 		if (lhs == nullptr || c->decl == nullptr) {
 			return tuple_count;
@@ -5914,10 +5894,13 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 		return tuple_count;
 	};
 
-
 	bool allow_ok    = (flags & UnpackFlag_AllowOk) != 0;
-	bool is_variadic = (flags & UnpackFlag_IsVariadic) != 0;
 	bool allow_undef = (flags & UnpackFlag_AllowUndef) != 0;
+
+	bool is_variadic = variadic_index > -1;
+	if (!is_variadic) {
+		variadic_index = lhs_count;
+	}
 
 	bool optional_ok = false;
 	isize tuple_index = 0;
@@ -5934,26 +5917,18 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 
 		Type *type_hint = nullptr;
 
-
-		if (lhs != nullptr && tuple_index < lhs_count) {
-			// NOTE(bill): override DeclInfo for dependency
-			Entity *e = lhs[tuple_index];
-			if (e != nullptr) {
-				type_hint = e->type;
-				if (e->flags & EntityFlag_Ellipsis) {
-					GB_ASSERT(is_type_slice(e->type));
-					GB_ASSERT(e->type->kind == Type_Slice);
-					type_hint = e->type->Slice.elem;
+		if (lhs != nullptr) {
+			if (tuple_index < variadic_index) {
+				// NOTE(bill): override DeclInfo for dependency
+				Entity *e = lhs[tuple_index];
+				if (e != nullptr) {
+					type_hint = e->type;
 				}
-			}
-		} else if (lhs != nullptr && tuple_index >= lhs_count && is_variadic) {
-			// NOTE(bill): override DeclInfo for dependency
-			Entity *e = lhs[lhs_count-1];
-			if (e != nullptr) {
-				type_hint = e->type;
-				if (e->flags & EntityFlag_Ellipsis) {
+			} else if (is_variadic) {
+				Entity *e = lhs[variadic_index];
+				if (e != nullptr) {
+					GB_ASSERT(e->flags & EntityFlag_Ellipsis);
 					GB_ASSERT(is_type_slice(e->type));
-					GB_ASSERT(e->type->kind == Type_Slice);
 					type_hint = e->type->Slice.elem;
 				}
 			}
@@ -6493,17 +6468,16 @@ gb_internal bool is_call_expr_field_value(AstCallExpr *ce) {
 	return ce->args[0]->kind == Ast_FieldValue;
 }
 
-gb_internal Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize *lhs_count_, bool *is_variadic) {
+gb_internal Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize *lhs_count_) {
 	Entity **lhs = nullptr;
 	isize lhs_count = -1;
 
-	if (proc_type == nullptr) {
+	if (proc_type == nullptr || proc_type == t_invalid) {
 		return nullptr;
 	}
 
 	GB_ASSERT(is_type_proc(proc_type));
 	TypeProc *pt = &base_type(proc_type)->Proc;
-	*is_variadic = pt->variadic;
 
 	if (!pt->is_polymorphic || pt->is_poly_specialized) {
 		if (pt->params != nullptr) {
@@ -6697,6 +6671,9 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 
 	GB_ASSERT(proc_type != nullptr);
 	proc_type = base_type(proc_type);
+	if (proc_type == t_invalid) {
+		return false;
+	}
 	GB_ASSERT(proc_type->kind == Type_Proc);
 
 	CallArgumentError err = check_call_arguments_internal(c, call, e, proc_type, positional_operands, named_operands, show_error_mode, data);
@@ -6830,7 +6807,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 	Entity **lhs = nullptr;
 	isize lhs_count = -1;
-	bool is_variadic = false;
+	i32 variadic_index = -1;
 
 	auto positional_operands = array_make<Operand>(heap_allocator(), 0, 0);
 	auto named_operands = array_make<Operand>(heap_allocator(), 0, 0);
@@ -6839,9 +6816,14 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 	if (procs.count == 1) {
 		Entity *e = procs[0];
-
-		lhs = populate_proc_parameter_list(c, e->type, &lhs_count, &is_variadic);
-		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, is_variadic ? UnpackFlag_IsVariadic : UnpackFlag_None);
+		Type *pt = base_type(e->type);
+		if (pt != nullptr && is_type_proc(pt)) {
+			lhs = populate_proc_parameter_list(c, pt, &lhs_count);
+			if (pt->Proc.variadic) {
+				variadic_index = pt->Proc.variadic_index;
+			}
+		}
+		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
 
 		if (check_named_arguments(c, e->type, named_args, &named_operands, true)) {
 			check_call_arguments_single(c, call, operand,
@@ -6901,11 +6883,30 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					}
 					lhs[param_index] = e;
 				}
+
+				for (Entity *p : procs) {
+					Type *pt = base_type(p->type);
+					if (!(pt != nullptr && is_type_proc(pt))) {
+						continue;
+					}
+					
+					if (pt->Proc.is_polymorphic) {
+						if (variadic_index == -1) {
+							variadic_index = pt->Proc.variadic_index;
+						} else if (variadic_index != pt->Proc.variadic_index) {
+							variadic_index = -1;
+							break;
+						}
+					} else {
+						variadic_index = -1;
+						break;
+					}
+				}
 			}
 		}
 	}
 
-	check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, is_variadic ? UnpackFlag_IsVariadic : UnpackFlag_None);
+	check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
 
 	for_array(i, named_args) {
 		Ast *arg = named_args[i];
@@ -7343,13 +7344,16 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 	defer (array_free(&named_operands));
 
 	if (positional_args.count > 0) {
-		isize lhs_count = -1;
-		bool is_variadic = false;
 		Entity **lhs =  nullptr;
+		isize lhs_count = -1;
+		i32 variadic_index = -1;
 		if (pt != nullptr)  {
-			lhs = populate_proc_parameter_list(c, proc_type, &lhs_count, &is_variadic);
+			lhs = populate_proc_parameter_list(c, proc_type, &lhs_count);
+			if (pt->variadic) {
+				variadic_index = pt->variadic_index;
+			}
 		}
-		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, is_variadic ? UnpackFlag_IsVariadic : UnpackFlag_None);
+		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
 	}
 
 	if (named_args.count > 0) {
@@ -8756,23 +8760,52 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 	String name = bd->name.string;
 	if (name == "file") {
 		String file = get_file_path_string(bd->token.pos.file_id);
-		if (build_context.obfuscate_source_code_locations) {
+		switch (build_context.source_code_location_info) {
+		case SourceCodeLocationInfo_Normal:
+			break;
+		case SourceCodeLocationInfo_Obfuscated:
 			file = obfuscate_string(file, "F");
+			break;
+		case SourceCodeLocationInfo_Filename:
+			file = last_path_element(file);
+			break;
+		case SourceCodeLocationInfo_None:
+			file = str_lit("");
+			break;
 		}
 		o->type = t_untyped_string;
 		o->value = exact_value_string(file);
 	} else if (name == "directory") {
 		String file = get_file_path_string(bd->token.pos.file_id);
 		String path = dir_from_path(file);
-		if (build_context.obfuscate_source_code_locations) {
+		switch (build_context.source_code_location_info) {
+		case SourceCodeLocationInfo_Normal:
+			break;
+		case SourceCodeLocationInfo_Obfuscated:
 			path = obfuscate_string(path, "D");
+			break;
+		case SourceCodeLocationInfo_Filename:
+			path = last_path_element(path);
+			break;
+		case SourceCodeLocationInfo_None:
+			path = str_lit("");
+			break;
 		}
 		o->type = t_untyped_string;
 		o->value = exact_value_string(path);
 	} else if (name == "line") {
 		i32 line = bd->token.pos.line;
-		if (build_context.obfuscate_source_code_locations) {
+		switch (build_context.source_code_location_info) {
+		case SourceCodeLocationInfo_Normal:
+			break;
+		case SourceCodeLocationInfo_Obfuscated:
 			line = obfuscate_i32(line);
+			break;
+		case SourceCodeLocationInfo_Filename:
+			break;
+		case SourceCodeLocationInfo_None:
+			line = 0;
+			break;
 		}
 		o->type = t_untyped_integer;
 		o->value = exact_value_i64(line);
@@ -8783,8 +8816,17 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 			o->value = exact_value_string(str_lit(""));
 		} else {
 			String p = c->proc_name;
-			if (build_context.obfuscate_source_code_locations) {
+			switch (build_context.source_code_location_info) {
+			case SourceCodeLocationInfo_Normal:
+				break;
+			case SourceCodeLocationInfo_Obfuscated:
 				p = obfuscate_string(p, "P");
+				break;
+			case SourceCodeLocationInfo_Filename:
+				break;
+			case SourceCodeLocationInfo_None:
+				p = str_lit("");
+				break;
 			}
 			o->type = t_untyped_string;
 			o->value = exact_value_string(p);
@@ -11087,7 +11129,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_ast_node(u, Uninit, node);
 		o->mode = Addressing_Value;
 		o->type = t_untyped_uninit;
-		error(node, "Use of --- outside of variable declaration");
+		error(node, "Global variables will always be zeroed if left unassigned, --- is disallowed");
 	case_end;
 
 
@@ -11319,6 +11361,13 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		node->viral_state_flags |= de->expr->viral_state_flags;
 
 		if (o->mode == Addressing_Invalid) {
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		} else if (o->mode == Addressing_Type) {
+ 			gbString str = expr_to_string(o->expr);
+			error(o->expr, "Cannot dereference '%s' because it is a type", str);
+
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;

@@ -64,6 +64,7 @@ Network_Error :: union #shared_nil {
 	UDP_Recv_Error,
 	Shutdown_Error,
 	Interfaces_Error,
+	Socket_Info_Error,
 	Socket_Option_Error,
 	Set_Blocking_Error,
 	Parse_Endpoint_Error,
@@ -259,6 +260,9 @@ DNS_Configuration :: struct {
 	// Configuration files.
 	resolv_conf: string,
 	hosts_file:  string,
+
+	resolv_conf_buf: [128]u8,
+	hosts_file_buf:  [128]u8,
 
 	// TODO: Allow loading these up with `reload_configuration()` call or the like,
 	// so we don't have to do it each call.

@@ -20,7 +20,8 @@ import "core:terminal/ansi"
 
 @(private="file") stop_test_gate:   sync.Mutex
 @(private="file") stop_test_index:  libc.sig_atomic_t
-@(private="file") stop_test_reason: libc.sig_atomic_t
+@(private="file") stop_test_signal: libc.sig_atomic_t
+@(private="file") stop_test_passed: libc.sig_atomic_t
 @(private="file") stop_test_alert:  libc.sig_atomic_t
 
 @(private="file", thread_local)
@@ -99,7 +100,30 @@ This is a dire bug and should be reported to the Odin developers.
 
 	if sync.mutex_guard(&stop_test_gate) {
 		intrinsics.atomic_store(&stop_test_index, local_test_index)
-		intrinsics.atomic_store(&stop_test_reason, cast(libc.sig_atomic_t)sig)
+		intrinsics.atomic_store(&stop_test_signal, cast(libc.sig_atomic_t)sig)
+		passed: bool
+		check_passing: {
+			if location := local_test_assertion_raised.location; location != {} {
+				for i in 0..<local_test_expected_failures.location_count {
+					if local_test_expected_failures.locations[i] == location {
+						passed = true
+						break check_passing
+					}
+				}
+			}
+			if message := local_test_assertion_raised.message; message != "" {
+				for i in 0..<local_test_expected_failures.message_count {
+					if local_test_expected_failures.messages[i] == message {
+						passed = true
+						break check_passing
+					}
+				}
+			}
+			if signal := local_test_expected_failures.signal; signal == sig {
+				passed = true
+			}
+		}
+		intrinsics.atomic_store(&stop_test_passed, cast(libc.sig_atomic_t)passed)
 		intrinsics.atomic_store(&stop_test_alert, 1)
 
 		for {
@@ -154,11 +178,15 @@ _should_stop_test :: proc() -> (test_index: int, reason: Stop_Reason, ok: bool) 
 		intrinsics.atomic_store(&stop_test_alert, 0)
 
 		test_index = cast(int)intrinsics.atomic_load(&stop_test_index)
-		switch intrinsics.atomic_load(&stop_test_reason) {
-		case libc.SIGFPE: reason = .Arithmetic_Error
-		case libc.SIGILL: reason = .Illegal_Instruction
-		case libc.SIGSEGV: reason = .Segmentation_Fault
-		case      SIGTRAP: reason = .Unhandled_Trap
+		if cast(bool)intrinsics.atomic_load(&stop_test_passed) {
+			reason = .Successful_Stop
+		} else {
+			switch intrinsics.atomic_load(&stop_test_signal) {
+			case libc.SIGFPE: reason = .Arithmetic_Error
+			case libc.SIGILL: reason = .Illegal_Instruction
+			case libc.SIGSEGV: reason = .Segmentation_Fault
+			case      SIGTRAP: reason = .Unhandled_Trap
+			}
 		}
 		ok = true
 	}

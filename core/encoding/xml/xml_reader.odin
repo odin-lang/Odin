@@ -175,7 +175,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 		data = bytes.clone(data)
 	}
 
-	t := &Tokenizer{}
+	t := new(Tokenizer)
 	init(t, string(data), path, error_handler)
 
 	doc = new(Document)
@@ -403,6 +403,7 @@ destroy :: proc(doc: ^Document) {
 	}
 	delete(doc.strings_to_free)
 
+	free(doc.tokenizer)
 	free(doc)
 }
 

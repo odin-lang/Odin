@@ -59,7 +59,8 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			}
 		}
 
-		if pos_str, has_pos := get_struct_subtag(args_tag, SUBTAG_POS); has_pos {
+		pos_str, has_pos := get_struct_subtag(args_tag, SUBTAG_POS)
+		if has_pos {
 			#partial switch specific_type_info in field.type.variant {
 			case runtime.Type_Info_Map:
 				fmt.panicf("%T.%s has `%s` defined, and this does not make sense on a map type.",
@@ -79,7 +80,7 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			fmt.assertf(!reflect.is_boolean(field.type), "%T.%s is a required boolean. This is disallowed.",
 				model_type, field.name, loc = loc)
 
-			fmt.assertf(field.name != INTERNAL_VARIADIC_FLAG, "%T.%s is defined as required. This is disallowed.",
+			fmt.assertf(field.name != INTERNAL_OVERFLOW_FLAG, "%T.%s is defined as required. This is disallowed.",
 				model_type, field.name, loc = loc)
 
 			if len(requirement) > 0 {
@@ -109,24 +110,28 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			}
 		}
 
-		if length, is_variadic := get_struct_subtag(args_tag, SUBTAG_VARIADIC); is_variadic {
+		if length, is_manifold := get_struct_subtag(args_tag, SUBTAG_MANIFOLD); is_manifold {
+			fmt.assertf(!has_pos,
+				"%T.%s has both `%s` and `%s` defined. This is disallowed.\n\tSuggestion: Use a dynamic array field named `%s` to accept unspecified positional arguments.",
+				model_type, field.name, SUBTAG_POS, SUBTAG_MANIFOLD, INTERNAL_OVERFLOW_FLAG, loc = loc)
+
 			if value, parse_ok := strconv.parse_u64_of_base(length, 10); parse_ok {
 				fmt.assertf(value > 0,
 					"%T.%s has `%s` set to %i. It must be greater than zero.",
-					model_type, field.name, value, SUBTAG_VARIADIC, loc = loc)
+					model_type, field.name, value, SUBTAG_MANIFOLD, loc = loc)
 				fmt.assertf(value != 1,
-					"%T.%s has `%s` set to 1. This has no effect.",
-					model_type, field.name, SUBTAG_VARIADIC, loc = loc)
+					"%T.%s has `%s` set to 1. This is equivalent to not defining `%s`.",
+					model_type, field.name, SUBTAG_MANIFOLD, SUBTAG_MANIFOLD, loc = loc)
 			}
 
 			#partial switch specific_type_info in field.type.variant {
 			case runtime.Type_Info_Dynamic_Array:
 				fmt.assertf(style != .Odin,
 					"%T.%s has `%s` defined, but this only makes sense in UNIX-style parsing mode.",
-					model_type, field.name, SUBTAG_VARIADIC, loc = loc)
+					model_type, field.name, SUBTAG_MANIFOLD, loc = loc)
 			case:
 				fmt.panicf("%T.%s has `%s` defined, but this only makes sense on dynamic arrays.",
-					model_type, field.name, SUBTAG_VARIADIC, loc = loc)
+					model_type, field.name, SUBTAG_MANIFOLD, loc = loc)
 			}
 		}
 

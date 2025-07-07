@@ -41,7 +41,7 @@ _lookup :: proc(key: string) -> (value: string, idx: int) {
 	return "", -1
 }
 
-_lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {
 		_build_env()
 	}
@@ -52,6 +52,23 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 	}
 	return
 }
+
+_lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {
+		_build_env()
+	}
+
+	if v, idx := _lookup(key); idx != -1 {
+		if len(buf) >= len(v) {
+			copy(buf, v)
+			return string(buf[:len(v)]), nil
+		}
+		return "", .Buffer_Full
+	}
+	return "", .Env_Var_Not_Found
+}
+
+_lookup_env :: proc{_lookup_env_alloc, _lookup_env_buf}
 
 _set_env :: proc(key, v_new: string) -> Error {
 	if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {

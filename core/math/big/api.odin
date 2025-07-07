@@ -160,6 +160,5 @@ destroy :: proc {
 		int_destroy :: proc(integers: ..^Int)
 	*/
 	int_destroy,
+	internal_rat_destroy,
 }
-
-

@@ -39,7 +39,8 @@ Type representing a thread handle and the associated with that thread data.
 Thread :: struct {
 	using specific: Thread_Os_Specific,
 	flags: bit_set[Thread_State; u8],
-	// Thread ID.
+	// Thread ID. Depending on the platform, may start out as 0 (zero) until the thread
+	// has had a chance to run.
 	id: int,
 	// The thread procedure.
 	procedure: Thread_Proc,
@@ -257,8 +258,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -290,8 +293,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -327,8 +332,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -370,8 +377,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -419,8 +428,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -470,8 +481,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`

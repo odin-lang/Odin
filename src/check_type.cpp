@@ -3284,7 +3284,7 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 		}
 
 		if (count < 0) {
-			error(at->count, "? can only be used in conjuction with compound literals");
+			error(at->count, "? can only be used in conjunction with compound literals");
 			count = 0;
 		}
 

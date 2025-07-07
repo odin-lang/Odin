@@ -823,7 +823,7 @@ gb_internal int error_value_cmp(void const *a, void const *b) {
 gb_global String error_article_table[][2] = {
 	{str_lit("a "),  str_lit("bit_set literal")},
 	{str_lit("a "),  str_lit("constant declaration")},
-	{str_lit("a "),  str_lit("dynamiic array literal")},
+	{str_lit("a "),  str_lit("dynamic array literal")},
 	{str_lit("a "),  str_lit("map index")},
 	{str_lit("a "),  str_lit("map literal")},
 	{str_lit("a "),  str_lit("matrix literal")},

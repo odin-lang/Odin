@@ -497,7 +497,11 @@ typedef i32 b32; // NOTE(bill): Prefer this!!!
 
 #if !defined(gb_no_asan)
 	#if defined(_MSC_VER)
-		#define gb_no_asan __declspec(no_sanitize_address)
+		#if _MSC_VER >= 1930
+			#define gb_no_asan __declspec(no_sanitize_address)
+		#else
+			#define gb_no_asan
+		#endif
 	#else
 		#define gb_no_asan __attribute__((disable_sanitizer_instrumentation))
 	#endif

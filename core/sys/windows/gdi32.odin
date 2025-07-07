@@ -350,4 +350,4 @@ NEWTEXTMETRICW :: struct {
 	ntmAvgWidth:        UINT,
 }
 
-FONTENUMPROCW :: #type proc(lpelf: ^ENUMLOGFONTW, lpntm: ^NEWTEXTMETRICW, FontType: DWORD, lParam: LPARAM) -> INT
+FONTENUMPROCW :: #type proc "system" (lpelf: ^ENUMLOGFONTW, lpntm: ^NEWTEXTMETRICW, FontType: DWORD, lParam: LPARAM) -> INT

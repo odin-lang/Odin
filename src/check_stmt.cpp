@@ -418,7 +418,7 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 
 
-gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs) {
+gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs, String context_name) {
 	if (rhs->mode == Addressing_Invalid) {
 		return nullptr;
 	}
@@ -430,7 +430,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 
 	Ast *node = unparen_expr(lhs->expr);
 
-	check_no_copy_assignment(*rhs, str_lit("assignment"));
+	check_no_copy_assignment(*rhs, context_name);
 
 	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
@@ -630,7 +630,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		ctx->bit_field_bit_size = lhs_e->Variable.bit_field_bit_size;
 	}
 
-	check_assignment(ctx, rhs, assignment_type, str_lit("assignment"));
+	check_assignment(ctx, rhs, assignment_type, context_name);
 
 	ctx->bit_field_bit_size = prev_bit_field_bit_size;
 
@@ -2418,7 +2418,7 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 
 		isize lhs_count = as->lhs.count;
 		if (lhs_count == 0) {
-			error(as->op, "Missing lhs in assignment statement");
+			error(as->op, "Missing LHS in assignment statement");
 			return;
 		}
 
@@ -2451,7 +2451,7 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 			if (lhs_to_ignore[i]) {
 				continue;
 			}
-			check_assignment_variable(ctx, &lhs_operands[i], &rhs_operands[i]);
+			check_assignment_variable(ctx, &lhs_operands[i], &rhs_operands[i], str_lit("assignment"));
 		}
 		if (lhs_count != rhs_count) {
 			error(as->lhs[0], "Assignment count mismatch '%td' = '%td'", lhs_count, rhs_count);
@@ -2461,11 +2461,11 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 		// a += 1; // Single-sided
 		Token op = as->op;
 		if (as->lhs.count != 1 || as->rhs.count != 1) {
-			error(op, "Assignment operation '%.*s' requires single-valued expressions", LIT(op.string));
+			error(op, "Assignment operator '%.*s' requires single-valued operands", LIT(op.string));
 			return;
 		}
 		if (!gb_is_between(op.kind, Token__AssignOpBegin+1, Token__AssignOpEnd-1)) {
-			error(op, "Unknown Assignment operation '%.*s'", LIT(op.string));
+			error(op, "Unknown assignment operator '%.*s'", LIT(op.string));
 			return;
 		}
 		Operand lhs = {Addressing_Invalid};
@@ -2474,15 +2474,16 @@ gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
 		ast_node(be, BinaryExpr, binary_expr);
 		be->op = op;
 		be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
-		 // NOTE(bill): Only use the first one will be used
+		// NOTE(bill): Only use the first one will be used
 		be->left  = as->lhs[0];
 		be->right = as->rhs[0];
 
 		check_expr(ctx, &lhs, as->lhs[0]);
 		check_binary_expr(ctx, &rhs, binary_expr, nullptr, true);
 		if (rhs.mode != Addressing_Invalid) {
-			// NOTE(bill): Only use the first one will be used
-			check_assignment_variable(ctx, &lhs, &rhs);
+			be->op.string = substring(be->op.string, 0, be->op.string.len - 1);
+			rhs.expr = binary_expr;
+			check_assignment_variable(ctx, &lhs, &rhs, str_lit("assignment operation"));
 		}
 	}
 }

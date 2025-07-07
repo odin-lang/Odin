@@ -674,7 +674,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	return i64(res), nil
 }
 
-@(require_results)
+@(require_results, no_sanitize_memory)
 file_size :: proc(fd: Handle) -> (i64, Error) {
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
@@ -794,7 +794,7 @@ last_write_time_by_name :: proc(name: string) -> (time: File_Time, err: Error) {
 	return File_Time(modified), nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -808,7 +808,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -822,7 +822,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
@@ -946,7 +946,7 @@ access :: proc(path: string, mask: int) -> (bool, Error) {
 }
 
 @(require_results)
-lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+lookup_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
 	// NOTE(tetra): Lifetime of 'cstr' is unclear, but _unix_free(cstr) segfaults.
@@ -958,10 +958,38 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 }
 
 @(require_results)
-get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+lookup_env_buffer :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	if len(key) + 1 > len(buf) {
+		return "", .Buffer_Full
+	} else {
+		copy(buf, key)
+	}
+
+	if value = string(_unix_getenv(cstring(raw_data(buf)))); value == "" {
+		return "", .Env_Var_Not_Found
+	} else {
+		if len(value) > len(buf) {
+			return "", .Buffer_Full
+		} else {
+			copy(buf, value)
+			return string(buf[:len(value)]), nil
+		}
+	}
+}
+lookup_env :: proc{lookup_env_alloc, lookup_env_buffer}
+
+@(require_results)
+get_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
+
+@(require_results)
+get_env_buf :: proc(buf: []u8, key: string) -> (value: string) {
+	value, _ = lookup_env(buf, key)
+	return
+}
+get_env :: proc{get_env_alloc, get_env_buf}
 
 set_env :: proc(key, value: string) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
@@ -1069,13 +1097,18 @@ _processor_core_count :: proc() -> int {
 	return int(_unix_get_nprocs())
 }
 
-@(require_results)
+@(private, require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for arg, i in runtime.args__ {
 		res[i] = string(arg)
 	}
 	return res
+}
+
+@(private, fini)
+_delete_command_line_arguments :: proc() {
+	delete(args)
 }
 
 @(require_results)

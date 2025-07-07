@@ -34,6 +34,7 @@ init_platform :: proc() {
 	} else {
 		os_version.platform = .MacOS
 		switch version.majorVersion {
+		case 26: ws(&b, "macOS Tahoe")
 		case 15: ws(&b, "macOS Sequoia")
 		case 14: ws(&b, "macOS Sonoma")
 		case 13: ws(&b, "macOS Ventura")

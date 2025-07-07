@@ -4,7 +4,6 @@ package os2
 import "base:runtime"
 import "core:encoding/ini"
 import "core:strings"
-import "core:sys/posix"
 
 _user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	#partial switch ODIN_OS {
@@ -169,14 +168,7 @@ _xdg_user_dirs_lookup :: proc(xdg_key: string, allocator: runtime.Allocator) -> 
 
 	for k, v in ini.iterate(&it) {
 		if k == xdg_key {
-			we: posix.wordexp_t
-			defer posix.wordfree(&we)
-
-			if _err := posix.wordexp(strings.clone_to_cstring(v, temp_allocator), &we, nil); _err != nil || we.we_wordc != 1 {
-				return "", .Wordexp_Failed
-			}
-
-			return strings.clone_from_cstring(we.we_wordv[0], allocator)
+			return replace_environment_placeholders(v, allocator), nil
 		}
 	}
 	return

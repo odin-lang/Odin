@@ -31,7 +31,7 @@ Unimplemented headers:
 - iso646.h | Impossible
 - math.h | See `core:c/libc`
 - mqueue.h | Targets don't seem to have implemented it
-- regex.h | See `core:regex`
+- regex.h | See `core:text/regex`
 - search.h | Not useful in Odin
 - spawn.h | Use `fork`, `execve`, etc.
 - stdarg.h | See `core:c/libc`
@@ -52,6 +52,8 @@ package posix
 import "base:intrinsics"
 
 import "core:c"
+
+IS_SUPPORTED :: _IS_SUPPORTED
 
 result :: enum c.int {
  	// Use `errno` and `strerror` for more information.

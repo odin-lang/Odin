@@ -11,7 +11,7 @@ when ODIN_OS == .Windows {
 
 MAJOR_VERSION :: 3
 MINOR_VERSION :: 2
-PATCHLEVEL    :: 0
+PATCHLEVEL    :: 4
 
 Animation :: struct {
 	w, h:   c.int,

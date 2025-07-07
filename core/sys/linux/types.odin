@@ -937,17 +937,12 @@ IO_Vec :: struct {
 }
 
 /*
-	Access mode for shared memory
-*/
-IPC_Mode :: bit_set[IPC_Mode_Bits; u32]
-
-/*
-	Flags used by IPC objects
+	Access modes and flags used by SystemV IPC procedures.
 */
 IPC_Flags :: bit_set[IPC_Flags_Bits; i16]
 
 /*
-	Permissions for IPC objects
+	Permissions for SystemV IPC primitives.
 */
 IPC_Perm :: struct {
 	key:  Key,
@@ -955,7 +950,7 @@ IPC_Perm :: struct {
 	gid:  u32,
 	cuid: u32,
 	cgid: u32,
-	mode: IPC_Mode,
+	mode: IPC_Flags, // Only contains mode flags.
 	seq:  u16,
 	_:    [2 + 2*size_of(int)]u8,
 }

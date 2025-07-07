@@ -370,6 +370,7 @@ enum BuildFlagKind {
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
 	BuildFlag_ObfuscateSourceCodeLocations,
+	BuildFlag_SourceCodeLocations,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -594,6 +595,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DynamicMapCalls,         str_lit("dynamic-map-calls"),         BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_ObfuscateSourceCodeLocations, str_lit("obfuscate-source-code-locations"), BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_SourceCodeLocations, 		str_lit("source-code-locations"), 		BuildFlagParam_String,  Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc | Command_test | Command_build);
@@ -1422,7 +1424,23 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_ObfuscateSourceCodeLocations:
-							build_context.obfuscate_source_code_locations = true;
+							gb_printf_err("'-obfuscate-source-code-locations' is now deprecated in favor of '-source-code-locations:obfuscated'\n");
+							build_context.source_code_location_info = SourceCodeLocationInfo_Obfuscated;
+							break;
+
+						case BuildFlag_SourceCodeLocations:
+							if (str_eq_ignore_case(value.value_string, str_lit("normal"))) {
+								build_context.source_code_location_info = SourceCodeLocationInfo_Normal;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("obfuscated"))) {
+								build_context.source_code_location_info = SourceCodeLocationInfo_Obfuscated;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("filename"))) {
+								build_context.source_code_location_info = SourceCodeLocationInfo_Filename;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("none"))) {
+								build_context.source_code_location_info = SourceCodeLocationInfo_None;
+							} else {
+								gb_printf_err("-source-code-locations:<string> options are 'normal', 'obfuscated', 'filename', and 'none'\n");
+								bad_flags = true;
+							}
 							break;
 
 						case BuildFlag_DefaultToNilAllocator:
@@ -2397,12 +2415,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
-	if (test_only) {
-		if (print_flag("-build-only")) {
-			print_usage_line(2, "Only builds the test executable; does not automatically run it afterwards.");
-		}
-	}
-
 	if (check) {
 		if (print_flag("-collection:<name>=<filepath>")) {
 			print_usage_line(2, "Defines a library collection used for imports.");
@@ -2669,8 +2681,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 
 
-		if (print_flag("-obfuscate-source-code-locations")) {
-			print_usage_line(2, "Obfuscate the file and procedure strings, and line and column numbers, stored with a 'runtime.Source_Code_Location' value.");
+		if (print_flag("-source-code-locations:<string>")) {
+			print_usage_line(2, "Processes the file and procedure strings, and line and column numbers, stored with a 'runtime.Source_Code_Location' value.");
+			print_usage_line(2, "Available options:");
+				print_usage_line(3, "-source-code-locations:normal");
+				print_usage_line(3, "-source-code-locations:obfuscated");
+				print_usage_line(3, "-source-code-locations:filename");
+				print_usage_line(3, "-source-code-locations:none");
+			print_usage_line(2, "The default is -source-code-locations:normal.");
 		}
 
 
