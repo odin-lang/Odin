@@ -6,7 +6,7 @@ when ODIN_OS == .Windows {
 	}
 } else {
 	foreign import lib {
-		"kb_text_shape.a",
+		"lib/kb_text_shape.a",
 	}
 }
 
