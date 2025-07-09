@@ -2778,6 +2778,10 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			Ast *stmt = ds->stmt;
 			Ast *original_stmt = stmt;
 
+			if (stmt->kind == Ast_BlockStmt && stmt->BlockStmt.stmts.count == 0) {
+				break; // empty defer statement
+			}
+
 			bool is_singular = true;
 			while (is_singular && stmt->kind == Ast_BlockStmt) {
 				Ast *inner_stmt = nullptr;
