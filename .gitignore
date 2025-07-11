@@ -297,3 +297,8 @@ build.sh
 *.rdi
 tests/issues/build/*
 misc/featuregen/featuregen
+
+# Clangd stuff
+.cache/
+.clangd
+compile_commands.json
