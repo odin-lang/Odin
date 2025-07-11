@@ -170,15 +170,15 @@ wstring_to_utf8_alloc :: proc(s: wstring, N: int, allocator := context.temp_allo
 	return string(text[:n]), nil
 }
 
-wstring_to_utf8_buf :: proc(buf: []u8, s: wstring) -> (res: string) {
-	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, -1, nil, 0, nil, nil)
+wstring_to_utf8_buf :: proc(buf: []u8, s: wstring, N := -1) -> (res: string) {
+	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), nil, 0, nil, nil)
 	if n == 0 {
 		return
 	} else if int(n) > len(buf) {
 		return
 	}
 
-	n2 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, -1, raw_data(buf), n, nil, nil)
+	n2 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), raw_data(buf), n, nil, nil)
 	if n2 == 0 {
 		return
 	} else if int(n2) > len(buf) {
@@ -196,6 +196,21 @@ wstring_to_utf8_buf :: proc(buf: []u8, s: wstring) -> (res: string) {
 
 wstring_to_utf8 :: proc{wstring_to_utf8_alloc, wstring_to_utf8_buf}
 
+/*
+Converts a UTF-16 string into a regular UTF-8 `string` and allocates the result.
+If the input is null-terminated, only the part of the input string leading up
+to it will be converted.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to be converted
+- allocator: (default: context.allocator)
+
+Returns:
+- res: A cloned and converted string
+- err: An optional allocator error if one occured, `nil` otherwise
+*/
 utf16_to_utf8_alloc :: proc(s: []u16, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
 	if len(s) == 0 {
 		return "", nil
@@ -203,11 +218,25 @@ utf16_to_utf8_alloc :: proc(s: []u16, allocator := context.temp_allocator) -> (r
 	return wstring_to_utf8(raw_data(s), len(s), allocator)
 }
 
+/*
+Converts a UTF-16 string into a regular UTF-8 `string`, using `buf` as its backing.
+If the input is null-terminated, only the part of the input string leading up
+to it will be converted.
+
+*Uses `buf` for backing*
+
+Inputs:
+- s: The string to be converted
+- buf: Backing buffer for result string
+
+Returns:
+- res: A converted string, backed byu `buf`
+*/
 utf16_to_utf8_buf :: proc(buf: []u8, s: []u16) -> (res: string) {
 	if len(s) == 0 {
 		return
 	}
-	return wstring_to_utf8(buf, raw_data(s))
+	return wstring_to_utf8(buf, raw_data(s), len(s))
 }
 
 utf16_to_utf8 :: proc{utf16_to_utf8_alloc, utf16_to_utf8_buf}
