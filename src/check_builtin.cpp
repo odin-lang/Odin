@@ -1,9 +1,12 @@
 typedef bool (BuiltinTypeIsProc)(Type *t);
 
 gb_internal int enum_constant_entity_cmp(void const* a, void const* b) {
-	BigInt bi = (*cast(Entity const **)a)->Constant.value.value_integer;
-	BigInt bj = (*cast(Entity const **)b)->Constant.value.value_integer;
-	return big_int_cmp(&bi, &bj);
+	Entity const *ea = *(cast(Entity const **)a);
+	Entity const *eb = *(cast(Entity const **)b);
+	GB_ASSERT(ea->kind == Entity_Constant && eb->kind == Entity_Constant);
+	GB_ASSERT(ea->Constant.value.kind == ExactValue_Integer && eb->Constant.value.kind == ExactValue_Integer);
+	
+	return big_int_cmp(&ea->Constant.value.value_integer, &eb->Constant.value.value_integer);
 }
 
 gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - BuiltinProc__type_simple_boolean_begin] = {
