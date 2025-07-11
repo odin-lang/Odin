@@ -1150,6 +1150,58 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
+	case BuiltinProc_simd_table_lookup:
+		{
+			if (ce->args.count != 2) {
+				error(call, "'%.*s' expected 2 arguments, got %td", LIT(builtin_name), ce->args.count);
+				return false;
+			}
+			
+			Operand table = {};
+			Operand indices = {};
+			check_expr(c, &table, ce->args[0]); if (table.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &indices, ce->args[1], table.type); if (indices.mode == Addressing_Invalid) return false;
+			
+			if (!is_type_simd_vector(table.type)) {
+				error(table.expr, "'%.*s' expected a simd vector type for table", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_simd_vector(indices.type)) {
+				error(indices.expr, "'%.*s' expected a simd vector type for indices", LIT(builtin_name));
+				return false;
+			}
+			
+			Type *table_elem = base_array_type(table.type);
+			Type *indices_elem = base_array_type(indices.type);
+			
+			if (!is_type_integer(table_elem)) {
+				gbString table_str = type_to_string(table.type);
+				error(table.expr, "'%.*s' expected table to be a simd vector of integers, got '%s'", LIT(builtin_name), table_str);
+				gb_string_free(table_str);
+				return false;
+			}
+			
+			if (!is_type_integer(indices_elem)) {
+				gbString indices_str = type_to_string(indices.type);
+				error(indices.expr, "'%.*s' expected indices to be a simd vector of integers, got '%s'", LIT(builtin_name), indices_str);
+				gb_string_free(indices_str);
+				return false;
+			}
+			
+			if (!are_types_identical(table.type, indices.type)) {
+				gbString table_str = type_to_string(table.type);
+				gbString indices_str = type_to_string(indices.type);
+				error(indices.expr, "'%.*s' expected table and indices to have the same type, got '%s' vs '%s'", LIT(builtin_name), table_str, indices_str);
+				gb_string_free(indices_str);
+				gb_string_free(table_str);
+				return false;
+			}
+			
+			operand->mode = Addressing_Value;
+			operand->type = table.type;
+			return true;
+		}
+
 	case BuiltinProc_simd_ceil:
 	case BuiltinProc_simd_floor:
 	case BuiltinProc_simd_trunc:
