@@ -1436,27 +1436,30 @@ gb_internal CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_
 }
 
 gb_internal void consume_comment_groups(AstFile *f, Token prev) {
-	if (f->curr_token.kind == Token_Comment) {
-		CommentGroup *comment = nullptr;
-		isize end_line = 0;
-
-		if (f->curr_token.pos.line == prev.pos.line) {
-			comment = consume_comment_group(f, 0, &end_line);
-			if (f->curr_token.pos.line != end_line || f->curr_token.kind == Token_EOF) {
-				f->line_comment = comment;
-			}
-		}
-
-		end_line = -1;
-		while (f->curr_token.kind == Token_Comment) {
-			comment = consume_comment_group(f, 1, &end_line);
-		}
-		if (end_line+1 == f->curr_token.pos.line || end_line < 0) {
-			f->lead_comment = comment;
-		}
-
-		GB_ASSERT(f->curr_token.kind != Token_Comment);
+	if (f->curr_token.kind != Token_Comment) {
+		return;
 	}
+	CommentGroup *comment = nullptr;
+	isize end_line = 0;
+
+	if (f->curr_token.pos.line == prev.pos.line) {
+		comment = consume_comment_group(f, 0, &end_line);
+		if (f->curr_token.pos.line != end_line ||
+		    f->curr_token.pos.line == prev.pos.line+1 ||
+		    f->curr_token.kind == Token_EOF) {
+			f->line_comment = comment;
+		}
+	}
+
+	end_line = -1;
+	while (f->curr_token.kind == Token_Comment) {
+		comment = consume_comment_group(f, 1, &end_line);
+	}
+	if (end_line+1 == f->curr_token.pos.line || end_line < 0) {
+		f->lead_comment = comment;
+	}
+
+	GB_ASSERT(f->curr_token.kind != Token_Comment);
 }
 
 gb_internal gb_inline bool ignore_newlines(AstFile *f) {
