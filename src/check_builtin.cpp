@@ -6946,6 +6946,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			array_sort(enum_constants, enum_constant_entity_cmp);
 			
 			BigInt minus_one = big_int_make_i64(-1);
+			defer (big_int_dealloc(&minus_one));
 			BigInt diff = {};
 			
 			bool contiguous = true;
@@ -6956,6 +6957,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				BigInt curr = enum_constants[i]->Constant.value.value_integer;
 				BigInt next = enum_constants[i + 1]->Constant.value.value_integer;
 				big_int_sub(&diff, &curr, &next);
+				defer (big_int_dealloc(&diff));
 				
 				if (!big_int_is_zero(&diff) && big_int_cmp(&diff, &minus_one) != 0) {
 					contiguous = false;
