@@ -1,5 +1,11 @@
 typedef bool (BuiltinTypeIsProc)(Type *t);
 
+gb_internal int enum_constant_entity_cmp(void const* a, void const* b) {
+	BigInt bi = (*cast(Entity const **)a)->Constant.value.value_integer;
+	BigInt bj = (*cast(Entity const **)b)->Constant.value.value_integer;
+	return big_int_cmp(&bi, &bj);
+}
+
 gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - BuiltinProc__type_simple_boolean_begin] = {
 	nullptr, // BuiltinProc__type_simple_boolean_begin
 
@@ -6916,6 +6922,48 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			operand->mode = Addressing_Type;
 			operand->type = bit_set_to_int(bt);
+			break;
+		}
+
+	case BuiltinProc_type_enum_is_contiguous:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_enum(type)) {
+				gbString t = type_to_string(type);
+				error(ce->args[0], "Expected an enum type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+			
+			// sort enum fields in place in ascending order
+			Array<Entity *> enum_constants = type->Enum.fields;
+			array_sort(enum_constants, enum_constant_entity_cmp);
+			
+			BigInt minus_one = big_int_make_i64(-1);
+			BigInt diff = {};
+			
+			bool contiguous = true;
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+			
+			for (isize i = 0; i < enum_constants.count - 1; i++) {
+				BigInt curr = enum_constants[i]->Constant.value.value_integer;
+				BigInt next = enum_constants[i + 1]->Constant.value.value_integer;
+				big_int_sub(&diff, &curr, &next);
+				
+				if (!big_int_is_zero(&diff) && big_int_cmp(&diff, &minus_one) != 0) {
+					contiguous = false;
+					break;
+				}
+			}
+
+			operand->value = exact_value_bool(contiguous);
 			break;
 		}
 

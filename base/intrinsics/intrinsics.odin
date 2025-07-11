@@ -213,6 +213,9 @@ type_is_subtype_of :: proc($T, $U: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
+// Contiguous as in having a set of constants, when sorted, the difference between consecutive values is only 0 or 1
+type_enum_is_contiguous :: proc($T: typeid) -> bool where type_is_enum(T) ---
+
 type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 where type_is_comparable(T) ---
 type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
 
