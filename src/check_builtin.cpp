@@ -6941,8 +6941,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 			
-			// sort enum fields in place in ascending order
-			Array<Entity *> enum_constants = type->Enum.fields;
+			auto enum_constants = array_make<Entity *>(temporary_allocator(), type->Enum.fields.count);
+			array_copy(&enum_constants, type->Enum.fields, 0);
 			array_sort(enum_constants, enum_constant_entity_cmp);
 			
 			BigInt minus_one = big_int_make_i64(-1);
