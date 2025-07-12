@@ -41,6 +41,13 @@ foreign lib {
 	cfsetospeed :: proc(termios_p: ^termios, rate: speed_t) -> result ---
 
 	/*
+	Set the terminal to "Raw" mode
+	
+	[[ More; https://www.man7.org/linux/man-pages/man3/termios.3.html ]]
+	*/
+	cfmakeraw :: proc(termios_p: ^termios) ---
+
+	/*
 	Wait for transmission of output.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/tcdrain.html ]]
