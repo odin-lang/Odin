@@ -242,7 +242,7 @@ struct lbGenerator : LinkerData {
 	MPSCQueue<lbEntityCorrection> entities_to_correct_linkage;
 	MPSCQueue<lbObjCGlobal> objc_selectors;
 	MPSCQueue<lbObjCGlobal> objc_classes;
-  MPSCQueue<lbObjCGlobal> objc_ivars;
+	MPSCQueue<lbObjCGlobal> objc_ivars;
 	MPSCQueue<String> raddebug_section_strings;
 };
 
