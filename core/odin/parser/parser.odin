@@ -673,7 +673,9 @@ parse_ident :: proc(p: ^Parser) -> ^ast.Ident {
 		name = tok.text
 		advance_token(p)
 	} else {
-		expect_token(p, .Ident)
+		e := tokenizer.to_string(.Ident)
+		g := tokenizer.token_to_string(tok)
+		error(p, pos, "expected '%s', got '%s'", e, g)
 	}
 	i := ast.new(ast.Ident, pos, end_pos(tok))
 	i.name = name
