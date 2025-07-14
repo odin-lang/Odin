@@ -214,7 +214,9 @@ _set_name :: proc(thread: ^Thread, name:string) {
 	when ODIN_OS == .Haiku {
 		unimplemented("core:thread set_name for haiku is not yet supported")
 	} else when ODIN_OS == .Darwin {
-		if thread != nil do return
+		if thread != nil {
+			return
+		}
 	} else {
 		tid: posix.pthread_t
 		if thread == nil {
