@@ -46,7 +46,10 @@ _yield :: proc() {
 	unimplemented("core:thread procedure not supported on target")
 }
 
-_get_name :: proc(thread: Thread, allocator : runtime.Allocator, loc : runtime.Source_Code_Location) -> (string, runtime.Allocator_Error) {
+_get_name :: proc(thread: ^Thread, allocator : runtime.Allocator, loc : runtime.Source_Code_Location) -> (string, runtime.Allocator_Error) {
 	unimplemented("core:thread procedure not supported on target")
 }
 
+_set_name :: proc(thread: ^Thread, name:string) {
+	unimplemented("core:thread procedure not supported on target")
+}
