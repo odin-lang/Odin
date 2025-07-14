@@ -846,7 +846,9 @@ try_cross_linking:;
 
 				// Only specify this flag if the user has given a minimum version to target.
 				// This will cause warnings to show up for mismatched libraries.
-				if (build_context.minimum_os_version_string_given) {
+				// NOTE(harold): For device subtargets we have to explicitly set the default version to 
+				//               avoid the same warning since we configure our own minimum version when compiling for devices.
+				if (build_context.minimum_os_version_string_given || selected_subtarget != Subtarget_Default) {
 					link_settings = gb_string_append_fmt(link_settings, "-m%s-version-min=%.*s ", darwin_min_version_id, LIT(build_context.minimum_os_version_string));
 				}
 
