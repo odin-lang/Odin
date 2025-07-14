@@ -191,7 +191,7 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 
 	tid : posix.pthread_t
 	if thread == nil {
-		tid = transmute(posix.pthread_t)sync.current_thread_id()
+		tid = posix.pthread_self()
 	} else {
 		tid = thread.unix_thread
 	}
@@ -218,7 +218,7 @@ _set_name :: proc(thread: ^Thread, name:string) {
 	} else {
 		tid: posix.pthread_t
 		if thread == nil {
-			tid = transmute(posix.pthread_t)sync.current_thread_id
+			tid = posix.pthread_self()
 		} else {
 			tid = t.unix_thread
 		}
