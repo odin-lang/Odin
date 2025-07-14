@@ -1907,12 +1907,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	// does not annoy the user with version warnings.
 	if (metrics->os == TargetOs_darwin) {
 		if (!bc->minimum_os_version_string_given) {
-			bc->minimum_os_version_string = str_lit("11.0.0");
+			if (subtarget == Subtarget_Default) {
+				bc->minimum_os_version_string = str_lit("11.0.0");
+			} else if (subtarget == Subtarget_iOS || subtarget == Subtarget_iPhoneSimulator) {
+				// NOTE(harold): We default to 17.4 on iOS because that's when os_sync_wait_on_address was added and
+				//               we'd like to avoid any potential App Store issues by using the private ulock_* there.
+				bc->minimum_os_version_string = str_lit("17.4");
+			}
 		}
 
-		if (subtarget == Subtarget_Default) {
-			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
-		}
+		bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
 	} else if (selected_subtarget == Subtarget_Android) {
 		init_android_values(bc->build_mode == BuildMode_Executable && (bc->command_kind & Command__does_build) != 0);
 	}

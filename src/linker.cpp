@@ -431,8 +431,10 @@ try_cross_linking:;
 
 			// Link using `clang`, unless overridden by `ODIN_CLANG_PATH` environment variable.
 			const char* clang_path = gb_get_env("ODIN_CLANG_PATH", permanent_allocator());
+			bool has_odin_clang_path_env = true;
 			if (clang_path == NULL) {
 				clang_path = "clang";
+				has_odin_clang_path_env = false;
 			}
 
 			// NOTE(vassvik): needs to add the root to the library search paths, so that the full filenames of the library
@@ -779,6 +781,8 @@ try_cross_linking:;
 				char const* darwin_xcrun_sdk_name = "macosx";
 				char const* darwin_min_version_id = "macosx";
 
+				const char* original_clang_path = clang_path;
+
 				// NOTE(harold): We set the clang_path to run through xcrun because otherwise it complaints about the the sysroot
 				//               being set to 'MacOSX' even though we've set the sysroot to the correct SDK (-Wincompatible-sysroot).
 				//               This is because it is likely not using the SDK's toolchain Apple Clang but another one installed in the system.
@@ -787,17 +791,19 @@ try_cross_linking:;
 					darwin_platform_name  = "iPhoneOS";
 					darwin_xcrun_sdk_name = "iphoneos";
 					darwin_min_version_id = "ios";
-					clang_path            = "xcrun --sdk iphoneos clang";
+					if (!has_odin_clang_path_env) {
+						clang_path = "xcrun --sdk iphoneos clang";
+					}
 					break;
 				case Subtarget_iPhoneSimulator:
 					darwin_platform_name  = "iPhoneSimulator";
 					darwin_xcrun_sdk_name = "iphonesimulator";
 					darwin_min_version_id = "ios-simulator";
-					clang_path            = "xcrun --sdk iphonesimulator clang";
+					if (!has_odin_clang_path_env) {
+						clang_path = "xcrun --sdk iphonesimulator clang";
+					}
 					break;
 				}
-
-				const char* original_clang_path = clang_path;
 
 				gbString darwin_find_sdk_cmd = gb_string_make(temporary_allocator(), "");
 				darwin_find_sdk_cmd = gb_string_append_fmt(darwin_find_sdk_cmd, "xcrun --sdk %s --show-sdk-path", darwin_xcrun_sdk_name);
