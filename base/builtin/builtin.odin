@@ -145,7 +145,7 @@ ODIN_OS_STRING                  :: ODIN_OS_STRING
 
 /*
 	An `enum` value indicating the platform subtarget, chosen using the `-subtarget` switch.
-	Possible values are: `.Default` `.iOS`, and `.Android`.
+	Possible values are: `.Default` `.iOS`, .iPhoneSimulator, and `.Android`.
 */
 ODIN_PLATFORM_SUBTARGET         :: ODIN_PLATFORM_SUBTARGET
 

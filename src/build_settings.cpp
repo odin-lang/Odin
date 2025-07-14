@@ -172,6 +172,7 @@ struct TargetMetrics {
 enum Subtarget : u32 {
 	Subtarget_Default,
 	Subtarget_iOS,
+	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
 
 	Subtarget_COUNT,
@@ -180,6 +181,7 @@ enum Subtarget : u32 {
 gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit(""),
 	str_lit("ios"),
+	str_lit("iphonesimulator"),
 	str_lit("android"),
 };
 
@@ -1824,16 +1826,29 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		}
 	}
 
-	if (metrics->os == TargetOs_darwin && subtarget == Subtarget_iOS) {
-		switch (metrics->arch) {
-		case TargetArch_arm64:
-			bc->metrics.target_triplet = str_lit("arm64-apple-ios");
-			break;
-		case TargetArch_amd64:
-			bc->metrics.target_triplet = str_lit("x86_64-apple-ios");
-			break;
-		default:
-			GB_PANIC("Unknown architecture for darwin");
+	if (metrics->os == TargetOs_darwin) {
+		switch (subtarget) {
+			case Subtarget_iOS:
+				switch (metrics->arch) {
+				case TargetArch_arm64:
+					bc->metrics.target_triplet = str_lit("arm64-apple-ios");
+					break;
+				default:
+					GB_PANIC("Unknown architecture for -subtarget:ios");
+				}
+				break;
+			case Subtarget_iPhoneSimulator:
+				switch (metrics->arch) {
+				case TargetArch_arm64:
+					bc->metrics.target_triplet = str_lit("arm64-apple-ios-simulator");
+					break;
+				case TargetArch_amd64:
+					bc->metrics.target_triplet = str_lit("x86_64-apple-ios-simulator");
+					break;
+				default:
+					GB_PANIC("Unknown architecture for -subtarget:iphonesimulator");
+				}
+				break;
 		}
 	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
 		switch (metrics->arch) {
