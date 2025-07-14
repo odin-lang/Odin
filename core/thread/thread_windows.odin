@@ -6,8 +6,11 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:sync"
 import win32 "core:sys/windows"
+import "core:unicode/utf16"
 
 _IS_SUPPORTED :: true
+//NOTE(peperronii): not sure about the exact length but there must be a limit
+_THREAD_DESCRIPTION_LENGTH :: 64
 
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
@@ -150,5 +153,35 @@ _terminate :: proc(thread: ^Thread, exit_code: int) {
 
 _yield :: proc() {
 	win32.SwitchToThread()
+}
+
+_get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc : runtime.Source_Code_Location) -> (name:string, err:runtime.Allocator_Error) {
+	t_handle : win32.HANDLE
+	if thread == nil do t_handle = win32.GetCurrentThread()
+	else do t_handle = t.win32_thread
+	
+	buf_8 : [_THREAD_DESCRIPTION_LENGTH * 2]u8
+	buf_16 : [_THREAD_DESCRIPTION_LENGTH]u16
+	win32.GetThreadDescription(t_handle, raw_data(buf_16[:]))
+	n := utf16.decode_to_utf(buf_8[:], buf_16[:])
+	buf := make([]u8, n, allocator, loc)
+
+	copy(buf, buf_8[:])
+
+	name = transmute(string)buf
+
+	return
+}
+
+_set_name :: proc(thread: ^Thread, name: string) {
+	t_handle : win32.HANDLE
+	if thread == nil do t_handle = win32.GetCurrentThread()
+	else do t_handle = t.win32_thread
+
+	buf : [_THREAD_DESCRIPTION_LENGTH]u16
+	utf16.encode_string(buf_16[:], name)
+	// _THREAD_DESCRIPTION_LENGTH includes terminating null
+	buf[len(buf) - 1] = 0
+	win32.SetThreadDescription(t_handle, raw_data(buf[:]))
 }
 

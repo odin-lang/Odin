@@ -156,6 +156,28 @@ yield :: proc() {
 }
 
 /*
+Get thread's name/description.
+
+If thread is nil the procedure will get the name of the calling thread.
+
+allocates memory for the returned string using provided allocator.
+*/
+get_name :: proc(thread: ^Thread, allocator := context.allocator, loc := #caller_location) -> (string, runtime.Allocator_Error) #optional_allocator_error {
+	return _get_name(thread, allocator, loc)
+}
+
+/*
+Set thread's name/description.
+
+If thread is nil the procedure will set the name of the calling thread.
+
+MacOS: only support changing the name of the calling thread.
+if thread is not nil the procedure will do nothing.
+*/
+set_name :: proc(thread: ^Thread, name: string) {
+	_set_name(thread, name)
+}
+/*
 Run a procedure on a different thread.
 
 This procedure runs the given procedure on another thread. The context
