@@ -797,7 +797,7 @@ try_cross_linking:;
 					break;
 				}
 
-				const char* original_clang_path = original_clang_path;
+				const char* original_clang_path = clang_path;
 
 				gbString darwin_find_sdk_cmd = gb_string_make(temporary_allocator(), "");
 				darwin_find_sdk_cmd = gb_string_append_fmt(darwin_find_sdk_cmd, "xcrun --sdk %s --show-sdk-path", darwin_xcrun_sdk_name);
