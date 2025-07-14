@@ -558,6 +558,7 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	Odin_Platform_Subtarget_Type :: enum int {
 		Default,
 		iOS,
+		iPhoneSimulator
 		Android,
 	}
 */

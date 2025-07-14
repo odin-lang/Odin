@@ -591,7 +591,7 @@ try_cross_linking:;
 						// Do not add libc again, this is added later already, and omitted with
 						// the `-no-crt` flag, not skipping here would cause duplicate library
 						// warnings when linking on darwin and might link libc silently even with `-no-crt`.
-						if (lib == str_lit("System.framework") || lib == str_lit("c")) {
+						if (lib == str_lit("System.framework") || lib == str_lit("System") || lib == str_lit("c")) {
 							continue;
 						}
 
@@ -772,10 +772,54 @@ try_cross_linking:;
 			gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(platform_lib_str));
 			if (build_context.metrics.os == TargetOs_darwin) {
-				// Get the MacOSX SDK path.
+				// Get the SDK path.
 				gbString darwin_sdk_path = gb_string_make(temporary_allocator(), "");
-				if (!system_exec_command_line_app_output("xcrun --sdk macosx --show-sdk-path", &darwin_sdk_path)) {
-					darwin_sdk_path = gb_string_set(darwin_sdk_path, "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk");
+
+				char const* darwin_platform_name  = "MacOSX";
+				char const* darwin_xcrun_sdk_name = "macosx";
+				char const* darwin_min_version_id = "macosx";
+
+				// NOTE(harold): We set the clang_path to run through xcrun because otherwise it complaints about the the sysroot
+				//               being set to 'MacOSX' even though we've set the sysroot to the correct SDK (-Wincompatible-sysroot).
+				//               This is because it is likely not using the SDK's toolchain Apple Clang but another one installed in the system.
+				switch (selected_subtarget) {
+				case Subtarget_iOS:
+					darwin_platform_name  = "iPhoneOS";
+					darwin_xcrun_sdk_name = "iphoneos";
+					darwin_min_version_id = "ios";
+					clang_path            = "xcrun --sdk iphoneos clang";
+					break;
+				case Subtarget_iPhoneSimulator:
+					darwin_platform_name  = "iPhoneSimulator";
+					darwin_xcrun_sdk_name = "iphonesimulator";
+					darwin_min_version_id = "ios-simulator";
+					clang_path            = "xcrun --sdk iphonesimulator clang";
+					break;
+				}
+
+				const char* original_clang_path = clang_path;
+
+				gbString darwin_find_sdk_cmd = gb_string_make(temporary_allocator(), "");
+				darwin_find_sdk_cmd = gb_string_append_fmt(darwin_find_sdk_cmd, "xcrun --sdk %s --show-sdk-path", darwin_xcrun_sdk_name);
+
+				if (!system_exec_command_line_app_output(darwin_find_sdk_cmd, &darwin_sdk_path)) {
+
+					// Fallback to default clang, since `xcrun --sdk` did not work.
+					clang_path = original_clang_path;
+
+					// Best-effort fallback to known locations
+					gbString darwin_sdk_path = gb_string_make(temporary_allocator(), "");
+					darwin_sdk_path = gb_string_append_fmt(darwin_sdk_path, "/Library/Developer/CommandLineTools/SDKs/%s.sdk", darwin_platform_name);
+
+					if (!path_is_directory(make_string_c(darwin_sdk_path))) {
+						gb_string_clear(darwin_sdk_path);
+						darwin_sdk_path = gb_string_append_fmt(darwin_sdk_path, "/Applications/Xcode.app/Contents/Developer/Platforms/%s.platform/Developer/SDKs/%s.sdk", darwin_platform_name);
+
+						if (!path_is_directory(make_string_c(darwin_sdk_path))) {
+							gb_printf_err("Failed to find %s SDK\n", darwin_platform_name);
+							return -1;
+						}
+					}
 				} else {
 					// Trim the trailing newline.
 					darwin_sdk_path = gb_string_trim_space(darwin_sdk_path);
@@ -797,7 +841,7 @@ try_cross_linking:;
 				// Only specify this flag if the user has given a minimum version to target.
 				// This will cause warnings to show up for mismatched libraries.
 				if (build_context.minimum_os_version_string_given) {
-					link_settings = gb_string_append_fmt(link_settings, "-mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+					link_settings = gb_string_append_fmt(link_settings, "-m%s-version-min=%.*s ", darwin_min_version_id, LIT(build_context.minimum_os_version_string));
 				}
 
 				if (build_context.build_mode != BuildMode_DynamicLibrary) {

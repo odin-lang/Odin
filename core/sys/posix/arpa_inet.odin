@@ -4,7 +4,7 @@ package posix
 import "core:c"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else when ODIN_OS == .Haiku {
 	foreign import lib "system:network"
 } else {

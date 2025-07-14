@@ -10,7 +10,7 @@ import "core:sys/posix"
 import "core:sys/unix"
 import "core:time"
 
-foreign import lib "system:System.framework"
+foreign import lib "system:System"
 
 foreign lib {
 	sysctl :: proc(
