@@ -189,7 +189,7 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 		unimplemented("core:thread get_name for haiku is not yet supported")
 	}
 
-	tid : posix.pthread_t
+	tid: posix.pthread_t
 	if thread == nil {
 		tid = posix.pthread_self()
 	} else {
@@ -220,11 +220,11 @@ _set_name :: proc(thread: ^Thread, name:string) {
 		if thread == nil {
 			tid = posix.pthread_self()
 		} else {
-			tid = t.unix_thread
+			tid = thread.unix_thread
 		}
 	}
 
-	buf : [_MAX_PTHREAD_NAME_LENGTH]u8
+	buf: [_MAX_PTHREAD_NAME_LENGTH]u8
 	copy_from_string(buf[:], name)
 
 	// _MAX_PTHREAD_NAME_LENGTH includes terminating null

@@ -167,11 +167,14 @@ get_name :: proc(thread: ^Thread, allocator := context.allocator, loc := #caller
 }
 
 /*
-Set thread's name/description.
+Set thread's name/description. 
 
 If thread is nil the procedure will set the name of the calling thread.
 
-MacOS: only support changing the name of the calling thread.
+the provided string must be available until this procedure ends
+and will be truncated to fit their platform's limit.
+
+MacOS: only supports changing the name of the calling thread.
 if thread is not nil the procedure will do nothing.
 */
 set_name :: proc(thread: ^Thread, name: string) {
