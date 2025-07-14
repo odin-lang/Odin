@@ -5797,7 +5797,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT && !path_is_directory(name)) {
+		if (ext == FILE_EXT && !fi.is_dir) {
 			files_with_ext += 1;
 		}
 		if (ext == FILE_EXT && !is_excluded_target_filename(name)) {
@@ -5822,7 +5822,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT && !path_is_directory(name)) {
+		if (ext == FILE_EXT && !fi.is_dir) {
 			if (is_excluded_target_filename(name)) {
 				continue;
 			}
