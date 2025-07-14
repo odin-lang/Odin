@@ -1916,7 +1916,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			}
 		}
 
-		bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
+		if (subtarget == Subtarget_iPhoneSimulator) {
+			// For the iOS simulator subtarget, the version must be between 'ios' and '-simulator'.
+			String suffix = str_lit("-simulator");
+			GB_ASSERT(string_ends_with(bc->metrics.target_triplet, suffix));
+
+			String prefix = substring(bc->metrics.target_triplet, 0, bc->metrics.target_triplet.len - suffix.len);
+			bc->metrics.target_triplet = concatenate3_strings(permanent_allocator(), prefix, bc->minimum_os_version_string, suffix);
+		} else {
+			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
+		}
 	} else if (selected_subtarget == Subtarget_Android) {
 		init_android_values(bc->build_mode == BuildMode_Executable && (bc->command_kind & Command__does_build) != 0);
 	}
