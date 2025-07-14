@@ -157,8 +157,11 @@ _yield :: proc() {
 
 _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc : runtime.Source_Code_Location) -> (name:string, err:runtime.Allocator_Error) {
 	t_handle : win32.HANDLE
-	if thread == nil do t_handle = win32.GetCurrentThread()
-	else do t_handle = t.win32_thread
+	if thread == nil {
+		t_handle = win32.GetCurrentThread()
+	} else {
+		t_handle = t.win32_thread
+	}
 	
 	buf_8 : [_THREAD_DESCRIPTION_LENGTH * 2]u8
 	buf_16 : [_THREAD_DESCRIPTION_LENGTH]u16
@@ -175,8 +178,11 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc : runtime.S
 
 _set_name :: proc(thread: ^Thread, name: string) {
 	t_handle : win32.HANDLE
-	if thread == nil do t_handle = win32.GetCurrentThread()
-	else do t_handle = t.win32_thread
+	if thread == nil {
+		t_handle = win32.GetCurrentThread()
+	} else {
+		t_handle = t.win32_thread
+	}
 
 	buf : [_THREAD_DESCRIPTION_LENGTH]u16
 	utf16.encode_string(buf_16[:], name)

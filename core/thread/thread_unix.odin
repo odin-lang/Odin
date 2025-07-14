@@ -190,8 +190,11 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 	}
 
 	tid : posix.pthread_t
-	if thread == nil do tid = transmute(posix.pthread_t)sync.current_thread_id()
-	else do tid = thread.unix_thread
+	if thread == nil {
+		tid = transmute(posix.pthread_t)sync.current_thread_id()
+	} else {
+		tid = thread.unix_thread
+	}
 	
 	buf := make([]u8, _MAX_PTHREAD_NAME_LENGTH, allocator, loc) or_return
 
@@ -214,8 +217,11 @@ _set_name :: proc(thread: ^Thread, name:string) {
 		if thread != nil do return
 	} else {
 		tid: posix.pthread_t
-		if thread == nil do tid = transmute(posix.pthread_t)sync.current_thread_id
-		else do tid = t.unix_thread
+		if thread == nil {
+			tid = transmute(posix.pthread_t)sync.current_thread_id
+		} else {
+			tid = t.unix_thread
+		}
 	}
 
 	buf : [_MAX_PTHREAD_NAME_LENGTH]u8
