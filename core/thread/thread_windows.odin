@@ -166,10 +166,10 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc : runtime.S
 	buf_8: [_THREAD_DESCRIPTION_LENGTH * 2]u8
 	buf_16: [_THREAD_DESCRIPTION_LENGTH]u16
 	win32.GetThreadDescription(t_handle, raw_data(buf_16[:]))
-	n := utf16.decode_to_utf(buf_8[:], buf_16[:])
+	n := utf16.decode_to_utf8(buf_8[:], buf_16[:])
 	buf := make([]u8, n, allocator, loc)
 
-	copy(buf, buf_8[:])
+	copy(buf[:], buf_8[:])
 
 	name = transmute(string)buf
 
@@ -185,7 +185,7 @@ _set_name :: proc(thread: ^Thread, name: string) {
 	}
 
 	buf: [_THREAD_DESCRIPTION_LENGTH]u16
-	utf16.encode_string(buf_16[:], name)
+	utf16.encode_string(buf[:], name)
 	// _THREAD_DESCRIPTION_LENGTH includes terminating null
 	buf[len(buf) - 1] = 0
 	win32.SetThreadDescription(t_handle, raw_data(buf[:]))
