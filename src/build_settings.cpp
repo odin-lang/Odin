@@ -1834,7 +1834,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 					bc->metrics.target_triplet = str_lit("arm64-apple-ios");
 					break;
 				default:
-					GB_PANIC("Unknown architecture for -subtarget:ios");
+					GB_PANIC("Unknown architecture for -subtarget:iphone");
 				}
 				break;
 			case Subtarget_iPhoneSimulator:
