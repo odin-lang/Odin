@@ -227,7 +227,7 @@ _set_name :: proc(thread: ^Thread, name:string) {
 	}
 
 	buf: [_MAX_PTHREAD_NAME_LENGTH]u8
-	copy_from_string(buf[:], name)
+	copy(buf[:], name)
 
 	// _MAX_PTHREAD_NAME_LENGTH includes terminating null
 	buf[len(buf) - 1] = 0
