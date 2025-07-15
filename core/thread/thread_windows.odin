@@ -155,7 +155,7 @@ _yield :: proc() {
 	win32.SwitchToThread()
 }
 
-_get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc : runtime.Source_Code_Location) -> (name:string, err:runtime.Allocator_Error) {
+_get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.Source_Code_Location) -> (name: string, err: runtime.Allocator_Error) {
 	t_handle: win32.HANDLE
 	if thread == nil {
 		t_handle = win32.GetCurrentThread()
