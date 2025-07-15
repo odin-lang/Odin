@@ -23,7 +23,7 @@ package net
 import "core:strings"
 import "core:sys/posix"
 
-foreign import lib "system:System.framework"
+foreign import lib "system:System"
 
 @(private)
 _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Interfaces_Error) {

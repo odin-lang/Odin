@@ -1171,9 +1171,10 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[Subtarget_COUNT] = {
-			{"Default", Subtarget_Default},
-			{"iOS",     Subtarget_iOS},
-			{"Android", Subtarget_Android},
+			{"Default",         Subtarget_Default},
+			{"iOS",             Subtarget_iOS},
+			{"iPhoneSimulator", Subtarget_iPhoneSimulator},
+			{"Android",         Subtarget_Android},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));

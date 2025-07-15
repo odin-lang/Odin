@@ -4,7 +4,7 @@ package darwin
 import "core:c"
 
 @(export)
-foreign import system "system:System.framework"
+foreign import system "system:System"
 
 Bool :: b8
 
