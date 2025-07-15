@@ -209,7 +209,7 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 	return
 }
 
-_set_name :: proc(thread: ^Thread, name:string) {
+_set_name :: proc(thread: ^Thread, name: string) {
 	// Haiku doesn't have pthread_getname yet
 	when ODIN_OS == .Haiku {
 		unimplemented("core:thread set_name for haiku is not yet supported")
