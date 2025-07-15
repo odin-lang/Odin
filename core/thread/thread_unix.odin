@@ -5,6 +5,7 @@ package thread
 import "base:runtime"
 import "core:sync"
 import "core:sys/posix"
+import "core:strings"
 
 _IS_SUPPORTED :: true
 _MAX_PTHREAD_NAME_LENGTH :: 16
@@ -205,7 +206,8 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 	}
 
 	name = transmute(string)buf
-
+	name = strings.truncate_to_byte(name, 0)
+	
 	return
 }
 
@@ -237,8 +239,7 @@ _set_name :: proc(thread: ^Thread, name: string) {
 	} else when ODIN_OS == .OpenBSD {
 		pthread_set_name_np(tid, raw_data(buf[:]))
 	} else when ODIN_OS == .NetBSD {
-		format := []u8{'%','s', 0}
-		pthread_setname_np(tid, raw_data(format), raw_data(buf[:]))
+		pthread_setname_np(tid, "%s", raw_data(buf[:]))
 	} else {
 		pthread_setname_np(tid, raw_data(buf[:]))
 	}
