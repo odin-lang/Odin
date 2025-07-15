@@ -162,7 +162,7 @@ If thread is nil the procedure will get the name of the calling thread.
 
 allocates memory for the returned string using provided allocator.
 */
-get_name :: proc(thread: ^Thread, allocator := context.allocator, loc := #caller_location) -> (string, runtime.Allocator_Error) {
+get_name :: proc(thread: ^Thread, allocator := context.temp_allocator, loc := #caller_location) -> (string, runtime.Allocator_Error) {
 	return _get_name(thread, allocator, loc)
 }
 
