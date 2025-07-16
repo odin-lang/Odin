@@ -174,8 +174,9 @@ enum Subtarget : u32 {
 	Subtarget_iPhone,
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
-
+	
 	Subtarget_COUNT,
+	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
 };
 
 gb_global String subtarget_strings[Subtarget_COUNT] = {
@@ -859,7 +860,7 @@ gb_global NamedTargetMetrics *selected_target_metrics;
 gb_global Subtarget selected_subtarget;
 
 
-gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtarget_ = nullptr) {
+gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtarget_ = nullptr, String *subtarget_str = nullptr) {
 	String os_name = str;
 	String subtarget = {};
 	auto part = string_partition(str, str_lit(":"));
@@ -876,18 +877,26 @@ gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtar
 			break;
 		}
 	}
-	if (subtarget_) *subtarget_ = Subtarget_Default;
 
-	if (subtarget.len != 0) {
-		if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
-			if (subtarget_) *subtarget_ = Subtarget_Default;
-		} else {
-			for (isize i = 1; i < Subtarget_COUNT; i++) {
-				if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
-					if (subtarget_) *subtarget_ = cast(Subtarget)i;
-					break;
+	if (subtarget_str) *subtarget_str = subtarget;
+
+	if (subtarget_) {
+		if (subtarget.len != 0) {
+			*subtarget_ = Subtarget_Invalid;
+
+			if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
+				*subtarget_ = Subtarget_Default;
+				
+			} else {
+				for (isize i = 1; i < Subtarget_COUNT; i++) {
+					if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
+						*subtarget_ = cast(Subtarget)i;
+						break;
+					}
 				}
 			}
+		} else {
+			*subtarget_ = Subtarget_Default;
 		}
 	}
 
