@@ -1853,7 +1853,7 @@ op_state_op_specific :: struct #raw_union {
 }
 
 lookup_indices :: struct {
- 	FeatureTag:  feature_tag,
+	FeatureTag:  feature_tag,
 	FeatureId:   feature_id,
 	SkipFlags:   skip_flags,
 	GlyphFilter: glyph_flags,
