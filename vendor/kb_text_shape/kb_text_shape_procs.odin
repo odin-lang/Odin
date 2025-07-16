@@ -14,6 +14,12 @@ import "core:mem"
 
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
+	FeatureTagToId                    :: proc(Tag: feature_tag) -> feature_id ---
+	FeatureOverride                   :: proc(Id: feature_id,  Alternate: b32, Value: u32) -> feature_override ---
+	FeatureOverrideFromTag            :: proc(Tag: feature_tag, Alternate: b32, Value: u32) -> feature_override ---
+	GlyphConfigOverrideFeature        :: proc(Config: ^glyph_config, Id:  feature_id,  Alternate: b32, Value: u32) -> b32 ---
+	GlyphConfigOverrideFeatureFromTag :: proc(Config: ^glyph_config, Tag: feature_tag, Alternate: b32, Value: u32) -> b32 ---
+
 	FontIsValid       :: proc(Font: ^font) -> b32 ---
 	SizeOfShapeState  :: proc(Font: ^font) -> un ---
 
@@ -21,7 +27,7 @@ foreign lib {
 
 	ShapeConfig       :: proc(Font: ^font, Script: script, Language: language) -> shape_config ---
 	ShaperIsComplex   :: proc(Shaper: shaper) -> b32 ---
-	ScriptIsComplex   :: proc(Script: script) -> b32 ---
+	ScriptTagToScript :: proc(Tag: script_tag) -> script ---
 
 	Shape             :: proc(State: ^shape_state, Config: ^shape_config,
 	                          MainDirection, RunDirection: direction,
@@ -35,6 +41,26 @@ foreign lib {
 	Break             :: proc(State: ^break_state, Break: ^break_type) -> b32 ---
 	CodepointToGlyph  :: proc(Font: ^font, Codepoint: rune) -> glyph ---
 	InferScript       :: proc(Direction: ^direction, Script: ^script, GlyphScript: script) ---
+}
+
+
+@(require_results)
+GlyphConfig :: proc "c" (FeatureOverrides: []feature_override) -> glyph_config {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_GlyphConfig :: proc(FeatureOverrides: [^]feature_override, FeatureOverrideCount: u32) -> glyph_config ---
+	}
+	return kbts_GlyphConfig(raw_data(FeatureOverrides), u32(len(FeatureOverrides)))
+
+}
+
+@(require_results)
+EmptyGlyphConfig :: proc(FeatureOverrides: []feature_override) -> glyph_config {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_EmptyGlyphConfig :: proc(FeatureOverrides: [^]feature_override, FeatureOverrideCapacity: u32) -> glyph_config ---
+	}
+	return kbts_EmptyGlyphConfig(raw_data(FeatureOverrides), u32(len(FeatureOverrides)))
 }
 
 @(require_results)
@@ -58,10 +84,10 @@ DecodeUtf8 :: proc "contextless" (String: string) -> (Codepoint: rune, SourceCha
 
 	@(default_calling_convention="c", require_results)
 	foreign lib {
-		kbts_DecodeUtf8 :: proc(Utf8: [^]byte, Length: uint) -> decode ---
+		kbts_DecodeUtf8 :: proc(Utf8: [^]byte, Length: un) -> decode ---
 	}
 
-	Decode := kbts_DecodeUtf8(raw_data(String), len(String))
+	Decode := kbts_DecodeUtf8(raw_data(String), un(len(String)))
 	return Decode.Codepoint, Decode.SourceCharactersConsumed, bool(Decode.Valid)
 }
 

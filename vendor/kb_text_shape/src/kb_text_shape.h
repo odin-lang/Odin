@@ -1,4 +1,4 @@
-/* kb_text_shape - v1.0 - text segmentation and shaping
+/* kb_text_shape - v1.03 - text segmentation and shaping
    by Jimmy Lefevre
 
    SECURITY
@@ -35,16 +35,52 @@
        kbts_FreeShapeState()
        kbts_FontFromFile()
        kbts_FreeFont()
+     Additionally, we call KBTS_MEMSET(), which defaults to memset(), including outside of NO_CRT code.
+     If you want to redirect it to your own function, you can do this:
+       #define KBTS_MEMSET my_awesome_memset
 
    API
      Segmentation
        kbts_BeginBreak()
-       kbts_BreakAddCodepoint() -- Feed a codepoint to the breaker, call kbts_Break() after this
+       kbts_BreakAddCodepoint() -- Feed a codepoint to the breaker.
+         You need to call Break() repeatedly after every call to BreakAddCodepoint().
+         Something like:
+         kbts_BreakAddCodepoint(&BreakState, ...);
+         kbts_break Break;
+         while(kbts_Break(&BreakState, &Break)) {...}
+
+         When you call Break(), We guarantee that breaks are returned in-order. On our side, this means
+         that they are buffered and reordered. On your side, it means that there is a delay of a few
+         characters between your current position and the Break.Position that you will see.
+
+         In some cases, our buffering might break. When that happens, we set
+         BREAK_STATE_FLAG_RAN_OUT_OF_REORDER_BUFFER_SPACE, and kbts_BreakStateIsValid() will return false.
+         This is a sticky error, so you can check it whenever you like.
+         To clear the error flag and start segmenting again, you will need to call BeginBreak(&BreakState),
+         which resets the entire state.
+
+         Note that the input configurations for which our buffering breaks should be, for all intents and
+         purposes, nonsensical. If you find legitimate text that we cannot segment without running out of
+         buffer space, then that is a bug.
+
+         The default buffer size is determined by the BREAK_REORDER_BUFFER_FLUSH_THRESHOLD. If you really
+         need a bigger buffer, then you might want to consider modifying this constant and recompiling
+         the library, although this should be viewed as an emergency solution and not a routine
+         configuration option.
        kbts_BreakFlush()
        kbts_Break()             -- Call repeatedly to get breaks
        kbts_BreakStateIsValid()
      Easy font loading
-       kbts_FontFromFile()      -- Open a font, byteswap it in place, and allocate auxiliary structures
+       kbts_FontFromFile()      -- Open a font, byteswap it in place, and allocate auxiliary structures.
+         When you read a font with kb_text_shape, the library will byteswap its data in-place and perform
+         a bunch of other pre-computation passes to figure out memory limits and other useful information.
+         This means you cannot trivially pass our pointer to the font data to any other TTF library, since
+         they will expect the data to be in big endian format, which it won't be after we are done with it.
+
+         You can expect font reading to be pretty slow.
+         On the other hand, you can expect shaping to be pretty fast.
+
+         To open a font with your own IO and memory allocation, see "Manual Memory Management" below.
        kbts_FreeFont()
        kbts_FontIsValid()
      Shaping
@@ -52,23 +88,76 @@
        kbts_FreeShapeState()
        kbts_ShapeConfig()       -- Bake a font/script-specific shaping configuration
        kbts_CodepointToGlyph()
-       kbts_InferScript()
-       kbts_Shape()             -- Returns 1 if more memory is needed, you should probably call this in a while()
+       kbts_InferScript()       -- Hacky script recognition for when no segmentation data is available
+       kbts_Shape()             -- Returns 1 if more memory is needed, you should probably call this in a while().
+         This is how you might call this in practice:
+           while(kbts_Shape(State, &Config, Direction, Direction, Glyphs, &GlyphCount, GlyphCapacity))
+           {
+             Glyphs = realloc(Glyphs, sizeof(kbts_glyph) * State->RequiredGlyphCapacity);
+             GlyphCapacity = State->RequiredGlyphCapacity;
+           }
+         Once Shape() returns 0, you are done shaping. Glyph indices are in the kbts_glyph.Id field.
+         Please note that, while the glyphs do also contain a Codepoint field, this field will mostly
+         be meaningless whenever complex shaping operations occur. This is because fonts exclusively
+         work on glyph indices, and a lot of ligatures are obviously a combination of several codepoints
+         and do not have a corresponding codepoint in the Unicode world.
+         The same is true when a single glyph is split into multiple glyphs. A font might decide to
+         decompose a letter-with-accent into a letter glyph + an accent glyph. In that case, we will
+         know what the accent glyph's index is, but we are not told what its codepoint is.
+
+         There is currently no way to track where in the source text each glyph originates from.
+         One thing we might try is to have a "void *UserData" member on each glyph, and flow it through
+         the different substitutions, but I personally have not needed this yet and I do not have good
+         test cases for it. If you are interested, let me know!
+
+         Final positions are in font units and can be extracted with Cursor() and PositionGlyph().
+         To convert font units to fractional pixels in FreeType:
+           (FontX * FtSizeMetrics.x_scale) >> 16
+           (FontY * FtSizeMetrics.y_scale) >> 16
+         This will give you 26.6 fractional pixel units.
+         See https://freetype.org/freetype2/docs/reference/ft2-sizing_and_scaling.html for more info.
        kbts_ResetShapeState()
+     Shaping - feature control
+       kbts_FeatureOverride()   -- Describe a manual override for a font feature
+       kbts_FeatureOverrideFromTag() -- This also works on features that do not have a kbts_feature_id, but they will be slower.
+                                        (Calling this with a feature that has a kbts_feature_id will not be slower.)
+       kbts_GlyphConfig()       -- Bake per-glyph parameters (for now, only feature overrides)
+     Shaping - feature control - incremental API
+       With this API, you provide a buffer first, and gradually construct the glyph_config.
+       kbts_EmptyGlyphConfig()
+       kbts_GlyphConfigOverrideFeature()
+       kbts_GlyphConfigOverrideFeatureFromTag()
      Layout
        kbts_Cursor()
        kbts_PositionGlyph()
      Manual memory management
        kbts_SizeOfShapeState()
        kbts_PlaceShapeState()
-       kbts_ReadFontHeader()    -- Read the top of the file and return how many bytes are needed to read the rest
-       kbts_ReadFontData()      -- Read and byteswap the rest
+       kbts_ReadFontHeader()    -- Read and byteswap the top of the file.
+       kbts_ReadFontData()      -- Read and byteswap the rest.
        kbts_PostReadFontInitialize() -- Initialize auxiliary structures
+         Example code for reading a font file with this API looks like this:
+           size_t ScratchSize = kbts_ReadFontHeader(&Font, Data, Size);
+           size_t PermanentMemorySize = kbts_ReadFontData(&Font, malloc(ScratchSize), ScratchSize);
+           kbts_PostReadFontInitialize(&Font, malloc(PermanentMemorySize), PermanentMemorySize);
+
+         Please note that, AS SOON AS YOU CALL ReadFontHeader(), THE FONT DATA IS MODIFIED IN-PLACE.
+                           AS SOON AS YOU CALL ReadFontHeader(), THE FONT DATA IS MODIFIED IN-PLACE.
+                           AS SOON AS YOU CALL ReadFontHeader(), THE FONT DATA IS MODIFIED IN-PLACE.
+                           AS SOON AS YOU CALL ReadFontHeader(), THE FONT DATA IS MODIFIED IN-PLACE!
+         If you need to open the same font with another library, you need to copy the data BEFORE
+         calling ReadFontHeader().
+
+         The buffer you pass to ReadFontData() is temporary and can be freed once the function returns.
+         The buffer you pass to PostReadFontInitialize() is persistent and can only be freed once you
+         are done with the font.
      Utility, etc.
        kbts_ShaperIsComplex()
        kbts_ScriptIsComplex()
        kbts_InferScript()       -- Stupid script detection. Do not ship this! Use script breaks instead.
        kbts_DecodeUtf8()
+       kbts_ScriptTagToScript()
+       kbts_FeatureTagToId()
 
    EXAMPLE USAGE
      Complete example:
@@ -83,7 +172,7 @@
        kbts_direction Direction = KBTS_DIRECTION_NONE;
        for(size_t StringAt = 0; StringAt < Length;)
        {
-         kbts_decode Decode = kbts_DecodeUtf8(String, Length - StringAt);
+         kbts_decode Decode = kbts_DecodeUtf8(String + StringAt, Length - StringAt);
          StringAt += Decode.SourceCharactersConsumed;
          if(Decode.Valid)
          {
@@ -142,8 +231,24 @@
          }
        }
 
+     Control which font features apply to which glyphs:
+       kbts_feature_override Ss03FeatureOverrides[] = {
+         kbts_FeatureOverride(KBTS_FEATURE_ID_ccmp, 0, 0), // Disable ccmp
+         kbts_FeatureOverride(KBTS_FEATURE_ID_ss03, 0, 1), // Enable ss03
+       };
+       kbts_glyph_config Ss03Config = kbts_GlyphConfig(Ss03FeatureOverrides, 2);
+       kbts_feature_override SaltFeatureOverrides[] = {
+         kbts_FeatureOverride(KBTS_FEATURE_ID_salt, 1, 3), // Pick alternate glyph number 3 from feature 'salt'
+       };
+       kbts_glyph_config SaltConfig = kbts_GlyphConfig(SaltFeatureOverrides, 1);
+
+       // Then, do this before calling kbts_Shape():
+       MyGlyphs[0].Config = &Ss03Config;
+       MyGlyphs[1].Config = &SaltConfig;
+
      Open a font with your own memory:
        kbts_font Font;
+       // Be careful: ReadFontHeader() and ReadFontData() both byteswap font data in-place!
        size_t ScratchSize = kbts_ReadFontHeader(&Font, Data, Size);
        size_t PermanentMemorySize = kbts_ReadFontData(&Font, malloc(ScratchSize), ScratchSize);
        kbts_PostReadFontInitialize(&Font, malloc(PermanentMemorySize), PermanentMemorySize);
@@ -181,6 +286,29 @@
        // Once a shape_config has been created, it is assumed to be immutable and can be trivially shared
        // between runs/operations that have the same parameters.
 
+   PERFORMANCE
+     Just like most libraries that interact with font files, we use the file as an in-memory database.
+     There are a few issues with this approach:
+     - Font files can be arbitrarily complex, making it difficult to predict system behavior at runtime.
+     - Font files are encoded in big endian byte order, which is stupid and slow.
+     We compensate for this by pre-processing as much as we can when opening the file. Notably, we
+     byteswap everything we need in-place, we precompute some useful runtime memory bounds, and we
+     allocate a few auxiliary acceleration structures.
+
+     Since we byteswap everything in-place, you cannot pass the same font data to kbts and to another
+     library, because the other library will expect everything to be big endian.
+
+     As a result of this approach, opening fonts is slow and shaping is fast. This is very much intentional.
+     At the time of writing (2025-07-13), on Harfbuzz's test suite, we are, on average, 4.5x faster than
+     Harfbuzz on my laptop (Ryzen 9 5900HX). As fonts are complex, and Harfbuzz's test suite is quite varied,
+     the speedup numbers are rather spread out:
+       Best: 22x
+       10th percentile: 6.5x
+       Median: 4.5x
+       90th percentile: 2.5x
+       Worst: 1.05x
+     So, aside from a few extreme cases, you should expect a small integer speedup factor compared to Harfbuzz.
+
    LANGUAGE SUPPORT
      Shaping is NOT supported for the following scripts:
        Zawgyi: some fonts exist, but no standardized OpenType feature set seems to exist as of writing.
@@ -215,6 +343,19 @@
        0x2069 Pop directional isolate
      See https://unicode.org/reports/tr9 for more information.
 
+   VERSION HISTORY
+     1.03  - New functions: kbts_FeatureTagToId(), kbts_FeatureOverrideFromTag(), kbts_EmptyGlyphConfig(), kbts_GlyphConfigOverrideFeature(), kbts_GlyphConfigOverrideFeatureFromTag(), kbts_ScriptTagToScript()
+             Unregistered features can now be overriden using their tags.
+               This is slower than overriding registered features, i.e. those that have a kbts_feature_id.
+             Compiler warning cleanup
+     1.02b - Feature control for GPOS features
+             Bounds checking in ReadFontHeader
+     1.02a - Positioning fix for format 2 GPOS pair adjustments
+     1.02  - Added per-glyph manual feature control through kbts_FeatureOverride(), kbts_GlyphConfig()
+             Added enum definitions for features cv01-cv99 and ss01-ss20
+     1.01  - Header cleanup and glyph output documentation
+     1.0   - Initial release
+
    TODO
      Word dictionaries for word breaking: CJK, etc.
      'stch' feature.
@@ -245,7 +386,7 @@
 
 
 #ifndef KB_TEXT_SHAPE_INCLUDED
-#  define KB_TEXT_SHAPE_INDLUDED
+#  define KB_TEXT_SHAPE_INCLUDED
 
 #  ifndef kbts_s64
 #    if defined(_MSC_VER) || defined(__BORLANDC__)
@@ -341,6 +482,8 @@ typedef kbts_u8 kbts_joining_feature;
 enum kbts_joining_feature_enum
 {
   KBTS_JOINING_FEATURE_NONE,
+
+  // These must correspond with glyph_flags and FEATURE_IDs.
   KBTS_JOINING_FEATURE_ISOL,
   KBTS_JOINING_FEATURE_FINA,
   KBTS_JOINING_FEATURE_FIN2,
@@ -1135,6 +1278,7 @@ enum kbts_op_kind_enum
   KBTS_OP_KIND_NORMALIZE_HANGUL,
   KBTS_OP_KIND_FLAG_JOINING_LETTERS,
   KBTS_OP_KIND_GSUB_FEATURES,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER,
 
   // Positioning ops.
   KBTS_OP_KIND_GPOS_METRICS,
@@ -1191,8 +1335,11 @@ enum kbts_glyph_flags_enum
 // In USE, glyphs are mostly not pre-flagged for feature application.
 // However, we do want to flag rphf/pref results for reordering, so we want to
 // keep all of the flags as usual, and only use these feature flags for filtering.
-#define KBTS_USE_GLYPH_FEATURE_MASK (((KBTS_GLYPH_FLAG_INIT << 1) - 1) | KBTS_GLYPH_FLAG_NUMR | KBTS_GLYPH_FLAG_DNOM | KBTS_GLYPH_FLAG_FRAC)
-#define KBTS_JOINING_FEATURE_MASK (KBTS_GLYPH_FLAG_ISOL | KBTS_GLYPH_FLAG_FINA | KBTS_GLYPH_FLAG_FIN2 | KBTS_GLYPH_FLAG_FIN3 | KBTS_GLYPH_FLAG_MEDI | KBTS_GLYPH_FLAG_MED2 | KBTS_GLYPH_FLAG_INIT)
+#define KBTS_USE_GLYPH_FEATURE_MASK (KBTS_GLYPH_FLAG_ISOL | KBTS_GLYPH_FLAG_FINA | KBTS_GLYPH_FLAG_FIN2 | KBTS_GLYPH_FLAG_FIN3 | \
+                                     KBTS_GLYPH_FLAG_MEDI | KBTS_GLYPH_FLAG_MED2 | KBTS_GLYPH_FLAG_INIT | KBTS_GLYPH_FLAG_NUMR | \
+                                     KBTS_GLYPH_FLAG_DNOM | KBTS_GLYPH_FLAG_FRAC)
+#define KBTS_JOINING_FEATURE_MASK (KBTS_GLYPH_FLAG_ISOL | KBTS_GLYPH_FLAG_FINA | KBTS_GLYPH_FLAG_FIN2 | KBTS_GLYPH_FLAG_FIN3 | \
+                                   KBTS_GLYPH_FLAG_MEDI | KBTS_GLYPH_FLAG_MED2 | KBTS_GLYPH_FLAG_INIT)
 #define KBTS_JOINING_FEATURE_TO_GLYPH_FLAG(Feature) (1 << ((Feature) - 1))
 
 // Japanese text contains "kinsoku" characters, around which breaking a line is forbidden.
@@ -1420,8 +1567,184 @@ enum kbts_shaper_enum
 
   KBTS_SHAPER_COUNT,
 };
+typedef kbts_u32 kbts_script_tag;
+enum kbts_script_tag_enum
+{
+  KBTS_SCRIPT_TAG_DONT_KNOW = KBTS_FOURCC(' ', ' ', ' ', ' '),
+  KBTS_SCRIPT_TAG_ADLAM = KBTS_FOURCC('a', 'd', 'l', 'm'),
+  KBTS_SCRIPT_TAG_AHOM = KBTS_FOURCC('a', 'h', 'o', 'm'),
+  KBTS_SCRIPT_TAG_ANATOLIAN_HIEROGLYPHS = KBTS_FOURCC('h', 'l', 'u', 'w'),
+  KBTS_SCRIPT_TAG_ARABIC = KBTS_FOURCC('a', 'r', 'a', 'b'),
+  KBTS_SCRIPT_TAG_ARMENIAN = KBTS_FOURCC('a', 'r', 'm', 'n'),
+  KBTS_SCRIPT_TAG_AVESTAN = KBTS_FOURCC('a', 'v', 's', 't'),
+  KBTS_SCRIPT_TAG_BALINESE = KBTS_FOURCC('b', 'a', 'l', 'i'),
+  KBTS_SCRIPT_TAG_BAMUM = KBTS_FOURCC('b', 'a', 'm', 'u'),
+  KBTS_SCRIPT_TAG_BASSA_VAH = KBTS_FOURCC('b', 'a', 's', 's'),
+  KBTS_SCRIPT_TAG_BATAK = KBTS_FOURCC('b', 'a', 't', 'k'),
+  KBTS_SCRIPT_TAG_BENGALI = KBTS_FOURCC('b', 'n', 'g', '2'),
+  KBTS_SCRIPT_TAG_BHAIKSUKI = KBTS_FOURCC('b', 'h', 'k', 's'),
+  KBTS_SCRIPT_TAG_BOPOMOFO = KBTS_FOURCC('b', 'o', 'p', 'o'),
+  KBTS_SCRIPT_TAG_BRAHMI = KBTS_FOURCC('b', 'r', 'a', 'h'),
+  KBTS_SCRIPT_TAG_BUGINESE = KBTS_FOURCC('b', 'u', 'g', 'i'),
+  KBTS_SCRIPT_TAG_BUHID = KBTS_FOURCC('b', 'u', 'h', 'd'),
+  KBTS_SCRIPT_TAG_CANADIAN_SYLLABICS = KBTS_FOURCC('c', 'a', 'n', 's'),
+  KBTS_SCRIPT_TAG_CARIAN = KBTS_FOURCC('c', 'a', 'r', 'i'),
+  KBTS_SCRIPT_TAG_CAUCASIAN_ALBANIAN = KBTS_FOURCC('a', 'g', 'h', 'b'),
+  KBTS_SCRIPT_TAG_CHAKMA = KBTS_FOURCC('c', 'a', 'k', 'm'),
+  KBTS_SCRIPT_TAG_CHAM = KBTS_FOURCC('c', 'h', 'a', 'm'),
+  KBTS_SCRIPT_TAG_CHEROKEE = KBTS_FOURCC('c', 'h', 'e', 'r'),
+  KBTS_SCRIPT_TAG_CHORASMIAN = KBTS_FOURCC('c', 'h', 'r', 's'),
+  KBTS_SCRIPT_TAG_CJK_IDEOGRAPHIC = KBTS_FOURCC('h', 'a', 'n', 'i'),
+  KBTS_SCRIPT_TAG_COPTIC = KBTS_FOURCC('c', 'o', 'p', 't'),
+  KBTS_SCRIPT_TAG_CYPRIOT_SYLLABARY = KBTS_FOURCC('c', 'p', 'r', 't'),
+  KBTS_SCRIPT_TAG_CYPRO_MINOAN = KBTS_FOURCC('c', 'p', 'm', 'n'),
+  KBTS_SCRIPT_TAG_CYRILLIC = KBTS_FOURCC('c', 'y', 'r', 'l'),
+  KBTS_SCRIPT_TAG_DEFAULT = KBTS_FOURCC('D', 'F', 'L', 'T'),
+  KBTS_SCRIPT_TAG_DEFAULT2 = KBTS_FOURCC('D', 'F', 'L', 'T'),
+  KBTS_SCRIPT_TAG_DESERET = KBTS_FOURCC('d', 's', 'r', 't'),
+  KBTS_SCRIPT_TAG_DEVANAGARI = KBTS_FOURCC('d', 'e', 'v', '2'),
+  KBTS_SCRIPT_TAG_DIVES_AKURU = KBTS_FOURCC('d', 'i', 'a', 'k'),
+  KBTS_SCRIPT_TAG_DOGRA = KBTS_FOURCC('d', 'o', 'g', 'r'),
+  KBTS_SCRIPT_TAG_DUPLOYAN = KBTS_FOURCC('d', 'u', 'p', 'l'),
+  KBTS_SCRIPT_TAG_EGYPTIAN_HIEROGLYPHS = KBTS_FOURCC('e', 'g', 'y', 'p'),
+  KBTS_SCRIPT_TAG_ELBASAN = KBTS_FOURCC('e', 'l', 'b', 'a'),
+  KBTS_SCRIPT_TAG_ELYMAIC = KBTS_FOURCC('e', 'l', 'y', 'm'),
+  KBTS_SCRIPT_TAG_ETHIOPIC = KBTS_FOURCC('e', 't', 'h', 'i'),
+  KBTS_SCRIPT_TAG_GARAY = KBTS_FOURCC('g', 'a', 'r', 'a'),
+  KBTS_SCRIPT_TAG_GEORGIAN = KBTS_FOURCC('g', 'e', 'o', 'r'),
+  KBTS_SCRIPT_TAG_GLAGOLITIC = KBTS_FOURCC('g', 'l', 'a', 'g'),
+  KBTS_SCRIPT_TAG_GOTHIC = KBTS_FOURCC('g', 'o', 't', 'h'),
+  KBTS_SCRIPT_TAG_GRANTHA = KBTS_FOURCC('g', 'r', 'a', 'n'),
+  KBTS_SCRIPT_TAG_GREEK = KBTS_FOURCC('g', 'r', 'e', 'k'),
+  KBTS_SCRIPT_TAG_GUJARATI = KBTS_FOURCC('g', 'j', 'r', '2'),
+  KBTS_SCRIPT_TAG_GUNJALA_GONDI = KBTS_FOURCC('g', 'o', 'n', 'g'),
+  KBTS_SCRIPT_TAG_GURMUKHI = KBTS_FOURCC('g', 'u', 'r', '2'),
+  KBTS_SCRIPT_TAG_GURUNG_KHEMA = KBTS_FOURCC('g', 'u', 'k', 'h'),
+  KBTS_SCRIPT_TAG_HANGUL = KBTS_FOURCC('h', 'a', 'n', 'g'),
+  KBTS_SCRIPT_TAG_HANIFI_ROHINGYA = KBTS_FOURCC('r', 'o', 'h', 'g'),
+  KBTS_SCRIPT_TAG_HANUNOO = KBTS_FOURCC('h', 'a', 'n', 'o'),
+  KBTS_SCRIPT_TAG_HATRAN = KBTS_FOURCC('h', 'a', 't', 'r'),
+  KBTS_SCRIPT_TAG_HEBREW = KBTS_FOURCC('h', 'e', 'b', 'r'),
+  KBTS_SCRIPT_TAG_HIRAGANA = KBTS_FOURCC('k', 'a', 'n', 'a'),
+  KBTS_SCRIPT_TAG_IMPERIAL_ARAMAIC = KBTS_FOURCC('a', 'r', 'm', 'i'),
+  KBTS_SCRIPT_TAG_INSCRIPTIONAL_PAHLAVI = KBTS_FOURCC('p', 'h', 'l', 'i'),
+  KBTS_SCRIPT_TAG_INSCRIPTIONAL_PARTHIAN = KBTS_FOURCC('p', 'r', 't', 'i'),
+  KBTS_SCRIPT_TAG_JAVANESE = KBTS_FOURCC('j', 'a', 'v', 'a'),
+  KBTS_SCRIPT_TAG_KAITHI = KBTS_FOURCC('k', 't', 'h', 'i'),
+  KBTS_SCRIPT_TAG_KANNADA = KBTS_FOURCC('k', 'n', 'd', '2'),
+  KBTS_SCRIPT_TAG_KATAKANA = KBTS_FOURCC('k', 'a', 'n', 'a'),
+  KBTS_SCRIPT_TAG_KAWI = KBTS_FOURCC('k', 'a', 'w', 'i'),
+  KBTS_SCRIPT_TAG_KAYAH_LI = KBTS_FOURCC('k', 'a', 'l', 'i'),
+  KBTS_SCRIPT_TAG_KHAROSHTHI = KBTS_FOURCC('k', 'h', 'a', 'r'),
+  KBTS_SCRIPT_TAG_KHITAN_SMALL_SCRIPT = KBTS_FOURCC('k', 'i', 't', 's'),
+  KBTS_SCRIPT_TAG_KHMER = KBTS_FOURCC('k', 'h', 'm', 'r'),
+  KBTS_SCRIPT_TAG_KHOJKI = KBTS_FOURCC('k', 'h', 'o', 'j'),
+  KBTS_SCRIPT_TAG_KHUDAWADI = KBTS_FOURCC('s', 'i', 'n', 'd'),
+  KBTS_SCRIPT_TAG_KIRAT_RAI = KBTS_FOURCC('k', 'r', 'a', 'i'),
+  KBTS_SCRIPT_TAG_LAO = KBTS_FOURCC('l', 'a', 'o', ' '),
+  KBTS_SCRIPT_TAG_LATIN = KBTS_FOURCC('l', 'a', 't', 'n'),
+  KBTS_SCRIPT_TAG_LEPCHA = KBTS_FOURCC('l', 'e', 'p', 'c'),
+  KBTS_SCRIPT_TAG_LIMBU = KBTS_FOURCC('l', 'i', 'm', 'b'),
+  KBTS_SCRIPT_TAG_LINEAR_A = KBTS_FOURCC('l', 'i', 'n', 'a'),
+  KBTS_SCRIPT_TAG_LINEAR_B = KBTS_FOURCC('l', 'i', 'n', 'b'),
+  KBTS_SCRIPT_TAG_LISU = KBTS_FOURCC('l', 'i', 's', 'u'),
+  KBTS_SCRIPT_TAG_LYCIAN = KBTS_FOURCC('l', 'y', 'c', 'i'),
+  KBTS_SCRIPT_TAG_LYDIAN = KBTS_FOURCC('l', 'y', 'd', 'i'),
+  KBTS_SCRIPT_TAG_MAHAJANI = KBTS_FOURCC('m', 'a', 'h', 'j'),
+  KBTS_SCRIPT_TAG_MAKASAR = KBTS_FOURCC('m', 'a', 'k', 'a'),
+  KBTS_SCRIPT_TAG_MALAYALAM = KBTS_FOURCC('m', 'l', 'm', '2'),
+  KBTS_SCRIPT_TAG_MANDAIC = KBTS_FOURCC('m', 'a', 'n', 'd'),
+  KBTS_SCRIPT_TAG_MANICHAEAN = KBTS_FOURCC('m', 'a', 'n', 'i'),
+  KBTS_SCRIPT_TAG_MARCHEN = KBTS_FOURCC('m', 'a', 'r', 'c'),
+  KBTS_SCRIPT_TAG_MASARAM_GONDI = KBTS_FOURCC('g', 'o', 'n', 'm'),
+  KBTS_SCRIPT_TAG_MEDEFAIDRIN = KBTS_FOURCC('m', 'e', 'd', 'f'),
+  KBTS_SCRIPT_TAG_MEETEI_MAYEK = KBTS_FOURCC('m', 't', 'e', 'i'),
+  KBTS_SCRIPT_TAG_MENDE_KIKAKUI = KBTS_FOURCC('m', 'e', 'n', 'd'),
+  KBTS_SCRIPT_TAG_MEROITIC_CURSIVE = KBTS_FOURCC('m', 'e', 'r', 'c'),
+  KBTS_SCRIPT_TAG_MEROITIC_HIEROGLYPHS = KBTS_FOURCC('m', 'e', 'r', 'o'),
+  KBTS_SCRIPT_TAG_MIAO = KBTS_FOURCC('p', 'l', 'r', 'd'),
+  KBTS_SCRIPT_TAG_MODI = KBTS_FOURCC('m', 'o', 'd', 'i'),
+  KBTS_SCRIPT_TAG_MONGOLIAN = KBTS_FOURCC('m', 'o', 'n', 'g'),
+  KBTS_SCRIPT_TAG_MRO = KBTS_FOURCC('m', 'r', 'o', 'o'),
+  KBTS_SCRIPT_TAG_MULTANI = KBTS_FOURCC('m', 'u', 'l', 't'),
+  KBTS_SCRIPT_TAG_MYANMAR = KBTS_FOURCC('m', 'y', 'm', '2'),
+  KBTS_SCRIPT_TAG_NABATAEAN = KBTS_FOURCC('n', 'b', 'a', 't'),
+  KBTS_SCRIPT_TAG_NAG_MUNDARI = KBTS_FOURCC('n', 'a', 'g', 'm'),
+  KBTS_SCRIPT_TAG_NANDINAGARI = KBTS_FOURCC('n', 'a', 'n', 'd'),
+  KBTS_SCRIPT_TAG_NEWA = KBTS_FOURCC('n', 'e', 'w', 'a'),
+  KBTS_SCRIPT_TAG_NEW_TAI_LUE = KBTS_FOURCC('t', 'a', 'l', 'u'),
+  KBTS_SCRIPT_TAG_NKO = KBTS_FOURCC('n', 'k', 'o', ' '),
+  KBTS_SCRIPT_TAG_NUSHU = KBTS_FOURCC('n', 's', 'h', 'u'),
+  KBTS_SCRIPT_TAG_NYIAKENG_PUACHUE_HMONG = KBTS_FOURCC('h', 'm', 'n', 'p'),
+  KBTS_SCRIPT_TAG_OGHAM = KBTS_FOURCC('o', 'g', 'a', 'm'),
+  KBTS_SCRIPT_TAG_OL_CHIKI = KBTS_FOURCC('o', 'l', 'c', 'k'),
+  KBTS_SCRIPT_TAG_OL_ONAL = KBTS_FOURCC('o', 'n', 'a', 'o'),
+  KBTS_SCRIPT_TAG_OLD_ITALIC = KBTS_FOURCC('i', 't', 'a', 'l'),
+  KBTS_SCRIPT_TAG_OLD_HUNGARIAN = KBTS_FOURCC('h', 'u', 'n', 'g'),
+  KBTS_SCRIPT_TAG_OLD_NORTH_ARABIAN = KBTS_FOURCC('n', 'a', 'r', 'b'),
+  KBTS_SCRIPT_TAG_OLD_PERMIC = KBTS_FOURCC('p', 'e', 'r', 'm'),
+  KBTS_SCRIPT_TAG_OLD_PERSIAN_CUNEIFORM = KBTS_FOURCC('x', 'p', 'e', 'o'),
+  KBTS_SCRIPT_TAG_OLD_SOGDIAN = KBTS_FOURCC('s', 'o', 'g', 'o'),
+  KBTS_SCRIPT_TAG_OLD_SOUTH_ARABIAN = KBTS_FOURCC('s', 'a', 'r', 'b'),
+  KBTS_SCRIPT_TAG_OLD_TURKIC = KBTS_FOURCC('o', 'r', 'k', 'h'),
+  KBTS_SCRIPT_TAG_OLD_UYGHUR = KBTS_FOURCC('o', 'u', 'g', 'r'),
+  KBTS_SCRIPT_TAG_ODIA = KBTS_FOURCC('o', 'r', 'y', '2'),
+  KBTS_SCRIPT_TAG_OSAGE = KBTS_FOURCC('o', 's', 'g', 'e'),
+  KBTS_SCRIPT_TAG_OSMANYA = KBTS_FOURCC('o', 's', 'm', 'a'),
+  KBTS_SCRIPT_TAG_PAHAWH_HMONG = KBTS_FOURCC('h', 'm', 'n', 'g'),
+  KBTS_SCRIPT_TAG_PALMYRENE = KBTS_FOURCC('p', 'a', 'l', 'm'),
+  KBTS_SCRIPT_TAG_PAU_CIN_HAU = KBTS_FOURCC('p', 'a', 'u', 'c'),
+  KBTS_SCRIPT_TAG_PHAGS_PA = KBTS_FOURCC('p', 'h', 'a', 'g'),
+  KBTS_SCRIPT_TAG_PHOENICIAN = KBTS_FOURCC('p', 'h', 'n', 'x'),
+  KBTS_SCRIPT_TAG_PSALTER_PAHLAVI = KBTS_FOURCC('p', 'h', 'l', 'p'),
+  KBTS_SCRIPT_TAG_REJANG = KBTS_FOURCC('r', 'j', 'n', 'g'),
+  KBTS_SCRIPT_TAG_RUNIC = KBTS_FOURCC('r', 'u', 'n', 'r'),
+  KBTS_SCRIPT_TAG_SAMARITAN = KBTS_FOURCC('s', 'a', 'm', 'r'),
+  KBTS_SCRIPT_TAG_SAURASHTRA = KBTS_FOURCC('s', 'a', 'u', 'r'),
+  KBTS_SCRIPT_TAG_SHARADA = KBTS_FOURCC('s', 'h', 'r', 'd'),
+  KBTS_SCRIPT_TAG_SHAVIAN = KBTS_FOURCC('s', 'h', 'a', 'w'),
+  KBTS_SCRIPT_TAG_SIDDHAM = KBTS_FOURCC('s', 'i', 'd', 'd'),
+  KBTS_SCRIPT_TAG_SIGN_WRITING = KBTS_FOURCC('s', 'g', 'n', 'w'),
+  KBTS_SCRIPT_TAG_SOGDIAN = KBTS_FOURCC('s', 'o', 'g', 'd'),
+  KBTS_SCRIPT_TAG_SINHALA = KBTS_FOURCC('s', 'i', 'n', 'h'),
+  KBTS_SCRIPT_TAG_SORA_SOMPENG = KBTS_FOURCC('s', 'o', 'r', 'a'),
+  KBTS_SCRIPT_TAG_SOYOMBO = KBTS_FOURCC('s', 'o', 'y', 'o'),
+  KBTS_SCRIPT_TAG_SUMERO_AKKADIAN_CUNEIFORM = KBTS_FOURCC('x', 's', 'u', 'x'),
+  KBTS_SCRIPT_TAG_SUNDANESE = KBTS_FOURCC('s', 'u', 'n', 'd'),
+  KBTS_SCRIPT_TAG_SUNUWAR = KBTS_FOURCC('s', 'u', 'n', 'u'),
+  KBTS_SCRIPT_TAG_SYLOTI_NAGRI = KBTS_FOURCC('s', 'y', 'l', 'o'),
+  KBTS_SCRIPT_TAG_SYRIAC = KBTS_FOURCC('s', 'y', 'r', 'c'),
+  KBTS_SCRIPT_TAG_TAGALOG = KBTS_FOURCC('t', 'g', 'l', 'g'),
+  KBTS_SCRIPT_TAG_TAGBANWA = KBTS_FOURCC('t', 'a', 'g', 'b'),
+  KBTS_SCRIPT_TAG_TAI_LE = KBTS_FOURCC('t', 'a', 'l', 'e'),
+  KBTS_SCRIPT_TAG_TAI_THAM = KBTS_FOURCC('l', 'a', 'n', 'a'),
+  KBTS_SCRIPT_TAG_TAI_VIET = KBTS_FOURCC('t', 'a', 'v', 't'),
+  KBTS_SCRIPT_TAG_TAKRI = KBTS_FOURCC('t', 'a', 'k', 'r'),
+  KBTS_SCRIPT_TAG_TAMIL = KBTS_FOURCC('t', 'm', 'l', '2'),
+  KBTS_SCRIPT_TAG_TANGSA = KBTS_FOURCC('t', 'n', 's', 'a'),
+  KBTS_SCRIPT_TAG_TANGUT = KBTS_FOURCC('t', 'a', 'n', 'g'),
+  KBTS_SCRIPT_TAG_TELUGU = KBTS_FOURCC('t', 'e', 'l', '2'),
+  KBTS_SCRIPT_TAG_THAANA = KBTS_FOURCC('t', 'h', 'a', 'a'),
+  KBTS_SCRIPT_TAG_THAI = KBTS_FOURCC('t', 'h', 'a', 'i'),
+  KBTS_SCRIPT_TAG_TIBETAN = KBTS_FOURCC('t', 'i', 'b', 't'),
+  KBTS_SCRIPT_TAG_TIFINAGH = KBTS_FOURCC('t', 'f', 'n', 'g'),
+  KBTS_SCRIPT_TAG_TIRHUTA = KBTS_FOURCC('t', 'i', 'r', 'h'),
+  KBTS_SCRIPT_TAG_TODHRI = KBTS_FOURCC('t', 'o', 'd', 'r'),
+  KBTS_SCRIPT_TAG_TOTO = KBTS_FOURCC('t', 'o', 't', 'o'),
+  KBTS_SCRIPT_TAG_TULU_TIGALARI = KBTS_FOURCC('t', 'u', 't', 'g'),
+  KBTS_SCRIPT_TAG_UGARITIC_CUNEIFORM = KBTS_FOURCC('u', 'g', 'a', 'r'),
+  KBTS_SCRIPT_TAG_VAI = KBTS_FOURCC('v', 'a', 'i', ' '),
+  KBTS_SCRIPT_TAG_VITHKUQI = KBTS_FOURCC('v', 'i', 't', 'h'),
+  KBTS_SCRIPT_TAG_WANCHO = KBTS_FOURCC('w', 'c', 'h', 'o'),
+  KBTS_SCRIPT_TAG_WARANG_CITI = KBTS_FOURCC('w', 'a', 'r', 'a'),
+  KBTS_SCRIPT_TAG_YEZIDI = KBTS_FOURCC('y', 'e', 'z', 'i'),
+  KBTS_SCRIPT_TAG_YI = KBTS_FOURCC('y', 'i', ' ', ' '),
+  KBTS_SCRIPT_TAG_ZANABAZAR_SQUARE = KBTS_FOURCC('z', 'a', 'n', 'b'),
+};
+
 typedef kbts_u32 kbts_script;
-enum kbts_script_enum {
+enum kbts_script_enum
+{
   KBTS_SCRIPT_DONT_KNOW,
   KBTS_SCRIPT_ADLAM,
   KBTS_SCRIPT_AHOM,
@@ -1595,154 +1918,505 @@ enum kbts_script_enum {
   KBTS_SCRIPT_COUNT,
 };
 
-
-// The order of the first few features here matters.
-// They must map 1:1 with glyph flags that are part of GLYPH_FEATURE_MASK.
-#  define KBTS_X_FEATURES \
-KBTS_X(isol, 'i', 's', 'o', 'l')  /* Isolated Forms */ \
-KBTS_X(fina, 'f', 'i', 'n', 'a')  /* Terminal Forms */ \
-KBTS_X(fin2, 'f', 'i', 'n', '2')  /* Terminal Forms #2 */ \
-KBTS_X(fin3, 'f', 'i', 'n', '3')  /* Terminal Forms #3 */ \
-KBTS_X(medi, 'm', 'e', 'd', 'i')  /* Medial Forms */ \
-KBTS_X(med2, 'm', 'e', 'd', '2')  /* Medial Forms #2 */ \
-KBTS_X(init, 'i', 'n', 'i', 't')  /* Initial Forms */ \
-KBTS_X(ljmo, 'l', 'j', 'm', 'o')  /* Leading Jamo Forms */ \
-KBTS_X(vjmo, 'v', 'j', 'm', 'o')  /* Vowel Jamo Forms */ \
-KBTS_X(tjmo, 't', 'j', 'm', 'o')  /* Trailing Jamo Forms */ \
-KBTS_X(rphf, 'r', 'p', 'h', 'f')  /* Reph Form */ \
-KBTS_X(blwf, 'b', 'l', 'w', 'f')  /* Below-base Forms */ \
-KBTS_X(half, 'h', 'a', 'l', 'f')  /* Half Forms */ \
-KBTS_X(pstf, 'p', 's', 't', 'f')  /* Post-base Forms */ \
-KBTS_X(abvf, 'a', 'b', 'v', 'f')  /* Above-base Forms */ \
-KBTS_X(pref, 'p', 'r', 'e', 'f')  /* Pre-base Forms */ \
-KBTS_X(numr, 'n', 'u', 'm', 'r')  /* Numerators */ \
-KBTS_X(frac, 'f', 'r', 'a', 'c')  /* Fractions */ \
-KBTS_X(dnom, 'd', 'n', 'o', 'm')  /* Denominators */ \
-KBTS_X(cfar, 'c', 'f', 'a', 'r')  /* Conjunct Form After Ro */ \
-KBTS_X(aalt, 'a', 'a', 'l', 't')  /* Access All Alternates */ \
-KBTS_X(abvm, 'a', 'b', 'v', 'm')  /* Above-base Mark Positioning */ \
-KBTS_X(abvs, 'a', 'b', 'v', 's')  /* Above-base Substitutions */ \
-KBTS_X(afrc, 'a', 'f', 'r', 'c')  /* Alternative Fractions */ \
-KBTS_X(akhn, 'a', 'k', 'h', 'n')  /* Akhand */ \
-KBTS_X(apkn, 'a', 'p', 'k', 'n')  /* Kerning for Alternate Proportional Widths */ \
-KBTS_X(blwm, 'b', 'l', 'w', 'm')  /* Below-base Mark Positioning */ \
-KBTS_X(blws, 'b', 'l', 'w', 's')  /* Below-base Substitutions */ \
-KBTS_X(calt, 'c', 'a', 'l', 't')  /* Contextual Alternates */ \
-KBTS_X(case, 'c', 'a', 's', 'e')  /* Case-sensitive Forms */ \
-KBTS_X(ccmp, 'c', 'c', 'm', 'p')  /* Glyph Composition / Decomposition */ \
-KBTS_X(chws, 'c', 'h', 'w', 's')  /* Contextual Half-width Spacing */ \
-KBTS_X(cjct, 'c', 'j', 'c', 't')  /* Conjunct Forms */ \
-KBTS_X(clig, 'c', 'l', 'i', 'g')  /* Contextual Ligatures */ \
-KBTS_X(cpct, 'c', 'p', 'c', 't')  /* Centered CJK Punctuation */ \
-KBTS_X(cpsp, 'c', 'p', 's', 'p')  /* Capital Spacing */ \
-KBTS_X(cswh, 'c', 's', 'w', 'h')  /* Contextual Swash */ \
-KBTS_X(curs, 'c', 'u', 'r', 's')  /* Cursive Positioning */ \
-KBTS_X(cv01, 'c', 'v', '0', '1')  /*  'cv99'  Character Variant 1 – Character Variant 99 */ \
-KBTS_X(c2pc, 'c', '2', 'p', 'c')  /* Petite Capitals From Capitals */ \
-KBTS_X(c2sc, 'c', '2', 's', 'c')  /* Small Capitals From Capitals */ \
-KBTS_X(dist, 'd', 'i', 's', 't')  /* Distances */ \
-KBTS_X(dlig, 'd', 'l', 'i', 'g')  /* Discretionary Ligatures */ \
-KBTS_X(dtls, 'd', 't', 'l', 's')  /* Dotless Forms */ \
-KBTS_X(expt, 'e', 'x', 'p', 't')  /* Expert Forms */ \
-KBTS_X(falt, 'f', 'a', 'l', 't')  /* Final Glyph on Line Alternates */ \
-KBTS_X(flac, 'f', 'l', 'a', 'c')  /* Flattened Accent Forms */ \
-KBTS_X(fwid, 'f', 'w', 'i', 'd')  /* Full Widths */ \
-KBTS_X(haln, 'h', 'a', 'l', 'n')  /* Halant Forms */ \
-KBTS_X(halt, 'h', 'a', 'l', 't')  /* Alternate Half Widths */ \
-KBTS_X(hist, 'h', 'i', 's', 't')  /* Historical Forms */ \
-KBTS_X(hkna, 'h', 'k', 'n', 'a')  /* Horizontal Kana Alternates */ \
-KBTS_X(hlig, 'h', 'l', 'i', 'g')  /* Historical Ligatures */ \
-KBTS_X(hngl, 'h', 'n', 'g', 'l')  /* Hangul */ \
-KBTS_X(hojo, 'h', 'o', 'j', 'o')  /* Hojo Kanji Forms (JIS X 0212-1990 Kanji Forms) */ \
-KBTS_X(hwid, 'h', 'w', 'i', 'd')  /* Half Widths */ \
-KBTS_X(ital, 'i', 't', 'a', 'l')  /* Italics */ \
-KBTS_X(jalt, 'j', 'a', 'l', 't')  /* Justification Alternates */ \
-KBTS_X(jp78, 'j', 'p', '7', '8')  /* JIS78 Forms */ \
-KBTS_X(jp83, 'j', 'p', '8', '3')  /* JIS83 Forms */ \
-KBTS_X(jp90, 'j', 'p', '9', '0')  /* JIS90 Forms */ \
-KBTS_X(jp04, 'j', 'p', '0', '4')  /* JIS2004 Forms */ \
-KBTS_X(kern, 'k', 'e', 'r', 'n')  /* Kerning */ \
-KBTS_X(lfbd, 'l', 'f', 'b', 'd')  /* Left Bounds */ \
-KBTS_X(liga, 'l', 'i', 'g', 'a')  /* Standard Ligatures */ \
-KBTS_X(lnum, 'l', 'n', 'u', 'm')  /* Lining Figures */ \
-KBTS_X(locl, 'l', 'o', 'c', 'l')  /* Localized Forms */ \
-KBTS_X(ltra, 'l', 't', 'r', 'a')  /* Left-to-right Alternates */ \
-KBTS_X(ltrm, 'l', 't', 'r', 'm')  /* Left-to-right Mirrored Forms */ \
-KBTS_X(mark, 'm', 'a', 'r', 'k')  /* Mark Positioning */ \
-KBTS_X(mgrk, 'm', 'g', 'r', 'k')  /* Mathematical Greek */ \
-KBTS_X(mkmk, 'm', 'k', 'm', 'k')  /* Mark to Mark Positioning */ \
-KBTS_X(mset, 'm', 's', 'e', 't')  /* Mark Positioning via Substitution */ \
-KBTS_X(nalt, 'n', 'a', 'l', 't')  /* Alternate Annotation Forms */ \
-KBTS_X(nlck, 'n', 'l', 'c', 'k')  /* NLC Kanji Forms */ \
-KBTS_X(nukt, 'n', 'u', 'k', 't')  /* Nukta Forms */ \
-KBTS_X(onum, 'o', 'n', 'u', 'm')  /* Oldstyle Figures */ \
-KBTS_X(opbd, 'o', 'p', 'b', 'd')  /* Optical Bounds */ \
-KBTS_X(ordn, 'o', 'r', 'd', 'n')  /* Ordinals */ \
-KBTS_X(ornm, 'o', 'r', 'n', 'm')  /* Ornaments */ \
-KBTS_X(palt, 'p', 'a', 'l', 't')  /* Proportional Alternate Widths */ \
-KBTS_X(pcap, 'p', 'c', 'a', 'p')  /* Petite Capitals */ \
-KBTS_X(pkna, 'p', 'k', 'n', 'a')  /* Proportional Kana */ \
-KBTS_X(pnum, 'p', 'n', 'u', 'm')  /* Proportional Figures */ \
-KBTS_X(pres, 'p', 'r', 'e', 's')  /* Pre-base Substitutions */ \
-KBTS_X(psts, 'p', 's', 't', 's')  /* Post-base Substitutions */ \
-KBTS_X(pwid, 'p', 'w', 'i', 'd')  /* Proportional Widths */ \
-KBTS_X(qwid, 'q', 'w', 'i', 'd')  /* Quarter Widths */ \
-KBTS_X(rand, 'r', 'a', 'n', 'd')  /* Randomize */ \
-KBTS_X(rclt, 'r', 'c', 'l', 't')  /* Required Contextual Alternates */ \
-KBTS_X(rkrf, 'r', 'k', 'r', 'f')  /* Rakar Forms */ \
-KBTS_X(rlig, 'r', 'l', 'i', 'g')  /* Required Ligatures */ \
-KBTS_X(rtbd, 'r', 't', 'b', 'd')  /* Right Bounds */ \
-KBTS_X(rtla, 'r', 't', 'l', 'a')  /* Right-to-left Alternates */ \
-KBTS_X(rtlm, 'r', 't', 'l', 'm')  /* Right-to-left Mirrored Forms */ \
-KBTS_X(ruby, 'r', 'u', 'b', 'y')  /* Ruby Notation Forms */ \
-KBTS_X(rvrn, 'r', 'v', 'r', 'n')  /* Required Variation Alternates */ \
-KBTS_X(salt, 's', 'a', 'l', 't')  /* Stylistic Alternates */ \
-KBTS_X(sinf, 's', 'i', 'n', 'f')  /* Scientific Inferiors */ \
-KBTS_X(size, 's', 'i', 'z', 'e')  /* Optical size */ \
-KBTS_X(smcp, 's', 'm', 'c', 'p')  /* Small Capitals */ \
-KBTS_X(smpl, 's', 'm', 'p', 'l')  /* Simplified Forms */ \
-KBTS_X(ss01, 's', 's', '0', '1')  /*  'ss20'  Stylistic Set 1 – Stylistic Set 20 */ \
-KBTS_X(ssty, 's', 's', 't', 'y')  /* Math Script-style Alternates */ \
-KBTS_X(stch, 's', 't', 'c', 'h')  /* Stretching Glyph Decomposition */ \
-KBTS_X(subs, 's', 'u', 'b', 's')  /* Subscript */ \
-KBTS_X(sups, 's', 'u', 'p', 's')  /* Superscript */ \
-KBTS_X(swsh, 's', 'w', 's', 'h')  /* Swash */ \
-KBTS_X(test, 't', 'e', 's', 't')  /* Test features, only for development */ \
-KBTS_X(titl, 't', 'i', 't', 'l')  /* Titling */ \
-KBTS_X(tnam, 't', 'n', 'a', 'm')  /* Traditional Name Forms */ \
-KBTS_X(tnum, 't', 'n', 'u', 'm')  /* Tabular Figures */ \
-KBTS_X(trad, 't', 'r', 'a', 'd')  /* Traditional Forms */ \
-KBTS_X(twid, 't', 'w', 'i', 'd')  /* Third Widths */ \
-KBTS_X(unic, 'u', 'n', 'i', 'c')  /* Unicase */ \
-KBTS_X(valt, 'v', 'a', 'l', 't')  /* Alternate Vertical Metrics */ \
-KBTS_X(vapk, 'v', 'a', 'p', 'k')  /* Kerning for Alternate Proportional Vertical Metrics */ \
-KBTS_X(vatu, 'v', 'a', 't', 'u')  /* Vattu Variants */ \
-KBTS_X(vchw, 'v', 'c', 'h', 'w')  /* Vertical Contextual Half-width Spacing */ \
-KBTS_X(vert, 'v', 'e', 'r', 't')  /* Vertical Alternates */ \
-KBTS_X(vhal, 'v', 'h', 'a', 'l')  /* Alternate Vertical Half Metrics */ \
-KBTS_X(vkna, 'v', 'k', 'n', 'a')  /* Vertical Kana Alternates */ \
-KBTS_X(vkrn, 'v', 'k', 'r', 'n')  /* Vertical Kerning */ \
-KBTS_X(vpal, 'v', 'p', 'a', 'l')  /* Proportional Alternate Vertical Metrics */ \
-KBTS_X(vrt2, 'v', 'r', 't', '2')  /* Vertical Alternates and Rotation */ \
-KBTS_X(vrtr, 'v', 'r', 't', 'r')  /* Vertical Alternates for Rotation */ \
-KBTS_X(zero, 'z', 'e', 'r', 'o')  /* Slashed Zero */
-
 typedef kbts_u32 kbts_feature_tag;
 enum kbts_feature_tag_enum
 {
-#  define KBTS_X(Name, C0, C1, C2, C3) KBTS_FEATURE_TAG_##Name = KBTS_FOURCC(C0, C1, C2, C3),
-  KBTS_X_FEATURES
-#  undef KBTS_X
+  KBTS_FEATURE_TAG_UNREGISTERED = KBTS_FOURCC(0, 0, 0, 0), // Features that aren't pre-defined in the OpenType spec
+  KBTS_FEATURE_TAG_isol = KBTS_FOURCC('i', 's', 'o', 'l'), // Isolated Forms
+  KBTS_FEATURE_TAG_fina = KBTS_FOURCC('f', 'i', 'n', 'a'), // Terminal Forms
+  KBTS_FEATURE_TAG_fin2 = KBTS_FOURCC('f', 'i', 'n', '2'), // Terminal Forms #2
+  KBTS_FEATURE_TAG_fin3 = KBTS_FOURCC('f', 'i', 'n', '3'), // Terminal Forms #3
+  KBTS_FEATURE_TAG_medi = KBTS_FOURCC('m', 'e', 'd', 'i'), // Medial Forms
+  KBTS_FEATURE_TAG_med2 = KBTS_FOURCC('m', 'e', 'd', '2'), // Medial Forms #2
+  KBTS_FEATURE_TAG_init = KBTS_FOURCC('i', 'n', 'i', 't'), // Initial Forms
+  KBTS_FEATURE_TAG_ljmo = KBTS_FOURCC('l', 'j', 'm', 'o'), // Leading Jamo Forms
+  KBTS_FEATURE_TAG_vjmo = KBTS_FOURCC('v', 'j', 'm', 'o'), // Vowel Jamo Forms
+  KBTS_FEATURE_TAG_tjmo = KBTS_FOURCC('t', 'j', 'm', 'o'), // Trailing Jamo Forms
+  KBTS_FEATURE_TAG_rphf = KBTS_FOURCC('r', 'p', 'h', 'f'), // Reph Form
+  KBTS_FEATURE_TAG_blwf = KBTS_FOURCC('b', 'l', 'w', 'f'), // Below-base Forms
+  KBTS_FEATURE_TAG_half = KBTS_FOURCC('h', 'a', 'l', 'f'), // Half Forms
+  KBTS_FEATURE_TAG_pstf = KBTS_FOURCC('p', 's', 't', 'f'), // Post-base Forms
+  KBTS_FEATURE_TAG_abvf = KBTS_FOURCC('a', 'b', 'v', 'f'), // Above-base Forms
+  KBTS_FEATURE_TAG_pref = KBTS_FOURCC('p', 'r', 'e', 'f'), // Pre-base Forms
+  KBTS_FEATURE_TAG_numr = KBTS_FOURCC('n', 'u', 'm', 'r'), // Numerators
+  KBTS_FEATURE_TAG_frac = KBTS_FOURCC('f', 'r', 'a', 'c'), // Fractions
+  KBTS_FEATURE_TAG_dnom = KBTS_FOURCC('d', 'n', 'o', 'm'), // Denominators
+  KBTS_FEATURE_TAG_cfar = KBTS_FOURCC('c', 'f', 'a', 'r'), // Conjunct Form After Ro
+  KBTS_FEATURE_TAG_aalt = KBTS_FOURCC('a', 'a', 'l', 't'), // Access All Alternates
+  KBTS_FEATURE_TAG_abvm = KBTS_FOURCC('a', 'b', 'v', 'm'), // Above-base Mark Positioning
+  KBTS_FEATURE_TAG_abvs = KBTS_FOURCC('a', 'b', 'v', 's'), // Above-base Substitutions
+  KBTS_FEATURE_TAG_afrc = KBTS_FOURCC('a', 'f', 'r', 'c'), // Alternative Fractions
+  KBTS_FEATURE_TAG_akhn = KBTS_FOURCC('a', 'k', 'h', 'n'), // Akhand
+  KBTS_FEATURE_TAG_apkn = KBTS_FOURCC('a', 'p', 'k', 'n'), // Kerning for Alternate Proportional Widths
+  KBTS_FEATURE_TAG_blwm = KBTS_FOURCC('b', 'l', 'w', 'm'), // Below-base Mark Positioning
+  KBTS_FEATURE_TAG_blws = KBTS_FOURCC('b', 'l', 'w', 's'), // Below-base Substitutions
+  KBTS_FEATURE_TAG_calt = KBTS_FOURCC('c', 'a', 'l', 't'), // Contextual Alternates
+  KBTS_FEATURE_TAG_case = KBTS_FOURCC('c', 'a', 's', 'e'), // Case-sensitive Forms
+  KBTS_FEATURE_TAG_ccmp = KBTS_FOURCC('c', 'c', 'm', 'p'), // Glyph Composition / Decomposition
+  KBTS_FEATURE_TAG_chws = KBTS_FOURCC('c', 'h', 'w', 's'), // Contextual Half-width Spacing
+  KBTS_FEATURE_TAG_cjct = KBTS_FOURCC('c', 'j', 'c', 't'), // Conjunct Forms
+  KBTS_FEATURE_TAG_clig = KBTS_FOURCC('c', 'l', 'i', 'g'), // Contextual Ligatures
+  KBTS_FEATURE_TAG_cpct = KBTS_FOURCC('c', 'p', 'c', 't'), // Centered CJK Punctuation
+  KBTS_FEATURE_TAG_cpsp = KBTS_FOURCC('c', 'p', 's', 'p'), // Capital Spacing
+  KBTS_FEATURE_TAG_cswh = KBTS_FOURCC('c', 's', 'w', 'h'), // Contextual Swash
+  KBTS_FEATURE_TAG_curs = KBTS_FOURCC('c', 'u', 'r', 's'), // Cursive Positioning
+  KBTS_FEATURE_TAG_cv01 = KBTS_FOURCC('c', 'v', '0', '1'), // Character Variant 1
+  KBTS_FEATURE_TAG_cv02 = KBTS_FOURCC('c', 'v', '0', '2'), // Character Variant 2
+  KBTS_FEATURE_TAG_cv03 = KBTS_FOURCC('c', 'v', '0', '3'), // Character Variant 3
+  KBTS_FEATURE_TAG_cv04 = KBTS_FOURCC('c', 'v', '0', '4'), // Character Variant 4
+  KBTS_FEATURE_TAG_cv05 = KBTS_FOURCC('c', 'v', '0', '5'), // Character Variant 5
+  KBTS_FEATURE_TAG_cv06 = KBTS_FOURCC('c', 'v', '0', '6'), // Character Variant 6
+  KBTS_FEATURE_TAG_cv07 = KBTS_FOURCC('c', 'v', '0', '7'), // Character Variant 7
+  KBTS_FEATURE_TAG_cv08 = KBTS_FOURCC('c', 'v', '0', '8'), // Character Variant 8
+  KBTS_FEATURE_TAG_cv09 = KBTS_FOURCC('c', 'v', '0', '9'), // Character Variant 9
+  KBTS_FEATURE_TAG_cv10 = KBTS_FOURCC('c', 'v', '1', '0'), // Character Variant 10
+  KBTS_FEATURE_TAG_cv11 = KBTS_FOURCC('c', 'v', '1', '1'), // Character Variant 11
+  KBTS_FEATURE_TAG_cv12 = KBTS_FOURCC('c', 'v', '1', '2'), // Character Variant 12
+  KBTS_FEATURE_TAG_cv13 = KBTS_FOURCC('c', 'v', '1', '3'), // Character Variant 13
+  KBTS_FEATURE_TAG_cv14 = KBTS_FOURCC('c', 'v', '1', '4'), // Character Variant 14
+  KBTS_FEATURE_TAG_cv15 = KBTS_FOURCC('c', 'v', '1', '5'), // Character Variant 15
+  KBTS_FEATURE_TAG_cv16 = KBTS_FOURCC('c', 'v', '1', '6'), // Character Variant 16
+  KBTS_FEATURE_TAG_cv17 = KBTS_FOURCC('c', 'v', '1', '7'), // Character Variant 17
+  KBTS_FEATURE_TAG_cv18 = KBTS_FOURCC('c', 'v', '1', '8'), // Character Variant 18
+  KBTS_FEATURE_TAG_cv19 = KBTS_FOURCC('c', 'v', '1', '9'), // Character Variant 19
+  KBTS_FEATURE_TAG_cv20 = KBTS_FOURCC('c', 'v', '2', '0'), // Character Variant 20
+  KBTS_FEATURE_TAG_cv21 = KBTS_FOURCC('c', 'v', '2', '1'), // Character Variant 21
+  KBTS_FEATURE_TAG_cv22 = KBTS_FOURCC('c', 'v', '2', '2'), // Character Variant 22
+  KBTS_FEATURE_TAG_cv23 = KBTS_FOURCC('c', 'v', '2', '3'), // Character Variant 23
+  KBTS_FEATURE_TAG_cv24 = KBTS_FOURCC('c', 'v', '2', '4'), // Character Variant 24
+  KBTS_FEATURE_TAG_cv25 = KBTS_FOURCC('c', 'v', '2', '5'), // Character Variant 25
+  KBTS_FEATURE_TAG_cv26 = KBTS_FOURCC('c', 'v', '2', '6'), // Character Variant 26
+  KBTS_FEATURE_TAG_cv27 = KBTS_FOURCC('c', 'v', '2', '7'), // Character Variant 27
+  KBTS_FEATURE_TAG_cv28 = KBTS_FOURCC('c', 'v', '2', '8'), // Character Variant 28
+  KBTS_FEATURE_TAG_cv29 = KBTS_FOURCC('c', 'v', '2', '9'), // Character Variant 29
+  KBTS_FEATURE_TAG_cv30 = KBTS_FOURCC('c', 'v', '3', '0'), // Character Variant 30
+  KBTS_FEATURE_TAG_cv31 = KBTS_FOURCC('c', 'v', '3', '1'), // Character Variant 31
+  KBTS_FEATURE_TAG_cv32 = KBTS_FOURCC('c', 'v', '3', '2'), // Character Variant 32
+  KBTS_FEATURE_TAG_cv33 = KBTS_FOURCC('c', 'v', '3', '3'), // Character Variant 33
+  KBTS_FEATURE_TAG_cv34 = KBTS_FOURCC('c', 'v', '3', '4'), // Character Variant 34
+  KBTS_FEATURE_TAG_cv35 = KBTS_FOURCC('c', 'v', '3', '5'), // Character Variant 35
+  KBTS_FEATURE_TAG_cv36 = KBTS_FOURCC('c', 'v', '3', '6'), // Character Variant 36
+  KBTS_FEATURE_TAG_cv37 = KBTS_FOURCC('c', 'v', '3', '7'), // Character Variant 37
+  KBTS_FEATURE_TAG_cv38 = KBTS_FOURCC('c', 'v', '3', '8'), // Character Variant 38
+  KBTS_FEATURE_TAG_cv39 = KBTS_FOURCC('c', 'v', '3', '9'), // Character Variant 39
+  KBTS_FEATURE_TAG_cv40 = KBTS_FOURCC('c', 'v', '4', '0'), // Character Variant 40
+  KBTS_FEATURE_TAG_cv41 = KBTS_FOURCC('c', 'v', '4', '1'), // Character Variant 41
+  KBTS_FEATURE_TAG_cv42 = KBTS_FOURCC('c', 'v', '4', '2'), // Character Variant 42
+  KBTS_FEATURE_TAG_cv43 = KBTS_FOURCC('c', 'v', '4', '3'), // Character Variant 43
+  KBTS_FEATURE_TAG_cv44 = KBTS_FOURCC('c', 'v', '4', '4'), // Character Variant 44
+  KBTS_FEATURE_TAG_cv45 = KBTS_FOURCC('c', 'v', '4', '5'), // Character Variant 45
+  KBTS_FEATURE_TAG_cv46 = KBTS_FOURCC('c', 'v', '4', '6'), // Character Variant 46
+  KBTS_FEATURE_TAG_cv47 = KBTS_FOURCC('c', 'v', '4', '7'), // Character Variant 47
+  KBTS_FEATURE_TAG_cv48 = KBTS_FOURCC('c', 'v', '4', '8'), // Character Variant 48
+  KBTS_FEATURE_TAG_cv49 = KBTS_FOURCC('c', 'v', '4', '9'), // Character Variant 49
+  KBTS_FEATURE_TAG_cv50 = KBTS_FOURCC('c', 'v', '5', '0'), // Character Variant 50
+  KBTS_FEATURE_TAG_cv51 = KBTS_FOURCC('c', 'v', '5', '1'), // Character Variant 51
+  KBTS_FEATURE_TAG_cv52 = KBTS_FOURCC('c', 'v', '5', '2'), // Character Variant 52
+  KBTS_FEATURE_TAG_cv53 = KBTS_FOURCC('c', 'v', '5', '3'), // Character Variant 53
+  KBTS_FEATURE_TAG_cv54 = KBTS_FOURCC('c', 'v', '5', '4'), // Character Variant 54
+  KBTS_FEATURE_TAG_cv55 = KBTS_FOURCC('c', 'v', '5', '5'), // Character Variant 55
+  KBTS_FEATURE_TAG_cv56 = KBTS_FOURCC('c', 'v', '5', '6'), // Character Variant 56
+  KBTS_FEATURE_TAG_cv57 = KBTS_FOURCC('c', 'v', '5', '7'), // Character Variant 57
+  KBTS_FEATURE_TAG_cv58 = KBTS_FOURCC('c', 'v', '5', '8'), // Character Variant 58
+  KBTS_FEATURE_TAG_cv59 = KBTS_FOURCC('c', 'v', '5', '9'), // Character Variant 59
+  KBTS_FEATURE_TAG_cv60 = KBTS_FOURCC('c', 'v', '6', '0'), // Character Variant 60
+  KBTS_FEATURE_TAG_cv61 = KBTS_FOURCC('c', 'v', '6', '1'), // Character Variant 61
+  KBTS_FEATURE_TAG_cv62 = KBTS_FOURCC('c', 'v', '6', '2'), // Character Variant 62
+  KBTS_FEATURE_TAG_cv63 = KBTS_FOURCC('c', 'v', '6', '3'), // Character Variant 63
+  KBTS_FEATURE_TAG_cv64 = KBTS_FOURCC('c', 'v', '6', '4'), // Character Variant 64
+  KBTS_FEATURE_TAG_cv65 = KBTS_FOURCC('c', 'v', '6', '5'), // Character Variant 65
+  KBTS_FEATURE_TAG_cv66 = KBTS_FOURCC('c', 'v', '6', '6'), // Character Variant 66
+  KBTS_FEATURE_TAG_cv67 = KBTS_FOURCC('c', 'v', '6', '7'), // Character Variant 67
+  KBTS_FEATURE_TAG_cv68 = KBTS_FOURCC('c', 'v', '6', '8'), // Character Variant 68
+  KBTS_FEATURE_TAG_cv69 = KBTS_FOURCC('c', 'v', '6', '9'), // Character Variant 69
+  KBTS_FEATURE_TAG_cv70 = KBTS_FOURCC('c', 'v', '7', '0'), // Character Variant 70
+  KBTS_FEATURE_TAG_cv71 = KBTS_FOURCC('c', 'v', '7', '1'), // Character Variant 71
+  KBTS_FEATURE_TAG_cv72 = KBTS_FOURCC('c', 'v', '7', '2'), // Character Variant 72
+  KBTS_FEATURE_TAG_cv73 = KBTS_FOURCC('c', 'v', '7', '3'), // Character Variant 73
+  KBTS_FEATURE_TAG_cv74 = KBTS_FOURCC('c', 'v', '7', '4'), // Character Variant 74
+  KBTS_FEATURE_TAG_cv75 = KBTS_FOURCC('c', 'v', '7', '5'), // Character Variant 75
+  KBTS_FEATURE_TAG_cv76 = KBTS_FOURCC('c', 'v', '7', '6'), // Character Variant 76
+  KBTS_FEATURE_TAG_cv77 = KBTS_FOURCC('c', 'v', '7', '7'), // Character Variant 77
+  KBTS_FEATURE_TAG_cv78 = KBTS_FOURCC('c', 'v', '7', '8'), // Character Variant 78
+  KBTS_FEATURE_TAG_cv79 = KBTS_FOURCC('c', 'v', '7', '9'), // Character Variant 79
+  KBTS_FEATURE_TAG_cv80 = KBTS_FOURCC('c', 'v', '8', '0'), // Character Variant 80
+  KBTS_FEATURE_TAG_cv81 = KBTS_FOURCC('c', 'v', '8', '1'), // Character Variant 81
+  KBTS_FEATURE_TAG_cv82 = KBTS_FOURCC('c', 'v', '8', '2'), // Character Variant 82
+  KBTS_FEATURE_TAG_cv83 = KBTS_FOURCC('c', 'v', '8', '3'), // Character Variant 83
+  KBTS_FEATURE_TAG_cv84 = KBTS_FOURCC('c', 'v', '8', '4'), // Character Variant 84
+  KBTS_FEATURE_TAG_cv85 = KBTS_FOURCC('c', 'v', '8', '5'), // Character Variant 85
+  KBTS_FEATURE_TAG_cv86 = KBTS_FOURCC('c', 'v', '8', '6'), // Character Variant 86
+  KBTS_FEATURE_TAG_cv87 = KBTS_FOURCC('c', 'v', '8', '7'), // Character Variant 87
+  KBTS_FEATURE_TAG_cv88 = KBTS_FOURCC('c', 'v', '8', '8'), // Character Variant 88
+  KBTS_FEATURE_TAG_cv89 = KBTS_FOURCC('c', 'v', '8', '9'), // Character Variant 89
+  KBTS_FEATURE_TAG_cv90 = KBTS_FOURCC('c', 'v', '9', '0'), // Character Variant 90
+  KBTS_FEATURE_TAG_cv91 = KBTS_FOURCC('c', 'v', '9', '1'), // Character Variant 91
+  KBTS_FEATURE_TAG_cv92 = KBTS_FOURCC('c', 'v', '9', '2'), // Character Variant 92
+  KBTS_FEATURE_TAG_cv93 = KBTS_FOURCC('c', 'v', '9', '3'), // Character Variant 93
+  KBTS_FEATURE_TAG_cv94 = KBTS_FOURCC('c', 'v', '9', '4'), // Character Variant 94
+  KBTS_FEATURE_TAG_cv95 = KBTS_FOURCC('c', 'v', '9', '5'), // Character Variant 95
+  KBTS_FEATURE_TAG_cv96 = KBTS_FOURCC('c', 'v', '9', '6'), // Character Variant 96
+  KBTS_FEATURE_TAG_cv97 = KBTS_FOURCC('c', 'v', '9', '7'), // Character Variant 97
+  KBTS_FEATURE_TAG_cv98 = KBTS_FOURCC('c', 'v', '9', '8'), // Character Variant 98
+  KBTS_FEATURE_TAG_cv99 = KBTS_FOURCC('c', 'v', '9', '9'), // Character Variant 99
+  KBTS_FEATURE_TAG_c2pc = KBTS_FOURCC('c', '2', 'p', 'c'), // Petite Capitals From Capitals
+  KBTS_FEATURE_TAG_c2sc = KBTS_FOURCC('c', '2', 's', 'c'), // Small Capitals From Capitals
+  KBTS_FEATURE_TAG_dist = KBTS_FOURCC('d', 'i', 's', 't'), // Distances
+  KBTS_FEATURE_TAG_dlig = KBTS_FOURCC('d', 'l', 'i', 'g'), // Discretionary Ligatures
+  KBTS_FEATURE_TAG_dtls = KBTS_FOURCC('d', 't', 'l', 's'), // Dotless Forms
+  KBTS_FEATURE_TAG_expt = KBTS_FOURCC('e', 'x', 'p', 't'), // Expert Forms
+  KBTS_FEATURE_TAG_falt = KBTS_FOURCC('f', 'a', 'l', 't'), // Final Glyph on Line Alternates
+  KBTS_FEATURE_TAG_flac = KBTS_FOURCC('f', 'l', 'a', 'c'), // Flattened Accent Forms
+  KBTS_FEATURE_TAG_fwid = KBTS_FOURCC('f', 'w', 'i', 'd'), // Full Widths
+  KBTS_FEATURE_TAG_haln = KBTS_FOURCC('h', 'a', 'l', 'n'), // Halant Forms
+  KBTS_FEATURE_TAG_halt = KBTS_FOURCC('h', 'a', 'l', 't'), // Alternate Half Widths
+  KBTS_FEATURE_TAG_hist = KBTS_FOURCC('h', 'i', 's', 't'), // Historical Forms
+  KBTS_FEATURE_TAG_hkna = KBTS_FOURCC('h', 'k', 'n', 'a'), // Horizontal Kana Alternates
+  KBTS_FEATURE_TAG_hlig = KBTS_FOURCC('h', 'l', 'i', 'g'), // Historical Ligatures
+  KBTS_FEATURE_TAG_hngl = KBTS_FOURCC('h', 'n', 'g', 'l'), // Hangul
+  KBTS_FEATURE_TAG_hojo = KBTS_FOURCC('h', 'o', 'j', 'o'), // Hojo Kanji Forms (JIS X 0212-1990 Kanji Forms)
+  KBTS_FEATURE_TAG_hwid = KBTS_FOURCC('h', 'w', 'i', 'd'), // Half Widths
+  KBTS_FEATURE_TAG_ital = KBTS_FOURCC('i', 't', 'a', 'l'), // Italics
+  KBTS_FEATURE_TAG_jalt = KBTS_FOURCC('j', 'a', 'l', 't'), // Justification Alternates
+  KBTS_FEATURE_TAG_jp78 = KBTS_FOURCC('j', 'p', '7', '8'), // JIS78 Forms
+  KBTS_FEATURE_TAG_jp83 = KBTS_FOURCC('j', 'p', '8', '3'), // JIS83 Forms
+  KBTS_FEATURE_TAG_jp90 = KBTS_FOURCC('j', 'p', '9', '0'), // JIS90 Forms
+  KBTS_FEATURE_TAG_jp04 = KBTS_FOURCC('j', 'p', '0', '4'), // JIS2004 Forms
+  KBTS_FEATURE_TAG_kern = KBTS_FOURCC('k', 'e', 'r', 'n'), // Kerning
+  KBTS_FEATURE_TAG_lfbd = KBTS_FOURCC('l', 'f', 'b', 'd'), // Left Bounds
+  KBTS_FEATURE_TAG_liga = KBTS_FOURCC('l', 'i', 'g', 'a'), // Standard Ligatures
+  KBTS_FEATURE_TAG_lnum = KBTS_FOURCC('l', 'n', 'u', 'm'), // Lining Figures
+  KBTS_FEATURE_TAG_locl = KBTS_FOURCC('l', 'o', 'c', 'l'), // Localized Forms
+  KBTS_FEATURE_TAG_ltra = KBTS_FOURCC('l', 't', 'r', 'a'), // Left-to-right Alternates
+  KBTS_FEATURE_TAG_ltrm = KBTS_FOURCC('l', 't', 'r', 'm'), // Left-to-right Mirrored Forms
+  KBTS_FEATURE_TAG_mark = KBTS_FOURCC('m', 'a', 'r', 'k'), // Mark Positioning
+  KBTS_FEATURE_TAG_mgrk = KBTS_FOURCC('m', 'g', 'r', 'k'), // Mathematical Greek
+  KBTS_FEATURE_TAG_mkmk = KBTS_FOURCC('m', 'k', 'm', 'k'), // Mark to Mark Positioning
+  KBTS_FEATURE_TAG_mset = KBTS_FOURCC('m', 's', 'e', 't'), // Mark Positioning via Substitution
+  KBTS_FEATURE_TAG_nalt = KBTS_FOURCC('n', 'a', 'l', 't'), // Alternate Annotation Forms
+  KBTS_FEATURE_TAG_nlck = KBTS_FOURCC('n', 'l', 'c', 'k'), // NLC Kanji Forms
+  KBTS_FEATURE_TAG_nukt = KBTS_FOURCC('n', 'u', 'k', 't'), // Nukta Forms
+  KBTS_FEATURE_TAG_onum = KBTS_FOURCC('o', 'n', 'u', 'm'), // Oldstyle Figures
+  KBTS_FEATURE_TAG_opbd = KBTS_FOURCC('o', 'p', 'b', 'd'), // Optical Bounds
+  KBTS_FEATURE_TAG_ordn = KBTS_FOURCC('o', 'r', 'd', 'n'), // Ordinals
+  KBTS_FEATURE_TAG_ornm = KBTS_FOURCC('o', 'r', 'n', 'm'), // Ornaments
+  KBTS_FEATURE_TAG_palt = KBTS_FOURCC('p', 'a', 'l', 't'), // Proportional Alternate Widths
+  KBTS_FEATURE_TAG_pcap = KBTS_FOURCC('p', 'c', 'a', 'p'), // Petite Capitals
+  KBTS_FEATURE_TAG_pkna = KBTS_FOURCC('p', 'k', 'n', 'a'), // Proportional Kana
+  KBTS_FEATURE_TAG_pnum = KBTS_FOURCC('p', 'n', 'u', 'm'), // Proportional Figures
+  KBTS_FEATURE_TAG_pres = KBTS_FOURCC('p', 'r', 'e', 's'), // Pre-base Substitutions
+  KBTS_FEATURE_TAG_psts = KBTS_FOURCC('p', 's', 't', 's'), // Post-base Substitutions
+  KBTS_FEATURE_TAG_pwid = KBTS_FOURCC('p', 'w', 'i', 'd'), // Proportional Widths
+  KBTS_FEATURE_TAG_qwid = KBTS_FOURCC('q', 'w', 'i', 'd'), // Quarter Widths
+  KBTS_FEATURE_TAG_rand = KBTS_FOURCC('r', 'a', 'n', 'd'), // Randomize
+  KBTS_FEATURE_TAG_rclt = KBTS_FOURCC('r', 'c', 'l', 't'), // Required Contextual Alternates
+  KBTS_FEATURE_TAG_rkrf = KBTS_FOURCC('r', 'k', 'r', 'f'), // Rakar Forms
+  KBTS_FEATURE_TAG_rlig = KBTS_FOURCC('r', 'l', 'i', 'g'), // Required Ligatures
+  KBTS_FEATURE_TAG_rtbd = KBTS_FOURCC('r', 't', 'b', 'd'), // Right Bounds
+  KBTS_FEATURE_TAG_rtla = KBTS_FOURCC('r', 't', 'l', 'a'), // Right-to-left Alternates
+  KBTS_FEATURE_TAG_rtlm = KBTS_FOURCC('r', 't', 'l', 'm'), // Right-to-left Mirrored Forms
+  KBTS_FEATURE_TAG_ruby = KBTS_FOURCC('r', 'u', 'b', 'y'), // Ruby Notation Forms
+  KBTS_FEATURE_TAG_rvrn = KBTS_FOURCC('r', 'v', 'r', 'n'), // Required Variation Alternates
+  KBTS_FEATURE_TAG_salt = KBTS_FOURCC('s', 'a', 'l', 't'), // Stylistic Alternates
+  KBTS_FEATURE_TAG_sinf = KBTS_FOURCC('s', 'i', 'n', 'f'), // Scientific Inferiors
+  KBTS_FEATURE_TAG_size = KBTS_FOURCC('s', 'i', 'z', 'e'), // Optical size
+  KBTS_FEATURE_TAG_smcp = KBTS_FOURCC('s', 'm', 'c', 'p'), // Small Capitals
+  KBTS_FEATURE_TAG_smpl = KBTS_FOURCC('s', 'm', 'p', 'l'), // Simplified Forms
+  KBTS_FEATURE_TAG_ss01 = KBTS_FOURCC('s', 's', '0', '1'), // Stylistic Set 1
+  KBTS_FEATURE_TAG_ss02 = KBTS_FOURCC('s', 's', '0', '2'), // Stylistic Set 2
+  KBTS_FEATURE_TAG_ss03 = KBTS_FOURCC('s', 's', '0', '3'), // Stylistic Set 3
+  KBTS_FEATURE_TAG_ss04 = KBTS_FOURCC('s', 's', '0', '4'), // Stylistic Set 4
+  KBTS_FEATURE_TAG_ss05 = KBTS_FOURCC('s', 's', '0', '5'), // Stylistic Set 5
+  KBTS_FEATURE_TAG_ss06 = KBTS_FOURCC('s', 's', '0', '6'), // Stylistic Set 6
+  KBTS_FEATURE_TAG_ss07 = KBTS_FOURCC('s', 's', '0', '7'), // Stylistic Set 7
+  KBTS_FEATURE_TAG_ss08 = KBTS_FOURCC('s', 's', '0', '8'), // Stylistic Set 8
+  KBTS_FEATURE_TAG_ss09 = KBTS_FOURCC('s', 's', '0', '9'), // Stylistic Set 9
+  KBTS_FEATURE_TAG_ss10 = KBTS_FOURCC('s', 's', '1', '0'), // Stylistic Set 10
+  KBTS_FEATURE_TAG_ss11 = KBTS_FOURCC('s', 's', '1', '1'), // Stylistic Set 11
+  KBTS_FEATURE_TAG_ss12 = KBTS_FOURCC('s', 's', '1', '2'), // Stylistic Set 12
+  KBTS_FEATURE_TAG_ss13 = KBTS_FOURCC('s', 's', '1', '3'), // Stylistic Set 13
+  KBTS_FEATURE_TAG_ss14 = KBTS_FOURCC('s', 's', '1', '4'), // Stylistic Set 14
+  KBTS_FEATURE_TAG_ss15 = KBTS_FOURCC('s', 's', '1', '5'), // Stylistic Set 15
+  KBTS_FEATURE_TAG_ss16 = KBTS_FOURCC('s', 's', '1', '6'), // Stylistic Set 16
+  KBTS_FEATURE_TAG_ss17 = KBTS_FOURCC('s', 's', '1', '7'), // Stylistic Set 17
+  KBTS_FEATURE_TAG_ss18 = KBTS_FOURCC('s', 's', '1', '8'), // Stylistic Set 18
+  KBTS_FEATURE_TAG_ss19 = KBTS_FOURCC('s', 's', '1', '9'), // Stylistic Set 19
+  KBTS_FEATURE_TAG_ss20 = KBTS_FOURCC('s', 's', '2', '0'), // Stylistic Set 20
+  KBTS_FEATURE_TAG_ssty = KBTS_FOURCC('s', 's', 't', 'y'), // Math Script-style Alternates
+  KBTS_FEATURE_TAG_stch = KBTS_FOURCC('s', 't', 'c', 'h'), // Stretching Glyph Decomposition
+  KBTS_FEATURE_TAG_subs = KBTS_FOURCC('s', 'u', 'b', 's'), // Subscript
+  KBTS_FEATURE_TAG_sups = KBTS_FOURCC('s', 'u', 'p', 's'), // Superscript
+  KBTS_FEATURE_TAG_swsh = KBTS_FOURCC('s', 'w', 's', 'h'), // Swash
+  KBTS_FEATURE_TAG_test = KBTS_FOURCC('t', 'e', 's', 't'), // Test features, only for development
+  KBTS_FEATURE_TAG_titl = KBTS_FOURCC('t', 'i', 't', 'l'), // Titling
+  KBTS_FEATURE_TAG_tnam = KBTS_FOURCC('t', 'n', 'a', 'm'), // Traditional Name Forms
+  KBTS_FEATURE_TAG_tnum = KBTS_FOURCC('t', 'n', 'u', 'm'), // Tabular Figures
+  KBTS_FEATURE_TAG_trad = KBTS_FOURCC('t', 'r', 'a', 'd'), // Traditional Forms
+  KBTS_FEATURE_TAG_twid = KBTS_FOURCC('t', 'w', 'i', 'd'), // Third Widths
+  KBTS_FEATURE_TAG_unic = KBTS_FOURCC('u', 'n', 'i', 'c'), // Unicase
+  KBTS_FEATURE_TAG_valt = KBTS_FOURCC('v', 'a', 'l', 't'), // Alternate Vertical Metrics
+  KBTS_FEATURE_TAG_vapk = KBTS_FOURCC('v', 'a', 'p', 'k'), // Kerning for Alternate Proportional Vertical Metrics
+  KBTS_FEATURE_TAG_vatu = KBTS_FOURCC('v', 'a', 't', 'u'), // Vattu Variants
+  KBTS_FEATURE_TAG_vchw = KBTS_FOURCC('v', 'c', 'h', 'w'), // Vertical Contextual Half-width Spacing
+  KBTS_FEATURE_TAG_vert = KBTS_FOURCC('v', 'e', 'r', 't'), // Vertical Alternates
+  KBTS_FEATURE_TAG_vhal = KBTS_FOURCC('v', 'h', 'a', 'l'), // Alternate Vertical Half Metrics
+  KBTS_FEATURE_TAG_vkna = KBTS_FOURCC('v', 'k', 'n', 'a'), // Vertical Kana Alternates
+  KBTS_FEATURE_TAG_vkrn = KBTS_FOURCC('v', 'k', 'r', 'n'), // Vertical Kerning
+  KBTS_FEATURE_TAG_vpal = KBTS_FOURCC('v', 'p', 'a', 'l'), // Proportional Alternate Vertical Metrics
+  KBTS_FEATURE_TAG_vrt2 = KBTS_FOURCC('v', 'r', 't', '2'), // Vertical Alternates and Rotation
+  KBTS_FEATURE_TAG_vrtr = KBTS_FOURCC('v', 'r', 't', 'r'), // Vertical Alternates for Rotation
+  KBTS_FEATURE_TAG_zero = KBTS_FOURCC('z', 'e', 'r', 'o'), // Slashed Zero
 };
 
 typedef kbts_u32 kbts_feature_id;
 enum kbts_feature_id_enum
 {
-#  define KBTS_X(Name, C0, C1, C2, C3) KBTS_FEATURE_ID_##Name,
-  KBTS_X_FEATURES
-#  undef KBTS_X
-
-    KBTS_FEATURE_ID_COUNT,
+  KBTS_FEATURE_ID_UNREGISTERED, // Features that aren't pre-defined in the OpenType spec
+  KBTS_FEATURE_ID_isol, // Isolated Forms
+  KBTS_FEATURE_ID_fina, // Terminal Forms
+  KBTS_FEATURE_ID_fin2, // Terminal Forms #2
+  KBTS_FEATURE_ID_fin3, // Terminal Forms #3
+  KBTS_FEATURE_ID_medi, // Medial Forms
+  KBTS_FEATURE_ID_med2, // Medial Forms #2
+  KBTS_FEATURE_ID_init, // Initial Forms
+  KBTS_FEATURE_ID_ljmo, // Leading Jamo Forms
+  KBTS_FEATURE_ID_vjmo, // Vowel Jamo Forms
+  KBTS_FEATURE_ID_tjmo, // Trailing Jamo Forms
+  KBTS_FEATURE_ID_rphf, // Reph Form
+  KBTS_FEATURE_ID_blwf, // Below-base Forms
+  KBTS_FEATURE_ID_half, // Half Forms
+  KBTS_FEATURE_ID_pstf, // Post-base Forms
+  KBTS_FEATURE_ID_abvf, // Above-base Forms
+  KBTS_FEATURE_ID_pref, // Pre-base Forms
+  KBTS_FEATURE_ID_numr, // Numerators
+  KBTS_FEATURE_ID_frac, // Fractions
+  KBTS_FEATURE_ID_dnom, // Denominators
+  KBTS_FEATURE_ID_cfar, // Conjunct Form After Ro
+  KBTS_FEATURE_ID_aalt, // Access All Alternates
+  KBTS_FEATURE_ID_abvm, // Above-base Mark Positioning
+  KBTS_FEATURE_ID_abvs, // Above-base Substitutions
+  KBTS_FEATURE_ID_afrc, // Alternative Fractions
+  KBTS_FEATURE_ID_akhn, // Akhand
+  KBTS_FEATURE_ID_apkn, // Kerning for Alternate Proportional Widths
+  KBTS_FEATURE_ID_blwm, // Below-base Mark Positioning
+  KBTS_FEATURE_ID_blws, // Below-base Substitutions
+  KBTS_FEATURE_ID_calt, // Contextual Alternates
+  KBTS_FEATURE_ID_case, // Case-sensitive Forms
+  KBTS_FEATURE_ID_ccmp, // Glyph Composition / Decomposition
+  KBTS_FEATURE_ID_chws, // Contextual Half-width Spacing
+  KBTS_FEATURE_ID_cjct, // Conjunct Forms
+  KBTS_FEATURE_ID_clig, // Contextual Ligatures
+  KBTS_FEATURE_ID_cpct, // Centered CJK Punctuation
+  KBTS_FEATURE_ID_cpsp, // Capital Spacing
+  KBTS_FEATURE_ID_cswh, // Contextual Swash
+  KBTS_FEATURE_ID_curs, // Cursive Positioning
+  KBTS_FEATURE_ID_cv01, // Character Variant 1
+  KBTS_FEATURE_ID_cv02, // Character Variant 2
+  KBTS_FEATURE_ID_cv03, // Character Variant 3
+  KBTS_FEATURE_ID_cv04, // Character Variant 4
+  KBTS_FEATURE_ID_cv05, // Character Variant 5
+  KBTS_FEATURE_ID_cv06, // Character Variant 6
+  KBTS_FEATURE_ID_cv07, // Character Variant 7
+  KBTS_FEATURE_ID_cv08, // Character Variant 8
+  KBTS_FEATURE_ID_cv09, // Character Variant 9
+  KBTS_FEATURE_ID_cv10, // Character Variant 10
+  KBTS_FEATURE_ID_cv11, // Character Variant 11
+  KBTS_FEATURE_ID_cv12, // Character Variant 12
+  KBTS_FEATURE_ID_cv13, // Character Variant 13
+  KBTS_FEATURE_ID_cv14, // Character Variant 14
+  KBTS_FEATURE_ID_cv15, // Character Variant 15
+  KBTS_FEATURE_ID_cv16, // Character Variant 16
+  KBTS_FEATURE_ID_cv17, // Character Variant 17
+  KBTS_FEATURE_ID_cv18, // Character Variant 18
+  KBTS_FEATURE_ID_cv19, // Character Variant 19
+  KBTS_FEATURE_ID_cv20, // Character Variant 20
+  KBTS_FEATURE_ID_cv21, // Character Variant 21
+  KBTS_FEATURE_ID_cv22, // Character Variant 22
+  KBTS_FEATURE_ID_cv23, // Character Variant 23
+  KBTS_FEATURE_ID_cv24, // Character Variant 24
+  KBTS_FEATURE_ID_cv25, // Character Variant 25
+  KBTS_FEATURE_ID_cv26, // Character Variant 26
+  KBTS_FEATURE_ID_cv27, // Character Variant 27
+  KBTS_FEATURE_ID_cv28, // Character Variant 28
+  KBTS_FEATURE_ID_cv29, // Character Variant 29
+  KBTS_FEATURE_ID_cv30, // Character Variant 30
+  KBTS_FEATURE_ID_cv31, // Character Variant 31
+  KBTS_FEATURE_ID_cv32, // Character Variant 32
+  KBTS_FEATURE_ID_cv33, // Character Variant 33
+  KBTS_FEATURE_ID_cv34, // Character Variant 34
+  KBTS_FEATURE_ID_cv35, // Character Variant 35
+  KBTS_FEATURE_ID_cv36, // Character Variant 36
+  KBTS_FEATURE_ID_cv37, // Character Variant 37
+  KBTS_FEATURE_ID_cv38, // Character Variant 38
+  KBTS_FEATURE_ID_cv39, // Character Variant 39
+  KBTS_FEATURE_ID_cv40, // Character Variant 40
+  KBTS_FEATURE_ID_cv41, // Character Variant 41
+  KBTS_FEATURE_ID_cv42, // Character Variant 42
+  KBTS_FEATURE_ID_cv43, // Character Variant 43
+  KBTS_FEATURE_ID_cv44, // Character Variant 44
+  KBTS_FEATURE_ID_cv45, // Character Variant 45
+  KBTS_FEATURE_ID_cv46, // Character Variant 46
+  KBTS_FEATURE_ID_cv47, // Character Variant 47
+  KBTS_FEATURE_ID_cv48, // Character Variant 48
+  KBTS_FEATURE_ID_cv49, // Character Variant 49
+  KBTS_FEATURE_ID_cv50, // Character Variant 50
+  KBTS_FEATURE_ID_cv51, // Character Variant 51
+  KBTS_FEATURE_ID_cv52, // Character Variant 52
+  KBTS_FEATURE_ID_cv53, // Character Variant 53
+  KBTS_FEATURE_ID_cv54, // Character Variant 54
+  KBTS_FEATURE_ID_cv55, // Character Variant 55
+  KBTS_FEATURE_ID_cv56, // Character Variant 56
+  KBTS_FEATURE_ID_cv57, // Character Variant 57
+  KBTS_FEATURE_ID_cv58, // Character Variant 58
+  KBTS_FEATURE_ID_cv59, // Character Variant 59
+  KBTS_FEATURE_ID_cv60, // Character Variant 60
+  KBTS_FEATURE_ID_cv61, // Character Variant 61
+  KBTS_FEATURE_ID_cv62, // Character Variant 62
+  KBTS_FEATURE_ID_cv63, // Character Variant 63
+  KBTS_FEATURE_ID_cv64, // Character Variant 64
+  KBTS_FEATURE_ID_cv65, // Character Variant 65
+  KBTS_FEATURE_ID_cv66, // Character Variant 66
+  KBTS_FEATURE_ID_cv67, // Character Variant 67
+  KBTS_FEATURE_ID_cv68, // Character Variant 68
+  KBTS_FEATURE_ID_cv69, // Character Variant 69
+  KBTS_FEATURE_ID_cv70, // Character Variant 70
+  KBTS_FEATURE_ID_cv71, // Character Variant 71
+  KBTS_FEATURE_ID_cv72, // Character Variant 72
+  KBTS_FEATURE_ID_cv73, // Character Variant 73
+  KBTS_FEATURE_ID_cv74, // Character Variant 74
+  KBTS_FEATURE_ID_cv75, // Character Variant 75
+  KBTS_FEATURE_ID_cv76, // Character Variant 76
+  KBTS_FEATURE_ID_cv77, // Character Variant 77
+  KBTS_FEATURE_ID_cv78, // Character Variant 78
+  KBTS_FEATURE_ID_cv79, // Character Variant 79
+  KBTS_FEATURE_ID_cv80, // Character Variant 80
+  KBTS_FEATURE_ID_cv81, // Character Variant 81
+  KBTS_FEATURE_ID_cv82, // Character Variant 82
+  KBTS_FEATURE_ID_cv83, // Character Variant 83
+  KBTS_FEATURE_ID_cv84, // Character Variant 84
+  KBTS_FEATURE_ID_cv85, // Character Variant 85
+  KBTS_FEATURE_ID_cv86, // Character Variant 86
+  KBTS_FEATURE_ID_cv87, // Character Variant 87
+  KBTS_FEATURE_ID_cv88, // Character Variant 88
+  KBTS_FEATURE_ID_cv89, // Character Variant 89
+  KBTS_FEATURE_ID_cv90, // Character Variant 90
+  KBTS_FEATURE_ID_cv91, // Character Variant 91
+  KBTS_FEATURE_ID_cv92, // Character Variant 92
+  KBTS_FEATURE_ID_cv93, // Character Variant 93
+  KBTS_FEATURE_ID_cv94, // Character Variant 94
+  KBTS_FEATURE_ID_cv95, // Character Variant 95
+  KBTS_FEATURE_ID_cv96, // Character Variant 96
+  KBTS_FEATURE_ID_cv97, // Character Variant 97
+  KBTS_FEATURE_ID_cv98, // Character Variant 98
+  KBTS_FEATURE_ID_cv99, // Character Variant 99
+  KBTS_FEATURE_ID_c2pc, // Petite Capitals From Capitals
+  KBTS_FEATURE_ID_c2sc, // Small Capitals From Capitals
+  KBTS_FEATURE_ID_dist, // Distances
+  KBTS_FEATURE_ID_dlig, // Discretionary Ligatures
+  KBTS_FEATURE_ID_dtls, // Dotless Forms
+  KBTS_FEATURE_ID_expt, // Expert Forms
+  KBTS_FEATURE_ID_falt, // Final Glyph on Line Alternates
+  KBTS_FEATURE_ID_flac, // Flattened Accent Forms
+  KBTS_FEATURE_ID_fwid, // Full Widths
+  KBTS_FEATURE_ID_haln, // Halant Forms
+  KBTS_FEATURE_ID_halt, // Alternate Half Widths
+  KBTS_FEATURE_ID_hist, // Historical Forms
+  KBTS_FEATURE_ID_hkna, // Horizontal Kana Alternates
+  KBTS_FEATURE_ID_hlig, // Historical Ligatures
+  KBTS_FEATURE_ID_hngl, // Hangul
+  KBTS_FEATURE_ID_hojo, // Hojo Kanji Forms (JIS X 0212-1990 Kanji Forms)
+  KBTS_FEATURE_ID_hwid, // Half Widths
+  KBTS_FEATURE_ID_ital, // Italics
+  KBTS_FEATURE_ID_jalt, // Justification Alternates
+  KBTS_FEATURE_ID_jp78, // JIS78 Forms
+  KBTS_FEATURE_ID_jp83, // JIS83 Forms
+  KBTS_FEATURE_ID_jp90, // JIS90 Forms
+  KBTS_FEATURE_ID_jp04, // JIS2004 Forms
+  KBTS_FEATURE_ID_kern, // Kerning
+  KBTS_FEATURE_ID_lfbd, // Left Bounds
+  KBTS_FEATURE_ID_liga, // Standard Ligatures
+  KBTS_FEATURE_ID_lnum, // Lining Figures
+  KBTS_FEATURE_ID_locl, // Localized Forms
+  KBTS_FEATURE_ID_ltra, // Left-to-right Alternates
+  KBTS_FEATURE_ID_ltrm, // Left-to-right Mirrored Forms
+  KBTS_FEATURE_ID_mark, // Mark Positioning
+  KBTS_FEATURE_ID_mgrk, // Mathematical Greek
+  KBTS_FEATURE_ID_mkmk, // Mark to Mark Positioning
+  KBTS_FEATURE_ID_mset, // Mark Positioning via Substitution
+  KBTS_FEATURE_ID_nalt, // Alternate Annotation Forms
+  KBTS_FEATURE_ID_nlck, // NLC Kanji Forms
+  KBTS_FEATURE_ID_nukt, // Nukta Forms
+  KBTS_FEATURE_ID_onum, // Oldstyle Figures
+  KBTS_FEATURE_ID_opbd, // Optical Bounds
+  KBTS_FEATURE_ID_ordn, // Ordinals
+  KBTS_FEATURE_ID_ornm, // Ornaments
+  KBTS_FEATURE_ID_palt, // Proportional Alternate Widths
+  KBTS_FEATURE_ID_pcap, // Petite Capitals
+  KBTS_FEATURE_ID_pkna, // Proportional Kana
+  KBTS_FEATURE_ID_pnum, // Proportional Figures
+  KBTS_FEATURE_ID_pres, // Pre-base Substitutions
+  KBTS_FEATURE_ID_psts, // Post-base Substitutions
+  KBTS_FEATURE_ID_pwid, // Proportional Widths
+  KBTS_FEATURE_ID_qwid, // Quarter Widths
+  KBTS_FEATURE_ID_rand, // Randomize
+  KBTS_FEATURE_ID_rclt, // Required Contextual Alternates
+  KBTS_FEATURE_ID_rkrf, // Rakar Forms
+  KBTS_FEATURE_ID_rlig, // Required Ligatures
+  KBTS_FEATURE_ID_rtbd, // Right Bounds
+  KBTS_FEATURE_ID_rtla, // Right-to-left Alternates
+  KBTS_FEATURE_ID_rtlm, // Right-to-left Mirrored Forms
+  KBTS_FEATURE_ID_ruby, // Ruby Notation Forms
+  KBTS_FEATURE_ID_rvrn, // Required Variation Alternates
+  KBTS_FEATURE_ID_salt, // Stylistic Alternates
+  KBTS_FEATURE_ID_sinf, // Scientific Inferiors
+  KBTS_FEATURE_ID_size, // Optical size
+  KBTS_FEATURE_ID_smcp, // Small Capitals
+  KBTS_FEATURE_ID_smpl, // Simplified Forms
+  KBTS_FEATURE_ID_ss01, // Stylistic Set 1
+  KBTS_FEATURE_ID_ss02, // Stylistic Set 2
+  KBTS_FEATURE_ID_ss03, // Stylistic Set 3
+  KBTS_FEATURE_ID_ss04, // Stylistic Set 4
+  KBTS_FEATURE_ID_ss05, // Stylistic Set 5
+  KBTS_FEATURE_ID_ss06, // Stylistic Set 6
+  KBTS_FEATURE_ID_ss07, // Stylistic Set 7
+  KBTS_FEATURE_ID_ss08, // Stylistic Set 8
+  KBTS_FEATURE_ID_ss09, // Stylistic Set 9
+  KBTS_FEATURE_ID_ss10, // Stylistic Set 10
+  KBTS_FEATURE_ID_ss11, // Stylistic Set 11
+  KBTS_FEATURE_ID_ss12, // Stylistic Set 12
+  KBTS_FEATURE_ID_ss13, // Stylistic Set 13
+  KBTS_FEATURE_ID_ss14, // Stylistic Set 14
+  KBTS_FEATURE_ID_ss15, // Stylistic Set 15
+  KBTS_FEATURE_ID_ss16, // Stylistic Set 16
+  KBTS_FEATURE_ID_ss17, // Stylistic Set 17
+  KBTS_FEATURE_ID_ss18, // Stylistic Set 18
+  KBTS_FEATURE_ID_ss19, // Stylistic Set 19
+  KBTS_FEATURE_ID_ss20, // Stylistic Set 20
+  KBTS_FEATURE_ID_ssty, // Math Script-style Alternates
+  KBTS_FEATURE_ID_stch, // Stretching Glyph Decomposition
+  KBTS_FEATURE_ID_subs, // Subscript
+  KBTS_FEATURE_ID_sups, // Superscript
+  KBTS_FEATURE_ID_swsh, // Swash
+  KBTS_FEATURE_ID_test, // Test features, only for development
+  KBTS_FEATURE_ID_titl, // Titling
+  KBTS_FEATURE_ID_tnam, // Traditional Name Forms
+  KBTS_FEATURE_ID_tnum, // Tabular Figures
+  KBTS_FEATURE_ID_trad, // Traditional Forms
+  KBTS_FEATURE_ID_twid, // Third Widths
+  KBTS_FEATURE_ID_unic, // Unicase
+  KBTS_FEATURE_ID_valt, // Alternate Vertical Metrics
+  KBTS_FEATURE_ID_vapk, // Kerning for Alternate Proportional Vertical Metrics
+  KBTS_FEATURE_ID_vatu, // Vattu Variants
+  KBTS_FEATURE_ID_vchw, // Vertical Contextual Half-width Spacing
+  KBTS_FEATURE_ID_vert, // Vertical Alternates
+  KBTS_FEATURE_ID_vhal, // Alternate Vertical Half Metrics
+  KBTS_FEATURE_ID_vkna, // Vertical Kana Alternates
+  KBTS_FEATURE_ID_vkrn, // Vertical Kerning
+  KBTS_FEATURE_ID_vpal, // Proportional Alternate Vertical Metrics
+  KBTS_FEATURE_ID_vrt2, // Vertical Alternates and Rotation
+  KBTS_FEATURE_ID_vrtr, // Vertical Alternates for Rotation
+  KBTS_FEATURE_ID_zero, // Slashed Zero
+  KBTS_FEATURE_ID_COUNT,
 };
 
 typedef kbts_u8 kbts_shaping_table;
@@ -1783,6 +2457,7 @@ typedef struct kbts_lookup_subtable_info
 typedef struct kbts_font
 {
   char *FileBase;
+  kbts_un FileSize;
   kbts_head *Head;
   kbts_u16 *Cmap;
   kbts_gdef *Gdef;
@@ -1815,17 +2490,44 @@ typedef struct kbts_glyph_classes
   kbts_u16 MarkAttachmentClass;
 } kbts_glyph_classes;
 
+typedef struct kbts_feature_set
+{
+  kbts_u64 Flags[(KBTS_FEATURE_ID_COUNT + 63) / 64];
+} kbts_feature_set;
+
+typedef struct kbts_feature_override
+{
+  kbts_feature_id Id;
+  kbts_feature_tag Tag;
+  kbts_u32 EnabledOrAlternatePlusOne;
+} kbts_feature_override;
+
+typedef struct kbts_glyph_config
+{
+  kbts_feature_set EnabledFeatures;
+  kbts_feature_set DisabledFeatures;
+  kbts_u32 FeatureOverrideCount;
+  kbts_u32 FeatureOverrideCapacity;
+  kbts_u32 RequiredFeatureOverrideCapacity;
+  kbts_feature_override *FeatureOverrides; // [FeatureOverrideCount]
+} kbts_glyph_config;
+
 typedef struct kbts_glyph
 {
   kbts_u32 Codepoint;
-  kbts_u16 Id;
+  kbts_u16 Id; // Glyph index. This is what you want to use to query outline data.
   kbts_u16 Uid;
   kbts_glyph_classes Classes;
 
   kbts_u64 Decomposition;
 
+  kbts_glyph_config *Config;
+
   kbts_glyph_flags Flags;
 
+  // These fields are the glyph's final positioning data.
+  // For normal usage, you should not have to use these directly yourself.
+  // In case you are curious or have a specific need, see kbts_PositionGlyph() to see how these are used.
   kbts_s32 OffsetX;
   kbts_s32 OffsetY;
   kbts_s32 AdvanceX;
@@ -1891,6 +2593,7 @@ typedef struct kbts_op_state_normalize
 
 typedef struct kbts_op_state_gsub
 {
+  kbts_feature_set LookupFeatures;
   kbts_un LookupIndex;
   kbts_u32 GlyphFilter;
   kbts_u32 SkipFlags;
@@ -1911,17 +2614,13 @@ typedef union kbts_op_state_op_specific
 
 typedef struct kbts_lookup_indices
 {
+  kbts_u32 FeatureTag;
   kbts_u32 FeatureId;
   kbts_u32 SkipFlags;
   kbts_u32 GlyphFilter;
   kbts_u32 Count;
   kbts_u16 *Indices;
 } kbts_lookup_indices;
-
-typedef struct kbts_feature_set
-{
-  kbts_u64 Flags[(KBTS_FEATURE_ID_COUNT + 63) / 64];
-} kbts_feature_set;
 
 typedef struct kbts_op
 {
@@ -1940,6 +2639,8 @@ typedef struct kbts_op_state
 
   kbts_u32 FeatureCount;
   kbts_lookup_indices FeatureLookupIndices[KBTS_MAX_SIMULTANEOUS_FEATURES];
+  kbts_u32 UnregisteredFeatureCount;
+  kbts_feature_tag UnregisteredFeatureTags[KBTS_MAX_SIMULTANEOUS_FEATURES];
 
   kbts_op_state_op_specific OpSpecific;
 
@@ -1973,6 +2674,8 @@ typedef struct kbts_shape_config
   kbts_langsys *Langsys[KBTS_SHAPING_TABLE_COUNT];
   kbts_op_list OpLists[4];
 
+  kbts_feature_set *Features;
+
   kbts_shaper Shaper;
   kbts_shaper_properties *ShaperProperties;
 
@@ -2002,6 +2705,8 @@ typedef struct kbts_shape_state
   kbts_shape_config *Config;
   kbts_direction MainDirection;
   kbts_direction RunDirection;
+
+  kbts_feature_set UserFeatures;
 
   kbts_glyph_array GlyphArray;
   kbts_glyph_array ClusterGlyphArray;
@@ -2124,13 +2829,19 @@ typedef struct kbts_decode
   kbts_u32 Valid;
 } kbts_decode;
 
-// Shaping
 #ifndef KB_TEXT_SHAPE_NO_CRT
 KBTS_EXPORT kbts_font kbts_FontFromFile(const char *FileName);
 KBTS_EXPORT void kbts_FreeFont(kbts_font *Font);
 KBTS_EXPORT kbts_shape_state *kbts_CreateShapeState(kbts_font *Font);
 KBTS_EXPORT void kbts_FreeShapeState(kbts_shape_state *State);
 #endif
+KBTS_EXPORT kbts_feature_id kbts_FeatureTagToId(kbts_feature_tag Tag);
+KBTS_EXPORT kbts_feature_override kbts_FeatureOverride(kbts_feature_id Id, int Alternate, kbts_u32 Value);
+KBTS_EXPORT kbts_feature_override kbts_FeatureOverrideFromTag(kbts_feature_tag Tag, int Alternate, kbts_u32 Value);
+KBTS_EXPORT kbts_glyph_config kbts_GlyphConfig(kbts_feature_override *FeatureOverrides, kbts_u32 FeatureOverrideCount);
+KBTS_EXPORT kbts_glyph_config kbts_EmptyGlyphConfig(kbts_feature_override *FeatureOverrides, kbts_u32 FeatureOverrideCapacity);
+KBTS_EXPORT int kbts_GlyphConfigOverrideFeature(kbts_glyph_config *Config, kbts_feature_id Id, int Alternate, kbts_u32 Value);
+KBTS_EXPORT int kbts_GlyphConfigOverrideFeatureFromTag(kbts_glyph_config *Config, kbts_feature_tag Tag, int Alternate, kbts_u32 Value);
 KBTS_EXPORT int kbts_FontIsValid(kbts_font *Font);
 KBTS_EXPORT kbts_un kbts_ReadFontHeader(kbts_font *Font, void *Data, kbts_un Size);
 KBTS_EXPORT kbts_un kbts_ReadFontData(kbts_font *Font, void *Scratch, kbts_un ScratchSize);
@@ -2138,8 +2849,8 @@ KBTS_EXPORT int kbts_PostReadFontInitialize(kbts_font *Font, void *Memory, kbts_
 KBTS_EXPORT kbts_un kbts_SizeOfShapeState(kbts_font *Font);
 KBTS_EXPORT kbts_shape_state *kbts_PlaceShapeState(void *Address, kbts_un Size);
 KBTS_EXPORT void kbts_ResetShapeState(kbts_shape_state *State);
-KBTS_EXPORT kbts_shape_config kbts_ShapeConfig(kbts_font *Font, kbts_u32 Script, kbts_u32 Language);
-KBTS_EXPORT kbts_u32 kbts_ShaperIsComplex(kbts_shaper Shaper);
+KBTS_EXPORT kbts_shape_config kbts_ShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language);
+KBTS_EXPORT int kbts_ShaperIsComplex(kbts_shaper Shaper);
 KBTS_EXPORT int kbts_Shape(kbts_shape_state *State, kbts_shape_config *Config, kbts_direction MainDirection, kbts_direction RunDirection, kbts_glyph *Glyphs, kbts_u32 *GlyphCount, kbts_u32 GlyphCapacity);
 KBTS_EXPORT kbts_cursor kbts_Cursor(kbts_direction Direction);
 KBTS_EXPORT void kbts_PositionGlyph(kbts_cursor *Cursor, kbts_glyph *Glyph, kbts_s32 *X, kbts_s32 *Y);
@@ -2148,11 +2859,11 @@ KBTS_EXPORT int kbts_BreakStateIsValid(kbts_break_state *State);
 KBTS_EXPORT void kbts_BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint, kbts_u32 PositionIncrement, int EndOfText);
 KBTS_EXPORT void kbts_BreakFlush(kbts_break_state *State);
 KBTS_EXPORT int kbts_Break(kbts_break_state *State, kbts_break *Break);
-KBTS_EXPORT kbts_decode kbts_DecodeUtf8(const char *Utf8, size_t Length);
+KBTS_EXPORT kbts_decode kbts_DecodeUtf8(const char *Utf8, kbts_un Length);
 KBTS_EXPORT kbts_glyph kbts_CodepointToGlyph(kbts_font *Font, kbts_u32 Codepoint);
 KBTS_EXPORT void kbts_InferScript(kbts_direction *Direction, kbts_script *Script, kbts_script GlyphScript);
 KBTS_EXPORT int kbts_ScriptIsComplex(kbts_script Script);
-KBTS_EXPORT kbts_u32 kbts_ShaperIsComplex(kbts_shaper Shaper);
+KBTS_EXPORT kbts_script kbts_ScriptTagToScript(kbts_script_tag Tag);
 #endif
 
 #ifdef KB_TEXT_SHAPE_IMPLEMENTATION
@@ -2204,6 +2915,11 @@ KBTS_EXPORT kbts_u32 kbts_ShaperIsComplex(kbts_shaper Shaper);
 #include <stdio.h>
 #endif
 
+#ifndef KBTS_MEMSET
+#include <string.h>
+#define KBTS_MEMSET memset
+#endif
+
 #ifndef kbts_ByteSwap16
 #  if defined(_MSC_VER) && !defined(__clang__)
 #    define kbts_ByteSwap16(X) _byteswap_ushort(X)
@@ -2220,6 +2936,8 @@ KBTS_EXPORT kbts_u32 kbts_ShaperIsComplex(kbts_shaper Shaper);
 
 #define KBTS_FEATURE_FLAG0(Feature) (1ull << KBTS_FEATURE_ID_##Feature)
 #define KBTS_FEATURE_FLAG1(Feature) (1ull << (KBTS_FEATURE_ID_##Feature - 64))
+#define KBTS_FEATURE_FLAG2(Feature) (1ull << (KBTS_FEATURE_ID_##Feature - 128))
+#define KBTS_FEATURE_FLAG3(Feature) (1ull << (KBTS_FEATURE_ID_##Feature - 192))
 
 // #  define KBTS_DUMP
 #  ifdef KBTS_DUMP
@@ -2243,177 +2961,609 @@ typedef struct kbts_script_properties {
 } kbts_script_properties;
 
 static kbts_script_properties kbts_ScriptProperties[KBTS_SCRIPT_COUNT] = {
-  {KBTS_FOURCC(' ', ' ', ' ', ' '),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('a', 'd', 'l', 'm'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('a', 'h', 'o', 'm'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('h', 'l', 'u', 'w'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('a', 'r', 'a', 'b'),KBTS_SHAPER_ARABIC},
-  {KBTS_FOURCC('a', 'r', 'm', 'n'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('a', 'v', 's', 't'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('b', 'a', 'l', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('b', 'a', 'm', 'u'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('b', 'a', 's', 's'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('b', 'a', 't', 'k'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('b', 'n', 'g', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('b', 'h', 'k', 's'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('b', 'o', 'p', 'o'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('b', 'r', 'a', 'h'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('b', 'u', 'g', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('b', 'u', 'h', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('c', 'a', 'n', 's'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('c', 'a', 'r', 'i'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('a', 'g', 'h', 'b'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('c', 'a', 'k', 'm'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('c', 'h', 'a', 'm'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('c', 'h', 'e', 'r'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('c', 'h', 'r', 's'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('h', 'a', 'n', 'i'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('c', 'o', 'p', 't'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('c', 'p', 'r', 't'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('c', 'p', 'm', 'n'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('c', 'y', 'r', 'l'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('D', 'F', 'L', 'T'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('D', 'F', 'L', 'T'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('d', 's', 'r', 't'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('d', 'e', 'v', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('d', 'i', 'a', 'k'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('d', 'o', 'g', 'r'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('d', 'u', 'p', 'l'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('e', 'g', 'y', 'p'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('e', 'l', 'b', 'a'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('e', 'l', 'y', 'm'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('e', 't', 'h', 'i'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('g', 'a', 'r', 'a'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('g', 'e', 'o', 'r'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('g', 'l', 'a', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('g', 'o', 't', 'h'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('g', 'r', 'a', 'n'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('g', 'r', 'e', 'k'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('g', 'j', 'r', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('g', 'o', 'n', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('g', 'u', 'r', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('g', 'u', 'k', 'h'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('h', 'a', 'n', 'g'),KBTS_SHAPER_HANGUL},
-  {KBTS_FOURCC('r', 'o', 'h', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('h', 'a', 'n', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('h', 'a', 't', 'r'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('h', 'e', 'b', 'r'),KBTS_SHAPER_HEBREW},
-  {KBTS_FOURCC('k', 'a', 'n', 'a'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('a', 'r', 'm', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('p', 'h', 'l', 'i'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('p', 'r', 't', 'i'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('j', 'a', 'v', 'a'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('k', 't', 'h', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('k', 'n', 'd', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('k', 'a', 'n', 'a'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('k', 'a', 'w', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('k', 'a', 'l', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('k', 'h', 'a', 'r'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('k', 'i', 't', 's'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('k', 'h', 'm', 'r'),KBTS_SHAPER_KHMER},
-  {KBTS_FOURCC('k', 'h', 'o', 'j'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'i', 'n', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('k', 'r', 'a', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('l', 'a', 'o', ' '),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('l', 'a', 't', 'n'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('l', 'e', 'p', 'c'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('l', 'i', 'm', 'b'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('l', 'i', 'n', 'a'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('l', 'i', 'n', 'b'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('l', 'i', 's', 'u'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('l', 'y', 'c', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('l', 'y', 'd', 'i'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('m', 'a', 'h', 'j'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'a', 'k', 'a'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'l', 'm', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('m', 'a', 'n', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'a', 'n', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'a', 'r', 'c'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('g', 'o', 'n', 'm'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'e', 'd', 'f'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 't', 'e', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'e', 'n', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'e', 'r', 'c'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'e', 'r', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('p', 'l', 'r', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'o', 'd', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'o', 'n', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'r', 'o', 'o'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('m', 'u', 'l', 't'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('m', 'y', 'm', '2'),KBTS_SHAPER_MYANMAR},
-  {KBTS_FOURCC('n', 'b', 'a', 't'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('n', 'a', 'g', 'm'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('n', 'a', 'n', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('n', 'e', 'w', 'a'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'a', 'l', 'u'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('n', 'k', 'o', ' '),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('n', 's', 'h', 'u'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('h', 'm', 'n', 'p'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('o', 'g', 'a', 'm'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('o', 'l', 'c', 'k'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('o', 'n', 'a', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('i', 't', 'a', 'l'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('h', 'u', 'n', 'g'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('n', 'a', 'r', 'b'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('p', 'e', 'r', 'm'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('x', 'p', 'e', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'o', 'g', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'a', 'r', 'b'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('o', 'r', 'k', 'h'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('o', 'u', 'g', 'r'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('o', 'r', 'y', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('o', 's', 'g', 'e'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('o', 's', 'm', 'a'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('h', 'm', 'n', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('p', 'a', 'l', 'm'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('p', 'a', 'u', 'c'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('p', 'h', 'a', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('p', 'h', 'n', 'x'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('p', 'h', 'l', 'p'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('r', 'j', 'n', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('r', 'u', 'n', 'r'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('s', 'a', 'm', 'r'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('s', 'a', 'u', 'r'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'h', 'r', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'h', 'a', 'w'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('s', 'i', 'd', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'g', 'n', 'w'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'o', 'g', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'i', 'n', 'h'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'o', 'r', 'a'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'o', 'y', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('x', 's', 'u', 'x'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'u', 'n', 'd'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'u', 'n', 'u'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'y', 'l', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('s', 'y', 'r', 'c'),KBTS_SHAPER_ARABIC},
-  {KBTS_FOURCC('t', 'g', 'l', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'a', 'g', 'b'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'a', 'l', 'e'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('l', 'a', 'n', 'a'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'a', 'v', 't'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'a', 'k', 'r'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'm', 'l', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('t', 'n', 's', 'a'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'a', 'n', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'e', 'l', '2'),KBTS_SHAPER_INDIC},
-  {KBTS_FOURCC('t', 'h', 'a', 'a'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('t', 'h', 'a', 'i'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('t', 'i', 'b', 't'),KBTS_SHAPER_TIBETAN},
-  {KBTS_FOURCC('t', 'f', 'n', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'i', 'r', 'h'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'o', 'd', 'r'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'o', 't', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('t', 'u', 't', 'g'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('u', 'g', 'a', 'r'),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('v', 'a', 'i', ' '),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('v', 'i', 't', 'h'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('w', 'c', 'h', 'o'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('w', 'a', 'r', 'a'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('y', 'e', 'z', 'i'),KBTS_SHAPER_USE},
-  {KBTS_FOURCC('y', 'i', ' ', ' '),KBTS_SHAPER_DEFAULT},
-  {KBTS_FOURCC('z', 'a', 'n', 'b'),KBTS_SHAPER_USE},
+  {KBTS_FOURCC(' ', ' ', ' ', ' '), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('a', 'd', 'l', 'm'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('a', 'h', 'o', 'm'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('h', 'l', 'u', 'w'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('a', 'r', 'a', 'b'), KBTS_SHAPER_ARABIC},
+  {KBTS_FOURCC('a', 'r', 'm', 'n'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('a', 'v', 's', 't'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('b', 'a', 'l', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('b', 'a', 'm', 'u'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('b', 'a', 's', 's'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('b', 'a', 't', 'k'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('b', 'n', 'g', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('b', 'h', 'k', 's'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('b', 'o', 'p', 'o'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('b', 'r', 'a', 'h'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('b', 'u', 'g', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('b', 'u', 'h', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('c', 'a', 'n', 's'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('c', 'a', 'r', 'i'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('a', 'g', 'h', 'b'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('c', 'a', 'k', 'm'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('c', 'h', 'a', 'm'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('c', 'h', 'e', 'r'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('c', 'h', 'r', 's'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('h', 'a', 'n', 'i'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('c', 'o', 'p', 't'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('c', 'p', 'r', 't'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('c', 'p', 'm', 'n'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('c', 'y', 'r', 'l'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('D', 'F', 'L', 'T'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('D', 'F', 'L', 'T'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('d', 's', 'r', 't'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('d', 'e', 'v', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('d', 'i', 'a', 'k'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('d', 'o', 'g', 'r'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('d', 'u', 'p', 'l'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('e', 'g', 'y', 'p'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('e', 'l', 'b', 'a'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('e', 'l', 'y', 'm'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('e', 't', 'h', 'i'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('g', 'a', 'r', 'a'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('g', 'e', 'o', 'r'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('g', 'l', 'a', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('g', 'o', 't', 'h'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('g', 'r', 'a', 'n'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('g', 'r', 'e', 'k'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('g', 'j', 'r', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('g', 'o', 'n', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('g', 'u', 'r', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('g', 'u', 'k', 'h'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('h', 'a', 'n', 'g'), KBTS_SHAPER_HANGUL},
+  {KBTS_FOURCC('r', 'o', 'h', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('h', 'a', 'n', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('h', 'a', 't', 'r'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('h', 'e', 'b', 'r'), KBTS_SHAPER_HEBREW},
+  {KBTS_FOURCC('k', 'a', 'n', 'a'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('a', 'r', 'm', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('p', 'h', 'l', 'i'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('p', 'r', 't', 'i'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('j', 'a', 'v', 'a'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('k', 't', 'h', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('k', 'n', 'd', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('k', 'a', 'n', 'a'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('k', 'a', 'w', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('k', 'a', 'l', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('k', 'h', 'a', 'r'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('k', 'i', 't', 's'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('k', 'h', 'm', 'r'), KBTS_SHAPER_KHMER},
+  {KBTS_FOURCC('k', 'h', 'o', 'j'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'i', 'n', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('k', 'r', 'a', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('l', 'a', 'o', ' '), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('l', 'a', 't', 'n'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('l', 'e', 'p', 'c'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('l', 'i', 'm', 'b'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('l', 'i', 'n', 'a'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('l', 'i', 'n', 'b'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('l', 'i', 's', 'u'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('l', 'y', 'c', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('l', 'y', 'd', 'i'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('m', 'a', 'h', 'j'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'a', 'k', 'a'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'l', 'm', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('m', 'a', 'n', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'a', 'n', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'a', 'r', 'c'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('g', 'o', 'n', 'm'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'e', 'd', 'f'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 't', 'e', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'e', 'n', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'e', 'r', 'c'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'e', 'r', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('p', 'l', 'r', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'o', 'd', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'o', 'n', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'r', 'o', 'o'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('m', 'u', 'l', 't'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('m', 'y', 'm', '2'), KBTS_SHAPER_MYANMAR},
+  {KBTS_FOURCC('n', 'b', 'a', 't'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('n', 'a', 'g', 'm'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('n', 'a', 'n', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('n', 'e', 'w', 'a'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'a', 'l', 'u'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('n', 'k', 'o', ' '), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('n', 's', 'h', 'u'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('h', 'm', 'n', 'p'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('o', 'g', 'a', 'm'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('o', 'l', 'c', 'k'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('o', 'n', 'a', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('i', 't', 'a', 'l'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('h', 'u', 'n', 'g'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('n', 'a', 'r', 'b'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('p', 'e', 'r', 'm'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('x', 'p', 'e', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'o', 'g', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'a', 'r', 'b'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('o', 'r', 'k', 'h'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('o', 'u', 'g', 'r'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('o', 'r', 'y', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('o', 's', 'g', 'e'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('o', 's', 'm', 'a'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('h', 'm', 'n', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('p', 'a', 'l', 'm'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('p', 'a', 'u', 'c'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('p', 'h', 'a', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('p', 'h', 'n', 'x'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('p', 'h', 'l', 'p'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('r', 'j', 'n', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('r', 'u', 'n', 'r'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('s', 'a', 'm', 'r'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('s', 'a', 'u', 'r'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'h', 'r', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'h', 'a', 'w'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('s', 'i', 'd', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'g', 'n', 'w'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'o', 'g', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'i', 'n', 'h'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'o', 'r', 'a'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'o', 'y', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('x', 's', 'u', 'x'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'u', 'n', 'd'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'u', 'n', 'u'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'y', 'l', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('s', 'y', 'r', 'c'), KBTS_SHAPER_ARABIC},
+  {KBTS_FOURCC('t', 'g', 'l', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'a', 'g', 'b'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'a', 'l', 'e'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('l', 'a', 'n', 'a'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'a', 'v', 't'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'a', 'k', 'r'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'm', 'l', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('t', 'n', 's', 'a'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'a', 'n', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'e', 'l', '2'), KBTS_SHAPER_INDIC},
+  {KBTS_FOURCC('t', 'h', 'a', 'a'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('t', 'h', 'a', 'i'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('t', 'i', 'b', 't'), KBTS_SHAPER_TIBETAN},
+  {KBTS_FOURCC('t', 'f', 'n', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'i', 'r', 'h'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'o', 'd', 'r'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'o', 't', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('t', 'u', 't', 'g'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('u', 'g', 'a', 'r'), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('v', 'a', 'i', ' '), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('v', 'i', 't', 'h'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('w', 'c', 'h', 'o'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('w', 'a', 'r', 'a'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('y', 'e', 'z', 'i'), KBTS_SHAPER_USE},
+  {KBTS_FOURCC('y', 'i', ' ', ' '), KBTS_SHAPER_DEFAULT},
+  {KBTS_FOURCC('z', 'a', 'n', 'b'), KBTS_SHAPER_USE},
 };
+
+KBTS_EXPORT kbts_script kbts_ScriptTagToScript(kbts_script_tag Tag)
+{
+  kbts_script Result = 0;
+  switch(Tag)
+  {
+  case KBTS_SCRIPT_TAG_DONT_KNOW: Result = KBTS_SCRIPT_DONT_KNOW; break;
+  case KBTS_SCRIPT_TAG_ADLAM: Result = KBTS_SCRIPT_ADLAM; break;
+  case KBTS_SCRIPT_TAG_AHOM: Result = KBTS_SCRIPT_AHOM; break;
+  case KBTS_SCRIPT_TAG_ANATOLIAN_HIEROGLYPHS: Result = KBTS_SCRIPT_ANATOLIAN_HIEROGLYPHS; break;
+  case KBTS_SCRIPT_TAG_ARABIC: Result = KBTS_SCRIPT_ARABIC; break;
+  case KBTS_SCRIPT_TAG_ARMENIAN: Result = KBTS_SCRIPT_ARMENIAN; break;
+  case KBTS_SCRIPT_TAG_AVESTAN: Result = KBTS_SCRIPT_AVESTAN; break;
+  case KBTS_SCRIPT_TAG_BALINESE: Result = KBTS_SCRIPT_BALINESE; break;
+  case KBTS_SCRIPT_TAG_BAMUM: Result = KBTS_SCRIPT_BAMUM; break;
+  case KBTS_SCRIPT_TAG_BASSA_VAH: Result = KBTS_SCRIPT_BASSA_VAH; break;
+  case KBTS_SCRIPT_TAG_BATAK: Result = KBTS_SCRIPT_BATAK; break;
+  case KBTS_SCRIPT_TAG_BENGALI: Result = KBTS_SCRIPT_BENGALI; break;
+  case KBTS_SCRIPT_TAG_BHAIKSUKI: Result = KBTS_SCRIPT_BHAIKSUKI; break;
+  case KBTS_SCRIPT_TAG_BOPOMOFO: Result = KBTS_SCRIPT_BOPOMOFO; break;
+  case KBTS_SCRIPT_TAG_BRAHMI: Result = KBTS_SCRIPT_BRAHMI; break;
+  case KBTS_SCRIPT_TAG_BUGINESE: Result = KBTS_SCRIPT_BUGINESE; break;
+  case KBTS_SCRIPT_TAG_BUHID: Result = KBTS_SCRIPT_BUHID; break;
+  case KBTS_SCRIPT_TAG_CANADIAN_SYLLABICS: Result = KBTS_SCRIPT_CANADIAN_SYLLABICS; break;
+  case KBTS_SCRIPT_TAG_CARIAN: Result = KBTS_SCRIPT_CARIAN; break;
+  case KBTS_SCRIPT_TAG_CAUCASIAN_ALBANIAN: Result = KBTS_SCRIPT_CAUCASIAN_ALBANIAN; break;
+  case KBTS_SCRIPT_TAG_CHAKMA: Result = KBTS_SCRIPT_CHAKMA; break;
+  case KBTS_SCRIPT_TAG_CHAM: Result = KBTS_SCRIPT_CHAM; break;
+  case KBTS_SCRIPT_TAG_CHEROKEE: Result = KBTS_SCRIPT_CHEROKEE; break;
+  case KBTS_SCRIPT_TAG_CHORASMIAN: Result = KBTS_SCRIPT_CHORASMIAN; break;
+  case KBTS_SCRIPT_TAG_CJK_IDEOGRAPHIC: Result = KBTS_SCRIPT_CJK_IDEOGRAPHIC; break;
+  case KBTS_SCRIPT_TAG_COPTIC: Result = KBTS_SCRIPT_COPTIC; break;
+  case KBTS_SCRIPT_TAG_CYPRIOT_SYLLABARY: Result = KBTS_SCRIPT_CYPRIOT_SYLLABARY; break;
+  case KBTS_SCRIPT_TAG_CYPRO_MINOAN: Result = KBTS_SCRIPT_CYPRO_MINOAN; break;
+  case KBTS_SCRIPT_TAG_CYRILLIC: Result = KBTS_SCRIPT_CYRILLIC; break;
+  case KBTS_SCRIPT_TAG_DEFAULT: Result = KBTS_SCRIPT_DEFAULT; break;
+  case KBTS_SCRIPT_TAG_DESERET: Result = KBTS_SCRIPT_DESERET; break;
+  case KBTS_SCRIPT_TAG_DEVANAGARI: Result = KBTS_SCRIPT_DEVANAGARI; break;
+  case KBTS_SCRIPT_TAG_DIVES_AKURU: Result = KBTS_SCRIPT_DIVES_AKURU; break;
+  case KBTS_SCRIPT_TAG_DOGRA: Result = KBTS_SCRIPT_DOGRA; break;
+  case KBTS_SCRIPT_TAG_DUPLOYAN: Result = KBTS_SCRIPT_DUPLOYAN; break;
+  case KBTS_SCRIPT_TAG_EGYPTIAN_HIEROGLYPHS: Result = KBTS_SCRIPT_EGYPTIAN_HIEROGLYPHS; break;
+  case KBTS_SCRIPT_TAG_ELBASAN: Result = KBTS_SCRIPT_ELBASAN; break;
+  case KBTS_SCRIPT_TAG_ELYMAIC: Result = KBTS_SCRIPT_ELYMAIC; break;
+  case KBTS_SCRIPT_TAG_ETHIOPIC: Result = KBTS_SCRIPT_ETHIOPIC; break;
+  case KBTS_SCRIPT_TAG_GARAY: Result = KBTS_SCRIPT_GARAY; break;
+  case KBTS_SCRIPT_TAG_GEORGIAN: Result = KBTS_SCRIPT_GEORGIAN; break;
+  case KBTS_SCRIPT_TAG_GLAGOLITIC: Result = KBTS_SCRIPT_GLAGOLITIC; break;
+  case KBTS_SCRIPT_TAG_GOTHIC: Result = KBTS_SCRIPT_GOTHIC; break;
+  case KBTS_SCRIPT_TAG_GRANTHA: Result = KBTS_SCRIPT_GRANTHA; break;
+  case KBTS_SCRIPT_TAG_GREEK: Result = KBTS_SCRIPT_GREEK; break;
+  case KBTS_SCRIPT_TAG_GUJARATI: Result = KBTS_SCRIPT_GUJARATI; break;
+  case KBTS_SCRIPT_TAG_GUNJALA_GONDI: Result = KBTS_SCRIPT_GUNJALA_GONDI; break;
+  case KBTS_SCRIPT_TAG_GURMUKHI: Result = KBTS_SCRIPT_GURMUKHI; break;
+  case KBTS_SCRIPT_TAG_GURUNG_KHEMA: Result = KBTS_SCRIPT_GURUNG_KHEMA; break;
+  case KBTS_SCRIPT_TAG_HANGUL: Result = KBTS_SCRIPT_HANGUL; break;
+  case KBTS_SCRIPT_TAG_HANIFI_ROHINGYA: Result = KBTS_SCRIPT_HANIFI_ROHINGYA; break;
+  case KBTS_SCRIPT_TAG_HANUNOO: Result = KBTS_SCRIPT_HANUNOO; break;
+  case KBTS_SCRIPT_TAG_HATRAN: Result = KBTS_SCRIPT_HATRAN; break;
+  case KBTS_SCRIPT_TAG_HEBREW: Result = KBTS_SCRIPT_HEBREW; break;
+  case KBTS_SCRIPT_TAG_HIRAGANA: Result = KBTS_SCRIPT_HIRAGANA; break;
+  case KBTS_SCRIPT_TAG_IMPERIAL_ARAMAIC: Result = KBTS_SCRIPT_IMPERIAL_ARAMAIC; break;
+  case KBTS_SCRIPT_TAG_INSCRIPTIONAL_PAHLAVI: Result = KBTS_SCRIPT_INSCRIPTIONAL_PAHLAVI; break;
+  case KBTS_SCRIPT_TAG_INSCRIPTIONAL_PARTHIAN: Result = KBTS_SCRIPT_INSCRIPTIONAL_PARTHIAN; break;
+  case KBTS_SCRIPT_TAG_JAVANESE: Result = KBTS_SCRIPT_JAVANESE; break;
+  case KBTS_SCRIPT_TAG_KAITHI: Result = KBTS_SCRIPT_KAITHI; break;
+  case KBTS_SCRIPT_TAG_KANNADA: Result = KBTS_SCRIPT_KANNADA; break;
+  case KBTS_SCRIPT_TAG_KAWI: Result = KBTS_SCRIPT_KAWI; break;
+  case KBTS_SCRIPT_TAG_KAYAH_LI: Result = KBTS_SCRIPT_KAYAH_LI; break;
+  case KBTS_SCRIPT_TAG_KHAROSHTHI: Result = KBTS_SCRIPT_KHAROSHTHI; break;
+  case KBTS_SCRIPT_TAG_KHITAN_SMALL_SCRIPT: Result = KBTS_SCRIPT_KHITAN_SMALL_SCRIPT; break;
+  case KBTS_SCRIPT_TAG_KHMER: Result = KBTS_SCRIPT_KHMER; break;
+  case KBTS_SCRIPT_TAG_KHOJKI: Result = KBTS_SCRIPT_KHOJKI; break;
+  case KBTS_SCRIPT_TAG_KHUDAWADI: Result = KBTS_SCRIPT_KHUDAWADI; break;
+  case KBTS_SCRIPT_TAG_KIRAT_RAI: Result = KBTS_SCRIPT_KIRAT_RAI; break;
+  case KBTS_SCRIPT_TAG_LAO: Result = KBTS_SCRIPT_LAO; break;
+  case KBTS_SCRIPT_TAG_LATIN: Result = KBTS_SCRIPT_LATIN; break;
+  case KBTS_SCRIPT_TAG_LEPCHA: Result = KBTS_SCRIPT_LEPCHA; break;
+  case KBTS_SCRIPT_TAG_LIMBU: Result = KBTS_SCRIPT_LIMBU; break;
+  case KBTS_SCRIPT_TAG_LINEAR_A: Result = KBTS_SCRIPT_LINEAR_A; break;
+  case KBTS_SCRIPT_TAG_LINEAR_B: Result = KBTS_SCRIPT_LINEAR_B; break;
+  case KBTS_SCRIPT_TAG_LISU: Result = KBTS_SCRIPT_LISU; break;
+  case KBTS_SCRIPT_TAG_LYCIAN: Result = KBTS_SCRIPT_LYCIAN; break;
+  case KBTS_SCRIPT_TAG_LYDIAN: Result = KBTS_SCRIPT_LYDIAN; break;
+  case KBTS_SCRIPT_TAG_MAHAJANI: Result = KBTS_SCRIPT_MAHAJANI; break;
+  case KBTS_SCRIPT_TAG_MAKASAR: Result = KBTS_SCRIPT_MAKASAR; break;
+  case KBTS_SCRIPT_TAG_MALAYALAM: Result = KBTS_SCRIPT_MALAYALAM; break;
+  case KBTS_SCRIPT_TAG_MANDAIC: Result = KBTS_SCRIPT_MANDAIC; break;
+  case KBTS_SCRIPT_TAG_MANICHAEAN: Result = KBTS_SCRIPT_MANICHAEAN; break;
+  case KBTS_SCRIPT_TAG_MARCHEN: Result = KBTS_SCRIPT_MARCHEN; break;
+  case KBTS_SCRIPT_TAG_MASARAM_GONDI: Result = KBTS_SCRIPT_MASARAM_GONDI; break;
+  case KBTS_SCRIPT_TAG_MEDEFAIDRIN: Result = KBTS_SCRIPT_MEDEFAIDRIN; break;
+  case KBTS_SCRIPT_TAG_MEETEI_MAYEK: Result = KBTS_SCRIPT_MEETEI_MAYEK; break;
+  case KBTS_SCRIPT_TAG_MENDE_KIKAKUI: Result = KBTS_SCRIPT_MENDE_KIKAKUI; break;
+  case KBTS_SCRIPT_TAG_MEROITIC_CURSIVE: Result = KBTS_SCRIPT_MEROITIC_CURSIVE; break;
+  case KBTS_SCRIPT_TAG_MEROITIC_HIEROGLYPHS: Result = KBTS_SCRIPT_MEROITIC_HIEROGLYPHS; break;
+  case KBTS_SCRIPT_TAG_MIAO: Result = KBTS_SCRIPT_MIAO; break;
+  case KBTS_SCRIPT_TAG_MODI: Result = KBTS_SCRIPT_MODI; break;
+  case KBTS_SCRIPT_TAG_MONGOLIAN: Result = KBTS_SCRIPT_MONGOLIAN; break;
+  case KBTS_SCRIPT_TAG_MRO: Result = KBTS_SCRIPT_MRO; break;
+  case KBTS_SCRIPT_TAG_MULTANI: Result = KBTS_SCRIPT_MULTANI; break;
+  case KBTS_SCRIPT_TAG_MYANMAR: Result = KBTS_SCRIPT_MYANMAR; break;
+  case KBTS_SCRIPT_TAG_NABATAEAN: Result = KBTS_SCRIPT_NABATAEAN; break;
+  case KBTS_SCRIPT_TAG_NAG_MUNDARI: Result = KBTS_SCRIPT_NAG_MUNDARI; break;
+  case KBTS_SCRIPT_TAG_NANDINAGARI: Result = KBTS_SCRIPT_NANDINAGARI; break;
+  case KBTS_SCRIPT_TAG_NEWA: Result = KBTS_SCRIPT_NEWA; break;
+  case KBTS_SCRIPT_TAG_NEW_TAI_LUE: Result = KBTS_SCRIPT_NEW_TAI_LUE; break;
+  case KBTS_SCRIPT_TAG_NKO: Result = KBTS_SCRIPT_NKO; break;
+  case KBTS_SCRIPT_TAG_NUSHU: Result = KBTS_SCRIPT_NUSHU; break;
+  case KBTS_SCRIPT_TAG_NYIAKENG_PUACHUE_HMONG: Result = KBTS_SCRIPT_NYIAKENG_PUACHUE_HMONG; break;
+  case KBTS_SCRIPT_TAG_OGHAM: Result = KBTS_SCRIPT_OGHAM; break;
+  case KBTS_SCRIPT_TAG_OL_CHIKI: Result = KBTS_SCRIPT_OL_CHIKI; break;
+  case KBTS_SCRIPT_TAG_OL_ONAL: Result = KBTS_SCRIPT_OL_ONAL; break;
+  case KBTS_SCRIPT_TAG_OLD_ITALIC: Result = KBTS_SCRIPT_OLD_ITALIC; break;
+  case KBTS_SCRIPT_TAG_OLD_HUNGARIAN: Result = KBTS_SCRIPT_OLD_HUNGARIAN; break;
+  case KBTS_SCRIPT_TAG_OLD_NORTH_ARABIAN: Result = KBTS_SCRIPT_OLD_NORTH_ARABIAN; break;
+  case KBTS_SCRIPT_TAG_OLD_PERMIC: Result = KBTS_SCRIPT_OLD_PERMIC; break;
+  case KBTS_SCRIPT_TAG_OLD_PERSIAN_CUNEIFORM: Result = KBTS_SCRIPT_OLD_PERSIAN_CUNEIFORM; break;
+  case KBTS_SCRIPT_TAG_OLD_SOGDIAN: Result = KBTS_SCRIPT_OLD_SOGDIAN; break;
+  case KBTS_SCRIPT_TAG_OLD_SOUTH_ARABIAN: Result = KBTS_SCRIPT_OLD_SOUTH_ARABIAN; break;
+  case KBTS_SCRIPT_TAG_OLD_TURKIC: Result = KBTS_SCRIPT_OLD_TURKIC; break;
+  case KBTS_SCRIPT_TAG_OLD_UYGHUR: Result = KBTS_SCRIPT_OLD_UYGHUR; break;
+  case KBTS_SCRIPT_TAG_ODIA: Result = KBTS_SCRIPT_ODIA; break;
+  case KBTS_SCRIPT_TAG_OSAGE: Result = KBTS_SCRIPT_OSAGE; break;
+  case KBTS_SCRIPT_TAG_OSMANYA: Result = KBTS_SCRIPT_OSMANYA; break;
+  case KBTS_SCRIPT_TAG_PAHAWH_HMONG: Result = KBTS_SCRIPT_PAHAWH_HMONG; break;
+  case KBTS_SCRIPT_TAG_PALMYRENE: Result = KBTS_SCRIPT_PALMYRENE; break;
+  case KBTS_SCRIPT_TAG_PAU_CIN_HAU: Result = KBTS_SCRIPT_PAU_CIN_HAU; break;
+  case KBTS_SCRIPT_TAG_PHAGS_PA: Result = KBTS_SCRIPT_PHAGS_PA; break;
+  case KBTS_SCRIPT_TAG_PHOENICIAN: Result = KBTS_SCRIPT_PHOENICIAN; break;
+  case KBTS_SCRIPT_TAG_PSALTER_PAHLAVI: Result = KBTS_SCRIPT_PSALTER_PAHLAVI; break;
+  case KBTS_SCRIPT_TAG_REJANG: Result = KBTS_SCRIPT_REJANG; break;
+  case KBTS_SCRIPT_TAG_RUNIC: Result = KBTS_SCRIPT_RUNIC; break;
+  case KBTS_SCRIPT_TAG_SAMARITAN: Result = KBTS_SCRIPT_SAMARITAN; break;
+  case KBTS_SCRIPT_TAG_SAURASHTRA: Result = KBTS_SCRIPT_SAURASHTRA; break;
+  case KBTS_SCRIPT_TAG_SHARADA: Result = KBTS_SCRIPT_SHARADA; break;
+  case KBTS_SCRIPT_TAG_SHAVIAN: Result = KBTS_SCRIPT_SHAVIAN; break;
+  case KBTS_SCRIPT_TAG_SIDDHAM: Result = KBTS_SCRIPT_SIDDHAM; break;
+  case KBTS_SCRIPT_TAG_SIGN_WRITING: Result = KBTS_SCRIPT_SIGN_WRITING; break;
+  case KBTS_SCRIPT_TAG_SOGDIAN: Result = KBTS_SCRIPT_SOGDIAN; break;
+  case KBTS_SCRIPT_TAG_SINHALA: Result = KBTS_SCRIPT_SINHALA; break;
+  case KBTS_SCRIPT_TAG_SORA_SOMPENG: Result = KBTS_SCRIPT_SORA_SOMPENG; break;
+  case KBTS_SCRIPT_TAG_SOYOMBO: Result = KBTS_SCRIPT_SOYOMBO; break;
+  case KBTS_SCRIPT_TAG_SUMERO_AKKADIAN_CUNEIFORM: Result = KBTS_SCRIPT_SUMERO_AKKADIAN_CUNEIFORM; break;
+  case KBTS_SCRIPT_TAG_SUNDANESE: Result = KBTS_SCRIPT_SUNDANESE; break;
+  case KBTS_SCRIPT_TAG_SUNUWAR: Result = KBTS_SCRIPT_SUNUWAR; break;
+  case KBTS_SCRIPT_TAG_SYLOTI_NAGRI: Result = KBTS_SCRIPT_SYLOTI_NAGRI; break;
+  case KBTS_SCRIPT_TAG_SYRIAC: Result = KBTS_SCRIPT_SYRIAC; break;
+  case KBTS_SCRIPT_TAG_TAGALOG: Result = KBTS_SCRIPT_TAGALOG; break;
+  case KBTS_SCRIPT_TAG_TAGBANWA: Result = KBTS_SCRIPT_TAGBANWA; break;
+  case KBTS_SCRIPT_TAG_TAI_LE: Result = KBTS_SCRIPT_TAI_LE; break;
+  case KBTS_SCRIPT_TAG_TAI_THAM: Result = KBTS_SCRIPT_TAI_THAM; break;
+  case KBTS_SCRIPT_TAG_TAI_VIET: Result = KBTS_SCRIPT_TAI_VIET; break;
+  case KBTS_SCRIPT_TAG_TAKRI: Result = KBTS_SCRIPT_TAKRI; break;
+  case KBTS_SCRIPT_TAG_TAMIL: Result = KBTS_SCRIPT_TAMIL; break;
+  case KBTS_SCRIPT_TAG_TANGSA: Result = KBTS_SCRIPT_TANGSA; break;
+  case KBTS_SCRIPT_TAG_TANGUT: Result = KBTS_SCRIPT_TANGUT; break;
+  case KBTS_SCRIPT_TAG_TELUGU: Result = KBTS_SCRIPT_TELUGU; break;
+  case KBTS_SCRIPT_TAG_THAANA: Result = KBTS_SCRIPT_THAANA; break;
+  case KBTS_SCRIPT_TAG_THAI: Result = KBTS_SCRIPT_THAI; break;
+  case KBTS_SCRIPT_TAG_TIBETAN: Result = KBTS_SCRIPT_TIBETAN; break;
+  case KBTS_SCRIPT_TAG_TIFINAGH: Result = KBTS_SCRIPT_TIFINAGH; break;
+  case KBTS_SCRIPT_TAG_TIRHUTA: Result = KBTS_SCRIPT_TIRHUTA; break;
+  case KBTS_SCRIPT_TAG_TODHRI: Result = KBTS_SCRIPT_TODHRI; break;
+  case KBTS_SCRIPT_TAG_TOTO: Result = KBTS_SCRIPT_TOTO; break;
+  case KBTS_SCRIPT_TAG_TULU_TIGALARI: Result = KBTS_SCRIPT_TULU_TIGALARI; break;
+  case KBTS_SCRIPT_TAG_UGARITIC_CUNEIFORM: Result = KBTS_SCRIPT_UGARITIC_CUNEIFORM; break;
+  case KBTS_SCRIPT_TAG_VAI: Result = KBTS_SCRIPT_VAI; break;
+  case KBTS_SCRIPT_TAG_VITHKUQI: Result = KBTS_SCRIPT_VITHKUQI; break;
+  case KBTS_SCRIPT_TAG_WANCHO: Result = KBTS_SCRIPT_WANCHO; break;
+  case KBTS_SCRIPT_TAG_WARANG_CITI: Result = KBTS_SCRIPT_WARANG_CITI; break;
+  case KBTS_SCRIPT_TAG_YEZIDI: Result = KBTS_SCRIPT_YEZIDI; break;
+  case KBTS_SCRIPT_TAG_YI: Result = KBTS_SCRIPT_YI; break;
+  case KBTS_SCRIPT_TAG_ZANABAZAR_SQUARE: Result = KBTS_SCRIPT_ZANABAZAR_SQUARE; break;
+  default: break;
+  }
+  return Result;
+}
+
+KBTS_EXPORT kbts_feature_id kbts_FeatureTagToId(kbts_feature_tag Tag)
+{
+  kbts_feature_id Result = 0;
+  switch(Tag)
+  {
+  case KBTS_FEATURE_TAG_isol: Result = KBTS_FEATURE_ID_isol; break;
+  case KBTS_FEATURE_TAG_fina: Result = KBTS_FEATURE_ID_fina; break;
+  case KBTS_FEATURE_TAG_fin2: Result = KBTS_FEATURE_ID_fin2; break;
+  case KBTS_FEATURE_TAG_fin3: Result = KBTS_FEATURE_ID_fin3; break;
+  case KBTS_FEATURE_TAG_medi: Result = KBTS_FEATURE_ID_medi; break;
+  case KBTS_FEATURE_TAG_med2: Result = KBTS_FEATURE_ID_med2; break;
+  case KBTS_FEATURE_TAG_init: Result = KBTS_FEATURE_ID_init; break;
+  case KBTS_FEATURE_TAG_ljmo: Result = KBTS_FEATURE_ID_ljmo; break;
+  case KBTS_FEATURE_TAG_vjmo: Result = KBTS_FEATURE_ID_vjmo; break;
+  case KBTS_FEATURE_TAG_tjmo: Result = KBTS_FEATURE_ID_tjmo; break;
+  case KBTS_FEATURE_TAG_rphf: Result = KBTS_FEATURE_ID_rphf; break;
+  case KBTS_FEATURE_TAG_blwf: Result = KBTS_FEATURE_ID_blwf; break;
+  case KBTS_FEATURE_TAG_half: Result = KBTS_FEATURE_ID_half; break;
+  case KBTS_FEATURE_TAG_pstf: Result = KBTS_FEATURE_ID_pstf; break;
+  case KBTS_FEATURE_TAG_abvf: Result = KBTS_FEATURE_ID_abvf; break;
+  case KBTS_FEATURE_TAG_pref: Result = KBTS_FEATURE_ID_pref; break;
+  case KBTS_FEATURE_TAG_numr: Result = KBTS_FEATURE_ID_numr; break;
+  case KBTS_FEATURE_TAG_frac: Result = KBTS_FEATURE_ID_frac; break;
+  case KBTS_FEATURE_TAG_dnom: Result = KBTS_FEATURE_ID_dnom; break;
+  case KBTS_FEATURE_TAG_cfar: Result = KBTS_FEATURE_ID_cfar; break;
+  case KBTS_FEATURE_TAG_aalt: Result = KBTS_FEATURE_ID_aalt; break;
+  case KBTS_FEATURE_TAG_abvm: Result = KBTS_FEATURE_ID_abvm; break;
+  case KBTS_FEATURE_TAG_abvs: Result = KBTS_FEATURE_ID_abvs; break;
+  case KBTS_FEATURE_TAG_afrc: Result = KBTS_FEATURE_ID_afrc; break;
+  case KBTS_FEATURE_TAG_akhn: Result = KBTS_FEATURE_ID_akhn; break;
+  case KBTS_FEATURE_TAG_apkn: Result = KBTS_FEATURE_ID_apkn; break;
+  case KBTS_FEATURE_TAG_blwm: Result = KBTS_FEATURE_ID_blwm; break;
+  case KBTS_FEATURE_TAG_blws: Result = KBTS_FEATURE_ID_blws; break;
+  case KBTS_FEATURE_TAG_calt: Result = KBTS_FEATURE_ID_calt; break;
+  case KBTS_FEATURE_TAG_case: Result = KBTS_FEATURE_ID_case; break;
+  case KBTS_FEATURE_TAG_ccmp: Result = KBTS_FEATURE_ID_ccmp; break;
+  case KBTS_FEATURE_TAG_chws: Result = KBTS_FEATURE_ID_chws; break;
+  case KBTS_FEATURE_TAG_cjct: Result = KBTS_FEATURE_ID_cjct; break;
+  case KBTS_FEATURE_TAG_clig: Result = KBTS_FEATURE_ID_clig; break;
+  case KBTS_FEATURE_TAG_cpct: Result = KBTS_FEATURE_ID_cpct; break;
+  case KBTS_FEATURE_TAG_cpsp: Result = KBTS_FEATURE_ID_cpsp; break;
+  case KBTS_FEATURE_TAG_cswh: Result = KBTS_FEATURE_ID_cswh; break;
+  case KBTS_FEATURE_TAG_curs: Result = KBTS_FEATURE_ID_curs; break;
+  case KBTS_FEATURE_TAG_cv01: Result = KBTS_FEATURE_ID_cv01; break;
+  case KBTS_FEATURE_TAG_cv02: Result = KBTS_FEATURE_ID_cv02; break;
+  case KBTS_FEATURE_TAG_cv03: Result = KBTS_FEATURE_ID_cv03; break;
+  case KBTS_FEATURE_TAG_cv04: Result = KBTS_FEATURE_ID_cv04; break;
+  case KBTS_FEATURE_TAG_cv05: Result = KBTS_FEATURE_ID_cv05; break;
+  case KBTS_FEATURE_TAG_cv06: Result = KBTS_FEATURE_ID_cv06; break;
+  case KBTS_FEATURE_TAG_cv07: Result = KBTS_FEATURE_ID_cv07; break;
+  case KBTS_FEATURE_TAG_cv08: Result = KBTS_FEATURE_ID_cv08; break;
+  case KBTS_FEATURE_TAG_cv09: Result = KBTS_FEATURE_ID_cv09; break;
+  case KBTS_FEATURE_TAG_cv10: Result = KBTS_FEATURE_ID_cv10; break;
+  case KBTS_FEATURE_TAG_cv11: Result = KBTS_FEATURE_ID_cv11; break;
+  case KBTS_FEATURE_TAG_cv12: Result = KBTS_FEATURE_ID_cv12; break;
+  case KBTS_FEATURE_TAG_cv13: Result = KBTS_FEATURE_ID_cv13; break;
+  case KBTS_FEATURE_TAG_cv14: Result = KBTS_FEATURE_ID_cv14; break;
+  case KBTS_FEATURE_TAG_cv15: Result = KBTS_FEATURE_ID_cv15; break;
+  case KBTS_FEATURE_TAG_cv16: Result = KBTS_FEATURE_ID_cv16; break;
+  case KBTS_FEATURE_TAG_cv17: Result = KBTS_FEATURE_ID_cv17; break;
+  case KBTS_FEATURE_TAG_cv18: Result = KBTS_FEATURE_ID_cv18; break;
+  case KBTS_FEATURE_TAG_cv19: Result = KBTS_FEATURE_ID_cv19; break;
+  case KBTS_FEATURE_TAG_cv20: Result = KBTS_FEATURE_ID_cv20; break;
+  case KBTS_FEATURE_TAG_cv21: Result = KBTS_FEATURE_ID_cv21; break;
+  case KBTS_FEATURE_TAG_cv22: Result = KBTS_FEATURE_ID_cv22; break;
+  case KBTS_FEATURE_TAG_cv23: Result = KBTS_FEATURE_ID_cv23; break;
+  case KBTS_FEATURE_TAG_cv24: Result = KBTS_FEATURE_ID_cv24; break;
+  case KBTS_FEATURE_TAG_cv25: Result = KBTS_FEATURE_ID_cv25; break;
+  case KBTS_FEATURE_TAG_cv26: Result = KBTS_FEATURE_ID_cv26; break;
+  case KBTS_FEATURE_TAG_cv27: Result = KBTS_FEATURE_ID_cv27; break;
+  case KBTS_FEATURE_TAG_cv28: Result = KBTS_FEATURE_ID_cv28; break;
+  case KBTS_FEATURE_TAG_cv29: Result = KBTS_FEATURE_ID_cv29; break;
+  case KBTS_FEATURE_TAG_cv30: Result = KBTS_FEATURE_ID_cv30; break;
+  case KBTS_FEATURE_TAG_cv31: Result = KBTS_FEATURE_ID_cv31; break;
+  case KBTS_FEATURE_TAG_cv32: Result = KBTS_FEATURE_ID_cv32; break;
+  case KBTS_FEATURE_TAG_cv33: Result = KBTS_FEATURE_ID_cv33; break;
+  case KBTS_FEATURE_TAG_cv34: Result = KBTS_FEATURE_ID_cv34; break;
+  case KBTS_FEATURE_TAG_cv35: Result = KBTS_FEATURE_ID_cv35; break;
+  case KBTS_FEATURE_TAG_cv36: Result = KBTS_FEATURE_ID_cv36; break;
+  case KBTS_FEATURE_TAG_cv37: Result = KBTS_FEATURE_ID_cv37; break;
+  case KBTS_FEATURE_TAG_cv38: Result = KBTS_FEATURE_ID_cv38; break;
+  case KBTS_FEATURE_TAG_cv39: Result = KBTS_FEATURE_ID_cv39; break;
+  case KBTS_FEATURE_TAG_cv40: Result = KBTS_FEATURE_ID_cv40; break;
+  case KBTS_FEATURE_TAG_cv41: Result = KBTS_FEATURE_ID_cv41; break;
+  case KBTS_FEATURE_TAG_cv42: Result = KBTS_FEATURE_ID_cv42; break;
+  case KBTS_FEATURE_TAG_cv43: Result = KBTS_FEATURE_ID_cv43; break;
+  case KBTS_FEATURE_TAG_cv44: Result = KBTS_FEATURE_ID_cv44; break;
+  case KBTS_FEATURE_TAG_cv45: Result = KBTS_FEATURE_ID_cv45; break;
+  case KBTS_FEATURE_TAG_cv46: Result = KBTS_FEATURE_ID_cv46; break;
+  case KBTS_FEATURE_TAG_cv47: Result = KBTS_FEATURE_ID_cv47; break;
+  case KBTS_FEATURE_TAG_cv48: Result = KBTS_FEATURE_ID_cv48; break;
+  case KBTS_FEATURE_TAG_cv49: Result = KBTS_FEATURE_ID_cv49; break;
+  case KBTS_FEATURE_TAG_cv50: Result = KBTS_FEATURE_ID_cv50; break;
+  case KBTS_FEATURE_TAG_cv51: Result = KBTS_FEATURE_ID_cv51; break;
+  case KBTS_FEATURE_TAG_cv52: Result = KBTS_FEATURE_ID_cv52; break;
+  case KBTS_FEATURE_TAG_cv53: Result = KBTS_FEATURE_ID_cv53; break;
+  case KBTS_FEATURE_TAG_cv54: Result = KBTS_FEATURE_ID_cv54; break;
+  case KBTS_FEATURE_TAG_cv55: Result = KBTS_FEATURE_ID_cv55; break;
+  case KBTS_FEATURE_TAG_cv56: Result = KBTS_FEATURE_ID_cv56; break;
+  case KBTS_FEATURE_TAG_cv57: Result = KBTS_FEATURE_ID_cv57; break;
+  case KBTS_FEATURE_TAG_cv58: Result = KBTS_FEATURE_ID_cv58; break;
+  case KBTS_FEATURE_TAG_cv59: Result = KBTS_FEATURE_ID_cv59; break;
+  case KBTS_FEATURE_TAG_cv60: Result = KBTS_FEATURE_ID_cv60; break;
+  case KBTS_FEATURE_TAG_cv61: Result = KBTS_FEATURE_ID_cv61; break;
+  case KBTS_FEATURE_TAG_cv62: Result = KBTS_FEATURE_ID_cv62; break;
+  case KBTS_FEATURE_TAG_cv63: Result = KBTS_FEATURE_ID_cv63; break;
+  case KBTS_FEATURE_TAG_cv64: Result = KBTS_FEATURE_ID_cv64; break;
+  case KBTS_FEATURE_TAG_cv65: Result = KBTS_FEATURE_ID_cv65; break;
+  case KBTS_FEATURE_TAG_cv66: Result = KBTS_FEATURE_ID_cv66; break;
+  case KBTS_FEATURE_TAG_cv67: Result = KBTS_FEATURE_ID_cv67; break;
+  case KBTS_FEATURE_TAG_cv68: Result = KBTS_FEATURE_ID_cv68; break;
+  case KBTS_FEATURE_TAG_cv69: Result = KBTS_FEATURE_ID_cv69; break;
+  case KBTS_FEATURE_TAG_cv70: Result = KBTS_FEATURE_ID_cv70; break;
+  case KBTS_FEATURE_TAG_cv71: Result = KBTS_FEATURE_ID_cv71; break;
+  case KBTS_FEATURE_TAG_cv72: Result = KBTS_FEATURE_ID_cv72; break;
+  case KBTS_FEATURE_TAG_cv73: Result = KBTS_FEATURE_ID_cv73; break;
+  case KBTS_FEATURE_TAG_cv74: Result = KBTS_FEATURE_ID_cv74; break;
+  case KBTS_FEATURE_TAG_cv75: Result = KBTS_FEATURE_ID_cv75; break;
+  case KBTS_FEATURE_TAG_cv76: Result = KBTS_FEATURE_ID_cv76; break;
+  case KBTS_FEATURE_TAG_cv77: Result = KBTS_FEATURE_ID_cv77; break;
+  case KBTS_FEATURE_TAG_cv78: Result = KBTS_FEATURE_ID_cv78; break;
+  case KBTS_FEATURE_TAG_cv79: Result = KBTS_FEATURE_ID_cv79; break;
+  case KBTS_FEATURE_TAG_cv80: Result = KBTS_FEATURE_ID_cv80; break;
+  case KBTS_FEATURE_TAG_cv81: Result = KBTS_FEATURE_ID_cv81; break;
+  case KBTS_FEATURE_TAG_cv82: Result = KBTS_FEATURE_ID_cv82; break;
+  case KBTS_FEATURE_TAG_cv83: Result = KBTS_FEATURE_ID_cv83; break;
+  case KBTS_FEATURE_TAG_cv84: Result = KBTS_FEATURE_ID_cv84; break;
+  case KBTS_FEATURE_TAG_cv85: Result = KBTS_FEATURE_ID_cv85; break;
+  case KBTS_FEATURE_TAG_cv86: Result = KBTS_FEATURE_ID_cv86; break;
+  case KBTS_FEATURE_TAG_cv87: Result = KBTS_FEATURE_ID_cv87; break;
+  case KBTS_FEATURE_TAG_cv88: Result = KBTS_FEATURE_ID_cv88; break;
+  case KBTS_FEATURE_TAG_cv89: Result = KBTS_FEATURE_ID_cv89; break;
+  case KBTS_FEATURE_TAG_cv90: Result = KBTS_FEATURE_ID_cv90; break;
+  case KBTS_FEATURE_TAG_cv91: Result = KBTS_FEATURE_ID_cv91; break;
+  case KBTS_FEATURE_TAG_cv92: Result = KBTS_FEATURE_ID_cv92; break;
+  case KBTS_FEATURE_TAG_cv93: Result = KBTS_FEATURE_ID_cv93; break;
+  case KBTS_FEATURE_TAG_cv94: Result = KBTS_FEATURE_ID_cv94; break;
+  case KBTS_FEATURE_TAG_cv95: Result = KBTS_FEATURE_ID_cv95; break;
+  case KBTS_FEATURE_TAG_cv96: Result = KBTS_FEATURE_ID_cv96; break;
+  case KBTS_FEATURE_TAG_cv97: Result = KBTS_FEATURE_ID_cv97; break;
+  case KBTS_FEATURE_TAG_cv98: Result = KBTS_FEATURE_ID_cv98; break;
+  case KBTS_FEATURE_TAG_cv99: Result = KBTS_FEATURE_ID_cv99; break;
+  case KBTS_FEATURE_TAG_c2pc: Result = KBTS_FEATURE_ID_c2pc; break;
+  case KBTS_FEATURE_TAG_c2sc: Result = KBTS_FEATURE_ID_c2sc; break;
+  case KBTS_FEATURE_TAG_dist: Result = KBTS_FEATURE_ID_dist; break;
+  case KBTS_FEATURE_TAG_dlig: Result = KBTS_FEATURE_ID_dlig; break;
+  case KBTS_FEATURE_TAG_dtls: Result = KBTS_FEATURE_ID_dtls; break;
+  case KBTS_FEATURE_TAG_expt: Result = KBTS_FEATURE_ID_expt; break;
+  case KBTS_FEATURE_TAG_falt: Result = KBTS_FEATURE_ID_falt; break;
+  case KBTS_FEATURE_TAG_flac: Result = KBTS_FEATURE_ID_flac; break;
+  case KBTS_FEATURE_TAG_fwid: Result = KBTS_FEATURE_ID_fwid; break;
+  case KBTS_FEATURE_TAG_haln: Result = KBTS_FEATURE_ID_haln; break;
+  case KBTS_FEATURE_TAG_halt: Result = KBTS_FEATURE_ID_halt; break;
+  case KBTS_FEATURE_TAG_hist: Result = KBTS_FEATURE_ID_hist; break;
+  case KBTS_FEATURE_TAG_hkna: Result = KBTS_FEATURE_ID_hkna; break;
+  case KBTS_FEATURE_TAG_hlig: Result = KBTS_FEATURE_ID_hlig; break;
+  case KBTS_FEATURE_TAG_hngl: Result = KBTS_FEATURE_ID_hngl; break;
+  case KBTS_FEATURE_TAG_hojo: Result = KBTS_FEATURE_ID_hojo; break;
+  case KBTS_FEATURE_TAG_hwid: Result = KBTS_FEATURE_ID_hwid; break;
+  case KBTS_FEATURE_TAG_ital: Result = KBTS_FEATURE_ID_ital; break;
+  case KBTS_FEATURE_TAG_jalt: Result = KBTS_FEATURE_ID_jalt; break;
+  case KBTS_FEATURE_TAG_jp78: Result = KBTS_FEATURE_ID_jp78; break;
+  case KBTS_FEATURE_TAG_jp83: Result = KBTS_FEATURE_ID_jp83; break;
+  case KBTS_FEATURE_TAG_jp90: Result = KBTS_FEATURE_ID_jp90; break;
+  case KBTS_FEATURE_TAG_jp04: Result = KBTS_FEATURE_ID_jp04; break;
+  case KBTS_FEATURE_TAG_kern: Result = KBTS_FEATURE_ID_kern; break;
+  case KBTS_FEATURE_TAG_lfbd: Result = KBTS_FEATURE_ID_lfbd; break;
+  case KBTS_FEATURE_TAG_liga: Result = KBTS_FEATURE_ID_liga; break;
+  case KBTS_FEATURE_TAG_lnum: Result = KBTS_FEATURE_ID_lnum; break;
+  case KBTS_FEATURE_TAG_locl: Result = KBTS_FEATURE_ID_locl; break;
+  case KBTS_FEATURE_TAG_ltra: Result = KBTS_FEATURE_ID_ltra; break;
+  case KBTS_FEATURE_TAG_ltrm: Result = KBTS_FEATURE_ID_ltrm; break;
+  case KBTS_FEATURE_TAG_mark: Result = KBTS_FEATURE_ID_mark; break;
+  case KBTS_FEATURE_TAG_mgrk: Result = KBTS_FEATURE_ID_mgrk; break;
+  case KBTS_FEATURE_TAG_mkmk: Result = KBTS_FEATURE_ID_mkmk; break;
+  case KBTS_FEATURE_TAG_mset: Result = KBTS_FEATURE_ID_mset; break;
+  case KBTS_FEATURE_TAG_nalt: Result = KBTS_FEATURE_ID_nalt; break;
+  case KBTS_FEATURE_TAG_nlck: Result = KBTS_FEATURE_ID_nlck; break;
+  case KBTS_FEATURE_TAG_nukt: Result = KBTS_FEATURE_ID_nukt; break;
+  case KBTS_FEATURE_TAG_onum: Result = KBTS_FEATURE_ID_onum; break;
+  case KBTS_FEATURE_TAG_opbd: Result = KBTS_FEATURE_ID_opbd; break;
+  case KBTS_FEATURE_TAG_ordn: Result = KBTS_FEATURE_ID_ordn; break;
+  case KBTS_FEATURE_TAG_ornm: Result = KBTS_FEATURE_ID_ornm; break;
+  case KBTS_FEATURE_TAG_palt: Result = KBTS_FEATURE_ID_palt; break;
+  case KBTS_FEATURE_TAG_pcap: Result = KBTS_FEATURE_ID_pcap; break;
+  case KBTS_FEATURE_TAG_pkna: Result = KBTS_FEATURE_ID_pkna; break;
+  case KBTS_FEATURE_TAG_pnum: Result = KBTS_FEATURE_ID_pnum; break;
+  case KBTS_FEATURE_TAG_pres: Result = KBTS_FEATURE_ID_pres; break;
+  case KBTS_FEATURE_TAG_psts: Result = KBTS_FEATURE_ID_psts; break;
+  case KBTS_FEATURE_TAG_pwid: Result = KBTS_FEATURE_ID_pwid; break;
+  case KBTS_FEATURE_TAG_qwid: Result = KBTS_FEATURE_ID_qwid; break;
+  case KBTS_FEATURE_TAG_rand: Result = KBTS_FEATURE_ID_rand; break;
+  case KBTS_FEATURE_TAG_rclt: Result = KBTS_FEATURE_ID_rclt; break;
+  case KBTS_FEATURE_TAG_rkrf: Result = KBTS_FEATURE_ID_rkrf; break;
+  case KBTS_FEATURE_TAG_rlig: Result = KBTS_FEATURE_ID_rlig; break;
+  case KBTS_FEATURE_TAG_rtbd: Result = KBTS_FEATURE_ID_rtbd; break;
+  case KBTS_FEATURE_TAG_rtla: Result = KBTS_FEATURE_ID_rtla; break;
+  case KBTS_FEATURE_TAG_rtlm: Result = KBTS_FEATURE_ID_rtlm; break;
+  case KBTS_FEATURE_TAG_ruby: Result = KBTS_FEATURE_ID_ruby; break;
+  case KBTS_FEATURE_TAG_rvrn: Result = KBTS_FEATURE_ID_rvrn; break;
+  case KBTS_FEATURE_TAG_salt: Result = KBTS_FEATURE_ID_salt; break;
+  case KBTS_FEATURE_TAG_sinf: Result = KBTS_FEATURE_ID_sinf; break;
+  case KBTS_FEATURE_TAG_size: Result = KBTS_FEATURE_ID_size; break;
+  case KBTS_FEATURE_TAG_smcp: Result = KBTS_FEATURE_ID_smcp; break;
+  case KBTS_FEATURE_TAG_smpl: Result = KBTS_FEATURE_ID_smpl; break;
+  case KBTS_FEATURE_TAG_ss01: Result = KBTS_FEATURE_ID_ss01; break;
+  case KBTS_FEATURE_TAG_ss02: Result = KBTS_FEATURE_ID_ss02; break;
+  case KBTS_FEATURE_TAG_ss03: Result = KBTS_FEATURE_ID_ss03; break;
+  case KBTS_FEATURE_TAG_ss04: Result = KBTS_FEATURE_ID_ss04; break;
+  case KBTS_FEATURE_TAG_ss05: Result = KBTS_FEATURE_ID_ss05; break;
+  case KBTS_FEATURE_TAG_ss06: Result = KBTS_FEATURE_ID_ss06; break;
+  case KBTS_FEATURE_TAG_ss07: Result = KBTS_FEATURE_ID_ss07; break;
+  case KBTS_FEATURE_TAG_ss08: Result = KBTS_FEATURE_ID_ss08; break;
+  case KBTS_FEATURE_TAG_ss09: Result = KBTS_FEATURE_ID_ss09; break;
+  case KBTS_FEATURE_TAG_ss10: Result = KBTS_FEATURE_ID_ss10; break;
+  case KBTS_FEATURE_TAG_ss11: Result = KBTS_FEATURE_ID_ss11; break;
+  case KBTS_FEATURE_TAG_ss12: Result = KBTS_FEATURE_ID_ss12; break;
+  case KBTS_FEATURE_TAG_ss13: Result = KBTS_FEATURE_ID_ss13; break;
+  case KBTS_FEATURE_TAG_ss14: Result = KBTS_FEATURE_ID_ss14; break;
+  case KBTS_FEATURE_TAG_ss15: Result = KBTS_FEATURE_ID_ss15; break;
+  case KBTS_FEATURE_TAG_ss16: Result = KBTS_FEATURE_ID_ss16; break;
+  case KBTS_FEATURE_TAG_ss17: Result = KBTS_FEATURE_ID_ss17; break;
+  case KBTS_FEATURE_TAG_ss18: Result = KBTS_FEATURE_ID_ss18; break;
+  case KBTS_FEATURE_TAG_ss19: Result = KBTS_FEATURE_ID_ss19; break;
+  case KBTS_FEATURE_TAG_ss20: Result = KBTS_FEATURE_ID_ss20; break;
+  case KBTS_FEATURE_TAG_ssty: Result = KBTS_FEATURE_ID_ssty; break;
+  case KBTS_FEATURE_TAG_stch: Result = KBTS_FEATURE_ID_stch; break;
+  case KBTS_FEATURE_TAG_subs: Result = KBTS_FEATURE_ID_subs; break;
+  case KBTS_FEATURE_TAG_sups: Result = KBTS_FEATURE_ID_sups; break;
+  case KBTS_FEATURE_TAG_swsh: Result = KBTS_FEATURE_ID_swsh; break;
+  case KBTS_FEATURE_TAG_test: Result = KBTS_FEATURE_ID_test; break;
+  case KBTS_FEATURE_TAG_titl: Result = KBTS_FEATURE_ID_titl; break;
+  case KBTS_FEATURE_TAG_tnam: Result = KBTS_FEATURE_ID_tnam; break;
+  case KBTS_FEATURE_TAG_tnum: Result = KBTS_FEATURE_ID_tnum; break;
+  case KBTS_FEATURE_TAG_trad: Result = KBTS_FEATURE_ID_trad; break;
+  case KBTS_FEATURE_TAG_twid: Result = KBTS_FEATURE_ID_twid; break;
+  case KBTS_FEATURE_TAG_unic: Result = KBTS_FEATURE_ID_unic; break;
+  case KBTS_FEATURE_TAG_valt: Result = KBTS_FEATURE_ID_valt; break;
+  case KBTS_FEATURE_TAG_vapk: Result = KBTS_FEATURE_ID_vapk; break;
+  case KBTS_FEATURE_TAG_vatu: Result = KBTS_FEATURE_ID_vatu; break;
+  case KBTS_FEATURE_TAG_vchw: Result = KBTS_FEATURE_ID_vchw; break;
+  case KBTS_FEATURE_TAG_vert: Result = KBTS_FEATURE_ID_vert; break;
+  case KBTS_FEATURE_TAG_vhal: Result = KBTS_FEATURE_ID_vhal; break;
+  case KBTS_FEATURE_TAG_vkna: Result = KBTS_FEATURE_ID_vkna; break;
+  case KBTS_FEATURE_TAG_vkrn: Result = KBTS_FEATURE_ID_vkrn; break;
+  case KBTS_FEATURE_TAG_vpal: Result = KBTS_FEATURE_ID_vpal; break;
+  case KBTS_FEATURE_TAG_vrt2: Result = KBTS_FEATURE_ID_vrt2; break;
+  case KBTS_FEATURE_TAG_vrtr: Result = KBTS_FEATURE_ID_vrtr; break;
+  case KBTS_FEATURE_TAG_zero: Result = KBTS_FEATURE_ID_zero; break;
+  default: break;
+  }
+  return Result;
+}
 
 static kbts_s32 kbts_UnicodeParentDeltas[1679] = {
   132,133,134,135,244,246,248,250,252,254,315,351,416,418,7678,7680,7682,7792,7794,132,133,134,135,275,277,279,281,283,285,346,382,447,
@@ -11791,7 +12941,7 @@ static kbts_indic_script_properties kbts_IndicScriptProperties(kbts_u32 Script)
   return Result;
 }
 
-static void kbts_ByteSwapArray16(kbts_u16 *Array, kbts_un Count)
+static void kbts_ByteSwapArray16Unchecked(kbts_u16 *Array, kbts_un Count)
 {
   KBTS_FOR(It, 0, Count)
   {
@@ -11799,12 +12949,34 @@ static void kbts_ByteSwapArray16(kbts_u16 *Array, kbts_un Count)
   }
 }
 
-static void kbts_ByteSwapArray32(kbts_u32 *Array, kbts_un Count)
+static int kbts_ByteSwapArray16(kbts_u16 *Array, kbts_un Count, char *End)
+{
+  int Result = 0;
+  if((char *)(Array + Count) <= End)
+  {
+    kbts_ByteSwapArray16Unchecked(Array, Count);
+    Result = 1;
+  }
+  return Result;
+}
+
+static void kbts_ByteSwapArray32Unchecked(kbts_u32 *Array, kbts_un Count)
 {
   KBTS_FOR(It, 0, Count)
   {
     Array[It] = kbts_ByteSwap32(Array[It]);
   }
+}
+
+static int kbts_ByteSwapArray32(kbts_u32 *Array, kbts_un Count, char *End)
+{
+  int Result = 0;
+  if((char *)(Array + Count) <= End)
+  {
+    kbts_ByteSwapArray32Unchecked(Array, Count);
+    Result = 1;
+  }
+  return Result;
 }
 
 static kbts_u64 kbts_ContainsFeature(kbts_feature_set *Set, kbts_feature_id Id)
@@ -11822,6 +12994,97 @@ static void kbts_AddFeature(kbts_feature_set *Set, kbts_feature_id Id)
   kbts_un BitIndex = Id % 64;
 
   Set->Flags[WordIndex] |= 1ull << BitIndex;
+}
+
+static kbts_feature_override kbts_FeatureOverrideBase(kbts_feature_id Id, kbts_feature_tag Tag, int Alternate, kbts_u32 Value)
+{
+  kbts_feature_override Result = KBTS_ZERO;
+  Result.Id = Id;
+  Result.Tag = Tag;
+
+  if(Alternate)
+  {
+    Result.EnabledOrAlternatePlusOne = Value + 1;
+  }
+  else
+  {
+    Result.EnabledOrAlternatePlusOne = Value;
+  }
+
+  return Result;
+}
+KBTS_EXPORT kbts_feature_override kbts_FeatureOverrideFromTag(kbts_feature_tag Tag, int Alternate, kbts_u32 Value)
+{
+  kbts_feature_override Result = kbts_FeatureOverrideBase(kbts_FeatureTagToId(Tag), Tag, Alternate, Value);
+  return Result;
+}
+KBTS_EXPORT kbts_feature_override kbts_FeatureOverride(kbts_feature_id Id, int Alternate, kbts_u32 Value)
+{
+  kbts_feature_override Result = kbts_FeatureOverrideBase(Id, 0, Alternate, Value);
+  return Result;
+}
+
+KBTS_EXPORT kbts_glyph_config kbts_GlyphConfig(kbts_feature_override *FeatureOverrides, kbts_u32 FeatureOverrideCount)
+{
+  kbts_glyph_config Result = KBTS_ZERO;
+  Result.FeatureOverrides = FeatureOverrides;
+  Result.FeatureOverrideCount = FeatureOverrideCount;
+
+  KBTS_FOR(FeatureOverrideIndex, 0, FeatureOverrideCount)
+  {
+    kbts_feature_override *Override = &FeatureOverrides[FeatureOverrideIndex];
+    if(Override->EnabledOrAlternatePlusOne)
+    {
+      kbts_AddFeature(&Result.EnabledFeatures, FeatureOverrides[FeatureOverrideIndex].Id);
+    }
+    else
+    {
+      kbts_AddFeature(&Result.DisabledFeatures, FeatureOverrides[FeatureOverrideIndex].Id);
+    }
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT kbts_glyph_config kbts_EmptyGlyphConfig(kbts_feature_override *FeatureOverrides, kbts_u32 FeatureOverrideCapacity)
+{
+  kbts_glyph_config Result = KBTS_ZERO;
+  Result.FeatureOverrides = FeatureOverrides;
+  Result.FeatureOverrideCapacity = FeatureOverrideCapacity;
+  return Result;
+}
+
+static int kbts_GlyphConfigOverrideFeatureBase(kbts_glyph_config *Config, kbts_feature_id Id, kbts_feature_tag Tag, int Alternate, kbts_u32 Value)
+{
+  kbts_feature_set *Set = &Config->EnabledFeatures;
+  if(!Value)
+  {
+    Set = &Config->DisabledFeatures;
+  }
+  kbts_AddFeature(Set, Id);
+
+  if(!Id || Alternate)
+  {
+    if(Config->FeatureOverrideCount < Config->FeatureOverrideCapacity)
+    {
+      kbts_feature_override Override = kbts_FeatureOverrideFromTag(Tag, Alternate, Value);
+      Config->FeatureOverrides[Config->FeatureOverrideCount++] = Override;
+    }
+    Config->RequiredFeatureOverrideCapacity += 1;
+  }
+
+  int Result = Config->RequiredFeatureOverrideCapacity <= Config->FeatureOverrideCapacity;
+  return Result;
+}
+KBTS_EXPORT int kbts_GlyphConfigOverrideFeature(kbts_glyph_config *Config, kbts_feature_id Id, int Alternate, kbts_u32 Value)
+{
+  int Result = kbts_GlyphConfigOverrideFeatureBase(Config, Id, 0, Alternate, Value);
+  return Result;
+}
+KBTS_EXPORT int kbts_GlyphConfigOverrideFeatureFromTag(kbts_glyph_config *Config, kbts_feature_tag Tag, int Alternate, kbts_u32 Value)
+{
+  int Result = kbts_GlyphConfigOverrideFeatureBase(Config, kbts_FeatureTagToId(Tag), Tag, Alternate, Value);
+  return Result;
 }
 
 //
@@ -13015,13 +14278,6 @@ static kbts_class_sequence_rule *kbts_GetClassSequenceRule(kbts_class_sequence_r
   return Result;
 }
 
-static kbts_coverage *kbts_GetCoverage(kbts_sequence_context_3 *Context, kbts_un Index)
-{
-  kbts_u16 *Offsets = (kbts_u16 *)(Context + 1);
-  kbts_coverage *Result = KBTS_POINTER_OFFSET(kbts_coverage, Context, Offsets[Index]);
-  return Result;
-}
-
 static kbts_chained_sequence_rule_set *kbts_GetChainedSequenceRuleSet(kbts_chained_sequence_context_1 *Context, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Context + 1);
@@ -13051,6 +14307,7 @@ static kbts_chained_sequence_rule *kbts_GetChainedClassSequenceRule(kbts_chained
   return Result;
 }
 
+#if 0 // @Incomplete
 static kbts_feature_variation_pointer kbts_GetFeatureVariation(kbts_feature_variations *Variations, kbts_un Index)
 {
   kbts_feature_variation_record *Records = (kbts_feature_variation_record *)(Variations + 1);
@@ -13079,6 +14336,7 @@ static kbts_feature_substitution_pointer kbts_GetFeatureSubstitution(kbts_featur
   Result.AlternateFeature = KBTS_POINTER_OFFSET(kbts_feature, Table, Record->AlternateFeatureOffset);
   return Result;
 }
+#endif
 
 static kbts_cmap_subtable_pointer kbts_GetCmapSubtable(kbts_cmap *Cmap, kbts_un Index)
 {
@@ -13174,10 +14432,27 @@ static kbts_mark_info kbts_GetMarkInfo(void *Subtable, kbts_un SubtableOffsetToM
 typedef struct kbts_byteswap_context
 {
   char *FileBase;
+  char *FileEnd;
   kbts_u32 *Pointers;
   kbts_un PointerCapacity;
   kbts_un PointerCount;
+
+  int Error;
 } kbts_byteswap_context;
+
+static int kbts_ByteSwapArray16Context(kbts_u16 *Array, kbts_un Count, kbts_byteswap_context *Context)
+{
+  int Result = kbts_ByteSwapArray16(Array, Count, Context->FileEnd);
+  Context->Error |= !Result;
+  return Result;
+}
+
+static int kbts_ByteSwapArray32Context(kbts_u32 *Array, kbts_un Count, kbts_byteswap_context *Context)
+{
+  int Result = kbts_ByteSwapArray32(Array, Count, Context->FileEnd);
+  Context->Error |= !Result;
+  return Result;
+}
 
 typedef struct kbts_cover_glyph_result
 {
@@ -13244,7 +14519,7 @@ static int kbts_PushLookup(kbts_gdef *Gdef, kbts_lookup_info_frame *Frames, kbts
 
 static int kbts_AlreadyVisited(kbts_byteswap_context *Context, void *Pointer)
 {
-  int Result = !Pointer;
+  int Result = !Pointer || Context->Error;
 
   if(!Result)
   {
@@ -13255,13 +14530,16 @@ static int kbts_AlreadyVisited(kbts_byteswap_context *Context, void *Pointer)
     if(Context->PointerCount)
     {
       kbts_un PointerCount = Context->PointerCount;
-      while(PointerCount > 1)
+      if(PointerCount)
       {
-        kbts_un HalfCount = PointerCount / 2;
-        Index = (Pointers[Index + HalfCount - 1] < Pointer32) ? (Index + HalfCount) : Index;
-        PointerCount -= HalfCount;
+        while(PointerCount > 1)
+        {
+          kbts_un HalfCount = PointerCount / 2;
+          Index = (Pointers[Index + HalfCount - 1] < Pointer32) ? (Index + HalfCount) : Index;
+          PointerCount -= HalfCount;
+        }
+        Result = (Pointer32 == Pointers[Index]);
       }
-      Result = (Pointer32 == Pointers[Index]);
     }
 
     if(!Result && (Context->PointerCount < Context->PointerCapacity))
@@ -13285,8 +14563,8 @@ static void kbts_ByteSwapFeature(kbts_byteswap_context *Context, kbts_feature *F
   if(!kbts_AlreadyVisited(Context, Feature))
   {
     kbts_u16 *LookupIndices = KBTS_POINTER_AFTER(kbts_u16, Feature);
-    kbts_ByteSwapArray16(&Feature->FeatureParamsOffset, 2);
-    kbts_ByteSwapArray16(LookupIndices, Feature->LookupIndexCount);
+    Context->Error |= !kbts_ByteSwapArray16(&Feature->FeatureParamsOffset, 2, Context->FileEnd);
+    Context->Error |= !kbts_ByteSwapArray16(LookupIndices, Feature->LookupIndexCount, Context->FileEnd);
 
     // We require lookup indices to be sorted per feature for the lookup application order to match Harfbuzz.
     // Lookup indices are _typically_ sorted per feature, but we can't assume it is always the case.
@@ -13318,7 +14596,7 @@ static void kbts_ByteSwapFeature(kbts_byteswap_context *Context, kbts_feature *F
 
 static void kbts_ByteSwapGsubGposCommon(kbts_byteswap_context *Context, kbts_gsub_gpos *Header)
 {
-  kbts_ByteSwapArray16(&Header->Major, 5);
+  kbts_ByteSwapArray16Context(&Header->Major, 5, Context);
 
   if(Header->Minor == 1)
   {
@@ -13349,8 +14627,8 @@ static void kbts_ByteSwapGsubGposCommon(kbts_byteswap_context *Context, kbts_gsu
 
         if(DefaultLangsys && !kbts_AlreadyVisited(Context, DefaultLangsys))
         {
-          kbts_ByteSwapArray16(&DefaultLangsys->LookupOrderOffset, 3);
-          kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, DefaultLangsys), DefaultLangsys->FeatureIndexCount);
+          kbts_ByteSwapArray16Context(&DefaultLangsys->LookupOrderOffset, 3, Context);
+          kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, DefaultLangsys), DefaultLangsys->FeatureIndexCount, Context);
         }
 
         kbts_langsys_record *LangsysRecords = KBTS_POINTER_AFTER(kbts_langsys_record, Script);
@@ -13363,8 +14641,8 @@ static void kbts_ByteSwapGsubGposCommon(kbts_byteswap_context *Context, kbts_gsu
           kbts_langsys *Langsys = KBTS_POINTER_OFFSET(kbts_langsys, Script, LangsysRecord->Offset);
           if(!kbts_AlreadyVisited(Context, Langsys))
           {
-            kbts_ByteSwapArray16(&Langsys->LookupOrderOffset, 3);
-            kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Langsys), Langsys->FeatureIndexCount);
+            kbts_ByteSwapArray16Context(&Langsys->LookupOrderOffset, 3, Context);
+            kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Langsys), Langsys->FeatureIndexCount, Context);
           }
         }
 
@@ -13405,7 +14683,7 @@ static void kbts_ByteSwapGsubGposCommon(kbts_byteswap_context *Context, kbts_gsu
 
       if(!kbts_AlreadyVisited(Context, FeatureVariations))
       {
-        kbts_ByteSwapArray16(&FeatureVariations->Major, 2);
+        kbts_ByteSwapArray16Context(&FeatureVariations->Major, 2, Context);
         FeatureVariations->RecordCount = kbts_ByteSwap32(FeatureVariations->RecordCount);
 
         kbts_feature_variation_record *Records = KBTS_POINTER_AFTER(kbts_feature_variation_record, FeatureVariations);
@@ -13413,7 +14691,7 @@ static void kbts_ByteSwapGsubGposCommon(kbts_byteswap_context *Context, kbts_gsu
         {
           kbts_feature_variation_record *Record = &Records[VariationIndex];
 
-          kbts_ByteSwapArray32(&Record->ConditionSetOffset, 2);
+          kbts_ByteSwapArray32Context(&Record->ConditionSetOffset, 2, Context);
 
           kbts_condition_set *Set = KBTS_POINTER_OFFSET(kbts_condition_set, FeatureVariations, Record->ConditionSetOffset);
 
@@ -13422,7 +14700,7 @@ static void kbts_ByteSwapGsubGposCommon(kbts_byteswap_context *Context, kbts_gsu
             Set->Count = kbts_ByteSwap16(Set->Count);
 
             kbts_u32 *ConditionOffsets = KBTS_POINTER_AFTER(kbts_u32, Set);
-            kbts_ByteSwapArray32(ConditionOffsets, Set->Count);
+            kbts_ByteSwapArray32Context(ConditionOffsets, Set->Count, Context);
 
             KBTS_FOR(ConditionIndex, 0, Set->Count)
             {
@@ -13430,7 +14708,7 @@ static void kbts_ByteSwapGsubGposCommon(kbts_byteswap_context *Context, kbts_gsu
 
               if(!kbts_AlreadyVisited(Context, Condition))
               {
-                kbts_ByteSwapArray16(&Condition->Format, 4);
+                kbts_ByteSwapArray16Context(&Condition->Format, 4, Context);
               }
             }
 
@@ -13438,7 +14716,7 @@ static void kbts_ByteSwapGsubGposCommon(kbts_byteswap_context *Context, kbts_gsu
 
             if(!kbts_AlreadyVisited(Context, FeatureSubst))
             {
-              kbts_ByteSwapArray16(&FeatureSubst->Major, 3);
+              kbts_ByteSwapArray16Context(&FeatureSubst->Major, 3, Context);
 
               kbts_feature_table_substitution_record *SubstRecords = KBTS_POINTER_AFTER(kbts_feature_table_substitution_record, FeatureSubst);
               KBTS_FOR(SubstRecordIndex, 0, FeatureSubst->Count)
@@ -13486,7 +14764,7 @@ static int kbts_ByteSwapLookup(kbts_byteswap_context *Context, kbts_lookup *Look
   {
     Result = 1;
 
-    kbts_ByteSwapArray16(&Lookup->Type, 3);
+    kbts_ByteSwapArray16Context(&Lookup->Type, 3, Context);
     kbts_u16 *SubtableOffsets = KBTS_POINTER_AFTER(kbts_u16, Lookup);
 
     kbts_un U16Count = Lookup->SubtableCount;
@@ -13494,7 +14772,7 @@ static int kbts_ByteSwapLookup(kbts_byteswap_context *Context, kbts_lookup *Look
     {
       U16Count += 1;
     }
-    kbts_ByteSwapArray16(SubtableOffsets, U16Count);
+    kbts_ByteSwapArray16Context(SubtableOffsets, U16Count, Context);
   }
 
   return Result;
@@ -13504,7 +14782,7 @@ static void kbts_ByteSwapCoverage(kbts_byteswap_context *Context, kbts_coverage 
 {
   if(!kbts_AlreadyVisited(Context, Coverage))
   {
-    kbts_ByteSwapArray16(&Coverage->Format, 2);
+    kbts_ByteSwapArray16Context(&Coverage->Format, 2, Context);
 
     kbts_un U16Count = 0;
     if(Coverage->Format == 1)
@@ -13516,7 +14794,7 @@ static void kbts_ByteSwapCoverage(kbts_byteswap_context *Context, kbts_coverage 
       U16Count = Coverage->Count * 3;
     }
 
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Coverage), U16Count);
+    kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Coverage), U16Count, Context);
   }
 }
 
@@ -13536,7 +14814,7 @@ static void kbts_ByteSwapAnchor(kbts_byteswap_context *Context, kbts_anchor *Anc
       U16Count = 4;
     }
 
-    kbts_ByteSwapArray16((kbts_u16 *)&Anchor->X, U16Count);
+    kbts_ByteSwapArray16Context((kbts_u16 *)&Anchor->X, U16Count, Context);
   }
 }
 
@@ -13547,7 +14825,7 @@ static void kbts_ByteSwapBaseArray(kbts_byteswap_context *Context, kbts_u16 Mark
     Array->BaseCount = kbts_ByteSwap16(Array->BaseCount);
 
     kbts_u16 *BaseAnchorOffsets = KBTS_POINTER_AFTER(kbts_u16, Array);
-    kbts_ByteSwapArray16(BaseAnchorOffsets, Array->BaseCount * MarkClassCount);
+    kbts_ByteSwapArray16Context(BaseAnchorOffsets, Array->BaseCount * MarkClassCount, Context);
 
     KBTS_FOR(OffsetIndex, 0, (kbts_un)Array->BaseCount * MarkClassCount)
     {
@@ -13565,7 +14843,7 @@ static void kbts_ByteSwapDevice(kbts_byteswap_context *Context, kbts_device *Dev
 {
   if(!kbts_AlreadyVisited(Context, Device))
   {
-    kbts_ByteSwapArray16(&Device->U.Device.StartSize, 3);
+    kbts_ByteSwapArray16Context(&Device->U.Device.StartSize, 3, Context);
 
     if(Device->DeltaFormat <= 3)
     {
@@ -13582,7 +14860,7 @@ static kbts_unpacked_value_record kbts_ByteSwapValueRecord(kbts_byteswap_context
   {
     kbts_un U16Count = kbts_PopCount32(ValueFormat);
 
-    kbts_ByteSwapArray16(Record, U16Count);
+    kbts_ByteSwapArray16Context(Record, U16Count, Context);
 
     Result = kbts_UnpackValueRecord(Parent, ValueFormat, Record);
 
@@ -13600,7 +14878,7 @@ static void kbts_ByteSwapMarkArray(kbts_byteswap_context *Context, kbts_mark_arr
   if(!kbts_AlreadyVisited(Context, MarkArray))
   {
     MarkArray->Count = kbts_ByteSwap16(MarkArray->Count);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, MarkArray), MarkArray->Count * 2);
+    kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, MarkArray), MarkArray->Count * 2, Context);
 
     kbts_mark_record *MarkRecords = KBTS_POINTER_AFTER(kbts_mark_record, MarkArray);
     KBTS_FOR(MarkRecordIndex, 0, MarkArray->Count)
@@ -13617,7 +14895,7 @@ static void kbts_ByteSwapChainedSequenceRuleSet(kbts_byteswap_context *Context, 
   if(Set && !kbts_AlreadyVisited(Context, Set))
   {
     Set->Count = kbts_ByteSwap16(Set->Count);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Set), Set->Count);
+    kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Set), Set->Count, Context);
 
     KBTS_FOR(RuleIndex, 0, Set->Count)
     {
@@ -13628,7 +14906,7 @@ static void kbts_ByteSwapChainedSequenceRuleSet(kbts_byteswap_context *Context, 
         kbts_unpacked_chained_sequence_rule Unpacked = kbts_UnpackChainedSequenceRule(Rule, 1);
 
         kbts_un U16Count = Unpacked.BacktrackCount + Unpacked.InputCount + Unpacked.LookaheadCount + Unpacked.RecordCount * 2 + 3;
-        kbts_ByteSwapArray16(&Rule->BacktrackGlyphCount, U16Count);
+        kbts_ByteSwapArray16Context(&Rule->BacktrackGlyphCount, U16Count, Context);
       }
     }
   }
@@ -13669,22 +14947,28 @@ static void kbts_ByteSwapClassDefinition(kbts_byteswap_context *Context, kbts_u1
     if(*Base == 1)
     {
       kbts_class_definition_1 *ClassDef = (kbts_class_definition_1 *)Base;
-      kbts_ByteSwapArray16(&ClassDef->StartGlyphId, 2);
-      kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, ClassDef), ClassDef->GlyphCount);
+      kbts_ByteSwapArray16Context(&ClassDef->StartGlyphId, 2, Context);
+      kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, ClassDef), ClassDef->GlyphCount, Context);
     }
     else if(*Base == 2)
     {
       kbts_class_definition_2 *ClassDef = (kbts_class_definition_2 *)Base;
       ClassDef->Count = kbts_ByteSwap16(ClassDef->Count);
 
-      kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, ClassDef), ClassDef->Count * 3);
+      kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, ClassDef), ClassDef->Count * 3, Context);
     }
   }
 }
 
-static kbts_u16 kbts_GlyphClassFromTable(kbts_u16 *ClassDefinitionBase, kbts_un Id)
+typedef struct kbts_glyph_class_from_table_result
 {
-  kbts_u16 Result = 0;
+  int Found;
+  kbts_u16 Class;
+} kbts_glyph_class_from_table_result;
+
+static kbts_glyph_class_from_table_result kbts_GlyphClassFromTable(kbts_u16 *ClassDefinitionBase, kbts_un Id)
+{
+  kbts_glyph_class_from_table_result Result = KBTS_ZERO;
 
   // From the Microsoft docs:
   //   There is one offset to a ChainedClassSequenceRuleSet subtable for each class defined in the input sequence
@@ -13704,7 +14988,8 @@ static kbts_u16 kbts_GlyphClassFromTable(kbts_u16 *ClassDefinitionBase, kbts_un 
     kbts_un Offset = Id - ClassDef->StartGlyphId;
     if(Offset < ClassDef->GlyphCount)
     {
-      Result = GlyphClasses[Offset];
+      Result.Class = GlyphClasses[Offset];
+      Result.Found = 1;
     }
   }
   else if(*ClassDefinitionBase == 2)
@@ -13713,15 +14998,19 @@ static kbts_u16 kbts_GlyphClassFromTable(kbts_u16 *ClassDefinitionBase, kbts_un 
     kbts_class_range_record *Ranges = KBTS_POINTER_AFTER(kbts_class_range_record, ClassDef);
 
     kbts_un RangeCount = ClassDef->Count;
-    while(RangeCount > 1)
+    if(RangeCount)
     {
-      kbts_un HalfCount = RangeCount / 2;
-      Ranges = (Ranges[HalfCount - 1].EndGlyphId < Id) ? (Ranges + HalfCount) : Ranges;
-      RangeCount -= HalfCount;
-    }
-    if((Id >= Ranges->StartGlyphId) && (Id <= Ranges->EndGlyphId))
-    {
-      Result = Ranges->Class;
+      while(RangeCount > 1)
+      {
+        kbts_un HalfCount = RangeCount / 2;
+        Ranges = (Ranges[HalfCount - 1].EndGlyphId < Id) ? (Ranges + HalfCount) : Ranges;
+        RangeCount -= HalfCount;
+      }
+      if((Id >= Ranges->StartGlyphId) && (Id <= Ranges->EndGlyphId))
+      {
+        Result.Class = Ranges->Class;
+        Result.Found = 1;
+      }
     }
   }
 
@@ -13734,37 +15023,40 @@ static kbts_cover_glyph_result kbts_CoverGlyph(kbts_coverage *Coverage, kbts_u32
   kbts_cover_glyph_result Result = KBTS_ZERO;
   kbts_un Count = Coverage->Count;
 
-  if(Coverage->Format == 1)
+  if(Count)
   {
-    kbts_u16 *GlyphIds = KBTS_POINTER_AFTER(kbts_u16, Coverage);
+    if(Coverage->Format == 1)
+    {
+      kbts_u16 *GlyphIds = KBTS_POINTER_AFTER(kbts_u16, Coverage);
 
-    while(Count > 1)
-    {
-      kbts_un HalfCount = Count / 2;
-      GlyphIds = (GlyphIds[HalfCount - 1] < GlyphId) ? (GlyphIds + HalfCount) : GlyphIds;
-      Count -= HalfCount;
-    }
+      while(Count > 1)
+      {
+        kbts_un HalfCount = Count / 2;
+        GlyphIds = (GlyphIds[HalfCount - 1] < GlyphId) ? (GlyphIds + HalfCount) : GlyphIds;
+        Count -= HalfCount;
+      }
 
-    if(GlyphId == *GlyphIds)
-    {
-      Result.Valid = 1;
-      Result.Index = (kbts_u32)(GlyphIds - KBTS_POINTER_AFTER(kbts_u16, Coverage));
+      if(GlyphId == *GlyphIds)
+      {
+        Result.Valid = 1;
+        Result.Index = (kbts_u32)(GlyphIds - KBTS_POINTER_AFTER(kbts_u16, Coverage));
+      }
     }
-  }
-  else if(Coverage->Format == 2)
-  {
-    kbts_range_record *Ranges = KBTS_POINTER_AFTER(kbts_range_record, Coverage);
+    else if(Coverage->Format == 2)
+    {
+      kbts_range_record *Ranges = KBTS_POINTER_AFTER(kbts_range_record, Coverage);
 
-    while(Count > 1)
-    {
-      kbts_un HalfCount = Count / 2;
-      Ranges = (Ranges[HalfCount - 1].EndGlyphId < GlyphId) ? (Ranges + HalfCount) : Ranges;
-      Count -= HalfCount;
-    }
-    if((GlyphId >= Ranges->StartGlyphId) && (GlyphId <= Ranges->EndGlyphId))
-    {
-      Result.Valid = 1;
-      Result.Index = Ranges->StartCoverageIndex + GlyphId - Ranges->StartGlyphId;
+      while(Count > 1)
+      {
+        kbts_un HalfCount = Count / 2;
+        Ranges = (Ranges[HalfCount - 1].EndGlyphId < GlyphId) ? (Ranges + HalfCount) : Ranges;
+        Count -= HalfCount;
+      }
+      if((GlyphId >= Ranges->StartGlyphId) && (GlyphId <= Ranges->EndGlyphId))
+      {
+        Result.Valid = 1;
+        Result.Index = Ranges->StartCoverageIndex + GlyphId - Ranges->StartGlyphId;
+      }
     }
   }
 
@@ -13778,7 +15070,7 @@ static void kbts_ByteSwapSequenceContextSubtable(kbts_byteswap_context *Context,
   {
     kbts_sequence_context_1 *Subst = (kbts_sequence_context_1 *)Base;
     Subst->SeqRuleSetCount = kbts_ByteSwap16(Subst->SeqRuleSetCount);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->SeqRuleSetCount);
+    kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->SeqRuleSetCount, Context);
 
     KBTS_FOR(SetIndex, 0, Subst->SeqRuleSetCount)
     {
@@ -13787,7 +15079,7 @@ static void kbts_ByteSwapSequenceContextSubtable(kbts_byteswap_context *Context,
       if(Set && !kbts_AlreadyVisited(Context, Set))
       {
         Set->Count = kbts_ByteSwap16(Set->Count);
-        kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Set), Set->Count);
+        kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Set), Set->Count, Context);
 
         KBTS_FOR(RuleIndex, 0, Set->Count)
         {
@@ -13795,8 +15087,8 @@ static void kbts_ByteSwapSequenceContextSubtable(kbts_byteswap_context *Context,
 
           if(!kbts_AlreadyVisited(Context, Rule))
           {
-            kbts_ByteSwapArray16(&Rule->GlyphCount, 2);
-            kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Rule), (kbts_un)Rule->GlyphCount - 1 + (kbts_un)Rule->SequenceLookupCount * 2);
+            kbts_ByteSwapArray16Context(&Rule->GlyphCount, 2, Context);
+            kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Rule), (kbts_un)Rule->GlyphCount - 1 + (kbts_un)Rule->SequenceLookupCount * 2, Context);
           }
         }
       }
@@ -13805,8 +15097,8 @@ static void kbts_ByteSwapSequenceContextSubtable(kbts_byteswap_context *Context,
   else if(Base[0] == 2)
   {
     kbts_sequence_context_2 *Subst = (kbts_sequence_context_2 *)Base;
-    kbts_ByteSwapArray16(&Subst->ClassDefOffset, 2);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->ClassSequenceRuleSetCount);
+    kbts_ByteSwapArray16Context(&Subst->ClassDefOffset, 2, Context);
+    kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->ClassSequenceRuleSetCount, Context);
 
     kbts_u16 *ClassDefBase = KBTS_POINTER_OFFSET(kbts_u16, Subst, Subst->ClassDefOffset);
     kbts_ByteSwapClassDefinition(Context, ClassDefBase);
@@ -13818,7 +15110,7 @@ static void kbts_ByteSwapSequenceContextSubtable(kbts_byteswap_context *Context,
       if(Set && !kbts_AlreadyVisited(Context, Set))
       {
         Set->Count = kbts_ByteSwap16(Set->Count);
-        kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Set), Set->Count);
+        kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Set), Set->Count, Context);
 
         KBTS_FOR(RuleIndex, 0, Set->Count)
         {
@@ -13826,8 +15118,8 @@ static void kbts_ByteSwapSequenceContextSubtable(kbts_byteswap_context *Context,
 
           if(!kbts_AlreadyVisited(Context, Rule))
           {
-            kbts_ByteSwapArray16(&Rule->GlyphCount, 2);
-            kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Rule), Rule->GlyphCount - 1 + 2 * Rule->SequenceLookupCount);
+            kbts_ByteSwapArray16Context(&Rule->GlyphCount, 2, Context);
+            kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Rule), Rule->GlyphCount - 1 + 2 * Rule->SequenceLookupCount, Context);
           }
         }
       }
@@ -13867,8 +15159,8 @@ static void kbts_ByteSwapSequenceContextSubtable(kbts_byteswap_context *Context,
   else if(Base[0] == 3)
   {
     kbts_sequence_context_3 *Subst = (kbts_sequence_context_3 *)Base;
-    kbts_ByteSwapArray16(&Subst->GlyphCount, 2);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->GlyphCount + 2 * Subst->SequenceLookupCount);
+    kbts_ByteSwapArray16Context(&Subst->GlyphCount, 2, Context);
+    kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->GlyphCount + 2 * Subst->SequenceLookupCount, Context);
 
     kbts_u16 *CoverageOffsets = KBTS_POINTER_AFTER(kbts_u16, Subst);
     KBTS_FOR(CoverageIndex, 0, Subst->GlyphCount)
@@ -14145,7 +15437,7 @@ static void kbts_ByteSwapChainedSequenceContextSubtable(kbts_byteswap_context *C
   {
     kbts_chained_sequence_context_1 *Subst = (kbts_chained_sequence_context_1 *)Base;
     Subst->ChainedSequenceRuleSetCount = kbts_ByteSwap16(Subst->ChainedSequenceRuleSetCount);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->ChainedSequenceRuleSetCount);
+    kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->ChainedSequenceRuleSetCount, Context);
 
     KBTS_FOR(SetIndex, 0, Subst->ChainedSequenceRuleSetCount)
     {
@@ -14155,8 +15447,8 @@ static void kbts_ByteSwapChainedSequenceContextSubtable(kbts_byteswap_context *C
   else if(Base[0] == 2)
   {
     kbts_chained_sequence_context_2 *Subst = (kbts_chained_sequence_context_2 *)Base;
-    kbts_ByteSwapArray16(&Subst->BacktrackClassDefOffset, 4);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->ChainedClassSequenceRuleSetCount);
+    kbts_ByteSwapArray16Context(&Subst->BacktrackClassDefOffset, 4, Context);
+    kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->ChainedClassSequenceRuleSetCount, Context);
 
     kbts_u16 *BacktrackClassDefinition = KBTS_POINTER_OFFSET(kbts_u16, Subst, Subst->BacktrackClassDefOffset);
     kbts_ByteSwapClassDefinition(Context, BacktrackClassDefinition);
@@ -14229,7 +15521,7 @@ static void kbts_ByteSwapChainedSequenceContextSubtable(kbts_byteswap_context *C
     kbts_unpacked_chained_sequence_context_3 Unpacked = kbts_UnpackChainedSequenceContext3(Subst, 1);
 
     kbts_un U16Count = Unpacked.BacktrackCount + Unpacked.InputCount + Unpacked.LookaheadCount + Unpacked.RecordCount * 2 + 4;
-    kbts_ByteSwapArray16(&Subst->BacktrackGlyphCount, U16Count);
+    kbts_ByteSwapArray16Context(&Subst->BacktrackGlyphCount, U16Count, Context);
 
     KBTS_FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
     {
@@ -14355,7 +15647,7 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
       if(Subst->Format == 2)
       {
         kbts_u16 *GlyphIds = KBTS_POINTER_AFTER(kbts_u16, Subst);
-        kbts_ByteSwapArray16(GlyphIds, Subst->DeltaOrCount.GlyphCount);
+        kbts_ByteSwapArray16Context(GlyphIds, Subst->DeltaOrCount.GlyphCount, Context);
 
         #ifdef KBTS_DUMP
         KBTS_DUMPF("    [");
@@ -14374,7 +15666,7 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
     {
       kbts_multiple_substitution *Subst = (kbts_multiple_substitution *)Base;
       Subst->SequenceCount = kbts_ByteSwap16(Subst->SequenceCount);
-      kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->SequenceCount);
+      kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->SequenceCount, Context);
 
       KBTS_FOR(SequenceIndex, 0, Subst->SequenceCount)
       {
@@ -14384,7 +15676,7 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
         {
           Sequence->GlyphCount = kbts_ByteSwap16(Sequence->GlyphCount);
 
-          kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Sequence), Sequence->GlyphCount);
+          kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Sequence), Sequence->GlyphCount, Context);
         }
 
         #ifdef KBTS_DUMP
@@ -14405,7 +15697,7 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
     {
       kbts_alternate_substitution *Subst = (kbts_alternate_substitution *)Base;
       Subst->AlternateSetCount = kbts_ByteSwap16(Subst->AlternateSetCount);
-      kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->AlternateSetCount);
+      kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->AlternateSetCount, Context);
 
       KBTS_FOR(SetIndex, 0, Subst->AlternateSetCount)
       {
@@ -14415,7 +15707,7 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
         {
           Set->GlyphCount = kbts_ByteSwap16(Set->GlyphCount);
 
-          kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Set), Set->GlyphCount);
+          kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Set), Set->GlyphCount, Context);
         }
 
         #ifdef KBTS_DUMP
@@ -14436,7 +15728,7 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
     {
       kbts_ligature_substitution *Subst = (kbts_ligature_substitution *)Base;
       Subst->LigatureSetCount = kbts_ByteSwap16(Subst->LigatureSetCount);
-      kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->LigatureSetCount);
+      kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Subst), Subst->LigatureSetCount, Context);
 
       KBTS_FOR(SetIndex, 0, Subst->LigatureSetCount)
       {
@@ -14445,7 +15737,7 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
         if(!kbts_AlreadyVisited(Context, Set))
         {
           Set->Count = kbts_ByteSwap16(Set->Count);
-          kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Set), Set->Count);
+          kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Set), Set->Count, Context);
 
           KBTS_FOR(LigatureIndex, 0, Set->Count)
           {
@@ -14453,8 +15745,8 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
 
             if(!kbts_AlreadyVisited(Context, Ligature))
             {
-              kbts_ByteSwapArray16(&Ligature->Glyph, 2);
-              kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Ligature), Ligature->ComponentCount - 1);
+              kbts_ByteSwapArray16Context(&Ligature->Glyph, 2, Context);
+              kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Ligature), Ligature->ComponentCount - 1, Context);
 
 #  ifdef KBTS_DUMP
               KBTS_DUMPF("ligature: [");
@@ -14494,7 +15786,7 @@ static void kbts_ByteSwapGsubLookupSubtable(kbts_byteswap_context *Context, kbts
       kbts_unpacked_reverse_chain_substitution Unpacked = kbts_UnpackReverseChainSubstitution(Subst, 1);
 
       kbts_un U16Count = Unpacked.BacktrackCount + Unpacked.GlyphCount + Unpacked.LookaheadCount + 3;
-      kbts_ByteSwapArray16(&Subst->BacktrackGlyphCount, U16Count);
+      kbts_ByteSwapArray16Context(&Subst->BacktrackGlyphCount, U16Count, Context);
 
       KBTS_FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
       {
@@ -14559,10 +15851,10 @@ static void kbts_ByteSwapGposLookupSubtable(kbts_byteswap_context *Context, kbts
       if(*Base == 1)
       {
         kbts_pair_adjustment_1 *Adjust = (kbts_pair_adjustment_1 *)Base;
-        kbts_ByteSwapArray16(&Adjust->ValueFormat1, 3);
+        kbts_ByteSwapArray16Context(&Adjust->ValueFormat1, 3, Context);
 
         kbts_u16 *SetOffsets = KBTS_POINTER_AFTER(kbts_u16, Adjust);
-        kbts_ByteSwapArray16(SetOffsets, Adjust->SetCount);
+        kbts_ByteSwapArray16Context(SetOffsets, Adjust->SetCount, Context);
 
         kbts_un Size1 = kbts_PopCount32(Adjust->ValueFormat1);
         kbts_un Size2 = kbts_PopCount32(Adjust->ValueFormat2);
@@ -14595,7 +15887,7 @@ static void kbts_ByteSwapGposLookupSubtable(kbts_byteswap_context *Context, kbts
       else if(*Base == 2)
       {
         kbts_pair_adjustment_2 *Adjust = (kbts_pair_adjustment_2 *)Base;
-        kbts_ByteSwapArray16(&Adjust->ValueFormat1, 6);
+        kbts_ByteSwapArray16Context(&Adjust->ValueFormat1, 6, Context);
 
         kbts_ByteSwapClassDefinition(Context, KBTS_POINTER_OFFSET(kbts_u16, Adjust, Adjust->ClassDefinition1Offset));
         kbts_ByteSwapClassDefinition(Context, KBTS_POINTER_OFFSET(kbts_u16, Adjust, Adjust->ClassDefinition2Offset));
@@ -14622,7 +15914,7 @@ static void kbts_ByteSwapGposLookupSubtable(kbts_byteswap_context *Context, kbts
     {
       kbts_cursive_attachment *Adjust = (kbts_cursive_attachment *)Base;
       Adjust->EntryExitCount = kbts_ByteSwap16(Adjust->EntryExitCount);
-      kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Adjust), Adjust->EntryExitCount * 2);
+      kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, Adjust), Adjust->EntryExitCount * 2, Context);
 
       kbts_entry_exit *EntryExits = KBTS_POINTER_AFTER(kbts_entry_exit, Adjust);
       KBTS_FOR(EntryExitIndex, 0, Adjust->EntryExitCount)
@@ -14646,7 +15938,7 @@ static void kbts_ByteSwapGposLookupSubtable(kbts_byteswap_context *Context, kbts
     case 6:
     {
       kbts_mark_to_base_attachment *Adjust = (kbts_mark_to_base_attachment *)Base;
-      kbts_ByteSwapArray16(&Adjust->BaseCoverageOffset, 4);
+      kbts_ByteSwapArray16Context(&Adjust->BaseCoverageOffset, 4, Context);
 
       kbts_ByteSwapCoverage(Context, KBTS_POINTER_OFFSET(kbts_coverage, Adjust, Adjust->BaseCoverageOffset));
       kbts_ByteSwapMarkArray(Context, KBTS_POINTER_OFFSET(kbts_mark_array, Adjust, Adjust->MarkArrayOffset));
@@ -14657,7 +15949,7 @@ static void kbts_ByteSwapGposLookupSubtable(kbts_byteswap_context *Context, kbts
     case 5:
     {
       kbts_mark_to_ligature_attachment *Adjust = (kbts_mark_to_ligature_attachment *)Base;
-      kbts_ByteSwapArray16(&Adjust->LigatureCoverageOffset, 4);
+      kbts_ByteSwapArray16Context(&Adjust->LigatureCoverageOffset, 4, Context);
 
       kbts_ByteSwapCoverage(Context, KBTS_POINTER_OFFSET(kbts_coverage, Adjust, Adjust->LigatureCoverageOffset));
       kbts_ByteSwapMarkArray(Context, KBTS_POINTER_OFFSET(kbts_mark_array, Adjust, Adjust->MarkArrayOffset));
@@ -14666,7 +15958,7 @@ static void kbts_ByteSwapGposLookupSubtable(kbts_byteswap_context *Context, kbts
       if(!kbts_AlreadyVisited(Context, LigatureArray))
       {
         LigatureArray->Count = kbts_ByteSwap16(LigatureArray->Count);
-        kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, LigatureArray), LigatureArray->Count);
+        kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, LigatureArray), LigatureArray->Count, Context);
 
         KBTS_FOR(AttachIndex, 0, LigatureArray->Count)
         {
@@ -14677,7 +15969,7 @@ static void kbts_ByteSwapGposLookupSubtable(kbts_byteswap_context *Context, kbts
             Attach->Count = kbts_ByteSwap16(Attach->Count);
 
             kbts_u16 *AttachAnchorOffsets = KBTS_POINTER_AFTER(kbts_u16, Attach);
-            kbts_ByteSwapArray16(AttachAnchorOffsets, Attach->Count * Adjust->MarkClassCount);
+            kbts_ByteSwapArray16Context(AttachAnchorOffsets, Attach->Count * Adjust->MarkClassCount, Context);
 
             KBTS_FOR(ComponentIndex, 0, Attach->Count)
             {
@@ -14729,20 +16021,17 @@ static kbts_glyph_classes kbts_GlyphClasses(kbts_font *Font, kbts_u32 Id)
   kbts_gdef *Gdef = Font->Gdef;
   if(Gdef)
   {
-    kbts_u16 Class = 0;
     if(Gdef->ClassDefinitionOffset)
     {
       kbts_u16 *ClassDefBase = KBTS_POINTER_OFFSET(kbts_u16, Gdef, Gdef->ClassDefinitionOffset);
-      Class = kbts_GlyphClassFromTable(ClassDefBase, Id);
+      Result.Class = kbts_GlyphClassFromTable(ClassDefBase, Id).Class;
     }
 
-    if(Gdef->MarkAttachmentClassDefinitionOffset && (Class == KBTS_GLYPH_CLASS_MARK))
+    if(Gdef->MarkAttachmentClassDefinitionOffset && (Result.Class == KBTS_GLYPH_CLASS_MARK))
     {
       kbts_u16 *MarkAttachmentClassDefBase = KBTS_POINTER_OFFSET(kbts_u16, Gdef, Gdef->MarkAttachmentClassDefinitionOffset);
-      Result.MarkAttachmentClass = kbts_GlyphClassFromTable(MarkAttachmentClassDefBase, Id);
+      Result.MarkAttachmentClass = kbts_GlyphClassFromTable(MarkAttachmentClassDefBase, Id).Class;
     }
-
-    Result.Class = Class;
   }
 
   return Result;
@@ -14808,8 +16097,7 @@ KBTS_EXPORT kbts_glyph kbts_CodepointToGlyph(kbts_font *Font, kbts_u32 Codepoint
       {
         Result.Id = Cmap0->GlyphIdArray[Codepoint];
       }
-    }
-    break;
+    } break;
 
     case 2:
     {
@@ -14850,8 +16138,7 @@ KBTS_EXPORT kbts_glyph kbts_CodepointToGlyph(kbts_font *Font, kbts_u32 Codepoint
 
         Result.Id = GlyphId;
       }
-    }
-    break;
+    } break;
 
     case 4:
     {
@@ -14861,31 +16148,36 @@ KBTS_EXPORT kbts_glyph kbts_CodepointToGlyph(kbts_font *Font, kbts_u32 Codepoint
       kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
       kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
       kbts_u16 *IdRangeOffsets = (kbts_u16 *)(IdDeltas + SegmentCount);
+      kbts_un SegmentIndexOffset = 0;
 
-      KBTS_FOR(SegmentIndex, 0, SegmentCount)
+      if(SegmentCount)
       {
-        kbts_u16 Start = StartCodes[SegmentIndex];
-        if((Codepoint >= Start) && (Codepoint <= EndCodes[SegmentIndex]))
+        while(SegmentCount > 1)
         {
-          kbts_s16 Delta = IdDeltas[SegmentIndex];
-          kbts_u16 RangeOffset = IdRangeOffsets[SegmentIndex];
-
-          kbts_u16 GlyphId = (kbts_u16)Delta;
-          if(RangeOffset)
-          {
-            GlyphId += *(&IdRangeOffsets[SegmentIndex] + (Codepoint - Start) + RangeOffset / 2);
-          }
-          else
-          {
-            GlyphId += (kbts_u16)(Codepoint);
-          }
-          Result.Id = GlyphId;
-
-          break;
+          kbts_un HalfCount = SegmentCount / 2;
+          SegmentIndexOffset = (EndCodes[SegmentIndexOffset + HalfCount - 1] < Codepoint) ? (SegmentIndexOffset + HalfCount) : SegmentIndexOffset;
+          SegmentCount -= HalfCount;
         }
       }
-    }
-    break;
+
+      kbts_u16 Start = StartCodes[SegmentIndexOffset];
+      if((Codepoint >= Start) && (Codepoint <= EndCodes[SegmentIndexOffset]))
+      {
+        kbts_s16 Delta = IdDeltas[SegmentIndexOffset];
+        kbts_u16 RangeOffset = IdRangeOffsets[SegmentIndexOffset];
+
+        kbts_u16 GlyphId = (kbts_u16)Delta;
+        if(RangeOffset)
+        {
+          GlyphId += *(&IdRangeOffsets[SegmentIndexOffset] + (Codepoint - Start) + RangeOffset / 2);
+        }
+        else
+        {
+          GlyphId += (kbts_u16)(Codepoint);
+        }
+        Result.Id = GlyphId;
+      }
+    } break;
 
     case 6:
     {
@@ -14897,8 +16189,7 @@ KBTS_EXPORT kbts_glyph kbts_CodepointToGlyph(kbts_font *Font, kbts_u32 Codepoint
       {
         Result.Id = GlyphIds[Offset];
       }
-    }
-    break;
+    } break;
 
     case 12:
     {
@@ -14906,22 +16197,25 @@ KBTS_EXPORT kbts_glyph kbts_CodepointToGlyph(kbts_font *Font, kbts_u32 Codepoint
       kbts_sequential_map_group *Groups = KBTS_POINTER_AFTER(kbts_sequential_map_group, Cmap12);
 
       kbts_un GlyphId = 0;
-      KBTS_FOR(GroupIndex, 0, Cmap12->GroupCount)
+      kbts_un GroupCount = Cmap12->GroupCount;
+      if(GroupCount)
       {
-        kbts_sequential_map_group *Group = &Groups[GroupIndex];
-
-        if((Codepoint >= Group->StartCharacterCode) && (Codepoint <= Group->EndCharacterCode))
+        while(GroupCount > 1)
         {
-          kbts_un Offset = Codepoint - Group->StartCharacterCode;
-          GlyphId = Group->StartGlyphId + Offset;
-
-          break;
+          kbts_un HalfCount = GroupCount / 2;
+          Groups = (Groups[HalfCount - 1].EndCharacterCode < Codepoint) ? (Groups + HalfCount) : Groups;
+          GroupCount -= HalfCount;
         }
       }
 
+      if((Codepoint >= Groups->StartCharacterCode) && (Codepoint <= Groups->EndCharacterCode))
+      {
+        kbts_un Offset = Codepoint - Groups->StartCharacterCode;
+        GlyphId = Groups->StartGlyphId + Offset;
+      }
+
       Result.Id = (kbts_u16)GlyphId;
-    }
-    break;
+    } break;
     }
   }
 
@@ -14990,22 +16284,6 @@ static kbts_u32 kbts_IsValidFeatureIteration(kbts_iterate_features *It)
   return Result;
 }
 
-static kbts_feature_id kbts_FeatureToId(kbts_feature_tag Feature)
-{
-  kbts_feature_id Result = 0;
-
-  switch(Feature)
-  {
-#  define KBTS_X(Name, C0, C1, C2, C3) case KBTS_FEATURE_TAG_##Name: Result = KBTS_FEATURE_ID_##Name; break;
-    KBTS_X_FEATURES
-#  undef KBTS_X
-
-  default: break;
-  }
-
-  return Result;
-}
-
 static kbts_u32 kbts_NextFeature(kbts_iterate_features *It)
 {
   kbts_u32 Result = 0;
@@ -15038,13 +16316,15 @@ static kbts_u32 kbts_NextFeature(kbts_iterate_features *It)
 
       It->FeatureIndex += 1;
 
-      kbts_u32 FeatureId = kbts_FeatureToId(Feature.Tag);
-      kbts_u64 FeatureFlag = (FeatureId < 32) ? (1ull << FeatureId) : 0;
-      if(kbts_ContainsFeature(&It->EnabledFeatures, kbts_FeatureToId(Feature.Tag)))
+      kbts_u32 FeatureId = kbts_FeatureTagToId(Feature.Tag);
+      if(kbts_ContainsFeature(&It->EnabledFeatures, FeatureId))
       {
         It->Feature = Feature.Feature;
         It->CurrentFeatureTag = Feature.Tag;
-        It->CurrentFeatureFlag = FeatureFlag & KBTS_GLYPH_FEATURE_MASK;
+        if(FeatureId && (FeatureId <= 32))
+        {
+          It->CurrentFeatureFlag = (1 << (FeatureId - 1)) & KBTS_GLYPH_FEATURE_MASK;
+        }
         Result = 1;
 
         break;
@@ -15108,29 +16388,101 @@ typedef struct kbts_do_single_substitution_result
   kbts_u32 PerformedSubstitution;
 } kbts_do_single_substitution_result;
 
+static kbts_feature_set kbts_ShaperFeatures[] = {
+  /* KBTS_SHAPER_DEFAULT */ {{KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm) | KBTS_FEATURE_FLAG0(curs) |
+                              KBTS_FEATURE_FLAG0(frac) | KBTS_FEATURE_FLAG0(numr) | KBTS_FEATURE_FLAG0(dnom) | KBTS_FEATURE_FLAG0(ccmp) |
+                              KBTS_FEATURE_FLAG0(clig) | KBTS_FEATURE_FLAG0(calt),
+                              0,
+                              KBTS_FEATURE_FLAG2(locl) | KBTS_FEATURE_FLAG2(ltra) | KBTS_FEATURE_FLAG2(ltrm) | KBTS_FEATURE_FLAG2(liga) |
+                              KBTS_FEATURE_FLAG2(rlig) | KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(dist) | KBTS_FEATURE_FLAG2(kern) |
+                              KBTS_FEATURE_FLAG2(mark) | KBTS_FEATURE_FLAG2(mkmk),
+                              KBTS_FEATURE_FLAG3(rvrn)}},
+  /* KBTS_SHAPER_ARABIC */ {{KBTS_FEATURE_FLAG0(frac) | KBTS_FEATURE_FLAG0(numr) | KBTS_FEATURE_FLAG0(dnom) | KBTS_FEATURE_FLAG0(ccmp) |
+                             KBTS_FEATURE_FLAG0(isol) | KBTS_FEATURE_FLAG0(fina) | KBTS_FEATURE_FLAG0(fin2) | KBTS_FEATURE_FLAG0(fin3) |
+                             KBTS_FEATURE_FLAG0(medi) | KBTS_FEATURE_FLAG0(med2) | KBTS_FEATURE_FLAG0(init) | KBTS_FEATURE_FLAG0(calt) |
+                             KBTS_FEATURE_FLAG0(clig) | KBTS_FEATURE_FLAG2(mset) | KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm) |
+                             KBTS_FEATURE_FLAG0(curs),
+                             0,
+                             KBTS_FEATURE_FLAG2(rlig) | KBTS_FEATURE_FLAG2(liga) | KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(mark) |
+                             KBTS_FEATURE_FLAG2(mkmk) | KBTS_FEATURE_FLAG2(dist) | KBTS_FEATURE_FLAG2(kern) | KBTS_FEATURE_FLAG2(locl),
+                             KBTS_FEATURE_FLAG3(rvrn) | KBTS_FEATURE_FLAG3(rtlm) | KBTS_FEATURE_FLAG3(stch) | KBTS_FEATURE_FLAG3(rtla)}},
+  /* KBTS_SHAPER_HANGUL */ {{KBTS_FEATURE_FLAG0(frac) | KBTS_FEATURE_FLAG0(numr) | KBTS_FEATURE_FLAG0(dnom) | KBTS_FEATURE_FLAG0(ljmo) |
+                             KBTS_FEATURE_FLAG0(vjmo) | KBTS_FEATURE_FLAG0(tjmo) | KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm) |
+                             KBTS_FEATURE_FLAG0(ccmp) | KBTS_FEATURE_FLAG0(clig) | KBTS_FEATURE_FLAG0(curs),
+                             0,
+                             KBTS_FEATURE_FLAG2(ltra) | KBTS_FEATURE_FLAG2(ltrm) | KBTS_FEATURE_FLAG2(dist) | KBTS_FEATURE_FLAG2(kern) |
+                             KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(locl) | KBTS_FEATURE_FLAG2(mark) | KBTS_FEATURE_FLAG2(mkmk) |
+                             KBTS_FEATURE_FLAG2(rlig) | KBTS_FEATURE_FLAG2(liga),
+                             KBTS_FEATURE_FLAG3(rvrn)}},
+  /* KBTS_SHAPER_HEBREW */ {{KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm) | KBTS_FEATURE_FLAG0(curs) |
+                             KBTS_FEATURE_FLAG0(frac) | KBTS_FEATURE_FLAG0(numr) | KBTS_FEATURE_FLAG0(dnom) | KBTS_FEATURE_FLAG0(ccmp) |
+                             KBTS_FEATURE_FLAG0(clig) | KBTS_FEATURE_FLAG0(calt),
+                             0,
+                             KBTS_FEATURE_FLAG2(locl) | KBTS_FEATURE_FLAG2(ltra) | KBTS_FEATURE_FLAG2(ltrm) | KBTS_FEATURE_FLAG2(liga) |
+                             KBTS_FEATURE_FLAG2(rlig) | KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(dist) | KBTS_FEATURE_FLAG2(kern) |
+                             KBTS_FEATURE_FLAG2(mark) | KBTS_FEATURE_FLAG2(mkmk),
+                             KBTS_FEATURE_FLAG3(rvrn)}}, // (Same as DEFAULT)
+  /* KBTS_SHAPER_INDIC */  {{KBTS_FEATURE_FLAG0(frac) | KBTS_FEATURE_FLAG0(numr) | KBTS_FEATURE_FLAG0(dnom) | KBTS_FEATURE_FLAG0(akhn) |
+                             KBTS_FEATURE_FLAG0(rphf) | KBTS_FEATURE_FLAG0(pref) | KBTS_FEATURE_FLAG0(blwf) | KBTS_FEATURE_FLAG0(abvf) |
+                             KBTS_FEATURE_FLAG0(half) | KBTS_FEATURE_FLAG0(pstf) | KBTS_FEATURE_FLAG0(cjct) | KBTS_FEATURE_FLAG0(abvs) |
+                             KBTS_FEATURE_FLAG0(blws) | KBTS_FEATURE_FLAG0(init) | KBTS_FEATURE_FLAG0(calt) | KBTS_FEATURE_FLAG0(clig) |
+                             KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm) | KBTS_FEATURE_FLAG0(curs),
+                             0,
+                             KBTS_FEATURE_FLAG2(ltra) | KBTS_FEATURE_FLAG2(ltrm) | KBTS_FEATURE_FLAG2(nukt) | KBTS_FEATURE_FLAG2(rkrf) |
+                             KBTS_FEATURE_FLAG2(pres) | KBTS_FEATURE_FLAG2(psts) | KBTS_FEATURE_FLAG2(locl) | KBTS_FEATURE_FLAG2(rlig) |
+                             KBTS_FEATURE_FLAG2(dist) | KBTS_FEATURE_FLAG2(haln) | KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(mark) |
+                             KBTS_FEATURE_FLAG2(mkmk) | KBTS_FEATURE_FLAG2(kern),
+                             KBTS_FEATURE_FLAG3(rvrn) | KBTS_FEATURE_FLAG3(vatu),}},
+  /* KBTS_SHAPER_KHMER */ {{KBTS_FEATURE_FLAG0(frac) | KBTS_FEATURE_FLAG0(numr) | KBTS_FEATURE_FLAG0(dnom) | KBTS_FEATURE_FLAG0(ccmp) |
+                            KBTS_FEATURE_FLAG0(pref) | KBTS_FEATURE_FLAG0(blwf) | KBTS_FEATURE_FLAG0(abvf) | KBTS_FEATURE_FLAG0(pstf) |
+                            KBTS_FEATURE_FLAG0(cfar) | KBTS_FEATURE_FLAG0(abvs) | KBTS_FEATURE_FLAG0(blws) | KBTS_FEATURE_FLAG0(calt) |
+                            KBTS_FEATURE_FLAG0(clig) | KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm) | KBTS_FEATURE_FLAG0(curs),
+                            0,
+                            KBTS_FEATURE_FLAG2(dist) | KBTS_FEATURE_FLAG2(kern) | KBTS_FEATURE_FLAG2(mark) | KBTS_FEATURE_FLAG2(mkmk) |
+                            KBTS_FEATURE_FLAG2(pres) | KBTS_FEATURE_FLAG2(ltra) | KBTS_FEATURE_FLAG2(ltrm) | KBTS_FEATURE_FLAG2(locl) |
+                            KBTS_FEATURE_FLAG2(psts) | KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(rlig),
+                            KBTS_FEATURE_FLAG3(rvrn)}},
+  /* KBTS_SHAPER_MYANMAR */ {{KBTS_FEATURE_FLAG0(rphf) | KBTS_FEATURE_FLAG0(pref) | KBTS_FEATURE_FLAG0(blwf) | KBTS_FEATURE_FLAG0(pstf) |
+                              KBTS_FEATURE_FLAG0(frac) | KBTS_FEATURE_FLAG0(numr) | KBTS_FEATURE_FLAG0(dnom) | KBTS_FEATURE_FLAG0(ccmp) |
+                              KBTS_FEATURE_FLAG0(abvs) | KBTS_FEATURE_FLAG0(blws) | KBTS_FEATURE_FLAG0(calt) | KBTS_FEATURE_FLAG0(clig) |
+                              KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm) | KBTS_FEATURE_FLAG0(curs),
+                              0,
+                              KBTS_FEATURE_FLAG2(mark) | KBTS_FEATURE_FLAG2(mkmk) | KBTS_FEATURE_FLAG2(ltra) | KBTS_FEATURE_FLAG2(ltrm) |
+                              KBTS_FEATURE_FLAG2(locl) | KBTS_FEATURE_FLAG2(psts) | KBTS_FEATURE_FLAG2(rlig) | KBTS_FEATURE_FLAG2(pres) |
+                              KBTS_FEATURE_FLAG2(liga) | KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(dist) | KBTS_FEATURE_FLAG2(kern),
+                              KBTS_FEATURE_FLAG3(rvrn)}},
+  /* KBTS_SHAPER_TIBETAN */ {{KBTS_FEATURE_FLAG0(ccmp) | KBTS_FEATURE_FLAG0(abvs) | KBTS_FEATURE_FLAG0(blws) | KBTS_FEATURE_FLAG0(calt) |
+                              KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm),
+                              0,
+                              KBTS_FEATURE_FLAG2(locl) | KBTS_FEATURE_FLAG2(liga) | KBTS_FEATURE_FLAG2(kern) | KBTS_FEATURE_FLAG2(mkmk),
+                              0}},
+  /* KBTS_SHAPER_USE */ {{KBTS_FEATURE_FLAG0(frac) | KBTS_FEATURE_FLAG0(numr) | KBTS_FEATURE_FLAG0(dnom) | KBTS_FEATURE_FLAG0(ccmp) |
+                          KBTS_FEATURE_FLAG0(akhn) | KBTS_FEATURE_FLAG0(rphf) | KBTS_FEATURE_FLAG0(pref) | KBTS_FEATURE_FLAG0(abvf) |
+                          KBTS_FEATURE_FLAG0(blwf) | KBTS_FEATURE_FLAG0(cjct) | KBTS_FEATURE_FLAG0(half) | KBTS_FEATURE_FLAG0(pstf) |
+                          KBTS_FEATURE_FLAG0(fina) | KBTS_FEATURE_FLAG0(init) | KBTS_FEATURE_FLAG0(isol) | KBTS_FEATURE_FLAG0(medi) |
+                          KBTS_FEATURE_FLAG0(abvs) | KBTS_FEATURE_FLAG0(blws) | KBTS_FEATURE_FLAG0(calt) | KBTS_FEATURE_FLAG0(clig) |
+                          KBTS_FEATURE_FLAG0(abvm) | KBTS_FEATURE_FLAG0(blwm) | KBTS_FEATURE_FLAG0(curs),
+                          0,
+                          KBTS_FEATURE_FLAG2(ltra) | KBTS_FEATURE_FLAG2(ltrm) | KBTS_FEATURE_FLAG2(locl) | KBTS_FEATURE_FLAG2(nukt) |
+                          KBTS_FEATURE_FLAG2(rkrf) | KBTS_FEATURE_FLAG2(rlig) | KBTS_FEATURE_FLAG2(dist) | KBTS_FEATURE_FLAG2(kern) |
+                          KBTS_FEATURE_FLAG2(mark) | KBTS_FEATURE_FLAG2(mkmk) | KBTS_FEATURE_FLAG2(haln) | KBTS_FEATURE_FLAG2(liga) |
+                          KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(pres) | KBTS_FEATURE_FLAG2(psts),
+                          KBTS_FEATURE_FLAG3(rvrn) | KBTS_FEATURE_FLAG3(vatu)}},
+};
+
 // Make sure that these fit KBTS_MAX_SIMULTANEOUS_FEATURES!
 static kbts_u8 kbts_Ops_Default[] = {
   KBTS_OP_KIND_NORMALIZE,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_rvrn,
-  KBTS_OP_KIND_GSUB_FEATURES, 12, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
-                                  KBTS_FEATURE_ID_liga, KBTS_FEATURE_ID_ccmp, KBTS_FEATURE_ID_locl, KBTS_FEATURE_ID_rlig, KBTS_FEATURE_ID_clig,
-                                  KBTS_FEATURE_ID_calt, KBTS_FEATURE_ID_rclt,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER, 12, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
+                                            KBTS_FEATURE_ID_liga, KBTS_FEATURE_ID_ccmp, KBTS_FEATURE_ID_locl, KBTS_FEATURE_ID_rlig, KBTS_FEATURE_ID_clig,
+                                            KBTS_FEATURE_ID_calt, KBTS_FEATURE_ID_rclt,
   KBTS_OP_KIND_GPOS_METRICS,
   KBTS_OP_KIND_GPOS_FEATURES, 7, KBTS_FEATURE_ID_abvm, KBTS_FEATURE_ID_blwm, KBTS_FEATURE_ID_mark, KBTS_FEATURE_ID_mkmk, KBTS_FEATURE_ID_curs,
                                  KBTS_FEATURE_ID_dist, KBTS_FEATURE_ID_kern,
   KBTS_OP_KIND_POST_GPOS_FIXUP,
 };
-static kbts_u8 kbts_Ops_Hebrew[] = {
-  KBTS_OP_KIND_NORMALIZE,
-  KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_rvrn,
-  KBTS_OP_KIND_GSUB_FEATURES, 12, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_rtla, KBTS_FEATURE_ID_rtlm,
-                                  KBTS_FEATURE_ID_liga, KBTS_FEATURE_ID_ccmp, KBTS_FEATURE_ID_locl, KBTS_FEATURE_ID_rlig, KBTS_FEATURE_ID_clig,
-                                  KBTS_FEATURE_ID_calt, KBTS_FEATURE_ID_rclt,
-  KBTS_OP_KIND_GPOS_METRICS,
-  KBTS_OP_KIND_GPOS_FEATURES, 7, KBTS_FEATURE_ID_abvm, KBTS_FEATURE_ID_blwm, KBTS_FEATURE_ID_mark, KBTS_FEATURE_ID_mkmk, KBTS_FEATURE_ID_curs,
-                                 KBTS_FEATURE_ID_dist, KBTS_FEATURE_ID_kern,
-  KBTS_OP_KIND_POST_GPOS_FIXUP,
-};
+
 /* @Incomplete: Vertical text.
 static kbts_u8 kbts_Ops_DefaultTtbBtt[] = {
   KBTS_OP_KIND_NORMALIZE,
@@ -15145,8 +16497,8 @@ static kbts_u8 kbts_Ops_DefaultTtbBtt[] = {
 static kbts_u8 kbts_Ops_Hangul[] = {
   KBTS_OP_KIND_NORMALIZE, KBTS_OP_KIND_NORMALIZE_HANGUL,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_rvrn,
-  KBTS_OP_KIND_GSUB_FEATURES, 8, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
-                                 KBTS_FEATURE_ID_ljmo, KBTS_FEATURE_ID_vjmo, KBTS_FEATURE_ID_tjmo,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER, 8, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
+                                           KBTS_FEATURE_ID_ljmo, KBTS_FEATURE_ID_vjmo, KBTS_FEATURE_ID_tjmo,
   KBTS_OP_KIND_GPOS_METRICS,
   KBTS_OP_KIND_GPOS_FEATURES, 13, KBTS_FEATURE_ID_abvm, KBTS_FEATURE_ID_blwm, KBTS_FEATURE_ID_ccmp, KBTS_FEATURE_ID_locl, KBTS_FEATURE_ID_mark,
                                   KBTS_FEATURE_ID_mkmk, KBTS_FEATURE_ID_rlig, KBTS_FEATURE_ID_liga, KBTS_FEATURE_ID_clig, KBTS_FEATURE_ID_curs,
@@ -15156,7 +16508,7 @@ static kbts_u8 kbts_Ops_Hangul[] = {
 static kbts_u8 kbts_Ops_ArabicRclt[] = {
   KBTS_OP_KIND_NORMALIZE, KBTS_OP_KIND_FLAG_JOINING_LETTERS,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_rvrn,
-  KBTS_OP_KIND_GSUB_FEATURES, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_rtla, KBTS_FEATURE_ID_rtlm,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_rtla, KBTS_FEATURE_ID_rtlm,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_stch,
   KBTS_OP_KIND_GSUB_FEATURES, 2, KBTS_FEATURE_ID_ccmp, KBTS_FEATURE_ID_locl,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_isol,
@@ -15179,7 +16531,7 @@ static kbts_u8 kbts_Ops_ArabicRclt[] = {
 static kbts_u8 kbts_Ops_ArabicNoRclt[] = {
   KBTS_OP_KIND_NORMALIZE, KBTS_OP_KIND_FLAG_JOINING_LETTERS,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_rvrn,
-  KBTS_OP_KIND_GSUB_FEATURES, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_rtla, KBTS_FEATURE_ID_rtlm,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_rtla, KBTS_FEATURE_ID_rtlm,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_stch,
   KBTS_OP_KIND_GSUB_FEATURES, 2, KBTS_FEATURE_ID_ccmp, KBTS_FEATURE_ID_locl,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_isol,
@@ -15204,7 +16556,7 @@ static kbts_u8 kbts_Ops_ArabicNoRclt[] = {
 static kbts_u8 kbts_Ops_Indic0[] = {
   KBTS_OP_KIND_PRE_NORMALIZE_DOTTED_CIRCLES, KBTS_OP_KIND_NORMALIZE,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_rvrn,
-  KBTS_OP_KIND_GSUB_FEATURES, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
 };
 // After BeginCluster.
 static kbts_u8 kbts_Ops_Indic1[] = {
@@ -15236,7 +16588,7 @@ static kbts_u8 kbts_Ops_Indic3[] = {
 static kbts_u8 kbts_Ops_Use0[] = {
   KBTS_OP_KIND_PRE_NORMALIZE_DOTTED_CIRCLES, KBTS_OP_KIND_NORMALIZE, KBTS_OP_KIND_FLAG_JOINING_LETTERS,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_rvrn,
-  KBTS_OP_KIND_GSUB_FEATURES, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
 };
 static kbts_u8 kbts_Ops_Use1[] = {
   KBTS_OP_KIND_GSUB_FEATURES, 4, KBTS_FEATURE_ID_locl, KBTS_FEATURE_ID_ccmp, KBTS_FEATURE_ID_nukt, KBTS_FEATURE_ID_akhn,
@@ -15256,7 +16608,7 @@ static kbts_u8 kbts_Ops_Use3[] = {
   KBTS_OP_KIND_POST_GPOS_FIXUP,
 };
 static kbts_u8 kbts_Ops_Tibetan[] = {
-  KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_locl,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER, 1, KBTS_FEATURE_ID_locl,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_ccmp,
   KBTS_OP_KIND_GSUB_FEATURES, 4, KBTS_FEATURE_ID_abvs, KBTS_FEATURE_ID_blws, KBTS_FEATURE_ID_calt, KBTS_FEATURE_ID_liga,
   KBTS_OP_KIND_GPOS_METRICS,
@@ -15266,7 +16618,7 @@ static kbts_u8 kbts_Ops_Tibetan[] = {
 static kbts_u8 kbts_Ops_Khmer0[] = {
   KBTS_OP_KIND_PRE_NORMALIZE_DOTTED_CIRCLES, KBTS_OP_KIND_NORMALIZE,
   KBTS_OP_KIND_GSUB_FEATURES, 1, KBTS_FEATURE_ID_rvrn,
-  KBTS_OP_KIND_GSUB_FEATURES, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
+  KBTS_OP_KIND_GSUB_FEATURES_WITH_USER, 5, KBTS_FEATURE_ID_frac, KBTS_FEATURE_ID_numr, KBTS_FEATURE_ID_dnom, KBTS_FEATURE_ID_ltra, KBTS_FEATURE_ID_ltrm,
 };
 static kbts_u8 kbts_Ops_Khmer1[] = {
   KBTS_OP_KIND_GSUB_FEATURES, 7, KBTS_FEATURE_ID_locl, KBTS_FEATURE_ID_ccmp, KBTS_FEATURE_ID_pref, KBTS_FEATURE_ID_blwf, KBTS_FEATURE_ID_abvf,
@@ -15303,7 +16655,7 @@ static kbts_op_list kbts_ShaperOpLists[KBTS_SHAPER_COUNT] = {
   /* DEFAULT, */ {kbts_Ops_Default, KBTS_ARRAY_LENGTH(kbts_Ops_Default)},
   /* ARABIC,  */ {kbts_Ops_ArabicRclt, KBTS_ARRAY_LENGTH(kbts_Ops_ArabicRclt)},
   /* HANGUL,  */ {kbts_Ops_Hangul, KBTS_ARRAY_LENGTH(kbts_Ops_Hangul)},
-  /* HEBREW,  */ {kbts_Ops_Hebrew, KBTS_ARRAY_LENGTH(kbts_Ops_Hebrew)},
+  /* HEBREW,  */ {kbts_Ops_Default, KBTS_ARRAY_LENGTH(kbts_Ops_Default)},
   /* INDIC,   */ {kbts_Ops_Indic0, KBTS_ARRAY_LENGTH(kbts_Ops_Indic0)},
   /* KHMER,   */ {kbts_Ops_Khmer0, KBTS_ARRAY_LENGTH(kbts_Ops_Khmer0)},
   /* MYANMAR, */ {kbts_Ops_Myanmar0, KBTS_ARRAY_LENGTH(kbts_Ops_Myanmar0)},
@@ -15338,7 +16690,7 @@ KBTS_EXPORT kbts_un kbts_SizeOfShapeState(kbts_font *Font)
 KBTS_EXPORT kbts_shape_state *kbts_PlaceShapeState(void *Address, kbts_un Size)
 {
   kbts_shape_state *State = (kbts_shape_state *)Address;
-  memset(State, 0, Size);
+  KBTS_MEMSET(State, 0, Size);
 
   return State;
 }
@@ -15413,7 +16765,6 @@ static int kbts_GrowGlyphArray(kbts_u32 *ResumePoint_, kbts_glyph_array *Array, 
 
   if(NewTotalCount <= Array->Capacity)
   {
-    // @Cleanup: memmove
     if(NewTotalCount > TotalCount)
     {
       for(kbts_un ToIndex = NewTotalCount; ToIndex > InsertIndex + GrowCount; --ToIndex)
@@ -15479,19 +16830,21 @@ static void kbts_BeginFeatures(kbts_op_state *State, kbts_shape_config *Config, 
       //  }
       //}
 
-      kbts_u32 FeatureId = kbts_FeatureToId(Feature.Tag);
+      kbts_u32 FeatureId = kbts_FeatureTagToId(Feature.Tag);
       if(Feature.Feature->LookupIndexCount && kbts_ContainsFeature(&EnabledFeatures, FeatureId))
       {
         kbts_lookup_indices LookupIndices = KBTS_ZERO;
+        LookupIndices.FeatureTag = Feature.Tag;
         LookupIndices.FeatureId = FeatureId;
         LookupIndices.SkipFlags = kbts_SkipFlags(FeatureId, Config->Shaper);
         // For Myanmar, we could try and tag glyphs depending on their Indic properties in BeginCluster, just like we do for
         // Indic scripts.
         // However, Harfbuzz does _not_ do this, so it seems like a bunch of work that would, at best, make us diverge from
         // Harfbuzz more often.
-        if(Config->Shaper != KBTS_SHAPER_MYANMAR)
+        if((Config->Shaper != KBTS_SHAPER_MYANMAR) && (FeatureId >= 1) && (FeatureId <= 32))
         {
-          LookupIndices.GlyphFilter = (FeatureId < 32) ? (1 << FeatureId) & KBTS_GLYPH_FEATURE_MASK : 0;
+          // These must properly map KBTS_FEATURE_ID to kbts_glyph_flags!
+          LookupIndices.GlyphFilter = (1 << (FeatureId - 1)) & KBTS_GLYPH_FEATURE_MASK;
         }
         LookupIndices.Count = Feature.Feature->LookupIndexCount;
         LookupIndices.Indices = KBTS_POINTER_AFTER(kbts_u16, Feature.Feature);
@@ -15658,10 +17011,10 @@ static kbts_sequence_lookup_result kbts_DoSequenceLookup(kbts_unpacked_lookup *L
     // Instead, we know which set to use based on the current glyph's class.
     // From the Microsoft docs:
     //   The class value is used as the index into an array of offsets to ClassSequenceRuleSet tables.
-    kbts_u16 CurrentGlyphClass = kbts_GlyphClassFromTable(ClassDefinitionBase, CurrentGlyph->Id);
-    kbts_class_sequence_rule_set *Set = kbts_GetClassSequenceRuleSet(Subst, CurrentGlyphClass);
+    kbts_glyph_class_from_table_result CurrentGlyphClass = kbts_GlyphClassFromTable(ClassDefinitionBase, CurrentGlyph->Id);
+    kbts_class_sequence_rule_set *Set = kbts_GetClassSequenceRuleSet(Subst, CurrentGlyphClass.Class);
 
-    if((CurrentGlyphClass < Subst->ClassSequenceRuleSetCount) && Set)
+    if((CurrentGlyphClass.Class < Subst->ClassSequenceRuleSetCount) && Set)
     {
       KBTS_FOR(RuleIndex, 0, Set->Count)
       {
@@ -15673,7 +17026,7 @@ static kbts_sequence_lookup_result kbts_DoSequenceLookup(kbts_unpacked_lookup *L
           if(!kbts_SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
           {
             InputOffsets[InputCount] = (kbts_u16)(InputGlyph - CurrentGlyph);
-            InputClasses[InputCount++] = kbts_GlyphClassFromTable(ClassDefinitionBase, InputGlyph->Id);
+            InputClasses[InputCount++] = kbts_GlyphClassFromTable(ClassDefinitionBase, InputGlyph->Id).Class;
           }
 
           InputGlyph += 1;
@@ -15801,7 +17154,7 @@ static kbts_sequence_lookup_result kbts_DoSequenceLookup(kbts_unpacked_lookup *L
     // current glyph. The class value is used as the index into an array of offsets to ChainedClassSequenceRuleSet
     // tables.
     //
-    kbts_u16 CurrentGlyphClass = kbts_GlyphClassFromTable(InputClassDefinition, CurrentGlyph->Id);
+    kbts_u16 CurrentGlyphClass = kbts_GlyphClassFromTable(InputClassDefinition, CurrentGlyph->Id).Class;
     kbts_chained_sequence_rule_set *Set = kbts_GetChainedClassSequenceRuleSet(Subst, CurrentGlyphClass);
     // If the glyph was contained in the coverage table, then it should have a valid class.
     // Nevertheless, one Harfbuzz test font did not remove out-of-bounds glyph classes from the class definition
@@ -15824,8 +17177,9 @@ static kbts_sequence_lookup_result kbts_DoSequenceLookup(kbts_unpacked_lookup *L
         {
           if(!kbts_SkipGlyph(BacktrackGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
           {
-            kbts_u16 Class = kbts_GlyphClassFromTable(BacktrackClassDefinition, BacktrackGlyph->Id);
-            BacktrackClasses[BacktrackClassCount++] = Class;
+            // @Robustness: Do we want to break if we don't find a class?
+            kbts_glyph_class_from_table_result Class = kbts_GlyphClassFromTable(BacktrackClassDefinition, BacktrackGlyph->Id);
+            BacktrackClasses[BacktrackClassCount++] = Class.Class;
           }
 
           BacktrackGlyph -= 1;
@@ -15836,19 +17190,20 @@ static kbts_sequence_lookup_result kbts_DoSequenceLookup(kbts_unpacked_lookup *L
         {
           if(!kbts_SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
           {
-            kbts_u16 InputClass = kbts_GlyphClassFromTable(InputClassDefinition, InputGlyph->Id);
+            kbts_glyph_class_from_table_result InputClass = kbts_GlyphClassFromTable(InputClassDefinition, InputGlyph->Id);
             // In many cases, the font designer just wants to match "a set of glyphs" forward,
             // and it doesn't matter whether those glyphs are in the input sequence or part of the lookahead.
             // This happens often enough that we care to special-case it.
-            kbts_u16 LookaheadClass = InputClass;
+            kbts_glyph_class_from_table_result LookaheadClass = InputClass;
             if(LookaheadClassDefinition != InputClassDefinition)
             {
               LookaheadClass = kbts_GlyphClassFromTable(LookaheadClassDefinition, InputGlyph->Id);
             }
 
+            // @Robustness: Do we want to break if we don't find a class?
             InputClassOffsets[InputClassCount] = (kbts_u16)(InputGlyph - CurrentGlyph);
-            InputClasses[InputClassCount] = InputClass;
-            LookaheadClasses[InputClassCount] = LookaheadClass;
+            InputClasses[InputClassCount] = InputClass.Class;
+            LookaheadClasses[InputClassCount] = LookaheadClass.Class;
 
             InputClassCount += 1;
           }
@@ -16083,6 +17438,7 @@ static kbts_do_single_adjustment_result kbts_DoSingleAdjustment(kbts_shape_confi
 
           kbts_unpacked_value_record Unpacked1 = KBTS_ZERO;
           kbts_unpacked_value_record Unpacked2 = KBTS_ZERO;
+          int Valid = 0;
 
           if(Base[0] == 1)
           {
@@ -16107,6 +17463,7 @@ static kbts_do_single_adjustment_result kbts_DoSingleAdjustment(kbts_shape_confi
                 Unpacked1 = kbts_UnpackValueRecord(Adjust, Adjust->ValueFormat1, Records);
                 Records += Unpacked1.Size;
                 Unpacked2 = kbts_UnpackValueRecord(Adjust, Adjust->ValueFormat2, Records);
+                Valid = 1;
               }
             }
           }
@@ -16121,28 +17478,41 @@ static kbts_do_single_adjustment_result kbts_DoSingleAdjustment(kbts_shape_confi
             kbts_un PairRecordSize = Size1 + Size2;
             kbts_u16 *PairRecords = KBTS_POINTER_AFTER(kbts_u16, Adjust);
 
-            kbts_u32 Class1 = kbts_GlyphClassFromTable(ClassDef1, CurrentGlyph->Id);
-            kbts_u32 Class2 = kbts_GlyphClassFromTable(ClassDef2, NextGlyphId);
+            // From the Microsoft docs:
+            //   PairPosFormat2 requires that each glyph in all pairs be assigned to a class, which is
+            //   identified by an integer called a class value.
+            // This _seems_ like it would mean that, if either glyph is not specified in its respective
+            // class definition table, then we should skip the lookup.
+            // However, this seems wrong in practice. Undefined classes seem to just default to 0, and then
+            // the bounds check takes care of deciding whether the lookup is okay to apply or not.
+            kbts_glyph_class_from_table_result Class1 = kbts_GlyphClassFromTable(ClassDef1, CurrentGlyph->Id);
+            kbts_glyph_class_from_table_result Class2 = kbts_GlyphClassFromTable(ClassDef2, NextGlyphId);
+            if((Class1.Class < Adjust->Class1Count) && (Class2.Class < Adjust->Class2Count))
+            {
+              kbts_u16 *PairRecord = PairRecords + Class1.Class * PairRecordSize * Adjust->Class2Count + Class2.Class * PairRecordSize;
 
-            kbts_u16 *PairRecord = PairRecords + Class1 * PairRecordSize * Adjust->Class2Count + Class2 * PairRecordSize;
+              Unpacked1 = kbts_UnpackValueRecord(Adjust, Adjust->ValueFormat1, PairRecord);
+              PairRecord += Size1;
 
-            Unpacked1 = kbts_UnpackValueRecord(Adjust, Adjust->ValueFormat1, PairRecord);
-            PairRecord += Size1;
-
-            Unpacked2 = kbts_UnpackValueRecord(Adjust, Adjust->ValueFormat2, PairRecord);
-            PairRecord += Size2;
+              Unpacked2 = kbts_UnpackValueRecord(Adjust, Adjust->ValueFormat2, PairRecord);
+              PairRecord += Size2;
+              Valid = 1;
+            }
           }
 
-          kbts_ApplyValueRecord(CurrentGlyph, &Unpacked1);
-          CurrentGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
-
-          kbts_ApplyValueRecord(&InputGlyphs[NextGlyph.Index], &Unpacked2);
-          NextGlyph.Glyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
-
-          Result.PositionedGlyphCount = 2;
-          if(!Unpacked2.Size)
+          if(Valid)
           {
-            Result.PositionedGlyphCount = 1;
+            kbts_ApplyValueRecord(CurrentGlyph, &Unpacked1);
+            CurrentGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
+
+            kbts_ApplyValueRecord(&InputGlyphs[NextGlyph.Index], &Unpacked2);
+            NextGlyph.Glyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
+
+            Result.PositionedGlyphCount = 2;
+            if(!Unpacked2.Size)
+            {
+              Result.PositionedGlyphCount = 1;
+            }
           }
         }
       }
@@ -16823,8 +18193,66 @@ static kbts_substitution_result_flags kbts_DoSubstitution(kbts_shape_state *Shap
               kbts_alternate_set *Set = kbts_GetAlternateSet(Subst, Cover.Index);
               kbts_u16 *AltGlyphIds = KBTS_POINTER_AFTER(kbts_u16, Set);
 
-              // @Incomplete: Have a way for the user to select which alternative to use.
-              kbts_u16 NewId = AltGlyphIds[0];
+              kbts_un AlternateIndex = 0;
+
+              {
+                kbts_feature_set *ShaperFeatures = ShapeState->Config->Features;
+                kbts_glyph_config *GlyphConfig = CurrentGlyph->Config;
+                if(GlyphConfig)
+                {
+                  int HasOverride = 0;
+                  KBTS_FOR(WordIndex, 0, KBTS_ARRAY_LENGTH(GlyphConfig->EnabledFeatures.Flags))
+                  {
+                    kbts_u64 Flags = GlyphConfig->EnabledFeatures.Flags[WordIndex] & ShaperFeatures->Flags[WordIndex];
+                    if(Flags)
+                    {
+                      HasOverride = 1;
+                      break;
+                    }
+                  }
+
+                  if(HasOverride)
+                  {
+                    kbts_op_state_gsub *Gsub = &ShapeState->OpState.OpSpecific.Gsub;
+                    KBTS_FOR(OverrideIndex, 0, GlyphConfig->FeatureOverrideCount)
+                    {
+                      kbts_feature_override *Override = &GlyphConfig->FeatureOverrides[OverrideIndex];
+                      kbts_u32 EnabledOrAlternatePlusOne = Override->EnabledOrAlternatePlusOne;
+
+                      if(EnabledOrAlternatePlusOne && kbts_ContainsFeature(&Gsub->LookupFeatures, Override->Id))
+                      {
+                        int Match = 1;
+                        if(!Override->Id)
+                        {
+                          // Slow path for unregistered features.
+                          Match = 0;
+                          KBTS_FOR(UnregisteredFeatureIndex, 0, ShapeState->OpState.UnregisteredFeatureCount)
+                          {
+                            if(Override->Tag == ShapeState->OpState.UnregisteredFeatureTags[UnregisteredFeatureIndex])
+                            {
+                              Match = 1;
+                              break;
+                            }
+                          }
+                        }
+
+                        if(Match)
+                        {
+                          AlternateIndex = EnabledOrAlternatePlusOne - 1;
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+
+              if(AlternateIndex >= Set->GlyphCount)
+              {
+                AlternateIndex = 0;
+              }
+
+              kbts_u16 NewId = AltGlyphIds[AlternateIndex];
               kbts_GsubMutate(Font, CurrentGlyph, NewId, GeneratedGlyphFlags);
             }
           } break;
@@ -16926,6 +18354,8 @@ static kbts_substitution_result_flags kbts_DoSubstitution(kbts_shape_state *Shap
                       }
                     }
 
+                    // Currently, we only take the main glyph's config into account while making the ligature's config.
+                    // Maybe we should merge all of the components' configs into one instead?
                     kbts_GsubMutate(Font, CurrentGlyph, Ligature->Glyph, GeneratedGlyphFlags | KBTS_GLYPH_FLAG_LIGATURE);
                     CurrentGlyph->Uid = (kbts_u16)LigatureUid;
                     // Harfbuzz does this, because Uniscribe does this, and so we do the same. Sigh.
@@ -17032,7 +18462,6 @@ Cleanup:;
 static kbts_u32 kbts_WouldSubstitute(kbts_shape_state *ShapeState, kbts_lookup_list *LookupList, kbts_gsub_frame *Frames, kbts_feature *Feature, kbts_skip_flags SkipFlags, kbts_glyph *Glyphs, kbts_un GlyphCount)
 {
   kbts_u32 Result = 0;
-  kbts_u32 DummyGlyphCount = (kbts_u32)GlyphCount;
   kbts_glyph_array GlyphArray = kbts_GlyphArray(Glyphs, GlyphCount, GlyphCount, GlyphCount);
 
   kbts_iterate_lookups IterateLookups = kbts_IterateLookups(LookupList, Feature);
@@ -17068,9 +18497,7 @@ Done:;
   return Result;
 }
 
-#include <emmintrin.h>
-
-static int kbts_NextLookupIndex(kbts_op_state *S, kbts_un *LookupIndex, kbts_u32 *SkipFlags_, kbts_u32 *GlyphFilter_)
+static int kbts_NextLookupIndex(kbts_op_state *S, kbts_un *LookupIndex, kbts_u32 *SkipFlags_, kbts_u32 *GlyphFilter_, kbts_feature_set *FeatureSet_)
 {
   kbts_un LowestIndex = 0xFFFFFFFF;
   KBTS_FOR(FeatureIndex, 0, S->FeatureCount)
@@ -17083,8 +18510,10 @@ static int kbts_NextLookupIndex(kbts_op_state *S, kbts_un *LookupIndex, kbts_u32
     }
   }
 
+  kbts_feature_set FeatureSet = KBTS_ZERO;
   kbts_skip_flags SkipFlags = 0;
   kbts_u32 GlyphFilter = 0;
+  kbts_un UnregisteredFeatureCount = 0;
   KBTS_FOR(FeatureIndex, 0, S->FeatureCount)
   {
     kbts_lookup_indices *Indices = &S->FeatureLookupIndices[FeatureIndex];
@@ -17093,6 +18522,13 @@ static int kbts_NextLookupIndex(kbts_op_state *S, kbts_un *LookupIndex, kbts_u32
     {
       SkipFlags |= Indices->SkipFlags;
       GlyphFilter |= Indices->GlyphFilter;
+      kbts_AddFeature(&FeatureSet, Indices->FeatureId);
+
+      if(!Indices->FeatureId && (UnregisteredFeatureCount < KBTS_MAX_SIMULTANEOUS_FEATURES))
+      {
+        S->UnregisteredFeatureTags[UnregisteredFeatureCount++] = Indices->FeatureTag;
+      }
+
       ++Indices->Indices; --Indices->Count;
       if(!Indices->Count)
       {
@@ -17101,10 +18537,60 @@ static int kbts_NextLookupIndex(kbts_op_state *S, kbts_un *LookupIndex, kbts_u32
     }
   }
 
+  S->UnregisteredFeatureCount = (kbts_u32)UnregisteredFeatureCount;
   *LookupIndex = LowestIndex;
   *SkipFlags_ = SkipFlags;
   *GlyphFilter_ = GlyphFilter;
+  *FeatureSet_ = FeatureSet;
   return LowestIndex != 0xFFFFFFFF;
+}
+
+static int kbts_ConfigAllowsFeatures(kbts_op_state *S, kbts_shape_config *Config, kbts_glyph_config *GlyphConfig, kbts_feature_set *Features)
+{
+  kbts_glyph_config DummyGlyphConfig = KBTS_ZERO;
+  kbts_u64 UserEnabled = 0; // Whether the user enabled _any_ feature corresponding to this lookup.
+  kbts_u64 UserDisabled = 1; // Whether the user disabled _all_ features corresponding to this lookup.
+  kbts_u64 DefaultEnabled = 0; // Whether any feature is non-user.
+
+  if(!GlyphConfig)
+  {
+    GlyphConfig = &DummyGlyphConfig;
+  }
+
+  kbts_u64 Mask = 1; // Ignore unregistered features in the broad pass.
+  KBTS_FOR(WordIndex, 0, KBTS_ARRAY_LENGTH(GlyphConfig->EnabledFeatures.Flags))
+  {
+    kbts_u64 LookupFeatureFlags = Features->Flags[WordIndex] & ~Mask;
+    Mask = 0;
+
+    UserEnabled |= GlyphConfig->EnabledFeatures.Flags[WordIndex] & LookupFeatureFlags;
+    UserDisabled &= (GlyphConfig->DisabledFeatures.Flags[WordIndex] & LookupFeatureFlags) == LookupFeatureFlags;
+    DefaultEnabled |= Features->Flags[WordIndex] & Config->Features->Flags[WordIndex];
+  }
+
+  if(Features->Flags[0] & (GlyphConfig->EnabledFeatures.Flags[0] | GlyphConfig->DisabledFeatures.Flags[0]) & KBTS_FEATURE_FLAG0(UNREGISTERED))
+  {
+    // Slow path for unregistered features.
+    KBTS_FOR(FeatureOverrideIndex, 0, GlyphConfig->FeatureOverrideCount)
+    {
+      kbts_feature_override *Override = &GlyphConfig->FeatureOverrides[FeatureOverrideIndex];
+      if(Override->Id == KBTS_FEATURE_ID_UNREGISTERED)
+      {
+        kbts_feature_tag OverrideTag = Override->Tag;
+        KBTS_FOR(UnregisteredFeatureIndex, 0, S->UnregisteredFeatureCount)
+        {
+          if(OverrideTag == S->UnregisteredFeatureTags[UnregisteredFeatureIndex])
+          {
+            UserEnabled |= Override->EnabledOrAlternatePlusOne;
+            UserDisabled &= !Override->EnabledOrAlternatePlusOne;
+            break;
+          }
+        }
+      }
+    }
+  }
+  int Result = (!UserDisabled && (DefaultEnabled || UserEnabled));
+  return Result;
 }
 
 static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *GlyphArray)
@@ -17138,11 +18624,10 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
     // The USE spec gives us a list of codepoint sequences which necessitate insertion of a dotted circle.
     // These sequences are from IndicShapingInvalidClusters.txt.
     S->GlyphIndex = 0;
-
-    kbts_u64 Codepoints = 0; // 0xABBBBBCCCCCDDDDD
+    kbts_u64 Codepoints; Codepoints = 0; // 0xABBBBBCCCCCDDDDD
     for(; S->GlyphIndex < GlyphArray->Count; ++S->GlyphIndex)
     {
-      kbts_u32 NewCodepoint = Glyphs[S->GlyphIndex].Codepoint & 0x1FFFFF;
+      kbts_u32 NewCodepoint; NewCodepoint = Glyphs[S->GlyphIndex].Codepoint & 0x1FFFFF;
       Codepoints = (Codepoints << 21) | NewCodepoint;
 
       // This switch is faster than any table lookup I could come up with in my tests.
@@ -17289,9 +18774,8 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
     // myanmar: HB_OT_SHAPE_NORMALIZATION_MODE_COMPOSED_DIACRITICS_NO_SHORT_CIRCUIT,
     // use:     HB_OT_SHAPE_NORMALIZATION_MODE_COMPOSED_DIACRITICS_NO_SHORT_CIRCUIT,
 
-    kbts_glyph *DecompositionGlyphs = KBTS_POINTER_AFTER(kbts_glyph, S);
-
     { // Full NFD decomposition
+      kbts_glyph *DecompositionGlyphs; DecompositionGlyphs = KBTS_POINTER_AFTER(kbts_glyph, S);
       for(S->GlyphIndex = 0; S->GlyphIndex < GlyphArray->Count; ++S->GlyphIndex)
       {
         DecompositionGlyphs[0] = Glyphs[S->GlyphIndex];
@@ -17320,6 +18804,7 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
             KBTS_FOR(DecompositionIndex, 0, DecompositionSize)
             {
               kbts_glyph DecompositionGlyph = kbts_CodepointToGlyph(Font, kbts_GetDecompositionCodepoint(Decomposition, DecompositionIndex));
+              DecompositionGlyph.Config = GlyphToDecompose.Config;
 
               AnyUnsupported |= !DecompositionGlyph.Id;
               Decomposed[DecompositionIndex] = DecompositionGlyph;
@@ -17386,10 +18871,23 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
         AfterFractionSlashGlyphFlags = Swap;
       }
 
+      // We also collate user features here.
+      kbts_feature_set UserFeatures = KBTS_ZERO;
+      kbts_feature_set *DefaultFeatures = Config->Features;
+
       KBTS_FOR(GlyphIndex, 0, S->WrittenCount)
       {
         kbts_glyph *Glyph = &Glyphs[GlyphIndex];
         Glyph->Uid = (kbts_u16)++ShapeState->NextGlyphUid;
+
+        if(Glyph->Config)
+        {
+          kbts_glyph_config *GlyphConfig = Glyph->Config;
+          KBTS_FOR(WordIndex, 0, KBTS_ARRAY_LENGTH(UserFeatures.Flags))
+          {
+            UserFeatures.Flags[WordIndex] |= GlyphConfig->EnabledFeatures.Flags[WordIndex] & ~DefaultFeatures->Flags[WordIndex];
+          }
+        }
 
         kbts_un AvailableGlyphCount = 0;
         if(!Glyph->CombiningClass)
@@ -17428,6 +18926,7 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
           kbts_u32 DecompositionSize = kbts_GetDecompositionSize(ParentGlyph.Decomposition);
 
           ParentGlyph.Uid = LastBase->Uid;
+          ParentGlyph.Config = LastBase->Config;
           if((DecompositionSize == AvailableGlyphCount) && ParentGlyph.Id)
           {
             if(DecompositionSize == 2)
@@ -17484,6 +18983,15 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
           InFraction = 0;
         }
       }
+
+      // Ignore added features that are already part of the shaper.
+      kbts_feature_set *ShaperFeatures = Config->Features;
+      KBTS_FOR(WordIndex, 0, KBTS_ARRAY_LENGTH(UserFeatures.Flags))
+      {
+        UserFeatures.Flags[WordIndex] &= ~ShaperFeatures->Flags[WordIndex];
+      }
+
+      ShapeState->UserFeatures = UserFeatures;
     }
 
     { // Unicode mark reordering.
@@ -17659,10 +19167,14 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
     else if((Config->Script == KBTS_SCRIPT_THAI) || (Config->Script == KBTS_SCRIPT_LAO))
     {
       // Decompose sara/sala ams.
-      kbts_un AboveBaseGlyphCount = 0;
+      kbts_un AboveBaseGlyphCount; AboveBaseGlyphCount = 0;
       for(S->GlyphIndex = 0; S->GlyphIndex < S->WrittenCount; ++S->GlyphIndex)
       {
-        ResumePoint5:;
+        if(0)
+        {
+          ResumePoint5:;
+          AboveBaseGlyphCount = S->OpSpecific.Normalize.AboveBaseGlyphCount;
+        }
         kbts_glyph *Glyph = &Glyphs[S->GlyphIndex];
         kbts_u32 Codepoint = Glyph->Codepoint;
 
@@ -17714,148 +19226,148 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
   case KBTS_OP_KIND_NORMALIZE_HANGUL:
   {
     KBTS_INSTRUMENT_BLOCK_BEGIN("NORMALIZE_HANGUL")
+    kbts_op_state_normalize_hangul *NormalizeHangul; NormalizeHangul = &S->OpSpecific.NormalizeHangul;
     S->GlyphIndex = 0;
     while(S->GlyphIndex < GlyphArray->Count)
     {
-      kbts_glyph *Glyph = &Glyphs[S->GlyphIndex];
-
-      kbts_un L = 0;
-      kbts_un V = 0;
-      kbts_un T = 0;
-
-      kbts_hangul_syllable_info LInfo = kbts_HangulSyllableInfo(Glyph->Codepoint);
-      if(LInfo.Type >= KBTS_HANGUL_SYLLABLE_TYPE_LV)
       {
-        kbts_un SIndex = (Glyph->Codepoint - 0xAC00);
+        kbts_glyph *Glyph = &Glyphs[S->GlyphIndex];
+        kbts_un L = 0;
+        kbts_un V = 0;
+        kbts_un T = 0;
 
-        L = 0x1100 + SIndex / 588;
-        V = 0x1161 + (SIndex % 588) / 28;
-
-        kbts_un TIndex = SIndex % 28;
-        if(TIndex)
+        kbts_hangul_syllable_info LInfo = kbts_HangulSyllableInfo(Glyph->Codepoint);
+        if(LInfo.Type >= KBTS_HANGUL_SYLLABLE_TYPE_LV)
         {
-          T = 0x11A7 + TIndex;
-        }
-      }
-      else if(LInfo.Type == KBTS_HANGUL_SYLLABLE_TYPE_L)
-      {
-        L = Glyph->Codepoint;
-      }
+          kbts_un SIndex = (Glyph->Codepoint - 0xAC00);
 
-      S->GlyphIndex += 1;
+          L = 0x1100 + SIndex / 588;
+          V = 0x1161 + (SIndex % 588) / 28;
 
-      kbts_op_state_normalize_hangul *NormalizeHangul = &S->OpSpecific.NormalizeHangul;
-
-      if(L)
-      {
-        kbts_hangul_syllable_info VInfo = KBTS_ZERO;
-
-        if(!V && (S->GlyphIndex < GlyphArray->Count))
-        {
-          kbts_u32 VCodepoint = Glyphs[S->GlyphIndex].Codepoint;
-
-          VInfo = kbts_HangulSyllableInfo(VCodepoint);
-
-          if(VInfo.Type == KBTS_HANGUL_SYLLABLE_TYPE_V)
+          kbts_un TIndex = SIndex % 28;
+          if(TIndex)
           {
-            V = VCodepoint;
-
-            S->GlyphIndex += 1;
+            T = 0x11A7 + TIndex;
           }
         }
-
-        if(V)
+        else if(LInfo.Type == KBTS_HANGUL_SYLLABLE_TYPE_L)
         {
-          kbts_hangul_syllable_info TInfo = KBTS_ZERO;
+          L = Glyph->Codepoint;
+        }
 
-          if(!T && (S->GlyphIndex < GlyphArray->Count))
+        S->GlyphIndex += 1;
+
+        if(L)
+        {
+          kbts_hangul_syllable_info VInfo = KBTS_ZERO;
+
+          if(!V && (S->GlyphIndex < GlyphArray->Count))
           {
-            kbts_u32 TCodepoint = Glyphs[S->GlyphIndex].Codepoint;
+            kbts_u32 VCodepoint = Glyphs[S->GlyphIndex].Codepoint;
 
-            TInfo = kbts_HangulSyllableInfo(TCodepoint);
+            VInfo = kbts_HangulSyllableInfo(VCodepoint);
 
-            if(TInfo.Type == KBTS_HANGUL_SYLLABLE_TYPE_T)
+            if(VInfo.Type == KBTS_HANGUL_SYLLABLE_TYPE_V)
             {
-              T = TCodepoint;
+              V = VCodepoint;
 
               S->GlyphIndex += 1;
             }
           }
 
-          NormalizeHangul->LvtGlyphCount = 0;
-
-          // Check for any tone marks that we need to swap to the front of the syllable.
-          // The OpenType shaping documents say that we need to do this after applying GSUB features, but
-          // harfbuzz does it before, so it's probably fine to do it here?
-          // It's also basically free to do here, which is nice.
-          if(S->GlyphIndex < GlyphArray->Count)
+          if(V)
           {
-            kbts_u32 ToneMarkCodepoint = Glyphs[S->GlyphIndex].Codepoint;
+            kbts_hangul_syllable_info TInfo = KBTS_ZERO;
 
-            if((ToneMarkCodepoint >= 0x302E) && (ToneMarkCodepoint <= 0x302F))
+            if(!T && (S->GlyphIndex < GlyphArray->Count))
             {
-              NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = kbts_CodepointToGlyph(Font, ToneMarkCodepoint);
+              kbts_u32 TCodepoint = Glyphs[S->GlyphIndex].Codepoint;
 
-              S->GlyphIndex += 1;
-            }
-          }
+              TInfo = kbts_HangulSyllableInfo(TCodepoint);
 
-          if(LInfo.Composable & VInfo.Composable & TInfo.Composable)
-          {
-            // Try LVT.
-            kbts_un LvtCodepoint = 0xAC00 + (L - 0x1100) * 588 + (V - 0x1161) * 28 + (T - 0x11A7);
+              if(TInfo.Type == KBTS_HANGUL_SYLLABLE_TYPE_T)
+              {
+                T = TCodepoint;
 
-            kbts_glyph LvtGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)LvtCodepoint);
-            if(LvtGlyph.Id)
-            {
-              NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = LvtGlyph;
-            }
-          }
-
-          if(!NormalizeHangul->LvtGlyphCount)
-          {
-            kbts_glyph LvGlyph = {0};
-            if(LInfo.Composable & VInfo.Composable)
-            {
-              // Try LV.
-              kbts_un LvCodepoint = 0xAC00 + (L - 0x1100) * 588 + (V - 0x1161) * 28;
-
-              LvGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)LvCodepoint);
+                S->GlyphIndex += 1;
+              }
             }
 
-            if(LvGlyph.Id)
+            NormalizeHangul->LvtGlyphCount = 0;
+
+            // Check for any tone marks that we need to swap to the front of the syllable.
+            // The OpenType shaping documents say that we need to do this after applying GSUB features, but
+            // harfbuzz does it before, so it's probably fine to do it here?
+            // It's also basically free to do here, which is nice.
+            if(S->GlyphIndex < GlyphArray->Count)
             {
-              NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = LvGlyph;
+              kbts_u32 ToneMarkCodepoint = Glyphs[S->GlyphIndex].Codepoint;
+
+              if((ToneMarkCodepoint >= 0x302E) && (ToneMarkCodepoint <= 0x302F))
+              {
+                NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = kbts_CodepointToGlyph(Font, ToneMarkCodepoint);
+
+                S->GlyphIndex += 1;
+              }
             }
-            else
+
+            if(LInfo.Composable & VInfo.Composable & TInfo.Composable)
             {
-              // Do L-V.
-              kbts_glyph LGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)L);
-              LGlyph.Flags |= KBTS_GLYPH_FLAG_LJMO;
+              // Try LVT.
+              kbts_un LvtCodepoint = 0xAC00 + (L - 0x1100) * 588 + (V - 0x1161) * 28 + (T - 0x11A7);
 
-              kbts_glyph VGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)V);
-              VGlyph.Flags |= KBTS_GLYPH_FLAG_VJMO;
-
-              NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = LGlyph;
-              NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = VGlyph;
+              kbts_glyph LvtGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)LvtCodepoint);
+              if(LvtGlyph.Id)
+              {
+                NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = LvtGlyph;
+              }
             }
 
-            if(T)
+            if(!NormalizeHangul->LvtGlyphCount)
             {
-              kbts_glyph TGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)T);
-              TGlyph.Flags |= KBTS_GLYPH_FLAG_TJMO;
+              kbts_glyph LvGlyph = KBTS_ZERO;
+              if(LInfo.Composable & VInfo.Composable)
+              {
+                // Try LV.
+                kbts_un LvCodepoint = 0xAC00 + (L - 0x1100) * 588 + (V - 0x1161) * 28;
 
-              NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = TGlyph;
+                LvGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)LvCodepoint);
+              }
+
+              if(LvGlyph.Id)
+              {
+                NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = LvGlyph;
+              }
+              else
+              {
+                // Do L-V.
+                kbts_glyph LGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)L);
+                LGlyph.Flags |= KBTS_GLYPH_FLAG_LJMO;
+
+                kbts_glyph VGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)V);
+                VGlyph.Flags |= KBTS_GLYPH_FLAG_VJMO;
+
+                NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = LGlyph;
+                NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = VGlyph;
+              }
+
+              if(T)
+              {
+                kbts_glyph TGlyph = kbts_CodepointToGlyph(Font, (kbts_u32)T);
+                TGlyph.Flags |= KBTS_GLYPH_FLAG_TJMO;
+
+                NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = TGlyph;
+              }
             }
           }
         }
-      }
 
-      if(!NormalizeHangul->LvtGlyphCount)
-      {
-        kbts_glyph NewGlyph = kbts_CodepointToGlyph(Font, Glyph->Codepoint);
+        if(!NormalizeHangul->LvtGlyphCount)
+        {
+          kbts_glyph NewGlyph = kbts_CodepointToGlyph(Font, Glyph->Codepoint);
 
-        NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = NewGlyph;
+          NormalizeHangul->LvtGlyphs[NormalizeHangul->LvtGlyphCount++] = NewGlyph;
+        }
       }
 
       { // Insert the LVT glyphs.
@@ -17887,16 +19399,19 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
   case KBTS_OP_KIND_GSUB_FEATURES:
   {
     KBTS_INSTRUMENT_BLOCK_BEGIN("GSUB_FEATURES")
-    kbts_gsub_gpos *FontGsub = Font->ShapingTables[KBTS_SHAPING_TABLE_GSUB];
-    kbts_lookup_list *LookupList = kbts_GetLookupList(FontGsub);
-    kbts_gsub_frame *Frames = KBTS_POINTER_AFTER(kbts_gsub_frame, S);
-    kbts_op_state_gsub *Gsub = &S->OpSpecific.Gsub;
+
+    kbts_gsub_gpos *FontGsub; FontGsub = Font->ShapingTables[KBTS_SHAPING_TABLE_GSUB];
+    kbts_lookup_list *LookupList; LookupList = kbts_GetLookupList(FontGsub);
+    kbts_gsub_frame *Frames; Frames = KBTS_POINTER_AFTER(kbts_gsub_frame, S);
+    kbts_op_state_gsub *Gsub; Gsub = &S->OpSpecific.Gsub;
+    kbts_u32 GlyphFilter;
+    kbts_skip_flags SkipFlags;
+    kbts_feature_set LookupFeatures;
 
     kbts_BeginFeatures(S, Config, KBTS_SHAPING_TABLE_GSUB, Op->Features);
-    kbts_u32 GlyphFilter;
-    kbts_skip_flags SkipFlags = 0;
-    while(kbts_NextLookupIndex(S, &Gsub->LookupIndex, &SkipFlags, &GlyphFilter))
+    while(kbts_NextLookupIndex(S, &Gsub->LookupIndex, &SkipFlags, &GlyphFilter, &LookupFeatures))
     {
+      Gsub->LookupFeatures = LookupFeatures;
       S->GlyphIndex = 0;
 
       // From the Microsoft docs:
@@ -17908,52 +19423,56 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
       while(S->GlyphIndex < GlyphArray->Count)
       {
         Frames[0].InputGlyphCount = 1;
-        kbts_u32 FilterMask = Config->Shaper == KBTS_SHAPER_USE ? KBTS_USE_GLYPH_FEATURE_MASK : KBTS_GLYPH_FEATURE_MASK;
-        kbts_u32 EffectiveGlyphFilter = GlyphFilter & FilterMask;
 
-        // Reverse chaining substitutions are tricky.
-        // See the comment at :ReverseChaining.
-        // @Duplication: We just copy the top-level mirroring logic from DoSubstitution here for now.
-        kbts_lookup *Lookup = kbts_GetLookup(LookupList, Gsub->LookupIndex);
-        kbts_un CurrentGlyphIndex = (Lookup->Type == 8) ? GlyphArray->Count - 1 - S->GlyphIndex : S->GlyphIndex;
-
-        if(kbts_GlyphIncludedInLookup(Config->Font, 0, Gsub->LookupIndex, Glyphs[CurrentGlyphIndex].Id) && ((Glyphs[CurrentGlyphIndex].Flags & EffectiveGlyphFilter) == EffectiveGlyphFilter))
         {
-          S->FrameCount = 0;
+          kbts_u32 FilterMask = Config->Shaper == KBTS_SHAPER_USE ? KBTS_USE_GLYPH_FEATURE_MASK : KBTS_GLYPH_FEATURE_MASK;
+          kbts_u32 EffectiveGlyphFilter = GlyphFilter & FilterMask;
 
+          // Reverse chaining substitutions are tricky.
+          // See the comment at :ReverseChaining.
+          // @Duplication: We just copy the top-level mirroring logic from DoSubstitution here for now.
+          kbts_lookup *Lookup = kbts_GetLookup(LookupList, Gsub->LookupIndex);
+          kbts_un CurrentGlyphIndex = (Lookup->Type == 8) ? GlyphArray->Count - 1 - S->GlyphIndex : S->GlyphIndex;
+          kbts_glyph *CurrentGlyph = &Glyphs[CurrentGlyphIndex];
+
+          if(kbts_GlyphIncludedInLookup(Config->Font, 0, Gsub->LookupIndex, CurrentGlyph->Id) &&
+             ((CurrentGlyph->Flags & EffectiveGlyphFilter) == EffectiveGlyphFilter) &&
+             kbts_ConfigAllowsFeatures(S, Config, CurrentGlyph->Config, &LookupFeatures))
           {
-            kbts_gsub_frame *Frame = &Frames[S->FrameCount++];
+            kbts_gsub_frame *Frame = &Frames[0];
 
             Frame->LookupIndex = (kbts_u16)Gsub->LookupIndex;
             Frame->SubtableIndex = 0;
             Frame->InputGlyphIndex = (kbts_u16)S->GlyphIndex;
+            S->FrameCount = 1;
+          }
+        }
+
+        while(S->FrameCount)
+        {
+          if(0)
+          {
+          ResumePoint2:;
+            FontGsub = Font->ShapingTables[KBTS_SHAPING_TABLE_GSUB];
+            Gsub = &S->OpSpecific.Gsub;
+            LookupList = kbts_GetLookupList(FontGsub);
+            Frames = KBTS_POINTER_AFTER(kbts_gsub_frame, S);
+            LookupFeatures = Gsub->LookupFeatures;
+            GlyphFilter = Gsub->GlyphFilter;
+            SkipFlags = Gsub->SkipFlags;
           }
 
-          while(S->FrameCount)
+          // These flags are used by USE.
+          kbts_u32 GeneratedGlyphFlags = GlyphFilter & (KBTS_GLYPH_FLAG_RPHF | KBTS_GLYPH_FLAG_PREF);
+          kbts_substitution_result_flags SubstitutionFlags = kbts_DoSubstitution(ShapeState, LookupList, Frames, &S->FrameCount, GlyphArray, 0, SkipFlags, GeneratedGlyphFlags);
+          if(SubstitutionFlags & KBTS_SUBSTITUTION_RESULT_FLAG_GROW_BUFFER)
           {
-            if(0)
-            {
-            ResumePoint2:;
-              FontGsub = Font->ShapingTables[KBTS_SHAPING_TABLE_GSUB];
-              Gsub = &S->OpSpecific.Gsub;
-              LookupList = kbts_GetLookupList(FontGsub);
-              Frames = KBTS_POINTER_AFTER(kbts_gsub_frame, S);
-              GlyphFilter = Gsub->GlyphFilter;
-              SkipFlags = Gsub->SkipFlags;
-            }
+            Gsub->GlyphFilter = GlyphFilter;
+            Gsub->SkipFlags = SkipFlags;
+            S->ResumePoint = 2;
 
-            // These flags are used by USE.
-            kbts_u32 GeneratedGlyphFlags = GlyphFilter & (KBTS_GLYPH_FLAG_RPHF | KBTS_GLYPH_FLAG_PREF);
-            kbts_substitution_result_flags SubstitutionFlags = kbts_DoSubstitution(ShapeState, LookupList, Frames, &S->FrameCount, GlyphArray, 0, SkipFlags, GeneratedGlyphFlags);
-            if(SubstitutionFlags & KBTS_SUBSTITUTION_RESULT_FLAG_GROW_BUFFER)
-            {
-              Gsub->GlyphFilter = GlyphFilter;
-              Gsub->SkipFlags = SkipFlags;
-              S->ResumePoint = 2;
-
-              KBTS_INSTRUMENT_END
-              return 1;
-            }
+            KBTS_INSTRUMENT_END
+            return 1;
           }
         }
 
@@ -18107,7 +19626,8 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
     kbts_un LookupIndex;
     kbts_skip_flags SkipFlags;
     kbts_u32 GlyphFilter;
-    while(kbts_NextLookupIndex(S, &LookupIndex, &SkipFlags, &GlyphFilter))
+    kbts_feature_set LookupFeatures;
+    while(kbts_NextLookupIndex(S, &LookupIndex, &SkipFlags, &GlyphFilter, &LookupFeatures))
     {
       kbts_lookup *PackedLookup = kbts_GetLookup(LookupList, LookupIndex);
       kbts_unpacked_lookup Lookup = kbts_UnpackLookup(Font->Gdef, PackedLookup);
@@ -18117,7 +19637,8 @@ static kbts_u32 kbts_ExecuteOp(kbts_shape_state *ShapeState, kbts_glyph_array *G
       {
         kbts_un DeltaGlyphIndex = 1;
 
-        if(kbts_GlyphIncludedInLookup(Config->Font, 1, LookupIndex, GlyphArray->Glyphs[PositionedGlyphCount].Id))
+        if(kbts_GlyphIncludedInLookup(Config->Font, 1, LookupIndex, GlyphArray->Glyphs[PositionedGlyphCount].Id) &&
+           kbts_ConfigAllowsFeatures(S, Config, Glyphs[PositionedGlyphCount].Config, &LookupFeatures))
         {
           KBTS_FOR(SubtableIndex, 0, Lookup.SubtableCount)
           {
@@ -18355,8 +19876,6 @@ static kbts_glyph kbts_Substitute1(kbts_shape_state *ShapeState, kbts_lookup_lis
     Frames[0].InputGlyphCount = 1;
     kbts_u32 FrameCount = 1;
 
-    kbts_u32 GlyphCount = 1;
-
     while(FrameCount)
     {
       kbts_substitution_result_flags SubstitutionResult = kbts_DoSubstitution(ShapeState, LookupList, Frames, &FrameCount, &GlyphArray, 0, SkipFlags, 0);
@@ -18457,7 +19976,6 @@ static kbts_begin_cluster_result kbts_BeginCluster(kbts_shape_state *ShapeState,
 
       kbts_gsub_frame *Frames = KBTS_POINTER_AFTER(kbts_gsub_frame, OpState);
       kbts_glyph *OnePastLastSyllableGlyph = Glyphs + ScanGlyphIndex;
-      kbts_script Script = ShapeState->Config->Script;
 
       if((Config->Script == KBTS_SCRIPT_KANNADA) && (ScanGlyphIndex >= 3) && (Glyphs[0].SyllabicClass == KBTS_INDIC_SYLLABIC_CLASS_RA) &&
          (Glyphs[1].SyllabicClass == KBTS_INDIC_SYLLABIC_CLASS_HALANT) && (Glyphs[2].SyllabicClass == KBTS_INDIC_SYLLABIC_CLASS_ZWJ))
@@ -18542,8 +20060,6 @@ static kbts_begin_cluster_result kbts_BeginCluster(kbts_shape_state *ShapeState,
         Scratch[0] = Config->Virama;
         Scratch[2] = Config->Virama;
 
-        kbts_feature *Pstf = Config->Pstf;
-        kbts_feature *Blwf = Config->Blwf;
         kbts_feature *Locl = Config->Locl;
         kbts_feature *Vatu = Config->Vatu;
 
@@ -18859,8 +20375,8 @@ static kbts_begin_cluster_result kbts_BeginCluster(kbts_shape_state *ShapeState,
       }
 
       // All post-base glyphs get BLWF, ABVF, PSTF. Some get PREF.
-      kbts_glyph Scratch[2] = {0};
-      kbts_glyph *LastGlyph = 0;
+      kbts_glyph Scratch[2]; Scratch[0] = Scratch[1] = KBTS_ZERO_TYPE(kbts_glyph);
+      kbts_glyph *LastGlyph; LastGlyph = 0;
       KBTS_FOR(GlyphIndex, BaseIndex + 1, ScanGlyphIndex)
       {
         kbts_glyph *Glyph = &Glyphs[GlyphIndex];
@@ -19730,7 +21246,7 @@ static kbts_end_cluster_result kbts_EndCluster(kbts_shape_state *ShapeState, kbt
   return Result;
 }
 
-static kbts_op_list kbts_OpList(uint8_t *Ops, kbts_un Size)
+static kbts_op_list kbts_OpList(kbts_u8 *Ops, kbts_un Size)
 {
   kbts_op_list Result = KBTS_ZERO;
   Result.Ops = Ops;
@@ -19739,7 +21255,7 @@ static kbts_op_list kbts_OpList(uint8_t *Ops, kbts_un Size)
 }
 #define KBTS_OP_LIST(OpList) kbts_OpList((kbts_Ops_##OpList), KBTS_ARRAY_LENGTH(kbts_Ops_##OpList))
 
-KBTS_EXPORT kbts_shape_config kbts_ShapeConfig(kbts_font *Font, kbts_u32 Script, kbts_u32 Language)
+KBTS_EXPORT kbts_shape_config kbts_ShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language)
 {
   kbts_shape_config Result = KBTS_ZERO;
 
@@ -19836,9 +21352,11 @@ KBTS_EXPORT kbts_shape_config kbts_ShapeConfig(kbts_font *Font, kbts_u32 Script,
     break;
   }
 
+  Result.Features = &kbts_ShaperFeatures[Result.Shaper];
+
   kbts_feature *Rclt = 0;
   kbts_feature_set SyllableFeatureSet = {{KBTS_FEATURE_FLAG0(rphf) | KBTS_FEATURE_FLAG0(blwf) | KBTS_FEATURE_FLAG0(half) | KBTS_FEATURE_FLAG0(pstf) | KBTS_FEATURE_FLAG0(pref),
-                                          KBTS_FEATURE_FLAG1(rclt) | KBTS_FEATURE_FLAG1(locl) | KBTS_FEATURE_FLAG1(vatu)}};
+                                          0, KBTS_FEATURE_FLAG2(rclt) | KBTS_FEATURE_FLAG2(locl), KBTS_FEATURE_FLAG3(vatu)}};
   kbts_iterate_features IterateFeatures = kbts_IterateFeatures(&Result, KBTS_SHAPING_TABLE_GSUB, SyllableFeatureSet);
   while(kbts_NextFeature(&IterateFeatures))
   {
@@ -19884,21 +21402,37 @@ KBTS_EXPORT kbts_shape_config kbts_ShapeConfig(kbts_font *Font, kbts_u32 Script,
   return Result;
 }
 
-static kbts_op kbts_ReadOp(kbts_u8 *Ops, kbts_u32 *Ip_)
+static kbts_op kbts_ReadOp(kbts_shape_state *State, kbts_u8 *Ops)
 {
-  kbts_u32 Ip = *Ip_;
   kbts_op Result = KBTS_ZERO;
-  Result.Kind = Ops[Ip++];
+  Result.Kind = Ops[State->Ip++];
+
+  if(Result.Kind == KBTS_OP_KIND_GSUB_FEATURES_WITH_USER)
+  {
+    Result.Kind = KBTS_OP_KIND_GSUB_FEATURES;
+    Result.Features = State->UserFeatures;
+  }
+
   if((Result.Kind == KBTS_OP_KIND_GSUB_FEATURES) || (Result.Kind == KBTS_OP_KIND_GPOS_FEATURES))
   {
-    kbts_un FeatureCount = Ops[Ip++];
+    kbts_un FeatureCount = Ops[State->Ip++];
+    int Rtl = (State->RunDirection == KBTS_DIRECTION_RTL);
     KBTS_FOR(FeatureIndex, 0, FeatureCount)
     {
-      kbts_u32 FeatureId = Ops[Ip++];
+      kbts_u32 FeatureId = Ops[State->Ip++];
+
+      if((FeatureId == KBTS_FEATURE_ID_ltra) && Rtl)
+      {
+        FeatureId = KBTS_FEATURE_ID_rtla;
+      }
+      else if((FeatureId == KBTS_FEATURE_ID_ltrm) && Rtl)
+      {
+        FeatureId = KBTS_FEATURE_ID_rtlm;
+      }
+
       kbts_AddFeature(&Result.Features, FeatureId);
     }
   }
-  *Ip_ = Ip;
   return Result;
 }
 
@@ -19908,11 +21442,15 @@ KBTS_EXPORT int kbts_Shape(kbts_shape_state *State, kbts_shape_config *Config, k
   State->Config = Config;
   State->MainDirection = MainDirection;
   State->RunDirection = RunDirection;
-  State->GlyphArray = kbts_GlyphArray(Glyphs, *GlyphCount, *GlyphCount, GlyphCapacity);
 
   kbts_glyph_array *GlyphArray = &State->GlyphArray;
+  // The Glyphs array might move after a grow, so update the pointers here.
+  // We preserve Count information, though, because it makes it simpler not to touch anything
+  // when we are dealing with sub-arrays like Cluster.
+  GlyphArray->Glyphs = Glyphs;
+  GlyphArray->Capacity = GlyphCapacity;
   kbts_glyph_array *Cluster = &State->ClusterGlyphArray;
-  Cluster->Glyphs = Glyphs + State->At; // In case the Glyphs array moved after a grow.
+  Cluster->Glyphs = Glyphs + State->At;
   Cluster->Capacity = GlyphCapacity - State->At;
 
   kbts_u32 ResumePoint = State->ResumePoint;
@@ -19927,11 +21465,13 @@ KBTS_EXPORT int kbts_Shape(kbts_shape_state *State, kbts_shape_config *Config, k
   case 6: goto ResumePoint6; break;
   }
 
+  *GlyphArray = kbts_GlyphArray(Glyphs, *GlyphCount, *GlyphCount, GlyphCapacity);
+
   // For simple shapers, all of the shaping happens in this single loop.
   // For complex shapers, this loop is preparing the text for clustering logic, which happens below.
   for(State->Ip = 0; State->Ip < Config->OpLists[0].Length;)
   {
-    State->Op = kbts_ReadOp(Config->OpLists[0].Ops, &State->Ip);
+    State->Op = kbts_ReadOp(State, Config->OpLists[0].Ops);
     ResumePoint1:;
     if(kbts_ExecuteOp(State, GlyphArray))
     {
@@ -19956,19 +21496,20 @@ KBTS_EXPORT int kbts_Shape(kbts_shape_state *State, kbts_shape_config *Config, k
         }
       }
 
-      kbts_begin_cluster_result BeginClusterResult = kbts_BeginCluster(State, Glyphs + State->At, GlyphArray->Count - State->At);
-      GlyphArray->Count += BeginClusterResult.InsertedGlyphCount;
-      GlyphArray->TotalCount += BeginClusterResult.InsertedGlyphCount;
-      State->ClusterGlyphCount = (kbts_u32)BeginClusterResult.ClusterGlyphCount;
+      {
+        kbts_begin_cluster_result BeginClusterResult = kbts_BeginCluster(State, Glyphs + State->At, GlyphArray->Count - State->At);
+        GlyphArray->Count += BeginClusterResult.InsertedGlyphCount;
+        GlyphArray->TotalCount += BeginClusterResult.InsertedGlyphCount;
+        State->ClusterGlyphCount = (kbts_u32)BeginClusterResult.ClusterGlyphCount;
+        *Cluster = kbts_GlyphArray(Glyphs + State->At, BeginClusterResult.ClusterGlyphCount, GlyphArray->Count - State->At, GlyphCapacity - State->At);
+      }
 
-      *Cluster = kbts_GlyphArray(Glyphs + State->At, BeginClusterResult.ClusterGlyphCount, GlyphArray->Count - State->At, GlyphCapacity - State->At);
-
-      kbts_glyph *LastGlyphInCluster = &Glyphs[State->At + Cluster->Count - 1];
+      kbts_glyph *LastGlyphInCluster; LastGlyphInCluster = &Glyphs[State->At + Cluster->Count - 1];
       State->WordBreak = !(LastGlyphInCluster->UnicodeFlags & KBTS_UNICODE_FLAG_PART_OF_WORD);
 
       for(State->Ip = 0; State->Ip < Config->OpLists[1].Length;)
       {
-        State->Op = kbts_ReadOp(Config->OpLists[1].Ops, &State->Ip);
+        State->Op = kbts_ReadOp(State, Config->OpLists[1].Ops);
         ResumePoint3:;
         if(kbts_ExecuteOp(State, Cluster))
         {
@@ -19977,7 +21518,7 @@ KBTS_EXPORT int kbts_Shape(kbts_shape_state *State, kbts_shape_config *Config, k
         }
       }
 
-      kbts_end_cluster_result EndClusterResult = kbts_EndCluster(State, Cluster);
+      kbts_end_cluster_result EndClusterResult; EndClusterResult = kbts_EndCluster(State, Cluster);
       if(EndClusterResult.InsertDottedCircle)
       {
         State->DottedCircleInsertIndex = (kbts_u32)EndClusterResult.DottedCircleIndex;
@@ -19992,7 +21533,7 @@ KBTS_EXPORT int kbts_Shape(kbts_shape_state *State, kbts_shape_config *Config, k
 
       for(State->Ip = 0; State->Ip < Config->OpLists[2].Length;)
       {
-        State->Op = kbts_ReadOp(Config->OpLists[2].Ops, &State->Ip);
+        State->Op = kbts_ReadOp(State, Config->OpLists[2].Ops);
         ResumePoint4:;
         if(kbts_ExecuteOp(State, Cluster))
         {
@@ -20012,7 +21553,7 @@ KBTS_EXPORT int kbts_Shape(kbts_shape_state *State, kbts_shape_config *Config, k
     // This is where Indic GPOS + post-passes happen.
     for(State->Ip = 0; State->Ip < Config->OpLists[3].Length;)
     {
-      State->Op = kbts_ReadOp(Config->OpLists[3].Ops, &State->Ip);
+      State->Op = kbts_ReadOp(State, Config->OpLists[3].Ops);
       ResumePoint5:;
       if(kbts_ExecuteOp(State, GlyphArray))
       {
@@ -20087,516 +21628,592 @@ KBTS_EXPORT void kbts_PositionGlyph(kbts_cursor *Cursor, kbts_glyph *Glyph, kbts
 
 KBTS_EXPORT kbts_un kbts_ReadFontHeader(kbts_font *Font, void *Data, kbts_un Size)
 {
-  // @Incomplete: Add a bounds checking/validation pass.
   KBTS_UNUSED(Size);
-  Font->FileBase = (char *)Data;
-  kbts_table_directory *Directory = (kbts_table_directory *)Font->FileBase;
-
-  Directory->TableCount = kbts_ByteSwap16(Directory->TableCount);
-  Directory->SearchRange = kbts_ByteSwap16(Directory->SearchRange);
-  Directory->EntrySelector = kbts_ByteSwap16(Directory->EntrySelector);
-  Directory->RangeShift = kbts_ByteSwap16(Directory->RangeShift);
-
-  kbts_table_record *Tables = (kbts_table_record *)(Directory + 1);
-
-  kbts_un ShapingTableSizes[KBTS_SHAPING_TABLE_COUNT] = {0};
-  kbts_u32 GdefSize = 0;
-
-  for(kbts_un TableIndex = 0; TableIndex < Directory->TableCount; ++TableIndex)
+  kbts_un Result = 0;
+  if(Size >= sizeof(kbts_table_directory))
   {
-    kbts_table_record *Table = &Tables[TableIndex];
-    Table->Checksum = kbts_ByteSwap32(Table->Checksum);
-    Table->Offset = kbts_ByteSwap32(Table->Offset);
-    Table->Length = kbts_ByteSwap32(Table->Length);
-    void *TableBase = KBTS_POINTER_OFFSET(void, Font->FileBase, Table->Offset);
+    char *FileEnd = (char *)Data + Size;
+    Font->FileBase = (char *)Data;
+    Font->FileSize = Size;
+    kbts_table_directory *Directory = (kbts_table_directory *)Font->FileBase;
 
-    switch(Table->Tag)
+    Directory->TableCount = kbts_ByteSwap16(Directory->TableCount);
+    Directory->SearchRange = kbts_ByteSwap16(Directory->SearchRange);
+    Directory->EntrySelector = kbts_ByteSwap16(Directory->EntrySelector);
+    Directory->RangeShift = kbts_ByteSwap16(Directory->RangeShift);
+
+    kbts_table_record *Tables = KBTS_POINTER_AFTER(kbts_table_record, Directory);
+
+    kbts_un ShapingTableSizes[KBTS_SHAPING_TABLE_COUNT] = {0};
+    kbts_u32 GdefSize = 0;
+    kbts_un DirectoryTableCapacity = (FileEnd - (char *)Tables) / sizeof(kbts_table_record);
+    if(Directory->TableCount <= DirectoryTableCapacity)
     {
-    case KBTS_FOURCC('h', 'e', 'a', 'd'):
-    {
-      kbts_head *Head = (kbts_head *)TableBase;
-      kbts_ByteSwapArray16(&Head->Major, 2);
-      kbts_ByteSwapArray32(&Head->Revision, 2);
-      // We do not swap the magic number.
-      kbts_ByteSwapArray16(&Head->Flags, 2);
-      // We do not swap file times.
-      kbts_ByteSwapArray16((kbts_u16 *)&Head->XMin, 9);
-
-      Font->Head = Head;
-    } break;
-
-    case KBTS_FOURCC('c', 'm', 'a', 'p'):
-    {
-      kbts_cmap *Cmap = (kbts_cmap *)TableBase;
-      Cmap->Version = kbts_ByteSwap16(Cmap->Version);
-      Cmap->TableCount = kbts_ByteSwap16(Cmap->TableCount);
-
-      kbts_encoding_record *Records = KBTS_POINTER_AFTER(kbts_encoding_record, Cmap);
-
-      KBTS_FOR(It, 0, Cmap->TableCount)
+      for(kbts_un TableIndex = 0; TableIndex < Directory->TableCount; ++TableIndex)
       {
-        kbts_encoding_record *Record = &Records[It];
-        Record->EncodingId = kbts_ByteSwap16(Record->EncodingId);
-        Record->PlatformId = kbts_ByteSwap16(Record->PlatformId);
-        Record->SubtableOffset = kbts_ByteSwap32(Record->SubtableOffset);
-      }
+        kbts_table_record *Table = &Tables[TableIndex];
+        Table->Checksum = kbts_ByteSwap32(Table->Checksum);
+        Table->Offset = kbts_ByteSwap32(Table->Offset);
+        Table->Length = kbts_ByteSwap32(Table->Length);
+        int TableValid = 0;
 
-      kbts_cmap_subtable_pointer PreferredSubtable = KBTS_ZERO;
-      kbts_u16 PreferredFormat = 1;
-      KBTS_FOR(It, 0, Cmap->TableCount)
-      {
-        kbts_cmap_subtable_pointer Subtable = kbts_GetCmapSubtable(Cmap, It);
-        kbts_u16 Format = kbts_ByteSwap16(*Subtable.Subtable);
-
-        if(Format == 14)
+        void *TableBase = KBTS_POINTER_OFFSET(void, Font->FileBase, Table->Offset);
+        char *TableEnd = (char *)TableBase + Table->Length;
+        if(((char *)TableBase >= (char *)(Tables + Directory->TableCount)) && (TableEnd <= FileEnd))
         {
-          Font->Cmap14 = (kbts_cmap_14 *)Subtable.Subtable;
-        }
-        else if(!PreferredSubtable.Subtable)
-        {
-          PreferredSubtable = Subtable;
-        }
-        else
-        {
-          kbts_u16 Precedence = kbts_CmapFormatPrecedence[Format];
-          kbts_u16 PreferredPrecedence = kbts_CmapFormatPrecedence[PreferredFormat];
-
-          if((Precedence > PreferredPrecedence) || ((Precedence == PreferredPrecedence) && (Subtable.PlatformId == 3)))
+          switch(Table->Tag)
           {
-            PreferredSubtable = Subtable;
-            PreferredFormat = Format;
+          case KBTS_FOURCC('h', 'e', 'a', 'd'):
+          {
+            if(Table->Length >= sizeof(kbts_head))
+            {
+              kbts_head *Head = (kbts_head *)TableBase;
+              kbts_ByteSwapArray16Unchecked(&Head->Major, 2);
+              kbts_ByteSwapArray32Unchecked(&Head->Revision, 2);
+              // We do not swap the magic number.
+              kbts_ByteSwapArray16Unchecked(&Head->Flags, 2);
+              // We do not swap file times.
+              kbts_ByteSwapArray16Unchecked((kbts_u16 *)&Head->XMin, 9);
+
+              Font->Head = Head;
+              TableValid = 1;
+            }
+          } break;
+
+          case KBTS_FOURCC('c', 'm', 'a', 'p'):
+          {
+            if(Table->Length >= sizeof(kbts_cmap))
+            {
+              kbts_cmap *Cmap = (kbts_cmap *)TableBase;
+              Cmap->Version = kbts_ByteSwap16(Cmap->Version);
+              Cmap->TableCount = kbts_ByteSwap16(Cmap->TableCount);
+
+              kbts_encoding_record *Records = KBTS_POINTER_AFTER(kbts_encoding_record, Cmap);
+
+              if((char *)(Records + Cmap->TableCount) <= TableEnd)
+              {
+                KBTS_FOR(It, 0, Cmap->TableCount)
+                {
+                  kbts_encoding_record *Record = &Records[It];
+                  Record->EncodingId = kbts_ByteSwap16(Record->EncodingId);
+                  Record->PlatformId = kbts_ByteSwap16(Record->PlatformId);
+                  Record->SubtableOffset = kbts_ByteSwap32(Record->SubtableOffset);
+                }
+
+                kbts_cmap_subtable_pointer PreferredSubtable = KBTS_ZERO;
+                kbts_u16 PreferredFormat = 1;
+                KBTS_FOR(It, 0, Cmap->TableCount)
+                {
+                  kbts_cmap_subtable_pointer Subtable = kbts_GetCmapSubtable(Cmap, It);
+                  if((char *)(Subtable.Subtable + 1) <= TableEnd)
+                  {
+                    kbts_u16 Format = kbts_ByteSwap16(*Subtable.Subtable);
+
+                    if(Format == 14)
+                    {
+                      if((char *)(Subtable.Subtable + sizeof(kbts_cmap_14)) <= TableEnd)
+                      {
+                        Font->Cmap14 = (kbts_cmap_14 *)Subtable.Subtable;
+                      }
+                    }
+                    else if(!PreferredSubtable.Subtable)
+                    {
+                      PreferredSubtable = Subtable;
+                    }
+                    else if(Format < KBTS_ARRAY_LENGTH(kbts_CmapFormatPrecedence))
+                    {
+                      kbts_u16 Precedence = kbts_CmapFormatPrecedence[Format];
+                      kbts_u16 PreferredPrecedence = kbts_CmapFormatPrecedence[PreferredFormat];
+
+                      if((Precedence > PreferredPrecedence) || ((Precedence == PreferredPrecedence) && (Subtable.PlatformId == 3)))
+                      {
+                        PreferredSubtable = Subtable;
+                        PreferredFormat = Format;
+                      }
+                    }
+                  }
+                }
+
+                if(PreferredSubtable.Subtable)
+                {
+                  *PreferredSubtable.Subtable = kbts_ByteSwap16(*PreferredSubtable.Subtable);
+                  switch(*PreferredSubtable.Subtable)
+                  {
+                  case 0:
+                  {
+                    kbts_cmap_0 *Cmap0 = (kbts_cmap_0 *)PreferredSubtable.Subtable;
+                    if((char *)(Cmap0 + 1) <= TableEnd)
+                    {
+                      Cmap0->Length = kbts_ByteSwap16(Cmap0->Length);
+                      Cmap0->Language = kbts_ByteSwap16(Cmap0->Language);
+                      TableValid = 1;
+                    }
+                  }
+                  break;
+
+                  case 2:
+                  {
+                    kbts_cmap_2 *Cmap2 = (kbts_cmap_2 *)PreferredSubtable.Subtable;
+                    if(kbts_ByteSwapArray16(&Cmap2->Length, 258, TableEnd))
+                    {
+                      kbts_un SubHeaderCount = 0;
+                      KBTS_FOR(It, 0, 256)
+                      {
+                        kbts_un SubHeaderIndex = Cmap2->SubHeaderKeys[It];
+                        SubHeaderCount = KBTS_MAX(SubHeaderCount, SubHeaderIndex + 1);
+                      }
+
+                      kbts_sub_header *SubHeaders = KBTS_POINTER_AFTER(kbts_sub_header, Cmap2);
+                      if(kbts_ByteSwapArray16(&SubHeaders->FirstCode, 4 * SubHeaderCount, TableEnd))
+                      {
+                        kbts_u16 *GlyphIds = (kbts_u16 *)(SubHeaders + SubHeaderCount);
+
+                        kbts_sn GlyphIdCount = 0;
+                        KBTS_FOR(It, 0, SubHeaderCount)
+                        {
+                          kbts_sub_header *SubHeader = &SubHeaders[It];
+
+                          kbts_u16 *OnePastLastGlyphId = &SubHeader->IdRangeOffset + SubHeader->IdRangeOffset / 2 + SubHeader->EntryCount;
+                          GlyphIdCount = KBTS_MAX(GlyphIdCount, OnePastLastGlyphId - GlyphIds);
+                        }
+
+                        if(kbts_ByteSwapArray16(GlyphIds, (kbts_un)GlyphIdCount, TableEnd))
+                        {
+                          TableValid = 1;
+                        }
+                      }
+                    }
+                  }
+                  break;
+
+                  case 4:
+                  {
+                    kbts_cmap_4 *Cmap4 = (kbts_cmap_4 *)PreferredSubtable.Subtable;
+                    if(kbts_ByteSwapArray16(&Cmap4->Length, 5, TableEnd) &&
+                       kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Cmap4), Cmap4->SegmentCountTimesTwo * 2 + 1, TableEnd))
+                    {
+                      kbts_un SegmentCount = Cmap4->SegmentCountTimesTwo / 2;
+                      kbts_u16 *EndCodes = KBTS_POINTER_AFTER(kbts_u16, Cmap4);
+                      kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
+                      kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
+                      kbts_u16 *IdRangeOffsets = (kbts_u16 *)(IdDeltas + SegmentCount);
+                      kbts_u16 *GlyphIds = IdRangeOffsets + SegmentCount;
+
+                      kbts_sn GlyphIdCount = 0;
+
+                      KBTS_FOR(SegmentIndex, 0, SegmentCount)
+                      {
+                        kbts_u16 Offset = IdRangeOffsets[SegmentIndex];
+
+                        if(Offset)
+                        {
+                          kbts_u16 *IdLookup = &IdRangeOffsets[SegmentIndex] + (EndCodes[SegmentIndex] - StartCodes[SegmentIndex] + 1) + Offset / 2;
+
+                          GlyphIdCount = KBTS_MAX(GlyphIdCount, (IdLookup - GlyphIds));
+                        }
+                      }
+
+                      if(kbts_ByteSwapArray16(GlyphIds, (kbts_un)GlyphIdCount, TableEnd))
+                      {
+                        TableValid = 1;
+                      }
+                    }
+                  }
+                  break;
+
+                  case 6:
+                  {
+                    kbts_cmap_6 *Cmap6 = (kbts_cmap_6 *)PreferredSubtable.Subtable;
+                    if(kbts_ByteSwapArray16(&Cmap6->Length, 4, TableEnd) &&
+                       kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Cmap6), Cmap6->EntryCount, TableEnd))
+                    {
+                      TableValid = 1;
+                    }
+                  }
+                  break;
+
+                  case 12:
+                  {
+                    kbts_cmap_12_13 *Cmap12 = (kbts_cmap_12_13 *)PreferredSubtable.Subtable;
+                    if(kbts_ByteSwapArray32(&Cmap12->Length, 3, TableEnd) &&
+                       kbts_ByteSwapArray32(KBTS_POINTER_AFTER(kbts_u32, Cmap12), Cmap12->GroupCount * 3, TableEnd))
+                    {
+                      TableValid = 1;
+                    }
+                  }
+                  break;
+                  }
+
+                  Font->Cmap = PreferredSubtable.Subtable;
+                }
+              }
+            }
+          }
+          break;
+
+          case KBTS_FOURCC('G', 'D', 'E', 'F'):
+          {
+            kbts_gdef *Gdef = (kbts_gdef *)TableBase;
+            GdefSize = Table->Length;
+
+            if(kbts_ByteSwapArray16(&Gdef->Major, 6, TableEnd))
+            {
+              if(Gdef->Minor >= 2)
+              {
+                if(Table->Length >= 14)
+                {
+                  Gdef->MarkGlyphSetsDefinitionOffset = kbts_ByteSwap16(Gdef->MarkGlyphSetsDefinitionOffset);
+
+                  if(Gdef->Minor == 3)
+                  {
+                    if(Table->Length >= sizeof(kbts_gdef))
+                    {
+                      // @Incomplete
+                      Gdef->ItemVariationStoreOffset = kbts_ByteSwap32(Gdef->ItemVariationStoreOffset);
+                      TableValid = 1;
+                    }
+                  }
+                  else
+                  {
+                    TableValid = 1;
+                  }
+                }
+              }
+              else
+              {
+                TableValid = 1;
+              }
+            }
+
+            Font->Gdef = Gdef;
+          }
+          break;
+
+          case KBTS_FOURCC('G', 'S', 'U', 'B'):
+          case KBTS_FOURCC('G', 'P', 'O', 'S'):
+          {
+            // We do not do any bounds checking here because Gsub/Gpos tables get byteswapped later on,
+            // in ByteSwapGsubGposCommon.
+            kbts_un Index = (Table->Tag == KBTS_FOURCC('G', 'S', 'U', 'B')) ? KBTS_SHAPING_TABLE_GSUB : KBTS_SHAPING_TABLE_GPOS;
+            Font->ShapingTables[Index] = (kbts_gsub_gpos *)TableBase;
+            ShapingTableSizes[Index] = Table->Length;
+            TableValid = 1;
+          } break;
+
+          case KBTS_FOURCC('h', 'h', 'e', 'a'):
+          case KBTS_FOURCC('v', 'h', 'e', 'a'):
+          {
+            kbts_un Orientation = Table->Tag == KBTS_FOURCC('h', 'h', 'e', 'a') ? KBTS_ORIENTATION_HORIZONTAL : KBTS_ORIENTATION_VERTICAL;
+            kbts_hea *Hea = (kbts_hea *)TableBase;
+            if(kbts_ByteSwapArray16((kbts_u16 *)Hea, sizeof(kbts_hea) / sizeof(kbts_u16), TableEnd))
+            {
+              Font->Hea[Orientation] = Hea;
+              TableValid = 1;
+            }
+          } break;
+
+          case KBTS_FOURCC('h', 'm', 't', 'x'):
+          case KBTS_FOURCC('v', 'm', 't', 'x'):
+          {
+            kbts_un Orientation = Table->Tag == KBTS_FOURCC('h', 'm', 't', 'x') ? KBTS_ORIENTATION_HORIZONTAL : KBTS_ORIENTATION_VERTICAL;
+            kbts_u16 *Mtx = (kbts_u16 *)TableBase;
+            kbts_ByteSwapArray16Unchecked(Mtx, Table->Length / sizeof(kbts_u16));
+            Font->Mtx[Orientation] = Mtx;
+            TableValid = 1;
+          } break;
+
+          case KBTS_FOURCC('m', 'a', 'x', 'p'):
+          {
+            if(Table->Length >= 6)
+            {
+              Font->Maxp = (kbts_maxp *)TableBase;
+              Font->Maxp->Major = kbts_ByteSwap16(Font->Maxp->Major);
+              Font->Maxp->Minor = kbts_ByteSwap16(Font->Maxp->Minor);
+
+              kbts_un U16Count = 0;
+              if(!Font->Maxp->Major && (Font->Maxp->Minor == 0x5000))
+              {
+                U16Count = 1;
+              }
+              else if((Font->Maxp->Major == 1) && !Font->Maxp->Minor)
+              {
+                U16Count = 14;
+              }
+
+              if(kbts_ByteSwapArray16(&Font->Maxp->GlyphCount, U16Count, TableEnd))
+              {
+                Font->GlyphCount = Font->Maxp->GlyphCount;
+                TableValid = 1;
+              }
+            }
+          } break;
+
+          default:
+          {
+            TableValid = 1;
+          } break;
           }
         }
-      }
 
-      *PreferredSubtable.Subtable = kbts_ByteSwap16(*PreferredSubtable.Subtable);
-      switch(*PreferredSubtable.Subtable)
-      {
-      case 0:
-      {
-        kbts_cmap_0 *Cmap0 = (kbts_cmap_0 *)PreferredSubtable.Subtable;
-        Cmap0->Length = kbts_ByteSwap16(Cmap0->Length);
-        Cmap0->Language = kbts_ByteSwap16(Cmap0->Language);
-      }
-      break;
-
-      case 2:
-      {
-        kbts_cmap_2 *Cmap2 = (kbts_cmap_2 *)PreferredSubtable.Subtable;
-        kbts_ByteSwapArray16(&Cmap2->Length, 258);
-
-        kbts_un SubHeaderCount = 0;
-        KBTS_FOR(It, 0, 256)
+        if(!TableValid)
         {
-          kbts_un SubHeaderIndex = Cmap2->SubHeaderKeys[It];
-          SubHeaderCount = KBTS_MAX(SubHeaderCount, SubHeaderIndex + 1);
-        }
-
-        kbts_sub_header *SubHeaders = KBTS_POINTER_AFTER(kbts_sub_header, Cmap2);
-        kbts_ByteSwapArray16(&SubHeaders->FirstCode, 4 * SubHeaderCount);
-
-        kbts_u16 *GlyphIds = (kbts_u16 *)(SubHeaders + SubHeaderCount);
-
-        kbts_sn GlyphIdCount = 0;
-        KBTS_FOR(It, 0, SubHeaderCount)
-        {
-          kbts_sub_header *SubHeader = &SubHeaders[It];
-
-          kbts_u16 *OnePastLastGlyphId = &SubHeader->IdRangeOffset + SubHeader->IdRangeOffset / 2 + SubHeader->EntryCount;
-          GlyphIdCount = KBTS_MAX(GlyphIdCount, OnePastLastGlyphId - GlyphIds);
-        }
-
-        kbts_ByteSwapArray16(GlyphIds, (kbts_un)GlyphIdCount);
-      }
-      break;
-
-      case 4:
-      {
-        kbts_cmap_4 *Cmap4 = (kbts_cmap_4 *)PreferredSubtable.Subtable;
-        kbts_ByteSwapArray16(&Cmap4->Length, 5);
-        kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Cmap4), Cmap4->SegmentCountTimesTwo * 2 + 1);
-
-        kbts_un SegmentCount = Cmap4->SegmentCountTimesTwo / 2;
-        kbts_u16 *EndCodes = KBTS_POINTER_AFTER(kbts_u16, Cmap4);
-        kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
-        kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
-        kbts_u16 *IdRangeOffsets = (kbts_u16 *)(IdDeltas + SegmentCount);
-        kbts_u16 *GlyphIds = IdRangeOffsets + SegmentCount;
-
-        kbts_sn GlyphIdCount = 0;
-
-        KBTS_FOR(SegmentIndex, 0, SegmentCount)
-        {
-          kbts_u16 Offset = IdRangeOffsets[SegmentIndex];
-
-          if(Offset)
-          {
-            kbts_u16 *IdLookup = &IdRangeOffsets[SegmentIndex] + (EndCodes[SegmentIndex] - StartCodes[SegmentIndex] + 1) + Offset / 2;
-
-            GlyphIdCount = KBTS_MAX(GlyphIdCount, (IdLookup - GlyphIds));
-          }
-        }
-
-        kbts_ByteSwapArray16(GlyphIds, (kbts_un)GlyphIdCount);
-      }
-      break;
-
-      case 6:
-      {
-        kbts_cmap_6 *Cmap6 = (kbts_cmap_6 *)PreferredSubtable.Subtable;
-        kbts_ByteSwapArray16(&Cmap6->Length, 4);
-        kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, Cmap6), Cmap6->EntryCount);
-      }
-      break;
-
-      case 12:
-      {
-        kbts_cmap_12_13 *Cmap12 = (kbts_cmap_12_13 *)PreferredSubtable.Subtable;
-        kbts_ByteSwapArray32(&Cmap12->Length, 3);
-        kbts_ByteSwapArray32(KBTS_POINTER_AFTER(kbts_u32, Cmap12), Cmap12->GroupCount * 3);
-      }
-      break;
-      }
-
-      Font->Cmap = PreferredSubtable.Subtable;
-    }
-    break;
-
-    case KBTS_FOURCC('G', 'D', 'E', 'F'):
-    {
-      Font->Gdef = (kbts_gdef *)TableBase;
-      GdefSize = Table->Length;
-
-      kbts_gdef *Gdef = Font->Gdef;
-
-      kbts_ByteSwapArray16(&Gdef->Major, 6);
-
-      if(Gdef->Minor >= 2)
-      {
-        Gdef->MarkGlyphSetsDefinitionOffset = kbts_ByteSwap16(Gdef->MarkGlyphSetsDefinitionOffset);
-
-        if(Gdef->Minor == 3)
-        {
-          // @Incomplete
-          Gdef->ItemVariationStoreOffset = kbts_ByteSwap32(Gdef->ItemVariationStoreOffset);
+          goto Error;
         }
       }
     }
-    break;
-
-    case KBTS_FOURCC('G', 'S', 'U', 'B'):
-    case KBTS_FOURCC('G', 'P', 'O', 'S'):
+    else
     {
-      kbts_un Index = (Table->Tag == KBTS_FOURCC('G', 'S', 'U', 'B')) ? KBTS_SHAPING_TABLE_GSUB : KBTS_SHAPING_TABLE_GPOS;
-      Font->ShapingTables[Index] = (kbts_gsub_gpos *)TableBase;
-      ShapingTableSizes[Index] = Table->Length;
+      goto Error;
     }
-    break;
 
-    case KBTS_FOURCC('h', 'h', 'e', 'a'):
-    case KBTS_FOURCC('v', 'h', 'e', 'a'):
+    if(kbts_FontIsValid(Font))
     {
-      kbts_un Orientation = Table->Tag == KBTS_FOURCC('h', 'h', 'e', 'a') ? KBTS_ORIENTATION_HORIZONTAL : KBTS_ORIENTATION_VERTICAL;
-      Font->Hea[Orientation] = (kbts_hea *)TableBase;
-      kbts_ByteSwapArray16((kbts_u16 *)Font->Hea[Orientation], Table->Length / sizeof(kbts_u16));
-    }
-    break;
-
-    case KBTS_FOURCC('h', 'm', 't', 'x'):
-    case KBTS_FOURCC('v', 'm', 't', 'x'):
-    {
-      kbts_un Orientation = Table->Tag == KBTS_FOURCC('h', 'm', 't', 'x') ? KBTS_ORIENTATION_HORIZONTAL : KBTS_ORIENTATION_VERTICAL;
-      Font->Mtx[Orientation] = KBTS_POINTER_OFFSET(kbts_u16, Font->FileBase, Table->Offset);
-      kbts_ByteSwapArray16(Font->Mtx[Orientation], Table->Length / sizeof(kbts_u16));
-    }
-    break;
-
-    case KBTS_FOURCC('m', 'a', 'x', 'p'):
-    {
-      Font->Maxp = KBTS_POINTER_OFFSET(kbts_maxp, Font->FileBase, Table->Offset);
-      Font->Maxp->Major = kbts_ByteSwap16(Font->Maxp->Major);
-      Font->Maxp->Minor = kbts_ByteSwap16(Font->Maxp->Minor);
-
-      kbts_un U16Count = 0;
-      if(!Font->Maxp->Major && (Font->Maxp->Minor == 0x5000))
-      {
-        U16Count = 1;
-      }
-      else if((Font->Maxp->Major == 1) && !Font->Maxp->Minor)
-      {
-        U16Count = 14;
-      }
-
-      kbts_ByteSwapArray16(&Font->Maxp->GlyphCount, U16Count);
-      Font->GlyphCount = Font->Maxp->GlyphCount;
-    }
-    break;
+      Result = sizeof(kbts_u32) * ((ShapingTableSizes[KBTS_SHAPING_TABLE_GSUB] + ShapingTableSizes[KBTS_SHAPING_TABLE_GPOS] + GdefSize) / 2);
     }
   }
+  else
+  {
+    goto Error;
+  }
 
-  kbts_un Result = sizeof(kbts_u32) * ((ShapingTableSizes[KBTS_SHAPING_TABLE_GSUB] + ShapingTableSizes[KBTS_SHAPING_TABLE_GPOS] + GdefSize) / 2);
+  if(0)
+  {
+    Error:;
+    Font->Error = 1;
+  }
+
   return (kbts_u32)Result;
 }
 
 KBTS_EXPORT kbts_un kbts_ReadFontData(kbts_font *Font, void *Scratch, kbts_un ScratchSize)
 {
-  kbts_byteswap_context ByteSwapContext = KBTS_ZERO;
-  ByteSwapContext.FileBase = Font->FileBase;
-  ByteSwapContext.PointerCapacity = ScratchSize / sizeof(kbts_u32);
-  ByteSwapContext.Pointers = (kbts_u32 *)Scratch;
-
-  kbts_un TotalLookupCount = 0;
-  kbts_un TotalSubtableCount = 0;
-
-  kbts_gdef *Gdef = Font->Gdef;
-  if(Gdef)
+  kbts_un Result = 0;
+  if(kbts_FontIsValid(Font))
   {
-    if(Gdef->ClassDefinitionOffset)
-    {
-      kbts_u16 *ClassDefBase = KBTS_POINTER_OFFSET(kbts_u16, Gdef, Gdef->ClassDefinitionOffset);
-      kbts_ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
-    }
+    kbts_byteswap_context ByteSwapContext = KBTS_ZERO;
+    ByteSwapContext.FileBase = Font->FileBase;
+    ByteSwapContext.FileEnd = Font->FileBase + Font->FileSize;
+    ByteSwapContext.PointerCapacity = ScratchSize / sizeof(kbts_u32);
+    ByteSwapContext.Pointers = (kbts_u32 *)Scratch;
 
-    if(Gdef->MarkAttachmentClassDefinitionOffset)
-    {
-      kbts_u16 *ClassDefBase = KBTS_POINTER_OFFSET(kbts_u16, Gdef, Gdef->MarkAttachmentClassDefinitionOffset);
-      kbts_ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
-    }
+    kbts_un TotalLookupCount = 0;
+    kbts_un TotalSubtableCount = 0;
 
-    if((Gdef->Minor >= 2) && Gdef->MarkGlyphSetsDefinitionOffset)
+    kbts_gdef *Gdef = Font->Gdef;
+    if(Gdef)
     {
-      kbts_mark_glyph_sets *MarkGlyphSets = KBTS_POINTER_OFFSET(kbts_mark_glyph_sets, Gdef, Gdef->MarkGlyphSetsDefinitionOffset);
-      kbts_ByteSwapArray16(&MarkGlyphSets->Format, 2);
-      if(MarkGlyphSets->Format == 1)
+      if(Gdef->ClassDefinitionOffset)
       {
-        kbts_u32 *CoverageOffsets = KBTS_POINTER_AFTER(kbts_u32, MarkGlyphSets);
-        kbts_ByteSwapArray32(CoverageOffsets, MarkGlyphSets->MarkGlyphSetCount);
+        kbts_u16 *ClassDefBase = KBTS_POINTER_OFFSET(kbts_u16, Gdef, Gdef->ClassDefinitionOffset);
+        kbts_ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
+      }
 
-        KBTS_FOR(MarkGlyphSetIndex, 0, MarkGlyphSets->MarkGlyphSetCount)
+      if(Gdef->MarkAttachmentClassDefinitionOffset)
+      {
+        kbts_u16 *ClassDefBase = KBTS_POINTER_OFFSET(kbts_u16, Gdef, Gdef->MarkAttachmentClassDefinitionOffset);
+        kbts_ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
+      }
+
+      if((Gdef->Minor >= 2) && Gdef->MarkGlyphSetsDefinitionOffset)
+      {
+        kbts_mark_glyph_sets *MarkGlyphSets = KBTS_POINTER_OFFSET(kbts_mark_glyph_sets, Gdef, Gdef->MarkGlyphSetsDefinitionOffset);
+        kbts_ByteSwapArray16Context(&MarkGlyphSets->Format, 2, &ByteSwapContext);
+        if(MarkGlyphSets->Format == 1)
         {
-          kbts_coverage *Coverage = KBTS_POINTER_OFFSET(kbts_coverage, MarkGlyphSets, CoverageOffsets[MarkGlyphSetIndex]);
-          kbts_ByteSwapCoverage(&ByteSwapContext, Coverage);
+          kbts_u32 *CoverageOffsets = KBTS_POINTER_AFTER(kbts_u32, MarkGlyphSets);
+          kbts_ByteSwapArray32Context(CoverageOffsets, MarkGlyphSets->MarkGlyphSetCount, &ByteSwapContext);
+
+          KBTS_FOR(MarkGlyphSetIndex, 0, MarkGlyphSets->MarkGlyphSetCount)
+          {
+            kbts_coverage *Coverage = KBTS_POINTER_OFFSET(kbts_coverage, MarkGlyphSets, CoverageOffsets[MarkGlyphSetIndex]);
+            kbts_ByteSwapCoverage(&ByteSwapContext, Coverage);
+          }
         }
       }
     }
-  }
 
-  kbts_gsub_gpos *Gsub = Font->ShapingTables[KBTS_SHAPING_TABLE_GSUB];
-  if(Gsub)
-  {
-    kbts_ByteSwapGsubGposCommon(&ByteSwapContext, Gsub);
-
-    kbts_lookup_list *LookupList = kbts_GetLookupList(Gsub);
-    LookupList->Count = kbts_ByteSwap16(LookupList->Count);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, LookupList), LookupList->Count);
-
-    TotalLookupCount += LookupList->Count;
-
-    KBTS_FOR(LookupIndex, 0, LookupList->Count)
+    kbts_gsub_gpos *Gsub = Font->ShapingTables[KBTS_SHAPING_TABLE_GSUB];
+    if(Gsub)
     {
-      kbts_lookup *PackedLookup = kbts_GetLookup(LookupList, LookupIndex);
+      kbts_ByteSwapGsubGposCommon(&ByteSwapContext, Gsub);
 
-      KBTS_DUMPF("GSUB Lookup %llu:\n", LookupIndex);
+      kbts_lookup_list *LookupList = kbts_GetLookupList(Gsub);
+      LookupList->Count = kbts_ByteSwap16(LookupList->Count);
+      kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, LookupList), LookupList->Count, &ByteSwapContext);
 
-      if(kbts_ByteSwapLookup(&ByteSwapContext, PackedLookup))
+      TotalLookupCount += LookupList->Count;
+
+      KBTS_FOR(LookupIndex, 0, LookupList->Count)
       {
-        kbts_unpacked_lookup Lookup = kbts_UnpackLookup(Font->Gdef, PackedLookup);
-        KBTS_DUMPF("  Flags %u\n", Lookup.Flags);
+        kbts_lookup *PackedLookup = kbts_GetLookup(LookupList, LookupIndex);
 
-        KBTS_FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
+        KBTS_DUMPF("GSUB Lookup %llu:\n", LookupIndex);
+
+        if(kbts_ByteSwapLookup(&ByteSwapContext, PackedLookup))
         {
-          kbts_u16 *Base = KBTS_POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubstitutionIndex]);
+          kbts_unpacked_lookup Lookup = kbts_UnpackLookup(Font->Gdef, PackedLookup);
+          KBTS_DUMPF("  Flags %u\n", Lookup.Flags);
 
-          KBTS_DUMPF("  Subtable %llu:\n", SubstitutionIndex);
+          KBTS_FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
+          {
+            kbts_u16 *Base = KBTS_POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubstitutionIndex]);
 
-          kbts_ByteSwapGsubLookupSubtable(&ByteSwapContext, Lookup.Type, Base);
+            KBTS_DUMPF("  Subtable %llu:\n", SubstitutionIndex);
+
+            kbts_ByteSwapGsubLookupSubtable(&ByteSwapContext, Lookup.Type, Base);
+          }
         }
+
+        TotalSubtableCount += PackedLookup->SubtableCount;
       }
-
-      TotalSubtableCount += PackedLookup->SubtableCount;
     }
-  }
 
-  kbts_gsub_gpos *Gpos = Font->ShapingTables[KBTS_SHAPING_TABLE_GPOS];
-  if(Gpos)
-  {
-    kbts_ByteSwapGsubGposCommon(&ByteSwapContext, Gpos);
-
-    kbts_lookup_list *LookupList = kbts_GetLookupList(Gpos);
-    LookupList->Count = kbts_ByteSwap16(LookupList->Count);
-    kbts_ByteSwapArray16(KBTS_POINTER_AFTER(kbts_u16, LookupList), LookupList->Count);
-
-    TotalLookupCount += LookupList->Count;
-
-    KBTS_FOR(LookupIndex, 0, LookupList->Count)
+    kbts_gsub_gpos *Gpos = Font->ShapingTables[KBTS_SHAPING_TABLE_GPOS];
+    if(Gpos)
     {
-      kbts_lookup *PackedLookup = kbts_GetLookup(LookupList, LookupIndex);
+      kbts_ByteSwapGsubGposCommon(&ByteSwapContext, Gpos);
 
-      KBTS_DUMPF("GPOS Lookup %llu:\n", LookupIndex);
+      kbts_lookup_list *LookupList = kbts_GetLookupList(Gpos);
+      LookupList->Count = kbts_ByteSwap16(LookupList->Count);
+      kbts_ByteSwapArray16Context(KBTS_POINTER_AFTER(kbts_u16, LookupList), LookupList->Count, &ByteSwapContext);
 
-      if(kbts_ByteSwapLookup(&ByteSwapContext, PackedLookup))
+      TotalLookupCount += LookupList->Count;
+
+      KBTS_FOR(LookupIndex, 0, LookupList->Count)
       {
-        kbts_unpacked_lookup Lookup = kbts_UnpackLookup(Font->Gdef, PackedLookup);
+        kbts_lookup *PackedLookup = kbts_GetLookup(LookupList, LookupIndex);
 
-        KBTS_DUMPF("  Flags %x\n", Lookup.Flags);
+        KBTS_DUMPF("GPOS Lookup %llu:\n", LookupIndex);
 
-        KBTS_FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
+        if(kbts_ByteSwapLookup(&ByteSwapContext, PackedLookup))
         {
-          kbts_u16 *Base = KBTS_POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubstitutionIndex]);
+          kbts_unpacked_lookup Lookup = kbts_UnpackLookup(Font->Gdef, PackedLookup);
 
-          KBTS_DUMPF("  Subtable %zu:\n", (size_t)SubstitutionIndex);
+          KBTS_DUMPF("  Flags %x\n", Lookup.Flags);
 
-          kbts_ByteSwapGposLookupSubtable(&ByteSwapContext, LookupList, Lookup.Type, Base);
+          KBTS_FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
+          {
+            kbts_u16 *Base = KBTS_POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubstitutionIndex]);
+
+            KBTS_DUMPF("  Subtable %llu:\n", (kbts_un)SubstitutionIndex);
+
+            kbts_ByteSwapGposLookupSubtable(&ByteSwapContext, LookupList, Lookup.Type, Base);
+          }
         }
+
+        TotalSubtableCount += PackedLookup->SubtableCount;
       }
-
-      TotalSubtableCount += PackedLookup->SubtableCount;
     }
-  }
 
-  // At this point, we are done byteswapping the file, so we can start reusing the scratch memory.
+    // At this point, we are done byteswapping the file, so we can start reusing the scratch memory.
 
-  if(Gsub)
-  {
-    kbts_lookup_list *LookupList = kbts_GetLookupList(Gsub);
-
-    // Figure out lookup recursion depth and other useful metrics.
-    // Most of these are not used yet, but would be useful for a streaming shaper and/or to inform GLYPH_BUFFER_GROW_MARGIN.
-    kbts_un MaximumBacktrackWithoutSkippingGlyphs = 0;
-    kbts_un MaximumLookaheadWithoutSkippingGlyphs = 0;
-    kbts_un MaximumLookupStackSize = 1;
-    kbts_un MaximumSubstitutionOutputSize = 1;
-    kbts_un MaximumInputSequenceLength = 1;
-
-    // We are done byteswapping the file, so we can reclaim the scratch memory.
-    kbts_lookup_info_frame *Frames = (kbts_lookup_info_frame *)Scratch;
-    kbts_un FrameCapacity = ScratchSize / sizeof(kbts_lookup_info_frame);
-
-    KBTS_FOR(RootLookupIndex, 0, LookupList->Count)
+    if(Gsub)
     {
-      kbts_lookup *PackedRootLookup = kbts_GetLookup(LookupList, RootLookupIndex);
-      kbts_unpacked_lookup RootLookup = kbts_UnpackLookup(Gdef, PackedRootLookup);
+      kbts_lookup_list *LookupList = kbts_GetLookupList(Gsub);
 
-      KBTS_FOR(RootSubtableIndex, 0, RootLookup.SubtableCount)
+      // Figure out lookup recursion depth and other useful metrics.
+      // Most of these are not used yet, but would be useful for a streaming shaper and/or to inform GLYPH_BUFFER_GROW_MARGIN.
+      kbts_un MaximumBacktrackWithoutSkippingGlyphs = 0;
+      kbts_un MaximumLookaheadWithoutSkippingGlyphs = 0;
+      kbts_un MaximumLookupStackSize = 1;
+      kbts_un MaximumSubstitutionOutputSize = 1;
+      kbts_un MaximumInputSequenceLength = 1;
+
+      // We are done byteswapping the file, so we can reclaim the scratch memory.
+      kbts_lookup_info_frame *Frames = (kbts_lookup_info_frame *)Scratch;
+      kbts_un FrameCapacity = ScratchSize / sizeof(kbts_lookup_info_frame);
+
+      KBTS_FOR(RootLookupIndex, 0, LookupList->Count)
       {
-        kbts_un FrameCount = 0;
+        kbts_lookup *PackedRootLookup = kbts_GetLookup(LookupList, RootLookupIndex);
+        kbts_unpacked_lookup RootLookup = kbts_UnpackLookup(Gdef, PackedRootLookup);
+
+        KBTS_FOR(RootSubtableIndex, 0, RootLookup.SubtableCount)
         {
-          kbts_lookup_info_frame First = KBTS_ZERO;
-          First.LookupType = RootLookup.Type;
-          First.Base = KBTS_POINTER_OFFSET(kbts_u16, PackedRootLookup, RootLookup.SubtableOffsets[RootSubtableIndex]);
-          First.StackSize = 1;
-          if(FrameCount < FrameCapacity)
+          kbts_un FrameCount = 0;
           {
-            Frames[FrameCount++] = First;
-          }
-          else
-          {
-            Font->Error = 1;
-            goto DoneGatheringLookupInfo;
-          }
-        }
-
-        while(FrameCount)
-        {
-          kbts_lookup_info_frame Frame = Frames[--FrameCount];
-          kbts_u16 LookupType = Frame.LookupType;
-          kbts_u16 *Base = Frame.Base;
-          kbts_u32 LookaheadOffset = Frame.LookaheadOffset;
-          kbts_u32 StackSize = Frame.StackSize;
-
-          MaximumLookupStackSize = KBTS_MAX(MaximumLookupStackSize, StackSize);
-
-          while(LookupType == 7)
-          {
-            kbts_extension *Subst = (kbts_extension *)Base;
-
-            Base = KBTS_POINTER_OFFSET(kbts_u16, Subst, Subst->Offset);
-            LookupType = Subst->LookupType;
-          }
-
-          kbts_u32 Result = 1;
-
-          switch(LookupType)
-          {
-          case 2:
-          {
-            kbts_multiple_substitution *Subst = (kbts_multiple_substitution *)Base;
-            KBTS_FOR(SequenceIndex, 0, Subst->SequenceCount)
+            kbts_lookup_info_frame First = KBTS_ZERO;
+            First.LookupType = RootLookup.Type;
+            First.Base = KBTS_POINTER_OFFSET(kbts_u16, PackedRootLookup, RootLookup.SubtableOffsets[RootSubtableIndex]);
+            First.StackSize = 1;
+            if(FrameCount < FrameCapacity)
             {
-              kbts_sequence *Sequence = kbts_GetSequence(Subst, SequenceIndex);
-
-              MaximumSubstitutionOutputSize = KBTS_MAX(MaximumSubstitutionOutputSize, Sequence->GlyphCount);
+              Frames[FrameCount++] = First;
             }
-          } break;
-
-          case 4:
-          {
-            kbts_ligature_substitution *Subst = (kbts_ligature_substitution *)Base;
-
-            KBTS_FOR(SetIndex, 0, Subst->LigatureSetCount)
+            else
             {
-              kbts_ligature_set *Set = kbts_GetLigatureSet(Subst, SetIndex);
+              Font->Error = 1;
+              goto DoneGatheringLookupInfo;
+            }
+          }
 
-              KBTS_FOR(LigatureIndex, 0, Set->Count)
+          while(FrameCount)
+          {
+            kbts_lookup_info_frame Frame = Frames[--FrameCount];
+            kbts_u16 LookupType = Frame.LookupType;
+            kbts_u16 *Base = Frame.Base;
+            kbts_u32 LookaheadOffset = Frame.LookaheadOffset;
+            kbts_u32 StackSize = Frame.StackSize;
+
+            MaximumLookupStackSize = KBTS_MAX(MaximumLookupStackSize, StackSize);
+
+            while(LookupType == 7)
+            {
+              kbts_extension *Subst = (kbts_extension *)Base;
+
+              Base = KBTS_POINTER_OFFSET(kbts_u16, Subst, Subst->Offset);
+              LookupType = Subst->LookupType;
+            }
+
+            switch(LookupType)
+            {
+            case 2:
+            {
+              kbts_multiple_substitution *Subst = (kbts_multiple_substitution *)Base;
+              KBTS_FOR(SequenceIndex, 0, Subst->SequenceCount)
               {
-                kbts_ligature *Ligature = kbts_GetLigature(Set, LigatureIndex);
+                kbts_sequence *Sequence = kbts_GetSequence(Subst, SequenceIndex);
 
-                MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Ligature->ComponentCount - 1);
+                MaximumSubstitutionOutputSize = KBTS_MAX(MaximumSubstitutionOutputSize, Sequence->GlyphCount);
               }
-            }
-          } break;
+            } break;
 
-          case 5:
-          {
-            if(Base[0] == 1)
+            case 4:
             {
-              kbts_sequence_context_1 *Subst = (kbts_sequence_context_1 *)Base;
+              kbts_ligature_substitution *Subst = (kbts_ligature_substitution *)Base;
 
-              KBTS_FOR(SetIndex, 0, Subst->SeqRuleSetCount)
+              KBTS_FOR(SetIndex, 0, Subst->LigatureSetCount)
               {
-                kbts_sequence_rule_set *Set = kbts_GetSequenceRuleSet(Subst, SetIndex);
+                kbts_ligature_set *Set = kbts_GetLigatureSet(Subst, SetIndex);
 
-                KBTS_FOR(RuleIndex, 0, Set->Count)
+                KBTS_FOR(LigatureIndex, 0, Set->Count)
                 {
-                  kbts_sequence_rule *Rule = kbts_GetSequenceRule(Set, RuleIndex);
+                  kbts_ligature *Ligature = kbts_GetLigature(Set, LigatureIndex);
 
-                  MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Rule->GlyphCount - 1);
-                  MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Rule->GlyphCount);
-
-                  kbts_u16 *InputSequence = KBTS_POINTER_AFTER(kbts_u16, Rule);
-                  kbts_sequence_lookup_record *Records = (kbts_sequence_lookup_record *)(InputSequence + Rule->GlyphCount - 1);
-                  KBTS_FOR(RecordIndex, 0, Rule->SequenceLookupCount)
-                  {
-                    kbts_sequence_lookup_record *Record = &Records[RecordIndex];
-                    if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
-                    {
-                      Font->Error = 1;
-                      goto DoneGatheringLookupInfo;
-                    }
-                  }
+                  MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Ligature->ComponentCount - 1);
                 }
               }
-            }
-            else if(Base[0] == 2)
+            } break;
+
+            case 5:
             {
-              kbts_sequence_context_2 *Subst = (kbts_sequence_context_2 *)Base;
-
-              KBTS_FOR(SetIndex, 0, Subst->ClassSequenceRuleSetCount)
+              if(Base[0] == 1)
               {
-                kbts_class_sequence_rule_set *Set = kbts_GetClassSequenceRuleSet(Subst, SetIndex);
+                kbts_sequence_context_1 *Subst = (kbts_sequence_context_1 *)Base;
 
-                if(Set)
+                KBTS_FOR(SetIndex, 0, Subst->SeqRuleSetCount)
                 {
+                  kbts_sequence_rule_set *Set = kbts_GetSequenceRuleSet(Subst, SetIndex);
+
                   KBTS_FOR(RuleIndex, 0, Set->Count)
                   {
-                    kbts_class_sequence_rule *Rule = kbts_GetClassSequenceRule(Set, RuleIndex);
+                    kbts_sequence_rule *Rule = kbts_GetSequenceRule(Set, RuleIndex);
 
                     MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Rule->GlyphCount - 1);
                     MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Rule->GlyphCount);
 
                     kbts_u16 *InputSequence = KBTS_POINTER_AFTER(kbts_u16, Rule);
                     kbts_sequence_lookup_record *Records = (kbts_sequence_lookup_record *)(InputSequence + Rule->GlyphCount - 1);
-
                     KBTS_FOR(RecordIndex, 0, Rule->SequenceLookupCount)
                     {
                       kbts_sequence_lookup_record *Record = &Records[RecordIndex];
@@ -20609,144 +22226,179 @@ KBTS_EXPORT kbts_un kbts_ReadFontData(kbts_font *Font, void *Scratch, kbts_un Sc
                   }
                 }
               }
-            }
-            else if(Base[0] == 3)
-            {
-              kbts_sequence_context_3 *Subst = (kbts_sequence_context_3 *)Base;
-
-              MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Subst->GlyphCount - 1);
-              MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Subst->GlyphCount);
-
-              kbts_u16 *CoverageOffsets = KBTS_POINTER_AFTER(kbts_u16, Subst);
-              kbts_sequence_lookup_record *Records = (kbts_sequence_lookup_record *)(CoverageOffsets + Subst->GlyphCount);
-
-              KBTS_FOR(RecordIndex, 0, Subst->SequenceLookupCount)
+              else if(Base[0] == 2)
               {
-                kbts_sequence_lookup_record *Record = &Records[RecordIndex];
-                if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
+                kbts_sequence_context_2 *Subst = (kbts_sequence_context_2 *)Base;
+
+                KBTS_FOR(SetIndex, 0, Subst->ClassSequenceRuleSetCount)
                 {
-                  Font->Error = 1;
-                  goto DoneGatheringLookupInfo;
-                }
-              }
-            }
-          } break;
+                  kbts_class_sequence_rule_set *Set = kbts_GetClassSequenceRuleSet(Subst, SetIndex);
 
-          case 6:
-          {
-            if(Base[0] == 1)
-            {
-              kbts_chained_sequence_context_1 *Subst = (kbts_chained_sequence_context_1 *)Base;
-
-              KBTS_FOR(SetIndex, 0, Subst->ChainedSequenceRuleSetCount)
-              {
-                kbts_chained_sequence_rule_set *Set = kbts_GetChainedSequenceRuleSet(Subst, SetIndex);
-
-                if(Set)
-                {
-                  KBTS_FOR(RuleIndex, 0, Set->Count)
+                  if(Set)
                   {
-                    kbts_chained_sequence_rule *Rule = kbts_GetChainedSequenceRule(Set, RuleIndex);
-                    kbts_unpacked_chained_sequence_rule Unpacked = kbts_UnpackChainedSequenceRule(Rule, 0);
-
-                    MaximumBacktrackWithoutSkippingGlyphs = KBTS_MAX(MaximumBacktrackWithoutSkippingGlyphs, Unpacked.BacktrackCount);
-                    MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Unpacked.LookaheadCount);
-                    MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Unpacked.InputCount);
-
-                    KBTS_FOR(RecordIndex, 0, Unpacked.RecordCount)
+                    KBTS_FOR(RuleIndex, 0, Set->Count)
                     {
-                      kbts_sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
-                      if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
+                      kbts_class_sequence_rule *Rule = kbts_GetClassSequenceRule(Set, RuleIndex);
+
+                      MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Rule->GlyphCount - 1);
+                      MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Rule->GlyphCount);
+
+                      kbts_u16 *InputSequence = KBTS_POINTER_AFTER(kbts_u16, Rule);
+                      kbts_sequence_lookup_record *Records = (kbts_sequence_lookup_record *)(InputSequence + Rule->GlyphCount - 1);
+
+                      KBTS_FOR(RecordIndex, 0, Rule->SequenceLookupCount)
                       {
-                        Font->Error = 1;
-                        goto DoneGatheringLookupInfo;
+                        kbts_sequence_lookup_record *Record = &Records[RecordIndex];
+                        if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
+                        {
+                          Font->Error = 1;
+                          goto DoneGatheringLookupInfo;
+                        }
                       }
                     }
                   }
                 }
               }
-            }
-            else if(Base[0] == 2)
-            {
-              kbts_chained_sequence_context_2 *Subst = (kbts_chained_sequence_context_2 *)Base;
-
-              KBTS_FOR(SetIndex, 0, Subst->ChainedClassSequenceRuleSetCount)
+              else if(Base[0] == 3)
               {
-                // @Duplication with 6.1.
-                kbts_chained_sequence_rule_set *Set = kbts_GetChainedClassSequenceRuleSet(Subst, SetIndex);
+                kbts_sequence_context_3 *Subst = (kbts_sequence_context_3 *)Base;
 
-                if(Set)
+                MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Subst->GlyphCount - 1);
+                MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Subst->GlyphCount);
+
+                kbts_u16 *CoverageOffsets = KBTS_POINTER_AFTER(kbts_u16, Subst);
+                kbts_sequence_lookup_record *Records = (kbts_sequence_lookup_record *)(CoverageOffsets + Subst->GlyphCount);
+
+                KBTS_FOR(RecordIndex, 0, Subst->SequenceLookupCount)
                 {
-                  KBTS_FOR(RuleIndex, 0, Set->Count)
+                  kbts_sequence_lookup_record *Record = &Records[RecordIndex];
+                  if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
                   {
-                    kbts_chained_sequence_rule *Rule = kbts_GetChainedSequenceRule(Set, RuleIndex);
-                    kbts_unpacked_chained_sequence_rule Unpacked = kbts_UnpackChainedSequenceRule(Rule, 0);
+                    Font->Error = 1;
+                    goto DoneGatheringLookupInfo;
+                  }
+                }
+              }
+            } break;
 
-                    MaximumBacktrackWithoutSkippingGlyphs = KBTS_MAX(MaximumBacktrackWithoutSkippingGlyphs, Unpacked.BacktrackCount);
-                    MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Unpacked.LookaheadCount);
-                    MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Unpacked.InputCount);
+            case 6:
+            {
+              if(Base[0] == 1)
+              {
+                kbts_chained_sequence_context_1 *Subst = (kbts_chained_sequence_context_1 *)Base;
 
-                    KBTS_FOR(RecordIndex, 0, Unpacked.RecordCount)
+                KBTS_FOR(SetIndex, 0, Subst->ChainedSequenceRuleSetCount)
+                {
+                  kbts_chained_sequence_rule_set *Set = kbts_GetChainedSequenceRuleSet(Subst, SetIndex);
+
+                  if(Set)
+                  {
+                    KBTS_FOR(RuleIndex, 0, Set->Count)
                     {
-                      kbts_sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
-                      if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
+                      kbts_chained_sequence_rule *Rule = kbts_GetChainedSequenceRule(Set, RuleIndex);
+                      kbts_unpacked_chained_sequence_rule Unpacked = kbts_UnpackChainedSequenceRule(Rule, 0);
+
+                      MaximumBacktrackWithoutSkippingGlyphs = KBTS_MAX(MaximumBacktrackWithoutSkippingGlyphs, Unpacked.BacktrackCount);
+                      MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Unpacked.LookaheadCount);
+                      MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Unpacked.InputCount);
+
+                      KBTS_FOR(RecordIndex, 0, Unpacked.RecordCount)
                       {
-                        Font->Error = 1;
-                        goto DoneGatheringLookupInfo;
+                        kbts_sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
+                        if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
+                        {
+                          Font->Error = 1;
+                          goto DoneGatheringLookupInfo;
+                        }
                       }
                     }
                   }
                 }
               }
-            }
-            else if(Base[0] == 3)
+              else if(Base[0] == 2)
+              {
+                kbts_chained_sequence_context_2 *Subst = (kbts_chained_sequence_context_2 *)Base;
+
+                KBTS_FOR(SetIndex, 0, Subst->ChainedClassSequenceRuleSetCount)
+                {
+                  // @Duplication with 6.1.
+                  kbts_chained_sequence_rule_set *Set = kbts_GetChainedClassSequenceRuleSet(Subst, SetIndex);
+
+                  if(Set)
+                  {
+                    KBTS_FOR(RuleIndex, 0, Set->Count)
+                    {
+                      kbts_chained_sequence_rule *Rule = kbts_GetChainedSequenceRule(Set, RuleIndex);
+                      kbts_unpacked_chained_sequence_rule Unpacked = kbts_UnpackChainedSequenceRule(Rule, 0);
+
+                      MaximumBacktrackWithoutSkippingGlyphs = KBTS_MAX(MaximumBacktrackWithoutSkippingGlyphs, Unpacked.BacktrackCount);
+                      MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Unpacked.LookaheadCount);
+                      MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Unpacked.InputCount);
+
+                      KBTS_FOR(RecordIndex, 0, Unpacked.RecordCount)
+                      {
+                        kbts_sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
+                        if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
+                        {
+                          Font->Error = 1;
+                          goto DoneGatheringLookupInfo;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              else if(Base[0] == 3)
+              {
+                kbts_chained_sequence_context_3 *Subst = (kbts_chained_sequence_context_3 *)Base;
+                kbts_unpacked_chained_sequence_context_3 Unpacked = kbts_UnpackChainedSequenceContext3(Subst, 0);
+
+                MaximumBacktrackWithoutSkippingGlyphs = KBTS_MAX(MaximumBacktrackWithoutSkippingGlyphs, Unpacked.BacktrackCount);
+                MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Unpacked.LookaheadCount);
+                MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Unpacked.InputCount);
+
+                KBTS_FOR(RecordIndex, 0, Unpacked.RecordCount)
+                {
+                  kbts_sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
+                  if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
+                  {
+                    Font->Error = 1;
+                    goto DoneGatheringLookupInfo;
+                  }
+                }
+              }
+            } break;
+
+            case 8:
             {
-              kbts_chained_sequence_context_3 *Subst = (kbts_chained_sequence_context_3 *)Base;
-              kbts_unpacked_chained_sequence_context_3 Unpacked = kbts_UnpackChainedSequenceContext3(Subst, 0);
+              kbts_reverse_chain_substitution *Subst = (kbts_reverse_chain_substitution *)Base;
+              kbts_unpacked_reverse_chain_substitution Unpacked = kbts_UnpackReverseChainSubstitution(Subst, 0);
 
               MaximumBacktrackWithoutSkippingGlyphs = KBTS_MAX(MaximumBacktrackWithoutSkippingGlyphs, Unpacked.BacktrackCount);
               MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Unpacked.LookaheadCount);
-              MaximumInputSequenceLength = KBTS_MAX(MaximumInputSequenceLength, Unpacked.InputCount);
-
-              KBTS_FOR(RecordIndex, 0, Unpacked.RecordCount)
-              {
-                kbts_sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
-                if(!kbts_PushLookup(Gdef, Frames, &FrameCount, FrameCapacity, kbts_GetLookup(LookupList, Record->LookupListIndex), LookaheadOffset + Record->SequenceIndex, StackSize + RecordIndex + 1))
-                {
-                  Font->Error = 1;
-                  goto DoneGatheringLookupInfo;
-                }
-              }
+            } break;
             }
-          } break;
-
-          case 8:
-          {
-            kbts_reverse_chain_substitution *Subst = (kbts_reverse_chain_substitution *)Base;
-            kbts_unpacked_reverse_chain_substitution Unpacked = kbts_UnpackReverseChainSubstitution(Subst, 0);
-
-            MaximumBacktrackWithoutSkippingGlyphs = KBTS_MAX(MaximumBacktrackWithoutSkippingGlyphs, Unpacked.BacktrackCount);
-            MaximumLookaheadWithoutSkippingGlyphs = KBTS_MAX(MaximumLookaheadWithoutSkippingGlyphs, LookaheadOffset + Unpacked.LookaheadCount);
-          } break;
           }
         }
       }
+
+      DoneGatheringLookupInfo:;
+      Font->LookupInfo.MaximumBacktrackWithoutSkippingGlyphs = (kbts_u32)MaximumBacktrackWithoutSkippingGlyphs;
+      Font->LookupInfo.MaximumLookaheadWithoutSkippingGlyphs = (kbts_u32)MaximumLookaheadWithoutSkippingGlyphs;
+      Font->LookupInfo.MaximumSubstitutionOutputSize = (kbts_u32)MaximumSubstitutionOutputSize;
+      Font->LookupInfo.MaximumInputSequenceLength = (kbts_u32)MaximumInputSequenceLength;
+      Font->LookupInfo.MaximumLookupStackSize = (kbts_u32)MaximumLookupStackSize;
     }
 
-    DoneGatheringLookupInfo:;
-    Font->LookupInfo.MaximumBacktrackWithoutSkippingGlyphs = (kbts_u32)MaximumBacktrackWithoutSkippingGlyphs;
-    Font->LookupInfo.MaximumLookaheadWithoutSkippingGlyphs = (kbts_u32)MaximumLookaheadWithoutSkippingGlyphs;
-    Font->LookupInfo.MaximumSubstitutionOutputSize = (kbts_u32)MaximumSubstitutionOutputSize;
-    Font->LookupInfo.MaximumInputSequenceLength = (kbts_u32)MaximumInputSequenceLength;
-    Font->LookupInfo.MaximumLookupStackSize = (kbts_u32)MaximumLookupStackSize;
+    Font->LookupCount = (kbts_u32)TotalLookupCount;
+    Font->SubtableCount = (kbts_u32)TotalSubtableCount;
+
+    kbts_un GlyphLookupMatrixSizeInBytes = ((((TotalLookupCount * Font->GlyphCount) + 7) / 8) + 3) & ~3;
+    kbts_un GlyphLookupSubtableMatrixSizeInBytes = ((((TotalSubtableCount * Font->GlyphCount) + 7) / 8) + 3) & ~3;
+    Result = GlyphLookupMatrixSizeInBytes + GlyphLookupSubtableMatrixSizeInBytes + sizeof(kbts_u32) * TotalLookupCount + sizeof(kbts_lookup_subtable_info) * TotalSubtableCount;
+
+    Font->Error |= ByteSwapContext.Error;
   }
-
-  Font->LookupCount = (kbts_u32)TotalLookupCount;
-  Font->SubtableCount = (kbts_u32)TotalSubtableCount;
-
-  kbts_un GlyphLookupMatrixSizeInBytes = ((((TotalLookupCount * Font->GlyphCount) + 7) / 8) + 3) & ~3;
-  kbts_un GlyphLookupSubtableMatrixSizeInBytes = ((((TotalSubtableCount * Font->GlyphCount) + 7) / 8) + 3) & ~3;
-  kbts_un Result = GlyphLookupMatrixSizeInBytes + GlyphLookupSubtableMatrixSizeInBytes + sizeof(kbts_u32) * TotalLookupCount + sizeof(kbts_lookup_subtable_info) * TotalSubtableCount;
   return Result;
 }
 
@@ -20765,7 +22417,7 @@ KBTS_EXPORT int kbts_PostReadFontInitialize(kbts_font *Font, void *Memory, kbts_
     kbts_un GlyphLookupSubtableMatrixSizeInBytes = (GlyphLookupSubtableMatrixSizeInBits + 7) / 8;
     GlyphLookupSubtableMatrixSizeInBytes = (GlyphLookupSubtableMatrixSizeInBytes + 3) & ~3; // Align to u32
 
-    memset(Memory, 0, MemorySize);
+    KBTS_MEMSET(Memory, 0, MemorySize);
 
     kbts_u32 *GlyphLookupMatrix = (kbts_u32 *)Memory;
     kbts_u32 *GlyphLookupSubtableMatrix = KBTS_POINTER_OFFSET(kbts_u32, GlyphLookupMatrix, GlyphLookupMatrixSizeInBytes);
@@ -20893,7 +22545,7 @@ KBTS_EXPORT int kbts_PostReadFontInitialize(kbts_font *Font, void *Memory, kbts_
                 {
                   kbts_sequence_context_2 *Subst = (kbts_sequence_context_2 *)Base;
                   kbts_u16 *ClassDefBase = KBTS_POINTER_OFFSET(kbts_u16, Subst, Subst->ClassDefOffset);
-                  kbts_u32 Class = kbts_GlyphClassFromTable(ClassDefBase, Glyph.Id);
+                  kbts_glyph_class_from_table_result Class = kbts_GlyphClassFromTable(ClassDefBase, Glyph.Id);
 
                   KBTS_FOR(SetIndex, 0, Subst->ClassSequenceRuleSetCount)
                   {
@@ -20909,7 +22561,7 @@ KBTS_EXPORT int kbts_PostReadFontInitialize(kbts_font *Font, void *Memory, kbts_
 
                         KBTS_FOR(SequenceIndex, 1, Rule->GlyphCount)
                         {
-                          if(SequenceClasses[SequenceIndex - 1] == Class)
+                          if(SequenceClasses[SequenceIndex - 1] == Class.Class)
                           {
                             InSecondary = 1;
                             goto DoneCheckingForInclusion;
@@ -20999,9 +22651,9 @@ KBTS_EXPORT int kbts_PostReadFontInitialize(kbts_font *Font, void *Memory, kbts_
                   kbts_u16 *InputClassDefinition = KBTS_POINTER_OFFSET(kbts_u16, Subst, Subst->InputClassDefOffset);
                   kbts_u16 *LookaheadClassDefinition = KBTS_POINTER_OFFSET(kbts_u16, Subst, Subst->LookaheadClassDefOffset);
 
-                  kbts_u16 BacktrackClass = kbts_GlyphClassFromTable(BacktrackClassDefinition, Glyph.Id);
-                  kbts_u16 InputClass = kbts_GlyphClassFromTable(InputClassDefinition, Glyph.Id);
-                  kbts_u16 LookaheadClass = kbts_GlyphClassFromTable(LookaheadClassDefinition, Glyph.Id);
+                  kbts_u16 BacktrackClass = kbts_GlyphClassFromTable(BacktrackClassDefinition, Glyph.Id).Class;
+                  kbts_u16 InputClass = kbts_GlyphClassFromTable(InputClassDefinition, Glyph.Id).Class;
+                  kbts_u16 LookaheadClass = kbts_GlyphClassFromTable(LookaheadClassDefinition, Glyph.Id).Class;
 
                   KBTS_FOR(SetIndex, 0, Subst->ChainedClassSequenceRuleSetCount)
                   {
@@ -22127,20 +23779,22 @@ static void kbts_BreakAddCodepoint_(kbts_break_state *State, kbts_u32 Codepoint,
     #undef KBTS_LINE_BREAK
     #undef KBTS_LINE_UNBREAK
 
-    kbts_u64 EffectiveLineBreaks = LineBreaks & ~(LineUnbreaks | LineUnbreaksAsync);
-
-    kbts_DoLineBreak(State, PositionOffset3 + LineBreak3PositionOffset, EffectiveLineBreaks >> 48, 0, 0);
-    if(EndOfText)
     {
-      kbts_DoLineBreak(State, PositionOffset2 + LineBreak2PositionOffset, EffectiveLineBreaks >> 32, 0, 0);
-      { // @Cleanup: This is the same flag code as DoLineBreak, but we want to use FlagState buffering for this.
-        // The only places where we want to manually call DoBreak is for asynchronous/buffered guys.
-        kbts_u8 FlushFlags = 0;
-        if((EffectiveLineBreaks >> 16) & KBTS_LINE_BREAK_ALLOWED_MASK) FlushFlags |= KBTS_BREAK_FLAG_LINE_SOFT;
-        if((EffectiveLineBreaks >> 16) & KBTS_LINE_BREAK_REQUIRED_MASK) FlushFlags |= KBTS_BREAK_FLAG_LINE_HARD;
-        KBTS_BREAK(FlushFlags, 1);
+      kbts_u64 EffectiveLineBreaks = LineBreaks & ~(LineUnbreaks | LineUnbreaksAsync);
+
+      kbts_DoLineBreak(State, PositionOffset3 + LineBreak3PositionOffset, EffectiveLineBreaks >> 48, 0, 0);
+      if(EndOfText)
+      {
+        kbts_DoLineBreak(State, PositionOffset2 + LineBreak2PositionOffset, EffectiveLineBreaks >> 32, 0, 0);
+        { // @Cleanup: This is the same flag code as DoLineBreak, but we want to use FlagState buffering for this.
+          // The only places where we want to manually call DoBreak is for asynchronous/buffered guys.
+          kbts_u8 FlushFlags = 0;
+          if((EffectiveLineBreaks >> 16) & KBTS_LINE_BREAK_ALLOWED_MASK) FlushFlags |= KBTS_BREAK_FLAG_LINE_SOFT;
+          if((EffectiveLineBreaks >> 16) & KBTS_LINE_BREAK_REQUIRED_MASK) FlushFlags |= KBTS_BREAK_FLAG_LINE_HARD;
+          KBTS_BREAK(FlushFlags, 1);
+        }
+        // Lines are never broken after the end of text.
       }
-      // Lines are never broken after the end of text.
     }
 
     State->LineBreaks = LineBreaks;
@@ -22225,13 +23879,13 @@ KBTS_EXPORT void kbts_BeginBreak(kbts_break_state *State, kbts_direction MainDir
 {
   if(State)
   {
-    memset(State, 0, sizeof(*State));
+    KBTS_MEMSET(State, 0, sizeof(*State));
     State->MainDirection = (kbts_u8)MainDirection;
     State->JapaneseLineBreakStyle = JapaneseLineBreakStyle;
   }
 }
 
-KBTS_EXPORT kbts_decode kbts_DecodeUtf8(const char *Utf8, size_t Length)
+KBTS_EXPORT kbts_decode kbts_DecodeUtf8(const char *Utf8, kbts_un Length)
 {
   kbts_decode Result = KBTS_ZERO;
   const char *Utf8Start = Utf8;
@@ -22279,8 +23933,8 @@ KBTS_EXPORT kbts_decode kbts_DecodeUtf8(const char *Utf8, size_t Length)
       FollowupCharacterCount = 3;
       Result.Codepoint = First & 7;
       Result.Valid = 1;
-
-}    break;
+    }
+    break;
     }
 
     if(Length > FollowupCharacterCount)
@@ -22312,9 +23966,9 @@ KBTS_EXPORT kbts_decode kbts_DecodeUtf8(const char *Utf8, size_t Length)
   return Result;
 }
 
-KBTS_EXPORT kbts_u32 kbts_ShaperIsComplex(kbts_shaper Shaper)
+KBTS_EXPORT int kbts_ShaperIsComplex(kbts_shaper Shaper)
 {
-  kbts_u32 Result = Shaper != KBTS_SHAPER_DEFAULT; // @Incomplete?
+  int Result = Shaper != KBTS_SHAPER_DEFAULT; // @Incomplete?
 
   return Result;
 }
