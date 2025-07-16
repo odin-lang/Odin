@@ -1300,18 +1300,8 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 
 		const bool is_union = base->kind == Type_Union;
 		if (!is_union) {
-			// Check for objc_SEL
-			if (internal_check_is_assignable_to(base, t_objc_SEL)) {
-				return str_lit(":");
-			}
-
-			// Check for objc_Class
-			if (internal_check_is_assignable_to(base, t_objc_SEL)) {
-				return str_lit("#");
-			}
-
 			// Treat struct as an Objective-C Class?
-			if (has_type_got_objc_class_attribute(base) && pointer_depth == 0) {
+			if (has_type_got_objc_class_attribute(t) && pointer_depth == 0) {
 				return str_lit("#");
 			}
 		}
@@ -1354,6 +1344,17 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		return str_lit("?");
 
 	case Type_Pointer: {
+		// NOTE: These types are pointers, so we must check here for special cases
+		// Check for objc_SEL
+		if (internal_check_is_assignable_to(t, t_objc_SEL)) {
+			return str_lit(":");
+		}
+
+		// Check for objc_Class
+		if (internal_check_is_assignable_to(t, t_objc_Class)) {
+			return str_lit("#");
+		}
+
 		String pointee = lb_get_objc_type_encoding(t->Pointer.elem, pointer_depth +1);
 		// Special case for Objective-C Objects
 		if (pointer_depth == 0 && pointee == "@") {
@@ -1645,6 +1646,21 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			continue;
 		}
 
+		// Check if it has any class methods ahead of time so that we know to grab the meta_class
+		lbValue meta_class_value = {};
+		for (const ObjcMethodData &md : *methods) {
+			if (!md.ac.objc_is_class_method) {
+				continue;
+			}
+
+			// Get the meta_class
+			args.count       = 1;
+			args[0]          = class_value;
+			meta_class_value = lb_emit_runtime_call(p, "object_getClass", args);
+
+			break;
+		}
+
 		for (const ObjcMethodData &md : *methods) {
 			GB_ASSERT( md.proc_entity->kind == Entity_Procedure);
 			Type *method_type = md.proc_entity->type;
@@ -1770,8 +1786,10 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			GB_ASSERT(sel_address);
 			lbValue selector_value = lb_addr_load(p, *sel_address);
 
+			lbValue target_class = !md.ac.objc_is_class_method ? class_value : meta_class_value;
+
 			args.count = 4;
-			args[0] = class_value;    // Class
+			args[0] = target_class;   // Class
 			args[1] = selector_value; // SEL
 			args[2] = lbValue { wrapper_proc->value, wrapper_proc->type };
 			args[3] = lb_const_value(m, t_cstring, exact_value_string(method_encoding));
