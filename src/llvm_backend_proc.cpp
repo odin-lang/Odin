@@ -1723,7 +1723,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 
 	case BuiltinProc_simd_runtime_swizzle:
 		{
-			LLVMValueRef table = arg0.value;
+			LLVMValueRef src = arg0.value;
 			LLVMValueRef indices = lb_build_expr(p, ce->args[1]).value;
 			
 			Type *vt = arg0.type;
@@ -1807,7 +1807,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			}
 			
 			if (use_hardware_runtime_swizzle && intrinsic_name != nullptr) {
-				// Use dedicated hardware table lookup instruction
+				// Use dedicated hardware swizzle instruction
 				
 				// Check if required target features are enabled
 				bool features_enabled = true;
@@ -1834,7 +1834,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						}
 					}
 				} else if (build_context.metrics.arch == TargetArch_arm64 || build_context.metrics.arch == TargetArch_arm32) {
-					// ARM/ARM64 feature checking - NEON is required for all table lookups
+					// ARM/ARM64 feature checking - NEON is required for all table/swizzle ops
 					if (!check_target_feature_is_enabled(str_lit("neon"), nullptr)) {
 						features_enabled = false;
 					}
@@ -1856,77 +1856,77 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("512"));
 						}
 					} else if (build_context.metrics.arch == TargetArch_arm64) {
-						// ARM64 function attributes - enable NEON for table lookup instructions
+						// ARM64 function attributes - enable NEON for swizzle instructions
 						lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+neon"));
-						// Set appropriate vector width for multi-table operations
+						// Set appropriate vector width for multi-swizzle operations
 						if (count >= 32) {
 							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("256"));
 						}
 					} else if (build_context.metrics.arch == TargetArch_arm32) {
-						// ARM32 function attributes - enable NEON for table lookup instructions
+						// ARM32 function attributes - enable NEON for swizzle instructions
 						lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+neon"));
 					}
 					
-					// Handle ARM's multi-table intrinsics by splitting the table vector
+					// Handle ARM's multi-swizzle intrinsics by splitting the src vector
 					if (build_context.metrics.arch == TargetArch_arm64 && count > 16) {
-						// ARM64 TBL2/TBL3/TBL4: Split table into multiple 16-byte vectors
+						// ARM64 TBL2/TBL3/TBL4: Split src into multiple 16-byte vectors
 						int num_tables = cast(int)(count / 16);
-						GB_ASSERT_MSG(count % 16 == 0, "ARM64 table size must be multiple of 16 bytes, got %lld bytes", count);
+						GB_ASSERT_MSG(count % 16 == 0, "ARM64 src size must be multiple of 16 bytes, got %lld bytes", count);
 						GB_ASSERT_MSG(num_tables <= 4, "ARM64 NEON supports maximum 4 tables (tbl4), got %d tables for %lld-byte vector", num_tables, count);
 						
-						LLVMValueRef table_parts[4]; // Max 4 tables for tbl4
+						LLVMValueRef src_parts[4]; // Max 4 tables for tbl4
 						for (int i = 0; i < num_tables; i++) {
-							// Extract 16-byte slice from the larger table
+							// Extract 16-byte slice from the larger src
 							LLVMValueRef indices_for_extract[16];
 							for (int j = 0; j < 16; j++) {
 								indices_for_extract[j] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), i * 16 + j, false);
 							}
 							LLVMValueRef extract_mask = LLVMConstVector(indices_for_extract, 16);
-							table_parts[i] = LLVMBuildShuffleVector(p->builder, table, LLVMGetUndef(LLVMTypeOf(table)), extract_mask, "");
+							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
 						}
 						
 						// Call appropriate ARM64 tbl intrinsic
 						if (count == 32) {
-							LLVMValueRef args[3] = { table_parts[0], table_parts[1], indices };
+							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
 							res.value = lb_call_intrinsic(p, intrinsic_name, args, 3, nullptr, 0);
 						} else if (count == 48) {
-							LLVMValueRef args[4] = { table_parts[0], table_parts[1], table_parts[2], indices };
+							LLVMValueRef args[4] = { src_parts[0], src_parts[1], src_parts[2], indices };
 							res.value = lb_call_intrinsic(p, intrinsic_name, args, 4, nullptr, 0);
 						} else if (count == 64) {
-							LLVMValueRef args[5] = { table_parts[0], table_parts[1], table_parts[2], table_parts[3], indices };
+							LLVMValueRef args[5] = { src_parts[0], src_parts[1], src_parts[2], src_parts[3], indices };
 							res.value = lb_call_intrinsic(p, intrinsic_name, args, 5, nullptr, 0);
 						}
 					} else if (build_context.metrics.arch == TargetArch_arm32 && count > 8) {
-						// ARM32 VTBL2/VTBL3/VTBL4: Split table into multiple 8-byte vectors
+						// ARM32 VTBL2/VTBL3/VTBL4: Split src into multiple 8-byte vectors
 						int num_tables = cast(int)count / 8;
-						GB_ASSERT_MSG(count % 8 == 0, "ARM32 table size must be multiple of 8 bytes, got %lld bytes", count);
+						GB_ASSERT_MSG(count % 8 == 0, "ARM32 src size must be multiple of 8 bytes, got %lld bytes", count);
 						GB_ASSERT_MSG(num_tables <= 4, "ARM32 NEON supports maximum 4 tables (vtbl4), got %d tables for %lld-byte vector", num_tables, count);
 						
-						LLVMValueRef table_parts[4]; // Max 4 tables for vtbl4
+						LLVMValueRef src_parts[4]; // Max 4 tables for vtbl4
 						for (int i = 0; i < num_tables; i++) {
-							// Extract 8-byte slice from the larger table
+							// Extract 8-byte slice from the larger src
 							LLVMValueRef indices_for_extract[8];
 							for (int j = 0; j < 8; j++) {
 								indices_for_extract[j] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), i * 8 + j, false);
 							}
 							LLVMValueRef extract_mask = LLVMConstVector(indices_for_extract, 8);
-							table_parts[i] = LLVMBuildShuffleVector(p->builder, table, LLVMGetUndef(LLVMTypeOf(table)), extract_mask, "");
+							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
 						}
 						
 						// Call appropriate ARM32 vtbl intrinsic
 						if (count == 16) {
-							LLVMValueRef args[3] = { table_parts[0], table_parts[1], indices };
+							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
 							res.value = lb_call_intrinsic(p, intrinsic_name, args, 3, nullptr, 0);
 						} else if (count == 24) {
-							LLVMValueRef args[4] = { table_parts[0], table_parts[1], table_parts[2], indices };
+							LLVMValueRef args[4] = { src_parts[0], src_parts[1], src_parts[2], indices };
 							res.value = lb_call_intrinsic(p, intrinsic_name, args, 4, nullptr, 0);
 						} else if (count == 32) {
-							LLVMValueRef args[5] = { table_parts[0], table_parts[1], table_parts[2], table_parts[3], indices };
+							LLVMValueRef args[5] = { src_parts[0], src_parts[1], src_parts[2], src_parts[3], indices };
 							res.value = lb_call_intrinsic(p, intrinsic_name, args, 5, nullptr, 0);
 						}
 					} else {
-						// Single-table case (x86, WebAssembly, ARM single-table)
-						LLVMValueRef args[2] = { table, indices };
+						// Single runtime swizzle case (x86, WebAssembly, ARM single-table)
+						LLVMValueRef args[2] = { src, indices };
 						res.value = lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), nullptr, 0);
 					}
 					return res;
@@ -1948,16 +1948,16 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			LLVMValueRef index_mask;
 			
 			if (elem_size == 1) {
-				// 8-bit: mask to table size (like pshufb behavior)
+				// 8-bit: mask to src size (like pshufb behavior)
 				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
 			} else if (elem_size == 2) {
-				// 16-bit: mask to table size 
+				// 16-bit: mask to src size 
 				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
 			} else if (elem_size == 4) {
-				// 32-bit: mask to table size
+				// 32-bit: mask to src size
 				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
 			} else {
-				// 64-bit: mask to table size
+				// 64-bit: mask to src size
 				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
 			}
 			
@@ -1978,11 +1978,11 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					index_i32 = masked_index;
 				}
 				
-				values[i] = LLVMBuildExtractElement(p->builder, table, index_i32, "");
+				values[i] = LLVMBuildExtractElement(p->builder, src, index_i32, "");
 			}
 			
 			// Build result vector
-			res.value = LLVMGetUndef(LLVMTypeOf(table));
+			res.value = LLVMGetUndef(LLVMTypeOf(src));
 			for (i64 i = 0; i < count; i++) {
 				LLVMValueRef idx_i = LLVMConstInt(i32_type, cast(unsigned)i, false);
 				res.value = LLVMBuildInsertElement(p->builder, res.value, values[i], idx_i, "");

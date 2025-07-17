@@ -1157,27 +1157,27 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				return false;
 			}
 			
-			Operand table = {};
+			Operand src = {};
 			Operand indices = {};
-			check_expr(c, &table, ce->args[0]); if (table.mode == Addressing_Invalid) return false;
-			check_expr_with_type_hint(c, &indices, ce->args[1], table.type); if (indices.mode == Addressing_Invalid) return false;
+			check_expr(c, &src, ce->args[0]); if (src.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &indices, ce->args[1], src.type); if (indices.mode == Addressing_Invalid) return false;
 			
-			if (!is_type_simd_vector(table.type)) {
-				error(table.expr, "'%.*s' expected a simd vector type for runtime swizzle", LIT(builtin_name));
+			if (!is_type_simd_vector(src.type)) {
+				error(src.expr, "'%.*s' expected first argument to be a simd vector", LIT(builtin_name));
 				return false;
 			}
 			if (!is_type_simd_vector(indices.type)) {
-				error(indices.expr, "'%.*s' expected a simd vector type for indices", LIT(builtin_name));
+				error(indices.expr, "'%.*s' expected second argument (indices) to be a simd vector", LIT(builtin_name));
 				return false;
 			}
 			
-			Type *table_elem = base_array_type(table.type);
+			Type *src_elem = base_array_type(src.type);
 			Type *indices_elem = base_array_type(indices.type);
 			
-			if (!is_type_integer(table_elem)) {
-				gbString table_str = type_to_string(table.type);
-				error(table.expr, "'%.*s' expected table to be a simd vector of integers, got '%s'", LIT(builtin_name), table_str);
-				gb_string_free(table_str);
+			if (!is_type_integer(src_elem)) {
+				gbString src_str = type_to_string(src.type);
+				error(src.expr, "'%.*s' expected first argument to be a simd vector of integers, got '%s'", LIT(builtin_name), src_str);
+				gb_string_free(src_str);
 				return false;
 			}
 			
@@ -1188,17 +1188,17 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				return false;
 			}
 			
-			if (!are_types_identical(table.type, indices.type)) {
-				gbString table_str = type_to_string(table.type);
+			if (!are_types_identical(src.type, indices.type)) {
+				gbString src_str = type_to_string(src.type);
 				gbString indices_str = type_to_string(indices.type);
-				error(indices.expr, "'%.*s' expected table and indices to have the same type, got '%s' vs '%s'", LIT(builtin_name), table_str, indices_str);
+				error(indices.expr, "'%.*s' expected both arguments to have the same type, got '%s' vs '%s'", LIT(builtin_name), src_str, indices_str);
 				gb_string_free(indices_str);
-				gb_string_free(table_str);
+				gb_string_free(src_str);
 				return false;
 			}
 			
 			operand->mode = Addressing_Value;
-			operand->type = table.type;
+			operand->type = src.type;
 			return true;
 		}
 
