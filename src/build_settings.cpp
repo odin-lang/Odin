@@ -171,16 +171,17 @@ struct TargetMetrics {
 
 enum Subtarget : u32 {
 	Subtarget_Default,
-	Subtarget_iOS,
+	Subtarget_iPhone,
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
-
+	
 	Subtarget_COUNT,
+	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
 };
 
 gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit(""),
-	str_lit("ios"),
+	str_lit("iphone"),
 	str_lit("iphonesimulator"),
 	str_lit("android"),
 };
@@ -859,7 +860,7 @@ gb_global NamedTargetMetrics *selected_target_metrics;
 gb_global Subtarget selected_subtarget;
 
 
-gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtarget_ = nullptr) {
+gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtarget_ = nullptr, String *subtarget_str = nullptr) {
 	String os_name = str;
 	String subtarget = {};
 	auto part = string_partition(str, str_lit(":"));
@@ -876,18 +877,26 @@ gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtar
 			break;
 		}
 	}
-	if (subtarget_) *subtarget_ = Subtarget_Default;
 
-	if (subtarget.len != 0) {
-		if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
-			if (subtarget_) *subtarget_ = Subtarget_Default;
-		} else {
-			for (isize i = 1; i < Subtarget_COUNT; i++) {
-				if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
-					if (subtarget_) *subtarget_ = cast(Subtarget)i;
-					break;
+	if (subtarget_str) *subtarget_str = subtarget;
+
+	if (subtarget_) {
+		if (subtarget.len != 0) {
+			*subtarget_ = Subtarget_Invalid;
+
+			if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
+				*subtarget_ = Subtarget_Default;
+				
+			} else {
+				for (isize i = 1; i < Subtarget_COUNT; i++) {
+					if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
+						*subtarget_ = cast(Subtarget)i;
+						break;
+					}
 				}
 			}
+		} else {
+			*subtarget_ = Subtarget_Default;
 		}
 	}
 
@@ -1828,13 +1837,13 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (metrics->os == TargetOs_darwin) {
 		switch (subtarget) {
-			case Subtarget_iOS:
+			case Subtarget_iPhone:
 				switch (metrics->arch) {
 				case TargetArch_arm64:
 					bc->metrics.target_triplet = str_lit("arm64-apple-ios");
 					break;
 				default:
-					GB_PANIC("Unknown architecture for -subtarget:ios");
+					GB_PANIC("Unknown architecture for -subtarget:iphone");
 				}
 				break;
 			case Subtarget_iPhoneSimulator:
@@ -1909,7 +1918,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		if (!bc->minimum_os_version_string_given) {
 			if (subtarget == Subtarget_Default) {
 				bc->minimum_os_version_string = str_lit("11.0.0");
-			} else if (subtarget == Subtarget_iOS || subtarget == Subtarget_iPhoneSimulator) {
+			} else if (subtarget == Subtarget_iPhone || subtarget == Subtarget_iPhoneSimulator) {
 				// NOTE(harold): We default to 17.4 on iOS because that's when os_sync_wait_on_address was added and
 				//               we'd like to avoid any potential App Store issues by using the private ulock_* there.
 				bc->minimum_os_version_string = str_lit("17.4");
@@ -1917,7 +1926,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		}
 
 		if (subtarget == Subtarget_iPhoneSimulator) {
-			// For the iOS simulator subtarget, the version must be between 'ios' and '-simulator'.
+			// For the iPhoneSimulator subtarget, the version must be between 'ios' and '-simulator'.
 			String suffix = str_lit("-simulator");
 			GB_ASSERT(string_ends_with(bc->metrics.target_triplet, suffix));
 

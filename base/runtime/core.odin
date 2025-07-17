@@ -557,7 +557,7 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	// Defined internally by the compiler
 	Odin_Platform_Subtarget_Type :: enum int {
 		Default,
-		iOS,
+		iPhone,
 		iPhoneSimulator
 		Android,
 	}
@@ -566,6 +566,8 @@ Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 
 Odin_Platform_Subtarget_Types :: bit_set[Odin_Platform_Subtarget_Type]
 
+@(builtin)
+ODIN_PLATFORM_SUBTARGET_IOS :: ODIN_PLATFORM_SUBTARGET == .iPhone || ODIN_PLATFORM_SUBTARGET == .iPhoneSimulator
 
 /*
 	// Defined internally by the compiler

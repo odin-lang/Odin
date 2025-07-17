@@ -28,7 +28,7 @@ init_platform :: proc() {
 
 	macos_version = {int(version.majorVersion), int(version.minorVersion), int(version.patchVersion)}
 
-	when ODIN_PLATFORM_SUBTARGET == .iOS {
+	when ODIN_PLATFORM_SUBTARGET_IOS {
 		os_version.platform = .iOS
 		ws(&b, "iOS")
 	} else {

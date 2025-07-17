@@ -6220,9 +6220,10 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				continue;
 			}
 
-			Subtarget subtarget = Subtarget_Default;
+			Subtarget subtarget     = Subtarget_Invalid;
+			String    subtarget_str = {};
 
-			TargetOsKind   os   = get_target_os_from_string(p, &subtarget);
+			TargetOsKind   os   = get_target_os_from_string(p, &subtarget, &subtarget_str);
 			TargetArchKind arch = get_target_arch_from_string(p);
 			num_tokens += 1;
 
@@ -6233,10 +6234,29 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				break;
 			}
 
+			bool is_ios_subtarget = false;
+			if (subtarget == Subtarget_Invalid) {
+				// Special case for pseudo subtarget
+				if (!str_eq_ignore_case(subtarget_str, "ios")) {
+					syntax_error(token_for_pos, "Invalid subtarget '%.*s'.", LIT(subtarget_str));
+					break;
+				}
+
+				is_ios_subtarget = true;
+			}
+
+
 			if (os != TargetOs_Invalid) {
 				this_kind_os_seen = true;
 
-				bool same_subtarget = (subtarget == Subtarget_Default) || (subtarget == selected_subtarget);
+				// NOTE: Only testing for 'default' and not 'generic' because the 'generic' nomenclature implies any subtarget.
+				bool is_explicit_default_subtarget = str_eq_ignore_case(subtarget_str, "default");
+				bool same_subtarget = (subtarget == Subtarget_Default && !is_explicit_default_subtarget) || (subtarget == selected_subtarget);
+
+				// Special case for iPhone or iPhoneSimulator
+				if (is_ios_subtarget && (selected_subtarget == Subtarget_iPhone || selected_subtarget == Subtarget_iPhoneSimulator)) {
+					same_subtarget = true;
+				}
 
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
