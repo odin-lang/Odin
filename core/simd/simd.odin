@@ -2441,6 +2441,57 @@ Graphically, the operation looks as follows. The `t` and `f` represent the
 select :: intrinsics.simd_select
 
 /*
+Runtime Equivalent to Shuffle.
+
+Performs element-wise table lookups using runtime indices.
+Each element in the indices vector selects an element from the table vector.
+The indices are automatically masked to prevent out-of-bounds access.
+
+This operation is hardware-accelerated on most platforms when using 8-bit
+integer vectors. For other element types or unsupported vector sizes, it
+falls back to software emulation.
+
+Inputs:
+- `table`: The lookup table vector (should be power-of-2 size for correct masking).
+- `indices`: The indices vector (automatically masked to valid range).
+
+Returns:
+- A vector where `result[i] = table[indices[i] & (table_size-1)]`.
+
+Operation:
+
+	for i in 0 ..< len(indices) {
+		masked_index := indices[i] & (len(table) - 1)
+		result[i] = table[masked_index]
+	}
+	return result
+
+Implementation:
+
+	| Platform    | Lane Size                                 | Implementation      |
+	|-------------|-------------------------------------------|---------------------|
+	| x86-64      | pshufb (16B), vpshufb (32B), AVX512 (64B) | Single vector       |
+	| ARM64       | tbl1 (16B), tbl2 (32B), tbl4 (64B)        | Automatic splitting |
+	| ARM32       | vtbl1 (8B), vtbl2 (16B), vtbl4 (32B)      | Automatic splitting |
+	| WebAssembly | i8x16.swizzle (16B), Emulation (>16B)     | Mixed               |
+	| Other       | Emulation                                 | Software            |
+
+Example:
+
+	import "core:simd"
+	import "core:fmt"
+
+	runtime_swizzle_example :: proc() {
+		table := simd.u8x16{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+		indices := simd.u8x16{15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
+		result := simd.runtime_swizzle(table, indices)
+		fmt.println(result) // Expected: {15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
+	}
+
+*/
+runtime_swizzle :: intrinsics.simd_runtime_swizzle
+
+/*
 Compute the square root of each lane in a SIMD vector.
 */
 sqrt    :: intrinsics.sqrt

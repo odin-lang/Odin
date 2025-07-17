@@ -1159,6 +1159,58 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
+	case BuiltinProc_simd_runtime_swizzle:
+		{
+			if (ce->args.count != 2) {
+				error(call, "'%.*s' expected 2 arguments, got %td", LIT(builtin_name), ce->args.count);
+				return false;
+			}
+			
+			Operand src = {};
+			Operand indices = {};
+			check_expr(c, &src, ce->args[0]); if (src.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &indices, ce->args[1], src.type); if (indices.mode == Addressing_Invalid) return false;
+			
+			if (!is_type_simd_vector(src.type)) {
+				error(src.expr, "'%.*s' expected first argument to be a simd vector", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_simd_vector(indices.type)) {
+				error(indices.expr, "'%.*s' expected second argument (indices) to be a simd vector", LIT(builtin_name));
+				return false;
+			}
+			
+			Type *src_elem = base_array_type(src.type);
+			Type *indices_elem = base_array_type(indices.type);
+			
+			if (!is_type_integer(src_elem)) {
+				gbString src_str = type_to_string(src.type);
+				error(src.expr, "'%.*s' expected first argument to be a simd vector of integers, got '%s'", LIT(builtin_name), src_str);
+				gb_string_free(src_str);
+				return false;
+			}
+			
+			if (!is_type_integer(indices_elem)) {
+				gbString indices_str = type_to_string(indices.type);
+				error(indices.expr, "'%.*s' expected indices to be a simd vector of integers, got '%s'", LIT(builtin_name), indices_str);
+				gb_string_free(indices_str);
+				return false;
+			}
+			
+			if (!are_types_identical(src.type, indices.type)) {
+				gbString src_str = type_to_string(src.type);
+				gbString indices_str = type_to_string(indices.type);
+				error(indices.expr, "'%.*s' expected both arguments to have the same type, got '%s' vs '%s'", LIT(builtin_name), src_str, indices_str);
+				gb_string_free(indices_str);
+				gb_string_free(src_str);
+				return false;
+			}
+			
+			operand->mode = Addressing_Value;
+			operand->type = src.type;
+			return true;
+		}
+
 	case BuiltinProc_simd_ceil:
 	case BuiltinProc_simd_floor:
 	case BuiltinProc_simd_trunc:
