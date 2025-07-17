@@ -2333,7 +2333,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		if (mode == Addressing_Invalid) {
 			gbString t = type_to_string(operand->type);
-			error(call, "'%.*s' is not supported for '%s'", LIT(builtin_name), t);
+			if (is_type_bit_set(op_type) && id == BuiltinProc_len) {
+				error(call, "'%.*s' is not supported for '%s', did you mean 'card'?", LIT(builtin_name), t);
+			} else {
+				error(call, "'%.*s' is not supported for '%s'", LIT(builtin_name), t);
+			}
 			return false;
 		}
 
