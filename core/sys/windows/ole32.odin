@@ -25,11 +25,12 @@ COINIT :: enum DWORD {
 	SPEED_OVER_MEMORY = 0x8,
 }
 
+IUnknown_UUID_STRING :: "00000000-0000-0000-C000-000000000046"
+IUnknown_UUID := &IID{0x00000000, 0x0000, 0x0000, {0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}}
+IUnknownVtbl :: IUnknown_VTable
 IUnknown :: struct {
 	using _iunknown_vtable: ^IUnknown_VTable,
 }
-
-IUnknownVtbl :: IUnknown_VTable
 IUnknown_VTable :: struct {
 	QueryInterface: proc "system" (This: ^IUnknown, riid: REFIID, ppvObject: ^rawptr) -> HRESULT,
 	AddRef:         proc "system" (This: ^IUnknown) -> ULONG,
