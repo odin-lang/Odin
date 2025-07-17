@@ -2481,15 +2481,15 @@ Example:
 	import "core:simd"
 	import "core:fmt"
 
-	table_lookup_example :: proc() {
+	runtime_swizzle_example :: proc() {
 		table := simd.u8x16{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 		indices := simd.u8x16{15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
-		result := simd.table_lookup(table, indices)
+		result := simd.runtime_swizzle(table, indices)
 		fmt.println(result) // Expected: {15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
 	}
 
 */
-table_lookup :: intrinsics.simd_table_lookup
+runtime_swizzle :: intrinsics.simd_runtime_swizzle
 
 /*
 Compute the square root of each lane in a SIMD vector.

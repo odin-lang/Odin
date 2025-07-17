@@ -1721,7 +1721,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			return res;
 		}
 
-	case BuiltinProc_simd_table_lookup:
+	case BuiltinProc_simd_runtime_swizzle:
 		{
 			LLVMValueRef table = arg0.value;
 			LLVMValueRef indices = lb_build_expr(p, ce->args[1]).value;
@@ -1734,11 +1734,11 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			
 			// Determine strategy based on element size and target architecture
 			char const *intrinsic_name = nullptr;
-			bool use_hardware_table_lookup = false;
+			bool use_hardware_runtime_swizzle = false;
 			
 			// 8-bit elements: Use dedicated table lookup instructions
 			if (elem_size == 1) {
-				use_hardware_table_lookup = true;
+				use_hardware_runtime_swizzle = true;
 				
 				if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
 					// x86/x86-64: Use pshufb intrinsics
@@ -1753,7 +1753,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						intrinsic_name = "llvm.x86.avx512.pshuf.b.512";
 						break;
 					default:
-						use_hardware_table_lookup = false;
+						use_hardware_runtime_swizzle = false;
 						break;
 					}
 				} else if (build_context.metrics.arch == TargetArch_arm64) {
@@ -1772,7 +1772,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						intrinsic_name = "llvm.aarch64.neon.tbl4";
 						break;
 					default:
-						use_hardware_table_lookup = false;
+						use_hardware_runtime_swizzle = false;
 						break;
 					}
 				} else if (build_context.metrics.arch == TargetArch_arm32) {
@@ -1791,7 +1791,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						intrinsic_name = "llvm.arm.neon.vtbl4";
 						break;
 					default:
-						use_hardware_table_lookup = false;
+						use_hardware_runtime_swizzle = false;
 						break;
 					}
 				} else if (build_context.metrics.arch == TargetArch_wasm32 || build_context.metrics.arch == TargetArch_wasm64p32) {
@@ -1799,14 +1799,14 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					if (count == 16) {
 						intrinsic_name = "llvm.wasm.swizzle";
 					} else {
-						use_hardware_table_lookup = false;
+						use_hardware_runtime_swizzle = false;
 					}
 				} else {
-					use_hardware_table_lookup = false;
+					use_hardware_runtime_swizzle = false;
 				}
 			}
 			
-			if (use_hardware_table_lookup && intrinsic_name != nullptr) {
+			if (use_hardware_runtime_swizzle && intrinsic_name != nullptr) {
 				// Use dedicated hardware table lookup instruction
 				
 				// Check if required target features are enabled
@@ -1932,7 +1932,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					return res;
 				} else {
 					// Features not enabled, fall back to emulation
-					use_hardware_table_lookup = false;
+					use_hardware_runtime_swizzle = false;
 				}
 			}
 			

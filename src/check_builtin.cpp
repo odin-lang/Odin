@@ -1150,7 +1150,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
-	case BuiltinProc_simd_table_lookup:
+	case BuiltinProc_simd_runtime_swizzle:
 		{
 			if (ce->args.count != 2) {
 				error(call, "'%.*s' expected 2 arguments, got %td", LIT(builtin_name), ce->args.count);
@@ -1163,7 +1163,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			check_expr_with_type_hint(c, &indices, ce->args[1], table.type); if (indices.mode == Addressing_Invalid) return false;
 			
 			if (!is_type_simd_vector(table.type)) {
-				error(table.expr, "'%.*s' expected a simd vector type for table", LIT(builtin_name));
+				error(table.expr, "'%.*s' expected a simd vector type for runtime swizzle", LIT(builtin_name));
 				return false;
 			}
 			if (!is_type_simd_vector(indices.type)) {
