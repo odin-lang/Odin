@@ -787,7 +787,7 @@ try_cross_linking:;
 				//               being set to 'MacOSX' even though we've set the sysroot to the correct SDK (-Wincompatible-sysroot).
 				//               This is because it is likely not using the SDK's toolchain Apple Clang but another one installed in the system.
 				switch (selected_subtarget) {
-				case Subtarget_iOS:
+				case Subtarget_iPhone:
 					darwin_platform_name  = "iPhoneOS";
 					darwin_xcrun_sdk_name = "iphoneos";
 					darwin_min_version_id = "ios";
