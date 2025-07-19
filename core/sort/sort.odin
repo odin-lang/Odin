@@ -33,7 +33,7 @@ This struct defines the methods required to sort a collection using the `sort` p
 It is typically used for custom data structures or when additional control over sorting is needed.
 */
 Interface :: struct {
-// Length of the collection
+	// Length of the collection
 	len:  proc(it: Interface) -> int,
 	// Compare elements at indices `i` and `j`, returning true if element at `i` is less than `j`
 	less: proc(it: Interface, i, j: int) -> bool,
