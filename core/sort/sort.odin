@@ -8,13 +8,13 @@ The package is designed for Odin's core libraries, with a focus on performance a
 
 
 
-**Note(stability)**: Sorting procedures are not guaranteed to be stable unless specified otherwise.
-**Note(Comparison of Sorting Methods)**:
-- **Quicksort**: Fast average-case performance (O(n log n)), but not stable. Best for general-purpose sorting with good cache performance.
-- **Merge Sort**: Stable with O(n log n) complexity, requiring extra memory. Ideal for linked lists or when stability is needed.
-- **Heap Sort**: O(n log n) complexity, not stable, in-place but with poor cache locality. Suitable for environments with limited memory
+Note(stability): Sorting procedures are not guaranteed to be stable unless specified otherwise.
+Note(Comparison of Sorting Methods):
+- Quicksort: Fast average-case performance (O(n log n)), but not stable. Best for general-purpose sorting with good cache performance.
+- Merge Sort: Stable with O(n log n) complexity, requiring extra memory. Ideal for linked lists or when stability is needed.
+- Heap Sort: O(n log n) complexity, not stable, in-place but with poor cache locality. Suitable for environments with limited memory
 or when constant-time removal of largest/smallest elements is needed.
-- **Bubble Sort**: Simple but inefficient (O(n²)). Stable. Useful for small datasets or educational purposes.
+- Bubble Sort: Simple but inefficient (O(n²)). Stable. Useful for small datasets or educational purposes.
 */
 package sort
 
@@ -50,13 +50,13 @@ This procedure sorts the collection defined by `it` in ascending order using a q
 This sort is not guaranteed to be stable, meaning equal elements may be reordered.
 Fast average-case performance (O(n log n)). Best for general-purpose sorting with good cache performance.
 
-**Note**: Quicksort is a divide-and-conquer algorithm that selects a pivot and partitions the collection
+Note: Quicksort is a divide-and-conquer algorithm that selects a pivot and partitions the collection
 into elements less than and greater than the pivot, recursively sorting the partitions.
 
-**Inputs**:
+Inputs:
 - `it`: The Interface defining the collection and sorting operations
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -67,7 +67,7 @@ into elements less than and greater than the pivot, recursively sorting the part
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 sort :: proc(it: Interface) {
@@ -89,13 +89,13 @@ Create a sorting Interface for a slice of ordered elements.
 This procedure creates an `Interface` for sorting a slice `s` of type `T` where `T` supports ordering.
 The resulting Interface can be used with the `sort` procedure.
 
-**Inputs**:
+Inputs:
 - `s`: Pointer to the slice to be sorted
 
-**Returns**:
+Returns:
 - An Interface configured for sorting the slice
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -106,7 +106,7 @@ The resulting Interface can be used with the `sort` procedure.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 1, 3, 4, 5]
 */
 slice_interface :: proc(s: ^$T/[]$E) -> Interface where ORD(E) {
@@ -132,13 +132,13 @@ Create a reverse sorting Interface from an existing Interface.
 
 This procedure wraps an existing `Interface` to sort in descending order by reversing the `less` comparison.
 
-**Inputs**:
+Inputs:
 - `it`: Pointer to the original Interface
 
-**Returns**:
+Returns:
 - An Interface that sorts in descending order
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -150,7 +150,7 @@ This procedure wraps an existing `Interface` to sort in descending order by reve
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [5, 4, 3, 1, 1]
 */
 reverse_interface :: proc(it: ^Interface) -> Interface {
@@ -177,10 +177,10 @@ Sort a collection in descending order.
 
 This procedure sorts the collection defined by `it` in descending order by using a reversed Interface.
 
-**Inputs**:
+Inputs:
 - `it`: The Interface defining the collection and sorting operations
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -191,7 +191,7 @@ This procedure sorts the collection defined by `it` in descending order by using
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [5, 4, 3, 2, 1]
 */
 reverse_sort :: proc(it: Interface) {
@@ -204,13 +204,13 @@ Check if a collection is sorted in ascending order.
 
 This procedure verifies if the collection defined by `it` is sorted in ascending order.
 
-**Inputs**:
+Inputs:
 - `it`: The Interface defining the collection and sorting operations
 
-**Returns**:
+Returns:
 - True if the collection is sorted in ascending order, false otherwise
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -221,7 +221,7 @@ This procedure verifies if the collection defined by `it` is sorted in ascending
         fmt.println(result) // Prints: true
     }
 
-**Output**:
+Output:
     true
 */
 is_sorted :: proc(it: Interface) -> bool {
@@ -239,13 +239,13 @@ Swap a range of elements in a collection.
 
 This procedure swaps `n` elements starting at indices `a` and `b` in the collection defined by `it`.
 
-**Inputs**:
+Inputs:
 - `it`: The Interface defining the collection and sorting operations
 - `a`: Starting index of the first range
 - `b`: Starting index of the second range
 - `n`: Number of elements to swap
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -257,7 +257,7 @@ This procedure swaps `n` elements starting at indices `a` and `b` in the collect
     }
 
 
-**Output**:
+Output:
     [1, 2, 3, 4, 5, 6]
 */
 swap_range :: proc(it: Interface, a, b, n: int) {
@@ -271,13 +271,13 @@ Rotate elements in a collection.
 
 This procedure rotates elements in the range `[a, b)` around the pivot `m` in the collection defined by `it`.
 
-**Inputs**:
+Inputs:
 - `it`: The Interface defining the collection and sorting operations
 - `a`: Start index of the range
 - `m`: Pivot index for rotation
 - `b`: End index of the range (exclusive)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -288,7 +288,7 @@ This procedure rotates elements in the range `[a, b)` around the pivot `m` in th
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 3, 4, 5, 6]
 */
 rotate :: proc(it: Interface, a, m, b: int) {
@@ -315,10 +315,10 @@ This procedure implements the quicksort algorithm for the range `[a, b)` in the 
 It uses a hybrid approach with heap sort for small partitions and shell sort for very small ones.
 Fast average-case performance (O(n log n)). Best for general-purpose sorting with good cache performance.
 
-**Note**: Quicksort is a divide-and-conquer algorithm that selects a pivot and partitions the collection
+Note: Quicksort is a divide-and-conquer algorithm that selects a pivot and partitions the collection
 into elements less than and greater than the pivot, recursively sorting the partitions.
 
-**Inputs**:
+Inputs:
 - `it`: The Interface defining the collection and sorting operations
 - `a`: Start index of the range
 - `b`: End index of the range (exclusive)
@@ -474,7 +474,7 @@ Perform an insertion sort on a collection (private).
 
 This procedure sorts the range `[a, b)` in the collection defined by `it` using insertion sort.
 
-**Inputs**:
+Inputs:
 - `it`: The Interface defining the collection and sorting operations
 - `a`: Start index of the range
 - `b`: End index of the range (exclusive)
@@ -494,14 +494,14 @@ Sort a slice using bubble sort with a custom comparison function.
 This procedure sorts the slice `array` in-place using bubble sort and the comparison function `f`.
 It is a simple but inefficient (O(n²)) algorithm. Stable. Useful for small datasets or for educational purposes.
 
-**Note**: Bubble sort repeatedly steps through the list, compares adjacent elements, and swaps them
+Note: Bubble sort repeatedly steps through the list, compares adjacent elements, and swaps them
 if they are in the wrong order, until no swaps are needed.
 
-**Inputs**:
+Inputs:
 - `array`: The slice to sort
 - `f`: Comparison function returning -1, 0, or 1 for less than, equal, or greater than
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -511,7 +511,7 @@ if they are in the wrong order, until no swaps are needed.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
@@ -548,13 +548,13 @@ Sort a slice of ordered elements using bubble sort.
 This procedure sorts the slice `array` in-place using bubble sort for types that support ordering.
 It is a simple but inefficient (O(n²)) algorithm. Stable. Useful for small datasets or for educational purposes.
 
-**Note**: Bubble sort repeatedly steps through the list, compares adjacent elements, and swaps them
+Note: Bubble sort repeatedly steps through the list, compares adjacent elements, and swaps them
 if they are in the wrong order, until no swaps are needed.
 
-**Inputs**:
+Inputs:
 - `array`: The slice to sort
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -564,7 +564,7 @@ if they are in the wrong order, until no swaps are needed.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 bubble_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
@@ -600,14 +600,14 @@ Sort a slice using quicksort with a custom comparison function.
 This procedure sorts the slice `array` in-place using quicksort and the comparison function `f`.
 Fast average-case performance (O(n log n)). Best for general-purpose sorting with good cache performance.
 
-**Note**: Quicksort is a divide-and-conquer algorithm that selects a pivot and partitions the slice
+Note: Quicksort is a divide-and-conquer algorithm that selects a pivot and partitions the slice
 into elements less than and greater than the pivot, recursively sorting the partitions.
 
-**Inputs**:
+Inputs:
 - `array`: The slice to sort
 - `f`: Comparison function returning -1, 0, or 1 for less than, equal, or greater than
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -617,7 +617,7 @@ into elements less than and greater than the pivot, recursively sorting the part
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
@@ -654,13 +654,13 @@ Sort a slice of ordered elements using quicksort.
 This procedure sorts the slice `array` in-place using quicksort for types that support ordering.
 Fast average-case performance (O(n log n)). Best for general-purpose sorting with good cache performance.
 
-**Note**: Quicksort is a divide-and-conquer algorithm that selects a pivot and partitions the slice
+Note: Quicksort is a divide-and-conquer algorithm that selects a pivot and partitions the slice
 into elements less than and greater than the pivot, recursively sorting the partitions.
 
-**Inputs**:
+Inputs:
 - `array`: The slice to sort
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -670,7 +670,7 @@ into elements less than and greater than the pivot, recursively sorting the part
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
@@ -705,10 +705,10 @@ Compute the base-2 logarithm of an integer (private).
 
 This procedure calculates the floor of the base-2 logarithm of `x`, used internally for sorting algorithms.
 
-**Inputs**:
+Inputs:
 - `x`: The input integer
 
-**Returns**:
+Returns:
 - The floor of log2(x)
 */
 _log2 :: proc(x: int) -> int {
@@ -726,14 +726,14 @@ This procedure sorts the slice `array` in-place using merge sort and the compari
 Merge sort is stable, preserving the order of equal elements. O(n log n) complexity, requiring extra memory.
 Ideal for linked lists or when stability is needed.
 
-**Note**: Merge sort is a divide-and-conquer algorithm that recursively divides the slice into halves,
+Note: Merge sort is a divide-and-conquer algorithm that recursively divides the slice into halves,
 sorts them, and merges the sorted halves while maintaining stability.
 
-**Inputs**:
+Inputs:
 - `array`: The slice to sort
 - `f`: Comparison function returning -1, 0, or 1 for less than, equal, or greater than
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -743,7 +743,7 @@ sorts them, and merges the sorted halves while maintaining stability.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
@@ -794,13 +794,13 @@ This procedure sorts the slice `array` in-place using merge sort for types that 
 Merge sort is stable, preserving the order of equal elements. O(n log n) complexity, requiring extra memory.
 Ideal for linked lists or when stability is needed.
 
-**Note**: Merge sort is a divide-and-conquer algorithm that recursively divides the slice into halves,
+Note: Merge sort is a divide-and-conquer algorithm that recursively divides the slice into halves,
 sorts them, and merges the sorted halves while maintaining stability.
 
-**Inputs**:
+Inputs:
 - `array`: The slice to sort
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -810,7 +810,7 @@ sorts them, and merges the sorted halves while maintaining stability.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
@@ -861,14 +861,14 @@ This procedure sorts the slice `array` in-place using heap sort and the comparis
 O(n log n) complexity, not stable, in-place but with poor cache locality. Suitable for environments
 with limited memory or when constant-time removal of largest/smallest elements is needed.
 
-**Note**: Heap sort builds a max-heap from the slice, repeatedly extracts the maximum element,
+Note: Heap sort builds a max-heap from the slice, repeatedly extracts the maximum element,
 and places it at the end, reducing the heap size until sorted.
 
-**Inputs**:
+Inputs:
 - `array`: The slice to sort
 - `f`: Comparison function returning -1, 0, or 1 for less than, equal, or greater than
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -878,7 +878,7 @@ and places it at the end, reducing the heap size until sorted.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 heap_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
@@ -921,13 +921,13 @@ Sort a slice of ordered elements using heap sort.
 This procedure sorts the slice `array` in-place using heap sort for types that support ordering.
 Suitable for environments with limited memory or when constant-time removal of largest/smallest elements is needed.
 
-**Note**: Heap sort builds a max-heap from the slice, repeatedly extracts the maximum element,
+Note: Heap sort builds a max-heap from the slice, repeatedly extracts the maximum element,
 and places it at the end, reducing the heap size until sorted.
 
-**Inputs**:
+Inputs:
 - `array`: The slice to sort
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -937,7 +937,7 @@ and places it at the end, reducing the heap size until sorted.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 2, 5, 8, 9]
 */
 heap_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
@@ -981,14 +981,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First boolean value
 - `b`: Second boolean value
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1012,7 +1012,7 @@ as a comparison function to determine the ordering of elements.
         }
     }
 
-**Output**:
+Output:
 	Completed:
 	Watch HR Training, false
 	Review code, false
@@ -1033,14 +1033,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First integer
 - `b`: Second integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1050,7 +1050,7 @@ as a comparison function to determine the ordering of elements.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [-5, 1, 2, 8]
 */
 compare_ints :: proc(a, b: int) -> int {
@@ -1066,14 +1066,14 @@ Compare two unsigned integers.
 
 This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if equal, or 1 if greater.
 
-**Inputs**:
+Inputs:
 - `a`: First unsigned integer
 - `b`: Second unsigned integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1083,7 +1083,7 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [1, 3, 7, 10]
 */
 compare_uints :: proc(a, b: uint) -> int {
@@ -1101,14 +1101,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 8-bit unsigned integer
 - `b`: Second 8-bit unsigned integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1118,7 +1118,7 @@ as a comparison function to determine the ordering of elements.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [10, 20, 50, 80]
 */
 compare_u8s :: proc(a, b: u8) -> int {
@@ -1136,14 +1136,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 16-bit unsigned integer
 - `b`: Second 16-bit unsigned integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1153,7 +1153,7 @@ as a comparison function to determine the ordering of elements.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [100, 200, 500, 800]
 */
 compare_u16s :: proc(a, b: u16) -> int {
@@ -1171,11 +1171,11 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 32-bit unsigned integer
 - `b`: Second 32-bit unsigned integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 */
 compare_u32s :: proc(a, b: u32) -> int {
@@ -1193,14 +1193,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 64-bit unsigned integer
 - `b`: Second 64-bit unsigned integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1210,7 +1210,7 @@ as a comparison function to determine the ordering of elements.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [10000, 20000, 50000, 80000]
 */
 compare_u64s :: proc(a, b: u64) -> int {
@@ -1228,14 +1228,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 8-bit signed integer
 - `b`: Second 8-bit signed integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1245,7 +1245,7 @@ as a comparison function to determine the ordering of elements.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [-20, -10, 50, 80]
 */
 compare_i8s :: proc(a, b: i8) -> int {
@@ -1263,11 +1263,11 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 16-bit signed integer
 - `b`: Second 16-bit signed integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
 	compare_i16s_example :: proc() {
@@ -1276,7 +1276,7 @@ as a comparison function to determine the ordering of elements.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [-200, -100, 500, 800]
 */
 compare_i16s :: proc(a, b: i16) -> int {
@@ -1294,21 +1294,21 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 32-bit signed integer
 - `b`: Second 32-bit signed integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
 	compare_i32s_example :: proc() {
         data := []i32{5000, -2000, 8000, -1000}
         sort.quick_sort_proc(data, sort.compare_i32s)
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [-2000, -1000, 5000, 8000]
 */
 compare_i32s :: proc(a, b: i32) -> int {
@@ -1326,14 +1326,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 64-bit signed integer
 - `b`: Second 64-bit signed integer
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1343,7 +1343,7 @@ as a comparison function to determine the ordering of elements.
         fmt.println(data)
     }
 
-**Output**:
+Output:
     [-20000, -10000, 50000, 80000]
 */
 compare_i64s :: proc(a, b: i64) -> int {
@@ -1361,14 +1361,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 32-bit float
 - `b`: Second 32-bit float
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1378,7 +1378,7 @@ compare_f32s_example :: proc() {
     fmt.println(data)
 }
 
-**Output**:
+Output:
 	[2.2, 2.5, 2.8]
 */
 compare_f32s :: proc(a, b: f32) -> int {
@@ -1396,14 +1396,14 @@ This procedure compares `a` and `b`, returning -1 if `a` is less than `b`, 0 if 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Inputs**:
+Inputs:
 - `a`: First 64-bit float
 - `b`: Second 64-bit float
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1413,7 +1413,7 @@ as a comparison function to determine the ordering of elements.
 		fmt.println(data)
 	}
 
-**Output**:
+Output:
     [1.00000000001, 1.00000000002, 1.00000000008]
 */
 compare_f64s :: proc(a, b: f64) -> int {
@@ -1431,17 +1431,17 @@ This procedure compares `a` and `b` based on their byte sequences, returning -1 
 It is designed for use with `*_sort_proc` procedures (e.g., `quick_sort_proc`, `merge_sort_proc`)
 as a comparison function to determine the ordering of elements.
 
-**Note**: A string byte sequence is the sequence of bytes representing the string's characters,
+Note: A string byte sequence is the sequence of bytes representing the string's characters,
 typically in UTF-8 encoding, compared byte-by-byte to determine lexicographical order.
 
-**Inputs**:
+Inputs:
 - `a`: First string
 - `b`: Second string
 
-**Returns**:
+Returns:
 - Comparison result (-1, 0, or 1)
 
-**Example**:
+Example:
     import "core:sort"
     import "core:fmt"
 
@@ -1451,7 +1451,7 @@ typically in UTF-8 encoding, compared byte-by-byte to determine lexicographical 
         fmt.println(data)
     }
 
-**Output**:
+Output:
     ["cake", "carrot", "crape", "crumpet"]
 */
 compare_strings :: proc(a, b: string) -> int {
