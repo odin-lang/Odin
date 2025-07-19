@@ -917,7 +917,7 @@ _processor_core_count :: proc() -> int {
 @(private, require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
-	for arg, i in res {
+	for _, i in res {
 		res[i] = string(runtime.args__[i])
 	}
 	return res
