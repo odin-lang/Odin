@@ -55,6 +55,24 @@ CONTEXT_OPENGL_PROFILE_MASK :: 0x30FD
 
 OPENGL_API        :: 0x30A2
 
+Error :: enum i32 {
+	SUCCESS             = 0x3000,
+	NOT_INITIALIZED     = 0x3001,
+	BAD_ACCESS          = 0x3002,
+	BAD_ALLOC           = 0x3003,
+	BAD_ATTRIBUTE       = 0x3004,
+	BAD_CONFIG          = 0x3005,
+	BAD_CONTEXT         = 0x3006,
+	BAD_CURRENT_SURFACE = 0x3007,
+	BAD_DISPLAY         = 0x3008,
+	BAD_MATCH           = 0x3009,
+	BAD_NATIVE_PIXMAP   = 0x300A,
+	BAD_NATIVE_WINDOW   = 0x300B,
+	BAD_PARAMETER       = 0x300C,
+	BAD_SURFACE         = 0x300D,
+	CONTEXT_LOST        = 0x300E,
+}
+
 foreign import egl "system:EGL"
 @(default_calling_convention="c", link_prefix="egl")
 foreign egl {
@@ -73,6 +91,7 @@ foreign egl {
 	DestroyContext      :: proc(display: Display, ctx: Context) -> Boolean ---
 	DestroySurface      :: proc(display: Display, surface: Surface) -> Boolean ---
 	Terminate           :: proc(display: Display) -> Boolean ---
+	GetError            :: proc() -> Error ---
 }
 
 gl_set_proc_address :: proc(p: rawptr, name: cstring) {
