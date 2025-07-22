@@ -179,7 +179,7 @@ _set_name :: proc(thread: ^Thread) {
 		return
 	}
 
-	t_handle = thread.win32_thread
+	t_handle := thread.win32_thread
 
 	buf: [_THREAD_DESCRIPTION_LENGTH]u16
 	// _THREAD_DESCRIPTION_LENGTH includes terminating null

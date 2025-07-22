@@ -223,7 +223,9 @@ _set_name :: proc(thread: ^Thread) {
 		return
 	}
 
-	tid := thread.unix_thread
+	when ODIN_OS != .Darwin {
+		tid := thread.unix_thread
+	}
 
 	buf: [_MAX_PTHREAD_NAME_LENGTH]u8
 	copy(buf[:], name)
