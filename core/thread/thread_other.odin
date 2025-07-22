@@ -14,7 +14,7 @@ _thread_priority_map := [Thread_Priority]i32{
 	.High = +2,
 }
 
-_create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal, name: Maybe(string) = nil) -> ^Thread {
 	unimplemented("core:thread procedure not supported on target")
 }
 

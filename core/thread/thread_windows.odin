@@ -25,7 +25,7 @@ _thread_priority_map := [Thread_Priority]i32{
 	.High = +2,
 }
 
-_create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(string)) -> ^Thread {
 	win32_thread_id: win32.DWORD
 
 	__windows_thread_entry_proc :: proc "system" (t_: rawptr) -> win32.DWORD {
@@ -46,6 +46,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 				_maybe_destroy_default_temp_allocator(init_context)
 				runtime.run_thread_local_cleaners()
 			}
+
+			_set_name(t)
 
 			t.procedure(t)
 		}
@@ -79,6 +81,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	thread.win32_thread    = win32_thread
 	thread.win32_thread_id = win32_thread_id
 	thread.id              = int(win32_thread_id)
+	thread.name            = name
 
 	ok := win32.SetThreadPriority(win32_thread, _thread_priority_map[priority])
 	assert(ok == true)
@@ -170,13 +173,13 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 	return
 }
 
-_set_name :: proc(thread: ^Thread, name: string) {
-	t_handle: win32.HANDLE
-	if thread == nil {
-		t_handle = win32.GetCurrentThread()
-	} else {
-		t_handle = thread.win32_thread
+_set_name :: proc(thread: ^Thread) {
+	name, ok := thread.name.?
+	if !ok {
+		return
 	}
+
+	t_handle = thread.win32_thread
 
 	buf: [_THREAD_DESCRIPTION_LENGTH]u16
 	// _THREAD_DESCRIPTION_LENGTH includes terminating null

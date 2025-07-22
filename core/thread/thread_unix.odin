@@ -19,7 +19,7 @@ Thread_Os_Specific :: struct #align(16) {
 // Creates a thread which will run the given procedure.
 // It then waits for `start` to be called.
 //
-_create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(string)) -> ^Thread {
 	__unix_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
@@ -57,6 +57,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 				_maybe_destroy_default_temp_allocator(init_context)
 				runtime.run_thread_local_cleaners()
 			}
+
+			_set_name(t)
 
 			t.procedure(t)
 		}
@@ -211,22 +213,17 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 	return
 }
 
-_set_name :: proc(thread: ^Thread, name: string) {
-	// Haiku doesn't have pthread_getname yet
-	when ODIN_OS == .Haiku {
-		unimplemented("core:thread set_name for haiku is not yet supported")
-	} else when ODIN_OS == .Darwin {
-		if thread != nil {
-			return
-		}
-	} else {
-		tid: posix.pthread_t
-		if thread == nil {
-			tid = posix.pthread_self()
-		} else {
-			tid = thread.unix_thread
-		}
+_set_name :: proc(thread: ^Thread) {
+	if ODIN_OS == .Haiku {
+		return
 	}
+
+	name, ok := thread.name.?
+	if !ok {
+		return
+	}
+
+	tid := thread.unix_thread
 
 	buf: [_MAX_PTHREAD_NAME_LENGTH]u8
 	copy(buf[:], name)
