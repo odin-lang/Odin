@@ -282,13 +282,18 @@ test_dynamic_arena :: proc(t: ^testing.T) {
 
 @test
 test_buddy :: proc(t: ^testing.T) {
-	N :: 4096
+	N :: 8192
 	buf: [N]u8
 
+	base := &buf[0]
+	address := mem.align_forward(base, size_of(mem.Buddy_Block))
+	delta := uintptr(address) - uintptr(base)
+
 	ba: mem.Buddy_Allocator
-	mem.buddy_allocator_init(&ba, buf[:], align_of(u8))
-	basic_sanity_test(t, mem.buddy_allocator(&ba), N / 8)
-	basic_sanity_test(t, mem.buddy_allocator(&ba), N / 8)
+
+	mem.buddy_allocator_init(&ba, buf[delta:delta+N/2], size_of(mem.Buddy_Block))
+	basic_sanity_test(t, mem.buddy_allocator(&ba), N / 16)
+	basic_sanity_test(t, mem.buddy_allocator(&ba), N / 16)
 }
 
 @test
