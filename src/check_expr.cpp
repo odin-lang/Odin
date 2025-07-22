@@ -6245,20 +6245,43 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	for (isize i = 0; i < pt->param_count; i++) {
 		if (!visited[i]) {
 			Entity *e = pt->params->Tuple.variables[i];
+			bool context_allocator_error = false;
 			if (e->kind == Entity_Variable) {
 				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-					ordered_operands[i].mode = Addressing_Value;
-					ordered_operands[i].type = e->type;
-					ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+					if (ast_file_vet_explicit_allocators(c->file)) {
+						// NOTE(lucas): check if we are trying to default to context.allocator or context.temp_allocator
+						if (e->Variable.param_value.original_ast_expr->kind == Ast_SelectorExpr) {
+							auto& expr = e->Variable.param_value.original_ast_expr->SelectorExpr.expr;
+							auto& selector = e->Variable.param_value.original_ast_expr->SelectorExpr.selector;
+							if (expr->kind == Ast_Implicit &&
+								expr->Implicit.string == STR_LIT("context") &&
+								selector->kind == Ast_Ident &&
+								(selector->Ident.token.string == STR_LIT("allocator") ||
+      								selector->Ident.token.string == STR_LIT("temp_allocator"))) {
+								context_allocator_error = true;
+							}
+						}
+					}
 
-					dummy_argument_count += 1;
-					score += assign_score_function(1);
-					continue;
+					if (!context_allocator_error) {
+						ordered_operands[i].mode = Addressing_Value;
+						ordered_operands[i].type = e->type;
+						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+
+						dummy_argument_count += 1;
+						score += assign_score_function(1);
+						continue;
+					}
 				}
 			}
 
 			if (show_error) {
-				if (e->kind == Entity_TypeName) {
+				if (context_allocator_error) {
+					gbString str = type_to_string(e->type);
+					error(call, "Parameter '%.*s' of type '%s' must be explicitly provided in procedure call",
+					      LIT(e->token.string), str);
+					gb_string_free(str);
+				} else if (e->kind == Entity_TypeName) {
 					error(call, "Type parameter '%.*s' is missing in procedure call",
 					      LIT(e->token.string));
 				} else if (e->kind == Entity_Constant && e->Constant.value.kind != ExactValue_Invalid) {
