@@ -2223,6 +2223,9 @@ Initialize a buddy allocator.
 
 This procedure initializes the buddy allocator `b` with a backing buffer `data`
 and block alignment specified by `alignment`.
+
+`alignment` may be any power of two, but the backing buffer must be aligned to
+at least `size_of(Buddy_Block)`.
 */
 buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint, loc := #caller_location) {
 	assert(data != nil)
@@ -2233,7 +2236,7 @@ buddy_allocator_init :: proc(b: ^Buddy_Allocator, data: []byte, alignment: uint,
 		alignment = size_of(Buddy_Block)
 	}
 	ptr := raw_data(data)
-	assert(uintptr(ptr) % uintptr(alignment) == 0, "data is not aligned to minimum alignment", loc)
+	assert(uintptr(ptr) % uintptr(alignment) == 0, "The data is not aligned to the minimum alignment, which must be at least `size_of(Buddy_Block)`.", loc)
 	b.head = (^Buddy_Block)(ptr)
 	b.head.size = len(data)
 	b.head.is_free = true
