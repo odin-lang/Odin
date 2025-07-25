@@ -4869,8 +4869,8 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 	u64 h = seed ^ (len * m);
 
 	u64 const *data = cast(u64 const *)data_;
-	u8  const *data2 = cast(u8 const *)data_;
 	u64 const* end = data + (len / 8);
+	u8  const *data2 = cast(u8 const *)end;
 
 	while (data != end) {
 		u64 k = *data++;
