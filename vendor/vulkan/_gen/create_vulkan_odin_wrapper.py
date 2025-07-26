@@ -312,7 +312,11 @@ def parse_constants(f):
         value = remove_prefix(value, 'VK_')
         v = number_suffix_re.findall(value)
         if v:
-            value = v[0]
+            if '~' in value:
+                value = "~u32(" + v[0] + ")"
+            else:
+                value = v[0]
+
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
     f.write("\n")
 
