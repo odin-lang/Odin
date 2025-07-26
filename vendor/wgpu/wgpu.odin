@@ -10,7 +10,7 @@ WGPU_USE_DAWN :: #config(WGPU_USE_DAWN, false)
 
 when ODIN_OS == .Windows {
 	@(private) ARCH :: "x86_64"   when ODIN_ARCH == .amd64 else "x86_64" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
-	@(private) EXT  :: ".dll.lib" when WGPU_SHARED || WGPU_USE_DAWN /* TODO: try to build Dawn statically */ else ".lib"
+	@(private) EXT  :: ".dll.lib" when WGPU_SHARED else ".lib"
 	@(private) LIB_TYPE :: "dawn" when WGPU_USE_DAWN else "wgpu"
 	@(private) LIB_FILE :: "webgpu_dawn" when WGPU_USE_DAWN else "wgpu_native"
 	@(private) LIB  :: "lib/" + LIB_TYPE + "-windows-" + ARCH + "-msvc-" + TYPE + "/lib/" + LIB_FILE + EXT
@@ -27,8 +27,8 @@ when ODIN_OS == .Windows {
 		@(export)
 		foreign import libwgpu {
 			LIB,
-			"system:gdi32.lib",
-			"system:user32.lib",
+			"system:dxguid.lib",
+			"system:onecore.lib", // no clue what this is, CompareObjectHandles is supposed to be in Kernelbase
 		}
 	} else {
 		@(export)
