@@ -2,36 +2,52 @@ package wgpu
 
 import "base:intrinsics"
 
-WGPU_SHARED :: #config(WGPU_SHARED, false)
-WGPU_DEBUG  :: #config(WGPU_DEBUG,  false)
+WGPU_SHARED   :: #config(WGPU_SHARED,   false)
+WGPU_DEBUG    :: #config(WGPU_DEBUG,    false)
+WGPU_USE_DAWN :: #config(WGPU_USE_DAWN, false)
 
 @(private) TYPE :: "debug" when WGPU_DEBUG else "release"
 
 when ODIN_OS == .Windows {
 	@(private) ARCH :: "x86_64"   when ODIN_ARCH == .amd64 else "x86_64" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
-	@(private) EXT  :: ".dll.lib" when WGPU_SHARED else ".lib"
-	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-msvc-" + TYPE + "/lib/wgpu_native" + EXT
+	@(private) EXT  :: ".dll.lib" when WGPU_SHARED || WGPU_USE_DAWN /* TODO: try to build Dawn statically */ else ".lib"
+	@(private) LIB_TYPE :: "dawn" when WGPU_USE_DAWN else "wgpu"
+	@(private) LIB_FILE :: "webgpu_dawn" when WGPU_USE_DAWN else "wgpu_native"
+	@(private) LIB  :: "lib/" + LIB_TYPE + "-windows-" + ARCH + "-msvc-" + TYPE + "/lib/" + LIB_FILE + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v25.0.2.1, make sure to read the README at '" + #directory + "README.md'")
+		when WGPU_USE_DAWN {
+			#panic("Could not find the compiled Dawn library at '" + #directory + LIB + "', these can be downloaded from https://github.com/mmozeiko/build-dawn/releases, make sure to read the README at '" + #directory + "README.md'")
+		} else {
+			#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v25.0.2.1, make sure to read the README at '" + #directory + "README.md'")
+		}
 	}
 
-	@(export)
-	foreign import libwgpu {
-		LIB,
-		"system:d3dcompiler.lib",
-		"system:ws2_32.lib",
-		"system:userenv.lib",
-		"system:bcrypt.lib",
-		"system:ntdll.lib",
-		"system:opengl32.lib",
-		"system:advapi32.lib",
-		"system:user32.lib",
-		"system:gdi32.lib",
-		"system:ole32.lib",
-		"system:oleaut32.lib",
-		"system:propsys.lib",
-		"system:runtimeobject.lib",
+	when WGPU_USE_DAWN {
+		@(export)
+		foreign import libwgpu {
+			LIB,
+			"system:gdi32.lib",
+			"system:user32.lib",
+		}
+	} else {
+		@(export)
+		foreign import libwgpu {
+			LIB,
+			"system:d3dcompiler.lib",
+			"system:ws2_32.lib",
+			"system:userenv.lib",
+			"system:bcrypt.lib",
+			"system:ntdll.lib",
+			"system:opengl32.lib",
+			"system:advapi32.lib",
+			"system:user32.lib",
+			"system:gdi32.lib",
+			"system:ole32.lib",
+			"system:oleaut32.lib",
+			"system:propsys.lib",
+			"system:runtimeobject.lib",
+		}
 	}
 } else when ODIN_OS == .Darwin {
 	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
@@ -1691,7 +1707,7 @@ foreign libwgpu {
 // Wrappers of Instance
 
 CreateInstance :: proc "c" (/* NULLABLE */ descriptor: /* const */ ^InstanceDescriptor = nil) -> Instance {
-	when ODIN_OS != .JS {
+	when ODIN_OS != .JS && !WGPU_USE_DAWN {
 		v := (transmute([4]u8)GetVersion()).wzyx
 
 		if v.xyz != BINDINGS_VERSION.xyz {
