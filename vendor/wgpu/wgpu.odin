@@ -9,11 +9,11 @@ WGPU_USE_DAWN :: #config(WGPU_USE_DAWN, false)
 @(private) TYPE :: "debug" when WGPU_DEBUG else "release"
 
 when ODIN_OS == .Windows {
-	@(private) ARCH :: "x86_64"   when ODIN_ARCH == .amd64 else "x86_64" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
-	@(private) EXT  :: ".dll.lib" when WGPU_SHARED else ".lib"
+	@(private) ARCH     :: "x86_64" when ODIN_ARCH == .amd64 else "x86_64" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
+	@(private) EXT      :: ".dll.lib" when WGPU_SHARED else ".lib"
 	@(private) LIB_TYPE :: "dawn" when WGPU_USE_DAWN else "wgpu"
 	@(private) LIB_FILE :: "webgpu_dawn" when WGPU_USE_DAWN else "wgpu_native"
-	@(private) LIB  :: "lib/" + LIB_TYPE + "-windows-" + ARCH + "-msvc-" + TYPE + "/lib/" + LIB_FILE + EXT
+	@(private) LIB      :: "lib/" + LIB_TYPE + "-windows-" + ARCH + "-msvc-" + TYPE + "/lib/" + LIB_FILE + EXT
 
 	when !#exists(LIB) {
 		when WGPU_USE_DAWN {
@@ -50,9 +50,11 @@ when ODIN_OS == .Windows {
 		}
 	}
 } else when ODIN_OS == .Darwin {
-	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
-	@(private) EXT  :: ".dylib" when WGPU_SHARED else ".a"
-	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
+	@(private) ARCH     :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
+	@(private) EXT      :: ".dylib" when WGPU_SHARED else ".a"
+	@(private) LIB_TYPE :: "dawn" when WGPU_USE_DAWN else "wgpu"
+	@(private) LIB_FILE :: "libwebgpu_dawn" when WGPU_USE_DAWN else "libwgpu_native"
+	@(private) LIB      :: "lib/" + LIB_TYPE + "-macos-" + ARCH + "-" + TYPE + "/lib/"+ LIB_FILE + EXT
 
 	when !#exists(LIB) {
 		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v25.0.2.1, make sure to read the README at '" + #directory + "README.md'")
@@ -67,9 +69,11 @@ when ODIN_OS == .Windows {
 		"system:Metal.framework",
 	}
 } else when ODIN_OS == .Linux {
-	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
-	@(private) EXT  :: ".so"    when WGPU_SHARED else ".a"
-	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
+	@(private) ARCH     :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
+	@(private) EXT      :: ".so" when WGPU_SHARED else ".a"
+	@(private) LIB_TYPE :: "dawn" when WGPU_USE_DAWN else "wgpu"
+	@(private) LIB_FILE :: "libwebgpu_dawn" when WGPU_USE_DAWN else "libwgpu_native"
+	@(private) LIB      :: "lib/" + LIB_TYPE + "-linux-" + ARCH + "-" + TYPE + "/lib/" + LIB_FILE + EXT
 
 	when !#exists(LIB) {
 		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v25.0.2.1, make sure to read the README at '" + #directory + "README.md'")
