@@ -6,7 +6,7 @@ import linux "core:sys/linux"
 
 _get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
 	if ODIN_ARCH == .arm64 {
-		freq = u64(intrinsics.arm64_read_cycle_counter_frequency())
+		frequency := u64(intrinsics.arm64_read_cycle_counter_frequency())
 		return frequency, true
 	} else {
 		// Get the file descriptor for the perf mapping
