@@ -88,7 +88,7 @@ context_create_with_scale :: proc(filename: string, precise_time: bool, timestam
 	ctx.precise_time = precise_time
 	ctx.timestamp_scale = timestamp_scale
 
-	temp := [size_of(Manual_Header)]u8{}
+	temp := [size_of(Manual_Stream_Header)]u8{}
 	_build_stream_header(temp[:], ctx.timestamp_scale)
 	os.write(ctx.fd, temp[:])
 	ok = true
