@@ -2509,7 +2509,13 @@ extern "C" {
 #pragma warning(disable:4127) // Conditional expression is constant
 #endif
 
+gb_internal void print_all_errors(void);
+gb_internal bool any_errors(void);
+gb_internal bool any_warnings(void);
 void gb_assert_handler(char const *prefix, char const *condition, char const *file, i32 line, char const *msg, ...) {
+	if (any_errors() || any_warnings()) {
+		print_all_errors();
+	}
 	gb_printf_err("%s(%d): %s: ", file, line, prefix);
 	if (condition)
 		gb_printf_err( "`%s` ", condition);
