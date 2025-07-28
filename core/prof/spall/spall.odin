@@ -57,6 +57,7 @@ Name_Container_Event :: struct #packed {
 	type: Manual_Event_Type,
 	name_len: u8,
 }
+NAME_EVENT_MAX :: size_of(Name_Container_Event) + 255
 
 // User Interface
 
@@ -71,6 +72,7 @@ Buffer :: struct {
 	head: int,
 	tid:  u32,
 	pid:  u32,
+	first_ts: u64,
 }
 
 BUFFER_DEFAULT_SIZE :: 0x10_0000
@@ -125,10 +127,10 @@ buffer_create :: proc(data: []byte, tid: u32 = 0, pid: u32 = 0) -> (buffer: Buff
 buffer_flush :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_check /* bounds check would segfault instrumentation */ {
 	buffer_size := buffer.head - size_of(Manual_Buffer_Header)
 	hdr := (^Manual_Buffer_Header)(raw_data(buffer.data))
-	hdr.size = buffer_size
-	hdr.pid  = buffer.pid
-	hdr.tid  = buffer.tid
-	hdr.first_ts = buffer.first_ts
+	hdr.size = u32le(buffer_size)
+	hdr.pid  = u32le(buffer.pid)
+	hdr.tid  = u32le(buffer.tid)
+	hdr.first_ts = u64le(buffer.first_ts)
 
 	start := _trace_now(ctx)
 	write(ctx.fd, buffer.data[:buffer.head])
@@ -170,12 +172,12 @@ _trace_now :: proc "contextless" (ctx: ^Context) -> u64 {
 
 @(no_instrumentation)
 _build_stream_header :: proc "contextless" (buffer: []u8, timestamp_scale: f64) -> (header_size: int, ok: bool) #optional_ok {
-	header_size = size_of(Manual_Header)
+	header_size = size_of(Manual_Stream_Header)
 	if header_size > len(buffer) {
 		return 0, false
 	}
 
-	hdr := (^Manual_Header)(raw_data(buffer))
+	hdr := (^Manual_Stream_Header)(raw_data(buffer))
 	hdr.magic = MANUAL_MAGIC
 	hdr.version = 3
 	hdr.timestamp_scale = f64le(timestamp_scale)
