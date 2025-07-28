@@ -1,6 +1,6 @@
 package darwin
 
-foreign import mach "system:System.framework"
+foreign import mach "system:System"
 
 import "core:c"
 import "base:intrinsics"

@@ -6245,20 +6245,43 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	for (isize i = 0; i < pt->param_count; i++) {
 		if (!visited[i]) {
 			Entity *e = pt->params->Tuple.variables[i];
+			bool context_allocator_error = false;
 			if (e->kind == Entity_Variable) {
 				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-					ordered_operands[i].mode = Addressing_Value;
-					ordered_operands[i].type = e->type;
-					ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+					if (ast_file_vet_explicit_allocators(c->file)) {
+						// NOTE(lucas): check if we are trying to default to context.allocator or context.temp_allocator
+						if (e->Variable.param_value.original_ast_expr->kind == Ast_SelectorExpr) {
+							auto& expr = e->Variable.param_value.original_ast_expr->SelectorExpr.expr;
+							auto& selector = e->Variable.param_value.original_ast_expr->SelectorExpr.selector;
+							if (expr->kind == Ast_Implicit &&
+								expr->Implicit.string == STR_LIT("context") &&
+								selector->kind == Ast_Ident &&
+								(selector->Ident.token.string == STR_LIT("allocator") ||
+      								selector->Ident.token.string == STR_LIT("temp_allocator"))) {
+								context_allocator_error = true;
+							}
+						}
+					}
 
-					dummy_argument_count += 1;
-					score += assign_score_function(1);
-					continue;
+					if (!context_allocator_error) {
+						ordered_operands[i].mode = Addressing_Value;
+						ordered_operands[i].type = e->type;
+						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+
+						dummy_argument_count += 1;
+						score += assign_score_function(1);
+						continue;
+					}
 				}
 			}
 
 			if (show_error) {
-				if (e->kind == Entity_TypeName) {
+				if (context_allocator_error) {
+					gbString str = type_to_string(e->type);
+					error(call, "Parameter '%.*s' of type '%s' must be explicitly provided in procedure call",
+					      LIT(e->token.string), str);
+					gb_string_free(str);
+				} else if (e->kind == Entity_TypeName) {
 					error(call, "Type parameter '%.*s' is missing in procedure call",
 					      LIT(e->token.string));
 				} else if (e->kind == Entity_Constant && e->Constant.value.kind != ExactValue_Invalid) {
@@ -10312,51 +10335,47 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			is_constant = false;
 		}
 
-		if (cl->elems[0]->kind == Ast_FieldValue) {
-			error(cl->elems[0], "'field = value' in a bit_set a literal is not allowed");
-			is_constant = false;
-		} else {
-			for (Ast *elem : cl->elems) {
-				if (elem->kind == Ast_FieldValue) {
-					error(elem, "'field = value' in a bit_set a literal is not allowed");
+		for (Ast *elem : cl->elems) {
+			if (elem->kind == Ast_FieldValue) {
+				error(elem, "'field = value' in a bit_set literal is not allowed");
+				is_constant = false;
+				continue;
+			}
+
+			check_expr_with_type_hint(c, o, elem, et);
+
+			if (is_constant) {
+				is_constant = o->mode == Addressing_Constant;
+			}
+
+			if (elem->kind == Ast_BinaryExpr) {
+				switch (elem->BinaryExpr.op.kind) {
+				case Token_Or:
+					{
+						gbString x = expr_to_string(elem->BinaryExpr.left);
+						gbString y = expr_to_string(elem->BinaryExpr.right);
+						gbString e = expr_to_string(elem);
+						error(elem, "Was the following intended? '%s, %s'; if not, surround the expression with parentheses '(%s)'", x, y, e);
+						gb_string_free(e);
+						gb_string_free(y);
+						gb_string_free(x);
+					}
+					break;
+				}
+			}
+
+			check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
+			if (o->mode == Addressing_Constant) {
+				i64 lower = t->BitSet.lower;
+				i64 upper = t->BitSet.upper;
+				i64 v = exact_value_to_i64(o->value);
+				if (lower <= v && v <= upper) {
+					// okay
+				} else {
+					gbString s = expr_to_string(o->expr);
+					error(elem, "Bit field value out of bounds, %s (%lld) not in the range %lld .. %lld", s, v, lower, upper);
+					gb_string_free(s);
 					continue;
-				}
-
-				check_expr_with_type_hint(c, o, elem, et);
-
-				if (is_constant) {
-					is_constant = o->mode == Addressing_Constant;
-				}
-
-				if (elem->kind == Ast_BinaryExpr) {
-					switch (elem->BinaryExpr.op.kind) {
-					case Token_Or:
-						{
-							gbString x = expr_to_string(elem->BinaryExpr.left);
-							gbString y = expr_to_string(elem->BinaryExpr.right);
-							gbString e = expr_to_string(elem);
-							error(elem, "Was the following intended? '%s, %s'; if not, surround the expression with parentheses '(%s)'", x, y, e);
-							gb_string_free(e);
-							gb_string_free(y);
-							gb_string_free(x);
-						}
-						break;
-					}
-				}
-
-				check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
-				if (o->mode == Addressing_Constant) {
-					i64 lower = t->BitSet.lower;
-					i64 upper = t->BitSet.upper;
-					i64 v = exact_value_to_i64(o->value);
-					if (lower <= v && v <= upper) {
-						// okay
-					} else {
-						gbString s = expr_to_string(o->expr);
-						error(elem, "Bit field value out of bounds, %s (%lld) not in the range %lld .. %lld", s, v, lower, upper);
-						gb_string_free(s);
-						continue;
-					}
 				}
 			}
 		}

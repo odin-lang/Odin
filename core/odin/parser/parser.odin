@@ -348,27 +348,30 @@ consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^ast.Comment_Gro
 }
 
 consume_comment_groups :: proc(p: ^Parser, prev: tokenizer.Token) {
-	if p.curr_tok.kind == .Comment {
-		comment: ^ast.Comment_Group
-		end_line := 0
-
-		if p.curr_tok.pos.line == prev.pos.line {
-			comment, end_line = consume_comment_group(p, 0)
-			if p.curr_tok.pos.line != end_line || p.curr_tok.kind == .EOF {
-				p.line_comment = comment
-			}
-		}
-
-		end_line = -1
-		for p.curr_tok.kind == .Comment {
-			comment, end_line = consume_comment_group(p, 1)
-		}
-		if end_line+1 >= p.curr_tok.pos.line || end_line < 0 {
-			p.lead_comment = comment
-		}
-
-		assert(p.curr_tok.kind != .Comment)
+	if p.curr_tok.kind != .Comment {
+		return
 	}
+	comment: ^ast.Comment_Group
+	end_line := 0
+
+	if p.curr_tok.pos.line == prev.pos.line {
+		comment, end_line = consume_comment_group(p, 0)
+		if p.curr_tok.pos.line != end_line ||
+		   p.curr_tok.pos.line == prev.pos.line+1 ||
+		   p.curr_tok.kind == .EOF {
+			p.line_comment = comment
+		}
+	}
+
+	end_line = -1
+	for p.curr_tok.kind == .Comment {
+		comment, end_line = consume_comment_group(p, 1)
+	}
+	if end_line+1 >= p.curr_tok.pos.line || end_line < 0 {
+		p.lead_comment = comment
+	}
+
+	assert(p.curr_tok.kind != .Comment)
 }
 
 advance_token :: proc(p: ^Parser) -> tokenizer.Token {

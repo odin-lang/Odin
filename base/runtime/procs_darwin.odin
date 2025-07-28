@@ -31,5 +31,6 @@ foreign ObjC {
 	class_getInstanceVariable :: proc "c" (cls : objc_Class, name: cstring) -> objc_Ivar ---
 	class_getInstanceSize     :: proc "c" (cls : objc_Class) -> uint ---
 	ivar_getOffset            :: proc "c" (v: objc_Ivar) -> uintptr ---
+	object_getClass           :: proc "c" (obj: objc_id) -> objc_Class ---
 }
 

@@ -33,6 +33,10 @@ gb_internal bool ast_file_vet_deprecated(AstFile *f) {
 	return (ast_file_vet_flags(f) & VetFlag_Deprecated) != 0;
 }
 
+gb_internal bool ast_file_vet_explicit_allocators(AstFile *f) {
+	return (ast_file_vet_flags(f) & VetFlag_ExplicitAllocators) != 0;
+}
+
 gb_internal bool file_allow_newline(AstFile *f) {
 	bool is_strict = build_context.strict_style || ast_file_vet_style(f);
 	return !is_strict;
@@ -1436,27 +1440,30 @@ gb_internal CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_
 }
 
 gb_internal void consume_comment_groups(AstFile *f, Token prev) {
-	if (f->curr_token.kind == Token_Comment) {
-		CommentGroup *comment = nullptr;
-		isize end_line = 0;
-
-		if (f->curr_token.pos.line == prev.pos.line) {
-			comment = consume_comment_group(f, 0, &end_line);
-			if (f->curr_token.pos.line != end_line || f->curr_token.kind == Token_EOF) {
-				f->line_comment = comment;
-			}
-		}
-
-		end_line = -1;
-		while (f->curr_token.kind == Token_Comment) {
-			comment = consume_comment_group(f, 1, &end_line);
-		}
-		if (end_line+1 == f->curr_token.pos.line || end_line < 0) {
-			f->lead_comment = comment;
-		}
-
-		GB_ASSERT(f->curr_token.kind != Token_Comment);
+	if (f->curr_token.kind != Token_Comment) {
+		return;
 	}
+	CommentGroup *comment = nullptr;
+	isize end_line = 0;
+
+	if (f->curr_token.pos.line == prev.pos.line) {
+		comment = consume_comment_group(f, 0, &end_line);
+		if (f->curr_token.pos.line != end_line ||
+		    f->curr_token.pos.line == prev.pos.line+1 ||
+		    f->curr_token.kind == Token_EOF) {
+			f->line_comment = comment;
+		}
+	}
+
+	end_line = -1;
+	while (f->curr_token.kind == Token_Comment) {
+		comment = consume_comment_group(f, 1, &end_line);
+	}
+	if (end_line+1 == f->curr_token.pos.line || end_line < 0) {
+		f->lead_comment = comment;
+	}
+
+	GB_ASSERT(f->curr_token.kind != Token_Comment);
 }
 
 gb_internal gb_inline bool ignore_newlines(AstFile *f) {
@@ -5794,7 +5801,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT && !path_is_directory(name)) {
+		if (ext == FILE_EXT && !fi.is_dir) {
 			files_with_ext += 1;
 		}
 		if (ext == FILE_EXT && !is_excluded_target_filename(name)) {
@@ -5819,7 +5826,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT && !path_is_directory(name)) {
+		if (ext == FILE_EXT && !fi.is_dir) {
 			if (is_excluded_target_filename(name)) {
 				continue;
 			}
@@ -6217,9 +6224,10 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				continue;
 			}
 
-			Subtarget subtarget = Subtarget_Default;
+			Subtarget subtarget     = Subtarget_Invalid;
+			String    subtarget_str = {};
 
-			TargetOsKind   os   = get_target_os_from_string(p, &subtarget);
+			TargetOsKind   os   = get_target_os_from_string(p, &subtarget, &subtarget_str);
 			TargetArchKind arch = get_target_arch_from_string(p);
 			num_tokens += 1;
 
@@ -6230,10 +6238,29 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				break;
 			}
 
+			bool is_ios_subtarget = false;
+			if (subtarget == Subtarget_Invalid) {
+				// Special case for pseudo subtarget
+				if (!str_eq_ignore_case(subtarget_str, "ios")) {
+					syntax_error(token_for_pos, "Invalid subtarget '%.*s'.", LIT(subtarget_str));
+					break;
+				}
+
+				is_ios_subtarget = true;
+			}
+
+
 			if (os != TargetOs_Invalid) {
 				this_kind_os_seen = true;
 
-				bool same_subtarget = (subtarget == Subtarget_Default) || (subtarget == selected_subtarget);
+				// NOTE: Only testing for 'default' and not 'generic' because the 'generic' nomenclature implies any subtarget.
+				bool is_explicit_default_subtarget = str_eq_ignore_case(subtarget_str, "default");
+				bool same_subtarget = (subtarget == Subtarget_Default && !is_explicit_default_subtarget) || (subtarget == selected_subtarget);
+
+				// Special case for iPhone or iPhoneSimulator
+				if (is_ios_subtarget && (selected_subtarget == Subtarget_iPhone || selected_subtarget == Subtarget_iPhoneSimulator)) {
+					same_subtarget = true;
+				}
 
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
@@ -6333,6 +6360,7 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			error_line("\textra\n");
 			error_line("\tcast\n");
 			error_line("\ttabs\n");
+			error_line("\texplicit-allocators\n");
 			return build_context.vet_flags;
 		}
 	}
