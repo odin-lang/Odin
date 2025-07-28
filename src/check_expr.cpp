@@ -8218,6 +8218,55 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	return Expr_Expr;
 }
 
+gb_internal void check_expr_as_value(CheckerContext *c, Operand *o, Ast *e, Type *type_hint) {
+	check_expr_base(c, o, e, type_hint);
+	check_not_tuple(c, o);
+	error_operand_no_value(o); // Handle the Addressing_NoValue case
+	switch (o->mode) {
+	case Addressing_Type: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+
+		error(o->expr,
+				"Cannot use type '%s' as a runtime value.",
+				expr_str);
+
+		error_line("\tUse 'typeid_of' to convert a type to a runtime 'typeid' value.\n");
+
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		break;
+	}
+	case Addressing_Builtin: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+
+		error(o->expr,
+				"Cannot use built-in procedure '%s' as a runtime value.",
+				expr_str);
+
+		error_line("\tBuilt-in procedures are implemented by the compiler and might not be actually instantiated procedures.\n");
+
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		break;
+	}
+	case Addressing_ProcGroup: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+
+		error(o->expr,
+				"Cannot use overloaded procedure '%s' as a runtime value.",
+				expr_str);
+
+		error_line("\tPlease specify which overload to use (via cast or type inference) to use that specific version of the procedure.\n");
+
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		break;
+	}
+	}
+}
 
 gb_internal void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t) {
 	check_expr_base(c, o, e, t);
@@ -8917,7 +8966,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	Operand x = {Addressing_Invalid};
 	Operand y = {Addressing_Invalid};
-	check_expr_or_type(c, &x, te->x, type_hint);
+	check_expr_as_value(c, &x, te->x, type_hint);
 	node->viral_state_flags |= te->x->viral_state_flags;
 
 	if (te->y != nullptr) {
@@ -8925,18 +8974,10 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 		if (type_hint == nullptr && is_type_typed(x.type)) {
 			th = x.type;
 		}
-		check_expr_or_type(c, &y, te->y, th);
+		check_expr_as_value(c, &y, te->y, th);
 		node->viral_state_flags |= te->y->viral_state_flags;
 	} else {
 		error(node, "A ternary expression must have an else clause");
-		return kind;
-	}
-
-	if (x.mode == Addressing_Type || y.mode == Addressing_Type) {
-		Ast *type_expr = (x.mode == Addressing_Type) ? x.expr : y.expr;
-		gbString type_string = expr_to_string(type_expr);
-		error(node, "Type %s is invalid operand for ternary if expression", type_string);
-		gb_string_free(type_string);
 		return kind;
 	}
 
@@ -11581,7 +11622,6 @@ gb_internal void check_expr_or_type(CheckerContext *c, Operand *o, Ast *e, Type 
 	check_not_tuple(c, o);
 	error_operand_no_value(o);
 }
-
 
 
 gb_internal bool is_exact_value_zero(ExactValue const &v) {
