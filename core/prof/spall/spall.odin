@@ -53,11 +53,11 @@ Pad_Skip :: struct #packed {
 	size: u32le,
 }
 
-Name_Container_Event :: struct #packed {
+Name_Event :: struct #packed {
 	type: Manual_Event_Type,
 	name_len: u8,
 }
-NAME_EVENT_MAX :: size_of(Name_Container_Event) + 255
+NAME_EVENT_MAX :: size_of(Name_Event) + 255
 
 // User Interface
 
@@ -225,10 +225,10 @@ _build_end :: proc "contextless" (buffer: []u8, ts: u64) -> (event_size: int, ok
 
 @(no_instrumentation)
 _build_name_event :: #force_inline proc "contextless" (buffer: []u8, name: string, type: Manual_Event_Type) -> (event_size: int, ok: bool) #optional_ok #no_bounds_check /* bounds check would segfault instrumentation */ {
-	ev := (^Name_Container_Event)(raw_data(buffer))
+	ev := (^Name_Event)(raw_data(buffer))
 	name_len := min(len(name), 255)
 
-	event_size = size_of(Name_Container_Event) + name_len
+	event_size = size_of(Name_Event) + name_len
 	if event_size > len(buffer) {
 		return 0, false
 	}
@@ -238,7 +238,7 @@ _build_name_event :: #force_inline proc "contextless" (buffer: []u8, name: strin
 
 	ev.type = type
 	ev.name_len = u8(name_len)
-	intrinsics.mem_copy_non_overlapping(raw_data(buffer[size_of(Name_Container_Event):]), raw_data(name), name_len)
+	intrinsics.mem_copy_non_overlapping(raw_data(buffer[size_of(Name_Event):]), raw_data(name), name_len)
 	ok = true
 
 	return
