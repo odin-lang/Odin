@@ -8,29 +8,36 @@ import "base:intrinsics"
 
 MANUAL_MAGIC :: u64le(0x0BADF00D)
 
-Manual_Header :: struct #packed {
+Manual_Stream_Header :: struct #packed {
 	magic:           u64le,
 	version:         u64le,
 	timestamp_scale: f64le,
 	reserved:        u64le,
 }
 
+Manual_Buffer_Header :: struct #packed {
+	size:     u32le,
+	tid:      u32le,
+	pid:      u32le,
+	first_ts: u64le,
+}
+
 Manual_Event_Type :: enum u8 {
-	Invalid             = 0,
+	Invalid      = 0,
 
-	Begin               = 3,
-	End                 = 4,
-	Instant             = 5,
+	Begin        = 3,
+	End          = 4,
+	Instant      = 5,
 
-	Pad_Skip            = 7,
+	Pad_Skip     = 7,
+
+	Name_Process = 8,
+	Name_Thread  = 9,
 }
 
 Begin_Event :: struct #packed {
 	type:     Manual_Event_Type,
-	category: u8,
-	pid:      u32le,
-	tid:      u32le,
-	ts:       f64le,
+	ts:       u64le,
 	name_len: u8,
 	args_len: u8,
 }
@@ -38,14 +45,17 @@ BEGIN_EVENT_MAX :: size_of(Begin_Event) + 255 + 255
 
 End_Event :: struct #packed {
 	type: Manual_Event_Type,
-	pid:  u32le,
-	tid:  u32le,
-	ts:   f64le,
+	ts:   u64le,
 }
 
 Pad_Skip :: struct #packed {
 	type: Manual_Event_Type,
 	size: u32le,
+}
+
+Name_Container_Event :: struct #packed {
+	type: Manual_Event_Type,
+	name_len: u8,
 }
 
 // User Interface
@@ -77,7 +87,7 @@ context_create_with_scale :: proc(filename: string, precise_time: bool, timestam
 	ctx.timestamp_scale = timestamp_scale
 
 	temp := [size_of(Manual_Header)]u8{}
-	_build_header(temp[:], ctx.timestamp_scale)
+	_build_stream_header(temp[:], ctx.timestamp_scale)
 	os.write(ctx.fd, temp[:])
 	ok = true
 	return
@@ -102,23 +112,32 @@ context_destroy :: proc(ctx: ^Context) {
 
 buffer_create :: proc(data: []byte, tid: u32 = 0, pid: u32 = 0) -> (buffer: Buffer, ok: bool) #optional_ok {
 	assert(len(data) >= 1024)
-	buffer.data = data
-	buffer.tid  = tid
-	buffer.pid  = pid
-	buffer.head = 0
+	buffer.data     = data
+	buffer.tid      = tid
+	buffer.pid      = pid
+	buffer.first_ts = 0
+	buffer.head = size_of(Manual_Buffer_Header)
 	ok = true
 	return
 }
 
 @(no_instrumentation)
 buffer_flush :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_check /* bounds check would segfault instrumentation */ {
+	buffer_size := buffer.head - size_of(Manual_Buffer_Header)
+	hdr := (^Manual_Buffer_Header)(raw_data(buffer.data))
+	hdr.size = buffer_size
+	hdr.pid  = buffer.pid
+	hdr.tid  = buffer.tid
+	hdr.first_ts = buffer.first_ts
+
 	start := _trace_now(ctx)
 	write(ctx.fd, buffer.data[:buffer.head])
-	buffer.head = 0
+	buffer.head = size_of(Manual_Buffer_Header)
 	end := _trace_now(ctx)
 
-	buffer.head += _build_begin(buffer.data[buffer.head:], "Spall Trace Buffer Flush", "", start, buffer.tid, buffer.pid)
-	buffer.head += _build_end(buffer.data[buffer.head:], end, buffer.tid, buffer.pid)
+	buffer.head += _build_begin(buffer.data[buffer.head:], "Spall Trace Buffer Flush", "", start)
+	buffer.head += _build_end(buffer.data[buffer.head:], end)
+	buffer.first_ts = end
 }
 
 buffer_destroy :: proc(ctx: ^Context, buffer: ^Buffer) {
@@ -141,16 +160,16 @@ _scoped_buffer_end :: proc(ctx: ^Context, buffer: ^Buffer, _, _: string, _ := #c
 }
 
 @(no_instrumentation)
-_trace_now :: proc "contextless" (ctx: ^Context) -> f64 {
+_trace_now :: proc "contextless" (ctx: ^Context) -> u64 {
 	if !ctx.precise_time {
-		return f64(tick_now()) / 1_000
+		return u64(tick_now())
 	}
 
-	return f64(intrinsics.read_cycle_counter())
+	return u64(intrinsics.read_cycle_counter())
 }
 
 @(no_instrumentation)
-_build_header :: proc "contextless" (buffer: []u8, timestamp_scale: f64) -> (header_size: int, ok: bool) #optional_ok {
+_build_stream_header :: proc "contextless" (buffer: []u8, timestamp_scale: f64) -> (header_size: int, ok: bool) #optional_ok {
 	header_size = size_of(Manual_Header)
 	if header_size > len(buffer) {
 		return 0, false
@@ -158,7 +177,7 @@ _build_header :: proc "contextless" (buffer: []u8, timestamp_scale: f64) -> (hea
 
 	hdr := (^Manual_Header)(raw_data(buffer))
 	hdr.magic = MANUAL_MAGIC
-	hdr.version = 1
+	hdr.version = 3
 	hdr.timestamp_scale = f64le(timestamp_scale)
 	hdr.reserved = 0
 	ok = true
@@ -166,7 +185,7 @@ _build_header :: proc "contextless" (buffer: []u8, timestamp_scale: f64) -> (hea
 }
 
 @(no_instrumentation)
-_build_begin :: #force_inline proc "contextless" (buffer: []u8, name: string, args: string, ts: f64, tid: u32, pid: u32) -> (event_size: int, ok: bool) #optional_ok #no_bounds_check /* bounds check would segfault instrumentation */ {
+_build_begin :: #force_inline proc "contextless" (buffer: []u8, name: string, args: string, ts: u64) -> (event_size: int, ok: bool) #optional_ok #no_bounds_check /* bounds check would segfault instrumentation */ {
 	ev := (^Begin_Event)(raw_data(buffer))
 	name_len := min(len(name), 255)
 	args_len := min(len(args), 255)
@@ -177,9 +196,7 @@ _build_begin :: #force_inline proc "contextless" (buffer: []u8, name: string, ar
 	}
 
 	ev.type = .Begin
-	ev.pid  = u32le(pid)
-	ev.tid  = u32le(tid)
-	ev.ts   = f64le(ts)
+	ev.ts   = u64le(ts)
 	ev.name_len = u8(name_len)
 	ev.args_len = u8(args_len)
 	intrinsics.mem_copy_non_overlapping(raw_data(buffer[size_of(Begin_Event):]), raw_data(name), name_len)
@@ -190,7 +207,7 @@ _build_begin :: #force_inline proc "contextless" (buffer: []u8, name: string, ar
 }
 
 @(no_instrumentation)
-_build_end :: proc "contextless" (buffer: []u8, ts: f64, tid: u32, pid: u32) -> (event_size: int, ok: bool) #optional_ok {
+_build_end :: proc "contextless" (buffer: []u8, ts: u64) -> (event_size: int, ok: bool) #optional_ok {
 	ev := (^End_Event)(raw_data(buffer))
 	event_size = size_of(End_Event)
 	if event_size > len(buffer) {
@@ -198,9 +215,28 @@ _build_end :: proc "contextless" (buffer: []u8, ts: f64, tid: u32, pid: u32) -> 
 	}
 
 	ev.type = .End
-	ev.pid  = u32le(pid)
-	ev.tid  = u32le(tid)
-	ev.ts   = f64le(ts)
+	ev.ts   = u64le(ts)
+	ok = true
+
+	return
+}
+
+@(no_instrumentation)
+_build_name_event :: #force_inline proc "contextless" (buffer: []u8, name: string, type: Manual_Event_Type) -> (event_size: int, ok: bool) #optional_ok #no_bounds_check /* bounds check would segfault instrumentation */ {
+	ev := (^Name_Container_Event)(raw_data(buffer))
+	name_len := min(len(name), 255)
+
+	event_size = size_of(Name_Container_Event) + name_len
+	if event_size > len(buffer) {
+		return 0, false
+	}
+	if type != .Name_Process && type != .Name_Thread {
+		return 0, false
+	}
+
+	ev.type = type
+	ev.name_len = u8(name_len)
+	intrinsics.mem_copy_non_overlapping(raw_data(buffer[size_of(Name_Container_Event):]), raw_data(name), name_len)
 	ok = true
 
 	return
@@ -212,7 +248,7 @@ _buffer_begin :: proc "contextless" (ctx: ^Context, buffer: ^Buffer, name: strin
 		buffer_flush(ctx, buffer)
 	}
 	name := location.procedure if name == "" else name
-	buffer.head += _build_begin(buffer.data[buffer.head:], name, args, _trace_now(ctx), buffer.tid, buffer.pid)
+	buffer.head += _build_begin(buffer.data[buffer.head:], name, args, _trace_now(ctx))
 }
 
 @(no_instrumentation)
@@ -223,7 +259,23 @@ _buffer_end :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_ch
 		buffer_flush(ctx, buffer)
 	}
 
-	buffer.head += _build_end(buffer.data[buffer.head:], ts, buffer.tid, buffer.pid)
+	buffer.head += _build_end(buffer.data[buffer.head:], ts)
+}
+
+@(no_instrumentation)
+_buffer_name_thread :: proc "contextless" (ctx: ^Context, buffer: ^Buffer, name: string, location := #caller_location) #no_bounds_check /* bounds check would segfault instrumentation */ {
+	if buffer.head + NAME_EVENT_MAX > len(buffer.data) {
+		buffer_flush(ctx, buffer)
+	}
+	buffer.head += _build_name_event(buffer.data[buffer.head:], name, .Name_Thread)
+}
+
+@(no_instrumentation)
+_buffer_name_process :: proc "contextless" (ctx: ^Context, buffer: ^Buffer, name: string, location := #caller_location) #no_bounds_check /* bounds check would segfault instrumentation */ {
+	if buffer.head + NAME_EVENT_MAX > len(buffer.data) {
+		buffer_flush(ctx, buffer)
+	}
+	buffer.head += _build_name_event(buffer.data[buffer.head:], name, .Name_Process)
 }
 
 @(no_instrumentation)
