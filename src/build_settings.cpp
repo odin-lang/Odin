@@ -1887,6 +1887,13 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			str_lit("-target "), bc->metrics.target_triplet, str_lit(" "));
 	} else if (is_arch_wasm()) {
 		gbString link_flags = gb_string_make(heap_allocator(), " ");
+
+		// NOTE(laytan): Put the stack first in the memory,
+		// causing a stack overflow to error immediately instead of corrupting globals.
+		link_flags = gb_string_appendc(link_flags, "--stack-first ");
+		// NOTE(laytan): default stack size is 64KiB, up to a more reasonable 1MiB.
+		link_flags = gb_string_appendc(link_flags, "-z stack-size=1048576 ");
+
 		// link_flags = gb_string_appendc(link_flags, "--export-all ");
 		// link_flags = gb_string_appendc(link_flags, "--export-table ");
 		// if (bc->metrics.arch == TargetArch_wasm64) {
