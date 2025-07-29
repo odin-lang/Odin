@@ -301,26 +301,26 @@ dyld_all_image_infos :: struct {
 @(default_calling_convention="c")
 foreign mach {
 	mach_task_self     :: proc() -> mach_port_t ---
-	mach_msg           :: proc(header: rawptr, option: Msg_Option_Flags, send_size: u32, receive_limit: u32, receive_name: mach_port_t, timeout: u32, notify: mach_port_t) -> kern_return_t ---
-	mach_msg_send      :: proc(header: rawptr) -> kern_return_t ---
-	mach_vm_allocate   :: proc(target_task: task_t, adddress: u64, size: u64, flags: i32) -> kern_return_t ---
-	mach_vm_deallocate :: proc(target_task: task_t, adddress: ^u64, size: u64) -> kern_return_t ---
-	mach_vm_remap      :: proc(target_task: task_t, page: rawptr, size: u64, mask: u64, flags: i32, src_task: task_t, src_address: u64, copy: b32, cur_protection: ^i32, max_protection: ^i32, inheritance: VM_Inherit) -> kern_return_t ---
-	mach_vm_region_recurse :: proc(target_task: task_t, address: ^u64, size: ^u64, depth: ^u32, info: vm_region_recurse_info_t, count: ^u32) -> kern_return_t ---
+	mach_msg           :: proc(header: rawptr, option: Msg_Option_Flags, send_size: u32, receive_limit: u32, receive_name: mach_port_t, timeout: u32, notify: mach_port_t) -> Kern_Return ---
+	mach_msg_send      :: proc(header: rawptr) -> Kern_Return ---
+	mach_vm_allocate   :: proc(target_task: task_t, adddress: u64, size: u64, flags: i32) -> Kern_Return ---
+	mach_vm_deallocate :: proc(target_task: task_t, adddress: ^u64, size: u64) -> Kern_Return ---
+	mach_vm_remap      :: proc(target_task: task_t, page: rawptr, size: u64, mask: u64, flags: i32, src_task: task_t, src_address: u64, copy: b32, cur_protection: ^i32, max_protection: ^i32, inheritance: VM_Inherit) -> Kern_Return ---
+	mach_vm_region_recurse :: proc(target_task: task_t, address: ^u64, size: ^u64, depth: ^u32, info: vm_region_recurse_info_t, count: ^u32) -> Kern_Return ---
 	vm_page_size:  u64
 	vm_page_mask:  u64
 	vm_page_shift: i32
 
-	mach_port_allocate   :: proc(task: task_t, right: Port_Right, name: rawptr) -> kern_return_t ---
-	mach_port_deallocate :: proc(task: task_t, name: u32) -> kern_return_t ---
-	mach_port_extract_right :: proc(task: task_t, name: u32, msgt_name: u32, poly: ^mach_port_t, poly_poly: ^mach_port_t) -> kern_return_t ---
+	mach_port_allocate   :: proc(task: task_t, right: Port_Right, name: rawptr) -> Kern_Return ---
+	mach_port_deallocate :: proc(task: task_t, name: u32) -> Kern_Return ---
+	mach_port_extract_right :: proc(task: task_t, name: u32, msgt_name: u32, poly: ^mach_port_t, poly_poly: ^mach_port_t) -> Kern_Return ---
 
-	task_get_special_port :: proc(task: task_t, port: i32, special_port: ^mach_port_t) -> kern_return_t ---
-	task_suspend   :: proc(task: task_t) -> kern_return_t ---
-	task_resume    :: proc(task: task_t) -> kern_return_t ---
-	task_threads   :: proc(task: task_t, thread_list: ^thread_list_t, list_count: ^u32) -> kern_return_t ---
-	task_info      :: proc(task: task_t, flavor: i32, info: task_info_t, count: ^u32) -> kern_return_t ---
-	task_terminate :: proc(task: task_t) -> kern_return_t ---
+	task_get_special_port :: proc(task: task_t, port: i32, special_port: ^mach_port_t) -> Kern_Return ---
+	task_suspend   :: proc(task: task_t) -> Kern_Return ---
+	task_resume    :: proc(task: task_t) -> Kern_Return ---
+	task_threads   :: proc(task: task_t, thread_list: ^thread_list_t, list_count: ^u32) -> Kern_Return ---
+	task_info      :: proc(task: task_t, flavor: i32, info: task_info_t, count: ^u32) -> Kern_Return ---
+	task_terminate :: proc(task: task_t) -> Kern_Return ---
 
 	semaphore_create :: proc(task: task_t, semaphore: ^semaphore_t, policy: Sync_Policy, value: c.int) -> Kern_Return ---
 	semaphore_destroy :: proc(task: task_t, semaphore: semaphore_t) -> Kern_Return ---
@@ -331,11 +331,11 @@ foreign mach {
 
 	semaphore_wait :: proc(semaphore: semaphore_t) -> Kern_Return ---
 
-	thread_get_state :: proc(thread: thread_act_t, flavor: i32, thread_state: thread_state_t, old_state_count: ^u32) -> kern_return_t ---
-	thread_info :: proc(thread: thread_act_t, flavor: u32, thread_info: ^thread_identifier_info, info_count: ^u32) -> kern_return_t ---
+	thread_get_state :: proc(thread: thread_act_t, flavor: i32, thread_state: thread_state_t, old_state_count: ^u32) -> Kern_Return ---
+	thread_info :: proc(thread: thread_act_t, flavor: u32, thread_info: ^thread_identifier_info, info_count: ^u32) -> Kern_Return ---
 
-	bootstrap_register2 :: proc(bp: mach_port_t, service_name: name_t, sp: mach_port_t, flags: u64) -> kern_return_t ---
-	bootstrap_look_up :: proc(bp: mach_port_t, service_name: name_t, sp: ^mach_port_t) -> kern_return_t ---
+	bootstrap_register2 :: proc(bp: mach_port_t, service_name: name_t, sp: mach_port_t, flags: u64) -> Kern_Return ---
+	bootstrap_look_up :: proc(bp: mach_port_t, service_name: name_t, sp: ^mach_port_t) -> Kern_Return ---
 
 	vm_map :: proc(
 		target_task:    vm_map_t,
