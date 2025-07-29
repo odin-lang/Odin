@@ -1073,6 +1073,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 	lbValue result = {};
 
+	isize ignored_args = 0;
 	auto processed_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
 
 	{
@@ -1095,6 +1096,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			lbArgType *arg = &ft->args[param_index];
 			if (arg->kind == lbArg_Ignore) {
 				param_index += 1;
+				ignored_args += 1;
 				continue;
 			}
 
@@ -1203,7 +1205,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			auto tuple_fix_values = slice_make<lbValue>(permanent_allocator(), ret_count);
 			auto tuple_geps = slice_make<lbValue>(permanent_allocator(), ret_count);
 
-			isize offset = ft->original_arg_count;
+			isize offset = ft->original_arg_count - ignored_args;
 			for (isize j = 0; j < ret_count-1; j++) {
 				lbValue ret_arg_ptr = processed_args[offset + j];
 				lbValue ret_arg = lb_emit_load(p, ret_arg_ptr);
@@ -2807,6 +2809,21 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				char const *name = "llvm.readcyclecounter";
 				res.value = lb_call_intrinsic(p, name, nullptr, 0, nullptr, 0);
 			}
+			return res;
+		}
+	case BuiltinProc_read_cycle_counter_frequency:
+		{
+			lbValue res = {};
+			res.type = tv.type;
+
+			if (build_context.metrics.arch == TargetArch_arm64) {
+				LLVMTypeRef func_type = LLVMFunctionType(LLVMInt64TypeInContext(p->module->ctx), nullptr, 0, false);
+				bool has_side_effects = false;
+				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs $0, cntfrq_el0"), str_lit("=r"), has_side_effects);
+				GB_ASSERT(the_asm != nullptr);
+				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			}
+
 			return res;
 		}
 
