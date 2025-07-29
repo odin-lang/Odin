@@ -4714,6 +4714,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 
 	case BuiltinProc_read_cycle_counter_frequency:
+		if (build_context.metrics.arch != TargetArch_arm64) {
+			error(call, "'%.*s' is only allowed on arm64 targets", LIT(builtin_name));
+			return false;
+		}
+		operand->mode = Addressing_Value;
+		operand->type = t_i64;
+		break;
+
 	case BuiltinProc_read_cycle_counter:
 		operand->mode = Addressing_Value;
 		operand->type = t_i64;
