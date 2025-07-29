@@ -3,7 +3,7 @@
 package time
 
 import "base:intrinsics"
-import linux "core:sys/linux"
+@(require) import linux "core:sys/linux"
 
 _get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
 	when ODIN_ARCH == .arm64 {
