@@ -22,27 +22,6 @@ MACH_PORT_DEAD :: ~mach_port_t(0)
 
 MACH_MSG_PORT_DESCRIPTOR :: 0
 
-MACH_SEND_MSG     :: 0x00000001
-MACH_RCV_MSG      :: 0x00000002
-MACH_SEND_TIMEOUT :: 0x00000010
-MACH_RCV_TIMEOUT  :: 0x00000100
-
-MACH_MSG_TYPE_COPY_SEND :: 19
-MACH_MSG_TYPE_MAKE_SEND :: 20
-MACH_MSGH_BITS_COMPLEX :: 0x80000000
-
-MACH_PORT_RIGHT_SEND    :: 0
-MACH_PORT_RIGHT_RECEIVE :: 1
-
-VM_INHERIT_SHARE        :: 0
-VM_INHERIT_COPY         :: 1
-VM_INHERIT_NONE         :: 2
-VM_INHERIT_DONATE_COPY  :: 3
-
-TASK_BOOTSTRAP_PORT :: 4
-
-BOOTSTRAP_NAME_IN_USE :: 1101
-
 X86_THREAD_STATE32 :: 1
 X86_THREAD_STATE64 :: 4
 ARM_THREAD_STATE64 :: 6
@@ -69,6 +48,8 @@ vm_inherit_t :: distinct c.uint
 
 mach_port_name_t :: distinct c.uint
 
+mach_port_right_t :: distinct c.uint
+
 sync_policy_t :: distinct c.int
 
 mach_msg_port_descriptor_t :: struct {
@@ -78,6 +59,77 @@ mach_msg_port_descriptor_t :: struct {
 		_: u32 | 16,
 		disposition: u32 | 8,
 		type: u32 | 8,
+	},
+}
+
+Task_Port_Type :: enum u32 {
+	Kernel   = 1,
+	Host,
+	Name,
+	Bootstrap,
+	Seatbelt = 7,
+	Access   = 9,
+}
+
+Bootstrap_Error :: enum u32 {
+	Success,
+	Not_Privileged  = 1100,
+	Name_In_Use     = 1101,
+	Unknown_Service = 1102,
+	Service_Active  = 1103,
+	Bad_Count       = 1104,
+	No_Memory       = 1105,
+	No_Children     = 1106,
+}
+
+Msg_Type :: enum u32 {
+	Unstructured = 0,
+	Bit          = 0,
+	Boolean      = 0,
+	Integer_16   = 1,
+	Integer_32   = 2,
+	Char         = 8,
+	Byte         = 9,
+	Integer_8    = 9,
+	Real         = 10,
+	Integer_64   = 11,
+	String       = 12,
+	String_C     = 12,
+
+	Port_Name      = 15,
+
+	Move_Receive   = 16,
+	Port_Receive   = 16,
+	Move_Send      = 17,
+	Port_Send      = 17,
+	Move_Send_Once = 18,
+	Port_Send_Once = 18,
+	Copy_Send      = 19,
+	Make_Send      = 20,
+	Make_Send_Once = 21,
+}
+
+Msg_Header_Bits :: enum u32 {
+	Zero                   = 0,
+	Remote_Mask         = 0xff,
+	Local_Mask        = 0xff00,
+	Migrated      = 0x08000000,
+	Unused        = 0x07ff0000,
+	Complex_Data  = 0x10000000,
+	Complex_Ports = 0x20000000,
+	Circular      = 0x40000000,
+	Complex       = 0x80000000,
+}
+
+mach_msg_type_t :: struct {
+	using _: bit_field u32 {
+		name:       u32 | 8,
+		size:       u32 | 8,
+		number:     u32 | 12,
+		inline:     u32 | 1,
+		longform:   u32 | 1,
+		deallocate: u32 | 1,
+		unused:     u32 | 1,
 	},
 }
 
@@ -248,18 +300,18 @@ dyld_all_image_infos :: struct {
 
 @(default_calling_convention="c")
 foreign mach {
-	mach_task_self     :: proc() -> task_t ---
-	mach_msg           :: proc(header: rawptr, option: mach_msg_option_t, send_size: u32, receive_limit: u32, receive_name: mach_port_t, timeout: u32, notify: mach_port_t) -> kern_return_t ---
+	mach_task_self     :: proc() -> mach_port_t ---
+	mach_msg           :: proc(header: rawptr, option: Msg_Option_Flags, send_size: u32, receive_limit: u32, receive_name: mach_port_t, timeout: u32, notify: mach_port_t) -> kern_return_t ---
 	mach_msg_send      :: proc(header: rawptr) -> kern_return_t ---
 	mach_vm_allocate   :: proc(target_task: task_t, adddress: u64, size: u64, flags: i32) -> kern_return_t ---
 	mach_vm_deallocate :: proc(target_task: task_t, adddress: ^u64, size: u64) -> kern_return_t ---
-	mach_vm_remap      :: proc(target_task: task_t, page: rawptr, size: u64, mask: u64, flags: i32, src_task: task_t, src_address: u64, copy: b32, cur_protection: ^i32, max_protection: ^i32, inheritance: i32) -> kern_return_t ---
+	mach_vm_remap      :: proc(target_task: task_t, page: rawptr, size: u64, mask: u64, flags: i32, src_task: task_t, src_address: u64, copy: b32, cur_protection: ^i32, max_protection: ^i32, inheritance: VM_Inherit) -> kern_return_t ---
 	mach_vm_region_recurse :: proc(target_task: task_t, address: ^u64, size: ^u64, depth: ^u32, info: vm_region_recurse_info_t, count: ^u32) -> kern_return_t ---
 	vm_page_size:  u64
 	vm_page_mask:  u64
 	vm_page_shift: i32
 
-	mach_port_allocate   :: proc(task: task_t, right: u32, name: rawptr) -> kern_return_t ---
+	mach_port_allocate   :: proc(task: task_t, right: Port_Right, name: rawptr) -> kern_return_t ---
 	mach_port_deallocate :: proc(task: task_t, name: u32) -> kern_return_t ---
 	mach_port_extract_right :: proc(task: task_t, name: u32, msgt_name: u32, poly: ^mach_port_t, poly_poly: ^mach_port_t) -> kern_return_t ---
 
@@ -731,6 +783,39 @@ VM_Prot_Flags :: distinct bit_set[VM_Prot; vm_prot_t]
 VM_PROT_NONE    :: VM_Prot_Flags{}
 VM_PROT_DEFAULT :: VM_Prot_Flags{.Read, .Write}
 VM_PROT_ALL     :: VM_Prot_Flags{.Read, .Write, .Execute}
+
+/*
+ * Mach msg options, defined as bits within the mach_msg_option_t type
+ */
+
+Msg_Option :: enum mach_msg_option_t {
+	Send_Msg,
+	Receive_Msg,
+
+	Send_Timeout      = LOG2(0x10),
+	Send_Notify       = LOG2(0x20),
+	Send_Interrupt    = LOG2(0x40),
+	Send_Cancel       = LOG2(0x80),
+	Receive_Timeout   = LOG2(0x100),
+	Receive_Notify    = LOG2(0x200),
+	Receive_Interrupt = LOG2(0x400),
+	Receive_Large     = LOG2(0x800),
+	Send_Always       = LOG2(0x10000),
+}
+
+Msg_Option_Flags :: distinct bit_set[Msg_Option; mach_msg_option_t]
+
+/*
+ *  Enumeration of valid values for mach_port_right_t
+ */
+
+Port_Right :: enum mach_port_right_t {
+	Send,
+	Receive,
+	Send_Once,
+	Port_Set,
+	Dead_Name,
+}
 
 /*
  *	Enumeration of valid values for vm_inherit_t.

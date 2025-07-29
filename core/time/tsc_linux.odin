@@ -2,6 +2,7 @@
 #+build linux
 package time
 
+import "base:intrinsics"
 import linux "core:sys/linux"
 
 _get_tsc_frequency :: proc "contextless" () -> (u64, bool) {

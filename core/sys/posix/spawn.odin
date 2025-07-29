@@ -1,7 +1,5 @@
 package posix
 
-import "core:c"
-
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System.framework"
 } else {
@@ -9,6 +7,6 @@ when ODIN_OS == .Darwin {
 }
 
 foreign lib {
-	posix_spawn :: proc(pid: ^pid_t, path: cstring, file_actions: rawptr, attrp: rawptr, argv: [^]cstring, envp: [^]cstring) -> c.int ---
-	posix_spawnp :: proc(pid: ^pid_t, file: cstring, file_actions: rawptr, attrp: rawptr, argv: [^]cstring, envp: [^]cstring) -> c.int ---
+	posix_spawn :: proc(pid: ^pid_t, path: cstring, file_actions: rawptr, attrp: rawptr, argv: [^]cstring, envp: [^]cstring) -> Errno ---
+	posix_spawnp :: proc(pid: ^pid_t, file: cstring, file_actions: rawptr, attrp: rawptr, argv: [^]cstring, envp: [^]cstring) -> Errno ---
 }

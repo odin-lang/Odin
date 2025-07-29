@@ -695,13 +695,13 @@ _spawn :: #force_inline proc(path: string, args: []string, envs: []string, file_
 	}
 
 	child_pid: posix.pid_t
-	status: i32
+	status: posix.Errno
 	if is_spawnp {
 		status = posix.posix_spawnp(&child_pid, path_cstr, file_actions, attributes, raw_data(args_cstrs), raw_data(envs_cstrs))
 	} else {
 		status = posix.posix_spawn(&child_pid, path_cstr, file_actions, attributes, raw_data(args_cstrs), raw_data(envs_cstrs))
 	}
-	if status != 0 {
+	if status != .NONE {
 		return 0, Platform_Error(status)
 	}
 	return child_pid, nil
