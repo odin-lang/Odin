@@ -2811,6 +2811,21 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			}
 			return res;
 		}
+	case BuiltinProc_read_cycle_counter_frequency:
+		{
+			lbValue res = {};
+			res.type = tv.type;
+
+			if (build_context.metrics.arch == TargetArch_arm64) {
+				LLVMTypeRef func_type = LLVMFunctionType(LLVMInt64TypeInContext(p->module->ctx), nullptr, 0, false);
+				bool has_side_effects = false;
+				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs $0, cntfrq_el0"), str_lit("=r"), has_side_effects);
+				GB_ASSERT(the_asm != nullptr);
+				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			}
+
+			return res;
+		}
 
 	case BuiltinProc_count_trailing_zeros:
 		return lb_emit_count_trailing_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
