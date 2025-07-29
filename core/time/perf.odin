@@ -104,6 +104,8 @@ TSC at a fixed frequency, independent of ACPI state, and CPU frequency.
 has_invariant_tsc :: proc "contextless" () -> bool {
 	when ODIN_ARCH == .amd64 {
 		return x86_has_invariant_tsc()
+	} else when ODIN_ARCH == .arm64 {
+		return true
 	}
 
 	return false

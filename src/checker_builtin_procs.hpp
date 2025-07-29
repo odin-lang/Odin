@@ -61,6 +61,7 @@ enum BuiltinProcId {
 	BuiltinProc_trap,
 	BuiltinProc_debug_trap,
 	BuiltinProc_read_cycle_counter,
+	BuiltinProc_read_cycle_counter_frequency,
 
 	BuiltinProc_count_ones,
 	BuiltinProc_count_zeros,
@@ -224,6 +225,7 @@ BuiltinProc__simd_end,
 
 	BuiltinProc_x86_cpuid,
 	BuiltinProc_x86_xgetbv,
+
 
 	// Constant type tests
 
@@ -421,6 +423,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("trap"),               0, false, Expr_Expr, BuiltinProcPkg_intrinsics, /*diverging*/true},
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("read_cycle_counter_frequency"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("count_ones"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
