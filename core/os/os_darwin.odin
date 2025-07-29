@@ -7,10 +7,8 @@ foreign import pthread "system:System"
 import "base:runtime"
 import "core:strings"
 import "core:c"
-import "core:sys/posix"
 
 Handle    :: distinct i32
-Pid       :: distinct i32
 File_Time :: distinct u64
 
 INVALID_HANDLE :: ~Handle(0)
@@ -679,39 +677,6 @@ get_last_error_string :: proc() -> string {
 	return string(_darwin_string_error(__error()^))
 }
 
-_spawn :: #force_inline proc(path: string, args: []string, envs: []string, file_actions: rawptr, attributes: rawptr, is_spawnp: bool) -> (posix.pid_t, Error) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-
-	args_cstrs := make([]cstring, len(args) + 2, context.temp_allocator)
-	args_cstrs[0] = strings.clone_to_cstring(path, context.temp_allocator)
-	for i := 0; i < len(args); i += 1 {
-		args_cstrs[i+1] = strings.clone_to_cstring(args[i], context.temp_allocator)
-	}
-
-	envs_cstrs := make([]cstring, len(envs) + 1, context.temp_allocator)
-	for i := 0; i < len(envs); i += 1 {
-		envs_cstrs[i] = strings.clone_to_cstring(envs[i], context.temp_allocator)
-	}
-
-	child_pid: posix.pid_t
-	status: posix.Errno
-	if is_spawnp {
-		status = posix.posix_spawnp(&child_pid, path_cstr, file_actions, attributes, raw_data(args_cstrs), raw_data(envs_cstrs))
-	} else {
-		status = posix.posix_spawn(&child_pid, path_cstr, file_actions, attributes, raw_data(args_cstrs), raw_data(envs_cstrs))
-	}
-	if status != .NONE {
-		return 0, Platform_Error(status)
-	}
-	return child_pid, nil
-}
-spawn :: proc(path: string, args: []string, envs: []string, file_actions: rawptr, attributes: rawptr) -> (posix.pid_t, Error) {
-	return _spawn(path, args, envs, file_actions, attributes, false)
-}
-spawnp :: proc(path: string, args: []string, envs: []string, file_actions: rawptr, attributes: rawptr) -> (posix.pid_t, Error) {
-	return _spawn(path, args, envs, file_actions, attributes, true)
-}
 
 @(require_results)
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (handle: Handle, err: Error) {
