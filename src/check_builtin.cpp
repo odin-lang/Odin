@@ -4713,7 +4713,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		break;
 
-	case BuiltinProc_arm64_read_cycle_counter_frequency:
+	case BuiltinProc_read_cycle_counter_frequency:
 	case BuiltinProc_read_cycle_counter:
 		operand->mode = Addressing_Value;
 		operand->type = t_i64;
