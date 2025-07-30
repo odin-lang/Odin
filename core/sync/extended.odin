@@ -50,7 +50,7 @@ wait_group_add :: proc "contextless" (wg: ^Wait_Group, delta: int) {
 	switch counter := atomic_load(&wg.counter); counter {
 	case counter < 0:
 		panic_contextless("sync.Wait_Group negative counter")
-	case if wg.counter == 0:
+	case wg.counter == 0:
 		cond_broadcast(&wg.cond)
 		if atomic_load(&wg.counter) != 0 {
 			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
