@@ -52,6 +52,7 @@ XXH3_SECRET_SIZE_MIN    :: 136
 #assert(len(XXH3_kSecret) == 192 && len(XXH3_kSecret) > XXH3_SECRET_SIZE_MIN)
 
 XXH_ACC_ALIGN           :: 8   /* scalar */
+XXH_MAX_WIDTH           :: #config(XXH_MAX_WIDTH, 512) / 64
 
 /*
 	This is the optimal update size for incremental hashing.
@@ -733,10 +734,6 @@ XXH3_accumulate_512_f       :: #type proc(acc: []xxh_u64, input:  []u8, secret: 
 XXH3_scramble_accumulator_f :: #type proc(acc: []xxh_u64, secret: []u8)
 XXH3_init_custom_secret_f   :: #type proc(custom_secret: []u8, seed64: xxh_u64)
 
-XXH3_accumulate_512       : XXH3_accumulate_512_f       = XXH3_accumulate_512_scalar
-XXH3_scramble_accumulator : XXH3_scramble_accumulator_f = XXH3_scramble_accumulator_scalar
-XXH3_init_custom_secret   : XXH3_init_custom_secret_f   = XXH3_init_custom_secret_scalar
-
 /* scalar variants - universal */
 @(optimization_mode="favor_size")
 XXH3_accumulate_512_scalar :: #force_inline proc(acc: []xxh_u64, input: []u8, secret: []u8) {
@@ -782,6 +779,89 @@ XXH3_init_custom_secret_scalar :: #force_inline proc(custom_secret: []u8, seed64
 		hi := XXH64_read64(XXH3_kSecret[16 * i + 8:]) - seed64
 		XXH_writeLE64(custom_secret[16 * i:    ], u64le(lo))
 		XXH_writeLE64(custom_secret[16 * i + 8:], u64le(hi))
+	}
+}
+
+/* generalized SIMD variants */
+@(optimization_mode="favor_size")
+XXH3_accumulate_512_simd_generic :: #force_inline proc(acc: []xxh_u64, input: []u8, secret: []u8, $W: uint) {
+	u32xW :: #simd[W]u32
+	u64xW :: #simd[W]u64
+
+	#no_bounds_check for i in uint(0)..<XXH_ACC_NB/W {
+		data_val := XXH64_read64_simd(input[8 * W * i:], W)
+		sec      := XXH64_read64_simd(secret[8 * W * i:], W)
+		data_key := data_val ~ sec
+
+		// Swap adjacent lanes
+		when W == 2 {
+			data_val = swizzle(data_val, 1, 0)
+		} else when W == 4 {
+			data_val = swizzle(data_val, 1, 0, 3, 2)
+		} else when W == 8 {
+			data_val = swizzle(data_val, 1, 0, 3, 2, 5, 4, 7, 6)
+		} else {
+			#panic("Unsupported vector size!")
+		}
+
+		a := XXH64_read64_simd(acc[W * i:], W)
+		a += data_val
+		a += u64xW(u32xW(data_key)) * intrinsics.simd_shr(data_key, 32)
+		XXH64_write64_simd(acc[W * i:], a)
+	}
+}
+
+XXH3_scramble_accumulator_simd_generic :: #force_inline proc(acc: []xxh_u64, secret: []u8, $W: uint) {
+	u64xW :: #simd[W]u64
+	#no_bounds_check for i in uint(0)..<XXH_ACC_NB/W {
+		key64 := XXH64_read64_simd(secret[8 * W * i:], W)
+		acc64 := XXH64_read64_simd(acc[W * i:], W)
+		acc64 ~= intrinsics.simd_shr(acc64, 47)
+		acc64 ~= key64
+		acc64 *= XXH_PRIME32_1
+		XXH64_write64_simd(acc[W * i:], acc64)
+	}
+}
+
+@(optimization_mode="favor_size")
+XXH3_init_custom_secret_simd_generic :: #force_inline proc(custom_secret: []u8, seed64: xxh_u64, $W: uint) {
+	u64xW :: #simd[W]u64
+
+	seedVec := u64xW(seed64)
+	for i in 0..<W/2 {
+		j := 2*i + 1
+		seedVec = intrinsics.simd_replace(seedVec, j, -intrinsics.simd_extract(seedVec, j))
+	}
+
+	nbRounds := XXH_SECRET_DEFAULT_SIZE / 8 / W
+	#no_bounds_check for i in uint(0)..<nbRounds {
+		block := XXH64_read64_simd(XXH3_kSecret[8 * W * i:], W)
+		block += seedVec
+		XXH64_write64_simd(custom_secret[8 * W * i:], block)
+	}
+}
+
+XXH3_accumulate_512 :: #force_inline proc(acc: []xxh_u64, input: []u8, secret: []u8) {
+	when XXH_NATIVE_WIDTH > 1 {
+		XXH3_accumulate_512_simd_generic(acc, input, secret, XXH_NATIVE_WIDTH)
+	} else {
+		XXH3_accumulate_512_scalar(acc, input, secret)
+	}
+}
+
+XXH3_scramble_accumulator :: #force_inline proc(acc: []xxh_u64, secret: []u8) {
+	when XXH_NATIVE_WIDTH > 1 {
+		XXH3_scramble_accumulator_simd_generic(acc, secret, XXH_NATIVE_WIDTH)
+	} else {
+		XXH3_scramble_accumulator_scalar(acc, secret)
+	}
+}
+
+XXH3_init_custom_secret :: #force_inline proc(custom_secret: []u8, seed64: xxh_u64) {
+	when XXH_NATIVE_WIDTH > 1 {
+		XXH3_init_custom_secret_simd_generic(custom_secret, seed64, XXH_NATIVE_WIDTH)
+	} else {
+		XXH3_init_custom_secret_scalar(custom_secret, seed64)
 	}
 }
 
