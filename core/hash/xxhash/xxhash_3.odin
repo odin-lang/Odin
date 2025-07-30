@@ -63,10 +63,11 @@ XXH3_INTERNAL_BUFFER_SIZE :: 256
 	Streaming state.
 
 	IMPORTANT: This structure has a strict alignment requirement of 64 bytes!! **
-	Do not allocate this with `make()` or `new`, it will not be sufficiently aligned.
-	Use`XXH3_create_state` and `XXH3_destroy_state, or stack allocation.
+	Default allocators will align it correctly if created via `new`, as will
+	placing this struct on the cache, but if using a custom allocator make sure
+	that it handles the alignment correctly!
 */
-XXH3_state :: struct {
+XXH3_state :: struct #align(64) {
 	acc:               [8]u64,
 	custom_secret:     [XXH_SECRET_DEFAULT_SIZE]u8,
 	buffer:            [XXH3_INTERNAL_BUFFER_SIZE]u8,
@@ -478,7 +479,7 @@ XXH3_128bits_internal :: #force_inline proc(
 /* ===   Public XXH128 API   === */
 @(optimization_mode="favor_size")
 XXH3_128_default :: proc(input: []u8) -> (hash: XXH3_128_hash) {
-	return XXH3_128bits_internal(input, 0, XXH3_kSecret[:], XXH3_hashLong_128b_withSeed)
+	return XXH3_128bits_internal(input, 0, XXH3_kSecret[:], XXH3_hashLong_128b_default)
 }
 
 @(optimization_mode="favor_size")
@@ -748,7 +749,7 @@ XXH3_accumulate_512_scalar :: #force_inline proc(acc: []xxh_u64, input: []u8, se
 		sec := XXH64_read64(xsecret[8 * i:])
 		data_key    := data_val ~ sec
 		xacc[i ~ 1] += data_val /* swap adjacent lanes */
-		xacc[i    ] += u64(u128(u32(data_key)) * u128(u64(data_key >> 32)))
+		xacc[i    ] += u64(u32(data_key)) * u64(data_key >> 32)
 	}
 }
 
@@ -966,19 +967,8 @@ XXH3_hashLong_64b_default :: #force_no_inline proc(input: []u8, seed64: xxh_u64,
 	return XXH3_hashLong_64b_internal(input, XXH3_kSecret[:], XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
 
-/*
-	XXH3_hashLong_64b_withSeed():
-	Generate a custom key based on alteration of default XXH3_kSecret with the seed,
-	and then use this key for long mode hashing.
-
-	This operation is decently fast but nonetheless costs a little bit of time.
-	Try to avoid it whenever possible (typically when seed==0).
-
-	It's important for performance that XXH3_hashLong is not inlined. Not sure
-	why (uop cache maybe?), but the difference is large and easily measurable.
-*/
 @(optimization_mode="favor_size")
-XXH3_hashLong_64b_withSeed_internal :: #force_no_inline proc(
+XXH3_hashLong_64b_withSeed_internal :: #force_inline proc(
 	input:       []u8,
 	seed:        xxh_u64,
 	f_acc512:    XXH3_accumulate_512_f,
@@ -995,7 +985,15 @@ XXH3_hashLong_64b_withSeed_internal :: #force_no_inline proc(
 }
 
 /*
-	It's important for performance that XXH3_hashLong is not inlined.
+	XXH3_hashLong_64b_withSeed():
+	Generate a custom key based on alteration of default XXH3_kSecret with the seed,
+	and then use this key for long mode hashing.
+
+	This operation is decently fast but nonetheless costs a little bit of time.
+	Try to avoid it whenever possible (typically when seed==0).
+
+	It's important for performance that XXH3_hashLong is not inlined. Not sure
+	why (uop cache maybe?), but the difference is large and easily measurable.
 */
 @(optimization_mode="favor_size")
 XXH3_hashLong_64b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
@@ -1006,7 +1004,7 @@ XXH3_hashLong_64b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, 
 XXH3_hashLong64_f :: #type proc(input: []u8, seed: xxh_u64, secret: []u8)  -> (res: xxh_u64)
 
 @(optimization_mode="favor_size")
-XXH3_64bits_internal :: proc(input: []u8, seed: xxh_u64, secret: []u8, f_hashLong: XXH3_hashLong64_f) -> (hash: xxh_u64) {
+XXH3_64bits_internal :: #force_inline proc(input: []u8, seed: xxh_u64, secret: []u8, f_hashLong: XXH3_hashLong64_f) -> (hash: xxh_u64) {
 	assert(len(secret) >= XXH3_SECRET_SIZE_MIN)
 	/*
 		If an action is to be taken if len(secret) condition is not respected, it should be done here.
