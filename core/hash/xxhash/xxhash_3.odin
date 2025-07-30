@@ -382,7 +382,6 @@ XXH3_INIT_ACC :: [XXH_ACC_NB]xxh_u64{
 
 XXH_SECRET_MERGEACCS_START :: 11
 
-@(optimization_mode="favor_size")
 XXH3_hashLong_128b_internal :: #force_inline proc(
 			input: []u8,
 			secret: []u8,
@@ -410,7 +409,6 @@ XXH3_hashLong_128b_internal :: #force_inline proc(
 /*
  * It's important for performance that XXH3_hashLong is not inlined.
  */
-@(optimization_mode="favor_size")
 XXH3_hashLong_128b_default :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (res: XXH3_128_hash) {
 	return XXH3_hashLong_128b_internal(input, XXH3_kSecret[:], XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
@@ -418,12 +416,10 @@ XXH3_hashLong_128b_default :: #force_no_inline proc(input: []u8, seed: xxh_u64, 
 /*
  * It's important for performance that XXH3_hashLong is not inlined.
  */
-@(optimization_mode="favor_size")
 XXH3_hashLong_128b_withSecret :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (res: XXH3_128_hash) {
 	return XXH3_hashLong_128b_internal(input, secret, XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
 
-@(optimization_mode="favor_size")
 XXH3_hashLong_128b_withSeed_internal :: #force_inline proc(
 								input: []u8, seed: xxh_u64, secret: []u8,
 								f_acc512: XXH3_accumulate_512_f,
@@ -444,7 +440,6 @@ XXH3_hashLong_128b_withSeed_internal :: #force_inline proc(
 /*
  * It's important for performance that XXH3_hashLong is not inlined.
  */
- @(optimization_mode="favor_size")
 XXH3_hashLong_128b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (res: XXH3_128_hash) {
 	return XXH3_hashLong_128b_withSeed_internal(input, seed, secret, XXH3_accumulate_512, XXH3_scramble_accumulator , XXH3_init_custom_secret)
 }
@@ -784,7 +779,6 @@ XXH3_init_custom_secret_scalar :: #force_inline proc(custom_secret: []u8, seed64
 }
 
 /* generalized SIMD variants */
-@(optimization_mode="favor_size")
 XXH3_accumulate_512_simd_generic :: #force_inline proc(acc: []xxh_u64, input: []u8, secret: []u8, $W: uint) {
 	u32xW :: #simd[W]u32
 	u64xW :: #simd[W]u64
@@ -824,7 +818,6 @@ XXH3_scramble_accumulator_simd_generic :: #force_inline proc(acc: []xxh_u64, sec
 	}
 }
 
-@(optimization_mode="favor_size")
 XXH3_init_custom_secret_simd_generic :: #force_inline proc(custom_secret: []u8, seed64: xxh_u64, $W: uint) {
 	u64xW :: #simd[W]u64
 
@@ -950,7 +943,6 @@ XXH3_hashLong_64b_internal :: #force_inline proc(input: []u8, secret: []u8,
 /*
 	It's important for performance that XXH3_hashLong is not inlined.
 */
-@(optimization_mode="favor_size")
 XXH3_hashLong_64b_withSecret :: #force_no_inline proc(input: []u8, seed64: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
 	return XXH3_hashLong_64b_internal(input, secret, XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
@@ -962,12 +954,10 @@ XXH3_hashLong_64b_withSecret :: #force_no_inline proc(input: []u8, seed64: xxh_u
 	This variant enforces that the compiler can detect that,
 	and uses this opportunity to streamline the generated code for better performance.
 */
-@(optimization_mode="favor_size")
 XXH3_hashLong_64b_default :: #force_no_inline proc(input: []u8, seed64: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
 	return XXH3_hashLong_64b_internal(input, XXH3_kSecret[:], XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
 
-@(optimization_mode="favor_size")
 XXH3_hashLong_64b_withSeed_internal :: #force_inline proc(
 	input:       []u8,
 	seed:        xxh_u64,
@@ -995,7 +985,6 @@ XXH3_hashLong_64b_withSeed_internal :: #force_inline proc(
 	It's important for performance that XXH3_hashLong is not inlined. Not sure
 	why (uop cache maybe?), but the difference is large and easily measurable.
 */
-@(optimization_mode="favor_size")
 XXH3_hashLong_64b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, secret: []u8) -> (hash: xxh_u64) {
 	return XXH3_hashLong_64b_withSeed_internal(input, seed, XXH3_accumulate_512, XXH3_scramble_accumulator, XXH3_init_custom_secret)
 }
