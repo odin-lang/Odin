@@ -1613,7 +1613,7 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 //
 string_to_enum_value :: proc($T: typeid, s: string) -> (T, bool) {
 	ti := runtime.type_info_base(type_info_of(T))
-	if e, ok := ti.variant.(runtime.Type_Info_Enum); ok {
+	if e, ok := ti.variant.(^runtime.Type_Info_Enum); ok {
 		for str, idx in e.names {
 			if s == str {
 				// NOTE(bill): Unsafe cast
@@ -1640,7 +1640,7 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 	type_info := type_info_of(v.id)
 	#partial switch e in type_info.variant {
 	case: fmt_bad_verb(fi, verb)
-	case runtime.Type_Info_Enum:
+	case ^runtime.Type_Info_Enum:
 		switch verb {
 		case: fmt_bad_verb(fi, verb)
 		case 'i', 'd', 'f':
@@ -1680,7 +1680,7 @@ stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.T
 	ev += runtime.Type_Info_Enum_Value(offset)
 	#partial switch e in et.variant {
 	case: return "", false
-	case runtime.Type_Info_Enum:
+	case ^runtime.Type_Info_Enum:
 		if reflect.is_string(e.base) {
 			for val, idx in e.values {
 				if val == ev {
@@ -1716,7 +1716,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 		}
 		t := runtime.type_info_base(ti)
 		#partial switch info in t.variant {
-		case runtime.Type_Info_Integer:
+		case ^runtime.Type_Info_Integer:
 			switch info.endianness {
 			case .Platform: return false
 			case .Little:   return ODIN_ENDIAN != .Little
@@ -1730,12 +1730,12 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 
 	type_info := type_info_of(v.id)
 	#partial switch info in type_info.variant {
-	case runtime.Type_Info_Named:
+	case ^runtime.Type_Info_Named:
 		val := v
 		val.id = info.base.id
 		fmt_bit_set(fi, val, info.name, verb)
 
-	case runtime.Type_Info_Bit_Set:
+	case ^runtime.Type_Info_Bit_Set:
 		bits: u128
 		bit_size := u128(8*type_info.size)
 
@@ -1803,7 +1803,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 		io.write_byte(fi.writer, '{', &fi.n)
 		defer io.write_byte(fi.writer, '}', &fi.n)
 
-		e, is_enum := et.variant.(runtime.Type_Info_Enum)
+		e, is_enum := et.variant.(^runtime.Type_Info_Enum)
 		commas := 0
 		loop: for i in transmute(bit_set[0..<128])bits {
 			i := i64(i) + info.lower
@@ -1813,7 +1813,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 
 			if is_enum {
 				enum_name: string
-				if ti_named, is_named := info.elem.variant.(runtime.Type_Info_Named); is_named {
+				if ti_named, is_named := info.elem.variant.(^runtime.Type_Info_Named); is_named {
 					enum_name = ti_named.name
 				}
 				for ev, evi in e.values {
@@ -1903,8 +1903,8 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 // Returns: A boolean value indicating whether to continue processing the tag
 //
 @(private)
-handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb: ^rune, optional_len: ^int, use_nul_termination: ^bool) -> (do_continue: bool) {
-	handle_optional_len :: proc(data: rawptr, info: reflect.Type_Info_Struct, field_name: string, optional_len: ^int) {
+handle_tag :: proc(state: ^Info_State, data: rawptr, info: ^reflect.Type_Info_Struct, idx: int, verb: ^rune, optional_len: ^int, use_nul_termination: ^bool) -> (do_continue: bool) {
+	handle_optional_len :: proc(data: rawptr, info: ^reflect.Type_Info_Struct, field_name: string, optional_len: ^int) {
 		if optional_len == nil {
 			return
 		}
@@ -2007,12 +2007,12 @@ handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Str
 // - info: Type information about the struct
 // - type_name: The name of the type being formatted
 //
-fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_Struct, type_name: string) {
+fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: ^runtime.Type_Info_Struct, type_name: string) {
 	if the_verb != 'v' && the_verb != 'w' {
 		fmt_bad_verb(fi, the_verb)
 		return
 	}
-	if .raw_union in info.flags {
+	if .raw_union in info.struct_flags {
 		if type_name == "" {
 			io.write_string(fi.writer, "(raw union)", &fi.n)
 		} else {
@@ -2053,7 +2053,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		defer fi.indent -= 1
 
 		base_type_name: string
-		if v, ok := info.soa_base_type.variant.(runtime.Type_Info_Named); ok {
+		if v, ok := info.soa_base_type.variant.(^runtime.Type_Info_Named); ok {
 			base_type_name = v.name
 		}
 
@@ -2117,7 +2117,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 				io.write_string(fi.writer, " = ", &fi.n)
 
 				if info.soa_kind == .Fixed {
-					t := info.types[i].variant.(runtime.Type_Info_Array).elem
+					t := info.types[i].variant.(^runtime.Type_Info_Array).elem
 					t_size := uintptr(t.size)
 					if reflect.is_any(t) {
 						io.write_string(fi.writer, "any{}", &fi.n)
@@ -2126,7 +2126,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 						fmt_arg(fi, any{data, t.id}, verb)
 					}
 				} else {
-					t := info.types[i].variant.(runtime.Type_Info_Multi_Pointer).elem
+					t := info.types[i].variant.(^runtime.Type_Info_Multi_Pointer).elem
 					t_size := uintptr(t.size)
 					if reflect.is_any(t) {
 						io.write_string(fi.writer, "any{}", &fi.n)
@@ -2299,7 +2299,7 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 //
 // NOTE: This procedure supports built-in custom formatters for core library types such as runtime.Source_Code_Location, time.Duration, and time.Time.
 //
-fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) {
+fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: ^runtime.Type_Info_Named) {
 	write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
 		n := width-1
 		for x := i; x >= 10; x /= 10 {
@@ -2456,26 +2456,26 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 	}
 
 	#partial switch b in info.base.variant {
-	case runtime.Type_Info_Struct:
+	case ^runtime.Type_Info_Struct:
 		fmt_struct(fi, v, verb, b, info.name)
-	case runtime.Type_Info_Bit_Field:
+	case ^runtime.Type_Info_Bit_Field:
 		fmt_bit_field(fi, v, verb, b, info.name)
-	case runtime.Type_Info_Bit_Set:
+	case ^runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
 	case:
 		if verb == 'w' {
 			#partial switch _ in info.base.variant {
-			case runtime.Type_Info_Array,
-			     runtime.Type_Info_Enumerated_Array,
-			     runtime.Type_Info_Dynamic_Array,
-			     runtime.Type_Info_Slice,
-			     runtime.Type_Info_Struct,
-			     runtime.Type_Info_Enum,
-			     runtime.Type_Info_Map,
-			     runtime.Type_Info_Bit_Set,
-			     runtime.Type_Info_Simd_Vector,
-			     runtime.Type_Info_Matrix,
-			     runtime.Type_Info_Bit_Field:
+			case ^runtime.Type_Info_Array,
+			     ^runtime.Type_Info_Enumerated_Array,
+			     ^runtime.Type_Info_Dynamic_Array,
+			     ^runtime.Type_Info_Slice,
+			     ^runtime.Type_Info_Struct,
+			     ^runtime.Type_Info_Enum,
+			     ^runtime.Type_Info_Map,
+			     ^runtime.Type_Info_Bit_Set,
+			     ^runtime.Type_Info_Simd_Vector,
+			     ^runtime.Type_Info_Matrix,
+			     ^runtime.Type_Info_Bit_Field:
 				io.write_string(fi.writer, info.name, &fi.n)
 			}
 		}
@@ -2491,7 +2491,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 // - info: The union type information.
 // - type_size: The size of the union type.
 //
-fmt_union :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Union, type_size: int) {
+fmt_union :: proc(fi: ^Info, v: any, verb: rune, info: ^runtime.Type_Info_Union, type_size: int) {
 	if type_size == 0 {
 		io.write_string(fi.writer, "nil", &fi.n)
 		return
@@ -2544,7 +2544,7 @@ fmt_union :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Union, 
 // - verb: The formatting verb rune.
 // - info: A runtime.Type_Info_Matrix struct containing matrix type information.
 //
-fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix) {
+fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: ^runtime.Type_Info_Matrix) {
 	if verb == 'w' {
 		io.write_byte(fi.writer, '{', &fi.n)
 	} else {
@@ -2601,7 +2601,7 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 	}
 }
 
-fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit_Field, type_name: string) {
+fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: ^runtime.Type_Info_Bit_Field, type_name: string) {
 	read_bits :: proc(ptr: [^]byte, offset, size: uintptr) -> (res: u64) {
 		for i in 0..<size {
 			j := i+offset
@@ -2614,7 +2614,7 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		return
 	}
 
-	handle_bit_field_tag :: proc(data: rawptr, info: reflect.Type_Info_Bit_Field, idx: int, verb: ^rune) -> (do_continue: bool) {
+	handle_bit_field_tag :: proc(data: rawptr, info: ^runtime.Type_Info_Bit_Field, idx: int, verb: ^rune) -> (do_continue: bool) {
 		tag := info.tags[idx]
 		if vt, ok := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "fmt"); ok {
 			value := strings.trim_space(string(vt))
@@ -2722,21 +2722,21 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	type_info := type_info_of(v.id)
 	switch info in type_info.variant {
-	case runtime.Type_Info_Any:        // Ignore
-	case runtime.Type_Info_Parameters: // Ignore
+	case ^runtime.Type_Info_Any:        // Ignore
+	case ^runtime.Type_Info_Parameters: // Ignore
 
-	case runtime.Type_Info_Named:
+	case ^runtime.Type_Info_Named:
 		fmt_named(fi, v, verb, info)
 
-	case runtime.Type_Info_Boolean:    fmt_arg(fi, v, verb)
-	case runtime.Type_Info_Integer:    fmt_arg(fi, v, verb)
-	case runtime.Type_Info_Rune:       fmt_arg(fi, v, verb)
-	case runtime.Type_Info_Float:      fmt_arg(fi, v, verb)
-	case runtime.Type_Info_Complex:    fmt_arg(fi, v, verb)
-	case runtime.Type_Info_Quaternion: fmt_arg(fi, v, verb)
-	case runtime.Type_Info_String:     fmt_arg(fi, v, verb)
+	case ^runtime.Type_Info_Boolean:    fmt_arg(fi, v, verb)
+	case ^runtime.Type_Info_Integer:    fmt_arg(fi, v, verb)
+	case ^runtime.Type_Info_Rune:       fmt_arg(fi, v, verb)
+	case ^runtime.Type_Info_Float:      fmt_arg(fi, v, verb)
+	case ^runtime.Type_Info_Complex:    fmt_arg(fi, v, verb)
+	case ^runtime.Type_Info_Quaternion: fmt_arg(fi, v, verb)
+	case ^runtime.Type_Info_String:     fmt_arg(fi, v, verb)
 
-	case runtime.Type_Info_Pointer:
+	case ^runtime.Type_Info_Pointer:
 		if v.id == typeid_of(^runtime.Type_Info) {
 			reflect.write_type(fi.writer, (^^runtime.Type_Info)(v.data)^, &fi.n)
 		} else {
@@ -2747,10 +2747,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				elem := runtime.type_info_base(info.elem)
 				if elem != nil {
 					#partial switch e in elem.variant {
-					case runtime.Type_Info_Array,
-					     runtime.Type_Info_Slice,
-					     runtime.Type_Info_Dynamic_Array,
-					     runtime.Type_Info_Map:
+					case ^runtime.Type_Info_Array,
+					     ^runtime.Type_Info_Slice,
+					     ^runtime.Type_Info_Dynamic_Array,
+					     ^runtime.Type_Info_Map:
 						if ptr == nil {
 							io.write_string(fi.writer, "<nil>", &fi.n)
 							return
@@ -2763,9 +2763,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 							return
 						}
 
-					case runtime.Type_Info_Struct,
-					     runtime.Type_Info_Union,
-					     runtime.Type_Info_Bit_Field:
+					case ^runtime.Type_Info_Struct,
+					     ^runtime.Type_Info_Union,
+					     ^runtime.Type_Info_Bit_Field:
 						if ptr == nil {
 							io.write_string(fi.writer, "<nil>", &fi.n)
 							return
@@ -2783,11 +2783,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			fmt_pointer(fi, ptr, verb)
 		}
 
-	case runtime.Type_Info_Soa_Pointer:
+	case ^runtime.Type_Info_Soa_Pointer:
 		ptr := (^runtime.Raw_Soa_Pointer)(v.data)^
 		fmt_soa_pointer(fi, ptr, verb)
 
-	case runtime.Type_Info_Multi_Pointer:
+	case ^runtime.Type_Info_Multi_Pointer:
 		ptr := (^rawptr)(v.data)^
 		if ptr == nil {
 			io.write_string(fi.writer, "<nil>", &fi.n)
@@ -2809,7 +2809,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				}
 
 				#partial switch e in elem.variant {
-				case runtime.Type_Info_Integer:
+				case ^runtime.Type_Info_Integer:
 					switch verb {
 					case 's', 'q':
 						switch elem.id {
@@ -2823,10 +2823,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						}
 					}
 
-				case runtime.Type_Info_Array,
-				     runtime.Type_Info_Slice,
-				     runtime.Type_Info_Dynamic_Array,
-				     runtime.Type_Info_Map:
+				case ^runtime.Type_Info_Array,
+				     ^runtime.Type_Info_Slice,
+				     ^runtime.Type_Info_Dynamic_Array,
+				     ^runtime.Type_Info_Map:
 					if fi.indirection_level < 1 {
 						fi.indirection_level += 1
 						defer fi.indirection_level -= 1
@@ -2835,8 +2835,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						return
 					}
 
-				case runtime.Type_Info_Struct,
-				     runtime.Type_Info_Union:
+				case ^runtime.Type_Info_Struct,
+				     ^runtime.Type_Info_Union:
 					if fi.indirection_level < 1 {
 						fi.indirection_level += 1
 						defer fi.indirection_level -= 1
@@ -2849,7 +2849,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 		fmt_pointer(fi, ptr, verb)
 
-	case runtime.Type_Info_Enumerated_Array:
+	case ^runtime.Type_Info_Enumerated_Array:
 		fi.record_level += 1
 		defer fi.record_level -= 1
 
@@ -2901,7 +2901,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 		}
 
-	case runtime.Type_Info_Array:
+	case ^runtime.Type_Info_Array:
 		n := info.count
 		ptr := v.data
 		if ol, ok := fi.optional_len.?; ok {
@@ -2914,7 +2914,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
 
-	case runtime.Type_Info_Slice:
+	case ^runtime.Type_Info_Slice:
 		slice := cast(^mem.Raw_Slice)v.data
 		n := slice.len
 		ptr := slice.data
@@ -2928,7 +2928,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
 
-	case runtime.Type_Info_Dynamic_Array:
+	case ^runtime.Type_Info_Dynamic_Array:
 		array := cast(^mem.Raw_Dynamic_Array)v.data
 		n := array.len
 		ptr := array.data
@@ -2942,7 +2942,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
 
-	case runtime.Type_Info_Simd_Vector:
+	case ^runtime.Type_Info_Simd_Vector:
 		io.write_byte(fi.writer, '<', &fi.n)
 		defer io.write_byte(fi.writer, '>', &fi.n)
 		for i in 0..<info.count {
@@ -2953,7 +2953,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 
-	case runtime.Type_Info_Map:
+	case ^runtime.Type_Info_Map:
 		switch verb {
 		case:
 			fmt_bad_verb(fi, verb)
@@ -3012,16 +3012,16 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 		}
 
-	case runtime.Type_Info_Struct:
+	case ^runtime.Type_Info_Struct:
 		fmt_struct(fi, v, verb, info, "")
 
-	case runtime.Type_Info_Union:
+	case ^runtime.Type_Info_Union:
 		fmt_union(fi, v, verb, info, type_info.size)
 
-	case runtime.Type_Info_Enum:
+	case ^runtime.Type_Info_Enum:
 		fmt_enum(fi, v, verb)
 
-	case runtime.Type_Info_Procedure:
+	case ^runtime.Type_Info_Procedure:
 		ptr := (^rawptr)(v.data)^
 		if ptr == nil {
 			io.write_string(fi.writer, "nil", &fi.n)
@@ -3031,17 +3031,17 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			fmt_pointer(fi, ptr, 'p')
 		}
 
-	case runtime.Type_Info_Type_Id:
+	case ^runtime.Type_Info_Type_Id:
 		id := (^typeid)(v.data)^
 		reflect.write_typeid(fi.writer, id, &fi.n)
 
-	case runtime.Type_Info_Bit_Set:
+	case ^runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
 
-	case runtime.Type_Info_Matrix:
+	case ^runtime.Type_Info_Matrix:
 		fmt_matrix(fi, v, verb, info)
 
-	case runtime.Type_Info_Bit_Field:
+	case ^runtime.Type_Info_Bit_Field:
 		fmt_bit_field(fi, v, verb, info, "")
 	}
 }
@@ -3158,7 +3158,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	}
 
 	arg_info := type_info_of(arg.id)
-	if info, ok := arg_info.variant.(runtime.Type_Info_Named); ok {
+	if info, ok := arg_info.variant.(^runtime.Type_Info_Named); ok {
 		fmt_named(fi, arg, verb, info)
 		return
 	}

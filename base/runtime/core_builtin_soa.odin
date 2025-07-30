@@ -91,13 +91,13 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, a
 
 	ti := type_info_of(typeid_of(T))
 	ti = type_info_base(ti)
-	si := &ti.variant.(Type_Info_Struct)
+	si := ti.variant.(^Type_Info_Struct)
 
 	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 	total_size := 0
 	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
 		total_size += type.size * length
 		total_size = align_forward_int(total_size, max_align)
 	}
@@ -121,7 +121,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, a
 	data := uintptr(&array)
 	offset := 0
 	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
 
 		offset = align_forward_int(offset, max_align)
 
@@ -226,9 +226,8 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 		return nil
 	}
 
-	ti := type_info_of(typeid_of(T))
-	ti = type_info_base(ti)
-	si := &ti.variant.(Type_Info_Struct)
+	ti := type_info_base(type_info_of(T))
+	si := ti.variant.(^Type_Info_Struct)
 
 	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 	assert(footer.cap == old_cap)
@@ -238,7 +237,7 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 
 	max_align :: align_of(E)
 	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
 
 		old_size += type.size * old_cap
 		new_size += type.size * capacity
@@ -261,7 +260,7 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 	old_offset := 0
 	new_offset := 0
 	for i in 0..<field_count {
-		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
 
 		old_offset = align_forward_int(old_offset, max_align)
 		new_offset = align_forward_int(new_offset, max_align)
@@ -312,7 +311,7 @@ _append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_broa
 	if size_of(E) > 0 && cap(array)-len(array) > 0 {
 		ti := type_info_of(T)
 		ti = type_info_base(ti)
-		si := &ti.variant.(Type_Info_Struct)
+		si := ti.variant.(^Type_Info_Struct)
 		field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 		data := (^rawptr)(array)^
@@ -325,7 +324,7 @@ _append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_broa
 
 		max_align :: align_of(E)
 		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+			type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
 
 			soa_offset  = align_forward_int(soa_offset, max_align)
 			item_offset = align_forward_int(item_offset, type.align)
@@ -374,7 +373,7 @@ _append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_bro
 	if size_of(E) > 0 && arg_len > 0 {
 		ti := type_info_of(typeid_of(T))
 		ti = type_info_base(ti)
-		si := &ti.variant.(Type_Info_Struct)
+		si := ti.variant.(^Type_Info_Struct)
 		field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 		data := (^rawptr)(array)^
@@ -386,7 +385,7 @@ _append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_bro
 
 		max_align :: align_of(E)
 		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+			type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
 
 			soa_offset  = align_forward_int(soa_offset, max_align)
 			item_offset = align_forward_int(item_offset, type.align)
@@ -491,13 +490,13 @@ unordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, lo
 	if index+1 < len(array) {
 		ti := type_info_of(typeid_of(T))
 		ti = type_info_base(ti)
-		si := &ti.variant.(Type_Info_Struct)
+		si := ti.variant.(^Type_Info_Struct)
 
 		field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 		data := uintptr(array)
 		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+			type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
 
 			offset := rawptr((^uintptr)(data)^ + uintptr(index*type.size))
 			final := rawptr((^uintptr)(data)^ + uintptr((len(array)-1)*type.size))
@@ -519,13 +518,13 @@ ordered_remove_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, loc 
 	if index+1 < len(array) {
 		ti := type_info_of(typeid_of(T))
 		ti = type_info_base(ti)
-		si := &ti.variant.(Type_Info_Struct)
+		si := ti.variant.(^Type_Info_Struct)
 
 		field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
 		data := uintptr(array)
 		for i in 0..<field_count {
-			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+			type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
 
 			offset := (^uintptr)(data)^ + uintptr(index*type.size)
 			length := type.size*(len(array) - index - 1)

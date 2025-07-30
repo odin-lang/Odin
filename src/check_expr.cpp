@@ -10562,6 +10562,8 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 			}
 
 			if (!ok) {
+				ERROR_BLOCK();
+
 				gbString expr_str = expr_to_string(o->expr);
 				gbString dst_type_str = type_to_string(t);
 				defer (gb_string_free(expr_str));
@@ -10570,6 +10572,18 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 					error(o->expr, "Cannot type assert '%s' to '%s' as this is an empty union", expr_str, dst_type_str);
 				} else {
 					error(o->expr, "Cannot type assert '%s' to '%s' as it is not a variant of that union", expr_str, dst_type_str);
+
+					for (Type *vt : bsrc->Union.variants) {
+						Type *xt = type_deref(vt);
+						Type *yt = type_deref(t);
+						if (are_types_identical(xt, yt)) {
+							gbString s = type_to_string(vt);
+							error_line("\tDid you mean: '%s'?", s);
+							gb_string_free(s);
+							break;
+						}
+					}
+
 				}
 				o->mode = Addressing_Invalid;
 				o->expr = node;

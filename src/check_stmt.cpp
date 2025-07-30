@@ -1501,9 +1501,23 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 						}
 					}
 					if (!tag_type_found) {
+						ERROR_BLOCK();
+
 						gbString type_str = type_to_string(y.type);
 						error(y.expr, "Unknown variant type, got '%s'", type_str);
 						gb_string_free(type_str);
+
+						for (Type *vt : bt->Union.variants) {
+							Type *xt = type_deref(vt);
+							Type *yt = type_deref(y.type);
+							if (are_types_identical(xt, yt)) {
+								gbString s = type_to_string(vt);
+								error_line("\tDid you mean: '%s'?", s);
+								gb_string_free(s);
+								break;
+							}
+						}
+
 						continue;
 					}
 					case_type = y.type;
