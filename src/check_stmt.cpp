@@ -430,8 +430,6 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 
 	Ast *node = unparen_expr(lhs->expr);
 
-	check_no_copy_assignment(*rhs, context_name);
-
 	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
 		check_assignment(ctx, rhs, nullptr, str_lit("assignment to '_' identifier"));
