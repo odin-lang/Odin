@@ -47,7 +47,7 @@ wait_group_add :: proc "contextless" (wg: ^Wait_Group, delta: int) {
 	guard(&wg.mutex)
 
 	atomic_add(&wg.counter, delta)
-	switch counter := atomic_load(&wg.counter); counter {
+	switch counter := atomic_load(&wg.counter); {
 	case counter < 0:
 		panic_contextless("sync.Wait_Group negative counter")
 	case wg.counter == 0:
