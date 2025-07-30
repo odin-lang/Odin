@@ -97,7 +97,7 @@ context_create_with_scale :: proc(filename: string, precise_time: bool, timestam
 
 context_create_with_sleep :: proc(filename: string, sleep := 2 * time.Second) -> (ctx: Context, ok: bool) #optional_ok {
 	freq, freq_ok := time.tsc_frequency(sleep)
-	timestamp_scale: f64 = ((1 / f64(freq)) * 1_000_000) if freq_ok else 1
+	timestamp_scale: f64 = ((1 / f64(freq)) * 1_000_000_000) if freq_ok else 1
 	return context_create_with_scale(filename, freq_ok, timestamp_scale)
 }
 
@@ -125,6 +125,10 @@ buffer_create :: proc(data: []byte, tid: u32 = 0, pid: u32 = 0) -> (buffer: Buff
 
 @(no_instrumentation)
 buffer_flush :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_check /* bounds check would segfault instrumentation */ {
+	if len(buffer.data) == 0 {
+		return
+	}
+
 	buffer_size := buffer.head - size_of(Manual_Buffer_Header)
 	hdr := (^Manual_Buffer_Header)(raw_data(buffer.data))
 	hdr.size = u32le(buffer_size)
