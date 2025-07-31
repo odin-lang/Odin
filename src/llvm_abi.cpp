@@ -850,14 +850,18 @@ namespace lbAbiAmd64SysV {
 				} else if (oldv == RegClass_SSEUp) {
 					oldv = RegClass_SSEDv;
 				} else if (is_sse(oldv)) {
-					i++;
-					while (i != e && oldv == RegClass_SSEUp) {
-						i++;
+					for (i++; i < e; i++) {
+						RegClass v = (*cls)[cast(isize)i];
+						if (v != RegClass_SSEUp) {
+							break;
+						}
 					}
 				} else if (oldv == RegClass_X87) {
-					i++;
-					while (i != e && oldv == RegClass_X87Up) {
-						i++;
+					for (i++; i < e; i++) {
+						RegClass v = (*cls)[cast(isize)i];
+						if (v != RegClass_X87Up) {
+							break;
+						}
 					}
 				} else {
 					i++;
@@ -1046,10 +1050,9 @@ namespace lbAbiAmd64SysV {
 				i64 elem_sz = lb_sizeof(elem);
 				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
 				RegClass reg = RegClass_NoClass;
-				unsigned elem_width = LLVMGetIntTypeWidth(elem);
 				switch (elem_kind) {
-				case LLVMIntegerTypeKind:
-				case LLVMHalfTypeKind:
+				case LLVMIntegerTypeKind: {
+					unsigned elem_width = LLVMGetIntTypeWidth(elem);
 					switch (elem_width) {
 					case 8:  reg = RegClass_SSEInt8;  break;
 					case 16: reg = RegClass_SSEInt16; break;
@@ -1064,6 +1067,10 @@ namespace lbAbiAmd64SysV {
 						}
 						GB_PANIC("Unhandled integer width for vector type %u", elem_width);
 					}
+					break;
+				};
+				case LLVMHalfTypeKind:
+					reg = RegClass_SSEInt16;
 					break;
 				case LLVMFloatTypeKind:
 					reg = RegClass_SSEFv;
