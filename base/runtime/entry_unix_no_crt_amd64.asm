@@ -3,6 +3,7 @@ bits 64
 extern _start_odin
 global _start
 
+section .note.GNU-stack
 section .text
 
 ;; Entry point for programs that specify -no-crt option
