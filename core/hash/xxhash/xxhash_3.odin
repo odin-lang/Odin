@@ -64,7 +64,7 @@ XXH3_INTERNAL_BUFFER_SIZE :: 256
 
 	IMPORTANT: This structure has a strict alignment requirement of 64 bytes!! **
 	Default allocators will align it correctly if created via `new`, as will
-	placing this struct on the cache, but if using a custom allocator make sure
+	placing this struct on the stack, but if using a custom allocator make sure
 	that it handles the alignment correctly!
 */
 XXH3_state :: struct #align(64) {
@@ -870,7 +870,7 @@ XXH_PREFETCH_DIST :: 320
 XXH3_accumulate :: #force_inline proc(
 	acc: []xxh_u64, input: []u8, secret: []u8, nbStripes: uint, f_acc512: XXH3_accumulate_512_f) {
 
-	for n := uint(0); n < nbStripes; n += 1 {
+	#no_bounds_check for n := uint(0); n < nbStripes; n += 1 {
 		when !XXH_DISABLE_PREFETCH {
 			in_ptr := &input[n * XXH_STRIPE_LEN]
 			prefetch(in_ptr, XXH_PREFETCH_DIST)
