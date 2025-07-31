@@ -35,7 +35,7 @@ _start:
     xor rbp, rbp
     ;; Load argc into 1st param reg, argv into 2nd param reg
     pop rdi
-    mov rdx, rsi
+    mov rsi, rsp
     ;; Align stack pointer down to 16-bytes (sysv calling convention)
     and rsp, -16
     ;; Call into odin entry point
