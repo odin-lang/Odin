@@ -6952,7 +6952,7 @@ gb_internal void check_parsed_files(Checker *c) {
 					if (entry.key != tt.hash) {
 						continue;
 					}
-					auto const &other = type_info_types[entry.value];
+					auto const &other = c->info.type_info_types_hash_map[entry.value];
 					if (are_types_identical_unique_tuples(tt.type, other.type)) {
 						continue;
 					}
