@@ -2584,16 +2584,19 @@ general_end:;
 	if (src_size > dst_size) {
 		GB_ASSERT(p->decl_block != p->curr_block);
 		// NOTE(laytan): src is bigger than dst, need to memcpy the part of src we want.
+		
+		LLVMTypeRef llvm_src_type = LLVMPointerType(src_type, 0);
+		LLVMTypeRef llvm_dst_type = LLVMPointerType(dst_type, 0);
 
 		LLVMValueRef val_ptr; 
 		if (LLVMIsALoadInst(val)) {
 			val_ptr = LLVMGetOperand(val, 0);
 		} else if (LLVMIsAAllocaInst(val)) {
-			val_ptr = LLVMBuildPointerCast(p->builder, val, LLVMPointerType(src_type, 0), "");
+			val_ptr = LLVMBuildPointerCast(p->builder, val, llvm_src_type, "");
 		} else {
 			// NOTE(laytan): we need a pointer to memcpy from.
 			LLVMValueRef val_copy = llvm_alloca(p, src_type, src_align);
-			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, LLVMPointerType(src_type, 0), "");
+			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, llvm_src_type, "");
 			LLVMBuildStore(p->builder, val, val_ptr);
 		}
 
@@ -2601,11 +2604,11 @@ general_end:;
 		max_align = gb_max(max_align, 16);
 
 		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
-		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(dst_type, 0), "");
+		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, llvm_dst_type, "");
 
 		LLVMTypeRef types[3] = {
-			lb_type(p->module, t_rawptr),
-			lb_type(p->module, t_rawptr),
+			llvm_dst_type,
+			llvm_src_type,
 			lb_type(p->module, t_int)
 		};
 
