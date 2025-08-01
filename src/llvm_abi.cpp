@@ -1028,7 +1028,7 @@ namespace lbAbiAmd64SysV {
 			unify(cls, ix + off/8, RegClass_Int);
 			break;
 		case LLVMHalfTypeKind:
-			unify(cls, ix + off/8, (off%8 == 6) ? RegClass_SSEHv : RegClass_SSEHs);
+			unify(cls, ix + off/8, (off%8 != 0) ? RegClass_SSEHv : RegClass_SSEHs);
 			break;
 		case LLVMFloatTypeKind:
 			unify(cls, ix + off/8, (off%8 == 4) ? RegClass_SSEFv : RegClass_SSEFs);
