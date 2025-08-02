@@ -126,7 +126,37 @@ decode_rune_in_string :: proc(s: string16) -> (r: rune, width: int) {
 	return
 }
 
-rune_count :: proc(s: []u16) -> (n: int) {
+string_to_runes :: proc "odin" (s: string16, allocator := context.allocator) -> (runes: []rune) {
+	n := rune_count(s)
+
+	runes = make([]rune, n, allocator)
+	i := 0
+	for r in s {
+		runes[i] = r
+		i += 1
+	}
+	return
+}
+
+
+rune_count :: proc{
+	rune_count_in_string,
+	rune_count_in_slice,
+}
+rune_count_in_string :: proc(s: string16) -> (n: int) {
+	for i := 0; i < len(s); i += 1 {
+		c := s[i]
+		if _surr1 <= c && c < _surr2 && i+1 < len(s) &&
+			_surr2 <= s[i+1] && s[i+1] < _surr3 {
+			i += 1
+		}
+		n += 1
+	}
+	return
+}
+
+
+rune_count_in_slice :: proc(s: []u16) -> (n: int) {
 	for i := 0; i < len(s); i += 1 {
 		c := s[i]
 		if _surr1 <= c && c < _surr2 && i+1 < len(s) && 

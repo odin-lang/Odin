@@ -7179,7 +7179,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 			operand->mode = Addressing_Value;
-			operand->type = alloc_type_multi_pointer(t_u16);
+			if (type_hint != nullptr && is_type_cstring16(type_hint)) {
+				operand->type = type_hint;
+			} else {
+				operand->type = alloc_type_multi_pointer(t_u16);
+			}
 			operand->value = {};
 			break;
 		}

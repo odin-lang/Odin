@@ -107,8 +107,8 @@ PDWORD64 :: ^DWORD64
 PDWORD_PTR :: ^DWORD_PTR
 ATOM :: distinct WORD
 
-wstring :: [^]WCHAR
-PWSTR   :: [^]WCHAR
+wstring :: cstring16
+PWSTR   :: cstring16
 
 PBYTE :: ^BYTE
 LPBYTE :: ^BYTE

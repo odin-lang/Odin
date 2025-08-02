@@ -619,7 +619,7 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 	return .Unsupported
 }
 
-_open_sym_link :: proc(p: [^]u16) -> (handle: win32.HANDLE, err: Error) {
+_open_sym_link :: proc(p: cstring16) -> (handle: win32.HANDLE, err: Error) {
 	attrs := u32(win32.FILE_FLAG_BACKUP_SEMANTICS)
 	attrs |= win32.FILE_FLAG_OPEN_REPARSE_POINT
 	handle = win32.CreateFileW(p, 0, 0, nil, win32.OPEN_EXISTING, attrs, nil)

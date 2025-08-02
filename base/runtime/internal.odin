@@ -781,6 +781,68 @@ string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
 	return r, size
 }
 
+
+string16_decode_rune :: #force_inline proc "contextless" (s: string16) -> (rune, int) {
+	REPLACEMENT_CHAR :: '\ufffd'
+	_surr1           :: 0xd800
+	_surr2           :: 0xdc00
+	_surr3           :: 0xe000
+	_surr_self       :: 0x10000
+
+	r := rune(REPLACEMENT_CHAR)
+
+	if len(s) < 1 {
+		return r, 0
+	}
+
+	w := 1
+	switch c := s[0]; {
+	case c < _surr1, _surr3 <= c:
+		r = rune(c)
+	case _surr1 <= c && c < _surr2 && 1 < len(s) &&
+		_surr2 <= s[1] && s[1] < _surr3:
+		r1, r2 := rune(c), rune(s[1])
+		if _surr1 <= r1 && r1 < _surr2 && _surr2 <= r2 && r2 < _surr3 {
+			r = (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self
+		}
+		w += 1
+	}
+	return r, w
+}
+
+string16_decode_last_rune :: proc "contextless" (s: string16) -> (rune, int) {
+	REPLACEMENT_CHAR :: '\ufffd'
+	_surr1           :: 0xd800
+	_surr2           :: 0xdc00
+	_surr3           :: 0xe000
+	_surr_self       :: 0x10000
+
+	r := rune(REPLACEMENT_CHAR)
+
+	if len(s) < 1 {
+		return r, 0
+	}
+
+	n := len(s)-1
+	c := s[n]
+	w := 1
+	if _surr2 <= c && c < _surr3 {
+		if n >= 1 {
+			r1 := rune(s[n-1])
+			r2 := rune(c)
+			if _surr1 <= r1 && r1 < _surr2 {
+				r = (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self
+			}
+			w = 2
+		}
+	} else if c < _surr1 || _surr3 <= c {
+		r = rune(c)
+	}
+	return r, w
+}
+
+
+
 abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {
 	p, q := abs(real(x)), abs(imag(x))
 	if p < q {

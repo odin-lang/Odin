@@ -3426,7 +3426,7 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	if (are_types_identical(src, t_cstring16) && is_type_u16_multi_ptr(dst)) {
 		return !is_constant;
 	}
-	// cstring -> rawptr
+	// cstring16 -> rawptr
 	if (are_types_identical(src, t_cstring16) && is_type_rawptr(dst)) {
 		return !is_constant;
 	}

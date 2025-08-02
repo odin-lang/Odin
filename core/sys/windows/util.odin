@@ -122,14 +122,14 @@ utf8_to_utf16 :: proc{utf8_to_utf16_alloc, utf8_to_utf16_buf}
 
 utf8_to_wstring_alloc :: proc(s: string, allocator := context.temp_allocator) -> wstring {
 	if res := utf8_to_utf16(s, allocator); len(res) > 0 {
-		return raw_data(res)
+		return wstring(raw_data(res))
 	}
 	return nil
 }
 
 utf8_to_wstring_buf :: proc(buf: []u16, s: string) -> wstring {
 	if res := utf8_to_utf16(buf, s); len(res) > 0 {
-		return raw_data(res)
+		return wstring(raw_data(res))
 	}
 	return nil
 }
@@ -215,7 +215,7 @@ utf16_to_utf8_alloc :: proc(s: []u16, allocator := context.temp_allocator) -> (r
 	if len(s) == 0 {
 		return "", nil
 	}
-	return wstring_to_utf8(raw_data(s), len(s), allocator)
+	return wstring_to_utf8(wstring(raw_data(s)), len(s), allocator)
 }
 
 /*
@@ -236,7 +236,7 @@ utf16_to_utf8_buf :: proc(buf: []u8, s: []u16) -> (res: string) {
 	if len(s) == 0 {
 		return
 	}
-	return wstring_to_utf8(buf, raw_data(s), len(s))
+	return wstring_to_utf8(buf, wstring(raw_data(s)), len(s))
 }
 
 utf16_to_utf8 :: proc{utf16_to_utf8_alloc, utf16_to_utf8_buf}
@@ -298,7 +298,7 @@ _add_user :: proc(servername: string, username: string, password: string) -> (ok
 		servername_w = nil
 	} else {
 		server := utf8_to_utf16(servername, context.temp_allocator)
-		servername_w = &server[0]
+		servername_w = wstring(&server[0])
 	}
 
 	if len(username) == 0 || len(username) > LM20_UNLEN {
@@ -348,7 +348,7 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 
 	res := LookupAccountNameW(
 		nil, // Look on this computer first
-		&username_w[0],
+		wstring(&username_w[0]),
 		&sid,
 		&cbsid,
 		nil,
@@ -364,10 +364,10 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 
 	res = LookupAccountNameW(
 		nil,
-		&username_w[0],
+		wstring(&username_w[0]),
 		&sid,
 		&cbsid,
-		&cname_w[0],
+		wstring(&cname_w[0]),
 		&computer_name_size,
 		&pe_use,
 	)
@@ -390,7 +390,7 @@ get_sid :: proc(username: string, sid: ^SID) -> (ok: bool) {
 
 	res := LookupAccountNameW(
 		nil, // Look on this computer first
-		&username_w[0],
+		wstring(&username_w[0]),
 		sid,
 		&cbsid,
 		nil,
@@ -406,10 +406,10 @@ get_sid :: proc(username: string, sid: ^SID) -> (ok: bool) {
 
 	res = LookupAccountNameW(
 		nil,
-		&username_w[0],
+		wstring(&username_w[0]),
 		sid,
 		&cbsid,
-		&cname_w[0],
+		wstring(&cname_w[0]),
 		&computer_name_size,
 		&pe_use,
 	)
@@ -428,7 +428,7 @@ add_user_to_group :: proc(sid: ^SID, group: string) -> (ok: NET_API_STATUS) {
 	group_name := utf8_to_utf16(group, context.temp_allocator)
 	ok = NetLocalGroupAddMembers(
 		nil,
-		&group_name[0],
+		wstring(&group_name[0]),
 		0,
 		&group_member,
 		1,
@@ -443,7 +443,7 @@ add_del_from_group :: proc(sid: ^SID, group: string) -> (ok: NET_API_STATUS) {
 	group_name := utf8_to_utf16(group, context.temp_allocator)
 	ok = NetLocalGroupDelMembers(
 		nil,
-		&group_name[0],
+		cstring16(&group_name[0]),
 		0,
 		&group_member,
 		1,
@@ -465,19 +465,19 @@ add_user_profile :: proc(username: string) -> (ok: bool, profile_path: string) {
 	if res == false {
 		return false, ""
 	}
-	defer LocalFree(sb)
+	defer LocalFree(rawptr(sb))
 
 	pszProfilePath := make([]u16, 257, context.temp_allocator)
 	res2 := CreateProfile(
 		sb,
-		&username_w[0],
-		&pszProfilePath[0],
+		cstring16(&username_w[0]),
+		cstring16(&pszProfilePath[0]),
 		257,
 	)
 	if res2 != 0 {
 		return false, ""
 	}
-	profile_path = wstring_to_utf8(&pszProfilePath[0], 257) or_else ""
+	profile_path = wstring_to_utf8(wstring(&pszProfilePath[0]), 257) or_else ""
 
 	return true, profile_path
 }
@@ -495,7 +495,7 @@ delete_user_profile :: proc(username: string) -> (ok: bool) {
 	if res == false {
 		return false
 	}
-	defer LocalFree(sb)
+	defer LocalFree(rawptr(sb))
 
 	res2 := DeleteProfileW(
 		sb,
@@ -548,13 +548,13 @@ delete_user :: proc(servername: string, username: string) -> (ok: bool) {
 		servername_w = nil
 	} else {
 		server := utf8_to_utf16(servername, context.temp_allocator)
-		servername_w = &server[0]
+		servername_w = wstring(&server[0])
 	}
 	username_w := utf8_to_utf16(username)
 
 	res := NetUserDel(
 		servername_w,
-		&username_w[0],
+		wstring(&username_w[0]),
 	)
 	if res != .Success {
 		return false
@@ -586,9 +586,9 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 	user_token: HANDLE
 
 	ok = bool(LogonUserW(
-		lpszUsername    = &username_w[0],
-		lpszDomain      = &domain_w[0],
-		lpszPassword    = &password_w[0],
+		lpszUsername    = wstring(&username_w[0]),
+		lpszDomain      = wstring(&domain_w[0]),
+		lpszPassword    = wstring(&password_w[0]),
 		dwLogonType     = .NEW_CREDENTIALS,
 		dwLogonProvider = .WINNT50,
 		phToken         = &user_token,
@@ -605,8 +605,8 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 
 	ok = bool(CreateProcessAsUserW(
 		user_token,
-		&app_w[0],
-		&commandline_w[0],
+		wstring(&app_w[0]),
+		wstring(&commandline_w[0]),
 		nil,	// lpProcessAttributes,
 		nil,	// lpThreadAttributes,
 		false,	// bInheritHandles,

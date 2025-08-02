@@ -191,6 +191,23 @@ gb_internal lbValue lb_emit_clamp(lbProcedure *p, Type *t, lbValue x, lbValue mi
 	return z;
 }
 
+gb_internal lbValue lb_emit_string16(lbProcedure *p, lbValue str_elem, lbValue str_len) {
+	if (false && lb_is_const(str_elem) && lb_is_const(str_len)) {
+		LLVMValueRef values[2] = {
+			str_elem.value,
+			str_len.value,
+		};
+		lbValue res = {};
+		res.type = t_string16;
+		res.value = llvm_const_named_struct(p->module, t_string16, values, gb_count_of(values));
+		return res;
+	} else {
+		lbAddr res = lb_add_local_generated(p, t_string16, false);
+		lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 0), str_elem);
+		lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 1), str_len);
+		return lb_addr_load(p, res);
+	}
+}
 
 
 gb_internal lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
