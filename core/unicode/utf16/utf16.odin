@@ -106,6 +106,26 @@ decode :: proc(d: []rune, s: []u16) -> (n: int) {
 	return
 }
 
+decode_rune_in_string :: proc(s: string16) -> (r: rune, width: int) {
+	r = rune(REPLACEMENT_CHAR)
+	n := len(s)
+	if n < 1 {
+		return
+	}
+	width = 1
+
+
+	switch c := s[0]; {
+	case c < _surr1, _surr3 <= c:
+		r = rune(c)
+	case _surr1 <= c && c < _surr2 && 1 < len(s) &&
+		_surr2 <= s[1] && s[1] < _surr3:
+		r = decode_surrogate_pair(rune(c), rune(s[1]))
+		width += 1
+	}
+	return
+}
+
 rune_count :: proc(s: []u16) -> (n: int) {
 	for i := 0; i < len(s); i += 1 {
 		c := s[i]

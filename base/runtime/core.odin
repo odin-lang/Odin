@@ -73,7 +73,7 @@ Type_Info_Rune       :: struct {}
 Type_Info_Float      :: struct {endianness: Platform_Endianness}
 Type_Info_Complex    :: struct {}
 Type_Info_Quaternion :: struct {}
-Type_Info_String     :: struct {is_cstring: bool}
+Type_Info_String     :: struct {is_cstring: bool, is_utf16: bool}
 Type_Info_Boolean    :: struct {}
 Type_Info_Any        :: struct {}
 Type_Info_Type_Id    :: struct {}
@@ -397,6 +397,11 @@ Raw_String :: struct {
 	len:  int,
 }
 
+Raw_String16 :: struct {
+	data: [^]u16,
+	len:  int,
+}
+
 Raw_Slice :: struct {
 	data: rawptr,
 	len:  int,
@@ -449,6 +454,12 @@ Raw_Cstring :: struct {
 	data: [^]byte,
 }
 #assert(size_of(Raw_Cstring) == size_of(cstring))
+
+Raw_Cstring16 :: struct {
+	data: [^]u16,
+}
+#assert(size_of(Raw_Cstring16) == size_of(cstring16))
+
 
 Raw_Soa_Pointer :: struct {
 	data:  rawptr,

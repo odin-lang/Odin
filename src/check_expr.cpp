@@ -2862,6 +2862,14 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 			add_package_dependency(c, "runtime", "string_eq");
 			add_package_dependency(c, "runtime", "string_ne");
 			break;
+		case Basic_cstring16:
+			add_package_dependency(c, "runtime", "cstring16_eq");
+			add_package_dependency(c, "runtime", "cstring16_ne");
+			break;
+		case Basic_string16:
+			add_package_dependency(c, "runtime", "string16_eq");
+			add_package_dependency(c, "runtime", "string16_ne");
+			break;
 		}
 		break;
 	case Type_Struct:
@@ -3034,6 +3042,24 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 				case Token_Gt:    add_package_dependency(c, "runtime", "cstring_gt"); break;
 				case Token_LtEq:  add_package_dependency(c, "runtime", "cstring_le"); break;
 				case Token_GtEq:  add_package_dependency(c, "runtime", "cstring_gt"); break;
+				}
+			} else if (is_type_cstring16(x->type) && is_type_cstring16(y->type)) {
+				switch (op) {
+				case Token_CmpEq: add_package_dependency(c, "runtime", "cstring16_eq"); break;
+				case Token_NotEq: add_package_dependency(c, "runtime", "cstring16_ne"); break;
+				case Token_Lt:    add_package_dependency(c, "runtime", "cstring16_lt"); break;
+				case Token_Gt:    add_package_dependency(c, "runtime", "cstring16_gt"); break;
+				case Token_LtEq:  add_package_dependency(c, "runtime", "cstring16_le"); break;
+				case Token_GtEq:  add_package_dependency(c, "runtime", "cstring16_gt"); break;
+				}
+			} else if (is_type_string16(x->type) || is_type_string16(y->type)) {
+				switch (op) {
+				case Token_CmpEq: add_package_dependency(c, "runtime", "string16_eq"); break;
+				case Token_NotEq: add_package_dependency(c, "runtime", "string16_ne"); break;
+				case Token_Lt:    add_package_dependency(c, "runtime", "string16_lt"); break;
+				case Token_Gt:    add_package_dependency(c, "runtime", "string16_gt"); break;
+				case Token_LtEq:  add_package_dependency(c, "runtime", "string16_le"); break;
+				case Token_GtEq:  add_package_dependency(c, "runtime", "string16_gt"); break;
 				}
 			} else if (is_type_string(x->type) || is_type_string(y->type)) {
 				switch (op) {
@@ -3340,6 +3366,11 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 		return true;
 	}
 
+	// []u16 <-> string16 (not cstring16)
+	if (is_type_u16_slice(src) && (is_type_string16(dst) && !is_type_cstring16(dst))) {
+		return true;
+	}
+
 	// cstring -> string
 	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
 		if (operand->mode != Addressing_Constant) {
@@ -3347,6 +3378,14 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 		}
 		return true;
 	}
+	// cstring16 -> string16
+	if (are_types_identical(src, t_cstring16) && are_types_identical(dst, t_string16)) {
+		if (operand->mode != Addressing_Constant) {
+			add_package_dependency(c, "runtime", "cstring16_to_string16");
+		}
+		return true;
+	}
+
 	// cstring -> ^u8
 	if (are_types_identical(src, t_cstring) && is_type_u8_ptr(dst)) {
 		return !is_constant;
@@ -3372,6 +3411,34 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	if (is_type_rawptr(src) && are_types_identical(dst, t_cstring)) {
 		return !is_constant;
 	}
+
+	// cstring -> ^u16
+	if (are_types_identical(src, t_cstring16) && is_type_u16_ptr(dst)) {
+		return !is_constant;
+	}
+	// cstring -> [^]u16
+	if (are_types_identical(src, t_cstring16) && is_type_u16_multi_ptr(dst)) {
+		return !is_constant;
+	}
+	// cstring -> rawptr
+	if (are_types_identical(src, t_cstring16) && is_type_rawptr(dst)) {
+		return !is_constant;
+	}
+
+
+	// ^u16 -> cstring16
+	if (is_type_u16_ptr(src) && are_types_identical(dst, t_cstring16)) {
+		return !is_constant;
+	}
+	// [^]u16 -> cstring
+	if (is_type_u16_multi_ptr(src) && are_types_identical(dst, t_cstring16)) {
+		return !is_constant;
+	}
+	// rawptr -> cstring16
+	if (is_type_rawptr(src) && are_types_identical(dst, t_cstring16)) {
+		return !is_constant;
+	}
+
 	// proc <-> proc
 	if (is_type_proc(src) && is_type_proc(dst)) {
 		if (is_type_polymorphic(dst)) {
@@ -4557,6 +4624,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				if (is_type_any(target_type)) {
 					// target_type = t_untyped_nil;
 				} else if (is_type_cstring(target_type)) {
+					// target_type = t_untyped_nil;
+				} else if (is_type_cstring16(target_type)) {
 					// target_type = t_untyped_nil;
 				} else if (!type_has_nil(target_type)) {
 					operand->mode = Addressing_Invalid;
@@ -8226,12 +8295,23 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 	case Type_Basic:
 		if (t->Basic.kind == Basic_string) {
 			if (o->mode == Addressing_Constant) {
+				GB_ASSERT(o->value.kind == ExactValue_String);
 				*max_count = o->value.value_string.len;
 			}
 			if (o->mode != Addressing_Constant) {
 				o->mode = Addressing_Value;
 			}
 			o->type = t_u8;
+			return true;
+		} else if (t->Basic.kind == Basic_string16) {
+			if (o->mode == Addressing_Constant) {
+				GB_ASSERT(o->value.kind == ExactValue_String16);
+				*max_count = o->value.value_string16.len;
+			}
+			if (o->mode != Addressing_Constant) {
+				o->mode = Addressing_Value;
+			}
+			o->type = t_u16;
 			return true;
 		} else if (t->Basic.kind == Basic_UntypedString) {
 			if (o->mode == Addressing_Constant) {
@@ -10879,7 +10959,15 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_UntypedString) {
 			valid = true;
 			if (o->mode == Addressing_Constant) {
+				GB_ASSERT(o->value.kind == ExactValue_String);
 				max_count = o->value.value_string.len;
+			}
+			o->type = type_deref(o->type);
+		} else if (t->Basic.kind == Basic_string16) {
+			valid = true;
+			if (o->mode == Addressing_Constant) {
+				GB_ASSERT(o->value.kind == ExactValue_String16);
+				max_count = o->value.value_string16.len;
 			}
 			o->type = type_deref(o->type);
 		}

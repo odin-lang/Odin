@@ -2327,6 +2327,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (is_type_string(op_type) && id == BuiltinProc_len) {
 			if (operand->mode == Addressing_Constant) {
 				mode = Addressing_Constant;
+
+				GB_ASSERT_MSG(!is_type_string16(op_type), "TODO(bill): constant utf-16 string len");
+
 				String str = operand->value.value_string;
 				value = exact_value_i64(str.len);
 				type = t_untyped_integer;
@@ -2334,6 +2337,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				mode = Addressing_Value;
 				if (is_type_cstring(op_type)) {
 					add_package_dependency(c, "runtime", "cstring_len");
+				} else if (is_type_cstring16(op_type)) {
+					add_package_dependency(c, "runtime", "cstring16_len");
 				}
 			}
 		} else if (is_type_array(op_type)) {
@@ -4683,7 +4688,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				break;
 			case Type_Basic:
 				if (t->Basic.kind == Basic_string) {
-					operand->type = alloc_type_multi_pointer(t_u8);
+					operand->type = t_u8_multi_ptr;
+				} else if (t->Basic.kind == Basic_string16) {
+					operand->type = t_u16_multi_ptr;
 				}
 				break;
 			case Type_Pointer:
