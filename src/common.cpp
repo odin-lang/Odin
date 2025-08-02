@@ -350,6 +350,7 @@ gb_global bool global_module_path_set = false;
 #include "ptr_map.cpp"
 #include "ptr_set.cpp"
 #include "string_map.cpp"
+#include "string16_map.cpp"
 #include "string_set.cpp"
 #include "priority_queue.cpp"
 #include "thread_pool.cpp"

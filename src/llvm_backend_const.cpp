@@ -594,7 +594,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			return res;
 		} else if (value.kind == ExactValue_String16) {
 			GB_ASSERT(is_type_slice(type));
-			GB_PANIC("TODO(bill): UTF-16 String");
+			res.value = lb_find_or_add_entity_string16_slice_with_type(m, value.value_string16, original_type).value;
 			return res;
 		}else {
 			ast_node(cl, CompoundLit, value.value_compound);

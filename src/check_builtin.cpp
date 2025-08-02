@@ -2329,10 +2329,15 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			if (operand->mode == Addressing_Constant) {
 				mode = Addressing_Constant;
 
-				GB_ASSERT_MSG(!is_type_string16(op_type), "TODO(bill): constant utf-16 string len");
-
-				String str = operand->value.value_string;
-				value = exact_value_i64(str.len);
+				if (operand->value.kind == ExactValue_String) {
+					String str = operand->value.value_string;
+					value = exact_value_i64(str.len);
+				} else if (operand->value.kind == ExactValue_String16) {
+					String16 str = operand->value.value_string16;
+					value = exact_value_i64(str.len);
+				} else {
+					GB_PANIC("Unhandled value kind: %d", operand->value.kind);
+				}
 				type = t_untyped_integer;
 			} else {
 				mode = Addressing_Value;

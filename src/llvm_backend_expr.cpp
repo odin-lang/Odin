@@ -2526,12 +2526,6 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 
 	if (is_type_untyped(src)) {
-		if (is_type_string(src) && is_type_string16(dst)) {
-			GB_PANIC("TODO(bill): UTF-16 string");
-			lbAddr result = lb_add_local_generated(p, t, false);
-			lb_addr_store(p, result, value);
-			return lb_addr_load(p, result);
-		}
 		if (is_type_string(src) && is_type_string(dst)) {
 			lbAddr result = lb_add_local_generated(p, t, false);
 			lb_addr_store(p, result, value);
