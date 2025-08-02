@@ -2106,6 +2106,9 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 	} else if (is_type_boolean(type)) {
 		return in_value.kind == ExactValue_Bool;
 	} else if (is_type_string(type)) {
+		if (in_value.kind == ExactValue_String16) {
+			return is_type_string16(type) || is_type_cstring16(type);
+		}
 		return in_value.kind == ExactValue_String;
 	} else if (is_type_integer(type) || is_type_rune(type)) {
 		if (in_value.kind == ExactValue_Bool) {
@@ -2318,6 +2321,9 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			// return true;
 		}
 		if (in_value.kind == ExactValue_String) {
+			return false;
+		}
+		if (in_value.kind == ExactValue_String16) {
 			return false;
 		}
 		if (out_value) *out_value = in_value;
@@ -4654,6 +4660,13 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 						break;
 					}
 				}
+			} else if (operand->value.kind == ExactValue_String16) {
+				String16 s = operand->value.value_string16;
+				if (is_type_u16_array(t)) {
+					if (s.len == t->Array.count) {
+						break;
+					}
+				}
 			}
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
@@ -4980,6 +4993,12 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 	if (value.kind == ExactValue_String) {
 		GB_ASSERT(0 <= index && index < value.value_string.len);
 		u8 val = value.value_string[index];
+		if (success_) *success_ = true;
+		if (finish_) *finish_ = true;
+		return exact_value_u64(val);
+	} else if (value.kind == ExactValue_String16) {
+		GB_ASSERT(0 <= index && index < value.value_string.len);
+		u16 val = value.value_string16[index];
 		if (success_) *success_ = true;
 		if (finish_) *finish_ = true;
 		return exact_value_u64(val);
@@ -11124,15 +11143,21 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->expr = node;
 			return kind;
 		}
-
-		String s = {};
-		if (o->value.kind == ExactValue_String) {
-			s = o->value.value_string;
-		}
-
 		o->mode = Addressing_Constant;
 		o->type = t;
-		o->value = exact_value_string(substring(s, cast(isize)indices[0], cast(isize)indices[1]));
+
+		if (o->value.kind == ExactValue_String16) {
+			String16 s = o->value.value_string16;
+
+			o->value = exact_value_string16(substring(s, cast(isize)indices[0], cast(isize)indices[1]));
+		} else {
+			String s = {};
+			if (o->value.kind == ExactValue_String) {
+				s = o->value.value_string;
+			}
+
+			o->value = exact_value_string(substring(s, cast(isize)indices[0], cast(isize)indices[1]));
+		}
 	}
 	return kind;
 }
@@ -11221,6 +11246,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		Type *t = t_invalid;
 		switch (node->tav.value.kind) {
 		case ExactValue_String:     t = t_untyped_string;     break;
+		case ExactValue_String16:   t = t_string16;           break; // TODO(bill): determine this correctly
 		case ExactValue_Float:      t = t_untyped_float;      break;
 		case ExactValue_Complex:    t = t_untyped_complex;    break;
 		case ExactValue_Quaternion: t = t_untyped_quaternion; break;
@@ -11657,6 +11683,8 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 		return !v.value_bool;
 	case ExactValue_String:
 		return v.value_string.len == 0;
+	case ExactValue_String16:
+		return v.value_string16.len == 0;
 	case ExactValue_Integer:
 		return big_int_is_zero(&v.value_integer);
 	case ExactValue_Float:

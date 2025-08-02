@@ -6,6 +6,7 @@ gb_internal bool lb_is_type_aggregate(Type *t) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
 		case Basic_string:
+		case Basic_string16:
 		case Basic_any:
 			return true;
 
@@ -981,7 +982,8 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 	} else if (build_context.ptr_size != build_context.int_size) {
 		switch (t->kind) {
 		case Type_Basic:
-			if (t->Basic.kind != Basic_string) {
+			if (t->Basic.kind != Basic_string &&
+			    t->Basic.kind != Basic_string16) {
 				break;
 			}
 			/*fallthrough*/
@@ -1160,6 +1162,11 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 0: result_type = alloc_type_pointer(t->Slice.elem); break;
 		case 1: result_type = t_int; break;
 		}
+	} else if (is_type_string16(t)) {
+		switch (index) {
+		case 0: result_type = t_u16_ptr; break;
+		case 1: result_type = t_int;    break;
+		}
 	} else if (is_type_string(t)) {
 		switch (index) {
 		case 0: result_type = t_u8_ptr; break;
@@ -1273,6 +1280,12 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
+		case Basic_string16:
+			switch (index) {
+			case 0: result_type = t_u16_ptr; break;
+			case 1: result_type = t_int;    break;
+			}
+			break;
 		case Basic_string:
 			switch (index) {
 			case 0: result_type = t_u8_ptr; break;
@@ -1437,6 +1450,10 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			}
 
 			case Basic_string:
+				e = lb_emit_struct_ep(p, e, index);
+				break;
+
+			case Basic_string16:
 				e = lb_emit_struct_ep(p, e, index);
 				break;
 

@@ -319,7 +319,6 @@ write_string :: proc(s: Writer, str: string, n_written: ^int = nil) -> (n: int, 
 write_string16 :: proc(s: Writer, str: string16, n_written: ^int = nil) -> (n: int, err: Error) {
 	for i := 0; i < len(str); i += 1 {
 		r := rune(utf16.REPLACEMENT_CHAR)
-
 		switch c := str[i]; {
 		case c < utf16._surr1, utf16._surr3 <= c:
 			r = rune(c)
@@ -329,7 +328,8 @@ write_string16 :: proc(s: Writer, str: string16, n_written: ^int = nil) -> (n: i
 			i += 1
 		}
 
-		w, err := write_rune(s, r, n_written)
+		w: int
+		w, err = write_rune(s, r, n_written)
 		n += w
 		if err != nil {
 			return

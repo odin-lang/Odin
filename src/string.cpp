@@ -79,6 +79,13 @@ gb_internal String substring(String const &s, isize lo, isize hi) {
 	return make_string(s.text+lo, hi-lo);
 }
 
+gb_internal String16 substring(String16 const &s, isize lo, isize hi) {
+	isize max = s.len;
+	GB_ASSERT_MSG(lo <= hi && hi <= max, "%td..%td..%td", lo, hi, max);
+
+	return make_string16(s.text+lo, hi-lo);
+}
+
 
 gb_internal char *alloc_cstring(gbAllocator a, String s) {
 	char *c_str = gb_alloc_array(a, char, s.len+1);

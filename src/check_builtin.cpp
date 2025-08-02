@@ -19,6 +19,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_complex,
 	is_type_quaternion,
 	is_type_string,
+	is_type_string16,
 	is_type_typeid,
 	is_type_any,
 	is_type_endian_platform,
@@ -6139,6 +6140,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_complex:
 	case BuiltinProc_type_is_quaternion:
 	case BuiltinProc_type_is_string:
+	case BuiltinProc_type_is_string16:
 	case BuiltinProc_type_is_typeid:
 	case BuiltinProc_type_is_any:
 	case BuiltinProc_type_is_endian_platform:

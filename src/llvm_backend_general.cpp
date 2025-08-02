@@ -2715,6 +2715,43 @@ gb_internal LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String co
 	}
 }
 
+gb_internal LLVMValueRef lb_find_or_add_entity_string16_ptr(lbModule *m, String16 const &str, bool custom_link_section) {
+	// TODO(bill): caching for UTF-16 strings
+
+	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
+
+	LLVMValueRef data = nullptr;
+	{
+		LLVMTypeRef llvm_u16 = LLVMInt16TypeInContext(m->ctx);
+
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, str.len+1);
+
+		for (isize i = 0; i < str.len; i++) {
+			values[i] = LLVMConstInt(llvm_u16, str.text[i], false);
+		}
+		values[str.len] = LLVMConstInt(llvm_u16, 0, false);
+
+		data = LLVMConstArray(llvm_u16, values, cast(unsigned)(str.len+1));
+	}
+
+
+	u32 id = m->global_array_index.fetch_add(1);
+	gbString name = gb_string_make(temporary_allocator(), "csbs$");
+	name = gb_string_appendc(name, m->module_name);
+	name = gb_string_append_fmt(name, "$%x", id);
+
+	LLVMTypeRef type = LLVMTypeOf(data);
+	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
+	LLVMSetInitializer(global_data, data);
+	lb_make_global_private_const(global_data);
+	LLVMSetAlignment(global_data, 1);
+
+	LLVMValueRef ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
+	return ptr;
+}
+
 gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str, bool custom_link_section) {
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
