@@ -568,6 +568,14 @@ window_delegate_register_and_alloc :: proc(template: WindowDelegateTemplate, cla
 @(objc_class="CALayer")
 Layer :: struct { using _: Object }
 
+@(objc_type=Layer, objc_name="contents")
+Layer_contents :: proc "c" (self: ^Layer) -> rawptr {
+	return msgSend(rawptr, self, "contents")
+}
+@(objc_type=Layer, objc_name="setContents")
+Layer_setContents :: proc "c" (self: ^Layer, contents: rawptr) {
+	msgSend(nil, self, "setContents:", contents)
+}
 @(objc_type=Layer, objc_name="contentsScale")
 Layer_contentsScale :: proc "c" (self: ^Layer) -> Float {
 	return msgSend(Float, self, "contentsScale")
