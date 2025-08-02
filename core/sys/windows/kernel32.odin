@@ -258,7 +258,7 @@ foreign kernel32 {
 	) -> BOOL ---
 	CreateProcessW :: proc(
 		lpApplicationName: LPCWSTR,
-		lpCommandLine: LPWSTR,
+		lpCommandLine: LPCWSTR,
 		lpProcessAttributes: LPSECURITY_ATTRIBUTES,
 		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
 		bInheritHandles: BOOL,
