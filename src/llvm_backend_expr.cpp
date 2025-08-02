@@ -1560,7 +1560,7 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 		} else if (lb_is_empty_string_constant(be->right) && !is_type_union(be->left->tav.type)) {
 			// `x == ""` or `x != ""`
 			Type *str_type = t_string;
-			if (is_type_string16(be->left->tav.type)) {
+			if (is_type_string16(be->left->tav.type) || is_type_cstring16(be->left->tav.type)) {
 				str_type = t_string16;
 			}
 			lbValue s = lb_build_expr(p, be->left);
@@ -1572,7 +1572,7 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 		} else if (lb_is_empty_string_constant(be->left) && !is_type_union(be->right->tav.type)) {
 			// `"" == x` or `"" != x`
 			Type *str_type = t_string;
-			if (is_type_string16(be->right->tav.type)) {
+			if (is_type_string16(be->right->tav.type) || is_type_cstring16(be->right->tav.type)) {
 				str_type = t_string16;
 			}
 			lbValue s = lb_build_expr(p, be->right);
