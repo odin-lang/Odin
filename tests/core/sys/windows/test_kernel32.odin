@@ -12,7 +12,7 @@ lcid_to_local :: proc(t: ^testing.T) {
 	cc := win32.LCIDToLocaleName(lcid, &wname[0], len(wname) - 1, 0)
 	testing.expectf(t, cc == 6, "%#x (should be: %#x)", u32(cc), 6)
 	if cc == 0 {return}
-	str, err := win32.wstring_to_utf8(win32.wstring(&wname), int(cc))
+	str, err := win32.wstring_to_utf8(win32.wstring(&wname[0]), int(cc))
 	testing.expectf(t, err == .None, "%v (should be: %x)", err, 0)
 	exp :: "en-US"
 	testing.expectf(t, str == exp, "%v (should be: %v)", str, exp)

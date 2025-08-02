@@ -27,7 +27,8 @@ utf16_to_utf8_buf_test :: proc(t: ^testing.T) {
 		buf := make([]u8, len(test.ustr))
 		defer delete(buf)
 
-		res := win32.utf16_to_utf8_buf(buf[:], test.wstr[:len(test.ustr)])
+		wstr := string16(test.wstr)
+		res := win32.utf16_to_utf8_buf(buf[:], transmute([]u16)wstr)
 		testing.expect_value(t, res, test.ustr)
 	}
 }
