@@ -1559,16 +1559,24 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			return lb_emit_conv(p, cmp, type);
 		} else if (lb_is_empty_string_constant(be->right) && !is_type_union(be->left->tav.type)) {
 			// `x == ""` or `x != ""`
+			Type *str_type = t_string;
+			if (is_type_string16(be->left->tav.type)) {
+				str_type = t_string16;
+			}
 			lbValue s = lb_build_expr(p, be->left);
-			s = lb_emit_conv(p, s, t_string);
+			s = lb_emit_conv(p, s, str_type);
 			lbValue len = lb_string_len(p, s);
 			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
 		} else if (lb_is_empty_string_constant(be->left) && !is_type_union(be->right->tav.type)) {
 			// `"" == x` or `"" != x`
+			Type *str_type = t_string;
+			if (is_type_string16(be->right->tav.type)) {
+				str_type = t_string16;
+			}
 			lbValue s = lb_build_expr(p, be->right);
-			s = lb_emit_conv(p, s, t_string);
+			s = lb_emit_conv(p, s, str_type);
 			lbValue len = lb_string_len(p, s);
 			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
 			Type *type = default_type(tv.type);
@@ -2792,8 +2800,8 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 
 
 		if (is_type_cstring16(a) ^ is_type_cstring16(b)) {
-			left  = lb_emit_conv(p, left, t_string);
-			right = lb_emit_conv(p, right, t_string);
+			left  = lb_emit_conv(p, left, t_string16);
+			right = lb_emit_conv(p, right, t_string16);
 		}
 
 		char const *runtime_procedure = nullptr;
