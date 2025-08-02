@@ -658,7 +658,6 @@ gb_internal String normalize_path(gbAllocator a, String const &path, String cons
 
 
 
-// TODO(bill): Make this non-windows specific
 gb_internal String16 string_to_string16(gbAllocator a, String s) {
 	int len, len1;
 	u16 *text;
@@ -680,7 +679,6 @@ gb_internal String16 string_to_string16(gbAllocator a, String s) {
 		return make_string16(nullptr, 0);
 	}
 	text[len] = 0;
-
 	return make_string16(text, len);
 }
 

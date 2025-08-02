@@ -2758,7 +2758,7 @@ gb_internal LLVMValueRef lb_find_or_add_entity_string16_ptr(lbModule *m, String1
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 	LLVMSetInitializer(global_data, data);
 	lb_make_global_private_const(global_data);
-	LLVMSetAlignment(global_data, 1);
+	LLVMSetAlignment(global_data, 2);
 
 	LLVMValueRef ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
 	if (!custom_link_section) {
@@ -2855,7 +2855,7 @@ gb_internal lbValue lb_find_or_add_entity_string16_slice_with_type(lbModule *m, 
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 	LLVMSetInitializer(global_data, data);
 	lb_make_global_private_const(global_data);
-	LLVMSetAlignment(global_data, 1);
+	LLVMSetAlignment(global_data, 2);
 
 	i64 data_len = str.len;
 	LLVMValueRef ptr = nullptr;
