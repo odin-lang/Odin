@@ -919,7 +919,7 @@ win32_wstring_to_utf8 :: proc(s: cstring16, allocator: runtime.Allocator) -> (re
 @(private="package")
 win32_utf16_to_utf8 :: proc{
 	win32_utf16_string16_to_utf8,
-	win32_utf16_u16_to_utf8
+	win32_utf16_u16_to_utf8,
 }
 
 @(private="package", require_results)

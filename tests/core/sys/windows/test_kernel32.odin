@@ -17,7 +17,7 @@ lcid_to_local :: proc(t: ^testing.T) {
 	exp :: "en-US"
 	testing.expectf(t, str == exp, "%v (should be: %v)", str, exp)
 
-	cc2 := win32.LocaleNameToLCID(L(exp), 0)
+	cc2 := win32.LocaleNameToLCID(exp, 0)
 	testing.expectf(t, cc2 == 0x0409, "%#x (should be: %#x)", u32(cc2), 0x0409)
 
 	//fmt.printfln("%0X", lcid)

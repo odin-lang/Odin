@@ -12,11 +12,11 @@ UTF16_Vector :: struct {
 
 utf16_vectors := []UTF16_Vector{
 	{
-		intrinsics.constant_utf16_cstring("Hellope, World!"),
+		"Hellope, World!",
 		"Hellope, World!",
 	},
 	{
-		intrinsics.constant_utf16_cstring("Hellope\x00, World!"),
+		"Hellope\x00, World!",
 		"Hellope",
 	},
 }
