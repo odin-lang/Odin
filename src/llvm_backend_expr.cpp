@@ -2330,6 +2330,21 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
+	// [^]u16 <-> cstring16
+	if (is_type_u16_multi_ptr(src) && is_type_cstring16(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+	if (is_type_cstring16(src) && is_type_u16_multi_ptr(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+	if (is_type_u16_ptr(src) && is_type_cstring16(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+	if (is_type_cstring16(src) && is_type_u16_ptr(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+
+
 	// []u16 <-> string16
 	if (is_type_u16_slice(src) && is_type_string16(dst)) {
 		return lb_emit_transmute(p, value, t);
@@ -2753,7 +2768,53 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		return lb_compare_records(p, op_kind, left, right, b);
 	}
 
+
+	if (is_type_string16(a) || is_type_cstring16(a)) {
+		if (is_type_cstring16(a) && is_type_cstring16(b)) {
+			left  = lb_emit_conv(p, left, t_cstring16);
+			right = lb_emit_conv(p, right, t_cstring16);
+			char const *runtime_procedure = nullptr;
+			switch (op_kind) {
+			case Token_CmpEq: runtime_procedure = "cstring16_eq"; break;
+			case Token_NotEq: runtime_procedure = "cstring16_ne"; break;
+			case Token_Lt:    runtime_procedure = "cstring16_lt"; break;
+			case Token_Gt:    runtime_procedure = "cstring16_gt"; break;
+			case Token_LtEq:  runtime_procedure = "cstring16_le"; break;
+			case Token_GtEq:  runtime_procedure = "cstring16_ge"; break;
+			}
+			GB_ASSERT(runtime_procedure != nullptr);
+
+			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			args[0] = left;
+			args[1] = right;
+			return lb_emit_runtime_call(p, runtime_procedure, args);
+		}
+
+
+		if (is_type_cstring16(a) ^ is_type_cstring16(b)) {
+			left  = lb_emit_conv(p, left, t_string);
+			right = lb_emit_conv(p, right, t_string);
+		}
+
+		char const *runtime_procedure = nullptr;
+		switch (op_kind) {
+		case Token_CmpEq: runtime_procedure = "string16_eq"; break;
+		case Token_NotEq: runtime_procedure = "string16_ne"; break;
+		case Token_Lt:    runtime_procedure = "string16_lt"; break;
+		case Token_Gt:    runtime_procedure = "string16_gt"; break;
+		case Token_LtEq:  runtime_procedure = "string16_le"; break;
+		case Token_GtEq:  runtime_procedure = "string16_ge"; break;
+		}
+		GB_ASSERT(runtime_procedure != nullptr);
+
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		args[0] = left;
+		args[1] = right;
+		return lb_emit_runtime_call(p, runtime_procedure, args);
+	}
+
 	if (is_type_string(a)) {
+
 		if (is_type_cstring(a) && is_type_cstring(b)) {
 			left  = lb_emit_conv(p, left, t_cstring);
 			right = lb_emit_conv(p, right, t_cstring);
