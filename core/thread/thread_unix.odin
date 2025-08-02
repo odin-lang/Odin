@@ -81,8 +81,13 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	}
 	defer posix.pthread_attr_destroy(&attrs)
 
-	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
+	stacksize: posix.rlimit
+	if res := posix.getrlimit(.STACK, &stacksize); res == .OK && stacksize.rlim_cur > 0 {
+		_ = posix.pthread_attr_setstacksize(&attrs, uint(stacksize.rlim_cur))
+	}
+
 	res: posix.Errno
+	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
 	res = posix.pthread_attr_setdetachstate(&attrs, .CREATE_JOINABLE)
 	assert(res == nil)
 	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
