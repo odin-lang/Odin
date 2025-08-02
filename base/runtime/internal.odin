@@ -493,11 +493,39 @@ string_cmp :: proc "contextless" (a, b: string) -> int {
 	return ret
 }
 
+
+string16_eq :: proc "contextless" (lhs, rhs: string16) -> bool {
+	x := transmute(Raw_String16)lhs
+	y := transmute(Raw_String16)rhs
+	if x.len != y.len {
+		return false
+	}
+	return #force_inline memory_equal(x.data, y.data, x.len*size_of(u16))
+}
+
+string16_cmp :: proc "contextless" (a, b: string16) -> int {
+	x := transmute(Raw_String16)a
+	y := transmute(Raw_String16)b
+
+	ret := memory_compare(x.data, y.data, min(x.len, y.len)*size_of(u16))
+	if ret == 0 && x.len != y.len {
+		return -1 if x.len < y.len else +1
+	}
+	return ret
+}
+
 string_ne :: #force_inline proc "contextless" (a, b: string) -> bool { return !string_eq(a, b) }
 string_lt :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) < 0 }
 string_gt :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) > 0 }
 string_le :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) <= 0 }
 string_ge :: #force_inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) >= 0 }
+
+string16_ne :: #force_inline proc "contextless" (a, b: string16) -> bool { return !string16_eq(a, b) }
+string16_lt :: #force_inline proc "contextless" (a, b: string16) -> bool { return string16_cmp(a, b) < 0 }
+string16_gt :: #force_inline proc "contextless" (a, b: string16) -> bool { return string16_cmp(a, b) > 0 }
+string16_le :: #force_inline proc "contextless" (a, b: string16) -> bool { return string16_cmp(a, b) <= 0 }
+string16_ge :: #force_inline proc "contextless" (a, b: string16) -> bool { return string16_cmp(a, b) >= 0 }
+
 
 cstring_len :: proc "contextless" (s: cstring) -> int {
 	p0 := uintptr((^byte)(s))
@@ -508,6 +536,16 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 	return int(p - p0)
 }
 
+cstring16_len :: proc "contextless" (s: cstring16) -> int {
+	p := ([^]u16)(s)
+	n := 0
+	for p != nil && p[0] != 0 {
+		p = p[1:]
+		n += 1
+	}
+	return n
+}
+
 cstring_to_string :: proc "contextless" (s: cstring) -> string {
 	if s == nil {
 		return ""
@@ -515,6 +553,15 @@ cstring_to_string :: proc "contextless" (s: cstring) -> string {
 	ptr := (^byte)(s)
 	n := cstring_len(s)
 	return transmute(string)Raw_String{ptr, n}
+}
+
+cstring16_to_string16 :: proc "contextless" (s: cstring16) -> string16 {
+	if s == nil {
+		return ""
+	}
+	ptr := (^u16)(s)
+	n := cstring16_len(s)
+	return transmute(string16)Raw_String16{ptr, n}
 }
 
 
@@ -559,6 +606,46 @@ cstring_gt :: #force_inline proc "contextless" (a, b: cstring) -> bool { return 
 cstring_le :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) <= 0 }
 cstring_ge :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) >= 0 }
 
+cstring16_eq :: proc "contextless" (lhs, rhs: cstring16) -> bool {
+	x := ([^]u16)(lhs)
+	y := ([^]u16)(rhs)
+	if x == y {
+		return true
+	}
+	if (x == nil) ~ (y == nil) {
+		return false
+	}
+	xn := cstring16_len(lhs)
+	yn := cstring16_len(rhs)
+	if xn != yn {
+		return false
+	}
+	return #force_inline memory_equal(x, y, xn*size_of(u16))
+}
+
+cstring16_cmp :: proc "contextless" (lhs, rhs: cstring16) -> int {
+	x := ([^]u16)(lhs)
+	y := ([^]u16)(rhs)
+	if x == y {
+		return 0
+	}
+	if (x == nil) ~ (y == nil) {
+		return -1 if x == nil else +1
+	}
+	xn := cstring16_len(lhs)
+	yn := cstring16_len(rhs)
+	ret := memory_compare(x, y, min(xn, yn)*size_of(u16))
+	if ret == 0 && xn != yn {
+		return -1 if xn < yn else +1
+	}
+	return ret
+}
+
+cstring16_ne :: #force_inline proc "contextless" (a, b: cstring16) -> bool { return !cstring16_eq(a, b) }
+cstring16_lt :: #force_inline proc "contextless" (a, b: cstring16) -> bool { return cstring16_cmp(a, b) < 0 }
+cstring16_gt :: #force_inline proc "contextless" (a, b: cstring16) -> bool { return cstring16_cmp(a, b) > 0 }
+cstring16_le :: #force_inline proc "contextless" (a, b: cstring16) -> bool { return cstring16_cmp(a, b) <= 0 }
+cstring16_ge :: #force_inline proc "contextless" (a, b: cstring16) -> bool { return cstring16_cmp(a, b) >= 0 }
 
 complex32_eq :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) == real(b) && imag(a) == imag(b) }
 complex32_ne :: #force_inline proc "contextless"  (a, b: complex32)  -> bool { return real(a) != real(b) || imag(a) != imag(b) }
@@ -693,6 +780,68 @@ string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
 	}
 	return r, size
 }
+
+
+string16_decode_rune :: #force_inline proc "contextless" (s: string16) -> (rune, int) {
+	REPLACEMENT_CHAR :: '\ufffd'
+	_surr1           :: 0xd800
+	_surr2           :: 0xdc00
+	_surr3           :: 0xe000
+	_surr_self       :: 0x10000
+
+	r := rune(REPLACEMENT_CHAR)
+
+	if len(s) < 1 {
+		return r, 0
+	}
+
+	w := 1
+	switch c := s[0]; {
+	case c < _surr1, _surr3 <= c:
+		r = rune(c)
+	case _surr1 <= c && c < _surr2 && 1 < len(s) &&
+		_surr2 <= s[1] && s[1] < _surr3:
+		r1, r2 := rune(c), rune(s[1])
+		if _surr1 <= r1 && r1 < _surr2 && _surr2 <= r2 && r2 < _surr3 {
+			r = (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self
+		}
+		w += 1
+	}
+	return r, w
+}
+
+string16_decode_last_rune :: proc "contextless" (s: string16) -> (rune, int) {
+	REPLACEMENT_CHAR :: '\ufffd'
+	_surr1           :: 0xd800
+	_surr2           :: 0xdc00
+	_surr3           :: 0xe000
+	_surr_self       :: 0x10000
+
+	r := rune(REPLACEMENT_CHAR)
+
+	if len(s) < 1 {
+		return r, 0
+	}
+
+	n := len(s)-1
+	c := s[n]
+	w := 1
+	if _surr2 <= c && c < _surr3 {
+		if n >= 1 {
+			r1 := rune(s[n-1])
+			r2 := rune(c)
+			if _surr1 <= r1 && r1 < _surr2 {
+				r = (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self
+			}
+			w = 2
+		}
+	} else if c < _surr1 || _surr3 <= c {
+		r = rune(c)
+	}
+	return r, w
+}
+
+
 
 abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {
 	p, q := abs(real(x)), abs(imag(x))

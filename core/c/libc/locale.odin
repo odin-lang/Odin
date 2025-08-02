@@ -72,14 +72,14 @@ when ODIN_OS == .Windows {
 		n_sep_by_space:       c.char,
 		p_sign_posn:          c.char,
 		n_sign_posn:          c.char,
-		_W_decimal_point:     [^]u16 `fmt:"s,0"`,
-		_W_thousands_sep:     [^]u16 `fmt:"s,0"`,
-		_W_int_curr_symbol:   [^]u16 `fmt:"s,0"`,
-		_W_currency_symbol:   [^]u16 `fmt:"s,0"`,
-		_W_mon_decimal_point: [^]u16 `fmt:"s,0"`,
-		_W_mon_thousands_sep: [^]u16 `fmt:"s,0"`,
-		_W_positive_sign:     [^]u16 `fmt:"s,0"`,
-		_W_negative_sign:     [^]u16 `fmt:"s,0"`,
+		_W_decimal_point:     cstring16,
+		_W_thousands_sep:     cstring16,
+		_W_int_curr_symbol:   cstring16,
+		_W_currency_symbol:   cstring16,
+		_W_mon_decimal_point: cstring16,
+		_W_mon_thousands_sep: cstring16,
+		_W_positive_sign:     cstring16,
+		_W_negative_sign:     cstring16,
 	}
 } else {
 	lconv :: struct {

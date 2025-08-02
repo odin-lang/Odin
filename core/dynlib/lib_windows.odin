@@ -13,7 +13,7 @@ _LIBRARY_FILE_EXTENSION :: "dll"
 _load_library :: proc(path: string, global_symbols: bool, allocator: runtime.Allocator) -> (Library, bool) {
 	// NOTE(bill): 'global_symbols' is here only for consistency with POSIX which has RTLD_GLOBAL
 	wide_path := win32.utf8_to_wstring(path, allocator)
-	defer free(wide_path, allocator)
+	defer free(rawptr(wide_path), allocator)
 	handle := cast(Library)win32.LoadLibraryW(wide_path)
 	return handle, handle != nil
 }

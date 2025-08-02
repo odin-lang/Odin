@@ -1089,7 +1089,7 @@ gb_internal String internal_odin_root_dir(void) {
 	text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
 
 	GetModuleFileNameW(nullptr, text, cast(int)len);
-	path = string16_to_string(heap_allocator(), make_string16(text, len));
+	path = string16_to_string(heap_allocator(), make_string16(cast(u16 *)text, len));
 
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
@@ -1387,14 +1387,14 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 
 	mutex_lock(&fullpath_mutex);
 
-	len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
+	len = GetFullPathNameW(cast(wchar_t *)&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
 		wchar_t *text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
-		GetFullPathNameW(&string16[0], len, text, nullptr);
+		GetFullPathNameW(cast(wchar_t *)&string16[0], len, text, nullptr);
 		mutex_unlock(&fullpath_mutex);
 
 		text[len] = 0;
-		result = string16_to_string(a, make_string16(text, len));
+		result = string16_to_string(a, make_string16(cast(u16 *)text, len));
 		result = string_trim_whitespace(result);
 
 		// Replace Windows style separators

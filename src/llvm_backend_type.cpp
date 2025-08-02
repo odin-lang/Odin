@@ -531,7 +531,33 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 			case Basic_cstring:
 				{
 					tag_type = t_type_info_string;
-					LLVMValueRef vals[1] = {
+					LLVMValueRef vals[2] = {
+						lb_const_bool(m, t_bool, true).value,
+						lb_const_bool(m, t_bool, false).value,
+					};
+
+					variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
+				}
+				break;
+
+			case Basic_string16:
+				{
+					tag_type = t_type_info_string;
+					LLVMValueRef vals[2] = {
+						lb_const_bool(m, t_bool, false).value,
+						lb_const_bool(m, t_bool, true).value,
+					};
+
+					variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
+				}
+				break;
+
+
+			case Basic_cstring16:
+				{
+					tag_type = t_type_info_string;
+					LLVMValueRef vals[2] = {
+						lb_const_bool(m, t_bool, true).value,
 						lb_const_bool(m, t_bool, true).value,
 					};
 

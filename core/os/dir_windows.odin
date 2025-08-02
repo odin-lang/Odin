@@ -87,7 +87,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	defer delete(path)
 
 	find_data := &win32.WIN32_FIND_DATAW{}
-	find_handle := win32.FindFirstFileW(raw_data(wpath_search), find_data)
+	find_handle := win32.FindFirstFileW(cstring16(raw_data(wpath_search)), find_data)
 	if find_handle == win32.INVALID_HANDLE_VALUE {
 		err = get_last_error()
 		return dfi[:], err

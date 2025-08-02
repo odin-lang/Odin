@@ -350,6 +350,7 @@ gb_global bool global_module_path_set = false;
 #include "ptr_map.cpp"
 #include "ptr_set.cpp"
 #include "string_map.cpp"
+#include "string16_map.cpp"
 #include "string_set.cpp"
 #include "priority_queue.cpp"
 #include "thread_pool.cpp"
@@ -669,7 +670,7 @@ gb_internal gb_inline f64 gb_sqrt(f64 x) {
 gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 	u32 i, j;
 
-	u32 len = cast(u32)string16_len(cmd_line);
+	u32 len = cast(u32)string16_len(cast(u16 *)cmd_line);
 	i = ((len+2)/2)*gb_size_of(void *) + gb_size_of(void *);
 
 	wchar_t **argv = cast(wchar_t **)GlobalAlloc(GMEM_FIXED, i + (len+2)*gb_size_of(wchar_t));

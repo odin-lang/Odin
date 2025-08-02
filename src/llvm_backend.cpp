@@ -1264,7 +1264,13 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		case Basic_string:
 			return build_context.metrics.int_size == 4 ? str_lit("{string=*i}") : str_lit("{string=*q}");
 
+		case Basic_string16:
+			return build_context.metrics.int_size == 4 ? str_lit("{string16=*i}") : str_lit("{string16=*q}");
+
 		case Basic_cstring: return str_lit("*");
+		case Basic_cstring16: return str_lit("*");
+
+
 		case Basic_any:     return str_lit("{any=^v^v}");  // rawptr + ^Type_Info
 
 		case Basic_typeid:

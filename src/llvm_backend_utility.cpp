@@ -6,6 +6,7 @@ gb_internal bool lb_is_type_aggregate(Type *t) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
 		case Basic_string:
+		case Basic_string16:
 		case Basic_any:
 			return true;
 
@@ -190,6 +191,23 @@ gb_internal lbValue lb_emit_clamp(lbProcedure *p, Type *t, lbValue x, lbValue mi
 	return z;
 }
 
+gb_internal lbValue lb_emit_string16(lbProcedure *p, lbValue str_elem, lbValue str_len) {
+	if (false && lb_is_const(str_elem) && lb_is_const(str_len)) {
+		LLVMValueRef values[2] = {
+			str_elem.value,
+			str_len.value,
+		};
+		lbValue res = {};
+		res.type = t_string16;
+		res.value = llvm_const_named_struct(p->module, t_string16, values, gb_count_of(values));
+		return res;
+	} else {
+		lbAddr res = lb_add_local_generated(p, t_string16, false);
+		lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 0), str_elem);
+		lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 1), str_len);
+		return lb_addr_load(p, res);
+	}
+}
 
 
 gb_internal lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
@@ -981,7 +999,8 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 	} else if (build_context.ptr_size != build_context.int_size) {
 		switch (t->kind) {
 		case Type_Basic:
-			if (t->Basic.kind != Basic_string) {
+			if (t->Basic.kind != Basic_string &&
+			    t->Basic.kind != Basic_string16) {
 				break;
 			}
 			/*fallthrough*/
@@ -1160,6 +1179,11 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 0: result_type = alloc_type_pointer(t->Slice.elem); break;
 		case 1: result_type = t_int; break;
 		}
+	} else if (is_type_string16(t)) {
+		switch (index) {
+		case 0: result_type = t_u16_ptr; break;
+		case 1: result_type = t_int;    break;
+		}
 	} else if (is_type_string(t)) {
 		switch (index) {
 		case 0: result_type = t_u8_ptr; break;
@@ -1273,6 +1297,12 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
+		case Basic_string16:
+			switch (index) {
+			case 0: result_type = t_u16_ptr; break;
+			case 1: result_type = t_int;    break;
+			}
+			break;
 		case Basic_string:
 			switch (index) {
 			case 0: result_type = t_u8_ptr; break;
@@ -1437,6 +1467,10 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			}
 
 			case Basic_string:
+				e = lb_emit_struct_ep(p, e, index);
+				break;
+
+			case Basic_string16:
 				e = lb_emit_struct_ep(p, e, index);
 				break;
 
@@ -1626,11 +1660,17 @@ gb_internal void lb_fill_string(lbProcedure *p, lbAddr const &string, lbValue ba
 
 gb_internal lbValue lb_string_elem(lbProcedure *p, lbValue string) {
 	Type *t = base_type(string.type);
+	if (t->kind == Type_Basic && t->Basic.kind == Basic_string16) {
+		return lb_emit_struct_ev(p, string, 0);
+	}
 	GB_ASSERT(t->kind == Type_Basic && t->Basic.kind == Basic_string);
 	return lb_emit_struct_ev(p, string, 0);
 }
 gb_internal lbValue lb_string_len(lbProcedure *p, lbValue string) {
 	Type *t = base_type(string.type);
+	if (t->kind == Type_Basic && t->Basic.kind == Basic_string16) {
+		return lb_emit_struct_ev(p, string, 1);
+	}
 	GB_ASSERT_MSG(t->kind == Type_Basic && t->Basic.kind == Basic_string, "%s", type_to_string(t));
 	return lb_emit_struct_ev(p, string, 1);
 }
@@ -1640,6 +1680,12 @@ gb_internal lbValue lb_cstring_len(lbProcedure *p, lbValue value) {
 	auto args = array_make<lbValue>(permanent_allocator(), 1);
 	args[0] = lb_emit_conv(p, value, t_cstring);
 	return lb_emit_runtime_call(p, "cstring_len", args);
+}
+gb_internal lbValue lb_cstring16_len(lbProcedure *p, lbValue value) {
+	GB_ASSERT(is_type_cstring16(value.type));
+	auto args = array_make<lbValue>(permanent_allocator(), 1);
+	args[0] = lb_emit_conv(p, value, t_cstring16);
+	return lb_emit_runtime_call(p, "cstring16_len", args);
 }
 
 

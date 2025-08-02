@@ -353,10 +353,10 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			#partial switch info in ti.variant {
 			case runtime.Type_Info_String:
 				switch x in v {
-				case string:
-					return x == ""
-				case cstring:
-					return x == nil || x == ""
+				case string:    return x == ""
+				case cstring:   return x == nil || x == ""
+				case string16:  return x == ""
+				case cstring16: return x == nil || x == ""
 				}
 			case runtime.Type_Info_Any:
 				return v.(any) == nil

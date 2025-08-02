@@ -142,9 +142,9 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	}
 
 	wcmd = string_to_string16(permanent_allocator(), make_string(cast(u8 *)cmd_line, cmd_len-1));
-	if (CreateProcessW(nullptr, wcmd.text,
-					   nullptr, nullptr, true, 0, nullptr, nullptr,
-					   &start_info, &pi)) {
+	if (CreateProcessW(nullptr, cast(wchar_t *)wcmd.text,
+	                   nullptr, nullptr, true, 0, nullptr, nullptr,
+	                   &start_info, &pi)) {
 		WaitForSingleObject(pi.hProcess, INFINITE);
 		GetExitCodeProcess(pi.hProcess, cast(DWORD *)&exit_code);
 
@@ -232,7 +232,7 @@ gb_internal Array<String> setup_args(int argc, char const **argv) {
 	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc);
 	auto args = array_make<String>(a, 0, wargc);
 	for (isize i = 0; i < wargc; i++) {
-		wchar_t *warg = wargv[i];
+		u16 *warg = cast(u16 *)wargv[i];
 		isize wlen = string16_len(warg);
 		String16 wstr = make_string16(warg, wlen);
 		String arg = string16_to_string(a, wstr);

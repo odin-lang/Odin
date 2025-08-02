@@ -324,8 +324,8 @@ read_reg_string :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: string, ok
 
 	status := sys.RegGetValueW(
 		hkey,
-		&key_name_wide[0],
-		&val_name_wide[0],
+		cstring16(&key_name_wide[0]),
+		cstring16(&val_name_wide[0]),
 		sys.RRF_RT_REG_SZ,
 		nil,
 		raw_data(result_wide[:]),
@@ -359,8 +359,8 @@ read_reg_i32 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i32, ok: bool
 	result_size := sys.DWORD(size_of(i32))
 	status := sys.RegGetValueW(
 		hkey,
-		&key_name_wide[0],
-		&val_name_wide[0],
+		cstring16(&key_name_wide[0]),
+		cstring16(&val_name_wide[0]),
 		sys.RRF_RT_REG_DWORD,
 		nil,
 		&res,
@@ -386,8 +386,8 @@ read_reg_i64 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i64, ok: bool
 	result_size := sys.DWORD(size_of(i64))
 	status := sys.RegGetValueW(
 		hkey,
-		&key_name_wide[0],
-		&val_name_wide[0],
+		cstring16(&key_name_wide[0]),
+		cstring16(&val_name_wide[0]),
 		sys.RRF_RT_REG_QWORD,
 		nil,
 		&res,

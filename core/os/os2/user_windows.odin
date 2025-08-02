@@ -74,6 +74,5 @@ _get_known_folder_path :: proc(rfid: win32.REFKNOWNFOLDERID, allocator: runtime.
 		return "", .Invalid_Path
 	}
 
-	dir, _ = win32.wstring_to_utf8(path_w, -1, allocator)
-	return
+	return win32_wstring_to_utf8(cstring16(path_w), allocator)
 }

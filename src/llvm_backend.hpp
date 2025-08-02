@@ -173,7 +173,8 @@ struct lbModule {
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
 	Array<lbProcedure *> missing_procedures_to_check;
 
-	StringMap<LLVMValueRef> const_strings;
+	StringMap<LLVMValueRef>   const_strings;
+	String16Map<LLVMValueRef> const_string16s;
 
 	PtrMap<u64/*type hash*/, struct lbFunctionType *> function_type_map;
 

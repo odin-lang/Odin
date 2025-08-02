@@ -231,7 +231,7 @@ Array<String> cache_gather_envs() {
 
 		wchar_t *curr_string = strings;
 		while (curr_string && *curr_string) {
-			String16 wstr = make_string16_c(curr_string);
+			String16 wstr = make_string16_c(cast(u16 *)curr_string);
 			curr_string += wstr.len+1;
 			String str = string16_to_string(temporary_allocator(), wstr);
 			if (string_starts_with(str, str_lit("CURR_DATE_TIME="))) {

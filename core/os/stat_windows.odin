@@ -17,7 +17,7 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 	buf := make([dynamic]u16, 100)
 	defer delete(buf)
 	for {
-		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
+		n := win32.GetFullPathNameW(cstring16(raw_data(p)), u32(len(buf)), cstring16(raw_data(buf)), nil)
 		if n == 0 {
 			return "", get_last_error()
 		}
@@ -154,7 +154,7 @@ cleanpath_from_handle_u16 :: proc(fd: Handle, allocator: runtime.Allocator) -> (
 		return nil, get_last_error()
 	}
 	buf := make([]u16, max(n, win32.DWORD(260))+1, allocator)
-	buf_len := win32.GetFinalPathNameByHandleW(h, raw_data(buf), n, 0)
+	buf_len := win32.GetFinalPathNameByHandleW(h, cstring16(raw_data(buf)), n, 0)
 	return buf[:buf_len], nil
 }
 @(private, require_results)

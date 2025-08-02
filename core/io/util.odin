@@ -264,6 +264,33 @@ write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written
 	return
 }
 
+write_quoted_string16 :: proc(w: Writer, str: string16, quote: byte = '"', n_written: ^int = nil, for_json := false) -> (n: int, err: Error) {
+	defer if n_written != nil {
+		n_written^ += n
+	}
+	write_byte(w, quote, &n) or_return
+	for width, s := 0, str; len(s) > 0; s = s[width:] {
+		r := rune(s[0])
+		width = 1
+		if r >= utf8.RUNE_SELF {
+			r, width = utf16.decode_rune_in_string(s)
+		}
+		if width == 1 && r == utf8.RUNE_ERROR {
+			write_byte(w, '\\', &n)                   or_return
+			write_byte(w, 'x', &n)                    or_return
+			write_byte(w, DIGITS_LOWER[s[0]>>4], &n)  or_return
+			write_byte(w, DIGITS_LOWER[s[0]&0xf], &n) or_return
+			continue
+		}
+
+		n_wrapper(write_escaped_rune(w, r, quote, false, nil, for_json), &n) or_return
+
+	}
+	write_byte(w, quote, &n) or_return
+	return
+}
+
+
 // writer append a quoted rune into the byte buffer, return the written size
 write_quoted_rune :: proc(w: Writer, r: rune) -> (n: int) {
 	_write_byte :: #force_inline proc(w: Writer, c: byte) -> int {

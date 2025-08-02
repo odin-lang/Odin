@@ -802,6 +802,20 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 				LLVMMetadataRef char_type = lb_debug_type_basic_type(m, str_lit("char"), 8, LLVMDWARFTypeEncoding_Unsigned);
 				return LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, ptr_bits, ptr_bits, 0, "cstring", 7);
 			}
+
+		case Basic_string16:
+			{
+				LLVMMetadataRef elements[2] = {};
+				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_u16_ptr, 0);
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, int_bits);
+				return lb_debug_basic_struct(m, str_lit("string16"), 2*int_bits, int_bits, elements, gb_count_of(elements));
+			}
+		case Basic_cstring16:
+			{
+				LLVMMetadataRef char_type = lb_debug_type_basic_type(m, str_lit("wchar_t"), 16, LLVMDWARFTypeEncoding_Unsigned);
+				return LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, ptr_bits, ptr_bits, 0, "cstring16", 7);
+			}
+
 		case Basic_any:
 			{
 				LLVMMetadataRef elements[2] = {};

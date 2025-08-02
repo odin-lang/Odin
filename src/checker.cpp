@@ -1363,13 +1363,15 @@ gb_internal void init_universal(void) {
 	}
 
 
-	t_u8_ptr       = alloc_type_pointer(t_u8);
-	t_u8_multi_ptr = alloc_type_multi_pointer(t_u8);
-	t_int_ptr      = alloc_type_pointer(t_int);
-	t_i64_ptr      = alloc_type_pointer(t_i64);
-	t_f64_ptr      = alloc_type_pointer(t_f64);
-	t_u8_slice     = alloc_type_slice(t_u8);
-	t_string_slice = alloc_type_slice(t_string);
+	t_u8_ptr        = alloc_type_pointer(t_u8);
+	t_u8_multi_ptr  = alloc_type_multi_pointer(t_u8);
+	t_u16_ptr       = alloc_type_pointer(t_u16);
+	t_u16_multi_ptr = alloc_type_multi_pointer(t_u16);
+	t_int_ptr       = alloc_type_pointer(t_int);
+	t_i64_ptr       = alloc_type_pointer(t_i64);
+	t_f64_ptr       = alloc_type_pointer(t_f64);
+	t_u8_slice      = alloc_type_slice(t_u8);
+	t_string_slice  = alloc_type_slice(t_string);
 
 	// intrinsics types for objective-c stuff
 	{

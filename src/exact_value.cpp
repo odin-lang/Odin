@@ -29,6 +29,7 @@ enum ExactValueKind {
 	ExactValue_Compound   = 8,
 	ExactValue_Procedure  = 9,
 	ExactValue_Typeid     = 10,
+	ExactValue_String16   = 11,
 
 	ExactValue_Count,
 };
@@ -46,6 +47,7 @@ struct ExactValue {
 		Ast *          value_compound;
 		Ast *          value_procedure;
 		Type *         value_typeid;
+		String16       value_string16;
 	};
 };
 
@@ -65,6 +67,9 @@ gb_internal uintptr hash_exact_value(ExactValue v) {
 		break;
 	case ExactValue_String:
 		res = gb_fnv32a(v.value_string.text, v.value_string.len);
+		break;
+	case ExactValue_String16:
+		res = gb_fnv32a(v.value_string.text, v.value_string.len*gb_size_of(u16));
 		break;
 	case ExactValue_Integer:
 		{
@@ -116,6 +121,11 @@ gb_internal ExactValue exact_value_bool(bool b) {
 gb_internal ExactValue exact_value_string(String string) {
 	ExactValue result = {ExactValue_String};
 	result.value_string = string;
+	return result;
+}
+gb_internal ExactValue exact_value_string16(String16 string) {
+	ExactValue result = {ExactValue_String16};
+	result.value_string16 = string;
 	return result;
 }
 
@@ -656,6 +666,7 @@ gb_internal i32 exact_value_order(ExactValue const &v) {
 		return 0;
 	case ExactValue_Bool:
 	case ExactValue_String:
+	case ExactValue_String16:
 		return 1;
 	case ExactValue_Integer:
 		return 2;
@@ -689,6 +700,7 @@ gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 
 	case ExactValue_Bool:
 	case ExactValue_String:
+	case ExactValue_String16:
 	case ExactValue_Quaternion:
 	case ExactValue_Pointer:
 	case ExactValue_Compound:
@@ -891,7 +903,18 @@ gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, E
 		gb_memmove(data,        sx.text, sx.len);
 		gb_memmove(data+sx.len, sy.text, sy.len);
 		return exact_value_string(make_string(data, len));
-		break;
+	}
+	case ExactValue_String16: {
+		if (op != Token_Add) goto error;
+
+		// NOTE(bill): How do you minimize this over allocation?
+		String sx = x.value_string;
+		String sy = y.value_string;
+		isize len = sx.len+sy.len;
+		u16 *data = gb_alloc_array(permanent_allocator(), u16, len);
+		gb_memmove(data,        sx.text, sx.len*gb_size_of(u16));
+		gb_memmove(data+sx.len, sy.text, sy.len*gb_size_of(u16));
+		return exact_value_string16(make_string16(data, len));
 	}
 	}
 
@@ -994,6 +1017,19 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 		}
 		break;
 	}
+	case ExactValue_String16: {
+		String16 a = x.value_string16;
+		String16 b = y.value_string16;
+		switch (op) {
+		case Token_CmpEq: return a == b;
+		case Token_NotEq: return a != b;
+		case Token_Lt:    return a <  b;
+		case Token_LtEq:  return a <= b;
+		case Token_Gt:    return a >  b;
+		case Token_GtEq:  return a >= b;
+		}
+		break;
+	}
 
 	case ExactValue_Pointer: {
 		switch (op) {
@@ -1038,6 +1074,20 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 		return gb_string_appendc(str, v.value_bool ? "true" : "false");
 	case ExactValue_String: {
 		String s = quote_to_ascii(heap_allocator(), v.value_string);
+		string_limit = gb_max(string_limit, 36);
+		if (s.len <= string_limit) {
+			str = gb_string_append_length(str, s.text, s.len);
+		} else {
+			isize n = string_limit/5;
+			str = gb_string_append_length(str, s.text, n);
+			str = gb_string_append_fmt(str, "\"..%lld chars..\"", s.len-(2*n));
+			str = gb_string_append_length(str, s.text+s.len-n, n);
+		}
+		gb_free(heap_allocator(), s.text);
+		return str;
+	}
+	case ExactValue_String16: {
+		String s = quote_to_ascii(heap_allocator(), v.value_string16);
 		string_limit = gb_max(string_limit, 36);
 		if (s.len <= string_limit) {
 			str = gb_string_append_length(str, s.text, s.len);

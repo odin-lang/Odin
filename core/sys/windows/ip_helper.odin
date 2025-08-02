@@ -38,9 +38,9 @@ IP_Adapter_Addresses :: struct {
 	FirstAnycastAddress:    ^IP_ADAPTER_ANYCAST_ADDRESS_XP,
 	FirstMulticastAddress:  ^IP_ADAPTER_MULTICAST_ADDRESS_XP,
 	FirstDnsServerAddress:  ^IP_ADAPTER_DNS_SERVER_ADDRESS_XP,
-	DnsSuffix:              ^u16,
-	Description:            ^u16,
-	FriendlyName:           ^u16,
+	DnsSuffix:              cstring16,
+	Description:            cstring16,
+	FriendlyName:           cstring16,
 	PhysicalAddress:        [8]u8,
 	PhysicalAddressLength:  u32,
 	Anonymous2:             struct #raw_union {
