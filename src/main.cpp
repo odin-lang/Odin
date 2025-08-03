@@ -2294,6 +2294,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	} else if (command == "run") {
 		print_usage_header_once();
 		print_usage_line(1, "run     Same as 'build', but also then runs the newly compiled executable.");
+		print_usage_line(2, "If the executable exits successfully, then it is deleted.");
 		print_usage_line(2, "Append an empty flag and then the args, '-- <args>', to specify args for the output.");
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "odin run .                     Builds and runs package in current directory.");
