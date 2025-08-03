@@ -5763,22 +5763,6 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 	return false;
 }
 
-gb_internal bool check_no_copy_assignment(Operand const &o, String const &context) {
-	if (o.type && is_type_no_copy(o.type)) {
-		Ast *expr = unparen_expr(o.expr);
-		if (expr && o.mode != Addressing_Constant && o.mode != Addressing_Type) {
-			if (expr->kind == Ast_CallExpr) {
-				// Okay
-			} else {
-				error(o.expr, "Invalid use of #no_copy value in %.*s", LIT(context));
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-
 gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Slice<Ast *> const &rhs) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
@@ -5849,7 +5833,6 @@ gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> 
 			for (Entity *e : tuple->variables) {
 				o.type = e->type;
 				array_add(operands, o);
-				check_no_copy_assignment(o, str_lit("assignment"));
 			}
 
 			tuple_index += tuple->variables.count;
@@ -6234,12 +6217,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			}
 		}
 
-	}
-
-	for (Operand const &o : ordered_operands) {
-		if (o.mode != Addressing_Invalid) {
-			check_no_copy_assignment(o, str_lit("procedure call expression"));
-		}
 	}
 
 	for (isize i = 0; i < pt->param_count; i++) {

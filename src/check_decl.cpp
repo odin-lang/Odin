@@ -145,13 +145,6 @@ gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize l
 		if (d != nullptr) {
 			d->init_expr = o->expr;
 		}
-
-		if (o->type && is_type_no_copy(o->type)) {
-			ERROR_BLOCK();
-			if (check_no_copy_assignment(*o, str_lit("initialization"))) {
-				error_line("\tInitialization of a #no_copy type must be either implicitly zero, a constant literal, or a return value from a call expression");
-			}
-		}
 	}
 	if (rhs_count > 0 && lhs_count != rhs_count) {
 		error(lhs[0]->token, "Assignment count mismatch '%td' = '%td'", lhs_count, rhs_count);

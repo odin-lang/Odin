@@ -47,12 +47,12 @@ wait_group_add :: proc "contextless" (wg: ^Wait_Group, delta: int) {
 	guard(&wg.mutex)
 
 	atomic_add(&wg.counter, delta)
-	if wg.counter < 0 {
+	switch counter := atomic_load(&wg.counter); {
+	case counter < 0:
 		panic_contextless("sync.Wait_Group negative counter")
-	}
-	if wg.counter == 0 {
+	case wg.counter == 0:
 		cond_broadcast(&wg.cond)
-		if wg.counter != 0 {
+		if atomic_load(&wg.counter) != 0 {
 			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
@@ -78,11 +78,8 @@ wait group's internal counter reaches zero.
 wait_group_wait :: proc "contextless" (wg: ^Wait_Group) {
 	guard(&wg.mutex)
 
-	if wg.counter != 0 {
+	for atomic_load(&wg.counter) != 0 {
 		cond_wait(&wg.cond, &wg.mutex)
-		if wg.counter != 0 {
-			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
-		}
 	}
 }
 
@@ -100,12 +97,9 @@ wait_group_wait_with_timeout :: proc "contextless" (wg: ^Wait_Group, duration: t
 	}
 	guard(&wg.mutex)
 
-	if wg.counter != 0 {
+	for atomic_load(&wg.counter) != 0 {
 		if !cond_wait_with_timeout(&wg.cond, &wg.mutex, duration) {
 			return false
-		}
-		if wg.counter != 0 {
-			panic_contextless("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 	return true

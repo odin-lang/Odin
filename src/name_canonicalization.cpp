@@ -687,7 +687,6 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 
 		if (type->Struct.is_packed)    type_writer_appendc(w, "#packed");
 		if (type->Struct.is_raw_union) type_writer_appendc(w, "#raw_union");
-		if (type->Struct.is_no_copy)   type_writer_appendc(w, "#no_copy");
 		if (type->Struct.custom_min_field_align != 0) type_writer_append_fmt(w, "#min_field_align(%lld)", cast(long long)type->Struct.custom_min_field_align);
 		if (type->Struct.custom_max_field_align != 0) type_writer_append_fmt(w, "#max_field_align(%lld)", cast(long long)type->Struct.custom_max_field_align);
 		if (type->Struct.custom_align != 0)           type_writer_append_fmt(w, "#align(%lld)",           cast(long long)type->Struct.custom_align);

@@ -115,7 +115,7 @@ Type_Info_Struct_Flags :: distinct bit_set[Type_Info_Struct_Flag; u8]
 Type_Info_Struct_Flag :: enum u8 {
 	packed    = 0,
 	raw_union = 1,
-	no_copy   = 2,
+	_         = 2,
 	align     = 3,
 }
 

@@ -797,7 +797,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				u8 flags = 0;
 				if (t->Struct.is_packed)    flags |= 1<<0;
 				if (t->Struct.is_raw_union) flags |= 1<<1;
-				if (t->Struct.is_no_copy)   flags |= 1<<2;
+				//
 				if (t->Struct.custom_align) flags |= 1<<3;
 
 				vals[6] = lb_const_int(m, t_u8, flags).value;

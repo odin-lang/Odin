@@ -527,6 +527,8 @@ namespace lbAbiAmd64SysV {
 	enum RegClass {
 		RegClass_NoClass,
 		RegClass_Int,
+		RegClass_SSEHs,
+		RegClass_SSEHv,
 		RegClass_SSEFs,
 		RegClass_SSEFv,
 		RegClass_SSEDs,
@@ -545,6 +547,8 @@ namespace lbAbiAmd64SysV {
 
 	gb_internal bool is_sse(RegClass reg_class) {
 		switch (reg_class) {
+		case RegClass_SSEHs:
+		case RegClass_SSEHv:
 		case RegClass_SSEFs:
 		case RegClass_SSEFv:
 		case RegClass_SSEDs:
@@ -693,6 +697,8 @@ namespace lbAbiAmd64SysV {
 			case RegClass_Int:
 				needed_int += 1;
 				break;
+			case RegClass_SSEHs:
+			case RegClass_SSEHv:
 			case RegClass_SSEFs:
 			case RegClass_SSEFv:
 			case RegClass_SSEDs:
@@ -804,6 +810,8 @@ namespace lbAbiAmd64SysV {
 			to_write = RegClass_Memory;
 		} else if (newv == RegClass_SSEUp) {
 			switch (oldv) {
+			case RegClass_SSEHv:
+			case RegClass_SSEHs:
 			case RegClass_SSEFv:
 			case RegClass_SSEFs:
 			case RegClass_SSEDv:
@@ -850,14 +858,18 @@ namespace lbAbiAmd64SysV {
 				} else if (oldv == RegClass_SSEUp) {
 					oldv = RegClass_SSEDv;
 				} else if (is_sse(oldv)) {
-					i++;
-					while (i != e && oldv == RegClass_SSEUp) {
-						i++;
+					for (i++; i < e; i++) {
+						RegClass v = (*cls)[cast(isize)i];
+						if (v != RegClass_SSEUp) {
+							break;
+						}
 					}
 				} else if (oldv == RegClass_X87) {
-					i++;
-					while (i != e && oldv == RegClass_X87Up) {
-						i++;
+					for (i++; i < e; i++) {
+						RegClass v = (*cls)[cast(isize)i];
+						if (v != RegClass_X87Up) {
+							break;
+						}
 					}
 				} else {
 					i++;
@@ -914,6 +926,7 @@ namespace lbAbiAmd64SysV {
 						sz -= rs;
 						break;
 					}
+				case RegClass_SSEHv:
 				case RegClass_SSEFv:
 				case RegClass_SSEDv:
 				case RegClass_SSEInt8:
@@ -924,6 +937,10 @@ namespace lbAbiAmd64SysV {
 						unsigned elems_per_word = 0;
 						LLVMTypeRef elem_type = nullptr;
 						switch (reg_class) {
+						case RegClass_SSEHv:
+							elems_per_word = 4;
+							elem_type = LLVMHalfTypeInContext(c);
+							break;
 						case RegClass_SSEFv:
 							elems_per_word = 2;
 							elem_type = LLVMFloatTypeInContext(c);
@@ -957,6 +974,10 @@ namespace lbAbiAmd64SysV {
 						i += vec_len;
 						continue;
 					}
+					break;
+				case RegClass_SSEHs:
+					array_add(&types, LLVMHalfTypeInContext(c));
+					sz -= 2;
 					break;
 				case RegClass_SSEFs:
 					array_add(&types, LLVMFloatTypeInContext(c));
@@ -1004,8 +1025,10 @@ namespace lbAbiAmd64SysV {
 			break;
 		}
 		case LLVMPointerTypeKind:
-		case LLVMHalfTypeKind:
 			unify(cls, ix + off/8, RegClass_Int);
+			break;
+		case LLVMHalfTypeKind:
+			unify(cls, ix + off/8, (off%8 != 0) ? RegClass_SSEHv : RegClass_SSEHs);
 			break;
 		case LLVMFloatTypeKind:
 			unify(cls, ix + off/8, (off%8 == 4) ? RegClass_SSEFv : RegClass_SSEFs);
@@ -1046,10 +1069,9 @@ namespace lbAbiAmd64SysV {
 				i64 elem_sz = lb_sizeof(elem);
 				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
 				RegClass reg = RegClass_NoClass;
-				unsigned elem_width = LLVMGetIntTypeWidth(elem);
 				switch (elem_kind) {
-				case LLVMIntegerTypeKind:
-				case LLVMHalfTypeKind:
+				case LLVMIntegerTypeKind: {
+					unsigned elem_width = LLVMGetIntTypeWidth(elem);
 					switch (elem_width) {
 					case 8:  reg = RegClass_SSEInt8;  break;
 					case 16: reg = RegClass_SSEInt16; break;
@@ -1064,6 +1086,10 @@ namespace lbAbiAmd64SysV {
 						}
 						GB_PANIC("Unhandled integer width for vector type %u", elem_width);
 					}
+					break;
+				};
+				case LLVMHalfTypeKind:
+					reg = RegClass_SSEHv;
 					break;
 				case LLVMFloatTypeKind:
 					reg = RegClass_SSEFv;
