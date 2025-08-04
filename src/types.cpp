@@ -2559,6 +2559,62 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	return false;
 }
 
+// NOTE(bill): type can be easily compared using memcmp or contains a float
+gb_internal bool is_type_nearly_simple_compare(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Array:
+		return is_type_nearly_simple_compare(t->Array.elem);
+
+	case Type_EnumeratedArray:
+		return is_type_nearly_simple_compare(t->EnumeratedArray.elem);
+
+	case Type_Basic:
+		if (t->Basic.flags & (BasicFlag_SimpleCompare|BasicFlag_Numeric)) {
+			return true;
+		}
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
+		return false;
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_SoaPointer:
+	case Type_Proc:
+	case Type_BitSet:
+		return true;
+
+	case Type_Matrix:
+		return is_type_nearly_simple_compare(t->Matrix.elem);
+
+	case Type_Struct:
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields[i];
+			if (!is_type_nearly_simple_compare(f->type)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_Union:
+		for_array(i, t->Union.variants) {
+			Type *v = t->Union.variants[i];
+			if (!is_type_nearly_simple_compare(v)) {
+				return false;
+			}
+		}
+		// make it dumb on purpose
+		return t->Union.variants.count == 1;
+
+	case Type_SimdVector:
+		return is_type_nearly_simple_compare(t->SimdVector.elem);
+
+	}
+
+	return false;
+}
+
 gb_internal bool is_type_load_safe(Type *type) {
 	GB_ASSERT(type != nullptr);
 	type = core_type(core_array_type(type));

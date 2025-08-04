@@ -264,6 +264,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_sliceable,
 	BuiltinProc_type_is_comparable,
 	BuiltinProc_type_is_simple_compare, // easily compared using memcmp
+	BuiltinProc_type_is_nearly_simple_compare, // easily compared using memcmp (including floats)
 	BuiltinProc_type_is_dereferenceable,
 	BuiltinProc_type_is_valid_map_key,
 	BuiltinProc_type_is_valid_matrix_elements,
@@ -621,6 +622,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_sliceable"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_comparable"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simple_compare"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_nearly_simple_compare"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_dereferenceable"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_map_key"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_matrix_elements"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
