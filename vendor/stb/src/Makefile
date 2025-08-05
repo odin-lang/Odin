@@ -73,6 +73,7 @@ iphone:
 	libtool -o ../lib/iphone/stb_vorbis.a stb_vorbis-iphone.o
 	xcrun -sdk iphoneos $(CC) -target arm64-apple-ios -arch arm64 -c -O2 -Os stb_sprintf.c -o stb_sprintf-iphone.o
 	libtool -o ../lib/iphone/stb_sprintf.a stb_sprintf-iphone.o
+	rm *.o
 iphonesimulator:
 	mkdir -p ../lib/iphonesimulator
 	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64 -c -O2 -Os stb_image_write.c -o stb_image_write-iphonesimulator.o
@@ -87,3 +88,4 @@ iphonesimulator:
 	libtool -o ../lib/iphonesimulator/stb_vorbis.a stb_vorbis-iphonesimulator.o
 	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64 -c -O2 -Os stb_sprintf.c -o stb_sprintf-iphonesimulator.o
 	libtool -o ../lib/iphonesimulator/stb_sprintf.a stb_sprintf-iphonesimulator.o
+	rm *.o
