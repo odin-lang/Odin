@@ -26,7 +26,6 @@ foreign libc {
 get_last_error :: proc "contextless" () -> int {
 	return int(__error()^)
 }
->>>>>>> 3451b4638 (Initial commit for iOS target)
 
 MAX_RW :: 0x7fffffff
 
