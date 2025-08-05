@@ -830,16 +830,16 @@ try_cross_linking:;
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-L/usr/local/lib ");
 
-					if (build_context.minimum_os_version_string_given) {
-						link_settings = gb_string_append_fmt(link_settings, "-mios-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
-					}
+				if (build_context.minimum_os_version_string_given) {
+					link_settings = gb_string_append_fmt(link_settings, "-mios-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+				}
 				
-				} else if (selected_subtarget == Subtarget_iPhoneSimulator) {
-						platform_lib_str = gb_string_append_fmt(platform_lib_str, "-target %.*s -Wl,-ld_classic -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk ", LIT(build_context.metrics.target_triplet));
+				if (selected_subtarget == Subtarget_iPhoneSimulator) {
+					platform_lib_str = gb_string_append_fmt(platform_lib_str, "-target %.*s -Wl,-ld_classic -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk ", LIT(build_context.metrics.target_triplet));
 
-						if (build_context.minimum_os_version_string_given) {
-							link_settings = gb_string_append_fmt(link_settings, "-mios-simulator-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
-						}
+					if (build_context.minimum_os_version_string_given) {
+						link_settings = gb_string_append_fmt(link_settings, "-mios-simulator-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+					}
 				} else {
 					platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib ");
 
@@ -860,9 +860,6 @@ try_cross_linking:;
 					}
 				}
 
-<<<<<<< HEAD
-				if (build_context.build_mode != BuildMode_DynamicLibrary && build_context.build_mode != BuildMode_StaticLibrary) {
-=======
 				// MacPort's default library path, checking if it exists to avoid linking warnings.
 				if (gb_file_exists("/opt/local/lib")) {
 					platform_lib_str = gb_string_appendc(platform_lib_str, "-L/opt/local/lib ");
@@ -877,7 +874,6 @@ try_cross_linking:;
 				}
 
 				if (build_context.build_mode != BuildMode_DynamicLibrary) {
->>>>>>> ec7509430369eb5d57a081507792dc03b1c05bab
 					// This points the linker to where the entry point is
 					link_settings = gb_string_appendc(link_settings, "-e _main ");
 				}
@@ -950,7 +946,6 @@ try_cross_linking:;
 			}
 			
 
-<<<<<<< HEAD
 			if (build_context.build_mode == BuildMode_StaticLibrary) {
 				if (is_osx) {
 					gbString static_link_command_line = gb_string_make(heap_allocator(), "libtool");
@@ -960,7 +955,7 @@ try_cross_linking:;
 					static_link_command_line = gb_string_appendc(static_link_command_line, object_files);
 					return system_exec_command_line_app("libtool", static_link_command_line);
 				}
-=======
+			}
 			gbString link_command_line = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(link_command_line));
 
@@ -989,42 +984,22 @@ try_cross_linking:;
 			if (build_context.linker_choice == Linker_lld) {
 				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
 				result = system_exec_command_line_app("lld-link", link_command_line);
->>>>>>> ec7509430369eb5d57a081507792dc03b1c05bab
 			} else {
-				gbString link_command_line = gb_string_make(heap_allocator(), clang_path);
-				defer (gb_string_free(link_command_line));
-
-				link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
-				link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
-
-				link_command_line = gb_string_appendc(link_command_line, object_files);
-				link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
-				link_command_line = gb_string_append_fmt(link_command_line, " %s ", lib_str);
-				link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
-				link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
-				link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
-
-				if (build_context.use_lld) {
-					link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
-					result = system_exec_command_line_app("lld-link", link_command_line);
-				} else {
 					result = system_exec_command_line_app("ld-link", link_command_line);
-				}
+			}
+
+			if (result) {
+				return result;
+			}
+
+			if (is_osx && build_context.ODIN_DEBUG) {
+				// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
+				// to the symbols in the object file
+				result = system_exec_command_line_app("dsymutil", "dsymutil %.*s", LIT(output_filename));
 
 				if (result) {
 					return result;
 				}
-
-				if (is_osx && build_context.ODIN_DEBUG) {
-					// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
-					// to the symbols in the object file
-					result = system_exec_command_line_app("dsymutil", "dsymutil %.*s", LIT(output_filename));
-
-					if (result) {
-						return result;
-					}
-				}
-
 			}
 
 		}

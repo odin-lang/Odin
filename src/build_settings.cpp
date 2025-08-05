@@ -1787,7 +1787,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		case Subtarget_Default:
 			bc->metrics.target_triplet = concatenate_strings(permanent_allocator(), bc->metrics.target_triplet, bc->minimum_os_version_string);
 			break;
-		case Subtarget_iOS:
+		case Subtarget_iPhone:
 			if (metrics->arch == TargetArch_arm64) {
 				bc->metrics.target_triplet = str_lit("arm64-apple-ios");
 			} else {
