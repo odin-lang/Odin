@@ -557,14 +557,9 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	// Defined internally by the compiler
 	Odin_Platform_Subtarget_Type :: enum int {
 		Default,
-<<<<<<< HEAD
-		iOS,
-		iPhoneSimulator,
-=======
 		iPhone,
 		iPhoneSimulator
 		Android,
->>>>>>> ec7509430369eb5d57a081507792dc03b1c05bab
 	}
 */
 Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
