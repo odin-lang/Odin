@@ -721,7 +721,14 @@ try_cross_linking:;
 			}
 
 			if (build_context.build_mode == BuildMode_StaticLibrary) {
-				compiler_error("TODO(bill): -build-mode:static on non-windows targets");
+				if (build_context.metrics.os == TargetOs_darwin) {
+					gbString static_link_command_line = gb_string_make(heap_allocator(), "libtool");
+					defer (gb_string_free(static_link_command_line));
+					static_link_command_line = gb_string_append_fmt(static_link_command_line, " -o \"%.*s\" ", LIT(output_filename));
+					static_link_command_line = gb_string_appendc(static_link_command_line, " -static ");
+					static_link_command_line = gb_string_appendc(static_link_command_line, object_files);
+					return system_exec_command_line_app("libtool", static_link_command_line);
+				}
 			}
 
 			// NOTE(dweiler): We use clang as a frontend for the linker as there are
