@@ -523,7 +523,7 @@ Vector3Unproject :: proc "c" (source: Vector3, projection: Matrix, view: Matrix)
 
 	quat: Quaternion
 	quat.x = source.x
-	quat.y = source.z
+	quat.y = source.y
 	quat.z = source.z
 	quat.w = 1
 
@@ -831,8 +831,8 @@ fmaxf :: proc "contextless" (x, y: f32) -> f32 {
 		return x
 	}
 
-	if math.signbit(x) != math.signbit(y) {
-		return y if math.signbit(x) else x
+	if math.sign_bit(x) != math.sign_bit(y) {
+		return y if math.sign_bit(x) else x
 	}
 
 	return y if x < y else x

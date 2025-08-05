@@ -536,24 +536,21 @@ parse_tzif :: proc(_buffer: []u8, region_name: string, allocator := context.allo
 	buffer = buffer[(int(real_hdr.leapcnt) * size_of(Leapsecond_Record)):]
 
 	standard_wall_tags := buffer[:int(real_hdr.isstdcnt)]
-	buffer = buffer[int(real_hdr.isstdcnt):]
-
-	ut_tags := buffer[:int(real_hdr.isutcnt)]
-
-	for stdwall_tag, idx in standard_wall_tags {
-		ut_tag := ut_tags[idx]
-
+	for stdwall_tag, _ in standard_wall_tags {
 		if (stdwall_tag != 0 && stdwall_tag != 1) {
 			return
 		}
+	}
+
+	buffer = buffer[int(real_hdr.isstdcnt):]
+
+	ut_tags := buffer[:int(real_hdr.isutcnt)]
+	for ut_tag, _ in ut_tags {
 		if (ut_tag != 0 && ut_tag != 1) {
 			return
 		}
-
-		if ut_tag == 1 && stdwall_tag != 1 {
-			return
-		}
 	}
+
 	buffer = buffer[int(real_hdr.isutcnt):]
 
 	// Start of footer
@@ -580,12 +577,7 @@ parse_tzif :: proc(_buffer: []u8, region_name: string, allocator := context.allo
 	footer_str := string(buffer[:end_idx])
 
 	// UTC is a special case, we don't need to alloc
-	if len(local_time_types) == 1 {
-		name := cstring(raw_data(timezone_string_table[local_time_types[0].idx:]))
-		if name != "UTC" {
-			return
-		}
-
+	if len(local_time_types) == 1 && local_time_types[0].utoff == 0 {
 		return nil, true
 	}
 

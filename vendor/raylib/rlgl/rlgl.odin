@@ -113,6 +113,7 @@ import rl "../."
 VERSION :: "5.0"
 
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
+RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "../wasm/libraylib.a")
 
 // Note: We pull in the full raylib library. If you want a truly stand-alone rlgl, then:
 // - Compile a separate rlgl library and use that in the foreign import blocks below.
@@ -134,18 +135,20 @@ when ODIN_OS == .Windows {
 		// multiple copies of raylib.so, but since these bindings are for
 		// particular version of the library, I better specify it. Ideally,
 		// though, it's best specified in terms of major (.so.4)
-		"../linux/libraylib.so.500" when RAYLIB_SHARED else "../linux/libraylib.a",
+		"../linux/libraylib.so.550" when RAYLIB_SHARED else "../linux/libraylib.a",
 		"system:dl",
 		"system:pthread",
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"../macos" +
-			("-arm64" when ODIN_ARCH == .arm64 else "") +
-			"/libraylib" + (".500.dylib" when RAYLIB_SHARED else ".a"),
+		"../macos/libraylib.550.dylib" when RAYLIB_SHARED else "../macos/libraylib.a",
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
+	} 
+} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib {
+		RAYLIB_WASM_LIB,
 	}
 } else {
 	foreign import lib "system:raylib"
@@ -372,17 +375,20 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - Matrix operations
 	//------------------------------------------------------------------------------------
-	MatrixMode   :: proc(mode: c.int) ---                 // Choose the current matrix to be transformed
-	PushMatrix   :: proc() ---                            // Push the current matrix to stack
-	PopMatrix    :: proc() ---                            // Pop lattest inserted matrix from stack
-	LoadIdentity :: proc() ---                            // Reset current matrix to identity matrix
-	Translatef   :: proc(x, y, z: f32) ---                // Multiply the current matrix by a translation matrix
-	Rotatef      :: proc(angleDeg: f32, x, y, z: f32) --- // Multiply the current matrix by a rotation matrix
-	Scalef       :: proc(x, y, z: f32) ---                // Multiply the current matrix by a scaling matrix
-	MultMatrixf  :: proc(matf: [^]f32) ---                // Multiply the current matrix by another matrix
-	Frustum      :: proc(left, right, bottom, top, znear, zfar: f64) ---
-	Ortho        :: proc(left, right, bottom, top, znear, zfar: f64) ---
-	Viewport     :: proc(x, y, width, height: c.int) ---  // Set the viewport area
+	MatrixMode          :: proc(mode: c.int) ---                 // Choose the current matrix to be transformed
+	PushMatrix          :: proc() ---                            // Push the current matrix to stack
+	PopMatrix           :: proc() ---                            // Pop lattest inserted matrix from stack
+	LoadIdentity        :: proc() ---                            // Reset current matrix to identity matrix
+	Translatef          :: proc(x, y, z: f32) ---                // Multiply the current matrix by a translation matrix
+	Rotatef             :: proc(angleDeg: f32, x, y, z: f32) --- // Multiply the current matrix by a rotation matrix
+	Scalef              :: proc(x, y, z: f32) ---                // Multiply the current matrix by a scaling matrix
+	MultMatrixf         :: proc(matf: [^]f32) ---                // Multiply the current matrix by another matrix
+	Frustum             :: proc(left, right, bottom, top, znear, zfar: f64) ---
+	Ortho               :: proc(left, right, bottom, top, znear, zfar: f64) ---
+	Viewport            :: proc(x, y, width, height: c.int) ---  // Set the viewport area
+	SetClipPlanes       :: proc(near, far: f64) ---              // Set clip planes distances
+	GetCullDistanceNear :: proc() -> f64 ---                     // Get cull plane distance near
+	GetCullDistanceFar  :: proc() -> f64 ---                     // Get cull plane distance far
 
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - Vertex level operations
@@ -511,7 +517,7 @@ foreign lib {
 	UpdateVertexBufferElements       :: proc(id: c.uint, data: rawptr, dataSize: c.int, offset: c.int) ---        // Update vertex buffer elements with new data
 	UnloadVertexArray                :: proc(vaoId: c.uint) ---
 	UnloadVertexBuffer               :: proc(vboId: c.uint) ---
-	SetVertexAttribute               :: proc(index: c.uint, compSize: c.int, type: c.int, normalized: bool, stride: c.int, pointer: rawptr) ---
+	SetVertexAttribute               :: proc(index: c.uint, compSize: c.int, type: c.int, normalized: bool, stride: c.int, offset: c.int) ---
 	SetVertexAttributeDivisor        :: proc(index: c.uint, divisor: c.int) ---
 	SetVertexAttributeDefault        :: proc(locIndex: c.int, value: rawptr, attribType: c.int, count: c.int) --- // Set vertex attribute default value
 	DrawVertexArray                  :: proc(offset: c.int, count: c.int) ---
@@ -532,7 +538,7 @@ foreign lib {
 	ReadScreenPixels    :: proc(width, height: c.int) -> [^]byte ---                                                        // Read screen pixel data (color buffer)
 
 	// Framebuffer management (fbo)
-	LoadFramebuffer     :: proc(width, height: c.int) -> c.uint ---                                           // Load an empty framebuffer
+	LoadFramebuffer     :: proc() -> c.uint ---                                           // Load an empty framebuffer
 	FramebufferAttach   :: proc(fboId, texId: c.uint, attachType: c.int, texType: c.int, mipLevel: c.int) --- // Attach texture/renderbuffer to a framebuffer
 	FramebufferComplete :: proc(id: c.uint) -> bool ---                                                       // Verify framebuffer is complete
 	UnloadFramebuffer   :: proc(id: c.uint) ---                                                               // Delete framebuffer from GPU

@@ -2,7 +2,7 @@
 // It takes a string providing the source, which then can be tokenized through
 // repeated calls to the scan procedure.
 // For compatibility with existing tooling and languages, the NUL character is not allowed.
-// If an UTF-8 encoded byte order mark (BOM) is the first character in the first character in the source, it will be discarded.
+// If an UTF-8 encoded byte order mark (BOM) is the first character in the source, it will be discarded.
 //
 // By default, a Scanner skips white space and Odin comments and recognizes all literals defined by the Odin programming language specification.
 // A Scanner may be customized to recognize only a subset of those literals and to recognize different identifiers and white space characters.
@@ -285,6 +285,7 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 		case 'o': return "octal literal"
 		case 'z': return "dozenal literal"
 		case 'x': return "hexadecimal literal"
+		case 'h': return "hexadecimal literal"
 		}
 		return "decimal literal"
 	}
@@ -360,7 +361,8 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 					base, prefix = 12, 'z'
 				case 'h':
 					tok = Float
-					fallthrough
+					ch = advance(s)
+					base, prefix = 16, 'h'
 				case 'x':
 					ch = advance(s)
 					base, prefix = 16, 'x'
@@ -447,7 +449,7 @@ scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 	ch := advance(s)
 	for ch != quote {
 		if ch == '\n' || ch < 0 {
-			error(s, "literal no terminated")
+			error(s, "literal not terminated")
 			return
 		}
 		if ch == '\\' {

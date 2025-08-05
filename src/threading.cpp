@@ -756,7 +756,7 @@ gb_internal void futex_signal(Futex *f) {
 
 			perror("Futex wake");
 			GB_PANIC("futex wake fail");
-		} else if (ret == 1) {
+		} else {
 			return;
 		}
 	}
@@ -773,7 +773,7 @@ gb_internal void futex_broadcast(Futex *f) {
 
 			perror("Futex wake");
 			GB_PANIC("futex wake fail");
-		} else if (ret == 1) {
+		} else {
 			return;
 		}
 	}
@@ -783,7 +783,7 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 	for (;;) {
 		int ret = futex((volatile uint32_t *)f, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL);
 		if (ret == -1) {
-			if (*f != val) {
+			if (errno == EAGAIN) {
 				return;
 			}
 

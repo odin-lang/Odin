@@ -81,12 +81,8 @@ private_key_set_bytes :: proc(priv_key: ^Private_Key, b: []byte) -> bool {
 
 // private_key_bytes sets dst to byte-encoding of priv_key.
 private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
-	if !priv_key._is_initialized {
-		panic("crypto/ed25519: uninitialized private key")
-	}
-	if len(dst) != PRIVATE_KEY_SIZE {
-		panic("crypto/ed25519: invalid destination size")
-	}
+	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized private key")
+	ensure(len(dst) == PRIVATE_KEY_SIZE, "crypto/ed25519: invalid destination size")
 
 	copy(dst, priv_key._b[:])
 }
@@ -98,12 +94,8 @@ private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
 
 // sign writes the signature by priv_key over msg to sig.
 sign :: proc(priv_key: ^Private_Key, msg, sig: []byte) {
-	if !priv_key._is_initialized {
-		panic("crypto/ed25519: uninitialized private key")
-	}
-	if len(sig) != SIGNATURE_SIZE {
-		panic("crypto/ed25519: invalid destination size")
-	}
+	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized private key")
+	ensure(len(sig) == SIGNATURE_SIZE, "crypto/ed25519: invalid destination size")
 
 	// 1. Compute the hash of the private key d, H(d) = (h_0, h_1, ..., h_2b-1)
 	// using SHA-512 for Ed25519.  H(d) may be precomputed.
@@ -178,9 +170,7 @@ public_key_set_bytes :: proc "contextless" (pub_key: ^Public_Key, b: []byte) -> 
 
 // public_key_set_priv sets pub_key to the public component of priv_key.
 public_key_set_priv :: proc(pub_key: ^Public_Key, priv_key: ^Private_Key) {
-	if !priv_key._is_initialized {
-		panic("crypto/ed25519: uninitialized public key")
-	}
+	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized public key")
 
 	src := &priv_key._pub_key
 	copy(pub_key._b[:], src._b[:])
@@ -191,21 +181,15 @@ public_key_set_priv :: proc(pub_key: ^Public_Key, priv_key: ^Private_Key) {
 
 // public_key_bytes sets dst to byte-encoding of pub_key.
 public_key_bytes :: proc(pub_key: ^Public_Key, dst: []byte) {
-	if !pub_key._is_initialized {
-		panic("crypto/ed25519: uninitialized public key")
-	}
-	if len(dst) != PUBLIC_KEY_SIZE {
-		panic("crypto/ed25519: invalid destination size")
-	}
+	ensure(pub_key._is_initialized, "crypto/ed25519: uninitialized public key")
+	ensure(len(dst) == PUBLIC_KEY_SIZE, "crypto/ed25519: invalid destination size")
 
 	copy(dst, pub_key._b[:])
 }
 
 // public_key_equal returns true iff pub_key is equal to other.
 public_key_equal :: proc(pub_key, other: ^Public_Key) -> bool {
-	if !pub_key._is_initialized || !other._is_initialized {
-		panic("crypto/ed25519: uninitialized public key")
-	}
+	ensure(pub_key._is_initialized && other._is_initialized, "crypto/ed25519: uninitialized public key")
 
 	return crypto.compare_constant_time(pub_key._b[:], other._b[:]) == 1
 }

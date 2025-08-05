@@ -84,6 +84,45 @@ out_of_memory_in_parse_json :: proc(t: ^testing.T) {
 }
 
 @test
+out_of_memory_in_unmarshal :: proc(t: ^testing.T) {
+	arena: virtual.Arena
+	arena_buffer: [128]byte
+	arena_init_error := virtual.arena_init_buffer(&arena, arena_buffer[:])
+	testing.expectf(t, arena_init_error == nil, "Expected arena initialization to not return error, got: %v\n", arena_init_error)
+
+	context.allocator = virtual.arena_allocator(&arena)
+
+	json_data := `{
+		"number": 42,
+		"strs": [
+			"Cat",
+			"Dog",
+			"Toucan"
+		],
+		"flag": true
+	}`
+
+	Test_Structure :: struct {
+		number: int,
+		strs: []string,
+		flag: bool,
+	}
+	test_result: Test_Structure
+
+	err := json.unmarshal(transmute([]u8)json_data, &test_result)
+	testing.expectf(t, err == nil, "Expected `json.unmarshal` to succeed, got error %v", err)
+
+	// Test #4515 fix.
+	// Without `or_return` in `unmarshal_object`'s struct_loop, `json.unmarshal` would return OOM a few times and then return `Unsupported_Type_Error`.
+	// With the fix we expect it to return OOM every time, so if this ever fails, it means we have a regression.
+	for _ in 0..<8 {
+		err  = json.unmarshal(transmute([]u8)json_data, &test_result)
+		expected_error := json.Error.Out_Of_Memory
+		testing.expectf(t, err == json.Error.Out_Of_Memory, "Expected `json.unmarshal` to fail with %v, got %v", expected_error, err)
+	}
+}
+
+@test
 marshal_json :: proc(t: ^testing.T) {
    
 	My_Struct :: struct {
@@ -442,5 +481,51 @@ map_with_integer_keys :: proc(t: ^testing.T) {
 		if key in my_map2 {
 			testing.expectf(t, runtime.string_eq(item, my_map2[key]), "Expected value %s to be present in unmarshaled map", key)
 		}
+	}
+}
+
+@test
+enumerated_array :: proc(t: ^testing.T) {
+	Fruit :: enum { Apple, Banana, Pear }
+	Fruit_Stock :: [Fruit]uint {
+		.Apple = 14,
+		.Banana = 3,
+		.Pear = 513,
+	}
+
+	{ // test unmarshaling from array
+		marshaled := "[14,3,513]"
+
+		unmarshaled: [Fruit]uint
+		err := json.unmarshal_string(marshaled, &unmarshaled)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, unmarshaled, Fruit_Stock)
+	}
+
+	Sparse_Fruit :: enum { Apple, Banana, Cherry = 23, Pear }
+	Sparse_Fruit_Stock :: #partial #sparse [Sparse_Fruit]uint {
+		.Apple = 14,
+		.Banana = 3,
+		.Pear = 513,
+	}
+
+	{ // test unmarshaling from object
+		marshaled := `{"Apple":14,"Banana":3,"Cherry":0,"Pear":513}`
+
+		unmarshaled: #sparse [Sparse_Fruit]uint
+		err := json.unmarshal_string(marshaled, &unmarshaled)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, unmarshaled, Sparse_Fruit_Stock)
+	}
+
+	{ // test marshal -> unmarshal
+		marshaled, err_marshal := json.marshal(Sparse_Fruit_Stock)
+		defer delete(marshaled)
+		testing.expect_value(t, err_marshal, nil)
+
+		unmarshaled: #sparse [Sparse_Fruit]uint
+		err_unmarshal := json.unmarshal(marshaled, &unmarshaled)
+		testing.expect_value(t, err_unmarshal, nil)
+		testing.expect_value(t, unmarshaled, Sparse_Fruit_Stock)
 	}
 }

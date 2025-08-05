@@ -1,3 +1,5 @@
+#+build !wasi
+#+build !js
 package filepath
 
 import "core:os"

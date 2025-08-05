@@ -1,5 +1,5 @@
 lib/*
-!lib/.gitkeep
+!lib/wgpu-windows-x86_64-msvc-release
 example/web/triangle.wasm
 example/web/wgpu.js
 example/web/runtime.js

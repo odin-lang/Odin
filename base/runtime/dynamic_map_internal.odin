@@ -158,21 +158,21 @@ map_cell_index_static :: #force_inline proc "contextless" (cells: [^]Map_Cell($T
 	} else when (N & (N - 1)) == 0 && N <= 8*size_of(uintptr) {
 		// Likely case, N is a power of two because T is a power of two.
 
+		// Unique case, no need to index data here since only one element.
+		when N == 1 {
+			return &cells[index].data[0]
+		}
+
 		// Compute the integer log 2 of N, this is the shift amount to index the
 		// correct cell. Odin's intrinsics.count_leading_zeros does not produce a
 		// constant, hence this approach. We only need to check up to N = 64.
-		SHIFT :: 1 when N < 2  else
-		         2 when N < 4  else
-		         3 when N < 8  else
-		         4 when N < 16 else
-		         5 when N < 32 else 6
+		SHIFT :: 1 when N == 2  else
+		         2 when N == 4  else
+		         3 when N == 8  else
+		         4 when N == 16 else
+		         5 when N == 32 else 6
 		#assert(SHIFT <= MAP_CACHE_LINE_LOG2)
-		// Unique case, no need to index data here since only one element.
-		when N == 1 {
-			return &cells[index >> SHIFT].data[0]
-		} else {
-			return &cells[index >> SHIFT].data[index & (N - 1)]
-		}
+		return &cells[index >> SHIFT].data[index & (N - 1)]
 	} else {
 		// Least likely (and worst case), we pay for a division operation but we
 		// assume the compiler does not actually generate a division. N will be in the
@@ -400,7 +400,7 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 // This procedure returns the address of the just inserted value, and will
 // return 'nil' if there was no room to insert the entry
 @(require_results)
-map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
+map_insert_hash_dynamic_with_key :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (key: uintptr, result: uintptr) {
 	h        := h
 	pos      := map_desired_position(m^, h)
 	distance := uintptr(0)
@@ -436,7 +436,11 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 			hs[pos] = h
 
-			return result if result != 0 else v_dst
+			if result == 0 {
+				key    = k_dst
+				result = v_dst
+			}
+			return
 		}
 
 		if map_hash_is_deleted(element_hash) {
@@ -444,12 +448,13 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 		}
 
 		if probe_distance := map_probe_distance(m^, element_hash, pos); distance > probe_distance {
-			if result == 0 {
-				result = map_cell_index_dynamic(vs, info.vs, pos)
-			}
-
 			kp := map_cell_index_dynamic(ks, info.ks, pos)
 			vp := map_cell_index_dynamic(vs, info.vs, pos)
+
+			if result == 0 {
+				key    = kp
+				result = vp
+			}
 
 			intrinsics.mem_copy_non_overlapping(rawptr(tk), rawptr(k), size_of_k)
 			intrinsics.mem_copy_non_overlapping(rawptr(k),  rawptr(kp), size_of_k)
@@ -491,7 +496,11 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 			hs[pos] = h
 
-			return result if result != 0 else v_dst
+			if result == 0 {
+				key    = k_dst
+				result = v_dst
+			}
+			return
 		}
 
 		k_src := map_cell_index_dynamic(ks, info.ks, la_pos)
@@ -501,6 +510,7 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 		if probe_distance < look_ahead {
 			// probed can be made ideal while placing saved (ending condition)
 			if result == 0 {
+				key    = k_dst
 				result = v_dst
 			}
 			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
@@ -550,6 +560,7 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 		} else {
 			// place saved, save probed
 			if result == 0 {
+				key    = k_dst
 				result = v_dst
 			}
 			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
@@ -566,6 +577,12 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 		pos = (pos + 1) & mask
 		distance += 1
 	}
+}
+
+@(require_results)
+map_insert_hash_dynamic :: #force_inline proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
+	_, result = map_insert_hash_dynamic_with_key(m, info, h, ik, iv)
+	return
 }
 
 @(require_results)
@@ -941,6 +958,29 @@ __dynamic_map_set_extra :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 	return nil, rawptr(result)
 }
 
+__dynamic_map_entry :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key: rawptr, zero: rawptr, loc := #caller_location) -> (key_ptr: rawptr, value_ptr: rawptr, just_inserted: bool, err: Allocator_Error) {
+	hash := info.key_hasher(key, map_seed(m^))
+
+	if key_ptr, value_ptr = __dynamic_map_get_key_and_value(m, info, hash, key); value_ptr != nil {
+		return
+	}
+
+	has_grown: bool
+	if err, has_grown = __dynamic_map_check_grow(m, info, loc); err != nil {
+		return
+	} else if has_grown {
+		hash = info.key_hasher(key, map_seed(m^))
+	}
+
+	kp, vp := map_insert_hash_dynamic_with_key(m, info, hash, uintptr(key), uintptr(zero))
+	key_ptr   = rawptr(kp)
+	value_ptr = rawptr(vp)
+
+	m.len += 1
+	just_inserted = true
+	return
+}
+
 
 // IMPORTANT: USED WITHIN THE COMPILER
 @(private)
@@ -988,4 +1028,33 @@ default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> ui
 	}
 	h &= HASH_MASK
 	return uintptr(h) | uintptr(uintptr(h) == 0)
+}
+
+default_hasher_f64 :: proc "contextless" (f: f64, seed: uintptr) -> uintptr {
+	f := f
+	buf: [size_of(f)]u8
+	if f == 0 {
+		return default_hasher(&buf, seed, size_of(buf))
+	}
+	if f != f {
+		// TODO(bill): What should the logic be for NaNs?
+		return default_hasher(&f, seed, size_of(f))
+	}
+	return default_hasher(&f, seed, size_of(f))
+}
+
+default_hasher_complex128 :: proc "contextless" (x, y: f64, seed: uintptr) -> uintptr {
+	seed := seed
+	seed = default_hasher_f64(x, seed)
+	seed = default_hasher_f64(y, seed)
+	return seed
+}
+
+default_hasher_quaternion256 :: proc "contextless" (x, y, z, w: f64, seed: uintptr) -> uintptr {
+	seed := seed
+	seed = default_hasher_f64(x, seed)
+	seed = default_hasher_f64(y, seed)
+	seed = default_hasher_f64(z, seed)
+	seed = default_hasher_f64(w, seed)
+	return seed
 }

@@ -277,6 +277,7 @@ odin
 *.bin
 demo.bin
 libLLVM*.so*
+*.a
 
 # shared collection
 shared/
@@ -293,5 +294,11 @@ build.sh
 
 # RAD debugger project file
 *.raddbg
-
+*.rdi
+tests/issues/build/*
 misc/featuregen/featuregen
+
+# Clangd stuff
+.cache/
+.clangd
+compile_commands.json

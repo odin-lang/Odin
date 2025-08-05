@@ -18,7 +18,7 @@ package blake2b
 import "../_blake2"
 
 // DIGEST_SIZE is the BLAKE2b digest size in bytes.
-DIGEST_SIZE :: 64
+DIGEST_SIZE :: _blake2.BLAKE2B_SIZE
 
 // BLOCK_SIZE is the BLAKE2b block size in bytes.
 BLOCK_SIZE :: _blake2.BLAKE2B_BLOCK_SIZE
@@ -27,9 +27,11 @@ BLOCK_SIZE :: _blake2.BLAKE2B_BLOCK_SIZE
 Context :: _blake2.Blake2b_Context
 
 // init initializes a Context with the default BLAKE2b config.
-init :: proc(ctx: ^Context) {
+init :: proc(ctx: ^Context, digest_size := DIGEST_SIZE) {
+	ensure(digest_size <= _blake2.MAX_SIZE, "crypto/blake2b: invalid digest size")
+
 	cfg: _blake2.Blake2_Config
-	cfg.size = _blake2.BLAKE2B_SIZE
+	cfg.size = u8(digest_size)
 	_blake2.init(ctx, &cfg)
 }
 

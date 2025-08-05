@@ -1,5 +1,10 @@
 package linux
 
+import "base:intrinsics"
+
+@(private)
+log2 :: intrinsics.constant_log2
+
 
 /*
 	Represents an error returned by most of syscalls
@@ -152,43 +157,65 @@ Errno :: enum i32 {
 	RDONLY flag is not present, because it has the value of 0, i.e. it is the
 	default, unless WRONLY or RDWR is specified.
 */
-Open_Flags_Bits :: enum {
-	WRONLY    = 0,
-	RDWR      = 1,
-	CREAT     = 6,
-	EXCL      = 7,
-	NOCTTY    = 8,
-	TRUNC     = 9,
-	APPEND    = 10,
-	NONBLOCK  = 11,
-	DSYNC     = 12,
-	ASYNC     = 13,
-	DIRECT    = 14,
-	LARGEFILE = 15,
-	DIRECTORY = 16,
-	NOFOLLOW  = 17,
-	NOATIME   = 18,
-	CLOEXEC   = 19,
-	PATH      = 21,
+when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECT    = 14,
+		LARGEFILE = 15,
+		DIRECTORY = 16,
+		NOFOLLOW  = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
+	// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
+	#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
+	#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
+	#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
+	#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
+	#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
+	#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
+	#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
+	#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
+	#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
+	#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
+	#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
+	#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
+	#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
+	#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
+	#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
+	#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
+} else {
+	Open_Flags_Bits :: enum {
+		WRONLY    = 0,
+		RDWR      = 1,
+		CREAT     = 6,
+		EXCL      = 7,
+		NOCTTY    = 8,
+		TRUNC     = 9,
+		APPEND    = 10,
+		NONBLOCK  = 11,
+		DSYNC     = 12,
+		ASYNC     = 13,
+		DIRECTORY = 14,
+		NOFOLLOW  = 15,
+		DIRECT    = 16,
+		LARGEFILE = 17,
+		NOATIME   = 18,
+		CLOEXEC   = 19,
+		PATH      = 21,
+	}
 }
-// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
-#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
-#assert(1 << uint(Open_Flags_Bits.RDWR)      == 0o0000000_2)
-#assert(1 << uint(Open_Flags_Bits.CREAT)     == 0o00000_100)
-#assert(1 << uint(Open_Flags_Bits.EXCL)      == 0o00000_200)
-#assert(1 << uint(Open_Flags_Bits.NOCTTY)    == 0o00000_400)
-#assert(1 << uint(Open_Flags_Bits.TRUNC)     == 0o0000_1000)
-#assert(1 << uint(Open_Flags_Bits.APPEND)    == 0o0000_2000)
-#assert(1 << uint(Open_Flags_Bits.NONBLOCK)  == 0o0000_4000)
-#assert(1 << uint(Open_Flags_Bits.DSYNC)     == 0o000_10000)
-#assert(1 << uint(Open_Flags_Bits.ASYNC)     == 0o000_20000)
-#assert(1 << uint(Open_Flags_Bits.DIRECT)    == 0o000_40000)
-#assert(1 << uint(Open_Flags_Bits.LARGEFILE) == 0o00_100000)
-#assert(1 << uint(Open_Flags_Bits.DIRECTORY) == 0o00_200000)
-#assert(1 << uint(Open_Flags_Bits.NOFOLLOW)  == 0o00_400000)
-#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
-#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
-#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
 
 /*
 	Bits for FD_Flags bitset
@@ -519,10 +546,40 @@ Fd_Poll_Events_Bits :: enum {
 	RDHUP  = 13,
 }
 
+Inotify_Init_Bits :: enum {
+	NONBLOCK = 11,
+	CLOEXEC  = 19,
+}
+
+Inotify_Event_Bits :: enum u32 {
+	ACCESS        = 0,
+	MODIFY        = 1,
+	ATTRIB        = 2,
+	CLOSE_WRITE   = 3,
+	CLOSE_NOWRITE = 4,
+	OPEN          = 5,
+	MOVED_FROM    = 6,
+	MOVED_TO      = 7,
+	CREATE        = 8,
+	DELETE        = 9,
+	DELETE_SELF   = 10,
+	MOVE_SELF     = 11,
+	UNMOUNT       = 13,
+	Q_OVERFLOW    = 14,
+	IGNORED       = 15,
+	ONLYDIR       = 24,
+	DONT_FOLLOW   = 25,
+	EXCL_UNLINK   = 26,
+	MASK_CREATE   = 28,
+	MASK_ADD      = 29,
+	ISDIR         = 30,
+	ONESHOT       = 31,
+}
+
 /*
 	Bits for Mem_Protection bitfield
 */
-Mem_Protection_Bits :: enum{
+Mem_Protection_Bits :: enum {
 	READ      = 0,
 	WRITE     = 1,
 	EXEC      = 2,
@@ -537,11 +594,13 @@ Mem_Protection_Bits :: enum{
 
 /*
 	Bits for Map_Flags
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags_Bits :: enum {
 	SHARED          = 0,
 	PRIVATE         = 1,
-	SHARED_VALIDATE = 2,
+	DROPPABLE       = 3,
 	FIXED           = 4,
 	ANONYMOUS       = 5,
 	// platform-dependent section start
@@ -1277,6 +1336,7 @@ Socket_Option :: enum {
 	ACCEPTCONN                    = 30,
 	PEERSEC                       = 31,
 	PASSSEC                       = 34,
+	IP_ADD_MEMBERSHIP             = 35,
 	MARK                          = 36,
 	PROTOCOL                      = 38,
 	DOMAIN                        = 39,
@@ -1558,36 +1618,39 @@ PER_HPUX        :: 0x0010
 PER_MASK        :: 0x00ff
 
 /*
-	Bits for access modes for shared memory
+	Bits for SystemV IPC flags.
+
+	In this enum, access modes are common for any shared memory. Prefixed
+	entries (i.e. `IPC_` or `SHM_`) denote flags, where `IPC_` are common flags
+	for all SystemV IPC primitives, and `SHM_`, `SEM_` and `MSG_` are specific
+	to shared memory segments, semaphores and message queues respectively.
+	
+	These bits overlap, because they are meant to be used within the
+	context of specific procedures. Creation flags, used for `*get` procedures,
+	and usage flags used by all other IPC procedures. Do not mix creation and
+	usage flags, as well as flags prefixed differently (excluding `IPC_`
+	prefix).
 */
-IPC_Mode_Bits :: enum {
+IPC_Flags_Bits :: enum {
+	// Access modes for shared memory.
 	WROTH  = 1,
 	RDOTH  = 2,
 	WRGRP  = 4,
 	RDGRP  = 5,
 	WRUSR  = 7,
 	RDUSR  = 8,
-	DEST   = 9,
-	LOCKED = 10,
-}
-
-/*
-	Shared memory flags bits
-*/
-IPC_Flags_Bits :: enum {
+	// Creation flags for shared memory.
 	IPC_CREAT     = 9,
 	IPC_EXCL      = 10,
-	IPC_NOWAIT    = 11,
-	// Semaphore
-	SEM_UNDO      = 9,
-	// Shared memory
 	SHM_HUGETLB   = 11,
 	SHM_NORESERVE = 12,
+	// Usage flags for shared memory.
+	IPC_NOWAIT    = 11,
+	SEM_UNDO      = 9,
 	SHM_RDONLY    = 12,
 	SHM_RND       = 13,
 	SHM_REMAP     = 14,
 	SHM_EXEC      = 15,
-	// Message queue
 	MSG_NOERROR   = 12,
 	MSG_EXCEPT    = 13,
 	MSG_COPY      = 14,
@@ -1786,22 +1849,23 @@ EPoll_Flags_Bits :: enum {
 }
 
 EPoll_Event_Kind :: enum u32 {
-	IN        = 0x001,
-	PRI       = 0x002,
-	OUT       = 0x004,
-	RDNORM    = 0x040,
-	RDBAND    = 0x080,
-	WRNORM    = 0x100,
-	WRBAND    = 0x200,
-	MSG       = 0x400,
-	ERR       = 0x008,
-	HUP       = 0x010,
-	RDHUP     = 0x2000,
-	EXCLUSIVE = 1<<28,
-	WAKEUP    = 1<<29,
-	ONESHOT   = 1<<30,
-	ET        = 1<<31,
+	IN        = log2(0x001),
+	PRI       = log2(0x002),
+	OUT       = log2(0x004),
+	RDNORM    = log2(0x040),
+	RDBAND    = log2(0x080),
+	WRNORM    = log2(0x100),
+	WRBAND    = log2(0x200),
+	MSG       = log2(0x400),
+	ERR       = log2(0x008),
+	HUP       = log2(0x010),
+	RDHUP     = log2(0x2000),
+	EXCLUSIVE = log2(1<<28),
+	WAKEUP    = log2(1<<29),
+	ONESHOT   = log2(1<<30),
+	ET        = log2(1<<31),
 }
+EPoll_Event_Set :: bit_set[EPoll_Event_Kind; u32]
 
 EPoll_Ctl_Opcode :: enum i32 {
 	ADD = 1,

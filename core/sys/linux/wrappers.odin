@@ -54,22 +54,45 @@ WCOREDUMP :: #force_inline proc "contextless" (s: u32) -> bool {
 // TODO: sigaddset etc
 
 
-/// Iterate the results of getdents
-/// Only iterates as much data as loaded in the buffer
-/// In case you need to iterate *all* files in a directory
-/// consider using dirent_get_iterate
-///
-/// Example of using dirent_iterate_buf
-///   // Get dirents into a buffer
-///   buf: [128]u8
-///   sys.getdents(dirfd, buf[:])
-///   // Print the names of the files
-///   for dir in sys.dirent_iterate_buf(buf[:], &offs) {
-///       name := sys.dirent_name(dir)
-///       fmt.println(name)
-///   }
-/// This function doesn't automatically make a request
-/// for the buffer to be refilled
+/*
+Iterate the results of `getdents()`.
+
+This procedure extracts a directory entry from `buf` at the offset `offs`.
+`offs` will be modified to store an offset to the possible next directory entry
+in `buf`. The procedure only iterates as much data as loaded in the buffer and
+does not automatically make a request for the buffer to be refilled.
+
+Inputs:
+- buf: A byte buffer with data from `getdents()`
+- offs: An offset to the next possible directory entry in `buf`
+
+Returns:
+- A pointer to a directory entry in `buf`, or `nil`
+- A bool value denoting if a valid directory entry is returned
+
+Example:
+
+    import "core:fmt"
+    import "core:sys/linux"
+
+    print_names :: proc(dirfd: linux.Fd) {
+        // Get dirents into a buffer.
+        buf: [128]u8
+        // Loop until there are no more entries.
+        for {
+            written, err := linux.getdents(dirfd, buf[:])
+            if err != .NONE || written == 0 {
+                break
+            }
+            // Print the names of the files.
+            offset : int
+            for dir in linux.dirent_iterate_buf(buf[:written], &offset) {
+                name := linux.dirent_name(dir)
+                fmt.println(name)
+            }
+        }
+    }
+*/
 dirent_iterate_buf :: proc "contextless" (buf: []u8, offs: ^int) -> (d: ^Dirent, cont: bool) {
 	// Stopped iterating when there's no space left
 	if offs^ >= len(buf) {
@@ -82,26 +105,31 @@ dirent_iterate_buf :: proc "contextless" (buf: []u8, offs: ^int) -> (d: ^Dirent,
 	return dirent, true
 }
 
-/// Obtain the name of dirent as a string
-/// The lifetime of the string is bound to the lifetime of the provided dirent structure
+/*
+Obtain the name of dirent as a string.
+
+The lifetime of the returned string is bound to the lifetime of the provided dirent structure.
+
+Inputs:
+- dirent: A directory entry
+
+Returns:
+- A name of the entry
+*/
 dirent_name :: proc "contextless" (dirent: ^Dirent) -> string #no_bounds_check {
 	str := ([^]u8)(&dirent.name)
-	// Note(flysand): The string size calculated above applies only to the ideal case
-	// we subtract 1 byte from the string size, because a null terminator is guaranteed
-	// to be present. But! That said, the dirents are aligned to 8 bytes and the padding
-	// between the null terminator and the start of the next struct may be not initialized
-	// which means we also have to scan these garbage bytes.
-	str_size := int(dirent.reclen) - 1 - cast(int)offset_of(Dirent, name)
-	// This skips *only* over the garbage, since if we're not garbage we're at nul terminator,
-	// which skips this loop
-	for str[str_size] != 0 {
-		str_size -= 1
+	// Dirents are aligned to 8 bytes, so there is guaranteed to be a null
+	// terminator in the last 8 bytes.
+	str_size := int(dirent.reclen) - cast(int)offset_of(Dirent, name)
+
+	trunc := min(str_size, 8)
+	str_size -= trunc
+	for _ in 0..<trunc {
+		if str[str_size] == 0 {
+			break
+		}
+		str_size += 1
 	}
-	for str[str_size-1] == 0 {
-		str_size -= 1
-	}
-	// Oh yeah btw i could also just `repne scasb` this thing, but honestly I started doing
-	// it the painful way, might as well finish doing it that way
 	return string(str[:str_size])
 }
 

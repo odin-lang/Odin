@@ -1,4 +1,4 @@
-#+build linux, windows, darwin, netbsd, openbsd, freebsd
+#+build linux, windows, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "base:intrinsics"
@@ -9,7 +9,7 @@ import "core:c/libc"
 when ODIN_OS == .Windows {
 	foreign import lib "system:libucrt.lib"
 } else when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }

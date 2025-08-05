@@ -29,9 +29,14 @@ import win "core:sys/windows"
 _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
 	context.allocator = allocator
 
+	options := win.DNS_QUERY_OPTIONS{}
+	if strings.has_suffix(hostname, ".local") {
+		options = {.MULTICAST_ONLY, .MULTICAST_WAIT} // 0x00020500
+	}
+
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator)
 	rec: ^win.DNS_RECORD
-	res := win.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil)
+	res := win.DnsQuery_UTF8(host_cstr, u16(type), options, nil, &rec, nil)
 
 	switch u32(res) {
 	case 0:

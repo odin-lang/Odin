@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 #+private
 package testing
 

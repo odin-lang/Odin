@@ -1,11 +1,13 @@
 package os
 
-foreign import libc "system:c"
+foreign import lib "system:c"
 
 import "base:runtime"
 import "core:c"
+import "core:c/libc"
 import "core:strings"
 import "core:sys/haiku"
+import "core:sys/posix"
 
 Handle    :: i32
 Pid       :: i32
@@ -14,7 +16,7 @@ _Platform_Error :: haiku.Errno
 
 MAX_PATH :: haiku.PATH_MAX
 
-ENOSYS :: _Platform_Error(i32(haiku.Errno.POSIX_ERROR_BASE) + 9)
+ENOSYS :: _Platform_Error(haiku.Errno.ENOSYS)
 
 INVALID_HANDLE :: ~Handle(0)
 
@@ -117,14 +119,13 @@ S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK 
 S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
 S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
+__error :: libc.errno
+_unix_open :: posix.open
 
-foreign libc {
-	@(link_name="_errorp")        __error              :: proc() -> ^c.int ---
-
+foreign lib {
 	@(link_name="fork")           _unix_fork           :: proc() -> pid_t ---
 	@(link_name="getthrid")       _unix_getthrid       :: proc() -> int ---
 
-	@(link_name="open")           _unix_open           :: proc(path: cstring, flags: c.int, #c_vararg mode: ..u16) -> Handle ---
 	@(link_name="close")          _unix_close          :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")           _unix_read           :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="pread")          _unix_pread          :: proc(fd: Handle, buf: rawptr, size: c.size_t, offset: i64) -> c.ssize_t ---
@@ -150,6 +151,7 @@ foreign libc {
 	@(link_name="closedir")       _unix_closedir       :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")      _unix_rewinddir      :: proc(dirp: Dir) ---
 	@(link_name="readdir_r")      _unix_readdir_r      :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
+	@(link_name="dup")            _unix_dup            :: proc(fd: Handle) -> Handle ---
 
 	@(link_name="malloc")         _unix_malloc         :: proc(size: c.size_t) -> rawptr ---
 	@(link_name="calloc")         _unix_calloc         :: proc(num, size: c.size_t) -> rawptr ---
@@ -157,7 +159,7 @@ foreign libc {
 	@(link_name="realloc")        _unix_realloc        :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 
 	@(link_name="getenv")         _unix_getenv         :: proc(cstring) -> cstring ---
-	@(link_name="realpath")       _unix_realpath       :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	@(link_name="realpath")       _unix_realpath       :: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
 
 	@(link_name="exit")           _unix_exit           :: proc(status: c.int) -> ! ---
 
@@ -203,7 +205,7 @@ fork :: proc() -> (Pid, Error) {
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	handle := _unix_open(cstr, c.int(flags), u16(mode))
+	handle := cast(Handle)_unix_open(cstr, transmute(posix.O_Flags)i32(flags), transmute(posix.mode_t)i32(mode))
 	if handle == -1 {
 		return INVALID_HANDLE, get_last_error()
 	}
@@ -314,7 +316,7 @@ file_size :: proc(fd: Handle) -> (i64, Error) {
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
 
-@(require_results)
+@(private, require_results)
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
 	for arg, i in runtime.args__ {
@@ -323,7 +325,12 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return res
 }
 
-@(private, require_results)
+@(private, fini)
+_delete_command_line_arguments :: proc() {
+	delete(args)
+}
+
+@(private, require_results, no_sanitize_memory)
 _stat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -337,7 +344,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
@@ -351,7 +358,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	return s, nil
 }
 
-@(private, require_results)
+@(private, require_results, no_sanitize_memory)
 _fstat :: proc(fd: Handle) -> (OS_Stat, Error) {
 	// deliberately uninitialized
 	s: OS_Stat = ---
@@ -444,7 +451,7 @@ absolute_path_from_relative :: proc(rel: string, allocator := context.allocator)
 	if path_ptr == nil {
 		return "", get_last_error()
 	}
-	defer _unix_free(path_ptr)
+	defer _unix_free(rawptr(path_ptr))
 
 	path_cstr := cstring(path_ptr)
 	return strings.clone(string(path_cstr), allocator)
@@ -461,9 +468,10 @@ access :: proc(path: string, mask: int) -> (bool, Error) {
 }
 
 @(require_results)
-lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+lookup_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
+	// NOTE(tetra): Lifetime of 'cstr' is unclear, but _unix_free(cstr) segfaults.
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
 		return "", false
@@ -472,10 +480,39 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 }
 
 @(require_results)
-get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+lookup_env_buffer :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	if len(key) + 1 > len(buf) {
+		return "", .Buffer_Full
+	} else {
+		copy(buf, key)
+	}
+
+	if value = string(_unix_getenv(cstring(raw_data(buf)))); value == "" {
+		return "", .Env_Var_Not_Found
+	} else {
+		if len(value) > len(buf) {
+			return "", .Buffer_Full
+		} else {
+			copy(buf, value)
+			return string(buf[:len(value)]), nil
+		}
+	}
+}
+lookup_env :: proc{lookup_env_alloc, lookup_env_buffer}
+
+@(require_results)
+get_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string) {
 	value, _ = lookup_env(key, allocator)
 	return
 }
+
+@(require_results)
+get_env_buf :: proc(buf: []u8, key: string) -> (value: string) {
+	value, _ = lookup_env(buf, key)
+	return
+}
+get_env :: proc{get_env_alloc, get_env_buf}
+
 
 @(private, require_results)
 _processor_core_count :: proc() -> int {
@@ -487,4 +524,18 @@ _processor_core_count :: proc() -> int {
 exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	_unix_exit(i32(code))
+}
+
+@(require_results)
+current_thread_id :: proc "contextless" () -> int {
+	return int(haiku.find_thread(nil))
+}
+
+@(private, require_results)
+_dup :: proc(fd: Handle) -> (Handle, Error) {
+	dup := _unix_dup(fd)
+	if dup == -1 {
+		return INVALID_HANDLE, get_last_error()
+	}
+	return dup, nil
 }

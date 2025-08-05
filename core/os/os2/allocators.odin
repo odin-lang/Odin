@@ -8,42 +8,12 @@ file_allocator :: proc() -> runtime.Allocator {
 	return heap_allocator()
 }
 
-temp_allocator_proc :: runtime.arena_allocator_proc
-
 @(private="file")
 MAX_TEMP_ARENA_COUNT :: 2
-
+@(private="file")
+MAX_TEMP_ARENA_COLLISIONS :: MAX_TEMP_ARENA_COUNT - 1
 @(private="file", thread_local)
 global_default_temp_allocator_arenas: [MAX_TEMP_ARENA_COUNT]runtime.Arena
-
-@(private="file", thread_local)
-global_default_temp_allocator_index: uint
-
-
-@(require_results)
-temp_allocator :: proc() -> runtime.Allocator {
-	arena := &global_default_temp_allocator_arenas[global_default_temp_allocator_index]
-	if arena.backing_allocator.procedure == nil {
-		arena.backing_allocator = heap_allocator()
-	}
-
-	return runtime.Allocator{
-		procedure = temp_allocator_proc,
-		data      = arena,
-	}
-}
-
-
-
-@(require_results)
-temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: runtime.Arena_Temp) {
-	temp = runtime.arena_temp_begin(&global_default_temp_allocator_arenas[global_default_temp_allocator_index], loc)
-	return
-}
-
-temp_allocator_temp_end :: proc(temp: runtime.Arena_Temp, loc := #caller_location) {
-	runtime.arena_temp_end(temp, loc)
-}
 
 @(fini, private)
 temp_allocator_fini :: proc() {
@@ -53,18 +23,49 @@ temp_allocator_fini :: proc() {
 	global_default_temp_allocator_arenas = {}
 }
 
-TEMP_ALLOCATOR_GUARD_END :: proc(temp: runtime.Arena_Temp, loc := #caller_location) {
-	runtime.arena_temp_end(temp, loc)
-	if temp.arena != nil {
-		global_default_temp_allocator_index = (global_default_temp_allocator_index-1)%MAX_TEMP_ARENA_COUNT
-	}
+Temp_Allocator :: struct {
+	using arena: ^runtime.Arena,
+	using allocator: runtime.Allocator,
+	tmp: runtime.Arena_Temp,
+	loc: runtime.Source_Code_Location,
+}
+	
+TEMP_ALLOCATOR_GUARD_END :: proc(temp: Temp_Allocator) {
+	runtime.arena_temp_end(temp.tmp, temp.loc)
 }
 
 @(deferred_out=TEMP_ALLOCATOR_GUARD_END)
-TEMP_ALLOCATOR_GUARD :: #force_inline proc(loc := #caller_location) -> (runtime.Arena_Temp, runtime.Source_Code_Location) {
-	global_default_temp_allocator_index = (global_default_temp_allocator_index+1)%MAX_TEMP_ARENA_COUNT
-	tmp := temp_allocator_temp_begin(loc)
-	return tmp, loc
+TEMP_ALLOCATOR_GUARD :: #force_inline proc(collisions: []runtime.Allocator, loc := #caller_location) -> Temp_Allocator {
+	assert(len(collisions) <= MAX_TEMP_ARENA_COLLISIONS, "Maximum collision count exceeded. MAX_TEMP_ARENA_COUNT must be increased!")
+	good_arena: ^runtime.Arena
+	for i in 0..<MAX_TEMP_ARENA_COUNT {
+		good_arena = &global_default_temp_allocator_arenas[i]
+		for c in collisions {
+			if good_arena == c.data {
+				good_arena = nil
+			}
+		}
+		if good_arena != nil {
+			break
+		}
+	}
+	assert(good_arena != nil)
+	if good_arena.backing_allocator.procedure == nil {
+		good_arena.backing_allocator = heap_allocator()
+	}
+	tmp := runtime.arena_temp_begin(good_arena, loc)
+	return { good_arena, runtime.arena_allocator(good_arena), tmp, loc }
+}
+
+temp_allocator_begin :: runtime.arena_temp_begin
+temp_allocator_end :: runtime.arena_temp_end
+@(deferred_out=_temp_allocator_end)
+temp_allocator_scope :: proc(tmp: Temp_Allocator) -> (runtime.Arena_Temp) {
+	return temp_allocator_begin(tmp.arena)
+}
+@(private="file")
+_temp_allocator_end :: proc(tmp: runtime.Arena_Temp) {
+	temp_allocator_end(tmp)
 }
 
 @(init, private)

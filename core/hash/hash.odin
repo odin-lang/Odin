@@ -127,7 +127,7 @@ jenkins :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 {
 }
 
 @(optimization_mode="favor_size")
-murmur32 :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 {
+murmur32 :: proc "contextless" (data: []byte, seed := u32(0x9747b28c)) -> u32 {
 	c1_32: u32 : 0xcc9e2d51
 	c2_32: u32 : 0x1b873593
 

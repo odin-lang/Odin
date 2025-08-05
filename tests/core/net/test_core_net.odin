@@ -12,6 +12,7 @@
 */
 #+build !netbsd
 #+build !openbsd
+#+feature dynamic-literals
 package test_core_net
 
 import "core:testing"

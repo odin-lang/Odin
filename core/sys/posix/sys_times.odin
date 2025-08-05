@@ -1,8 +1,8 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }
@@ -25,7 +25,7 @@ when ODIN_OS == .NetBSD {
 	@(private) LTIMES :: "times"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux || ODIN_OS == .Haiku {
 
 	tms :: struct {
 		tms_utime:  clock_t, /* [PSX] user CPU time */

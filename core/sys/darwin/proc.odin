@@ -4,7 +4,7 @@ import "base:intrinsics"
 
 import "core:sys/posix"
 
-foreign import lib "system:System.framework"
+foreign import lib "system:System"
 
 // Incomplete bindings to the proc API on MacOS, add to when needed.
 

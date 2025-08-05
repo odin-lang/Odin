@@ -1,8 +1,8 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }

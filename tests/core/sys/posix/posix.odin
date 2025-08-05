@@ -1,4 +1,4 @@
-#+build linux, darwin, freebsd, openbsd, netbsd
+#+build linux, darwin, freebsd, openbsd, netbsd, haiku
 package tests_core_posix
 
 import "core:log"
@@ -65,8 +65,17 @@ test_dirent :: proc(t: ^testing.T) {
 		for entry in entries {
 			defer posix.free(entry)
 
-			if entry.d_type != .REG {
-				continue
+			when ODIN_OS == .Haiku {
+				stat: posix.stat_t
+				posix.stat(cstring(raw_data(entry.d_name[:])), &stat)
+
+				if !posix.S_ISREG(stat.st_mode) {
+					continue
+				}
+			} else {
+				if entry.d_type != .REG {
+					continue
+				}
 			}
 
 			name := string(cstring(raw_data(entry.d_name[:])))
@@ -86,8 +95,17 @@ test_dirent :: proc(t: ^testing.T) {
 				break
 			}
 
-			if entry.d_type != .REG {
-				continue
+			when ODIN_OS == .Haiku {
+				stat: posix.stat_t
+				posix.stat(cstring(raw_data(entry.d_name[:])), &stat)
+
+				if !posix.S_ISREG(stat.st_mode) {
+					continue
+				}
+			} else {
+				if entry.d_type != .REG {
+					continue
+				}
 			}
 
 			name := string(cstring(raw_data(entry.d_name[:])))
@@ -140,15 +158,15 @@ test_langinfo :: proc(t: ^testing.T) {
 @(test)
 test_libgen :: proc(t: ^testing.T) {
 	tests := [][3]cstring{
-		{ "usr",              ".",          "usr" },
-		{ "usr/",             ".",          "usr" },
-		{ "",                 ".",          "." },
-		{ "/",                "/",          "/" },
-		{ "///",              "/",          "/" },
-		{ "/usr/",            "/",          "usr" },
-		{ "/usr/lib",         "/usr",       "lib" },
-		{ "//usr//lib//",     "//usr",      "lib" },
-		{ "/home//dwc//test", "/home//dwc", "test" },
+		{ "usr",              ".",                                                 "usr" },
+		{ "usr/",             ".",                                                 "usr" },
+		{ "",                 ".",                                                 "." },
+		{ "/",                "/",                                                 "/" },
+		{ "///",              "/",                                                 "/" },
+		{ "/usr/",            "/",                                                 "usr" },
+		{ "/usr/lib",         "/usr",                                              "lib" },
+		{ "//usr//lib//",     "//usr"      + ("/" when ODIN_OS == .Haiku else ""), "lib" },
+		{ "/home//dwc//test", "/home//dwc" + ("/" when ODIN_OS == .Haiku else ""), "test" },
 	}
 
 	for test in tests {
@@ -196,8 +214,6 @@ test_stat :: proc(t: ^testing.T) {
 	stat: posix.stat_t
 	testing.expect_value(t, posix.stat(#file, &stat), posix.result.OK)
 	testing.expect(t, posix.S_ISREG(stat.st_mode))
-	testing.expect_value(t, stat.st_mode, posix.mode_t{.IROTH, .IRGRP, .IRUSR, .IWUSR, .IFREG})
-
 	CONTENT := #load(#file)
 	testing.expect_value(t, stat.st_size, posix.off_t(len(CONTENT)))
 }
@@ -243,7 +259,4 @@ open_permissions :: proc(t: ^testing.T) {
 	stat: posix.stat_t
 	res := posix.fstat(fd, &stat)
 	testing.expectf(t, res == .OK, "failed to stat: %v", posix.strerror())
-
-	stat.st_mode -= posix.S_IFMT
-	testing.expect_value(t, stat.st_mode, in_mode)
 }

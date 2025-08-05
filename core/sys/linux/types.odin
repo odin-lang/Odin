@@ -3,7 +3,7 @@ package linux
 /*
 	Type for storage device handle.
 */
-Dev :: distinct int
+Dev :: distinct u64
 
 /*
 	Type for 32-bit User IDs.
@@ -29,6 +29,11 @@ Id :: distinct uint
 	Represents a file descriptor.
 */
 Fd  :: distinct i32
+
+/*
+	Represents a watch descriptor.
+*/
+Wd  :: distinct i32
 
 /*
 	Type for PID file descriptors.
@@ -148,6 +153,7 @@ when ODIN_ARCH == .amd64 {
 		uid:        Uid,
 		gid:        Gid,
 		rdev:       Dev,
+		_:          [4]u8,
 		size:       i64,
 		blksize:    uint,
 		blocks:     u64,
@@ -282,7 +288,7 @@ Rename_Flags :: bit_set[Rename_Flags_Bits; u32]
 
 /*
 	Directory entry record.
-	Recommended iterate these with `dirent_iterator()`,
+	Recommended to iterate these with `dirent_iterate_buf()`,
 	and obtain the name via `dirent_name()`.
 */
 Dirent :: struct {
@@ -343,6 +349,18 @@ Poll_Fd :: struct {
 	revents: Fd_Poll_Events,
 }
 
+Inotify_Init_Flags :: bit_set[Inotify_Init_Bits; i32]
+
+Inotify_Event :: struct {
+	wd:     Wd,
+	mask:   Inotify_Event_Mask,
+	cookie: u32,
+	len:    u32,
+	name:   [0]u8,
+}
+
+Inotify_Event_Mask :: bit_set[Inotify_Event_Bits; u32]
+
 /*
 	Specifies protection for memory pages.
 */
@@ -350,6 +368,8 @@ Mem_Protection :: bit_set[Mem_Protection_Bits; i32]
 
 /*
 	Flags for mmap.
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags :: bit_set[Map_Flags_Bits; i32]
 
@@ -499,79 +519,79 @@ Pid_FD_Flags :: bit_set[Pid_FD_Flags_Bits; i32]
 Sig_Set :: [_SIGSET_NWORDS]uint
 
 @private SI_MAX_SIZE       :: 128
-@private SI_ARCH_PREAMBLE  :: 4 * size_of(i32)
+@private SI_ARCH_PREAMBLE  :: 4 * size_of(i32) when size_of(rawptr) == 8 else 3 * size_of(i32)
 @private SI_PAD_SIZE       :: SI_MAX_SIZE - SI_ARCH_PREAMBLE
 
 Sig_Handler_Fn :: #type proc "c" (sig: Signal)
 Sig_Restore_Fn :: #type proc "c" () -> !
 
-Sig_Info :: struct #packed {
-	signo: Signal,
-	errno: Errno,
-	code: i32,
-	_pad0: i32,
-	using _union: struct #raw_union {
-		_pad1: [SI_PAD_SIZE]u8,
-		using _kill: struct {
-			pid: Pid, /* sender's pid */
-			uid: Uid, /* sender's uid */
-		},
-		using _timer: struct {
-			timerid: i32,   /* timer id */
-			overrun: i32,   /* overrun count */
-			value: Sig_Val, /* timer value */
-		},
-		/* POSIX.1b signals */
-		using _rt: struct {
-			_pid0: Pid, /* sender's pid */
-			_uid0: Uid, /* sender's uid */
-		},
-		/* SIGCHLD */
-		using _sigchld: struct {
-			_pid1: Pid,  /* which child */
-			_uid1: Uid,  /* sender's uid */
-			status: i32, /* exit code */
-			utime: uint,
-			stime: uint, //clock_t
-		},
-		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
-		using _sigfault: struct {
-			addr: rawptr, /* faulting insn/memory ref. */
-			using _: struct #raw_union {
-				trapno: i32,   /* Trap number that caused signal */
-				addr_lsb: i16, /* LSB of the reported address */
-				using _addr_bnd: struct {
-					_pad2: u64,
-					lower: rawptr, /* lower bound during fault */
-					upper: rawptr, /* upper bound during fault */
-				},
-				using _addr_pkey: struct {
-					_pad3: u64,
-					pkey: u32, /* protection key on PTE that faulted */
-				},
-				using _perf: struct {
-					perf_data: u64,
-					perf_type: u32,
-					perf_flags: u32,
+when size_of(rawptr) == 8 {
+	Sig_Info :: struct #packed {
+		signo: Signal,
+		errno: Errno,
+		code: i32,
+		_pad0: i32,
+		using _union: struct #raw_union {
+			_pad1: [SI_PAD_SIZE]u8,
+			using _kill: struct {
+				pid: Pid, /* sender's pid */
+				uid: Uid, /* sender's uid */
+			},
+			using _timer: struct {
+				timerid: i32,   /* timer id */
+				overrun: i32,   /* overrun count */
+				value: Sig_Val, /* timer value */
+			},
+			/* POSIX.1b signals */
+			using _rt: struct {
+				_pid0: Pid, /* sender's pid */
+				_uid0: Uid, /* sender's uid */
+			},
+			/* SIGCHLD */
+			using _sigchld: struct {
+				_pid1: Pid,  /* which child */
+				_uid1: Uid,  /* sender's uid */
+				status: i32, /* exit code */
+				utime: uint,
+				stime: uint, //clock_t
+			},
+			/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
+			using _sigfault: struct {
+				addr: rawptr, /* faulting insn/memory ref. */
+				using _: struct #raw_union {
+					trapno: i32,   /* Trap number that caused signal */
+					addr_lsb: i16, /* LSB of the reported address */
+					using _addr_bnd: struct {
+						_pad2: u64,
+						lower: rawptr, /* lower bound during fault */
+						upper: rawptr, /* upper bound during fault */
+					},
+					using _addr_pkey: struct {
+						_pad3: u64,
+						pkey: u32, /* protection key on PTE that faulted */
+					},
+					using _perf: struct {
+						perf_data: u64,
+						perf_type: u32,
+						perf_flags: u32,
+					},
 				},
 			},
+			/* SIGPOLL */
+			using _sigpoll: struct {
+				band: int, /* POLL_IN, POLL_OUT, POLL_MSG */
+				fd: Fd,
+			},
+			/* SIGSYS */
+			using _sigsys: struct {
+				call_addr: rawptr, /* calling user insn */
+				syscall: i32,      /* triggering system call number */
+				arch: u32,         /* AUDIT_ARCH_* of syscall */
+			},
 		},
-		/* SIGPOLL */
-		using _sigpoll: struct {
-			band: int, /* POLL_IN, POLL_OUT, POLL_MSG */
-			fd: Fd,
-		},
-		/* SIGSYS */
-		using _sigsys: struct {
-			call_addr: rawptr, /* calling user insn */
-			syscall: i32,      /* triggering system call number */
-			arch: u32,         /* AUDIT_ARCH_* of syscall */
-		},
-	},
-}
+	}
 
-#assert(size_of(Sig_Info) == 128)
-when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
+	#assert(size_of(Sig_Info) == 128)
 	#assert(offset_of(Sig_Info, signo)      == 0x00)
 	#assert(offset_of(Sig_Info, errno)      == 0x04)
 	#assert(offset_of(Sig_Info, code)       == 0x08)
@@ -598,7 +618,96 @@ when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
 	#assert(offset_of(Sig_Info, syscall)    == 0x18)
 	#assert(offset_of(Sig_Info, arch)       == 0x1C)
 } else {
-	// TODO
+	Sig_Info :: struct {
+		signo: Signal,
+		errno: Errno,
+		code: i32,
+		using _union: struct #raw_union {
+			_pad1: [SI_PAD_SIZE]u8,
+			using _kill: struct {
+				pid: Pid, /* sender's pid */
+				uid: Uid, /* sender's uid */
+			},
+			using _timer: struct {
+				timerid: i32,   /* timer id */
+				overrun: i32,   /* overrun count */
+				value: Sig_Val, /* timer value */
+			},
+			/* POSIX.1b signals */
+			using _rt: struct {
+				_pid0: Pid, /* sender's pid */
+				_uid0: Uid, /* sender's uid */
+			},
+			/* SIGCHLD */
+			using _sigchld: struct {
+				_pid1: Pid,  /* which child */
+				_uid1: Uid,  /* sender's uid */
+				status: i32, /* exit code */
+				utime: uint,
+				stime: uint, //clock_t
+			},
+			/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
+			using _sigfault: struct {
+				addr: rawptr, /* faulting insn/memory ref. */
+				using _: struct #raw_union {
+					trapno: i32,   /* Trap number that caused signal */
+					addr_lsb: i16, /* LSB of the reported address */
+					using _addr_bnd: struct {
+						_pad2: u32,
+						lower: rawptr, /* lower bound during fault */
+						upper: rawptr, /* upper bound during fault */
+					},
+					using _addr_pkey: struct {
+						_pad3: u32,
+						pkey: u32, /* protection key on PTE that faulted */
+					},
+					using _perf: struct {
+						perf_data: u32,
+						perf_type: u32,
+						perf_flags: u32,
+					},
+				},
+			},
+			/* SIGPOLL */
+			using _sigpoll: struct {
+				band: int, /* POLL_IN, POLL_OUT, POLL_MSG */
+				fd: Fd,
+			},
+			/* SIGSYS */
+			using _sigsys: struct {
+				call_addr: rawptr, /* calling user insn */
+				syscall: i32,      /* triggering system call number */
+				arch: u32,         /* AUDIT_ARCH_* of syscall */
+			},
+		},
+	}
+
+	#assert(size_of(Sig_Info) == 128)
+	#assert(offset_of(Sig_Info, signo)      == 0x00)
+	#assert(offset_of(Sig_Info, errno)      == 0x04)
+	#assert(offset_of(Sig_Info, code)       == 0x08)
+	#assert(offset_of(Sig_Info, pid)        == 0x0c)
+	#assert(offset_of(Sig_Info, uid)        == 0x10)
+	#assert(offset_of(Sig_Info, timerid)    == 0x0c)
+	#assert(offset_of(Sig_Info, overrun)    == 0x10)
+	#assert(offset_of(Sig_Info, value)      == 0x14)
+	#assert(offset_of(Sig_Info, status)     == 0x14)
+	#assert(offset_of(Sig_Info, utime)      == 0x18)
+	#assert(offset_of(Sig_Info, stime)      == 0x1c)
+	#assert(offset_of(Sig_Info, addr)       == 0x0c)
+	#assert(offset_of(Sig_Info, addr_lsb)   == 0x10)
+	#assert(offset_of(Sig_Info, trapno)     == 0x10)
+	#assert(offset_of(Sig_Info, lower)      == 0x14)
+	#assert(offset_of(Sig_Info, upper)      == 0x18)
+	#assert(offset_of(Sig_Info, pkey)       == 0x14)
+	#assert(offset_of(Sig_Info, perf_data)  == 0x10)
+	#assert(offset_of(Sig_Info, perf_type)  == 0x14)
+	#assert(offset_of(Sig_Info, perf_flags) == 0x18)
+	#assert(offset_of(Sig_Info, band)       == 0x0c)
+	#assert(offset_of(Sig_Info, fd)         == 0x10)
+	#assert(offset_of(Sig_Info, call_addr)  == 0x0c)
+	#assert(offset_of(Sig_Info, syscall)    == 0x10)
+	#assert(offset_of(Sig_Info, arch)       == 0x14)
 }
 
 SIGEV_MAX_SIZE :: 64
@@ -668,12 +777,21 @@ Address_Family :: distinct Protocol_Family
 Socket_Msg :: bit_set[Socket_Msg_Bits; i32]
 
 /*
+	Struct representing a generic socket address.
+*/
+Sock_Addr :: struct #packed {
+	sa_family: Address_Family,
+	sa_data:   [14]u8,
+}
+
+/*
 	Struct representing IPv4 socket address.
 */
 Sock_Addr_In :: struct #packed {
 	sin_family: Address_Family,
 	sin_port:   u16be,
 	sin_addr:   [4]u8,
+	sin_zero:   [size_of(Sock_Addr) - size_of(Address_Family) - size_of(u16be) - size_of([4]u8)]u8,
 }
 
 /*
@@ -703,6 +821,7 @@ Sock_Addr_Any :: struct #raw_union {
 		family: Address_Family,
 		port:   u16be,
 	},
+	using generic: Sock_Addr,
 	using ipv4: Sock_Addr_In,
 	using ipv6: Sock_Addr_In6,
 	using uds: Sock_Addr_Un,
@@ -818,17 +937,12 @@ IO_Vec :: struct {
 }
 
 /*
-	Access mode for shared memory
-*/
-IPC_Mode :: bit_set[IPC_Mode_Bits; u32]
-
-/*
-	Flags used by IPC objects
+	Access modes and flags used by SystemV IPC procedures.
 */
 IPC_Flags :: bit_set[IPC_Flags_Bits; i16]
 
 /*
-	Permissions for IPC objects
+	Permissions for SystemV IPC primitives.
 */
 IPC_Perm :: struct {
 	key:  Key,
@@ -836,7 +950,7 @@ IPC_Perm :: struct {
 	gid:  u32,
 	cuid: u32,
 	cgid: u32,
-	mode: IPC_Mode,
+	mode: IPC_Flags, // Only contains mode flags.
 	seq:  u16,
 	_:    [2 + 2*size_of(int)]u8,
 }
@@ -1333,7 +1447,7 @@ EPoll_Data :: struct #raw_union {
 }
 
 EPoll_Event :: struct #packed {
-	events: EPoll_Event_Kind,
+	events: EPoll_Event_Set,
 	data:   EPoll_Data,
 }
 

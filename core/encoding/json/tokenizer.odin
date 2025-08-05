@@ -101,7 +101,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 	}
 
-	scan_espace :: proc(t: ^Tokenizer) -> bool {
+	scan_escape :: proc(t: ^Tokenizer) -> bool {
 		switch t.r {
 		case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
 			next_rune(t)
@@ -259,6 +259,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			skip_digits(t)
 		}
 		if t.r == 'e' || t.r == 'E' {
+			token.kind = .Float
 			switch r := next_rune(t); r {
 			case '+', '-':
 				next_rune(t)
@@ -309,7 +310,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 				break
 			}
 			if r == '\\' {
-				scan_espace(t)
+				scan_escape(t)
 			}
 		}
 
@@ -485,7 +486,7 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 	case '"':
 		// okay
 	case '\'':
-		if spec != .JSON {
+		if spec == .JSON {
 			return false
 		}
 		// okay

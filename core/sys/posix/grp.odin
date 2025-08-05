@@ -1,10 +1,10 @@
-#+build linux, darwin, netbsd, openbsd, freebsd
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }
@@ -115,7 +115,7 @@ foreign lib {
 	getgrnam_r :: proc(name: cstring, grp: ^group, buffer: [^]byte, bufsize: c.size_t, result: ^^group) -> Errno ---
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku || ODIN_OS == .Linux {
 
 	gid_t :: distinct c.uint32_t
 

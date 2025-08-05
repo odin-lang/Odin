@@ -19,16 +19,25 @@ MAX_NODE_LOCAL_BUS_COUNT :: 2
 /* Use this when the bus count is determined by the node instance rather than the vtable. */
 NODE_BUS_COUNT_UNKNOWN :: 255
 
+/* For some internal memory management of ma_node_graph. */
+stack :: struct {
+	offset:      uint,
+	sizeInBytes: uint,
+	_data:       [1]byte,
+}
+
 node :: struct {}
 
 /* Node flags. */
-node_flags :: enum c.int {
-	PASSTHROUGH                = 0x00000001,
-	CONTINUOUS_PROCESSING      = 0x00000002,
-	ALLOW_NULL_INPUT           = 0x00000004,
-	DIFFERENT_PROCESSING_RATES = 0x00000008,
-	SILENT_OUTPUT              = 0x00000010,
+node_flag :: enum c.int {
+	PASSTHROUGH                = 0,
+	CONTINUOUS_PROCESSING      = 1,
+	ALLOW_NULL_INPUT           = 2,
+	DIFFERENT_PROCESSING_RATES = 3,
+	SILENT_OUTPUT              = 4,
 }
+
+node_flags :: bit_set[node_flag; u32]
 
 /* The playback state of a node. Either started or stopped. */
 node_state :: enum c.int {
@@ -51,7 +60,7 @@ node_vtable :: struct {
 	onProcess: proc "c" (pNode: ^node, ppFramesIn: ^[^]f32, pFrameCountIn: ^u32, ppFramesOut: ^[^]f32, pFrameCountOut: ^u32),
 
 	/*
-	A callback for retrieving the number of a input frames that are required to output the
+	A callback for retrieving the number of input frames that are required to output the
 	specified number of output frames. You would only want to implement this when the node performs
 	resampling. This is optional, even for nodes that perform resampling, but it does offer a
 	small reduction in latency as it allows miniaudio to calculate the exact number of input frames
@@ -75,7 +84,7 @@ node_vtable :: struct {
 	Flags describing characteristics of the node. This is currently just a placeholder for some
 	ideas for later on.
 	*/
-	flags: u32,
+	flags: node_flags,
 }
 
 node_config :: struct {
@@ -86,6 +95,12 @@ node_config :: struct {
 	pInputChannels:  ^u32,          /* The number of elements are determined by the input bus count as determined by the vtable, or `inputBusCount` if the vtable specifies `MA_NODE_BUS_COUNT_UNKNOWN`. */
 	pOutputChannels: ^u32,          /* The number of elements are determined by the output bus count as determined by the vtable, or `outputBusCount` if the vtable specifies `MA_NODE_BUS_COUNT_UNKNOWN`. */
 }
+
+node_output_bus_flag :: enum c.int {
+	HAS_READ = 0, /* 0x01 */
+}
+
+node_output_bus_flags :: bit_set[node_output_bus_flag; u32]
 
 /*
 A node has multiple output buses. An output bus is attached to an input bus as an item in a linked
@@ -99,7 +114,7 @@ node_output_bus :: struct {
 
 	/* Mutable via multiple threads. Must be used atomically. The weird ordering here is for packing reasons. */
 	inputNodeInputBusIndex: u8,                             /* The index of the input bus on the input. Required for detaching. Will only be used in the spinlock so does not need to be atomic. */
-	flags:                  u32, /*atomic*/                 /* Some state flags for tracking the read state of the output buffer. A combination of MA_NODE_OUTPUT_BUS_FLAG_*. */
+	flags:                  node_output_bus_flags, /*atomic*/                 /* Some state flags for tracking the read state of the output buffer. A combination of MA_NODE_OUTPUT_BUS_FLAG_*. */
 	refCount:               u32, /*atomic*/                 /* Reference count for some thread-safety when detaching. */
 	isAttached:             b32, /*atomic*/                 /* This is used to prevent iteration of nodes that are in the middle of being detached. Used for thread safety. */
 	lock:                   spinlock, /*atomic*/            /* Unfortunate lock, but significantly simplifies the implementation. Required for thread-safe attaching and detaching. */
@@ -126,8 +141,12 @@ node_input_bus :: struct {
 
 node_base :: struct {
 	/* These variables are set once at startup. */
-	pNodeGraph:                  ^node_graph,     /* The graph this node belongs to. */
+	pNodeGraph:                  ^node_graph,       /* The graph this node belongs to. */
 	vtable:                      ^node_vtable,
+	inputBusCount:               u32,
+	outputBusCount:              u32,
+	pInputBuses:                 [^]node_input_bus  `fmt:"v,inputBusCount"`,
+	pOutputBuses:                [^]node_output_bus `fmt:"v,outputBusCount"`,
 	pCachedData:                 [^]f32,            /* Allocated on the heap. Fixed size. Needs to be stored on the heap because reading from output buses is done in separate function calls. */
 	cachedDataCapInFramesPerBus: u16,               /* The capacity of the input data cache in frames, per bus. */
 
@@ -140,10 +159,6 @@ node_base :: struct {
 	state:          node_state, /*atomic*/      /* When set to stopped, nothing will be read, regardless of the times in stateTimes. */
 	stateTimes:     [2]u64, /*atomic*/          /* Indexed by ma_node_state. Specifies the time based on the global clock that a node should be considered to be in the relevant state. */
 	localTime:      u64, /*atomic*/             /* The node's local clock. This is just a running sum of the number of output frames that have been processed. Can be modified by any thread with `ma_node_set_time()`. */
-	inputBusCount:  u32,
-	outputBusCount: u32,
-	pInputBuses:    [^]node_input_bus,
-	pOutputBuses:   [^]node_output_bus,
 
 	/* Memory management. */
 	_inputBuses:  [MAX_NODE_LOCAL_BUS_COUNT]node_input_bus,
@@ -181,18 +196,25 @@ foreign lib {
 }
 
 node_graph_config :: struct {
-	channels:             u32,
-	nodeCacheCapInFrames: u16,
+	channels:               u32,
+	processingSizeInFrames: u32,  /* This is the preferred processing size for node processing callbacks unless overridden by a node itself. Can be 0 in which case it will be based on the frame count passed into ma_node_graph_read_pcm_frames(), but will not be well defined. */
+	preMixStackSizeInBytes: uint, /* Defaults to 512KB per channel. Reducing this will save memory, but the depth of your node graph will be more restricted. */
 }
 
 node_graph :: struct {
 	/* Immutable. */
 	base:                 node_base,       /* The node graph itself is a node so it can be connected as an input to different node graph. This has zero inputs and calls ma_node_graph_read_pcm_frames() to generate it's output. */
 	endpoint:             node_base,       /* Special node that all nodes eventually connect to. Data is read from this node in ma_node_graph_read_pcm_frames(). */
-	nodeCacheCapInFrames: u16,
+
+	pProcessingCache:               [^]f32, /* This will be allocated when processingSizeInFrames is non-zero. This is needed because ma_node_graph_read_pcm_frames() can be called with a variable number of frames, and we may need to do some buffering in situations where the caller requests a frame count that's not a multiple of processingSizeInFrames. */
+	processingCacheFramesRemaining: u32,
+	processingSizeInFrames:         u32,
 
 	/* Read and written by multiple threads. */
 	isReading:            b32, /*atomic*/
+
+	/* Modified only by the audio thread. */
+	pPreMixStack: ^stack,
 }
 
 @(default_calling_convention="c", link_prefix="ma_")

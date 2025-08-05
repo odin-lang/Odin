@@ -1212,7 +1212,6 @@ Filter_Params :: struct #packed {
 
 depth_scale_table :: []u8{0, 0xff, 0x55, 0, 0x11, 0,0,0, 0x01}
 
-// @(optimization_mode="speed")
 defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 
 	using params
@@ -1273,7 +1272,6 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 	return
 }
 
-// @(optimization_mode="speed")
 defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 
 	using params
@@ -1436,7 +1434,6 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 	return true
 }
 
-// @(optimization_mode="speed")
 defilter_16 :: proc(params: ^Filter_Params) -> bool {
 	using params
 

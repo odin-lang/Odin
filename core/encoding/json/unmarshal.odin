@@ -117,9 +117,25 @@ assign_int :: proc(val: any, i: $T) -> bool {
 	case uint:    dst = uint   (i)
 	case uintptr: dst = uintptr(i)
 	case:
+		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
+			if ti == nil {
+				return false
+			}
+			t := runtime.type_info_base(ti)
+			#partial switch info in t.variant {
+			case runtime.Type_Info_Integer:
+				switch info.endianness {
+				case .Platform: return false
+				case .Little:   return ODIN_ENDIAN != .Little
+				case .Big:      return ODIN_ENDIAN != .Big
+				}
+			}
+			return false
+		}
+
 		ti := type_info_of(v.id)
-		if _, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
-			do_byte_swap := !reflect.bit_set_is_big_endian(v)
+		if info, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
+			do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying)
 			switch ti.size * 8 {
 			case 0: // no-op.
 			case 8:
@@ -172,20 +188,33 @@ assign_float :: proc(val: any, f: $T) -> bool {
 
 
 @(private)
-unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> bool {
+unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> (ok: bool, err: Error) {
 	val := val
 	switch &dst in val {
 	case string:
 		dst = str
-		return true
+		return true, nil
 	case cstring:  
 		if str == "" {
-			dst = strings.clone_to_cstring("", p.allocator)
+			a_err: runtime.Allocator_Error
+			dst, a_err = strings.clone_to_cstring("", p.allocator)
+			#partial switch a_err {
+			case nil:
+				// okay
+			case .Out_Of_Memory:
+				err = .Out_Of_Memory
+			case:
+				err = .Invalid_Allocator
+			}
+			if err != nil {
+				return
+			}
 		} else {
 			// NOTE: This is valid because 'clone_string' appends a NUL terminator
 			dst = cstring(raw_data(str)) 
 		}
-		return true
+		ok = true
+		return
 	}
 	
 	#partial switch variant in ti.variant {
@@ -193,31 +222,37 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 		for name, i in variant.names {
 			if name == str {
 				assign_int(val, variant.values[i])
-				return true
+				return true, nil
 			}
 		}
 		// TODO(bill): should this be an error or not?
-		return true
+		return true, nil
 		
 	case reflect.Type_Info_Integer:
-		i := strconv.parse_i128(str) or_return
+		i, pok := strconv.parse_i128(str)
+		if !pok {
+			return false, nil
+		}
 		if assign_int(val, i) {
-			return true
+			return true, nil
 		}
 		if assign_float(val, i) {
-			return true
+			return true, nil
 		}
 	case reflect.Type_Info_Float:
-		f := strconv.parse_f64(str) or_return
+		f, pok := strconv.parse_f64(str)
+		if !pok {
+			return false, nil
+		}
 		if assign_int(val, f) {
-			return true
+			return true, nil
 		}
 		if assign_float(val, f) {
-			return true
+			return true, nil
 		}
 	}
 	
-	return false
+	return false, nil
 }
 
 
@@ -304,7 +339,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	case .Ident:
 		advance_token(p)
 		if p.spec == .MJSON {
-			if unmarshal_string_token(p, any{v.data, ti.id}, token.text, ti) {
+			if unmarshal_string_token(p, any{v.data, ti.id}, token.text, ti) or_return {
 				return nil
 			}
 		}
@@ -314,7 +349,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		advance_token(p)
 		str  := unquote_string(token, p.spec, p.allocator) or_return
 		dest := any{v.data, ti.id}
-		if !unmarshal_string_token(p, dest, str, ti) {
+		if !(unmarshal_string_token(p, dest, str, ti) or_return) {
 			delete(str, p.allocator)
 			return UNSUPPORTED_TYPE
 		}
@@ -371,6 +406,9 @@ unmarshal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_loca
 	return prev
 }
 
+// Struct tags can include not only the name of the JSON key, but also a tag such as `omitempty`.
+// Example: `json:"key_name,omitempty"`
+// This returns the first field as `json_name`, and the rest are returned as `extra`.
 @(private)
 json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
 	json_name = value
@@ -398,29 +436,23 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 		if .raw_union in t.flags {
 			return UNSUPPORTED_TYPE
 		}
-	
+
+		fields := reflect.struct_fields_zipped(ti.id)
+		
 		struct_loop: for p.curr_token.kind != end_token {
-			key, _ := parse_object_key(p, p.allocator)
+			key := parse_object_key(p, p.allocator) or_return
 			defer delete(key, p.allocator)
 			
 			unmarshal_expect_token(p, .Colon)						
-			
-			fields := reflect.struct_fields_zipped(ti.id)
-
-			field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
-				prev_set := field_used[offset/8] & byte(offset&7) != 0
-				field_used[offset/8] |= byte(offset&7)
-				return prev_set
-			}
 
 			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
-			field_used := intrinsics.alloca(field_used_bytes, 1)
+			field_used := intrinsics.alloca(field_used_bytes + 1, 1) // + 1 to not overflow on size_of 0 types.
 			intrinsics.mem_zero(field_used, field_used_bytes)
 
 			use_field_idx := -1
 			
 			for field, field_idx in fields {
-				tag_value := string(reflect.struct_tag_get(field.tag, "json"))
+				tag_value := reflect.struct_tag_get(field.tag, "json")
 				json_name, _ := json_name_from_tag_value(tag_value)
 				if key == json_name {
 					use_field_idx = field_idx
@@ -430,7 +462,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			if use_field_idx < 0 {
 				for field, field_idx in fields {
-					if key == field.name {
+					tag_value := reflect.struct_tag_get(field.tag, "json")
+					json_name, _ := json_name_from_tag_value(tag_value)
+					if json_name == "" && key == field.name {
 						use_field_idx = field_idx
 						break
 					}
@@ -451,7 +485,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 						}
 					}
 
-					if field.name == key {
+					tag_value := reflect.struct_tag_get(field.tag, "json")
+					json_name, _ := json_name_from_tag_value(tag_value)
+					if (json_name == "" && field.name == key) || json_name == key {
 						offset = field.offset
 						type = field.type
 						found = true
@@ -473,6 +509,11 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 
 			if field_found {
+				field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
+					prev_set := field_used[offset/8] & byte(offset&7) != 0
+					field_used[offset/8] |= byte(offset&7)
+					return prev_set
+				}
 				if field_test(field_used, offset) {
 					return .Multiple_Use_Field
 				}

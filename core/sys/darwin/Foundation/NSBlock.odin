@@ -25,6 +25,10 @@ Block_createLocalWithParam :: proc (user_data: rawptr, user_proc: proc "c" (user
 	b, _ := Block_createInternalWithParam(false, user_data, user_proc, {})
 	return b
 }
+@(objc_type=Block, objc_name="invoke")
+Block_invoke :: proc "c" (self: ^Block, args: ..any) -> ^Object {
+	return msgSend(^Object, self, "invoke:", ..args)
+}
 
 @(private)
 Internal_Block_Literal_Base :: struct {

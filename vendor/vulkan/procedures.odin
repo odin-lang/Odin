@@ -23,98 +23,104 @@ ProcReallocationFunction           :: #type proc "system" (pUserData: rawptr, pO
 ProcVoidFunction                   :: #type proc "system" ()
 
 // Instance Procedure Types
-ProcAcquireDrmDisplayEXT                                            :: #type proc "system" (physicalDevice: PhysicalDevice, drmFd: i32, display: DisplayKHR) -> Result
-ProcAcquireWinrtDisplayNV                                           :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR) -> Result
-ProcCreateDebugReportCallbackEXT                                    :: #type proc "system" (instance: Instance, pCreateInfo: ^DebugReportCallbackCreateInfoEXT, pAllocator: ^AllocationCallbacks, pCallback: ^DebugReportCallbackEXT) -> Result
-ProcCreateDebugUtilsMessengerEXT                                    :: #type proc "system" (instance: Instance, pCreateInfo: ^DebugUtilsMessengerCreateInfoEXT, pAllocator: ^AllocationCallbacks, pMessenger: ^DebugUtilsMessengerEXT) -> Result
-ProcCreateDevice                                                    :: #type proc "system" (physicalDevice: PhysicalDevice, pCreateInfo: ^DeviceCreateInfo, pAllocator: ^AllocationCallbacks, pDevice: ^Device) -> Result
-ProcCreateDisplayModeKHR                                            :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR, pCreateInfo: ^DisplayModeCreateInfoKHR, pAllocator: ^AllocationCallbacks, pMode: ^DisplayModeKHR) -> Result
-ProcCreateDisplayPlaneSurfaceKHR                                    :: #type proc "system" (instance: Instance, pCreateInfo: ^DisplaySurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-ProcCreateHeadlessSurfaceEXT                                        :: #type proc "system" (instance: Instance, pCreateInfo: ^HeadlessSurfaceCreateInfoEXT, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-ProcCreateIOSSurfaceMVK                                             :: #type proc "system" (instance: Instance, pCreateInfo: ^IOSSurfaceCreateInfoMVK, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-ProcCreateMacOSSurfaceMVK                                           :: #type proc "system" (instance: Instance, pCreateInfo: ^MacOSSurfaceCreateInfoMVK, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-ProcCreateMetalSurfaceEXT                                           :: #type proc "system" (instance: Instance, pCreateInfo: ^MetalSurfaceCreateInfoEXT, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-ProcCreateWaylandSurfaceKHR                                         :: #type proc "system" (instance: Instance, pCreateInfo: ^WaylandSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-ProcCreateWin32SurfaceKHR                                           :: #type proc "system" (instance: Instance, pCreateInfo: ^Win32SurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-ProcDebugReportMessageEXT                                           :: #type proc "system" (instance: Instance, flags: DebugReportFlagsEXT, objectType: DebugReportObjectTypeEXT, object: u64, location: int, messageCode: i32, pLayerPrefix: cstring, pMessage: cstring)
-ProcDestroyDebugReportCallbackEXT                                   :: #type proc "system" (instance: Instance, callback: DebugReportCallbackEXT, pAllocator: ^AllocationCallbacks)
-ProcDestroyDebugUtilsMessengerEXT                                   :: #type proc "system" (instance: Instance, messenger: DebugUtilsMessengerEXT, pAllocator: ^AllocationCallbacks)
-ProcDestroyInstance                                                 :: #type proc "system" (instance: Instance, pAllocator: ^AllocationCallbacks)
-ProcDestroySurfaceKHR                                               :: #type proc "system" (instance: Instance, surface: SurfaceKHR, pAllocator: ^AllocationCallbacks)
-ProcEnumerateDeviceExtensionProperties                              :: #type proc "system" (physicalDevice: PhysicalDevice, pLayerName: cstring, pPropertyCount: ^u32, pProperties: [^]ExtensionProperties) -> Result
-ProcEnumerateDeviceLayerProperties                                  :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]LayerProperties) -> Result
-ProcEnumeratePhysicalDeviceGroups                                   :: #type proc "system" (instance: Instance, pPhysicalDeviceGroupCount: ^u32, pPhysicalDeviceGroupProperties: [^]PhysicalDeviceGroupProperties) -> Result
-ProcEnumeratePhysicalDeviceGroupsKHR                                :: #type proc "system" (instance: Instance, pPhysicalDeviceGroupCount: ^u32, pPhysicalDeviceGroupProperties: [^]PhysicalDeviceGroupProperties) -> Result
-ProcEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR   :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, pCounterCount: ^u32, pCounters: [^]PerformanceCounterKHR, pCounterDescriptions: [^]PerformanceCounterDescriptionKHR) -> Result
-ProcEnumeratePhysicalDevices                                        :: #type proc "system" (instance: Instance, pPhysicalDeviceCount: ^u32, pPhysicalDevices: [^]PhysicalDevice) -> Result
-ProcGetDisplayModeProperties2KHR                                    :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR, pPropertyCount: ^u32, pProperties: [^]DisplayModeProperties2KHR) -> Result
-ProcGetDisplayModePropertiesKHR                                     :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR, pPropertyCount: ^u32, pProperties: [^]DisplayModePropertiesKHR) -> Result
-ProcGetDisplayPlaneCapabilities2KHR                                 :: #type proc "system" (physicalDevice: PhysicalDevice, pDisplayPlaneInfo: ^DisplayPlaneInfo2KHR, pCapabilities: [^]DisplayPlaneCapabilities2KHR) -> Result
-ProcGetDisplayPlaneCapabilitiesKHR                                  :: #type proc "system" (physicalDevice: PhysicalDevice, mode: DisplayModeKHR, planeIndex: u32, pCapabilities: [^]DisplayPlaneCapabilitiesKHR) -> Result
-ProcGetDisplayPlaneSupportedDisplaysKHR                             :: #type proc "system" (physicalDevice: PhysicalDevice, planeIndex: u32, pDisplayCount: ^u32, pDisplays: [^]DisplayKHR) -> Result
-ProcGetDrmDisplayEXT                                                :: #type proc "system" (physicalDevice: PhysicalDevice, drmFd: i32, connectorId: u32, display: ^DisplayKHR) -> Result
-ProcGetInstanceProcAddr                                             :: #type proc "system" (instance: Instance, pName: cstring) -> ProcVoidFunction
-ProcGetInstanceProcAddrLUNARG                                       :: #type proc "system" (instance: Instance, pName: cstring) -> ProcVoidFunction
-ProcGetPhysicalDeviceCalibrateableTimeDomainsEXT                    :: #type proc "system" (physicalDevice: PhysicalDevice, pTimeDomainCount: ^u32, pTimeDomains: [^]TimeDomainKHR) -> Result
-ProcGetPhysicalDeviceCalibrateableTimeDomainsKHR                    :: #type proc "system" (physicalDevice: PhysicalDevice, pTimeDomainCount: ^u32, pTimeDomains: [^]TimeDomainKHR) -> Result
-ProcGetPhysicalDeviceCooperativeMatrixPropertiesKHR                 :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]CooperativeMatrixPropertiesKHR) -> Result
-ProcGetPhysicalDeviceCooperativeMatrixPropertiesNV                  :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]CooperativeMatrixPropertiesNV) -> Result
-ProcGetPhysicalDeviceDisplayPlaneProperties2KHR                     :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]DisplayPlaneProperties2KHR) -> Result
-ProcGetPhysicalDeviceDisplayPlanePropertiesKHR                      :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]DisplayPlanePropertiesKHR) -> Result
-ProcGetPhysicalDeviceDisplayProperties2KHR                          :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]DisplayProperties2KHR) -> Result
-ProcGetPhysicalDeviceDisplayPropertiesKHR                           :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]DisplayPropertiesKHR) -> Result
-ProcGetPhysicalDeviceExternalBufferProperties                       :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalBufferInfo: ^PhysicalDeviceExternalBufferInfo, pExternalBufferProperties: [^]ExternalBufferProperties)
-ProcGetPhysicalDeviceExternalBufferPropertiesKHR                    :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalBufferInfo: ^PhysicalDeviceExternalBufferInfo, pExternalBufferProperties: [^]ExternalBufferProperties)
-ProcGetPhysicalDeviceExternalFenceProperties                        :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalFenceInfo: ^PhysicalDeviceExternalFenceInfo, pExternalFenceProperties: [^]ExternalFenceProperties)
-ProcGetPhysicalDeviceExternalFencePropertiesKHR                     :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalFenceInfo: ^PhysicalDeviceExternalFenceInfo, pExternalFenceProperties: [^]ExternalFenceProperties)
-ProcGetPhysicalDeviceExternalImageFormatPropertiesNV                :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, type: ImageType, tiling: ImageTiling, usage: ImageUsageFlags, flags: ImageCreateFlags, externalHandleType: ExternalMemoryHandleTypeFlagsNV, pExternalImageFormatProperties: [^]ExternalImageFormatPropertiesNV) -> Result
-ProcGetPhysicalDeviceExternalSemaphoreProperties                    :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalSemaphoreInfo: ^PhysicalDeviceExternalSemaphoreInfo, pExternalSemaphoreProperties: [^]ExternalSemaphoreProperties)
-ProcGetPhysicalDeviceExternalSemaphorePropertiesKHR                 :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalSemaphoreInfo: ^PhysicalDeviceExternalSemaphoreInfo, pExternalSemaphoreProperties: [^]ExternalSemaphoreProperties)
-ProcGetPhysicalDeviceFeatures                                       :: #type proc "system" (physicalDevice: PhysicalDevice, pFeatures: [^]PhysicalDeviceFeatures)
-ProcGetPhysicalDeviceFeatures2                                      :: #type proc "system" (physicalDevice: PhysicalDevice, pFeatures: [^]PhysicalDeviceFeatures2)
-ProcGetPhysicalDeviceFeatures2KHR                                   :: #type proc "system" (physicalDevice: PhysicalDevice, pFeatures: [^]PhysicalDeviceFeatures2)
-ProcGetPhysicalDeviceFormatProperties                               :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, pFormatProperties: [^]FormatProperties)
-ProcGetPhysicalDeviceFormatProperties2                              :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, pFormatProperties: [^]FormatProperties2)
-ProcGetPhysicalDeviceFormatProperties2KHR                           :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, pFormatProperties: [^]FormatProperties2)
-ProcGetPhysicalDeviceFragmentShadingRatesKHR                        :: #type proc "system" (physicalDevice: PhysicalDevice, pFragmentShadingRateCount: ^u32, pFragmentShadingRates: [^]PhysicalDeviceFragmentShadingRateKHR) -> Result
-ProcGetPhysicalDeviceImageFormatProperties                          :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, type: ImageType, tiling: ImageTiling, usage: ImageUsageFlags, flags: ImageCreateFlags, pImageFormatProperties: [^]ImageFormatProperties) -> Result
-ProcGetPhysicalDeviceImageFormatProperties2                         :: #type proc "system" (physicalDevice: PhysicalDevice, pImageFormatInfo: ^PhysicalDeviceImageFormatInfo2, pImageFormatProperties: [^]ImageFormatProperties2) -> Result
-ProcGetPhysicalDeviceImageFormatProperties2KHR                      :: #type proc "system" (physicalDevice: PhysicalDevice, pImageFormatInfo: ^PhysicalDeviceImageFormatInfo2, pImageFormatProperties: [^]ImageFormatProperties2) -> Result
-ProcGetPhysicalDeviceMemoryProperties                               :: #type proc "system" (physicalDevice: PhysicalDevice, pMemoryProperties: [^]PhysicalDeviceMemoryProperties)
-ProcGetPhysicalDeviceMemoryProperties2                              :: #type proc "system" (physicalDevice: PhysicalDevice, pMemoryProperties: [^]PhysicalDeviceMemoryProperties2)
-ProcGetPhysicalDeviceMemoryProperties2KHR                           :: #type proc "system" (physicalDevice: PhysicalDevice, pMemoryProperties: [^]PhysicalDeviceMemoryProperties2)
-ProcGetPhysicalDeviceMultisamplePropertiesEXT                       :: #type proc "system" (physicalDevice: PhysicalDevice, samples: SampleCountFlags, pMultisampleProperties: [^]MultisamplePropertiesEXT)
-ProcGetPhysicalDeviceOpticalFlowImageFormatsNV                      :: #type proc "system" (physicalDevice: PhysicalDevice, pOpticalFlowImageFormatInfo: ^OpticalFlowImageFormatInfoNV, pFormatCount: ^u32, pImageFormatProperties: [^]OpticalFlowImageFormatPropertiesNV) -> Result
-ProcGetPhysicalDevicePresentRectanglesKHR                           :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pRectCount: ^u32, pRects: [^]Rect2D) -> Result
-ProcGetPhysicalDeviceProperties                                     :: #type proc "system" (physicalDevice: PhysicalDevice, pProperties: [^]PhysicalDeviceProperties)
-ProcGetPhysicalDeviceProperties2                                    :: #type proc "system" (physicalDevice: PhysicalDevice, pProperties: [^]PhysicalDeviceProperties2)
-ProcGetPhysicalDeviceProperties2KHR                                 :: #type proc "system" (physicalDevice: PhysicalDevice, pProperties: [^]PhysicalDeviceProperties2)
-ProcGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR           :: #type proc "system" (physicalDevice: PhysicalDevice, pPerformanceQueryCreateInfo: ^QueryPoolPerformanceCreateInfoKHR, pNumPasses: [^]u32)
-ProcGetPhysicalDeviceQueueFamilyProperties                          :: #type proc "system" (physicalDevice: PhysicalDevice, pQueueFamilyPropertyCount: ^u32, pQueueFamilyProperties: [^]QueueFamilyProperties)
-ProcGetPhysicalDeviceQueueFamilyProperties2                         :: #type proc "system" (physicalDevice: PhysicalDevice, pQueueFamilyPropertyCount: ^u32, pQueueFamilyProperties: [^]QueueFamilyProperties2)
-ProcGetPhysicalDeviceQueueFamilyProperties2KHR                      :: #type proc "system" (physicalDevice: PhysicalDevice, pQueueFamilyPropertyCount: ^u32, pQueueFamilyProperties: [^]QueueFamilyProperties2)
-ProcGetPhysicalDeviceSparseImageFormatProperties                    :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, type: ImageType, samples: SampleCountFlags, usage: ImageUsageFlags, tiling: ImageTiling, pPropertyCount: ^u32, pProperties: [^]SparseImageFormatProperties)
-ProcGetPhysicalDeviceSparseImageFormatProperties2                   :: #type proc "system" (physicalDevice: PhysicalDevice, pFormatInfo: ^PhysicalDeviceSparseImageFormatInfo2, pPropertyCount: ^u32, pProperties: [^]SparseImageFormatProperties2)
-ProcGetPhysicalDeviceSparseImageFormatProperties2KHR                :: #type proc "system" (physicalDevice: PhysicalDevice, pFormatInfo: ^PhysicalDeviceSparseImageFormatInfo2, pPropertyCount: ^u32, pProperties: [^]SparseImageFormatProperties2)
-ProcGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV :: #type proc "system" (physicalDevice: PhysicalDevice, pCombinationCount: ^u32, pCombinations: [^]FramebufferMixedSamplesCombinationNV) -> Result
-ProcGetPhysicalDeviceSurfaceCapabilities2EXT                        :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pSurfaceCapabilities: [^]SurfaceCapabilities2EXT) -> Result
-ProcGetPhysicalDeviceSurfaceCapabilities2KHR                        :: #type proc "system" (physicalDevice: PhysicalDevice, pSurfaceInfo: ^PhysicalDeviceSurfaceInfo2KHR, pSurfaceCapabilities: [^]SurfaceCapabilities2KHR) -> Result
-ProcGetPhysicalDeviceSurfaceCapabilitiesKHR                         :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pSurfaceCapabilities: [^]SurfaceCapabilitiesKHR) -> Result
-ProcGetPhysicalDeviceSurfaceFormats2KHR                             :: #type proc "system" (physicalDevice: PhysicalDevice, pSurfaceInfo: ^PhysicalDeviceSurfaceInfo2KHR, pSurfaceFormatCount: ^u32, pSurfaceFormats: [^]SurfaceFormat2KHR) -> Result
-ProcGetPhysicalDeviceSurfaceFormatsKHR                              :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pSurfaceFormatCount: ^u32, pSurfaceFormats: [^]SurfaceFormatKHR) -> Result
-ProcGetPhysicalDeviceSurfacePresentModes2EXT                        :: #type proc "system" (physicalDevice: PhysicalDevice, pSurfaceInfo: ^PhysicalDeviceSurfaceInfo2KHR, pPresentModeCount: ^u32, pPresentModes: [^]PresentModeKHR) -> Result
-ProcGetPhysicalDeviceSurfacePresentModesKHR                         :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pPresentModeCount: ^u32, pPresentModes: [^]PresentModeKHR) -> Result
-ProcGetPhysicalDeviceSurfaceSupportKHR                              :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, surface: SurfaceKHR, pSupported: ^b32) -> Result
-ProcGetPhysicalDeviceToolProperties                                 :: #type proc "system" (physicalDevice: PhysicalDevice, pToolCount: ^u32, pToolProperties: [^]PhysicalDeviceToolProperties) -> Result
-ProcGetPhysicalDeviceToolPropertiesEXT                              :: #type proc "system" (physicalDevice: PhysicalDevice, pToolCount: ^u32, pToolProperties: [^]PhysicalDeviceToolProperties) -> Result
-ProcGetPhysicalDeviceVideoCapabilitiesKHR                           :: #type proc "system" (physicalDevice: PhysicalDevice, pVideoProfile: ^VideoProfileInfoKHR, pCapabilities: [^]VideoCapabilitiesKHR) -> Result
-ProcGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR           :: #type proc "system" (physicalDevice: PhysicalDevice, pQualityLevelInfo: ^PhysicalDeviceVideoEncodeQualityLevelInfoKHR, pQualityLevelProperties: [^]VideoEncodeQualityLevelPropertiesKHR) -> Result
-ProcGetPhysicalDeviceVideoFormatPropertiesKHR                       :: #type proc "system" (physicalDevice: PhysicalDevice, pVideoFormatInfo: ^PhysicalDeviceVideoFormatInfoKHR, pVideoFormatPropertyCount: ^u32, pVideoFormatProperties: [^]VideoFormatPropertiesKHR) -> Result
-ProcGetPhysicalDeviceWaylandPresentationSupportKHR                  :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, display: ^wl_display) -> b32
-ProcGetPhysicalDeviceWin32PresentationSupportKHR                    :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32) -> b32
-ProcGetWinrtDisplayNV                                               :: #type proc "system" (physicalDevice: PhysicalDevice, deviceRelativeId: u32, pDisplay: ^DisplayKHR) -> Result
-ProcReleaseDisplayEXT                                               :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR) -> Result
-ProcSubmitDebugUtilsMessageEXT                                      :: #type proc "system" (instance: Instance, messageSeverity: DebugUtilsMessageSeverityFlagsEXT, messageTypes: DebugUtilsMessageTypeFlagsEXT, pCallbackData: ^DebugUtilsMessengerCallbackDataEXT)
+ProcAcquireDrmDisplayEXT                                             :: #type proc "system" (physicalDevice: PhysicalDevice, drmFd: i32, display: DisplayKHR) -> Result
+ProcAcquireWinrtDisplayNV                                            :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR) -> Result
+ProcCreateDebugReportCallbackEXT                                     :: #type proc "system" (instance: Instance, pCreateInfo: ^DebugReportCallbackCreateInfoEXT, pAllocator: ^AllocationCallbacks, pCallback: ^DebugReportCallbackEXT) -> Result
+ProcCreateDebugUtilsMessengerEXT                                     :: #type proc "system" (instance: Instance, pCreateInfo: ^DebugUtilsMessengerCreateInfoEXT, pAllocator: ^AllocationCallbacks, pMessenger: ^DebugUtilsMessengerEXT) -> Result
+ProcCreateDevice                                                     :: #type proc "system" (physicalDevice: PhysicalDevice, pCreateInfo: ^DeviceCreateInfo, pAllocator: ^AllocationCallbacks, pDevice: ^Device) -> Result
+ProcCreateDisplayModeKHR                                             :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR, pCreateInfo: ^DisplayModeCreateInfoKHR, pAllocator: ^AllocationCallbacks, pMode: ^DisplayModeKHR) -> Result
+ProcCreateDisplayPlaneSurfaceKHR                                     :: #type proc "system" (instance: Instance, pCreateInfo: ^DisplaySurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcCreateHeadlessSurfaceEXT                                         :: #type proc "system" (instance: Instance, pCreateInfo: ^HeadlessSurfaceCreateInfoEXT, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcCreateIOSSurfaceMVK                                              :: #type proc "system" (instance: Instance, pCreateInfo: ^IOSSurfaceCreateInfoMVK, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcCreateMacOSSurfaceMVK                                            :: #type proc "system" (instance: Instance, pCreateInfo: ^MacOSSurfaceCreateInfoMVK, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcCreateMetalSurfaceEXT                                            :: #type proc "system" (instance: Instance, pCreateInfo: ^MetalSurfaceCreateInfoEXT, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcCreateWaylandSurfaceKHR                                          :: #type proc "system" (instance: Instance, pCreateInfo: ^WaylandSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcCreateWin32SurfaceKHR                                            :: #type proc "system" (instance: Instance, pCreateInfo: ^Win32SurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcCreateXcbSurfaceKHR                                              :: #type proc "system" (instance: Instance, pCreateInfo: ^XcbSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcCreateXlibSurfaceKHR                                             :: #type proc "system" (instance: Instance, pCreateInfo: ^XlibSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+ProcDebugReportMessageEXT                                            :: #type proc "system" (instance: Instance, flags: DebugReportFlagsEXT, objectType: DebugReportObjectTypeEXT, object: u64, location: int, messageCode: i32, pLayerPrefix: cstring, pMessage: cstring)
+ProcDestroyDebugReportCallbackEXT                                    :: #type proc "system" (instance: Instance, callback: DebugReportCallbackEXT, pAllocator: ^AllocationCallbacks)
+ProcDestroyDebugUtilsMessengerEXT                                    :: #type proc "system" (instance: Instance, messenger: DebugUtilsMessengerEXT, pAllocator: ^AllocationCallbacks)
+ProcDestroyInstance                                                  :: #type proc "system" (instance: Instance, pAllocator: ^AllocationCallbacks)
+ProcDestroySurfaceKHR                                                :: #type proc "system" (instance: Instance, surface: SurfaceKHR, pAllocator: ^AllocationCallbacks)
+ProcEnumerateDeviceExtensionProperties                               :: #type proc "system" (physicalDevice: PhysicalDevice, pLayerName: cstring, pPropertyCount: ^u32, pProperties: [^]ExtensionProperties) -> Result
+ProcEnumerateDeviceLayerProperties                                   :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]LayerProperties) -> Result
+ProcEnumeratePhysicalDeviceGroups                                    :: #type proc "system" (instance: Instance, pPhysicalDeviceGroupCount: ^u32, pPhysicalDeviceGroupProperties: [^]PhysicalDeviceGroupProperties) -> Result
+ProcEnumeratePhysicalDeviceGroupsKHR                                 :: #type proc "system" (instance: Instance, pPhysicalDeviceGroupCount: ^u32, pPhysicalDeviceGroupProperties: [^]PhysicalDeviceGroupProperties) -> Result
+ProcEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR    :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, pCounterCount: ^u32, pCounters: [^]PerformanceCounterKHR, pCounterDescriptions: [^]PerformanceCounterDescriptionKHR) -> Result
+ProcEnumeratePhysicalDevices                                         :: #type proc "system" (instance: Instance, pPhysicalDeviceCount: ^u32, pPhysicalDevices: [^]PhysicalDevice) -> Result
+ProcGetDisplayModeProperties2KHR                                     :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR, pPropertyCount: ^u32, pProperties: [^]DisplayModeProperties2KHR) -> Result
+ProcGetDisplayModePropertiesKHR                                      :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR, pPropertyCount: ^u32, pProperties: [^]DisplayModePropertiesKHR) -> Result
+ProcGetDisplayPlaneCapabilities2KHR                                  :: #type proc "system" (physicalDevice: PhysicalDevice, pDisplayPlaneInfo: ^DisplayPlaneInfo2KHR, pCapabilities: [^]DisplayPlaneCapabilities2KHR) -> Result
+ProcGetDisplayPlaneCapabilitiesKHR                                   :: #type proc "system" (physicalDevice: PhysicalDevice, mode: DisplayModeKHR, planeIndex: u32, pCapabilities: [^]DisplayPlaneCapabilitiesKHR) -> Result
+ProcGetDisplayPlaneSupportedDisplaysKHR                              :: #type proc "system" (physicalDevice: PhysicalDevice, planeIndex: u32, pDisplayCount: ^u32, pDisplays: [^]DisplayKHR) -> Result
+ProcGetDrmDisplayEXT                                                 :: #type proc "system" (physicalDevice: PhysicalDevice, drmFd: i32, connectorId: u32, display: ^DisplayKHR) -> Result
+ProcGetInstanceProcAddr                                              :: #type proc "system" (instance: Instance, pName: cstring) -> ProcVoidFunction
+ProcGetInstanceProcAddrLUNARG                                        :: #type proc "system" (instance: Instance, pName: cstring) -> ProcVoidFunction
+ProcGetPhysicalDeviceCalibrateableTimeDomainsEXT                     :: #type proc "system" (physicalDevice: PhysicalDevice, pTimeDomainCount: ^u32, pTimeDomains: [^]TimeDomainKHR) -> Result
+ProcGetPhysicalDeviceCalibrateableTimeDomainsKHR                     :: #type proc "system" (physicalDevice: PhysicalDevice, pTimeDomainCount: ^u32, pTimeDomains: [^]TimeDomainKHR) -> Result
+ProcGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]CooperativeMatrixFlexibleDimensionsPropertiesNV) -> Result
+ProcGetPhysicalDeviceCooperativeMatrixPropertiesKHR                  :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]CooperativeMatrixPropertiesKHR) -> Result
+ProcGetPhysicalDeviceCooperativeMatrixPropertiesNV                   :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]CooperativeMatrixPropertiesNV) -> Result
+ProcGetPhysicalDeviceCooperativeVectorPropertiesNV                   :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]CooperativeVectorPropertiesNV) -> Result
+ProcGetPhysicalDeviceDisplayPlaneProperties2KHR                      :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]DisplayPlaneProperties2KHR) -> Result
+ProcGetPhysicalDeviceDisplayPlanePropertiesKHR                       :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]DisplayPlanePropertiesKHR) -> Result
+ProcGetPhysicalDeviceDisplayProperties2KHR                           :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]DisplayProperties2KHR) -> Result
+ProcGetPhysicalDeviceDisplayPropertiesKHR                            :: #type proc "system" (physicalDevice: PhysicalDevice, pPropertyCount: ^u32, pProperties: [^]DisplayPropertiesKHR) -> Result
+ProcGetPhysicalDeviceExternalBufferProperties                        :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalBufferInfo: ^PhysicalDeviceExternalBufferInfo, pExternalBufferProperties: [^]ExternalBufferProperties)
+ProcGetPhysicalDeviceExternalBufferPropertiesKHR                     :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalBufferInfo: ^PhysicalDeviceExternalBufferInfo, pExternalBufferProperties: [^]ExternalBufferProperties)
+ProcGetPhysicalDeviceExternalFenceProperties                         :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalFenceInfo: ^PhysicalDeviceExternalFenceInfo, pExternalFenceProperties: [^]ExternalFenceProperties)
+ProcGetPhysicalDeviceExternalFencePropertiesKHR                      :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalFenceInfo: ^PhysicalDeviceExternalFenceInfo, pExternalFenceProperties: [^]ExternalFenceProperties)
+ProcGetPhysicalDeviceExternalImageFormatPropertiesNV                 :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, type: ImageType, tiling: ImageTiling, usage: ImageUsageFlags, flags: ImageCreateFlags, externalHandleType: ExternalMemoryHandleTypeFlagsNV, pExternalImageFormatProperties: [^]ExternalImageFormatPropertiesNV) -> Result
+ProcGetPhysicalDeviceExternalSemaphoreProperties                     :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalSemaphoreInfo: ^PhysicalDeviceExternalSemaphoreInfo, pExternalSemaphoreProperties: [^]ExternalSemaphoreProperties)
+ProcGetPhysicalDeviceExternalSemaphorePropertiesKHR                  :: #type proc "system" (physicalDevice: PhysicalDevice, pExternalSemaphoreInfo: ^PhysicalDeviceExternalSemaphoreInfo, pExternalSemaphoreProperties: [^]ExternalSemaphoreProperties)
+ProcGetPhysicalDeviceFeatures                                        :: #type proc "system" (physicalDevice: PhysicalDevice, pFeatures: [^]PhysicalDeviceFeatures)
+ProcGetPhysicalDeviceFeatures2                                       :: #type proc "system" (physicalDevice: PhysicalDevice, pFeatures: [^]PhysicalDeviceFeatures2)
+ProcGetPhysicalDeviceFeatures2KHR                                    :: #type proc "system" (physicalDevice: PhysicalDevice, pFeatures: [^]PhysicalDeviceFeatures2)
+ProcGetPhysicalDeviceFormatProperties                                :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, pFormatProperties: [^]FormatProperties)
+ProcGetPhysicalDeviceFormatProperties2                               :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, pFormatProperties: [^]FormatProperties2)
+ProcGetPhysicalDeviceFormatProperties2KHR                            :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, pFormatProperties: [^]FormatProperties2)
+ProcGetPhysicalDeviceFragmentShadingRatesKHR                         :: #type proc "system" (physicalDevice: PhysicalDevice, pFragmentShadingRateCount: ^u32, pFragmentShadingRates: [^]PhysicalDeviceFragmentShadingRateKHR) -> Result
+ProcGetPhysicalDeviceImageFormatProperties                           :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, type: ImageType, tiling: ImageTiling, usage: ImageUsageFlags, flags: ImageCreateFlags, pImageFormatProperties: [^]ImageFormatProperties) -> Result
+ProcGetPhysicalDeviceImageFormatProperties2                          :: #type proc "system" (physicalDevice: PhysicalDevice, pImageFormatInfo: ^PhysicalDeviceImageFormatInfo2, pImageFormatProperties: [^]ImageFormatProperties2) -> Result
+ProcGetPhysicalDeviceImageFormatProperties2KHR                       :: #type proc "system" (physicalDevice: PhysicalDevice, pImageFormatInfo: ^PhysicalDeviceImageFormatInfo2, pImageFormatProperties: [^]ImageFormatProperties2) -> Result
+ProcGetPhysicalDeviceMemoryProperties                                :: #type proc "system" (physicalDevice: PhysicalDevice, pMemoryProperties: [^]PhysicalDeviceMemoryProperties)
+ProcGetPhysicalDeviceMemoryProperties2                               :: #type proc "system" (physicalDevice: PhysicalDevice, pMemoryProperties: [^]PhysicalDeviceMemoryProperties2)
+ProcGetPhysicalDeviceMemoryProperties2KHR                            :: #type proc "system" (physicalDevice: PhysicalDevice, pMemoryProperties: [^]PhysicalDeviceMemoryProperties2)
+ProcGetPhysicalDeviceMultisamplePropertiesEXT                        :: #type proc "system" (physicalDevice: PhysicalDevice, samples: SampleCountFlags, pMultisampleProperties: [^]MultisamplePropertiesEXT)
+ProcGetPhysicalDeviceOpticalFlowImageFormatsNV                       :: #type proc "system" (physicalDevice: PhysicalDevice, pOpticalFlowImageFormatInfo: ^OpticalFlowImageFormatInfoNV, pFormatCount: ^u32, pImageFormatProperties: [^]OpticalFlowImageFormatPropertiesNV) -> Result
+ProcGetPhysicalDevicePresentRectanglesKHR                            :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pRectCount: ^u32, pRects: [^]Rect2D) -> Result
+ProcGetPhysicalDeviceProperties                                      :: #type proc "system" (physicalDevice: PhysicalDevice, pProperties: [^]PhysicalDeviceProperties)
+ProcGetPhysicalDeviceProperties2                                     :: #type proc "system" (physicalDevice: PhysicalDevice, pProperties: [^]PhysicalDeviceProperties2)
+ProcGetPhysicalDeviceProperties2KHR                                  :: #type proc "system" (physicalDevice: PhysicalDevice, pProperties: [^]PhysicalDeviceProperties2)
+ProcGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR            :: #type proc "system" (physicalDevice: PhysicalDevice, pPerformanceQueryCreateInfo: ^QueryPoolPerformanceCreateInfoKHR, pNumPasses: [^]u32)
+ProcGetPhysicalDeviceQueueFamilyProperties                           :: #type proc "system" (physicalDevice: PhysicalDevice, pQueueFamilyPropertyCount: ^u32, pQueueFamilyProperties: [^]QueueFamilyProperties)
+ProcGetPhysicalDeviceQueueFamilyProperties2                          :: #type proc "system" (physicalDevice: PhysicalDevice, pQueueFamilyPropertyCount: ^u32, pQueueFamilyProperties: [^]QueueFamilyProperties2)
+ProcGetPhysicalDeviceQueueFamilyProperties2KHR                       :: #type proc "system" (physicalDevice: PhysicalDevice, pQueueFamilyPropertyCount: ^u32, pQueueFamilyProperties: [^]QueueFamilyProperties2)
+ProcGetPhysicalDeviceSparseImageFormatProperties                     :: #type proc "system" (physicalDevice: PhysicalDevice, format: Format, type: ImageType, samples: SampleCountFlags, usage: ImageUsageFlags, tiling: ImageTiling, pPropertyCount: ^u32, pProperties: [^]SparseImageFormatProperties)
+ProcGetPhysicalDeviceSparseImageFormatProperties2                    :: #type proc "system" (physicalDevice: PhysicalDevice, pFormatInfo: ^PhysicalDeviceSparseImageFormatInfo2, pPropertyCount: ^u32, pProperties: [^]SparseImageFormatProperties2)
+ProcGetPhysicalDeviceSparseImageFormatProperties2KHR                 :: #type proc "system" (physicalDevice: PhysicalDevice, pFormatInfo: ^PhysicalDeviceSparseImageFormatInfo2, pPropertyCount: ^u32, pProperties: [^]SparseImageFormatProperties2)
+ProcGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV  :: #type proc "system" (physicalDevice: PhysicalDevice, pCombinationCount: ^u32, pCombinations: [^]FramebufferMixedSamplesCombinationNV) -> Result
+ProcGetPhysicalDeviceSurfaceCapabilities2EXT                         :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pSurfaceCapabilities: [^]SurfaceCapabilities2EXT) -> Result
+ProcGetPhysicalDeviceSurfaceCapabilities2KHR                         :: #type proc "system" (physicalDevice: PhysicalDevice, pSurfaceInfo: ^PhysicalDeviceSurfaceInfo2KHR, pSurfaceCapabilities: [^]SurfaceCapabilities2KHR) -> Result
+ProcGetPhysicalDeviceSurfaceCapabilitiesKHR                          :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pSurfaceCapabilities: [^]SurfaceCapabilitiesKHR) -> Result
+ProcGetPhysicalDeviceSurfaceFormats2KHR                              :: #type proc "system" (physicalDevice: PhysicalDevice, pSurfaceInfo: ^PhysicalDeviceSurfaceInfo2KHR, pSurfaceFormatCount: ^u32, pSurfaceFormats: [^]SurfaceFormat2KHR) -> Result
+ProcGetPhysicalDeviceSurfaceFormatsKHR                               :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pSurfaceFormatCount: ^u32, pSurfaceFormats: [^]SurfaceFormatKHR) -> Result
+ProcGetPhysicalDeviceSurfacePresentModes2EXT                         :: #type proc "system" (physicalDevice: PhysicalDevice, pSurfaceInfo: ^PhysicalDeviceSurfaceInfo2KHR, pPresentModeCount: ^u32, pPresentModes: [^]PresentModeKHR) -> Result
+ProcGetPhysicalDeviceSurfacePresentModesKHR                          :: #type proc "system" (physicalDevice: PhysicalDevice, surface: SurfaceKHR, pPresentModeCount: ^u32, pPresentModes: [^]PresentModeKHR) -> Result
+ProcGetPhysicalDeviceSurfaceSupportKHR                               :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, surface: SurfaceKHR, pSupported: ^b32) -> Result
+ProcGetPhysicalDeviceToolProperties                                  :: #type proc "system" (physicalDevice: PhysicalDevice, pToolCount: ^u32, pToolProperties: [^]PhysicalDeviceToolProperties) -> Result
+ProcGetPhysicalDeviceToolPropertiesEXT                               :: #type proc "system" (physicalDevice: PhysicalDevice, pToolCount: ^u32, pToolProperties: [^]PhysicalDeviceToolProperties) -> Result
+ProcGetPhysicalDeviceVideoCapabilitiesKHR                            :: #type proc "system" (physicalDevice: PhysicalDevice, pVideoProfile: ^VideoProfileInfoKHR, pCapabilities: [^]VideoCapabilitiesKHR) -> Result
+ProcGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR            :: #type proc "system" (physicalDevice: PhysicalDevice, pQualityLevelInfo: ^PhysicalDeviceVideoEncodeQualityLevelInfoKHR, pQualityLevelProperties: [^]VideoEncodeQualityLevelPropertiesKHR) -> Result
+ProcGetPhysicalDeviceVideoFormatPropertiesKHR                        :: #type proc "system" (physicalDevice: PhysicalDevice, pVideoFormatInfo: ^PhysicalDeviceVideoFormatInfoKHR, pVideoFormatPropertyCount: ^u32, pVideoFormatProperties: [^]VideoFormatPropertiesKHR) -> Result
+ProcGetPhysicalDeviceWaylandPresentationSupportKHR                   :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, display: ^wl_display) -> b32
+ProcGetPhysicalDeviceWin32PresentationSupportKHR                     :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32) -> b32
+ProcGetPhysicalDeviceXcbPresentationSupportKHR                       :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, connection: ^xcb_connection_t, visual_id: xcb_visualid_t) -> b32
+ProcGetPhysicalDeviceXlibPresentationSupportKHR                      :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, dpy: ^XlibDisplay, visualID: XlibVisualID) -> b32
+ProcGetWinrtDisplayNV                                                :: #type proc "system" (physicalDevice: PhysicalDevice, deviceRelativeId: u32, pDisplay: ^DisplayKHR) -> Result
+ProcReleaseDisplayEXT                                                :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR) -> Result
+ProcSubmitDebugUtilsMessageEXT                                       :: #type proc "system" (instance: Instance, messageSeverity: DebugUtilsMessageSeverityFlagsEXT, messageTypes: DebugUtilsMessageTypeFlagsEXT, pCallbackData: ^DebugUtilsMessengerCallbackDataEXT)
 
 // Device Procedure Types
 ProcAcquireFullScreenExclusiveModeEXT                      :: #type proc "system" (device: Device, swapchain: SwapchainKHR) -> Result
@@ -153,8 +159,10 @@ ProcCmdBindDescriptorBufferEmbeddedSamplers2EXT            :: #type proc "system
 ProcCmdBindDescriptorBufferEmbeddedSamplersEXT             :: #type proc "system" (commandBuffer: CommandBuffer, pipelineBindPoint: PipelineBindPoint, layout: PipelineLayout, set: u32)
 ProcCmdBindDescriptorBuffersEXT                            :: #type proc "system" (commandBuffer: CommandBuffer, bufferCount: u32, pBindingInfos: [^]DescriptorBufferBindingInfoEXT)
 ProcCmdBindDescriptorSets                                  :: #type proc "system" (commandBuffer: CommandBuffer, pipelineBindPoint: PipelineBindPoint, layout: PipelineLayout, firstSet: u32, descriptorSetCount: u32, pDescriptorSets: [^]DescriptorSet, dynamicOffsetCount: u32, pDynamicOffsets: [^]u32)
-ProcCmdBindDescriptorSets2KHR                              :: #type proc "system" (commandBuffer: CommandBuffer, pBindDescriptorSetsInfo: ^BindDescriptorSetsInfoKHR)
+ProcCmdBindDescriptorSets2                                 :: #type proc "system" (commandBuffer: CommandBuffer, pBindDescriptorSetsInfo: ^BindDescriptorSetsInfo)
+ProcCmdBindDescriptorSets2KHR                              :: #type proc "system" (commandBuffer: CommandBuffer, pBindDescriptorSetsInfo: ^BindDescriptorSetsInfo)
 ProcCmdBindIndexBuffer                                     :: #type proc "system" (commandBuffer: CommandBuffer, buffer: Buffer, offset: DeviceSize, indexType: IndexType)
+ProcCmdBindIndexBuffer2                                    :: #type proc "system" (commandBuffer: CommandBuffer, buffer: Buffer, offset: DeviceSize, size: DeviceSize, indexType: IndexType)
 ProcCmdBindIndexBuffer2KHR                                 :: #type proc "system" (commandBuffer: CommandBuffer, buffer: Buffer, offset: DeviceSize, size: DeviceSize, indexType: IndexType)
 ProcCmdBindInvocationMaskHUAWEI                            :: #type proc "system" (commandBuffer: CommandBuffer, imageView: ImageView, imageLayout: ImageLayout)
 ProcCmdBindPipeline                                        :: #type proc "system" (commandBuffer: CommandBuffer, pipelineBindPoint: PipelineBindPoint, pipeline: Pipeline)
@@ -171,11 +179,14 @@ ProcCmdBlitImage2KHR                                       :: #type proc "system
 ProcCmdBuildAccelerationStructureNV                        :: #type proc "system" (commandBuffer: CommandBuffer, pInfo: ^AccelerationStructureInfoNV, instanceData: Buffer, instanceOffset: DeviceSize, update: b32, dst: AccelerationStructureNV, src: AccelerationStructureNV, scratch: Buffer, scratchOffset: DeviceSize)
 ProcCmdBuildAccelerationStructuresIndirectKHR              :: #type proc "system" (commandBuffer: CommandBuffer, infoCount: u32, pInfos: [^]AccelerationStructureBuildGeometryInfoKHR, pIndirectDeviceAddresses: [^]DeviceAddress, pIndirectStrides: [^]u32, ppMaxPrimitiveCounts: ^[^]u32)
 ProcCmdBuildAccelerationStructuresKHR                      :: #type proc "system" (commandBuffer: CommandBuffer, infoCount: u32, pInfos: [^]AccelerationStructureBuildGeometryInfoKHR, ppBuildRangeInfos: ^[^]AccelerationStructureBuildRangeInfoKHR)
+ProcCmdBuildClusterAccelerationStructureIndirectNV         :: #type proc "system" (commandBuffer: CommandBuffer, pCommandInfos: [^]ClusterAccelerationStructureCommandsInfoNV)
 ProcCmdBuildMicromapsEXT                                   :: #type proc "system" (commandBuffer: CommandBuffer, infoCount: u32, pInfos: [^]MicromapBuildInfoEXT)
+ProcCmdBuildPartitionedAccelerationStructuresNV            :: #type proc "system" (commandBuffer: CommandBuffer, pBuildInfo: ^BuildPartitionedAccelerationStructureInfoNV)
 ProcCmdClearAttachments                                    :: #type proc "system" (commandBuffer: CommandBuffer, attachmentCount: u32, pAttachments: [^]ClearAttachment, rectCount: u32, pRects: [^]ClearRect)
 ProcCmdClearColorImage                                     :: #type proc "system" (commandBuffer: CommandBuffer, image: Image, imageLayout: ImageLayout, pColor: ^ClearColorValue, rangeCount: u32, pRanges: [^]ImageSubresourceRange)
 ProcCmdClearDepthStencilImage                              :: #type proc "system" (commandBuffer: CommandBuffer, image: Image, imageLayout: ImageLayout, pDepthStencil: ^ClearDepthStencilValue, rangeCount: u32, pRanges: [^]ImageSubresourceRange)
 ProcCmdControlVideoCodingKHR                               :: #type proc "system" (commandBuffer: CommandBuffer, pCodingControlInfo: ^VideoCodingControlInfoKHR)
+ProcCmdConvertCooperativeVectorMatrixNV                    :: #type proc "system" (commandBuffer: CommandBuffer, infoCount: u32, pInfos: [^]ConvertCooperativeVectorMatrixInfoNV)
 ProcCmdCopyAccelerationStructureKHR                        :: #type proc "system" (commandBuffer: CommandBuffer, pInfo: ^CopyAccelerationStructureInfoKHR)
 ProcCmdCopyAccelerationStructureNV                         :: #type proc "system" (commandBuffer: CommandBuffer, dst: AccelerationStructureNV, src: AccelerationStructureNV, mode: CopyAccelerationStructureModeKHR)
 ProcCmdCopyAccelerationStructureToMemoryKHR                :: #type proc "system" (commandBuffer: CommandBuffer, pInfo: ^CopyAccelerationStructureToMemoryInfoKHR)
@@ -209,6 +220,9 @@ ProcCmdDecompressMemoryNV                                  :: #type proc "system
 ProcCmdDispatch                                            :: #type proc "system" (commandBuffer: CommandBuffer, groupCountX: u32, groupCountY: u32, groupCountZ: u32)
 ProcCmdDispatchBase                                        :: #type proc "system" (commandBuffer: CommandBuffer, baseGroupX: u32, baseGroupY: u32, baseGroupZ: u32, groupCountX: u32, groupCountY: u32, groupCountZ: u32)
 ProcCmdDispatchBaseKHR                                     :: #type proc "system" (commandBuffer: CommandBuffer, baseGroupX: u32, baseGroupY: u32, baseGroupZ: u32, groupCountX: u32, groupCountY: u32, groupCountZ: u32)
+ProcCmdDispatchGraphAMDX                                   :: #type proc "system" (commandBuffer: CommandBuffer, scratch: DeviceAddress, scratchSize: DeviceSize, pCountInfo: ^DispatchGraphCountInfoAMDX)
+ProcCmdDispatchGraphIndirectAMDX                           :: #type proc "system" (commandBuffer: CommandBuffer, scratch: DeviceAddress, scratchSize: DeviceSize, pCountInfo: ^DispatchGraphCountInfoAMDX)
+ProcCmdDispatchGraphIndirectCountAMDX                      :: #type proc "system" (commandBuffer: CommandBuffer, scratch: DeviceAddress, scratchSize: DeviceSize, countInfo: DeviceAddress)
 ProcCmdDispatchIndirect                                    :: #type proc "system" (commandBuffer: CommandBuffer, buffer: Buffer, offset: DeviceSize)
 ProcCmdDraw                                                :: #type proc "system" (commandBuffer: CommandBuffer, vertexCount: u32, instanceCount: u32, firstVertex: u32, firstInstance: u32)
 ProcCmdDrawClusterHUAWEI                                   :: #type proc "system" (commandBuffer: CommandBuffer, groupCountX: u32, groupCountY: u32, groupCountZ: u32)
@@ -247,6 +261,7 @@ ProcCmdExecuteCommands                                     :: #type proc "system
 ProcCmdExecuteGeneratedCommandsEXT                         :: #type proc "system" (commandBuffer: CommandBuffer, isPreprocessed: b32, pGeneratedCommandsInfo: ^GeneratedCommandsInfoEXT)
 ProcCmdExecuteGeneratedCommandsNV                          :: #type proc "system" (commandBuffer: CommandBuffer, isPreprocessed: b32, pGeneratedCommandsInfo: ^GeneratedCommandsInfoNV)
 ProcCmdFillBuffer                                          :: #type proc "system" (commandBuffer: CommandBuffer, dstBuffer: Buffer, dstOffset: DeviceSize, size: DeviceSize, data: u32)
+ProcCmdInitializeGraphScratchMemoryAMDX                    :: #type proc "system" (commandBuffer: CommandBuffer, executionGraph: Pipeline, scratch: DeviceAddress, scratchSize: DeviceSize)
 ProcCmdInsertDebugUtilsLabelEXT                            :: #type proc "system" (commandBuffer: CommandBuffer, pLabelInfo: ^DebugUtilsLabelEXT)
 ProcCmdNextSubpass                                         :: #type proc "system" (commandBuffer: CommandBuffer, contents: SubpassContents)
 ProcCmdNextSubpass2                                        :: #type proc "system" (commandBuffer: CommandBuffer, pSubpassBeginInfo: ^SubpassBeginInfo, pSubpassEndInfo: ^SubpassEndInfo)
@@ -258,10 +273,15 @@ ProcCmdPipelineBarrier2KHR                                 :: #type proc "system
 ProcCmdPreprocessGeneratedCommandsEXT                      :: #type proc "system" (commandBuffer: CommandBuffer, pGeneratedCommandsInfo: ^GeneratedCommandsInfoEXT, stateCommandBuffer: CommandBuffer)
 ProcCmdPreprocessGeneratedCommandsNV                       :: #type proc "system" (commandBuffer: CommandBuffer, pGeneratedCommandsInfo: ^GeneratedCommandsInfoNV)
 ProcCmdPushConstants                                       :: #type proc "system" (commandBuffer: CommandBuffer, layout: PipelineLayout, stageFlags: ShaderStageFlags, offset: u32, size: u32, pValues: rawptr)
-ProcCmdPushConstants2KHR                                   :: #type proc "system" (commandBuffer: CommandBuffer, pPushConstantsInfo: ^PushConstantsInfoKHR)
-ProcCmdPushDescriptorSet2KHR                               :: #type proc "system" (commandBuffer: CommandBuffer, pPushDescriptorSetInfo: ^PushDescriptorSetInfoKHR)
+ProcCmdPushConstants2                                      :: #type proc "system" (commandBuffer: CommandBuffer, pPushConstantsInfo: ^PushConstantsInfo)
+ProcCmdPushConstants2KHR                                   :: #type proc "system" (commandBuffer: CommandBuffer, pPushConstantsInfo: ^PushConstantsInfo)
+ProcCmdPushDescriptorSet                                   :: #type proc "system" (commandBuffer: CommandBuffer, pipelineBindPoint: PipelineBindPoint, layout: PipelineLayout, set: u32, descriptorWriteCount: u32, pDescriptorWrites: [^]WriteDescriptorSet)
+ProcCmdPushDescriptorSet2                                  :: #type proc "system" (commandBuffer: CommandBuffer, pPushDescriptorSetInfo: ^PushDescriptorSetInfo)
+ProcCmdPushDescriptorSet2KHR                               :: #type proc "system" (commandBuffer: CommandBuffer, pPushDescriptorSetInfo: ^PushDescriptorSetInfo)
 ProcCmdPushDescriptorSetKHR                                :: #type proc "system" (commandBuffer: CommandBuffer, pipelineBindPoint: PipelineBindPoint, layout: PipelineLayout, set: u32, descriptorWriteCount: u32, pDescriptorWrites: [^]WriteDescriptorSet)
-ProcCmdPushDescriptorSetWithTemplate2KHR                   :: #type proc "system" (commandBuffer: CommandBuffer, pPushDescriptorSetWithTemplateInfo: ^PushDescriptorSetWithTemplateInfoKHR)
+ProcCmdPushDescriptorSetWithTemplate                       :: #type proc "system" (commandBuffer: CommandBuffer, descriptorUpdateTemplate: DescriptorUpdateTemplate, layout: PipelineLayout, set: u32, pData: rawptr)
+ProcCmdPushDescriptorSetWithTemplate2                      :: #type proc "system" (commandBuffer: CommandBuffer, pPushDescriptorSetWithTemplateInfo: ^PushDescriptorSetWithTemplateInfo)
+ProcCmdPushDescriptorSetWithTemplate2KHR                   :: #type proc "system" (commandBuffer: CommandBuffer, pPushDescriptorSetWithTemplateInfo: ^PushDescriptorSetWithTemplateInfo)
 ProcCmdPushDescriptorSetWithTemplateKHR                    :: #type proc "system" (commandBuffer: CommandBuffer, descriptorUpdateTemplate: DescriptorUpdateTemplate, layout: PipelineLayout, set: u32, pData: rawptr)
 ProcCmdResetEvent                                          :: #type proc "system" (commandBuffer: CommandBuffer, event: Event, stageMask: PipelineStageFlags)
 ProcCmdResetEvent2                                         :: #type proc "system" (commandBuffer: CommandBuffer, event: Event, stageMask: PipelineStageFlags2)
@@ -324,6 +344,7 @@ ProcCmdSetFragmentShadingRateKHR                           :: #type proc "system
 ProcCmdSetFrontFace                                        :: #type proc "system" (commandBuffer: CommandBuffer, frontFace: FrontFace)
 ProcCmdSetFrontFaceEXT                                     :: #type proc "system" (commandBuffer: CommandBuffer, frontFace: FrontFace)
 ProcCmdSetLineRasterizationModeEXT                         :: #type proc "system" (commandBuffer: CommandBuffer, lineRasterizationMode: LineRasterizationModeEXT)
+ProcCmdSetLineStipple                                      :: #type proc "system" (commandBuffer: CommandBuffer, lineStippleFactor: u32, lineStipplePattern: u16)
 ProcCmdSetLineStippleEXT                                   :: #type proc "system" (commandBuffer: CommandBuffer, lineStippleFactor: u32, lineStipplePattern: u16)
 ProcCmdSetLineStippleEnableEXT                             :: #type proc "system" (commandBuffer: CommandBuffer, stippledLineEnable: b32)
 ProcCmdSetLineStippleKHR                                   :: #type proc "system" (commandBuffer: CommandBuffer, lineStippleFactor: u32, lineStipplePattern: u16)
@@ -345,8 +366,10 @@ ProcCmdSetRasterizationStreamEXT                           :: #type proc "system
 ProcCmdSetRasterizerDiscardEnable                          :: #type proc "system" (commandBuffer: CommandBuffer, rasterizerDiscardEnable: b32)
 ProcCmdSetRasterizerDiscardEnableEXT                       :: #type proc "system" (commandBuffer: CommandBuffer, rasterizerDiscardEnable: b32)
 ProcCmdSetRayTracingPipelineStackSizeKHR                   :: #type proc "system" (commandBuffer: CommandBuffer, pipelineStackSize: u32)
-ProcCmdSetRenderingAttachmentLocationsKHR                  :: #type proc "system" (commandBuffer: CommandBuffer, pLocationInfo: ^RenderingAttachmentLocationInfoKHR)
-ProcCmdSetRenderingInputAttachmentIndicesKHR               :: #type proc "system" (commandBuffer: CommandBuffer, pInputAttachmentIndexInfo: ^RenderingInputAttachmentIndexInfoKHR)
+ProcCmdSetRenderingAttachmentLocations                     :: #type proc "system" (commandBuffer: CommandBuffer, pLocationInfo: ^RenderingAttachmentLocationInfo)
+ProcCmdSetRenderingAttachmentLocationsKHR                  :: #type proc "system" (commandBuffer: CommandBuffer, pLocationInfo: ^RenderingAttachmentLocationInfo)
+ProcCmdSetRenderingInputAttachmentIndices                  :: #type proc "system" (commandBuffer: CommandBuffer, pInputAttachmentIndexInfo: ^RenderingInputAttachmentIndexInfo)
+ProcCmdSetRenderingInputAttachmentIndicesKHR               :: #type proc "system" (commandBuffer: CommandBuffer, pInputAttachmentIndexInfo: ^RenderingInputAttachmentIndexInfo)
 ProcCmdSetRepresentativeFragmentTestEnableNV               :: #type proc "system" (commandBuffer: CommandBuffer, representativeFragmentTestEnable: b32)
 ProcCmdSetSampleLocationsEXT                               :: #type proc "system" (commandBuffer: CommandBuffer, pSampleLocationsInfo: ^SampleLocationsInfoEXT)
 ProcCmdSetSampleLocationsEnableEXT                         :: #type proc "system" (commandBuffer: CommandBuffer, sampleLocationsEnable: b32)
@@ -390,12 +413,16 @@ ProcCmdWriteTimestamp                                      :: #type proc "system
 ProcCmdWriteTimestamp2                                     :: #type proc "system" (commandBuffer: CommandBuffer, stage: PipelineStageFlags2, queryPool: QueryPool, query: u32)
 ProcCmdWriteTimestamp2KHR                                  :: #type proc "system" (commandBuffer: CommandBuffer, stage: PipelineStageFlags2, queryPool: QueryPool, query: u32)
 ProcCompileDeferredNV                                      :: #type proc "system" (device: Device, pipeline: Pipeline, shader: u32) -> Result
+ProcConvertCooperativeVectorMatrixNV                       :: #type proc "system" (device: Device, pInfo: ^ConvertCooperativeVectorMatrixInfoNV) -> Result
 ProcCopyAccelerationStructureKHR                           :: #type proc "system" (device: Device, deferredOperation: DeferredOperationKHR, pInfo: ^CopyAccelerationStructureInfoKHR) -> Result
 ProcCopyAccelerationStructureToMemoryKHR                   :: #type proc "system" (device: Device, deferredOperation: DeferredOperationKHR, pInfo: ^CopyAccelerationStructureToMemoryInfoKHR) -> Result
-ProcCopyImageToImageEXT                                    :: #type proc "system" (device: Device, pCopyImageToImageInfo: ^CopyImageToImageInfoEXT) -> Result
-ProcCopyImageToMemoryEXT                                   :: #type proc "system" (device: Device, pCopyImageToMemoryInfo: ^CopyImageToMemoryInfoEXT) -> Result
+ProcCopyImageToImage                                       :: #type proc "system" (device: Device, pCopyImageToImageInfo: ^CopyImageToImageInfo) -> Result
+ProcCopyImageToImageEXT                                    :: #type proc "system" (device: Device, pCopyImageToImageInfo: ^CopyImageToImageInfo) -> Result
+ProcCopyImageToMemory                                      :: #type proc "system" (device: Device, pCopyImageToMemoryInfo: ^CopyImageToMemoryInfo) -> Result
+ProcCopyImageToMemoryEXT                                   :: #type proc "system" (device: Device, pCopyImageToMemoryInfo: ^CopyImageToMemoryInfo) -> Result
 ProcCopyMemoryToAccelerationStructureKHR                   :: #type proc "system" (device: Device, deferredOperation: DeferredOperationKHR, pInfo: ^CopyMemoryToAccelerationStructureInfoKHR) -> Result
-ProcCopyMemoryToImageEXT                                   :: #type proc "system" (device: Device, pCopyMemoryToImageInfo: ^CopyMemoryToImageInfoEXT) -> Result
+ProcCopyMemoryToImage                                      :: #type proc "system" (device: Device, pCopyMemoryToImageInfo: ^CopyMemoryToImageInfo) -> Result
+ProcCopyMemoryToImageEXT                                   :: #type proc "system" (device: Device, pCopyMemoryToImageInfo: ^CopyMemoryToImageInfo) -> Result
 ProcCopyMemoryToMicromapEXT                                :: #type proc "system" (device: Device, deferredOperation: DeferredOperationKHR, pInfo: ^CopyMemoryToMicromapInfoEXT) -> Result
 ProcCopyMicromapEXT                                        :: #type proc "system" (device: Device, deferredOperation: DeferredOperationKHR, pInfo: ^CopyMicromapInfoEXT) -> Result
 ProcCopyMicromapToMemoryEXT                                :: #type proc "system" (device: Device, deferredOperation: DeferredOperationKHR, pInfo: ^CopyMicromapToMemoryInfoEXT) -> Result
@@ -415,6 +442,7 @@ ProcCreateDescriptorSetLayout                              :: #type proc "system
 ProcCreateDescriptorUpdateTemplate                         :: #type proc "system" (device: Device, pCreateInfo: ^DescriptorUpdateTemplateCreateInfo, pAllocator: ^AllocationCallbacks, pDescriptorUpdateTemplate: ^DescriptorUpdateTemplate) -> Result
 ProcCreateDescriptorUpdateTemplateKHR                      :: #type proc "system" (device: Device, pCreateInfo: ^DescriptorUpdateTemplateCreateInfo, pAllocator: ^AllocationCallbacks, pDescriptorUpdateTemplate: ^DescriptorUpdateTemplate) -> Result
 ProcCreateEvent                                            :: #type proc "system" (device: Device, pCreateInfo: ^EventCreateInfo, pAllocator: ^AllocationCallbacks, pEvent: ^Event) -> Result
+ProcCreateExecutionGraphPipelinesAMDX                      :: #type proc "system" (device: Device, pipelineCache: PipelineCache, createInfoCount: u32, pCreateInfos: [^]ExecutionGraphPipelineCreateInfoAMDX, pAllocator: ^AllocationCallbacks, pPipelines: [^]Pipeline) -> Result
 ProcCreateFence                                            :: #type proc "system" (device: Device, pCreateInfo: ^FenceCreateInfo, pAllocator: ^AllocationCallbacks, pFence: ^Fence) -> Result
 ProcCreateFramebuffer                                      :: #type proc "system" (device: Device, pCreateInfo: ^FramebufferCreateInfo, pAllocator: ^AllocationCallbacks, pFramebuffer: ^Framebuffer) -> Result
 ProcCreateGraphicsPipelines                                :: #type proc "system" (device: Device, pipelineCache: PipelineCache, createInfoCount: u32, pCreateInfos: [^]GraphicsPipelineCreateInfo, pAllocator: ^AllocationCallbacks, pPipelines: [^]Pipeline) -> Result
@@ -517,6 +545,7 @@ ProcGetBufferOpaqueCaptureAddressKHR                       :: #type proc "system
 ProcGetBufferOpaqueCaptureDescriptorDataEXT                :: #type proc "system" (device: Device, pInfo: ^BufferCaptureDescriptorDataInfoEXT, pData: rawptr) -> Result
 ProcGetCalibratedTimestampsEXT                             :: #type proc "system" (device: Device, timestampCount: u32, pTimestampInfos: [^]CalibratedTimestampInfoKHR, pTimestamps: [^]u64, pMaxDeviation: ^u64) -> Result
 ProcGetCalibratedTimestampsKHR                             :: #type proc "system" (device: Device, timestampCount: u32, pTimestampInfos: [^]CalibratedTimestampInfoKHR, pTimestamps: [^]u64, pMaxDeviation: ^u64) -> Result
+ProcGetClusterAccelerationStructureBuildSizesNV            :: #type proc "system" (device: Device, pInfo: ^ClusterAccelerationStructureInputInfoNV, pSizeInfo: ^AccelerationStructureBuildSizesInfoKHR)
 ProcGetCudaModuleCacheNV                                   :: #type proc "system" (device: Device, module: CudaModuleNV, pCacheSize: ^int, pCacheData: rawptr) -> Result
 ProcGetDeferredOperationMaxConcurrencyKHR                  :: #type proc "system" (device: Device, operation: DeferredOperationKHR) -> u32
 ProcGetDeferredOperationResultKHR                          :: #type proc "system" (device: Device, operation: DeferredOperationKHR) -> Result
@@ -540,7 +569,8 @@ ProcGetDeviceImageMemoryRequirements                       :: #type proc "system
 ProcGetDeviceImageMemoryRequirementsKHR                    :: #type proc "system" (device: Device, pInfo: ^DeviceImageMemoryRequirements, pMemoryRequirements: [^]MemoryRequirements2)
 ProcGetDeviceImageSparseMemoryRequirements                 :: #type proc "system" (device: Device, pInfo: ^DeviceImageMemoryRequirements, pSparseMemoryRequirementCount: ^u32, pSparseMemoryRequirements: [^]SparseImageMemoryRequirements2)
 ProcGetDeviceImageSparseMemoryRequirementsKHR              :: #type proc "system" (device: Device, pInfo: ^DeviceImageMemoryRequirements, pSparseMemoryRequirementCount: ^u32, pSparseMemoryRequirements: [^]SparseImageMemoryRequirements2)
-ProcGetDeviceImageSubresourceLayoutKHR                     :: #type proc "system" (device: Device, pInfo: ^DeviceImageSubresourceInfoKHR, pLayout: ^SubresourceLayout2KHR)
+ProcGetDeviceImageSubresourceLayout                        :: #type proc "system" (device: Device, pInfo: ^DeviceImageSubresourceInfo, pLayout: ^SubresourceLayout2)
+ProcGetDeviceImageSubresourceLayoutKHR                     :: #type proc "system" (device: Device, pInfo: ^DeviceImageSubresourceInfo, pLayout: ^SubresourceLayout2)
 ProcGetDeviceMemoryCommitment                              :: #type proc "system" (device: Device, memory: DeviceMemory, pCommittedMemoryInBytes: [^]DeviceSize)
 ProcGetDeviceMemoryOpaqueCaptureAddress                    :: #type proc "system" (device: Device, pInfo: ^DeviceMemoryOpaqueCaptureAddressInfo) -> u64
 ProcGetDeviceMemoryOpaqueCaptureAddressKHR                 :: #type proc "system" (device: Device, pInfo: ^DeviceMemoryOpaqueCaptureAddressInfo) -> u64
@@ -552,6 +582,8 @@ ProcGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI          :: #type proc "system
 ProcGetDynamicRenderingTilePropertiesQCOM                  :: #type proc "system" (device: Device, pRenderingInfo: ^RenderingInfo, pProperties: [^]TilePropertiesQCOM) -> Result
 ProcGetEncodedVideoSessionParametersKHR                    :: #type proc "system" (device: Device, pVideoSessionParametersInfo: ^VideoEncodeSessionParametersGetInfoKHR, pFeedbackInfo: ^VideoEncodeSessionParametersFeedbackInfoKHR, pDataSize: ^int, pData: rawptr) -> Result
 ProcGetEventStatus                                         :: #type proc "system" (device: Device, event: Event) -> Result
+ProcGetExecutionGraphPipelineNodeIndexAMDX                 :: #type proc "system" (device: Device, executionGraph: Pipeline, pNodeInfo: ^PipelineShaderStageNodeCreateInfoAMDX, pNodeIndex: ^u32) -> Result
+ProcGetExecutionGraphPipelineScratchSizeAMDX               :: #type proc "system" (device: Device, executionGraph: Pipeline, pSizeInfo: ^ExecutionGraphPipelineScratchSizeAMDX) -> Result
 ProcGetFenceFdKHR                                          :: #type proc "system" (device: Device, pGetFdInfo: ^FenceGetFdInfoKHR, pFd: ^c.int) -> Result
 ProcGetFenceStatus                                         :: #type proc "system" (device: Device, fence: Fence) -> Result
 ProcGetFenceWin32HandleKHR                                 :: #type proc "system" (device: Device, pGetWin32HandleInfo: ^FenceGetWin32HandleInfoKHR, pHandle: ^HANDLE) -> Result
@@ -567,20 +599,25 @@ ProcGetImageSparseMemoryRequirements                       :: #type proc "system
 ProcGetImageSparseMemoryRequirements2                      :: #type proc "system" (device: Device, pInfo: ^ImageSparseMemoryRequirementsInfo2, pSparseMemoryRequirementCount: ^u32, pSparseMemoryRequirements: [^]SparseImageMemoryRequirements2)
 ProcGetImageSparseMemoryRequirements2KHR                   :: #type proc "system" (device: Device, pInfo: ^ImageSparseMemoryRequirementsInfo2, pSparseMemoryRequirementCount: ^u32, pSparseMemoryRequirements: [^]SparseImageMemoryRequirements2)
 ProcGetImageSubresourceLayout                              :: #type proc "system" (device: Device, image: Image, pSubresource: ^ImageSubresource, pLayout: ^SubresourceLayout)
-ProcGetImageSubresourceLayout2EXT                          :: #type proc "system" (device: Device, image: Image, pSubresource: ^ImageSubresource2KHR, pLayout: ^SubresourceLayout2KHR)
-ProcGetImageSubresourceLayout2KHR                          :: #type proc "system" (device: Device, image: Image, pSubresource: ^ImageSubresource2KHR, pLayout: ^SubresourceLayout2KHR)
+ProcGetImageSubresourceLayout2                             :: #type proc "system" (device: Device, image: Image, pSubresource: ^ImageSubresource2, pLayout: ^SubresourceLayout2)
+ProcGetImageSubresourceLayout2EXT                          :: #type proc "system" (device: Device, image: Image, pSubresource: ^ImageSubresource2, pLayout: ^SubresourceLayout2)
+ProcGetImageSubresourceLayout2KHR                          :: #type proc "system" (device: Device, image: Image, pSubresource: ^ImageSubresource2, pLayout: ^SubresourceLayout2)
 ProcGetImageViewAddressNVX                                 :: #type proc "system" (device: Device, imageView: ImageView, pProperties: [^]ImageViewAddressPropertiesNVX) -> Result
+ProcGetImageViewHandle64NVX                                :: #type proc "system" (device: Device, pInfo: ^ImageViewHandleInfoNVX) -> u64
 ProcGetImageViewHandleNVX                                  :: #type proc "system" (device: Device, pInfo: ^ImageViewHandleInfoNVX) -> u32
 ProcGetImageViewOpaqueCaptureDescriptorDataEXT             :: #type proc "system" (device: Device, pInfo: ^ImageViewCaptureDescriptorDataInfoEXT, pData: rawptr) -> Result
 ProcGetLatencyTimingsNV                                    :: #type proc "system" (device: Device, swapchain: SwapchainKHR, pLatencyMarkerInfo: ^GetLatencyMarkerInfoNV)
 ProcGetMemoryFdKHR                                         :: #type proc "system" (device: Device, pGetFdInfo: ^MemoryGetFdInfoKHR, pFd: ^c.int) -> Result
 ProcGetMemoryFdPropertiesKHR                               :: #type proc "system" (device: Device, handleType: ExternalMemoryHandleTypeFlags, fd: c.int, pMemoryFdProperties: [^]MemoryFdPropertiesKHR) -> Result
 ProcGetMemoryHostPointerPropertiesEXT                      :: #type proc "system" (device: Device, handleType: ExternalMemoryHandleTypeFlags, pHostPointer: rawptr, pMemoryHostPointerProperties: [^]MemoryHostPointerPropertiesEXT) -> Result
+ProcGetMemoryMetalHandleEXT                                :: #type proc "system" (device: Device, pGetMetalHandleInfo: ^MemoryGetMetalHandleInfoEXT, pHandle: ^rawptr) -> Result
+ProcGetMemoryMetalHandlePropertiesEXT                      :: #type proc "system" (device: Device, handleType: ExternalMemoryHandleTypeFlags, pHandle: rawptr, pMemoryMetalHandleProperties: [^]MemoryMetalHandlePropertiesEXT) -> Result
 ProcGetMemoryRemoteAddressNV                               :: #type proc "system" (device: Device, pMemoryGetRemoteAddressInfo: ^MemoryGetRemoteAddressInfoNV, pAddress: [^]RemoteAddressNV) -> Result
 ProcGetMemoryWin32HandleKHR                                :: #type proc "system" (device: Device, pGetWin32HandleInfo: ^MemoryGetWin32HandleInfoKHR, pHandle: ^HANDLE) -> Result
 ProcGetMemoryWin32HandleNV                                 :: #type proc "system" (device: Device, memory: DeviceMemory, handleType: ExternalMemoryHandleTypeFlagsNV, pHandle: ^HANDLE) -> Result
 ProcGetMemoryWin32HandlePropertiesKHR                      :: #type proc "system" (device: Device, handleType: ExternalMemoryHandleTypeFlags, handle: HANDLE, pMemoryWin32HandleProperties: [^]MemoryWin32HandlePropertiesKHR) -> Result
 ProcGetMicromapBuildSizesEXT                               :: #type proc "system" (device: Device, buildType: AccelerationStructureBuildTypeKHR, pBuildInfo: ^MicromapBuildInfoEXT, pSizeInfo: ^MicromapBuildSizesInfoEXT)
+ProcGetPartitionedAccelerationStructuresBuildSizesNV       :: #type proc "system" (device: Device, pInfo: ^PartitionedAccelerationStructureInstancesInputNV, pSizeInfo: ^AccelerationStructureBuildSizesInfoKHR)
 ProcGetPastPresentationTimingGOOGLE                        :: #type proc "system" (device: Device, swapchain: SwapchainKHR, pPresentationTimingCount: ^u32, pPresentationTimings: [^]PastPresentationTimingGOOGLE) -> Result
 ProcGetPerformanceParameterINTEL                           :: #type proc "system" (device: Device, parameter: PerformanceParameterTypeINTEL, pValue: ^PerformanceValueINTEL) -> Result
 ProcGetPipelineBinaryDataKHR                               :: #type proc "system" (device: Device, pInfo: ^PipelineBinaryDataInfoKHR, pPipelineBinaryKey: ^PipelineBinaryKeyKHR, pPipelineBinaryDataSize: ^int, pPipelineBinaryData: rawptr) -> Result
@@ -603,7 +640,8 @@ ProcGetRayTracingShaderGroupHandlesNV                      :: #type proc "system
 ProcGetRayTracingShaderGroupStackSizeKHR                   :: #type proc "system" (device: Device, pipeline: Pipeline, group: u32, groupShader: ShaderGroupShaderKHR) -> DeviceSize
 ProcGetRefreshCycleDurationGOOGLE                          :: #type proc "system" (device: Device, swapchain: SwapchainKHR, pDisplayTimingProperties: [^]RefreshCycleDurationGOOGLE) -> Result
 ProcGetRenderAreaGranularity                               :: #type proc "system" (device: Device, renderPass: RenderPass, pGranularity: ^Extent2D)
-ProcGetRenderingAreaGranularityKHR                         :: #type proc "system" (device: Device, pRenderingAreaInfo: ^RenderingAreaInfoKHR, pGranularity: ^Extent2D)
+ProcGetRenderingAreaGranularity                            :: #type proc "system" (device: Device, pRenderingAreaInfo: ^RenderingAreaInfo, pGranularity: ^Extent2D)
+ProcGetRenderingAreaGranularityKHR                         :: #type proc "system" (device: Device, pRenderingAreaInfo: ^RenderingAreaInfo, pGranularity: ^Extent2D)
 ProcGetSamplerOpaqueCaptureDescriptorDataEXT               :: #type proc "system" (device: Device, pInfo: ^SamplerCaptureDescriptorDataInfoEXT, pData: rawptr) -> Result
 ProcGetSemaphoreCounterValue                               :: #type proc "system" (device: Device, semaphore: Semaphore, pValue: ^u64) -> Result
 ProcGetSemaphoreCounterValueKHR                            :: #type proc "system" (device: Device, semaphore: Semaphore, pValue: ^u64) -> Result
@@ -626,7 +664,8 @@ ProcInitializePerformanceApiINTEL                          :: #type proc "system
 ProcInvalidateMappedMemoryRanges                           :: #type proc "system" (device: Device, memoryRangeCount: u32, pMemoryRanges: [^]MappedMemoryRange) -> Result
 ProcLatencySleepNV                                         :: #type proc "system" (device: Device, swapchain: SwapchainKHR, pSleepInfo: ^LatencySleepInfoNV) -> Result
 ProcMapMemory                                              :: #type proc "system" (device: Device, memory: DeviceMemory, offset: DeviceSize, size: DeviceSize, flags: MemoryMapFlags, ppData: ^rawptr) -> Result
-ProcMapMemory2KHR                                          :: #type proc "system" (device: Device, pMemoryMapInfo: ^MemoryMapInfoKHR, ppData: ^rawptr) -> Result
+ProcMapMemory2                                             :: #type proc "system" (device: Device, pMemoryMapInfo: ^MemoryMapInfo, ppData: ^rawptr) -> Result
+ProcMapMemory2KHR                                          :: #type proc "system" (device: Device, pMemoryMapInfo: ^MemoryMapInfo, ppData: ^rawptr) -> Result
 ProcMergePipelineCaches                                    :: #type proc "system" (device: Device, dstCache: PipelineCache, srcCacheCount: u32, pSrcCaches: [^]PipelineCache) -> Result
 ProcMergeValidationCachesEXT                               :: #type proc "system" (device: Device, dstCache: ValidationCacheEXT, srcCacheCount: u32, pSrcCaches: [^]ValidationCacheEXT) -> Result
 ProcQueueBeginDebugUtilsLabelEXT                           :: #type proc "system" (queue: Queue, pLabelInfo: ^DebugUtilsLabelEXT)
@@ -666,12 +705,14 @@ ProcSetPrivateData                                         :: #type proc "system
 ProcSetPrivateDataEXT                                      :: #type proc "system" (device: Device, objectType: ObjectType, objectHandle: u64, privateDataSlot: PrivateDataSlot, data: u64) -> Result
 ProcSignalSemaphore                                        :: #type proc "system" (device: Device, pSignalInfo: ^SemaphoreSignalInfo) -> Result
 ProcSignalSemaphoreKHR                                     :: #type proc "system" (device: Device, pSignalInfo: ^SemaphoreSignalInfo) -> Result
-ProcTransitionImageLayoutEXT                               :: #type proc "system" (device: Device, transitionCount: u32, pTransitions: [^]HostImageLayoutTransitionInfoEXT) -> Result
+ProcTransitionImageLayout                                  :: #type proc "system" (device: Device, transitionCount: u32, pTransitions: [^]HostImageLayoutTransitionInfo) -> Result
+ProcTransitionImageLayoutEXT                               :: #type proc "system" (device: Device, transitionCount: u32, pTransitions: [^]HostImageLayoutTransitionInfo) -> Result
 ProcTrimCommandPool                                        :: #type proc "system" (device: Device, commandPool: CommandPool, flags: CommandPoolTrimFlags)
 ProcTrimCommandPoolKHR                                     :: #type proc "system" (device: Device, commandPool: CommandPool, flags: CommandPoolTrimFlags)
 ProcUninitializePerformanceApiINTEL                        :: #type proc "system" (device: Device)
 ProcUnmapMemory                                            :: #type proc "system" (device: Device, memory: DeviceMemory)
-ProcUnmapMemory2KHR                                        :: #type proc "system" (device: Device, pMemoryUnmapInfo: ^MemoryUnmapInfoKHR) -> Result
+ProcUnmapMemory2                                           :: #type proc "system" (device: Device, pMemoryUnmapInfo: ^MemoryUnmapInfo) -> Result
+ProcUnmapMemory2KHR                                        :: #type proc "system" (device: Device, pMemoryUnmapInfo: ^MemoryUnmapInfo) -> Result
 ProcUpdateDescriptorSetWithTemplate                        :: #type proc "system" (device: Device, descriptorSet: DescriptorSet, descriptorUpdateTemplate: DescriptorUpdateTemplate, pData: rawptr)
 ProcUpdateDescriptorSetWithTemplateKHR                     :: #type proc "system" (device: Device, descriptorSet: DescriptorSet, descriptorUpdateTemplate: DescriptorUpdateTemplate, pData: rawptr)
 ProcUpdateDescriptorSets                                   :: #type proc "system" (device: Device, descriptorWriteCount: u32, pDescriptorWrites: [^]WriteDescriptorSet, descriptorCopyCount: u32, pDescriptorCopies: [^]CopyDescriptorSet)
@@ -696,97 +737,103 @@ EnumerateInstanceVersion:             ProcEnumerateInstanceVersion
 GetInstanceProcAddr:                  ProcGetInstanceProcAddr
 
 // Instance Procedures
-AcquireDrmDisplayEXT:                                            ProcAcquireDrmDisplayEXT
-AcquireWinrtDisplayNV:                                           ProcAcquireWinrtDisplayNV
-CreateDebugReportCallbackEXT:                                    ProcCreateDebugReportCallbackEXT
-CreateDebugUtilsMessengerEXT:                                    ProcCreateDebugUtilsMessengerEXT
-CreateDevice:                                                    ProcCreateDevice
-CreateDisplayModeKHR:                                            ProcCreateDisplayModeKHR
-CreateDisplayPlaneSurfaceKHR:                                    ProcCreateDisplayPlaneSurfaceKHR
-CreateHeadlessSurfaceEXT:                                        ProcCreateHeadlessSurfaceEXT
-CreateIOSSurfaceMVK:                                             ProcCreateIOSSurfaceMVK
-CreateMacOSSurfaceMVK:                                           ProcCreateMacOSSurfaceMVK
-CreateMetalSurfaceEXT:                                           ProcCreateMetalSurfaceEXT
-CreateWaylandSurfaceKHR:                                         ProcCreateWaylandSurfaceKHR
-CreateWin32SurfaceKHR:                                           ProcCreateWin32SurfaceKHR
-DebugReportMessageEXT:                                           ProcDebugReportMessageEXT
-DestroyDebugReportCallbackEXT:                                   ProcDestroyDebugReportCallbackEXT
-DestroyDebugUtilsMessengerEXT:                                   ProcDestroyDebugUtilsMessengerEXT
-DestroyInstance:                                                 ProcDestroyInstance
-DestroySurfaceKHR:                                               ProcDestroySurfaceKHR
-EnumerateDeviceExtensionProperties:                              ProcEnumerateDeviceExtensionProperties
-EnumerateDeviceLayerProperties:                                  ProcEnumerateDeviceLayerProperties
-EnumeratePhysicalDeviceGroups:                                   ProcEnumeratePhysicalDeviceGroups
-EnumeratePhysicalDeviceGroupsKHR:                                ProcEnumeratePhysicalDeviceGroupsKHR
-EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR:   ProcEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR
-EnumeratePhysicalDevices:                                        ProcEnumeratePhysicalDevices
-GetDisplayModeProperties2KHR:                                    ProcGetDisplayModeProperties2KHR
-GetDisplayModePropertiesKHR:                                     ProcGetDisplayModePropertiesKHR
-GetDisplayPlaneCapabilities2KHR:                                 ProcGetDisplayPlaneCapabilities2KHR
-GetDisplayPlaneCapabilitiesKHR:                                  ProcGetDisplayPlaneCapabilitiesKHR
-GetDisplayPlaneSupportedDisplaysKHR:                             ProcGetDisplayPlaneSupportedDisplaysKHR
-GetDrmDisplayEXT:                                                ProcGetDrmDisplayEXT
-GetInstanceProcAddrLUNARG:                                       ProcGetInstanceProcAddrLUNARG
-GetPhysicalDeviceCalibrateableTimeDomainsEXT:                    ProcGetPhysicalDeviceCalibrateableTimeDomainsEXT
-GetPhysicalDeviceCalibrateableTimeDomainsKHR:                    ProcGetPhysicalDeviceCalibrateableTimeDomainsKHR
-GetPhysicalDeviceCooperativeMatrixPropertiesKHR:                 ProcGetPhysicalDeviceCooperativeMatrixPropertiesKHR
-GetPhysicalDeviceCooperativeMatrixPropertiesNV:                  ProcGetPhysicalDeviceCooperativeMatrixPropertiesNV
-GetPhysicalDeviceDisplayPlaneProperties2KHR:                     ProcGetPhysicalDeviceDisplayPlaneProperties2KHR
-GetPhysicalDeviceDisplayPlanePropertiesKHR:                      ProcGetPhysicalDeviceDisplayPlanePropertiesKHR
-GetPhysicalDeviceDisplayProperties2KHR:                          ProcGetPhysicalDeviceDisplayProperties2KHR
-GetPhysicalDeviceDisplayPropertiesKHR:                           ProcGetPhysicalDeviceDisplayPropertiesKHR
-GetPhysicalDeviceExternalBufferProperties:                       ProcGetPhysicalDeviceExternalBufferProperties
-GetPhysicalDeviceExternalBufferPropertiesKHR:                    ProcGetPhysicalDeviceExternalBufferPropertiesKHR
-GetPhysicalDeviceExternalFenceProperties:                        ProcGetPhysicalDeviceExternalFenceProperties
-GetPhysicalDeviceExternalFencePropertiesKHR:                     ProcGetPhysicalDeviceExternalFencePropertiesKHR
-GetPhysicalDeviceExternalImageFormatPropertiesNV:                ProcGetPhysicalDeviceExternalImageFormatPropertiesNV
-GetPhysicalDeviceExternalSemaphoreProperties:                    ProcGetPhysicalDeviceExternalSemaphoreProperties
-GetPhysicalDeviceExternalSemaphorePropertiesKHR:                 ProcGetPhysicalDeviceExternalSemaphorePropertiesKHR
-GetPhysicalDeviceFeatures:                                       ProcGetPhysicalDeviceFeatures
-GetPhysicalDeviceFeatures2:                                      ProcGetPhysicalDeviceFeatures2
-GetPhysicalDeviceFeatures2KHR:                                   ProcGetPhysicalDeviceFeatures2KHR
-GetPhysicalDeviceFormatProperties:                               ProcGetPhysicalDeviceFormatProperties
-GetPhysicalDeviceFormatProperties2:                              ProcGetPhysicalDeviceFormatProperties2
-GetPhysicalDeviceFormatProperties2KHR:                           ProcGetPhysicalDeviceFormatProperties2KHR
-GetPhysicalDeviceFragmentShadingRatesKHR:                        ProcGetPhysicalDeviceFragmentShadingRatesKHR
-GetPhysicalDeviceImageFormatProperties:                          ProcGetPhysicalDeviceImageFormatProperties
-GetPhysicalDeviceImageFormatProperties2:                         ProcGetPhysicalDeviceImageFormatProperties2
-GetPhysicalDeviceImageFormatProperties2KHR:                      ProcGetPhysicalDeviceImageFormatProperties2KHR
-GetPhysicalDeviceMemoryProperties:                               ProcGetPhysicalDeviceMemoryProperties
-GetPhysicalDeviceMemoryProperties2:                              ProcGetPhysicalDeviceMemoryProperties2
-GetPhysicalDeviceMemoryProperties2KHR:                           ProcGetPhysicalDeviceMemoryProperties2KHR
-GetPhysicalDeviceMultisamplePropertiesEXT:                       ProcGetPhysicalDeviceMultisamplePropertiesEXT
-GetPhysicalDeviceOpticalFlowImageFormatsNV:                      ProcGetPhysicalDeviceOpticalFlowImageFormatsNV
-GetPhysicalDevicePresentRectanglesKHR:                           ProcGetPhysicalDevicePresentRectanglesKHR
-GetPhysicalDeviceProperties:                                     ProcGetPhysicalDeviceProperties
-GetPhysicalDeviceProperties2:                                    ProcGetPhysicalDeviceProperties2
-GetPhysicalDeviceProperties2KHR:                                 ProcGetPhysicalDeviceProperties2KHR
-GetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR:           ProcGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR
-GetPhysicalDeviceQueueFamilyProperties:                          ProcGetPhysicalDeviceQueueFamilyProperties
-GetPhysicalDeviceQueueFamilyProperties2:                         ProcGetPhysicalDeviceQueueFamilyProperties2
-GetPhysicalDeviceQueueFamilyProperties2KHR:                      ProcGetPhysicalDeviceQueueFamilyProperties2KHR
-GetPhysicalDeviceSparseImageFormatProperties:                    ProcGetPhysicalDeviceSparseImageFormatProperties
-GetPhysicalDeviceSparseImageFormatProperties2:                   ProcGetPhysicalDeviceSparseImageFormatProperties2
-GetPhysicalDeviceSparseImageFormatProperties2KHR:                ProcGetPhysicalDeviceSparseImageFormatProperties2KHR
-GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV: ProcGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV
-GetPhysicalDeviceSurfaceCapabilities2EXT:                        ProcGetPhysicalDeviceSurfaceCapabilities2EXT
-GetPhysicalDeviceSurfaceCapabilities2KHR:                        ProcGetPhysicalDeviceSurfaceCapabilities2KHR
-GetPhysicalDeviceSurfaceCapabilitiesKHR:                         ProcGetPhysicalDeviceSurfaceCapabilitiesKHR
-GetPhysicalDeviceSurfaceFormats2KHR:                             ProcGetPhysicalDeviceSurfaceFormats2KHR
-GetPhysicalDeviceSurfaceFormatsKHR:                              ProcGetPhysicalDeviceSurfaceFormatsKHR
-GetPhysicalDeviceSurfacePresentModes2EXT:                        ProcGetPhysicalDeviceSurfacePresentModes2EXT
-GetPhysicalDeviceSurfacePresentModesKHR:                         ProcGetPhysicalDeviceSurfacePresentModesKHR
-GetPhysicalDeviceSurfaceSupportKHR:                              ProcGetPhysicalDeviceSurfaceSupportKHR
-GetPhysicalDeviceToolProperties:                                 ProcGetPhysicalDeviceToolProperties
-GetPhysicalDeviceToolPropertiesEXT:                              ProcGetPhysicalDeviceToolPropertiesEXT
-GetPhysicalDeviceVideoCapabilitiesKHR:                           ProcGetPhysicalDeviceVideoCapabilitiesKHR
-GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR:           ProcGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR
-GetPhysicalDeviceVideoFormatPropertiesKHR:                       ProcGetPhysicalDeviceVideoFormatPropertiesKHR
-GetPhysicalDeviceWaylandPresentationSupportKHR:                  ProcGetPhysicalDeviceWaylandPresentationSupportKHR
-GetPhysicalDeviceWin32PresentationSupportKHR:                    ProcGetPhysicalDeviceWin32PresentationSupportKHR
-GetWinrtDisplayNV:                                               ProcGetWinrtDisplayNV
-ReleaseDisplayEXT:                                               ProcReleaseDisplayEXT
-SubmitDebugUtilsMessageEXT:                                      ProcSubmitDebugUtilsMessageEXT
+AcquireDrmDisplayEXT:                                             ProcAcquireDrmDisplayEXT
+AcquireWinrtDisplayNV:                                            ProcAcquireWinrtDisplayNV
+CreateDebugReportCallbackEXT:                                     ProcCreateDebugReportCallbackEXT
+CreateDebugUtilsMessengerEXT:                                     ProcCreateDebugUtilsMessengerEXT
+CreateDevice:                                                     ProcCreateDevice
+CreateDisplayModeKHR:                                             ProcCreateDisplayModeKHR
+CreateDisplayPlaneSurfaceKHR:                                     ProcCreateDisplayPlaneSurfaceKHR
+CreateHeadlessSurfaceEXT:                                         ProcCreateHeadlessSurfaceEXT
+CreateIOSSurfaceMVK:                                              ProcCreateIOSSurfaceMVK
+CreateMacOSSurfaceMVK:                                            ProcCreateMacOSSurfaceMVK
+CreateMetalSurfaceEXT:                                            ProcCreateMetalSurfaceEXT
+CreateWaylandSurfaceKHR:                                          ProcCreateWaylandSurfaceKHR
+CreateWin32SurfaceKHR:                                            ProcCreateWin32SurfaceKHR
+CreateXcbSurfaceKHR:                                              ProcCreateXcbSurfaceKHR
+CreateXlibSurfaceKHR:                                             ProcCreateXlibSurfaceKHR
+DebugReportMessageEXT:                                            ProcDebugReportMessageEXT
+DestroyDebugReportCallbackEXT:                                    ProcDestroyDebugReportCallbackEXT
+DestroyDebugUtilsMessengerEXT:                                    ProcDestroyDebugUtilsMessengerEXT
+DestroyInstance:                                                  ProcDestroyInstance
+DestroySurfaceKHR:                                                ProcDestroySurfaceKHR
+EnumerateDeviceExtensionProperties:                               ProcEnumerateDeviceExtensionProperties
+EnumerateDeviceLayerProperties:                                   ProcEnumerateDeviceLayerProperties
+EnumeratePhysicalDeviceGroups:                                    ProcEnumeratePhysicalDeviceGroups
+EnumeratePhysicalDeviceGroupsKHR:                                 ProcEnumeratePhysicalDeviceGroupsKHR
+EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR:    ProcEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR
+EnumeratePhysicalDevices:                                         ProcEnumeratePhysicalDevices
+GetDisplayModeProperties2KHR:                                     ProcGetDisplayModeProperties2KHR
+GetDisplayModePropertiesKHR:                                      ProcGetDisplayModePropertiesKHR
+GetDisplayPlaneCapabilities2KHR:                                  ProcGetDisplayPlaneCapabilities2KHR
+GetDisplayPlaneCapabilitiesKHR:                                   ProcGetDisplayPlaneCapabilitiesKHR
+GetDisplayPlaneSupportedDisplaysKHR:                              ProcGetDisplayPlaneSupportedDisplaysKHR
+GetDrmDisplayEXT:                                                 ProcGetDrmDisplayEXT
+GetInstanceProcAddrLUNARG:                                        ProcGetInstanceProcAddrLUNARG
+GetPhysicalDeviceCalibrateableTimeDomainsEXT:                     ProcGetPhysicalDeviceCalibrateableTimeDomainsEXT
+GetPhysicalDeviceCalibrateableTimeDomainsKHR:                     ProcGetPhysicalDeviceCalibrateableTimeDomainsKHR
+GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV: ProcGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV
+GetPhysicalDeviceCooperativeMatrixPropertiesKHR:                  ProcGetPhysicalDeviceCooperativeMatrixPropertiesKHR
+GetPhysicalDeviceCooperativeMatrixPropertiesNV:                   ProcGetPhysicalDeviceCooperativeMatrixPropertiesNV
+GetPhysicalDeviceCooperativeVectorPropertiesNV:                   ProcGetPhysicalDeviceCooperativeVectorPropertiesNV
+GetPhysicalDeviceDisplayPlaneProperties2KHR:                      ProcGetPhysicalDeviceDisplayPlaneProperties2KHR
+GetPhysicalDeviceDisplayPlanePropertiesKHR:                       ProcGetPhysicalDeviceDisplayPlanePropertiesKHR
+GetPhysicalDeviceDisplayProperties2KHR:                           ProcGetPhysicalDeviceDisplayProperties2KHR
+GetPhysicalDeviceDisplayPropertiesKHR:                            ProcGetPhysicalDeviceDisplayPropertiesKHR
+GetPhysicalDeviceExternalBufferProperties:                        ProcGetPhysicalDeviceExternalBufferProperties
+GetPhysicalDeviceExternalBufferPropertiesKHR:                     ProcGetPhysicalDeviceExternalBufferPropertiesKHR
+GetPhysicalDeviceExternalFenceProperties:                         ProcGetPhysicalDeviceExternalFenceProperties
+GetPhysicalDeviceExternalFencePropertiesKHR:                      ProcGetPhysicalDeviceExternalFencePropertiesKHR
+GetPhysicalDeviceExternalImageFormatPropertiesNV:                 ProcGetPhysicalDeviceExternalImageFormatPropertiesNV
+GetPhysicalDeviceExternalSemaphoreProperties:                     ProcGetPhysicalDeviceExternalSemaphoreProperties
+GetPhysicalDeviceExternalSemaphorePropertiesKHR:                  ProcGetPhysicalDeviceExternalSemaphorePropertiesKHR
+GetPhysicalDeviceFeatures:                                        ProcGetPhysicalDeviceFeatures
+GetPhysicalDeviceFeatures2:                                       ProcGetPhysicalDeviceFeatures2
+GetPhysicalDeviceFeatures2KHR:                                    ProcGetPhysicalDeviceFeatures2KHR
+GetPhysicalDeviceFormatProperties:                                ProcGetPhysicalDeviceFormatProperties
+GetPhysicalDeviceFormatProperties2:                               ProcGetPhysicalDeviceFormatProperties2
+GetPhysicalDeviceFormatProperties2KHR:                            ProcGetPhysicalDeviceFormatProperties2KHR
+GetPhysicalDeviceFragmentShadingRatesKHR:                         ProcGetPhysicalDeviceFragmentShadingRatesKHR
+GetPhysicalDeviceImageFormatProperties:                           ProcGetPhysicalDeviceImageFormatProperties
+GetPhysicalDeviceImageFormatProperties2:                          ProcGetPhysicalDeviceImageFormatProperties2
+GetPhysicalDeviceImageFormatProperties2KHR:                       ProcGetPhysicalDeviceImageFormatProperties2KHR
+GetPhysicalDeviceMemoryProperties:                                ProcGetPhysicalDeviceMemoryProperties
+GetPhysicalDeviceMemoryProperties2:                               ProcGetPhysicalDeviceMemoryProperties2
+GetPhysicalDeviceMemoryProperties2KHR:                            ProcGetPhysicalDeviceMemoryProperties2KHR
+GetPhysicalDeviceMultisamplePropertiesEXT:                        ProcGetPhysicalDeviceMultisamplePropertiesEXT
+GetPhysicalDeviceOpticalFlowImageFormatsNV:                       ProcGetPhysicalDeviceOpticalFlowImageFormatsNV
+GetPhysicalDevicePresentRectanglesKHR:                            ProcGetPhysicalDevicePresentRectanglesKHR
+GetPhysicalDeviceProperties:                                      ProcGetPhysicalDeviceProperties
+GetPhysicalDeviceProperties2:                                     ProcGetPhysicalDeviceProperties2
+GetPhysicalDeviceProperties2KHR:                                  ProcGetPhysicalDeviceProperties2KHR
+GetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR:            ProcGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR
+GetPhysicalDeviceQueueFamilyProperties:                           ProcGetPhysicalDeviceQueueFamilyProperties
+GetPhysicalDeviceQueueFamilyProperties2:                          ProcGetPhysicalDeviceQueueFamilyProperties2
+GetPhysicalDeviceQueueFamilyProperties2KHR:                       ProcGetPhysicalDeviceQueueFamilyProperties2KHR
+GetPhysicalDeviceSparseImageFormatProperties:                     ProcGetPhysicalDeviceSparseImageFormatProperties
+GetPhysicalDeviceSparseImageFormatProperties2:                    ProcGetPhysicalDeviceSparseImageFormatProperties2
+GetPhysicalDeviceSparseImageFormatProperties2KHR:                 ProcGetPhysicalDeviceSparseImageFormatProperties2KHR
+GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV:  ProcGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV
+GetPhysicalDeviceSurfaceCapabilities2EXT:                         ProcGetPhysicalDeviceSurfaceCapabilities2EXT
+GetPhysicalDeviceSurfaceCapabilities2KHR:                         ProcGetPhysicalDeviceSurfaceCapabilities2KHR
+GetPhysicalDeviceSurfaceCapabilitiesKHR:                          ProcGetPhysicalDeviceSurfaceCapabilitiesKHR
+GetPhysicalDeviceSurfaceFormats2KHR:                              ProcGetPhysicalDeviceSurfaceFormats2KHR
+GetPhysicalDeviceSurfaceFormatsKHR:                               ProcGetPhysicalDeviceSurfaceFormatsKHR
+GetPhysicalDeviceSurfacePresentModes2EXT:                         ProcGetPhysicalDeviceSurfacePresentModes2EXT
+GetPhysicalDeviceSurfacePresentModesKHR:                          ProcGetPhysicalDeviceSurfacePresentModesKHR
+GetPhysicalDeviceSurfaceSupportKHR:                               ProcGetPhysicalDeviceSurfaceSupportKHR
+GetPhysicalDeviceToolProperties:                                  ProcGetPhysicalDeviceToolProperties
+GetPhysicalDeviceToolPropertiesEXT:                               ProcGetPhysicalDeviceToolPropertiesEXT
+GetPhysicalDeviceVideoCapabilitiesKHR:                            ProcGetPhysicalDeviceVideoCapabilitiesKHR
+GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR:            ProcGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR
+GetPhysicalDeviceVideoFormatPropertiesKHR:                        ProcGetPhysicalDeviceVideoFormatPropertiesKHR
+GetPhysicalDeviceWaylandPresentationSupportKHR:                   ProcGetPhysicalDeviceWaylandPresentationSupportKHR
+GetPhysicalDeviceWin32PresentationSupportKHR:                     ProcGetPhysicalDeviceWin32PresentationSupportKHR
+GetPhysicalDeviceXcbPresentationSupportKHR:                       ProcGetPhysicalDeviceXcbPresentationSupportKHR
+GetPhysicalDeviceXlibPresentationSupportKHR:                      ProcGetPhysicalDeviceXlibPresentationSupportKHR
+GetWinrtDisplayNV:                                                ProcGetWinrtDisplayNV
+ReleaseDisplayEXT:                                                ProcReleaseDisplayEXT
+SubmitDebugUtilsMessageEXT:                                       ProcSubmitDebugUtilsMessageEXT
 
 // Device Procedures
 AcquireFullScreenExclusiveModeEXT:                      ProcAcquireFullScreenExclusiveModeEXT
@@ -825,8 +872,10 @@ CmdBindDescriptorBufferEmbeddedSamplers2EXT:            ProcCmdBindDescriptorBuf
 CmdBindDescriptorBufferEmbeddedSamplersEXT:             ProcCmdBindDescriptorBufferEmbeddedSamplersEXT
 CmdBindDescriptorBuffersEXT:                            ProcCmdBindDescriptorBuffersEXT
 CmdBindDescriptorSets:                                  ProcCmdBindDescriptorSets
+CmdBindDescriptorSets2:                                 ProcCmdBindDescriptorSets2
 CmdBindDescriptorSets2KHR:                              ProcCmdBindDescriptorSets2KHR
 CmdBindIndexBuffer:                                     ProcCmdBindIndexBuffer
+CmdBindIndexBuffer2:                                    ProcCmdBindIndexBuffer2
 CmdBindIndexBuffer2KHR:                                 ProcCmdBindIndexBuffer2KHR
 CmdBindInvocationMaskHUAWEI:                            ProcCmdBindInvocationMaskHUAWEI
 CmdBindPipeline:                                        ProcCmdBindPipeline
@@ -843,11 +892,14 @@ CmdBlitImage2KHR:                                       ProcCmdBlitImage2KHR
 CmdBuildAccelerationStructureNV:                        ProcCmdBuildAccelerationStructureNV
 CmdBuildAccelerationStructuresIndirectKHR:              ProcCmdBuildAccelerationStructuresIndirectKHR
 CmdBuildAccelerationStructuresKHR:                      ProcCmdBuildAccelerationStructuresKHR
+CmdBuildClusterAccelerationStructureIndirectNV:         ProcCmdBuildClusterAccelerationStructureIndirectNV
 CmdBuildMicromapsEXT:                                   ProcCmdBuildMicromapsEXT
+CmdBuildPartitionedAccelerationStructuresNV:            ProcCmdBuildPartitionedAccelerationStructuresNV
 CmdClearAttachments:                                    ProcCmdClearAttachments
 CmdClearColorImage:                                     ProcCmdClearColorImage
 CmdClearDepthStencilImage:                              ProcCmdClearDepthStencilImage
 CmdControlVideoCodingKHR:                               ProcCmdControlVideoCodingKHR
+CmdConvertCooperativeVectorMatrixNV:                    ProcCmdConvertCooperativeVectorMatrixNV
 CmdCopyAccelerationStructureKHR:                        ProcCmdCopyAccelerationStructureKHR
 CmdCopyAccelerationStructureNV:                         ProcCmdCopyAccelerationStructureNV
 CmdCopyAccelerationStructureToMemoryKHR:                ProcCmdCopyAccelerationStructureToMemoryKHR
@@ -881,6 +933,9 @@ CmdDecompressMemoryNV:                                  ProcCmdDecompressMemoryN
 CmdDispatch:                                            ProcCmdDispatch
 CmdDispatchBase:                                        ProcCmdDispatchBase
 CmdDispatchBaseKHR:                                     ProcCmdDispatchBaseKHR
+CmdDispatchGraphAMDX:                                   ProcCmdDispatchGraphAMDX
+CmdDispatchGraphIndirectAMDX:                           ProcCmdDispatchGraphIndirectAMDX
+CmdDispatchGraphIndirectCountAMDX:                      ProcCmdDispatchGraphIndirectCountAMDX
 CmdDispatchIndirect:                                    ProcCmdDispatchIndirect
 CmdDraw:                                                ProcCmdDraw
 CmdDrawClusterHUAWEI:                                   ProcCmdDrawClusterHUAWEI
@@ -919,6 +974,7 @@ CmdExecuteCommands:                                     ProcCmdExecuteCommands
 CmdExecuteGeneratedCommandsEXT:                         ProcCmdExecuteGeneratedCommandsEXT
 CmdExecuteGeneratedCommandsNV:                          ProcCmdExecuteGeneratedCommandsNV
 CmdFillBuffer:                                          ProcCmdFillBuffer
+CmdInitializeGraphScratchMemoryAMDX:                    ProcCmdInitializeGraphScratchMemoryAMDX
 CmdInsertDebugUtilsLabelEXT:                            ProcCmdInsertDebugUtilsLabelEXT
 CmdNextSubpass:                                         ProcCmdNextSubpass
 CmdNextSubpass2:                                        ProcCmdNextSubpass2
@@ -930,9 +986,14 @@ CmdPipelineBarrier2KHR:                                 ProcCmdPipelineBarrier2K
 CmdPreprocessGeneratedCommandsEXT:                      ProcCmdPreprocessGeneratedCommandsEXT
 CmdPreprocessGeneratedCommandsNV:                       ProcCmdPreprocessGeneratedCommandsNV
 CmdPushConstants:                                       ProcCmdPushConstants
+CmdPushConstants2:                                      ProcCmdPushConstants2
 CmdPushConstants2KHR:                                   ProcCmdPushConstants2KHR
+CmdPushDescriptorSet:                                   ProcCmdPushDescriptorSet
+CmdPushDescriptorSet2:                                  ProcCmdPushDescriptorSet2
 CmdPushDescriptorSet2KHR:                               ProcCmdPushDescriptorSet2KHR
 CmdPushDescriptorSetKHR:                                ProcCmdPushDescriptorSetKHR
+CmdPushDescriptorSetWithTemplate:                       ProcCmdPushDescriptorSetWithTemplate
+CmdPushDescriptorSetWithTemplate2:                      ProcCmdPushDescriptorSetWithTemplate2
 CmdPushDescriptorSetWithTemplate2KHR:                   ProcCmdPushDescriptorSetWithTemplate2KHR
 CmdPushDescriptorSetWithTemplateKHR:                    ProcCmdPushDescriptorSetWithTemplateKHR
 CmdResetEvent:                                          ProcCmdResetEvent
@@ -996,6 +1057,7 @@ CmdSetFragmentShadingRateKHR:                           ProcCmdSetFragmentShadin
 CmdSetFrontFace:                                        ProcCmdSetFrontFace
 CmdSetFrontFaceEXT:                                     ProcCmdSetFrontFaceEXT
 CmdSetLineRasterizationModeEXT:                         ProcCmdSetLineRasterizationModeEXT
+CmdSetLineStipple:                                      ProcCmdSetLineStipple
 CmdSetLineStippleEXT:                                   ProcCmdSetLineStippleEXT
 CmdSetLineStippleEnableEXT:                             ProcCmdSetLineStippleEnableEXT
 CmdSetLineStippleKHR:                                   ProcCmdSetLineStippleKHR
@@ -1017,7 +1079,9 @@ CmdSetRasterizationStreamEXT:                           ProcCmdSetRasterizationS
 CmdSetRasterizerDiscardEnable:                          ProcCmdSetRasterizerDiscardEnable
 CmdSetRasterizerDiscardEnableEXT:                       ProcCmdSetRasterizerDiscardEnableEXT
 CmdSetRayTracingPipelineStackSizeKHR:                   ProcCmdSetRayTracingPipelineStackSizeKHR
+CmdSetRenderingAttachmentLocations:                     ProcCmdSetRenderingAttachmentLocations
 CmdSetRenderingAttachmentLocationsKHR:                  ProcCmdSetRenderingAttachmentLocationsKHR
+CmdSetRenderingInputAttachmentIndices:                  ProcCmdSetRenderingInputAttachmentIndices
 CmdSetRenderingInputAttachmentIndicesKHR:               ProcCmdSetRenderingInputAttachmentIndicesKHR
 CmdSetRepresentativeFragmentTestEnableNV:               ProcCmdSetRepresentativeFragmentTestEnableNV
 CmdSetSampleLocationsEXT:                               ProcCmdSetSampleLocationsEXT
@@ -1062,11 +1126,15 @@ CmdWriteTimestamp:                                      ProcCmdWriteTimestamp
 CmdWriteTimestamp2:                                     ProcCmdWriteTimestamp2
 CmdWriteTimestamp2KHR:                                  ProcCmdWriteTimestamp2KHR
 CompileDeferredNV:                                      ProcCompileDeferredNV
+ConvertCooperativeVectorMatrixNV:                       ProcConvertCooperativeVectorMatrixNV
 CopyAccelerationStructureKHR:                           ProcCopyAccelerationStructureKHR
 CopyAccelerationStructureToMemoryKHR:                   ProcCopyAccelerationStructureToMemoryKHR
+CopyImageToImage:                                       ProcCopyImageToImage
 CopyImageToImageEXT:                                    ProcCopyImageToImageEXT
+CopyImageToMemory:                                      ProcCopyImageToMemory
 CopyImageToMemoryEXT:                                   ProcCopyImageToMemoryEXT
 CopyMemoryToAccelerationStructureKHR:                   ProcCopyMemoryToAccelerationStructureKHR
+CopyMemoryToImage:                                      ProcCopyMemoryToImage
 CopyMemoryToImageEXT:                                   ProcCopyMemoryToImageEXT
 CopyMemoryToMicromapEXT:                                ProcCopyMemoryToMicromapEXT
 CopyMicromapEXT:                                        ProcCopyMicromapEXT
@@ -1087,6 +1155,7 @@ CreateDescriptorSetLayout:                              ProcCreateDescriptorSetL
 CreateDescriptorUpdateTemplate:                         ProcCreateDescriptorUpdateTemplate
 CreateDescriptorUpdateTemplateKHR:                      ProcCreateDescriptorUpdateTemplateKHR
 CreateEvent:                                            ProcCreateEvent
+CreateExecutionGraphPipelinesAMDX:                      ProcCreateExecutionGraphPipelinesAMDX
 CreateFence:                                            ProcCreateFence
 CreateFramebuffer:                                      ProcCreateFramebuffer
 CreateGraphicsPipelines:                                ProcCreateGraphicsPipelines
@@ -1189,6 +1258,7 @@ GetBufferOpaqueCaptureAddressKHR:                       ProcGetBufferOpaqueCaptu
 GetBufferOpaqueCaptureDescriptorDataEXT:                ProcGetBufferOpaqueCaptureDescriptorDataEXT
 GetCalibratedTimestampsEXT:                             ProcGetCalibratedTimestampsEXT
 GetCalibratedTimestampsKHR:                             ProcGetCalibratedTimestampsKHR
+GetClusterAccelerationStructureBuildSizesNV:            ProcGetClusterAccelerationStructureBuildSizesNV
 GetCudaModuleCacheNV:                                   ProcGetCudaModuleCacheNV
 GetDeferredOperationMaxConcurrencyKHR:                  ProcGetDeferredOperationMaxConcurrencyKHR
 GetDeferredOperationResultKHR:                          ProcGetDeferredOperationResultKHR
@@ -1212,6 +1282,7 @@ GetDeviceImageMemoryRequirements:                       ProcGetDeviceImageMemory
 GetDeviceImageMemoryRequirementsKHR:                    ProcGetDeviceImageMemoryRequirementsKHR
 GetDeviceImageSparseMemoryRequirements:                 ProcGetDeviceImageSparseMemoryRequirements
 GetDeviceImageSparseMemoryRequirementsKHR:              ProcGetDeviceImageSparseMemoryRequirementsKHR
+GetDeviceImageSubresourceLayout:                        ProcGetDeviceImageSubresourceLayout
 GetDeviceImageSubresourceLayoutKHR:                     ProcGetDeviceImageSubresourceLayoutKHR
 GetDeviceMemoryCommitment:                              ProcGetDeviceMemoryCommitment
 GetDeviceMemoryOpaqueCaptureAddress:                    ProcGetDeviceMemoryOpaqueCaptureAddress
@@ -1224,6 +1295,8 @@ GetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI:          ProcGetDeviceSubpassShad
 GetDynamicRenderingTilePropertiesQCOM:                  ProcGetDynamicRenderingTilePropertiesQCOM
 GetEncodedVideoSessionParametersKHR:                    ProcGetEncodedVideoSessionParametersKHR
 GetEventStatus:                                         ProcGetEventStatus
+GetExecutionGraphPipelineNodeIndexAMDX:                 ProcGetExecutionGraphPipelineNodeIndexAMDX
+GetExecutionGraphPipelineScratchSizeAMDX:               ProcGetExecutionGraphPipelineScratchSizeAMDX
 GetFenceFdKHR:                                          ProcGetFenceFdKHR
 GetFenceStatus:                                         ProcGetFenceStatus
 GetFenceWin32HandleKHR:                                 ProcGetFenceWin32HandleKHR
@@ -1239,20 +1312,25 @@ GetImageSparseMemoryRequirements:                       ProcGetImageSparseMemory
 GetImageSparseMemoryRequirements2:                      ProcGetImageSparseMemoryRequirements2
 GetImageSparseMemoryRequirements2KHR:                   ProcGetImageSparseMemoryRequirements2KHR
 GetImageSubresourceLayout:                              ProcGetImageSubresourceLayout
+GetImageSubresourceLayout2:                             ProcGetImageSubresourceLayout2
 GetImageSubresourceLayout2EXT:                          ProcGetImageSubresourceLayout2EXT
 GetImageSubresourceLayout2KHR:                          ProcGetImageSubresourceLayout2KHR
 GetImageViewAddressNVX:                                 ProcGetImageViewAddressNVX
+GetImageViewHandle64NVX:                                ProcGetImageViewHandle64NVX
 GetImageViewHandleNVX:                                  ProcGetImageViewHandleNVX
 GetImageViewOpaqueCaptureDescriptorDataEXT:             ProcGetImageViewOpaqueCaptureDescriptorDataEXT
 GetLatencyTimingsNV:                                    ProcGetLatencyTimingsNV
 GetMemoryFdKHR:                                         ProcGetMemoryFdKHR
 GetMemoryFdPropertiesKHR:                               ProcGetMemoryFdPropertiesKHR
 GetMemoryHostPointerPropertiesEXT:                      ProcGetMemoryHostPointerPropertiesEXT
+GetMemoryMetalHandleEXT:                                ProcGetMemoryMetalHandleEXT
+GetMemoryMetalHandlePropertiesEXT:                      ProcGetMemoryMetalHandlePropertiesEXT
 GetMemoryRemoteAddressNV:                               ProcGetMemoryRemoteAddressNV
 GetMemoryWin32HandleKHR:                                ProcGetMemoryWin32HandleKHR
 GetMemoryWin32HandleNV:                                 ProcGetMemoryWin32HandleNV
 GetMemoryWin32HandlePropertiesKHR:                      ProcGetMemoryWin32HandlePropertiesKHR
 GetMicromapBuildSizesEXT:                               ProcGetMicromapBuildSizesEXT
+GetPartitionedAccelerationStructuresBuildSizesNV:       ProcGetPartitionedAccelerationStructuresBuildSizesNV
 GetPastPresentationTimingGOOGLE:                        ProcGetPastPresentationTimingGOOGLE
 GetPerformanceParameterINTEL:                           ProcGetPerformanceParameterINTEL
 GetPipelineBinaryDataKHR:                               ProcGetPipelineBinaryDataKHR
@@ -1275,6 +1353,7 @@ GetRayTracingShaderGroupHandlesNV:                      ProcGetRayTracingShaderG
 GetRayTracingShaderGroupStackSizeKHR:                   ProcGetRayTracingShaderGroupStackSizeKHR
 GetRefreshCycleDurationGOOGLE:                          ProcGetRefreshCycleDurationGOOGLE
 GetRenderAreaGranularity:                               ProcGetRenderAreaGranularity
+GetRenderingAreaGranularity:                            ProcGetRenderingAreaGranularity
 GetRenderingAreaGranularityKHR:                         ProcGetRenderingAreaGranularityKHR
 GetSamplerOpaqueCaptureDescriptorDataEXT:               ProcGetSamplerOpaqueCaptureDescriptorDataEXT
 GetSemaphoreCounterValue:                               ProcGetSemaphoreCounterValue
@@ -1298,6 +1377,7 @@ InitializePerformanceApiINTEL:                          ProcInitializePerformanc
 InvalidateMappedMemoryRanges:                           ProcInvalidateMappedMemoryRanges
 LatencySleepNV:                                         ProcLatencySleepNV
 MapMemory:                                              ProcMapMemory
+MapMemory2:                                             ProcMapMemory2
 MapMemory2KHR:                                          ProcMapMemory2KHR
 MergePipelineCaches:                                    ProcMergePipelineCaches
 MergeValidationCachesEXT:                               ProcMergeValidationCachesEXT
@@ -1338,11 +1418,13 @@ SetPrivateData:                                         ProcSetPrivateData
 SetPrivateDataEXT:                                      ProcSetPrivateDataEXT
 SignalSemaphore:                                        ProcSignalSemaphore
 SignalSemaphoreKHR:                                     ProcSignalSemaphoreKHR
+TransitionImageLayout:                                  ProcTransitionImageLayout
 TransitionImageLayoutEXT:                               ProcTransitionImageLayoutEXT
 TrimCommandPool:                                        ProcTrimCommandPool
 TrimCommandPoolKHR:                                     ProcTrimCommandPoolKHR
 UninitializePerformanceApiINTEL:                        ProcUninitializePerformanceApiINTEL
 UnmapMemory:                                            ProcUnmapMemory
+UnmapMemory2:                                           ProcUnmapMemory2
 UnmapMemory2KHR:                                        ProcUnmapMemory2KHR
 UpdateDescriptorSetWithTemplate:                        ProcUpdateDescriptorSetWithTemplate
 UpdateDescriptorSetWithTemplateKHR:                     ProcUpdateDescriptorSetWithTemplateKHR
@@ -1368,97 +1450,103 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetInstanceProcAddr,                  "vkGetInstanceProcAddr")
 
 	// Instance Procedures
-	set_proc_address(&AcquireDrmDisplayEXT,                                            "vkAcquireDrmDisplayEXT")
-	set_proc_address(&AcquireWinrtDisplayNV,                                           "vkAcquireWinrtDisplayNV")
-	set_proc_address(&CreateDebugReportCallbackEXT,                                    "vkCreateDebugReportCallbackEXT")
-	set_proc_address(&CreateDebugUtilsMessengerEXT,                                    "vkCreateDebugUtilsMessengerEXT")
-	set_proc_address(&CreateDevice,                                                    "vkCreateDevice")
-	set_proc_address(&CreateDisplayModeKHR,                                            "vkCreateDisplayModeKHR")
-	set_proc_address(&CreateDisplayPlaneSurfaceKHR,                                    "vkCreateDisplayPlaneSurfaceKHR")
-	set_proc_address(&CreateHeadlessSurfaceEXT,                                        "vkCreateHeadlessSurfaceEXT")
-	set_proc_address(&CreateIOSSurfaceMVK,                                             "vkCreateIOSSurfaceMVK")
-	set_proc_address(&CreateMacOSSurfaceMVK,                                           "vkCreateMacOSSurfaceMVK")
-	set_proc_address(&CreateMetalSurfaceEXT,                                           "vkCreateMetalSurfaceEXT")
-	set_proc_address(&CreateWaylandSurfaceKHR,                                         "vkCreateWaylandSurfaceKHR")
-	set_proc_address(&CreateWin32SurfaceKHR,                                           "vkCreateWin32SurfaceKHR")
-	set_proc_address(&DebugReportMessageEXT,                                           "vkDebugReportMessageEXT")
-	set_proc_address(&DestroyDebugReportCallbackEXT,                                   "vkDestroyDebugReportCallbackEXT")
-	set_proc_address(&DestroyDebugUtilsMessengerEXT,                                   "vkDestroyDebugUtilsMessengerEXT")
-	set_proc_address(&DestroyInstance,                                                 "vkDestroyInstance")
-	set_proc_address(&DestroySurfaceKHR,                                               "vkDestroySurfaceKHR")
-	set_proc_address(&EnumerateDeviceExtensionProperties,                              "vkEnumerateDeviceExtensionProperties")
-	set_proc_address(&EnumerateDeviceLayerProperties,                                  "vkEnumerateDeviceLayerProperties")
-	set_proc_address(&EnumeratePhysicalDeviceGroups,                                   "vkEnumeratePhysicalDeviceGroups")
-	set_proc_address(&EnumeratePhysicalDeviceGroupsKHR,                                "vkEnumeratePhysicalDeviceGroupsKHR")
-	set_proc_address(&EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR,   "vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR")
-	set_proc_address(&EnumeratePhysicalDevices,                                        "vkEnumeratePhysicalDevices")
-	set_proc_address(&GetDisplayModeProperties2KHR,                                    "vkGetDisplayModeProperties2KHR")
-	set_proc_address(&GetDisplayModePropertiesKHR,                                     "vkGetDisplayModePropertiesKHR")
-	set_proc_address(&GetDisplayPlaneCapabilities2KHR,                                 "vkGetDisplayPlaneCapabilities2KHR")
-	set_proc_address(&GetDisplayPlaneCapabilitiesKHR,                                  "vkGetDisplayPlaneCapabilitiesKHR")
-	set_proc_address(&GetDisplayPlaneSupportedDisplaysKHR,                             "vkGetDisplayPlaneSupportedDisplaysKHR")
-	set_proc_address(&GetDrmDisplayEXT,                                                "vkGetDrmDisplayEXT")
-	set_proc_address(&GetInstanceProcAddrLUNARG,                                       "vkGetInstanceProcAddrLUNARG")
-	set_proc_address(&GetPhysicalDeviceCalibrateableTimeDomainsEXT,                    "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT")
-	set_proc_address(&GetPhysicalDeviceCalibrateableTimeDomainsKHR,                    "vkGetPhysicalDeviceCalibrateableTimeDomainsKHR")
-	set_proc_address(&GetPhysicalDeviceCooperativeMatrixPropertiesKHR,                 "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR")
-	set_proc_address(&GetPhysicalDeviceCooperativeMatrixPropertiesNV,                  "vkGetPhysicalDeviceCooperativeMatrixPropertiesNV")
-	set_proc_address(&GetPhysicalDeviceDisplayPlaneProperties2KHR,                     "vkGetPhysicalDeviceDisplayPlaneProperties2KHR")
-	set_proc_address(&GetPhysicalDeviceDisplayPlanePropertiesKHR,                      "vkGetPhysicalDeviceDisplayPlanePropertiesKHR")
-	set_proc_address(&GetPhysicalDeviceDisplayProperties2KHR,                          "vkGetPhysicalDeviceDisplayProperties2KHR")
-	set_proc_address(&GetPhysicalDeviceDisplayPropertiesKHR,                           "vkGetPhysicalDeviceDisplayPropertiesKHR")
-	set_proc_address(&GetPhysicalDeviceExternalBufferProperties,                       "vkGetPhysicalDeviceExternalBufferProperties")
-	set_proc_address(&GetPhysicalDeviceExternalBufferPropertiesKHR,                    "vkGetPhysicalDeviceExternalBufferPropertiesKHR")
-	set_proc_address(&GetPhysicalDeviceExternalFenceProperties,                        "vkGetPhysicalDeviceExternalFenceProperties")
-	set_proc_address(&GetPhysicalDeviceExternalFencePropertiesKHR,                     "vkGetPhysicalDeviceExternalFencePropertiesKHR")
-	set_proc_address(&GetPhysicalDeviceExternalImageFormatPropertiesNV,                "vkGetPhysicalDeviceExternalImageFormatPropertiesNV")
-	set_proc_address(&GetPhysicalDeviceExternalSemaphoreProperties,                    "vkGetPhysicalDeviceExternalSemaphoreProperties")
-	set_proc_address(&GetPhysicalDeviceExternalSemaphorePropertiesKHR,                 "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR")
-	set_proc_address(&GetPhysicalDeviceFeatures,                                       "vkGetPhysicalDeviceFeatures")
-	set_proc_address(&GetPhysicalDeviceFeatures2,                                      "vkGetPhysicalDeviceFeatures2")
-	set_proc_address(&GetPhysicalDeviceFeatures2KHR,                                   "vkGetPhysicalDeviceFeatures2KHR")
-	set_proc_address(&GetPhysicalDeviceFormatProperties,                               "vkGetPhysicalDeviceFormatProperties")
-	set_proc_address(&GetPhysicalDeviceFormatProperties2,                              "vkGetPhysicalDeviceFormatProperties2")
-	set_proc_address(&GetPhysicalDeviceFormatProperties2KHR,                           "vkGetPhysicalDeviceFormatProperties2KHR")
-	set_proc_address(&GetPhysicalDeviceFragmentShadingRatesKHR,                        "vkGetPhysicalDeviceFragmentShadingRatesKHR")
-	set_proc_address(&GetPhysicalDeviceImageFormatProperties,                          "vkGetPhysicalDeviceImageFormatProperties")
-	set_proc_address(&GetPhysicalDeviceImageFormatProperties2,                         "vkGetPhysicalDeviceImageFormatProperties2")
-	set_proc_address(&GetPhysicalDeviceImageFormatProperties2KHR,                      "vkGetPhysicalDeviceImageFormatProperties2KHR")
-	set_proc_address(&GetPhysicalDeviceMemoryProperties,                               "vkGetPhysicalDeviceMemoryProperties")
-	set_proc_address(&GetPhysicalDeviceMemoryProperties2,                              "vkGetPhysicalDeviceMemoryProperties2")
-	set_proc_address(&GetPhysicalDeviceMemoryProperties2KHR,                           "vkGetPhysicalDeviceMemoryProperties2KHR")
-	set_proc_address(&GetPhysicalDeviceMultisamplePropertiesEXT,                       "vkGetPhysicalDeviceMultisamplePropertiesEXT")
-	set_proc_address(&GetPhysicalDeviceOpticalFlowImageFormatsNV,                      "vkGetPhysicalDeviceOpticalFlowImageFormatsNV")
-	set_proc_address(&GetPhysicalDevicePresentRectanglesKHR,                           "vkGetPhysicalDevicePresentRectanglesKHR")
-	set_proc_address(&GetPhysicalDeviceProperties,                                     "vkGetPhysicalDeviceProperties")
-	set_proc_address(&GetPhysicalDeviceProperties2,                                    "vkGetPhysicalDeviceProperties2")
-	set_proc_address(&GetPhysicalDeviceProperties2KHR,                                 "vkGetPhysicalDeviceProperties2KHR")
-	set_proc_address(&GetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR,           "vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR")
-	set_proc_address(&GetPhysicalDeviceQueueFamilyProperties,                          "vkGetPhysicalDeviceQueueFamilyProperties")
-	set_proc_address(&GetPhysicalDeviceQueueFamilyProperties2,                         "vkGetPhysicalDeviceQueueFamilyProperties2")
-	set_proc_address(&GetPhysicalDeviceQueueFamilyProperties2KHR,                      "vkGetPhysicalDeviceQueueFamilyProperties2KHR")
-	set_proc_address(&GetPhysicalDeviceSparseImageFormatProperties,                    "vkGetPhysicalDeviceSparseImageFormatProperties")
-	set_proc_address(&GetPhysicalDeviceSparseImageFormatProperties2,                   "vkGetPhysicalDeviceSparseImageFormatProperties2")
-	set_proc_address(&GetPhysicalDeviceSparseImageFormatProperties2KHR,                "vkGetPhysicalDeviceSparseImageFormatProperties2KHR")
-	set_proc_address(&GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV, "vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV")
-	set_proc_address(&GetPhysicalDeviceSurfaceCapabilities2EXT,                        "vkGetPhysicalDeviceSurfaceCapabilities2EXT")
-	set_proc_address(&GetPhysicalDeviceSurfaceCapabilities2KHR,                        "vkGetPhysicalDeviceSurfaceCapabilities2KHR")
-	set_proc_address(&GetPhysicalDeviceSurfaceCapabilitiesKHR,                         "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")
-	set_proc_address(&GetPhysicalDeviceSurfaceFormats2KHR,                             "vkGetPhysicalDeviceSurfaceFormats2KHR")
-	set_proc_address(&GetPhysicalDeviceSurfaceFormatsKHR,                              "vkGetPhysicalDeviceSurfaceFormatsKHR")
-	set_proc_address(&GetPhysicalDeviceSurfacePresentModes2EXT,                        "vkGetPhysicalDeviceSurfacePresentModes2EXT")
-	set_proc_address(&GetPhysicalDeviceSurfacePresentModesKHR,                         "vkGetPhysicalDeviceSurfacePresentModesKHR")
-	set_proc_address(&GetPhysicalDeviceSurfaceSupportKHR,                              "vkGetPhysicalDeviceSurfaceSupportKHR")
-	set_proc_address(&GetPhysicalDeviceToolProperties,                                 "vkGetPhysicalDeviceToolProperties")
-	set_proc_address(&GetPhysicalDeviceToolPropertiesEXT,                              "vkGetPhysicalDeviceToolPropertiesEXT")
-	set_proc_address(&GetPhysicalDeviceVideoCapabilitiesKHR,                           "vkGetPhysicalDeviceVideoCapabilitiesKHR")
-	set_proc_address(&GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR,           "vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR")
-	set_proc_address(&GetPhysicalDeviceVideoFormatPropertiesKHR,                       "vkGetPhysicalDeviceVideoFormatPropertiesKHR")
-	set_proc_address(&GetPhysicalDeviceWaylandPresentationSupportKHR,                  "vkGetPhysicalDeviceWaylandPresentationSupportKHR")
-	set_proc_address(&GetPhysicalDeviceWin32PresentationSupportKHR,                    "vkGetPhysicalDeviceWin32PresentationSupportKHR")
-	set_proc_address(&GetWinrtDisplayNV,                                               "vkGetWinrtDisplayNV")
-	set_proc_address(&ReleaseDisplayEXT,                                               "vkReleaseDisplayEXT")
-	set_proc_address(&SubmitDebugUtilsMessageEXT,                                      "vkSubmitDebugUtilsMessageEXT")
+	set_proc_address(&AcquireDrmDisplayEXT,                                             "vkAcquireDrmDisplayEXT")
+	set_proc_address(&AcquireWinrtDisplayNV,                                            "vkAcquireWinrtDisplayNV")
+	set_proc_address(&CreateDebugReportCallbackEXT,                                     "vkCreateDebugReportCallbackEXT")
+	set_proc_address(&CreateDebugUtilsMessengerEXT,                                     "vkCreateDebugUtilsMessengerEXT")
+	set_proc_address(&CreateDevice,                                                     "vkCreateDevice")
+	set_proc_address(&CreateDisplayModeKHR,                                             "vkCreateDisplayModeKHR")
+	set_proc_address(&CreateDisplayPlaneSurfaceKHR,                                     "vkCreateDisplayPlaneSurfaceKHR")
+	set_proc_address(&CreateHeadlessSurfaceEXT,                                         "vkCreateHeadlessSurfaceEXT")
+	set_proc_address(&CreateIOSSurfaceMVK,                                              "vkCreateIOSSurfaceMVK")
+	set_proc_address(&CreateMacOSSurfaceMVK,                                            "vkCreateMacOSSurfaceMVK")
+	set_proc_address(&CreateMetalSurfaceEXT,                                            "vkCreateMetalSurfaceEXT")
+	set_proc_address(&CreateWaylandSurfaceKHR,                                          "vkCreateWaylandSurfaceKHR")
+	set_proc_address(&CreateWin32SurfaceKHR,                                            "vkCreateWin32SurfaceKHR")
+	set_proc_address(&CreateXcbSurfaceKHR,                                              "vkCreateXcbSurfaceKHR")
+	set_proc_address(&CreateXlibSurfaceKHR,                                             "vkCreateXlibSurfaceKHR")
+	set_proc_address(&DebugReportMessageEXT,                                            "vkDebugReportMessageEXT")
+	set_proc_address(&DestroyDebugReportCallbackEXT,                                    "vkDestroyDebugReportCallbackEXT")
+	set_proc_address(&DestroyDebugUtilsMessengerEXT,                                    "vkDestroyDebugUtilsMessengerEXT")
+	set_proc_address(&DestroyInstance,                                                  "vkDestroyInstance")
+	set_proc_address(&DestroySurfaceKHR,                                                "vkDestroySurfaceKHR")
+	set_proc_address(&EnumerateDeviceExtensionProperties,                               "vkEnumerateDeviceExtensionProperties")
+	set_proc_address(&EnumerateDeviceLayerProperties,                                   "vkEnumerateDeviceLayerProperties")
+	set_proc_address(&EnumeratePhysicalDeviceGroups,                                    "vkEnumeratePhysicalDeviceGroups")
+	set_proc_address(&EnumeratePhysicalDeviceGroupsKHR,                                 "vkEnumeratePhysicalDeviceGroupsKHR")
+	set_proc_address(&EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR,    "vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR")
+	set_proc_address(&EnumeratePhysicalDevices,                                         "vkEnumeratePhysicalDevices")
+	set_proc_address(&GetDisplayModeProperties2KHR,                                     "vkGetDisplayModeProperties2KHR")
+	set_proc_address(&GetDisplayModePropertiesKHR,                                      "vkGetDisplayModePropertiesKHR")
+	set_proc_address(&GetDisplayPlaneCapabilities2KHR,                                  "vkGetDisplayPlaneCapabilities2KHR")
+	set_proc_address(&GetDisplayPlaneCapabilitiesKHR,                                   "vkGetDisplayPlaneCapabilitiesKHR")
+	set_proc_address(&GetDisplayPlaneSupportedDisplaysKHR,                              "vkGetDisplayPlaneSupportedDisplaysKHR")
+	set_proc_address(&GetDrmDisplayEXT,                                                 "vkGetDrmDisplayEXT")
+	set_proc_address(&GetInstanceProcAddrLUNARG,                                        "vkGetInstanceProcAddrLUNARG")
+	set_proc_address(&GetPhysicalDeviceCalibrateableTimeDomainsEXT,                     "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT")
+	set_proc_address(&GetPhysicalDeviceCalibrateableTimeDomainsKHR,                     "vkGetPhysicalDeviceCalibrateableTimeDomainsKHR")
+	set_proc_address(&GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV, "vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV")
+	set_proc_address(&GetPhysicalDeviceCooperativeMatrixPropertiesKHR,                  "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR")
+	set_proc_address(&GetPhysicalDeviceCooperativeMatrixPropertiesNV,                   "vkGetPhysicalDeviceCooperativeMatrixPropertiesNV")
+	set_proc_address(&GetPhysicalDeviceCooperativeVectorPropertiesNV,                   "vkGetPhysicalDeviceCooperativeVectorPropertiesNV")
+	set_proc_address(&GetPhysicalDeviceDisplayPlaneProperties2KHR,                      "vkGetPhysicalDeviceDisplayPlaneProperties2KHR")
+	set_proc_address(&GetPhysicalDeviceDisplayPlanePropertiesKHR,                       "vkGetPhysicalDeviceDisplayPlanePropertiesKHR")
+	set_proc_address(&GetPhysicalDeviceDisplayProperties2KHR,                           "vkGetPhysicalDeviceDisplayProperties2KHR")
+	set_proc_address(&GetPhysicalDeviceDisplayPropertiesKHR,                            "vkGetPhysicalDeviceDisplayPropertiesKHR")
+	set_proc_address(&GetPhysicalDeviceExternalBufferProperties,                        "vkGetPhysicalDeviceExternalBufferProperties")
+	set_proc_address(&GetPhysicalDeviceExternalBufferPropertiesKHR,                     "vkGetPhysicalDeviceExternalBufferPropertiesKHR")
+	set_proc_address(&GetPhysicalDeviceExternalFenceProperties,                         "vkGetPhysicalDeviceExternalFenceProperties")
+	set_proc_address(&GetPhysicalDeviceExternalFencePropertiesKHR,                      "vkGetPhysicalDeviceExternalFencePropertiesKHR")
+	set_proc_address(&GetPhysicalDeviceExternalImageFormatPropertiesNV,                 "vkGetPhysicalDeviceExternalImageFormatPropertiesNV")
+	set_proc_address(&GetPhysicalDeviceExternalSemaphoreProperties,                     "vkGetPhysicalDeviceExternalSemaphoreProperties")
+	set_proc_address(&GetPhysicalDeviceExternalSemaphorePropertiesKHR,                  "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR")
+	set_proc_address(&GetPhysicalDeviceFeatures,                                        "vkGetPhysicalDeviceFeatures")
+	set_proc_address(&GetPhysicalDeviceFeatures2,                                       "vkGetPhysicalDeviceFeatures2")
+	set_proc_address(&GetPhysicalDeviceFeatures2KHR,                                    "vkGetPhysicalDeviceFeatures2KHR")
+	set_proc_address(&GetPhysicalDeviceFormatProperties,                                "vkGetPhysicalDeviceFormatProperties")
+	set_proc_address(&GetPhysicalDeviceFormatProperties2,                               "vkGetPhysicalDeviceFormatProperties2")
+	set_proc_address(&GetPhysicalDeviceFormatProperties2KHR,                            "vkGetPhysicalDeviceFormatProperties2KHR")
+	set_proc_address(&GetPhysicalDeviceFragmentShadingRatesKHR,                         "vkGetPhysicalDeviceFragmentShadingRatesKHR")
+	set_proc_address(&GetPhysicalDeviceImageFormatProperties,                           "vkGetPhysicalDeviceImageFormatProperties")
+	set_proc_address(&GetPhysicalDeviceImageFormatProperties2,                          "vkGetPhysicalDeviceImageFormatProperties2")
+	set_proc_address(&GetPhysicalDeviceImageFormatProperties2KHR,                       "vkGetPhysicalDeviceImageFormatProperties2KHR")
+	set_proc_address(&GetPhysicalDeviceMemoryProperties,                                "vkGetPhysicalDeviceMemoryProperties")
+	set_proc_address(&GetPhysicalDeviceMemoryProperties2,                               "vkGetPhysicalDeviceMemoryProperties2")
+	set_proc_address(&GetPhysicalDeviceMemoryProperties2KHR,                            "vkGetPhysicalDeviceMemoryProperties2KHR")
+	set_proc_address(&GetPhysicalDeviceMultisamplePropertiesEXT,                        "vkGetPhysicalDeviceMultisamplePropertiesEXT")
+	set_proc_address(&GetPhysicalDeviceOpticalFlowImageFormatsNV,                       "vkGetPhysicalDeviceOpticalFlowImageFormatsNV")
+	set_proc_address(&GetPhysicalDevicePresentRectanglesKHR,                            "vkGetPhysicalDevicePresentRectanglesKHR")
+	set_proc_address(&GetPhysicalDeviceProperties,                                      "vkGetPhysicalDeviceProperties")
+	set_proc_address(&GetPhysicalDeviceProperties2,                                     "vkGetPhysicalDeviceProperties2")
+	set_proc_address(&GetPhysicalDeviceProperties2KHR,                                  "vkGetPhysicalDeviceProperties2KHR")
+	set_proc_address(&GetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR,            "vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR")
+	set_proc_address(&GetPhysicalDeviceQueueFamilyProperties,                           "vkGetPhysicalDeviceQueueFamilyProperties")
+	set_proc_address(&GetPhysicalDeviceQueueFamilyProperties2,                          "vkGetPhysicalDeviceQueueFamilyProperties2")
+	set_proc_address(&GetPhysicalDeviceQueueFamilyProperties2KHR,                       "vkGetPhysicalDeviceQueueFamilyProperties2KHR")
+	set_proc_address(&GetPhysicalDeviceSparseImageFormatProperties,                     "vkGetPhysicalDeviceSparseImageFormatProperties")
+	set_proc_address(&GetPhysicalDeviceSparseImageFormatProperties2,                    "vkGetPhysicalDeviceSparseImageFormatProperties2")
+	set_proc_address(&GetPhysicalDeviceSparseImageFormatProperties2KHR,                 "vkGetPhysicalDeviceSparseImageFormatProperties2KHR")
+	set_proc_address(&GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV,  "vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV")
+	set_proc_address(&GetPhysicalDeviceSurfaceCapabilities2EXT,                         "vkGetPhysicalDeviceSurfaceCapabilities2EXT")
+	set_proc_address(&GetPhysicalDeviceSurfaceCapabilities2KHR,                         "vkGetPhysicalDeviceSurfaceCapabilities2KHR")
+	set_proc_address(&GetPhysicalDeviceSurfaceCapabilitiesKHR,                          "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")
+	set_proc_address(&GetPhysicalDeviceSurfaceFormats2KHR,                              "vkGetPhysicalDeviceSurfaceFormats2KHR")
+	set_proc_address(&GetPhysicalDeviceSurfaceFormatsKHR,                               "vkGetPhysicalDeviceSurfaceFormatsKHR")
+	set_proc_address(&GetPhysicalDeviceSurfacePresentModes2EXT,                         "vkGetPhysicalDeviceSurfacePresentModes2EXT")
+	set_proc_address(&GetPhysicalDeviceSurfacePresentModesKHR,                          "vkGetPhysicalDeviceSurfacePresentModesKHR")
+	set_proc_address(&GetPhysicalDeviceSurfaceSupportKHR,                               "vkGetPhysicalDeviceSurfaceSupportKHR")
+	set_proc_address(&GetPhysicalDeviceToolProperties,                                  "vkGetPhysicalDeviceToolProperties")
+	set_proc_address(&GetPhysicalDeviceToolPropertiesEXT,                               "vkGetPhysicalDeviceToolPropertiesEXT")
+	set_proc_address(&GetPhysicalDeviceVideoCapabilitiesKHR,                            "vkGetPhysicalDeviceVideoCapabilitiesKHR")
+	set_proc_address(&GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR,            "vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR")
+	set_proc_address(&GetPhysicalDeviceVideoFormatPropertiesKHR,                        "vkGetPhysicalDeviceVideoFormatPropertiesKHR")
+	set_proc_address(&GetPhysicalDeviceWaylandPresentationSupportKHR,                   "vkGetPhysicalDeviceWaylandPresentationSupportKHR")
+	set_proc_address(&GetPhysicalDeviceWin32PresentationSupportKHR,                     "vkGetPhysicalDeviceWin32PresentationSupportKHR")
+	set_proc_address(&GetPhysicalDeviceXcbPresentationSupportKHR,                       "vkGetPhysicalDeviceXcbPresentationSupportKHR")
+	set_proc_address(&GetPhysicalDeviceXlibPresentationSupportKHR,                      "vkGetPhysicalDeviceXlibPresentationSupportKHR")
+	set_proc_address(&GetWinrtDisplayNV,                                                "vkGetWinrtDisplayNV")
+	set_proc_address(&ReleaseDisplayEXT,                                                "vkReleaseDisplayEXT")
+	set_proc_address(&SubmitDebugUtilsMessageEXT,                                       "vkSubmitDebugUtilsMessageEXT")
 
 	// Device Procedures
 	set_proc_address(&AcquireFullScreenExclusiveModeEXT,                      "vkAcquireFullScreenExclusiveModeEXT")
@@ -1497,8 +1585,10 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdBindDescriptorBufferEmbeddedSamplersEXT,             "vkCmdBindDescriptorBufferEmbeddedSamplersEXT")
 	set_proc_address(&CmdBindDescriptorBuffersEXT,                            "vkCmdBindDescriptorBuffersEXT")
 	set_proc_address(&CmdBindDescriptorSets,                                  "vkCmdBindDescriptorSets")
+	set_proc_address(&CmdBindDescriptorSets2,                                 "vkCmdBindDescriptorSets2")
 	set_proc_address(&CmdBindDescriptorSets2KHR,                              "vkCmdBindDescriptorSets2KHR")
 	set_proc_address(&CmdBindIndexBuffer,                                     "vkCmdBindIndexBuffer")
+	set_proc_address(&CmdBindIndexBuffer2,                                    "vkCmdBindIndexBuffer2")
 	set_proc_address(&CmdBindIndexBuffer2KHR,                                 "vkCmdBindIndexBuffer2KHR")
 	set_proc_address(&CmdBindInvocationMaskHUAWEI,                            "vkCmdBindInvocationMaskHUAWEI")
 	set_proc_address(&CmdBindPipeline,                                        "vkCmdBindPipeline")
@@ -1515,11 +1605,14 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdBuildAccelerationStructureNV,                        "vkCmdBuildAccelerationStructureNV")
 	set_proc_address(&CmdBuildAccelerationStructuresIndirectKHR,              "vkCmdBuildAccelerationStructuresIndirectKHR")
 	set_proc_address(&CmdBuildAccelerationStructuresKHR,                      "vkCmdBuildAccelerationStructuresKHR")
+	set_proc_address(&CmdBuildClusterAccelerationStructureIndirectNV,         "vkCmdBuildClusterAccelerationStructureIndirectNV")
 	set_proc_address(&CmdBuildMicromapsEXT,                                   "vkCmdBuildMicromapsEXT")
+	set_proc_address(&CmdBuildPartitionedAccelerationStructuresNV,            "vkCmdBuildPartitionedAccelerationStructuresNV")
 	set_proc_address(&CmdClearAttachments,                                    "vkCmdClearAttachments")
 	set_proc_address(&CmdClearColorImage,                                     "vkCmdClearColorImage")
 	set_proc_address(&CmdClearDepthStencilImage,                              "vkCmdClearDepthStencilImage")
 	set_proc_address(&CmdControlVideoCodingKHR,                               "vkCmdControlVideoCodingKHR")
+	set_proc_address(&CmdConvertCooperativeVectorMatrixNV,                    "vkCmdConvertCooperativeVectorMatrixNV")
 	set_proc_address(&CmdCopyAccelerationStructureKHR,                        "vkCmdCopyAccelerationStructureKHR")
 	set_proc_address(&CmdCopyAccelerationStructureNV,                         "vkCmdCopyAccelerationStructureNV")
 	set_proc_address(&CmdCopyAccelerationStructureToMemoryKHR,                "vkCmdCopyAccelerationStructureToMemoryKHR")
@@ -1553,6 +1646,9 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdDispatch,                                            "vkCmdDispatch")
 	set_proc_address(&CmdDispatchBase,                                        "vkCmdDispatchBase")
 	set_proc_address(&CmdDispatchBaseKHR,                                     "vkCmdDispatchBaseKHR")
+	set_proc_address(&CmdDispatchGraphAMDX,                                   "vkCmdDispatchGraphAMDX")
+	set_proc_address(&CmdDispatchGraphIndirectAMDX,                           "vkCmdDispatchGraphIndirectAMDX")
+	set_proc_address(&CmdDispatchGraphIndirectCountAMDX,                      "vkCmdDispatchGraphIndirectCountAMDX")
 	set_proc_address(&CmdDispatchIndirect,                                    "vkCmdDispatchIndirect")
 	set_proc_address(&CmdDraw,                                                "vkCmdDraw")
 	set_proc_address(&CmdDrawClusterHUAWEI,                                   "vkCmdDrawClusterHUAWEI")
@@ -1591,6 +1687,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdExecuteGeneratedCommandsEXT,                         "vkCmdExecuteGeneratedCommandsEXT")
 	set_proc_address(&CmdExecuteGeneratedCommandsNV,                          "vkCmdExecuteGeneratedCommandsNV")
 	set_proc_address(&CmdFillBuffer,                                          "vkCmdFillBuffer")
+	set_proc_address(&CmdInitializeGraphScratchMemoryAMDX,                    "vkCmdInitializeGraphScratchMemoryAMDX")
 	set_proc_address(&CmdInsertDebugUtilsLabelEXT,                            "vkCmdInsertDebugUtilsLabelEXT")
 	set_proc_address(&CmdNextSubpass,                                         "vkCmdNextSubpass")
 	set_proc_address(&CmdNextSubpass2,                                        "vkCmdNextSubpass2")
@@ -1602,9 +1699,14 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdPreprocessGeneratedCommandsEXT,                      "vkCmdPreprocessGeneratedCommandsEXT")
 	set_proc_address(&CmdPreprocessGeneratedCommandsNV,                       "vkCmdPreprocessGeneratedCommandsNV")
 	set_proc_address(&CmdPushConstants,                                       "vkCmdPushConstants")
+	set_proc_address(&CmdPushConstants2,                                      "vkCmdPushConstants2")
 	set_proc_address(&CmdPushConstants2KHR,                                   "vkCmdPushConstants2KHR")
+	set_proc_address(&CmdPushDescriptorSet,                                   "vkCmdPushDescriptorSet")
+	set_proc_address(&CmdPushDescriptorSet2,                                  "vkCmdPushDescriptorSet2")
 	set_proc_address(&CmdPushDescriptorSet2KHR,                               "vkCmdPushDescriptorSet2KHR")
 	set_proc_address(&CmdPushDescriptorSetKHR,                                "vkCmdPushDescriptorSetKHR")
+	set_proc_address(&CmdPushDescriptorSetWithTemplate,                       "vkCmdPushDescriptorSetWithTemplate")
+	set_proc_address(&CmdPushDescriptorSetWithTemplate2,                      "vkCmdPushDescriptorSetWithTemplate2")
 	set_proc_address(&CmdPushDescriptorSetWithTemplate2KHR,                   "vkCmdPushDescriptorSetWithTemplate2KHR")
 	set_proc_address(&CmdPushDescriptorSetWithTemplateKHR,                    "vkCmdPushDescriptorSetWithTemplateKHR")
 	set_proc_address(&CmdResetEvent,                                          "vkCmdResetEvent")
@@ -1668,6 +1770,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdSetFrontFace,                                        "vkCmdSetFrontFace")
 	set_proc_address(&CmdSetFrontFaceEXT,                                     "vkCmdSetFrontFaceEXT")
 	set_proc_address(&CmdSetLineRasterizationModeEXT,                         "vkCmdSetLineRasterizationModeEXT")
+	set_proc_address(&CmdSetLineStipple,                                      "vkCmdSetLineStipple")
 	set_proc_address(&CmdSetLineStippleEXT,                                   "vkCmdSetLineStippleEXT")
 	set_proc_address(&CmdSetLineStippleEnableEXT,                             "vkCmdSetLineStippleEnableEXT")
 	set_proc_address(&CmdSetLineStippleKHR,                                   "vkCmdSetLineStippleKHR")
@@ -1689,7 +1792,9 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdSetRasterizerDiscardEnable,                          "vkCmdSetRasterizerDiscardEnable")
 	set_proc_address(&CmdSetRasterizerDiscardEnableEXT,                       "vkCmdSetRasterizerDiscardEnableEXT")
 	set_proc_address(&CmdSetRayTracingPipelineStackSizeKHR,                   "vkCmdSetRayTracingPipelineStackSizeKHR")
+	set_proc_address(&CmdSetRenderingAttachmentLocations,                     "vkCmdSetRenderingAttachmentLocations")
 	set_proc_address(&CmdSetRenderingAttachmentLocationsKHR,                  "vkCmdSetRenderingAttachmentLocationsKHR")
+	set_proc_address(&CmdSetRenderingInputAttachmentIndices,                  "vkCmdSetRenderingInputAttachmentIndices")
 	set_proc_address(&CmdSetRenderingInputAttachmentIndicesKHR,               "vkCmdSetRenderingInputAttachmentIndicesKHR")
 	set_proc_address(&CmdSetRepresentativeFragmentTestEnableNV,               "vkCmdSetRepresentativeFragmentTestEnableNV")
 	set_proc_address(&CmdSetSampleLocationsEXT,                               "vkCmdSetSampleLocationsEXT")
@@ -1734,11 +1839,15 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CmdWriteTimestamp2,                                     "vkCmdWriteTimestamp2")
 	set_proc_address(&CmdWriteTimestamp2KHR,                                  "vkCmdWriteTimestamp2KHR")
 	set_proc_address(&CompileDeferredNV,                                      "vkCompileDeferredNV")
+	set_proc_address(&ConvertCooperativeVectorMatrixNV,                       "vkConvertCooperativeVectorMatrixNV")
 	set_proc_address(&CopyAccelerationStructureKHR,                           "vkCopyAccelerationStructureKHR")
 	set_proc_address(&CopyAccelerationStructureToMemoryKHR,                   "vkCopyAccelerationStructureToMemoryKHR")
+	set_proc_address(&CopyImageToImage,                                       "vkCopyImageToImage")
 	set_proc_address(&CopyImageToImageEXT,                                    "vkCopyImageToImageEXT")
+	set_proc_address(&CopyImageToMemory,                                      "vkCopyImageToMemory")
 	set_proc_address(&CopyImageToMemoryEXT,                                   "vkCopyImageToMemoryEXT")
 	set_proc_address(&CopyMemoryToAccelerationStructureKHR,                   "vkCopyMemoryToAccelerationStructureKHR")
+	set_proc_address(&CopyMemoryToImage,                                      "vkCopyMemoryToImage")
 	set_proc_address(&CopyMemoryToImageEXT,                                   "vkCopyMemoryToImageEXT")
 	set_proc_address(&CopyMemoryToMicromapEXT,                                "vkCopyMemoryToMicromapEXT")
 	set_proc_address(&CopyMicromapEXT,                                        "vkCopyMicromapEXT")
@@ -1759,6 +1868,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CreateDescriptorUpdateTemplate,                         "vkCreateDescriptorUpdateTemplate")
 	set_proc_address(&CreateDescriptorUpdateTemplateKHR,                      "vkCreateDescriptorUpdateTemplateKHR")
 	set_proc_address(&CreateEvent,                                            "vkCreateEvent")
+	set_proc_address(&CreateExecutionGraphPipelinesAMDX,                      "vkCreateExecutionGraphPipelinesAMDX")
 	set_proc_address(&CreateFence,                                            "vkCreateFence")
 	set_proc_address(&CreateFramebuffer,                                      "vkCreateFramebuffer")
 	set_proc_address(&CreateGraphicsPipelines,                                "vkCreateGraphicsPipelines")
@@ -1861,6 +1971,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetBufferOpaqueCaptureDescriptorDataEXT,                "vkGetBufferOpaqueCaptureDescriptorDataEXT")
 	set_proc_address(&GetCalibratedTimestampsEXT,                             "vkGetCalibratedTimestampsEXT")
 	set_proc_address(&GetCalibratedTimestampsKHR,                             "vkGetCalibratedTimestampsKHR")
+	set_proc_address(&GetClusterAccelerationStructureBuildSizesNV,            "vkGetClusterAccelerationStructureBuildSizesNV")
 	set_proc_address(&GetCudaModuleCacheNV,                                   "vkGetCudaModuleCacheNV")
 	set_proc_address(&GetDeferredOperationMaxConcurrencyKHR,                  "vkGetDeferredOperationMaxConcurrencyKHR")
 	set_proc_address(&GetDeferredOperationResultKHR,                          "vkGetDeferredOperationResultKHR")
@@ -1884,6 +1995,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetDeviceImageMemoryRequirementsKHR,                    "vkGetDeviceImageMemoryRequirementsKHR")
 	set_proc_address(&GetDeviceImageSparseMemoryRequirements,                 "vkGetDeviceImageSparseMemoryRequirements")
 	set_proc_address(&GetDeviceImageSparseMemoryRequirementsKHR,              "vkGetDeviceImageSparseMemoryRequirementsKHR")
+	set_proc_address(&GetDeviceImageSubresourceLayout,                        "vkGetDeviceImageSubresourceLayout")
 	set_proc_address(&GetDeviceImageSubresourceLayoutKHR,                     "vkGetDeviceImageSubresourceLayoutKHR")
 	set_proc_address(&GetDeviceMemoryCommitment,                              "vkGetDeviceMemoryCommitment")
 	set_proc_address(&GetDeviceMemoryOpaqueCaptureAddress,                    "vkGetDeviceMemoryOpaqueCaptureAddress")
@@ -1896,6 +2008,8 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetDynamicRenderingTilePropertiesQCOM,                  "vkGetDynamicRenderingTilePropertiesQCOM")
 	set_proc_address(&GetEncodedVideoSessionParametersKHR,                    "vkGetEncodedVideoSessionParametersKHR")
 	set_proc_address(&GetEventStatus,                                         "vkGetEventStatus")
+	set_proc_address(&GetExecutionGraphPipelineNodeIndexAMDX,                 "vkGetExecutionGraphPipelineNodeIndexAMDX")
+	set_proc_address(&GetExecutionGraphPipelineScratchSizeAMDX,               "vkGetExecutionGraphPipelineScratchSizeAMDX")
 	set_proc_address(&GetFenceFdKHR,                                          "vkGetFenceFdKHR")
 	set_proc_address(&GetFenceStatus,                                         "vkGetFenceStatus")
 	set_proc_address(&GetFenceWin32HandleKHR,                                 "vkGetFenceWin32HandleKHR")
@@ -1911,20 +2025,25 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetImageSparseMemoryRequirements2,                      "vkGetImageSparseMemoryRequirements2")
 	set_proc_address(&GetImageSparseMemoryRequirements2KHR,                   "vkGetImageSparseMemoryRequirements2KHR")
 	set_proc_address(&GetImageSubresourceLayout,                              "vkGetImageSubresourceLayout")
+	set_proc_address(&GetImageSubresourceLayout2,                             "vkGetImageSubresourceLayout2")
 	set_proc_address(&GetImageSubresourceLayout2EXT,                          "vkGetImageSubresourceLayout2EXT")
 	set_proc_address(&GetImageSubresourceLayout2KHR,                          "vkGetImageSubresourceLayout2KHR")
 	set_proc_address(&GetImageViewAddressNVX,                                 "vkGetImageViewAddressNVX")
+	set_proc_address(&GetImageViewHandle64NVX,                                "vkGetImageViewHandle64NVX")
 	set_proc_address(&GetImageViewHandleNVX,                                  "vkGetImageViewHandleNVX")
 	set_proc_address(&GetImageViewOpaqueCaptureDescriptorDataEXT,             "vkGetImageViewOpaqueCaptureDescriptorDataEXT")
 	set_proc_address(&GetLatencyTimingsNV,                                    "vkGetLatencyTimingsNV")
 	set_proc_address(&GetMemoryFdKHR,                                         "vkGetMemoryFdKHR")
 	set_proc_address(&GetMemoryFdPropertiesKHR,                               "vkGetMemoryFdPropertiesKHR")
 	set_proc_address(&GetMemoryHostPointerPropertiesEXT,                      "vkGetMemoryHostPointerPropertiesEXT")
+	set_proc_address(&GetMemoryMetalHandleEXT,                                "vkGetMemoryMetalHandleEXT")
+	set_proc_address(&GetMemoryMetalHandlePropertiesEXT,                      "vkGetMemoryMetalHandlePropertiesEXT")
 	set_proc_address(&GetMemoryRemoteAddressNV,                               "vkGetMemoryRemoteAddressNV")
 	set_proc_address(&GetMemoryWin32HandleKHR,                                "vkGetMemoryWin32HandleKHR")
 	set_proc_address(&GetMemoryWin32HandleNV,                                 "vkGetMemoryWin32HandleNV")
 	set_proc_address(&GetMemoryWin32HandlePropertiesKHR,                      "vkGetMemoryWin32HandlePropertiesKHR")
 	set_proc_address(&GetMicromapBuildSizesEXT,                               "vkGetMicromapBuildSizesEXT")
+	set_proc_address(&GetPartitionedAccelerationStructuresBuildSizesNV,       "vkGetPartitionedAccelerationStructuresBuildSizesNV")
 	set_proc_address(&GetPastPresentationTimingGOOGLE,                        "vkGetPastPresentationTimingGOOGLE")
 	set_proc_address(&GetPerformanceParameterINTEL,                           "vkGetPerformanceParameterINTEL")
 	set_proc_address(&GetPipelineBinaryDataKHR,                               "vkGetPipelineBinaryDataKHR")
@@ -1947,6 +2066,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetRayTracingShaderGroupStackSizeKHR,                   "vkGetRayTracingShaderGroupStackSizeKHR")
 	set_proc_address(&GetRefreshCycleDurationGOOGLE,                          "vkGetRefreshCycleDurationGOOGLE")
 	set_proc_address(&GetRenderAreaGranularity,                               "vkGetRenderAreaGranularity")
+	set_proc_address(&GetRenderingAreaGranularity,                            "vkGetRenderingAreaGranularity")
 	set_proc_address(&GetRenderingAreaGranularityKHR,                         "vkGetRenderingAreaGranularityKHR")
 	set_proc_address(&GetSamplerOpaqueCaptureDescriptorDataEXT,               "vkGetSamplerOpaqueCaptureDescriptorDataEXT")
 	set_proc_address(&GetSemaphoreCounterValue,                               "vkGetSemaphoreCounterValue")
@@ -1970,6 +2090,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&InvalidateMappedMemoryRanges,                           "vkInvalidateMappedMemoryRanges")
 	set_proc_address(&LatencySleepNV,                                         "vkLatencySleepNV")
 	set_proc_address(&MapMemory,                                              "vkMapMemory")
+	set_proc_address(&MapMemory2,                                             "vkMapMemory2")
 	set_proc_address(&MapMemory2KHR,                                          "vkMapMemory2KHR")
 	set_proc_address(&MergePipelineCaches,                                    "vkMergePipelineCaches")
 	set_proc_address(&MergeValidationCachesEXT,                               "vkMergeValidationCachesEXT")
@@ -2010,11 +2131,13 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&SetPrivateDataEXT,                                      "vkSetPrivateDataEXT")
 	set_proc_address(&SignalSemaphore,                                        "vkSignalSemaphore")
 	set_proc_address(&SignalSemaphoreKHR,                                     "vkSignalSemaphoreKHR")
+	set_proc_address(&TransitionImageLayout,                                  "vkTransitionImageLayout")
 	set_proc_address(&TransitionImageLayoutEXT,                               "vkTransitionImageLayoutEXT")
 	set_proc_address(&TrimCommandPool,                                        "vkTrimCommandPool")
 	set_proc_address(&TrimCommandPoolKHR,                                     "vkTrimCommandPoolKHR")
 	set_proc_address(&UninitializePerformanceApiINTEL,                        "vkUninitializePerformanceApiINTEL")
 	set_proc_address(&UnmapMemory,                                            "vkUnmapMemory")
+	set_proc_address(&UnmapMemory2,                                           "vkUnmapMemory2")
 	set_proc_address(&UnmapMemory2KHR,                                        "vkUnmapMemory2KHR")
 	set_proc_address(&UpdateDescriptorSetWithTemplate,                        "vkUpdateDescriptorSetWithTemplate")
 	set_proc_address(&UpdateDescriptorSetWithTemplateKHR,                     "vkUpdateDescriptorSetWithTemplateKHR")
@@ -2069,8 +2192,10 @@ Device_VTable :: struct {
 	CmdBindDescriptorBufferEmbeddedSamplersEXT:             ProcCmdBindDescriptorBufferEmbeddedSamplersEXT,
 	CmdBindDescriptorBuffersEXT:                            ProcCmdBindDescriptorBuffersEXT,
 	CmdBindDescriptorSets:                                  ProcCmdBindDescriptorSets,
+	CmdBindDescriptorSets2:                                 ProcCmdBindDescriptorSets2,
 	CmdBindDescriptorSets2KHR:                              ProcCmdBindDescriptorSets2KHR,
 	CmdBindIndexBuffer:                                     ProcCmdBindIndexBuffer,
+	CmdBindIndexBuffer2:                                    ProcCmdBindIndexBuffer2,
 	CmdBindIndexBuffer2KHR:                                 ProcCmdBindIndexBuffer2KHR,
 	CmdBindInvocationMaskHUAWEI:                            ProcCmdBindInvocationMaskHUAWEI,
 	CmdBindPipeline:                                        ProcCmdBindPipeline,
@@ -2087,11 +2212,14 @@ Device_VTable :: struct {
 	CmdBuildAccelerationStructureNV:                        ProcCmdBuildAccelerationStructureNV,
 	CmdBuildAccelerationStructuresIndirectKHR:              ProcCmdBuildAccelerationStructuresIndirectKHR,
 	CmdBuildAccelerationStructuresKHR:                      ProcCmdBuildAccelerationStructuresKHR,
+	CmdBuildClusterAccelerationStructureIndirectNV:         ProcCmdBuildClusterAccelerationStructureIndirectNV,
 	CmdBuildMicromapsEXT:                                   ProcCmdBuildMicromapsEXT,
+	CmdBuildPartitionedAccelerationStructuresNV:            ProcCmdBuildPartitionedAccelerationStructuresNV,
 	CmdClearAttachments:                                    ProcCmdClearAttachments,
 	CmdClearColorImage:                                     ProcCmdClearColorImage,
 	CmdClearDepthStencilImage:                              ProcCmdClearDepthStencilImage,
 	CmdControlVideoCodingKHR:                               ProcCmdControlVideoCodingKHR,
+	CmdConvertCooperativeVectorMatrixNV:                    ProcCmdConvertCooperativeVectorMatrixNV,
 	CmdCopyAccelerationStructureKHR:                        ProcCmdCopyAccelerationStructureKHR,
 	CmdCopyAccelerationStructureNV:                         ProcCmdCopyAccelerationStructureNV,
 	CmdCopyAccelerationStructureToMemoryKHR:                ProcCmdCopyAccelerationStructureToMemoryKHR,
@@ -2125,6 +2253,9 @@ Device_VTable :: struct {
 	CmdDispatch:                                            ProcCmdDispatch,
 	CmdDispatchBase:                                        ProcCmdDispatchBase,
 	CmdDispatchBaseKHR:                                     ProcCmdDispatchBaseKHR,
+	CmdDispatchGraphAMDX:                                   ProcCmdDispatchGraphAMDX,
+	CmdDispatchGraphIndirectAMDX:                           ProcCmdDispatchGraphIndirectAMDX,
+	CmdDispatchGraphIndirectCountAMDX:                      ProcCmdDispatchGraphIndirectCountAMDX,
 	CmdDispatchIndirect:                                    ProcCmdDispatchIndirect,
 	CmdDraw:                                                ProcCmdDraw,
 	CmdDrawClusterHUAWEI:                                   ProcCmdDrawClusterHUAWEI,
@@ -2163,6 +2294,7 @@ Device_VTable :: struct {
 	CmdExecuteGeneratedCommandsEXT:                         ProcCmdExecuteGeneratedCommandsEXT,
 	CmdExecuteGeneratedCommandsNV:                          ProcCmdExecuteGeneratedCommandsNV,
 	CmdFillBuffer:                                          ProcCmdFillBuffer,
+	CmdInitializeGraphScratchMemoryAMDX:                    ProcCmdInitializeGraphScratchMemoryAMDX,
 	CmdInsertDebugUtilsLabelEXT:                            ProcCmdInsertDebugUtilsLabelEXT,
 	CmdNextSubpass:                                         ProcCmdNextSubpass,
 	CmdNextSubpass2:                                        ProcCmdNextSubpass2,
@@ -2174,9 +2306,14 @@ Device_VTable :: struct {
 	CmdPreprocessGeneratedCommandsEXT:                      ProcCmdPreprocessGeneratedCommandsEXT,
 	CmdPreprocessGeneratedCommandsNV:                       ProcCmdPreprocessGeneratedCommandsNV,
 	CmdPushConstants:                                       ProcCmdPushConstants,
+	CmdPushConstants2:                                      ProcCmdPushConstants2,
 	CmdPushConstants2KHR:                                   ProcCmdPushConstants2KHR,
+	CmdPushDescriptorSet:                                   ProcCmdPushDescriptorSet,
+	CmdPushDescriptorSet2:                                  ProcCmdPushDescriptorSet2,
 	CmdPushDescriptorSet2KHR:                               ProcCmdPushDescriptorSet2KHR,
 	CmdPushDescriptorSetKHR:                                ProcCmdPushDescriptorSetKHR,
+	CmdPushDescriptorSetWithTemplate:                       ProcCmdPushDescriptorSetWithTemplate,
+	CmdPushDescriptorSetWithTemplate2:                      ProcCmdPushDescriptorSetWithTemplate2,
 	CmdPushDescriptorSetWithTemplate2KHR:                   ProcCmdPushDescriptorSetWithTemplate2KHR,
 	CmdPushDescriptorSetWithTemplateKHR:                    ProcCmdPushDescriptorSetWithTemplateKHR,
 	CmdResetEvent:                                          ProcCmdResetEvent,
@@ -2240,6 +2377,7 @@ Device_VTable :: struct {
 	CmdSetFrontFace:                                        ProcCmdSetFrontFace,
 	CmdSetFrontFaceEXT:                                     ProcCmdSetFrontFaceEXT,
 	CmdSetLineRasterizationModeEXT:                         ProcCmdSetLineRasterizationModeEXT,
+	CmdSetLineStipple:                                      ProcCmdSetLineStipple,
 	CmdSetLineStippleEXT:                                   ProcCmdSetLineStippleEXT,
 	CmdSetLineStippleEnableEXT:                             ProcCmdSetLineStippleEnableEXT,
 	CmdSetLineStippleKHR:                                   ProcCmdSetLineStippleKHR,
@@ -2261,7 +2399,9 @@ Device_VTable :: struct {
 	CmdSetRasterizerDiscardEnable:                          ProcCmdSetRasterizerDiscardEnable,
 	CmdSetRasterizerDiscardEnableEXT:                       ProcCmdSetRasterizerDiscardEnableEXT,
 	CmdSetRayTracingPipelineStackSizeKHR:                   ProcCmdSetRayTracingPipelineStackSizeKHR,
+	CmdSetRenderingAttachmentLocations:                     ProcCmdSetRenderingAttachmentLocations,
 	CmdSetRenderingAttachmentLocationsKHR:                  ProcCmdSetRenderingAttachmentLocationsKHR,
+	CmdSetRenderingInputAttachmentIndices:                  ProcCmdSetRenderingInputAttachmentIndices,
 	CmdSetRenderingInputAttachmentIndicesKHR:               ProcCmdSetRenderingInputAttachmentIndicesKHR,
 	CmdSetRepresentativeFragmentTestEnableNV:               ProcCmdSetRepresentativeFragmentTestEnableNV,
 	CmdSetSampleLocationsEXT:                               ProcCmdSetSampleLocationsEXT,
@@ -2306,11 +2446,15 @@ Device_VTable :: struct {
 	CmdWriteTimestamp2:                                     ProcCmdWriteTimestamp2,
 	CmdWriteTimestamp2KHR:                                  ProcCmdWriteTimestamp2KHR,
 	CompileDeferredNV:                                      ProcCompileDeferredNV,
+	ConvertCooperativeVectorMatrixNV:                       ProcConvertCooperativeVectorMatrixNV,
 	CopyAccelerationStructureKHR:                           ProcCopyAccelerationStructureKHR,
 	CopyAccelerationStructureToMemoryKHR:                   ProcCopyAccelerationStructureToMemoryKHR,
+	CopyImageToImage:                                       ProcCopyImageToImage,
 	CopyImageToImageEXT:                                    ProcCopyImageToImageEXT,
+	CopyImageToMemory:                                      ProcCopyImageToMemory,
 	CopyImageToMemoryEXT:                                   ProcCopyImageToMemoryEXT,
 	CopyMemoryToAccelerationStructureKHR:                   ProcCopyMemoryToAccelerationStructureKHR,
+	CopyMemoryToImage:                                      ProcCopyMemoryToImage,
 	CopyMemoryToImageEXT:                                   ProcCopyMemoryToImageEXT,
 	CopyMemoryToMicromapEXT:                                ProcCopyMemoryToMicromapEXT,
 	CopyMicromapEXT:                                        ProcCopyMicromapEXT,
@@ -2331,6 +2475,7 @@ Device_VTable :: struct {
 	CreateDescriptorUpdateTemplate:                         ProcCreateDescriptorUpdateTemplate,
 	CreateDescriptorUpdateTemplateKHR:                      ProcCreateDescriptorUpdateTemplateKHR,
 	CreateEvent:                                            ProcCreateEvent,
+	CreateExecutionGraphPipelinesAMDX:                      ProcCreateExecutionGraphPipelinesAMDX,
 	CreateFence:                                            ProcCreateFence,
 	CreateFramebuffer:                                      ProcCreateFramebuffer,
 	CreateGraphicsPipelines:                                ProcCreateGraphicsPipelines,
@@ -2433,6 +2578,7 @@ Device_VTable :: struct {
 	GetBufferOpaqueCaptureDescriptorDataEXT:                ProcGetBufferOpaqueCaptureDescriptorDataEXT,
 	GetCalibratedTimestampsEXT:                             ProcGetCalibratedTimestampsEXT,
 	GetCalibratedTimestampsKHR:                             ProcGetCalibratedTimestampsKHR,
+	GetClusterAccelerationStructureBuildSizesNV:            ProcGetClusterAccelerationStructureBuildSizesNV,
 	GetCudaModuleCacheNV:                                   ProcGetCudaModuleCacheNV,
 	GetDeferredOperationMaxConcurrencyKHR:                  ProcGetDeferredOperationMaxConcurrencyKHR,
 	GetDeferredOperationResultKHR:                          ProcGetDeferredOperationResultKHR,
@@ -2456,6 +2602,7 @@ Device_VTable :: struct {
 	GetDeviceImageMemoryRequirementsKHR:                    ProcGetDeviceImageMemoryRequirementsKHR,
 	GetDeviceImageSparseMemoryRequirements:                 ProcGetDeviceImageSparseMemoryRequirements,
 	GetDeviceImageSparseMemoryRequirementsKHR:              ProcGetDeviceImageSparseMemoryRequirementsKHR,
+	GetDeviceImageSubresourceLayout:                        ProcGetDeviceImageSubresourceLayout,
 	GetDeviceImageSubresourceLayoutKHR:                     ProcGetDeviceImageSubresourceLayoutKHR,
 	GetDeviceMemoryCommitment:                              ProcGetDeviceMemoryCommitment,
 	GetDeviceMemoryOpaqueCaptureAddress:                    ProcGetDeviceMemoryOpaqueCaptureAddress,
@@ -2468,6 +2615,8 @@ Device_VTable :: struct {
 	GetDynamicRenderingTilePropertiesQCOM:                  ProcGetDynamicRenderingTilePropertiesQCOM,
 	GetEncodedVideoSessionParametersKHR:                    ProcGetEncodedVideoSessionParametersKHR,
 	GetEventStatus:                                         ProcGetEventStatus,
+	GetExecutionGraphPipelineNodeIndexAMDX:                 ProcGetExecutionGraphPipelineNodeIndexAMDX,
+	GetExecutionGraphPipelineScratchSizeAMDX:               ProcGetExecutionGraphPipelineScratchSizeAMDX,
 	GetFenceFdKHR:                                          ProcGetFenceFdKHR,
 	GetFenceStatus:                                         ProcGetFenceStatus,
 	GetFenceWin32HandleKHR:                                 ProcGetFenceWin32HandleKHR,
@@ -2483,20 +2632,25 @@ Device_VTable :: struct {
 	GetImageSparseMemoryRequirements2:                      ProcGetImageSparseMemoryRequirements2,
 	GetImageSparseMemoryRequirements2KHR:                   ProcGetImageSparseMemoryRequirements2KHR,
 	GetImageSubresourceLayout:                              ProcGetImageSubresourceLayout,
+	GetImageSubresourceLayout2:                             ProcGetImageSubresourceLayout2,
 	GetImageSubresourceLayout2EXT:                          ProcGetImageSubresourceLayout2EXT,
 	GetImageSubresourceLayout2KHR:                          ProcGetImageSubresourceLayout2KHR,
 	GetImageViewAddressNVX:                                 ProcGetImageViewAddressNVX,
+	GetImageViewHandle64NVX:                                ProcGetImageViewHandle64NVX,
 	GetImageViewHandleNVX:                                  ProcGetImageViewHandleNVX,
 	GetImageViewOpaqueCaptureDescriptorDataEXT:             ProcGetImageViewOpaqueCaptureDescriptorDataEXT,
 	GetLatencyTimingsNV:                                    ProcGetLatencyTimingsNV,
 	GetMemoryFdKHR:                                         ProcGetMemoryFdKHR,
 	GetMemoryFdPropertiesKHR:                               ProcGetMemoryFdPropertiesKHR,
 	GetMemoryHostPointerPropertiesEXT:                      ProcGetMemoryHostPointerPropertiesEXT,
+	GetMemoryMetalHandleEXT:                                ProcGetMemoryMetalHandleEXT,
+	GetMemoryMetalHandlePropertiesEXT:                      ProcGetMemoryMetalHandlePropertiesEXT,
 	GetMemoryRemoteAddressNV:                               ProcGetMemoryRemoteAddressNV,
 	GetMemoryWin32HandleKHR:                                ProcGetMemoryWin32HandleKHR,
 	GetMemoryWin32HandleNV:                                 ProcGetMemoryWin32HandleNV,
 	GetMemoryWin32HandlePropertiesKHR:                      ProcGetMemoryWin32HandlePropertiesKHR,
 	GetMicromapBuildSizesEXT:                               ProcGetMicromapBuildSizesEXT,
+	GetPartitionedAccelerationStructuresBuildSizesNV:       ProcGetPartitionedAccelerationStructuresBuildSizesNV,
 	GetPastPresentationTimingGOOGLE:                        ProcGetPastPresentationTimingGOOGLE,
 	GetPerformanceParameterINTEL:                           ProcGetPerformanceParameterINTEL,
 	GetPipelineBinaryDataKHR:                               ProcGetPipelineBinaryDataKHR,
@@ -2519,6 +2673,7 @@ Device_VTable :: struct {
 	GetRayTracingShaderGroupStackSizeKHR:                   ProcGetRayTracingShaderGroupStackSizeKHR,
 	GetRefreshCycleDurationGOOGLE:                          ProcGetRefreshCycleDurationGOOGLE,
 	GetRenderAreaGranularity:                               ProcGetRenderAreaGranularity,
+	GetRenderingAreaGranularity:                            ProcGetRenderingAreaGranularity,
 	GetRenderingAreaGranularityKHR:                         ProcGetRenderingAreaGranularityKHR,
 	GetSamplerOpaqueCaptureDescriptorDataEXT:               ProcGetSamplerOpaqueCaptureDescriptorDataEXT,
 	GetSemaphoreCounterValue:                               ProcGetSemaphoreCounterValue,
@@ -2542,6 +2697,7 @@ Device_VTable :: struct {
 	InvalidateMappedMemoryRanges:                           ProcInvalidateMappedMemoryRanges,
 	LatencySleepNV:                                         ProcLatencySleepNV,
 	MapMemory:                                              ProcMapMemory,
+	MapMemory2:                                             ProcMapMemory2,
 	MapMemory2KHR:                                          ProcMapMemory2KHR,
 	MergePipelineCaches:                                    ProcMergePipelineCaches,
 	MergeValidationCachesEXT:                               ProcMergeValidationCachesEXT,
@@ -2582,11 +2738,13 @@ Device_VTable :: struct {
 	SetPrivateDataEXT:                                      ProcSetPrivateDataEXT,
 	SignalSemaphore:                                        ProcSignalSemaphore,
 	SignalSemaphoreKHR:                                     ProcSignalSemaphoreKHR,
+	TransitionImageLayout:                                  ProcTransitionImageLayout,
 	TransitionImageLayoutEXT:                               ProcTransitionImageLayoutEXT,
 	TrimCommandPool:                                        ProcTrimCommandPool,
 	TrimCommandPoolKHR:                                     ProcTrimCommandPoolKHR,
 	UninitializePerformanceApiINTEL:                        ProcUninitializePerformanceApiINTEL,
 	UnmapMemory:                                            ProcUnmapMemory,
+	UnmapMemory2:                                           ProcUnmapMemory2,
 	UnmapMemory2KHR:                                        ProcUnmapMemory2KHR,
 	UpdateDescriptorSetWithTemplate:                        ProcUpdateDescriptorSetWithTemplate,
 	UpdateDescriptorSetWithTemplateKHR:                     ProcUpdateDescriptorSetWithTemplateKHR,
@@ -2639,8 +2797,10 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CmdBindDescriptorBufferEmbeddedSamplersEXT             = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorBufferEmbeddedSamplersEXT")
 	vtable.CmdBindDescriptorBuffersEXT                            = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorBuffersEXT")
 	vtable.CmdBindDescriptorSets                                  = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorSets")
+	vtable.CmdBindDescriptorSets2                                 = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorSets2")
 	vtable.CmdBindDescriptorSets2KHR                              = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorSets2KHR")
 	vtable.CmdBindIndexBuffer                                     = auto_cast GetDeviceProcAddr(device, "vkCmdBindIndexBuffer")
+	vtable.CmdBindIndexBuffer2                                    = auto_cast GetDeviceProcAddr(device, "vkCmdBindIndexBuffer2")
 	vtable.CmdBindIndexBuffer2KHR                                 = auto_cast GetDeviceProcAddr(device, "vkCmdBindIndexBuffer2KHR")
 	vtable.CmdBindInvocationMaskHUAWEI                            = auto_cast GetDeviceProcAddr(device, "vkCmdBindInvocationMaskHUAWEI")
 	vtable.CmdBindPipeline                                        = auto_cast GetDeviceProcAddr(device, "vkCmdBindPipeline")
@@ -2657,11 +2817,14 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CmdBuildAccelerationStructureNV                        = auto_cast GetDeviceProcAddr(device, "vkCmdBuildAccelerationStructureNV")
 	vtable.CmdBuildAccelerationStructuresIndirectKHR              = auto_cast GetDeviceProcAddr(device, "vkCmdBuildAccelerationStructuresIndirectKHR")
 	vtable.CmdBuildAccelerationStructuresKHR                      = auto_cast GetDeviceProcAddr(device, "vkCmdBuildAccelerationStructuresKHR")
+	vtable.CmdBuildClusterAccelerationStructureIndirectNV         = auto_cast GetDeviceProcAddr(device, "vkCmdBuildClusterAccelerationStructureIndirectNV")
 	vtable.CmdBuildMicromapsEXT                                   = auto_cast GetDeviceProcAddr(device, "vkCmdBuildMicromapsEXT")
+	vtable.CmdBuildPartitionedAccelerationStructuresNV            = auto_cast GetDeviceProcAddr(device, "vkCmdBuildPartitionedAccelerationStructuresNV")
 	vtable.CmdClearAttachments                                    = auto_cast GetDeviceProcAddr(device, "vkCmdClearAttachments")
 	vtable.CmdClearColorImage                                     = auto_cast GetDeviceProcAddr(device, "vkCmdClearColorImage")
 	vtable.CmdClearDepthStencilImage                              = auto_cast GetDeviceProcAddr(device, "vkCmdClearDepthStencilImage")
 	vtable.CmdControlVideoCodingKHR                               = auto_cast GetDeviceProcAddr(device, "vkCmdControlVideoCodingKHR")
+	vtable.CmdConvertCooperativeVectorMatrixNV                    = auto_cast GetDeviceProcAddr(device, "vkCmdConvertCooperativeVectorMatrixNV")
 	vtable.CmdCopyAccelerationStructureKHR                        = auto_cast GetDeviceProcAddr(device, "vkCmdCopyAccelerationStructureKHR")
 	vtable.CmdCopyAccelerationStructureNV                         = auto_cast GetDeviceProcAddr(device, "vkCmdCopyAccelerationStructureNV")
 	vtable.CmdCopyAccelerationStructureToMemoryKHR                = auto_cast GetDeviceProcAddr(device, "vkCmdCopyAccelerationStructureToMemoryKHR")
@@ -2695,6 +2858,9 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CmdDispatch                                            = auto_cast GetDeviceProcAddr(device, "vkCmdDispatch")
 	vtable.CmdDispatchBase                                        = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchBase")
 	vtable.CmdDispatchBaseKHR                                     = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchBaseKHR")
+	vtable.CmdDispatchGraphAMDX                                   = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchGraphAMDX")
+	vtable.CmdDispatchGraphIndirectAMDX                           = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchGraphIndirectAMDX")
+	vtable.CmdDispatchGraphIndirectCountAMDX                      = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchGraphIndirectCountAMDX")
 	vtable.CmdDispatchIndirect                                    = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchIndirect")
 	vtable.CmdDraw                                                = auto_cast GetDeviceProcAddr(device, "vkCmdDraw")
 	vtable.CmdDrawClusterHUAWEI                                   = auto_cast GetDeviceProcAddr(device, "vkCmdDrawClusterHUAWEI")
@@ -2733,6 +2899,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CmdExecuteGeneratedCommandsEXT                         = auto_cast GetDeviceProcAddr(device, "vkCmdExecuteGeneratedCommandsEXT")
 	vtable.CmdExecuteGeneratedCommandsNV                          = auto_cast GetDeviceProcAddr(device, "vkCmdExecuteGeneratedCommandsNV")
 	vtable.CmdFillBuffer                                          = auto_cast GetDeviceProcAddr(device, "vkCmdFillBuffer")
+	vtable.CmdInitializeGraphScratchMemoryAMDX                    = auto_cast GetDeviceProcAddr(device, "vkCmdInitializeGraphScratchMemoryAMDX")
 	vtable.CmdInsertDebugUtilsLabelEXT                            = auto_cast GetDeviceProcAddr(device, "vkCmdInsertDebugUtilsLabelEXT")
 	vtable.CmdNextSubpass                                         = auto_cast GetDeviceProcAddr(device, "vkCmdNextSubpass")
 	vtable.CmdNextSubpass2                                        = auto_cast GetDeviceProcAddr(device, "vkCmdNextSubpass2")
@@ -2744,9 +2911,14 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CmdPreprocessGeneratedCommandsEXT                      = auto_cast GetDeviceProcAddr(device, "vkCmdPreprocessGeneratedCommandsEXT")
 	vtable.CmdPreprocessGeneratedCommandsNV                       = auto_cast GetDeviceProcAddr(device, "vkCmdPreprocessGeneratedCommandsNV")
 	vtable.CmdPushConstants                                       = auto_cast GetDeviceProcAddr(device, "vkCmdPushConstants")
+	vtable.CmdPushConstants2                                      = auto_cast GetDeviceProcAddr(device, "vkCmdPushConstants2")
 	vtable.CmdPushConstants2KHR                                   = auto_cast GetDeviceProcAddr(device, "vkCmdPushConstants2KHR")
+	vtable.CmdPushDescriptorSet                                   = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSet")
+	vtable.CmdPushDescriptorSet2                                  = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSet2")
 	vtable.CmdPushDescriptorSet2KHR                               = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSet2KHR")
 	vtable.CmdPushDescriptorSetKHR                                = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetKHR")
+	vtable.CmdPushDescriptorSetWithTemplate                       = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplate")
+	vtable.CmdPushDescriptorSetWithTemplate2                      = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplate2")
 	vtable.CmdPushDescriptorSetWithTemplate2KHR                   = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplate2KHR")
 	vtable.CmdPushDescriptorSetWithTemplateKHR                    = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplateKHR")
 	vtable.CmdResetEvent                                          = auto_cast GetDeviceProcAddr(device, "vkCmdResetEvent")
@@ -2810,6 +2982,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CmdSetFrontFace                                        = auto_cast GetDeviceProcAddr(device, "vkCmdSetFrontFace")
 	vtable.CmdSetFrontFaceEXT                                     = auto_cast GetDeviceProcAddr(device, "vkCmdSetFrontFaceEXT")
 	vtable.CmdSetLineRasterizationModeEXT                         = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineRasterizationModeEXT")
+	vtable.CmdSetLineStipple                                      = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineStipple")
 	vtable.CmdSetLineStippleEXT                                   = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineStippleEXT")
 	vtable.CmdSetLineStippleEnableEXT                             = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineStippleEnableEXT")
 	vtable.CmdSetLineStippleKHR                                   = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineStippleKHR")
@@ -2831,7 +3004,9 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CmdSetRasterizerDiscardEnable                          = auto_cast GetDeviceProcAddr(device, "vkCmdSetRasterizerDiscardEnable")
 	vtable.CmdSetRasterizerDiscardEnableEXT                       = auto_cast GetDeviceProcAddr(device, "vkCmdSetRasterizerDiscardEnableEXT")
 	vtable.CmdSetRayTracingPipelineStackSizeKHR                   = auto_cast GetDeviceProcAddr(device, "vkCmdSetRayTracingPipelineStackSizeKHR")
+	vtable.CmdSetRenderingAttachmentLocations                     = auto_cast GetDeviceProcAddr(device, "vkCmdSetRenderingAttachmentLocations")
 	vtable.CmdSetRenderingAttachmentLocationsKHR                  = auto_cast GetDeviceProcAddr(device, "vkCmdSetRenderingAttachmentLocationsKHR")
+	vtable.CmdSetRenderingInputAttachmentIndices                  = auto_cast GetDeviceProcAddr(device, "vkCmdSetRenderingInputAttachmentIndices")
 	vtable.CmdSetRenderingInputAttachmentIndicesKHR               = auto_cast GetDeviceProcAddr(device, "vkCmdSetRenderingInputAttachmentIndicesKHR")
 	vtable.CmdSetRepresentativeFragmentTestEnableNV               = auto_cast GetDeviceProcAddr(device, "vkCmdSetRepresentativeFragmentTestEnableNV")
 	vtable.CmdSetSampleLocationsEXT                               = auto_cast GetDeviceProcAddr(device, "vkCmdSetSampleLocationsEXT")
@@ -2876,11 +3051,15 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CmdWriteTimestamp2                                     = auto_cast GetDeviceProcAddr(device, "vkCmdWriteTimestamp2")
 	vtable.CmdWriteTimestamp2KHR                                  = auto_cast GetDeviceProcAddr(device, "vkCmdWriteTimestamp2KHR")
 	vtable.CompileDeferredNV                                      = auto_cast GetDeviceProcAddr(device, "vkCompileDeferredNV")
+	vtable.ConvertCooperativeVectorMatrixNV                       = auto_cast GetDeviceProcAddr(device, "vkConvertCooperativeVectorMatrixNV")
 	vtable.CopyAccelerationStructureKHR                           = auto_cast GetDeviceProcAddr(device, "vkCopyAccelerationStructureKHR")
 	vtable.CopyAccelerationStructureToMemoryKHR                   = auto_cast GetDeviceProcAddr(device, "vkCopyAccelerationStructureToMemoryKHR")
+	vtable.CopyImageToImage                                       = auto_cast GetDeviceProcAddr(device, "vkCopyImageToImage")
 	vtable.CopyImageToImageEXT                                    = auto_cast GetDeviceProcAddr(device, "vkCopyImageToImageEXT")
+	vtable.CopyImageToMemory                                      = auto_cast GetDeviceProcAddr(device, "vkCopyImageToMemory")
 	vtable.CopyImageToMemoryEXT                                   = auto_cast GetDeviceProcAddr(device, "vkCopyImageToMemoryEXT")
 	vtable.CopyMemoryToAccelerationStructureKHR                   = auto_cast GetDeviceProcAddr(device, "vkCopyMemoryToAccelerationStructureKHR")
+	vtable.CopyMemoryToImage                                      = auto_cast GetDeviceProcAddr(device, "vkCopyMemoryToImage")
 	vtable.CopyMemoryToImageEXT                                   = auto_cast GetDeviceProcAddr(device, "vkCopyMemoryToImageEXT")
 	vtable.CopyMemoryToMicromapEXT                                = auto_cast GetDeviceProcAddr(device, "vkCopyMemoryToMicromapEXT")
 	vtable.CopyMicromapEXT                                        = auto_cast GetDeviceProcAddr(device, "vkCopyMicromapEXT")
@@ -2901,6 +3080,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.CreateDescriptorUpdateTemplate                         = auto_cast GetDeviceProcAddr(device, "vkCreateDescriptorUpdateTemplate")
 	vtable.CreateDescriptorUpdateTemplateKHR                      = auto_cast GetDeviceProcAddr(device, "vkCreateDescriptorUpdateTemplateKHR")
 	vtable.CreateEvent                                            = auto_cast GetDeviceProcAddr(device, "vkCreateEvent")
+	vtable.CreateExecutionGraphPipelinesAMDX                      = auto_cast GetDeviceProcAddr(device, "vkCreateExecutionGraphPipelinesAMDX")
 	vtable.CreateFence                                            = auto_cast GetDeviceProcAddr(device, "vkCreateFence")
 	vtable.CreateFramebuffer                                      = auto_cast GetDeviceProcAddr(device, "vkCreateFramebuffer")
 	vtable.CreateGraphicsPipelines                                = auto_cast GetDeviceProcAddr(device, "vkCreateGraphicsPipelines")
@@ -3003,6 +3183,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.GetBufferOpaqueCaptureDescriptorDataEXT                = auto_cast GetDeviceProcAddr(device, "vkGetBufferOpaqueCaptureDescriptorDataEXT")
 	vtable.GetCalibratedTimestampsEXT                             = auto_cast GetDeviceProcAddr(device, "vkGetCalibratedTimestampsEXT")
 	vtable.GetCalibratedTimestampsKHR                             = auto_cast GetDeviceProcAddr(device, "vkGetCalibratedTimestampsKHR")
+	vtable.GetClusterAccelerationStructureBuildSizesNV            = auto_cast GetDeviceProcAddr(device, "vkGetClusterAccelerationStructureBuildSizesNV")
 	vtable.GetCudaModuleCacheNV                                   = auto_cast GetDeviceProcAddr(device, "vkGetCudaModuleCacheNV")
 	vtable.GetDeferredOperationMaxConcurrencyKHR                  = auto_cast GetDeviceProcAddr(device, "vkGetDeferredOperationMaxConcurrencyKHR")
 	vtable.GetDeferredOperationResultKHR                          = auto_cast GetDeviceProcAddr(device, "vkGetDeferredOperationResultKHR")
@@ -3026,6 +3207,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.GetDeviceImageMemoryRequirementsKHR                    = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageMemoryRequirementsKHR")
 	vtable.GetDeviceImageSparseMemoryRequirements                 = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageSparseMemoryRequirements")
 	vtable.GetDeviceImageSparseMemoryRequirementsKHR              = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageSparseMemoryRequirementsKHR")
+	vtable.GetDeviceImageSubresourceLayout                        = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageSubresourceLayout")
 	vtable.GetDeviceImageSubresourceLayoutKHR                     = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageSubresourceLayoutKHR")
 	vtable.GetDeviceMemoryCommitment                              = auto_cast GetDeviceProcAddr(device, "vkGetDeviceMemoryCommitment")
 	vtable.GetDeviceMemoryOpaqueCaptureAddress                    = auto_cast GetDeviceProcAddr(device, "vkGetDeviceMemoryOpaqueCaptureAddress")
@@ -3038,6 +3220,8 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.GetDynamicRenderingTilePropertiesQCOM                  = auto_cast GetDeviceProcAddr(device, "vkGetDynamicRenderingTilePropertiesQCOM")
 	vtable.GetEncodedVideoSessionParametersKHR                    = auto_cast GetDeviceProcAddr(device, "vkGetEncodedVideoSessionParametersKHR")
 	vtable.GetEventStatus                                         = auto_cast GetDeviceProcAddr(device, "vkGetEventStatus")
+	vtable.GetExecutionGraphPipelineNodeIndexAMDX                 = auto_cast GetDeviceProcAddr(device, "vkGetExecutionGraphPipelineNodeIndexAMDX")
+	vtable.GetExecutionGraphPipelineScratchSizeAMDX               = auto_cast GetDeviceProcAddr(device, "vkGetExecutionGraphPipelineScratchSizeAMDX")
 	vtable.GetFenceFdKHR                                          = auto_cast GetDeviceProcAddr(device, "vkGetFenceFdKHR")
 	vtable.GetFenceStatus                                         = auto_cast GetDeviceProcAddr(device, "vkGetFenceStatus")
 	vtable.GetFenceWin32HandleKHR                                 = auto_cast GetDeviceProcAddr(device, "vkGetFenceWin32HandleKHR")
@@ -3053,20 +3237,25 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.GetImageSparseMemoryRequirements2                      = auto_cast GetDeviceProcAddr(device, "vkGetImageSparseMemoryRequirements2")
 	vtable.GetImageSparseMemoryRequirements2KHR                   = auto_cast GetDeviceProcAddr(device, "vkGetImageSparseMemoryRequirements2KHR")
 	vtable.GetImageSubresourceLayout                              = auto_cast GetDeviceProcAddr(device, "vkGetImageSubresourceLayout")
+	vtable.GetImageSubresourceLayout2                             = auto_cast GetDeviceProcAddr(device, "vkGetImageSubresourceLayout2")
 	vtable.GetImageSubresourceLayout2EXT                          = auto_cast GetDeviceProcAddr(device, "vkGetImageSubresourceLayout2EXT")
 	vtable.GetImageSubresourceLayout2KHR                          = auto_cast GetDeviceProcAddr(device, "vkGetImageSubresourceLayout2KHR")
 	vtable.GetImageViewAddressNVX                                 = auto_cast GetDeviceProcAddr(device, "vkGetImageViewAddressNVX")
+	vtable.GetImageViewHandle64NVX                                = auto_cast GetDeviceProcAddr(device, "vkGetImageViewHandle64NVX")
 	vtable.GetImageViewHandleNVX                                  = auto_cast GetDeviceProcAddr(device, "vkGetImageViewHandleNVX")
 	vtable.GetImageViewOpaqueCaptureDescriptorDataEXT             = auto_cast GetDeviceProcAddr(device, "vkGetImageViewOpaqueCaptureDescriptorDataEXT")
 	vtable.GetLatencyTimingsNV                                    = auto_cast GetDeviceProcAddr(device, "vkGetLatencyTimingsNV")
 	vtable.GetMemoryFdKHR                                         = auto_cast GetDeviceProcAddr(device, "vkGetMemoryFdKHR")
 	vtable.GetMemoryFdPropertiesKHR                               = auto_cast GetDeviceProcAddr(device, "vkGetMemoryFdPropertiesKHR")
 	vtable.GetMemoryHostPointerPropertiesEXT                      = auto_cast GetDeviceProcAddr(device, "vkGetMemoryHostPointerPropertiesEXT")
+	vtable.GetMemoryMetalHandleEXT                                = auto_cast GetDeviceProcAddr(device, "vkGetMemoryMetalHandleEXT")
+	vtable.GetMemoryMetalHandlePropertiesEXT                      = auto_cast GetDeviceProcAddr(device, "vkGetMemoryMetalHandlePropertiesEXT")
 	vtable.GetMemoryRemoteAddressNV                               = auto_cast GetDeviceProcAddr(device, "vkGetMemoryRemoteAddressNV")
 	vtable.GetMemoryWin32HandleKHR                                = auto_cast GetDeviceProcAddr(device, "vkGetMemoryWin32HandleKHR")
 	vtable.GetMemoryWin32HandleNV                                 = auto_cast GetDeviceProcAddr(device, "vkGetMemoryWin32HandleNV")
 	vtable.GetMemoryWin32HandlePropertiesKHR                      = auto_cast GetDeviceProcAddr(device, "vkGetMemoryWin32HandlePropertiesKHR")
 	vtable.GetMicromapBuildSizesEXT                               = auto_cast GetDeviceProcAddr(device, "vkGetMicromapBuildSizesEXT")
+	vtable.GetPartitionedAccelerationStructuresBuildSizesNV       = auto_cast GetDeviceProcAddr(device, "vkGetPartitionedAccelerationStructuresBuildSizesNV")
 	vtable.GetPastPresentationTimingGOOGLE                        = auto_cast GetDeviceProcAddr(device, "vkGetPastPresentationTimingGOOGLE")
 	vtable.GetPerformanceParameterINTEL                           = auto_cast GetDeviceProcAddr(device, "vkGetPerformanceParameterINTEL")
 	vtable.GetPipelineBinaryDataKHR                               = auto_cast GetDeviceProcAddr(device, "vkGetPipelineBinaryDataKHR")
@@ -3089,6 +3278,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.GetRayTracingShaderGroupStackSizeKHR                   = auto_cast GetDeviceProcAddr(device, "vkGetRayTracingShaderGroupStackSizeKHR")
 	vtable.GetRefreshCycleDurationGOOGLE                          = auto_cast GetDeviceProcAddr(device, "vkGetRefreshCycleDurationGOOGLE")
 	vtable.GetRenderAreaGranularity                               = auto_cast GetDeviceProcAddr(device, "vkGetRenderAreaGranularity")
+	vtable.GetRenderingAreaGranularity                            = auto_cast GetDeviceProcAddr(device, "vkGetRenderingAreaGranularity")
 	vtable.GetRenderingAreaGranularityKHR                         = auto_cast GetDeviceProcAddr(device, "vkGetRenderingAreaGranularityKHR")
 	vtable.GetSamplerOpaqueCaptureDescriptorDataEXT               = auto_cast GetDeviceProcAddr(device, "vkGetSamplerOpaqueCaptureDescriptorDataEXT")
 	vtable.GetSemaphoreCounterValue                               = auto_cast GetDeviceProcAddr(device, "vkGetSemaphoreCounterValue")
@@ -3112,6 +3302,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.InvalidateMappedMemoryRanges                           = auto_cast GetDeviceProcAddr(device, "vkInvalidateMappedMemoryRanges")
 	vtable.LatencySleepNV                                         = auto_cast GetDeviceProcAddr(device, "vkLatencySleepNV")
 	vtable.MapMemory                                              = auto_cast GetDeviceProcAddr(device, "vkMapMemory")
+	vtable.MapMemory2                                             = auto_cast GetDeviceProcAddr(device, "vkMapMemory2")
 	vtable.MapMemory2KHR                                          = auto_cast GetDeviceProcAddr(device, "vkMapMemory2KHR")
 	vtable.MergePipelineCaches                                    = auto_cast GetDeviceProcAddr(device, "vkMergePipelineCaches")
 	vtable.MergeValidationCachesEXT                               = auto_cast GetDeviceProcAddr(device, "vkMergeValidationCachesEXT")
@@ -3152,11 +3343,13 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.SetPrivateDataEXT                                      = auto_cast GetDeviceProcAddr(device, "vkSetPrivateDataEXT")
 	vtable.SignalSemaphore                                        = auto_cast GetDeviceProcAddr(device, "vkSignalSemaphore")
 	vtable.SignalSemaphoreKHR                                     = auto_cast GetDeviceProcAddr(device, "vkSignalSemaphoreKHR")
+	vtable.TransitionImageLayout                                  = auto_cast GetDeviceProcAddr(device, "vkTransitionImageLayout")
 	vtable.TransitionImageLayoutEXT                               = auto_cast GetDeviceProcAddr(device, "vkTransitionImageLayoutEXT")
 	vtable.TrimCommandPool                                        = auto_cast GetDeviceProcAddr(device, "vkTrimCommandPool")
 	vtable.TrimCommandPoolKHR                                     = auto_cast GetDeviceProcAddr(device, "vkTrimCommandPoolKHR")
 	vtable.UninitializePerformanceApiINTEL                        = auto_cast GetDeviceProcAddr(device, "vkUninitializePerformanceApiINTEL")
 	vtable.UnmapMemory                                            = auto_cast GetDeviceProcAddr(device, "vkUnmapMemory")
+	vtable.UnmapMemory2                                           = auto_cast GetDeviceProcAddr(device, "vkUnmapMemory2")
 	vtable.UnmapMemory2KHR                                        = auto_cast GetDeviceProcAddr(device, "vkUnmapMemory2KHR")
 	vtable.UpdateDescriptorSetWithTemplate                        = auto_cast GetDeviceProcAddr(device, "vkUpdateDescriptorSetWithTemplate")
 	vtable.UpdateDescriptorSetWithTemplateKHR                     = auto_cast GetDeviceProcAddr(device, "vkUpdateDescriptorSetWithTemplateKHR")
@@ -3209,8 +3402,10 @@ load_proc_addresses_device :: proc(device: Device) {
 	CmdBindDescriptorBufferEmbeddedSamplersEXT             = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorBufferEmbeddedSamplersEXT")
 	CmdBindDescriptorBuffersEXT                            = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorBuffersEXT")
 	CmdBindDescriptorSets                                  = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorSets")
+	CmdBindDescriptorSets2                                 = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorSets2")
 	CmdBindDescriptorSets2KHR                              = auto_cast GetDeviceProcAddr(device, "vkCmdBindDescriptorSets2KHR")
 	CmdBindIndexBuffer                                     = auto_cast GetDeviceProcAddr(device, "vkCmdBindIndexBuffer")
+	CmdBindIndexBuffer2                                    = auto_cast GetDeviceProcAddr(device, "vkCmdBindIndexBuffer2")
 	CmdBindIndexBuffer2KHR                                 = auto_cast GetDeviceProcAddr(device, "vkCmdBindIndexBuffer2KHR")
 	CmdBindInvocationMaskHUAWEI                            = auto_cast GetDeviceProcAddr(device, "vkCmdBindInvocationMaskHUAWEI")
 	CmdBindPipeline                                        = auto_cast GetDeviceProcAddr(device, "vkCmdBindPipeline")
@@ -3227,11 +3422,14 @@ load_proc_addresses_device :: proc(device: Device) {
 	CmdBuildAccelerationStructureNV                        = auto_cast GetDeviceProcAddr(device, "vkCmdBuildAccelerationStructureNV")
 	CmdBuildAccelerationStructuresIndirectKHR              = auto_cast GetDeviceProcAddr(device, "vkCmdBuildAccelerationStructuresIndirectKHR")
 	CmdBuildAccelerationStructuresKHR                      = auto_cast GetDeviceProcAddr(device, "vkCmdBuildAccelerationStructuresKHR")
+	CmdBuildClusterAccelerationStructureIndirectNV         = auto_cast GetDeviceProcAddr(device, "vkCmdBuildClusterAccelerationStructureIndirectNV")
 	CmdBuildMicromapsEXT                                   = auto_cast GetDeviceProcAddr(device, "vkCmdBuildMicromapsEXT")
+	CmdBuildPartitionedAccelerationStructuresNV            = auto_cast GetDeviceProcAddr(device, "vkCmdBuildPartitionedAccelerationStructuresNV")
 	CmdClearAttachments                                    = auto_cast GetDeviceProcAddr(device, "vkCmdClearAttachments")
 	CmdClearColorImage                                     = auto_cast GetDeviceProcAddr(device, "vkCmdClearColorImage")
 	CmdClearDepthStencilImage                              = auto_cast GetDeviceProcAddr(device, "vkCmdClearDepthStencilImage")
 	CmdControlVideoCodingKHR                               = auto_cast GetDeviceProcAddr(device, "vkCmdControlVideoCodingKHR")
+	CmdConvertCooperativeVectorMatrixNV                    = auto_cast GetDeviceProcAddr(device, "vkCmdConvertCooperativeVectorMatrixNV")
 	CmdCopyAccelerationStructureKHR                        = auto_cast GetDeviceProcAddr(device, "vkCmdCopyAccelerationStructureKHR")
 	CmdCopyAccelerationStructureNV                         = auto_cast GetDeviceProcAddr(device, "vkCmdCopyAccelerationStructureNV")
 	CmdCopyAccelerationStructureToMemoryKHR                = auto_cast GetDeviceProcAddr(device, "vkCmdCopyAccelerationStructureToMemoryKHR")
@@ -3265,6 +3463,9 @@ load_proc_addresses_device :: proc(device: Device) {
 	CmdDispatch                                            = auto_cast GetDeviceProcAddr(device, "vkCmdDispatch")
 	CmdDispatchBase                                        = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchBase")
 	CmdDispatchBaseKHR                                     = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchBaseKHR")
+	CmdDispatchGraphAMDX                                   = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchGraphAMDX")
+	CmdDispatchGraphIndirectAMDX                           = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchGraphIndirectAMDX")
+	CmdDispatchGraphIndirectCountAMDX                      = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchGraphIndirectCountAMDX")
 	CmdDispatchIndirect                                    = auto_cast GetDeviceProcAddr(device, "vkCmdDispatchIndirect")
 	CmdDraw                                                = auto_cast GetDeviceProcAddr(device, "vkCmdDraw")
 	CmdDrawClusterHUAWEI                                   = auto_cast GetDeviceProcAddr(device, "vkCmdDrawClusterHUAWEI")
@@ -3303,6 +3504,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	CmdExecuteGeneratedCommandsEXT                         = auto_cast GetDeviceProcAddr(device, "vkCmdExecuteGeneratedCommandsEXT")
 	CmdExecuteGeneratedCommandsNV                          = auto_cast GetDeviceProcAddr(device, "vkCmdExecuteGeneratedCommandsNV")
 	CmdFillBuffer                                          = auto_cast GetDeviceProcAddr(device, "vkCmdFillBuffer")
+	CmdInitializeGraphScratchMemoryAMDX                    = auto_cast GetDeviceProcAddr(device, "vkCmdInitializeGraphScratchMemoryAMDX")
 	CmdInsertDebugUtilsLabelEXT                            = auto_cast GetDeviceProcAddr(device, "vkCmdInsertDebugUtilsLabelEXT")
 	CmdNextSubpass                                         = auto_cast GetDeviceProcAddr(device, "vkCmdNextSubpass")
 	CmdNextSubpass2                                        = auto_cast GetDeviceProcAddr(device, "vkCmdNextSubpass2")
@@ -3314,9 +3516,14 @@ load_proc_addresses_device :: proc(device: Device) {
 	CmdPreprocessGeneratedCommandsEXT                      = auto_cast GetDeviceProcAddr(device, "vkCmdPreprocessGeneratedCommandsEXT")
 	CmdPreprocessGeneratedCommandsNV                       = auto_cast GetDeviceProcAddr(device, "vkCmdPreprocessGeneratedCommandsNV")
 	CmdPushConstants                                       = auto_cast GetDeviceProcAddr(device, "vkCmdPushConstants")
+	CmdPushConstants2                                      = auto_cast GetDeviceProcAddr(device, "vkCmdPushConstants2")
 	CmdPushConstants2KHR                                   = auto_cast GetDeviceProcAddr(device, "vkCmdPushConstants2KHR")
+	CmdPushDescriptorSet                                   = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSet")
+	CmdPushDescriptorSet2                                  = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSet2")
 	CmdPushDescriptorSet2KHR                               = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSet2KHR")
 	CmdPushDescriptorSetKHR                                = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetKHR")
+	CmdPushDescriptorSetWithTemplate                       = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplate")
+	CmdPushDescriptorSetWithTemplate2                      = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplate2")
 	CmdPushDescriptorSetWithTemplate2KHR                   = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplate2KHR")
 	CmdPushDescriptorSetWithTemplateKHR                    = auto_cast GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplateKHR")
 	CmdResetEvent                                          = auto_cast GetDeviceProcAddr(device, "vkCmdResetEvent")
@@ -3380,6 +3587,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	CmdSetFrontFace                                        = auto_cast GetDeviceProcAddr(device, "vkCmdSetFrontFace")
 	CmdSetFrontFaceEXT                                     = auto_cast GetDeviceProcAddr(device, "vkCmdSetFrontFaceEXT")
 	CmdSetLineRasterizationModeEXT                         = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineRasterizationModeEXT")
+	CmdSetLineStipple                                      = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineStipple")
 	CmdSetLineStippleEXT                                   = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineStippleEXT")
 	CmdSetLineStippleEnableEXT                             = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineStippleEnableEXT")
 	CmdSetLineStippleKHR                                   = auto_cast GetDeviceProcAddr(device, "vkCmdSetLineStippleKHR")
@@ -3401,7 +3609,9 @@ load_proc_addresses_device :: proc(device: Device) {
 	CmdSetRasterizerDiscardEnable                          = auto_cast GetDeviceProcAddr(device, "vkCmdSetRasterizerDiscardEnable")
 	CmdSetRasterizerDiscardEnableEXT                       = auto_cast GetDeviceProcAddr(device, "vkCmdSetRasterizerDiscardEnableEXT")
 	CmdSetRayTracingPipelineStackSizeKHR                   = auto_cast GetDeviceProcAddr(device, "vkCmdSetRayTracingPipelineStackSizeKHR")
+	CmdSetRenderingAttachmentLocations                     = auto_cast GetDeviceProcAddr(device, "vkCmdSetRenderingAttachmentLocations")
 	CmdSetRenderingAttachmentLocationsKHR                  = auto_cast GetDeviceProcAddr(device, "vkCmdSetRenderingAttachmentLocationsKHR")
+	CmdSetRenderingInputAttachmentIndices                  = auto_cast GetDeviceProcAddr(device, "vkCmdSetRenderingInputAttachmentIndices")
 	CmdSetRenderingInputAttachmentIndicesKHR               = auto_cast GetDeviceProcAddr(device, "vkCmdSetRenderingInputAttachmentIndicesKHR")
 	CmdSetRepresentativeFragmentTestEnableNV               = auto_cast GetDeviceProcAddr(device, "vkCmdSetRepresentativeFragmentTestEnableNV")
 	CmdSetSampleLocationsEXT                               = auto_cast GetDeviceProcAddr(device, "vkCmdSetSampleLocationsEXT")
@@ -3446,11 +3656,15 @@ load_proc_addresses_device :: proc(device: Device) {
 	CmdWriteTimestamp2                                     = auto_cast GetDeviceProcAddr(device, "vkCmdWriteTimestamp2")
 	CmdWriteTimestamp2KHR                                  = auto_cast GetDeviceProcAddr(device, "vkCmdWriteTimestamp2KHR")
 	CompileDeferredNV                                      = auto_cast GetDeviceProcAddr(device, "vkCompileDeferredNV")
+	ConvertCooperativeVectorMatrixNV                       = auto_cast GetDeviceProcAddr(device, "vkConvertCooperativeVectorMatrixNV")
 	CopyAccelerationStructureKHR                           = auto_cast GetDeviceProcAddr(device, "vkCopyAccelerationStructureKHR")
 	CopyAccelerationStructureToMemoryKHR                   = auto_cast GetDeviceProcAddr(device, "vkCopyAccelerationStructureToMemoryKHR")
+	CopyImageToImage                                       = auto_cast GetDeviceProcAddr(device, "vkCopyImageToImage")
 	CopyImageToImageEXT                                    = auto_cast GetDeviceProcAddr(device, "vkCopyImageToImageEXT")
+	CopyImageToMemory                                      = auto_cast GetDeviceProcAddr(device, "vkCopyImageToMemory")
 	CopyImageToMemoryEXT                                   = auto_cast GetDeviceProcAddr(device, "vkCopyImageToMemoryEXT")
 	CopyMemoryToAccelerationStructureKHR                   = auto_cast GetDeviceProcAddr(device, "vkCopyMemoryToAccelerationStructureKHR")
+	CopyMemoryToImage                                      = auto_cast GetDeviceProcAddr(device, "vkCopyMemoryToImage")
 	CopyMemoryToImageEXT                                   = auto_cast GetDeviceProcAddr(device, "vkCopyMemoryToImageEXT")
 	CopyMemoryToMicromapEXT                                = auto_cast GetDeviceProcAddr(device, "vkCopyMemoryToMicromapEXT")
 	CopyMicromapEXT                                        = auto_cast GetDeviceProcAddr(device, "vkCopyMicromapEXT")
@@ -3471,6 +3685,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	CreateDescriptorUpdateTemplate                         = auto_cast GetDeviceProcAddr(device, "vkCreateDescriptorUpdateTemplate")
 	CreateDescriptorUpdateTemplateKHR                      = auto_cast GetDeviceProcAddr(device, "vkCreateDescriptorUpdateTemplateKHR")
 	CreateEvent                                            = auto_cast GetDeviceProcAddr(device, "vkCreateEvent")
+	CreateExecutionGraphPipelinesAMDX                      = auto_cast GetDeviceProcAddr(device, "vkCreateExecutionGraphPipelinesAMDX")
 	CreateFence                                            = auto_cast GetDeviceProcAddr(device, "vkCreateFence")
 	CreateFramebuffer                                      = auto_cast GetDeviceProcAddr(device, "vkCreateFramebuffer")
 	CreateGraphicsPipelines                                = auto_cast GetDeviceProcAddr(device, "vkCreateGraphicsPipelines")
@@ -3573,6 +3788,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	GetBufferOpaqueCaptureDescriptorDataEXT                = auto_cast GetDeviceProcAddr(device, "vkGetBufferOpaqueCaptureDescriptorDataEXT")
 	GetCalibratedTimestampsEXT                             = auto_cast GetDeviceProcAddr(device, "vkGetCalibratedTimestampsEXT")
 	GetCalibratedTimestampsKHR                             = auto_cast GetDeviceProcAddr(device, "vkGetCalibratedTimestampsKHR")
+	GetClusterAccelerationStructureBuildSizesNV            = auto_cast GetDeviceProcAddr(device, "vkGetClusterAccelerationStructureBuildSizesNV")
 	GetCudaModuleCacheNV                                   = auto_cast GetDeviceProcAddr(device, "vkGetCudaModuleCacheNV")
 	GetDeferredOperationMaxConcurrencyKHR                  = auto_cast GetDeviceProcAddr(device, "vkGetDeferredOperationMaxConcurrencyKHR")
 	GetDeferredOperationResultKHR                          = auto_cast GetDeviceProcAddr(device, "vkGetDeferredOperationResultKHR")
@@ -3596,6 +3812,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	GetDeviceImageMemoryRequirementsKHR                    = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageMemoryRequirementsKHR")
 	GetDeviceImageSparseMemoryRequirements                 = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageSparseMemoryRequirements")
 	GetDeviceImageSparseMemoryRequirementsKHR              = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageSparseMemoryRequirementsKHR")
+	GetDeviceImageSubresourceLayout                        = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageSubresourceLayout")
 	GetDeviceImageSubresourceLayoutKHR                     = auto_cast GetDeviceProcAddr(device, "vkGetDeviceImageSubresourceLayoutKHR")
 	GetDeviceMemoryCommitment                              = auto_cast GetDeviceProcAddr(device, "vkGetDeviceMemoryCommitment")
 	GetDeviceMemoryOpaqueCaptureAddress                    = auto_cast GetDeviceProcAddr(device, "vkGetDeviceMemoryOpaqueCaptureAddress")
@@ -3608,6 +3825,8 @@ load_proc_addresses_device :: proc(device: Device) {
 	GetDynamicRenderingTilePropertiesQCOM                  = auto_cast GetDeviceProcAddr(device, "vkGetDynamicRenderingTilePropertiesQCOM")
 	GetEncodedVideoSessionParametersKHR                    = auto_cast GetDeviceProcAddr(device, "vkGetEncodedVideoSessionParametersKHR")
 	GetEventStatus                                         = auto_cast GetDeviceProcAddr(device, "vkGetEventStatus")
+	GetExecutionGraphPipelineNodeIndexAMDX                 = auto_cast GetDeviceProcAddr(device, "vkGetExecutionGraphPipelineNodeIndexAMDX")
+	GetExecutionGraphPipelineScratchSizeAMDX               = auto_cast GetDeviceProcAddr(device, "vkGetExecutionGraphPipelineScratchSizeAMDX")
 	GetFenceFdKHR                                          = auto_cast GetDeviceProcAddr(device, "vkGetFenceFdKHR")
 	GetFenceStatus                                         = auto_cast GetDeviceProcAddr(device, "vkGetFenceStatus")
 	GetFenceWin32HandleKHR                                 = auto_cast GetDeviceProcAddr(device, "vkGetFenceWin32HandleKHR")
@@ -3623,20 +3842,25 @@ load_proc_addresses_device :: proc(device: Device) {
 	GetImageSparseMemoryRequirements2                      = auto_cast GetDeviceProcAddr(device, "vkGetImageSparseMemoryRequirements2")
 	GetImageSparseMemoryRequirements2KHR                   = auto_cast GetDeviceProcAddr(device, "vkGetImageSparseMemoryRequirements2KHR")
 	GetImageSubresourceLayout                              = auto_cast GetDeviceProcAddr(device, "vkGetImageSubresourceLayout")
+	GetImageSubresourceLayout2                             = auto_cast GetDeviceProcAddr(device, "vkGetImageSubresourceLayout2")
 	GetImageSubresourceLayout2EXT                          = auto_cast GetDeviceProcAddr(device, "vkGetImageSubresourceLayout2EXT")
 	GetImageSubresourceLayout2KHR                          = auto_cast GetDeviceProcAddr(device, "vkGetImageSubresourceLayout2KHR")
 	GetImageViewAddressNVX                                 = auto_cast GetDeviceProcAddr(device, "vkGetImageViewAddressNVX")
+	GetImageViewHandle64NVX                                = auto_cast GetDeviceProcAddr(device, "vkGetImageViewHandle64NVX")
 	GetImageViewHandleNVX                                  = auto_cast GetDeviceProcAddr(device, "vkGetImageViewHandleNVX")
 	GetImageViewOpaqueCaptureDescriptorDataEXT             = auto_cast GetDeviceProcAddr(device, "vkGetImageViewOpaqueCaptureDescriptorDataEXT")
 	GetLatencyTimingsNV                                    = auto_cast GetDeviceProcAddr(device, "vkGetLatencyTimingsNV")
 	GetMemoryFdKHR                                         = auto_cast GetDeviceProcAddr(device, "vkGetMemoryFdKHR")
 	GetMemoryFdPropertiesKHR                               = auto_cast GetDeviceProcAddr(device, "vkGetMemoryFdPropertiesKHR")
 	GetMemoryHostPointerPropertiesEXT                      = auto_cast GetDeviceProcAddr(device, "vkGetMemoryHostPointerPropertiesEXT")
+	GetMemoryMetalHandleEXT                                = auto_cast GetDeviceProcAddr(device, "vkGetMemoryMetalHandleEXT")
+	GetMemoryMetalHandlePropertiesEXT                      = auto_cast GetDeviceProcAddr(device, "vkGetMemoryMetalHandlePropertiesEXT")
 	GetMemoryRemoteAddressNV                               = auto_cast GetDeviceProcAddr(device, "vkGetMemoryRemoteAddressNV")
 	GetMemoryWin32HandleKHR                                = auto_cast GetDeviceProcAddr(device, "vkGetMemoryWin32HandleKHR")
 	GetMemoryWin32HandleNV                                 = auto_cast GetDeviceProcAddr(device, "vkGetMemoryWin32HandleNV")
 	GetMemoryWin32HandlePropertiesKHR                      = auto_cast GetDeviceProcAddr(device, "vkGetMemoryWin32HandlePropertiesKHR")
 	GetMicromapBuildSizesEXT                               = auto_cast GetDeviceProcAddr(device, "vkGetMicromapBuildSizesEXT")
+	GetPartitionedAccelerationStructuresBuildSizesNV       = auto_cast GetDeviceProcAddr(device, "vkGetPartitionedAccelerationStructuresBuildSizesNV")
 	GetPastPresentationTimingGOOGLE                        = auto_cast GetDeviceProcAddr(device, "vkGetPastPresentationTimingGOOGLE")
 	GetPerformanceParameterINTEL                           = auto_cast GetDeviceProcAddr(device, "vkGetPerformanceParameterINTEL")
 	GetPipelineBinaryDataKHR                               = auto_cast GetDeviceProcAddr(device, "vkGetPipelineBinaryDataKHR")
@@ -3659,6 +3883,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	GetRayTracingShaderGroupStackSizeKHR                   = auto_cast GetDeviceProcAddr(device, "vkGetRayTracingShaderGroupStackSizeKHR")
 	GetRefreshCycleDurationGOOGLE                          = auto_cast GetDeviceProcAddr(device, "vkGetRefreshCycleDurationGOOGLE")
 	GetRenderAreaGranularity                               = auto_cast GetDeviceProcAddr(device, "vkGetRenderAreaGranularity")
+	GetRenderingAreaGranularity                            = auto_cast GetDeviceProcAddr(device, "vkGetRenderingAreaGranularity")
 	GetRenderingAreaGranularityKHR                         = auto_cast GetDeviceProcAddr(device, "vkGetRenderingAreaGranularityKHR")
 	GetSamplerOpaqueCaptureDescriptorDataEXT               = auto_cast GetDeviceProcAddr(device, "vkGetSamplerOpaqueCaptureDescriptorDataEXT")
 	GetSemaphoreCounterValue                               = auto_cast GetDeviceProcAddr(device, "vkGetSemaphoreCounterValue")
@@ -3682,6 +3907,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	InvalidateMappedMemoryRanges                           = auto_cast GetDeviceProcAddr(device, "vkInvalidateMappedMemoryRanges")
 	LatencySleepNV                                         = auto_cast GetDeviceProcAddr(device, "vkLatencySleepNV")
 	MapMemory                                              = auto_cast GetDeviceProcAddr(device, "vkMapMemory")
+	MapMemory2                                             = auto_cast GetDeviceProcAddr(device, "vkMapMemory2")
 	MapMemory2KHR                                          = auto_cast GetDeviceProcAddr(device, "vkMapMemory2KHR")
 	MergePipelineCaches                                    = auto_cast GetDeviceProcAddr(device, "vkMergePipelineCaches")
 	MergeValidationCachesEXT                               = auto_cast GetDeviceProcAddr(device, "vkMergeValidationCachesEXT")
@@ -3722,11 +3948,13 @@ load_proc_addresses_device :: proc(device: Device) {
 	SetPrivateDataEXT                                      = auto_cast GetDeviceProcAddr(device, "vkSetPrivateDataEXT")
 	SignalSemaphore                                        = auto_cast GetDeviceProcAddr(device, "vkSignalSemaphore")
 	SignalSemaphoreKHR                                     = auto_cast GetDeviceProcAddr(device, "vkSignalSemaphoreKHR")
+	TransitionImageLayout                                  = auto_cast GetDeviceProcAddr(device, "vkTransitionImageLayout")
 	TransitionImageLayoutEXT                               = auto_cast GetDeviceProcAddr(device, "vkTransitionImageLayoutEXT")
 	TrimCommandPool                                        = auto_cast GetDeviceProcAddr(device, "vkTrimCommandPool")
 	TrimCommandPoolKHR                                     = auto_cast GetDeviceProcAddr(device, "vkTrimCommandPoolKHR")
 	UninitializePerformanceApiINTEL                        = auto_cast GetDeviceProcAddr(device, "vkUninitializePerformanceApiINTEL")
 	UnmapMemory                                            = auto_cast GetDeviceProcAddr(device, "vkUnmapMemory")
+	UnmapMemory2                                           = auto_cast GetDeviceProcAddr(device, "vkUnmapMemory2")
 	UnmapMemory2KHR                                        = auto_cast GetDeviceProcAddr(device, "vkUnmapMemory2KHR")
 	UpdateDescriptorSetWithTemplate                        = auto_cast GetDeviceProcAddr(device, "vkUpdateDescriptorSetWithTemplate")
 	UpdateDescriptorSetWithTemplateKHR                     = auto_cast GetDeviceProcAddr(device, "vkUpdateDescriptorSetWithTemplateKHR")
@@ -3743,97 +3971,103 @@ load_proc_addresses_device :: proc(device: Device) {
 }
 
 load_proc_addresses_instance :: proc(instance: Instance) {
-	AcquireDrmDisplayEXT                                            = auto_cast GetInstanceProcAddr(instance, "vkAcquireDrmDisplayEXT")
-	AcquireWinrtDisplayNV                                           = auto_cast GetInstanceProcAddr(instance, "vkAcquireWinrtDisplayNV")
-	CreateDebugReportCallbackEXT                                    = auto_cast GetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT")
-	CreateDebugUtilsMessengerEXT                                    = auto_cast GetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT")
-	CreateDevice                                                    = auto_cast GetInstanceProcAddr(instance, "vkCreateDevice")
-	CreateDisplayModeKHR                                            = auto_cast GetInstanceProcAddr(instance, "vkCreateDisplayModeKHR")
-	CreateDisplayPlaneSurfaceKHR                                    = auto_cast GetInstanceProcAddr(instance, "vkCreateDisplayPlaneSurfaceKHR")
-	CreateHeadlessSurfaceEXT                                        = auto_cast GetInstanceProcAddr(instance, "vkCreateHeadlessSurfaceEXT")
-	CreateIOSSurfaceMVK                                             = auto_cast GetInstanceProcAddr(instance, "vkCreateIOSSurfaceMVK")
-	CreateMacOSSurfaceMVK                                           = auto_cast GetInstanceProcAddr(instance, "vkCreateMacOSSurfaceMVK")
-	CreateMetalSurfaceEXT                                           = auto_cast GetInstanceProcAddr(instance, "vkCreateMetalSurfaceEXT")
-	CreateWaylandSurfaceKHR                                         = auto_cast GetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR")
-	CreateWin32SurfaceKHR                                           = auto_cast GetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR")
-	DebugReportMessageEXT                                           = auto_cast GetInstanceProcAddr(instance, "vkDebugReportMessageEXT")
-	DestroyDebugReportCallbackEXT                                   = auto_cast GetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT")
-	DestroyDebugUtilsMessengerEXT                                   = auto_cast GetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT")
-	DestroyInstance                                                 = auto_cast GetInstanceProcAddr(instance, "vkDestroyInstance")
-	DestroySurfaceKHR                                               = auto_cast GetInstanceProcAddr(instance, "vkDestroySurfaceKHR")
-	EnumerateDeviceExtensionProperties                              = auto_cast GetInstanceProcAddr(instance, "vkEnumerateDeviceExtensionProperties")
-	EnumerateDeviceLayerProperties                                  = auto_cast GetInstanceProcAddr(instance, "vkEnumerateDeviceLayerProperties")
-	EnumeratePhysicalDeviceGroups                                   = auto_cast GetInstanceProcAddr(instance, "vkEnumeratePhysicalDeviceGroups")
-	EnumeratePhysicalDeviceGroupsKHR                                = auto_cast GetInstanceProcAddr(instance, "vkEnumeratePhysicalDeviceGroupsKHR")
-	EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR   = auto_cast GetInstanceProcAddr(instance, "vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR")
-	EnumeratePhysicalDevices                                        = auto_cast GetInstanceProcAddr(instance, "vkEnumeratePhysicalDevices")
-	GetDisplayModeProperties2KHR                                    = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayModeProperties2KHR")
-	GetDisplayModePropertiesKHR                                     = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayModePropertiesKHR")
-	GetDisplayPlaneCapabilities2KHR                                 = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayPlaneCapabilities2KHR")
-	GetDisplayPlaneCapabilitiesKHR                                  = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayPlaneCapabilitiesKHR")
-	GetDisplayPlaneSupportedDisplaysKHR                             = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayPlaneSupportedDisplaysKHR")
-	GetDrmDisplayEXT                                                = auto_cast GetInstanceProcAddr(instance, "vkGetDrmDisplayEXT")
-	GetInstanceProcAddrLUNARG                                       = auto_cast GetInstanceProcAddr(instance, "vkGetInstanceProcAddrLUNARG")
-	GetPhysicalDeviceCalibrateableTimeDomainsEXT                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT")
-	GetPhysicalDeviceCalibrateableTimeDomainsKHR                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCalibrateableTimeDomainsKHR")
-	GetPhysicalDeviceCooperativeMatrixPropertiesKHR                 = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR")
-	GetPhysicalDeviceCooperativeMatrixPropertiesNV                  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesNV")
-	GetPhysicalDeviceDisplayPlaneProperties2KHR                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayPlaneProperties2KHR")
-	GetPhysicalDeviceDisplayPlanePropertiesKHR                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayPlanePropertiesKHR")
-	GetPhysicalDeviceDisplayProperties2KHR                          = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayProperties2KHR")
-	GetPhysicalDeviceDisplayPropertiesKHR                           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayPropertiesKHR")
-	GetPhysicalDeviceExternalBufferProperties                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalBufferProperties")
-	GetPhysicalDeviceExternalBufferPropertiesKHR                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalBufferPropertiesKHR")
-	GetPhysicalDeviceExternalFenceProperties                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalFenceProperties")
-	GetPhysicalDeviceExternalFencePropertiesKHR                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalFencePropertiesKHR")
-	GetPhysicalDeviceExternalImageFormatPropertiesNV                = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalImageFormatPropertiesNV")
-	GetPhysicalDeviceExternalSemaphoreProperties                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalSemaphoreProperties")
-	GetPhysicalDeviceExternalSemaphorePropertiesKHR                 = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR")
-	GetPhysicalDeviceFeatures                                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures")
-	GetPhysicalDeviceFeatures2                                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2")
-	GetPhysicalDeviceFeatures2KHR                                   = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2KHR")
-	GetPhysicalDeviceFormatProperties                               = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties")
-	GetPhysicalDeviceFormatProperties2                              = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2")
-	GetPhysicalDeviceFormatProperties2KHR                           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2KHR")
-	GetPhysicalDeviceFragmentShadingRatesKHR                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFragmentShadingRatesKHR")
-	GetPhysicalDeviceImageFormatProperties                          = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceImageFormatProperties")
-	GetPhysicalDeviceImageFormatProperties2                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceImageFormatProperties2")
-	GetPhysicalDeviceImageFormatProperties2KHR                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceImageFormatProperties2KHR")
-	GetPhysicalDeviceMemoryProperties                               = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceMemoryProperties")
-	GetPhysicalDeviceMemoryProperties2                              = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceMemoryProperties2")
-	GetPhysicalDeviceMemoryProperties2KHR                           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceMemoryProperties2KHR")
-	GetPhysicalDeviceMultisamplePropertiesEXT                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceMultisamplePropertiesEXT")
-	GetPhysicalDeviceOpticalFlowImageFormatsNV                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceOpticalFlowImageFormatsNV")
-	GetPhysicalDevicePresentRectanglesKHR                           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDevicePresentRectanglesKHR")
-	GetPhysicalDeviceProperties                                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties")
-	GetPhysicalDeviceProperties2                                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2")
-	GetPhysicalDeviceProperties2KHR                                 = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR")
-	GetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR")
-	GetPhysicalDeviceQueueFamilyProperties                          = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties")
-	GetPhysicalDeviceQueueFamilyProperties2                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties2")
-	GetPhysicalDeviceQueueFamilyProperties2KHR                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties2KHR")
-	GetPhysicalDeviceSparseImageFormatProperties                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSparseImageFormatProperties")
-	GetPhysicalDeviceSparseImageFormatProperties2                   = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSparseImageFormatProperties2")
-	GetPhysicalDeviceSparseImageFormatProperties2KHR                = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSparseImageFormatProperties2KHR")
-	GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV")
-	GetPhysicalDeviceSurfaceCapabilities2EXT                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT")
-	GetPhysicalDeviceSurfaceCapabilities2KHR                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceCapabilities2KHR")
-	GetPhysicalDeviceSurfaceCapabilitiesKHR                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")
-	GetPhysicalDeviceSurfaceFormats2KHR                             = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceFormats2KHR")
-	GetPhysicalDeviceSurfaceFormatsKHR                              = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceFormatsKHR")
-	GetPhysicalDeviceSurfacePresentModes2EXT                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfacePresentModes2EXT")
-	GetPhysicalDeviceSurfacePresentModesKHR                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfacePresentModesKHR")
-	GetPhysicalDeviceSurfaceSupportKHR                              = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceSupportKHR")
-	GetPhysicalDeviceToolProperties                                 = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceToolProperties")
-	GetPhysicalDeviceToolPropertiesEXT                              = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceToolPropertiesEXT")
-	GetPhysicalDeviceVideoCapabilitiesKHR                           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoCapabilitiesKHR")
-	GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR")
-	GetPhysicalDeviceVideoFormatPropertiesKHR                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoFormatPropertiesKHR")
-	GetPhysicalDeviceWaylandPresentationSupportKHR                  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceWaylandPresentationSupportKHR")
-	GetPhysicalDeviceWin32PresentationSupportKHR                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceWin32PresentationSupportKHR")
-	GetWinrtDisplayNV                                               = auto_cast GetInstanceProcAddr(instance, "vkGetWinrtDisplayNV")
-	ReleaseDisplayEXT                                               = auto_cast GetInstanceProcAddr(instance, "vkReleaseDisplayEXT")
-	SubmitDebugUtilsMessageEXT                                      = auto_cast GetInstanceProcAddr(instance, "vkSubmitDebugUtilsMessageEXT")
+	AcquireDrmDisplayEXT                                             = auto_cast GetInstanceProcAddr(instance, "vkAcquireDrmDisplayEXT")
+	AcquireWinrtDisplayNV                                            = auto_cast GetInstanceProcAddr(instance, "vkAcquireWinrtDisplayNV")
+	CreateDebugReportCallbackEXT                                     = auto_cast GetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT")
+	CreateDebugUtilsMessengerEXT                                     = auto_cast GetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT")
+	CreateDevice                                                     = auto_cast GetInstanceProcAddr(instance, "vkCreateDevice")
+	CreateDisplayModeKHR                                             = auto_cast GetInstanceProcAddr(instance, "vkCreateDisplayModeKHR")
+	CreateDisplayPlaneSurfaceKHR                                     = auto_cast GetInstanceProcAddr(instance, "vkCreateDisplayPlaneSurfaceKHR")
+	CreateHeadlessSurfaceEXT                                         = auto_cast GetInstanceProcAddr(instance, "vkCreateHeadlessSurfaceEXT")
+	CreateIOSSurfaceMVK                                              = auto_cast GetInstanceProcAddr(instance, "vkCreateIOSSurfaceMVK")
+	CreateMacOSSurfaceMVK                                            = auto_cast GetInstanceProcAddr(instance, "vkCreateMacOSSurfaceMVK")
+	CreateMetalSurfaceEXT                                            = auto_cast GetInstanceProcAddr(instance, "vkCreateMetalSurfaceEXT")
+	CreateWaylandSurfaceKHR                                          = auto_cast GetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR")
+	CreateWin32SurfaceKHR                                            = auto_cast GetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR")
+	CreateXcbSurfaceKHR                                              = auto_cast GetInstanceProcAddr(instance, "vkCreateXcbSurfaceKHR")
+	CreateXlibSurfaceKHR                                             = auto_cast GetInstanceProcAddr(instance, "vkCreateXlibSurfaceKHR")
+	DebugReportMessageEXT                                            = auto_cast GetInstanceProcAddr(instance, "vkDebugReportMessageEXT")
+	DestroyDebugReportCallbackEXT                                    = auto_cast GetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT")
+	DestroyDebugUtilsMessengerEXT                                    = auto_cast GetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT")
+	DestroyInstance                                                  = auto_cast GetInstanceProcAddr(instance, "vkDestroyInstance")
+	DestroySurfaceKHR                                                = auto_cast GetInstanceProcAddr(instance, "vkDestroySurfaceKHR")
+	EnumerateDeviceExtensionProperties                               = auto_cast GetInstanceProcAddr(instance, "vkEnumerateDeviceExtensionProperties")
+	EnumerateDeviceLayerProperties                                   = auto_cast GetInstanceProcAddr(instance, "vkEnumerateDeviceLayerProperties")
+	EnumeratePhysicalDeviceGroups                                    = auto_cast GetInstanceProcAddr(instance, "vkEnumeratePhysicalDeviceGroups")
+	EnumeratePhysicalDeviceGroupsKHR                                 = auto_cast GetInstanceProcAddr(instance, "vkEnumeratePhysicalDeviceGroupsKHR")
+	EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR    = auto_cast GetInstanceProcAddr(instance, "vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR")
+	EnumeratePhysicalDevices                                         = auto_cast GetInstanceProcAddr(instance, "vkEnumeratePhysicalDevices")
+	GetDisplayModeProperties2KHR                                     = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayModeProperties2KHR")
+	GetDisplayModePropertiesKHR                                      = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayModePropertiesKHR")
+	GetDisplayPlaneCapabilities2KHR                                  = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayPlaneCapabilities2KHR")
+	GetDisplayPlaneCapabilitiesKHR                                   = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayPlaneCapabilitiesKHR")
+	GetDisplayPlaneSupportedDisplaysKHR                              = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayPlaneSupportedDisplaysKHR")
+	GetDrmDisplayEXT                                                 = auto_cast GetInstanceProcAddr(instance, "vkGetDrmDisplayEXT")
+	GetInstanceProcAddrLUNARG                                        = auto_cast GetInstanceProcAddr(instance, "vkGetInstanceProcAddrLUNARG")
+	GetPhysicalDeviceCalibrateableTimeDomainsEXT                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT")
+	GetPhysicalDeviceCalibrateableTimeDomainsKHR                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCalibrateableTimeDomainsKHR")
+	GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV")
+	GetPhysicalDeviceCooperativeMatrixPropertiesKHR                  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR")
+	GetPhysicalDeviceCooperativeMatrixPropertiesNV                   = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesNV")
+	GetPhysicalDeviceCooperativeVectorPropertiesNV                   = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeVectorPropertiesNV")
+	GetPhysicalDeviceDisplayPlaneProperties2KHR                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayPlaneProperties2KHR")
+	GetPhysicalDeviceDisplayPlanePropertiesKHR                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayPlanePropertiesKHR")
+	GetPhysicalDeviceDisplayProperties2KHR                           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayProperties2KHR")
+	GetPhysicalDeviceDisplayPropertiesKHR                            = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayPropertiesKHR")
+	GetPhysicalDeviceExternalBufferProperties                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalBufferProperties")
+	GetPhysicalDeviceExternalBufferPropertiesKHR                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalBufferPropertiesKHR")
+	GetPhysicalDeviceExternalFenceProperties                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalFenceProperties")
+	GetPhysicalDeviceExternalFencePropertiesKHR                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalFencePropertiesKHR")
+	GetPhysicalDeviceExternalImageFormatPropertiesNV                 = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalImageFormatPropertiesNV")
+	GetPhysicalDeviceExternalSemaphoreProperties                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalSemaphoreProperties")
+	GetPhysicalDeviceExternalSemaphorePropertiesKHR                  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR")
+	GetPhysicalDeviceFeatures                                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures")
+	GetPhysicalDeviceFeatures2                                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2")
+	GetPhysicalDeviceFeatures2KHR                                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2KHR")
+	GetPhysicalDeviceFormatProperties                                = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties")
+	GetPhysicalDeviceFormatProperties2                               = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2")
+	GetPhysicalDeviceFormatProperties2KHR                            = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2KHR")
+	GetPhysicalDeviceFragmentShadingRatesKHR                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFragmentShadingRatesKHR")
+	GetPhysicalDeviceImageFormatProperties                           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceImageFormatProperties")
+	GetPhysicalDeviceImageFormatProperties2                          = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceImageFormatProperties2")
+	GetPhysicalDeviceImageFormatProperties2KHR                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceImageFormatProperties2KHR")
+	GetPhysicalDeviceMemoryProperties                                = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceMemoryProperties")
+	GetPhysicalDeviceMemoryProperties2                               = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceMemoryProperties2")
+	GetPhysicalDeviceMemoryProperties2KHR                            = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceMemoryProperties2KHR")
+	GetPhysicalDeviceMultisamplePropertiesEXT                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceMultisamplePropertiesEXT")
+	GetPhysicalDeviceOpticalFlowImageFormatsNV                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceOpticalFlowImageFormatsNV")
+	GetPhysicalDevicePresentRectanglesKHR                            = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDevicePresentRectanglesKHR")
+	GetPhysicalDeviceProperties                                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties")
+	GetPhysicalDeviceProperties2                                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2")
+	GetPhysicalDeviceProperties2KHR                                  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR")
+	GetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR            = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR")
+	GetPhysicalDeviceQueueFamilyProperties                           = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties")
+	GetPhysicalDeviceQueueFamilyProperties2                          = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties2")
+	GetPhysicalDeviceQueueFamilyProperties2KHR                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties2KHR")
+	GetPhysicalDeviceSparseImageFormatProperties                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSparseImageFormatProperties")
+	GetPhysicalDeviceSparseImageFormatProperties2                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSparseImageFormatProperties2")
+	GetPhysicalDeviceSparseImageFormatProperties2KHR                 = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSparseImageFormatProperties2KHR")
+	GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV")
+	GetPhysicalDeviceSurfaceCapabilities2EXT                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT")
+	GetPhysicalDeviceSurfaceCapabilities2KHR                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceCapabilities2KHR")
+	GetPhysicalDeviceSurfaceCapabilitiesKHR                          = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")
+	GetPhysicalDeviceSurfaceFormats2KHR                              = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceFormats2KHR")
+	GetPhysicalDeviceSurfaceFormatsKHR                               = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceFormatsKHR")
+	GetPhysicalDeviceSurfacePresentModes2EXT                         = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfacePresentModes2EXT")
+	GetPhysicalDeviceSurfacePresentModesKHR                          = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfacePresentModesKHR")
+	GetPhysicalDeviceSurfaceSupportKHR                               = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceSupportKHR")
+	GetPhysicalDeviceToolProperties                                  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceToolProperties")
+	GetPhysicalDeviceToolPropertiesEXT                               = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceToolPropertiesEXT")
+	GetPhysicalDeviceVideoCapabilitiesKHR                            = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoCapabilitiesKHR")
+	GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR            = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR")
+	GetPhysicalDeviceVideoFormatPropertiesKHR                        = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoFormatPropertiesKHR")
+	GetPhysicalDeviceWaylandPresentationSupportKHR                   = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceWaylandPresentationSupportKHR")
+	GetPhysicalDeviceWin32PresentationSupportKHR                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceWin32PresentationSupportKHR")
+	GetPhysicalDeviceXcbPresentationSupportKHR                       = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceXcbPresentationSupportKHR")
+	GetPhysicalDeviceXlibPresentationSupportKHR                      = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceXlibPresentationSupportKHR")
+	GetWinrtDisplayNV                                                = auto_cast GetInstanceProcAddr(instance, "vkGetWinrtDisplayNV")
+	ReleaseDisplayEXT                                                = auto_cast GetInstanceProcAddr(instance, "vkReleaseDisplayEXT")
+	SubmitDebugUtilsMessageEXT                                       = auto_cast GetInstanceProcAddr(instance, "vkSubmitDebugUtilsMessageEXT")
 
 	// Device Procedures (may call into dispatch)
 	AcquireFullScreenExclusiveModeEXT                      = auto_cast GetInstanceProcAddr(instance, "vkAcquireFullScreenExclusiveModeEXT")
@@ -3872,8 +4106,10 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CmdBindDescriptorBufferEmbeddedSamplersEXT             = auto_cast GetInstanceProcAddr(instance, "vkCmdBindDescriptorBufferEmbeddedSamplersEXT")
 	CmdBindDescriptorBuffersEXT                            = auto_cast GetInstanceProcAddr(instance, "vkCmdBindDescriptorBuffersEXT")
 	CmdBindDescriptorSets                                  = auto_cast GetInstanceProcAddr(instance, "vkCmdBindDescriptorSets")
+	CmdBindDescriptorSets2                                 = auto_cast GetInstanceProcAddr(instance, "vkCmdBindDescriptorSets2")
 	CmdBindDescriptorSets2KHR                              = auto_cast GetInstanceProcAddr(instance, "vkCmdBindDescriptorSets2KHR")
 	CmdBindIndexBuffer                                     = auto_cast GetInstanceProcAddr(instance, "vkCmdBindIndexBuffer")
+	CmdBindIndexBuffer2                                    = auto_cast GetInstanceProcAddr(instance, "vkCmdBindIndexBuffer2")
 	CmdBindIndexBuffer2KHR                                 = auto_cast GetInstanceProcAddr(instance, "vkCmdBindIndexBuffer2KHR")
 	CmdBindInvocationMaskHUAWEI                            = auto_cast GetInstanceProcAddr(instance, "vkCmdBindInvocationMaskHUAWEI")
 	CmdBindPipeline                                        = auto_cast GetInstanceProcAddr(instance, "vkCmdBindPipeline")
@@ -3890,11 +4126,14 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CmdBuildAccelerationStructureNV                        = auto_cast GetInstanceProcAddr(instance, "vkCmdBuildAccelerationStructureNV")
 	CmdBuildAccelerationStructuresIndirectKHR              = auto_cast GetInstanceProcAddr(instance, "vkCmdBuildAccelerationStructuresIndirectKHR")
 	CmdBuildAccelerationStructuresKHR                      = auto_cast GetInstanceProcAddr(instance, "vkCmdBuildAccelerationStructuresKHR")
+	CmdBuildClusterAccelerationStructureIndirectNV         = auto_cast GetInstanceProcAddr(instance, "vkCmdBuildClusterAccelerationStructureIndirectNV")
 	CmdBuildMicromapsEXT                                   = auto_cast GetInstanceProcAddr(instance, "vkCmdBuildMicromapsEXT")
+	CmdBuildPartitionedAccelerationStructuresNV            = auto_cast GetInstanceProcAddr(instance, "vkCmdBuildPartitionedAccelerationStructuresNV")
 	CmdClearAttachments                                    = auto_cast GetInstanceProcAddr(instance, "vkCmdClearAttachments")
 	CmdClearColorImage                                     = auto_cast GetInstanceProcAddr(instance, "vkCmdClearColorImage")
 	CmdClearDepthStencilImage                              = auto_cast GetInstanceProcAddr(instance, "vkCmdClearDepthStencilImage")
 	CmdControlVideoCodingKHR                               = auto_cast GetInstanceProcAddr(instance, "vkCmdControlVideoCodingKHR")
+	CmdConvertCooperativeVectorMatrixNV                    = auto_cast GetInstanceProcAddr(instance, "vkCmdConvertCooperativeVectorMatrixNV")
 	CmdCopyAccelerationStructureKHR                        = auto_cast GetInstanceProcAddr(instance, "vkCmdCopyAccelerationStructureKHR")
 	CmdCopyAccelerationStructureNV                         = auto_cast GetInstanceProcAddr(instance, "vkCmdCopyAccelerationStructureNV")
 	CmdCopyAccelerationStructureToMemoryKHR                = auto_cast GetInstanceProcAddr(instance, "vkCmdCopyAccelerationStructureToMemoryKHR")
@@ -3928,6 +4167,9 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CmdDispatch                                            = auto_cast GetInstanceProcAddr(instance, "vkCmdDispatch")
 	CmdDispatchBase                                        = auto_cast GetInstanceProcAddr(instance, "vkCmdDispatchBase")
 	CmdDispatchBaseKHR                                     = auto_cast GetInstanceProcAddr(instance, "vkCmdDispatchBaseKHR")
+	CmdDispatchGraphAMDX                                   = auto_cast GetInstanceProcAddr(instance, "vkCmdDispatchGraphAMDX")
+	CmdDispatchGraphIndirectAMDX                           = auto_cast GetInstanceProcAddr(instance, "vkCmdDispatchGraphIndirectAMDX")
+	CmdDispatchGraphIndirectCountAMDX                      = auto_cast GetInstanceProcAddr(instance, "vkCmdDispatchGraphIndirectCountAMDX")
 	CmdDispatchIndirect                                    = auto_cast GetInstanceProcAddr(instance, "vkCmdDispatchIndirect")
 	CmdDraw                                                = auto_cast GetInstanceProcAddr(instance, "vkCmdDraw")
 	CmdDrawClusterHUAWEI                                   = auto_cast GetInstanceProcAddr(instance, "vkCmdDrawClusterHUAWEI")
@@ -3966,6 +4208,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CmdExecuteGeneratedCommandsEXT                         = auto_cast GetInstanceProcAddr(instance, "vkCmdExecuteGeneratedCommandsEXT")
 	CmdExecuteGeneratedCommandsNV                          = auto_cast GetInstanceProcAddr(instance, "vkCmdExecuteGeneratedCommandsNV")
 	CmdFillBuffer                                          = auto_cast GetInstanceProcAddr(instance, "vkCmdFillBuffer")
+	CmdInitializeGraphScratchMemoryAMDX                    = auto_cast GetInstanceProcAddr(instance, "vkCmdInitializeGraphScratchMemoryAMDX")
 	CmdInsertDebugUtilsLabelEXT                            = auto_cast GetInstanceProcAddr(instance, "vkCmdInsertDebugUtilsLabelEXT")
 	CmdNextSubpass                                         = auto_cast GetInstanceProcAddr(instance, "vkCmdNextSubpass")
 	CmdNextSubpass2                                        = auto_cast GetInstanceProcAddr(instance, "vkCmdNextSubpass2")
@@ -3977,9 +4220,14 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CmdPreprocessGeneratedCommandsEXT                      = auto_cast GetInstanceProcAddr(instance, "vkCmdPreprocessGeneratedCommandsEXT")
 	CmdPreprocessGeneratedCommandsNV                       = auto_cast GetInstanceProcAddr(instance, "vkCmdPreprocessGeneratedCommandsNV")
 	CmdPushConstants                                       = auto_cast GetInstanceProcAddr(instance, "vkCmdPushConstants")
+	CmdPushConstants2                                      = auto_cast GetInstanceProcAddr(instance, "vkCmdPushConstants2")
 	CmdPushConstants2KHR                                   = auto_cast GetInstanceProcAddr(instance, "vkCmdPushConstants2KHR")
+	CmdPushDescriptorSet                                   = auto_cast GetInstanceProcAddr(instance, "vkCmdPushDescriptorSet")
+	CmdPushDescriptorSet2                                  = auto_cast GetInstanceProcAddr(instance, "vkCmdPushDescriptorSet2")
 	CmdPushDescriptorSet2KHR                               = auto_cast GetInstanceProcAddr(instance, "vkCmdPushDescriptorSet2KHR")
 	CmdPushDescriptorSetKHR                                = auto_cast GetInstanceProcAddr(instance, "vkCmdPushDescriptorSetKHR")
+	CmdPushDescriptorSetWithTemplate                       = auto_cast GetInstanceProcAddr(instance, "vkCmdPushDescriptorSetWithTemplate")
+	CmdPushDescriptorSetWithTemplate2                      = auto_cast GetInstanceProcAddr(instance, "vkCmdPushDescriptorSetWithTemplate2")
 	CmdPushDescriptorSetWithTemplate2KHR                   = auto_cast GetInstanceProcAddr(instance, "vkCmdPushDescriptorSetWithTemplate2KHR")
 	CmdPushDescriptorSetWithTemplateKHR                    = auto_cast GetInstanceProcAddr(instance, "vkCmdPushDescriptorSetWithTemplateKHR")
 	CmdResetEvent                                          = auto_cast GetInstanceProcAddr(instance, "vkCmdResetEvent")
@@ -4043,6 +4291,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CmdSetFrontFace                                        = auto_cast GetInstanceProcAddr(instance, "vkCmdSetFrontFace")
 	CmdSetFrontFaceEXT                                     = auto_cast GetInstanceProcAddr(instance, "vkCmdSetFrontFaceEXT")
 	CmdSetLineRasterizationModeEXT                         = auto_cast GetInstanceProcAddr(instance, "vkCmdSetLineRasterizationModeEXT")
+	CmdSetLineStipple                                      = auto_cast GetInstanceProcAddr(instance, "vkCmdSetLineStipple")
 	CmdSetLineStippleEXT                                   = auto_cast GetInstanceProcAddr(instance, "vkCmdSetLineStippleEXT")
 	CmdSetLineStippleEnableEXT                             = auto_cast GetInstanceProcAddr(instance, "vkCmdSetLineStippleEnableEXT")
 	CmdSetLineStippleKHR                                   = auto_cast GetInstanceProcAddr(instance, "vkCmdSetLineStippleKHR")
@@ -4064,7 +4313,9 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CmdSetRasterizerDiscardEnable                          = auto_cast GetInstanceProcAddr(instance, "vkCmdSetRasterizerDiscardEnable")
 	CmdSetRasterizerDiscardEnableEXT                       = auto_cast GetInstanceProcAddr(instance, "vkCmdSetRasterizerDiscardEnableEXT")
 	CmdSetRayTracingPipelineStackSizeKHR                   = auto_cast GetInstanceProcAddr(instance, "vkCmdSetRayTracingPipelineStackSizeKHR")
+	CmdSetRenderingAttachmentLocations                     = auto_cast GetInstanceProcAddr(instance, "vkCmdSetRenderingAttachmentLocations")
 	CmdSetRenderingAttachmentLocationsKHR                  = auto_cast GetInstanceProcAddr(instance, "vkCmdSetRenderingAttachmentLocationsKHR")
+	CmdSetRenderingInputAttachmentIndices                  = auto_cast GetInstanceProcAddr(instance, "vkCmdSetRenderingInputAttachmentIndices")
 	CmdSetRenderingInputAttachmentIndicesKHR               = auto_cast GetInstanceProcAddr(instance, "vkCmdSetRenderingInputAttachmentIndicesKHR")
 	CmdSetRepresentativeFragmentTestEnableNV               = auto_cast GetInstanceProcAddr(instance, "vkCmdSetRepresentativeFragmentTestEnableNV")
 	CmdSetSampleLocationsEXT                               = auto_cast GetInstanceProcAddr(instance, "vkCmdSetSampleLocationsEXT")
@@ -4109,11 +4360,15 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CmdWriteTimestamp2                                     = auto_cast GetInstanceProcAddr(instance, "vkCmdWriteTimestamp2")
 	CmdWriteTimestamp2KHR                                  = auto_cast GetInstanceProcAddr(instance, "vkCmdWriteTimestamp2KHR")
 	CompileDeferredNV                                      = auto_cast GetInstanceProcAddr(instance, "vkCompileDeferredNV")
+	ConvertCooperativeVectorMatrixNV                       = auto_cast GetInstanceProcAddr(instance, "vkConvertCooperativeVectorMatrixNV")
 	CopyAccelerationStructureKHR                           = auto_cast GetInstanceProcAddr(instance, "vkCopyAccelerationStructureKHR")
 	CopyAccelerationStructureToMemoryKHR                   = auto_cast GetInstanceProcAddr(instance, "vkCopyAccelerationStructureToMemoryKHR")
+	CopyImageToImage                                       = auto_cast GetInstanceProcAddr(instance, "vkCopyImageToImage")
 	CopyImageToImageEXT                                    = auto_cast GetInstanceProcAddr(instance, "vkCopyImageToImageEXT")
+	CopyImageToMemory                                      = auto_cast GetInstanceProcAddr(instance, "vkCopyImageToMemory")
 	CopyImageToMemoryEXT                                   = auto_cast GetInstanceProcAddr(instance, "vkCopyImageToMemoryEXT")
 	CopyMemoryToAccelerationStructureKHR                   = auto_cast GetInstanceProcAddr(instance, "vkCopyMemoryToAccelerationStructureKHR")
+	CopyMemoryToImage                                      = auto_cast GetInstanceProcAddr(instance, "vkCopyMemoryToImage")
 	CopyMemoryToImageEXT                                   = auto_cast GetInstanceProcAddr(instance, "vkCopyMemoryToImageEXT")
 	CopyMemoryToMicromapEXT                                = auto_cast GetInstanceProcAddr(instance, "vkCopyMemoryToMicromapEXT")
 	CopyMicromapEXT                                        = auto_cast GetInstanceProcAddr(instance, "vkCopyMicromapEXT")
@@ -4134,6 +4389,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CreateDescriptorUpdateTemplate                         = auto_cast GetInstanceProcAddr(instance, "vkCreateDescriptorUpdateTemplate")
 	CreateDescriptorUpdateTemplateKHR                      = auto_cast GetInstanceProcAddr(instance, "vkCreateDescriptorUpdateTemplateKHR")
 	CreateEvent                                            = auto_cast GetInstanceProcAddr(instance, "vkCreateEvent")
+	CreateExecutionGraphPipelinesAMDX                      = auto_cast GetInstanceProcAddr(instance, "vkCreateExecutionGraphPipelinesAMDX")
 	CreateFence                                            = auto_cast GetInstanceProcAddr(instance, "vkCreateFence")
 	CreateFramebuffer                                      = auto_cast GetInstanceProcAddr(instance, "vkCreateFramebuffer")
 	CreateGraphicsPipelines                                = auto_cast GetInstanceProcAddr(instance, "vkCreateGraphicsPipelines")
@@ -4236,6 +4492,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetBufferOpaqueCaptureDescriptorDataEXT                = auto_cast GetInstanceProcAddr(instance, "vkGetBufferOpaqueCaptureDescriptorDataEXT")
 	GetCalibratedTimestampsEXT                             = auto_cast GetInstanceProcAddr(instance, "vkGetCalibratedTimestampsEXT")
 	GetCalibratedTimestampsKHR                             = auto_cast GetInstanceProcAddr(instance, "vkGetCalibratedTimestampsKHR")
+	GetClusterAccelerationStructureBuildSizesNV            = auto_cast GetInstanceProcAddr(instance, "vkGetClusterAccelerationStructureBuildSizesNV")
 	GetCudaModuleCacheNV                                   = auto_cast GetInstanceProcAddr(instance, "vkGetCudaModuleCacheNV")
 	GetDeferredOperationMaxConcurrencyKHR                  = auto_cast GetInstanceProcAddr(instance, "vkGetDeferredOperationMaxConcurrencyKHR")
 	GetDeferredOperationResultKHR                          = auto_cast GetInstanceProcAddr(instance, "vkGetDeferredOperationResultKHR")
@@ -4259,6 +4516,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetDeviceImageMemoryRequirementsKHR                    = auto_cast GetInstanceProcAddr(instance, "vkGetDeviceImageMemoryRequirementsKHR")
 	GetDeviceImageSparseMemoryRequirements                 = auto_cast GetInstanceProcAddr(instance, "vkGetDeviceImageSparseMemoryRequirements")
 	GetDeviceImageSparseMemoryRequirementsKHR              = auto_cast GetInstanceProcAddr(instance, "vkGetDeviceImageSparseMemoryRequirementsKHR")
+	GetDeviceImageSubresourceLayout                        = auto_cast GetInstanceProcAddr(instance, "vkGetDeviceImageSubresourceLayout")
 	GetDeviceImageSubresourceLayoutKHR                     = auto_cast GetInstanceProcAddr(instance, "vkGetDeviceImageSubresourceLayoutKHR")
 	GetDeviceMemoryCommitment                              = auto_cast GetInstanceProcAddr(instance, "vkGetDeviceMemoryCommitment")
 	GetDeviceMemoryOpaqueCaptureAddress                    = auto_cast GetInstanceProcAddr(instance, "vkGetDeviceMemoryOpaqueCaptureAddress")
@@ -4271,6 +4529,8 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetDynamicRenderingTilePropertiesQCOM                  = auto_cast GetInstanceProcAddr(instance, "vkGetDynamicRenderingTilePropertiesQCOM")
 	GetEncodedVideoSessionParametersKHR                    = auto_cast GetInstanceProcAddr(instance, "vkGetEncodedVideoSessionParametersKHR")
 	GetEventStatus                                         = auto_cast GetInstanceProcAddr(instance, "vkGetEventStatus")
+	GetExecutionGraphPipelineNodeIndexAMDX                 = auto_cast GetInstanceProcAddr(instance, "vkGetExecutionGraphPipelineNodeIndexAMDX")
+	GetExecutionGraphPipelineScratchSizeAMDX               = auto_cast GetInstanceProcAddr(instance, "vkGetExecutionGraphPipelineScratchSizeAMDX")
 	GetFenceFdKHR                                          = auto_cast GetInstanceProcAddr(instance, "vkGetFenceFdKHR")
 	GetFenceStatus                                         = auto_cast GetInstanceProcAddr(instance, "vkGetFenceStatus")
 	GetFenceWin32HandleKHR                                 = auto_cast GetInstanceProcAddr(instance, "vkGetFenceWin32HandleKHR")
@@ -4286,20 +4546,25 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetImageSparseMemoryRequirements2                      = auto_cast GetInstanceProcAddr(instance, "vkGetImageSparseMemoryRequirements2")
 	GetImageSparseMemoryRequirements2KHR                   = auto_cast GetInstanceProcAddr(instance, "vkGetImageSparseMemoryRequirements2KHR")
 	GetImageSubresourceLayout                              = auto_cast GetInstanceProcAddr(instance, "vkGetImageSubresourceLayout")
+	GetImageSubresourceLayout2                             = auto_cast GetInstanceProcAddr(instance, "vkGetImageSubresourceLayout2")
 	GetImageSubresourceLayout2EXT                          = auto_cast GetInstanceProcAddr(instance, "vkGetImageSubresourceLayout2EXT")
 	GetImageSubresourceLayout2KHR                          = auto_cast GetInstanceProcAddr(instance, "vkGetImageSubresourceLayout2KHR")
 	GetImageViewAddressNVX                                 = auto_cast GetInstanceProcAddr(instance, "vkGetImageViewAddressNVX")
+	GetImageViewHandle64NVX                                = auto_cast GetInstanceProcAddr(instance, "vkGetImageViewHandle64NVX")
 	GetImageViewHandleNVX                                  = auto_cast GetInstanceProcAddr(instance, "vkGetImageViewHandleNVX")
 	GetImageViewOpaqueCaptureDescriptorDataEXT             = auto_cast GetInstanceProcAddr(instance, "vkGetImageViewOpaqueCaptureDescriptorDataEXT")
 	GetLatencyTimingsNV                                    = auto_cast GetInstanceProcAddr(instance, "vkGetLatencyTimingsNV")
 	GetMemoryFdKHR                                         = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryFdKHR")
 	GetMemoryFdPropertiesKHR                               = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryFdPropertiesKHR")
 	GetMemoryHostPointerPropertiesEXT                      = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryHostPointerPropertiesEXT")
+	GetMemoryMetalHandleEXT                                = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryMetalHandleEXT")
+	GetMemoryMetalHandlePropertiesEXT                      = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryMetalHandlePropertiesEXT")
 	GetMemoryRemoteAddressNV                               = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryRemoteAddressNV")
 	GetMemoryWin32HandleKHR                                = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryWin32HandleKHR")
 	GetMemoryWin32HandleNV                                 = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryWin32HandleNV")
 	GetMemoryWin32HandlePropertiesKHR                      = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryWin32HandlePropertiesKHR")
 	GetMicromapBuildSizesEXT                               = auto_cast GetInstanceProcAddr(instance, "vkGetMicromapBuildSizesEXT")
+	GetPartitionedAccelerationStructuresBuildSizesNV       = auto_cast GetInstanceProcAddr(instance, "vkGetPartitionedAccelerationStructuresBuildSizesNV")
 	GetPastPresentationTimingGOOGLE                        = auto_cast GetInstanceProcAddr(instance, "vkGetPastPresentationTimingGOOGLE")
 	GetPerformanceParameterINTEL                           = auto_cast GetInstanceProcAddr(instance, "vkGetPerformanceParameterINTEL")
 	GetPipelineBinaryDataKHR                               = auto_cast GetInstanceProcAddr(instance, "vkGetPipelineBinaryDataKHR")
@@ -4322,6 +4587,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetRayTracingShaderGroupStackSizeKHR                   = auto_cast GetInstanceProcAddr(instance, "vkGetRayTracingShaderGroupStackSizeKHR")
 	GetRefreshCycleDurationGOOGLE                          = auto_cast GetInstanceProcAddr(instance, "vkGetRefreshCycleDurationGOOGLE")
 	GetRenderAreaGranularity                               = auto_cast GetInstanceProcAddr(instance, "vkGetRenderAreaGranularity")
+	GetRenderingAreaGranularity                            = auto_cast GetInstanceProcAddr(instance, "vkGetRenderingAreaGranularity")
 	GetRenderingAreaGranularityKHR                         = auto_cast GetInstanceProcAddr(instance, "vkGetRenderingAreaGranularityKHR")
 	GetSamplerOpaqueCaptureDescriptorDataEXT               = auto_cast GetInstanceProcAddr(instance, "vkGetSamplerOpaqueCaptureDescriptorDataEXT")
 	GetSemaphoreCounterValue                               = auto_cast GetInstanceProcAddr(instance, "vkGetSemaphoreCounterValue")
@@ -4345,6 +4611,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	InvalidateMappedMemoryRanges                           = auto_cast GetInstanceProcAddr(instance, "vkInvalidateMappedMemoryRanges")
 	LatencySleepNV                                         = auto_cast GetInstanceProcAddr(instance, "vkLatencySleepNV")
 	MapMemory                                              = auto_cast GetInstanceProcAddr(instance, "vkMapMemory")
+	MapMemory2                                             = auto_cast GetInstanceProcAddr(instance, "vkMapMemory2")
 	MapMemory2KHR                                          = auto_cast GetInstanceProcAddr(instance, "vkMapMemory2KHR")
 	MergePipelineCaches                                    = auto_cast GetInstanceProcAddr(instance, "vkMergePipelineCaches")
 	MergeValidationCachesEXT                               = auto_cast GetInstanceProcAddr(instance, "vkMergeValidationCachesEXT")
@@ -4385,11 +4652,13 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	SetPrivateDataEXT                                      = auto_cast GetInstanceProcAddr(instance, "vkSetPrivateDataEXT")
 	SignalSemaphore                                        = auto_cast GetInstanceProcAddr(instance, "vkSignalSemaphore")
 	SignalSemaphoreKHR                                     = auto_cast GetInstanceProcAddr(instance, "vkSignalSemaphoreKHR")
+	TransitionImageLayout                                  = auto_cast GetInstanceProcAddr(instance, "vkTransitionImageLayout")
 	TransitionImageLayoutEXT                               = auto_cast GetInstanceProcAddr(instance, "vkTransitionImageLayoutEXT")
 	TrimCommandPool                                        = auto_cast GetInstanceProcAddr(instance, "vkTrimCommandPool")
 	TrimCommandPoolKHR                                     = auto_cast GetInstanceProcAddr(instance, "vkTrimCommandPoolKHR")
 	UninitializePerformanceApiINTEL                        = auto_cast GetInstanceProcAddr(instance, "vkUninitializePerformanceApiINTEL")
 	UnmapMemory                                            = auto_cast GetInstanceProcAddr(instance, "vkUnmapMemory")
+	UnmapMemory2                                           = auto_cast GetInstanceProcAddr(instance, "vkUnmapMemory2")
 	UnmapMemory2KHR                                        = auto_cast GetInstanceProcAddr(instance, "vkUnmapMemory2KHR")
 	UpdateDescriptorSetWithTemplate                        = auto_cast GetInstanceProcAddr(instance, "vkUpdateDescriptorSetWithTemplate")
 	UpdateDescriptorSetWithTemplateKHR                     = auto_cast GetInstanceProcAddr(instance, "vkUpdateDescriptorSetWithTemplateKHR")

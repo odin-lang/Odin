@@ -24,15 +24,12 @@ Type_Info_Enumerated_Array       :: runtime.Type_Info_Enumerated_Array
 Type_Info_Dynamic_Array          :: runtime.Type_Info_Dynamic_Array
 Type_Info_Slice                  :: runtime.Type_Info_Slice
 Type_Info_Parameters             :: runtime.Type_Info_Parameters
-Type_Info_Tuple                  :: runtime.Type_Info_Parameters
 Type_Info_Struct                 :: runtime.Type_Info_Struct
 Type_Info_Union                  :: runtime.Type_Info_Union
 Type_Info_Enum                   :: runtime.Type_Info_Enum
 Type_Info_Map                    :: runtime.Type_Info_Map
 Type_Info_Bit_Set                :: runtime.Type_Info_Bit_Set
 Type_Info_Simd_Vector            :: runtime.Type_Info_Simd_Vector
-Type_Info_Relative_Pointer       :: runtime.Type_Info_Relative_Pointer
-Type_Info_Relative_Multi_Pointer :: runtime.Type_Info_Relative_Multi_Pointer
 Type_Info_Matrix                 :: runtime.Type_Info_Matrix
 Type_Info_Soa_Pointer            :: runtime.Type_Info_Soa_Pointer
 Type_Info_Bit_Field              :: runtime.Type_Info_Bit_Field
@@ -60,15 +57,13 @@ Type_Kind :: enum {
 	Enumerated_Array,
 	Dynamic_Array,
 	Slice,
-	Tuple,
+	Parameters,
 	Struct,
 	Union,
 	Enum,
 	Map,
 	Bit_Set,
 	Simd_Vector,
-	Relative_Pointer,
-	Relative_Multi_Pointer,
 	Matrix,
 	Soa_Pointer,
 	Bit_Field,
@@ -80,35 +75,33 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 	ti := type_info_of(T)
 	if ti != nil {
 		switch _ in ti.variant {
-		case Type_Info_Named:                  return .Named
-		case Type_Info_Integer:                return .Integer
-		case Type_Info_Rune:                   return .Rune
-		case Type_Info_Float:                  return .Float
-		case Type_Info_Complex:                return .Complex
-		case Type_Info_Quaternion:             return .Quaternion
-		case Type_Info_String:                 return .String
-		case Type_Info_Boolean:                return .Boolean
-		case Type_Info_Any:                    return .Any
-		case Type_Info_Type_Id:                return .Type_Id
-		case Type_Info_Pointer:                return .Pointer
-		case Type_Info_Multi_Pointer:          return .Multi_Pointer
-		case Type_Info_Procedure:              return .Procedure
-		case Type_Info_Array:                  return .Array
-		case Type_Info_Enumerated_Array:       return .Enumerated_Array
-		case Type_Info_Dynamic_Array:          return .Dynamic_Array
-		case Type_Info_Slice:                  return .Slice
-		case Type_Info_Parameters:             return .Tuple
-		case Type_Info_Struct:                 return .Struct
-		case Type_Info_Union:                  return .Union
-		case Type_Info_Enum:                   return .Enum
-		case Type_Info_Map:                    return .Map
-		case Type_Info_Bit_Set:                return .Bit_Set
-		case Type_Info_Simd_Vector:            return .Simd_Vector
-		case Type_Info_Relative_Pointer:       return .Relative_Pointer
-		case Type_Info_Relative_Multi_Pointer: return .Relative_Multi_Pointer
-		case Type_Info_Matrix:                 return .Matrix
-		case Type_Info_Soa_Pointer:            return .Soa_Pointer
-		case Type_Info_Bit_Field:              return .Bit_Field
+		case Type_Info_Named:            return .Named
+		case Type_Info_Integer:          return .Integer
+		case Type_Info_Rune:             return .Rune
+		case Type_Info_Float:            return .Float
+		case Type_Info_Complex:          return .Complex
+		case Type_Info_Quaternion:       return .Quaternion
+		case Type_Info_String:           return .String
+		case Type_Info_Boolean:          return .Boolean
+		case Type_Info_Any:              return .Any
+		case Type_Info_Type_Id:          return .Type_Id
+		case Type_Info_Pointer:          return .Pointer
+		case Type_Info_Multi_Pointer:    return .Multi_Pointer
+		case Type_Info_Procedure:        return .Procedure
+		case Type_Info_Array:            return .Array
+		case Type_Info_Enumerated_Array: return .Enumerated_Array
+		case Type_Info_Dynamic_Array:    return .Dynamic_Array
+		case Type_Info_Slice:            return .Slice
+		case Type_Info_Parameters:       return .Parameters
+		case Type_Info_Struct:           return .Struct
+		case Type_Info_Union:            return .Union
+		case Type_Info_Enum:             return .Enum
+		case Type_Info_Map:              return .Map
+		case Type_Info_Bit_Set:          return .Bit_Set
+		case Type_Info_Simd_Vector:      return .Simd_Vector
+		case Type_Info_Matrix:           return .Matrix
+		case Type_Info_Soa_Pointer:      return .Soa_Pointer
+		case Type_Info_Bit_Field:        return .Bit_Field
 		}
 
 	}
@@ -182,6 +175,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 	case Type_Info_Enumerated_Array: return v.elem.id
 	case Type_Info_Slice:            return v.elem.id
 	case Type_Info_Dynamic_Array:    return v.elem.id
+	case Type_Info_Simd_Vector:      return v.elem.id
 	}
 	return id
 }
@@ -266,7 +260,11 @@ length :: proc(val: any) -> int {
 		} else {
 			return (^runtime.Raw_String)(val.data).len
 		}
+
+	case Type_Info_Simd_Vector:
+		return a.count
 	}
+
 	return 0
 }
 
@@ -292,7 +290,11 @@ capacity :: proc(val: any) -> int {
 
 	case Type_Info_Map:
 		return runtime.map_cap((^runtime.Raw_Map)(val.data)^)
+
+	case Type_Info_Simd_Vector:
+		return a.count
 	}
+
 	return 0
 }
 
@@ -723,6 +725,27 @@ enum_name_from_value_any :: proc(value: any) -> (name: string, ok: bool) {
 	return
 }
 
+/*
+Returns whether the value given has a defined name in the enum type.
+*/
+@(require_results)
+enum_value_has_name :: proc(value: $T) -> bool where intrinsics.type_is_enum(T) {
+	when len(T) == cap(T) {
+		return value >= min(T) && value <= max(T)
+	} else {
+		if value < min(T) || value > max(T) {
+			return false
+		}
+
+		for valid_value in T {
+			if valid_value == value {
+				return true
+			}
+		}
+
+		return false
+	}
+}
 
 
 
@@ -1416,6 +1439,11 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 
 	case Type_Info_Complex:
 		switch v in a {
+		case complex32:
+			if imag(v) == 0 {
+				value = f64(real(v))
+				valid = true
+			}
 		case complex64:
 			if imag(v) == 0 {
 				value = f64(real(v))
@@ -1430,6 +1458,11 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 
 	case Type_Info_Quaternion:
 		switch v in a {
+		case quaternion64:
+			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
+				value = f64(real(v))
+				valid = true
+			}
 		case quaternion128:
 			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
 				value = f64(real(v))
@@ -1466,21 +1499,6 @@ as_string :: proc(a: any) -> (value: string, valid: bool) {
 
 	return
 }
-
-@(require_results)
-relative_pointer_to_absolute :: proc(a: any) -> rawptr {
-	if a == nil { return nil }
-	a := a
-	ti := runtime.type_info_core(type_info_of(a.id))
-	a.id = ti.id
-
-	#partial switch info in ti.variant {
-	case Type_Info_Relative_Pointer:
-		return relative_pointer_to_absolute_raw(a.data, info.base_integer.id)
-	}
-	return nil
-}
-
 
 @(require_results)
 relative_pointer_to_absolute_raw :: proc(data: rawptr, base_integer_id: typeid) -> rawptr {
@@ -1543,10 +1561,6 @@ as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
 		case cstring: value = rawptr(v)
 		case: valid = false
 		}
-
-	case Type_Info_Relative_Pointer:
-		valid = true
-		value = relative_pointer_to_absolute_raw(a.data, info.base_integer.id)
 	}
 
 	return
@@ -1642,13 +1656,40 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return equal(va, vb, including_indirect_array_recursion, recursion_level+1) 
 	case Type_Info_Map:
 		return false
+	case Type_Info_Float:
+		x, _ := as_f64(a)
+		y, _ := as_f64(b)
+		return x == y
+	case Type_Info_Complex:
+		switch x in a {
+		case complex32:
+			#no_type_assert y := b.(complex32)
+			return x == y
+		case complex64:
+			#no_type_assert y := b.(complex64)
+			return x == y
+		case complex128:
+			#no_type_assert y := b.(complex128)
+			return x == y
+		}
+		return false
+	case Type_Info_Quaternion:
+		switch x in a {
+		case quaternion64:
+			#no_type_assert y := b.(quaternion64)
+			return x == y
+		case quaternion128:
+			#no_type_assert y := b.(quaternion128)
+			return x == y
+		case quaternion256:
+			#no_type_assert y := b.(quaternion256)
+			return x == y
+		}
+		return false
 	case 
 		Type_Info_Boolean,
 		Type_Info_Integer, 
 		Type_Info_Rune,
-		Type_Info_Float,
-		Type_Info_Complex,
-		Type_Info_Quaternion,
 		Type_Info_Type_Id,
 		Type_Info_Pointer,
 		Type_Info_Multi_Pointer,
@@ -1656,8 +1697,6 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		Type_Info_Bit_Set,
 		Type_Info_Enum,
 		Type_Info_Simd_Vector,
-		Type_Info_Relative_Pointer,
-		Type_Info_Relative_Multi_Pointer,
 		Type_Info_Soa_Pointer,
 		Type_Info_Matrix:
 		return runtime.memory_compare(a.data, b.data, t.size) == 0

@@ -1,13 +1,14 @@
-#+build darwin, linux, netbsd, freebsd, openbsd
+#+build darwin, linux, netbsd, freebsd, openbsd, haiku
 package os
 
 import "core:strings"
 
 @(require_results)
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
-	dupfd := _dup(fd) or_return
+	context.allocator = allocator
 
-	dirp := _fdopendir(dupfd) or_return
+	dupfd := _dup(fd) or_return
+	dirp  := _fdopendir(dupfd) or_return
 	defer _closedir(dirp)
 
 	dirpath := absolute_path_from_handle(dupfd) or_return

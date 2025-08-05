@@ -646,7 +646,6 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	struct_type->Struct.node       = node;
 	struct_type->Struct.scope      = ctx->scope;
 	struct_type->Struct.is_packed  = st->is_packed;
-	struct_type->Struct.is_no_copy = st->is_no_copy;
 	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
 		&struct_type->Struct.is_polymorphic,
@@ -685,7 +684,8 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	ST_ALIGN(min_field_align);
 	ST_ALIGN(max_field_align);
 	ST_ALIGN(align);
-	if (struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
+	if (struct_type->Struct.custom_align != 0 &&
+		struct_type->Struct.custom_align < struct_type->Struct.custom_min_field_align) {
 		error(st->align, "#align(%lld) is defined to be less than #min_field_align(%lld)",
 		      cast(long long)struct_type->Struct.custom_align,
 		      cast(long long)struct_type->Struct.custom_min_field_align);
@@ -1154,8 +1154,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		}
 	}
 
-
-
+	#if 0 // Reconsider at a later date
 	if (bit_sizes.count > 0 && is_type_integer(backing_type)) {
 		bool all_booleans = is_type_boolean(fields[0]->type);
 		bool all_ones = bit_sizes[0] == 1;
@@ -1181,7 +1180,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			}
 		}
 	}
-
+	#endif
 
 	bit_field_type->BitField.fields      = slice_from_array(fields);
 	bit_field_type->BitField.bit_sizes   = slice_from_array(bit_sizes);
@@ -1910,9 +1909,18 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			case ParameterValue_Location:
 			case ParameterValue_Expression:
 			case ParameterValue_Value:
+				// Special case for polymorphic procedures as default values
+				if (param_value.ast_value != nullptr) {
+					Entity *e = entity_from_expr(param_value.ast_value);
+					if (e != nullptr && e->kind == Entity_Procedure && is_type_polymorphic(e->type)) {
+						// Allow polymorphic procedures as default parameter values
+						// The type will be correctly determined at call site
+						break;
+					}
+				}
 				gbString str = type_to_string(type);
 				error(params[i], "A default value for a parameter must not be a polymorphic constant type, got %s", str);
-				gb_string_free(str);
+					gb_string_free(str);
 				break;
 			}
 		}
@@ -2081,7 +2089,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type, allow_array_programming)) {
 						bool ok = true;
 						if (p->flags&FieldFlag_any_int) {
-							if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
+							if (op.type == nullptr) {
+								ok = false;
+							} else if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
 								ok = false;
 							} else if (!check_is_castable_to(ctx, &op, type)) {
 								ok = false;
@@ -2366,8 +2376,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 }
 
 gb_internal void check_procedure_param_polymorphic_type(CheckerContext *ctx, Type *type, Ast *type_expr) {
-	GB_ASSERT_NOT_NULL(type_expr);
-	if (type == nullptr || ctx->in_polymorphic_specialization) { return; }
+	if (type == nullptr || type_expr == nullptr || ctx->in_polymorphic_specialization) { return; }
 	if (!is_type_polymorphic_record_unspecialized(type)) { return; }
 
 	bool invalid_polymorpic_type_use = false;
@@ -2441,8 +2450,12 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	bool success = true;
 	isize specialization_count = 0;
 	Type *params  = check_get_params(c, c->scope, pt->params, &variadic, &variadic_index, &success, &specialization_count, operands);
-	Type *results = check_get_results(c, c->scope, pt->results);
 
+	bool no_poly_return = c->disallow_polymorphic_return_types;
+	c->disallow_polymorphic_return_types = c->scope == c->polymorphic_scope;
+	// NOTE(zen3ger): if the parapoly scope is the current proc's scope, then the return types shall not declare new poly vars
+	Type *results = check_get_results(c, c->scope, pt->results);
+	c->disallow_polymorphic_return_types = no_poly_return;
 
 	isize param_count = 0;
 	isize result_count = 0;
@@ -2769,6 +2782,21 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 			return;
 		}
 
+		if (key->kind == Type_Basic) {
+			if (key->Basic.flags & BasicFlag_Quaternion) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				add_package_dependency(ctx, "runtime", "default_hasher_quaternion256");
+				return;
+			} else if (key->Basic.flags & BasicFlag_Complex) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				add_package_dependency(ctx, "runtime", "default_hasher_complex128");
+				return;
+			} else if (key->Basic.flags & BasicFlag_Float) {
+				add_package_dependency(ctx, "runtime", "default_hasher_f64");
+				return;
+			}
+		}
+
 		if (key->kind == Type_Struct) {
 			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Struct.fields) {
@@ -2855,15 +2883,23 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 	}
 	
 	if (generic_row == nullptr && row_count < MATRIX_ELEMENT_COUNT_MIN) {
-		gbString s = expr_to_string(row.expr);
-		error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
-		gb_string_free(s);
+		if (row.expr == nullptr) {
+			error(node, "Invalid matrix row count, got nothing");
+		} else {
+			gbString s = expr_to_string(row.expr);
+			error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			gb_string_free(s);
+		}
 	}
 	
 	if (generic_column == nullptr && column_count < MATRIX_ELEMENT_COUNT_MIN) {
-		gbString s = expr_to_string(column.expr);
-		error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
-		gb_string_free(s);
+		if (column.expr == nullptr) {
+			error(node, "Invalid matrix column count, got nothing");
+		} else {
+			gbString s = expr_to_string(column.expr);
+			error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			gb_string_free(s);
+		}
 	}
 	
 	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
@@ -3247,7 +3283,7 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 		}
 
 		if (count < 0) {
-			error(at->count, "? can only be used in conjuction with compound literals");
+			error(at->count, "? can only be used in conjunction with compound literals");
 			count = 0;
 		}
 
@@ -3269,8 +3305,11 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 				if (generic_type != nullptr) {
 					// Ignore
 				} else if (count < 1 || !is_power_of_two(count)) {
-					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
 					*type = alloc_type_array(elem, count, generic_type);
+					if (ctx->disallow_polymorphic_return_types && count == 0) {
+						return;
+					}
+					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
 					return;
 				}
 
@@ -3384,6 +3423,9 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		}
 		Type *t = alloc_type_generic(ctx->scope, 0, token.string, specific);
 		if (ctx->allow_polymorphic_types) {
+			if (ctx->disallow_polymorphic_return_types) {
+				error(ident, "Undeclared polymorphic parameter '%.*s' in return type", LIT(token.string));
+			}
 			Scope *ps = ctx->polymorphic_scope;
 			Scope *s = ctx->scope;
 			Scope *entity_scope = s;
@@ -3487,6 +3529,17 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			elem = o.type;
 		}
 
+		if (!ctx->in_polymorphic_specialization && ctx->disallow_polymorphic_return_types) {
+			Type *t = base_type(elem);
+			if (t != nullptr &&
+			    unparen_expr(pt->type)->kind == Ast_Ident &&
+			    is_type_polymorphic_record_unspecialized(t)) {
+				gbString err_str = expr_to_string(e);
+				error(e, "Invalid use of a non-specialized polymorphic type '%s'", err_str);
+				gb_string_free(err_str);
+			}
+		}
+
 
 		if (pt->tag != nullptr) {
 			GB_ASSERT(pt->tag->kind == Ast_BasicDirective);
@@ -3517,41 +3570,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(rt, RelativeType, e);
-		GB_ASSERT(rt->tag->kind == Ast_CallExpr);
-		ast_node(ce, CallExpr, rt->tag);
-
-		Type *base_integer = nullptr;
-
-		if (ce->args.count != 1) {
-			error(rt->type, "#relative expected 1 type argument, got %td", ce->args.count);
-		} else {
-			base_integer = check_type(ctx, ce->args[0]);
-			if (!is_type_integer(base_integer)) {
-				error(rt->type, "#relative base types must be an integer");
-				base_integer = nullptr;
-			} else if (type_size_of(base_integer) > 64) {
-				error(rt->type, "#relative base integer types be less than or equal to 64-bits");
-				base_integer = nullptr;
-			}
-		}
-
-		Type *relative_type = nullptr;
-		Type *base_type = check_type(ctx, rt->type);
-		if (!is_type_pointer(base_type) && !is_type_multi_pointer(base_type)) {
-			error(rt->type, "#relative types can only be a pointer or multi-pointer");
-			relative_type = base_type;
-		} else if (base_integer == nullptr) {
-			relative_type = base_type;
-		} else {
-			if (is_type_pointer(base_type)) {
-				relative_type = alloc_type_relative_pointer(base_type, base_integer);
-			} else if (is_type_multi_pointer(base_type)) {
-				relative_type = alloc_type_relative_multi_pointer(base_type, base_integer);
-			}
-		}
-		GB_ASSERT(relative_type != nullptr);
-
-		*type = relative_type;
+		error(e, "#relative types have been removed from the compiler. Prefer \"core:relative\".");
+		*type = t_invalid;
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
@@ -3784,7 +3804,11 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 		#if 0
 		error(e, "Invalid type definition of '%.*s'", LIT(type->Named.name));
 		#endif
-		type->Named.base = t_invalid;
+		if (type->Named.type_name->TypeName.is_type_alias) {
+			// NOTE(laytan): keep it null, type declaration is a mini "cycle" to be filled later.
+		} else {
+			type->Named.base = t_invalid;
+		}
 	}
 
 	if (is_type_polymorphic(type)) {
@@ -3802,7 +3826,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 	}
 	#endif
 
-	if (is_type_typed(type)) {
+	if (type->kind == Type_Named && type->Named.base == nullptr || is_type_typed(type)) {
 		add_type_and_value(ctx, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);

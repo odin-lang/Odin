@@ -1,139 +1,186 @@
+#+feature dynamic-literals
 package test_core_hash
 
-import "core:hash/xxhash"
 import "core:hash"
 import "core:testing"
-import "core:math/rand"
 import "base:intrinsics"
 
+/*
+	Built-in `#hash`es:
+		#hash("murmur32"),
+		#hash("murmur64"),
+	};
+*/
+
+V32 :: struct{s: string, h: u32}
+V64 :: struct{s: string, h: u64}
+
 @test
-test_xxhash_zero_fixed :: proc(t: ^testing.T) {
-	many_zeroes := make([]u8, 16 * 1024 * 1024)
-	defer delete(many_zeroes)
-
-	// All at once.
-	for i, v in ZERO_VECTORS {
-		b := many_zeroes[:i]
-
-		xxh32    := xxhash.XXH32(b)
-		xxh64    := xxhash.XXH64(b)
-		xxh3_64  := xxhash.XXH3_64(b)
-		xxh3_128 := xxhash.XXH3_128(b)
-
-		testing.expectf(t, xxh32    == v.xxh_32,   "[   XXH32(%03d) ] Expected: %08x, got: %08x", i, v.xxh_32,   xxh32)
-		testing.expectf(t, xxh64    == v.xxh_64,   "[   XXH64(%03d) ] Expected: %16x, got: %16x", i, v.xxh_64,   xxh64)
-		testing.expectf(t, xxh3_64  == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %16x, got: %16x", i, v.xxh3_64,  xxh3_64)
-		testing.expectf(t, xxh3_128 == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %32x, got: %32x", i, v.xxh3_128, xxh3_128)
+test_adler32_vectors :: proc(t: ^testing.T) {
+	vectors :: []V32{
+		{""             , 0x00000001},
+		{"a"            , 0x00620062},
+		{"abc"          , 0x024d0127},
+		{"Hello"        , 0x058c01f5},
+		{"world"        , 0x06a60229},
+		{"Hello, world!", 0x205e048a},
 	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		adler := hash.adler32(b)
+		testing.expectf(t, adler == vector.h, "\n\t[ADLER-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, adler)
+	}
+
+	testing.expect_value(t, #hash(vectors[0].s, "adler32"), int(vectors[0].h))
+	testing.expect_value(t, #hash(vectors[1].s, "adler32"), int(vectors[1].h))
+	testing.expect_value(t, #hash(vectors[2].s, "adler32"), int(vectors[2].h))
+	testing.expect_value(t, #hash(vectors[3].s, "adler32"), int(vectors[3].h))
+	testing.expect_value(t, #hash(vectors[4].s, "adler32"), int(vectors[4].h))
+	testing.expect_value(t, #hash(vectors[5].s, "adler32"), int(vectors[5].h))
 }
 
-@(test)
-test_xxhash_zero_streamed_random_updates :: proc(t: ^testing.T) {
-	many_zeroes := make([]u8, 16 * 1024 * 1024)
-	defer delete(many_zeroes)
+@test
+test_djb2_vectors :: proc(t: ^testing.T) {
+	vectors :: []V32{
+		{""             , 5381}, // Initial seed
+		{"a"            , 0x0002b606},
+		{"abc"          , 0x0b885c8b},
+		{"Hello"        , 0x0d4f2079},
+		{"world"        , 0x10a7356d},
+		{"Hello, world!", 0xe18796ae},
+	}
 
-	// Streamed
-	for i, v in ZERO_VECTORS {
-		b := many_zeroes[:i]
-
-		xxh_32_state, xxh_32_err := xxhash.XXH32_create_state()
-		defer xxhash.XXH32_destroy_state(xxh_32_state)
-		testing.expect(t, xxh_32_err == nil, "Problem initializing XXH_32 state")
-
-		xxh_64_state, xxh_64_err := xxhash.XXH64_create_state()
-		defer xxhash.XXH64_destroy_state(xxh_64_state)
-		testing.expect(t, xxh_64_err == nil, "Problem initializing XXH_64 state")
-
-		xxh3_64_state, xxh3_64_err := xxhash.XXH3_create_state()
-		defer xxhash.XXH3_destroy_state(xxh3_64_state)
-		testing.expect(t, xxh3_64_err == nil, "Problem initializing XXH3_64 state")
-
-		xxh3_128_state, xxh3_128_err := xxhash.XXH3_create_state()
-		defer xxhash.XXH3_destroy_state(xxh3_128_state)
-		testing.expect(t, xxh3_128_err == nil, "Problem initializing XXH3_128 state")
-
-		// XXH3_128_update
-		rand.reset(t.seed)
-		for len(b) > 0 {
-			update_size := min(len(b), rand.int_max(8192))
-			if update_size > 4096 {
-				update_size %= 73
-			}
-			xxhash.XXH32_update   (xxh_32_state,   b[:update_size])
-			xxhash.XXH64_update   (xxh_64_state,   b[:update_size])
-
-			xxhash.XXH3_64_update (xxh3_64_state,  b[:update_size])
-			xxhash.XXH3_128_update(xxh3_128_state, b[:update_size])
-
-			b = b[update_size:]
-		}
-
-		// Now finalize
-		xxh32    := xxhash.XXH32_digest(xxh_32_state)
-		xxh64    := xxhash.XXH64_digest(xxh_64_state)
-
-		xxh3_64  := xxhash.XXH3_64_digest(xxh3_64_state)
-		xxh3_128 := xxhash.XXH3_128_digest(xxh3_128_state)
-
-		testing.expectf(t, xxh32     == v.xxh_32,   "[   XXH32(%03d) ] Expected: %08x, got: %08x", i,   v.xxh_32,   xxh32)
-		testing.expectf(t, xxh64     == v.xxh_64,   "[   XXH64(%03d) ] Expected: %16x, got: %16x", i,   v.xxh_64,   xxh64)
-		testing.expectf(t, xxh3_64   == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %16x, got: %16x", i,  v.xxh3_64, xxh3_64)
-		testing.expectf(t, xxh3_128  == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %32x, got: %32x", i, v.xxh3_128, xxh3_128)
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		djb2 := hash.djb2(b)
+		testing.expectf(t, djb2 == vector.h, "\n\t[DJB-2(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, djb2)
 	}
 }
 
 @test
-test_xxhash_seeded :: proc(t: ^testing.T) {
-	buf := make([]u8, 256)
-	defer delete(buf)
-
-	for seed, table in XXHASH_TEST_VECTOR_SEEDED {
-		for v, i in table {
-			b := buf[:i]
-
-			xxh32    := xxhash.XXH32(b, u32(seed))
-			xxh64    := xxhash.XXH64(b, seed)
-			xxh3_64  := xxhash.XXH3_64(b, seed)
-			xxh3_128 := xxhash.XXH3_128(b, seed)
-
-			testing.expectf(t, xxh32    == v.xxh_32,   "[   XXH32(%03d) ] Expected: %08x, got: %08x", i,   v.xxh_32, xxh32)
-			testing.expectf(t, xxh64    == v.xxh_64,   "[   XXH64(%03d) ] Expected: %16x, got: %16x", i,   v.xxh_64, xxh64)
-			testing.expectf(t, xxh3_64  == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %16x, got: %16x", i, v.xxh3_64, xxh3_64)
-			testing.expectf(t, xxh3_128 == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %32x, got: %32x", i, v.xxh3_128, xxh3_128)
-
-			if len(b) > xxhash.XXH3_MIDSIZE_MAX {
-				xxh3_state, _ := xxhash.XXH3_create_state()
-				xxhash.XXH3_64_reset_with_seed(xxh3_state, seed)
-				xxhash.XXH3_64_update(xxh3_state, b)
-				xxh3_64_streamed := xxhash.XXH3_64_digest(xxh3_state)
-				xxhash.XXH3_destroy_state(xxh3_state)
-				testing.expectf(t, xxh3_64_streamed == v.xxh3_64, "[XXH3_64s(%03d) ] Expected: %16x, got: %16x", i, v.xxh3_64, xxh3_64_streamed)
-
-				xxh3_state2, _ := xxhash.XXH3_create_state()
-				xxhash.XXH3_128_reset_with_seed(xxh3_state2, seed)
-				xxhash.XXH3_128_update(xxh3_state2, b)
-				xxh3_128_streamed := xxhash.XXH3_128_digest(xxh3_state2)
-				xxhash.XXH3_destroy_state(xxh3_state2)
-				testing.expectf(t, xxh3_128_streamed == v.xxh3_128, "[XXH3_128s(%03d) ] Expected: %32x, got: %32x", i, v.xxh3_128, xxh3_128_streamed)
-			}
-		}
+test_fnv32_vectors :: proc(t: ^testing.T) {
+	vectors :: []V32{
+		{""             , 0x811c9dc5},
+		{"a"            , 0x050c5d7e},
+		{"abc"          , 0x439c2f4b},
+		{"Hello"        , 0x3726bd47},
+		{"world"        , 0x9b8e862f},
+		{"Hello, world!", 0xe84ead66},
 	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		fnv := hash.fnv32_no_a(b)
+		testing.expectf(t, fnv == vector.h, "\n\t[FNV-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, fnv)
+	}
+
+	testing.expect_value(t, #hash(vectors[0].s, "fnv32"), int(vectors[0].h))
+	testing.expect_value(t, #hash(vectors[1].s, "fnv32"), int(vectors[1].h))
+	testing.expect_value(t, #hash(vectors[2].s, "fnv32"), int(vectors[2].h))
+	testing.expect_value(t, #hash(vectors[3].s, "fnv32"), int(vectors[3].h))
+	testing.expect_value(t, #hash(vectors[4].s, "fnv32"), int(vectors[4].h))
+	testing.expect_value(t, #hash(vectors[5].s, "fnv32"), int(vectors[5].h))
 }
 
 @test
-test_xxhash_secret :: proc(t: ^testing.T) {
-	buf := make([]u8, 256)
-	defer delete(buf)
-
-	for secret, table in XXHASH_TEST_VECTOR_SECRET {
-		secret_bytes := transmute([]u8)secret
-		for v, i in table {
-			b := buf[:i]
-
-			xxh3_128 := xxhash.XXH3_128(b, secret_bytes)
-			testing.expectf(t, xxh3_128  == v.xxh3_128_secret, "[XXH3_128(%03d)] Expected: %32x, got: %32x", i, v.xxh3_128_secret, xxh3_128)
-		}
+test_fnv64_vectors :: proc(t: ^testing.T) {
+	vectors :: []V64{
+		{""             , 0xcbf29ce484222325},
+		{"a"            , 0xaf63bd4c8601b7be},
+		{"abc"          , 0xd8dcca186bafadcb},
+		{"Hello"        , 0xfa365282a44c0ba7},
+		{"world"        , 0x3ec0cf0cc4a6540f},
+		{"Hello, world!", 0x6519bd6389aaa166},
 	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		fnv := hash.fnv64_no_a(b)
+		testing.expectf(t, fnv == vector.h, "\n\t[FNV-64(%v)] Expected: 0x%16x, got: 0x%16x", vector.s, vector.h, fnv)
+	}
+
+	testing.expect_value(t, i128(#hash(vectors[0].s, "fnv64")), i128(vectors[0].h))
+	testing.expect_value(t, i128(#hash(vectors[1].s, "fnv64")), i128(vectors[1].h))
+	testing.expect_value(t, i128(#hash(vectors[2].s, "fnv64")), i128(vectors[2].h))
+	testing.expect_value(t, i128(#hash(vectors[3].s, "fnv64")), i128(vectors[3].h))
+	testing.expect_value(t, i128(#hash(vectors[4].s, "fnv64")), i128(vectors[4].h))
+	testing.expect_value(t, i128(#hash(vectors[5].s, "fnv64")), i128(vectors[5].h))
+}
+
+@test
+test_fnv32a_vectors :: proc(t: ^testing.T) {
+	vectors :: []V32{
+		{""             , 0x811c9dc5},
+		{"a"            , 0xe40c292c},
+		{"abc"          , 0x1a47e90b},
+		{"Hello"        , 0xf55c314b},
+		{"world"        , 0x37a3e893},
+		{"Hello, world!", 0xed90f094},
+	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		fnv := hash.fnv32a(b)
+		testing.expectf(t, fnv == vector.h, "\n\t[FNV-32a(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, fnv)
+	}
+
+	testing.expect_value(t, #hash(vectors[0].s, "fnv32a"), int(vectors[0].h))
+	testing.expect_value(t, #hash(vectors[1].s, "fnv32a"), int(vectors[1].h))
+	testing.expect_value(t, #hash(vectors[2].s, "fnv32a"), int(vectors[2].h))
+	testing.expect_value(t, #hash(vectors[3].s, "fnv32a"), int(vectors[3].h))
+	testing.expect_value(t, #hash(vectors[4].s, "fnv32a"), int(vectors[4].h))
+	testing.expect_value(t, #hash(vectors[5].s, "fnv32a"), int(vectors[5].h))
+}
+
+@test
+test_fnv64a_vectors :: proc(t: ^testing.T) {
+	vectors :: []V64{
+		{""             , 0xcbf29ce484222325},
+		{"a"            , 0xaf63dc4c8601ec8c},
+		{"abc"          , 0xe71fa2190541574b},
+		{"Hello"        , 0x63f0bfacf2c00f6b},
+		{"world"        , 0x4f59ff5e730c8af3},
+		{"Hello, world!", 0x38d1334144987bf4},
+	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		fnv := hash.fnv64a(b)
+		testing.expectf(t, fnv == vector.h, "\n\t[FNV-64a(%v)] Expected: 0x%16x, got: 0x%16x", vector.s, vector.h, fnv)
+	}
+
+	testing.expect_value(t, i128(#hash(vectors[0].s, "fnv64a")), i128(vectors[0].h))
+	testing.expect_value(t, i128(#hash(vectors[1].s, "fnv64a")), i128(vectors[1].h))
+	testing.expect_value(t, i128(#hash(vectors[2].s, "fnv64a")), i128(vectors[2].h))
+	testing.expect_value(t, i128(#hash(vectors[3].s, "fnv64a")), i128(vectors[3].h))
+	testing.expect_value(t, i128(#hash(vectors[4].s, "fnv64a")), i128(vectors[4].h))
+	testing.expect_value(t, i128(#hash(vectors[5].s, "fnv64a")), i128(vectors[5].h))
+}
+
+@test
+test_crc32_vectors :: proc(t: ^testing.T) {
+	vectors :: []V32{
+		{""             , 0x00000000},
+		{"a"            , 0xe8b7be43},
+		{"abc"          , 0x352441c2},
+		{"Hello"        , 0xf7d18982},
+		{"world"        , 0x3a771143},
+		{"Hello, world!", 0xebe6c6e6},
+	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		crc := hash.crc32(b)
+		testing.expectf(t, crc == vector.h, "\n\t[CRC-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, crc)
+	}
+
+	testing.expect_value(t, #hash(vectors[0].s, "crc32"), int(vectors[0].h))
+	testing.expect_value(t, #hash(vectors[1].s, "crc32"), int(vectors[1].h))
+	testing.expect_value(t, #hash(vectors[2].s, "crc32"), int(vectors[2].h))
+	testing.expect_value(t, #hash(vectors[3].s, "crc32"), int(vectors[3].h))
+	testing.expect_value(t, #hash(vectors[4].s, "crc32"), int(vectors[4].h))
+	testing.expect_value(t, #hash(vectors[5].s, "crc32"), int(vectors[5].h))
 }
 
 @test
@@ -166,4 +213,54 @@ test_crc64_vectors :: proc(t: ^testing.T) {
 		testing.expectf(t, iso  == expected[2], "[ CRC-64 ISO 3306] Expected: %016x, got: %016x", expected[2], iso)
 		testing.expectf(t, iso2 == expected[3], "[~CRC-64 ISO 3306] Expected: %016x, got: %016x", expected[3], iso2)
 	}
+}
+
+@test
+test_murmur32_vectors :: proc(t: ^testing.T) {
+	vectors :: []V32{
+		{""             , 0xebb6c228},
+		{"a"            , 0x7fa09ea6},
+		{"abc"          , 0xc84a62dd},
+		{"Hello"        , 0xec73fdbe},
+		{"world"        , 0xd7f8a5f2},
+		{"Hello, world!", 0x24884cba},
+	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		murmur := hash.murmur32(b)
+		testing.expectf(t, murmur == vector.h, "\n\t[MURMUR-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, murmur)
+	}
+
+	testing.expect_value(t, #hash(vectors[0].s, "murmur32"), int(vectors[0].h))
+	testing.expect_value(t, #hash(vectors[1].s, "murmur32"), int(vectors[1].h))
+	testing.expect_value(t, #hash(vectors[2].s, "murmur32"), int(vectors[2].h))
+	testing.expect_value(t, #hash(vectors[3].s, "murmur32"), int(vectors[3].h))
+	testing.expect_value(t, #hash(vectors[4].s, "murmur32"), int(vectors[4].h))
+	testing.expect_value(t, #hash(vectors[5].s, "murmur32"), int(vectors[5].h))
+}
+
+@test
+test_murmur64_vectors :: proc(t: ^testing.T) {
+	vectors :: []V64{
+		{""             , 0x8397626cd6895052},
+		{"a"            , 0xe96b6245652273ae},
+		{"abc"          , 0xa9316c8740c81414},
+		{"Hello"        , 0x89cc3a85a7045a4f},
+		{"world"        , 0xf030e222b1f740f6},
+		{"Hello, world!", 0x710583fa7f802a84},
+	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		murmur := hash.murmur64a(b)
+		testing.expectf(t, murmur == vector.h, "\n\t[MURMUR-64(%v)] Expected: 0x%16x, got: 0x%16x", vector.s, vector.h, murmur)
+	}
+
+	testing.expect_value(t, i128(#hash(vectors[0].s, "murmur64")), i128(vectors[0].h))
+	testing.expect_value(t, i128(#hash(vectors[1].s, "murmur64")), i128(vectors[1].h))
+	testing.expect_value(t, i128(#hash(vectors[2].s, "murmur64")), i128(vectors[2].h))
+	testing.expect_value(t, i128(#hash(vectors[3].s, "murmur64")), i128(vectors[3].h))
+	testing.expect_value(t, i128(#hash(vectors[4].s, "murmur64")), i128(vectors[4].h))
+	testing.expect_value(t, i128(#hash(vectors[5].s, "murmur64")), i128(vectors[5].h))
 }

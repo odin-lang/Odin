@@ -3,8 +3,10 @@ package sdl2
 import "core:c"
 
 when ODIN_OS == .Windows {
+	@(ignore_duplicates)
 	foreign import lib "SDL2.lib"
 } else {
+	@(ignore_duplicates)
 	foreign import lib "system:SDL2"
 }
 
@@ -72,12 +74,14 @@ when ODIN_ENDIAN == .Little {
 	AUDIO_F32SYS :: AUDIO_F32MSB
 }
 
-
-AUDIO_ALLOW_FREQUENCY_CHANGE    :: 0x00000001
-AUDIO_ALLOW_FORMAT_CHANGE       :: 0x00000002
-AUDIO_ALLOW_CHANNELS_CHANGE     :: 0x00000004
-AUDIO_ALLOW_SAMPLES_CHANGE      :: 0x00000008
-AUDIO_ALLOW_ANY_CHANGE          :: AUDIO_ALLOW_FREQUENCY_CHANGE|AUDIO_ALLOW_FORMAT_CHANGE|AUDIO_ALLOW_CHANNELS_CHANGE|AUDIO_ALLOW_SAMPLES_CHANGE
+AudioAllowChangeFlags :: distinct bit_set[AudioAllowChangeFlag; c.int]
+AudioAllowChangeFlag :: enum c.int {
+	FREQUENCY    = 0,
+	FORMAT       = 1,
+	CHANNELS     = 2,
+	SAMPLES      = 3,
+}
+AUDIO_ALLOW_ANY_CHANGE :: AudioAllowChangeFlags{.FREQUENCY, .FORMAT, .CHANNELS, .SAMPLES}
 
 AudioCallback :: proc "c" (userdata: rawptr, stream: [^]u8, len: c.int)
 
@@ -149,7 +153,7 @@ foreign lib {
 	                        iscapture: bool,
 	                        desired: ^AudioSpec,
 	                        obtained: ^AudioSpec,
-	                        allowed_changes: bool) -> AudioDeviceID ---
+	                        allowed_changes: AudioAllowChangeFlags) -> AudioDeviceID ---
 }
 
 

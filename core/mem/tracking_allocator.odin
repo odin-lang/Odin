@@ -35,11 +35,17 @@ Tracking_Allocator_Bad_Free_Entry :: struct {
 }
 
 /*
+Callback type for when tracking allocator runs into a bad free.
+*/
+Tracking_Allocator_Bad_Free_Callback :: proc(t: ^Tracking_Allocator, memory: rawptr, location: runtime.Source_Code_Location)
+
+/*
 Tracking allocator data.
 */
 Tracking_Allocator :: struct {
 	backing: Allocator,
 	allocation_map: map[rawptr]Tracking_Allocator_Entry,
+	bad_free_callback: Tracking_Allocator_Bad_Free_Callback,
 	bad_free_array: [dynamic]Tracking_Allocator_Bad_Free_Entry,
 	mutex: sync.Mutex,
 	clear_on_free_all: bool,
@@ -58,9 +64,11 @@ This procedure initializes the tracking allocator `t` with a backing allocator
 specified with `backing_allocator`. The `internals_allocator` will used to
 allocate the tracked data.
 */
+@(no_sanitize_address)
 tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Allocator, internals_allocator := context.allocator) {
 	t.backing = backing_allocator
 	t.allocation_map.allocator = internals_allocator
+	t.bad_free_callback = tracking_allocator_bad_free_callback_panic
 	t.bad_free_array.allocator = internals_allocator
 	if .Free_All in query_features(t.backing) {
 		t.clear_on_free_all = true
@@ -70,6 +78,7 @@ tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Alloc
 /*
 Destroy the tracking allocator.
 */
+@(no_sanitize_address)
 tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 	delete(t.allocation_map)
 	delete(t.bad_free_array)
@@ -83,6 +92,7 @@ This procedure clears the tracked data from a tracking allocator.
 **Note**: This procedure clears only the current allocation data while keeping
 the totals intact.
 */
+@(no_sanitize_address)
 tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
@@ -96,6 +106,7 @@ Reset the tracking allocator.
 
 Reset all of a Tracking Allocator's allocation data back to zero.
 */
+@(no_sanitize_address)
 tracking_allocator_reset :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
@@ -110,14 +121,45 @@ tracking_allocator_reset :: proc(t: ^Tracking_Allocator) {
 }
 
 /*
+Default behavior for a bad free: Crash with error message that says where the
+bad free happened.
+
+Override Tracking_Allocator.bad_free_callback to have something else happen. For
+example, you can use tracking_allocator_bad_free_callback_add_to_array to return
+the tracking allocator to the old behavior, where the bad_free_array was used.
+*/
+@(no_sanitize_address)
+tracking_allocator_bad_free_callback_panic :: proc(t: ^Tracking_Allocator, memory: rawptr, location: runtime.Source_Code_Location) {
+	runtime.print_caller_location(location)
+	runtime.print_string(" Tracking allocator error: Bad free of pointer ")
+	runtime.print_uintptr(uintptr(memory))
+	runtime.print_string("\n")
+	runtime.trap()
+}
+
+/*
+Alternative behavior for a bad free: Store in `bad_free_array`. If you use this,
+then you must make sure to check Tracking_Allocator.bad_free_array at some point.
+*/
+@(no_sanitize_address)
+tracking_allocator_bad_free_callback_add_to_array :: proc(t: ^Tracking_Allocator, memory: rawptr, location: runtime.Source_Code_Location) {
+	append(&t.bad_free_array, Tracking_Allocator_Bad_Free_Entry {
+		memory = memory,
+		location = location,
+	})
+}
+
+/*
 Tracking allocator.
 
 The tracking allocator is an allocator wrapper that tracks memory allocations.
 This allocator stores all the allocations in a map. Whenever a pointer that's
 not inside of the map is freed, the `bad_free_array` entry is added.
 
-An example of how to use the `Tracking_Allocator` to track subsequent allocations
-in your program and report leaks and bad frees:
+Here follows an example of how to use the `Tracking_Allocator` to track
+subsequent allocations in your program and report leaks. By default, the
+tracking allocator will crash on bad frees. You can override that behavior by
+overriding `track.bad_free_callback`.
 
 Example:
 
@@ -137,12 +179,9 @@ Example:
 		for _, leak in track.allocation_map {
 			fmt.printf("%v leaked %m\n", leak.location, leak.size)
 		}
-		for bad_free in track.bad_free_array {
-			fmt.printf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory)
-		}
 	}
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 	return Allocator{
 		data = data,
@@ -150,6 +189,7 @@ tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 	}
 }
 
+@(no_sanitize_address)
 tracking_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode: Allocator_Mode,
@@ -158,6 +198,7 @@ tracking_allocator_proc :: proc(
 	old_size: int,
 	loc := #caller_location,
 ) -> (result: []byte, err: Allocator_Error) {
+	@(no_sanitize_address)
 	track_alloc :: proc(data: ^Tracking_Allocator, entry: ^Tracking_Allocator_Entry) {
 		data.total_memory_allocated += i64(entry.size)
 		data.total_allocation_count += 1
@@ -167,6 +208,7 @@ tracking_allocator_proc :: proc(
 		}
 	}
 
+	@(no_sanitize_address)
 	track_free :: proc(data: ^Tracking_Allocator, entry: ^Tracking_Allocator_Entry) {
 		data.total_memory_freed += i64(entry.size)
 		data.total_free_count += 1
@@ -191,10 +233,9 @@ tracking_allocator_proc :: proc(
 	}
 
 	if mode == .Free && old_memory != nil && old_memory not_in data.allocation_map {
-		append(&data.bad_free_array, Tracking_Allocator_Bad_Free_Entry{
-			memory = old_memory,
-			location = loc,
-		})
+		if data.bad_free_callback != nil {
+			data.bad_free_callback(data, old_memory, loc)
+		}
 	} else {
 		result = data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, loc) or_return
 	}

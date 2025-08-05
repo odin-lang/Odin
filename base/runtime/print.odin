@@ -403,7 +403,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_string("struct ")
 		if .packed    in info.flags { print_string("#packed ") }
 		if .raw_union in info.flags { print_string("#raw_union ") }
-		if .no_copy   in info.flags { print_string("#no_copy ") }
+		// if .no_copy   in info.flags { print_string("#no_copy ") }
 		if .align in info.flags {
 			print_string("#align(")
 			print_u64(u64(ti.align))
@@ -486,18 +486,6 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_u64(u64(info.count))
 		print_byte(']')
 		print_type(info.elem)
-
-	case Type_Info_Relative_Pointer:
-		print_string("#relative(")
-		print_type(info.base_integer)
-		print_string(") ")
-		print_type(info.pointer)
-
-	case Type_Info_Relative_Multi_Pointer:
-		print_string("#relative(")
-		print_type(info.base_integer)
-		print_string(") ")
-		print_type(info.pointer)
 		
 	case Type_Info_Matrix:
 		print_string("matrix[")

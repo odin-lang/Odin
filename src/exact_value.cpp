@@ -370,7 +370,11 @@ gb_internal ExactValue exact_value_from_basic_literal(TokenKind kind, String con
 	}
 	case Token_Rune: {
 		Rune r = GB_RUNE_INVALID;
-		utf8_decode(string.text, string.len, &r);
+		if (string.len == 1) {
+			r = cast(Rune)string.text[0];
+		} else {
+			utf8_decode(string.text, string.len, &r);
+		}
 		return exact_value_i64(r);
 	}
 	}
@@ -950,6 +954,10 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
+		if (isnan(a) || isnan(b)) {
+			return op == Token_NotEq;
+		}
+
 		switch (op) {
 		case Token_CmpEq: return cmp_f64(a, b) == 0;
 		case Token_NotEq: return cmp_f64(a, b) != 0;

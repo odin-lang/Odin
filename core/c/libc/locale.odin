@@ -5,7 +5,7 @@ import "core:c"
 when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
 } else when ODIN_OS == .Darwin {
-	foreign import libc "system:System.framework"
+	foreign import libc "system:System"
 } else {
 	foreign import libc "system:c"
 }
@@ -110,7 +110,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD  || ODIN_OS == .OpenBSD || ODIN_OS == .Windows {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD  || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku || ODIN_OS == .Windows {
 
 	LC_ALL      :: 0
 	LC_COLLATE  :: 1

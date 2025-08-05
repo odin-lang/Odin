@@ -115,11 +115,16 @@ open :: proc(name: string, flags := File_Flags{.Read}, perm := 0o777) -> (^File,
 
 @(require_results)
 new_file :: proc(handle: uintptr, name: string) -> ^File {
-	file, err := _new_file(handle, name)
+	file, err := _new_file(handle, name, file_allocator())
 	if err != nil {
 		panic(error_string(err))
 	}
 	return file
+}
+
+@(require_results)
+clone :: proc(f: ^File) -> (^File, Error) {
+	return _clone(f)
 }
 
 @(require_results)
@@ -286,8 +291,8 @@ exists :: proc(path: string) -> bool {
 
 @(require_results)
 is_file :: proc(path: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	fi, err := stat(path, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	fi, err := stat(path, temp_allocator)
 	if err != nil {
 		return false
 	}
@@ -298,8 +303,8 @@ is_dir :: is_directory
 
 @(require_results)
 is_directory :: proc(path: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	fi, err := stat(path, temp_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	fi, err := stat(path, temp_allocator)
 	if err != nil {
 		return false
 	}
@@ -308,6 +313,15 @@ is_directory :: proc(path: string) -> bool {
 
 
 copy_file :: proc(dst_path, src_path: string) -> Error {
+	when #defined(_copy_file_native) {
+		return _copy_file_native(dst_path, src_path)
+	} else {
+		return _copy_file(dst_path, src_path)
+	}
+}
+
+@(private)
+_copy_file :: proc(dst_path, src_path: string) -> Error {
 	src := open(src_path) or_return
 	defer close(src)
 

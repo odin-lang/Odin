@@ -22,7 +22,7 @@ foreign gdi32 {
 
 	CreateDIBPatternBrush :: proc(h: HGLOBAL, iUsage: UINT) -> HBRUSH ---
 	CreateDIBitmap :: proc(hdc: HDC, pbmih: ^BITMAPINFOHEADER, flInit: DWORD, pjBits: VOID, pbmi: ^BITMAPINFO, iUsage: UINT) -> HBITMAP ---
-	CreateDIBSection :: proc(hdc: HDC, pbmi: ^BITMAPINFO, usage: UINT, ppvBits: VOID, hSection: HANDLE, offset: DWORD) -> HBITMAP ---
+	CreateDIBSection :: proc(hdc: HDC, pbmi: ^BITMAPINFO, usage: UINT, ppvBits: ^^VOID, hSection: HANDLE, offset: DWORD) -> HBITMAP ---
 	StretchDIBits :: proc(hdc: HDC, xDest, yDest, DestWidth, DestHeight, xSrc, ySrc, SrcWidth, SrcHeight: INT, lpBits: VOID, lpbmi: ^BITMAPINFO, iUsage: UINT, rop: DWORD) -> INT ---
 	StretchBlt :: proc(hdcDest: HDC, xDest, yDest, wDest, hDest: INT, hdcSrc: HDC, xSrc, ySrc, wSrc, hSrc: INT, rop: DWORD) -> BOOL ---
 
@@ -350,4 +350,4 @@ NEWTEXTMETRICW :: struct {
 	ntmAvgWidth:        UINT,
 }
 
-FONTENUMPROCW :: #type proc(lpelf: ^ENUMLOGFONTW, lpntm: ^NEWTEXTMETRICW, FontType: DWORD, lParam: LPARAM) -> INT
+FONTENUMPROCW :: #type proc "system" (lpelf: ^ENUMLOGFONTW, lpntm: ^NEWTEXTMETRICW, FontType: DWORD, lParam: LPARAM) -> INT

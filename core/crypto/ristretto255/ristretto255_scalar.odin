@@ -42,9 +42,7 @@ sc_set_bytes :: proc(sc: ^Scalar, b: []byte) -> bool {
 // scalar, from a wide (512-bit) byte string by interpreting b as a
 // little-endian value, and reducing it mod the group order.
 sc_set_bytes_wide :: proc(sc: ^Scalar, b: []byte) {
-	if len(b) != WIDE_SCALAR_SIZE {
-		panic("crypto/ristretto255: invalid wide input size")
-	}
+	ensure(len(b) == WIDE_SCALAR_SIZE, "crypto/ristretto255: invalid wide input size")
 
 	b_ := (^[WIDE_SCALAR_SIZE]byte)(raw_data(b))
 	grp.sc_set_bytes_wide(sc, b_)
@@ -52,9 +50,7 @@ sc_set_bytes_wide :: proc(sc: ^Scalar, b: []byte) {
 
 // sc_bytes sets dst to the canonical encoding of sc.
 sc_bytes :: proc(sc: ^Scalar, dst: []byte) {
-	if len(dst) != SCALAR_SIZE {
-		panic("crypto/ristretto255: invalid destination size")
-	}
+	ensure(len(dst) == SCALAR_SIZE, "crypto/ristretto255: invalid destination size")
 
 	grp.sc_bytes(dst, sc)
 }

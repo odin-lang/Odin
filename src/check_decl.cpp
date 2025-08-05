@@ -60,7 +60,7 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 				error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
 			}
 			if (e->type == nullptr) {
-				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type does not have a default type\n", LIT(e->token.string));
+				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type and does not have a default type\n", LIT(e->token.string));
 			}
 			e->type = operand->type;
 			return nullptr;
@@ -94,12 +94,14 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 				return nullptr;
 			}
 			if (e2->state.load() != EntityState_Resolved) {
-				gbString str = type_to_string(t);
-				defer (gb_string_free(str));
-				error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
-				e->type = t_invalid;
+				e->type = t;
 				return nullptr;
 			}
+			gbString str = type_to_string(t);
+			defer (gb_string_free(str));
+			error(operand->expr, "Invalid use of a non-specialized polymorphic type '%s' in %.*s", str, LIT(context_name));
+			e->type = t_invalid;
+			return nullptr;
 		} else if (is_type_empty_union(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
@@ -142,13 +144,6 @@ gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize l
 		check_init_variable(ctx, e, o, context_name);
 		if (d != nullptr) {
 			d->init_expr = o->expr;
-		}
-
-		if (o->type && is_type_no_copy(o->type)) {
-			ERROR_BLOCK();
-			if (check_no_copy_assignment(*o, str_lit("initialization"))) {
-				error_line("\tInitialization of a #no_copy type must be either implicitly zero, a constant literal, or a return value from a call expression");
-			}
 		}
 	}
 	if (rhs_count > 0 && lhs_count != rhs_count) {
@@ -466,6 +461,10 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	}
 	e->type = named;
 
+	if (!is_distinct) {
+		e->TypeName.is_type_alias = true;
+	}
+
 	check_type_path_push(ctx, e);
 	Type *bt = check_type_expr(ctx, te, named);
 	check_type_path_pop(ctx);
@@ -500,9 +499,9 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	if (!is_distinct) {
 		e->type = bt;
 		named->Named.base = bt;
-		e->TypeName.is_type_alias = true;
 	}
 
+	e->TypeName.is_type_alias = !is_distinct;
 
 	if (decl->type_expr != nullptr) {
 		Type *t = check_type(ctx, decl->type_expr);
@@ -518,12 +517,90 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	if (decl != nullptr) {
 		AttributeContext ac = {};
 		check_decl_attributes(ctx, decl->attributes, type_decl_attribute, &ac);
+
 		if (e->kind == Entity_TypeName && ac.objc_class != "") {
+
 			e->TypeName.objc_class_name = ac.objc_class;
+
+			if (ac.objc_is_implementation) {
+				e->TypeName.objc_is_implementation = ac.objc_is_implementation;
+				e->TypeName.objc_superclass        = ac.objc_superclass;
+				e->TypeName.objc_ivar              = ac.objc_ivar;
+				e->TypeName.objc_context_provider  = ac.objc_context_provider;
+
+				mutex_lock(&ctx->info->objc_class_name_mutex);
+				bool class_exists = string_set_update(&ctx->info->obcj_class_name_set, ac.objc_class);
+				mutex_unlock(&ctx->info->objc_class_name_mutex);
+				if (class_exists) {
+					error(e->token, "@(objc_class) name '%.*s' has already been used elsewhere", LIT(ac.objc_class));
+				}
+
+				mpsc_enqueue(&ctx->info->objc_class_implementations, e);
+
+				GB_ASSERT(e->TypeName.objc_ivar == nullptr || e->TypeName.objc_ivar->kind == Type_Named);
+
+				// Enqueue the contex_provider proc to be checked after it is resolved
+				if (e->TypeName.objc_context_provider != nullptr) {
+					mpsc_enqueue(&ctx->checker->procs_with_objc_context_provider_to_check, e);
+				}
+
+				// TODO(harold): I think there's a Check elsewhere in the checker for checking cycles.
+				//					See about moving this to the right location.
+				// Ensure superclass hierarchy are all Objective-C classes and does not cycle
+
+				// NOTE(harold): We check for superclass unconditionally (before checking if super is null)
+				//				 because this should be the case 99.99% of the time. Not subclassing something that
+				//				 is, or is the child of, NSObject means the objc runtime messaging will not properly work on this type.
+				TypeSet super_set{};
+				type_set_init(&super_set, 8);
+				defer (type_set_destroy(&super_set));
+
+				type_set_update(&super_set, e->type);
+
+				Type *super = ac.objc_superclass;
+				while (super != nullptr) {
+					if (type_set_update(&super_set, super)) {
+						error(e->token, "@(objc_superclass) Superclass hierarchy cycle encountered");
+						break;
+					}
+
+					check_single_global_entity(ctx->checker, super->Named.type_name, super->Named.type_name->decl_info);
+
+					if (super->kind != Type_Named) {
+						error(e->token, "@(objc_superclass) Referenced type must be a named struct");
+						break;
+					}
+
+					Type* named_type = base_named_type(super);
+					GB_ASSERT(named_type->kind == Type_Named);
+
+					if (!is_type_objc_object(named_type)) {
+						error(e->token, "@(objc_superclass) Superclass '%.*s' must be an Objective-C class", LIT(named_type->Named.name));
+						break;
+					}
+
+					if (named_type->Named.type_name->TypeName.objc_class_name == "") {
+						error(e->token, "@(objc_superclass) Superclass '%.*s' must have a valid @(objc_class) attribute", LIT(named_type->Named.name));
+						break;
+					}
+
+					super = named_type->Named.type_name->TypeName.objc_superclass;
+				}
+			} else {
+				if (ac.objc_superclass != nullptr) {
+					error(e->token, "@(objc_superclass) may only be applied when the @(obj_implement) attribute is also applied");
+				} else if (ac.objc_ivar != nullptr) {
+					error(e->token, "@(objc_ivar) may only be applied when the @(obj_implement) attribute is also applied");
+				} else if (ac.objc_context_provider != nullptr) {
+					error(e->token, "@(objc_context_provider) may only be applied when the @(obj_implement) attribute is also applied");
+				}
+			}
 
 			if (type_size_of(e->type) > 0) {
 				error(e->token, "@(objc_class) marked type must be of zero size");
 			}
+		} else if (ac.objc_is_implementation) {
+			error(e->token, "@(objc_implement) may only be applied when the @(objc_class) attribute is also applied");
 		}
 	}
 
@@ -626,6 +703,10 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 				Operand x = {};
 				x.type = entity->type;
 				x.mode = Addressing_Variable;
+				if (entity->kind == Entity_Constant) {
+					x.mode  = Addressing_Constant;
+					x.value = entity->Constant.value;
+				}
 				if (!check_is_assignable_to(ctx, &x, e->type)) {
 					gbString expr_str = expr_to_string(init);
 					gbString op_type_str = type_to_string(entity->type);
@@ -855,6 +936,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	} else {
 		String name = ident->Ident.token.string;
 		Entity *found = scope_lookup(ctx->scope, name);
+
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
 				// NOTE(bill): link against nothing
@@ -911,64 +993,168 @@ gb_internal String handle_link_name(CheckerContext *ctx, Token token, String lin
 }
 
 
-gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeContext const &ac) {
-	if (!(ac.objc_name.len || ac.objc_is_class_method || ac.objc_type)) {
+gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeContext &ac) {
+	if (!ac.objc_type) {
 		return;
 	}
-	if (ac.objc_name.len == 0 && ac.objc_is_class_method) {
-		error(e->token, "@(objc_name) is required with @(objc_is_class_method)");
-	} else if (ac.objc_type == nullptr) {
-		error(e->token, "@(objc_name) requires that @(objc_type) to be set");
-	} else if (ac.objc_name.len == 0 && ac.objc_type) {
-		error(e->token, "@(objc_name) is required with @(objc_type)");
+
+	Type *t = ac.objc_type;
+	GB_ASSERT(t->kind == Type_Named);	// NOTE(harold): This is already checked for at the attribute resolution stage.
+
+	// Attempt to infer th objc_name automatically if the proc name contains
+	// the type name objc_type's name, followed by an underscore, as a prefix.
+	if (ac.objc_name.len == 0) {
+		String proc_name = e->token.string;
+		String type_name = t->Named.name;
+
+		if (proc_name.len > type_name.len + 1 &&
+			proc_name[type_name.len] == '_' &&
+			str_eq(type_name, substring(proc_name, 0, type_name.len))
+		) {
+			ac.objc_name = substring(proc_name, type_name.len+1, proc_name.len);
+		} else {
+			error(e->token, "@(objc_name) requires that @(objc_type) be set or inferred "
+							"by prefixing the proc name with the type and underscore: MyObjcType_myProcName :: proc().");
+		}
+	}
+
+	Entity *tn = t->Named.type_name;
+	GB_ASSERT(tn->kind == Entity_TypeName);
+
+	if (tn->scope != e->scope) {
+		error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
 	} else {
-		Type *t = ac.objc_type;
-		if (t->kind == Type_Named) {
-			Entity *tn = t->Named.type_name;
+		// Enable implementation by default if the class is an implementer too and
+		// @objc_implement was not set to false explicitly in this proc.
+		bool implement = tn->TypeName.objc_is_implementation;
+		if (ac.objc_is_disabled_implement) {
+			implement = false;
+		}
 
-			GB_ASSERT(tn->kind == Entity_TypeName);
+		if (implement) {
+			GB_ASSERT(e->kind == Entity_Procedure);
 
-			if (tn->scope != e->scope) {
-				error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
+			auto &proc = e->type->Proc;
+			Type *first_param = proc.param_count > 0 ? proc.params->Tuple.variables[0]->type : t_untyped_nil;
+
+			if (!tn->TypeName.objc_is_implementation) {
+				error(e->token, "@(objc_is_implement) attribute may only be applied to procedures whose class also have @(objc_is_implement) applied");
+			} else if (!ac.objc_is_class_method && !(first_param->kind == Type_Pointer && internal_check_is_assignable_to(t, first_param->Pointer.elem))) {
+				error(e->token, "Objective-C instance methods implementations require the first parameter to be a pointer to the class type set by @(objc_type)");
+			} else if (proc.calling_convention == ProcCC_Odin && !tn->TypeName.objc_context_provider) {
+				error(e->token, "Objective-C methods with Odin calling convention can only be used with classes that have @(objc_context_provider) set");
+			} else if (ac.objc_is_class_method && proc.calling_convention != ProcCC_CDecl) {
+				error(e->token, "Objective-C class methods (objc_is_class_method=true) that have @objc_is_implementation can only use \"c\" calling convention");
+			} else if (proc.result_count > 1) {
+				error(e->token, "Objective-C method implementations may return at most 1 value");
 			} else {
-				mutex_lock(&global_type_name_objc_metadata_mutex);
-				defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
-
-				if (!tn->TypeName.objc_metadata) {
-					tn->TypeName.objc_metadata = create_type_name_obj_c_metadata();
+				// Always export unconditionally
+				// NOTE(harold): This means check_objc_methods() MUST be called before
+				//				 e->Procedure.is_export is set in check_proc_decl()!
+				if (ac.is_export) {
+					error(e->token, "Explicit export not allowed when @(objc_implement) is set. It set exported implicitly");
 				}
-				auto *md = tn->TypeName.objc_metadata;
-				mutex_lock(md->mutex);
-				defer (mutex_unlock(md->mutex));
+				if (ac.link_name != "") {
+					error(e->token, "Explicit linkage not allowed when @(objc_implement) is set. It set to \"strong\" implicitly");
+				}
 
-				if (!ac.objc_is_class_method) {
-					bool ok = true;
-					for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
-						if (entry.name == ac.objc_name) {
-							error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
-							ok = false;
-							break;
-						}
-					}
-					if (ok) {
-						array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
-					}
+				ac.is_export = true;
+				ac.linkage   = STR_LIT("strong");
+
+				auto method = ObjcMethodData{ ac, e };
+				method.ac.objc_selector = ac.objc_selector != "" ? ac.objc_selector : ac.objc_name;
+
+				CheckerInfo *info = ctx->info;
+				mutex_lock(&info->objc_method_mutex);
+				defer (mutex_unlock(&info->objc_method_mutex));
+
+				Array<ObjcMethodData>* method_list = map_get(&info->objc_method_implementations, t);
+				if (method_list) {
+					array_add(method_list, method);
 				} else {
-					bool ok = true;
-					for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
-						if (entry.name == ac.objc_name) {
-							error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
-							ok = false;
-							break;
-						}
-					}
-					if (ok) {
-						array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
-					}
+					auto list = array_make<ObjcMethodData>(permanent_allocator(), 1, 8);
+					list[0] = method;
+
+					map_set(&info->objc_method_implementations, t, list);
 				}
+			}
+		} else if (ac.objc_selector != "") {
+			error(e->token, "@(objc_selector) may only be applied to procedures that are Objective-C implementations.");
+		}
+
+		mutex_lock(&global_type_name_objc_metadata_mutex);
+		defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
+
+		if (!tn->TypeName.objc_metadata) {
+			tn->TypeName.objc_metadata = create_type_name_obj_c_metadata();
+		}
+		auto *md = tn->TypeName.objc_metadata;
+		mutex_lock(md->mutex);
+		defer (mutex_unlock(md->mutex));
+
+		if (!ac.objc_is_class_method) {
+			bool ok = true;
+			for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
+				if (entry.name == ac.objc_name) {
+					error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+					ok = false;
+					break;
+				}
+			}
+			if (ok) {
+				array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+			}
+		} else {
+			bool ok = true;
+			for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
+				if (entry.name == ac.objc_name) {
+					error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+					ok = false;
+					break;
+				}
+			}
+			if (ok) {
+				array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
 			}
 		}
 	}
+}
+
+gb_internal void check_foreign_procedure(CheckerContext *ctx, Entity *e, DeclInfo *d) {
+	GB_ASSERT(e != nullptr);
+	GB_ASSERT(e->kind == Entity_Procedure);
+	String name = e->Procedure.link_name;
+
+	mutex_lock(&ctx->info->foreign_mutex);
+
+	auto *fp = &ctx->info->foreigns;
+	StringHashKey key = string_hash_string(name);
+	Entity **found = string_map_get(fp, key);
+	if (found && e != *found) {
+		Entity *f = *found;
+		TokenPos pos = f->token.pos;
+		Type *this_type = base_type(e->type);
+		Type *other_type = base_type(f->type);
+		if (is_type_proc(this_type) && is_type_proc(other_type)) {
+			if (!are_signatures_similar_enough(this_type, other_type)) {
+				error(d->proc_lit,
+				      "Redeclaration of foreign procedure '%.*s' with different type signatures\n"
+				      "\tat %s",
+				      LIT(name), token_pos_to_string(pos));
+			}
+		} else if (!signature_parameter_similar_enough(this_type, other_type)) {
+			error(d->proc_lit,
+			      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
+			      "\tat %s",
+			      LIT(name), token_pos_to_string(pos));
+		}
+	} else if (name == "main") {
+		error(d->proc_lit, "The link name 'main' is reserved for internal use");
+	} else {
+		string_map_set(fp, key, e);
+	}
+
+	mutex_unlock(&ctx->info->foreign_mutex);
 }
 
 gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
@@ -1097,6 +1283,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		break;
 	}
 
+	// NOTE(harold): For Objective-C method implementations, this must happen after
+	//				 check_objc_methods() is called as it re-sets ac.is_export to true unconditionally.
+	//				 The same is true for the linkage, set below.
 	e->Procedure.entry_point_only = ac.entry_point_only;
 	e->Procedure.is_export = ac.is_export;
 
@@ -1146,11 +1335,15 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		has_instrumentation = false;
 		e->flags |= EntityFlag_Require;
 	} else if (ac.instrumentation_enter) {
+		init_core_source_code_location(ctx->checker);
 		if (!is_valid_instrumentation_call(e->type)) {
 			init_core_source_code_location(ctx->checker);
 			gbString s = type_to_string(e->type);
 			error(e->token, "@(instrumentation_enter) procedures must have the type '%s', got %s", instrumentation_proc_type_str, s);
 			gb_string_free(s);
+		}
+		if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(e->token, "@(instrumentation_enter) procedures must be declared at the file scope");
 		}
 		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
 		if (ctx->info->instrumentation_enter_entity != nullptr) {
@@ -1168,6 +1361,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			error(e->token, "@(instrumentation_exit) procedures must have the type '%s', got %s", instrumentation_proc_type_str, s);
 			gb_string_free(s);
 		}
+		if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(e->token, "@(instrumentation_exit) procedures must be declared at the file scope");
+		}
 		MUTEX_GUARD(&ctx->info->instrumentation_mutex);
 		if (ctx->info->instrumentation_exit_entity != nullptr) {
 			error(e->token, "@(instrumentation_exit) has already been set");
@@ -1181,6 +1377,8 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->Procedure.has_instrumentation = has_instrumentation;
 
+	e->Procedure.no_sanitize_address = ac.no_sanitize_address;
+	e->Procedure.no_sanitize_memory  = ac.no_sanitize_memory;
 
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
@@ -1196,6 +1394,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
+	// NOTE(harold): See export/linkage note above(where is_export is assigned) regarding Objective-C method implementations
 	bool is_foreign = e->Procedure.is_foreign;
 	bool is_export  = e->Procedure.is_export;
 	
@@ -1307,57 +1506,16 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			name = e->Procedure.link_name;
 		}
 		Entity *foreign_library = init_entity_foreign_library(ctx, e);
-		
-		if (is_arch_wasm() && foreign_library != nullptr) {
-			String module_name = str_lit("env");
-			GB_ASSERT (foreign_library->kind == Entity_LibraryName);
-			if (foreign_library->LibraryName.paths.count != 1) {
-				error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
-				      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
-			}
-
-			if (foreign_library->LibraryName.paths.count >= 1) {
-				module_name = foreign_library->LibraryName.paths[0];
-			}
-
-			if (!string_ends_with(module_name, str_lit(".o"))) {
-				name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
-			}
-		}
-
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
+		e->Procedure.foreign_library = foreign_library;
 
-		mutex_lock(&ctx->info->foreign_mutex);
-
-		auto *fp = &ctx->info->foreigns;
-		StringHashKey key = string_hash_string(name);
-		Entity **found = string_map_get(fp, key);
-		if (found && e != *found) {
-			Entity *f = *found;
-			TokenPos pos = f->token.pos;
-			Type *this_type = base_type(e->type);
-			Type *other_type = base_type(f->type);
-			if (is_type_proc(this_type) && is_type_proc(other_type)) {
-				if (!are_signatures_similar_enough(this_type, other_type)) {
-					error(d->proc_lit,
-					      "Redeclaration of foreign procedure '%.*s' with different type signatures\n"
-					      "\tat %s",
-					      LIT(name), token_pos_to_string(pos));
-				}
-			} else if (!signature_parameter_similar_enough(this_type, other_type)) {
-				error(d->proc_lit,
-				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-				      "\tat %s",
-				      LIT(name), token_pos_to_string(pos));
-			}
-		} else if (name == "main") {
-			error(d->proc_lit, "The link name 'main' is reserved for internal use");
+		if (is_arch_wasm() && foreign_library != nullptr) {
+			// NOTE(bill): this must be delayed because the foreign import paths might not be evaluated yet until much later
+			mpsc_enqueue(&ctx->info->foreign_decls_to_check, e);
 		} else {
-			string_map_set(fp, key, e);
+			check_foreign_procedure(ctx, e, d);
 		}
-
-		mutex_unlock(&ctx->info->foreign_mutex);
 	} else {
 		String name = e->token.string;
 		if (e->Procedure.link_name.len > 0) {
@@ -1743,8 +1901,8 @@ gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
 			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
 			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
 
-			for (Type *t : decl->type_info_deps) {
-				ptr_set_add(&decl->parent->type_info_deps, t);
+			for (auto const &tt : decl->type_info_deps) {
+				type_set_add(&decl->parent->type_info_deps, tt);
 			}
 
 			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
@@ -1784,6 +1942,10 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_decl = decl;
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
+
+	if (decl->parent && decl->entity && decl->parent->entity) {
+		decl->entity->parent_proc_decl = decl->parent;
+	}
 
 	if (ctx->pkg->name != "runtime") {
 		switch (type->Proc.calling_convention) {
@@ -1874,6 +2036,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	check_open_scope(ctx, body);
 	{
+		ctx->scope->decl_info = decl;
+
 		for (auto const &entry : using_entities) {
 			Entity *uvar = entry.uvar;
 			Entity *prev = scope_insert(ctx->scope, uvar);

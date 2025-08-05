@@ -158,14 +158,6 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	case Type_Info_Simd_Vector:
 		y := b.variant.(Type_Info_Simd_Vector) or_return
 		return x.count == y.count && x.elem == y.elem
-
-	case Type_Info_Relative_Pointer:
-		y := b.variant.(Type_Info_Relative_Pointer) or_return
-		return x.base_integer == y.base_integer && x.pointer == y.pointer
-
-	case Type_Info_Relative_Multi_Pointer:
-		y := b.variant.(Type_Info_Relative_Multi_Pointer) or_return
-		return x.base_integer == y.base_integer && x.pointer == y.pointer
 		
 	case Type_Info_Matrix:
 		y := b.variant.(Type_Info_Matrix) or_return
@@ -356,12 +348,6 @@ is_parameters :: proc(info: ^Type_Info) -> bool {
 	_, ok := type_info_base(info).variant.(Type_Info_Parameters)
 	return ok
 }
-@(require_results, deprecated="prefer is_parameters")
-is_tuple :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false }
-	_, ok := type_info_base(info).variant.(Type_Info_Parameters)
-	return ok
-}
 @(require_results)
 is_struct :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
@@ -390,18 +376,6 @@ is_enum :: proc(info: ^Type_Info) -> bool {
 is_simd_vector :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Simd_Vector)
-	return ok
-}
-@(require_results)
-is_relative_pointer :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false }
-	_, ok := type_info_base(info).variant.(Type_Info_Relative_Pointer)
-	return ok
-}
-@(require_results)
-is_relative_multi_pointer :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false }
-	_, ok := type_info_base(info).variant.(Type_Info_Relative_Multi_Pointer)
 	return ok
 }
 
@@ -656,7 +630,7 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		io.write_string(w, "struct ", &n) or_return
 		if .packed    in info.flags { io.write_string(w, "#packed ",    &n) or_return }
 		if .raw_union in info.flags { io.write_string(w, "#raw_union ", &n) or_return }
-		if .no_copy   in info.flags { io.write_string(w, "#no_copy ", &n) or_return }
+		// if .no_copy   in info.flags { io.write_string(w, "#no_copy ", &n) or_return }
 		if .align in info.flags {
 			io.write_string(w, "#align(",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return
@@ -736,18 +710,6 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		io.write_i64(w, i64(info.count), 10, &n) or_return
 		io.write_byte(w, ']',                &n) or_return
 		write_type(w, info.elem,             &n) or_return
-
-	case Type_Info_Relative_Pointer:
-		io.write_string(w, "#relative(", &n) or_return
-		write_type(w, info.base_integer, &n) or_return
-		io.write_string(w, ") ",         &n) or_return
-		write_type(w, info.pointer,      &n) or_return
-
-	case Type_Info_Relative_Multi_Pointer:
-		io.write_string(w, "#relative(", &n) or_return
-		write_type(w, info.base_integer, &n) or_return
-		io.write_string(w, ") ",         &n) or_return
-		write_type(w, info.pointer,      &n) or_return
 		
 	case Type_Info_Matrix:
 		if info.layout == .Row_Major {

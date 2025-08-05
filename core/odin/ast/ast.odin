@@ -432,10 +432,13 @@ Range_Stmt :: struct {
 	reverse:   bool,
 }
 
-Inline_Range_Stmt :: struct {
+Inline_Range_Stmt :: Unroll_Range_Stmt
+
+Unroll_Range_Stmt :: struct {
 	using node: Stmt,
 	label:     ^Expr,
-	inline_pos: tokenizer.Pos,
+	unroll_pos: tokenizer.Pos,
+	args:       []^Expr,
 	for_pos:    tokenizer.Pos,
 	val0:       ^Expr,
 	val1:       ^Expr,

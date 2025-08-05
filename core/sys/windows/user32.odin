@@ -2,6 +2,7 @@
 package sys_windows
 
 import "base:intrinsics"
+import "core:c"
 foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="system")
@@ -32,6 +33,8 @@ foreign user32 {
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
 
+	RegisterHotKey :: proc(hnwd: HWND, id: c.int, fsModifiers: UINT, vk: UINT) -> BOOL ---
+
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
 		lpClassName: LPCWSTR,
@@ -44,6 +47,8 @@ foreign user32 {
 		lpParam: LPVOID,
 	) -> HWND ---
 
+	GetWindowThreadProcessId :: proc(hwnd: HWND, lpdwProcessId: LPDWORD) -> DWORD ---
+
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
 
 	ShowWindow :: proc(hWnd: HWND, nCmdShow: INT) -> BOOL ---
@@ -51,6 +56,7 @@ foreign user32 {
 	IsWindowVisible :: proc(hwnd: HWND) -> BOOL ---
 	IsWindowEnabled :: proc(hwnd: HWND) -> BOOL ---
 	IsIconic :: proc(hwnd: HWND) -> BOOL ---
+	IsZoomed :: proc(hwnd: HWND) -> BOOL ---
 	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
 	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
 	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---
@@ -59,6 +65,8 @@ foreign user32 {
 	UpdateWindow :: proc(hWnd: HWND) -> BOOL ---
 	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
 	GetActiveWindow :: proc() -> HWND ---
+	SetFocus :: proc(hWnd: HWND) -> HWND ---
+	GetFocus :: proc() -> HWND ---
 	RedrawWindow :: proc(hwnd: HWND, lprcUpdate: LPRECT, hrgnUpdate: HRGN, flags: RedrawWindowFlags) -> BOOL ---
 	SetParent :: proc(hWndChild: HWND, hWndNewParent: HWND) -> HWND ---
 	SetPropW :: proc(hWnd: HWND, lpString: LPCWSTR, hData: HANDLE) -> BOOL ---
@@ -207,6 +215,7 @@ foreign user32 {
 	EnumDisplayMonitors :: proc(hdc: HDC, lprcClip: LPRECT, lpfnEnum: Monitor_Enum_Proc, dwData: LPARAM) -> BOOL ---
 
 	EnumWindows :: proc(lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
+	EnumChildWindows :: proc(hWndParent: HWND, lpEnumFunc: Window_Enum_Proc, lParam: LPARAM) -> BOOL ---
 
 	IsProcessDPIAware :: proc() -> BOOL ---
 	SetProcessDPIAware :: proc() -> BOOL ---
@@ -548,11 +557,11 @@ RI_KEY_TERMSRV_SHADOW :: 0x10
 MOUSE_MOVE_RELATIVE :: 0x00
 MOUSE_MOVE_ABSOLUTE :: 0x01
 MOUSE_VIRTUAL_DESKTOP :: 0x02
-MOUSE_ATTRIUBTTES_CHANGED :: 0x04
+MOUSE_ATTRIBUTES_CHANGED :: 0x04
 MOUSE_MOVE_NOCOALESCE :: 0x08
 
 RI_MOUSE_BUTTON_1_DOWN :: 0x0001
-RI_MOUSE_LEFT_BUTTON_DOWNS :: RI_MOUSE_BUTTON_1_DOWN
+RI_MOUSE_LEFT_BUTTON_DOWN :: RI_MOUSE_BUTTON_1_DOWN
 RI_MOUSE_BUTTON_1_UP :: 0x0002
 RI_MOUSE_LEFT_BUTTON_UP :: RI_MOUSE_BUTTON_1_UP
 RI_MOUSE_BUTTON_2_DOWN :: 0x0004
@@ -781,3 +790,84 @@ CF_GDIOBJLAST      :: 0x03FF
 CF_OWNERDISPLAY    :: 0x0080
 CF_PRIVATEFIRST    :: 0x0200
 CF_PRIVATELAST     :: 0x02FF
+
+STICKYKEYS :: struct {
+	cbSize: UINT,
+	dwFlags: DWORD,
+}
+LPSTICKYKEYS :: ^STICKYKEYS
+
+SKF_STICKYKEYSON    :: 0x1
+SKF_AVAILABLE       :: 0x2
+SKF_HOTKEYACTIVE    :: 0x4
+SKF_CONFIRMHOTKEY   :: 0x8
+SKF_HOTKEYSOUND     :: 0x10
+SKF_INDICATOR       :: 0x20
+SKF_AUDIBLEFEEDBACK :: 0x40
+SKF_TRISTATE        :: 0x80
+SKF_TWOKEYSOFF      :: 0x100
+SKF_LSHIFTLOCKED    :: 0x10000
+SKF_RSHIFTLOCKED    :: 0x20000
+SKF_LCTLLOCKED      :: 0x40000
+SKF_RCTLLOCKED      :: 0x80000
+SKF_LALTLOCKED      :: 0x100000
+SKF_RALTLOCKED      :: 0x200000
+SKF_LWINLOCKED      :: 0x400000
+SKF_RWINLOCKED      :: 0x800000
+SKF_LSHIFTLATCHED   :: 0x1000000
+SKF_RSHIFTLATCHED   :: 0x2000000
+SKF_LCTLLATCHED     :: 0x4000000
+SKF_RCTLLATCHED     :: 0x8000000
+SKF_LALTLATCHED     :: 0x10000000
+SKF_RALTLATCHED     :: 0x20000000
+
+TOGGLEKEYS :: struct {
+	cbSize: UINT,
+	dwFlags: DWORD,
+}
+LPTOGGLEKEYS :: ^TOGGLEKEYS
+
+TKF_TOGGLEKEYSON  :: 0x1
+TKF_AVAILABLE     :: 0x2
+TKF_HOTKEYACTIVE  :: 0x4
+TKF_CONFIRMHOTKEY :: 0x8
+TKF_HOTKEYSOUND   :: 0x10
+TKF_INDICATOR     :: 0x20
+
+FILTERKEYS :: struct {
+	cbSize:  UINT,
+	dwFlags: DWORD,
+	iWaitMSec: DWORD,
+	iDelayMSec: DWORD,
+	iRepeatMSec: DWORD,
+	iBounceMSec: DWORD,
+}
+LPFILTERKEYS :: ^FILTERKEYS
+
+FKF_FILTERKEYSON  :: 0x1
+FKF_AVAILABLE     :: 0x2
+FKF_HOTKEYACTIVE  :: 0x4
+FKF_CONFIRMHOTKEY :: 0x8
+FKF_HOTKEYSOUND   :: 0x10
+FKF_INDICATOR     :: 0x20
+FKF_CLICKON       :: 0x40
+
+NONCLIENTMETRICSW :: struct {
+	cbSize: UINT,
+	iBorderWidth: i32,
+	iScrollWidth: i32,
+	iScrollHeight: i32,
+	iCaptionWidth: i32,
+	iCaptionHeight: i32,
+	lfCaptionFont: LOGFONTW,
+	iSmCaptionWidth: i32,
+	iSmCaptionHeight: i32,
+	lfSmCaptionFont: LOGFONTW,
+	iMenuWidth: i32,
+	iMenuHeight: i32,
+	lfMenuFont: LOGFONTW,
+	lfStatusFont: LOGFONTW,
+	lfMessageFont: LOGFONTW,
+	iPaddedBorderWidth: i32,
+}
+LPNONCLIENTMETRICSW :: ^NONCLIENTMETRICSW

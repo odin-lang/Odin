@@ -21,7 +21,7 @@ with tempfile.NamedTemporaryFile(suffix=".odin", delete=True) as temp_file:
 	temp_file.write(b"package main\n")
 
 	for arch, target, triple, cpus, features in archs:
-		cmd = ["odin", "build", temp_file.name, "-file", "-build-mode:llvm", "-out:temp", "-target-features:\"help\"", f"-target:\"{target}\""]
+		cmd = ["odin", "build", temp_file.name, "-file", "-use-single-module", "-build-mode:asm", "-out:temp", "-target-features:\"help\"", f"-target:\"{target}\""]
 		process = subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True)
 
 		state = SEEKING_CPUS
@@ -59,7 +59,7 @@ with tempfile.NamedTemporaryFile(suffix=".odin", delete=True) as temp_file:
 			print(f"odin build returned with non-zero exit code {process.returncode}")
 			sys.exit(1)
 
-		os.remove("temp.ll")
+		os.remove("temp.S")
 
 def print_default_features(triple, microarch):
 	cmd = ["./featuregen", triple, microarch]

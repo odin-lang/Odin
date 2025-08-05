@@ -12,8 +12,8 @@ _futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
 	when !intrinsics.has_target_feature("atomics") {
 		panic_contextless("usage of `core:sync` requires the `-target-feature:\"atomics\"` or a `-microarch` that supports it")
 	} else {
-		s := intrinsics.wasm_memory_atomic_wait32((^u32)(f), expected, -1)
-		return s != 0
+		_ = intrinsics.wasm_memory_atomic_wait32((^u32)(f), expected, -1)
+		return true
 	}
 }
 
@@ -22,7 +22,7 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 		panic_contextless("usage of `core:sync` requires the `-target-feature:\"atomics\"` or a `-microarch` that supports it")
 	} else {
 		s := intrinsics.wasm_memory_atomic_wait32((^u32)(f), expected, i64(duration))
-		return s != 0
+		return s != 2
 	}
 }
 
@@ -30,12 +30,7 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 	when !intrinsics.has_target_feature("atomics") {
 		panic_contextless("usage of `core:sync` requires the `-target-feature:\"atomics\"` or a `-microarch` that supports it")
 	} else {
-		loop: for {
-			s := intrinsics.wasm_memory_atomic_notify32((^u32)(f), 1)
-			if s >= 1 {
-				return
-			}
-		}
+		_ = intrinsics.wasm_memory_atomic_notify32((^u32)(f), 1)
 	}
 }
 
@@ -43,12 +38,7 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 	when !intrinsics.has_target_feature("atomics") {
 		panic_contextless("usage of `core:sync` requires the `-target-feature:\"atomics\"` or a `-microarch` that supports it")
 	} else {
-		loop: for {
-			s := intrinsics.wasm_memory_atomic_notify32((^u32)(f), ~u32(0))
-			if s >= 0 {
-				return
-			}
-		}
+		_ = intrinsics.wasm_memory_atomic_notify32((^u32)(f), max(u32))
 	}
 }
 

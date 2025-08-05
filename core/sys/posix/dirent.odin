@@ -1,10 +1,10 @@
-#+build darwin, linux, freebsd, openbsd, netbsd
+#+build darwin, linux, freebsd, openbsd, netbsd, haiku
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }
@@ -53,15 +53,6 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/closedir.html ]]
 	*/
 	closedir :: proc(dirp: DIR) -> result ---
-
-	/*
-	Return a file descriptor referring to the same directory as the dirp argument.
-
-	// TODO: this is a macro on NetBSD?
-
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dirfd.html ]]
-	*/
-	dirfd :: proc(dirp: DIR) -> FD ---
 
 	/*
 	Equivalent to the opendir() function except that the directory is specified by a file descriptor
@@ -161,11 +152,36 @@ when ODIN_OS == .NetBSD {
 	@(private) LSCANDIR   :: "__scandir30"
 	@(private) LOPENDIR   :: "__opendir30"
 	@(private) LREADDIR   :: "__readdir30"
+
+	/*
+	Return a file descriptor referring to the same directory as the dirp argument.
+
+	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dirfd.html ]]
+	*/
+	dirfd :: proc "c" (dirp: DIR) -> FD {
+		_dirdesc :: struct {
+			dd_fd: FD,
+
+			// more stuff...
+		}
+
+		return (^_dirdesc)(dirp).dd_fd
+	}
+
 } else {
 	@(private) LALPHASORT :: "alphasort" + INODE_SUFFIX
 	@(private) LSCANDIR   :: "scandir"   + INODE_SUFFIX
 	@(private) LOPENDIR   :: "opendir"   + INODE_SUFFIX
 	@(private) LREADDIR   :: "readdir"   + INODE_SUFFIX
+
+	foreign lib {
+		/*
+		Return a file descriptor referring to the same directory as the dirp argument.
+
+		[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dirfd.html ]]
+		*/
+		dirfd :: proc(dirp: DIR) -> FD ---
+	}
 }
 
 when ODIN_OS == .Darwin {
@@ -203,12 +219,23 @@ when ODIN_OS == .Darwin {
 
 } else when ODIN_OS == .Linux {
 
-		dirent :: struct {
-			d_ino:    u64,                     /* [PSX] file number of entry */
-			d_off:    i64,                     /* directory offset of the next entry */
-			d_reclen: u16,                     /* length of this record */
-			d_type:   D_Type,                  /* file type  */
-			d_name:   [256]c.char `fmt:"s,0"`, /* [PSX] entry name */
-		}
+	dirent :: struct {
+		d_ino:    u64,                     /* [PSX] file number of entry */
+		d_off:    i64,                     /* directory offset of the next entry */
+		d_reclen: u16,                     /* length of this record */
+		d_type:   D_Type,                  /* file type  */
+		d_name:   [256]c.char `fmt:"s,0"`, /* [PSX] entry name */
+	}
+
+} else when ODIN_OS == .Haiku {
+
+	dirent :: struct {
+		d_dev:    dev_t,                 /* device */
+		d_pdev:   dev_t,                 /* parent device (only for queries) */
+		d_ino:    ino_t,                 /* inode number */
+		d_pino:   ino_t,                 /* parent inode (only for queries) */
+		d_reclen: c.ushort,              /* length of this record, not the name */
+		d_name:   [0]c.char `fmt:"s,0"`, /* name of the entry (null byte terminated) */
+	}
 
 }

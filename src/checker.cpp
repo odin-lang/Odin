@@ -3,7 +3,10 @@
 #include "entity.cpp"
 #include "types.cpp"
 
-String get_final_microarchitecture();
+
+gb_internal u64 type_hash_canonical_type(Type *type);
+
+gb_internal String get_final_microarchitecture();
 
 gb_internal void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
@@ -170,7 +173,7 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	d->parent = parent;
 	d->scope  = scope;
 	ptr_set_init(&d->deps, 0);
-	ptr_set_init(&d->type_info_deps, 0);
+	type_set_init(&d->type_info_deps, 0);
 	d->labels.allocator = heap_allocator();
 	d->variadic_reuses.allocator = heap_allocator();
 	d->variadic_reuse_max_bytes = 0;
@@ -354,6 +357,10 @@ gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 	case Ast_BitFieldType:
 		scope->flags |= ScopeFlag_Type;
 		break;
+	}
+	if (c->decl && c->decl->proc_lit) {
+		// Number the scopes within a procedure body depth-first
+		scope->index = c->decl->scope_index++;
 	}
 	c->scope = scope;
 	c->state_flags |= StateFlag_bounds_check;
@@ -542,6 +549,23 @@ gb_internal u64 check_vet_flags(Ast *node) {
 	return ast_file_vet_flags(file);
 }
 
+gb_internal u64 check_feature_flags(CheckerContext *c, Ast *node) {
+	AstFile *file = c->file;
+	if (file == nullptr &&
+	    c->curr_proc_decl &&
+	    c->curr_proc_decl->proc_lit) {
+		file = c->curr_proc_decl->proc_lit->file();
+	}
+	if (file == nullptr) {
+		file = node->file();
+	}
+	if (file != nullptr && file->feature_flags_set) {
+		return file->feature_flags;
+	}
+	return 0;
+}
+
+
 enum VettedEntityKind {
 	VettedEntity_Invalid,
 
@@ -704,11 +728,16 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 		bool is_unused = false;
 		if (vet_unused && check_vet_unused(c, e, &ve_unused)) {
 			is_unused = true;
-		} else if (vet_unused_procedures &&
-		           e->kind == Entity_Procedure) {
+		} else if (vet_unused_procedures && e->kind == Entity_Procedure) {
 			if (e->flags&EntityFlag_Used) {
 				is_unused = false;
 			} else if (e->flags & EntityFlag_Require) {
+				is_unused = false;
+			} else if (e->flags & EntityFlag_Init) {
+				is_unused = false;
+			} else if (e->flags & EntityFlag_Fini) {
+				is_unused = false;
+			} else if (e->Procedure.is_export) {
 				is_unused = false;
 			} else if (e->pkg && e->pkg->kind == Package_Init && e->token.string == "main") {
 				is_unused = false;
@@ -727,14 +756,20 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 			array_add(&vetted_entities, ve_unused);
 		} else if (is_shadowed) {
 			array_add(&vetted_entities, ve_shadowed);
-		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static)) == 0 && !e->Variable.is_global) {
+		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static|EntityFlag_Field)) == 0 && !e->Variable.is_global) {
 			i64 sz = type_size_of(e->type);
 			// TODO(bill): When is a good size warn?
 			// Is >256 KiB good enough?
 			if (sz > 1ll<<18) {
-				gbString type_str = type_to_string(e->type);
-				warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
-				gb_string_free(type_str);
+				bool is_ref = false;
+				if((e->flags & EntityFlag_ForValue) != 0) {
+					is_ref = type_deref(e->Variable.for_loop_parent_type) != NULL;
+				}
+				if(!is_ref) {
+					gbString type_str = type_to_string(e->type);
+					warning(e->token, "Declaration of '%.*s' may cause a stack overflow due to its type '%s' having a size of %lld bytes", LIT(e->token.string), type_str, cast(long long)sz);
+					gb_string_free(type_str);
+				}
 			}
 		}
 	}
@@ -802,11 +837,17 @@ gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
 	rw_mutex_unlock(&d->deps_mutex);
 }
 gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
-	if (d == nullptr) {
+	if (d == nullptr || type == nullptr) {
 		return;
 	}
+	if (type->kind == Type_Named) {
+		Entity *e = type->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			type = type->Named.base;
+		}
+	}
 	rw_mutex_lock(&d->type_info_deps_mutex);
-	ptr_set_add(&d->type_info_deps, type);
+	type_set_add(&d->type_info_deps, type);
 	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
@@ -1037,11 +1078,30 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("true",  true);
 	add_global_bool_constant("false", false);
 
-	add_global_string_constant("ODIN_VENDOR",             bc->ODIN_VENDOR);
-	add_global_string_constant("ODIN_VERSION",            bc->ODIN_VERSION);
-	add_global_string_constant("ODIN_ROOT",               bc->ODIN_ROOT);
-	add_global_string_constant("ODIN_BUILD_PROJECT_NAME", bc->ODIN_BUILD_PROJECT_NAME);
-	add_global_string_constant("ODIN_WINDOWS_SUBSYSTEM",  bc->ODIN_WINDOWS_SUBSYSTEM);
+	add_global_string_constant("ODIN_VENDOR",                   bc->ODIN_VENDOR);
+	add_global_string_constant("ODIN_VERSION",                  bc->ODIN_VERSION);
+	add_global_string_constant("ODIN_ROOT",                     bc->ODIN_ROOT);
+	add_global_string_constant("ODIN_BUILD_PROJECT_NAME",       bc->ODIN_BUILD_PROJECT_NAME);
+
+	{
+		GlobalEnumValue values[Windows_Subsystem_COUNT] = {
+			{"Unknown",                 Windows_Subsystem_UNKNOWN},
+		 	{"Boot_Application",        Windows_Subsystem_BOOT_APPLICATION},
+			{"Console",                 Windows_Subsystem_CONSOLE},
+			{"EFI_Application",         Windows_Subsystem_EFI_APPLICATION},
+			{"EFI_Boot_Service_Driver", Windows_Subsystem_EFI_BOOT_SERVICE_DRIVER},
+			{"EFI_Rom",                 Windows_Subsystem_EFI_ROM},
+			{"EFI_Runtime_Driver",      Windows_Subsystem_EFI_RUNTIME_DRIVER},
+			{"Native",                  Windows_Subsystem_NATIVE},
+			{"Posix",                   Windows_Subsystem_POSIX},
+			{"Windows",                 Windows_Subsystem_WINDOWS},
+			{"Windows_CE",              Windows_Subsystem_WINDOWSCE},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Windows_Subsystem_Type"), values, gb_count_of(values));
+		add_global_enum_constant(fields, "ODIN_WINDOWS_SUBSYSTEM",  bc->ODIN_WINDOWS_SUBSYSTEM);
+		add_global_string_constant("ODIN_WINDOWS_SUBSYSTEM_STRING", windows_subsystem_names[bc->ODIN_WINDOWS_SUBSYSTEM]);
+	}
 
 	{
 		GlobalEnumValue values[TargetOs_COUNT] = {
@@ -1061,7 +1121,7 @@ gb_internal void init_universal(void) {
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_OS_Type"), values, gb_count_of(values));
-		add_global_enum_constant(fields, "ODIN_OS", bc->metrics.os);
+		add_global_enum_constant(fields, "ODIN_OS",  bc->metrics.os);
 		add_global_string_constant("ODIN_OS_STRING", target_os_names[bc->metrics.os]);
 	}
 
@@ -1111,9 +1171,10 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[Subtarget_COUNT] = {
-			{"Default", 		Subtarget_Default},
-			{"iOS",     		Subtarget_iOS},
+			{"Default",         Subtarget_Default},
+			{"iPhone",          Subtarget_iPhone},
 			{"iPhoneSimulator", Subtarget_iPhoneSimulator},
+			{"Android",         Subtarget_Android},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));
@@ -1165,7 +1226,6 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_NO_BOUNDS_CHECK",            build_context.no_bounds_check);
 	add_global_bool_constant("ODIN_NO_TYPE_ASSERT",             build_context.no_type_assert);
 	add_global_bool_constant("ODIN_DEFAULT_TO_PANIC_ALLOCATOR", bc->ODIN_DEFAULT_TO_PANIC_ALLOCATOR);
-	add_global_bool_constant("ODIN_NO_DYNAMIC_LITERALS",        bc->no_dynamic_literals);
 	add_global_bool_constant("ODIN_NO_CRT",                     bc->no_crt);
 	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",       bc->use_separate_modules);
 	add_global_bool_constant("ODIN_TEST",                       bc->command_kind == Command_test);
@@ -1316,10 +1376,12 @@ gb_internal void init_universal(void) {
 		t_objc_object   = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_object"),   alloc_type_struct_complete());
 		t_objc_selector = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_selector"), alloc_type_struct_complete());
 		t_objc_class    = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_class"),    alloc_type_struct_complete());
+		t_objc_ivar     = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_ivar"),     alloc_type_struct_complete());
 
 		t_objc_id       = alloc_type_pointer(t_objc_object);
 		t_objc_SEL      = alloc_type_pointer(t_objc_selector);
 		t_objc_Class    = alloc_type_pointer(t_objc_class);
+		t_objc_Ivar     = alloc_type_pointer(t_objc_ivar);
 	}
 }
 
@@ -1337,8 +1399,11 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->foreigns);
 	// map_init(&i->gen_procs);
 	map_init(&i->gen_types);
-	array_init(&i->type_info_types, a);
-	map_init(&i->type_info_map);
+
+	type_set_init(&i->min_dep_type_info_set);
+	map_init(&i->min_dep_type_info_index_map);
+
+	// map_init(&i->type_info_map);
 	string_map_init(&i->files);
 	string_map_init(&i->packages);
 	array_init(&i->variable_init_order, a);
@@ -1349,6 +1414,10 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->defineables, a);
 
 	map_init(&i->objc_msgSend_types);
+	mpsc_init(&i->objc_class_implementations, a);
+	string_set_init(&i->obcj_class_name_set, 0);
+	map_init(&i->objc_method_implementations);
+
 	string_map_init(&i->load_file_cache);
 	array_init(&i->all_procedures, heap_allocator());
 
@@ -1357,6 +1426,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
+	mpsc_init(&i->foreign_decls_to_check, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
 
 	string_map_init(&i->load_directory_cache);
@@ -1370,8 +1440,10 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->foreigns);
 	// map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
-	array_free(&i->type_info_types);
-	map_destroy(&i->type_info_map);
+
+	type_set_destroy(&i->min_dep_type_info_set);
+	map_destroy(&i->min_dep_type_info_index_map);
+
 	string_map_destroy(&i->files);
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
@@ -1383,6 +1455,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
+	mpsc_destroy(&i->foreign_decls_to_check);
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
@@ -1455,6 +1528,8 @@ gb_internal void init_checker(Checker *c) {
 
 	TIME_SECTION("init proc queues");
 	mpsc_init(&c->procs_with_deferred_to_check, a); //, 1<<10);
+	mpsc_init(&c->procs_with_objc_context_provider_to_check, a);
+
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
@@ -1604,6 +1679,23 @@ gb_internal void check_remove_expr_info(CheckerContext *c, Ast *e) {
 	}
 }
 
+gb_internal isize type_info_index(CheckerInfo *info, TypeInfoPair pair, bool error_on_failure) {
+	mutex_lock(&info->minimum_dependency_type_info_mutex);
+
+	isize entry_index = -1;
+	u64 hash = pair.hash;
+	isize *found_entry_index = map_get(&info->min_dep_type_info_index_map, hash);
+	if (found_entry_index) {
+		entry_index = *found_entry_index;
+	}
+	mutex_unlock(&info->minimum_dependency_type_info_mutex);
+
+	if (error_on_failure && entry_index < 0) {
+		compiler_error("Type_Info for '%s' could not be found", type_to_string(pair.type));
+	}
+	return entry_index;
+}
+
 
 gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	type = default_type(type);
@@ -1611,32 +1703,10 @@ gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_f
 		type = t_bool;
 	}
 
-	mutex_lock(&info->type_info_mutex);
-
-	isize entry_index = -1;
-	isize *found_entry_index = map_get(&info->type_info_map, type);
-	if (found_entry_index) {
-		entry_index = *found_entry_index;
-	}
-	if (entry_index < 0) {
-		// NOTE(bill): Do manual linear search
-		for (auto const &e : info->type_info_map) {
-			if (are_types_identical_unique_tuples(e.key, type)) {
-				entry_index = e.value;
-				// NOTE(bill): Add it to the search map
-				map_set(&info->type_info_map, type, entry_index);
-				break;
-			}
-		}
-	}
-
-	mutex_unlock(&info->type_info_mutex);
-
-	if (error_on_failure && entry_index < 0) {
-		compiler_error("Type_Info for '%s' could not be found", type_to_string(type));
-	}
-	return entry_index;
+	u64 hash = type_hash_canonical_type(type);
+	return type_info_index(info, {type, hash}, error_on_failure);
 }
+
 
 
 gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
@@ -1985,13 +2055,17 @@ gb_internal void add_type_info_type(CheckerContext *c, Type *t) {
 }
 
 gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
-	if (t == nullptr) {
+	if (t == nullptr || c == nullptr) {
 		return;
 	}
 
 	add_type_info_dependency(c->info, c->decl, t);
-
+#if 0
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
+		if (type_set_update(&c->info->type_info_set, t)) {
+			// return;
+		}
+
 		auto found = map_get(&c->info->type_info_map, t);
 		if (found != nullptr) {
 			// Types have already been added
@@ -2014,7 +2088,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			// Unique entry
 			// NOTE(bill): map entries grow linearly and in order
 			ti_index = c->info->type_info_types.count;
-			array_add(&c->info->type_info_types, t);
+			TypeInfoPair tt = {t, type_hash_canonical_type(t)};
+			array_add(&c->info->type_info_types, tt);
 		}
 		map_set(&c->checker->info.type_info_map, t, ti_index);
 
@@ -2187,16 +2262,6 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->SimdVector.elem);
 		break;
 
-	case Type_RelativePointer:
-		add_type_info_type_internal(c, bt->RelativePointer.pointer_type);
-		add_type_info_type_internal(c, bt->RelativePointer.base_integer);
-		break;
-
-	case Type_RelativeMultiPointer:
-		add_type_info_type_internal(c, bt->RelativeMultiPointer.pointer_type);
-		add_type_info_type_internal(c, bt->RelativeMultiPointer.base_integer);
-		break;
-
 	case Type_Matrix:
 		add_type_info_type_internal(c, bt->Matrix.elem);
 		break;
@@ -2219,6 +2284,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
 		break;
 	}
+#endif
 }
 
 
@@ -2276,19 +2342,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		return;
 	}
 
-	auto *set = &c->info.minimum_dependency_type_info_set;
-
-	isize ti_index = type_info_index(&c->info, t, false);
-	if (ti_index < 0) {
-		add_type_info_type(&c->builtin_ctx, t); // Missing the type information
-		ti_index = type_info_index(&c->info, t, false);
-	}
-	GB_ASSERT(ti_index >= 0);
-	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
-	// and effectively assigns the `+1` of the value
-	isize const count = set->count;
-	if (map_set_if_not_previously_exists(set, ti_index+1, count)) {
-		// Type already exists;
+	if (type_set_update(&c->info.min_dep_type_info_set, t)) {
 		return;
 	}
 
@@ -2442,16 +2496,6 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, bt->SimdVector.elem);
 		break;
 
-	case Type_RelativePointer:
-		add_min_dep_type_info(c, bt->RelativePointer.pointer_type);
-		add_min_dep_type_info(c, bt->RelativePointer.base_integer);
-		break;
-
-	case Type_RelativeMultiPointer:
-		add_min_dep_type_info(c, bt->RelativeMultiPointer.pointer_type);
-		add_min_dep_type_info(c, bt->RelativeMultiPointer.base_integer);
-		break;
-
 	case Type_Matrix:
 		add_min_dep_type_info(c, bt->Matrix.elem);
 		break;
@@ -2498,8 +2542,8 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (decl == nullptr) {
 		return;
 	}
-	for (Type *t : decl->type_info_deps) {
-		add_min_dep_type_info(c, t);
+	for (TypeInfoPair const tt : decl->type_info_deps) {
+		add_min_dep_type_info(c, tt.type);
 	}
 
 	for (Entity *e : decl->deps) {
@@ -2635,6 +2679,10 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_init = false;
 				}
 
+				if (is_blank_ident(e->token)) {
+					error(e->token, "An @(init) procedure must not use a blank identifier as its name");
+				}
+
 				if (is_init) {
 					add_dependency_to_set(c, e);
 					array_add(&c->info.init_procedures, e);
@@ -2655,6 +2703,10 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
 					error(e->token, "@(fini) procedures must be declared at the file scope");
 					is_fini = false;
+				}
+
+				if (is_blank_ident(e->token)) {
+					error(e->token, "An @(fini) procedure must not use a blank identifier as its name");
 				}
 
 				if (is_fini) {
@@ -2699,7 +2751,6 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
 
 	ptr_set_init(&c->info.minimum_dependency_set, min_dep_set_cap);
-	map_init(&c->info.minimum_dependency_type_info_set);
 
 #define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
 	if (condition) {                                                                             \
@@ -3076,8 +3127,6 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_map              = find_core_type(c, str_lit("Type_Info_Map"));
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
-	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
-	t_type_info_relative_multi_pointer = find_core_type(c, str_lit("Type_Info_Relative_Multi_Pointer"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 	t_type_info_bit_field        = find_core_type(c, str_lit("Type_Info_Bit_Field"));
@@ -3106,8 +3155,6 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_map_ptr              = alloc_type_pointer(t_type_info_map);
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
-	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
-	t_type_info_relative_multi_pointer_ptr = alloc_type_pointer(t_type_info_relative_multi_pointer);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
@@ -3648,6 +3695,33 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			}
 		}
 		return true;
+	} else if (name == "objc_implement") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_implementation = ev.value_bool;
+
+			if (!ac->objc_is_implementation) {
+				ac->objc_is_disabled_implement = true;
+			}
+		} else if (ev.kind == ExactValue_Invalid) {
+			ac->objc_is_implementation = true;
+		} else {
+			error(elem, "Expected a boolean value, or no value, for '%.*s'", LIT(name));
+		}
+
+		return true;
+	} else if (name == "objc_selector") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			if (string_is_valid_identifier(ev.value_string)) {
+				ac->objc_selector = ev.value_string;
+			} else {
+				error(elem, "Invalid identifier for '%.*s', got '%.*s'", LIT(name), LIT(ev.value_string));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "require_target_feature") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
@@ -3696,6 +3770,18 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(value, "'%.*s' expects no parameter", LIT(name));
 		}
 		ac->instrumentation_exit = true;
+		return true;
+	} else if (name == "no_sanitize_address") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->no_sanitize_address = true;
+		return true;
+	} else if (name == "no_sanitize_memory") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->no_sanitize_memory = true;
 		return true;
 	}
 	return false;
@@ -3887,6 +3973,51 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 			ac->objc_class = ev.value_string;
 		}
 		return true;
+	} else if (name == "objc_implement") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_implementation = ev.value_bool;
+		} else if (ev.kind == ExactValue_Invalid) {
+			ac->objc_is_implementation = true;
+		} else {
+			error(elem, "Expected a boolean value, or no value, for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_superclass") {
+		Type *objc_superclass = check_type(c, value);
+
+		if (objc_superclass != nullptr) {
+			ac->objc_superclass = objc_superclass;
+		} else {
+			error(value, "'%.*s' expected a named type", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_ivar") {
+		Type *objc_ivar = check_type(c, value);
+
+		if (objc_ivar != nullptr && objc_ivar->kind == Type_Named) {
+			ac->objc_ivar = objc_ivar;
+		} else {
+			error(value, "'%.*s' expected a named type", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_context_provider") {
+		Operand o = {};
+		check_expr(c, &o, value);
+		Entity *e = entity_of_node(o.expr);
+
+		if (e != nullptr) {
+			if (ac->objc_context_provider != nullptr) {
+				error(elem, "Previous usage of a 'objc_context_provider' attribute");
+			}
+			if (e->kind != Entity_Procedure) {
+				error(elem, "'objc_context_provider' must refer to a procedure");
+			} else {
+				ac->objc_context_provider = e;
+			}
+
+			return true;
+		}
 	}
 	return false;
 }
@@ -3895,6 +4026,7 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 #include "check_expr.cpp"
 #include "check_builtin.cpp"
 #include "check_type.cpp"
+#include "name_canonicalization.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
 
@@ -5017,6 +5149,9 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "export") {
+		ac->is_export = true;
+		return true;
 	} else if (name == "force" || name == "require") {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
@@ -5040,6 +5175,12 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 		} else {
 			ac->extra_linker_flags = ev.value_string;
 		}
+		return true;
+	} else if (name == "ignore_duplicates") {
+		if (value != nullptr) {
+			error(elem, "Expected no parameter for '%.*s'", LIT(name));
+		}
+		ac->ignore_duplicates = true;
 		return true;
 	}
 	return false;
@@ -5119,6 +5260,38 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 
 		e->LibraryName.paths = fl->fullpaths;
 	}
+
+	for (Entity *e = nullptr; mpsc_dequeue(&c->info.foreign_decls_to_check, &e); /**/) {
+		GB_ASSERT(e != nullptr);
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+		if (!is_arch_wasm()) {
+			continue;
+		}
+		Entity *foreign_library = e->Procedure.foreign_library;
+		GB_ASSERT(foreign_library != nullptr);
+
+		String name = e->Procedure.link_name;
+
+		String module_name = str_lit("env");
+		GB_ASSERT (foreign_library->kind == Entity_LibraryName);
+		if (foreign_library->LibraryName.paths.count != 1) {
+			error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
+			      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
+		}
+
+		if (foreign_library->LibraryName.paths.count >= 1) {
+			module_name = foreign_library->LibraryName.paths[0];
+		}
+
+		if (!string_ends_with(module_name, str_lit(".o"))) {
+			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
+		}
+		e->Procedure.link_name = name;
+
+		check_foreign_procedure(&ctx, e, e->decl_info);
+	}
 }
 
 gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
@@ -5144,20 +5317,30 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
 
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+
+	Scope *scope = parent_scope;
+	if (ac.is_export) {
+		scope = parent_scope->parent;
+	}
+
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
 	e->LibraryName.decl = decl;
 	add_entity_flags_from_file(ctx, e, parent_scope);
-	add_entity(ctx, parent_scope, nullptr, e);
+	add_entity(ctx, scope, nullptr, e);
 
-	AttributeContext ac = {};
-	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+
 	if (ac.require_declaration) {
 		mpsc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
 	}
 	if (ac.foreign_import_priority_index != 0) {
 		e->LibraryName.priority_index = ac.foreign_import_priority_index;
+	}
+	if (ac.ignore_duplicates) {
+		e->LibraryName.ignore_duplicates = true;
 	}
 	String extra_linker_flags = string_trim_whitespace(ac.extra_linker_flags);
 	if (extra_linker_flags.len != 0) {
@@ -6168,6 +6351,12 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
+		if (dst->flags & EntityFlag_Disabled) {
+			// Prevent procedures that have been disabled from acting as deferrals.
+			src->Procedure.deferred_procedure = {};
+			continue;
+		}
+
 		GB_ASSERT(is_type_proc(src->type));
 		GB_ASSERT(is_type_proc(dst->type));
 		Type *src_params = base_type(src->type)->Proc.params;
@@ -6269,6 +6458,10 @@ gb_internal void check_deferred_procedures(Checker *c) {
 					continue;
 				}
 
+				if (dst_params == nullptr) {
+					error(src->token, "Deferred procedure must have parameters for %s", attribute);
+					continue;
+				}
 				GB_ASSERT(dst_params->kind == Type_Tuple);
 
 				Type *tsrc = alloc_type_tuple();
@@ -6319,6 +6512,44 @@ gb_internal void check_deferred_procedures(Checker *c) {
 
 }
 
+gb_internal void check_objc_context_provider_procedures(Checker *c) {
+	for (Entity *e = nullptr; mpsc_dequeue(&c->procs_with_objc_context_provider_to_check, &e); /**/) {
+		GB_ASSERT(e->kind == Entity_TypeName);
+
+		Entity *proc_entity = e->TypeName.objc_context_provider;
+		GB_ASSERT(proc_entity->kind == Entity_Procedure);
+
+		auto &proc = proc_entity->type->Proc;
+
+		Type *return_type = proc.result_count != 1 ? t_untyped_nil : base_named_type(proc.results->Tuple.variables[0]->type);
+		if (return_type != t_context) {
+			error(proc_entity->token, "The @(objc_context_provider) procedure must only return a context.");
+		}
+
+		const char *self_param_err = "The @(objc_context_provider) procedure must take as a parameter a single pointer to the @(objc_type) value.";
+		if (proc.param_count != 1) {
+			error(proc_entity->token, self_param_err);
+		}
+
+		Type *self_param = base_type(proc.params->Tuple.variables[0]->type);
+		if (self_param->kind != Type_Pointer) {
+			error(proc_entity->token, self_param_err);
+		}
+
+		Type *self_type = base_named_type(self_param->Pointer.elem);
+		if (!internal_check_is_assignable_to(self_type, e->type) &&
+			!(e->TypeName.objc_ivar && internal_check_is_assignable_to(self_type, e->TypeName.objc_ivar))) {
+			error(proc_entity->token, self_param_err);
+		}
+		if (proc.calling_convention != ProcCC_CDecl && proc.calling_convention != ProcCC_Contextless) {
+			error(e->token, self_param_err);
+		}
+		if (proc.is_polymorphic) {
+			error(e->token, self_param_err);
+		}
+	}
+}
+
 gb_internal void check_unique_package_names(Checker *c) {
 	ERROR_BLOCK();
 
@@ -6353,6 +6584,19 @@ gb_internal void check_unique_package_names(Checker *c) {
 		           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
 		           "\tA package name is required for link name prefixing to have a consistent ABI\n");
 		error_line("%s found at previous location\n", token_pos_to_string(ast_token(prev).pos));
+
+		// NOTE(Jeroen): Check if the conflicting imports are the same case-folded directory
+		//               See https://github.com/odin-lang/Odin/issues/5080
+		#if defined(GB_SYSTEM_WINDOWS)
+		String dir_a = pkg->files[0]->directory;
+		String dir_b = (*found)->files[0]->directory;
+
+		if (str_eq_ignore_case(dir_a, dir_b)) {
+			error_line("\tRemember that Windows case-folds paths, and so %.*s and %.*s are the same directory.\n", LIT(dir_a), LIT(dir_b));
+			// Could also perform a FS lookup to check which of the two is the actual directory and suggest it, but this should be enough.
+		}
+		#endif
+
 		end_error_block();
 	}
 }
@@ -6435,7 +6679,7 @@ gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 gb_internal void add_type_info_for_type_definitions(Checker *c) {
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
+		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
 			i64 align = type_align_of(e->type);
 			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
 				add_type_info_type(&c->builtin_ctx, e->type);
@@ -6465,6 +6709,7 @@ gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
 		check_walk_all_dependencies(decl);
 	}
 }
+
 
 gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("map full filepaths to scope");
@@ -6556,8 +6801,12 @@ gb_internal void check_parsed_files(Checker *c) {
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr) {
-			(void)type_align_of(e->type);
+		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
+			if (e->TypeName.is_type_alias) {
+				// Ignore for the time being
+			} else {
+				(void)type_align_of(e->type);
+			}
 		} else if (e->kind == Entity_Procedure) {
 			DeclInfo *decl = e->decl_info;
 			ast_node(pl, ProcLit, decl->proc_lit);
@@ -6574,6 +6823,9 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check deferred procedures");
 	check_deferred_procedures(c);
+
+	TIME_SECTION("check objc context provider procedures");
+	check_objc_context_provider_procedures(c);
 
 	TIME_SECTION("calculate global init order");
 	calculate_global_init_order(c);
@@ -6669,6 +6921,58 @@ gb_internal void check_parsed_files(Checker *c) {
 		}
 		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
 	}
+
+	TIME_SECTION("initialize and check for collisions in type info array");
+	{
+		Array<TypeInfoPair> type_info_types; // sorted after filled
+		array_init(&type_info_types, heap_allocator());
+		defer (array_free(&type_info_types));
+
+		for (auto const &tt : c->info.min_dep_type_info_set) {
+			array_add(&type_info_types, tt);
+		}
+		array_sort(type_info_types, type_info_pair_cmp);
+
+		array_init(&c->info.type_info_types_hash_map, heap_allocator(), type_info_types.count*2 + 1);
+		map_reserve(&c->info.min_dep_type_info_index_map, type_info_types.count);
+
+		isize hash_map_len = c->info.type_info_types_hash_map.count;
+		for (auto const &tt : type_info_types) {
+			isize index = tt.hash % hash_map_len;
+			// NOTE(bill): no need for a sanity check since there
+			// will always be enough space for the entries
+			for (;;) {
+				if (index == 0 || c->info.type_info_types_hash_map[index].hash != 0) {
+					index = (index+1) % hash_map_len;
+					continue;
+				}
+				break;
+			}
+			c->info.type_info_types_hash_map[index] = tt;
+
+			bool exists = map_set_if_not_previously_exists(&c->info.min_dep_type_info_index_map, tt.hash, index);
+			if (exists) {
+				for (auto const &entry : c->info.min_dep_type_info_index_map) {
+					if (entry.key != tt.hash) {
+						continue;
+					}
+					auto const &other = c->info.type_info_types_hash_map[entry.value];
+					if (are_types_identical_unique_tuples(tt.type, other.type)) {
+						continue;
+					}
+					gbString t = temp_canonical_string(tt.type);
+					gbString o = temp_canonical_string(other.type);
+					GB_PANIC("%s (%s) %llu vs %s (%s) %llu",
+					         type_to_string(tt.type, false),    t, cast(unsigned long long)tt.hash,
+					         type_to_string(other.type, false), o, cast(unsigned long long)other.hash);
+				}
+			}
+		}
+
+
+		GB_ASSERT(c->info.min_dep_type_info_index_map.count <= type_info_types.count);
+	}
+
 
 	TIME_SECTION("sort init and fini procedures");
 	check_sort_init_and_fini_procedures(c);

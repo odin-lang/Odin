@@ -7,6 +7,7 @@
 
 	A test suite for PNG, TGA, NetPBM, QOI and BMP.
 */
+#+feature dynamic-literals
 package test_core_image
 
 import "core:testing"

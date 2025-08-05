@@ -1,4 +1,5 @@
 #+vet !using-stmt !using-param
+#+feature dynamic-literals
 package main
 
 import "core:fmt"
@@ -2052,22 +2053,6 @@ explicit_context_definition :: proc "c" () {
 	dummy_procedure()
 }
 
-relative_data_types :: proc() {
-	fmt.println("\n#relative data types")
-
-	x: int = 123
-	ptr: #relative(i16) ^int
-	ptr = &x
-	fmt.println(ptr^)
-
-	arr := [3]int{1, 2, 3}
-	multi_ptr: #relative(i16) [^]int
-	multi_ptr = &arr[0]
-	fmt.println(multi_ptr)
-	fmt.println(multi_ptr[:3])
-	fmt.println(multi_ptr[1])
-}
-
 or_else_operator :: proc() {
 	fmt.println("\n#'or_else'")
 	{
@@ -2151,7 +2136,7 @@ or_return_operator :: proc() {
 		return .None
 	}
 	foo_2 :: proc() -> (n: int, err: Error) {
-		// It is more common that your procedure turns multiple values
+		// It is more common that your procedure returns multiple values
 		// If 'or_return' is used within a procedure multiple parameters (2+),
 		// then all the parameters must be named so that the remaining parameters
 		// so that a bare 'return' statement can be used
@@ -2200,7 +2185,7 @@ or_break_and_or_continue_operators :: proc() {
 	// The concept of 'or_break' and 'or_continue' is very similar to that of 'or_return'.
 	// The difference is that unlike 'or_return', the value does not get returned from
 	// the current procedure but rather discarded if it is 'false' or not 'nil', and then
-	// the specified branch (i.e. break or_continue).
+	// the specified branch (i.e. break or continue).
 	// The or branch expression can be labelled if a specific statement needs to be used.
 
 	Error :: enum {
@@ -2352,7 +2337,7 @@ matrix_type :: proc() {
 		// There is no support for booleans, quaternions, or any compound type.
 
 		// Indexing a matrix can be used with the matrix indexing syntax
-		// This mirrors othe type usages: type on the left, usage on the right
+		// This mirrors other type usages: type on the left, usage on the right
 
 		elem := m[1, 2] // row 1, column 2
 		assert(elem == -6)
@@ -2614,6 +2599,7 @@ main :: proc() {
 		using_statement()
 		implicit_context_system()
 		parametric_polymorphism()
+		threading_example()
 		array_programming()
 		map_type()
 		implicit_selector_expression()
@@ -2629,12 +2615,10 @@ main :: proc() {
 		ranged_fields_for_array_compound_literals()
 		deprecated_attribute()
 		range_statements_with_multiple_return_values()
-		threading_example()
 		soa_struct_layout()
 		constant_literal_expressions()
 		union_maybe()
 		explicit_context_definition()
-		relative_data_types()
 		or_else_operator()
 		or_return_operator()
 		or_break_and_or_continue_operators()

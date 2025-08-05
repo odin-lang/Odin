@@ -21,23 +21,29 @@ File_Impl :: struct {
 	name:  string,
 	cname: cstring,
 	fd:    posix.FD,
+	allocator: runtime.Allocator,
 }
 
 @(init)
 init_std_files :: proc() {
-	// NOTE: is this (paths) also the case on non darwin?
+	new_std :: proc(impl: ^File_Impl, fd: posix.FD, name: cstring) -> ^File {
+		impl.file.impl = impl
+		impl.fd = fd
+		impl.allocator = runtime.nil_allocator()
+		impl.cname = name
+		impl.name  = string(name)
+		impl.file.stream = {
+			data = impl,
+			procedure = _file_stream_proc,
+		}
+		impl.file.fstat = _fstat
+		return &impl.file
+	}
 
-	stdin = __new_file(posix.STDIN_FILENO)
-	(^File_Impl)(stdin.impl).name  = "/dev/stdin"
-	(^File_Impl)(stdin.impl).cname = "/dev/stdin"
-
-	stdout = __new_file(posix.STDIN_FILENO)
-	(^File_Impl)(stdout.impl).name  = "/dev/stdout"
-	(^File_Impl)(stdout.impl).cname = "/dev/stdout"
-
-	stderr = __new_file(posix.STDIN_FILENO)
-	(^File_Impl)(stderr.impl).name  = "/dev/stderr"
-	(^File_Impl)(stderr.impl).cname = "/dev/stderr"
+	@(static) files: [3]File_Impl
+	stdin  = new_std(&files[0], posix.STDIN_FILENO,  "/dev/stdin")
+	stdout = new_std(&files[1], posix.STDOUT_FILENO, "/dev/stdout")
+	stderr = new_std(&files[2], posix.STDERR_FILENO, "/dev/stderr")
 }
 
 _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
@@ -63,8 +69,8 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 	if .Trunc       in flags { sys_flags += {.TRUNC} }
 	if .Inheritable in flags { sys_flags -= {.CLOEXEC} }
 
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cname := clone_to_cstring(name, temp_allocator) or_return
 
 	fd := posix.open(cname, sys_flags, transmute(posix.mode_t)posix._mode_t(perm))
 	if fd < 0 {
@@ -72,10 +78,10 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 		return
 	}
 
-	return _new_file(uintptr(fd), name)
+	return _new_file(uintptr(fd), name, file_allocator())
 }
 
-_new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
+_new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
 	if name == "" {
 		err = .Invalid_Path
 		return
@@ -84,10 +90,10 @@ _new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
 		return
 	}
 
-	crname := _posix_absolute_path(posix.FD(handle), name, file_allocator()) or_return
+	crname := _posix_absolute_path(posix.FD(handle), name, allocator) or_return
 	rname  := string(crname)
 
-	f = __new_file(posix.FD(handle))
+	f = __new_file(posix.FD(handle), allocator)
 	impl := (^File_Impl)(f.impl)
 	impl.name  = rname
 	impl.cname = crname
@@ -95,16 +101,40 @@ _new_file :: proc(handle: uintptr, name: string) -> (f: ^File, err: Error) {
 	return f, nil
 }
 
-__new_file :: proc(handle: posix.FD) -> ^File {
-	impl := new(File_Impl, file_allocator())
+__new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
+	impl := new(File_Impl, allocator)
 	impl.file.impl = impl
 	impl.fd = posix.FD(handle)
+	impl.allocator = allocator
 	impl.file.stream = {
 		data = impl,
 		procedure = _file_stream_proc,
 	}
 	impl.file.fstat = _fstat
 	return &impl.file
+}
+
+_clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
+	if f == nil || f.impl == nil {
+		err = .Invalid_Pointer
+		return
+	}
+
+	impl := (^File_Impl)(f.impl)
+
+	fd := posix.dup(impl.fd)
+	if fd <= 0 {
+		err = _get_platform_error()
+		return
+	}
+	defer if err != nil { posix.close(fd) }
+
+	clone = __new_file(fd, file_allocator())	
+	clone_impl := (^File_Impl)(clone.impl)
+	clone_impl.cname = clone_to_cstring(impl.name, file_allocator()) or_return
+	clone_impl.name  = string(clone_impl.cname)
+
+	return
 }
 
 _close :: proc(f: ^File_Impl) -> (err: Error) {
@@ -114,8 +144,10 @@ _close :: proc(f: ^File_Impl) -> (err: Error) {
 		err = _get_platform_error()
 	}
 
-	delete(f.cname, file_allocator())
-	free(f, file_allocator())
+	allocator := f.allocator
+
+	delete(f.cname, allocator)
+	free(f, allocator)
 	return
 }
 
@@ -151,39 +183,39 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 	return nil
 }
 
-_remove :: proc(name: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+_remove :: proc(name: string) -> (err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cname := clone_to_cstring(name, temp_allocator) or_return
 	if posix.remove(cname) != 0 {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_rename :: proc(old_path, new_path: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cold := temp_cstring(old_path)
-	cnew := temp_cstring(new_path)
+_rename :: proc(old_path, new_path: string) -> (err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cold := clone_to_cstring(old_path, temp_allocator) or_return
+	cnew := clone_to_cstring(new_path, temp_allocator) or_return
 	if posix.rename(cold, cnew) != 0 {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_link :: proc(old_name, new_name: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cold := temp_cstring(old_name)
-	cnew := temp_cstring(new_name)
+_link :: proc(old_name, new_name: string) -> (err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cold := clone_to_cstring(old_name, temp_allocator) or_return
+	cnew := clone_to_cstring(new_name, temp_allocator) or_return
 	if posix.link(cold, cnew) != .OK {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_symlink :: proc(old_name, new_name: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cold := temp_cstring(old_name)
-	cnew := temp_cstring(new_name)
+_symlink :: proc(old_name, new_name: string) -> (err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cold := clone_to_cstring(old_name, temp_allocator) or_return
+	cnew := clone_to_cstring(new_name, temp_allocator) or_return
 	if posix.symlink(cold, cnew) != .OK {
 		return _get_platform_error()
 	}
@@ -191,8 +223,8 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 }
 
 _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, err: Error) {
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	cname := clone_to_cstring(name, temp_allocator) or_return
 
 	buf: [dynamic]byte
 	buf.allocator = allocator
@@ -236,9 +268,9 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 	}
 }
 
-_chdir :: proc(name: string) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+_chdir :: proc(name: string) -> (err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cname := clone_to_cstring(name, temp_allocator) or_return
 	if posix.chdir(cname) != .OK {
 		return _get_platform_error()
 	}
@@ -259,9 +291,9 @@ _fchmod :: proc(f: ^File, mode: int) -> Error {
 	return nil
 }
 
-_chmod :: proc(name: string, mode: int) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+_chmod :: proc(name: string, mode: int) -> (err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cname := clone_to_cstring(name, temp_allocator) or_return
 	if posix.chmod(cname, transmute(posix.mode_t)posix._mode_t(mode)) != .OK {
 		return _get_platform_error()
 	}
@@ -275,9 +307,9 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 	return nil
 }
 
-_chown :: proc(name: string, uid, gid: int) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+_chown :: proc(name: string, uid, gid: int) -> (err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cname := clone_to_cstring(name, temp_allocator) or_return
 	if posix.chown(cname, posix.uid_t(uid), posix.gid_t(gid)) != .OK {
 		return _get_platform_error()
 	}
@@ -285,15 +317,15 @@ _chown :: proc(name: string, uid, gid: int) -> Error {
 }
 
 _lchown :: proc(name: string, uid, gid: int) -> Error {
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cname := clone_to_cstring(name, temp_allocator) or_return
 	if posix.lchown(cname, posix.uid_t(uid), posix.gid_t(gid)) != .OK {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
+_chtimes :: proc(name: string, atime, mtime: time.Time) -> (err: Error) {
 	times := [2]posix.timeval{
 		{
 			tv_sec  = posix.time_t(atime._nsec/1e9),           /* seconds */
@@ -305,8 +337,8 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 		},
 	}
 
-	TEMP_ALLOCATOR_GUARD()
-	cname := temp_cstring(name)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cname := clone_to_cstring(name, temp_allocator) or_return
 
 	if posix.utimes(cname, &times) != .OK {
 		return _get_platform_error()
@@ -333,8 +365,9 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 }
 
 _exists :: proc(path: string) -> bool {
-	TEMP_ALLOCATOR_GUARD()
-	cpath := temp_cstring(path)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	cpath, err := clone_to_cstring(path, temp_allocator)
+	if err != nil { return false }
 	return posix.access(cpath) == .OK
 }
 

@@ -53,7 +53,7 @@ File_Info :: struct {
 @(private, require_results)
 _make_time_from_unix_file_time :: proc(uft: Unix_File_Time) -> time.Time {
 	return time.Time{
-		_nsec = uft.nanoseconds + uft.seconds * 1_000_000_000,
+		_nsec = i64(uft.nanoseconds) + i64(uft.seconds) * 1_000_000_000,
 	}
 }
 

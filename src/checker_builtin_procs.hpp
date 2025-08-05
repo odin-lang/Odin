@@ -26,6 +26,7 @@ enum BuiltinProcId {
 	BuiltinProc_conj,
 
 	BuiltinProc_expand_values,
+	BuiltinProc_compress_values,
 
 	BuiltinProc_min,
 	BuiltinProc_max,
@@ -60,6 +61,7 @@ enum BuiltinProcId {
 	BuiltinProc_trap,
 	BuiltinProc_debug_trap,
 	BuiltinProc_read_cycle_counter,
+	BuiltinProc_read_cycle_counter_frequency,
 
 	BuiltinProc_count_ones,
 	BuiltinProc_count_zeros,
@@ -170,8 +172,12 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_extract,
 	BuiltinProc_simd_replace,
 
+	BuiltinProc_simd_reduce_add_bisect,
+	BuiltinProc_simd_reduce_mul_bisect,
 	BuiltinProc_simd_reduce_add_ordered,
 	BuiltinProc_simd_reduce_mul_ordered,
+	BuiltinProc_simd_reduce_add_pairs,
+	BuiltinProc_simd_reduce_mul_pairs,
 	BuiltinProc_simd_reduce_min,
 	BuiltinProc_simd_reduce_max,
 	BuiltinProc_simd_reduce_and,
@@ -181,8 +187,12 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_reduce_any,
 	BuiltinProc_simd_reduce_all,
 
+	BuiltinProc_simd_extract_lsbs,
+	BuiltinProc_simd_extract_msbs,
+
 	BuiltinProc_simd_shuffle,
 	BuiltinProc_simd_select,
+	BuiltinProc_simd_runtime_swizzle,
 
 	BuiltinProc_simd_ceil,
 	BuiltinProc_simd_floor,
@@ -202,6 +212,9 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_masked_expand_load,
 	BuiltinProc_simd_masked_compress_store,
 
+	BuiltinProc_simd_indices,
+
+
 	// Platform specific SIMD intrinsics
 	BuiltinProc_simd_x86__MM_SHUFFLE,
 BuiltinProc__simd_end,
@@ -212,6 +225,7 @@ BuiltinProc__simd_end,
 
 	BuiltinProc_x86_cpuid,
 	BuiltinProc_x86_xgetbv,
+
 
 	// Constant type tests
 
@@ -224,8 +238,12 @@ BuiltinProc__type_begin,
 	BuiltinProc_type_convert_variants_to_pointers,
 	BuiltinProc_type_merge,
 
+	BuiltinProc_type_integer_to_unsigned,
+	BuiltinProc_type_integer_to_signed,
+
 BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_boolean,
+	BuiltinProc_type_is_bit_field,
 	BuiltinProc_type_is_integer,
 	BuiltinProc_type_is_rune,
 	BuiltinProc_type_is_float,
@@ -246,6 +264,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_sliceable,
 	BuiltinProc_type_is_comparable,
 	BuiltinProc_type_is_simple_compare, // easily compared using memcmp
+	BuiltinProc_type_is_nearly_simple_compare, // easily compared using memcmp (including floats)
 	BuiltinProc_type_is_dereferenceable,
 	BuiltinProc_type_is_valid_map_key,
 	BuiltinProc_type_is_valid_matrix_elements,
@@ -310,6 +329,8 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_bit_set_backing_type,
 
+	BuiltinProc_type_enum_is_contiguous,
+
 	BuiltinProc_type_equal_proc,
 	BuiltinProc_type_hasher_proc,
 	BuiltinProc_type_map_info,
@@ -328,6 +349,7 @@ BuiltinProc__type_end,
 	BuiltinProc_objc_find_class,
 	BuiltinProc_objc_register_selector,
 	BuiltinProc_objc_register_class,
+	BuiltinProc_objc_ivar_get,
 
 	BuiltinProc_constant_utf16_cstring,
 
@@ -365,6 +387,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("conj"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("expand_values"),    1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("compress_values"),  1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("min"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("max"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},
@@ -401,6 +424,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("trap"),               0, false, Expr_Expr, BuiltinProcPkg_intrinsics, /*diverging*/true},
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("read_cycle_counter_frequency"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("count_ones"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -512,8 +536,12 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_extract"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_replace"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("simd_reduce_add_bisect"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_mul_bisect"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_add_ordered"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_mul_ordered"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_add_pairs"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_mul_pairs"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_min"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_max"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_and"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -523,9 +551,13 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_reduce_any"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_all"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("simd_extract_lsbs"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_extract_msbs"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 
 	{STR_LIT("simd_shuffle"), 2, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_select"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_runtime_swizzle"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_ceil") , 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_floor"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -545,6 +577,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_masked_expand_load"),    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_masked_compress_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("simd_indices"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("simd_x86__MM_SHUFFLE"), 4, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
@@ -562,6 +596,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_elem_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_convert_variants_to_pointers"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_merge"),                2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_integer_to_unsigned"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_integer_to_signed"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_boolean"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -585,6 +622,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_sliceable"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_comparable"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simple_compare"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_nearly_simple_compare"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_dereferenceable"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_map_key"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_matrix_elements"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -602,6 +640,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_enum"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_proc"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_bit_set"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_bit_field"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_matrix"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -648,6 +687,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("type_bit_set_backing_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_enum_is_contiguous"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics },
+
 	{STR_LIT("type_equal_proc"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_hasher_proc"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_map_info"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -667,6 +708,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("objc_find_class"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("objc_ivar_get"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

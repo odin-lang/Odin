@@ -38,6 +38,13 @@ DWMNCRENDERINGPOLICY :: enum {
 	DWMNCRP_LAST,
 }
 
+DWM_WINDOW_CORNER_PREFERENCE :: enum c_int {
+	DEFAULT,
+	DONOTROUND,
+	ROUND,
+	ROUNDSMALL,
+}
+
 @(default_calling_convention="system")
 foreign dwmapi {
 	DwmFlush :: proc() -> HRESULT ---

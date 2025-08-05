@@ -554,7 +554,7 @@ IOutput :: struct #raw_union {
 IOutput_VTable :: struct {
 	using idxgiobject_vtable: IObject_VTable,
 	GetDesc:                     proc "system" (this: ^IOutput, pDesc: ^OUTPUT_DESC) -> HRESULT,
-	GetDisplayModeList:          proc "system" (this: ^IOutput, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: ^MODE_DESC) -> HRESULT,
+	GetDisplayModeList:          proc "system" (this: ^IOutput, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: [^]MODE_DESC) -> HRESULT,
 	FindClosestMatchingMode:     proc "system" (this: ^IOutput, pModeToMatch: ^MODE_DESC, pClosestMatch: ^MODE_DESC, pConcernedDevice: ^IUnknown) -> HRESULT,
 	WaitForVBlank:               proc "system" (this: ^IOutput) -> HRESULT,
 	TakeOwnership:               proc "system" (this: ^IOutput, pDevice: ^IUnknown, Exclusive: BOOL) -> HRESULT,
@@ -611,7 +611,7 @@ IDevice_VTable :: struct {
 	using idxgiobject_vtable: IObject_VTable,
 	GetAdapter:             proc "system" (this: ^IDevice, pAdapter: ^^IAdapter) -> HRESULT,
 	CreateSurface:          proc "system" (this: ^IDevice, pDesc: ^SURFACE_DESC, NumSurfaces: u32, Usage: USAGE, pSharedResource: ^SHARED_RESOURCE, ppSurface: ^^ISurface) -> HRESULT,
-	QueryResourceResidency: proc "system" (this: ^IDevice, ppResources: ^^IUnknown, pResidencyStatus: ^RESIDENCY, NumResources: u32) -> HRESULT,
+	QueryResourceResidency: proc "system" (this: ^IDevice, ppResources: [^]^IUnknown, pResidencyStatus: [^]RESIDENCY, NumResources: u32) -> HRESULT,
 	SetGPUThreadPriority:   proc "system" (this: ^IDevice, Priority: i32) -> HRESULT,
 	GetGPUThreadPriority:   proc "system" (this: ^IDevice, pPriority: ^i32) -> HRESULT,
 }
@@ -792,8 +792,8 @@ IDevice2 :: struct #raw_union {
 }
 IDevice2_VTable :: struct {
 	using idxgidevice1_vtable: IDevice1_VTable,
-	OfferResources:   proc "system" (this: ^IDevice2, NumResources: u32, ppResources: ^^IResource, Priority: OFFER_RESOURCE_PRIORITY) -> HRESULT,
-	ReclaimResources: proc "system" (this: ^IDevice2, NumResources: u32, ppResources: ^^IResource, pDiscarded: ^BOOL) -> HRESULT,
+	OfferResources:   proc "system" (this: ^IDevice2, NumResources: u32, ppResources: [^]^IResource, Priority: OFFER_RESOURCE_PRIORITY) -> HRESULT,
+	ReclaimResources: proc "system" (this: ^IDevice2, NumResources: u32, ppResources: [^]^IResource, pDiscarded: ^BOOL) -> HRESULT,
 	EnqueueSetEvent:  proc "system" (this: ^IDevice2, hEvent: HANDLE) -> HRESULT,
 }
 MODE_DESC1 :: struct {
@@ -934,7 +934,7 @@ IOutput1 :: struct #raw_union {
 }
 IOutput1_VTable :: struct {
 	using idxgioutput_vtable: IOutput_VTable,
-	GetDisplayModeList1:      proc "system" (this: ^IOutput1, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: ^MODE_DESC1) -> HRESULT,
+	GetDisplayModeList1:      proc "system" (this: ^IOutput1, EnumFormat: FORMAT, Flags: ENUM_MODES, pNumModes: ^u32, pDesc: [^]MODE_DESC1) -> HRESULT,
 	FindClosestMatchingMode1: proc "system" (this: ^IOutput1, pModeToMatch: ^MODE_DESC1, pClosestMatch: ^MODE_DESC1, pConcernedDevice: ^IUnknown) -> HRESULT,
 	GetDisplaySurfaceData1:   proc "system" (this: ^IOutput1, pDestination: ^IResource) -> HRESULT,
 	DuplicateOutput:          proc "system" (this: ^IOutput1, pDevice: ^IUnknown, ppOutputDuplication: ^^IOutputDuplication) -> HRESULT,
@@ -1232,8 +1232,8 @@ IDevice4 :: struct #raw_union {
 }
 IDevice4_VTable :: struct {
 	using idxgidevice3_vtable: IDevice3_VTable,
-	OfferResources1:   proc "system" (this: ^IDevice4, NumResources: u32, ppResources: ^^IResource, Priority: OFFER_RESOURCE_PRIORITY, Flags: OFFER_RESOURCE_FLAGS) -> HRESULT,
-	ReclaimResources1: proc "system" (this: ^IDevice4, NumResources: u32, ppResources: ^^IResource, pResults: ^RECLAIM_RESOURCE_RESULTS) -> HRESULT,
+	OfferResources1:   proc "system" (this: ^IDevice4, NumResources: u32, ppResources: [^]^IResource, Priority: OFFER_RESOURCE_PRIORITY, Flags: OFFER_RESOURCE_FLAGS) -> HRESULT,
+	ReclaimResources1: proc "system" (this: ^IDevice4, NumResources: u32, ppResources: [^]^IResource, pResults: [^]RECLAIM_RESOURCE_RESULTS) -> HRESULT,
 }
 
 FEATURE :: enum i32 {

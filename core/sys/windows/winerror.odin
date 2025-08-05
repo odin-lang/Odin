@@ -173,6 +173,9 @@ FACILITY :: enum DWORD {
 	EAS                                      = 85,
 	WEB                                      = 885,
 	WEB_SOCKET                               = 886,
+	XAUDIO2                                  = 896,
+	XAPO                                     = 897,
+	GAMEINPUT                                = 906,
 	MOBILE                                   = 1793,
 	SQLITE                                   = 1967,
 	SERVICE_FABRIC                           = 1968,
@@ -231,6 +234,7 @@ ERROR_PIPE_BUSY              : DWORD : 231
 
 // https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
 S_OK           :: 0x00000000 // Operation successful
+S_FALSE        :: 0x00000001
 E_NOTIMPL      :: 0x80004001 // Not implemented
 E_NOINTERFACE  :: 0x80004002 // No such interface supported
 E_POINTER      :: 0x80004003 // Pointer that is not valid
@@ -251,26 +255,30 @@ SEVERITY :: enum DWORD {
 // Generic test for success on any status value (non-negative numbers indicate success).
 SUCCEEDED :: #force_inline proc "contextless" (#any_int result: int) -> bool { return result >= S_OK }
 // and the inverse
-FAILED :: #force_inline proc(#any_int result: int) -> bool { return result < S_OK }
+FAILED :: #force_inline proc "contextless" (#any_int result: int) -> bool { return result < S_OK }
 
 // Generic test for error on any status value.
-IS_ERROR :: #force_inline proc(#any_int status: int) -> bool { return u32(status) >> 31 == u32(SEVERITY.ERROR) }
+IS_ERROR :: #force_inline proc "contextless" (#any_int status: int) -> bool { return u32(status) >> 31 == u32(SEVERITY.ERROR) }
 
 // Return the code
-HRESULT_CODE :: #force_inline proc(#any_int hr: int) -> int { return int(u32(hr) & 0xFFFF) }
+HRESULT_CODE :: #force_inline proc "contextless" (#any_int hr: int) -> int { return int(u32(hr) & 0xFFFF) }
 
 //  Return the facility
-HRESULT_FACILITY :: #force_inline proc(#any_int hr: int) -> FACILITY { return FACILITY((u32(hr) >> 16) & 0x1FFF) }
+HRESULT_FACILITY :: #force_inline proc "contextless" (#any_int hr: int) -> FACILITY { return FACILITY((u32(hr) >> 16) & 0x1FFF) }
 
 //  Return the severity
-HRESULT_SEVERITY :: #force_inline proc(#any_int hr: int) -> SEVERITY { return SEVERITY((u32(hr) >> 31) & 0x1) }
+HRESULT_SEVERITY :: #force_inline proc "contextless" (#any_int hr: int) -> SEVERITY { return SEVERITY((u32(hr) >> 31) & 0x1) }
 
 // Create an HRESULT value from component pieces
-MAKE_HRESULT :: #force_inline proc(#any_int sev: int, #any_int fac: int, #any_int code: int) -> HRESULT {
+MAKE_HRESULT :: #force_inline proc "contextless" (#any_int sev: int, #any_int fac: int, #any_int code: int) -> HRESULT {
 	return HRESULT((uint(sev)<<31) | (uint(fac)<<16) | (uint(code)))
 }
 
-DECODE_HRESULT :: #force_inline proc(#any_int hr: int) -> (SEVERITY, FACILITY, int) {
+HRESULT_FROM_WIN32 :: #force_inline proc "contextless" (#any_int code: int) -> HRESULT {
+	return HRESULT(code) <= 0 ? HRESULT(code) : HRESULT(uint(code & 0x0000FFFF) | (uint(FACILITY.WIN32) << 16) | 0x80000000)
+}
+
+DECODE_HRESULT :: #force_inline proc "contextless" (#any_int hr: int) -> (SEVERITY, FACILITY, int) {
 	return HRESULT_SEVERITY(hr), HRESULT_FACILITY(hr), HRESULT_CODE(hr)
 }
 

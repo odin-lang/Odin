@@ -48,22 +48,41 @@ to_type :: proc(buf: []u8, $T: typeid) -> (T, bool) #optional_ok {
 }
 
 /*
-	Turn a slice of one type, into a slice of another type.
+Turn a slice of one type, into a slice of another type.
 
-	Only converts the type and length of the slice itself.
-	The length is rounded down to the nearest whole number of items.
+Only converts the type and length of the slice itself.
+The length is rounded down to the nearest whole number of items.
 
-	```
-	large_items := []i64{1, 2, 3, 4}
-	small_items := slice.reinterpret([]i32, large_items)
-	assert(len(small_items) == 8)
-	```
-	```
-	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
-						  2, 0, 0, 0}
-	large_items := slice.reinterpret([]i64, small_items)
-	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
-	```
+Example:
+
+	import "core:fmt"
+	import "core:slice"
+
+	i64s_as_i32s :: proc() {
+		large_items := []i64{1, 2, 3, 4}
+		small_items := slice.reinterpret([]i32, large_items)
+		assert(len(small_items) == 8)
+		fmt.println(large_items, "->", small_items)
+	}
+
+	bytes_as_i64s :: proc() {
+		small_items := [12]byte{}
+		small_items[0] = 1
+		small_items[8] = 2
+		large_items := slice.reinterpret([]i64, small_items[:])
+		assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
+		fmt.println(small_items, "->", large_items)
+	}
+
+	reinterpret_example :: proc() {
+		i64s_as_i32s()
+		bytes_as_i64s()
+	}
+
+Output:
+	[1, 2, 3, 4] -> [1, 0, 2, 0, 3, 0, 4, 0]
+	[1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0] -> [1]
+
 */
 @(require_results)
 reinterpret :: proc "contextless" ($T: typeid/[]$U, s: []$V) -> []U {
@@ -368,6 +387,25 @@ has_prefix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_c
 	return false
 }
 
+/*
+	return the suffix length common between slices `a` and `b`.
+
+	slice.suffix_length([]u8{1, 2, 3, 4}, []u8{1, 2, 3, 4}) -> 4
+	slice.suffix_length([]u8{1, 2, 3, 4}, []u8{3, 4}) -> 2
+	slice.suffix_length([]u8{1, 2, 3, 4}, []u8{1}) -> 0
+	slice.suffix_length([]u8{1, 2, 3, 4}, []u8{1, 3, 5}) -> 0
+	slice.suffix_length([]u8{3, 4, 5}, []u8{3, 5}) -> 1
+*/
+@(require_results)
+suffix_length :: proc(a, b: $T/[]$E) -> (n: int) where intrinsics.type_is_comparable(E) {
+	len_a, len_b := len(a), len(b)
+	_len := builtin.min(len_a, len_b)
+
+	#no_bounds_check for i := 1; i <= _len && a[len_a - i] == b[len_b - i]; i += 1 {
+		n += 1
+	}
+	return
+}
 
 @(require_results)
 has_suffix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_comparable(E) {
@@ -469,6 +507,12 @@ length :: proc(a: $T/[]$E) -> int {
 @(require_results)
 is_empty :: proc(a: $T/[]$E) -> bool {
 	return len(a) == 0
+}
+
+// Gets the byte size of the backing data
+@(require_results)
+size :: proc "contextless" (a: $T/[]$E) -> int {
+	return len(a) * size_of(E)
 }
 
 
@@ -873,8 +917,7 @@ bitset_to_enum_slice_with_buffer :: proc(buf: []$E, bs: $T) -> (slice: []E) wher
 //    sl := slice.bitset_to_enum_slice(bs)
 @(require_results)
 bitset_to_enum_slice_with_make :: proc(bs: $T, $E: typeid, allocator := context.allocator) -> (slice: []E) where intrinsics.type_is_enum(E), intrinsics.type_bit_set_elem_type(T) == E {
-	ones := intrinsics.count_ones(transmute(E)bs)
-	buf  := make([]E, int(ones), allocator)
+	buf := make([]E, card(bs), allocator)
 	return bitset_to_enum_slice(buf, bs)
 }
 

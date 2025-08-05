@@ -1,8 +1,8 @@
 #+build haiku
 package sys_haiku
 
-import "core:c"
-import "core:sys/unix"
+import "base:intrinsics"
+import "core:sys/posix"
 
 foreign import libroot "system:c"
 
@@ -18,8 +18,8 @@ OS_NAME_LENGTH   :: 32
 
 area_info :: struct {
 	area:       area_id,
-	name:       [OS_NAME_LENGTH]c.char,
-	size:       c.size_t,
+	name:       [OS_NAME_LENGTH]byte,
+	size:       uint,
 	lock:       u32,
 	protection: u32,
 	team:       team_id,
@@ -31,11 +31,11 @@ area_info :: struct {
 }
 
 area_locking :: enum u32 {
-	NO_LOCK           = 0,
-	LAZY_LOCK         = 1,
-	FULL_LOCK         = 2,
-	CONTIGUOUS        = 3,
-	LOMEM             = 4, // CONTIGUOUS, < 16 MB physical address
+	NO_LOCK            = 0,
+	LAZY_LOCK          = 1,
+	FULL_LOCK          = 2,
+	CONTIGUOUS         = 3,
+	LOMEM              = 4, // CONTIGUOUS, < 16 MB physical address
 	_32_BIT_FULL_LOCK  = 5, // FULL_LOCK, < 4 GB physical addresses
 	_32_BIT_CONTIGUOUS = 6, // CONTIGUOUS, < 4 GB physical address
 }
@@ -52,27 +52,29 @@ address_spec :: enum u32 {
 	RANDOMIZED_BASE_ADDRESS = 7,
 }
 
-area_protection_flags :: enum u32 {
-	READ_AREA      = 1 << 0,
-	WRITE_AREA     = 1 << 1,
-	EXECUTE_AREA   = 1 << 2,
+area_protection_flag :: enum u32 {
+	READ_AREA      = 0,
+	WRITE_AREA     = 1,
+	EXECUTE_AREA   = 2,
 	// "stack" protection is not available on most platforms - it's used
 	// to only commit memory as needed, and have guard pages at the
 	// bottom of the stack.
-	STACK_AREA     = 1 << 3,
-	CLONEABLE_AREA = 1 << 8,
+	STACK_AREA     = 3,
+	CLONEABLE_AREA = 8,
 }
+area_protection_flags :: distinct bit_set[area_protection_flag; u32]
 
+@(default_calling_convention="c")
 foreign libroot {
-	create_area         :: proc(name: cstring, startAddress: ^rawptr, addressSpec: address_spec, size: c.size_t, lock: area_locking, protection: area_protection_flags) -> area_id ---
+	create_area         :: proc(name: cstring, startAddress: ^rawptr, addressSpec: address_spec, size: uint, lock: area_locking, protection: area_protection_flags) -> area_id ---
 	clone_area          :: proc(name: cstring, destAddress: ^rawptr, addressSpec: address_spec, protection: area_protection_flags, source: area_id) -> area_id ---
 	find_area           :: proc(name: cstring) -> area_id ---
 	area_for            :: proc(address: rawptr) -> area_id ---
 	delete_area         :: proc(id: area_id) -> status_t ---
-	resize_area         :: proc(id: area_id, newSize: c.size_t) -> status_t ---
+	resize_area         :: proc(id: area_id, newSize: uint) -> status_t ---
 	set_area_protection :: proc(id: area_id, newProtection: area_protection_flags) -> status_t ---
-	_get_area_info      :: proc(id: area_id, areaInfo: ^area_info, size: c.size_t) -> status_t ---
-	_get_next_area_info :: proc(team: team_id, cookie: ^c.ssize_t, areaInfo: ^area_info, size: c.size_t) -> status_t ---
+	_get_area_info      :: proc(id: area_id, areaInfo: ^area_info, size: uint) -> status_t ---
+	_get_next_area_info :: proc(team: team_id, cookie: ^int, areaInfo: ^area_info, size: uint) -> status_t ---
 }
 
 // Ports
@@ -80,33 +82,35 @@ foreign libroot {
 port_info :: struct {
 	port:        port_id,
 	team:        team_id,
-	name:        [OS_NAME_LENGTH]c.char,
+	name:        [OS_NAME_LENGTH]byte,
 	capacity:    i32, // queue depth
 	queue_count: i32, // # msgs waiting to be read
 	total_count: i32, // total # msgs read so far
 }
 
-port_flags :: enum u32 {
-	USE_USER_MEMCPY   = 0x80000000,
+port_flag :: enum u32 {
+	USE_USER_MEMCPY   = intrinsics.constant_log2(0x80000000),
 	// read the message, but don't remove it; kernel-only; memory must be locked
-	PEEK_PORT_MESSAGE = 0x100,
+	PEEK_PORT_MESSAGE = intrinsics.constant_log2(0x100),
 }
+port_flags :: distinct bit_set[port_flag; u32]
 
+@(default_calling_convention="c")
 foreign libroot {
 	create_port          :: proc(capacity: i32, name: cstring) -> port_id ---
 	find_port            :: proc(name: cstring) -> port_id ---
-	read_port            :: proc(port: port_id, code: ^i32, buffer: rawptr, bufferSize: c.size_t) -> c.ssize_t ---
-	read_port_etc        :: proc(port: port_id, code: ^i32, buffer: rawptr, bufferSize: c.size_t, flags: port_flags, timeout: bigtime_t) -> c.ssize_t ---
-	write_port           :: proc(port: port_id, code: i32, buffer: rawptr, bufferSize: c.size_t) -> status_t ---
-	write_port_etc       :: proc(port: port_id, code: i32, buffer: rawptr, bufferSize: c.size_t, flags: port_flags, timeout: bigtime_t) -> status_t ---
+	read_port            :: proc(port: port_id, code: ^i32, buffer: rawptr, bufferSize: uint) -> int ---
+	read_port_etc        :: proc(port: port_id, code: ^i32, buffer: rawptr, bufferSize: uint, flags: port_flags, timeout: bigtime_t) -> int ---
+	write_port           :: proc(port: port_id, code: i32, buffer: rawptr, bufferSize: uint) -> status_t ---
+	write_port_etc       :: proc(port: port_id, code: i32, buffer: rawptr, bufferSize: uint, flags: port_flags, timeout: bigtime_t) -> status_t ---
 	close_port           :: proc(port: port_id) -> status_t ---
 	delete_port          :: proc(port: port_id) -> status_t ---
-	port_buffer_size     :: proc(port: port_id) -> c.ssize_t ---
-	port_buffer_size_etc :: proc(port: port_id, flags: port_flags, timeout: bigtime_t) -> c.ssize_t ---
-	port_count           :: proc(port: port_id) -> c.ssize_t ---
+	port_buffer_size     :: proc(port: port_id) -> int ---
+	port_buffer_size_etc :: proc(port: port_id, flags: port_flags, timeout: bigtime_t) -> int ---
+	port_count           :: proc(port: port_id) -> int ---
 	set_port_owner       :: proc(port: port_id, team: team_id) -> status_t ---
-	_get_port_info       :: proc(port: port_id, portInfo: ^port_info, portInfoSize: c.size_t) -> status_t ---
-	_get_next_port_info  :: proc(team: team_id, cookie: ^i32, portInfo: ^port_info, portInfoSize: c.size_t) -> status_t ---
+	_get_port_info       :: proc(port: port_id, portInfo: ^port_info, portInfoSize: uint) -> status_t ---
+	_get_next_port_info  :: proc(team: team_id, cookie: ^i32, portInfo: ^port_info, portInfoSize: uint) -> status_t ---
 }
 
 // Semaphores
@@ -114,22 +118,24 @@ foreign libroot {
 sem_info :: struct {
 	sem:           sem_id,
 	team:          team_id,
-	name:          [OS_NAME_LENGTH]c.char,
+	name:          [OS_NAME_LENGTH]byte,
 	count:         i32,
 	latest_holder: thread_id,
 }
 
-semaphore_flags :: enum u32 {
-	CAN_INTERRUPT      = 0x01, // acquisition of the semaphore can be interrupted (system use only)
-	CHECK_PERMISSION   = 0x04, // ownership will be checked (system use only)
-	KILL_CAN_INTERRUPT = 0x20, // acquisition of the semaphore can be interrupted by SIGKILL[THR], even if not CAN_INTERRUPT (system use only)
+semaphore_flag :: enum u32 {
+	CAN_INTERRUPT      = intrinsics.constant_log2(0x01), // acquisition of the semaphore can be interrupted (system use only)
+	CHECK_PERMISSION   = intrinsics.constant_log2(0x04), // ownership will be checked (system use only)
+	KILL_CAN_INTERRUPT = intrinsics.constant_log2(0x20), // acquisition of the semaphore can be interrupted by SIGKILL[THR], even if not CAN_INTERRUPT (system use only)
 	
 	// release_sem_etc() only flags
-	DO_NOT_RESCHEDULE       = 0x02, // thread is not rescheduled
-	RELEASE_ALL             = 0x08, // all waiting threads will be woken up, count will be zeroed
-	RELEASE_IF_WAITING_ONLY	= 0x10, // release count only if there are any threads waiting
+	DO_NOT_RESCHEDULE       = intrinsics.constant_log2(0x02), // thread is not rescheduled
+	RELEASE_ALL             = intrinsics.constant_log2(0x08), // all waiting threads will be woken up, count will be zeroed
+	RELEASE_IF_WAITING_ONLY	= intrinsics.constant_log2(0x10), // release count only if there are any threads waiting
 }
+semaphore_flags :: distinct bit_set[semaphore_flag; u32]
 
+@(default_calling_convention="c")
 foreign libroot {
 	create_sem         :: proc(count: i32, name: cstring) -> sem_id ---
 	delete_sem         :: proc(id: sem_id) -> status_t ---
@@ -141,8 +147,8 @@ foreign libroot {
 	switch_sem_etc     :: proc(semToBeReleased: sem_id, id: sem_id, count: i32, flags: semaphore_flags, timeout: bigtime_t) -> status_t ---
 	get_sem_count      :: proc(id: sem_id, threadCount: ^i32) -> status_t ---
 	set_sem_owner      :: proc(id: sem_id, team: team_id) -> status_t ---
-	_get_sem_info      :: proc(id: sem_id, info: ^sem_info, infoSize: c.size_t) -> status_t ---
-	_get_next_sem_info :: proc(team: team_id, cookie: ^i32, info: ^sem_info, infoSize: c.size_t) -> status_t ---
+	_get_sem_info      :: proc(id: sem_id, info: ^sem_info, infoSize: uint) -> status_t ---
+	_get_next_sem_info :: proc(team: team_id, cookie: ^i32, info: ^sem_info, infoSize: uint) -> status_t ---
 }
 
 // Teams
@@ -155,7 +161,7 @@ team_info :: struct {
 	debugger_nub_thread: thread_id,
 	debugger_nub_port:   port_id,
 	argc:                i32,
-	args:                [64]c.char,
+	args:                [64]byte,
 	uid:                 uid_t,
 	gid:                 gid_t,
 
@@ -165,7 +171,7 @@ team_info :: struct {
 	group_id:            pid_t,
 	session_id:          pid_t,
 	parent:              team_id,
-	name:                [OS_NAME_LENGTH]c.char,
+	name:                [OS_NAME_LENGTH]byte,
 	start_time:          bigtime_t,
 }
 
@@ -183,17 +189,18 @@ team_usage_who :: enum i32 {
 	CHILDREN = -1,
 }
 
+@(default_calling_convention="c")
 foreign libroot {
 	// see also: send_signal()
 	kill_team            :: proc(team: team_id) -> status_t ---
-	_get_team_info       :: proc(id: team_id, info: ^team_info, size: c.size_t) -> status_t ---
-	_get_next_team_info  :: proc(cookie: ^i32, info: ^team_info, size: c.size_t) -> status_t ---
-	_get_team_usage_info :: proc(id: team_id, who: team_usage_who, info: ^team_usage_info, size: c.size_t) -> status_t ---
+	_get_team_info       :: proc(id: team_id, info: ^team_info, size: uint) -> status_t ---
+	_get_next_team_info  :: proc(cookie: ^i32, info: ^team_info, size: uint) -> status_t ---
+	_get_team_usage_info :: proc(id: team_id, who: team_usage_who, info: ^team_usage_info, size: uint) -> status_t ---
 }
 
 // Threads
 
-thread_state :: enum c.int {
+thread_state :: enum i32 {
 	RUNNING = 1,
 	READY,
 	RECEIVING,
@@ -205,7 +212,7 @@ thread_state :: enum c.int {
 thread_info :: struct {
 	thread:      thread_id,
 	team:        team_id,
-	name:        [OS_NAME_LENGTH]c.char,
+	name:        [OS_NAME_LENGTH]byte,
 	state:       thread_state,
 	priority:    thread_priority,
 	sem:         sem_id,
@@ -234,6 +241,7 @@ SYSTEM_TIMEBASE :: 0
 
 thread_func :: #type proc "c" (rawptr) -> status_t
 
+@(default_calling_convention="c")
 foreign libroot {
 	spawn_thread          :: proc(thread_func, name: cstring, priority: thread_priority, data: rawptr) -> thread_id ---
 	kill_thread           :: proc(thread: thread_id) -> status_t ---
@@ -247,24 +255,25 @@ foreign libroot {
 	wait_for_thread_etc   :: proc(id: thread_id, flags: u32, timeout: bigtime_t, _returnCode: ^status_t) -> status_t ---
 	on_exit_thread        :: proc(callback: proc "c" (rawptr), data: rawptr) -> status_t ---
 	find_thread           :: proc(name: cstring) -> thread_id ---
-	send_data             :: proc(thread: thread_id, code: i32, buffer: rawptr, bufferSize: c.size_t) -> status_t ---
-	receive_data          :: proc(sender: ^thread_id, buffer: rawptr, bufferSize: c.size_t) -> i32 ---
+	send_data             :: proc(thread: thread_id, code: i32, buffer: rawptr, bufferSize: uint) -> status_t ---
+	receive_data          :: proc(sender: ^thread_id, buffer: rawptr, bufferSize: uint) -> i32 ---
 	has_data              :: proc(thread: thread_id) -> bool ---
 	snooze                :: proc(amount: bigtime_t) -> status_t ---
 	// FIXME: Find and define those flags.
-	snooze_etc            :: proc(amount: bigtime_t, timeBase: c.int, flags: u32) -> status_t ---
-	snooze_until          :: proc(time: bigtime_t, timeBase: c.int) -> status_t ---
-	_get_thread_info      :: proc(id: thread_id, info: ^thread_info, size: c.size_t) -> status_t ---
-	_get_next_thread_info :: proc(team: team_id, cookie: ^i32, info: ^thread_info, size: c.size_t) -> status_t ---
+	snooze_etc            :: proc(amount: bigtime_t, timeBase: i32, flags: u32) -> status_t ---
+	snooze_until          :: proc(time: bigtime_t, timeBase: i32) -> status_t ---
+	_get_thread_info      :: proc(id: thread_id, info: ^thread_info, size: uint) -> status_t ---
+	_get_next_thread_info :: proc(team: team_id, cookie: ^i32, info: ^thread_info, size: uint) -> status_t ---
 	// bridge to the pthread API
 	get_pthread_thread_id :: proc(thread: pthread_t) -> thread_id ---
 }
 
 // Time
 
+@(default_calling_convention="c")
 foreign libroot {
-	real_time_clock       :: proc() -> c.ulong ---
-	set_real_time_clock   :: proc(secsSinceJan1st1970: c.ulong) ---
+	real_time_clock       :: proc() -> uint ---
+	set_real_time_clock   :: proc(secsSinceJan1st1970: uint) ---
 	real_time_clock_usecs :: proc() -> bigtime_t ---
 	// time since booting in microseconds
 	system_time           :: proc() -> bigtime_t ---
@@ -280,12 +289,14 @@ alarm_mode :: enum u32 {
 	PERIODIC_ALARM, // "when" specifies the period
 }
 
+@(default_calling_convention="c")
 foreign libroot {
 	set_alarm :: proc(_when: bigtime_t, mode: alarm_mode) -> bigtime_t ---
 }
 
 // Debugger
 
+@(default_calling_convention="c")
 foreign libroot {
 	debugger :: proc(message: cstring) ---
 	/*
@@ -296,7 +307,7 @@ foreign libroot {
 
 		to re-enable the default debugger pass a zero.
 	*/
-	disable_debugger :: proc(state: c.int) -> c.int ---
+	disable_debugger :: proc(state: i32) -> i32 ---
 }
 
 // System information
@@ -338,15 +349,15 @@ system_info :: struct {
 	max_teams:         u32,
 	used_teams:        u32,
 
-	kernel_name:       [FILE_NAME_LENGTH]c.char,
-	kernel_build_date: [OS_NAME_LENGTH]c.char,
-	kernel_build_time: [OS_NAME_LENGTH]c.char,
+	kernel_name:       [FILE_NAME_LENGTH]byte,
+	kernel_build_date: [OS_NAME_LENGTH]byte,
+	kernel_build_time: [OS_NAME_LENGTH]byte,
 
 	kernel_version:    i64,
 	abi:               u32,       // the system API
 }
 
-topology_level_type :: enum c.int {
+topology_level_type :: enum i32 {
 	UNKNOWN,
 	ROOT,
 	SMT,
@@ -354,7 +365,7 @@ topology_level_type :: enum c.int {
 	PACKAGE,
 }
 
-cpu_platform :: enum c.int {
+cpu_platform :: enum i32 {
 	UNKNOWN,
 	x86,
 	x86_64,
@@ -370,7 +381,7 @@ cpu_platform :: enum c.int {
 	RISC_V,
 }
 
-cpu_vendor :: enum c.int {
+cpu_vendor :: enum i32 {
 	UNKNOWN,
 	AMD,
 	CYRIX,
@@ -408,95 +419,80 @@ cpu_topology_node_info :: struct {
 	},
 }
 
-// FIXME: Add cpuid_info when bit fields are ready.
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	cpuid_info :: struct #raw_union {
+		eax_0: struct {
+			max_eax:   u32,
+			vendor_id: [12]byte,
+		},
 
+		eax_1: struct {
+			using _: bit_field u32 {
+				stepping:        u32 | 4,
+				model:           u32 | 4,
+				family:          u32 | 4,
+				type:            u32 | 2,
+				reserved_0:      u32 | 2,
+				extended_model:  u32 | 4,
+				extended_family: u32 | 8,
+				reserved_1:      u32 | 4,
+			},
+
+			using _: bit_field u32 {
+				brand_index:  u32 | 8,
+				clflush:      u32 | 8,
+				logical_cpus: u32 | 8,
+				apic_id:      u32 | 8,
+			},
+
+			features:          u32,
+			extended_features: u32,
+		},
+
+		eax_2: struct {
+			call_num:          u8,
+			cache_descriptors: [15]u8,
+		},
+
+		eax_3: struct {
+			reserved:           [2]u32,
+			serial_number_high: u32,
+			serial_number_low:  u32,
+		},
+
+		as_chars: [16]byte,
+
+		regs: struct {
+			eax: u32,
+			ebx: u32,
+			edx: u32,
+			ecx: u32,
+		},
+	}
+}
+
+@(default_calling_convention="c")
 foreign libroot {
 	get_system_info       :: proc(info: ^system_info) -> status_t ---
-	_get_cpu_info_etc     :: proc(firstCPU: u32, cpuCount: u32, info: ^cpu_info, size: c.size_t) -> status_t ---
+	_get_cpu_info_etc     :: proc(firstCPU: u32, cpuCount: u32, info: ^cpu_info, size: uint) -> status_t ---
 	get_cpu_topology_info :: proc(topologyInfos: [^]cpu_topology_node_info, topologyInfoCount: ^u32) -> status_t ---
 
-	is_computer_on        :: proc() -> i32 ---
-	is_computer_on_fire   :: proc() -> f64 ---
+	when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+		get_cpuid :: proc(info: ^cpuid_info, eaxRegister: u32, cpuNum: u32) -> status_t ---
+	}
+
+	is_computer_on      :: proc() -> i32 ---
+	is_computer_on_fire :: proc() -> f64 ---
 }
 
-// Signal.h
+// POSIX signals
 
-SIG_BLOCK   :: 1
-SIG_UNBLOCK :: 2
-SIG_SETMASK :: 3
-
-/*
- * The list of all defined signals:
- *
- * The numbering of signals for Haiku attempts to maintain
- * some consistency with UN*X conventions so that things
- * like "kill -9" do what you expect.
- */
-
-SIGHUP     :: 1  // hangup -- tty is gone!
-SIGINT     :: 2  // interrupt
-SIGQUIT    :: 3  // `quit' special character typed in tty
-SIGILL     :: 4  // illegal instruction
-SIGCHLD    :: 5  // child process exited
-SIGABRT    :: 6  // abort() called, dont' catch
-SIGPIPE    :: 7  // write to a pipe w/no readers
-SIGFPE     :: 8  // floating point exception
-SIGKILL    :: 9  // kill a team (not catchable)
-SIGSTOP    :: 10 // suspend a thread (not catchable)
-SIGSEGV    :: 11 // segmentation violation (read: invalid pointer)
-SIGCONT    :: 12 // continue execution if suspended
-SIGTSTP    :: 13 // `stop' special character typed in tty
-SIGALRM    :: 14 // an alarm has gone off (see alarm())
-SIGTERM    :: 15 // termination requested
-SIGTTIN    :: 16 // read of tty from bg process
-SIGTTOU    :: 17 // write to tty from bg process
-SIGUSR1    :: 18 // app defined signal 1
-SIGUSR2    :: 19 // app defined signal 2
-SIGWINCH   :: 20 // tty window size changed
-SIGKILLTHR :: 21 // be specific: kill just the thread, not team
-SIGTRAP    :: 22 // Trace/breakpoint trap
-SIGPOLL    :: 23 // Pollable event
-SIGPROF    :: 24 // Profiling timer expired
-SIGSYS     :: 25 // Bad system call
-SIGURG     :: 26 // High bandwidth data is available at socket
-SIGVTALRM  :: 27 // Virtual timer expired
-SIGXCPU    :: 28 // CPU time limit exceeded
-SIGXFSZ    :: 29 // File size limit exceeded
-SIGBUS     :: 30 // access to undefined portion of a memory object
-
-sigval :: struct #raw_union {
-	sival_int: c.int,
-	sival_ptr: rawptr,
-}
-
-siginfo_t :: struct {
-	si_signo:  c.int,  // signal number
-	si_code:   c.int,  // signal code
-	si_errno:  c.int,  // if non zero, an error number associated with this signal
-
-	si_pid:    pid_t,  // sending process ID
-	si_uid:    uid_t,  // real user ID of sending process
-	si_addr:   rawptr, // address of faulting instruction
-	si_status: c.int,  // exit value or signal
-	si_band:   c.long, // band event for SIGPOLL
-	si_value:  sigval, // signal value
-}
-
+@(default_calling_convention="c")
 foreign libroot {
-	// signal set (sigset_t) manipulation
-	sigemptyset  :: proc(set: ^sigset_t) -> c.int ---
-	sigfillset   :: proc(set: ^sigset_t) -> c.int ---
-	sigaddset    :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
-	sigdelset    :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
-	sigismember  :: proc(set: ^sigset_t, _signal: c.int) -> c.int ---
-	// querying and waiting for signals
-	sigpending   :: proc(set: ^sigset_t) -> c.int ---
-	sigsuspend   :: proc(mask: ^sigset_t) -> c.int ---
-	sigpause     :: proc(_signal: c.int) -> c.int ---
-	sigwait      :: proc(set: ^sigset_t, _signal: ^c.int) -> c.int ---
-	sigwaitinfo  :: proc(set: ^sigset_t, info: ^siginfo_t) -> c.int ---
-	sigtimedwait :: proc(set: ^sigset_t, info: ^siginfo_t, timeout: ^unix.timespec) -> c.int ---
+	/*
+	Wait for queued signals.
 
-	send_signal      :: proc(threadID: thread_id, signal: c.uint) -> c.int ---
-	set_signal_stack :: proc(base: rawptr, size: c.size_t) ---
+	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/sigtimedwait.html ]]
+	*/
+	sigtimedwait :: proc(set: ^posix.sigset_t, info: ^posix.siginfo_t, timeout: ^posix.timespec) -> posix.result ---
 }

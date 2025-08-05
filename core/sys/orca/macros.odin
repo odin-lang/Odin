@@ -37,12 +37,7 @@ log_info :: proc "contextless" (msg: cstring, loc := #caller_location) {
 }
 
 abort :: proc "contextless" (msg: cstring, loc := #caller_location) {
-	abort_ext(
-		cstring(raw_data(loc.procedure)),
-		cstring(raw_data(loc.file_path)),
-		loc.line,
-		msg,
-	)
+	abort_ext(cstring(raw_data(loc.procedure)), cstring(raw_data(loc.file_path)), loc.line, msg)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +50,12 @@ list_entry :: proc "contextless" (elt: ^list_elt, $T: typeid, $member: string) -
 }
 
 // Get the next entry in a list.
-list_next_entry :: proc "contextless" (list: ^list, elt: ^list_elt, $T: typeid, $member: string) -> ^T {
+list_next_entry :: proc "contextless" (
+	list: ^list,
+	elt: ^list_elt,
+	$T: typeid,
+	$member: string,
+) -> ^T {
 	if elt.next != list.last {
 		return list_entry(elt.next, T, member)
 	}
@@ -64,7 +64,12 @@ list_next_entry :: proc "contextless" (list: ^list, elt: ^list_elt, $T: typeid, 
 }
 
 // Get the previous entry in a list.
-list_prev_entry :: proc "contextless" (list: ^list, elt: ^list_elt, $T: typeid, $member: string) -> ^T {
+list_prev_entry :: proc "contextless" (
+	list: ^list,
+	elt: ^list_elt,
+	$T: typeid,
+	$member: string,
+) -> ^T {
 	if elt.prev != list.last {
 		return list_entry(elt.prev, T, member)
 	}
@@ -94,9 +99,23 @@ list_last_entry :: proc "contextless" (list: ^list, $T: typeid, $member: string)
 // 	_elt: ^list_elt
 // 	for elt in oc.list_for(list, &_elt, int, "elt") {
 // 	}
-list_for :: proc "contextless" (list: ^list, elt: ^^list_elt, $T: typeid, $member: string) -> (^T, bool) {
+list_for :: proc "contextless" (
+	list: ^list,
+	elt: ^^list_elt,
+	$T: typeid,
+	$member: string,
+) -> (
+	^T,
+	bool,
+) {
 	if elt == nil {
-		assert_fail(#file, #procedure, #line, "elt != nil", "misuse of `list_for`, expected `elt` to not be nil")
+		assert_fail(
+			#file,
+			#procedure,
+			#line,
+			"elt != nil",
+			"misuse of `list_for`, expected `elt` to not be nil",
+		)
 	}
 
 	if elt^ == nil {
@@ -112,7 +131,15 @@ list_for :: proc "contextless" (list: ^list, elt: ^^list_elt, $T: typeid, $membe
 
 list_iter :: list_for
 
-list_for_reverse :: proc "contextless" (list: ^list, elt: ^^list_elt, $T: typeid, $member: string) -> (^T, bool) {
+list_for_reverse :: proc "contextless" (
+	list: ^list,
+	elt: ^^list_elt,
+	$T: typeid,
+	$member: string,
+) -> (
+	^T,
+	bool,
+) {
 	if elt^ == nil {
 		elt^ = list.last
 		entry := list_checked_entry(elt^, T, member)
@@ -226,27 +253,17 @@ str32_list_for :: proc "contextless" (list: ^str32_list, elt: ^^list_elt) -> (^s
 	return list_for(&list.list, elt, str32_elt, "listElt")
 }
 
-@(deferred_none=ui_box_end)
-ui_container :: proc "contextless" (name: string, flags: ui_flags = {}) -> ^ui_box {
-	return ui_box_begin_str8(name, flags)
+@(deferred_none = ui_box_end)
+ui_container :: proc "contextless" (name: string) -> ^ui_box {
+	return ui_box_begin_str8(name)
 }
 
-@(deferred_none=ui_end_frame)
-ui_frame :: proc "contextless" (frame_size: [2]f32, style: ui_style, mask: ui_style_mask) {
-	ui_begin_frame(frame_size, style, mask)
+@(deferred_none = ui_menu_end)
+ui_menu :: proc "contextless" (key, name: string) {
+	ui_menu_begin_str8(key, name)
 }
 
-@(deferred_none=ui_panel_end)
-ui_panel :: proc "contextless" (name: cstring, flags: ui_flags) {
-	ui_panel_begin(name, flags)
-}
-
-@(deferred_none=ui_menu_end)
-ui_menu :: proc "contextless" (name: cstring) {
-	ui_menu_begin(name)
-}
-
-@(deferred_none=ui_menu_bar_end)
-ui_menu_bar :: proc "contextless" (name: cstring) {
-	ui_menu_bar_begin(name)
+@(deferred_none = ui_menu_bar_end)
+ui_menu_bar :: proc "contextless" (key: string) {
+	ui_menu_bar_begin_str8(key)
 }

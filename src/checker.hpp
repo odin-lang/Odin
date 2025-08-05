@@ -139,7 +139,10 @@ struct AttributeContext {
 	bool    entry_point_only      : 1;
 	bool    instrumentation_enter : 1;
 	bool    instrumentation_exit  : 1;
+	bool    no_sanitize_address   : 1;
+	bool    no_sanitize_memory    : 1;
 	bool    rodata                : 1;
+	bool    ignore_duplicates     : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
 	String extra_linker_flags;
@@ -147,8 +150,14 @@ struct AttributeContext {
 
 	String  objc_class;
 	String  objc_name;
-	bool    objc_is_class_method;
+	String  objc_selector;
 	Type *  objc_type;
+	Type *  objc_superclass;
+	Type *  objc_ivar;
+	Entity *objc_context_provider;
+	bool    objc_is_class_method;
+	bool    objc_is_implementation;     // This struct or proc provides a class/method implementation, not a binding to an existing type.
+	bool    objc_is_disabled_implement; // This means the method explicitly set @objc_implement to false so it won't be inferred from the class' attribute.
 
 	String require_target_feature; // required by the target micro-architecture
 	String enable_target_feature;  // will be enabled for the procedure only
@@ -166,6 +175,7 @@ typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 
 gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
 
+#include "name_canonicalization.hpp"
 
 enum ProcCheckedState : u8 {
 	ProcCheckedState_Unchecked,
@@ -220,12 +230,14 @@ struct DeclInfo {
 	RwMutex          deps_mutex;
 	PtrSet<Entity *> deps;
 
-	RwMutex     type_info_deps_mutex;
-	PtrSet<Type *>    type_info_deps;
+	RwMutex type_info_deps_mutex;
+	TypeSet type_info_deps;
 
 	BlockingMutex type_and_value_mutex;
 
 	Array<BlockLabel> labels;
+
+	i32 scope_index;
 
 	Array<VariadicReuseData> variadic_reuses;
 	i64 variadic_reuse_max_bytes;
@@ -271,9 +283,13 @@ struct Scope {
 	std::atomic<Scope *> next;
 	std::atomic<Scope *> head_child;
 
+	i32 index; // within a procedure
+
 	RwMutex mutex;
 	StringMap<Entity *> elements;
 	PtrSet<Scope *> imported;
+
+	DeclInfo *decl_info;
 
 	i32             flags; // ScopeFlag
 	union {
@@ -357,6 +373,11 @@ struct ObjcMsgData {
 	Type *proc_type;
 };
 
+struct ObjcMethodData {
+	AttributeContext ac;
+	Entity *proc_entity;
+};
+
 enum LoadFileTier {
 	LoadFileTier_Invalid,
 	LoadFileTier_Exists,
@@ -420,8 +441,10 @@ struct CheckerInfo {
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
-	PtrMap</*type info index*/isize, /*min dep index*/isize>  minimum_dependency_type_info_set;
-
+	BlockingMutex minimum_dependency_type_info_mutex;
+	PtrMap</*type info hash*/u64, /*min dep index*/isize> min_dep_type_info_index_map;
+	TypeSet             min_dep_type_info_set;
+	Array<TypeInfoPair> type_info_types_hash_map; // 2 * type_info_types.count
 
 
 	Array<Entity *> testing_procedures;
@@ -449,9 +472,10 @@ struct CheckerInfo {
 	BlockingMutex                  gen_types_mutex;
 	PtrMap<Type *, GenTypesData *> gen_types;
 
-	BlockingMutex type_info_mutex; // NOT recursive
-	Array<Type *> type_info_types;
-	PtrMap<Type *, isize> type_info_map;
+	// BlockingMutex type_info_mutex; // NOT recursive
+	// Array<TypeInfoPair> type_info_types;
+	// PtrMap<Type *, isize> type_info_map;
+	// TypeSet type_info_set;
 
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;
@@ -461,11 +485,20 @@ struct CheckerInfo {
 	MPSCQueue<Entity *> required_global_variable_queue;
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
 	MPSCQueue<Entity *> foreign_imports_to_check_fullpaths;
+	MPSCQueue<Entity *> foreign_decls_to_check;
 
 	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 
-	BlockingMutex objc_types_mutex;
+	BlockingMutex objc_objc_msgSend_mutex;
 	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
+
+	BlockingMutex objc_class_name_mutex;
+	StringSet obcj_class_name_set;
+	MPSCQueue<Entity *> objc_class_implementations;
+
+	BlockingMutex objc_method_mutex;
+	PtrMap<Type *, Array<ObjcMethodData>> objc_method_implementations;
+
 
 	BlockingMutex load_file_mutex;
 	StringMap<LoadFileCache *> load_file_cache;
@@ -521,6 +554,7 @@ struct CheckerContext {
 	bool       in_enum_type;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
+	bool       disallow_polymorphic_return_types; // NOTE(zen3ger): no poly type decl in return types
 	bool       no_polymorphic_errors;
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
@@ -542,6 +576,7 @@ struct Checker {
 	CheckerContext builtin_ctx;
 
 	MPSCQueue<Entity *> procs_with_deferred_to_check;
+	MPSCQueue<Entity *> procs_with_objc_context_provider_to_check;
 	Array<ProcInfo *> procs_to_check;
 
 	BlockingMutex nested_proc_lits_mutex;
@@ -568,6 +603,7 @@ gb_internal DeclInfo *   decl_info_of_entity    (Entity * e);
 gb_internal AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 // IMPORTANT: Only to use once checking is done
 gb_internal isize        type_info_index        (CheckerInfo *i, Type *type, bool error_on_failure);
+gb_internal isize        type_info_index        (CheckerInfo *info, TypeInfoPair pair, bool error_on_failure);
 
 // Will return nullptr if not found
 gb_internal Entity *entity_of_node(Ast *expr);

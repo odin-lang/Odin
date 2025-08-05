@@ -1,7 +1,9 @@
+#+build windows
 package all
 
-import wgpu "vendor:wgpu"
-import b2 "vendor:box2d"
-
-_ :: wgpu
-_ :: b2
+@(require) import "vendor:wgpu/glfwglue"
+@(require) import "vendor:wgpu/sdl2glue"
+@(require) import "vendor:wgpu"
+@(require) import "vendor:box2d"
+@(require) import "vendor:windows/GameInput"
+@(require) import "vendor:windows/XAudio2"

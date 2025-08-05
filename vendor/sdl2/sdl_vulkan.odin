@@ -4,8 +4,10 @@ import "core:c"
 import vk "vendor:vulkan"
 
 when ODIN_OS == .Windows {
+	@(ignore_duplicates)
 	foreign import lib "SDL2.lib"
 } else {
+	@(ignore_duplicates)
 	foreign import lib "system:SDL2"
 }
 

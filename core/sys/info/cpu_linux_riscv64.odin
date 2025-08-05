@@ -9,7 +9,7 @@ import "core:sys/linux"
 @(init, private)
 init_cpu_features :: proc() {
 	_features: CPU_Features
-	defer cpu_features = _features
+	defer cpu.features = _features
 
 	HWCAP_Bits :: enum u64 {
 		I = 'I' - 'A',
@@ -109,5 +109,5 @@ init_cpu_features :: proc() {
 
 @(init, private)
 init_cpu_name :: proc() {
-	cpu_name = "RISCV64"
+	cpu.name = "RISCV64"
 }

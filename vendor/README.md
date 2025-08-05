@@ -158,3 +158,9 @@ Se also LICENCE in `cgltf` directory itself.
 ## fontstash (Port)
 
 [Font stash](https://github.com/memononen/fontstash) is a light-weight online font texture atlas builder. It uses stb_truetype to render fonts on demand to a texture atlas.
+
+## kb
+
+[kb](https://github.com/JimmyLefevre/kb) provides ICU-like text segmentation (i.e. breaking Unicode text by direction, line, word and grapheme). It also provides Harfbuzz-like text shaping for OpenType fonts, which means it is capable of handling complex script layout and ligatures, among other things.
+
+It does not handle rasterization. It will only help you know which glyphs to display where!

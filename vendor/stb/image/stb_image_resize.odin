@@ -18,12 +18,8 @@ when RESIZE_LIB != "" {
 	}
 }
 
-when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
-	foreign import lib "../lib/stb_image_resize_wasm.o"
-} else when RESIZE_LIB != "" {
-	foreign import lib { RESIZE_LIB }
-} else {
-	foreign import lib "system:stb_image_resize"
+foreign import lib {
+	RESIZE_LIB when RESIZE_LIB != "" else "system:stb_image_resize",
 }
 
 //////////////////////////////////////////////////////////////////////////////
