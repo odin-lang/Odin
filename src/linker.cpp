@@ -728,6 +728,8 @@ try_cross_linking:;
 					static_link_command_line = gb_string_appendc(static_link_command_line, " -static ");
 					static_link_command_line = gb_string_appendc(static_link_command_line, object_files);
 					return system_exec_command_line_app("libtool", static_link_command_line);
+				} else {
+					compiler_error("TODO(bill): -build-mode:static on non-windows, non-darwin targets");
 				}
 			}
 
