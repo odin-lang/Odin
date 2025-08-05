@@ -249,9 +249,9 @@ _destroy :: proc(f: ^File_Impl) -> Error {
 	a := f.allocator
 	err0 := free(f.wname, a)
 	err1 := delete(f.name, a)
-	err2 := free(f, a)
-	err3 := delete(f.r_buf, a)
-	err4 := delete(f.w_buf, a)
+	err2 := delete(f.r_buf, a)
+	err3 := delete(f.w_buf, a)
+	err4 := free(f, a)
 	err0 or_return
 	err1 or_return
 	err2 or_return
