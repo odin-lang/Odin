@@ -14,5 +14,4 @@ _get_tsc_frequency :: proc "contextless" () -> (freq: u64, ok: bool) {
 	}
 	ok = true
 	return
-
 }
