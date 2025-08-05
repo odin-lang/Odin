@@ -985,7 +985,7 @@ try_cross_linking:;
 				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
 				result = system_exec_command_line_app("lld-link", link_command_line);
 			} else {
-					result = system_exec_command_line_app("ld-link", link_command_line);
+				result = system_exec_command_line_app("ld-link", link_command_line);
 			}
 
 			if (result) {
@@ -995,7 +995,7 @@ try_cross_linking:;
 			if (is_osx && build_context.ODIN_DEBUG) {
 				// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 				// to the symbols in the object file
-				result = system_exec_command_line_app("dsymutil", "dsymutil %.*s", LIT(output_filename));
+				result = system_exec_command_line_app("dsymutil", "dsymutil \"%.*s\"", LIT(output_filename));
 
 				if (result) {
 					return result;
