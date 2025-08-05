@@ -6802,7 +6802,11 @@ gb_internal void check_parsed_files(Checker *c) {
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
 		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
-			(void)type_align_of(e->type);
+			if (e->TypeName.is_type_alias) {
+				// Ignore for the time being
+			} else {
+				(void)type_align_of(e->type);
+			}
 		} else if (e->kind == Entity_Procedure) {
 			DeclInfo *decl = e->decl_info;
 			ast_node(pl, ProcLit, decl->proc_lit);
