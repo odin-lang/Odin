@@ -3101,6 +3101,9 @@ gb_internal void init_core_type_info(Checker *c) {
 
 	GB_ASSERT(tis->fields.count == 5);
 
+	Entity *type_info_string_encoding_kind = find_core_entity(c, str_lit("Type_Info_String_Encoding_Kind"));
+	t_type_info_string_encoding_kind = type_info_string_encoding_kind->type;
+
 	Entity *type_info_variant = tis->fields[4];
 	Type *tiv_type = type_info_variant->type;
 	GB_ASSERT(is_type_union(tiv_type));

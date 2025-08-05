@@ -514,8 +514,9 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 			io.write_byte(w, 'c', &n) or_return
 		}
 		io.write_string(w, "string", &n)  or_return
-		if info.is_utf16 {
-			io.write_string(w, "16", &n) or_return
+		switch info.encoding {
+		case .UTF_8:  /**/
+		case .UTF_16: io.write_string(w, "16", &n) or_return
 		}
 	case Type_Info_Boolean:
 		switch ti.id {

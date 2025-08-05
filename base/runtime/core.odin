@@ -61,6 +61,11 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 	Dynamic = 3,
 }
 
+Type_Info_String_Encoding_Kind :: enum u8 {
+	UTF_8  = 0,
+	UTF_16 = 1,
+}
+
 // Variant Types
 Type_Info_Named :: struct {
 	name: string,
@@ -73,7 +78,7 @@ Type_Info_Rune       :: struct {}
 Type_Info_Float      :: struct {endianness: Platform_Endianness}
 Type_Info_Complex    :: struct {}
 Type_Info_Quaternion :: struct {}
-Type_Info_String     :: struct {is_cstring: bool, is_utf16: bool}
+Type_Info_String     :: struct {is_cstring: bool, encoding: Type_Info_String_Encoding_Kind}
 Type_Info_Boolean    :: struct {}
 Type_Info_Any        :: struct {}
 Type_Info_Type_Id    :: struct {}

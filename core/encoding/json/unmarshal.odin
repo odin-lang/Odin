@@ -571,7 +571,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 
 			#partial switch tk in t.key.variant {
 				case runtime.Type_Info_String:
-					assert(!tk.is_utf16)
+					assert(tk.encoding == .UTF_8)
 
 					key_ptr = rawptr(&key)
 					key_cstr: cstring

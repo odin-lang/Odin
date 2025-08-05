@@ -297,8 +297,9 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 			print_byte('c')
 		}
 		print_string("string")
-		if info.is_utf16 {
-			print_string("16")
+		switch info.encoding {
+		case .UTF_8:  /**/
+		case .UTF_16: print_string("16")
 		}
 	case Type_Info_Boolean:
 		switch ti.id {

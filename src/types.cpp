@@ -661,6 +661,8 @@ gb_global Type *t_type_info_enum_value           = nullptr;
 gb_global Type *t_type_info_ptr                  = nullptr;
 gb_global Type *t_type_info_enum_value_ptr       = nullptr;
 
+gb_global Type *t_type_info_string_encoding_kind = nullptr;
+
 gb_global Type *t_type_info_named                = nullptr;
 gb_global Type *t_type_info_integer              = nullptr;
 gb_global Type *t_type_info_rune                 = nullptr;
