@@ -58,3 +58,32 @@ darwin:
 	$(CC) -arch arm64  -c -O2 -Os -fPIC stb_sprintf.c -o stb_sprintf-arm64.o -mmacosx-version-min=10.12
 	lipo -create stb_sprintf-x86_64.o stb_sprintf-arm64.o -output ../lib/darwin/stb_sprintf.a
 	rm *.o
+
+iphone:
+	mkdir -p ../lib/iphone
+	xcrun -sdk iphoneos $(CC) -target arm64-apple-ios -arch arm64 -c -O2 -Os stb_image_write.c -o stb_image_write-iphone.o
+	libtool -o ../lib/iphone/stb_image_write.a stb_image_write-iphone.o
+	xcrun -sdk iphoneos $(CC) -target arm64-apple-ios -arch arm64 -c -O2 -Os stb_image_resize.c -o stb_image_resize-iphone.o
+	libtool -o ../lib/iphone/stb_image_resize.a stb_image_resize-iphone.o
+	xcrun -sdk iphoneos $(CC) -target arm64-apple-ios -arch arm64 -c -O2 -Os stb_truetype.c -o stb_truetype-iphone.o
+	libtool -o ../lib/iphone/stb_truetype.a stb_truetype-iphone.o
+	xcrun -sdk iphoneos $(CC) -target arm64-apple-ios -arch arm64 -c -O2 -Os stb_rect_pack.c -o stb_rect_pack-iphone.o
+	libtool -o ../lib/iphone/stb_rect_pack.a stb_rect_pack-iphone.o
+	xcrun -sdk iphoneos $(CC) -target arm64-apple-ios -arch arm64 -c -O2 -Os stb_vorbis.c -o stb_vorbis-iphone.o
+	libtool -o ../lib/iphone/stb_vorbis.a stb_vorbis-iphone.o
+	xcrun -sdk iphoneos $(CC) -target arm64-apple-ios -arch arm64 -c -O2 -Os stb_sprintf.c -o stb_sprintf-iphone.o
+	libtool -o ../lib/iphone/stb_sprintf.a stb_sprintf-iphone.o
+iphonesimulator:
+	mkdir -p ../lib/iphonesimulator
+	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64 -c -O2 -Os stb_image_write.c -o stb_image_write-iphonesimulator.o
+	libtool -o ../lib/iphonesimulator/stb_image_write.a stb_image_write-iphonesimulator.o
+	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64 -c -O2 -Os stb_image_resize.c -o stb_image_resize-iphonesimulator.o
+	libtool -o ../lib/iphonesimulator/stb_image_resize.a stb_image_resize-iphonesimulator.o
+	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64 -c -O2 -Os stb_truetype.c -o stb_truetype-iphonesimulator.o
+	libtool -o ../lib/iphonesimulator/stb_truetype.a stb_truetype-iphonesimulator.o
+	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64 -c -O2 -Os stb_rect_pack.c -o stb_rect_pack-iphonesimulator.o
+	libtool -o ../lib/iphonesimulator/stb_rect_pack.a stb_rect_pack-iphonesimulator.o
+	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64 -c -O2 -Os stb_vorbis.c -o stb_vorbis-iphonesimulator.o
+	libtool -o ../lib/iphonesimulator/stb_vorbis.a stb_vorbis-iphonesimulator.o
+	xcrun -sdk iphonesimulator $(CC) -target arm64-apple-ios-simulator -arch arm64 -c -O2 -Os stb_sprintf.c -o stb_sprintf-iphonesimulator.o
+	libtool -o ../lib/iphonesimulator/stb_sprintf.a stb_sprintf-iphonesimulator.o
