@@ -157,10 +157,11 @@ struct TypeStruct {
 
 	bool            is_polymorphic;
 	bool            are_offsets_set             : 1;
-	bool            are_offsets_being_processed : 1;
 	bool            is_packed                   : 1;
 	bool            is_raw_union                : 1;
 	bool            is_poly_specialized         : 1;
+
+	std::atomic<bool> are_offsets_being_processed;
 };
 
 struct TypeUnion {
@@ -259,7 +260,7 @@ struct TypeProc {
 		Slice<Entity *> variables; /* Entity_Variable */  \
 		i64 *           offsets;                          \
 		BlockingMutex   mutex; /* for settings offsets */ \
-		bool            are_offsets_being_processed;      \
+		std::atomic<bool> are_offsets_being_processed;    \
 		bool            are_offsets_set;                  \
 		bool            is_packed;                        \
 	})                                                        \
@@ -2633,6 +2634,62 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	return false;
 }
 
+// NOTE(bill): type can be easily compared using memcmp or contains a float
+gb_internal bool is_type_nearly_simple_compare(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Array:
+		return is_type_nearly_simple_compare(t->Array.elem);
+
+	case Type_EnumeratedArray:
+		return is_type_nearly_simple_compare(t->EnumeratedArray.elem);
+
+	case Type_Basic:
+		if (t->Basic.flags & (BasicFlag_SimpleCompare|BasicFlag_Numeric)) {
+			return true;
+		}
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
+		return false;
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_SoaPointer:
+	case Type_Proc:
+	case Type_BitSet:
+		return true;
+
+	case Type_Matrix:
+		return is_type_nearly_simple_compare(t->Matrix.elem);
+
+	case Type_Struct:
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields[i];
+			if (!is_type_nearly_simple_compare(f->type)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_Union:
+		for_array(i, t->Union.variants) {
+			Type *v = t->Union.variants[i];
+			if (!is_type_nearly_simple_compare(v)) {
+				return false;
+			}
+		}
+		// make it dumb on purpose
+		return t->Union.variants.count == 1;
+
+	case Type_SimdVector:
+		return is_type_nearly_simple_compare(t->SimdVector.elem);
+
+	}
+
+	return false;
+}
+
 gb_internal bool is_type_load_safe(Type *type) {
 	GB_ASSERT(type != nullptr);
 	type = core_type(core_array_type(type));
@@ -4121,18 +4178,18 @@ gb_internal bool type_set_offsets(Type *t) {
 	if (t->kind == Type_Struct) {
 		MUTEX_GUARD(&t->Struct.offset_mutex);
 		if (!t->Struct.are_offsets_set) {
-			t->Struct.are_offsets_being_processed = true;
+			t->Struct.are_offsets_being_processed.store(true);
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align);
-			t->Struct.are_offsets_being_processed = false;
+			t->Struct.are_offsets_being_processed.store(false);
 			t->Struct.are_offsets_set = true;
 			return true;
 		}
 	} else if (is_type_tuple(t)) {
 		MUTEX_GUARD(&t->Tuple.mutex);
 		if (!t->Tuple.are_offsets_set) {
-			t->Tuple.are_offsets_being_processed = true;
+			t->Tuple.are_offsets_being_processed.store(true);
 			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false, 1, 0);
-			t->Tuple.are_offsets_being_processed = false;
+			t->Tuple.are_offsets_being_processed.store(false);
 			t->Tuple.are_offsets_set = true;
 			return true;
 		}
@@ -4317,9 +4374,12 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
-			if (t->Struct.are_offsets_being_processed && t->Struct.offsets == nullptr) {
-				type_path_print_illegal_cycle(path, path->path.count-1);
-				return FAILURE_SIZE;
+			{
+				MUTEX_GUARD(&t->Struct.offset_mutex);
+				if (t->Struct.are_offsets_being_processed.load() && t->Struct.offsets == nullptr) {
+					type_path_print_illegal_cycle(path, path->path.count-1);
+					return FAILURE_SIZE;
+				}
 			}
 			type_set_offsets(t);
 			GB_ASSERT(t->Struct.fields.count == 0 || t->Struct.offsets != nullptr);

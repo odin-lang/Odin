@@ -103,6 +103,7 @@ context_create_with_sleep :: proc(filename: string, sleep := 2 * time.Second) ->
 
 context_create :: proc{context_create_with_scale, context_create_with_sleep}
 
+@(no_instrumentation)
 context_destroy :: proc(ctx: ^Context) {
 	if ctx == nil {
 		return
@@ -146,6 +147,7 @@ buffer_flush :: proc "contextless" (ctx: ^Context, buffer: ^Buffer) #no_bounds_c
 	buffer.first_ts = end
 }
 
+@(no_instrumentation)
 buffer_destroy :: proc(ctx: ^Context, buffer: ^Buffer) {
 	buffer_flush(ctx, buffer)
 
@@ -155,12 +157,14 @@ buffer_destroy :: proc(ctx: ^Context, buffer: ^Buffer) {
 
 
 @(deferred_in=_scoped_buffer_end)
+@(no_instrumentation)
 SCOPED_EVENT :: proc(ctx: ^Context, buffer: ^Buffer, name: string, args: string = "", location := #caller_location) -> bool {
 	_buffer_begin(ctx, buffer, name, args, location)
 	return true
 }
 
 @(private)
+@(no_instrumentation)
 _scoped_buffer_end :: proc(ctx: ^Context, buffer: ^Buffer, _, _: string, _ := #caller_location) {
 	_buffer_end(ctx, buffer)
 }

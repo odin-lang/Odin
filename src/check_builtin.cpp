@@ -33,6 +33,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_sliceable,
 	is_type_comparable,
 	is_type_simple_compare,
+	is_type_nearly_simple_compare,
 	is_type_dereferenceable,
 	is_type_valid_for_keys,
 	is_type_valid_for_matrix_elems,
@@ -6159,6 +6160,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_sliceable:
 	case BuiltinProc_type_is_comparable:
 	case BuiltinProc_type_is_simple_compare:
+	case BuiltinProc_type_is_nearly_simple_compare:
 	case BuiltinProc_type_is_dereferenceable:
 	case BuiltinProc_type_is_valid_map_key:
 	case BuiltinProc_type_is_valid_matrix_elements:
