@@ -5,6 +5,7 @@ package io
 
 import "base:intrinsics"
 import "core:unicode/utf8"
+import "core:unicode/utf16"
 
 // Seek whence values
 Seek_From :: enum {
@@ -312,6 +313,29 @@ read_rune :: proc(br: Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: 
 // write_string writes the contents of the string s to w.
 write_string :: proc(s: Writer, str: string, n_written: ^int = nil) -> (n: int, err: Error) {
 	return write(s, transmute([]byte)str, n_written)
+}
+
+// write_string16 writes the contents of the string16 s to w reencoded as utf-8
+write_string16 :: proc(s: Writer, str: string16, n_written: ^int = nil) -> (n: int, err: Error) {
+	for i := 0; i < len(str); i += 1 {
+		r := rune(utf16.REPLACEMENT_CHAR)
+		switch c := str[i]; {
+		case c < utf16._surr1, utf16._surr3 <= c:
+			r = rune(c)
+		case utf16._surr1 <= c && c < utf16._surr2 && i+1 < len(str) &&
+		     utf16._surr2 <= str[i+1] && str[i+1] < utf16._surr3:
+			r = utf16.decode_surrogate_pair(rune(c), rune(str[i+1]))
+			i += 1
+		}
+
+		w: int
+		w, err = write_rune(s, r, n_written)
+		n += w
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 // write_rune writes a UTF-8 encoded rune to w.

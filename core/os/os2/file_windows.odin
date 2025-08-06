@@ -247,7 +247,7 @@ _destroy :: proc(f: ^File_Impl) -> Error {
 	}
 
 	a := f.allocator
-	err0 := free(f.wname, a)
+	err0 := free(rawptr(f.wname), a)
 	err1 := delete(f.name, a)
 	err2 := delete(f.r_buf, a)
 	err3 := delete(f.w_buf, a)
@@ -619,7 +619,7 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 	return .Unsupported
 }
 
-_open_sym_link :: proc(p: [^]u16) -> (handle: win32.HANDLE, err: Error) {
+_open_sym_link :: proc(p: cstring16) -> (handle: win32.HANDLE, err: Error) {
 	attrs := u32(win32.FILE_FLAG_BACKUP_SEMANTICS)
 	attrs |= win32.FILE_FLAG_OPEN_REPARSE_POINT
 	handle = win32.CreateFileW(p, 0, 0, nil, win32.OPEN_EXISTING, attrs, nil)
@@ -661,7 +661,7 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 	}
 
 
-	handle := _open_sym_link(raw_data(p)) or_return
+	handle := _open_sym_link(cstring16(raw_data(p))) or_return
 	defer win32.CloseHandle(handle)
 
 	n := win32.GetFinalPathNameByHandleW(handle, nil, 0, win32.VOLUME_NAME_DOS)
@@ -672,7 +672,7 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	buf := make([]u16, n+1, temp_allocator)
-	n = win32.GetFinalPathNameByHandleW(handle, raw_data(buf), u32(len(buf)), win32.VOLUME_NAME_DOS)
+	n = win32.GetFinalPathNameByHandleW(handle, cstring16(raw_data(buf)), u32(len(buf)), win32.VOLUME_NAME_DOS)
 	if n == 0 {
 		return "", _get_platform_error()
 	}
@@ -713,7 +713,7 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 	switch rdb.ReparseTag {
 	case win32.IO_REPARSE_TAG_SYMLINK:
 		rb := (^win32.SYMBOLIC_LINK_REPARSE_BUFFER)(&rdb.rest)
-		pb := win32.wstring(&rb.PathBuffer)
+		pb := ([^]u16)(&rb.PathBuffer)
 		pb[rb.SubstituteNameOffset+rb.SubstituteNameLength] = 0
 		p := pb[rb.SubstituteNameOffset:][:rb.SubstituteNameLength]
 		if rb.Flags & win32.SYMLINK_FLAG_RELATIVE != 0 {
@@ -723,7 +723,7 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 
 	case win32.IO_REPARSE_TAG_MOUNT_POINT:
 		rb := (^win32.MOUNT_POINT_REPARSE_BUFFER)(&rdb.rest)
-		pb := win32.wstring(&rb.PathBuffer)
+		pb := ([^]u16)(&rb.PathBuffer)
 		pb[rb.SubstituteNameOffset+rb.SubstituteNameLength] = 0
 		p := pb[rb.SubstituteNameOffset:][:rb.SubstituteNameLength]
 		return _normalize_link_path(p, allocator)
@@ -874,8 +874,8 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 
 
 @(private="package", require_results)
-win32_utf8_to_wstring :: proc(s: string, allocator: runtime.Allocator) -> (ws: [^]u16, err: runtime.Allocator_Error) {
-	ws = raw_data(win32_utf8_to_utf16(s, allocator) or_return)
+win32_utf8_to_wstring :: proc(s: string, allocator: runtime.Allocator) -> (ws: cstring16, err: runtime.Allocator_Error) {
+	ws = cstring16(raw_data(win32_utf8_to_utf16(s, allocator) or_return))
 	return
 }
 
@@ -909,24 +909,26 @@ win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u
 }
 
 @(private="package", require_results)
-win32_wstring_to_utf8 :: proc(s: [^]u16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
-	if s == nil || s[0] == 0 {
+win32_wstring_to_utf8 :: proc(s: cstring16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+	if s == nil || s == "" {
 		return "", nil
 	}
-	n := 0
-	for s[n] != 0 {
-		n += 1
-	}
-	return win32_utf16_to_utf8(s[:n], allocator)
+	return win32_utf16_to_utf8(string16(s), allocator)
+}
+
+@(private="package")
+win32_utf16_to_utf8 :: proc{
+	win32_utf16_string16_to_utf8,
+	win32_utf16_u16_to_utf8,
 }
 
 @(private="package", require_results)
-win32_utf16_to_utf8 :: proc(s: []u16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+win32_utf16_string16_to_utf8 :: proc(s: string16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
 	if len(s) == 0 {
 		return
 	}
 
-	n := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, raw_data(s), i32(len(s)), nil, 0, nil, nil)
+	n := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, cstring16(raw_data(s)), i32(len(s)), nil, 0, nil, nil)
 	if n == 0 {
 		return
 	}
@@ -938,7 +940,41 @@ win32_utf16_to_utf8 :: proc(s: []u16, allocator: runtime.Allocator) -> (res: str
 	// will not be null terminated.
 	text := make([]byte, n, allocator) or_return
 
-	n1 := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, raw_data(s), i32(len(s)), raw_data(text), n, nil, nil)
+	n1 := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, cstring16(raw_data(s)), i32(len(s)), raw_data(text), n, nil, nil)
+	if n1 == 0 {
+		delete(text, allocator)
+		return
+	}
+
+	for i in 0..<n {
+		if text[i] == 0 {
+			n = i
+			break
+		}
+	}
+	res = string(text[:n])
+	return
+}
+
+@(private="package", require_results)
+win32_utf16_u16_to_utf8 :: proc(s: []u16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+	if len(s) == 0 {
+		return
+	}
+
+	n := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, cstring16(raw_data(s)), i32(len(s)), nil, 0, nil, nil)
+	if n == 0 {
+		return
+	}
+
+	// If N < 0 the call to WideCharToMultiByte assume the wide string is null terminated
+	// and will scan it to find the first null terminated character. The resulting string will
+	// also be null terminated.
+	// If N > 0 it assumes the wide string is not null terminated and the resulting string
+	// will not be null terminated.
+	text := make([]byte, n, allocator) or_return
+
+	n1 := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, cstring16(raw_data(s)), i32(len(s)), raw_data(text), n, nil, nil)
 	if n1 == 0 {
 		delete(text, allocator)
 		return

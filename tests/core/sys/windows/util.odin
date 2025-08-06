@@ -12,11 +12,11 @@ UTF16_Vector :: struct {
 
 utf16_vectors := []UTF16_Vector{
 	{
-		intrinsics.constant_utf16_cstring("Hellope, World!"),
+		"Hellope, World!",
 		"Hellope, World!",
 	},
 	{
-		intrinsics.constant_utf16_cstring("Hellope\x00, World!"),
+		"Hellope\x00, World!",
 		"Hellope",
 	},
 }
@@ -27,7 +27,8 @@ utf16_to_utf8_buf_test :: proc(t: ^testing.T) {
 		buf := make([]u8, len(test.ustr))
 		defer delete(buf)
 
-		res := win32.utf16_to_utf8_buf(buf[:], test.wstr[:len(test.ustr)])
+		wstr := string16(test.wstr)
+		res := win32.utf16_to_utf8_buf(buf[:], transmute([]u16)wstr)
 		testing.expect_value(t, res, test.ustr)
 	}
 }

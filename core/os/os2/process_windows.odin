@@ -175,7 +175,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				info.fields += {.Command_Line}
 			}
 			if .Command_Args in selection {
-				info.command_args = _parse_command_line(raw_data(cmdline_w), allocator) or_return
+				info.command_args = _parse_command_line(cstring16(raw_data(cmdline_w)), allocator) or_return
 				info.fields += {.Command_Args}
 			}
 		}
@@ -286,7 +286,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 				info.fields += {.Command_Line}
 			}
 			if .Command_Args in selection {
-				info.command_args = _parse_command_line(raw_data(cmdline_w), allocator) or_return
+				info.command_args = _parse_command_line(cstring16(raw_data(cmdline_w)), allocator) or_return
 				info.fields += {.Command_Args}
 			}
 		}
@@ -610,7 +610,7 @@ _process_exe_by_pid :: proc(pid: int, allocator: runtime.Allocator) -> (exe_path
 		err =_get_platform_error()
 		return
 	}
-	return win32_wstring_to_utf8(raw_data(entry.szExePath[:]), allocator)
+	return win32_wstring_to_utf8(cstring16(raw_data(entry.szExePath[:])), allocator)
 }
 
 _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Allocator) -> (full_username: string, err: Error) {
@@ -650,7 +650,7 @@ _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Alloc
 	return strings.concatenate({domain, "\\", username}, allocator)
 }
 
-_parse_command_line :: proc(cmd_line_w: [^]u16, allocator: runtime.Allocator) -> (argv: []string, err: Error) {
+_parse_command_line :: proc(cmd_line_w: cstring16, allocator: runtime.Allocator) -> (argv: []string, err: Error) {
 	argc: i32
 	argv_w := win32.CommandLineToArgvW(cmd_line_w, &argc)
 	if argv_w == nil {

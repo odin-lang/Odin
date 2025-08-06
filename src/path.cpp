@@ -130,7 +130,7 @@ gb_internal String directory_from_path(String const &s) {
 		String16 wstr = string_to_string16(a, path);
 		defer (gb_free(a, wstr.text));
 
-		i32 attribs = GetFileAttributesW(wstr.text);
+		i32 attribs = GetFileAttributesW(cast(wchar_t *)wstr.text);
 		if (attribs < 0) return false;
 
 		return (attribs & FILE_ATTRIBUTE_DIRECTORY) != 0;
@@ -360,7 +360,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	defer (gb_free(a, wstr.text));
 
 	WIN32_FIND_DATAW file_data = {};
-	HANDLE find_file = FindFirstFileW(wstr.text, &file_data);
+	HANDLE find_file = FindFirstFileW(cast(wchar_t *)wstr.text, &file_data);
 	if (find_file == INVALID_HANDLE_VALUE) {
 		return ReadDirectory_Unknown;
 	}
@@ -372,7 +372,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		wchar_t *filename_w = file_data.cFileName;
 		u64 size = cast(u64)file_data.nFileSizeLow;
 		size |= (cast(u64)file_data.nFileSizeHigh) << 32;
-		String name = string16_to_string(a, make_string16_c(filename_w));
+		String name = string16_to_string(a, make_string16_c(cast(u16 *)filename_w));
 		if (name == "." || name == "..") {
 			gb_free(a, name.text);
 			continue;
@@ -494,7 +494,7 @@ gb_internal bool write_directory(String path) {
 #else
 gb_internal bool write_directory(String path) {
 	String16 wstr = string_to_string16(heap_allocator(), path);
-	LPCWSTR wdirectory_name = wstr.text;
+	LPCWSTR wdirectory_name = cast(wchar_t *)wstr.text;
 
 	HANDLE directory = CreateFileW(wdirectory_name,
 			GENERIC_WRITE,

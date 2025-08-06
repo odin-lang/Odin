@@ -159,9 +159,9 @@ iana_to_windows_tz :: proc(iana_name: string, allocator := context.allocator) ->
 	status: windows.UError 
 
 	iana_name_wstr := windows.utf8_to_wstring(iana_name, allocator)
-	defer free(iana_name_wstr, allocator)
+	defer free(rawptr(iana_name_wstr), allocator)
 
-	wintz_name_len := windows.ucal_getWindowsTimeZoneID(iana_name_wstr, -1, raw_data(wintz_name_buffer[:]), len(wintz_name_buffer), &status)
+	wintz_name_len := windows.ucal_getWindowsTimeZoneID(iana_name_wstr, -1, cstring16(raw_data(wintz_name_buffer[:])), len(wintz_name_buffer), &status)
 	if status != .U_ZERO_ERROR {
 		return
 	}
@@ -178,7 +178,7 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 	iana_name_buffer: [128]u16
 	status: windows.UError
 
-	zone_str_len := windows.ucal_getDefaultTimeZone(raw_data(iana_name_buffer[:]), len(iana_name_buffer), &status)
+	zone_str_len := windows.ucal_getDefaultTimeZone(cstring16(raw_data(iana_name_buffer[:])), len(iana_name_buffer), &status)
 	if status != .U_ZERO_ERROR {
 		return
 	}
@@ -291,7 +291,7 @@ _region_load :: proc(reg_str: string, allocator := context.allocator) -> (out_re
 	defer delete(tz_key, allocator)
 
 	tz_key_wstr := windows.utf8_to_wstring(tz_key, allocator)
-	defer free(tz_key_wstr, allocator)
+	defer free(rawptr(tz_key_wstr), allocator)
 
 	key: windows.HKEY
 	res := windows.RegOpenKeyExW(windows.HKEY_LOCAL_MACHINE, tz_key_wstr, 0, windows.KEY_READ, &key)

@@ -141,6 +141,7 @@ type_is_quaternion :: proc($T: typeid) -> bool ---
 type_is_string     :: proc($T: typeid) -> bool ---
 type_is_typeid     :: proc($T: typeid) -> bool ---
 type_is_any        :: proc($T: typeid) -> bool ---
+type_is_string16   :: proc($T: typeid) -> bool ---
 
 type_is_endian_platform       :: proc($T: typeid) -> bool ---
 type_is_endian_little         :: proc($T: typeid) -> bool ---

@@ -61,6 +61,11 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 	Dynamic = 3,
 }
 
+Type_Info_String_Encoding_Kind :: enum u8 {
+	UTF_8  = 0,
+	UTF_16 = 1,
+}
+
 // Variant Types
 Type_Info_Named :: struct {
 	name: string,
@@ -73,7 +78,7 @@ Type_Info_Rune       :: struct {}
 Type_Info_Float      :: struct {endianness: Platform_Endianness}
 Type_Info_Complex    :: struct {}
 Type_Info_Quaternion :: struct {}
-Type_Info_String     :: struct {is_cstring: bool}
+Type_Info_String     :: struct {is_cstring: bool, encoding: Type_Info_String_Encoding_Kind}
 Type_Info_Boolean    :: struct {}
 Type_Info_Any        :: struct {}
 Type_Info_Type_Id    :: struct {}
@@ -397,6 +402,11 @@ Raw_String :: struct {
 	len:  int,
 }
 
+Raw_String16 :: struct {
+	data: [^]u16,
+	len:  int,
+}
+
 Raw_Slice :: struct {
 	data: rawptr,
 	len:  int,
@@ -449,6 +459,12 @@ Raw_Cstring :: struct {
 	data: [^]byte,
 }
 #assert(size_of(Raw_Cstring) == size_of(cstring))
+
+Raw_Cstring16 :: struct {
+	data: [^]u16,
+}
+#assert(size_of(Raw_Cstring16) == size_of(cstring16))
+
 
 Raw_Soa_Pointer :: struct {
 	data:  rawptr,

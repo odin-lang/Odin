@@ -2289,6 +2289,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		}
 		if (is_type_cstring(t)) {
 			return lb_cstring_len(p, v);
+		} else if (is_type_cstring16(t)) {
+			return lb_cstring16_len(p, v);
+		} else if (is_type_string16(t)) {
+			return lb_string_len(p, v);
 		} else if (is_type_string(t)) {
 			return lb_string_len(p, v);
 		} else if (is_type_array(t)) {
@@ -2727,6 +2731,11 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 					res = lb_string_elem(p, x);
 					res = lb_emit_conv(p, res, tv.type);
 				} else if (t->Basic.kind == Basic_cstring) {
+					res = lb_emit_conv(p, x, tv.type);
+				} else if (t->Basic.kind == Basic_string16) {
+					res = lb_string_elem(p, x);
+					res = lb_emit_conv(p, res, tv.type);
+				} else if (t->Basic.kind == Basic_cstring16) {
 					res = lb_emit_conv(p, x, tv.type);
 				}
 				break;

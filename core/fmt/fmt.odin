@@ -1551,6 +1551,79 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 fmt_cstring :: proc(fi: ^Info, s: cstring, verb: rune) {
 	fmt_string(fi, string(s), verb)
 }
+
+// Formats a string UTF-16 with a specific format.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - s: The string to format.
+// - verb: The format specifier character (e.g. 's', 'v', 'q', 'x', 'X').
+//
+fmt_string16 :: proc(fi: ^Info, s: string16, verb: rune) {
+	s, verb := s, verb
+	if ol, ok := fi.optional_len.?; ok {
+		s = s[:clamp(ol, 0, len(s))]
+	}
+	if !fi.in_bad && fi.record_level > 0 && verb == 'v' {
+		verb = 'q'
+	}
+
+	switch verb {
+	case 's', 'v':
+		if fi.width_set {
+			if fi.width > len(s) {
+				if fi.minus {
+					io.write_string16(fi.writer, s, &fi.n)
+				}
+
+				for _ in 0..<fi.width - len(s) {
+					io.write_byte(fi.writer, ' ', &fi.n)
+				}
+
+				if !fi.minus {
+					io.write_string16(fi.writer, s, &fi.n)
+				}
+			} else {
+				io.write_string16(fi.writer, s, &fi.n)
+			}
+		} else {
+			io.write_string16(fi.writer, s, &fi.n)
+		}
+
+	case 'q', 'w': // quoted string
+		io.write_quoted_string16(fi.writer, s, '"', &fi.n)
+
+	case 'x', 'X':
+		space := fi.space
+		fi.space = false
+		defer fi.space = space
+
+		for i in 0..<len(s) {
+			if i > 0 && space {
+				io.write_byte(fi.writer, ' ', &fi.n)
+			}
+			char_set := __DIGITS_UPPER
+			if verb == 'x' {
+				char_set = __DIGITS_LOWER
+			}
+			_fmt_int(fi, u64(s[i]), 16, false, bit_size=16, digits=char_set)
+		}
+
+	case:
+		fmt_bad_verb(fi, verb)
+	}
+}
+// Formats a C-style UTF-16 string with a specific format.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - s: The C-style string to format.
+// - verb: The format specifier character (Ref fmt_string).
+//
+fmt_cstring16 :: proc(fi: ^Info, s: cstring16, verb: rune) {
+	fmt_string16(fi, string16(s), verb)
+}
+
 // Formats a raw pointer with a specific format.
 //
 // Inputs:
@@ -2273,14 +2346,14 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 		}
 
 		switch reflect.type_info_base(elem).id {
-		case byte:  fmt_string(fi, string(([^]byte)(data)[:n]), verb); return
-		case u16:   print_utf16(fi, ([^]u16)(data)[:n]);               return
-		case u16le: print_utf16(fi, ([^]u16le)(data)[:n]);             return
-		case u16be: print_utf16(fi, ([^]u16be)(data)[:n]);             return
-		case u32:   print_utf32(fi, ([^]u32)(data)[:n]);               return
-		case u32le: print_utf32(fi, ([^]u32le)(data)[:n]);             return
-		case u32be: print_utf32(fi, ([^]u32be)(data)[:n]);             return
-		case rune:  print_utf32(fi, ([^]rune)(data)[:n]);              return
+		case byte:  fmt_string(fi,   string  (([^]byte)(data)[:n]), verb); return
+		case u16:   fmt_string16(fi, string16(([^]u16) (data)[:n]), verb); return
+		case u16le: print_utf16(fi, ([^]u16le)(data)[:n]); return
+		case u16be: print_utf16(fi, ([^]u16be)(data)[:n]); return
+		case u32:   print_utf32(fi, ([^]u32)(data)[:n]);   return
+		case u32le: print_utf32(fi, ([^]u32le)(data)[:n]); return
+		case u32be: print_utf32(fi, ([^]u32be)(data)[:n]); return
+		case rune:  print_utf32(fi, ([^]rune)(data)[:n]);  return
 		}
 	}
 	if verb == 'p' {
@@ -3209,6 +3282,9 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 
 	case string:  fmt_string(fi, a, verb)
 	case cstring: fmt_cstring(fi, a, verb)
+
+	case string16:  fmt_string16(fi, a, verb)
+	case cstring16: fmt_cstring16(fi, a, verb)
 
 	case typeid:  reflect.write_typeid(fi.writer, a, &fi.n)
 

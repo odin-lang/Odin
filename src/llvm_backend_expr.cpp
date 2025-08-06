@@ -1559,16 +1559,24 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			return lb_emit_conv(p, cmp, type);
 		} else if (lb_is_empty_string_constant(be->right) && !is_type_union(be->left->tav.type)) {
 			// `x == ""` or `x != ""`
+			Type *str_type = t_string;
+			if (is_type_string16(be->left->tav.type) || is_type_cstring16(be->left->tav.type)) {
+				str_type = t_string16;
+			}
 			lbValue s = lb_build_expr(p, be->left);
-			s = lb_emit_conv(p, s, t_string);
+			s = lb_emit_conv(p, s, str_type);
 			lbValue len = lb_string_len(p, s);
 			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
 		} else if (lb_is_empty_string_constant(be->left) && !is_type_union(be->right->tav.type)) {
 			// `"" == x` or `"" != x`
+			Type *str_type = t_string;
+			if (is_type_string16(be->right->tav.type) || is_type_cstring16(be->right->tav.type)) {
+				str_type = t_string16;
+			}
 			lbValue s = lb_build_expr(p, be->right);
-			s = lb_emit_conv(p, s, t_string);
+			s = lb_emit_conv(p, s, str_type);
 			lbValue len = lb_string_len(p, s);
 			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
 			Type *type = default_type(tv.type);
@@ -1656,6 +1664,8 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				res.type = t;
 				res.value = llvm_cstring(m, str);
 				return res;
+			} else if (src->kind == Type_Basic && src->Basic.kind == Basic_string16 && dst->Basic.kind == Basic_cstring16) {
+				GB_PANIC("TODO(bill): UTF-16 string");
 			}
 			// if (is_type_float(dst)) {
 			// 	return value;
@@ -1793,6 +1803,38 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		lbValue s = lb_emit_runtime_call(p, "cstring_to_string", args);
 		return lb_emit_conv(p, s, dst);
 	}
+
+
+
+	if (is_type_cstring16(src) && is_type_u16_ptr(dst)) {
+		return lb_emit_transmute(p, value, dst);
+	}
+	if (is_type_u16_ptr(src) && is_type_cstring16(dst)) {
+		return lb_emit_transmute(p, value, dst);
+	}
+	if (is_type_cstring16(src) && is_type_u16_multi_ptr(dst)) {
+		return lb_emit_transmute(p, value, dst);
+	}
+	if (is_type_u8_multi_ptr(src) && is_type_cstring16(dst)) {
+		return lb_emit_transmute(p, value, dst);
+	}
+	if (is_type_cstring16(src) && is_type_rawptr(dst)) {
+		return lb_emit_transmute(p, value, dst);
+	}
+	if (is_type_rawptr(src) && is_type_cstring16(dst)) {
+		return lb_emit_transmute(p, value, dst);
+	}
+
+	if (are_types_identical(src, t_cstring16) && are_types_identical(dst, t_string16)) {
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		lbValue c = lb_emit_conv(p, value, t_cstring16);
+		auto args = array_make<lbValue>(temporary_allocator(), 1);
+		args[0] = c;
+		lbValue s = lb_emit_runtime_call(p, "cstring16_to_string16", args);
+		return lb_emit_conv(p, s, dst);
+	}
+
 
 
 	// integer -> boolean
@@ -2296,6 +2338,29 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
+	// [^]u16 <-> cstring16
+	if (is_type_u16_multi_ptr(src) && is_type_cstring16(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+	if (is_type_cstring16(src) && is_type_u16_multi_ptr(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+	if (is_type_u16_ptr(src) && is_type_cstring16(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+	if (is_type_cstring16(src) && is_type_u16_ptr(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+
+
+	// []u16 <-> string16
+	if (is_type_u16_slice(src) && is_type_string16(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+	if (is_type_string16(src) && is_type_u16_slice(dst)) {
+		return lb_emit_transmute(p, value, t);
+	}
+
 	// []byte/[]u8 <-> string
 	if (is_type_u8_slice(src) && is_type_string(dst)) {
 		return lb_emit_transmute(p, value, t);
@@ -2303,6 +2368,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_string(src) && is_type_u8_slice(dst)) {
 		return lb_emit_transmute(p, value, t);
 	}
+
 
 	if (is_type_array_like(dst)) {
 		Type *elem = base_array_type(dst);
@@ -2710,7 +2776,53 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		return lb_compare_records(p, op_kind, left, right, b);
 	}
 
+
+	if (is_type_string16(a) || is_type_cstring16(a)) {
+		if (is_type_cstring16(a) && is_type_cstring16(b)) {
+			left  = lb_emit_conv(p, left, t_cstring16);
+			right = lb_emit_conv(p, right, t_cstring16);
+			char const *runtime_procedure = nullptr;
+			switch (op_kind) {
+			case Token_CmpEq: runtime_procedure = "cstring16_eq"; break;
+			case Token_NotEq: runtime_procedure = "cstring16_ne"; break;
+			case Token_Lt:    runtime_procedure = "cstring16_lt"; break;
+			case Token_Gt:    runtime_procedure = "cstring16_gt"; break;
+			case Token_LtEq:  runtime_procedure = "cstring16_le"; break;
+			case Token_GtEq:  runtime_procedure = "cstring16_ge"; break;
+			}
+			GB_ASSERT(runtime_procedure != nullptr);
+
+			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			args[0] = left;
+			args[1] = right;
+			return lb_emit_runtime_call(p, runtime_procedure, args);
+		}
+
+
+		if (is_type_cstring16(a) ^ is_type_cstring16(b)) {
+			left  = lb_emit_conv(p, left, t_string16);
+			right = lb_emit_conv(p, right, t_string16);
+		}
+
+		char const *runtime_procedure = nullptr;
+		switch (op_kind) {
+		case Token_CmpEq: runtime_procedure = "string16_eq"; break;
+		case Token_NotEq: runtime_procedure = "string16_ne"; break;
+		case Token_Lt:    runtime_procedure = "string16_lt"; break;
+		case Token_Gt:    runtime_procedure = "string16_gt"; break;
+		case Token_LtEq:  runtime_procedure = "string16_le"; break;
+		case Token_GtEq:  runtime_procedure = "string16_ge"; break;
+		}
+		GB_ASSERT(runtime_procedure != nullptr);
+
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		args[0] = left;
+		args[1] = right;
+		return lb_emit_runtime_call(p, runtime_procedure, args);
+	}
+
 	if (is_type_string(a)) {
+
 		if (is_type_cstring(a) && is_type_cstring(b)) {
 			left  = lb_emit_conv(p, left, t_cstring);
 			right = lb_emit_conv(p, right, t_cstring);
@@ -3050,6 +3162,13 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 		switch (bt->Basic.kind) {
 		case Basic_rawptr:
 		case Basic_cstring:
+			if (op_kind == Token_CmpEq) {
+				res.value = LLVMBuildIsNull(p->builder, x.value, "");
+			} else if (op_kind == Token_NotEq) {
+				res.value = LLVMBuildIsNotNull(p->builder, x.value, "");
+			}
+			return res;
+		case Basic_cstring16:
 			if (op_kind == Token_CmpEq) {
 				res.value = LLVMBuildIsNull(p->builder, x.value, "");
 			} else if (op_kind == Token_NotEq) {
@@ -4298,11 +4417,12 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 	}
 
 
-	case Type_Basic: { // Basic_string
+	case Type_Basic: { // Basic_string/Basic_string16
 		lbValue str;
 		lbValue elem;
 		lbValue len;
 		lbValue index;
+
 
 		str = lb_build_expr(p, ie->expr);
 		if (deref) {
@@ -4432,6 +4552,22 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	}
 
 	case Type_Basic: {
+		if (is_type_string16(type)) {
+			GB_ASSERT_MSG(are_types_identical(type, t_string16), "got %s", type_to_string(type));
+			lbValue len = lb_string_len(p, base);
+			if (high.value == nullptr) high = len;
+
+			if (!no_indices) {
+				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+			}
+
+			lbValue elem    = lb_emit_ptr_offset(p, lb_string_elem(p, base), low);
+			lbValue new_len = lb_emit_arith(p, Token_Sub, high, low, t_int);
+
+			lbAddr str = lb_add_local_generated(p, t_string16, false);
+			lb_fill_string(p, str, elem, new_len);
+			return str;
+		}
 		GB_ASSERT_MSG(are_types_identical(type, t_string), "got %s", type_to_string(type));
 		lbValue len = lb_string_len(p, base);
 		if (high.value == nullptr) high = len;

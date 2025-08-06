@@ -298,7 +298,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_String:
-
+		assert(t.encoding == .UTF_8)
 		if t.is_cstring {
 			length  := base64.decoded_len(bytes)
 			builder := strings.builder_make(0, length+1)

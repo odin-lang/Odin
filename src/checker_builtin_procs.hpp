@@ -250,6 +250,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_complex,
 	BuiltinProc_type_is_quaternion,
 	BuiltinProc_type_is_string,
+	BuiltinProc_type_is_string16,
 	BuiltinProc_type_is_typeid,
 	BuiltinProc_type_is_any,
 
@@ -608,6 +609,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_complex"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_quaternion"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_string"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_string16"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_typeid"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_any"),               1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

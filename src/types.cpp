@@ -41,8 +41,13 @@ enum BasicKind {
 	Basic_uint,
 	Basic_uintptr,
 	Basic_rawptr,
-	Basic_string,  // ^u8 + int
-	Basic_cstring, // ^u8
+
+	Basic_string,  // [^]u8 + int
+	Basic_cstring, // [^]u8
+
+	Basic_string16,  // [^]u16 + int
+	Basic_cstring16, // [^]u16 + int
+
 	Basic_any,     // rawptr + ^Type_Info
 
 	Basic_typeid,
@@ -501,8 +506,14 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_uintptr,           BasicFlag_Integer | BasicFlag_Unsigned,    -1, STR_LIT("uintptr")}},
 
 	{Type_Basic, {Basic_rawptr,            BasicFlag_Pointer,                         -1, STR_LIT("rawptr")}},
+
 	{Type_Basic, {Basic_string,            BasicFlag_String,                          -1, STR_LIT("string")}},
 	{Type_Basic, {Basic_cstring,           BasicFlag_String,                          -1, STR_LIT("cstring")}},
+
+	{Type_Basic, {Basic_string16,          BasicFlag_String,                          -1, STR_LIT("string16")}},
+	{Type_Basic, {Basic_cstring16,         BasicFlag_String,                          -1, STR_LIT("cstring16")}},
+
+
 	{Type_Basic, {Basic_any,               0,                                         16, STR_LIT("any")}},
 
 	{Type_Basic, {Basic_typeid,            0,                                          8, STR_LIT("typeid")}},
@@ -592,8 +603,12 @@ gb_global Type *t_uint            = &basic_types[Basic_uint];
 gb_global Type *t_uintptr         = &basic_types[Basic_uintptr];
 
 gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
+
 gb_global Type *t_string          = &basic_types[Basic_string];
 gb_global Type *t_cstring         = &basic_types[Basic_cstring];
+gb_global Type *t_string16        = &basic_types[Basic_string16];
+gb_global Type *t_cstring16       = &basic_types[Basic_cstring16];
+
 gb_global Type *t_any             = &basic_types[Basic_any];
 
 gb_global Type *t_typeid          = &basic_types[Basic_typeid];
@@ -631,6 +646,8 @@ gb_global Type *t_untyped_uninit     = &basic_types[Basic_UntypedUninit];
 
 gb_global Type *t_u8_ptr       = nullptr;
 gb_global Type *t_u8_multi_ptr = nullptr;
+gb_global Type *t_u16_ptr       = nullptr;
+gb_global Type *t_u16_multi_ptr = nullptr;
 gb_global Type *t_int_ptr      = nullptr;
 gb_global Type *t_i64_ptr      = nullptr;
 gb_global Type *t_f64_ptr      = nullptr;
@@ -643,6 +660,8 @@ gb_global Type *t_type_info                      = nullptr;
 gb_global Type *t_type_info_enum_value           = nullptr;
 gb_global Type *t_type_info_ptr                  = nullptr;
 gb_global Type *t_type_info_enum_value_ptr       = nullptr;
+
+gb_global Type *t_type_info_string_encoding_kind = nullptr;
 
 gb_global Type *t_type_info_named                = nullptr;
 gb_global Type *t_type_info_integer              = nullptr;
@@ -1293,11 +1312,27 @@ gb_internal bool is_type_string(Type *t) {
 	}
 	return false;
 }
+gb_internal bool is_type_string16(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_string16;
+	}
+	return false;
+}
 gb_internal bool is_type_cstring(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_cstring;
+	}
+	return false;
+}
+gb_internal bool is_type_cstring16(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_cstring16;
 	}
 	return false;
 }
@@ -1427,6 +1462,12 @@ gb_internal bool is_type_rawptr(Type *t) {
 gb_internal bool is_type_u8(Type *t) {
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_u8;
+	}
+	return false;
+}
+gb_internal bool is_type_u16(Type *t) {
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_u16;
 	}
 	return false;
 }
@@ -1687,6 +1728,39 @@ gb_internal bool is_type_rune_array(Type *t) {
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Array) {
 		return is_type_rune(t->Array.elem);
+	}
+	return false;
+}
+
+gb_internal bool is_type_u16_slice(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Slice) {
+		return is_type_u16(t->Slice.elem);
+	}
+	return false;
+}
+gb_internal bool is_type_u16_array(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Array) {
+		return is_type_u16(t->Array.elem);
+	}
+	return false;
+}
+gb_internal bool is_type_u16_ptr(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Pointer) {
+		return is_type_u16(t->Slice.elem);
+	}
+	return false;
+}
+gb_internal bool is_type_u16_multi_ptr(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_MultiPointer) {
+		return is_type_u16(t->Slice.elem);
 	}
 	return false;
 }
@@ -2110,7 +2184,7 @@ gb_internal bool is_type_indexable(Type *t) {
 	Type *bt = base_type(t);
 	switch (bt->kind) {
 	case Type_Basic:
-		return bt->Basic.kind == Basic_string;
+		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_string16;
 	case Type_Array:
 	case Type_Slice:
 	case Type_DynamicArray:
@@ -2130,7 +2204,7 @@ gb_internal bool is_type_sliceable(Type *t) {
 	Type *bt = base_type(t);
 	switch (bt->kind) {
 	case Type_Basic:
-		return bt->Basic.kind == Basic_string;
+		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_string16;
 	case Type_Array:
 	case Type_Slice:
 	case Type_DynamicArray:
@@ -2377,6 +2451,7 @@ gb_internal bool type_has_nil(Type *t) {
 		case Basic_any:
 			return true;
 		case Basic_cstring:
+		case Basic_cstring16:
 			return true;
 		case Basic_typeid:
 			return true;
@@ -2444,8 +2519,9 @@ gb_internal bool is_type_comparable(Type *t) {
 		case Basic_rune:
 			return true;
 		case Basic_string:
-			return true;
 		case Basic_cstring:
+		case Basic_string16:
+		case Basic_cstring16:
 			return true;
 		case Basic_typeid:
 			return true;
@@ -3831,10 +3907,12 @@ gb_internal i64 type_size_of(Type *t) {
 	if (t->kind == Type_Basic) {
 		GB_ASSERT_MSG(is_type_typed(t), "%s", type_to_string(t));
 		switch (t->Basic.kind) {
-		case Basic_string:  size = 2*build_context.int_size; break;
-		case Basic_cstring: size = build_context.ptr_size;   break;
-		case Basic_any:     size = 16;                       break;
-		case Basic_typeid:  size = 8;                        break;
+		case Basic_string:    size = 2*build_context.int_size; break;
+		case Basic_cstring:   size = build_context.ptr_size;   break;
+		case Basic_string16:  size = 2*build_context.int_size; break;
+		case Basic_cstring16: size = build_context.ptr_size;   break;
+		case Basic_any:       size = 16;                       break;
+		case Basic_typeid:    size = 8;                        break;
 
 		case Basic_int: case Basic_uint:
 			size = build_context.int_size;
@@ -3894,10 +3972,12 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
 		switch (t->Basic.kind) {
-		case Basic_string:  return build_context.int_size;
-		case Basic_cstring: return build_context.ptr_size;
-		case Basic_any:     return 8;
-		case Basic_typeid:  return 8;
+		case Basic_string:    return build_context.int_size;
+		case Basic_cstring:   return build_context.ptr_size;
+		case Basic_string16:  return build_context.int_size;
+		case Basic_cstring16: return build_context.ptr_size;
+		case Basic_any:       return 8;
+		case Basic_typeid:    return 8;
 
 		case Basic_int: case Basic_uint:
 			return build_context.int_size;
@@ -4145,10 +4225,12 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 			return size;
 		}
 		switch (kind) {
-		case Basic_string:  return 2*build_context.int_size;
-		case Basic_cstring: return build_context.ptr_size;
-		case Basic_any:     return 16;
-		case Basic_typeid:  return 8;
+		case Basic_string:    return 2*build_context.int_size;
+		case Basic_cstring:   return build_context.ptr_size;
+		case Basic_string16:  return 2*build_context.int_size;
+		case Basic_cstring16: return build_context.ptr_size;
+		case Basic_any:       return 16;
+		case Basic_typeid:    return 8;
 
 		case Basic_int: case Basic_uint:
 			return build_context.int_size;
@@ -4380,6 +4462,15 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 				if (field_type_) *field_type_ = t_int;
 				return build_context.int_size; // len
 			}
+		} else if (t->Basic.kind == Basic_string16) {
+			switch (index) {
+			case 0:
+				if (field_type_) *field_type_ = t_u16_ptr;
+				return 0;                      // data
+			case 1:
+				if (field_type_) *field_type_ = t_int;
+				return build_context.int_size; // len
+			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
 			case 0:
@@ -4452,6 +4543,11 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 			switch (t->kind) {
 			case Type_Basic:
 				if (t->Basic.kind == Basic_string) {
+					switch (index) {
+					case 0: t = t_rawptr; break;
+					case 1: t = t_int;    break;
+					}
+				} else if (t->Basic.kind == Basic_string16) {
 					switch (index) {
 					case 0: t = t_rawptr; break;
 					case 1: t = t_int;    break;
@@ -4696,6 +4792,11 @@ gb_internal Type *type_internal_index(Type *t, isize index) {
 				{
 					GB_ASSERT(index == 0 || index == 1);
 					return index == 0 ? t_u8_ptr : t_int;
+				}
+			case Basic_string16:
+				{
+					GB_ASSERT(index == 0 || index == 1);
+					return index == 0 ? t_u16_ptr : t_int;
 				}
 			case Basic_any:
 				{

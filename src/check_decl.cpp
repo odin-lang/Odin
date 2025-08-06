@@ -815,6 +815,12 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 	if (sig_compare(is_type_cstring, is_type_u8_multi_ptr, x, y)) {
 		return true;
 	}
+	if (sig_compare(is_type_cstring16, is_type_u16_ptr, x, y)) {
+		return true;
+	}
+	if (sig_compare(is_type_cstring16, is_type_u16_multi_ptr, x, y)) {
+		return true;
+	}
 
 	if (sig_compare(is_type_uintptr, is_type_rawptr, x, y)) {
 		return true;

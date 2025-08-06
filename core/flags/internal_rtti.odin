@@ -127,6 +127,8 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		}
 
 	case runtime.Type_Info_String:
+		assert(specific_type_info.encoding == .UTF_8)
+
 		if specific_type_info.is_cstring {
 			cstr_ptr := (^cstring)(ptr)
 			if cstr_ptr != nil {

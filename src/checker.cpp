@@ -1363,13 +1363,15 @@ gb_internal void init_universal(void) {
 	}
 
 
-	t_u8_ptr       = alloc_type_pointer(t_u8);
-	t_u8_multi_ptr = alloc_type_multi_pointer(t_u8);
-	t_int_ptr      = alloc_type_pointer(t_int);
-	t_i64_ptr      = alloc_type_pointer(t_i64);
-	t_f64_ptr      = alloc_type_pointer(t_f64);
-	t_u8_slice     = alloc_type_slice(t_u8);
-	t_string_slice = alloc_type_slice(t_string);
+	t_u8_ptr        = alloc_type_pointer(t_u8);
+	t_u8_multi_ptr  = alloc_type_multi_pointer(t_u8);
+	t_u16_ptr       = alloc_type_pointer(t_u16);
+	t_u16_multi_ptr = alloc_type_multi_pointer(t_u16);
+	t_int_ptr       = alloc_type_pointer(t_int);
+	t_i64_ptr       = alloc_type_pointer(t_i64);
+	t_f64_ptr       = alloc_type_pointer(t_f64);
+	t_u8_slice      = alloc_type_slice(t_u8);
+	t_string_slice  = alloc_type_slice(t_string);
 
 	// intrinsics types for objective-c stuff
 	{
@@ -3098,6 +3100,9 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_enum_value_ptr = alloc_type_pointer(t_type_info_enum_value);
 
 	GB_ASSERT(tis->fields.count == 5);
+
+	Entity *type_info_string_encoding_kind = find_core_entity(c, str_lit("Type_Info_String_Encoding_Kind"));
+	t_type_info_string_encoding_kind = type_info_string_encoding_kind->type;
 
 	Entity *type_info_variant = tis->fields[4];
 	Type *tiv_type = type_info_variant->type;

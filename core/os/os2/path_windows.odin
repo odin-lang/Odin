@@ -91,11 +91,11 @@ _remove_all :: proc(path: string) -> Error {
 		nil,
 		win32.FO_DELETE,
 		dir,
-		&empty[0],
+		cstring16(&empty[0]),
 		win32.FOF_NOCONFIRMATION | win32.FOF_NOERRORUI | win32.FOF_SILENT,
 		false,
 		nil,
-		&empty[0],
+		cstring16(&empty[0]),
 	}
 	res := win32.SHFileOperationW(&file_op)
 	if res != 0 {
@@ -303,13 +303,13 @@ _get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absol
 	}
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	rel_utf16 := win32.utf8_to_utf16(rel, temp_allocator)
-	n := win32.GetFullPathNameW(raw_data(rel_utf16), 0, nil, nil)
+	n := win32.GetFullPathNameW(cstring16(raw_data(rel_utf16)), 0, nil, nil)
 	if n == 0 {
 		return "", Platform_Error(win32.GetLastError())
 	}
 
 	buf := make([]u16, n, temp_allocator) or_return
-	n = win32.GetFullPathNameW(raw_data(rel_utf16), u32(n), raw_data(buf), nil)
+	n = win32.GetFullPathNameW(cstring16(raw_data(rel_utf16)), u32(n), cstring16(raw_data(buf)), nil)
 	if n == 0 {
 		return "", Platform_Error(win32.GetLastError())
 	}

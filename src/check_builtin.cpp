@@ -19,6 +19,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_complex,
 	is_type_quaternion,
 	is_type_string,
+	is_type_string16,
 	is_type_typeid,
 	is_type_any,
 	is_type_endian_platform,
@@ -2328,13 +2329,23 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (is_type_string(op_type) && id == BuiltinProc_len) {
 			if (operand->mode == Addressing_Constant) {
 				mode = Addressing_Constant;
-				String str = operand->value.value_string;
-				value = exact_value_i64(str.len);
+
+				if (operand->value.kind == ExactValue_String) {
+					String str = operand->value.value_string;
+					value = exact_value_i64(str.len);
+				} else if (operand->value.kind == ExactValue_String16) {
+					String16 str = operand->value.value_string16;
+					value = exact_value_i64(str.len);
+				} else {
+					GB_PANIC("Unhandled value kind: %d", operand->value.kind);
+				}
 				type = t_untyped_integer;
 			} else {
 				mode = Addressing_Value;
 				if (is_type_cstring(op_type)) {
 					add_package_dependency(c, "runtime", "cstring_len");
+				} else if (is_type_cstring16(op_type)) {
+					add_package_dependency(c, "runtime", "cstring16_len");
 				}
 			}
 		} else if (is_type_array(op_type)) {
@@ -4684,7 +4695,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				break;
 			case Type_Basic:
 				if (t->Basic.kind == Basic_string) {
-					operand->type = alloc_type_multi_pointer(t_u8);
+					operand->type = t_u8_multi_ptr;
+				} else if (t->Basic.kind == Basic_string16) {
+					operand->type = t_u16_multi_ptr;
 				}
 				break;
 			case Type_Pointer:
@@ -6133,6 +6146,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_complex:
 	case BuiltinProc_type_is_quaternion:
 	case BuiltinProc_type_is_string:
+	case BuiltinProc_type_is_string16:
 	case BuiltinProc_type_is_typeid:
 	case BuiltinProc_type_is_any:
 	case BuiltinProc_type_is_endian_platform:
@@ -7172,7 +7186,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 			operand->mode = Addressing_Value;
-			operand->type = alloc_type_multi_pointer(t_u16);
+			if (type_hint != nullptr && is_type_cstring16(type_hint)) {
+				operand->type = type_hint;
+			} else {
+				operand->type = alloc_type_multi_pointer(t_u16);
+			}
 			operand->value = {};
 			break;
 		}

@@ -72,7 +72,7 @@ foreign Kernel32 {
 		flProtect:               u32,
 		dwMaximumSizeHigh:       u32,
 		dwMaximumSizeLow:        u32,
-		lpName:                  [^]u16,
+		lpName:                  cstring16,
 	) -> rawptr ---
 
 	MapViewOfFile :: proc(

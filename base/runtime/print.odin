@@ -293,7 +293,14 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_string("quaternion")
 		print_u64(u64(8*ti.size))
 	case Type_Info_String:
+		if info.is_cstring {
+			print_byte('c')
+		}
 		print_string("string")
+		switch info.encoding {
+		case .UTF_8:  /**/
+		case .UTF_16: print_string("16")
+		}
 	case Type_Info_Boolean:
 		switch ti.id {
 		case bool: print_string("bool")
