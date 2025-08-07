@@ -47,20 +47,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jirutka/setup-alpine@v1
-        with:
-          branch: edge
-      - name: (Linux) Download LLVM
+      - name: (Linux) Download LLVM and Build Odin
         run: |
-          apk add --no-cache \
-          musl-dev llvm20-dev clang20 git mold lz4 \
-          libxml2-static llvm20-static zlib-static zstd-static \
-          make
-        shell: alpine.sh --root {0}
-      - name: build odin
-        # NOTE: this build does slow compile times because of musl
-        run: ci/build_linux_static.sh
-        shell: alpine.sh {0}
+          docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
+            apk add --no-cache \
+              musl-dev llvm20-dev clang20 git mold lz4 \
+              libxml2-static llvm20-static zlib-static zstd-static \
+              make &&
+            ./ci/build_linux_static.sh
+          '
       - name: Odin run
         run: ./odin run examples/demo
       - name: Copy artifacts
@@ -74,6 +69,7 @@ jobs:
           cp -r core $FILE
           cp -r vendor $FILE
           cp -r examples $FILE
+          ./ci/remove_windows_binaries.sh $FILE
           # Creating a tarball so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
           tar -czvf dist.tar.gz $FILE
       - name: Odin run
@@ -84,6 +80,46 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux_artifacts
+          path: dist.tar.gz
+  build_linux_arm:
+    name: Linux ARM Build
+    if: github.repository == 'odin-lang/Odin'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: (Linux ARM) Download LLVM and Build Odin
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src arm64v8/alpine sh -c '
+            apk add --no-cache \
+              musl-dev llvm20-dev clang20 git mold lz4 \
+              libxml2-static llvm20-static zlib-static zstd-static \
+              make &&
+            ./ci/build_linux_static.sh
+          '
+      - name: Odin run
+        run: ./odin run examples/demo
+      - name: Copy artifacts
+        run: |
+          FILE="odin-linux-arm64-nightly+$(date -I)"
+          mkdir $FILE
+          cp odin $FILE
+          cp LICENSE $FILE
+          cp -r shared $FILE
+          cp -r base $FILE
+          cp -r core $FILE
+          cp -r vendor $FILE
+          cp -r examples $FILE
+          ./ci/remove_windows_binaries.sh $FILE
+          # Creating a tarball so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
+          tar -czvf dist.tar.gz $FILE
+      - name: Odin run
+        run: |
+          FILE="odin-linux-arm64-nightly+$(date -I)"
+          $FILE/odin run examples/demo
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux_arm_artifacts
           path: dist.tar.gz
   build_macos:
     name: MacOS Build
@@ -111,6 +147,7 @@ jobs:
           cp -r core $FILE
           cp -r vendor $FILE
           cp -r examples $FILE
+          ./ci/remove_windows_binaries.sh $FILE
           dylibbundler -b -x $FILE/odin -d $FILE/libs -od -p @executable_path/libs
           # Creating a tarball so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
           tar -czvf dist.tar.gz $FILE
@@ -149,6 +186,7 @@ jobs:
           cp -r core $FILE
           cp -r vendor $FILE
           cp -r examples $FILE
+          ./ci/remove_windows_binaries.sh $FILE
           dylibbundler -b -x $FILE/odin -d $FILE/libs -od -p @executable_path/libs
           # Creating a tarball so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
           tar -czvf dist.tar.gz $FILE
@@ -163,7 +201,7 @@ jobs:
           path: dist.tar.gz
   upload_b2:
     runs-on: [ubuntu-latest]
-    needs: [build_windows, build_macos, build_macos_arm, build_linux]
+    needs: [build_windows, build_macos, build_macos_arm, build_linux, build_linux_arm]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -192,6 +230,12 @@ jobs:
           name: linux_artifacts
           path: linux_artifacts
 
+      - name: Download Ubuntu ARM artifacts
+        uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux_arm_artifacts
+          path: linux_arm_artifacts
+
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4.1.7
         with:
@@ -219,6 +263,7 @@ jobs:
           file linux_artifacts/dist.tar.gz
           python3 ci/nightly.py artifact windows-amd64 windows_artifacts/
           python3 ci/nightly.py artifact linux-amd64 linux_artifacts/dist.tar.gz
+          python3 ci/nightly.py artifact linux-arm64 linux_arm_artifacts/dist.tar.gz
           python3 ci/nightly.py artifact macos-amd64 macos_artifacts/dist.tar.gz
           python3 ci/nightly.py artifact macos-arm64 macos_arm_artifacts/dist.tar.gz
           python3 ci/nightly.py prune
