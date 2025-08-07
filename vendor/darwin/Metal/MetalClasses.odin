@@ -2767,6 +2767,10 @@ RenderPipelineDescriptor_fragmentBuffers :: #force_inline proc "c" (self: ^Rende
 RenderPipelineDescriptor_fragmentFunction :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^Function {
 	return msgSend(^Function, self, "fragmentFunction")
 }
+@(objc_type=RenderPipelineDescriptor, objc_name="vertexLinkedFunctions")
+RenderPipelineDescriptor_vertexLinkedFunctions :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^LinkedFunctions {
+	return msgSend(^LinkedFunctions, self, "vertexLinkedFunctions")
+}
 @(objc_type=RenderPipelineDescriptor, objc_name="fragmentLinkedFunctions")
 RenderPipelineDescriptor_fragmentLinkedFunctions :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^LinkedFunctions {
 	return msgSend(^LinkedFunctions, self, "fragmentLinkedFunctions")
@@ -2834,6 +2838,10 @@ RenderPipelineDescriptor_setDepthAttachmentPixelFormat :: #force_inline proc "c"
 @(objc_type=RenderPipelineDescriptor, objc_name="setFragmentFunction")
 RenderPipelineDescriptor_setFragmentFunction :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, fragmentFunction: ^Function) {
 	msgSend(nil, self, "setFragmentFunction:", fragmentFunction)
+}
+@(objc_type=RenderPipelineDescriptor, objc_name="setVertexLinkedFunctions")
+RenderPipelineDescriptor_setVertexLinkedFunctions :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, vertexLinkedFunctions: ^LinkedFunctions) {
+	msgSend(nil, self, "setVertexLinkedFunctions:", vertexLinkedFunctions)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setFragmentLinkedFunctions")
 RenderPipelineDescriptor_setFragmentLinkedFunctions :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, fragmentLinkedFunctions: ^LinkedFunctions) {
