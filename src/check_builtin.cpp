@@ -7146,7 +7146,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_string;
-			operand->value = type_to_canonical_string(permanent_allocator(), type);
+			operand->value = exact_value_string(type_to_canonical_string(permanent_allocator(), type));
 			break;
 		}
 
