@@ -3374,8 +3374,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMModuleRef mod = m->mod;
 			LLVMContextRef ctx = m->ctx;
 
-			lb_add_raddbg_string(m, "type_view: {type: \"[]?\", expr: \"array(data, len)\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"string\", expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"[]?\",        expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"string\",     expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic]?\", expr: \"rows($, array(data, len), len, cap, allocator)\"}");
 
 			// column major matrices
 			lb_add_raddbg_string(m, "type_view: {type: \"matrix[1, ?]?\",  expr: \"columns($.data, $[0])\"}");
