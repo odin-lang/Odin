@@ -457,6 +457,229 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		return true;
 
 	} break;
+
+	case BuiltinProc_objc_block:
+	{
+		// NOTE(harold): The last argument specified in the call is the handler proc,
+		//               any other arguments before it are capture by-copy arguments.
+		auto param_operands = slice_make<Operand>(permanent_allocator(), ce->args.count);
+
+		isize capture_arg_count = ce->args.count - 1;
+
+		// NOTE(harold): The first parameter is already checked at check_builtin_procedure().
+		// Checking again would invalidate the Entity -> Value map for direct parameters if it's the handler proc.
+		param_operands[0] = *operand;
+
+		for (isize i = 0; i < ce->args.count-1; i++) {
+			Operand x = {};
+			check_expr(c, &x, ce->args[i]);
+
+			switch (x.mode) {
+			case Addressing_Value:
+			case Addressing_Context:
+			case Addressing_Variable:
+			case Addressing_Constant:
+				param_operands[i] = x;
+				break;
+
+			default:
+				gbString e = expr_to_string(x.expr);
+				gbString t = type_to_string(x.type);
+				error(x.expr, "'%.*s' capture arguments must be values, but got %s of type %s", LIT(builtin_name), e, t);
+				gb_string_free(t);
+				gb_string_free(e);
+				return false;
+			}
+		}
+
+		// Validate handler proc
+		Operand handler = {};
+
+		if (capture_arg_count == 0) {
+			// It's already been checked and assigned
+			handler = param_operands[0];
+		} else {
+			check_expr_or_type(c, &handler, ce->args[capture_arg_count]);
+			param_operands[capture_arg_count] = handler;
+		}
+
+		if (!is_operand_value(handler) || handler.type->kind != Type_Proc) {
+			gbString e = expr_to_string(handler.expr);
+			gbString t = type_to_string(handler.type);
+			error(handler.expr, "'%.*s' expected a procedure, but got '%s' of type %s", LIT(builtin_name), e, t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		}
+
+		Ast *handler_node = unparen_expr(handler.expr);
+
+		// Only direct reference to procs are allowed
+		switch (handler_node->kind) {
+		case Ast_ProcLit: break; // ok
+		case Ast_Ident: {
+			auto& ident = handler_node->Ident;
+
+			if (ident.entity == nullptr) {
+				error(handler.expr, "'%.*s' failed to resolve entity from expression", LIT(builtin_name));
+				return false;
+			}
+
+			if (ident.entity->kind != Entity_Procedure) {
+				gbString e = expr_to_string(handler_node);
+
+				ERROR_BLOCK();
+				error(handler.expr, "'%.*s' expected a direct reference to a procedure", LIT(builtin_name));
+				if(ident.entity->kind == Entity_Variable) {
+					error_line("\tSuggestion: Variables referencing a procedure are not allowed, they are not a direct procedure reference.");
+				} else {
+					error_line("\tSuggestion: Ensure '%s' is not a runtime-evaluated expression.", e); // NOTE(harold): Is this case possible to hit?
+				}
+				error_line("\n\t            Refer to a procedure directly by its name or declare it anonymously: %.*s(proc(){})", LIT(builtin_name));
+
+				gb_string_free(e);
+				return false;
+			}
+		} break;
+
+		default: {
+			gbString e = expr_to_string(handler_node);
+			ERROR_BLOCK();
+			error(handler.expr, "'%.*s' expected a direct reference to a procedure", LIT(builtin_name));
+			if( handler_node->kind == Ast_CallExpr) {
+				error_line("\tSuggestion: Do not use a procedure returned from another procedure.");
+			} else {
+				error_line("\tSuggestion: Ensure '%s' is not a runtime-evaluated expression.", e);
+			}
+			error_line("\n\t            Refer to a procedure directly by its name or declare it anonymously: %.*s(proc(){})", LIT(builtin_name));
+
+			gb_string_free(e);
+		} return false;
+		} // End switch
+
+		auto& handler_type_proc = handler.type->Proc;
+
+		if (capture_arg_count > handler_type_proc.param_count) {
+			error(handler.expr, "'%.*s' captured arguments exceeded the handler's parameter count", LIT(builtin_name));
+			return false;
+		}
+
+		// If the handler proc is odin calling convention, but there must be a context defined in this scope.
+		if (handler_type_proc.calling_convention == ProcCC_Odin) {
+			if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+				ERROR_BLOCK();
+				error(handler.expr, "The handler procedure for '%.*s' requires a context, but no context is defined in the current scope", LIT(builtin_name));
+				error_line("\tSuggestion: 'context = runtime.default_context()', or use the \"c\" calling convention for the handler procedure");
+				return false;
+			}
+		}
+
+		// At most a single return value is supported
+		if (handler_type_proc.result_count > 1) {
+			error(handler_type_proc.node->ProcType.results, "Handler procedures for '%.*s' cannot have multiple return values", LIT(builtin_name));
+			return false;
+		}
+
+		// Ensure that captured args are assignable to the handler's corresponding capture params
+		if (handler_type_proc.param_count > 0) {
+			auto&			handler_param_types         = handler.type->Proc.params->Tuple.variables;
+			Slice<Entity *> handler_capture_param_types = slice(handler_param_types, handler_param_types.count - capture_arg_count, handler_param_types.count);
+
+			for (isize i = 0; i < capture_arg_count; i++) {
+				Operand op = param_operands[i];
+				if (!check_is_assignable_to(c, &op, handler_capture_param_types[i]->type)) {
+					gbString e   = expr_to_string(op.expr);
+					gbString src = type_to_string(op.type);
+					gbString dst = type_to_string(handler_capture_param_types[i]->type);
+					error(op.expr, "'%.*s' captured value '%s' of type '%s' is not assignable to type '%s'", LIT(builtin_name), e, src, dst);
+					gb_string_free(e);
+					gb_string_free(src);
+					gb_string_free(dst);
+					return false;
+				}
+			}
+		}
+
+		ProcCallingConvention cc = handler_type_proc.calling_convention;
+		switch (cc) {
+		case ProcCC_Odin:
+		case ProcCC_Contextless:
+		case ProcCC_CDecl:
+			break; // ok
+		default:
+			ERROR_BLOCK();
+
+			error(handler.expr, "'%.*s' Invalid calling convention for block procedure.", LIT(builtin_name));
+			error_line("\tSuggestion: Do not specify a calling convention ot else use \"c\" or \"cotextless\"");
+			return false;
+		}
+
+		if (handler_type_proc.is_polymorphic) {
+			error(handler.expr, "'%.*s' Unspecialized polymorphic procedures are not allowed.", LIT(builtin_name));
+			return false;
+		}
+
+		// Create the specialized Objc_Block type that this intrinsic will return
+		Token ident = {};
+		ident.kind   = Token_Ident;
+		ident.string = str_lit("Objc_Block");
+		ident.pos    = ast_token(call).pos;
+
+		Token l_paren = {};
+		l_paren.kind   = Token_OpenParen;
+		l_paren.string = str_lit("(");
+		l_paren.pos    = ident.pos;
+
+		Token r_paren = {};
+		r_paren.kind   = Token_CloseParen;
+		l_paren.string = str_lit(")");
+		r_paren.pos    = ident.pos;
+
+		// Remove the capture args from the resulting Objc_Block type signature
+		Ast* handler_proc_type_copy = clone_ast(handler_type_proc.node);
+		handler_proc_type_copy->ProcType.params->FieldList.list.count -= capture_arg_count;
+
+		// Make sure the Objc_Block's specialized proc is always "c" calling conv,
+		// even if we have a context, as the invoker is always "c".
+		// This allows us to have compatibility with the target block types with either calling convention used.
+		handler_proc_type_copy->ProcType.calling_convention = ProcCC_CDecl;
+
+		Array<Ast *> poly_args = {};
+		array_init(&poly_args, permanent_allocator(), 1, 1);
+		poly_args[0] = handler_proc_type_copy;
+
+
+		Type *t_Objc_Block = find_core_type(c->checker, str_lit("Objc_Block"));
+		Operand poly_op = {};
+		poly_op.type = t_Objc_Block;
+		poly_op.mode = Addressing_Type;
+
+		Ast *poly_call = ast_call_expr(nullptr, ast_ident(nullptr, ident), poly_args, l_paren, r_paren, {});
+
+		auto err = check_polymorphic_record_type(c, &poly_op, poly_call);
+
+		if (err != 0) {
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
+			error(handler.expr, "'%.*s' failed to determine resulting Objc_Block handler procedure", LIT(builtin_name));
+			return false;
+		}
+
+		GB_ASSERT(poly_op.type != t_Objc_Block);
+		GB_ASSERT(poly_op.mode == Addressing_Type);
+
+		bool is_global_block = capture_arg_count == 0 && handler_type_proc.calling_convention != ProcCC_Odin;
+		if (is_global_block) {
+			try_to_add_package_dependency(c, "runtime", "_NSConcreteGlobalBlock");
+		} else {
+			try_to_add_package_dependency(c, "runtime", "_NSConcreteStackBlock");
+		}
+
+		*operand = poly_op;
+		operand->type = alloc_type_pointer(operand->type);
+		operand->mode = Addressing_Value;
+		return true;
+	} break;
 	}
 }
 
@@ -2291,6 +2514,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_register_selector: 
 	case BuiltinProc_objc_register_class:
 	case BuiltinProc_objc_ivar_get:
+	case BuiltinProc_objc_block:
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:

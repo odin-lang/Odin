@@ -2944,6 +2944,7 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	lbGenerator *gen = m->gen;
 
+	GB_ASSERT(e != nullptr);
 	GB_ASSERT(is_type_proc(e->type));
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
