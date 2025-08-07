@@ -233,6 +233,9 @@ type_integer_to_signed   :: proc($T: typeid) -> type where type_is_integer(T), t
 
 type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
 
+// Returns the canonicalized name of the type, of which is used to produce the pseudo-unique 'typeid'
+type_canonical_name :: proc($T: typeid) -> string ---
+
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
 constant_log2 :: proc($v: $T) -> T where type_is_integer(T) ---

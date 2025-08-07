@@ -7134,6 +7134,22 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			break;
 		}
 
+	case BuiltinProc_type_canonical_name:
+		{
+			Operand op = {};
+			Type *type = check_type(c, ce->args[0]);
+			Type *bt = base_type(type);
+			if (bt == nullptr || bt == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_string;
+			operand->value = type_to_canonical_string(permanent_allocator(), type);
+			break;
+		}
+
 	case BuiltinProc_procedure_of:
 		{
 			Ast *call_expr = unparen_expr(ce->args[0]);
