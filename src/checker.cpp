@@ -1460,6 +1460,10 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->foreign_decls_to_check);
 
 	map_destroy(&i->objc_msgSend_types);
+	string_set_destroy(&i->obcj_class_name_set);
+	mpsc_destroy(&i->objc_class_implementations);
+	map_destroy(&i->objc_method_implementations);
+
 	string_map_destroy(&i->load_file_cache);
 	string_map_destroy(&i->load_directory_cache);
 	map_destroy(&i->load_directory_map);

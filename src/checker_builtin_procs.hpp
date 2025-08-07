@@ -353,6 +353,7 @@ BuiltinProc__type_end,
 	BuiltinProc_objc_register_selector,
 	BuiltinProc_objc_register_class,
 	BuiltinProc_objc_ivar_get,
+	BuiltinProc_objc_block,
 
 	BuiltinProc_constant_utf16_cstring,
 
@@ -714,6 +715,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_ivar_get"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("objc_block"),             1, true,  Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

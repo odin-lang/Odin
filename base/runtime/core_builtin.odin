@@ -5,6 +5,11 @@ import "base:intrinsics"
 @builtin
 Maybe :: union($T: typeid) {T}
 
+/*
+Represents an Objective-C block with a given procedure signature T
+*/
+@builtin
+Objc_Block :: struct($T: typeid) where intrinsics.type_is_proc(T) { using _: intrinsics.objc_object }
 
 /*
 Recovers the containing/parent struct from a pointer to one of its fields.
