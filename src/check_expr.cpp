@@ -7954,7 +7954,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			operand->expr = proc;
 			operand->type = t_invalid;
 			add_type_and_value(c, proc, operand->mode, operand->type, operand->value);
-		} else {
+		} else if (name == "name_of") {
 			if (args.count != 1) {
 				error(call, "#name_of expects exactly one type argument");
 				operand->mode = Addressing_Invalid;
