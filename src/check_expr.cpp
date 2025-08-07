@@ -7955,6 +7955,34 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			operand->type = t_invalid;
 			add_type_and_value(c, proc, operand->mode, operand->type, operand->value);
 		} else {
+			if (args.count != 1) {
+				error(call, "#name_of expects exactly one type argument");
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return Expr_Expr;
+			}
+
+			Operand arg_operand = {};
+			check_expr_or_type(c, &arg_operand, args[0]);
+			if (arg_operand.mode != Addressing_Type) {
+				error(args[0], "Argument to #name_of must be a type");
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return Expr_Expr;
+			}
+
+			Type *type_arg = arg_operand.type;
+
+			gbString str = type_to_string(type_arg);
+			String result = make_string_c(gb_string_make(heap_allocator(), str));
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_string;
+			operand->value = exact_value_string(result);
+
+			operand->expr = call;
+			return Expr_Expr;
+		} else {
 			error(proc, "Unknown directive: #%.*s", LIT(name));
 			operand->expr = proc;
 			operand->type = t_invalid;

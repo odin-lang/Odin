@@ -2503,6 +2503,18 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		           name.string == "force_no_inline") {
 			return parse_force_inlining_operand(f, name);
 		}
+		else if (token.string == "name_of") {
+			Token open = expect_token(f, Token_OpenParen);
+			Ast *type_arg = parse_type(f);
+			Token close = expect_token(f, Token_CloseParen);
+
+			auto args = array_make<Ast *>(ast_allocator(f));
+
+			array_add(&args, type_arg);
+
+			Ast *bd = ast_basic_directive(f, token, name);
+			return ast_call_expr(f, bd, args, open, close, {});
+		}
 		return ast_basic_directive(f, token, name);
 	}
 
