@@ -12,6 +12,7 @@ g_allocator: mem.Compat_Allocator
 @(init)
 init_context :: proc "contextless" () {
 	g_ctx = runtime.default_context()
+	context = g_ctx
 
 	// Wrapping the allocator with the mem.Compat_Allocator so we can
 	// mimic the realloc semantics.
