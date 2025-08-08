@@ -6428,6 +6428,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 			error_line("\tdynamic-literals\n");
 			error_line("\tinteger-division-by-zero:trap\n");
 			error_line("\tinteger-division-by-zero:zero\n");
+			error_line("\tinteger-division-by-zero:self\n");
 			return OptInFeatureFlag_NONE;
 		}
 	}

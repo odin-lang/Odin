@@ -1550,8 +1550,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_Trap;
 							} else if (str_eq_ignore_case(value.value_string, "zero")) {
 								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_Zero;
-							} else {
-								gb_printf_err("-integer-division-by-zero options are 'trap' and 'zero'.\n");
+							} else if (str_eq_ignore_case(value.value_string, "self")) {
+								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_Self;
+							}else {
+								gb_printf_err("-integer-division-by-zero options are 'trap', 'zero', and 'self'.\n");
 								bad_flags = true;
 							}
 							break;
@@ -2585,7 +2587,8 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Specifies the default behaviour for integer division by zero.");
 			print_usage_line(2, "Available Options:");
 			print_usage_line(3, "-integer-division-by-zero:trap        Trap on division/modulo/remainder by zero");
-			print_usage_line(3, "-integer-division-by-zero:zero        x/0 == 0 and x%%0 == x and x%%%%0 == 0");
+			print_usage_line(3, "-integer-division-by-zero:zero        x/0 == 0 and x%%0 == x and x%%%%0 == x");
+			print_usage_line(3, "-integer-division-by-zero:self        x/0 == x and x%%0 == 0 and x%%%%0 == 0");
 		}
 	}
 

@@ -302,6 +302,9 @@ gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_beha
 		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Zero) {
 			return IntegerDivisionByZero_Zero;
 		}
+		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Self) {
+			return IntegerDivisionByZero_Self;
+		}
 	}
 	return build_context.integer_division_by_zero_behaviour;
 }
@@ -1159,7 +1162,6 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	lb_start_block(p, edge_case_block);
 
-	incoming_values[1] = zero;
 
 	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
 	case IntegerDivisionByZero_Trap:
@@ -1167,7 +1169,10 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 		LLVMBuildUnreachable(p->builder);
 		break;
 	case IntegerDivisionByZero_Zero:
-		// Already fine
+		incoming_values[1] = zero;
+		break;
+	case IntegerDivisionByZero_Self:
+		incoming_values[1] = lhs;
 		break;
 	}
 
@@ -1178,6 +1183,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
 	case IntegerDivisionByZero_Trap:
+	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
 		break;
 	case IntegerDivisionByZero_Zero:
@@ -1242,7 +1248,6 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 
 		IFF a/0 == 0, then (a%0 == a) or (a%%0 == a)
 	*/
-	incoming_values[1] = lhs;
 
 	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
 	case IntegerDivisionByZero_Trap:
@@ -1250,7 +1255,10 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 		LLVMBuildUnreachable(p->builder);
 		break;
 	case IntegerDivisionByZero_Zero:
-		// Already fine
+		incoming_values[1] = lhs;
+		break;
+	case IntegerDivisionByZero_Self:
+		incoming_values[1] = zero;
 		break;
 	}
 
@@ -1261,6 +1269,7 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 
 	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
 	case IntegerDivisionByZero_Trap:
+	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
 		break;
 	case IntegerDivisionByZero_Zero:

@@ -4311,7 +4311,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 
 			if (fail) {
 				if (is_type_integer(x->type) || (x->mode == Addressing_Constant && x->value.kind == ExactValue_Integer)) {
-					if (check_for_integer_division_by_zero(c, node) == IntegerDivisionByZero_Zero) {
+					if (check_for_integer_division_by_zero(c, node) != IntegerDivisionByZero_Trap) {
 						// Okay
 						break;
 					}
@@ -4371,14 +4371,19 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		match_exact_values(&a, &b);
 
 
-		if (check_for_integer_division_by_zero(c, node) == IntegerDivisionByZero_Zero &&
+		IntegerDivisionByZeroKind zero_behaviour = check_for_integer_division_by_zero(c, node);
+		if (zero_behaviour != IntegerDivisionByZero_Trap &&
 		    b.kind == ExactValue_Integer && big_int_is_zero(&b.value_integer) &&
 		    (op.kind == Token_QuoEq || op.kind == Token_Mod || op.kind == Token_ModMod)) {
 		    	if (op.kind == Token_QuoEq) {
-		    		// x/0 == 0
-				x->value = b;
+		    		if (zero_behaviour == IntegerDivisionByZero_Zero) {
+			    		// x/0 == 0
+					x->value = b;
+				} else {
+			    		// x/0 == x
+					x->value = a;
+				}
 			} else {
-		    		// x%0 == x
 		    		/*
 					NOTE(bill): @integer division by zero rules
 
@@ -4386,8 +4391,16 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		    			floored:   r = a - b*floor(a/b)
 
 		    			IFF a/0 == 0, then (a%0 == a) or (a%%0 == a)
+		    			IFF a/0 == a, then (a%0 == 0) or (a%%0 == 0)
 		    		*/
-				x->value = a;
+
+		    		if (zero_behaviour == IntegerDivisionByZero_Zero) {
+			    		// x%0 == x
+					x->value = a;
+				} else {
+			    		// x%0 == 0
+					x->value = b;
+				}
 			}
 		} else {
 			x->value = exact_binary_operator_value(op.kind, a, b);
@@ -9646,6 +9659,9 @@ gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(Checker
 	}
 	if ((flags & OptInFeatureFlag_IntegerDivisionByZero_Zero) != 0) {
 		return IntegerDivisionByZero_Zero;
+	}
+	if ((flags & OptInFeatureFlag_IntegerDivisionByZero_Self) != 0) {
+		return IntegerDivisionByZero_Self;
 	}
 	return build_context.integer_division_by_zero_behaviour;
 }
