@@ -2583,7 +2583,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (check) {
-		if (print_flag("-integer-division-by-zero:<strng>")) {
+		if (print_flag("-integer-division-by-zero:<string>")) {
 			print_usage_line(2, "Specifies the default behaviour for integer division by zero.");
 			print_usage_line(2, "Available Options:");
 			print_usage_line(3, "-integer-division-by-zero:trap        Trap on division/modulo/remainder by zero");
