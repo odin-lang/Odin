@@ -3302,16 +3302,22 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			}
 			GB_ASSERT(name != nullptr);
 
-			LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
 			lbValue res = {};
+			res.type = platform_type;
 
-			LLVMValueRef args[3] = {
+			if (id == BuiltinProc_fixed_point_div ||
+			    id == BuiltinProc_fixed_point_div_sat) {
+				res.value = lb_integer_division_intrinsics(p, x.value, y.value, scale.value, platform_type, name);
+			} else {
+				LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
+
+				LLVMValueRef args[3] = {
 					x.value,
 					y.value,
 					scale.value };
 
-			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
-			res.type = platform_type;
+				res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			}
 			return lb_emit_conv(p, res, tv.type);
 		}
 

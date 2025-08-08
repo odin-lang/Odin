@@ -1200,6 +1200,79 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	return res;
 }
 
+gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, char const *name) {
+	LLVMTypeRef type = LLVMTypeOf(rhs);
+	GB_ASSERT(LLVMTypeOf(lhs) == type);
+
+	LLVMValueRef incoming_values[2] = {};
+	LLVMBasicBlockRef incoming_blocks[2] = {};
+
+	lbBlock *safe_block      = lb_create_block(p, "div.safe");
+	lbBlock *edge_case_block = lb_create_block(p, "div.edge");
+	lbBlock *done_block      = lb_create_block(p, "div.done");
+
+	LLVMValueRef zero = LLVMConstNull(type);
+	LLVMValueRef dem_check = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, zero, "");
+	lbValue cond = {dem_check, t_untyped_bool};
+
+	lb_emit_if(p, cond, safe_block, edge_case_block);
+
+	lb_start_block(p, safe_block);
+
+	{
+		LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
+
+		LLVMValueRef args[3] = {
+			lhs,
+			rhs,
+			scale };
+
+		incoming_values[0] = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+	}
+
+	lb_emit_jump(p, done_block);
+
+	lb_start_block(p, edge_case_block);
+
+
+	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
+	case IntegerDivisionByZero_Trap:
+		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
+		LLVMBuildUnreachable(p->builder);
+		break;
+	case IntegerDivisionByZero_Zero:
+		incoming_values[1] = zero;
+		break;
+	case IntegerDivisionByZero_Self:
+		incoming_values[1] = lhs;
+		break;
+	}
+
+	lb_emit_jump(p, done_block);
+	lb_start_block(p, done_block);
+
+	LLVMValueRef res = incoming_values[0];
+
+	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
+	case IntegerDivisionByZero_Trap:
+	case IntegerDivisionByZero_Self:
+		res = incoming_values[0];
+		break;
+	case IntegerDivisionByZero_Zero:
+		res = LLVMBuildPhi(p->builder, type, "");
+
+		GB_ASSERT(p->curr_block->preds.count >= 2);
+		incoming_blocks[0] = p->curr_block->preds[0]->block;
+		incoming_blocks[1] = p->curr_block->preds[1]->block;
+
+		LLVMAddIncoming(res, incoming_values, incoming_blocks, 2);
+		break;
+	}
+
+	return res;
+}
+
+
 gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, bool is_unsigned, bool is_floored) {
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
