@@ -38,6 +38,6 @@ Note that only one can be active at a time.
 Inputs:
 - setter: The type setter. Pass `nil` to disable any previously set setter.
 */
-register_type_setter :: proc(setter: Custom_Type_Setter) {
+register_type_setter :: proc "contextless" (setter: Custom_Type_Setter) {
 	global_custom_type_setter = setter
 }
