@@ -2461,7 +2461,8 @@ gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o
 	} else if (is_type_pointer(o->type) &&
 	           are_types_identical(type_deref(o->type), type)) {
 		gbString s = expr_to_string(o->expr);
-		error_line("\tSuggestion: Did you mean `%s^`\n", s);
+		if (s[0] == '&') error_line("\tSuggestion: Did you mean `%s`\n", &s[1]);
+		else error_line("\tSuggestion: Did you mean `%s^`\n", s);
 		gb_string_free(s);
 	}
 }
