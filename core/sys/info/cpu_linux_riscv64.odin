@@ -7,7 +7,7 @@ import "base:intrinsics"
 import "core:sys/linux"
 
 @(init, private)
-init_cpu_features :: proc() {
+init_cpu_features :: proc "contextless" () {
 	_features: CPU_Features
 	defer cpu.features = _features
 
@@ -85,7 +85,7 @@ init_cpu_features :: proc() {
 			return
 		}
 
-		assert(pairs[0].key == .IMA_EXT_0)
+		assert_contextless(pairs[0].key == .IMA_EXT_0)
 		exts := pairs[0].value.ima_ext_0
 		exts -= { .FD, .C, .V }
 		_features += transmute(CPU_Features)exts
@@ -97,7 +97,7 @@ init_cpu_features :: proc() {
 				_features += { .Misaligned_Supported }
 			}
 		} else {
-			assert(pairs[1].key == .CPUPERF_0)
+			assert_contextless(pairs[1].key == .CPUPERF_0)
 			if .FAST in pairs[1].value.cpu_perf_0 {
 				_features += { .Misaligned_Supported, .Misaligned_Fast }
 			} else if .UNSUPPORTED not_in pairs[1].value.cpu_perf_0 {
@@ -108,6 +108,6 @@ init_cpu_features :: proc() {
 }
 
 @(init, private)
-init_cpu_name :: proc() {
+init_cpu_name :: proc "contextless" () {
 	cpu.name = "RISCV64"
 }

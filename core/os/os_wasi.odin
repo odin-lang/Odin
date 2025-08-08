@@ -30,11 +30,11 @@ args := _alloc_command_line_arguments()
 @(private, require_results)
 _alloc_command_line_arguments :: proc "contextless" () -> []string {
 	context = runtime.default_context()
-	args := make([]string, len(runtime.args__))
-	for &arg, i in args {
+	cmd_args := make([]string, len(runtime.args__))
+	for &arg, i in cmd_args {
 		arg = string(runtime.args__[i])
 	}
-	return args
+	return cmd_args
 }
 
 @(private, fini)
@@ -59,9 +59,8 @@ Preopen :: struct {
 preopens: []Preopen
 
 @(init, private)
-init_preopens :: proc() {
-
-	strip_prefixes :: proc(path: string) -> string {
+init_preopens :: proc "contextless" () {
+	strip_prefixes :: proc "contextless"(path: string) -> string {
 		path := path
 		loop: for len(path) > 0 {
 			switch {
@@ -77,6 +76,8 @@ init_preopens :: proc() {
 		}
 		return path
 	}
+
+	context = runtime.default_context()
 
 	dyn_preopens: [dynamic]Preopen
 	loop: for fd := wasi.fd_t(3); ; fd += 1 {
