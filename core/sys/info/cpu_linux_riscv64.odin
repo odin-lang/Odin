@@ -81,7 +81,7 @@ init_cpu_features :: proc "contextless" () {
 		}
 		err := linux.riscv_hwprobe(raw_data(pairs), len(pairs), 0, nil, {})
 		if err != nil {
-			assert(err == .ENOSYS, "unexpected error from riscv_hwprobe()")
+			assert_contextless(err == .ENOSYS, "unexpected error from riscv_hwprobe()")
 			return
 		}
 
