@@ -6446,8 +6446,8 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 		res = feature_flags &~ feature_not_flags;
 	}
 
-	if ((res & OptInFeatureFlag_IntegerDivisionByZero_ALL) ==
-	           OptInFeatureFlag_IntegerDivisionByZero_ALL) {
+	u64 idbz_count = gb_count_set_bits(res & OptInFeatureFlag_IntegerDivisionByZero_ALL);
+	if (idbz_count > 1) {
 		syntax_error(token_for_pos, "Only one integer-division-by-zero feature flag can be enabled");
 	}
 
