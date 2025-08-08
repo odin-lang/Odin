@@ -8166,8 +8166,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
 		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
 			ERROR_BLOCK();
-			error(call, "'context' has not been defined within this scope, but is required for this procedure call");
-			error_line("\tSuggestion: 'context = runtime.default_context()'");
+			if (c->scope->flags & ScopeFlag_File) {
+				error(call, "Procedures requiring a 'context' cannot be called at the global scope");
+			} else {
+				error(call, "'context' has not been defined within this scope, but is required for this procedure call");
+				error_line("\tSuggestion: 'context = runtime.default_context()'");
+			}
 		}
 	}
 
