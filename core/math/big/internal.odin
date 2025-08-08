@@ -29,7 +29,6 @@ package math_big
 
 import "base:builtin"
 import "base:intrinsics"
-import "base:runtime"
 import "core:mem"
 import rnd "core:math/rand"
 
