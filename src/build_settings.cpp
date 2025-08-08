@@ -352,11 +352,23 @@ u64 get_vet_flag_from_name(String const &name) {
 enum OptInFeatureFlags : u64 {
 	OptInFeatureFlag_NONE            = 0,
 	OptInFeatureFlag_DynamicLiterals = 1u<<0,
+
+	OptInFeatureFlag_IntegerDivisionByZero_Trap = 1u<<1,
+	OptInFeatureFlag_IntegerDivisionByZero_Zero = 1u<<2,
+
+	OptInFeatureFlag_IntegerDivisionByZero_ALL = OptInFeatureFlag_IntegerDivisionByZero_Trap|OptInFeatureFlag_IntegerDivisionByZero_Zero,
+
 };
 
 u64 get_feature_flag_from_name(String const &name) {
 	if (name == "dynamic-literals") {
 		return OptInFeatureFlag_DynamicLiterals;
+	}
+	if (name == "integer-division-by-zero:trap") {
+		return OptInFeatureFlag_IntegerDivisionByZero_Trap;
+	}
+	if (name == "integer-division-by-zero:zero") {
+		return OptInFeatureFlag_IntegerDivisionByZero_Zero;
 	}
 	return OptInFeatureFlag_NONE;
 }

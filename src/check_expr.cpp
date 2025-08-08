@@ -129,7 +129,7 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 gb_internal bool is_exact_value_zero(ExactValue const &v);
 
-gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(Ast *node);
+gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(CheckerContext *c, Ast *node);
 
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
@@ -4311,7 +4311,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 
 			if (fail) {
 				if (is_type_integer(x->type) || (x->mode == Addressing_Constant && x->value.kind == ExactValue_Integer)) {
-					if (check_for_integer_division_by_zero(node) == IntegerDivisionByZero_Zero) {
+					if (check_for_integer_division_by_zero(c, node) == IntegerDivisionByZero_Zero) {
 						// Okay
 						break;
 					}
@@ -4371,7 +4371,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		match_exact_values(&a, &b);
 
 
-		if (check_for_integer_division_by_zero(node) == IntegerDivisionByZero_Zero &&
+		if (check_for_integer_division_by_zero(c, node) == IntegerDivisionByZero_Zero &&
 		    b.kind == ExactValue_Integer && big_int_is_zero(&b.value_integer) &&
 		    (op.kind == Token_QuoEq || op.kind == Token_Mod || op.kind == Token_ModMod)) {
 		    	if (op.kind == Token_QuoEq) {
@@ -9638,8 +9638,15 @@ gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCom
 	return cl->elems.count > 0;
 }
 
-gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(Ast *node) {
+gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(CheckerContext *c, Ast *node) {
 	// TODO(bill): per file `#+feature` flags
+	u64 flags = check_feature_flags(c, node);
+	if ((flags & OptInFeatureFlag_IntegerDivisionByZero_Trap) != 0) {
+		return IntegerDivisionByZero_Trap;
+	}
+	if ((flags & OptInFeatureFlag_IntegerDivisionByZero_Zero) != 0) {
+		return IntegerDivisionByZero_Zero;
+	}
 	return build_context.integer_division_by_zero_behaviour;
 }
 

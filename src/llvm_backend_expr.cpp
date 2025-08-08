@@ -283,8 +283,26 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 	return res;
 }
 
-gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero(lbProcedure *p) {
-	// TODO(bill): per file `#+feature` flags
+gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_behaviour(lbProcedure *p) {
+	AstFile *file = nullptr;
+
+	if (p->body && p->body->file()) {
+		file = p->body->file();
+	} else if (p->type_expr && p->type_expr->file()) {
+		file = p->type_expr->file();
+	} else if (p->entity && p->entity->file) {
+		file = p->entity->file;
+	}
+
+	if (file != nullptr && file->feature_flags_set) {
+		u64 flags = file->feature_flags;
+		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Trap) {
+			return IntegerDivisionByZero_Trap;
+		}
+		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Zero) {
+			return IntegerDivisionByZero_Zero;
+		}
+	}
 	return build_context.integer_division_by_zero_behaviour;
 }
 
@@ -1143,7 +1161,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	incoming_values[1] = zero;
 
-	switch (lb_check_for_integer_division_by_zero(p))  {
+	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
 	case IntegerDivisionByZero_Trap:
 		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
 		LLVMBuildUnreachable(p->builder);
@@ -1158,7 +1176,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	LLVMValueRef res = incoming_values[0];
 
-	switch (lb_check_for_integer_division_by_zero(p))  {
+	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
 	case IntegerDivisionByZero_Trap:
 		res = incoming_values[0];
 		break;
@@ -1226,7 +1244,7 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 	*/
 	incoming_values[1] = lhs;
 
-	switch (lb_check_for_integer_division_by_zero(p))  {
+	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
 	case IntegerDivisionByZero_Trap:
 		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
 		LLVMBuildUnreachable(p->builder);
@@ -1241,7 +1259,7 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 
 	LLVMValueRef res = incoming_values[0];
 
-	switch (lb_check_for_integer_division_by_zero(p))  {
+	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
 	case IntegerDivisionByZero_Trap:
 		res = incoming_values[0];
 		break;
