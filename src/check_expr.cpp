@@ -129,6 +129,8 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 gb_internal bool is_exact_value_zero(ExactValue const &v);
 
+gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(Ast *node);
+
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
 	LoadDirective_Error    = 1,
@@ -4308,7 +4310,25 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 			}
 
 			if (fail) {
-				error(y->expr, "Division by zero not allowed");
+				if (is_type_integer(x->type) || (x->mode == Addressing_Constant && x->value.kind == ExactValue_Integer)) {
+					if (check_for_integer_division_by_zero(node) == IntegerDivisionByZero_Zero) {
+						// Okay
+						break;
+					}
+				}
+
+				switch (op.kind) {
+				case Token_Mod:
+				case Token_ModMod:
+				case Token_ModEq:
+				case Token_ModModEq:
+					error(y->expr, "Division by zero through '%.*s' not allowed", LIT(token_strings[op.kind]));
+					break;
+				case Token_Quo:
+				case Token_QuoEq:
+					error(y->expr, "Division by zero not allowed");
+					break;
+				}
 				x->mode = Addressing_Invalid;
 				return;
 			}
@@ -4348,7 +4368,30 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 			}
 		}
 
-		x->value = exact_binary_operator_value(op.kind, a, b);
+		match_exact_values(&a, &b);
+
+
+		if (check_for_integer_division_by_zero(node) == IntegerDivisionByZero_Zero &&
+		    b.kind == ExactValue_Integer && big_int_is_zero(&b.value_integer) &&
+		    (op.kind == Token_QuoEq || op.kind == Token_Mod || op.kind == Token_ModMod)) {
+		    	if (op.kind == Token_QuoEq) {
+		    		// x/0 == 0
+				x->value = b;
+			} else {
+		    		// x%0 == x
+		    		/*
+					NOTE(bill): @integer division by zero rules
+
+		    			truncated: r = a - b*trunc(a/b)
+		    			floored:   r = a - b*floor(a/b)
+
+		    			IFF a/0 == 0, then (a%0 == a) or (a%%0 == a)
+		    		*/
+				x->value = a;
+			}
+		} else {
+			x->value = exact_binary_operator_value(op.kind, a, b);
+		}
 
 		if (is_type_typed(x->type)) {
 			if (node != nullptr) {
@@ -9593,6 +9636,11 @@ gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCom
 	}
 
 	return cl->elems.count > 0;
+}
+
+gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(Ast *node) {
+	// TODO(bill): per file `#+feature` flags
+	return build_context.integer_division_by_zero_behaviour;
 }
 
 gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {

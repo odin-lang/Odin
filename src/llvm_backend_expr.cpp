@@ -283,6 +283,12 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 	return res;
 }
 
+gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero(lbProcedure *p) {
+	// TODO(bill): per file `#+feature` flags
+	return build_context.integer_division_by_zero_behaviour;
+}
+
+
 gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, lbValue *res_) {
 	GB_ASSERT(is_type_array_like(type));
 	Type *elem_type = base_array_type(type);
@@ -354,7 +360,6 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 			}
 
 		} else {
-
 			switch (op) {
 			case Token_Add:
 				z = LLVMBuildAdd(p->builder, x, y, "");
@@ -366,17 +371,15 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				z = LLVMBuildMul(p->builder, x, y, "");
 				break;
 			case Token_Quo:
-				if (is_type_unsigned(integral_type)) {
-					z = LLVMBuildUDiv(p->builder, x, y, "");
-				} else {
-					z = LLVMBuildSDiv(p->builder, x, y, "");
+				{
+					auto *call = is_type_unsigned(integral_type) ? LLVMBuildUDiv : LLVMBuildSDiv;
+					z = call(p->builder, x, y, "");
 				}
 				break;
 			case Token_Mod:
-				if (is_type_unsigned(integral_type)) {
-					z = LLVMBuildURem(p->builder, x, y, "");
-				} else {
-					z = LLVMBuildSRem(p->builder, x, y, "");
+				{
+					auto *call = is_type_unsigned(integral_type) ? LLVMBuildURem : LLVMBuildSRem;
+					z = call(p->builder, x, y, "");
 				}
 				break;
 			case Token_ModMod:
@@ -1111,6 +1114,150 @@ gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue l
 	return {};
 }
 
+gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, bool is_signed) {
+	LLVMTypeRef type = LLVMTypeOf(rhs);
+	GB_ASSERT(LLVMTypeOf(lhs) == type);
+
+	auto *call = is_signed ? LLVMBuildSDiv : LLVMBuildUDiv;
+
+
+	LLVMValueRef incoming_values[2] = {};
+	LLVMBasicBlockRef incoming_blocks[2] = {};
+
+	lbBlock *safe_block      = lb_create_block(p, "div.safe");
+	lbBlock *edge_case_block = lb_create_block(p, "div.edge");
+	lbBlock *done_block      = lb_create_block(p, "div.done");
+
+	LLVMValueRef zero = LLVMConstNull(type);
+	LLVMValueRef dem_check = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, zero, "");
+	lbValue cond = {dem_check, t_untyped_bool};
+
+	lb_emit_if(p, cond, safe_block, edge_case_block);
+
+	lb_start_block(p, safe_block);
+	incoming_values[0] = call(p->builder, lhs, rhs, "");
+
+	lb_emit_jump(p, done_block);
+
+	lb_start_block(p, edge_case_block);
+
+	incoming_values[1] = zero;
+
+	switch (lb_check_for_integer_division_by_zero(p))  {
+	case IntegerDivisionByZero_Trap:
+		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
+		LLVMBuildUnreachable(p->builder);
+		break;
+	case IntegerDivisionByZero_Zero:
+		// Already fine
+		break;
+	}
+
+	lb_emit_jump(p, done_block);
+	lb_start_block(p, done_block);
+
+	LLVMValueRef res = incoming_values[0];
+
+	switch (lb_check_for_integer_division_by_zero(p))  {
+	case IntegerDivisionByZero_Trap:
+		res = incoming_values[0];
+		break;
+	case IntegerDivisionByZero_Zero:
+		res = LLVMBuildPhi(p->builder, type, "");
+
+		GB_ASSERT(p->curr_block->preds.count >= 2);
+		incoming_blocks[0] = p->curr_block->preds[0]->block;
+		incoming_blocks[1] = p->curr_block->preds[1]->block;
+
+		LLVMAddIncoming(res, incoming_values, incoming_blocks, 2);
+		break;
+	}
+
+	return res;
+}
+
+gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, bool is_unsigned, bool is_floored) {
+	LLVMTypeRef type = LLVMTypeOf(rhs);
+	GB_ASSERT(LLVMTypeOf(lhs) == type);
+
+	LLVMValueRef incoming_values[2] = {};
+	LLVMBasicBlockRef incoming_blocks[2] = {};
+
+	lbBlock *safe_block      = lb_create_block(p, "div.safe");
+	lbBlock *edge_case_block = lb_create_block(p, "div.edge");
+	lbBlock *done_block      = lb_create_block(p, "div.done");
+
+	LLVMValueRef zero = LLVMConstNull(type);
+	LLVMValueRef dem_check = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, zero, "");
+	lbValue cond = {dem_check, t_untyped_bool};
+
+	lb_emit_if(p, cond, safe_block, edge_case_block);
+
+	lb_start_block(p, safe_block);
+
+	if (is_floored) { // %%
+		if (is_unsigned) {
+			incoming_values[0] = LLVMBuildURem(p->builder, lhs, rhs, "");
+		} else {
+			LLVMValueRef a = LLVMBuildSRem(p->builder, lhs, rhs, "");
+			LLVMValueRef b = LLVMBuildAdd(p->builder, a, rhs, "");
+			LLVMValueRef c = LLVMBuildSRem(p->builder, b, rhs, "");
+			incoming_values[0] = c;
+		}
+	} else { // %
+		if (is_unsigned) {
+			incoming_values[0] = LLVMBuildURem(p->builder, lhs, rhs, "");
+		} else {
+			incoming_values[0] = LLVMBuildSRem(p->builder, lhs, rhs, "");
+		}
+	}
+
+	lb_emit_jump(p, done_block);
+
+	lb_start_block(p, edge_case_block);
+
+	/*
+		NOTE(bill): @integer division by zero rules
+
+		truncated: r = a - b*trunc(a/b)
+		floored:   r = a - b*floor(a/b)
+
+		IFF a/0 == 0, then (a%0 == a) or (a%%0 == a)
+	*/
+	incoming_values[1] = lhs;
+
+	switch (lb_check_for_integer_division_by_zero(p))  {
+	case IntegerDivisionByZero_Trap:
+		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
+		LLVMBuildUnreachable(p->builder);
+		break;
+	case IntegerDivisionByZero_Zero:
+		// Already fine
+		break;
+	}
+
+	lb_emit_jump(p, done_block);
+	lb_start_block(p, done_block);
+
+	LLVMValueRef res = incoming_values[0];
+
+	switch (lb_check_for_integer_division_by_zero(p))  {
+	case IntegerDivisionByZero_Trap:
+		res = incoming_values[0];
+		break;
+	case IntegerDivisionByZero_Zero:
+		res = LLVMBuildPhi(p->builder, type, "");
+
+		GB_ASSERT(p->curr_block->preds.count >= 2);
+		incoming_blocks[0] = p->curr_block->preds[0]->block;
+		incoming_blocks[1] = p->curr_block->preds[1]->block;
+
+		LLVMAddIncoming(res, incoming_values, incoming_blocks, 2);
+		break;
+	}
+
+	return res;
+}
 
 
 gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type) {
@@ -1350,33 +1497,20 @@ handle_op:;
 		if (is_type_float(integral_type)) {
 			res.value = LLVMBuildFDiv(p->builder, lhs.value, rhs.value, "");
 			return res;
-		} else if (is_type_unsigned(integral_type)) {
-			res.value = LLVMBuildUDiv(p->builder, lhs.value, rhs.value, "");
+		} else {
+			res.value = lb_integer_division(p, lhs.value, rhs.value, !is_type_unsigned(integral_type));
 			return res;
 		}
-		res.value = LLVMBuildSDiv(p->builder, lhs.value, rhs.value, "");
-		return res;
 	case Token_Mod:
 		if (is_type_float(integral_type)) {
 			res.value = LLVMBuildFRem(p->builder, lhs.value, rhs.value, "");
 			return res;
-		} else if (is_type_unsigned(integral_type)) {
-			res.value = LLVMBuildURem(p->builder, lhs.value, rhs.value, "");
-			return res;
 		}
-		res.value = LLVMBuildSRem(p->builder, lhs.value, rhs.value, "");
+		res.value = lb_integer_modulo(p, lhs.value, rhs.value, is_type_unsigned(integral_type), /*is_floored*/false);
 		return res;
 	case Token_ModMod:
-		if (is_type_unsigned(integral_type)) {
-			res.value = LLVMBuildURem(p->builder, lhs.value, rhs.value, "");
-			return res;
-		} else {
-			LLVMValueRef a = LLVMBuildSRem(p->builder, lhs.value, rhs.value, "");
-			LLVMValueRef b = LLVMBuildAdd(p->builder, a, rhs.value, "");
-			LLVMValueRef c = LLVMBuildSRem(p->builder, b, rhs.value, "");
-			res.value = c;
-			return res;
-		}
+		res.value = lb_integer_modulo(p, lhs.value, rhs.value, is_type_unsigned(integral_type), /*is_floored*/true);
+		return res;
 
 	case Token_And:
 		res.value = LLVMBuildAnd(p->builder, lhs.value, rhs.value, "");

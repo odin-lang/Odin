@@ -404,6 +404,11 @@ String linker_choices[Linker_COUNT] = {
 	str_lit("radlink"),
 };
 
+enum IntegerDivisionByZeroKind : u8 {
+	IntegerDivisionByZero_Trap,
+	IntegerDivisionByZero_Zero,
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -484,6 +489,8 @@ struct BuildContext {
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+
+	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 
 	LinkerChoice linker_choice;
 
