@@ -9,7 +9,7 @@ _ :: runtime
 DEFAULT_PAGE_SIZE := uint(4096)
 
 @(init, private)
-platform_memory_init :: proc() {
+platform_memory_init :: proc "contextless" () {
 	_platform_memory_init()
 }
 

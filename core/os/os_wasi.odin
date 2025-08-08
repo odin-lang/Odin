@@ -28,16 +28,18 @@ stderr: Handle = 2
 args := _alloc_command_line_arguments()
 
 @(private, require_results)
-_alloc_command_line_arguments :: proc() -> (args: []string) {
-	args = make([]string, len(runtime.args__))
+_alloc_command_line_arguments :: proc "contextless" () -> []string {
+	context = runtime.default_context()
+	args := make([]string, len(runtime.args__))
 	for &arg, i in args {
 		arg = string(runtime.args__[i])
 	}
-	return
+	return args
 }
 
 @(private, fini)
-_delete_command_line_arguments :: proc() {
+_delete_command_line_arguments :: proc "contextless" () {
+	context = runtime.default_context()
 	delete(args)
 }
 

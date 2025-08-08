@@ -25,8 +25,8 @@ File_Impl :: struct {
 }
 
 @(init)
-init_std_files :: proc() {
-	new_std :: proc(impl: ^File_Impl, fd: posix.FD, name: cstring) -> ^File {
+init_std_files :: proc "contextless" () {
+	new_std :: proc "contextless" (impl: ^File_Impl, fd: posix.FD, name: cstring) -> ^File {
 		impl.file.impl = impl
 		impl.fd = fd
 		impl.allocator = runtime.nil_allocator()

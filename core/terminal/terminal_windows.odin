@@ -1,10 +1,11 @@
 #+private
 package terminal
 
+import "base:runtime"
 import "core:os"
 import "core:sys/windows"
 
-_is_terminal :: proc(handle: os.Handle) -> bool {
+_is_terminal :: proc "contextless" (handle: os.Handle) -> bool {
 	is_tty := windows.GetFileType(windows.HANDLE(handle)) == windows.FILE_TYPE_CHAR
 	return is_tty
 }
@@ -18,7 +19,7 @@ old_modes: [2]struct{
 }
 
 @(init)
-_init_terminal :: proc() {
+_init_terminal :: proc "contextless" () {
 	vtp_enabled: bool
 
 	for &v in old_modes {
@@ -42,13 +43,15 @@ _init_terminal :: proc() {
 		// This color depth is available on Windows 10 since build 10586.
 		color_depth = .Four_Bit
 	} else {
+		context = runtime.default_context()
+
 		// The user may be on a non-default terminal emulator.
 		color_depth = get_environment_color()
 	}
 }
 
 @(fini)
-_fini_terminal :: proc() {
+_fini_terminal :: proc "contextless" () {
 	for v in old_modes {
 		handle := windows.GetStdHandle(v.handle)
 		if handle == windows.INVALID_HANDLE || handle == nil {

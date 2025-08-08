@@ -16,7 +16,7 @@ MAX_TEMP_ARENA_COLLISIONS :: MAX_TEMP_ARENA_COUNT - 1
 global_default_temp_allocator_arenas: [MAX_TEMP_ARENA_COUNT]runtime.Arena
 
 @(fini, private)
-temp_allocator_fini :: proc() {
+temp_allocator_fini :: proc "contextless" () {
 	for &arena in global_default_temp_allocator_arenas {
 		runtime.arena_destroy(&arena)
 	}
@@ -69,6 +69,6 @@ _temp_allocator_end :: proc(tmp: runtime.Arena_Temp) {
 }
 
 @(init, private)
-init_thread_local_cleaner :: proc() {
+init_thread_local_cleaner :: proc "contextless" () {
 	runtime.add_thread_local_cleaner(temp_allocator_fini)
 }

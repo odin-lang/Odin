@@ -2675,6 +2675,10 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_init = false;
 				}
 
+				if (t->Proc.calling_convention != ProcCC_Contextless) {
+					error(e->token, "@(init) procedures must be declared as \"contextless\"");
+				}
+
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
 					error(e->token, "@(init) procedures must be declared at the file scope");
 					is_init = false;
@@ -2688,6 +2692,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 				if (is_blank_ident(e->token)) {
 					error(e->token, "An @(init) procedure must not use a blank identifier as its name");
 				}
+
 
 				if (is_init) {
 					add_dependency_to_set(c, e);
@@ -2704,6 +2709,10 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					error(e->token, "@(fini) procedures must have a signature type with no parameters nor results, got %s", str);
 					gb_string_free(str);
 					is_fini = false;
+				}
+
+				if (t->Proc.calling_convention != ProcCC_Contextless) {
+					error(e->token, "@(fini) procedures must be declared as \"contextless\"");
 				}
 
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
