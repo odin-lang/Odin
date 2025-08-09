@@ -6147,7 +6147,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	Entity *entity, Type *proc_type,
 	Array<Operand> positional_operands, Array<Operand> const &named_operands,
 	CallArgumentErrorMode show_error_mode,
-	CallArgumentData *data) {
+	CallArgumentData *data,
+	bool checking_proc_group) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	CallArgumentError err = CallArgumentError_None;
@@ -6314,7 +6315,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			bool context_allocator_error = false;
 			if (e->kind == Entity_Variable) {
 				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-					if (ast_file_vet_explicit_allocators(c->file)) {
+					if (ast_file_vet_explicit_allocators(c->file) && !checking_proc_group) {
 						// NOTE(lucas): check if we are trying to default to context.allocator or context.temp_allocator
 						if (e->Variable.param_value.original_ast_expr->kind == Ast_SelectorExpr) {
 							auto& expr = e->Variable.param_value.original_ast_expr->SelectorExpr.expr;
@@ -6741,7 +6742,8 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 	Entity *e, Type *proc_type,
 	Array<Operand> const &positional_operands, Array<Operand> const &named_operands,
 	CallArgumentErrorMode show_error_mode,
-	CallArgumentData *data) {
+	CallArgumentData *data,
+	bool checking_proc_group) {
 
 	bool return_on_failure = show_error_mode == CallArgumentErrorMode::NoErrors;
 
@@ -6765,7 +6767,7 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 	}
 	GB_ASSERT(proc_type->kind == Type_Proc);
 
-	CallArgumentError err = check_call_arguments_internal(c, call, e, proc_type, positional_operands, named_operands, show_error_mode, data);
+	CallArgumentError err = check_call_arguments_internal(c, call, e, proc_type, positional_operands, named_operands, show_error_mode, data, checking_proc_group);
 	if (return_on_failure && err != CallArgumentError_None) {
 		return false;
 	}
@@ -6919,7 +6921,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				e, e->type,
 				positional_operands, named_operands,
 				CallArgumentErrorMode::ShowErrors,
-				&data);
+				&data, false);
 		}
 		return data;
 	}
@@ -7063,7 +7065,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				p, pt,
 				positional_operands, named_operands,
 				CallArgumentErrorMode::NoErrors,
-				&data);
+				&data, true);
 			if (!is_a_candidate) {
 				continue;
 			}
@@ -7372,7 +7374,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			e, e->type,
 			positional_operands, named_operands,
 			CallArgumentErrorMode::ShowErrors,
-			&data);
+			&data, false);
 		return data;
 	}
 
@@ -7485,7 +7487,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			nullptr, proc_type,
 			positional_operands, named_operands,
 			CallArgumentErrorMode::ShowErrors,
-			&data);
+			&data, false);
 	} else if (pt) {
 		data.result_type = pt->results;
 	}
