@@ -389,6 +389,18 @@ foreign xlib {
 		requestor:   Window,
 		time:        Time,
 		) ---
+	GetTextProperty :: proc(
+		display:            ^Display,
+		window:             Window,
+		text_prop_return:   ^XTextProperty,
+		property:           Atom,
+		) -> Status ---
+	SetTextProperty :: proc(
+		display:     ^Display,
+		window:      Window,
+		text_prop:   ^XTextProperty,
+		property:    Atom,
+		) ---
 	// Creating and freeing pixmaps
 	CreatePixmap :: proc(
 		display:   ^Display,
