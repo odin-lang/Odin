@@ -82,14 +82,16 @@ _tag_implementations_id: map[string]Tag_Implementation
 _tag_implementations_type: map[typeid]Tag_Implementation
 
 // Register a custom tag implementation to be used when marshalling that type and unmarshalling that tag number.
-tag_register_type :: proc(impl: Tag_Implementation, nr: Tag_Number, type: typeid) {
+tag_register_type :: proc "contextless" (impl: Tag_Implementation, nr: Tag_Number, type: typeid) {
+	context = runtime.default_context()
 	_tag_implementations_nr[nr] = impl
 	_tag_implementations_type[type] = impl
 }
 
 // Register a custom tag implementation to be used when marshalling that tag number or marshalling
 // a field with the struct tag `cbor_tag:"nr"`.
-tag_register_number :: proc(impl: Tag_Implementation, nr: Tag_Number, id: string) {
+tag_register_number :: proc "contextless" (impl: Tag_Implementation, nr: Tag_Number, id: string) {
+	context = runtime.default_context()
 	_tag_implementations_nr[nr] = impl
 	_tag_implementations_id[id] = impl
 }
@@ -98,13 +100,13 @@ tag_register_number :: proc(impl: Tag_Implementation, nr: Tag_Number, id: string
 INITIALIZE_DEFAULT_TAGS :: #config(CBOR_INITIALIZE_DEFAULT_TAGS, !ODIN_DEFAULT_TO_PANIC_ALLOCATOR && !ODIN_DEFAULT_TO_NIL_ALLOCATOR)
 
 @(private, init, disabled=!INITIALIZE_DEFAULT_TAGS)
-tags_initialize_defaults :: proc() {
+tags_initialize_defaults :: proc "contextless" () {
 	tags_register_defaults()
 }
 
 // Registers tags that have implementations provided by this package.
 // This is done by default and can be controlled with the `CBOR_INITIALIZE_DEFAULT_TAGS` define.
-tags_register_defaults :: proc() {
+tags_register_defaults :: proc "contextless" () {
 	tag_register_number({nil, tag_time_unmarshal,   tag_time_marshal},   TAG_EPOCH_TIME_NR, TAG_EPOCH_TIME_ID)
 	tag_register_number({nil, tag_base64_unmarshal, tag_base64_marshal}, TAG_BASE64_NR,     TAG_BASE64_ID)
 	tag_register_number({nil, tag_cbor_unmarshal,   tag_cbor_marshal},   TAG_CBOR_NR,       TAG_CBOR_ID)

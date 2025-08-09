@@ -13,7 +13,7 @@ import "core:time"
 foreign import lib "system:System"
 
 foreign lib {
-	sysctl :: proc(
+	sysctl :: proc "c" (
 		name: [^]i32, namelen: u32,
 		oldp: rawptr, oldlenp: ^uint,
 		newp: rawptr, newlen: uint,

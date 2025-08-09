@@ -23,7 +23,7 @@ nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, .None
 }
 
-nil_allocator :: proc() -> Allocator {
+nil_allocator :: proc "contextless" () -> Allocator {
 	return Allocator{
 		procedure = nil_allocator_proc,
 		data = nil,

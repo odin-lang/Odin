@@ -2,9 +2,12 @@ package sysinfo
 
 import sys "core:sys/windows"
 import "base:intrinsics"
+import "base:runtime"
 
 @(init, private)
-init_cpu_core_count :: proc() {
+init_cpu_core_count :: proc "contextless" () {
+	context = runtime.default_context()
+
 	infos: []sys.SYSTEM_LOGICAL_PROCESSOR_INFORMATION
 	defer delete(infos)
 

@@ -1,6 +1,7 @@
 package sysinfo
 
 import "base:intrinsics"
+import "base:runtime"
 
 import "core:strconv"
 import "core:strings"
@@ -10,7 +11,9 @@ import "core:sys/linux"
 version_string_buf: [1024]u8
 
 @(init, private)
-init_os_version :: proc () {
+init_os_version :: proc "contextless" () {
+	context = runtime.default_context()
+
 	os_version.platform = .Linux
 
 	b := strings.builder_from_bytes(version_string_buf[:])
@@ -91,11 +94,11 @@ init_os_version :: proc () {
 }
 
 @(init, private)
-init_ram :: proc() {
+init_ram :: proc "contextless" () {
 	// Retrieve RAM info using `sysinfo`
 	sys_info: linux.Sys_Info
 	errno := linux.sysinfo(&sys_info)
-	assert(errno == .NONE, "Good luck to whoever's debugging this, something's seriously cucked up!")
+	assert_contextless(errno == .NONE, "Good luck to whoever's debugging this, something's seriously cucked up!")
 	ram = RAM{
 		total_ram  = int(sys_info.totalram)  * int(sys_info.mem_unit),
 		free_ram   = int(sys_info.freeram)   * int(sys_info.mem_unit),

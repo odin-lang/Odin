@@ -628,7 +628,7 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 	}
 }
 
-ensure_winsock_initialized :: proc() {
+ensure_winsock_initialized :: proc "contextless" () {
 	@static gate := false
 	@static initted := false
 
@@ -644,7 +644,7 @@ ensure_winsock_initialized :: proc() {
 	unused_info: WSADATA
 	version_requested := WORD(2) << 8 | 2
 	res := WSAStartup(version_requested, &unused_info)
-	assert(res == 0, "unable to initialized Winsock2")
+	assert_contextless(res == 0, "unable to initialized Winsock2")
 
 	initted = true
 }

@@ -43,8 +43,8 @@ File_Impl :: struct {
 }
 
 @(init)
-init_std_files :: proc() {
-	new_std :: proc(impl: ^File_Impl, code: u32, name: string) -> ^File {
+init_std_files :: proc "contextless" () {
+	new_std :: proc "contextless" (impl: ^File_Impl, code: u32, name: string) -> ^File {
 		impl.file.impl = impl
 
 		impl.allocator = runtime.nil_allocator()
@@ -77,7 +77,7 @@ init_std_files :: proc() {
 	stderr = new_std(&files[2], win32.STD_ERROR_HANDLE,  "<stderr>")
 }
 
-_handle :: proc(f: ^File) -> win32.HANDLE {
+_handle :: proc "contextless" (f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
 }
 
@@ -234,7 +234,7 @@ _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
 	return _new_file(uintptr(clonefd), name(f), file_allocator())
 }
 
-_fd :: proc(f: ^File) -> uintptr {
+_fd :: proc "contextless" (f: ^File) -> uintptr {
 	if f == nil || f.impl == nil {
 		return INVALID_HANDLE
 	}

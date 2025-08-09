@@ -45,8 +45,8 @@ _stderr := File{
 }
 
 @init
-_standard_stream_init :: proc() {
-	new_std :: proc(impl: ^File_Impl, fd: linux.Fd, name: string) -> ^File {
+_standard_stream_init :: proc "contextless" () {
+	new_std :: proc "contextless" (impl: ^File_Impl, fd: linux.Fd, name: string) -> ^File {
 		impl.file.impl = impl
 		impl.fd = linux.Fd(fd)
 		impl.allocator = runtime.nil_allocator()

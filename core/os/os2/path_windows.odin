@@ -160,7 +160,7 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 can_use_long_paths: bool
 
 @(init)
-init_long_path_support :: proc() {
+init_long_path_support :: proc "contextless" () {
 	can_use_long_paths = false
 
 	key: win32.HKEY

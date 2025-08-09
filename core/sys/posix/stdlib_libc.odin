@@ -60,7 +60,7 @@ wctomb        :: libc.wctomb
 mbstowcs      :: libc.mbstowcs
 wcstombs      :: libc.wcstombs
 
-free :: #force_inline proc(ptr: $T) where intrinsics.type_is_pointer(T) || intrinsics.type_is_multi_pointer(T) || T == cstring {
+free :: #force_inline proc "c" (ptr: $T) where intrinsics.type_is_pointer(T) || intrinsics.type_is_multi_pointer(T) || T == cstring {
 	libc.free(rawptr(ptr))
 }
 
