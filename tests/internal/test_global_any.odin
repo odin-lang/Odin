@@ -3,7 +3,7 @@ package test_internal
 @(private="file")
 global_any_from_proc: any = from_proc()
 
-from_proc :: proc() -> f32 {
+from_proc :: proc "contextless" () -> f32 {
 	return 1.1
 }
 

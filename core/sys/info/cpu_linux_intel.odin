@@ -2,12 +2,15 @@
 #+build linux
 package sysinfo
 
+import "base:runtime"
 import "core:sys/linux"
 import "core:strings"
 import "core:strconv"
 
 @(init, private)
-init_cpu_core_count :: proc() {
+init_cpu_core_count :: proc "contextless" () {
+	context = runtime.default_context()
+
 	fd, err := linux.open("/proc/cpuinfo", {})
 	if err != .NONE { return }
 	defer linux.close(fd)

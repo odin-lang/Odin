@@ -25,7 +25,7 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	return false
 }
 
-_platform_memory_init :: proc() {
+_platform_memory_init :: proc "contextless" () {
 }
 
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {

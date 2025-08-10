@@ -169,7 +169,7 @@ exit :: proc "c" (exit_code: c.int) -> ! {
 }
 
 @(private, fini)
-finish_atexit :: proc "c" () {
+finish_atexit :: proc "contextless" () {
 	n := intrinsics.atomic_exchange(&atexit_functions_count, 0)
 	for function in atexit_functions[:n] {
 		function()
