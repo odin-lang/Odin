@@ -1139,8 +1139,23 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
+	LLVMValueRef zero = LLVMConstNull(type);
+	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
+
 	auto *call = is_signed ? LLVMBuildSDiv : LLVMBuildUDiv;
 
+	if (LLVMIsConstant(rhs)) {
+		if (LLVMIsNull(rhs)) {
+			switch (behaviour) {
+			case IntegerDivisionByZero_Self:
+				return lhs;
+			case IntegerDivisionByZero_Zero:
+				return zero;
+			}
+		} else {
+			return call(p->builder, lhs, rhs, "");
+		}
+	}
 
 	LLVMValueRef incoming_values[2] = {};
 	LLVMBasicBlockRef incoming_blocks[2] = {};
@@ -1149,7 +1164,6 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	lbBlock *edge_case_block = lb_create_block(p, "div.edge");
 	lbBlock *done_block      = lb_create_block(p, "div.done");
 
-	LLVMValueRef zero = LLVMConstNull(type);
 	LLVMValueRef dem_check = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, zero, "");
 	lbValue cond = {dem_check, t_untyped_bool};
 
@@ -1157,13 +1171,12 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	lb_start_block(p, safe_block);
 	incoming_values[0] = call(p->builder, lhs, rhs, "");
-
 	lb_emit_jump(p, done_block);
 
 	lb_start_block(p, edge_case_block);
 
 
-	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
+	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
 		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
 		LLVMBuildUnreachable(p->builder);
@@ -1181,7 +1194,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	LLVMValueRef res = incoming_values[0];
 
-	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
+	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
 	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
@@ -1204,22 +1217,10 @@ gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValu
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
-	LLVMValueRef incoming_values[2] = {};
-	LLVMBasicBlockRef incoming_blocks[2] = {};
-
-	lbBlock *safe_block      = lb_create_block(p, "div.safe");
-	lbBlock *edge_case_block = lb_create_block(p, "div.edge");
-	lbBlock *done_block      = lb_create_block(p, "div.done");
-
 	LLVMValueRef zero = LLVMConstNull(type);
-	LLVMValueRef dem_check = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, zero, "");
-	lbValue cond = {dem_check, t_untyped_bool};
+	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
 
-	lb_emit_if(p, cond, safe_block, edge_case_block);
-
-	lb_start_block(p, safe_block);
-
-	{
+	auto const do_op = [&]() -> LLVMValueRef {
 		LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
 
 		LLVMValueRef args[3] = {
@@ -1227,15 +1228,42 @@ gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValu
 			rhs,
 			scale };
 
-		incoming_values[0] = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+		return lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+	};
+
+	if (LLVMIsConstant(rhs)) {
+		if (LLVMIsNull(rhs)) {
+			switch (behaviour) {
+			case IntegerDivisionByZero_Self:
+				return lhs;
+			case IntegerDivisionByZero_Zero:
+				return zero;
+			}
+		} else {
+			return do_op();
+		}
 	}
 
+	LLVMValueRef incoming_values[2] = {};
+	LLVMBasicBlockRef incoming_blocks[2] = {};
+
+	lbBlock *safe_block      = lb_create_block(p, "div.safe");
+	lbBlock *edge_case_block = lb_create_block(p, "div.edge");
+	lbBlock *done_block      = lb_create_block(p, "div.done");
+
+	LLVMValueRef dem_check = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, zero, "");
+	lbValue cond = {dem_check, t_untyped_bool};
+
+	lb_emit_if(p, cond, safe_block, edge_case_block);
+
+	lb_start_block(p, safe_block);
+	incoming_values[0] = do_op();
 	lb_emit_jump(p, done_block);
 
 	lb_start_block(p, edge_case_block);
 
 
-	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
+	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
 		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
 		LLVMBuildUnreachable(p->builder);
@@ -1253,7 +1281,7 @@ gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValu
 
 	LLVMValueRef res = incoming_values[0];
 
-	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
+	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
 	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
@@ -1277,6 +1305,42 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
+	LLVMValueRef zero = LLVMConstNull(type);
+	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
+
+	auto const do_op = [&]() -> LLVMValueRef {
+		if (is_floored) { // %%
+			if (is_unsigned) {
+				return LLVMBuildURem(p->builder, lhs, rhs, "");
+			} else {
+				LLVMValueRef a = LLVMBuildSRem(p->builder, lhs, rhs, "");
+				LLVMValueRef b = LLVMBuildAdd(p->builder, a, rhs, "");
+				LLVMValueRef c = LLVMBuildSRem(p->builder, b, rhs, "");
+				return c;
+			}
+		} else { // %
+			if (is_unsigned) {
+				return LLVMBuildURem(p->builder, lhs, rhs, "");
+			} else {
+				return LLVMBuildSRem(p->builder, lhs, rhs, "");
+			}
+		}
+	};
+
+	if (LLVMIsConstant(rhs)) {
+		if (LLVMIsNull(rhs)) {
+			switch (behaviour) {
+			case IntegerDivisionByZero_Self:
+				return zero;
+			case IntegerDivisionByZero_Zero:
+				return lhs;
+			}
+		} else {
+			return do_op();
+		}
+	}
+
+
 	LLVMValueRef incoming_values[2] = {};
 	LLVMBasicBlockRef incoming_blocks[2] = {};
 
@@ -1284,31 +1348,13 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 	lbBlock *edge_case_block = lb_create_block(p, "div.edge");
 	lbBlock *done_block      = lb_create_block(p, "div.done");
 
-	LLVMValueRef zero = LLVMConstNull(type);
 	LLVMValueRef dem_check = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, zero, "");
 	lbValue cond = {dem_check, t_untyped_bool};
 
 	lb_emit_if(p, cond, safe_block, edge_case_block);
 
 	lb_start_block(p, safe_block);
-
-	if (is_floored) { // %%
-		if (is_unsigned) {
-			incoming_values[0] = LLVMBuildURem(p->builder, lhs, rhs, "");
-		} else {
-			LLVMValueRef a = LLVMBuildSRem(p->builder, lhs, rhs, "");
-			LLVMValueRef b = LLVMBuildAdd(p->builder, a, rhs, "");
-			LLVMValueRef c = LLVMBuildSRem(p->builder, b, rhs, "");
-			incoming_values[0] = c;
-		}
-	} else { // %
-		if (is_unsigned) {
-			incoming_values[0] = LLVMBuildURem(p->builder, lhs, rhs, "");
-		} else {
-			incoming_values[0] = LLVMBuildSRem(p->builder, lhs, rhs, "");
-		}
-	}
-
+	incoming_values[0] = do_op();
 	lb_emit_jump(p, done_block);
 
 	lb_start_block(p, edge_case_block);
@@ -1320,9 +1366,10 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 		floored:   r = a - b*floor(a/b)
 
 		IFF a/0 == 0, then (a%0 == a) or (a%%0 == a)
+		IFF a/0 == a, then (a%0 == 0) or (a%%0 == 0)
 	*/
 
-	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
+	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
 		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
 		LLVMBuildUnreachable(p->builder);
@@ -1340,7 +1387,7 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 
 	LLVMValueRef res = incoming_values[0];
 
-	switch (lb_check_for_integer_division_by_zero_behaviour(p))  {
+	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
 	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
