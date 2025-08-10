@@ -505,7 +505,13 @@ write_base_name:
 
 			Type *params = nullptr;
 			Entity *parent = type_get_polymorphic_parent(e->type, &params);
-			if (parent && (parent->token.string == e->token.string)) {
+			if (parent && (e->token.string == parent->token.string)) {
+				// Check for `distinct` forms
+				type_writer_append(w, parent->token.string.text, parent->token.string.len);
+				write_canonical_params(w, params);
+			} else if (parent && string_starts_with(e->token.string, parent->token.string) &&
+			                     string_contains_char(e->token.string, '(')) {
+				// Check for named specialization forms
 				type_writer_append(w, parent->token.string.text, parent->token.string.len);
 				write_canonical_params(w, params);
 			} else {
@@ -767,7 +773,6 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 	case Type_Named:
 		if (type->Named.type_name != nullptr) {
 			write_canonical_entity_name(w, type->Named.type_name);
-			return;
 		} else {
 			type_writer_append(w, type->Named.name.text, type->Named.name.len);
 		}
