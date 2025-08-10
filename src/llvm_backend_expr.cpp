@@ -1355,9 +1355,9 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 	LLVMValueRef incoming_values[2] = {};
 	LLVMBasicBlockRef incoming_blocks[2] = {};
 
-	lbBlock *safe_block      = lb_create_block(p, "div.safe");
-	lbBlock *edge_case_block = lb_create_block(p, "div.edge");
-	lbBlock *done_block      = lb_create_block(p, "div.done");
+	lbBlock *safe_block      = lb_create_block(p, "mod.safe");
+	lbBlock *edge_case_block = lb_create_block(p, "mod.edge");
+	lbBlock *done_block      = lb_create_block(p, "mod.done");
 
 	LLVMValueRef dem_check = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, zero, "");
 	lbValue cond = {dem_check, t_untyped_bool};
