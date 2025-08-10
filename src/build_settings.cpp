@@ -353,14 +353,18 @@ enum OptInFeatureFlags : u64 {
 	OptInFeatureFlag_NONE            = 0,
 	OptInFeatureFlag_DynamicLiterals = 1u<<0,
 
-	OptInFeatureFlag_IntegerDivisionByZero_Trap = 1u<<1,
-	OptInFeatureFlag_IntegerDivisionByZero_Zero = 1u<<2,
-	OptInFeatureFlag_IntegerDivisionByZero_Self = 1u<<3,
+	OptInFeatureFlag_GlobalContext = 1u<<1,
 
-	OptInFeatureFlag_GlobalContext = 1u<<4,
+	OptInFeatureFlag_IntegerDivisionByZero_Trap    = 1u<<2,
+	OptInFeatureFlag_IntegerDivisionByZero_Zero    = 1u<<3,
+	OptInFeatureFlag_IntegerDivisionByZero_Self    = 1u<<4,
+	OptInFeatureFlag_IntegerDivisionByZero_AllBits = 1u<<5,
 
 
-	OptInFeatureFlag_IntegerDivisionByZero_ALL = OptInFeatureFlag_IntegerDivisionByZero_Trap|OptInFeatureFlag_IntegerDivisionByZero_Zero|OptInFeatureFlag_IntegerDivisionByZero_Self,
+	OptInFeatureFlag_IntegerDivisionByZero_ALL = OptInFeatureFlag_IntegerDivisionByZero_Trap|
+	                                             OptInFeatureFlag_IntegerDivisionByZero_Zero|
+	                                             OptInFeatureFlag_IntegerDivisionByZero_Self|
+	                                             OptInFeatureFlag_IntegerDivisionByZero_AllBits,
 
 };
 
@@ -377,6 +381,10 @@ u64 get_feature_flag_from_name(String const &name) {
 	if (name == "integer-division-by-zero:self") {
 		return OptInFeatureFlag_IntegerDivisionByZero_Self;
 	}
+	if (name == "integer-division-by-zero:all-bits") {
+		return OptInFeatureFlag_IntegerDivisionByZero_AllBits;
+	}
+
 
 	if (name == "global-context") {
 		return OptInFeatureFlag_GlobalContext;
@@ -431,6 +439,7 @@ enum IntegerDivisionByZeroKind : u8 {
 	IntegerDivisionByZero_Trap,
 	IntegerDivisionByZero_Zero,
 	IntegerDivisionByZero_Self,
+	IntegerDivisionByZero_AllBits,
 };
 
 // This stores the information for the specify architecture of this build

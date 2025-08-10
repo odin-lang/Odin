@@ -4377,12 +4377,23 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		    b.kind == ExactValue_Integer && big_int_is_zero(&b.value_integer) &&
 		    (op.kind == Token_QuoEq || op.kind == Token_Mod || op.kind == Token_ModMod)) {
 		    	if (op.kind == Token_QuoEq) {
-		    		if (zero_behaviour == IntegerDivisionByZero_Zero) {
+		    		switch (zero_behaviour) {
+		    		case IntegerDivisionByZero_Zero:
 			    		// x/0 == 0
 					x->value = b;
-				} else {
+					break;
+				case IntegerDivisionByZero_Self:
 			    		// x/0 == x
 					x->value = a;
+					break;
+				case IntegerDivisionByZero_AllBits:
+			    		// x/0 == 0b111...111
+			    		if (is_type_untyped(x->type)) {
+			    			x->value = exact_value_i64(-1);
+			    		} else {
+						x->value = exact_unary_operator_value(Token_Xor, b, cast(i32)(8*type_size_of(x->type)), is_type_unsigned(x->type));
+					}
+					break;
 				}
 			} else {
 		    		/*
@@ -4391,16 +4402,21 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		    			truncated: r = a - b*trunc(a/b)
 		    			floored:   r = a - b*floor(a/b)
 
-		    			IFF a/0 == 0, then (a%0 == a) or (a%%0 == a)
-		    			IFF a/0 == a, then (a%0 == 0) or (a%%0 == 0)
+		    			IFF a/0 == 0,        then (a%0 == a) or (a%%0 == a)
+		    			IFF a/0 == a,        then (a%0 == 0) or (a%%0 == 0)
+		    			IFF a/0 == 0b111..., then (a%0 == a) or (a%%0 == a)
 		    		*/
 
-		    		if (zero_behaviour == IntegerDivisionByZero_Zero) {
+				switch (zero_behaviour) {
+				case IntegerDivisionByZero_Zero:
+				case IntegerDivisionByZero_AllBits:
 			    		// x%0 == x
 					x->value = a;
-				} else {
+					break;
+				case IntegerDivisionByZero_Self:
 			    		// x%0 == 0
 					x->value = b;
+					break;
 				}
 			}
 		} else {
@@ -9669,6 +9685,9 @@ gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(Checker
 	}
 	if ((flags & OptInFeatureFlag_IntegerDivisionByZero_Self) != 0) {
 		return IntegerDivisionByZero_Self;
+	}
+	if ((flags & OptInFeatureFlag_IntegerDivisionByZero_AllBits) != 0) {
+		return IntegerDivisionByZero_AllBits;
 	}
 	return build_context.integer_division_by_zero_behaviour;
 }

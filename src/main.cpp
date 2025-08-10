@@ -2589,6 +2589,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(3, "-integer-division-by-zero:trap        Trap on division/modulo/remainder by zero");
 			print_usage_line(3, "-integer-division-by-zero:zero        x/0 == 0 and x%%0 == x and x%%%%0 == x");
 			print_usage_line(3, "-integer-division-by-zero:self        x/0 == x and x%%0 == 0 and x%%%%0 == 0");
+			print_usage_line(3, "-integer-division-by-zero:all-bits    x/0 == ~T(0) and x%%0 == x and x%%%%0 == x");
 		}
 	}
 

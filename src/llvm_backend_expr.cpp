@@ -305,6 +305,9 @@ gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_beha
 		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Self) {
 			return IntegerDivisionByZero_Self;
 		}
+		if (flags & OptInFeatureFlag_IntegerDivisionByZero_AllBits) {
+			return IntegerDivisionByZero_AllBits;
+		}
 	}
 	return build_context.integer_division_by_zero_behaviour;
 }
@@ -1140,6 +1143,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
 	LLVMValueRef zero = LLVMConstNull(type);
+	LLVMValueRef all_bits = LLVMConstNot(zero);
 	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
 
 	auto *call = is_signed ? LLVMBuildSDiv : LLVMBuildUDiv;
@@ -1151,6 +1155,9 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 				return lhs;
 			case IntegerDivisionByZero_Zero:
 				return zero;
+			case IntegerDivisionByZero_AllBits:
+				// return all_bits;
+				break;
 			}
 		} else {
 			if (!is_signed && lb_sizeof(type) <= 8) {
@@ -1198,6 +1205,9 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	case IntegerDivisionByZero_Self:
 		incoming_values[1] = lhs;
 		break;
+	case IntegerDivisionByZero_AllBits:
+		incoming_values[1] = all_bits;
+		break;
 	}
 
 	lb_emit_jump(p, done_block);
@@ -1211,6 +1221,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 		res = incoming_values[0];
 		break;
 	case IntegerDivisionByZero_Zero:
+	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");
 
 		GB_ASSERT(p->curr_block->preds.count >= 2);
@@ -1229,6 +1240,7 @@ gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValu
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
 	LLVMValueRef zero = LLVMConstNull(type);
+	LLVMValueRef all_bits = LLVMConstNot(zero);
 	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
 
 	auto const do_op = [&]() -> LLVMValueRef {
@@ -1285,6 +1297,9 @@ gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValu
 	case IntegerDivisionByZero_Self:
 		incoming_values[1] = lhs;
 		break;
+	case IntegerDivisionByZero_AllBits:
+		incoming_values[1] = all_bits;
+		break;
 	}
 
 	lb_emit_jump(p, done_block);
@@ -1298,6 +1313,7 @@ gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValu
 		res = incoming_values[0];
 		break;
 	case IntegerDivisionByZero_Zero:
+	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");
 
 		GB_ASSERT(p->curr_block->preds.count >= 2);
@@ -1344,6 +1360,7 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 			case IntegerDivisionByZero_Self:
 				return zero;
 			case IntegerDivisionByZero_Zero:
+			case IntegerDivisionByZero_AllBits:
 				return lhs;
 			}
 		} else {
@@ -1386,6 +1403,7 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 		LLVMBuildUnreachable(p->builder);
 		break;
 	case IntegerDivisionByZero_Zero:
+	case IntegerDivisionByZero_AllBits:
 		incoming_values[1] = lhs;
 		break;
 	case IntegerDivisionByZero_Self:
@@ -1404,6 +1422,7 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 		res = incoming_values[0];
 		break;
 	case IntegerDivisionByZero_Zero:
+	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");
 
 		GB_ASSERT(p->curr_block->preds.count >= 2);
