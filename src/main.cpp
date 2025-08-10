@@ -392,6 +392,8 @@ enum BuildFlagKind {
 
 	BuildFlag_PrintLinkerFlags,
 
+	BuildFlag_IntegerDivisionByZero,
+
 	// internal use only
 	BuildFlag_InternalFastISel,
 	BuildFlag_InternalIgnoreLazy,
@@ -612,6 +614,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_MinLinkLibs,             str_lit("min-link-libs"),             BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_PrintLinkerFlags,        str_lit("print-linker-flags"),        BuildFlagParam_None,    Command_build);
+
+	add_flag(&build_flags, BuildFlag_IntegerDivisionByZero,   str_lit("integer-division-by-zero"),  BuildFlagParam_String, Command__does_check);
+
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
@@ -1515,7 +1520,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							} else if (str_eq_ignore_case(value.value_string, str_lit("unix"))) {
 								build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Unix;
 							} else {
-								gb_printf_err("-error-pos-style options are 'unix', 'odin' and 'default' (odin)\n");
+								gb_printf_err("-error-pos-style options are 'unix', 'odin', and 'default' (odin)\n");
 								bad_flags = true;
 							}
 							break;
@@ -1537,6 +1542,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_PrintLinkerFlags:
 							build_context.print_linker_flags = true;
+							break;
+
+						case BuildFlag_IntegerDivisionByZero:
+							GB_ASSERT(value.kind == ExactValue_String);
+							if (str_eq_ignore_case(value.value_string, "trap")) {
+								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_Trap;
+							} else if (str_eq_ignore_case(value.value_string, "zero")) {
+								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_Zero;
+							} else if (str_eq_ignore_case(value.value_string, "self")) {
+								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_Self;
+							}else {
+								gb_printf_err("-integer-division-by-zero options are 'trap', 'zero', and 'self'.\n");
+								bad_flags = true;
+							}
 							break;
 
 						case BuildFlag_InternalFastISel:
@@ -2561,7 +2580,19 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-ignore-warnings")) {
 			print_usage_line(2, "Ignores warning messages.");
 		}
+	}
 
+	if (check) {
+		if (print_flag("-integer-division-by-zero:<string>")) {
+			print_usage_line(2, "Specifies the default behaviour for integer division by zero.");
+			print_usage_line(2, "Available Options:");
+			print_usage_line(3, "-integer-division-by-zero:trap        Trap on division/modulo/remainder by zero");
+			print_usage_line(3, "-integer-division-by-zero:zero        x/0 == 0 and x%%0 == x and x%%%%0 == x");
+			print_usage_line(3, "-integer-division-by-zero:self        x/0 == x and x%%0 == 0 and x%%%%0 == 0");
+		}
+	}
+
+	if (check) {
 		if (print_flag("-json-errors")) {
 			print_usage_line(2, "Prints the error messages as json to stderr.");
 		}

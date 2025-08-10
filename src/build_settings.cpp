@@ -352,11 +352,27 @@ u64 get_vet_flag_from_name(String const &name) {
 enum OptInFeatureFlags : u64 {
 	OptInFeatureFlag_NONE            = 0,
 	OptInFeatureFlag_DynamicLiterals = 1u<<0,
+
+	OptInFeatureFlag_IntegerDivisionByZero_Trap = 1u<<1,
+	OptInFeatureFlag_IntegerDivisionByZero_Zero = 1u<<2,
+	OptInFeatureFlag_IntegerDivisionByZero_Self = 1u<<3,
+
+	OptInFeatureFlag_IntegerDivisionByZero_ALL = OptInFeatureFlag_IntegerDivisionByZero_Trap|OptInFeatureFlag_IntegerDivisionByZero_Zero|OptInFeatureFlag_IntegerDivisionByZero_Self,
+
 };
 
 u64 get_feature_flag_from_name(String const &name) {
 	if (name == "dynamic-literals") {
 		return OptInFeatureFlag_DynamicLiterals;
+	}
+	if (name == "integer-division-by-zero:trap") {
+		return OptInFeatureFlag_IntegerDivisionByZero_Trap;
+	}
+	if (name == "integer-division-by-zero:zero") {
+		return OptInFeatureFlag_IntegerDivisionByZero_Zero;
+	}
+	if (name == "integer-division-by-zero:self") {
+		return OptInFeatureFlag_IntegerDivisionByZero_Self;
 	}
 	return OptInFeatureFlag_NONE;
 }
@@ -402,6 +418,12 @@ String linker_choices[Linker_COUNT] = {
 	str_lit("default"),
 	str_lit("lld"),
 	str_lit("radlink"),
+};
+
+enum IntegerDivisionByZeroKind : u8 {
+	IntegerDivisionByZero_Trap,
+	IntegerDivisionByZero_Zero,
+	IntegerDivisionByZero_Self,
 };
 
 // This stores the information for the specify architecture of this build
@@ -484,6 +506,8 @@ struct BuildContext {
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+
+	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 
 	LinkerChoice linker_choice;
 
