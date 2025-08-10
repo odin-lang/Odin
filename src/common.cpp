@@ -80,6 +80,13 @@ gb_internal gb_inline bool is_power_of_two(i64 x) {
 	return !(x & (x-1));
 }
 
+gb_internal gb_inline bool is_power_of_two_u64(u64 x) {
+	if (x == 0) {
+		return false;
+	}
+	return !(x & (x-1));
+}
+
 gb_internal int isize_cmp(isize x, isize y) {
 	if (x < y) {
 		return -1;

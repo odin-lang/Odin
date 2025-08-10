@@ -1153,6 +1153,17 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 				return zero;
 			}
 		} else {
+			if (!is_signed && lb_sizeof(type) <= 8) {
+				u64 v = cast(u64)LLVMConstIntGetZExtValue(rhs);
+				if (v == 1) {
+					return lhs;
+				} else if (is_power_of_two_u64(v)) {
+					u64 n = floor_log2(v);
+					LLVMValueRef bits = LLVMConstInt(type, n, false);
+					return LLVMBuildLShr(p->builder, lhs, bits, "");
+				}
+			}
+
 			return call(p->builder, lhs, rhs, "");
 		}
 	}
