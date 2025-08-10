@@ -1855,7 +1855,12 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 
 		auto prev_flags = c.scope->flags;
 		defer (c.scope->flags = prev_flags);
-		c.scope->flags &= ~ScopeFlag_ContextDefined;
+
+		if (check_feature_flags(ctx, d->decl_node) & OptInFeatureFlag_GlobalContext) {
+			c.scope->flags |= ScopeFlag_ContextDefined;
+		} else {
+			c.scope->flags &= ~ScopeFlag_ContextDefined;
+		}
 
 
 		e->parent_proc_decl = c.curr_proc_decl;

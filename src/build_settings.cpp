@@ -357,6 +357,9 @@ enum OptInFeatureFlags : u64 {
 	OptInFeatureFlag_IntegerDivisionByZero_Zero = 1u<<2,
 	OptInFeatureFlag_IntegerDivisionByZero_Self = 1u<<3,
 
+	OptInFeatureFlag_GlobalContext = 1u<<4,
+
+
 	OptInFeatureFlag_IntegerDivisionByZero_ALL = OptInFeatureFlag_IntegerDivisionByZero_Trap|OptInFeatureFlag_IntegerDivisionByZero_Zero|OptInFeatureFlag_IntegerDivisionByZero_Self,
 
 };
@@ -373,6 +376,10 @@ u64 get_feature_flag_from_name(String const &name) {
 	}
 	if (name == "integer-division-by-zero:self") {
 		return OptInFeatureFlag_IntegerDivisionByZero_Self;
+	}
+
+	if (name == "global-context") {
+		return OptInFeatureFlag_GlobalContext;
 	}
 	return OptInFeatureFlag_NONE;
 }
