@@ -286,8 +286,19 @@ gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(Checker
 
 gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_type, Type *original_type) {
 	GB_ASSERT(is_type_named(named_type));
+	GB_ASSERT(original_type->kind == Type_Named);
 	gbAllocator a = heap_allocator();
 	Scope *s = ctx->scope->parent;
+
+	AstPackage *pkg = nullptr;
+	if (original_type->Named.type_name && original_type->Named.type_name->pkg) {
+		pkg = original_type->Named.type_name->pkg;
+	}
+
+	if (pkg == nullptr) {
+		// NOTE(bill): if the `pkg` cannot be determined, default to the current context's pkg instead
+		pkg = ctx->pkg;
+	}
 
 	Entity *e = nullptr;
 	{
@@ -300,12 +311,11 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		e = alloc_entity_type_name(s, token, named_type);
 		e->state = EntityState_Resolved;
 		e->file = ctx->file;
-		e->pkg = ctx->pkg;
+		e->pkg = pkg;
 		add_entity_use(ctx, node, e);
 	}
 
 	named_type->Named.type_name = e;
-	GB_ASSERT(original_type->kind == Type_Named);
 	e->TypeName.objc_class_name = original_type->Named.type_name->TypeName.objc_class_name;
 	// TODO(bill): Is this even correct? Or should the metadata be copied?
 	e->TypeName.objc_metadata = original_type->Named.type_name->TypeName.objc_metadata;
@@ -646,7 +656,6 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	struct_type->Struct.node       = node;
 	struct_type->Struct.scope      = ctx->scope;
 	struct_type->Struct.is_packed  = st->is_packed;
-	struct_type->Struct.is_no_copy = st->is_no_copy;
 	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
 		&struct_type->Struct.is_polymorphic,

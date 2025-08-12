@@ -31,7 +31,7 @@ _lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: 
 		return "", false
 	}
 
-	value = win32_utf16_to_utf8(b[:n], allocator) or_else ""
+	value = win32_utf16_to_utf8(string16(b[:n]), allocator) or_else ""
 	found = true
 	return
 }

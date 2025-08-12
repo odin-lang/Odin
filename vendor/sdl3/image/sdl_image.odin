@@ -89,12 +89,12 @@ foreign lib {
 	ReadXPMFromArrayToRGB888 :: proc(xpm: [^]cstring) -> ^SDL.Surface ---
 
 	/* Individual saving functions */
-	SaveAVIF    :: proc(surface: ^SDL.Surface, file: cstring, quality: c.int) -> c.int ---
-	SaveAVIF_IO :: proc(surface: ^SDL.Surface, dst: ^SDL.IOStream, closeio: bool, quality: c.int) -> c.int ---
-	SavePNG     :: proc(surface: ^SDL.Surface, file: cstring) -> c.int ---
-	SavePNG_IO  :: proc(surface: ^SDL.Surface, dst: ^SDL.IOStream, closeio: bool) -> c.int ---
-	SaveJPG     :: proc(surface: ^SDL.Surface, file: cstring, quality: c.int) -> c.int ---
-	SaveJPG_IO  :: proc(surface: ^SDL.Surface, dst: ^SDL.IOStream, closeio: bool, quality: c.int) -> c.int ---
+	SaveAVIF    :: proc(surface: ^SDL.Surface, file: cstring, quality: c.int) -> c.bool ---
+	SaveAVIF_IO :: proc(surface: ^SDL.Surface, dst: ^SDL.IOStream, closeio: bool, quality: c.int) -> c.bool ---
+	SavePNG     :: proc(surface: ^SDL.Surface, file: cstring) -> c.bool ---
+	SavePNG_IO  :: proc(surface: ^SDL.Surface, dst: ^SDL.IOStream, closeio: bool) -> c.bool ---
+	SaveJPG     :: proc(surface: ^SDL.Surface, file: cstring, quality: c.int) -> c.bool ---
+	SaveJPG_IO  :: proc(surface: ^SDL.Surface, dst: ^SDL.IOStream, closeio: bool, quality: c.int) -> c.bool ---
 
 	LoadAnimation         :: proc(file: cstring) -> ^Animation ---
 	LoadAnimation_IO      :: proc(src: ^SDL.IOStream, closeio: bool) -> ^Animation ---

@@ -262,12 +262,28 @@ image :: struct {
 	extensions:       [^]extension `fmt:"v,extensions_count"`,
 }
 
+filter_type :: enum c.int {
+	undefined              = 0,
+	nearest                = 9728,
+	linear                 = 9729,
+	nearest_mipmap_nearest = 9984,
+	linear_mipmap_nearest  = 9985,
+	nearest_mipmap_linear  = 9986,
+	linear_mipmap_linear   = 9987,
+}
+
+wrap_mode :: enum c.int {
+	clamp_to_edge   = 33071,
+	mirrored_repeat = 33648,
+	repeat          = 10497,
+}
+
 sampler :: struct {
 	name:             cstring,
-	mag_filter:       c.int,
-	min_filter:       c.int,
-	wrap_s:           c.int,
-	wrap_t:           c.int,
+	mag_filter:       filter_type,
+	min_filter:       filter_type,
+	wrap_s:           wrap_mode,
+	wrap_t:           wrap_mode,
 	extras:           extras_t,
 	extensions_count: uint,
 	extensions:       [^]extension `fmt:"v,extensions_count"`,

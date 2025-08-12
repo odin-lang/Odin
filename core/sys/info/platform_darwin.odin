@@ -1,5 +1,7 @@
 package sysinfo
 
+import "base:runtime"
+
 import    "core:strconv"
 import    "core:strings"
 import    "core:sys/unix"
@@ -9,7 +11,8 @@ import NS "core:sys/darwin/Foundation"
 version_string_buf: [1024]u8
 
 @(init, private)
-init_platform :: proc() {
+init_platform :: proc "contextless" () {
+	context = runtime.default_context()
 	ws :: strings.write_string
 	wi :: strings.write_int
 
@@ -28,7 +31,7 @@ init_platform :: proc() {
 
 	macos_version = {int(version.majorVersion), int(version.minorVersion), int(version.patchVersion)}
 
-	when ODIN_PLATFORM_SUBTARGET == .iOS {
+	when ODIN_PLATFORM_SUBTARGET_IOS {
 		os_version.platform = .iOS
 		ws(&b, "iOS")
 	} else {

@@ -525,14 +525,48 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				break;
 
 			case Basic_string:
-				tag_type = t_type_info_string;
+				{
+					tag_type = t_type_info_string;
+					LLVMValueRef vals[2] = {
+						lb_const_bool(m, t_bool, false).value,
+						lb_const_int(m, t_type_info_string_encoding_kind, 0).value,
+					};
+
+					variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
+				}
 				break;
 
 			case Basic_cstring:
 				{
 					tag_type = t_type_info_string;
-					LLVMValueRef vals[1] = {
+					LLVMValueRef vals[2] = {
 						lb_const_bool(m, t_bool, true).value,
+						lb_const_int(m, t_type_info_string_encoding_kind, 0).value,
+					};
+
+					variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
+				}
+				break;
+
+			case Basic_string16:
+				{
+					tag_type = t_type_info_string;
+					LLVMValueRef vals[2] = {
+						lb_const_bool(m, t_bool, false).value,
+						lb_const_int(m, t_type_info_string_encoding_kind, 1).value,
+					};
+
+					variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
+				}
+				break;
+
+
+			case Basic_cstring16:
+				{
+					tag_type = t_type_info_string;
+					LLVMValueRef vals[2] = {
+						lb_const_bool(m, t_bool, true).value,
+						lb_const_int(m, t_type_info_string_encoding_kind, 1).value,
 					};
 
 					variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
@@ -797,7 +831,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				u8 flags = 0;
 				if (t->Struct.is_packed)    flags |= 1<<0;
 				if (t->Struct.is_raw_union) flags |= 1<<1;
-				if (t->Struct.is_no_copy)   flags |= 1<<2;
+				//
 				if (t->Struct.custom_align) flags |= 1<<3;
 
 				vals[6] = lb_const_int(m, t_u8, flags).value;

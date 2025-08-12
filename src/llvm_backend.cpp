@@ -1264,7 +1264,13 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		case Basic_string:
 			return build_context.metrics.int_size == 4 ? str_lit("{string=*i}") : str_lit("{string=*q}");
 
+		case Basic_string16:
+			return build_context.metrics.int_size == 4 ? str_lit("{string16=*i}") : str_lit("{string16=*q}");
+
 		case Basic_cstring: return str_lit("*");
+		case Basic_cstring16: return str_lit("*");
+
+
 		case Basic_any:     return str_lit("{any=^v^v}");  // rawptr + ^Type_Info
 
 		case Basic_typeid:
@@ -3368,8 +3374,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMModuleRef mod = m->mod;
 			LLVMContextRef ctx = m->ctx;
 
-			lb_add_raddbg_string(m, "type_view: {type: \"[]?\", expr: \"array(data, len)\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"string\", expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"[]?\",        expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"string\",     expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic]?\", expr: \"rows($, array(data, len), len, cap, allocator)\"}");
 
 			// column major matrices
 			lb_add_raddbg_string(m, "type_view: {type: \"matrix[1, ?]?\",  expr: \"columns($.data, $[0])\"}");

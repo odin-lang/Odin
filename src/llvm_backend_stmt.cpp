@@ -622,6 +622,121 @@ gb_internal void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_t
 	if (done_) *done_ = done;
 }
 
+gb_internal void lb_build_range_string16(lbProcedure *p, lbValue expr, Type *val_type,
+                                       lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_,
+                                       bool is_reverse) {
+
+	lbModule *m = p->module;
+	lbValue count = lb_const_int(m, t_int, 0);
+	Type *expr_type = base_type(expr.type);
+	switch (expr_type->kind) {
+	case Type_Basic:
+		count = lb_string_len(p, expr);
+		break;
+	default:
+		GB_PANIC("Cannot do range_string of %s", type_to_string(expr_type));
+		break;
+	}
+
+	lbValue val = {};
+	lbValue idx = {};
+	lbBlock *loop = nullptr;
+	lbBlock *done = nullptr;
+	lbBlock *body = nullptr;
+
+	loop = lb_create_block(p, "for.string16.loop");
+	body = lb_create_block(p, "for.string16.body");
+	done = lb_create_block(p, "for.string16.done");
+
+	lbAddr offset_ = lb_add_local_generated(p, t_int, false);
+	lbValue offset = {};
+	lbValue cond = {};
+
+	if (!is_reverse) {
+		/*
+			for c, offset in str {
+				...
+			}
+
+			offset := 0
+			for offset < len(str) {
+				c, _w := string16_decode_rune(str[offset:])
+				...
+				offset += _w
+			}
+		*/
+		lb_addr_store(p, offset_, lb_const_int(m, t_int, 0));
+
+		lb_emit_jump(p, loop);
+		lb_start_block(p, loop);
+
+
+		offset = lb_addr_load(p, offset_);
+		cond = lb_emit_comp(p, Token_Lt, offset, count);
+	} else {
+		// NOTE(bill): REVERSED LOGIC
+		/*
+			#reverse for c, offset in str {
+				...
+			}
+
+			offset := len(str)
+			for offset > 0 {
+				c, _w := string16_decode_last_rune(str[:offset])
+				offset -= _w
+				...
+			}
+		*/
+		lb_addr_store(p, offset_, count);
+
+		lb_emit_jump(p, loop);
+		lb_start_block(p, loop);
+
+		offset = lb_addr_load(p, offset_);
+		cond = lb_emit_comp(p, Token_Gt, offset, lb_const_int(m, t_int, 0));
+	}
+	lb_emit_if(p, cond, body, done);
+	lb_start_block(p, body);
+
+
+	lbValue rune_and_len = {};
+	if (!is_reverse) {
+		lbValue str_elem = lb_emit_ptr_offset(p, lb_string_elem(p, expr), offset);
+		lbValue str_len  = lb_emit_arith(p, Token_Sub, count, offset, t_int);
+		auto args = array_make<lbValue>(permanent_allocator(), 1);
+		args[0] = lb_emit_string16(p, str_elem, str_len);
+
+		rune_and_len = lb_emit_runtime_call(p, "string16_decode_rune", args);
+		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
+		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Add, offset, len, t_int));
+
+		idx = offset;
+	} else {
+		// NOTE(bill): REVERSED LOGIC
+		lbValue str_elem = lb_string_elem(p, expr);
+		lbValue str_len  = offset;
+		auto args = array_make<lbValue>(permanent_allocator(), 1);
+		args[0] = lb_emit_string16(p, str_elem, str_len);
+
+		rune_and_len = lb_emit_runtime_call(p, "string16_decode_last_rune", args);
+		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
+		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Sub, offset, len, t_int));
+
+		idx = lb_addr_load(p, offset_);
+	}
+
+
+	if (val_type != nullptr) {
+		val = lb_emit_struct_ev(p, rune_and_len, 0);
+	}
+
+	if (val_)  *val_  = val;
+	if (idx_)  *idx_  = idx;
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
+}
+
+
 
 gb_internal Ast *lb_strip_and_prefix(Ast *ident) {
 	if (ident != nullptr) {
@@ -1138,7 +1253,11 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			}
 			Type *t = base_type(string.type);
 			GB_ASSERT(!is_type_cstring(t));
-			lb_build_range_string(p, string, val0_type, &val, &key, &loop, &done, rs->reverse);
+			if (is_type_string16(t)) {
+				lb_build_range_string16(p, string, val0_type, &val, &key, &loop, &done, rs->reverse);
+			} else {
+				lb_build_range_string(p, string, val0_type, &val, &key, &loop, &done, rs->reverse);
+			}
 			break;
 		}
 		case Type_Tuple:

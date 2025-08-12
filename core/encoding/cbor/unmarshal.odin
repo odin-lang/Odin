@@ -335,6 +335,8 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add, allocator := context.allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_String:
+		assert(t.encoding == .UTF_8)
+
 		bytes := err_conv(_decode_bytes(d, add, allocator=allocator, loc=loc)) or_return
 
 		if t.is_cstring {

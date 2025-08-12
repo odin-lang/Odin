@@ -61,6 +61,7 @@ enum BuiltinProcId {
 	BuiltinProc_trap,
 	BuiltinProc_debug_trap,
 	BuiltinProc_read_cycle_counter,
+	BuiltinProc_read_cycle_counter_frequency,
 
 	BuiltinProc_count_ones,
 	BuiltinProc_count_zeros,
@@ -191,6 +192,7 @@ BuiltinProc__simd_begin,
 
 	BuiltinProc_simd_shuffle,
 	BuiltinProc_simd_select,
+	BuiltinProc_simd_runtime_swizzle,
 
 	BuiltinProc_simd_ceil,
 	BuiltinProc_simd_floor,
@@ -224,6 +226,7 @@ BuiltinProc__simd_end,
 	BuiltinProc_x86_cpuid,
 	BuiltinProc_x86_xgetbv,
 
+
 	// Constant type tests
 
 BuiltinProc__type_begin,
@@ -247,6 +250,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_complex,
 	BuiltinProc_type_is_quaternion,
 	BuiltinProc_type_is_string,
+	BuiltinProc_type_is_string16,
 	BuiltinProc_type_is_typeid,
 	BuiltinProc_type_is_any,
 
@@ -261,6 +265,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_sliceable,
 	BuiltinProc_type_is_comparable,
 	BuiltinProc_type_is_simple_compare, // easily compared using memcmp
+	BuiltinProc_type_is_nearly_simple_compare, // easily compared using memcmp (including floats)
 	BuiltinProc_type_is_dereferenceable,
 	BuiltinProc_type_is_valid_map_key,
 	BuiltinProc_type_is_valid_matrix_elements,
@@ -334,6 +339,8 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_has_shared_fields,
 
+	BuiltinProc_type_canonical_name,
+
 BuiltinProc__type_end,
 
 	BuiltinProc_procedure_of,
@@ -346,6 +353,7 @@ BuiltinProc__type_end,
 	BuiltinProc_objc_register_selector,
 	BuiltinProc_objc_register_class,
 	BuiltinProc_objc_ivar_get,
+	BuiltinProc_objc_block,
 
 	BuiltinProc_constant_utf16_cstring,
 
@@ -420,6 +428,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("trap"),               0, false, Expr_Expr, BuiltinProcPkg_intrinsics, /*diverging*/true},
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("read_cycle_counter_frequency"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("count_ones"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -552,6 +561,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("simd_shuffle"), 2, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_select"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_runtime_swizzle"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_ceil") , 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_floor"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -602,6 +612,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_complex"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_quaternion"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_string"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_string16"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_typeid"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_any"),               1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -616,6 +627,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_sliceable"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_comparable"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simple_compare"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_nearly_simple_compare"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_dereferenceable"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_map_key"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_matrix_elements"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -688,6 +700,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_map_cell_info"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_has_shared_fields"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_canonical_name"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
@@ -702,6 +715,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_ivar_get"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("objc_block"),             1, true,  Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

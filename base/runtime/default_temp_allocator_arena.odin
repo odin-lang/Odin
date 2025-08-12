@@ -52,10 +52,13 @@ memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint
 	return
 }
 
-memory_block_dealloc :: proc(block_to_free: ^Memory_Block, loc := #caller_location) {
+memory_block_dealloc :: proc "contextless" (block_to_free: ^Memory_Block, loc := #caller_location) {
 	if block_to_free != nil {
+
 		allocator := block_to_free.allocator
 		// sanitizer.address_unpoison(block_to_free.base, block_to_free.capacity)
+		context = default_context()
+		context.allocator = allocator
 		mem_free(block_to_free, allocator, loc)
 	}
 }
@@ -172,7 +175,7 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 	arena.total_used = 0
 }
 
-arena_destroy :: proc(arena: ^Arena, loc := #caller_location) {
+arena_destroy :: proc "contextless" (arena: ^Arena, loc := #caller_location) {
 	for arena.curr_block != nil {
 		free_block := arena.curr_block
 		arena.curr_block = free_block.prev

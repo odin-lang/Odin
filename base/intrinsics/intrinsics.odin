@@ -32,6 +32,7 @@ trap       :: proc() -> ! ---
 alloca             :: proc(size, align: int) -> [^]u8 ---
 cpu_relax          :: proc() ---
 read_cycle_counter :: proc() -> i64 ---
+read_cycle_counter_frequency :: proc() -> i64 ---
 
 count_ones           :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_zeros          :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
@@ -140,6 +141,7 @@ type_is_quaternion :: proc($T: typeid) -> bool ---
 type_is_string     :: proc($T: typeid) -> bool ---
 type_is_typeid     :: proc($T: typeid) -> bool ---
 type_is_any        :: proc($T: typeid) -> bool ---
+type_is_string16   :: proc($T: typeid) -> bool ---
 
 type_is_endian_platform       :: proc($T: typeid) -> bool ---
 type_is_endian_little         :: proc($T: typeid) -> bool ---
@@ -231,6 +233,9 @@ type_integer_to_signed   :: proc($T: typeid) -> type where type_is_integer(T), t
 
 type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
 
+// Returns the canonicalized name of the type, of which is used to produce the pseudo-unique 'typeid'
+type_canonical_name :: proc($T: typeid) -> string ---
+
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
 constant_log2 :: proc($v: $T) -> T where type_is_integer(T) ---
@@ -314,6 +319,7 @@ simd_indices :: proc($T: typeid/#simd[$N]$E) -> T where type_is_numeric(T) ---
 
 simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T ---
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
+simd_runtime_swizzle :: proc(table: #simd[N]T, indices: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
 
 // Lane-wise operations
 simd_ceil    :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
@@ -361,6 +367,7 @@ x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebx, ecx, edx: u32) ---
 x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 
 
+
 // Darwin targets only
 objc_object   :: struct{}
 objc_selector :: struct{}
@@ -377,6 +384,7 @@ objc_register_selector :: proc($name: string) -> objc_SEL   ---
 objc_find_class        :: proc($name: string) -> objc_Class ---
 objc_register_class    :: proc($name: string) -> objc_Class ---
 objc_ivar_get          :: proc(self: ^$T) -> ^$U ---
+objc_block             :: proc(invoke: $T, ..any) -> ^Objc_Block(T) where type_is_proc(T) ---
 
 valgrind_client_request :: proc(default: uintptr, request: uintptr, a0, a1, a2, a3, a4: uintptr) -> uintptr ---
 

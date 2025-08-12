@@ -1172,7 +1172,7 @@ gb_internal void init_universal(void) {
 	{
 		GlobalEnumValue values[Subtarget_COUNT] = {
 			{"Default",         Subtarget_Default},
-			{"iOS",             Subtarget_iOS},
+			{"iPhone",          Subtarget_iPhone},
 			{"iPhoneSimulator", Subtarget_iPhoneSimulator},
 			{"Android",         Subtarget_Android},
 		};
@@ -1363,13 +1363,15 @@ gb_internal void init_universal(void) {
 	}
 
 
-	t_u8_ptr       = alloc_type_pointer(t_u8);
-	t_u8_multi_ptr = alloc_type_multi_pointer(t_u8);
-	t_int_ptr      = alloc_type_pointer(t_int);
-	t_i64_ptr      = alloc_type_pointer(t_i64);
-	t_f64_ptr      = alloc_type_pointer(t_f64);
-	t_u8_slice     = alloc_type_slice(t_u8);
-	t_string_slice = alloc_type_slice(t_string);
+	t_u8_ptr        = alloc_type_pointer(t_u8);
+	t_u8_multi_ptr  = alloc_type_multi_pointer(t_u8);
+	t_u16_ptr       = alloc_type_pointer(t_u16);
+	t_u16_multi_ptr = alloc_type_multi_pointer(t_u16);
+	t_int_ptr       = alloc_type_pointer(t_int);
+	t_i64_ptr       = alloc_type_pointer(t_i64);
+	t_f64_ptr       = alloc_type_pointer(t_f64);
+	t_u8_slice      = alloc_type_slice(t_u8);
+	t_string_slice  = alloc_type_slice(t_string);
 
 	// intrinsics types for objective-c stuff
 	{
@@ -1458,6 +1460,10 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->foreign_decls_to_check);
 
 	map_destroy(&i->objc_msgSend_types);
+	string_set_destroy(&i->obcj_class_name_set);
+	mpsc_destroy(&i->objc_class_implementations);
+	map_destroy(&i->objc_method_implementations);
+
 	string_map_destroy(&i->load_file_cache);
 	string_map_destroy(&i->load_directory_cache);
 	map_destroy(&i->load_directory_map);
@@ -2669,6 +2675,10 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_init = false;
 				}
 
+				if (t->Proc.calling_convention != ProcCC_Contextless) {
+					error(e->token, "@(init) procedures must be declared as \"contextless\"");
+				}
+
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
 					error(e->token, "@(init) procedures must be declared at the file scope");
 					is_init = false;
@@ -2682,6 +2692,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 				if (is_blank_ident(e->token)) {
 					error(e->token, "An @(init) procedure must not use a blank identifier as its name");
 				}
+
 
 				if (is_init) {
 					add_dependency_to_set(c, e);
@@ -2698,6 +2709,10 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					error(e->token, "@(fini) procedures must have a signature type with no parameters nor results, got %s", str);
 					gb_string_free(str);
 					is_fini = false;
+				}
+
+				if (t->Proc.calling_convention != ProcCC_Contextless) {
+					error(e->token, "@(fini) procedures must be declared as \"contextless\"");
 				}
 
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
@@ -3098,6 +3113,9 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_enum_value_ptr = alloc_type_pointer(t_type_info_enum_value);
 
 	GB_ASSERT(tis->fields.count == 5);
+
+	Entity *type_info_string_encoding_kind = find_core_entity(c, str_lit("Type_Info_String_Encoding_Kind"));
+	t_type_info_string_encoding_kind = type_info_string_encoding_kind->type;
 
 	Entity *type_info_variant = tis->fields[4];
 	Type *tiv_type = type_info_variant->type;
@@ -6802,7 +6820,11 @@ gb_internal void check_parsed_files(Checker *c) {
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
 		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
-			(void)type_align_of(e->type);
+			if (e->TypeName.is_type_alias) {
+				// Ignore for the time being
+			} else {
+				(void)type_align_of(e->type);
+			}
 		} else if (e->kind == Entity_Procedure) {
 			DeclInfo *decl = e->decl_info;
 			ast_node(pl, ProcLit, decl->proc_lit);
@@ -6952,7 +6974,7 @@ gb_internal void check_parsed_files(Checker *c) {
 					if (entry.key != tt.hash) {
 						continue;
 					}
-					auto const &other = type_info_types[entry.value];
+					auto const &other = c->info.type_info_types_hash_map[entry.value];
 					if (are_types_identical_unique_tuples(tt.type, other.type)) {
 						continue;
 					}

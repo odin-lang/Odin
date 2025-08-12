@@ -1,6 +1,7 @@
 #+private
 package terminal
 
+import "base:runtime"
 import "core:os"
 import "core:strings"
 
@@ -68,8 +69,10 @@ get_environment_color :: proc() -> Color_Depth {
 }
 
 @(init)
-init_terminal :: proc() {
+init_terminal :: proc "contextless" () {
 	_init_terminal()
+
+	context = runtime.default_context()
 
 	// We respect `NO_COLOR` specifically as a color-disabler but not as a
 	// blanket ban on any terminal manipulation codes, hence why this comes
@@ -81,6 +84,6 @@ init_terminal :: proc() {
 }
 
 @(fini)
-fini_terminal :: proc() {
+fini_terminal :: proc "contextless" () {
 	_fini_terminal()
 }

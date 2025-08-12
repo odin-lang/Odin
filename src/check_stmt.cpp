@@ -430,8 +430,6 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 
 	Ast *node = unparen_expr(lhs->expr);
 
-	check_no_copy_assignment(*rhs, context_name);
-
 	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
 		check_assignment(ctx, rhs, nullptr, str_lit("assignment to '_' identifier"));
@@ -976,7 +974,14 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			Type *t = base_type(operand.type);
 			switch (t->kind) {
 			case Type_Basic:
-				if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
+				if (is_type_string16(t) && t->Basic.kind != Basic_cstring) {
+					val0 = t_rune;
+					val1 = t_int;
+					inline_for_depth = exact_value_i64(operand.value.value_string.len);
+					if (unroll_count > 0) {
+						error(node, "#unroll(%lld) does not support strings", cast(long long)unroll_count);
+					}
+				} else if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
 					val0 = t_rune;
 					val1 = t_int;
 					inline_for_depth = exact_value_i64(operand.value.value_string.len);
@@ -1238,7 +1243,11 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 
 				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
 
-				if (is_type_string(x.type)) {
+				if (is_type_string16(x.type)) {
+					// NOTE(bill): Force dependency for strings here
+					add_package_dependency(ctx, "runtime", "string16_le");
+					add_package_dependency(ctx, "runtime", "string16_lt");
+				} else if (is_type_string(x.type)) {
 					// NOTE(bill): Force dependency for strings here
 					add_package_dependency(ctx, "runtime", "string_le");
 					add_package_dependency(ctx, "runtime", "string_lt");
@@ -1772,7 +1781,16 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 			switch (t->kind) {
 			case Type_Basic:
-				if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_UntypedString) {
+				if (t->Basic.kind == Basic_string16) {
+					is_possibly_addressable = false;
+					array_add(&vals, t_rune);
+					array_add(&vals, t_int);
+					if (is_reverse) {
+						add_package_dependency(ctx, "runtime", "string16_decode_last_rune");
+					} else {
+						add_package_dependency(ctx, "runtime", "string16_decode_rune");
+					}
+				} else if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_UntypedString) {
 					is_possibly_addressable = false;
 					array_add(&vals, t_rune);
 					array_add(&vals, t_int);

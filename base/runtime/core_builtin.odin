@@ -5,6 +5,11 @@ import "base:intrinsics"
 @builtin
 Maybe :: union($T: typeid) {T}
 
+/*
+Represents an Objective-C block with a given procedure signature T
+*/
+@builtin
+Objc_Block :: struct($T: typeid) where intrinsics.type_is_proc(T) { using _: intrinsics.objc_object }
 
 /*
 Recovers the containing/parent struct from a pointer to one of its fields.
@@ -86,11 +91,26 @@ copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int 
 	}
 	return n
 }
+
+// `copy_from_string16` is a built-in procedure that copies elements from a source string `src` to a destination slice `dst`.
+// The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
+// of len(src) and len(dst).
+//
+// Prefer the procedure group `copy`.
+@builtin
+copy_from_string16 :: proc "contextless" (dst: $T/[]$E/u16, src: $S/string16) -> int {
+	n := min(len(dst), len(src))
+	if n > 0 {
+		intrinsics.mem_copy(raw_data(dst), raw_data(src), n*size_of(u16))
+	}
+	return n
+}
+
 // `copy` is a built-in procedure that copies elements from a source slice/string `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 @builtin
-copy :: proc{copy_slice, copy_from_string}
+copy :: proc{copy_slice, copy_from_string, copy_from_string16}
 
 
 
@@ -285,6 +305,15 @@ delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error 
 }
 
 
+@builtin
+delete_string16 :: proc(str: string16, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	return mem_free_with_size(raw_data(str), len(str)*size_of(u16), allocator, loc)
+}
+@builtin
+delete_cstring16 :: proc(str: cstring16, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	return mem_free((^u16)(str), allocator, loc)
+}
+
 // `delete` will try to free the underlying data of the passed built-in data structure (string, cstring, dynamic array, slice, or map), with the given `allocator` if the allocator supports this operation.
 //
 // Note: Prefer `delete` over the specific `delete_*` procedures where possible.
@@ -297,6 +326,8 @@ delete :: proc{
 	delete_map,
 	delete_soa_slice,
 	delete_soa_dynamic_array,
+	delete_string16,
+	delete_cstring16,
 }
 
 
