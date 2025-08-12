@@ -565,6 +565,26 @@ gb_internal u64 check_feature_flags(CheckerContext *c, Ast *node) {
 	return 0;
 }
 
+gb_internal u64 check_feature_flags(Entity *e) {
+	if (e == nullptr) {
+		return 0;
+	}
+	AstFile *file = nullptr;
+	if (e->file == nullptr) {
+		file = e->file;
+	}
+	if (file == nullptr) {
+		if (e->decl_info && e->decl_info->decl_node) {
+			file = e->decl_info->decl_node->file();
+		}
+	}
+	if (file != nullptr && file->feature_flags_set) {
+		return file->feature_flags;
+	}
+	return 0;
+}
+
+
 
 enum VettedEntityKind {
 	VettedEntity_Invalid,
@@ -2675,8 +2695,13 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_init = false;
 				}
 
-				if (t->Proc.calling_convention != ProcCC_Contextless) {
-					error(e->token, "@(init) procedures must be declared as \"contextless\"");
+				u64 feature_flags = check_feature_flags(e);
+				if ((feature_flags & OptInFeatureFlag_GlobalContext) == 0) {
+					if (t->Proc.calling_convention != ProcCC_Contextless) {
+						ERROR_BLOCK();
+						error(e->token, "@(init) procedures must be declared as \"contextless\"");
+						error_line("\tSuggestion: this can be bypassed, for the time being, with '#+feature global-context'");
+					}
 				}
 
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
@@ -2711,8 +2736,13 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_fini = false;
 				}
 
-				if (t->Proc.calling_convention != ProcCC_Contextless) {
-					error(e->token, "@(fini) procedures must be declared as \"contextless\"");
+				u64 feature_flags = check_feature_flags(e);
+				if ((feature_flags & OptInFeatureFlag_GlobalContext) == 0) {
+					if (t->Proc.calling_convention != ProcCC_Contextless) {
+						ERROR_BLOCK();
+						error(e->token, "@(fini) procedures must be declared as \"contextless\"");
+						error_line("\tSuggestion: this can be bypassed, for the time being, with '#+feature global-context'");
+					}
 				}
 
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
