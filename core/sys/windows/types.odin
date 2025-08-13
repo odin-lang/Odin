@@ -3385,6 +3385,19 @@ FILE_ATTRIBUTE_TAG_INFO :: struct {
 	ReparseTag: DWORD,
 }
 
+// getaddrinfo flags https://learn.microsoft.com/en-us/windows/win32/api/ws2def/ns-ws2def-addrinfoa
+AI_PASSIVE 				  :: 0x01
+AI_CANONNAME 			  :: 0x02
+AI_NUMERICHOST 			  :: 0x04
+AI_ALL 					  :: 0x0100
+AI_ADDRCONFIG 			  :: 0x0400
+AI_V4MAPPED 			  :: 0x0800
+AI_NON_AUTHORITATIVE 	  :: 0x04000
+AI_SECURE 				  :: 0x08000
+AI_RETURN_PREFERRED_NAMES :: 0x010000
+AI_FQDN 				  :: 0x00020000
+AI_FILESERVER 			  :: 0x00040000
+
 PADDRINFOEXW :: ^ADDRINFOEXW
 LPADDRINFOEXW :: ^ADDRINFOEXW
 ADDRINFOEXW :: struct {
