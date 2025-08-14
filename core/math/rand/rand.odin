@@ -508,18 +508,8 @@ Possible Output:
 */
 @(require_results)
 read :: proc(p: []byte, gen := context.random_generator) -> (n: int) {
-	pos := i8(0)
-	val := i64(0)
-	for n = 0; n < len(p); n += 1 {
-		if pos == 0 {
-			val = int63(gen)
-			pos = 7
-		}
-		p[n] = byte(val)
-		val >>= 8
-		pos -= 1
-	}
-	return
+	if !runtime.random_generator_read_bytes(gen, p) {return 0}
+	return len(p)
 }
 
 /*
