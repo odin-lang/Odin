@@ -5581,7 +5581,7 @@ Device_newBufferWithSlice :: #force_inline proc "c" (self: ^Device, slice: $S/[]
 }
 @(objc_type=Device, objc_name="newBufferWithSliceNoCopy")
 Device_newBufferWithSliceNoCopy :: #force_inline proc "c" (self: ^Device, slice: $S/[]$E, options: ResourceOptions, deallocator: rawptr) -> ^Buffer {
-	return Device_newBufferWithBytesNotCopy(self, mem.slice_to_bytes(slice), options, deallocator)
+	return Device_newBufferWithBytesNoCopy(self, mem.slice_to_bytes(slice), options, deallocator)
 }
 @(objc_type=Device, objc_name="newBufferWithLength")
 Device_newBufferWithLength :: #force_inline proc "c" (self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Buffer {
