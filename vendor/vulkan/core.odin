@@ -690,7 +690,7 @@ NV_SHADING_RATE_IMAGE_EXTENSION_NAME                      :: "VK_NV_shading_rate
 NV_ray_tracing                                            :: 1
 NV_RAY_TRACING_SPEC_VERSION                               :: 3
 NV_RAY_TRACING_EXTENSION_NAME                             :: "VK_NV_ray_tracing"
-SHADER_UNUSED_KHR                                         :: 0
+SHADER_UNUSED_KHR                                         :: ~u32(0)
 NV_representative_fragment_test                           :: 1
 NV_REPRESENTATIVE_FRAGMENT_TEST_SPEC_VERSION              :: 2
 NV_REPRESENTATIVE_FRAGMENT_TEST_EXTENSION_NAME            :: "VK_NV_representative_fragment_test"
