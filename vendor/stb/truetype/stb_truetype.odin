@@ -124,9 +124,9 @@ pack_context :: struct {
 
 stbrp_coord :: distinct c.int
 stbrp_rect :: struct {
-    x, y: stbrp_coord,
-    id, w, h: c.int,
-    was_packed: b32,
+	x, y: stbrp_coord,
+	id, w, h: c.int,
+	was_packed: b32,
 }
 
 POINT_SIZE :: #force_inline proc(x: $T) -> T { return -x } // @NOTE: this was a macro
