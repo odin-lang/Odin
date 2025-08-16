@@ -12,6 +12,7 @@ import "core:mem"
 import "core:container/queue"
 
 Task_Proc :: #type proc(task: Task)
+ThreadCleanup_Proc :: #type proc(pool: ^Pool)
 
 Task :: struct {
 	procedure:  Task_Proc,
@@ -40,6 +41,7 @@ Pool :: struct {
 
 	threads: []^Thread,
 
+    thread_cleanup_proc: ThreadCleanup_Proc,
 
 	tasks:      queue.Queue(Task),
 	tasks_done: [dynamic]Task,
@@ -66,6 +68,10 @@ pool_thread_runner :: proc(t: ^Thread) {
 		}
 	}
 
+    if pool.thread_cleanup_proc != nil {
+        pool.thread_cleanup_proc(pool)
+    }
+
 	sync.post(&pool.sem_available, 1)
 }
 
@@ -73,12 +79,13 @@ pool_thread_runner :: proc(t: ^Thread) {
 // it is destroyed.
 //
 // The thread pool requires an allocator which it either owns, or which is thread safe.
-pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int) {
+pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int, thread_cleanup_proc: ThreadCleanup_Proc=nil) {
 	context.allocator = allocator
 	pool.allocator = allocator
 	queue.init(&pool.tasks)
 	pool.tasks_done = make([dynamic]Task)
 	pool.threads    = make([]^Thread, max(thread_count, 1))
+    pool.thread_cleanup_proc = thread_cleanup_proc
 
 	pool.is_running = true
 
