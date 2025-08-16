@@ -631,6 +631,42 @@ choice :: proc(array: $T/[]$E, gen := context.random_generator) -> (res: E) {
 	return array[int63_max(n, gen)]
 }
 
+/*
+Fills a generic slice of integers with random values. If no generator is provided, the global random number generator will be used.
+
+Inputs:
+- p: The slice of integers to fill.
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	fill_slice :: proc() {
+		a: [12]i16
+		fill_slice(a[:])
+		fmt.printfln("%v", a)
+		b: [3]u64
+		fill_slice(b[:])
+		fmt.printfln("%v", b)
+	}
+Possible Output:
+	[27638, 20931, 10685, 3478, 5990, 16848, 31262, 16446, 28490, 22277, 19649, 26265]
+	[11997116992704820865, 9263287199357756902, 7687005275187288335]
+*/
+fill_slice :: proc(p: []$E, gen := context.random_generator) -> (ok: bool)
+	where intrinsics.type_is_integer(E) #no_bounds_check {
+	bytes := (([^]byte)(raw_data(p)))[:size_of(E) * len(p)]
+	ok = read(bytes, gen) == len(bytes)
+	when intrinsics.type_is_unsigned(E) {
+		return ok
+	} else {
+		for &e in p {
+			i := math.abs(e)
+			e = i
+		}
+		return ok
+	}
+}
 
 @(require_results)
 choice_enum :: proc($T: typeid, gen := context.random_generator) -> T where intrinsics.type_is_enum(T) {
