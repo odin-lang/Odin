@@ -1,7 +1,6 @@
 package stb_truetype
 
 import c "core:c"
-import stbrp "vendor:stb/rect_pack"
 
 @(private)
 LIB :: (
@@ -123,6 +122,13 @@ pack_context :: struct {
 	nodes:                                   rawptr,
 }
 
+stbrp_coord :: distinct c.int
+stbrp_rect :: struct {
+    x, y: stbrp_coord,
+    id, w, h: c.int,
+    was_packed: b32,
+}
+
 POINT_SIZE :: #force_inline proc(x: $T) -> T { return -x } // @NOTE: this was a macro
 
 // bindings
@@ -200,9 +206,9 @@ foreign stbtt {
 	// then call RenderIntoRects repeatedly. This may result in a
 	// better packing than calling PackFontRanges multiple times
 	// (or it may not).
-	PackFontRangesGatherRects     :: proc(spc: ^pack_context, info: ^fontinfo, ranges: ^pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> c.int ---
-	PackFontRangesPackRects       :: proc(spc: ^pack_context, rects: [^]stbrp.Rect, num_rects: c.int) --- 
-	PackFontRangesRenderIntoRects :: proc(spc: ^pack_context, info: ^fontinfo, ranges: ^pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> c.int --- 
+	PackFontRangesGatherRects     :: proc(spc: ^pack_context, info: ^fontinfo, ranges: ^pack_range, num_ranges: c.int, rects: [^]stbrp_rect) -> c.int ---
+	PackFontRangesPackRects       :: proc(spc: ^pack_context, rects: [^]stbrp_rect, num_rects: c.int) --- 
+	PackFontRangesRenderIntoRects :: proc(spc: ^pack_context, info: ^fontinfo, ranges: ^pack_range, num_ranges: c.int, rects: [^]stbrp_rect) -> c.int --- 
 }
 
 //////////////////////////////////////////////////////////////////////////////
