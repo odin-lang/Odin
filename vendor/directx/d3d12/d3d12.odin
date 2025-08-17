@@ -851,10 +851,10 @@ FEATURE :: enum i32 {
 	OPTIONS19                             = 48,
 }
 
-SHADER_MIN_PRECISION_SUPPORT :: enum i32 {
-	NONE    = 0,
-	_10_BIT = 1,
-	_16_BIT = 2,
+SHADER_MIN_PRECISION_SUPPORT :: distinct bit_set[SHADER_MIN_PRECISION_SUPPORT_FLAG; u32]
+SHADER_MIN_PRECISION_SUPPORT_FLAG :: enum i32 {
+	_10_BIT,
+	_16_BIT,
 }
 
 TILED_RESOURCES_TIER :: enum i32 {
