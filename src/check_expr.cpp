@@ -6472,6 +6472,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			}
 		}
 
+		if (e && e->kind == Entity_Constant && is_type_proc(e->type)) {
+			if (o->mode != Addressing_Constant) {
+				if (show_error) {
+					error(o->expr, "Expected a constant procedure value for the argument '%.*s'", LIT(e->token.string));
+				}
+				err = CallArgumentError_NoneConstantParameter;
+			}
+		}
 
 		if (!err && is_type_any(param_type)) {
 			add_type_info_type(c, o->type);
