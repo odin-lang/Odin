@@ -268,8 +268,8 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 			}
 		}
 
-		m = (n-i) / 8 * 8
-		for /**/; i < m; i += 8 {
+		m = (n-i) / size_of(uintptr) * size_of(uintptr)
+		for /**/; i < m; i += size_of(uintptr) {
 			if intrinsics.unaligned_load(cast(^uintptr)&a[i]) != intrinsics.unaligned_load(cast(^uintptr)&b[i]) {
 				return false
 			}
@@ -389,8 +389,8 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 			}
 		}
 
-		m = (n-i) / 8 * 8
-		for /**/; i < m; i += 8 {
+		m = (n-i) / size_of(uintptr) * size_of(uintptr)
+		for /**/; i < m; i += size_of(uintptr) {
 			if intrinsics.unaligned_load(cast(^uintptr)&bytes[i]) != 0 {
 				return 1
 			}
