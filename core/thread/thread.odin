@@ -161,7 +161,9 @@ yield :: proc() {
 /*
 Get thread's name/description.
 
-If thread is nil the procedure will get the name of the calling thread.
+This procedure returns the name of the given thread. If `thread` is `nil`, this procedure returns the name of the calling thread.
+
+**Note(linux, bsd)**: Because the thread name is stored in as the `cmdline`, if the thread name was not set, the command that has been used to create the process as the name of the thread.
 
 allocates memory for the returned string using provided allocator.
 */
