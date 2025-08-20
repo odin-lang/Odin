@@ -293,7 +293,14 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_string("quaternion")
 		print_u64(u64(8*ti.size))
 	case Type_Info_String:
+		if info.is_cstring {
+			print_byte('c')
+		}
 		print_string("string")
+		switch info.encoding {
+		case .UTF_8:  /**/
+		case .UTF_16: print_string("16")
+		}
 	case Type_Info_Boolean:
 		switch ti.id {
 		case bool: print_string("bool")
@@ -403,7 +410,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_string("struct ")
 		if .packed    in info.flags { print_string("#packed ") }
 		if .raw_union in info.flags { print_string("#raw_union ") }
-		if .no_copy   in info.flags { print_string("#no_copy ") }
+		// if .no_copy   in info.flags { print_string("#no_copy ") }
 		if .align in info.flags {
 			print_string("#align(")
 			print_u64(u64(ti.align))

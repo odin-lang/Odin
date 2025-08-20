@@ -173,7 +173,8 @@ struct lbModule {
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
 	Array<lbProcedure *> missing_procedures_to_check;
 
-	StringMap<LLVMValueRef> const_strings;
+	StringMap<LLVMValueRef>   const_strings;
+	String16Map<LLVMValueRef> const_string16s;
 
 	PtrMap<u64/*type hash*/, struct lbFunctionType *> function_type_map;
 
@@ -197,6 +198,7 @@ struct lbModule {
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
 	StringMap<lbAddr> objc_ivars;
+	isize             objc_next_block_id;  // Used to name objective-c blocks, per module
 
 	PtrMap<u64/*type hash*/, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
@@ -482,7 +484,10 @@ gb_internal void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, l
 gb_internal void lb_start_block(lbProcedure *p, lbBlock *b);
 
 gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
-
+gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type);
+gb_internal void lb_begin_procedure_body(lbProcedure *p);
+gb_internal void lb_end_procedure_body(lbProcedure *p);
+gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining);
 
 gb_internal lbAddr lb_find_or_generate_context_ptr(lbProcedure *p);
 gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);

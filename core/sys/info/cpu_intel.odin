@@ -52,7 +52,7 @@ CPU :: struct {
 cpu: CPU
 
 @(init, private)
-init_cpu_features :: proc "c" () {
+init_cpu_features :: proc "contextless" () {
 	is_set :: #force_inline proc "c" (bit: u32, value: u32) -> bool {
 		return (value>>bit) & 0x1 != 0
 	}
@@ -156,7 +156,7 @@ init_cpu_features :: proc "c" () {
 _cpu_name_buf: [72]u8
 
 @(init, private)
-init_cpu_name :: proc "c" () {
+init_cpu_name :: proc "contextless" () {
 	number_of_extended_ids, _, _, _ := cpuid(0x8000_0000, 0)
 	if number_of_extended_ids < 0x8000_0004 {
 		return

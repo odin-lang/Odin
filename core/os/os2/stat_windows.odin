@@ -49,12 +49,12 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 
 	p := win32_utf8_to_utf16(name, temp_allocator) or_return
 
-	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
+	n := win32.GetFullPathNameW(cstring16(raw_data(p)), 0, nil, nil)
 	if n == 0 {
 		return "", _get_platform_error()
 	}
 	buf := make([]u16, n+1, temp_allocator)
-	n = win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
+	n = win32.GetFullPathNameW(cstring16(raw_data(p)), u32(len(buf)), cstring16(raw_data(buf)), nil)
 	if n == 0 {
 		return "", _get_platform_error()
 	}
@@ -140,8 +140,8 @@ _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (strin
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	buf := make([]u16, max(n, 260)+1, temp_allocator)
-	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
-	return _cleanpath_from_buf(buf[:n], allocator)
+	n = win32.GetFinalPathNameByHandleW(h, cstring16(raw_data(buf)), u32(len(buf)), 0)
+	return _cleanpath_from_buf(string16(buf[:n]), allocator)
 }
 
 _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
@@ -158,12 +158,12 @@ _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	buf := make([]u16, max(n, 260)+1, temp_allocator)
-	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
+	n = win32.GetFinalPathNameByHandleW(h, cstring16(raw_data(buf)), u32(len(buf)), 0)
 	return _cleanpath_strip_prefix(buf[:n]), nil
 }
 
-_cleanpath_from_buf :: proc(buf: []u16, allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
-	buf := buf
+_cleanpath_from_buf :: proc(buf: string16, allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
+	buf := transmute([]u16)buf
 	buf = _cleanpath_strip_prefix(buf)
 	return win32_utf16_to_utf8(buf, allocator)
 }

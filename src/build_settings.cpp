@@ -171,16 +171,17 @@ struct TargetMetrics {
 
 enum Subtarget : u32 {
 	Subtarget_Default,
-	Subtarget_iOS,
+	Subtarget_iPhone,
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
-
+	
 	Subtarget_COUNT,
+	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
 };
 
 gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit(""),
-	str_lit("ios"),
+	str_lit("iphone"),
 	str_lit("iphonesimulator"),
 	str_lit("android"),
 };
@@ -308,6 +309,7 @@ enum VetFlags : u64 {
 	VetFlag_Cast            = 1u<<8,
 	VetFlag_Tabs            = 1u<<9,
 	VetFlag_UnusedProcedures = 1u<<10,
+	VetFlag_ExplicitAllocators = 1u<<11,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -341,6 +343,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Tabs;
 	} else if (name == "unused-procedures") {
 		return VetFlag_UnusedProcedures;
+	} else if (name == "explicit-allocators") {
+		return VetFlag_ExplicitAllocators;
 	}
 	return VetFlag_NONE;
 }
@@ -348,11 +352,42 @@ u64 get_vet_flag_from_name(String const &name) {
 enum OptInFeatureFlags : u64 {
 	OptInFeatureFlag_NONE            = 0,
 	OptInFeatureFlag_DynamicLiterals = 1u<<0,
+
+	OptInFeatureFlag_GlobalContext = 1u<<1,
+
+	OptInFeatureFlag_IntegerDivisionByZero_Trap    = 1u<<2,
+	OptInFeatureFlag_IntegerDivisionByZero_Zero    = 1u<<3,
+	OptInFeatureFlag_IntegerDivisionByZero_Self    = 1u<<4,
+	OptInFeatureFlag_IntegerDivisionByZero_AllBits = 1u<<5,
+
+
+	OptInFeatureFlag_IntegerDivisionByZero_ALL = OptInFeatureFlag_IntegerDivisionByZero_Trap|
+	                                             OptInFeatureFlag_IntegerDivisionByZero_Zero|
+	                                             OptInFeatureFlag_IntegerDivisionByZero_Self|
+	                                             OptInFeatureFlag_IntegerDivisionByZero_AllBits,
+
 };
 
 u64 get_feature_flag_from_name(String const &name) {
 	if (name == "dynamic-literals") {
 		return OptInFeatureFlag_DynamicLiterals;
+	}
+	if (name == "integer-division-by-zero:trap") {
+		return OptInFeatureFlag_IntegerDivisionByZero_Trap;
+	}
+	if (name == "integer-division-by-zero:zero") {
+		return OptInFeatureFlag_IntegerDivisionByZero_Zero;
+	}
+	if (name == "integer-division-by-zero:self") {
+		return OptInFeatureFlag_IntegerDivisionByZero_Self;
+	}
+	if (name == "integer-division-by-zero:all-bits") {
+		return OptInFeatureFlag_IntegerDivisionByZero_AllBits;
+	}
+
+
+	if (name == "global-context") {
+		return OptInFeatureFlag_GlobalContext;
 	}
 	return OptInFeatureFlag_NONE;
 }
@@ -398,6 +433,13 @@ String linker_choices[Linker_COUNT] = {
 	str_lit("default"),
 	str_lit("lld"),
 	str_lit("radlink"),
+};
+
+enum IntegerDivisionByZeroKind : u8 {
+	IntegerDivisionByZero_Trap,
+	IntegerDivisionByZero_Zero,
+	IntegerDivisionByZero_Self,
+	IntegerDivisionByZero_AllBits,
 };
 
 // This stores the information for the specify architecture of this build
@@ -480,6 +522,8 @@ struct BuildContext {
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+
+	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 
 	LinkerChoice linker_choice;
 
@@ -859,7 +903,7 @@ gb_global NamedTargetMetrics *selected_target_metrics;
 gb_global Subtarget selected_subtarget;
 
 
-gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtarget_ = nullptr) {
+gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtarget_ = nullptr, String *subtarget_str = nullptr) {
 	String os_name = str;
 	String subtarget = {};
 	auto part = string_partition(str, str_lit(":"));
@@ -876,18 +920,26 @@ gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtar
 			break;
 		}
 	}
-	if (subtarget_) *subtarget_ = Subtarget_Default;
 
-	if (subtarget.len != 0) {
-		if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
-			if (subtarget_) *subtarget_ = Subtarget_Default;
-		} else {
-			for (isize i = 1; i < Subtarget_COUNT; i++) {
-				if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
-					if (subtarget_) *subtarget_ = cast(Subtarget)i;
-					break;
+	if (subtarget_str) *subtarget_str = subtarget;
+
+	if (subtarget_) {
+		if (subtarget.len != 0) {
+			*subtarget_ = Subtarget_Invalid;
+
+			if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
+				*subtarget_ = Subtarget_Default;
+				
+			} else {
+				for (isize i = 1; i < Subtarget_COUNT; i++) {
+					if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
+						*subtarget_ = cast(Subtarget)i;
+						break;
+					}
 				}
 			}
+		} else {
+			*subtarget_ = Subtarget_Default;
 		}
 	}
 
@@ -1077,7 +1129,7 @@ gb_internal String internal_odin_root_dir(void) {
 	text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
 
 	GetModuleFileNameW(nullptr, text, cast(int)len);
-	path = string16_to_string(heap_allocator(), make_string16(text, len));
+	path = string16_to_string(heap_allocator(), make_string16(cast(u16 *)text, len));
 
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
@@ -1375,14 +1427,14 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 
 	mutex_lock(&fullpath_mutex);
 
-	len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
+	len = GetFullPathNameW(cast(wchar_t *)&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
 		wchar_t *text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
-		GetFullPathNameW(&string16[0], len, text, nullptr);
+		GetFullPathNameW(cast(wchar_t *)&string16[0], len, text, nullptr);
 		mutex_unlock(&fullpath_mutex);
 
 		text[len] = 0;
-		result = string16_to_string(a, make_string16(text, len));
+		result = string16_to_string(a, make_string16(cast(u16 *)text, len));
 		result = string_trim_whitespace(result);
 
 		// Replace Windows style separators
@@ -1828,13 +1880,13 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (metrics->os == TargetOs_darwin) {
 		switch (subtarget) {
-			case Subtarget_iOS:
+			case Subtarget_iPhone:
 				switch (metrics->arch) {
 				case TargetArch_arm64:
 					bc->metrics.target_triplet = str_lit("arm64-apple-ios");
 					break;
 				default:
-					GB_PANIC("Unknown architecture for -subtarget:ios");
+					GB_PANIC("Unknown architecture for -subtarget:iphone");
 				}
 				break;
 			case Subtarget_iPhoneSimulator:
@@ -1875,6 +1927,13 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			str_lit("-target "), bc->metrics.target_triplet, str_lit(" "));
 	} else if (is_arch_wasm()) {
 		gbString link_flags = gb_string_make(heap_allocator(), " ");
+
+		// NOTE(laytan): Put the stack first in the memory,
+		// causing a stack overflow to error immediately instead of corrupting globals.
+		link_flags = gb_string_appendc(link_flags, "--stack-first ");
+		// NOTE(laytan): default stack size is 64KiB, up to a more reasonable 1MiB.
+		link_flags = gb_string_appendc(link_flags, "-z stack-size=1048576 ");
+
 		// link_flags = gb_string_appendc(link_flags, "--export-all ");
 		// link_flags = gb_string_appendc(link_flags, "--export-table ");
 		// if (bc->metrics.arch == TargetArch_wasm64) {
@@ -1909,7 +1968,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		if (!bc->minimum_os_version_string_given) {
 			if (subtarget == Subtarget_Default) {
 				bc->minimum_os_version_string = str_lit("11.0.0");
-			} else if (subtarget == Subtarget_iOS || subtarget == Subtarget_iPhoneSimulator) {
+			} else if (subtarget == Subtarget_iPhone || subtarget == Subtarget_iPhoneSimulator) {
 				// NOTE(harold): We default to 17.4 on iOS because that's when os_sync_wait_on_address was added and
 				//               we'd like to avoid any potential App Store issues by using the private ulock_* there.
 				bc->minimum_os_version_string = str_lit("17.4");
@@ -1917,7 +1976,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		}
 
 		if (subtarget == Subtarget_iPhoneSimulator) {
-			// For the iOS simulator subtarget, the version must be between 'ios' and '-simulator'.
+			// For the iPhoneSimulator subtarget, the version must be between 'ios' and '-simulator'.
 			String suffix = str_lit("-simulator");
 			GB_ASSERT(string_ends_with(bc->metrics.target_triplet, suffix));
 

@@ -85,6 +85,7 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	string_map_init(&m->members);
 	string_map_init(&m->procedures);
 	string_map_init(&m->const_strings);
+	string16_map_init(&m->const_string16s);
 	map_init(&m->function_type_map);
 	string_map_init(&m->gen_procs);
 	if (USE_SEPARATE_MODULES) {
@@ -1812,6 +1813,37 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return type;
 			}
 		case Basic_cstring: return LLVMPointerType(LLVMInt8TypeInContext(ctx), 0);
+
+
+		case Basic_string16:
+			{
+				char const *name = "..string16";
+				LLVMTypeRef type = LLVMGetTypeByName(m->mod, name);
+				if (type != nullptr) {
+					return type;
+				}
+				type = LLVMStructCreateNamed(ctx, name);
+
+				if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
+					GB_ASSERT(build_context.metrics.ptr_size == 4);
+					GB_ASSERT(build_context.metrics.int_size == 8);
+					LLVMTypeRef fields[3] = {
+						LLVMPointerType(lb_type(m, t_u16), 0),
+						lb_type(m, t_i32),
+						lb_type(m, t_int),
+					};
+					LLVMStructSetBody(type, fields, 3, false);
+				} else {
+					LLVMTypeRef fields[2] = {
+						LLVMPointerType(lb_type(m, t_u16), 0),
+						lb_type(m, t_int),
+					};
+					LLVMStructSetBody(type, fields, 2, false);
+				}
+				return type;
+			}
+		case Basic_cstring16: return LLVMPointerType(LLVMInt16TypeInContext(ctx), 0);
+
 		case Basic_any:
 			{
 				char const *name = "..any";
@@ -2584,16 +2616,19 @@ general_end:;
 	if (src_size > dst_size) {
 		GB_ASSERT(p->decl_block != p->curr_block);
 		// NOTE(laytan): src is bigger than dst, need to memcpy the part of src we want.
+		
+		LLVMTypeRef llvm_src_type = LLVMPointerType(src_type, 0);
+		LLVMTypeRef llvm_dst_type = LLVMPointerType(dst_type, 0);
 
 		LLVMValueRef val_ptr; 
 		if (LLVMIsALoadInst(val)) {
 			val_ptr = LLVMGetOperand(val, 0);
 		} else if (LLVMIsAAllocaInst(val)) {
-			val_ptr = LLVMBuildPointerCast(p->builder, val, LLVMPointerType(src_type, 0), "");
+			val_ptr = LLVMBuildPointerCast(p->builder, val, llvm_src_type, "");
 		} else {
 			// NOTE(laytan): we need a pointer to memcpy from.
 			LLVMValueRef val_copy = llvm_alloca(p, src_type, src_align);
-			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, LLVMPointerType(src_type, 0), "");
+			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, llvm_src_type, "");
 			LLVMBuildStore(p->builder, val, val_ptr);
 		}
 
@@ -2601,11 +2636,11 @@ general_end:;
 		max_align = gb_max(max_align, 16);
 
 		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
-		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(dst_type, 0), "");
+		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, llvm_dst_type, "");
 
 		LLVMTypeRef types[3] = {
-			lb_type(p->module, t_rawptr),
-			lb_type(p->module, t_rawptr),
+			llvm_dst_type,
+			llvm_src_type,
 			lb_type(p->module, t_int)
 		};
 
@@ -2681,6 +2716,57 @@ gb_internal LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String co
 	}
 }
 
+gb_internal LLVMValueRef lb_find_or_add_entity_string16_ptr(lbModule *m, String16 const &str, bool custom_link_section) {
+	String16HashKey key = {};
+	LLVMValueRef *found = nullptr;
+
+	if (!custom_link_section) {
+		key = string_hash_string(str);
+		found = string16_map_get(&m->const_string16s, key);
+	}
+	if (found != nullptr) {
+		return *found;
+	}
+
+
+
+	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
+
+	LLVMValueRef data = nullptr;
+	{
+		LLVMTypeRef llvm_u16 = LLVMInt16TypeInContext(m->ctx);
+
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, str.len+1);
+
+		for (isize i = 0; i < str.len; i++) {
+			values[i] = LLVMConstInt(llvm_u16, str.text[i], false);
+		}
+		values[str.len] = LLVMConstInt(llvm_u16, 0, false);
+
+		data = LLVMConstArray(llvm_u16, values, cast(unsigned)(str.len+1));
+	}
+
+
+	u32 id = m->global_array_index.fetch_add(1);
+	gbString name = gb_string_make(temporary_allocator(), "csbs$");
+	name = gb_string_appendc(name, m->module_name);
+	name = gb_string_append_fmt(name, "$%x", id);
+
+	LLVMTypeRef type = LLVMTypeOf(data);
+	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
+	LLVMSetInitializer(global_data, data);
+	lb_make_global_private_const(global_data);
+	LLVMSetAlignment(global_data, 2);
+
+	LLVMValueRef ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
+	if (!custom_link_section) {
+		string16_map_set(&m->const_string16s, key, ptr);
+	}
+	return ptr;
+}
+
 gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str, bool custom_link_section) {
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
@@ -2741,6 +2827,60 @@ gb_internal lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *
 	return res;
 }
 
+gb_internal lbValue lb_find_or_add_entity_string16_slice_with_type(lbModule *m, String16 const &str, Type *slice_type) {
+	GB_ASSERT(is_type_slice(slice_type));
+	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
+	LLVMValueRef data = nullptr;
+	{
+		LLVMTypeRef llvm_u16 = LLVMInt16TypeInContext(m->ctx);
+
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, str.len+1);
+
+		for (isize i = 0; i < str.len; i++) {
+			values[i] = LLVMConstInt(llvm_u16, str.text[i], false);
+		}
+		values[str.len] = LLVMConstInt(llvm_u16, 0, false);
+
+		data = LLVMConstArray(llvm_u16, values, cast(unsigned)(str.len+1));
+	}
+
+	u32 id = m->global_array_index.fetch_add(1);
+	gbString name = gb_string_make(temporary_allocator(), "csba$");
+	name = gb_string_appendc(name, m->module_name);
+	name = gb_string_append_fmt(name, "$%x", id);
+
+	LLVMTypeRef type = LLVMTypeOf(data);
+	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
+	LLVMSetInitializer(global_data, data);
+	lb_make_global_private_const(global_data);
+	LLVMSetAlignment(global_data, 2);
+
+	i64 data_len = str.len;
+	LLVMValueRef ptr = nullptr;
+	if (data_len != 0) {
+		ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
+	} else {
+		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
+	}
+	if (!is_type_u16_slice(slice_type)) {
+		Type *bt = base_type(slice_type);
+		Type *elem = bt->Slice.elem;
+		i64 sz = type_size_of(elem);
+		GB_ASSERT(sz > 0);
+		ptr = LLVMConstPointerCast(ptr, lb_type(m, alloc_type_pointer(elem)));
+		data_len /= sz;
+	}
+
+	LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), data_len, true);
+	LLVMValueRef values[2] = {ptr, len};
+
+	lbValue res = {};
+	res.value = llvm_const_named_struct(m, slice_type, values, 2);
+	res.type = slice_type;
+	return res;
+}
 
 
 gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
@@ -2804,6 +2944,7 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	lbGenerator *gen = m->gen;
 
+	GB_ASSERT(e != nullptr);
 	GB_ASSERT(is_type_proc(e->type));
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);

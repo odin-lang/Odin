@@ -41,8 +41,13 @@ enum BasicKind {
 	Basic_uint,
 	Basic_uintptr,
 	Basic_rawptr,
-	Basic_string,  // ^u8 + int
-	Basic_cstring, // ^u8
+
+	Basic_string,  // [^]u8 + int
+	Basic_cstring, // [^]u8
+
+	Basic_string16,  // [^]u16 + int
+	Basic_cstring16, // [^]u16 + int
+
 	Basic_any,     // rawptr + ^Type_Info
 
 	Basic_typeid,
@@ -152,11 +157,11 @@ struct TypeStruct {
 
 	bool            is_polymorphic;
 	bool            are_offsets_set             : 1;
-	bool            are_offsets_being_processed : 1;
 	bool            is_packed                   : 1;
 	bool            is_raw_union                : 1;
-	bool            is_no_copy                  : 1;
 	bool            is_poly_specialized         : 1;
+
+	std::atomic<bool> are_offsets_being_processed;
 };
 
 struct TypeUnion {
@@ -255,7 +260,7 @@ struct TypeProc {
 		Slice<Entity *> variables; /* Entity_Variable */  \
 		i64 *           offsets;                          \
 		BlockingMutex   mutex; /* for settings offsets */ \
-		bool            are_offsets_being_processed;      \
+		std::atomic<bool> are_offsets_being_processed;    \
 		bool            are_offsets_set;                  \
 		bool            is_packed;                        \
 	})                                                        \
@@ -501,8 +506,14 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_uintptr,           BasicFlag_Integer | BasicFlag_Unsigned,    -1, STR_LIT("uintptr")}},
 
 	{Type_Basic, {Basic_rawptr,            BasicFlag_Pointer,                         -1, STR_LIT("rawptr")}},
+
 	{Type_Basic, {Basic_string,            BasicFlag_String,                          -1, STR_LIT("string")}},
 	{Type_Basic, {Basic_cstring,           BasicFlag_String,                          -1, STR_LIT("cstring")}},
+
+	{Type_Basic, {Basic_string16,          BasicFlag_String,                          -1, STR_LIT("string16")}},
+	{Type_Basic, {Basic_cstring16,         BasicFlag_String,                          -1, STR_LIT("cstring16")}},
+
+
 	{Type_Basic, {Basic_any,               0,                                         16, STR_LIT("any")}},
 
 	{Type_Basic, {Basic_typeid,            0,                                          8, STR_LIT("typeid")}},
@@ -592,8 +603,12 @@ gb_global Type *t_uint            = &basic_types[Basic_uint];
 gb_global Type *t_uintptr         = &basic_types[Basic_uintptr];
 
 gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
+
 gb_global Type *t_string          = &basic_types[Basic_string];
 gb_global Type *t_cstring         = &basic_types[Basic_cstring];
+gb_global Type *t_string16        = &basic_types[Basic_string16];
+gb_global Type *t_cstring16       = &basic_types[Basic_cstring16];
+
 gb_global Type *t_any             = &basic_types[Basic_any];
 
 gb_global Type *t_typeid          = &basic_types[Basic_typeid];
@@ -631,6 +646,8 @@ gb_global Type *t_untyped_uninit     = &basic_types[Basic_UntypedUninit];
 
 gb_global Type *t_u8_ptr       = nullptr;
 gb_global Type *t_u8_multi_ptr = nullptr;
+gb_global Type *t_u16_ptr       = nullptr;
+gb_global Type *t_u16_multi_ptr = nullptr;
 gb_global Type *t_int_ptr      = nullptr;
 gb_global Type *t_i64_ptr      = nullptr;
 gb_global Type *t_f64_ptr      = nullptr;
@@ -643,6 +660,8 @@ gb_global Type *t_type_info                      = nullptr;
 gb_global Type *t_type_info_enum_value           = nullptr;
 gb_global Type *t_type_info_ptr                  = nullptr;
 gb_global Type *t_type_info_enum_value_ptr       = nullptr;
+
+gb_global Type *t_type_info_string_encoding_kind = nullptr;
 
 gb_global Type *t_type_info_named                = nullptr;
 gb_global Type *t_type_info_integer              = nullptr;
@@ -1293,11 +1312,27 @@ gb_internal bool is_type_string(Type *t) {
 	}
 	return false;
 }
+gb_internal bool is_type_string16(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_string16;
+	}
+	return false;
+}
 gb_internal bool is_type_cstring(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_cstring;
+	}
+	return false;
+}
+gb_internal bool is_type_cstring16(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_cstring16;
 	}
 	return false;
 }
@@ -1427,6 +1462,12 @@ gb_internal bool is_type_rawptr(Type *t) {
 gb_internal bool is_type_u8(Type *t) {
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_u8;
+	}
+	return false;
+}
+gb_internal bool is_type_u16(Type *t) {
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_u16;
 	}
 	return false;
 }
@@ -1691,6 +1732,39 @@ gb_internal bool is_type_rune_array(Type *t) {
 	return false;
 }
 
+gb_internal bool is_type_u16_slice(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Slice) {
+		return is_type_u16(t->Slice.elem);
+	}
+	return false;
+}
+gb_internal bool is_type_u16_array(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Array) {
+		return is_type_u16(t->Array.elem);
+	}
+	return false;
+}
+gb_internal bool is_type_u16_ptr(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Pointer) {
+		return is_type_u16(t->Slice.elem);
+	}
+	return false;
+}
+gb_internal bool is_type_u16_multi_ptr(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_MultiPointer) {
+		return is_type_u16(t->Slice.elem);
+	}
+	return false;
+}
+
 
 gb_internal bool is_type_array_like(Type *t) {
 	return is_type_array(t) || is_type_enumerated_array(t);
@@ -1779,10 +1853,6 @@ gb_internal bool is_type_soa_struct(Type *t) {
 gb_internal bool is_type_raw_union(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Struct && t->Struct.is_raw_union);
-}
-gb_internal bool is_type_no_copy(Type *t) {
-	t = base_type(t);
-	return (t->kind == Type_Struct && t->Struct.is_no_copy);
 }
 gb_internal bool is_type_enum(Type *t) {
 	t = base_type(t);
@@ -2114,7 +2184,7 @@ gb_internal bool is_type_indexable(Type *t) {
 	Type *bt = base_type(t);
 	switch (bt->kind) {
 	case Type_Basic:
-		return bt->Basic.kind == Basic_string;
+		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_string16;
 	case Type_Array:
 	case Type_Slice:
 	case Type_DynamicArray:
@@ -2134,7 +2204,7 @@ gb_internal bool is_type_sliceable(Type *t) {
 	Type *bt = base_type(t);
 	switch (bt->kind) {
 	case Type_Basic:
-		return bt->Basic.kind == Basic_string;
+		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_string16;
 	case Type_Array:
 	case Type_Slice:
 	case Type_DynamicArray:
@@ -2381,6 +2451,7 @@ gb_internal bool type_has_nil(Type *t) {
 		case Basic_any:
 			return true;
 		case Basic_cstring:
+		case Basic_cstring16:
 			return true;
 		case Basic_typeid:
 			return true;
@@ -2448,8 +2519,9 @@ gb_internal bool is_type_comparable(Type *t) {
 		case Basic_rune:
 			return true;
 		case Basic_string:
-			return true;
 		case Basic_cstring:
+		case Basic_string16:
+		case Basic_cstring16:
 			return true;
 		case Basic_typeid:
 			return true;
@@ -2558,6 +2630,62 @@ gb_internal bool is_type_simple_compare(Type *t) {
 
 	case Type_SimdVector:
 		return is_type_simple_compare(t->SimdVector.elem);
+
+	}
+
+	return false;
+}
+
+// NOTE(bill): type can be easily compared using memcmp or contains a float
+gb_internal bool is_type_nearly_simple_compare(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Array:
+		return is_type_nearly_simple_compare(t->Array.elem);
+
+	case Type_EnumeratedArray:
+		return is_type_nearly_simple_compare(t->EnumeratedArray.elem);
+
+	case Type_Basic:
+		if (t->Basic.flags & (BasicFlag_SimpleCompare|BasicFlag_Numeric)) {
+			return true;
+		}
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
+		return false;
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_SoaPointer:
+	case Type_Proc:
+	case Type_BitSet:
+		return true;
+
+	case Type_Matrix:
+		return is_type_nearly_simple_compare(t->Matrix.elem);
+
+	case Type_Struct:
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields[i];
+			if (!is_type_nearly_simple_compare(f->type)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_Union:
+		for_array(i, t->Union.variants) {
+			Type *v = t->Union.variants[i];
+			if (!is_type_nearly_simple_compare(v)) {
+				return false;
+			}
+		}
+		// make it dumb on purpose
+		return t->Union.variants.count == 1;
+
+	case Type_SimdVector:
+		return is_type_nearly_simple_compare(t->SimdVector.elem);
 
 	}
 
@@ -2859,7 +2987,6 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	case Type_Struct:
 		if (x->Struct.is_raw_union == y->Struct.is_raw_union &&
-		    x->Struct.is_no_copy   == y->Struct.is_no_copy &&
 		    x->Struct.fields.count == y->Struct.fields.count &&
 		    x->Struct.is_packed    == y->Struct.is_packed &&
 		    x->Struct.soa_kind == y->Struct.soa_kind &&
@@ -3780,10 +3907,12 @@ gb_internal i64 type_size_of(Type *t) {
 	if (t->kind == Type_Basic) {
 		GB_ASSERT_MSG(is_type_typed(t), "%s", type_to_string(t));
 		switch (t->Basic.kind) {
-		case Basic_string:  size = 2*build_context.int_size; break;
-		case Basic_cstring: size = build_context.ptr_size;   break;
-		case Basic_any:     size = 16;                       break;
-		case Basic_typeid:  size = 8;                        break;
+		case Basic_string:    size = 2*build_context.int_size; break;
+		case Basic_cstring:   size = build_context.ptr_size;   break;
+		case Basic_string16:  size = 2*build_context.int_size; break;
+		case Basic_cstring16: size = build_context.ptr_size;   break;
+		case Basic_any:       size = 16;                       break;
+		case Basic_typeid:    size = 8;                        break;
 
 		case Basic_int: case Basic_uint:
 			size = build_context.int_size;
@@ -3843,10 +3972,12 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
 		switch (t->Basic.kind) {
-		case Basic_string:  return build_context.int_size;
-		case Basic_cstring: return build_context.ptr_size;
-		case Basic_any:     return 8;
-		case Basic_typeid:  return 8;
+		case Basic_string:    return build_context.int_size;
+		case Basic_cstring:   return build_context.ptr_size;
+		case Basic_string16:  return build_context.int_size;
+		case Basic_cstring16: return build_context.ptr_size;
+		case Basic_any:       return 8;
+		case Basic_typeid:    return 8;
 
 		case Basic_int: case Basic_uint:
 			return build_context.int_size;
@@ -4049,18 +4180,18 @@ gb_internal bool type_set_offsets(Type *t) {
 	if (t->kind == Type_Struct) {
 		MUTEX_GUARD(&t->Struct.offset_mutex);
 		if (!t->Struct.are_offsets_set) {
-			t->Struct.are_offsets_being_processed = true;
+			t->Struct.are_offsets_being_processed.store(true);
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align);
-			t->Struct.are_offsets_being_processed = false;
+			t->Struct.are_offsets_being_processed.store(false);
 			t->Struct.are_offsets_set = true;
 			return true;
 		}
 	} else if (is_type_tuple(t)) {
 		MUTEX_GUARD(&t->Tuple.mutex);
 		if (!t->Tuple.are_offsets_set) {
-			t->Tuple.are_offsets_being_processed = true;
+			t->Tuple.are_offsets_being_processed.store(true);
 			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false, 1, 0);
-			t->Tuple.are_offsets_being_processed = false;
+			t->Tuple.are_offsets_being_processed.store(false);
 			t->Tuple.are_offsets_set = true;
 			return true;
 		}
@@ -4094,10 +4225,12 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 			return size;
 		}
 		switch (kind) {
-		case Basic_string:  return 2*build_context.int_size;
-		case Basic_cstring: return build_context.ptr_size;
-		case Basic_any:     return 16;
-		case Basic_typeid:  return 8;
+		case Basic_string:    return 2*build_context.int_size;
+		case Basic_cstring:   return build_context.ptr_size;
+		case Basic_string16:  return 2*build_context.int_size;
+		case Basic_cstring16: return build_context.ptr_size;
+		case Basic_any:       return 16;
+		case Basic_typeid:    return 8;
 
 		case Basic_int: case Basic_uint:
 			return build_context.int_size;
@@ -4243,9 +4376,12 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
-			if (t->Struct.are_offsets_being_processed && t->Struct.offsets == nullptr) {
-				type_path_print_illegal_cycle(path, path->path.count-1);
-				return FAILURE_SIZE;
+			{
+				MUTEX_GUARD(&t->Struct.offset_mutex);
+				if (t->Struct.are_offsets_being_processed.load() && t->Struct.offsets == nullptr) {
+					type_path_print_illegal_cycle(path, path->path.count-1);
+					return FAILURE_SIZE;
+				}
 			}
 			type_set_offsets(t);
 			GB_ASSERT(t->Struct.fields.count == 0 || t->Struct.offsets != nullptr);
@@ -4326,6 +4462,15 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 				if (field_type_) *field_type_ = t_int;
 				return build_context.int_size; // len
 			}
+		} else if (t->Basic.kind == Basic_string16) {
+			switch (index) {
+			case 0:
+				if (field_type_) *field_type_ = t_u16_ptr;
+				return 0;                      // data
+			case 1:
+				if (field_type_) *field_type_ = t_int;
+				return build_context.int_size; // len
+			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
 			case 0:
@@ -4398,6 +4543,11 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 			switch (t->kind) {
 			case Type_Basic:
 				if (t->Basic.kind == Basic_string) {
+					switch (index) {
+					case 0: t = t_rawptr; break;
+					case 1: t = t_int;    break;
+					}
+				} else if (t->Basic.kind == Basic_string16) {
 					switch (index) {
 					case 0: t = t_rawptr; break;
 					case 1: t = t_int;    break;
@@ -4643,6 +4793,11 @@ gb_internal Type *type_internal_index(Type *t, isize index) {
 					GB_ASSERT(index == 0 || index == 1);
 					return index == 0 ? t_u8_ptr : t_int;
 				}
+			case Basic_string16:
+				{
+					GB_ASSERT(index == 0 || index == 1);
+					return index == 0 ? t_u16_ptr : t_int;
+				}
 			case Basic_any:
 				{
 					GB_ASSERT(index == 0 || index == 1);
@@ -4832,7 +4987,6 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 
 		if (type->Struct.is_packed)    str = gb_string_appendc(str, " #packed");
 		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
-		if (type->Struct.is_no_copy)   str = gb_string_appendc(str, " #no_copy");
 		if (type->Struct.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Struct.custom_align);
 
 		str = gb_string_appendc(str, " {");

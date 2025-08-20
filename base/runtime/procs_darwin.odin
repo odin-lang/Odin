@@ -1,8 +1,11 @@
 #+private
 package runtime
 
-@(priority_index=-1e6)
+@(priority_index=-1e5)
 foreign import ObjC "system:objc"
+
+@(priority_index=-1e6)
+foreign import libSystem "system:System"
 
 import "base:intrinsics"
 
@@ -31,5 +34,13 @@ foreign ObjC {
 	class_getInstanceVariable :: proc "c" (cls : objc_Class, name: cstring) -> objc_Ivar ---
 	class_getInstanceSize     :: proc "c" (cls : objc_Class) -> uint ---
 	ivar_getOffset            :: proc "c" (v: objc_Ivar) -> uintptr ---
+	object_getClass           :: proc "c" (obj: objc_id) -> objc_Class ---
 }
 
+foreign libSystem {
+	_NSConcreteGlobalBlock: intrinsics.objc_class
+	_NSConcreteStackBlock:  intrinsics.objc_class
+
+	_Block_object_assign  :: proc "c" (rawptr, rawptr, i32) ---
+	_Block_object_dispose :: proc "c" (rawptr, i32) ---
+}

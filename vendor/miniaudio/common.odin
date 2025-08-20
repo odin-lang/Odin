@@ -25,7 +25,7 @@ BINDINGS_VERSION          :: [3]u32{BINDINGS_VERSION_MAJOR, BINDINGS_VERSION_MIN
 BINDINGS_VERSION_STRING   :: "0.11.22"
 
 @(init)
-version_check :: proc() {
+version_check :: proc "contextless" () {
 	v: [3]u32
 	version(&v.x, &v.y, &v.z)
 	if v != BINDINGS_VERSION {
@@ -43,7 +43,7 @@ version_check :: proc() {
 			n += copy(buf[n:], "and executing `make`")
 		}
 
-		panic(string(buf[:n]))
+		panic_contextless(string(buf[:n]))
 	}
 }
 

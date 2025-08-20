@@ -56,13 +56,6 @@ query_info :: proc(gen := context.random_generator) -> Generator_Query_Info {
 }
 
 
-@(private)
-_random_u64 :: proc(gen := context.random_generator) -> (res: u64) {
-	ok := runtime.random_generator_read_ptr(gen, &res, size_of(res))
-	assert(ok, "uninitialized gen/context.random_generator")
-	return
-}
-
 /*
 Generates a random 32 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 
@@ -84,7 +77,7 @@ Possible Output:
 
 */
 @(require_results)
-uint32 :: proc(gen := context.random_generator) -> (val: u32) { return u32(_random_u64(gen)) }
+uint32 :: proc(gen := context.random_generator) -> (val: u32) {return u32(uint64(gen))}
 
 /*
 Generates a random 64 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
@@ -107,7 +100,11 @@ Possible Output:
 
 */
 @(require_results)
-uint64 :: proc(gen := context.random_generator) -> (val: u64) { return _random_u64(gen) }
+uint64 :: proc(gen := context.random_generator) -> (val: u64) {
+	ok := runtime.random_generator_read_ptr(gen, &val, size_of(val))
+	assert(ok, "uninitialized gen/context.random_generator")
+	return
+}
 
 /*
 Generates a random 128 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
@@ -131,13 +128,13 @@ Possible Output:
 */
 @(require_results)
 uint128 :: proc(gen := context.random_generator) -> (val: u128) {
-	a := u128(_random_u64(gen))
-	b := u128(_random_u64(gen))
+	a := u128(uint64(gen))
+	b := u128(uint64(gen))
 	return (a<<64) | b
 }
 
 /*
-Generates a random 31 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 31 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 The sign bit will always be set to 0, thus all generated numbers will be positive.
 
 Returns:
@@ -160,7 +157,7 @@ Possible Output:
 @(require_results) int31  :: proc(gen := context.random_generator) -> (val: i32)  { return i32(uint32(gen) << 1 >> 1) }
 
 /*
-Generates a random 63 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 63 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 The sign bit will always be set to 0, thus all generated numbers will be positive.
 
 Returns:
@@ -183,7 +180,7 @@ Possible Output:
 @(require_results) int63  :: proc(gen := context.random_generator) -> (val: i64)  { return i64(uint64(gen) << 1 >> 1) }
 
 /*
-Generates a random 127 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 127 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 The sign bit will always be set to 0, thus all generated numbers will be positive.
 
 Returns:
@@ -480,8 +477,8 @@ Possible Output:
 }
 
 /*
-Fills a byte slice with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Fills a byte slice with random values using the provided random number generator. If no generator is provided the global random number generator will be used.
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.
 
 Inputs:
 - p: The byte slice to fill
@@ -508,22 +505,12 @@ Possible Output:
 */
 @(require_results)
 read :: proc(p: []byte, gen := context.random_generator) -> (n: int) {
-	pos := i8(0)
-	val := i64(0)
-	for n = 0; n < len(p); n += 1 {
-		if pos == 0 {
-			val = int63(gen)
-			pos = 7
-		}
-		p[n] = byte(val)
-		val >>= 8
-		pos -= 1
-	}
-	return
+	if !runtime.random_generator_read_bytes(gen, p) {return 0}
+	return len(p)
 }
 
 /*
-Creates a slice of `int` filled with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Creates a slice of `int` filled with random values using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 *Allocates Using Provided Allocator*
 
@@ -566,7 +553,7 @@ perm :: proc(n: int, allocator := context.allocator, gen := context.random_gener
 }
 
 /*
-Randomizes the ordering of elements for the provided slice. If no generator is provided the global random number generator will be used.  
+Randomizes the ordering of elements for the provided slice. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - array: The slice to randomize
@@ -607,7 +594,7 @@ shuffle :: proc(array: $T/[]$E, gen := context.random_generator) {
 }
 
 /*
-Returns a random element from the provided slice. If no generator is provided the global random number generator will be used.  
+Returns a random element from the provided slice. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - array: The slice to choose an element from

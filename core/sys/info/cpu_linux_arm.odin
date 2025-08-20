@@ -2,11 +2,13 @@
 #+build linux
 package sysinfo
 
+import "base:runtime"
 import "core:sys/linux"
 import "core:strings"
 
 @(init, private)
-init_cpu_features :: proc() {
+init_cpu_features :: proc "contextless" () {
+	context = runtime.default_context()
 	fd, err := linux.open("/proc/cpuinfo", {})
 	if err != .NONE { return }
 	defer linux.close(fd)

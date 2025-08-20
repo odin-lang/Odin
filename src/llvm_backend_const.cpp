@@ -122,6 +122,25 @@ gb_internal lbValue lb_const_ptr_cast(lbModule *m, lbValue value, Type *t) {
 
 
 gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len) {
+	GB_ASSERT(!is_type_string16(t));
+	if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
+		LLVMValueRef values[3] = {
+			data,
+			LLVMConstNull(lb_type(m, t_i32)),
+			len,
+		};
+		return llvm_const_named_struct_internal(lb_type(m, t), values, 3);
+	} else {
+		LLVMValueRef values[2] = {
+			data,
+			len,
+		};
+		return llvm_const_named_struct_internal(lb_type(m, t), values, 2);
+	}
+}
+
+gb_internal LLVMValueRef llvm_const_string16_internal(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len) {
+	GB_ASSERT(is_type_string16(t));
 	if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
 		LLVMValueRef values[3] = {
 			data,
@@ -236,6 +255,10 @@ gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value) {
 
 gb_internal lbValue lb_const_string(lbModule *m, String const &value) {
 	return lb_const_value(m, t_string, exact_value_string(value));
+}
+
+gb_internal lbValue lb_const_string(lbModule *m, String16 const &value) {
+	return lb_const_value(m, t_string16, exact_value_string16(value));
 }
 
 
@@ -569,7 +592,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			GB_ASSERT(is_type_slice(type));
 			res.value = lb_find_or_add_entity_string_byte_slice_with_type(m, value.value_string, original_type).value;
 			return res;
-		} else {
+		} else if (value.kind == ExactValue_String16) {
+			GB_ASSERT(is_type_slice(type));
+			res.value = lb_find_or_add_entity_string16_slice_with_type(m, value.value_string16, original_type).value;
+			return res;
+		}else {
 			ast_node(cl, CompoundLit, value.value_compound);
 
 			isize count = cl->elems.count;
@@ -751,7 +778,55 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		{
 			bool custom_link_section = cc.link_section.len > 0;
 
-			LLVMValueRef ptr = lb_find_or_add_entity_string_ptr(m, value.value_string, custom_link_section);
+			LLVMValueRef ptr = nullptr;
+			lbValue res = {};
+			res.type = default_type(original_type);
+
+			isize len = value.value_string.len;
+
+			if (is_type_string16(res.type) || is_type_cstring16(res.type)) {
+				TEMPORARY_ALLOCATOR_GUARD();
+				String16 s16 = string_to_string16(temporary_allocator(), value.value_string);
+				len = s16.len;
+				ptr = lb_find_or_add_entity_string16_ptr(m, s16, custom_link_section);
+			} else {
+				ptr = lb_find_or_add_entity_string_ptr(m, value.value_string, custom_link_section);
+			}
+
+			if (custom_link_section) {
+				LLVMSetSection(ptr, alloc_cstring(permanent_allocator(), cc.link_section));
+			}
+
+			if (is_type_cstring(res.type) || is_type_cstring16(res.type)) {
+				res.value = ptr;
+			} else {
+				if (len == 0) {
+					if (is_type_string16(res.type)) {
+						ptr = LLVMConstNull(lb_type(m, t_u16_ptr));
+					} else {
+						ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
+					}
+				}
+				LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), len, true);
+				GB_ASSERT(is_type_string(original_type));
+
+				if (is_type_string16(res.type)) {
+					res.value = llvm_const_string16_internal(m, original_type, ptr, str_len);
+				} else {
+					res.value = llvm_const_string_internal(m, original_type, ptr, str_len);
+				}
+			}
+
+			return res;
+		}
+
+	case ExactValue_String16:
+		{
+			GB_ASSERT(is_type_string16(res.type) || is_type_cstring16(res.type));
+
+			bool custom_link_section = cc.link_section.len > 0;
+
+			LLVMValueRef ptr = lb_find_or_add_entity_string16_ptr(m, value.value_string16, custom_link_section);
 			lbValue res = {};
 			res.type = default_type(original_type);
 
@@ -759,20 +834,21 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				LLVMSetSection(ptr, alloc_cstring(permanent_allocator(), cc.link_section));
 			}
 
-			if (is_type_cstring(res.type)) {
+			if (is_type_cstring16(res.type)) {
 				res.value = ptr;
 			} else {
-				if (value.value_string.len == 0) {
+				if (value.value_string16.len == 0) {
 					ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
 				}
-				LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string.len, true);
+				LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string16.len, true);
 				GB_ASSERT(is_type_string(original_type));
 
-				res.value = llvm_const_string_internal(m, original_type, ptr, str_len);
+				res.value = llvm_const_string16_internal(m, original_type, ptr, str_len);
 			}
 
 			return res;
 		}
+
 
 	case ExactValue_Integer:
 		if (is_type_pointer(type) || is_type_multi_pointer(type) || is_type_proc(type)) {

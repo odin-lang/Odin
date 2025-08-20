@@ -27,10 +27,10 @@
 
 package math_big
 
-import "core:mem"
-import "base:intrinsics"
-import rnd "core:math/rand"
 import "base:builtin"
+import "base:intrinsics"
+import "core:mem"
+import rnd "core:math/rand"
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
@@ -2885,12 +2885,12 @@ internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context
 }
 internal_clear_if_uninitialized :: proc {internal_clear_if_uninitialized_single, internal_clear_if_uninitialized_multi, }
 
-internal_error_if_immutable_single :: proc(arg: ^Int) -> (err: Error) {
+internal_error_if_immutable_single :: proc "contextless" (arg: ^Int) -> (err: Error) {
 	if arg != nil && .Immutable in arg.flags { return .Assignment_To_Immutable }
 	return nil
 }
 
-internal_error_if_immutable_multi :: proc(args: ..^Int) -> (err: Error) {
+internal_error_if_immutable_multi :: proc "contextless" (args: ..^Int) -> (err: Error) {
 	for i in args {
 		if i != nil && .Immutable in i.flags { return .Assignment_To_Immutable }
 	}

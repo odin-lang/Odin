@@ -720,7 +720,7 @@ autoselect_pbm_format_from_image :: proc(img: ^Image, prefer_binary := true, for
 }
 
 @(init, private)
-_register :: proc() {
+_register :: proc "contextless" () {
 	loader :: proc(data: []byte, options: image.Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
 		return load_from_bytes(data, allocator)
 	}

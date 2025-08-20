@@ -43,12 +43,14 @@ File_Console_Logger_Data :: struct {
 @(private) global_subtract_stderr_options: Options
 
 @(init, private)
-init_standard_stream_status :: proc() {
+init_standard_stream_status :: proc "contextless" () {
 	// NOTE(Feoramund): While it is technically possible for these streams to
 	// be redirected during the runtime of the program, the cost of checking on
 	// every single log message is not worth it to support such an
 	// uncommonly-used feature.
 	if terminal.color_enabled {
+		context = runtime.default_context()
+
 		// This is done this way because it's possible that only one of these
 		// streams could be redirected to a file.
 		if !terminal.is_terminal(os.stdout) {

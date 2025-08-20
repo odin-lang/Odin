@@ -16,12 +16,19 @@ Arguments to the current process.
 args := get_args()
 
 @(private="file")
-get_args :: proc() -> []string {
+get_args :: proc "contextless" () -> []string {
+	context = runtime.default_context()
 	result := make([]string, len(runtime.args__), heap_allocator())
 	for rt_arg, i in runtime.args__ {
 		result[i] = string(rt_arg)
 	}
 	return result
+}
+
+@(fini, private="file")
+delete_args :: proc "contextless" () {
+	context = runtime.default_context()
+	delete(args, heap_allocator())
 }
 
 /*

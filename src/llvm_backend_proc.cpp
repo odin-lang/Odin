@@ -985,6 +985,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 gb_internal lbValue lb_lookup_runtime_procedure(lbModule *m, String const &name) {
 	AstPackage *pkg = m->info->runtime_package;
 	Entity *e = scope_lookup_current(pkg->scope, name);
+	GB_ASSERT_MSG(e != nullptr, "Runtime procedure not found: %s", name);
 	return lb_find_procedure_value_from_entity(m, e);
 }
 
@@ -1073,6 +1074,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 	lbValue result = {};
 
+	isize ignored_args = 0;
 	auto processed_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
 
 	{
@@ -1095,6 +1097,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			lbArgType *arg = &ft->args[param_index];
 			if (arg->kind == lbArg_Ignore) {
 				param_index += 1;
+				ignored_args += 1;
 				continue;
 			}
 
@@ -1203,7 +1206,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			auto tuple_fix_values = slice_make<lbValue>(permanent_allocator(), ret_count);
 			auto tuple_geps = slice_make<lbValue>(permanent_allocator(), ret_count);
 
-			isize offset = ft->original_arg_count;
+			isize offset = ft->original_arg_count - ignored_args;
 			for (isize j = 0; j < ret_count-1; j++) {
 				lbValue ret_arg_ptr = processed_args[offset + j];
 				lbValue ret_arg = lb_emit_load(p, ret_arg_ptr);
@@ -1721,6 +1724,275 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			return res;
 		}
 
+	case BuiltinProc_simd_runtime_swizzle:
+		{
+			LLVMValueRef src = arg0.value;
+			LLVMValueRef indices = lb_build_expr(p, ce->args[1]).value;
+			
+			Type *vt = arg0.type;
+			GB_ASSERT(vt->kind == Type_SimdVector);
+			i64 count = vt->SimdVector.count;
+			Type *elem_type = vt->SimdVector.elem;
+			i64 elem_size = type_size_of(elem_type);
+			
+			// Determine strategy based on element size and target architecture
+			char const *intrinsic_name = nullptr;
+			bool use_hardware_runtime_swizzle = false;
+			
+			// 8-bit elements: Use dedicated table lookup instructions
+			if (elem_size == 1) {
+				use_hardware_runtime_swizzle = true;
+				
+				if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
+					// x86/x86-64: Use pshufb intrinsics
+					switch (count) {
+					case 16:
+						intrinsic_name = "llvm.x86.ssse3.pshuf.b.128";
+						break;
+					case 32:
+						intrinsic_name = "llvm.x86.avx2.pshuf.b";
+						break;
+					case 64:
+						intrinsic_name = "llvm.x86.avx512.pshuf.b.512";
+						break;
+					default:
+						use_hardware_runtime_swizzle = false;
+						break;
+					}
+				} else if (build_context.metrics.arch == TargetArch_arm64) {
+					// ARM64: Use NEON tbl intrinsics with automatic table splitting
+					switch (count) {
+					case 16:
+						intrinsic_name = "llvm.aarch64.neon.tbl1";
+						break;
+					case 32:
+						intrinsic_name = "llvm.aarch64.neon.tbl2";
+						break;
+					case 48:
+						intrinsic_name = "llvm.aarch64.neon.tbl3";
+						break;
+					case 64:
+						intrinsic_name = "llvm.aarch64.neon.tbl4";
+						break;
+					default:
+						use_hardware_runtime_swizzle = false;
+						break;
+					}
+				} else if (build_context.metrics.arch == TargetArch_arm32) {
+					// ARM32: Use NEON vtbl intrinsics with automatic table splitting
+					switch (count) {
+					case 8:
+						intrinsic_name = "llvm.arm.neon.vtbl1";
+						break;
+					case 16:
+						intrinsic_name = "llvm.arm.neon.vtbl2";
+						break;
+					case 24:
+						intrinsic_name = "llvm.arm.neon.vtbl3";
+						break;
+					case 32:
+						intrinsic_name = "llvm.arm.neon.vtbl4";
+						break;
+					default:
+						use_hardware_runtime_swizzle = false;
+						break;
+					}
+				} else if (build_context.metrics.arch == TargetArch_wasm32 || build_context.metrics.arch == TargetArch_wasm64p32) {
+					// WebAssembly: Use swizzle (only supports 16-byte vectors)
+					if (count == 16) {
+						intrinsic_name = "llvm.wasm.swizzle";
+					} else {
+						use_hardware_runtime_swizzle = false;
+					}
+				} else {
+					use_hardware_runtime_swizzle = false;
+				}
+			}
+			
+			if (use_hardware_runtime_swizzle && intrinsic_name != nullptr) {
+				// Use dedicated hardware swizzle instruction
+				
+				// Check if required target features are enabled
+				bool features_enabled = true;
+				if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
+					// x86/x86-64 feature checking
+					if (count == 16) {
+						// SSE/SSSE3 for 128-bit vectors
+						if (!check_target_feature_is_enabled(str_lit("ssse3"), nullptr)) {
+							features_enabled = false;
+						}
+					} else if (count == 32) {
+						// AVX2 requires ssse3 + avx2 features
+						if (!check_target_feature_is_enabled(str_lit("ssse3"), nullptr) || 
+							!check_target_feature_is_enabled(str_lit("avx2"), nullptr)) {
+							features_enabled = false;
+						}
+					} else if (count == 64) {
+						// AVX512 requires ssse3 + avx2 + avx512f + avx512bw features
+						if (!check_target_feature_is_enabled(str_lit("ssse3"), nullptr) ||
+							!check_target_feature_is_enabled(str_lit("avx2"), nullptr) ||
+							!check_target_feature_is_enabled(str_lit("avx512f"), nullptr) ||
+							!check_target_feature_is_enabled(str_lit("avx512bw"), nullptr)) {
+							features_enabled = false;
+						}
+					}
+				} else if (build_context.metrics.arch == TargetArch_arm64 || build_context.metrics.arch == TargetArch_arm32) {
+					// ARM/ARM64 feature checking - NEON is required for all table/swizzle ops
+					if (!check_target_feature_is_enabled(str_lit("neon"), nullptr)) {
+						features_enabled = false;
+					}
+				}
+				
+				if (features_enabled) {
+					// Add target features to function attributes for LLVM instruction selection
+					if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
+						// x86/x86-64 function attributes
+						if (count == 16) {
+							// SSE/SSSE3 for 128-bit vectors
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+ssse3"));
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("128"));
+						} else if (count == 32) {
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+avx,+avx2,+ssse3"));
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("256"));
+						} else if (count == 64) {
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+avx,+avx2,+avx512f,+avx512bw,+ssse3"));
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("512"));
+						}
+					} else if (build_context.metrics.arch == TargetArch_arm64) {
+						// ARM64 function attributes - enable NEON for swizzle instructions
+						lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+neon"));
+						// Set appropriate vector width for multi-swizzle operations
+						if (count >= 32) {
+							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("256"));
+						}
+					} else if (build_context.metrics.arch == TargetArch_arm32) {
+						// ARM32 function attributes - enable NEON for swizzle instructions
+						lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+neon"));
+					}
+					
+					// Handle ARM's multi-swizzle intrinsics by splitting the src vector
+					if (build_context.metrics.arch == TargetArch_arm64 && count > 16) {
+						// ARM64 TBL2/TBL3/TBL4: Split src into multiple 16-byte vectors
+						int num_tables = cast(int)(count / 16);
+						GB_ASSERT_MSG(count % 16 == 0, "ARM64 src size must be multiple of 16 bytes, got %lld bytes", count);
+						GB_ASSERT_MSG(num_tables <= 4, "ARM64 NEON supports maximum 4 tables (tbl4), got %d tables for %lld-byte vector", num_tables, count);
+						
+						LLVMValueRef src_parts[4]; // Max 4 tables for tbl4
+						for (int i = 0; i < num_tables; i++) {
+							// Extract 16-byte slice from the larger src
+							LLVMValueRef indices_for_extract[16];
+							for (int j = 0; j < 16; j++) {
+								indices_for_extract[j] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), i * 16 + j, false);
+							}
+							LLVMValueRef extract_mask = LLVMConstVector(indices_for_extract, 16);
+							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
+						}
+						
+						// Call appropriate ARM64 tbl intrinsic
+						if (count == 32) {
+							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 3, nullptr, 0);
+						} else if (count == 48) {
+							LLVMValueRef args[4] = { src_parts[0], src_parts[1], src_parts[2], indices };
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 4, nullptr, 0);
+						} else if (count == 64) {
+							LLVMValueRef args[5] = { src_parts[0], src_parts[1], src_parts[2], src_parts[3], indices };
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 5, nullptr, 0);
+						}
+					} else if (build_context.metrics.arch == TargetArch_arm32 && count > 8) {
+						// ARM32 VTBL2/VTBL3/VTBL4: Split src into multiple 8-byte vectors
+						int num_tables = cast(int)count / 8;
+						GB_ASSERT_MSG(count % 8 == 0, "ARM32 src size must be multiple of 8 bytes, got %lld bytes", count);
+						GB_ASSERT_MSG(num_tables <= 4, "ARM32 NEON supports maximum 4 tables (vtbl4), got %d tables for %lld-byte vector", num_tables, count);
+						
+						LLVMValueRef src_parts[4]; // Max 4 tables for vtbl4
+						for (int i = 0; i < num_tables; i++) {
+							// Extract 8-byte slice from the larger src
+							LLVMValueRef indices_for_extract[8];
+							for (int j = 0; j < 8; j++) {
+								indices_for_extract[j] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), i * 8 + j, false);
+							}
+							LLVMValueRef extract_mask = LLVMConstVector(indices_for_extract, 8);
+							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
+						}
+						
+						// Call appropriate ARM32 vtbl intrinsic
+						if (count == 16) {
+							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 3, nullptr, 0);
+						} else if (count == 24) {
+							LLVMValueRef args[4] = { src_parts[0], src_parts[1], src_parts[2], indices };
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 4, nullptr, 0);
+						} else if (count == 32) {
+							LLVMValueRef args[5] = { src_parts[0], src_parts[1], src_parts[2], src_parts[3], indices };
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 5, nullptr, 0);
+						}
+					} else {
+						// Single runtime swizzle case (x86, WebAssembly, ARM single-table)
+						LLVMValueRef args[2] = { src, indices };
+						res.value = lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), nullptr, 0);
+					}
+					return res;
+				} else {
+					// Features not enabled, fall back to emulation
+					use_hardware_runtime_swizzle = false;
+				}
+			}
+			
+			// Fallback: Emulate with extracts and inserts for all element sizes
+			GB_ASSERT(count > 0 && count <= 64); // Sanity check
+			
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+			LLVMTypeRef i32_type = LLVMInt32TypeInContext(p->module->ctx);
+			LLVMTypeRef elem_llvm_type = lb_type(p->module, elem_type);
+			
+			// Calculate mask based on element size and vector count
+			i64 max_index = count - 1;
+			LLVMValueRef index_mask;
+			
+			if (elem_size == 1) {
+				// 8-bit: mask to src size (like pshufb behavior)
+				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
+			} else if (elem_size == 2) {
+				// 16-bit: mask to src size 
+				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
+			} else if (elem_size == 4) {
+				// 32-bit: mask to src size
+				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
+			} else {
+				// 64-bit: mask to src size
+				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
+			}
+			
+			for (i64 i = 0; i < count; i++) {
+				LLVMValueRef idx_i = LLVMConstInt(i32_type, cast(unsigned)i, false);
+				LLVMValueRef index_elem = LLVMBuildExtractElement(p->builder, indices, idx_i, "");
+				
+				// Mask index to valid range
+				LLVMValueRef masked_index = LLVMBuildAnd(p->builder, index_elem, index_mask, "");
+				
+				// Convert to i32 for extractelement
+				LLVMValueRef index_i32;
+				if (LLVMGetIntTypeWidth(LLVMTypeOf(masked_index)) < 32) {
+					index_i32 = LLVMBuildZExt(p->builder, masked_index, i32_type, "");
+				} else if (LLVMGetIntTypeWidth(LLVMTypeOf(masked_index)) > 32) {
+					index_i32 = LLVMBuildTrunc(p->builder, masked_index, i32_type, "");
+				} else {
+					index_i32 = masked_index;
+				}
+				
+				values[i] = LLVMBuildExtractElement(p->builder, src, index_i32, "");
+			}
+			
+			// Build result vector
+			res.value = LLVMGetUndef(LLVMTypeOf(src));
+			for (i64 i = 0; i < count; i++) {
+				LLVMValueRef idx_i = LLVMConstInt(i32_type, cast(unsigned)i, false);
+				res.value = LLVMBuildInsertElement(p->builder, res.value, values[i], idx_i, "");
+			}
+			return res;
+		}
+
 	case BuiltinProc_simd_ceil:
 	case BuiltinProc_simd_floor:
 	case BuiltinProc_simd_trunc:
@@ -2018,6 +2290,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		}
 		if (is_type_cstring(t)) {
 			return lb_cstring_len(p, v);
+		} else if (is_type_cstring16(t)) {
+			return lb_cstring16_len(p, v);
+		} else if (is_type_string16(t)) {
+			return lb_string_len(p, v);
 		} else if (is_type_string(t)) {
 			return lb_string_len(p, v);
 		} else if (is_type_array(t)) {
@@ -2457,6 +2733,11 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 					res = lb_emit_conv(p, res, tv.type);
 				} else if (t->Basic.kind == Basic_cstring) {
 					res = lb_emit_conv(p, x, tv.type);
+				} else if (t->Basic.kind == Basic_string16) {
+					res = lb_string_elem(p, x);
+					res = lb_emit_conv(p, res, tv.type);
+				} else if (t->Basic.kind == Basic_cstring16) {
+					res = lb_emit_conv(p, x, tv.type);
 				}
 				break;
 			case Type_Pointer:
@@ -2538,6 +2819,21 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				char const *name = "llvm.readcyclecounter";
 				res.value = lb_call_intrinsic(p, name, nullptr, 0, nullptr, 0);
 			}
+			return res;
+		}
+	case BuiltinProc_read_cycle_counter_frequency:
+		{
+			lbValue res = {};
+			res.type = tv.type;
+
+			if (build_context.metrics.arch == TargetArch_arm64) {
+				LLVMTypeRef func_type = LLVMFunctionType(LLVMInt64TypeInContext(p->module->ctx), nullptr, 0, false);
+				bool has_side_effects = false;
+				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs $0, cntfrq_el0"), str_lit("=r"), has_side_effects);
+				GB_ASSERT(the_asm != nullptr);
+				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			}
+
 			return res;
 		}
 
@@ -3006,16 +3302,22 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			}
 			GB_ASSERT(name != nullptr);
 
-			LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
 			lbValue res = {};
+			res.type = platform_type;
 
-			LLVMValueRef args[3] = {
+			if (id == BuiltinProc_fixed_point_div ||
+			    id == BuiltinProc_fixed_point_div_sat) {
+				res.value = lb_integer_division_intrinsics(p, x.value, y.value, scale.value, platform_type, name);
+			} else {
+				LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
+
+				LLVMValueRef args[3] = {
 					x.value,
 					y.value,
 					scale.value };
 
-			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
-			res.type = platform_type;
+				res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			}
 			return lb_emit_conv(p, res, tv.type);
 		}
 
@@ -3451,6 +3753,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_objc_register_selector: return lb_handle_objc_register_selector(p, expr);
 	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
 	case BuiltinProc_objc_ivar_get:          return lb_handle_objc_ivar_get(p, expr);
+	case BuiltinProc_objc_block:             return lb_handle_objc_block(p, expr);
 
 
 	case BuiltinProc_constant_utf16_cstring:

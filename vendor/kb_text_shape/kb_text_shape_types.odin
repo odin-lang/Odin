@@ -801,6 +801,7 @@ op_kind :: enum u8 {
 	NORMALIZE_HANGUL,
 	FLAG_JOINING_LETTERS,
 	GSUB_FEATURES,
+	GSUB_FEATURES_WITH_USER,
 
 	// Positioning ops.
 	GPOS_METRICS,
@@ -1067,6 +1068,179 @@ shaper :: enum u32 {
 	USE,
 }
 
+script_tag :: enum u32 {
+	DONT_KNOW                 = (' ' | ' '<<8 | ' '<<16 | ' '<<24),
+	ADLAM                     = ('a' | 'd'<<8 | 'l'<<16 | 'm'<<24),
+	AHOM                      = ('a' | 'h'<<8 | 'o'<<16 | 'm'<<24),
+	ANATOLIAN_HIEROGLYPHS     = ('h' | 'l'<<8 | 'u'<<16 | 'w'<<24),
+	ARABIC                    = ('a' | 'r'<<8 | 'a'<<16 | 'b'<<24),
+	ARMENIAN                  = ('a' | 'r'<<8 | 'm'<<16 | 'n'<<24),
+	AVESTAN                   = ('a' | 'v'<<8 | 's'<<16 | 't'<<24),
+	BALINESE                  = ('b' | 'a'<<8 | 'l'<<16 | 'i'<<24),
+	BAMUM                     = ('b' | 'a'<<8 | 'm'<<16 | 'u'<<24),
+	BASSA_VAH                 = ('b' | 'a'<<8 | 's'<<16 | 's'<<24),
+	BATAK                     = ('b' | 'a'<<8 | 't'<<16 | 'k'<<24),
+	BENGALI                   = ('b' | 'n'<<8 | 'g'<<16 | '2'<<24),
+	BHAIKSUKI                 = ('b' | 'h'<<8 | 'k'<<16 | 's'<<24),
+	BOPOMOFO                  = ('b' | 'o'<<8 | 'p'<<16 | 'o'<<24),
+	BRAHMI                    = ('b' | 'r'<<8 | 'a'<<16 | 'h'<<24),
+	BUGINESE                  = ('b' | 'u'<<8 | 'g'<<16 | 'i'<<24),
+	BUHID                     = ('b' | 'u'<<8 | 'h'<<16 | 'd'<<24),
+	CANADIAN_SYLLABICS        = ('c' | 'a'<<8 | 'n'<<16 | 's'<<24),
+	CARIAN                    = ('c' | 'a'<<8 | 'r'<<16 | 'i'<<24),
+	CAUCASIAN_ALBANIAN        = ('a' | 'g'<<8 | 'h'<<16 | 'b'<<24),
+	CHAKMA                    = ('c' | 'a'<<8 | 'k'<<16 | 'm'<<24),
+	CHAM                      = ('c' | 'h'<<8 | 'a'<<16 | 'm'<<24),
+	CHEROKEE                  = ('c' | 'h'<<8 | 'e'<<16 | 'r'<<24),
+	CHORASMIAN                = ('c' | 'h'<<8 | 'r'<<16 | 's'<<24),
+	CJK_IDEOGRAPHIC           = ('h' | 'a'<<8 | 'n'<<16 | 'i'<<24),
+	COPTIC                    = ('c' | 'o'<<8 | 'p'<<16 | 't'<<24),
+	CYPRIOT_SYLLABARY         = ('c' | 'p'<<8 | 'r'<<16 | 't'<<24),
+	CYPRO_MINOAN              = ('c' | 'p'<<8 | 'm'<<16 | 'n'<<24),
+	CYRILLIC                  = ('c' | 'y'<<8 | 'r'<<16 | 'l'<<24),
+	DEFAULT                   = ('D' | 'F'<<8 | 'L'<<16 | 'T'<<24),
+	DEFAULT2                  = ('D' | 'F'<<8 | 'L'<<16 | 'T'<<24),
+	DESERET                   = ('d' | 's'<<8 | 'r'<<16 | 't'<<24),
+	DEVANAGARI                = ('d' | 'e'<<8 | 'v'<<16 | '2'<<24),
+	DIVES_AKURU               = ('d' | 'i'<<8 | 'a'<<16 | 'k'<<24),
+	DOGRA                     = ('d' | 'o'<<8 | 'g'<<16 | 'r'<<24),
+	DUPLOYAN                  = ('d' | 'u'<<8 | 'p'<<16 | 'l'<<24),
+	EGYPTIAN_HIEROGLYPHS      = ('e' | 'g'<<8 | 'y'<<16 | 'p'<<24),
+	ELBASAN                   = ('e' | 'l'<<8 | 'b'<<16 | 'a'<<24),
+	ELYMAIC                   = ('e' | 'l'<<8 | 'y'<<16 | 'm'<<24),
+	ETHIOPIC                  = ('e' | 't'<<8 | 'h'<<16 | 'i'<<24),
+	GARAY                     = ('g' | 'a'<<8 | 'r'<<16 | 'a'<<24),
+	GEORGIAN                  = ('g' | 'e'<<8 | 'o'<<16 | 'r'<<24),
+	GLAGOLITIC                = ('g' | 'l'<<8 | 'a'<<16 | 'g'<<24),
+	GOTHIC                    = ('g' | 'o'<<8 | 't'<<16 | 'h'<<24),
+	GRANTHA                   = ('g' | 'r'<<8 | 'a'<<16 | 'n'<<24),
+	GREEK                     = ('g' | 'r'<<8 | 'e'<<16 | 'k'<<24),
+	GUJARATI                  = ('g' | 'j'<<8 | 'r'<<16 | '2'<<24),
+	GUNJALA_GONDI             = ('g' | 'o'<<8 | 'n'<<16 | 'g'<<24),
+	GURMUKHI                  = ('g' | 'u'<<8 | 'r'<<16 | '2'<<24),
+	GURUNG_KHEMA              = ('g' | 'u'<<8 | 'k'<<16 | 'h'<<24),
+	HANGUL                    = ('h' | 'a'<<8 | 'n'<<16 | 'g'<<24),
+	HANIFI_ROHINGYA           = ('r' | 'o'<<8 | 'h'<<16 | 'g'<<24),
+	HANUNOO                   = ('h' | 'a'<<8 | 'n'<<16 | 'o'<<24),
+	HATRAN                    = ('h' | 'a'<<8 | 't'<<16 | 'r'<<24),
+	HEBREW                    = ('h' | 'e'<<8 | 'b'<<16 | 'r'<<24),
+	HIRAGANA                  = ('k' | 'a'<<8 | 'n'<<16 | 'a'<<24),
+	IMPERIAL_ARAMAIC          = ('a' | 'r'<<8 | 'm'<<16 | 'i'<<24),
+	INSCRIPTIONAL_PAHLAVI     = ('p' | 'h'<<8 | 'l'<<16 | 'i'<<24),
+	INSCRIPTIONAL_PARTHIAN    = ('p' | 'r'<<8 | 't'<<16 | 'i'<<24),
+	JAVANESE                  = ('j' | 'a'<<8 | 'v'<<16 | 'a'<<24),
+	KAITHI                    = ('k' | 't'<<8 | 'h'<<16 | 'i'<<24),
+	KANNADA                   = ('k' | 'n'<<8 | 'd'<<16 | '2'<<24),
+	KATAKANA                  = ('k' | 'a'<<8 | 'n'<<16 | 'a'<<24),
+	KAWI                      = ('k' | 'a'<<8 | 'w'<<16 | 'i'<<24),
+	KAYAH_LI                  = ('k' | 'a'<<8 | 'l'<<16 | 'i'<<24),
+	KHAROSHTHI                = ('k' | 'h'<<8 | 'a'<<16 | 'r'<<24),
+	KHITAN_SMALL_SCRIPT       = ('k' | 'i'<<8 | 't'<<16 | 's'<<24),
+	KHMER                     = ('k' | 'h'<<8 | 'm'<<16 | 'r'<<24),
+	KHOJKI                    = ('k' | 'h'<<8 | 'o'<<16 | 'j'<<24),
+	KHUDAWADI                 = ('s' | 'i'<<8 | 'n'<<16 | 'd'<<24),
+	KIRAT_RAI                 = ('k' | 'r'<<8 | 'a'<<16 | 'i'<<24),
+	LAO                       = ('l' | 'a'<<8 | 'o'<<16 | ' '<<24),
+	LATIN                     = ('l' | 'a'<<8 | 't'<<16 | 'n'<<24),
+	LEPCHA                    = ('l' | 'e'<<8 | 'p'<<16 | 'c'<<24),
+	LIMBU                     = ('l' | 'i'<<8 | 'm'<<16 | 'b'<<24),
+	LINEAR_A                  = ('l' | 'i'<<8 | 'n'<<16 | 'a'<<24),
+	LINEAR_B                  = ('l' | 'i'<<8 | 'n'<<16 | 'b'<<24),
+	LISU                      = ('l' | 'i'<<8 | 's'<<16 | 'u'<<24),
+	LYCIAN                    = ('l' | 'y'<<8 | 'c'<<16 | 'i'<<24),
+	LYDIAN                    = ('l' | 'y'<<8 | 'd'<<16 | 'i'<<24),
+	MAHAJANI                  = ('m' | 'a'<<8 | 'h'<<16 | 'j'<<24),
+	MAKASAR                   = ('m' | 'a'<<8 | 'k'<<16 | 'a'<<24),
+	MALAYALAM                 = ('m' | 'l'<<8 | 'm'<<16 | '2'<<24),
+	MANDAIC                   = ('m' | 'a'<<8 | 'n'<<16 | 'd'<<24),
+	MANICHAEAN                = ('m' | 'a'<<8 | 'n'<<16 | 'i'<<24),
+	MARCHEN                   = ('m' | 'a'<<8 | 'r'<<16 | 'c'<<24),
+	MASARAM_GONDI             = ('g' | 'o'<<8 | 'n'<<16 | 'm'<<24),
+	MEDEFAIDRIN               = ('m' | 'e'<<8 | 'd'<<16 | 'f'<<24),
+	MEETEI_MAYEK              = ('m' | 't'<<8 | 'e'<<16 | 'i'<<24),
+	MENDE_KIKAKUI             = ('m' | 'e'<<8 | 'n'<<16 | 'd'<<24),
+	MEROITIC_CURSIVE          = ('m' | 'e'<<8 | 'r'<<16 | 'c'<<24),
+	MEROITIC_HIEROGLYPHS      = ('m' | 'e'<<8 | 'r'<<16 | 'o'<<24),
+	MIAO                      = ('p' | 'l'<<8 | 'r'<<16 | 'd'<<24),
+	MODI                      = ('m' | 'o'<<8 | 'd'<<16 | 'i'<<24),
+	MONGOLIAN                 = ('m' | 'o'<<8 | 'n'<<16 | 'g'<<24),
+	MRO                       = ('m' | 'r'<<8 | 'o'<<16 | 'o'<<24),
+	MULTANI                   = ('m' | 'u'<<8 | 'l'<<16 | 't'<<24),
+	MYANMAR                   = ('m' | 'y'<<8 | 'm'<<16 | '2'<<24),
+	NABATAEAN                 = ('n' | 'b'<<8 | 'a'<<16 | 't'<<24),
+	NAG_MUNDARI               = ('n' | 'a'<<8 | 'g'<<16 | 'm'<<24),
+	NANDINAGARI               = ('n' | 'a'<<8 | 'n'<<16 | 'd'<<24),
+	NEWA                      = ('n' | 'e'<<8 | 'w'<<16 | 'a'<<24),
+	NEW_TAI_LUE               = ('t' | 'a'<<8 | 'l'<<16 | 'u'<<24),
+	NKO                       = ('n' | 'k'<<8 | 'o'<<16 | ' '<<24),
+	NUSHU                     = ('n' | 's'<<8 | 'h'<<16 | 'u'<<24),
+	NYIAKENG_PUACHUE_HMONG    = ('h' | 'm'<<8 | 'n'<<16 | 'p'<<24),
+	OGHAM                     = ('o' | 'g'<<8 | 'a'<<16 | 'm'<<24),
+	OL_CHIKI                  = ('o' | 'l'<<8 | 'c'<<16 | 'k'<<24),
+	OL_ONAL                   = ('o' | 'n'<<8 | 'a'<<16 | 'o'<<24),
+	OLD_ITALIC                = ('i' | 't'<<8 | 'a'<<16 | 'l'<<24),
+	OLD_HUNGARIAN             = ('h' | 'u'<<8 | 'n'<<16 | 'g'<<24),
+	OLD_NORTH_ARABIAN         = ('n' | 'a'<<8 | 'r'<<16 | 'b'<<24),
+	OLD_PERMIC                = ('p' | 'e'<<8 | 'r'<<16 | 'm'<<24),
+	OLD_PERSIAN_CUNEIFORM     = ('x' | 'p'<<8 | 'e'<<16 | 'o'<<24),
+	OLD_SOGDIAN               = ('s' | 'o'<<8 | 'g'<<16 | 'o'<<24),
+	OLD_SOUTH_ARABIAN         = ('s' | 'a'<<8 | 'r'<<16 | 'b'<<24),
+	OLD_TURKIC                = ('o' | 'r'<<8 | 'k'<<16 | 'h'<<24),
+	OLD_UYGHUR                = ('o' | 'u'<<8 | 'g'<<16 | 'r'<<24),
+	ODIA                      = ('o' | 'r'<<8 | 'y'<<16 | '2'<<24),
+	OSAGE                     = ('o' | 's'<<8 | 'g'<<16 | 'e'<<24),
+	OSMANYA                   = ('o' | 's'<<8 | 'm'<<16 | 'a'<<24),
+	PAHAWH_HMONG              = ('h' | 'm'<<8 | 'n'<<16 | 'g'<<24),
+	PALMYRENE                 = ('p' | 'a'<<8 | 'l'<<16 | 'm'<<24),
+	PAU_CIN_HAU               = ('p' | 'a'<<8 | 'u'<<16 | 'c'<<24),
+	PHAGS_PA                  = ('p' | 'h'<<8 | 'a'<<16 | 'g'<<24),
+	PHOENICIAN                = ('p' | 'h'<<8 | 'n'<<16 | 'x'<<24),
+	PSALTER_PAHLAVI           = ('p' | 'h'<<8 | 'l'<<16 | 'p'<<24),
+	REJANG                    = ('r' | 'j'<<8 | 'n'<<16 | 'g'<<24),
+	RUNIC                     = ('r' | 'u'<<8 | 'n'<<16 | 'r'<<24),
+	SAMARITAN                 = ('s' | 'a'<<8 | 'm'<<16 | 'r'<<24),
+	SAURASHTRA                = ('s' | 'a'<<8 | 'u'<<16 | 'r'<<24),
+	SHARADA                   = ('s' | 'h'<<8 | 'r'<<16 | 'd'<<24),
+	SHAVIAN                   = ('s' | 'h'<<8 | 'a'<<16 | 'w'<<24),
+	SIDDHAM                   = ('s' | 'i'<<8 | 'd'<<16 | 'd'<<24),
+	SIGN_WRITING              = ('s' | 'g'<<8 | 'n'<<16 | 'w'<<24),
+	SOGDIAN                   = ('s' | 'o'<<8 | 'g'<<16 | 'd'<<24),
+	SINHALA                   = ('s' | 'i'<<8 | 'n'<<16 | 'h'<<24),
+	SORA_SOMPENG              = ('s' | 'o'<<8 | 'r'<<16 | 'a'<<24),
+	SOYOMBO                   = ('s' | 'o'<<8 | 'y'<<16 | 'o'<<24),
+	SUMERO_AKKADIAN_CUNEIFORM = ('x' | 's'<<8 | 'u'<<16 | 'x'<<24),
+	SUNDANESE                 = ('s' | 'u'<<8 | 'n'<<16 | 'd'<<24),
+	SUNUWAR                   = ('s' | 'u'<<8 | 'n'<<16 | 'u'<<24),
+	SYLOTI_NAGRI              = ('s' | 'y'<<8 | 'l'<<16 | 'o'<<24),
+	SYRIAC                    = ('s' | 'y'<<8 | 'r'<<16 | 'c'<<24),
+	TAGALOG                   = ('t' | 'g'<<8 | 'l'<<16 | 'g'<<24),
+	TAGBANWA                  = ('t' | 'a'<<8 | 'g'<<16 | 'b'<<24),
+	TAI_LE                    = ('t' | 'a'<<8 | 'l'<<16 | 'e'<<24),
+	TAI_THAM                  = ('l' | 'a'<<8 | 'n'<<16 | 'a'<<24),
+	TAI_VIET                  = ('t' | 'a'<<8 | 'v'<<16 | 't'<<24),
+	TAKRI                     = ('t' | 'a'<<8 | 'k'<<16 | 'r'<<24),
+	TAMIL                     = ('t' | 'm'<<8 | 'l'<<16 | '2'<<24),
+	TANGSA                    = ('t' | 'n'<<8 | 's'<<16 | 'a'<<24),
+	TANGUT                    = ('t' | 'a'<<8 | 'n'<<16 | 'g'<<24),
+	TELUGU                    = ('t' | 'e'<<8 | 'l'<<16 | '2'<<24),
+	THAANA                    = ('t' | 'h'<<8 | 'a'<<16 | 'a'<<24),
+	THAI                      = ('t' | 'h'<<8 | 'a'<<16 | 'i'<<24),
+	TIBETAN                   = ('t' | 'i'<<8 | 'b'<<16 | 't'<<24),
+	TIFINAGH                  = ('t' | 'f'<<8 | 'n'<<16 | 'g'<<24),
+	TIRHUTA                   = ('t' | 'i'<<8 | 'r'<<16 | 'h'<<24),
+	TODHRI                    = ('t' | 'o'<<8 | 'd'<<16 | 'r'<<24),
+	TOTO                      = ('t' | 'o'<<8 | 't'<<16 | 'o'<<24),
+	TULU_TIGALARI             = ('t' | 'u'<<8 | 't'<<16 | 'g'<<24),
+	UGARITIC_CUNEIFORM        = ('u' | 'g'<<8 | 'a'<<16 | 'r'<<24),
+	VAI                       = ('v' | 'a'<<8 | 'i'<<16 | ' '<<24),
+	VITHKUQI                  = ('v' | 'i'<<8 | 't'<<16 | 'h'<<24),
+	WANCHO                    = ('w' | 'c'<<8 | 'h'<<16 | 'o'<<24),
+	WARANG_CITI               = ('w' | 'a'<<8 | 'r'<<16 | 'a'<<24),
+	YEZIDI                    = ('y' | 'e'<<8 | 'z'<<16 | 'i'<<24),
+	YI                        = ('y' | 'i'<<8 | ' '<<16 | ' '<<24),
+	ZANABAZAR_SQUARE          = ('z' | 'a'<<8 | 'n'<<16 | 'b'<<24),
+}
+
 script :: enum u32 {
 	DONT_KNOW,
 	ADLAM,
@@ -1241,6 +1415,7 @@ script :: enum u32 {
 }
 
 feature_tag :: enum u32 {
+	UNREGISTERED = 0,
 	isol = ('i' | 's'<<8 | 'o'<<16 | 'l'<<24),  /* Isolated Forms */
 	fina = ('f' | 'i'<<8 | 'n'<<16 | 'a'<<24),  /* Terminal Forms */
 	fin2 = ('f' | 'i'<<8 | 'n'<<16 | '2'<<24),  /* Terminal Forms #2 */
@@ -1371,6 +1546,7 @@ feature_tag :: enum u32 {
 }
 
 feature_id :: enum u32 {
+	UNREGISTERED = 0,
 	isol,  /* Isolated Forms */
 	fina,  /* Terminal Forms */
 	fin2,  /* Terminal Forms #2 */
@@ -1531,6 +1707,7 @@ lookup_subtable_info :: struct {
 
 font :: struct {
 	FileBase:      [^]byte,
+	FileSize:      un,
 	Head:          ^head,
 	Cmap:          ^u16,
 	Gdef:          ^gdef,
@@ -1563,16 +1740,30 @@ glyph_classes :: struct {
 	MarkAttachmentClass: u16,
 }
 
+glyph_config :: struct {
+	EnabledFeatures:                 feature_set,
+	DisabledFeatures:                feature_set,
+	FeatureOverrideCount:            u32,
+	FeatureOverrideCapacity:         u32,
+	RequiredFeatureOverrideCapacity: u32,
+	FeatureOverrides:                [^]feature_override `fmt:"v,FeatureOverrideCount"`,
+}
+
 glyph :: struct {
 	Codepoint: rune,
-	Id:        u16,
+	Id:        u16, // Glyph index. This is what you want to use to query outline data.
 	Uid:       u16,
 	Classes:   glyph_classes,
 
 	Decomposition: u64,
 
+	Config: ^glyph_config,
+
 	Flags: glyph_flags,
 
+	// These fields are the glyph's final positioning data.
+	// For normal usage, you should not have to use these directly yourself.
+	// In case you are curious or have a specific need, see kbts_PositionGlyph() to see how these are used.
 	OffsetX:  i32,
 	OffsetY:  i32,
 	AdvanceX: i32,
@@ -1644,9 +1835,10 @@ skip_flag :: enum u32 {
 }
 
 op_state_gsub :: struct {
-	LookupIndex: un,
-	GlyphFilter: glyph_flags,
-	SkipFlags:   skip_flags,
+	LookupFeatures: feature_set,
+	LookupIndex:    un,
+	GlyphFilter:    glyph_flags,
+	SkipFlags:      skip_flags,
 }
 
 op_state_normalize_hangul :: struct {
@@ -1661,6 +1853,7 @@ op_state_op_specific :: struct #raw_union {
 }
 
 lookup_indices :: struct {
+	FeatureTag:  feature_tag,
 	FeatureId:   feature_id,
 	SkipFlags:   skip_flags,
 	GlyphFilter: glyph_flags,
@@ -1670,6 +1863,12 @@ lookup_indices :: struct {
 
 feature_set :: struct {
 	Flags: [(uint(len(feature_id)) + 63) / 64]u64,
+}
+
+feature_override :: struct {
+	Id:                        feature_id,
+	Tag:                       feature_tag,
+	EnabledOrAlternatePlusOne: u32,
 }
 
 op :: struct {
@@ -1686,7 +1885,10 @@ op_state :: struct {
 	ResumePoint:  u32,
 
 	FeatureCount:         u32,
-	FeatureLookupIndices: [MAX_SIMULTANEOUS_FEATURES]lookup_indices,
+	FeatureLookupIndices: [MAX_SIMULTANEOUS_FEATURES]lookup_indices `fmt:"v,FeatureCount"`,
+
+	UnregisteredFeatureCount: u32,
+	UnregisteredFeatureTags:  [MAX_SIMULTANEOUS_FEATURES]feature_tag `fmt:"v,UnregisteredFeatureCount"`,
 
 	OpSpecific: op_state_op_specific,
 
@@ -1718,6 +1920,8 @@ shape_config :: struct {
 	Langsys:  [shaping_table]^langsys,
 	OpLists:  [4]op_list,
 
+	Features: ^feature_set,
+
 	Shaper:           shaper,
 	ShaperProperties: ^shaper_properties,
 
@@ -1746,6 +1950,8 @@ shape_state :: struct {
 	Config:        ^shape_config,
 	MainDirection: direction,
 	RunDirection:  direction,
+
+	UserFeatures: feature_set,
 
 	GlyphArray:        glyph_array,
 	ClusterGlyphArray: glyph_array,
