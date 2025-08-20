@@ -60,7 +60,7 @@ FontStyle :: enum u32 {
 FontStyleFlags :: distinct bit_set[FontStyle; u32]
 
 // NOTE: This is called TTF_HintingFlags but its not a bit_set so 
-// the "flags" doesnt really make sense, its just the hinting.
+// the "flags" doesn't really make sense, its just the hinting.
 Hinting :: enum c.int {
 	INVALID = -1,
 	NORMAL,
@@ -125,11 +125,8 @@ SubString :: struct {
 
 @(default_calling_convention="c", link_prefix="TTF_", require_results)
 foreign lib {
-	Version            :: proc() -> c.int ---
-	GetFreeTypeVersion :: proc(major, minor, patch: ^c.int) ---
-	GetHarfBuzzVersion :: proc(major, minor, patch: ^c.int) ---
-
-	Init :: proc() -> bool ---
+	Version :: proc() -> c.int ---
+	WasInit :: proc() -> c.int ---
 
 	OpenFont               :: proc(file: cstring, ptsize: f32) -> ^Font ---
 	OpenFontIO             :: proc(src: ^SDL.IOStream, closeio: bool, ptsize: f32) -> ^Font ---
@@ -140,14 +137,7 @@ foreign lib {
 	GetFontProperties :: proc(font: ^Font) -> SDL.PropertiesID ---
 	GetFontGeneration :: proc(font: ^Font) -> u32 ---
 
-	AddFallbackFont    :: proc(font: ^Font, fallback: ^Font) -> bool ---
-	RemoveFallbackFont :: proc(font: ^Font, fallback: ^Font) ---
-	ClearFallbackFonts :: proc(font: ^Font) ---
-
-	SetFontSize    :: proc(font: ^Font, ptsize: f32) -> bool ---
-	SetFontSizeDPI :: proc(font: ^Font, ptsize: f32, hdpi: c.int, vdpi: c.int) -> bool ---
-	GetFontSize    :: proc(font: ^Font) -> f32 ---
-	GetFontDPI     :: proc(font: ^Font, hdpi: ^c.int, vdpi: ^c.int) -> bool ---
+	GetFontSize  :: proc(font: ^Font) -> f32 ---
 
 	SetFontStyle :: proc(font: ^Font, style: FontStyleFlags) ---
 	GetFontStyle :: proc(font: ^Font) -> FontStyleFlags ---
@@ -184,31 +174,20 @@ foreign lib {
 	GetFontFamilyName :: proc(font: ^Font) -> cstring ---
 	GetFontStyleName :: proc(font: ^Font) -> cstring ---
 
-	SetFontDirection :: proc(font: ^Font, direction: Direction) -> bool ---
 	GetFontDirection :: proc(font: ^Font) -> Direction ---
 
 	StringToTag :: proc(string: cstring) -> u32 ---
-	TagToString :: proc(tag: u32, string: [^]c.char, size: c.size_t) ---
 
-	SetFontScript :: proc(font: ^Font, script: u32) -> bool ---
 	GetFontScript :: proc(font: ^Font) -> u32 ---
-
-	SetFontLanguage :: proc(font: ^Font, language_bcp47: cstring) -> bool ---
 
 	GetGlyphScript        :: proc(ch: u32) -> u32 ---
 	FontHasGlyph          :: proc(font: ^Font, ch: u32) -> bool ---
 	GetGlyphImage         :: proc(font: ^Font, ch: u32, image_type: ^ImageType) -> ^SDL.Surface ---
 	GetGlyphImageForIndex :: proc(font: ^Font, glyph_index: u32, image_type: ^ImageType) -> ^SDL.Surface ---
-	GetGlyphMetrics       :: proc(font: ^Font, ch: u32, minx, maxx, miny, maxy, advance: ^c.int) -> bool ---
-	GetGlyphKerning       :: proc(font: ^Font, previous_ch: u32, ch: u32, kerning: ^c.int) -> bool ---
-
-	GetStringSize        :: proc(font: ^Font, text: cstring, length: c.size_t, w, h: ^c.int) -> bool ---
-	GetStringSizeWrapped :: proc(font: ^Font, text: cstring, length: c.size_t, wrap_width: c.int, w, h: ^c.int) -> bool ---
-	MeasureString        :: proc(font: ^Font, text: cstring, length: c.size_t, max_width: c.int, measured_width: ^c.int, measured_length: ^c.size_t) -> bool ---
 
 	RenderText_Solid           :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color) -> ^SDL.Surface ---
 	RenderText_Solid_Wrapped   :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color, wrap_Length: c.int) -> ^SDL.Surface ---
-	RenderGylph_Solid          :: proc(font: ^Font, ch: u32, fg: SDL.Color) -> ^SDL.Surface ---
+	RenderGlyph_Solid          :: proc(font: ^Font, ch: u32, fg: SDL.Color) -> ^SDL.Surface ---
 	RenderText_Shaded          :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color) -> ^SDL.Surface ---
 	RenderText_Shaded_Wrapped  :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
 	RenderGlyph_Shaded         :: proc(font: ^Font, ch: u32, fg, bg: SDL.Color) -> ^SDL.Surface ---
@@ -219,32 +198,70 @@ foreign lib {
 	RenderText_LCD_Wrapped     :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
 	RenderGlyph_LCD            :: proc(font: ^Font, ch: u32, fg, bg: SDL.Color) -> ^SDL.Surface ---
 
-	CreateSurfaceTextEngine  :: proc() -> ^TextEngine ---
-	DrawSurfaceText          :: proc(text: ^Text, x, y: c.int, surface: ^SDL.Surface) -> bool ---
-	DestroySurfaceTextEngine :: proc(engine: ^TextEngine) ---
+	CreateSurfaceTextEngine :: proc() -> ^TextEngine ---
 
 	CreateRendererTextEngine               :: proc(renderer: ^SDL.Renderer) -> ^TextEngine ---
 	CreateRendererTextEngineWithProperties :: proc(props: SDL.PropertiesID) -> ^TextEngine ---
-	DrawRendererText                       :: proc(text: ^Text, x, y: f32) -> bool ---
-	DestroyRendererTextEngine              :: proc(engine: ^TextEngine) ---
 
 	CreateGPUTextEngine               :: proc(device: ^SDL.GPUDevice)  -> ^TextEngine ---
 	CreateGPUTextEngineWithProperties :: proc(props: SDL.PropertiesID) -> ^TextEngine ---
 	GetGPUTextDrawData                :: proc(text: ^Text) -> ^GPUAtlasDrawSequence ---
-	DestroyGPUTextEngine              :: proc(engine: ^TextEngine) ---
 	SetGPUTextEngineWinding           :: proc(engine: ^TextEngine, winding: GPUTextEngineWinding) ---
 	GetGPUTextEngineWinding           :: proc(#by_ptr engine: TextEngine) -> GPUTextEngineWinding ---
 
-	CreateText                   :: proc(engine: ^TextEngine, font: ^Font, text: cstring, length: c.size_t) -> ^Text ---
-	GetTextProperties            :: proc(text: ^Text) -> SDL.PropertiesID ---
+	CreateText                :: proc(engine: ^TextEngine, font: ^Font, text: cstring, length: c.size_t) -> ^Text ---
+	GetTextProperties         :: proc(text: ^Text) -> SDL.PropertiesID ---
+	GetTextEngine             :: proc(text: ^Text) -> ^TextEngine ---
+	GetTextFont               :: proc(text: ^Text) -> ^Font ---
+	GetTextDirection          :: proc(text: ^Text) -> Direction ---
+	GetTextScript             :: proc(text: ^Text) -> u32 ---
+	TextWrapWhitespaceVisible :: proc(text: ^Text) -> bool ---
+
+	GetTextSubStringsForRange :: proc(text: ^Text, offset, length: c.int, count: ^c.int) -> [^]^SubString ---
+}
+
+@(default_calling_convention="c", link_prefix="TTF_")
+foreign lib {
+	GetFreeTypeVersion :: proc(major, minor, patch: ^c.int) ---
+	GetHarfBuzzVersion :: proc(major, minor, patch: ^c.int) ---
+
+	Init :: proc() -> bool ---
+
+	AddFallbackFont    :: proc(font: ^Font, fallback: ^Font) -> bool ---
+	RemoveFallbackFont :: proc(font: ^Font, fallback: ^Font) ---
+	ClearFallbackFonts :: proc(font: ^Font) ---
+
+	SetFontSize    :: proc(font: ^Font, ptsize: f32) -> bool ---
+	SetFontSizeDPI :: proc(font: ^Font, ptsize: f32, hdpi: c.int, vdpi: c.int) -> bool ---
+	GetFontDPI     :: proc(font: ^Font, hdpi: ^c.int, vdpi: ^c.int) -> bool ---
+
+	SetFontDirection :: proc(font: ^Font, direction: Direction) -> bool ---
+
+	TagToString :: proc(tag: u32, string: [^]c.char, size: c.size_t) ---
+
+	SetFontScript :: proc(font: ^Font, script: u32) -> bool ---
+
+	SetFontLanguage :: proc(font: ^Font, language_bcp47: cstring) -> bool ---
+
+	GetGlyphMetrics :: proc(font: ^Font, ch: u32, minx, maxx, miny, maxy, advance: ^c.int) -> bool ---
+	GetGlyphKerning :: proc(font: ^Font, previous_ch: u32, ch: u32, kerning: ^c.int) -> bool ---
+
+	GetStringSize        :: proc(font: ^Font, text: cstring, length: c.size_t, w, h: ^c.int) -> bool ---
+	GetStringSizeWrapped :: proc(font: ^Font, text: cstring, length: c.size_t, wrap_width: c.int, w, h: ^c.int) -> bool ---
+	MeasureString        :: proc(font: ^Font, text: cstring, length: c.size_t, max_width: c.int, measured_width: ^c.int, measured_length: ^c.size_t) -> bool ---
+
+	DrawSurfaceText           :: proc(text: ^Text, x, y: c.int, surface: ^SDL.Surface) -> bool ---
+	DestroySurfaceTextEngine  :: proc(engine: ^TextEngine) ---
+
+	DrawRendererText          :: proc(text: ^Text, x, y: f32) -> bool ---
+	DestroyRendererTextEngine :: proc(engine: ^TextEngine) ---
+
+	DestroyGPUTextEngine      :: proc(engine: ^TextEngine) ---
+
 	SetTextEngine                :: proc(text: ^Text, engine: ^TextEngine) -> bool ---
-	GetTextEngine                :: proc(text: ^Text) -> ^TextEngine ---
 	SetTextFont                  :: proc(text: ^Text, font: ^Font) -> bool ---
-	GetTextFont                  :: proc(text: ^Text) -> ^Font ---
 	SetTextDirection             :: proc(text: ^Text, direction: Direction) -> bool ---
-	GetTextDirection             :: proc(text: ^Text) -> Direction ---
 	SetTextScript                :: proc(text: ^Text, script: u32) -> bool ---
-	GetTextScript                :: proc(text: ^Text) -> u32 ---
 	SetTextColor                 :: proc(text: ^Text, r, g, b, a: u8) -> bool ---
 	SetTextColorFloat            :: proc(text: ^Text, r, g, b, a: f32) -> bool ---
 	GetTextColor                 :: proc(text: ^Text, r, g, b, a: ^u8) -> bool ---
@@ -254,7 +271,6 @@ foreign lib {
 	SetTextWrapWidth             :: proc(text: ^Text, wrap_width: c.int) -> bool ---
 	GetTextWrapWidth             :: proc(text: ^Text, wrap_width: ^c.int) -> bool ---
 	SetTextWrapWhitespaceVisible :: proc(text: ^Text, visible: bool) -> bool ---
-	TextWrapWhitespaceVisible    :: proc(text: ^Text) -> bool ---
 
 	SetTextString    :: proc(text: ^Text, string: cstring, length: c.size_t) -> bool ---
 	InsertTextString :: proc(text: ^Text, offset: c.int, string: cstring, length: c.size_t) -> bool ---
@@ -265,7 +281,6 @@ foreign lib {
 
 	GetTextSubString          :: proc(text: ^Text, offset: c.int, substring: ^SubString) -> bool ---
 	GetTextSubStringForLine   :: proc(text: ^Text, line: c.int, substring: ^SubString) -> bool ---
-	GetTextSubStringsForRange :: proc(text: ^Text, offset, length: c.int, count: ^c.int) -> [^]^SubString ---
 	GetTextSubStringForPoint  :: proc(text: ^Text, x, y: c.int, substring: ^SubString) -> bool ---
 	GetPreviousTextSubString  :: proc(text: ^Text, #by_ptr substring: SubString, previous: ^SubString) -> bool ---
 	GetNextTextSubString      :: proc(text: ^Text, #by_ptr substring: SubString, next: ^SubString) -> bool ---
@@ -274,5 +289,4 @@ foreign lib {
 	DestroyText :: proc(text: ^Text) ---
 	CloseFont   :: proc(font: ^Font) ---
 	Quit        :: proc() ---
-	WasInit     :: proc() -> c.int ---
 }
