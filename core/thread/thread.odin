@@ -104,7 +104,11 @@ thread will be in a suspended state, until `start()` procedure is called.
 
 To start the thread, call `start()`. Also the `create_and_start()`
 procedure can be called to create and start the thread immediately.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 */
+
 create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal, name: Maybe(string) = nil) -> ^Thread {
 	return _create(procedure, priority, name)
 }
@@ -178,6 +182,9 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
@@ -193,6 +200,9 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
@@ -207,6 +217,9 @@ Run a procedure with one polymorphic parameter on a different thread.
 This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -224,6 +237,9 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
@@ -240,6 +256,9 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
@@ -255,6 +274,9 @@ Run a procedure with four polymorphic parameters on a different thread.
 This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -275,6 +297,9 @@ to execute. The thread will have priority specified by the `priority` parameter.
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -310,6 +335,9 @@ to execute. The thread will have priority specified by the `priority` parameter.
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -349,6 +377,9 @@ to execute. The thread will have priority specified by the `priority` parameter.
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -394,6 +425,9 @@ to execute. The thread will have priority specified by the `priority` parameter.
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -445,6 +479,9 @@ to execute. The thread will have priority specified by the `priority` parameter.
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -498,6 +535,9 @@ to execute. The thread will have priority specified by the `priority` parameter.
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
