@@ -161,6 +161,9 @@ struct AttributeContext {
 
 	String require_target_feature; // required by the target micro-architecture
 	String enable_target_feature;  // will be enabled for the procedure only
+
+	bool   raddbg_type_view;
+	String raddbg_type_view_string;
 };
 
 gb_internal gb_inline AttributeContext make_attribute_context(String link_prefix, String link_suffix) {
@@ -427,6 +430,11 @@ struct Defineable {
 	String pos_str;
 };
 
+struct RaddbgTypeView {
+	Type * type;
+	String view;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -486,6 +494,9 @@ struct CheckerInfo {
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
 	MPSCQueue<Entity *> foreign_imports_to_check_fullpaths;
 	MPSCQueue<Entity *> foreign_decls_to_check;
+
+	MPSCQueue<RaddbgTypeView> raddbg_type_views_queue;
+	Array<RaddbgTypeView> raddbg_type_views;
 
 	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 

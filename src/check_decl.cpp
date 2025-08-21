@@ -602,6 +602,13 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 		} else if (ac.objc_is_implementation) {
 			error(e->token, "@(objc_implement) may only be applied when the @(objc_class) attribute is also applied");
 		}
+
+		if (ac.raddbg_type_view) {
+			RaddbgTypeView type_view = {};
+			type_view.type = e->type;
+			type_view.view = ac.raddbg_type_view_string;
+			mpsc_enqueue(&ctx->info->raddbg_type_views_queue, type_view);
+		}
 	}
 
 

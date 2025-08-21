@@ -3416,7 +3416,29 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 
 			TEMPORARY_ALLOCATOR_GUARD();
+			for (RaddbgTypeView const &type_view : gen->info->raddbg_type_views) {
+				if (type_view.type == nullptr) {
+					continue;
+				}
 
+				if (type_view.view.len == 0) {
+					continue;
+				}
+
+				String t_str = type_to_canonical_string(temporary_allocator(), type_view.type);
+
+				gbString s = gb_string_make(temporary_allocator(), "");
+
+				s = gb_string_appendc(s, "type_view: {type: \"");
+				s = gb_string_append_length(s, t_str.text, t_str.len);
+				s = gb_string_appendc(s, "\", expr: \"");
+				s = gb_string_append_length(s, type_view.view.text, type_view.view.len);
+				s = gb_string_appendc(s, "\"}");
+
+				lb_add_raddbg_string(m, s);
+			}
+
+			TEMPORARY_ALLOCATOR_GUARD();
 			u32 global_name_index = 0;
 			for (String str = {}; mpsc_dequeue(&gen->raddebug_section_strings, &str); /**/) {
 				LLVMValueRef data = LLVMConstStringInContext(ctx, cast(char const *)str.text, cast(unsigned)str.len, false);

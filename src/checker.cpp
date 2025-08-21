@@ -1451,6 +1451,9 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->foreign_decls_to_check, a); // 1<<10);
 	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
 
+	mpsc_init(&i->raddbg_type_views_queue, a);
+	array_init(&i->raddbg_type_views, a);
+
 	string_map_init(&i->load_directory_cache);
 	map_init(&i->load_directory_map);
 }
@@ -1478,6 +1481,9 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
 	mpsc_destroy(&i->foreign_decls_to_check);
+
+	mpsc_destroy(&i->raddbg_type_views_queue);
+	array_free(&i->raddbg_type_views);
 
 	map_destroy(&i->objc_msgSend_types);
 	string_set_destroy(&i->obcj_class_name_set);
@@ -4066,6 +4072,21 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 			return true;
 		}
+	} else if (name == "raddbg_type_view") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Invalid) {
+			ac->raddbg_type_view = true;
+		} else if (ev.kind == ExactValue_String) {
+			ac->raddbg_type_view = true;
+			ac->raddbg_type_view_string = ev.value_string;
+
+			if (ev.value_string.len == 0) {
+				error(elem, "Expected a non-empty string for '%.*s'", LIT(name));
+			}
+		} else {
+			error(elem, "Expected a string or no value for '%.*s'", LIT(name));
+		}
+		return true;
 	}
 	return false;
 }
@@ -7034,6 +7055,155 @@ gb_internal void check_parsed_files(Checker *c) {
 					error(node, "usage of intrinsics.__entry_point will be a no-op");
 				}
 			}
+		}
+	}
+
+	TIME_SECTION("collate type info stuff");
+	{
+		auto const struct_tag_lookup = [](String tag, char const *key_c, String *value_) -> bool {
+			String t = tag;
+			String key = make_string_c(key_c);
+			while (t.len != 0) {
+				isize i = 0;
+				while (i < t.len && t[i] == ' ') { // Skip whitespace
+					i += 1;
+				}
+				t.text += i;
+				t.len  -= i;
+				if (t.len == 0) {
+					break;
+				}
+
+				i = 0;
+
+				while (i < t.len) {
+					u8 c = t[i];
+					if (c == ':' || c == '"') {
+						break;
+					} else if ((0 <= c && c < ' ') || (0x7f <= c && c <= 0x9f)) {
+						// break if control character is found
+						break;
+					}
+					i += 1;
+				}
+
+				if (i == 0) {
+					break;
+				}
+				if (i+1 >= t.len) {
+					break;
+				}
+				if (t[i] != ':' || t[i+1] != '"') {
+					break;
+				}
+				String name = {t.text, i};
+				t = {t.text+i+1, t.len-(i+1)};
+
+				i = 1;
+				while (i < t.len && t[i] != '"') { // find closing quote
+					if (t[i] == '\\') {
+						i += 1; // Skip escaped characters
+					}
+					i += 1;
+				}
+				if (i >= t.len) {
+					break;
+				}
+
+				String value = {t.text, i+1};
+				t = {t.text+i+1, t.len-(i+1)};
+
+				if (key == name) {
+					value = {value.text+1, i-1};
+					if (value_) *value_ = value;
+					return true;
+				}
+			}
+			return false;
+		};
+
+		for (RaddbgTypeView type_view; mpsc_dequeue(&c->info.raddbg_type_views_queue, &type_view); /**/) {
+
+			Type *type = type_view.type;
+			if (type == nullptr || type == t_invalid) {
+				continue;
+			}
+			String view = type_view.view;
+			if (view.len == 0) {
+				// NOTE(bill): Generate one automatically from the struct field tags if they exist
+				//             If it cannot be generated, it'll be ignored/err
+
+				Type *bt = base_type(type);
+				if (is_type_struct(type)) {
+					GB_ASSERT(bt->kind == Type_Struct);
+					if (bt->Struct.tags != nullptr) {
+						bool found_any = false;
+
+						for (isize i = 0; i < bt->Struct.fields.count; i++) {
+							String tag = bt->Struct.tags[i];
+							String value = {};
+							if (struct_tag_lookup(tag, "raddbg", &value)) {
+								found_any = true;
+							} else if (struct_tag_lookup(tag, "fmt", &value)) {
+								found_any = true;
+							}
+						}
+
+						if (!found_any) {
+							goto raddbg_type_view_end;
+						}
+
+						gbString s = gb_string_make(heap_allocator(), "");
+
+						s = gb_string_appendc(s, "rows($");
+
+						for (isize i = 0; i < bt->Struct.fields.count; i++) {
+							Entity *field = bt->Struct.fields[i];
+							GB_ASSERT(field != nullptr);
+							String name = field->token.string;
+
+							s = gb_string_appendc(s, ", ");
+
+							bool custom_rule = false;
+
+							String tag = bt->Struct.tags[i];
+							String value = {};
+							if (struct_tag_lookup(tag, "raddbg", &value)) {
+								s = gb_string_append_length(s, value.text, value.len);
+								custom_rule = true;
+							} else if (struct_tag_lookup(tag, "fmt", &value)) {
+								auto p = string_partition(value, make_string_c(","));
+								String tail = p.tail;
+								if (tail.len != 0 && tail != "0") {
+									s = gb_string_appendc(s, "array(");
+									s = gb_string_append_length(s, name.text, name.len);
+									s = gb_string_appendc(s, ", ");
+									s = gb_string_append_length(s, tail.text, tail.len);
+									s = gb_string_appendc(s, ")");
+									custom_rule = true;
+								}
+							}
+
+							if (!custom_rule) {
+								s = gb_string_append_length(s, name.text, name.len);
+							}
+						}
+
+						s = gb_string_appendc(s, ")");
+
+						view = make_string((u8 const *)s, gb_string_length(s));
+					}
+				}
+			}
+
+		raddbg_type_view_end:;
+
+			if (view.len == 0) {
+				// Ignore the type, it didn't anything custom
+				continue;
+			}
+
+			array_add(&c->info.raddbg_type_views, RaddbgTypeView{type, view});
 		}
 	}
 
