@@ -22,7 +22,7 @@ DEFAULT_CAPACITY :: 16
 /*
 Initialize a `Queue` with a starting `capacity` and an `allocator`.
 */
-init :: proc(q: ^$Q/Queue($T), capacity := DEFAULT_CAPACITY, allocator := context.allocator) -> runtime.Allocator_Error {
+init :: proc(q: ^$Q/Queue($T), capacity := DEFAULT_CAPACITY, allocator := context.allocator, loc := #caller_location) -> runtime.Allocator_Error {
 	clear(q)
 	q.data = transmute([dynamic]T)runtime.Raw_Dynamic_Array{
 		data = nil,
@@ -30,7 +30,7 @@ init :: proc(q: ^$Q/Queue($T), capacity := DEFAULT_CAPACITY, allocator := contex
 		cap = 0,
 		allocator = allocator,
 	}
-	return reserve(q, capacity)
+	return reserve(q, capacity, loc)
 }
 
 /*
@@ -114,9 +114,9 @@ Reserve enough space in the queue for at least the specified capacity.
 
 This may return an error if allocation failed.
 */
-reserve :: proc(q: ^$Q/Queue($T), capacity: int) -> runtime.Allocator_Error {
+reserve :: proc(q: ^$Q/Queue($T), capacity: int, loc := #caller_location) -> runtime.Allocator_Error {
 	if capacity > space(q^) {
-		return _grow(q, uint(capacity))
+		return _grow(q, uint(capacity), loc)
 	}
 	return nil
 }
@@ -269,9 +269,9 @@ Example:
 		assert(queue.pop_front(&q) == 3)
 	}
 */
-push_back :: proc(q: ^$Q/Queue($T), elem: T) -> (ok: bool, err: runtime.Allocator_Error) {
+push_back :: proc(q: ^$Q/Queue($T), elem: T, loc := #caller_location) -> (ok: bool, err: runtime.Allocator_Error) {
 	if space(q^) == 0 {
-		_grow(q) or_return
+		_grow(q, loc = loc) or_return
 	}
 	idx := (q.offset+uint(q.len))%builtin.len(q.data)
 	q.data[idx] = elem
@@ -303,9 +303,9 @@ Example:
 		assert(queue.pop_back(&q) == 1)
 	}
 */
-push_front :: proc(q: ^$Q/Queue($T), elem: T) -> (ok: bool, err: runtime.Allocator_Error)  {
+push_front :: proc(q: ^$Q/Queue($T), elem: T, loc := #caller_location) -> (ok: bool, err: runtime.Allocator_Error)  {
 	if space(q^) == 0 {
-		_grow(q) or_return
+		_grow(q, loc = loc) or_return
 	}
 	q.offset = uint(q.offset - 1 + builtin.len(q.data)) % builtin.len(q.data)
 	q.len += 1
@@ -396,10 +396,10 @@ Push many elements at once to the back of the queue.
 If there is not enough space left and allocation fails to get more, this will
 return false with an `Allocator_Error`.
 */
-push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T) -> (ok: bool, err: runtime.Allocator_Error)  {
+push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T, loc := #caller_location) -> (ok: bool, err: runtime.Allocator_Error)  {
 	n := uint(builtin.len(elems))
 	if space(q^) < int(n) {
-		_grow(q, q.len + n) or_return
+		_grow(q, q.len + n, loc) or_return
 	}
 
 	sz := uint(builtin.len(q.data))
@@ -465,10 +465,10 @@ clear :: proc(q: ^$Q/Queue($T)) {
 
 
 // Internal growing procedure
-_grow :: proc(q: ^$Q/Queue($T), min_capacity: uint = 0) -> runtime.Allocator_Error {
+_grow :: proc(q: ^$Q/Queue($T), min_capacity: uint = 0, loc := #caller_location) -> runtime.Allocator_Error {
 	new_capacity := max(min_capacity, uint(8), uint(builtin.len(q.data))*2)
 	n := uint(builtin.len(q.data))
-	builtin.resize(&q.data, int(new_capacity)) or_return
+	builtin.resize(&q.data, int(new_capacity), loc) or_return
 	if q.offset + q.len > n {
 		diff := n - q.offset
 		copy(q.data[new_capacity-diff:], q.data[q.offset:][:diff])
