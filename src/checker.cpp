@@ -6777,7 +6777,7 @@ gb_internal void handle_raddbg_type_view(Checker *c, RaddbgTypeView const &type_
 
 						if (width_ok) {
 							s = gb_string_appendc(s, "digits(");
-							paren_count += 1;
+							custom_rule = true;
 						}
 
 						switch (verb) {
@@ -6816,13 +6816,13 @@ gb_internal void handle_raddbg_type_view(Checker *c, RaddbgTypeView const &type_
 							custom_rule = true;
 						}
 
-						if (width_ok) {
-							s = gb_string_append_fmt(s, ", %llu", cast(unsigned long long)width);
-						}
 
 						for (isize j = 0; j < paren_count; j++) {
 							s = gb_string_appendc(s, ")");
 							custom_rule = true;
+						}
+						if (width_ok) {
+							s = gb_string_append_fmt(s, ", %llu)", cast(unsigned long long)width);
 						}
 					}
 				}
