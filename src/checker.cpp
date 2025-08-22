@@ -6834,8 +6834,6 @@ gb_internal void handle_raddbg_type_view(Checker *c, RaddbgTypeView const &type_
 
 			s = gb_string_appendc(s, ")");
 
-
-			gb_printf_err("%s\n", s);
 			view = make_string((u8 const *)s, gb_string_length(s));
 		}
 	}
