@@ -373,12 +373,32 @@ remove_window_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callba
 	return _remove_window_event_listener(event_kind_string[kind], user_data, callback, use_capture)
 }
 
+add_document_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="add_document_event_listener")
+		_add_document_event_listener :: proc(name: string, name_code: Event_Kind, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
+	}
+	return _add_document_event_listener(event_kind_string[kind], kind, user_data, callback, use_capture)
+}
+
+remove_document_event_listener :: proc(kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="remove_document_event_listener")
+		_remove_document_event_listener :: proc(name: string, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
+	}
+	return _remove_document_event_listener(event_kind_string[kind], user_data, callback, use_capture)
+}
+
 remove_event_listener_from_event :: proc(e: Event) -> bool {
 	from_use_capture_false: bool
 	from_use_capture_true: bool
 	if e.id == "" {
 		from_use_capture_false = remove_window_event_listener(e.kind, e.user_data, e.callback, false)
 		from_use_capture_true = remove_window_event_listener(e.kind, e.user_data, e.callback, true)
+		from_use_capture_false |= remove_document_event_listener(e.kind, e.user_data, e.callback, false)
+		from_use_capture_true |= remove_document_event_listener(e.kind, e.user_data, e.callback, true)
 	} else {
 		from_use_capture_false = remove_event_listener(e.id, e.kind, e.user_data, e.callback, false)
 		from_use_capture_true = remove_event_listener(e.id, e.kind, e.user_data, e.callback, true)

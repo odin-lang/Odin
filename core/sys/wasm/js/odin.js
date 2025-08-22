@@ -1738,6 +1738,28 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				return true;
 			},
 
+			add_document_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
+				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
+				let element = document;
+				let key = listener_key('document', name, data, callback, !!use_capture);
+				if (wasmMemoryInterface.listenerMap.has(key)) {
+					return false;
+				}
+
+				let listener = (e) => {
+					let event_data = {};
+					event_data.id_ptr = 0;
+					event_data.id_len = 0;
+					event_data.event = e;
+					event_data.name_code = name_code;
+
+					onEventReceived(event_data, data, callback);
+				};
+				wasmMemoryInterface.listenerMap.set(key, listener);
+				element.addEventListener(name, listener, !!use_capture);
+				return true;
+			},
+
 			remove_event_listener: (id_ptr, id_len, name_ptr, name_len, data, callback, use_capture) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
@@ -1761,6 +1783,20 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				let element = window;
 
 				let key = listener_key('window', name, data, callback, !!use_capture);
+				let listener = wasmMemoryInterface.listenerMap.get(key);
+				if (listener === undefined) {
+					return false;
+				}
+				wasmMemoryInterface.listenerMap.delete(key);
+
+				element.removeEventListener(name, listener, !!use_capture);
+				return true;
+			},
+			remove_document_event_listener: (name_ptr, name_len, data, callback, use_capture) => {
+				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
+				let element = document;
+
+				let key = listener_key('document', name, data, callback, !!use_capture);
 				let listener = wasmMemoryInterface.listenerMap.get(key);
 				if (listener === undefined) {
 					return false;
