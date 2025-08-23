@@ -250,7 +250,7 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 	old_data := (^rawptr)(array)^
 
 	new_bytes, resize_err := array.allocator.procedure(
-		array.allocator.data, .Resize if zero_memory else .Resize_Non_Zeroed, new_size, max_align,
+		array.allocator.data, .Resize_Non_Zeroed, new_size, max_align,
 		old_data, old_size, loc,
 	)
 	new_data := raw_data(new_bytes)
