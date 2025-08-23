@@ -262,10 +262,9 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 
 		footer.cap = capacity
 
-		// Adjust layout
-		// before: |x x y y z z|
-		// now:    |x x y y z z _ _ _|
-		// after:  |x x _ y y _ z z _|
+		// Correct data memory
+		// from: |x x y y z z _ _ _|
+		// to:   |x x _ y y _ z z _|
 
 		for i in 0..<field_count {
 			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
@@ -280,7 +279,9 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 
 			(^rawptr)(uintptr(array) + i*size_of(rawptr))^ = new_data_elem
 
-			mem_zero(old_data_elem, int(uintptr(new_data_elem) - uintptr(old_data_elem)))
+			if zero_memory {
+				mem_zero(old_data_elem, int(uintptr(new_data_elem) - uintptr(old_data_elem)))
+			}
 
 			old_offset += type.size * old_cap
 			new_offset += type.size * capacity
@@ -301,10 +302,9 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 
 	footer.cap = capacity
 
-	// Adjust layout
-	// before: |x x y y z z|
-	// now:    |x x y y z z| ... |_ _ _ _ _ _ _ _ _|
-	// after:                    |x x _ y y _ z z _|
+	// Correct data memory
+	// from: |x x y y z z| ... |_ _ _ _ _ _ _ _ _|
+	// to:                     |x x _ y y _ z z _|
 
 	for i in 0..<field_count {
 		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
