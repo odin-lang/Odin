@@ -180,6 +180,40 @@ test_map_get :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_soa_array_resize :: proc(t: ^testing.T) {
+
+	V :: struct {x: int, y: u8}
+
+	array := make(#soa[dynamic]V, 0, 2)
+	defer delete(array)
+
+	append(&array, V{1, 2}, V{3, 4})
+
+	testing.expect_value(t, len(array), 2)
+	testing.expect_value(t, array[0], V{1, 2})
+	testing.expect_value(t, array[1], V{3, 4})
+
+	resize(&array, 1)
+
+	testing.expect_value(t, len(array), 1)
+	testing.expect_value(t, array[0], V{1, 2})
+
+	resize(&array, 2)
+
+	testing.expect_value(t, len(array), 2)
+	testing.expect_value(t, array[0], V{1, 2})
+	testing.expect_value(t, array[1], V{0, 0})
+
+	resize(&array, 0)
+	resize(&array, 3)
+
+	testing.expect_value(t, len(array), 3)
+	testing.expect_value(t, array[0], V{0, 0})
+	testing.expect_value(t, array[1], V{0, 0})
+	testing.expect_value(t, array[2], V{0, 0})
+}
+
+@(test)
 test_memory_equal :: proc(t: ^testing.T) {
 	data: [256]u8
 	cmp: [256]u8

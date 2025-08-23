@@ -178,9 +178,33 @@ resize_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int length: int, loc := #cal
 	if array == nil {
 		return nil
 	}
+
 	reserve_soa(array, length, loc) or_return
 	footer := raw_soa_footer(array)
+	old_len := footer.len
 	footer.len = length
+
+	if size_of(E) > 0 && length > old_len {
+		ti := type_info_of(typeid_of(T))
+		ti = type_info_base(ti)
+		si := &ti.variant.(Type_Info_Struct)
+
+		field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+
+		data := (^rawptr)(array)^
+
+		soa_offset := 0
+		for i in 0..<field_count {
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+
+			soa_offset = align_forward_int(soa_offset, align_of(E))
+
+			mem_zero(rawptr(uintptr(data) + uintptr(soa_offset) + uintptr(type.size * old_len)), type.size * (length - old_len))
+
+			soa_offset += type.size * cap(array)
+		}
+	}
+
 	return nil
 }
 
