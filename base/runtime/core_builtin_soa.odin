@@ -266,6 +266,12 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 		// from: |x x y y z z _ _ _|
 		// to:   |x x _ y y _ z z _|
 
+		// move old data to the end of the new allocation to avoid overlap
+		old_start := uintptr(new_data) + uintptr(new_size - old_size)
+		mem_copy(rawptr(old_start), old_data, old_size)
+
+		// now:  |_ _ _ x x y y z z|
+
 		for i in 0..<field_count {
 			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
@@ -273,18 +279,21 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 			new_offset = align_forward_int(new_offset, max_align)
 
 			new_data_elem := rawptr(uintptr(new_data) + uintptr(new_offset))
-			old_data_elem := rawptr(uintptr(new_data) + uintptr(old_offset))
+			old_data_elem := rawptr(old_start + uintptr(old_offset))
 
-			mem_copy(new_data_elem, old_data_elem, type.size * old_cap)
+			old_size_elem := type.size * old_cap
+			new_size_elem := type.size * capacity
+
+			mem_copy(new_data_elem, old_data_elem, old_size_elem)
 
 			(^rawptr)(uintptr(array) + i*size_of(rawptr))^ = new_data_elem
 
 			if zero_memory {
-				mem_zero(old_data_elem, int(uintptr(new_data_elem) - uintptr(old_data_elem)))
+				mem_zero(rawptr(uintptr(new_data_elem) + uintptr(old_size_elem)), new_size_elem - old_size_elem)
 			}
 
-			old_offset += type.size * old_cap
-			new_offset += type.size * capacity
+			old_offset += old_size_elem
+			new_offset += new_size_elem
 		}
 
 		return nil
