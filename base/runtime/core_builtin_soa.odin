@@ -179,14 +179,12 @@ resize_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int length: int, loc := #cal
 		return nil
 	}
 
-	reserve_soa(array, length, loc) or_return
 	footer := raw_soa_footer(array)
-	old_len := footer.len
-	footer.len = length
 
-	if size_of(E) > 0 && length > old_len {
-		ti := type_info_of(typeid_of(T))
-		ti = type_info_base(ti)
+	if length > footer.cap {
+		reserve_soa(array, length, loc) or_return
+	} else if size_of(E) > 0 && length > footer.len {
+		ti := type_info_base(type_info_of(typeid_of(T)))
 		si := &ti.variant.(Type_Info_Struct)
 
 		field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
@@ -199,12 +197,13 @@ resize_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int length: int, loc := #cal
 
 			soa_offset = align_forward_int(soa_offset, align_of(E))
 
-			mem_zero(rawptr(uintptr(data) + uintptr(soa_offset) + uintptr(type.size * old_len)), type.size * (length - old_len))
+			mem_zero(rawptr(uintptr(data) + uintptr(soa_offset) + uintptr(type.size * footer.len)), type.size * (length - footer.len))
 
-			soa_offset += type.size * cap(array)
+			soa_offset += type.size * footer.cap
 		}
 	}
 
+	footer.len = length
 	return nil
 }
 

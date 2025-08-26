@@ -213,6 +213,7 @@ test_soa_array_resize :: proc(t: ^testing.T) {
 	testing.expect_value(t, array[2], V{0, 0})
 }
 
+@(test)
 test_soa_make_len :: proc(t: ^testing.T) {
 
 	array, err := make(#soa[dynamic][2]int, 2)
