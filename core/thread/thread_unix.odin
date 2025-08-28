@@ -58,9 +58,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(s
 				runtime.run_thread_local_cleaners()
 			}
 
-			when ODIN_OS != .Haiku {
-				_set_name(t)
-			}
+			_set_name(t)
 
 			t.procedure(t)
 		}
@@ -130,6 +128,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(s
 		free(thread, thread.creation_allocator)
 		return nil
 	}
+
+	thread.name = name
+
 	return thread
 }
 
