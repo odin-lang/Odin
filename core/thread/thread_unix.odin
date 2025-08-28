@@ -58,7 +58,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(s
 				runtime.run_thread_local_cleaners()
 			}
 
-			_set_name(t)
+			when ODIN_OS != .Haiku {
+				_set_name(t)
+			}
 
 			t.procedure(t)
 		}
