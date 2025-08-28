@@ -740,6 +740,14 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 							if (is_type_string(dst)) {
 								return 1;
 							}
+							if (is_type_u8_array(dst)) {
+								if (operand->mode == Addressing_Constant) {
+									String s = operand->value.value_string;
+									if (s.len <= dst->Array.count) {
+										return 2;
+									}
+								}
+							}
 							break;
 						case Basic_UntypedFloat:
 							if (is_type_float(dst)) {
@@ -2333,8 +2341,24 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		if (in_value.kind == ExactValue_Integer) {
 			return true;
 		}
+	} else if (in_value.kind == ExactValue_Compound) {
+		if (type->kind == Type_Array) {
+			AstCompoundLit *cl = &in_value.value_compound->CompoundLit;
+			if (cl->elems.count != type->Array.count) {
+				return false;
+			}
+			for (isize i = 0; i < cl->elems.count; i++) {
+				Operand elem_operand = {};
+				elem_operand.mode = cl->elems[i]->tav.mode;
+				elem_operand.type = cl->elems[i]->tav.type;
+				elem_operand.value = cl->elems[i]->tav.value;
+				if (!check_representable_as_constant(c, elem_operand.value, type->Array.elem, nullptr)) {
+					return false;
+				}
+			}
+			return true;
+		}
 	}
-
 	return false;
 }
 
@@ -4724,7 +4748,33 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			if (operand->value.kind == ExactValue_String) {
 				String s = operand->value.value_string;
 				if (is_type_u8_array(t)) {
-					if (s.len == t->Array.count) {
+					if (s.len <= t->Array.count) { // Allow shorter strings, pad with zeros
+						Ast *cl = ast_compound_lit(operand->expr->file(), nullptr, array_make<Ast*>(heap_allocator(), t->Array.count), empty_token, empty_token);
+						for (isize i = 0; i < t->Array.count; i++) {
+							u8 char_val = 0;
+							if (i < s.len) {
+								char_val = s.text[i];
+							}
+							char char_str[2] = {cast(char)char_val, '\0'};
+							String char_string = {cast(u8 *)char_str, 1};
+							Token char_token = {};
+							char_token.kind = Token_Rune;
+							char_token.string = char_string;
+							char_token.pos = ast_token(operand->expr).pos;
+						
+							Ast *lit = alloc_ast_node(operand->expr->file(), Ast_BasicLit);
+							lit->BasicLit.token = char_token;
+							lit->tav.mode = Addressing_Constant;
+							lit->tav.type = t_u8;
+							lit->tav.value = exact_value_u64(char_val);
+							cl->CompoundLit.elems[i] = lit;
+						}
+						cl->tav.mode = Addressing_Constant;
+						cl->tav.type = t;
+						cl->tav.value = exact_value_compound(cl);
+						operand->value = cl->tav.value;
+						operand->type = t;
+						operand->mode = Addressing_Constant;
 						break;
 					}
 				} else if (is_type_rune_array(t)) {
