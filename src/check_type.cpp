@@ -2085,7 +2085,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 							if (op.mode == Addressing_Constant) {
 								poly_const = op.value;
 							} else {
-								error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
+								if (!ctx->in_proc_group) {
+									error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
+								}
 								success = false;
 							}
 						}
