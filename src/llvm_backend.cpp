@@ -2686,8 +2686,15 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
 		call_cleanup = false;
-	} else if (build_context.metrics.os == TargetOs_windows && (build_context.metrics.arch == TargetArch_i386 || build_context.no_crt)) {
+	} else if (build_context.metrics.os == TargetOs_windows && build_context.no_crt) {
 		name = str_lit("mainCRTStartup");
+	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_i386 && !build_context.no_crt) {
+		// Windows i386 with CRT: libcmt expects _main (main with underscore prefix)
+		name = str_lit("main");
+		has_args = true;
+		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
+		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
+		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
 	} else if (is_arch_wasm()) {
 		name = str_lit("_start");
 		call_cleanup = false;
@@ -3162,6 +3169,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				String link_name = e->Procedure.link_name;
 				if (e->pkg->kind == Package_Runtime) {
 					if (link_name == "main"           ||
+					    link_name == "_main"          ||
 					    link_name == "DllMain"        ||
 					    link_name == "WinMain"        ||
 					    link_name == "wWinMain"       ||
