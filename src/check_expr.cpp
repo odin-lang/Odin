@@ -7126,6 +7126,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	gbString expr_name = expr_to_string(operand->expr);
 	defer (gb_string_free(expr_name));
 
+	c->in_proc_group = true;
 	for_array(i, procs) {
 		Entity *p = procs[i];
 		if (p->flags & EntityFlag_Disabled) {
@@ -7168,6 +7169,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			array_add(&valids, item);
 		}
 	}
+	c->in_proc_group = false;
 
 	if (max_matched_features > 0) {
 		for_array(i, valids) {
