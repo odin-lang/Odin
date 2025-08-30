@@ -82,7 +82,8 @@ foreign Opengl32 {
 	wglSetLayerPaletteEntries :: proc(hdc: HDC, layer_plane, start, entries: c.int, cr: ^COLORREF) -> c.int ---
 	wglShareLists             :: proc(HGLRC1, HGLRC2: HGLRC) -> BOOL ---
 	wglSwapLayerBuffers       :: proc(hdc: HDC, planes: DWORD) -> BOOL ---
-	wglUseFontBitmaps         :: proc(hdc: HDC, first, count, list_base: DWORD) -> BOOL ---
+	wglUseFontBitmapsA        :: proc(hdc: HDC, first, count, list_base: DWORD) -> BOOL ---
+	wglUseFontBitmapsW        :: proc(hdc: HDC, first, count, list_base: DWORD) -> BOOL ---
 	wglUseFontOutlines        :: proc(hdc: HDC, first, count, list_base: DWORD, deviation, extrusion: f32, format: c.int, gmf: LPGLYPHMETRICSFLOAT) -> BOOL ---
 }
 
