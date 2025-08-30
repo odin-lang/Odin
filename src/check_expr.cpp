@@ -6272,11 +6272,16 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		positional_operand_count = gb_min(positional_operands.count, pt->variadic_index);
 	} else if (positional_operand_count > pt->param_count) {
 		err = CallArgumentError_TooManyArguments;
-		char const *err_fmt = "Too many arguments for '%s', expected %td arguments, got %td";
 		if (show_error) {
 			gbString proc_str = expr_to_string(ce->proc);
 			defer (gb_string_free(proc_str));
-			error(call, err_fmt, proc_str, param_count_excluding_defaults, positional_operands.count);
+			if(param_count_excluding_defaults != pt->param_count) {
+				char const *err_fmt = "Too many arguments for '%s', expected between %td and %td arguments, got %td";
+				error(call, err_fmt, proc_str, param_count_excluding_defaults, pt->param_count, positional_operands.count);
+			} else {
+				char const *err_fmt = "Too many arguments for '%s', expected %td arguments, got %td";
+				error(call, err_fmt, proc_str, pt->param_count, positional_operands.count);
+			}
 		}
 		return err;
 	}
