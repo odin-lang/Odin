@@ -58,7 +58,7 @@ foreign Ole32 {
 	CoTaskMemFree :: proc(pv: rawptr) ---
 
 	CLSIDFromProgID :: proc(lpszProgID: LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
-	CLSIDFromProgIDEx :: proc(lpszProgID, LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
+	CLSIDFromProgIDEx :: proc(lpszProgID: LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
 	CLSIDFromString :: proc(lpsz: LPOLESTR, pclsid: LPCLSID) -> HRESULT ---
 	IIDFromString :: proc(lpsz: LPOLESTR, lpiid: LPIID) -> HRESULT ---
 	ProgIDFromCLSID :: proc(clsid: REFCLSID, lplpszProgID: ^LPOLESTR) -> HRESULT ---
