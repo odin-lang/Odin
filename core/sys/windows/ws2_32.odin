@@ -82,6 +82,17 @@ Example Load:
 	}
 */
 
+LPFN_GETACCEPTEXSOCKADDRS :: #type proc "system" (
+	lpOutputBuffer:        PVOID,
+	dwReceiveDataLength:   DWORD,
+	dwLocalAddressLength:  DWORD,
+	dwRemoteAddressLength: DWORD,
+	LocalSockaddr:         ^^sockaddr,
+	LocalSockaddrLength:   LPINT,
+	RemoteSockaddr:        ^^sockaddr,
+	RemoteSockaddrLength:  LPINT,
+)
+
 foreign import ws2_32 "system:Ws2_32.lib"
 @(default_calling_convention="system")
 foreign ws2_32 {
