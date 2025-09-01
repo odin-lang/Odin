@@ -29,6 +29,8 @@ Integer:
 	%x    base 16, with lower-case letters for a-f
 	%X    base 16, with upper-case letters for A-F
 	%U    Unicode format: U+1234; same as "U+%04X"
+	%m    number of bytes in the best unit of measurement, e.g. 123.45mib
+	%M    number of bytes in the best unit of measurement, e.g. 123.45MiB
 Floating-point, complex numbers, and quaternions:
 	%e    scientific notation, e.g. -1.23456e+78
 	%E    scientific notation, e.g. -1.23456E+78
@@ -38,8 +40,6 @@ Floating-point, complex numbers, and quaternions:
 	%G    synonym for %g
 	%h    hexadecimal (lower-case) representation with 0h prefix (0h01234abcd)
 	%H    hexadecimal (upper-case) representation with 0H prefix (0h01234ABCD)
-	%m    number of bytes in the best unit of measurement, e.g. 123.45mib
-	%M    number of bytes in the best unit of measurement, e.g. 123.45MiB
 String and slice of bytes
 	%s    the uninterpreted bytes of the string or slice
 	%q    a double-quoted string safely escaped with Odin syntax
