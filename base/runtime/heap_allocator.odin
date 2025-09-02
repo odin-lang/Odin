@@ -2,6 +2,7 @@ package runtime
 
 import "base:intrinsics"
 
+@(require_results)
 heap_allocator :: proc() -> Allocator {
 	return Allocator{
 		procedure = heap_allocator_proc,

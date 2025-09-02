@@ -89,10 +89,12 @@ wasm_allocator_init :: proc(a: ^WASM_Allocator, alignment: uint = 8) {
 
 global_default_wasm_allocator_data: WASM_Allocator
 
+@(require_results)
 default_wasm_allocator :: proc() -> Allocator {
 	return wasm_allocator(&global_default_wasm_allocator_data)
 }
 
+@(require_results)
 wasm_allocator :: proc(a: ^WASM_Allocator) -> Allocator {
 	return {
 		data      = a,

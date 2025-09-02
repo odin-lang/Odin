@@ -70,7 +70,7 @@ DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD :: #force_inline proc(ignore := false, loc := 
 	}
 }
 
-
+@(require_results)
 default_temp_allocator :: proc(allocator: ^Default_Temp_Allocator) -> Allocator {
 	return Allocator{
 		procedure = default_temp_allocator_proc,
