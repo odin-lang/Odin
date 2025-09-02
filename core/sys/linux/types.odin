@@ -1446,9 +1446,16 @@ EPoll_Data :: struct #raw_union {
 	u64: u64,
 }
 
-EPoll_Event :: struct #packed {
-	events: EPoll_Event_Set,
-	data:   EPoll_Data,
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	EPoll_Event :: struct #packed {
+		events: EPoll_Event_Set,
+		data:   EPoll_Data,
+	}
+} else {
+	EPoll_Event :: struct {
+		events: EPoll_Event_Set,
+		data:   EPoll_Data,
+	}
 }
 
 /*
