@@ -187,6 +187,7 @@ arena_destroy :: proc "contextless" (arena: ^Arena, loc := #caller_location) {
 	arena.total_capacity = 0
 }
 
+@(require_results)
 arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	return Allocator{arena_allocator_proc, arena}
 }

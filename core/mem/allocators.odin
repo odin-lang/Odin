@@ -2436,6 +2436,7 @@ compat_allocator_init :: proc(rra: ^Compat_Allocator, allocator := context.alloc
 	rra.parent = allocator
 }
 
+@(require_results)
 compat_allocator :: proc(rra: ^Compat_Allocator) -> Allocator {
 	return Allocator{
 		data      = rra,
