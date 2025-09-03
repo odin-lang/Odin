@@ -413,6 +413,7 @@ foreign kernel32 {
 		lpBytesLeftThisMessage: ^u32,
 	) -> BOOL ---
 	CancelIo :: proc(handle: HANDLE) -> BOOL ---
+	CancelIoEx :: proc(hFile: HANDLE, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetOverlappedResult :: proc(
 		hFile: HANDLE,
 		lpOverlapped: LPOVERLAPPED,
