@@ -3617,6 +3617,11 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
+	
+	// Warn about Windows i386 thread-local storage limitations
+	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
+		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
+	}
 
 	// Check chosen microarchitecture. If not found or ?, print list.
 	bool print_microarch_list = true;
