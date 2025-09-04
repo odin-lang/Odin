@@ -14,9 +14,13 @@ easytype :: enum c.int {
 	OT_FUNCTION, /* function pointer */
 }
 
-/* "alias" means it is provided for old programs to remain functional,
-   we prefer another name */
-OT_FLAG_ALIAS :: 1<<0
+
+easyoptionflags :: distinct bit_set[easyoptionflag; c.uint]
+easyoptionflag :: enum c.uint {
+	/* "alias" means it is provided for old programs to remain functional,
+	   we prefer another name */
+	ALIAS = 0,
+}
 
 /* The CURLOPTTYPE_* id ranges can still be used to figure out what type/size
    to use for curl_easy_setopt() for the given id */
@@ -24,7 +28,7 @@ easyoption :: struct {
 	name:  cstring,
 	id:    option,
 	type:  easytype,
-	flags: c.uint,
+	flags: easyoptionflags,
 }
 
 

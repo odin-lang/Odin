@@ -129,6 +129,15 @@ httppost_flag :: enum c.long {
 	LARGE       = 7,
 }
 
+HTTPPOST_FILENAME    :: httppost_flags{.FILENAME}
+HTTPPOST_READFILE    :: httppost_flags{.READFILE}
+HTTPPOST_PTRNAME     :: httppost_flags{.PTRNAME}
+HTTPPOST_PTRCONTENTS :: httppost_flags{.PTRCONTENTS}
+HTTPPOST_BUFFER      :: httppost_flags{.BUFFER}
+HTTPPOST_PTRBUFFER   :: httppost_flags{.PTRBUFFER}
+HTTPPOST_CALLBACK    :: httppost_flags{.CALLBACK}
+HTTPPOST_LARGE       :: httppost_flags{.LARGE}
+
 httppost :: struct {
 	next:           ^httppost,                   /* next entry in the list */
 	name:           cstring `fmt:"v,name"`,      /* pointer to allocated name */
@@ -238,6 +247,15 @@ finfoflag :: enum c.uint {
 	KNOWN_SIZE       = 6,
 	KNOWN_HLINKCOUNT = 7,
 }
+
+FINFOFLAG_KNOWN_FILENAME   :: finfoflags{.KNOWN_FILENAME}
+FINFOFLAG_KNOWN_FILETYPE   :: finfoflags{.KNOWN_FILETYPE}
+FINFOFLAG_KNOWN_TIME       :: finfoflags{.KNOWN_TIME}
+FINFOFLAG_KNOWN_PERM       :: finfoflags{.KNOWN_PERM}
+FINFOFLAG_KNOWN_UID        :: finfoflags{.KNOWN_UID}
+FINFOFLAG_KNOWN_GID        :: finfoflags{.KNOWN_GID}
+FINFOFLAG_KNOWN_SIZE       :: finfoflags{.KNOWN_SIZE}
+FINFOFLAG_KNOWN_HLINKCOUNT :: finfoflags{.KNOWN_HLINKCOUNT}
 
 /* Information about a single file, used when doing FTP wildcard matching */
 fileinfo :: struct {

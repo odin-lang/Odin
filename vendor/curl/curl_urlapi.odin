@@ -54,30 +54,48 @@ UPart :: enum c.int {
 	ZONEID, /* added in 7.65.0 */
 }
 
+UFlags :: distinct bit_set[UFlag; c.uint]
+UFlag :: enum c.uint {
+	DEFAULT_PORT       =  0,  /* return default port number */
+	NO_DEFAULT_PORT    =  1,  /* act as if no port number was set,
+	                             if the port number matches the
+	                             default for the scheme */
+	DEFAULT_SCHEME     =  2,  /* return default scheme if
+	                             missing */
+	NON_SUPPORT_SCHEME =  3,  /* allow non-supported scheme */
+	PATH_AS_IS         =  4,  /* leave dot sequences */
+	DISALLOW_USER      =  5,  /* no user+password allowed */
+	URLDECODE          =  6,  /* URL decode on get */
+	URLENCODE          =  7,  /* URL encode on set */
+	APPENDQUERY        =  8,  /* append a form style part */
+	GUESS_SCHEME       =  9,  /* legacy curl-style guessing */
+	NO_AUTHORITY       =  10, /* Allow empty authority when the
+	                             scheme is unknown. */
+	ALLOW_SPACE        =  11, /* Allow spaces in the URL */
+	PUNYCODE           =  12, /* get the hostname in punycode */
+	PUNY2IDN           =  13, /* punycode => IDN conversion */
+	GET_EMPTY          =  14, /* allow empty queries and fragments
+	                             when extracting the URL or the
+	                             components */
+	NO_GUESS_SCHEME    =  15, /* for get, do not accept a guess */
+}
 
-U_DEFAULT_PORT       ::  (1<<0)  /* return default port number */
-U_NO_DEFAULT_PORT    ::  (1<<1)  /* act as if no port number was set,
-                                    if the port number matches the
-                                    default for the scheme */
-U_DEFAULT_SCHEME     ::  (1<<2)  /* return default scheme if
-                                    missing */
-U_NON_SUPPORT_SCHEME ::  (1<<3)  /* allow non-supported scheme */
-U_PATH_AS_IS         ::  (1<<4)  /* leave dot sequences */
-U_DISALLOW_USER      ::  (1<<5)  /* no user+password allowed */
-U_URLDECODE          ::  (1<<6)  /* URL decode on get */
-U_URLENCODE          ::  (1<<7)  /* URL encode on set */
-U_APPENDQUERY        ::  (1<<8)  /* append a form style part */
-U_GUESS_SCHEME       ::  (1<<9)  /* legacy curl-style guessing */
-U_NO_AUTHORITY       ::  (1<<10) /* Allow empty authority when the
-                                    scheme is unknown. */
-U_ALLOW_SPACE        ::  (1<<11) /* Allow spaces in the URL */
-U_PUNYCODE           ::  (1<<12) /* get the hostname in punycode */
-U_PUNY2IDN           ::  (1<<13) /* punycode => IDN conversion */
-U_GET_EMPTY          ::  (1<<14) /* allow empty queries and fragments
-                                    when extracting the URL or the
-                                    components */
-U_NO_GUESS_SCHEME    ::  (1<<15) /* for get, do not accept a guess */
-
+U_DEFAULT_PORT       :: UFlags{.DEFAULT_PORT}
+U_NO_DEFAULT_PORT    :: UFlags{.NO_DEFAULT_PORT}
+U_DEFAULT_SCHEME     :: UFlags{.DEFAULT_SCHEME}
+U_NON_SUPPORT_SCHEME :: UFlags{.NON_SUPPORT_SCHEME}
+U_PATH_AS_IS         :: UFlags{.PATH_AS_IS}
+U_DISALLOW_USER      :: UFlags{.DISALLOW_USER}
+U_URLDECODE          :: UFlags{.URLDECODE}
+U_URLENCODE          :: UFlags{.URLENCODE}
+U_APPENDQUERY        :: UFlags{.APPENDQUERY}
+U_GUESS_SCHEME       :: UFlags{.GUESS_SCHEME}
+U_NO_AUTHORITY       :: UFlags{.NO_AUTHORITY}
+U_ALLOW_SPACE        :: UFlags{.ALLOW_SPACE}
+U_PUNYCODE           :: UFlags{.PUNYCODE}
+U_PUNY2IDN           :: UFlags{.PUNY2IDN}
+U_GET_EMPTY          :: UFlags{.GET_EMPTY}
+U_NO_GUESS_SCHEME    :: UFlags{.NO_GUESS_SCHEME}
 
 @(default_calling_convention="c", link_prefix="curl_")
 foreign lib {
@@ -105,14 +123,14 @@ foreign lib {
 	 * handle. Returns error code. The returned pointer MUST be freed with
 	 * curl_free() afterwards.
 	 */
-	url_get :: proc(handle: ^CURLU, what: UPart, part: ^[^]byte, flags: c.uint) -> ^Ucode ---
+	url_get :: proc(handle: ^CURLU, what: UPart, part: ^[^]byte, flags: UFlags) -> ^Ucode ---
 
 	/*
 	 * curl_url_set() sets a specific part of the URL in a CURLU handle. Returns
 	 * error code. The passed in string will be copied. Passing a NULL instead of
 	 * a part string, clears that part.
 	 */
-	url_set :: proc(handle: ^CURLU, what: ^UPart, part: cstring, flags: c.uint) -> Ucode ---
+	url_set :: proc(handle: ^CURLU, what: ^UPart, part: cstring, flags: UFlags) -> Ucode ---
 
 	/*
 	 * curl_url_strerror() turns a CURLUcode value into the equivalent human

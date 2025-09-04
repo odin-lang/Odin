@@ -3,14 +3,19 @@ package vendor_curl
 import c "core:c/libc"
 
 /* Flag bits in the curl_blob struct: */
-BLOB_COPY   :: 1 /* tell libcurl to copy the data */
-BLOB_NOCOPY :: 0 /* tell libcurl to NOT copy the data */
+BLOB_COPY   :: blob_flags{.COPY} /* tell libcurl to copy the data */
+BLOB_NOCOPY :: blob_flags{}      /* tell libcurl to NOT copy the data */
+
+blob_flags :: distinct bit_set[blob_flag; c.uint]
+blob_flag :: enum c.uint {
+	COPY = 0,
+}
 
 blob :: struct {
 	data:  rawptr,
 	len:   c.size_t,
-	flags: c.uint, /* bit 0 is defined, the rest are reserved and should be
-	                  left zeroes */
+	flags: blob_flags, /* bit 0 is defined, the rest are reserved and should be
+	                      left zeroes */
 }
 
 @(default_calling_convention="c", link_prefix="curl_")

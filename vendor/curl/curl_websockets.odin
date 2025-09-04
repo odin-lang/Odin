@@ -5,22 +5,33 @@ import c "core:c/libc"
 
 ws_frame :: struct {
 	age:       c.int,    /* zero */
-	flags:     c.int,    /* See the CURLWS_* defines */
+	flags:     ws_flags, /* See the CURLWS_* defines */
 	offset:    off_t,    /* the offset of this data into the frame */
 	bytesleft: off_t,    /* number of pending bytes left of the payload */
 	len:       c.size_t, /* size of the current data chunk */
 }
 
-/* flag bits */
-WS_TEXT   :: 1<<0
-WS_BINARY :: 1<<1
-WS_CONT   :: 1<<2
-WS_CLOSE  :: 1<<3
-WS_PING   :: 1<<4
-WS_OFFSET :: 1<<5
+ws_flags :: distinct bit_set[ws_flag; c.uint]
+ws_flag :: enum c.uint {
+	/* flag bits */
+	TEXT   = 0,
+	BINARY = 1,
+	CONT   = 2,
+	CLOSE  = 3,
+	PING   = 4,
+	OFFSET = 5,
 
-/* flags for curl_ws_send() */
-WS_PONG       :: 1<<6
+	/* flags for curl_ws_send() */
+	PONG   = 6,
+}
+
+WS_TEXT   :: ws_flags{.TEXT}
+WS_BINARY :: ws_flags{.BINARY}
+WS_CONT   :: ws_flags{.CONT}
+WS_CLOSE  :: ws_flags{.CLOSE}
+WS_PING   :: ws_flags{.PING}
+WS_OFFSET :: ws_flags{.OFFSET}
+WS_PONG   :: ws_flags{.PONG}
 
 /* bits for the CURLOPT_WS_OPTIONS bitmask: */
 WS_RAW_MODE   :: 1<<0
@@ -51,7 +62,7 @@ foreign lib {
 	ws_send :: proc(curl: CURL, buffer: rawptr,
 	                buflen: c.size_t, sent: ^c.size_t,
 	                fragsize: off_t,
-	                flags: c.uint) -> code ---
+	                flags: ws_flags) -> code ---
 
 
 	ws_meta :: proc(curl: ^CURL) -> ^ws_frame ---
