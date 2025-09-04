@@ -3619,9 +3619,8 @@ int main(int arg_count, char const **arg_ptr) {
 	// }
 	
 	// Warn about Windows i386 thread-local storage limitations
-	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows && build_context.no_crt) {
-		gb_printf_err("Warning: Thread-local storage is not supported on Windows i386 with -no-crt.\n");
-		gb_printf_err("         Multi-threaded code will not work correctly.\n");
+	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
+		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
 	}
 
 	// Check chosen microarchitecture. If not found or ?, print list.
