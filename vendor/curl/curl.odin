@@ -92,10 +92,6 @@ sslbackend :: enum c.int {
 	AWSLC     = OPENSSL,
 	BORINGSSL = OPENSSL,
 	LIBRESSL  = OPENSSL,
-
-	/* deprecated names: */
-	CYASSL    = WOLFSSL,
-	DARWINSSL = SECURETRANSPORT,
 }
 
 /* bits for the CURLOPT_FOLLOWLOCATION option */
