@@ -1797,6 +1797,7 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		}
 
 		expr = unparen_expr(expr);
+		if(!expr) break;
 	}
 	mutex_unlock(mutex);
 }
