@@ -7947,10 +7947,12 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 				s = gb_string_append_fmt(s, "$%.*s", LIT(name));
 
 				if (v->kind == Entity_TypeName) {
-					if (v->type->kind != Type_Generic) {
-						s = gb_string_append_fmt(s, "=");
-						s = write_type_to_string(s, v->type, false);
-					}
+					if(v->type){
+						if (v->type->kind != Type_Generic) {
+							s = gb_string_append_fmt(s, "=");
+							s = write_type_to_string(s, v->type, false);
+						}
+					};
 				} else if (v->kind == Entity_Constant) {
 					if (v->Constant.value.kind != ExactValue_Invalid) {
 						s = gb_string_append_fmt(s, "=");
