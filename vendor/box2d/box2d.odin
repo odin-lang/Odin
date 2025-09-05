@@ -1370,7 +1370,7 @@ foreign lib {
 
 	// Create a motor joint
 	//	@see b2MotorJointDef for details
-	CreateMotorJoint               :: proc(worldId: WorldId, def: MotorJointDef) -> JointId ---
+	CreateMotorJoint               :: proc(worldId: WorldId, #by_ptr def: MotorJointDef) -> JointId ---
 
 	// Set the motor joint linear offset target
 	MotorJoint_SetLinearOffset     :: proc(jointId: JointId, linearOffset: Vec2) ---
