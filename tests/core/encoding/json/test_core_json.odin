@@ -529,3 +529,35 @@ enumerated_array :: proc(t: ^testing.T) {
 		testing.expect_value(t, unmarshaled, Sparse_Fruit_Stock)
 	}
 }
+
+import "core:fmt"
+@test
+quaternion :: proc(t: ^testing.T) {
+	rotation: quaternion128
+	rotation.x = 0
+	rotation.y = 0.95
+	rotation.z = 0
+	rotation.w = 0.3
+
+	{ // test unmarshaling
+		marshaled := "[0, 0.95, 0, 0.300]"
+
+		unmarshaled: quaternion128
+		err := json.unmarshal_string(marshaled, &unmarshaled)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, unmarshaled, rotation)
+	}
+
+	{ // test marshal -> unmarshal
+		marshaled, err_marshal := json.marshal(rotation)
+		defer delete(marshaled)
+		testing.expect_value(t, err_marshal, nil)
+
+		fmt.println(marshaled)
+
+		unmarshaled: quaternion128
+		err_unmarshal := json.unmarshal(marshaled, &unmarshaled)
+		testing.expect_value(t, err_unmarshal, nil)
+		testing.expect_value(t, unmarshaled, rotation)
+	}
+}
