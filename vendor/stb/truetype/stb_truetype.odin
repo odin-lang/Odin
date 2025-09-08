@@ -108,9 +108,9 @@ packedchar :: struct {
 pack_range :: struct {
 	font_size:                        f32,
 	first_unicode_codepoint_in_range: c.int,
-	array_of_unicode_codepoints:      [^]rune, // optional
+	array_of_unicode_codepoints:      [^]rune,
 	num_chars:                        c.int,
-	chardata_for_range:               [^]packedchar, // output
+	chardata_for_range:               [^]packedchar,
 	_, _: u8, // used internally to store oversample info
 }
 
@@ -137,7 +137,7 @@ foreign stbtt {
 	// bilinear filtering).
 	//
 	// Returns 0 on failure, 1 on success.
-	PackBegin :: proc(spc: ^pack_context, pixels: [^]byte, width, height, stride_in_bytes, padding: c.int, alloc_context: rawptr) -> c.int ---
+	PackBegin :: proc(spc: ^pack_context, pixels: [^]byte, width, height, stride_in_bytes, padding: c.int, alloc_context: rawptr) -> b32 ---
 	
 	// Cleans up the packing context and frees all memory.
 	PackEnd :: proc(spc: ^pack_context) ---
@@ -154,13 +154,17 @@ foreign stbtt {
 	// and pass that result as 'font_size':
 	//       ...,            20 , ... // font max minus min y is 20 pixels tall
 	//       ..., POINT_SIZE(20), ... // 'M' is 20 pixels tall
-	PackFontRange :: proc(spc: ^pack_context, fontdata: [^]byte, font_index: c.int, font_size: f32, first_unicode_char_in_range, num_chars_in_range: c.int, chardata_for_range: [^]packedchar) -> c.int ---
+	//
+	// Returns 0 on failure, 1 on success.
+	PackFontRange :: proc(spc: ^pack_context, fontdata: [^]byte, font_index: c.int, font_size: f32, first_unicode_char_in_range, num_chars_in_range: c.int, chardata_for_range: [^]packedchar) -> b32 ---
 	
 	// Creates character bitmaps from multiple ranges of characters stored in
 	// ranges. This will usually create a better-packed bitmap than multiple
 	// calls to stbtt_PackFontRange. Note that you can call this multiple
 	// times within a single PackBegin/PackEnd.
-	PackFontRanges :: proc(spc: ^pack_context, fontdata: [^]byte, font_index: c.int, ranges: [^]pack_range, num_ranges: c.int) -> c.int ---
+	//
+	// Returns 0 on failure, 1 on success.
+	PackFontRanges :: proc(spc: ^pack_context, fontdata: [^]byte, font_index: c.int, ranges: [^]pack_range, num_ranges: c.int) -> b32 ---
 	
 	// Oversampling a font increases the quality by allowing higher-quality subpixel
 	// positioning, and is especially valuable at smaller text sizes.
@@ -200,9 +204,13 @@ foreign stbtt {
 	// then call RenderIntoRects repeatedly. This may result in a
 	// better packing than calling PackFontRanges multiple times
 	// (or it may not).
+	//
+	// Returns the number of rects which were not skipped.
+	// PackSetSkipMissingCodepoints controls this behavior.
 	PackFontRangesGatherRects     :: proc(spc: ^pack_context, info: ^fontinfo, ranges: [^]pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> c.int ---
 	PackFontRangesPackRects       :: proc(spc: ^pack_context, rects: [^]stbrp.Rect, num_rects: c.int) --- 
-	PackFontRangesRenderIntoRects :: proc(spc: ^pack_context, info: ^fontinfo, ranges: [^]pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> c.int --- 
+	// Returns 0 on failure, 1 on success.
+	PackFontRangesRenderIntoRects :: proc(spc: ^pack_context, info: ^fontinfo, ranges: [^]pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> b32 --- 
 }
 
 //////////////////////////////////////////////////////////////////////////////
