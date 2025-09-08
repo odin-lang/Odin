@@ -108,9 +108,9 @@ packedchar :: struct {
 pack_range :: struct {
 	font_size:                        f32,
 	first_unicode_codepoint_in_range: c.int,
-	array_of_unicode_codepoints:      [^]rune,
+	array_of_unicode_codepoints:      [^]rune, // optional
 	num_chars:                        c.int,
-	chardata_for_range:               ^packedchar,
+	chardata_for_range:               [^]packedchar, // output
 	_, _: u8, // used internally to store oversample info
 }
 
@@ -154,7 +154,7 @@ foreign stbtt {
 	// and pass that result as 'font_size':
 	//       ...,            20 , ... // font max minus min y is 20 pixels tall
 	//       ..., POINT_SIZE(20), ... // 'M' is 20 pixels tall
-	PackFontRange :: proc(spc: ^pack_context, fontdata: [^]byte, font_index: c.int, font_size: f32, first_unicode_char_in_range, num_chars_in_range: c.int, chardata_for_range: ^packedchar) -> c.int ---
+	PackFontRange :: proc(spc: ^pack_context, fontdata: [^]byte, font_index: c.int, font_size: f32, first_unicode_char_in_range, num_chars_in_range: c.int, chardata_for_range: [^]packedchar) -> c.int ---
 	
 	// Creates character bitmaps from multiple ranges of characters stored in
 	// ranges. This will usually create a better-packed bitmap than multiple
@@ -200,9 +200,9 @@ foreign stbtt {
 	// then call RenderIntoRects repeatedly. This may result in a
 	// better packing than calling PackFontRanges multiple times
 	// (or it may not).
-	PackFontRangesGatherRects     :: proc(spc: ^pack_context, info: ^fontinfo, ranges: ^pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> c.int ---
+	PackFontRangesGatherRects     :: proc(spc: ^pack_context, info: ^fontinfo, ranges: [^]pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> c.int ---
 	PackFontRangesPackRects       :: proc(spc: ^pack_context, rects: [^]stbrp.Rect, num_rects: c.int) --- 
-	PackFontRangesRenderIntoRects :: proc(spc: ^pack_context, info: ^fontinfo, ranges: ^pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> c.int --- 
+	PackFontRangesRenderIntoRects :: proc(spc: ^pack_context, info: ^fontinfo, ranges: [^]pack_range, num_ranges: c.int, rects: [^]stbrp.Rect) -> c.int --- 
 }
 
 //////////////////////////////////////////////////////////////////////////////
