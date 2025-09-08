@@ -1007,6 +1007,6 @@ destroy :: proc(img: ^Image) {
 }
 
 @(init, private)
-_register :: proc() {
+_register :: proc "contextless" () {
 	image.register(.JPEG, load_from_bytes, destroy)
 }
