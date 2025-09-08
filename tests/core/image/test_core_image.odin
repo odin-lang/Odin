@@ -19,6 +19,7 @@ import pbm "core:image/netpbm"
 import "core:image/png"
 import "core:image/qoi"
 import "core:image/tga"
+import "core:image/jpeg"
 
 import "core:bytes"
 import "core:hash"
@@ -28,6 +29,7 @@ import "core:time"
 
 TEST_SUITE_PATH_PNG :: ODIN_ROOT + "tests/core/assets/PNG"
 TEST_SUITE_PATH_BMP :: ODIN_ROOT + "tests/core/assets/BMP"
+TEST_SUITE_PATH_JPG :: ODIN_ROOT + "tests/core/assets/JPG"
 
 I_Error :: image.Error
 
@@ -2353,6 +2355,52 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 
 				bytes.buffer_destroy(&buf)
 				bmp.destroy(reload_img)
+			}
+			bmp.destroy(img)
+		}
+	}
+	return
+}
+
+// JPG test image
+Basic_JPG_Tests := []Test{
+	{
+		"emblem-1024", {
+			{Default, nil, {1024, 1024, 3, 8}, 0x_46a29e0f},
+		},
+	},
+}
+
+@test
+jpeg_test_basic :: proc(t: ^testing.T) {
+	run_jpg_suite(t, Basic_JPG_Tests)
+}
+
+run_jpg_suite :: proc(t: ^testing.T, suite: []Test) {
+	for file in suite {
+		test_file := strings.concatenate({TEST_SUITE_PATH_JPG, "/", file.file, ".jpg"}, context.allocator)
+		defer delete(test_file)
+
+		for test in file.tests {
+			img, err := jpeg.load(test_file, test.options)
+
+			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
+			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
+
+			if err == nil { // No point in running the other tests if it didn't load.
+				pixels := bytes.buffer_to_bytes(&img.pixels)
+
+				dims   := Dims{img.width, img.height, img.channels, img.depth}
+				testing.expectf(t, test.dims == dims, "%v has %v, expected: %v.", file.file, dims, test.dims)
+
+				img_hash := hash.crc32(pixels)
+				testing.expectf(t, test.hash == img_hash, "%v test #1's hash is %08x, expected %08x with %v.", file.file, img_hash, test.hash, test.options)
+
+				// Save to BMP file to check load
+				test_bmp := strings.concatenate({TEST_SUITE_PATH_JPG, "/", file.file, ".bmp"}, context.temp_allocator)
+
+				save_err := bmp.save(test_bmp, img)
+				testing.expectf(t, save_err == nil, "expected saving to BMP in memory not to raise error, got %v", save_err)
 			}
 			bmp.destroy(img)
 		}

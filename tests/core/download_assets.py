@@ -7,7 +7,7 @@ import zipfile
 import hashlib
 import hmac
 
-TEST_SUITES        = ['PNG', 'XML', 'BMP']
+TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG']
 DOWNLOAD_BASE_PATH = sys.argv[1] + "/{}"
 ASSETS_BASE_URL    = "https://raw.githubusercontent.com/odin-lang/test-assets/master/{}/{}"
 HMAC_KEY           = "https://odin-lang.org"
@@ -280,7 +280,9 @@ HMAC_DIGESTS = {
 	'rletopdown.bmp':      "37500893aad0b40656aa80fd5c7c5f9b35d033018b8070d8b1d7baeb34c90f90462288b13295204b90aa3e5c9be797d22a328e3714ab259334e879a09a3de175",
 	'shortfile.bmp':       "be3ffade7999304f00f9b7d152b5b27811ad1166d0fd43004392467a28f44b6a4ec02a23c0296bacd4f02f8041cd824b9ca6c9fc31fed27e36e572113bb47d73",
 
-	'unicode.xml':  "e0cdc94f07fdbb15eea811ed2ae6dcf494a83d197dafe6580c740270feb0d8f5f7146d4a7d4c2d2ea25f8bd9678bc986123484b39399819a6b7262687959d1ae",
+	'emblem-1024.jpg':     "d7b7e3ffaa5cda04c667e3742752091d78e02aa2d3c7a63406af679ce810a0a86666b10fcab12cc7ead2fadf2f6c2e1237bc94f892a62a4c218e18a20f96dbe4",
+
+	'unicode.xml':         "e0cdc94f07fdbb15eea811ed2ae6dcf494a83d197dafe6580c740270feb0d8f5f7146d4a7d4c2d2ea25f8bd9678bc986123484b39399819a6b7262687959d1ae",
 }
 
 def try_download_file(url, out_file):

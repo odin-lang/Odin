@@ -366,7 +366,7 @@ chrm :: proc(c: image.PNG_Chunk) -> (res: cHRM, ok: bool) {
 	return
 }
 
-exif :: proc(c: image.PNG_Chunk) -> (res: Exif, ok: bool) {
+exif :: proc(c: image.PNG_Chunk) -> (res: image.Exif, ok: bool) {
 
 	ok = true
 
