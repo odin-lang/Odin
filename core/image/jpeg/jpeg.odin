@@ -31,15 +31,15 @@ Component :: enum u8 {
 	Cr = 3,
 }
 
-HuffmanTable :: struct {
+Huffman_Table :: struct {
 	symbols: [HUFFMAN_MAX_SYMBOLS]byte,
 	codes: [HUFFMAN_MAX_SYMBOLS]u32,
 	offsets: [HUFFMAN_MAX_BITS + 1]byte,
 }
 
-QuantizationTable :: [COEFFICIENT_COUNT]u16be
+Quantization_Table :: [COEFFICIENT_COUNT]u16be
 
-ColorComponent :: struct {
+Color_Component :: struct {
 	dc_table_idx: u8,
 	ac_table_idx: u8,
 	quantization_table_idx: u8,
@@ -143,7 +143,7 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 }
 
 @(private="file")
-get_symbol :: proc(ctx: ^$C, huffman_table: HuffmanTable) -> byte {
+get_symbol :: proc(ctx: ^$C, huffman_table: Huffman_Table) -> byte {
 	possible_code: u32 = 0
 
 	for i in 0..<HUFFMAN_MAX_BITS {
@@ -201,9 +201,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	expect_EOI := false
 	zero_based_components := false
-	huffman: [Coefficient][4]HuffmanTable
-	quantization: [4]QuantizationTable
-	color_components: [Component]ColorComponent
+	huffman: [Coefficient][4]Huffman_Table
+	quantization: [4]Quantization_Table
+	color_components: [Component]Color_Component
 	restart_interval: int
 	// Image width and height in MCUs
 	mcu_width: int
@@ -565,8 +565,12 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				// how many lines in the frame we have.
 				// ISO/IEC 10918-1: 1993.
 				// Section B.2.5
-				if img.width == 0 || img.height == 0 || img.width * img.height > image.MAX_DIMENSIONS {
+				if img.width == 0 || img.height == 0 {
 					return img, .Invalid_Image_Dimensions
+				}
+
+				if u128(img.width) * u128(img.height) > image.MAX_DIMENSIONS {
+					return img, .Image_Dimensions_Too_Large
 				}
 
 				// TODO: Some JPEGs use CMYK as the color model which means there will be 4 components
@@ -919,15 +923,15 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 								for j := BLOCK_SIZE - 1; j >= 0; j -= 1 {
 									for k := BLOCK_SIZE - 1; k >= 0; k -= 1 {
 										i := j * BLOCK_SIZE + k
-										cbcrPixelRow := j / luma_v_sampling_factor + 4 * v
-										cbcrPixelColumn := k / luma_h_sampling_factor + 4 * h
-										cbcrPixel := cbcrPixelRow * BLOCK_SIZE + cbcrPixelColumn
+										cbcr_pixel_row    := j / luma_v_sampling_factor + 4 * v
+										cbcr_pixel_column := k / luma_h_sampling_factor + 4 * h
+										cbcr_pixel := cbcr_pixel_row * BLOCK_SIZE + cbcr_pixel_column
 
-										r := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] + 1.402 * cast(f32)cbcr_blk[.Cr][cbcrPixel] + 128, 0, 255)
-										g := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] - 0.344 * cast(f32)cbcr_blk[.Cb][cbcrPixel] - 0.714 * cast(f32)cbcr_blk[.Cr][cbcrPixel] + 128, 0, 255)
-										b := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] + 1.772 * cast(f32)cbcr_blk[.Cb][cbcrPixel] + 128, 0, 255)
+										r := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] + 1.402 * cast(f32)cbcr_blk[.Cr][cbcr_pixel] + 128, 0, 255)
+										g := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] - 0.344 * cast(f32)cbcr_blk[.Cb][cbcr_pixel] - 0.714 * cast(f32)cbcr_blk[.Cr][cbcr_pixel] + 128, 0, 255)
+										b := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] + 1.772 * cast(f32)cbcr_blk[.Cb][cbcr_pixel] + 128, 0, 255)
 
-										y_blk[.Y][i] = r
+										y_blk[.Y][i]  = r
 										y_blk[.Cb][i] = g
 										y_blk[.Cr][i] = b
 									}
