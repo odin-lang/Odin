@@ -2389,6 +2389,7 @@ run_jpg_suite :: proc(t: ^testing.T, suite: []Test) {
 
 		for test in file.tests {
 			img, err := jpeg.load(test_file, test.options)
+			defer jpeg.destroy(img)
 
 			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
 			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
@@ -2402,13 +2403,13 @@ run_jpg_suite :: proc(t: ^testing.T, suite: []Test) {
 				img_hash := hash.crc32(pixels)
 				testing.expectf(t, test.hash == img_hash, "%v test #1's hash is %08x, expected %08x with %v.", file.file, img_hash, test.hash, test.options)
 
-				// Save to BMP file to check load
-				test_bmp := strings.concatenate({TEST_SUITE_PATH_JPG, "/", file.file, ".bmp"}, context.temp_allocator)
-
-				save_err := bmp.save(test_bmp, img)
-				testing.expectf(t, save_err == nil, "expected saving to BMP in memory not to raise error, got %v", save_err)
+				// Optionally save to BMP file to check file loaded properly during development
+				when false  {
+					test_bmp := strings.concatenate({TEST_SUITE_PATH_JPG, "/", file.file, ".bmp"}, context.temp_allocator)
+					save_err := bmp.save(test_bmp, img)
+					testing.expectf(t, save_err == nil, "expected saving to BMP not to raise error, got %v", save_err)
+				}
 			}
-			bmp.destroy(img)
 		}
 	}
 	return
