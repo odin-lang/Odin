@@ -637,7 +637,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					color_components[id].h_sampling_factor = cast(int)horizontal_sampling
 				}
 			case .SOF2: // Progressive DCT
-				unimplemented("SOF2")
+				fallthrough
 			case .SOF3: // Lossless (sequential)
 				fallthrough
 			case .SOF5: // Differential sequential DCT

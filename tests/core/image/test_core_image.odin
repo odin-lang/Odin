@@ -5,7 +5,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
-	A test suite for PNG, TGA, NetPBM, QOI and BMP.
+	A test suite for PNG, TGA, NetPBM, QOI, BMP, and JPEG.
 */
 #+feature dynamic-literals
 package test_core_image
@@ -2366,7 +2366,13 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 Basic_JPG_Tests := []Test{
 	{
 		"emblem-1024", {
-			{Default, nil, {1024, 1024, 3, 8}, 0x_46a29e0f},
+			{Default,   nil, {1024, 1024, 3, 8}, 0x_46a29e0f},
+			// {Alpha_Add, nil, {1024, 1024, 4, 8}, 0x_46a29e0f},
+		},
+	},
+	{
+		"emblem-1024-progressive", {
+			{Default,   .Unsupported_Frame_Type, {1024, 1024, 3, 8}, 0x_46a29e0f},
 		},
 	},
 }
