@@ -2,4 +2,6 @@
 *.zip
 *.png
 *.jpg
+*.qoi
+*.pbm
 math_big_test_library.*

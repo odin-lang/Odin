@@ -51,6 +51,7 @@ Blend_BG_Keep        :: image.Options{.blend_background, .alpha_add_if_missing}
 Return_Metadata      :: image.Options{.return_metadata}
 No_Channel_Expansion :: image.Options{.do_not_expand_channels, .return_metadata}
 
+
 Dims :: struct {
 	width:     int,
 	height:    int,
@@ -2373,6 +2374,13 @@ Basic_JPG_Tests := []Test{
 	{
 		"emblem-1024-progressive", {
 			{Default,   .Unsupported_Frame_Type, {1024, 1024, 3, 8}, 0x_46a29e0f},
+		},
+	},
+	{
+		"emblem-1024-gray", {
+			{Default,              nil,                 {1024, 1024, 3, 8}, 0x_4115d669},
+			{Alpha_Add,            nil,                 {1024, 1024, 4, 8}, 0x_db496297},
+			{No_Channel_Expansion, .Unsupported_Option, {1024, 1024, 1, 8}, 0},
 		},
 	},
 }
