@@ -642,22 +642,23 @@ JFXX_Extension_Code :: enum u8 {
 }
 
 JPEG_Marker :: enum u8 {
-	SOF0  = 0xC0,
-	SOF1  = 0xC1,
-	SOF2  = 0xC2,
-	SOF3  = 0xC3,
+	SOF0  = 0xC0, // Baseline sequential DCT
+	SOF1  = 0xC1, // Extended sequential DCT
+	SOF2  = 0xC2, // Progressive DCT
+	SOF3  = 0xC3, // Lossless (sequential)
+	SOF5  = 0xC5, // Differential sequential DCT
+	SOF6  = 0xC6, // Differential progressive DCT
+	SOF7  = 0xC7, // Differential lossless (sequential)
+	SOF9  = 0xC9, // Extended sequential DCT, Arithmetic coding
+	SOF10 = 0xCA, // Progressive DCT, Arithmetic coding
+	SOF11 = 0xCB, // Lossless (sequential), Arithmetic coding
+	SOF13 = 0xCD, // Differential sequential DCT, Arithmetic coding
+	SOF14 = 0xCE, // Differential progressive DCT, Arithmetic coding
+	SOF15 = 0xCF, // Differential lossless (sequential), Arithmetic coding
+
 	DHT   = 0xC4,
-	SOF5  = 0xC5,
-	SOF6  = 0xC6,
-	SOF7  = 0xC7,
 	JPG   = 0xC8,
-	SOF9  = 0xC9,
-	SOF10 = 0xCA,
-	SOF11 = 0xCB,
 	DAC   = 0xCC,
-	SOF13 = 0xCD,
-	SOF14 = 0xCE,
-	SOF15 = 0xCF,
 	RST0  = 0xD0,
 	RST1  = 0xD1,
 	RST2  = 0xD2,
@@ -713,6 +714,7 @@ JPEG_Info :: struct {
 	jfxx_app0: Maybe(JFXX_APP0),
 	comments: [dynamic]string,
 	exif: [dynamic]Exif,
+	frame_type: JPEG_Marker,
 }
 
 // Function to help with image buffer calculations
