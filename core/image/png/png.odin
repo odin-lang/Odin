@@ -138,14 +138,6 @@ Text :: struct {
 	text:              string,
 }
 
-Exif :: struct {
-	byte_order: enum {
-		little_endian,
-		big_endian,
-	},
-	data: []u8,
-}
-
 iCCP :: struct {
 	name:    string,
 	profile: []u8,
@@ -250,8 +242,12 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 	header := (^image.PNG_IHDR)(raw_data(c.data))^
 	// Validate IHDR
 	using header
-	if width == 0 || height == 0 || u128(width) * u128(height) > image.MAX_DIMENSIONS {
+	if width == 0 || height == 0 {
 		return {}, .Invalid_Image_Dimensions
+	}
+
+	if u128(width) * u128(height) > image.MAX_DIMENSIONS {
+		return {}, .Image_Dimensions_Too_Large
 	}
 
 	if compression_method != 0 {

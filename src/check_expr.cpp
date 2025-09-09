@@ -6473,7 +6473,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 
 		if (e && e->kind == Entity_Constant && is_type_proc(e->type)) {
-			if (o->mode != Addressing_Constant) {
+			bool ok = false;
+			if (o->mode == Addressing_Constant) {
+				ok = true;
+			} else if (o->value.kind == ExactValue_Procedure) {
+				ok = true;
+			}
+
+			if (!ok) {
 				if (show_error) {
 					error(o->expr, "Expected a constant procedure value for the argument '%.*s'", LIT(e->token.string));
 				}
@@ -7947,7 +7954,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 				s = gb_string_append_fmt(s, "$%.*s", LIT(name));
 
 				if (v->kind == Entity_TypeName) {
-					if (v->type->kind != Type_Generic) {
+					if (v->type != nullptr && v->type->kind != Type_Generic) {
 						s = gb_string_append_fmt(s, "=");
 						s = write_type_to_string(s, v->type, false);
 					}
@@ -11423,6 +11430,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 		o->mode = Addressing_Value;
 		o->type = type;
+		o->value = exact_value_procedure(node);
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, node);
