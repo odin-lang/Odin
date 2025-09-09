@@ -190,6 +190,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		options -= {.return_header}
 	}
 
+	if .do_not_expand_channels in options || .do_not_expand_grayscale in options {
+		return img, .Unsupported_Option
+	}
+
 	first := compress.read_u8(ctx) or_return
 	soi := cast(image.JPEG_Marker)compress.read_u8(ctx) or_return
 	if first != 0xFF && soi != .SOI {
@@ -637,7 +641,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					color_components[id].h_sampling_factor = cast(int)horizontal_sampling
 				}
 			case .SOF2: // Progressive DCT
-				unimplemented("SOF2")
+				fallthrough
 			case .SOF3: // Lossless (sequential)
 				fallthrough
 			case .SOF5: // Differential sequential DCT
@@ -927,9 +931,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 										cbcr_pixel_column := k / luma_h_sampling_factor + 4 * h
 										cbcr_pixel := cbcr_pixel_row * BLOCK_SIZE + cbcr_pixel_column
 
-										r := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] + 1.402 * cast(f32)cbcr_blk[.Cr][cbcr_pixel] + 128, 0, 255)
-										g := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] - 0.344 * cast(f32)cbcr_blk[.Cb][cbcr_pixel] - 0.714 * cast(f32)cbcr_blk[.Cr][cbcr_pixel] + 128, 0, 255)
-										b := cast(i16)math.clamp(cast(f32)y_blk[.Y][i] + 1.772 * cast(f32)cbcr_blk[.Cb][cbcr_pixel] + 128, 0, 255)
+										r := cast(i16)clamp(cast(f32)y_blk[.Y][i] + 1.402 * cast(f32)cbcr_blk[.Cr][cbcr_pixel] + 128, 0, 255)
+										g := cast(i16)clamp(cast(f32)y_blk[.Y][i] - 0.344 * cast(f32)cbcr_blk[.Cb][cbcr_pixel] - 0.714 * cast(f32)cbcr_blk[.Cr][cbcr_pixel] + 128, 0, 255)
+										b := cast(i16)clamp(cast(f32)y_blk[.Y][i] + 1.772 * cast(f32)cbcr_blk[.Cb][cbcr_pixel] + 128, 0, 255)
 
 										y_blk[.Y][i]  = r
 										y_blk[.Cb][i] = g
@@ -941,33 +945,109 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					}
 				}
 
+				orig_channels := img.channels
+
+				// We automatically expand grayscale images to RGB
+				if img.channels == 1 {
+					img.channels += 2
+				}
+
+				if .alpha_add_if_missing in options {
+					img.channels  += 1
+					orig_channels += 1
+				}
+
 				if resize(&img.pixels.buf, img.width * img.height * img.channels) != nil {
 					return img, .Unable_To_Allocate_Or_Resize
 				}
 
-				out := mem.slice_data_cast([]image.RGB_Pixel, img.pixels.buf[:])
-				for y in 0..<img.height {
-					mcu_row := y / BLOCK_SIZE
-					pixel_row := y % BLOCK_SIZE
-					for x in 0..<img.width {
-						mcu_col := x / BLOCK_SIZE
-						pixel_col := x % BLOCK_SIZE
-						mcu_idx := mcu_row * block_width + mcu_col
-						pixel_idx := pixel_row * BLOCK_SIZE + pixel_col
+				switch orig_channels {
+				case 1: // Grayscale JPEG expanded to RGB
+					out     := mem.slice_data_cast([]image.RGB_Pixel, img.pixels.buf[:])
+					out_idx := 0
+					for y in 0..<img.height {
+						mcu_row   := y / BLOCK_SIZE
+						pixel_row := y % BLOCK_SIZE
+						for x in 0..<img.width {
+							mcu_col   := x / BLOCK_SIZE
+							pixel_col := x % BLOCK_SIZE
+							mcu_idx   := mcu_row   * block_width + mcu_col
+							pixel_idx := pixel_row * BLOCK_SIZE  + pixel_col
 
-						if img.channels == 3 {
-							out[y * img.width + x] = {
+							luma := cast(byte)blocks[mcu_idx][.Y][pixel_idx]
+							out[out_idx] = {luma, luma, luma}
+
+							out_idx += 1
+						}
+					}
+
+				case 2: // Grayscale JPEG expanded to RGBA
+					out     := mem.slice_data_cast([]image.RGBA_Pixel, img.pixels.buf[:])
+					out_idx := 0
+					for y in 0..<img.height {
+						mcu_row   := y / BLOCK_SIZE
+						pixel_row := y % BLOCK_SIZE
+
+						for x in 0..<img.width {
+							mcu_col   := x / BLOCK_SIZE
+							pixel_col := x % BLOCK_SIZE
+							mcu_idx   := mcu_row   * block_width + mcu_col
+							pixel_idx := pixel_row * BLOCK_SIZE  + pixel_col
+
+							luma := cast(byte)blocks[mcu_idx][.Y][pixel_idx]
+							out[out_idx] = {luma, luma, luma, 255}
+							out_idx += 1
+						}
+					}
+
+				case 3:
+					out     := mem.slice_data_cast([]image.RGB_Pixel, img.pixels.buf[:])
+					out_idx := 0
+					for y in 0..<img.height {
+						mcu_row   := y / BLOCK_SIZE
+						pixel_row := y % BLOCK_SIZE
+
+						for x in 0..<img.width {
+							mcu_col   := x / BLOCK_SIZE
+							pixel_col := x % BLOCK_SIZE
+							mcu_idx   := mcu_row   * block_width + mcu_col
+							pixel_idx := pixel_row * BLOCK_SIZE  + pixel_col
+
+							out[out_idx] = {
 								cast(byte)blocks[mcu_idx][.Y][pixel_idx],
 								cast(byte)blocks[mcu_idx][.Cb][pixel_idx],
 								cast(byte)blocks[mcu_idx][.Cr][pixel_idx],
 							}
-						} else {
-							img.pixels.buf[y * img.width + x] = cast(byte)blocks[mcu_idx][.Y][pixel_idx]
+							out_idx += 1
+						}
+					}
+
+				case 4:
+					out     := mem.slice_data_cast([]image.RGBA_Pixel, img.pixels.buf[:])
+					out_idx := 0
+					for y in 0..<img.height {
+						mcu_row   := y / BLOCK_SIZE
+						pixel_row := y % BLOCK_SIZE
+
+						for x in 0..<img.width {
+							mcu_col   := x / BLOCK_SIZE
+							pixel_col := x % BLOCK_SIZE
+							mcu_idx   := mcu_row   * block_width + mcu_col
+							pixel_idx := pixel_row * BLOCK_SIZE  + pixel_col
+
+							out[out_idx] = {
+								cast(byte)blocks[mcu_idx][.Y][pixel_idx],
+								cast(byte)blocks[mcu_idx][.Cb][pixel_idx],
+								cast(byte)blocks[mcu_idx][.Cr][pixel_idx],
+								255, // Alpha
+							}
+							out_idx += 1
 						}
 					}
 				}
 
 				expect_EOI = true
+
 			case .TEM:
 				// TEM doesn't have a length, continue to next marker
 			case:
