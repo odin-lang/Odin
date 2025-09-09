@@ -1230,7 +1230,6 @@ gb_internal bool is_type_named(Type *t) {
 }
 
 gb_internal bool is_type_boolean(Type *t) {
-	// t = core_type(t);
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
@@ -1239,7 +1238,6 @@ gb_internal bool is_type_boolean(Type *t) {
 	return false;
 }
 gb_internal bool is_type_integer(Type *t) {
-	// t = core_type(t);
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
@@ -1249,6 +1247,7 @@ gb_internal bool is_type_integer(Type *t) {
 }
 gb_internal bool is_type_integer_like(Type *t) {
 	t = core_type(t);
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & (BasicFlag_Integer|BasicFlag_Boolean)) != 0;
 	}
@@ -1281,7 +1280,6 @@ gb_internal bool is_type_integer_128bit(Type *t) {
 	return false;
 }
 gb_internal bool is_type_rune(Type *t) {
-	// t = core_type(t);
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
@@ -1290,7 +1288,6 @@ gb_internal bool is_type_rune(Type *t) {
 	return false;
 }
 gb_internal bool is_type_numeric(Type *t) {
-	// t = core_type(t);
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
@@ -1448,24 +1445,28 @@ gb_internal bool is_type_tuple(Type *t) {
 	return t->kind == Type_Tuple;
 }
 gb_internal bool is_type_uintptr(Type *t) {
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		return (t->Basic.kind == Basic_uintptr);
 	}
 	return false;
 }
 gb_internal bool is_type_rawptr(Type *t) {
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_rawptr;
 	}
 	return false;
 }
 gb_internal bool is_type_u8(Type *t) {
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_u8;
 	}
 	return false;
 }
 gb_internal bool is_type_u16(Type *t) {
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_u16;
 	}
@@ -1612,6 +1613,7 @@ gb_internal bool is_matrix_square(Type *t) {
 
 gb_internal bool is_type_valid_for_matrix_elems(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	if (is_type_integer(t)) {
 		return true;
 	} else if (is_type_float(t)) {
@@ -1839,40 +1841,49 @@ gb_internal Type *base_complex_elem_type(Type *t) {
 
 gb_internal bool is_type_struct(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return t->kind == Type_Struct;
 }
 gb_internal bool is_type_union(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return t->kind == Type_Union;
 }
 gb_internal bool is_type_soa_struct(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None;
 }
 
 gb_internal bool is_type_raw_union(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return (t->kind == Type_Struct && t->Struct.is_raw_union);
 }
 gb_internal bool is_type_enum(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return (t->kind == Type_Enum);
 }
 gb_internal bool is_type_bit_set(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return (t->kind == Type_BitSet);
 }
 gb_internal bool is_type_bit_field(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return (t->kind == Type_BitField);
 }
 gb_internal bool is_type_map(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return t->kind == Type_Map;
 }
 
 gb_internal bool is_type_union_maybe_pointer(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Union && t->Union.variants.count == 1) {
 		Type *v = t->Union.variants[0];
 		return is_type_internally_pointer_like(v);
@@ -1883,6 +1894,7 @@ gb_internal bool is_type_union_maybe_pointer(Type *t) {
 
 gb_internal bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Union && t->Union.variants.count == 1) {
 		Type *v = t->Union.variants[0];
 		if (is_type_internally_pointer_like(v)) {
@@ -1917,6 +1929,7 @@ gb_internal TypeEndianKind type_endian_kind_of(Type *t) {
 
 gb_internal bool is_type_endian_big(Type *t) {
 	t = core_type(t);
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		if (t->Basic.flags & BasicFlag_EndianBig) {
 			return true;
@@ -1933,6 +1946,7 @@ gb_internal bool is_type_endian_big(Type *t) {
 }
 gb_internal bool is_type_endian_little(Type *t) {
 	t = core_type(t);
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		if (t->Basic.flags & BasicFlag_EndianLittle) {
 			return true;
@@ -1950,6 +1964,7 @@ gb_internal bool is_type_endian_little(Type *t) {
 
 gb_internal bool is_type_endian_platform(Type *t) {
 	t = core_type(t);
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) == 0;
 	} else if (t->kind == Type_BitSet) {
@@ -1965,6 +1980,7 @@ gb_internal bool types_have_same_internal_endian(Type *a, Type *b) {
 }
 gb_internal bool is_type_endian_specific(Type *t) {
 	t = core_type(t);
+	if (t == nullptr) { return false; }
 	if (t->kind == Type_BitSet) {
 		t = bit_set_to_int(t);
 	}
@@ -2062,19 +2078,23 @@ gb_internal Type *integer_endian_type_to_platform_type(Type *t) {
 
 gb_internal bool is_type_any(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
 }
 gb_internal bool is_type_typeid(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_typeid);
 }
 gb_internal bool is_type_untyped_nil(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	// NOTE(bill): checking for `nil` or `---` at once is just to improve the error handling
 	return (t->kind == Type_Basic && (t->Basic.kind == Basic_UntypedNil || t->Basic.kind == Basic_UntypedUninit));
 }
 gb_internal bool is_type_untyped_uninit(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) { return false; }
 	// NOTE(bill): checking for `nil` or `---` at once is just to improve the error handling
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedUninit);
 }
