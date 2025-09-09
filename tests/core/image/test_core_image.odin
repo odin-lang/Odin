@@ -2367,7 +2367,7 @@ Basic_JPG_Tests := []Test{
 	{
 		"emblem-1024", {
 			{Default,   nil, {1024, 1024, 3, 8}, 0x_46a29e0f},
-			// {Alpha_Add, nil, {1024, 1024, 4, 8}, 0x_46a29e0f},
+			{Alpha_Add, nil, {1024, 1024, 4, 8}, 0x_cae2d532},
 		},
 	},
 	{
@@ -2394,21 +2394,21 @@ run_jpg_suite :: proc(t: ^testing.T, suite: []Test) {
 			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
 			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
 
-			if err == nil { // No point in running the other tests if it didn't load.
-				pixels := bytes.buffer_to_bytes(&img.pixels)
+			// No point in running the other tests if it didn't load.
+			(err == nil) or_continue
 
-				dims   := Dims{img.width, img.height, img.channels, img.depth}
-				testing.expectf(t, test.dims == dims, "%v has %v, expected: %v.", file.file, dims, test.dims)
+			pixels := bytes.buffer_to_bytes(&img.pixels)
+			dims   := Dims{img.width, img.height, img.channels, img.depth}
+			testing.expectf(t, test.dims == dims, "%v has %v, expected: %v.", file.file, dims, test.dims)
 
-				img_hash := hash.crc32(pixels)
-				testing.expectf(t, test.hash == img_hash, "%v test #1's hash is %08x, expected %08x with %v.", file.file, img_hash, test.hash, test.options)
+			img_hash := hash.crc32(pixels)
+			testing.expectf(t, test.hash == img_hash, "%v test #1's hash is %08x, expected %08x with %v.", file.file, img_hash, test.hash, test.options)
 
-				// Optionally save to BMP file to check file loaded properly during development
-				when false  {
-					test_bmp := strings.concatenate({TEST_SUITE_PATH_JPG, "/", file.file, ".bmp"}, context.temp_allocator)
-					save_err := bmp.save(test_bmp, img)
-					testing.expectf(t, save_err == nil, "expected saving to BMP not to raise error, got %v", save_err)
-				}
+			// Optionally save to QOI file to check file loaded properly during development
+			when false {
+				test_qoi := strings.concatenate({TEST_SUITE_PATH_JPG, "/", file.file, ".qoi"}, context.temp_allocator)
+				save_err := qoi.save(test_qoi, img)
+				testing.expectf(t, save_err == nil, "expected saving to QOI not to raise error, got %v", save_err)
 			}
 		}
 	}
