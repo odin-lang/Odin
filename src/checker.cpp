@@ -2584,7 +2584,7 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 	for (TypeInfoPair const tt : decl->type_info_deps) {
 		add_min_dep_type_info(c, tt.type);
 	}
-	for (Entity *e : decl->deps) {
+	FOR_PTR_SET(e, decl->deps) {
 		switch (e->kind) {
 		case Entity_Procedure:
 			if (e->Procedure.is_foreign) {
@@ -2611,7 +2611,7 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 		}
 	}
 
-	for (Entity *e : decl->deps) {
+	FOR_PTR_SET(e, decl->deps) {
 		add_dependency_to_set(c, e);
 	}
 
@@ -2643,7 +2643,7 @@ gb_internal WORKER_TASK_PROC(add_dependency_to_set_worker) {
 		add_min_dep_type_info(c, tt.type);
 	}
 
-	for (Entity *e : decl->deps) {
+	FOR_PTR_SET(e, decl->deps) {
 		switch (e->kind) {
 		case Entity_Procedure:
 			if (e->Procedure.is_foreign) {
@@ -2670,7 +2670,7 @@ gb_internal WORKER_TASK_PROC(add_dependency_to_set_worker) {
 		}
 	}
 
-	for (Entity *e : decl->deps) {
+	FOR_PTR_SET(e, decl->deps) {
 		add_dependency_to_set_threaded(c, e);
 	}
 
@@ -3047,9 +3047,7 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		DeclInfo *decl = decl_info_of_entity(e);
 		GB_ASSERT(decl != nullptr);
 
-		FOR_PTR_SET(i_dep, decl->deps) {
-			Entity *dep = decl->deps.keys[i_dep];
-
+		FOR_PTR_SET(dep, decl->deps) {
 			if (dep->flags & EntityFlag_Field) {
 				continue;
 			}
@@ -3080,21 +3078,14 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 
 		// Connect each pred 'p' of 'n' with each succ 's' and from
 		// the procedure node
-		FOR_PTR_SET(i_p, n->pred) {
-			EntityGraphNode *p = n->pred.keys[i_p];
-
+		FOR_PTR_SET(p, n->pred) {
 			// Ignore self-cycles
 			if (p == n) {
 				continue;
 			}
 			// Each succ 's' of 'n' becomes a succ of 'p', and
 			// each pred 'p' of 'n' becomes a pred of 's'
-			FOR_PTR_SET(i_s, n->succ) {
-				EntityGraphNode *s = n->succ.keys[i_s];
-				if (s == nullptr || s == cast(EntityGraphNode *)PtrSet<EntityGraphNode *>::TOMBSTONE) {
-					// NOTE(bill): This is inlined to improve development build performance
-					continue;
-				}
+			FOR_PTR_SET(s, n->succ) {
 				// Ignore self-cycles
 				if (s == n) {
 					continue;
@@ -5859,7 +5850,7 @@ gb_internal void check_import_entities(Checker *c) {
 			}
 		}
 
-		for (ImportGraphNode *p : n->pred) {
+		FOR_PTR_SET(p, n->pred) {
 			p->dep_count = gb_max(p->dep_count-1, 0);
 			priority_queue_fix(&pq, p->index);
 		}
@@ -5976,7 +5967,8 @@ gb_internal bool find_entity_path_tuple(Type *tuple, Entity *end, gbAllocator al
 		if (var_decl == nullptr) {
 			continue;
 		}
-		for (Entity *dep : var_decl->deps) {
+
+		FOR_PTR_SET(dep, var_decl->deps) {
 			if (dep == end) {
 				auto path = array_make<Entity *>(allocator);
 				array_add(&path, dep);
@@ -6026,7 +6018,7 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, gbAlloc
 				return path;
 			}
 		} else {
-			for (Entity *dep : decl->deps) {
+			FOR_PTR_SET(dep, decl->deps) {
 				if (dep == end) {
 					auto path = array_make<Entity *>(allocator);
 					array_add(&path, dep);
@@ -6080,7 +6072,7 @@ gb_internal void calculate_global_init_order(Checker *c) {
 			}
 		}
 
-		for (EntityGraphNode *p : n->pred) {
+		FOR_PTR_SET(p, n->pred) {
 			p->dep_count -= 1;
 			p->dep_count = gb_max(p->dep_count, 0);
 			priority_queue_fix(&pq, p->index);
@@ -6273,7 +6265,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	add_untyped_expressions(&c->info, ctx.untyped);
 
 	rw_mutex_shared_lock(&ctx.decl->deps_mutex);
-	for (Entity *dep : ctx.decl->deps) {
+	FOR_PTR_SET(dep, ctx.decl->deps) {
 		if (dep && dep->kind == Entity_Procedure &&
 		    (dep->flags & EntityFlag_ProcBodyChecked) == 0) {
 			check_procedure_later_from_entity(c, dep, NULL);
@@ -7346,7 +7338,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		DeclInfo *decl = e->decl_info;
 		ast_node(pl, ProcLit, decl->proc_lit);
 		if (pl->inlining == ProcInlining_inline) {
-			for (Entity *dep : decl->deps) {
+			FOR_PTR_SET(dep, decl->deps) {
 				if (dep == e) {
 					error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
 					break;

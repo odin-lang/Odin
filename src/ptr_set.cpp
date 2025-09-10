@@ -16,6 +16,8 @@ template <typename T> gb_internal bool ptr_set_exists (PtrSet<T> *s, T ptr);
 template <typename T> gb_internal void ptr_set_remove (PtrSet<T> *s, T ptr);
 template <typename T> gb_internal void ptr_set_clear  (PtrSet<T> *s);
 
+#define FOR_PTR_SET(element, set_) for (auto *it = &(set_).keys[0], element = it ? *it : nullptr; (set_).keys != nullptr && it < &(set_).keys[(set_).capacity]; it++) if (element = *it, (*it != nullptr && *it != cast(void *)~(uintptr)(0ull)))
+
 gb_internal gbAllocator ptr_set_allocator(void) {
 	return heap_allocator();
 }
@@ -83,7 +85,7 @@ gb_internal gb_inline void ptr_set_grow(PtrSet<T> *old_set) {
 	PtrSet<T> new_set = {};
 	ptr_set_init(&new_set, gb_max(old_set->capacity<<1, 16));
 
-	for (T ptr : *old_set) {
+	FOR_PTR_SET(ptr, *old_set) {
 		bool was_new = ptr_set_update(&new_set, ptr);
 		GB_ASSERT(!was_new);
 	}
@@ -195,7 +197,7 @@ gb_internal gb_inline void ptr_set_clear(PtrSet<T> *s) {
 	gb_zero_size(s->keys, s->capacity*gb_size_of(T));
 }
 
-template <typename T>
+/*template <typename T>
 struct PtrSetIterator {
 	PtrSet<T> *set;
 	usize index;
@@ -239,7 +241,6 @@ gb_internal PtrSetIterator<T> begin(PtrSet<T> &set) noexcept {
 template <typename T>
 gb_internal PtrSetIterator<T> end(PtrSet<T> &set) noexcept {
 	return PtrSetIterator<T>{&set, set.capacity};
-}
+}*/
 
 
-#define FOR_PTR_SET(index_, set_) for (usize index_ = 0; index_ < (set_).capacity; index_++) if ((set_).keys[index_] != nullptr && (set_).keys[index_] != cast(void *)~(uintptr)(0ull))

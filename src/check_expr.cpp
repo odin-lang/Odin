@@ -6028,7 +6028,7 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 			}
 			rw_mutex_shared_lock(&decl->deps_mutex);
 			rw_mutex_lock(&c->decl->deps_mutex);
-			for (Entity *dep : decl->deps) {
+			FOR_PTR_SET(dep, decl->deps) {
 				ptr_set_add(&c->decl->deps, dep);
 			}
 			rw_mutex_unlock(&c->decl->deps_mutex);

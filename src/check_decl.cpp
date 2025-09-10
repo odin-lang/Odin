@@ -1915,7 +1915,7 @@ gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
 			rw_mutex_shared_lock(&decl->deps_mutex);
 			rw_mutex_lock(&decl->parent->deps_mutex);
 
-			for (Entity *e : decl->deps) {
+			FOR_PTR_SET(e, decl->deps) {
 				ptr_set_add(&decl->parent->deps, e);
 			}
 
