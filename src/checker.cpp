@@ -2996,7 +2996,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 #undef FORCE_ADD_RUNTIME_ENTITIES
 }
 
-gb_internal bool is_entity_a_dependency(Entity *e) {
+gb_internal gb_inline bool is_entity_a_dependency(Entity *e) {
 	if (e == nullptr) return false;
 	switch (e->kind) {
 	case Entity_Procedure:
@@ -3047,7 +3047,9 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		DeclInfo *decl = decl_info_of_entity(e);
 		GB_ASSERT(decl != nullptr);
 
-		for (Entity *dep : decl->deps) {
+		FOR_PTR_SET(i_dep, decl->deps) {
+			Entity *dep = decl->deps.keys[i_dep];
+
 			if (dep->flags & EntityFlag_Field) {
 				continue;
 			}
@@ -3078,14 +3080,21 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 
 		// Connect each pred 'p' of 'n' with each succ 's' and from
 		// the procedure node
-		for (EntityGraphNode *p : n->pred) {
+		FOR_PTR_SET(i_p, n->pred) {
+			EntityGraphNode *p = n->pred.keys[i_p];
+
 			// Ignore self-cycles
 			if (p == n) {
 				continue;
 			}
 			// Each succ 's' of 'n' becomes a succ of 'p', and
 			// each pred 'p' of 'n' becomes a pred of 's'
-			for (EntityGraphNode *s : n->succ) {
+			FOR_PTR_SET(i_s, n->succ) {
+				EntityGraphNode *s = n->succ.keys[i_s];
+				if (s == nullptr || s == cast(EntityGraphNode *)PtrSet<EntityGraphNode *>::TOMBSTONE) {
+					// NOTE(bill): This is inlined to improve development build performance
+					continue;
+				}
 				// Ignore self-cycles
 				if (s == n) {
 					continue;

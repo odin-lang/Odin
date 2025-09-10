@@ -240,3 +240,6 @@ template <typename T>
 gb_internal PtrSetIterator<T> end(PtrSet<T> &set) noexcept {
 	return PtrSetIterator<T>{&set, set.capacity};
 }
+
+
+#define FOR_PTR_SET(index_, set_) for (usize index_ = 0; index_ < (set_).capacity; index_++) if ((set_).keys[index_] != nullptr && (set_).keys[index_] != cast(void *)~(uintptr)(0ull))
