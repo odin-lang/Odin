@@ -7204,6 +7204,36 @@ gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
 }
 #endif
 
+gb_internal WORKER_TASK_PROC(check_scope_usage_file_worker) {
+	Checker *c = global_checker_ptr.load(std::memory_order_relaxed);
+	AstFile *f = cast(AstFile *)data;
+	u64 vet_flags = ast_file_vet_flags(f);
+	check_scope_usage(c, f->scope, vet_flags);
+	return 0;
+}
+
+gb_internal WORKER_TASK_PROC(check_scope_usage_pkg_worker) {
+	Checker *c = global_checker_ptr.load(std::memory_order_relaxed);
+	AstPackage *pkg = cast(AstPackage *)data;
+	check_scope_usage_internal(c, pkg->scope, 0, true);
+	return 0;
+}
+
+
+
+gb_internal void check_all_scope_usages(Checker *c) {
+	for (auto const &entry : c->info.files) {
+		AstFile *f = entry.value;
+		thread_pool_add_task(check_scope_usage_file_worker, f);
+	}
+	for (auto const &entry : c->info.packages) {
+		AstPackage *pkg = entry.value;
+		thread_pool_add_task(check_scope_usage_pkg_worker, pkg);
+	}
+
+	thread_pool_wait();
+}
+
 
 gb_internal void check_parsed_files(Checker *c) {
 	global_checker_ptr.store(c, std::memory_order_relaxed);
@@ -7271,16 +7301,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("add entities from procedure bodies");
 	check_merge_queues_into_arrays(c);
 
-	TIME_SECTION("check scope usage");
-	for (auto const &entry : c->info.files) {
-		AstFile *f = entry.value;
-		u64 vet_flags = ast_file_vet_flags(f);
-		check_scope_usage(c, f->scope, vet_flags);
-	}
-	for (auto const &entry : c->info.packages) {
-		AstPackage *pkg = entry.value;
-		check_scope_usage_internal(c, pkg->scope, 0, true);
-	}
+	TIME_SECTION("check all scope usages");
+	check_all_scope_usages(c);
+
 
 	TIME_SECTION("add basic type information");
 	// Add "Basic" type information
