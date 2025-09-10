@@ -267,19 +267,19 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_,
 
 
 gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(CheckerContext *ctx, Type *original_type) {
-	mutex_lock(&ctx->info->gen_types_mutex); // @@global
-
 	GenTypesData *found_gen_types = nullptr;
-	auto *found_gen_types_ptr = map_get(&ctx->info->gen_types, original_type);
-	if (found_gen_types_ptr == nullptr) {
+
+	GB_ASSERT(original_type->kind == Type_Named);
+	mutex_lock(&original_type->Named.gen_types_data_mutex);
+	if (original_type->Named.gen_types_data == nullptr) {
 		GenTypesData *gen_types = gb_alloc_item(permanent_allocator(), GenTypesData);
 		gen_types->types = array_make<Entity *>(heap_allocator());
-		map_set(&ctx->info->gen_types, original_type, gen_types);
-		found_gen_types_ptr = map_get(&ctx->info->gen_types, original_type);
+		original_type->Named.gen_types_data = gen_types;
 	}
-	found_gen_types = *found_gen_types_ptr;
-	GB_ASSERT(found_gen_types != nullptr);
-	mutex_unlock(&ctx->info->gen_types_mutex); // @@global
+	found_gen_types = original_type->Named.gen_types_data;
+
+	mutex_unlock(&original_type->Named.gen_types_data_mutex);
+
 	return found_gen_types;
 }
 

@@ -1420,13 +1420,10 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->entities,      a);
 	map_init(&i->global_untyped);
 	string_map_init(&i->foreigns);
-	// map_init(&i->gen_procs);
-	map_init(&i->gen_types);
 
 	type_set_init(&i->min_dep_type_info_set);
 	map_init(&i->min_dep_type_info_index_map);
 
-	// map_init(&i->type_info_map);
 	string_map_init(&i->files);
 	string_map_init(&i->packages);
 	array_init(&i->variable_init_order, a);
@@ -1465,8 +1462,6 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->entities);
 	map_destroy(&i->global_untyped);
 	string_map_destroy(&i->foreigns);
-	// map_destroy(&i->gen_procs);
-	map_destroy(&i->gen_types);
 
 	type_set_destroy(&i->min_dep_type_info_set);
 	map_destroy(&i->min_dep_type_info_index_map);

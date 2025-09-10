@@ -206,13 +206,18 @@ struct TypeProc {
 	bool     optional_ok;
 };
 
+struct TypeNamed {
+	String  name;
+	Type *  base;
+	Entity *type_name; /* Entity_TypeName */
+
+	BlockingMutex gen_types_data_mutex;
+	GenTypesData *gen_types_data;
+};
+
 #define TYPE_KINDS                                                \
 	TYPE_KIND(Basic, BasicType)                               \
-	TYPE_KIND(Named, struct {                                 \
-		String  name;                                     \
-		Type *  base;                                     \
-		Entity *type_name; /* Entity_TypeName */          \
-	})                                                        \
+	TYPE_KIND(Named, TypeNamed)                               \
 	TYPE_KIND(Generic, struct {                               \
 		i64     id;                                       \
 		String  name;                                     \
