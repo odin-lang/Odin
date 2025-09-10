@@ -309,11 +309,12 @@ struct EntityGraphNode;
 typedef PtrSet<EntityGraphNode *> EntityGraphNodeSet;
 
 struct EntityGraphNode {
-	Entity *     entity; // Procedure, Variable, Constant
+	Entity *entity; // Procedure, Variable, Constant
+
 	EntityGraphNodeSet pred;
 	EntityGraphNodeSet succ;
-	isize        index; // Index in array/queue
-	isize        dep_count;
+	isize index; // Index in array/queue
+	isize dep_count;
 };
 
 
@@ -516,7 +517,7 @@ struct CheckerInfo {
 	BlockingMutex load_file_mutex;
 	StringMap<LoadFileCache *> load_file_cache;
 
-	BlockingMutex all_procedures_mutex;
+	MPSCQueue<ProcInfo *> all_procedures_queue;
 	Array<ProcInfo *> all_procedures;
 
 	BlockingMutex instrumentation_mutex;
@@ -629,7 +630,7 @@ gb_internal void    scope_lookup_parent (Scope *s, String const &name, Scope **s
 gb_internal Entity *scope_insert (Scope *s, Entity *entity);
 
 
-gb_internal void      add_type_and_value      (CheckerContext *c, Ast *expression, AddressingMode mode, Type *type, ExactValue const &value);
+gb_internal void      add_type_and_value      (CheckerContext *c, Ast *expression, AddressingMode mode, Type *type, ExactValue const &value, bool use_mutex=true);
 gb_internal ExprInfo *check_get_expr_info     (CheckerContext *c, Ast *expr);
 gb_internal void      add_untyped             (CheckerContext *c, Ast *expression, AddressingMode mode, Type *basic_type, ExactValue const &value);
 gb_internal void      add_entity_use          (CheckerContext *c, Ast *identifier, Entity *entity);
@@ -650,8 +651,8 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 gb_internal void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws);
 gb_internal void check_delayed_file_import_entity(CheckerContext *c, Ast *decl);
 
-gb_internal CheckerTypePath *new_checker_type_path();
-gb_internal void destroy_checker_type_path(CheckerTypePath *tp);
+gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator);
+gb_internal void destroy_checker_type_path(CheckerTypePath *tp, gbAllocator allocator);
 
 gb_internal void    check_type_path_push(CheckerContext *c, Entity *e);
 gb_internal Entity *check_type_path_pop (CheckerContext *c);

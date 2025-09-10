@@ -153,6 +153,17 @@ gb_internal AstFile *thread_safe_get_ast_file_from_id(i32 index) {
 }
 
 
+// use AFTER PARSER
+gb_internal AstFile *thread_unsafe_get_ast_file_from_id(i32 index) {
+	GB_ASSERT(index >= 0);
+	AstFile *file = nullptr;
+	if (index < global_files.count) {
+		file = global_files[index];
+	}
+	return file;
+}
+
+
 
 // NOTE: defined in build_settings.cpp
 gb_internal bool global_warnings_as_errors(void);

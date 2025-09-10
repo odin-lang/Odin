@@ -348,7 +348,7 @@ gb_internal Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Typ
 	entity->type   = type;
 	entity->id     = 1 + global_entity_id.fetch_add(1);
 	if (token.pos.file_id) {
-		entity->file = thread_safe_get_ast_file_from_id(token.pos.file_id);
+		entity->file = thread_unsafe_get_ast_file_from_id(token.pos.file_id);
 	}
 	return entity;
 }

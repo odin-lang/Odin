@@ -1441,7 +1441,8 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	map_init(&i->objc_method_implementations);
 
 	string_map_init(&i->load_file_cache);
-	array_init(&i->all_procedures, heap_allocator());
+	array_init(&i->all_procedures, a);
+	mpsc_init(&i->all_procedures_queue, a);
 
 	mpsc_init(&i->entity_queue, a); // 1<<20);
 	mpsc_init(&i->definition_queue, a); //); // 1<<20);
@@ -1475,6 +1476,10 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->required_foreign_imports_through_force);
 	array_free(&i->defineables);
 
+	array_free(&i->all_procedures);
+
+	mpsc_destroy(&i->all_procedures_queue);
+
 	mpsc_destroy(&i->entity_queue);
 	mpsc_destroy(&i->definition_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
@@ -1502,12 +1507,12 @@ gb_internal CheckerContext make_checker_context(Checker *c) {
 	ctx.scope     = builtin_pkg->scope;
 	ctx.pkg       = builtin_pkg;
 
-	ctx.type_path = new_checker_type_path();
+	ctx.type_path = new_checker_type_path(heap_allocator());
 	ctx.type_level = 0;
 	return ctx;
 }
 gb_internal void destroy_checker_context(CheckerContext *ctx) {
-	destroy_checker_type_path(ctx->type_path);
+	destroy_checker_type_path(ctx->type_path, heap_allocator());
 }
 
 gb_internal bool add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
@@ -1758,7 +1763,7 @@ gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
+gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value, bool use_mutex) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1776,7 +1781,7 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		mutex = &ctx->pkg->type_and_value_mutex;
 	}
 
-	mutex_lock(mutex);
+	if (use_mutex) mutex_lock(mutex);
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
@@ -1801,7 +1806,7 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 			break;
 		};
 	}
-	mutex_unlock(mutex);
+	if (use_mutex) mutex_unlock(mutex);
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -2345,11 +2350,9 @@ gb_internal void check_procedure_later(Checker *c, ProcInfo *info) {
 	}
 
 	if (DEBUG_CHECK_ALL_PROCEDURES) {
-		MUTEX_GUARD_BLOCK(&c->info.all_procedures_mutex) {
-			GB_ASSERT(info != nullptr);
-			GB_ASSERT(info->decl != nullptr);
-			array_add(&c->info.all_procedures, info);
-		}
+		GB_ASSERT(info != nullptr);
+		GB_ASSERT(info->decl != nullptr);
+		mpsc_enqueue(&c->info.all_procedures_queue, info);
 	}
 }
 
@@ -3195,18 +3198,16 @@ gb_internal Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String 
 	return e->type;
 }
 
-gb_internal CheckerTypePath *new_checker_type_path() {
-	gbAllocator a = heap_allocator();
-	auto *tp = gb_alloc_item(a, CheckerTypePath);
-	array_init(tp, a, 0, 16);
+gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator) {
+	auto *tp = gb_alloc_item(allocator, CheckerTypePath);
+	array_init(tp, allocator, 0, 16);
 	return tp;
 }
 
-gb_internal void destroy_checker_type_path(CheckerTypePath *tp) {
+gb_internal void destroy_checker_type_path(CheckerTypePath *tp, gbAllocator allocator) {
 	array_free(tp);
-	gb_free(heap_allocator(), tp);
+	gb_free(allocator, tp);
 }
-
 
 gb_internal void check_type_path_push(CheckerContext *c, Entity *e) {
 	GB_ASSERT(c->type_path != nullptr);
@@ -5283,9 +5284,10 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(scope->flags&ScopeFlag_Pkg);
 
 
-	if (ptr_set_update(&parent_scope->imported, scope)) {
-		// error(token, "Multiple import of the same file within this scope");
-	}
+	ptr_set_add(&parent_scope->imported, scope);
+	// if (ptr_set_update(&parent_scope->imported, scope)) {
+	// 	// error(token, "Multiple import of the same file within this scope");
+	// }
 
 	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
 	if (is_blank_ident(import_name)) {
@@ -6041,10 +6043,10 @@ gb_internal void calculate_global_init_order(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	TIME_SECTION("calculate_global_init_order: generate entity dependency graph");
-	Arena *arena = get_arena(ThreadArena_Temporary);
-	ArenaTempGuard arena_guard(arena);
+	Arena *temporary_arena = get_arena(ThreadArena_Temporary);
+	ArenaTempGuard temporary_arena_guard(temporary_arena);
 
-	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info, arena);
+	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info, temporary_arena);
 
 	TIME_SECTION("calculate_global_init_order: priority queue create");
 	// NOTE(bill): Priority queue
@@ -6321,8 +6323,9 @@ gb_internal void check_safety_all_procedures_for_unchecked(Checker *c) {
 	defer (map_destroy(&untyped));
 
 
-	for_array(i, c->info.all_procedures) {
-		ProcInfo *pi = c->info.all_procedures[i];
+	array_reserve(&c->info.all_procedures, c->info.all_procedures_queue.count.load());
+
+	for (ProcInfo *pi = nullptr; mpsc_dequeue(&c->info.all_procedures_queue, &pi); /**/) {
 		GB_ASSERT(pi != nullptr);
 		GB_ASSERT(pi->decl != nullptr);
 		Entity *e = pi->decl->entity;
@@ -6337,6 +6340,8 @@ gb_internal void check_safety_all_procedures_for_unchecked(Checker *c) {
 				consume_proc_info(c, pi, &untyped);
 			}
 		}
+
+		array_add(&c->info.all_procedures, pi);
 	}
 }
 
@@ -7412,7 +7417,6 @@ gb_internal void check_parsed_files(Checker *c) {
 
 
 	TIME_SECTION("add untyped expression values");
-	// Add untyped expression values
 	for (UntypedExprInfo u = {}; mpsc_dequeue(&c->global_untyped_queue, &u); /**/) {
 		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
 		if (is_type_typed(u.info->type)) {

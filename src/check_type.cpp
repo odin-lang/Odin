@@ -3512,8 +3512,9 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 
 	case_ast_node(pt, PointerType, e);
 		CheckerContext c = *ctx;
-		c.type_path = new_checker_type_path();
-		defer (destroy_checker_type_path(c.type_path));
+
+		TEMPORARY_ALLOCATOR_GUARD();
+		c.type_path = new_checker_type_path(temporary_allocator());
 
 		Type *elem = t_invalid;
 		Operand o = {};
@@ -3747,8 +3748,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 
 gb_internal Type *check_type(CheckerContext *ctx, Ast *e) {
 	CheckerContext c = *ctx;
-	c.type_path = new_checker_type_path();
-	defer (destroy_checker_type_path(c.type_path));
+	TEMPORARY_ALLOCATOR_GUARD();
+	c.type_path = new_checker_type_path(temporary_allocator());
 
 	return check_type_expr(&c, e, nullptr);
 }

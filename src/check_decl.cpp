@@ -1981,9 +1981,9 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	ast_node(bs, BlockStmt, body);
 
+	TEMPORARY_ALLOCATOR_GUARD();
 	Array<ProcUsingVar> using_entities = {};
-	using_entities.allocator = heap_allocator();
-	defer (array_free(&using_entities));
+	using_entities.allocator = temporary_allocator();
 
 	{
 		if (type->Proc.param_count > 0) {

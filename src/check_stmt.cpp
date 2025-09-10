@@ -2567,8 +2567,9 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		result_count = proc_type->Proc.results->Tuple.variables.count;
 	}
 
-	auto operands = array_make<Operand>(heap_allocator(), 0, 2*rs->results.count);
-	defer (array_free(&operands));
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto operands = array_make<Operand>(temporary_allocator(), 0, 2*rs->results.count);
 
 	check_unpack_arguments(ctx, result_entities, result_count, &operands, rs->results, UnpackFlag_AllowOk);
 

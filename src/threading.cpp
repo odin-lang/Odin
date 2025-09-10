@@ -448,9 +448,9 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	}
 #endif
 
-static const int RWLOCK_WRITER   = 1;
-static const int RWLOCK_UPGRADED = 2;
-static const int RWLOCK_READER   = 4;
+static const int RWLOCK_WRITER   = 1<<0;
+static const int RWLOCK_UPGRADED = 1<<1;
+static const int RWLOCK_READER   = 1<<2;
 struct RWSpinLock {
 	Futex bits;
 };
@@ -467,7 +467,7 @@ bool rwlock_try_acquire_upgrade(RWSpinLock *l) {
 
 void rwlock_acquire_upgrade(RWSpinLock *l) {
 	while (!rwlock_try_acquire_upgrade(l)) {
-		futex_wait(&l->bits, RWLOCK_UPGRADED);
+		futex_wait(&l->bits, RWLOCK_UPGRADED | RWLOCK_WRITER);
 	}
 }
 void rwlock_release_upgrade(RWSpinLock *l) {
@@ -481,7 +481,7 @@ bool rwlock_try_release_upgrade_and_acquire_write(RWSpinLock *l) {
 
 void rwlock_release_upgrade_and_acquire_write(RWSpinLock *l) {
 	while (!rwlock_try_release_upgrade_and_acquire_write(l)) {
-		futex_wait(&l->bits, RWLOCK_WRITER);
+		futex_wait(&l->bits, RWLOCK_UPGRADED);
 	}
 }
 

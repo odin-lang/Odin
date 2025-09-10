@@ -1163,7 +1163,7 @@ gb_internal String internal_odin_root_dir(void) {
 		return global_module_path;
 	}
 
-	auto path_buf = array_make<char>(heap_allocator(), 300);
+	auto path_buf = array_make<char>(temporary_allocator(), 300);
 	defer (array_free(&path_buf));
 
 	len = 0;

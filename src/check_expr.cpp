@@ -7516,11 +7516,10 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		return check_call_arguments_proc_group(c, operand, call);
 	}
 
-	auto positional_operands = array_make<Operand>(heap_allocator(), 0, positional_args.count);
-	auto named_operands      = array_make<Operand>(heap_allocator(), 0, 0);
+	TEMPORARY_ALLOCATOR_GUARD();
 
-	defer (array_free(&positional_operands));
-	defer (array_free(&named_operands));
+	auto positional_operands = array_make<Operand>(temporary_allocator(), 0, positional_args.count);
+	auto named_operands      = array_make<Operand>(temporary_allocator(), 0, 0);
 
 	if (positional_args.count > 0) {
 		Entity **lhs =  nullptr;
@@ -7623,11 +7622,10 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		// NOTE(bill, 2019-10-26): Allow a cycle in the parameters but not in the fields themselves
 		auto prev_type_path = c->type_path;
-		c->type_path = new_checker_type_path();
-		defer ({
-			destroy_checker_type_path(c->type_path);
-			c->type_path = prev_type_path;
-		});
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		c->type_path = new_checker_type_path(temporary_allocator());
+		defer (c->type_path = prev_type_path);
 
 		if (is_call_expr_field_value(ce)) {
 			named_fields = true;
