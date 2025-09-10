@@ -7025,6 +7025,7 @@ gb_internal void add_type_info_for_type_definitions(Checker *c) {
 	}
 }
 
+#if 0
 gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
 	if (decl == nullptr) {
 		return;
@@ -7046,6 +7047,44 @@ gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
 		check_walk_all_dependencies(decl);
 	}
 }
+#else
+gb_internal void check_walk_all_dependencies(DeclInfo *decl);
+
+gb_internal WORKER_TASK_PROC(check_walk_all_dependencies_worker_proc) {
+	if (data == nullptr) {
+		return 0;
+	}
+	DeclInfo *decl = cast(DeclInfo *)data;
+
+	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
+		thread_pool_add_task(check_walk_all_dependencies_worker_proc, child);
+		check_walk_all_dependencies(child);
+	}
+
+	add_deps_from_child_to_parent(decl);
+	return 0;
+}
+
+gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
+	if (decl != nullptr) {
+		thread_pool_add_task(check_walk_all_dependencies_worker_proc, decl);
+	}
+}
+
+gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
+	mutex_lock(&c->nested_proc_lits_mutex);
+	for (DeclInfo *decl : c->nested_proc_lits) {
+		check_walk_all_dependencies(decl);
+	}
+	mutex_unlock(&c->nested_proc_lits_mutex);
+	for (Entity *e : c->info.entities) {
+		DeclInfo *decl = e->decl_info;
+		check_walk_all_dependencies(decl);
+	}
+
+	thread_pool_wait();
+}
+#endif
 
 
 gb_internal void check_parsed_files(Checker *c) {
