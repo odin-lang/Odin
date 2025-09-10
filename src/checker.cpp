@@ -2997,7 +2997,6 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 }
 
 gb_internal gb_inline bool is_entity_a_dependency(Entity *e) {
-	if (e == nullptr) return false;
 	switch (e->kind) {
 	case Entity_Procedure:
 		return true;
@@ -3026,7 +3025,7 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
-		if (!is_entity_a_dependency(e)) {
+		if (e == nullptr || !is_entity_a_dependency(e)) {
 			continue;
 		}
 		EntityGraphNode *n = arena_alloc_item<EntityGraphNode>(arena);
@@ -3048,10 +3047,10 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		GB_ASSERT(decl != nullptr);
 
 		FOR_PTR_SET(dep, decl->deps) {
+			GB_ASSERT(dep != nullptr);
 			if (dep->flags & EntityFlag_Field) {
 				continue;
 			}
-			GB_ASSERT(dep != nullptr);
 			if (!is_entity_a_dependency(dep)) {
 				continue;
 			}
@@ -7129,13 +7128,18 @@ gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 }
 
 gb_internal void add_type_info_for_type_definitions(Checker *c) {
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
+	for (Entity *e : c->info.definitions) {
 		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
+		#if 0
 			i64 align = type_align_of(e->type);
 			if (align > 0 && e->min_dep_count.load(std::memory_order_relaxed) > 0) {
 				add_type_info_type(&c->builtin_ctx, e->type);
 			}
+		#else
+			if (e->min_dep_count.load(std::memory_order_relaxed) > 0) {
+				add_type_info_type(&c->builtin_ctx, e->type);
+			}
+		#endif
 		}
 	}
 }
@@ -7232,6 +7236,43 @@ gb_internal void check_all_scope_usages(Checker *c) {
 }
 
 
+gb_internal void check_for_type_cycles(Checker *c) {
+	// NOTE(bill): Check for illegal cyclic type declarations
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind != Entity_TypeName) {
+			continue;
+		}
+		if (e->type != nullptr && is_type_typed(e->type)) {
+			if (e->TypeName.is_type_alias) {
+				// Ignore for the time being
+			} else {
+				(void)type_align_of(e->type);
+			}
+		}
+	}
+}
+
+gb_internal void check_for_inline_cycles(Checker *c) {
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+		DeclInfo *decl = e->decl_info;
+		ast_node(pl, ProcLit, decl->proc_lit);
+		if (pl->inlining == ProcInlining_inline) {
+			FOR_PTR_SET(dep, decl->deps) {
+				if (dep == e) {
+					error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
+					break;
+				}
+			}
+		}
+	}
+}
+
+
 gb_internal void check_parsed_files(Checker *c) {
 	global_checker_ptr.store(c, std::memory_order_relaxed);
 
@@ -7314,38 +7355,10 @@ gb_internal void check_parsed_files(Checker *c) {
 	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check for type cycles");
-	// NOTE(bill): Check for illegal cyclic type declarations
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind != Entity_TypeName) {
-			continue;
-		}
-		if (e->type != nullptr && is_type_typed(e->type)) {
-			if (e->TypeName.is_type_alias) {
-				// Ignore for the time being
-			} else {
-				(void)type_align_of(e->type);
-			}
-		}
-	}
+	check_for_type_cycles(c);
 
 	TIME_SECTION("check for inline cycles");
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind != Entity_Procedure) {
-			continue;
-		}
-		DeclInfo *decl = e->decl_info;
-		ast_node(pl, ProcLit, decl->proc_lit);
-		if (pl->inlining == ProcInlining_inline) {
-			FOR_PTR_SET(dep, decl->deps) {
-				if (dep == e) {
-					error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
-					break;
-				}
-			}
-		}
-	}
+	check_for_inline_cycles(c);
 
 	TIME_SECTION("check deferred procedures");
 	check_deferred_procedures(c);
