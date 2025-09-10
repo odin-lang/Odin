@@ -2485,7 +2485,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				allow_token(p, .Comma) or_break
 			}
 
-			close := expect_token(p, .Close_Brace)
+			close := expect_closing_brace_of_field_list(p)
 
 			if len(args) == 0 {
 				error(p, tok.pos, "expected at least 1 argument in procedure group")
