@@ -113,6 +113,13 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	return ptr;	
 }
 
+
+template <typename T>
+gb_internal T *arena_alloc_item(Arena *arena) {
+	return cast(T *)arena_alloc(arena, gb_size_of(T), gb_align_of(T));
+}
+
+
 gb_internal void arena_free_all(Arena *arena) {
 	while (arena->curr_block != nullptr) {
 		MemoryBlock *free_block = arena->curr_block;

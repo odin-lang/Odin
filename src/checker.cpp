@@ -3006,22 +3006,37 @@ gb_internal bool is_entity_a_dependency(Entity *e) {
 	return false;
 }
 
-gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
-	PtrMap<Entity *, EntityGraphNode *> M = {};
-	map_init(&M, info->entities.count);
-	defer (map_destroy(&M));
+gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, Arena *arena) {
+	PtrMap<Entity *, EntityGraphNode *> M_procs = {};
+	PtrMap<Entity *, EntityGraphNode *> M_vars  = {};
+	PtrMap<Entity *, EntityGraphNode *> M_other = {};
+
+	map_init(&M_procs, info->entities.count);
+	defer (map_destroy(&M_procs));
+
+	map_init(&M_vars, info->entities.count);
+	defer (map_destroy(&M_vars));
+
+	map_init(&M_other, info->entities.count);
+	defer (map_destroy(&M_other));
+
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
-		if (is_entity_a_dependency(e)) {
-			EntityGraphNode *n = gb_alloc_item(allocator, EntityGraphNode);
-			n->entity = e;
-			map_set(&M, e, n);
+		if (!is_entity_a_dependency(e)) {
+			continue;
+		}
+		EntityGraphNode *n = arena_alloc_item<EntityGraphNode>(arena);
+		n->entity = e;
+		switch (e->kind) {
+		case Entity_Procedure: map_set(&M_procs, e, n); break;
+		case Entity_Variable:  map_set(&M_vars,  e, n); break;
+		default:               map_set(&M_other, e, n); break;
 		}
 	}
 
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 1");
 	// Calculate edges for graph M
-	for (auto const &entry : M) {
+	for (auto const &entry : M_procs) {
 		EntityGraphNode *n = entry.value;
 		Entity *e = n->entity;
 
@@ -3033,54 +3048,68 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 				continue;
 			}
 			GB_ASSERT(dep != nullptr);
-			if (is_entity_a_dependency(dep)) {
-				EntityGraphNode *m = map_must_get(&M, dep);
-				entity_graph_node_set_add(&n->succ, m);
-				entity_graph_node_set_add(&m->pred, n);
+			if (!is_entity_a_dependency(dep)) {
+				continue;
 			}
+			EntityGraphNode *m = nullptr;
+
+			switch (dep->kind) {
+			case Entity_Procedure: m = map_must_get(&M_procs, dep); break;
+			case Entity_Variable:  m = map_must_get(&M_vars,  dep); break;
+			default:               m = map_must_get(&M_other, dep); break;
+			}
+			entity_graph_node_set_add(&n->succ, m);
+			entity_graph_node_set_add(&m->pred, n);
 		}
 	}
 
-	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2");
-	auto G = array_make<EntityGraphNode *>(allocator, 0, M.count);
+	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2a (init)");
 
-	for (auto const &m_entry : M) {
-		auto *e = m_entry.key;
+	auto G = array_make<EntityGraphNode *>(arena_allocator(arena), 0, M_procs.count + M_vars.count + M_other.count);
+
+	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2b (procs)");
+
+	for (auto const &m_entry : M_procs) {
 		EntityGraphNode *n = m_entry.value;
 
-		if (e->kind == Entity_Procedure) {
-			// Connect each pred 'p' of 'n' with each succ 's' and from
-			// the procedure node
-			for (EntityGraphNode *p : n->pred) {
-				// Ignore self-cycles
-				if (p != n) {
-					// Each succ 's' of 'n' becomes a succ of 'p', and
-					// each pred 'p' of 'n' becomes a pred of 's'
-					for (EntityGraphNode *s  : n->succ) {
-						// Ignore self-cycles
-						if (s != n) {
-							if (p->entity->kind == Entity_Procedure &&
-							    s->entity->kind == Entity_Procedure) {
-							    	// NOTE(bill, 2020-11-15): Only care about variable initialization ordering
-							    	// TODO(bill): This is probably wrong!!!!
-								continue;
-							}
-							// IMPORTANT NOTE/TODO(bill, 2020-11-15): These three calls take the majority of the
-							// the time to process
-							entity_graph_node_set_add(&p->succ, s);
-							entity_graph_node_set_add(&s->pred, p);
-							// Remove edge to 'n'
-							entity_graph_node_set_remove(&s->pred, n);
-						}
-					}
-
-					// Remove edge to 'n'
-					entity_graph_node_set_remove(&p->succ, n);
-				}
+		// Connect each pred 'p' of 'n' with each succ 's' and from
+		// the procedure node
+		for (EntityGraphNode *p : n->pred) {
+			// Ignore self-cycles
+			if (p == n) {
+				continue;
 			}
-		} else if (e->kind == Entity_Variable) {
-			array_add(&G, n);
+			// Each succ 's' of 'n' becomes a succ of 'p', and
+			// each pred 'p' of 'n' becomes a pred of 's'
+			for (EntityGraphNode *s : n->succ) {
+				// Ignore self-cycles
+				if (s == n) {
+					continue;
+				}
+				if (p->entity->kind == Entity_Procedure &&
+				    s->entity->kind == Entity_Procedure) {
+				    	// NOTE(bill, 2020-11-15): Only care about variable initialization ordering
+				    	// TODO(bill): This is probably wrong!!!!
+					continue;
+				}
+				// IMPORTANT NOTE/TODO(bill, 2020-11-15): These three calls take the majority of the
+				// the time to process
+				entity_graph_node_set_add(&p->succ, s);
+				entity_graph_node_set_add(&s->pred, p);
+				// Remove edge to 'n'
+				entity_graph_node_set_remove(&s->pred, n);
+			}
+
+			// Remove edge to 'n'
+			entity_graph_node_set_remove(&p->succ, n);
 		}
+	}
+
+	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2c (vars)");
+
+	for (auto const &m_entry : M_vars) {
+		EntityGraphNode *n = m_entry.value;
+		array_add(&G, n);
 	}
 
 	TIME_SECTION("generate_entity_dependency_graph: Dependency Count Checker");
@@ -6012,13 +6041,10 @@ gb_internal void calculate_global_init_order(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	TIME_SECTION("calculate_global_init_order: generate entity dependency graph");
-	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info, heap_allocator());
-	defer ({
-		for_array(i, dep_graph) {
-			entity_graph_node_destroy(dep_graph[i], heap_allocator());
-		}
-		array_free(&dep_graph);
-	});
+	Arena *arena = get_arena(ThreadArena_Temporary);
+	ArenaTempGuard arena_guard(arena);
+
+	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info, arena);
 
 	TIME_SECTION("calculate_global_init_order: priority queue create");
 	// NOTE(bill): Priority queue
