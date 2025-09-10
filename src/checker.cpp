@@ -6177,7 +6177,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	switch (pi->decl->proc_checked_state.load()) {
 	case ProcCheckedState_InProgress:
 		if (e) {
-			GB_ASSERT(global_procedure_body_in_worker_queue.load());
+			GB_ASSERT(global_procedure_body_in_worker_queue.load() != 0);
 		}
 		return false;
 	case ProcCheckedState_Checked:
@@ -6431,7 +6431,7 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 gb_internal void check_init_worker_data(Checker *c) {
 	u32 thread_count = cast(u32)global_thread_pool.threads.count;
 
-	check_procedure_bodies_worker_data = gb_alloc_array(permanent_allocator(), CheckProcedureBodyWorkerData, thread_count);
+	check_procedure_bodies_worker_data = permanent_alloc_array<CheckProcedureBodyWorkerData>(thread_count);
 
 	for (isize i = 0; i < thread_count; i++) {
 		check_procedure_bodies_worker_data[i].c = c;
@@ -6493,7 +6493,7 @@ gb_internal Type *tuple_to_pointers(Type *ot) {
 
 
 	Type *t = alloc_type_tuple();
-	t->Tuple.variables = slice_make<Entity *>(heap_allocator(), ot->Tuple.variables.count);
+	t->Tuple.variables = permanent_slice_make<Entity *>(ot->Tuple.variables.count);
 
 	Scope *scope = nullptr;
 	for_array(i, t->Tuple.variables) {

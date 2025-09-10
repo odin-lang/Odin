@@ -4639,7 +4639,6 @@ gb_internal ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 }
 
 gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
-	// GB_ASSERT_NOT_NULL(target_type);
 	if (target_type == nullptr || operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
 	    is_type_typed(operand->type) ||
@@ -4810,7 +4809,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			TEMPORARY_ALLOCATOR_GUARD();
 
 			isize count = t->Union.variants.count;
-			ValidIndexAndScore *valids = gb_alloc_array(temporary_allocator(), ValidIndexAndScore, count);
+			ValidIndexAndScore *valids = temporary_alloc_array<ValidIndexAndScore>(count);
 			isize valid_count = 0;
 			isize first_success_index = -1;
 			for_array(i, t->Union.variants) {
@@ -6257,7 +6256,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	}
 
 	GB_ASSERT(ce->split_args);
-	auto visited = slice_make<bool>(temporary_allocator(), pt->param_count);
+	auto visited = temporary_slice_make<bool>(pt->param_count);
 	auto ordered_operands = array_make<Operand>(temporary_allocator(), pt->param_count);
 	defer ({
 		for (Operand const &o : ordered_operands) {
@@ -7254,7 +7253,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 
 		// Try to reduce the list further for `$T: typeid` like parameters
-		bool *possibly_ignore = gb_alloc_array(temporary_allocator(), bool, procs.count);
+		bool *possibly_ignore = temporary_alloc_array<bool>(procs.count);
 		isize possibly_ignore_set = 0;
 
 		if (true) {
@@ -7342,7 +7341,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 
 		isize max_spaces = gb_max(max_name_length, max_type_length);
-		char *spaces = gb_alloc_array(temporary_allocator(), char, max_spaces+1);
+		char *spaces = temporary_alloc_array<char>(max_spaces+1);
 		for (isize i = 0; i < max_spaces; i++) {
 			spaces[i] = ' ';
 		}
@@ -7706,7 +7705,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	} else {
 		TEMPORARY_ALLOCATOR_GUARD();
 
-		bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
+		bool *visited = temporary_alloc_array<bool>(param_count);
 
 		// LEAK(bill)
 		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
@@ -8881,7 +8880,7 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 	isize count = multi_map_count(seen, key);
 	if (count) {
 		TEMPORARY_ALLOCATOR_GUARD();
-		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
+		TypeAndToken *taps = temporary_alloc_array<TypeAndToken>(count);
 
 		multi_map_get_all(seen, key, taps);
 		for (isize i = 0; i < count; i++) {
@@ -10927,7 +10926,7 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 		}
 	}
 
-	auto modified_args = slice_make<Ast *>(heap_allocator(), ce->args.count+1);
+	auto modified_args = permanent_slice_make<Ast *>(ce->args.count+1);
 	modified_args[0] = first_arg;
 	slice_copy(&modified_args, ce->args, 1);
 	ce->args = modified_args;

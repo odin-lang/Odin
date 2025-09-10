@@ -1126,7 +1126,7 @@ gb_internal String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
+	text = permanent_alloc_array<wchar_t>(len+1);
 
 	GetModuleFileNameW(nullptr, text, cast(int)len);
 	path = string16_to_string(heap_allocator(), make_string16(cast(u16 *)text, len));
@@ -1181,7 +1181,7 @@ gb_internal String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
+	text = permanent_alloc_array<u8>(len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
 	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
@@ -1233,7 +1233,7 @@ gb_internal String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
+	text = permanent_alloc_array<u8>(len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
 	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
@@ -1394,7 +1394,7 @@ gb_internal String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
+	text = permanent_alloc_array<u8>(len + 1);
 
 	gb_memmove(text, &path_buf[0], len);
 
@@ -1429,7 +1429,7 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 
 	len = GetFullPathNameW(cast(wchar_t *)&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
-		wchar_t *text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
+		wchar_t *text = permanent_alloc_array<wchar_t>(len+1);
 		GetFullPathNameW(cast(wchar_t *)&string16[0], len, text, nullptr);
 		mutex_unlock(&fullpath_mutex);
 

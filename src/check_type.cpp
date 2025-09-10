@@ -1106,7 +1106,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 
 	GB_ASSERT(fields.count <= bf->fields.count);
 
-	auto bit_offsets = slice_make<i64>(permanent_allocator(), fields.count);
+	auto bit_offsets = permanent_slice_make<i64>(fields.count);
 	i64 curr_offset = 0;
 	for_array(i, bit_sizes) {
 		bit_offsets[i] = curr_offset;
@@ -2707,7 +2707,7 @@ gb_internal Type *get_map_cell_type(Type *type) {
 	// Padding exists
 	Type *s = alloc_type_struct();
 	Scope *scope = create_scope(nullptr, nullptr);
-	s->Struct.fields = slice_make<Entity *>(permanent_allocator(), 2);
+	s->Struct.fields = permanent_slice_make<Entity *>(2);
 	s->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("v"), alloc_type_array(type, len), false, 0, EntityState_Resolved);
 	s->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("_"), alloc_type_array(t_u8, padding), false, 1, EntityState_Resolved);
 	s->Struct.scope = scope;
@@ -2732,7 +2732,7 @@ gb_internal void init_map_internal_debug_types(Type *type) {
 
 	Type *metadata_type = alloc_type_struct();
 	Scope *metadata_scope = create_scope(nullptr, nullptr);
-	metadata_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 5);
+	metadata_type->Struct.fields = permanent_slice_make<Entity *>(5);
 	metadata_type->Struct.fields[0] = alloc_entity_field(metadata_scope, make_token_ident("key"),    key,       false, 0, EntityState_Resolved);
 	metadata_type->Struct.fields[1] = alloc_entity_field(metadata_scope, make_token_ident("value"),  value,     false, 1, EntityState_Resolved);
 	metadata_type->Struct.fields[2] = alloc_entity_field(metadata_scope, make_token_ident("hash"),   t_uintptr, false, 2, EntityState_Resolved);
@@ -2750,7 +2750,7 @@ gb_internal void init_map_internal_debug_types(Type *type) {
 
 	Scope *scope = create_scope(nullptr, nullptr);
 	Type *debug_type = alloc_type_struct();
-	debug_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 3);
+	debug_type->Struct.fields = permanent_slice_make<Entity *>(3);
 	debug_type->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("data"),       metadata_type, false, 0, EntityState_Resolved);
 	debug_type->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("len"),        t_int,         false, 1, EntityState_Resolved);
 	debug_type->Struct.fields[2] = alloc_entity_field(scope, make_token_ident("allocator"),  t_allocator,   false, 2, EntityState_Resolved);
@@ -2983,13 +2983,13 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 	if (wait_to_finish) {
 		wait_signal_until_available(&old_struct->Struct.fields_wait_signal);
 	} else {
-		GB_ASSERT(old_struct->Struct.fields_wait_signal.futex.load());
+		GB_ASSERT(old_struct->Struct.fields_wait_signal.futex.load() != 0);
 	}
 
 	field_count = old_struct->Struct.fields.count;
 
-	t->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
-	t->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
+	t->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
+	t->Struct.tags = permanent_alloc_array<String>(field_count+extra_field_count);
 
 
 	auto const &add_entity = [](Scope *scope, Entity *entity) {
@@ -3107,7 +3107,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	if (is_polymorphic) {
 		field_count = 0;
 
-		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 		soa_struct->Struct.soa_count = 0;
 
@@ -3117,7 +3117,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		Type *old_array = base_type(elem);
 		field_count = cast(isize)old_array->Array.count;
 
-		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 
 		string_map_init(&scope->elements, 8);
@@ -3159,8 +3159,8 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		if (old_struct->Struct.fields_wait_signal.futex.load()) {
 			field_count = old_struct->Struct.fields.count;
 
-			soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
-			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
+			soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
+			soa_struct->Struct.tags = permanent_alloc_array<String>(field_count+extra_field_count);
 
 			for_array(i, old_struct->Struct.fields) {
 				Entity *old_field = old_struct->Struct.fields[i];
@@ -3355,7 +3355,7 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 	}
 }
 gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
-	GB_ASSERT_NOT_NULL(type);
+	GB_ASSERT(type != nullptr);
 	if (e == nullptr) {
 		*type = t_invalid;
 		return true;

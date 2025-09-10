@@ -353,7 +353,7 @@ gb_internal gbAllocator arena_allocator(Arena *arena) {
 gb_internal GB_ALLOCATOR_PROC(arena_allocator_proc) {
 	void *ptr = nullptr;
 	Arena *arena = cast(Arena *)allocator_data;
-	GB_ASSERT_NOT_NULL(arena);
+	GB_ASSERT(arena != nullptr);
 
 	switch (type) {
 	case gbAllocation_Alloc:
@@ -399,6 +399,48 @@ gb_internal Arena *get_arena(ThreadArenaKind kind) {
 	GB_PANIC("INVALID ARENA KIND");
 	return nullptr;
 }
+
+
+template <typename T>
+gb_internal T *permanent_alloc_item() {
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	return arena_alloc_item<T>(arena);
+}
+
+template <typename T>
+gb_internal T *permanent_alloc_array(isize count) {
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+}
+
+template <typename T>
+gb_internal Slice<T> permanent_slice_make(isize count) {
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	T *data = cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	return {data, count};
+}
+
+template <typename T>
+gb_internal T *temporary_alloc_item() {
+	Arena *arena = get_arena(ThreadArena_Temporary);
+	return arena_alloc_item<T>(arena);
+}
+
+template <typename T>
+gb_internal T *temporary_alloc_array(isize count) {
+	Arena *arena = get_arena(ThreadArena_Temporary);
+	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+}
+
+template <typename T>
+gb_internal Slice<T> temporary_slice_make(isize count) {
+	Arena *arena = get_arena(ThreadArena_Temporary);
+	T *data = cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	return {data, count};
+}
+
+
+
 
 
 
