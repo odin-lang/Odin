@@ -380,16 +380,25 @@ gb_internal Entity *scope_lookup_current(Scope *s, String const &name) {
 }
 
 
-gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_) {
+gb_global std::atomic<bool> in_single_threaded_checker_stage;
+
+gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_, u32 hash) {
+	bool is_single_threaded = in_single_threaded_checker_stage.load(std::memory_order_relaxed);
 	if (scope != nullptr) {
 		bool gone_thru_proc = false;
 		bool gone_thru_package = false;
-		StringHashKey key = string_hash_string(name);
+		StringHashKey key = {};
+		if (hash) {
+			key.hash = hash;
+			key.string = name;
+		} else {
+			key = string_hash_string(name);
+		}
 		for (Scope *s = scope; s != nullptr; s = s->parent) {
 			Entity **found = nullptr;
-			rw_mutex_shared_lock(&s->mutex);
+			if (!is_single_threaded) rw_mutex_shared_lock(&s->mutex);
 			found = string_map_get(&s->elements, key);
-			rw_mutex_shared_unlock(&s->mutex);
+			if (!is_single_threaded) rw_mutex_shared_unlock(&s->mutex);
 			if (found) {
 				Entity *e = *found;
 				if (gone_thru_proc) {
@@ -424,9 +433,9 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 	if (scope_) *scope_ = nullptr;
 }
 
-gb_internal Entity *scope_lookup(Scope *s, String const &name) {
+gb_internal Entity *scope_lookup(Scope *s, String const &name, u32 hash) {
 	Entity *entity = nullptr;
-	scope_lookup_parent(s, name, nullptr, &entity);
+	scope_lookup_parent(s, name, nullptr, &entity, hash);
 	return entity;
 }
 
@@ -507,11 +516,9 @@ end:;
 	return result;
 }
 
-gb_global bool in_single_threaded_checker_stage = false;
-
 gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
 	String name = entity->token.string;
-	if (in_single_threaded_checker_stage) {
+	if (in_single_threaded_checker_stage.load(std::memory_order_relaxed)) {
 		return scope_insert_with_name_no_mutex(s, name, entity);
 	} else {
 		return scope_insert_with_name(s, name, entity);
@@ -853,9 +860,13 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 
 
 gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
-	rw_mutex_lock(&d->deps_mutex);
-	ptr_set_add(&d->deps, e);
-	rw_mutex_unlock(&d->deps_mutex);
+	if (in_single_threaded_checker_stage.load(std::memory_order_relaxed)) {
+		ptr_set_add(&d->deps, e);
+	} else {
+		rw_mutex_lock(&d->deps_mutex);
+		ptr_set_add(&d->deps, e);
+		rw_mutex_unlock(&d->deps_mutex);
+	}
 }
 gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
 	if (d == nullptr || type == nullptr) {
@@ -4958,7 +4969,7 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) 
 }
 
 gb_internal void check_all_global_entities(Checker *c) {
-	in_single_threaded_checker_stage = true;
+	in_single_threaded_checker_stage.store(true, std::memory_order_relaxed);
 
 	// NOTE(bill): This must be single threaded
 	// Don't bother trying
@@ -4980,7 +4991,7 @@ gb_internal void check_all_global_entities(Checker *c) {
 		}
 	}
 
-	in_single_threaded_checker_stage = false;
+	in_single_threaded_checker_stage.store(false, std::memory_order_relaxed);
 }
 
 

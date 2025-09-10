@@ -948,7 +948,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 		error(ident, "foreign library names must be an identifier");
 	} else {
 		String name = ident->Ident.token.string;
-		Entity *found = scope_lookup(ctx->scope, name);
+		Entity *found = scope_lookup(ctx->scope, name, ident->Ident.hash);
 
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {

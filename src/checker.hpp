@@ -623,8 +623,8 @@ gb_internal Entity *entity_of_node(Ast *expr);
 
 
 gb_internal Entity *scope_lookup_current(Scope *s, String const &name);
-gb_internal Entity *scope_lookup (Scope *s, String const &name);
-gb_internal void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_);
+gb_internal Entity *scope_lookup (Scope *s, String const &name, u32 hash=0);
+gb_internal void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_, u32 hash=0);
 gb_internal Entity *scope_insert (Scope *s, Entity *entity);
 
 
