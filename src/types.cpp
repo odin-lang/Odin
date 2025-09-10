@@ -435,11 +435,8 @@ gb_internal Selection make_selection(Entity *entity, Array<i32> index, bool indi
 }
 
 gb_internal void selection_add_index(Selection *s, isize index) {
-	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
-	// of heap allocation
-	// TODO(bill): Find a way to use a backing buffer for initial use as the general case is probably .count<3
 	if (s->index.data == nullptr) {
-		array_init(&s->index, heap_allocator());
+		array_init(&s->index, permanent_allocator());
 	}
 	array_add(&s->index, cast(i32)index);
 }
@@ -447,7 +444,7 @@ gb_internal void selection_add_index(Selection *s, isize index) {
 gb_internal Selection selection_combine(Selection const &lhs, Selection const &rhs) {
 	Selection new_sel = lhs;
 	new_sel.indirect = lhs.indirect || rhs.indirect;
-	new_sel.index = array_make<i32>(heap_allocator(), lhs.index.count+rhs.index.count);
+	new_sel.index = array_make<i32>(permanent_allocator(), lhs.index.count+rhs.index.count);
 	array_copy(&new_sel.index, lhs.index, 0);
 	array_copy(&new_sel.index, rhs.index, lhs.index.count);
 	return new_sel;
@@ -3958,7 +3955,7 @@ gb_internal i64 type_size_of(Type *t) {
 		TypePath path{};
 		type_path_init(&path);
 		{
-			MUTEX_GUARD(&g_type_mutex);
+			// MUTEX_GUARD(&g_type_mutex);
 			size = type_size_of_internal(t, &path);
 			t->cached_size.store(size);
 		}
@@ -3978,7 +3975,7 @@ gb_internal i64 type_align_of(Type *t) {
 	TypePath path{};
 	type_path_init(&path);
 	{
-		MUTEX_GUARD(&g_type_mutex);
+		// MUTEX_GUARD(&g_type_mutex);
 		t->cached_align.store(type_align_of_internal(t, &path));
 	}
 	type_path_free(&path);
@@ -4704,7 +4701,7 @@ gb_internal Type *alloc_type_tuple_from_field_types(Type **field_types, isize fi
 	}
 
 	Type *t = alloc_type_tuple();
-	t->Tuple.variables = slice_make<Entity *>(heap_allocator(), field_count);
+	t->Tuple.variables = slice_make<Entity *>(permanent_allocator(), field_count);
 
 	Scope *scope = nullptr;
 	for_array(i, t->Tuple.variables) {

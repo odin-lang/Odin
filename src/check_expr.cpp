@@ -5101,7 +5101,6 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					ast_node(fv, FieldValue, elem);
 					String name = fv->field->Ident.token.string;
 					Selection sub_sel = lookup_field(node->tav.type, name, false);
-					defer (array_free(&sub_sel.index));
 					if (sub_sel.index.count > 0 &&
 					    sub_sel.index[0] == index) {
 						value = fv->value->tav.value;
@@ -7885,9 +7884,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
 
-		mutex_lock(&found_gen_types->mutex);
+		rw_mutex_shared_lock(&found_gen_types->mutex);
 		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
-		mutex_unlock(&found_gen_types->mutex);
+		rw_mutex_shared_unlock(&found_gen_types->mutex);
 
 		if (found_entity) {
 			operand->mode = Addressing_Type;

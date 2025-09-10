@@ -417,7 +417,7 @@ struct GenProcsData {
 
 struct GenTypesData {
 	Array<Entity *> types;
-	BlockingMutex   mutex;
+	RwMutex         mutex;
 };
 
 struct Defineable {

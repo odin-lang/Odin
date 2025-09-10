@@ -2563,10 +2563,11 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 		Type *dt = t;
 
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		GB_ASSERT(is_type_struct(st) || is_type_raw_union(st));
 		Selection sel = {};
-		sel.index.allocator = heap_allocator();
-		defer (array_free(&sel.index));
+		sel.index.allocator = temporary_allocator();
 		if (lookup_subtype_polymorphic_selection(t, src_type, &sel)) {
 			if (sel.entity == nullptr) {
 				GB_PANIC("invalid subtype cast  %s -> ", type_to_string(src_type), type_to_string(t));
