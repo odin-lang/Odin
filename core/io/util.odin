@@ -189,6 +189,23 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 		write_encoded_rune(w, r, false, &n) or_return
 		return
 	}
+	if r < 32 && for_json {
+		switch r {
+		case '\b': write_string(w, `\b`, &n) or_return
+		case '\f': write_string(w, `\f`, &n) or_return
+		case '\n': write_string(w, `\n`, &n) or_return
+		case '\r': write_string(w, `\r`, &n) or_return
+		case '\t': write_string(w, `\t`, &n) or_return
+		case:
+			write_byte(w, '\\', &n) or_return
+			write_byte(w, 'u', &n)  or_return
+			write_byte(w, '0', &n)  or_return
+			write_byte(w, '0', &n)  or_return
+			write_byte(w, DIGITS_LOWER[r>>4 & 0xf], &n) or_return
+			write_byte(w, DIGITS_LOWER[r    & 0xf], &n) or_return
+		}
+		return
+	}
 	switch r {
 	case '\a': write_string(w, `\a`, &n) or_return
 	case '\b': write_string(w, `\b`, &n) or_return
