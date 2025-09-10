@@ -15,22 +15,11 @@ import "base:intrinsics"
 */
 
 /*
-	==========================    TUNABLES     ==========================
-
-	`initialize_constants` returns `#config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF)`
-	and we initialize this cutoff that way so that the procedure is used and called,
-	because it handles initializing the constants ONE, ZERO, MINUS_ONE, NAN and INF.
-
-	`initialize_constants` also replaces the other `_DEFAULT_*` cutoffs with custom compile-time values if so `#config`ured.
-
-*/
-
-/*
 	There is a bug with DLL globals. They don't get set.
 	To allow tests to run we add `-define:MATH_BIG_EXE=false` to hardcode the cutoffs for now.
 */
 when #config(MATH_BIG_EXE, true) {
-	MUL_KARATSUBA_CUTOFF := initialize_constants()
+	MUL_KARATSUBA_CUTOFF := _DEFAULT_MUL_KARATSUBA_CUTOFF
 	SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF
 	MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF
 	SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF
