@@ -334,6 +334,7 @@ struct Type {
 	// NOTE(bill): These need to be at the end to not affect the unionized data
 	std::atomic<i64> cached_size;
 	std::atomic<i64> cached_align;
+	std::atomic<u64> canonical_hash;
 	std::atomic<u32> flags; // TypeFlag
 	bool failure;
 };

@@ -3050,7 +3050,8 @@ gb_internal void print_show_unused(Checker *c) {
 		if (e->token.string == "_") {
 			continue;
 		}
-		if (ptr_set_exists(&info->minimum_dependency_set, e)) {
+
+		if (e->min_dep_count.load(std::memory_order_relaxed) > 0) {
 			continue;
 		}
 		array_add(&unused, e);

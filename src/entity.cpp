@@ -164,6 +164,7 @@ struct Entity {
 	u64         id;
 	std::atomic<u64>         flags;
 	std::atomic<EntityState> state;
+	std::atomic<i32>         min_dep_count;
 	Token       token;
 	Scope *     scope;
 	Type *      type;

@@ -798,9 +798,8 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e) {
 	GB_ASSERT(pd->body != nullptr);
 	lbModule *m = p->module;
-	auto *min_dep_set = &m->info->minimum_dependency_set;
 
-	if (ptr_set_exists(min_dep_set, e) == false) {
+	if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 		// NOTE(bill): Nothing depends upon it so doesn't need to be built
 		return;
 	}

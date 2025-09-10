@@ -448,6 +448,44 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	}
 #endif
 
+static const int RWLOCK_WRITER   = 1;
+static const int RWLOCK_UPGRADED = 2;
+static const int RWLOCK_READER   = 4;
+struct RWSpinLock {
+	Futex bits;
+};
+
+void rwlock_release_write(RWSpinLock *l) {
+	l->bits.fetch_and(~(RWLOCK_WRITER | RWLOCK_UPGRADED), std::memory_order_release);
+	futex_signal(&l->bits);
+}
+
+bool rwlock_try_acquire_upgrade(RWSpinLock *l) {
+	int value = l->bits.fetch_or(RWLOCK_UPGRADED, std::memory_order_acquire);
+	return (value & (RWLOCK_UPGRADED | RWLOCK_WRITER)) == 0;
+}
+
+void rwlock_acquire_upgrade(RWSpinLock *l) {
+	while (!rwlock_try_acquire_upgrade(l)) {
+		futex_wait(&l->bits, RWLOCK_UPGRADED);
+	}
+}
+void rwlock_release_upgrade(RWSpinLock *l) {
+	l->bits.fetch_add(-RWLOCK_UPGRADED, std::memory_order_acq_rel);
+}
+
+bool rwlock_try_release_upgrade_and_acquire_write(RWSpinLock *l) {
+	int expect = RWLOCK_UPGRADED;
+	return l->bits.compare_exchange_strong(expect, RWLOCK_WRITER, std::memory_order_acq_rel);
+}
+
+void rwlock_release_upgrade_and_acquire_write(RWSpinLock *l) {
+	while (!rwlock_try_release_upgrade_and_acquire_write(l)) {
+		futex_wait(&l->bits, RWLOCK_WRITER);
+	}
+}
+
+
 struct Parker {
 	Futex state;
 };

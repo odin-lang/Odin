@@ -2097,8 +2097,6 @@ gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp) {
 }
 
 gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, CheckerInfo *info, bool do_threading) {
-	auto *min_dep_set = &info->minimum_dependency_set;
-
 	for (Entity *e : info->entities) {
 		String  name  = e->token.string;
 		Scope * scope = e->scope;
@@ -2135,10 +2133,15 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 			}
 		}
 
-		if (!polymorphic_struct && !ptr_set_exists(min_dep_set, e)) {
+		if (!polymorphic_struct && e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
+
+		// if (!polymorphic_struct && !ptr_set_exists(min_dep_set, e)) {
+		// 	// NOTE(bill): Nothing depends upon it so doesn't need to be built
+		// 	continue;
+		// }
 
 		lbModule *m = &gen->default_module;
 		if (USE_SEPARATE_MODULES) {
@@ -2845,8 +2848,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
 
-	auto *min_dep_set = &info->minimum_dependency_set;
-
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64: 
 	case TargetArch_i386:
@@ -3184,9 +3185,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			continue;
 		}
 
-		if (!ptr_set_exists(min_dep_set, e)) {
+		if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 			continue;
 		}
+
+		// if (!ptr_set_exists(min_dep_set, e)) {
+		// 	continue;
+		// }
 
 		DeclInfo *decl = decl_info_of_entity(e);
 		if (decl == nullptr) {
