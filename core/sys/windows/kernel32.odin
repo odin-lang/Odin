@@ -413,6 +413,7 @@ foreign kernel32 {
 		lpBytesLeftThisMessage: ^u32,
 	) -> BOOL ---
 	CancelIo :: proc(handle: HANDLE) -> BOOL ---
+	CancelIoEx :: proc(hFile: HANDLE, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetOverlappedResult :: proc(
 		hFile: HANDLE,
 		lpOverlapped: LPOVERLAPPED,
@@ -554,6 +555,7 @@ foreign kernel32 {
 	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 
 	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---
+	RtlNtStatusToDosError :: proc(status: NTSTATUS) -> ULONG ---
 
 	GetSystemPowerStatus :: proc(lpSystemPowerStatus: ^SYSTEM_POWER_STATUS) -> BOOL ---
 }
