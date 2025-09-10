@@ -162,8 +162,6 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	if (found_scope == nullptr) {
 		return;
 	}
-	rw_mutex_lock(&found_scope->mutex);
-	defer (rw_mutex_unlock(&found_scope->mutex));
 
 	// IMPORTANT NOTE(bill, 2021-04-10): Overriding behaviour was flawed in that the
 	// original entity was still used check checked, but the checking was only
@@ -172,7 +170,9 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	// Therefore two things can be done: the type can be assigned to state that it
 	// has been "evaluated" and the variant data can be copied across
 
+	rw_mutex_lock(&found_scope->mutex);
 	string_map_set(&found_scope->elements, original_name, new_entity);
+	rw_mutex_unlock(&found_scope->mutex);
 
 	original_entity->flags |= EntityFlag_Overridden;
 	original_entity->type = new_entity->type;
