@@ -6986,10 +6986,10 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	isize lhs_count = -1;
 	i32 variadic_index = -1;
 
-	auto positional_operands = array_make<Operand>(heap_allocator(), 0, 0);
-	auto named_operands = array_make<Operand>(heap_allocator(), 0, 0);
-	defer (array_free(&positional_operands));
-	defer (array_free(&named_operands));
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto positional_operands = array_make<Operand>(temporary_allocator(), 0, 0);
+	auto named_operands = array_make<Operand>(temporary_allocator(), 0, 0);
 
 	if (procs.count == 1) {
 		Entity *e = procs[0];
@@ -7030,7 +7030,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		if (proc_arg_count >= 0) {
 			lhs_count = proc_arg_count;
 			if (lhs_count > 0)  {
-				lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
+				lhs = gb_alloc_array(temporary_allocator(), Entity *, lhs_count);
 				for (isize param_index = 0; param_index < lhs_count; param_index++) {
 					Entity *e = nullptr;
 					for (Entity *p : procs) {
@@ -7116,13 +7116,9 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		array_add(&named_operands, o);
 	}
 
-	gb_free(heap_allocator(), lhs);
+	auto valids = array_make<ValidIndexAndScore>(temporary_allocator(), 0, procs.count);
 
-	auto valids = array_make<ValidIndexAndScore>(heap_allocator(), 0, procs.count);
-	defer (array_free(&valids));
-
-	auto proc_entities = array_make<Entity *>(heap_allocator(), 0, procs.count*2 + 1);
-	defer (array_free(&proc_entities));
+	auto proc_entities = array_make<Entity *>(temporary_allocator(), 0, procs.count*2 + 1);
 	for (Entity *proc : procs) {
 		array_add(&proc_entities, proc);
 	}
@@ -7606,6 +7602,8 @@ gb_internal isize lookup_polymorphic_record_parameter(Type *t, String parameter_
 
 
 gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *operand, Ast *call) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	ast_node(ce, CallExpr, call);
 
 	Type *original_type = operand->type;
@@ -7614,7 +7612,6 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	bool show_error = true;
 
 	Array<Operand> operands = {};
-	defer (array_free(&operands));
 
 	CallArgumentError err = CallArgumentError_None;
 
@@ -7629,7 +7626,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 		if (is_call_expr_field_value(ce)) {
 			named_fields = true;
-			operands = array_make<Operand>(heap_allocator(), ce->args.count);
+			operands = array_make<Operand>(temporary_allocator(), ce->args.count);
 			for_array(i, ce->args) {
 				Ast *arg = ce->args[i];
 				ast_node(fv, FieldValue, arg);
@@ -7661,7 +7658,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			}
 
 		} else {
-			operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
+			operands = array_make<Operand>(temporary_allocator(), 0, 2*ce->args.count);
 
 			Entity **lhs = nullptr;
 			isize lhs_count = -1;

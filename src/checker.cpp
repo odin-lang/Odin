@@ -722,9 +722,10 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 
 gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_flags, bool per_entity) {
 	u64 original_vet_flags = vet_flags;
+
+	TEMPORARY_ALLOCATOR_GUARD();
 	Array<VettedEntity> vetted_entities = {};
-	array_init(&vetted_entities, heap_allocator());
-	defer (array_free(&vetted_entities));
+	array_init(&vetted_entities, temporary_allocator());
 
 	rw_mutex_shared_lock(&scope->mutex);
 	for (auto const &entry : scope->elements) {
@@ -5123,14 +5124,14 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 	}
 }
 
-gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
+gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, gbAllocator allocator) {
 	PtrMap<AstPackage *, ImportGraphNode *> M = {};
 	map_init(&M, 2*c->parser->packages.count);
 	defer (map_destroy(&M));
 
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
-		ImportGraphNode *n = import_graph_node_create(heap_allocator(), pkg);
+		ImportGraphNode *n = import_graph_node_create(allocator, pkg);
 		map_set(&M, pkg, n);
 	}
 
@@ -5147,7 +5148,7 @@ gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c
 	}
 
 	Array<ImportGraphNode *> G = {};
-	array_init(&G, heap_allocator(), 0, M.count);
+	array_init(&G, allocator, 0, M.count);
 
 	isize i = 0;
 	for (auto const &entry : M) {
@@ -5166,7 +5167,7 @@ struct ImportPathItem {
 	Ast *   decl;
 };
 
-gb_internal Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage *end, PtrSet<AstPackage *> *visited) {
+gb_internal Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage *end, PtrSet<AstPackage *> *visited, gbAllocator allocator) {
 	Array<ImportPathItem> empty_path = {};
 
 	if (ptr_set_update(visited, start)) {
@@ -5200,11 +5201,11 @@ gb_internal Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start
 
 				ImportPathItem item = {pkg, decl};
 				if (pkg == end) {
-					auto path = array_make<ImportPathItem>(heap_allocator());
+					auto path = array_make<ImportPathItem>(allocator);
 					array_add(&path, item);
 					return path;
 				}
-				auto next_path = find_import_path(c, pkg, end, visited);
+				auto next_path = find_import_path(c, pkg, end, visited, allocator);
 				if (next_path.count > 0) {
 					array_add(&next_path, item);
 					return next_path;
@@ -5809,14 +5810,9 @@ gb_internal void check_export_entities(Checker *c) {
 }
 
 gb_internal void check_import_entities(Checker *c) {
-	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c);
-	defer ({
-		for_array(i, dep_graph) {
-			import_graph_node_destroy(dep_graph[i], heap_allocator());
-		}
-		array_free(&dep_graph);
-	});
+	TEMPORARY_ALLOCATOR_GUARD();
 
+	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c, temporary_allocator());
 
 	TIME_SECTION("check_import_entities - sort packages");
 	// NOTE(bill): Priority queue
@@ -5826,8 +5822,7 @@ gb_internal void check_import_entities(Checker *c) {
 	defer (ptr_set_destroy(&emitted));
 
 	Array<ImportGraphNode *> package_order = {};
-	array_init(&package_order, heap_allocator(), 0, c->parser->packages.count);
-	defer (array_free(&package_order));
+	array_init(&package_order, temporary_allocator(), 0, c->parser->packages.count);
 
 	while (pq.queue.count > 0) {
 		ImportGraphNode *n = priority_queue_pop(&pq);
@@ -5835,11 +5830,12 @@ gb_internal void check_import_entities(Checker *c) {
 		AstPackage *pkg = n->pkg;
 
 		if (n->dep_count > 0) {
+			TEMPORARY_ALLOCATOR_GUARD();
+
 			PtrSet<AstPackage *> visited = {};
 			defer (ptr_set_destroy(&visited));
 
-			auto path = find_import_path(c, pkg, pkg, &visited);
-			defer (array_free(&path));
+			auto path = find_import_path(c, pkg, pkg, &visited, temporary_allocator());
 
 			if (path.count > 1) {
 				ImportPathItem item = path[path.count-1];
@@ -5957,9 +5953,9 @@ gb_internal void check_import_entities(Checker *c) {
 }
 
 
-gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *visited = nullptr);
+gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, gbAllocator allocator, PtrSet<Entity *> *visited = nullptr);
 
-gb_internal bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity *> *visited, Array<Entity *> *path_) {
+gb_internal bool find_entity_path_tuple(Type *tuple, Entity *end, gbAllocator allocator, PtrSet<Entity *> *visited, Array<Entity *> *path_) {
 	GB_ASSERT(path_ != nullptr);
 	if (tuple == nullptr) {
 		return false;
@@ -5973,12 +5969,12 @@ gb_internal bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity 
 		}
 		for (Entity *dep : var_decl->deps) {
 			if (dep == end) {
-				auto path = array_make<Entity *>(heap_allocator());
+				auto path = array_make<Entity *>(allocator);
 				array_add(&path, dep);
 				*path_ = path;
 				return true;
 			}
-			auto next_path = find_entity_path(dep, end, visited);
+			auto next_path = find_entity_path(dep, end, allocator, visited);
 			if (next_path.count > 0) {
 				array_add(&next_path, dep);
 				*path_ = next_path;
@@ -5990,7 +5986,7 @@ gb_internal bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity 
 	return false;
 }
 
-gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *visited) {
+gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, gbAllocator allocator, PtrSet<Entity *> *visited) {
 	PtrSet<Entity *> visited_ = {};
 	bool made_visited = false;
 	if (visited == nullptr) {
@@ -6014,20 +6010,20 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<
 			GB_ASSERT(t->kind == Type_Proc);
 
 			Array<Entity *> path = {};
-			if (find_entity_path_tuple(t->Proc.params, end, visited, &path)) {
+			if (find_entity_path_tuple(t->Proc.params, end, allocator, visited, &path)) {
 				return path;
 			}
-			if (find_entity_path_tuple(t->Proc.results, end, visited, &path)) {
+			if (find_entity_path_tuple(t->Proc.results, end, allocator, visited, &path)) {
 				return path;
 			}
 		} else {
 			for (Entity *dep : decl->deps) {
 				if (dep == end) {
-					auto path = array_make<Entity *>(heap_allocator());
+					auto path = array_make<Entity *>(allocator);
 					array_add(&path, dep);
 					return path;
 				}
-				auto next_path = find_entity_path(dep, end, visited);
+				auto next_path = find_entity_path(dep, end, allocator, visited);
 				if (next_path.count > 0) {
 					array_add(&next_path, dep);
 					return next_path;
@@ -6061,8 +6057,8 @@ gb_internal void calculate_global_init_order(Checker *c) {
 		Entity *e = n->entity;
 
 		if (n->dep_count > 0) {
-			auto path = find_entity_path(e, e);
-			defer (array_free(&path));
+			TEMPORARY_ALLOCATOR_GUARD();
+			auto path = find_entity_path(e, e, temporary_allocator());
 
 			if (path.count > 0) {
 				Entity *e = path[0];
@@ -7450,9 +7446,10 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("initialize and check for collisions in type info array");
 	{
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		Array<TypeInfoPair> type_info_types; // sorted after filled
-		array_init(&type_info_types, heap_allocator());
-		defer (array_free(&type_info_types));
+		array_init(&type_info_types, temporary_allocator());
 
 		for (auto const &tt : c->info.min_dep_type_info_set) {
 			array_add(&type_info_types, tt);
