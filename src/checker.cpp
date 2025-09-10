@@ -2552,14 +2552,12 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 	}
 }
 
-
 gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (entity == nullptr) {
 		return;
 	}
 
 	CheckerInfo *info = &c->info;
-	auto *set = &info->minimum_dependency_set;
 
 	if (entity->type != nullptr &&
 	    is_type_polymorphic(entity->type)) {
@@ -2569,8 +2567,11 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 		}
 	}
 
-	if (ptr_set_update(set, entity)) {
-		return;
+	{
+		MUTEX_GUARD(&info->minimum_dependency_type_info_mutex);
+		if (ptr_set_update(&info->minimum_dependency_set, entity)) {
+			return;
+		}
 	}
 
 	DeclInfo *decl = decl_info_of_entity(entity);
@@ -7173,25 +7174,35 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 	check_merge_queues_into_arrays(c);
 
-	TIME_SECTION("check for type cycles and inline cycles");
+	TIME_SECTION("check for type cycles");
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
-		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
+		if (e->kind != Entity_TypeName) {
+			continue;
+		}
+		if (e->type != nullptr && is_type_typed(e->type)) {
 			if (e->TypeName.is_type_alias) {
 				// Ignore for the time being
 			} else {
 				(void)type_align_of(e->type);
 			}
-		} else if (e->kind == Entity_Procedure) {
-			DeclInfo *decl = e->decl_info;
-			ast_node(pl, ProcLit, decl->proc_lit);
-			if (pl->inlining == ProcInlining_inline) {
-				for (Entity *dep : decl->deps) {
-					if (dep == e) {
-						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
-						break;
-					}
+		}
+	}
+
+	TIME_SECTION("check for inline cycles");
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+		DeclInfo *decl = e->decl_info;
+		ast_node(pl, ProcLit, decl->proc_lit);
+		if (pl->inlining == ProcInlining_inline) {
+			for (Entity *dep : decl->deps) {
+				if (dep == e) {
+					error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
+					break;
 				}
 			}
 		}
