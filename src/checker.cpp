@@ -2377,8 +2377,11 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		return;
 	}
 
-	if (type_set_update(&c->info.min_dep_type_info_set, t)) {
-		return;
+	{
+		MUTEX_GUARD(&c->info.minimum_dependency_type_info_mutex);
+		if (type_set_update(&c->info.min_dep_type_info_set, t)) {
+			return;
+		}
 	}
 
 	// Add nested types
@@ -2604,6 +2607,82 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 	}
 }
 
+struct AddDependecyToSetWorkerData {
+	Checker *c;
+	Entity *entity;
+};
+
+gb_internal void add_dependency_to_set_threaded(Checker *c, Entity *entity);
+
+gb_internal WORKER_TASK_PROC(add_dependency_to_set_worker) {
+	AddDependecyToSetWorkerData *wd = cast(AddDependecyToSetWorkerData *)data;
+	Checker *c = wd->c;
+	Entity *entity = wd->entity;
+	if (entity == nullptr) {
+		return 0;
+	}
+
+	CheckerInfo *info = &c->info;
+
+	if (entity->type != nullptr &&
+	    is_type_polymorphic(entity->type)) {
+		DeclInfo *decl = decl_info_of_entity(entity);
+		if (decl != nullptr && decl->gen_proc_type == nullptr) {
+			return 0;
+		}
+	}
+
+	{
+		MUTEX_GUARD(&info->minimum_dependency_type_info_mutex);
+		if (ptr_set_update(&info->minimum_dependency_set, entity)) {
+			return 0;
+		}
+	}
+
+	DeclInfo *decl = decl_info_of_entity(entity);
+	if (decl == nullptr) {
+		return 0;
+	}
+	for (TypeInfoPair const tt : decl->type_info_deps) {
+		add_min_dep_type_info(c, tt.type);
+	}
+
+	for (Entity *e : decl->deps) {
+		add_dependency_to_set(c, e);
+		if (e->kind == Entity_Procedure && e->Procedure.is_foreign) {
+			Entity *fl = e->Procedure.foreign_library;
+			if (fl != nullptr) {
+				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
+				              (fl->flags&EntityFlag_Used),
+				              "%.*s", LIT(entity->token.string));
+				add_dependency_to_set_threaded(c, fl);
+			}
+		} else if (e->kind == Entity_Variable && e->Variable.is_foreign) {
+			Entity *fl = e->Variable.foreign_library;
+			if (fl != nullptr) {
+				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
+				              (fl->flags&EntityFlag_Used),
+				              "%.*s", LIT(entity->token.string));
+				add_dependency_to_set_threaded(c, fl);
+			}
+		}
+	}
+	return 0;
+}
+
+
+gb_internal void add_dependency_to_set_threaded(Checker *c, Entity *entity) {
+	if (entity == nullptr) {
+		return;
+	}
+
+	AddDependecyToSetWorkerData *wd = gb_alloc_item(temporary_allocator(), AddDependecyToSetWorkerData);
+	wd->c = c;
+	wd->entity = entity;
+	thread_pool_add_task(add_dependency_to_set_worker, wd);
+}
+
+
 gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
 	Entity *e = scope_lookup(scope, name);
 	if (e == nullptr) {
@@ -2657,23 +2736,23 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 		Entity *e = c->info.definitions[i];
 		if (e->scope == builtin_pkg->scope) {
 			if (e->type == nullptr) {
-				add_dependency_to_set(c, e);
+				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
-			add_dependency_to_set(c, e);
+			add_dependency_to_set_threaded(c, e);
 		} else if (e->kind == Entity_Variable && e->Variable.is_export) {
-			add_dependency_to_set(c, e);
+			add_dependency_to_set_threaded(c, e);
 		}
 	}
 
 	for (Entity *e; mpsc_dequeue(&c->info.required_foreign_imports_through_force_queue, &e); /**/) {
 		array_add(&c->info.required_foreign_imports_through_force, e);
-		add_dependency_to_set(c, e);
+		add_dependency_to_set_threaded(c, e);
 	}
 
 	for (Entity *e; mpsc_dequeue(&c->info.required_global_variable_queue, &e); /**/) {
 		e->flags |= EntityFlag_Used;
-		add_dependency_to_set(c, e);
+		add_dependency_to_set_threaded(c, e);
 	}
 
 	for_array(i, c->info.entities) {
@@ -2681,16 +2760,16 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 		switch (e->kind) {
 		case Entity_Variable:
 			if (e->Variable.is_export) {
-				add_dependency_to_set(c, e);
+				add_dependency_to_set_threaded(c, e);
 			} else if (e->flags & EntityFlag_Require) {
-				add_dependency_to_set(c, e);
+				add_dependency_to_set_threaded(c, e);
 			}
 			break;
 		case Entity_Procedure:
 			if (e->Procedure.is_export) {
-				add_dependency_to_set(c, e);
+				add_dependency_to_set_threaded(c, e);
 			} else if (e->flags & EntityFlag_Require) {
-				add_dependency_to_set(c, e);
+				add_dependency_to_set_threaded(c, e);
 			}
 			if (e->flags & EntityFlag_Init) {
 				Type *t = base_type(e->type);
@@ -2730,7 +2809,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 
 
 				if (is_init) {
-					add_dependency_to_set(c, e);
+					add_dependency_to_set_threaded(c, e);
 					array_add(&c->info.init_procedures, e);
 				}
 			} else if (e->flags & EntityFlag_Fini) {
@@ -2765,7 +2844,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 				}
 
 				if (is_fini) {
-					add_dependency_to_set(c, e);
+					add_dependency_to_set_threaded(c, e);
 					array_add(&c->info.fini_procedures, e);
 				}
 			}
@@ -2782,7 +2861,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 			Entity *e = entry.value;
 			if (e != nullptr) {
 				e->flags |= EntityFlag_Used;
-				add_dependency_to_set(c, e);
+				add_dependency_to_set_threaded(c, e);
 			}
 		}
 
@@ -2797,7 +2876,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 		}
 	} else if (start != nullptr) {
 		start->flags |= EntityFlag_Used;
-		add_dependency_to_set(c, start);
+		add_dependency_to_set_threaded(c, start);
 	}
 }
 
@@ -2904,6 +2983,8 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	add_dependency_to_set(c, c->info.instrumentation_exit_entity);
 
 	generate_minimum_dependency_set_internal(c, start);
+
+	thread_pool_wait();
 
 
 #undef FORCE_ADD_RUNTIME_ENTITIES
