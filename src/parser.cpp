@@ -1,5 +1,7 @@
 #include "parser_pos.cpp"
 
+gb_global std::atomic<bool> g_parsing_done;
+
 gb_internal bool in_vet_packages(AstFile *file) {
 	if (file == nullptr) {
 		return true;
@@ -176,7 +178,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		return nullptr;
 	}
 	if (f == nullptr) {
-		f = node->thread_safe_file();
+		if (g_parsing_done.load(std::memory_order_relaxed)) {
+			f = node->file();
+		} else {
+			f = node->thread_safe_file();
+		}
 	}
 	Ast *n = alloc_ast_node(f, node->kind);
 	gb_memmove(n, node, ast_node_size(node->kind));
@@ -6923,6 +6929,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
 		}
 	}
+
+	g_parsing_done.store(true, std::memory_order_relaxed);
 
 	return ParseFile_None;
 }

@@ -7886,8 +7886,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
 
 		mutex_lock(&found_gen_types->mutex);
-		defer (mutex_unlock(&found_gen_types->mutex));
 		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
+		mutex_unlock(&found_gen_types->mutex);
 
 		if (found_entity) {
 			operand->mode = Addressing_Type;
