@@ -242,17 +242,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	case: return img, .Unsupported_Compression
 	}
 
-	// Flipped vertically
-	if info.height < 0 {
-		pixels := mem.slice_data_cast([]RGB_Pixel, img.pixels.buf[:])
-		for y in 0..<img.height / 2 {
-			for x in 0..<img.width {
-				top := y * img.width + x
-				bot := (img.height - y - 1) * img.width + x
-
-				pixels[top], pixels[bot] = pixels[bot], pixels[top]
-			}
-		}
+	// is flipped XOR user wants to flip
+	if (int(info.height < 0) ~ int(.vertical_flip in options)) == 1 {
+		image.vertical_flip(img)
 	}
 	return
 }
