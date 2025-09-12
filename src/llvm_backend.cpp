@@ -1905,6 +1905,8 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
 
 	if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
+		m->gen->module_verification_failure.store(true, std::memory_order_relaxed);
+
 		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
 		if (build_context.keep_temp_files) {
 			TIME_SECTION("LLVM Print Module to File");
@@ -2416,6 +2418,18 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		return 1;
 	}
 #endif
+
+	if (!LLVM_IGNORE_VERIFICATION) {
+		lbModule *m = wd->m;
+		if (m->gen->do_threading) {
+			thread_pool_add_task(lb_llvm_module_verification_worker_proc, m);
+		} else {
+			if (lb_llvm_module_verification_worker_proc(m)) {
+				return 1;
+			}
+		}
+	}
+
 	return 0;
 }
 
@@ -2508,8 +2522,7 @@ gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
 	}
 }
 
-
-gb_internal void lb_llvm_module_passes(lbGenerator *gen, bool do_threading) {
+gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool do_threading) {
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
@@ -2517,12 +2530,9 @@ gb_internal void lb_llvm_module_passes(lbGenerator *gen, bool do_threading) {
 			wd->m = m;
 			wd->target_machine = m->target_machine;
 
-			if (do_threading) {
-				thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
-			} else {
-				lb_llvm_module_pass_worker_proc(wd);
-			}
+			thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
 		}
+
 		thread_pool_wait();
 	} else {
 		for (auto const &entry : gen->modules) {
@@ -2611,29 +2621,7 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 }
 
 
-gb_internal bool lb_llvm_module_verification(lbGenerator *gen, bool do_threading) {
-	if (LLVM_IGNORE_VERIFICATION) {
-		return true;
-	}
 
-	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			thread_pool_add_task(lb_llvm_module_verification_worker_proc, m);
-		}
-		thread_pool_wait();
-
-	} else {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			if (lb_llvm_module_verification_worker_proc(m)) {
-				return false;
-			}
-		}
-	}
-
-	return true;
-}
 
 gb_internal void lb_add_foreign_library_paths(lbGenerator *gen) {
 	for (auto const &entry : gen->modules) {
@@ -2884,7 +2872,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1;
 
-	bool do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
+	gen->do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
 
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
@@ -3388,14 +3376,14 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	if (gen->modules.count <= 1) {
-		do_threading = false;
+		gen->do_threading = false;
 	}
 
 	TIME_SECTION("LLVM Global Procedures and Types");
-	lb_create_global_procedures_and_types(gen, info, do_threading);
+	lb_create_global_procedures_and_types(gen, info, gen->do_threading);
 
 	TIME_SECTION("LLVM Procedure Generation");
-	lb_generate_procedures(gen, do_threading);
+	lb_generate_procedures(gen, gen->do_threading);
 
 	if (build_context.command_kind == Command_test && !already_has_entry_point) {
 		TIME_SECTION("LLVM main");
@@ -3403,7 +3391,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Procedure Generation (missing)");
-	lb_generate_missing_procedures(gen, do_threading);
+	lb_generate_missing_procedures(gen, gen->do_threading);
 
 	if (gen->objc_names) {
 		TIME_SECTION("Finalize objc names");
@@ -3504,7 +3492,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	if (do_threading) {
+	if (gen->do_threading) {
 		isize non_empty_module_count = 0;
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
@@ -3513,18 +3501,17 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			}
 		}
 		if (non_empty_module_count <= 1) {
-			do_threading = false;
+			gen->do_threading = false;
 		}
 	}
 
 	TIME_SECTION("LLVM Function Pass");
-	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
+	lb_llvm_function_passes(gen, gen->do_threading && !build_context.ODIN_DEBUG);
 
-	TIME_SECTION("LLVM Module Pass");
-	lb_llvm_module_passes(gen, do_threading);
+	TIME_SECTION("LLVM Module Pass and Verification");
+	lb_llvm_module_passes_and_verification(gen, gen->do_threading);
 
-	TIME_SECTION("LLVM Module Verification");
-	if (!lb_llvm_module_verification(gen, do_threading)) {
+	if (gen->module_verification_failure.load(std::memory_order_relaxed)) {
 		return false;
 	}
 
@@ -3650,7 +3637,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		gb_printf_err("LLVM object generation has been ignored!\n");
 		return false;
 	}
-	if (!lb_llvm_object_generation(gen, do_threading)) {
+	if (!lb_llvm_object_generation(gen, gen->do_threading)) {
 		return false;
 	}
 

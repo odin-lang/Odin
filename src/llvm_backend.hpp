@@ -242,6 +242,8 @@ gb_internal void lb_module_timing_end(lbModuleTiming *mt);
 struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
+	bool do_threading;
+
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
@@ -262,6 +264,8 @@ struct lbGenerator : LinkerData {
 	MPSCQueue<String> raddebug_section_strings;
 
 	MPSCQueue<lbModuleTiming>    module_timings;
+
+	std::atomic<bool> module_verification_failure;
 };
 
 
