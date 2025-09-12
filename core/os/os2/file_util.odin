@@ -129,8 +129,10 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 
 	if has_size && size > 0 {
 		total: int
-		data = make([]byte, size, allocator) or_return
-		for total < len(data) {
+		// one extra byte for null terminator
+		buffer := make([]byte, size + 1, allocator) or_return
+		data = buffer[:size]
+		for total < size {
 			n: int
 			n, err = read(f, data[total:])
 			total += n
@@ -156,6 +158,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 				if err == .EOF || err == .Broken_Pipe {
 					err = nil
 				}
+				append_nothing(&out_buffer) // null terminator
 				data = out_buffer[:total]
 				return
 			}
