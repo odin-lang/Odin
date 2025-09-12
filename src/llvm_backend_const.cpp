@@ -699,12 +699,26 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		Type *core_elem = core_array_type(type);
 		return lb_const_value(m, core_elem, value, cc);
 	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
-		GB_ASSERT(type->Array.count == value.value_string.len);
+		GB_ASSERT(value.value_string.len <= type->Array.count);
 		LLVMValueRef data = LLVMConstStringInContext(ctx,
 			cast(char const *)value.value_string.text,
 			cast(unsigned)value.value_string.len,
 			true /*DontNullTerminate*/);
-		res.value = data;
+			// If the string is shorter than the array, we need to pad with zeros.
+			if (value.value_string.len < type->Array.count) {
+				LLVMTypeRef elem_type = lb_type(m, t_u8);
+				LLVMValueRef *elems = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
+				for (isize i = 0; i < type->Array.count; i++) {
+					u8 char_val = 0;
+					if (i < value.value_string.len) {
+						char_val = value.value_string.text[i];
+					}
+					elems[i] = LLVMConstInt(elem_type, char_val, false);
+				}
+			    res.value = llvm_const_array(elem_type, elems, cast(unsigned)type->Array.count);
+			} else {
+			    res.value = data;
+			}
 		return res;
 	} else if (is_type_array(type) &&
 		value.kind != ExactValue_Invalid &&
