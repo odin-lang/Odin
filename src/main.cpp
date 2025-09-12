@@ -403,6 +403,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalCached,
 	BuildFlag_InternalNoInline,
 	BuildFlag_InternalByValue,
+	BuildFlag_InternalIgnoreVerification,
 
 	BuildFlag_Tilde,
 
@@ -626,6 +627,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalCached,          str_lit("internal-cached"),           BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalNoInline,        str_lit("internal-no-inline"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalIgnoreVerification, str_lit("internal-ignore-verification"), BuildFlagParam_None, Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
@@ -1584,6 +1586,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalByValue:
 							build_context.internal_by_value = true;
 							break;
+						case BuildFlag_InternalIgnoreVerification:
+							build_context.internal_ignore_verification = true;
+							break;
+
 
 						case BuildFlag_Tilde:
 							build_context.tilde_backend = true;

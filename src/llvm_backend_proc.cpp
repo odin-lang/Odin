@@ -1256,21 +1256,21 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				by_ptr = true;
 				/*fallthrough*/
 			case DeferredProcedure_in:
-				result_as_args = array_clone(heap_allocator(), in_args);
+				result_as_args = array_clone(permanent_allocator(), in_args);
 				break;
 			case DeferredProcedure_out_by_ptr:
 				by_ptr = true;
 				/*fallthrough*/
 			case DeferredProcedure_out:
-				result_as_args = lb_value_to_array(p, heap_allocator(), result);
+				result_as_args = lb_value_to_array(p, permanent_allocator(), result);
 				break;
 			case DeferredProcedure_in_out_by_ptr:
 				by_ptr = true;
 				/*fallthrough*/
 			case DeferredProcedure_in_out:
 				{
-					auto out_args = lb_value_to_array(p, heap_allocator(), result);
-					array_init(&result_as_args, heap_allocator(), in_args.count + out_args.count);
+					auto out_args = lb_value_to_array(p, permanent_allocator(), result);
+					array_init(&result_as_args, permanent_allocator(), in_args.count + out_args.count);
 					array_copy(&result_as_args, in_args, 0);
 					array_copy(&result_as_args, out_args, in_args.count);
 				}
@@ -4228,10 +4228,11 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 					variadic_args = lb_build_expr(p, variadic[0]);
 					variadic_args = lb_emit_conv(p, variadic_args, slice_type);
 				} else {
+					TEMPORARY_ALLOCATOR_GUARD();
+
 					Type *elem_type = slice_type->Slice.elem;
 
-					auto var_args = array_make<lbValue>(heap_allocator(), 0, variadic.count);
-					defer (array_free(&var_args));
+					auto var_args = array_make<lbValue>(temporary_allocator(), 0, variadic.count);
 					for (Ast *var_arg : variadic) {
 						lbValue v = lb_build_expr(p, var_arg);
 						lb_add_values_to_array(p, &var_args, v);

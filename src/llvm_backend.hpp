@@ -150,6 +150,7 @@ struct lbModule {
 	struct lbGenerator *gen;
 	LLVMTargetMachineRef target_machine;
 
+	Checker *checker;
 	CheckerInfo *info;
 	AstPackage *pkg; // possibly associated
 	AstFile *file;   // possibly associated
@@ -225,6 +226,19 @@ struct lbObjCGlobal {
 	Type *    class_impl_type;  // This is set when the class has the objc_implement attribute set to true.
 };
 
+struct lbModuleTiming {
+	lbModule *m;
+
+	u64 start;
+	u64 end;
+
+	bool is_from_missing;
+};
+
+
+gb_internal lbModuleTiming lb_module_timing_start(lbModule *m);
+gb_internal void lb_module_timing_end(lbModuleTiming *mt);
+
 struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
@@ -233,7 +247,7 @@ struct lbGenerator : LinkerData {
 	lbModule default_module;
 
 	RecursiveMutex anonymous_proc_lits_mutex;
-	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
+	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; // TODO(bill): Why does this have to be "global"?
 
 	isize used_module_count;
 
@@ -246,6 +260,8 @@ struct lbGenerator : LinkerData {
 	MPSCQueue<lbObjCGlobal> objc_classes;
 	MPSCQueue<lbObjCGlobal> objc_ivars;
 	MPSCQueue<String> raddebug_section_strings;
+
+	MPSCQueue<lbModuleTiming>    module_timings;
 };
 
 

@@ -8,7 +8,7 @@
 #endif
 
 #ifndef LLVM_IGNORE_VERIFICATION
-#define LLVM_IGNORE_VERIFICATION 0
+#define LLVM_IGNORE_VERIFICATION build_context.internal_ignore_verification
 #endif
 
 
@@ -1922,22 +1922,24 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
 }
 
 
+struct lbCreateStartupWorkerData {
+	lbModule *main_module;
+	lbProcedure *p;
+	lbProcedure *objc_names;
+	Array<lbGlobalVariable> *global_variables;
+};
 
-gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
-	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+gb_internal WORKER_TASK_PROC(lb_create_startup_runtime_worker_proc) {
+	lbCreateStartupWorkerData *wd = cast(lbCreateStartupWorkerData *)data;
 
-	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
-	p->is_startup = true;
-	lb_add_attribute_to_proc(p->module, p->value, "optnone");
-	lb_add_attribute_to_proc(p->module, p->value, "noinline");
-
-	// Make sure shared libraries call their own runtime startup on Linux.
-	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
-	LLVMSetLinkage(p->value, LLVMWeakAnyLinkage);
+	lbModule *main_module = wd->main_module;
+	lbProcedure *p = wd->p;
+	lbProcedure *objc_names = wd->objc_names;
+	Array<lbGlobalVariable> &global_variables = *wd->global_variables;
 
 	lb_begin_procedure_body(p);
 
-	lb_setup_type_info_data(main_module);
+	lb_setup_type_info_data(p->module);
 
 	if (objc_names) {
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, objc_names->type), objc_names->value, nullptr, 0, "");
@@ -2023,7 +2025,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	}
 	CheckerInfo *info = main_module->gen->info;
-	
+
 	for (Entity *e : info->init_procedures) {
 		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
 		lb_emit_call(p, value, {}, ProcInlining_none);
@@ -2033,6 +2035,34 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	lb_end_procedure_body(p);
 
 	lb_verify_function(main_module, p);
+
+	return 0;
+}
+
+
+
+gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> *global_variables) { // Startup Runtime
+	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+
+	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
+	p->is_startup = true;
+	lb_add_attribute_to_proc(p->module, p->value, "optnone");
+	lb_add_attribute_to_proc(p->module, p->value, "noinline");
+
+	// Make sure shared libraries call their own runtime startup on Linux.
+	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
+	LLVMSetLinkage(p->value, LLVMWeakAnyLinkage);
+
+
+	lbCreateStartupWorkerData *wd = permanent_alloc_item<lbCreateStartupWorkerData>();
+	wd->main_module      = main_module;
+	wd->p                = p;
+	wd->objc_names       = objc_names;
+	wd->global_variables = global_variables;
+
+	// TODO(bill): determine whether or not this is better multithreaded or not
+	lb_create_startup_runtime_worker_proc(wd);
+
 	return p;
 }
 
@@ -2389,14 +2419,18 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	return 0;
 }
 
-
-
-gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
+gb_internal WORKER_TASK_PROC(lb_generate_procedures_in_a_module_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
+	lbModuleTiming module_timing = lb_module_timing_start(m);
+
 	for (isize i = 0; i < m->procedures_to_generate.count; i++) {
 		lbProcedure *p = m->procedures_to_generate[i];
 		lb_generate_procedure(p->module, p);
 	}
+
+
+	lb_module_timing_end(&module_timing);
+
 	return 0;
 }
 
@@ -2404,25 +2438,32 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
+			thread_pool_add_task(lb_generate_procedures_in_a_module_worker_proc, m);
 		}
 
 		thread_pool_wait();
 	} else {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			lb_generate_procedures_worker_proc(m);
+			lb_generate_procedures_in_a_module_worker_proc(m);
 		}
 	}
 }
 
 gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
+
+	lbModuleTiming module_timing = lb_module_timing_start(m);
+	module_timing.is_from_missing = true;
+
 	for (isize i = 0; i < m->missing_procedures_to_check.count; i++) {
 		lbProcedure *p = m->missing_procedures_to_check[i];
 		debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
 		lb_generate_procedure(m, p);
 	}
+
+	lb_module_timing_end(&module_timing);
+
 	return 0;
 }
 
@@ -3333,7 +3374,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	gen->objc_names = lb_create_objc_names(default_module);
 
 	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables & @(init))");
-	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names, global_variables);
+	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names, &global_variables);
 
 	TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
 	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);
@@ -3532,6 +3573,78 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		label_object_generation = gb_string_append_fmt(label_object_generation, " (%td used modules)", gen->used_module_count);
 	}
 	TIME_SECTION_WITH_LEN(label_object_generation, gb_string_length(label_object_generation));
+
+
+	// if (true) {
+	// 	Array<lbProcedureTiming> timings = {};
+	// 	array_init(&timings, heap_allocator(), 0, gen->procedure_timings.count);
+	// 	defer (array_free(&timings));
+
+	// 	for (lbProcedureTiming pt = {}; mpsc_dequeue(&gen->procedure_timings, &pt); /**/) {
+	// 		array_add(&timings, pt);
+	// 	}
+
+	// 	array_sort(timings, [](void const *a, void const *b) -> int {
+	// 		lbProcedureTiming const *x = cast(lbProcedureTiming *)a;
+	// 		lbProcedureTiming const *y = cast(lbProcedureTiming *)b;
+
+	// 		i64 t_x = cast(i64)(x->end - x->start);
+	// 		i64 t_y = cast(i64)(y->end - y->start);
+
+	// 		if (t_x < t_y) {
+	// 			return +1;
+	// 		} else if (t_x > t_y) {
+	// 			return -1;
+	// 		}
+	// 		return 0;
+	// 	});
+
+	// 	isize count = 0;
+	// 	for (lbProcedureTiming const &pt : timings) {
+	// 		if (count++ >= 20) {
+	// 			break;
+	// 		}
+
+	// 		f64 t_us = cast(f64)(pt.end - pt.start) / 1.0e3;
+	// 		f64 v_us = cast(f64)(pt.after_verify - pt.end) / 1.0e3;
+	// 		gb_printf_err("%.*s %.3f us %.3f us\n", LIT(pt.p->name), t_us, v_us);
+	// 	}
+
+	// 	return false;
+	// }
+
+	if (true) {
+		Array<lbModuleTiming> timings = {};
+		array_init(&timings, heap_allocator(), 0, gen->module_timings.count);
+		defer (array_free(&timings));
+
+		for (lbModuleTiming mt = {}; mpsc_dequeue(&gen->module_timings, &mt); /**/) {
+			array_add(&timings, mt);
+		}
+
+		array_sort(timings, [](void const *a, void const *b) -> int {
+			lbModuleTiming const *x = cast(lbModuleTiming *)a;
+			lbModuleTiming const *y = cast(lbModuleTiming *)b;
+
+			i64 t_x = cast(i64)(x->end - x->start);
+			i64 t_y = cast(i64)(y->end - y->start);
+
+			if (t_x < t_y) {
+				return +1;
+			} else if (t_x > t_y) {
+				return -1;
+			}
+			return 0;
+		});
+
+		for (lbModuleTiming const &mt : timings) {
+			f64 t = cast(f64)(mt.end - mt.start) / 1.0e3;
+			gb_printf_err("%s %.3f us - procedures %u\n", mt.m->module_name, t, mt.m->procedures.count);
+		}
+
+		return false;
+	}
+
 	
 	if (build_context.ignore_llvm_build) {
 		gb_printf_err("LLVM object generation has been ignored!\n");

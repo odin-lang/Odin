@@ -115,6 +115,13 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 
 }
 
+gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	lb_init_module(m, m->checker);
+	return 0;
+}
+
+
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	if (global_error_collector.count != 0) {
 		return false;
@@ -134,19 +141,26 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	gen->info = &c->info;
 
-	map_init(&gen->modules, gen->info->packages.count*2);
-	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
+	bool module_per_file = build_context.module_per_file && build_context.optimization_level <= 0;
+
+	isize module_capacity = 0;
+	module_capacity += gen->info->packages.count*2;
+	module_capacity += gen->info->files.count*2;
+
+	map_init(&gen->modules, module_capacity);
+	map_init(&gen->modules_through_ctx, module_capacity);
 	map_init(&gen->anonymous_proc_lits, 1024);
 
 	if (USE_SEPARATE_MODULES) {
-		bool module_per_file = build_context.module_per_file && build_context.optimization_level <= 0;
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
+			m->checker = c;
 			m->pkg = pkg;
 			m->gen = gen;
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
+
 			if (!module_per_file) {
 				continue;
 			}
@@ -161,6 +175,8 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			}
 		}
 	}
+
+	thread_pool_wait();
 
 	gen->default_module.gen = gen;
 	map_set(&gen->modules, cast(void *)1, &gen->default_module);
@@ -178,11 +194,26 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	mpsc_init(&gen->objc_ivars, heap_allocator());
 	mpsc_init(&gen->raddebug_section_strings, heap_allocator());
 
+	mpsc_init(&gen->module_timings, heap_allocator());
+
+
 	return true;
 }
 
 
 
+
+gb_internal lbModuleTiming lb_module_timing_start(lbModule *m) {
+	lbModuleTiming mt = {};
+	mt.m = m;
+	mt.start = time_stamp_time_now();
+	return mt;
+}
+gb_internal void lb_module_timing_end(lbModuleTiming *mt) {
+	mt->end = time_stamp_time_now();
+
+	mpsc_enqueue(&mt->m->gen->module_timings, *mt);
+}
 gb_internal lbValue lb_global_type_info_data_ptr(lbModule *m) {
 	lbValue v = lb_find_value_from_entity(m, lb_global_type_info_data_entity);
 	return v;

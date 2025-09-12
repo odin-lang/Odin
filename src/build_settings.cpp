@@ -554,6 +554,7 @@ struct BuildContext {
 
 	bool internal_no_inline;
 	bool internal_by_value;
+	bool internal_ignore_verification;
 
 	bool   no_threaded_checker;
 
