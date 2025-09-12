@@ -54,7 +54,12 @@ container_of :: #force_inline proc "contextless" (ptr: $P/^$Field_Type, $T: type
 
 
 when !NO_DEFAULT_TEMP_ALLOCATOR {
-	@thread_local global_default_temp_allocator_data: Default_Temp_Allocator
+	when ODIN_ARCH == .i386 && ODIN_OS == .Windows {
+		// Thread-local storage is problematic on Windows i386
+		global_default_temp_allocator_data: Default_Temp_Allocator
+	} else {
+		@thread_local global_default_temp_allocator_data: Default_Temp_Allocator
+	}
 }
 
 @(builtin, disabled=NO_DEFAULT_TEMP_ALLOCATOR)

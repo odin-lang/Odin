@@ -281,7 +281,11 @@ try_cross_linking:;
 					link_settings = gb_string_append_fmt(link_settings, " /NOENTRY");
 				}
 			} else {
-				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
+				// For i386 with CRT, libcmt provides the entry point
+				// For other cases or no_crt, we need to specify the entry point
+				if (!(build_context.metrics.arch == TargetArch_i386 && !build_context.no_crt)) {
+					link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
+				}
 			}
 
 			if (build_context.build_paths[BuildPath_Symbols].name != "") {
