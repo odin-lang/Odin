@@ -2710,12 +2710,17 @@ general_end:;
 
 
 
-gb_internal LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str, bool custom_link_section) {
+gb_internal LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str, bool custom_link_section, u32 hash=0) {
 	StringHashKey key = {};
 	LLVMValueRef *found = nullptr;
 
 	if (!custom_link_section) {
-		key = string_hash_string(str);
+		if (hash) {
+			key.hash = hash;
+			key.string = str;
+		} else {
+			key = string_hash_string(str);
+		}
 		found = string_map_get(&m->const_strings, key);
 	}
 	if (found != nullptr) {

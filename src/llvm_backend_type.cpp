@@ -403,7 +403,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 			lbValue loc = lb_const_source_code_location_as_global_ptr(m, proc_name, pos);
 
 			LLVMValueRef vals[4] = {
-				lb_const_string(m, t->Named.type_name->token.string).value,
+				lb_const_string_with_hash(m, t->Named.type_name->token.string, t->Named.type_name->name_hash).value,
 				get_type_info_ptr(m, t->Named.base),
 				pkg_name,
 				loc.value
@@ -705,7 +705,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 				lb_global_type_info_member_types_values[type_offset+i] = get_type_info_ptr(m, f->type);
 				if (f->token.string.len > 0) {
-					lb_global_type_info_member_names_values[name_offset+i] = lb_const_string(m, f->token.string).value;
+					lb_global_type_info_member_names_values[name_offset+i] = lb_const_string_with_hash(m, f->token.string, f->name_hash).value;
 				}
 			}
 
@@ -747,7 +747,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 					GB_ASSERT(is_type_integer(t->Enum.base_type));
 
 					for_array(i, fields) {
-						name_values[i] = lb_const_string(m, fields[i]->token.string).value;
+						name_values [i] = lb_const_string_with_hash(m, fields[i]->token.string, fields[i]->name_hash).value;
 						value_values[i] = lb_const_value(m, t_i64, fields[i]->Constant.value).value;
 					}
 
@@ -884,7 +884,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 					lb_global_type_info_member_usings_values[usings_offset+source_index]   = lb_const_bool(m, t_bool, (f->flags&EntityFlag_Using) != 0).value;
 
 					if (f->token.string.len > 0) {
-						lb_global_type_info_member_names_values[names_offset+source_index] = lb_const_string(m, f->token.string).value;
+						lb_global_type_info_member_names_values[names_offset+source_index] = lb_const_string_with_hash(m, f->token.string, f->name_hash).value;
 					}
 
 					if (t->Struct.tags != nullptr) {
@@ -1007,7 +1007,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 						lbValue index = lb_const_int(m, t_int, source_index);
 						if (f->token.string.len > 0) {
-							lb_global_type_info_member_names_values[names_offset+source_index] = lb_const_string(m, f->token.string).value;
+							lb_global_type_info_member_names_values[names_offset+source_index] = lb_const_string_with_hash(m, f->token.string, f->name_hash).value;
 						}
 
 						lb_global_type_info_member_types_values[types_offset+source_index] = get_type_info_ptr(m, f->type);

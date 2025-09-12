@@ -244,7 +244,24 @@ gb_internal lbValue lb_const_undef(lbModule *m, Type *type) {
 	return lbValue{v, type};
 }
 
+gb_internal lbValue lb_const_string_with_hash(lbModule *m, String const &value, u32 hash) {
+	isize len = value.len;
+	LLVMValueRef ptr = nullptr;
 
+	if (len == 0) {
+		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
+	} else {
+		ptr = lb_find_or_add_entity_string_ptr(m, value, false, hash);
+	}
+
+	LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), len, true);
+
+	lbValue res = {};
+	res.type = t_string;
+	res.value = llvm_const_string_internal(m, t_string, ptr, str_len);
+
+	return res;
+}
 
 gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value) {
 	lbValue res = {};

@@ -2063,7 +2063,11 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	wd->global_variables = global_variables;
 
 	// TODO(bill): determine whether or not this is better multithreaded or not
-	lb_create_startup_runtime_worker_proc(wd);
+	if (main_module->gen->do_threading) {
+		thread_pool_add_task(lb_create_startup_runtime_worker_proc, wd);
+	} else {
+		lb_create_startup_runtime_worker_proc(wd);
+	}
 
 	return p;
 }
@@ -2267,7 +2271,9 @@ gb_internal void lb_llvm_function_pass_per_function_internal(lbModule *module, l
 
 gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	lbModule *m = cast(lbModule *)data;
-	{
+
+
+	if (m->function_pass_managers[0] == nullptr) {
 		GB_ASSERT(m->function_pass_managers[lbFunctionPassManager_default] == nullptr);
 
 		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
@@ -2445,6 +2451,10 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_in_a_module_worker_proc) {
 
 	lb_module_timing_end(&module_timing);
 
+	if (m->gen->do_threading && !build_context.ODIN_DEBUG) {
+		thread_pool_add_task(lb_llvm_function_pass_per_module, m);
+	}
+
 	return 0;
 }
 
@@ -2477,6 +2487,10 @@ gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc
 	}
 
 	lb_module_timing_end(&module_timing);
+
+	if (m->gen->do_threading && !build_context.ODIN_DEBUG) {
+		thread_pool_add_task(lb_llvm_function_pass_per_module, m);
+	}
 
 	return 0;
 }
@@ -3506,7 +3520,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Function Pass");
-	lb_llvm_function_passes(gen, gen->do_threading && !build_context.ODIN_DEBUG);
+	if (!(gen->do_threading && !build_context.ODIN_DEBUG)) {
+		lb_llvm_function_passes(gen, gen->do_threading && !build_context.ODIN_DEBUG);
+	}
 
 	TIME_SECTION("LLVM Module Pass and Verification");
 	lb_llvm_module_passes_and_verification(gen, gen->do_threading);

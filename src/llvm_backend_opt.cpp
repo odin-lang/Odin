@@ -479,6 +479,10 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 	if (p == nullptr) {
 		return;
 	}
+	if (p->has_had_passes) {
+		return;
+	}
+
 	// NOTE(bill): LLVMAddDCEPass doesn't seem to be exported in the official DLL's for LLVM
 	// which means we cannot rely upon it
 	// This is also useful for read the .ll for debug purposes because a lot of instructions
@@ -499,6 +503,8 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 	}
 
 	LLVMRunFunctionPassManager(fpm, p->value);
+
+	p->has_had_passes = true;
 }
 
 gb_internal void llvm_delete_function(LLVMValueRef func) {

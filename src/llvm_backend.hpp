@@ -368,6 +368,7 @@ struct lbProcedure {
 	bool         is_export;
 	bool         is_entry_point;
 	bool         is_startup;
+	bool         has_had_passes;
 
 	lbFunctionType *abi_function_type;
 

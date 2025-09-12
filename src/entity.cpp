@@ -166,6 +166,8 @@ struct Entity {
 	std::atomic<EntityState> state;
 	std::atomic<i32>         min_dep_count;
 	Token       token;
+	u32         name_hash;
+
 	Scope *     scope;
 	Type *      type;
 	std::atomic<Ast *> identifier; // Can be nullptr
@@ -345,6 +347,9 @@ gb_internal Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Typ
 	entity->state  = EntityState_Unresolved;
 	entity->scope  = scope;
 	entity->token  = token;
+	if (token.string.len > 0) {
+		entity->name_hash = string_hash(token.string);
+	}
 	entity->type   = type;
 	entity->id     = 1 + global_entity_id.fetch_add(1);
 	if (token.pos.file_id) {
