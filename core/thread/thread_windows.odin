@@ -10,7 +10,7 @@ import "core:unicode/utf16"
 
 _IS_SUPPORTED :: true
 //NOTE(peperronii): not sure about the exact length but there must be a limit
-_THREAD_DESCRIPTION_LENGTH :: 64
+_THREAD_DESCRIPTION_LENGTH :: 128
 
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
