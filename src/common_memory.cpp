@@ -488,8 +488,8 @@ gb_internal gbAllocator temporary_allocator() {
 #define TEMP_ARENA_GUARD(arena) ArenaTempGuard GB_DEFER_3(_arena_guard_){arena}
 
 
-// #define TEMPORARY_ALLOCATOR_GUARD()
-#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
+// #define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
+#define TEMPORARY_ALLOCATOR_GUARD()
 #define PERMANENT_ALLOCATOR_GUARD()
 
 
