@@ -481,7 +481,7 @@ gb_internal gbAllocator permanent_allocator() {
 }
 
 gb_internal gbAllocator temporary_allocator() {
-	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Permanent};
+	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Temporary};
 }
 
 
