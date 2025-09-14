@@ -2137,12 +2137,9 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		String  name  = e->token.string;
 		Scope * scope = e->scope;
 
-		if ((scope->flags & ScopeFlag_File) == 0) {
+		if ((scope->flags & (ScopeFlag_File)) == 0) {
 			continue;
 		}
-
-		Scope *package_scope = scope->parent;
-		GB_ASSERT(package_scope->flags & ScopeFlag_Pkg);
 
 		switch (e->kind) {
 		case Entity_Variable:
@@ -2483,6 +2480,7 @@ gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc
 	for (isize i = 0; i < m->missing_procedures_to_check.count; i++) {
 		lbProcedure *p = m->missing_procedures_to_check[i];
 		debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
+		// gb_printf_err("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
 		lb_generate_procedure(m, p);
 	}
 
@@ -3531,6 +3529,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		return false;
 	}
 
+	thread_pool_wait();
+
 	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 
@@ -3616,37 +3616,37 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	// 	return false;
 	// }
 
-	if (true) {
-		Array<lbModuleTiming> timings = {};
-		array_init(&timings, heap_allocator(), 0, gen->module_timings.count);
-		defer (array_free(&timings));
+	// if (false) {
+	// 	Array<lbModuleTiming> timings = {};
+	// 	array_init(&timings, heap_allocator(), 0, gen->module_timings.count);
+	// 	defer (array_free(&timings));
 
-		for (lbModuleTiming mt = {}; mpsc_dequeue(&gen->module_timings, &mt); /**/) {
-			array_add(&timings, mt);
-		}
+	// 	for (lbModuleTiming mt = {}; mpsc_dequeue(&gen->module_timings, &mt); /**/) {
+	// 		array_add(&timings, mt);
+	// 	}
 
-		array_sort(timings, [](void const *a, void const *b) -> int {
-			lbModuleTiming const *x = cast(lbModuleTiming *)a;
-			lbModuleTiming const *y = cast(lbModuleTiming *)b;
+	// 	array_sort(timings, [](void const *a, void const *b) -> int {
+	// 		lbModuleTiming const *x = cast(lbModuleTiming *)a;
+	// 		lbModuleTiming const *y = cast(lbModuleTiming *)b;
 
-			i64 t_x = cast(i64)(x->end - x->start);
-			i64 t_y = cast(i64)(y->end - y->start);
+	// 		i64 t_x = cast(i64)(x->end - x->start);
+	// 		i64 t_y = cast(i64)(y->end - y->start);
 
-			if (t_x < t_y) {
-				return +1;
-			} else if (t_x > t_y) {
-				return -1;
-			}
-			return 0;
-		});
+	// 		if (t_x < t_y) {
+	// 			return +1;
+	// 		} else if (t_x > t_y) {
+	// 			return -1;
+	// 		}
+	// 		return 0;
+	// 	});
 
-		for (lbModuleTiming const &mt : timings) {
-			f64 t = cast(f64)(mt.end - mt.start) / 1.0e3;
-			gb_printf_err("%s %.3f us - procedures %u\n", mt.m->module_name, t, mt.m->procedures.count);
-		}
+	// 	for (lbModuleTiming const &mt : timings) {
+	// 		f64 t = cast(f64)(mt.end - mt.start) / 1.0e3;
+	// 		gb_printf_err("%s %.3f us - procedures %u\n", mt.m->module_name, t, mt.m->procedures.count);
+	// 	}
 
-		return false;
-	}
+	// 	return false;
+	// }
 
 	
 	if (build_context.ignore_llvm_build) {

@@ -1512,7 +1512,6 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 }
 
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
-	GB_ASSERT(m != nullptr);
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
