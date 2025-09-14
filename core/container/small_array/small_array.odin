@@ -169,7 +169,7 @@ Output:
 	x
 
 */
-get_safe :: proc(a: $A/Small_Array($N, $T), index: int) -> (T, bool) #no_bounds_check {
+get_safe :: proc "contextless" (a: $A/Small_Array($N, $T), index: int) -> (T, bool) #no_bounds_check {
 	if index < 0 || index >= a.len {
 		return {}, false
 	}
@@ -183,11 +183,11 @@ Get a pointer to the item at the specified position.
 - `a`: A pointer to the small-array
 - `index`: The position of the item to get
 
-**Returns** 
+**Returns**
 - the pointer to the element at the specified position
 - true if element exists, false otherwise
 */
-get_ptr_safe :: proc(a: ^$A/Small_Array($N, $T), index: int) -> (^T, bool) #no_bounds_check {
+get_ptr_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int) -> (^T, bool) #no_bounds_check {
 	if index < 0 || index >= a.len {
 		return {}, false
 	}
