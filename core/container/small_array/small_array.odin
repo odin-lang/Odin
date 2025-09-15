@@ -1,8 +1,8 @@
 package container_small_array
 
 import "base:builtin"
+@require import "base:intrinsics"
 @require import "base:runtime"
-@require import "core:mem"
 
 /*
 A fixed-size stack-allocated array operated on in a dynamic fashion.
@@ -285,11 +285,11 @@ Output:
 	[1]
 	[1, 2, 0, 0, 0]
 */
-resize :: proc "contextless" (a: ^$A/Small_Array, length: int) {
+resize :: proc "contextless" (a: ^$A/Small_Array($N, $T), length: int) {
 	prev_len := a.len
 	a.len = min(length, builtin.len(a.data))
 	if prev_len < a.len {
-		mem.zero_slice(a.data[prev_len:a.len])
+		intrinsics.mem_zero(&a.data[prev_len], size_of(T)*(a.len-prev_len))
 	}
 }
 
