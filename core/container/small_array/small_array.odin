@@ -231,7 +231,7 @@ Example:
 		fmt.println(small_array.slice(&a))
 
 		// resizing makes the change visible
-		small_array.resize(&a, 100)
+		small_array.non_zero_resize(&a, 100)
 		fmt.println(small_array.slice(&a))
 	}
 
@@ -309,7 +309,7 @@ Example:
 	import "core:container/small_array"
 	import "core:fmt"
 
-	resize_example :: proc() {
+	non_zero_resize :: proc() {
 		a: small_array.Small_Array(5, int)
 
 		small_array.push_back(&a, 1)
