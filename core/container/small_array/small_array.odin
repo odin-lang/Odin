@@ -283,7 +283,7 @@ Output:
 
 	[1, 2]
 	[1]
-	[1, 2, 0, 0, 0]
+	[1, 0, 0, 0, 0]
 */
 resize :: proc "contextless" (a: ^$A/Small_Array($N, $T), length: int) {
 	prev_len := a.len
@@ -316,10 +316,10 @@ Example:
 		small_array.push_back(&a, 2)
 		fmt.println(small_array.slice(&a))
 
-		small_array.resize(&a, 1)
+		small_array.non_zero_resize(&a, 1)
 		fmt.println(small_array.slice(&a))
 
-		small_array.resize(&a, 100)
+		small_array.non_zero_resize(&a, 100)
 		fmt.println(small_array.slice(&a))
 	}
 
