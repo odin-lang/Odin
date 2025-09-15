@@ -1,9 +1,8 @@
 package container_small_array
 
 import "base:builtin"
-import "base:runtime"
-import "core:mem"
-_ :: runtime
+@require import "base:runtime"
+@require import "core:mem"
 
 /*
 A fixed-size stack-allocated array operated on in a dynamic fashion.
