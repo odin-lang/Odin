@@ -8151,6 +8151,73 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 }
 
 
+void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<Type *> param_types);
+
+gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *call, Entity *proc_entity, Type *proc_type) {
+	auto &proc = proc_type->Proc;
+	Slice<Entity *> params = proc.params ? proc.params->Tuple.variables : Slice<Entity *>{};
+
+	Type *self_type = nullptr;
+	isize params_start = 1;
+
+	ast_node(ce, CallExpr, call);
+
+	Type *return_type = proc.result_count == 0 ? nullptr : proc.results->Tuple.variables[0]->type;
+	bool is_return_instancetype = return_type != nullptr && return_type == t_objc_instancetype;
+
+	if (params.count == 0 || !is_type_objc_ptr_to_object(params[0]->type)) {
+		if (!proc_entity->Procedure.is_objc_class_method) {
+			// Not a class method, invalid call
+			error(call, "Invalid Objective-C call: The Objective-C method is not a class method but this first parameter is not an Objective-C object pointer.");
+			return;
+		}
+
+		if (is_return_instancetype) {
+			if (ce->proc->kind == Ast_SelectorExpr) {
+				ast_node(se, SelectorExpr, ce->proc);
+
+				// NOTE(harold): These should have already been checked, right?
+				GB_ASSERT(se->expr->tav.mode == Addressing_Type && se->expr->tav.type->kind == Type_Named);
+
+				return_type = alloc_type_pointer(se->expr->tav.type);
+			} else {
+				return_type = proc_entity->Procedure.objc_class->type;
+			}
+		}
+
+		self_type    = t_objc_Class;
+		params_start = 0;
+	} else if (ce->args.count > 0) {
+		GB_ASSERT(is_type_objc_ptr_to_object(params[0]->type));
+
+		if (ce->args[0]->tav.objc_super_target) {
+			self_type = t_objc_super_ptr;
+		} else {
+			self_type = ce->args[0]->tav.type;
+		}
+
+		if (is_return_instancetype) {
+			// NOTE(harold): These should have already been checked, right?
+			GB_ASSERT(ce->args[0]->tav.type && ce->args[0]->tav.type->kind == Type_Pointer && ce->args[0]->tav.type->Pointer.elem->kind == Type_Named);
+
+			return_type = ce->args[0]->tav.type;
+		}
+	}
+
+	auto param_types = slice_make<Type *>(permanent_allocator(), proc.param_count + 2 - params_start);
+	param_types[0] = self_type;
+	param_types[1] = t_objc_SEL;
+
+	for (isize i = params_start; i < params.count; i++) {
+		param_types[i+2-params_start] = params[i]->type;
+	}
+
+	if (is_return_instancetype) {
+		operand->type = return_type;
+	}
+
+	add_objc_proc_type(c, call, return_type, param_types);
+}
 
 gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
 	if (proc != nullptr &&
@@ -8412,6 +8479,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				operand->expr->CallExpr.optional_ok_one = true;
 			}
 		}
+	}
+
+	Entity *proc_entity = entity_from_expr(call->CallExpr.proc);
+	bool is_objc_call = proc_entity && proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_objc_impl_or_import;
+	if (is_objc_call) {
+		check_objc_call_expr(c, operand, call, proc_entity, pt);
 	}
 
 	return Expr_Expr;

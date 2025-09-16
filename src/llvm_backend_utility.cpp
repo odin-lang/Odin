@@ -2373,7 +2373,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 	///       https://www.newosxbook.com/src.php?tree=xnu&file=/libkern/libkern/Block_private.h
 	///       https://github.com/llvm/llvm-project/blob/21f1f9558df3830ffa637def364e3c0cb0dbb3c0/compiler-rt/lib/BlocksRuntime/Block_private.h
 	///       https://github.com/apple-oss-distributions/libclosure/blob/3668b0837f47be3cc1c404fb5e360f4ff178ca13/runtime.cpp
-
+	// TODO(harold): Ensure we don't have any issues with large struct arguments or returns in block wrappers.
 	ast_node(ce, CallExpr, expr);
 	GB_ASSERT(ce->args.count > 0);
 
@@ -2452,7 +2452,9 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	lbProcedure *invoker_proc = lb_create_dummy_procedure(m, make_string((u8*)block_invoker_name,
 									gb_string_length(block_invoker_name)), invoker_proc_type);
+
 	LLVMSetLinkage(invoker_proc->value, LLVMPrivateLinkage);
+	lb_add_function_type_attributes(invoker_proc->value, lb_get_function_type(m, invoker_proc_type), ProcCC_CDecl);
 
 	// Create the block descriptor and block literal
 	gbString block_lit_type_name = gb_string_make(temporary_allocator(), "__$ObjC_Block_Literal_");
@@ -2531,45 +2533,66 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 	/// Invoker body
 	lb_begin_procedure_body(invoker_proc);
 	{
-		auto call_args = array_make<lbValue>(temporary_allocator(), user_proc.param_count, user_proc.param_count);
+		// Reserve 2 extra arguments for: Indirect return values and context.
+		auto call_args = array_make<LLVMValueRef>(temporary_allocator(), 0, user_proc.param_count + 2);
 
-		for (isize i = 1; i < invoker_proc->raw_input_parameters.count; i++) {
-			lbValue arg = {};
-			arg.type  = invoker_args[i];
-			arg.value = invoker_proc->raw_input_parameters[i],
-			call_args[i-1] = arg;
+		isize block_literal_arg_index = 0;
+
+		lbFunctionType* user_proc_ft = lb_get_function_type(m, user_proc_value.type);
+
+		lbArgKind return_kind = {};
+
+		GB_ASSERT(user_proc.result_count <= 1);
+		if (user_proc.result_count > 0) {
+			return_kind = user_proc_ft->ret.kind;
+
+			if (return_kind == lbArg_Indirect) {
+				// Forward indirect return value
+				array_add(&call_args, invoker_proc->raw_input_parameters[0]);
+				block_literal_arg_index = 1;
+			}
 		}
 
-		LLVMValueRef block_literal = invoker_proc->raw_input_parameters[0];
+		// Forward raw arguments
+		for (isize i = block_literal_arg_index+1; i < invoker_proc->raw_input_parameters.count; i++) {
+			array_add(&call_args, invoker_proc->raw_input_parameters[i]);
+		}
+
+		LLVMValueRef block_literal = invoker_proc->raw_input_parameters[block_literal_arg_index];
+
+		// Copy capture parameters from the block literal
+		isize capture_arg_in_user_proc_start_index = user_proc_ft->args.count - capture_arg_count;
+		if (user_proc.calling_convention == ProcCC_Odin) {
+			capture_arg_in_user_proc_start_index -= 1;
+		}
+
+		for (isize i = 0; i < capture_arg_count; i++) {
+			LLVMValueRef cap_value = LLVMBuildStructGEP2(invoker_proc->builder, block_lit_type, block_literal, unsigned(capture_fields_offset + i), "");
+
+			// Don't emit load if indirect. Pass the pointer as-is
+			isize cap_arg_index_in_user_proc = capture_arg_in_user_proc_start_index + i;
+
+			if (user_proc_ft->args[cap_arg_index_in_user_proc].kind != lbArg_Indirect) {
+				cap_value = OdinLLVMBuildLoad(invoker_proc, lb_type(invoker_proc->module, captured_values[i].type), cap_value);
+			}
+
+			array_add(&call_args, cap_value);
+		}
 
 		// Push context, if needed
 		if (user_proc.calling_convention == ProcCC_Odin) {
 			LLVMValueRef p_context = LLVMBuildStructGEP2(invoker_proc->builder, block_lit_type, block_literal, 5, "context");
-			lbValue ctx_val = {};
-			ctx_val.type  = t_context_ptr;
-			ctx_val.value = p_context;
-
-			lb_push_context_onto_stack(invoker_proc, lb_addr(ctx_val));
+			array_add(&call_args, p_context);
 		}
 
-		// Copy capture parameters from the block literal
-		for (isize i = 0; i < capture_arg_count; i++) {
-			LLVMValueRef cap_value = LLVMBuildStructGEP2(invoker_proc->builder, block_lit_type, block_literal, unsigned(capture_fields_offset + i), "");
+		LLVMTypeRef  fnp     = lb_type_internal_for_procedures_raw(m, user_proc_value.type);
+		LLVMValueRef ret_val = LLVMBuildCall2(invoker_proc->builder, fnp, user_proc_value.value, call_args.data, (unsigned)call_args.count, "");
 
-			lbValue cap_arg = {};
-			cap_arg.value = cap_value;
-			cap_arg.type  = alloc_type_pointer(captured_values[i].type);
-
-			lbValue arg = lb_emit_load(invoker_proc, cap_arg);
-			call_args[block_forward_args+i] = arg;
+		if (user_proc.result_count > 0 && return_kind != lbArg_Indirect) {
+			LLVMBuildRet(invoker_proc->builder, ret_val);
 		}
-
-		lbValue result = lb_emit_call(invoker_proc, user_proc_value, call_args, proc_lit->ProcLit.inlining);
-
-		GB_ASSERT(user_proc.result_count <= 1);
-		if (user_proc.result_count > 0) {
-			GB_ASSERT(result.value != nullptr);
-			LLVMBuildRet(p->builder, result.value);
+		else {
+			LLVMBuildRetVoid(invoker_proc->builder);
 		}
 	}
 	lb_end_procedure_body(invoker_proc);
@@ -2587,8 +2610,8 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 	gbString block_var_name = gb_string_make(temporary_allocator(), "__$objc_block_literal_");
 	block_var_name = gb_string_append_fmt(block_var_name, "%lld", m->objc_next_block_id);
 
-	lbValue result = {};
-	result.type = block_result_type;
+	lbValue block_result = {};
+	block_result.type = block_result_type;
 
 	lbValue isa_val      = lb_find_runtime_value(m, is_global ? str_lit("_NSConcreteGlobalBlock") : str_lit("_NSConcreteStackBlock"));
 	lbValue flags_val    = lb_const_int(m, t_i32, (u64)raw_flags);
@@ -2596,7 +2619,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	if (is_global) {
 		LLVMValueRef p_block_lit = LLVMAddGlobal(m->mod, block_lit_type, block_var_name);
-		result.value = p_block_lit;
+		block_result.value = p_block_lit;
 
 		LLVMValueRef fields_values[5] = {
 			isa_val.value,       // isa
@@ -2611,7 +2634,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	} else {
 		LLVMValueRef p_block_lit = llvm_alloca(p, block_lit_type, lb_alignof(block_lit_type), block_var_name);
-		result.value = p_block_lit;
+		block_result.value = p_block_lit;
 
 		// Initialize it
 		LLVMValueRef f_isa        = LLVMBuildStructGEP2(p->builder, block_lit_type, p_block_lit, 0, "isa");
@@ -2651,7 +2674,20 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 		}
 	}
 
-	return result;
+	return block_result;
+}
+
+gb_internal lbValue lb_handle_objc_block_invoke(lbProcedure *p, Ast *expr) {
+	return {};
+}
+
+gb_internal lbValue lb_handle_objc_super(lbProcedure *p, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+	GB_ASSERT(ce->args.count == 1);
+
+	// NOTE(harold): This doesn't actually do anything by itself,
+	// it has an effect when used on the left side of a selector call expression.
+	return lb_build_expr(p, ce->args[0]);
 }
 
 gb_internal lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
@@ -2766,6 +2802,120 @@ gb_internal lbValue lb_handle_objc_send(lbProcedure *p, Ast *expr) {
 
 	return lb_emit_call(p, the_proc, args);
 }
+
+gb_internal lbValue lb_handle_objc_auto_send(lbProcedure *p, Ast *expr, Slice<lbValue> const arg_values) {
+	ast_node(ce, CallExpr, expr);
+
+	lbModule *m = p->module;
+	CheckerInfo *info = m->info;
+	ObjcMsgData data = map_must_get(&info->objc_msgSend_types, expr);
+
+	Type *proc_type = data.proc_type;
+	GB_ASSERT(proc_type != nullptr);
+
+	Entity *objc_method_ent = entity_of_node(ce->proc);
+	GB_ASSERT(objc_method_ent != nullptr);
+	GB_ASSERT(objc_method_ent->kind == Entity_Procedure);
+	GB_ASSERT(objc_method_ent->Procedure.objc_selector_name.len > 0);
+
+	auto &proc = proc_type->Proc;
+	GB_ASSERT(proc.param_count >= 2);
+
+	Type *objc_super_orig_type = nullptr;
+	if (ce->args.count > 0) {
+		objc_super_orig_type = unparen_expr(ce->args[0])->tav.objc_super_target;
+	}
+
+	isize arg_offset = 1;
+	lbValue id = {};
+	if (!objc_method_ent->Procedure.is_objc_class_method) {
+		GB_ASSERT(ce->args.count > 0);
+		id = arg_values[0];
+
+		if (objc_super_orig_type) {
+			GB_ASSERT(objc_super_orig_type->kind == Type_Named);
+
+			auto& tn = objc_super_orig_type->Named.type_name->TypeName;
+			lbAddr p_supercls = lb_handle_objc_find_or_register_class(p, tn.objc_class_name, tn.objc_is_implementation ? objc_super_orig_type : nullptr);
+
+			lbValue supercls     = lb_addr_load(p, p_supercls);
+			lbAddr  p_objc_super = lb_add_local_generated(p, t_objc_super, false);
+
+			lbValue f_id         = lb_emit_struct_ep(p, p_objc_super.addr, 0);
+			lbValue f_superclass = lb_emit_struct_ep(p, p_objc_super.addr, 1);
+
+			id = lb_emit_conv(p, id, t_objc_id);
+			lb_emit_store(p, f_id, id);
+			lb_emit_store(p, f_superclass, supercls);
+
+			id = p_objc_super.addr;
+		}
+	} else {
+		Entity *objc_class = objc_method_ent->Procedure.objc_class;
+		if (ce->proc->kind == Ast_SelectorExpr) {
+			// NOTE (harold): If called via a selector expression (ex: Foo.alloc()), then we should use
+			//                the lhs-side to determine the class. This allows for class methods to be called
+			//                with the correct class as the target, even when the method is defined in a superclass.
+			ast_node(se, SelectorExpr, ce->proc);
+			GB_ASSERT(se->expr->tav.mode == Addressing_Type && se->expr->tav.type->kind == Type_Named);
+
+			objc_class = entity_from_expr(se->expr);
+
+			GB_ASSERT(objc_class);
+			GB_ASSERT(objc_class->kind == Entity_TypeName);
+			GB_ASSERT(objc_class->TypeName.objc_class_name != "");
+		}
+
+		Type *class_impl_type = objc_class->TypeName.objc_is_implementation ? objc_class->type : nullptr;
+
+		id = lb_addr_load(p, lb_handle_objc_find_or_register_class(p, objc_class->TypeName.objc_class_name, class_impl_type));
+		arg_offset = 0;
+	}
+
+	lbValue sel = lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, objc_method_ent->Procedure.objc_selector_name));
+
+	auto args = array_make<lbValue>(permanent_allocator(), 0, arg_values.count + 2 - arg_offset);
+
+	array_add(&args, id);
+	array_add(&args, sel);
+
+	for (isize i = arg_offset; i < ce->args.count; i++) {
+		array_add(&args, arg_values[i]);
+	}
+
+	lbValue the_proc = {};
+
+	if (!objc_super_orig_type) {
+		switch (data.kind) {
+			default:
+				GB_PANIC("unhandled ObjcMsgKind %u", data.kind);
+				break;
+			case ObjcMsg_normal: the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSend"));        break;
+			case ObjcMsg_fpret:  the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSend_fpret"));  break;
+			case ObjcMsg_fp2ret: the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSend_fp2ret")); break;
+			case ObjcMsg_stret:  the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSend_stret"));  break;
+		}
+	} else {
+		switch (data.kind) {
+			default:
+				GB_PANIC("unhandled ObjcMsgKind %u", data.kind);
+				break;
+			case ObjcMsg_normal:
+			case ObjcMsg_fpret:
+			case ObjcMsg_fp2ret:
+				the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSendSuper2"));
+				break;
+			case ObjcMsg_stret:
+				the_proc = lb_lookup_runtime_procedure(m, str_lit("objc_msgSendSuper2_stret"));
+				break;
+		}
+	}
+
+	the_proc = lb_emit_conv(p, the_proc, data.proc_type);
+
+	return lb_emit_call(p, the_proc, args);
+}
+
 
 gb_internal LLVMAtomicOrdering llvm_atomic_ordering_from_odin(ExactValue const &value) {
 	GB_ASSERT(value.kind == ExactValue_Integer);

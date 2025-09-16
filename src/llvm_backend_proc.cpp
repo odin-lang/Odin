@@ -3753,6 +3753,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
 	case BuiltinProc_objc_ivar_get:          return lb_handle_objc_ivar_get(p, expr);
 	case BuiltinProc_objc_block:             return lb_handle_objc_block(p, expr);
+	case BuiltinProc_objc_super:             return lb_handle_objc_super(p, expr);
 
 
 	case BuiltinProc_constant_utf16_cstring:
@@ -4122,21 +4123,23 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	}
 
 	Ast *proc_expr = unparen_expr(ce->proc);
+	Entity *proc_entity = entity_of_node(proc_expr);
+
 	if (proc_mode == Addressing_Builtin) {
-		Entity *e = entity_of_node(proc_expr);
 		BuiltinProcId id = BuiltinProc_Invalid;
-		if (e != nullptr) {
-			id = cast(BuiltinProcId)e->Builtin.id;
+		if (proc_entity != nullptr) {
+			id = cast(BuiltinProcId)proc_entity->Builtin.id;
 		} else {
 			id = BuiltinProc_DIRECTIVE;
 		}
 		return lb_build_builtin_proc(p, expr, tv, id);
 	}
 
+	bool is_objc_call = proc_entity->Procedure.is_objc_impl_or_import;
+
 	// NOTE(bill): Regular call
 	lbValue value = {};
 
-	Entity *proc_entity = entity_of_node(proc_expr);
 	if (proc_entity != nullptr) {
 		if (proc_entity->flags & EntityFlag_Disabled) {
 			GB_ASSERT(tv.type == nullptr);
@@ -4170,11 +4173,13 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		}
 	}
 
-	if (value.value == nullptr) {
+	if (is_objc_call) {
+		value.type = proc_tv.type;
+	} else if (value.value == nullptr) {
 		value = lb_build_expr(p, proc_expr);
 	}
 
-	GB_ASSERT(value.value != nullptr);
+	GB_ASSERT(value.value != nullptr || is_objc_call);
 	Type *proc_type_ = base_type(value.type);
 	GB_ASSERT(proc_type_->kind == Type_Proc);
 	TypeProc *pt = &proc_type_->Proc;
@@ -4402,6 +4407,11 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 
 	isize final_count = is_c_vararg ? args.count : pt->param_count;
 	auto call_args = array_slice(args, 0, final_count);
+
+	if (is_objc_call) {
+		return lb_handle_objc_auto_send(p, expr, slice(call_args, 0, call_args.count));
+	}
+
 	return lb_emit_call(p, value, call_args, ce->inlining);
 }
 
