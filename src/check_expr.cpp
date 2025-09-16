@@ -7018,8 +7018,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	{
 		// NOTE(bill, 2019-07-13): This code is used to improve the type inference for procedure groups
 		// where the same positional parameter has the same type value (and ellipsis)
-
-		//TODO: get rid of proc_arg_count. make lhs as long as longest proc with most params. watch out for null safety
 		isize proc_arg_count = -1;
 		for (Entity *p : procs) {
 			Type *pt = base_type(p->type);
