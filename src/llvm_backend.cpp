@@ -2303,6 +2303,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 struct lbLLVMModulePassWorkerData {
 	lbModule *m;
 	LLVMTargetMachineRef target_machine;
+	bool do_threading;
 };
 
 gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
@@ -2386,6 +2387,13 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		return 1;
 	}
 #endif
+
+	if (wd->do_threading) {
+		thread_pool_add_task(lb_llvm_module_verification_worker_proc, wd->m);
+	} else {
+		lb_llvm_module_verification_worker_proc(wd->m);
+	}
+
 	return 0;
 }
 
@@ -2468,19 +2476,16 @@ gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
 }
 
 
-gb_internal void lb_llvm_module_passes(lbGenerator *gen, bool do_threading) {
+gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool do_threading) {
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
 			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 			wd->m = m;
 			wd->target_machine = m->target_machine;
+			wd->do_threading = true;
 
-			if (do_threading) {
-				thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
-			} else {
-				lb_llvm_module_pass_worker_proc(wd);
-			}
+			thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
 		}
 		thread_pool_wait();
 	} else {
@@ -2489,6 +2494,7 @@ gb_internal void lb_llvm_module_passes(lbGenerator *gen, bool do_threading) {
 			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 			wd->m = m;
 			wd->target_machine = m->target_machine;
+			wd->do_threading = false;
 			lb_llvm_module_pass_worker_proc(wd);
 		}
 	}
@@ -2567,31 +2573,6 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 	return make_string(cast(u8 *)path, gb_string_length(path));
 
-}
-
-
-gb_internal bool lb_llvm_module_verification(lbGenerator *gen, bool do_threading) {
-	if (LLVM_IGNORE_VERIFICATION) {
-		return true;
-	}
-
-	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			thread_pool_add_task(lb_llvm_module_verification_worker_proc, m);
-		}
-		thread_pool_wait();
-
-	} else {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			if (lb_llvm_module_verification_worker_proc(m)) {
-				return false;
-			}
-		}
-	}
-
-	return true;
 }
 
 gb_internal void lb_add_foreign_library_paths(lbGenerator *gen) {
@@ -3479,11 +3460,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Function Pass");
 	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
 
-	TIME_SECTION("LLVM Module Pass");
-	lb_llvm_module_passes(gen, do_threading);
+	TIME_SECTION("LLVM Module Pass and Verification");
+	lb_llvm_module_passes_and_verification(gen, do_threading);
 
-	TIME_SECTION("LLVM Module Verification");
-	if (!lb_llvm_module_verification(gen, do_threading)) {
+	if (gen->module_verification_failed.load(std::memory_order_relaxed)) {
 		return false;
 	}
 

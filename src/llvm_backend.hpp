@@ -239,6 +239,8 @@ struct lbGenerator : LinkerData {
 
 	isize used_module_count;
 
+	std::atomic<bool> module_verification_failed;
+
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;

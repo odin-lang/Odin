@@ -158,7 +158,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				auto pm = gb_alloc_item(permanent_allocator(), lbModule);
 				pm->pkg = pkg;
 				pm->gen = gen;
-				m->polymorphic_module = pm;
+				m->polymorphic_module  = pm;
 				pm->polymorphic_module = pm;
 
 				map_set(&gen->modules, cast(void *)pm, pm); // point to itself just add it to the list
@@ -166,7 +166,9 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				lb_init_module(pm, c);
 			}
 
-			if (!module_per_file) {
+			if (pkg->kind == Package_Runtime) {
+				// allow this to be per file
+			} else if (!module_per_file) {
 				continue;
 			}
 			// NOTE(bill): Probably per file is not a good idea, so leave this for later
@@ -182,7 +184,9 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				if (build_context.internal_weak_monomorphization) {
 					auto pm  = gb_alloc_item(permanent_allocator(), lbModule);
 					pm->file = file;
+					pm->pkg  = pkg;
 					pm->gen  = gen;
+					m->polymorphic_module  = pm;
 					pm->polymorphic_module = pm;
 
 					map_set(&gen->modules, cast(void *)pm, pm); // point to itself just add it to the list
