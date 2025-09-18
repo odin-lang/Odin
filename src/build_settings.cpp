@@ -555,6 +555,7 @@ struct BuildContext {
 	bool internal_no_inline;
 	bool internal_by_value;
 	bool internal_weak_monomorphization;
+	bool internal_ignore_llvm_verification;
 
 	bool   no_threaded_checker;
 

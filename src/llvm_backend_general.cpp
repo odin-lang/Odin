@@ -154,7 +154,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
 
-			if (build_context.internal_weak_monomorphization) {
+			if (LLVM_WEAK_MONOMORPHIZATION) {
 				auto pm = gb_alloc_item(permanent_allocator(), lbModule);
 				pm->pkg = pkg;
 				pm->gen = gen;
@@ -181,7 +181,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				lb_init_module(m, c);
 
 
-				if (build_context.internal_weak_monomorphization) {
+				if (LLVM_WEAK_MONOMORPHIZATION) {
 					auto pm  = gb_alloc_item(permanent_allocator(), lbModule);
 					pm->file = file;
 					pm->pkg  = pkg;
@@ -469,7 +469,7 @@ gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e, lbModule 
 	GB_ASSERT(curr_module != nullptr);
 	lbModule *m = lb_module_of_entity_internal(gen, e, curr_module);
 
-	if (USE_SEPARATE_MODULES && build_context.internal_weak_monomorphization) {
+	if (USE_SEPARATE_MODULES) {
 		if (e->kind == Entity_Procedure && e->Procedure.generated_from_polymorphic) {
 			if (m->polymorphic_module) {
 				return m->polymorphic_module;

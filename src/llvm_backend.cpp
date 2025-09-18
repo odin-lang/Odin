@@ -8,7 +8,11 @@
 #endif
 
 #ifndef LLVM_IGNORE_VERIFICATION
-#define LLVM_IGNORE_VERIFICATION 0
+#define LLVM_IGNORE_VERIFICATION build_context.internal_ignore_llvm_verification
+#endif
+
+#ifndef LLVM_WEAK_MONOMORPHIZATION
+#define LLVM_WEAK_MONOMORPHIZATION build_context.internal_weak_monomorphization
 #endif
 
 
@@ -620,6 +624,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 
 #define LLVM_SET_VALUE_NAME(value, name) LLVMSetValueName2((value), (name), gb_count_of((name))-1);
 
+
 gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	GB_ASSERT(!build_context.dynamic_map_calls);
 	type = base_type(type);
@@ -634,6 +639,9 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_map_get_proc);
 	string_map_set(&m->gen_procs, proc_name, p);
+
+	p->internal_gen_type = type;
+
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
@@ -1891,6 +1899,10 @@ gb_internal void lb_verify_function(lbModule *m, lbProcedure *p, bool dump_ll=fa
 }
 
 gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
+	if (LLVM_IGNORE_VERIFICATION) {
+		return 0;
+	}
+
 	char *llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 	lbModule *m = cast(lbModule *)data;
@@ -2298,6 +2310,14 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 }
 
 
+void lb_remove_unused_functions_and_globals(lbGenerator *gen) {
+	for (auto &entry : gen->modules) {
+		lbModule *m = entry.value;
+		lb_run_remove_unused_function_pass(m);
+		lb_run_remove_unused_globals_pass(m);
+	}
+}
+
 struct lbLLVMModulePassWorkerData {
 	lbModule *m;
 	LLVMTargetMachineRef target_machine;
@@ -2306,9 +2326,6 @@ struct lbLLVMModulePassWorkerData {
 
 gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	auto wd = cast(lbLLVMModulePassWorkerData *)data;
-
-	lb_run_remove_unused_function_pass(wd->m);
-	lb_run_remove_unused_globals_pass(wd->m);
 
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
@@ -2385,6 +2402,10 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		return 1;
 	}
 #endif
+
+	if (LLVM_IGNORE_VERIFICATION) {
+		return 0;
+	}
 
 	if (wd->do_threading) {
 		thread_pool_add_task(lb_llvm_module_verification_worker_proc, wd->m);
@@ -3464,12 +3485,14 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Function Pass");
 	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
 
+	TIME_SECTION("LLVM Remove Unused Functions and Globals");
+	lb_remove_unused_functions_and_globals(gen);
+
 	TIME_SECTION("LLVM Module Pass and Verification");
 	lb_llvm_module_passes_and_verification(gen, do_threading);
 
-	if (gen->module_verification_failed.load(std::memory_order_relaxed)) {
-		return false;
-	}
+	TIME_SECTION("LLVM Correct Entity Linkage");
+	lb_correct_entity_linkage(gen);
 
 	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
@@ -3497,8 +3520,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	TIME_SECTION("LLVM Correct Entity Linkage");
-	lb_correct_entity_linkage(gen);
 
 	////////////////////////////////////////////
 	for (auto const &entry: gen->modules) {

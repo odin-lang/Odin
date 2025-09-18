@@ -241,8 +241,6 @@ struct lbGenerator : LinkerData {
 
 	isize used_module_count;
 
-	std::atomic<bool> module_verification_failed;
-
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
@@ -409,6 +407,8 @@ struct lbProcedure {
 	void (*generate_body)(lbModule *m, lbProcedure *p);
 	Array<lbGlobalVariable> *global_variables;
 	lbProcedure *objc_names;
+
+	Type *internal_gen_type; // map_set, map_get, etc.
 };
 
 
