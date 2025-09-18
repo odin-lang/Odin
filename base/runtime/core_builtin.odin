@@ -334,20 +334,19 @@ delete :: proc{
 // The new built-in procedure allocates memory. The first argument is a type, not a value, and the value
 // return is a pointer to a newly allocated value of that type using the specified allocator, default is context.allocator
 @(builtin, require_results)
-new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> (^T, Allocator_Error) #optional_allocator_error {
-	return new_aligned(T, align_of(T), allocator, loc)
+new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) #optional_allocator_error {
+	t = (^T)(raw_data(mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return))
+	return
 }
 @(require_results)
 new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
-	data := mem_alloc_bytes(size_of(T), alignment, allocator, loc) or_return
-	t = (^T)(raw_data(data))
+	t = (^T)(raw_data(mem_alloc_bytes(size_of(T), alignment, allocator, loc) or_return))
 	return
 }
 
 @(builtin, require_results)
 new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) #optional_allocator_error {
-	t_data := mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return
-	t = (^T)(raw_data(t_data))
+	t = (^T)(raw_data(mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return))
 	if t != nil {
 		t^ = data
 	}
@@ -357,14 +356,21 @@ new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_locat
 DEFAULT_DYNAMIC_ARRAY_CAPACITY :: 8
 
 @(require_results)
-make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
+make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (res: T, err: Allocator_Error) #optional_allocator_error {
+	err = _make_aligned_type_erased(&res, size_of(E), len, alignment, allocator, loc)
+	return
+}
+
+@(require_results)
+_make_aligned_type_erased :: proc(slice: rawptr, elem_size: int, len: int, alignment: int, allocator: Allocator, loc := #caller_location) -> Allocator_Error {
 	make_slice_error_loc(loc, len)
-	data, err := mem_alloc_bytes(size_of(E)*len, alignment, allocator, loc)
-	if data == nil && size_of(E) != 0 {
-		return nil, err
+	data, err := mem_alloc_bytes(elem_size*len, alignment, allocator, loc)
+	if data == nil && elem_size != 0 {
+		return err
 	}
-	s := Raw_Slice{raw_data(data), len}
-	return transmute(T)s, err
+	(^Raw_Slice)(slice).data = raw_data(data)
+	(^Raw_Slice)(slice).len  = len
+	return err
 }
 
 // `make_slice` allocates and initializes a slice. Like `new`, the first argument is a type, not a value.
@@ -372,8 +378,9 @@ make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocat
 //
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
-make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
-	return make_aligned(T, len, align_of(E), allocator, loc)
+make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (res: T, err: Allocator_Error) #optional_allocator_error {
+	err = _make_aligned_type_erased(&res, size_of(E), len, align_of(E), allocator, loc)
+	return
 }
 // `make_dynamic_array` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
