@@ -2061,26 +2061,9 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 	return p;
 }
 
-gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p);
-
-gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
-	lbModule *m = cast(lbModule *)data;
-	for (isize i = 0; i < m->procedures_to_generate.count; i++) {
-		lbProcedure *p = m->procedures_to_generate[i];
-		lb_generate_procedure(p->module, p);
-	}
-	return 0;
-}
-
-
-struct lbGenerateProceduresWorkerData {
-	lbModule *m;
-	bool do_threading;
-};
 
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
-	lbGenerateProceduresWorkerData *wd = cast(lbGenerateProceduresWorkerData *)data;
-	lbModule *m = wd->m;
+	lbModule *m = cast(lbModule *)data;
 	for (Entity *e : m->global_types_to_create) {
 		(void)lb_get_entity_name(m, e);
 		(void)lb_type(m, e->type);
@@ -2089,10 +2072,6 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 	for (Entity *e : m->global_procedures_to_create) {
 		(void)lb_get_entity_name(m, e);
 		array_add(&m->procedures_to_generate, lb_create_procedure(m, e));
-	}
-
-	if (wd->do_threading) {
-		thread_pool_add_task(lb_generate_procedures_worker_proc, m);
 	}
 	return 0;
 }
@@ -2183,28 +2162,22 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
-			auto wd = permanent_alloc_item<lbGenerateProceduresWorkerData>();
-			wd->m = entry.value;
-			wd->do_threading = true;
-			thread_pool_add_task(lb_generate_procedures_and_types_per_module, wd);
+			lbModule *m = entry.value;
+			thread_pool_add_task(lb_generate_procedures_and_types_per_module, m);
 		}
 	} else {
 		for (auto const &entry : gen->modules) {
-			auto wd = permanent_alloc_item<lbGenerateProceduresWorkerData>();
-			wd->m = entry.value;
-			wd->do_threading = false;
-			lb_generate_procedures_and_types_per_module(wd);
-		}
-
-		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			lb_generate_procedures_worker_proc(m);
+			lb_generate_procedures_and_types_per_module(m);
 		}
 
 	}
 
 	thread_pool_wait();
 }
+
+gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p);
+
 
 gb_internal bool lb_is_module_empty(lbModule *m) {
 	if (LLVMGetFirstFunction(m->mod) == nullptr &&
@@ -2420,6 +2393,33 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	}
 
 	return 0;
+}
+
+
+
+gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	for (isize i = 0; i < m->procedures_to_generate.count; i++) {
+		lbProcedure *p = m->procedures_to_generate[i];
+		lb_generate_procedure(p->module, p);
+	}
+	return 0;
+}
+
+gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
+	if (do_threading) {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
+		}
+
+		thread_pool_wait();
+	} else {
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			lb_generate_procedures_worker_proc(m);
+		}
+	}
 }
 
 gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
@@ -3332,8 +3332,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		do_threading = false;
 	}
 
-	TIME_SECTION("LLVM Global Procedures and Types + Procedure Generation");
+	TIME_SECTION("LLVM Global Procedures and Types");
 	lb_create_global_procedures_and_types(gen, info, do_threading);
+
+	TIME_SECTION("LLVM Procedure Generation");
+	lb_generate_procedures(gen, do_threading);
 
 	if (build_context.command_kind == Command_test && !already_has_entry_point) {
 		TIME_SECTION("LLVM main");
