@@ -2145,7 +2145,7 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 
 		lbModule *m = &gen->default_module;
 		if (USE_SEPARATE_MODULES) {
-			m = lb_module_of_entity(gen, e);
+			m = lb_module_of_entity(gen, e, m);
 		}
 		GB_ASSERT(m != nullptr);
 

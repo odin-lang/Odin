@@ -150,6 +150,8 @@ struct lbModule {
 	struct lbGenerator *gen;
 	LLVMTargetMachineRef target_machine;
 
+	lbModule *polymorphic_module;
+
 	CheckerInfo *info;
 	AstPackage *pkg; // possibly associated
 	AstFile *file;   // possibly associated

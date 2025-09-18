@@ -46,6 +46,12 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 		}
 		module_name = gb_string_appendc(module_name, "builtin");
 	}
+	if (m->polymorphic_module == m) {
+		if (gb_string_length(module_name)) {
+			module_name = gb_string_appendc(module_name, "-");
+		}
+		module_name = gb_string_appendc(module_name, "$parapoly");
+	}
 
 	m->module_name = module_name;
 	m->ctx = LLVMContextCreate();
@@ -147,17 +153,42 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			m->gen = gen;
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
+
+			if (build_context.internal_weak_monomorphization) {
+				auto pm = gb_alloc_item(permanent_allocator(), lbModule);
+				pm->pkg = pkg;
+				pm->gen = gen;
+				m->polymorphic_module = pm;
+				pm->polymorphic_module = pm;
+
+				map_set(&gen->modules, cast(void *)pm, pm); // point to itself just add it to the list
+
+				lb_init_module(pm, c);
+			}
+
 			if (!module_per_file) {
 				continue;
 			}
 			// NOTE(bill): Probably per file is not a good idea, so leave this for later
 			for (AstFile *file : pkg->files) {
-				auto m = gb_alloc_item(permanent_allocator(), lbModule);
+				auto m  = gb_alloc_item(permanent_allocator(), lbModule);
 				m->file = file;
-				m->pkg = pkg;
-				m->gen = gen;
+				m->pkg  = pkg;
+				m->gen  = gen;
 				map_set(&gen->modules, cast(void *)file, m);
 				lb_init_module(m, c);
+
+
+				if (build_context.internal_weak_monomorphization) {
+					auto pm  = gb_alloc_item(permanent_allocator(), lbModule);
+					pm->file = file;
+					pm->gen  = gen;
+					pm->polymorphic_module = pm;
+
+					map_set(&gen->modules, cast(void *)pm, pm); // point to itself just add it to the list
+
+					lb_init_module(pm, c);
+				}
 			}
 		}
 	}
@@ -403,9 +434,9 @@ gb_internal lbModule *lb_module_of_expr(lbGenerator *gen, Ast *expr) {
 	return &gen->default_module;
 }
 
-gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
-	GB_ASSERT(e != nullptr);
+gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, lbModule *curr_module) {
 	lbModule **found = nullptr;
+
 	if (e->kind == Entity_Procedure &&
 	    e->decl_info &&
 	    e->decl_info->code_gen_module) {
@@ -426,6 +457,22 @@ gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
 		}
 	}
 	return &gen->default_module;
+}
+
+
+gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e, lbModule *curr_module) {
+	GB_ASSERT(e != nullptr);
+	GB_ASSERT(curr_module != nullptr);
+	lbModule *m = lb_module_of_entity_internal(gen, e, curr_module);
+
+	if (USE_SEPARATE_MODULES && build_context.internal_weak_monomorphization) {
+		if (e->kind == Entity_Procedure && e->Procedure.generated_from_polymorphic) {
+			if (m->polymorphic_module) {
+				return m->polymorphic_module;
+			}
+		}
+	}
+	return m;
 }
 
 gb_internal lbAddr lb_addr(lbValue addr) {
@@ -2914,7 +2961,7 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 		return lb_find_procedure_value_from_entity(m, e);
 	}
 	if (USE_SEPARATE_MODULES) {
-		lbModule *other_module = lb_module_of_entity(m->gen, e);
+		lbModule *other_module = lb_module_of_entity(m->gen, e, m);
 		if (other_module != m) {
 			String name = lb_get_entity_name(other_module, e);
 
@@ -2962,7 +3009,7 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 	lbModule *other_module = m;
 	if (USE_SEPARATE_MODULES) {
-		other_module = lb_module_of_entity(gen, e);
+		other_module = lb_module_of_entity(gen, e, m);
 	}
 	if (other_module == m) {
 		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), m);
@@ -3145,7 +3192,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	}
 
 	if (USE_SEPARATE_MODULES) {
-		lbModule *other_module = lb_module_of_entity(m->gen, e);
+		lbModule *other_module = lb_module_of_entity(m->gen, e, m);
 
 		bool is_external = other_module != m;
 		if (!is_external) {
