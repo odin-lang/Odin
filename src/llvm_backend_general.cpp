@@ -15,7 +15,9 @@ gb_global isize lb_global_type_info_member_offsets_index = 0;
 gb_global isize lb_global_type_info_member_usings_index  = 0;
 gb_global isize lb_global_type_info_member_tags_index    = 0;
 
-gb_internal void lb_init_module(lbModule *m, Checker *c) {
+gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	Checker *c = m->checker;
 	m->info = &c->info;
 
 
@@ -119,6 +121,15 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 
 	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);
 
+	return 0;
+}
+
+gb_internal void lb_init_module(lbModule *m, bool do_threading) {
+	if (do_threading) {
+		thread_pool_add_task(lb_init_module_worker_proc, m);
+	} else {
+		lb_init_module_worker_proc(m);
+	}
 }
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
@@ -130,6 +141,10 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	if (tc < 2) {
 		return false;
 	}
+
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1;
+	bool do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
 
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
@@ -151,19 +166,21 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
 			m->gen = gen;
+			m->checker = c;
 			map_set(&gen->modules, cast(void *)pkg, m);
-			lb_init_module(m, c);
+			lb_init_module(m, do_threading);
 
 			if (LLVM_WEAK_MONOMORPHIZATION) {
 				auto pm = gb_alloc_item(permanent_allocator(), lbModule);
 				pm->pkg = pkg;
 				pm->gen = gen;
+				pm->checker = c;
 				m->polymorphic_module  = pm;
 				pm->polymorphic_module = pm;
 
 				map_set(&gen->modules, cast(void *)pm, pm); // point to itself just add it to the list
 
-				lb_init_module(pm, c);
+				lb_init_module(pm, do_threading);
 			}
 
 			if (pkg->kind == Package_Runtime) {
@@ -177,8 +194,9 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				m->file = file;
 				m->pkg  = pkg;
 				m->gen  = gen;
+				m->checker = c;
 				map_set(&gen->modules, cast(void *)file, m);
-				lb_init_module(m, c);
+				lb_init_module(m, do_threading);
 
 
 				if (LLVM_WEAK_MONOMORPHIZATION) {
@@ -186,20 +204,24 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 					pm->file = file;
 					pm->pkg  = pkg;
 					pm->gen  = gen;
+					pm->checker = c;
 					m->polymorphic_module  = pm;
 					pm->polymorphic_module = pm;
 
 					map_set(&gen->modules, cast(void *)pm, pm); // point to itself just add it to the list
 
-					lb_init_module(pm, c);
+					lb_init_module(pm, do_threading);
 				}
 			}
 		}
 	}
 
 	gen->default_module.gen = gen;
+	gen->default_module.checker = c;
 	map_set(&gen->modules, cast(void *)1, &gen->default_module);
-	lb_init_module(&gen->default_module, c);
+	lb_init_module(&gen->default_module, do_threading);
+
+	thread_pool_wait();
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;

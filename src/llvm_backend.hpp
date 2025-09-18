@@ -147,6 +147,8 @@ struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
 
+	Checker *checker;
+
 	struct lbGenerator *gen;
 	LLVMTargetMachineRef target_machine;
 
