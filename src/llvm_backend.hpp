@@ -333,6 +333,14 @@ struct lbVariadicReuseSlices {
 	lbAddr slice_addr;
 };
 
+struct lbGlobalVariable {
+	lbValue var;
+	lbValue init;
+	DeclInfo *decl;
+	bool is_initialized;
+};
+
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -395,6 +403,10 @@ struct lbProcedure {
 	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
 
 	Array<lbValue> asan_stack_locals;
+
+	void (*generate_body)(lbModule *m, lbProcedure *p);
+	Array<lbGlobalVariable> *global_variables;
+	lbProcedure *objc_names;
 };
 
 

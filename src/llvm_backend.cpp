@@ -1153,15 +1153,6 @@ gb_internal lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_pt
 	return lb_emit_runtime_call(p, "__dynamic_map_reserve", args);
 }
 
-
-struct lbGlobalVariable {
-	lbValue var;
-	lbValue init;
-	DeclInfo *decl;
-	bool is_initialized;
-};
-
-
 gb_internal lbProcedure *lb_create_objc_names(lbModule *main_module) {
 	if (build_context.metrics.os != TargetOs_darwin) {
 		return nullptr;
@@ -1922,33 +1913,21 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
 }
 
 
-
-gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
-	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
-
-	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
-	p->is_startup = true;
-	lb_add_attribute_to_proc(p->module, p->value, "optnone");
-	lb_add_attribute_to_proc(p->module, p->value, "noinline");
-
-	// Make sure shared libraries call their own runtime startup on Linux.
-	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
-	LLVMSetLinkage(p->value, LLVMWeakAnyLinkage);
-
+gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedure *p) {
 	lb_begin_procedure_body(p);
 
-	lb_setup_type_info_data(main_module);
+	lb_setup_type_info_data(m);
 
-	if (objc_names) {
-		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, objc_names->type), objc_names->value, nullptr, 0, "");
+	if (p->objc_names) {
+		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(m, p->objc_names->type), p->objc_names->value, nullptr, 0, "");
 	}
 
-	for (auto &var : global_variables) {
+	for (auto &var : *p->global_variables) {
 		if (var.is_initialized) {
 			continue;
 		}
 
-		lbModule *entity_module = main_module;
+		lbModule *entity_module = m;
 
 		Entity *e = var.decl->entity;
 		GB_ASSERT(e->kind == Entity_Variable);
@@ -2001,7 +1980,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 				gbString var_name = gb_string_make(permanent_allocator(), "__$global_any::");
 				gbString e_str = string_canonical_entity_name(temporary_allocator(), e);
 				var_name = gb_string_append_length(var_name, e_str, gb_strlen(e_str));
-				lbAddr g = lb_add_global_generated_with_name(main_module, var_type, {}, make_string_c(var_name));
+				lbAddr g = lb_add_global_generated_with_name(m, var_type, {}, make_string_c(var_name));
 				lb_addr_store(p, g, var.init);
 				lbValue gp = lb_addr_get_ptr(p, g);
 
@@ -2022,17 +2001,36 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 
 	}
-	CheckerInfo *info = main_module->gen->info;
-	
+	CheckerInfo *info = m->gen->info;
+
 	for (Entity *e : info->init_procedures) {
-		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
+		lbValue value = lb_find_procedure_value_from_entity(m, e);
 		lb_emit_call(p, value, {}, ProcInlining_none);
 	}
 
 
 	lb_end_procedure_body(p);
+}
 
-	lb_verify_function(main_module, p);
+
+gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
+	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+
+	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
+	p->is_startup = true;
+	lb_add_attribute_to_proc(p->module, p->value, "optnone");
+	lb_add_attribute_to_proc(p->module, p->value, "noinline");
+
+	// Make sure shared libraries call their own runtime startup on Linux.
+	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
+	LLVMSetLinkage(p->value, LLVMWeakAnyLinkage);
+
+	p->generate_body    = lb_create_startup_runtime_generate_body;
+	p->global_variables = &global_variables;
+	p->objc_names       = objc_names;
+
+	array_add(&main_module->procedures_to_generate, p);
+
 	return p;
 }
 
@@ -2800,6 +2798,7 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 	if (p->is_done) {
 		return;
 	}
+
 	if (p->body != nullptr) { // Build Procedure
 		m->curr_procedure = p;
 		lb_begin_procedure_body(p);
@@ -2807,6 +2806,8 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 		lb_end_procedure_body(p);
 		p->is_done = true;
 		m->curr_procedure = nullptr;
+	} else if (p->generate_body != nullptr) {
+		p->generate_body(m, p);
 	}
 
 	// Add Flags
