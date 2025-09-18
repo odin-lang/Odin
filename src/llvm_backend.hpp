@@ -173,6 +173,8 @@ struct lbModule {
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
+
+	BlockingMutex missing_procedures_to_check_mutex;
 	Array<lbProcedure *> missing_procedures_to_check;
 
 	StringMap<LLVMValueRef>   const_strings;

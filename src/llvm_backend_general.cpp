@@ -3030,10 +3030,11 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	}
 
 	if (ignore_body) {
-		mutex_lock(&gen->anonymous_proc_lits_mutex);
-		defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));
+		// mutex_lock(&gen->anonymous_proc_lits_mutex);
+		// defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));
 
 		GB_ASSERT(other_module != nullptr);
+		mutex_lock(&other_module->missing_procedures_to_check_mutex);
 		rw_mutex_shared_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
 		rw_mutex_shared_unlock(&other_module->values_mutex);
@@ -3042,6 +3043,7 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
 			array_add(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
 		}
+		mutex_unlock(&other_module->missing_procedures_to_check_mutex);
 	} else {
 		array_add(&m->missing_procedures_to_check, missing_proc);
 	}
