@@ -3458,6 +3458,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	TIME_SECTION("LLVM Add Foreign Library Paths");
+	lb_add_foreign_library_paths(gen);
+
 	TIME_SECTION("LLVM Function Pass");
 	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
 
@@ -3493,9 +3496,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			return true;
 		}
 	}
-
-	TIME_SECTION("LLVM Add Foreign Library Paths");
-	lb_add_foreign_library_paths(gen);
 
 	TIME_SECTION("LLVM Correct Entity Linkage");
 	lb_correct_entity_linkage(gen);
