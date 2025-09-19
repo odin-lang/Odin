@@ -3096,6 +3096,8 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
 	lbGenerator *gen = m->gen;
+	gb_unused(gen);
+
 	ast_node(pl, ProcLit, expr);
 
 	if (pl->decl->entity.load() != nullptr) {
@@ -3121,10 +3123,15 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	token.string = name;
 	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
 	e->file = expr->file();
+
+#if 0
 	e->pkg = e->file->pkg;
 	e->scope = e->file->scope;
 
 	lbModule *target_module = lb_module_of_entity(gen, e, m);
+#else
+	lbModule *target_module = m;
+#endif
 	GB_ASSERT(target_module != nullptr);
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
