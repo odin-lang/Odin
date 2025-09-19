@@ -3082,12 +3082,9 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		if (found == nullptr) {
 			// THIS IS THE RACE CONDITION
 			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
-			if (!missing_proc_in_other_module->is_done.load(std::memory_order_relaxed)) {
-				mpsc_enqueue(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
-			}
+			mpsc_enqueue(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
 		}
 	} else {
-		GB_PANIC("missing procedure: %.*s", LIT(missing_proc->name));
 		mpsc_enqueue(&m->missing_procedures_to_check, missing_proc);
 	}
 
@@ -3133,15 +3130,9 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	token.string = name;
 	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
 	e->file = expr->file();
-
-#if 0
-	e->pkg = e->file->pkg;
 	e->scope = e->file->scope;
 
-	lbModule *target_module = lb_module_of_entity(gen, e, m);
-#else
 	lbModule *target_module = m;
-#endif
 	GB_ASSERT(target_module != nullptr);
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
@@ -3160,9 +3151,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		rw_mutex_shared_unlock(&target_module->values_mutex);
 		if (found == nullptr) {
 			lbProcedure *missing_proc_in_target_module = lb_create_procedure(target_module, e, false);
-			if (!missing_proc_in_target_module->is_done.load(std::memory_order_relaxed)) {
-				mpsc_enqueue(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
-			}
+			mpsc_enqueue(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
 		}
 
 		lbProcedure *p = lb_create_procedure(m, e, true);
