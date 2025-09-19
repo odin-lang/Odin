@@ -2020,7 +2020,7 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			continue;
 		}
 
-		if (type_size_of(e->type) > 32) {
+		if (type_size_of(e->type) > 8) {
 			String ename = lb_get_entity_name(m, e);
 			gbString name = gb_string_make(permanent_allocator(), "");
 			name = gb_string_appendc(name, "__$startup$");
