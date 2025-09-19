@@ -99,7 +99,6 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		}
 	}
 
-
 	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
 
 	p->module = m;

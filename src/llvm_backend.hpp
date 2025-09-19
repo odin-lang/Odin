@@ -366,9 +366,9 @@ struct lbProcedure {
 
 	lbFunctionType *abi_function_type;
 
-	LLVMValueRef    value;
-	LLVMBuilderRef  builder;
-	bool            is_done;
+	LLVMValueRef      value;
+	LLVMBuilderRef    builder;
+	std::atomic<bool> is_done;
 
 	lbAddr           return_ptr;
 	Array<lbDefer>   defer_stmts;

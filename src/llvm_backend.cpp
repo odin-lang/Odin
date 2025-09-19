@@ -12,7 +12,7 @@
 #endif
 
 #ifndef LLVM_WEAK_MONOMORPHIZATION
-#define LLVM_WEAK_MONOMORPHIZATION build_context.internal_weak_monomorphization
+#define LLVM_WEAK_MONOMORPHIZATION 1
 #endif
 
 
@@ -2478,8 +2478,14 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->missing_procedures_to_check, &p); /**/) {
-		debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
-		lb_generate_procedure(m, p);
+		if (!p->is_done.load(std::memory_order_relaxed)) {
+			debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
+			lb_generate_procedure(m, p);
+		}
+
+		for (lbProcedure *nested = nullptr; mpsc_dequeue(&m->procedures_to_generate, &nested); /**/) {
+			mpsc_enqueue(&m->missing_procedures_to_check, nested);
+		}
 	}
 	return 0;
 }
@@ -2860,7 +2866,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 }
 
 gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
-	if (p->is_done) {
+	if (p->is_done.load(std::memory_order_relaxed)) {
 		return;
 	}
 
@@ -2869,7 +2875,7 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 		lb_begin_procedure_body(p);
 		lb_build_stmt(p, p->body);
 		lb_end_procedure_body(p);
-		p->is_done = true;
+		p->is_done.store(true, std::memory_order_relaxed);
 		m->curr_procedure = nullptr;
 	} else if (p->generate_body != nullptr) {
 		p->generate_body(m, p);
