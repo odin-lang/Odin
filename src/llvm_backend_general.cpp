@@ -3083,7 +3083,7 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
-	// lbGenerator *gen = m->gen;
+	lbGenerator *gen = m->gen;
 	ast_node(pl, ProcLit, expr);
 
 	if (pl->decl->entity.load() != nullptr) {
@@ -3112,8 +3112,11 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	e->pkg = e->file->pkg;
 	e->scope = e->file->scope;
 
+	lbModule *target_module = lb_module_of_entity(gen, e, m);
+	GB_ASSERT(target_module != nullptr);
+
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
-	pl->decl->code_gen_module = m;
+	pl->decl->code_gen_module = target_module;
 	e->decl_info = pl->decl;
 	e->parent_proc_decl = pl->decl->parent;
 	e->Procedure.is_anonymous = true;
@@ -3121,20 +3124,41 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 
 	pl->decl->entity.store(e);
 
-	lbProcedure *p = lb_create_procedure(m, e);
-	GB_ASSERT(e->code_gen_module == m);
 
-	lbValue value = {};
-	value.value = p->value;
-	value.type = p->type;
+	if (target_module != m) {
+		mutex_lock(&target_module->missing_procedures_to_check_mutex);
+		rw_mutex_shared_lock(&target_module->values_mutex);
+		lbValue *found = map_get(&target_module->values, e);
+		rw_mutex_shared_unlock(&target_module->values_mutex);
+		if (found == nullptr) {
+			// THIS IS THE RACE CONDITION
+			lbProcedure *missing_proc_in_target_module = lb_create_procedure(target_module, e, false);
+			array_add(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
+		}
 
-	array_add(&m->procedures_to_generate, p);
-	if (parent != nullptr) {
-		array_add(&parent->children, p);
+		mutex_unlock(&target_module->missing_procedures_to_check_mutex);
+
+		lbProcedure *p = lb_create_procedure(m, e, true);
+
+		lbValue value = {};
+		value.value = p->value;
+		value.type = p->type;
+		return value;
 	} else {
-		string_map_set(&m->members, name, value);
+		lbProcedure *p = lb_create_procedure(m, e);
+
+		lbValue value = {};
+		value.value = p->value;
+		value.type = p->type;
+
+		array_add(&m->procedures_to_generate, p);
+		if (parent != nullptr) {
+			array_add(&parent->children, p);
+		} else {
+			string_map_set(&m->members, name, value);
+		}
+		return value;
 	}
-	return value;
 }
 
 
