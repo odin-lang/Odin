@@ -2001,6 +2001,8 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 	if (p->objc_names) {
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(m, p->objc_names->type), p->objc_names->value, nullptr, 0, "");
 	}
+	Type *dummy_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+	LLVMTypeRef raw_dummy_type = lb_type_internal_for_procedures_raw(m, dummy_type);
 
 	for (auto &var : *p->global_variables) {
 		if (var.is_initialized) {
@@ -2018,8 +2020,25 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			continue;
 		}
 
-		lb_init_global_var(m, p, e, init_expr, var);
+		if (type_size_of(e->type) > 32) {
+			String ename = lb_get_entity_name(m, e);
+			gbString name = gb_string_make(permanent_allocator(), "");
+			name = gb_string_appendc(name, "__$startup$");
+			name = gb_string_append_length(name, ename.text, ename.len);
 
+			lbProcedure *dummy = lb_create_dummy_procedure(m, make_string_c(name), dummy_type);
+			LLVMSetVisibility(dummy->value, LLVMHiddenVisibility);
+			LLVMSetLinkage(dummy->value, LLVMWeakAnyLinkage);
+
+			lb_begin_procedure_body(dummy);
+			lb_init_global_var(m, dummy, e, init_expr, var);
+			lb_end_procedure_body(dummy);
+
+			LLVMValueRef context_ptr = lb_find_or_generate_context_ptr(p).addr.value;
+			LLVMBuildCall2(p->builder, raw_dummy_type, dummy->value, &context_ptr, 1, "");
+		} else {
+			lb_init_global_var(m, p, e, init_expr, var);
+		}
 	}
 	CheckerInfo *info = m->gen->info;
 
