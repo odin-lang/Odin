@@ -246,26 +246,12 @@ gb_internal String lb_internal_gen_name_from_type(char const *prefix, Type *type
 	return proc_name;
 }
 
-
-gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
-	type = base_type(type);
-	GB_ASSERT(is_type_comparable(type));
+gb_internal void lb_equal_proc_generate_body(lbModule *m, lbProcedure *p) {
+	Type *type = p->internal_gen_type;
 
 	Type *pt = alloc_type_pointer(type);
 	LLVMTypeRef ptr_type = lb_type(m, pt);
 
-	String proc_name = lb_internal_gen_name_from_type("__$equal", type);
-	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
-	lbProcedure *compare_proc = nullptr;
-	if (found) {
-		compare_proc = *found;
-		GB_ASSERT(compare_proc != nullptr);
-		return {compare_proc->value, compare_proc->type};
-	}
-
-
-	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
-	string_map_set(&m->gen_procs, proc_name, p);
 	lb_begin_procedure_body(p);
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
@@ -393,9 +379,29 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	}
 
 	lb_end_procedure_body(p);
+}
 
-	compare_proc = p;
-	return {compare_proc->value, compare_proc->type};
+gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
+	type = base_type(type);
+	GB_ASSERT(is_type_comparable(type));
+
+	String proc_name = lb_internal_gen_name_from_type("__$equal", type);
+	lbProcedure **found = string_map_get(&m->gen_procs, proc_name);
+	if (found) {
+		lbProcedure *p = *found;
+		GB_ASSERT(p != nullptr);
+		return {p->value, p->type};
+	}
+
+	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
+	string_map_set(&m->gen_procs, proc_name, p);
+	p->internal_gen_type = type;
+	p->generate_body = lb_equal_proc_generate_body;
+
+	// p->generate_body(m, p);
+	mpsc_enqueue(&m->procedures_to_generate, p);
+
+	return {p->value, p->type};
 }
 
 gb_internal lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue data, lbValue seed) {
@@ -2068,7 +2074,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	p->global_variables = &global_variables;
 	p->objc_names       = objc_names;
 
-	array_add(&main_module->procedures_to_generate, p);
+	mpsc_enqueue(&main_module->procedures_to_generate, p);
 
 	return p;
 }
@@ -2110,7 +2116,7 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 
 	for (Entity *e : m->global_procedures_to_create) {
 		(void)lb_get_entity_name(m, e);
-		array_add(&m->procedures_to_generate, lb_create_procedure(m, e));
+		mpsc_enqueue(&m->procedures_to_generate, lb_create_procedure(m, e));
 	}
 	return 0;
 }
@@ -2298,7 +2304,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		lb_llvm_function_pass_per_function_internal(m, m->gen->objc_names);
 	}
 
-	for (lbProcedure *p : m->procedures_to_generate) {
+	MUTEX_GUARD_BLOCK(&m->generated_procedures_mutex) for (lbProcedure *p : m->generated_procedures) {
 		if (p->body != nullptr) { // Build Procedure
 			lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default;
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
@@ -2447,8 +2453,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
-	for (isize i = 0; i < m->procedures_to_generate.count; i++) {
-		lbProcedure *p = m->procedures_to_generate[i];
+	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
 		lb_generate_procedure(p->module, p);
 	}
 	return 0;
@@ -2876,6 +2881,9 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 	}
 
 	lb_verify_function(m, p, true);
+
+	MUTEX_GUARD(&m->generated_procedures_mutex);
+	array_add(&m->generated_procedures, p);
 }
 
 

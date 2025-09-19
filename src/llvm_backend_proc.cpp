@@ -835,7 +835,7 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 
 	lb_add_entity(m, e, value);
 	array_add(&p->children, nested_proc);
-	array_add(&m->procedures_to_generate, nested_proc);
+	mpsc_enqueue(&m->procedures_to_generate, nested_proc);
 }
 
 

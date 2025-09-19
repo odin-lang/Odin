@@ -97,12 +97,16 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	map_init(&m->function_type_map);
 	string_map_init(&m->gen_procs);
 	if (USE_SEPARATE_MODULES) {
-		array_init(&m->procedures_to_generate, a, 0, 1<<10);
+		mpsc_init(&m->procedures_to_generate, a);
 		map_init(&m->procedure_values,               1<<11);
+		array_init(&m->generated_procedures,   a, 0, 1<<10);
 	} else {
-		array_init(&m->procedures_to_generate, a, 0, c->info.all_procedures.count);
+		mpsc_init(&m->procedures_to_generate, a);
 		map_init(&m->procedure_values,               c->info.all_procedures.count*2);
+		array_init(&m->generated_procedures,   a, 0, c->info.all_procedures.count*2);
 	}
+
+
 	array_init(&m->global_procedures_to_create, a, 0, 1024);
 	array_init(&m->global_types_to_create, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
@@ -212,6 +216,14 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 					lb_init_module(pm, do_threading);
 				}
 			}
+		}
+
+		if (LLVM_WEAK_MONOMORPHIZATION) {
+			lbModule *m = gb_alloc_item(permanent_allocator(), lbModule);
+			gen->equal_module = m;
+			m->checker = c;
+			map_set(&gen->modules, cast(void *)m, m); // point to itself just add it to the list
+			lb_init_module(m, do_threading);
 		}
 	}
 
@@ -3169,7 +3181,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		value.value = p->value;
 		value.type = p->type;
 
-		array_add(&m->procedures_to_generate, p);
+		mpsc_enqueue(&m->procedures_to_generate, p);
 		if (parent != nullptr) {
 			array_add(&parent->children, p);
 		} else {

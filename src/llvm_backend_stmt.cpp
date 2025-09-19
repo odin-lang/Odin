@@ -92,7 +92,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			value.value = nested_proc->value;
 			value.type = nested_proc->type;
 
-			array_add(&p->module->procedures_to_generate, nested_proc);
+			mpsc_enqueue(&p->module->procedures_to_generate, nested_proc);
 			array_add(&p->children, nested_proc);
 			string_map_set(&p->module->members, name, value);
 		}

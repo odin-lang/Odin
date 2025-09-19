@@ -186,9 +186,12 @@ struct lbModule {
 
 	StringMap<lbProcedure *> gen_procs;   // key is the canonicalized name
 
-	Array<lbProcedure *> procedures_to_generate;
+	MPSCQueue<lbProcedure *> procedures_to_generate;
 	Array<Entity *> global_procedures_to_create;
 	Array<Entity *> global_types_to_create;
+
+	BlockingMutex generated_procedures_mutex;
+	Array<lbProcedure *> generated_procedures;
 
 	lbProcedure *curr_procedure;
 
@@ -237,6 +240,8 @@ struct lbGenerator : LinkerData {
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
+
+	lbModule *equal_module;
 
 	isize used_module_count;
 
