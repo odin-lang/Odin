@@ -2477,15 +2477,9 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 
 gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
-	for (isize i = 0; i < m->missing_procedures_to_check.count; i++) {
-		lbProcedure *p = m->missing_procedures_to_check[i];
+	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->missing_procedures_to_check, &p); /**/) {
 		debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
-		isize count = m->procedures_to_generate.count;
 		lb_generate_procedure(m, p);
-		isize new_count = m->procedures_to_generate.count;
-		if (count != new_count) {
-			gb_printf_err("NEW STUFF!\n");
-		}
 	}
 	return 0;
 }
@@ -2504,6 +2498,12 @@ gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_thread
 			// NOTE(bill): procedures may be added during generation
 			lb_generate_missing_procedures_to_check_worker_proc(m);
 		}
+	}
+
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
+		GB_ASSERT(m->missing_procedures_to_check.count == 0);
+		GB_ASSERT(m->procedures_to_generate.count == 0);
 	}
 }
 

@@ -109,7 +109,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 
 	array_init(&m->global_procedures_to_create, a, 0, 1024);
 	array_init(&m->global_types_to_create, a, 0, 1024);
-	array_init(&m->missing_procedures_to_check, a, 0, 16);
+	mpsc_init(&m->missing_procedures_to_check, a);
 	map_init(&m->debug_values);
 
 	string_map_init(&m->objc_classes);
@@ -3079,18 +3079,16 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		// defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));
 
 		GB_ASSERT(other_module != nullptr);
-		mutex_lock(&other_module->missing_procedures_to_check_mutex);
 		rw_mutex_shared_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
 		rw_mutex_shared_unlock(&other_module->values_mutex);
 		if (found == nullptr) {
 			// THIS IS THE RACE CONDITION
 			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
-			array_add(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
+			mpsc_enqueue(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
 		}
-		mutex_unlock(&other_module->missing_procedures_to_check_mutex);
 	} else {
-		array_add(&m->missing_procedures_to_check, missing_proc);
+		mpsc_enqueue(&m->missing_procedures_to_check, missing_proc);
 	}
 
 	rw_mutex_shared_lock(&m->values_mutex);
@@ -3157,16 +3155,14 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 
 
 	if (target_module != m) {
-		mutex_lock(&target_module->missing_procedures_to_check_mutex);
 		rw_mutex_shared_lock(&target_module->values_mutex);
 		lbValue *found = map_get(&target_module->values, e);
 		rw_mutex_shared_unlock(&target_module->values_mutex);
 		if (found == nullptr) {
 			lbProcedure *missing_proc_in_target_module = lb_create_procedure(target_module, e, false);
-			array_add(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
+			mpsc_enqueue(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
 		}
 
-		mutex_unlock(&target_module->missing_procedures_to_check_mutex);
 
 		lbProcedure *p = lb_create_procedure(m, e, true);
 
