@@ -1,8 +1,8 @@
 package container_small_array
 
 import "base:builtin"
-import "base:runtime"
-_ :: runtime
+@require import "base:intrinsics"
+@require import "base:runtime"
 
 /*
 A fixed-size stack-allocated array operated on in a dynamic fashion.
@@ -231,7 +231,7 @@ Example:
 		fmt.println(small_array.slice(&a))
 
 		// resizing makes the change visible
-		small_array.resize(&a, 100)
+		small_array.non_zero_resize(&a, 100)
 		fmt.println(small_array.slice(&a))
 	}
 
@@ -250,6 +250,8 @@ set :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, item: T) {
 /*
 Tries to resize the small-array to the specified length.
 
+The memory of added elements will be zeroed out.
+
 The new length will be:
 	- `length` if `length` <= capacity
 	- capacity if length > capacity
@@ -259,7 +261,7 @@ The new length will be:
 - `length`: The new desired length
 
 Example:
-	
+
 	import "core:container/small_array"
 	import "core:fmt"
 
@@ -269,7 +271,7 @@ Example:
 		small_array.push_back(&a, 1)
 		small_array.push_back(&a, 2)
 		fmt.println(small_array.slice(&a))
-		
+
 		small_array.resize(&a, 1)
 		fmt.println(small_array.slice(&a))
 
@@ -278,12 +280,56 @@ Example:
 	}
 
 Output:
-	
+
+	[1, 2]
+	[1]
+	[1, 0, 0, 0, 0]
+*/
+resize :: proc "contextless" (a: ^$A/Small_Array($N, $T), length: int) {
+	prev_len := a.len
+	a.len = min(length, builtin.len(a.data))
+	if prev_len < a.len {
+		intrinsics.mem_zero(&a.data[prev_len], size_of(T)*(a.len-prev_len))
+	}
+}
+
+/*
+Tries to resize the small-array to the specified length.
+
+The new length will be:
+	- `length` if `length` <= capacity
+	- capacity if length > capacity
+
+**Inputs**
+- `a`: A pointer to the small-array
+- `length`: The new desired length
+
+Example:
+
+	import "core:container/small_array"
+	import "core:fmt"
+
+	non_zero_resize :: proc() {
+		a: small_array.Small_Array(5, int)
+
+		small_array.push_back(&a, 1)
+		small_array.push_back(&a, 2)
+		fmt.println(small_array.slice(&a))
+
+		small_array.non_zero_resize(&a, 1)
+		fmt.println(small_array.slice(&a))
+
+		small_array.non_zero_resize(&a, 100)
+		fmt.println(small_array.slice(&a))
+	}
+
+Output:
+
 	[1, 2]
 	[1]
 	[1, 2, 0, 0, 0]
 */
-resize :: proc "contextless" (a: ^$A/Small_Array, length: int) {
+non_zero_resize :: proc "contextless" (a: ^$A/Small_Array, length: int) {
 	a.len = min(length, builtin.len(a.data))
 }
 
