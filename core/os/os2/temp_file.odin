@@ -18,7 +18,7 @@ create_temp_file :: proc(dir, pattern: string) -> (f: ^File, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	dir := dir if dir != "" else temp_directory(temp_allocator) or_return
 	prefix, suffix := _prefix_and_suffix(pattern) or_return
-	prefix = temp_join_path(dir, prefix) or_return
+	prefix = temp_join_path(dir, prefix, temp_allocator) or_return
 
 	rand_buf: [10]byte
 	name_buf := make([]byte, len(prefix)+len(rand_buf)+len(suffix), temp_allocator)
@@ -50,7 +50,7 @@ make_directory_temp :: proc(dir, pattern: string, allocator: runtime.Allocator) 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	dir := dir if dir != "" else temp_directory(temp_allocator) or_return
 	prefix, suffix := _prefix_and_suffix(pattern) or_return
-	prefix = temp_join_path(dir, prefix) or_return
+	prefix = temp_join_path(dir, prefix, temp_allocator) or_return
 
 	rand_buf: [10]byte
 	name_buf := make([]byte, len(prefix)+len(rand_buf)+len(suffix), temp_allocator)
@@ -88,12 +88,10 @@ temp_directory :: proc(allocator: runtime.Allocator) -> (string, Error) {
 
 
 @(private="file")
-temp_join_path :: proc(dir, name: string) -> (string, runtime.Allocator_Error) {
-	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-
+temp_join_path :: proc(dir, name: string, allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
 	if len(dir) > 0 && is_path_separator(dir[len(dir)-1]) {
-		return concatenate({dir, name}, temp_allocator,)
+		return concatenate({dir, name}, allocator)
 	}
 
-	return concatenate({dir, Path_Separator_String, name}, temp_allocator)
+	return concatenate({dir, Path_Separator_String, name}, allocator)
 }
