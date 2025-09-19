@@ -8176,7 +8176,6 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 					} else {
 						// NOTE(bill): Otherwise the compiler can override the polymorphic type
 						// as it assumes it is determining the type
-						AddressingMode old_mode = operand->mode;
 						check_cast(c, operand, t);
 					}
 				}
