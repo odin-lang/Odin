@@ -608,7 +608,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		entity->flags |= EntityFlag_Disabled;
 	}
 
-	d->entity = entity;
+	d->entity.store(entity);
 
 	AstFile *file = nullptr;
 	{
@@ -8335,9 +8335,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				if (c->curr_proc_decl == nullptr) {
 					error(call, "Calling a '#force_inline' procedure that enables target features is not allowed at file scope");
 				} else {
-					GB_ASSERT(c->curr_proc_decl->entity);
-					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
-					String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
+					Entity *e = c->curr_proc_decl->entity.load();
+					GB_ASSERT(e);
+					GB_ASSERT(e->type->kind == Type_Proc);
+					String scope_features = e->type->Proc.enable_target_feature;
 					if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
 						ERROR_BLOCK();
 						error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));

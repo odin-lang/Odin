@@ -238,9 +238,6 @@ struct lbGenerator : LinkerData {
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
-	RecursiveMutex anonymous_proc_lits_mutex;
-	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
-
 	isize used_module_count;
 
 	lbProcedure *startup_runtime;

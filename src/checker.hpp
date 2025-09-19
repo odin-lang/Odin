@@ -209,7 +209,7 @@ struct DeclInfo {
 
 	Scope *       scope;
 
-	Entity *entity;
+	std::atomic<Entity *> entity;
 
 	Ast *         decl_node;
 	Ast *         type_expr;

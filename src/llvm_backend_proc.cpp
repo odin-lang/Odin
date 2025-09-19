@@ -2211,7 +2211,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				GB_ASSERT(e != nullptr);
 
 				if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
-					procedure = e->parent_proc_decl->entity->token.string;
+					procedure = e->parent_proc_decl->entity.load()->token.string;
 				} else {
 					procedure = str_lit("");
 				}

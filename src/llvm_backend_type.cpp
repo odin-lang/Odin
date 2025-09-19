@@ -394,8 +394,9 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 			String proc_name = {};
 			if (t->Named.type_name->parent_proc_decl) {
 				DeclInfo *decl = t->Named.type_name->parent_proc_decl;
-				if (decl->entity && decl->entity->kind == Entity_Procedure) {
-					proc_name = decl->entity->token.string;
+				Entity *e = decl->entity.load();
+				if (e && e->kind == Entity_Procedure) {
+					proc_name = e->token.string;
 				}
 			}
 			TokenPos pos = t->Named.type_name->token.pos;

@@ -157,7 +157,6 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	map_init(&gen->modules, gen->info->packages.count*2);
 	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
-	map_init(&gen->anonymous_proc_lits, 1024);
 
 	if (USE_SEPARATE_MODULES) {
 		bool module_per_file = build_context.module_per_file && build_context.optimization_level <= 0;
@@ -3084,18 +3083,14 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
-	lbGenerator *gen = m->gen;
+	// lbGenerator *gen = m->gen;
+	ast_node(pl, ProcLit, expr);
 
-	mutex_lock(&gen->anonymous_proc_lits_mutex);
-	defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));
-
-	TokenPos pos = ast_token(expr).pos;
-	lbProcedure **found = map_get(&gen->anonymous_proc_lits, expr);
-	if (found) {
-		return lb_find_procedure_value_from_entity(m, (*found)->entity);
+	if (pl->decl->entity.load() != nullptr) {
+		return lb_find_procedure_value_from_entity(m, pl->decl->entity.load());
 	}
 
-	ast_node(pl, ProcLit, expr);
+	TokenPos pos = ast_token(expr).pos;
 
 	// NOTE(bill): Generate a new name
 	// parent$count
@@ -3114,14 +3109,17 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	token.string = name;
 	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
 	e->file = expr->file();
+	e->pkg = e->file->pkg;
+	e->scope = e->file->scope;
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
 	pl->decl->code_gen_module = m;
 	e->decl_info = pl->decl;
-	pl->decl->entity = e;
 	e->parent_proc_decl = pl->decl->parent;
 	e->Procedure.is_anonymous = true;
 	e->flags |= EntityFlag_ProcBodyChecked;
+
+	pl->decl->entity.store(e);
 
 	lbProcedure *p = lb_create_procedure(m, e);
 	GB_ASSERT(e->code_gen_module == m);
@@ -3130,7 +3128,6 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	value.value = p->value;
 	value.type = p->type;
 
-	map_set(&gen->anonymous_proc_lits, expr, p);
 	array_add(&m->procedures_to_generate, p);
 	if (parent != nullptr) {
 		array_add(&parent->children, p);
