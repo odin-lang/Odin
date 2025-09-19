@@ -3504,14 +3504,17 @@ gb_internal bool is_type_union_constantable(Type *type) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
 
-
-	if (bt->Union.variants.count <= 1) {
+	if (bt->Union.variants.count == 0) {
 		return true;
+	} else if (bt->Union.variants.count == 1) {
+		return is_type_constant_type(bt->Union.variants[0]);
 	}
 
-	// for (Type *v : bt->Union.variants) {
-
-	// }
+	for (Type *v : bt->Union.variants) {
+		if (!is_type_constant_type(v)) {
+			return false;
+		}
+	}
 	return false;
 }
 
@@ -8175,9 +8178,6 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 						// as it assumes it is determining the type
 						AddressingMode old_mode = operand->mode;
 						check_cast(c, operand, t);
-						if (old_mode == Addressing_Constant && old_mode != operand->mode) {
-							gb_printf_err("HERE: %d -> %d %s\n", old_mode, operand->mode, expr_to_string(operand->expr));
-						}
 					}
 				}
 				operand->type = t;
