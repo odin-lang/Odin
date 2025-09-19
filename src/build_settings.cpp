@@ -418,6 +418,7 @@ enum LinkerChoice : i32 {
 	Linker_Default = 0,
 	Linker_lld,
 	Linker_radlink,
+	Linker_mold,
 
 	Linker_COUNT,
 };
@@ -433,6 +434,7 @@ String linker_choices[Linker_COUNT] = {
 	str_lit("default"),
 	str_lit("lld"),
 	str_lit("radlink"),
+	str_lit("mold"),
 };
 
 enum IntegerDivisionByZeroKind : u8 {
