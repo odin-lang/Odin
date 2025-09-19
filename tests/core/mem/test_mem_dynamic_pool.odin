@@ -44,11 +44,11 @@ expect_pool_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, al
 	testing.expect(t, pool.used_blocks == nil)
 }
 
-expect_pool_allocation_out_of_band :: proc(t: ^testing.T, num_bytes, out_band_size: int) {
+expect_pool_allocation_out_of_band :: proc(t: ^testing.T, num_bytes, block_size, out_band_size: int) {
 	testing.expect(t, num_bytes >= out_band_size, "Sanity check failed, your test call is flawed! Make sure that num_bytes >= out_band_size!")
 
 	pool: mem.Dynamic_Pool
-	mem.dynamic_pool_init(&pool, out_band_size = out_band_size)
+	mem.dynamic_pool_init(&pool, block_size = block_size, out_band_size = out_band_size)
 	pool_allocator := mem.dynamic_pool_allocator(&pool)
 
 	element, err := mem.alloc(num_bytes, allocator = pool_allocator)
@@ -69,14 +69,15 @@ test_dynamic_pool_alloc_aligned :: proc(t: ^testing.T) {
 
 @(test)
 test_dynamic_pool_alloc_unaligned :: proc(t: ^testing.T) {
-	expect_pool_allocation(t, expected_used_bytes =   8,   num_bytes=1, alignment=8)
-	expect_pool_allocation(t, expected_used_bytes =   16,  num_bytes=9, alignment=8)
+	expect_pool_allocation(t, expected_used_bytes = 8,  num_bytes = 1, alignment = 8)
+	expect_pool_allocation(t, expected_used_bytes = 16, num_bytes = 9, alignment = 8)
 }
 
 @(test)
 test_dynamic_pool_alloc_out_of_band :: proc(t: ^testing.T) {
-	expect_pool_allocation_out_of_band(t, num_bytes = 128, out_band_size = 128)
-	expect_pool_allocation_out_of_band(t, num_bytes = 129, out_band_size = 128)
+	expect_pool_allocation_out_of_band(t, num_bytes = 128, block_size = 512, out_band_size = 128)
+	expect_pool_allocation_out_of_band(t, num_bytes = 129, block_size = 512, out_band_size = 128)
+	expect_pool_allocation_out_of_band(t, num_bytes = 513, block_size = 512, out_band_size = 128)
 }
 
 @(test)
