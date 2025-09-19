@@ -168,7 +168,7 @@ gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValue
 		return llvm_const_named_struct_internal(struct_type, values, value_count_);
 	}
 	Type *bt = base_type(t);
-	GB_ASSERT(bt->kind == Type_Struct);
+	GB_ASSERT(bt->kind == Type_Struct || bt->kind == Type_Union);
 	
 	GB_ASSERT(value_count_ == bt->Struct.fields.count);
 	
@@ -584,6 +584,47 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 	}
 
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
+
+	if (is_type_union(type) && is_type_union_constantable(type)) {
+		Type *bt = base_type(type);
+		GB_ASSERT(bt->kind == Type_Union);
+		GB_ASSERT(bt->Union.variants.count <= 1);
+		if (bt->Union.variants.count == 0) {
+			return lb_const_nil(m, original_type);
+		} else if (bt->Union.variants.count == 1) {
+			Type *t = bt->Union.variants[0];
+			lbValue cv =  lb_const_value(m, t, value, cc);
+			GB_ASSERT(LLVMIsConstant(cv.value));
+
+			LLVMTypeRef llvm_type = lb_type(m, original_type);
+
+			if (is_type_union_maybe_pointer(type)) {
+				LLVMValueRef values[1] = {cv.value};
+				res.value = llvm_const_named_struct_internal(llvm_type, values, 1);
+				res.type = original_type;
+				return res;
+			} else {
+
+				unsigned tag_value = 1;
+				if (bt->Union.kind == UnionType_no_nil) {
+					tag_value = 0;
+				}
+				LLVMValueRef tag = LLVMConstInt(LLVMStructGetTypeAtIndex(llvm_type, 1), tag_value, false);
+				LLVMValueRef padding = nullptr;
+				LLVMValueRef values[3] = {cv.value, tag, padding};
+
+				isize value_count = 2;
+				if (LLVMCountStructElementTypes(llvm_type) > 2) {
+					value_count = 3;
+					padding = LLVMConstNull(LLVMStructGetTypeAtIndex(llvm_type, 2));
+				}
+				res.value = llvm_const_named_struct_internal(llvm_type, values, value_count);
+				res.type = original_type;
+				return res;
+			}
+		}
+
+	}
 
 	// GB_ASSERT_MSG(is_type_typed(type), "%s", type_to_string(type));
 

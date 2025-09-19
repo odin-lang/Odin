@@ -3500,6 +3500,21 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	return false;
 }
 
+gb_internal bool is_type_union_constantable(Type *type) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_Union);
+
+
+	if (bt->Union.variants.count <= 1) {
+		return true;
+	}
+
+	// for (Type *v : bt->Union.variants) {
+
+	// }
+	return false;
+}
+
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 
@@ -3524,6 +3539,9 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
 		} else if (is_type_union(type)) {
+			if (is_type_union_constantable(type)) {
+				return true;
+			}
 			x->mode = Addressing_Value;
 		}
 		if (x->mode == Addressing_Value) {
@@ -3582,7 +3600,11 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		Type *final_type = type;
 		if (is_const_expr && !is_type_constant_type(type)) {
 			if (is_type_union(type)) {
-				convert_to_typed(c, x, type);
+				if (is_type_union_constantable(type)) {
+
+				} else {
+					convert_to_typed(c, x, type);
+				}
 			}
 			final_type = default_type(x->type);
 		}
@@ -8151,7 +8173,11 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 					} else {
 						// NOTE(bill): Otherwise the compiler can override the polymorphic type
 						// as it assumes it is determining the type
+						AddressingMode old_mode = operand->mode;
 						check_cast(c, operand, t);
+						if (old_mode == Addressing_Constant && old_mode != operand->mode) {
+							gb_printf_err("HERE: %d -> %d %s\n", old_mode, operand->mode, expr_to_string(operand->expr));
+						}
 					}
 				}
 				operand->type = t;

@@ -1565,7 +1565,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init_expr) {
+gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
