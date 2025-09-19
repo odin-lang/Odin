@@ -1924,6 +1924,74 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
 	return 0;
 }
 
+gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast *init_expr, lbGlobalVariable &var) {
+	if (init_expr != nullptr)  {
+		lbValue init = lb_build_expr(p, init_expr);
+		if (init.value == nullptr) {
+			LLVMTypeRef global_type = llvm_addr_type(p->module, var.var);
+			if (is_type_untyped_nil(init.type)) {
+				LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
+				var.is_initialized = true;
+
+				if (e->Variable.is_rodata) {
+					LLVMSetGlobalConstant(var.var.value, true);
+				}
+				return true;
+			}
+			GB_PANIC("Invalid init value, got %s", expr_to_string(init_expr));
+		}
+
+		if (is_type_any(e->type) || is_type_union(e->type)) {
+			var.init = init;
+		} else if (lb_is_const_or_global(init)) {
+			if (!var.is_initialized) {
+				if (is_type_proc(init.type)) {
+					init.value = LLVMConstPointerCast(init.value, lb_type(p->module, init.type));
+				}
+				LLVMSetInitializer(var.var.value, init.value);
+				var.is_initialized = true;
+
+				if (e->Variable.is_rodata) {
+					LLVMSetGlobalConstant(var.var.value, true);
+				}
+				return true;
+			}
+		} else {
+			var.init = init;
+		}
+	}
+
+	if (var.init.value != nullptr) {
+		GB_ASSERT(!var.is_initialized);
+		Type *t = type_deref(var.var.type);
+
+		if (is_type_any(t)) {
+			// NOTE(bill): Edge case for 'any' type
+			Type *var_type = default_type(var.init.type);
+			gbString var_name = gb_string_make(permanent_allocator(), "__$global_any::");
+			gbString e_str = string_canonical_entity_name(temporary_allocator(), e);
+			var_name = gb_string_append_length(var_name, e_str, gb_strlen(e_str));
+			lbAddr g = lb_add_global_generated_with_name(m, var_type, {}, make_string_c(var_name));
+			lb_addr_store(p, g, var.init);
+			lbValue gp = lb_addr_get_ptr(p, g);
+
+			lbValue data = lb_emit_struct_ep(p, var.var, 0);
+			lbValue ti   = lb_emit_struct_ep(p, var.var, 1);
+			lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
+			lb_emit_store(p, ti,   lb_typeid(p->module, var_type));
+		} else {
+			LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
+			lbValue src0 = lb_emit_conv(p, var.init, t);
+			LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
+			LLVMValueRef dst = var.var.value;
+			LLVMBuildStore(p->builder, src, dst);
+		}
+
+		var.is_initialized = true;
+	}
+	return false;
+}
+
 
 gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedure *p) {
 	lb_begin_procedure_body(p);
@@ -1944,73 +2012,13 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 		Entity *e = var.decl->entity;
 		GB_ASSERT(e->kind == Entity_Variable);
 		e->code_gen_module = entity_module;
-
 		Ast *init_expr = var.decl->init_expr;
-		if (init_expr != nullptr)  {
-			lbValue init = lb_build_expr(p, init_expr);
-			if (init.value == nullptr) {
-				LLVMTypeRef global_type = llvm_addr_type(p->module, var.var);
-				if (is_type_untyped_nil(init.type)) {
-					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
-					var.is_initialized = true;
 
-					if (e->Variable.is_rodata) {
-						LLVMSetGlobalConstant(var.var.value, true);
-					}
-					continue;
-				}
-				GB_PANIC("Invalid init value, got %s", expr_to_string(init_expr));
-			}
-
-			if (is_type_any(e->type) || is_type_union(e->type)) {
-				var.init = init;
-			} else if (lb_is_const_or_global(init)) {
-				if (!var.is_initialized) {
-					if (is_type_proc(init.type)) {
-						init.value = LLVMConstPointerCast(init.value, lb_type(p->module, init.type));
-					}
-					LLVMSetInitializer(var.var.value, init.value);
-					var.is_initialized = true;
-
-					if (e->Variable.is_rodata) {
-						LLVMSetGlobalConstant(var.var.value, true);
-					}
-					continue;
-				}
-			} else {
-				var.init = init;
-			}
+		if (init_expr == nullptr && var.init.value == nullptr) {
+			continue;
 		}
 
-		if (var.init.value != nullptr) {
-			GB_ASSERT(!var.is_initialized);
-			Type *t = type_deref(var.var.type);
-
-			if (is_type_any(t)) {
-				// NOTE(bill): Edge case for 'any' type
-				Type *var_type = default_type(var.init.type);
-				gbString var_name = gb_string_make(permanent_allocator(), "__$global_any::");
-				gbString e_str = string_canonical_entity_name(temporary_allocator(), e);
-				var_name = gb_string_append_length(var_name, e_str, gb_strlen(e_str));
-				lbAddr g = lb_add_global_generated_with_name(m, var_type, {}, make_string_c(var_name));
-				lb_addr_store(p, g, var.init);
-				lbValue gp = lb_addr_get_ptr(p, g);
-
-				lbValue data = lb_emit_struct_ep(p, var.var, 0);
-				lbValue ti   = lb_emit_struct_ep(p, var.var, 1);
-				lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
-				lb_emit_store(p, ti,   lb_typeid(p->module, var_type));
-			} else {
-				LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
-				lbValue src0 = lb_emit_conv(p, var.init, t);
-				LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
-				LLVMValueRef dst = var.var.value;
-				LLVMBuildStore(p->builder, src, dst);
-			}
-
-			var.is_initialized = true;
-		}
-
+		lb_init_global_var(m, p, e, init_expr, var);
 
 	}
 	CheckerInfo *info = m->gen->info;
@@ -2448,7 +2456,12 @@ gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc
 	for (isize i = 0; i < m->missing_procedures_to_check.count; i++) {
 		lbProcedure *p = m->missing_procedures_to_check[i];
 		debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
+		isize count = m->procedures_to_generate.count;
 		lb_generate_procedure(m, p);
+		isize new_count = m->procedures_to_generate.count;
+		if (count != new_count) {
+			gb_printf_err("NEW STUFF!\n");
+		}
 	}
 	return 0;
 }
