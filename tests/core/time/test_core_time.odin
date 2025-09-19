@@ -363,7 +363,7 @@ test_convert_timezone_roundtrip :: proc(t: ^testing.T) {
 	dst_dt, _ := dt.components_to_datetime(2024, 10, 4, 23, 47, 0)
 	std_dt, _ := dt.components_to_datetime(2024, 11, 4, 23, 47, 0)
 
-	local_tz, local_load_ok := tz.region_load("local")
+	local_tz, local_load_ok := tz.region_load_local(true)
 	testing.expectf(t, local_load_ok, "Failed to load local timezone")
 	defer tz.region_destroy(local_tz)
 
