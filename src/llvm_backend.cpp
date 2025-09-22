@@ -12,7 +12,7 @@
 #endif
 
 #ifndef LLVM_WEAK_MONOMORPHIZATION
-#define LLVM_WEAK_MONOMORPHIZATION 1
+#define LLVM_WEAK_MONOMORPHIZATION (USE_SEPARATE_MODULES && 1)
 #endif
 
 
@@ -2070,11 +2070,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
 	LLVMSetLinkage(p->value, LLVMWeakAnyLinkage);
 
-	p->generate_body    = lb_create_startup_runtime_generate_body;
 	p->global_variables = &global_variables;
 	p->objc_names       = objc_names;
 
-	mpsc_enqueue(&main_module->procedures_to_generate, p);
+	lb_create_startup_runtime_generate_body(main_module, p);
 
 	return p;
 }
