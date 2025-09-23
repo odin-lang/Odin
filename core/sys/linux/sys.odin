@@ -2131,7 +2131,7 @@ pivot_root :: proc "contextless" (new_root: rawptr, old_root: rawptr) -> (Errno)
 // Deprecated and discouraged
 
 /*
-	Operatons on a process or thread
+	Operations on a process or thread
 	Available since Linux 2.1.57
 */
 prctl :: proc "contextless" (op: i32) -> (Errno) {
@@ -2179,7 +2179,6 @@ chroot :: proc "contextless" (pathname: cstring) -> (Errno) {
 	Commit filesystem caches to disk
 	Available since Linux 1.0.
 */
-//sync :: proc "contextless" (fd: Fd) -> (Errno) {
 sync :: proc "contextless" () -> (Errno) {
 	ret := syscall(SYS_sync)
 	return Errno(-ret)
@@ -2285,7 +2284,6 @@ ioperm :: proc "contextless" (form: u32, num: u32, turn_on: i32) -> (Errno) {
 	Available since Linux 2.2
 */
 init_module :: proc "contextless" (module_image: []u8, size: u32, param_values: cstring) -> (Errno) {
-	// TODO: Check module_image (buffer containing binary image to be loaded)
 	ret := syscall(SYS_init_module, raw_data(module_image), size, cast(rawptr) param_values)
 	return Errno(-ret)	
 }
