@@ -423,28 +423,44 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	}
 
 	struct RwMutex {
-		// TODO(bill): make this a proper RW mutex
-		BlockingMutex mutex;
+		BlockingMutex lock;
+		Condition     cond;
+		int32_t       readers;
 	};
 
 	gb_internal void rw_mutex_lock(RwMutex *m) {
-		mutex_lock(&m->mutex);
+		mutex_lock(&m->lock);
+		while (m->readers != 0) {
+			condition_wait(&m->cond, &m->lock);
+		}
 	}
 	gb_internal bool rw_mutex_try_lock(RwMutex *m) {
-		return mutex_try_lock(&m->mutex);
+		// TODO(bill): rw_mutex_try_lock
+		rw_mutex_lock(m);
+		return true;
 	}
 	gb_internal void rw_mutex_unlock(RwMutex *m) {
-		mutex_unlock(&m->mutex);
+		condition_signal(&m->cond);
+		mutex_unlock(&m->lock);
 	}
 
 	gb_internal void rw_mutex_shared_lock(RwMutex *m) {
-		mutex_lock(&m->mutex);
+		mutex_lock(&m->lock);
+		m->readers += 1;
+		mutex_unlock(&m->lock);
 	}
 	gb_internal bool rw_mutex_try_shared_lock(RwMutex *m) {
-		return mutex_try_lock(&m->mutex);
+		// TODO(bill): rw_mutex_try_shared_lock
+		rw_mutex_shared_lock(m);
+		return true;
 	}
 	gb_internal void rw_mutex_shared_unlock(RwMutex *m) {
-		mutex_unlock(&m->mutex);
+		mutex_lock(&m->lock);
+		m->readers -= 1;
+		if (m->readers == 0) {
+			condition_signal(&m->cond);
+		}
+		mutex_unlock(&m->lock);
 	}
 #endif
 
