@@ -221,7 +221,8 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		if (LLVM_WEAK_MONOMORPHIZATION) {
 			lbModule *m = gb_alloc_item(permanent_allocator(), lbModule);
 			gen->equal_module = m;
-			m->checker = c;
+			m->gen            = gen;
+			m->checker        = c;
 			map_set(&gen->modules, cast(void *)m, m); // point to itself just add it to the list
 			lb_init_module(m, do_threading);
 		}
