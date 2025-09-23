@@ -2283,8 +2283,8 @@ ioperm :: proc "contextless" (form: u32, num: u32, turn_on: i32) -> (Errno) {
 	Load a kernel module
 	Available since Linux 2.2
 */
-init_module :: proc "contextless" (module_image: []u8, size: u32, param_values: cstring) -> (Errno) {
-	ret := syscall(SYS_init_module, raw_data(module_image), size, cast(rawptr) param_values)
+init_module :: proc "contextless" (module_image: rawptr, size: u32, param_values: cstring) -> (Errno) {
+	ret := syscall(SYS_init_module, module_image, size, cast(rawptr) param_values)
 	return Errno(-ret)	
 }
 
@@ -2301,8 +2301,8 @@ delete_module :: proc "contextless" (name: cstring, flags: u32) -> (Errno) {
 	Manipulate disk quotas
 	Available since Linux 2.0
 */
-quotactl :: proc "contextless" (op: i32, special: rawptr, id: i32, addr: rawptr) -> (Errno) {
-	ret := syscall(SYS_quotactl, op, special, id, addr)
+quotactl :: proc "contextless" (op: i32, special: cstring, id: i32, addr: rawptr) -> (Errno) {
+	ret := syscall(SYS_quotactl, op, cast(rawptr) special, id, addr)
 	return Errno(-ret)
 }
 
@@ -2344,8 +2344,8 @@ readahead :: proc "contextless" (fd: Fd, offset: u64, count: u64) -> (Errno) {
 	Set an extended attribute value
 	Available since Linux 2.6.25
 */
-setxattr :: proc "contextless" (path: cstring, name: cstring, value: []u8, size: u64, flags: i32) -> (Errno) {
-	ret := syscall(SYS_setxattr, cast(rawptr) path, cast(rawptr) name, raw_data(value), size, flags)
+setxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: u64, flags: i32) -> (Errno) {
+	ret := syscall(SYS_setxattr, cast(rawptr) path, cast(rawptr) name, value, size, flags)
 	return Errno(-ret)
 }
 
@@ -2363,7 +2363,7 @@ lsetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, si
 	Available since Linux 2.6.25
 */
 fsetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: u64, flags: i32) -> (Errno) {
-	ret := syscall(SYS_fsetxattr, cast(rawptr) name, value, size, flags)
+	ret := syscall(SYS_fsetxattr, fd, cast(rawptr) name, value, size, flags)
 	return Errno(-ret)
 }
 
@@ -2443,8 +2443,8 @@ lremovexattr :: proc "contextless" (path: cstring, name: cstring) -> (Errno) {
 	Remove an extended attribute
 	Available since Linux 2.6.25
 */
-fremovexattr :: proc "contextless" (path: cstring, name: cstring) -> (Errno) {
-	ret := syscall(SYS_fremovexattr, cast(rawptr) path, cast(rawptr) name)
+fremovexattr :: proc "contextless" (fd: Fd, name: cstring) -> (Errno) {
+	ret := syscall(SYS_fremovexattr, fd, cast(rawptr) name)
 	return Errno(-ret)
 }
 
