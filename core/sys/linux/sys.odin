@@ -2122,8 +2122,8 @@ modify_ldt :: proc "contextless" (func: i32, ptr: rawptr, bytecount: uint) -> (i
 	Change the root mount
 	Available since Linux 2.3.41
 */
-pivot_root :: proc "contextless" (new_root: rawptr, old_root: rawptr) -> (Errno) {
-	ret := syscall(SYS_pivot_root, new_root, old_root)
+pivot_root :: proc "contextless" (new_root: cstring, old_root: cstring) -> (Errno) {
+	ret := syscall(SYS_pivot_root, cast(rawptr) new_root, cast(rawptr) old_root)
 	return Errno(-ret)
 }
 
@@ -2134,8 +2134,8 @@ pivot_root :: proc "contextless" (new_root: rawptr, old_root: rawptr) -> (Errno)
 	Operations on a process or thread
 	Available since Linux 2.1.57
 */
-prctl :: proc "contextless" (op: i32) -> (Errno) {
-	ret := syscall(SYS_prctl, op)
+prctl :: proc "contextless" (op: i32, args: ..u64) -> (Errno) {
+	ret := syscall(SYS_prctl, op, args[0], args[1], args[2], args[3])
 	return Errno(-ret)
 }
 
