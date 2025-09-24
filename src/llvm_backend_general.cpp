@@ -1733,10 +1733,11 @@ gb_internal LLVMTypeRef lb_type_internal_union_block_type(lbModule *m, Type *typ
 	}
 
 	i64 align = type_align_of(type);
-	i64 size = type_size_of(type);
-	gb_unused(size);
 
 	unsigned block_size = cast(unsigned)type->Union.variant_block_size;
+	if (block_size == 0) {
+		return lb_type_padding_filler(m, block_size, align);
+	}
 
 	bool all_pointers = align == build_context.ptr_size;
 	for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {

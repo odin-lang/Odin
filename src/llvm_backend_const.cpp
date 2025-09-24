@@ -542,6 +542,12 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 	GB_ASSERT(bt->kind == Type_Union);
 	GB_ASSERT(lb_type(m, variant_type) == LLVMTypeOf(variant_value));
 
+	LLVMTypeRef llvm_type = lb_type(m, union_type);
+
+	if (LLVMIsNull(variant_value)) {
+		return LLVMConstNull(llvm_type);
+	}
+
 	if (bt->Union.variants.count == 0) {
 		GB_ASSERT(LLVMIsNull(variant_value));
 		return variant_value;
@@ -550,7 +556,6 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 	i64 block_size = bt->Union.variant_block_size;
 	i64 variant_size = type_size_of(variant_type);
 
-	LLVMTypeRef llvm_type = lb_type(m, union_type);
 	LLVMTypeRef llvm_variant_type = lb_type(m, variant_type);
 
 	if (is_type_union_maybe_pointer(bt)) {
@@ -580,13 +585,6 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 
 	LLVMTypeRef block_type = LLVMStructGetTypeAtIndex(llvm_type, 0);
 
-	LLVMTypeRef block_padding = nullptr;
-	i64 block_padding_size = block_size - variant_size;
-	if (block_padding_size > 0) {
-		block_padding = lb_type_padding_filler(m, block_padding_size, type_align_of(variant_type));
-		return nullptr;
-	}
-
 	LLVMTypeRef tag_type = lb_type(m, union_tag_type(bt));
 
 	i64 used_size = block_size + lb_sizeof(tag_type);
@@ -601,12 +599,55 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 	unsigned i = 0;
 	LLVMValueRef values[3] = {};
 
-	LLVMValueRef variant_value_wrapped = variant_value;
+	LLVMValueRef block_value = variant_value;
 
 	if (lb_sizeof(llvm_variant_type) == 0) {
-		variant_value_wrapped = LLVMConstNull(block_type);
+		block_value = LLVMConstNull(block_type);
 	} else if (block_type != llvm_variant_type) {
 		if (block_size != variant_size) {
+
+			if (LLVMGetTypeKind(block_type) == LLVMArrayTypeKind &&
+			    LLVMGetTypeKind(llvm_variant_type) == LLVMIntegerTypeKind) {
+				LLVMTypeRef elem = LLVMGetElementType(block_type);
+				unsigned count = LLVMGetArrayLength(block_type);
+				if (elem == llvm_variant_type) {
+					LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
+					elems[0] = variant_value;
+					for (unsigned j = 1; j < count; j++) {
+						elems[j] = LLVMConstNull(elem);
+					}
+					block_value = LLVMConstArray(elem, elems, count);
+
+					goto assign_value_wrapped;
+				} else if (!is_type_different_to_arch_endianness(variant_type)) {
+					i64 elem_size = lb_sizeof(elem);
+					i64 variant_size = lb_sizeof(llvm_variant_type);
+					if (elem_size > variant_size) {
+						u64 val = LLVMConstIntGetZExtValue(variant_value);
+
+						LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
+						elems[0] = LLVMConstInt(elem, val, false);
+						for (unsigned j = 1; j < count; j++) {
+							elems[j] = LLVMConstNull(elem);
+						}
+						block_value = LLVMConstArray(elem, elems, count);
+
+						goto assign_value_wrapped;
+					}
+				}
+			} else if (LLVMGetTypeKind(block_type) == LLVMIntegerTypeKind &&
+			           LLVMGetTypeKind(llvm_variant_type) == LLVMIntegerTypeKind) {
+				if (!is_type_different_to_arch_endianness(variant_type)) {
+					i64 variant_size = lb_sizeof(llvm_variant_type);
+					if (block_size > variant_size) {
+						u64 val = LLVMConstIntGetZExtValue(variant_value);
+						block_value = LLVMConstInt(block_type, val, false);
+
+						goto assign_value_wrapped;
+					}
+				}
+			}
+
 			return nullptr;
 		}
 		if (LLVMGetTypeKind(block_type) == LLVMIntegerTypeKind) {
@@ -614,10 +655,10 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 			case LLVMHalfTypeKind:
 			case LLVMFloatTypeKind:
 			case LLVMDoubleTypeKind:
-				variant_value_wrapped = LLVMConstBitCast(variant_value_wrapped, block_type);
+				block_value = LLVMConstBitCast(block_value, block_type);
 				goto assign_value_wrapped;
 			case LLVMPointerTypeKind:
-				variant_value_wrapped = LLVMConstPtrToInt(variant_value_wrapped, block_type);
+				block_value = LLVMConstPtrToInt(block_value, block_type);
 				goto assign_value_wrapped;
 			}
 		}
@@ -626,11 +667,8 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 	}
 
 assign_value_wrapped:;
-	values[i++] = variant_value_wrapped;
+	values[i++] = block_value;
 
-	if (block_padding_size > 0) {
-		values[i++] = LLVMConstNull(block_padding);
-	}
 	unsigned long long the_tag = cast(unsigned long long)union_variant_index(union_type, variant_type);
 	values[i++] = LLVMConstInt(tag_type, the_tag, false);
 	if (padding > 0) {
@@ -646,6 +684,7 @@ gb_internal bool lb_try_construct_const_union(lbModule *m, lbValue *value, Type 
 			*value = {res, union_type};
 			return true;
 		}
+		// gb_printf_err("%s -> %s\n", LLVMPrintValueToString(value->value), LLVMPrintTypeToString(lb_type(m, union_type)));
 	}
 	return false;
 }
