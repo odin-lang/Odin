@@ -195,7 +195,13 @@ gb_internal void mutex_lock(RecursiveMutex *m) {
 			// inside the lock
 			return;
 		}
-		futex_wait(&m->owner, prev_owner);
+
+		// NOTE(lucas): we are doing spin lock since futex signal is expensive on OSX. The recursive locks are
+		// very short lived so we don't hit this mega often and I see no perform regression on windows (with
+		// a performance uplift on OSX).
+
+		//futex_wait(&m->owner, prev_owner);
+		yield_thread();
 	}
 }
 gb_internal bool mutex_try_lock(RecursiveMutex *m) {
@@ -216,7 +222,9 @@ gb_internal void mutex_unlock(RecursiveMutex *m) {
 		return;
 	}
 	m->owner.exchange(0, std::memory_order_release);
-	futex_signal(&m->owner);
+	// NOTE(lucas): see comment about spin lock in mutex_lock above
+
+	// futex_signal(&m->owner);
 	// outside the lock
 }
 
@@ -423,44 +431,28 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	}
 
 	struct RwMutex {
-		BlockingMutex lock;
-		Condition     cond;
-		int32_t       readers;
+		// TODO(bill): make this a proper RW mutex
+		BlockingMutex mutex;
 	};
 
 	gb_internal void rw_mutex_lock(RwMutex *m) {
-		mutex_lock(&m->lock);
-		while (m->readers != 0) {
-			condition_wait(&m->cond, &m->lock);
-		}
+		mutex_lock(&m->mutex);
 	}
 	gb_internal bool rw_mutex_try_lock(RwMutex *m) {
-		// TODO(bill): rw_mutex_try_lock
-		rw_mutex_lock(m);
-		return true;
+		return mutex_try_lock(&m->mutex);
 	}
 	gb_internal void rw_mutex_unlock(RwMutex *m) {
-		condition_signal(&m->cond);
-		mutex_unlock(&m->lock);
+		mutex_unlock(&m->mutex);
 	}
 
 	gb_internal void rw_mutex_shared_lock(RwMutex *m) {
-		mutex_lock(&m->lock);
-		m->readers += 1;
-		mutex_unlock(&m->lock);
+		mutex_lock(&m->mutex);
 	}
 	gb_internal bool rw_mutex_try_shared_lock(RwMutex *m) {
-		// TODO(bill): rw_mutex_try_shared_lock
-		rw_mutex_shared_lock(m);
-		return true;
+		return mutex_try_lock(&m->mutex);
 	}
 	gb_internal void rw_mutex_shared_unlock(RwMutex *m) {
-		mutex_lock(&m->lock);
-		m->readers -= 1;
-		if (m->readers == 0) {
-			condition_signal(&m->cond);
-		}
-		mutex_unlock(&m->lock);
+		mutex_unlock(&m->mutex);
 	}
 #endif
 
