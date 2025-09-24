@@ -29,16 +29,16 @@ test_type_inference_on_literals_with_default_args :: proc(t: ^testing.T) {
 		proc_nil :: proc() { }
 		proc_default_arg :: proc(a: Bit_Set={.A}) -> Bit_Set { return a }
 		group :: proc{proc_nil, proc_default_arg}
-	
+
 		testing.expect_value(t, group(Bit_Set{.A}), Bit_Set{.A})
 		testing.expect_value(t, group({.A}),        Bit_Set{.A})
 	}
-	{ 
+	{
 		Bit_Set :: bit_set[enum{A, B, C}]
 		proc_1 :: proc(a: Bit_Set={.A})                  -> int { return 1 }
 		proc_2 :: proc(a: Bit_Set={.B}, b: Bit_Set={.C}) -> int { return 2 }
 		group :: proc{proc_1, proc_2}
-	
+
 		testing.expect_value(t, group(),            2)
 		testing.expect_value(t, group(Bit_Set{.A}), 2)
 		testing.expect_value(t, group({.A}),        2)
@@ -56,7 +56,7 @@ test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	testing.expect_value(t, group_array({1.1, 2.2, 3.3}),       [3]f32{1.1, 2.2, 3.3})
 	testing.expect_value(t, group_array({0=1.1, 1=2.2, 2=3.3}), [3]f32{1.1, 2.2, 3.3})
 	testing.expect_value(t, group_array({}),                    [3]f32{})
-	
+
 	proc_slice_u8 :: proc(a: []u8) -> []u8 { return a }
 	group_slice_u8 :: proc{proc_nil, proc_slice_u8}
 	testing.expect_value(t, len(group_slice_u8([]u8{1, 2, 3})),   3)
@@ -72,7 +72,7 @@ test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(group_dynamic_array({0=1, 1=2, 2=3})),      3)
 	testing.expect_value(t, len(group_dynamic_array({})),                   0)
 	testing.expect_value(t, group_dynamic_array(nil) == nil,                true)
-	
+
 	Enum :: enum{A, B, C}
 	proc_enum :: proc(a: Enum) -> Enum { return a }
 	group_enum :: proc{proc_nil, proc_enum}
@@ -90,14 +90,14 @@ test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	testing.expect_value(t, group_bit_set(Bit_Set{.A}), Bit_Set{.A})
 	testing.expect_value(t, group_bit_set({.A}),        Bit_Set{.A})
 	testing.expect_value(t, group_bit_set({}),          Bit_Set{})
-	
+
 	Struct :: struct{a: int, b: int, c: int}
 	proc_struct :: proc(a: Struct) -> Struct { return a }
 	group_struct :: proc{proc_nil, proc_struct}
 	testing.expect_value(t, group_struct(Struct{a = 9}), Struct{a = 9})
 	testing.expect_value(t, group_struct({a = 9}),       Struct{a = 9})
 	testing.expect_value(t, group_struct({}),            Struct{})
-	
+
 	Raw_Union :: struct #raw_union{int_: int, f32_: f32}
 	proc_raw_union :: proc(a: Raw_Union) -> Raw_Union { return a }
 	group_raw_union :: proc{proc_nil, proc_raw_union}
@@ -109,8 +109,8 @@ test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	proc_union :: proc(a: Union) -> Union { return a }
 	group_union :: proc{proc_nil, proc_union}
 	testing.expect_value(t, group_union(int(9)).(int), 9)
-	testing.expect_value(t, group_union({}).(int),     0)
-	
+	testing.expect_value(t, group_union({}),           nil)
+
 	proc_map :: proc(a: map[u8]u8) -> map[u8]u8 { return a }
 	group_map :: proc{proc_nil, proc_map}
 	testing.expect_value(t, len(group_map(map[u8]u8{1=1, 2=2})), 2)
@@ -129,8 +129,8 @@ test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	proc_soa_array :: proc(a: SOA_Array) -> SOA_Array { return a }
 	group_soa_array :: proc{proc_nil, proc_soa_array}
 	testing.expect_value(t, len(group_soa_array(SOA_Array{{}, {}})),                                2)
-	testing.expect_value(t, len(group_soa_array({struct{int, int}{1, 2}, struct{int, int}{1, 2}})), 1)
-	testing.expect_value(t, len(group_soa_array({})),                                               0)
+	testing.expect_value(t, len(group_soa_array({struct{int, int}{1, 2}, struct{int, int}{1, 2}})), 2)
+	testing.expect_value(t, len(group_soa_array({})),                                               2)
 	testing.expect_value(t, len(soa_zip(a=[]int{1, 2}, b=[]int{3, 4})),                             2)
 
 	proc_matrix :: proc(a: matrix[2,2]f32) -> matrix[2,2]f32 { return a }
