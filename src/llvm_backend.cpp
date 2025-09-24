@@ -12,7 +12,7 @@
 #endif
 
 #ifndef LLVM_WEAK_MONOMORPHIZATION
-#define LLVM_WEAK_MONOMORPHIZATION (USE_SEPARATE_MODULES && 1)
+#define LLVM_WEAK_MONOMORPHIZATION (USE_SEPARATE_MODULES && build_context.internal_weak_monomorphization)
 #endif
 
 
