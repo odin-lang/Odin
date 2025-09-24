@@ -537,6 +537,84 @@ gb_internal bool lb_is_nested_possibly_constant(Type *ft, Selection const &sel, 
 	return lb_is_elem_const(elem, ft);
 }
 
+gb_internal Slice<LLVMValueRef> lb_construct_const_union_flatten_values(lbModule *m, LLVMValueRef variant_value, Type *variant_type, LLVMTypeRef elem) {
+	LLVMTypeRef llvm_variant_type = lb_type(m, variant_type);
+	LLVMTypeKind variant_kind = LLVMGetTypeKind(llvm_variant_type);
+
+	if (are_types_identical(base_type(variant_type), t_string)) {
+		LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(2);
+		elems[0] = llvm_const_extract_value(m, variant_value, 0);
+		elems[0] = LLVMConstPtrToInt(elems[0], elem);
+
+		elems[1] = llvm_const_extract_value(m, variant_value, 1);
+
+		return {elems, 2};
+	}
+
+	if (is_type_struct(variant_type)) {
+		// Type *st = base_type(variant_type);
+		// if (st->Struct.fields.count == 1) {
+		// 	return lb_construct_const_union_flatten_values(m, llvm_const_extract_value(m, variant_value, 0), st->Struct.fields[0]->type, elem);
+		// }
+	} else if (variant_kind == LLVMIntegerTypeKind) {
+		if (elem == llvm_variant_type) {
+			LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(1);
+			elems[0] = variant_value;
+			return {elems, 1};
+		} else if (!is_type_different_to_arch_endianness(variant_type)) {
+			i64 elem_size = lb_sizeof(elem);
+			i64 variant_size = lb_sizeof(llvm_variant_type);
+			if (elem_size > variant_size) {
+				u64 val = LLVMConstIntGetZExtValue(variant_value);
+
+				LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(1);
+				elems[0] = LLVMConstInt(elem, val, false);
+				return {elems, 1};
+			}
+		}
+	} else if (!is_type_different_to_arch_endianness(variant_type)) {
+		switch (variant_kind) {
+		case LLVMHalfTypeKind:
+			{
+				LLVMBool loses = false;
+				f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+				u16 val = f32_to_f16(cast(f32)res);
+
+				LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(1);
+				elems[0] = LLVMConstInt(elem, val, false);
+				return {elems, 1};
+			}
+			break;
+		case LLVMFloatTypeKind:
+			{
+				LLVMBool loses = false;
+				f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+				union { f32 f; u32 i; } val = {};
+				val.f = cast(f32)res;
+
+				LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(1);
+				elems[0] = LLVMConstInt(elem, val.i, false);
+				return {elems, 1};
+			}
+			break;
+		case LLVMDoubleTypeKind:
+			{
+				LLVMBool loses = false;
+				f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+				union { f64 f; u64 i; } val = {};
+				val.f = res;
+
+				LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(1);
+				elems[0] = LLVMConstInt(elem, val.i, false);
+				return {elems, 1};
+			}
+			break;
+		}
+	}
+
+	return {};
+}
+
 gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef variant_value, Type *variant_type, Type *union_type) {
 	Type *bt = base_type(union_type);
 	GB_ASSERT(bt->kind == Type_Union);
@@ -601,43 +679,98 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 
 	LLVMValueRef block_value = variant_value;
 
-	if (lb_sizeof(llvm_variant_type) == 0) {
+	if (block_size == 0) {
+		block_value = LLVMConstNull(block_type);
+	} else if (lb_sizeof(llvm_variant_type) == 0) {
 		block_value = LLVMConstNull(block_type);
 	} else if (block_type != llvm_variant_type) {
-		if (block_size != variant_size) {
+		LLVMTypeKind block_kind   = LLVMGetTypeKind(block_type);
+		LLVMTypeKind variant_kind = LLVMGetTypeKind(llvm_variant_type);
 
-			if (LLVMGetTypeKind(block_type) == LLVMArrayTypeKind &&
-			    LLVMGetTypeKind(llvm_variant_type) == LLVMIntegerTypeKind) {
+		if (block_size != variant_size) {
+			if (block_kind == LLVMArrayTypeKind) {
 				LLVMTypeRef elem = LLVMGetElementType(block_type);
 				unsigned count = LLVMGetArrayLength(block_type);
-				if (elem == llvm_variant_type) {
-					LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
-					elems[0] = variant_value;
-					for (unsigned j = 1; j < count; j++) {
-						elems[j] = LLVMConstNull(elem);
-					}
-					block_value = LLVMConstArray(elem, elems, count);
 
-					goto assign_value_wrapped;
-				} else if (!is_type_different_to_arch_endianness(variant_type)) {
-					i64 elem_size = lb_sizeof(elem);
-					i64 variant_size = lb_sizeof(llvm_variant_type);
-					if (elem_size > variant_size) {
-						u64 val = LLVMConstIntGetZExtValue(variant_value);
-
+				if (variant_kind == LLVMIntegerTypeKind) {
+					if (elem == llvm_variant_type) {
 						LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
-						elems[0] = LLVMConstInt(elem, val, false);
+						elems[0] = variant_value;
 						for (unsigned j = 1; j < count; j++) {
 							elems[j] = LLVMConstNull(elem);
 						}
 						block_value = LLVMConstArray(elem, elems, count);
-
 						goto assign_value_wrapped;
+					} else if (!is_type_different_to_arch_endianness(variant_type)) {
+						i64 elem_size = lb_sizeof(elem);
+						i64 variant_size = lb_sizeof(llvm_variant_type);
+						if (elem_size > variant_size) {
+							u64 val = LLVMConstIntGetZExtValue(variant_value);
+
+							LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
+							elems[0] = LLVMConstInt(elem, val, false);
+							for (unsigned j = 1; j < count; j++) {
+								elems[j] = LLVMConstNull(elem);
+							}
+							block_value = LLVMConstArray(elem, elems, count);
+							goto assign_value_wrapped;
+						}
+					}
+				} else if (!is_type_different_to_arch_endianness(variant_type)) {
+					switch (variant_kind) {
+					case LLVMHalfTypeKind:
+						{
+							LLVMBool loses = false;
+							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+							u16 val = f32_to_f16(cast(f32)res);
+
+							LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
+							elems[0] = LLVMConstInt(elem, val, false);
+							for (unsigned j = 1; j < count; j++) {
+								elems[j] = LLVMConstNull(elem);
+							}
+							block_value = LLVMConstArray(elem, elems, count);
+							goto assign_value_wrapped;
+						}
+						break;
+					case LLVMFloatTypeKind:
+						{
+							LLVMBool loses = false;
+							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+							union { f32 f; u32 i; } val = {};
+							val.f = cast(f32)res;
+
+							LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
+							elems[0] = LLVMConstInt(elem, val.i, false);
+							for (unsigned j = 1; j < count; j++) {
+								elems[j] = LLVMConstNull(elem);
+							}
+							block_value = LLVMConstArray(elem, elems, count);
+							goto assign_value_wrapped;
+						}
+						break;
+					case LLVMDoubleTypeKind:
+						{
+							LLVMBool loses = false;
+							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+							union { f64 f; u64 i; } val = {};
+							val.f = res;
+
+							LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
+							elems[0] = LLVMConstInt(elem, val.i, false);
+							for (unsigned j = 1; j < count; j++) {
+								elems[j] = LLVMConstNull(elem);
+							}
+							block_value = LLVMConstArray(elem, elems, count);
+							goto assign_value_wrapped;
+						}
+						break;
 					}
 				}
-			} else if (LLVMGetTypeKind(block_type) == LLVMIntegerTypeKind &&
-			           LLVMGetTypeKind(llvm_variant_type) == LLVMIntegerTypeKind) {
-				if (!is_type_different_to_arch_endianness(variant_type)) {
+
+
+			} else if (block_kind == LLVMIntegerTypeKind && !is_type_different_to_arch_endianness(variant_type)) {
+				if (variant_kind == LLVMIntegerTypeKind) {
 					i64 variant_size = lb_sizeof(llvm_variant_type);
 					if (block_size > variant_size) {
 						u64 val = LLVMConstIntGetZExtValue(variant_value);
@@ -645,13 +778,48 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 
 						goto assign_value_wrapped;
 					}
+				} else {
+					switch (variant_kind) {
+					case LLVMHalfTypeKind:
+						{
+							LLVMBool loses = false;
+							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+							u16 val = f32_to_f16(cast(f32)res);
+
+							block_value = LLVMConstInt(block_type, val, false);
+							goto assign_value_wrapped;
+						}
+						break;
+					case LLVMFloatTypeKind:
+						{
+							LLVMBool loses = false;
+							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+							union { f32 f; u32 i; } val = {};
+							val.f = cast(f32)res;
+
+							block_value = LLVMConstInt(block_type, val.i, false);
+							goto assign_value_wrapped;
+						}
+						break;
+					case LLVMDoubleTypeKind:
+						{
+							LLVMBool loses = false;
+							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
+							union { f64 f; u64 i; } val = {};
+							val.f = res;
+
+							block_value = LLVMConstInt(block_type, val.i, false);
+							goto assign_value_wrapped;
+						}
+						break;
+					}
 				}
 			}
 
 			return nullptr;
 		}
-		if (LLVMGetTypeKind(block_type) == LLVMIntegerTypeKind) {
-			switch (LLVMGetTypeKind(llvm_variant_type)) {
+		if (block_kind == LLVMIntegerTypeKind) {
+			switch (variant_kind) {
 			case LLVMHalfTypeKind:
 			case LLVMFloatTypeKind:
 			case LLVMDoubleTypeKind:
