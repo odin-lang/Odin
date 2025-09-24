@@ -540,22 +540,38 @@ gb_internal bool lb_is_nested_possibly_constant(Type *ft, Selection const &sel, 
 gb_internal Slice<LLVMValueRef> lb_construct_const_union_flatten_values(lbModule *m, LLVMValueRef variant_value, Type *variant_type, LLVMTypeRef elem) {
 	LLVMTypeRef llvm_variant_type = lb_type(m, variant_type);
 	LLVMTypeKind variant_kind = LLVMGetTypeKind(llvm_variant_type);
-
-	if (are_types_identical(base_type(variant_type), t_string)) {
-		LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(2);
-		elems[0] = llvm_const_extract_value(m, variant_value, 0);
-		elems[0] = LLVMConstPtrToInt(elems[0], elem);
-
-		elems[1] = llvm_const_extract_value(m, variant_value, 1);
-
-		return {elems, 2};
-	}
+	LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
 
 	if (is_type_struct(variant_type)) {
-		// Type *st = base_type(variant_type);
-		// if (st->Struct.fields.count == 1) {
-		// 	return lb_construct_const_union_flatten_values(m, llvm_const_extract_value(m, variant_value, 0), st->Struct.fields[0]->type, elem);
-		// }
+		Type *st = base_type(variant_type);
+		GB_ASSERT(st->kind == Type_Struct);
+		if (st->Struct.fields.count == 1) {
+			LLVMValueRef f = llvm_const_extract_value(m, variant_value, 0);
+			return lb_construct_const_union_flatten_values(m, f, st->Struct.fields[0]->type, elem);
+		}
+	} else if (is_llvm_type_slice_like(llvm_variant_type)) {
+		if (lb_sizeof(elem) == build_context.ptr_size) {
+			LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(2);
+			elems[0] = llvm_const_extract_value(m, variant_value, 0);
+			elems[0] = LLVMConstPtrToInt(elems[0], elem);
+
+			elems[1] = llvm_const_extract_value(m, variant_value, 1);
+
+			return {elems, 2};
+		}
+	} else if (is_type_array_like(variant_type)) {
+		Type *array_elem = base_array_type(variant_type);
+		isize array_count = get_array_type_count(variant_type);
+		Slice<LLVMValueRef> array = temporary_slice_make<LLVMValueRef>(array_count);
+		for (isize i = 0; i < array_count; i++) {
+			LLVMValueRef v = llvm_const_extract_value(m, variant_value, 0);
+			auto res = lb_construct_const_union_flatten_values(m, v, array_elem, elem);
+			if (res.count != 1) {
+				return {};
+			}
+			array[i] = res[0];
+		}
+		return array;
 	} else if (variant_kind == LLVMIntegerTypeKind) {
 		if (elem == llvm_variant_type) {
 			LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(1);
@@ -572,7 +588,8 @@ gb_internal Slice<LLVMValueRef> lb_construct_const_union_flatten_values(lbModule
 				return {elems, 1};
 			}
 		}
-	} else if (!is_type_different_to_arch_endianness(variant_type)) {
+	} else if (!is_type_different_to_arch_endianness(variant_type) &&
+	           elem_kind == LLVMIntegerTypeKind) {
 		switch (variant_kind) {
 		case LLVMHalfTypeKind:
 			{
@@ -687,138 +704,39 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 		LLVMTypeKind block_kind   = LLVMGetTypeKind(block_type);
 		LLVMTypeKind variant_kind = LLVMGetTypeKind(llvm_variant_type);
 
-		if (block_size != variant_size) {
-			if (block_kind == LLVMArrayTypeKind) {
-				LLVMTypeRef elem = LLVMGetElementType(block_type);
-				unsigned count = LLVMGetArrayLength(block_type);
 
-				if (variant_kind == LLVMIntegerTypeKind) {
-					if (elem == llvm_variant_type) {
-						LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
-						elems[0] = variant_value;
-						for (unsigned j = 1; j < count; j++) {
-							elems[j] = LLVMConstNull(elem);
-						}
-						block_value = LLVMConstArray(elem, elems, count);
-						goto assign_value_wrapped;
-					} else if (!is_type_different_to_arch_endianness(variant_type)) {
-						i64 elem_size = lb_sizeof(elem);
-						i64 variant_size = lb_sizeof(llvm_variant_type);
-						if (elem_size > variant_size) {
-							u64 val = LLVMConstIntGetZExtValue(variant_value);
+		if (block_kind == LLVMArrayTypeKind) {
+			LLVMTypeRef elem = LLVMGetElementType(block_type);
+			unsigned count = LLVMGetArrayLength(block_type);
 
-							LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
-							elems[0] = LLVMConstInt(elem, val, false);
-							for (unsigned j = 1; j < count; j++) {
-								elems[j] = LLVMConstNull(elem);
-							}
-							block_value = LLVMConstArray(elem, elems, count);
-							goto assign_value_wrapped;
-						}
-					}
-				} else if (!is_type_different_to_arch_endianness(variant_type)) {
-					switch (variant_kind) {
-					case LLVMHalfTypeKind:
-						{
-							LLVMBool loses = false;
-							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
-							u16 val = f32_to_f16(cast(f32)res);
+			Slice<LLVMValueRef> partial_elems = lb_construct_const_union_flatten_values(m, variant_value, variant_type, elem);
+			if (partial_elems.count == count) {
+				block_value = LLVMConstArray(elem, partial_elems.data, count);
+				goto assign_value_wrapped;
+			}
 
-							LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
-							elems[0] = LLVMConstInt(elem, val, false);
-							for (unsigned j = 1; j < count; j++) {
-								elems[j] = LLVMConstNull(elem);
-							}
-							block_value = LLVMConstArray(elem, elems, count);
-							goto assign_value_wrapped;
-						}
-						break;
-					case LLVMFloatTypeKind:
-						{
-							LLVMBool loses = false;
-							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
-							union { f32 f; u32 i; } val = {};
-							val.f = cast(f32)res;
+			Slice<LLVMValueRef> full_elems = temporary_slice_make<LLVMValueRef>(count);
+			slice_copy(&full_elems, partial_elems);
+			for (isize j = partial_elems.count; j < count; j++) {
+				full_elems[j] = LLVMConstNull(elem);
+			}
+			block_value = LLVMConstArray(elem, full_elems.data, count);
+			goto assign_value_wrapped;
 
-							LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
-							elems[0] = LLVMConstInt(elem, val.i, false);
-							for (unsigned j = 1; j < count; j++) {
-								elems[j] = LLVMConstNull(elem);
-							}
-							block_value = LLVMConstArray(elem, elems, count);
-							goto assign_value_wrapped;
-						}
-						break;
-					case LLVMDoubleTypeKind:
-						{
-							LLVMBool loses = false;
-							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
-							union { f64 f; u64 i; } val = {};
-							val.f = res;
-
-							LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(count);
-							elems[0] = LLVMConstInt(elem, val.i, false);
-							for (unsigned j = 1; j < count; j++) {
-								elems[j] = LLVMConstNull(elem);
-							}
-							block_value = LLVMConstArray(elem, elems, count);
-							goto assign_value_wrapped;
-						}
-						break;
-					}
-				}
-
-
-			} else if (block_kind == LLVMIntegerTypeKind && !is_type_different_to_arch_endianness(variant_type)) {
-				if (variant_kind == LLVMIntegerTypeKind) {
-					i64 variant_size = lb_sizeof(llvm_variant_type);
-					if (block_size > variant_size) {
-						u64 val = LLVMConstIntGetZExtValue(variant_value);
-						block_value = LLVMConstInt(block_type, val, false);
-
-						goto assign_value_wrapped;
-					}
-				} else {
-					switch (variant_kind) {
-					case LLVMHalfTypeKind:
-						{
-							LLVMBool loses = false;
-							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
-							u16 val = f32_to_f16(cast(f32)res);
-
-							block_value = LLVMConstInt(block_type, val, false);
-							goto assign_value_wrapped;
-						}
-						break;
-					case LLVMFloatTypeKind:
-						{
-							LLVMBool loses = false;
-							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
-							union { f32 f; u32 i; } val = {};
-							val.f = cast(f32)res;
-
-							block_value = LLVMConstInt(block_type, val.i, false);
-							goto assign_value_wrapped;
-						}
-						break;
-					case LLVMDoubleTypeKind:
-						{
-							LLVMBool loses = false;
-							f64 res = LLVMConstRealGetDouble(variant_value, &loses);
-							union { f64 f; u64 i; } val = {};
-							val.f = res;
-
-							block_value = LLVMConstInt(block_type, val.i, false);
-							goto assign_value_wrapped;
-						}
-						break;
-					}
+		} else if (block_size != variant_size) {
+			if (block_kind == LLVMIntegerTypeKind && !is_type_different_to_arch_endianness(variant_type)) {
+				Slice<LLVMValueRef> partial_elems = lb_construct_const_union_flatten_values(m, variant_value, variant_type, block_type);
+				if (partial_elems.count == 1) {
+					block_value = partial_elems[0];
+					goto assign_value_wrapped;
 				}
 			}
 
 			return nullptr;
 		}
 		if (block_kind == LLVMIntegerTypeKind) {
+			GB_ASSERT(block_size == variant_size);
+
 			switch (variant_kind) {
 			case LLVMHalfTypeKind:
 			case LLVMFloatTypeKind:
