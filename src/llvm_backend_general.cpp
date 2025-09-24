@@ -1778,6 +1778,28 @@ gb_internal LLVMTypeRef lb_type_internal_union_block_type(lbModule *m, Type *typ
 		}
 	} end_rest_zero_except_one:;
 
+	// {
+	// 	LLVMTypeRef first_different = nullptr;
+	// 	for (isize i = 0; i < type->Union.variants.count; i++) {
+	// 		Type *t = type->Union.variants[i];
+	// 		if (type_size_of(t) == 0) {
+	// 			continue;
+	// 		}
+	// 		if (first_different == nullptr) {
+	// 			first_different = lb_type(m, base_type(t));
+	// 		} else {
+	// 			LLVMTypeRef llvm_t = lb_type(m, base_type(t));
+	// 			if (llvm_t != first_different) {
+	// 				goto end_rest_zero_except_one_llvm_like;
+	// 			}
+	// 		}
+	// 	}
+	// 	if (first_different != nullptr) {
+	// 		return first_different;
+	// 	}
+	// } end_rest_zero_except_one_llvm_like:;
+
+
 	return lb_type_padding_filler(m, block_size, align);
 }
 

@@ -547,6 +547,9 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 		return variant_value;
 	}
 
+	i64 block_size = bt->Union.variant_block_size;
+	i64 variant_size = type_size_of(variant_type);
+
 	LLVMTypeRef llvm_type = lb_type(m, union_type);
 	LLVMTypeRef llvm_variant_type = lb_type(m, variant_type);
 
@@ -564,7 +567,7 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 		values[i++] = variant_value;
 		values[i++] = LLVMConstInt(tag_type, the_tag, false);
 
-		i64 used_size = bt->Union.variant_block_size + lb_sizeof(tag_type);
+		i64 used_size = block_size + lb_sizeof(tag_type);
 		i64 padding = type_size_of(union_type) - used_size;
 		i64 align = type_align_of(union_type);
 		if (padding > 0) {
@@ -578,7 +581,7 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 	LLVMTypeRef block_type = LLVMStructGetTypeAtIndex(llvm_type, 0);
 
 	LLVMTypeRef block_padding = nullptr;
-	i64 block_padding_size = bt->Union.variant_block_size - type_size_of(variant_type);
+	i64 block_padding_size = block_size - variant_size;
 	if (block_padding_size > 0) {
 		block_padding = lb_type_padding_filler(m, block_padding_size, type_align_of(variant_type));
 		return nullptr;
@@ -586,7 +589,7 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 
 	LLVMTypeRef tag_type = lb_type(m, union_tag_type(bt));
 
-	i64 used_size = bt->Union.variant_block_size + lb_sizeof(tag_type);
+	i64 used_size = block_size + lb_sizeof(tag_type);
 	i64 padding = type_size_of(union_type) - used_size;
 	i64 align = type_align_of(union_type);
 	LLVMTypeRef padding_type = nullptr;
@@ -603,9 +606,26 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 	if (lb_sizeof(llvm_variant_type) == 0) {
 		variant_value_wrapped = LLVMConstNull(block_type);
 	} else if (block_type != llvm_variant_type) {
+		if (block_size != variant_size) {
+			return nullptr;
+		}
+		if (LLVMGetTypeKind(block_type) == LLVMIntegerTypeKind) {
+			switch (LLVMGetTypeKind(llvm_variant_type)) {
+			case LLVMHalfTypeKind:
+			case LLVMFloatTypeKind:
+			case LLVMDoubleTypeKind:
+				variant_value_wrapped = LLVMConstBitCast(variant_value_wrapped, block_type);
+				goto assign_value_wrapped;
+			case LLVMPointerTypeKind:
+				variant_value_wrapped = LLVMConstPtrToInt(variant_value_wrapped, block_type);
+				goto assign_value_wrapped;
+			}
+		}
+
 		return nullptr;
 	}
 
+assign_value_wrapped:;
 	values[i++] = variant_value_wrapped;
 
 	if (block_padding_size > 0) {
