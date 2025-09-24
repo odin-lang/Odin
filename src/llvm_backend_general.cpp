@@ -1719,8 +1719,69 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 	map_set(&m->func_raw_types, type, new_abi_fn_type);
 
 	return new_abi_fn_type;
-
 }
+
+
+gb_internal LLVMTypeRef lb_type_internal_union_block_type(lbModule *m, Type *type) {
+	GB_ASSERT(type->kind == Type_Union);
+
+	if (type->Union.variants.count <= 0) {
+		return nullptr;
+	}
+	if (type->Union.variants.count == 1) {
+		return lb_type(m, type->Union.variants[0]);
+	}
+
+	i64 align = type_align_of(type);
+	i64 size = type_size_of(type);
+	gb_unused(size);
+
+	unsigned block_size = cast(unsigned)type->Union.variant_block_size;
+
+	bool all_pointers = align == build_context.ptr_size;
+	for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {
+		Type *t = type->Union.variants[i];
+		if (!is_type_internally_pointer_like(t)) {
+			all_pointers = false;
+		}
+	}
+	if (all_pointers) {
+		return lb_type(m, t_rawptr);
+	}
+
+	{
+		Type *pt = type->Union.variants[0];
+		for (isize i = 1; i < type->Union.variants.count; i++) {
+			Type *t = type->Union.variants[i];
+			if (!are_types_identical(pt, t)) {
+				goto end_check_for_all_the_same;
+			}
+		}
+		return lb_type(m, pt);
+	} end_check_for_all_the_same:;
+
+	{
+		Type *first_different = nullptr;
+		for (isize i = 0; i < type->Union.variants.count; i++) {
+			Type *t = type->Union.variants[i];
+			if (type_size_of(t) == 0) {
+				continue;
+			}
+			if (first_different == nullptr) {
+				first_different = t;
+			} else if (!are_types_identical(first_different, t)) {
+				goto end_rest_zero_except_one;
+			}
+		}
+		if (first_different != nullptr) {
+			return lb_type(m, first_different);
+		}
+	} end_rest_zero_except_one:;
+
+	return lb_type_padding_filler(m, block_size, align);
+}
+
+
 gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	LLVMContextRef ctx = m->ctx;
 	i64 size = type_size_of(type); // Check size
@@ -2233,8 +2294,6 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 			}
 
-			unsigned block_size = cast(unsigned)type->Union.variant_block_size;
-
 			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 3);
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
@@ -2252,20 +2311,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					array_add(&fields, padding_type);
 				}
 			} else {
-				LLVMTypeRef block_type = nullptr;
-
-				bool all_pointers = align == build_context.ptr_size;
-				for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {
-					Type *t = type->Union.variants[i];
-					if (!is_type_internally_pointer_like(t)) {
-						all_pointers = false;
-					}
-				}
-				if (all_pointers) {
-					block_type = lb_type(m, t_rawptr);
-				} else {
-					block_type = lb_type_padding_filler(m, block_size, align);
-				}
+				LLVMTypeRef block_type = lb_type_internal_union_block_type(m, type);
 
 				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);

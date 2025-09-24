@@ -1914,7 +1914,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
 
 	if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
-		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
+		gb_printf_err("LLVM Error in module %s:\n%s\n", m->module_name, llvm_error);
 		if (build_context.keep_temp_files) {
 			TIME_SECTION("LLVM Print Module to File");
 			String filepath_ll = lb_filepath_ll_for_module(m);

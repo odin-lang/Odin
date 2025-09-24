@@ -537,6 +537,100 @@ gb_internal bool lb_is_nested_possibly_constant(Type *ft, Selection const &sel, 
 	return lb_is_elem_const(elem, ft);
 }
 
+gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef variant_value, Type *variant_type, Type *union_type) {
+	Type *bt = base_type(union_type);
+	GB_ASSERT(bt->kind == Type_Union);
+	GB_ASSERT(lb_type(m, variant_type) == LLVMTypeOf(variant_value));
+
+	if (bt->Union.variants.count == 0) {
+		GB_ASSERT(LLVMIsNull(variant_value));
+		return variant_value;
+	}
+
+	LLVMTypeRef llvm_type = lb_type(m, union_type);
+	LLVMTypeRef llvm_variant_type = lb_type(m, variant_type);
+
+	if (is_type_union_maybe_pointer(bt)) {
+		GB_ASSERT(lb_sizeof(LLVMTypeOf(variant_value)) == lb_sizeof(llvm_type));
+		return LLVMConstBitCast(variant_value, llvm_type);
+	}
+
+	if (bt->Union.variants.count == 1) {
+		unsigned long long the_tag = cast(unsigned long long)union_variant_index(union_type, variant_type);
+		LLVMTypeRef tag_type = lb_type(m, union_tag_type(bt));
+
+		LLVMValueRef values[3] = {};
+		unsigned i = 0;
+		values[i++] = variant_value;
+		values[i++] = LLVMConstInt(tag_type, the_tag, false);
+
+		i64 used_size = bt->Union.variant_block_size + lb_sizeof(tag_type);
+		i64 padding = type_size_of(union_type) - used_size;
+		i64 align = type_align_of(union_type);
+		if (padding > 0) {
+			LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
+			values[i++] = LLVMConstNull(padding_type);
+		}
+
+		return LLVMConstNamedStruct(llvm_type, values, i);
+	}
+
+	LLVMTypeRef block_type = LLVMStructGetTypeAtIndex(llvm_type, 0);
+
+	LLVMTypeRef block_padding = nullptr;
+	i64 block_padding_size = bt->Union.variant_block_size - type_size_of(variant_type);
+	if (block_padding_size > 0) {
+		block_padding = lb_type_padding_filler(m, block_padding_size, type_align_of(variant_type));
+		return nullptr;
+	}
+
+	LLVMTypeRef tag_type = lb_type(m, union_tag_type(bt));
+
+	i64 used_size = bt->Union.variant_block_size + lb_sizeof(tag_type);
+	i64 padding = type_size_of(union_type) - used_size;
+	i64 align = type_align_of(union_type);
+	LLVMTypeRef padding_type = nullptr;
+	if (padding > 0) {
+		padding_type = lb_type_padding_filler(m, padding, align);
+	}
+
+
+	unsigned i = 0;
+	LLVMValueRef values[3] = {};
+
+	LLVMValueRef variant_value_wrapped = variant_value;
+
+	if (lb_sizeof(llvm_variant_type) == 0) {
+		variant_value_wrapped = LLVMConstNull(block_type);
+	} else if (block_type != llvm_variant_type) {
+		return nullptr;
+	}
+
+	values[i++] = variant_value_wrapped;
+
+	if (block_padding_size > 0) {
+		values[i++] = LLVMConstNull(block_padding);
+	}
+	unsigned long long the_tag = cast(unsigned long long)union_variant_index(union_type, variant_type);
+	values[i++] = LLVMConstInt(tag_type, the_tag, false);
+	if (padding > 0) {
+		values[i++] = LLVMConstNull(padding_type);
+	}
+	return LLVMConstNamedStruct(llvm_type, values, i);
+}
+
+gb_internal bool lb_try_construct_const_union(lbModule *m, lbValue *value, Type *variant_type, Type *union_type) {
+	if (lb_is_const(*value)) {
+		LLVMValueRef res = lb_construct_const_union(m, value->value, variant_type, union_type);
+		if (res != nullptr) {
+			*value = {res, union_type};
+			return true;
+		}
+	}
+	return false;
+}
+
+
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
