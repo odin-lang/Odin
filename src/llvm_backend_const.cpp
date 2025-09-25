@@ -755,6 +755,9 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 		}
 
 		return nullptr;
+	} else {
+		// TODO(bill): ignore this for the time being
+		return nullptr;
 	}
 
 assign_value_wrapped:;
