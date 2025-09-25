@@ -701,6 +701,11 @@ gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef vari
 	} else if (lb_sizeof(llvm_variant_type) == 0) {
 		block_value = LLVMConstNull(block_type);
 	} else if (block_type != llvm_variant_type) {
+		if (true) {
+			// TODO(bill): ignore this for the time being
+			return nullptr;
+		}
+
 		LLVMTypeKind block_kind   = LLVMGetTypeKind(block_type);
 		LLVMTypeKind variant_kind = LLVMGetTypeKind(llvm_variant_type);
 
