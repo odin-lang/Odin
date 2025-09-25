@@ -1,5 +1,6 @@
 package darwin
 
+// odinfmt: disable
 import "core:c"
 import "base:intrinsics"
 
@@ -432,3 +433,9 @@ syscall_shm_open :: #force_inline proc "contextless" (name: cstring, oflag: u32,
 syscall_shm_unlink :: #force_inline proc "contextless" (name: cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.shm_unlink), transmute(uintptr)name)
 }
+
+syscall_ptrace :: #force_inline proc "contextless" (request: c.int, pid: pid_t, addr: cstring, data: c.int) -> c.int {
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.ptrace), uintptr(request), uintptr(pid), transmute(uintptr)addr, uintptr(data))
+}
+//odinfmt: enable
+
