@@ -32,7 +32,6 @@ is_UNC :: proc(path: string) -> bool {
 	return volume_name_len(path) > 2
 }
 
-
 is_abs :: proc(path: string) -> bool {
 	if is_reserved_name(path) {
 		return true
@@ -49,7 +48,6 @@ is_abs :: proc(path: string) -> bool {
 	}
 	return is_slash(path[0])
 }
-
 
 @(private)
 temp_full_path :: proc(name: string) -> (path: string, err: os.Error) {
@@ -76,8 +74,6 @@ temp_full_path :: proc(name: string) -> (path: string, err: os.Error) {
 	return win32.utf16_to_utf8(buf[:n], ta)
 }
 
-
-
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 	full_path, err := temp_full_path(path)
@@ -88,17 +84,16 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	return p, true
 }
 
-
-join :: proc(elems: []string, allocator := context.allocator) -> string {
+join :: proc(elems: []string, allocator := context.allocator) -> (string, runtime.Allocator_Error) #optional_allocator_error {
 	for e, i in elems {
 		if e != "" {
 			return join_non_empty(elems[i:], allocator)
 		}
 	}
-	return ""
+	return "", nil
 }
 
-join_non_empty :: proc(elems: []string, allocator := context.allocator) -> string {
+join_non_empty :: proc(elems: []string, allocator := context.allocator) -> (joined: string, err: runtime.Allocator_Error) {
 	context.allocator = allocator
 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
@@ -110,23 +105,25 @@ join_non_empty :: proc(elems: []string, allocator := context.allocator) -> strin
 				break
 			}
 		}
-		s := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator)
-		s = strings.concatenate({elems[0], s}, context.temp_allocator)
+		s := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator) or_return
+		s = strings.concatenate({elems[0], s}, context.temp_allocator) or_return
 		return clean(s)
 	}
 
-	p := clean(strings.join(elems, SEPARATOR_STRING, context.temp_allocator))
+	p := strings.join(elems, SEPARATOR_STRING, context.temp_allocator) or_return
+	p = clean(p) or_return
 	if !is_UNC(p) {
-		return p
+		return p, nil
 	}
-
-	head := clean(elems[0], context.temp_allocator)
+	
+	head := clean(elems[0], context.temp_allocator) or_return
 	if is_UNC(head) {
-		return p
+		return p, nil
 	}
 	delete(p) // It is not needed now
 
-	tail := clean(strings.join(elems[1:], SEPARATOR_STRING, context.temp_allocator), context.temp_allocator)
+	tail := strings.join(elems[1:], SEPARATOR_STRING, context.temp_allocator) or_return
+	tail = clean(tail, context.temp_allocator) or_return
 	if head[len(head)-1] == SEPARATOR {
 		return strings.concatenate({head, tail})
 	}
