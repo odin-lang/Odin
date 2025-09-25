@@ -608,7 +608,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		entity->flags |= EntityFlag_Disabled;
 	}
 
-	d->entity = entity;
+	d->entity.store(entity);
 
 	AstFile *file = nullptr;
 	{
@@ -3500,6 +3500,24 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	return false;
 }
 
+gb_internal bool is_type_union_constantable(Type *type) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_Union);
+
+	if (bt->Union.variants.count == 0) {
+		return true;
+	} else if (bt->Union.variants.count == 1) {
+		return is_type_constant_type(bt->Union.variants[0]);
+	}
+
+	for (Type *v : bt->Union.variants) {
+		if (!is_type_constant_type(v)) {
+			return false;
+		}
+	}
+	return false;
+}
+
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 
@@ -3524,6 +3542,9 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
 		} else if (is_type_union(type)) {
+			if (is_type_union_constantable(type)) {
+				return true;
+			}
 			x->mode = Addressing_Value;
 		}
 		if (x->mode == Addressing_Value) {
@@ -3582,7 +3603,11 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		Type *final_type = type;
 		if (is_const_expr && !is_type_constant_type(type)) {
 			if (is_type_union(type)) {
-				convert_to_typed(c, x, type);
+				if (is_type_union_constantable(type)) {
+
+				} else {
+					convert_to_typed(c, x, type);
+				}
 			}
 			final_type = default_type(x->type);
 		}
@@ -8339,9 +8364,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				if (c->curr_proc_decl == nullptr) {
 					error(call, "Calling a '#force_inline' procedure that enables target features is not allowed at file scope");
 				} else {
-					GB_ASSERT(c->curr_proc_decl->entity);
-					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
-					String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
+					Entity *e = c->curr_proc_decl->entity.load();
+					GB_ASSERT(e);
+					GB_ASSERT(e->type->kind == Type_Proc);
+					String scope_features = e->type->Proc.enable_target_feature;
 					if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
 						ERROR_BLOCK();
 						error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));

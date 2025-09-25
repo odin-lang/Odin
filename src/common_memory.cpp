@@ -481,15 +481,16 @@ gb_internal gbAllocator permanent_allocator() {
 }
 
 gb_internal gbAllocator temporary_allocator() {
-	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Permanent};
+	// return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Temporary};
+	return permanent_allocator();
 }
 
 
 #define TEMP_ARENA_GUARD(arena) ArenaTempGuard GB_DEFER_3(_arena_guard_){arena}
 
 
-// #define TEMPORARY_ALLOCATOR_GUARD()
-#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
+// #define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
+#define TEMPORARY_ALLOCATOR_GUARD()
 #define PERMANENT_ALLOCATOR_GUARD()
 
 

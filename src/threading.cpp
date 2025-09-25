@@ -195,7 +195,13 @@ gb_internal void mutex_lock(RecursiveMutex *m) {
 			// inside the lock
 			return;
 		}
-		futex_wait(&m->owner, prev_owner);
+
+		// NOTE(lucas): we are doing spin lock since futex signal is expensive on OSX. The recursive locks are
+		// very short lived so we don't hit this mega often and I see no perform regression on windows (with
+		// a performance uplift on OSX).
+
+		//futex_wait(&m->owner, prev_owner);
+		yield_thread();
 	}
 }
 gb_internal bool mutex_try_lock(RecursiveMutex *m) {
@@ -216,7 +222,9 @@ gb_internal void mutex_unlock(RecursiveMutex *m) {
 		return;
 	}
 	m->owner.exchange(0, std::memory_order_release);
-	futex_signal(&m->owner);
+	// NOTE(lucas): see comment about spin lock in mutex_lock above
+
+	// futex_signal(&m->owner);
 	// outside the lock
 }
 

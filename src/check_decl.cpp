@@ -1549,7 +1549,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				      "\tother at %s",
 				      LIT(name), token_pos_to_string(pos));
 			} else if (name == "main") {
-				if (d->entity->pkg->kind != Package_Runtime) {
+				if (d->entity.load()->pkg->kind != Package_Runtime) {
 					error(d->proc_lit, "The link name 'main' is reserved for internal use");
 				}
 			} else {
@@ -1565,7 +1565,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init_expr) {
+gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -1967,8 +1967,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
-	if (decl->parent && decl->entity && decl->parent->entity) {
-		decl->entity->parent_proc_decl = decl->parent;
+	if (decl->parent && decl->entity.load() && decl->parent->entity) {
+		decl->entity.load()->parent_proc_decl = decl->parent;
 	}
 
 	if (ctx->pkg->name != "runtime") {
@@ -2072,7 +2072,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		GB_ASSERT(decl->proc_checked_state != ProcCheckedState_Checked);
 		if (decl->defer_use_checked) {
 			GB_ASSERT(is_type_polymorphic(type, true));
-			error(token, "Defer Use Checked: %.*s", LIT(decl->entity->token.string));
+			error(token, "Defer Use Checked: %.*s", LIT(decl->entity.load()->token.string));
 			GB_ASSERT(decl->defer_use_checked == false);
 		}
 

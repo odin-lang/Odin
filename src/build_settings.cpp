@@ -418,6 +418,7 @@ enum LinkerChoice : i32 {
 	Linker_Default = 0,
 	Linker_lld,
 	Linker_radlink,
+	Linker_mold,
 
 	Linker_COUNT,
 };
@@ -433,6 +434,7 @@ String linker_choices[Linker_COUNT] = {
 	str_lit("default"),
 	str_lit("lld"),
 	str_lit("radlink"),
+	str_lit("mold"),
 };
 
 enum IntegerDivisionByZeroKind : u8 {
@@ -554,6 +556,8 @@ struct BuildContext {
 
 	bool internal_no_inline;
 	bool internal_by_value;
+	bool internal_weak_monomorphization;
+	bool internal_ignore_llvm_verification;
 
 	bool   no_threaded_checker;
 

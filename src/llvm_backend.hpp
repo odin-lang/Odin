@@ -147,8 +147,12 @@ struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
 
+	Checker *checker;
+
 	struct lbGenerator *gen;
 	LLVMTargetMachineRef target_machine;
+
+	lbModule *polymorphic_module;
 
 	CheckerInfo *info;
 	AstPackage *pkg; // possibly associated
@@ -171,7 +175,8 @@ struct lbModule {
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
-	Array<lbProcedure *> missing_procedures_to_check;
+
+	MPSCQueue<lbProcedure *> missing_procedures_to_check;
 
 	StringMap<LLVMValueRef>   const_strings;
 	String16Map<LLVMValueRef> const_string16s;
@@ -180,9 +185,12 @@ struct lbModule {
 
 	StringMap<lbProcedure *> gen_procs;   // key is the canonicalized name
 
-	Array<lbProcedure *> procedures_to_generate;
+	MPSCQueue<lbProcedure *> procedures_to_generate;
 	Array<Entity *> global_procedures_to_create;
 	Array<Entity *> global_types_to_create;
+
+	BlockingMutex generated_procedures_mutex;
+	Array<lbProcedure *> generated_procedures;
 
 	lbProcedure *curr_procedure;
 
@@ -232,8 +240,7 @@ struct lbGenerator : LinkerData {
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
-	RecursiveMutex anonymous_proc_lits_mutex;
-	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
+	lbModule *equal_module;
 
 	isize used_module_count;
 
@@ -329,6 +336,14 @@ struct lbVariadicReuseSlices {
 	lbAddr slice_addr;
 };
 
+struct lbGlobalVariable {
+	lbValue var;
+	lbValue init;
+	DeclInfo *decl;
+	bool is_initialized;
+};
+
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -351,9 +366,9 @@ struct lbProcedure {
 
 	lbFunctionType *abi_function_type;
 
-	LLVMValueRef    value;
-	LLVMBuilderRef  builder;
-	bool            is_done;
+	LLVMValueRef      value;
+	LLVMBuilderRef    builder;
+	std::atomic<bool> is_done;
 
 	lbAddr           return_ptr;
 	Array<lbDefer>   defer_stmts;
@@ -391,6 +406,12 @@ struct lbProcedure {
 	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
 
 	Array<lbValue> asan_stack_locals;
+
+	void (*generate_body)(lbModule *m, lbProcedure *p);
+	Array<lbGlobalVariable> *global_variables;
+	lbProcedure *objc_names;
+
+	Type *internal_gen_type; // map_set, map_get, etc.
 };
 
 

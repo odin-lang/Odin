@@ -2055,8 +2055,8 @@ gb_internal void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, En
 	add_entity_definition(info, identifier, e);
 	GB_ASSERT(e->decl_info == nullptr);
 	e->decl_info = d;
-	d->entity = e;
 	e->pkg = c->pkg;
+	d->entity.store(e);
 
 	isize queue_count = -1;
 	bool is_lazy = false;

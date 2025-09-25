@@ -2495,6 +2495,11 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			Type *vt = dst->Union.variants[0];
 			if (internal_check_is_assignable_to(src_type, vt)) {
 				value = lb_emit_conv(p, value, vt);
+				if (lb_is_const(value)) {
+					LLVMValueRef res = lb_construct_const_union(m, value.value, vt, t);
+					return {res, t};
+				}
+
 				lbAddr parent = lb_add_local_generated(p, t, true);
 				lb_emit_store_union_variant(p, parent.addr, value, vt);
 				return lb_addr_load(p, parent);
@@ -2503,11 +2508,18 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		for (Type *vt : dst->Union.variants) {
 			if (src_type == t_llvm_bool && is_type_boolean(vt)) {
 				value = lb_emit_conv(p, value, vt);
+				if (lb_try_construct_const_union(m, &value, vt, t)) {
+					return value;
+				}
+
 				lbAddr parent = lb_add_local_generated(p, t, true);
 				lb_emit_store_union_variant(p, parent.addr, value, vt);
 				return lb_addr_load(p, parent);
 			}
 			if (are_types_identical(src_type, vt)) {
+				if (lb_try_construct_const_union(m, &value, vt, t)) {
+					return value;
+				}
 				lbAddr parent = lb_add_local_generated(p, t, true);
 				lb_emit_store_union_variant(p, parent.addr, value, vt);
 				return lb_addr_load(p, parent);
@@ -2545,6 +2557,9 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		if (valid_count == 1) {
 			Type *vt = dst->Union.variants[first_success_index];
 			value = lb_emit_conv(p, value, vt);
+			if (lb_try_construct_const_union(m, &value, vt, t)) {
+					return value;
+				}
 			lbAddr parent = lb_add_local_generated(p, t, true);
 			lb_emit_store_union_variant(p, parent.addr, value, vt);
 			return lb_addr_load(p, parent);
