@@ -65,13 +65,20 @@ test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(group_slice_u8({})),              0)
 	testing.expect_value(t, group_slice_u8(nil) == nil,           true)
 
-	proc_dynamic_array :: proc(a: [dynamic]u8) -> [dynamic]u8 { return a }
+	proc_dynamic_array :: proc(t: ^testing.T, array: [dynamic]u8, expected_len: int) {
+		if expected_len < 0 {
+			testing.expect_value(t, array == nil, true)
+		} else {
+			testing.expect_value(t, len(array), expected_len)
+		}
+		delete(array)
+	}
 	group_dynamic_array :: proc{proc_nil, proc_dynamic_array}
-	testing.expect_value(t, len(group_dynamic_array([dynamic]u8{1, 2, 3})), 3)
-	testing.expect_value(t, len(group_dynamic_array({1, 2, 3})),            3)
-	testing.expect_value(t, len(group_dynamic_array({0=1, 1=2, 2=3})),      3)
-	testing.expect_value(t, len(group_dynamic_array({})),                   0)
-	testing.expect_value(t, group_dynamic_array(nil) == nil,                true)
+	group_dynamic_array(t, [dynamic]u8{1, 2, 3}, 3)
+	group_dynamic_array(t, {1, 2, 3},            3)
+	group_dynamic_array(t, {0=1, 1=2, 2=3},      3)
+	group_dynamic_array(t, {},                   0)
+	group_dynamic_array(t, nil,                  -1)
 
 	Enum :: enum{A, B, C}
 	proc_enum :: proc(a: Enum) -> Enum { return a }
@@ -111,12 +118,19 @@ test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	testing.expect_value(t, group_union(int(9)).(int), 9)
 	testing.expect_value(t, group_union({}),           nil)
 
-	proc_map :: proc(a: map[u8]u8) -> map[u8]u8 { return a }
+	proc_map :: proc(t: ^testing.T, map_: map[u8]u8, expected_len: int) {
+		if expected_len < 0 {
+			testing.expect_value(t, map_ == nil, true)
+		} else {
+			testing.expect_value(t, len(map_), expected_len)
+		}
+		delete(map_)
+	}
 	group_map :: proc{proc_nil, proc_map}
-	testing.expect_value(t, len(group_map(map[u8]u8{1=1, 2=2})), 2)
-	testing.expect_value(t, len(group_map({1=1, 2=2})),          2)
-	testing.expect_value(t, len(group_map({})),                  0)
-	testing.expect_value(t, group_map(nil) == nil,               true)
+	group_map(t, map[u8]u8{1=1, 2=2}, 2)
+	group_map(t, {1=1, 2=2},          2)
+	group_map(t, {},                  0)
+	group_map(t, nil,                 -1)
 
 	Bit_Field :: bit_field u16 {a: u8|4, b: u8|4, c: u8|4}
 	proc_bit_field :: proc(a: Bit_Field) -> Bit_Field { return a }
