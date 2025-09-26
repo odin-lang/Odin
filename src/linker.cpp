@@ -161,21 +161,32 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 try_cross_linking:;
 
 	#if defined(GB_SYSTEM_WINDOWS)
+		String section_name = str_lit("msvc-link");
 		bool is_windows = build_context.metrics.os == TargetOs_windows;
 	#else
+		String section_name = str_lit("lld-link");
 		bool is_windows = false;
 	#endif
 
 		bool is_osx = build_context.metrics.os == TargetOs_darwin;
 
 
+		switch (build_context.linker_choice) {
+		case Linker_Default:  break;
+		case Linker_lld:      section_name = str_lit("lld-link"); break;
+	#if defined(GB_SYSTEM_LINUX)
+		case Linker_mold:     section_name = str_lit("mold-link"); break;
+	#endif
+	#if defined(GB_SYSTEM_WINDOWS)
+		case Linker_radlink:  section_name = str_lit("rad-link"); break;
+	#endif
+		default:
+			gb_printf_err("'%.*s' linker is not support for this platform\n", LIT(linker_choices[build_context.linker_choice]));
+			return 1;
+		}
+
+
 		if (is_windows) {
-			String section_name = str_lit("msvc-link");
-			switch (build_context.linker_choice) {
-			case Linker_Default:  break;
-			case Linker_lld:      section_name = str_lit("lld-link"); break;
-			case Linker_radlink:  section_name = str_lit("rad-link"); break;
-			}
 			timings_start_section(timings, section_name);
 
 			gbString lib_str = gb_string_make(heap_allocator(), "");
@@ -281,7 +292,11 @@ try_cross_linking:;
 					link_settings = gb_string_append_fmt(link_settings, " /NOENTRY");
 				}
 			} else {
-				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
+				// For i386 with CRT, libcmt provides the entry point
+				// For other cases or no_crt, we need to specify the entry point
+				if (!(build_context.metrics.arch == TargetArch_i386 && !build_context.no_crt)) {
+					link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
+				}
 			}
 
 			if (build_context.build_paths[BuildPath_Symbols].name != "") {
@@ -419,7 +434,8 @@ try_cross_linking:;
 			}
 			}
 		} else {
-			timings_start_section(timings, str_lit("ld-link"));
+
+			timings_start_section(timings, section_name);
 
 			int const ODIN_ANDROID_API_LEVEL = build_context.ODIN_ANDROID_API_LEVEL;
 
@@ -952,6 +968,9 @@ try_cross_linking:;
 			if (build_context.linker_choice == Linker_lld) {
 				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
 				result = system_exec_command_line_app("lld-link", link_command_line);
+			} else if (build_context.linker_choice == Linker_mold) {
+				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=mold");
+				result = system_exec_command_line_app("mold-link", link_command_line);
 			} else {
 				result = system_exec_command_line_app("ld-link", link_command_line);
 			}

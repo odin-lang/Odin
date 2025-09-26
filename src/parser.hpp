@@ -396,6 +396,7 @@ struct AstSplitArgs {
 	AST_KIND(Ident,          "identifier",      struct { \
 		Token   token;  \
 		Entity *entity; \
+		u32     hash;   \
 	}) \
 	AST_KIND(Implicit,       "implicit",        Token) \
 	AST_KIND(Uninit,         "uninitialized value", Token) \

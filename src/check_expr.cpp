@@ -608,7 +608,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		entity->flags |= EntityFlag_Disabled;
 	}
 
-	d->entity = entity;
+	d->entity.store(entity);
 
 	AstFile *file = nullptr;
 	{
@@ -1293,6 +1293,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 						error_line("\t      Got:      %s\n", s_got);
 						gb_string_free(s_got);
 						gb_string_free(s_expected);
+
+						Type *tx = x->Proc.params->Tuple.variables[0]->type;
+						Type *ty = y->Proc.params->Tuple.variables[0]->type;
+						gb_printf_err("%s kind:%.*s e:%p ot:%p\n", type_to_string(tx), LIT(type_strings[tx->kind]), tx->Named.type_name, tx->Named.type_name->TypeName.original_type_for_parapoly);
+						gb_printf_err("%s kind:%.*s e:%p ot:%p\n", type_to_string(ty), LIT(type_strings[ty->kind]), ty->Named.type_name, ty->Named.type_name->TypeName.original_type_for_parapoly);
 					} else {
 						gbString s_expected = type_to_string(y);
 						gbString s_got = type_to_string(x);
@@ -1738,7 +1743,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	o->expr = n;
 	String name = n->Ident.token.string;
 
-	Entity *e = scope_lookup(c->scope, name);
+	Entity *e = scope_lookup(c->scope, name, n->Ident.hash);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
 			error(n, "'_' cannot be used as a value");
@@ -3500,6 +3505,24 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	return false;
 }
 
+gb_internal bool is_type_union_constantable(Type *type) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_Union);
+
+	if (bt->Union.variants.count == 0) {
+		return true;
+	} else if (bt->Union.variants.count == 1) {
+		return is_type_constant_type(bt->Union.variants[0]);
+	}
+
+	for (Type *v : bt->Union.variants) {
+		if (!is_type_constant_type(v)) {
+			return false;
+		}
+	}
+	return false;
+}
+
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 
@@ -3524,6 +3547,9 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
 		} else if (is_type_union(type)) {
+			if (is_type_union_constantable(type)) {
+				return true;
+			}
 			x->mode = Addressing_Value;
 		}
 		if (x->mode == Addressing_Value) {
@@ -3582,7 +3608,11 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		Type *final_type = type;
 		if (is_const_expr && !is_type_constant_type(type)) {
 			if (is_type_union(type)) {
-				convert_to_typed(c, x, type);
+				if (is_type_union_constantable(type)) {
+
+				} else {
+					convert_to_typed(c, x, type);
+				}
 			}
 			final_type = default_type(x->type);
 		}
@@ -4639,7 +4669,6 @@ gb_internal ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 }
 
 gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
-	// GB_ASSERT_NOT_NULL(target_type);
 	if (target_type == nullptr || operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
 	    is_type_typed(operand->type) ||
@@ -4810,7 +4839,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			TEMPORARY_ALLOCATOR_GUARD();
 
 			isize count = t->Union.variants.count;
-			ValidIndexAndScore *valids = gb_alloc_array(temporary_allocator(), ValidIndexAndScore, count);
+			ValidIndexAndScore *valids = temporary_alloc_array<ValidIndexAndScore>(count);
 			isize valid_count = 0;
 			isize first_success_index = -1;
 			for_array(i, t->Union.variants) {
@@ -5102,7 +5131,6 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					ast_node(fv, FieldValue, elem);
 					String name = fv->field->Ident.token.string;
 					Selection sub_sel = lookup_field(node->tav.type, name, false);
-					defer (array_free(&sub_sel.index));
 					if (sub_sel.index.count > 0 &&
 					    sub_sel.index[0] == index) {
 						value = fv->value->tav.value;
@@ -5363,7 +5391,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		}
 	} else */if (node->kind == Ast_Ident) {
 		String name = node->Ident.token.string;
-		return scope_lookup(c->scope, name);
+		return scope_lookup(c->scope, name, node->Ident.hash);
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
 		ast_node(se, SelectorExpr, node);
 		if (se->token.kind == Token_ArrowRight) {
@@ -5385,7 +5413,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 
 		if (op_expr->kind == Ast_Ident) {
 			String op_name = op_expr->Ident.token.string;
-			Entity *e = scope_lookup(c->scope, op_name);
+			Entity *e = scope_lookup(c->scope, op_name, op_expr->Ident.hash);
 			if (e == nullptr) {
 				return nullptr;
 			}
@@ -5482,7 +5510,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	if (op_expr->kind == Ast_Ident) {
 		String op_name = op_expr->Ident.token.string;
-		Entity *e = scope_lookup(c->scope, op_name);
+		Entity *e = scope_lookup(c->scope, op_name, op_expr->Ident.hash);
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
@@ -5905,7 +5933,7 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 				return true;
 			}
 		} else {
-			Entity *e = scope_lookup(s, name);
+			Entity *e = scope_lookup(s, name, i->hash);
 			if (e != nullptr) {
 				if (out_scope) *out_scope = e->scope;
 				return true;
@@ -6029,7 +6057,7 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 			}
 			rw_mutex_shared_lock(&decl->deps_mutex);
 			rw_mutex_lock(&c->decl->deps_mutex);
-			for (Entity *dep : decl->deps) {
+			FOR_PTR_SET(dep, decl->deps) {
 				ptr_set_add(&c->decl->deps, dep);
 			}
 			rw_mutex_unlock(&c->decl->deps_mutex);
@@ -6257,7 +6285,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	}
 
 	GB_ASSERT(ce->split_args);
-	auto visited = slice_make<bool>(temporary_allocator(), pt->param_count);
+	auto visited = temporary_slice_make<bool>(pt->param_count);
 	auto ordered_operands = array_make<Operand>(temporary_allocator(), pt->param_count);
 	defer ({
 		for (Operand const &o : ordered_operands) {
@@ -6473,7 +6501,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 
 		if (e && e->kind == Entity_Constant && is_type_proc(e->type)) {
-			if (o->mode != Addressing_Constant) {
+			bool ok = false;
+			if (o->mode == Addressing_Constant) {
+				ok = true;
+			} else if (o->value.kind == ExactValue_Procedure) {
+				ok = true;
+			}
+
+			if (!ok) {
 				if (show_error) {
 					error(o->expr, "Expected a constant procedure value for the argument '%.*s'", LIT(e->token.string));
 				}
@@ -6972,6 +7007,10 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				array_unordered_remove(&procs, proc_index);
 				continue;
 			}
+			if (!pt->Proc.variadic && max_arg_count != ISIZE_MAX && param_count < max_arg_count) {
+				array_unordered_remove(&procs, proc_index);
+				continue;
+			}
 			proc_index++;
 		}
 	}
@@ -6980,10 +7019,10 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	isize lhs_count = -1;
 	i32 variadic_index = -1;
 
-	auto positional_operands = array_make<Operand>(heap_allocator(), 0, 0);
-	auto named_operands = array_make<Operand>(heap_allocator(), 0, 0);
-	defer (array_free(&positional_operands));
-	defer (array_free(&named_operands));
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto positional_operands = array_make<Operand>(temporary_allocator(), 0, 0);
+	auto named_operands = array_make<Operand>(temporary_allocator(), 0, 0);
 
 	if (procs.count == 1) {
 		Entity *e = procs[0];
@@ -7024,7 +7063,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		if (proc_arg_count >= 0) {
 			lhs_count = proc_arg_count;
 			if (lhs_count > 0)  {
-				lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
+				lhs = gb_alloc_array(temporary_allocator(), Entity *, lhs_count);
 				for (isize param_index = 0; param_index < lhs_count; param_index++) {
 					Entity *e = nullptr;
 					for (Entity *p : procs) {
@@ -7110,13 +7149,9 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		array_add(&named_operands, o);
 	}
 
-	gb_free(heap_allocator(), lhs);
+	auto valids = array_make<ValidIndexAndScore>(temporary_allocator(), 0, procs.count);
 
-	auto valids = array_make<ValidIndexAndScore>(heap_allocator(), 0, procs.count);
-	defer (array_free(&valids));
-
-	auto proc_entities = array_make<Entity *>(heap_allocator(), 0, procs.count*2 + 1);
-	defer (array_free(&proc_entities));
+	auto proc_entities = array_make<Entity *>(temporary_allocator(), 0, procs.count*2 + 1);
 	for (Entity *proc : procs) {
 		array_add(&proc_entities, proc);
 	}
@@ -7247,7 +7282,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 
 		// Try to reduce the list further for `$T: typeid` like parameters
-		bool *possibly_ignore = gb_alloc_array(temporary_allocator(), bool, procs.count);
+		bool *possibly_ignore = temporary_alloc_array<bool>(procs.count);
 		isize possibly_ignore_set = 0;
 
 		if (true) {
@@ -7335,7 +7370,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 
 		isize max_spaces = gb_max(max_name_length, max_type_length);
-		char *spaces = gb_alloc_array(temporary_allocator(), char, max_spaces+1);
+		char *spaces = temporary_alloc_array<char>(max_spaces+1);
 		for (isize i = 0; i < max_spaces; i++) {
 			spaces[i] = ' ';
 		}
@@ -7510,11 +7545,10 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		return check_call_arguments_proc_group(c, operand, call);
 	}
 
-	auto positional_operands = array_make<Operand>(heap_allocator(), 0, positional_args.count);
-	auto named_operands      = array_make<Operand>(heap_allocator(), 0, 0);
+	TEMPORARY_ALLOCATOR_GUARD();
 
-	defer (array_free(&positional_operands));
-	defer (array_free(&named_operands));
+	auto positional_operands = array_make<Operand>(temporary_allocator(), 0, positional_args.count);
+	auto named_operands      = array_make<Operand>(temporary_allocator(), 0, 0);
 
 	if (positional_args.count > 0) {
 		Entity **lhs =  nullptr;
@@ -7601,6 +7635,8 @@ gb_internal isize lookup_polymorphic_record_parameter(Type *t, String parameter_
 
 
 gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *operand, Ast *call) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	ast_node(ce, CallExpr, call);
 
 	Type *original_type = operand->type;
@@ -7609,7 +7645,6 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	bool show_error = true;
 
 	Array<Operand> operands = {};
-	defer (array_free(&operands));
 
 	CallArgumentError err = CallArgumentError_None;
 
@@ -7617,15 +7652,14 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		// NOTE(bill, 2019-10-26): Allow a cycle in the parameters but not in the fields themselves
 		auto prev_type_path = c->type_path;
-		c->type_path = new_checker_type_path();
-		defer ({
-			destroy_checker_type_path(c->type_path);
-			c->type_path = prev_type_path;
-		});
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		c->type_path = new_checker_type_path(temporary_allocator());
+		defer (c->type_path = prev_type_path);
 
 		if (is_call_expr_field_value(ce)) {
 			named_fields = true;
-			operands = array_make<Operand>(heap_allocator(), ce->args.count);
+			operands = array_make<Operand>(temporary_allocator(), ce->args.count);
 			for_array(i, ce->args) {
 				Ast *arg = ce->args[i];
 				ast_node(fv, FieldValue, arg);
@@ -7657,7 +7691,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			}
 
 		} else {
-			operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
+			operands = array_make<Operand>(temporary_allocator(), 0, 2*ce->args.count);
 
 			Entity **lhs = nullptr;
 			isize lhs_count = -1;
@@ -7699,7 +7733,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	} else {
 		TEMPORARY_ALLOCATOR_GUARD();
 
-		bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
+		bool *visited = temporary_alloc_array<bool>(param_count);
 
 		// LEAK(bill)
 		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
@@ -7883,11 +7917,10 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	{
 		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
-
 		mutex_lock(&found_gen_types->mutex);
 		defer (mutex_unlock(&found_gen_types->mutex));
-		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 
+		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 		if (found_entity) {
 			operand->mode = Addressing_Type;
 			operand->type = found_entity->type;
@@ -8335,9 +8368,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				if (c->curr_proc_decl == nullptr) {
 					error(call, "Calling a '#force_inline' procedure that enables target features is not allowed at file scope");
 				} else {
-					GB_ASSERT(c->curr_proc_decl->entity);
-					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
-					String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
+					Entity *e = c->curr_proc_decl->entity.load();
+					GB_ASSERT(e);
+					GB_ASSERT(e->type->kind == Type_Proc);
+					String scope_features = e->type->Proc.enable_target_feature;
 					if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
 						ERROR_BLOCK();
 						error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
@@ -8874,7 +8908,7 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 	isize count = multi_map_count(seen, key);
 	if (count) {
 		TEMPORARY_ALLOCATOR_GUARD();
-		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
+		TypeAndToken *taps = temporary_alloc_array<TypeAndToken>(count);
 
 		multi_map_get_all(seen, key, taps);
 		for (isize i = 0; i < count; i++) {
@@ -10920,7 +10954,7 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 		}
 	}
 
-	auto modified_args = slice_make<Ast *>(heap_allocator(), ce->args.count+1);
+	auto modified_args = permanent_slice_make<Ast *>(ce->args.count+1);
 	modified_args[0] = first_arg;
 	slice_copy(&modified_args, ce->args, 1);
 	ce->args = modified_args;
@@ -11423,6 +11457,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 		o->mode = Addressing_Value;
 		o->type = type;
+		o->value = exact_value_procedure(node);
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, node);

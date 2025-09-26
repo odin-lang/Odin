@@ -714,13 +714,15 @@ extern "C++" {
 } while (0)
 #endif
 
+
+#if defined(DISABLE_ASSERT)
+#define GB_ASSERT(cond) gb_unused(cond)
+#endif
+
 #ifndef GB_ASSERT
 #define GB_ASSERT(cond) GB_ASSERT_MSG(cond, NULL)
 #endif
 
-#ifndef GB_ASSERT_NOT_NULL
-#define GB_ASSERT_NOT_NULL(ptr) GB_ASSERT_MSG((ptr) != NULL, #ptr " must not be NULL")
-#endif
 
 // NOTE(bill): Things that shouldn't happen with a message!
 #ifndef GB_PANIC
@@ -3719,7 +3721,7 @@ gb_inline i32 gb_strcmp(char const *s1, char const *s2) {
 }
 
 gb_inline char *gb_strcpy(char *dest, char const *source) {
-	GB_ASSERT_NOT_NULL(dest);
+	GB_ASSERT(dest != NULL);
 	if (source) {
 		char *str = dest;
 		while (*source) *str++ = *source++;
@@ -3729,7 +3731,7 @@ gb_inline char *gb_strcpy(char *dest, char const *source) {
 
 
 gb_inline char *gb_strncpy(char *dest, char const *source, isize len) {
-	GB_ASSERT_NOT_NULL(dest);
+	GB_ASSERT(dest != NULL);
 	if (source) {
 		char *str = dest;
 		while (len > 0 && *source) {
@@ -3746,7 +3748,7 @@ gb_inline char *gb_strncpy(char *dest, char const *source, isize len) {
 
 gb_inline isize gb_strlcpy(char *dest, char const *source, isize len) {
 	isize result = 0;
-	GB_ASSERT_NOT_NULL(dest);
+	GB_ASSERT(dest != NULL);
 	if (source) {
 		char const *source_start = source;
 		char *str = dest;
@@ -5636,7 +5638,7 @@ gbFileContents gb_file_read_contents(gbAllocator a, b32 zero_terminate, char con
 
 void gb_file_free_contents(gbFileContents *fc) {
     if (fc == NULL || fc->size == 0) return;
-	GB_ASSERT_NOT_NULL(fc->data);
+	GB_ASSERT(fc->data != NULL);
 	gb_free(fc->allocator, fc->data);
 	fc->data = NULL;
 	fc->size = 0;
@@ -5648,7 +5650,7 @@ void gb_file_free_contents(gbFileContents *fc) {
 
 gb_inline b32 gb_path_is_absolute(char const *path) {
 	b32 result = false;
-	GB_ASSERT_NOT_NULL(path);
+	GB_ASSERT(path != NULL);
 #if defined(GB_SYSTEM_WINDOWS)
 	result == (gb_strlen(path) > 2) &&
 	          gb_char_is_alpha(path[0]) &&
@@ -5663,7 +5665,7 @@ gb_inline b32 gb_path_is_relative(char const *path) { return !gb_path_is_absolut
 
 gb_inline b32 gb_path_is_root(char const *path) {
 	b32 result = false;
-	GB_ASSERT_NOT_NULL(path);
+	GB_ASSERT(path != NULL);
 #if defined(GB_SYSTEM_WINDOWS)
 	result = gb_path_is_absolute(path) && (gb_strlen(path) == 3);
 #else
@@ -5674,14 +5676,14 @@ gb_inline b32 gb_path_is_root(char const *path) {
 
 gb_inline char const *gb_path_base_name(char const *path) {
 	char const *ls;
-	GB_ASSERT_NOT_NULL(path);
+	GB_ASSERT(path != NULL);
 	ls = gb_char_last_occurence(path, '/');
 	return (ls == NULL) ? path : ls+1;
 }
 
 gb_inline char const *gb_path_extension(char const *path) {
 	char const *ld;
-	GB_ASSERT_NOT_NULL(path);
+	GB_ASSERT(path != NULL);
 	ld = gb_char_last_occurence(path, '.');
 	return (ld == NULL) ? NULL : ld+1;
 }

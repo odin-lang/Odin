@@ -778,13 +778,14 @@ int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, alloca
 */
 INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 
-@(init, private)
-_init_constants :: proc "contextless" () {
-	initialize_constants()
-}
+@(private)
+constant_allocator: runtime.Allocator
 
-initialize_constants :: proc "contextless" () -> (res: int) {
+@(init, private)
+initialize_constants :: proc "contextless" () {
 	context = runtime.default_context()
+	constant_allocator = context.allocator
+
 	internal_int_set_from_integer(     INT_ZERO,  0);      INT_ZERO.flags = {.Immutable}
 	internal_int_set_from_integer(      INT_ONE,  1);       INT_ONE.flags = {.Immutable}
 	internal_int_set_from_integer(INT_MINUS_ONE, -1); INT_MINUS_ONE.flags = {.Immutable}
@@ -796,15 +797,17 @@ initialize_constants :: proc "contextless" () -> (res: int) {
 	internal_int_set_from_integer(      INT_NAN,  1);       INT_NAN.flags = {.Immutable, .NaN}
 	internal_int_set_from_integer(      INT_INF,  1);       INT_INF.flags = {.Immutable, .Inf}
 	internal_int_set_from_integer(INT_MINUS_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
-
-	return _DEFAULT_MUL_KARATSUBA_CUTOFF
 }
 
 /*
 	Destroy constants.
 	Optional for an EXE, as this would be called at the very end of a process.
 */
-destroy_constants :: proc() {
+@(fini, private)
+destroy_constants :: proc "contextless" () {
+	context = runtime.default_context()
+	context.allocator = constant_allocator
+
 	internal_destroy(INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN)
 }
 

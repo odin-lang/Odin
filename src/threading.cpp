@@ -195,7 +195,13 @@ gb_internal void mutex_lock(RecursiveMutex *m) {
 			// inside the lock
 			return;
 		}
-		futex_wait(&m->owner, prev_owner);
+
+		// NOTE(lucas): we are doing spin lock since futex signal is expensive on OSX. The recursive locks are
+		// very short lived so we don't hit this mega often and I see no perform regression on windows (with
+		// a performance uplift on OSX).
+
+		//futex_wait(&m->owner, prev_owner);
+		yield_thread();
 	}
 }
 gb_internal bool mutex_try_lock(RecursiveMutex *m) {
@@ -216,7 +222,9 @@ gb_internal void mutex_unlock(RecursiveMutex *m) {
 		return;
 	}
 	m->owner.exchange(0, std::memory_order_release);
-	futex_signal(&m->owner);
+	// NOTE(lucas): see comment about spin lock in mutex_lock above
+
+	// futex_signal(&m->owner);
 	// outside the lock
 }
 
@@ -447,6 +455,44 @@ gb_internal void semaphore_wait(Semaphore *s) {
 		mutex_unlock(&m->mutex);
 	}
 #endif
+
+static const int RWLOCK_WRITER   = 1<<0;
+static const int RWLOCK_UPGRADED = 1<<1;
+static const int RWLOCK_READER   = 1<<2;
+struct RWSpinLock {
+	Futex bits;
+};
+
+void rwlock_release_write(RWSpinLock *l) {
+	l->bits.fetch_and(~(RWLOCK_WRITER | RWLOCK_UPGRADED), std::memory_order_release);
+	futex_signal(&l->bits);
+}
+
+bool rwlock_try_acquire_upgrade(RWSpinLock *l) {
+	int value = l->bits.fetch_or(RWLOCK_UPGRADED, std::memory_order_acquire);
+	return (value & (RWLOCK_UPGRADED | RWLOCK_WRITER)) == 0;
+}
+
+void rwlock_acquire_upgrade(RWSpinLock *l) {
+	while (!rwlock_try_acquire_upgrade(l)) {
+		futex_wait(&l->bits, RWLOCK_UPGRADED | RWLOCK_WRITER);
+	}
+}
+void rwlock_release_upgrade(RWSpinLock *l) {
+	l->bits.fetch_add(-RWLOCK_UPGRADED, std::memory_order_acq_rel);
+}
+
+bool rwlock_try_release_upgrade_and_acquire_write(RWSpinLock *l) {
+	int expect = RWLOCK_UPGRADED;
+	return l->bits.compare_exchange_strong(expect, RWLOCK_WRITER, std::memory_order_acq_rel);
+}
+
+void rwlock_release_upgrade_and_acquire_write(RWSpinLock *l) {
+	while (!rwlock_try_release_upgrade_and_acquire_write(l)) {
+		futex_wait(&l->bits, RWLOCK_UPGRADED);
+	}
+}
+
 
 struct Parker {
 	Futex state;

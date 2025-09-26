@@ -84,7 +84,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	String link_name = {};
 
 	if (ignore_body) {
-		lbModule *other_module = lb_module_of_entity(m->gen, entity);
+		lbModule *other_module = lb_module_of_entity(m->gen, entity, m);
 		link_name = lb_get_entity_name(other_module, entity);
 	} else {
 		link_name = lb_get_entity_name(m, entity);
@@ -98,7 +98,6 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			return string_map_must_get(&m->procedures, key);
 		}
 	}
-
 
 	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
 
@@ -798,9 +797,8 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e) {
 	GB_ASSERT(pd->body != nullptr);
 	lbModule *m = p->module;
-	auto *min_dep_set = &m->info->minimum_dependency_set;
 
-	if (ptr_set_exists(min_dep_set, e) == false) {
+	if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 		// NOTE(bill): Nothing depends upon it so doesn't need to be built
 		return;
 	}
@@ -836,7 +834,7 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 
 	lb_add_entity(m, e, value);
 	array_add(&p->children, nested_proc);
-	array_add(&m->procedures_to_generate, nested_proc);
+	mpsc_enqueue(&m->procedures_to_generate, nested_proc);
 }
 
 
@@ -2212,7 +2210,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				GB_ASSERT(e != nullptr);
 
 				if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
-					procedure = e->parent_proc_decl->entity->token.string;
+					procedure = e->parent_proc_decl->entity.load()->token.string;
 				} else {
 					procedure = str_lit("");
 				}

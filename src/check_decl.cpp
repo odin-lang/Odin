@@ -162,8 +162,6 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	if (found_scope == nullptr) {
 		return;
 	}
-	rw_mutex_lock(&found_scope->mutex);
-	defer (rw_mutex_unlock(&found_scope->mutex));
 
 	// IMPORTANT NOTE(bill, 2021-04-10): Overriding behaviour was flawed in that the
 	// original entity was still used check checked, but the checking was only
@@ -172,7 +170,9 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	// Therefore two things can be done: the type can be assigned to state that it
 	// has been "evaluated" and the variant data can be copied across
 
+	rw_mutex_lock(&found_scope->mutex);
 	string_map_set(&found_scope->elements, original_name, new_entity);
+	rw_mutex_unlock(&found_scope->mutex);
 
 	original_entity->flags |= EntityFlag_Overridden;
 	original_entity->type = new_entity->type;
@@ -948,7 +948,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 		error(ident, "foreign library names must be an identifier");
 	} else {
 		String name = ident->Ident.token.string;
-		Entity *found = scope_lookup(ctx->scope, name);
+		Entity *found = scope_lookup(ctx->scope, name, ident->Ident.hash);
 
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
@@ -1549,7 +1549,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				      "\tother at %s",
 				      LIT(name), token_pos_to_string(pos));
 			} else if (name == "main") {
-				if (d->entity->pkg->kind != Package_Runtime) {
+				if (d->entity.load()->pkg->kind != Package_Runtime) {
 					error(d->proc_lit, "The link name 'main' is reserved for internal use");
 				}
 			} else {
@@ -1565,7 +1565,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init_expr) {
+gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -1915,7 +1915,7 @@ gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
 			rw_mutex_shared_lock(&decl->deps_mutex);
 			rw_mutex_lock(&decl->parent->deps_mutex);
 
-			for (Entity *e : decl->deps) {
+			FOR_PTR_SET(e, decl->deps) {
 				ptr_set_add(&decl->parent->deps, e);
 			}
 
@@ -1967,8 +1967,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
-	if (decl->parent && decl->entity && decl->parent->entity) {
-		decl->entity->parent_proc_decl = decl->parent;
+	if (decl->parent && decl->entity.load() && decl->parent->entity) {
+		decl->entity.load()->parent_proc_decl = decl->parent;
 	}
 
 	if (ctx->pkg->name != "runtime") {
@@ -1981,9 +1981,9 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	ast_node(bs, BlockStmt, body);
 
+	TEMPORARY_ALLOCATOR_GUARD();
 	Array<ProcUsingVar> using_entities = {};
-	using_entities.allocator = heap_allocator();
-	defer (array_free(&using_entities));
+	using_entities.allocator = temporary_allocator();
 
 	{
 		if (type->Proc.param_count > 0) {
@@ -2072,7 +2072,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		GB_ASSERT(decl->proc_checked_state != ProcCheckedState_Checked);
 		if (decl->defer_use_checked) {
 			GB_ASSERT(is_type_polymorphic(type, true));
-			error(token, "Defer Use Checked: %.*s", LIT(decl->entity->token.string));
+			error(token, "Defer Use Checked: %.*s", LIT(decl->entity.load()->token.string));
 			GB_ASSERT(decl->defer_use_checked == false);
 		}
 

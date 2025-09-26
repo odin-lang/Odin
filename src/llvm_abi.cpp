@@ -522,6 +522,23 @@ namespace lbAbiAmd64Win64 {
 	}
 };
 
+
+gb_internal bool is_llvm_type_slice_like(LLVMTypeRef type) {
+	if (!lb_is_type_kind(type, LLVMStructTypeKind)) {
+		return false;
+	}
+	if (LLVMCountStructElementTypes(type) != 2) {
+		return false;
+	}
+	LLVMTypeRef fields[2] = {};
+	LLVMGetStructElementTypes(type, fields);
+	if (!lb_is_type_kind(fields[0], LLVMPointerTypeKind)) {
+		return false;
+	}
+	return lb_is_type_kind(fields[1], LLVMIntegerTypeKind) && lb_sizeof(fields[1]) == 8;
+
+}
+
 // NOTE(bill): I hate `namespace` in C++ but this is just because I don't want to prefix everything
 namespace lbAbiAmd64SysV {
 	enum RegClass {
@@ -651,23 +668,6 @@ namespace lbAbiAmd64SysV {
 		}
 		return false;
 	}
-
-	gb_internal bool is_llvm_type_slice_like(LLVMTypeRef type) {
-		if (!lb_is_type_kind(type, LLVMStructTypeKind)) {
-			return false;
-		}
-		if (LLVMCountStructElementTypes(type) != 2) {
-			return false;
-		}
-		LLVMTypeRef fields[2] = {};
-		LLVMGetStructElementTypes(type, fields);
-		if (!lb_is_type_kind(fields[0], LLVMPointerTypeKind)) {
-			return false;
-		}
-		return lb_is_type_kind(fields[1], LLVMIntegerTypeKind) && lb_sizeof(fields[1]) == 8;
-
-	}
-
 
 	gb_internal bool is_aggregate(LLVMTypeRef type) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);

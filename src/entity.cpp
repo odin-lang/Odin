@@ -164,6 +164,7 @@ struct Entity {
 	u64         id;
 	std::atomic<u64>         flags;
 	std::atomic<EntityState> state;
+	std::atomic<i32>         min_dep_count;
 	Token       token;
 	Scope *     scope;
 	Type *      type;
@@ -233,6 +234,7 @@ struct Entity {
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
+			Type * original_type_for_parapoly;
 			String ir_mangled_name;
 			bool   is_type_alias;
 			bool   objc_is_implementation;
@@ -347,7 +349,7 @@ gb_internal Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Typ
 	entity->type   = type;
 	entity->id     = 1 + global_entity_id.fetch_add(1);
 	if (token.pos.file_id) {
-		entity->file = thread_safe_get_ast_file_from_id(token.pos.file_id);
+		entity->file = thread_unsafe_get_ast_file_from_id(token.pos.file_id);
 	}
 	return entity;
 }

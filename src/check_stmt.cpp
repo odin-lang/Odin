@@ -484,7 +484,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		}
 		if (ident_node != nullptr) {
 			ast_node(i, Ident, ident_node);
-			e = scope_lookup(ctx->scope, i->token.string);
+			e = scope_lookup(ctx->scope, i->token.string, i->hash);
 			if (e != nullptr && e->kind == Entity_Variable) {
 				used = (e->flags & EntityFlag_Used) != 0; // NOTE(bill): Make backup just in case
 			}
@@ -1812,8 +1812,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					error(node, "Iteration over a bit_set of an enum is not allowed runtime type information (RTTI) has been disallowed");
 				}
 				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
-					String name = rs->vals[0]->Ident.token.string;
-					Entity *found = scope_lookup(ctx->scope, name);
+					AstIdent *ident = &rs->vals[0]->Ident;
+					String name = ident->token.string;
+					Entity *found = scope_lookup(ctx->scope, name, ident->hash);
 					if (found && are_types_identical(found->type, t->BitSet.elem)) {
 						ERROR_BLOCK();
 						gbString s = expr_to_string(expr);
@@ -1857,8 +1858,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					error(node, "#reverse for is not supported for map types, as maps are unordered");
 				}
 				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
-					String name = rs->vals[0]->Ident.token.string;
-					Entity *found = scope_lookup(ctx->scope, name);
+					AstIdent *ident = &rs->vals[0]->Ident;
+					String name = ident->token.string;
+					Entity *found = scope_lookup(ctx->scope, name, ident->hash);
 					if (found && are_types_identical(found->type, t->Map.key)) {
 						ERROR_BLOCK();
 						gbString s = expr_to_string(expr);
@@ -1963,7 +1965,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 	}
 
 	auto rhs = slice_from_array(vals);
-	auto lhs = slice_make<Ast *>(temporary_allocator(), rhs.count);
+	auto lhs = temporary_slice_make<Ast *>(rhs.count);
 	slice_copy(&lhs, rs->vals);
 
 	isize addressable_index = cast(isize)is_map;
@@ -2567,8 +2569,9 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		result_count = proc_type->Proc.results->Tuple.variables.count;
 	}
 
-	auto operands = array_make<Operand>(heap_allocator(), 0, 2*rs->results.count);
-	defer (array_free(&operands));
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto operands = array_make<Operand>(temporary_allocator(), 0, 2*rs->results.count);
 
 	check_unpack_arguments(ctx, result_entities, result_count, &operands, rs->results, UnpackFlag_AllowOk);
 

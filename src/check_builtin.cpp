@@ -354,7 +354,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		}
 
 		isize const arg_offset = 1;
-		auto param_types = slice_make<Type *>(permanent_allocator(), ce->args.count-arg_offset);
+		auto param_types = permanent_slice_make<Type *>(ce->args.count-arg_offset);
 		param_types[0] = t_objc_id;
 		param_types[1] = sel_type;
 
@@ -462,7 +462,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 	{
 		// NOTE(harold): The last argument specified in the call is the handler proc,
 		//               any other arguments before it are capture by-copy arguments.
-		auto param_operands = slice_make<Operand>(permanent_allocator(), ce->args.count);
+		auto param_operands = permanent_slice_make<Operand>(ce->args.count);
 
 		isize capture_arg_count = ce->args.count - 1;
 
@@ -3554,7 +3554,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	}
 
 	case BuiltinProc_compress_values: {
-		Operand *ops = gb_alloc_array(temporary_allocator(), Operand, ce->args.count);
+		Operand *ops = temporary_alloc_array<Operand>(ce->args.count);
 
 		isize value_count = 0;
 
@@ -3685,9 +3685,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Value;
 		} else {
 			Type *st = alloc_type_struct_complete();
-			st->Struct.fields = slice_make<Entity *>(permanent_allocator(), value_count);
-			st->Struct.tags = gb_alloc_array(permanent_allocator(), String, value_count);
-			st->Struct.offsets = gb_alloc_array(permanent_allocator(), i64, value_count);
+			st->Struct.fields = permanent_slice_make<Entity *>(value_count);
+			st->Struct.tags = permanent_alloc_array<String>(value_count);
+			st->Struct.offsets = permanent_alloc_array<i64>(value_count);
 
 			Scope *scope = create_scope(c->info, nullptr);
 
@@ -4387,7 +4387,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			elem = alloc_type_struct();
 			elem->Struct.scope = s;
 			elem->Struct.fields = slice_from_array(fields);
-			elem->Struct.tags = gb_alloc_array(permanent_allocator(), String, fields.count);
+			elem->Struct.tags = permanent_alloc_array<String>(fields.count);
 			elem->Struct.node = dummy_node_struct;
 			type_set_offsets(elem);
 			wait_signal_set(&elem->Struct.fields_wait_signal);
@@ -4419,7 +4419,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s);
 			return false;
 		}
-		auto types = slice_make<Type *>(permanent_allocator(), t->Struct.fields.count-1);
+		auto types = permanent_slice_make<Type *>(t->Struct.fields.count-1);
 		for_array(i, types) {
 			Entity *f = t->Struct.fields[i];
 			GB_ASSERT(f->type->kind == Type_MultiPointer);
@@ -4755,8 +4755,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (is_type_array(elem)) {
 			Type *old_array = base_type(elem);
 			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), cast(isize)old_array->Array.count);
-			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, cast(isize)old_array->Array.count);
+			soa_struct->Struct.fields = permanent_slice_make<Entity *>(cast(isize)old_array->Array.count);
+			soa_struct->Struct.tags = permanent_alloc_array<String>(cast(isize)old_array->Array.count);
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
@@ -4788,8 +4788,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			Type *old_struct = base_type(elem);
 			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = slice_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
-			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, old_struct->Struct.fields.count);
+			soa_struct->Struct.fields = permanent_slice_make<Entity *>(old_struct->Struct.fields.count);
+			soa_struct->Struct.tags = permanent_alloc_array<String>(old_struct->Struct.fields.count);
 			soa_struct->Struct.node = operand->expr;
 			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
@@ -6181,7 +6181,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 
 			Type *new_type = alloc_type_union();
-			auto variants = slice_make<Type *>(permanent_allocator(), bt->Union.variants.count);
+			auto variants = permanent_slice_make<Type *>(bt->Union.variants.count);
 			for_array(i, bt->Union.variants) {
 				variants[i] = alloc_type_pointer(bt->Union.variants[i]);
 			}
