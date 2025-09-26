@@ -633,6 +633,9 @@ gb_internal Slice<LLVMValueRef> lb_construct_const_union_flatten_values(lbModule
 }
 
 gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef variant_value, Type *variant_type, Type *union_type) {
+#if 1
+	return nullptr;
+#else 0
 	Type *bt = base_type(union_type);
 	GB_ASSERT(bt->kind == Type_Union);
 	GB_ASSERT(lb_type(m, variant_type) == LLVMTypeOf(variant_value));
@@ -768,6 +771,7 @@ assign_value_wrapped:;
 		values[i++] = LLVMConstNull(padding_type);
 	}
 	return LLVMConstNamedStruct(llvm_type, values, i);
+#endif
 }
 
 gb_internal bool lb_try_construct_const_union(lbModule *m, lbValue *value, Type *variant_type, Type *union_type) {
