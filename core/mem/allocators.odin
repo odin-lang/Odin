@@ -1819,17 +1819,17 @@ memory region.
 */
 @(require_results)
 dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	n := align_formula(size, a.alignment)
-	if n > a.block_size {
-		return nil, .Invalid_Argument
-	}
-	if n >= a.out_band_size {
-		assert(a.block_allocator.procedure != nil, "Backing block allocator must be initialized", loc=loc)
-		memory, err := alloc_bytes_non_zeroed(a.block_size, a.alignment, a.block_allocator, loc)
+	if size >= a.out_band_size {
+		assert(a.out_band_allocations.allocator.procedure != nil, "Backing array allocator must be initialized", loc=loc)
+		memory, err := alloc_bytes_non_zeroed(size, a.alignment, a.out_band_allocations.allocator, loc)
 		if memory != nil {
 			append(&a.out_band_allocations, raw_data(memory), loc = loc)
 		}
 		return memory, err
+	}
+	n := align_formula(size, a.alignment)
+	if n > a.block_size {
+		return nil, .Invalid_Argument
 	}
 	if a.bytes_left < n {
 		err := _dynamic_arena_cycle_new_block(a, loc)
@@ -1867,7 +1867,7 @@ dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
 	}
 	clear(&a.used_blocks)
 	for allocation in a.out_band_allocations {
-		free(allocation, a.block_allocator, loc=loc)
+		free(allocation, a.out_band_allocations.allocator, loc=loc)
 	}
 	clear(&a.out_band_allocations)
 	a.bytes_left = 0 // Make new allocations call `_dynamic_arena_cycle_new_block` again.
