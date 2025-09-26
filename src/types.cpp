@@ -18,8 +18,8 @@ enum BasicKind {
 	Basic_u16,
 	Basic_i32,
 	Basic_u32,
-	Basic_i64
-,	Basic_u64,
+	Basic_i64,
+	Basic_u64,
 	Basic_i128,
 	Basic_u128,
 
