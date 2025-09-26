@@ -2497,7 +2497,9 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				value = lb_emit_conv(p, value, vt);
 				if (lb_is_const(value)) {
 					LLVMValueRef res = lb_construct_const_union(m, value.value, vt, t);
-					return {res, t};
+					if (res != nullptr) {
+						return {res, t};
+					}
 				}
 
 				lbAddr parent = lb_add_local_generated(p, t, true);
