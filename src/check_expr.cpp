@@ -7007,6 +7007,10 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				array_unordered_remove(&procs, proc_index);
 				continue;
 			}
+			if (!pt->Proc.variadic && max_arg_count != ISIZE_MAX && param_count < max_arg_count) {
+				array_unordered_remove(&procs, proc_index);
+				continue;
+			}
 			proc_index++;
 		}
 	}
