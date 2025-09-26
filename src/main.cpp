@@ -2837,7 +2837,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons.");
 			print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
 			print_usage_line(2, "Errs on deprecated syntax.");
-			print_usage_line(2, "Errs when the attached-brace style in not adhered to (also known as 1TBS).");
+			print_usage_line(2, "Errs when the attached-brace style is not adhered to (also known as 1TBS).");
 			print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
 		}
 	}
