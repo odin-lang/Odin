@@ -234,6 +234,7 @@ struct Entity {
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
+			Type * original_type_for_parapoly;
 			String ir_mangled_name;
 			bool   is_type_alias;
 			bool   objc_is_implementation;

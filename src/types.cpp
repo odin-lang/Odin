@@ -18,8 +18,8 @@ enum BasicKind {
 	Basic_u16,
 	Basic_i32,
 	Basic_u32,
-	Basic_i64,
-	Basic_u64,
+	Basic_i64
+,	Basic_u64,
 	Basic_i128,
 	Basic_u128,
 
@@ -2860,6 +2860,7 @@ gb_internal bool are_types_identical(Type *x, Type *y) {
 		return false;
 	}
 
+	// MUTEX_GUARD(&g_type_mutex);
 	return are_types_identical_internal(x, y, false);
 }
 gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
@@ -2887,6 +2888,7 @@ gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
 		return false;
 	}
 
+	// MUTEX_GUARD(&g_type_mutex);
 	return are_types_identical_internal(x, y, true);
 }
 

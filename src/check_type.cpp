@@ -312,6 +312,7 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		e->state = EntityState_Resolved;
 		e->file = ctx->file;
 		e->pkg = pkg;
+		e->TypeName.original_type_for_parapoly = original_type;
 		add_entity_use(ctx, node, e);
 	}
 
@@ -321,8 +322,8 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 	e->TypeName.objc_metadata = original_type->Named.type_name->TypeName.objc_metadata;
 
 	auto *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(ctx, original_type);
-	rw_mutex_lock(&found_gen_types->mutex);
-	defer (rw_mutex_unlock(&found_gen_types->mutex));
+	mutex_lock(&found_gen_types->mutex);
+	defer (mutex_unlock(&found_gen_types->mutex));
 
 	for (Entity *prev : found_gen_types->types) {
 		if (prev == e) {
