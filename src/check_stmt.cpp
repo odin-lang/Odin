@@ -2671,6 +2671,20 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 			ERROR_BLOCK();
 			unsafe_return_error(o, "a compound literal of a slice");
 			error_line("\tNote: A constant slice value will use the memory of the current stack frame\n");
+		} else if (expr->kind == Ast_CompoundLit && is_type_struct(o.type)) {
+			ast_node(cl, CompoundLit, expr);
+			for (Ast *elem : cl->elems) {
+				if (elem->kind == Ast_FieldValue) {
+					ast_node(fv, FieldValue, elem);
+					if (fv->value->kind == Ast_CompoundLit && is_type_slice(entity_of_node(fv->field)->type)) {
+						ast_node(sl, CompoundLit, fv->value);
+						if (sl->elems.count == 0) {
+							continue;
+						}
+						unsafe_return_error(o, "a compound literal containing a slice");
+					} 
+				}
+			}
 		}
 	}
 
