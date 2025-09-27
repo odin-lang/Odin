@@ -2545,7 +2545,7 @@ gb_internal void check_if_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 // This needs to be improved tremendously, and a lot of it done during the
 // middle-end (or LLVM side) to improve checks and error messages
 void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
-	auto unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
+	auto const unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
 		gbString s = expr_to_string(o.expr);
 		if (extra_type) {
 			gbString t = type_to_string(extra_type);
@@ -2556,6 +2556,10 @@ void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 		}
 		gb_string_free(s);
 	};
+
+	if (type == nullptr || expr == nullptr) {
+		return;
+	}
 
 	if (expr->kind == Ast_CompoundLit && is_type_slice(type)) {
 		ast_node(cl, CompoundLit, expr);
@@ -2600,7 +2604,10 @@ void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 		for (Ast *elem : cl->elems) {
 			if (elem->kind == Ast_FieldValue) {
 				ast_node(fv, FieldValue, elem);
-				check_unsafe_return(o, entity_of_node(fv->field)->type, fv->value);
+				Entity *e = entity_of_node(fv->field);
+				if (e != nullptr) {
+					check_unsafe_return(o, e->type, fv->value);
+				}
 			}
 		}
 	}
