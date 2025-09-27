@@ -265,7 +265,6 @@ conditional_mem_zero :: proc "contextless" (data: rawptr, n_: int) #no_bounds_ch
 	n := uint(n_)
 
 	n_words := n / size_of(uintptr)
-	n_bytes := n % size_of(uintptr)
 	p_words := ([^]uintptr)(data)[:n_words]
 	p_bytes := ([^]byte)(data)[size_of(uintptr) * n_words:n]
 	for &p_word in p_words {
