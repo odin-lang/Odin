@@ -230,6 +230,56 @@ non_zero_mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int
 	return _mem_resize(ptr, old_size, new_size, alignment, allocator, false, loc)
 }
 
+conditional_mem_zero :: proc "contextless" (data: rawptr, n_: int) #no_bounds_check {
+	// When acquiring memory from the OS for the first time it's likely that the
+	// OS already gives the zero page mapped multiple times for the request. The
+	// actual allocation does not have physical pages allocated to it until those
+	// pages are written to which causes a page-fault. This is often called COW
+	// (Copy on Write)
+	//
+	// You do not want to actually zero out memory in this case because it would
+	// cause a bunch of page faults decreasing the speed of allocations and
+	// increase the amount of actual resident physical memory used.
+	//
+	// Instead a better technique is to check if memory is zerored before zeroing
+	// it. This turns out to be an important optimization in practice, saving
+	// nearly half (or more) the amount of physical memory used by an application.
+	// This is why every implementation of calloc in libc does this optimization.
+	//
+	// It may seem counter-intuitive but most allocations in an application are
+	// wasted and never used. When you consider something like a [dynamic]T which
+	// always doubles in capacity on resize but you rarely ever actually use the
+	// full capacity of a dynamic array it means you have a lot of resident waste
+	// if you actually zeroed the remainder of the memory.
+	//
+	// Keep in mind the OS is already guaranteed to give you zeroed memory by
+	// mapping in this zero page multiple times so in the best case there is no
+	// need to actually zero anything. As for testing all this memory for a zero
+	// value, it costs nothing because the the same zero page is used for the
+	// whole allocation and will exist in L1 cache for the entire zero checking
+	// process.
+
+	if n_ <= 0 {
+		return
+	}
+	n := uint(n_)
+
+	n_words := n / size_of(uintptr)
+	n_bytes := n % size_of(uintptr)
+	p_words := ([^]uintptr)(data)[:n_words]
+	p_bytes := ([^]byte)(data)[size_of(uintptr) * n_words:n]
+	for &p_word in p_words {
+		if p_word != 0 {
+			p_word = 0
+		}
+	}
+	for &p_byte in p_bytes {
+		if p_byte != 0 {
+			p_byte = 0
+		}
+	}
+}
+
 memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 	switch {
 	case n == 0: return true
