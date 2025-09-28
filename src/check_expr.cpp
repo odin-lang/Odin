@@ -821,9 +821,11 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	if (is_type_enum(dst) && are_types_identical(dst->Enum.base_type, operand->type)) {
-		if (c->in_enum_type) {
-			return 3;
+	if (c != nullptr) {
+		if (is_type_enum(dst) && are_types_identical(dst->Enum.base_type, operand->type)) {
+			if (c->in_enum_type) {
+				return 3;
+			}
 		}
 	}
 
@@ -3590,11 +3592,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		Type *final_type = type;
 		if (is_const_expr && !is_type_constant_type(type)) {
 			if (is_type_union(type)) {
-				if (is_type_union_constantable(type)) {
-
-				} else {
-					convert_to_typed(c, x, type);
-				}
+				convert_to_typed(c, x, type);
 			}
 			final_type = default_type(x->type);
 		}
@@ -8033,6 +8031,106 @@ gb_internal bool check_call_parameter_mixture(Slice<Ast *> const &args, char con
 	return Expr_Stmt; \
 }
 
+gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *operand, Ast *call, Slice<Ast *> const &args, Type *type_hint) {
+	GB_ASSERT(operand->mode == Addressing_Type);
+	Type *t = operand->type;
+	if (is_type_polymorphic_record(t)) {
+		CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("polymorphic type construction");
+
+		if (!is_type_named(t)) {
+			gbString s = expr_to_string(operand->expr);
+			error(call, "Illegal use of an unnamed polymorphic record, %s", s);
+			gb_string_free(s);
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;;
+			return Expr_Expr;
+		}
+		auto err = check_polymorphic_record_type(c, operand, call);
+		if (err == 0) {
+			Ast *ident = operand->expr;
+			while (ident->kind == Ast_SelectorExpr) {
+				Ast *s = ident->SelectorExpr.selector;
+				ident = s;
+			}
+			Type *ot = operand->type;
+			GB_ASSERT(ot->kind == Type_Named);
+			Entity *e = ot->Named.type_name;
+			add_entity_use(c, ident, e);
+			add_type_and_value(c, call, Addressing_Type, ot, empty_exact_value);
+		} else {
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
+		}
+	} else {
+		CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("type conversion");
+
+		operand->mode = Addressing_Invalid;
+		isize arg_count = args.count;
+		switch (arg_count) {
+		case 0:
+			{
+				gbString str = type_to_string(t);
+				error(call, "Missing argument in conversion to '%s'", str);
+				gb_string_free(str);
+			} break;
+		default:
+			{
+				gbString str = type_to_string(t);
+				if (t->kind == Type_Basic) {
+					ERROR_BLOCK();
+					switch (t->Basic.kind) {
+					case Basic_complex32:
+					case Basic_complex64:
+					case Basic_complex128:
+						error(call, "Too many arguments in conversion to '%s'", str);
+						error_line("\tSuggestion: %s(1+2i) or construct with 'complex'\n", str);
+						break;
+					case Basic_quaternion64:
+					case Basic_quaternion128:
+					case Basic_quaternion256:
+						error(call, "Too many arguments in conversion to '%s'", str);
+						error_line("\tSuggestion: %s(1+2i+3j+4k) or construct with 'quaternion'\n", str);
+						break;
+					default:
+						error(call, "Too many arguments in conversion to '%s'", str);
+					}
+				} else {
+					error(call, "Too many arguments in conversion to '%s'", str);
+				}
+				gb_string_free(str);
+			} break;
+		case 1: {
+			Ast *arg = args[0];
+			if (arg->kind == Ast_FieldValue) {
+				error(call, "'field = value' cannot be used in a type conversion");
+				arg = arg->FieldValue.value;
+				// NOTE(bill): Carry on the cast regardless
+			}
+			check_expr_with_type_hint(c, operand, arg, t);
+			if (operand->mode != Addressing_Invalid) {
+				if (is_type_polymorphic(t)) {
+					error(call, "A polymorphic type cannot be used in a type conversion");
+				} else {
+					// NOTE(bill): Otherwise the compiler can override the polymorphic type
+					// as it assumes it is determining the type
+					check_cast(c, operand, t);
+				}
+			}
+			operand->type = t;
+			operand->expr = call;
+
+
+			if (operand->mode != Addressing_Invalid) {
+				update_untyped_expr_type(c, arg, t, false);
+			}
+			break;
+		}
+		}
+	}
+	return Expr_Expr;
+}
+
+
 
 gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
 	if (proc != nullptr &&
@@ -8089,99 +8187,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	}
 
 	if (operand->mode == Addressing_Type) {
-		Type *t = operand->type;
-		if (is_type_polymorphic_record(t)) {
-			CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("polymorphic type construction");
-
-			if (!is_type_named(t)) {
-				gbString s = expr_to_string(operand->expr);
-				error(call, "Illegal use of an unnamed polymorphic record, %s", s);
-				gb_string_free(s);
-				operand->mode = Addressing_Invalid;
-				operand->type = t_invalid;;
-				return Expr_Expr;
-			}
-			auto err = check_polymorphic_record_type(c, operand, call);
-			if (err == 0) {
-				Ast *ident = operand->expr;
-				while (ident->kind == Ast_SelectorExpr) {
-					Ast *s = ident->SelectorExpr.selector;
-					ident = s;
-				}
-				Type *ot = operand->type;
-				GB_ASSERT(ot->kind == Type_Named);
-				Entity *e = ot->Named.type_name;
-				add_entity_use(c, ident, e);
-				add_type_and_value(c, call, Addressing_Type, ot, empty_exact_value);
-			} else {
-				operand->mode = Addressing_Invalid;
-				operand->type = t_invalid;
-			}
-		} else {
-			CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("type conversion");
-
-			operand->mode = Addressing_Invalid;
-			isize arg_count = args.count;
-			switch (arg_count) {
-			case 0:
-				{
-					gbString str = type_to_string(t);
-					error(call, "Missing argument in conversion to '%s'", str);
-					gb_string_free(str);
-				} break;
-			default:
-				{
-					gbString str = type_to_string(t);
-					if (t->kind == Type_Basic) {
-						ERROR_BLOCK();
-						switch (t->Basic.kind) {
-						case Basic_complex32:
-						case Basic_complex64:
-						case Basic_complex128:
-							error(call, "Too many arguments in conversion to '%s'", str);
-							error_line("\tSuggestion: %s(1+2i) or construct with 'complex'\n", str);
-							break;
-						case Basic_quaternion64:
-						case Basic_quaternion128:
-						case Basic_quaternion256:
-							error(call, "Too many arguments in conversion to '%s'", str);
-							error_line("\tSuggestion: %s(1+2i+3j+4k) or construct with 'quaternion'\n", str);
-							break;
-						default:
-							error(call, "Too many arguments in conversion to '%s'", str);
-						}
-					} else {
-						error(call, "Too many arguments in conversion to '%s'", str);
-					}
-					gb_string_free(str);
-				} break;
-			case 1: {
-				Ast *arg = args[0];
-				if (arg->kind == Ast_FieldValue) {
-					error(call, "'field = value' cannot be used in a type conversion");
-					arg = arg->FieldValue.value;
-					// NOTE(bill): Carry on the cast regardless
-				}
-				check_expr_with_type_hint(c, operand, arg, t);
-				if (operand->mode != Addressing_Invalid) {
-					if (is_type_polymorphic(t)) {
-						error(call, "A polymorphic type cannot be used in a type conversion");
-					} else {
-						// NOTE(bill): Otherwise the compiler can override the polymorphic type
-						// as it assumes it is determining the type
-						check_cast(c, operand, t);
-					}
-				}
-				operand->type = t;
-				operand->expr = call;
-				if (operand->mode != Addressing_Invalid) {
-					update_untyped_expr_type(c, arg, t, false);
-				}
-				break;
-			}
-			}
-		}
-		return Expr_Expr;
+		return check_call_expr_as_type_cast(c, operand, call, args, type_hint);
 	}
 
 	if (operand->mode == Addressing_Builtin) {

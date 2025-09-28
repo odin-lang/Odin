@@ -3256,7 +3256,7 @@ gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lb
 	LLVMTypeRef actual_type = lb_type(m, type);
 	if (value.value != nullptr) {
 		LLVMTypeRef value_type = LLVMTypeOf(value.value);
-		GB_ASSERT(lb_sizeof(actual_type) == lb_sizeof(value_type));
+		GB_ASSERT_MSG(lb_sizeof(actual_type) == lb_sizeof(value_type), "%s vs %s", LLVMPrintTypeToString(actual_type), LLVMPrintTypeToString(value_type));
 		actual_type = value_type;
 	}
 
