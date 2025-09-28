@@ -1947,7 +1947,7 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 			GB_PANIC("Invalid init value, got %s", expr_to_string(init_expr));
 		}
 
-		if (is_type_any(e->type) || is_type_union(e->type)) {
+		if (is_type_any(e->type)) {
 			var.init = init;
 		} else if (lb_is_const_or_global(init)) {
 			if (!var.is_initialized) {
@@ -3272,7 +3272,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 		if (decl->init_expr != nullptr) {
 			TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
-			if (!is_type_any(e->type) && !is_type_union(e->type)) {
+			if (!is_type_any(e->type)) {
 				if (tav.mode != Addressing_Invalid) {
 					if (tav.value.kind != ExactValue_Invalid) {
 						auto cc = LB_CONST_CONTEXT_DEFAULT;
@@ -3286,6 +3286,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 						LLVMDeleteGlobal(g.value);
 						g.value = nullptr;
 						g.value = LLVMAddGlobal(m->mod, LLVMTypeOf(init.value), alloc_cstring(permanent_allocator(), name));
+
+						if (e->token.string == "node_camera_info") {
+							gb_printf_err("HERE!\n");
+							gb_printf_err("%s\n", LLVMPrintValueToString(init.value));
+						}
+
 
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;

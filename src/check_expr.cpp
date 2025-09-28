@@ -8686,7 +8686,11 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 		}
 	}
 	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
+		add_type_info_type(c, o->type);
 		return true;
+	}
+	if (is_type_any(field_type)) {
+		return false;
 	}
 	return o->mode == Addressing_Constant;
 }
@@ -10052,7 +10056,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
 					check_assignment(c, &operand, elem_type, context_name);
 
-					is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 				} else {
 					Operand op_index = {};
 					check_expr(c, &op_index, fv->field);
@@ -10289,7 +10295,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
 					check_assignment(c, &operand, elem_type, context_name);
 
-					is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 
 					TokenKind upper_op = Token_LtEq;
 					if (op.kind == Token_RangeHalf) {
@@ -10330,7 +10338,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
 					check_assignment(c, &operand, elem_type, context_name);
 
-					is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 
 					add_to_seen_map(c, &seen, op_index);
 				}
@@ -10360,7 +10370,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				check_expr_with_type_hint(c, &operand, e, elem_type);
 				check_assignment(c, &operand, elem_type, context_name);
 
-				is_constant = is_constant && operand.mode == Addressing_Constant;
+				if (is_constant) {
+					is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+				}
 			}
 
 			if (max < index) {
