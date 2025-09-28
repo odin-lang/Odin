@@ -667,6 +667,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		return lb_const_nil(m, original_type);
 	}
 
+	if (value.kind == ExactValue_Compound) {
+		ast_node(cl, CompoundLit, value.value_compound);
+		if (cl->elems.count == 0) {
+			return lb_const_nil(m, original_type);
+		}
+	}
 
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
 
@@ -707,17 +713,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				return res;
 			}
 		} else {
-			GB_ASSERT(value_type != nullptr);
+			GB_ASSERT_MSG(value_type != nullptr, "%s :: %s", type_to_string(original_type), exact_value_to_string(value));
 
 			i64 block_size = bt->Union.variant_block_size;
 
 			if (are_types_identical(value_type, original_type)) {
-				if (value.kind == ExactValue_Compound) {
-					ast_node(cl, CompoundLit, value.value_compound);
-					GB_ASSERT(cl->elems.count == 0);
-					return lb_const_nil(m, original_type);
-				}
-
 				GB_PANIC("%s vs %s", type_to_string(value_type), type_to_string(original_type));
 			}
 
