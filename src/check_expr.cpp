@@ -3520,7 +3520,7 @@ gb_internal bool is_type_union_constantable(Type *type) {
 			return false;
 		}
 	}
-	return false;
+	return true;
 }
 
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
