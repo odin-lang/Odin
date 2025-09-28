@@ -1,3 +1,4 @@
+#+test
 package encoding_base32
 
 import "core:testing"
