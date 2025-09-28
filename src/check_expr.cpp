@@ -3505,24 +3505,6 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	return false;
 }
 
-gb_internal bool is_type_union_constantable(Type *type) {
-	Type *bt = base_type(type);
-	GB_ASSERT(bt->kind == Type_Union);
-
-	if (bt->Union.variants.count == 0) {
-		return true;
-	} else if (bt->Union.variants.count == 1) {
-		return is_type_constant_type(bt->Union.variants[0]);
-	}
-
-	for (Type *v : bt->Union.variants) {
-		if (!is_type_constant_type(v)) {
-			return false;
-		}
-	}
-	return true;
-}
-
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 
@@ -4880,7 +4862,10 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 					break;
 				}
 				operand->type = new_type;
-				operand->mode = Addressing_Value;
+				if (operand->mode != Addressing_Constant ||
+				    !elem_type_can_be_constant(operand->type)) {
+					operand->mode = Addressing_Value;
+				}
 				break;
 			} else if (valid_count > 1) {
 				ERROR_BLOCK();
@@ -9895,7 +9880,10 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					Operand o = {};
 					check_expr_or_type(c, &o, elem, field->type);
 
-					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
+					if (is_type_any(field->type) ||
+					    is_type_raw_union(field->type) ||
+					    (is_type_union(field->type) && !is_type_union_constantable(field->type)) ||
+					    is_type_typeid(field->type)) {
 						is_constant = false;
 					}
 					if (is_constant) {

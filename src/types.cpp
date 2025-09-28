@@ -2507,14 +2507,34 @@ gb_internal bool type_has_nil(Type *t) {
 	return false;
 }
 
+gb_internal bool is_type_union_constantable(Type *type) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_Union);
+
+	if (bt->Union.variants.count == 0) {
+		return true;
+	} else if (bt->Union.variants.count == 1) {
+		return is_type_constant_type(bt->Union.variants[0]);
+	}
+
+	for (Type *v : bt->Union.variants) {
+		if (!is_type_constant_type(v)) {
+			return false;
+		}
+	}
+	return true;
+}
 
 gb_internal bool elem_type_can_be_constant(Type *t) {
 	t = base_type(t);
 	if (t == t_invalid) {
 		return false;
 	}
-	if (is_type_any(t) || is_type_union(t) || is_type_raw_union(t)) {
+	if (is_type_any(t) || is_type_raw_union(t)) {
 		return false;
+	}
+	if (is_type_union(t)) {
+		return is_type_union_constantable(t);
 	}
 	return true;
 }

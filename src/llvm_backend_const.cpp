@@ -96,10 +96,6 @@ gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 	case LLVMPointerTypeKind:
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
-		// GB_PANIC("%s -> %s", LLVMPrintValueToString(val), LLVMPrintTypeToString(dst));
-		// NOTE(bill): It's not possible to do a bit cast on a struct, why was this code even here in the first place?
-		// It seems mostly to exist to get around the "anonymous -> named" struct assignments
-		// return LLVMConstBitCast(val, dst);
 		return val;
 	default:
 		GB_PANIC("Unhandled const cast %s to %s", LLVMPrintTypeToString(src), LLVMPrintTypeToString(dst));
@@ -199,11 +195,17 @@ gb_internal LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMVal
 	return LLVMConstNamedStruct(t, values, value_count);
 }
 
-gb_internal LLVMValueRef llvm_const_array(LLVMTypeRef elem_type, LLVMValueRef *values, isize value_count_) {
+gb_internal LLVMValueRef llvm_const_array(lbModule *m, LLVMTypeRef elem_type, LLVMValueRef *values, isize value_count_) {
 	unsigned value_count = cast(unsigned)value_count_;
 	for (unsigned i = 0; i < value_count; i++) {
 		values[i] = llvm_const_cast(values[i], elem_type);
 	}
+	for (unsigned i = 0; i < value_count; i++) {
+		if (elem_type != LLVMTypeOf(values[i])) {
+			return LLVMConstStructInContext(m->ctx, values, value_count, false);
+		}
+	}
+
 	return LLVMConstArray(elem_type, values, value_count);
 }
 
@@ -461,7 +463,7 @@ gb_internal LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type,
 		return lb_addr_load(p, v).value;
 	}
 
-	return llvm_const_array(lb_type(m, elem_type), values, cast(unsigned int)count);
+	return llvm_const_array(m, lb_type(m, elem_type), values, cast(unsigned int)count);
 }
 
 gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *a) {
@@ -1016,7 +1018,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			}
 			GB_ASSERT(offset == s.len);
 
-			res.value = llvm_const_array(et, elems, cast(unsigned)count);
+			res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
 			return res;
 		}
 		// NOTE(bill, 2021-10-07): Allow for array programming value constants
@@ -1046,7 +1048,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			elems[i] = single_elem.value;
 		}
 
-		res.value = llvm_const_array(lb_type(m, elem), elems, cast(unsigned)count);
+		res.value = llvm_const_array(m, lb_type(m, elem), elems, cast(unsigned)count);
 		return res;
 	} else if (is_type_matrix(type) &&
 		value.kind != ExactValue_Invalid &&
