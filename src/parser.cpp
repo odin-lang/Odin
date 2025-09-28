@@ -6561,6 +6561,10 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (string_starts_with(lc, str_lit("vet"))) {
 		f->vet_flags = parse_vet_tag(tok, lc);
 		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("test"))) {
+		if ((build_context.command_kind & Command_test) == 0) {
+			return false;
+		}
 	} else if (string_starts_with(lc, str_lit("ignore"))) {
 		return false;
 	} else if (string_starts_with(lc, str_lit("private"))) {
