@@ -96,6 +96,9 @@ gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst, bool
 	case LLVMPointerTypeKind:
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
+		if (LLVMTypeOf(val) != dst) {
+			if (failure_) *failure_ = true;
+		}
 		return val;
 	}
 	if (failure_) *failure_ = true;
@@ -796,38 +799,30 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 			LLVMValueRef array_data = nullptr;
 
-			u32 id = m->global_array_index.fetch_add(1);
-			gbString str = gb_string_make(temporary_allocator(), "csba$");
-			str = gb_string_appendc(str, m->module_name);
-			str = gb_string_append_fmt(str, "$%x", id);
-
-			String name = make_string(cast(u8 const *)str, gb_string_length(str));
-
-			Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
-			array_data = LLVMAddGlobal(m->mod, LLVMTypeOf(backing_array.value), str);
-			LLVMSetInitializer(array_data, backing_array.value);
-
-
 
 			if (is_local) {
-				LLVMSetGlobalConstant(array_data, true);
-
 				// NOTE(bill, 2020-06-08): This is a bit of a hack but a "constant" slice needs
 				// its backing data on the stack
 				lbProcedure *p = m->curr_procedure;
-
-				// NOTE(bill, 2025-09-28): make the array data global BUT memcpy it
-				// to make a local copy
 				LLVMTypeRef llvm_type = lb_type(m, t);
-				LLVMValueRef local_copy = llvm_alloca(p, llvm_type, 16);
+
+				unsigned alignment = cast(unsigned)gb_max(type_align_of(t), 16);
+
+				LLVMValueRef local_copy = llvm_alloca(p, LLVMTypeOf(backing_array.value), alignment);
+				LLVMBuildStore(p->builder, backing_array.value, local_copy);
+
+				array_data = llvm_alloca(p, llvm_type, alignment);
+
 				LLVMBuildMemCpy(p->builder,
-				                local_copy, 16,
-				                array_data, 1,
-				                LLVMConstInt(lb_type(m, t_int), type_size_of(t), false));
+				                array_data, alignment,
+				                local_copy, alignment,
+				                LLVMConstInt(lb_type(m, t_int), type_size_of(t), false)
+				);
+
 
 				{
 					LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
-					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, local_copy, indices, 2, "");
+					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 
 					lbAddr slice = lb_add_local_generated(p, original_type, false);
@@ -837,6 +832,17 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					return lb_addr_load(p, slice);
 				}
 			} else {
+				u32 id = m->global_array_index.fetch_add(1);
+				gbString str = gb_string_make(temporary_allocator(), "csba$");
+				str = gb_string_appendc(str, m->module_name);
+				str = gb_string_append_fmt(str, "$%x", id);
+
+				String name = make_string(cast(u8 const *)str, gb_string_length(str));
+
+				Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
+				array_data = LLVMAddGlobal(m->mod, LLVMTypeOf(backing_array.value), str);
+				LLVMSetInitializer(array_data, backing_array.value);
+
 				if (cc.link_section.len > 0) {
 					LLVMSetSection(array_data, alloc_cstring(permanent_allocator(), cc.link_section));
 				}
@@ -1673,7 +1679,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 					i32 index = field_remapping[f->Variable.field_index];
 					if (elem_type_can_be_constant(f->type)) {
-						values[index]  = lb_const_value(m, f->type, val, cc, tav.type).value;
+						lbValue value = lb_const_value(m, f->type, tav.value, cc, tav.type);
+						LLVMTypeRef value_type = LLVMTypeOf(value.value);
+						GB_ASSERT_MSG(lb_sizeof(value_type) == type_size_of(f->type), "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
+						values[index]  = value.value;
 						visited[index] = true;
 					}
 				}
@@ -1700,6 +1709,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 			if (is_constant) {
 				res.value = llvm_const_named_struct_internal(m, struct_type, values, cast(unsigned)value_count);
+				LLVMTypeRef res_type = LLVMTypeOf(res.value);
+				GB_ASSERT(lb_sizeof(res_type) == lb_sizeof(struct_type));
 				return res;
 			} else {
 				// TODO(bill): THIS IS HACK BUT IT WORKS FOR WHAT I NEED
