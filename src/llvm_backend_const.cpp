@@ -885,6 +885,16 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 			i64 block_size = bt->Union.variant_block_size;
 
+			if (are_types_identical(value_type, original_type)) {
+				if (value.kind == ExactValue_Compound) {
+					ast_node(cl, CompoundLit, value.value_compound);
+					GB_ASSERT(cl->elems.count == 0);
+					return lb_const_nil(m, original_type);
+				}
+
+				GB_PANIC("%s vs %s", type_to_string(value_type), type_to_string(original_type));
+			}
+
 			lbValue cv = lb_const_value(m, value_type, value, cc, value_type);
 			Type *variant_type = cv.type;
 
