@@ -3255,6 +3255,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 		GB_ASSERT(e->kind == Entity_Variable);
 
+
 		bool is_foreign = e->Variable.is_foreign;
 		bool is_export  = e->Variable.is_export;
 
@@ -3268,7 +3269,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbValue g = {};
 		g.type = alloc_type_pointer(e->type);
 		g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
-
 
 		if (decl->init_expr != nullptr) {
 			TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
@@ -3313,7 +3313,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
 			LLVMSetExternallyInitialized(g.value, true);
 			lb_add_foreign_library_path(m, e->Variable.foreign_library);
-		} else if (!var.is_initialized) {
+		} else if (LLVMGetInitializer(g.value) == nullptr) {
 			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
 		}
 		if (is_export) {
