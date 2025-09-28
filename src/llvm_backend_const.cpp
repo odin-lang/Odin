@@ -785,7 +785,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			GB_ASSERT(is_type_slice(type));
 			res.value = lb_find_or_add_entity_string16_slice_with_type(m, value.value_string16, original_type).value;
 			return res;
-		}else {
+		} else {
 			ast_node(cl, CompoundLit, value.value_compound);
 
 			isize count = cl->elems.count;
@@ -808,16 +808,25 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 				unsigned alignment = cast(unsigned)gb_max(type_align_of(t), 16);
 
-				LLVMValueRef local_copy = llvm_alloca(p, LLVMTypeOf(backing_array.value), alignment);
-				LLVMBuildStore(p->builder, backing_array.value, local_copy);
 
-				array_data = llvm_alloca(p, llvm_type, alignment);
+				bool do_local_copy = false;
+				if (do_local_copy) {
+					array_data = llvm_alloca(p, llvm_type, alignment);
 
-				LLVMBuildMemCpy(p->builder,
-				                array_data, alignment,
-				                local_copy, alignment,
-				                LLVMConstInt(lb_type(m, t_int), type_size_of(t), false)
-				);
+					LLVMValueRef local_copy = llvm_alloca(p, LLVMTypeOf(backing_array.value), alignment);
+					LLVMBuildStore(p->builder, backing_array.value, local_copy);
+
+					LLVMBuildMemCpy(p->builder,
+					                array_data, alignment,
+					                local_copy, alignment,
+					                LLVMConstInt(lb_type(m, t_int), type_size_of(t), false)
+					);
+				} else {
+					array_data = llvm_alloca(p, LLVMTypeOf(backing_array.value), alignment);
+					LLVMBuildStore(p->builder, backing_array.value, array_data);
+
+					array_data = LLVMBuildPointerCast(p->builder, array_data, LLVMPointerType(llvm_type, 0), "");
+				}
 
 
 				{
