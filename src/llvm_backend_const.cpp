@@ -81,7 +81,7 @@ gb_internal String lb_get_const_string(lbModule *m, lbValue value) {
 }
 
 
-gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
+gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst, bool *failure_) {
 	LLVMTypeRef src = LLVMTypeOf(val);
 	if (src == dst) {
 		return val;
@@ -97,10 +97,8 @@ gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
 		return val;
-	default:
-		GB_PANIC("Unhandled const cast %s to %s", LLVMPrintTypeToString(src), LLVMPrintTypeToString(dst));
 	}
-
+	if (failure_) *failure_ = true;
 	return val;
 }
 
@@ -125,13 +123,13 @@ gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMVa
 			LLVMConstNull(lb_type(m, t_i32)),
 			len,
 		};
-		return llvm_const_named_struct_internal(lb_type(m, t), values, 3);
+		return llvm_const_named_struct_internal(m, lb_type(m, t), values, 3);
 	} else {
 		LLVMValueRef values[2] = {
 			data,
 			len,
 		};
-		return llvm_const_named_struct_internal(lb_type(m, t), values, 2);
+		return llvm_const_named_struct_internal(m, lb_type(m, t), values, 2);
 	}
 }
 
@@ -143,13 +141,13 @@ gb_internal LLVMValueRef llvm_const_string16_internal(lbModule *m, Type *t, LLVM
 			LLVMConstNull(lb_type(m, t_i32)),
 			len,
 		};
-		return llvm_const_named_struct_internal(lb_type(m, t), values, 3);
+		return llvm_const_named_struct_internal(m, lb_type(m, t), values, 3);
 	} else {
 		LLVMValueRef values[2] = {
 			data,
 			len,
 		};
-		return llvm_const_named_struct_internal(lb_type(m, t), values, 2);
+		return llvm_const_named_struct_internal(m, lb_type(m, t), values, 2);
 	}
 }
 
@@ -161,7 +159,7 @@ gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValue
 	unsigned value_count = cast(unsigned)value_count_;
 	unsigned elem_count = LLVMCountStructElementTypes(struct_type);
 	if (elem_count == value_count) {
-		return llvm_const_named_struct_internal(struct_type, values, value_count_);
+		return llvm_const_named_struct_internal(m, struct_type, values, value_count_);
 	}
 	Type *bt = base_type(t);
 	GB_ASSERT(bt->kind == Type_Struct || bt->kind == Type_Union);
@@ -181,24 +179,33 @@ gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValue
 		}
 	}
 	
-	return llvm_const_named_struct_internal(struct_type, values_with_padding, values_with_padding_count);
+	return llvm_const_named_struct_internal(m, struct_type, values_with_padding, values_with_padding_count);
 }
 
-gb_internal LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
+gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
 	unsigned value_count = cast(unsigned)value_count_;
 	unsigned elem_count = LLVMCountStructElementTypes(t);
 	GB_ASSERT_MSG(value_count == elem_count, "%s %u %u", LLVMPrintTypeToString(t), value_count, elem_count);
+	bool failure = false;
 	for (unsigned i = 0; i < elem_count; i++) {
 		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(t, i);
-		values[i] = llvm_const_cast(values[i], elem_type);
+		values[i] = llvm_const_cast(values[i], elem_type, &failure);
+	}
+
+	if (failure) {
+		return LLVMConstStructInContext(m->ctx, values, value_count, true);
 	}
 	return LLVMConstNamedStruct(t, values, value_count);
 }
 
 gb_internal LLVMValueRef llvm_const_array(lbModule *m, LLVMTypeRef elem_type, LLVMValueRef *values, isize value_count_) {
 	unsigned value_count = cast(unsigned)value_count_;
+	bool failure = false;
 	for (unsigned i = 0; i < value_count; i++) {
-		values[i] = llvm_const_cast(values[i], elem_type);
+		values[i] = llvm_const_cast(values[i], elem_type, &failure);
+	}
+	if (failure) {
+		return LLVMConstStructInContext(m->ctx, values, value_count, false);
 	}
 	for (unsigned i = 0; i < value_count; i++) {
 		if (elem_type != LLVMTypeOf(values[i])) {
@@ -851,7 +858,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMValueRef values[1] = {cv.value};
-				res.value = llvm_const_named_struct_internal(llvm_type, values, 1);
+				res.value = llvm_const_named_struct_internal(m, llvm_type, values, 1);
 				res.type = original_type;
 				return res;
 			} else {
@@ -869,7 +876,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					value_count = 3;
 					padding = LLVMConstNull(LLVMStructGetTypeAtIndex(llvm_type, 2));
 				}
-				res.value = llvm_const_named_struct_internal(llvm_type, values, value_count);
+				res.value = llvm_const_named_struct_internal(m, llvm_type, values, value_count);
 				res.type = original_type;
 				return res;
 			}
@@ -1060,7 +1067,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		Type *elem = type->Matrix.elem;
 		
 		lbValue single_elem = lb_const_value(m, elem, value, cc);
-		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
+		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem), /*failure_*/nullptr);
 				
 		i64 total_elem_count = matrix_type_total_internal_elems(type);
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)total_elem_count);		
@@ -1082,7 +1089,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		Type *elem = type->SimdVector.elem;
 
 		lbValue single_elem = lb_const_value(m, elem, value, cc);
-		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
+		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem), /*failure_*/nullptr);
 
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, count);
 		for (i64 i = 0; i < count; i++) {
@@ -1662,7 +1669,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					values[i] = LLVMConstNull(et);
 				}
 				for (isize i = 0; i < total_elem_count; i++) {
-					values[i] = llvm_const_cast(values[i], et);
+					values[i] = llvm_const_cast(values[i], et, /*failure_*/nullptr);
 				}
 
 				res.value = LLVMConstVector(values, cast(unsigned)total_elem_count);
@@ -1829,7 +1836,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			}
 
 			if (is_constant) {
-				res.value = llvm_const_named_struct_internal(struct_type, values, cast(unsigned)value_count);
+				res.value = llvm_const_named_struct_internal(m, struct_type, values, cast(unsigned)value_count);
 				return res;
 			} else {
 				// TODO(bill): THIS IS HACK BUT IT WORKS FOR WHAT I NEED
@@ -1843,7 +1850,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 						new_values[i] = LLVMConstNull(LLVMTypeOf(old_value));
 					}
 				}
-				LLVMValueRef constant_value = llvm_const_named_struct_internal(struct_type, new_values, cast(unsigned)value_count);
+				LLVMValueRef constant_value = llvm_const_named_struct_internal(m, struct_type, new_values, cast(unsigned)value_count);
 
 				GB_ASSERT(is_local);
 				lbProcedure *p = m->curr_procedure;

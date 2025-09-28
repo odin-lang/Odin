@@ -3262,36 +3262,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbModule *m = &gen->default_module;
 		String name = lb_get_entity_name(m, e);
 
-		lbValue g = {};
-		g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
-		g.type = alloc_type_pointer(e->type);
-
-		lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
-
-		if (is_foreign) {
-			LLVMSetLinkage(g.value, LLVMExternalLinkage);
-			LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
-			LLVMSetExternallyInitialized(g.value, true);
-			lb_add_foreign_library_path(m, e->Variable.foreign_library);
-		} else {
-			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
-		}
-		if (is_export) {
-			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
-			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
-		} else if (!is_foreign) {
-			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
-		}
-		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
-		LLVMSetAlignment(g.value, cast(u32)type_align_of(e->type));
-		
-		if (e->Variable.link_section.len > 0) {
-			LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
-		}
-
 		lbGlobalVariable var = {};
-		var.var = g;
 		var.decl = decl;
+
+		lbValue g = {};
+		g.type = alloc_type_pointer(e->type);
+		g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+
 
 		if (decl->init_expr != nullptr) {
 			TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
@@ -3305,6 +3282,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 						ExactValue v = tav.value;
 						lbValue init = lb_const_value(m, tav.type, v, cc);
+
+						LLVMDeleteGlobal(g.value);
+						g.value = nullptr;
+						g.value = LLVMAddGlobal(m->mod, LLVMTypeOf(init.value), alloc_cstring(permanent_allocator(), name));
+
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
 						if (cc.is_rodata) {
@@ -3323,15 +3305,32 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetGlobalConstant(g.value, true);
 		}
 
+
+		lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
+
+		if (is_foreign) {
+			LLVMSetLinkage(g.value, LLVMExternalLinkage);
+			LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
+			LLVMSetExternallyInitialized(g.value, true);
+			lb_add_foreign_library_path(m, e->Variable.foreign_library);
+		} else if (!var.is_initialized) {
+			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
+		}
+		if (is_export) {
+			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
+			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
+		} else if (!is_foreign) {
+			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
+		}
+		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
+		LLVMSetAlignment(g.value, cast(u32)type_align_of(e->type));
+
+		if (e->Variable.link_section.len > 0) {
+			LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
+		}
 		if (e->flags & EntityFlag_Require) {
 			lb_append_to_compiler_used(m, g.value);
 		}
-
-		array_add(&global_variables, var);
-
-		lb_add_entity(m, e, g);
-		lb_add_member(m, name, g);
-
 
 		if (m->debug_builder) {
 			String global_name = e->token.string;
@@ -3361,6 +3360,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				LLVMGlobalSetMetadata(g.value, 0, global_variable_metadata);
 			}
 		}
+
+		g.value = LLVMConstPointerCast(g.value, lb_type(m, alloc_type_pointer(e->type)));
+
+		var.var = g;
+		array_add(&global_variables, var);
+
+		lb_add_entity(m, e, g);
+		lb_add_member(m, name, g);
+
+
 	}
 
 	if (build_context.ODIN_DEBUG) {
