@@ -2340,6 +2340,20 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		if (in_value.kind == ExactValue_Integer) {
 			return true;
 		}
+	} else if (is_type_typeid(type)) {
+
+		if (in_value.kind == ExactValue_Compound) {
+			ast_node(cl, CompoundLit, in_value.value_compound);
+			if (cl->elems.count == 0) {
+				in_value = exact_value_typeid(nullptr);
+			} else {
+				return false;
+			}
+		}
+		if (in_value.kind == ExactValue_Typeid) {
+			if (out_value) *out_value = in_value;
+			return true;
+		}
 	}
 
 	return false;
@@ -3509,6 +3523,7 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
+
 
 	Type *bt = base_type(type);
 	if (is_const_expr && is_type_constant_type(bt)) {

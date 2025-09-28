@@ -540,7 +540,7 @@ gb_internal bool lb_is_nested_possibly_constant(Type *ft, Selection const &sel, 
 	}
 
 
-	if (is_type_raw_union(ft) || is_type_typeid(ft)) {
+	if (is_type_raw_union(ft)) {
 		return false;
 	}
 	return lb_is_elem_const(elem, ft);
@@ -819,28 +819,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		return lb_const_nil(m, original_type);
 	}
 
-	if (value.kind == ExactValue_Procedure) {
-		lbValue res = {};
-		Ast *expr = unparen_expr(value.value_procedure);
-		GB_ASSERT(expr != nullptr);
-		if (expr->kind == Ast_ProcLit) {
-			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
-		} else {
-			Entity *e = entity_from_expr(expr);
-			res = lb_find_procedure_value_from_entity(m, e);
-		}
-		if (res.value == nullptr) {
-			// This is an unspecialized polymorphic procedure, return nil or dummy value
-			return lb_const_nil(m, original_type);
-		}
-		GB_ASSERT(LLVMGetValueKind(res.value) == LLVMFunctionValueKind);
-
-		if (LLVMGetIntrinsicID(res.value) == 0) {
-			// NOTE(bill): do not cast intrinsics as they are not really procedures that can be casted
-			res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
-		}
-		return res;
-	}
 
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
 
@@ -922,7 +900,29 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			res.value = LLVMConstStructInContext(m->ctx, values, value_count, true);
 			return res;
 		}
+	}
 
+	if (value.kind == ExactValue_Procedure) {
+		lbValue res = {};
+		Ast *expr = unparen_expr(value.value_procedure);
+		GB_ASSERT(expr != nullptr);
+		if (expr->kind == Ast_ProcLit) {
+			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
+		} else {
+			Entity *e = entity_from_expr(expr);
+			res = lb_find_procedure_value_from_entity(m, e);
+		}
+		if (res.value == nullptr) {
+			// This is an unspecialized polymorphic procedure, return nil or dummy value
+			return lb_const_nil(m, original_type);
+		}
+		GB_ASSERT(LLVMGetValueKind(res.value) == LLVMFunctionValueKind);
+
+		if (LLVMGetIntrinsicID(res.value) == 0) {
+			// NOTE(bill): do not cast intrinsics as they are not really procedures that can be casted
+			res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
+		}
+		return res;
 	}
 
 	// GB_ASSERT_MSG(is_type_typed(type), "%s", type_to_string(type));
@@ -1720,7 +1720,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					i32 index = field_remapping[f->Variable.field_index];
 					if (elem_type_can_be_constant(f->type)) {
 						if (sel.index.count == 1) {
-							values[index]  = lb_const_value(m, f->type, tav.value, cc, tav.type).value;
+							lbValue value = lb_const_value(m, f->type, tav.value, cc, tav.type);
+							LLVMTypeRef value_type = LLVMTypeOf(value.value);
+							GB_ASSERT_MSG(lb_sizeof(value_type) == type_size_of(f->type), "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
+							values[index]  = value.value;
 							visited[index] = true;
 						} else {
 							if (!visited[index]) {
