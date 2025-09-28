@@ -1686,7 +1686,28 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast 
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
 	if (e->Variable.is_rodata && o.mode != Addressing_Constant) {
+		ERROR_BLOCK();
 		error(o.expr, "Variables declared with @(rodata) must have constant initialization");
+		Ast *expr = unparen_expr(o.expr);
+		if (is_type_struct(e->type) && expr && expr->kind == Ast_CompoundLit) {
+			ast_node(cl, CompoundLit, expr);
+			for (Ast *elem_ : cl->elems) {
+				Ast *elem = elem_;
+				if (elem->kind == Ast_FieldValue) {
+					elem = elem->FieldValue.value;
+				}
+				elem = unparen_expr(elem);
+
+				Entity *e = entity_of_node(elem);
+				if (elem->tav.mode != Addressing_Constant && e == nullptr && elem->kind != Ast_ProcLit) {
+					Token tok = ast_token(elem);
+					TokenPos pos = tok.pos;
+					gbString s = type_to_string(type_of_expr(elem));
+					error_line("%s Element is not constant, which is required for @(rodata), of type %s\n", token_pos_to_string(pos), s);
+					gb_string_free(s);
+				}
+			}
+		}
 	}
 
 	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");

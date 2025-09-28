@@ -1377,14 +1377,20 @@ gb_internal bool is_type_ordered_numeric(Type *t) {
 gb_internal bool is_type_constant_type(Type *t) {
 	t = core_type(t);
 	if (t == nullptr) { return false; }
-	if (t->kind == Type_Basic) {
+	switch (t->kind) {
+	case Type_Basic:
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
 		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
-	}
-	if (t->kind == Type_BitSet) {
+	case Type_BitSet:
 		return true;
-	}
-	if (t->kind == Type_Proc) {
+	case Type_Proc:
 		return true;
+	case Type_Array:
+		return is_type_constant_type(t->Array.elem);
+	case Type_EnumeratedArray:
+		return is_type_constant_type(t->EnumeratedArray.elem);
 	}
 	return false;
 }
@@ -2538,6 +2544,20 @@ gb_internal bool elem_type_can_be_constant(Type *t) {
 	}
 	return true;
 }
+
+gb_internal bool elem_cannot_be_constant(Type *t) {
+	if (is_type_any(t)) {
+		return true;
+	}
+	if (is_type_union(t)) {
+		return !is_type_union_constantable(t);
+	}
+	if (is_type_raw_union(t)) {
+		return true;
+	}
+	return false;
+}
+
 
 gb_internal bool is_type_lock_free(Type *t) {
 	t = core_type(t);

@@ -8655,7 +8655,7 @@ gb_internal bool check_range(CheckerContext *c, Ast *node, bool is_for_loop, Ope
 	return true;
 }
 
-gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Operand *o) {
+gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Operand *o, Type *field_type) {
 	if (is_operand_nil(*o)) {
 		return true;
 	}
@@ -8669,6 +8669,9 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
 			return true;
 		}
+	}
+	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
+		return true;
 	}
 	return o->mode == Addressing_Constant;
 }
@@ -9620,8 +9623,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 						break;
 					}
 				}
-				if (is_constant &&
-				    (is_type_any(ft) || is_type_union(ft) || is_type_raw_union(ft) || is_type_typeid(ft))) {
+				if (is_constant && elem_cannot_be_constant(ft)) {
 					is_constant = false;
 				}
 			}
@@ -9656,11 +9658,11 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		Operand o = {};
 		check_expr_or_type(c, &o, fv->value, field->type);
 
-		if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
+		if (elem_cannot_be_constant(field->type)) {
 			is_constant = false;
 		}
 		if (is_constant) {
-			is_constant = check_is_operand_compound_lit_constant(c, &o);
+			is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
 		}
 
 		u8 prev_bit_field_bit_size = c->bit_field_bit_size;
@@ -9886,14 +9888,11 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					Operand o = {};
 					check_expr_or_type(c, &o, elem, field->type);
 
-					if (is_type_any(field->type) ||
-					    is_type_raw_union(field->type) ||
-					    (is_type_union(field->type) && !is_type_union_constantable(field->type)) ||
-					    is_type_typeid(field->type)) {
+					if (elem_cannot_be_constant(field->type)) {
 						is_constant = false;
 					}
 					if (is_constant) {
-						is_constant = check_is_operand_compound_lit_constant(c, &o);
+						is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
 					}
 
 					check_assignment(c, &o, field->type, str_lit("structure literal"));
@@ -10070,7 +10069,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
 					check_assignment(c, &operand, elem_type, context_name);
 
-					is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 				}
 			}
 
@@ -10097,7 +10098,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				check_expr_with_type_hint(c, &operand, e, elem_type);
 				check_assignment(c, &operand, elem_type, context_name);
 
-				is_constant = is_constant && operand.mode == Addressing_Constant;
+				if (is_constant) {
+					is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+				}
 			}
 
 			if (max < index) {
