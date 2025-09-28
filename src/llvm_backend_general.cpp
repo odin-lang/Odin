@@ -1493,8 +1493,11 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
 	GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
+	LLVMValueRef ptr = u.value;
+	ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(uvt, 0), "");
+
 	lbValue tag_ptr = {};
-	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, u.value, 1, "");
+	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
 	return tag_ptr;
 }

@@ -641,161 +641,6 @@ gb_internal Slice<LLVMValueRef> lb_construct_const_union_flatten_values(lbModule
 	return {};
 }
 
-gb_internal LLVMValueRef lb_construct_const_union(lbModule *m, LLVMValueRef variant_value, Type *variant_type, Type *union_type) {
-#if 1
-	return nullptr;
-#else
-	Type *bt = base_type(union_type);
-	GB_ASSERT(bt->kind == Type_Union);
-	GB_ASSERT(lb_type(m, variant_type) == LLVMTypeOf(variant_value));
-
-	LLVMTypeRef llvm_type = lb_type(m, union_type);
-
-	if (LLVMIsNull(variant_value)) {
-		return LLVMConstNull(llvm_type);
-	}
-
-	if (bt->Union.variants.count == 0) {
-		GB_ASSERT(LLVMIsNull(variant_value));
-		return variant_value;
-	}
-
-	i64 block_size = bt->Union.variant_block_size;
-	i64 variant_size = type_size_of(variant_type);
-
-	LLVMTypeRef llvm_variant_type = lb_type(m, variant_type);
-
-	if (is_type_union_maybe_pointer(bt)) {
-		GB_ASSERT(lb_sizeof(LLVMTypeOf(variant_value)) == lb_sizeof(llvm_type));
-		return LLVMConstBitCast(variant_value, llvm_type);
-	}
-
-	if (bt->Union.variants.count == 1) {
-		unsigned long long the_tag = cast(unsigned long long)union_variant_index(union_type, variant_type);
-		LLVMTypeRef tag_type = lb_type(m, union_tag_type(bt));
-
-		LLVMValueRef values[3] = {};
-		unsigned i = 0;
-		values[i++] = variant_value;
-		values[i++] = LLVMConstInt(tag_type, the_tag, false);
-
-		i64 used_size = block_size + lb_sizeof(tag_type);
-		i64 padding = type_size_of(union_type) - used_size;
-		i64 align = type_align_of(union_type);
-		if (padding > 0) {
-			LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
-			values[i++] = LLVMConstNull(padding_type);
-		}
-
-		return LLVMConstNamedStruct(llvm_type, values, i);
-	} else if (true) {
-		// TODO(bill): ignore this for the time being
-		return nullptr;
-	}
-
-	LLVMTypeRef block_type = LLVMStructGetTypeAtIndex(llvm_type, 0);
-
-	LLVMTypeRef tag_type = lb_type(m, union_tag_type(bt));
-
-	i64 used_size = block_size + lb_sizeof(tag_type);
-	i64 padding = type_size_of(union_type) - used_size;
-	i64 align = type_align_of(union_type);
-	LLVMTypeRef padding_type = nullptr;
-	if (padding > 0) {
-		padding_type = lb_type_padding_filler(m, padding, align);
-	}
-
-
-	unsigned i = 0;
-	LLVMValueRef values[3] = {};
-
-	LLVMValueRef block_value = variant_value;
-
-	if (block_size == 0) {
-		block_value = LLVMConstNull(block_type);
-	} else if (lb_sizeof(llvm_variant_type) == 0) {
-		block_value = LLVMConstNull(block_type);
-	} else if (block_type != llvm_variant_type) {
-
-		LLVMTypeKind block_kind   = LLVMGetTypeKind(block_type);
-		LLVMTypeKind variant_kind = LLVMGetTypeKind(llvm_variant_type);
-
-
-		if (block_kind == LLVMArrayTypeKind) {
-			LLVMTypeRef elem = LLVMGetElementType(block_type);
-			unsigned count = LLVMGetArrayLength(block_type);
-
-			Slice<LLVMValueRef> partial_elems = lb_construct_const_union_flatten_values(m, variant_value, variant_type, elem);
-			if (partial_elems.count == count) {
-				block_value = LLVMConstArray(elem, partial_elems.data, count);
-				goto assign_value_wrapped;
-			}
-
-			Slice<LLVMValueRef> full_elems = temporary_slice_make<LLVMValueRef>(count);
-			slice_copy(&full_elems, partial_elems);
-			for (isize j = partial_elems.count; j < count; j++) {
-				full_elems[j] = LLVMConstNull(elem);
-			}
-			block_value = LLVMConstArray(elem, full_elems.data, count);
-			goto assign_value_wrapped;
-
-		} else if (block_size != variant_size) {
-			if (block_kind == LLVMIntegerTypeKind && !is_type_different_to_arch_endianness(variant_type)) {
-				Slice<LLVMValueRef> partial_elems = lb_construct_const_union_flatten_values(m, variant_value, variant_type, block_type);
-				if (partial_elems.count == 1) {
-					block_value = partial_elems[0];
-					goto assign_value_wrapped;
-				}
-			}
-
-			return nullptr;
-		}
-		if (block_kind == LLVMIntegerTypeKind) {
-			GB_ASSERT(block_size == variant_size);
-
-			switch (variant_kind) {
-			case LLVMHalfTypeKind:
-			case LLVMFloatTypeKind:
-			case LLVMDoubleTypeKind:
-				block_value = LLVMConstBitCast(block_value, block_type);
-				goto assign_value_wrapped;
-			case LLVMPointerTypeKind:
-				block_value = LLVMConstPtrToInt(block_value, block_type);
-				goto assign_value_wrapped;
-			}
-		}
-
-		return nullptr;
-	} else {
-		// TODO(bill): ignore this for the time being
-		return nullptr;
-	}
-
-assign_value_wrapped:;
-	values[i++] = block_value;
-
-	unsigned long long the_tag = cast(unsigned long long)union_variant_index(union_type, variant_type);
-	values[i++] = LLVMConstInt(tag_type, the_tag, false);
-	if (padding > 0) {
-		values[i++] = LLVMConstNull(padding_type);
-	}
-	return LLVMConstNamedStruct(llvm_type, values, i);
-#endif
-}
-
-gb_internal bool lb_try_construct_const_union(lbModule *m, lbValue *value, Type *variant_type, Type *union_type) {
-	if (lb_is_const(*value)) {
-		LLVMValueRef res = lb_construct_const_union(m, value->value, variant_type, union_type);
-		if (res != nullptr) {
-			*value = {res, union_type};
-			return true;
-		}
-		// gb_printf_err("%s -> %s\n", LLVMPrintValueToString(value->value), LLVMPrintTypeToString(lb_type(m, union_type)));
-	}
-	return false;
-}
-
-
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc, Type *value_type) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
@@ -888,6 +733,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			Type *tag_type = union_tag_type(bt);
 			LLVMTypeRef llvm_tag_type = lb_type(m, tag_type);
 			i64 tag_index = union_variant_index(bt, variant_type);
+			GB_ASSERT(tag_index >= 0);
 			values[value_count++] = LLVMConstInt(llvm_tag_type, tag_index, false);
 			i64 used_size = block_size + type_size_of(tag_type);
 			i64 union_size = type_size_of(bt);
@@ -946,27 +792,42 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			count = gb_max(cast(isize)cl->max_count, count);
 			Type *elem = base_type(type)->Slice.elem;
 			Type *t = alloc_type_array(elem, count);
-			lbValue backing_array = lb_const_value(m, t, value, cc);
+			lbValue backing_array = lb_const_value(m, t, value, cc, nullptr);
 
 			LLVMValueRef array_data = nullptr;
 
+			u32 id = m->global_array_index.fetch_add(1);
+			gbString str = gb_string_make(temporary_allocator(), "csba$");
+			str = gb_string_appendc(str, m->module_name);
+			str = gb_string_append_fmt(str, "$%x", id);
+
+			String name = make_string(cast(u8 const *)str, gb_string_length(str));
+
+			Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
+			array_data = LLVMAddGlobal(m->mod, LLVMTypeOf(backing_array.value), str);
+			LLVMSetInitializer(array_data, backing_array.value);
+
+
+
 			if (is_local) {
+				LLVMSetGlobalConstant(array_data, true);
+
 				// NOTE(bill, 2020-06-08): This is a bit of a hack but a "constant" slice needs
 				// its backing data on the stack
 				lbProcedure *p = m->curr_procedure;
+
+				// NOTE(bill, 2025-09-28): make the array data global BUT memcpy it
+				// to make a local copy
 				LLVMTypeRef llvm_type = lb_type(m, t);
-
-				array_data = llvm_alloca(p, llvm_type, 16);
-
-				{
-					LLVMValueRef ptr = array_data;
-					ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(LLVMTypeOf(backing_array.value), 0), "");
-					LLVMBuildStore(p->builder, backing_array.value, ptr);
-				}
+				LLVMValueRef local_copy = llvm_alloca(p, llvm_type, 16);
+				LLVMBuildMemCpy(p->builder,
+				                local_copy, 16,
+				                array_data, 1,
+				                LLVMConstInt(lb_type(m, t_int), type_size_of(t), false));
 
 				{
 					LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
-					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
+					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, local_copy, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 
 					lbAddr slice = lb_add_local_generated(p, original_type, false);
@@ -976,17 +837,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					return lb_addr_load(p, slice);
 				}
 			} else {
-				u32 id = m->global_array_index.fetch_add(1);
-				gbString str = gb_string_make(temporary_allocator(), "csba$");
-				str = gb_string_appendc(str, m->module_name);
-				str = gb_string_append_fmt(str, "$%x", id);
-
-				String name = make_string(cast(u8 const *)str, gb_string_length(str));
-
-				Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
-				array_data = LLVMAddGlobal(m->mod, LLVMTypeOf(backing_array.value), str);
-				LLVMSetInitializer(array_data, backing_array.value);
-
 				if (cc.link_section.len > 0) {
 					LLVMSetSection(array_data, alloc_cstring(permanent_allocator(), cc.link_section));
 				}
