@@ -394,7 +394,7 @@ enum BuildFlagKind {
 
 	BuildFlag_IntegerDivisionByZero,
 
-	BuildFlag_ParaPolyDiagnostics,
+	BuildFlag_BuildDiagnostics,
 
 	// internal use only
 	BuildFlag_InternalFastISel,
@@ -621,7 +621,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_IntegerDivisionByZero,   str_lit("integer-division-by-zero"),  BuildFlagParam_String, Command__does_check);
 
-	add_flag(&build_flags, BuildFlag_ParaPolyDiagnostics,     str_lit("para-poly-diagnostics"),     BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_BuildDiagnostics,        str_lit("build-diagnostics"),         BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
@@ -1565,8 +1565,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
-						case BuildFlag_ParaPolyDiagnostics:
-							build_context.para_poly_diagnostics = true;
+						case BuildFlag_BuildDiagnostics:
+							build_context.build_diagnostics = true;
 							break;
 
 						case BuildFlag_InternalFastISel:

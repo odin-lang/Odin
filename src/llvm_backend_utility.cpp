@@ -3054,7 +3054,7 @@ gb_internal void lb_do_module_diagnostics(lbGenerator *gen) {
 
 }
 
-gb_internal void lb_do_code_gen_diagnostics(lbGenerator *gen) {
+gb_internal void lb_do_build_diagnostics(lbGenerator *gen) {
 	lb_do_para_poly_diagnostics(gen);
 	gb_printf("------------------------------------------------------------------------------------------\n");
 	gb_printf("------------------------------------------------------------------------------------------\n\n");
