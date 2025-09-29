@@ -548,6 +548,8 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
+	bool   para_poly_diagnostics;
+
 	bool   use_single_module;
 	bool   use_separate_modules;
 	bool   module_per_file;

@@ -587,6 +587,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	d->proc_lit = proc_lit;
 	d->proc_checked_state = ProcCheckedState_Unchecked;
 	d->defer_use_checked = false;
+	d->para_poly_original = old_decl->entity;
 
 	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
 	entity->state.store(EntityState_Resolved);
