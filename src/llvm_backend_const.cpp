@@ -1513,7 +1513,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							values[value_count++] = LLVMConstNull(padding_type);
 						}
 
-						LLVMValueRef res = LLVMConstStructInContext(m->ctx, values, value_count, true);
+						LLVMValueRef res = LLVMConstStructInContext(m->ctx, values, value_count, /*packed*/padding > 0);
 
 						return {res, original_type};
 					}
