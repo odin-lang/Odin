@@ -301,7 +301,7 @@ def parse_constants(f):
 
     f.write("\n// Vendor Constants\n")
     fixes = '|'.join(ext_suffixes)
-    inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+" + fixes + r"))"
+    inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+(?:" + fixes + r")\b))"
     pattern = r"#define\s+VK_" + inner + r"\s*(.*?)\n"
     data = re.findall(pattern, src, re.S)
 
@@ -311,7 +311,11 @@ def parse_constants(f):
     for name, value in data:
         value = remove_prefix(value, 'VK_')
         v = number_suffix_re.findall(value)
-        if v:
+        if value == "(~0U)" or value == "(~0UL)":
+            value = "~u32(0)"
+        elif value == "(~0ULL)":
+            value = "~u64(0)"
+        elif v:
             value = v[0]
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
     f.write("\n")
@@ -935,7 +939,6 @@ FALSE                                 :: 0
 QUEUE_FAMILY_IGNORED                  :: ~u32(0)
 SUBPASS_EXTERNAL                      :: ~u32(0)
 MAX_PHYSICAL_DEVICE_NAME_SIZE         :: 256
-MAX_SHADER_MODULE_IDENTIFIER_SIZE_EXT :: 32
 UUID_SIZE                             :: 16
 MAX_MEMORY_TYPES                      :: 32
 MAX_MEMORY_HEAPS                      :: 16
@@ -946,7 +949,6 @@ LUID_SIZE_KHX                         :: 8
 LUID_SIZE                             :: 8
 MAX_QUEUE_FAMILY_EXTERNAL             :: ~u32(1)
 MAX_GLOBAL_PRIORITY_SIZE              :: 16
-MAX_GLOBAL_PRIORITY_SIZE_EXT          :: MAX_GLOBAL_PRIORITY_SIZE
 QUEUE_FAMILY_EXTERNAL                 :: MAX_QUEUE_FAMILY_EXTERNAL
 
 // Vulkan Video API Constants
