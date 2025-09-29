@@ -302,7 +302,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 					(name##_values)[i] = LLVMConstNull(elem);                                                      \
 				}                                                                                                      \
 			}                                                                                                              \
-			LLVMSetInitializer(name.addr.value, llvm_const_array(elem, name##_values, at->Array.count));                   \
+			LLVMSetInitializer(name.addr.value, llvm_const_array(m, elem, name##_values, at->Array.count));                   \
 		})
 
 	type_info_allocate_values(lb_global_type_info_member_types);
@@ -752,8 +752,8 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 						value_values[i] = lb_const_value(m, t_i64, fields[i]->Constant.value).value;
 					}
 
-					LLVMValueRef name_init  = llvm_const_array(lb_type(m, t_string),               name_values,  cast(unsigned)fields.count);
-					LLVMValueRef value_init = llvm_const_array(lb_type(m, t_type_info_enum_value), value_values, cast(unsigned)fields.count);
+					LLVMValueRef name_init  = llvm_const_array(m, lb_type(m, t_string),               name_values,  cast(unsigned)fields.count);
+					LLVMValueRef value_init = llvm_const_array(m, lb_type(m, t_type_info_enum_value), value_values, cast(unsigned)fields.count);
 					LLVMSetInitializer(name_array.value,  name_init);
 					LLVMSetInitializer(value_array.value, value_init);
 					LLVMSetGlobalConstant(name_array.value, true);

@@ -1493,8 +1493,11 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
 	GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
+	LLVMValueRef ptr = u.value;
+	ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(uvt, 0), "");
+
 	lbValue tag_ptr = {};
-	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, u.value, 1, "");
+	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
 	return tag_ptr;
 }
@@ -3253,17 +3256,26 @@ gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lb
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
+	LLVMTypeRef actual_type = lb_type(m, type);
+	if (value.value != nullptr) {
+		LLVMTypeRef value_type = LLVMTypeOf(value.value);
+		GB_ASSERT_MSG(lb_sizeof(actual_type) == lb_sizeof(value_type), "%s vs %s", LLVMPrintTypeToString(actual_type), LLVMPrintTypeToString(value_type));
+		actual_type = value_type;
+	}
+
 	Scope *scope = nullptr;
 	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
 	lbValue g = {};
 	g.type = alloc_type_pointer(type);
-	g.value = LLVMAddGlobal(m->mod, lb_type(m, type), alloc_cstring(temporary_allocator(), name));
+	g.value = LLVMAddGlobal(m->mod, actual_type, alloc_cstring(temporary_allocator(), name));
 	if (value.value != nullptr) {
 		GB_ASSERT_MSG(LLVMIsConstant(value.value), LLVMPrintValueToString(value.value));
 		LLVMSetInitializer(g.value, value.value);
 	} else {
 		LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, type)));
 	}
+
+	g.value = LLVMConstPointerCast(g.value, lb_type(m, g.type));
 
 	lb_add_entity(m, e, g);
 	lb_add_member(m, name, g);

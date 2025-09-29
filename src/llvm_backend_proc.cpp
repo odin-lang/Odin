@@ -921,13 +921,14 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 				    arg_type != param_type) {
 					LLVMTypeKind arg_kind = LLVMGetTypeKind(arg_type);
 					LLVMTypeKind param_kind = LLVMGetTypeKind(param_type);
-					if (arg_kind == param_kind &&
-					    arg_kind == LLVMPointerTypeKind) {
-						// NOTE(bill): LLVM's newer `ptr` only type system seems to fail at times
-						// I don't know why...
-						args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
-						arg_type = param_type;
-						continue;
+					if (arg_kind == param_kind) {
+						if (arg_kind == LLVMPointerTypeKind) {
+							// NOTE(bill): LLVM's newer `ptr` only type system seems to fail at times
+							// I don't know why...
+							args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
+							arg_type = param_type;
+							continue;
+						}
 					}
 				}
 
@@ -2237,7 +2238,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				elements[i] = element;
 			}
 
-			LLVMValueRef backing_array = llvm_const_array(lb_type(m, t_load_directory_file), elements, count);
+			LLVMValueRef backing_array = llvm_const_array(m, lb_type(m, t_load_directory_file), elements, count);
 
 			Type *array_type = alloc_type_array(t_load_directory_file, count);
 			lbAddr backing_array_addr = lb_add_global_generated_from_procedure(p, array_type, {backing_array, array_type});
