@@ -1475,6 +1475,39 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			}
 
 			if (is_type_raw_union(type)) {
+				if (is_type_raw_union_constantable(type)) {
+					GB_ASSERT(cl->elems.count == 1);
+					GB_ASSERT(cl->elems[0]->kind == Ast_FieldValue);
+					ast_node(fv, FieldValue, cl->elems[0]);
+					Entity *f = entity_of_node(fv->field);
+
+					TypeAndValue tav = fv->value->tav;
+					if (tav.value.kind != ExactValue_Invalid) {
+						lbValue value = lb_const_value(m, f->type, tav.value, cc, f->type);
+
+						LLVMValueRef values[2];
+						unsigned value_count = 0;
+
+						values[value_count++] = value.value;
+
+						i64 union_alignment = type_align_of(type);
+						i64 value_alignment = type_align_of(f->type);
+						i64 alignment = gb_max(gb_min(value_alignment, union_alignment), 1);
+
+						i64 union_size = type_size_of(type);
+						i64 value_size = lb_sizeof(LLVMTypeOf(value.value));
+						i64 padding = union_size-value_size;
+						if (padding > 0) {
+							LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, alignment);
+							values[value_count++] = LLVMConstNull(padding_type);
+						}
+
+						LLVMValueRef res = LLVMConstStructInContext(m->ctx, values, value_count, true);
+
+						return {res, original_type};
+					}
+
+				}
 				return lb_const_nil(m, original_type);
 			}
 			

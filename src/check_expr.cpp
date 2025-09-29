@@ -9847,7 +9847,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			if (t->Struct.is_raw_union) {
 				if (cl->elems.count > 0) {
 					// NOTE: unions cannot be constant
-					is_constant = false;
+					is_constant = elem_type_can_be_constant(t);
 
 					if (cl->elems[0]->kind != Ast_FieldValue) {
 						gbString type_str = type_to_string(type);

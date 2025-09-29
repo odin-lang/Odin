@@ -2531,6 +2531,20 @@ gb_internal bool is_type_union_constantable(Type *type) {
 	return true;
 }
 
+gb_internal bool is_type_raw_union_constantable(Type *type) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_Struct);
+	GB_ASSERT(bt->Struct.is_raw_union);
+
+	for (Entity *f : bt->Struct.fields) {
+		if (!is_type_constant_type(f->type)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
 gb_internal bool elem_type_can_be_constant(Type *t) {
 	t = base_type(t);
 	if (t == t_invalid) {
@@ -2540,7 +2554,7 @@ gb_internal bool elem_type_can_be_constant(Type *t) {
 		return false;
 	}
 	if (is_type_raw_union(t)) {
-		return false;
+		return is_type_raw_union_constantable(t);
 	}
 	if (is_type_union(t)) {
 		return is_type_union_constantable(t);
@@ -2556,7 +2570,7 @@ gb_internal bool elem_cannot_be_constant(Type *t) {
 		return !is_type_union_constantable(t);
 	}
 	if (is_type_raw_union(t)) {
-		return true;
+		return !is_type_raw_union_constantable(t);
 	}
 	return false;
 }
