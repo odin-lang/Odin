@@ -1503,14 +1503,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					if (elem_type_can_be_constant(f->type)) {
 						if (sel.index.count == 1) {
 							lbValue value = lb_const_value(m, f->type, tav.value, cc, tav.type);
-							if (is_type_union(f->type)) {
-								if (f->token.string == "default_value") {
-									if (LLVMIsNull(value.value)) {
-										gb_printf_err("HERE: %s %s\n", type_to_string(f->type), LLVMPrintValueToString(value.value));
-										GB_PANIC("GAH");
-									}
-								}
-							}
 							LLVMTypeRef value_type = LLVMTypeOf(value.value);
 							GB_ASSERT_MSG(lb_sizeof(value_type) == type_size_of(f->type), "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
 							values[index]  = value.value;
