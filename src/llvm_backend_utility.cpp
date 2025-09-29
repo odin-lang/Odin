@@ -2949,6 +2949,13 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 			return +1;
 		}
 
+		if (x->total_code_size > y->total_code_size) {
+			return -1;
+		}
+		if (x->total_code_size < y->total_code_size) {
+			return +1;
+		}
+
 		return string_compare(x->canonical_name, y->canonical_name);
 	});
 
