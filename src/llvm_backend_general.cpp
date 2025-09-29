@@ -186,9 +186,32 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				lb_init_module(pm, do_threading);
 			}
 
-			if (pkg->kind == Package_Runtime) {
-				// allow this to be per file
-			} else if (!module_per_file) {
+			bool allow_for_per_file = pkg->kind == Package_Runtime || module_per_file;
+
+			#if 0
+			if (!allow_for_per_file) {
+				if (pkg->files.count >= 20) {
+					isize proc_count = 0;
+					for (Entity *e : gen->info->entities) {
+						if (e->kind != Entity_Procedure) {
+							continue;
+						}
+						if (e->Procedure.is_foreign) {
+							continue;
+						}
+						if (e->pkg == pkg) {
+							proc_count += 1;
+						}
+					}
+
+					if (proc_count >= 300) {
+						allow_for_per_file = true;
+					}
+				}
+			}
+			#endif
+
+			if (!allow_for_per_file) {
 				continue;
 			}
 			// NOTE(bill): Probably per file is not a good idea, so leave this for later

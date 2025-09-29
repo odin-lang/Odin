@@ -2897,7 +2897,7 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 
 		f64 average = cast(f64)code_size / cast(f64)gb_max(count, 1);
 
-		gb_printf("%23td | %19d | %25.2f | %.*s\n", code_size, count, average, LIT(name));
+		gb_printf("%23td | %19td | %25.2f | %.*s\n", code_size, count, average, LIT(name));
 		if (max_count-- <= 0) {
 			break;
 		}
@@ -2930,7 +2930,7 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 
 		f64 average = cast(f64)code_size / cast(f64)gb_max(count, 1);
 
-		gb_printf("%19d | %23td | %25.2f | %.*s\n", count, code_size, average, LIT(name));
+		gb_printf("%19td | %23td | %25.2f | %.*s\n", count, code_size, average, LIT(name));
 		if (max_count-- <= 0) {
 			break;
 		}
@@ -2989,8 +2989,8 @@ gb_internal void lb_do_module_diagnostics(lbGenerator *gen) {
 	array_init(&modules, heap_allocator());
 	defer (array_free(&modules));
 
-	for (auto &entry : gen->modules) {
-		lbModule *m = entry.value;
+	for (auto &em : gen->modules) {
+		lbModule *m = em.value;
 
 		{
 			lbDiagModuleEntry entry = {};
@@ -3040,14 +3040,28 @@ gb_internal void lb_do_module_diagnostics(lbGenerator *gen) {
 	});
 
 	gb_printf("Module Diagnostics\n\n");
-	gb_printf("Total Instructions | Global Internals | Global Externals | Proc Internals | Proc Externals | Module Name\n");
+	gb_printf("Total Instructions | Global Internals | Global Externals | Proc Internals | Proc Externals | Files | Instructions/File | Instructions/Proc | Module Name\n");
+	gb_printf("-------------------+------------------+------------------+----------------+----------------+-------+-------------------+-------------------+------------\n");
 	for (auto &entry : modules) {
-		gb_printf("%18td | %16td | %16td | %14td | %14d | %s \n",
+		isize file_count = 1;
+		if (entry.m->file != nullptr) {
+			file_count = 1;
+		} else if (entry.m->pkg) {
+			file_count = entry.m->pkg->files.count;
+		}
+
+		f64 instructions_per_file = cast(f64)entry.total_instruction_count / gb_max(1.0, cast(f64)file_count);
+		f64 instructions_per_proc = cast(f64)entry.total_instruction_count / gb_max(1.0, cast(f64)entry.proc_internal_count);
+
+		gb_printf("%18td | %16td | %16td | %14td | %14td | %5td | %17.1f | %17.1f | %s \n",
 		          entry.total_instruction_count,
 		          entry.global_internal_count,
 		          entry.global_external_count,
 		          entry.proc_internal_count,
 		          entry.proc_external_count,
+		          file_count,
+		          instructions_per_file,
+		          instructions_per_proc,
 		          entry.m->module_name);
 	}
 
