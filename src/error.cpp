@@ -1,3 +1,15 @@
+enum NamedWarning : u32 {
+	NamedWarning_None = 0,
+	NamedWarning_ForeignProcRedecl,
+
+	NamedWarning_COUNT,
+};
+
+gb_global String named_warning_texts[NamedWarning_COUNT] = {
+	str_lit(""),
+	str_lit("Redeclaration of foreign procedure '%.*s' with different type signatures\n" "\tat %s"),
+};
+
 enum ErrorValueKind : u32 {
 	ErrorValue_Error,
 	ErrorValue_Warning,
@@ -168,6 +180,7 @@ gb_internal AstFile *thread_unsafe_get_ast_file_from_id(i32 index) {
 // NOTE: defined in build_settings.cpp
 gb_internal bool global_warnings_as_errors(void);
 gb_internal bool global_ignore_warnings(void);
+gb_internal bool global_warning_is_ignored(NamedWarning warning);
 gb_internal bool show_error_line(void);
 gb_internal bool terse_errors(void);
 gb_internal bool json_errors(void);
@@ -175,6 +188,7 @@ gb_internal bool has_ansi_terminal_colours(void);
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 
 gb_internal void warning(Token const &token, char const *fmt, ...);
+gb_internal void warning_named(NamedWarning warning, Token const &token, ...);
 gb_internal void error(Token const &token, char const *fmt, ...);
 gb_internal void error(TokenPos pos, char const *fmt, ...);
 gb_internal void error_line(char const *fmt, ...);
@@ -562,12 +576,12 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 	mutex_unlock(&global_error_collector.mutex);
 }
 
-gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va, NamedWarning warning = NamedWarning_None) {
 	if (global_warnings_as_errors()) {
 		error_va(pos, end, fmt, va);
 		return;
 	}
-	if (global_ignore_warnings()) {
+	if (global_warning_is_ignored(warning)) {
 		return;
 	}
 

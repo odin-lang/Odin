@@ -561,6 +561,24 @@ gb_internal void warning(Ast *node, char const *fmt, ...) {
 	va_end(va);
 }
 
+gb_internal void warning_named(NamedWarning warning, Ast *node, ...) {
+	GB_ASSERT(warning != NamedWarning_None);
+
+	auto* fmt = (const char*)named_warning_texts[warning].text;
+
+	Token token = {};
+	TokenPos end_pos = {};
+	if (node != nullptr) {
+		token = ast_token(node);
+		end_pos = ast_end_pos(node);
+	}
+
+	va_list va;
+	va_start(va, node);
+	warning_va(token.pos, end_pos, fmt, va, warning);
+	va_end(va);
+}
+
 gb_internal void syntax_error(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};

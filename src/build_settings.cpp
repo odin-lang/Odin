@@ -444,6 +444,19 @@ enum IntegerDivisionByZeroKind : u8 {
 	IntegerDivisionByZero_AllBits,
 };
 
+struct NamedWarningString {
+	NamedWarning kind;
+	String       name;
+};
+
+enum NamedWarning : u32;
+
+NamedWarningString named_warning_name_map[] = {
+	{ NamedWarning_None, str_lit("") },
+	{ NamedWarning_ForeignProcRedecl, str_lit("foreign-proc-redecl") },
+};
+
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -534,6 +547,7 @@ struct BuildContext {
 	bool   strict_style;
 
 	bool   ignore_warnings;
+	PtrSet< usize> disabled_warnings;
 	bool   warnings_as_errors;
 	bool   hide_error_line;
 	bool   terse_errors;
@@ -630,6 +644,9 @@ gb_internal bool global_warnings_as_errors(void) {
 }
 gb_internal bool global_ignore_warnings(void) {
 	return build_context.ignore_warnings;
+}
+gb_internal bool global_warning_is_ignored(NamedWarning warning) {
+	return global_ignore_warnings() || (warning != NamedWarning_None && ptr_set_exists(&build_context.disabled_warnings, (usize)warning));
 }
 
 gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {

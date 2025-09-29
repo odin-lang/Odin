@@ -381,6 +381,7 @@ enum BuildFlagKind {
 	BuildFlag_DocFormat,
 
 	BuildFlag_IgnoreWarnings,
+	BuildFlag_DisableWarning,
 	BuildFlag_WarningsAsErrors,
 	BuildFlag_TerseErrors,
 	BuildFlag_VerboseErrors,
@@ -608,6 +609,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DocFormat,               str_lit("doc-format"),                BuildFlagParam_None,    Command_doc);
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,          str_lit("ignore-warnings"),           BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_DisableWarning,          str_lit("disable-warning"),           BuildFlagParam_String,    Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors,        str_lit("warnings-as-errors"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_TerseErrors,             str_lit("terse-errors"),              BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
@@ -652,6 +654,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
 
+	StringMap<NamedWarning> warning_map = {};
 
 	Array<String> flag_args = {};
 
@@ -1492,6 +1495,46 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							} else {
 								build_context.ignore_warnings = true;
+							}
+							break;
+						}
+						case BuildFlag_DisableWarning: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String warnings = string_trim_whitespace(value.value_string);
+
+							String_Iterator it = {warnings, 0};
+							for (;;) {
+								String warning = string_trim_whitespace(string_split_iterator(&it, ','));
+
+								if (warning.len == 0) {
+									if(it.pos == warnings.len) {
+										break;
+									}
+
+									gb_printf_err("-%.*s must specify a non-empty value\n", LIT(name));
+									bad_flags = true;
+									continue;
+								}
+
+								if (warning_map.entries_capacity == 0) {
+									// Lazily-initialized
+									string_map_init(&warning_map, usize(NamedWarning_COUNT));
+
+									// NOTE(harold): Start in 1 to ignore '_None' warning
+									for (isize i = 1; i < isize(NamedWarning_COUNT); i++) {
+										string_map_set(&warning_map, named_warning_name_map[i].name, named_warning_name_map[i].kind);
+									}
+								}
+
+								NamedWarning *warning_kind = string_map_get(&warning_map, warning);
+								if (warning_kind == nullptr || *warning_kind == NamedWarning_None) {
+									gb_printf_err("-%.*s Unknown warning: '%.*s'\n", LIT(name), LIT(warning));
+									bad_flags = true;
+									break;
+								}
+
+								ptr_set_add(&build_context.disabled_warnings, (usize)*warning_kind);
 							}
 							break;
 						}
@@ -3612,6 +3655,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	string_set_init(&build_context.custom_attributes);
 	string_set_init(&build_context.vet_packages);
+	ptr_set_init(&build_context.disabled_warnings, isize(NamedWarning_COUNT));
 
 	if (!parse_build_flags(args)) {
 		return 1;
