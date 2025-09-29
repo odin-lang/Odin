@@ -603,6 +603,17 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				return res;
 			}
 		} else {
+			if (value_type == nullptr) {
+				if (value.kind == ExactValue_Compound) {
+					ast_node(cl, CompoundLit, value.value_compound);
+					if (cl->elems.count == 0) {
+						return lb_const_nil(m, original_type);
+					}
+				} else if (value.kind == ExactValue_Invalid) {
+					return lb_const_nil(m, original_type);
+				}
+			}
+
 			GB_ASSERT_MSG(value_type != nullptr, "%s :: %s", type_to_string(original_type), exact_value_to_string(value));
 
 			i64 block_size = bt->Union.variant_block_size;
