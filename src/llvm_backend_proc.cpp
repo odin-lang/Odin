@@ -928,12 +928,6 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 							args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
 							arg_type = param_type;
 							continue;
-						} else if (arg_kind == LLVMStructTypeKind) {
-							if (lb_sizeof(arg_type) == lb_sizeof(param_type)) {
-								args[i]	 = LLVMBuildBitCast(p->builder, args[i], param_type, "");
-								arg_type = param_type;
-								continue;
-							}
 						}
 					}
 				}

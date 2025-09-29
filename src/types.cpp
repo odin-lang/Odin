@@ -2541,7 +2541,8 @@ gb_internal bool is_type_raw_union_constantable(Type *type) {
 			return false;
 		}
 	}
-	return true;
+	// return true;
+	return false; // Disable raw union constants for the time being
 }
 
 
