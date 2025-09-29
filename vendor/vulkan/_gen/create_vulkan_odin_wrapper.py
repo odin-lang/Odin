@@ -311,7 +311,7 @@ def parse_constants(f):
     for name, value in data:
         value = remove_prefix(value, 'VK_')
         v = number_suffix_re.findall(value)
-        if value == "(~0U)" or value == "(~0UL)":
+        if value == "(~0U)":
             value = "~u32(0)"
         elif value == "(~0ULL)":
             value = "~u64(0)"
