@@ -5120,7 +5120,11 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 		}
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
-			if (is_type_struct(node->tav.type)) {
+			if (is_type_raw_union(node->tav.type)) {
+				if (success_) *success_ = false;
+				if (finish_) *finish_ = true;
+				return empty_exact_value;
+			} else if (is_type_struct(node->tav.type)) {
 				bool found = false;
 				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
@@ -5834,7 +5838,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	switch (entity->kind) {
 	case Entity_Constant:
-	operand->value = entity->Constant.value;
+		operand->value = entity->Constant.value;
 		operand->mode = Addressing_Constant;
 		if (operand->value.kind == ExactValue_Procedure) {
 			Entity *proc = strip_entity_wrapping(operand->value.value_procedure);
