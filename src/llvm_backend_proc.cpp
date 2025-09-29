@@ -921,13 +921,20 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 				    arg_type != param_type) {
 					LLVMTypeKind arg_kind = LLVMGetTypeKind(arg_type);
 					LLVMTypeKind param_kind = LLVMGetTypeKind(param_type);
-					if (arg_kind == param_kind &&
-					    arg_kind == LLVMPointerTypeKind) {
-						// NOTE(bill): LLVM's newer `ptr` only type system seems to fail at times
-						// I don't know why...
-						args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
-						arg_type = param_type;
-						continue;
+					if (arg_kind == param_kind) {
+						if (arg_kind == LLVMPointerTypeKind) {
+							// NOTE(bill): LLVM's newer `ptr` only type system seems to fail at times
+							// I don't know why...
+							args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
+							arg_type = param_type;
+							continue;
+						} else if (arg_kind == LLVMStructTypeKind) {
+							if (lb_sizeof(arg_type) == lb_sizeof(param_type)) {
+								args[i]	 = LLVMBuildBitCast(p->builder, args[i], param_type, "");
+								arg_type = param_type;
+								continue;
+							}
+						}
 					}
 				}
 
