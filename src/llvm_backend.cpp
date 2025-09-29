@@ -3287,12 +3287,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 						g.value = nullptr;
 						g.value = LLVMAddGlobal(m->mod, LLVMTypeOf(init.value), alloc_cstring(permanent_allocator(), name));
 
-						if (e->token.string == "node_camera_info") {
-							gb_printf_err("HERE!\n");
-							gb_printf_err("%s\n", LLVMPrintValueToString(init.value));
-						}
-
-
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
 						if (cc.is_rodata) {
