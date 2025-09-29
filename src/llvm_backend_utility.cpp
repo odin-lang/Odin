@@ -2373,7 +2373,6 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 	///       https://www.newosxbook.com/src.php?tree=xnu&file=/libkern/libkern/Block_private.h
 	///       https://github.com/llvm/llvm-project/blob/21f1f9558df3830ffa637def364e3c0cb0dbb3c0/compiler-rt/lib/BlocksRuntime/Block_private.h
 	///       https://github.com/apple-oss-distributions/libclosure/blob/3668b0837f47be3cc1c404fb5e360f4ff178ca13/runtime.cpp
-	// TODO(harold): Ensure we don't have any issues with large struct arguments or returns in block wrappers.
 	ast_node(ce, CallExpr, expr);
 	GB_ASSERT(ce->args.count > 0);
 
