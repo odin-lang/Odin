@@ -2790,7 +2790,7 @@ gb_internal LLVMAtomicOrdering llvm_atomic_ordering_from_odin(Ast *expr) {
 
 
 
-struct lbParaPolyEntry {
+struct lbDiagParaPolyEntry {
 	Entity *entity;
 	String  canonical_name;
 	isize   count;
@@ -2812,7 +2812,7 @@ gb_internal isize lb_total_code_size(lbProcedure *p) {
 }
 
 gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
-	PtrMap<Entity * /* Parent */, lbParaPolyEntry> procs = {};
+	PtrMap<Entity * /* Parent */, lbDiagParaPolyEntry> procs = {};
 	map_init(&procs);
 	defer (map_destroy(&procs));
 
@@ -2833,9 +2833,9 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 				continue;
 			}
 
-			lbParaPolyEntry *entry = map_get(&procs, para_poly_parent);
+			lbDiagParaPolyEntry *entry = map_get(&procs, para_poly_parent);
 			if (entry == nullptr) {
-				lbParaPolyEntry entry = {};
+				lbDiagParaPolyEntry entry = {};
 				entry.entity = para_poly_parent;
 				entry.count = 0;
 
@@ -2863,7 +2863,7 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 	}
 
 
-	auto entries = array_make<lbParaPolyEntry>(heap_allocator(), 0, procs.count);
+	auto entries = array_make<lbDiagParaPolyEntry>(heap_allocator(), 0, procs.count);
 	defer (array_free(&entries));
 
 	for (auto &entry : procs) {
@@ -2871,8 +2871,8 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 	}
 
 	array_sort(entries, [](void const *a, void const *b) -> int {
-		lbParaPolyEntry *x = cast(lbParaPolyEntry *)a;
-		lbParaPolyEntry *y = cast(lbParaPolyEntry *)b;
+		lbDiagParaPolyEntry *x = cast(lbDiagParaPolyEntry *)a;
+		lbDiagParaPolyEntry *y = cast(lbDiagParaPolyEntry *)b;
 		if (x->total_code_size > y->total_code_size) {
 			return -1;
 		}
@@ -2906,8 +2906,8 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 	gb_printf("------------------------------------------------------------------------------------------\n");
 
 	array_sort(entries, [](void const *a, void const *b) -> int {
-		lbParaPolyEntry *x = cast(lbParaPolyEntry *)a;
-		lbParaPolyEntry *y = cast(lbParaPolyEntry *)b;
+		lbDiagParaPolyEntry *x = cast(lbDiagParaPolyEntry *)a;
+		lbDiagParaPolyEntry *y = cast(lbDiagParaPolyEntry *)b;
 		if (x->count > y->count) {
 			return -1;
 		}
@@ -2940,8 +2940,8 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 
 
 	array_sort(entries, [](void const *a, void const *b) -> int {
-		lbParaPolyEntry *x = cast(lbParaPolyEntry *)a;
-		lbParaPolyEntry *y = cast(lbParaPolyEntry *)b;
+		lbDiagParaPolyEntry *x = cast(lbDiagParaPolyEntry *)a;
+		lbDiagParaPolyEntry *y = cast(lbDiagParaPolyEntry *)b;
 		if (x->count < y->count) {
 			return -1;
 		}
@@ -2972,5 +2972,93 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 		gb_printf("%17td | %.*s\n", code_size, LIT(name));
 	}
 
+}
+
+struct lbDiagModuleEntry {
+	lbModule *m;
+	String name;
+	isize global_internal_count;
+	isize global_external_count;
+	isize proc_internal_count;
+	isize proc_external_count;
+	isize total_instruction_count;
+};
+
+gb_internal void lb_do_module_diagnostics(lbGenerator *gen) {
+	Array<lbDiagModuleEntry> modules = {};
+	array_init(&modules, heap_allocator());
+	defer (array_free(&modules));
+
+	for (auto &entry : gen->modules) {
+		lbModule *m = entry.value;
+
+		{
+			lbDiagModuleEntry entry = {};
+			entry.m = m;
+			entry.name = make_string_c(m->module_name);
+			array_add(&modules, entry);
+		}
+		lbDiagModuleEntry &entry = modules[modules.count-1];
+
+		for (LLVMValueRef p = LLVMGetFirstFunction(m->mod); p != nullptr; p = LLVMGetNextFunction(p)) {
+			LLVMBasicBlockRef block = LLVMGetFirstBasicBlock(p);
+			if (block == nullptr) {
+				entry.proc_external_count += 1;
+			} else {
+				entry.proc_internal_count += 1;
+
+				for (; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
+					for (LLVMValueRef i = LLVMGetFirstInstruction(block); i != nullptr; i = LLVMGetNextInstruction(i)) {
+						entry.total_instruction_count += 1;
+					}
+				}
+			}
+		}
+
+		for (LLVMValueRef g = LLVMGetFirstGlobal(m->mod); g != nullptr; g = LLVMGetNextGlobal(g)) {
+			LLVMLinkage linkage = LLVMGetLinkage(g);
+			if (linkage == LLVMExternalLinkage) {
+				entry.global_external_count += 1;
+			} else {
+				entry.global_internal_count += 1;
+			}
+		}
+	}
+
+	array_sort(modules, [](void const *a, void const *b) -> int {
+		lbDiagModuleEntry *x = cast(lbDiagModuleEntry *)a;
+		lbDiagModuleEntry *y = cast(lbDiagModuleEntry *)b;
+
+		if (x->total_instruction_count > y->total_instruction_count) {
+			return -1;
+		}
+		if (x->total_instruction_count < y->total_instruction_count) {
+			return +1;
+		}
+
+		return string_compare(x->name, y->name);
+	});
+
+	gb_printf("Module Diagnostics\n\n");
+	gb_printf("Total Instructions | Global Internals | Global Externals | Proc Internals | Proc Externals | Module Name\n");
+	for (auto &entry : modules) {
+		gb_printf("%18td | %16td | %16td | %14td | %14d | %s \n",
+		          entry.total_instruction_count,
+		          entry.global_internal_count,
+		          entry.global_external_count,
+		          entry.proc_internal_count,
+		          entry.proc_external_count,
+		          entry.m->module_name);
+	}
+
+
+}
+
+gb_internal void lb_do_code_gen_diagnostics(lbGenerator *gen) {
+	lb_do_para_poly_diagnostics(gen);
 	gb_printf("------------------------------------------------------------------------------------------\n");
+	gb_printf("------------------------------------------------------------------------------------------\n\n");
+	lb_do_module_diagnostics(gen);
+	gb_printf("------------------------------------------------------------------------------------------\n");
+	gb_printf("------------------------------------------------------------------------------------------\n\n");
 }

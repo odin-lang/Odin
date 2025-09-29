@@ -3245,10 +3245,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			continue;
 		}
 
-		// if (!ptr_set_exists(min_dep_set, e)) {
-		// 	continue;
-		// }
-
 		DeclInfo *decl = decl_info_of_entity(e);
 		if (decl == nullptr) {
 			continue;
@@ -3259,8 +3255,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		bool is_foreign = e->Variable.is_foreign;
 		bool is_export  = e->Variable.is_export;
 
+		lbModule *default_module = &gen->default_module;
 
-		lbModule *m = &gen->default_module;
+		lbModule *m = default_module;
+		lbModule *e_module = lb_module_of_entity(gen, e, default_module);
+
+		bool const split_globals_across_modules = false;
+		if (split_globals_across_modules) {
+			m = e_module;
+		}
+
 		String name = lb_get_entity_name(m, e);
 
 		lbGlobalVariable var = {};
@@ -3361,15 +3365,26 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			}
 		}
 
-		g.value = LLVMConstPointerCast(g.value, lb_type(m, alloc_type_pointer(e->type)));
+		if (default_module == m) {
+			g.value = LLVMConstPointerCast(g.value, lb_type(m, alloc_type_pointer(e->type)));
 
-		var.var = g;
-		array_add(&global_variables, var);
+			var.var = g;
+			array_add(&global_variables, var);
+		} else {
+			lbValue local_g = {};
+			local_g.type  = alloc_type_pointer(e->type);
+			local_g.value = LLVMAddGlobal(default_module->mod, lb_type(default_module, e->type), alloc_cstring(permanent_allocator(), name));
+			LLVMSetLinkage(local_g.value, LLVMExternalLinkage);
+
+			var.var = local_g;
+			array_add(&global_variables, var);
+
+			lb_add_entity(default_module, e, local_g);
+			lb_add_member(default_module, name, local_g);
+		}
 
 		lb_add_entity(m, e, g);
 		lb_add_member(m, name, g);
-
-
 	}
 
 	if (build_context.ODIN_DEBUG) {
@@ -3557,7 +3572,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	lb_correct_entity_linkage(gen);
 
 	if (build_context.para_poly_diagnostics) {
-		lb_do_para_poly_diagnostics(gen);
+		lb_do_code_gen_diagnostics(gen);
 	}
 
 	llvm_error = nullptr;
