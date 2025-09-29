@@ -2787,3 +2787,190 @@ gb_internal LLVMAtomicOrdering llvm_atomic_ordering_from_odin(Ast *expr) {
 	ExactValue value = type_and_value_of_expr(expr).value;
 	return llvm_atomic_ordering_from_odin(value);
 }
+
+
+
+struct lbParaPolyEntry {
+	Entity *entity;
+	String  canonical_name;
+	isize   count;
+	isize   total_code_size;
+};
+
+gb_internal isize lb_total_code_size(lbProcedure *p) {
+	isize instruction_count = 0;
+
+	LLVMBasicBlockRef first = LLVMGetFirstBasicBlock(p->value);
+
+	for (LLVMBasicBlockRef block = first; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
+		for (LLVMValueRef instr = LLVMGetFirstInstruction(block); instr != nullptr; instr = LLVMGetNextInstruction(instr)) {
+			instruction_count += 1;
+		}
+	}
+	return instruction_count;
+
+}
+
+gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
+	PtrMap<Entity * /* Parent */, lbParaPolyEntry> procs = {};
+	map_init(&procs);
+	defer (map_destroy(&procs));
+
+	for (auto &entry : gen->modules) {
+		lbModule *m = entry.value;
+		for (lbProcedure *p : m->generated_procedures) {
+			Entity *e = p->entity;
+			if (e == nullptr) {
+				continue;
+			}
+			if (p->builder == nullptr) {
+				continue;
+			}
+
+			DeclInfo *d = e->decl_info;
+			Entity *para_poly_parent = d->para_poly_original;
+			if (para_poly_parent == nullptr) {
+				continue;
+			}
+
+			lbParaPolyEntry *entry = map_get(&procs, para_poly_parent);
+			if (entry == nullptr) {
+				lbParaPolyEntry entry = {};
+				entry.entity = para_poly_parent;
+				entry.count = 0;
+
+
+				gbString w = string_canonical_entity_name(permanent_allocator(), entry.entity);
+				String name = make_string_c(w);
+
+				for (isize i = 0; i < name.len; i++) {
+					String s = substring(name, i, name.len);
+					if (string_starts_with(s, str_lit(":proc"))) {
+						name = substring(name, 0, i);
+						break;
+					}
+				}
+
+				entry.canonical_name = name;
+
+				map_set(&procs, para_poly_parent, entry);
+			}
+			entry = map_get(&procs, para_poly_parent);
+			GB_ASSERT(entry != nullptr);
+			entry->count += 1;
+			entry->total_code_size += lb_total_code_size(p);
+		}
+	}
+
+
+	auto entries = array_make<lbParaPolyEntry>(heap_allocator(), 0, procs.count);
+	defer (array_free(&entries));
+
+	for (auto &entry : procs) {
+		array_add(&entries, entry.value);
+	}
+
+	array_sort(entries, [](void const *a, void const *b) -> int {
+		lbParaPolyEntry *x = cast(lbParaPolyEntry *)a;
+		lbParaPolyEntry *y = cast(lbParaPolyEntry *)b;
+		if (x->total_code_size > y->total_code_size) {
+			return -1;
+		}
+		if (x->total_code_size < y->total_code_size) {
+			return +1;
+		}
+		return string_compare(x->canonical_name, y->canonical_name);
+	});
+
+
+	gb_printf("Parametric Polymorphic Procedure Diagnostics\n");
+	gb_printf("------------------------------------------------------------------------------------------\n");
+
+	gb_printf("Sorted by Total Instruction Count Descending (Top 100)\n\n");
+	gb_printf("Total Instruction Count | Instantiation Count | Average Instruction Count | Procedure Name\n");
+
+	isize max_count = 100;
+	for (auto &entry : entries) {
+		isize   code_size = entry.total_code_size;
+		isize   count     = entry.count;
+		String  name      = entry.canonical_name;
+
+		f64 average = cast(f64)code_size / cast(f64)gb_max(count, 1);
+
+		gb_printf("%23td | %19d | %25.2f | %.*s\n", code_size, count, average, LIT(name));
+		if (max_count-- <= 0) {
+			break;
+		}
+	}
+
+	gb_printf("------------------------------------------------------------------------------------------\n");
+
+	array_sort(entries, [](void const *a, void const *b) -> int {
+		lbParaPolyEntry *x = cast(lbParaPolyEntry *)a;
+		lbParaPolyEntry *y = cast(lbParaPolyEntry *)b;
+		if (x->count > y->count) {
+			return -1;
+		}
+		if (x->count < y->count) {
+			return +1;
+		}
+
+		return string_compare(x->canonical_name, y->canonical_name);
+	});
+
+	gb_printf("Sorted by Total Instantiation Count Descending (Top 100)\n\n");
+	gb_printf("Instantiation Count | Total Instruction Count | Average Instruction Count | Procedure Name\n");
+
+	max_count = 100;
+	for (auto &entry : entries) {
+		isize   code_size = entry.total_code_size;
+		isize   count     = entry.count;
+		String  name      = entry.canonical_name;
+
+
+		f64 average = cast(f64)code_size / cast(f64)gb_max(count, 1);
+
+		gb_printf("%19d | %23td | %25.2f | %.*s\n", count, code_size, average, LIT(name));
+		if (max_count-- <= 0) {
+			break;
+		}
+	}
+
+	gb_printf("------------------------------------------------------------------------------------------\n");
+
+
+	array_sort(entries, [](void const *a, void const *b) -> int {
+		lbParaPolyEntry *x = cast(lbParaPolyEntry *)a;
+		lbParaPolyEntry *y = cast(lbParaPolyEntry *)b;
+		if (x->count < y->count) {
+			return -1;
+		}
+		if (x->count > y->count) {
+			return +1;
+		}
+
+		if (x->total_code_size > y->total_code_size) {
+			return -1;
+		}
+		if (x->total_code_size < y->total_code_size) {
+			return +1;
+		}
+
+		return string_compare(x->canonical_name, y->canonical_name);
+	});
+
+	gb_printf("Single Instanced Parametric Polymorphic Procedures\n\n");
+	gb_printf("Instruction Count | Procedure Name\n");
+	for (auto &entry : entries) {
+		isize   code_size = entry.total_code_size;
+		isize   count     = entry.count;
+		String  name      = entry.canonical_name;
+		if (count != 1) {
+			break;
+		}
+
+		gb_printf("%17td | %.*s\n", code_size, LIT(name));
+	}
+
+	gb_printf("------------------------------------------------------------------------------------------\n");
+}

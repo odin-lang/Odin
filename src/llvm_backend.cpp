@@ -3556,6 +3556,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Correct Entity Linkage");
 	lb_correct_entity_linkage(gen);
 
+	if (build_context.para_poly_diagnostics) {
+		lb_do_para_poly_diagnostics(gen);
+	}
+
 	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 
