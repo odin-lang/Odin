@@ -2897,7 +2897,7 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 
 		f64 average = cast(f64)code_size / cast(f64)gb_max(count, 1);
 
-		gb_printf("%23td | %19d | %25.2f | %.*s\n", code_size, count, average, LIT(name));
+		gb_printf("%23td | %19td | %25.2f | %.*s\n", code_size, count, average, LIT(name));
 		if (max_count-- <= 0) {
 			break;
 		}
@@ -2930,7 +2930,7 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 
 		f64 average = cast(f64)code_size / cast(f64)gb_max(count, 1);
 
-		gb_printf("%19d | %23td | %25.2f | %.*s\n", count, code_size, average, LIT(name));
+		gb_printf("%19td | %23td | %25.2f | %.*s\n", count, code_size, average, LIT(name));
 		if (max_count-- <= 0) {
 			break;
 		}
