@@ -70,31 +70,33 @@ init_global_temporary_allocator :: proc(size: int, backup_allocator := context.a
 }
 
 
+@(require_results)
+copy_slice_raw :: proc "contextless" (dst, src: rawptr, dst_len, src_len, elem_size: int) -> int {
+	n := min(dst_len, src_len)
+	if n > 0 {
+		intrinsics.mem_copy(dst, src, n*elem_size)
+	}
+	return n
+}
+
 // `copy_slice` is a built-in procedure that copies elements from a source slice `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 //
 // Prefer the procedure group `copy`.
 @builtin
-copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
-	n := min(len(dst), len(src))
-	if n > 0 {
-		intrinsics.mem_copy(raw_data(dst), raw_data(src), n*size_of(E))
-	}
-	return n
+copy_slice :: #force_inline proc "contextless" (dst, src: $T/[]$E) -> int {
+	return copy_slice_raw(raw_data(dst), raw_data(src), len(dst), len(src), size_of(E))
 }
+
 // `copy_from_string` is a built-in procedure that copies elements from a source string `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 //
 // Prefer the procedure group `copy`.
 @builtin
-copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
-	n := min(len(dst), len(src))
-	if n > 0 {
-		intrinsics.mem_copy(raw_data(dst), raw_data(src), n)
-	}
-	return n
+copy_from_string :: #force_inline proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
+	return copy_slice_raw(raw_data(dst), raw_data(src), len(dst), len(src), 1)
 }
 
 // `copy_from_string16` is a built-in procedure that copies elements from a source string `src` to a destination slice `dst`.
@@ -103,12 +105,8 @@ copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int 
 //
 // Prefer the procedure group `copy`.
 @builtin
-copy_from_string16 :: proc "contextless" (dst: $T/[]$E/u16, src: $S/string16) -> int {
-	n := min(len(dst), len(src))
-	if n > 0 {
-		intrinsics.mem_copy(raw_data(dst), raw_data(src), n*size_of(u16))
-	}
-	return n
+copy_from_string16 :: #force_inline proc "contextless" (dst: $T/[]$E/u16, src: $S/string16) -> int {
+	return copy_slice_raw(raw_data(dst), raw_data(src), len(dst), len(src), 2)
 }
 
 // `copy` is a built-in procedure that copies elements from a source slice/string `src` to a destination slice `dst`.
