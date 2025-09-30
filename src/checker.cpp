@@ -3389,8 +3389,10 @@ gb_internal void init_core_map_type(Checker *c) {
 }
 
 gb_internal void init_core_objc_c(Checker *c) {
-	t_objc_super     = find_core_type(c, str_lit("objc_super"));
-	t_objc_super_ptr = alloc_type_pointer(t_objc_super);
+	if (build_context.metrics.os == TargetOs_darwin) {
+		t_objc_super     = find_core_type(c, str_lit("objc_super"));
+		t_objc_super_ptr = alloc_type_pointer(t_objc_super);
+	}
 }
 
 gb_internal void init_preload(Checker *c) {
