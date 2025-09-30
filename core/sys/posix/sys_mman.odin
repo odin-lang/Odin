@@ -92,7 +92,12 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/shm_open.html ]]
 	*/
-	shm_open :: proc(name: cstring, oflag: O_Flags, mode: mode_t) -> FD ---
+	when ODIN_OS == .Darwin {
+		// https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/shm_open.2.html
+		shm_open :: proc(name: cstring, oflag: O_Flags, #c_vararg args: ..any) -> FD ---
+	} else {
+		shm_open :: proc(name: cstring, oflag: O_Flags, mode: mode_t) -> FD ---
+	}
 
 	/*
 	Removes a shared memory object.
