@@ -853,10 +853,40 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 
 	Type *x_base = base_type(x);
 	Type *y_base = base_type(y);
-	if (x_base->kind == y_base->kind && x_base->kind == Type_Struct) {
-		return type_size_of(x_base) == type_size_of(y_base) && type_align_of(x_base) == type_align_of(y_base);
+	if (x_base->kind == y_base->kind &&
+	    x_base->kind == Type_Struct) {
+	    	i64 xs = type_size_of(x_base);
+		i64 ys = type_size_of(y_base);
+
+	    	i64 xa = type_align_of(x_base);
+		i64 ya = type_align_of(y_base);
+
+
+		if (x_base->Struct.is_raw_union == y_base->Struct.is_raw_union &&
+		    xs == ys && xa == ya) {
+		    	if (xs > 16) {
+		    		// @@ABI NOTE(bill): Just allow anything over 16-bytes to be allowed, because on all current ABIs
+		    		// it will be passed by point
+		    		// NOTE(bill): this must be changed when ABI changes
+		    		return true;
+		    	}
+		    	if (x->Struct.fields.count == y->Struct.fields.count) {
+		    		for (isize i = 0; i < x->Struct.fields.count; i++) {
+		    			Entity *a = x->Struct.fields[i];
+		    			Entity *b = y->Struct.fields[i];
+		    			bool similar = signature_parameter_similar_enough(a->type, b->type);
+		    			if (!similar) {
+		    				// NOTE(bill): If the fields are not similar enough, then stop.
+		    				goto end;
+		    			}
+		    		}
+		    	}
+		    	// HACK NOTE(bill): Allow this for the time begin until it actually becomes a practical problem
+			return true;
+		}
 	}
 
+end:;
 	return are_types_identical(x, y);
 }
 
