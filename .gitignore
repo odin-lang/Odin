@@ -307,3 +307,4 @@ compile_commands.json
 build/
 cmake-build*/
 CMakeLists.txt
+sandbox/

@@ -4135,7 +4135,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		return lb_build_builtin_proc(p, expr, tv, id);
 	}
 
-	bool is_objc_call = proc_entity->Procedure.is_objc_impl_or_import;
+	bool is_objc_call = proc_entity && proc_entity->Procedure.is_objc_impl_or_import;
 
 	// NOTE(bill): Regular call
 	lbValue value = {};
