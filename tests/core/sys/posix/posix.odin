@@ -21,7 +21,7 @@ test_arpa_inet :: proc(t: ^testing.T) {
 			dst: [posix.INET6_ADDRSTRLEN]byte
 		}
 
-		res := posix.inet_pton(af, src, &addr, size_of(addr))
+		res := posix.inet_pton(af, src, &addr)
 		testing.expect_value(t, res, expect, loc)
 
 		if expect == .SUCCESS {
