@@ -29,7 +29,9 @@ foreign ObjC {
 	objc_msgSend_fpret       :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) -> f64 ---
 	objc_msgSend_fp2ret      :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) -> complex128 ---
 	objc_msgSend_stret       :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) ---
-	objc_msgSendSuper2       :: proc "c" (super: ^objc_super, op: objc_SEL, #c_vararg args: ..any) ---
+
+	// See: https://github.com/opensource-apple/objc4/blob/cd5e62a5597ea7a31dccef089317abb3a661c154/runtime/objc-abi.h#L111
+	objc_msgSendSuper2       :: proc "c" (super: rawptr, op: objc_SEL, #c_vararg args: ..any) -> objc_id ---
 	objc_msgSendSuper2_stret :: proc "c" (super: ^objc_super, op: objc_SEL, #c_vararg args: ..any) ---
 
 
