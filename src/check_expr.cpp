@@ -9719,7 +9719,10 @@ gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
 }
 
 gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCompoundLit *cl) {
-	if (cl->elems.count > 0 && (check_feature_flags(c, node) & OptInFeatureFlag_DynamicLiterals) == 0 && !build_context.dynamic_literals) {
+	if (cl->elems.count == 0) {
+		return false;
+	}
+	if ((check_feature_flags(c, node) & OptInFeatureFlag_DynamicLiterals) == 0 && !build_context.dynamic_literals) {
 		ERROR_BLOCK();
 		error(node, "Compound literals of dynamic types are disabled by default");
 		error_line("\tSuggestion: If you want to enable them for this specific file, add '#+feature dynamic-literals' at the top of the file\n");
@@ -9730,9 +9733,13 @@ gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCom
 			error_line("\tWarning: As '-default-to-panic-allocator' has been set, the dynamic compound literal may not be initialized as expected\n");
 		}
 		return false;
+	} else if (c->curr_proc_decl != nullptr && c->curr_proc_calling_convention != ProcCC_Odin) {
+		if (c->scope != nullptr && (c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+			error(node, "Compound literals of dynamic types require a 'context' to defined");
+		}
 	}
 
-	return cl->elems.count > 0;
+	return true;
 }
 
 gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(CheckerContext *c, Ast *node) {
