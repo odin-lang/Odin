@@ -870,6 +870,9 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 		    		// NOTE(bill): this must be changed when ABI changes
 		    		return true;
 		    	}
+		    	if (x_base->Struct.is_raw_union) {
+		    		return true;
+		    	}
 		    	if (x->Struct.fields.count == y->Struct.fields.count) {
 		    		for (isize i = 0; i < x->Struct.fields.count; i++) {
 		    			Entity *a = x->Struct.fields[i];
