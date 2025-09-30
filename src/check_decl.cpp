@@ -853,12 +853,17 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 
 	Type *x_base = base_type(x);
 	Type *y_base = base_type(y);
+
+	if (x_base == y_base) {
+		return true;
+	}
+
 	if (x_base->kind == y_base->kind &&
 	    x_base->kind == Type_Struct) {
-	    	i64 xs = type_size_of(x_base);
+		i64 xs = type_size_of(x_base);
 		i64 ys = type_size_of(y_base);
 
-	    	i64 xa = type_align_of(x_base);
+		i64 xa = type_align_of(x_base);
 		i64 ya = type_align_of(y_base);
 
 
