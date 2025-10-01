@@ -5,6 +5,9 @@ import "base:runtime"
 import subtle "core:crypto/_subtle"
 import "core:mem"
 
+// Omit large precomputed tables, trading off performance for size.
+COMPACT_IMPLS: bool : #config(ODIN_CRYPTO_COMPACT, false)
+
 // HAS_RAND_BYTES is true iff the runtime provides a cryptographic
 // entropy source.
 HAS_RAND_BYTES :: runtime.HAS_RAND_BYTES
