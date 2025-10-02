@@ -1664,18 +1664,18 @@ Casts a rune to int
 
 Example:
 
-    import "core:strconv"
-    rune_to_int :: proc () {
-        my_int, ok := strconv.rtoi('5')
-        if ok {
-            assert(typeid_of(type_of(my_int)) == int)
-            fmt.println(my_int)
-        }
-    }
+	import "core:strconv"
+	rune_to_int :: proc () {
+		my_int, ok := strconv.rtoi('5')
+		if ok {
+			assert(typeid_of(type_of(my_int)) == int)
+			fmt.println(my_int)
+		}
+	}
 
 Output:
 
-    5
+	5
 
 **Returns:**
 
@@ -1683,10 +1683,10 @@ Output:
 - ok: ok=false if input not a rune or not numeric.
 */
 rtoi :: proc(r: rune) -> (value: int, ok: bool) #optional_ok {
-    if '0' <= r && r <= '9' {
-        return int(r - '0'), true
-    }    
-    return -1, false
+	if '0' <= r && r <= '9' {
+		return int(r - '0'), true
+	}
+	return -1, false
 }
 /*
 Casts one u8 character to int
@@ -1697,19 +1697,19 @@ Casts one u8 character to int
 
 Example:
 
-    import "core:strconv"
-    u8_to_int :: proc () {
-        my_u8 := u8('8')
-        my_int, ok := strconv.utoi(my_u8)
-        if ok {
-            assert(typeid_of(type_of(my_int)) == int)
-            fmt.println(my_int)
-        }
-    }
+	import "core:strconv"
+	u8_to_int :: proc () {
+		my_u8 := u8('8')
+		my_int, ok := strconv.utoi(my_u8)
+		if ok {
+			assert(typeid_of(type_of(my_int)) == int)
+			fmt.println(my_int)
+		}
+	}
 
 Output:
 
-    8
+	8
 
 
 **Returns:**
@@ -1718,10 +1718,10 @@ Output:
 - ok: ok=false if input not a u8 character or not numeric.
 */
 utoi :: proc(u: u8) -> (value: int, ok: bool) #optional_ok {
-    if '0' <= u && u <= '9' {
-        return int(u - '0'), true
-    }       
-    return -1, false
+	if '0' <= u && u <= '9' {
+		return int(u - '0'), true
+	}
+	return -1, false
 }
 /*
 Writes a quoted string representation of the input string to a given byte slice and returns the result as a string
