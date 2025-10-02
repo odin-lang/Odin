@@ -1655,71 +1655,10 @@ Output:
 write_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size))
 }
-/*
-Casts a rune to int
-
-**Input:**
-
-- r: The input rune to find the integer value of
-
-Example:
-
-	import "core:strconv"
-	rune_to_int :: proc () {
-		my_int, ok := strconv.rtoi('5')
-		if ok {
-			assert(typeid_of(type_of(my_int)) == int)
-			fmt.println(my_int)
-		}
-	}
-
-Output:
-
-	5
-
-**Returns:**
-
-- value: the integer value of the given rune
-- ok: ok=false if input not a rune or not numeric.
-*/
-rtoi :: proc(r: rune) -> (value: int, ok: bool) #optional_ok {
+// Accepts '0'..='9', otherwise returns ok = false
+digit_to_int :: proc(r: rune) -> (value: int, ok: bool) {
 	if '0' <= r && r <= '9' {
 		return int(r - '0'), true
-	}
-	return -1, false
-}
-/*
-Casts one u8 character to int
-
-**Input:**
-
-- u: The input u8 character to find the integer value of
-
-Example:
-
-	import "core:strconv"
-	u8_to_int :: proc () {
-		my_u8 := u8('8')
-		my_int, ok := strconv.utoi(my_u8)
-		if ok {
-			assert(typeid_of(type_of(my_int)) == int)
-			fmt.println(my_int)
-		}
-	}
-
-Output:
-
-	8
-
-
-**Returns:**
-
-- value: the integer value of the given u8 character
-- ok: ok=false if input not a u8 character or not numeric.
-*/
-utoi :: proc(u: u8) -> (value: int, ok: bool) #optional_ok {
-	if '0' <= u && u <= '9' {
-		return int(u - '0'), true
 	}
 	return -1, false
 }
