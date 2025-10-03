@@ -1547,35 +1547,6 @@ write_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
 }
 
 /*
-`itoa` C name deprecated, use `int_to_string` instead (same procedure)
-
-Converts an integer value to a string and stores it in the given buffer
-
-**Inputs**
-- buf: The buffer to store the resulting string
-- i: The integer value to be converted
-
-Example:
-
-	import "core:fmt"
-	import "core:strconv"
-	int_to_string_example :: proc() {
-		buf: [4]byte
-		result := strconv.int_to_string(buf[:], 42)
-		fmt.println(result, buf) // "42"
-	}
-
-Output:
-
-	42 [52, 50, 0, 0]
-
-**Returns**
-- The resulting string after converting the integer value
-*/
-int_to_string :: proc(buf: []byte, i: int) -> string {
-	return write_int(buf, i64(i), 10)
-}
-/*
 `ftoa` C name deprecated, use `int_to_string` instead (same procedure)
 
 Writes a float64 value as a string to the given buffer with the specified format and precision

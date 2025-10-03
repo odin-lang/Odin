@@ -39,7 +39,7 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 
 // 2025-10-03 Deprecated C short names and implementations
 
-@(deprecated="Use int_to_string instead")
+@(deprecated="Use strconv.write_int() instead")
 itoa :: proc(buf: []byte, i: int) -> string {
 	return write_int(buf, i64(i), 10)
 }
@@ -50,13 +50,13 @@ atoi :: proc(s: string) -> int {
 	return v
 }
 
-@(deprecated="Use parse_f64() instead")
+@(deprecated="Use strconv.parse_f64() instead")
 atof :: proc(s: string) -> f64 {
 	v, _  := parse_f64(s)
 	return v
 }
 
-@(deprecated="Use write_float instead")
+@(deprecated="Use strconv.write_float() instead")
 ftoa :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size))
 }
