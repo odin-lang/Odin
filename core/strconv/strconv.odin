@@ -1547,7 +1547,7 @@ write_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
 }
 
 /*
-`ftoa` C name deprecated, use `int_to_string` instead (same procedure)
+`ftoa` C name deprecated, use `write_float` instead (same procedure)
 
 Writes a float64 value as a string to the given buffer with the specified format and precision
 
