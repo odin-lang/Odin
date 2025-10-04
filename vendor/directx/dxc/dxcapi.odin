@@ -302,7 +302,9 @@ DXC_OUT_KIND :: enum u32 {
 	REFLECTION      = 8,
 	ROOT_SIGNATURE  = 9,
 	EXTRA_OUTPUTS   = 10,
-	FORCE_DWORD     = 0xFFFFFFFF,
+	REMARKS         = 11,
+	TIME_REPORT     = 12,
+	TIME_TRACE      = 13,
 }
 
 IResult_UUID_STRING :: "58346CDA-DDE7-4497-9461-6F87AF5E0659"
@@ -514,6 +516,41 @@ IPdbUtils_VTable :: struct {
 	OverrideRootSignature: proc "system" (this: ^IPdbUtils, pRootSignature: wstring) -> HRESULT,
 }
 
+IPdbUtils2_UUID_STRING :: "4315D938-F369-4F93-95A2-252017CC3807"
+IPdbUtils2_UUID := &IID{0x4315D938, 0xF369, 0x4F93, {0x95, 0xA2, 0x25, 0x20, 0x17, 0xCC, 0x38, 0x07}}
+IPdbUtils2 :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using idxcpdbutils2_vtable: ^IPdbUtils2_VTable,
+}
+IPdbUtils2_VTable :: struct {
+	using iunknown_vtable: IUnknown_VTable,
+	Load:                  proc "system" (this: ^IPdbUtils2, pPdbOrDxil: ^IBlob) -> HRESULT,
+	GetSourceCount:        proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetSource:             proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobEncoding) -> HRESULT,
+	GetSourceName:         proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobUtf16) -> HRESULT,
+	GetLibraryPDBCount:    proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetLibraryPDB:         proc "system" (this: ^IPdbUtils2, uIndex: u32, ppOutPdbUtils: ^^IPdbUtils2, ppLibraryName: ^^IBlobUtf16) -> HRESULT,
+	GetFlagCount:          proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetFlag:               proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobUtf16) -> HRESULT,
+	GetArgCount:           proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetArg:                proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobUtf16) -> HRESULT,
+	GetArgPairCount:       proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetArgPair:            proc "system" (this: ^IPdbUtils2, uIndex: u32, ppName: ^^IBlobUtf16, ppValue: ^^IBlobUtf16) -> HRESULT,
+	GetDefineCount:        proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetDefine:             proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobUtf16) -> HRESULT,
+	GetTargetProfile:      proc "system" (this: ^IPdbUtils2, pResult: ^^IBlobUtf16) -> HRESULT,
+	GetEntryPoint:         proc "system" (this: ^IPdbUtils2, pResult: ^^IBlobUtf16) -> HRESULT,
+	GetMainFileName:       proc "system" (this: ^IPdbUtils2, pResult: ^^IBlobUtf16) -> HRESULT,
+	GetHash:               proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlob) -> HRESULT,
+	GetName:               proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlobUtf16) -> HRESULT,
+	GetVersionInfo:        proc "system" (this: ^IPdbUtils2, ppVersionInfo: ^^IVersionInfo) -> HRESULT,
+	GetCustomToolchainID:  proc "system" (this: ^IPdbUtils2, pID: ^u32) -> HRESULT,
+	GetCustomToolchainData:proc "system" (this: ^IPdbUtils2, ppBlob: ^^IBlob) -> HRESULT,
+	GetWholeDxil:          proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlob) -> HRESULT,
+	IsFullPDB:             proc "system" (this: ^IPdbUtils2) -> BOOL,
+	IsPDBRef:              proc "system" (this: ^IPdbUtils2) -> BOOL,
+}
+
 
 Compiler_CLSID_STRING :: "73E22D93-E6CE-47F3-B5BF-F0664F39C1B0"
 Compiler_CLSID := &CLSID{0x73E22D93, 0xE6CE, 0x47F3, {0xB5, 0xBF, 0xF0, 0x66, 0x4F, 0x39, 0xC1, 0xB0}}
@@ -553,7 +590,18 @@ PdbUtils_CLSID := &CLSID{0x54621DFB, 0xF2CE, 0x457E, {0xAE, 0x8C, 0xEC, 0x35, 0x
 
 CP_UTF8  :: 65001
 CP_UTF16 :: 1200
+CP_UTF32 :: 12000
 CP_ACP   :: 0
+
+HashFlags :: bit_set[HashFlag;u32]
+HashFlag :: enum i32 {
+	INCLUDES_SOURCE,
+}
+
+ShaderHash :: struct {
+	Flags:      HashFlags,
+	HashDigest: [16]byte,
+}
 
 make_fourcc :: proc "contextless" (ch0, ch1, ch2, ch3: u32) -> u32 {
 	return ch0 | (ch1 << 8) | (ch2 << 16) | (ch3 << 24)
