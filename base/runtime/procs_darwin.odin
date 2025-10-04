@@ -15,16 +15,25 @@ objc_SEL   :: ^intrinsics.objc_selector
 objc_Ivar  :: ^intrinsics.objc_ivar
 objc_BOOL  :: bool
 
+objc_super :: struct {
+	receiver: 	 objc_id,
+	super_class: objc_Class,
+}
 
 objc_IMP :: proc "c" (object: objc_id, sel: objc_SEL, #c_vararg args: ..any) -> objc_id
 
 foreign ObjC {
 	sel_registerName :: proc "c" (name: cstring) -> objc_SEL ---
 
-	objc_msgSend        :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) ---
-	objc_msgSend_fpret  :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) -> f64 ---
-	objc_msgSend_fp2ret :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) -> complex128 ---
-	objc_msgSend_stret  :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) ---
+	objc_msgSend             :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) ---
+	objc_msgSend_fpret       :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) -> f64 ---
+	objc_msgSend_fp2ret      :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) -> complex128 ---
+	objc_msgSend_stret       :: proc "c" (self: objc_id, op: objc_SEL, #c_vararg args: ..any) ---
+
+	// See: https://github.com/opensource-apple/objc4/blob/cd5e62a5597ea7a31dccef089317abb3a661c154/runtime/objc-abi.h#L111
+	objc_msgSendSuper2       :: proc "c" (super: rawptr, op: objc_SEL, #c_vararg args: ..any) -> objc_id ---
+	objc_msgSendSuper2_stret :: proc "c" (super: ^objc_super, op: objc_SEL, #c_vararg args: ..any) ---
+
 
 	objc_lookUpClass          :: proc "c" (name: cstring) -> objc_Class ---
 	objc_allocateClassPair    :: proc "c" (superclass: objc_Class, name: cstring, extraBytes: uint) -> objc_Class ---
@@ -33,6 +42,7 @@ foreign ObjC {
 	class_addIvar             :: proc "c" (cls: objc_Class, name: cstring, size: uint, alignment: u8, types: cstring) -> objc_BOOL ---
 	class_getInstanceVariable :: proc "c" (cls : objc_Class, name: cstring) -> objc_Ivar ---
 	class_getInstanceSize     :: proc "c" (cls : objc_Class) -> uint ---
+	class_getSuperclass       :: proc "c" (cls : objc_Class) -> objc_Class ---
 	ivar_getOffset            :: proc "c" (v: objc_Ivar) -> uintptr ---
 	object_getClass           :: proc "c" (obj: objc_id) -> objc_Class ---
 }

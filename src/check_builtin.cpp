@@ -210,7 +210,7 @@ gb_internal ObjcMsgKind get_objc_proc_kind(Type *return_type) {
 	return ObjcMsg_normal;
 }
 
-gb_internal void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<Type *> param_types) {
+void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<Type *> param_types) {
 	ObjcMsgKind kind = get_objc_proc_kind(return_type);
 
 	Scope *scope = create_scope(c->info, nullptr);
@@ -248,6 +248,12 @@ gb_internal void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_t
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_stret");
+
+	Slice<Ast *> args = call->CallExpr.args;
+	if (args.count > 0 && args[0]->tav.objc_super_target) {
+		try_to_add_package_dependency(c, "runtime", "objc_msgSendSuper2");
+		try_to_add_package_dependency(c, "runtime", "objc_msgSendSuper2_stret");
+	}
 }
 
 gb_internal bool is_constant_string(CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) {
@@ -466,8 +472,8 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 
 		isize capture_arg_count = ce->args.count - 1;
 
-		// NOTE(harold): The first parameter is already checked at check_builtin_procedure().
-		// Checking again would invalidate the Entity -> Value map for direct parameters if it's the handler proc.
+		// NOTE(harold): The first argument is already checked at check_builtin_procedure().
+		// Checking again would invalidate the Entity -> Value map for direct arguments if it's the handler proc.
 		param_operands[0] = *operand;
 
 		for (isize i = 0; i < ce->args.count-1; i++) {
@@ -679,6 +685,52 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		operand->type = alloc_type_pointer(operand->type);
 		operand->mode = Addressing_Value;
 		return true;
+	} break;
+
+	case BuiltinProc_objc_super:
+	{
+		// Must be a pointer to an Objective-C object.
+		Type *objc_obj = operand->type;
+		if (!is_type_objc_ptr_to_object(objc_obj)) {
+			gbString e = expr_to_string(operand->expr);
+			gbString t = type_to_string(objc_obj);
+			error(operand->expr, "'%.*s' expected a pointer to an Objective-C object, but got '%s' of type %s", LIT(builtin_name), e, t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		}
+
+		if (operand->mode != Addressing_Value && operand->mode != Addressing_Variable) {
+			gbString e = expr_to_string(operand->expr);
+			gbString t = type_to_string(operand->type);
+			error(operand->expr, "'%.*s' expression '%s', of type %s, must be a value or variable.", LIT(builtin_name), e, t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return false;
+		}
+
+		Type *obj_type = type_deref(objc_obj);
+		GB_ASSERT(obj_type->kind == Type_Named);
+
+		// NOTE(harold) Track original type before transforming it to the superclass.
+		//              This is needed because objc_msgSendSuper2 must start its search on the subclass, not the superclass.
+		call->tav.objc_super_target = obj_type;
+
+		// The superclass type must be known at compile time. We require this so that the selector method expressions
+		// methods are resolved to the superclass's methods instead of the subclass's.
+		Type *superclass = obj_type->Named.type_name->TypeName.objc_superclass;
+		if (superclass == nullptr) {
+			gbString t = type_to_string(obj_type);
+			error(operand->expr, "'%.*s' target object '%.*s' does not have an Objective-C superclass. One must be set via the @(objc_superclass) attribute", LIT(builtin_name), t);
+			gb_string_free(t);
+			return false;
+		}
+
+		GB_ASSERT(superclass->Named.type_name->TypeName.objc_class_name.len > 0);
+
+		operand->type = alloc_type_pointer(superclass);
+		return true;
+
 	} break;
 	}
 }
@@ -2515,6 +2567,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_register_class:
 	case BuiltinProc_objc_ivar_get:
 	case BuiltinProc_objc_block:
+	case BuiltinProc_objc_super:
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:
