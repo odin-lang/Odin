@@ -7488,8 +7488,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		Entity *e = proc_entities[valids[0].index];
 		GB_ASSERT(e != nullptr);
 
-		Array<Operand> named_operands = {};
-
 		check_call_arguments_single(c, call, operand,
 			e, e->type,
 			positional_operands, named_operands,
