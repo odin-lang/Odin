@@ -164,25 +164,25 @@ orthogonal :: proc{vector2_orthogonal, vector3_orthogonal}
 
 @(require_results)
 vector4_srgb_to_linear_f16 :: proc "contextless" (col: Vector4f16) -> Vector4f16 {
-	r := math.pow(col.x, 2.2)
-	g := math.pow(col.y, 2.2)
-	b := math.pow(col.z, 2.2)
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
 	a := col.w
 	return {r, g, b, a}
 }
 @(require_results)
 vector4_srgb_to_linear_f32 :: proc "contextless" (col: Vector4f32) -> Vector4f32 {
-	r := math.pow(col.x, 2.2)
-	g := math.pow(col.y, 2.2)
-	b := math.pow(col.z, 2.2)
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
 	a := col.w
 	return {r, g, b, a}
 }
 @(require_results)
 vector4_srgb_to_linear_f64 :: proc "contextless" (col: Vector4f64) -> Vector4f64 {
-	r := math.pow(col.x, 2.2)
-	g := math.pow(col.y, 2.2)
-	b := math.pow(col.z, 2.2)
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
 	a := col.w
 	return {r, g, b, a}
 }
@@ -192,70 +192,55 @@ vector4_srgb_to_linear :: proc{
 	vector4_srgb_to_linear_f64,
 }
 
+@(require_results)
+vector3_srgb_to_linear_f16 :: proc "contextless" (col: Vector3f16) -> Vector3f16 {
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
+	return {r, g, b}
+}
+@(require_results)
+vector3_srgb_to_linear_f32 :: proc "contextless" (col: Vector3f32) -> Vector3f32 {
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
+	return {r, g, b}
+}
+@(require_results)
+vector3_srgb_to_linear_f64 :: proc "contextless" (col: Vector3f64) -> Vector3f64 {
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
+	return {r, g, b}
+}
+vector3_srgb_to_linear :: proc{
+	vector3_srgb_to_linear_f16,
+	vector3_srgb_to_linear_f32,
+	vector3_srgb_to_linear_f64,
+}
+
 
 @(require_results)
 vector4_linear_to_srgb_f16 :: proc "contextless" (col: Vector4f16) -> Vector4f16 {
-	a :: 2.51
-	b :: 0.03
-	c :: 2.43
-	d :: 0.59
-	e :: 0.14
-
-	x := col.x
-	y := col.y
-	z := col.z
-
-	x = (x * (a * x + b)) / (x * (c * x + d) + e)
-	y = (y * (a * y + b)) / (y * (c * y + d) + e)
-	z = (z * (a * z + b)) / (z * (c * z + d) + e)
-
-	x = math.pow(clamp(x, 0, 1), 1.0 / 2.2)
-	y = math.pow(clamp(y, 0, 1), 1.0 / 2.2)
-	z = math.pow(clamp(z, 0, 1), 1.0 / 2.2)
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
 
 	return {x, y, z, col.w}
 }
 @(require_results)
 vector4_linear_to_srgb_f32 :: proc "contextless" (col: Vector4f32) -> Vector4f32 {
-	a :: 2.51
-	b :: 0.03
-	c :: 2.43
-	d :: 0.59
-	e :: 0.14
-
-	x := col.x
-	y := col.y
-	z := col.z
-
-	x = (x * (a * x + b)) / (x * (c * x + d) + e)
-	y = (y * (a * y + b)) / (y * (c * y + d) + e)
-	z = (z * (a * z + b)) / (z * (c * z + d) + e)
-
-	x = math.pow(clamp(x, 0, 1), 1.0 / 2.2)
-	y = math.pow(clamp(y, 0, 1), 1.0 / 2.2)
-	z = math.pow(clamp(z, 0, 1), 1.0 / 2.2)
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
 
 	return {x, y, z, col.w}
 }
 @(require_results)
 vector4_linear_to_srgb_f64 :: proc "contextless" (col: Vector4f64) -> Vector4f64 {
-	a :: 2.51
-	b :: 0.03
-	c :: 2.43
-	d :: 0.59
-	e :: 0.14
-
-	x := col.x
-	y := col.y
-	z := col.z
-
-	x = (x * (a * x + b)) / (x * (c * x + d) + e)
-	y = (y * (a * y + b)) / (y * (c * y + d) + e)
-	z = (z * (a * z + b)) / (z * (c * z + d) + e)
-
-	x = math.pow(clamp(x, 0, 1), 1.0 / 2.2)
-	y = math.pow(clamp(y, 0, 1), 1.0 / 2.2)
-	z = math.pow(clamp(z, 0, 1), 1.0 / 2.2)
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
 
 	return {x, y, z, col.w}
 }
@@ -263,6 +248,36 @@ vector4_linear_to_srgb :: proc{
 	vector4_linear_to_srgb_f16,
 	vector4_linear_to_srgb_f32,
 	vector4_linear_to_srgb_f64,
+}
+
+@(require_results)
+vector3_linear_to_srgb_f16 :: proc "contextless" (col: Vector3f16) -> Vector3f16 {
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
+
+	return {x, y, z}
+}
+@(require_results)
+vector3_linear_to_srgb_f32 :: proc "contextless" (col: Vector3f32) -> Vector3f32 {
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
+
+	return {x, y, z}
+}
+@(require_results)
+vector3_linear_to_srgb_f64 :: proc "contextless" (col: Vector3f64) -> Vector3f64 {
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
+
+	return {x, y, z}
+}
+vector3_linear_to_srgb :: proc{
+	vector3_linear_to_srgb_f16,
+	vector3_linear_to_srgb_f32,
+	vector3_linear_to_srgb_f64,
 }
 
 
