@@ -199,7 +199,7 @@ _get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fullpath:
 	buf: [32]u8
 	copy(buf[:], PROC_FD_PATH)
 
-	strconv.itoa(buf[len(PROC_FD_PATH):], int(fd))
+	strconv.write_int(buf[len(PROC_FD_PATH):], i64(fd), 10)
 
 	if fullpath, err = _read_link_cstr(cstring(&buf[0]), allocator); err != nil || fullpath[0] != '/' {
 		delete(fullpath, allocator)
