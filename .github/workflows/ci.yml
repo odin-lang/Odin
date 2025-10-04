@@ -74,35 +74,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # MacOS 13 runs on Intel, 14 runs on ARM
-        os: [macos-14, ubuntu-latest]
+        llvm_version: ['14', '17', '18', '19', '20']
+        os: [macos-latest, ubuntu-22.04]
+    name: ${{ matrix.os }} - LLVM ${{ matrix.llvm_version }} Build, Check, and Test
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
     timeout-minutes: 15
     steps:
-
       - uses: actions/checkout@v4
 
-      - name: Download LLVM (MacOS Intel)
-        if: matrix.os == 'macos-13'
+      - name: Download LLVM (MacOS)
+        if: matrix.os == 'macos-latest'
+        env:
+          LLVM_VERSION: ${{ matrix.llvm_version }}
         run: |
           brew update
-          brew install llvm@20 lua@5.4 lld
-          echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
-
-      - name: Download LLVM (MacOS ARM)
-        if: matrix.os == 'macos-14'
-        run: |
-          brew update
-          brew install llvm@20 wasmtime lua@5.4 lld
-          echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
+          brew install llvm@${LLVM_VERSION} wasmtime lua@5.4 lld
+          echo "$(brew --prefix llvm@${LLVM_VERSION})/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
+        env:
+          LLVM_VERSION: ${{ matrix.llvm_version }}
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          sudo ./llvm.sh ${LLVM_VERSION}
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Build Odin
@@ -148,35 +144,35 @@ jobs:
       - name: Check benchmarks
         run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
       - name: Odin check examples/all for Linux i386
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_i386
       - name: Odin check examples/all for Linux arm64
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_arm64
       - name: Odin check examples/all for FreeBSD amd64
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
       - name: Odin check examples/all for OpenBSD amd64
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:openbsd_amd64
       - name: Odin check examples/all for js_wasm32
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:js_wasm32
       - name: Odin check examples/all for js_wasm64p32
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:js_wasm64p32
 
       - name: Odin check examples/all/sdl3 for Linux i386
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:linux_i386
       - name: Odin check examples/all/sdl3 for Linux arm64
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:linux_arm64
       - name: Odin check examples/all/sdl3 for FreeBSD amd64
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:freebsd_amd64
       - name: Odin check examples/all/sdl3 for OpenBSD amd64
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:openbsd_amd64
 
   build_windows:
