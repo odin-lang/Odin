@@ -1472,3 +1472,91 @@ RISCV_HWProbe :: struct {
 		raw:                    u64,
 	},
 }
+
+Clock_State :: enum {
+	TIME_OK = 0,
+	TIME_INS = 1,
+	TIME_DEL = 2,
+	TIME_OOP = 3,
+	TIME_WAIT = 4,
+	TIME_ERROR = 5,
+}
+
+Timex :: struct {
+	modes:     int,
+	offset:    i64,
+	freq:      i64,
+	maxerror:  i64,
+	esterror:  i64,
+	status:    int,
+	constant:  i64,
+	precision: i64,
+	tolerance: i64,
+	time:      Time_Val,
+	tick:      i64,
+	ppsfreq:   i64,
+	jitter:    i64,
+	shift:     int,
+	stabil:    i64,
+	jitcnt:    i64,
+	calcnt:    i64,
+	errcnt:    i64,
+	stbcnt:    i64,
+	tai:       int,
+}
+
+io_sqring_offsets :: struct {
+	head: u32,
+	tail: u32,
+	ring_mask: u32,
+	ring_entries: u32,
+	flags: u32,
+	dropped: u32,
+	array: u32,
+	resv1: u32,
+	user_addr: u64,
+}
+
+io_cqring_offsets :: struct {
+	head: u32,
+	tail: u32,
+	ring_mask: u32,
+	ring_entries: u32,
+	overflow: u32,
+	cqes: u32,
+	flags: u32,
+	resv1: u32,
+	user_addr: u64,
+}
+
+io_uring_params :: struct {
+	sq_entries: u32,
+	cq_entries: u32,
+	flags: u32,
+	sq_thread_cpu: u32,
+	sq_thread_idle: u32,
+	features: u32,
+	wq_fd: u32,
+	resv: [3]u32,
+	sq_off: io_sqring_offsets,
+	cq_off: io_cqring_offsets,
+}
+
+Reboot_Magic :: enum u64 {
+	RB_MAGIC_1     = 0xfee1dead,
+	RB_MAGIC_2     = 0x28121969,
+	RB_MAGIC_2A    = 0x05121996, // Since Linux 2.1.17
+	RB_MAGIC_2B    = 0x16041998, // Since Linux 2.1.97
+	RB_MAGIC_2C    = 0x20112000, // Since Linux 2.5.71
+}
+
+Reboot_Operation :: enum u64 {
+	RB_DISABLE_CAD = 0,
+	RB_ENABLE_CAD  = 0x89abcdef,
+	RB_HALT_SYSTEM = 0xcdef0123,
+	RB_KEXEC       = 0x45584543,
+	RB_POWER_OFF   = 0x4321fedc,
+	RB_AUTOBOOT    = 0x01234567,
+	RB_AUTOBOOT_2  = 0xa1b2c3d4,
+	RB_SW_SUSPEND  = 0xd000fce2,
+}
