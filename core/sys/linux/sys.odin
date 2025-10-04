@@ -2477,18 +2477,8 @@ exit_group :: proc "contextless" (code: i32) -> ! {
 	Available since Linux 2.6.
 */
 epoll_wait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32) -> (i32, Errno) {
-	when ODIN_ARCH != .arm64 && ODIN_ARCH != .riscv64 {
-		ret := syscall(SYS_epoll_wait, epfd, events, count, timeout)
-		return errno_unwrap(ret, i32)
-	} else {
-		// Convert milliseconds to nanosecond timespec
-		timeout_ns := Time_Spec {
-			time_sec = uint(timeout * 1000),
-			time_nsec = 0,
-		}
-		ret := syscall(SYS_epoll_pwait, epfd, events, count, &timeout_ns, rawptr(nil))
-		return errno_unwrap(ret, i32)
-	}
+	ret := syscall(SYS_epoll_pwait, epfd, events, count, timeout, rawptr(nil))
+	return errno_unwrap(ret, i32)
 }
 
 /*
