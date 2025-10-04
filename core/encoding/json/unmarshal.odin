@@ -274,6 +274,103 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 				assign_int(tag, 1)
 			}
 		} else if v.id != Value {
+			// Check for $data, $name and $tag: They are written if the JSON
+			// was marashalled using write_union_variant_info set to true.
+			if token.kind == .Open_Brace {
+				variant_name: string
+				variant_tag: i64 = -1
+				has_data_parser: bool
+				data_parser: Parser
+
+				check_p := p^
+				check_p.parse_integers = true
+				unmarshal_expect_token(&check_p, .Open_Brace)
+
+				parse_key :: proc(p: ^Parser) -> (key: string, err: Error) {
+					tok := p.curr_token
+					if p.spec != .JSON {
+						if allow_token(p, .Ident) {
+							return tok.text, nil
+						}
+					}
+					if tok_err := expect_token(p, .String); tok_err != nil {
+						err = .Expected_String_For_Object_Key
+						return
+					}
+					return tok.text[1:len(tok.text)-1], nil
+				}
+
+				for check_p.curr_token.kind != .Close_Brace {
+					key := parse_key(&check_p) or_return
+
+					expect_token(&check_p, .Colon) or_return
+
+					if key == "$data" {
+						has_data_parser = true
+						data_parser = check_p
+						skip_value(&check_p) or_return
+					} else if key == "$name" {
+						expect_token(&check_p, .String) or_return
+						variant_name = check_p.prev_token.text[1:len(check_p.prev_token.text)-1]
+					} else if key == "$tag" {
+						expect_token(&check_p, .Integer) or_return
+						if i, i_ok := strconv.parse_i64(check_p.prev_token.text); i_ok {
+							variant_tag = i
+						}
+					} else {
+						skip_value(&check_p) or_return
+					}
+
+					if parse_comma(&check_p) {
+						break
+					}
+				}
+
+				unmarshal_expect_token(&check_p, .Close_Brace)
+
+				if has_data_parser {
+					if variant_name != "" {
+						for variant, i in u.variants {
+							named := variant.variant.(runtime.Type_Info_Named) or_continue
+
+							if named.name != variant_name {
+								continue
+							}
+
+							variant_any := any{v.data, variant.id}
+							if err = unmarshal_value(&data_parser, variant_any); err == nil {
+								p^ = data_parser
+
+								raw_tag := i
+								if !u.no_nil { raw_tag += 1 }
+								tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
+								assign_int(tag, raw_tag)
+								return
+							}
+						}
+					}
+
+					if variant_tag != -1 {
+						for variant, i in u.variants {
+							if i64(i) != variant_tag {
+								continue
+							}
+
+							variant_any := any{v.data, variant.id}
+							if err = unmarshal_value(&data_parser, variant_any); err == nil {
+								p^ = data_parser
+
+								raw_tag := i
+								if !u.no_nil { raw_tag += 1 }
+								tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
+								assign_int(tag, raw_tag)
+								return
+							}
+						}
+					}
+				}
+			}
+
 			for variant, i in u.variants {
 				variant_any := any{v.data, variant.id}
 				variant_p := p^
