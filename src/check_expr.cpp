@@ -6211,7 +6211,6 @@ gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *
 					continue;
 				}
 			}
-			break;
 		}
 	}
 
