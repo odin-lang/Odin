@@ -1501,8 +1501,11 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	map_destroy(&i->objc_msgSend_types);
 	string_set_destroy(&i->obcj_class_name_set);
-	mpsc_destroy(&i->objc_class_implementations);
 	map_destroy(&i->objc_method_implementations);
+
+	// NOTE(harold): Disabling this: It can cause the 'count == 0' assert to trigger
+	//               when there's checker errors and the queue is still full as it did not reach the generation stage.
+	// mpsc_destroy(&i->objc_class_implementations);
 
 	string_map_destroy(&i->load_file_cache);
 	string_map_destroy(&i->load_directory_cache);

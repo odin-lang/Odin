@@ -2271,12 +2271,12 @@ gb_internal lbValue lb_handle_objc_ivar_get(lbProcedure *p, Ast *expr) {
 }
 
 gb_internal void lb_create_objc_block_helper_procs(
-	lbModule *m, LLVMTypeRef block_lit_type, isize capture_field_offset,
+	lbModule *m, LLVMTypeRef block_lit_type, isize capture_field_offset, isize block_id,
 	Slice<lbValue> capture_values, Slice<isize> objc_object_indices,
 	lbProcedure *&out_copy_helper, lbProcedure *&out_dispose_helper
 ) {
-	gbString copy_helper_name    = gb_string_append_fmt(gb_string_make(temporary_allocator(), ""), "__$objc_block_copy_helper_%lld", m->objc_next_block_id);
-	gbString dispose_helper_name = gb_string_append_fmt(gb_string_make(temporary_allocator(), ""), "__$objc_block_dispose_helper_%lld", m->objc_next_block_id);
+	gbString copy_helper_name    = gb_string_append_fmt(gb_string_make(temporary_allocator(), ""), "__$objc_block_copy_helper_%lld", block_id);
+	gbString dispose_helper_name = gb_string_append_fmt(gb_string_make(temporary_allocator(), ""), "__$objc_block_dispose_helper_%lld", block_id);
 
 	// copy:    Block_Literal *dst, Block_Literal *src, i32 field_apropos
 	// dispose: Block_Literal *src, i32 field_apropos
@@ -2385,7 +2385,8 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	lbModule *m = p->module;
 
-	m->objc_next_block_id += 1;
+	lbModule *default_module = &m->gen->default_module;
+	const isize block_id = default_module->objc_next_block_id++;
 
 	const isize capture_arg_count = ce->args.count - 1;
 
@@ -2431,7 +2432,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	// Create proc with the block signature
 	// (takes a block literal pointer as the first parameter, followed by any expected ones from the user's proc)
-	gbString block_invoker_name = gb_string_append_fmt(gb_string_make(permanent_allocator(), ""), "__$objc_block_invoker_%lld", m->objc_next_block_id);
+	gbString block_invoker_name = gb_string_append_fmt(gb_string_make(permanent_allocator(), ""), "__$objc_block_invoker_%lld", block_id);
 
 	// Add + 1 because the first parameter received is the block literal pointer itself
 	auto invoker_args = array_make<Type *>(temporary_allocator(), block_forward_args + 1, block_forward_args + 1);
@@ -2464,10 +2465,10 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	// Create the block descriptor and block literal
 	gbString block_lit_type_name = gb_string_make(temporary_allocator(), "__$ObjC_Block_Literal_");
-	block_lit_type_name = gb_string_append_fmt(block_lit_type_name, "%lld", m->objc_next_block_id);
+	block_lit_type_name = gb_string_append_fmt(block_lit_type_name, "%lld", block_id);
 
 	gbString block_desc_type_name = gb_string_make(temporary_allocator(), "__$ObjC_Block_Descriptor_");
-	block_desc_type_name = gb_string_append_fmt(block_desc_type_name, "%lld", m->objc_next_block_id);
+	block_desc_type_name = gb_string_append_fmt(block_desc_type_name, "%lld", block_id);
 
 	LLVMTypeRef  block_lit_type = {};
 	LLVMTypeRef  block_desc_type = {};
@@ -2511,7 +2512,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	// Generate copy and dispose helper functions for captured params that are Objective-C objects (or a Block)
 	if (has_objc_fields) {
-		lb_create_objc_block_helper_procs(m, block_lit_type, capture_fields_offset,
+		lb_create_objc_block_helper_procs(m, block_lit_type, capture_fields_offset, block_id,
 			slice(captured_values, 0, captured_values.count),
 			slice(objc_captures, 0, objc_captures.count),
 			copy_helper, dispose_helper);
@@ -2530,7 +2531,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	// Create global block descriptor
 	gbString desc_global_name = gb_string_make(temporary_allocator(), "__$objc_block_desc_");
-	desc_global_name = gb_string_append_fmt(desc_global_name, "%lld", m->objc_next_block_id);
+	desc_global_name = gb_string_append_fmt(desc_global_name, "%lld", block_id);
 
 	LLVMValueRef p_descriptor = LLVMAddGlobal(m->mod, block_desc_type, desc_global_name);
 	LLVMSetInitializer(p_descriptor, block_desc_initializer);
@@ -2614,7 +2615,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 	}
 
 	gbString block_var_name = gb_string_make(temporary_allocator(), "__$objc_block_literal_");
-	block_var_name = gb_string_append_fmt(block_var_name, "%lld", m->objc_next_block_id);
+	block_var_name = gb_string_append_fmt(block_var_name, "%lld", block_id);
 
 	lbValue block_result = {};
 	block_result.type = block_result_type;
