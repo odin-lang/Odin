@@ -1296,11 +1296,6 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 						error_line("\t      Got:      %s\n", s_got);
 						gb_string_free(s_got);
 						gb_string_free(s_expected);
-
-						Type *tx = x->Proc.params->Tuple.variables[0]->type;
-						Type *ty = y->Proc.params->Tuple.variables[0]->type;
-						gb_printf_err("%s kind:%.*s e:%p ot:%p\n", type_to_string(tx), LIT(type_strings[tx->kind]), tx->Named.type_name, tx->Named.type_name->TypeName.original_type_for_parapoly);
-						gb_printf_err("%s kind:%.*s e:%p ot:%p\n", type_to_string(ty), LIT(type_strings[ty->kind]), ty->Named.type_name, ty->Named.type_name->TypeName.original_type_for_parapoly);
 					} else {
 						gbString s_expected = type_to_string(y);
 						gbString s_got = type_to_string(x);
