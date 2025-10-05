@@ -752,11 +752,14 @@ gb_global Type *t_objc_object   = nullptr;
 gb_global Type *t_objc_selector = nullptr;
 gb_global Type *t_objc_class    = nullptr;
 gb_global Type *t_objc_ivar     = nullptr;
+gb_global Type *t_objc_super    = nullptr;     // Struct used in lieu of the 'self' instance when calling objc_msgSendSuper.
+gb_global Type *t_objc_super_ptr = nullptr;
 
 gb_global Type *t_objc_id    = nullptr;
 gb_global Type *t_objc_SEL   = nullptr;
 gb_global Type *t_objc_Class = nullptr;
 gb_global Type *t_objc_Ivar  = nullptr;
+gb_global Type *t_objc_instancetype = nullptr; // Special distinct variant of t_objc_id used mimic auto-typing of instancetype* in Objective-C
 
 enum OdinAtomicMemoryOrder : i32 {
 	OdinAtomicMemoryOrder_relaxed = 0, // unordered
@@ -4733,6 +4736,14 @@ gb_internal bool has_type_got_objc_class_attribute(Type *t) {
 gb_internal bool internal_check_is_assignable_to(Type *src, Type *dst);
 gb_internal bool is_type_objc_object(Type *t) {
 	return internal_check_is_assignable_to(t, t_objc_object);
+}
+
+gb_internal bool is_type_objc_ptr_to_object(Type *t) {
+	// NOTE (harold): is_type_objc_object() returns true if it's a pointer to an object or the object itself.
+	//                This returns true ONLY if Type is a shallow pointer to an Objective-C object.
+
+	Type *elem = type_deref(t);
+	return elem != t && elem->kind == Type_Named && is_type_objc_object(elem);
 }
 
 gb_internal Type *get_struct_field_type(Type *t, isize index) {

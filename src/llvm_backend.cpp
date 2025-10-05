@@ -1417,8 +1417,21 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 		return str_lit("?");
 	case Type_Proc:
 		return str_lit("?");
-	case Type_BitSet:
-		return lb_get_objc_type_encoding(t->BitSet.underlying, pointer_depth);
+	case Type_BitSet: {
+		Type *bitset_integer_type = t->BitSet.underlying;
+		if (!bitset_integer_type) {
+			switch (t->cached_size) {
+				case 1:  bitset_integer_type = t_u8;   break;
+				case 2:  bitset_integer_type = t_u16;  break;
+				case 4:  bitset_integer_type = t_u32;  break;
+				case 8:  bitset_integer_type = t_u64;  break;
+				case 16: bitset_integer_type = t_u128; break;
+			}
+		}
+		GB_ASSERT_MSG(bitset_integer_type, "Could not determine bit_set integer size for objc_type_encoding");
+
+		return lb_get_objc_type_encoding(bitset_integer_type, pointer_depth);
+	}
 
 	case Type_SimdVector: {
 		String type_str = lb_get_objc_type_encoding(t->SimdVector.elem, pointer_depth);
@@ -1452,7 +1465,10 @@ String lb_get_objc_type_encoding(Type *t, isize pointer_depth = 0) {
 
 struct lbObjCGlobalClass {
 	lbObjCGlobal g;
-	lbValue      class_value;    // Local registered class value
+	union {
+		lbValue      class_value;    // Local registered class value
+		lbAddr       class_global;   // Global class pointer. Placeholder for class implementations which are registered in order of definition.
+	};
 };
 
 gb_internal void lb_register_objc_thing(
@@ -1482,44 +1498,43 @@ gb_internal void lb_register_objc_thing(
 		LLVMSetInitializer(v.value, LLVMConstNull(t));
 	}
 
-	lbValue class_ptr  = {};
-	lbValue class_name = lb_const_value(m, t_cstring, exact_value_string(g.name));
-
 	// If this class requires an implementation, save it for registration below.
 	if (g.class_impl_type != nullptr) {
 
 		// Make sure the superclass has been initialized before us
-		lbValue superclass_value = lb_const_nil(m, t_objc_Class);
-
 		auto &tn = g.class_impl_type->Named.type_name->TypeName;
 		Type *superclass = tn.objc_superclass;
 		if (superclass != nullptr) {
 			auto& superclass_global = string_map_must_get(&class_map, superclass->Named.type_name->TypeName.objc_class_name);
 			lb_register_objc_thing(handled, m, args, class_impls, class_map, p, superclass_global.g, call);
-			GB_ASSERT(superclass_global.class_value.value);
-
-			superclass_value = superclass_global.class_value;
+			GB_ASSERT(superclass_global.class_global.addr.value);
 		}
 
-		args.count = 3;
-		args[0] = superclass_value;
-		args[1] = class_name;
-		args[2] = lb_const_int(m, t_uint, 0);
-		class_ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
+		lbObjCGlobalClass impl_global = {};
+		impl_global.g            = g;
+		impl_global.class_global = addr;
 
-		array_add(&class_impls, lbObjCGlobalClass{g, class_ptr});
+		array_add(&class_impls, impl_global);
+
+		lbObjCGlobalClass* class_global = string_map_get(&class_map, g.name);
+		if (class_global != nullptr) {
+			class_global->class_global = addr;
+		}
 	}
 	else {
+		lbValue class_ptr  = {};
+		lbValue class_name = lb_const_value(m, t_cstring, exact_value_string(g.name));
+
 		args.count = 1;
 		args[0] = class_name;
 		class_ptr = lb_emit_runtime_call(p, call, args);
-	}
 
-	lb_addr_store(p, addr, class_ptr);
+		lb_addr_store(p, addr, class_ptr);
 
-	lbObjCGlobalClass* class_global = string_map_get(&class_map, g.name);
-	if (class_global != nullptr) {
-		class_global->class_value = class_ptr;
+		lbObjCGlobalClass* class_global = string_map_get(&class_map, g.name);
+		if (class_global != nullptr) {
+			class_global->class_value = class_ptr;
+		}
 	}
 }
 
@@ -1582,7 +1597,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	string_map_init(&global_class_map, (usize)gen->objc_classes.count);
 	defer (string_map_destroy(&global_class_map));
 
-	for (lbObjCGlobal g :referenced_classes) {
+	for (lbObjCGlobal g : referenced_classes) {
 		string_map_set(&global_class_map, g.name, lbObjCGlobalClass{g});
 	}
 
@@ -1629,9 +1644,36 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 	for (const auto &cd : class_impls) {
 		auto &g = cd.g;
-		Type *class_type = g.class_impl_type;
+
+		Type *class_type     = g.class_impl_type;
 		Type *class_ptr_type = alloc_type_pointer(class_type);
-		lbValue class_value = cd.class_value;
+
+		// Begin class registration: create class pair and update global reference
+		lbValue class_value = {};
+
+		{
+			lbValue superclass_value = lb_const_nil(m, t_objc_Class);
+
+			auto& tn = class_type->Named.type_name->TypeName;
+			Type *superclass = tn.objc_superclass;
+
+			if (superclass != nullptr) {
+				auto& superclass_global = string_map_must_get(&global_class_map, superclass->Named.type_name->TypeName.objc_class_name);
+				superclass_value = superclass_global.class_value;
+			}
+
+			args.count = 3;
+			args[0] = superclass_value;
+			args[1] = lb_const_value(m, t_cstring, exact_value_string(g.name));
+			args[2] = lb_const_int(m, t_uint, 0);
+			class_value = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
+
+			lbObjCGlobalClass &mapped_global = string_map_must_get(&global_class_map, tn.objc_class_name);
+			lb_addr_store(p, mapped_global.class_global, class_value);
+
+			mapped_global.class_value = class_value;
+		}
+
 
 		Type *ivar_type = class_type->Named.type_name->TypeName.objc_ivar;
 
@@ -1650,7 +1692,6 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 			is_context_provider_ivar = ivar_type != nullptr && internal_check_is_assignable_to(contex_provider_self_named_type, ivar_type);
 		}
-
 
 		Array<ObjcMethodData> *methods = map_get(&m->info->objc_method_implementations, class_type);
 		if (!methods) {
@@ -1710,17 +1751,21 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 														wrapper_results_tuple, method_type->Proc.result_count, false, ProcCC_CDecl);
 
 			lbProcedure *wrapper_proc = lb_create_dummy_procedure(m, proc_name, wrapper_proc_type);
-			lb_add_attribute_to_proc(wrapper_proc->module, wrapper_proc->value, "nounwind");
+
+			lb_add_function_type_attributes(wrapper_proc->value, lb_get_function_type(m, wrapper_proc_type), ProcCC_CDecl);
 
 			// Emit the wrapper
-			LLVMSetLinkage(wrapper_proc->value, LLVMExternalLinkage);
+			// LLVMSetLinkage(wrapper_proc->value, LLVMInternalLinkage);
+			LLVMSetDLLStorageClass(wrapper_proc->value, LLVMDLLExportStorageClass);
+			lb_add_attribute_to_proc(wrapper_proc->module, wrapper_proc->value, "nounwind");
+
 			lb_begin_procedure_body(wrapper_proc);
 			{
+				LLVMValueRef context_addr = nullptr;
 				if (method_type->Proc.calling_convention == ProcCC_Odin) {
 					GB_ASSERT(context_provider);
 
 					// Emit the get odin context call
-
 					get_context_args[0] = lbValue {
 						wrapper_proc->raw_input_parameters[0],
 						contex_provider_self_ptr_type,
@@ -1736,44 +1781,58 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 						get_context_args[0] = lb_handle_objc_ivar_for_objc_object_pointer(wrapper_proc, real_self);
 					}
 
-					lbValue context	     = lb_emit_call(wrapper_proc, context_provider_proc_value, get_context_args);
-					lbAddr  context_addr = lb_addr(lb_address_from_load_or_generate_local(wrapper_proc, context));
-					lb_push_context_onto_stack(wrapper_proc, context_addr);
+					lbValue context = lb_emit_call(wrapper_proc, context_provider_proc_value, get_context_args);
+					context_addr    = lb_address_from_load(wrapper_proc, context).value;//lb_address_from_load_or_generate_local(wrapper_proc, context));
+					// context_addr = LLVMGetOperand(context.value, 0);
 				}
 
+				isize method_forward_arg_count = method_param_count + method_param_offset;
+				isize method_forward_return_arg_offset = 0;
+				auto raw_method_args = array_make<LLVMValueRef>(temporary_allocator(), 0, method_forward_arg_count+1);
 
-				auto method_call_args = array_make<lbValue>(temporary_allocator(), method_param_count + method_param_offset);
+				lbValue method_proc_value = lb_find_procedure_value_from_entity(m, md.proc_entity);
+				lbFunctionType* ft = lb_get_function_type(m, method_type);
+				bool has_return = false;
+				lbArgKind return_kind = {};
+
+				if (wrapper_results_tuple != nullptr) {
+					has_return = true;
+					return_kind = ft->ret.kind;
+
+					if (return_kind == lbArg_Indirect) {
+						method_forward_return_arg_offset = 1;
+						array_add(&raw_method_args, wrapper_proc->return_ptr.addr.value);
+					}
+				}
 
 				if (!md.ac.objc_is_class_method) {
-					method_call_args[0] = lbValue {
-						wrapper_proc->raw_input_parameters[0],
-						class_ptr_type,
-					};
+					array_add(&raw_method_args, wrapper_proc->raw_input_parameters[method_forward_return_arg_offset]);
 				}
 
 				for (isize i = 0; i < method_param_count; i++) {
-					method_call_args[i+method_param_offset] = lbValue {
-						wrapper_proc->raw_input_parameters[i+2],
-						method_type->Proc.params->Tuple.variables[i+method_param_offset]->type,
-					};
+					array_add(&raw_method_args, wrapper_proc->raw_input_parameters[i+2+method_forward_return_arg_offset]);
 				}
-				lbValue method_proc_value = lb_find_procedure_value_from_entity(m, md.proc_entity);
+
+				if (method_type->Proc.calling_convention == ProcCC_Odin) {
+					array_add(&raw_method_args, context_addr);
+				}
 
 				// Call real procedure for method from here, passing the parameters expected, if any.
-				lbValue return_value = lb_emit_call(wrapper_proc, method_proc_value, method_call_args);
+				LLVMTypeRef fnp = lb_type_internal_for_procedures_raw(m, method_type);
+				LLVMValueRef ret_val_raw = LLVMBuildCall2(wrapper_proc->builder, fnp, method_proc_value.value, raw_method_args.data, (unsigned)raw_method_args.count, "");
 
-				if (wrapper_results_tuple != nullptr) {
-					auto &result_var = method_type->Proc.results->Tuple.variables[0];
-					return_value = lb_emit_conv(wrapper_proc, return_value, result_var->type);
-					lb_build_return_stmt_internal(wrapper_proc, return_value, result_var->token.pos);
+				if (has_return && return_kind != lbArg_Indirect) {
+					LLVMBuildRet(wrapper_proc->builder, ret_val_raw);
+				}
+				else {
+					LLVMBuildRetVoid(wrapper_proc->builder);
 				}
 			}
 			lb_end_procedure_body(wrapper_proc);
 
-
 			// Add the method to the class
 			String method_encoding = str_lit("v");
-			// TODO (harold): Checker must ensure that objc_methods have a single return value or none!
+
 			GB_ASSERT(method_type->Proc.result_count <= 1);
 			if (method_type->Proc.result_count != 0) {
 				method_encoding = lb_get_objc_type_encoding(method_type->Proc.results->Tuple.variables[0]->type);
@@ -1785,8 +1844,8 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 				method_encoding = concatenate_strings(temporary_allocator(), method_encoding, str_lit("#:"));
 			}
 
-			for (isize i = method_param_offset; i < method_param_count; i++) {
-				Type *param_type = method_type->Proc.params->Tuple.variables[i]->type;
+			for (isize i = 0; i < method_param_count; i++) {
+				Type *param_type = method_type->Proc.params->Tuple.variables[i + method_param_offset]->type;
 				String param_encoding = lb_get_objc_type_encoding(param_type);
 
 				method_encoding = concatenate_strings(temporary_allocator(), method_encoding, param_encoding);
@@ -1805,7 +1864,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			args[2] = lbValue { wrapper_proc->value, wrapper_proc->type };
 			args[3] = lb_const_value(m, t_cstring, exact_value_string(method_encoding));
 
-			// TODO(harold): Emit check BOOL result and panic if false.
+			// TODO(harold): Emit check BOOL result and panic if false?
 			lb_emit_runtime_call(p, "class_addMethod", args);
 
 		} // End methods
@@ -1853,7 +1912,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			// Defined in an external package, define it now in the main package
 			LLVMTypeRef t = lb_type(m, t_int);
 
-			lbValue global{};
+			lbValue global = {};
 			global.value = LLVMAddGlobal(m->mod, t, g.global_name);
 			global.type  = t_int_ptr;
 
@@ -2192,6 +2251,11 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		GB_ASSERT(m != nullptr);
 
 		if (e->kind == Entity_Procedure) {
+			if (e->Procedure.is_foreign && e->Procedure.is_objc_impl_or_import) {
+				// Do not generate declarations for foreign Objective-C methods. These are called indirectly through the Objective-C runtime.
+				continue;
+			}
+
 			array_add(&m->global_procedures_to_create, e);
 		} else if (e->kind == Entity_TypeName) {
 			array_add(&m->global_types_to_create, e);
