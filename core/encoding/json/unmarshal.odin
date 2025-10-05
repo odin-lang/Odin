@@ -438,7 +438,8 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 		}
 
 		fields := reflect.struct_fields_zipped(ti.id)
-		
+        successfully_parsed_fields := 0
+
 		struct_loop: for p.curr_token.kind != end_token {
 			key := parse_object_key(p, p.allocator) or_return
 			defer delete(key, p.allocator)
@@ -521,7 +522,8 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
 				unmarshal_value(p, field) or_return
-					
+                successfully_parsed_fields += 1
+
 				if parse_comma(p) {
 					break struct_loop
 				}
@@ -541,7 +543,13 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				continue struct_loop
 			}
 		}
-		
+
+        if successfully_parsed_fields == 0 {
+            // not a single matching struct field was found in the json
+            // treat this as unsuccessful
+            return .Invalid_Data
+        }
+
 	case reflect.Type_Info_Map:
 		if !reflect.is_string(t.key) && !reflect.is_integer(t.key) {
 			return UNSUPPORTED_TYPE
