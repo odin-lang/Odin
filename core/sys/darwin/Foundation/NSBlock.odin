@@ -62,7 +62,7 @@ global_block_descriptor := Block_Descriptor{
 	size     = size_of(Internal_Block_Literal),
 }
 
-foreign import libSystem "system:System.framework"
+foreign import libSystem "system:System"
 foreign libSystem {
 	_NSConcreteGlobalBlock: intrinsics.objc_class
 	_NSConcreteStackBlock: intrinsics.objc_class

@@ -37,14 +37,28 @@ EnqueueTaskCallback :: #type proc "c" (task: TaskCallback, itemCount: i32, minRa
 //	@ingroup world
 FinishTaskCallback :: #type proc "c" (userTask: rawptr, userContext: rawptr)
 
+// Optional friction mixing callback. This intentionally provides no context objects because this is called
+// from a worker thread.
+// @warning This function should not attempt to modify Box2D state or user application state.
+// @ingroup world
+FrictionCallback :: #type proc "c" (frictionA: f32, userMaterialIdA: i32, frictionB: f32, userMaterialIdB: i32)
+
+// Optional restitution mixing callback. This intentionally provides no context objects because this is called
+// from a worker thread.
+// @warning This function should not attempt to modify Box2D state or user application state.
+// @ingroup world
+RestitutionCallback :: #type proc "c" (restitutionA: f32, userMaterialIdA: i32, restitutuionB: f32, userMaterialIdB: i32)
+
 // Result from b2World_RayCastClosest
 // @ingroup world
 RayResult :: struct {
-	shapeId:  ShapeId,
-	point:    Vec2,
-	normal:   Vec2,
-	fraction: f32,
-	hit:      bool,
+	shapeId:    ShapeId,
+	point:      Vec2,
+	normal:     Vec2,
+	fraction:   f32,
+	nodeVisits: i32,
+	leafVisits: i32,
+	hit:        bool,
 }
 
 // World definition used to create a simulation world.
@@ -54,21 +68,24 @@ WorldDef :: struct {
 	// Gravity vector. Box2D has no up-vector defined.
 	gravity: Vec2,
 
-	// Restitution velocity threshold, usually in m/s. Collisions above this
+	// Restitution speed threshold, usually in m/s. Collisions above this
 	// speed have restitution applied (will bounce).
 	restitutionThreshold: f32,
 
-	// This parameter controls how fast overlap is resolved and has units of meters per second
-	contactPushoutVelocity: f32,
-
-	// Threshold velocity for hit events. Usually meters per second.
+	// Threshold speed for hit events. Usually meters per second.
 	hitEventThreshold: f32,
 
-	// Contact stiffness. Cycles per second.
+	// Contact stiffness. Cycles per second. Increasing this increases the speed of overlap recovery, but can introduce jitter.
 	contactHertz: f32,
 
-	// Contact bounciness. Non-dimensional.
+	// Contact bounciness. Non-dimensional. You can speed up overlap recovery by decreasing this with
+	// the trade-off that overlap resolution becomes more energetic.
 	contactDampingRatio: f32,
+
+	// This parameter controls how fast overlap is resolved and usually has units of meters per second. This only
+	// puts a cap on the resolution speed. The resolution speed is increased by increasing the hertz and/or
+	// decreasing the damping ratio.
+	maxContactPushSpeed: f32,
 
 	// Joint stiffness. Cycles per second.
 	jointHertz: f32,
@@ -76,15 +93,28 @@ WorldDef :: struct {
 	// Joint bounciness. Non-dimensional.
 	jointDampingRatio: f32,
 
+	// Maximum linear speed. Usually meters per second.
+	maximumLinearSpeed: f32,
+
+	// Optional mixing callback for friction. The default uses sqrt(frictionA * frictionB).
+	frictionCallback: FrictionCallback,
+
+	// Optional mixing callback for restitution. The default uses max(restitutionA, restitutionB).
+	restitutionCallback: RestitutionCallback,
+
 	// Can bodies go to sleep to improve performance
 	enableSleep: bool,
 
 	// Enable continuous collision
-	enableContinous: bool,
+	enableContinuous: bool,
 
 	// Number of workers to use with the provided task system. Box2D performs best when using only
-	//	performance cores and accessing a single L2 cache. Efficiency cores and hyper-threading provide
-	//	little benefit and may even harm performance.
+	// performance cores and accessing a single L2 cache. Efficiency cores and hyper-threading provide
+	// little benefit and may even harm performance.
+	// @note Box2D does not create threads. This is the number of threads your applications has created
+	// that you are allocating to b2World_Step.
+	// @warning Do not modify the default value unless you are also providing a task system and providing
+	// task callbacks (enqueueTask and finishTask).
 	workerCount: i32,
 
 	// Function to spawn tasks
@@ -95,6 +125,9 @@ WorldDef :: struct {
 
 	// User context that is provided to enqueueTask and finishTask
 	userTaskContext: rawptr,
+
+	// User data
+	userData: rawptr,
 
 	// Used internally to detect a valid definition. DO NOT SET.
 	internalValue: i32,
@@ -138,20 +171,20 @@ BodyDef :: struct {
 	// The initial world rotation of the body. Use b2MakeRot() if you have an angle.
 	rotation: Rot,
 
-	// The initial linear velocity of the body's origin. Typically in meters per second.
+	// The initial linear velocity of the body's origin. Usually in meters per second.
 	linearVelocity: Vec2,
 
 	// The initial angular velocity of the body. Radians per second.
 	angularVelocity: f32,
 
-	// Linear damping is use to reduce the linear velocity. The damping parameter
+	// Linear damping is used to reduce the linear velocity. The damping parameter
 	// can be larger than 1 but the damping effect becomes sensitive to the
 	// time step when the damping parameter is large.
 	//	Generally linear damping is undesirable because it makes objects move slowly
 	//	as if they are f32ing.
 	linearDamping: f32,
 
-	// Angular damping is use to reduce the angular velocity. The damping parameter
+	// Angular damping is used to reduce the angular velocity. The damping parameter
 	// can be larger than 1.0f but the damping effect becomes sensitive to the
 	// time step when the damping parameter is large.
 	//	Angular damping can be use slow down rotating bodies.
@@ -160,8 +193,11 @@ BodyDef :: struct {
 	// Scale the gravity applied to this body. Non-dimensional.
 	gravityScale: f32,
 
-	// Sleep velocity threshold, default is 0.05 meter per second
+	// Sleep speed threshold, default is 0.05 meters per second
 	sleepThreshold: f32,
+
+	// Optional body name for debugging. Up to 32 characters (excluding null termination)
+	name: cstring,
 
 	// Use this to store application specific body data.
 	userData: rawptr,
@@ -184,9 +220,9 @@ BodyDef :: struct {
 	// Used to disable a body. A disabled body does not move or collide.
 	isEnabled: bool,
 
-	// Automatically compute mass and related properties on this body from shapes.
-	// Triggers whenever a shape is add/removed/changed. Default is true.
-	automaticMass: bool,
+	// This allows this body to bypass rotational speed limits. Should only be used
+	// for circular objects, like wheels.
+	allowFastRotation: bool,
 
 	// Used internally to detect a valid definition. DO NOT SET.
 	internalValue: i32,
@@ -200,7 +236,7 @@ Filter :: struct {
 	// The collision category bits. Normally you would just set one bit. The category bits should
 	//	represent your application object types. For example:
 	//	@code{.odin}
-	//	My_Categories :: enum u32 {
+	//	My_Categories :: enum u64 {
 	//		Static  = 0x00000001,
 	//		Dynamic = 0x00000002,
 	//		Debris  = 0x00000004,
@@ -209,16 +245,16 @@ Filter :: struct {
 	//	};
 	//	@endcode
 	//      Or use a bit_set.
-	categoryBits: u32,
+	categoryBits: u64,
 
 	// The collision mask bits. This states the categories that this
 	// shape would accept for collision.
 	//	For example, you may want your player to only collide with static objects
 	//	and other players.
 	//	@code{.odin}
-	//	maskBits = u32(My_Categories.Static | My_Categories.Player);
+	//	maskBits = u64(My_Categories.Static | My_Categories.Player);
 	//	@endcode
-	maskBits: u32,
+	maskBits: u64,
 
 	// Collision groups allow a certain group of objects to never collide (negative)
 	// or always collide (positive). A group index of zero has no effect. Non-zero group filtering
@@ -236,11 +272,11 @@ Filter :: struct {
 // @ingroup shape
 QueryFilter :: struct {
 	// The collision category bits of this query. Normally you would just set one bit.
-	categoryBits: u32,
+	categoryBits: u64,
 
 	// The collision mask bits. This states the shape categories that this
 	// query would accept for collision.
-	maskBits: u32,
+	maskBits: u64,
 }
 
 
@@ -259,12 +295,36 @@ ShapeType :: enum c.int {
 	// A convex polygon
 	polygonShape,
 
-	// A smooth segment owned by a chain shape
-	smoothSegmentShape,
+	// A line segment owned by a chain shape
+	chainSegmentShape,
 }
 
 // The number of shape types
 shapeTypeCount :: len(ShapeType)
+
+// Surface materials allow chain shapes to have per segment surface properties.
+// @ingroup shape
+SurfaceMaterial :: struct {
+	// The Coulomb (dry) friction coefficient, usually in the range [0,1].
+	friction: f32,
+
+	// The coefficient of restitution (bounce) usually in the range [0,1].
+	// https://en.wikipedia.org/wiki/Coefficient_of_restitution
+	restitution: f32,
+
+	// The rolling resistance usually in the range [0,1].
+	rollingResistance: f32,
+
+	// The tangent speed for conveyor belts
+	tangentSpeed: f32,
+
+	// User material identifier. This is passed with query results and to friction and restitution
+	// combining functions. It is not used internally.
+	userMaterialId: i32,
+
+	// Custom debug draw color.
+	customColor: u32,
+}
 
 // Used to create a shape.
 // This is a temporary object used to bundle shape creation parameters. You may use
@@ -275,58 +335,61 @@ ShapeDef :: struct {
 	// Use this to store application specific shape data.
 	userData: rawptr,
 
-	// The Coulomb (dry) friction coefficient, usually in the range [0,1].
-	friction: f32,
-
-	// The restitution (bounce) usually in the range [0,1].
-	restitution: f32,
+	// The surface material for this shape.
+	material: SurfaceMaterial,
 
 	// The density, usually in kg/m^2.
+	// This is not part of the surface material because this is for the interior, which may have
+	// other considerations, such as being hollow. For example a wood barrel may be hollow or full of water.
 	density: f32,
 
 	// Collision filtering data.
 	filter: Filter,
 
-	// Custom debug draw color.
-	customColor: u32,
-
 	// A sensor shape generates overlap events but never generates a collision response.
+	// Sensors do not have continuous collision. Instead, use a ray or shape cast for those scenarios.
+	// Sensors still contribute to the body mass if they have non-zero density.
+	// @note Sensor events are disabled by default.
+	// @see enableSensorEvents
 	isSensor: bool,
 
-	// Enable sensor events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors.
+	// Enable sensor events for this shape. This applies to sensors and non-sensors. False by default, even for sensors.
 	enableSensorEvents: bool,
 
-	// Enable contact events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors.
+	// Enable contact events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors. False by default.
 	enableContactEvents: bool,
 
-	// Enable hit events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors.
+	// Enable hit events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors. False by default.
 	enableHitEvents: bool,
 
 	// Enable pre-solve contact events for this shape. Only applies to dynamic bodies. These are expensive
 	//	and must be carefully handled due to threading. Ignored for sensors.
 	enablePreSolveEvents: bool,
 
-	// Normally shapes on static bodies don't invoke contact creation when they are added to the world. This overrides
-	//	that behavior and causes contact creation. This significantly slows down static body creation which can be important
-	//	when there are many static shapes.
-	forceContactCreation: bool,
+	// When shapes are created they will scan the environment for collision the next time step. This can significantly slow down
+	// static body creation when there are many static shapes.
+	// This is flag is ignored for dynamic and kinematic shapes which always invoke contact creation.
+	invokeContactCreation: bool,
+
+	// Should the body update the mass properties when this shape is created. Default is true.
+	updateBodyMass: bool,
 
 	// Used internally to detect a valid definition. DO NOT SET.
 	internalValue: i32,
 }
 
 
-// Used to create a chain of edges. This is designed to eliminate ghost collisions with some limitations.
+// Used to create a chain of line segments. This is designed to eliminate ghost collisions with some limitations.
 //	- chains are one-sided
 //	- chains have no mass and should be used on static bodies
-//	- chains have a counter-clockwise winding order
+//	- chains have a counter-clockwise winding order (normal points right of segment direction)
 //	- chains are either a loop or open
 // - a chain must have at least 4 points
-//	- the distance between any two points must be greater than b2_linearSlop
+//	- the distance between any two points must be greater than B2_LINEAR_SLOP
 //	- a chain shape should not self intersect (this is not validated)
 //	- an open chain shape has NO COLLISION on the first and final edge
 //	- you may overlap two open chains on their first three and/or last three points to get smooth collision
-//	- a chain shape creates multiple smooth edges shapes on the body
+//	- a chain shape creates multiple line segment shapes on the body
 // https://en.wikipedia.org/wiki/Polygonal_chain
 // Must be initialized using b2DefaultChainDef().
 //	@warning Do not use chain shapes unless you understand the limitations. This is an advanced feature.
@@ -341,17 +404,21 @@ ChainDef :: struct {
 	// The point count, must be 4 or more.
 	count: i32,
 
-	// The friction coefficient, usually in the range [0,1].
-	friction: f32,
+	// Surface materials for each segment. These are cloned.
+	materials: [^]SurfaceMaterial `fmt:"v,materialCount"`,
 
-	// The restitution (elasticity) usually in the range [0,1].
-	restitution: f32,
+	// The material count. Must be 1 or count. This allows you to provide one
+	// material for all segments or a unique material per segment.
+	materialCount: i32,
 
 	// Contact filtering data.
 	filter: Filter,
 
 	// Indicates a closed chain formed by connecting the first and last points
 	isLoop: bool,
+
+	// Enable sensors to detect this chain. False by default.
+	enableSensorEvents: bool,
 
 	// Used internally to detect a valid definition. DO NOT SET.
 	internalValue: i32,
@@ -365,29 +432,28 @@ Profile :: struct {
 	pairs:               f32,
 	collide:             f32,
 	solve:               f32,
-	buildIslands:        f32,
+	mergeIslands:        f32,
+	prepareStages:       f32,
 	solveConstraints:    f32,
-	prepareTasks:        f32,
-	solverTasks:         f32,
 	prepareConstraints:  f32,
 	integrateVelocities: f32,
 	warmStart:           f32,
-	solveVelocities:     f32,
+	solveImpulses:       f32,
 	integratePositions:  f32,
-	relaxVelocities:     f32,
+	relaxImpulses:       f32,
 	applyRestitution:    f32,
 	storeImpulses:       f32,
-	finalizeBodies:      f32,
 	splitIslands:        f32,
-	sleepIslands:        f32,
+	transforms:          f32,
 	hitEvents:           f32,
-	broadphase:          f32,
-	continuous:          f32,
+	refit:               f32,
+	bullets:             f32,
+	sleepIslands:        f32,
+	sensors:             f32,
 }
 
 // Counters that give details of the simulation size.
 Counters :: struct {
-	staticBodyCount:  i32,
 	bodyCount:        i32,
 	shapeCount:       i32,
 	contactCount:     i32,
@@ -409,6 +475,7 @@ Counters :: struct {
 // @ingroup joint
 JointType :: enum c.int {
 	distanceJoint,
+	filterJoint,
 	motorJoint,
 	mouseJoint,
 	prismaticJoint,
@@ -522,7 +589,7 @@ MotorJointDef :: struct {
 // applying huge forces. This also applies rotation constraint heuristic to improve control.
 // @ingroup mouse_joint
 MouseJointDef :: struct {
-	// The first attached body.
+	// The first attached body. This is assumed to be static.
 	bodyIdA: BodyId,
 
 	// The second attached body.
@@ -550,6 +617,22 @@ MouseJointDef :: struct {
 	internalValue: i32,
 }
 
+// A filter joint is used to disable collision between two specific bodies.
+//
+// @ingroup filter_joint
+FilterJointDef :: struct {
+	/// The first attached body.
+	bodyIdA: BodyId,
+
+	/// The second attached body.
+	bodyIdB: BodyId,
+
+	/// User data pointer
+	userData: rawptr,
+
+	/// Used internally to detect a valid definition. DO NOT SET.
+	internalValue: i32,
+}
 
 // Prismatic joint definition
 //
@@ -656,10 +739,10 @@ RevoluteJointDef :: struct {
 	// A flag to enable joint limits
 	enableLimit: bool,
 
-	// The lower angle for the joint limit in radians
+	// The lower angle for the joint limit in radians. Minimum of -0.95*pi radians.
 	lowerAngle: f32,
 
-	// The upper angle for the joint limit in radians
+	// The upper angle for the joint limit in radians. Maximum of 0.95*pi radians.
 	upperAngle: f32,
 
 	// A flag to enable the joint motor
@@ -790,6 +873,27 @@ WheelJointDef :: struct {
 	internalValue: i32,
 }
 
+// The explosion definition is used to configure options for explosions. Explosions
+// consider shape geometry when computing the impulse.
+// @ingroup world
+ExplosionDef :: struct {
+	/// Mask bits to filter shapes
+	maskBits: u64,
+
+	/// The center of the explosion in world space
+	position: Vec2,
+
+	/// The radius of the explosion
+	radius: f32,
+
+	/// The falloff distance beyond the radius. Impulse is reduced to zero at this distance.
+	falloff: f32,
+
+	/// Impulse per unit length. This applies an impulse according to the shape perimeter that
+	/// is facing the explosion. Explosions only apply to circles, capsules, and polygons. This
+	/// may be negative for implosions.
+	impulsePerLength: f32,
+}
 
 /**
  * @defgroup events Events
@@ -818,11 +922,18 @@ SensorBeginTouchEvent :: struct {
 }
 
 // An end touch event is generated when a shape stops overlapping a sensor shape.
+// These include things like setting the transform, destroying a body or shape, or changing
+// a filter. You will also get an end event if the sensor or visitor are destroyed.
+// Therefore you should always confirm the shape id is valid using b2Shape_IsValid.
 SensorEndTouchEvent :: struct {
 	// The id of the sensor shape
+	// @warning this shape may have been destroyed
+	// @see b2Shape_IsValid
 	sensorShapeId: ShapeId,
 
 	// The id of the dynamic shape that stopped touching the sensor shape
+	// @warning this shape may have been destroyed
+	// @see b2Shape_IsValid
 	visitorShapeId: ShapeId,
 }
 
@@ -850,14 +961,25 @@ ContactBeginTouchEvent :: struct {
 
 	// Id of the second shape
 	shapeIdB: ShapeId,
+
+	// The initial contact manifold. This is recorded before the solver is called,
+	// so all the impulses will be zero.
+	manifold: Manifold,
 }
 
 // An end touch event is generated when two shapes stop touching.
+// You will get an end event if you do anything that destroys contacts previous to the last
+// world step. These include things like setting the transform, destroying a body
+// or shape, or changing a filter or body type.
 ContactEndTouchEvent :: struct {
 	// Id of the first shape
+	// @warning this shape may have been destroyed
+	// @see b2Shape_IsValid
 	shapeIdA: ShapeId,
 
 	// Id of the second shape
+	// @warning this shape may have been destroyed
+	// @see b2Shape_IsValid
 	shapeIdB: ShapeId,
 }
 
@@ -994,201 +1116,191 @@ OverlapResultFcn :: #type proc "c" (shapeId: ShapeId, ctx: rawptr) -> bool
 //	@ingroup world
 CastResultFcn :: #type proc "c" (shapeId: ShapeId, point: Vec2, normal: Vec2, fraction: f32, ctx: rawptr) -> f32
 
-// These colors are used for debug draw.
-//	See https://www.rapidtables.com/web/color/index.html
+// Used to collect collision planes for character movers.
+// Return true to continue gathering planes.
+PlaneResultFcn :: #type proc "c" (shapeId: ShapeId, plane: ^PlaneResult, ctx: rawptr) -> bool
+
+// These colors are used for debug draw and mostly match the named SVG colors.
+// See https://www.rapidtables.com/web/color/index.html
+// https://johndecember.com/html/spec/colorsvg.html
+// https://upload.wikimedia.org/wikipedia/commons/2/2b/SVG_Recognized_color_keyword_names.svg
 HexColor :: enum c.int {
-	AliceBlue            = 0xf0f8ff,
-	AntiqueWhite         = 0xfaebd7,
-	Aqua                 = 0x00ffff,
-	Aquamarine           = 0x7fffd4,
-	Azure                = 0xf0ffff,
-	Beige                = 0xf5f5dc,
-	Bisque               = 0xffe4c4,
+	AliceBlue            = 0xF0F8FF,
+	AntiqueWhite         = 0xFAEBD7,
+	Aqua                 = 0x00FFFF,
+	Aquamarine           = 0x7FFFD4,
+	Azure                = 0xF0FFFF,
+	Beige                = 0xF5F5DC,
+	Bisque               = 0xFFE4C4,
 	Black                = 0x000000,
-	BlanchedAlmond       = 0xffebcd,
-	Blue                 = 0x0000ff,
-	BlueViolet           = 0x8a2be2,
-	Brown                = 0xa52a2a,
-	Burlywood            = 0xdeb887,
-	CadetBlue            = 0x5f9ea0,
-	Chartreuse           = 0x7fff00,
-	Chocolate            = 0xd2691e,
-	Coral                = 0xff7f50,
-	CornflowerBlue       = 0x6495ed,
-	Cornsilk             = 0xfff8dc,
-	Crimson              = 0xdc143c,
-	Cyan                 = 0x00ffff,
-	DarkBlue             = 0x00008b,
-	DarkCyan             = 0x008b8b,
-	DarkGoldenrod        = 0xb8860b,
-	DarkGray             = 0xa9a9a9,
+	BlanchedAlmond       = 0xFFEBCD,
+	Blue                 = 0x0000FF,
+	BlueViolet           = 0x8A2BE2,
+	Brown                = 0xA52A2A,
+	Burlywood            = 0xDEB887,
+	CadetBlue            = 0x5F9EA0,
+	Chartreuse           = 0x7FFF00,
+	Chocolate            = 0xD2691E,
+	Coral                = 0xFF7F50,
+	CornflowerBlue       = 0x6495ED,
+	Cornsilk             = 0xFFF8DC,
+	Crimson              = 0xDC143C,
+	Cyan                 = 0x00FFFF,
+	DarkBlue             = 0x00008B,
+	DarkCyan             = 0x008B8B,
+	DarkGoldenRod        = 0xB8860B,
+	DarkGray             = 0xA9A9A9,
 	DarkGreen            = 0x006400,
-	DarkKhaki            = 0xbdb76b,
-	DarkMagenta          = 0x8b008b,
-	DarkOliveGreen       = 0x556b2f,
-	DarkOrange           = 0xff8c00,
-	DarkOrchid           = 0x9932cc,
-	DarkRed              = 0x8b0000,
-	DarkSalmon           = 0xe9967a,
-	DarkSeaGreen         = 0x8fbc8f,
-	DarkSlateBlue        = 0x483d8b,
-	DarkSlateGray        = 0x2f4f4f,
-	DarkTurquoise        = 0x00ced1,
-	DarkViolet           = 0x9400d3,
-	DeepPink             = 0xff1493,
-	DeepSkyBlue          = 0x00bfff,
+	DarkKhaki            = 0xBDB76B,
+	DarkMagenta          = 0x8B008B,
+	DarkOliveGreen       = 0x556B2F,
+	DarkOrange           = 0xFF8C00,
+	DarkOrchid           = 0x9932CC,
+	DarkRed              = 0x8B0000,
+	DarkSalmon           = 0xE9967A,
+	DarkSeaGreen         = 0x8FBC8F,
+	DarkSlateBlue        = 0x483D8B,
+	DarkSlateGray        = 0x2F4F4F,
+	DarkTurquoise        = 0x00CED1,
+	DarkViolet           = 0x9400D3,
+	DeepPink             = 0xFF1493,
+	DeepSkyBlue          = 0x00BFFF,
 	DimGray              = 0x696969,
-	DodgerBlue           = 0x1e90ff,
-	Firebrick            = 0xb22222,
-	FloralWhite          = 0xfffaf0,
-	ForestGreen          = 0x228b22,
-	Fuchsia              = 0xff00ff,
-	Gainsboro            = 0xdcdcdc,
-	GhostWhite           = 0xf8f8ff,
-	Gold                 = 0xffd700,
-	Goldenrod            = 0xdaa520,
-	Gray                 = 0xbebebe,
-	Gray1                = 0x1a1a1a,
-	Gray2                = 0x333333,
-	Gray3                = 0x4d4d4d,
-	Gray4                = 0x666666,
-	Gray5                = 0x7f7f7f,
-	Gray6                = 0x999999,
-	Gray7                = 0xb3b3b3,
-	Gray8                = 0xcccccc,
-	Gray9                = 0xe5e5e5,
-	Green                = 0x00ff00,
-	GreenYellow          = 0xadff2f,
-	Honeydew             = 0xf0fff0,
-	HotPink              = 0xff69b4,
-	IndianRed            = 0xcd5c5c,
-	Indigo               = 0x4b0082,
-	Ivory                = 0xfffff0,
-	Khaki                = 0xf0e68c,
-	Lavender             = 0xe6e6fa,
-	LavenderBlush        = 0xfff0f5,
-	LawnGreen            = 0x7cfc00,
-	LemonChiffon         = 0xfffacd,
-	LightBlue            = 0xadd8e6,
-	LightCoral           = 0xf08080,
-	LightCyan            = 0xe0ffff,
-	LightGoldenrod       = 0xeedd82,
-	LightGoldenrodYellow = 0xfafad2,
-	LightGray            = 0xd3d3d3,
-	LightGreen           = 0x90ee90,
-	LightPink            = 0xffb6c1,
-	LightSalmon          = 0xffa07a,
-	LightSeaGreen        = 0x20b2aa,
-	LightSkyBlue         = 0x87cefa,
-	LightSlateBlue       = 0x8470ff,
+	DodgerBlue           = 0x1E90FF,
+	FireBrick            = 0xB22222,
+	FloralWhite          = 0xFFFAF0,
+	ForestGreen          = 0x228B22,
+	Fuchsia              = 0xFF00FF,
+	Gainsboro            = 0xDCDCDC,
+	GhostWhite           = 0xF8F8FF,
+	Gold                 = 0xFFD700,
+	GoldenRod            = 0xDAA520,
+	Gray                 = 0x808080,
+	Green                = 0x008000,
+	GreenYellow          = 0xADFF2F,
+	HoneyDew             = 0xF0FFF0,
+	HotPink              = 0xFF69B4,
+	IndianRed            = 0xCD5C5C,
+	Indigo               = 0x4B0082,
+	Ivory                = 0xFFFFF0,
+	Khaki                = 0xF0E68C,
+	Lavender             = 0xE6E6FA,
+	LavenderBlush        = 0xFFF0F5,
+	LawnGreen            = 0x7CFC00,
+	LemonChiffon         = 0xFFFACD,
+	LightBlue            = 0xADD8E6,
+	LightCoral           = 0xF08080,
+	LightCyan            = 0xE0FFFF,
+	LightGoldenRodYellow = 0xFAFAD2,
+	LightGray            = 0xD3D3D3,
+	LightGreen           = 0x90EE90,
+	LightPink            = 0xFFB6C1,
+	LightSalmon          = 0xFFA07A,
+	LightSeaGreen        = 0x20B2AA,
+	LightSkyBlue         = 0x87CEFA,
 	LightSlateGray       = 0x778899,
-	LightSteelBlue       = 0xb0c4de,
-	LightYellow          = 0xffffe0,
-	Lime                 = 0x00ff00,
-	LimeGreen            = 0x32cd32,
-	Linen                = 0xfaf0e6,
-	Magenta              = 0xff00ff,
-	Maroon               = 0xb03060,
-	MediumAquamarine     = 0x66cdaa,
-	MediumBlue           = 0x0000cd,
-	MediumOrchid         = 0xba55d3,
-	MediumPurple         = 0x9370db,
-	MediumSeaGreen       = 0x3cb371,
-	MediumSlateBlue      = 0x7b68ee,
-	MediumSpringGreen    = 0x00fa9a,
-	MediumTurquoise      = 0x48d1cc,
-	MediumVioletRed      = 0xc71585,
+	LightSteelBlue       = 0xB0C4DE,
+	LightYellow          = 0xFFFFE0,
+	Lime                 = 0x00FF00,
+	LimeGreen            = 0x32CD32,
+	Linen                = 0xFAF0E6,
+	Magenta              = 0xFF00FF,
+	Maroon               = 0x800000,
+	MediumAquaMarine     = 0x66CDAA,
+	MediumBlue           = 0x0000CD,
+	MediumOrchid         = 0xBA55D3,
+	MediumPurple         = 0x9370DB,
+	MediumSeaGreen       = 0x3CB371,
+	MediumSlateBlue      = 0x7B68EE,
+	MediumSpringGreen    = 0x00FA9A,
+	MediumTurquoise      = 0x48D1CC,
+	MediumVioletRed      = 0xC71585,
 	MidnightBlue         = 0x191970,
-	MintCream            = 0xf5fffa,
-	MistyRose            = 0xffe4e1,
-	Moccasin             = 0xffe4b5,
-	NavajoWhite          = 0xffdead,
+	MintCream            = 0xF5FFFA,
+	MistyRose            = 0xFFE4E1,
+	Moccasin             = 0xFFE4B5,
+	NavajoWhite          = 0xFFDEAD,
 	Navy                 = 0x000080,
-	NavyBlue             = 0x000080,
-	OldLace              = 0xfdf5e6,
+	OldLace              = 0xFDF5E6,
 	Olive                = 0x808000,
-	OliveDrab            = 0x6b8e23,
-	Orange               = 0xffa500,
-	OrangeRed            = 0xff4500,
-	Orchid               = 0xda70d6,
-	PaleGoldenrod        = 0xeee8aa,
-	PaleGreen            = 0x98fb98,
-	PaleTurquoise        = 0xafeeee,
-	PaleVioletRed        = 0xdb7093,
-	PapayaWhip           = 0xffefd5,
-	PeachPuff            = 0xffdab9,
-	Peru                 = 0xcd853f,
-	Pink                 = 0xffc0cb,
-	Plum                 = 0xdda0dd,
-	PowderBlue           = 0xb0e0e6,
-	Purple               = 0xa020f0,
+	OliveDrab            = 0x6B8E23,
+	Orange               = 0xFFA500,
+	OrangeRed            = 0xFF4500,
+	Orchid               = 0xDA70D6,
+	PaleGoldenRod        = 0xEEE8AA,
+	PaleGreen            = 0x98FB98,
+	PaleTurquoise        = 0xAFEEEE,
+	PaleVioletRed        = 0xDB7093,
+	PapayaWhip           = 0xFFEFD5,
+	PeachPuff            = 0xFFDAB9,
+	Peru                 = 0xCD853F,
+	Pink                 = 0xFFC0CB,
+	Plum                 = 0xDDA0DD,
+	PowderBlue           = 0xB0E0E6,
+	Purple               = 0x800080,
 	RebeccaPurple        = 0x663399,
-	Red                  = 0xff0000,
-	RosyBrown            = 0xbc8f8f,
-	RoyalBlue            = 0x4169e1,
-	SaddleBrown          = 0x8b4513,
-	Salmon               = 0xfa8072,
-	SandyBrown           = 0xf4a460,
-	SeaGreen             = 0x2e8b57,
-	Seashell             = 0xfff5ee,
-	Sienna               = 0xa0522d,
-	Silver               = 0xc0c0c0,
-	SkyBlue              = 0x87ceeb,
-	SlateBlue            = 0x6a5acd,
+	Red                  = 0xFF0000,
+	RosyBrown            = 0xBC8F8F,
+	RoyalBlue            = 0x4169E1,
+	SaddleBrown          = 0x8B4513,
+	Salmon               = 0xFA8072,
+	SandyBrown           = 0xF4A460,
+	SeaGreen             = 0x2E8B57,
+	SeaShell             = 0xFFF5EE,
+	Sienna               = 0xA0522D,
+	Silver               = 0xC0C0C0,
+	SkyBlue              = 0x87CEEB,
+	SlateBlue            = 0x6A5ACD,
 	SlateGray            = 0x708090,
-	Snow                 = 0xfffafa,
-	SpringGreen          = 0x00ff7f,
-	SteelBlue            = 0x4682b4,
-	Tan                  = 0xd2b48c,
+	Snow                 = 0xFFFAFA,
+	SpringGreen          = 0x00FF7F,
+	SteelBlue            = 0x4682B4,
+	Tan                  = 0xD2B48C,
 	Teal                 = 0x008080,
-	Thistle              = 0xd8bfd8,
-	Tomato               = 0xff6347,
-	Turquoise            = 0x40e0d0,
-	Violet               = 0xee82ee,
-	VioletRed            = 0xd02090,
-	Wheat                = 0xf5deb3,
-	White                = 0xffffff,
-	WhiteSmoke           = 0xf5f5f5,
-	Yellow               = 0xffff00,
-	YellowGreen          = 0x9acd32,
-	Box2DRed             = 0xdc3132,
-	Box2DBlue            = 0x30aebf,
-	Box2DGreen           = 0x8cc924,
-	Box2DYellow          = 0xffee8c,
+	Thistle              = 0xD8BFD8,
+	Tomato               = 0xFF6347,
+	Turquoise            = 0x40E0D0,
+	Violet               = 0xEE82EE,
+	Wheat                = 0xF5DEB3,
+	White                = 0xFFFFFF,
+	WhiteSmoke           = 0xF5F5F5,
+	Yellow               = 0xFFFF00,
+	YellowGreen          = 0x9ACD32,
+	Box2DRed             = 0xDC3132,
+	Box2DBlue            = 0x30AEBF,
+	Box2DGreen           = 0x8CC924,
+	Box2DYellow          = 0xFFEE8C,
 }
 
 // This struct holds callbacks you can implement to draw a Box2D world.
 //	@ingroup world
 DebugDraw :: struct {
 	// Draw a closed polygon provided in CCW order.
-	DrawPolygon: proc "c" (vertices: [^]Vec2, vertexCount: c.int, color: HexColor, ctx: rawptr),
+	DrawPolygonFcn: proc "c" (vertices: [^]Vec2, vertexCount: c.int, color: HexColor, ctx: rawptr),
 
 	// Draw a solid closed polygon provided in CCW order.
-	DrawSolidPolygon: proc "c" (transform: Transform, vertices: [^]Vec2, vertexCount: c.int, radius: f32, colr: HexColor, ctx: rawptr ),
+	DrawSolidPolygonFcn: proc "c" (transform: Transform, vertices: [^]Vec2, vertexCount: c.int, radius: f32, colr: HexColor, ctx: rawptr ),
 
 	// Draw a circle.
-	DrawCircle: proc "c" (center: Vec2, radius: f32, color: HexColor, ctx: rawptr),
+	DrawCircleFcn: proc "c" (center: Vec2, radius: f32, color: HexColor, ctx: rawptr),
 
 	// Draw a solid circle.
-	DrawSolidCircle: proc "c" (transform: Transform, radius: f32, color: HexColor, ctx: rawptr),
-
-	// Draw a capsule.
-	DrawCapsule: proc "c" (p1, p2: Vec2, radius: f32, color: HexColor, ctx: rawptr),
+	DrawSolidCircleFcn: proc "c" (transform: Transform, radius: f32, color: HexColor, ctx: rawptr),
 
 	// Draw a solid capsule.
-	DrawSolidCapsule: proc "c" (p1, p2: Vec2, radius: f32, color: HexColor, ctx: rawptr),
+	DrawSolidCapsuleFcn: proc "c" (p1, p2: Vec2, radius: f32, color: HexColor, ctx: rawptr),
 
 	// Draw a line segment.
-	DrawSegment: proc "c" (p1, p2: Vec2, color: HexColor, ctx: rawptr),
+	DrawSegmentFcn: proc "c" (p1, p2: Vec2, color: HexColor, ctx: rawptr),
 
 	// Draw a transform. Choose your own length scale.
-	DrawTransform: proc "c" (transform: Transform, ctx: rawptr),
+	DrawTransformFcn: proc "c" (transform: Transform, ctx: rawptr),
 
 	// Draw a point.
-	DrawPoint: proc "c" (p: Vec2, size: f32, color: HexColor, ctx: rawptr),
+	DrawPointFcn: proc "c" (p: Vec2, size: f32, color: HexColor, ctx: rawptr),
 
-	// Draw a string.
-	DrawString: proc "c" (p: Vec2, s: cstring, ctx: rawptr),
+	// Draw a string in world space.
+	DrawStringFcn: proc "c" (p: Vec2, s: cstring, color: HexColor, ctx: rawptr),
 
 	// Bounds to use if restricting drawing to a rectangular region
 	drawingBounds: AABB,
@@ -1206,10 +1318,13 @@ DebugDraw :: struct {
 	drawJointExtras: bool,
 
 	// Option to draw the bounding boxes for shapes
-	drawAABBs: bool,
+	drawBounds: bool,
 
 	// Option to draw the mass and center of mass of dynamic bodies
 	drawMass: bool,
+
+	// Option to draw body names
+	drawBodyNames: bool,
 
 	// Option to draw contact points
 	drawContacts: bool,
@@ -1223,8 +1338,14 @@ DebugDraw :: struct {
 	// Option to draw contact normal impulses
 	drawContactImpulses: bool,
 
+	// Option to draw contact feature ids
+	drawContactFeatures: bool,
+
 	// Option to draw contact friction impulses
 	drawFrictionImpulses: bool,
+
+	// Option to draw islands as bounding boxes
+	drawIslands: bool,
 
 	// User context that is passed as an argument to drawing callback functions
 	userContext: rawptr,

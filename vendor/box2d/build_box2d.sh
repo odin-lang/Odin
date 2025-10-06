@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -eu
 
-VERSION="3.0.0"
+VERSION="3.1.0"
 RELEASE="https://github.com/erincatto/box2d/archive/refs/tags/v$VERSION.tar.gz"
 
-cd "$(odin root)"/vendor/box2d
+cd "$(dirname "$0")"
 
 curl -O -L "$RELEASE"
 tar -xzvf "v$VERSION.tar.gz"
@@ -58,7 +58,7 @@ Darwin)
 	*)
 		rm -rf build
 		mkdir build
-		cmake $FLAGS -DCMAKE_OSX_ARCHITECTURES=arm64 -S . -B build
+		cmake $FLAGS -S . -B build
 		cmake --build build
 		cp build/src/libbox2d.a ../lib/box2d_other.a
 		;;
@@ -73,7 +73,8 @@ make -f wasm.Makefile
 if [[ $? -ne 0 ]]; then
 	printf "\e[30;43mwarning:\e[0m Native Box2D libraries were built successfully, the WASM build failed, likely because your default C compiler and/or linker doesn't support WASM, you can set the CC and LD environment variables to point to a compiler and linker that support it\n"
 fi
+make -f wasm.Makefile clean
 set -e
 
-rm -rf v3.0.0.tar.gz
-rm -rf box2d-3.0.0
+rm -rf "v$VERSION.tar.gz"
+rm -rf box2d-"$VERSION"

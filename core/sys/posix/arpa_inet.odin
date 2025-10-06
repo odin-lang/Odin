@@ -4,7 +4,7 @@ package posix
 import "core:c"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else when ODIN_OS == .Haiku {
 	foreign import lib "system:network"
 } else {
@@ -50,7 +50,6 @@ foreign lib {
 		af:   AF,        // INET or INET6
 		src:  cstring,
 		dst:  rawptr,    // either ^in_addr or ^in_addr6
-		size: socklen_t, // size_of(dst^)
 	) -> pton_result ---
 }
 

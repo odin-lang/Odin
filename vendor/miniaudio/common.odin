@@ -20,12 +20,12 @@ foreign import lib { LIB }
 
 BINDINGS_VERSION_MAJOR    :: 0
 BINDINGS_VERSION_MINOR    :: 11
-BINDINGS_VERSION_REVISION :: 21 
+BINDINGS_VERSION_REVISION :: 22
 BINDINGS_VERSION          :: [3]u32{BINDINGS_VERSION_MAJOR, BINDINGS_VERSION_MINOR, BINDINGS_VERSION_REVISION}
-BINDINGS_VERSION_STRING   :: "0.11.21"
+BINDINGS_VERSION_STRING   :: "0.11.22"
 
 @(init)
-version_check :: proc() {
+version_check :: proc "contextless" () {
 	v: [3]u32
 	version(&v.x, &v.y, &v.z)
 	if v != BINDINGS_VERSION {
@@ -43,7 +43,7 @@ version_check :: proc() {
 			n += copy(buf[n:], "and executing `make`")
 		}
 
-		panic(string(buf[:n]))
+		panic_contextless(string(buf[:n]))
 	}
 }
 

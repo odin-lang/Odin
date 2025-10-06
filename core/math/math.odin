@@ -2296,7 +2296,7 @@ nextafter_f16 :: proc "contextless" (x, y: f16) -> (r: f16) {
 	case x == y:
 		r = x
 	case x == 0:
-		r = copy_sign_f16(1, y)
+		r = copy_sign_f16(transmute(f16)u16(1), y)
 	case (y > x) == (x > 0):
 		r = transmute(f16)(transmute(u16)x + 1)
 	case:
@@ -2312,7 +2312,7 @@ nextafter_f32 :: proc "contextless" (x, y: f32) -> (r: f32) {
 	case x == y:
 		r = x
 	case x == 0:
-		r = copy_sign_f32(1, y)
+		r = copy_sign_f32(transmute(f32)u32(1), y)
 	case (y > x) == (x > 0):
 		r = transmute(f32)(transmute(u32)x + 1)
 	case:
@@ -2328,7 +2328,7 @@ nextafter_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
 	case x == y:
 		r = x
 	case x == 0:
-		r = copy_sign_f64(1, y)
+		r = copy_sign_f64(transmute(f64)u64(1), y)
 	case (y > x) == (x > 0):
 		r = transmute(f64)(transmute(u64)x + 1)
 	case:
@@ -2348,32 +2348,6 @@ nextafter :: proc{
 	nextafter_f32, nextafter_f32le, nextafter_f32be,
 	nextafter_f64, nextafter_f64le, nextafter_f64be,
 }
-
-@(require_results)
-signbit_f16 :: proc "contextless" (x: f16) -> bool {
-	return (transmute(u16)x)&(1<<15) != 0
-}
-@(require_results)
-signbit_f32 :: proc "contextless" (x: f32) -> bool {
-	return (transmute(u32)x)&(1<<31) != 0
-}
-@(require_results)
-signbit_f64 :: proc "contextless" (x: f64) -> bool {
-	return (transmute(u64)x)&(1<<63) != 0
-}
-@(require_results) signbit_f16le :: proc "contextless" (x: f16le) -> bool { return signbit_f16(f16(x)) }
-@(require_results) signbit_f32le :: proc "contextless" (x: f32le) -> bool { return signbit_f32(f32(x)) }
-@(require_results) signbit_f64le :: proc "contextless" (x: f64le) -> bool { return signbit_f64(f64(x)) }
-@(require_results) signbit_f16be :: proc "contextless" (x: f16be) -> bool { return signbit_f16(f16(x)) }
-@(require_results) signbit_f32be :: proc "contextless" (x: f32be) -> bool { return signbit_f32(f32(x)) }
-@(require_results) signbit_f64be :: proc "contextless" (x: f64be) -> bool { return signbit_f64(f64(x)) }
-
-signbit :: proc{
-	signbit_f16, signbit_f16le, signbit_f16be,
-	signbit_f32, signbit_f32le, signbit_f32be,
-	signbit_f64, signbit_f64le, signbit_f64be,
-}
-
 
 @(require_results)
 hypot_f16 :: proc "contextless" (x, y: f16) -> (r: f16) {

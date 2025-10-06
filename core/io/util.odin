@@ -22,12 +22,12 @@ write_ptr_at :: proc(w: Writer_At, p: rawptr, byte_size: int, offset: i64, n_wri
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [32]byte
-	s := strconv.append_bits(buf[:], i, base, false, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 write_i64 :: proc(w: Writer, i: i64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [32]byte
-	s := strconv.append_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 
@@ -40,18 +40,18 @@ write_int :: proc(w: Writer, i: int, base: int = 10, n_written: ^int = nil) -> (
 
 write_u128 :: proc(w: Writer, i: u128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [39]byte
-	s := strconv.append_bits_128(buf[:], i, base, false, 128, strconv.digits, nil)
+	s := strconv.write_bits_128(buf[:], i, base, false, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 write_i128 :: proc(w: Writer, i: i128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [40]byte
-	s := strconv.append_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
+	s := strconv.write_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 write_f16 :: proc(w: Writer, val: f16, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [386]byte
 
-	str := strconv.append_float(buf[1:], f64(val), 'f', 2*size_of(val), 8*size_of(val))
+	str := strconv.write_float(buf[1:], f64(val), 'f', 2*size_of(val), 8*size_of(val))
 	s := buf[:len(str)+1]
 	if s[1] == '+' || s[1] == '-' {
 		s = s[1:]
@@ -67,7 +67,7 @@ write_f16 :: proc(w: Writer, val: f16, n_written: ^int = nil) -> (n: int, err: E
 write_f32 :: proc(w: Writer, val: f32, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [386]byte
 
-	str := strconv.append_float(buf[1:], f64(val), 'f', 2*size_of(val), 8*size_of(val))
+	str := strconv.write_float(buf[1:], f64(val), 'f', 2*size_of(val), 8*size_of(val))
 	s := buf[:len(str)+1]
 	if s[1] == '+' || s[1] == '-' {
 		s = s[1:]
@@ -83,7 +83,7 @@ write_f32 :: proc(w: Writer, val: f32, n_written: ^int = nil) -> (n: int, err: E
 write_f64 :: proc(w: Writer, val: f64, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [386]byte
 
-	str := strconv.append_float(buf[1:], val, 'f', 2*size_of(val), 8*size_of(val))
+	str := strconv.write_float(buf[1:], val, 'f', 2*size_of(val), 8*size_of(val))
 	s := buf[:len(str)+1]
 	if s[1] == '+' || s[1] == '-' {
 		s = s[1:]
@@ -130,7 +130,7 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 			write_string(w, `\x`, &n) or_return
 			
 			buf: [2]byte
-			s := strconv.append_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
+			s := strconv.write_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
 			switch len(s) {
 			case 0: 
 				write_string(w, "00", &n) or_return
@@ -187,6 +187,23 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 		return
 	} else if is_printable(r) {
 		write_encoded_rune(w, r, false, &n) or_return
+		return
+	}
+	if r < 32 && for_json {
+		switch r {
+		case '\b': write_string(w, `\b`, &n) or_return
+		case '\f': write_string(w, `\f`, &n) or_return
+		case '\n': write_string(w, `\n`, &n) or_return
+		case '\r': write_string(w, `\r`, &n) or_return
+		case '\t': write_string(w, `\t`, &n) or_return
+		case:
+			write_byte(w, '\\', &n) or_return
+			write_byte(w, 'u', &n)  or_return
+			write_byte(w, '0', &n)  or_return
+			write_byte(w, '0', &n)  or_return
+			write_byte(w, DIGITS_LOWER[r>>4 & 0xf], &n) or_return
+			write_byte(w, DIGITS_LOWER[r    & 0xf], &n) or_return
+		}
 		return
 	}
 	switch r {
@@ -263,6 +280,33 @@ write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written
 	write_byte(w, quote, &n) or_return
 	return
 }
+
+write_quoted_string16 :: proc(w: Writer, str: string16, quote: byte = '"', n_written: ^int = nil, for_json := false) -> (n: int, err: Error) {
+	defer if n_written != nil {
+		n_written^ += n
+	}
+	write_byte(w, quote, &n) or_return
+	for width, s := 0, str; len(s) > 0; s = s[width:] {
+		r := rune(s[0])
+		width = 1
+		if r >= utf8.RUNE_SELF {
+			r, width = utf16.decode_rune_in_string(s)
+		}
+		if width == 1 && r == utf8.RUNE_ERROR {
+			write_byte(w, '\\', &n)                   or_return
+			write_byte(w, 'x', &n)                    or_return
+			write_byte(w, DIGITS_LOWER[s[0]>>4], &n)  or_return
+			write_byte(w, DIGITS_LOWER[s[0]&0xf], &n) or_return
+			continue
+		}
+
+		n_wrapper(write_escaped_rune(w, r, quote, false, nil, for_json), &n) or_return
+
+	}
+	write_byte(w, quote, &n) or_return
+	return
+}
+
 
 // writer append a quoted rune into the byte buffer, return the written size
 write_quoted_rune :: proc(w: Writer, r: rune) -> (n: int) {

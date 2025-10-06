@@ -20,6 +20,17 @@ new_aligned :: proc(arena: ^Arena, $T: typeid, alignment: uint, loc := #caller_l
 	return
 }
 
+// The `new_clone` procedure allocates memory for a type `T` from a `virtual.Arena`. The second argument is a value that
+// is to be copied to the allocated data. The value returned is a pointer to a newly allocated value of that type using the specified allocator.
+@(require_results)
+new_clone :: proc(arena: ^Arena, data: $T, loc := #caller_location) -> (ptr: ^T, err: Allocator_Error) {
+	ptr, err = new_aligned(arena, T, align_of(T), loc)
+	if ptr != nil && err == nil {
+		ptr^ = data
+	}
+	return
+}
+
 // `make_slice` allocates and initializes a slice. Like `new`, the second argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 //

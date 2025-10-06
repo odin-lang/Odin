@@ -54,14 +54,15 @@ run_trial_size :: proc(p: proc "contextless" ([]u8, byte) -> int, size: int, idx
 
 	accumulator: int
 
-	for _ in 0..<runs {
-		start := time.now()
-		accumulator += p(data, 'z')
-		done := time.since(start)
-		timing += done
-	}
+	watch: time.Stopwatch
 
-	timing /= time.Duration(runs)
+	time.stopwatch_start(&watch)
+	for _ in 0..<runs {
+		accumulator += p(data, 'z')
+	}
+	time.stopwatch_stop(&watch)
+
+	timing = time.stopwatch_duration(watch)
 
 	log.debug(accumulator)
 	return

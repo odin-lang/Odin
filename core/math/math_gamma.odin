@@ -132,7 +132,7 @@ gamma_f64 :: proc "contextless" (x: f64) -> f64 {
 	case is_inf(x, 1):
 		return inf_f64(1)
 	case x == 0:
-		if signbit(x) {
+		if sign_bit(x) {
 			return inf_f64(-1)
 		}
 		return inf_f64(1)

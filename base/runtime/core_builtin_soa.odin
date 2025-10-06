@@ -178,8 +178,31 @@ resize_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int length: int, loc := #cal
 	if array == nil {
 		return nil
 	}
-	reserve_soa(array, length, loc) or_return
+
 	footer := raw_soa_footer(array)
+
+	if length > footer.cap {
+		reserve_soa(array, length, loc) or_return
+	} else if size_of(E) > 0 && length > footer.len {
+		ti := type_info_base(type_info_of(typeid_of(T)))
+		si := &ti.variant.(Type_Info_Struct)
+
+		field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+
+		data := (^rawptr)(array)^
+
+		soa_offset := 0
+		for i in 0..<field_count {
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+
+			soa_offset = align_forward_int(soa_offset, align_of(E))
+
+			mem_zero(rawptr(uintptr(data) + uintptr(soa_offset) + uintptr(type.size * footer.len)), type.size * (length - footer.len))
+
+			soa_offset += type.size * footer.cap
+		}
+	}
+
 	footer.len = length
 	return nil
 }
@@ -249,17 +272,77 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 
 	old_data := (^rawptr)(array)^
 
+	resize: if old_data != nil {
+
+		new_bytes, resize_err := array.allocator.procedure(
+			array.allocator.data, .Resize_Non_Zeroed, new_size, max_align,
+			old_data, old_size, loc,
+		)
+		new_data := raw_data(new_bytes)
+
+		#partial switch resize_err {
+		case .Mode_Not_Implemented: break resize
+		case .None: // continue resizing
+		case: return resize_err
+		}
+
+		footer.cap = capacity
+
+		old_offset := 0
+		new_offset := 0
+
+		// Correct data memory
+		// from: |x x y y z z _ _ _|
+		// to:   |x x _ y y _ z z _|
+
+		// move old data to the end of the new allocation to avoid overlap
+		old_data = rawptr(uintptr(new_data) + uintptr(new_size - old_size))
+		mem_copy(old_data, new_data, old_size)
+
+		// now:  |_ _ _ x x y y z z|
+
+		for i in 0..<field_count {
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+
+			old_offset = align_forward_int(old_offset, max_align)
+			new_offset = align_forward_int(new_offset, max_align)
+
+			new_data_elem := rawptr(uintptr(new_data) + uintptr(new_offset))
+			old_data_elem := rawptr(uintptr(old_data) + uintptr(old_offset))
+
+			old_size_elem := type.size * old_cap
+			new_size_elem := type.size * capacity
+
+			mem_copy(new_data_elem, old_data_elem, old_size_elem)
+
+			(^rawptr)(uintptr(array) + i*size_of(rawptr))^ = new_data_elem
+
+			if zero_memory {
+				mem_zero(rawptr(uintptr(new_data_elem) + uintptr(old_size_elem)), new_size_elem - old_size_elem)
+			}
+
+			old_offset += old_size_elem
+			new_offset += new_size_elem
+		}
+
+		return nil
+	}
+
 	new_bytes := array.allocator.procedure(
 		array.allocator.data, .Alloc if zero_memory else .Alloc_Non_Zeroed, new_size, max_align,
 		nil, old_size, loc,
 	) or_return
 	new_data := raw_data(new_bytes)
 
-
 	footer.cap = capacity
 
 	old_offset := 0
 	new_offset := 0
+
+	// Correct data memory
+	// from: |x x y y z z| ... |_ _ _ _ _ _ _ _ _|
+	// to:                     |x x _ y y _ z z _|
+
 	for i in 0..<field_count {
 		type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
 
@@ -277,10 +360,12 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 		new_offset += type.size * capacity
 	}
 
-	array.allocator.procedure(
-		array.allocator.data, .Free, 0, max_align,
-		old_data, old_size, loc,
-	) or_return
+	if old_data != nil {
+		array.allocator.procedure(
+			array.allocator.data, .Free, 0, max_align,
+			old_data, old_size, loc,
+		) or_return
+	}
 
 	return nil
 }

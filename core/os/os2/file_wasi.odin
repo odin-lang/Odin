@@ -30,8 +30,8 @@ Preopen :: struct {
 preopens: []Preopen
 
 @(init)
-init_std_files :: proc() {
-	new_std :: proc(impl: ^File_Impl, fd: wasi.fd_t, name: string) -> ^File {
+init_std_files :: proc "contextless" () {
+	new_std :: proc "contextless" (impl: ^File_Impl, fd: wasi.fd_t, name: string) -> ^File {
 		impl.file.impl = impl
 		impl.allocator = runtime.nil_allocator()
 		impl.fd = fd

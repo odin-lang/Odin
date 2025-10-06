@@ -2,8 +2,8 @@ package wgpu
 
 import "base:runtime"
 
-BINDINGS_VERSION        :: [4]u8{24, 0, 0, 2}
-BINDINGS_VERSION_STRING :: "24.0.0.2"
+BINDINGS_VERSION        :: [4]u8{25, 0, 2, 1}
+BINDINGS_VERSION_STRING :: "25.0.2.1"
 
 LogLevel :: enum i32 {
 	Off,
@@ -56,14 +56,32 @@ PipelineStatisticName :: enum i32 {
 	ComputeShaderInvocations,
 }
 
+DxcMaxShaderModel :: enum i32 {
+	V6_0,
+	V6_1,
+	V6_2,
+	V6_3,
+	V6_4,
+	V6_5,
+	V6_6,
+	V6_7,
+}
+
+GLFenceBehaviour :: enum i32 {
+	Normal,
+	AutoFinish,
+}
+
 InstanceExtras :: struct {
 	using chain: ChainedStruct,
 	backends: InstanceBackendFlags,
 	flags: InstanceFlags,
 	dx12ShaderCompiler: Dx12Compiler,
 	gles3MinorVersion: Gles3MinorVersion,
+	glFenceBehaviour: GLFenceBehaviour,
 	dxilPath: StringView,
 	dxcPath: StringView,
+	dcxMaxShaderModel: DxcMaxShaderModel,
 }
 
 DeviceExtras :: struct {
@@ -72,7 +90,7 @@ DeviceExtras :: struct {
 }
 
 NativeLimits :: struct {
-	chain: ChainedStructOut,
+	using chain: ChainedStructOut,
 	maxPushConstantSize: u32,
 	maxNonSamplerBindings: u32,
 }
@@ -96,18 +114,18 @@ ShaderDefine :: struct {
 	value: StringView,
 }
 
-ShaderModuleGLSLDescriptor :: struct {
+ShaderSourceGLSL :: struct {
 	using chain: ChainedStruct,
 	stage: ShaderStage,
 	code: StringView,
 	defineCount: uint,
-	defines: [^]ShaderDefine `fmt:"v,defineCount"`,
+	defines: /* const */ [^]ShaderDefine `fmt:"v,defineCount"`,
 }
 
 ShaderModuleDescriptorSpirV :: struct {
 	label: StringView,
 	sourceSize: u32,
-	source: [^]u32 `fmt:"v,sourceSize"`,
+	source: /* const */ [^]u32 `fmt:"v,sourceSize"`,
 }
 
 RegistryReport :: struct {
@@ -170,7 +188,7 @@ QuerySetDescriptorExtras :: struct {
 
 SurfaceConfigurationExtras :: struct {
 	using chain: ChainedStruct,
-	desiredMaximumFrameLatency: i32,
+	desiredMaximumFrameLatency: u32,
 }
 
 LogCallback :: #type proc "c" (level: LogLevel, message: StringView, userdata: rawptr)

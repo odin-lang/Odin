@@ -61,6 +61,11 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 	Dynamic = 3,
 }
 
+Type_Info_String_Encoding_Kind :: enum u8 {
+	UTF_8  = 0,
+	UTF_16 = 1,
+}
+
 // Variant Types
 Type_Info_Named :: struct {
 	name: string,
@@ -73,7 +78,7 @@ Type_Info_Rune       :: struct {}
 Type_Info_Float      :: struct {endianness: Platform_Endianness}
 Type_Info_Complex    :: struct {}
 Type_Info_Quaternion :: struct {}
-Type_Info_String     :: struct {is_cstring: bool}
+Type_Info_String     :: struct {is_cstring: bool, encoding: Type_Info_String_Encoding_Kind}
 Type_Info_Boolean    :: struct {}
 Type_Info_Any        :: struct {}
 Type_Info_Type_Id    :: struct {}
@@ -110,13 +115,12 @@ Type_Info_Parameters :: struct { // Only used for procedures parameters and resu
 	types:        []^Type_Info,
 	names:        []string,
 }
-Type_Info_Tuple :: Type_Info_Parameters // Will be removed eventually
 
 Type_Info_Struct_Flags :: distinct bit_set[Type_Info_Struct_Flag; u8]
 Type_Info_Struct_Flag :: enum u8 {
 	packed    = 0,
 	raw_union = 1,
-	no_copy   = 2,
+	_         = 2,
 	align     = 3,
 }
 
@@ -398,6 +402,11 @@ Raw_String :: struct {
 	len:  int,
 }
 
+Raw_String16 :: struct {
+	data: [^]u16,
+	len:  int,
+}
+
 Raw_Slice :: struct {
 	data: rawptr,
 	len:  int,
@@ -442,12 +451,20 @@ Raw_Any :: struct {
 	data: rawptr,
 	id:   typeid,
 }
-#assert(size_of(Raw_Any) == size_of(any))
+when !ODIN_NO_RTTI {
+	#assert(size_of(Raw_Any) == size_of(any))
+}
 
 Raw_Cstring :: struct {
 	data: [^]byte,
 }
 #assert(size_of(Raw_Cstring) == size_of(cstring))
+
+Raw_Cstring16 :: struct {
+	data: [^]u16,
+}
+#assert(size_of(Raw_Cstring16) == size_of(cstring16))
+
 
 Raw_Soa_Pointer :: struct {
 	data:  rawptr,
@@ -556,10 +573,17 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	// Defined internally by the compiler
 	Odin_Platform_Subtarget_Type :: enum int {
 		Default,
-		iOS,
+		iPhone,
+		iPhoneSimulator
+		Android,
 	}
 */
 Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
+
+Odin_Platform_Subtarget_Types :: bit_set[Odin_Platform_Subtarget_Type]
+
+@(builtin)
+ODIN_PLATFORM_SUBTARGET_IOS :: ODIN_PLATFORM_SUBTARGET == .iPhone || ODIN_PLATFORM_SUBTARGET == .iPhoneSimulator
 
 /*
 	// Defined internally by the compiler

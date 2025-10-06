@@ -193,8 +193,9 @@ current_thread_id :: proc "contextless" () -> int {
 
 
 
-@(require_results)
-_alloc_command_line_arguments :: proc() -> []string {
+@(private, require_results)
+_alloc_command_line_arguments :: proc "contextless" () -> []string {
+	context = runtime.default_context()
 	arg_count: i32
 	arg_list_ptr := win32.CommandLineToArgvW(win32.GetCommandLineW(), &arg_count)
 	arg_list := make([]string, int(arg_count))
@@ -213,6 +214,15 @@ _alloc_command_line_arguments :: proc() -> []string {
 	}
 
 	return arg_list
+}
+
+@(private, fini)
+_delete_command_line_arguments :: proc "contextless" () {
+	context = runtime.default_context()
+	for s in args {
+		delete(s)
+	}
+	delete(args)
 }
 
 /*

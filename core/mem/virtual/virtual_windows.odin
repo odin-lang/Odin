@@ -72,7 +72,7 @@ foreign Kernel32 {
 		flProtect:               u32,
 		dwMaximumSizeHigh:       u32,
 		dwMaximumSizeLow:        u32,
-		lpName:                  [^]u16,
+		lpName:                  cstring16,
 	) -> rawptr ---
 
 	MapViewOfFile :: proc(
@@ -83,6 +83,8 @@ foreign Kernel32 {
 		dwNumberOfBytesToMap: uint,
 	) -> rawptr ---
 }
+
+@(no_sanitize_address)
 _reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	result := VirtualAlloc(nil, size, MEM_RESERVE, PAGE_READWRITE)
 	if result == nil {
@@ -93,6 +95,7 @@ _reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Err
 	return
 }
 
+@(no_sanitize_address)
 _commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
 	result := VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE)
 	if result == nil {
@@ -107,12 +110,18 @@ _commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
 	}
 	return nil
 }
+
+@(no_sanitize_address)
 _decommit :: proc "contextless" (data: rawptr, size: uint) {
 	VirtualFree(data, size, MEM_DECOMMIT)
 }
+
+@(no_sanitize_address)
 _release :: proc "contextless" (data: rawptr, size: uint) {
 	VirtualFree(data, 0, MEM_RELEASE)
 }
+
+@(no_sanitize_address)
 _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	pflags: u32
 	pflags = PAGE_NOACCESS
@@ -136,17 +145,18 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 }
 
 
-
-_platform_memory_init :: proc() {
+@(no_sanitize_address)
+_platform_memory_init :: proc "contextless" () {
 	sys_info: SYSTEM_INFO
 	GetSystemInfo(&sys_info)
 	DEFAULT_PAGE_SIZE = max(DEFAULT_PAGE_SIZE, uint(sys_info.dwPageSize))
 	
 	// is power of two
-	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
+	assert_contextless(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }
 
 
+@(no_sanitize_address)
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	page_flags: u32
 	if flags == {.Read} {

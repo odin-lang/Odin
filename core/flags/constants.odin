@@ -19,7 +19,7 @@ SUBTAG_NAME       :: "name"
 SUBTAG_POS        :: "pos"
 SUBTAG_REQUIRED   :: "required"
 SUBTAG_HIDDEN     :: "hidden"
-SUBTAG_VARIADIC   :: "variadic"
+SUBTAG_MANIFOLD   :: "manifold"
 SUBTAG_FILE       :: "file"
 SUBTAG_PERMS      :: "perms"
 SUBTAG_INDISTINCT :: "indistinct"
@@ -28,7 +28,7 @@ TAG_USAGE         :: "usage"
 
 UNDOCUMENTED_FLAG :: "<This flag has not been documented yet.>"
 
-INTERNAL_VARIADIC_FLAG   :: "varg"
+INTERNAL_OVERFLOW_FLAG   :: #config(ODIN_CORE_FLAGS_OVERFLOW_FLAG, "overflow")
 
 RESERVED_HELP_FLAG       :: "help"
 RESERVED_HELP_FLAG_SHORT :: "h"

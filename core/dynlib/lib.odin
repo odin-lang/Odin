@@ -145,6 +145,11 @@ initialize_symbols :: proc(
 		}
 	}
 
+	// No field for it in the struct.
+	if handle == nil {
+		handle = load_library(library_path) or_return
+	}
+
 	// Buffer to concatenate the prefix + symbol name.
 	prefixed_symbol_buf: [2048]u8 = ---
 

@@ -1,6 +1,5 @@
 package _chacha20
 
-import "base:intrinsics"
 import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
@@ -46,9 +45,8 @@ Context :: struct {
 // derivation is expected to be handled by the caller, so that the
 // HChaCha call can be suitably accelerated.
 init :: proc "contextless" (ctx: ^Context, key, iv: []byte, is_xchacha: bool) {
-	if len(key) != KEY_SIZE || len(iv) != IV_SIZE {
-		intrinsics.trap()
-	}
+	ensure_contextless(len(key) == KEY_SIZE, "chacha20: invalid key size")
+	ensure_contextless(len(iv) == IV_SIZE, "chacha20: invalid key size")
 
 	k, n := key, iv
 
@@ -76,12 +74,10 @@ init :: proc "contextless" (ctx: ^Context, key, iv: []byte, is_xchacha: bool) {
 
 // seek seeks the (X)ChaCha20 stream counter to the specified block.
 seek :: proc(ctx: ^Context, block_nr: u64) {
-	assert(ctx._is_initialized)
+	ensure(ctx._is_initialized)
 
 	if ctx._is_ietf_flavor {
-		if block_nr > MAX_CTR_IETF {
-			panic("crypto/chacha20: attempted to seek past maximum counter")
-		}
+		ensure(block_nr <= MAX_CTR_IETF, "crypto/chacha20: attempted to seek past maximum counter")
 	} else {
 		ctx._s[13] = u32(block_nr >> 32)
 	}
@@ -102,7 +98,7 @@ check_counter_limit :: proc(ctx: ^Context, nr_blocks: int) {
 	// Enforce the maximum consumed keystream per IV.
 	//
 	// While all modern "standard" definitions of ChaCha20 use
-	// the IETF 32-bit counter, for XChaCha20 most common
+	// the IETF 32-bit counter, for XChaCha20 historical
 	// implementations allow for a 64-bit counter.
 	//
 	// Honestly, the answer here is "use a MRAE primitive", but
@@ -110,14 +106,14 @@ check_counter_limit :: proc(ctx: ^Context, nr_blocks: int) {
 
 	ERR_CTR_EXHAUSTED :: "crypto/chacha20: maximum (X)ChaCha20 keystream per IV reached"
 
+	ctr_ok: bool
 	if ctx._is_ietf_flavor {
-		if u64(ctx._s[12]) + u64(nr_blocks) > MAX_CTR_IETF {
-			panic(ERR_CTR_EXHAUSTED)
-		}
+		ctr_ok = u64(ctx._s[12]) + u64(nr_blocks) <= MAX_CTR_IETF
 	} else {
 		ctr := (u64(ctx._s[13]) << 32) | u64(ctx._s[12])
-		if _, carry := bits.add_u64(ctr, u64(nr_blocks), 0); carry != 0 {
-			panic(ERR_CTR_EXHAUSTED)
-		}
+		_, carry := bits.add_u64(ctr, u64(nr_blocks), 0)
+		ctr_ok = carry == 0
 	}
+
+	ensure(ctr_ok, "crypto/chacha20: maximum (X)ChaCha20 keystream per IV reached")
 }

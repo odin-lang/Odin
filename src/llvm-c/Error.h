@@ -14,7 +14,7 @@
 #ifndef LLVM_C_ERROR_H
 #define LLVM_C_ERROR_H
 
-#include "ExternC.h"
+#include "llvm-c/ExternC.h"
 
 LLVM_C_EXTERN_C_BEGIN
 
@@ -50,6 +50,14 @@ LLVMErrorTypeId LLVMGetErrorTypeId(LLVMErrorRef Err);
  * to some other consuming operation, e.g. LLVMGetErrorMessage.
  */
 void LLVMConsumeError(LLVMErrorRef Err);
+
+/**
+ * Report a fatal error if Err is a failure value.
+ *
+ * This function can be used to wrap calls to fallible functions ONLY when it is
+ * known that the Error will always be a success value.
+ */
+void LLVMCantFail(LLVMErrorRef Err);
 
 /**
  * Returns the given string's error message. This operation consumes the error,

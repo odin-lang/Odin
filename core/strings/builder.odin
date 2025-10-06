@@ -296,8 +296,8 @@ Inputs:
 Returns:
 - res: A cstring of the Builder's buffer
 */
-unsafe_to_cstring :: proc(b: ^Builder) -> (res: cstring) {
-	append(&b.buf, 0)
+unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring) {
+	append(&b.buf, 0, loc)
 	pop(&b.buf)
 	return cstring(raw_data(b.buf))
 }
@@ -311,8 +311,8 @@ Returns:
 - res: A cstring of the Builder's buffer upon success
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-to_cstring :: proc(b: ^Builder) -> (res: cstring, err: mem.Allocator_Error) {
-	n := append(&b.buf, 0) or_return
+to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: mem.Allocator_Error) #optional_allocator_error {
+	n := append(&b.buf, 0, loc) or_return
 	if n != 1 {
 		return nil, .Out_Of_Memory
 	}
@@ -518,9 +518,9 @@ Output:
 	abc
 
 */
-write_string :: proc(b: ^Builder, s: string) -> (n: int) {
+write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int) {
 	n0 := len(b.buf)
-	append(&b.buf, s)
+	append(&b.buf, s, loc)
 	n1 := len(b.buf)
 	return n1-n0
 }
@@ -675,7 +675,7 @@ Returns:
 */
 write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false) -> (n: int) {
 	buf: [384]byte
-	s := strconv.append_float(buf[:], f, fmt, prec, bit_size)
+	s := strconv.write_float(buf[:], f, fmt, prec, bit_size)
 	// If the result starts with a `+` then unless we always want signed results,
 	// we skip it unless it's followed by an `I` (because of +Inf).
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
@@ -699,7 +699,7 @@ Returns:
 */
 write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
-	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
@@ -739,7 +739,7 @@ Output:
 */
 write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
-	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
@@ -761,7 +761,7 @@ Returns:
 */
 write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
-	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
@@ -782,7 +782,7 @@ Returns:
 */
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte
-	s := strconv.append_bits(buf[:], i, base, false, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
 	return write_string(b, s)
 }
 /*
@@ -800,7 +800,7 @@ Returns:
 */
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
 	buf: [32]byte
-	s := strconv.append_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
 	return write_string(b, s)
 }
 /*

@@ -375,17 +375,20 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - Matrix operations
 	//------------------------------------------------------------------------------------
-	MatrixMode   :: proc(mode: c.int) ---                 // Choose the current matrix to be transformed
-	PushMatrix   :: proc() ---                            // Push the current matrix to stack
-	PopMatrix    :: proc() ---                            // Pop lattest inserted matrix from stack
-	LoadIdentity :: proc() ---                            // Reset current matrix to identity matrix
-	Translatef   :: proc(x, y, z: f32) ---                // Multiply the current matrix by a translation matrix
-	Rotatef      :: proc(angleDeg: f32, x, y, z: f32) --- // Multiply the current matrix by a rotation matrix
-	Scalef       :: proc(x, y, z: f32) ---                // Multiply the current matrix by a scaling matrix
-	MultMatrixf  :: proc(matf: [^]f32) ---                // Multiply the current matrix by another matrix
-	Frustum      :: proc(left, right, bottom, top, znear, zfar: f64) ---
-	Ortho        :: proc(left, right, bottom, top, znear, zfar: f64) ---
-	Viewport     :: proc(x, y, width, height: c.int) ---  // Set the viewport area
+	MatrixMode          :: proc(mode: c.int) ---                 // Choose the current matrix to be transformed
+	PushMatrix          :: proc() ---                            // Push the current matrix to stack
+	PopMatrix           :: proc() ---                            // Pop lattest inserted matrix from stack
+	LoadIdentity        :: proc() ---                            // Reset current matrix to identity matrix
+	Translatef          :: proc(x, y, z: f32) ---                // Multiply the current matrix by a translation matrix
+	Rotatef             :: proc(angleDeg: f32, x, y, z: f32) --- // Multiply the current matrix by a rotation matrix
+	Scalef              :: proc(x, y, z: f32) ---                // Multiply the current matrix by a scaling matrix
+	MultMatrixf         :: proc(matf: [^]f32) ---                // Multiply the current matrix by another matrix
+	Frustum             :: proc(left, right, bottom, top, znear, zfar: f64) ---
+	Ortho               :: proc(left, right, bottom, top, znear, zfar: f64) ---
+	Viewport            :: proc(x, y, width, height: c.int) ---  // Set the viewport area
+	SetClipPlanes       :: proc(near, far: f64) ---              // Set clip planes distances
+	GetCullDistanceNear :: proc() -> f64 ---                     // Get cull plane distance near
+	GetCullDistanceFar  :: proc() -> f64 ---                     // Get cull plane distance far
 
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - Vertex level operations
@@ -535,7 +538,7 @@ foreign lib {
 	ReadScreenPixels    :: proc(width, height: c.int) -> [^]byte ---                                                        // Read screen pixel data (color buffer)
 
 	// Framebuffer management (fbo)
-	LoadFramebuffer     :: proc(width, height: c.int) -> c.uint ---                                           // Load an empty framebuffer
+	LoadFramebuffer     :: proc() -> c.uint ---                                           // Load an empty framebuffer
 	FramebufferAttach   :: proc(fboId, texId: c.uint, attachType: c.int, texType: c.int, mipLevel: c.int) --- // Attach texture/renderbuffer to a framebuffer
 	FramebufferComplete :: proc(id: c.uint) -> bool ---                                                       // Verify framebuffer is complete
 	UnloadFramebuffer   :: proc(id: c.uint) ---                                                               // Delete framebuffer from GPU

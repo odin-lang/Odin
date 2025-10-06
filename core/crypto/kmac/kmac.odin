@@ -36,6 +36,7 @@ sum :: proc(sec_strength: int, dst, msg, key, domain_sep: []byte) {
 // tag is valid.
 verify :: proc(sec_strength: int, tag, msg, key, domain_sep: []byte, allocator := context.temp_allocator) -> bool {
 	derived_tag := make([]byte, len(tag), allocator)
+	defer(delete(derived_tag))
 
 	sum(sec_strength, derived_tag, msg, key, domain_sep)
 
@@ -59,8 +60,6 @@ init_256 :: proc(ctx: ^Context, key, domain_sep: []byte) {
 
 // update adds more data to the Context.
 update :: proc(ctx: ^Context, data: []byte) {
-	assert(ctx.is_initialized)
-
 	shake.write((^shake.Context)(ctx), data)
 }
 
@@ -68,12 +67,9 @@ update :: proc(ctx: ^Context, data: []byte) {
 // on the Context.  This routine will panic if the dst length is less than
 // MIN_TAG_SIZE.
 final :: proc(ctx: ^Context, dst: []byte) {
-	assert(ctx.is_initialized)
 	defer reset(ctx)
 
-	if len(dst) < MIN_TAG_SIZE {
-		panic("crypto/kmac: invalid KMAC tag_size, too short")
-	}
+	ensure(len(dst) >= MIN_TAG_SIZE, "crypto/kmac: invalid KMAC tag_size, too short")
 
 	_sha3.final_cshake((^_sha3.Context)(ctx), dst)
 }
@@ -103,14 +99,12 @@ _init_kmac :: proc(ctx: ^Context, key, s: []byte, sec_strength: int) {
 		reset(ctx)
 	}
 
-	if len(key) < sec_strength / 8 {
-		panic("crypto/kmac: invalid KMAC key, too short")
-	}
+	ensure(len(key) >= sec_strength / 8, "crypto/kmac: invalid KMAC key, too short")
 
 	ctx_ := (^_sha3.Context)(ctx)
 	_sha3.init_cshake(ctx_, N_KMAC, s, sec_strength)
 	_sha3.bytepad(ctx_, [][]byte{key}, _sha3.rate_cshake(sec_strength))
 }
 
-@(private)
+@(private, rodata)
 N_KMAC := []byte{'K', 'M', 'A', 'C'}

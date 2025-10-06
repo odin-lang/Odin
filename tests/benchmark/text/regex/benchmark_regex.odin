@@ -103,9 +103,11 @@ expensive_for_backtrackers :: proc(t: ^testing.T) {
 
 @test
 global_capture_end_word :: proc(t: ^testing.T) {
+	// NOTE: The previous behavior of `.Global`, which was to automatically
+	// insert `.*?` at the start of the pattern, is now default.
 	EXPR :: `Hellope World!`
 
-	rex, err := regex.create(EXPR, { .Global })
+	rex, err := regex.create(EXPR, { /*.Global*/ })
 	if !testing.expect_value(t, err, nil) {
 		return
 	}
@@ -145,7 +147,7 @@ global_capture_end_word_unicode :: proc(t: ^testing.T) {
 	EXPR :: `こにちは`
 	needle := string(EXPR)
 
-	rex, err := regex.create(EXPR, { .Global, .Unicode })
+	rex, err := regex.create(EXPR, { /*.Global,*/ .Unicode })
 	if !testing.expect_value(t, err, nil) {
 		return
 	}
@@ -185,7 +187,7 @@ global_capture_end_word_unicode :: proc(t: ^testing.T) {
 alternations :: proc(t: ^testing.T) {
 	EXPR :: `a(?:bb|cc|dd|ee|ff)`
 
-	rex, err := regex.create(EXPR, { .No_Capture, .Global })
+	rex, err := regex.create(EXPR, { .No_Capture, /*.Global*/ })
 	if !testing.expect_value(t, err, nil) {
 		return
 	}
@@ -219,7 +221,7 @@ classes :: proc(t: ^testing.T) {
 	EXPR :: `[\w\d]+`
 	NEEDLE :: "0123456789abcdef"
 
-	rex, err := regex.create(EXPR, { .Global })
+	rex, err := regex.create(EXPR, { /*.Global*/ })
 	if !testing.expect_value(t, err, nil) {
 		return
 	}

@@ -26,14 +26,13 @@ struct String_Iterator {
 
 // NOTE(bill): String16 is only used for Windows due to its file directories
 struct String16 {
-	wchar_t *text;
-	isize    len;
-	wchar_t const &operator[](isize i) const {
+	u16 * text;
+	isize len;
+	u16 const &operator[](isize i) const {
 		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
 	}
 };
-
 
 gb_internal gb_inline String make_string(u8 const *text, isize len) {
 	String s;
@@ -45,19 +44,19 @@ gb_internal gb_inline String make_string(u8 const *text, isize len) {
 	return s;
 }
 
-
-gb_internal gb_inline String16 make_string16(wchar_t const *text, isize len) {
+gb_internal gb_inline String16 make_string16(u16 const *text, isize len) {
 	String16 s;
-	s.text = cast(wchar_t *)text;
+	s.text = cast(u16 *)text;
 	s.len = len;
 	return s;
 }
 
-gb_internal isize string16_len(wchar_t const *s) {
+
+gb_internal isize string16_len(u16 const *s) {
 	if (s == nullptr) {
 		return 0;
 	}
-	wchar_t const *p = s;
+	u16 const *p = s;
 	while (*p) {
 		p++;
 	}
@@ -69,7 +68,7 @@ gb_internal gb_inline String make_string_c(char const *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
 }
 
-gb_internal gb_inline String16 make_string16_c(wchar_t const *text) {
+gb_internal gb_inline String16 make_string16_c(u16 const *text) {
 	return make_string16(text, string16_len(text));
 }
 
@@ -78,6 +77,13 @@ gb_internal String substring(String const &s, isize lo, isize hi) {
 	GB_ASSERT_MSG(lo <= hi && hi <= max, "%td..%td..%td", lo, hi, max);
 
 	return make_string(s.text+lo, hi-lo);
+}
+
+gb_internal String16 substring(String16 const &s, isize lo, isize hi) {
+	isize max = s.len;
+	GB_ASSERT_MSG(lo <= hi && hi <= max, "%td..%td..%td", lo, hi, max);
+
+	return make_string16(s.text+lo, hi-lo);
 }
 
 
@@ -145,6 +151,27 @@ gb_internal int string_compare(String const &a, String const &b) {
 	return res;
 }
 
+
+gb_internal int string16_compare(String16 const &a, String16 const &b) {
+	if (a.text == b.text) {
+		return cast(int)(a.len - b.len);
+	}
+	if (a.text == nullptr) {
+		return -1;
+	}
+	if (b.text == nullptr) {
+		return +1;
+	}
+
+	uintptr n = gb_min(a.len, b.len);
+	int res = memcmp(a.text, b.text, n*gb_size_of(u16));
+	if (res == 0) {
+		res = cast(int)(a.len - b.len);
+	}
+	return res;
+}
+
+
 gb_internal isize string_index_byte(String const &s, u8 x) {
 	for (isize i = 0; i < s.len; i++) {
 		if (s.text[i] == x) {
@@ -181,6 +208,26 @@ template <isize N> gb_internal bool operator >= (String const &a, char const (&b
 
 template <> bool operator == (String const &a, char const (&b)[1]) { return a.len == 0; }
 template <> bool operator != (String const &a, char const (&b)[1]) { return a.len != 0; }
+
+
+gb_internal gb_inline bool str_eq(String16 const &a, String16 const &b) {
+	if (a.len != b.len) return false;
+	if (a.len == 0) return true;
+	return memcmp(a.text, b.text, a.len) == 0;
+}
+gb_internal gb_inline bool str_ne(String16 const &a, String16 const &b) { return !str_eq(a, b);                }
+gb_internal gb_inline bool str_lt(String16 const &a, String16 const &b) { return string16_compare(a, b) < 0;     }
+gb_internal gb_inline bool str_gt(String16 const &a, String16 const &b) { return string16_compare(a, b) > 0;     }
+gb_internal gb_inline bool str_le(String16 const &a, String16 const &b) { return string16_compare(a, b) <= 0;    }
+gb_internal gb_inline bool str_ge(String16 const &a, String16 const &b) { return string16_compare(a, b) >= 0;    }
+
+gb_internal gb_inline bool operator == (String16 const &a, String16 const &b) { return str_eq(a, b); }
+gb_internal gb_inline bool operator != (String16 const &a, String16 const &b) { return str_ne(a, b); }
+gb_internal gb_inline bool operator <  (String16 const &a, String16 const &b) { return str_lt(a, b); }
+gb_internal gb_inline bool operator >  (String16 const &a, String16 const &b) { return str_gt(a, b); }
+gb_internal gb_inline bool operator <= (String16 const &a, String16 const &b) { return str_le(a, b); }
+gb_internal gb_inline bool operator >= (String16 const &a, String16 const &b) { return str_ge(a, b); }
+
 
 gb_internal gb_inline bool string_starts_with(String const &s, String const &prefix) {
 	if (prefix.len > s.len) {
@@ -273,6 +320,15 @@ gb_internal String path_extension(String const &str, bool include_dot = true) {
 	return substring(str, include_dot ? pos : pos + 1, str.len);
 }
 
+
+gb_internal String path_remove_extension(String const &str) {
+	isize pos = string_extension_position(str);
+	if (pos < 0) {
+		return str;
+	}
+	return substring(str, 0, pos);
+}
+
 gb_internal String string_trim_whitespace(String str) {
 	while (str.len > 0 && rune_is_whitespace(str[str.len-1])) {
 		str.len--;
@@ -325,6 +381,83 @@ gb_internal Array<String> split_lines_from_array(Array<u8> const &array, gbAlloc
 	}
 
 	return lines;
+}
+
+enum : u32 { PRIME_RABIN_KARP = 16777619u };
+
+gb_internal u32 hash_str_rabin_karp(String const &s, u32 *pow_) {
+	u32 hash = 0;
+	u32 pow = 1;
+	for (isize i = 0; i < s.len; i++) {
+		hash = hash*PRIME_RABIN_KARP + cast(u32)s.text[i];
+	}
+	u32 sq = PRIME_RABIN_KARP;
+	for (isize i = s.len; i > 0; i >>= 1) {
+		if ((i & 1) != 0) {
+			pow *= sq;
+		}
+		sq *= sq;
+	}
+	if (pow_) *pow_ = pow;
+	return hash;
+
+}
+
+
+gb_internal isize string_index(String const &s, String const &substr) {
+	isize n = substr.len;
+	if (n == 0) {
+		return 0;
+	} else if (n == 1) {
+		return string_index_byte(s, substr[0]);
+	} else if (n == s.len) {
+		if (s == substr) {
+			return 0;
+		}
+		return -1;
+	} else if (n > s.len) {
+		return -1;
+	}
+	u32 pow = 1;
+	u32 hash = hash_str_rabin_karp(s, &pow);
+	u32 h = 0;
+	for (isize i = 0; i < n; i++) {
+		h = h*PRIME_RABIN_KARP + cast(u32)s.text[i];
+	}
+	if (h == hash && substring(s, 0, n) == substr) {
+		return 0;
+	}
+	for (isize i = n; i < s.len; /**/) {
+		h *= PRIME_RABIN_KARP;
+		h += cast(u32)s.text[i];
+		h -= pow * u32(s.text[i-n]);
+		i += 1;
+		if (h == hash && substring(s, i-n, i) == substr) {
+			return i - n;
+		}
+	}
+	return -1;
+}
+
+
+struct StringPartition {
+	String head;
+	String match;
+	String tail;
+};
+
+gb_internal StringPartition string_partition(String const &str, String const &sep) {
+	StringPartition res = {};
+	isize i = string_index(str, sep);
+	if (i < 0) {
+		res.head = str;
+		return res;
+	}
+
+	res.head  = substring(str, 0, i);
+	res.match = substring(str, i, i+sep.len);
+	res.tail  = substring(str, i+sep.len, str.len);
+	return res;
 }
 
 gb_internal bool string_contains_char(String const &s, u8 c) {
@@ -500,23 +633,28 @@ gb_internal String normalize_path(gbAllocator a, String const &path, String cons
 		return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, widechar_input, input_length, output, output_size, nullptr, nullptr);
 	}
 #elif defined(GB_SYSTEM_UNIX) || defined(GB_SYSTEM_OSX)
-
-	#include <iconv.h>
+	#include <wchar.h>
 
 	gb_internal int convert_multibyte_to_widechar(char const *multibyte_input, usize input_length, wchar_t *output, usize output_size) {
-		iconv_t conv = iconv_open("WCHAR_T", "UTF-8");
-		size_t result = iconv(conv, cast(char **)&multibyte_input, &input_length, cast(char **)&output, &output_size);
-		iconv_close(conv);
+		String	string = copy_string(heap_allocator(), make_string(cast(u8 const*)multibyte_input, input_length)); /* Guarantee NULL terminator */
+		u8*		input = string.text;
 
-		return cast(int)result;
+		mbstate_t	ps = { 0 };
+		size_t	result = mbsrtowcs(output, cast(const char**)&input, output_size, &ps);
+
+		gb_free(heap_allocator(), string.text);
+		return (result == (size_t)-1) ? -1 : (int)result;
 	}
 
 	gb_internal int convert_widechar_to_multibyte(wchar_t const *widechar_input, usize input_length, char* output, usize output_size) {
-		iconv_t conv = iconv_open("UTF-8", "WCHAR_T");
-		size_t result = iconv(conv, cast(char**) &widechar_input, &input_length, cast(char **)&output, &output_size);
-		iconv_close(conv);
+		String	string = copy_string(heap_allocator(), make_string(cast(u8 const*)widechar_input, input_length)); /* Guarantee NULL terminator */
+		u8*		input = string.text;
 
-		return cast(int)result;
+		mbstate_t	ps = { 0 };
+		size_t	result = wcsrtombs(output, cast(const wchar_t**)&input, output_size, &ps);
+
+		gb_free(heap_allocator(), string.text);
+		return (result == (size_t)-1) ? -1 : (int)result;
 	}
 #else
 #error Implement system
@@ -525,10 +663,9 @@ gb_internal String normalize_path(gbAllocator a, String const &path, String cons
 
 
 
-// TODO(bill): Make this non-windows specific
 gb_internal String16 string_to_string16(gbAllocator a, String s) {
 	int len, len1;
-	wchar_t *text;
+	u16 *text;
 
 	if (s.len < 1) {
 		return make_string16(nullptr, 0);
@@ -539,15 +676,14 @@ gb_internal String16 string_to_string16(gbAllocator a, String s) {
 		return make_string16(nullptr, 0);
 	}
 
-	text = gb_alloc_array(a, wchar_t, len+1);
+	text = gb_alloc_array(a, u16, len+1);
 
-	len1 = convert_multibyte_to_widechar(cast(char *)s.text, cast(int)s.len, text, cast(int)len);
+	len1 = convert_multibyte_to_widechar(cast(char *)s.text, cast(int)s.len, cast(wchar_t *)text, cast(int)len);
 	if (len1 == 0) {
 		gb_free(a, text);
 		return make_string16(nullptr, 0);
 	}
 	text[len] = 0;
-
 	return make_string16(text, len);
 }
 
@@ -560,7 +696,7 @@ gb_internal String string16_to_string(gbAllocator a, String16 s) {
 		return make_string(nullptr, 0);
 	}
 
-	len = convert_widechar_to_multibyte(s.text, cast(int)s.len, nullptr, 0);
+	len = convert_widechar_to_multibyte(cast(wchar_t *)s.text, cast(int)s.len, nullptr, 0);
 	if (len == 0) {
 		return make_string(nullptr, 0);
 	}
@@ -568,7 +704,7 @@ gb_internal String string16_to_string(gbAllocator a, String16 s) {
 
 	text = gb_alloc_array(a, u8, len+1);
 
-	len1 = convert_widechar_to_multibyte(s.text, cast(int)s.len, cast(char *)text, cast(int)len);
+	len1 = convert_widechar_to_multibyte(cast(wchar_t *)s.text, cast(int)s.len, cast(char *)text, cast(int)len);
 	if (len1 == 0) {
 		gb_free(a, text);
 		return make_string(nullptr, 0);
@@ -588,9 +724,9 @@ gb_internal String temporary_directory(gbAllocator allocator) {
 		return String{0};
 	}
 	DWORD len = gb_max(MAX_PATH, n);
-	wchar_t *b = gb_alloc_array(heap_allocator(), wchar_t, len+1);
+	u16 *b = gb_alloc_array(heap_allocator(), u16, len+1);
 	defer (gb_free(heap_allocator(), b));
-	n = GetTempPathW(len, b);
+	n = GetTempPathW(len, cast(wchar_t *)b);
 	if (n == 3 && b[1] == ':' && b[2] == '\\') {
 
 	} else if (n > 0 && b[n-1] == '\\') {
@@ -643,6 +779,104 @@ gb_internal String quote_to_ascii(gbAllocator a, String str, u8 quote='"') {
 		width = 1;
 		if (r >= 0x80) {
 			width = utf8_decode(s, n, &r);
+		}
+		if (width == 1 && r == GB_RUNE_INVALID) {
+			array_add(&buf, cast(u8)'\\');
+			array_add(&buf, cast(u8)'x');
+			array_add(&buf, cast(u8)lower_hex[s[0]>>4]);
+			array_add(&buf, cast(u8)lower_hex[s[0]&0xf]);
+			continue;
+		}
+
+		if (r == quote || r == '\\') {
+			array_add(&buf, cast(u8)'\\');
+			array_add(&buf, u8(r));
+			continue;
+		}
+		if (r < 0x80 && is_printable(r)) {
+			array_add(&buf, u8(r));
+			continue;
+		}
+		switch (r) {
+		case '\a':
+		case '\b':
+		case '\f':
+		case '\n':
+		case '\r':
+		case '\t':
+		case '\v':
+		default:
+			if (r < ' ') {
+				u8 b = cast(u8)r;
+				array_add(&buf, cast(u8)'\\');
+				array_add(&buf, cast(u8)'x');
+				array_add(&buf, cast(u8)lower_hex[b>>4]);
+				array_add(&buf, cast(u8)lower_hex[b&0xf]);
+			}
+			if (r > GB_RUNE_MAX) {
+				r = 0XFFFD;
+			}
+			if (r < 0x10000) {
+				array_add(&buf, cast(u8)'\\');
+				array_add(&buf, cast(u8)'u');
+				for (isize i = 12; i >= 0; i -= 4) {
+					array_add(&buf, cast(u8)lower_hex[(r>>i)&0xf]);
+				}
+			} else {
+				array_add(&buf, cast(u8)'\\');
+				array_add(&buf, cast(u8)'U');
+				for (isize i = 28; i >= 0; i -= 4) {
+					array_add(&buf, cast(u8)lower_hex[(r>>i)&0xf]);
+				}
+			}
+		}
+	}
+
+
+
+	array_add(&buf, quote);
+	String res = {};
+	res.text = buf.data;
+	res.len = buf.count;
+	return res;
+}
+
+gb_internal Rune decode_surrogate_pair(u16 r1, u16 r2) {
+	static Rune const _surr1     = 0xd800;
+	static Rune const _surr2     = 0xdc00;
+	static Rune const _surr3     = 0xe000;
+	static Rune const _surr_self = 0x10000;
+
+	if (_surr1 <= r1 && r1 < _surr2 && _surr2 <= r2 && r2 < _surr3) {
+		return (((r1-_surr1)<<10) | (r2 - _surr2)) + _surr_self;
+	}
+	return GB_RUNE_INVALID;
+}
+
+gb_internal String quote_to_ascii(gbAllocator a, String16 str, u8 quote='"') {
+	static Rune const _surr1     = 0xd800;
+	static Rune const _surr2     = 0xdc00;
+	static Rune const _surr3     = 0xe000;
+	static Rune const _surr_self = 0x10000;
+
+	u16 *s = cast(u16 *)str.text;
+	isize n = str.len;
+	auto buf = array_make<u8>(a, 0, n*2);
+	array_add(&buf, quote);
+	for (isize width = 0; n > 0; s += width, n -= width) {
+		Rune r = cast(Rune)s[0];
+		width = 1;
+		if (r < _surr1 || _surr3 <= r) {
+			r = cast(Rune)r;
+		} else if (_surr1 <= r && r < _surr2) {
+			if (n>1) {
+				r = decode_surrogate_pair(s[0], s[1]);
+				if (r != GB_RUNE_INVALID) {
+					width = 2;
+				}
+			} else {
+				r = GB_RUNE_INVALID;
+			}
 		}
 		if (width == 1 && r == GB_RUNE_INVALID) {
 			array_add(&buf, cast(u8)'\\');

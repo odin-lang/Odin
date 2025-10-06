@@ -527,7 +527,7 @@ gb_internal void report_os_info() {
 
 	#elif defined(GB_SYSTEM_OSX)
 		gbString sw_vers = gb_string_make(heap_allocator(), "");
-		if (!system_exec_command_line_app_output("sw_vers --productVersion", &sw_vers)) {
+		if (!system_exec_command_line_app_output("sw_vers -productVersion", &sw_vers)) {
 			gb_printf("macOS Unknown\n");
 			return;
 		}
@@ -540,6 +540,7 @@ gb_internal void report_os_info() {
 		}
 
 		switch (major) {
+		case 26: gb_printf("macOS Tahoe"); break;
 		case 15: gb_printf("macOS Sequoia"); break;
 		case 14: gb_printf("macOS Sonoma"); break;
 		case 13: gb_printf("macOS Ventura"); break;
@@ -667,8 +668,14 @@ gb_internal void print_bug_report_help() {
 	gb_printf("-nightly");
 	#endif
 
+	String version = {};
+
 	#ifdef GIT_SHA
-	gb_printf(":%s", GIT_SHA);
+	version.text = cast(u8 *)GIT_SHA;
+	version.len  = gb_strlen(GIT_SHA);
+	if (version != "") {
+		gb_printf(":%.*s", LIT(version));
+	}
 	#endif
 
 	gb_printf("\n");

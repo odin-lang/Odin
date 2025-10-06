@@ -12,7 +12,9 @@ import "base:runtime"
 version_string_buf: [1024]u8
 
 @(init, private)
-init_os_version :: proc () {
+init_os_version :: proc "contextless" () {
+	context = runtime.default_context()
+
 	/*
 		NOTE(Jeroen):
 			`GetVersionEx`  will return 6.2 for Windows 10 unless the program is manifested for Windows 10.
@@ -42,6 +44,7 @@ init_os_version :: proc () {
 	os_version.major    = int(osvi.dwMajorVersion)
 	os_version.minor    = int(osvi.dwMinorVersion)
 	os_version.build[0] = int(osvi.dwBuildNumber)
+
 
 	b := strings.builder_from_bytes(version_string_buf[:])
 	strings.write_string(&b, "Windows ")
@@ -259,7 +262,7 @@ init_os_version :: proc () {
 }
 
 @(init, private)
-init_ram :: proc() {
+init_ram :: proc "contextless" () {
 	state: sys.MEMORYSTATUSEX
 
 	state.dwLength = size_of(state)
@@ -276,9 +279,10 @@ init_ram :: proc() {
 }
 
 @(init, private)
-init_gpu_info :: proc() {
-
+init_gpu_info :: proc "contextless" () {
 	GPU_INFO_BASE :: "SYSTEM\\ControlSet001\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\"
+
+	context = runtime.default_context()
 
 	gpu_list: [dynamic]GPU
 	gpu_index: int
@@ -324,8 +328,8 @@ read_reg_string :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: string, ok
 
 	status := sys.RegGetValueW(
 		hkey,
-		&key_name_wide[0],
-		&val_name_wide[0],
+		cstring16(&key_name_wide[0]),
+		cstring16(&val_name_wide[0]),
 		sys.RRF_RT_REG_SZ,
 		nil,
 		raw_data(result_wide[:]),
@@ -359,8 +363,8 @@ read_reg_i32 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i32, ok: bool
 	result_size := sys.DWORD(size_of(i32))
 	status := sys.RegGetValueW(
 		hkey,
-		&key_name_wide[0],
-		&val_name_wide[0],
+		cstring16(&key_name_wide[0]),
+		cstring16(&val_name_wide[0]),
 		sys.RRF_RT_REG_DWORD,
 		nil,
 		&res,
@@ -386,8 +390,8 @@ read_reg_i64 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i64, ok: bool
 	result_size := sys.DWORD(size_of(i64))
 	status := sys.RegGetValueW(
 		hkey,
-		&key_name_wide[0],
-		&val_name_wide[0],
+		cstring16(&key_name_wide[0]),
+		cstring16(&val_name_wide[0]),
 		sys.RRF_RT_REG_QWORD,
 		nil,
 		&res,

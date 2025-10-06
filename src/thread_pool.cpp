@@ -19,6 +19,11 @@ enum GrabState {
 	Grab_Failed  = 2,
 };
 
+enum BroadcastWaitState {
+	Nobody_Waiting  = 0,
+	Someone_Waiting = 1,
+};
+
 struct ThreadPool {
 	gbAllocator       threads_allocator;
 	Slice<Thread>     threads;
@@ -54,8 +59,8 @@ gb_internal void thread_pool_destroy(ThreadPool *pool) {
 
 	for_array_off(i, 1, pool->threads) {
 		Thread *t = &pool->threads[i];
-		pool->tasks_available.fetch_add(1, std::memory_order_acquire);
-		futex_broadcast(&pool->tasks_available);
+		pool->tasks_available.store(Nobody_Waiting);
+		futex_broadcast(&t->pool->tasks_available);
 		thread_join_and_destroy(t);
 	}
 
@@ -87,8 +92,10 @@ void thread_pool_queue_push(Thread *thread, WorkerTask task) {
 	thread->queue.bottom.store(bot + 1, std::memory_order_relaxed);
 
 	thread->pool->tasks_left.fetch_add(1, std::memory_order_release);
-	thread->pool->tasks_available.fetch_add(1, std::memory_order_relaxed);
-	futex_broadcast(&thread->pool->tasks_available);
+	i32 state = Someone_Waiting;
+	if (thread->pool->tasks_available.compare_exchange_strong(state, Nobody_Waiting)) {
+		futex_broadcast(&thread->pool->tasks_available);
+	}
 }
 
 GrabState thread_pool_queue_take(Thread *thread, WorkerTask *task) {
@@ -230,12 +237,13 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 		}
 
 		// if we've done all our work, and there's nothing to steal, go to sleep
-		state = pool->tasks_available.load(std::memory_order_acquire);
+		pool->tasks_available.store(Someone_Waiting);
 		if (!pool->running) { break; }
-		futex_wait(&pool->tasks_available, state);
+		futex_wait(&pool->tasks_available, Someone_Waiting);
 
 		main_loop_continue:;
 	}
 
 	return 0;
 }
+

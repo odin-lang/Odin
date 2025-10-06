@@ -42,9 +42,12 @@ import "core:math/bits"
 Loose_Field_Element :: distinct [5]u64
 Tight_Field_Element :: distinct [5]u64
 
+@(rodata)
 FE_ZERO := Tight_Field_Element{0, 0, 0, 0, 0}
+@(rodata)
 FE_ONE := Tight_Field_Element{1, 0, 0, 0, 0}
 
+@(rodata)
 FE_SQRT_M1 := Tight_Field_Element {
 	1718705420411056,
 	234908883556509,

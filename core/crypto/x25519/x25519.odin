@@ -15,7 +15,7 @@ SCALAR_SIZE :: 32
 // POINT_SIZE is the size of a X25519 point (public key/shared secret) in bytes.
 POINT_SIZE :: 32
 
-@(private)
+@(private, rodata)
 _BASE_POINT: [32]byte = {9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 @(private)
@@ -101,15 +101,9 @@ _scalarmult :: proc "contextless" (out, scalar, point: ^[32]byte) {
 // scalarmult "multiplies" the provided scalar and point, and writes the
 // resulting point to dst.
 scalarmult :: proc(dst, scalar, point: []byte) {
-	if len(scalar) != SCALAR_SIZE {
-		panic("crypto/x25519: invalid scalar size")
-	}
-	if len(point) != POINT_SIZE {
-		panic("crypto/x25519: invalid point size")
-	}
-	if len(dst) != POINT_SIZE {
-		panic("crypto/x25519: invalid destination point size")
-	}
+	ensure(len(scalar) == SCALAR_SIZE, "crypto/x25519: invalid scalar size")
+	ensure(len(point) == POINT_SIZE, "crypto/x25519: invalid point size")
+	ensure(len(dst) == POINT_SIZE, "crypto/x25519: invalid destination point size")
 
 	// "clamp" the scalar
 	e: [32]byte = ---

@@ -48,7 +48,7 @@ WindowMaximizeProc     :: #type proc "c" (window: WindowHandle, iconified: c.int
 WindowContentScaleProc :: #type proc "c" (window: WindowHandle, xscale, yscale: f32)
 FramebufferSizeProc    :: #type proc "c" (window: WindowHandle, width, height: c.int)
 DropProc               :: #type proc "c" (window: WindowHandle, count: c.int, paths: [^]cstring)
-MonitorProc            :: #type proc "c" (window: WindowHandle, event: c.int)
+MonitorProc            :: #type proc "c" (monitor: MonitorHandle, event: c.int)
 
 KeyProc                :: #type proc "c" (window: WindowHandle, key, scancode, action, mods: c.int)
 MouseButtonProc        :: #type proc "c" (window: WindowHandle, button, action, mods: c.int)

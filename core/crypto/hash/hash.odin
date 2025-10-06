@@ -21,8 +21,7 @@ hash_string :: proc(algorithm: Algorithm, data: string, allocator := context.all
 // in a newly allocated slice.
 hash_bytes :: proc(algorithm: Algorithm, data: []byte, allocator := context.allocator) -> []byte {
 	dst := make([]byte, DIGEST_SIZES[algorithm], allocator)
-	hash_bytes_to_buffer(algorithm, data, dst)
-	return dst
+	return hash_bytes_to_buffer(algorithm, data, dst)
 }
 
 // hash_string_to_buffer will hash the given input and assign the
@@ -46,7 +45,7 @@ hash_bytes_to_buffer :: proc(algorithm: Algorithm, data, hash: []byte) -> []byte
 	update(&ctx, data)
 	final(&ctx, hash)
 
-	return hash
+	return hash[:DIGEST_SIZES[algorithm]]
 }
 
 // hash_stream will incrementally fully consume a stream, and return the

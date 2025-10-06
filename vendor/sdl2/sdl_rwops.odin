@@ -87,7 +87,7 @@ foreign lib {
 	RWseek  :: proc(ctx: ^RWops, offset: i64, whence: c.int) -> i64 ---
 	RWtell  :: proc(ctx: ^RWops) -> i64 ---
 	RWread  :: proc(ctx: ^RWops, ptr: rawptr, size: c.size_t, maxnum: c.size_t) -> c.size_t ---
-	RWwrite :: proc(ctx: ^RWops, size: c.size_t, num: c.size_t) -> c.size_t ---
+	RWwrite :: proc(ctx: ^RWops, ptr: rawptr, size: c.size_t, num: c.size_t) -> c.size_t ---
 	RWclose :: proc(ctx: ^RWops) -> c.int ---
 
 	LoadFile_RW :: proc(src: ^RWops, datasize: ^c.size_t, freesrc: bool) -> rawptr ---

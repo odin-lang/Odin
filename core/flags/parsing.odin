@@ -6,7 +6,7 @@ package flags
 Parsing_Style :: enum {
 	// Odin-style: `-flag`, `-flag:option`, `-map:key=value`
 	Odin,
-	// UNIX-style: `-flag` or `--flag`, `--flag=argument`, `--flag argument repeating-argument`
+	// UNIX-style: `-flag` or `--flag`, `--flag=argument`, `--flag argument (manifold-argument)`
 	Unix,
 }
 
@@ -61,7 +61,7 @@ parse :: proc(
 		}
 
 	case .Unix:
-		// Support for `-flag argument (repeating-argument ...)`
+		// Support for `-flag argument (manifold-argument ...)`
 		future_args: int
 		current_flag: string
 

@@ -831,8 +831,8 @@ fmaxf :: proc "contextless" (x, y: f32) -> f32 {
 		return x
 	}
 
-	if math.signbit(x) != math.signbit(y) {
-		return y if math.signbit(x) else x
+	if math.sign_bit(x) != math.sign_bit(y) {
+		return y if math.sign_bit(x) else x
 	}
 
 	return y if x < y else x

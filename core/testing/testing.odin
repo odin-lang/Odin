@@ -21,6 +21,8 @@ import "core:mem"
 _ :: reflect // alias reflect to nothing to force visibility for -vet
 _ :: mem     // in case TRACKING_MEMORY is not enabled
 
+MAX_EXPECTED_ASSERTIONS_PER_TEST :: 5
+
 // IMPORTANT NOTE: Compiler requires this layout
 Test_Signature :: proc(^T)
 
@@ -154,4 +156,75 @@ set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location
 		at_time = time.time_add(time.now(), duration),
 		location = loc,
 	})
+}
+
+/*
+Let the test runner know that it should expect an assertion failure from a
+specific location in the source code for this test.
+
+In the event that an assertion fails, a debug message will be logged with its
+exact message and location in a copyable format to make it convenient to write
+tests which use this API.
+
+This procedure may be called up to 5 times with different locations.
+
+This is a limitation for the sake of simplicity in the implementation, and you
+should consider breaking up your tests into smaller procedures if you need to
+check for asserts in more than 2 places.
+*/
+expect_assert_from :: proc(t: ^T, expected_place: runtime.Source_Code_Location, caller_loc := #caller_location) {
+	count := local_test_expected_failures.location_count
+	if count == MAX_EXPECTED_ASSERTIONS_PER_TEST {
+		panic("This test cannot handle that many expected assertions based on matching the location.", caller_loc)
+	}
+	local_test_expected_failures.locations[count] = expected_place
+	local_test_expected_failures.location_count += 1
+}
+
+/*
+Let the test runner know that it should expect an assertion failure with a
+specific message for this test.
+
+In the event that an assertion fails, a debug message will be logged with its
+exact message and location in a copyable format to make it convenient to write
+tests which use this API.
+
+This procedure may be called up to 5 times with different messages.
+
+This is a limitation for the sake of simplicity in the implementation, and you
+should consider breaking up your tests into smaller procedures if you need to
+check for more than a couple different assertion messages.
+*/
+expect_assert_message :: proc(t: ^T, expected_message: string, caller_loc := #caller_location) {
+	count := local_test_expected_failures.message_count
+	if count == MAX_EXPECTED_ASSERTIONS_PER_TEST {
+		panic("This test cannot handle that many expected assertions based on matching the message.", caller_loc)
+	}
+	local_test_expected_failures.messages[count] = expected_message
+	local_test_expected_failures.message_count += 1
+}
+
+expect_assert :: proc {
+	expect_assert_from,
+	expect_assert_message,
+}
+
+/*
+Let the test runner know that it should expect a signal to be raised within
+this test.
+
+This API is for advanced users, as arbitrary signals will not be caught; only
+the ones already handled by the test runner, such as
+
+- SIGINT,                           (interrupt)
+- SIGTERM,                          (polite termination)
+- SIGILL,                           (illegal instruction)
+- SIGFPE,                           (arithmetic error)
+- SIGSEGV, and                      (segmentation fault)
+- SIGTRAP (only on POSIX systems).  (trap / debug trap)
+
+Note that only one signal can be expected per test.
+*/
+expect_signal :: proc(t: ^T, #any_int sig: i32) {
+	local_test_expected_failures.signal = sig
 }

@@ -36,7 +36,7 @@ foreign webgl2 {
 	/* Texture objects */
 	TexStorage3D            :: proc(target: Enum, levels: i32, internalformat: Enum, width, height, depth: i32) ---
 	TexImage3D              :: proc(target: Enum, level: i32, internalformat: Enum, width, height, depth: i32, border: i32, format, type: Enum, size: int, data: rawptr) ---
-	TexSubImage3D           :: proc(target: Enum, level: i32, xoffset, yoffset, width, height, depth: i32, format, type: Enum, size: int, data: rawptr) ---
+	TexSubImage3D           :: proc(target: Enum, level: i32, xoffset, yoffset, zoffset, width, height, depth: i32, format, type: Enum, size: int, data: rawptr) ---
 	CompressedTexImage3D    :: proc(target: Enum, level: i32, internalformat: Enum, width, height, depth: i32, border: i32, imageSize: int, data: rawptr) ---
 	CompressedTexSubImage3D :: proc(target: Enum, level: i32, xoffset, yoffset: i32, width, height, depth: i32, format: Enum, imageSize: int, data: rawptr) ---
 	CopyTexSubImage3D       :: proc(target: Enum, level: i32, xoffset, yoffset, zoffset: i32, x, y, width, height: i32) ---

@@ -406,6 +406,6 @@ IMAGE_DESCRIPTOR_RIGHT_MASK :: 1<<4
 IMAGE_DESCRIPTOR_TOP_MASK   :: 1<<5
 
 @(init, private)
-_register :: proc() {
+_register :: proc "contextless" () {
 	image.register(.TGA, load_from_bytes, destroy)
 }

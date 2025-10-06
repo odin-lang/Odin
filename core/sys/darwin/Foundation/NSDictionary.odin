@@ -15,7 +15,7 @@ Dictionary_dictionaryWithObject :: proc "c" (object: ^Object, forKey: ^Object) -
 
 @(objc_type=Dictionary, objc_name="dictionaryWithObjects", objc_is_class_method=true)
 Dictionary_dictionaryWithObjects :: proc "c" (objects: [^]^Object, forKeys: [^]^Object, count: UInteger) -> ^Dictionary {
-	return msgSend(^Dictionary, Dictionary, "dictionaryWithObjects:forKeys:count", objects, forKeys, count)
+	return msgSend(^Dictionary, Dictionary, "dictionaryWithObjects:forKeys:count:", objects, forKeys, count)
 }
 
 
@@ -31,7 +31,7 @@ Dictionary_init :: proc "c" (self: ^Dictionary) -> ^Dictionary {
 
 @(objc_type=Dictionary, objc_name="initWithObjects")
 Dictionary_initWithObjects :: proc "c" (self: ^Dictionary, objects: [^]^Object, forKeys: [^]^Object, count: UInteger) -> ^Dictionary {
-	return msgSend(^Dictionary, self, "initWithObjects:forKeys:count", objects, forKeys, count)
+	return msgSend(^Dictionary, self, "initWithObjects:forKeys:count:", objects, forKeys, count)
 }
 
 @(objc_type=Dictionary, objc_name="objectForKey")

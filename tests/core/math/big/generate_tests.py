@@ -1,0 +1,648 @@
+#
+#	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+#	Made available under Odin's BSD-3 license.
+#
+#	A BigInt implementation in Odin.
+#	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
+#	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
+#
+
+from random import *
+import math
+import os
+import platform
+import time
+import gc
+from enum import Enum
+import argparse
+
+LEG_BITS = 60
+
+vectors = open('../test_vectors.odin', 'w')
+vectors.write("""package test_core_math_big
+
+import "core:math/big"
+
+// GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED
+//
+// This file is generated using `test_generator.py`
+//
+// GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED -=- GENERATED
+
+Big_Test_Operation :: enum {
+	Add,
+	Sub,
+	Mul,
+	Div,
+	Sqr,
+	Log,
+	Sqrt,
+	Pow,
+	Root,
+	Shl,
+	Shr,
+	Shr_Signed,
+	Factorial,
+	Gcd,
+	Lcm,
+	Is_Square,
+}
+
+Big_Test_Vector :: struct {
+	op:  Big_Test_Operation,
+	a:   string,
+	b:   string,
+	exp: string,
+	err: big.Error,
+}
+
+big_test_vectors := []Big_Test_Vector{
+""")
+
+parser = argparse.ArgumentParser(
+	description     = "Odin core:math/big test suite generator",
+	epilog          = "By default we generate regression and random tests with preset parameters.",
+    formatter_class = argparse.ArgumentDefaultsHelpFormatter,
+)
+
+#
+# We skip randomized tests altogether if this is set.
+#
+no_random = parser.add_mutually_exclusive_group()
+
+no_random.add_argument(
+	"-no-random",
+	help    = "Don't generate random tests",
+	action  = "store_true",
+)
+
+#
+# Normally we run a given number of cycles on each test.
+# Timed tests budget 1 second per 20_000 bits instead.
+#
+# For timed tests we budget a second per `n` bits and iterate until we hit that time.
+#
+timed_or_fast = no_random.add_mutually_exclusive_group()
+
+timed_or_fast.add_argument(
+	"-timed",
+	type    = bool,
+	default = False,
+	help    = "Timed tests instead of a preset number of iterations.",
+)
+parser.add_argument(
+	"-timed-bits",
+	type    = int,
+	metavar = "BITS",
+	default = 20_000,
+	help    = "Timed tests. Every `BITS` worth of input is given a second of running time.",
+)
+
+#
+# For normal tests (non-timed), `-fast-tests` cuts down on the number of iterations.
+#
+timed_or_fast.add_argument(
+	"-fast-tests",
+	help    = "Cut down on the number of iterations of each test",
+	action  = "store_true",
+)
+
+args = parser.parse_args()
+
+#
+# How many iterations of each random test do we want to run?
+#
+BITS_AND_ITERATIONS = [
+	(   120, 100),
+	( 1_200, 100),
+	( 4_096, 100),
+	(12_000,  10),
+]
+
+if args.fast_tests:
+	for k in range(len(BITS_AND_ITERATIONS)):
+		b, i = BITS_AND_ITERATIONS[k]
+		BITS_AND_ITERATIONS[k] = (b, i // 10 if i >= 100 else 5)
+
+if args.no_random:
+	BITS_AND_ITERATIONS = []
+
+TOTAL_TIME  = 0
+UNTIL_TIME  = 0
+UNTIL_ITERS = 0
+
+def we_iterate():
+	if args.timed:
+		return TOTAL_TIME < UNTIL_TIME
+	else:
+		global UNTIL_ITERS
+		UNTIL_ITERS -= 1
+		return UNTIL_ITERS != -1
+
+#
+# Error enum values
+#
+class Error(Enum):
+	Okay                    = 0
+	Out_Of_Memory           = 1
+	Invalid_Pointer         = 2
+	Invalid_Argument        = 3
+	Unknown_Error           = 4
+	Assignment_To_Immutable = 10
+	Max_Iterations_Reached  = 11
+	Buffer_Overflow         = 12
+	Integer_Overflow        = 13
+	Integer_Underflow       = 14
+	Division_by_Zero        = 30
+	Math_Domain_Error       = 31
+	Cannot_Open_File        = 50
+	Cannot_Read_File        = 51
+	Cannot_Write_File       = 52
+	Unimplemented           = 127
+
+#
+# Disable garbage collection
+#
+gc.disable()
+
+def arg_to_odin(a):
+	if a >= 0:
+		s = hex(a)[2:]
+	else:
+		s = '-' + hex(a)[3:]
+	return s.encode('utf-8')
+
+
+def big_integer_sqrt(src):
+	# The Python version on Github's CI doesn't offer math.isqrt.
+	# We implement our own
+	count = src.bit_length()
+	a, b = count >> 1, count & 1
+
+	x = 1 << (a + b)
+
+	while True:
+		# y = (x + n // x) // 2
+		t1 = src // x
+		t2 = t1  + x
+		y = t2 >> 1
+
+		if y >= x:
+			return x
+
+		x, y = y, x
+
+def big_integer_lcm(a, b):
+	# Computes least common multiple as `|a*b|/gcd(a,b)`
+	# Divide the smallest by the GCD.
+
+	if a == 0 or b == 0:
+		return 0
+
+	if abs(a) < abs(b):
+		# Store quotient in `t2` such that `t2 * b` is the LCM.
+		lcm = a // math.gcd(a, b)
+		return abs(b * lcm)
+	else:
+		# Store quotient in `t2` such that `t2 * a` is the LCM.
+		lcm = b // math.gcd(a, b)
+		return abs(a * lcm)
+
+def write_test_case(op = "", a = 0, b = 0, expected_result = 0, expected_error = Error.Okay):
+	def test_arg_to_odin(a):
+		if a >= 0:
+			s = hex(a)[2:]
+		else:
+			s = '-' + hex(a)[3:]
+		return s
+
+	vectors.write("\t{{{}, ".format(op))
+	vectors.write("\"{}\", ".format(test_arg_to_odin(a)))
+	vectors.write("\"{}\", ".format(test_arg_to_odin(b)))
+	if expected_result == None:
+		vectors.write("\"0\", ")
+	else:
+		vectors.write("\"{}\", ".format(test_arg_to_odin(expected_result)))
+
+	vectors.write("{}}},\n".format(expected_error)[5:])
+
+def test_add(a = 0, b = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(a), arg_to_odin(b)]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a + b
+
+	write_test_case(".Add", a, b, expected_result, expected_error)
+
+def test_sub(a = 0, b = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(a), arg_to_odin(b)]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a - b
+
+	write_test_case(".Sub", a, b, expected_result, expected_error)
+
+def test_mul(a = 0, b = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(a), arg_to_odin(b)]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a * b
+
+	write_test_case(".Mul", a, b, expected_result, expected_error)
+
+def test_sqr(a = 0, b = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(a)]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a * a
+
+	write_test_case(".Sqr", a, b, expected_result, expected_error)
+
+def test_div(a = 0, b = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(a), arg_to_odin(b)]
+	expected_result = None
+	if expected_error == Error.Okay:
+		#
+		# We don't round the division results, so if one component is negative, we're off by one.
+		#
+		if a < 0 and b > 0:
+			expected_result = int(-(abs(a) // b))
+		elif b < 0 and a > 0:
+			expected_result = int(-(a // abs((b))))
+		else:
+			expected_result = a // b if b != 0 else None
+
+	write_test_case(".Div", a, b, expected_result, expected_error)
+
+def test_log(a = 0, base = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(a), base]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = int(math.log(a, base))
+
+	write_test_case(".Log", a, base, expected_result, expected_error)
+
+def test_pow(base = 0, power = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(base), power]
+	expected_result = None
+	if expected_error == Error.Okay:
+		if power < 0:
+			expected_result = 0
+		else:
+			# NOTE(Jeroen): Don't use `math.pow`, it's a floating point approximation.
+			#               Use built-in `pow` or `a**b` instead.
+			expected_result = pow(base, power)
+
+	write_test_case(".Pow", base, power, expected_result, expected_error)
+
+def test_sqrt(number = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(number)]
+	expected_result = None
+	if expected_error == Error.Okay:
+		if number < 0:
+			expected_result = 0
+		else:
+			expected_result = big_integer_sqrt(number)
+
+	write_test_case(".Sqrt", number, 0, expected_result, expected_error)
+
+def root_n(number, root):
+	u, s = number, number + 1
+	while u < s:
+		s = u
+		t = (root-1) * s + number // pow(s, root - 1)
+		u = t // root
+	return s
+
+def test_root_n(number = 0, root = 0, expected_error = Error.Okay):
+	args = [arg_to_odin(number), root]
+	expected_result = None
+	if expected_error == Error.Okay:
+		if number < 0:
+			expected_result = 0
+		else:
+			expected_result = root_n(number, root)
+
+	write_test_case(".Root", number, root, expected_result, expected_error)
+
+def test_shl_leg(a = 0, digits = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a), digits]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a << (digits * LEG_BITS)
+
+	write_test_case(".Shl", a, (digits * LEG_BITS), expected_result, expected_error)
+
+def test_shr_leg(a = 0, digits = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a), digits]
+	expected_result = None
+	if expected_error == Error.Okay:
+		if a < 0:
+			# Don't pass negative numbers. We have a shr_signed.
+			return False
+		else:
+			expected_result = a >> (digits * LEG_BITS)
+
+	write_test_case(".Shr", a, (digits * LEG_BITS), expected_result, expected_error)
+
+def test_shl(a = 0, bits = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a), bits]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a << bits
+
+	write_test_case(".Shl", a, bits, expected_result, expected_error)
+
+def test_shr(a = 0, bits = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a), bits]
+	expected_result = None
+	if expected_error == Error.Okay:
+		if a < 0:
+			# Don't pass negative numbers. We have a shr_signed.
+			return False
+		else:
+			expected_result = a >> bits
+
+	write_test_case(".Shr", a, bits, expected_result, expected_error)
+
+def test_shr_signed(a = 0, bits = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a), bits]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = a >> bits
+
+	write_test_case(".Shr_Signed", a, bits, expected_result, expected_error)
+
+def test_factorial(number = 0, expected_error = Error.Okay):
+	args  = [number]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = math.factorial(number)
+
+	write_test_case(".Factorial", number, 0, expected_result, expected_error)
+
+def test_gcd(a = 0, b = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a), arg_to_odin(b)]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = math.gcd(a, b)
+
+	write_test_case(".Gcd", a, b, expected_result, expected_error)
+
+def test_lcm(a = 0, b = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a), arg_to_odin(b)]
+	expected_result = None
+	if expected_error == Error.Okay:
+		expected_result = big_integer_lcm(a, b)
+
+	write_test_case(".Lcm", a, b, expected_result, expected_error)
+
+def test_is_square(a = 0, b = 0, expected_error = Error.Okay):
+	args  = [arg_to_odin(a)]
+	expected_result = False
+	if expected_error == Error.Okay and a > 0:
+		expected_result = big_integer_sqrt(a) ** 2 == a
+
+	write_test_case(".Is_Square", a, 0, expected_result, expected_error)
+
+# TODO(Jeroen): Make sure tests cover edge cases, fast paths, and so on.
+#
+# The last two arguments in tests are the expected error and expected result.
+#
+# The expected error defaults to None.
+# By default the Odin implementation will be tested against the Python one.
+# You can override that by supplying an expected result as the last argument instead.
+
+TESTS = {
+	test_add: [
+		[ 1234,   5432],
+	],
+	test_sub: [
+		[ 1234,   5432],
+	],
+	test_mul: [
+		[ 1234,   5432],
+		[ 0xd3b4e926aaba3040e1c12b5ea553b5, 0x1a821e41257ed9281bee5bc7789ea7 ],
+		[ 1 << 21_105, 1 << 21_501 ],
+		[
+			0x200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+			0x200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+		]
+	],
+	test_sqr: [
+		[ 5432],
+		[ 0xd3b4e926aaba3040e1c12b5ea553b5 ],
+	],
+	test_div: [
+		[ 54321,	12345],
+		[ 55431,		0, Error.Division_by_Zero],
+		[ 12980742146337069150589594264770969721, 4611686018427387904 ],
+		[   831956404029821402159719858789932422, 243087903122332132 ],
+	],
+	test_log: [
+		[ 3192,			1, Error.Invalid_Argument],
+		[ -1234,		2, Error.Math_Domain_Error],
+		[ 0,			2, Error.Math_Domain_Error],
+		[ 1024,			2],
+	],
+	test_pow: [
+		[ 0,  -1, Error.Math_Domain_Error ], # Math
+		[ 0,   0 ], # 1
+		[ 0,   2 ], # 0
+		[ 42, -1,], # 0
+		[ 42,  1 ], # 1
+		[ 42,  0 ], # 42
+		[ 42,  2 ], # 42*42
+		[ 1023423462055631945665902260039819522, 6],
+		[ 2351415513563017480724958108064794964140712340951636081608226461329298597792428177392182921045756382154475969841516481766099091057155043079113409578271460350765774152509347176654430118446048617733844782454267084644777022821998489944144604889308377152515711394170267839394315842510152114743680838721625924309675796181595284284935359605488617487126635442626578631, 4],
+	],
+	test_sqrt: [
+		[  -1, Error.Invalid_Argument, ],
+		[  42, Error.Okay, ],
+		[  12345678901234567890, Error.Okay, ],
+		[  1298074214633706907132624082305024, Error.Okay, ],
+		[  0xa85e79177036820e9e63d14514884413c283db3dba2771f66ec888ae94fe253826ed3230efc1de0cbb4a2ba16fede5fe980d232472cca9e8f339714c56a9e64b5cff7538c33773f128898e8cad47234e8a086b4ce5b902231e2da75cc6cb510d892feb9c9c19ee5f5b7967cb7f081fb79099afe2d20203b0693ecc95c656e5515e0903a4ebc84d22fc2a176ba36dd795195535cfdf473e547930fbd6eae51ad11e974198b4733a10115f391c0fefd22654f5acd63c6415d4cbdaad6c1fc1812333d701b64bb230307fb37911561f5287efd67c2eec5a26a694931aec299c67874881bab0c42941cf0f4ef8ca3548e1adcc7f712eb714762184d656385ceacc7b9f75620dfa7ec62b70ee92a5998cee14ad2b9df3f0c861678bc3311c1fe78c5ce4ed30b90c56d18d50261a4f46fdbf6af94737920b50adf1229503edea8b32900000697f366eba632074a66dcd9999a1510ccefa6110bac2207602b16cd4ce42a36fbf276b5b14550faf75194256f175a867169ff30f8e4770d094b617e3df29612359e33d2a3e8f4e12acf243a22b2732e35a5039fea630886e80f49fb310cb34cd1ecb0dc3036761ac8eed5e2e3d6ea88c5b2f552405149fcb100f50368e969c7d1d45db10ea868838dddc3fbc54c9b658761522c31e46661f46205a6c8783d60638db10bc9515ece8509aa181332207c5a2753ee4a8297a65695fbd8184de, Error.Okay, ],
+	],
+	test_root_n: [
+		[  1298074214633706907132624082305024, 2, Error.Okay, ],	
+	],
+	test_shl_leg: [
+		[ 3192,			1 ],
+		[ 1298074214633706907132624082305024, 2 ],
+		[ 1024,			3 ],
+	],
+	test_shr_leg: [
+		[ 3680125442705055547392, 1 ],
+		[ 1725436586697640946858688965569256363112777243042596638790631055949824, 2 ],
+		[ 219504133884436710204395031992179571, 2 ],
+	],
+	test_shl: [
+		[ 3192,			1 ],
+		[ 1298074214633706907132624082305024, 2 ],
+		[ 1024,			3 ],
+	],
+	test_shr: [
+		[ 3680125442705055547392, 1 ],
+		[ 1725436586697640946858688965569256363112777243042596638790631055949824, 2 ],
+		[ 219504133884436710204395031992179571, 2 ],
+	],
+	test_shr_signed: [
+		[ -611105530635358368578155082258244262, 12 ],
+		[ -149195686190273039203651143129455, 12 ],
+		[ 611105530635358368578155082258244262, 12 ],
+		[ 149195686190273039203651143129455, 12 ],
+	],
+	test_factorial: [
+		[  6_000 ],   # Regular factorial, see cutoff in common.odin.
+		[ 12_345 ],   # Binary split factorial
+	],
+	test_gcd: [
+		[  23, 25, ],
+		[ 125, 25, ],
+		[ 125, 0,  ],
+		[   0, 0,  ],
+		[   0, 125,],
+	],
+	test_lcm: [
+		[  23,  25,],
+		[ 125, 25, ],
+		[ 125, 0,  ],
+		[   0, 0,  ],
+		[   0, 125,],
+	],
+	test_is_square: [
+		[ 12, ],
+		[ 0x4fa3f9fe4edb58bfae7bab80b94ffce6e02cdd067c509f75a5918e510d002a8b41949dee96f482678b6e593ee2a984aa68809af5bdc3c0ee839c588b3b619e0f4a5267a7533765f8621dd20994a9a5bdd7faca4aab4f84a72f4f30d623a44cbc974d48e7ab63259d3141da5467e0a2225d90e6388f8d05e0bcdcb67f6d11c4e17d4c168b9fb23bf0932d6082ed82241b01d7d80bb43bf516fc650d86d62e13df218557df8b3f2e4eb295485e3f221c01130791c0b1b4c77fae4ae98e000e42d943a1dff9bfd960fdabe6a729913f99d74b1a7736c213b6c134bbc6914e0b5ae9d1909a32c2084af5a49a99a97a8c3856fdf1e4ff39306ede6234f85f0dca94382a118d97058d0be641c7b0cecead08450042a56dff16808115f78857d8844df61d8e930427d410ee33a63c79, ]
+	],
+}
+
+if not args.fast_tests:
+	TESTS[test_factorial].append(
+		# This one on its own takes around 800ms, so we exclude it for FAST_TESTS
+		[ 10_000 ],
+	)
+
+total_passes   = 0
+total_failures = 0
+
+#
+# test_shr_signed also tests shr, so we're not going to test shr randomly.
+#
+RANDOM_TESTS = [
+	test_add,     test_sub,     test_mul,       test_sqr,
+	test_log,     test_pow,     test_sqrt,      test_root_n,
+	test_shl_leg, test_shr_leg, test_shl,       test_shr_signed,
+	test_gcd,     test_lcm,     test_is_square, test_div,
+]
+SKIP_LARGE   = [
+	test_pow, test_root_n, # test_gcd,
+]
+SKIP_LARGEST = []
+
+# Untimed warmup.
+for test_proc in TESTS:
+	for t in TESTS[test_proc]:
+		res   = test_proc(*t)
+
+if __name__ == '__main__':
+	print("\n---- math/big tests ----")
+	print()
+
+	max_name = 0
+	for test_proc in TESTS:
+		max_name = max(max_name, len(test_proc.__name__))
+
+	fmt_string = "{name:>{max_name}}, {test_count} tests"
+	fmt_string = fmt_string.replace("{max_name}", str(max_name))
+
+	for test_proc in TESTS:
+		count = 0
+		for t in TESTS[test_proc]:
+			count += 1
+			test_proc(*t)
+
+		print(fmt_string.format(name=test_proc.__name__, test_count=count))
+
+	for BITS, ITERATIONS in BITS_AND_ITERATIONS:
+		print()		
+		print("---- math/big with two random {bits:,} bit numbers ----".format(bits=BITS))
+		print()
+
+		#
+		# We've already tested up to the 10th root.
+		#
+		TEST_ROOT_N_PARAMS = [2, 3, 4, 5, 6]
+
+		for test_proc in RANDOM_TESTS:
+			if BITS >  1_200 and test_proc in SKIP_LARGE: continue
+			if BITS >  4_096 and test_proc in SKIP_LARGEST: continue
+
+			count = 0
+
+			UNTIL_ITERS = ITERATIONS
+			if test_proc == test_root_n and BITS == 1_200:
+				UNTIL_ITERS /= 10
+
+			UNTIL_TIME  = TOTAL_TIME + BITS / args.timed_bits
+			# We run each test for a second per 20k bits
+
+			index = 0
+
+			while we_iterate():
+				a = randint(-(1 << BITS), 1 << BITS)
+				b = randint(-(1 << BITS), 1 << BITS)
+
+				if test_proc == test_div:
+					# We've already tested division by zero above.
+					bits = int(BITS * 0.6)
+					b = randint(-(1 << bits), 1 << bits)
+					if b == 0:
+						b == 42
+				elif test_proc == test_log:
+					# We've already tested log's domain errors.
+					a = randint(1, 1 << BITS)
+					b = randint(2, 1 << 60)
+				elif test_proc == test_pow:
+					b = randint(1, 10)
+				elif test_proc == test_sqrt:
+					a = randint(1, 1 << BITS)
+					b = Error.Okay
+				elif test_proc == test_root_n:
+					a = randint(1, 1 << BITS)
+					b = TEST_ROOT_N_PARAMS[index]
+					index = (index + 1) % len(TEST_ROOT_N_PARAMS)
+				elif test_proc == test_shl_leg:
+					b = randint(0, 10);
+				elif test_proc == test_shr_leg:
+					a = abs(a)
+					b = randint(0, 10);
+				elif test_proc == test_shl:
+					b = randint(0, min(BITS, 120))
+				elif test_proc == test_shr_signed:
+					b = randint(0, min(BITS, 120))
+				elif test_proc == test_is_square:
+					a = randint(0, 1 << BITS)
+				elif test_proc == test_lcm:
+					smallest = min(a, b)
+					biggest  = max(a, b)
+
+					# Randomly swap biggest and smallest
+					if randint(1, 11) % 2 == 0:
+						smallest, biggest = biggest, smallest
+
+					a, b = smallest, biggest
+				else:
+					b = randint(0, 1 << BITS)
+
+				count += 1
+				test_proc(a, b)
+
+			print(fmt_string.format(name=test_proc.__name__, test_count=count))
+
+	print()		
+	print("---- THE END ----")
+
+	vectors.write("}")
+
+	if total_failures:
+		exit(1)

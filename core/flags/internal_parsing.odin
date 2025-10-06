@@ -95,7 +95,7 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 				// `--`, and only `--`.
 				// Everything from now on will be treated as an argument.
 				future_args = max(int)
-				current_flag = INTERNAL_VARIADIC_FLAG
+				current_flag = INTERNAL_OVERFLOW_FLAG
 				return
 			}
 		}

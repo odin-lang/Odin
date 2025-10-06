@@ -1,5 +1,7 @@
 #include "parser_pos.cpp"
 
+gb_global std::atomic<bool> g_parsing_done;
+
 gb_internal bool in_vet_packages(AstFile *file) {
 	if (file == nullptr) {
 		return true;
@@ -31,6 +33,10 @@ gb_internal bool ast_file_vet_style(AstFile *f) {
 
 gb_internal bool ast_file_vet_deprecated(AstFile *f) {
 	return (ast_file_vet_flags(f) & VetFlag_Deprecated) != 0;
+}
+
+gb_internal bool ast_file_vet_explicit_allocators(AstFile *f) {
+	return (ast_file_vet_flags(f) & VetFlag_ExplicitAllocators) != 0;
 }
 
 gb_internal bool file_allow_newline(AstFile *f) {
@@ -172,7 +178,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		return nullptr;
 	}
 	if (f == nullptr) {
-		f = node->thread_safe_file();
+		if (g_parsing_done.load(std::memory_order_relaxed)) {
+			f = node->file();
+		} else {
+			f = node->thread_safe_file();
+		}
 	}
 	Ast *n = alloc_ast_node(f, node->kind);
 	gb_memmove(n, node, ast_node_size(node->kind));
@@ -740,6 +750,7 @@ gb_internal Ast *ast_matrix_index_expr(AstFile *f, Ast *expr, Token open, Token 
 gb_internal Ast *ast_ident(AstFile *f, Token token) {
 	Ast *result = alloc_ast_node(f, Ast_Ident);
 	result->Ident.token = token;
+	result->Ident.hash = string_hash(token.string);
 	return result;
 }
 
@@ -1436,27 +1447,30 @@ gb_internal CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_
 }
 
 gb_internal void consume_comment_groups(AstFile *f, Token prev) {
-	if (f->curr_token.kind == Token_Comment) {
-		CommentGroup *comment = nullptr;
-		isize end_line = 0;
-
-		if (f->curr_token.pos.line == prev.pos.line) {
-			comment = consume_comment_group(f, 0, &end_line);
-			if (f->curr_token.pos.line != end_line || f->curr_token.kind == Token_EOF) {
-				f->line_comment = comment;
-			}
-		}
-
-		end_line = -1;
-		while (f->curr_token.kind == Token_Comment) {
-			comment = consume_comment_group(f, 1, &end_line);
-		}
-		if (end_line+1 == f->curr_token.pos.line || end_line < 0) {
-			f->lead_comment = comment;
-		}
-
-		GB_ASSERT(f->curr_token.kind != Token_Comment);
+	if (f->curr_token.kind != Token_Comment) {
+		return;
 	}
+	CommentGroup *comment = nullptr;
+	isize end_line = 0;
+
+	if (f->curr_token.pos.line == prev.pos.line) {
+		comment = consume_comment_group(f, 0, &end_line);
+		if (f->curr_token.pos.line != end_line ||
+		    f->curr_token.pos.line == prev.pos.line+1 ||
+		    f->curr_token.kind == Token_EOF) {
+			f->line_comment = comment;
+		}
+	}
+
+	end_line = -1;
+	while (f->curr_token.kind == Token_Comment) {
+		comment = consume_comment_group(f, 1, &end_line);
+	}
+	if (end_line+1 == f->curr_token.pos.line || end_line < 0) {
+		f->lead_comment = comment;
+	}
+
+	GB_ASSERT(f->curr_token.kind != Token_Comment);
 }
 
 gb_internal gb_inline bool ignore_newlines(AstFile *f) {
@@ -3274,6 +3288,8 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 		case Token_OpenBracket: {
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = false;
+			defer (f->allow_range = prev_allow_range);
+
 
 			Token open = {}, close = {}, interval = {};
 			Ast *indices[2] = {};
@@ -3281,6 +3297,13 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
+
+			if (f->curr_token.kind == Token_CloseBracket) {
+				error(f->curr_token, "Expected an operand, got ]");
+				close = expect_token(f, Token_CloseBracket);
+				operand = ast_index_expr(f, operand, nullptr, open, close);
+				break;
+			}
 
 			switch (f->curr_token.kind) {
 			case Token_Ellipsis:
@@ -3331,7 +3354,6 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}
 
-			f->allow_range = prev_allow_range;
 		} break;
 
 		case Token_Pointer: // Deference
@@ -5786,7 +5808,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT) {
+		if (ext == FILE_EXT && !fi.is_dir) {
 			files_with_ext += 1;
 		}
 		if (ext == FILE_EXT && !is_excluded_target_filename(name)) {
@@ -5811,7 +5833,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT) {
+		if (ext == FILE_EXT && !fi.is_dir) {
 			if (is_excluded_target_filename(name)) {
 				continue;
 			}
@@ -6157,7 +6179,7 @@ gb_internal String build_tag_get_token(String s, String *out) {
 		isize width = utf8_decode(&s[n], s.len-n, &rune);
 		if (n == 0 && rune == '!') {
 
-		} else if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != ':') {
 			isize k = gb_max(gb_max(n, width), 1);
 			*out = substring(s, k, s.len);
 			return substring(s, 0, k);
@@ -6209,7 +6231,10 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				continue;
 			}
 
-			TargetOsKind   os   = get_target_os_from_string(p);
+			Subtarget subtarget     = Subtarget_Invalid;
+			String    subtarget_str = {};
+
+			TargetOsKind   os   = get_target_os_from_string(p, &subtarget, &subtarget_str);
 			TargetArchKind arch = get_target_arch_from_string(p);
 			num_tokens += 1;
 
@@ -6220,14 +6245,35 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 				break;
 			}
 
+			bool is_ios_subtarget = false;
+			if (subtarget == Subtarget_Invalid) {
+				// Special case for pseudo subtarget
+				if (!str_eq_ignore_case(subtarget_str, "ios")) {
+					syntax_error(token_for_pos, "Invalid subtarget '%.*s'.", LIT(subtarget_str));
+					break;
+				}
+
+				is_ios_subtarget = true;
+			}
+
+
 			if (os != TargetOs_Invalid) {
 				this_kind_os_seen = true;
 
+				// NOTE: Only testing for 'default' and not 'generic' because the 'generic' nomenclature implies any subtarget.
+				bool is_explicit_default_subtarget = str_eq_ignore_case(subtarget_str, "default");
+				bool same_subtarget = (subtarget == Subtarget_Default && !is_explicit_default_subtarget) || (subtarget == selected_subtarget);
+
+				// Special case for iPhone or iPhoneSimulator
+				if (is_ios_subtarget && (selected_subtarget == Subtarget_iPhone || selected_subtarget == Subtarget_iPhoneSimulator)) {
+					same_subtarget = true;
+				}
+
 				GB_ASSERT(arch == TargetArch_Invalid);
 				if (is_notted) {
-					this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
+					this_kind_correct = this_kind_correct && (os != build_context.metrics.os || !same_subtarget);
 				} else {
-					this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
+					this_kind_correct = this_kind_correct && (os == build_context.metrics.os && same_subtarget);
 				}
 			} else if (arch != TargetArch_Invalid) {
 				this_kind_arch_seen = true;
@@ -6250,7 +6296,7 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 	return any_correct;
 }
 
-gb_internal String vet_tag_get_token(String s, String *out) {
+gb_internal String vet_tag_get_token(String s, String *out, bool allow_colon) {
 	s = string_trim_whitespace(s);
 	isize n = 0;
 	while (n < s.len) {
@@ -6258,7 +6304,7 @@ gb_internal String vet_tag_get_token(String s, String *out) {
 		isize width = utf8_decode(&s[n], s.len-n, &rune);
 		if (n == 0 && rune == '!') {
 
-		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != '-') {
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != '-' && !(allow_colon && rune == ':')) {
 			isize k = gb_max(gb_max(n, width), 1);
 			*out = substring(s, k, s.len);
 			return substring(s, 0, k);
@@ -6284,7 +6330,7 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 	u64 vet_not_flags = 0;
 
 	while (s.len > 0) {
-		String p = string_trim_whitespace(vet_tag_get_token(s, &s));
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s, /*allow_colon*/false));
 		if (p.len == 0) {
 			break;
 		}
@@ -6321,6 +6367,7 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			error_line("\textra\n");
 			error_line("\tcast\n");
 			error_line("\ttabs\n");
+			error_line("\texplicit-allocators\n");
 			return build_context.vet_flags;
 		}
 	}
@@ -6351,7 +6398,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 	u64 feature_not_flags = 0;
 
 	while (s.len > 0) {
-		String p = string_trim_whitespace(vet_tag_get_token(s, &s));
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s, /*allow_colon*/true));
 		if (p.len == 0) {
 			break;
 		}
@@ -6373,26 +6420,45 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 			} else {
 				feature_flags     |= flag;
 			}
+			if (is_notted) {
+				switch (flag) {
+				case OptInFeatureFlag_IntegerDivisionByZero_Trap:
+				case OptInFeatureFlag_IntegerDivisionByZero_Zero:
+					syntax_error(token_for_pos, "Feature flag does not support notting with '!' - '%.*s'", LIT(p));
+					break;
+				}
+			}
 		} else {
 			ERROR_BLOCK();
 			syntax_error(token_for_pos, "Invalid feature flag name: %.*s", LIT(p));
 			error_line("\tExpected one of the following\n");
 			error_line("\tdynamic-literals\n");
+			error_line("\tinteger-division-by-zero:trap\n");
+			error_line("\tinteger-division-by-zero:zero\n");
+			error_line("\tinteger-division-by-zero:self\n");
 			return OptInFeatureFlag_NONE;
 		}
 	}
 
+	u64 res = OptInFeatureFlag_NONE;
+
 	if (feature_flags == 0 && feature_not_flags == 0) {
-		return OptInFeatureFlag_NONE;
+		res = OptInFeatureFlag_NONE;
+	} else if (feature_flags == 0 && feature_not_flags != 0) {
+		res = OptInFeatureFlag_NONE &~ feature_not_flags;
+	} else if (feature_flags != 0 && feature_not_flags == 0) {
+		res = feature_flags;
+	} else {
+		GB_ASSERT(feature_flags != 0 && feature_not_flags != 0);
+		res = feature_flags &~ feature_not_flags;
 	}
-	if (feature_flags == 0 && feature_not_flags != 0) {
-		return OptInFeatureFlag_NONE &~ feature_not_flags;
+
+	u64 idbz_count = gb_count_set_bits(res & OptInFeatureFlag_IntegerDivisionByZero_ALL);
+	if (idbz_count > 1) {
+		syntax_error(token_for_pos, "Only one integer-division-by-zero feature flag can be enabled");
 	}
-	if (feature_flags != 0 && feature_not_flags == 0) {
-		return feature_flags;
-	}
-	GB_ASSERT(feature_flags != 0 && feature_not_flags != 0);
-	return feature_flags &~ feature_not_flags;
+
+	return res;
 }
 
 gb_internal String dir_from_path(String path) {
@@ -6495,6 +6561,10 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (string_starts_with(lc, str_lit("vet"))) {
 		f->vet_flags = parse_vet_tag(tok, lc);
 		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("test"))) {
+		if ((build_context.command_kind & Command_test) == 0) {
+			return false;
+		}
 	} else if (string_starts_with(lc, str_lit("ignore"))) {
 		return false;
 	} else if (string_starts_with(lc, str_lit("private"))) {
@@ -6864,6 +6934,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
 		}
 	}
+
+	g_parsing_done.store(true, std::memory_order_relaxed);
 
 	return ParseFile_None;
 }

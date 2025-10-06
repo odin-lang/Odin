@@ -173,6 +173,9 @@ FACILITY :: enum DWORD {
 	EAS                                      = 85,
 	WEB                                      = 885,
 	WEB_SOCKET                               = 886,
+	XAUDIO2                                  = 896,
+	XAPO                                     = 897,
+	GAMEINPUT                                = 906,
 	MOBILE                                   = 1793,
 	SQLITE                                   = 1967,
 	SERVICE_FABRIC                           = 1968,
@@ -219,9 +222,11 @@ ERROR_LOCK_FAILED            : DWORD : 167
 ERROR_ALREADY_EXISTS         : DWORD : 183
 ERROR_NO_DATA                : DWORD : 232
 ERROR_ENVVAR_NOT_FOUND       : DWORD : 203
+ERROR_MR_MID_NOT_FOUND       : DWORD : 317
 ERROR_OPERATION_ABORTED      : DWORD : 995
 ERROR_IO_PENDING             : DWORD : 997
 ERROR_NO_UNICODE_TRANSLATION : DWORD : 1113
+ERROR_NOT_FOUND              : DWORD : 1168
 ERROR_TIMEOUT                : DWORD : 1460
 ERROR_DATATYPE_MISMATCH      : DWORD : 1629
 ERROR_UNSUPPORTED_TYPE       : DWORD : 1630
@@ -231,6 +236,7 @@ ERROR_PIPE_BUSY              : DWORD : 231
 
 // https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
 S_OK           :: 0x00000000 // Operation successful
+S_FALSE        :: 0x00000001
 E_NOTIMPL      :: 0x80004001 // Not implemented
 E_NOINTERFACE  :: 0x80004002 // No such interface supported
 E_POINTER      :: 0x80004003 // Pointer that is not valid
@@ -268,6 +274,10 @@ HRESULT_SEVERITY :: #force_inline proc "contextless" (#any_int hr: int) -> SEVER
 // Create an HRESULT value from component pieces
 MAKE_HRESULT :: #force_inline proc "contextless" (#any_int sev: int, #any_int fac: int, #any_int code: int) -> HRESULT {
 	return HRESULT((uint(sev)<<31) | (uint(fac)<<16) | (uint(code)))
+}
+
+HRESULT_FROM_WIN32 :: #force_inline proc "contextless" (#any_int code: int) -> HRESULT {
+	return HRESULT(code) <= 0 ? HRESULT(code) : HRESULT(uint(code & 0x0000FFFF) | (uint(FACILITY.WIN32) << 16) | 0x80000000)
 }
 
 DECODE_HRESULT :: #force_inline proc "contextless" (#any_int hr: int) -> (SEVERITY, FACILITY, int) {

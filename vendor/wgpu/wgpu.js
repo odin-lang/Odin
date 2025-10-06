@@ -340,8 +340,8 @@ class WebGPUInterface {
 
 		return STATUS_SUCCESS;
 	}
-	
-	genericAdapterInfo(infoPtr) {
+
+	genericGetAdapterInfo(infoPtr) {
 		this.assert(infoPtr != 0);
 
 		const off = this.struct(infoPtr);
@@ -528,7 +528,7 @@ class WebGPUInterface {
 			return undefined;
 		}
 
-		const off = this.struct(ptr);
+		const off = this.struct(start);
 
 		return {
 			view:              this.textureViews.get(this.mem.loadPtr(off(4))),
@@ -1217,17 +1217,22 @@ class WebGPUInterface {
 					.then((device) => {
 						const deviceIdx = this.devices.create(device);
 
-						const deviceLostCallbackInfo = off(this.sizes.CallbackInfo);
-						if (descriptorPtr !== 0 && deviceLostCallbackInfo !== null) {
+						if (deviceLostCallbackInfo.callback !== null) {
 							device.lost.then((info) => {
 								const reason = ENUMS.DeviceLostReason.indexOf(info.reason);
+
+								const devicePtr = this.mem.exports.wgpu_alloc(4);
+								this.mem.storeI32(devicePtr, deviceIdx);
+
 								const messageAddr = this.makeMessageArg(info.message);
-								this.callCallback(deviceLostCallbackInfo, [deviceIdx, reason, messageAddr]);
+								this.callCallback(deviceLostCallbackInfo, [devicePtr, reason, messageAddr]);
+
+								this.mem.exports.wgpu_free(devicePtr);
 								this.mem.exports.wgpu_free(messageAddr);
 							});
 						}
 
-						if (descriptorPtr !== 0 && uncapturedErrorCallbackInfo !== null) {
+						if (uncapturedErrorCallbackInfo.callback !== null) {
 							device.onuncapturederror = (ev) => {
 								let status;
 								if (ev.error instanceof GPUValidationError) {
@@ -2028,7 +2033,7 @@ class WebGPUInterface {
 						addressModeW:  this.enumeration("AddressMode", off(4)),
 						magFilter:     this.enumeration("FilterMode", off(4)),
 						minFilter:     this.enumeration("FilterMode", off(4)),
-						mipMapFilter:  this.enumeration("MipmapFilterMode", off(4)),
+						mipmapFilter:  this.enumeration("MipmapFilterMode", off(4)),
 						lodMinClamp:   this.mem.loadF32(off(4)),
 						lodMaxClamp:   this.mem.loadF32(off(4)),
 						compare:       this.enumeration("CompareFunction", off(4)),
@@ -2583,7 +2588,12 @@ class WebGPUInterface {
 				}
 
 				dynamicOffsetCount = this.unwrapBigInt(dynamicOffsetCount);
-				const dynamicOffsets = this.array(dynamicOffsetCount, dynamicOffsetsPtr, this.mem.loadU32, 4);	
+				const dynamicOffsets = this.array(
+					dynamicOffsetCount,
+					dynamicOffsetsPtr,
+					(ptr) => this.mem.loadU32(ptr),
+					4
+				);
 
 				renderBundleEncoder.setBindGroup(groupIndex, group, dynamicOffsets);
 			},
@@ -2775,7 +2785,12 @@ class WebGPUInterface {
 				}
 
 				dynamicOffsetCount = this.unwrapBigInt(dynamicOffsetCount);
-				const dynamicOffsets = this.array(dynamicOffsetCount, dynamicOffsetsPtr, this.mem.loadU32, 4);	
+				const dynamicOffsets = this.array(
+					dynamicOffsetCount,
+					dynamicOffsetsPtr,
+					(ptr) => this.mem.loadU32(ptr),
+					4
+				);	
 
 				renderPassEncoder.setBindGroup(groupIndex, group, dynamicOffsets);
 			},
@@ -3082,7 +3097,7 @@ class WebGPUInterface {
 			 * @param {number} surfaceCapabilitiesPtr
 			 */
 			wgpuSurfaceCapabilitiesFreeMembers: (surfaceCapabilitiesPtr) => {
-				const off = this.struct(capabilitiesPtr);
+				const off = this.struct(surfaceCapabilitiesPtr);
 				off(4); // nextInChain
 				off(8); // usages
 				off(this.mem.intSize); // formatCount

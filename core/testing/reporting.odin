@@ -10,12 +10,12 @@ package testing
 */
 
 import "base:runtime"
-import "core:encoding/ansi"
 import "core:fmt"
 import "core:io"
 import "core:mem"
 import "core:path/filepath"
 import "core:strings"
+import "core:terminal/ansi"
 
 // Definitions of colors for use in the test runner.
 SGR_RESET   :: ansi.CSI + ansi.RESET           + ansi.SGR

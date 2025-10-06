@@ -781,7 +781,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_IsAudioDevicePlayback(SDL_AudioDeviceID dev
  * Physical devices can not be paused or unpaused, only logical devices
  * created through SDL_OpenAudioDevice() can be.
  *
- * \param dev a device opened by SDL_OpenAudioDevice().
+ * \param devid a device opened by SDL_OpenAudioDevice().
  * \returns true on success or false on failure; call SDL_GetError() for more
  *          information.
  *
@@ -792,7 +792,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_IsAudioDevicePlayback(SDL_AudioDeviceID dev
  * \sa SDL_ResumeAudioDevice
  * \sa SDL_AudioDevicePaused
  */
-extern SDL_DECLSPEC bool SDLCALL SDL_PauseAudioDevice(SDL_AudioDeviceID dev);
+extern SDL_DECLSPEC bool SDLCALL SDL_PauseAudioDevice(SDL_AudioDeviceID devid);
 
 /**
  * Use this function to unpause audio playback on a specified device.
@@ -809,7 +809,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_PauseAudioDevice(SDL_AudioDeviceID dev);
  * Physical devices can not be paused or unpaused, only logical devices
  * created through SDL_OpenAudioDevice() can be.
  *
- * \param dev a device opened by SDL_OpenAudioDevice().
+ * \param devid a device opened by SDL_OpenAudioDevice().
  * \returns true on success or false on failure; call SDL_GetError() for more
  *          information.
  *
@@ -820,7 +820,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_PauseAudioDevice(SDL_AudioDeviceID dev);
  * \sa SDL_AudioDevicePaused
  * \sa SDL_PauseAudioDevice
  */
-extern SDL_DECLSPEC bool SDLCALL SDL_ResumeAudioDevice(SDL_AudioDeviceID dev);
+extern SDL_DECLSPEC bool SDLCALL SDL_ResumeAudioDevice(SDL_AudioDeviceID devid);
 
 /**
  * Use this function to query if an audio device is paused.
@@ -832,7 +832,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_ResumeAudioDevice(SDL_AudioDeviceID dev);
  * created through SDL_OpenAudioDevice() can be. Physical and invalid device
  * IDs will report themselves as unpaused here.
  *
- * \param dev a device opened by SDL_OpenAudioDevice().
+ * \param devid a device opened by SDL_OpenAudioDevice().
  * \returns true if device is valid and paused, false otherwise.
  *
  * \threadsafety It is safe to call this function from any thread.
@@ -842,7 +842,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_ResumeAudioDevice(SDL_AudioDeviceID dev);
  * \sa SDL_PauseAudioDevice
  * \sa SDL_ResumeAudioDevice
  */
-extern SDL_DECLSPEC bool SDLCALL SDL_AudioDevicePaused(SDL_AudioDeviceID dev);
+extern SDL_DECLSPEC bool SDLCALL SDL_AudioDevicePaused(SDL_AudioDeviceID devid);
 
 /**
  * Get the gain of an audio device.
@@ -1583,6 +1583,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_PauseAudioStreamDevice(SDL_AudioStream *str
  * previously been paused. Once unpaused, any bound audio streams will begin
  * to progress again, and audio can be generated.
  *
+ * Remember, SDL_OpenAudioDeviceStream opens device in a paused state, so this
+ * function call is required for audio playback to begin on such device.
+ *
  * \param stream the audio stream associated with the audio device to resume.
  * \returns true on success or false on failure; call SDL_GetError() for more
  *          information.
@@ -1714,7 +1717,7 @@ typedef void (SDLCALL *SDL_AudioStreamCallback)(void *userdata, SDL_AudioStream 
  * audio to the stream during this call; if needed, the request that triggered
  * this callback will obtain the new data immediately.
  *
- * The callback's `approx_request` argument is roughly how many bytes of
+ * The callback's `additional_amount` argument is roughly how many bytes of
  * _unconverted_ data (in the stream's input format) is needed by the caller,
  * although this may overestimate a little for safety. This takes into account
  * how much is already in the stream and only asks for any extra necessary to
@@ -1759,13 +1762,13 @@ extern SDL_DECLSPEC bool SDLCALL SDL_SetAudioStreamGetCallback(SDL_AudioStream *
  * The callback can (optionally) call SDL_GetAudioStreamData() to obtain audio
  * from the stream during this call.
  *
- * The callback's `approx_request` argument is how many bytes of _converted_
- * data (in the stream's output format) was provided by the caller, although
- * this may underestimate a little for safety. This value might be less than
- * what is currently available in the stream, if data was already there, and
- * might be less than the caller provided if the stream needs to keep a buffer
- * to aid in resampling. Which means the callback may be provided with zero
- * bytes, and a different amount on each call.
+ * The callback's `additional_amount` argument is how many bytes of
+ * _converted_ data (in the stream's output format) was provided by the
+ * caller, although this may underestimate a little for safety. This value
+ * might be less than what is currently available in the stream, if data was
+ * already there, and might be less than the caller provided if the stream
+ * needs to keep a buffer to aid in resampling. Which means the callback may
+ * be provided with zero bytes, and a different amount on each call.
  *
  * The callback may call SDL_GetAudioStreamAvailable to see the total amount
  * currently available to read from the stream, instead of the total provided

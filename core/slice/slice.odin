@@ -387,6 +387,25 @@ has_prefix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_c
 	return false
 }
 
+/*
+	return the suffix length common between slices `a` and `b`.
+
+	slice.suffix_length([]u8{1, 2, 3, 4}, []u8{1, 2, 3, 4}) -> 4
+	slice.suffix_length([]u8{1, 2, 3, 4}, []u8{3, 4}) -> 2
+	slice.suffix_length([]u8{1, 2, 3, 4}, []u8{1}) -> 0
+	slice.suffix_length([]u8{1, 2, 3, 4}, []u8{1, 3, 5}) -> 0
+	slice.suffix_length([]u8{3, 4, 5}, []u8{3, 5}) -> 1
+*/
+@(require_results)
+suffix_length :: proc(a, b: $T/[]$E) -> (n: int) where intrinsics.type_is_comparable(E) {
+	len_a, len_b := len(a), len(b)
+	_len := builtin.min(len_a, len_b)
+
+	#no_bounds_check for i := 1; i <= _len && a[len_a - i] == b[len_b - i]; i += 1 {
+		n += 1
+	}
+	return
+}
 
 @(require_results)
 has_suffix :: proc(array: $T/[]$E, needle: T) -> bool where intrinsics.type_is_comparable(E) {

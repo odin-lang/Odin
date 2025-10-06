@@ -5,7 +5,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
-	A test suite for PNG, TGA, NetPBM, QOI and BMP.
+	A test suite for PNG, TGA, NetPBM, QOI, BMP, and JPEG.
 */
 #+feature dynamic-literals
 package test_core_image
@@ -19,6 +19,7 @@ import pbm "core:image/netpbm"
 import "core:image/png"
 import "core:image/qoi"
 import "core:image/tga"
+import "core:image/jpeg"
 
 import "core:bytes"
 import "core:hash"
@@ -28,6 +29,7 @@ import "core:time"
 
 TEST_SUITE_PATH_PNG :: ODIN_ROOT + "tests/core/assets/PNG"
 TEST_SUITE_PATH_BMP :: ODIN_ROOT + "tests/core/assets/BMP"
+TEST_SUITE_PATH_JPG :: ODIN_ROOT + "tests/core/assets/JPG"
 
 I_Error :: image.Error
 
@@ -48,6 +50,7 @@ Blend_BG             :: image.Options{.blend_background}
 Blend_BG_Keep        :: image.Options{.blend_background, .alpha_add_if_missing}
 Return_Metadata      :: image.Options{.return_metadata}
 No_Channel_Expansion :: image.Options{.do_not_expand_channels, .return_metadata}
+
 
 Dims :: struct {
 	width:     int,
@@ -2355,6 +2358,66 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 				bmp.destroy(reload_img)
 			}
 			bmp.destroy(img)
+		}
+	}
+	return
+}
+
+// JPG test image
+Basic_JPG_Tests := []Test{
+	{
+		"emblem-1024", {
+			{Default,   nil, {1024, 1024, 3, 8}, 0x_46a29e0f},
+			{Alpha_Add, nil, {1024, 1024, 4, 8}, 0x_cae2d532},
+		},
+	},
+	{
+		"emblem-1024-progressive", {
+			{Default,   .Unsupported_Frame_Type, {1024, 1024, 3, 8}, 0x_46a29e0f},
+		},
+	},
+	{
+		"emblem-1024-gray", {
+			{Default,              nil,                 {1024, 1024, 3, 8}, 0x_4115d669},
+			{Alpha_Add,            nil,                 {1024, 1024, 4, 8}, 0x_db496297},
+			{No_Channel_Expansion, .Unsupported_Option, {1024, 1024, 1, 8}, 0},
+		},
+	},
+}
+
+@test
+jpeg_test_basic :: proc(t: ^testing.T) {
+	run_jpg_suite(t, Basic_JPG_Tests)
+}
+
+run_jpg_suite :: proc(t: ^testing.T, suite: []Test) {
+	for file in suite {
+		test_file := strings.concatenate({TEST_SUITE_PATH_JPG, "/", file.file, ".jpg"}, context.allocator)
+		defer delete(test_file)
+
+		for test in file.tests {
+			img, err := jpeg.load(test_file, test.options)
+			defer jpeg.destroy(img)
+
+			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
+			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
+
+			// No point in running the other tests if it didn't load.
+			(err == nil) or_continue
+
+			pixels := bytes.buffer_to_bytes(&img.pixels)
+			dims   := Dims{img.width, img.height, img.channels, img.depth}
+			testing.expectf(t, test.dims == dims, "%v has %v, expected: %v.", file.file, dims, test.dims)
+
+			img_hash := hash.crc32(pixels)
+			testing.expectf(t, test.hash == img_hash, "%v test #1's hash is %08x, expected %08x with %v.", file.file, img_hash, test.hash, test.options)
+
+			// Optionally save to QOI file to check file loaded properly during development
+			when false {
+				test_qoi := strings.concatenate({TEST_SUITE_PATH_JPG, "/", file.file, ".qoi"}, context.temp_allocator)
+				save_err := qoi.save(test_qoi, img)
+				testing.expectf(t, save_err == nil, "expected saving to QOI not to raise error, got %v", save_err)
+			}
 		}
 	}
 	return

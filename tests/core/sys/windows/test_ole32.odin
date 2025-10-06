@@ -9,7 +9,7 @@ import "core:testing"
 string_from_clsid :: proc(t: ^testing.T) {
 	p: win32.LPOLESTR
 	hr := win32.StringFromCLSID(win32.CLSID_FileOpenDialog, &p)
-	defer if p != nil {win32.CoTaskMemFree(p)}
+	defer if p != nil {win32.CoTaskMemFree(rawptr(p))}
 
 	testing.expectf(t, win32.SUCCEEDED(hr), "%x (should be: %x)", u32(hr), 0)
 	testing.expectf(t, p != nil, "%v is nil", p)
@@ -33,7 +33,7 @@ clsid_from_string :: proc(t: ^testing.T) {
 string_from_iid :: proc(t: ^testing.T) {
 	p: win32.LPOLESTR
 	hr := win32.StringFromIID(win32.IID_IFileDialog, &p)
-	defer if p != nil {win32.CoTaskMemFree(p)}
+	defer if p != nil {win32.CoTaskMemFree(rawptr(p))}
 
 	testing.expectf(t, win32.SUCCEEDED(hr), "%x (should be: %x)", u32(hr), 0)
 	testing.expectf(t, p != nil, "%v is nil", p)

@@ -288,7 +288,7 @@ Rename_Flags :: bit_set[Rename_Flags_Bits; u32]
 
 /*
 	Directory entry record.
-	Recommended iterate these with `dirent_iterator()`,
+	Recommended to iterate these with `dirent_iterate_buf()`,
 	and obtain the name via `dirent_name()`.
 */
 Dirent :: struct {
@@ -368,6 +368,8 @@ Mem_Protection :: bit_set[Mem_Protection_Bits; i32]
 
 /*
 	Flags for mmap.
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags :: bit_set[Map_Flags_Bits; i32]
 
@@ -935,17 +937,12 @@ IO_Vec :: struct {
 }
 
 /*
-	Access mode for shared memory
-*/
-IPC_Mode :: bit_set[IPC_Mode_Bits; u32]
-
-/*
-	Flags used by IPC objects
+	Access modes and flags used by SystemV IPC procedures.
 */
 IPC_Flags :: bit_set[IPC_Flags_Bits; i16]
 
 /*
-	Permissions for IPC objects
+	Permissions for SystemV IPC primitives.
 */
 IPC_Perm :: struct {
 	key:  Key,
@@ -953,7 +950,7 @@ IPC_Perm :: struct {
 	gid:  u32,
 	cuid: u32,
 	cgid: u32,
-	mode: IPC_Mode,
+	mode: IPC_Flags, // Only contains mode flags.
 	seq:  u16,
 	_:    [2 + 2*size_of(int)]u8,
 }
@@ -1450,7 +1447,7 @@ EPoll_Data :: struct #raw_union {
 }
 
 EPoll_Event :: struct #packed {
-	events: EPoll_Event_Kind,
+	events: EPoll_Event_Set,
 	data:   EPoll_Data,
 }
 

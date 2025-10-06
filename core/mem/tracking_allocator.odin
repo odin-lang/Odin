@@ -64,6 +64,7 @@ This procedure initializes the tracking allocator `t` with a backing allocator
 specified with `backing_allocator`. The `internals_allocator` will used to
 allocate the tracked data.
 */
+@(no_sanitize_address)
 tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Allocator, internals_allocator := context.allocator) {
 	t.backing = backing_allocator
 	t.allocation_map.allocator = internals_allocator
@@ -77,6 +78,7 @@ tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Alloc
 /*
 Destroy the tracking allocator.
 */
+@(no_sanitize_address)
 tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 	delete(t.allocation_map)
 	delete(t.bad_free_array)
@@ -90,6 +92,7 @@ This procedure clears the tracked data from a tracking allocator.
 **Note**: This procedure clears only the current allocation data while keeping
 the totals intact.
 */
+@(no_sanitize_address)
 tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
@@ -103,6 +106,7 @@ Reset the tracking allocator.
 
 Reset all of a Tracking Allocator's allocation data back to zero.
 */
+@(no_sanitize_address)
 tracking_allocator_reset :: proc(t: ^Tracking_Allocator) {
 	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
@@ -124,6 +128,7 @@ Override Tracking_Allocator.bad_free_callback to have something else happen. For
 example, you can use tracking_allocator_bad_free_callback_add_to_array to return
 the tracking allocator to the old behavior, where the bad_free_array was used.
 */
+@(no_sanitize_address)
 tracking_allocator_bad_free_callback_panic :: proc(t: ^Tracking_Allocator, memory: rawptr, location: runtime.Source_Code_Location) {
 	runtime.print_caller_location(location)
 	runtime.print_string(" Tracking allocator error: Bad free of pointer ")
@@ -136,6 +141,7 @@ tracking_allocator_bad_free_callback_panic :: proc(t: ^Tracking_Allocator, memor
 Alternative behavior for a bad free: Store in `bad_free_array`. If you use this,
 then you must make sure to check Tracking_Allocator.bad_free_array at some point.
 */
+@(no_sanitize_address)
 tracking_allocator_bad_free_callback_add_to_array :: proc(t: ^Tracking_Allocator, memory: rawptr, location: runtime.Source_Code_Location) {
 	append(&t.bad_free_array, Tracking_Allocator_Bad_Free_Entry {
 		memory = memory,
@@ -175,7 +181,7 @@ Example:
 		}
 	}
 */
-@(require_results)
+@(require_results, no_sanitize_address)
 tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 	return Allocator{
 		data = data,
@@ -183,6 +189,7 @@ tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 	}
 }
 
+@(no_sanitize_address)
 tracking_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode: Allocator_Mode,
@@ -191,6 +198,7 @@ tracking_allocator_proc :: proc(
 	old_size: int,
 	loc := #caller_location,
 ) -> (result: []byte, err: Allocator_Error) {
+	@(no_sanitize_address)
 	track_alloc :: proc(data: ^Tracking_Allocator, entry: ^Tracking_Allocator_Entry) {
 		data.total_memory_allocated += i64(entry.size)
 		data.total_allocation_count += 1
@@ -200,6 +208,7 @@ tracking_allocator_proc :: proc(
 		}
 	}
 
+	@(no_sanitize_address)
 	track_free :: proc(data: ^Tracking_Allocator, entry: ^Tracking_Allocator_Entry) {
 		data.total_memory_freed += i64(entry.size)
 		data.total_free_count += 1

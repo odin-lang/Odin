@@ -109,34 +109,42 @@ For more information, see: https://swtch.com/~rsc/regexp/regexp2.html
 
 	(0x0A) Assert_Start
 
-	Asserts that the thread is at the beginning of a string.
+	Asserts that the thread is at the beginning of the string.
 
-	(0x0B) Assert_End
+	(0x0B) Assert_Start_Multiline
 
-	Asserts that the thread is at the end of a string.
+	This opcode is compiled in only when the `Multiline` flag is present as a
+	replacement for the `^` text anchor.
 
-	(0x0C) Assert_Word_Boundary
+	Asserts that the thread is at the beginning of the string or previously
+	parsed either a "\n" or "\r".
+
+	(0x0C) Assert_End
+
+	Asserts that the thread is at the end of the string.
+
+	(0x0D) Assert_Word_Boundary
 
 	Asserts that the thread is on a word boundary, which can be the start or
 	end of the text. This examines both the current rune and the next rune.
 
-	(0x0D) Assert_Non_Word_Boundary
+	(0x0E) Assert_Non_Word_Boundary
 
 	A modified version of Assert_Word_Boundary that returns the opposite value.
 
-	(0x0E) Multiline_Open
+	(0x0F) Multiline_Open
 
-	This opcode is compiled in only when the `Multiline` flag is present, and
-	it replaces both `^` and `$` text anchors.
+	This opcode is compiled in only when the `Multiline` flag is present as a
+	replacement for the `$` text anchor.
 
-	It asserts that either the current thread is on one of the string
-	boundaries, or it consumes a `\n` or `\r` character.
+	It asserts that either the current thread is at the end of the string,
+	or it consumes a `\n` or `\r` character.
 
 	If a `\r` character is consumed, the PC will be advanced to the sibling
 	`Multiline_Close` opcode to optionally consume a `\n` character on the next
 	frame.
 
-	(0x0F) Multiline_Close
+	(0x10) Multiline_Close
 
 	This opcode is always present after `Multiline_Open`.
 
@@ -144,10 +152,10 @@ For more information, see: https://swtch.com/~rsc/regexp/regexp2.html
 	For example, Windows newlines are represented by the characters `\r\n`,
 	whereas UNIX newlines are `\n` and Macintosh newlines are `\r`.
 
-	(0x10) Wait_For_Byte
-	(0x11) Wait_For_Rune
-	(0x12) Wait_For_Rune_Class
-	(0x13) Wait_For_Rune_Class_Negated
+	(0x11) Wait_For_Byte
+	(0x12) Wait_For_Rune
+	(0x13) Wait_For_Rune_Class
+	(0x14) Wait_For_Rune_Class_Negated
 
 	These opcodes are an optimization around restarting threads on failed
 	matches when the beginning to a pattern is predictable and the Global flag
@@ -156,7 +164,7 @@ For more information, see: https://swtch.com/~rsc/regexp/regexp2.html
 	They will cause the VM to wait for the next rune to match before splitting,
 	as would happen in the un-optimized version.
 
-	(0x14) Match_All_And_Escape
+	(0x15) Match_All_And_Escape
 
 	This opcode is an optimized version of `.*$` or `.+$` that causes the
 	active thread to immediately work on escaping the program by following all

@@ -13,5 +13,5 @@ stream_blocks :: proc(ctx: ^_chacha20.Context, dst, src: []byte, nr_blocks: int)
 }
 
 hchacha20 :: proc "contextless" (dst, key, iv: []byte) {
-	intrinsics.trap()
+	panic_contextless("crypto/chacha20: simd256 implementation unsupported")
 }

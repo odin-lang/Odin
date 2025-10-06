@@ -10,7 +10,9 @@ import "base:runtime"
 version_string_buf: [1024]u8
 
 @(init, private)
-init_os_version :: proc () {
+init_os_version :: proc "contextless" () {
+	context = runtime.default_context()
+
 	when ODIN_OS == .NetBSD {
 		os_version.platform = .NetBSD
 	} else {
@@ -66,7 +68,7 @@ init_os_version :: proc () {
 }
 
 @(init, private)
-init_ram :: proc() {
+init_ram :: proc "contextless" () {
 	// Retrieve RAM info using `sysctl`
 	mib := []i32{sys.CTL_HW, sys.HW_PHYSMEM64}
 	mem_size: u64

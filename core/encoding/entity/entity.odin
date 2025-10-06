@@ -108,7 +108,7 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 				it couldn't have been part of an XML tag body to be decoded here.
 
 				Keep in mind that we could already *be* inside a CDATA tag.
-				If so, write `>` as a literal and continue.
+				If so, write `<` as a literal and continue.
 			*/
 			if in_data {
 				write_rune(&builder, '<')
@@ -119,11 +119,9 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 		case ']':
 			// If we're unboxing _and_ decoding CDATA, we'll have to check for the end tag.
 			if in_data {
-				if t.read_offset + len(CDATA_END) < len(t.src) {
-					if string(t.src[t.offset:][:len(CDATA_END)]) == CDATA_END {
-						in_data = false
-						t.read_offset += len(CDATA_END) - 1
-					}
+				if strings.has_prefix(t.src[t.offset:], CDATA_END) {
+					in_data = false
+					t.read_offset += len(CDATA_END) - 1
 				}
 				continue
 			} else {
@@ -297,40 +295,40 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 	assert(t != nil && t.r == '<')
 	if t.read_offset + len(CDATA_START) >= len(t.src) { return false, .None }
 
-	if string(t.src[t.offset:][:len(CDATA_START)]) == CDATA_START {
-		t.read_offset += len(CDATA_START) - 1
-
+	s := string(t.src[t.offset:])
+	if strings.has_prefix(s, CDATA_START) {
 		if .Unbox_CDATA in options && .Decode_CDATA in options {
 			// We're unboxing _and_ decoding CDATA
+			t.read_offset += len(CDATA_START) - 1
 			return true, .None
 		}
 
-		// CDATA is passed through.
-		offset := t.offset
-
-		// Scan until end of CDATA.
+		// CDATA is passed through. Scan until end of CDATA.
+		start_offset  := t.offset
+		t.read_offset += len(CDATA_START)
 		for {
-			advance(t) or_return
-			if t.r < 0 { return true, .CDATA_Not_Terminated }
+			advance(t)
+			if t.r < 0 {
+				// error(t, offset, "[scan_string] CDATA was not terminated\n")
+				return true, .CDATA_Not_Terminated
+			}
 
-			if t.read_offset + len(CDATA_END) < len(t.src) {
-				if string(t.src[t.offset:][:len(CDATA_END)]) == CDATA_END {
-					t.read_offset += len(CDATA_END) - 1
+			// Scan until the end of a CDATA tag.
+			if s = string(t.src[t.read_offset:]); strings.has_prefix(s, CDATA_END) {
+				t.read_offset += len(CDATA_END)
+				cdata := string(t.src[start_offset:t.read_offset])
 
-					cdata := string(t.src[offset : t.read_offset])
-	
-					if .Unbox_CDATA in options {
-						cdata = cdata[len(CDATA_START):]
-						cdata = cdata[:len(cdata) - len(CDATA_END)]
-					}
-
-					write_string(builder, cdata)
-					return false, .None
+				if .Unbox_CDATA in options {
+					cdata = cdata[len(CDATA_START):]
+					cdata = cdata[:len(cdata) - len(CDATA_END)]
 				}
+				write_string(builder, cdata)
+				return false, .None
 			}
 		}
 
-	} else if string(t.src[t.offset:][:len(COMMENT_START)]) == COMMENT_START {
+
+	} else if strings.has_prefix(s, COMMENT_START) {
 		t.read_offset += len(COMMENT_START)
 		// Comment is passed through by default.
 		offset := t.offset

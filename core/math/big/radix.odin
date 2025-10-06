@@ -280,7 +280,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 		}
 
 		pos := ch - '+'
-		if RADIX_TABLE_REVERSE_SIZE <= pos {
+		if RADIX_TABLE_REVERSE_SIZE <= u32(pos) {
 			break
 		}
 		y := RADIX_TABLE_REVERSE[pos]
@@ -310,7 +310,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 		res.sign = sign
 	}
 
-	return nil
+	return internal_clamp(res)
 }
 
 

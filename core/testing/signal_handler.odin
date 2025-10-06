@@ -12,8 +12,26 @@ package testing
 import "base:runtime"
 import "core:log"
 
+@(private, thread_local)
+local_test_expected_failures: struct {
+	signal:         i32,
+
+	message_count:  int,
+	messages:       [MAX_EXPECTED_ASSERTIONS_PER_TEST]string,
+
+	location_count: int,
+	locations:      [MAX_EXPECTED_ASSERTIONS_PER_TEST]runtime.Source_Code_Location,
+}
+
+@(private, thread_local)
+local_test_assertion_raised: struct {
+	message: string,
+	location: runtime.Source_Code_Location,
+}
+
 Stop_Reason :: enum {
 	Unknown,
+	Successful_Stop,
 	Illegal_Instruction,
 	Arithmetic_Error,
 	Segmentation_Fault,
@@ -21,7 +39,12 @@ Stop_Reason :: enum {
 }
 
 test_assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
-	log.fatalf("%s: %s", prefix, message, location = loc)
+	if local_test_expected_failures.message_count + local_test_expected_failures.location_count > 0 {
+		local_test_assertion_raised = { message, loc }
+		log.debugf("%s\n\tmessage: %q\n\tlocation: %w", prefix, message, loc)
+	} else {
+		log.fatalf("%s: %s", prefix, message, location = loc)
+	}
 	runtime.trap()
 }
 

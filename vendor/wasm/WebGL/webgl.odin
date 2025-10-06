@@ -46,24 +46,26 @@ foreign webgl {
 	
 	IsExtensionSupported :: proc(name: string) -> bool ---
 
-	ActiveTexture      :: proc(x: Enum) ---
-	AttachShader       :: proc(program: Program, shader: Shader) ---
-	BindAttribLocation :: proc(program: Program, index: i32, name: string) ---
-	BindBuffer         :: proc(target: Enum, buffer: Buffer) ---
-	BindFramebuffer    :: proc(target: Enum, framebuffer: Framebuffer) ---
-	BindTexture        :: proc(target: Enum, texture: Texture) ---
-	BlendColor         :: proc(red, green, blue, alpha: f32) ---
-	BlendEquation      :: proc(mode: Enum) ---
-	BlendFunc          :: proc(sfactor, dfactor: Enum) ---
-	BlendFuncSeparate  :: proc(srcRGB, dstRGB, srcAlpha, dstAlpha: Enum) ---
+	ActiveTexture         :: proc(x: Enum) ---
+	AttachShader          :: proc(program: Program, shader: Shader) ---
+	BindAttribLocation    :: proc(program: Program, index: i32, name: string) ---
+	BindBuffer            :: proc(target: Enum, buffer: Buffer) ---
+	BindFramebuffer       :: proc(target: Enum, framebuffer: Framebuffer) ---
+	BindTexture           :: proc(target: Enum, texture: Texture) ---
+	BindRenderbuffer      :: proc(target: Enum, renderbuffer: Renderbuffer) ---
+	BlendColor            :: proc(red, green, blue, alpha: f32) ---
+	BlendEquation         :: proc(mode: Enum) ---
+	BlendEquationSeparate :: proc(modeRGB: Enum, modeAlpha: Enum) ---
+	BlendFunc             :: proc(sfactor, dfactor: Enum) ---
+	BlendFuncSeparate     :: proc(srcRGB, dstRGB, srcAlpha, dstAlpha: Enum) ---
 	
 	BufferData    :: proc(target: Enum, size: int, data: rawptr, usage: Enum) ---
 	BufferSubData :: proc(target: Enum, offset: uintptr, size: int, data: rawptr) ---
 
-	Clear         :: proc(bits: Enum) ---
+	Clear         :: proc(bits: u32) ---
 	ClearColor    :: proc(r, g, b, a: f32) ---
-	ClearDepth    :: proc(x: Enum) ---
-	ClearStencil  :: proc(x: Enum) ---
+	ClearDepth    :: proc(x: f32) ---
+	ClearStencil  :: proc(x: i32) ---
 	ColorMask     :: proc(r, g, b, a: bool) ---
 	CompileShader :: proc(shader: Shader) ---
 	
@@ -113,6 +115,7 @@ foreign webgl {
 	GetVertexAttribOffset :: proc(index: i32, pname: Enum) -> uintptr ---
 	GetProgramParameter   :: proc(program: Program, pname: Enum) -> i32 ---
 	GetParameter          :: proc(pname: Enum) -> i32 ---
+	GetParameter4i        :: proc(pname: Enum, v0, v1, v2, v4: ^i32) ---
 
 	Hint :: proc(target: Enum, mode: Enum) ---
 	
@@ -170,14 +173,63 @@ foreign webgl {
 	Viewport :: proc(x, y, w, h: i32) ---
 }
 
-Uniform1fv :: proc "contextless" (location: i32, v: f32)       { Uniform1f(location, v) }
-Uniform2fv :: proc "contextless" (location: i32, v: glm.vec2)  { Uniform2f(location, v.x, v.y) }
-Uniform3fv :: proc "contextless" (location: i32, v: glm.vec3)  { Uniform3f(location, v.x, v.y, v.z) }
-Uniform4fv :: proc "contextless" (location: i32, v: glm.vec4)  { Uniform4f(location, v.x, v.y, v.z, v.w) }
-Uniform1iv :: proc "contextless" (location: i32, v: i32)       { Uniform1i(location, v) }
-Uniform2iv :: proc "contextless" (location: i32, v: glm.ivec2) { Uniform2i(location, v.x, v.y) }
-Uniform3iv :: proc "contextless" (location: i32, v: glm.ivec3) { Uniform3i(location, v.x, v.y, v.z) }
-Uniform4iv :: proc "contextless" (location: i32, v: glm.ivec4) { Uniform4i(location, v.x, v.y, v.z, v.w) }
+Uniform1fv :: proc "contextless" (location: i32, v: []f32) {
+	foreign webgl {
+		@(link_name="Uniform1fv")
+		_Uniform1fv :: proc "contextless" (location: i32, count: int, value: [^]f32) ---
+	}
+	_Uniform1fv(location, len(v), &v[0])
+}
+Uniform2fv :: proc "contextless" (location: i32, v: []glm.vec2) {
+	foreign webgl {
+		@(link_name="Uniform2fv")
+		_Uniform2fv :: proc "contextless" (location: i32, count: int, value: [^]f32) ---
+	}
+	_Uniform2fv(location, len(v), &v[0].x)
+}
+Uniform3fv :: proc "contextless" (location: i32, v: []glm.vec3) {
+	foreign webgl {
+		@(link_name="Uniform3fv")
+		_Uniform3fv :: proc "contextless" (location: i32, count: int, value: [^]f32) ---
+	}
+	_Uniform3fv(location, len(v), &v[0].x)
+}
+Uniform4fv :: proc "contextless" (location: i32, v: []glm.vec4) {
+	foreign webgl {
+		@(link_name="Uniform4fv")
+		_Uniform4fv :: proc "contextless" (location: i32, count: int, value: [^]f32) ---
+	}
+	_Uniform4fv(location, len(v), &v[0].x)
+}
+
+Uniform1iv :: proc "contextless" (location: i32, v: []i32) {
+	foreign webgl {
+		@(link_name="Uniform1iv")
+		_Uniform1iv :: proc "contextless" (location: i32, count: int, value: [^]i32) ---
+	}
+	_Uniform1iv(location, len(v), &v[0])
+}
+Uniform2iv :: proc "contextless" (location: i32, v: []glm.ivec2) {
+	foreign webgl {
+		@(link_name="Uniform2iv")
+		_Uniform2iv :: proc "contextless" (location: i32, count: int, value: [^]i32) ---
+	}
+	_Uniform2iv(location, len(v), &v[0].x)
+}
+Uniform3iv :: proc "contextless" (location: i32, v: []glm.ivec3) {
+	foreign webgl {
+		@(link_name="Uniform3iv")
+		_Uniform3iv :: proc "contextless" (location: i32, count: int, value: [^]i32) ---
+	}
+	_Uniform3iv(location, len(v), &v[0].x)
+}
+Uniform4iv :: proc "contextless" (location: i32, v: []glm.ivec4) {
+	foreign webgl {
+		@(link_name="Uniform4iv")
+		_Uniform4iv :: proc "contextless" (location: i32, count: int, value: [^]i32) ---
+	}
+	_Uniform4iv(location, len(v), &v[0].x)
+}
 
 VertexAttrib1fv :: proc "contextless" (index: i32, v: f32)     { VertexAttrib1f(index, v) }
 VertexAttrib2fv :: proc "contextless" (index: i32, v: glm.vec2){ VertexAttrib2f(index, v.x, v.y) }

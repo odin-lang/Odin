@@ -180,7 +180,7 @@ Type_Kind :: enum u32le {
 	Struct                 = 10,
 	Union                  = 11,
 	Enum                   = 12,
-	Tuple                  = 13,
+	Parameters             = 13,
 	Proc                   = 14,
 	Bit_Set                = 15,
 	Simd_Vector            = 16,
@@ -256,10 +256,10 @@ Type :: struct {
 	types: Array(Type_Index),
 
 	// Used by:
-	// .Named  - 1 field for the definition
-	// .Struct - fields
-	// .Enum   - fields
-	// .Tuple  - parameters (procedures only)
+	// .Named       - 1 field for the definition
+	// .Struct      - fields
+	// .Enum        - fields
+	// .Parameters  - parameters (procedures only)
 	entities: Array(Entity_Index),
 
 	// Used By: .Struct, .Union

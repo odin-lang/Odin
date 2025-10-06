@@ -26,7 +26,7 @@
 #ifndef LLVM_C_LLJITUTILS_H
 #define LLVM_C_LLJITUTILS_H
 
-#include "LLJIT.h"
+#include "llvm-c/LLJIT.h"
 
 LLVM_C_EXTERN_C_BEGIN
 

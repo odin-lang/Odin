@@ -97,7 +97,7 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 			for &v in p {
 				if pos == 0 {
 					val = read_u64(r)
-					pos = 7
+					pos = 8
 				}
 				v = byte(val)
 				val >>= 8

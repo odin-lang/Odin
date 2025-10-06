@@ -1,6 +1,7 @@
 // Tests "core:reflect/reflect".
 package test_core_reflect
 
+import "base:intrinsics"
 import "core:reflect"
 import "core:testing"
 
@@ -259,5 +260,75 @@ test_as_f64 :: proc(t: ^testing.T) {
 			testing.expectf(t, valid,    "f64 %v !valid",      d.v)
 			testing.expectf(t, r == d.e, "f64 %v -> %v != %v", d.v, r, d.e)
 		}
+	}
+}
+
+@test
+test_simd_vectors :: proc(t: ^testing.T) {
+	{
+		V :: #simd[2]u64
+		v: V
+		E := typeid_of(u64)
+
+		testing.expect(t, typeid_of(intrinsics.type_elem_type(V)) == E)
+		testing.expect(t, reflect.typeid_elem(V) == E)
+		testing.expect(t, reflect.length(v)   == len(V))
+		testing.expect(t, reflect.capacity(v) == cap(V))
+		testing.expect(t, reflect.length(v)   == 2)
+	}
+	{
+		V :: #simd[4]f32
+		v: V
+		E := typeid_of(f32)
+
+		testing.expect(t, typeid_of(intrinsics.type_elem_type(V)) == E)
+		testing.expect(t, reflect.typeid_elem(V) == E)
+		testing.expect(t, reflect.length(v)   == len(V))
+		testing.expect(t, reflect.capacity(v) == cap(V))
+		testing.expect(t, reflect.length(v)   == 4)
+	}
+	{
+		V :: #simd[8]i16
+		v: V
+		E := typeid_of(i16)
+
+		testing.expect(t, typeid_of(intrinsics.type_elem_type(V)) == E)
+		testing.expect(t, reflect.typeid_elem(V) == E)
+		testing.expect(t, reflect.length(v)   == len(V))
+		testing.expect(t, reflect.capacity(v) == cap(V))
+		testing.expect(t, reflect.length(v)   == 8)
+	}
+	{
+		V :: #simd[16]u32
+		v: V
+		E := typeid_of(u32)
+
+		testing.expect(t, typeid_of(intrinsics.type_elem_type(V)) == E)
+		testing.expect(t, reflect.typeid_elem(V) == E)
+		testing.expect(t, reflect.length(v)   == len(V))
+		testing.expect(t, reflect.capacity(v) == cap(V))
+		testing.expect(t, reflect.length(v)   == 16)
+	}
+	{
+		V :: #simd[32]u16
+		v: V
+		E := typeid_of(u16)
+
+		testing.expect(t, typeid_of(intrinsics.type_elem_type(V)) == E)
+		testing.expect(t, reflect.typeid_elem(V) == E)
+		testing.expect(t, reflect.length(v)   == len(V))
+		testing.expect(t, reflect.capacity(v) == cap(V))
+		testing.expect(t, reflect.length(v)   == 32)
+	}
+	{
+		V :: #simd[64]i8
+		v: V
+		E := typeid_of(i8)
+
+		testing.expect(t, typeid_of(intrinsics.type_elem_type(V)) == E)
+		testing.expect(t, reflect.typeid_elem(V) == E)
+		testing.expect(t, reflect.length(v)   == len(V))
+		testing.expect(t, reflect.capacity(v) == cap(V))
+		testing.expect(t, reflect.length(v)   == 64)
 	}
 }

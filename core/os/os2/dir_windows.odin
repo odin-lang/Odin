@@ -14,7 +14,9 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 	if d.cFileName[0] == '.' && d.cFileName[1] == '.' && d.cFileName[2] == 0 {
 		return
 	}
-	path := concatenate({base_path, `\`, win32_utf16_to_utf8(d.cFileName[:], temp_allocator()) or_else ""}, allocator) or_return
+
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	path := concatenate({base_path, `\`, win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_else ""}, allocator) or_return
 
 	handle := win32.HANDLE(_open_internal(path, {.Read}, 0o666) or_else 0)
 	defer win32.CloseHandle(handle)
@@ -49,8 +51,6 @@ Read_Directory_Iterator_Impl :: struct {
 
 @(require_results)
 _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info, index: int, ok: bool) {
-	TEMP_ALLOCATOR_GUARD()
-
 	for !it.impl.no_more_files {
 		err: Error
 		file_info_delete(it.impl.prev_fi, file_allocator())
@@ -107,24 +107,16 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 		return
 	}
 
-	wpath: []u16
-	{
-		i := 0
-		for impl.wname[i] != 0 {
-			i += 1
-		}
-		wpath = impl.wname[:i]
-	}
+	wpath := string16(impl.wname)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
-	TEMP_ALLOCATOR_GUARD()
-
-	wpath_search := make([]u16, len(wpath)+3, temp_allocator())
+	wpath_search := make([]u16, len(wpath)+3, temp_allocator)
 	copy(wpath_search, wpath)
 	wpath_search[len(wpath)+0] = '\\'
 	wpath_search[len(wpath)+1] = '*'
 	wpath_search[len(wpath)+2] = 0
 
-	it.impl.find_handle = win32.FindFirstFileW(raw_data(wpath_search), &it.impl.find_data)
+	it.impl.find_handle = win32.FindFirstFileW(cstring16(raw_data(wpath_search)), &it.impl.find_data)
 	if it.impl.find_handle == win32.INVALID_HANDLE_VALUE {
 		read_directory_iterator_set_error(it, impl.name, _get_platform_error())
 		return

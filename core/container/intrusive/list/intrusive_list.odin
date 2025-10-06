@@ -278,19 +278,19 @@ Example:
 	iterate_next_example :: proc() {
 		l: list.List
 
-		one := My_Struct{value=1}
-		two := My_Struct{value=2}
+		one := My_Next_Struct{value=1}
+		two := My_Next_Struct{value=2}
 
 		list.push_back(&l, &one.node)
 		list.push_back(&l, &two.node)
 
-		it := list.iterator_head(l, My_Struct, "node")
+		it := list.iterator_head(l, My_Next_Struct, "node")
 		for num in list.iterate_next(&it) {
 			fmt.println(num.value)
 		}
 	}
 
-	My_Struct :: struct {
+	My_Next_Struct :: struct {
 		node : list.Node,
 		value: int,
 	}
@@ -325,22 +325,22 @@ Example:
 	import "core:fmt"
 	import "core:container/intrusive/list"
 
-	iterate_next_example :: proc() {
+	iterate_prev_example :: proc() {
 		l: list.List
 
-		one := My_Struct{value=1}
-		two := My_Struct{value=2}
+		one := My_Prev_Struct{value=1}
+		two := My_Prev_Struct{value=2}
 
 		list.push_back(&l, &one.node)
 		list.push_back(&l, &two.node)
 
-		it := list.iterator_tail(l, My_Struct, "node")
+		it := list.iterator_tail(l, My_Prev_Struct, "node")
 		for num in list.iterate_prev(&it) {
 			fmt.println(num.value)
 		}
 	}
 
-	My_Struct :: struct {
+	My_Prev_Struct :: struct {
 		node : list.Node,
 		value: int,
 	}

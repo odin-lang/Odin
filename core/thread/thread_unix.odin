@@ -29,12 +29,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		t.id = sync.current_thread_id()
 
-		if .Started not_in sync.atomic_load(&t.flags) {
+		for (.Started not_in sync.atomic_load(&t.flags)) {
 			sync.wait(&t.start_ok)
-		}
-
-		if .Joined in sync.atomic_load(&t.flags) {
-			return nil
 		}
 
 		// Enable thread's cancelability.
@@ -85,8 +81,13 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	}
 	defer posix.pthread_attr_destroy(&attrs)
 
-	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
+	stacksize: posix.rlimit
+	if res := posix.getrlimit(.STACK, &stacksize); res == .OK && stacksize.rlim_cur > 0 {
+		_ = posix.pthread_attr_setstacksize(&attrs, uint(stacksize.rlim_cur))
+	}
+
 	res: posix.Errno
+	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
 	res = posix.pthread_attr_setdetachstate(&attrs, .CREATE_JOINABLE)
 	assert(res == nil)
 	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
@@ -124,7 +125,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
-
 	return thread
 }
 
@@ -149,10 +149,13 @@ _join :: proc(t: ^Thread) {
 
 	// Prevent non-started threads from blocking main thread with initial wait
 	// condition.
-	if .Started not_in sync.atomic_load(&t.flags) {
+	for (.Started not_in sync.atomic_load(&t.flags)) {
 		_start(t)
 	}
+
 	posix.pthread_join(t.unix_thread, nil)
+
+	t.flags += {.Joined}
 }
 
 _join_multiple :: proc(threads: ..^Thread) {

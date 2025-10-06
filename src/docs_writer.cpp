@@ -43,7 +43,7 @@ struct OdinDocWriter {
 };
 
 gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e);
-gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type);
+gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool cache);
 
 template <typename T>
 gb_internal void odin_doc_writer_item_tracker_init(OdinDocWriterItemTracker<T> *t, isize size) {
@@ -467,8 +467,8 @@ gb_internal OdinDocArray<OdinDocString> odin_doc_where_clauses(OdinDocWriter *w,
 	return odin_write_slice(w, clauses.data, clauses.count);
 }
 
-gb_internal OdinDocArray<OdinDocTypeIndex> odin_doc_type_as_slice(OdinDocWriter *w, Type *type) {
-	OdinDocTypeIndex index = odin_doc_type(w, type);
+gb_internal OdinDocArray<OdinDocTypeIndex> odin_doc_type_as_slice(OdinDocWriter *w, Type *type, bool cache=true) {
+	OdinDocTypeIndex index = odin_doc_type(w, type, cache);
 	return odin_write_item_as_slice(w, index);
 }
 
@@ -479,7 +479,7 @@ gb_internal OdinDocArray<OdinDocEntityIndex> odin_doc_add_entity_as_slice(OdinDo
 
 
 
-gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
+gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool cache=true) {
 	if (type == nullptr) {
 		return 0;
 	}
@@ -491,10 +491,13 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		}
 	}
 
-	u64 type_hash = type_hash_canonical_type(type);
-	OdinDocTypeIndex *found = map_get(&w->type_cache, type_hash);
-	if (found) {
-		return *found;
+	u64 type_hash = {0};
+	if (cache) {
+		type_hash = type_hash_canonical_type(type);
+		OdinDocTypeIndex *found = map_get(&w->type_cache, type_hash);
+		if (found) {
+			return *found;
+		}
 	}
 
 
@@ -502,7 +505,9 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	OdinDocType doc_type = {};
 	OdinDocTypeIndex type_index = 0;
 	type_index = odin_doc_write_item(w, &w->types, &doc_type, &dst);
-	map_set(&w->type_cache, type_hash, type_index);
+	if (cache) {
+		map_set(&w->type_cache, type_hash, type_index);
+	}
 
 	switch (type->kind) {
 	case Type_Basic:
@@ -527,7 +532,10 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			doc_type.kind = OdinDocType_Generic;
 			doc_type.name = odin_doc_write_string(w, name);
 			if (type->Generic.specialized) {
-				doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized);
+				// NOTE(laytan): do not look at the cache for the specialization, it would resolve
+				// to the same entry as the type itself because `default_type` resolves to the
+				// specialization of a generic type.
+				doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized, cache=false);
 			}
 		}
 		break;

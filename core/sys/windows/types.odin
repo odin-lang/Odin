@@ -107,8 +107,8 @@ PDWORD64 :: ^DWORD64
 PDWORD_PTR :: ^DWORD_PTR
 ATOM :: distinct WORD
 
-wstring :: [^]WCHAR
-PWSTR   :: [^]WCHAR
+wstring :: cstring16
+PWSTR   :: cstring16
 
 PBYTE :: ^BYTE
 LPBYTE :: ^BYTE
@@ -145,7 +145,7 @@ LPSTR :: ^CHAR
 LPWSTR :: ^WCHAR
 OLECHAR :: WCHAR
 BSTR :: ^OLECHAR
-LPOLESTR :: ^OLECHAR
+LPOLESTR :: cstring16
 LPCOLESTR :: LPCSTR
 LPFILETIME :: ^FILETIME
 LPWSABUF :: ^WSABUF
@@ -1698,7 +1698,7 @@ NM_FONTCHANGED          :: NM_OUTOFMEMORY-22
 NM_CUSTOMTEXT           :: NM_OUTOFMEMORY-23 // uses NMCUSTOMTEXT struct
 NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING struct, defined after HTREEITEM
 
-PCZZWSTR :: ^WCHAR
+PCZZWSTR :: cstring16
 
 SHFILEOPSTRUCTW :: struct {
 	hwnd: HWND,
@@ -3385,6 +3385,19 @@ FILE_ATTRIBUTE_TAG_INFO :: struct {
 	ReparseTag: DWORD,
 }
 
+// getaddrinfo flags https://learn.microsoft.com/en-us/windows/win32/api/ws2def/ns-ws2def-addrinfoa
+AI_PASSIVE 				  :: 0x01
+AI_CANONNAME 			  :: 0x02
+AI_NUMERICHOST 			  :: 0x04
+AI_ALL 					  :: 0x0100
+AI_ADDRCONFIG 			  :: 0x0400
+AI_V4MAPPED 			  :: 0x0800
+AI_NON_AUTHORITATIVE 	  :: 0x04000
+AI_SECURE 				  :: 0x08000
+AI_RETURN_PREFERRED_NAMES :: 0x010000
+AI_FQDN 				  :: 0x00020000
+AI_FILESERVER 			  :: 0x00040000
+
 PADDRINFOEXW :: ^ADDRINFOEXW
 LPADDRINFOEXW :: ^ADDRINFOEXW
 ADDRINFOEXW :: struct {
@@ -4845,6 +4858,12 @@ SOMAXCONN    :: 128 // The number of messages that can be queued in memory after
 SOCKET_ERROR :: -1
 
 // Networking errors
+WSA_INVALID_HANDLE     :: 6     // Specified event object handle is invalid.
+WSA_NOT_ENOUGH_MEMORY  :: 8     // Insufficient memory available.
+WSA_INVALID_PARAMETER  :: 87    // One or more parameters are invalid.
+WSA_OPERATION_ABORTED  :: 995   // Overlapped operation aborted.
+WSA_IO_INCOMPLETE      :: 996   // Overlapped I/O event object not in signaled state.
+WSA_IO_PENDING         :: 997   // Overlapped operations will complete later.
 WSAEINTR               :: 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
 WSAEACCES              :: 10013 // If you try to bind a Udp socket to the broadcast address without the socket option set.
 WSAEFAULT              :: 10014 // A pointer that was passed to a WSA function is invalid, such as a buffer size is smaller than you said it was

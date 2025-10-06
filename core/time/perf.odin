@@ -18,6 +18,13 @@ tick_now :: proc "contextless" () -> Tick {
 }
 
 /*
+Add duration to a tick.
+*/
+tick_add :: proc "contextless" (t: Tick, d: Duration) -> Tick {
+	return Tick{t._nsec + i64(d)}
+}
+
+/*
 Obtain the difference between ticks.
 */
 tick_diff :: proc "contextless" (start, end: Tick) -> Duration {
@@ -97,6 +104,8 @@ TSC at a fixed frequency, independent of ACPI state, and CPU frequency.
 has_invariant_tsc :: proc "contextless" () -> bool {
 	when ODIN_ARCH == .amd64 {
 		return x86_has_invariant_tsc()
+	} else when ODIN_ARCH == .arm64 {
+		return true
 	}
 
 	return false

@@ -47,6 +47,8 @@ foreign user32 {
 		lpParam: LPVOID,
 	) -> HWND ---
 
+	GetWindowThreadProcessId :: proc(hwnd: HWND, lpdwProcessId: LPDWORD) -> DWORD ---
+
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
 
 	ShowWindow :: proc(hWnd: HWND, nCmdShow: INT) -> BOOL ---

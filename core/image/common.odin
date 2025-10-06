@@ -64,8 +64,16 @@ Image_Metadata :: union #shared_nil {
 	^QOI_Info,
 	^TGA_Info,
 	^BMP_Info,
+	^JPEG_Info,
 }
 
+Exif :: struct {
+	byte_order: enum {
+		little_endian,
+		big_endian,
+	},
+	data: []u8 `fmt:"-"`,
+}
 
 
 /*
@@ -112,8 +120,7 @@ Image_Option:
 
 	`.alpha_drop_if_present`
 		If the image has an alpha channel, drop it.
-		You may want to use `.alpha_
-		tiply` in this case.
+		You may want to use `.alpha_premultiply` in this case.
 
 		NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
 		unless you select `alpha_premultiply`.
@@ -163,6 +170,7 @@ Error :: union #shared_nil {
 	PNG_Error,
 	QOI_Error,
 	BMP_Error,
+	JPEG_Error,
 
 	compress.Error,
 	compress.General_Error,
@@ -573,6 +581,140 @@ TGA_Info :: struct {
 	image_id:  string,
 	footer:    Maybe(TGA_Footer),
 	extension: Maybe(TGA_Extension),
+}
+
+
+/*
+	JPEG-specific
+*/
+JFIF_Magic := [?]byte{0x4A, 0x46, 0x49, 0x46} // "JFIF"
+JFXX_Magic := [?]byte{0x4A, 0x46, 0x58, 0x58} // "JFXX"
+Exif_Magic := [?]byte{0x45, 0x78, 0x69, 0x66} // "Exif"
+
+JPEG_Error :: enum {
+	None = 0,
+	Duplicate_SOI_Marker,
+	Invalid_JFXX_Extension_Code,
+	Encountered_SOS_Before_SOF,
+	Invalid_Quantization_Table_Precision,
+	Invalid_Quantization_Table_Index,
+	Invalid_Huffman_Coefficient_Type,
+	Invalid_Huffman_Table_Index,
+	Unsupported_Frame_Type,
+	Invalid_Frame_Bit_Depth_Combo,
+	Invalid_Sampling_Factor,
+	Unsupported_12_Bit_Depth,
+	Multiple_SOS_Markers,
+	Encountered_RST_Marker_Outside_ECS,
+	Extra_Data_After_SOS, // Image seemed to have decoded okay, but there's more data after SOS
+	Invalid_Thumbnail_Size,
+	Huffman_Symbols_Exceeds_Max,
+}
+
+JFIF_Unit :: enum byte {
+	None = 0,
+	Dots_Per_Inch = 1,
+	Dots_Per_Centimeter = 2,
+}
+
+JFIF_APP0 :: struct {
+	version: u16be,
+	x_density: u16be,
+	y_density: u16be,
+	units: JFIF_Unit,
+	x_thumbnail: u8,
+	y_thumbnail: u8,
+	greyscale_thumbnail: bool,
+	thumbnail: []RGB_Pixel `fmt:"-"`,
+}
+
+JFXX_APP0 :: struct {
+	extension_code: JFXX_Extension_Code,
+	x_thumbnail: u8,
+	y_thumbnail: u8,
+	thumbnail: []byte `fmt:"-"`,
+}
+
+JFXX_Extension_Code :: enum u8 {
+	Thumbnail_JPEG = 0x10,
+	Thumbnail_1_Byte_Palette = 0x11,
+	Thumbnail_3_Byte_RGB = 0x13,
+}
+
+JPEG_Marker :: enum u8 {
+	SOF0  = 0xC0, // Baseline sequential DCT
+	SOF1  = 0xC1, // Extended sequential DCT
+	SOF2  = 0xC2, // Progressive DCT
+	SOF3  = 0xC3, // Lossless (sequential)
+	SOF5  = 0xC5, // Differential sequential DCT
+	SOF6  = 0xC6, // Differential progressive DCT
+	SOF7  = 0xC7, // Differential lossless (sequential)
+	SOF9  = 0xC9, // Extended sequential DCT, Arithmetic coding
+	SOF10 = 0xCA, // Progressive DCT, Arithmetic coding
+	SOF11 = 0xCB, // Lossless (sequential), Arithmetic coding
+	SOF13 = 0xCD, // Differential sequential DCT, Arithmetic coding
+	SOF14 = 0xCE, // Differential progressive DCT, Arithmetic coding
+	SOF15 = 0xCF, // Differential lossless (sequential), Arithmetic coding
+
+	DHT   = 0xC4,
+	JPG   = 0xC8,
+	DAC   = 0xCC,
+	RST0  = 0xD0,
+	RST1  = 0xD1,
+	RST2  = 0xD2,
+	RST3  = 0xD3,
+	RST4  = 0xD4,
+	RST5  = 0xD5,
+	RST6  = 0xD6,
+	RST7  = 0xD7,
+	SOI   = 0xD8,
+	EOI   = 0xD9,
+	SOS   = 0xDA,
+	DQT   = 0xDB,
+	DNL   = 0xDC,
+	DRI   = 0xDD,
+	DHP   = 0xDE,
+	EXP   = 0xDF,
+	APP0  = 0xE0,
+	APP1  = 0xE1,
+	APP2  = 0xE2,
+	APP3  = 0xE3,
+	APP4  = 0xE4,
+	APP5  = 0xE5,
+	APP6  = 0xE6,
+	APP7  = 0xE7,
+	APP8  = 0xE8,
+	APP9  = 0xE9,
+	APP10 = 0xEA,
+	APP11 = 0xEB,
+	APP12 = 0xEC,
+	APP13 = 0xED,
+	APP14 = 0xEE,
+	APP15 = 0xEF,
+	JPG0  = 0xF0,
+	JPG1  = 0xF1,
+	JPG2  = 0xF2,
+	JPG3  = 0xF3,
+	JPG4  = 0xF4,
+	JPG5  = 0xF5,
+	JPG6  = 0xF6,
+	JPG7  = 0xF7,
+	JPG8  = 0xF8,
+	JPG9  = 0xF9,
+	JPG10 = 0xFA,
+	JPG11 = 0xFB,
+	JPG12 = 0xFC,
+	JPG13 = 0xFD,
+	COM   = 0xFE,
+	TEM   = 0x01,
+}
+
+JPEG_Info :: struct {
+	jfif_app0: Maybe(JFIF_APP0),
+	jfxx_app0: Maybe(JFXX_APP0),
+	comments: [dynamic]string,
+	exif: [dynamic]Exif,
+	frame_type: JPEG_Marker,
 }
 
 // Function to help with image buffer calculations

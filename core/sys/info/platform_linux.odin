@@ -1,6 +1,7 @@
 package sysinfo
 
 import "base:intrinsics"
+import "base:runtime"
 
 import "core:strconv"
 import "core:strings"
@@ -10,15 +11,21 @@ import "core:sys/linux"
 version_string_buf: [1024]u8
 
 @(init, private)
-init_os_version :: proc () {
+init_os_version :: proc "contextless" () {
+	context = runtime.default_context()
+
 	os_version.platform = .Linux
 
 	b := strings.builder_from_bytes(version_string_buf[:])
 
 	// Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
-	{
+	pretty_parse: {
 		fd, errno := linux.open("/etc/os-release", {})
-		assert(errno == .NONE, "Failed to read /etc/os-release")
+		if errno != .NONE {
+			strings.write_string(&b, "Unknown Linux Distro")
+			break pretty_parse
+		}
+
 		defer {
 			cerrno := linux.close(fd)
 			assert(cerrno == .NONE, "Failed to close the file descriptor")
@@ -26,7 +33,10 @@ init_os_version :: proc () {
 
 		os_release_buf: [2048]u8
 		n, read_errno := linux.read(fd, os_release_buf[:])
-		assert(read_errno == .NONE, "Failed to read data from /etc/os-release")
+		if read_errno != .NONE {
+			strings.write_string(&b, "Unknown Linux Distro")
+			break pretty_parse
+		}
 		release := string(os_release_buf[:n])
 
 		// Search the line in the file until we find "PRETTY_NAME="
@@ -59,7 +69,7 @@ init_os_version :: proc () {
 	os_version.as_string = strings.to_string(b)
 
 	// Parse the Linux version out of the release string
-	{
+	version_loop: {
 		version_num, _, version_suffix := strings.partition(release_str, "-")
 		os_version.version = version_suffix
 
@@ -72,11 +82,11 @@ init_os_version :: proc () {
 			case 0: dst = &os_version.major
 			case 1: dst = &os_version.minor
 			case 2: dst = &os_version.patch
-			case:   break
+			case:   break version_loop
 			}
 
 			num, ok := strconv.parse_int(part)
-			if !ok { break }
+			if !ok { break version_loop }
 
 			dst^ = num
 		}
@@ -84,11 +94,11 @@ init_os_version :: proc () {
 }
 
 @(init, private)
-init_ram :: proc() {
+init_ram :: proc "contextless" () {
 	// Retrieve RAM info using `sysinfo`
 	sys_info: linux.Sys_Info
 	errno := linux.sysinfo(&sys_info)
-	assert(errno == .NONE, "Good luck to whoever's debugging this, something's seriously cucked up!")
+	assert_contextless(errno == .NONE, "Good luck to whoever's debugging this, something's seriously cucked up!")
 	ram = RAM{
 		total_ram  = int(sys_info.totalram)  * int(sys_info.mem_unit),
 		free_ram   = int(sys_info.freeram)   * int(sys_info.mem_unit),

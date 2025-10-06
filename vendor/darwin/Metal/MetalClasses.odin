@@ -2767,6 +2767,14 @@ RenderPipelineDescriptor_fragmentBuffers :: #force_inline proc "c" (self: ^Rende
 RenderPipelineDescriptor_fragmentFunction :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^Function {
 	return msgSend(^Function, self, "fragmentFunction")
 }
+@(objc_type=RenderPipelineDescriptor, objc_name="vertexLinkedFunctions")
+RenderPipelineDescriptor_vertexLinkedFunctions :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^LinkedFunctions {
+	return msgSend(^LinkedFunctions, self, "vertexLinkedFunctions")
+}
+@(objc_type=RenderPipelineDescriptor, objc_name="fragmentLinkedFunctions")
+RenderPipelineDescriptor_fragmentLinkedFunctions :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^LinkedFunctions {
+	return msgSend(^LinkedFunctions, self, "fragmentLinkedFunctions")
+}
 @(objc_type=RenderPipelineDescriptor, objc_name="inputPrimitiveTopology")
 RenderPipelineDescriptor_inputPrimitiveTopology :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> PrimitiveTopologyClass {
 	return msgSend(PrimitiveTopologyClass, self, "inputPrimitiveTopology")
@@ -2830,6 +2838,14 @@ RenderPipelineDescriptor_setDepthAttachmentPixelFormat :: #force_inline proc "c"
 @(objc_type=RenderPipelineDescriptor, objc_name="setFragmentFunction")
 RenderPipelineDescriptor_setFragmentFunction :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, fragmentFunction: ^Function) {
 	msgSend(nil, self, "setFragmentFunction:", fragmentFunction)
+}
+@(objc_type=RenderPipelineDescriptor, objc_name="setVertexLinkedFunctions")
+RenderPipelineDescriptor_setVertexLinkedFunctions :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, vertexLinkedFunctions: ^LinkedFunctions) {
+	msgSend(nil, self, "setVertexLinkedFunctions:", vertexLinkedFunctions)
+}
+@(objc_type=RenderPipelineDescriptor, objc_name="setFragmentLinkedFunctions")
+RenderPipelineDescriptor_setFragmentLinkedFunctions :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, fragmentLinkedFunctions: ^LinkedFunctions) {
+	msgSend(nil, self, "setFragmentLinkedFunctions:", fragmentLinkedFunctions)
 }
 @(objc_type=RenderPipelineDescriptor, objc_name="setInputPrimitiveTopology")
 RenderPipelineDescriptor_setInputPrimitiveTopology :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, inputPrimitiveTopology: PrimitiveTopologyClass) {
@@ -2940,86 +2956,6 @@ RenderPipelineDescriptor_vertexFunction :: #force_inline proc "c" (self: ^Render
 	return msgSend(^Function, self, "vertexFunction")
 }
 
-@(objc_type=RenderPipelineDescriptor, objc_name="objectFunction")
-RenderPipelineDescriptor_objectFunction :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^Function {
-	return msgSend(^Function, self, "objectFunction")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="setObjectFunction")
-RenderPipelineDescriptor_setObjectFunction :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, objectFunction: ^Function) {
-	msgSend(nil, self, "setObjectFunction:", objectFunction)
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="meshFunction")
-RenderPipelineDescriptor_meshFunction :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^Function {
-	return msgSend(^Function, self, "meshFunction")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="setMeshFunction")
-RenderPipelineDescriptor_setMeshFunction :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, meshFunction: ^Function) {
-	msgSend(nil, self, "setMeshFunction:", meshFunction)
-}
-
-@(objc_type=RenderPipelineDescriptor, objc_name="maxTotalThreadsPerObjectThreadgroup")
-RenderPipelineDescriptor_maxTotalThreadsPerObjectThreadgroup :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> NS.UInteger {
-	return msgSend(NS.UInteger, self, "maxTotalThreadsPerObjectThreadgroup")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="setMaxTotalThreadsPerObjectThreadgroup")
-RenderPipelineDescriptor_setMaxTotalThreadsPerObjectThreadgroup :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, maxTotalThreadsPerObjectThreadgroup: NS.UInteger) {
-	msgSend(nil, self, "setMaxTotalThreadsPerObjectThreadgroup:", maxTotalThreadsPerObjectThreadgroup)
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="maxTotalThreadsPerMeshThreadgroup")
-RenderPipelineDescriptor_maxTotalThreadsPerMeshThreadgroup :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> NS.UInteger {
-	return msgSend(NS.UInteger, self, "maxTotalThreadsPerMeshThreadgroup")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="setMaxTotalThreadsPerMeshThreadgroup")
-RenderPipelineDescriptor_setMaxTotalThreadsPerMeshThreadgroup :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, maxTotalThreadsPerMeshThreadgroup: NS.UInteger) {
-	msgSend(nil, self, "setMaxTotalThreadsPerMeshThreadgroup:", maxTotalThreadsPerMeshThreadgroup)
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="objectThreadgroupSizeIsMultipleOfThreadExecutionWidth")
-RenderPipelineDescriptor_objectThreadgroupSizeIsMultipleOfThreadExecutionWidth :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> NS.UInteger {
-	return msgSend(NS.UInteger, self, "objectThreadgroupSizeIsMultipleOfThreadExecutionWidth")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="setObjectThreadgroupSizeIsMultipleOfThreadExecutionWidth")
-RenderPipelineDescriptor_setObjectThreadgroupSizeIsMultipleOfThreadExecutionWidth :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, objectThreadgroupSizeIsMultipleOfThreadExecutionWidth: NS.UInteger) {
-	msgSend(nil, self, "setObjectThreadgroupSizeIsMultipleOfThreadExecutionWidth:", objectThreadgroupSizeIsMultipleOfThreadExecutionWidth)
-}
-
-@(objc_type=RenderPipelineDescriptor, objc_name="meshThreadgroupSizeIsMultipleOfThreadExecutionWidth")
-RenderPipelineDescriptor_meshThreadgroupSizeIsMultipleOfThreadExecutionWidth :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> BOOL {
-	return msgSend(BOOL, self, "meshThreadgroupSizeIsMultipleOfThreadExecutionWidth")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="setMeshThreadgroupSizeIsMultipleOfThreadExecutionWidth")
-RenderPipelineDescriptor_setMeshThreadgroupSizeIsMultipleOfThreadExecutionWidth :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, meshThreadgroupSizeIsMultipleOfThreadExecutionWidth: BOOL) {
-	msgSend(nil, self, "setMeshThreadgroupSizeIsMultipleOfThreadExecutionWidth:", meshThreadgroupSizeIsMultipleOfThreadExecutionWidth)
-}
-
-
-@(objc_type=RenderPipelineDescriptor, objc_name="payloadMemoryLength")
-RenderPipelineDescriptor_payloadMemoryLength :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> NS.UInteger {
-	return msgSend(NS.UInteger, self, "payloadMemoryLength")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="setPayloadMemoryLength")
-RenderPipelineDescriptor_setPayloadMemoryLength :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, payloadMemoryLength: NS.UInteger) {
-	msgSend(nil, self, "setPayloadMemoryLength:", payloadMemoryLength)
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="maxTotalThreadgroupsPerMeshGrid")
-RenderPipelineDescriptor_maxTotalThreadgroupsPerMeshGrid :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> NS.UInteger {
-	return msgSend(NS.UInteger, self, "maxTotalThreadgroupsPerMeshGrid")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="setMaxTotalThreadgroupsPerMeshGrid")
-RenderPipelineDescriptor_setMaxTotalThreadgroupsPerMeshGrid :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, maxTotalThreadgroupsPerMeshGrid: NS.UInteger) {
-	msgSend(nil, self, "setMaxTotalThreadgroupsPerMeshGrid:", maxTotalThreadgroupsPerMeshGrid)
-}
-
-@(objc_type=RenderPipelineDescriptor, objc_name="objectBuffers")
-RenderPipelineDescriptor_objectBuffers :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^PipelineBufferDescriptorArray {
-	return msgSend(^PipelineBufferDescriptorArray, self, "objectBuffers")
-}
-@(objc_type=RenderPipelineDescriptor, objc_name="meshBuffers")
-RenderPipelineDescriptor_meshBuffers :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ^PipelineBufferDescriptorArray {
-	return msgSend(^PipelineBufferDescriptorArray, self, "meshBuffers")
-}
-
-
-
 @(objc_type=RenderPipelineDescriptor, objc_name="alphaToCoverageEnabled")
 RenderPipelineDescriptor_alphaToCoverageEnabled :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> BOOL {
 	return msgSend(BOOL, self, "alphaToCoverageEnabled")
@@ -3032,6 +2968,272 @@ RenderPipelineDescriptor_alphaToOneEnabled :: #force_inline proc "c" (self: ^Ren
 @(objc_type=RenderPipelineDescriptor, objc_name="rasterizationEnabled")
 RenderPipelineDescriptor_rasterizationEnabled :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> BOOL {
 	return msgSend(BOOL, self, "rasterizationEnabled")
+}
+
+@(objc_type=RenderPipelineDescriptor, objc_name="shaderValidation")
+RenderPipelineDescriptor_shaderValidation :: #force_inline proc "c" (self: ^RenderPipelineDescriptor) -> ShaderValidation {
+	return msgSend(ShaderValidation, self, "shaderValidation")
+}
+@(objc_type=RenderPipelineDescriptor, objc_name="setShaderValidation")
+RenderPipelineDescriptor_setShaderValidation :: #force_inline proc "c" (self: ^RenderPipelineDescriptor, shaderValidation: ShaderValidation) {
+	msgSend(nil, self, "setShaderValidation:", shaderValidation)
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+@(objc_class="MTLMeshRenderPipelineDescriptor")
+MeshRenderPipelineDescriptor :: struct{ using _: NS.Copying(MeshRenderPipelineDescriptor) }
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="alloc", objc_is_class_method=true)
+MeshRenderPipelineDescriptor_alloc :: #force_inline proc "c" () -> ^MeshRenderPipelineDescriptor {
+	return msgSend(^MeshRenderPipelineDescriptor, MeshRenderPipelineDescriptor, "alloc")
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="init")
+MeshRenderPipelineDescriptor_init :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^MeshRenderPipelineDescriptor {
+	return msgSend(^MeshRenderPipelineDescriptor, self, "init")
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="binaryArchives")
+MeshRenderPipelineDescriptor_binaryArchives :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^NS.Array {
+	return msgSend(^NS.Array, self, "binaryArchives")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setBinaryArchives")
+MeshRenderPipelineDescriptor_setBinaryArchives :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, binaryArchives: ^NS.Array) {
+	msgSend(nil, self, "setBinaryArchives:", binaryArchives)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="colorAttachments")
+MeshRenderPipelineDescriptor_colorAttachments :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^RenderPipelineColorAttachmentDescriptorArray {
+	return msgSend(^RenderPipelineColorAttachmentDescriptorArray, self, "colorAttachments")
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="depthAttachmentPixelFormat")
+MeshRenderPipelineDescriptor_depthAttachmentPixelFormat :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> PixelFormat {
+	return msgSend(PixelFormat, self, "depthAttachmentPixelFormat")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setDepthAttachmentPixelFormat")
+MeshRenderPipelineDescriptor_setDepthAttachmentPixelFormat :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, depthAttachmentPixelFormat: PixelFormat) {
+	msgSend(nil, self, "setDepthAttachmentPixelFormat:", depthAttachmentPixelFormat)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="fragmentBuffers")
+MeshRenderPipelineDescriptor_fragmentBuffers :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^PipelineBufferDescriptorArray {
+	return msgSend(^PipelineBufferDescriptorArray, self, "fragmentBuffers")
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="fragmentFunction")
+MeshRenderPipelineDescriptor_fragmentFunction :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^Function {
+	return msgSend(^Function, self, "fragmentFunction")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setFragmentFunction")
+MeshRenderPipelineDescriptor_setFragmentFunction :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, fragmentFunction: ^Function) {
+	msgSend(nil, self, "setFragmentFunction:", fragmentFunction)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="fragmentLinkedFunctions")
+MeshRenderPipelineDescriptor_fragmentLinkedFunctions :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^LinkedFunctions {
+	return msgSend(^LinkedFunctions, self, "fragmentLinkedFunctions")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setFragmentLinkedFunctions")
+MeshRenderPipelineDescriptor_setFragmentLinkedFunctions :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, fragmentLinkedFunctions: ^LinkedFunctions) {
+	msgSend(nil, self, "setFragmentLinkedFunctions:", fragmentLinkedFunctions)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="alphaToCoverageEnabled")
+MeshRenderPipelineDescriptor_alphaToCoverageEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "alphaToCoverageEnabled")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="isAlphaToCoverageEnabled")
+MeshRenderPipelineDescriptor_isAlphaToCoverageEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "isAlphaToCoverageEnabled")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setAlphaToCoverageEnabled")
+MeshRenderPipelineDescriptor_setAlphaToCoverageEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, alphaToCoverageEnabled: BOOL) {
+	msgSend(nil, self, "setAlphaToCoverageEnabled:", alphaToCoverageEnabled)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="alphaToOneEnabled")
+MeshRenderPipelineDescriptor_alphaToOneEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "alphaToOneEnabled")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="isAlphaToOneEnabled")
+MeshRenderPipelineDescriptor_isAlphaToOneEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "isAlphaToOneEnabled")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setAlphaToOneEnabled")
+MeshRenderPipelineDescriptor_setAlphaToOneEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, alphaToOneEnabled: BOOL) {
+	msgSend(nil, self, "setAlphaToOneEnabled:", alphaToOneEnabled)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="rasterizationEnabled")
+MeshRenderPipelineDescriptor_rasterizationEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "rasterizationEnabled")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="isRasterizationEnabled")
+MeshRenderPipelineDescriptor_isRasterizationEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "isRasterizationEnabled")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setRasterizationEnabled")
+MeshRenderPipelineDescriptor_setRasterizationEnabled :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, rasterizationEnabled: BOOL) {
+	msgSend(nil, self, "setRasterizationEnabled:", rasterizationEnabled)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="label")
+MeshRenderPipelineDescriptor_label :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^NS.String {
+	return msgSend(^NS.String, self, "label")
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="maxTotalThreadgroupsPerMeshGrid")
+MeshRenderPipelineDescriptor_maxTotalThreadgroupsPerMeshGrid :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxTotalThreadgroupsPerMeshGrid")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setMaxTotalThreadgroupsPerMeshGrid")
+MeshRenderPipelineDescriptor_setMaxTotalThreadgroupsPerMeshGrid :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, maxTotalThreadgroupsPerMeshGrid: NS.UInteger) {
+	msgSend(nil, self, "setMaxTotalThreadgroupsPerMeshGrid:", maxTotalThreadgroupsPerMeshGrid)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="maxTotalThreadsPerMeshThreadgroup")
+MeshRenderPipelineDescriptor_maxTotalThreadsPerMeshThreadgroup :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxTotalThreadsPerMeshThreadgroup")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setMaxTotalThreadsPerMeshThreadgroup")
+MeshRenderPipelineDescriptor_setMaxTotalThreadsPerMeshThreadgroup :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, maxTotalThreadsPerMeshThreadgroup: NS.UInteger) {
+	msgSend(nil, self, "setMaxTotalThreadsPerMeshThreadgroup:", maxTotalThreadsPerMeshThreadgroup)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="maxTotalThreadsPerObjectThreadgroup")
+MeshRenderPipelineDescriptor_maxTotalThreadsPerObjectThreadgroup :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxTotalThreadsPerObjectThreadgroup")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setMaxTotalThreadsPerObjectThreadgroup")
+MeshRenderPipelineDescriptor_setMaxTotalThreadsPerObjectThreadgroup :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, maxTotalThreadsPerObjectThreadgroup: NS.UInteger) {
+	msgSend(nil, self, "setMaxTotalThreadsPerObjectThreadgroup:", maxTotalThreadsPerObjectThreadgroup)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="maxVertexAmplificationCount")
+MeshRenderPipelineDescriptor_maxVertexAmplificationCount :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "maxVertexAmplificationCount")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setMaxVertexAmplificationCount")
+MeshRenderPipelineDescriptor_setMaxVertexAmplificationCount :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, maxVertexAmplificationCount: NS.UInteger) {
+	msgSend(nil, self, "setMaxVertexAmplificationCount:", maxVertexAmplificationCount)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="meshBuffers")
+MeshRenderPipelineDescriptor_meshBuffers :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^PipelineBufferDescriptorArray {
+	return msgSend(^PipelineBufferDescriptorArray, self, "meshBuffers")
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="meshFunction")
+MeshRenderPipelineDescriptor_meshFunction :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^Function {
+	return msgSend(^Function, self, "meshFunction")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setMeshFunction")
+MeshRenderPipelineDescriptor_setMeshFunction :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, meshFunction: ^Function) {
+	msgSend(nil, self, "setMeshFunction:", meshFunction)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="meshLinkedFunctions")
+MeshRenderPipelineDescriptor_meshLinkedFunctions :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^LinkedFunctions {
+	return msgSend(^LinkedFunctions, self, "meshLinkedFunctions")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setMeshLinkedFunctions")
+MeshRenderPipelineDescriptor_setMeshLinkedFunctions :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, meshLinkedFunctions: ^LinkedFunctions) {
+	msgSend(nil, self, "setMeshLinkedFunctions:", meshLinkedFunctions)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="meshThreadgroupSizeIsMultipleOfThreadExecutionWidth")
+MeshRenderPipelineDescriptor_meshThreadgroupSizeIsMultipleOfThreadExecutionWidth :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "meshThreadgroupSizeIsMultipleOfThreadExecutionWidth")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setMeshThreadgroupSizeIsMultipleOfThreadExecutionWidth")
+MeshRenderPipelineDescriptor_setMeshThreadgroupSizeIsMultipleOfThreadExecutionWidth :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, meshThreadgroupSizeIsMultipleOfThreadExecutionWidth: BOOL) {
+	msgSend(nil, self, "setMeshThreadgroupSizeIsMultipleOfThreadExecutionWidth:", meshThreadgroupSizeIsMultipleOfThreadExecutionWidth)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="objectBuffers")
+MeshRenderPipelineDescriptor_objectBuffers :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^PipelineBufferDescriptorArray {
+	return msgSend(^PipelineBufferDescriptorArray, self, "objectBuffers")
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="objectFunction")
+MeshRenderPipelineDescriptor_objectFunction :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^Function {
+	return msgSend(^Function, self, "objectFunction")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setObjectFunction")
+MeshRenderPipelineDescriptor_setObjectFunction :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, objectFunction: ^Function) {
+	msgSend(nil, self, "setObjectFunction:", objectFunction)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="objectLinkedFunctions")
+MeshRenderPipelineDescriptor_objectLinkedFunctions :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ^LinkedFunctions {
+	return msgSend(^LinkedFunctions, self, "objectLinkedFunctions")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setObjectLinkedFunctions")
+MeshRenderPipelineDescriptor_setObjectLinkedFunctions :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, objectLinkedFunctions: ^LinkedFunctions) {
+	msgSend(nil, self, "setObjectLinkedFunctions:", objectLinkedFunctions)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="objectThreadgroupSizeIsMultipleOfThreadExecutionWidth")
+MeshRenderPipelineDescriptor_objectThreadgroupSizeIsMultipleOfThreadExecutionWidth :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "objectThreadgroupSizeIsMultipleOfThreadExecutionWidth")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setObjectThreadgroupSizeIsMultipleOfThreadExecutionWidth")
+MeshRenderPipelineDescriptor_setObjectThreadgroupSizeIsMultipleOfThreadExecutionWidth :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, objectThreadgroupSizeIsMultipleOfThreadExecutionWidth: BOOL) {
+	msgSend(nil, self, "setObjectThreadgroupSizeIsMultipleOfThreadExecutionWidth:", objectThreadgroupSizeIsMultipleOfThreadExecutionWidth)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="payloadMemoryLength")
+MeshRenderPipelineDescriptor_payloadMemoryLength :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "payloadMemoryLength")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setPayloadMemoryLength")
+MeshRenderPipelineDescriptor_setPayloadMemoryLength :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, payloadMemoryLength: NS.UInteger) {
+	msgSend(nil, self, "setPayloadMemoryLength:", payloadMemoryLength)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="rasterSampleCount")
+MeshRenderPipelineDescriptor_rasterSampleCount :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "rasterSampleCount")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setRasterSampleCount")
+MeshRenderPipelineDescriptor_setRasterSampleCount :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, rasterSampleCount: NS.UInteger) {
+	msgSend(nil, self, "setRasterSampleCount:", rasterSampleCount)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="shaderValidation")
+MeshRenderPipelineDescriptor_shaderValidation :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> ShaderValidation {
+	return msgSend(ShaderValidation, self, "shaderValidation")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setShaderValidation")
+MeshRenderPipelineDescriptor_setShaderValidation :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, shaderValidation: ShaderValidation) {
+	msgSend(nil, self, "setShaderValidation:", shaderValidation)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="stencilAttachmentPixelFormat")
+MeshRenderPipelineDescriptor_stencilAttachmentPixelFormat :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> PixelFormat {
+	return msgSend(PixelFormat, self, "stencilAttachmentPixelFormat")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setStencilAttachmentPixelFormat")
+MeshRenderPipelineDescriptor_setStencilAttachmentPixelFormat :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, stencilAttachmentPixelFormat: PixelFormat) {
+	msgSend(nil, self, "setStencilAttachmentPixelFormat:", stencilAttachmentPixelFormat)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="supportIndirectCommandBuffers")
+MeshRenderPipelineDescriptor_supportIndirectCommandBuffers :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) -> BOOL {
+	return msgSend(BOOL, self, "supportIndirectCommandBuffers")
+}
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="setSupportIndirectCommandBuffers")
+MeshRenderPipelineDescriptor_setSupportIndirectCommandBuffers :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor, supportIndirectCommandBuffers: BOOL) {
+	msgSend(nil, self, "setSupportIndirectCommandBuffers:", supportIndirectCommandBuffers)
+}
+
+@(objc_type=MeshRenderPipelineDescriptor, objc_name="reset")
+MeshRenderPipelineDescriptor_reset :: #force_inline proc "c" (self: ^MeshRenderPipelineDescriptor) {
+	msgSend(nil, self, "reset")
 }
 
 
@@ -4105,9 +4307,9 @@ AccelerationStructure_size :: #force_inline proc "c" (self: ^AccelerationStructu
 	return msgSend(NS.UInteger, self, "size")
 }
 
-@(objc_type=AccelerationStructure, objc_name="getResourceID")
-AccelerationStructure_getResourceID :: #force_inline proc "c" (self: ^AccelerationStructure) -> ResourceID {
-	return msgSend(ResourceID, self, "getResourceID")
+@(objc_type=AccelerationStructure, objc_name="gpuResourceID")
+AccelerationStructure_gpuResourceID :: #force_inline proc "c" (self: ^AccelerationStructure) -> ResourceID {
+	return msgSend(ResourceID, self, "gpuResourceID")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -5379,7 +5581,7 @@ Device_newBufferWithSlice :: #force_inline proc "c" (self: ^Device, slice: $S/[]
 }
 @(objc_type=Device, objc_name="newBufferWithSliceNoCopy")
 Device_newBufferWithSliceNoCopy :: #force_inline proc "c" (self: ^Device, slice: $S/[]$E, options: ResourceOptions, deallocator: rawptr) -> ^Buffer {
-	return Device_newBufferWithBytesNotCopy(self, mem.slice_to_bytes(slice), options, deallocator)
+	return Device_newBufferWithBytesNoCopy(self, mem.slice_to_bytes(slice), options, deallocator)
 }
 @(objc_type=Device, objc_name="newBufferWithLength")
 Device_newBufferWithLength :: #force_inline proc "c" (self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Buffer {
@@ -5702,14 +5904,13 @@ Device_supportsVertexAmplificationCount :: #force_inline proc "c" (self: ^Device
 
 
 @(objc_type=Device, objc_name="newRenderPipelineStateWithMeshDescriptor")
-Device_newRenderPipelineStateWithMeshDescriptor :: #force_inline proc "contextless" (self: ^Device, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (state: ^RenderPipelineState, error: ^NS.Error) {
-	state = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithMeshDescriptor:options:reflection:error:", options, reflection, &error)
+Device_newRenderPipelineStateWithMeshDescriptor :: #force_inline proc "c" (self: ^Device, descriptor: ^MeshRenderPipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedRenderPipelineReflection) -> (state: ^RenderPipelineState, error: ^NS.Error) {
+	state = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithMeshDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
 @(objc_type=Device, objc_name="newRenderPipelineStateWithMeshDescriptorAndCompletionHandler")
-Device_newRenderPipelineStateWithMeshDescriptorAndCompletionHandler :: #force_inline proc "c" (self: ^Device, options: PipelineOption, completionHandler: ^NewRenderPipelineStateWithReflectionCompletionHandler) -> (state: ^RenderPipelineState) {
-	state = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithMeshDescriptor:options:completionHandler:", options, completionHandler)
-	return
+Device_newRenderPipelineStateWithMeshDescriptorAndCompletionHandler :: #force_inline proc "c" (self: ^Device, descriptor: ^MeshRenderPipelineDescriptor, options: PipelineOption, completionHandler: NewRenderPipelineStateWithReflectionCompletionHandler) {
+	msgSend(nil, self, "newRenderPipelineStateWithMeshDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
 
 @(objc_type=Device, objc_name="newIOHandle")

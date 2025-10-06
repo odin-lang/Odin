@@ -257,7 +257,7 @@ reader_read_rune :: proc(b: ^Reader) -> (r: rune, size: int, err: io.Error) {
 	for b.r+utf8.UTF_MAX > b.w &&
 	    !utf8.full_rune(b.buf[b.r:b.w]) &&
 	    b.err == nil &&
-	    b.w-b.w < len(b.buf) {
+	    b.w-b.r < len(b.buf) {
 		_reader_read_new_chunk(b) or_return
 	}
 

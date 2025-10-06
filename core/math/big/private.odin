@@ -1370,8 +1370,8 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 
 /*
 	Slower bit-bang division... also smaller.
+	Prefer `_int_div_school` for speed.
 */
-@(deprecated="Use `_int_div_school`, it's 3.5x faster.")
 _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
 
 	ta, tb, tq, q := &Int{}, &Int{}, &Int{}, &Int{}

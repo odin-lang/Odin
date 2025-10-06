@@ -8,7 +8,7 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 	
 	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backing_allocator := context.allocator) {}
 	
-	default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {}
+	default_temp_allocator_destroy :: proc "contextless" (s: ^Default_Temp_Allocator) {}
 	
 	default_temp_allocator_proc :: nil_allocator_proc
 
@@ -28,7 +28,7 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 		_ = arena_init(&s.arena, uint(size), backing_allocator)
 	}
 
-	default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {
+	default_temp_allocator_destroy :: proc "contextless" (s: ^Default_Temp_Allocator) {
 		if s != nil {
 			arena_destroy(&s.arena)
 			s^ = {}
@@ -56,7 +56,7 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 	}
 
 	@(fini, private)
-	_destroy_temp_allocator_fini :: proc() {
+	_destroy_temp_allocator_fini :: proc "contextless" () {
 		default_temp_allocator_destroy(&global_default_temp_allocator_data)
 	}
 }
@@ -70,7 +70,7 @@ DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD :: #force_inline proc(ignore := false, loc := 
 	}
 }
 
-
+@(require_results)
 default_temp_allocator :: proc(allocator: ^Default_Temp_Allocator) -> Allocator {
 	return Allocator{
 		procedure = default_temp_allocator_proc,

@@ -114,7 +114,7 @@ xml_test_entities :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x05373317,
+		crc32     = 0x48f41216,
 	})
 }
 
@@ -128,7 +128,7 @@ xml_test_entities_unbox :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x350ca83e,
+		crc32     = 0xd0567818,
 	})
 }
 
@@ -142,7 +142,7 @@ xml_test_entities_unbox_decode :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x7f58db7d,
+		crc32     = 0x68d2571e,
 	})
 }
 
@@ -191,7 +191,7 @@ xml_test_unicode :: proc(t: ^testing.T) {
 }
 
 @(private)
-run_test :: proc(t: ^testing.T, test: TEST) {
+run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 	path := strings.concatenate({TEST_SUITE_PATH, test.filename})
 	defer delete(path)
 
@@ -205,10 +205,10 @@ run_test :: proc(t: ^testing.T, test: TEST) {
 	crc32 := hash.crc32(tree_bytes)
 
 	failed := err != test.err
-	testing.expectf(t, err == test.err, "%v: Expected return value %v, got %v", test.filename, test.err, err)
+	testing.expectf(t, err == test.err, "%v: Expected return value %v, got %v", test.filename, test.err, err, loc=loc)
 
 	failed |= crc32 != test.crc32
-	testing.expectf(t, crc32 == test.crc32, "%v: Expected CRC 0x%08x, got 0x%08x, with options %v", test.filename, test.crc32, crc32, test.options)
+	testing.expectf(t, crc32 == test.crc32, "%v: Expected CRC 0x%08x, got 0x%08x, with options %v", test.filename, test.crc32, crc32, test.options, loc=loc)
 
 	if failed {
 		// Don't fully print big trees.

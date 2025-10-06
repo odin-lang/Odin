@@ -107,14 +107,14 @@ main :: proc() {
 
 		// assignments: map[string]u8 `args:"name=assign" usage:"Number of jobs per worker."`,
 
-		// (Variadic) Only available in UNIX style:
+		// (Manifold) Only available in UNIX style:
 
-		// bots: [dynamic]string `args:"variadic=2,required"`,
+		// bots: [dynamic]string `args:"manifold=2,required"`,
 
 		verbose: bool `usage:"Show verbose output."`,
 		debug: bool `args:"hidden" usage:"print debug info"`,
 
-		varg: [dynamic]string `usage:"Any extra arguments go here."`,
+		overflow: [dynamic]string `usage:"Any extra arguments go here."`,
 	}
 
 	opt: Options

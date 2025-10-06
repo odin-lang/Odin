@@ -30,14 +30,6 @@ sort :: proc(it: Interface) {
 	_quick_sort(it, 0, n, max_depth(n))
 }
 
-
-@(deprecated="use slice.sort")
-slice :: proc(array: $T/[]$E) where ORD(E) {
-	_slice.sort(array)
-	// s := array;
-	// sort(slice_interface(&s));
-}
-
 slice_interface :: proc(s: ^$T/[]$E) -> Interface where ORD(E) {
 	return Interface{
 		collection = rawptr(s),
@@ -79,31 +71,6 @@ reverse_sort :: proc(it: Interface) {
 	it := it
 	sort(reverse_interface(&it))
 }
-
-@(deprecated="use slice.reverse")
-reverse_slice :: proc(array: $T/[]$E) where ORD(E) {
-	_slice.reverse(array)
-	/*
-	s := array;
-	sort(Interface{
-		collection = rawptr(&s),
-		len = proc(it: Interface) -> int {
-			s := (^T)(it.collection);
-			return len(s^);
-		},
-		less = proc(it: Interface, i, j: int) -> bool {
-			s := (^T)(it.collection);
-			return s[j] < s[i]; // manual set up
-		},
-		swap = proc(it: Interface, i, j: int) {
-			s := (^T)(it.collection);
-			s[i], s[j] = s[j], s[i];
-		},
-	});
-	*/
-}
-
-
 
 is_sorted :: proc(it: Interface) -> bool {
 	n := it->len()
@@ -294,11 +261,6 @@ _insertion_sort :: proc(it: Interface, a, b: int) {
 	}
 }
 
-
-
-
-
-// @(deprecated="use sort.sort or slice.sort_by")
 bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil)
 	count := len(array)
@@ -327,7 +289,6 @@ bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	}
 }
 
-// @(deprecated="use sort.sort_slice or slice.sort")
 bubble_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	count := len(array)
 
@@ -355,7 +316,6 @@ bubble_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	}
 }
 
-// @(deprecated="use sort.sort or slice.sort_by")
 quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil)
 	a := array
@@ -384,7 +344,6 @@ quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	quick_sort_proc(a[i:n], f)
 }
 
-// @(deprecated="use sort.sort_slice or slice.sort")
 quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	a := array
 	n := len(a)
@@ -420,7 +379,6 @@ _log2 :: proc(x: int) -> int {
 	return res
 }
 
-// @(deprecated="use sort.sort or slice.sort_by")
 merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	merge :: proc(a: A, start, mid, end: int, f: proc(T, T) -> int) {
 		s, m := start, mid
@@ -462,7 +420,6 @@ merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	internal_sort(array, 0, len(array)-1, f)
 }
 
-// @(deprecated="use sort.sort_slice or slice.sort")
 merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	merge :: proc(a: A, start, mid, end: int) {
 		s, m := start, mid
@@ -504,8 +461,6 @@ merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	internal_sort(array, 0, len(array)-1)
 }
 
-
-// @(deprecated="use sort.sort or slice.sort_by")
 heap_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	sift_proc :: proc(a: A, pi: int, n: int, f: proc(T, T) -> int) #no_bounds_check {
 		p := pi
@@ -540,7 +495,6 @@ heap_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	}
 }
 
-// @(deprecated="use sort.sort_slice or slice.sort")
 heap_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	sift :: proc(a: A, pi: int, n: int) #no_bounds_check {
 		p := pi

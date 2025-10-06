@@ -5,6 +5,11 @@ import "base:intrinsics"
 @builtin
 Maybe :: union($T: typeid) {T}
 
+/*
+Represents an Objective-C block with a given procedure signature T
+*/
+@builtin
+Objc_Block :: struct($T: typeid) where intrinsics.type_is_proc(T) { using _: intrinsics.objc_object }
 
 /*
 Recovers the containing/parent struct from a pointer to one of its fields.
@@ -49,7 +54,12 @@ container_of :: #force_inline proc "contextless" (ptr: $P/^$Field_Type, $T: type
 
 
 when !NO_DEFAULT_TEMP_ALLOCATOR {
-	@thread_local global_default_temp_allocator_data: Default_Temp_Allocator
+	when ODIN_ARCH == .i386 && ODIN_OS == .Windows {
+		// Thread-local storage is problematic on Windows i386
+		global_default_temp_allocator_data: Default_Temp_Allocator
+	} else {
+		@thread_local global_default_temp_allocator_data: Default_Temp_Allocator
+	}
 }
 
 @(builtin, disabled=NO_DEFAULT_TEMP_ALLOCATOR)
@@ -60,37 +70,50 @@ init_global_temporary_allocator :: proc(size: int, backup_allocator := context.a
 }
 
 
+@(require_results)
+copy_slice_raw :: proc "contextless" (dst, src: rawptr, dst_len, src_len, elem_size: int) -> int {
+	n := min(dst_len, src_len)
+	if n > 0 {
+		intrinsics.mem_copy(dst, src, n*elem_size)
+	}
+	return n
+}
+
 // `copy_slice` is a built-in procedure that copies elements from a source slice `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 //
 // Prefer the procedure group `copy`.
 @builtin
-copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
-	n := max(0, min(len(dst), len(src)))
-	if n > 0 {
-		intrinsics.mem_copy(raw_data(dst), raw_data(src), n*size_of(E))
-	}
-	return n
+copy_slice :: #force_inline proc "contextless" (dst, src: $T/[]$E) -> int {
+	return copy_slice_raw(raw_data(dst), raw_data(src), len(dst), len(src), size_of(E))
 }
+
 // `copy_from_string` is a built-in procedure that copies elements from a source string `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 //
 // Prefer the procedure group `copy`.
 @builtin
-copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
-	n := max(0, min(len(dst), len(src)))
-	if n > 0 {
-		intrinsics.mem_copy(raw_data(dst), raw_data(src), n)
-	}
-	return n
+copy_from_string :: #force_inline proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
+	return copy_slice_raw(raw_data(dst), raw_data(src), len(dst), len(src), 1)
 }
+
+// `copy_from_string16` is a built-in procedure that copies elements from a source string `src` to a destination slice `dst`.
+// The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
+// of len(src) and len(dst).
+//
+// Prefer the procedure group `copy`.
+@builtin
+copy_from_string16 :: #force_inline proc "contextless" (dst: $T/[]$E/u16, src: $S/string16) -> int {
+	return copy_slice_raw(raw_data(dst), raw_data(src), len(dst), len(src), 2)
+}
+
 // `copy` is a built-in procedure that copies elements from a source slice/string `src` to a destination slice `dst`.
 // The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
 // of len(src) and len(dst).
 @builtin
-copy :: proc{copy_slice, copy_from_string}
+copy :: proc{copy_slice, copy_from_string, copy_from_string16}
 
 
 
@@ -146,10 +169,16 @@ remove_range :: proc(array: ^$D/[dynamic]$T, #any_int lo, hi: int, loc := #calle
 @builtin
 pop :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
 	assert(len(array) > 0, loc=loc)
-	res = array[len(array)-1]
-	(^Raw_Dynamic_Array)(array).len -= 1
+	_pop_type_erased(&res, (^Raw_Dynamic_Array)(array), size_of(E))
 	return res
 }
+
+_pop_type_erased :: proc(res: rawptr, array: ^Raw_Dynamic_Array, elem_size: int, loc := #caller_location) {
+	end := rawptr(uintptr(array.data) + uintptr(elem_size*(array.len-1)))
+	intrinsics.mem_copy_non_overlapping(res, end, elem_size)
+	array.len -= 1
+}
+
 
 
 // `pop_safe` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
@@ -285,6 +314,15 @@ delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error 
 }
 
 
+@builtin
+delete_string16 :: proc(str: string16, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	return mem_free_with_size(raw_data(str), len(str)*size_of(u16), allocator, loc)
+}
+@builtin
+delete_cstring16 :: proc(str: cstring16, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	return mem_free((^u16)(str), allocator, loc)
+}
+
 // `delete` will try to free the underlying data of the passed built-in data structure (string, cstring, dynamic array, slice, or map), with the given `allocator` if the allocator supports this operation.
 //
 // Note: Prefer `delete` over the specific `delete_*` procedures where possible.
@@ -297,26 +335,27 @@ delete :: proc{
 	delete_map,
 	delete_soa_slice,
 	delete_soa_dynamic_array,
+	delete_string16,
+	delete_cstring16,
 }
 
 
 // The new built-in procedure allocates memory. The first argument is a type, not a value, and the value
 // return is a pointer to a newly allocated value of that type using the specified allocator, default is context.allocator
 @(builtin, require_results)
-new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> (^T, Allocator_Error) #optional_allocator_error {
-	return new_aligned(T, align_of(T), allocator, loc)
+new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) #optional_allocator_error {
+	t = (^T)(raw_data(mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return))
+	return
 }
 @(require_results)
 new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
-	data := mem_alloc_bytes(size_of(T), alignment, allocator, loc) or_return
-	t = (^T)(raw_data(data))
+	t = (^T)(raw_data(mem_alloc_bytes(size_of(T), alignment, allocator, loc) or_return))
 	return
 }
 
 @(builtin, require_results)
 new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) #optional_allocator_error {
-	t_data := mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return
-	t = (^T)(raw_data(t_data))
+	t = (^T)(raw_data(mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return))
 	if t != nil {
 		t^ = data
 	}
@@ -326,14 +365,21 @@ new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_locat
 DEFAULT_DYNAMIC_ARRAY_CAPACITY :: 8
 
 @(require_results)
-make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
+make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (res: T, err: Allocator_Error) #optional_allocator_error {
+	err = _make_aligned_type_erased(&res, size_of(E), len, alignment, allocator, loc)
+	return
+}
+
+@(require_results)
+_make_aligned_type_erased :: proc(slice: rawptr, elem_size: int, len: int, alignment: int, allocator: Allocator, loc := #caller_location) -> Allocator_Error {
 	make_slice_error_loc(loc, len)
-	data, err := mem_alloc_bytes(size_of(E)*len, alignment, allocator, loc)
-	if data == nil && size_of(E) != 0 {
-		return nil, err
+	data, err := mem_alloc_bytes(elem_size*len, alignment, allocator, loc)
+	if data == nil && elem_size != 0 {
+		return err
 	}
-	s := Raw_Slice{raw_data(data), len}
-	return transmute(T)s, err
+	(^Raw_Slice)(slice).data = raw_data(data)
+	(^Raw_Slice)(slice).len  = len
+	return err
 }
 
 // `make_slice` allocates and initializes a slice. Like `new`, the first argument is a type, not a value.
@@ -341,24 +387,27 @@ make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocat
 //
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
-make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
-	return make_aligned(T, len, align_of(E), allocator, loc)
+make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (res: T, err: Allocator_Error) #optional_allocator_error {
+	err = _make_aligned_type_erased(&res, size_of(E), len, align_of(E), allocator, loc)
+	return
 }
 // `make_dynamic_array` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 //
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
-make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
-	return make_dynamic_array_len_cap(T, 0, 0, allocator, loc)
+make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
+	err = _make_dynamic_array_len_cap((^Raw_Dynamic_Array)(&array), size_of(E), align_of(E), 0, 0, allocator, loc)
+	return
 }
 // `make_dynamic_array_len` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 //
 // Note: Prefer using the procedure group `make`.
 @(builtin, require_results)
-make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
-	return make_dynamic_array_len_cap(T, len, len, allocator, loc)
+make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
+	err = _make_dynamic_array_len_cap((^Raw_Dynamic_Array)(&array), size_of(E), align_of(E), len, len, allocator, loc)
+	return
 }
 // `make_dynamic_array_len_cap` allocates and initializes a dynamic array. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
@@ -463,7 +512,7 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 // Note: Prefer the procedure group `reserve`
 @builtin
 reserve_map :: proc(m: ^$T/map[$K]$V, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
-	return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc) if m != nil else nil
+	return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc)
 }
 
 // Shrinks the capacity of a map down to the current length.
@@ -492,7 +541,7 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 	return
 }
 
-_append_elem :: #force_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, arg_ptr: rawptr, should_zero: bool, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+_append_elem :: #force_no_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, arg_ptr: rawptr, should_zero: bool, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return
 	}
@@ -537,7 +586,7 @@ non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc :
 	}
 }
 
-_append_elems :: #force_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, should_zero: bool, loc := #caller_location, args: rawptr, arg_len: int) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+_append_elems :: #force_no_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, should_zero: bool, loc := #caller_location, args: rawptr, arg_len: int) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
@@ -648,6 +697,9 @@ append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (n: i
 
 @builtin
 inject_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcast arg: E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}
@@ -666,6 +718,9 @@ inject_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcas
 
 @builtin
 inject_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}
@@ -689,6 +744,9 @@ inject_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadca
 
 @builtin
 inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, arg: string, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
 	if array == nil {
 		return
 	}
@@ -777,7 +835,7 @@ clear_dynamic_array :: proc "contextless" (array: ^$T/[dynamic]$E) {
 // `reserve_dynamic_array` will try to reserve memory of a passed dynamic array or map to the requested element count (setting the `cap`).
 //
 // Note: Prefer the procedure group `reserve`.
-_reserve_dynamic_array :: #force_inline proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, capacity: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
+_reserve_dynamic_array :: #force_no_inline proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, capacity: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
 	if a == nil {
 		return nil
 	}
@@ -821,7 +879,7 @@ non_zero_reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int capacity
 }
 
 
-_resize_dynamic_array :: #force_inline proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, length: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
+_resize_dynamic_array :: #force_no_inline proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, length: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
 	if a == nil {
 		return nil
 	}

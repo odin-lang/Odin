@@ -60,9 +60,7 @@ Context :: struct {
 // init initializes a Context with the specified key.  The key SHOULD be
 // unique and MUST be unpredictable for each invocation.
 init :: proc(ctx: ^Context, key: []byte) {
-	if len(key) != KEY_SIZE {
-		panic("crypto/poly1305: invalid key size")
-	}
+	ensure(len(key) == KEY_SIZE, "crypto/poly1305: invalid key size")
 
 	// r = le_bytes_to_num(key[0..15])
 	// r = clamp(r) (r &= 0xffffffc0ffffffc0ffffffc0fffffff)
@@ -85,7 +83,7 @@ init :: proc(ctx: ^Context, key: []byte) {
 
 // update adds more data to the Context.
 update :: proc(ctx: ^Context, data: []byte) {
-	assert(ctx._is_initialized)
+	ensure(ctx._is_initialized)
 
 	msg := data
 	msg_len := len(data)
@@ -124,12 +122,10 @@ update :: proc(ctx: ^Context, data: []byte) {
 // final finalizes the Context, writes the tag to dst, and calls
 // reset on the Context.
 final :: proc(ctx: ^Context, dst: []byte) {
-	assert(ctx._is_initialized)
 	defer reset(ctx)
 
-	if len(dst) != TAG_SIZE {
-		panic("poly1305: invalid destination tag size")
-	}
+	ensure(ctx._is_initialized)
+	ensure(len(dst) == TAG_SIZE, "poly1305: invalid destination tag size")
 
 	// Process remaining block
 	if ctx._leftover > 0 {

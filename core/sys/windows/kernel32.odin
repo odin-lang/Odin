@@ -168,6 +168,7 @@ foreign kernel32 {
 	ResumeThread :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---
 	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
+	GetThreadDescription :: proc(hThread: HANDLE, ppszThreadDescription: ^PCWSTR) -> HRESULT ---
 	SetThreadDescription :: proc(hThread: HANDLE, lpThreadDescription: PCWSTR) -> HRESULT ---
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
@@ -257,7 +258,7 @@ foreign kernel32 {
 	) -> BOOL ---
 	CreateProcessW :: proc(
 		lpApplicationName: LPCWSTR,
-		lpCommandLine: LPWSTR,
+		lpCommandLine: LPCWSTR,
 		lpProcessAttributes: LPSECURITY_ATTRIBUTES,
 		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
 		bInheritHandles: BOOL,
@@ -372,6 +373,12 @@ foreign kernel32 {
 		bInitialState: BOOL,
 		lpName: LPCWSTR,
 	) -> HANDLE ---
+	CreateEventExW :: proc(
+		lpEventAttributes: LPSECURITY_ATTRIBUTES,
+		lpName: LPCWSTR,
+		dwFlags: DWORD,
+		dwDesiredAccess: DWORD,
+	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(
@@ -406,6 +413,7 @@ foreign kernel32 {
 		lpBytesLeftThisMessage: ^u32,
 	) -> BOOL ---
 	CancelIo :: proc(handle: HANDLE) -> BOOL ---
+	CancelIoEx :: proc(hFile: HANDLE, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetOverlappedResult :: proc(
 		hFile: HANDLE,
 		lpOverlapped: LPOVERLAPPED,
@@ -547,6 +555,7 @@ foreign kernel32 {
 	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 
 	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---
+	RtlNtStatusToDosError :: proc(status: NTSTATUS) -> ULONG ---
 
 	GetSystemPowerStatus :: proc(lpSystemPowerStatus: ^SYSTEM_POWER_STATUS) -> BOOL ---
 }
@@ -856,7 +865,6 @@ MEMORY_RESOURCE_NOTIFICATION_TYPE :: enum c_int {
 }
 LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryResourceNotification
 HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification
-
 
 @(default_calling_convention="system")
 foreign kernel32 {
@@ -1194,7 +1202,7 @@ DUMMYUNIONNAME_u :: struct #raw_union {
 SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	ProcessorMask: ULONG_PTR,
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
-	DummyUnion: DUMMYUNIONNAME_u,
+	using DummyUnion: DUMMYUNIONNAME_u,
 }
 
 SYSTEM_POWER_STATUS :: struct {

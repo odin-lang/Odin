@@ -516,7 +516,7 @@ gb_internal void llvm_delete_function(LLVMValueRef func) {
 	LLVMDeleteFunction(func);
 }
 
-gb_internal void lb_append_to_compiler_used(lbModule *m, LLVMValueRef func) {
+gb_internal void lb_append_to_compiler_used(lbModule *m, LLVMValueRef value) {
 	LLVMValueRef global = LLVMGetNamedGlobal(m->mod, "llvm.compiler.used");
 
 	LLVMValueRef *constants;
@@ -544,7 +544,7 @@ gb_internal void lb_append_to_compiler_used(lbModule *m, LLVMValueRef func) {
 	LLVMTypeRef Int8PtrTy = LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0);
 	LLVMTypeRef ATy = llvm_array_type(Int8PtrTy, operands);
 
-	constants[operands - 1] = LLVMConstBitCast(func, Int8PtrTy);
+	constants[operands - 1] = LLVMConstBitCast(value, Int8PtrTy);
 	LLVMValueRef initializer = LLVMConstArray(Int8PtrTy, constants, operands);
 
 	global = LLVMAddGlobal(m->mod, ATy, "llvm.compiler.used");

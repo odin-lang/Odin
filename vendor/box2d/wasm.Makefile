@@ -7,20 +7,20 @@
 # CC = $(shell brew --prefix llvm)/bin/clang
 # LD = $(shell brew --prefix llvm)/bin/wasm-ld
 
-VERSION   = 3.0.0
+VERSION   = 3.1.0
 SRCS      = $(wildcard box2d-$(VERSION)/src/*.c)
 OBJS_SIMD = $(SRCS:.c=_simd.o)
 OBJS      = $(SRCS:.c=.o)
 SYSROOT   = $(shell odin root)/vendor/libc
-CFLAGS    = -Ibox2d-$(VERSION)/include -Ibox2d-$(VERSION)/extern/simde --target=wasm32 -D__EMSCRIPTEN__ -DNDEBUG -O3 --sysroot=$(SYSROOT)
+CFLAGS    = -Ibox2d-$(VERSION)/include --target=wasm32 -D__EMSCRIPTEN__ -DNDEBUG -O3 --sysroot=$(SYSROOT)
 
-all: lib/box2d_wasm.o lib/box2d_wasm_simd.o clean
+all: lib/box2d_wasm.o lib/box2d_wasm_simd.o
 
 %.o: %.c
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) -DBOX2D_DISABLE_SIMD $< -o $@
 
 %_simd.o: %.c
-	$(CC) -c $(CFLAGS) -msimd128 $< -o $@
+	$(CC) -c $(CFLAGS) -DBOX2D_DISABLE_SIMD -msimd128 $< -o $@
 
 lib/box2d_wasm.o: $(OBJS)
 	$(LD) -r -o lib/box2d_wasm.o $(OBJS)

@@ -5,7 +5,7 @@ import "core:c"
 import "core:c/libc"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }

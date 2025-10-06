@@ -450,7 +450,8 @@ extern SDL_DECLSPEC bool SDLCALL SDL_CloseStorage(SDL_Storage *storage);
  *
  * This function should be called in regular intervals until it returns true -
  * however, it is not recommended to spinwait on this call, as the backend may
- * depend on a synchronous message loop.
+ * depend on a synchronous message loop. You might instead poll this in your
+ * game's main loop while processing events and drawing a loading screen.
  *
  * \param storage a storage container to query.
  * \returns true if the container is ready, false otherwise.
@@ -636,10 +637,10 @@ extern SDL_DECLSPEC Uint64 SDLCALL SDL_GetStorageSpaceRemaining(SDL_Storage *sto
  * Enumerate a directory tree, filtered by pattern, and return a list.
  *
  * Files are filtered out if they don't match the string in `pattern`, which
- * may contain wildcard characters '*' (match everything) and '?' (match one
+ * may contain wildcard characters `*` (match everything) and `?` (match one
  * character). If pattern is NULL, no filtering is done and all results are
  * returned. Subdirectories are permitted, and are specified with a path
- * separator of '/'. Wildcard characters '*' and '?' never match a path
+ * separator of '/'. Wildcard characters `*` and `?` never match a path
  * separator.
  *
  * `flags` may be set to SDL_GLOB_CASEINSENSITIVE to make the pattern matching

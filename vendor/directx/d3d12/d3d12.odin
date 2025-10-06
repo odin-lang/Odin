@@ -22,6 +22,8 @@ BOOL    :: dxgi.BOOL
 
 RECT :: dxgi.RECT
 
+LPCWSTR :: win32.LPCWSTR
+
 IModuleInstance :: d3d_compiler.ID3D11ModuleInstance
 IBlob           :: d3d_compiler.ID3DBlob
 IModule         :: d3d_compiler.ID3D11Module
@@ -680,7 +682,7 @@ IObject_VTable :: struct {
 	GetPrivateData:          proc "system" (this: ^IObject, guid: ^GUID, pDataSize: ^u32, pData: rawptr) -> HRESULT,
 	SetPrivateData:          proc "system" (this: ^IObject, guid: ^GUID, DataSize: u32, pData: rawptr) -> HRESULT,
 	SetPrivateDataInterface: proc "system" (this: ^IObject, guid: ^GUID, pData: ^IUnknown) -> HRESULT,
-	SetName:                 proc "system" (this: ^IObject, Name: [^]u16) -> HRESULT,
+	SetName:                 proc "system" (this: ^IObject, Name: LPCWSTR) -> HRESULT,
 }
 
 
@@ -837,12 +839,22 @@ FEATURE :: enum i32 {
 	OPTIONS8                              = 36,
 	OPTIONS9                              = 37,
 	WAVE_MMA                              = 38,
+	OPTIONS10                             = 39,
+	OPTIONS11                             = 40,
+	OPTIONS12                             = 41,
+	OPTIONS13                             = 42,
+	OPTIONS14                             = 43,
+	OPTIONS15                             = 44,
+	OPTIONS16                             = 45,
+	OPTIONS17                             = 46,
+	OPTIONS18                             = 47,
+	OPTIONS19                             = 48,
 }
 
-SHADER_MIN_PRECISION_SUPPORT :: enum i32 {
-	NONE    = 0,
-	_10_BIT = 1,
-	_16_BIT = 2,
+SHADER_MIN_PRECISION_SUPPORT :: distinct bit_set[SHADER_MIN_PRECISION_SUPPORT_FLAG; u32]
+SHADER_MIN_PRECISION_SUPPORT_FLAG :: enum i32 {
+	_10_BIT,
+	_16_BIT,
 }
 
 TILED_RESOURCES_TIER :: enum i32 {
@@ -1195,6 +1207,74 @@ FEATURE_DATA_OPTIONS9 :: struct {
 	WaveMMATier:                                       WAVE_MMA_TIER,
 }
 
+FEATURE_DATA_OPTIONS10 :: struct {
+	VariableRateShadingSumCombinerSupported:    BOOL,
+	MeshShaderPerPrimitiveShadingRateSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS11 :: struct {
+	AtomicInt64OnDescriptorHeapResourceSupported: BOOL,
+}
+
+TRI_STATE :: enum i32 {
+	UNKNOWN	= -1,
+	FALSE   = 0,
+	TRUE    = 1,
+}		
+
+FEATURE_DATA_OPTIONS12 :: struct {
+	MSPrimitivesPipelineStatisticIncludesCulledPrimitives: TRI_STATE,
+	EnhancedBarriersSupported:                             BOOL,
+	RelaxedFormatCastingSupported:                         BOOL,
+}
+
+FEATURE_DATA_OPTIONS13 :: struct {
+	UnrestrictedBufferTextureCopyPitchSupported: BOOL,
+	UnrestrictedVertexElementAlignmentSupported: BOOL,
+	InvertedViewportHeightFlipsYSupported:       BOOL,
+	InvertedViewportDepthFlipsZSupported:        BOOL,
+	TextureCopyBetweenDimensionsSupported:       BOOL,
+	AlphaBlendFactorSupported:                   BOOL,
+}
+
+FEATURE_DATA_OPTIONS14 :: struct {
+	AdvancedTextureOpsSupported:                    BOOL,
+	WriteableMSAATexturesSupported:                 BOOL,
+	IndependentFrontAndBackStencilRefMaskSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS15 :: struct {
+	TriangleFanSupported:                BOOL,
+	DynamicIndexBufferStripCutSupported: BOOL,
+}
+
+FEATURE_DATA_OPTIONS16 :: struct {
+	DynamicDepthBiasSupported: BOOL,
+	GPUUploadHeapSupported:    BOOL,
+}
+
+FEATURE_DATA_OPTIONS17 :: struct {
+	NonNormalizedCoordinateSamplersSupported: BOOL,
+	ManualWriteTrackingResourceSupported:     BOOL,
+}
+
+FEATURE_DATA_OPTIONS18 :: struct {
+	RenderPassesValid: BOOL,
+}
+
+FEATURE_DATA_OPTIONS19 :: struct {
+	MismatchingOutputDimensionsSupported:           BOOL,
+	SupportedSampleCountsWithNoOutputs:             u32,
+	PointSamplingAddressesNeverRoundUp:             BOOL,
+	RasterizerDesc2Supported:                       BOOL,
+	NarrowQuadrilateralLinesSupported:              BOOL,
+	AnisoFilterWithPointMipSupported:               BOOL,
+	MaxSamplerDescriptorHeapSize:                   u32,
+	MaxSamplerDescriptorHeapSizeWithStaticSamplers: u32,
+	MaxViewDescriptorHeapSize:                      u32,
+	ComputeOnlyCustomHeapSupported:                 BOOL,
+}
+
 WAVE_MMA_INPUT_DATATYPE :: enum i32 {
 	INVALID = 0,
 	BYTE    = 1,
@@ -1238,10 +1318,11 @@ RESOURCE_ALLOCATION_INFO1 :: struct {
 }
 
 HEAP_TYPE :: enum i32 {
-	DEFAULT  = 1,
-	UPLOAD   = 2,
-	READBACK = 3,
-	CUSTOM   = 4,
+	DEFAULT    = 1,
+	UPLOAD     = 2,
+	READBACK   = 3,
+	CUSTOM     = 4,
+	GPU_UPLOAD = 5,
 }
 
 CPU_PAGE_PROPERTY :: enum i32 {
@@ -1473,7 +1554,7 @@ RESOURCE_STATE_GENERIC_READ :: RESOURCE_STATES{
 	.VERTEX_AND_CONSTANT_BUFFER, .INDEX_BUFFER, .NON_PIXEL_SHADER_RESOURCE, .PIXEL_SHADER_RESOURCE, .INDIRECT_ARGUMENT, .COPY_SOURCE,
 }
 RESOURCE_STATE_ALL_SHADER_RESOURCE :: RESOURCE_STATES{
-	.SHADING_RATE_SOURCE, .INDEX_BUFFER,
+	.NON_PIXEL_SHADER_RESOURCE, .PIXEL_SHADER_RESOURCE,
 }
 
 RESOURCE_BARRIER_TYPE :: enum i32 {
@@ -2635,9 +2716,9 @@ IDevice_VTable :: struct {
 	CreateHeap:                       proc "system" (this: ^IDevice, pDesc: ^HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	CreatePlacedResource:             proc "system" (this: ^IDevice, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateReservedResource:           proc "system" (this: ^IDevice, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	CreateSharedHandle:               proc "system" (this: ^IDevice, pObject: ^IDeviceChild, pAttributes: ^win32.SECURITY_ATTRIBUTES, Access: u32, Name: [^]u16, pHandle: ^HANDLE) -> HRESULT,
+	CreateSharedHandle:               proc "system" (this: ^IDevice, pObject: ^IDeviceChild, pAttributes: ^win32.SECURITY_ATTRIBUTES, Access: u32, Name: LPCWSTR, pHandle: ^HANDLE) -> HRESULT,
 	OpenSharedHandle:                 proc "system" (this: ^IDevice, NTHandle: HANDLE, riid: ^IID, ppvObj: ^rawptr) -> HRESULT,
-	OpenSharedHandleByName:           proc "system" (this: ^IDevice, Name: [^]u16, Access: u32, pNTHandle: ^HANDLE) -> HRESULT,
+	OpenSharedHandleByName:           proc "system" (this: ^IDevice, Name: LPCWSTR, Access: u32, pNTHandle: ^HANDLE) -> HRESULT,
 	MakeResident:                     proc "system" (this: ^IDevice, NumObjects: u32, ppObjects: [^]^IPageable) -> HRESULT,
 	Evict:                            proc "system" (this: ^IDevice, NumObjects: u32, ppObjects: [^]^IPageable) -> HRESULT,
 	CreateFence:                      proc "system" (this: ^IDevice, InitialValue: u64, Flags: FENCE_FLAGS, riid: ^IID, ppFence: ^rawptr) -> HRESULT,
@@ -2659,9 +2740,9 @@ IPipelineLibrary :: struct #raw_union {
 }
 IPipelineLibrary_VTable :: struct {
 	using id3d12devicechild_vtable: IDeviceChild_VTable,
-	StorePipeline:        proc "system" (this: ^IPipelineLibrary, pName: [^]u16, pPipeline: ^IPipelineState) -> HRESULT,
-	LoadGraphicsPipeline: proc "system" (this: ^IPipelineLibrary, pName: [^]u16, pDesc: ^GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
-	LoadComputePipeline:  proc "system" (this: ^IPipelineLibrary, pName: [^]u16, pDesc: ^COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	StorePipeline:        proc "system" (this: ^IPipelineLibrary, pName: LPCWSTR, pPipeline: ^IPipelineState) -> HRESULT,
+	LoadGraphicsPipeline: proc "system" (this: ^IPipelineLibrary, pName: LPCWSTR, pDesc: ^GRAPHICS_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	LoadComputePipeline:  proc "system" (this: ^IPipelineLibrary, pName: LPCWSTR, pDesc: ^COMPUTE_PIPELINE_STATE_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 	GetSerializedSize:    proc "system" (this: ^IPipelineLibrary) -> SIZE_T,
 	Serialize:            proc "system" (this: ^IPipelineLibrary, pData: rawptr, DataSizeInBytes: SIZE_T) -> HRESULT,
 }
@@ -2675,7 +2756,7 @@ IPipelineLibrary1 :: struct #raw_union {
 }
 IPipelineLibrary1_VTable :: struct {
 	using id3d12pipelinelibrary_vtable: IPipelineLibrary_VTable,
-	LoadPipeline: proc "system" (this: ^IPipelineLibrary1, pName: [^]u16, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
+	LoadPipeline: proc "system" (this: ^IPipelineLibrary1, pName: LPCWSTR, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 }
 
 MULTIPLE_FENCE_WAIT_FLAGS :: distinct bit_set[MULTIPLE_FENCE_WAIT_FLAG; u32]
@@ -2882,7 +2963,7 @@ META_COMMAND_PARAMETER_STAGE :: enum i32 {
 }
 
 META_COMMAND_PARAMETER_DESC :: struct {
-	Name:                  [^]u16,
+	Name:                  LPCWSTR,
 	Type:                  META_COMMAND_PARAMETER_TYPE,
 	Flags:                 META_COMMAND_PARAMETER_FLAGS,
 	RequiredResourceState: RESOURCE_STATES,
@@ -2912,7 +2993,7 @@ GRAPHICS_STATES :: enum i32 {
 
 META_COMMAND_DESC :: struct {
 	Id:                       GUID,
-	Name:                     [^]u16,
+	Name:                     LPCWSTR,
 	InitializationDirtyState: GRAPHICS_STATES,
 	ExecutionDirtyState:      GRAPHICS_STATES,
 }
@@ -2933,8 +3014,8 @@ IStateObjectProperties :: struct #raw_union {
 }
 IStateObjectProperties_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetShaderIdentifier:  proc "system" (this: ^IStateObjectProperties, pExportName: [^]u16) -> rawptr,
-	GetShaderStackSize:   proc "system" (this: ^IStateObjectProperties, pExportName: [^]u16) -> u64,
+	GetShaderIdentifier:  proc "system" (this: ^IStateObjectProperties, pExportName: LPCWSTR) -> rawptr,
+	GetShaderStackSize:   proc "system" (this: ^IStateObjectProperties, pExportName: LPCWSTR) -> u64,
 	GetPipelineStackSize: proc "system" (this: ^IStateObjectProperties) -> u64,
 	SetPipelineStackSize: proc "system" (this: ^IStateObjectProperties, PipelineStackSizeInBytes: u64),
 }
@@ -2988,8 +3069,8 @@ EXPORT_FLAG :: enum u32 {
 }
 
 EXPORT_DESC :: struct {
-	Name:           [^]u16,
-	ExportToRename: [^]u16,
+	Name:           LPCWSTR,
+	ExportToRename: LPCWSTR,
 	Flags:          EXPORT_FLAGS,
 }
 
@@ -3335,9 +3416,9 @@ AUTO_BREADCRUMB_OP :: enum i32 {
 
 AUTO_BREADCRUMB_NODE :: struct {
 	pCommandListDebugNameA:  cstring,
-	pCommandListDebugNameW:  [^]u16,
+	pCommandListDebugNameW:  LPCWSTR,
 	pCommandQueueDebugNameA: cstring,
-	pCommandQueueDebugNameW: [^]u16,
+	pCommandQueueDebugNameW: LPCWSTR,
 	pCommandList:            ^IGraphicsCommandList,
 	pCommandQueue:           ^ICommandQueue,
 	BreadcrumbCount:         u32,
@@ -3348,14 +3429,14 @@ AUTO_BREADCRUMB_NODE :: struct {
 
 DRED_BREADCRUMB_CONTEXT :: struct {
 	BreadcrumbIndex: u32,
-	pContextString:  [^]u16,
+	pContextString:  LPCWSTR,
 }
 
 AUTO_BREADCRUMB_NODE1 :: struct {
 	pCommandListDebugNameA:  cstring,
-	pCommandListDebugNameW:  [^]u16,
+	pCommandListDebugNameW:  LPCWSTR,
 	pCommandQueueDebugNameA: cstring,
-	pCommandQueueDebugNameW: [^]u16,
+	pCommandQueueDebugNameW: LPCWSTR,
 	pCommandList:            ^IGraphicsCommandList,
 	pCommandQueue:           ^ICommandQueue,
 	BreadcrumbCount:         u32,

@@ -5,12 +5,10 @@ Type representing a mononotic day number corresponding to a date.
 
 	Ordinal 1 = Midnight Monday, January 1, 1 A.D. (Gregorian)
 	        |   Midnight Monday, January 3, 1 A.D. (Julian)
+
+Every other ordinal counts days forwards, starting from the above date.
 */
 Ordinal :: i64
-
-/*
-*/
-EPOCH   :: Ordinal(1)
 
 /*
 Minimum valid value for date.

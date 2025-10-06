@@ -34,6 +34,7 @@ iterate_opcodes :: proc(iter: ^Opcode_Iterator) -> (opcode: Opcode, pc: int, ok:
 	case .Split:                       iter.pc += size_of(Opcode) + 2 * size_of(u16)
 	case .Save:                        iter.pc += size_of(Opcode) + size_of(u8)
 	case .Assert_Start:                iter.pc += size_of(Opcode)
+	case .Assert_Start_Multiline:      iter.pc += size_of(Opcode)
 	case .Assert_End:                  iter.pc += size_of(Opcode)
 	case .Assert_Word_Boundary:        iter.pc += size_of(Opcode)
 	case .Assert_Non_Word_Boundary:    iter.pc += size_of(Opcode)
@@ -64,6 +65,7 @@ opcode_to_name :: proc(opcode: Opcode) -> (str: string) {
 	case .Split:                       str = "Split"
 	case .Save:                        str = "Save"
 	case .Assert_Start:                str = "Assert_Start"
+	case .Assert_Start_Multiline:      str = "Assert_Start_Multiline"
 	case .Assert_End:                  str = "Assert_End"
 	case .Assert_Word_Boundary:        str = "Assert_Word_Boundary"
 	case .Assert_Non_Word_Boundary:    str = "Assert_Non_Word_Boundary"

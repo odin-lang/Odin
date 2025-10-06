@@ -19,7 +19,7 @@ BOOL    :: dxgi.BOOL
 UINT    :: dxgi.UINT
 INT     :: dxgi.INT
 
-LPCWSTR  :: [^]u16
+LPCWSTR  :: windows.LPCWSTR
 
 RECT :: dxgi.RECT
 SIZE :: dxgi.SIZE

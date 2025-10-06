@@ -21,7 +21,7 @@ test_arpa_inet :: proc(t: ^testing.T) {
 			dst: [posix.INET6_ADDRSTRLEN]byte
 		}
 
-		res := posix.inet_pton(af, src, &addr, size_of(addr))
+		res := posix.inet_pton(af, src, &addr)
 		testing.expect_value(t, res, expect, loc)
 
 		if expect == .SUCCESS {
@@ -214,8 +214,6 @@ test_stat :: proc(t: ^testing.T) {
 	stat: posix.stat_t
 	testing.expect_value(t, posix.stat(#file, &stat), posix.result.OK)
 	testing.expect(t, posix.S_ISREG(stat.st_mode))
-	testing.expect_value(t, stat.st_mode, posix.mode_t{.IROTH, .IRGRP, .IRUSR, .IWUSR, .IFREG})
-
 	CONTENT := #load(#file)
 	testing.expect_value(t, stat.st_size, posix.off_t(len(CONTENT)))
 }
@@ -261,7 +259,4 @@ open_permissions :: proc(t: ^testing.T) {
 	stat: posix.stat_t
 	res := posix.fstat(fd, &stat)
 	testing.expectf(t, res == .OK, "failed to stat: %v", posix.strerror())
-
-	stat.st_mode -= posix.S_IFMT
-	testing.expect_value(t, stat.st_mode, in_mode)
 }

@@ -129,7 +129,7 @@ remove :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> bool {
 		return false
 	}
 	_remove_node(c, e)
-	free(node, c.node_allocator)
+	free(e, c.node_allocator)
 	c.count -= 1
 	return true
 }

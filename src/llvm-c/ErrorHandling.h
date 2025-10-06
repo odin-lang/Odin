@@ -14,7 +14,7 @@
 #ifndef LLVM_C_ERRORHANDLING_H
 #define LLVM_C_ERRORHANDLING_H
 
-#include "ExternC.h"
+#include "llvm-c/ExternC.h"
 
 LLVM_C_EXTERN_C_BEGIN
 

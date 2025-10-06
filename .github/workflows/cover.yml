@@ -1,0 +1,60 @@
+name: Test Coverage
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build_linux_amd64:
+    runs-on: ubuntu-latest
+    name: Linux AMD64 Test Coverage
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download LLVM (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
+
+      - name: Install kcov
+        run: |
+          sudo apt-get update
+          sudo apt-get install binutils-dev build-essential cmake libssl-dev libcurl4-openssl-dev libelf-dev libstdc++-12-dev zlib1g-dev libdw-dev libiberty-dev
+          git clone https://github.com/SimonKagstrom/kcov.git
+          mkdir kcov/build
+          cd kcov/build
+          cmake ..
+          sudo make
+          sudo make install
+          cd ../..
+          kcov --version
+
+      - name: Build Odin
+        run: ./build_odin.sh release
+
+      - name: Odin report
+        run: ./odin report
+
+      - name: Normal Core library tests
+        run: |
+          ./odin build tests/core/normal.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
+          mkdir kcov-out
+          kcov --exclude-path=tests,/usr kcov-out ./normal.bin .
+
+      - name: Optimized Core library tests
+        run: |
+          ./odin build tests/core/speed.odin -build-mode:test -debug -file -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
+          kcov --exclude-path=tests,/usr kcov-out ./speed.bin .
+
+      - name: Internals tests
+        run: |
+          ./odin build tests/internal -build-mode:test -debug -all-packages -vet -strict-style -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_amd64
+          kcov --exclude-path=tests,/usr kcov-out ./internal .
+
+      - uses: codecov/codecov-action@v5
+        with:
+          name: Ubuntu Coverage # optional
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true # optional (default = false
+          directory: kcov-out/kcov-merged

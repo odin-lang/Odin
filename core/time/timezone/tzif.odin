@@ -577,12 +577,7 @@ parse_tzif :: proc(_buffer: []u8, region_name: string, allocator := context.allo
 	footer_str := string(buffer[:end_idx])
 
 	// UTC is a special case, we don't need to alloc
-	if len(local_time_types) == 1 {
-		name := cstring(raw_data(timezone_string_table[local_time_types[0].idx:]))
-		if name != "UTC" {
-			return
-		}
-
+	if len(local_time_types) == 1 && local_time_types[0].utoff == 0 {
 		return nil, true
 	}
 

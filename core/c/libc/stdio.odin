@@ -9,7 +9,7 @@ when ODIN_OS == .Windows {
 		"system:legacy_stdio_definitions.lib",
 	}
 } else when ODIN_OS == .Darwin {
-	foreign import libc "system:System.framework"
+	foreign import libc "system:System"
 } else {
 	foreign import libc "system:c"
 }
@@ -275,7 +275,7 @@ foreign libc {
 	// 7.21.7 Character input/output functions
 	fgetc     :: proc(stream: ^FILE) -> int ---
 	fgets     :: proc(s: [^]char, n: int, stream: ^FILE) -> [^]char ---
-	fputc     :: proc(s: cstring, stream: ^FILE) -> int ---
+	fputc     :: proc(s: c.int, stream: ^FILE) -> int ---
 	getc      :: proc(stream: ^FILE) -> int ---
 	getchar   :: proc() -> int ---
 	putc      :: proc(c: int, stream: ^FILE) -> int ---

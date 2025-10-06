@@ -25,5 +25,5 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 		return
 	}
 
-	return string(buf[:size]), nil
+	return string(buf[:size-1]), nil
 }

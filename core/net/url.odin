@@ -125,7 +125,7 @@ percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 			bytes, n := utf8.encode_rune(ch)
 			for byte in bytes[:n] {
 				buf: [2]u8 = ---
-				t := strconv.append_int(buf[:], i64(byte), 16)
+				t := strconv.write_int(buf[:], i64(byte), 16)
 				strings.write_rune(&b, '%')
 				strings.write_string(&b, t)
 			}

@@ -5,7 +5,7 @@ package sync
 import "core:c"
 import "base:intrinsics"
 
-foreign import pthread "system:System.framework"
+foreign import pthread "system:System"
 
 _current_thread_id :: proc "contextless" () -> int {
 	tid: u64

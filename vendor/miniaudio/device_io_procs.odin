@@ -12,6 +12,8 @@ foreign lib {
 	device_job_thread_uninit :: proc(pJobThread: ^device_job_thread, pAllocationCallbacks: ^allocation_callbacks) ---
 	device_job_thread_post   :: proc(pJobThread: ^device_job_thread, pJob: ^job) -> result ---
 	device_job_thread_next   :: proc(pJobThread: ^device_job_thread, pJob: ^job) -> result ---
+
+	device_id_equal :: proc(pA: ^device_id, pB: ^device_id) -> b32 ---
 	
 	/*
 	Initializes a `ma_context_config` object.
@@ -370,6 +372,9 @@ foreign lib {
 	This function will allocate memory internally for the device lists and return a pointer to them through the `ppPlaybackDeviceInfos` and `ppCaptureDeviceInfos`
 	parameters. If you do not want to incur the overhead of these allocations consider using `ma_context_enumerate_devices()` which will instead use a callback.
 
+	Note that this only retrieves the ID and name/description of the device. The reason for only retrieving basic information is that it would otherwise require
+	opening the backend device in order to probe it for more detailed information which can be inefficient. Consider using `ma_context_get_device_info()` for this,
+	but don't call it from within the enumeration callback.
 
 	Parameters
 	----------
@@ -411,7 +416,7 @@ foreign lib {
 
 	See Also
 	--------
-	ma_context_get_devices()
+	ma_context_enumerate_devices()
 	*/
 	context_get_devices :: proc(pContext: ^context_type, ppPlaybackDeviceInfos: ^[^]device_info, pPlaybackDeviceCount: ^u32, ppCaptureDeviceInfos: ^[^]device_info, pCaptureDeviceCount: ^u32) -> result ---
 
@@ -550,7 +555,7 @@ foreign lib {
 	playback, capture, full-duplex or loopback. (Note that loopback mode is only supported on select backends.) Sending and receiving audio data to and from the
 	device is done via a callback which is fired by miniaudio at periodic time intervals.
 
-	The frequency at which data is delivered to and from a device depends on the size of it's period. The size of the period can be defined in terms of PCM frames
+	The frequency at which data is delivered to and from a device depends on the size of its period. The size of the period can be defined in terms of PCM frames
 	or milliseconds, whichever is more convenient. Generally speaking, the smaller the period, the lower the latency at the expense of higher CPU usage and
 	increased risk of glitching due to the more frequent and granular data deliver intervals. The size of a period will depend on your requirements, but
 	miniaudio's defaults should work fine for most scenarios. If you're building a game you should leave this fairly small, whereas if you're building a simple
@@ -624,7 +629,7 @@ foreign lib {
 
 			performanceProfile
 					A hint to miniaudio as to the performance requirements of your program. Can be either `ma_performance_profile_low_latency` (default) or
-					`ma_performance_profile_conservative`. This mainly affects the size of default buffers and can usually be left at it's default value.
+					`ma_performance_profile_conservative`. This mainly affects the size of default buffers and can usually be left at its default value.
 
 			noPreSilencedOutputBuffer
 					When set to true, the contents of the output buffer passed into the data callback will be left undefined. When set to false (default), the contents of
@@ -664,7 +669,7 @@ foreign lib {
 					A pointer that will passed to callbacks in pBackendVTable.
 
 			resampling.linear.lpfOrder
-					The linear resampler applies a low-pass filter as part of it's processing for anti-aliasing. This setting controls the order of the filter. The higher
+					The linear resampler applies a low-pass filter as part of its processing for anti-aliasing. This setting controls the order of the filter. The higher
 					the value, the better the quality, in general. Setting this to 0 will disable low-pass filtering altogether. The maximum value is
 					`MA_MAX_FILTER_ORDER`. The default value is `min(4, MA_MAX_FILTER_ORDER)`.
 
@@ -740,6 +745,9 @@ foreign lib {
 
 			pulse.pStreamNameCapture
 					PulseAudio only. Sets the stream name for capture.
+
+			pulse.channelMap
+				PulseAudio only. Sets the channel map that is requested from PulseAudio. See MA_PA_CHANNEL_MAP_* constants. Defaults to MA_PA_CHANNEL_MAP_AIFF.
 
 			coreaudio.allowNominalSampleRateChange
 					Core Audio only. Desktop only. When enabled, allows the sample rate of the device to be changed at the operating system level. This
@@ -914,7 +922,7 @@ foreign lib {
 
 	Remarks
 	-------
-	You only need to use this function if you want to configure the context differently to it's defaults. You should never use this function if you want to manage
+	You only need to use this function if you want to configure the context differently to its defaults. You should never use this function if you want to manage
 	your own context.
 
 	See the documentation for `ma_context_init()` for information on the different context configuration options.

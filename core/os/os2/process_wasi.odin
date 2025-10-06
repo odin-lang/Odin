@@ -44,8 +44,6 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	return
 }
 
-_Sys_Process_Attributes :: struct {}
-
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	err = .Unsupported
 	return

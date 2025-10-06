@@ -30,27 +30,79 @@ gb_internal String remove_directory_from_path(String const &s) {
 }
 
 
-// NOTE(Mark Naughton): getcwd as String
-#if !defined(GB_SYSTEM_WINDOWS)
-gb_internal String get_current_directory(void) {
-	char cwd[256];
-	getcwd(cwd, 256);
+#if defined(GB_SYSTEM_WINDOWS)
+gb_global SRWLOCK cwd_lock;
 
-	return make_string_c(cwd);
+String get_working_directory(gbAllocator allocator) {
+	AcquireSRWLockExclusive(&cwd_lock);
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	DWORD sz_utf16 = GetCurrentDirectoryW(0, nullptr);
+	wchar_t *dir_buf_wstr = gb_alloc_array(temporary_allocator(), wchar_t, sz_utf16);
+	if (dir_buf_wstr == nullptr) {
+		ReleaseSRWLockExclusive(&cwd_lock);
+		return {};
+	}
+
+	DWORD n = GetCurrentDirectoryW(sz_utf16, dir_buf_wstr);
+	GB_ASSERT(n+1 == sz_utf16);
+	ReleaseSRWLockExclusive(&cwd_lock);
+
+
+	isize buf_len = sz_utf16*4;
+	u8 *buf = gb_alloc_array(allocator, u8, buf_len);
+	gb_ucs2_to_utf8(buf, buf_len, cast(u16 *)dir_buf_wstr);
+
+	return make_string_c(cast(char const *)buf);
+}
+
+bool set_working_directory(String dir) {
+	bool ok = false;
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	char const *cdir = alloc_cstring(temporary_allocator(), dir);
+	wchar_t *wstr = gb__alloc_utf8_to_ucs2(temporary_allocator(), cdir, nullptr);
+
+	AcquireSRWLockExclusive(&cwd_lock);
+
+	ok = SetCurrentDirectoryW(wstr);
+
+	ReleaseSRWLockExclusive(&cwd_lock);
+
+	return ok;
 }
 
 #else
-gb_internal String get_current_directory(void) {
-	gbAllocator a = heap_allocator();
 
-	wchar_t cwd[256];
-	GetCurrentDirectoryW(256, cwd);
+String get_working_directory(gbAllocator allocator) {
+	TEMPORARY_ALLOCATOR_GUARD();
 
-	String16 wstr = make_string16_c(cwd);
+	auto buf = array_make<char>(temporary_allocator());
+	size_t size = PATH_MAX;
 
-	return string16_to_string(a, wstr);
+	char const *cwd = nullptr;
+	for (; cwd == nullptr; size *= 2) {
+		array_resize(&buf, size);
+
+		cwd = getcwd(buf.data, buf.count);
+		if (cwd == nullptr && errno != ERANGE) {
+			return {};
+		}
+	}
+
+	return copy_string(allocator, make_string_c(cwd));
 }
+
+bool set_working_directory(String dir) {
+	TEMPORARY_ALLOCATOR_GUARD();
+	char const *cdir = alloc_cstring(temporary_allocator(), dir);
+	return !chdir(cdir);
+}
+
 #endif
+
+
 
 gb_internal bool path_is_directory(String path);
 
@@ -78,7 +130,7 @@ gb_internal String directory_from_path(String const &s) {
 		String16 wstr = string_to_string16(a, path);
 		defer (gb_free(a, wstr.text));
 
-		i32 attribs = GetFileAttributesW(wstr.text);
+		i32 attribs = GetFileAttributesW(cast(wchar_t *)wstr.text);
 		if (attribs < 0) return false;
 
 		return (attribs & FILE_ATTRIBUTE_DIRECTORY) != 0;
@@ -308,7 +360,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	defer (gb_free(a, wstr.text));
 
 	WIN32_FIND_DATAW file_data = {};
-	HANDLE find_file = FindFirstFileW(wstr.text, &file_data);
+	HANDLE find_file = FindFirstFileW(cast(wchar_t *)wstr.text, &file_data);
 	if (find_file == INVALID_HANDLE_VALUE) {
 		return ReadDirectory_Unknown;
 	}
@@ -320,7 +372,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		wchar_t *filename_w = file_data.cFileName;
 		u64 size = cast(u64)file_data.nFileSizeLow;
 		size |= (cast(u64)file_data.nFileSizeHigh) << 32;
-		String name = string16_to_string(a, make_string16_c(filename_w));
+		String name = string16_to_string(a, make_string16_c(cast(u16 *)filename_w));
 		if (name == "." || name == "..") {
 			gb_free(a, name.text);
 			continue;
@@ -442,7 +494,7 @@ gb_internal bool write_directory(String path) {
 #else
 gb_internal bool write_directory(String path) {
 	String16 wstr = string_to_string16(heap_allocator(), path);
-	LPCWSTR wdirectory_name = wstr.text;
+	LPCWSTR wdirectory_name = cast(wchar_t *)wstr.text;
 
 	HANDLE directory = CreateFileW(wdirectory_name,
 			GENERIC_WRITE,

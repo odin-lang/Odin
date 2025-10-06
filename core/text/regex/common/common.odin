@@ -15,8 +15,6 @@ MAX_PROGRAM_SIZE   :: int(max(i16))
 MAX_CLASSES        :: int(max(u8))
 
 Flag :: enum u8 {
-	// Global: try to match the pattern anywhere in the string.
-	Global,
 	// Multiline: treat `^` and `$` as if they also match newlines.
 	Multiline,
 	// Case Insensitive: treat `a-z` as if it was also `A-Z`.
@@ -36,7 +34,6 @@ Flags :: bit_set[Flag; u8]
 
 @(rodata)
 Flag_To_Letter := #sparse[Flag]u8 {
-	.Global            = 'g',
 	.Multiline         = 'm',
 	.Case_Insensitive  = 'i',
 	.Ignore_Whitespace = 'x',

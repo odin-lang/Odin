@@ -7,6 +7,7 @@
 package math_big
 
 import "base:intrinsics"
+import "base:runtime"
 import rnd "core:math/rand"
 
 /*
@@ -777,32 +778,36 @@ int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, alloca
 */
 INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 
-@(init, private)
-_init_constants :: proc() {
-	initialize_constants()
-}
+@(private)
+constant_allocator: runtime.Allocator
 
-initialize_constants :: proc() -> (res: int) {
-	internal_set(     INT_ZERO,  0);      INT_ZERO.flags = {.Immutable}
-	internal_set(      INT_ONE,  1);       INT_ONE.flags = {.Immutable}
-	internal_set(INT_MINUS_ONE, -1); INT_MINUS_ONE.flags = {.Immutable}
+@(init, private)
+initialize_constants :: proc "contextless" () {
+	context = runtime.default_context()
+	constant_allocator = context.allocator
+
+	internal_int_set_from_integer(     INT_ZERO,  0);      INT_ZERO.flags = {.Immutable}
+	internal_int_set_from_integer(      INT_ONE,  1);       INT_ONE.flags = {.Immutable}
+	internal_int_set_from_integer(INT_MINUS_ONE, -1); INT_MINUS_ONE.flags = {.Immutable}
 
 	/*
 		We set these special values to -1 or 1 so they don't get mistake for zero accidentally.
 		This allows for shortcut tests of is_zero as .used == 0.
 	*/
-	internal_set(      INT_NAN,  1);       INT_NAN.flags = {.Immutable, .NaN}
-	internal_set(      INT_INF,  1);       INT_INF.flags = {.Immutable, .Inf}
-	internal_set(INT_MINUS_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
-
-	return _DEFAULT_MUL_KARATSUBA_CUTOFF
+	internal_int_set_from_integer(      INT_NAN,  1);       INT_NAN.flags = {.Immutable, .NaN}
+	internal_int_set_from_integer(      INT_INF,  1);       INT_INF.flags = {.Immutable, .Inf}
+	internal_int_set_from_integer(INT_MINUS_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
 }
 
 /*
 	Destroy constants.
 	Optional for an EXE, as this would be called at the very end of a process.
 */
-destroy_constants :: proc() {
+@(fini, private)
+destroy_constants :: proc "contextless" () {
+	context = runtime.default_context()
+	context.allocator = constant_allocator
+
 	internal_destroy(INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN)
 }
 

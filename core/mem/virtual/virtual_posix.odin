@@ -4,34 +4,16 @@ package mem_virtual
 
 import "core:sys/posix"
 
-// Define non-posix needed flags:
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
-	MADV_FREE :: 5      /* pages unneeded, discard contents */
-} else when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
-	MADV_FREE :: 6
-}
-
-_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	flags  := posix.Map_Flags{ .ANONYMOUS, .PRIVATE }
-	result := posix.mmap(nil, size, {}, flags)
-	if result == posix.MAP_FAILED {
-		return nil, .Out_Of_Memory
-	}
-
-	return ([^]byte)(uintptr(result))[:size], nil
-}
-
 _commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
 	if posix.mprotect(data, size, { .READ, .WRITE }) != .OK {
-		return .Out_Of_Memory
+		#partial switch posix.errno() {
+		case .EACCES, .EPERM:   return .Invalid_Pointer
+		case .ENOTSUP, .EINVAL: return .Invalid_Argument
+		case:                   return .Out_Of_Memory
+		}
 	}
 
 	return nil
-}
-
-_decommit :: proc "contextless" (data: rawptr, size: uint) {
-	posix.mprotect(data, size, {})
-	posix.posix_madvise(data, size, transmute(posix.MAdvice)i32(MADV_FREE))
 }
 
 _release :: proc "contextless" (data: rawptr, size: uint) {
@@ -46,13 +28,13 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	return posix.mprotect(data, size, transmute(posix.Prot_Flags)flags) == .OK
 }
 
-_platform_memory_init :: proc() {
+_platform_memory_init :: proc "contextless" () {
 	// NOTE: `posix.PAGESIZE` due to legacy reasons could be wrong so we use `sysconf`.
 	size := posix.sysconf(._PAGESIZE)
 	DEFAULT_PAGE_SIZE = uint(max(size, posix.PAGESIZE))
 
 	// is power of two
-	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
+	assert_contextless(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }
 
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {

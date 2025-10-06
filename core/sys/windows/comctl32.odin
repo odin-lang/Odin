@@ -573,10 +573,10 @@ Button_GetTextMargin :: #force_inline proc "system" (hwnd: HWND, pmargin: ^RECT)
 	return cast(BOOL)SendMessageW(hwnd, BCM_GETTEXTMARGIN, 0, cast(LPARAM)uintptr(pmargin))
 }
 Button_SetNote :: #force_inline proc "system" (hwnd: HWND, psz: LPCWSTR) -> BOOL {
-	return cast(BOOL)SendMessageW(hwnd, BCM_SETNOTE, 0, cast(LPARAM)uintptr(psz))
+	return cast(BOOL)SendMessageW(hwnd, BCM_SETNOTE, 0, cast(LPARAM)uintptr(rawptr(psz)))
 }
 Button_GetNote :: #force_inline proc "system" (hwnd: HWND, psz: LPCWSTR, pcc: ^c_int) -> BOOL {
-	return cast(BOOL)SendMessageW(hwnd, BCM_GETNOTE, uintptr(pcc), cast(LPARAM)uintptr(psz))
+	return cast(BOOL)SendMessageW(hwnd, BCM_GETNOTE, uintptr(pcc), cast(LPARAM)uintptr(rawptr(psz)))
 }
 Button_GetNoteLength :: #force_inline proc "system" (hwnd: HWND) -> LRESULT {
 	return SendMessageW(hwnd, BCM_GETNOTELENGTH, 0, 0)
@@ -604,10 +604,10 @@ EDITBALLOONTIP :: struct {
 PEDITBALLOONTIP :: ^EDITBALLOONTIP
 
 Edit_SetCueBannerText :: #force_inline proc "system" (hwnd: HWND, lpcwText: LPCWSTR) -> BOOL {
-	return cast(BOOL)SendMessageW(hwnd, EM_SETCUEBANNER, 0, cast(LPARAM)uintptr(lpcwText))
+	return cast(BOOL)SendMessageW(hwnd, EM_SETCUEBANNER, 0, cast(LPARAM)uintptr(rawptr(lpcwText)))
 }
 Edit_SetCueBannerTextFocused :: #force_inline proc "system" (hwnd: HWND, lpcwText: LPCWSTR, fDrawFocused: BOOL) -> BOOL {
-	return cast(BOOL)SendMessageW(hwnd, EM_SETCUEBANNER, cast(WPARAM)fDrawFocused, cast(LPARAM)uintptr(lpcwText))
+	return cast(BOOL)SendMessageW(hwnd, EM_SETCUEBANNER, cast(WPARAM)fDrawFocused, cast(LPARAM)uintptr(rawptr(lpcwText)))
 }
 Edit_GetCueBannerText :: #force_inline proc "system" (hwnd: HWND, lpwText: LPWSTR, cchText: LONG) -> BOOL {
 	return cast(BOOL)SendMessageW(hwnd, EM_GETCUEBANNER, uintptr(lpwText), cast(LPARAM)cchText)
@@ -1197,7 +1197,7 @@ ListView_GetItemPosition :: #force_inline proc "system" (hwnd: HWND, i: c_int, p
 	return cast(BOOL)SendMessageW(hwnd, LVM_GETITEMPOSITION, cast(WPARAM)i, cast(LPARAM)uintptr(ppt))
 }
 ListView_GetStringWidth :: #force_inline proc "system" (hwndLV: HWND, psz: LPCWSTR) -> c_int {
-	return cast(c_int)SendMessageW(hwndLV, LVM_GETSTRINGWIDTHW, 0, cast(LPARAM)uintptr(psz))
+	return cast(c_int)SendMessageW(hwndLV, LVM_GETSTRINGWIDTHW, 0, cast(LPARAM)uintptr(rawptr(psz)))
 }
 ListView_HitTest :: #force_inline proc "system" (hwndLV: HWND, pinfo: ^LV_HITTESTINFO) -> c_int {
 	return cast(c_int)SendMessageW(hwndLV, LVM_HITTEST, 0, cast(LPARAM)uintptr(pinfo))

@@ -3,7 +3,7 @@ package unix
 
 import "base:intrinsics"
 
-sysctl :: proc(mib: []i32, val: ^$T) -> (ok: bool) {
+sysctl :: proc "contextless" (mib: []i32, val: ^$T) -> (ok: bool) {
 	mib := mib
 	result_size := u64(size_of(T))
 

@@ -39,10 +39,10 @@ DWMNCRENDERINGPOLICY :: enum {
 }
 
 DWM_WINDOW_CORNER_PREFERENCE :: enum c_int {
-   DEFAULT,
-   DONOTROUND,
-   ROUND,
-   ROUNDSMALL,
+	DEFAULT,
+	DONOTROUND,
+	ROUND,
+	ROUNDSMALL,
 }
 
 @(default_calling_convention="system")

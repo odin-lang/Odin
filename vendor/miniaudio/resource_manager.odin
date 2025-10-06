@@ -16,6 +16,7 @@ resource_manager_data_source_flag :: enum c.int {
 	ASYNC          = 2,   /* When set, the resource manager will load the data source asynchronously. */
 	WAIT_INIT      = 3,   /* When set, waits for initialization of the underlying data source before returning from ma_resource_manager_data_source_init(). */
 	UNKNOWN_LENGTH = 4,   /* Gives the resource manager a hint that the length of the data source is unknown and calling `ma_data_source_get_length_in_pcm_frames()` should be avoided. */
+	LOOPING        = 5,   /* When set, configures the data source to loop by default. */
 }
 
 resource_manager_data_source_flags :: bit_set[resource_manager_data_source_flag; u32]
@@ -79,8 +80,8 @@ resource_manager_data_source_config :: struct {
 	rangeEndInPCMFrames:         u64,
 	loopPointBegInPCMFrames:     u64,
 	loopPointEndInPCMFrames:     u64,
-	isLooping:                   b32,
 	flags:                       u32,
+	isLooping:                   b32, /* Deprecated. Use the MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_LOOPING flag in `flags` instead. */
 }
 
 resource_manager_data_supply_type :: enum c.int {

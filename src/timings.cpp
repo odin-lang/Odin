@@ -197,7 +197,7 @@ gb_internal void timings_print_all(Timings *t, TimingUnit unit = TimingUnit_Mill
 
 	f64 total_time = time_stamp(t->total, t->freq, unit);
 
-	gb_printf("%.*s%.*s - % 9.3f %s - %6.2f%%\n",
+	gb_printf_err("%.*s%.*s - % 9.3f %s - %6.2f%%\n",
 	          LIT(t->total.label),
 	          cast(int)(max_len-t->total.label.len), SPACES,
 	          total_time,
@@ -207,7 +207,7 @@ gb_internal void timings_print_all(Timings *t, TimingUnit unit = TimingUnit_Mill
 	for_array(i, t->sections) {
 		TimeStamp ts = t->sections[i];
 		f64 section_time = time_stamp(ts, t->freq, unit);
-		gb_printf("%.*s%.*s - % 9.3f %s - %6.2f%%\n",
+		gb_printf_err("%.*s%.*s - % 9.3f %s - %6.2f%%\n",
 		          LIT(ts.label),
 	              cast(int)(max_len-ts.label.len), SPACES,
 		          section_time,

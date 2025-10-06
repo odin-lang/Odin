@@ -240,7 +240,7 @@ Example:
 	import "core:encoding/uuid"
 	import "core:fmt"
 
-	main :: proc() {
+	generate_v8_hash_bytes_example :: proc() {
 		my_uuid := uuid.generate_v8_hash(uuid.Namespace_DNS, "www.odin-lang.org", .SHA256)
 		my_uuid_string := uuid.to_string(my_uuid, context.temp_allocator)
 		fmt.println(my_uuid_string)
@@ -306,7 +306,7 @@ Example:
 	import "core:encoding/uuid"
 	import "core:fmt"
 
-	main :: proc() {
+	generate_v8_hash_string_example :: proc() {
 		my_uuid := uuid.generate_v8_hash(uuid.Namespace_DNS, "www.odin-lang.org", .SHA256)
 		my_uuid_string := uuid.to_string(my_uuid, context.temp_allocator)
 		fmt.println(my_uuid_string)

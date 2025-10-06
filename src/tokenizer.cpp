@@ -968,6 +968,7 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				advance_to_next_rune(t);
 				for (isize comment_scope = 1; comment_scope > 0; /**/) {
 					if (t->curr_rune == GB_RUNE_EOF) {
+						tokenizer_err(t, "Multi-line comment not terminated");
 						break;
 					} else if (t->curr_rune == '/') {
 						advance_to_next_rune(t);

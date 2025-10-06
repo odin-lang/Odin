@@ -63,8 +63,6 @@ Example:
 	read_csv_from_string :: proc(filename: string) {
 		r: csv.Reader
 		r.trim_leading_space  = true
-		r.reuse_record        = true // Without it you have to delete(record)
-		r.reuse_record_buffer = true // Without it you have to each of the fields within it
 		defer csv.reader_destroy(&r)
 
 		csv_data, ok := os.read_entire_file(filename)

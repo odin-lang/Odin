@@ -27,13 +27,20 @@ stderr: Handle = 2
 
 args := _alloc_command_line_arguments()
 
-@(require_results)
-_alloc_command_line_arguments :: proc() -> (args: []string) {
-	args = make([]string, len(runtime.args__))
-	for &arg, i in args {
+@(private, require_results)
+_alloc_command_line_arguments :: proc "contextless" () -> []string {
+	context = runtime.default_context()
+	cmd_args := make([]string, len(runtime.args__))
+	for &arg, i in cmd_args {
 		arg = string(runtime.args__[i])
 	}
-	return
+	return cmd_args
+}
+
+@(private, fini)
+_delete_command_line_arguments :: proc "contextless" () {
+	context = runtime.default_context()
+	delete(args)
 }
 
 // WASI works with "preopened" directories, the environment retrieves directories
@@ -52,9 +59,8 @@ Preopen :: struct {
 preopens: []Preopen
 
 @(init, private)
-init_preopens :: proc() {
-
-	strip_prefixes :: proc(path: string) -> string {
+init_preopens :: proc "contextless" () {
+	strip_prefixes :: proc "contextless"(path: string) -> string {
 		path := path
 		loop: for len(path) > 0 {
 			switch {
@@ -70,6 +76,8 @@ init_preopens :: proc() {
 		}
 		return path
 	}
+
+	context = runtime.default_context()
 
 	dyn_preopens: [dynamic]Preopen
 	loop: for fd := wasi.fd_t(3); ; fd += 1 {
@@ -239,3 +247,27 @@ exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	wasi.proc_exit(wasi.exitcode_t(code))
 }
+
+@(require_results)
+lookup_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	return "", false
+}
+
+@(require_results)
+lookup_env_buffer :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	return "", .Env_Var_Not_Found
+}
+lookup_env :: proc{lookup_env_alloc, lookup_env_buffer}
+
+@(require_results)
+get_env_alloc :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	value, _ = lookup_env(key, allocator)
+	return
+}
+
+@(require_results)
+get_env_buf :: proc(buf: []u8, key: string) -> (value: string) {
+	value, _ = lookup_env(buf, key)
+	return
+}
+get_env :: proc{get_env_alloc, get_env_buf}
