@@ -206,7 +206,7 @@ struct lbModule {
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
 	StringMap<lbAddr> objc_ivars;
-	isize             objc_next_block_id;  // Used to name objective-c blocks, per module
+	isize             objc_next_block_id;  // Used to name objective-c blocks. Tracked per module.
 
 	PtrMap<u64/*type hash*/, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
