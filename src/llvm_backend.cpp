@@ -2100,7 +2100,8 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			lb_end_procedure_body(dummy);
 
 			LLVMValueRef context_ptr = lb_find_or_generate_context_ptr(p).addr.value;
-			LLVMBuildCall2(p->builder, raw_dummy_type, dummy->value, &context_ptr, 1, "");
+			LLVMValueRef cast_ctx = LLVMBuildBitCast(p->builder, context_ptr, LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0), "");
+			LLVMBuildCall2(p->builder, raw_dummy_type, dummy->value, &cast_ctx, 1, "");
 		} else {
 			lb_init_global_var(m, p, e, init_expr, var);
 		}
