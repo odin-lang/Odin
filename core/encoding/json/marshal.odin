@@ -176,9 +176,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Pointer:
-		ptr := a.(rawptr)
-
-		if ptr == nil {
+		if v.id == typeid_of(Null) {
 			io.write_string(w, "null") or_return
 		} else {
 			return .Unsupported_Type
