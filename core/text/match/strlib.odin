@@ -646,7 +646,6 @@ lmem_find :: proc(s1, s2: string) -> int {
 
 // find a pattern with in a haystack with an offset
 // allow_memfind will speed up simple searches
-@(require_results)
 find_aux :: proc(
 	haystack: string, 
 	pattern: string, 
