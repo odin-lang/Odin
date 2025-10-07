@@ -358,7 +358,7 @@ sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
 		case a > b: return .Greater
 		}
 		return .Equal
-	})
+	}, nil)
 }
 
 reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
@@ -378,7 +378,7 @@ reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
 		case a > b: return .Less
 		}
 		return .Equal
-	})
+	}, nil)
 }
 
 @(require_results)
