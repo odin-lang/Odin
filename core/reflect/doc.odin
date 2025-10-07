@@ -29,20 +29,20 @@
 // the current stack frame.
 //
 // Example:
-//     x: int = 123
-//     a: any = x
-//     // equivalent to
-//     a: any
-//     a.data = &x
-//     a.id   = typeid_of(type_of(x))
+// 	x: int = 123
+// 	a: any = x
+// 	// equivalent to
+// 	a: any
+// 	a.data = &x
+// 	a.id   = typeid_of(type_of(x))
 //
 // Example:
-//     a: any = 123
-//     // equivalent to
-//     a: any
-//     tmp: int = 123
-//     a.data = &tmp
-//     a.id   = typeid_of(type_of(tmp))
+// 	a: any = 123
+// 	// equivalent to
+// 	a: any
+// 	tmp: int = 123
+// 	a.data = &tmp
+// 	a.id   = typeid_of(type_of(tmp))
 //
 //
 // `any` is a topologically-dual to a `union` in terms of its usage. Both support assignments of differing types
