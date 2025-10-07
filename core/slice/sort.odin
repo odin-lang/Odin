@@ -81,6 +81,25 @@ sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
 	swap_with_slice(data, temp)
 }
 
+@(private)
+_internal_sort_from_indices_permuation :: proc(data: $T/[]$E, indices: []int) {
+	assert(len(data) == len(indices))
+	if len(indices) <= 1 {
+		return
+	}
+
+	// TODO(bill): This is not O(N)
+	for i in 0..<len(indices) {
+		index_to_swap := indices[i]
+
+		for index_to_swap < i {
+			index_to_swap = indices[index_to_swap]
+		}
+
+		ptr_swap_non_overlapping(&data[i], &data[index_to_swap], size_of(E))
+	}
+}
+
 // sort sorts a slice and returns a slice of the original indices
 // This sort is not guaranteed to be stable
 sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (indices: []int) where ORD(E) {
@@ -90,11 +109,13 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (ind
 			for _, idx in indices {
 				indices[idx] = idx
 			}
+
 			raw := ([^]byte)(raw_data(indices))
 			_smoothsort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				data := ([^]E)(user_data)
+
 				xi, yi := (^int)(lhs)^, (^int)(rhs)^
-				x, y := data[xi], data[yi]
+				#no_bounds_check x, y := data[xi], data[yi]
 				if x < y {
 					return .Less
 				} else if x > y {
@@ -102,6 +123,8 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (ind
 				}
 				return .Equal
 			}, raw_data(data))
+
+			_internal_sort_from_indices_permuation(data, indices)
 		}
 		return indices
 	}
@@ -177,6 +200,8 @@ sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocat
 				}
 				return .Equal
 			}, ctx)
+
+			_internal_sort_from_indices_permuation(data, indices)
 		}
 	}
 	return indices
@@ -208,6 +233,8 @@ sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_d
 				}
 				return .Equal
 			}, ctx)
+
+			_internal_sort_from_indices_permuation(data, indices)
 		}
 	}
 	return indices
