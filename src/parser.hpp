@@ -27,10 +27,29 @@ enum AddressingMode : u8 {
 	Addressing_SwizzleVariable = 14, // Swizzle indexed variable
 };
 
+gb_global String const addressing_mode_strings[] = {
+	str_lit("Invalid"),
+	str_lit("NoValue"),
+	str_lit("Value"),
+	str_lit("Context"),
+	str_lit("Variable"),
+	str_lit("Constant"),
+	str_lit("Type"),
+	str_lit("Builtin"),
+	str_lit("ProcGroup"),
+	str_lit("MapIndex"),
+	str_lit("OptionalOk"),
+	str_lit("OptionalOkPtr"),
+	str_lit("SoaVariable"),
+	str_lit("SwizzleValue"),
+	str_lit("SwizzleVariable"),
+};
+
 struct TypeAndValue {
 	Type *         type;
 	AddressingMode mode;
-	bool           is_lhs; // Debug info
+	bool           is_lhs;            // Debug info
+	Type *         objc_super_target; // Original type of the Obj-C object before being converted to the superclass' type by the objc_super() intrinsic.
 	ExactValue     value;
 };
 

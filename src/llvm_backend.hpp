@@ -206,7 +206,7 @@ struct lbModule {
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
 	StringMap<lbAddr> objc_ivars;
-	isize             objc_next_block_id;  // Used to name objective-c blocks, per module
+	isize             objc_next_block_id;  // Used to name objective-c blocks. Tracked per module.
 
 	PtrMap<u64/*type hash*/, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
@@ -455,7 +455,7 @@ static lbConstContext const LB_CONST_CONTEXT_DEFAULT_NO_LOCAL = {false, false, {
 
 gb_internal lbValue lb_const_nil(lbModule *m, Type *type);
 gb_internal lbValue lb_const_undef(lbModule *m, Type *type);
-gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc = LB_CONST_CONTEXT_DEFAULT);
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc = LB_CONST_CONTEXT_DEFAULT, Type *value_type=nullptr);
 gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value);
 gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 
@@ -604,7 +604,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 gb_internal lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block);
 
 gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_);
-gb_internal LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMValueRef *values, isize value_count_);
+gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_);
 gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name);
 
 gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t);

@@ -1416,6 +1416,8 @@ gb_internal void init_universal(void) {
 		t_objc_SEL      = alloc_type_pointer(t_objc_selector);
 		t_objc_Class    = alloc_type_pointer(t_objc_class);
 		t_objc_Ivar     = alloc_type_pointer(t_objc_ivar);
+
+		t_objc_instancetype = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_instancetype"), t_objc_id);
 	}
 }
 
@@ -1499,8 +1501,11 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	map_destroy(&i->objc_msgSend_types);
 	string_set_destroy(&i->obcj_class_name_set);
-	mpsc_destroy(&i->objc_class_implementations);
 	map_destroy(&i->objc_method_implementations);
+
+	// NOTE(harold): Disabling this: It can cause the 'count == 0' assert to trigger
+	//               when there's checker errors and the queue is still full as it did not reach the generation stage.
+	// mpsc_destroy(&i->objc_class_implementations);
 
 	string_map_destroy(&i->load_file_cache);
 	string_map_destroy(&i->load_directory_cache);
@@ -3386,12 +3391,20 @@ gb_internal void init_core_map_type(Checker *c) {
 	t_raw_map_ptr       = alloc_type_pointer(t_raw_map);
 }
 
+gb_internal void init_core_objc_c(Checker *c) {
+	if (build_context.metrics.os == TargetOs_darwin) {
+		t_objc_super     = find_core_type(c, str_lit("objc_super"));
+		t_objc_super_ptr = alloc_type_pointer(t_objc_super);
+	}
+}
+
 gb_internal void init_preload(Checker *c) {
 	init_core_type_info(c);
 	init_mem_allocator(c);
 	init_core_context(c);
 	init_core_source_code_location(c);
 	init_core_map_type(c);
+	init_core_objc_c(c);
 }
 
 gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {

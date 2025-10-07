@@ -1937,7 +1937,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					if (buf_len > 0 && buf_ptr) {
 						let n = Math.min(buf_len, str.length);
 						str = str.substring(0, n);
-						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
+						wasmMemoryInterface.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
 						return n;
 					}
 				}
@@ -2001,7 +2001,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					if (buf_len > 0 && buf_ptr) {
 						let n = Math.min(buf_len, str.length);
 						str = str.substring(0, n);
-						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
+						wasmMemoryInterface.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
 						return n;
 					}
 				}

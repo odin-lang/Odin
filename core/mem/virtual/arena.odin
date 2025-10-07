@@ -108,6 +108,16 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 	}
 
 	sync.mutex_guard(&arena.mutex)
+	return arena_alloc_unguarded(arena, size, alignment, loc)
+}
+
+// Allocates memory from the provided arena.
+@(require_results, no_sanitize_address, private)
+arena_alloc_unguarded :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	size := size
+	if size == 0 {
+		return nil, nil
+	}
 
 	switch arena.kind {
 	case .Growing:
@@ -345,7 +355,11 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		case size == 0:
 			err = .Mode_Not_Implemented
 			return
-		case uintptr(old_data) & uintptr(alignment-1) == 0:
+		}
+
+		sync.mutex_guard(&arena.mutex)
+
+		if uintptr(old_data) & uintptr(alignment-1) == 0 {
 			if size < old_size {
 				// shrink data in-place
 				data = old_data[:size]
@@ -369,7 +383,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 			}
 		}
 
-		new_memory := arena_alloc(arena, size, alignment, location) or_return
+		new_memory := arena_alloc_unguarded(arena, size, alignment, location) or_return
 		if new_memory == nil {
 			return
 		}

@@ -752,11 +752,14 @@ gb_global Type *t_objc_object   = nullptr;
 gb_global Type *t_objc_selector = nullptr;
 gb_global Type *t_objc_class    = nullptr;
 gb_global Type *t_objc_ivar     = nullptr;
+gb_global Type *t_objc_super    = nullptr;     // Struct used in lieu of the 'self' instance when calling objc_msgSendSuper.
+gb_global Type *t_objc_super_ptr = nullptr;
 
 gb_global Type *t_objc_id    = nullptr;
 gb_global Type *t_objc_SEL   = nullptr;
 gb_global Type *t_objc_Class = nullptr;
 gb_global Type *t_objc_Ivar  = nullptr;
+gb_global Type *t_objc_instancetype = nullptr; // Special distinct variant of t_objc_id used mimic auto-typing of instancetype* in Objective-C
 
 enum OdinAtomicMemoryOrder : i32 {
 	OdinAtomicMemoryOrder_relaxed = 0, // unordered
@@ -1377,14 +1380,20 @@ gb_internal bool is_type_ordered_numeric(Type *t) {
 gb_internal bool is_type_constant_type(Type *t) {
 	t = core_type(t);
 	if (t == nullptr) { return false; }
-	if (t->kind == Type_Basic) {
+	switch (t->kind) {
+	case Type_Basic:
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
 		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
-	}
-	if (t->kind == Type_BitSet) {
+	case Type_BitSet:
 		return true;
-	}
-	if (t->kind == Type_Proc) {
+	case Type_Proc:
 		return true;
+	case Type_Array:
+		return is_type_constant_type(t->Array.elem);
+	case Type_EnumeratedArray:
+		return is_type_constant_type(t->EnumeratedArray.elem);
 	}
 	return false;
 }
@@ -2507,17 +2516,69 @@ gb_internal bool type_has_nil(Type *t) {
 	return false;
 }
 
+gb_internal bool is_type_union_constantable(Type *type) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_Union);
+
+	if (bt->Union.variants.count == 0) {
+		return true;
+	} else if (bt->Union.variants.count == 1) {
+		return is_type_constant_type(bt->Union.variants[0]);
+	}
+
+	for (Type *v : bt->Union.variants) {
+		if (!is_type_constant_type(v)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+gb_internal bool is_type_raw_union_constantable(Type *type) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_Struct);
+	GB_ASSERT(bt->Struct.is_raw_union);
+
+	for (Entity *f : bt->Struct.fields) {
+		if (!is_type_constant_type(f->type)) {
+			return false;
+		}
+	}
+	// return true;
+	return false; // Disable raw union constants for the time being
+}
+
 
 gb_internal bool elem_type_can_be_constant(Type *t) {
 	t = base_type(t);
 	if (t == t_invalid) {
 		return false;
 	}
-	if (is_type_any(t) || is_type_union(t) || is_type_raw_union(t)) {
+	if (is_type_any(t)) {
 		return false;
+	}
+	if (is_type_raw_union(t)) {
+		return is_type_raw_union_constantable(t);
+	}
+	if (is_type_union(t)) {
+		return is_type_union_constantable(t);
 	}
 	return true;
 }
+
+gb_internal bool elem_cannot_be_constant(Type *t) {
+	if (is_type_any(t)) {
+		return true;
+	}
+	if (is_type_union(t)) {
+		return !is_type_union_constantable(t);
+	}
+	if (is_type_raw_union(t)) {
+		return !is_type_raw_union_constantable(t);
+	}
+	return false;
+}
+
 
 gb_internal bool is_type_lock_free(Type *t) {
 	t = core_type(t);
@@ -4675,6 +4736,14 @@ gb_internal bool has_type_got_objc_class_attribute(Type *t) {
 gb_internal bool internal_check_is_assignable_to(Type *src, Type *dst);
 gb_internal bool is_type_objc_object(Type *t) {
 	return internal_check_is_assignable_to(t, t_objc_object);
+}
+
+gb_internal bool is_type_objc_ptr_to_object(Type *t) {
+	// NOTE (harold): is_type_objc_object() returns true if it's a pointer to an object or the object itself.
+	//                This returns true ONLY if Type is a shallow pointer to an Objective-C object.
+
+	Type *elem = type_deref(t);
+	return elem != t && elem->kind == Type_Named && is_type_objc_object(elem);
 }
 
 gb_internal Type *get_struct_field_type(Type *t, isize index) {

@@ -548,6 +548,8 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
+	bool   build_diagnostics;
+
 	bool   use_single_module;
 	bool   use_separate_modules;
 	bool   module_per_file;
@@ -966,14 +968,6 @@ gb_internal bool is_excluded_target_filename(String name) {
 	if (string_starts_with(name, str_lit("."))) {
 		// Ignore .*.odin files
 		return true;
-	}
-
-	if (build_context.command_kind != Command_test) {
-		String test_suffix = str_lit("_test");
-		if (string_ends_with(name, test_suffix) && name != test_suffix) {
-			// Ignore *_test.odin files
-			return true;
-		}
 	}
 
 	String str1 = {};
