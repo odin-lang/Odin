@@ -134,8 +134,13 @@ equal_fold :: proc(u, v: []byte) -> bool {
 			return false
 		}
 
-		// TODO(bill): Unicode folding
-
+		r := unicode.simple_fold(sr)
+		for r != sr && r < tr {
+			r = unicode.simple_fold(sr)
+		}
+		if r == tr {
+			continue loop
+		}
 		return false
 	}
 
