@@ -348,11 +348,11 @@ sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
 	ctx := &Context{key}
 
 	sort_by_generic_cmp(data, proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-		x, y := (^E)(lhs)^, (^E)(rhs)^
+		i, j := (^E)(lhs)^, (^E)(rhs)^
 
 		ctx := (^Context)(user_data)
-		a := k(i)
-		b := k(j)
+		a := ctx.key(i)
+		b := ctx.key(j)
 		switch {
 		case a < b: return .Less
 		case a > b: return .Greater
@@ -368,11 +368,11 @@ reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
 	ctx := &Context{key}
 
 	sort_by_generic_cmp(data, proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-		x, y := (^E)(lhs)^, (^E)(rhs)^
+		i, j := (^E)(lhs)^, (^E)(rhs)^
 
 		ctx := (^Context)(user_data)
-		a := k(i)
-		b := k(j)
+		a := ctx.key(i)
+		b := ctx.key(j)
 		switch {
 		case a < b: return .Greater
 		case a > b: return .Less
