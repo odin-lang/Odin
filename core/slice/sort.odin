@@ -325,36 +325,59 @@ reverse_sort :: proc(data: $T/[]$E) where ORD(E) {
 
 
 reverse_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
-	context._internal = rawptr(less)
-	sort_by(data, proc(i, j: E) -> bool {
-		k := (proc(i, j: E) -> bool)(context._internal)
-		return k(j, i)
-	})
+	sort_by_with_data(data, proc(i, j: E, user_data: rawptr) -> bool {
+		less := (proc(E, E) -> bool)(user_data)
+		return less(j, i)
+	}, rawptr(less))
 }
 
 reverse_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	context._internal = rawptr(cmp)
-	sort_by_cmp(data, proc(i, j: E) -> Ordering {
-		k := (proc(i, j: E) -> Ordering)(context._internal)
+	sort_by_cmp_with_data(data, proc(i, j: E, user_data: rawptr) -> Ordering {
+		k := (proc(i, j: E) -> Ordering)(user_data)
 		return k(j, i)
-	})
+	}, rawptr(data))
 }
 
 
 // TODO(bill): Should `sort_by_key` exist or is `sort_by` more than enough?
 sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
-	context._internal = rawptr(key)
-	sort_by(data, proc(i, j: E) -> bool {
-		k := (proc(E) -> K)(context._internal)
-		return k(i) < k(j)
+	Context :: struct {
+		key: proc(E) -> K,
+	}
+	ctx := &Context{key}
+
+	sort_by_generic_cmp(data, proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+		x, y := (^E)(lhs)^, (^E)(rhs)^
+
+		ctx := (^Context)(user_data)
+		a := k(i)
+		b := k(j)
+		switch {
+		case a < b: return .Less
+		case a > b: return .Greater
+		}
+		return .Equal
 	})
 }
 
 reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
-	context._internal = rawptr(key)
-	sort_by(data, proc(i, j: E) -> bool {
-		k := (proc(E) -> K)(context._internal)
-		return k(j) < k(i)
+	Context :: struct {
+		key: proc(E) -> K,
+	}
+	ctx := &Context{key}
+
+	sort_by_generic_cmp(data, proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+		x, y := (^E)(lhs)^, (^E)(rhs)^
+
+		ctx := (^Context)(user_data)
+		a := k(i)
+		b := k(j)
+		switch {
+		case a < b: return .Greater
+		case a > b: return .Less
+		}
+		return .Equal
 	})
 }
 
@@ -366,12 +389,4 @@ is_sorted_by_key :: proc(array: $T/[]$E, key: proc(E) -> $K) -> bool where ORD(K
 		}
 	}
 	return true
-}
-
-@(private, require_results)
-_max_depth :: proc(n: int) -> (depth: int) { // 2*ceil(log2(n+1))
-	for i := n; i > 0; i >>= 1 {
-		depth += 1
-	}
-	return depth * 2
 }
