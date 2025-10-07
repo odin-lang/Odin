@@ -6,6 +6,8 @@ Ordering :: enum {
 	Greater = +1,
 }
 
+Generic_Cmp :: #type proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering
+
 @(require_results)
 cmp :: proc(a, b: $E) -> Ordering where ORD(E) {
 	switch {
@@ -35,7 +37,16 @@ cmp_proc :: proc($E: typeid) -> (proc(E, E) -> Ordering) where ORD(E) {
 sort :: proc(data: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
-			_quick_sort_general(data, 0, n, _max_depth(n), struct{}{}, .Ordered)
+			raw := ([^]byte)(raw_data(data))
+			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+				x, y := (^E)(lhs)^, (^E)(rhs)^
+				if x < y {
+					return .Less
+				} else if x > y {
+					return .Greater
+				}
+				return .Equal
+			}, nil)
 		}
 	}
 }
@@ -79,7 +90,18 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (ind
 			for _, idx in indices {
 				indices[idx] = idx
 			}
-			_quick_sort_general_with_indices(data, indices, 0, n, _max_depth(n), struct{}{}, .Ordered)
+			raw := ([^]byte)(raw_data(indices))
+			_smoothsort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+				data := ([^]E)(user_data)
+				xi, yi := (^int)(lhs)^, (^int)(rhs)^
+				x, y := data[xi], data[yi]
+				if x < y {
+					return .Less
+				} else if x > y {
+					return .Greater
+				}
+				return .Equal
+			}, raw_data(data))
 		}
 		return indices
 	}
@@ -91,7 +113,39 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (ind
 sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
-			_quick_sort_general(data, 0, n, _max_depth(n), less, .Less)
+			raw := ([^]byte)(raw_data(data))
+			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+				x, y := (^E)(lhs)^, (^E)(rhs)^
+				less := (proc(E, E) -> bool)(user_data)
+				switch {
+				case less(x, y): return .Less
+				case less(y, x): return .Greater
+				}
+				return .Equal
+			}, rawptr(less))
+		}
+	}
+}
+
+sort_by_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) -> bool, user_data: rawptr) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			Context :: struct {
+				less:      proc(i, j: E, user_data: rawptr) -> bool,
+				user_data: rawptr,
+			}
+			ctx := &Context{less, user_data}
+
+			raw := ([^]byte)(raw_data(data))
+			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+				x, y := (^E)(lhs)^, (^E)(rhs)^
+				ctx := (^Context)(user_data)
+				switch {
+				case ctx.less(x, y, ctx.user_data): return .Less
+				case ctx.less(y, x, ctx.user_data): return .Greater
+				}
+				return .Equal
+			}, ctx)
 		}
 	}
 }
@@ -105,8 +159,55 @@ sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocat
 			for _, idx in indices {
 				indices[idx] = idx
 			}
-			_quick_sort_general_with_indices(data, indices, 0, n, _max_depth(n), less, .Less)
-			return indices
+
+			Context :: struct{
+				less: proc(i, j: E) -> bool,
+				data: T,
+			}
+			ctx := &Context{less, data}
+
+			raw := ([^]byte)(raw_data(indices))
+			_smoothsort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+				ctx := (^Context)(user_data)
+				xi, yi := (^int)(lhs)^, (^int)(rhs)^
+				x, y := ctx.data[xi], ctx.data[yi]
+				switch {
+				case ctx.less(x, y): return .Less
+				case ctx.less(y, x): return .Greater
+				}
+				return .Equal
+			}, ctx)
+		}
+	}
+	return indices
+}
+
+sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) -> bool, user_data: rawptr, allocator := context.allocator) -> (indices : []int) {
+	indices = make([]int, len(data), allocator)
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			for _, idx in indices {
+				indices[idx] = idx
+			}
+
+			Context :: struct{
+				less: proc(i, j: E, user_data: rawptr) -> bool,
+				data: T,
+				user_data: rawptr,
+			}
+			ctx := &Context{less, data, user_data}
+
+			raw := ([^]byte)(raw_data(indices))
+			_smoothsort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+				ctx := (^Context)(user_data)
+				xi, yi := (^int)(lhs)^, (^int)(rhs)^
+				x, y := ctx.data[xi], ctx.data[yi]
+				switch {
+				case ctx.less(x, y, ctx.user_data): return .Less
+				case ctx.less(y, x, ctx.user_data): return .Greater
+				}
+				return .Equal
+			}, ctx)
 		}
 	}
 	return indices
@@ -115,10 +216,46 @@ sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocat
 sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
-			_quick_sort_general(data, 0, n, _max_depth(n), cmp, .Cmp)
+			raw := ([^]byte)(raw_data(data))
+			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+				x, y := (^E)(lhs)^, (^E)(rhs)^
+				cmp := cast(proc(E, E) -> Ordering)(user_data)
+				return cmp(x, y)
+			}, rawptr(cmp))
 		}
 	}
 }
+
+
+sort_by_cmp_with_data :: proc(data: $T/[]$E, cmp: proc(i, j: E, user_data: rawptr) -> Ordering, user_data: rawptr) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			Context :: struct{
+				cmp: proc(i, j: E, user_data: rawptr) -> Ordering,
+				user_data: rawptr,
+			}
+			ctx := &Context{cmp, user_data}
+
+			raw := ([^]byte)(raw_data(data))
+			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+				x, y := (^E)(lhs)^, (^E)(rhs)^
+				ctx := (^Context)(user_data)
+				return ctx.cmp(x, y, ctx.user_data)
+			}, ctx)
+		}
+	}
+}
+
+
+sort_by_generic_cmp :: proc(data: $T/[]$E, cmp: Generic_Cmp, user_data: rawptr) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			raw := ([^]byte)(raw_data(data))
+			_smoothsort(raw, uint(len(data)), size_of(E), cmp, user_data)
+		}
+	}
+}
+
 
 // stable_sort sorts a slice
 stable_sort :: proc(data: $T/[]$E) where ORD(E) {
