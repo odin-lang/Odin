@@ -293,7 +293,7 @@ is_string16 :: proc(info: ^Type_Info) -> bool {
 is_cstring16 :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	v, ok := type_info_base(info).variant.(Type_Info_String)
-	return ok && v.is_cstring && v == .UTF_16
+	return ok && v.is_cstring && v.encoding == .UTF_16
 }
 
 // Returns true the base-type is a boolean of any kind, false otherwise.
