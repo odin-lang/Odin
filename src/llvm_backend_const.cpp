@@ -597,8 +597,7 @@ LLVMValueRef llvm_const_pad_to_size(lbModule *m, LLVMValueRef val, LLVMTypeRef d
 			LLVMValueRef elem = llvm_const_extract_value(m, val, i);
 			LLVMTypeRef elem_int_ty = LLVMIntTypeInContext(ctx, elem_bits);
 			LLVMValueRef elem_int = llvm_const_pad_to_size(m, elem, elem_int_ty);
-			LLVMValueRef shifted = llvm_const_shl(m, llvm_const_zext(m, elem_int, src_int_ty),
-																			 LLVMConstInt(src_int_ty, i * elem_bits, false));
+			LLVMValueRef shifted = llvm_const_shl(m, llvm_const_zext(m, elem_int, src_int_ty), LLVMConstInt(src_int_ty, i * elem_bits, false));
 			as_int = llvm_const_or(m, as_int, shifted);
 		}
 	} else {
