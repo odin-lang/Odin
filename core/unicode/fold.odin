@@ -14,7 +14,7 @@ package unicode
 // 	simple_fold('\u212a') == 'k'
 // 	simple_fold(-3)       == -3
 @(require_results)
-simple_fold :: proc(r: rune) -> rune {
+simple_fold :: proc(r: rune) -> rune #no_bounds_check {
 	Fold_Pair :: struct {
 		from: u16,
 		to:   u16,
