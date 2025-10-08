@@ -449,6 +449,31 @@ gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, 
 }
 
 
+gb_internal LLVMValueRef llvm_const_shl(lbModule *m, LLVMValueRef a, LLVMValueRef b) {
+	LLVMValueRef res = LLVMBuildShl(m->const_dummy_builder, a, b, "");
+	GB_ASSERT(LLVMIsConstant(res));
+	return res;
+}
+
+gb_internal LLVMValueRef llvm_const_lshr(lbModule *m, LLVMValueRef a, LLVMValueRef b) {
+	LLVMValueRef res = LLVMBuildLShr(m->const_dummy_builder, a, b, "");
+	GB_ASSERT(LLVMIsConstant(res));
+	return res;
+}
+
+gb_internal LLVMValueRef llvm_const_or(lbModule *m, LLVMValueRef a, LLVMValueRef b) {
+	LLVMValueRef res = LLVMBuildOr(m->const_dummy_builder, a, b, "");
+	GB_ASSERT(LLVMIsConstant(res));
+	return res;
+}
+
+gb_internal LLVMValueRef llvm_const_zext(lbModule *m, LLVMValueRef a, LLVMTypeRef b) {
+	LLVMValueRef res = LLVMBuildZExt(m->const_dummy_builder, a, b, "");
+	GB_ASSERT(LLVMIsConstant(res));
+	return res;
+}
+
+
 
 
 gb_internal LLVMValueRef llvm_cstring(lbModule *m, String const &str) {

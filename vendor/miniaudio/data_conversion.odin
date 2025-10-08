@@ -566,9 +566,9 @@ foreign lib {
 	pcm_rb_uninit               :: proc(pRB: ^pcm_rb) ---
 	pcm_rb_reset                :: proc(pRB: ^pcm_rb) ---
 	pcm_rb_acquire_read         :: proc(pRB: ^pcm_rb, pSizeInFrames: ^u32, ppBufferOut: ^rawptr) -> result ---
-	pcm_rb_commit_read          :: proc(pRB: ^pcm_rb, sizeInFrames: u32, pBufferOut: rawptr) -> result ---
+	pcm_rb_commit_read          :: proc(pRB: ^pcm_rb, sizeInFrames: u32) -> result ---
 	pcm_rb_acquire_write        :: proc(pRB: ^pcm_rb, pSizeInFrames: ^u32, ppBufferOut: ^rawptr) -> result ---
-	pcm_rb_commit_write         :: proc(pRB: ^pcm_rb, sizeInFrames: u32, pBufferOut: rawptr) -> result ---
+	pcm_rb_commit_write         :: proc(pRB: ^pcm_rb, sizeInFrames: u32) -> result ---
 	pcm_rb_seek_read            :: proc(pRB: ^pcm_rb, offsetInFrames: u32) -> result ---
 	pcm_rb_seek_write           :: proc(pRB: ^pcm_rb, offsetInFrames: u32) -> result ---
 	pcm_rb_pointer_distance     :: proc(pRB: ^pcm_rb) -> i32 --- /* Return value is in frames. */

@@ -6211,7 +6211,6 @@ gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *
 					continue;
 				}
 			}
-			break;
 		}
 	}
 
@@ -7482,8 +7481,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 		Entity *e = proc_entities[valids[0].index];
 		GB_ASSERT(e != nullptr);
-
-		Array<Operand> named_operands = {};
 
 		check_call_arguments_single(c, call, operand,
 			e, e->type,
