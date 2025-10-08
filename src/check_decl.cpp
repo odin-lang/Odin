@@ -559,17 +559,17 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 
 				Type *super = ac.objc_superclass;
 				while (super != nullptr) {
+					if (super->kind != Type_Named) {
+						error(e->token, "@(objc_superclass) Referenced type must be a named struct");
+						break;
+					}
+
 					if (type_set_update(&super_set, super)) {
 						error(e->token, "@(objc_superclass) Superclass hierarchy cycle encountered");
 						break;
 					}
 
 					check_single_global_entity(ctx->checker, super->Named.type_name, super->Named.type_name->decl_info);
-
-					if (super->kind != Type_Named) {
-						error(e->token, "@(objc_superclass) Referenced type must be a named struct");
-						break;
-					}
 
 					Type* named_type = base_named_type(super);
 					GB_ASSERT(named_type->kind == Type_Named);
