@@ -636,6 +636,8 @@ _cleanup_runtime_contextless :: proc "contextless" () {
 /////////////////////////////
 
 
+// type_info_base returns the base-type of a `^Type_Info` stripping the `distinct`ness from the first level
+@(require_results)
 type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil
@@ -652,6 +654,10 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 }
 
 
+// type_info_core returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum or bit_set `^Type_Info`.
+// This is also aliased as `type_info_base_without_enum`
+@(require_results)
 type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil
@@ -668,6 +674,10 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	}
 	return base
 }
+
+// type_info_base_without_enum returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum or bit_set `^Type_Info`.
+// This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
 
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
@@ -684,15 +694,23 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 }
 
 when !ODIN_NO_RTTI {
+	// typeid_base returns the base-type of a `typeid` stripping the `distinct`ness from the first level
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_of(id)
 		ti = type_info_base(ti)
 		return ti.id
 	}
+	// typeid_core returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
+	// returns the backing integer type of an enum or bit_set `typeid`.
+	// This is also aliased as `typeid_base_without_enum`
 	typeid_core :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_core(type_info_of(id))
 		return ti.id
 	}
+
+	// typeid_base_without_enum returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
+	// returns the backing integer type of an enum or bit_set `typeid`.
+	// This is also aliased as `typeid_core`
 	typeid_base_without_enum :: typeid_core
 }
 
@@ -708,11 +726,15 @@ default_logger_proc :: proc(data: rawptr, level: Logger_Level, text: string, opt
 	// Nothing
 }
 
+// Returns the default logger used by `context.logger`
+@(require_results)
 default_logger :: proc() -> Logger {
 	return Logger{default_logger_proc, nil, Logger_Level.Debug, nil}
 }
 
 
+// Returns the default `context`
+@(require_results)
 default_context :: proc "contextless" () -> Context {
 	c: Context
 	__init_context(&c)

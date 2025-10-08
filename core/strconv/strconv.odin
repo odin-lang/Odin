@@ -1547,85 +1547,8 @@ write_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
 }
 
 /*
-Converts an integer value to a string and stores it in the given buffer
+`ftoa` C name deprecated, use `write_float` instead (same procedure)
 
-**Inputs**
-- buf: The buffer to store the resulting string
-- i: The integer value to be converted
-
-Example:
-
-	import "core:fmt"
-	import "core:strconv"
-	itoa_example :: proc() {
-		buf: [4]byte
-		result := strconv.itoa(buf[:], 42)
-		fmt.println(result, buf) // "42"
-	}
-
-Output:
-
-	42 [52, 50, 0, 0]
-
-**Returns**
-- The resulting string after converting the integer value
-*/
-itoa :: proc(buf: []byte, i: int) -> string {
-	return write_int(buf, i64(i), 10)
-}
-/*
-Converts a string to an integer value
-
-**Inputs**
-- s: The string to be converted
-
-Example:
-
-	import "core:fmt"
-	import "core:strconv"
-	atoi_example :: proc() {
-		fmt.println(strconv.atoi("42"))
-	}
-
-Output:
-
-	42
-
-**Returns**
-- The resulting integer value
-*/
-atoi :: proc(s: string) -> int {
-	v, _ := parse_int(s)
-	return v
-}
-/*
-Converts a string to a float64 value
-
-**Inputs**
-- s: The string to be converted
-
-Example:
-
-	import "core:fmt"
-	import "core:strconv"
-	atof_example :: proc() {
-		fmt.printfln("%.3f", strconv.atof("3.14"))
-	}
-
-Output:
-
-	3.140
-
-**Returns**
-- The resulting float64 value after converting the string
-*/
-atof :: proc(s: string) -> f64 {
-	v, _  := parse_f64(s)
-	return v
-}
-// Alias to `write_float`
-ftoa :: write_float
-/*
 Writes a float64 value as a string to the given buffer with the specified format and precision
 
 **Inputs**
