@@ -81,14 +81,12 @@ sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
 	swap_with_slice(data, temp)
 }
 
-@(private)
-_internal_sort_from_indices_permuation :: proc(data: $T/[]$E, indices: []int) {
+sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 	assert(len(data) == len(indices))
 	if len(indices) <= 1 {
 		return
 	}
 
-	// TODO(bill): This is not O(N)
 	for i in 0..<len(indices) {
 		index_to_swap := indices[i]
 
@@ -124,7 +122,7 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (ind
 				return .Equal
 			}, raw_data(data))
 
-			_internal_sort_from_indices_permuation(data, indices)
+			sort_from_permutation_indices(data, indices)
 		}
 		return indices
 	}
@@ -201,7 +199,7 @@ sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocat
 				return .Equal
 			}, ctx)
 
-			_internal_sort_from_indices_permuation(data, indices)
+			sort_from_permutation_indices(data, indices)
 		}
 	}
 	return indices
@@ -234,7 +232,7 @@ sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_d
 				return .Equal
 			}, ctx)
 
-			_internal_sort_from_indices_permuation(data, indices)
+			sort_from_permutation_indices(data, indices)
 		}
 	}
 	return indices
