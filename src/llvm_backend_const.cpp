@@ -572,8 +572,8 @@ LLVMValueRef llvm_const_pad_to_size(lbModule *m, LLVMValueRef val, LLVMTypeRef d
 	LLVMContextRef ctx = m->ctx;
 	LLVMTargetDataRef td = LLVMGetModuleDataLayout(m->mod);
 	LLVMTypeRef src_ty = LLVMTypeOf(val);
-	unsigned src_bits = LLVMSizeOfTypeInBits(td, src_ty);
-	unsigned dst_bits = LLVMSizeOfTypeInBits(td, dst_ty);
+	unsigned src_bits = (unsigned)LLVMSizeOfTypeInBits(td, src_ty);
+	unsigned dst_bits = (unsigned)LLVMSizeOfTypeInBits(td, dst_ty);
 
 	LLVMValueRef as_int = nullptr;
 	LLVMTypeKind src_kind = LLVMGetTypeKind(src_ty);
@@ -589,7 +589,7 @@ LLVMValueRef llvm_const_pad_to_size(lbModule *m, LLVMValueRef val, LLVMTypeRef d
 	} else if (src_kind == LLVMArrayTypeKind) {
 		unsigned elem_count = LLVMGetArrayLength(src_ty);
 		LLVMTypeRef elem_ty = LLVMGetElementType(src_ty);
-		unsigned elem_bits = LLVMSizeOfTypeInBits(td, elem_ty);
+		unsigned elem_bits = (unsigned)LLVMSizeOfTypeInBits(td, elem_ty);
 		LLVMTypeRef src_int_ty = LLVMIntTypeInContext(ctx, src_bits);
 		as_int = LLVMConstInt(src_int_ty, 0, false);
 
@@ -627,7 +627,7 @@ LLVMValueRef llvm_const_pad_to_size(lbModule *m, LLVMValueRef val, LLVMTypeRef d
 	} else if (dst_kind == LLVMArrayTypeKind) {
 		unsigned elem_count = LLVMGetArrayLength(dst_ty);
 		LLVMTypeRef elem_ty = LLVMGetElementType(dst_ty);
-		unsigned elem_bits = LLVMSizeOfTypeInBits(td, elem_ty);
+		unsigned elem_bits = (unsigned)LLVMSizeOfTypeInBits(td, elem_ty);
 
 		LLVMValueRef *elems = temporary_alloc_array<LLVMValueRef>(elem_count);
 		LLVMTypeRef as_int_ty = LLVMTypeOf(as_int);
