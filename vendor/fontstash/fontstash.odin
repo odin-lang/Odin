@@ -335,7 +335,10 @@ AddFontMem :: proc(
 	res.freeLoadedData = freeLoadedData
 	res.name           = strings.clone(name)
 
-	stbtt.InitFont(&res.info, &res.loadedData[0], 0)
+	// Get offset of first font (if the font is a TTC then it can contain multiple fonts)
+	// Note: There is currently no support for specifying any other font than first one.
+	font_offset := stbtt.GetFontOffsetForIndex(raw_data(res.loadedData), 0)
+	stbtt.InitFont(&res.info, raw_data(res.loadedData), font_offset)
 	ascent, descent, line_gap: i32
 
 	stbtt.GetFontVMetrics(&res.info, &ascent, &descent, &line_gap)
