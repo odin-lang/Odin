@@ -1,3 +1,4 @@
+// package strconv implements conversions to and from string represnetations of other data types
 package strconv
 
 import "core:unicode/utf8"
