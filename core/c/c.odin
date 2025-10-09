@@ -1,4 +1,4 @@
-// package c just defines the basic types used by C programs
+// package c just defines the basic types used by C programs.
 package c
 
 import builtin "base:builtin"

@@ -1,4 +1,4 @@
-// package gzip implements a small GZIP implementation as an example.
+// package gzip implements a small GZIP unpacker as an example.
 package compress_gzip
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.

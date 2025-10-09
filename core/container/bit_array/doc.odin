@@ -1,4 +1,4 @@
-// package bit_array implements a dynamically-sized array of bits
+// package bit_array implements a dynamically-sized array of bits.
 package container_dynamic_bit_array
 
 /*

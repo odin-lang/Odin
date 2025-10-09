@@ -1,3 +1,5 @@
+// package cbor implements encoding, decoding, marshaling and unmarshaling types from/into RCF 8949 compatible CBOR binary.
+package encoding_cbor
 /*
 Package cbor encodes, decodes, marshals and unmarshals types from/into RCF 8949 compatible CBOR binary.
 Also provided are conversion to and from JSON and the CBOR diagnostic format.
@@ -165,5 +167,3 @@ Output:
 		"str": "Hello, World!"
 	}
 */
-package encoding_cbor
-
