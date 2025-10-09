@@ -1,3 +1,4 @@
+// package relative implements relative pointers and slices.
 package relative_types
 
 import "base:intrinsics"

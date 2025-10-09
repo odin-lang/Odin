@@ -1,5 +1,5 @@
 /*
-The SIMD support package.
+package simd implements cross-platform SIMD support types and procedures.
 
 SIMD (Single Instruction Multiple Data), is a CPU hardware feature that
 introduce special registers and instructions which operate on multiple units

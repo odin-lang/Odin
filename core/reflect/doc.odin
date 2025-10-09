@@ -1,4 +1,4 @@
-// Package reflect provides utility procedures and types to perform runtime type introspection/reflection (RTTI).
+// package reflect provides utility procedures and types to perform runtime type introspection/reflection (RTTI).
 //
 // WARNING! THIS IS ADVANCED BEHAVIOUR FOR ODIN! THIS SHOULD NOT BE USED BY BEGINNERS TO ODIN!
 //
