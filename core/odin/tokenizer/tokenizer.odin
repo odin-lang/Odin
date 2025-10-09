@@ -1,3 +1,4 @@
+// package tokenizer implements the tokenizer (lexer) for *.odin files, used to create tooling.
 package odin_tokenizer
 
 import "core:fmt"

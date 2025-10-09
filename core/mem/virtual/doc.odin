@@ -1,5 +1,5 @@
 /*
-package mem/virtual implements a platform agnostic way to reserve/commit/decommit virtual memory
+package virtual implements a platform agnostic way to reserve/commit/decommit virtual memory.
 
 
 virtual.Arena usage
