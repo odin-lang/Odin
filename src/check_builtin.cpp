@@ -6525,7 +6525,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			check_expr(c, &x, ce->args[1]);
 
 			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
-				error(ce->args[1], "Expected a const string for field argument");
+				error(ce->args[1], "Expected a constant string for field argument");
 				return false;
 			}
 
@@ -6605,7 +6605,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			check_expr(c, &x, ce->args[1]);
 
 			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
-				error(ce->args[1], "Expected a const string for field argument");
+				error(ce->args[1], "Expected a constant string for field argument");
 				return false;
 			}
 
@@ -7242,7 +7242,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			check_expr(c, &x, ce->args[1]);
 
 			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
-				error(ce->args[1], "Expected a const string for field argument");
+				error(ce->args[1], "Expected a constant string for field argument");
 				return false;
 			}
 
