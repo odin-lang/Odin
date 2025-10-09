@@ -1,6 +1,8 @@
+package encoding_base32
+
 // Base32 encoding/decoding implementation as specified in RFC 4648.
 // [[ More; https://www.rfc-editor.org/rfc/rfc4648.html ]]
-package encoding_base32
+
 
 // @note(zh): Encoding utility for Base32
 // A secondary param can be used to supply a custom alphabet to
