@@ -1,3 +1,6 @@
+// package list implements an intrusive doubly-linked list.
+package container_intrusive_list
+
 /*
 Package list implements an intrusive doubly-linked list.
 
@@ -46,4 +49,3 @@ Output:
 	Hello
 	World
 */
-package container_intrusive_list

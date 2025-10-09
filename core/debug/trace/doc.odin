@@ -1,6 +1,6 @@
+// package debug implements a stack trace library. Only works when debug symbols are enabled `-debug`.
+package debug_trace
 /*
-A debug stack trace library. Only works when debug symbols are enabled `-debug`.
-
 Example:
 	import "base:runtime"
 	import "core:debug/trace"
@@ -48,4 +48,3 @@ Example:
 	}
 
 */
-package debug_trace

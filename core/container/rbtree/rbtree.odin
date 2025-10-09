@@ -1,4 +1,3 @@
-// This package implements a red-black tree
 package container_rbtree
 
 @(require) import "base:intrinsics"
