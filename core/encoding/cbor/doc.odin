@@ -1,4 +1,4 @@
-// package cbor implements encoding, decoding, marshaling and unmarshaling types from/into RCF 8949 compatible CBOR binary.
+// package cbor implements encoding and decoding types from/into RCF 8949 compatible CBOR binary.
 package encoding_cbor
 /*
 Package cbor encodes, decodes, marshals and unmarshals types from/into RCF 8949 compatible CBOR binary.

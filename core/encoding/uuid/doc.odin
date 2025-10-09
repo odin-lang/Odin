@@ -1,6 +1,5 @@
 /*
-package uuid implements Universally Unique Identifiers according to the
-standard originally outlined in RFC 4122 with additions from RFC 9562.
+package uuid implements Universally Unique Identifiers according to RFC 4122, with additions from RFC 9562.
 
 The UUIDs are textually represented and read in the following string format:
 `00000000-0000-v000-V000-000000000000`

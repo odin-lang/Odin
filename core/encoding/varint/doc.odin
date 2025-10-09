@@ -1,5 +1,5 @@
 /*
-Implementation of the LEB128 variable integer encoding as used by DWARF encoding and DEX files, among others.
+package varint implements LEB128 variable integer encoding and decoding, as used by DWARF & DEX files.
 
 Author of this Odin package: Jeroen van Rijn
 
