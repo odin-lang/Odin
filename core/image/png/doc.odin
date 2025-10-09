@@ -1,5 +1,5 @@
 /*
-package png implements a PNG image reader
+package png implements a PNG image reader.
 
 The PNG specification is at [[ https://www.w3.org/TR/PNG/ ]].
 

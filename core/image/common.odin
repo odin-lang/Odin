@@ -1,3 +1,5 @@
+package image
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -6,9 +8,6 @@
 		Jeroen van Rijn: Initial implementation, optimization.
 		Ginger Bill:     Cosmetic changes.
 */
-
-// package image implements a general 2D image library to be used with other image related packages
-package image
 
 import "core:bytes"
 import "core:mem"

@@ -1,4 +1,4 @@
-// package bmp implements a Microsoft BMP image reader
+// package bmp implements a Microsoft BMP image reader and writer.
 package core_image_bmp
 
 import "core:image"
