@@ -1,7 +1,10 @@
-// The following is a generic O(V+E) topological sorter implementation.
-// This is the fastest known method for topological sorting and Odin's
-// map type is being used to accelerate lookups.
 package container_topological_sort
+
+/*
+	The following is a generic O(V+E) topological sorter implementation.
+	This is the fastest known method for topological sorting and Odin's
+	map type is being used to accelerate lookups.
+*/
 
 import "base:intrinsics"
 import "base:runtime"

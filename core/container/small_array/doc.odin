@@ -1,7 +1,7 @@
-/*
-Package small_array implements a dynamic array like
-interface on a stack-allocated, fixed-size array.
+// package small_array implements a dynamic array-like interface on a stack-allocated, fixed-size array.
+package container_small_array
 
+/*
 The Small_Array type is optimal for scenarios where you need
 a container for a fixed number of elements of a specific type,
 with the total number known at compile time but the exact
@@ -52,4 +52,3 @@ Output:
 	Hellope
 
 */
-package container_small_array
