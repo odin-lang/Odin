@@ -251,6 +251,8 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_quaternion,
 	BuiltinProc_type_is_string,
 	BuiltinProc_type_is_string16,
+	BuiltinProc_type_is_cstring,
+	BuiltinProc_type_is_cstring16,
 	BuiltinProc_type_is_typeid,
 	BuiltinProc_type_is_any,
 
