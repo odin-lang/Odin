@@ -1,5 +1,5 @@
 /*
-	OpenSimplex2 noise implementation.
+	package noise implements the OpenSimplex2 noise algorithm.
 
 	Ported from [[ https://github.com/KdotJPG/OpenSimplex2 }].
 	Copyright 2022 Yuki2 [[ https://github.com/NoahR02 ]]

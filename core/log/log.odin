@@ -1,3 +1,4 @@
+// package log implements the context.Logger interface.
 package log
 
 import "base:runtime"
