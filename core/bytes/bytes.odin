@@ -1,4 +1,4 @@
-// package bytes implements procedures for manipulation of byte slices.
+// Procedures for manipulation of `[]byte` slices.
 package bytes
 
 import "base:intrinsics"

@@ -1,4 +1,4 @@
-// File contains implementations of the Orca API that are defined as macros in Orca.
+// Implementations of the `Orca` API that are defined as macros in Orca.
 
 package orca
 

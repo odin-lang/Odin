@@ -1,4 +1,4 @@
-// This package helps break dependency cycles.
+// This package helps break dependency cycles for the regular expression engine.
 package regex_common
 
 /*

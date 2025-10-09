@@ -1,2 +1,2 @@
-// package libc declares the commonly used things in "libc" (C standard library).
+// Declares the commonly used things in `libc` (`C` standard library).
 package libc

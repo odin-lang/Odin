@@ -1,4 +1,4 @@
-// package xxhash implements Yann Collet's xxhash.
+// Yann Collet's `xxhash`.
 //
 // [[ xxhash Fast Hash Algorithm; https://cyan4973.github.io/xxHash/ ]]
 package xxhash

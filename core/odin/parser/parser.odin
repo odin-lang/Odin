@@ -1,4 +1,4 @@
-// package parser implements the *.odin file parser to be used in tooling.
+// The `Odin` file parser to be used in tooling.
 package odin_parser
 
 import "core:odin/ast"

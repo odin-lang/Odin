@@ -1,4 +1,4 @@
-// package slice implements utility procedures for working with slices, including sorting and searching them.
+// Utility procedures for working with slices, including sorting and searching them.
 package slice
 
 import "base:intrinsics"

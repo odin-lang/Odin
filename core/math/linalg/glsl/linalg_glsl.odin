@@ -1,4 +1,4 @@
-// package glsl implements a GLSL-like mathematics library plus numerous other utility procedures.
+// `GLSL`-like mathematics library plus numerous other utility procedures.
 package math_linalg_glsl
 
 import "base:builtin"

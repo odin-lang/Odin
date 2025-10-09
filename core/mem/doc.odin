@@ -1,5 +1,5 @@
 /*
-package mem implements various allocators and provides helpers for dealing with memory, pointers and slices.
+Various allocators and provides helpers for dealing with memory, pointers and slices.
 
 The documentation below describes basic concepts, applicable to the `mem`
 package.

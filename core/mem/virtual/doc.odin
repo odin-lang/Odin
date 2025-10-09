@@ -1,5 +1,5 @@
 /*
-package virtual implements a platform agnostic way to reserve/commit/decommit virtual memory.
+A platform agnostic way to reserve/commit/decommit virtual memory.
 
 
 virtual.Arena usage

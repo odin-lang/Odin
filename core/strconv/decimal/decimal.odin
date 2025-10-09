@@ -1,5 +1,6 @@
-// Multiple precision decimal numbers
-// NOTE: This is only for floating point printing and nothing else
+// Multiple precision decimal numbers for use by the `strconv` package.
+//
+// NOTE: This is only for floating point printing and nothing else.
 package strconv_decimal
 
 Decimal :: struct {

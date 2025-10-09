@@ -1,4 +1,4 @@
-// package bits implements bit-level operations, including the ability to set or toggle individual bits in an integer.
+// Bit-level operations, including the ability to set or toggle individual bits in an integer.
 package math_bits
 
 import "base:intrinsics"

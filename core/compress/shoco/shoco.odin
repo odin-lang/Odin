@@ -1,4 +1,4 @@
-// package shoco is an implementation of the shoco short string compressor.
+// `Shoco` short string compression and decompression.
 package compress_shoco
 
 /*

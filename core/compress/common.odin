@@ -1,4 +1,4 @@
-// package compress is a collection of utilities to aid with other compression packages.
+// A collection of utilities to aid with other `compress`ion packages.
 package compress
 
 /*

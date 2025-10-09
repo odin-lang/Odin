@@ -1,4 +1,4 @@
-// package ini implements a variant of the `.ini` file format with `key = value` entries in `[sections]`.
+// Reader and writer for a variant of the `.ini` file format with `key = value` entries in `[sections]`.
 package encoding_ini
 
 import "base:runtime"

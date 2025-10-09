@@ -1,4 +1,4 @@
-// package debug implements a stack trace library. Only works when debug symbols are enabled `-debug`.
+// Stack trace library. Only works when debug symbols are enabled using `-debug`.
 package debug_trace
 /*
 Example:

@@ -1,5 +1,5 @@
 /*
-package netpbm implements readers and writers for PBM, PGM, PPM, PAM and PFM images.
+Readers and writers for `PBM`, `PGM`, `PPM`, `PAM` and `PFM` images.
 
 Formats:
 

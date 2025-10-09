@@ -1,5 +1,5 @@
 /*
-package xml implements a parser for a useful subset of the XML specification.
+A parser for a useful subset of the `XML` specification.
 
 A from-scratch XML implementation, loosely modelled on the [[ spec; https://www.w3.org/TR/2006/REC-xml11-20060816 ]].
 

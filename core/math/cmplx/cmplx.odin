@@ -1,4 +1,4 @@
-// package cmplx implements trigonometric and other mathematic operations on complex numbers.
+// Trigonometric and other mathematic operations on complex numbers.
 package math_cmplx
 
 import "base:builtin"

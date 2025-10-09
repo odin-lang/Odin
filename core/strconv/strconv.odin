@@ -1,4 +1,4 @@
-// package strconv implements conversions to and from string represnetations of other data types
+// Conversions to and from `string` representations of other data types like integers and booleans.
 package strconv
 
 import "core:unicode/utf8"

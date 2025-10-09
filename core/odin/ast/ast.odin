@@ -1,4 +1,4 @@
-// package ast implements the Abstract Syntax Tree for the Odin parser packages.
+// Abstract Syntax Tree for the `Odin` parser packages.
 package odin_ast
 
 import "core:odin/tokenizer"

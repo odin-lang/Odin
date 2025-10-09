@@ -1,4 +1,4 @@
-// package heap implements a generic in-place max heap on a slice for any type.
+// A generic in-place max heap on a slice for any type.
 package heap
 
 /*

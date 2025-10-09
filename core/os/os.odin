@@ -1,4 +1,4 @@
-// package os implements cross-platform OS interactions like file I/O.
+// Cross-platform `OS` interactions like file `I/O`.
 package os
 
 import "base:intrinsics"

@@ -1,4 +1,4 @@
-// package ease implements easing procedures and flux easing used for animations.
+// Easing procedures and flux easing used for animations.
 package ease
 
 import "core:math"

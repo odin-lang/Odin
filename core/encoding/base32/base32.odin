@@ -1,3 +1,4 @@
+// `Base32` encoding and decoding, as specified in `RFC 4648`.
 package encoding_base32
 
 // Base32 encoding/decoding implementation as specified in RFC 4648.

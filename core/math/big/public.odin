@@ -1,3 +1,4 @@
+// Arbitrary precision integers and rationals.
 package math_big
 
 /*

@@ -1,4 +1,4 @@
-// Procedures to manipulate UTF-8 encoded strings
+// A `string` builder, as well as procedures to manipulate `UTF-8` encoded strings.
 package strings
 
 import "base:intrinsics"

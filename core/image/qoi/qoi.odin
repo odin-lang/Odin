@@ -1,4 +1,4 @@
-// package qoi implements a QOI image reader.
+// Reader and writer for `QOI` images.
 //
 // The QOI specification is at [[ https://qoiformat.org ]].
 package qoi

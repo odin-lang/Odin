@@ -1,4 +1,4 @@
-// package list implements an intrusive doubly-linked list.
+// An intrusive doubly-linked list.
 package container_intrusive_list
 
 /*

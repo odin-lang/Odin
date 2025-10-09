@@ -1,15 +1,5 @@
 /*
-Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
-Made available under Odin's BSD-3 license.
-
-List of contributors:
-	Jeroen van Rijn: Initial implementation.
-	Laytan: ARM and RISC-V CPU feature detection, iOS/macOS platform overhaul.
-*/
-
-/*
-Package `core:sys/info` gathers system information on:
-Windows, Linux, macOS, FreeBSD & OpenBSD.
+Gathers system information on `Windows`, `Linux`, `macOS`, `FreeBSD` & `OpenBSD`.
 
 Simply import the package and you'll have access to the OS version, RAM amount
 and CPU information.
@@ -87,3 +77,12 @@ Example:
 	RAM:  8.0 GiB
 */
 package sysinfo
+
+/*
+Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+Made available under Odin's BSD-3 license.
+
+List of contributors:
+	Jeroen van Rijn: Initial implementation.
+	Laytan: ARM and RISC-V CPU feature detection, iOS/macOS platform overhaul.
+*/

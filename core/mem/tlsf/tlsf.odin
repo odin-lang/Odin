@@ -1,4 +1,4 @@
-// package tlsf implements a Two Level Segregated Fit memory allocator.
+// Two Level Segregated Fit memory allocator.
 package mem_tlsf
 
 /*

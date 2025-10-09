@@ -1,5 +1,5 @@
 /*
-package blake2b implements the BLAKE2b hash algorithm.
+`BLAKE2b` hash algorithm.
 
 See:
 - [[ https://datatracker.ietf.org/doc/html/rfc7693 ]]

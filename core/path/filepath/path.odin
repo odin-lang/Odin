@@ -1,4 +1,4 @@
-// package filepath package uses either forward slashes or backslashes depending on the operating system.
+// Process paths using either forward slashes or backslashes depending on the operating system.
 // To process paths such as URLs that depend on forward slashes regardless of the OS, use the slashpath package.
 package filepath
 

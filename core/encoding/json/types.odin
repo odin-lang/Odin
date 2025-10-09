@@ -1,3 +1,4 @@
+// Encoding and decoding JSON in strict `JSON`, `JSON5` and `BitSquid` variants.
 package encoding_json
 
 import "core:strings"

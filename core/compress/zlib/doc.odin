@@ -1,4 +1,4 @@
-// package zlib implements Deflate decompression.
+// `Deflate` decompression of raw and `ZLIB`-type streams.
 package compress_zlib
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.

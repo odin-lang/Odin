@@ -1,2 +1,2 @@
-// package bufio implements buffered I/O. It wraps an `io.Stream` interface to provide buffering.
+// Wraps an `io.Stream` interface to provide buffered I/O.
 package bufio

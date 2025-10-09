@@ -1,3 +1,4 @@
+// `Base64` encoding and decoding.
 package encoding_base64
 
 import "core:io"

@@ -1,5 +1,5 @@
 /*
-package aegis implements the AEGIS-128L and AEGIS-256 AEAD algorithms.
+`AEGIS-128L` and `AEGIS-256` AEAD algorithms.
 
 Where AEAD stands for Authenticated Encryption with Additional Data.
 

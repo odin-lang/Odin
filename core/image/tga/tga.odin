@@ -1,4 +1,4 @@
-// package tga implements a TGA image reader and writer for 8-bit RGB and RGBA images.
+// Reader and writer for 8-bit RGB and RGBA `TGA` images.
 package tga
 
 /*

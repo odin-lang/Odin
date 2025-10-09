@@ -1,5 +1,5 @@
 /*
-package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
+Cross-platform Berkeley Sockets, `DNS` resolution and associated procedures.
 
 Features:
 - Supports Windows, Linux and OSX.

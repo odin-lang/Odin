@@ -1,4 +1,4 @@
-// package thread implements multi-threading operations so spawn threads and thread pools
+// Multi-threading operations to spawn threads and thread pools.
 package thread
 
 import "base:runtime"

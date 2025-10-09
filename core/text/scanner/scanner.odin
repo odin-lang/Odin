@@ -1,4 +1,4 @@
-// package text/scanner provides a scanner and tokenizer for UTF-8-encoded text.
+// A scanner and tokenizer for UTF-8-encoded text.
 // It takes a string providing the source, which then can be tokenized through
 // repeated calls to the scan procedure.
 // For compatibility with existing tooling and languages, the NUL character is not allowed.

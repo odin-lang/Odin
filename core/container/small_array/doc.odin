@@ -1,4 +1,4 @@
-// package small_array implements a dynamic array-like interface on a stack-allocated, fixed-size array.
+// A dynamic array-like interface on a stack-allocated, fixed-size array.
 package container_small_array
 
 /*

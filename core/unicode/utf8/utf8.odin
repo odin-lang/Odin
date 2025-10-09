@@ -1,4 +1,4 @@
-// package utf8 implements procedures and constants to support text-encoding in the UTF-8 character encoding
+// Procedures and constants to support text-encoding in the `UTF-8` character encoding.
 package utf8
 
 RUNE_ERROR :: '\ufffd'

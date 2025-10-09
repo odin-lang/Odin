@@ -1,5 +1,5 @@
 /*
-package spall is a package that is used for profiling using the "spall" format.
+Profiling using the "`spall`" format.
 
 Example:
 	package main

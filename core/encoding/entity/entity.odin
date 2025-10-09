@@ -1,5 +1,5 @@
 /*
-	package entity implements a unicode `&entity;` encoder and decoder.
+	Encode and decode `rune`s to/from a Unicode `&entity;`.
 
 	This code has several procedures to map unicode runes to/from different textual encodings.
 	- SGML/XML/HTML entity
