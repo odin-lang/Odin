@@ -6742,9 +6742,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			
 			// NOTE(jakubtomsu): forces calculation of variant_block_size
 			type_size_of(u);
-			// NOTE(Jeroen): A tag offset of zero is perfectly fine if all members of the union are empty structs.
-			//               What matters is that the tag size is > 0.
-			GB_ASSERT(u->Union.tag_size > 0);
+			if (u->Union.tag_size == 0) {
+				GB_ASSERT(is_type_union_maybe_pointer(u));
+			} else {
+				// NOTE(Jeroen): A tag offset of zero is perfectly fine if all members of the union are empty structs.
+				//               What matters is that the tag size is > 0.
+				GB_ASSERT(u->Union.tag_size > 0);
+			}
 			
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
