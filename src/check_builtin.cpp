@@ -57,6 +57,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_bit_field,
 	is_type_simd_vector,
 	is_type_matrix,
+	is_type_raw_union,
 
 	is_type_polymorphic_record_specialized,
 	is_type_polymorphic_record_unspecialized,
@@ -6424,12 +6425,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_float:
 	case BuiltinProc_type_is_complex:
 	case BuiltinProc_type_is_quaternion:
+	case BuiltinProc_type_is_typeid:
+	case BuiltinProc_type_is_any:
 	case BuiltinProc_type_is_string:
 	case BuiltinProc_type_is_string16:
 	case BuiltinProc_type_is_cstring:
 	case BuiltinProc_type_is_cstring16:
-	case BuiltinProc_type_is_typeid:
-	case BuiltinProc_type_is_any:
 	case BuiltinProc_type_is_endian_platform:
 	case BuiltinProc_type_is_endian_little:
 	case BuiltinProc_type_is_endian_big:
@@ -6461,6 +6462,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_bit_field:
 	case BuiltinProc_type_is_simd_vector:
 	case BuiltinProc_type_is_matrix:
+	case BuiltinProc_type_is_raw_union:
 	case BuiltinProc_type_is_specialized_polymorphic_record:
 	case BuiltinProc_type_is_unspecialized_polymorphic_record:
 	case BuiltinProc_type_has_nil:

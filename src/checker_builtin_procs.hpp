@@ -287,6 +287,8 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_bit_set,
 	BuiltinProc_type_is_simd_vector,
 	BuiltinProc_type_is_matrix,
+	BuiltinProc_type_is_raw_union,
+
 
 	BuiltinProc_type_is_specialized_polymorphic_record,
 	BuiltinProc_type_is_unspecialized_polymorphic_record,
@@ -614,10 +616,12 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_float"),             1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_complex"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_quaternion"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("type_is_string"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("type_is_string16"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_typeid"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_any"),               1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_string"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_string16"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_cstring"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_cstring16"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_endian_platform"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_endian_little"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -651,6 +655,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_bit_field"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_matrix"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_raw_union"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_specialized_polymorphic_record"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_unspecialized_polymorphic_record"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
