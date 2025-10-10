@@ -4923,11 +4923,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		Type *elem_type = base_any_array_type(lhs.type);
 
-		Array<Ast *> new_elems = {};
-		array_init(&new_elems, heap_allocator());
-
-		array_add_elems(&new_elems, lhs_cl->elems.data, lhs_cl->elems.count);
-
 		for (isize i = 1; i < ce->args.count; i++) {
 			Operand extra = {};
 			if (is_type_slice(lhs.type)) {
@@ -4988,8 +4983,25 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					return false;
 				}
 			}
+		}
 
-			array_add_elems(&new_elems, extra_cl->elems.data, extra_cl->elems.count);
+		isize count_needed = 0;
+
+		for (Ast *arg : ce->args) {
+			ExactValue value = arg->tav.value;
+			GB_ASSERT(value.kind == ExactValue_Compound);
+			ast_node(cl, CompoundLit, value.value_compound);
+			count_needed += cl->elems.count;
+		}
+
+		Array<Ast *> new_elems = {};
+		array_init(&new_elems, permanent_allocator(), 0, count_needed);
+
+		for (Ast *arg : ce->args) {
+			ExactValue value = arg->tav.value;
+			GB_ASSERT(value.kind == ExactValue_Compound);
+			ast_node(cl, CompoundLit, value.value_compound);
+			array_add_elems(&new_elems, cl->elems.data, cl->elems.count);
 		}
 
 		Ast *new_compound_lit = ast_compound_lit(lhs.expr->file(), nullptr, new_elems, ast_token(lhs.expr), ast_end_token(ce->args[ce->args.count-1]));
