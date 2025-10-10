@@ -4923,8 +4923,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		Type *elem_type = base_any_array_type(lhs.type);
 
-		Ast *type_ast = lhs_cl->type;
-
 		Array<Ast *> new_elems = {};
 		array_init(&new_elems, heap_allocator());
 
@@ -4991,13 +4989,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				}
 			}
 
-			if (type_ast == nullptr) {
-				type_ast = extra_cl->type;
-			}
 			array_add_elems(&new_elems, extra_cl->elems.data, extra_cl->elems.count);
 		}
 
-		Ast *new_compound_lit = ast_compound_lit(lhs.expr->file(), type_ast, new_elems, ast_token(lhs.expr), ast_end_token(ce->args[ce->args.count-1]));
+		Ast *new_compound_lit = ast_compound_lit(lhs.expr->file(), nullptr, new_elems, ast_token(lhs.expr), ast_end_token(ce->args[ce->args.count-1]));
 
 		operand->mode  = Addressing_Constant;
 		operand->value = exact_value_compound(new_compound_lit);
