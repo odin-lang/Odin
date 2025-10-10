@@ -4921,6 +4921,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
+		Type *elem_type = base_any_array_type(lhs.type);
+
 		Ast *type_ast = lhs_cl->type;
 
 		Array<Ast *> new_elems = {};
@@ -4930,7 +4932,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		for (isize i = 1; i < ce->args.count; i++) {
 			Operand extra = {};
-			check_expr_with_type_hint(c, &extra, ce->args[i], lhs.type);
+			if (is_type_slice(lhs.type)) {
+				check_expr_with_type_hint(c, &extra, ce->args[i], lhs.type);
+			} else {
+				check_expr(c, &extra, ce->args[i]);
+			}
 			if (extra.mode == Addressing_Invalid) {
 				return false;
 			}
@@ -4938,13 +4944,34 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(extra.expr, "'%.*s' expects a constant array or slice", LIT(builtin_name));
 				return false;
 			}
-			if (!are_types_identical(lhs.type, extra.type)) {
-				gbString a = type_to_string(lhs.type);
-				gbString b = type_to_string(extra.type);
-				error(extra.expr, "'%.*s' expects constant values of the same type, got '%s' vs '%s'", LIT(builtin_name), a, b);
-				gb_string_free(b);
-				gb_string_free(a);
-				return false;
+
+			if (is_type_slice(lhs.type)) {
+				if (!are_types_identical(lhs.type, extra.type)) {
+					gbString a = type_to_string(lhs.type);
+					gbString b = type_to_string(extra.type);
+					error(extra.expr, "'%.*s' expects constant values of the same slice type, got '%s' vs '%s'", LIT(builtin_name), a, b);
+					gb_string_free(b);
+					gb_string_free(a);
+					return false;
+				}
+			} else if (is_type_array(lhs.type)) {
+				if (!is_type_array(extra.type)) {
+					gbString a = type_to_string(extra.type);
+					error(extra.expr, "'%.*s' expects a constant array or slice, got %s", LIT(builtin_name), a);
+					gb_string_free(a);
+					return false;
+				}
+				Type *extra_elem_type = base_array_type(extra.type);
+				if (!are_types_identical(elem_type, extra_elem_type)) {
+					gbString a = type_to_string(elem_type);
+					gbString b = type_to_string(extra_elem_type);
+					error(extra.expr, "'%.*s' expects constant values of the same element-type, got '%s' vs '%s'", LIT(builtin_name), a, b);
+					gb_string_free(b);
+					gb_string_free(a);
+					return false;
+				}
+			} else {
+				GB_PANIC("Unhandled type: %s", type_to_string(lhs.type));
 			}
 
 			if (extra.value.kind != ExactValue_Compound) {
@@ -4974,7 +5001,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		operand->mode  = Addressing_Constant;
 		operand->value = exact_value_compound(new_compound_lit);
-		operand->type  = lhs.type;
+
+		if (is_type_slice(lhs.type)) {
+			operand->type = lhs.type;
+		} else {
+			operand->type = alloc_type_array(elem_type, new_elems.count);
+		}
 		break;
 	}
 
