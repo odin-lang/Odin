@@ -3239,6 +3239,9 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 }
 
 gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
+	if (are_types_identical(operand->type, y)) {
+		return true;
+	}
 	if (check_is_assignable_to(c, operand, y)) {
 		return true;
 	}
@@ -3526,17 +3529,21 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 		Type *elem = core_array_type(bt);
 
 		if (core_type(bt)->kind == Type_Basic) {
-			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
+			if (check_representable_as_constant(c, x->value, type, &x->value)) {
 				return true;
 			}
 			goto check_castable;
 		} else if (!are_types_identical(elem, bt) &&
 		           elem->kind == Type_Basic &&
 		           check_representable_as_constant(c, x->value, elem, &x->value)) {
-			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
+			if (check_representable_as_constant(c, x->value, type, &x->value)) {
 				return true;
 			}
 			goto check_castable;
+		} else if (check_is_castable_to(c, x, type)) {
+			x->value = {};
+			x->mode = Addressing_Value;
+			return true;
 		}
 
 		return false;
