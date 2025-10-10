@@ -429,7 +429,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 		
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 
-	{STR_LIT("concatenate"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("concatenate"), 2, true, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("alloca"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("cpu_relax"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},

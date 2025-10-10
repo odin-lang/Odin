@@ -4887,56 +4887,32 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_concatenate: {
 		Operand lhs = {};
-		Operand rhs = {};
 
 		check_expr(c, &lhs, ce->args[0]);
 		if (lhs.mode == Addressing_Invalid) {
 			return false;
 		}
-		check_expr(c, &rhs, ce->args[1]);
-		if (rhs.mode == Addressing_Invalid) {
-			return false;
-		}
 		if (lhs.mode != Addressing_Constant) {
-			error(lhs.expr, "'%*.s' expects a constant array or slice", LIT(builtin_name));
+			error(lhs.expr, "'%.*s' expects a constant array or slice", LIT(builtin_name));
 			return false;
 		}
-		if (rhs.mode != Addressing_Constant) {
-			error(rhs.expr, "'%*.s' expects a constant array or slice", LIT(builtin_name));
-			return false;
-		}
-
-		if (!are_types_identical(lhs.type, rhs.type)) {
-			gbString a = type_to_string(lhs.type);
-			gbString b = type_to_string(rhs.type);
-			error(rhs.expr, "'%*.s' expects a two constant values of the same type, got '%s' vs '%s'", LIT(builtin_name), a, b);
-			gb_string_free(b);
-			gb_string_free(a);
-			return false;
-		}
+		operand->type = lhs.type;
+		operand->mode = Addressing_Value;
 
 		if (!is_type_slice(lhs.type) && !is_type_array(lhs.type)) {
 			gbString a = type_to_string(lhs.type);
-			error(lhs.expr, "'%*.s' expects a constant array or slice, got %s", LIT(builtin_name), a);
+			error(lhs.expr, "'%.*s' expects a constant array or slice, got %s", LIT(builtin_name), a);
 			gb_string_free(a);
 			return false;
 		}
-
 		if (lhs.value.kind != ExactValue_Compound) {
 			gbString a = exact_value_to_string(lhs.value);
 			error(lhs.expr, "Expected a compound literal value for '%.*s', got '%s'", LIT(builtin_name), a);
 			gb_string_free(a);
 			return false;
 		}
-		if (rhs.value.kind != ExactValue_Compound) {
-			gbString a = exact_value_to_string(rhs.value);
-			error(rhs.expr, "Expected a compound literal value for '%.*s', got '%s'", LIT(builtin_name), a);
-			gb_string_free(a);
-			return false;
-		}
 
 		ast_node(lhs_cl, CompoundLit, lhs.value.value_compound);
-		ast_node(rhs_cl, CompoundLit, rhs.value.value_compound);
 
 		for (Ast *elem : lhs_cl->elems) {
 			if (elem->kind == Ast_FieldValue) {
@@ -4944,26 +4920,57 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 		}
-		for (Ast *elem : rhs_cl->elems) {
-			if (elem->kind == Ast_FieldValue) {
-				error(elem, "'%.*s' does not allow the use of 'field = value' to be concatenated together", LIT(builtin_name));
-				return false;
-			}
-		}
 
 		Ast *type_ast = lhs_cl->type;
-		if (type_ast == nullptr) {
-			type_ast = rhs_cl->type;
-		}
-
 
 		Array<Ast *> new_elems = {};
 		array_init(&new_elems, heap_allocator());
 
 		array_add_elems(&new_elems, lhs_cl->elems.data, lhs_cl->elems.count);
-		array_add_elems(&new_elems, rhs_cl->elems.data, rhs_cl->elems.count);
 
-		Ast *new_compound_lit = ast_compound_lit(lhs.expr->file(), type_ast, new_elems, ast_token(lhs.expr), ast_end_token(rhs.expr));
+		for (isize i = 1; i < ce->args.count; i++) {
+			Operand extra = {};
+			check_expr(c, &extra, ce->args[i]);
+			if (extra.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (extra.mode != Addressing_Constant) {
+				error(extra.expr, "'%.*s' expects a constant array or slice", LIT(builtin_name));
+				return false;
+			}
+			if (!are_types_identical(lhs.type, extra.type)) {
+				gbString a = type_to_string(lhs.type);
+				gbString b = type_to_string(extra.type);
+				error(extra.expr, "'%.*s' expects constant values of the same type, got '%s' vs '%s'", LIT(builtin_name), a, b);
+				gb_string_free(b);
+				gb_string_free(a);
+				return false;
+			}
+
+			if (extra.value.kind != ExactValue_Compound) {
+				gbString a = exact_value_to_string(extra.value);
+				error(extra.expr, "Expected a compound literal value for '%.*s', got '%s'", LIT(builtin_name), a);
+				gb_string_free(a);
+				return false;
+			}
+
+			ast_node(extra_cl, CompoundLit, extra.value.value_compound);
+
+
+			for (Ast *elem : extra_cl->elems) {
+				if (elem->kind == Ast_FieldValue) {
+					error(elem, "'%.*s' does not allow the use of 'field = value' to be concatenated together", LIT(builtin_name));
+					return false;
+				}
+			}
+
+			if (type_ast == nullptr) {
+				type_ast = extra_cl->type;
+			}
+			array_add_elems(&new_elems, extra_cl->elems.data, extra_cl->elems.count);
+		}
+
+		Ast *new_compound_lit = ast_compound_lit(lhs.expr->file(), type_ast, new_elems, ast_token(lhs.expr), ast_end_token(ce->args[ce->args.count-1]));
 
 		operand->mode  = Addressing_Constant;
 		operand->value = exact_value_compound(new_compound_lit);
