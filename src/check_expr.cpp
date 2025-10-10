@@ -3523,20 +3523,27 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 
 	Type *bt = base_type(type);
 	if (is_const_expr && is_type_constant_type(bt)) {
+		Type *elem = core_array_type(bt);
+
 		if (core_type(bt)->kind == Type_Basic) {
 			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
 				return true;
-			} else if (check_is_castable_to(c, x, type)) {
-				if (is_type_pointer(type)) {
-					return true;
-				}
 			}
-		} else if (check_is_castable_to(c, x, type)) {
-			x->value = {};
-			x->mode = Addressing_Value;
-			return true;
+			goto check_castable;
+		} else if (!are_types_identical(elem, bt) &&
+		           elem->kind == Type_Basic &&
+		           check_representable_as_constant(c, x->value, elem, &x->value)) {
+			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
+				return true;
+			}
+			goto check_castable;
 		}
-	} else if (check_is_castable_to(c, x, type)) {
+
+		return false;
+	}
+
+check_castable:
+	if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
