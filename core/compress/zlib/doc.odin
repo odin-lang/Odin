@@ -1,16 +1,6 @@
-// `Deflate` decompression of raw and `ZLIB`-type streams.
-package compress_zlib
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+`Deflate` decompression of raw and `ZLIB`-type streams.
 
-	List of contributors:
-		Jeroen van Rijn: Initial implementation.
-
-	An example of how to use `zlib.inflate`.
-*/
-
-/*
 Example:
 	package main
 
@@ -49,4 +39,15 @@ Example:
 		fmt.printf("Input: %v bytes, output (%v bytes):\n%v\n", len(ODIN_DEMO), len(s), s)
 		assert(len(s) == OUTPUT_SIZE)
 	}
+*/
+package compress_zlib
+
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	An example of how to use `zlib.inflate`.
 */

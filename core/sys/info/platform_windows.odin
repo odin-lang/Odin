@@ -285,25 +285,26 @@ init_gpu_info :: proc "contextless" () {
 	context = runtime.default_context()
 
 	gpu_list: [dynamic]GPU
-	gpu_index: int
 
-	for {
+	// TODO: Use registry APIs to iterate over entries instead of trying 0000..0009.
+	for gpu_index in 0..<10 {
 		key := fmt.tprintf("%v\\%04d", GPU_INFO_BASE, gpu_index)
 
+		gpu: ^GPU
 		if vendor, ok := read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "ProviderName"); ok {
 			append(&gpu_list, GPU{vendor_name = vendor})
+			gpu = &gpu_list[len(gpu_list) - 1]
 		} else {
-			break
+			continue
 		}
 
 		if desc, ok := read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "DriverDesc"); ok {
-			gpu_list[gpu_index].model_name = desc
+			gpu.model_name = desc
 		}
 
 		if vram, ok := read_reg_i64(sys.HKEY_LOCAL_MACHINE, key, "HardwareInformation.qwMemorySize"); ok {
-			gpu_list[gpu_index].total_ram = int(vram)
+			gpu.total_ram = int(vram)
 		}
-		gpu_index += 1
 	}
 	gpus = gpu_list[:]
 }

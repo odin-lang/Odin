@@ -1,8 +1,6 @@
 /*
 `LEB128` variable integer encoding and decoding, as used by `DWARF` & `DEX` files.
 
-Author of this Odin package: Jeroen van Rijn
-
 Example:
 	package main
 

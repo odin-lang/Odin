@@ -1,6 +1,6 @@
-// Stack trace library. Only works when debug symbols are enabled using `-debug`.
-package debug_trace
 /*
+Stack trace library. Only works when debug symbols are enabled using `-debug`.
+
 Example:
 	import "base:runtime"
 	import "core:debug/trace"
@@ -48,3 +48,4 @@ Example:
 	}
 
 */
+package debug_trace

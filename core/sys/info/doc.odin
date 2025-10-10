@@ -23,9 +23,6 @@ Example:
 		fmt.printfln("CPU cores: %vc/%vt", si.cpu.physical_cores, si.cpu.logical_cores)
 		fmt.printfln("RAM:       %#.1M",   si.ram.total_ram)
 
-		// fmt.printfln("Features: %v",      si.cpu.features)
-		// fmt.printfln("MacOS version: %v", si.macos_version)
-
 		fmt.println()
 		for gpu, i in si.gpus {
 			fmt.printfln("GPU #%v:", i)
@@ -37,26 +34,30 @@ Example:
 
 - Example Windows output:
 
-	Odin:  dev-2022-09
-	OS:    Windows 10 Professional (version: 20H2), build: 19042.1466
-	OS:    OS_Version{
+	Odin:      dev-2025-10
+	OS:        Windows 10 Professional (version: 22H2), build: 19045.6396
+	OS:        OS_Version{
 		platform = "Windows",
-		major = 10,
-		minor = 0,
-		patch = 0,
+		_ = Version{
+			major = 10,
+			minor = 0,
+			patch = 0,
+		},
 		build = [
-			19042,
-			1466,
+			19045,
+			6396,
 		],
-		version = "20H2",
-		as_string = "Windows 10 Professional (version: 20H2), build: 19042.1466",
+		version = "22H2",
+		as_string = "Windows 10 Professional (version: 22H2), build: 19045.6396",
 	}
-	CPU:   AMD Ryzen 7 1800X Eight-Core Processor
-	RAM:   64.0 GiB
+	CPU:       AMD Ryzen 9 5950X 16-Core Processor
+	CPU cores: 16c/32t
+	RAM:       63.9 GiB
+
 	GPU #0:
 		Vendor: Advanced Micro Devices, Inc.
-		Model:  Radeon RX Vega
-		VRAM:   8.0 GiB
+		Model:  AMD Radeon RX 9070
+		VRAM:   15.9 GiB
 
 - Example macOS output:
 

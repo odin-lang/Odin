@@ -1,10 +1,9 @@
-// A dynamically-sized array of bits.
-package container_dynamic_bit_array
-
 /*
+A dynamically-sized array of bits.
+
 The Bit Array can be used in several ways:
 
-By default you don't need to instantiate a Bit Array.
+By default you don't need to instantiate a `Bit_Array`.
 Example:
 	package test
 
@@ -21,11 +20,11 @@ Example:
 
 		// returns `false`, `false`, because this Bit Array wasn't created to allow negative indices.
 		was_set, was_retrieved := get(&bits, -1)
-		fmt.println(was_set, was_retrieved) 
+		fmt.println(was_set, was_retrieved)
 		destroy(&bits)
 	}
 
-A Bit Array can optionally allow for negative indices, if the minimum value was given during creation.
+A `Bit_Array` can optionally allow for negative indices, if the minimum value was given during creation.
 Example:
 	package test
 
@@ -52,3 +51,4 @@ Example:
 		fmt.printf("Freed.\n")
 	}
 */
+package container_dynamic_bit_array
