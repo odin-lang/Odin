@@ -1,7 +1,5 @@
 /*
-`Base32` encoding and decoding, as specified in `RFC 4648`.
-
-[[ RFC 4648; https://www.rfc-editor.org/rfc/rfc4648.html ]]
+`Base32` encoding and decoding, as specified in [[ RFC 4648; https://www.rfc-editor.org/rfc/rfc4648.html ]].
 
 A secondary param can be used to supply a custom alphabet to `encode` and a matching decoding table to `decode`.
 

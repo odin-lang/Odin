@@ -1,5 +1,5 @@
 /*
-Encoding and decoding JSON in strict `JSON`, `JSON5` and `BitSquid` variants.
+Encoding and decoding JSON in strict `JSON`, [[ JSON5 ; https://json5.org/ ]] and [[ BitSquid ; https://bitsquid.blogspot.com/2009/10/simplified-json-notation.html ]] variants.
 
 Using one of these `Specification`s.
 	JSON

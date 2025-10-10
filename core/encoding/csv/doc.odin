@@ -1,6 +1,5 @@
 /*
-Reader and writer for comma-separated values (`CSV`) files, per `RFC 4180`.
-This package supports the format described in [[ RFC 4180; https://tools.ietf.org/html/rfc4180.html ]]
+Reader and writer for comma-separated values (`CSV`) files, per [[ RFC 4180 ; https://tools.ietf.org/html/rfc4180.html ]].
 
 Example:
 	package main
