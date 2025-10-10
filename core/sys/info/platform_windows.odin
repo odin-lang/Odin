@@ -3,9 +3,10 @@ package sysinfo
 import sys "core:sys/windows"
 import "base:intrinsics"
 import "core:strings"
+import "core:strconv"
 import "core:unicode/utf16"
 
-import "core:fmt"
+// import "core:fmt"
 import "base:runtime"
 
 @(private)
@@ -280,20 +281,56 @@ init_ram :: proc "contextless" () {
 
 @(init, private)
 init_gpu_info :: proc "contextless" () {
-	GPU_INFO_BASE :: "SYSTEM\\ControlSet001\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\"
+	GPU_ROOT_KEY :: `SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`
 
 	context = runtime.default_context()
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	gpu_key: sys.HKEY
+	if status := sys.RegOpenKeyExW(
+		sys.HKEY_LOCAL_MACHINE,
+		GPU_ROOT_KEY,
+		0,
+		sys.KEY_ENUMERATE_SUB_KEYS,
+		&gpu_key,
+	); status != i32(sys.ERROR_SUCCESS) {
+		return
+	}
+	defer sys.RegCloseKey(gpu_key)
 
 	gpu_list: [dynamic]GPU
+	gpu: ^GPU
 
-	// TODO: Use registry APIs to iterate over entries instead of trying 0000..0009.
-	for gpu_index in 0..<10 {
-		key := fmt.tprintf("%v\\%04d", GPU_INFO_BASE, gpu_index)
+	index := sys.DWORD(0)
+	for {
+		defer index += 1
 
-		gpu: ^GPU
+		buf_wstring: [100]u16
+		buf_len := u32(len(buf_wstring))
+		buf_utf8: [4 * len(buf_wstring)]u8
+
+		if status := sys.RegEnumKeyW(
+			gpu_key,
+			index,
+			&buf_wstring[0],
+			&buf_len,
+		); status != i32(sys.ERROR_SUCCESS) {
+			break
+		}
+
+		utf16.decode_to_utf8(buf_utf8[:], buf_wstring[:])
+		leaf := string(cstring(&buf_utf8[0]))
+
+		// Skip leafs that are not of the form 000x
+		if _, is_integer := strconv.parse_int(leaf, 10); !is_integer {
+			continue
+		}
+
+		key := strings.concatenate({GPU_ROOT_KEY, "\\", leaf}, context.temp_allocator)
+
 		if vendor, ok := read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "ProviderName"); ok {
-			append(&gpu_list, GPU{vendor_name = vendor})
-			gpu = &gpu_list[len(gpu_list) - 1]
+			idx := append(&gpu_list, GPU{vendor_name = vendor})
+			gpu = &gpu_list[idx - 1]
 		} else {
 			continue
 		}
