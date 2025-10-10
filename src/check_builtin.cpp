@@ -4888,7 +4888,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_concatenate: {
 		Operand lhs = {};
 
-		check_expr(c, &lhs, ce->args[0]);
+		check_expr_with_type_hint(c, &lhs, ce->args[0], type_hint);
 		if (lhs.mode == Addressing_Invalid) {
 			return false;
 		}
@@ -4930,7 +4930,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		for (isize i = 1; i < ce->args.count; i++) {
 			Operand extra = {};
-			check_expr(c, &extra, ce->args[i]);
+			check_expr_with_type_hint(c, &extra, ce->args[i], lhs.type);
 			if (extra.mode == Addressing_Invalid) {
 				return false;
 			}
