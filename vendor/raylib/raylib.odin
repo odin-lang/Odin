@@ -1,5 +1,5 @@
 /*
-Package vendor:raylib implements bindings for version 5.5 of the raylib library (https://www.raylib.com/)
+Bindings for [[ raylib v5.5 ; https://www.raylib.com ]].
 
 	*********************************************************************************************
 	*

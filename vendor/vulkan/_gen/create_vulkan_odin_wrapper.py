@@ -6,6 +6,13 @@ import string
 import os.path
 import math
 
+PACKAGE_LINE = "package vulkan"
+
+BASE = """
+// Vulkan wrapper generated from [[ vulkan_core.h ; https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h ]].
+"""[1::]
+
+
 file_and_urls = [
     ("vk_platform.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h',    True),
     ("vulkan_core.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h',    False),
@@ -889,18 +896,9 @@ load_proc_addresses :: proc{
 }\n
 """[1::])
 
-
-
-BASE = """
-//
-// Vulkan wrapper generated from "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h"
-//
-package vulkan
-"""[1::]
-
-
 with open("../core.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
+    f.write(PACKAGE_LINE)
     f.write("""
 // Core API
 API_VERSION_1_0 :: (1<<22) | (0<<12) | (0)
@@ -974,13 +972,13 @@ MAKE_VIDEO_STD_VERSION :: MAKE_VERSION
     f.write("\n\n")
     parse_flags_def(f)
 with open("../enums.odin", 'w', encoding='utf-8') as f:
-    f.write(BASE)
+    f.write(PACKAGE_LINE)
     f.write("\n")
     parse_enums(f)
     parse_fake_enums(f)
     f.write("\n\n")
 with open("../structs.odin", 'w', encoding='utf-8') as f:
-    f.write(BASE)
+    f.write(PACKAGE_LINE)
     f.write("""
 import "core:c"
 
@@ -1041,7 +1039,7 @@ MTLCommandQueue_id :: rawptr
     parse_structs(f)
     f.write("\n\n")
 with open("../procedures.odin", 'w', encoding='utf-8') as f:
-    f.write(BASE)
+    f.write(PACKAGE_LINE)
     f.write("\n")
     parse_procedures(f)
     f.write("\n")

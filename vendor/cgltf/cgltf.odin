@@ -1,4 +1,4 @@
-// Bindings for [[ cgtlf ; https://github.com/jkuhlmann/cgltf ]].
+// Bindings for [[ Cgtlf ; https://github.com/jkuhlmann/cgltf ]].
 package cgltf
 
 @(private)

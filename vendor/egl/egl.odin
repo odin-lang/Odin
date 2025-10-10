@@ -1,3 +1,4 @@
+// Bindings for [[ EGL ; https://registry.khronos.org/EGL/sdk/docs/man/html/eglIntro.xhtml ]].
 #+build linux
 package egl
 
