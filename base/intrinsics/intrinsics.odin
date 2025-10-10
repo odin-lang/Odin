@@ -348,6 +348,9 @@ simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is_proc(T) ---
 
 
+// Utility Calls
+concatentate :: proc(x, y: $T, z: ..T) -> T where type_is_array(T) || type_is_slice(T) ---
+
 // Returns the value of the procedure where `x` must be a call expression
 procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---
 

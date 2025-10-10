@@ -56,6 +56,8 @@ enum BuiltinProcId {
 	
 	BuiltinProc_soa_struct,
 
+	BuiltinProc_concatenate,
+
 	BuiltinProc_alloca,
 	BuiltinProc_cpu_relax,
 	BuiltinProc_trap,
@@ -426,6 +428,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 		
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
+
+	{STR_LIT("concatenate"), 2, true, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("alloca"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("cpu_relax"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
