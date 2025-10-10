@@ -1,6 +1,6 @@
 #+build ignore
 /*
-	Bindings against CMark (https://github.com/commonmark/cmark)
+	Bindings for [[CMark; https://github.com/commonmark/cmark]].
 
 	Original authors: John MacFarlane, Vicent Marti, Kārlis Gaņģis, Nick Wellnhofer.
 	See LICENSE for license details.

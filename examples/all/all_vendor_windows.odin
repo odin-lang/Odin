@@ -1,6 +1,7 @@
 #+build windows
 package all
 
+@(require) import "vendor:compress/lz4"
 @(require) import "vendor:wgpu/glfwglue"
 @(require) import "vendor:wgpu/sdl2glue"
 @(require) import "vendor:wgpu"
