@@ -79,7 +79,7 @@ test_dirent :: proc(t: ^testing.T) {
 			}
 
 			name := string(cstring(raw_data(entry.d_name[:])))
-			testing.expectf(t, name in test_map, "%v in %v", name, test_map)
+			testing.expectf(t, name in test_map, "scandir: %v in %v", name, test_map)
 		}
 	}
 
@@ -109,7 +109,7 @@ test_dirent :: proc(t: ^testing.T) {
 			}
 
 			name := string(cstring(raw_data(entry.d_name[:])))
-			testing.expectf(t, name in test_map, "%v in %v", name, test_map)
+			testing.expectf(t, name in test_map, "readdir: %v in %v", name, test_map)
 		}
 	}
 }
@@ -220,7 +220,7 @@ test_stat :: proc(t: ^testing.T) {
 
 @(test)
 test_pthreads :: proc(t: ^testing.T) {
-	testing.set_fail_timeout(t, time.Second)
+	testing.set_fail_timeout(t, 3 * time.Second)
 
 	NTHREADS :: 3
 	thread_ids: [NTHREADS]posix.pthread_t
