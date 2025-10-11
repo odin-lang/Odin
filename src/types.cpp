@@ -1725,7 +1725,7 @@ gb_internal bool is_type_u8_ptr(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Pointer) {
-		return is_type_u8(t->Slice.elem);
+		return is_type_u8(t->Pointer.elem);
 	}
 	return false;
 }
@@ -1766,7 +1766,7 @@ gb_internal bool is_type_u16_ptr(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Pointer) {
-		return is_type_u16(t->Slice.elem);
+		return is_type_u16(t->Pointer.elem);
 	}
 	return false;
 }
