@@ -410,7 +410,7 @@ gb_internal u32 type_info_flags_of_type(Type *type) {
 		flags |= TypeInfoFlag_Comparable;
 	}
 	if (is_type_simple_compare(type)) {
-		flags |= TypeInfoFlag_Comparable;
+		flags |= TypeInfoFlag_Simple_Compare;
 	}
 	return flags;
 }
