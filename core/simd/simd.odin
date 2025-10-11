@@ -2690,7 +2690,7 @@ Example:
 	   +------+------+------+------+
 */
 bit_not :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
-	return xor(v, T(~E(0)))
+	return bit_xor(v, T(~E(0)))
 }
 
 /*
