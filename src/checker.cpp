@@ -5093,26 +5093,22 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 			error(token, "Unable to find package: %.*s", LIT(path));
 			exit_with_errors();
 		}
-		AstPackage *pkg = *found;
-		GB_ASSERT(pkg->scope != nullptr);
+		AstPackage *child_pkg = *found;
+		GB_ASSERT(child_pkg->scope != nullptr);
 
-		id->package = pkg;
+		id->package = child_pkg;
 
-		ImportGraphNode **found_node = nullptr;
-		ImportGraphNode *m = nullptr;
-		ImportGraphNode *n = nullptr;
-
-		found_node = map_get(M, pkg);
+		ImportGraphNode **found_node = map_get(M, child_pkg);
 		GB_ASSERT(found_node != nullptr);
-		m = *found_node;
+		ImportGraphNode *child = *found_node;
 
 		found_node = map_get(M, parent_pkg);
 		GB_ASSERT(found_node != nullptr);
-		n = *found_node;
+		ImportGraphNode *parent = *found_node;
 
-		import_graph_node_set_add(&n->succ, m);
-		import_graph_node_set_add(&m->pred, n);
-		ptr_set_add(&m->scope->imported, n->scope);
+		import_graph_node_set_add(&parent->succ, child);
+		import_graph_node_set_add(&child->pred, parent);
+		ptr_set_add(&parent->scope->imported, child->scope);
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
