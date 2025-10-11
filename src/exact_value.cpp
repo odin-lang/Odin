@@ -908,8 +908,8 @@ gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, E
 		if (op != Token_Add) goto error;
 
 		// NOTE(bill): How do you minimize this over allocation?
-		String sx = x.value_string;
-		String sy = y.value_string;
+		String16 sx = x.value_string16;
+		String16 sy = y.value_string16;
 		isize len = sx.len+sy.len;
 		u16 *data = gb_alloc_array(permanent_allocator(), u16, len);
 		gb_memmove(data,        sx.text, sx.len*gb_size_of(u16));
