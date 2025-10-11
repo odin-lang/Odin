@@ -3055,7 +3055,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 		first = false;
 
-		llvm_features = gb_string_appendc(llvm_features, "+");
+		if (*str.text != '+' && *str.text != '-') {
+			llvm_features = gb_string_appendc(llvm_features, "+");
+		}
+
 		llvm_features = gb_string_append_length(llvm_features, str.text, str.len);
 	}
 
