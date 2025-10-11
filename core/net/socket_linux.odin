@@ -134,7 +134,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (An
 }
 
 @(private)
-_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIONS) -> (TCP_Socket, Network_Error) {
+_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, non_blocking := false, options := DEFAULT_TCP_OPTIONS) -> (TCP_Socket, Network_Error) {
 	errno: linux.Errno
 	if endpoint.port == 0 {
 		return 0, .Port_Required
@@ -151,6 +151,9 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIO
 	// use the same address immediately.
 	reuse_addr: b32 = true
 	_ = linux.setsockopt(os_sock, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &reuse_addr)
+	if non_blocking {
+		_ = set_blocking(socket, true)
+	}
 	addr := _unwrap_os_addr(endpoint)
 	errno = linux.connect(linux.Fd(os_sock), &addr)
 	if errno != .NONE {

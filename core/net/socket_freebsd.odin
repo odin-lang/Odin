@@ -100,6 +100,10 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIO
 	new_socket := create_socket(family, .TCP) or_return
 	socket = new_socket.(TCP_Socket)
 
+	if non_blocking {
+		_ = set_blocking(socket, true)
+	}
+
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	errno := freebsd.connect(cast(Fd)socket, &sockaddr, cast(freebsd.socklen_t)sockaddr.len)
 	if errno != nil {

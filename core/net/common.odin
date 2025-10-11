@@ -47,6 +47,7 @@ import "base:runtime"
 	short data chunks, when TCP_NODELAY is enabled on that socket.
 */
 
+ODIN_NET_TCP_NON_BLOCKING_SOCKET :: #config(ODIN_NET_TCP_NON_BLOCKING_SOCKET, false)
 ODIN_NET_TCP_NODELAY_DEFAULT :: #config(ODIN_NET_TCP_NODELAY_DEFAULT, true)
 
 // COMMON DEFINITIONS

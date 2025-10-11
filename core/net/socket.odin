@@ -38,10 +38,10 @@ any_socket_to_socket :: proc "contextless" (socket: Any_Socket) -> Socket {
 
 	Errors that can be returned: `Parse_Endpoint_Error`, `Resolve_Error`, `DNS_Error`, `Create_Socket_Error`, or `Dial_Error`
 */
-dial_tcp_from_hostname_and_port_string :: proc(hostname_and_port: string, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
+dial_tcp_from_hostname_and_port_string :: proc(hostname_and_port: string, non_blocking := false, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname_and_port) or_return
 
-	return dial_tcp_from_host_or_endpoint(target, options)
+	return dial_tcp_from_host_or_endpoint(target, non_blocking, options)
 }
 
 /*
@@ -52,7 +52,7 @@ dial_tcp_from_hostname_and_port_string :: proc(hostname_and_port: string, option
 
 	Errors that can be returned: `Parse_Endpoint_Error`, `Resolve_Error`, `DNS_Error`, `Create_Socket_Error`, or `Dial_Error`
 */
-dial_tcp_from_hostname_with_port_override :: proc(hostname: string, port: int, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
+dial_tcp_from_hostname_with_port_override :: proc(hostname: string, port: int, non_blocking := false, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname) or_return
 	switch &t in target {
 	case Endpoint:
@@ -61,7 +61,7 @@ dial_tcp_from_hostname_with_port_override :: proc(hostname: string, port: int, o
 		t.port = port
 	}
 
-	return dial_tcp_from_host_or_endpoint(target, options)
+	return dial_tcp_from_host_or_endpoint(target, non_blocking, options)
 }
 
 /*
@@ -69,14 +69,14 @@ dial_tcp_from_hostname_with_port_override :: proc(hostname: string, port: int, o
 
 	Errors that can be returned: `Resolve_Error`, `DNS_Error`, `Create_Socket_Error`, or `Dial_Error`
 */
-dial_tcp_from_host :: proc(host: Host, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
+dial_tcp_from_host :: proc(host: Host, non_blocking := false, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
 	if host.port == 0 {
 		return 0, .Port_Required
 	}
 	ep4, ep6 := resolve(host.hostname) or_return
 	ep := ep4 if ep4.address != nil else ep6 // NOTE(tetra): We don't know what family the server uses, so we just default to IP4.
 	ep.port = host.port
-	return dial_tcp_from_endpoint(ep, options)
+	return dial_tcp_from_endpoint(ep, non_blocking, options)
 }
 
 /*
@@ -85,12 +85,12 @@ dial_tcp_from_host :: proc(host: Host, options := DEFAULT_TCP_OPTIONS) -> (socke
 
 	Errors that can be returned: `Parse_Endpoint_Error`, `Resolve_Error`, `DNS_Error`, `Create_Socket_Error`, or `Dial_Error`
 */
-dial_tcp_from_host_or_endpoint :: proc(target: Host_Or_Endpoint, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
+dial_tcp_from_host_or_endpoint :: proc(target: Host_Or_Endpoint, non_blocking := false, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
 	switch t in target {
 	case Endpoint:
-		return dial_tcp_from_endpoint(t, options)
+		return dial_tcp_from_endpoint(t, non_blocking, options)
 	case Host:
-		return dial_tcp_from_host(t, options)
+		return dial_tcp_from_host(t, non_blocking, options)
 	}
 	unreachable()
 }
@@ -100,8 +100,8 @@ dial_tcp_from_host_or_endpoint :: proc(target: Host_Or_Endpoint, options := DEFA
 
 	Errors that can be returned: `Create_Socket_Error`, or `Dial_Error`
 */
-dial_tcp_from_address_and_port :: proc(address: Address, port: int, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
-	return dial_tcp_from_endpoint({address, port}, options)
+dial_tcp_from_address_and_port :: proc(address: Address, port: int, non_blocking := false, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
+	return dial_tcp_from_endpoint({address, port}, non_blocking, options)
 }
 
 /*
@@ -109,8 +109,8 @@ dial_tcp_from_address_and_port :: proc(address: Address, port: int, options := D
 
 	Errors that can be returned: `Create_Socket_Error`, or `Dial_Error`
 */
-dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
-	return _dial_tcp_from_endpoint(endpoint, options)
+dial_tcp_from_endpoint :: proc(endpoint: Endpoint, non_blocking := false, options := DEFAULT_TCP_OPTIONS) -> (socket: TCP_Socket, err: Network_Error) {
+	return _dial_tcp_from_endpoint(endpoint, non_blocking, options)
 }
 
 dial_tcp :: proc{

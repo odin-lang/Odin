@@ -91,6 +91,9 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIO
 	// bypass the cooldown period, and allow the next run of the program to
 	// use the same address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
+	if non_blocking {
+		_ = set_blocking(socket, true)
+	}
 
 	sockaddr := _endpoint_to_sockaddr(endpoint)
 	if posix.connect(posix.FD(skt), (^posix.sockaddr)(&sockaddr), posix.socklen_t(sockaddr.ss_len)) != .OK {
