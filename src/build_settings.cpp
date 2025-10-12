@@ -575,6 +575,8 @@ struct BuildContext {
 
 	bool   min_link_libs;
 
+	String export_linked_libs_path;
+
 	bool   print_linker_flags;
 
 	RelocMode reloc_mode;
