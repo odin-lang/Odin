@@ -2317,7 +2317,7 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 				GB_ASSERT(file_path->tav.mode == Addressing_Constant && file_path->tav.value.kind == ExactValue_String);
 				String file_path_str = file_path->tav.value.value_string;
 
-				if (string_starts_with(file_path_str, str_lit("\"system:"))) {
+				if (string_starts_with(file_path_str, str_lit("system:"))) {
 					gb_fprintf(&f, "system");
 				} else {
 					gb_fprintf(&f, "user");
