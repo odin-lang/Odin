@@ -3719,6 +3719,11 @@ int main(int arg_count, char const **arg_ptr) {
 			String item = string_split_iterator(&target_it, ',');
 			if (item == "") break;
 
+			if (*item.text == '+' || *item.text == '-') {
+				item.text++;
+				item.len--;
+			}
+
 			String invalid;
 			if (!check_target_feature_is_valid_for_target_arch(item, &invalid) && item != str_lit("help")) {
 				if (item != str_lit("?")) {
