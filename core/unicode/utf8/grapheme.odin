@@ -107,7 +107,9 @@ decode_grapheme_clusters :: proc(
 
 	it := decode_grapheme_iterator_make(str)
 	for _, grapheme in decode_grapheme_iterate(&it) {
-		append(&graphemes, grapheme)
+		if track_graphemes {
+			append(&graphemes, grapheme)
+		}
 	}
 
 	grapheme_count = it.grapheme_count
