@@ -480,6 +480,7 @@ void rwlock_acquire_upgrade(RWSpinLock *l) {
 }
 void rwlock_release_upgrade(RWSpinLock *l) {
 	l->bits.fetch_add(-RWLOCK_UPGRADED, std::memory_order_acq_rel);
+	futex_signal(&l->bits);
 }
 
 bool rwlock_try_release_upgrade_and_acquire_write(RWSpinLock *l) {
