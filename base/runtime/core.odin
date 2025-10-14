@@ -15,7 +15,7 @@
 //
 // IMPORTANT NOTE(bill): `type_info_of` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
-// This could change at a later date if the all these data structures are
+// This could change at a later date if all these data structures are
 // implemented within the compiler rather than in this "preload" file
 //
 #+no-instrumentation
