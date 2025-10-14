@@ -2,6 +2,7 @@ package runtime
 
 import "base:intrinsics"
 
+@(require_results)
 heap_allocator :: proc() -> Allocator {
 	return Allocator{
 		procedure = heap_allocator_proc,
@@ -70,10 +71,12 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		new_memory = aligned_alloc(new_size, new_alignment, p, old_size, zero_memory) or_return
 
-		// NOTE: heap_resize does not zero the new memory, so we do it
-		if zero_memory && new_size > old_size {
-			new_region := raw_data(new_memory[old_size:])
-			intrinsics.mem_zero(new_region, new_size - old_size)
+		when ODIN_OS != .Windows {
+			// NOTE: heap_resize does not zero the new memory, so we do it
+			if zero_memory && new_size > old_size {
+				new_region := raw_data(new_memory[old_size:])
+				conditional_mem_zero(new_region, new_size - old_size)
+			}
 		}
 		return
 	}

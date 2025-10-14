@@ -50,10 +50,22 @@ NotificationCenter_defaultCenter :: proc "c" () -> ^NotificationCenter {
 	return msgSend(^NotificationCenter, NotificationCenter, "defaultCenter")
 }
 
-@(objc_type=NotificationCenter, objc_name="addObserver")
-NotificationCenter_addObserverName :: proc "c" (self: ^NotificationCenter, name: NotificationName, pObj: ^Object, pQueue: rawptr, block: ^Block) -> ^Object {
-	return msgSend(^Object, self, "addObserverName:object:queue:block:", name, pObj, pQueue, block)
+@(objc_type=NotificationCenter, objc_name="addObserverForName")
+NotificationCenter_addObserverForName :: proc{NotificationCenter_addObserverForName_old, NotificationCenter_addObserverForName_new}
+
+NotificationCenter_addObserverForName_old :: proc "c" (self: ^NotificationCenter, name: NotificationName, pObj: ^Object, pQueue: rawptr, block: ^Block) -> ^Object {
+	return msgSend(^Object, self, "addObserverForName:object:queue:usingBlock:", name, pObj, pQueue, block)
 }
+
+NotificationCenter_addObserverForName_new :: proc "c" (self: ^NotificationCenter, name: NotificationName, pObj: ^Object, pQueue: rawptr, block: ^Objc_Block) -> ^Object {
+	return msgSend(^Object, self, "addObserverForName:object:queue:usingBlock:", name, pObj, pQueue, block)
+}
+
+@(objc_type=NotificationCenter, objc_name="addObserver")
+NotificationCenter_addObserver :: proc "c" (self: ^NotificationCenter, observer: ^Object, selector: SEL, name: NotificationName, object: ^Object) {
+	msgSend(nil, self, "addObserver:selector:name:object:", observer, selector, name, object)
+}
+
 @(objc_type=NotificationCenter, objc_name="removeObserver")
 NotificationCenter_removeObserver :: proc "c" (self: ^NotificationCenter, pObserver: ^Object) {
 	msgSend(nil, self, "removeObserver:", pObserver)

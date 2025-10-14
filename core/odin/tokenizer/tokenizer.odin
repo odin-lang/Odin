@@ -1,3 +1,4 @@
+// The tokenizer (lexer) for `Odin` files, used to create tooling.
 package odin_tokenizer
 
 import "core:fmt"
@@ -209,14 +210,14 @@ scan_comment :: proc(t: ^Tokenizer) -> string {
 scan_file_tag :: proc(t: ^Tokenizer) -> string {
 	offset := t.offset - 1
 
-	for t.ch != '\n' {
+	for t.ch != '\n' && t.ch != utf8.RUNE_EOF {
 		if t.ch == '/' {
 			next := peek_byte(t, 0)
 
 			if next == '/' || next == '*' {
 				break
 			}
-		} 
+		}
 		advance_rune(t)
 	}
 

@@ -164,6 +164,7 @@ struct Entity {
 	u64         id;
 	std::atomic<u64>         flags;
 	std::atomic<EntityState> state;
+	std::atomic<i32>         min_dep_count;
 	Token       token;
 	Scope *     scope;
 	Type *      type;
@@ -233,6 +234,7 @@ struct Entity {
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
+			Type * original_type_for_parapoly;
 			String ir_mangled_name;
 			bool   is_type_alias;
 			bool   objc_is_implementation;
@@ -249,6 +251,8 @@ struct Entity {
 			String  link_name;
 			String  link_prefix;
 			String  link_suffix;
+			String  objc_selector_name;
+			Entity *objc_class;
 			DeferredProcedure deferred_procedure;
 
 			struct GenProcsData *gen_procs;
@@ -264,6 +268,8 @@ struct Entity {
 			bool    is_anonymous               : 1;
 			bool    no_sanitize_address        : 1;
 			bool    no_sanitize_memory         : 1;
+			bool    is_objc_impl_or_import     : 1;
+			bool    is_objc_class_method       : 1;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;
@@ -347,7 +353,7 @@ gb_internal Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Typ
 	entity->type   = type;
 	entity->id     = 1 + global_entity_id.fetch_add(1);
 	if (token.pos.file_id) {
-		entity->file = thread_safe_get_ast_file_from_id(token.pos.file_id);
+		entity->file = thread_unsafe_get_ast_file_from_id(token.pos.file_id);
 	}
 	return entity;
 }

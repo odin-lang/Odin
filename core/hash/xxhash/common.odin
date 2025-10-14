@@ -1,3 +1,8 @@
+// Yann Collet's `xxhash`.
+//
+// [[ xxhash Fast Hash Algorithm; https://cyan4973.github.io/xxHash/ ]]
+package xxhash
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 
@@ -6,9 +11,6 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-
-// An implementation of Yann Collet's [[ xxhash Fast Hash Algorithm; https://cyan4973.github.io/xxHash/ ]].
-package xxhash
 
 import "base:intrinsics"
 import "base:runtime"

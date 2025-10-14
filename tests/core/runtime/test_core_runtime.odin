@@ -180,6 +180,119 @@ test_map_get :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_soa_array_resize :: proc(t: ^testing.T) {
+
+	V :: struct {x: int, y: u8}
+
+	array := make(#soa[dynamic]V, 0, 2)
+	defer delete(array)
+
+	append(&array, V{1, 2}, V{3, 4})
+
+	testing.expect_value(t, len(array), 2)
+	testing.expect_value(t, array[0], V{1, 2})
+	testing.expect_value(t, array[1], V{3, 4})
+
+	resize(&array, 1)
+
+	testing.expect_value(t, len(array), 1)
+	testing.expect_value(t, array[0], V{1, 2})
+
+	resize(&array, 2)
+
+	testing.expect_value(t, len(array), 2)
+	testing.expect_value(t, array[0], V{1, 2})
+	testing.expect_value(t, array[1], V{0, 0})
+
+	resize(&array, 0)
+	resize(&array, 3)
+
+	testing.expect_value(t, len(array), 3)
+	testing.expect_value(t, array[0], V{0, 0})
+	testing.expect_value(t, array[1], V{0, 0})
+	testing.expect_value(t, array[2], V{0, 0})
+}
+
+@(test)
+test_soa_make_len :: proc(t: ^testing.T) {
+
+	array, err := make(#soa[dynamic][2]int, 2)
+	defer delete(array)
+	array[0] = [2]int{1, 2}
+	array[1] = [2]int{3, 4}
+
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(array), 2)
+	testing.expect_value(t, cap(array), 2)
+
+	testing.expect_value(t, array[0], [2]int{1, 2})
+	testing.expect_value(t, array[1], [2]int{3, 4})
+}
+
+@(test)
+test_soa_array_allocator_resize :: proc(t: ^testing.T) {
+
+	arena: runtime.Arena
+	context.allocator = runtime.arena_allocator(&arena)
+	defer runtime.arena_destroy(&arena)
+
+	// |1 3 _ 2 4 _|
+	// |1 3 _ _ 2 4 _ _|
+
+	array, err := make(#soa[dynamic][2]int, 2, 3)
+	defer delete(array)
+	array[0] = [2]int{1, 2}
+	array[1] = [2]int{3, 4}
+
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(array), 2)
+	testing.expect_value(t, cap(array), 3)
+
+	err = resize(&array, 4)
+
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(array), 4)
+	testing.expect_value(t, cap(array), 4)
+
+	testing.expect_value(t, array[0], [2]int{1, 2})
+	testing.expect_value(t, array[1], [2]int{3, 4})
+	testing.expect_value(t, array[2], [2]int{0, 0})
+	testing.expect_value(t, array[3], [2]int{0, 0})
+}
+
+
+@(test)
+test_soa_array_allocator_resize_overlapping :: proc(t: ^testing.T) {
+
+	arena: runtime.Arena
+	context.allocator = runtime.arena_allocator(&arena)
+	defer runtime.arena_destroy(&arena)
+
+	// |1 4 2 5 3 6|
+	// |1 4 _ _ 2 5 _ _ 3 6 _ _|
+
+	array, err := make(#soa[dynamic][3]int, 2, 2)
+	defer delete(array)
+	array[0] = [3]int{1, 2, 3}
+	array[1] = [3]int{4, 5, 6}
+
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(array), 2)
+	testing.expect_value(t, cap(array), 2)
+
+	err = resize(&array, 4)
+
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(array), 4)
+	testing.expect_value(t, cap(array), 4)
+
+	testing.expect_value(t, array[0], [3]int{1, 2, 3})
+	testing.expect_value(t, array[1], [3]int{4, 5, 6})
+	testing.expect_value(t, array[2], [3]int{0, 0, 0})
+	testing.expect_value(t, array[3], [3]int{0, 0, 0})
+}
+
+@(test)
 test_memory_equal :: proc(t: ^testing.T) {
 	data: [256]u8
 	cmp: [256]u8

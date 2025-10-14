@@ -1,5 +1,5 @@
 /*
-package blake2s implements the BLAKE2s hash algorithm.
+`BLAKE2s` hash algorithm.
 
 See:
 - [[ https://datatracker.ietf.org/doc/html/rfc7693 ]]

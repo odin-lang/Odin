@@ -1,3 +1,4 @@
+// An Odin-native source port of [[ nanovg ; https://github.com/memononen/nanovg ]]'s GL backend.
 #+build windows, linux, darwin
 package nanovg_gl
 

@@ -1,3 +1,4 @@
+// Bindings for [[ Direct3D 12 ; https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics ]].
 package directx_d3d12
 
 foreign import "system:d3d12.lib"
@@ -851,10 +852,10 @@ FEATURE :: enum i32 {
 	OPTIONS19                             = 48,
 }
 
-SHADER_MIN_PRECISION_SUPPORT :: enum i32 {
-	NONE    = 0,
-	_10_BIT = 1,
-	_16_BIT = 2,
+SHADER_MIN_PRECISION_SUPPORT :: distinct bit_set[SHADER_MIN_PRECISION_SUPPORT_FLAG; u32]
+SHADER_MIN_PRECISION_SUPPORT_FLAG :: enum i32 {
+	_10_BIT,
+	_16_BIT,
 }
 
 TILED_RESOURCES_TIER :: enum i32 {

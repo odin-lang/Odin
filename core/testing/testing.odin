@@ -1,3 +1,4 @@
+// The implementation of the `odin test` runner and procedures user tests can use for this purpose.
 package testing
 
 /*

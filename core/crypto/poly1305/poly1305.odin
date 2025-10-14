@@ -1,5 +1,5 @@
 /*
-package poly1305 implements the Poly1305 one-time MAC algorithm.
+`Poly1305` one-time MAC algorithm.
 
 See:
 - [[ https://datatracker.ietf.org/doc/html/rfc8439 ]]

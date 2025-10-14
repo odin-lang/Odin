@@ -1,15 +1,6 @@
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+A small `GZIP` unpacker.
 
-	List of contributors:
-		Jeroen van Rijn: Initial implementation.
-		Ginger Bill:     Cosmetic changes.
-
-	A small GZIP implementation as an example.
-*/
-
-/*
 Example:
 	import "core:bytes"
 	import "core:os"
@@ -88,3 +79,14 @@ Example:
 	}
 */
 package compress_gzip
+
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		Ginger Bill:     Cosmetic changes.
+
+	A small GZIP implementation as an example.
+*/

@@ -3,8 +3,6 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 		return;
 	}
 
-	auto *min_dep_set = &p->module->info->minimum_dependency_set;
-
 	for (Ast *ident : vd->names) {
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
@@ -21,7 +19,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			}
 		}
 
-		if (!polymorphic_struct && !ptr_set_exists(min_dep_set, e)) {
+		if (!polymorphic_struct && e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 			continue;
 		}
 
@@ -56,7 +54,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			if (gpd) {
 				rw_mutex_shared_lock(&gpd->mutex);
 				for (Entity *e : gpd->procs) {
-					if (!ptr_set_exists(min_dep_set, e)) {
+					if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 						continue;
 					}
 					DeclInfo *d = decl_info_of_entity(e);
@@ -94,7 +92,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			value.value = nested_proc->value;
 			value.type = nested_proc->type;
 
-			array_add(&p->module->procedures_to_generate, nested_proc);
+			mpsc_enqueue(&p->module->procedures_to_generate, nested_proc);
 			array_add(&p->children, nested_proc);
 			string_map_set(&p->module->members, name, value);
 		}

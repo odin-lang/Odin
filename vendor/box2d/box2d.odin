@@ -1,3 +1,4 @@
+// Bindings for [[ Box2D ; https://box2d.org ]].
 package vendor_box2d
 
 import "base:intrinsics"
@@ -1370,7 +1371,7 @@ foreign lib {
 
 	// Create a motor joint
 	//	@see b2MotorJointDef for details
-	CreateMotorJoint               :: proc(worldId: WorldId, def: MotorJointDef) -> JointId ---
+	CreateMotorJoint               :: proc(worldId: WorldId, #by_ptr def: MotorJointDef) -> JointId ---
 
 	// Set the motor joint linear offset target
 	MotorJoint_SetLinearOffset     :: proc(jointId: JointId, linearOffset: Vec2) ---

@@ -16,6 +16,8 @@ template <typename T> gb_internal bool ptr_set_exists (PtrSet<T> *s, T ptr);
 template <typename T> gb_internal void ptr_set_remove (PtrSet<T> *s, T ptr);
 template <typename T> gb_internal void ptr_set_clear  (PtrSet<T> *s);
 
+#define FOR_PTR_SET(element, set_) for (auto *it = &(set_).keys[0], element = it ? *it : nullptr; (set_).keys != nullptr && it < &(set_).keys[(set_).capacity]; it++) if (element = *it, (*it != nullptr && *it != cast(void *)~(uintptr)(0ull)))
+
 gb_internal gbAllocator ptr_set_allocator(void) {
 	return heap_allocator();
 }
@@ -83,7 +85,7 @@ gb_internal gb_inline void ptr_set_grow(PtrSet<T> *old_set) {
 	PtrSet<T> new_set = {};
 	ptr_set_init(&new_set, gb_max(old_set->capacity<<1, 16));
 
-	for (T ptr : *old_set) {
+	FOR_PTR_SET(ptr, *old_set) {
 		bool was_new = ptr_set_update(&new_set, ptr);
 		GB_ASSERT(!was_new);
 	}
@@ -135,6 +137,44 @@ gb_internal bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it pre
 }
 
 template <typename T>
+gb_internal bool ptr_set_update_with_mutex(PtrSet<T> *s, T ptr, RWSpinLock *m) { // returns true if it previously existsed
+	rwlock_acquire_upgrade(m);
+	if (ptr_set_exists(s, ptr)) {
+		rwlock_release_upgrade(m);
+		return true;
+	}
+
+	rwlock_release_upgrade_and_acquire_write(m);
+	defer (rwlock_release_write(m));
+
+	if (s->keys == nullptr) {
+		ptr_set_init(s);
+	} else if (ptr_set__full(s)) {
+		ptr_set_grow(s);
+	}
+	GB_ASSERT(s->count < s->capacity);
+	GB_ASSERT(s->capacity >= 0);
+
+	usize mask = s->capacity-1;
+	u32 hash = ptr_map_hash_key(ptr);
+	usize hash_index = (cast(usize)hash) & mask;
+	GB_ASSERT(hash_index < s->capacity);
+	for (usize i = 0; i < s->capacity; i++) {
+		T *key = &s->keys[hash_index];
+		GB_ASSERT(*key != ptr);
+		if (*key == (T)PtrSet<T>::TOMBSTONE || *key == 0) {
+			*key = ptr;
+			s->count++;
+			return false;
+		}
+		hash_index = (hash_index+1)&mask;
+	}
+
+	GB_PANIC("ptr set out of memory");
+	return false;
+}
+
+template <typename T>
 gb_internal T ptr_set_add(PtrSet<T> *s, T ptr) {
 	ptr_set_update(s, ptr);
 	return ptr;
@@ -157,7 +197,7 @@ gb_internal gb_inline void ptr_set_clear(PtrSet<T> *s) {
 	gb_zero_size(s->keys, s->capacity*gb_size_of(T));
 }
 
-template <typename T>
+/*template <typename T>
 struct PtrSetIterator {
 	PtrSet<T> *set;
 	usize index;
@@ -201,4 +241,6 @@ gb_internal PtrSetIterator<T> begin(PtrSet<T> &set) noexcept {
 template <typename T>
 gb_internal PtrSetIterator<T> end(PtrSet<T> &set) noexcept {
 	return PtrSetIterator<T>{&set, set.capacity};
-}
+}*/
+
+

@@ -1,5 +1,5 @@
 /*
-package siphash Implements the SipHash hashing algorithm.
+`SipHash` hashing algorithm.
 
 Use the specific procedures for a certain setup. The generic procedures will default to Siphash 2-4.
 

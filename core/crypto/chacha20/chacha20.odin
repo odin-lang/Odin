@@ -1,5 +1,5 @@
 /*
-package chacha20 implements the ChaCha20 and XChaCha20 stream ciphers.
+`ChaCha20` and `XChaCha20` stream ciphers.
 
 See:
 - [[ https://datatracker.ietf.org/doc/html/rfc8439 ]]

@@ -1,3 +1,4 @@
+// Interaction with the command line interface (`CLI`) of the system.
 package terminal
 
 import "core:os"

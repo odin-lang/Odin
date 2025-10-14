@@ -1,5 +1,7 @@
 #include "parser_pos.cpp"
 
+gb_global std::atomic<bool> g_parsing_done;
+
 gb_internal bool in_vet_packages(AstFile *file) {
 	if (file == nullptr) {
 		return true;
@@ -176,7 +178,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		return nullptr;
 	}
 	if (f == nullptr) {
-		f = node->thread_safe_file();
+		if (g_parsing_done.load(std::memory_order_relaxed)) {
+			f = node->file();
+		} else {
+			f = node->thread_safe_file();
+		}
 	}
 	Ast *n = alloc_ast_node(f, node->kind);
 	gb_memmove(n, node, ast_node_size(node->kind));
@@ -744,6 +750,7 @@ gb_internal Ast *ast_matrix_index_expr(AstFile *f, Ast *expr, Token open, Token 
 gb_internal Ast *ast_ident(AstFile *f, Token token) {
 	Ast *result = alloc_ast_node(f, Ast_Ident);
 	result->Ident.token = token;
+	result->Ident.hash = string_hash(token.string);
 	return result;
 }
 
@@ -6417,6 +6424,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 				switch (flag) {
 				case OptInFeatureFlag_IntegerDivisionByZero_Trap:
 				case OptInFeatureFlag_IntegerDivisionByZero_Zero:
+				case OptInFeatureFlag_IntegerDivisionByZero_AllBits:
 					syntax_error(token_for_pos, "Feature flag does not support notting with '!' - '%.*s'", LIT(p));
 					break;
 				}
@@ -6429,6 +6437,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 			error_line("\tinteger-division-by-zero:trap\n");
 			error_line("\tinteger-division-by-zero:zero\n");
 			error_line("\tinteger-division-by-zero:self\n");
+			error_line("\tinteger-division-by-zero:all-bits\n");
 			return OptInFeatureFlag_NONE;
 		}
 	}
@@ -6554,6 +6563,10 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (string_starts_with(lc, str_lit("vet"))) {
 		f->vet_flags = parse_vet_tag(tok, lc);
 		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("test"))) {
+		if ((build_context.command_kind & Command_test) == 0) {
+			return false;
+		}
 	} else if (string_starts_with(lc, str_lit("ignore"))) {
 		return false;
 	} else if (string_starts_with(lc, str_lit("private"))) {
@@ -6923,6 +6936,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
 		}
 	}
+
+	g_parsing_done.store(true, std::memory_order_relaxed);
 
 	return ParseFile_None;
 }

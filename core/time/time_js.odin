@@ -24,7 +24,7 @@ _sleep :: proc "contextless" (d: Duration) {
 
 _tick_now :: proc "contextless" () -> Tick {
 	foreign odin_env {
-		tick_now :: proc "contextless" () -> f32 ---
+		tick_now :: proc "contextless" () -> f64 ---
 	}
 	return Tick{i64(tick_now()*1e6)}
 }

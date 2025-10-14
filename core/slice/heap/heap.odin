@@ -1,3 +1,6 @@
+// A generic in-place max heap on a slice for any type.
+package heap
+
 /*
 	Copyright 2022 Dale Weiler <weilercdale@gmail.com>.
 	Made available under Odin's BSD-3 license.
@@ -5,9 +8,6 @@
 	List of contributors:
 		Dale Weiler: Initial implementation
 */
-
-// Package implements a generic max heap in-place on a slice for any type.
-package heap
 
 /*
 	Constructs a max heap in slice given by data with comparator. A max heap is

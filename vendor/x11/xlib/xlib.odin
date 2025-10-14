@@ -1,3 +1,4 @@
+// Bindings for [[ X11's Xlib (PDF) ; https://www.x.org/docs/X11/xlib.pdf ]].
 package xlib
 
 // Value, specifying whether `vendor:x11/xlib` is available on the current platform.

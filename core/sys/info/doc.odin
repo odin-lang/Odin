@@ -1,15 +1,5 @@
 /*
-Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
-Made available under Odin's BSD-3 license.
-
-List of contributors:
-	Jeroen van Rijn: Initial implementation.
-	Laytan: ARM and RISC-V CPU feature detection, iOS/macOS platform overhaul.
-*/
-
-/*
-Package `core:sys/info` gathers system information on:
-Windows, Linux, macOS, FreeBSD & OpenBSD.
+Gathers system information on `Windows`, `Linux`, `macOS`, `FreeBSD` & `OpenBSD`.
 
 Simply import the package and you'll have access to the OS version, RAM amount
 and CPU information.
@@ -30,12 +20,8 @@ Example:
 		fmt.printfln("OS:        %v",      si.os_version.as_string)
 		fmt.printfln("OS:        %#v",     si.os_version)
 		fmt.printfln("CPU:       %v",      si.cpu.name)
-		fmt.printfln("CPU:       %v",      si.cpu.name)
 		fmt.printfln("CPU cores: %vc/%vt", si.cpu.physical_cores, si.cpu.logical_cores)
 		fmt.printfln("RAM:       %#.1M",   si.ram.total_ram)
-
-		// fmt.printfln("Features: %v",      si.cpu.features)
-		// fmt.printfln("MacOS version: %v", si.macos_version)
 
 		fmt.println()
 		for gpu, i in si.gpus {
@@ -48,26 +34,30 @@ Example:
 
 - Example Windows output:
 
-	Odin:  dev-2022-09
-	OS:    Windows 10 Professional (version: 20H2), build: 19042.1466
-	OS:    OS_Version{
+	Odin:      dev-2025-10
+	OS:        Windows 10 Professional (version: 22H2), build: 19045.6396
+	OS:        OS_Version{
 		platform = "Windows",
-		major = 10,
-		minor = 0,
-		patch = 0,
+		_ = Version{
+			major = 10,
+			minor = 0,
+			patch = 0,
+		},
 		build = [
-			19042,
-			1466,
+			19045,
+			6396,
 		],
-		version = "20H2",
-		as_string = "Windows 10 Professional (version: 20H2), build: 19042.1466",
+		version = "22H2",
+		as_string = "Windows 10 Professional (version: 22H2), build: 19045.6396",
 	}
-	CPU:   AMD Ryzen 7 1800X Eight-Core Processor
-	RAM:   64.0 GiB
+	CPU:       AMD Ryzen 9 5950X 16-Core Processor
+	CPU cores: 16c/32t
+	RAM:       63.9 GiB
+
 	GPU #0:
 		Vendor: Advanced Micro Devices, Inc.
-		Model:  Radeon RX Vega
-		VRAM:   8.0 GiB
+		Model:  AMD Radeon RX 9070
+		VRAM:   15.9 GiB
 
 - Example macOS output:
 
@@ -88,3 +78,12 @@ Example:
 	RAM:  8.0 GiB
 */
 package sysinfo
+
+/*
+Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+Made available under Odin's BSD-3 license.
+
+List of contributors:
+	Jeroen van Rijn: Initial implementation.
+	Laytan: ARM and RISC-V CPU feature detection, iOS/macOS platform overhaul.
+*/

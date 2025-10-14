@@ -1,5 +1,5 @@
 /*
-package shake implements the SHAKE and cSHAKE XOF algorithm families.
+`SHAKE` and `cSHAKE` XOF algorithm families.
 
 The SHA3 hash algorithm can be found in the crypto/sha3.
 

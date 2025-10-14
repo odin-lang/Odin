@@ -296,8 +296,8 @@ Inputs:
 Returns:
 - res: A cstring of the Builder's buffer
 */
-unsafe_to_cstring :: proc(b: ^Builder) -> (res: cstring) {
-	append(&b.buf, 0)
+unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring) {
+	append(&b.buf, 0, loc)
 	pop(&b.buf)
 	return cstring(raw_data(b.buf))
 }
@@ -311,8 +311,8 @@ Returns:
 - res: A cstring of the Builder's buffer upon success
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-to_cstring :: proc(b: ^Builder) -> (res: cstring, err: mem.Allocator_Error) #optional_allocator_error {
-	n := append(&b.buf, 0) or_return
+to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: mem.Allocator_Error) #optional_allocator_error {
+	n := append(&b.buf, 0, loc) or_return
 	if n != 1 {
 		return nil, .Out_Of_Memory
 	}
@@ -518,9 +518,9 @@ Output:
 	abc
 
 */
-write_string :: proc(b: ^Builder, s: string) -> (n: int) {
+write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int) {
 	n0 := len(b.buf)
-	append(&b.buf, s)
+	append(&b.buf, s, loc)
 	n1 := len(b.buf)
 	return n1-n0
 }

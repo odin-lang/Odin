@@ -1,3 +1,4 @@
+// Abstract Syntax Tree for the `Odin` parser packages.
 package odin_ast
 
 import "core:odin/tokenizer"
@@ -70,7 +71,7 @@ File :: struct {
 	src:      string,
 
 	tags: [dynamic]tokenizer.Token,
-	docs: ^Comment_Group,
+	docs: ^Comment_Group, // possibly nil
 
 	pkg_decl:  ^Package_Decl,
 	pkg_token: tokenizer.Token,
@@ -137,26 +138,26 @@ Basic_Directive :: struct {
 Ellipsis :: struct {
 	using node: Expr,
 	tok:  tokenizer.Token_Kind,
-	expr: ^Expr,
+	expr: ^Expr, // possibly nil
 }
 
 Proc_Lit :: struct {
 	using node: Expr,
-	type: ^Proc_Type,
-	body: ^Stmt,
-	tags: Proc_Tags,
-	inlining: Proc_Inlining,
-	where_token: tokenizer.Token,
+	type:          ^Proc_Type,
+	body:          ^Stmt, // nil when it represents a foreign procedure
+	tags:          Proc_Tags,
+	inlining:      Proc_Inlining,
+	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
 }
 
 Comp_Lit :: struct {
 	using node: Expr,
-	type: ^Expr,
-	open: tokenizer.Pos,
+	type:  ^Expr, // nil when type is inferred
+	open:  tokenizer.Pos,
 	elems: []^Expr,
 	close: tokenizer.Pos,
-	tag: ^Expr,
+	tag:   ^Expr, // possibly nil
 }
 
 
@@ -170,7 +171,7 @@ Tag_Expr :: struct {
 Unary_Expr :: struct {
 	using node: Expr,
 	op:   tokenizer.Token,
-	expr: ^Expr,
+	expr: ^Expr, // nil in the case of `[?]T` or `x.?`
 }
 
 Binary_Expr :: struct {
@@ -224,9 +225,9 @@ Slice_Expr :: struct {
 	using node: Expr,
 	expr:     ^Expr,
 	open:     tokenizer.Pos,
-	low:      ^Expr,
+	low:      ^Expr,         // possibly nil
 	interval: tokenizer.Token,
-	high:     ^Expr,
+	high:     ^Expr,         // possibly nil
 	close:    tokenizer.Pos,
 }
 
@@ -291,7 +292,7 @@ Or_Branch_Expr :: struct {
 	using node: Expr,
 	expr:  ^Expr,
 	token: tokenizer.Token,
-	label: ^Expr,
+	label: ^Expr, // possibly nil when not used
 }
 
 Type_Assertion :: struct {
@@ -384,13 +385,13 @@ Block_Stmt :: struct {
 
 If_Stmt :: struct {
 	using node: Stmt,
-	label:     ^Expr,
+	label:     ^Expr, // possibly nil
 	if_pos:    tokenizer.Pos,
-	init:      ^Stmt,
+	init:      ^Stmt, // possibly nil
 	cond:      ^Expr,
 	body:      ^Stmt,
 	else_pos:  tokenizer.Pos,
-	else_stmt: ^Stmt,
+	else_stmt: ^Stmt, // possibly nil
 }
 
 When_Stmt :: struct {
@@ -398,7 +399,7 @@ When_Stmt :: struct {
 	when_pos:  tokenizer.Pos,
 	cond:      ^Expr,
 	body:      ^Stmt,
-	else_stmt: ^Stmt,
+	else_stmt: ^Stmt, // possibly nil
 }
 
 Return_Stmt :: struct {
@@ -413,17 +414,17 @@ Defer_Stmt :: struct {
 
 For_Stmt :: struct {
 	using node: Stmt,
-	label:     ^Expr,
+	label:     ^Expr, // possibly nil
 	for_pos:   tokenizer.Pos,
-	init:      ^Stmt,
-	cond:      ^Expr,
-	post:      ^Stmt,
+	init:      ^Stmt, // possibly nil
+	cond:      ^Expr, // possibly nil
+	post:      ^Stmt, // possibly nil
 	body:      ^Stmt,
 }
 
 Range_Stmt :: struct {
 	using node: Stmt,
-	label:     ^Expr,
+	label:     ^Expr, // possibly nil
 	for_pos:   tokenizer.Pos,
 	vals:      []^Expr,
 	in_pos:    tokenizer.Pos,
@@ -436,12 +437,12 @@ Inline_Range_Stmt :: Unroll_Range_Stmt
 
 Unroll_Range_Stmt :: struct {
 	using node: Stmt,
-	label:     ^Expr,
+	label:     ^Expr, // possibly nil
 	unroll_pos: tokenizer.Pos,
 	args:       []^Expr,
 	for_pos:    tokenizer.Pos,
 	val0:       ^Expr,
-	val1:       ^Expr,
+	val1:       ^Expr, // possibly nil
 	in_pos:     tokenizer.Pos,
 	expr:       ^Expr,
 	body:       ^Stmt,
@@ -460,9 +461,9 @@ Case_Clause :: struct {
 
 Switch_Stmt :: struct {
 	using node: Stmt,
-	label:      ^Expr,
+	label:      ^Expr, // possibly nil
 	switch_pos: tokenizer.Pos,
-	init:       ^Stmt,
+	init:       ^Stmt, // possibly nil
 	cond:       ^Expr,
 	body:       ^Stmt,
 	partial:    bool,
@@ -470,7 +471,7 @@ Switch_Stmt :: struct {
 
 Type_Switch_Stmt :: struct {
 	using node: Stmt,
-	label:      ^Expr,
+	label:      ^Expr, // possibly nil
 	switch_pos: tokenizer.Pos,
 	tag:        ^Stmt,
 	expr:       ^Expr,
@@ -481,7 +482,7 @@ Type_Switch_Stmt :: struct {
 Branch_Stmt :: struct {
 	using node: Stmt,
 	tok:   tokenizer.Token,
-	label: ^Ident,
+	label: ^Ident, // possibly nil
 }
 
 Using_Stmt :: struct {
@@ -498,55 +499,55 @@ Bad_Decl :: struct {
 
 Value_Decl :: struct {
 	using node: Decl,
-	docs:       ^Comment_Group,
+	docs:       ^Comment_Group, // possibly nil
 	attributes: [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	names:      []^Expr,
-	type:       ^Expr,
+	type:       ^Expr, // possibly nil
 	values:     []^Expr,
-	comment:    ^Comment_Group,
+	comment:    ^Comment_Group, // possibly nil
 	is_using:   bool,
 	is_mutable: bool,
 }
 
 Package_Decl :: struct {
 	using node: Decl,
-	docs:    ^Comment_Group,
+	docs:    ^Comment_Group, // possibly nil
 	token:   tokenizer.Token,
 	name:    string,
-	comment: ^Comment_Group,
+	comment: ^Comment_Group, // possibly nil
 }
 
 Import_Decl :: struct {
 	using node: Decl,
-	docs:       ^Comment_Group,
+	docs:       ^Comment_Group, // possibly nil
 	attributes:  [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	is_using:    bool,
 	import_tok:  tokenizer.Token,
 	name:        tokenizer.Token,
 	relpath:     tokenizer.Token,
 	fullpath:    string,
-	comment:     ^Comment_Group,
+	comment:     ^Comment_Group, // possibly nil
 }
 
 Foreign_Block_Decl :: struct {
 	using node: Decl,
-	docs:            ^Comment_Group,
+	docs:            ^Comment_Group, // possibly nil
 	attributes:      [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	tok:             tokenizer.Token,
-	foreign_library: ^Expr,
-	body:            ^Stmt,
+	foreign_library: ^Expr, // possibly nil
+	body:            ^Stmt, // possibly nil
 }
 
 Foreign_Import_Decl :: struct {
 	using node: Decl,
-	docs:            ^Comment_Group,
+	docs:            ^Comment_Group, // possibly nil
 	attributes:      [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	foreign_tok:     tokenizer.Token,
 	import_tok:      tokenizer.Token,
-	name:            ^Ident,
+	name:            ^Ident, // possibly nil
 	collection_name: string,
 	fullpaths:       []^Expr,
-	comment:         ^Comment_Group,
+	comment:         ^Comment_Group, // possibly nil
 }
 
 
@@ -689,13 +690,13 @@ Attribute :: struct {
 
 Field :: struct {
 	using node: Node,
-	docs:          ^Comment_Group,
+	docs:          ^Comment_Group, // possibly nil
 	names:         []^Expr, // Could be polymorphic
 	type:          ^Expr,
-	default_value: ^Expr,
+	default_value: ^Expr, // possibly nil
 	tag:           tokenizer.Token,
 	flags:         Field_Flags,
-	comment:       ^Comment_Group,
+	comment:       ^Comment_Group, // possibly nil
 }
 
 Field_List :: struct {
@@ -710,7 +711,7 @@ Field_List :: struct {
 Typeid_Type :: struct {
 	using node: Expr,
 	tok:            tokenizer.Token_Kind,
-	specialization: ^Expr,
+	specialization: ^Expr, // possibly nil
 }
 
 Helper_Type :: struct {
@@ -729,7 +730,7 @@ Poly_Type :: struct {
 	using node: Expr,
 	dollar:         tokenizer.Pos,
 	type:           ^Ident,
-	specialization: ^Expr,
+	specialization: ^Expr, // possibly nil
 }
 
 Proc_Type :: struct {
@@ -746,7 +747,7 @@ Proc_Type :: struct {
 
 Pointer_Type :: struct {
 	using node: Expr,
-	tag:     ^Expr,
+	tag:     ^Expr, // possibly nil
 	pointer: tokenizer.Pos,
 	elem:    ^Expr,
 }
@@ -762,7 +763,7 @@ Multi_Pointer_Type :: struct {
 Array_Type :: struct {
 	using node: Expr,
 	open:  tokenizer.Pos,
-	tag:   ^Expr,
+	tag:   ^Expr, // possibly nil
 	len:   ^Expr, // Unary_Expr node for [?]T array types, nil for slice types
 	close: tokenizer.Pos,
 	elem:  ^Expr,
@@ -770,7 +771,7 @@ Array_Type :: struct {
 
 Dynamic_Array_Type :: struct {
 	using node: Expr,
-	tag:         ^Expr,
+	tag:         ^Expr, // possibly nil
 	open:        tokenizer.Pos,
 	dynamic_pos: tokenizer.Pos,
 	close:       tokenizer.Pos,
@@ -780,10 +781,10 @@ Dynamic_Array_Type :: struct {
 Struct_Type :: struct {
 	using node: Expr,
 	tok_pos:         tokenizer.Pos,
-	poly_params:     ^Field_List,
-	align:           ^Expr,
-	min_field_align: ^Expr,
-	max_field_align: ^Expr,
+	poly_params:     ^Field_List, // possibly nil
+	align:           ^Expr,       // possibly nil
+	min_field_align: ^Expr,       // possibly nil
+	max_field_align: ^Expr,       // possibly nil
 	where_token:     tokenizer.Token,
 	where_clauses:   []^Expr,
 	is_packed:       bool,
@@ -803,8 +804,8 @@ Union_Type_Kind :: enum u8 {
 Union_Type :: struct {
 	using node: Expr,
 	tok_pos:       tokenizer.Pos,
-	poly_params:   ^Field_List,
-	align:         ^Expr,
+	poly_params:   ^Field_List, // possibly nil
+	align:         ^Expr,       // possibly nil
 	kind:          Union_Type_Kind,
 	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
@@ -814,7 +815,7 @@ Union_Type :: struct {
 Enum_Type :: struct {
 	using node: Expr,
 	tok_pos:  tokenizer.Pos,
-	base_type: ^Expr,
+	base_type: ^Expr, // possibly nil
 	open:      tokenizer.Pos,
 	fields:    []^Expr,
 	close:     tokenizer.Pos,
@@ -827,7 +828,7 @@ Bit_Set_Type :: struct {
 	tok_pos:    tokenizer.Pos,
 	open:       tokenizer.Pos,
 	elem:       ^Expr,
-	underlying: ^Expr,
+	underlying: ^Expr, // possibly nil
 	close:      tokenizer.Pos,
 }
 
@@ -864,12 +865,12 @@ Bit_Field_Type :: struct {
 
 Bit_Field_Field :: struct {
 	using node: Node,
-	docs:       ^Comment_Group,
+	docs:       ^Comment_Group, // possibly nil
 	name:       ^Expr,
 	type:       ^Expr,
 	bit_size:   ^Expr,
 	tag:        tokenizer.Token,
-	comments:   ^Comment_Group,
+	comments:   ^Comment_Group, // possibly nil
 }
 
 Any_Node :: union {

@@ -1,3 +1,4 @@
+// Procedures and constants to support text-encoding in the `UTF-8` character encoding.
 package utf8
 
 RUNE_ERROR :: '\ufffd'
@@ -108,7 +109,7 @@ decode_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 	if n < 1 {
 		return RUNE_ERROR, 0
 	}
-	s0 := s[0]
+	#no_bounds_check s0 := s[0]
 	x := accept_sizes[s0]
 	if x >= 0xF0 {
 		mask := rune(x) << 31 >> 31 // NOTE(bill): Create 0x0000 or 0xffff.

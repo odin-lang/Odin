@@ -57,10 +57,13 @@ gb_internal isize type_set__find(TypeSet *s, TypeInfoPair pair) {
 		usize mask = s->capacity-1;
 		usize hash_index = cast(usize)hash & mask;
 		for (usize i = 0; i < s->capacity; i++) {
-			Type *key = s->keys[hash_index].type;
-			if (are_types_identical_unique_tuples(key, pair.type)) {
+			auto *e = &s->keys[hash_index];
+			u64 hash  = e->hash;
+			Type *key = e->type;
+			if (hash == pair.hash &&
+			    are_types_identical_unique_tuples(key, pair.type)) {
 				return hash_index;
-			} else if (key == 0) {
+			} else if (key == nullptr) {
 				return -1;
 			}
 			hash_index = (hash_index+1)&mask;
@@ -162,6 +165,48 @@ gb_internal bool type_set_update(TypeSet *s, TypeInfoPair pair) { // returns tru
 gb_internal bool type_set_update(TypeSet *s, Type *ptr) { // returns true if it previously existsed
 	TypeInfoPair pair = {ptr, type_hash_canonical_type(ptr)};
 	return type_set_update(s, pair);
+}
+
+gb_internal bool type_set_update_with_mutex(TypeSet *s, TypeInfoPair pair, RWSpinLock *m) { // returns true if it previously existsed
+	rwlock_acquire_upgrade(m);
+	if (type_set_exists(s, pair)) {
+		rwlock_release_upgrade(m);
+		return true;
+	}
+
+	rwlock_release_upgrade_and_acquire_write(m);
+	defer (rwlock_release_write(m));
+
+	if (s->keys == nullptr) {
+		type_set_init(s);
+	} else if (type_set__full(s)) {
+		type_set_grow(s);
+	}
+	GB_ASSERT(s->count < s->capacity);
+	GB_ASSERT(s->capacity >= 0);
+
+	usize mask = s->capacity-1;
+	usize hash = cast(usize)pair.hash;
+	usize hash_index = (cast(usize)hash) & mask;
+	GB_ASSERT(hash_index < s->capacity);
+	for (usize i = 0; i < s->capacity; i++) {
+		TypeInfoPair *key = &s->keys[hash_index];
+		GB_ASSERT(!are_types_identical_unique_tuples(key->type, pair.type));
+		if (key->hash == TYPE_SET_TOMBSTONE || key->hash == 0) {
+			*key = pair;
+			s->count++;
+			return false;
+		}
+		hash_index = (hash_index+1)&mask;
+	}
+
+	GB_PANIC("ptr set out of memory");
+	return false;
+}
+
+gb_internal bool type_set_update_with_mutex(TypeSet *s, Type *ptr, RWSpinLock *m) { // returns true if it previously existsed
+	TypeInfoPair pair = {ptr, type_hash_canonical_type(ptr)};
+	return type_set_update_with_mutex(s, pair, m);
 }
 
 
@@ -328,12 +373,20 @@ gb_internal u64 type_hash_canonical_type(Type *type) {
 	if (type == nullptr) {
 		return 0;
 	}
+	u64 prev_hash = type->canonical_hash.load(std::memory_order_relaxed);
+	if (prev_hash != 0) {
+		return prev_hash;
+	}
+
 	u64 hash = fnv64a(nullptr, 0);
 	TypeWriter w = {};
 	type_writer_make_hasher(&w, &hash);
 	write_type_to_canonical_string(&w, type);
+	hash = hash ? hash : 1;
 
-	return hash ? hash : 1;
+	type->canonical_hash.store(hash, std::memory_order_relaxed);
+
+	return hash;
 }
 
 gb_internal String type_to_canonical_string(gbAllocator allocator, Type *type) {

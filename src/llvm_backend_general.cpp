@@ -15,7 +15,9 @@ gb_global isize lb_global_type_info_member_offsets_index = 0;
 gb_global isize lb_global_type_info_member_usings_index  = 0;
 gb_global isize lb_global_type_info_member_tags_index    = 0;
 
-gb_internal void lb_init_module(lbModule *m, Checker *c) {
+gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	Checker *c = m->checker;
 	m->info = &c->info;
 
 
@@ -45,6 +47,12 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 			module_name = gb_string_appendc(module_name, "-");
 		}
 		module_name = gb_string_appendc(module_name, "builtin");
+	}
+	if (m->polymorphic_module == m) {
+		if (gb_string_length(module_name)) {
+			module_name = gb_string_appendc(module_name, "-");
+		}
+		module_name = gb_string_appendc(module_name, "$parapoly");
 	}
 
 	m->module_name = module_name;
@@ -89,15 +97,19 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->function_type_map);
 	string_map_init(&m->gen_procs);
 	if (USE_SEPARATE_MODULES) {
-		array_init(&m->procedures_to_generate, a, 0, 1<<10);
+		mpsc_init(&m->procedures_to_generate, a);
 		map_init(&m->procedure_values,               1<<11);
+		array_init(&m->generated_procedures,   a, 0, 1<<10);
 	} else {
-		array_init(&m->procedures_to_generate, a, 0, c->info.all_procedures.count);
+		mpsc_init(&m->procedures_to_generate, a);
 		map_init(&m->procedure_values,               c->info.all_procedures.count*2);
+		array_init(&m->generated_procedures,   a, 0, c->info.all_procedures.count*2);
 	}
+
+
 	array_init(&m->global_procedures_to_create, a, 0, 1024);
 	array_init(&m->global_types_to_create, a, 0, 1024);
-	array_init(&m->missing_procedures_to_check, a, 0, 16);
+	mpsc_init(&m->missing_procedures_to_check, a);
 	map_init(&m->debug_values);
 
 	string_map_init(&m->objc_classes);
@@ -113,6 +125,15 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 
 	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);
 
+	return 0;
+}
+
+gb_internal void lb_init_module(lbModule *m, bool do_threading) {
+	if (do_threading) {
+		thread_pool_add_task(lb_init_module_worker_proc, m);
+	} else {
+		lb_init_module_worker_proc(m);
+	}
 }
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
@@ -125,6 +146,10 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		return false;
 	}
 
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize worker_count = thread_count-1;
+	bool do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
+
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
 
@@ -136,7 +161,6 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	map_init(&gen->modules, gen->info->packages.count*2);
 	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
-	map_init(&gen->anonymous_proc_lits, 1024);
 
 	if (USE_SEPARATE_MODULES) {
 		bool module_per_file = build_context.module_per_file && build_context.optimization_level <= 0;
@@ -145,26 +169,94 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
 			m->gen = gen;
+			m->checker = c;
 			map_set(&gen->modules, cast(void *)pkg, m);
-			lb_init_module(m, c);
-			if (!module_per_file) {
+			lb_init_module(m, do_threading);
+
+			if (LLVM_WEAK_MONOMORPHIZATION) {
+				auto pm = gb_alloc_item(permanent_allocator(), lbModule);
+				pm->pkg = pkg;
+				pm->gen = gen;
+				pm->checker = c;
+				m->polymorphic_module  = pm;
+				pm->polymorphic_module = pm;
+
+				map_set(&gen->modules, cast(void *)pm, pm); // point to itself just add it to the list
+
+				lb_init_module(pm, do_threading);
+			}
+
+			bool allow_for_per_file = pkg->kind == Package_Runtime || module_per_file;
+
+			#if 0
+			if (!allow_for_per_file) {
+				if (pkg->files.count >= 20) {
+					isize proc_count = 0;
+					for (Entity *e : gen->info->entities) {
+						if (e->kind != Entity_Procedure) {
+							continue;
+						}
+						if (e->Procedure.is_foreign) {
+							continue;
+						}
+						if (e->pkg == pkg) {
+							proc_count += 1;
+						}
+					}
+
+					if (proc_count >= 300) {
+						allow_for_per_file = true;
+					}
+				}
+			}
+			#endif
+
+			if (!allow_for_per_file) {
 				continue;
 			}
 			// NOTE(bill): Probably per file is not a good idea, so leave this for later
 			for (AstFile *file : pkg->files) {
-				auto m = gb_alloc_item(permanent_allocator(), lbModule);
+				auto m  = gb_alloc_item(permanent_allocator(), lbModule);
 				m->file = file;
-				m->pkg = pkg;
-				m->gen = gen;
+				m->pkg  = pkg;
+				m->gen  = gen;
+				m->checker = c;
 				map_set(&gen->modules, cast(void *)file, m);
-				lb_init_module(m, c);
+				lb_init_module(m, do_threading);
+
+
+				if (LLVM_WEAK_MONOMORPHIZATION) {
+					auto pm  = gb_alloc_item(permanent_allocator(), lbModule);
+					pm->file = file;
+					pm->pkg  = pkg;
+					pm->gen  = gen;
+					pm->checker = c;
+					m->polymorphic_module  = pm;
+					pm->polymorphic_module = pm;
+
+					map_set(&gen->modules, cast(void *)pm, pm); // point to itself just add it to the list
+
+					lb_init_module(pm, do_threading);
+				}
 			}
+		}
+
+		if (LLVM_WEAK_MONOMORPHIZATION) {
+			lbModule *m = gb_alloc_item(permanent_allocator(), lbModule);
+			gen->equal_module = m;
+			m->gen            = gen;
+			m->checker        = c;
+			map_set(&gen->modules, cast(void *)m, m); // point to itself just add it to the list
+			lb_init_module(m, do_threading);
 		}
 	}
 
 	gen->default_module.gen = gen;
+	gen->default_module.checker = c;
 	map_set(&gen->modules, cast(void *)1, &gen->default_module);
-	lb_init_module(&gen->default_module, c);
+	lb_init_module(&gen->default_module, do_threading);
+
+	thread_pool_wait();
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
@@ -403,9 +495,9 @@ gb_internal lbModule *lb_module_of_expr(lbGenerator *gen, Ast *expr) {
 	return &gen->default_module;
 }
 
-gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
-	GB_ASSERT(e != nullptr);
+gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, lbModule *curr_module) {
 	lbModule **found = nullptr;
+
 	if (e->kind == Entity_Procedure &&
 	    e->decl_info &&
 	    e->decl_info->code_gen_module) {
@@ -426,6 +518,22 @@ gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
 		}
 	}
 	return &gen->default_module;
+}
+
+
+gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e, lbModule *curr_module) {
+	GB_ASSERT(e != nullptr);
+	GB_ASSERT(curr_module != nullptr);
+	lbModule *m = lb_module_of_entity_internal(gen, e, curr_module);
+
+	if (USE_SEPARATE_MODULES) {
+		if (e->kind == Entity_Procedure && e->Procedure.generated_from_polymorphic) {
+			if (m->polymorphic_module) {
+				return m->polymorphic_module;
+			}
+		}
+	}
+	return m;
 }
 
 gb_internal lbAddr lb_addr(lbValue addr) {
@@ -1408,8 +1516,11 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
 	GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
+	LLVMValueRef ptr = u.value;
+	ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(uvt, 0), "");
+
 	lbValue tag_ptr = {};
-	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, u.value, 1, "");
+	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
 	return tag_ptr;
 }
@@ -1634,8 +1745,92 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 	map_set(&m->func_raw_types, type, new_abi_fn_type);
 
 	return new_abi_fn_type;
-
 }
+
+
+gb_internal LLVMTypeRef lb_type_internal_union_block_type(lbModule *m, Type *type) {
+	GB_ASSERT(type->kind == Type_Union);
+
+	if (type->Union.variants.count <= 0) {
+		return nullptr;
+	}
+	if (type->Union.variants.count == 1) {
+		return lb_type(m, type->Union.variants[0]);
+	}
+
+	i64 align = type_align_of(type);
+
+	unsigned block_size = cast(unsigned)type->Union.variant_block_size;
+	if (block_size == 0) {
+		return lb_type_padding_filler(m, block_size, align);
+	}
+
+	bool all_pointers = align == build_context.ptr_size;
+	for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {
+		Type *t = type->Union.variants[i];
+		if (!is_type_internally_pointer_like(t)) {
+			all_pointers = false;
+		}
+	}
+	if (all_pointers) {
+		return lb_type(m, t_rawptr);
+	}
+
+	{
+		Type *pt = type->Union.variants[0];
+		for (isize i = 1; i < type->Union.variants.count; i++) {
+			Type *t = type->Union.variants[i];
+			if (!are_types_identical(pt, t)) {
+				goto end_check_for_all_the_same;
+			}
+		}
+		return lb_type(m, pt);
+	} end_check_for_all_the_same:;
+
+	{
+		Type *first_different = nullptr;
+		for (isize i = 0; i < type->Union.variants.count; i++) {
+			Type *t = type->Union.variants[i];
+			if (type_size_of(t) == 0) {
+				continue;
+			}
+			if (first_different == nullptr) {
+				first_different = t;
+			} else if (!are_types_identical(first_different, t)) {
+				goto end_rest_zero_except_one;
+			}
+		}
+		if (first_different != nullptr) {
+			return lb_type(m, first_different);
+		}
+	} end_rest_zero_except_one:;
+
+	// {
+	// 	LLVMTypeRef first_different = nullptr;
+	// 	for (isize i = 0; i < type->Union.variants.count; i++) {
+	// 		Type *t = type->Union.variants[i];
+	// 		if (type_size_of(t) == 0) {
+	// 			continue;
+	// 		}
+	// 		if (first_different == nullptr) {
+	// 			first_different = lb_type(m, base_type(t));
+	// 		} else {
+	// 			LLVMTypeRef llvm_t = lb_type(m, base_type(t));
+	// 			if (llvm_t != first_different) {
+	// 				goto end_rest_zero_except_one_llvm_like;
+	// 			}
+	// 		}
+	// 	}
+	// 	if (first_different != nullptr) {
+	// 		return first_different;
+	// 	}
+	// } end_rest_zero_except_one_llvm_like:;
+
+
+	return lb_type_padding_filler(m, block_size, align);
+}
+
+
 gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	LLVMContextRef ctx = m->ctx;
 	i64 size = type_size_of(type); // Check size
@@ -2148,27 +2343,24 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 			}
 
-			unsigned block_size = cast(unsigned)type->Union.variant_block_size;
-
 			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 3);
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
 				array_add(&fields, variant);
-			} else {
-				LLVMTypeRef block_type = nullptr;
+			} else if (type->Union.variants.count == 1) {
+				LLVMTypeRef block_type = lb_type(m, type->Union.variants[0]);
 
-				bool all_pointers = align == build_context.ptr_size;
-				for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {
-					Type *t = type->Union.variants[i];
-					if (!is_type_internally_pointer_like(t)) {
-						all_pointers = false;
-					}
+				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
+				array_add(&fields, block_type);
+				array_add(&fields, tag_type);
+				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
+				i64 padding = size - used_size;
+				if (padding > 0) {
+					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
+					array_add(&fields, padding_type);
 				}
-				if (all_pointers) {
-					block_type = lb_type(m, t_rawptr);
-				} else {
-					block_type = lb_type_padding_filler(m, block_size, align);
-				}
+			} else {
+				LLVMTypeRef block_type = lb_type_internal_union_block_type(m, type);
 
 				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
@@ -2914,7 +3106,7 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 		return lb_find_procedure_value_from_entity(m, e);
 	}
 	if (USE_SEPARATE_MODULES) {
-		lbModule *other_module = lb_module_of_entity(m->gen, e);
+		lbModule *other_module = lb_module_of_entity(m->gen, e, m);
 		if (other_module != m) {
 			String name = lb_get_entity_name(other_module, e);
 
@@ -2962,7 +3154,7 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 	lbModule *other_module = m;
 	if (USE_SEPARATE_MODULES) {
-		other_module = lb_module_of_entity(gen, e);
+		other_module = lb_module_of_entity(gen, e, m);
 	}
 	if (other_module == m) {
 		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), m);
@@ -2979,9 +3171,6 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	}
 
 	if (ignore_body) {
-		mutex_lock(&gen->anonymous_proc_lits_mutex);
-		defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));
-
 		GB_ASSERT(other_module != nullptr);
 		rw_mutex_shared_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
@@ -2989,10 +3178,10 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		if (found == nullptr) {
 			// THIS IS THE RACE CONDITION
 			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
-			array_add(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
+			mpsc_enqueue(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
 		}
 	} else {
-		array_add(&m->missing_procedures_to_check, missing_proc);
+		mpsc_enqueue(&m->missing_procedures_to_check, missing_proc);
 	}
 
 	rw_mutex_shared_lock(&m->values_mutex);
@@ -3010,17 +3199,15 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
 	lbGenerator *gen = m->gen;
-
-	mutex_lock(&gen->anonymous_proc_lits_mutex);
-	defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));
-
-	TokenPos pos = ast_token(expr).pos;
-	lbProcedure **found = map_get(&gen->anonymous_proc_lits, expr);
-	if (found) {
-		return lb_find_procedure_value_from_entity(m, (*found)->entity);
-	}
+	gb_unused(gen);
 
 	ast_node(pl, ProcLit, expr);
+
+	if (pl->decl->entity.load() != nullptr) {
+		return lb_find_procedure_value_from_entity(m, pl->decl->entity.load());
+	}
+
+	TokenPos pos = ast_token(expr).pos;
 
 	// NOTE(bill): Generate a new name
 	// parent$count
@@ -3039,30 +3226,51 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	token.string = name;
 	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
 	e->file = expr->file();
+	e->scope = e->file->scope;
+
+	lbModule *target_module = m;
+	GB_ASSERT(target_module != nullptr);
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
-	pl->decl->code_gen_module = m;
+	pl->decl->code_gen_module = target_module;
 	e->decl_info = pl->decl;
-	pl->decl->entity = e;
 	e->parent_proc_decl = pl->decl->parent;
 	e->Procedure.is_anonymous = true;
 	e->flags |= EntityFlag_ProcBodyChecked;
 
-	lbProcedure *p = lb_create_procedure(m, e);
-	GB_ASSERT(e->code_gen_module == m);
+	pl->decl->entity.store(e);
 
-	lbValue value = {};
-	value.value = p->value;
-	value.type = p->type;
 
-	map_set(&gen->anonymous_proc_lits, expr, p);
-	array_add(&m->procedures_to_generate, p);
-	if (parent != nullptr) {
-		array_add(&parent->children, p);
+	if (target_module != m) {
+		rw_mutex_shared_lock(&target_module->values_mutex);
+		lbValue *found = map_get(&target_module->values, e);
+		rw_mutex_shared_unlock(&target_module->values_mutex);
+		if (found == nullptr) {
+			lbProcedure *missing_proc_in_target_module = lb_create_procedure(target_module, e, false);
+			mpsc_enqueue(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
+		}
+
+		lbProcedure *p = lb_create_procedure(m, e, true);
+
+		lbValue value = {};
+		value.value = p->value;
+		value.type = p->type;
+		return value;
 	} else {
-		string_map_set(&m->members, name, value);
+		lbProcedure *p = lb_create_procedure(m, e);
+
+		lbValue value = {};
+		value.value = p->value;
+		value.type = p->type;
+
+		mpsc_enqueue(&m->procedures_to_generate, p);
+		if (parent != nullptr) {
+			array_add(&parent->children, p);
+		} else {
+			string_map_set(&m->members, name, value);
+		}
+		return value;
 	}
-	return value;
 }
 
 
@@ -3071,17 +3279,26 @@ gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lb
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
+	LLVMTypeRef actual_type = lb_type(m, type);
+	if (value.value != nullptr) {
+		LLVMTypeRef value_type = LLVMTypeOf(value.value);
+		GB_ASSERT_MSG(lb_sizeof(actual_type) == lb_sizeof(value_type), "%s vs %s", LLVMPrintTypeToString(actual_type), LLVMPrintTypeToString(value_type));
+		actual_type = value_type;
+	}
+
 	Scope *scope = nullptr;
 	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
 	lbValue g = {};
 	g.type = alloc_type_pointer(type);
-	g.value = LLVMAddGlobal(m->mod, lb_type(m, type), alloc_cstring(temporary_allocator(), name));
+	g.value = LLVMAddGlobal(m->mod, actual_type, alloc_cstring(temporary_allocator(), name));
 	if (value.value != nullptr) {
 		GB_ASSERT_MSG(LLVMIsConstant(value.value), LLVMPrintValueToString(value.value));
 		LLVMSetInitializer(g.value, value.value);
 	} else {
 		LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, type)));
 	}
+
+	g.value = LLVMConstPointerCast(g.value, lb_type(m, g.type));
 
 	lb_add_entity(m, e, g);
 	lb_add_member(m, name, g);
@@ -3145,7 +3362,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	}
 
 	if (USE_SEPARATE_MODULES) {
-		lbModule *other_module = lb_module_of_entity(m->gen, e);
+		lbModule *other_module = lb_module_of_entity(m->gen, e, m);
 
 		bool is_external = other_module != m;
 		if (!is_external) {

@@ -1838,7 +1838,7 @@ Clock_Id :: enum {
 	Bits for POSIX interval timer flags.
 */
 ITimer_Flags_Bits :: enum {
-	ABSTIME = 1,
+	ABSTIME = 0,
 }
 
 /*

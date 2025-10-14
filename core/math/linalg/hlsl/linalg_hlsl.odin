@@ -1,4 +1,4 @@
-// core:math/linalg/hlsl implements a HLSL-like mathematics library plus numerous other utility procedures
+// `HLSL`-like mathematics library plus numerous other utility procedures.
 package math_linalg_hlsl
 
 import "base:builtin"

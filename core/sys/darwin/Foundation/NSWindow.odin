@@ -568,6 +568,15 @@ window_delegate_register_and_alloc :: proc(template: WindowDelegateTemplate, cla
 @(objc_class="CALayer")
 Layer :: struct { using _: Object }
 
+
+@(objc_type=Layer, objc_name="contents")
+Layer_contents :: proc "c" (self: ^Layer) -> rawptr {
+	return msgSend(rawptr, self, "contents")
+}
+@(objc_type=Layer, objc_name="setContents")
+Layer_setContents :: proc "c" (self: ^Layer, contents: rawptr) {
+	msgSend(nil, self, "setContents:", contents)
+}
 @(objc_type=Layer, objc_name="contentsScale")
 Layer_contentsScale :: proc "c" (self: ^Layer) -> Float {
 	return msgSend(Float, self, "contentsScale")
@@ -654,8 +663,12 @@ Window_frame :: proc "c" (self: ^Window) -> Rect {
 	return msgSend(Rect, self, "frame")
 }
 @(objc_type=Window, objc_name="setFrame")
-Window_setFrame :: proc "c" (self: ^Window, frame: Rect) {
-	msgSend(nil, self, "setFrame:", frame)
+Window_setFrame :: proc "c" (self: ^Window, frame: Rect, display: BOOL) {
+	msgSend(nil, self, "setFrame:display:", frame, display)
+}
+@(objc_type=Window, objc_name="setFrameOrigin")
+Window_setFrameOrigin :: proc "c" (self: ^Window, origin: Point) {
+	msgSend(nil, self, "setFrameOrigin:", origin)
 }
 @(objc_type=Window, objc_name="opaque")
 Window_opaque :: proc "c" (self: ^Window) -> BOOL {
@@ -692,6 +705,10 @@ Window_setMovable :: proc "c" (self: ^Window, ok: BOOL) {
 @(objc_type=Window, objc_name="setMovableByWindowBackground")
 Window_setMovableByWindowBackground :: proc "c" (self: ^Window, ok: BOOL) {
 	msgSend(nil, self, "setMovableByWindowBackground:", ok)
+}
+@(objc_type=Window, objc_name="setAcceptsMouseMovedEvents")
+Window_setAcceptsMouseMovedEvents :: proc "c" (self: ^Window, ok: BOOL) {
+	msgSend(nil, self, "setAcceptsMouseMovedEvents:", ok)
 }
 @(objc_type=Window, objc_name="setStyleMask")
 Window_setStyleMask :: proc "c" (self: ^Window, style_mask: WindowStyleMask) {

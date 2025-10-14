@@ -1,4 +1,6 @@
 /*
+Text edit primitives to use in a text box.
+
 Based off the articles by rxi:
 - [[ https://rxi.github.io/textbox_behaviour.html ]]
 - [[ https://rxi.github.io/a_simple_undo_system.html ]]

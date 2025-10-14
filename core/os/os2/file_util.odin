@@ -151,7 +151,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 			n: int
 			n, err = read(f, buffer[:])
 			total += n
-			append_elems(&out_buffer, ..buffer[:n])
+			append_elems(&out_buffer, ..buffer[:n]) or_return
 			if err != nil {
 				if err == .EOF || err == .Broken_Pipe {
 					err = nil

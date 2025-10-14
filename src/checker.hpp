@@ -161,6 +161,9 @@ struct AttributeContext {
 
 	String require_target_feature; // required by the target micro-architecture
 	String enable_target_feature;  // will be enabled for the procedure only
+
+	bool   raddbg_type_view;
+	String raddbg_type_view_string;
 };
 
 gb_internal gb_inline AttributeContext make_attribute_context(String link_prefix, String link_suffix) {
@@ -206,7 +209,7 @@ struct DeclInfo {
 
 	Scope *       scope;
 
-	Entity *entity;
+	std::atomic<Entity *> entity;
 
 	Ast *         decl_node;
 	Ast *         type_expr;
@@ -214,6 +217,8 @@ struct DeclInfo {
 	Array<Ast *>  attributes;
 	Ast *         proc_lit;      // Ast_ProcLit
 	Type *        gen_proc_type; // Precalculated
+
+	Entity *     para_poly_original;
 
 	bool          is_using;
 	bool          where_clauses_evaluated;
@@ -306,11 +311,12 @@ struct EntityGraphNode;
 typedef PtrSet<EntityGraphNode *> EntityGraphNodeSet;
 
 struct EntityGraphNode {
-	Entity *     entity; // Procedure, Variable, Constant
+	Entity *entity; // Procedure, Variable, Constant
+
 	EntityGraphNodeSet pred;
 	EntityGraphNodeSet succ;
-	isize        index; // Index in array/queue
-	isize        dep_count;
+	isize index; // Index in array/queue
+	isize dep_count;
 };
 
 
@@ -427,6 +433,11 @@ struct Defineable {
 	String pos_str;
 };
 
+struct RaddbgTypeView {
+	Type * type;
+	String view;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -440,9 +451,11 @@ struct CheckerInfo {
 	AstPackage *          init_package;
 	Scope *               init_scope;
 	Entity *              entry_point;
-	PtrSet<Entity *>      minimum_dependency_set;
-	BlockingMutex minimum_dependency_type_info_mutex;
+
+	RwMutex minimum_dependency_type_info_mutex;
 	PtrMap</*type info hash*/u64, /*min dep index*/isize> min_dep_type_info_index_map;
+
+	RWSpinLock	    min_dep_type_info_set_mutex;
 	TypeSet             min_dep_type_info_set;
 	Array<TypeInfoPair> type_info_types_hash_map; // 2 * type_info_types.count
 
@@ -469,8 +482,6 @@ struct CheckerInfo {
 
 	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
 
-	BlockingMutex                  gen_types_mutex;
-	PtrMap<Type *, GenTypesData *> gen_types;
 
 	// BlockingMutex type_info_mutex; // NOT recursive
 	// Array<TypeInfoPair> type_info_types;
@@ -486,6 +497,9 @@ struct CheckerInfo {
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
 	MPSCQueue<Entity *> foreign_imports_to_check_fullpaths;
 	MPSCQueue<Entity *> foreign_decls_to_check;
+
+	MPSCQueue<RaddbgTypeView> raddbg_type_views_queue;
+	Array<RaddbgTypeView> raddbg_type_views;
 
 	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 
@@ -503,7 +517,7 @@ struct CheckerInfo {
 	BlockingMutex load_file_mutex;
 	StringMap<LoadFileCache *> load_file_cache;
 
-	BlockingMutex all_procedures_mutex;
+	MPSCQueue<ProcInfo *> all_procedures_queue;
 	Array<ProcInfo *> all_procedures;
 
 	BlockingMutex instrumentation_mutex;
@@ -552,6 +566,7 @@ struct CheckerContext {
 
 	u32        stmt_flags;
 	bool       in_enum_type;
+	bool       in_proc_group;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       disallow_polymorphic_return_types; // NOTE(zen3ger): no poly type decl in return types
@@ -610,12 +625,12 @@ gb_internal Entity *entity_of_node(Ast *expr);
 
 
 gb_internal Entity *scope_lookup_current(Scope *s, String const &name);
-gb_internal Entity *scope_lookup (Scope *s, String const &name);
-gb_internal void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_);
+gb_internal Entity *scope_lookup (Scope *s, String const &name, u32 hash=0);
+gb_internal void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_, u32 hash=0);
 gb_internal Entity *scope_insert (Scope *s, Entity *entity);
 
 
-gb_internal void      add_type_and_value      (CheckerContext *c, Ast *expression, AddressingMode mode, Type *type, ExactValue const &value);
+gb_internal void      add_type_and_value      (CheckerContext *c, Ast *expression, AddressingMode mode, Type *type, ExactValue const &value, bool use_mutex=true);
 gb_internal ExprInfo *check_get_expr_info     (CheckerContext *c, Ast *expr);
 gb_internal void      add_untyped             (CheckerContext *c, Ast *expression, AddressingMode mode, Type *basic_type, ExactValue const &value);
 gb_internal void      add_entity_use          (CheckerContext *c, Ast *identifier, Entity *entity);
@@ -636,8 +651,8 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 gb_internal void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws);
 gb_internal void check_delayed_file_import_entity(CheckerContext *c, Ast *decl);
 
-gb_internal CheckerTypePath *new_checker_type_path();
-gb_internal void destroy_checker_type_path(CheckerTypePath *tp);
+gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator);
+gb_internal void destroy_checker_type_path(CheckerTypePath *tp, gbAllocator allocator);
 
 gb_internal void    check_type_path_push(CheckerContext *c, Entity *e);
 gb_internal Entity *check_type_path_pop (CheckerContext *c);

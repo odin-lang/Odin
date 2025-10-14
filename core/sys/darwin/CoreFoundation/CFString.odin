@@ -1,10 +1,12 @@
 package CoreFoundation
 
+import "core:c"
+
 foreign import CoreFoundation "system:CoreFoundation.framework"
 
 String :: distinct TypeRef // same as CFStringRef
 
-StringEncoding :: distinct u32
+StringEncoding :: distinct c.long
 
 StringBuiltInEncodings :: enum StringEncoding {
 	MacRoman      = 0,
@@ -171,7 +173,7 @@ foreign CoreFoundation {
 	// Fetches a range of the characters from a string into a byte buffer after converting the characters to a specified encoding.
 	StringGetBytes :: proc(thestring: String, range: Range, encoding: StringEncoding, lossByte: u8, isExternalRepresentation: b8, buffer: [^]byte, maxBufLen: Index, usedBufLen: ^Index) -> Index ---
 
-	StringIsEncodingAvailable :: proc(encoding: StringEncoding) -> bool ---
+	StringIsEncodingAvailable :: proc(encoding: StringEncoding) -> b8 ---
 
 	@(link_name = "__CFStringMakeConstantString")
 	StringMakeConstantString :: proc "c" (#const c: cstring) -> String ---
