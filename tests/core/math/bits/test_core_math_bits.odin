@@ -1,6 +1,7 @@
 package test_core_math_bits
 
 import "core:math/bits"
+import "core:math/rand"
 import "core:testing"
 
 @test
@@ -144,5 +145,27 @@ test_rotate :: proc(t: ^testing.T) {
 			r = bits.rotate_left(r, -1)
 		}
 		testing.expect_value(t, r, 0b1101)
+	}
+}
+
+@test
+test_insert_extract :: proc(t: ^testing.T) {
+	// replace 1..=8 bits in a random 64-bit number at all possible offsets
+	// extract them again, and compare to the original insert
+	for pattern_to_insert in u64(1)..<255 {
+		base       := rand.uint64()
+		bit_count  := uint(bits.len(pattern_to_insert))
+		max_offset := uint(64) - bit_count
+		for offset in uint(0)..<max_offset {
+			replaced  := bits.bitfield_insert(base, pattern_to_insert, offset, bit_count)
+			extracted := bits.bitfield_extract(replaced, offset, bit_count)
+
+			testing.expect_value(t, extracted, pattern_to_insert)
+
+			// Test that the original number and the replaced number
+			// are the same, except for the replaced bits
+			mask := ~(u64(1<<bit_count - 1) << offset)
+			testing.expect_value(t, base & mask, replaced & mask)
+		}
 	}
 }
