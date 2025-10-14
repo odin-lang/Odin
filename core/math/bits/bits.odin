@@ -3,26 +3,49 @@ package math_bits
 
 import "base:intrinsics"
 
+// The minimum value held by a `u8`. The same value as `min(u8)`, except untyped.
 U8_MIN  :: 0
+// The minimum value held by a `u16`. The same value as `min(u16)`, except untyped.
 U16_MIN :: 0
+// The minimum value held by a `u32`. The same value as `min(u32)`, except untyped.
 U32_MIN :: 0
+// The minimum value held by a `u64`. The same value as `min(u64)`, except untyped.
 U64_MIN :: 0
+// The minimum value held by a `uint`. The same value as `min(uint)`, except untyped.
+UINT_MIN :: 0
 
+// The maximum value held by a `u8`. The same value as `max(u8)`, except untyped.
 U8_MAX  :: 1 <<  8 - 1
+// The maximum value held by a `u16`. The same value as `max(u16)`, except untyped.
 U16_MAX :: 1 << 16 - 1
+// The maximum value held by a `u32`. The same value as `max(u32)`, except untyped.
 U32_MAX :: 1 << 32 - 1
+// The maximum value held by a `u64`. The same value as `max(u64)`, except untyped.
 U64_MAX :: 1 << 64 - 1
+// The maximum value held by a `uint`. The same value as `max(uint)`, except untyped.
+UINT_MAX :: U64_MAX when size_of(uint) == 8 else U32_MAX
 
+// The minimum value held by an `i8`. The same value as `min(i8)`, except untyped.
 I8_MIN  :: - 1 << 7
+// The minimum value held by an `i16`. The same value as `min(i16)`, except untyped.
 I16_MIN :: - 1 << 15
+// The minimum value held by an `i32`. The same value as `min(i32)`, except untyped.
 I32_MIN :: - 1 << 31
+// The minimum value held by an `i64`. The same value as `min(i64)`, except untyped.
 I64_MIN :: - 1 << 63
+// The minimum value held by an `int`. The same value as `min(int)`, except untyped.
+INT_MIN :: I64_MIN when size_of(int) == 8 else I32_MIN
 
+// The maximum value held by an `i8`. The same value as `max(i8)`, except untyped.
 I8_MAX  :: 1 <<  7 - 1
+// The maximum value held by an `i16`. The same value as `max(i16)`, except untyped.
 I16_MAX :: 1 << 15 - 1
+// The maximum value held by an `i32`. The same value as `max(i32)`, except untyped.
 I32_MAX :: 1 << 31 - 1
+// The maximum value held by an `i64`. The same value as `max(i64)`, except untyped.
 I64_MAX :: 1 << 63 - 1
-
+// The maximum value held by an `int`. The same value as `max(int)`, except untyped.
+INT_MAX :: I64_MAX when size_of(int) == 8 else I32_MAX
 
 count_ones           :: intrinsics.count_ones
 count_zeros          :: intrinsics.count_zeros
@@ -32,47 +55,183 @@ count_trailing_zeros :: intrinsics.count_trailing_zeros
 count_leading_zeros  :: intrinsics.count_leading_zeros
 reverse_bits         :: intrinsics.reverse_bits
 byte_swap            :: intrinsics.byte_swap
+overflowing_add      :: intrinsics.overflow_add
+overflowing_sub      :: intrinsics.overflow_sub
+overflowing_mul      :: intrinsics.overflow_mul
 
-overflowing_add :: intrinsics.overflow_add
-overflowing_sub :: intrinsics.overflow_sub
-overflowing_mul :: intrinsics.overflow_mul
+/*
+Returns the base-2 logarithm of an unsigned integer `x`
 
+Another way to say this is that `log2(x)` is the position of its leading `1` bit.
 
+NOTE: This is ill-defined for `0` as it has no `1` bits, and `log2(0)` will return `max(T)`.
+
+Inputs:
+- x: The unsigned integer
+
+Returns:
+- res: The base-2 logarithm of `x`
+
+Example:
+
+	import "core:fmt"
+	import "core:math/bits"
+
+	log2_example :: proc() {
+		for i in u8(1)..=8 {
+			fmt.printfln("{0} ({0:4b}): {1}", i, bits.log2(i))
+		}
+		assert(bits.log2(  u8(0)) == max(u8))
+		assert(bits.log2( u16(0)) == max(u16))
+		assert(bits.log2( u32(0)) == max(u32))
+		assert(bits.log2( u64(0)) == max(u64))
+		assert(bits.log2(u128(0)) == max(u128))
+	}
+
+Output:
+
+	1 (0001): 0
+	2 (0010): 1
+	3 (0011): 1
+	4 (0100): 2
+	5 (0101): 2
+	6 (0110): 2
+	7 (0111): 2
+	8 (1000): 3
+
+*/
 @(require_results)
-log2 :: proc "contextless" (x: $T) -> T where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T) {
+log2 :: proc "contextless" (x: $T) -> (res: T) where intrinsics.type_is_integer(T), intrinsics.type_is_unsigned(T) {
 	return (8*size_of(T)-1) - count_leading_zeros(x)
 }
 
+/*
+Returns unsigned integer `x` rotated left by `k` bits
+
+Can be thought of as a bit shift in which the leading bits are shifted back in on the bottom, rather than dropped.
+
+This is equivalent to the [[ROL ; https://www.felixcloutier.com/x86/rcl:rcr:rol:ror]] CPU instruction.
+
+Inputs:
+- x: The unsigned integer
+- k: Number of bits to rotate left by
+
+Returns:
+- res: `x` rotated left by `k` bits
+
+Example:
+
+	import "core:fmt"
+	import "core:math/bits"
+
+	rotate_left8_example :: proc() {
+		x := u8(13)
+		for k in 0..<8 {
+			fmt.printfln("{0:8b}: {1}", bits.rotate_left8(x, k), k)
+		}
+	}
+
+Output:
+
+	00001101: 0
+	00011010: 1
+	00110100: 2
+	01101000: 3
+	11010000: 4
+	10100001: 5
+	01000011: 6
+	10000110: 7
+
+*/
 @(require_results)
 rotate_left8 :: proc "contextless" (x: u8,  k: int) -> u8 {
 	n :: 8
 	s := uint(k) & (n-1)
-	return x <<s | x>>(n-s)
+	return x << s | x >> (n-s)
 }
+
+/*
+Returns unsigned integer `x` rotated left by `k` bits
+
+Can be thought of as a bit shift in which the leading bits are shifted back in on the bottom, rather than dropped.
+
+This is equivalent to the [[ROL ; https://www.felixcloutier.com/x86/rcl:rcr:rol:ror]] CPU instruction.
+
+Inputs:
+- x: The unsigned integer
+- k: Number of bits to rotate left by
+
+Returns:
+- res: `x` rotated left by `k` bits
+*/
 @(require_results)
 rotate_left16 :: proc "contextless" (x: u16, k: int) -> u16 {
 	n :: 16
 	s := uint(k) & (n-1)
-	return x <<s | x>>(n-s)
+	return x << s | x >>(n-s)
 }
+
+/*
+Returns unsigned integer `x` rotated left by `k` bits
+
+Can be thought of as a bit shift in which the leading bits are shifted back in on the bottom, rather than dropped.
+
+This is equivalent to the [[ROL ; https://www.felixcloutier.com/x86/rcl:rcr:rol:ror]] CPU instruction.
+
+Inputs:
+- x: The unsigned integer
+- k: Number of bits to rotate left by
+
+Returns:
+- res: `x` rotated left by `k` bits
+*/
 @(require_results)
 rotate_left32 :: proc "contextless" (x: u32, k: int) -> u32 {
 	n :: 32
 	s := uint(k) & (n-1)
-	return x <<s | x>>(n-s)
+	return x << s | x >> (n-s)
 }
+
+/*
+Returns unsigned integer `x` rotated left by `k` bits
+
+Can be thought of as a bit shift in which the leading bits are shifted back in on the bottom, rather than dropped.
+
+This is equivalent to the [[ROL ; https://www.felixcloutier.com/x86/rcl:rcr:rol:ror]] CPU instruction.
+
+Inputs:
+- x: The unsigned integer
+- k: Number of bits to rotate left by
+
+Returns:
+- res: `x` rotated left by `k` bits
+*/
 @(require_results)
 rotate_left64 :: proc "contextless" (x: u64, k: int) -> u64 {
 	n :: 64
 	s := uint(k) & (n-1)
-	return x <<s | x>>(n-s)
+	return x << s | x >> (n-s)
 }
 
+/*
+Returns unsigned integer `x` rotated left by `k` bits
+
+Can be thought of as a bit shift in which the leading bits are shifted back in on the bottom, rather than dropped.
+
+This is equivalent to the [[ROL ; https://www.felixcloutier.com/x86/rcl:rcr:rol:ror]] CPU instruction.
+
+Inputs:
+- x: The unsigned integer
+- k: Number of bits to rotate left by
+
+Returns:
+- res: `x` rotated left by `k` bits
+*/
 @(require_results)
 rotate_left :: proc "contextless" (x: uint, k: int) -> uint {
 	n :: 8*size_of(uint)
 	s := uint(k) & (n-1)
-	return x <<s | x>>(n-s)
+	return x << s | x >> (n-s)
 }
 
 @(require_results)
