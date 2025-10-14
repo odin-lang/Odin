@@ -2547,29 +2547,9 @@ gb_internal LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef c
 	unsigned kind = 0;
 	String s = make_string_c(name);
 
-	#if ODIN_LLVM_MINIMUM_VERSION_12
-		kind = LLVMGetEnumAttributeKindForName(name, s.len);
-		GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
-		return LLVMCreateTypeAttribute(ctx, kind, type);
-	#else
-		// NOTE(2021-02-25, bill); All this attributes require a type associated with them
-		// and the current LLVM C API does not expose this functionality yet.
-		// It is better to ignore the attributes for the time being
-		if (s == "byval") {
-			// return nullptr;
-		} else if (s == "byref") {
-			return nullptr;
-		} else if (s == "preallocated") {
-			return nullptr;
-		} else if (s == "sret") {
-			// return nullptr;
-		}
-		
-
-		kind = LLVMGetEnumAttributeKindForName(name, s.len);
-		GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
-		return LLVMCreateEnumAttribute(ctx, kind, 0);
-	#endif	
+	kind = LLVMGetEnumAttributeKindForName(name, s.len);
+	GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
+	return LLVMCreateTypeAttribute(ctx, kind, type);
 }
 
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value) {
@@ -2610,6 +2590,20 @@ gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, cha
 
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name) {
 	lb_add_proc_attribute_at_index(p, index, name, 0);
+}
+
+gb_internal void lb_add_proc_attribute_at_index_with_string(lbProcedure *p, isize index, String const &name, String const &value) {
+	LLVMAttributeRef attr = lb_create_string_attribute(p->module->ctx, name, value);
+	GB_ASSERT(attr != nullptr);
+	LLVMAddAttributeAtIndex(p->value, cast(unsigned)index, attr);
+}
+
+gb_internal void lb_add_nocapture_proc_attribute_at_index(lbProcedure *p, isize index) {
+	#if LLVM_VERSION_MAJOR >= 21
+		lb_add_proc_attribute_at_index_with_string(p, index, make_string_c("captures"), make_string_c("none"));
+	#else
+		lb_add_proc_attribute_at_index(p, index, "nocapture");
+	#endif
 }
 
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {

@@ -23,22 +23,8 @@
 #include <llvm-c/Transforms/Vectorize.h>
 #endif
 
-#if LLVM_VERSION_MAJOR < 11
-#error "LLVM Version 11 is the minimum required"
-#elif LLVM_VERSION_MAJOR == 12 && !(LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
-#error "If LLVM Version 12.x.y is wanted, at least LLVM 12.0.1 is required"
-#endif
-
-#if LLVM_VERSION_MAJOR > 12 || (LLVM_VERSION_MAJOR == 12 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
-#define ODIN_LLVM_MINIMUM_VERSION_12 1
-#else
-#define ODIN_LLVM_MINIMUM_VERSION_12 0
-#endif
-
-#if LLVM_VERSION_MAJOR > 13 || (LLVM_VERSION_MAJOR == 13 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
-#define ODIN_LLVM_MINIMUM_VERSION_13 1
-#else
-#define ODIN_LLVM_MINIMUM_VERSION_13 0
+#if LLVM_VERSION_MAJOR < 14
+#error "LLVM Version 14 is the minimum required"
 #endif
 
 #if LLVM_VERSION_MAJOR > 14 || (LLVM_VERSION_MAJOR == 14 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
@@ -431,10 +417,12 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
 gb_internal String lb_mangle_name(Entity *e);
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e);
 
+gb_internal LLVMAttributeRef lb_create_string_attribute(LLVMContextRef ctx, String const &key, String const &value);
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
 gb_internal LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char const *name, LLVMTypeRef type);
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
+gb_internal void lb_add_nocapture_proc_attribute_at_index(lbProcedure *p, isize index);
 gb_internal lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_body=false);
 
 

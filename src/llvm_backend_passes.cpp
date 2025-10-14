@@ -263,7 +263,7 @@ function(
 ),
 verify
 )");
-#else
+#else // LLVM 20 & 21 (same config)
 	array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
@@ -656,7 +656,7 @@ function(
 ),
 verify
 )");
-#else
+#else // LLVM 20 & 21 (same config)
 	array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
@@ -1052,7 +1052,7 @@ function(
 ),
 verify
 )");
-#else
+#else // LLVM 20 & 21 (same config)
 	array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,

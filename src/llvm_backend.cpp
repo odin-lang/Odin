@@ -37,12 +37,10 @@ gb_internal String get_default_microarchitecture() {
 		// x86-64-v2: (close to Nehalem) CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3
 		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
 		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
-		if (ODIN_LLVM_MINIMUM_VERSION_12) {
-			if (build_context.metrics.os == TargetOs_freestanding) {
-				default_march = str_lit("x86-64");
-			} else {
-				default_march = str_lit("x86-64-v2");
-			}
+		if (build_context.metrics.os == TargetOs_freestanding) {
+			default_march = str_lit("x86-64");
+		} else {
+			default_march = str_lit("x86-64-v2");
 		}
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		default_march = str_lit("generic-rv64");
