@@ -27,6 +27,7 @@ download_assets :: proc "contextless" () {
 @(require) import "io"
 @(require) import "math"
 @(require) import "math/big"
+@(require) import "math/bits"
 @(require) import "math/linalg/glsl"
 @(require) import "math/noise"
 @(require) import "math/rand"
