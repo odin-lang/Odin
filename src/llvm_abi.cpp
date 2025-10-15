@@ -144,7 +144,11 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	LLVMContextRef c = ft->ctx;
 	LLVMAttributeRef noalias_attr   = lb_create_enum_attribute(c, "noalias");
 	LLVMAttributeRef nonnull_attr   = lb_create_enum_attribute(c, "nonnull");
+#if LLVM_VERSION_MAJOR >= 21
+	LLVMAttributeRef nocapture_attr = lb_create_string_attribute(c, make_string_c("captures"), make_string_c("none"));
+#else
 	LLVMAttributeRef nocapture_attr = lb_create_enum_attribute(c, "nocapture");
+#endif
 
 	unsigned arg_index = offset;
 	for (unsigned i = 0; i < arg_count; i++) {

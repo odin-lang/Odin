@@ -272,7 +272,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			}
 			if (e->flags&EntityFlag_NoCapture) {
 				if (is_type_internally_pointer_like(e->type)) {
-					lb_add_proc_attribute_at_index(p, offset+parameter_index, "nocapture");
+					lb_add_nocapture_proc_attribute_at_index(p, offset+parameter_index);
 				}
 			}
 			parameter_index += 1;
@@ -430,7 +430,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nonnull");
-		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nocapture");
+		lb_add_nocapture_proc_attribute_at_index(p, offset+parameter_index);
 	}
 	return p;
 }
