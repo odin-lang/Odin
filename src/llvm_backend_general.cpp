@@ -2999,7 +2999,11 @@ gb_internal lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *
 		Type *bt = base_type(slice_type);
 		Type *elem = bt->Slice.elem;
 		i64 sz = type_size_of(elem);
+		i64 align = type_align_of(elem);
 		GB_ASSERT(sz > 0);
+		GB_ASSERT(align > 0);
+
+		LLVMSetAlignment(global_data, (u32)align);
 		ptr = LLVMConstPointerCast(ptr, lb_type(m, alloc_type_pointer(elem)));
 		data_len /= sz;
 	}
@@ -3054,7 +3058,11 @@ gb_internal lbValue lb_find_or_add_entity_string16_slice_with_type(lbModule *m, 
 		Type *bt = base_type(slice_type);
 		Type *elem = bt->Slice.elem;
 		i64 sz = type_size_of(elem);
+		i64 align = type_align_of(elem);
 		GB_ASSERT(sz > 0);
+		GB_ASSERT(align > 0);
+
+		LLVMSetAlignment(global_data, (u32)align);
 		ptr = LLVMConstPointerCast(ptr, lb_type(m, alloc_type_pointer(elem)));
 		data_len /= sz;
 	}
