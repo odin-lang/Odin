@@ -1,3 +1,4 @@
+// Defines the basic types used by `C` programs for foreign function and data structure interop.
 package c
 
 import builtin "base:builtin"

@@ -28,7 +28,8 @@ error() {
 
 # Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
 if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
-    if   [ -n "$(command -v $(brew --prefix llvm@20)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@20)/bin/llvm-config"
+    if   [ -n "$(command -v $(brew --prefix llvm@21)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@21)/bin/llvm-config"
+    elif [ -n "$(command -v $(brew --prefix llvm@20)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@20)/bin/llvm-config"
     elif [ -n "$(command -v $(brew --prefix llvm@19)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@19)/bin/llvm-config"
     elif [ -n "$(command -v $(brew --prefix llvm@18)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@18)/bin/llvm-config"
     elif [ -n "$(command -v $(brew --prefix llvm@17)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@17)/bin/llvm-config"
@@ -38,23 +39,19 @@ fi
 
 if [ -z "$LLVM_CONFIG" ]; then
 	# darwin, linux, openbsd
-	if   [ -n "$(command -v llvm-config-20)" ]; then LLVM_CONFIG="llvm-config-20"
+	if   [ -n "$(command -v llvm-config-21)" ]; then LLVM_CONFIG="llvm-config-21"
+	elif [ -n "$(command -v llvm-config-20)" ]; then LLVM_CONFIG="llvm-config-20"
 	elif [ -n "$(command -v llvm-config-19)" ]; then LLVM_CONFIG="llvm-config-19"
 	elif [ -n "$(command -v llvm-config-18)" ]; then LLVM_CONFIG="llvm-config-18"
 	elif [ -n "$(command -v llvm-config-17)" ]; then LLVM_CONFIG="llvm-config-17"
 	elif [ -n "$(command -v llvm-config-14)" ]; then LLVM_CONFIG="llvm-config-14"
-	elif [ -n "$(command -v llvm-config-13)" ]; then LLVM_CONFIG="llvm-config-13"
-	elif [ -n "$(command -v llvm-config-12)" ]; then LLVM_CONFIG="llvm-config-12"
-	elif [ -n "$(command -v llvm-config-11)" ]; then LLVM_CONFIG="llvm-config-11"
 	# freebsd
+	elif [ -n "$(command -v llvm-config21)" ]; then  LLVM_CONFIG="llvm-config21"
 	elif [ -n "$(command -v llvm-config20)" ]; then  LLVM_CONFIG="llvm-config20"
 	elif [ -n "$(command -v llvm-config19)" ]; then  LLVM_CONFIG="llvm-config19"
 	elif [ -n "$(command -v llvm-config18)" ]; then  LLVM_CONFIG="llvm-config18"
 	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config17"
 	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config14"
-	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config13"
-	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config12"
-	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config11"
 	# fallback
 	elif [ -n "$(command -v llvm-config)" ]; then LLVM_CONFIG="llvm-config"
 	else
@@ -75,18 +72,12 @@ LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
 
-if [ $LLVM_VERSION_MAJOR -lt 11 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 20 ]; then
-	error "Invalid LLVM version $LLVM_VERSION: must be 11, 12, 13, 14, 17, 18, 19 or 20"
+if [ $LLVM_VERSION_MAJOR -lt 14 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 21 ]; then
+	error "Invalid LLVM version $LLVM_VERSION: must be 14, 17, 18, 19, 20, or 21"
 fi
 
 case "$OS_NAME" in
 Darwin)
-	if [ "$OS_ARCH" = "arm64" ]; then
-		if [ $LLVM_VERSION_MAJOR -lt 13 ]; then
-			error "Invalid LLVM version $LLVM_VERSION: Darwin Arm64 requires LLVM 13, 14, 17, 18, 19 or 20"
-		fi
-	fi
-
 	darwin_sysroot=
 	if [ $(which xcrun) ]; then
 		darwin_sysroot="--sysroot $(xcrun --sdk macosx --show-sdk-path)"

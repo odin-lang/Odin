@@ -1,3 +1,4 @@
+// A Lua-like string match algorithm.
 package text_match
 
 import "base:runtime"
@@ -9,11 +10,12 @@ MAX_CAPTURES :: 32
 
 Capture :: struct {
 	init: int,
-	len: int,
+	len:  int,
 }
 
 Match :: struct {
-	byte_start, byte_end: int,
+	byte_start: int,
+	byte_end:   int,
 }
 
 Error :: enum {
@@ -27,18 +29,19 @@ Error :: enum {
 	Match_Invalid,
 }
 
-L_ESC :: '%'
-CAP_POSITION :: -2
+L_ESC          :: '%'
+CAP_POSITION   :: -2
 CAP_UNFINISHED :: -1
-INVALID :: -1
+INVALID        :: -1
 
 Match_State :: struct {
-	src: string,
+	src:     string,
 	pattern: string,
-	level: int,
+	level:   int,
 	capture: [MAX_CAPTURES]Capture,
 }
 
+@(require_results)
 match_class :: proc(c: rune, cl: rune) -> (res: bool) {
 	switch unicode.to_lower(cl) {
 	case 'a': res = is_alpha(c)
@@ -65,19 +68,23 @@ is_punct :: unicode.is_punct
 is_space :: unicode.is_space
 is_cntrl :: unicode.is_control
 
+@(require_results)
 is_alnum :: proc(c: rune) -> bool {
 	return unicode.is_alpha(c) || unicode.is_digit(c)
 }
 
+@(require_results)
 is_graph :: proc(c: rune) -> bool {
 	return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || unicode.is_digit(c)
 }
 
+@(require_results)
 is_xdigit :: proc(c: rune) -> bool {
 	return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || unicode.is_digit(c)
 }
 
 // find the first utf8 charater and its size, return an error if the character is an error
+@(require_results)
 utf8_peek :: proc(bytes: string) -> (c: rune, size: int, err: Error) {
 	c, size = utf8.decode_rune_in_string(bytes)
 
@@ -90,6 +97,7 @@ utf8_peek :: proc(bytes: string) -> (c: rune, size: int, err: Error) {
 
 // find the first utf8 charater and its size and advance the index
 // return an error if the character is an error
+@(require_results)
 utf8_advance :: proc(bytes: string, index: ^int) -> (c: rune, err: Error) {
 	size: int
 	c, size = utf8.decode_rune_in_string(bytes[index^:])
@@ -103,10 +111,12 @@ utf8_advance :: proc(bytes: string, index: ^int) -> (c: rune, err: Error) {
 }
 
 // continuation byte?
+@(require_results)
 is_cont :: proc(b: byte) -> bool {
 	return b & 0xc0 == 0x80
 }
 
+@(require_results)
 utf8_prev :: proc(bytes: string, a, b: int) -> int {
 	b := b
 
@@ -117,6 +127,7 @@ utf8_prev :: proc(bytes: string, a, b: int) -> int {
 	return a < b ? b - 1 : a
 }
 
+@(require_results)
 utf8_next :: proc(bytes: string, a: int) -> int {
 	a := a
 	b := len(bytes)
@@ -128,6 +139,7 @@ utf8_next :: proc(bytes: string, a: int) -> int {
 	return a < b ? a + 1 : b
 }
 
+@(require_results)
 check_capture :: proc(ms: ^Match_State, l: rune) -> (int, Error) {
 	l := int(l - '1')
 	
@@ -138,6 +150,7 @@ check_capture :: proc(ms: ^Match_State, l: rune) -> (int, Error) {
 	return l, .OK
 }
 
+@(require_results)
 capture_to_close :: proc(ms: ^Match_State) -> (int, Error) {
 	level := ms.level - 1
 
@@ -152,6 +165,7 @@ capture_to_close :: proc(ms: ^Match_State) -> (int, Error) {
 	return 0, .Invalid_Pattern_Capture
 }
 
+@(require_results)
 class_end :: proc(ms: ^Match_State, p: int) -> (step: int, err: Error) {
 	step = p
 	ch := utf8_advance(ms.pattern, &step) or_return
@@ -163,7 +177,7 @@ class_end :: proc(ms: ^Match_State, p: int) -> (step: int, err: Error) {
 			return
 		}
 
-		utf8_advance(ms.pattern, &step) or_return
+		_ = utf8_advance(ms.pattern, &step) or_return
 
 	case '[': 
 		// fine with step by 1
@@ -198,6 +212,7 @@ class_end :: proc(ms: ^Match_State, p: int) -> (step: int, err: Error) {
 	return
 }
 
+@(require_results)
 match_bracket_class :: proc(ms: ^Match_State, c: rune, p, ec: int) -> (sig: bool, err: Error) {
 	sig = true
 	p := p
@@ -240,6 +255,7 @@ match_bracket_class :: proc(ms: ^Match_State, c: rune, p, ec: int) -> (sig: bool
 	return
 }
 
+@(require_results)
 single_match :: proc(ms: ^Match_State, s, p, ep: int) -> (matched: bool, schar_size: int, err: Error) {
 	if s >= len(ms.src) {
 		return
@@ -254,13 +270,16 @@ single_match :: proc(ms: ^Match_State, s, p, ep: int) -> (matched: bool, schar_s
 	case L_ESC: 
 		pchar_next, _ := utf8_peek(ms.pattern[p + psize:]) or_return
 		matched = match_class(schar, pchar_next)
-	case '[': matched = match_bracket_class(ms, schar, p, ep - 1) or_return
-	case: matched = schar == pchar
+	case '[':
+		matched = match_bracket_class(ms, schar, p, ep - 1) or_return
+	case:
+		matched = schar == pchar
 	}
 
 	return
 }
 
+@(require_results)
 match_balance :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 	if p >= len(ms.pattern) - 1 {
 		return INVALID, .Invalid_Pattern_Capture
@@ -300,13 +319,13 @@ match_balance :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) 
 	return INVALID, .OK
 }
 
+@(require_results)
 max_expand :: proc(ms: ^Match_State, s, p, ep: int) -> (res: int, err: Error) {
 	m := s
 
 	// count up matches
 	for {
 		matched, size := single_match(ms, m, p, ep) or_return
-		
 		if !matched {
 			break
 		}
@@ -316,7 +335,6 @@ max_expand :: proc(ms: ^Match_State, s, p, ep: int) -> (res: int, err: Error) {
 
 	for s <= m {
 		result := match(ms, m, ep + 1) or_return
-
 		if result != INVALID {
 			return result, .OK
 		}
@@ -331,6 +349,7 @@ max_expand :: proc(ms: ^Match_State, s, p, ep: int) -> (res: int, err: Error) {
 	return INVALID, .OK
 }
 
+@(require_results)
 min_expand :: proc(ms: ^Match_State, s, p, ep: int) -> (res: int, err: Error) {
 	s := s
 
@@ -339,19 +358,19 @@ min_expand :: proc(ms: ^Match_State, s, p, ep: int) -> (res: int, err: Error) {
 
 		if result != INVALID {
 			return result, .OK
-		} else {
-			// TODO receive next step maybe?
-			matched, rune_size := single_match(ms, s, p, ep) or_return
+		}
+		// TODO receive next step maybe?
+		matched, rune_size := single_match(ms, s, p, ep) or_return
 
-			if matched {
-				s += rune_size
-			} else {
-				return INVALID, .OK
-			}
+		if matched {
+			s += rune_size
+		} else {
+			return INVALID, .OK
 		}
 	}
 }
 
+@(require_results)
 start_capture :: proc(ms: ^Match_State, s, p, what: int) -> (res: int, err: Error) {
 	level := ms.level
 
@@ -366,6 +385,7 @@ start_capture :: proc(ms: ^Match_State, s, p, what: int) -> (res: int, err: Erro
 	return
 }
 
+@(require_results)
 end_capture :: proc(ms: ^Match_State, s, p: int) -> (res: int, err: Error) {
 	l := capture_to_close(ms) or_return
 	
@@ -379,6 +399,7 @@ end_capture :: proc(ms: ^Match_State, s, p: int) -> (res: int, err: Error) {
 	return
 }
 
+@(require_results)
 match_capture :: proc(ms: ^Match_State, s: int, char: rune) -> (res: int, err: Error) {
 	index := check_capture(ms, char) or_return
 	length := ms.capture[index].len
@@ -390,6 +411,7 @@ match_capture :: proc(ms: ^Match_State, s: int, char: rune) -> (res: int, err: E
 	return INVALID, .OK
 }
 
+@(require_results)
 match :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 	s := s
 	p := p
@@ -431,7 +453,6 @@ match :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 		// balanced string
 		case 'b': 
 			s = match_balance(ms, s, p + 2) or_return
-
 			if s != INVALID {
 				// eg after %b()
 				return match(ms, s, p + 4)
@@ -460,7 +481,7 @@ match :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 			}
 
 			m1 := match_bracket_class(ms, previous, p, ep - 1) or_return
-			m2 := match_bracket_class(ms, current, p, ep - 1) or_return
+			m2 := match_bracket_class(ms, current,  p, ep - 1) or_return
 
 			if !m1 && m2 {
 				return match(ms, s, ep)
@@ -486,6 +507,7 @@ match :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 	return s, .OK
 }
 
+@(require_results)
 match_default :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 	s := s
 	ep := class_end(ms, p) or_return
@@ -495,8 +517,10 @@ match_default :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) 
 		epc := ep < len(ms.pattern) ? ms.pattern[ep] : 0
 
 		switch epc {
-		case '*', '?', '-': return match(ms, s, ep + 1)
-		case: s = INVALID
+		case '*', '?', '-':
+			return match(ms, s, ep + 1)
+		case:
+			s = INVALID
 		}
 	} else {
 		epc := ep < len(ms.pattern) ? ms.pattern[ep] : 0
@@ -505,22 +529,23 @@ match_default :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) 
 		case '?':
 			result := match(ms, s + ssize, ep + 1) or_return
 			
-			if result != INVALID {
-				s = result
-			} else {
+			if result == INVALID {
 				return match(ms, s, ep + 1)
 			}
+			s = result
 
 		case '+': s = max_expand(ms, s + ssize, p, ep) or_return
-		case '*': s = max_expand(ms, s, p, ep) or_return
-		case '-': s = min_expand(ms, s, p, ep) or_return
-		case: return match(ms, s + ssize, ep)
+		case '*': s = max_expand(ms, s,         p, ep) or_return
+		case '-': s = min_expand(ms, s,         p, ep) or_return
+		case:
+			return match(ms, s + ssize, ep)
 		}
 	}
 
 	return s, .OK
 }
 
+@(require_results)
 push_onecapture :: proc(ms: ^Match_State,  i: int,  s: int, e: int, matches: []Match) -> (err: Error) {
 	if i >= ms.level {
 		if i == 0 {
@@ -533,22 +558,21 @@ push_onecapture :: proc(ms: ^Match_State,  i: int,  s: int, e: int, matches: []M
 		length := ms.capture[i].len
 
 		switch length {
-		case CAP_UNFINISHED: err = .Unfinished_Capture
-		case CAP_POSITION: matches[i] = { init, init + 1 }
-		case: matches[i] = { init, init + length }
+		case CAP_UNFINISHED:
+			err = .Unfinished_Capture
+		case CAP_POSITION:
+			matches[i] = { init, init + 1 }
+		case:
+			matches[i] = { init, init + length }
 		}
 	}
 
 	return
 }
 
-push_captures :: proc(
-	ms: ^Match_State,
-	s: int,
-	e: int,
-	matches: []Match,
-) -> (nlevels: int, err: Error) {
-	nlevels = 1 if ms.level == 0 && s != -1 else ms.level
+@(require_results)
+push_captures :: proc(ms: ^Match_State, s, e: int, matches: []Match) -> (nlevels: int, err: Error) {
+	nlevels = 1 if ms.level == 0 && s >= 0 else ms.level
 
 	for i in 0..<nlevels {
 		push_onecapture(ms, i, s, e, matches) or_return
@@ -559,6 +583,7 @@ push_captures :: proc(
 
 // SPECIALS := "^$*+?.([%-"
 // all special characters inside a small ascii array
+@(rodata)
 SPECIALS_TABLE := [256]bool {
 	'^' = true,
 	'$' = true,
@@ -573,6 +598,7 @@ SPECIALS_TABLE := [256]bool {
 }
 
 // helper call to quick search for special characters
+@(require_results)
 index_special :: proc(text: string) -> int {
 	for i in 0..<len(text) {
 		if SPECIALS_TABLE[text[i]] {
@@ -583,34 +609,34 @@ index_special :: proc(text: string) -> int {
 	return -1
 }
 
+@(require_results)
 lmem_find :: proc(s1, s2: string) -> int {
 	l1 := len(s1)
 	l2 := len(s2)
 
 	if l2 == 0 {
 		return 0
-	} else if l2 > l1 {
+	}
+	if l2 > l1 {
 		return -1
-	} else {
-		init := strings.index_byte(s1, s2[0])
-		end := init + l2
+	}
 
-		for end <= l1 && init != -1 {
-			init += 1
+	init := strings.index_byte(s1, s2[0])
+	end := init + l2
 
-			if s1[init - 1:end] == s2 {
-				return init - 1
-			} else {
-				next := strings.index_byte(s1[init:], s2[0])
+	for end <= l1 && init >= 0 {
+		init += 1
 
-				if next == -1 {
-					return -1
-				} else {
-					init = init + next
-					end = init + l2
-				}
-			}
+		if s1[init - 1:end] == s2 {
+			return init - 1
 		}
+		next := strings.index_byte(s1[init:], s2[0])
+
+		if next == -1 {
+			return -1
+		}
+		init = init + next
+		end  = init + l2
 	}
 
 	return -1
@@ -618,36 +644,28 @@ lmem_find :: proc(s1, s2: string) -> int {
 
 // find a pattern with in a haystack with an offset
 // allow_memfind will speed up simple searches
-find_aux :: proc(
-	haystack: string, 
-	pattern: string, 
-	offset: int,
-	allow_memfind: bool,
-	matches: ^[MAX_CAPTURES]Match,
-) -> (captures: int, err: Error) {
+find_aux :: proc(haystack, pattern: string, offset: int, allow_memfind: bool, matches: ^[MAX_CAPTURES]Match) -> (captures: int, err: Error) {
 	s := offset
 	p := 0
 
 	specials_idx := index_special(pattern)
 	if allow_memfind && specials_idx == -1 {
-		if index := lmem_find(haystack[s:], pattern); index != -1 {
+		if index := lmem_find(haystack[s:], pattern); index >= 0 {
 			matches[0] = { index + s, index + s + len(pattern) }
 			captures = 1
-			return
-		} else {
-			return
 		}
+		return
 	}
 
 	pattern := pattern
 	anchor: bool
 	if len(pattern) > 0 && pattern[0] == '^' {
-		anchor = true
+		anchor  = true
 		pattern = pattern[1:]
 	}
 
 	ms := Match_State {
-		src = haystack,
+		src     = haystack,
 		pattern = pattern,
 	}
 
@@ -684,11 +702,8 @@ find_aux :: proc(
 // rest has to be used from captures
 // assumes captures is zeroed on first iteration
 // resets captures to zero on last iteration
-gmatch :: proc(
-	haystack: ^string,
-	pattern: string,
-	captures: ^[MAX_CAPTURES]Match,
-) -> (res: string, ok: bool) {
+@(require_results)
+gmatch :: proc(haystack: ^string, pattern: string, captures: ^[MAX_CAPTURES]Match) -> (res: string, ok: bool) {
 	haystack^ = haystack[captures[0].byte_end:]
 	if len(haystack) > 0 {
 		length, err := find_aux(haystack^, pattern, 0, false, captures)
@@ -707,24 +722,17 @@ gmatch :: proc(
 }
 
 // gsub with builder, replace patterns found with the replace content
-gsub_builder :: proc(
-	builder: ^strings.Builder,
-	haystack: string,
-	pattern: string,
-	replace: string,
-) -> string {
+@(require_results)
+gsub_builder :: proc(builder: ^strings.Builder, haystack, pattern, replace: string) -> string {
 	// find matches
 	captures: [MAX_CAPTURES]Match
 	haystack := haystack
 
 	for {
 		length, err := find_aux(haystack, pattern, 0, false, &captures)
-
-		// done
-		if length == 0 {
+		if length == 0 { // done
 			break
 		}
-
 		if err != .OK {
 			return {}
 		}
@@ -746,21 +754,17 @@ gsub_builder :: proc(
 }
 
 // uses temp builder to build initial string - then allocates the result
-gsub_allocator :: proc(
-	haystack: string,
-	pattern: string,
-	replace: string,
-	allocator := context.allocator,
-) -> string {
+@(require_results)
+gsub_allocator :: proc(haystack, pattern, replace: string, allocator := context.allocator) -> string {
 	builder := strings.builder_make(0, 256, context.temp_allocator)
 	return gsub_builder(&builder, haystack, pattern, replace)
 }
 
 Gsub_Proc :: proc(
 	// optional passed data
-	data: rawptr, 
+	data:     rawptr,
 	// word match found
-	word: string, 
+	word:     string,
 	// current haystack for found captures
 	haystack: string, 
 	// found captures - empty for no captures
@@ -768,20 +772,14 @@ Gsub_Proc :: proc(
 )
 
 // call a procedure on every match in the haystack
-gsub_with :: proc(
-	haystack: string,
-	pattern: string,
-	data: rawptr,
-	call: Gsub_Proc,
-) {
+gsub_with :: proc(haystack, pattern: string, data: rawptr, call: Gsub_Proc) {
 	// find matches
 	captures: [MAX_CAPTURES]Match
 	haystack := haystack
 
 	for {
 		length := find_aux(haystack, pattern, 0, false, &captures) or_break
-		// done
-		if length == 0 {
+		if length == 0 { // done
 			break
 		}
 
@@ -800,11 +798,8 @@ gsub :: proc { gsub_builder, gsub_allocator }
 // iterative find with zeroth capture only
 // assumes captures is zeroed on first iteration
 // resets captures to zero on last iteration
-gfind :: proc(
-	haystack: ^string,
-	pattern: string,
-	captures: ^[MAX_CAPTURES]Match,
-) -> (res: string, ok: bool) {
+@(require_results)
+gfind :: proc(haystack: ^string, pattern: string, captures: ^[MAX_CAPTURES]Match) -> (res: string, ok: bool) {
 	haystack^ = haystack[captures[0].byte_end:]
 	if len(haystack) > 0 {
 		length, err := find_aux(haystack^, pattern, 0, true, captures)
@@ -822,10 +817,8 @@ gfind :: proc(
 }
 
 // rebuilds a pattern into a case insensitive pattern
-pattern_case_insensitive_builder :: proc(
-	builder: ^strings.Builder, 
-	pattern: string,
-) -> (res: string) {
+@(require_results)
+pattern_case_insensitive_builder :: proc(builder: ^strings.Builder, pattern: string) -> string {
 	p := pattern
 	last_percent: bool
 
@@ -849,11 +842,8 @@ pattern_case_insensitive_builder :: proc(
 	return strings.to_string(builder^)
 }
 
-pattern_case_insensitive_allocator :: proc(
-	pattern: string, 
-	cap: int = 256,
-	allocator := context.allocator,
-) -> (res: string) {
+@(require_results)
+pattern_case_insensitive_allocator :: proc(pattern: string, cap: int = 256, allocator := context.allocator) -> string {
 	builder := strings.builder_make(0, cap, context.temp_allocator)
 	return pattern_case_insensitive_builder(&builder, pattern)	
 }
@@ -877,6 +867,7 @@ Matcher :: struct {
 }
 
 // init using haystack & pattern and an optional byte offset
+@(require_results)
 matcher_init :: proc(haystack, pattern: string, offset: int = 0) -> (res: Matcher) {
 	res.haystack = haystack
 	res.pattern = pattern
@@ -886,13 +877,14 @@ matcher_init :: proc(haystack, pattern: string, offset: int = 0) -> (res: Matche
 }
 
 // find the first match and return the byte start / end position in the string, true on success
+@(require_results)
 matcher_find :: proc(matcher: ^Matcher) -> (start, end: int, ok: bool) #no_bounds_check {
 	matcher.captures_length, matcher.err = find_aux(
 		matcher.haystack, 
 		matcher.pattern, 
 		matcher.offset, 
-		true, 
-		&matcher.captures,
+		allow_memfind=true,
+		matches=&matcher.captures,
 	)
 	ok = matcher.captures_length > 0 && matcher.err == .OK
 	match := matcher.captures[0]
@@ -902,13 +894,14 @@ matcher_find :: proc(matcher: ^Matcher) -> (start, end: int, ok: bool) #no_bound
 }
 
 // find the first match and return the matched word, true on success
+@(require_results)
 matcher_match :: proc(matcher: ^Matcher) -> (word: string, ok: bool) #no_bounds_check {
 	matcher.captures_length, matcher.err = find_aux(
 		matcher.haystack, 
 		matcher.pattern, 
 		matcher.offset, 
-		false, 
-		&matcher.captures,
+		allow_memfind=false,
+		matches=&matcher.captures,
 	)
 	ok = matcher.captures_length > 0 && matcher.err == .OK
 	match := matcher.captures[0]
@@ -917,6 +910,7 @@ matcher_match :: proc(matcher: ^Matcher) -> (word: string, ok: bool) #no_bounds_
 }
 
 // get the capture at the "correct" spot, as spot 0 is reserved for the first match
+@(require_results)
 matcher_capture :: proc(matcher: ^Matcher, index: int, loc := #caller_location) -> string #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index + 1, MAX_CAPTURES - 1)
 	cap := matcher.captures[index + 1]
@@ -924,6 +918,7 @@ matcher_capture :: proc(matcher: ^Matcher, index: int, loc := #caller_location) 
 }
 
 // get the raw match out of the captures, skipping spot 0
+@(require_results)
 matcher_capture_raw :: proc(matcher: ^Matcher, index: int, loc := #caller_location) -> Match #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index + 1, MAX_CAPTURES - 1)
 	return matcher.captures[index + 1]
@@ -933,6 +928,7 @@ matcher_capture_raw :: proc(matcher: ^Matcher, index: int, loc := #caller_locati
 matcher_gmatch :: matcher_match_iter
 
 // iteratively match the haystack till it cant find any matches
+@(require_results)
 matcher_match_iter :: proc(matcher: ^Matcher) -> (res: string, index: int, ok: bool) {
 	if len(matcher.iter) > 0 {
 		matcher.captures_length, matcher.err = find_aux(
@@ -962,6 +958,7 @@ matcher_match_iter :: proc(matcher: ^Matcher) -> (res: string, index: int, ok: b
 }
 
 // get a slice of all valid captures above the first match
+@(require_results)
 matcher_captures_slice :: proc(matcher: ^Matcher) -> []Match {
 	return matcher.captures[1:matcher.captures_length]
 }

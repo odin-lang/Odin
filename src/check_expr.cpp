@@ -1296,11 +1296,6 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 						error_line("\t      Got:      %s\n", s_got);
 						gb_string_free(s_got);
 						gb_string_free(s_expected);
-
-						Type *tx = x->Proc.params->Tuple.variables[0]->type;
-						Type *ty = y->Proc.params->Tuple.variables[0]->type;
-						gb_printf_err("%s kind:%.*s e:%p ot:%p\n", type_to_string(tx), LIT(type_strings[tx->kind]), tx->Named.type_name, tx->Named.type_name->TypeName.original_type_for_parapoly);
-						gb_printf_err("%s kind:%.*s e:%p ot:%p\n", type_to_string(ty), LIT(type_strings[ty->kind]), ty->Named.type_name, ty->Named.type_name->TypeName.original_type_for_parapoly);
 					} else {
 						gbString s_expected = type_to_string(y);
 						gbString s_got = type_to_string(x);
@@ -3244,6 +3239,9 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 }
 
 gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
+	if (are_types_identical(operand->type, y)) {
+		return true;
+	}
 	if (check_is_assignable_to(c, operand, y)) {
 		return true;
 	}
@@ -3528,20 +3526,31 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 
 	Type *bt = base_type(type);
 	if (is_const_expr && is_type_constant_type(bt)) {
+		Type *elem = core_array_type(bt);
+
 		if (core_type(bt)->kind == Type_Basic) {
-			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
+			if (check_representable_as_constant(c, x->value, type, &x->value)) {
 				return true;
-			} else if (check_is_castable_to(c, x, type)) {
-				if (is_type_pointer(type)) {
-					return true;
-				}
 			}
+			goto check_castable;
+		} else if (!are_types_identical(elem, bt) &&
+		           elem->kind == Type_Basic &&
+		           check_representable_as_constant(c, x->value, elem, &x->value)) {
+			if (check_representable_as_constant(c, x->value, type, &x->value)) {
+				return true;
+			}
+			goto check_castable;
 		} else if (check_is_castable_to(c, x, type)) {
 			x->value = {};
 			x->mode = Addressing_Value;
 			return true;
 		}
-	} else if (check_is_castable_to(c, x, type)) {
+
+		return false;
+	}
+
+check_castable:
+	if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
@@ -6216,7 +6225,6 @@ gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *
 					continue;
 				}
 			}
-			break;
 		}
 	}
 
@@ -7488,8 +7496,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		Entity *e = proc_entities[valids[0].index];
 		GB_ASSERT(e != nullptr);
 
-		Array<Operand> named_operands = {};
-
 		check_call_arguments_single(c, call, operand,
 			e, e->type,
 			positional_operands, named_operands,
@@ -8151,6 +8157,73 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 }
 
 
+void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<Type *> param_types);
+
+gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *call, Entity *proc_entity, Type *proc_type) {
+	auto &proc = proc_type->Proc;
+	Slice<Entity *> params = proc.params ? proc.params->Tuple.variables : Slice<Entity *>{};
+
+	Type *self_type = nullptr;
+	isize params_start = 1;
+
+	ast_node(ce, CallExpr, call);
+
+	Type *return_type = proc.result_count == 0 ? nullptr : proc.results->Tuple.variables[0]->type;
+	bool is_return_instancetype = return_type != nullptr && return_type == t_objc_instancetype;
+
+	if (params.count == 0 || !is_type_objc_ptr_to_object(params[0]->type)) {
+		if (!proc_entity->Procedure.is_objc_class_method) {
+			// Not a class method, invalid call
+			error(call, "Invalid Objective-C call: The Objective-C method is not a class method but this first parameter is not an Objective-C object pointer.");
+			return;
+		}
+
+		if (is_return_instancetype) {
+			if (ce->proc->kind == Ast_SelectorExpr) {
+				ast_node(se, SelectorExpr, ce->proc);
+
+				// NOTE(harold): These should have already been checked, right?
+				GB_ASSERT(se->expr->tav.mode == Addressing_Type && se->expr->tav.type->kind == Type_Named);
+
+				return_type = alloc_type_pointer(se->expr->tav.type);
+			} else {
+				return_type = proc_entity->Procedure.objc_class->type;
+			}
+		}
+
+		self_type    = t_objc_Class;
+		params_start = 0;
+	} else if (ce->args.count > 0) {
+		GB_ASSERT(is_type_objc_ptr_to_object(params[0]->type));
+
+		if (ce->args[0]->tav.objc_super_target) {
+			self_type = t_objc_super_ptr;
+		} else {
+			self_type = ce->args[0]->tav.type;
+		}
+
+		if (is_return_instancetype) {
+			// NOTE(harold): These should have already been checked, right?
+			GB_ASSERT(ce->args[0]->tav.type && ce->args[0]->tav.type->kind == Type_Pointer && ce->args[0]->tav.type->Pointer.elem->kind == Type_Named);
+
+			return_type = ce->args[0]->tav.type;
+		}
+	}
+
+	auto param_types = slice_make<Type *>(permanent_allocator(), proc.param_count + 2 - params_start);
+	param_types[0] = self_type;
+	param_types[1] = t_objc_SEL;
+
+	for (isize i = params_start; i < params.count; i++) {
+		param_types[i+2-params_start] = params[i]->type;
+	}
+
+	if (is_return_instancetype) {
+		operand->type = return_type;
+	}
+
+	add_objc_proc_type(c, call, return_type, param_types);
+}
 
 gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
 	if (proc != nullptr &&
@@ -8412,6 +8485,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				operand->expr->CallExpr.optional_ok_one = true;
 			}
 		}
+	}
+
+	Entity *proc_entity = entity_from_expr(call->CallExpr.proc);
+	bool is_objc_call = proc_entity && proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_objc_impl_or_import;
+	if (is_objc_call) {
+		check_objc_call_expr(c, operand, call, proc_entity, pt);
 	}
 
 	return Expr_Expr;
@@ -9719,7 +9798,10 @@ gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
 }
 
 gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCompoundLit *cl) {
-	if (cl->elems.count > 0 && (check_feature_flags(c, node) & OptInFeatureFlag_DynamicLiterals) == 0 && !build_context.dynamic_literals) {
+	if (cl->elems.count == 0) {
+		return false;
+	}
+	if ((check_feature_flags(c, node) & OptInFeatureFlag_DynamicLiterals) == 0 && !build_context.dynamic_literals) {
 		ERROR_BLOCK();
 		error(node, "Compound literals of dynamic types are disabled by default");
 		error_line("\tSuggestion: If you want to enable them for this specific file, add '#+feature dynamic-literals' at the top of the file\n");
@@ -9730,9 +9812,13 @@ gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCom
 			error_line("\tWarning: As '-default-to-panic-allocator' has been set, the dynamic compound literal may not be initialized as expected\n");
 		}
 		return false;
+	} else if (c->curr_proc_decl != nullptr && c->curr_proc_calling_convention != ProcCC_Odin) {
+		if (c->scope != nullptr && (c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+			error(node, "Compound literals of dynamic types require a 'context' to defined");
+		}
 	}
 
-	return cl->elems.count > 0;
+	return true;
 }
 
 gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(CheckerContext *c, Ast *node) {

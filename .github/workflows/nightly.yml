@@ -124,13 +124,13 @@ jobs:
   build_macos:
     name: MacOS Build
     if: github.repository == 'odin-lang/Odin'
-    runs-on: macos-13
+    runs-on: macos-14 # Intel machine
     steps:
       - uses: actions/checkout@v4
       - name: Download LLVM and setup PATH
         run: |
           brew update
-          brew install llvm@20 dylibbundler lld
+          brew install llvm@20 dylibbundler lld@20
 
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
@@ -169,7 +169,7 @@ jobs:
       - name: Download LLVM and setup PATH
         run: |
           brew update
-          brew install llvm@20 dylibbundler lld
+          brew install llvm@20 dylibbundler lld@20
 
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to

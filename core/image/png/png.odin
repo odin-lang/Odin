@@ -1,3 +1,6 @@
+#+vet !using-stmt
+package png
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -6,10 +9,6 @@
 		Jeroen van Rijn: Initial implementation.
 		Ginger Bill:     Cosmetic changes.
 */
-
-
-#+vet !using-stmt
-package png
 
 import "core:compress"
 import "core:compress/zlib"

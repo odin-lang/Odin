@@ -1,5 +1,5 @@
 /*
-Raw bindings for most POSIX APIs.
+Raw bindings for most `POSIX` APIs.
 
 Targets glibc and musl compatibility.
 

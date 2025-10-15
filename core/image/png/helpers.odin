@@ -1,3 +1,5 @@
+package png
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-2 license.
@@ -8,8 +10,6 @@
 
 	These are a few useful utility functions to work with PNG images.
 */
-
-package png
 
 import "core:image"
 import "core:compress/zlib"

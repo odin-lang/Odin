@@ -1,3 +1,4 @@
+// Trigonometric and other mathematic operations on complex numbers.
 package math_cmplx
 
 import "base:builtin"

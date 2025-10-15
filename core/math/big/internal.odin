@@ -1,3 +1,5 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -24,8 +26,6 @@
 
 	TODO: Handle +/- Infinity and NaN.
 */
-
-package math_big
 
 import "base:builtin"
 import "base:intrinsics"

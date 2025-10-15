@@ -1,15 +1,17 @@
+/*
+`Base64` encoding and decoding.
+
+A secondary param can be used to supply a custom alphabet to `encode` and a matching decoding table to `decode`.
+
+If none is supplied it just uses the standard Base64 alphabet.
+In case your specific version does not use padding, you may
+truncate it from the encoded output.
+*/
 package encoding_base64
 
 import "core:io"
 import "core:mem"
 import "core:strings"
-
-// @note(zh): Encoding utility for Base64
-// A secondary param can be used to supply a custom alphabet to
-// @link(encode) and a matching decoding table to @link(decode).
-// If none is supplied it just uses the standard Base64 alphabet.
-// Incase your specific version does not use padding, you may
-// truncate it from the encoded output.
 
 ENC_TABLE := [64]byte {
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',

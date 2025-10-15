@@ -1,5 +1,5 @@
 /*
-package pbkdf2 implements the PBKDF2 password-based key derivation function.
+`PBKDF2` password-based key derivation function.
 
 See: [[ https://www.rfc-editor.org/rfc/rfc2898 ]]
 */

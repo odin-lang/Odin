@@ -138,10 +138,13 @@ type_is_rune       :: proc($T: typeid) -> bool ---
 type_is_float      :: proc($T: typeid) -> bool ---
 type_is_complex    :: proc($T: typeid) -> bool ---
 type_is_quaternion :: proc($T: typeid) -> bool ---
-type_is_string     :: proc($T: typeid) -> bool ---
 type_is_typeid     :: proc($T: typeid) -> bool ---
 type_is_any        :: proc($T: typeid) -> bool ---
+type_is_string     :: proc($T: typeid) -> bool ---
 type_is_string16   :: proc($T: typeid) -> bool ---
+type_is_cstring    :: proc($T: typeid) -> bool ---
+type_is_cstring16  :: proc($T: typeid) -> bool ---
+
 
 type_is_endian_platform       :: proc($T: typeid) -> bool ---
 type_is_endian_little         :: proc($T: typeid) -> bool ---
@@ -154,6 +157,7 @@ type_is_indexable             :: proc($T: typeid) -> bool ---
 type_is_sliceable             :: proc($T: typeid) -> bool ---
 type_is_comparable            :: proc($T: typeid) -> bool ---
 type_is_simple_compare        :: proc($T: typeid) -> bool --- // easily compared using memcmp (== and !=)
+type_is_nearly_simple_compare :: proc($T: typeid) -> bool --- // easily compared using memcmp (including floats)
 type_is_dereferenceable       :: proc($T: typeid) -> bool ---
 type_is_valid_map_key         :: proc($T: typeid) -> bool ---
 type_is_valid_matrix_elements :: proc($T: typeid) -> bool ---
@@ -344,6 +348,9 @@ simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is_proc(T) ---
 
 
+// Utility Calls
+concatentate :: proc(x, y: $T, z: ..T) -> T where type_is_array(T) || type_is_slice(T) ---
+
 // Returns the value of the procedure where `x` must be a call expression
 procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---
 
@@ -374,10 +381,11 @@ objc_selector :: struct{}
 objc_class    :: struct{}
 objc_ivar     :: struct{}
 
-objc_id    :: ^objc_object
-objc_SEL   :: ^objc_selector
-objc_Class :: ^objc_class
-objc_Ivar  :: ^objc_ivar
+objc_id           :: ^objc_object
+objc_SEL          :: ^objc_selector
+objc_Class        :: ^objc_class
+objc_Ivar         :: ^objc_ivar
+objc_instancetype :: distinct objc_id
 
 objc_find_selector     :: proc($name: string) -> objc_SEL   ---
 objc_register_selector :: proc($name: string) -> objc_SEL   ---
@@ -385,6 +393,7 @@ objc_find_class        :: proc($name: string) -> objc_Class ---
 objc_register_class    :: proc($name: string) -> objc_Class ---
 objc_ivar_get          :: proc(self: ^$T) -> ^$U ---
 objc_block             :: proc(invoke: $T, ..any) -> ^Objc_Block(T) where type_is_proc(T) ---
+objc_super             :: proc(obj: ^$T) -> ^$U where type_is_subtype_of(T, objc_object) && type_is_subtype_of(U, objc_object) ---
 
 valgrind_client_request :: proc(default: uintptr, request: uintptr, a0, a1, a2, a3, a4: uintptr) -> uintptr ---
 

@@ -50,7 +50,6 @@ foreign lib {
 		af:   AF,        // INET or INET6
 		src:  cstring,
 		dst:  rawptr,    // either ^in_addr or ^in_addr6
-		size: socklen_t, // size_of(dst^)
 	) -> pton_result ---
 }
 

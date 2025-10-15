@@ -1,5 +1,5 @@
 /*
-package keccak implements the Keccak hash algorithm family.
+`Keccak` hash algorithm family.
 
 During the SHA-3 standardization process, the padding scheme was changed
 thus Keccac and SHA-3 produce different outputs.  Most users should use

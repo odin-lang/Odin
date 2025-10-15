@@ -1,8 +1,11 @@
 #+test
-package encoding_base32
+package test_encoding_base32
 
 import "core:testing"
 import "core:bytes"
+import "core:encoding/base32"
+
+Error :: base32.Error
 
 @(test)
 test_base32_decode_valid :: proc(t: ^testing.T) {
@@ -20,7 +23,7 @@ test_base32_decode_valid :: proc(t: ^testing.T) {
 	}
 
 	for c in cases {
-		output, err := decode(c.input)
+		output, err := base32.decode(c.input)
 		if output != nil {
 			defer delete(output)
 		}
@@ -50,7 +53,7 @@ test_base32_encode :: proc(t: ^testing.T) {
 	}
 
 	for c in cases {
-		output := encode(transmute([]byte)c.input)
+		output := base32.encode(transmute([]byte)c.input)
 		defer delete(output)
 		testing.expect(t, output == c.expected)
 	}
@@ -62,7 +65,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Characters outside alphabet
 		input := "MZ1W6YTB" // '1' not in alphabet (A-Z, 2-7)
-		output, err := decode(input)
+		output, err := base32.decode(input)
 		if output != nil {
 			defer delete(output)
 		}
@@ -71,7 +74,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Lowercase not allowed
 		input := "mzxq===="
-		output, err := decode(input)
+		output, err := base32.decode(input)
 		if output != nil {
 			defer delete(output)
 		}
@@ -82,7 +85,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Padding must only be at end
 		input := "MZ=Q===="
-		output, err := decode(input)
+		output, err := base32.decode(input)
 		if output != nil {
 			defer delete(output)
 		}
@@ -91,7 +94,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Missing padding
 		input := "MZXQ" // Should be MZXQ====
-		output, err := decode(input)
+		output, err := base32.decode(input)
 		if output != nil {
 			defer delete(output)
 		}
@@ -100,7 +103,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Incorrect padding length
 		input := "MZXQ=" // Needs 4 padding chars
-		output, err := decode(input)
+		output, err := base32.decode(input)
 		if output != nil {
 			defer delete(output)
 		}
@@ -109,7 +112,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Too much padding
 		input := "MY=========" // Extra padding chars
-		output, err := decode(input)
+		output, err := base32.decode(input)
 		if output != nil {
 			defer delete(output)
 		}
@@ -120,7 +123,7 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 	{
 		// Single character (invalid block)
 		input := "M"
-		output, err := decode(input)
+		output, err := base32.decode(input)
 		if output != nil {
 			defer delete(output)
 		}
@@ -141,9 +144,9 @@ test_base32_roundtrip :: proc(t: ^testing.T) {
 	}
 
 	for input in cases {
-		encoded := encode(transmute([]byte)input)
+		encoded := base32.encode(transmute([]byte)input)
 		defer delete(encoded)
-		decoded, err := decode(encoded)
+		decoded, err := base32.decode(encoded)
 		if decoded != nil {
 			defer delete(decoded)
 		}
@@ -188,7 +191,7 @@ test_base32_custom_alphabet :: proc(t: ^testing.T) {
 	*/
 
 	custom_validate :: proc(c: byte) -> bool {
-		return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'V') || c == byte(PADDING)
+		return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'V') || c == byte(base32.PADDING)
 	}
 
 	cases := [?]struct {
@@ -202,12 +205,12 @@ test_base32_custom_alphabet :: proc(t: ^testing.T) {
 
 	for c in cases {
 		// Test encoding
-		encoded := encode(transmute([]byte)c.input, custom_enc_table)
+		encoded := base32.encode(transmute([]byte)c.input, custom_enc_table)
 		defer delete(encoded)
 		testing.expect(t, encoded == c.enc_expected)
 
 		// Test decoding
-		decoded, err := decode(encoded, custom_dec_table, custom_validate)
+		decoded, err := base32.decode(encoded, custom_dec_table, custom_validate)
 		defer if decoded != nil {
 			delete(decoded)
 		}
@@ -219,7 +222,7 @@ test_base32_custom_alphabet :: proc(t: ^testing.T) {
 	// Test invalid character detection
 	{
 		input := "WXY=====" // Contains chars not in our alphabet
-		output, err := decode(input, custom_dec_table, custom_validate)
+		output, err := base32.decode(input, custom_dec_table, custom_validate)
 		if output != nil {
 			delete(output)
 		}

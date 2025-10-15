@@ -1,5 +1,5 @@
 /*
-package ristretto255 implement the ristretto255 prime-order group.
+Ristretto255 prime-order group.
 
 See:
 - [[ https://www.rfc-editor.org/rfc/rfc9496 ]]

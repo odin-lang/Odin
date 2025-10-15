@@ -1,3 +1,4 @@
+// Tokenizes regular expressions.
 package regex_tokenizer
 
 /*

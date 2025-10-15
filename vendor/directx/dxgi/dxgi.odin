@@ -1,3 +1,4 @@
+// Bindings for [[ DXGI ; https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ ]].
 package directx_dxgi
 
 foreign import dxgi {

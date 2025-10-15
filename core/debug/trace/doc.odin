@@ -1,5 +1,5 @@
 /*
-A debug stack trace library. Only works when debug symbols are enabled `-debug`.
+Stack trace library. Only works when debug symbols are enabled using `-debug`.
 
 Example:
 	import "base:runtime"

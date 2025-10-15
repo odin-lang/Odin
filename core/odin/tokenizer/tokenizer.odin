@@ -1,3 +1,4 @@
+// The tokenizer (lexer) for `Odin` files, used to create tooling.
 package odin_tokenizer
 
 import "core:fmt"

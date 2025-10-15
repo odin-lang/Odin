@@ -548,7 +548,7 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
-	bool   para_poly_diagnostics;
+	bool   build_diagnostics;
 
 	bool   use_single_module;
 	bool   use_separate_modules;
@@ -574,6 +574,8 @@ struct BuildContext {
 	SourceCodeLocationInfo source_code_location_info;
 
 	bool   min_link_libs;
+
+	String export_linked_libs_path;
 
 	bool   print_linker_flags;
 
@@ -2093,7 +2095,19 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 	for (;;) {
 		String str = string_split_iterator(&it, ',');
 		if (str == "") break;
+
 		if (!string_set_exists(&build_context.target_features_set, str)) {
+			String plus_str = concatenate_strings(temporary_allocator(), make_string_c("+"), str);
+
+			if (!string_set_exists(&build_context.target_features_set, plus_str)) {
+				if (not_enabled) *not_enabled = str;
+				return false;
+			}
+		}
+
+		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), str);
+
+		if (string_set_exists(&build_context.target_features_set, minus_str)) {
 			if (not_enabled) *not_enabled = str;
 			return false;
 		}

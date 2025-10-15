@@ -1,3 +1,4 @@
+// Bindings for [[ Box2D ; https://box2d.org ]].
 package vendor_box2d
 
 import "base:intrinsics"

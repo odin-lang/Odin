@@ -1,7 +1,7 @@
 /*
-	OpenSimplex2 noise implementation.
+	[[ OpenSimplex2 ; https://github.com/KdotJPG/OpenSimplex2 ]] noise algorithm.
 
-	Ported from [[ https://github.com/KdotJPG/OpenSimplex2 }].
+	Ported from [[ https://github.com/KdotJPG/OpenSimplex2 ]].
 	Copyright 2022 Yuki2 [[ https://github.com/NoahR02 ]]
 */
 package math_noise

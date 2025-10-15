@@ -1,3 +1,4 @@
+// Bindings for [[ Direct3D 12 ; https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics ]].
 package directx_d3d12
 
 foreign import "system:d3d12.lib"

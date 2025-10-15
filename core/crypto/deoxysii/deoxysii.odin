@@ -1,6 +1,5 @@
 /*
-package deoxysii implements the Deoxys-II-256 Authenticated Encryption
-with Additional Data algorithm.
+`Deoxys-II-256` Authenticated Encryption with Additional Data (`AEAD`) algorithm.
 
 - [[ https://sites.google.com/view/deoxyscipher ]]
 - [[ https://thomaspeyrin.github.io/web/assets/docs/papers/Jean-etal-JoC2021.pdf ]]

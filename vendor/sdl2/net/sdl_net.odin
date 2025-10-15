@@ -1,3 +1,4 @@
+// Bindings for [[ SDL2 Net ; https://wiki.libsdl.org/SDL2/FrontPage ]].
 package sdl2_net
 
 import "core:c"
