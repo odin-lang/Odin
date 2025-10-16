@@ -2992,17 +2992,17 @@ CRITICAL_SECTION :: struct {
 }
 
 SYNCHRONIZATION_BARRIER :: struct {
-    Reserved1:  DWORD,
-    Reserved2:  DWORD,
-    Reserved3:  [2]ULONG_PTR,
-    Reserved4:  DWORD,
-    Reserved5:  DWORD,
+	Reserved1:  DWORD,
+	Reserved2:  DWORD,
+	Reserved3:  [2]ULONG_PTR,
+	Reserved4:  DWORD,
+	Reserved5:  DWORD,
 }
 
 SYNCHRONIZATION_BARRIER_FLAG :: enum {
-    SPIN_ONLY  = 0,
-    BLOCK_ONLY = 1,
-    NO_DELETE  = 2,
+	SPIN_ONLY  = 0,
+	BLOCK_ONLY = 1,
+	NO_DELETE  = 2,
 }
 SYNCHRONIZATION_BARRIER_FLAGS :: distinct bit_set[SYNCHRONIZATION_BARRIER_FLAG; DWORD]
 
