@@ -1611,6 +1611,10 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 				error_line("\tSuggestion: Try slicing the value with '%s[:]'\n", os);
 				gb_string_free(os);
 			}
+		} else if (is_type_pointer(poly_type) && is_polymorphic_type_assignable(ctx, type_deref(poly_type), operand.type, false, modify_type)) {
+			gbString os = expr_to_string(operand.expr);
+			error_line("\tSuggestion: Did you mean '&%s'\n", os);
+			gb_string_free(os);
 		}
 	}
 	return t_invalid;

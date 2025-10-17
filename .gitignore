@@ -308,3 +308,6 @@ build/
 cmake-build*/
 CMakeLists.txt
 sandbox/
+
+# Ctags
+tags
