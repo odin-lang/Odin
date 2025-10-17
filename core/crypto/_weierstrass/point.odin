@@ -145,6 +145,12 @@ pt_clear :: proc "contextless" (p: ^$T) {
 	fe_clear(&p._z)
 }
 
+pt_clear_vec :: proc "contextless" (arg: []^$T) {
+	for p in arg1 {
+		pt_clear(p)
+	}
+}
+
 pt_add :: proc "contextless" (p, a, b: ^$T) {
 	// Algorithm 4 from "Complete addition formulas for prime
 	// order elliptic curves" by Renes, Costello, and Batina.
