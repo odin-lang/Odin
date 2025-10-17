@@ -247,7 +247,7 @@ Normalize :: proc "c" (v: Vec2) -> Vec2 {
 @(require_results)
 IsNormalized :: proc "c" (v: Vec2) -> bool {
 	aa := Dot(v, v)
-	return abs(1. - aa) < 10. * EPSILON
+	return abs(1. - aa) < 100. * EPSILON
 }
 
 @(require_results)
