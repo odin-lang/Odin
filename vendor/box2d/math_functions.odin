@@ -3,7 +3,7 @@ package vendor_box2d
 import "core:c"
 import "core:math"
 
-EPSILON :: 1e-23
+EPSILON :: math.F32_EPSILON
 
 Vec2 :: [2]f32
 
