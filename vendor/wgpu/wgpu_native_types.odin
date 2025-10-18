@@ -2,8 +2,8 @@ package wgpu
 
 import "base:runtime"
 
-BINDINGS_VERSION        :: [4]u8{25, 0, 2, 1}
-BINDINGS_VERSION_STRING :: "25.0.2.1"
+BINDINGS_VERSION        :: [4]u8{27, 0, 2, 0}
+BINDINGS_VERSION_STRING :: "27.0.2.0"
 
 LogLevel :: enum i32 {
 	Off,
@@ -79,9 +79,10 @@ InstanceExtras :: struct {
 	dx12ShaderCompiler: Dx12Compiler,
 	gles3MinorVersion: Gles3MinorVersion,
 	glFenceBehaviour: GLFenceBehaviour,
-	dxilPath: StringView,
 	dxcPath: StringView,
 	dcxMaxShaderModel: DxcMaxShaderModel,
+	budgetForDeviceCreation: ^u8,
+	budgetForDeviceLoss: ^u8,
 }
 
 DeviceExtras :: struct {
@@ -189,6 +190,30 @@ QuerySetDescriptorExtras :: struct {
 SurfaceConfigurationExtras :: struct {
 	using chain: ChainedStruct,
 	desiredMaximumFrameLatency: u32,
+}
+
+/**
+* Chained in `SurfaceDescriptor` to make a `Surface` wrapping a WinUI [[ SwapChainPanel ; https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.controls.swapchainpanel ]].
+*/
+SurfaceSourceSwapChainPanel :: struct {
+	using chain: ChainedStruct,
+    /**
+     * A pointer to the [[ ISwapChainPanelNative ; https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/win32/microsoft.ui.xaml.media.dxinterop/nn-microsoft-ui-xaml-media-dxinterop-iswapchainpanelnative ]]
+     * interface of the `SwapChainPanel` that will be wrapped by the `Surface`.
+     */
+	panelNative: rawptr,
+}
+
+PolygonMode :: enum i32 {
+	Fill,
+	Line,
+	Point,
+}
+
+PrimitiveStateExtras :: struct {
+	using chain: ChainedStruct,
+	polygonMode: PolygonMode,
+	conservative: b32,
 }
 
 LogCallback :: #type proc "c" (level: LogLevel, message: StringView, userdata: rawptr)

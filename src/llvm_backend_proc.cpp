@@ -240,8 +240,6 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			}
 		}
 	}
-	lb_set_linkage_from_entity_flags(p->module, p->value, entity->flags);
-
 
 	if (p->is_foreign) {
 		lb_set_wasm_procedure_import_attributes(p->value, entity, p->name);
@@ -284,6 +282,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		LLVMSetLinkage(p->value, LLVMExternalLinkage);
 	}
 
+	lb_set_linkage_from_entity_flags(p->module, p->value, entity->flags);
 
 	if (m->debug_builder) { // Debug Information
 		Type *bt = base_type(p->type);

@@ -13,7 +13,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-msvc-" + TYPE + "/lib/wgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v25.0.2.1, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	@(export)
@@ -39,7 +39,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v25.0.2.1, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	@(export)
@@ -56,7 +56,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v25.0.2.1, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the README at '" + #directory + "README.md'")
 	}
 
 	@(export)
@@ -282,8 +282,7 @@ FeatureName :: enum i32 {
 	// Native.
 	PushConstants = 0x00030001,
 	TextureAdapterSpecificFormatFeatures,
-	MultiDrawIndirect,
-	MultiDrawIndirectCount,
+	MultiDrawIndirectCount = 0x00030004,
 	VertexWritableStorage,
 	TextureBindingArray,
 	SampledTextureAndStorageBufferArrayNonUniformIndexing,
@@ -298,16 +297,15 @@ FeatureName :: enum i32 {
 	// TODO: requires wgpu.h api change
 	// AddressModeClampToZero,
 	// AddressModeClampToBorder,
-	// PolygonModeLine,
-	// PolygonModePoint,
-	// ConservativeRasterization,
+	PolygonModeLine = 0x00030013,
+	PolygonModePoint,
+	ConservativeRasterization,
 	// ClearTexture,
 	SpirvShaderPassthrough = 0x00030017,
 	// MultiView,
 	VertexAttribute64bit = 0x00030019,
 	TextureFormatNv12,
-	RayTracingAccelarationStructure,
-	RayQuery,
+	RayQuery = 0x0003001C,
 	ShaderF64,
 	ShaderI16,
 	ShaderPrimitiveIndex,
@@ -317,6 +315,7 @@ FeatureName :: enum i32 {
 	SubgroupBarrier,
 	TimestampQueryInsideEncoders,
 	TimestampQueryInsidePasses,
+	ShaderInt64,
 }
 
 FilterMode :: enum i32 {
@@ -446,6 +445,8 @@ SType :: enum i32 {
 	BindGroupLayoutEntryExtras,
 	QuerySetDescriptorExtras,
 	SurfaceConfigurationExtras,
+	SurfaceSourceSwapChainPanel,
+	PrimitiveStateExtras,
 
 	// Odin.
 	SurfaceSourceCanvasHTMLSelector = 0x00040001,
@@ -624,6 +625,7 @@ TextureFormat :: enum i32 {
 	Rgba16Snorm,
 	// From FeatureName.TextureFormatNv12
 	NV12,
+	P010,
 }
 
 TextureSampleType :: enum i32 {
