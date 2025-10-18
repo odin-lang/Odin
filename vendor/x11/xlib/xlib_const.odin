@@ -1,6 +1,15 @@
 #+build linux, freebsd, openbsd
 package xlib
 
+XNClientWindow: cstring : "clientWindow"
+XNInputStyle:   cstring : "inputStyle"
+XNFocusWindow:  cstring : "focusWindow"
+XNSpotLocation: cstring : "spotLocation"
+XNPreeditAttributes: cstring : "preeditAttributes"
+
+XIMPreeditNothing :: 0x0008
+XIMStatusNothing  :: 0x0400
+
 /* ----  X11/extensions/XKB.h ---------------------------------------------------------*/
 
 XkbMinLegalKeyCode     :: 8
@@ -136,6 +145,14 @@ Status :: enum i32 {
 	BadImplementation   = 17,
 	FirstExtensionError = 128,
 	LastExtensionError  = 255,
+}
+
+LookupStringStatus :: enum i32 {
+	BufferOverflow = -1,
+	LookupNone = 1,
+	LookupChars = 2,
+	LookupKeySym = 3,
+	LookupBoth = 4,
 }
 
 ByteOrder :: enum i32 {
