@@ -7283,6 +7283,10 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			error_line("\tNo given arguments\n");
 		} else {
 			print_argument_types();
+			const gbString append_proc_name = gb_string_make(temporary_allocator(), "append");
+			if(gb_string_are_equal(expr_name, append_proc_name)){
+				error_line("Suggestion: Make sure that you passed, as the first argument, a dynamic array by pointer, like so `append(&some_dynamic_array, ...)`.\n");
+			}
 		}
 
 		if (procs.count == 0) {
