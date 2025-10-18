@@ -41,13 +41,13 @@ FinishTaskCallback :: #type proc "c" (userTask: rawptr, userContext: rawptr)
 // from a worker thread.
 // @warning This function should not attempt to modify Box2D state or user application state.
 // @ingroup world
-FrictionCallback :: #type proc "c" (frictionA: f32, userMaterialIdA: i32, frictionB: f32, userMaterialIdB: i32)
+FrictionCallback :: #type proc "c" (frictionA: f32, userMaterialIdA: i32, frictionB: f32, userMaterialIdB: i32) -> f32
 
 // Optional restitution mixing callback. This intentionally provides no context objects because this is called
 // from a worker thread.
 // @warning This function should not attempt to modify Box2D state or user application state.
 // @ingroup world
-RestitutionCallback :: #type proc "c" (restitutionA: f32, userMaterialIdA: i32, restitutuionB: f32, userMaterialIdB: i32)
+RestitutionCallback :: #type proc "c" (restitutionA: f32, userMaterialIdA: i32, restitutionB: f32, userMaterialIdB: i32) -> f32
 
 // Result from b2World_RayCastClosest
 // @ingroup world
