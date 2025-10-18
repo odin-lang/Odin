@@ -981,9 +981,9 @@ gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t)
 
 	mutex_lock(&m->types_mutex);
 
-	auto *field_remapping = map_get(&m->struct_field_remapping, cast(void *)struct_type);
+	auto *field_remapping = map_get(&m->struct_field_remapping, cast(void *)t);
 	if (field_remapping == nullptr) {
-		field_remapping = map_get(&m->struct_field_remapping, cast(void *)t);
+		field_remapping = map_get(&m->struct_field_remapping, cast(void *)struct_type);
 	}
 
 	mutex_unlock(&m->types_mutex);
