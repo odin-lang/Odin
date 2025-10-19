@@ -22,27 +22,27 @@ foreign odin_env {
 }
 
 @(require_results)
-sin_f64 :: proc(θ: f64, loc := #caller_location) -> f64 {
+sin_f64 :: proc "contextless" (θ: f64, loc := #caller_location) -> f64 {
 	return _sin_f64(θ)
 }
 @(require_results)
-cos_f64 :: proc(θ: f64, loc := #caller_location) -> f64 {
+cos_f64 :: proc "contextless" (θ: f64, loc := #caller_location) -> f64 {
 	return _cos_f64(θ)
 }
 @(require_results)
-pow_f64 :: proc(x, power: f64, loc := #caller_location) -> f64 {
+pow_f64 :: proc "contextless" (x, power: f64, loc := #caller_location) -> f64 {
 	return _pow_f64(x, power)
 }
 @(require_results)
-fmuladd_f64 :: proc(a, b, c: f64, loc := #caller_location) -> f64 {
+fmuladd_f64 :: proc "contextless" (a, b, c: f64, loc := #caller_location) -> f64 {
 	return _fmuladd_f64(a, b, c)
 }
 @(require_results)
-ln_f64 :: proc(x: f64, loc := #caller_location) -> f64 {
+ln_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
 	return _ln_f64(x)
 }
 @(require_results)
-exp_f64 :: proc(x: f64, loc := #caller_location) -> f64 {
+exp_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
 	return _exp_f64(x)
 }
 
