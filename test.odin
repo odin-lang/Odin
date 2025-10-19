@@ -16,6 +16,7 @@ main :: proc() {
     // x2 := max(f16)
     // dump_val(1 / x)
     // dump_val(x2)
+    dump_val(math.fmuladd_f32(1, max(f32), max(f32)))
     // dump_val(x2 * 0.5 == x2)
     // math.validate_finite(f32(1), #location())
     // math.validate_finite(max(f32), #location())
