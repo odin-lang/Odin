@@ -5,8 +5,8 @@ package math
 import "base:runtime"
 import "base:intrinsics"
 
-ASSERT_ENABLED :: !ODIN_DISABLE_ASSERT && #config(MATH_ENABLE_ASSERT, ODIN_DEBUG)
-FINITE_VALIDATION_ENABLED :: ASSERT_ENABLED && #config(MATH_ENABLE_FINITE_VALIDATION, ODIN_DEBUG)
+ASSERT_ENABLED :: !ODIN_DISABLE_ASSERT && #config(MATH_ENABLE_ASSERT, false)
+FINITE_VALIDATION_ENABLED :: ASSERT_ENABLED && #config(MATH_ENABLE_FINITE_VALIDATION, false)
 
 // This epsilon is possibly not good enough for all use cases, but serves as a baseline for
 // avoiding divide-by-zero and other common problems.
