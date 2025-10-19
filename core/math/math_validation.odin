@@ -1,10 +1,11 @@
-// Optional validation layer to assert input/output correctness.
+// Optional validation layer to assert correctness.
+// Primary point is catching NaN/Inf bugs right at the source, and asserting correct input function domain.
 package math
 
 import "base:runtime"
 import "base:intrinsics"
 
-ASSERT_ENABLED :: #config(MATH_ENABLE_ASSERT, ODIN_DEBUG) && !ODIN_DISABLE_ASSERT
+ASSERT_ENABLED :: !ODIN_DISABLE_ASSERT && #config(MATH_ENABLE_ASSERT, ODIN_DEBUG)
 FINITE_VALIDATION_ENABLED :: ASSERT_ENABLED && #config(MATH_ENABLE_FINITE_VALIDATION, ODIN_DEBUG)
 
 // This epsilon is possibly not good enough for all use cases, but serves as a baseline for
@@ -12,7 +13,7 @@ FINITE_VALIDATION_ENABLED :: ASSERT_ENABLED && #config(MATH_ENABLE_FINITE_VALIDA
 VALIDATION_EPS :: 1e-12
 
 @(disabled=!ASSERT_ENABLED)
-validation_assert :: proc "contextless" (condition: bool, loc := #caller_location, message := #caller_expression(condition)) {
+validation_assert :: proc "contextless" (condition: bool, loc: runtime.Source_Code_Location, message := #caller_expression(condition)) {
 	if !condition {
 		@(cold)
 		internal :: proc "contextless" (message: string, loc: runtime.Source_Code_Location) {
@@ -22,7 +23,7 @@ validation_assert :: proc "contextless" (condition: bool, loc := #caller_locatio
 	}
 }
 
-validate_finite :: proc "contextless" (x: $T, loc := #caller_location) {
+validate_finite :: proc "contextless" (x: $T, loc: runtime.Source_Code_Location) where intrinsics.type_is_float(T) {
 	when FINITE_VALIDATION_ENABLED {
 		class := #force_inline classify(x)
 		validation_assert(class != .NaN, loc = loc)

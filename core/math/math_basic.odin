@@ -256,7 +256,7 @@ ln_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
 	}
 
 	// reduce
-	f1, ki := frexp(x)
+	f1, ki := frexp(x, loc)
 	if f1 < SQRT_TWO/2 {
 		f1 *= 2
 		ki -= 1

@@ -101,7 +101,7 @@ log1p :: proc {
 
 @(require_results)
 log1p_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
-	validate_finite(x)
+	validate_finite(x, loc)
 	validation_assert(x > -1, loc)
 	
 	SQRT2_M1      :: 0h3fda827999fcef34 // sqrt(2)-1 
