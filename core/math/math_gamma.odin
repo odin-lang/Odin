@@ -94,7 +94,11 @@ stirling :: proc "contextless" (x: f64) -> (f64, f64) {
 }
 
 @(require_results)
-gamma_f64 :: proc "contextless" (x: f64) -> f64 {
+gamma_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
+	validate_finite(x, loc)
+	validation_assert(x != 0, loc)
+	validation_assert(!is_neg_int(x), loc)
+	
 	is_neg_int :: proc "contextless" (x: f64) -> bool {
 		if x < 0 {
 			_, xf := modf(x)

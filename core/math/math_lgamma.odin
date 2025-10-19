@@ -81,7 +81,9 @@ package math
 
 
 @(require_results)
-lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
+lgamma_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> (lgamma: f64, sign: int) {
+	validate_finite(x, loc)
+	
 	@(require_results)
 	sin_pi :: proc "contextless" (x: f64) -> f64 {
 		if x < 0.25 {
