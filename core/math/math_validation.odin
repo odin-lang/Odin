@@ -23,11 +23,10 @@ validation_assert :: proc "contextless" (condition: bool, loc: runtime.Source_Co
 	}
 }
 
-validate_finite :: proc "contextless" (x: $T, loc: runtime.Source_Code_Location) where intrinsics.type_is_float(T) {
+validate_finite :: #force_inline proc "contextless" (x: $T, loc: runtime.Source_Code_Location) where intrinsics.type_is_float(T) {
 	when FINITE_VALIDATION_ENABLED {
-		class := #force_inline classify(x)
-		validation_assert(class != .NaN, loc = loc)
-		validation_assert(class != .Inf, loc = loc)
-		validation_assert(class != .Neg_Inf, loc = loc)
+		// NOTE(jakub): this check has to be as fast as possible so we don't slow-down math code too much.
+		// This scaled self comparison checks for both Nan and +-Inf.
+		validation_assert((x == x) && (x * 0.25) != x, loc = loc, message = "x is NaN/Inf")
 	}
 }

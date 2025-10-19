@@ -1,5 +1,6 @@
 package foo
 
+import "base:intrinsics"
 import "core:math/linalg"
 import "core:time"
 import "core:math/rand"
@@ -11,6 +12,20 @@ dump_val :: proc(x: $T, msg := "x", expr := #caller_expression(x)) {
 }
 
 main :: proc() {
+    // x: f16 = 0
+    // x2 := max(f16)
+    // dump_val(1 / x)
+    // dump_val(x2)
+    // dump_val(x2 * 0.5 == x2)
+    // math.validate_finite(f32(1), #location())
+    // math.validate_finite(max(f32), #location())
+    // math.validate_finite(min(f32), #location())
+    // math.validate_finite(max(f16), #location())
+    // math.validate_finite(min(f16), #location())
+    // math.validate_finite(max(f64), #location())
+    // math.validate_finite(min(f64), #location())
+    // math.validate_finite(math.nan_f32(), #location())
+    
     benchmark()
 }
 
