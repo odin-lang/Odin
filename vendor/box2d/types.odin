@@ -727,6 +727,10 @@ RevoluteJointDef :: struct {
 	// This defines the zero angle for the joint limit.
 	referenceAngle: f32,
 
+	// The target angle for the joint in radians. The spring-damper will drive
+	// to this angle.
+	targetAngle: f32,
+
 	// Enable a rotational spring on the revolute hinge axis
 	enableSpring: bool,
 
