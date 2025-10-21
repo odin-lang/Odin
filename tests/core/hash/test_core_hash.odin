@@ -12,6 +12,7 @@ import "base:intrinsics"
 	};
 */
 
+V16 :: struct{s: string, h: u16}
 V32 :: struct{s: string, h: u32}
 V64 :: struct{s: string, h: u64}
 
@@ -263,4 +264,22 @@ test_murmur64_vectors :: proc(t: ^testing.T) {
 	testing.expect_value(t, i128(#hash(vectors[3].s, "murmur64")), i128(vectors[3].h))
 	testing.expect_value(t, i128(#hash(vectors[4].s, "murmur64")), i128(vectors[4].h))
 	testing.expect_value(t, i128(#hash(vectors[5].s, "murmur64")), i128(vectors[5].h))
+}
+
+@test
+test_crc16_ccitt_0x1021_vectors :: proc(t: ^testing.T) {
+	vectors :: []V16{
+		{""             , 0x0000},
+		{"abc"          , 0x9dd6},
+		{"Hello"        , 0xcbd6},
+		{"world"        , 0x2363},
+		{"Hello, world!", 0x7ade},
+		{"\x70\x6a\x77" , 0x3299}, // ECMA-167, 7.2.6 Descriptor CRC
+	}
+
+	for vector in vectors {
+		b := transmute([]u8)vector.s
+		crc16 := hash.crc16_ccitt_0x1021(b)
+		testing.expectf(t, crc16 == vector.h, "\n\t[CCITT CRC-16({0:q})] Expected: 0x{1:4x}, got: 0x{2:4x}", vector.s, vector.h, crc16)
+	}
 }
