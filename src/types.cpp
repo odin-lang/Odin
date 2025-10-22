@@ -2,6 +2,9 @@ struct Ast;
 struct Scope;
 struct Entity;
 
+// NOTE(Jeroen): Minimum alignment for #load(file, <type>) slices
+#define MINIMUM_SLICE_ALIGNMENT 16
+
 enum BasicKind {
 	Basic_Invalid,
 
