@@ -3036,8 +3036,14 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
 	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
+		debugf("LLVM code mode: LLVMCodeModelJITDefault\n");
 	} else if (is_arch_x86() && build_context.metrics.os == TargetOs_freestanding) {
 		code_mode = LLVMCodeModelKernel;
+		debugf("LLVM code mode: LLVMCodeModelKernel\n");
+	}
+
+	if (code_mode == LLVMCodeModelDefault) {
+		debugf("LLVM code mode: LLVMCodeModelDefault\n");
 	}
 
 	String llvm_cpu = get_final_microarchitecture();

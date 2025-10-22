@@ -3840,6 +3840,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.show_debug_messages) {
 		debugf("Selected microarch: %.*s\n", LIT(march));
 		debugf("Default microarch features: %.*s\n", LIT(default_features));
+		debugf("Target triplet: %.*s\n", LIT(build_context.metrics.target_triplet));
 		for_array(i, build_context.build_paths) {
 			String build_path = path_to_string(heap_allocator(), build_context.build_paths[i]);
 			debugf("build_paths[%ld]: %.*s\n", i, LIT(build_path));
