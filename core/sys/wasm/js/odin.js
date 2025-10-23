@@ -2112,7 +2112,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 		wasmMemoryInterface.setMemory(exports.memory);
 	}
 
-	exports._start();
+	if (exports._start) {
+		exports._start();
+	}
 
 	// Define a `@export step :: proc(delta_time: f64) -> (keep_going: bool) {`
 	// in your app and it will get called every frame.
@@ -2130,7 +2132,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 			prevTimeStamp = currTimeStamp;
 
 			if (!exports.step(dt, odin_ctx)) {
-				exports._end();
+				if (exports._end) {
+					exports._end();
+				}
 				return;
 			}
 
@@ -2139,7 +2143,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 		window.requestAnimationFrame(step);
 	} else {
-		exports._end();
+		if (exports._end) {
+			exports._end();
+		}
 	}
 
 	return;
