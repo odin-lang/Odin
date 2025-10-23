@@ -62,7 +62,10 @@ Marshal_Options :: struct {
 	mjson_skipped_first_braces_end: bool,
 }
 
-marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Marshal_Error) {
+User_Marshaller :: #type proc(w: io.Writer, v: any)
+User_Marshaller_Map :: map[typeid]User_Marshaller
+
+marshal :: proc(v: any, opt: Marshal_Options = {}, user_marshallers: User_Marshaller_Map = nil, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Marshal_Error) {
 	b := strings.builder_make(allocator, loc)
 	defer if err != nil {
 		strings.builder_destroy(&b)
@@ -72,7 +75,7 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 
 	opt := opt
-	marshal_to_builder(&b, v, &opt) or_return
+	marshal_to_builder(&b, v, &opt, user_marshallers) or_return
 	
 	if len(b.buf) != 0 {
 		data = b.buf[:]
@@ -81,14 +84,22 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	return data, nil
 }
 
-marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: ^Marshal_Options) -> Marshal_Error {
-	return marshal_to_writer(strings.to_writer(b), v, opt)
+marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: ^Marshal_Options, user_marshallers: User_Marshaller_Map = nil) -> Marshal_Error {
+	return marshal_to_writer(strings.to_writer(b), v, opt, user_marshallers)
 }
 
-marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
+marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options, user_marshallers: User_Marshaller_Map = nil) -> (err: Marshal_Error) {
 	if v == nil {
 		io.write_string(w, "null") or_return
 		return
+	}
+
+	if user_marshallers != nil {
+		marshaller := user_marshallers[v.id]
+		if marshaller != nil {
+			marshaller(w, v)
+			return
+		}
 	}
 
 	ti := runtime.type_info_base(type_info_of(v.id))
@@ -208,7 +219,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		for i in 0..<info.count {
 			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt, user_marshallers) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
 		
@@ -227,7 +238,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			opt_write_iteration(w, opt, i == 0) or_return
 			opt_write_key(w, opt, enum_type.names[index]) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt, user_marshallers) or_return
 		}
 		opt_write_end(w, opt, '}') or_return
 		
@@ -237,7 +248,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		for i in 0..<array.len {
 			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt, user_marshallers) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
 
@@ -247,7 +258,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		for i in 0..<slice.len {
 			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(slice.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt, user_marshallers) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
 
@@ -297,7 +308,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 						}
 					}
 
-					marshal_to_writer(w, any{value, info.value.id}, opt) or_return
+					marshal_to_writer(w, any{value, info.value.id}, opt, user_marshallers) or_return
 				}
 			} else {
 				Entry :: struct {
@@ -340,7 +351,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				for s, i in sorted {
 					opt_write_iteration(w, opt, i == 0) or_return
 					opt_write_key(w, opt, s.key) or_return
-					marshal_to_writer(w, s.value, opt) or_return
+					marshal_to_writer(w, s.value, opt, user_marshallers) or_return
 				}
 			}
 		}
@@ -384,7 +395,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			return false
 		}
 
-		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
+		marshal_struct_fields :: proc(w: io.Writer, v: any, opt: ^Marshal_Options, user_marshallers: User_Marshaller_Map) -> (err: Marshal_Error) {
 			ti := runtime.type_info_base(type_info_of(v.id))
 			info := ti.variant.(runtime.Type_Info_Struct)
 			first_iteration := true
@@ -419,7 +430,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				} else {
 					// Marshal the fields of 'using _: T' fields directly into the parent struct
 					if info.usings[i] && name == "_" {
-						marshal_struct_fields(w, the_value, opt) or_return
+						marshal_struct_fields(w, the_value, opt, user_marshallers) or_return
 						continue
 					} else {
 						opt_write_key(w, opt, name) or_return
@@ -427,13 +438,13 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				}
 
 
-				marshal_to_writer(w, the_value, opt) or_return
+				marshal_to_writer(w, the_value, opt, user_marshallers) or_return
 			}
 			return
 		}
 		
 		opt_write_start(w, opt, '{') or_return
-		marshal_struct_fields(w, v, opt) or_return
+		marshal_struct_fields(w, v, opt, user_marshallers) or_return
 		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Union:
@@ -466,17 +477,17 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			tag -= 1
 		}
 		id := info.variants[tag].id
-		return marshal_to_writer(w, any{v.data, id}, opt)
+		return marshal_to_writer(w, any{v.data, id}, opt, user_marshallers)
 
 	case runtime.Type_Info_Enum:
 		if !opt.use_enum_names || len(info.names) == 0 {
-			return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+			return marshal_to_writer(w, any{v.data, info.base.id}, opt, user_marshallers)
 		} else {
 			name, found := reflect.enum_name_from_value_any(v)
 			if found {
-				return marshal_to_writer(w, name, opt)
+				return marshal_to_writer(w, name, opt, user_marshallers)
 			} else {
-				return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+				return marshal_to_writer(w, any{v.data, info.base.id}, opt, user_marshallers)
 			}
 		}
 
