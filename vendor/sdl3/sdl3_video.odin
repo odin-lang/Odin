@@ -206,9 +206,9 @@ GL_EGL_PLATFORM               :: GLAttr.EGL_PLATFORM
 
 GLProfile :: distinct bit_set[GLProfileFlag; Uint32]
 GLProfileFlag :: enum Uint32 {
-	CORE          = 0, /**< OpenGL Core Profile context */
-	COMPATIBILITY = 1, /**< OpenGL Compatibility Profile context */
-	ES            = 2, /**< GLX_CONTEXT_ES2_PROFILE_BIT_EXT */
+	CORE          = 1, /**< OpenGL Core Profile context */
+	COMPATIBILITY = 2, /**< OpenGL Compatibility Profile context */
+	ES            = 4, /**< GLX_CONTEXT_ES2_PROFILE_BIT_EXT */
 }
 GL_CONTEXT_PROFILE_CORE          :: GLProfile{.CORE}          /**< OpenGL Core Profile context */
 GL_CONTEXT_PROFILE_COMPATIBILITY :: GLProfile{.COMPATIBILITY} /**< OpenGL Compatibility Profile context */
