@@ -58,6 +58,7 @@ enum TargetArchKind : u16 {
 	TargetArch_arm64,
 	TargetArch_wasm32,
 	TargetArch_wasm64p32,
+	TargetArch_wasm64,
 	TargetArch_riscv64,
 
 	TargetArch_COUNT,
@@ -71,6 +72,7 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("arm64"),
 	str_lit("wasm32"),
 	str_lit("wasm64p32"),
+	str_lit("wasm64"),
 	str_lit("riscv64"),
 };
 
@@ -143,6 +145,7 @@ struct MicroarchFeatureList {
 #include "build_settings_microarch.cpp"
 
 gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
+	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
@@ -821,6 +824,15 @@ gb_global TargetMetrics target_wasi_wasm64p32 = {
 };
 
 
+// TODO: freestanding_wasm64
+gb_global TargetMetrics target_js_wasm64 = {
+	TargetOs_js,
+	TargetArch_wasm64,
+	8, 8, 8, 16,
+	str_lit("wasm64-js-js"),
+};
+// TODO: wasi_wasm64
+
 
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
@@ -897,6 +909,10 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
 	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
+
+	// TODO: freestanding_wasm64
+	{ str_lit("js_wasm64"),              &target_js_wasm64 },
+	// TODO: wasi_wasm64
 
 	{ str_lit("freestanding_amd64_sysv"),  &target_freestanding_amd64_sysv },
 	{ str_lit("freestanding_amd64_win64"), &target_freestanding_amd64_win64 },
@@ -1039,6 +1055,7 @@ gb_internal bool is_arch_wasm(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
 	case TargetArch_wasm64p32:
+	case TargetArch_wasm64:
 		return true;
 	}
 	return false;
@@ -1936,9 +1953,9 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 		// link_flags = gb_string_appendc(link_flags, "--export-all ");
 		// link_flags = gb_string_appendc(link_flags, "--export-table ");
-		// if (bc->metrics.arch == TargetArch_wasm64) {
-		// 	link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
-		// }
+		if (bc->metrics.arch == TargetArch_wasm64) {
+			link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
+		}
 		if (bc->metrics.os != TargetOs_orca) {
 			link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
 		}

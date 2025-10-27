@@ -1166,6 +1166,7 @@ gb_internal void init_universal(void) {
 			{"arm64",     TargetArch_arm64},
 			{"wasm32",    TargetArch_wasm32},
 			{"wasm64p32", TargetArch_wasm64p32},
+			{"wasm64",    TargetArch_wasm64},
 			{"riscv64",   TargetArch_riscv64},
 		};
 
