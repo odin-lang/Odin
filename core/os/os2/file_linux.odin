@@ -198,7 +198,7 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 	case .NONE:
 		return n, nil
 	case:
-		return -1, _get_platform_error(errno)
+		return 0, _get_platform_error(errno)
 	}
 }
 
@@ -209,7 +209,7 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 
 	n, errno := linux.read(f.fd, p[:min(len(p), MAX_RW)])
 	if errno != .NONE {
-		return -1, _get_platform_error(errno)
+		return 0, _get_platform_error(errno)
 	}
 	return i64(n), io.Error.EOF if n == 0 else nil
 }
@@ -223,7 +223,7 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 	}
 	n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
 	if errno != .NONE {
-		return -1, _get_platform_error(errno)
+		return 0, _get_platform_error(errno)
 	}
 	if n == 0 {
 		return 0, .EOF
@@ -276,7 +276,7 @@ _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	s: linux.Stat = ---
 	errno := linux.fstat(f.fd, &s)
 	if errno != .NONE {
-		return -1, _get_platform_error(errno)
+		return 0, _get_platform_error(errno)
 	}
 
 	if s.mode & linux.S_IFMT == linux.S_IFREG {
