@@ -9,13 +9,13 @@ package encoding_xml
 	- Jeroen van Rijn: Initial implementation.
 */
 
-import "core:bytes"
-import "core:encoding/entity"
-import "base:intrinsics"
-import "core:mem"
-import "core:os"
-import "core:strings"
-import "base:runtime"
+import    "base:runtime"
+import    "core:bytes"
+import    "core:encoding/entity"
+import    "base:intrinsics"
+import    "core:mem"
+import os "core:os/os2"
+import    "core:strings"
 
 likely :: intrinsics.expect
 
@@ -377,8 +377,8 @@ load_from_file :: proc(filename: string, options := DEFAULT_OPTIONS, error_handl
 	context.allocator = allocator
 	options := options
 
-	data, data_ok := os.read_entire_file(filename)
-	if !data_ok { return {}, .File_Error }
+	data, data_err := os.read_entire_file(filename, allocator)
+	if data_err != nil { return {}, .File_Error }
 
 	options.flags += { .Input_May_Be_Modified }
 

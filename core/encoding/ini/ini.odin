@@ -1,13 +1,13 @@
 // Reader and writer for a variant of the `.ini` file format with `key = value` entries in `[sections]`.
 package encoding_ini
 
-import "base:runtime"
-import "base:intrinsics"
-import "core:strings"
-import "core:strconv"
-import "core:io"
-import "core:os"
-import "core:fmt"
+import    "base:runtime"
+import    "base:intrinsics"
+import    "core:strings"
+import    "core:strconv"
+import    "core:io"
+import os "core:os/os2"
+import    "core:fmt"
 _ :: fmt
 
 Options :: struct {
@@ -121,8 +121,11 @@ load_map_from_string :: proc(src: string, allocator: runtime.Allocator, options 
 }
 
 load_map_from_path :: proc(path: string, allocator: runtime.Allocator, options := DEFAULT_OPTIONS) -> (m: Map, err: runtime.Allocator_Error, ok: bool) {
-	data := os.read_entire_file(path, allocator) or_return
+	data, data_err := os.read_entire_file(path, allocator)
 	defer delete(data, allocator)
+	if data_err != nil {
+		return
+	}
 	m, err = load_map_from_string(string(data), allocator, options)
 	ok = err == nil
 	defer if !ok {
