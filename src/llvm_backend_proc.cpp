@@ -1795,7 +1795,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						use_hardware_runtime_swizzle = false;
 						break;
 					}
-				} else if (build_context.metrics.arch == TargetArch_wasm32 || build_context.metrics.arch == TargetArch_wasm64p32) {
+				} else if (build_context.metrics.arch == TargetArch_wasm32 || build_context.metrics.arch == TargetArch_wasm64p32 || build_context.metrics.arch == TargetArch_wasm64) {
 					// WebAssembly: Use swizzle (only supports 16-byte vectors)
 					if (count == 16) {
 						intrinsic_name = "llvm.wasm.swizzle";
