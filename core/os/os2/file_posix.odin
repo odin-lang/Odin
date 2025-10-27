@@ -382,12 +382,14 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 
 		to_read := uint(min(len(p), MAX_RW))
-		n = i64(posix.read(fd, raw_data(p), to_read))
+		_n := i64(posix.read(fd, raw_data(p), to_read))
 		switch {
-		case n == 0:
+		case _n == 0:
 			err = .EOF
-		case n < 0:
+		case _n < 0:
 			err = .Unknown
+		case:
+			n = _n
 		}
 		return
 
@@ -402,12 +404,14 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 
 		to_read := uint(min(len(p), MAX_RW))
-		n = i64(posix.pread(fd, raw_data(p), to_read, posix.off_t(offset)))
+		_n := i64(posix.pread(fd, raw_data(p), to_read, posix.off_t(offset)))
 		switch {
-		case n == 0:
+		case _n == 0:
 			err = .EOF
-		case n < 0:
+		case _n < 0:
 			err = .Unknown
+		case:
+			n = _n
 		}
 		return
 
@@ -460,15 +464,18 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 			return
 		}
 
-		n = i64(posix.lseek(fd, posix.off_t(offset), posix.Whence(whence)))
-		if n < 0 {
+		_n := i64(posix.lseek(fd, posix.off_t(offset), posix.Whence(whence)))
+		if _n < 0 {
 			#partial switch posix.get_errno() {
 			case .EINVAL:
 				err = .Invalid_Offset
 			case:
 				err = .Unknown
 			}
+			return
 		}
+
+		n = _n
 		return
 
 	case .Size:

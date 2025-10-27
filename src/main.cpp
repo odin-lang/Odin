@@ -334,6 +334,7 @@ enum BuildFlagKind {
 
 	BuildFlag_ShowDefineables,
 	BuildFlag_ExportDefineables,
+	BuildFlag_IgnoreUnusedDefineables,
 
 	BuildFlag_Vet,
 	BuildFlag_VetShadowing,
@@ -563,6 +564,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_ShowDefineables,         str_lit("show-defineables"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_IgnoreUnusedDefineables, str_lit("ignore-unused-defineables"), BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
@@ -943,6 +945,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 
+							break;
+						}
+						case BuildFlag_IgnoreUnusedDefineables: {
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.ignore_unused_defineables = true;
 							break;
 						}
 						case BuildFlag_ShowSystemCalls: {
@@ -2882,6 +2889,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Shows an overview of all the #config/#defined usages in the project.");
 		}
 
+		if (print_flag("-ignore-unused-defineables")) {
+			print_usage_line(2, "Silence warning/error if a -define doesn't have at least one #config/#defined usage.");
+		}
+
 		if (print_flag("-show-system-calls")) {
 			print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler.");
 		}
@@ -3891,7 +3902,9 @@ int main(int arg_count, char const **arg_ptr) {
 
 	MAIN_TIME_SECTION("type check");
 	check_parsed_files(checker);
-	check_defines(&build_context, checker);
+	if (!build_context.ignore_unused_defineables) {
+		check_defines(&build_context, checker);
+	}
 	if (any_errors()) {
 		print_all_errors();
 		return 1;
