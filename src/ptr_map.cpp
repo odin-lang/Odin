@@ -467,7 +467,8 @@ struct MapFindResult {
 
 template <typename K, typename V>
 struct OrderedInsertPtrMapEntry {
-	static_assert(sizeof(K) == sizeof(void *), "Key size must be pointer size");
+	static_assert(TypeIsPointer<K>::value || TypeIsPtrSizedInteger<K>::value || TypeIs64BitInteger<K>::value,
+	              "OrderedInsertPtrMapEntry::K must be a pointer or 8-byte integer");
 
 	K        key;
 	V        value;
