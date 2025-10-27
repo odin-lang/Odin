@@ -1,6 +1,7 @@
 #+build !windows
 package os2
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:strings"
 
