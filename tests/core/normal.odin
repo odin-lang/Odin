@@ -18,6 +18,7 @@ download_assets :: proc "contextless" () {
 @(require) import "encoding/cbor"
 @(require) import "encoding/hex"
 @(require) import "encoding/hxa"
+@(require) import "encoding/ini"
 @(require) import "encoding/json"
 @(require) import "encoding/uuid"
 @(require) import "encoding/varint"
