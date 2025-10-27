@@ -9,17 +9,15 @@ import "core:testing"
 
 TEAPOT_PATH :: ODIN_ROOT + "tests/core/assets/HXA/teapot.hxa"
 
-import "core:os"
+import os "core:os/os2"
 
 @test
 test_read :: proc(t: ^testing.T) {
-	data, _ := os.read_entire_file(TEAPOT_PATH)
-	// file, err := hxa.read_from_file(TEAPOT_PATH)
+	data, _ := os.read_entire_file(TEAPOT_PATH, context.allocator)
 	file, err := hxa.read(data)
 	file.backing = data
 	file.allocator = context.allocator
 	hxa.file_destroy(file)
-	// fmt.printfln("%#v", file)
 
 	e :: hxa.Read_Error.None
 	testing.expectf(t, err == e, "read_from_file(%v) -> %v != %v", TEAPOT_PATH, err, e)
