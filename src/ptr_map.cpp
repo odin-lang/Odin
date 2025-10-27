@@ -13,7 +13,7 @@ enum : MapIndex { MAP_SENTINEL = ~(MapIndex)0 };
 
 template <typename T>
 struct PtrMapConstant {
-	static constexpr T TOMBSTONE = reinterpret_cast<T>(reinterpret_cast<void *>(~(uintptr)0));
+	static constexpr T const TOMBSTONE = (T)reinterpret_cast<void *>(~(uintptr)0);
 };
 
 template <>
