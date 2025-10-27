@@ -3829,34 +3829,71 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 	case BuiltinProc_wasm_memory_grow:
 		{
+			bool is_wasm64 = build_context.metrics.arch == TargetArch_wasm64;
 			char const *name = "llvm.wasm.memory.grow";
-			LLVMTypeRef types[1] = {
-				lb_type(p->module, t_i32),
-			};
+			
+			if (is_wasm64) {
+				// WASM64 uses i64 for memory operations
+				LLVMTypeRef types[1] = {
+					lb_type(p->module, t_i64),
+				};
 
-			LLVMValueRef args[2] = {};
-			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr).value;
-			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_uintptr).value;
+				LLVMValueRef args[2] = {};
+				args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_i32).value; // memory index is still i32
+				args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_i64).value; // page count is i64
 
-			lbValue res = {};
-			res.type = t_i32;
-			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
-			return lb_emit_conv(p, res, tv.type);
+				lbValue res = {};
+				res.type = t_i64;
+				res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+				return lb_emit_conv(p, res, tv.type);
+			} else {
+				// WASM32 uses i32 for memory operations
+				LLVMTypeRef types[1] = {
+					lb_type(p->module, t_i32),
+				};
+
+				LLVMValueRef args[2] = {};
+				args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_i32).value;
+				args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_i32).value;
+
+				lbValue res = {};
+				res.type = t_i32;
+				res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+				return lb_emit_conv(p, res, tv.type);
+			}
 		}
 	case BuiltinProc_wasm_memory_size:
 		{
+			bool is_wasm64 = build_context.metrics.arch == TargetArch_wasm64;
 			char const *name = "llvm.wasm.memory.size";
-			LLVMTypeRef types[1] = {
-				lb_type(p->module, t_i32),
-			};
+			
+			if (is_wasm64) {
+				// WASM64 uses i64 for memory operations
+				LLVMTypeRef types[1] = {
+					lb_type(p->module, t_i64),
+				};
 
-			LLVMValueRef args[1] = {};
-			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr).value;
+				LLVMValueRef args[1] = {};
+				args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_i32).value; // memory index is still i32
 
-			lbValue res = {};
-			res.type = t_i32;
-			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
-			return lb_emit_conv(p, res, tv.type);
+				lbValue res = {};
+				res.type = t_i64;
+				res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+				return lb_emit_conv(p, res, tv.type);
+			} else {
+				// WASM32 uses i32 for memory operations
+				LLVMTypeRef types[1] = {
+					lb_type(p->module, t_i32),
+				};
+
+				LLVMValueRef args[1] = {};
+				args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_i32).value;
+
+				lbValue res = {};
+				res.type = t_i32;
+				res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+				return lb_emit_conv(p, res, tv.type);
+			}
 		}
 
 	case BuiltinProc_wasm_memory_atomic_wait32:
