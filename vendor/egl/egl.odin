@@ -81,12 +81,12 @@ foreign import egl "system:EGL"
 @(default_calling_convention="c", link_prefix="egl")
 foreign egl {
 	GetDisplay          :: proc(display: NativeDisplayType) -> Display ---
-	GetPlatformDisplay  :: proc(platform: Platform, native_display: rawptr, attrib_list: ^i32) -> Display ---
+	GetPlatformDisplay  :: proc(platform: Platform, native_display: rawptr, attrib_list: ^int) -> Display ---
 	Initialize          :: proc(display: Display, major: ^i32, minor: ^i32) -> Boolean ---
 	BindAPI             :: proc(api: u32) -> Boolean ---
 	ChooseConfig        :: proc(display: Display, attrib_list: ^i32, configs: [^]Config, config_size: i32, num_config: ^i32) -> Boolean ---
 	CreateWindowSurface :: proc(display: Display, config: Config, native_window: NativeWindowType, attrib_list: ^i32) -> Surface ---
-	CreatePlatformWindowSurface :: proc(display: Display, config: Config, native_window: rawptr, attrib_list: ^i32) -> Surface ---
+	CreatePlatformWindowSurface :: proc(display: Display, config: Config, native_window: rawptr, attrib_list: ^int) -> Surface ---
 	CreateContext       :: proc(display: Display, config: Config, share_context: Context, attrib_list: ^i32) -> Context ---
 	MakeCurrent         :: proc(display: Display, draw: Surface, read: Surface, ctx: Context) -> Boolean ---
 	QuerySurface        :: proc(display: Display, surface: Surface, attribute: i32, value: ^i32) -> Boolean ---
