@@ -13,7 +13,7 @@ enum : MapIndex { MAP_SENTINEL = ~(MapIndex)0 };
 
 template <typename T>
 struct PtrMapConstant {
-	static constexpr T const TOMBSTONE = (T)reinterpret_cast<void *>(~(uintptr)0);
+	static constexpr void const *TOMBSTONE = reinterpret_cast<void *>(~(uintptr)0);
 };
 
 template <>
@@ -271,7 +271,7 @@ template <typename K, typename V>
 gb_internal void map_remove(PtrMap<K, V> *h, K key) {
 	MapIndex found_index = 0;
 	if (map_try_get(h, key, &found_index)) {
-		h->entries[found_index].key = PtrMapConstant<K>::TOMBSTONE;
+		h->entries[found_index].key = cast(K)PtrMapConstant<K>::TOMBSTONE;
 		h->count -= 1;
 	}
 }
