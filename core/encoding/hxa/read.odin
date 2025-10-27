@@ -1,7 +1,7 @@
 package encoding_hxa
 
 import "core:fmt"
-import "core:os"
+import os "core:os/os2"
 import "core:mem"
 
 Read_Error :: enum {
@@ -14,13 +14,13 @@ Read_Error :: enum {
 read_from_file :: proc(filename: string, print_error := false, allocator := context.allocator, loc := #caller_location) -> (file: File, err: Read_Error) {
 	context.allocator = allocator
 
-	data, ok := os.read_entire_file(filename, allocator, loc)
-	if !ok {
+	data, data_err := os.read_entire_file(filename, allocator)
+	if data_err != nil {
 		err = .Unable_To_Read_File
 		delete(data, allocator, loc)
 		return
 	}
-	file, err = read(data, filename, print_error, allocator, loc)
+	file, err = read(data, filename, print_error, allocator)
 	file.backing   = data
 	return
 }
