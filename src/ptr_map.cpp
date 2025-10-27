@@ -10,11 +10,25 @@ enum {
 
 
 enum : MapIndex { MAP_SENTINEL = ~(MapIndex)0 };
-static void *const MAP_TOMBSTONE = (void *)~(uintptr)0;
+
+template <typename T>
+struct PtrMapConstant {
+	static constexpr T TOMBSTONE = (T)(void *)~(uintptr)0;
+};
+
+template <>
+struct PtrMapConstant<u64> {
+	static constexpr u64 TOMBSTONE = ~(u64)0;
+};
+template <>
+struct PtrMapConstant<i64> {
+	static constexpr i64 TOMBSTONE = ~(i64)0;
+};
 
 template <typename K, typename V>
 struct PtrMapEntry {
-	static_assert(sizeof(K) == sizeof(void *), "Key size must be pointer size");
+	static_assert(TypeIsPointer<K>::value || TypeIsPtrSizedInteger<K>::value || TypeIs64BitInteger<K>::value,
+	              "PtrMapEntry::K must be a pointer or 8-byte integer");
 
 	K key;
 	V value;
@@ -99,7 +113,7 @@ gb_internal void map__insert(PtrMap<K, V> *h, K key, V const &value) {
 	MapIndex original_index = index;
 	do {
 		auto *entry = h->entries+index;
-		if (!entry->key || entry->key == cast(K)MAP_TOMBSTONE) {
+		if (!entry->key || entry->key == PtrMapConstant<K>::TOMBSTONE) {
 			entry->key   = key;
 			entry->value = value;
 			h->count += 1;
@@ -147,7 +161,7 @@ gb_internal void map_reserve(PtrMap<K, V> *h, isize cap) {
 		for (u32 i = 0; i < h->capacity; i++) {
 			auto *entry = h->entries+i;
 			if (entry->key &&
-			    entry->key != cast(K)MAP_TOMBSTONE) {
+			    entry->key != PtrMapConstant<K>::TOMBSTONE) {
 				map__insert(&new_h, entry->key, entry->value);
 			}
 		}
@@ -257,7 +271,7 @@ template <typename K, typename V>
 gb_internal void map_remove(PtrMap<K, V> *h, K key) {
 	MapIndex found_index = 0;
 	if (map_try_get(h, key, &found_index)) {
-		h->entries[found_index].key = cast(K)MAP_TOMBSTONE;
+		h->entries[found_index].key = PtrMapConstant<K>::TOMBSTONE;
 		h->count -= 1;
 	}
 }
@@ -367,7 +381,7 @@ struct PtrMapIterator {
 				return *this;
 			}
 			PtrMapEntry<K, V> *entry = map->entries+index;
-			if (entry->key && entry->key != cast(K)MAP_TOMBSTONE) {
+			if (entry->key && entry->key != PtrMapConstant<K>::TOMBSTONE) {
 				return *this;
 			}
 		}
@@ -404,7 +418,7 @@ gb_internal PtrMapIterator<K, V> begin(PtrMap<K, V> &m) noexcept {
 	MapIndex index = 0;
 	while (index < m.capacity) {
 		auto key = m.entries[index].key;
-		if (key && key != cast(K)MAP_TOMBSTONE) {
+		if (key && key != PtrMapConstant<K>::TOMBSTONE) {
 			break;
 		}
 		index++;
@@ -420,7 +434,7 @@ gb_internal PtrMapIterator<K, V> const begin(PtrMap<K, V> const &m) noexcept {
 	MapIndex index = 0;
 	while (index < m.capacity) {
 		auto key = m.entries[index].key;
-		if (key && key != cast(K)MAP_TOMBSTONE) {
+		if (key && key != PtrMapConstant<K>::TOMBSTONE) {
 			break;
 		}
 		index++;
