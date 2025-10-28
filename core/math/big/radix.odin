@@ -15,9 +15,9 @@ package math_big
 		- Also look at extracting and splatting several digits at once.
 */
 
-import "base:intrinsics"
-import "core:mem"
-import "core:os"
+import    "base:intrinsics"
+import    "core:mem"
+import os "core:os/os2"
 
 /*
 	This version of `itoa` allocates on behalf of the caller. The caller must free the string.
@@ -407,11 +407,10 @@ internal_int_read_from_ascii_file :: proc(a: ^Int, filename: string, radix := i8
 		For now, we'll read the entire file. Eventually we'll replace this with a copy that duplicates the logic
 		of `atoi` so we don't need to read the entire file.
 	*/
-
-	res, ok := os.read_entire_file(filename, allocator)
+	res, res_err := os.read_entire_file(filename, allocator)
 	defer delete(res, allocator)
 
-	if !ok {
+	if res_err != nil {
 		return .Cannot_Read_File
 	}
 
@@ -441,8 +440,8 @@ internal_int_write_to_ascii_file :: proc(a: ^Int, filename: string, radix := i8(
 		len  = l,
 	}
 
-	ok := os.write_entire_file(filename, data, truncate=true)
-	return nil if ok else .Cannot_Write_File
+	write_err := os.write_entire_file(filename, data, truncate=true)
+	return nil if write_err == nil else .Cannot_Write_File
 }
 
 /*
