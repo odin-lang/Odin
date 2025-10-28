@@ -22,7 +22,7 @@ Example:
 		if csv_err == nil {
 			csv.reader_init_with_string(&r, string(csv_data))
 		} else {
-			fmt.printfln("Unable to open file: %v. Error: %v", filename, csv_err)
+			fmt.eprintfln("Unable to open file: %v. Error: %v", filename, csv_err)
 			return
 		}
 
@@ -46,7 +46,7 @@ Example:
 		handle, err := os.open(filename)
 		defer os.close(handle)
 		if err != nil {
-			fmt.eprintfln("Error %v opening file: %v", err, filename)
+			fmt.eprintfln("Unable to open file: %v. Error: %v", filename, err)
 			return
 		}
 		csv.reader_init(&r, handle.stream)
@@ -67,12 +67,11 @@ Example:
 
 		csv_data, csv_err := os.read_entire_file(filename, context.allocator)
 		defer delete(csv_data, context.allocator)
-		if csv_err == nil {
-			csv.reader_init_with_string(&r, string(csv_data))
-		} else {
-			fmt.printfln("Unable to open file: %v. Error: %v", filename, csv_err)
+		if err != nil {
+			fmt.eprintfln("Unable to open file: %v. Error: %v", filename, csv_err)
 			return
 		}
+		csv.reader_init_with_string(&r, string(csv_data))
 
 		records, err := csv.read_all(&r)
 		if err != nil { /* Do something with CSV parse error */ }
