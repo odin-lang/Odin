@@ -22,6 +22,7 @@ FLOAT_EPSILON :: 1e-7
 DOUBLE_EPSILON :: 1e-15
 
 // Aliases (not distict) of types
+half   :: f16
 float  :: f32
 double :: f64
 int    :: builtin.i32
@@ -45,6 +46,30 @@ float3x4 :: matrix[3, 4]float
 float4x1 :: matrix[4, 1]float
 float4x2 :: matrix[4, 2]float
 float4x3 :: matrix[4, 3]float
+
+// Half Precision (half) Floating Point Types
+
+half2 :: [2]half
+half3 :: [3]half
+half4 :: [4]half
+
+half1x1 :: matrix[1, 1]half
+half2x2 :: matrix[2, 2]half
+half3x3 :: matrix[3, 3]half
+half4x4 :: matrix[4, 4]half
+
+half1x2 :: matrix[1, 2]half
+half1x3 :: matrix[1, 3]half
+half1x4 :: matrix[1, 4]half
+half2x1 :: matrix[2, 1]half
+half2x3 :: matrix[2, 3]half
+half2x4 :: matrix[2, 4]half
+half3x1 :: matrix[3, 1]half
+half3x2 :: matrix[3, 2]half
+half3x4 :: matrix[3, 4]half
+half4x1 :: matrix[4, 1]half
+half4x2 :: matrix[4, 2]half
+half4x3 :: matrix[4, 3]half
 
 float2 :: [2]float
 float3 :: [3]float
