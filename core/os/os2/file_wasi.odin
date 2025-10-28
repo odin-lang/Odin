@@ -274,6 +274,10 @@ __fd :: proc(f: ^File) -> wasi.fd_t {
 	return -1
 }
 
+_is_tty :: proc "contextless" (f: ^File) -> bool {
+	return false
+}
+
 _name :: proc(f: ^File) -> string {
 	if f != nil && f.impl != nil {
 		return (^File_Impl)(f.impl).name

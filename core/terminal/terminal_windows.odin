@@ -6,10 +6,7 @@ import os "core:os/os2"
 import    "core:sys/windows"
 
 _is_terminal :: proc "contextless" (f: ^os.File) -> bool {
-	context = runtime.default_context()
-	fd := os.fd(f)
-	is_tty := windows.GetFileType(windows.HANDLE(fd)) == windows.FILE_TYPE_CHAR
-	return is_tty
+	return os.is_tty(f)
 }
 
 old_modes: [2]struct{

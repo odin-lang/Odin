@@ -161,6 +161,12 @@ __fd :: proc(f: ^File) -> posix.FD {
 	return -1
 }
 
+is_tty :: proc "contextless" (f: ^File) -> bool {
+	fd     := _fd(f)
+	is_tty := posix.isatty(posix.FD(fd))
+	return bool(is_tty)
+}
+
 _name :: proc(f: ^File) -> string {
 	if f != nil && f.impl != nil {
 		return (^File_Impl)(f.impl).name

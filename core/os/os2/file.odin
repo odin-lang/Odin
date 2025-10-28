@@ -538,6 +538,11 @@ is_directory :: proc(path: string) -> bool {
 /*
 	`copy_file` copies a file from `src_path` to `dst_path` and returns an error if any was encountered.
 */
+@(require_results)
+is_tty :: proc "contextless" (f: ^File) -> bool {
+	return _is_tty(f)
+}
+
 copy_file :: proc(dst_path, src_path: string) -> Error {
 	when #defined(_copy_file_native) {
 		return _copy_file_native(dst_path, src_path)
