@@ -4,7 +4,7 @@ package xxhash
 	An implementation of Yann Collet's [xxhash Fast Hash Algorithm](https://cyan4973.github.io/xxHash/).
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 
-	Made available under Odin's BSD-3 license, based on the original C code.
+	Made available under Odin's license, based on the original C code.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
