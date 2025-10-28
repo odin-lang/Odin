@@ -1,3 +1,4 @@
+#+feature global-context
 #+private
 package os2
 
