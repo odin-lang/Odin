@@ -2,7 +2,6 @@
 package os2
 
 import "base:runtime"
-import "core:encoding/ini"
 import "core:strings"
 
 _user_cache_dir :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
@@ -157,18 +156,19 @@ _xdg_user_dirs_lookup :: proc(xdg_key: string, allocator: runtime.Allocator) -> 
 	user_dirs_path  := concatenate({config_dir, "/user-dirs.dirs"}, temp_allocator) or_return
 	content         := read_entire_file(user_dirs_path, temp_allocator) or_return
 
-	it := ini.Iterator{
-		section = "",
-		_src    = string(content),
-		options = ini.Options{
-			comment        = "#",
-			key_lower_case = false,
-		},
-	}
+	xdg_dirs := string(content)
+	for line in strings.split_lines_iterator(&xdg_dirs) {
+		if len(line) > 0 && line[0] == '#' {
+			continue
+		}
 
-	for k, v in ini.iterate(&it) {
-		if k == xdg_key {
-			return replace_environment_placeholders(v, allocator), nil
+		equals := strings.index(line, "=")
+		if equals > -1 {
+			if line[:equals] == xdg_key {
+				// Unquote to return a bare path string as we do on Windows
+				val := strings.trim(line[equals+1:], "\"")
+				return replace_environment_placeholders(val, allocator), nil
+			}
 		}
 	}
 	return
