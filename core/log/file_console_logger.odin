@@ -2,13 +2,13 @@
 #+build !orca
 package log
 
-import "base:runtime"
-import "core:fmt"
-import "core:strings"
-import "core:os"
-import "core:terminal"
-import "core:terminal/ansi"
-import "core:time"
+import    "base:runtime"
+import    "core:fmt"
+import    "core:strings"
+import os "core:os/os2"
+import    "core:terminal"
+import    "core:terminal/ansi"
+import    "core:time"
 
 Level_Headers := [?]string{
 	 0..<10 = "[DEBUG] --- ",
@@ -35,7 +35,7 @@ Default_File_Logger_Opts :: Options{
 
 
 File_Console_Logger_Data :: struct {
-	file_handle:  os.Handle,
+	file_handle: ^os.File,
 	ident: string,
 }
 
@@ -66,16 +66,16 @@ init_standard_stream_status :: proc "contextless" () {
 	}
 }
 
-create_file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
+create_file_logger :: proc(f: ^os.File, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
-	data.file_handle = h
+	data.file_handle = f
 	data.ident = ident
 	return Logger{file_logger_proc, data, lowest, opt}
 }
 
 destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
 	data := cast(^File_Console_Logger_Data)log.data
-	if data.file_handle != os.INVALID_HANDLE {
+	if data.file_handle != nil {
 		os.close(data.file_handle)
 	}
 	free(data, allocator)
@@ -83,7 +83,7 @@ destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
 
 create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
-	data.file_handle = os.INVALID_HANDLE
+	data.file_handle = nil
 	data.ident = ident
 	return Logger{console_logger_proc, data, lowest, opt}
 }
@@ -93,7 +93,7 @@ destroy_console_logger :: proc(log: Logger, allocator := context.allocator) {
 }
 
 @(private)
-_file_console_logger_proc :: proc(h: os.Handle, ident: string, level: Level, text: string, options: Options, location: runtime.Source_Code_Location) {
+_file_console_logger_proc :: proc(h: ^os.File, ident: string, level: Level, text: string, options: Options, location: runtime.Source_Code_Location) {
 	backing: [1024]byte //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
 	buf := strings.builder_from_bytes(backing[:])
 
@@ -106,9 +106,7 @@ _file_console_logger_proc :: proc(h: os.Handle, ident: string, level: Level, tex
 	do_location_header(options, &buf, location)
 
 	if .Thread_Id in options {
-		// NOTE(Oskar): not using context.thread_id here since that could be
-		// incorrect when replacing context for a thread.
-		fmt.sbprintf(&buf, "[{}] ", os.current_thread_id())
+		fmt.sbprintf(&buf, "[{}] ", os.get_current_thread_id())
 	}
 
 	if ident != "" {
@@ -126,7 +124,7 @@ file_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, option
 console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
 	options := options
 	data := cast(^File_Console_Logger_Data)logger_data
-	h: os.Handle = ---
+	h: ^os.File = nil
 	if level < Level.Error {
 		h = os.stdout
 		options -= global_subtract_stdout_options

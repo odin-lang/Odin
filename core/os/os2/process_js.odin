@@ -34,6 +34,14 @@ _get_ppid :: proc() -> int {
 	return 0
 }
 
+_get_current_thread_id :: proc "contextless" () -> int {
+	return 0
+}
+
+_get_processor_core_count :: proc() -> int {
+	return 1
+}
+
 _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	err = .Unsupported
 	return
