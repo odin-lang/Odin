@@ -108,9 +108,12 @@ read_entire_file :: proc{
 
 @(require_results)
 read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator, loc := #caller_location) -> (data: []byte, err: Error) {
-	f := open(name) or_return
+	f, ferr := open(name)
+	if ferr != nil {
+		return nil, ferr
+	}
 	defer close(f)
-	return read_entire_file_from_file(f, allocator, loc)
+	return read_entire_file_from_file(f=f, allocator=allocator, loc=loc)
 }
 
 @(require_results)
