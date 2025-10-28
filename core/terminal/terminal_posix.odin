@@ -4,13 +4,9 @@ package terminal
 
 import    "base:runtime"
 import os "core:os/os2"
-import    "core:sys/posix"
 
 _is_terminal :: proc "contextless" (f: ^os.File) -> bool {
-	context = runtime.default_context()
-	fd := os.fd(f)
-	is_tty := posix.isatty(posix.FD(fd))
-	return bool(is_tty)
+	return os.is_tty(f)
 }
 
 _init_terminal :: proc "contextless" () {

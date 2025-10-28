@@ -115,6 +115,21 @@ get_ppid :: proc() -> int {
 }
 
 /*
+Obtain the current thread id
+*/
+@(require_results)
+get_current_thread_id :: proc "contextless" () -> int {
+	return _get_current_thread_id()
+}
+
+/*
+Return the number of cores
+*/
+get_processor_core_count :: proc() -> int {
+	return _get_processor_core_count()
+}
+
+/*
 Obtain ID's of all processes running in the system.
 */
 @(require_results)

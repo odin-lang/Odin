@@ -29,6 +29,9 @@ _fd :: proc(f: ^File) -> uintptr {
 	return 0
 }
 
+_is_tty :: proc "contextless" (f: ^File) -> bool {
+	return true
+}
 
 _name :: proc(f: ^File) -> string {
 	return ""

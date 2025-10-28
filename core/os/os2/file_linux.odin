@@ -6,6 +6,7 @@ import "core:io"
 import "core:time"
 import "core:sync"
 import "core:sys/linux"
+import "core:sys/posix"
 
 // Most implementations will EINVAL at some point when doing big writes.
 // In practice a read/write call would probably never read/write these big buffers all at once,
@@ -176,6 +177,17 @@ _fd :: proc(f: ^File) -> uintptr {
 	}
 	impl := (^File_Impl)(f.impl)
 	return uintptr(impl.fd)
+}
+
+_is_tty :: proc "contextless" (f: ^File) -> bool {
+	if f == nil || f.impl == nil {
+		return false
+	}
+	impl := (^File_Impl)(f.impl)
+
+	// TODO: Replace `posix.isatty` with `tcgetattr(fd, &termios) == 0`
+	is_tty := posix.isatty(posix.FD(impl.fd))
+	return bool(is_tty)
 }
 
 _name :: proc(f: ^File) -> string {
