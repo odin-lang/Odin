@@ -5,12 +5,14 @@ import "base:runtime"
 import "base:intrinsics"
 
 import "core:bytes"
+import "core:c"
 import "core:sys/darwin"
 import "core:sys/posix"
 import "core:sys/unix"
 import "core:time"
 
-foreign import libc "system:System"
+foreign import libc    "system:System"
+foreign import pthread "system:System"
 
 foreign libc {
 	sysctl :: proc "c" (
@@ -33,7 +35,7 @@ _get_current_thread_id :: proc "contextless" () -> int {
 	return int(tid)
 }
 
-_processor_core_count :: proc() -> int {
+_get_processor_core_count :: proc() -> int {
 	count : int = 0
 	count_size := size_of(count)
 	if _sysctlbyname("hw.logicalcpu", &count, &count_size, nil, 0) == 0 {
