@@ -1,9 +1,12 @@
 #+private
 #+build netbsd
+package os2
+
+import "core:c"
+foreign import libc "system:c"
 
 @(private)
 foreign libc {
-	@(link_name="lwp_self")
 	_lwp_self     :: proc() -> i32 ---
 
 	@(link_name="sysctlbyname")
@@ -12,7 +15,7 @@ foreign libc {
 
 @(require_results)
 _get_current_thread_id :: proc "contextless" () -> int {
-	return int(lwp_self())
+	return int(_lwp_self())
 }
 
 _get_processor_core_count :: proc() -> int {

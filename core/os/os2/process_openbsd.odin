@@ -1,5 +1,10 @@
 #+private
 #+build openbsd
+package os2
+
+import "core:c"
+
+foreign import libc "system:c"
 
 @(default_calling_convention="c")
 foreign libc {
