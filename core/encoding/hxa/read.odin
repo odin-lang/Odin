@@ -14,10 +14,10 @@ Read_Error :: enum {
 read_from_file :: proc(filename: string, print_error := false, allocator := context.allocator, loc := #caller_location) -> (file: File, err: Read_Error) {
 	context.allocator = allocator
 
-	data, data_err := os.read_entire_file(filename, allocator)
+	data, data_err := os.read_entire_file(filename, allocator, loc)
 	if data_err != nil {
 		err = .Unable_To_Read_File
-		delete(data, allocator, loc)
+		delete(data, allocator)
 		return
 	}
 	file, err = read(data, filename, print_error, allocator)
