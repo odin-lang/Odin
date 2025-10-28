@@ -99,8 +99,8 @@ panic_allocator :: proc() -> Allocator {
 panic_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode: Allocator_Mode,
-    size, alignment: int,
-    old_memory: rawptr,
+	size, alignment: int,
+	old_memory: rawptr,
 	old_size: int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
