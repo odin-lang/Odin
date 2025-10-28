@@ -1,5 +1,8 @@
 #+private
 #+build freebsd
+package os2
+
+import "core:c"
 
 foreign import libc "system:c"
 foreign import dl "system:dl"
