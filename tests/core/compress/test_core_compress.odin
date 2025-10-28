@@ -1,7 +1,3 @@
-
-
-
-
 package test_core_compress
 
 /*
