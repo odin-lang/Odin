@@ -1,12 +1,14 @@
 #+private
 package terminal
 
-import "base:runtime"
-import "core:os"
-import "core:sys/windows"
+import    "base:runtime"
+import os "core:os/os2"
+import    "core:sys/windows"
 
-_is_terminal :: proc "contextless" (handle: os.Handle) -> bool {
-	is_tty := windows.GetFileType(windows.HANDLE(handle)) == windows.FILE_TYPE_CHAR
+_is_terminal :: proc "contextless" (f: ^os.File) -> bool {
+	context = runtime.default_context()
+	fd := os.fd(f)
+	is_tty := windows.GetFileType(windows.HANDLE(fd)) == windows.FILE_TYPE_CHAR
 	return is_tty
 }
 
