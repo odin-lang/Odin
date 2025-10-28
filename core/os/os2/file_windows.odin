@@ -241,6 +241,11 @@ _fd :: proc "contextless" (f: ^File) -> uintptr {
 	return uintptr((^File_Impl)(f.impl).fd)
 }
 
+_is_tty :: proc "contextless" (f: ^File) -> bool {
+	fd := _fd(f)
+	return win32.GetFileType(win32.HANDLE(fd)) == win32.FILE_TYPE_CHAR
+}
+
 _destroy :: proc(f: ^File_Impl) -> Error {
 	if f == nil {
 		return nil

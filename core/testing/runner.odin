@@ -20,7 +20,7 @@ import "core:io"
 @require import "core:log"
 import "core:math/rand"
 import "core:mem"
-import "core:os"
+import os "core:os/os2"
 import "core:slice"
 @require import "core:strings"
 import "core:sync/chan"
@@ -216,8 +216,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
-	stdout := io.to_writer(os.stream_from_handle(os.stdout))
-	stderr := io.to_writer(os.stream_from_handle(os.stderr))
+	stdout := os.stdout.stream
+	stderr := os.stderr.stream
 
 	// The animations are only ever shown through STDOUT;
 	// STDERR is used exclusively for logging regardless of error level.
@@ -314,7 +314,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	// -- Set thread count.
 
 	when TEST_THREADS == 0 {
-		thread_count := os.processor_core_count()
+		thread_count := os.get_processor_core_count()
 	} else {
 		thread_count := max(1, TEST_THREADS)
 	}
