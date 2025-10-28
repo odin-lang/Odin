@@ -161,7 +161,8 @@ __fd :: proc(f: ^File) -> posix.FD {
 	return -1
 }
 
-is_tty :: proc "contextless" (f: ^File) -> bool {
+_is_tty :: proc "contextless" (f: ^File) -> bool {
+	context = runtime.default_context()
 	fd     := _fd(f)
 	is_tty := posix.isatty(posix.FD(fd))
 	return bool(is_tty)
