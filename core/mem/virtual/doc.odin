@@ -1,7 +1,6 @@
 /*
 A platform agnostic way to reserve/commit/decommit virtual memory.
 
-
 virtual.Arena usage
 
 Example:
@@ -56,7 +55,21 @@ Example:
 		vmem.arena_destroy(&arena)
 	}
 
+virtual.map_file usage
 
+Example:
+	// Source: https://github.com/odin-lang/examples/blob/master/arena_allocator/arena_allocator.odin
+	import "core:fmt"
+
+	// virtual package implements cross-platform file memory mapping
+	import vmem "core:mem/virtual"
+
+	main :: proc() {
+		data, err := virtual.map_file_from_path(#file, {.Read})
+		defer virtual.unmap_file(data)
+		fmt.printfln("Error: %v", err)
+		fmt.printfln("Data:  %s", data)
+	}
 */
 package mem_virtual
 
