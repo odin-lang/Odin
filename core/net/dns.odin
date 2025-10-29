@@ -23,11 +23,11 @@ package net
 */
 
 @(require) import "base:runtime"
-import "core:mem"
-import "core:strings"
-import "core:time"
-import "core:os"
-import "core:math/rand"
+import    "core:mem"
+import    "core:strings"
+import    "core:time"
+import os "core:os/os2"
+import    "core:math/rand"
 @(require) import "core:sync"
 
 dns_config_initialized: sync.Once
@@ -367,7 +367,10 @@ unpack_dns_header :: proc(id: u16be, bits: u16be) -> (hdr: DNS_Header) {
 load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocator) -> (name_servers: []Endpoint, ok: bool) {
 	context.allocator = allocator
 
-	res := os.read_entire_file_from_filename(resolv_conf_path) or_return
+	res, res_err := os.read_entire_file(resolv_conf_path, allocator)
+	if res_err != nil {
+		return {}, false
+	}
 	defer delete(res)
 	resolv_str := string(res)
 
@@ -407,7 +410,10 @@ load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocato
 load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (hosts: []DNS_Host_Entry, ok: bool) {
 	context.allocator = allocator
 
-	res := os.read_entire_file_from_filename(hosts_file_path, allocator) or_return
+	res, res_err := os.read_entire_file(hosts_file_path, allocator)
+	if res_err != nil {
+		return {}, false
+	}
 	defer delete(res)
 
 	_hosts := make([dynamic]DNS_Host_Entry, 0, allocator)
