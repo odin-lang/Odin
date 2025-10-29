@@ -2289,9 +2289,10 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 
 	for (auto *e : gen->foreign_libraries) {
 		GB_ASSERT(e->kind == Entity_LibraryName);
+		ast_node(imp, ForeignImportDecl, e->LibraryName.decl);
 
-		for (auto lib_path : e->LibraryName.paths) {
-			lib_path = string_trim_whitespace(lib_path);
+		for (isize i = 0; i < e->LibraryName.paths.count; i++) {
+			String lib_path = string_trim_whitespace(e->LibraryName.paths[i]);
 			if (lib_path.len == 0) {
 				continue;
 			}
@@ -2312,16 +2313,15 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 			}
 
 			gb_fprintf(&f, "\t");
-			ast_node(imp, ForeignImportDecl, e->LibraryName.decl);
-			for (Ast* file_path : imp->filepaths) {
-				GB_ASSERT(file_path->tav.mode == Addressing_Constant && file_path->tav.value.kind == ExactValue_String);
-				String file_path_str = file_path->tav.value.value_string;
 
-				if (string_starts_with(file_path_str, str_lit("system:"))) {
-					gb_fprintf(&f, "system");
-				} else {
-					gb_fprintf(&f, "user");
-				}
+			Ast *file_path = imp->filepaths[i];
+			GB_ASSERT(file_path->tav.mode == Addressing_Constant && file_path->tav.value.kind == ExactValue_String);
+			String file_path_str = file_path->tav.value.value_string;
+
+			if (string_starts_with(file_path_str, str_lit("system:"))) {
+				gb_fprintf(&f, "system");
+			} else {
+				gb_fprintf(&f, "user");
 			}
 
 			gb_fprintf(&f, "\n");
