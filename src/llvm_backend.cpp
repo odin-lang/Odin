@@ -2553,6 +2553,8 @@ gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc
 }
 
 gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_threading) {
+	isize retry_count = 0;
+retry:;
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
@@ -2570,6 +2572,14 @@ gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_thread
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
+		if (m->missing_procedures_to_check.count != 0) {
+			if (retry_count > gen->modules.count) {
+				GB_ASSERT(m->missing_procedures_to_check.count == 0);
+			}
+
+			retry_count += 1;
+			goto retry;
+		}
 		GB_ASSERT(m->missing_procedures_to_check.count == 0);
 		GB_ASSERT(m->procedures_to_generate.count == 0);
 	}
