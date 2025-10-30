@@ -1,12 +1,11 @@
 package timezone
 
-import "base:intrinsics"
-
-import "core:slice"
-import "core:strings"
-import "core:os"
-import "core:strconv"
-import "core:time/datetime"
+import    "base:intrinsics"
+import    "core:slice"
+import    "core:strings"
+import os "core:os/os2"
+import    "core:strconv"
+import    "core:time/datetime"
 
 // Implementing RFC8536 [https://datatracker.ietf.org/doc/html/rfc8536]
 
@@ -70,7 +69,10 @@ tzif_data_block_size :: proc(hdr: ^TZif_Header, version: TZif_Version) -> (block
 
 
 load_tzif_file :: proc(filename: string, region_name: string, allocator := context.allocator) -> (out: ^datetime.TZ_Region, ok: bool) {
-	tzif_data := os.read_entire_file_from_filename(filename, allocator) or_return
+	tzif_data, tzif_err := os.read_entire_file(filename, allocator)
+	if tzif_err != nil {
+		return nil, false
+	}
 	defer delete(tzif_data, allocator)
 	return parse_tzif(tzif_data, region_name, allocator)
 }
