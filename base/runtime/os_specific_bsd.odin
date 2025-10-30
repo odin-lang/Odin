@@ -25,9 +25,6 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	return int(ret), 0
 }
 
-
-foreign import libc "system:c"
-
 _exit :: proc "contextless" (code: int) -> ! {
 	@(default_calling_convention="c")
 	foreign libc {

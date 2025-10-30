@@ -2902,13 +2902,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 
 		lbValue exit_runner = {};
 		{
-			AstPackage *pkg = try_get_core_package(m->info, str_lit("os"));
-			if (pkg == nullptr) {
-				pkg = try_get_core_package(m->info, str_lit("os2"));
-			}
-			if (pkg == nullptr) {
-				pkg = get_core_package(m->info, str_lit("os2"));
-			}
+			AstPackage *pkg = get_runtime_package(m->info);
 
 			String name = str_lit("exit");
 			Entity *e = scope_lookup_current(pkg->scope, name);
