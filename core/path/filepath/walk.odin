@@ -2,8 +2,8 @@
 #+build !js
 package filepath
 
-import "core:os"
-import "core:slice"
+import os "core:os/os2"
+import    "core:slice"
 
 // Walk_Proc is the type of the procedure called for each file or directory visited by 'walk'
 // The 'path' parameter contains the parameter to walk as a prefix (this is the same as info.fullpath except on 'root')
@@ -40,7 +40,7 @@ walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Error 
 
 @(private)
 _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (err: os.Error, skip_dir: bool) {
-	if !info.is_dir {
+	if info.type != .Directory {
 		if info.fullpath == "" && info.name == "" {
 			// ignore empty things
 			return
@@ -62,7 +62,7 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (e
 	for fi in fis {
 		err, skip_dir = _walk(fi, walk_proc, user_data)
 		if err != nil || skip_dir {
-			if !fi.is_dir || !skip_dir {
+			if fi.type != .Directory || !skip_dir {
 				return
 			}
 		}

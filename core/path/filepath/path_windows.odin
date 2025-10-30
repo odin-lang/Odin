@@ -1,9 +1,8 @@
 package filepath
 
-import "core:strings"
-import "base:runtime"
-import "core:os"
-import win32 "core:sys/windows"
+import       "core:strings"
+import       "base:runtime"
+import os    "core:os/os2"
 
 SEPARATOR :: '\\'
 SEPARATOR_STRING :: `\`
@@ -33,50 +32,12 @@ is_UNC :: proc(path: string) -> bool {
 }
 
 is_abs :: proc(path: string) -> bool {
-	if is_reserved_name(path) {
-		return true
-	}
-	l := volume_name_len(path)
-	if l == 0 {
-		return false
-	}
-
-	path := path
-	path = path[l:]
-	if path == "" {
-		return false
-	}
-	return is_slash(path[0])
-}
-
-@(private)
-temp_full_path :: proc(name: string) -> (path: string, err: os.Error) {
-	ta := context.temp_allocator
-
-	name := name
-	if name == "" {
-		name = "."
-	}
-
-	p := win32.utf8_to_utf16(name, ta)
-	n := win32.GetFullPathNameW(cstring16(raw_data(p)), 0, nil, nil)
-	if n == 0 {
-		return "", os.get_last_error()
-	}
-
-	buf := make([]u16, n, ta)
-	n = win32.GetFullPathNameW(cstring16(raw_data(p)), u32(len(buf)), cstring16(raw_data(buf)), nil)
-	if n == 0 {
-		delete(buf)
-		return "", os.get_last_error()
-	}
-
-	return win32.utf16_to_utf8(buf[:n], ta)
+	return os.is_absolute_path(path)
 }
 
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
-	full_path, err := temp_full_path(path)
+	full_path, err := os.get_absolute_path(path, context.temp_allocator)
 	if err != nil {
 		return "", false
 	}

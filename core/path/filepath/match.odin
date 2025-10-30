@@ -2,10 +2,10 @@
 #+build !js
 package filepath
 
-import "core:os"
-import "core:slice"
-import "core:strings"
-import "core:unicode/utf8"
+import os "core:os/os2"
+import    "core:slice"
+import    "core:strings"
+import    "core:unicode/utf8"
 
 Match_Error :: enum {
 	None,
@@ -286,28 +286,23 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := cont
 	defer os.close(d)
 
 	{
-		file_info, ferr := os.fstat(d)
-		defer os.file_info_delete(file_info)
+		file_info, ferr := os.fstat(d, allocator)
+		defer os.file_info_delete(file_info, allocator)
 
 		if ferr != nil {
 			return
 		}
-		if !file_info.is_dir {
+		if file_info.type != .Directory {
 			return
 		}
 	}
 
 
-	fis, _ := os.read_dir(d, -1)
+	fis, _ := os.read_dir(d, -1, allocator)
 	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
 		return a.name < b.name
 	})
-	defer {
-		for fi in fis {
-			os.file_info_delete(fi)
-		}
-		delete(fis)
-	}
+	defer os.file_info_slice_delete(fis, allocator)
 
 	for fi in fis {
 		n := fi.name
