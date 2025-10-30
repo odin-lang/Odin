@@ -244,6 +244,11 @@ constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
 constant_log2 :: proc($v: $T) -> T where type_is_integer(T) ---
 
+constant_floor :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_trunc :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_ceil  :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_round :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+
 // SIMD related
 simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T ---

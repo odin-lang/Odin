@@ -2739,7 +2739,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (allow_token(f, Token_Comma)) {
 				Ast *dummy_name = parse_ident(f);
 				if (!err_once) {
-					error(dummy_name, "'bit_field' fields do not support multiple names per field");
+					syntax_error(dummy_name, "'bit_field' fields do not support multiple names per field");
 					err_once = true;
 				}
 			}
@@ -3299,8 +3299,16 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			open = expect_token(f, Token_OpenBracket);
 
 			if (f->curr_token.kind == Token_CloseBracket) {
-				error(f->curr_token, "Expected an operand, got ]");
+				ERROR_BLOCK();
+				syntax_error(f->curr_token, "Expected an operand, got ]");
 				close = expect_token(f, Token_CloseBracket);
+
+				if (f->allow_type) {
+					gbString s = expr_to_string(operand);
+					error_line("\tSuggestion: If a type was wanted, did you mean '[]%s'?", s);
+					gb_string_free(s);
+				}
+
 				operand = ast_index_expr(f, operand, nullptr, open, close);
 				break;
 			}
@@ -6594,7 +6602,7 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (lc == "no-instrumentation") {
 		f->flags |= AstFile_NoInstrumentation;
 	} else {
-		error(tok, "Unknown tag '%.*s'", LIT(lc));
+		syntax_error(tok, "Unknown tag '%.*s'", LIT(lc));
 	}
 
 	return true;
