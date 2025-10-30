@@ -41,7 +41,7 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	p := clean(full_path, allocator)
+	p, _ := clean(full_path, allocator)
 	return p, true
 }
 
@@ -68,7 +68,8 @@ join_non_empty :: proc(elems: []string, allocator := context.allocator) -> (join
 		}
 		s := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator) or_return
 		s = strings.concatenate({elems[0], s}, context.temp_allocator) or_return
-		return clean(s)
+		s, _ = clean(s)
+		return
 	}
 
 	p := strings.join(elems, SEPARATOR_STRING, context.temp_allocator) or_return

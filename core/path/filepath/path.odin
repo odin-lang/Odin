@@ -2,19 +2,14 @@
 // To process paths such as URLs that depend on forward slashes regardless of the OS, use the slashpath package.
 package filepath
 
-import "base:runtime"
-import "core:strings"
+import    "base:runtime"
+import os "core:os/os2"
+import    "core:strings"
 
 SEPARATOR_CHARS :: `/\`
 
 // is_separator checks whether the byte is a valid separator character
-is_separator :: proc(c: byte) -> bool {
-	switch c {
-	case '/':  return true
-	case '\\': return ODIN_OS == .Windows
-	}
-	return false
-}
+is_separator :: os.is_path_separator
 
 @(private)
 is_slash :: proc(c: byte) -> bool {
@@ -23,14 +18,7 @@ is_slash :: proc(c: byte) -> bool {
 
 // Splits path immediate following the last separator; separating the path into a directory and file.
 // If no separator is found, `dir` will be empty and `path` set to `path`.
-split :: proc(path: string) -> (dir, file: string) {
-	vol := volume_name(path)
-	i := len(path) - 1
-	for i >= len(vol) && !is_separator(path[i]) {
-		i -= 1
-	}
-	return path[:i+1], path[i+1:]
-}
+split :: os.split_path
 
 /*
 	Returns leading volume name.
@@ -123,30 +111,7 @@ volume_name_len :: proc(path: string) -> int {
 
 	Returns "." if the path is an empty string.
 */
-base :: proc(path: string) -> string {
-	if path == "" {
-		return "."
-	}
-
-	path := path
-	for len(path) > 0 && is_separator(path[len(path)-1]) {
-		path = path[:len(path)-1]
-	}
-
-	path = path[volume_name_len(path):]
-
-	i := len(path)-1
-	for i >= 0 && !is_separator(path[i]) {
-		i -= 1
-	}
-	if i >= 0 {
-		path = path[i+1:]
-	}
-	if path == "" {
-		return SEPARATOR_STRING
-	}
-	return path
-}
+base :: os.base
 
 /*
 	Gets the name of a file from a path.
@@ -163,24 +128,7 @@ base :: proc(path: string) -> string {
 	Returns an empty string if there is no stem. e.g: '.gitignore'.
 	Returns an empty string if there's a trailing path separator.
 */
-stem :: proc(path: string) -> string {
-	if len(path) > 0 && is_separator(path[len(path) - 1]) {
-		// NOTE(tetra): Trailing separator
-		return ""
-	}
-
-	// NOTE(tetra): Get the basename
-	path := path
-	if i := strings.last_index_any(path, SEPARATOR_CHARS); i != -1 {
-		path = path[i+1:]
-	}
-
-	if i := strings.last_index_byte(path, '.'); i != -1 {
-		return path[:i]
-	}
-
-	return path
-}
+stem :: os.stem
 
 /*
 	Gets the name of a file from a path.
@@ -196,13 +144,7 @@ stem :: proc(path: string) -> string {
 	Returns an empty string if there is no stem. e.g: '.gitignore'.
 	Returns an empty string if there's a trailing path separator.
 */
-short_stem :: proc(path: string) -> string {
-	s := stem(path)
-	if i := strings.index_byte(s, '.'); i != -1 {
-		return s[:i]
-	}
-	return s
-}
+short_stem :: os.short_stem
 
 /*
 	Gets the file extension from a path, including the dot.
@@ -219,14 +161,7 @@ short_stem :: proc(path: string) -> string {
 	Returns an empty string if there is no dot.
 	Returns an empty string if there is a trailing path separator.
 */
-ext :: proc(path: string) -> string {
-	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
-		if path[i] == '.' {
-			return path[i:]
-		}
-	}
-	return ""
-}
+ext :: os.ext
 
 /*
 	Gets the file extension from a path, including the dot.
@@ -242,24 +177,7 @@ ext :: proc(path: string) -> string {
 	Returns an empty string if there is no dot.
 	Returns an empty string if there is a trailing path separator.
 */
-long_ext :: proc(path: string) -> string {
-	if len(path) > 0 && is_separator(path[len(path) - 1]) {
-		// NOTE(tetra): Trailing separator
-		return ""
-	}
-
-	// NOTE(tetra): Get the basename
-	path := path
-	if i := strings.last_index_any(path, SEPARATOR_CHARS); i != -1 {
-		path = path[i+1:]
-	}
-
-	if i := strings.index_byte(path, '.'); i != -1 {
-		return path[i:]
-	}
-
-	return ""
-}
+long_ext :: os.long_ext
 
 /*
 	Returns the shortest path name equivalent to `path` through solely lexical processing.
