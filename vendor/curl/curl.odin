@@ -739,7 +739,7 @@ khtype :: enum c.int {
 khkey :: struct {
 	key: cstring, /* points to a null-terminated string encoded with base64
 	                 if len is zero, otherwise to the "raw" data */
-  	len: c.size_t,
+	len: c.size_t,
 	keytype: khtype,
 }
 
