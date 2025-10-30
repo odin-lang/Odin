@@ -1,12 +1,11 @@
 package documentation_tester
 
-import "core:os"
-import "core:io"
-import "core:fmt"
-import "core:strings"
-import "core:odin/ast"
-import "core:odin/parser"
-import "core:c/libc"
+import os  "core:os/os2"
+import     "core:fmt"
+import     "core:strings"
+import     "core:odin/ast"
+import     "core:odin/parser"
+import     "core:c/libc"
 import doc "core:odin/doc-format"
 
 Example_Test :: struct {
@@ -63,10 +62,11 @@ main :: proc() {
 		errorf("expected path to odin executable")
 	}
 	g_path_to_odin = os.args[1]
-	data, ok := os.read_entire_file("all.odin-doc")
-	if !ok {
+	data, data_err := os.read_entire_file("all.odin-doc", context.allocator)
+	if data_err != nil {
 		errorf("unable to read file: all.odin-doc")
 	}
+	defer delete(data)
 	err: doc.Reader_Error
 	g_header, err = doc.read_from_bytes(data)
 	switch err {
@@ -257,8 +257,8 @@ find_and_add_examples :: proc(docs: string, package_name: string, entity_name: s
 
 write_test_suite :: proc(example_tests: []Example_Test) {
 	TEST_SUITE_DIRECTORY :: "verify"
-	os.remove_directory(TEST_SUITE_DIRECTORY)
-	os.make_directory(TEST_SUITE_DIRECTORY)
+	os.remove_all(TEST_SUITE_DIRECTORY)
+	os.mkdir(TEST_SUITE_DIRECTORY)
 
 	example_build := strings.builder_make()
 	test_runner := strings.builder_make()
@@ -450,13 +450,7 @@ main :: proc() {
 			continue
 		}
 		defer os.close(test_file_handle)
-		stream := os.stream_from_handle(test_file_handle)
-		writer, ok := io.to_writer(stream); if ! ok {
-			fmt.eprintf("We could not make the writer for the path %q\n", save_path)
-			g_bad_doc = true
-			continue
-		}
-		fmt.wprintf(writer, "%v%v_%v", code_string[:index_of_proc_name], test.package_name, code_string[index_of_proc_name:])
+		fmt.wprintf(test_file_handle.stream, "%v%v_%v", code_string[:index_of_proc_name], test.package_name, code_string[index_of_proc_name:])
 		fmt.println("Done")
 	}
 
@@ -468,7 +462,7 @@ main :: proc() {
 		os.exit(1)
 	}
 }`)
-	os.write_entire_file("verify/main.odin", transmute([]byte)strings.to_string(test_runner))
+	_ = os.write_entire_file("verify/main.odin", transmute([]byte)strings.to_string(test_runner))
 }
 
 run_test_suite :: proc() -> bool {
