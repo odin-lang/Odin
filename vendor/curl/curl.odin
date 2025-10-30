@@ -3,9 +3,34 @@ package vendor_curl
 import c "core:c/libc"
 
 when ODIN_OS == .Windows {
+	@(export, extra_linker_flags="/NODEFAULTLIB:libcmt")
+	foreign import lib {
+		"lib/libcurl_a.lib",
+		"system:Advapi32.lib",
+		"system:Crypt32.lib",
+		"system:Normaliz.lib",
+		"system:Secur32.lib",
+		"system:Wldap32.lib",
+		"system:Ws2_32.lib",
+	}
+} else when ODIN_OS == .Linux {
 	@(export)
 	foreign import lib {
-		"libcurl_a.lib",
+		"system:curl",
+		"system:mbedtls",
+		"system:mbedx509",
+		"system:mbedcrypto",
+		"system:z",
+	}
+} else when ODIN_OS == .Darwin {
+	@(export)
+	foreign import lib {
+		"system:curl",
+		"system:mbedtls",
+		"system:mbedx509",
+		"system:mbedcrypto",
+		"system:z",
+		"system:SystemConfiguration.framework",
 	}
 }
 
