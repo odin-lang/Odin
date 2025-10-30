@@ -111,6 +111,7 @@ package all
 @(require) import "core:prof/spall"
 
 @(require) import "core:os"
+@(require) import "core:os/os2"
 
 @(require) import "core:path/slashpath"
 @(require) import "core:path/filepath"
