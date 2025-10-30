@@ -49,6 +49,11 @@ enum BuiltinProcId {
 
 	BuiltinProc_constant_log2,
 
+	BuiltinProc_constant_floor,
+	BuiltinProc_constant_truncate,
+	BuiltinProc_constant_ceil,
+	BuiltinProc_constant_round,
+
 	BuiltinProc_transpose,
 	BuiltinProc_outer_product,
 	BuiltinProc_hadamard_product,
@@ -420,7 +425,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("has_target_feature"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("constant_log2"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_log2"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_floor"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_truncate"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_ceil"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_round"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
