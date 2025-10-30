@@ -1,13 +1,12 @@
 package test_core_io
 
-import "core:bufio"
-import "core:bytes"
-import "core:io"
-import "core:log"
-import "core:os"
-import "core:os/os2"
-import "core:strings"
-import "core:testing"
+import    "core:bufio"
+import    "core:bytes"
+import    "core:io"
+import    "core:log"
+import os "core:os/os2"
+import    "core:strings"
+import    "core:testing"
 
 Passed_Tests :: distinct io.Stream_Mode_Set
 
@@ -540,7 +539,7 @@ test_string_builder_stream :: proc(t: ^testing.T) {
 }
 
 @test
-test_os_file_stream :: proc(t: ^testing.T) {
+test_os2_file_stream :: proc(t: ^testing.T) {
 	defer if !testing.failed(t) {
 		testing.expect_value(t, os.remove(TEMPORARY_FILENAME), nil)
 	}
@@ -550,51 +549,14 @@ test_os_file_stream :: proc(t: ^testing.T) {
 		buf[i] = 'A' + i
 	}
 
-	TEMPORARY_FILENAME :: "test_core_io_os_file_stream"
-
-	fd, open_err := os.open(TEMPORARY_FILENAME, os.O_RDWR | os.O_CREATE | os.O_TRUNC, 0o644)
-	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
-		return
-	}
-	
-	stream := os.stream_from_handle(fd)
-
-	bytes_written, write_err := io.write(stream, buf[:])
-	if !testing.expectf(t, bytes_written == len(buf) && write_err == nil,
-		"failed to Write initial buffer: bytes_written<%v> != len_buf<%v>, %v", bytes_written, len(buf), write_err) {
-		return
-	}
-
-	flush_err := io.flush(stream)
-	if !testing.expectf(t, flush_err == nil,
-		"failed to Flush initial buffer: %v", write_err) {
-		return
-	}
-
-	results, _ := _test_stream(t, stream, buf[:])
-
-	log.debugf("%#v", results)
-}
-
-@test
-test_os2_file_stream :: proc(t: ^testing.T) {
-	defer if !testing.failed(t) {
-		testing.expect_value(t, os2.remove(TEMPORARY_FILENAME), nil)
-	}
-
-	buf: [32]u8
-	for i in 0..<u8(len(buf)) {
-		buf[i] = 'A' + i
-	}
-
 	TEMPORARY_FILENAME :: "test_core_io_os2_file_stream"
 
-	fd, open_err := os2.open(TEMPORARY_FILENAME, {.Read, .Write, .Create, .Trunc})
+	fd, open_err := os.open(TEMPORARY_FILENAME, {.Read, .Write, .Create, .Trunc})
 	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
 		return
 	}
 
-	stream := os2.to_stream(fd)
+	stream := os.to_stream(fd)
 
 	bytes_written, write_err := io.write(stream, buf[:])
 	if !testing.expectf(t, bytes_written == len(buf) && write_err == nil,
@@ -679,7 +641,7 @@ test_bufio_buffered_read_writer :: proc(t: ^testing.T) {
 	// Using an os2.File as the backing stream for both reader & writer.
 
 	defer if !testing.failed(t) {
-		testing.expect_value(t, os2.remove(TEMPORARY_FILENAME), nil)
+		testing.expect_value(t, os.remove(TEMPORARY_FILENAME), nil)
 	}
 
 	buf: [32]u8
@@ -689,13 +651,13 @@ test_bufio_buffered_read_writer :: proc(t: ^testing.T) {
 
 	TEMPORARY_FILENAME :: "test_core_io_bufio_read_writer_os2_file_stream"
 
-	fd, open_err := os2.open(TEMPORARY_FILENAME, {.Read, .Write, .Create, .Trunc})
+	fd, open_err := os.open(TEMPORARY_FILENAME, {.Read, .Write, .Create, .Trunc})
 	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
 		return
 	}
-	defer testing.expect_value(t, os2.close(fd), nil)
+	defer testing.expect_value(t, os.close(fd), nil)
 
-	stream := os2.to_stream(fd)
+	stream := os.to_stream(fd)
 
 	bytes_written, write_err := io.write(stream, buf[:])
 	if !testing.expectf(t, bytes_written == len(buf) && write_err == nil,
