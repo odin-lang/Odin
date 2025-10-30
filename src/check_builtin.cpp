@@ -4769,7 +4769,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	}
 
 	case BuiltinProc_constant_floor:
-	case BuiltinProc_constant_truncate:
+	case BuiltinProc_constant_trunc:
 	case BuiltinProc_constant_ceil:
 	case BuiltinProc_constant_round:
 	{
@@ -4789,10 +4789,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		} else if (value.kind == ExactValue_Float) {
 			f64 f = value.value_float;
 			switch (id) {
-			case BuiltinProc_constant_floor:    f = floor(f); break;
-			case BuiltinProc_constant_truncate: f = trunc(f); break;
-			case BuiltinProc_constant_ceil:     f = ceil(f);  break;
-			case BuiltinProc_constant_round:    f = round(f); break;
+			case BuiltinProc_constant_floor: f = floor(f); break;
+			case BuiltinProc_constant_trunc: f = trunc(f); break;
+			case BuiltinProc_constant_ceil:  f = ceil(f);  break;
+			case BuiltinProc_constant_round: f = round(f); break;
 			default:
 				GB_PANIC("Unhandled built-in: %.*s", LIT(builtin_name));
 				break;
