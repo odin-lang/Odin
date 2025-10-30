@@ -35,6 +35,6 @@ _exit :: proc "contextless" (code: int) -> ! {
 		94  when ODIN_ARCH == .riscv64 else
 		0
 
-	intrinsics.syscall(uintptr(SYS_exit_group), i32(code))
+	intrinsics.syscall(uintptr(SYS_exit_group), uintptr(i32(code)))
 	unreachable()
 }
