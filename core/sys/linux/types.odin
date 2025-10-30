@@ -1446,9 +1446,25 @@ EPoll_Data :: struct #raw_union {
 	u64: u64,
 }
 
-EPoll_Event :: struct #packed {
-	events: EPoll_Event_Set,
-	data:   EPoll_Data,
+/*
+	Linux kernel only packs this struct on x86_64.
+	include/uapi/linux/eventpoll.h:	
+		#ifdef __x86_64__
+		#define EPOLL_PACKED __attribute__((packed))
+		#else
+		#define EPOLL_PACKED
+		#endif
+*/
+when ODIN_ARCH == .amd64 {
+	EPoll_Event :: struct #packed {
+		events: EPoll_Event_Set,
+		data:   EPoll_Data,
+	}
+} else {
+	EPoll_Event :: struct {
+		events: EPoll_Event_Set,
+		data:   EPoll_Data,
+	}
 }
 
 /*

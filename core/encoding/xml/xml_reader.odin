@@ -1,13 +1,13 @@
+package encoding_xml
 /*
+	An XML 1.0 / 1.1 parser
+
 	2021-2022 Jeroen van Rijn <nom@duclavier.com>.
 	available under Odin's BSD-3 license.
 
 	List of contributors:
 	- Jeroen van Rijn: Initial implementation.
 */
-
-package encoding_xml
-// An XML 1.0 / 1.1 parser
 
 import "core:bytes"
 import "core:encoding/entity"

@@ -124,7 +124,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_attr_getscope.html ]]
 	*/
-	pthread_attr_setscope :: proc(attr: ^pthread_attr_t, contentionscope: ^Thread_Scope) -> Errno ---
+	pthread_attr_setscope :: proc(attr: ^pthread_attr_t, contentionscope: Thread_Scope) -> Errno ---
 
 	/*
 	Get the area of storage to be used for the created thread's stack.
@@ -400,7 +400,7 @@ when ODIN_OS == .Darwin {
 	PTHREAD_SCOPE_PROCESS   :: 2
 	PTHREAD_SCOPE_SYSTEM    :: 1
 
-	pthread_t :: distinct u64
+	pthread_t :: distinct rawptr
 
 	pthread_attr_t :: struct {
 		__sig:    c.long,

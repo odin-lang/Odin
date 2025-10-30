@@ -1,3 +1,4 @@
+// The `Odin` file parser to be used in tooling.
 package odin_parser
 
 import "core:odin/ast"
@@ -98,10 +99,8 @@ end_pos :: proc(tok: tokenizer.Token) -> tokenizer.Pos {
 	pos := tok.pos
 	pos.offset += len(tok.text)
 
-	if tok.kind == .Comment {
-		if tok.text[:2] != "/*" {
-			pos.column += len(tok.text)
-		} else {
+	if tok.kind == .Comment || tok.kind == .String {
+		if tok.text[:2] == "/*" || tok.text[:1] == "`" {
 			for i := 0; i < len(tok.text); i += 1 {
 				c := tok.text[i]
 				if c == '\n' {
@@ -111,6 +110,8 @@ end_pos :: proc(tok: tokenizer.Token) -> tokenizer.Pos {
 					pos.column += 1
 				}
 			}
+		} else {
+			pos.column += len(tok.text)
 		}
 	} else {
 		pos.column += len(tok.text)
@@ -2485,7 +2486,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				allow_token(p, .Comma) or_break
 			}
 
-			close := expect_token(p, .Close_Brace)
+			close := expect_closing_brace_of_field_list(p)
 
 			if len(args) == 0 {
 				error(p, tok.pos, "expected at least 1 argument in procedure group")

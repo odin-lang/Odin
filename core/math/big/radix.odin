@@ -1,3 +1,5 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -12,9 +14,6 @@
 		- Use Barrett reduction for non-powers-of-two.
 		- Also look at extracting and splatting several digits at once.
 */
-
-
-package math_big
 
 import "base:intrinsics"
 import "core:mem"

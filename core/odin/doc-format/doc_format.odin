@@ -1,3 +1,4 @@
+// The `.odin-doc` file format, as used by these package docs at `pkg.odin-lang.org`.
 package odin_doc_format
 
 import "core:mem"

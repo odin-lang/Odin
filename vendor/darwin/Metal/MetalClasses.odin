@@ -1,3 +1,4 @@
+// Bindings for [[ Metal ; https://developer.apple.com/documentation/metal ]].
 package objc_Metal
 
 import NS "core:sys/darwin/Foundation"

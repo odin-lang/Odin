@@ -123,7 +123,7 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr)
 
-mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+mem_alloc_bytes :: #force_no_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if size == 0 || allocator.procedure == nil{
 		return nil, nil
@@ -131,7 +131,7 @@ mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNM
 	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
 }
 
-mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+mem_alloc :: #force_no_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if size == 0 || allocator.procedure == nil {
 		return nil, nil
@@ -139,7 +139,7 @@ mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, a
 	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
 }
 
-mem_alloc_non_zeroed :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+mem_alloc_non_zeroed :: #force_no_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if size == 0 || allocator.procedure == nil {
 		return nil, nil
@@ -147,7 +147,7 @@ mem_alloc_non_zeroed :: #force_inline proc(size: int, alignment: int = DEFAULT_A
 	return allocator.procedure(allocator.data, .Alloc_Non_Zeroed, size, alignment, nil, 0, loc)
 }
 
-mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+mem_free :: #force_no_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	if ptr == nil || allocator.procedure == nil {
 		return nil
 	}
@@ -155,7 +155,7 @@ mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc 
 	return err
 }
 
-mem_free_with_size :: #force_inline proc(ptr: rawptr, byte_count: int, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+mem_free_with_size :: #force_no_inline proc(ptr: rawptr, byte_count: int, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	if ptr == nil || allocator.procedure == nil {
 		return nil
 	}
@@ -163,7 +163,7 @@ mem_free_with_size :: #force_inline proc(ptr: rawptr, byte_count: int, allocator
 	return err
 }
 
-mem_free_bytes :: #force_inline proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+mem_free_bytes :: #force_no_inline proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	if bytes == nil || allocator.procedure == nil {
 		return nil
 	}
@@ -172,14 +172,14 @@ mem_free_bytes :: #force_inline proc(bytes: []byte, allocator := context.allocat
 }
 
 
-mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #caller_location) -> (err: Allocator_Error) {
+mem_free_all :: #force_no_inline proc(allocator := context.allocator, loc := #caller_location) -> (err: Allocator_Error) {
 	if allocator.procedure != nil {
 		_, err = allocator.procedure(allocator.data, .Free_All, 0, 0, nil, 0, loc)
 	}
 	return
 }
 
-_mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, should_zero: bool, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+_mem_resize :: #force_no_inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, should_zero: bool, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	if allocator.procedure == nil {
 		return nil, nil
@@ -228,6 +228,55 @@ mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAUL
 non_zero_mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	assert(is_power_of_two_int(alignment), "Alignment must be a power of two", loc)
 	return _mem_resize(ptr, old_size, new_size, alignment, allocator, false, loc)
+}
+
+conditional_mem_zero :: proc "contextless" (data: rawptr, n_: int) #no_bounds_check {
+	// When acquiring memory from the OS for the first time it's likely that the
+	// OS already gives the zero page mapped multiple times for the request. The
+	// actual allocation does not have physical pages allocated to it until those
+	// pages are written to which causes a page-fault. This is often called COW
+	// (Copy on Write)
+	//
+	// You do not want to actually zero out memory in this case because it would
+	// cause a bunch of page faults decreasing the speed of allocations and
+	// increase the amount of actual resident physical memory used.
+	//
+	// Instead a better technique is to check if memory is zerored before zeroing
+	// it. This turns out to be an important optimization in practice, saving
+	// nearly half (or more) the amount of physical memory used by an application.
+	// This is why every implementation of calloc in libc does this optimization.
+	//
+	// It may seem counter-intuitive but most allocations in an application are
+	// wasted and never used. When you consider something like a [dynamic]T which
+	// always doubles in capacity on resize but you rarely ever actually use the
+	// full capacity of a dynamic array it means you have a lot of resident waste
+	// if you actually zeroed the remainder of the memory.
+	//
+	// Keep in mind the OS is already guaranteed to give you zeroed memory by
+	// mapping in this zero page multiple times so in the best case there is no
+	// need to actually zero anything. As for testing all this memory for a zero
+	// value, it costs nothing because the the same zero page is used for the
+	// whole allocation and will exist in L1 cache for the entire zero checking
+	// process.
+
+	if n_ <= 0 {
+		return
+	}
+	n := uint(n_)
+
+	n_words := n / size_of(uintptr)
+	p_words := ([^]uintptr)(data)[:n_words]
+	p_bytes := ([^]byte)(data)[size_of(uintptr) * n_words:n]
+	for &p_word in p_words {
+		if p_word != 0 {
+			p_word = 0
+		}
+	}
+	for &p_byte in p_bytes {
+		if p_byte != 0 {
+			p_byte = 0
+		}
+	}
 }
 
 memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
@@ -667,7 +716,7 @@ quaternion256_eq :: #force_inline proc "contextless" (a, b: quaternion256) -> bo
 quaternion256_ne :: #force_inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b) }
 
 
-string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int) {
+string_decode_rune :: proc "contextless" (s: string) -> (rune, int) {
 	// NOTE(bill): Duplicated here to remove dependency on package unicode/utf8
 
 	@(static, rodata) accept_sizes := [256]u8{
@@ -782,7 +831,7 @@ string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
 }
 
 
-string16_decode_rune :: #force_inline proc "contextless" (s: string16) -> (rune, int) {
+string16_decode_rune :: proc "contextless" (s: string16) -> (rune, int) {
 	REPLACEMENT_CHAR :: '\ufffd'
 	_surr1           :: 0xd800
 	_surr2           :: 0xdc00

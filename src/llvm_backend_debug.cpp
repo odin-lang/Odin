@@ -1327,7 +1327,7 @@ gb_internal void lb_add_debug_info_for_global_constant_from_entity(lbGenerator *
 	}
 	lbModule *m = &gen->default_module;
 	if (USE_SEPARATE_MODULES) {
-		m = lb_module_of_entity(gen, e);
+		m = lb_module_of_entity(gen, e, m);
 	}
 	GB_ASSERT(m != nullptr);
 

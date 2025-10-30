@@ -1,3 +1,5 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -8,9 +10,6 @@
 
 	This file contains prime finding operations.
 */
-
-
-package math_big
 
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.

@@ -107,17 +107,14 @@ read_entire_file :: proc{
 }
 
 @(require_results)
-read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
-	f, ferr := open(name)
-	if ferr != nil {
-		return nil, ferr
-	}
+read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator, loc := #caller_location) -> (data: []byte, err: Error) {
+	f := open(name) or_return
 	defer close(f)
-	return read_entire_file_from_file(f, allocator)
+	return read_entire_file_from_file(f, allocator, loc)
 }
 
 @(require_results)
-read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
+read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator, loc := #caller_location) -> (data: []byte, err: Error) {
 	size: int
 	has_size := false
 	if size64, serr := file_size(f); serr == nil {
@@ -129,7 +126,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 
 	if has_size && size > 0 {
 		total: int
-		data = make([]byte, size, allocator) or_return
+		data = make([]byte, size, allocator, loc) or_return
 		for total < len(data) {
 			n: int
 			n, err = read(f, data[total:])
@@ -145,13 +142,13 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator) -> (d
 		return
 	} else {
 		buffer: [1024]u8
-		out_buffer := make([dynamic]u8, 0, 0, allocator)
+		out_buffer := make([dynamic]u8, 0, 0, allocator, loc)
 		total := 0
 		for {
 			n: int
 			n, err = read(f, buffer[:])
 			total += n
-			append_elems(&out_buffer, ..buffer[:n]) or_return
+			append_elems(&out_buffer, ..buffer[:n], loc=loc) or_return
 			if err != nil {
 				if err == .EOF || err == .Broken_Pipe {
 					err = nil

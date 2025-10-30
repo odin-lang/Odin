@@ -1,5 +1,7 @@
 #include "parser_pos.cpp"
 
+gb_global std::atomic<bool> g_parsing_done;
+
 gb_internal bool in_vet_packages(AstFile *file) {
 	if (file == nullptr) {
 		return true;
@@ -176,7 +178,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		return nullptr;
 	}
 	if (f == nullptr) {
-		f = node->thread_safe_file();
+		if (g_parsing_done.load(std::memory_order_relaxed)) {
+			f = node->file();
+		} else {
+			f = node->thread_safe_file();
+		}
 	}
 	Ast *n = alloc_ast_node(f, node->kind);
 	gb_memmove(n, node, ast_node_size(node->kind));
@@ -744,6 +750,7 @@ gb_internal Ast *ast_matrix_index_expr(AstFile *f, Ast *expr, Token open, Token 
 gb_internal Ast *ast_ident(AstFile *f, Token token) {
 	Ast *result = alloc_ast_node(f, Ast_Ident);
 	result->Ident.token = token;
+	result->Ident.hash = string_hash(token.string);
 	return result;
 }
 
@@ -2732,7 +2739,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (allow_token(f, Token_Comma)) {
 				Ast *dummy_name = parse_ident(f);
 				if (!err_once) {
-					error(dummy_name, "'bit_field' fields do not support multiple names per field");
+					syntax_error(dummy_name, "'bit_field' fields do not support multiple names per field");
 					err_once = true;
 				}
 			}
@@ -3292,8 +3299,16 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			open = expect_token(f, Token_OpenBracket);
 
 			if (f->curr_token.kind == Token_CloseBracket) {
-				error(f->curr_token, "Expected an operand, got ]");
+				ERROR_BLOCK();
+				syntax_error(f->curr_token, "Expected an operand, got ]");
 				close = expect_token(f, Token_CloseBracket);
+
+				if (f->allow_type) {
+					gbString s = expr_to_string(operand);
+					error_line("\tSuggestion: If a type was wanted, did you mean '[]%s'?", s);
+					gb_string_free(s);
+				}
+
 				operand = ast_index_expr(f, operand, nullptr, open, close);
 				break;
 			}
@@ -6417,6 +6432,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 				switch (flag) {
 				case OptInFeatureFlag_IntegerDivisionByZero_Trap:
 				case OptInFeatureFlag_IntegerDivisionByZero_Zero:
+				case OptInFeatureFlag_IntegerDivisionByZero_AllBits:
 					syntax_error(token_for_pos, "Feature flag does not support notting with '!' - '%.*s'", LIT(p));
 					break;
 				}
@@ -6429,6 +6445,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 			error_line("\tinteger-division-by-zero:trap\n");
 			error_line("\tinteger-division-by-zero:zero\n");
 			error_line("\tinteger-division-by-zero:self\n");
+			error_line("\tinteger-division-by-zero:all-bits\n");
 			return OptInFeatureFlag_NONE;
 		}
 	}
@@ -6554,6 +6571,10 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (string_starts_with(lc, str_lit("vet"))) {
 		f->vet_flags = parse_vet_tag(tok, lc);
 		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("test"))) {
+		if ((build_context.command_kind & Command_test) == 0) {
+			return false;
+		}
 	} else if (string_starts_with(lc, str_lit("ignore"))) {
 		return false;
 	} else if (string_starts_with(lc, str_lit("private"))) {
@@ -6581,7 +6602,7 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (lc == "no-instrumentation") {
 		f->flags |= AstFile_NoInstrumentation;
 	} else {
-		error(tok, "Unknown tag '%.*s'", LIT(lc));
+		syntax_error(tok, "Unknown tag '%.*s'", LIT(lc));
 	}
 
 	return true;
@@ -6923,6 +6944,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
 		}
 	}
+
+	g_parsing_done.store(true, std::memory_order_relaxed);
 
 	return ParseFile_None;
 }

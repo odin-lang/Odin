@@ -1,5 +1,5 @@
 /*
-package sha3 implements the SHA3 hash algorithm family.
+`SHA3` hash algorithm family.
 
 The SHAKE XOF can be found in crypto/shake.  While discouraged if the
 pre-standardization Keccak algorithm is required, it can be found in

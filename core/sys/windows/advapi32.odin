@@ -167,6 +167,13 @@ foreign advapi32 {
 		lpftLastWriteTime: ^FILETIME,
 	) -> LSTATUS ---
 
+	RegEnumKeyW :: proc(
+		hKey: HKEY,
+		dwIndex: DWORD,
+		lpName: LPWSTR,
+		lpcchName: LPDWORD,
+	  ) -> LSTATUS ---
+
 	RegEnumKeyExW :: proc(
 		hKey: HKEY,
 		dwIndex: DWORD,

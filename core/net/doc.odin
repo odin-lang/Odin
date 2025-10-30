@@ -1,20 +1,5 @@
 /*
-	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
-	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
-	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
-	Copyright 2024 Feoramund       <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
-
-	List of contributors:
-		Tetralux:        Initial implementation
-		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
-		Jeroen van Rijn: Cross platform unification, code style, documentation
-		Feoramund:       FreeBSD platform code
-*/
-
-/*
-Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
-For other protocols and their features, see subdirectories of this package.
+Cross-platform Berkeley Sockets, `DNS` resolution and associated procedures.
 
 Features:
 - Supports Windows, Linux and OSX.
@@ -44,3 +29,17 @@ or worse. This means that should you replace the temp allocator with an insuffic
 we'll do our best to loudly complain the first time you try it.
 */
 package net
+
+/*
+	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
+	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
+	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2024 Feoramund       <rune@swevencraft.org>.
+	Made available under Odin's BSD-3 license.
+
+	List of contributors:
+		Tetralux:        Initial implementation
+		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
+		Jeroen van Rijn: Cross platform unification, code style, documentation
+		Feoramund:       FreeBSD platform code
+*/

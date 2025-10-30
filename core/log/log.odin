@@ -1,3 +1,4 @@
+// Implementations of the `context.Logger` interface.
 package log
 
 import "base:runtime"
@@ -193,7 +194,7 @@ log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location)
 		return
 	}
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	str := fmt.tprint(..args, sep=sep) //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
+	str := fmt.tprint(..args, sep=sep)
 	logger.procedure(logger.data, level, str, logger.options, location)
 }
 

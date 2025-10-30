@@ -82,6 +82,7 @@ package all
 @(require) import "core:image/png"
 @(require) import "core:image/qoi"
 @(require) import "core:image/tga"
+@(require) import "core:image/jpeg"
 
 @(require) import "core:io"
 @(require) import "core:log"

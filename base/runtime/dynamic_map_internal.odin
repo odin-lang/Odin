@@ -985,6 +985,9 @@ __dynamic_map_entry :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 // IMPORTANT: USED WITHIN THE COMPILER
 @(private)
 __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uint, loc := #caller_location) -> Allocator_Error {
+	if m == nil {
+		return nil
+	}
 	return map_reserve_dynamic(m, info, uintptr(new_capacity), loc)
 }
 

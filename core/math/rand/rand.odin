@@ -1,7 +1,4 @@
-
-/*
-Package core:math/rand implements various random number generators
-*/
+// Random number generators.
 package rand
 
 import "base:intrinsics"

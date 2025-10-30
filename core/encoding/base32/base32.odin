@@ -1,19 +1,20 @@
-// Base32 encoding/decoding implementation as specified in RFC 4648.
-// [[ More; https://www.rfc-editor.org/rfc/rfc4648.html ]]
+/*
+`Base32` encoding and decoding, as specified in [[ RFC 4648; https://www.rfc-editor.org/rfc/rfc4648.html ]].
+
+A secondary param can be used to supply a custom alphabet to `encode` and a matching decoding table to `decode`.
+
+If none is supplied it just uses the standard Base32 alphabet.
+In case your specific version does not use padding, you may
+truncate it from the encoded output.
+
+Error represents errors that can occur during base32 decoding operations.
+As per RFC 4648:
+- Section 3.3: Invalid character handling
+- Section 3.2: Padding requirements
+- Section 6: Base32 encoding specifics (including block size requirements)
+*/
 package encoding_base32
 
-// @note(zh): Encoding utility for Base32
-// A secondary param can be used to supply a custom alphabet to
-// @link(encode) and a matching decoding table to @link(decode).
-// If none is supplied it just uses the standard Base32 alphabet.
-// In case your specific version does not use padding, you may
-// truncate it from the encoded output.
-
-// Error represents errors that can occur during base32 decoding operations.
-// As per RFC 4648:
-// - Section 3.3: Invalid character handling
-// - Section 3.2: Padding requirements
-// - Section 6: Base32 encoding specifics (including block size requirements)
 Error :: enum {
 	None,
 	Invalid_Character, // Input contains characters outside the specified alphabet

@@ -1,3 +1,4 @@
+// Timezone lookup.
 package timezone
 
 import "core:fmt"

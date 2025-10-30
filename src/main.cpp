@@ -334,6 +334,7 @@ enum BuildFlagKind {
 
 	BuildFlag_ShowDefineables,
 	BuildFlag_ExportDefineables,
+	BuildFlag_IgnoreUnusedDefineables,
 
 	BuildFlag_Vet,
 	BuildFlag_VetShadowing,
@@ -391,8 +392,11 @@ enum BuildFlagKind {
 	BuildFlag_MinLinkLibs,
 
 	BuildFlag_PrintLinkerFlags,
+	BuildFlag_ExportLinkedLibraries,
 
 	BuildFlag_IntegerDivisionByZero,
+
+	BuildFlag_BuildDiagnostics,
 
 	// internal use only
 	BuildFlag_InternalFastISel,
@@ -403,6 +407,8 @@ enum BuildFlagKind {
 	BuildFlag_InternalCached,
 	BuildFlag_InternalNoInline,
 	BuildFlag_InternalByValue,
+	BuildFlag_InternalWeakMonomorphization,
+	BuildFlag_InternalLLVMVerification,
 
 	BuildFlag_Tilde,
 
@@ -558,6 +564,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_ShowDefineables,         str_lit("show-defineables"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_IgnoreUnusedDefineables, str_lit("ignore-unused-defineables"), BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
@@ -612,11 +619,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_MaxErrorCount,           str_lit("max-error-count"),           BuildFlagParam_Integer, Command_all);
 
 	add_flag(&build_flags, BuildFlag_MinLinkLibs,             str_lit("min-link-libs"),             BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExportLinkedLibraries,   str_lit("export-linked-libs-file"),   BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_PrintLinkerFlags,        str_lit("print-linker-flags"),        BuildFlagParam_None,    Command_build);
 
 	add_flag(&build_flags, BuildFlag_IntegerDivisionByZero,   str_lit("integer-division-by-zero"),  BuildFlagParam_String, Command__does_check);
 
+	add_flag(&build_flags, BuildFlag_BuildDiagnostics,        str_lit("build-diagnostics"),         BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
@@ -626,6 +635,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalCached,          str_lit("internal-cached"),           BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalNoInline,        str_lit("internal-no-inline"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalWeakMonomorphization, str_lit("internal-weak-monomorphization"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
@@ -934,6 +945,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 
+							break;
+						}
+						case BuildFlag_IgnoreUnusedDefineables: {
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.ignore_unused_defineables = true;
 							break;
 						}
 						case BuildFlag_ShowSystemCalls: {
@@ -1540,6 +1556,14 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.min_link_libs = true;
 							break;
 
+						case BuildFlag_ExportLinkedLibraries:
+							build_context.export_linked_libs_path = string_trim_whitespace(value.value_string);
+							if (build_context.export_linked_libs_path.len == 0) {
+								gb_printf_err("-%.*s specified an empty path\n", LIT(name));
+								bad_flags = true;
+							}
+							break;
+
 						case BuildFlag_PrintLinkerFlags:
 							build_context.print_linker_flags = true;
 							break;
@@ -1556,6 +1580,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("-integer-division-by-zero options are 'trap', 'zero', and 'self'.\n");
 								bad_flags = true;
 							}
+							break;
+
+						case BuildFlag_BuildDiagnostics:
+							build_context.build_diagnostics = true;
 							break;
 
 						case BuildFlag_InternalFastISel:
@@ -1584,6 +1612,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalByValue:
 							build_context.internal_by_value = true;
 							break;
+						case BuildFlag_InternalWeakMonomorphization:
+							build_context.internal_weak_monomorphization = true;
+							break;
+						case BuildFlag_InternalLLVMVerification:
+							build_context.internal_ignore_llvm_verification = true;
+							break;
+
 
 						case BuildFlag_Tilde:
 							build_context.tilde_backend = true;
@@ -2244,6 +2279,63 @@ gb_internal void export_dependencies(Checker *c) {
 	}
 }
 
+gb_internal void export_linked_libraries(LinkerData *gen) {
+	gbFile f = {};
+	char * fileName = (char *)build_context.export_linked_libs_path.text;
+	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, fileName);
+	if (err != gbFileError_None) {
+		gb_printf_err("Failed to export linked library list to: %s\n", fileName);
+		exit_with_errors();
+		return;
+	}
+	defer (gb_file_close(&f));
+
+	StringSet min_libs_set = {};
+	string_set_init(&min_libs_set, 64);
+	defer (string_set_destroy(&min_libs_set));
+
+	for (auto *e : gen->foreign_libraries) {
+		GB_ASSERT(e->kind == Entity_LibraryName);
+		ast_node(imp, ForeignImportDecl, e->LibraryName.decl);
+
+		for (isize i = 0; i < e->LibraryName.paths.count; i++) {
+			String lib_path = string_trim_whitespace(e->LibraryName.paths[i]);
+			if (lib_path.len == 0) {
+				continue;
+			}
+
+			if (string_set_update(&min_libs_set, lib_path)) {
+				continue;
+			}
+
+			gb_fprintf(&f, "%.*s\t", LIT(lib_path));
+
+			String ext = path_extension(lib_path, false);
+			if (str_eq_ignore_case(ext, "a") || str_eq_ignore_case(ext, "lib") ||
+				str_eq_ignore_case(ext, "o") || str_eq_ignore_case(ext, "obj")
+			) {
+				gb_fprintf(&f, "static");
+			} else {
+				gb_fprintf(&f, "dynamic");
+			}
+
+			gb_fprintf(&f, "\t");
+
+			Ast *file_path = imp->filepaths[i];
+			GB_ASSERT(file_path->tav.mode == Addressing_Constant && file_path->tav.value.kind == ExactValue_String);
+			String file_path_str = file_path->tav.value.value_string;
+
+			if (string_starts_with(file_path_str, str_lit("system:"))) {
+				gb_fprintf(&f, "system");
+			} else {
+				gb_fprintf(&f, "user");
+			}
+
+			gb_fprintf(&f, "\n");
+		}
+	}
+}
+
 gb_internal void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
 
@@ -2797,6 +2889,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Shows an overview of all the #config/#defined usages in the project.");
 		}
 
+		if (print_flag("-ignore-unused-defineables")) {
+			print_usage_line(2, "Silence warning/error if a -define doesn't have at least one #config/#defined usage.");
+		}
+
 		if (print_flag("-show-system-calls")) {
 			print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler.");
 		}
@@ -2826,7 +2922,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons.");
 			print_usage_line(2, "Errs on missing trailing commas followed by a newline.");
 			print_usage_line(2, "Errs on deprecated syntax.");
-			print_usage_line(2, "Errs when the attached-brace style in not adhered to (also known as 1TBS).");
+			print_usage_line(2, "Errs when the attached-brace style is not adhered to (also known as 1TBS).");
 			print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
 		}
 	}
@@ -3050,7 +3146,8 @@ gb_internal void print_show_unused(Checker *c) {
 		if (e->token.string == "_") {
 			continue;
 		}
-		if (ptr_set_exists(&info->minimum_dependency_set, e)) {
+
+		if (e->min_dep_count.load(std::memory_order_relaxed) > 0) {
 			continue;
 		}
 		array_add(&unused, e);
@@ -3617,6 +3714,11 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
+	
+	// Warn about Windows i386 thread-local storage limitations
+	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
+		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
+	}
 
 	// Check chosen microarchitecture. If not found or ?, print list.
 	bool print_microarch_list = true;
@@ -3695,6 +3797,11 @@ int main(int arg_count, char const **arg_ptr) {
 			String item = string_split_iterator(&target_it, ',');
 			if (item == "") break;
 
+			if (*item.text == '+' || *item.text == '-') {
+				item.text++;
+				item.len--;
+			}
+
 			String invalid;
 			if (!check_target_feature_is_valid_for_target_arch(item, &invalid) && item != str_lit("help")) {
 				if (item != str_lit("?")) {
@@ -3744,6 +3851,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.show_debug_messages) {
 		debugf("Selected microarch: %.*s\n", LIT(march));
 		debugf("Default microarch features: %.*s\n", LIT(default_features));
+		debugf("Target triplet: %.*s\n", LIT(build_context.metrics.target_triplet));
 		for_array(i, build_context.build_paths) {
 			String build_path = path_to_string(heap_allocator(), build_context.build_paths[i]);
 			debugf("build_paths[%ld]: %.*s\n", i, LIT(build_path));
@@ -3794,7 +3902,9 @@ int main(int arg_count, char const **arg_ptr) {
 
 	MAIN_TIME_SECTION("type check");
 	check_parsed_files(checker);
-	check_defines(&build_context, checker);
+	if (!build_context.ignore_unused_defineables) {
+		check_defines(&build_context, checker);
+	}
 	if (any_errors()) {
 		print_all_errors();
 		return 1;
@@ -3911,6 +4021,10 @@ int main(int arg_count, char const **arg_ptr) {
 						export_dependencies(checker);
 					}
 					return result;
+				} else {
+					if (build_context.export_linked_libs_path != "") {
+						export_linked_libraries(gen);
+					}
 				}
 				break;
 			}

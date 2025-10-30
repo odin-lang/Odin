@@ -1,3 +1,6 @@
+// Reader and writer for 8-bit RGB and RGBA `TGA` images.
+package tga
+
 /*
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
@@ -6,10 +9,6 @@
 		Jeroen van Rijn: Initial implementation.
 		Benoit Jacquier: tga loader
 */
-
-
-// package tga implements a TGA image writer for 8-bit RGB and RGBA images.
-package tga
 
 import "core:mem"
 import "core:image"
