@@ -309,7 +309,7 @@ Example:
 	import "core:container/small_array"
 	import "core:fmt"
 
-	non_zero_resize :: proc() {
+	non_zero_resize_example :: proc() {
 		a: small_array.Small_Array(5, int)
 
 		small_array.push_back(&a, 1)

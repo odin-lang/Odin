@@ -13,6 +13,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	nullptr, // BuiltinProc__type_simple_boolean_begin
 
 	is_type_boolean,
+	is_type_bit_field,
 	is_type_integer,
 	is_type_rune,
 	is_type_float,
@@ -24,6 +25,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_cstring16,
 	is_type_typeid,
 	is_type_any,
+
 	is_type_endian_platform,
 	is_type_endian_little,
 	is_type_endian_big,
@@ -34,8 +36,8 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_indexable,
 	is_type_sliceable,
 	is_type_comparable,
-	is_type_simple_compare,
-	is_type_nearly_simple_compare,
+	is_type_simple_compare, // easily compared using memcmp
+	is_type_nearly_simple_compare, // easily compared using memcmp (including floats)
 	is_type_dereferenceable,
 	is_type_valid_for_keys,
 	is_type_valid_for_matrix_elems,
@@ -47,14 +49,12 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_enumerated_array,
 	is_type_slice,
 	is_type_dynamic_array,
-
 	is_type_map,
 	is_type_struct,
 	is_type_union,
 	is_type_enum,
 	is_type_proc,
 	is_type_bit_set,
-	is_type_bit_field,
 	is_type_simd_vector,
 	is_type_matrix,
 	is_type_raw_union,
@@ -4768,6 +4768,42 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 	}
 
+	case BuiltinProc_constant_floor:
+	case BuiltinProc_constant_trunc:
+	case BuiltinProc_constant_ceil:
+	case BuiltinProc_constant_round:
+	{
+		Operand o = {};
+		check_expr(c, &o, ce->args[0]);
+
+		if (!is_type_integer_or_float(o.type) && (o.mode != Addressing_Constant)) {
+			error(ce->args[0], "Expected a constant number for '%.*s'", LIT(builtin_name));
+			return false;
+		}
+		operand->mode = Addressing_Constant;
+		operand->type = o.type;
+
+		ExactValue value = o.value;
+		if (value.kind == ExactValue_Integer) {
+			// do nothing
+		} else if (value.kind == ExactValue_Float) {
+			f64 f = value.value_float;
+			switch (id) {
+			case BuiltinProc_constant_floor: f = floor(f); break;
+			case BuiltinProc_constant_trunc: f = trunc(f); break;
+			case BuiltinProc_constant_ceil:  f = ceil(f);  break;
+			case BuiltinProc_constant_round: f = round(f); break;
+			default:
+				GB_PANIC("Unhandled built-in: %.*s", LIT(builtin_name));
+				break;
+			}
+			value = exact_value_float(f);
+		}
+
+		operand->value = value;
+		break;
+	}
+
 	case BuiltinProc_soa_struct: {
 		Operand x = {};
 		Operand y = {};
@@ -6552,17 +6588,18 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 
 	case BuiltinProc_type_is_boolean:
+	case BuiltinProc_type_is_bit_field:
 	case BuiltinProc_type_is_integer:
 	case BuiltinProc_type_is_rune:
 	case BuiltinProc_type_is_float:
 	case BuiltinProc_type_is_complex:
 	case BuiltinProc_type_is_quaternion:
-	case BuiltinProc_type_is_typeid:
-	case BuiltinProc_type_is_any:
 	case BuiltinProc_type_is_string:
 	case BuiltinProc_type_is_string16:
 	case BuiltinProc_type_is_cstring:
 	case BuiltinProc_type_is_cstring16:
+	case BuiltinProc_type_is_typeid:
+	case BuiltinProc_type_is_any:
 	case BuiltinProc_type_is_endian_platform:
 	case BuiltinProc_type_is_endian_little:
 	case BuiltinProc_type_is_endian_big:
@@ -6573,8 +6610,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_indexable:
 	case BuiltinProc_type_is_sliceable:
 	case BuiltinProc_type_is_comparable:
-	case BuiltinProc_type_is_simple_compare:
-	case BuiltinProc_type_is_nearly_simple_compare:
+	case BuiltinProc_type_is_simple_compare: // easily compared using memcmp
+	case BuiltinProc_type_is_nearly_simple_compare: // easily compared using memcmp (including floats)
 	case BuiltinProc_type_is_dereferenceable:
 	case BuiltinProc_type_is_valid_map_key:
 	case BuiltinProc_type_is_valid_matrix_elements:
@@ -6591,7 +6628,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_enum:
 	case BuiltinProc_type_is_proc:
 	case BuiltinProc_type_is_bit_set:
-	case BuiltinProc_type_is_bit_field:
 	case BuiltinProc_type_is_simd_vector:
 	case BuiltinProc_type_is_matrix:
 	case BuiltinProc_type_is_raw_union:
