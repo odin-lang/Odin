@@ -1,6 +1,7 @@
 #+build windows, linux, darwin
 package test_vendor_curl
 
+import "base:runtime"
 import "core:testing"
 import "vendor:curl"
 
