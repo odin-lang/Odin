@@ -11,3 +11,8 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	write(1, data)
 	return len(data), 0
 }
+
+
+_exit :: proc "contextless" (code: int) -> ! {
+	trap()
+}
