@@ -1,6 +1,3 @@
-// Tests "core:encoding:hxa".
-// Must be run with `-collection:tests=` flag, e.g.
-// ./odin run tests/core/encoding/hxa/test_core_hxa.odin -out=tests/core/test_core_hxa -collection:tests=./tests
 package test_core_hxa
 
 import "core:encoding/hxa"
