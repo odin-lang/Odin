@@ -332,7 +332,7 @@ and returns an integer count of the `T` between them.
 - `b`: A pointer to a type T
 
 **Returns**
-- `b` - `a` in items of T as an `int`.
+- `a` - `b` in items of T as an `int`.
 
 Example:
 
