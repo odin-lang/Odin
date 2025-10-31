@@ -80,6 +80,19 @@ make_directory_temp :: proc(dir, pattern: string, allocator: runtime.Allocator) 
 }
 
 temp_dir :: temp_directory
+
+/*
+	Returns the default directory to use for temporary files.
+
+	On Unix systems, it typically returns $TMPDIR if non-empty, otherwlse `/tmp`.
+	On Windows, it uses `GetTempPathW`, returning the first non-empty value from one of the following:
+	    * `%TMP%`
+	    * `%TEMP%`
+	    * `%USERPROFILE %`
+	    * or the Windows directory
+	  See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettemppathw for more information.
+	On wasi, it returns `/tmp`.
+*/
 @(require_results)
 temp_directory :: proc(allocator: runtime.Allocator) -> (string, Error) {
 	return _temp_dir(allocator)
