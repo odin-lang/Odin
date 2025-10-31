@@ -803,7 +803,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			}
 		} else {
 			if total_done_count != last_done_count {
-				if !global_ansi_disabled {
+				if !(global_ansi_disabled || !FANCY_OUTPUT) {
 					fmt.wprintf(stdout, OSC_WINDOW_TITLE, total_done_count, total_test_count)
 				}
 				last_done_count = total_done_count
