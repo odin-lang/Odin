@@ -375,3 +375,11 @@ test_split_path_list :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(test)
+test_glob :: proc(t: ^testing.T) {
+
+
+
+
+}
