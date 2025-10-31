@@ -37,10 +37,11 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 
 		// Looking for tz path (ex fmt: "UTC", "Etc/UTC" or "America/Los_Angeles")
 		path_dir, path_file := filepath.split(path)
+
 		if path_dir == "" {
 			return
 		}
-		upper_path_dir, upper_path_chunk := filepath.split(path_dir[:len(path_dir)-1])
+		upper_path_dir, upper_path_chunk := filepath.split(path_dir[:len(path_dir)])
 		if upper_path_dir == "" {
 			return
 		}
@@ -79,13 +80,13 @@ _region_load :: proc(_reg_str: string, allocator := context.allocator) -> (out_r
 			delete(local_name, allocator)
 			return nil, true
 		}
-
 		reg_str = local_name
 	}
 	defer if _reg_str == "local" { delete(reg_str, allocator) }
 
 	db_path := "/usr/share/zoneinfo"
 	region_path := filepath.join({db_path, reg_str}, allocator)
+
 	defer delete(region_path, allocator)
 
 	return load_tzif_file(region_path, reg_str, allocator)
