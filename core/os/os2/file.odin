@@ -90,17 +90,56 @@ O_SPARSE  :: File_Flags{.Sparse}
 */
 O_INHERITABLE :: File_Flags{.Inheritable}
 
+Permissions :: distinct bit_set[Permission_Flag; u32]
+Permission_Flag :: enum u32 {
+	Execute_Other = 0,
+	Write_Other   = 1,
+	Read_Other    = 2,
+
+	Execute_Group = 3,
+	Write_Group   = 4,
+	Read_Group    = 5,
+
+	Execute_User  = 6,
+	Write_User    = 7,
+	Read_User     = 8,
+}
+
+Permissions_Execute_All :: Permissions{.Execute_User, .Execute_Group, .Execute_Other}
+Permissions_Write_All   :: Permissions{.Write_User,   .Write_Group,   .Write_Other}
+Permissions_Read_All    :: Permissions{.Read_User,    .Read_Group,    .Read_Other}
+
+Permissions_Read_Write_All :: Permissions_Read_All + Permissions_Write_All
+
+Permissions_All :: Permissions_Read_All + Permissions_Write_All + Permissions_Execute_All
+
+Permissions_Default_File      :: Permissions_Read_All + Permissions_Write_All
+Permissions_Default_Directory :: Permissions_Read_All + Permissions_Write_All + Permissions_Execute_All
+Permissions_Default           :: Permissions_Default_Directory
+
+perm :: proc{
+	perm_number,
+}
+
+@(require_results)
+perm_number :: proc "contextless" (perm: int) -> Permissions {
+	return transmute(Permissions)u32(perm & 0o777)
+}
+
+
+
+
 stdin:  ^File = nil // OS-Specific
 stdout: ^File = nil // OS-Specific
 stderr: ^File = nil // OS-Specific
 
 @(require_results)
 create :: proc(name: string) -> (^File, Error) {
-	return open(name, {.Read, .Write, .Create}, 0o777)
+	return open(name, {.Read, .Write, .Create}, Permissions_Default)
 }
 
 @(require_results)
-open :: proc(name: string, flags := File_Flags{.Read}, perm := 0o777) -> (^File, Error) {
+open :: proc(name: string, flags := File_Flags{.Read}, perm := Permissions_Default) -> (^File, Error) {
 	return _open(name, flags, perm)
 }
 
@@ -237,7 +276,7 @@ change_directory :: proc(name: string) -> Error {
 
 chmod :: change_mode
 
-change_mode :: proc(name: string, mode: int) -> Error {
+change_mode :: proc(name: string, mode: Permissions) -> Error {
 	return _chmod(name, mode)
 }
 
@@ -255,7 +294,7 @@ fchange_directory :: proc(f: ^File) -> Error {
 
 fchmod :: fchange_mode
 
-fchange_mode :: proc(f: ^File, mode: int) -> Error {
+fchange_mode :: proc(f: ^File, mode: Permissions) -> Error {
 	return _fchmod(f, mode)
 }
 
@@ -331,7 +370,7 @@ _copy_file :: proc(dst_path, src_path: string) -> Error {
 		return .Invalid_File
 	}
 
-	dst := open(dst_path, {.Read, .Write, .Create, .Trunc}, info.mode & 0o777) or_return
+	dst := open(dst_path, {.Read, .Write, .Create, .Trunc}, info.mode & Permissions_All) or_return
 	defer close(dst)
 
 	_, err := io.copy(to_writer(dst), to_reader(src))

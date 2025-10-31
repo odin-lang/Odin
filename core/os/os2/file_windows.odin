@@ -12,7 +12,6 @@ import win32 "core:sys/windows"
 
 INVALID_HANDLE :: ~uintptr(0)
 
-S_IWRITE :: 0o200
 _ERROR_BAD_NETPATH :: 53
 MAX_RW :: 1<<30
 
@@ -81,7 +80,7 @@ _handle :: proc "contextless" (f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
 }
 
-_open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: uintptr, err: Error) {
+_open_internal :: proc(name: string, flags: File_Flags, perm: Permissions) -> (handle: uintptr, err: Error) {
 	if len(name) == 0 {
 		err = .Not_Exist
 		return
@@ -122,7 +121,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 	}
 
 	attrs: u32 = win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS
-	if perm & S_IWRITE == 0 {
+	if .Write_User not_in perm {
 		attrs = win32.FILE_ATTRIBUTE_READONLY
 		if create_mode == win32.CREATE_ALWAYS {
 			// NOTE(bill): Open has just asked to create a file in read-only mode.
@@ -150,7 +149,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 }
 
 
-_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	flags := flags if flags != nil else {.Read}
 	handle := _open_internal(name, flags, perm) or_return
 	return _new_file(handle, name, file_allocator())
@@ -193,7 +192,7 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 
 
 @(require_results)
-_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm := 0o777) -> (f: ^File, err: Error) {
+_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm: Permissions) -> (f: ^File, err: Error) {
 	assert(buffer_size > 0)
 	flags := flags if flags != nil else {.Read}
 	handle := _open_internal(name, flags, perm) or_return
@@ -744,7 +743,7 @@ _fchdir :: proc(f: ^File) -> Error {
 	return nil
 }
 
-_fchmod :: proc(f: ^File, mode: int) -> Error {
+_fchmod :: proc(f: ^File, mode: Permissions) -> Error {
 	if f == nil || f.impl == nil {
 		return nil
 	}
@@ -753,7 +752,7 @@ _fchmod :: proc(f: ^File, mode: int) -> Error {
 		return _get_platform_error()
 	}
 	attrs := d.dwFileAttributes
-	if mode & S_IWRITE != 0 {
+	if .Write_User in mode {
 		attrs &~= win32.FILE_ATTRIBUTE_READONLY
 	} else {
 		attrs |= win32.FILE_ATTRIBUTE_READONLY
@@ -780,7 +779,7 @@ _chdir :: proc(name: string) -> Error {
 	return nil
 }
 
-_chmod :: proc(name: string, mode: int) -> Error {
+_chmod :: proc(name: string, mode: Permissions) -> Error {
 	f := open(name, {.Write}) or_return
 	defer close(f)
 	return _fchmod(f, mode)

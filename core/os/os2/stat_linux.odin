@@ -26,7 +26,7 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fi: File
 	case linux.S_IFREG:  type = .Regular
 	case linux.S_IFSOCK: type = .Socket
 	}
-	mode := int(0o7777 & transmute(u32)s.mode)
+	mode := transmute(Permissions)(0o7777 & transmute(u32)s.mode)
 
 	// TODO: As of Linux 4.11, the new statx syscall can retrieve creation_time
 	fi = File_Info {

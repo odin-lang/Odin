@@ -12,7 +12,7 @@ File_Info :: struct {
 
 	inode:             u128, // might be zero if cannot be determined
 	size:              i64 `fmt:"M"`,
-	mode:              int `fmt:"o"`,
+	mode:              Permissions,
 	type:              File_Type,
 
 	creation_time:     time.Time,

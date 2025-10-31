@@ -161,7 +161,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator, loc :
 }
 
 @(require_results)
-write_entire_file :: proc(name: string, data: []byte, perm: int = 0o644, truncate := true) -> Error {
+write_entire_file :: proc(name: string, data: []byte, perm := Permissions_Read_All + {.Write_User}, truncate := true) -> Error {
 	flags := O_WRONLY|O_CREATE
 	if truncate {
 		flags |= O_TRUNC

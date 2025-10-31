@@ -65,7 +65,7 @@ _standard_stream_init :: proc "contextless" () {
 	stderr = new_std(&files[2], 2, "/proc/self/fd/2")
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
 
@@ -88,7 +88,7 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 	if .Trunc in flags         { sys_flags += {.TRUNC} }
 	if .Inheritable in flags   { sys_flags -= {.CLOEXEC} }
 
-	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)u32(perm))
+	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)transmute(u32)perm)
 	if errno != .NONE {
 		return nil, _get_platform_error(errno)
 	}
@@ -132,7 +132,7 @@ _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
 
 
 @(require_results)
-_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm := 0o777) -> (f: ^File, err: Error) {
+_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm: Permissions) -> (f: ^File, err: Error) {
 	assert(buffer_size > 0)
 	f, err = _open(name, flags, perm)
 	if f != nil && err == nil {
@@ -369,15 +369,15 @@ _fchdir :: proc(f: ^File) -> Error {
 	return _get_platform_error(linux.fchdir(impl.fd))
 }
 
-_chmod :: proc(name: string, mode: int) -> Error {
+_chmod :: proc(name: string, mode: Permissions) -> Error {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
-	return _get_platform_error(linux.chmod(name_cstr, transmute(linux.Mode)(u32(mode))))
+	return _get_platform_error(linux.chmod(name_cstr, transmute(linux.Mode)transmute(u32)mode))
 }
 
-_fchmod :: proc(f: ^File, mode: int) -> Error {
+_fchmod :: proc(f: ^File, mode: Permissions) -> Error {
 	impl := (^File_Impl)(f.impl)
-	return _get_platform_error(linux.fchmod(impl.fd, transmute(linux.Mode)(u32(mode))))
+	return _get_platform_error(linux.fchmod(impl.fd, transmute(linux.Mode)transmute(u32)mode))
 }
 
 // NOTE: will throw error without super user priviledges
