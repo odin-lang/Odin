@@ -691,8 +691,13 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		} else if (bt->Union.variants.count == 1) {
 			if (value.kind == ExactValue_Compound) {
 				ast_node(cl, CompoundLit, value.value_compound);
-				if (cl->elems.count == 0 && cl->type == nullptr) {
-					return lb_const_nil(m, original_type);
+				if (cl->elems.count == 0) {
+					if (cl->type == nullptr) {
+						return lb_const_nil(m, original_type);
+					}
+					if (are_types_identical(type_of_expr(cl->type), original_type)) {
+						return lb_const_nil(m, original_type);
+					}
 				}
 			}
 

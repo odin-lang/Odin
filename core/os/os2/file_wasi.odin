@@ -52,8 +52,8 @@ init_std_files :: proc "contextless" () {
 }
 
 @(init)
-init_preopens :: proc() {
-	strip_prefixes :: proc(path: string) -> string {
+init_preopens :: proc "contextless" () {
+	strip_prefixes :: proc "contextless" (path: string) -> string {
 		path := path
 		loop: for len(path) > 0 {
 			switch {
@@ -69,6 +69,8 @@ init_preopens :: proc() {
 		}
 		return path
 	}
+
+	context = runtime.default_context()
 
 	n: int
 	n_loop: for fd := wasi.fd_t(3); ; fd += 1 {
@@ -172,7 +174,7 @@ match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
 	return match.fd, relative, true
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	dir_fd, relative, ok := match_preopen(name)
 	if !ok {
 		return nil, .Invalid_Path
@@ -378,11 +380,11 @@ _fchdir :: proc(f: ^File) -> Error {
 	return .Unsupported
 }
 
-_fchmod :: proc(f: ^File, mode: int) -> Error {
+_fchmod :: proc(f: ^File, mode: Permissions) -> Error {
 	return .Unsupported
 }
 
-_chmod :: proc(name: string, mode: int) -> Error {
+_chmod :: proc(name: string, mode: Permissions) -> Error {
 	return .Unsupported
 }
 

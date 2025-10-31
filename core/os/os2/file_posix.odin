@@ -46,7 +46,7 @@ init_std_files :: proc "contextless" () {
 	stderr = new_std(&files[2], posix.STDERR_FILENO, "/dev/stderr")
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	if name == "" {
 		err = .Invalid_Path
 		return
@@ -72,7 +72,7 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cname := clone_to_cstring(name, temp_allocator) or_return
 
-	fd := posix.open(cname, sys_flags, transmute(posix.mode_t)posix._mode_t(perm))
+	fd := posix.open(cname, sys_flags, transmute(posix.mode_t)posix._mode_t(transmute(u32)perm))
 	if fd < 0 {
 		err = _get_platform_error()
 		return
@@ -291,17 +291,17 @@ _fchdir :: proc(f: ^File) -> Error {
 	return nil
 }
 
-_fchmod :: proc(f: ^File, mode: int) -> Error {
-	if posix.fchmod(__fd(f), transmute(posix.mode_t)posix._mode_t(mode)) != .OK {
+_fchmod :: proc(f: ^File, mode: Permissions) -> Error {
+	if posix.fchmod(__fd(f), transmute(posix.mode_t)posix._mode_t(transmute(u32)mode)) != .OK {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_chmod :: proc(name: string, mode: int) -> (err: Error) {
+_chmod :: proc(name: string, mode: Permissions) -> (err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cname := clone_to_cstring(name, temp_allocator) or_return
-	if posix.chmod(cname, transmute(posix.mode_t)posix._mode_t(mode)) != .OK {
+	if posix.chmod(cname, transmute(posix.mode_t)posix._mode_t(transmute(u32)mode)) != .OK {
 		return _get_platform_error()
 	}
 	return nil

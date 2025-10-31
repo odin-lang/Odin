@@ -22,11 +22,6 @@ foreign libc {
 PIDFD_UNASSIGNED  :: ~uintptr(0)
 
 @(private="package")
-_exit :: proc "contextless" (code: int) -> ! {
-	linux.exit_group(i32(code))
-}
-
-@(private="package")
 _get_uid :: proc() -> int {
 	return int(linux.getuid())
 }
