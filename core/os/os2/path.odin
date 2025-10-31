@@ -22,6 +22,11 @@ is_path_separator :: proc(c: byte) -> bool {
 	return _is_path_separator(c)
 }
 
+@(private)
+is_slash :: proc(c: byte) -> bool {
+	return c == '\\' || c == '/'
+}
+
 mkdir :: make_directory
 
 /*
@@ -668,6 +673,15 @@ match :: proc(pattern, name: string) -> (matched: bool, err: Error) {
 // glob ignores file system errors
 //
 glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []string, err: Error) {
+	_split :: proc(path: string) -> (dir, file: string) {
+		vol := volume_name(path)
+		i := len(path) - 1
+		for i >= len(vol) && !is_path_separator(path[i]) {
+			i -= 1
+		}
+		return path[:i+1], path[i+1:]
+	}
+
 	context.allocator = allocator
 
 	if !has_meta(pattern) {
@@ -677,13 +691,14 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 		return m[:], nil
 	}
 
-	dir, file := split_path(pattern)
+	// NOTE(Jeroen): For `glob`, we need this version of `split`, which leaves the trailing `/` on `dir`.
+	dir, file := _split(pattern)
 
-	volume_len: int
-	temp_buf:   [8]byte
-	volume_len, dir = _clean_glob_path(dir, temp_buf[:])
+	temp_buf: [8]byte
+	vol_len:  int
+	vol_len, dir = clean_glob_path(dir, temp_buf[:])
 
-	if !has_meta(dir[volume_len:]) {
+	if !has_meta(dir[vol_len:]) {
 		m, e := _glob(dir, file, nil)
 		return m[:], e
 	}
@@ -904,10 +919,9 @@ has_meta :: proc(path: string) -> bool {
 }
 
 @(private)
-_clean_glob_path :: proc(path: string, temp_buf: []byte) -> (prefix_len: int, cleaned: string) {
+clean_glob_path :: proc(path: string, temp_buf: []byte) -> (int, string) {
 	when ODIN_OS == .Windows {
 		vol_len := _volume_name_len(path)
-
 		switch {
 		case path == "":
 			return 0, "."
@@ -927,7 +941,7 @@ _clean_glob_path :: proc(path: string, temp_buf: []byte) -> (prefix_len: int, cl
 		switch path {
 		case "":
 			return 0, "."
-		case _Path_Separator_String:
+		case Path_Separator_String:
 			return 0, path
 		}
 		return 0, path[:len(path)-1]
