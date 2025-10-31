@@ -3,6 +3,10 @@ package os2
 import "core:io"
 import "base:runtime"
 
+/*
+	General errors that are common within this package which cannot
+	be categorized by `io.Error` nor `runtime.Allocator_Error`.
+*/
 General_Error :: enum u32 {
 	None,
 
@@ -33,8 +37,12 @@ General_Error :: enum u32 {
 	Unsupported,
 }
 
+// A platform specific error
 Platform_Error :: _Platform_Error
 
+/*
+	`Error` is a union of different classes of errors that could be returned from procedures in this package.
+*/
 Error :: union #shared_nil {
 	General_Error,
 	io.Error,
@@ -46,6 +54,7 @@ Error :: union #shared_nil {
 ERROR_NONE :: Error{}
 
 
+// Attempts to convert an `Error` into a platform specific error as an integer. `ok` is false if not possible
 @(require_results)
 is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
 	v := ferr.(Platform_Error) or_else {}
@@ -53,6 +62,7 @@ is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
 }
 
 
+// Attempts to return the error `ferr` as a string without any allocation
 @(require_results)
 error_string :: proc(ferr: Error) -> string {
 	if ferr == nil {
@@ -112,6 +122,9 @@ error_string :: proc(ferr: Error) -> string {
 	return "unknown error"
 }
 
+/*
+	`print_error` is a utility procedure which will print an error `ferr` to a specified file `f`.
+*/
 print_error :: proc(f: ^File, ferr: Error, msg: string) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	err_str := error_string(ferr)
@@ -126,4 +139,15 @@ print_error :: proc(f: ^File, ferr: Error, msg: string) {
 	copy(buf[len(msg) + 2:], err_str)
 	buf[length - 1] = '\n'
 	write(f, buf)
+}
+
+
+
+// Attempts to convert an `Error` `ferr` into an `io.Error`
+@(private)
+error_to_io_error :: proc(ferr: Error) -> io.Error {
+	if ferr == nil {
+		return .None
+	}
+	return ferr.(io.Error) or_else .Unknown
 }

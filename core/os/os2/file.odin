@@ -399,12 +399,18 @@ change_owner :: proc(name: string, uid, gid: int) -> Error {
 
 fchdir :: fchange_directory
 
+/*
+	Changes the current working directory to the file, which must be a directory.
+*/
 fchange_directory :: proc(f: ^File) -> Error {
 	return _fchdir(f)
 }
 
 fchmod :: fchange_mode
 
+/*
+	Changes the current `mode` permissions of the file `f`.
+*/
 fchange_mode :: proc(f: ^File, mode: Permissions) -> Error {
 	return _fchmod(f, mode)
 }

@@ -6,6 +6,10 @@ import "core:strings"
 
 read_dir :: read_directory
 
+/*
+	Reads the file `f` (assuming it is a directory) and returns the unsorted directory entries.
+	This returns up to `n` entries OR all of them if `n <= 0`.
+*/
 @(require_results)
 read_directory :: proc(f: ^File, n: int, allocator: runtime.Allocator) -> (files: []File_Info, err: Error) {
 	if f == nil {
@@ -47,11 +51,18 @@ read_directory :: proc(f: ^File, n: int, allocator: runtime.Allocator) -> (files
 }
 
 
+/*
+	Reads the file `f` (assuming it is a directory) and returns all of the unsorted directory entries.
+*/
 @(require_results)
 read_all_directory :: proc(f: ^File, allocator: runtime.Allocator) -> (fi: []File_Info, err: Error) {
 	return read_directory(f, -1, allocator)
 }
 
+/*
+	Reads the named directory by path (assuming it is a directory) and returns the unsorted directory entries.
+	This returns up to `n` entries OR all of them if `n <= 0`.
+*/
 @(require_results)
 read_directory_by_path :: proc(path: string, n: int, allocator: runtime.Allocator) -> (fi: []File_Info, err: Error) {
 	f := open(path) or_return
@@ -59,6 +70,9 @@ read_directory_by_path :: proc(path: string, n: int, allocator: runtime.Allocato
 	return read_directory(f, n, allocator)
 }
 
+/*
+	Reads the named directory by path (assuming it is a directory) and returns all of the unsorted directory entries.
+*/
 @(require_results)
 read_all_directory_by_path :: proc(path: string, allocator: runtime.Allocator) -> (fi: []File_Info, err: Error) {
 	return read_directory_by_path(path, -1, allocator)
