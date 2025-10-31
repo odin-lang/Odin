@@ -160,6 +160,69 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator, loc :
 	}
 }
 
+read_entire_file_as_cstring :: proc{
+	read_entire_file_from_path_as_cstring,
+	read_entire_file_from_file_as_cstring,
+}
+
+@(require_results)
+read_entire_file_from_path_as_cstring :: proc(name: string, allocator: runtime.Allocator) -> (data: cstring, size: int, err: Error) {
+	f := open(name) or_return
+	defer close(f)
+	return read_entire_file_from_file_as_cstring(f, allocator)
+}
+
+@(require_results)
+read_entire_file_from_file_as_cstring :: proc(f: ^File, allocator: runtime.Allocator) -> (data: cstring, size: int, err: Error) {
+
+	has_size := false
+	if size64, serr := file_size(f); serr == nil {
+		if i64(int(size64)) == size64 {
+			has_size = true
+			size = int(size64)
+		}
+	}
+
+	if has_size && size > 0 {
+		total: int
+		// one extra byte for null terminator
+		buffer := make([]byte, size + 1, allocator) or_return
+		data = cstring(raw_data(buffer))
+		for total < size {
+			n: int
+			n, err = read(f, buffer[total:size])
+			total += n
+			if err != nil {
+				if err == .EOF {
+					err = nil
+				}
+				size = total
+				break
+			}
+		}
+		return
+	} else {
+		buffer: [1024]u8
+		out_buffer := make([dynamic]u8, 0, 0, allocator)
+		data = cstring(raw_data(out_buffer))
+		for {
+			n: int
+			n, err = read(f, buffer[:])
+			append_elems(&out_buffer, ..buffer[:n]) or_return
+			size += n
+			data = cstring(raw_data(out_buffer))
+			if err != nil {
+				if err == .EOF || err == .Broken_Pipe {
+					err = nil
+				}
+				append_nothing(&out_buffer) or_return // null terminator
+				data = cstring(raw_data(out_buffer))
+				return
+			}
+		}
+	}
+}
+
 @(require_results)
 write_entire_file :: proc(name: string, data: []byte, perm := Permissions_Read_All + {.Write_User}, truncate := true) -> Error {
 	flags := O_WRONLY|O_CREATE
