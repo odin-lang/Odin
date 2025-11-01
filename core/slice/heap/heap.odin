@@ -3,7 +3,7 @@ package heap
 
 /*
 	Copyright 2022 Dale Weiler <weilercdale@gmail.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Dale Weiler: Initial implementation

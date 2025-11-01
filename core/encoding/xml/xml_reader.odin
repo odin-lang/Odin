@@ -3,7 +3,7 @@ package encoding_xml
 	An XML 1.0 / 1.1 parser
 
 	2021-2022 Jeroen van Rijn <nom@duclavier.com>.
-	available under Odin's BSD-3 license.
+	available under Odin's license.
 
 	List of contributors:
 	- Jeroen van Rijn: Initial implementation.

@@ -4,7 +4,7 @@ package encoding_xml
 	An XML 1.0 / 1.1 parser
 
 	Copyright 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	This file contains helper functions.
 */

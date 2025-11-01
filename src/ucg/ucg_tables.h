@@ -1,6 +1,6 @@
 /*
  * SPDX-FileCopyrightText: (c) 2024 Feoramund
- * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-License-Identifier: zlib
  */
 #ifndef _UCG_TABLES_INCLUDED
 #define _UCG_TABLES_INCLUDED

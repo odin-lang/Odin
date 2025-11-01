@@ -3,7 +3,7 @@ package i18n
 	A parser for GNU GetText .MO files.
 
 	Copyright 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	A from-scratch implementation based after the specification found here:
 		https://www.gnu.org/software/gettext/manual/html_node/MO-Files.html

@@ -6,8 +6,6 @@ _ :: intrinsics
 // High performance, cache-friendly, open-addressed Robin Hood hashing hash map
 // data structure with various optimizations for Odin.
 //
-// Copyright 2022 (c) Dale Weiler
-//
 // The core of the hash map data structure is the Raw_Map struct which is a
 // type-erased representation of the map. This type-erased representation is
 // used in two ways: static and dynamic. When static type information is known,

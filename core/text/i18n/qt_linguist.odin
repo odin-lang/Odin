@@ -3,7 +3,7 @@ package i18n
 	A parser for Qt Linguist TS files.
 
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	A from-scratch implementation based after the specification found here:
 		https://doc.qt.io/qt-5/linguist-ts-file-format.html

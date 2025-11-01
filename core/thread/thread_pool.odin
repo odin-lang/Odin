@@ -3,7 +3,7 @@ package thread
 /*
 	thread.Pool
 	Copyright 2022 eisbehr
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 */
 
 import "base:intrinsics"
