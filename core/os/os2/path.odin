@@ -22,9 +22,32 @@ is_path_separator :: proc(c: byte) -> bool {
 	return _is_path_separator(c)
 }
 
-@(private)
-is_slash :: proc(c: byte) -> bool {
-	return c == '\\' || c == '/'
+/*
+Returns the result of replacing each path separator character in the path
+with the `new_sep` rune.
+
+*Allocates Using Provided Allocator*
+*/
+replace_path_separators :: proc(path: string, new_sep: rune, allocator: runtime.Allocator) -> (new_path: string, err: Error) {
+	buf := make([]u8, len(path), allocator) or_return
+
+	i: int
+	for r in path {
+		replacement := r
+		if r == '/' || r == '\\' {
+			replacement = new_sep
+		}
+
+		if replacement <= rune(0x7F) {
+			buf[i] = u8(replacement)
+			i += 1
+		} else {
+			b, w := utf8.encode_rune(r)
+			copy(buf[i:], b[:w])
+			i += w
+		}
+	}
+	return string(buf), nil
 }
 
 mkdir :: make_directory
