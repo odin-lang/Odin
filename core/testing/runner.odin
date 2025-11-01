@@ -63,6 +63,9 @@ LOG_STATE_CHANGES     : bool   : #config(ODIN_TEST_LOG_STATE_CHANGES, false)
 USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
 // Output a report of the tests to the given path.
 JSON_REPORT           : string : #config(ODIN_TEST_JSON_REPORT, "")
+// Print the full file path for failed test cases on a new line
+// in a way that's friendly to regex capture for an editor's "go to error".
+GO_TO_ERROR           : bool   : #config(ODIN_TEST_GO_TO_ERROR, false)
 
 get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 	when LOG_LEVEL == "debug"   { return .Debug   } else
