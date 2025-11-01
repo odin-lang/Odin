@@ -9,7 +9,7 @@ import "core:time"
 
 File_Impl :: distinct rawptr
 
-_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	return nil, .Unsupported
 }
 
@@ -73,11 +73,11 @@ _fchdir :: proc(f: ^File) -> Error {
 	return .Unsupported
 }
 
-_fchmod :: proc(f: ^File, mode: int) -> Error {
+_fchmod :: proc(f: ^File, mode: Permissions) -> Error {
 	return .Unsupported
 }
 
-_chmod :: proc(name: string, mode: int) -> Error {
+_chmod :: proc(name: string, mode: Permissions) -> Error {
 	return .Unsupported
 }
 
