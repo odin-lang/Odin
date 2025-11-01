@@ -9,7 +9,7 @@ import "base:intrinsics"
 
 // Helper for handling negative bases with fractional exponents
 // since math.pow(negative, fraction) returns NaN
-@(private="file")
+@(private)
 _signed_pow :: proc "contextless" (x, exp: $T) -> T where intrinsics.type_is_float(T) {
 	if x >= 0 {
 		return math.pow(x, exp)
@@ -17,6 +17,8 @@ _signed_pow :: proc "contextless" (x, exp: $T) -> T where intrinsics.type_is_flo
 		return -math.pow(-x, exp)
 	}
 }
+
+@(private) PI_2_INV :: 2 / math.PI
 
 // Inverse of quadratic_in
 // x = sqrt(y)
@@ -33,14 +35,14 @@ quadratic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_i
 }
 
 // Inverse of quadratic_in_out
-// x = sqrt(y/2)           ; [0, 0.5)
-// x = 1 - sqrt((1-y)/2)   ; [0.5, 1]
+// x = sqrt(y/2)         ; [0, 0.5)
+// x = 1 - sqrt((1-y)/2) ; [0.5, 1]
 @(require_results)
 quadratic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
 	if p < 0.5 {
-		return math.sqrt(p / 2)
+		return math.sqrt(p * 0.5)
 	} else {
-		return 1 - math.sqrt((1 - p) / 2)
+		return 1 - math.sqrt((1 - p) * 0.5)
 	}
 }
 
@@ -59,14 +61,14 @@ cubic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_fl
 }
 
 // Inverse of cubic_in_out
-// x = (y/4)^(1/3)              ; [0, 0.5)
-// x = ((y-1)*2)^(1/3)/2 + 1    ; [0.5, 1]
+// x = (y/4)^(1/3)           ; [0, 0.5)
+// x = ((y-1)*2)^(1/3)/2 + 1 ; [0.5, 1]
 @(require_results)
 cubic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
 	if p < 0.5 {
-		return math.pow(p / 4, 1.0/3.0)
+		return math.pow(p * 0.25, 1.0/3.0)
 	} else {
-		return _signed_pow((p - 1) * 2, 1.0/3.0) / 2 + 1
+		return _signed_pow((p - 1) * 2, 1.0/3.0) * 0.5 + 1
 	}
 }
 
@@ -85,14 +87,14 @@ quartic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_
 }
 
 // Inverse of quartic_in_out
-// x = (y/8)^(1/4)             ; [0, 0.5)
-// x = 1 - ((1-y)/8)^(1/4)     ; [0.5, 1]
+// x = (y/8)^(1/4)         ; [0, 0.5)
+// x = 1 - ((1-y)/8)^(1/4) ; [0.5, 1]
 @(require_results)
 quartic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
 	if p < 0.5 {
-		return math.pow(p / 8, 0.25)
+		return math.pow(p * 0.125, 0.25)
 	} else {
-		return 1 - math.pow((1 - p) / 8, 0.25)
+		return 1 - math.pow((1 - p) * 0.125, 0.25)
 	}
 }
 
@@ -111,14 +113,14 @@ quintic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_
 }
 
 // Inverse of quintic_in_out
-// x = (y/16)^(1/5)             ; [0, 0.5)
-// x = ((y-1)*2)^(1/5)/2 + 1    ; [0.5, 1]
+// x = (y/16)^(1/5)          ; [0, 0.5)
+// x = ((y-1)*2)^(1/5)/2 + 1 ; [0.5, 1]
 @(require_results)
 quintic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
 	if p < 0.5 {
-		return math.pow(p / 16, 0.2)
+		return math.pow(0.0625 * p, 0.2)
 	} else {
-		return _signed_pow((p - 1) * 2, 0.2) / 2 + 1
+		return _signed_pow((p - 1) * 2, 0.2) * 0.5 + 1
 	}
 }
 
@@ -126,14 +128,14 @@ quintic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_
 // x = asin(y - 1) * 2/π + 1
 @(require_results)
 sine_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
-	return math.asin(p - 1) * 2/math.PI + 1
+	return math.asin(p - 1) * PI_2_INV + 1
 }
 
 // Inverse of sine_out
 // x = asin(y) * 2/π
 @(require_results)
 sine_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
-	return math.asin(p) * 2/math.PI
+	return math.asin(p) * PI_2_INV
 }
 
 // Inverse of sine_in_out
@@ -158,16 +160,16 @@ circular_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is
 }
 
 // Inverse of circular_in_out
-// x = sqrt(1 - (1-2y)²) / 2         ; [0, 0.5)
-// x = 1 - sqrt(1 - (2y-1)²) / 2     ; [0.5, 1]
+// x = sqrt(1 - (1-2y)²) / 2     ; [0, 0.5)
+// x = 1 - sqrt(1 - (2y-1)²) / 2 ; [0.5, 1]
 @(require_results)
 circular_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
 	if p < 0.5 {
 		q := 1 - 2*p
-		return math.sqrt(1 - q*q) / 2
+		return 0.5 * math.sqrt(1 - q*q)
 	} else {
 		q := 2*p - 1
-		return 1 - math.sqrt(1 - q*q) / 2
+		return 1 - 0.5 * math.sqrt(1 - q*q)
 	}
 }
 
@@ -175,19 +177,19 @@ circular_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type
 // x = log₂(y) / 10 + 1
 @(require_results)
 exponential_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
-	return p == 0.0 ? 0.0 : math.log2(p) / 10 + 1
+	return p == 0.0 ? 0.0 : 0.1 * math.log2(p) + 1
 }
 
 // Inverse of exponential_out
 // x = -log₂(1 - y) / 10
 @(require_results)
 exponential_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
-	return p == 1.0 ? 1.0 : -math.log2(1 - p) / 10
+	return p == 1.0 ? 1.0 : 0.1 * -math.log2(1 - p)
 }
 
 // Inverse of exponential_in_out
-// x = (log₂(2y) + 10) / 20         ; [0, 0.5)
-// x = (10 - log₂(2(1-y))) / 20     ; [0.5, 1]
+// x = (log₂(2y) + 10) / 20     ; [0, 0.5)
+// x = (10 - log₂(2(1-y))) / 20 ; [0.5, 1]
 @(require_results)
 exponential_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
 	if p == 0.0 || p == 1.0 {
@@ -195,9 +197,9 @@ exponential_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.t
 	}
 
 	if p < 0.5 {
-		return (math.log2(2*p) + 10) / 20
+		return 0.05 * (math.log2(2*p) + 10)
 	} else {
-		return (10 - math.log2(2*(1-p))) / 20
+		return 0.05 * (10 - math.log2(2*(1-p)))
 	}
 }
 
