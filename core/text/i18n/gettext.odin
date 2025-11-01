@@ -14,7 +14,6 @@ package i18n
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-import "core:os"
 import "core:strings"
 import "core:bytes"
 
@@ -28,22 +27,17 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 		return {}, .MO_File_Invalid
 	}
 
-	/*
-		Check magic. Should be 0x950412de in native Endianness.
-	*/
+	// Check magic. Should be 0x950412de in native Endianness.
 	native := true
 	magic  := read_u32(data, native) or_return
 
 	if magic != 0x950412de {
 		native = false
-		magic = read_u32(data, native) or_return
-
+		magic  = read_u32(data, native) or_return
 		if magic != 0x950412de { return {}, .MO_File_Invalid_Signature }
 	}
 
-	/*
-		We can ignore version_minor at offset 6.
-	*/
+	// We can ignore version_minor at offset 6.
 	version_major := read_u16(data[4:]) or_return
 	if version_major > 1 { return {}, .MO_File_Unsupported_Version }
 
@@ -53,17 +47,13 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 
 	if count == 0 { return {}, .Empty_Translation_Catalog }
 
-	/*
-		Initalize Translation, interner and optional pluralizer.
-	*/
+	// Initalize Translation, interner and optional pluralizer.
 	translation = new(Translation)
 	translation.pluralize = pluralizer
 	strings.intern_init(&translation.intern, allocator, allocator)
 
 	for n := u32(0); n < count; n += 1 {
-		/*
-			Grab string's original length and offset.
-		*/
+		// Grab string's original length and offset.
 		offset := original_offset + 8 * n
 		if len(data) < int(offset + 8) { return translation, .MO_File_Invalid }
 
@@ -82,9 +72,7 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 		key_data := data[o_offset:][:o_length]
 		val_data := data[t_offset:][:t_length]
 
-		/*
-			Could be a pluralized string.
-		*/
+		// Could be a pluralized string.
 		zero := []byte{0}
 		keys := bytes.split(key_data, zero); defer delete(keys)
 		vals := bytes.split(val_data, zero); defer delete(vals)
@@ -138,21 +126,14 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 }
 
 parse_mo_file :: proc(filename: string, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
-	context.allocator = allocator
-
-	data, data_ok := os.read_entire_file(filename)
+	data := read_file(filename, allocator) or_return
 	defer delete(data)
-
-	if !data_ok { return {}, .File_Error }
-
 	return parse_mo_from_bytes(data, options, pluralizer, allocator)
 }
 
 parse_mo :: proc { parse_mo_file, parse_mo_from_bytes }
 
-/*
-	Helpers.
-*/
+@(private)
 read_u32 :: proc(data: []u8, native_endian := true) -> (res: u32, err: Error) {
 	if len(data) < size_of(u32) { return 0, .Premature_EOF }
 
@@ -169,6 +150,7 @@ read_u32 :: proc(data: []u8, native_endian := true) -> (res: u32, err: Error) {
 	}
 }
 
+@(private)
 read_u16 :: proc(data: []u8, native_endian := true) -> (res: u16, err: Error) {
 	if len(data) < size_of(u16) { return 0, .Premature_EOF }
 

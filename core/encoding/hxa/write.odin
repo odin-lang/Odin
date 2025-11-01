@@ -1,7 +1,7 @@
 package encoding_hxa
 
-import "core:os"
-import "core:mem"
+import os "core:os/os2"
+import    "core:mem"
 
 Write_Error :: enum {
 	None,
@@ -18,7 +18,7 @@ write_to_file :: proc(filepath: string, file: File) -> (err: Write_Error) {
 	defer delete(buf)
 
 	write_internal(&Writer{data = buf}, file)
-	if !os.write_entire_file(filepath, buf) {
+	if os.write_entire_file(filepath, buf) != nil {
 		err =.Failed_File_Write
 	}
 	return

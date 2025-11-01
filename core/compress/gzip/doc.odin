@@ -2,10 +2,11 @@
 A small `GZIP` unpacker.
 
 Example:
-	import "core:bytes"
-	import "core:os"
-	import "core:compress"
-	import "core:fmt"
+	import    "core:bytes"
+	import os "core:os/os2"
+	import    "core:compress"
+	import    "core:compress/gzip"
+	import    "core:fmt"
 
 	// Small GZIP file with fextra, fname and fcomment present.
 	@private
@@ -22,7 +23,8 @@ Example:
 
 	main :: proc() {
 		// Set up output buffer.
-		buf := bytes.Buffer{}
+		buf: bytes.Buffer
+		defer bytes.buffer_destroy(&buf)
 
 		stdout :: proc(s: string) {
 			os.write_string(os.stdout, s)
@@ -31,15 +33,13 @@ Example:
 			os.write_string(os.stderr, s)
 		}
 
-		args := os.args
-
-		if len(args) < 2 {
+		if len(os.args) < 2 {
 			stderr("No input file specified.\n")
-			err := load(data=TEST, buf=&buf, known_gzip_size=len(TEST))
+			err := gzip.load(data=TEST, buf=&buf, known_gzip_size=len(TEST))
 			if err == nil {
-				stdout("Displaying test vector: ")
+				stdout("Displaying test vector: \"")
 				stdout(bytes.buffer_to_string(&buf))
-				stdout("\n")
+				stdout("\"\n")
 			} else {
 				fmt.printf("gzip.load returned %v\n", err)
 			}
@@ -47,35 +47,31 @@ Example:
 			os.exit(0)
 		}
 
-		// The rest are all files.
-		args = args[1:]
-		err: Error
+		for file in os.args[1:] {
+			err: gzip.Error
 
-		for file in args {
 			if file == "-" {
 				// Read from stdin
-				s := os.stream_from_handle(os.stdin)
 				ctx := &compress.Context_Stream_Input{
-					input = s,
+					input = os.stdin.stream,
 				}
-				err = load(ctx, &buf)
+				err = gzip.load(ctx, &buf)
 			} else {
-				err = load(file, &buf)
+				err = gzip.load(file, &buf)
 			}
-			if err != nil {
-				if err != E_General.File_Not_Found {
-					stderr("File not found: ")
-					stderr(file)
-					stderr("\n")
-					os.exit(1)
-				}
+			switch err {
+			case nil:
+				stdout(bytes.buffer_to_string(&buf))
+			case gzip.E_General.File_Not_Found:
+				stderr("File not found: ")
+				stderr(file)
+				stderr("\n")
+				os.exit(1)
+			case:
 				stderr("GZIP returned an error.\n")
-					bytes.buffer_destroy(&buf)
 				os.exit(2)
 			}
-			stdout(bytes.buffer_to_string(&buf))
 		}
-		bytes.buffer_destroy(&buf)
 	}
 */
 package compress_gzip

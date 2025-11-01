@@ -1,24 +1,22 @@
 #+build !js
 package image
 
-import "core:os"
+import os "core:os/os2"
 
 load :: proc{
 	load_from_bytes,
 	load_from_file,
 }
 
-
 load_from_file :: proc(filename: string, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	data, ok := os.read_entire_file(filename, allocator)
+	data, data_err := os.read_entire_file(filename, allocator)
 	defer delete(data, allocator)
-	if ok {
+	if data_err == nil {
 		return load_from_bytes(data, options, allocator)
 	} else {
 		return nil, .Unable_To_Read_File
 	}
 }
-
 
 which :: proc{
 	which_bytes,

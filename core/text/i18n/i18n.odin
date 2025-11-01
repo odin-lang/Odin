@@ -8,7 +8,9 @@ package i18n
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-import "core:strings"
+import    "base:runtime"
+import os "core:os/os2"
+import    "core:strings"
 
 // Currently active catalog.
 ACTIVE: ^Translation
@@ -229,4 +231,13 @@ destroy :: proc(catalog: ^Translation = ACTIVE, allocator := context.allocator) 
 	delete(catalog.k_v)
 	strings.intern_destroy(&catalog.intern)
 	free(catalog)
+}
+
+@(private)
+read_file :: proc(filename: string, allocator: runtime.Allocator) -> (data: []u8, err: Error) {
+	file_data, file_err := os.read_entire_file(filename, allocator)
+	if file_err != nil {
+		return {}, .File_Error
+	}
+	return file_data, nil
 }

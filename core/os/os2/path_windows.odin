@@ -157,6 +157,7 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 	}
 }
 
+@(private)
 can_use_long_paths: bool
 
 @(init)

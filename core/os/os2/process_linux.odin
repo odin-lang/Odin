@@ -5,11 +5,19 @@ package os2
 import "base:runtime"
 import "base:intrinsics"
 
+import "core:c"
 import "core:time"
 import "core:slice"
 import "core:strings"
 import "core:strconv"
+import "core:sys/unix"
 import "core:sys/linux"
+
+foreign import libc "system:c"
+
+foreign libc {
+	@(link_name="get_nprocs")       _unix_get_nprocs    :: proc() -> c.int ---
+}
 
 PIDFD_UNASSIGNED  :: ~uintptr(0)
 
@@ -41,6 +49,16 @@ _get_pid :: proc() -> int {
 @(private="package")
 _get_ppid :: proc() -> int {
 	return int(linux.getppid())
+}
+
+@(private="package")
+_get_current_thread_id :: proc "contextless" () -> int {
+	return unix.sys_gettid()
+}
+
+@(private="package")
+_get_processor_core_count :: proc() -> int {
+	return int(_unix_get_nprocs())
 }
 
 @(private="package")

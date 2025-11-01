@@ -5,7 +5,6 @@ import "base:intrinsics"
 import "base:runtime"
 
 import "core:c"
-import "core:os"
 import "core:slice"
 import "core:sort"
 import "core:strconv"
@@ -166,7 +165,7 @@ atexit :: proc "c" (function: proc "c" ()) -> i32 {
 @(require, linkage="strong", link_name="exit")
 exit :: proc "c" (exit_code: c.int) -> ! {
 	finish_atexit()
-	os.exit(int(exit_code))
+	runtime.exit(int(exit_code))
 }
 
 @(private, fini)

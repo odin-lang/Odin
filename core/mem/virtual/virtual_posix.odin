@@ -47,3 +47,7 @@ _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) 
 	}
 	return ([^]byte)(addr)[:size], nil
 }
+
+_unmap_file :: proc "contextless" (data: []byte) {
+	_release(raw_data(data), uint(len(data)))
+}

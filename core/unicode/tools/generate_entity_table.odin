@@ -1,17 +1,14 @@
 package xml_example
 
-import "core:encoding/xml"
-import "core:os"
+import      "core:encoding/xml"
+import os   "core:os/os2"
 import path "core:path/filepath"
-import "core:mem"
-import "core:strings"
-import "core:strconv"
-import "core:slice"
-import "core:fmt"
+import      "core:strings"
+import      "core:strconv"
+import      "core:slice"
+import      "core:fmt"
 
-/*
-	Silent error handler for the parser.
-*/
+// Silent error handler for the parser.
 Error_Handler :: proc(pos: xml.Pos, fmt: string, args: ..any) {}
 
 OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, }, expected_doctype = "unicode", }
@@ -22,7 +19,7 @@ Entity :: struct {
 	description: string,
 }
 
-generate_encoding_entity_table :: proc() {
+main :: proc() {
 	filename := path.join({ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml"})
 	defer delete(filename)
 
@@ -33,14 +30,14 @@ generate_encoding_entity_table :: proc() {
 	defer xml.destroy(doc)
 
 	if err != .None {
-		fmt.printf("Load/Parse error: %v\n", err)
+		fmt.printfln("Load/Parse error: %v", err)
 		if err == .File_Error {
-			fmt.printf("\"%v\" not found. Did you run \"tests\\download_assets.py\"?", filename)
+			fmt.eprintfln("%q not found. Did you run \"tests\\download_assets.py\"?", filename)
 		}
 		os.exit(1)
 	}
 
-	fmt.printf("\"%v\" loaded and parsed.\n", filename)
+	fmt.printfln("%q loaded and parsed.", filename)
 
 	generated_buf: strings.Builder
 	defer strings.builder_destroy(&generated_buf)
@@ -54,7 +51,7 @@ generate_encoding_entity_table :: proc() {
 
 	charlist := doc.elements[charlist_id]
 
-	fmt.printf("Found `<charlist>` with %v children.\n", len(charlist.value))
+	fmt.printfln("Found `<charlist>` with %v children.", len(charlist.value))
 
 	entity_map: map[string]Entity
 	names: [dynamic]string
@@ -70,7 +67,7 @@ generate_encoding_entity_table :: proc() {
 		char := doc.elements[id]
 
 		if char.ident != "character" {
-			fmt.eprintf("Expected `<character>`, got `<%v>`\n", char.ident)
+			fmt.eprintfln("Expected `<character>`, got `<%v>`", char.ident)
 			os.exit(1)
 		}
 
@@ -78,18 +75,24 @@ generate_encoding_entity_table :: proc() {
 			fmt.eprintln("`<character id=\"...\">` attribute not found.")
 			os.exit(1)
 		} else {
-			codepoint := strconv.atoi(codepoint_string)
+			dash := strings.index(codepoint_string, "-")
+			if dash > -1 {
+				codepoint_string = codepoint_string[:dash]
+			}
+			codepoint, code_ok := strconv.parse_int(codepoint_string)
+			if !code_ok {
+				fmt.eprintfln("codepoint_string: %q, codepoint: %v", codepoint_string, codepoint)
+				continue
+			}
 
 			desc, desc_ok := xml.find_child_by_ident(doc, id, "description")
+			assert(desc_ok)
 			description := ""
 			if len(doc.elements[desc].value) == 1 {
 				description = doc.elements[desc].value[0].(string)
 			}
 
-			/*
-				For us to be interested in this codepoint, it has to have at least one entity.
-			*/
-
+			// For us to be interested in this codepoint, it has to have at least one entity.
 			nth := 0
 			for {
 				character_entity := xml.find_child_by_ident(doc, id, "entity", nth) or_break
@@ -103,8 +106,8 @@ generate_encoding_entity_table :: proc() {
 				}
 
 				if name == "\"\"" {
-					fmt.printf("%#v\n", char)
-					fmt.printf("%#v\n", character_entity)
+					fmt.printfln("%#v", char)
+					fmt.printfln("%#v", character_entity)
 				}
 
 				if len(name) > max_name_length { longest_name  = name }
@@ -130,18 +133,14 @@ generate_encoding_entity_table :: proc() {
 		}
 	}
 
-	/*
-		Sort by name.
-	*/
+	// Sort by name.
 	slice.sort(names[:])
 
-	fmt.printf("Found %v unique `&name;` -> rune mappings.\n", count)
-	fmt.printf("Shortest name: %v (%v)\n", shortest_name, min_name_length)
-	fmt.printf("Longest name:  %v (%v)\n", longest_name,  max_name_length)
+	fmt.printfln("Found %v unique `&name;` -> rune mappings.", count)
+	fmt.printfln("Shortest name: %v (%v)", shortest_name, min_name_length)
+	fmt.printfln("Longest name:  %v (%v)", longest_name,  max_name_length)
 
-	/*
-		Generate table.
-	*/
+	// Generate table.
 	fmt.wprintln(w, "package encoding_unicode_entity")
 	fmt.wprintln(w, "")
 	fmt.wprintln(w, GENERATED)
@@ -149,10 +148,10 @@ generate_encoding_entity_table :: proc() {
 	fmt.wprintf (w, TABLE_FILE_PROLOG)
 	fmt.wprintln(w, "")
 
-	fmt.wprintf (w, "// `&%v;`\n", shortest_name)
-	fmt.wprintf (w, "XML_NAME_TO_RUNE_MIN_LENGTH :: %v\n", min_name_length)
-	fmt.wprintf (w, "// `&%v;`\n", longest_name)
-	fmt.wprintf (w, "XML_NAME_TO_RUNE_MAX_LENGTH :: %v\n", max_name_length)
+	fmt.wprintfln(w, "// `&%v;`", shortest_name)
+	fmt.wprintfln(w, "XML_NAME_TO_RUNE_MIN_LENGTH :: %v", min_name_length)
+	fmt.wprintfln(w, "// `&%v;`", longest_name)
+	fmt.wprintfln(w, "XML_NAME_TO_RUNE_MAX_LENGTH :: %v", max_name_length)
 	fmt.wprintln(w, "")
 
 	fmt.wprintln(w,
@@ -189,7 +188,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			}
 
 			prefix = rune(v[0])
-			fmt.wprintf (w, "\tcase '%v':\n", prefix)
+			fmt.wprintfln(w, "\tcase '%v':", prefix)
 			fmt.wprintln(w, "\t\tswitch name {")
 		}
 
@@ -199,8 +198,8 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 		for i := len(e.name); i < max_name_length; i += 1 {
 			fmt.wprintf(w, " ")
 		}
-		fmt.wprintf(w, " // %v\n", e.description)
-		fmt.wprintf(w, "\t\t\treturn %v, true\n", rune_to_string(e.codepoint))
+		fmt.wprintfln(w, " // %v", e.description)
+		fmt.wprintfln(w, "\t\t\treturn %v, true", rune_to_string(e.codepoint))
 
 		should_close = true
 	}
@@ -216,17 +215,13 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 
 	written := os.write_entire_file(generated_filename, transmute([]byte)strings.to_string(generated_buf))
 
-	if written {
-		fmt.printf("Successfully written generated \"%v\".\n", generated_filename)
+	if written == nil {
+		fmt.printfln("Successfully written generated \"%v\".", generated_filename)
 	} else {
-		fmt.printf("Failed to write generated \"%v\".\n", generated_filename)
+		fmt.printfln("Failed to write generated \"%v\".", generated_filename)
 	}
 
-	delete(entity_map)
-	delete(names)
-	for &name in names {
-		free(&name)
-	}
+	// Not a library, no need to clean up.
 }
 
 GENERATED :: `/*
@@ -275,20 +270,4 @@ is_dotted_name :: proc(name: string) -> (dotted: bool) {
 		if r == '.' { return true}
 	}
 	return false
-}
-
-main :: proc() {
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	context.allocator = mem.tracking_allocator(&track)
-
-	generate_encoding_entity_table()
-
-	if len(track.allocation_map) > 0 {
-		fmt.println()
-		for _, v in track.allocation_map {
-			fmt.printf("%v Leaked %v bytes.\n", v.location, v.size)
-		}
-	}
-	fmt.println("Done and cleaned up!")
 }

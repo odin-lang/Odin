@@ -495,6 +495,15 @@ is_directory :: proc(path: string) -> bool {
 }
 
 /*
+	Returns `true` when file `f` is connected to a terminal (emulator).
+*/
+@(require_results)
+is_tty :: proc "contextless" (f: ^File) -> bool {
+	return _is_tty(f)
+}
+
+
+/*
 	`copy_file` copies a file from `src_path` to `dst_path` and returns an error if any was encountered.
 */
 copy_file :: proc(dst_path, src_path: string) -> Error {

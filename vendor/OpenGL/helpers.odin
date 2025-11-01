@@ -3,10 +3,11 @@ package vendor_gl
 
 // Helper for loading shaders into a program
 
-import "core:os"
-import "core:fmt"
-import "core:strings"
-import "base:runtime"
+import os "core:os/os2"
+import    "core:fmt"
+import    "core:strings"
+import    "core:time"
+import    "base:runtime"
 _ :: fmt
 _ :: runtime
 
@@ -150,7 +151,10 @@ create_and_link_program :: proc(shader_ids: []u32, binary_retrievable := false) 
 }
 
 load_compute_file :: proc(filename: string, binary_retrievable := false) -> (program_id: u32, ok: bool) {
-	cs_data := os.read_entire_file(filename) or_return
+	cs_data, cs_data_err := os.read_entire_file(filename, context.allocator)
+	if cs_data_err != nil {
+		return 0, false
+	}
 	defer delete(cs_data)
 
 	// Create the shaders
@@ -165,10 +169,16 @@ load_compute_source :: proc(cs_data: string, binary_retrievable := false) -> (pr
 }
 
 load_shaders_file :: proc(vs_filename, fs_filename: string, binary_retrievable := false) -> (program_id: u32, ok: bool) {
-	vs_data := os.read_entire_file(vs_filename) or_return
+	vs_data, vs_data_err := os.read_entire_file(vs_filename, context.allocator)
+	if vs_data_err != nil {
+		return 0, false
+	}
 	defer delete(vs_data)
 	
-	fs_data := os.read_entire_file(fs_filename) or_return
+	fs_data, fs_data_err := os.read_entire_file(fs_filename, context.allocator)
+	if fs_data_err != nil {
+		return 0, false
+	}
 	defer delete(fs_data)
 
 	return load_shaders_source(string(vs_data), string(fs_data), binary_retrievable)
@@ -192,14 +202,14 @@ when ODIN_OS == .Windows {
 	update_shader_if_changed :: proc(
 		vertex_name, fragment_name: string, 
 		program: u32, 
-		last_vertex_time, last_fragment_time: os.File_Time,
+		last_vertex_time, last_fragment_time: time.Time,
 	) -> (
 		old_program: u32, 
-		current_vertex_time, current_fragment_time: os.File_Time, 
+		current_vertex_time, current_fragment_time: time.Time,
 		updated: bool,
 	) {
-		current_vertex_time, _ = os.last_write_time_by_name(vertex_name)
-		current_fragment_time, _ = os.last_write_time_by_name(fragment_name)
+		current_vertex_time, _   = os.modification_time_by_path(vertex_name)
+		current_fragment_time, _ = os.modification_time_by_path(fragment_name)
 		old_program = program
 
 		if current_vertex_time != last_vertex_time || current_fragment_time != last_fragment_time {
@@ -220,13 +230,13 @@ when ODIN_OS == .Windows {
 	update_shader_if_changed_compute :: proc(
 		compute_name: string, 
 		program: u32, 
-		last_compute_time: os.File_Time,
+		last_compute_time: time.Time,
 	) -> (
 		old_program: u32, 
-		current_compute_time: os.File_Time, 
+		current_compute_time: time.Time,
 		updated: bool,
 	) {
-		current_compute_time, _ = os.last_write_time_by_name(compute_name)
+		current_compute_time, _ = os.modification_time_by_path(compute_name)
 		old_program = program
 
 		if current_compute_time != last_compute_time {

@@ -1,3 +1,4 @@
+#+feature global-context
 #+private
 package os2
 
@@ -270,6 +271,10 @@ __fd :: proc(f: ^File) -> wasi.fd_t {
 		return (^File_Impl)(f.impl).fd
 	}
 	return -1
+}
+
+_is_tty :: proc "contextless" (f: ^File) -> bool {
+	return false
 }
 
 _name :: proc(f: ^File) -> string {

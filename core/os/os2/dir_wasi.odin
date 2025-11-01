@@ -1,7 +1,6 @@
 #+private
 package os2
 
-import "base:runtime"
 import "core:slice"
 import "base:intrinsics"
 import "core:sys/wasm/wasi"

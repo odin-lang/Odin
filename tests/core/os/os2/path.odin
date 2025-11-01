@@ -1,8 +1,10 @@
 package tests_core_os_os2
 
+import    "core:fmt"
 import os "core:os/os2"
 import    "core:log"
 import    "core:testing"
+import    "core:slice"
 import    "core:strings"
 
 @(test)
@@ -373,5 +375,74 @@ test_split_path_list :: proc(t: ^testing.T) {
 			}
 			testing.expectf(t, ok, "expected split_path_list(%q) -> %v; got %v, %v", tc.path_list, tc.expected, result, err)
 		}
+	}
+}
+
+Glob_Test :: struct {
+	pattern: string,
+	matches: []string,
+	err:     os.Error,
+}
+
+glob_tests := []Glob_Test{
+	{
+		pattern = ODIN_ROOT + "tests/core/os/*/*.txt",
+		matches = {
+			ODIN_ROOT + "tests/core/os/dir/b.txt",
+		},
+		err     = {},
+	},
+	{
+		pattern = ODIN_ROOT + "tests/core/os/os2/*.odin",
+		matches = {
+			ODIN_ROOT + "tests/core/os/os2/dir.odin",
+			ODIN_ROOT + "tests/core/os/os2/file.odin",
+			ODIN_ROOT + "tests/core/os/os2/path.odin",
+			ODIN_ROOT + "tests/core/os/os2/process.odin",
+		},
+		err     = {},
+	},
+}
+
+@(test)
+test_glob :: proc(t: ^testing.T) {
+	compare_matches :: proc(t: ^testing.T, pattern: string, globbed, expected: []string) {
+		glob_fold   := make([]string, len(globbed), context.temp_allocator)
+		expect_fold := make([]string, len(globbed), context.temp_allocator)
+
+		for glob, i in globbed {
+			// If `glob` returned a path in response to a pattern,
+			// then `match` should consider that path a match, too,
+			// irrespective of `/` versus `\` presence.
+			no_match_msg := fmt.tprintf("Expected os.match(%q, %q) to be `true`, got `false`", pattern, glob)
+			match, _ := os.match(pattern, glob)
+
+			f, _ := strings.replace_all(glob, `\`, `/`, context.temp_allocator)
+			glob_fold[i] = f
+			testing.expect(t, match, no_match_msg)
+		}
+
+		for exp, i in expected {
+			f, _ := strings.replace_all(exp, `\`, `/`, context.temp_allocator)
+			expect_fold[i] = f
+		}
+
+		slice.sort(glob_fold)
+		slice.sort(expect_fold)
+
+		not_equal_msg := fmt.tprintf("Expected os.glob(%q) to return %v, got %v", pattern, glob_fold, expect_fold)
+		testing.expect(t, slice.equal(glob_fold, expect_fold), not_equal_msg)
+	}
+
+	for glob in glob_tests {
+		globbed, err := os.glob(glob.pattern, context.allocator)
+		defer {
+			for file in globbed {
+				delete(file)
+			}
+			delete(globbed)
+		}
+		testing.expect_value(t, err, glob.err)
+		compare_matches(t, glob.pattern, globbed, glob.matches)
 	}
 }

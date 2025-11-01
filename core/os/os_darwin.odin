@@ -598,7 +598,7 @@ foreign libc {
 	@(link_name="fstat64")          _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---
-    @(link_name="fsync")            _unix_fsync         :: proc(handle: Handle) -> c.int ---
+	@(link_name="fsync")            _unix_fsync         :: proc(handle: Handle) -> c.int ---
 	@(link_name="dup")              _unix_dup           :: proc(handle: Handle) -> Handle ---
 
 	@(link_name="fdopendir$INODE64") _unix_fdopendir_amd64 :: proc(fd: Handle) -> Dir ---
