@@ -189,12 +189,13 @@ Example:
 
 	import "core:fmt"
 	import "core:io"
-	import "core:os"
+	import os "core:os/os2"
 	import "core:text/table"
 
 	scripts :: proc(w: io.Writer) {
 		t: table.Table
 		table.init(&t)
+		defer table.destroy(&t)
 		table.caption(&t, "Tést Suite")
 		table.padding(&t, 1, 3)
 		table.header_of_aligned_values(&t, {{.Left, "Script"}, {.Center, "Sample"}})
@@ -224,9 +225,7 @@ Example:
 	}
 
 	main :: proc() {
-		stdout := os.stream_from_handle(os.stdout)
-
-		scripts(stdout)
+		scripts(os.to_stream(os.stdout))
 	}
 
 Output:
@@ -266,14 +265,15 @@ corners and dividers.
 Example:
 	package main
 
-	import "core:fmt"
-	import "core:io"
-	import "core:os"
-	import "core:text/table"
+	import    "core:fmt"
+	import    "core:io"
+	import os "core:os/os2"
+	import    "core:text/table"
 
 	box_drawing :: proc(w: io.Writer) {
 		t: table.Table
 		table.init(&t)
+		defer table.destroy(&t)
 		table.caption(&t, "Box Drawing Example")
 		table.padding(&t, 2, 2)
 		table.header_of_aligned_values(&t, {{.Left, "Operating System"}, {.Center, "Year Introduced"}})
@@ -299,9 +299,7 @@ Example:
 	}
 
 	main :: proc() {
-		stdout := os.stream_from_handle(os.stdout)
-
-		box_drawing(stdout)
+		box_drawing(os.to_stream(os.stdout))
 	}
 
 While the decorations support multi-codepoint Unicode graphemes, do note that
