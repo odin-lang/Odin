@@ -3,6 +3,7 @@ package tests_core_os_os2
 import os "core:os/os2"
 import    "core:log"
 import    "core:testing"
+import    "core:slice"
 import    "core:strings"
 
 @(test)
@@ -376,10 +377,33 @@ test_split_path_list :: proc(t: ^testing.T) {
 	}
 }
 
+Glob_Test :: struct {
+	pattern: string,
+	matches: []string,
+	err:     os.Error,
+}
+
+glob_tests := []Glob_Test{
+	{
+		pattern = ODIN_ROOT + "tests/core/os/*/*.txt",
+		matches = {},
+		err     = nil,
+	},
+}
+
 @(test)
 test_glob :: proc(t: ^testing.T) {
+	for glob in glob_tests {
+		files, err := os.glob(glob.pattern, context.allocator)
+		defer {
+			for file in files {
+				delete(file)
+			}
+			delete(files)
+		}
+		testing.expect_value(t, err, glob.err)
 
-
-
-
+		slice.sort(files)
+		log.infof("files: %v", files)
+	}
 }
