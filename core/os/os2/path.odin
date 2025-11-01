@@ -771,6 +771,14 @@ scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
 
 @(private="file")
 match_chunk :: proc(chunk, s: string) -> (rest: string, ok: bool, err: Error) {
+	slash_equal :: proc(a, b: u8) -> bool {
+		switch a {
+		case '/':  return b == '/' || b == '\\'
+		case '\\': return b == '/' || b == '\\'
+		case: return a == b
+		}
+	}
+
 	chunk, s := chunk, s
 	for len(chunk) > 0 {
 		if len(s) == 0 {
@@ -831,7 +839,7 @@ match_chunk :: proc(chunk, s: string) -> (rest: string, ok: bool, err: Error) {
 			}
 			fallthrough
 		case:
-			if chunk[0] != s[0] {
+			if !slash_equal(chunk[0], s[0]) {
 				return
 			}
 			s = s[1:]
