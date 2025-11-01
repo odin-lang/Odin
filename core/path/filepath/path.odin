@@ -2,7 +2,6 @@
 // To process paths such as URLs that depend on forward slashes regardless of the OS, use the slashpath package.
 package filepath
 
-import    "base:runtime"
 import os "core:os/os2"
 import    "core:strings"
 
@@ -10,11 +9,6 @@ SEPARATOR_CHARS :: `/\`
 
 // is_separator checks whether the byte is a valid separator character
 is_separator :: os.is_path_separator
-
-@(private)
-is_slash :: proc(c: byte) -> bool {
-	return c == '\\' || c == '/'
-}
 
 /*
 	In Windows, returns `true` if `path` is one of the following:
@@ -144,22 +138,25 @@ long_ext :: os.long_ext
 */
 clean :: os.clean_path
 
-// Returns the result of replacing each forward slash `/` character in the path with the separate OS specific character.
-from_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
-	if SEPARATOR == '/' {
-		return path, false
-	}
-	return strings.replace_all(path, "/", SEPARATOR_STRING, allocator)
-}
+/*
+Returns the result of replacing each path separator character in the path
+with the specific character `new_sep`.
 
-// Returns the result of replacing each OS specific separator with a forward slash `/` character.
-to_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
-	if SEPARATOR == '/' {
-		return path, false
-	}
-	return strings.replace_all(path, SEPARATOR_STRING, "/", allocator)
-}
+*Allocates Using Provided Allocator*
+*/
+replace_path_separators := os.replace_path_separators
 
+/*
+Return true if `path` is an absolute path as opposed to a relative one.
+*/
+is_abs :: os.is_absolute_path
+
+/*
+Get the absolute path to `path` with respect to the process's current directory.
+
+*Allocates Using Provided Allocator*
+*/
+abs :: os.get_absolute_path
 
 Relative_Error :: enum {
 	None,
@@ -275,108 +272,4 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 // An empty string returns nil. A non-empty string with no separators returns a 1-element array.
 // Any empty components will be included, e.g. `a::b` will return a 3-element array, as will `::`.
 // Separators within pairs of double-quotes will be ignored and stripped, e.g. `"a:b"c:d` will return []{`a:bc`, `d`}.
-split_list :: proc(path: string, allocator := context.allocator) -> (list: []string, err: runtime.Allocator_Error) #optional_allocator_error {
-	if path == "" {
-		return nil, nil
-	}
-
-	start: int
-	quote: bool
-
-	start, quote = 0, false
-	count := 0
-
-	for i := 0; i < len(path); i += 1 {
-		c := path[i]
-		switch {
-		case c == '"':
-			quote = !quote
-		case c == LIST_SEPARATOR && !quote:
-			count += 1
-		}
-	}
-
-	start, quote = 0, false
-	list = make([]string, count + 1, allocator) or_return
-	index := 0
-	for i := 0; i < len(path); i += 1 {
-		c := path[i]
-		switch {
-		case c == '"':
-			quote = !quote
-		case c == LIST_SEPARATOR && !quote:
-			list[index] = path[start:i]
-			index += 1
-			start = i + 1
-		}
-	}
-	assert(index == count)
-	list[index] = path[start:]
-
-	for s0, i in list {
-		s, new := strings.replace_all(s0, `"`, ``, allocator)
-		if !new {
-			s = strings.clone(s, allocator) or_return
-		}
-		list[i] = s
-	}
-
-	return list, nil
-}
-
-
-
-
-/*
-	Lazy_Buffer is a lazily made path buffer
-	When it does allocate, it uses the context.allocator
- */
-@(private)
-Lazy_Buffer :: struct {
-	s: string,
-	b: []byte,
-	w: int, // write index
-	vol_and_path: string,
-	vol_len:      int,
-}
-
-@(private)
-lazy_buffer_index :: proc(lb: ^Lazy_Buffer, i: int) -> byte {
-	if lb.b != nil {
-		return lb.b[i]
-	}
-	return lb.s[i]
-}
-@(private)
-lazy_buffer_append :: proc(lb: ^Lazy_Buffer, c: byte) -> (err: runtime.Allocator_Error) {
-	if lb.b == nil {
-		if lb.w < len(lb.s) && lb.s[lb.w] == c {
-			lb.w += 1
-			return
-		}
-		lb.b = make([]byte, len(lb.s)) or_return
-		copy(lb.b, lb.s[:lb.w])
-	}
-	lb.b[lb.w] = c
-	lb.w += 1
-	return
-}
-@(private)
-lazy_buffer_string :: proc(lb: ^Lazy_Buffer) -> (s: string, err: runtime.Allocator_Error) {
-	if lb.b == nil {
-		return strings.clone(lb.vol_and_path[:lb.vol_len+lb.w])
-	}
-
-	x := lb.vol_and_path[:lb.vol_len]
-	y := string(lb.b[:lb.w])
-	z := make([]byte, len(x)+len(y)) or_return
-	copy(z, x)
-	copy(z[len(x):], y)
-	return string(z), nil
-}
-@(private)
-lazy_buffer_destroy :: proc(lb: ^Lazy_Buffer) -> runtime.Allocator_Error {
-	err := delete(lb.b)
-	lb^ = {}
-	return err
-}
+split_list :: os.split_path_list

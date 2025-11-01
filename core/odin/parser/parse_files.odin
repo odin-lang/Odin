@@ -11,8 +11,8 @@ import    "core:strings"
 collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 	NO_POS :: tokenizer.Pos{}
 
-	pkg_path, pkg_path_ok := filepath.abs(path)
-	if !pkg_path_ok {
+	pkg_path, pkg_path_err := os.get_absolute_path(path, context.allocator)
+	if pkg_path_err != nil {
 		return
 	}
 
@@ -28,8 +28,8 @@ collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 	pkg.fullpath = pkg_path
 
 	for match in matches {
-		fullpath, ok := filepath.abs(match)
-		if !ok {
+		fullpath, fullpath_err := os.get_absolute_path(match, context.allocator)
+		if fullpath_err != nil {
 			return
 		}
 
