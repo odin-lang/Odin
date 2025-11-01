@@ -89,42 +89,44 @@ sincos :: proc{
 	sincos_f64, sincos_f64le, sincos_f64be,
 }
 
-sincos_f16 :: proc "contextless" (x: f16) -> (sin, cos: f16) #no_bounds_check {
-	s, c := sincos_f64(f64(x))
+sincos_f16 :: proc "contextless" (x: f16, loc := #caller_location) -> (sin, cos: f16) #no_bounds_check {
+	s, c := sincos_f64(f64(x), loc)
 	return f16(s), f16(c)
 }
-sincos_f16le :: proc "contextless" (x: f16le) -> (sin, cos: f16le) #no_bounds_check {
-	s, c := sincos_f64(f64(x))
+sincos_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> (sin, cos: f16le) #no_bounds_check {
+	s, c := sincos_f64(f64(x), loc)
 	return f16le(s), f16le(c)
 }
-sincos_f16be :: proc "contextless" (x: f16be) -> (sin, cos: f16be) #no_bounds_check {
-	s, c := sincos_f64(f64(x))
+sincos_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> (sin, cos: f16be) #no_bounds_check {
+	s, c := sincos_f64(f64(x), loc)
 	return f16be(s), f16be(c)
 }
 
-sincos_f32 :: proc "contextless" (x: f32) -> (sin, cos: f32) #no_bounds_check {
-	s, c := sincos_f64(f64(x))
+sincos_f32 :: proc "contextless" (x: f32, loc := #caller_location) -> (sin, cos: f32) #no_bounds_check {
+	s, c := sincos_f64(f64(x), loc)
 	return f32(s), f32(c)
 }
-sincos_f32le :: proc "contextless" (x: f32le) -> (sin, cos: f32le) #no_bounds_check {
-	s, c := sincos_f64(f64(x))
+sincos_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> (sin, cos: f32le) #no_bounds_check {
+	s, c := sincos_f64(f64(x), loc)
 	return f32le(s), f32le(c)
 }
-sincos_f32be :: proc "contextless" (x: f32be) -> (sin, cos: f32be) #no_bounds_check {
-	s, c := sincos_f64(f64(x))
+sincos_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> (sin, cos: f32be) #no_bounds_check {
+	s, c := sincos_f64(f64(x), loc)
 	return f32be(s), f32be(c)
 }
 
-sincos_f64le :: proc "contextless" (x: f64le) -> (sin, cos: f64le) #no_bounds_check {
-	s, c := sincos_f64(f64(x))
+sincos_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> (sin, cos: f64le) #no_bounds_check {
+	s, c := sincos_f64(f64(x), loc)
 	return f64le(s), f64le(c)
 }
-sincos_f64be :: proc "contextless" (x: f64be) -> (sin, cos: f64be) #no_bounds_check {
-	s, c := sincos_f64(f64(x))
+sincos_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> (sin, cos: f64be) #no_bounds_check {
+	s, c := sincos_f64(f64(x), loc)
 	return f64be(s), f64be(c)
 }
 
-sincos_f64 :: proc "contextless" (x: f64) -> (sin, cos: f64) #no_bounds_check {
+sincos_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> (sin, cos: f64) #no_bounds_check {
+	validate_finite(x, loc)
+
 	x := x
 
 	PI4A :: 0h3fe921fb40000000 // 7.85398125648498535156e-1  PI/4 split into three parts
