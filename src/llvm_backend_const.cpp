@@ -701,6 +701,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				}
 			}
 
+			if (value_type == t_untyped_nil) {
+				return lb_const_nil(m, original_type);
+			}
+
 			Type *t = bt->Union.variants[0];
 			lbValue cv =  lb_const_value(m, t, value, cc);
 			GB_ASSERT(LLVMIsConstant(cv.value));
@@ -741,6 +745,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				} else if (value.kind == ExactValue_Invalid) {
 					return lb_const_nil(m, original_type);
 				}
+			} else if (value_type == t_untyped_nil) {
+				return lb_const_nil(m, original_type);
 			}
 
 			GB_ASSERT_MSG(value_type != nullptr, "%s :: %s", type_to_string(original_type), exact_value_to_string(value));
