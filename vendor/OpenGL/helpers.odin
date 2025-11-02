@@ -6,7 +6,7 @@ package vendor_gl
 import os "core:os/os2"
 import    "core:fmt"
 import    "core:strings"
-import    "core:time"
+@(require) import "core:time"
 import    "base:runtime"
 _ :: fmt
 _ :: runtime
