@@ -1,9 +1,7 @@
 #+build js
 package fmt
 
-import    "core:bufio"
-import    "core:io"
-import os "core:os/os2"
+import "core:strings"
 
 foreign import "odin_env"
 
@@ -12,90 +10,77 @@ foreign odin_env {
 	write :: proc "contextless" (fd: u32, p: []byte) ---
 }
 
-@(private="file")
-write_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
-	if mode == .Write {
-		fd := u32(uintptr(stream_data))
-		write(fd, p)
-		return i64(len(p)), nil
-	}
-	return 0, .Unsupported
-}
+stdout :: u32(1)
+stderr :: u32(2)
 
 @(private="file")
-stdout := io.Writer{
-	procedure = write_stream_proc,
-	data      = rawptr(uintptr(1)),
-}
-@(private="file")
-stderr := io.Writer{
-	procedure = write_stream_proc,
-	data      = rawptr(uintptr(2)),
-}
+BUF_SIZE :: 1024
 
 @(private="file")
-fd_to_writer :: proc(f: ^os.File, loc := #caller_location) -> io.Writer {
-	switch {
-	case f == os.stdout: return stdout
-	case f == os.stderr: return stderr
-	case:   panic("`fmt.fprint` variant called with invalid file descriptor for JS, only 1 (stdout) and 2 (stderr) are supported", loc)
+// TODO: Find a way to grow this if necessary
+buf: [BUF_SIZE]byte
+
+@(private="file")
+get_fd :: proc(f: any, loc := #caller_location) -> (fd: u32) {
+	if _fd, _ok := f.(u32); _ok {
+		fd = _fd
 	}
+	if fd != 1 && fd != 2 {
+		panic("`fmt.fprint` variant called with invalid file descriptor for JS, only 1 (stdout) and 2 (stderr) are supported", loc)
+	}
+	return fd
 }
 
 // fprint formats using the default print settings and writes to fd
-fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true, loc := #caller_location) -> int {
-	buf: [1024]byte
-	b: bufio.Writer
-	defer bufio.writer_flush(&b)
-
-	bufio.writer_init_with_buf(&b, fd_to_writer(f, loc), buf[:])
-	w := bufio.writer_to_writer(&b)
-	return wprint(w, ..args, sep=sep, flush=flush)
+// flush is ignored
+fprint :: proc(f: any, args: ..any, sep := " ", flush := true, loc := #caller_location) -> (n: int) {
+	fd := get_fd(f)
+	s := bprint(buf[:], ..args, sep=sep)
+	n = len(s)
+	write(fd, transmute([]byte)s)
+	return n
 }
 
-// fprintln formats using the default print settings and writes to fd
-fprintln :: proc(f: ^os.File, args: ..any, sep := " ", flush := true, loc := #caller_location) -> int {
-	buf: [1024]byte
-	b: bufio.Writer
-	defer bufio.writer_flush(&b)
-
-	bufio.writer_init_with_buf(&b, fd_to_writer(f, loc), buf[:])
-
-	w := bufio.writer_to_writer(&b)
-	return wprintln(w, ..args, sep=sep, flush=flush)
+// fprintln formats using the default print settings and writes to fd, followed by a newline
+// flush is ignored
+fprintln :: proc(f: any, args: ..any, sep := " ", flush := true, loc := #caller_location) -> (n: int) {
+	fd := get_fd(f)
+	s := bprintln(buf[:], ..args, sep=sep)
+	n = len(s)
+	write(fd, transmute([]byte)s)
+	return n
 }
 
 // fprintf formats according to the specified format string and writes to fd
-fprintf :: proc(f: ^os.File, fmt: string, args: ..any, flush := true, newline := false, loc := #caller_location) -> int {
-	buf: [1024]byte
-	b: bufio.Writer
-	defer bufio.writer_flush(&b)
-
-	bufio.writer_init_with_buf(&b, fd_to_writer(f, loc), buf[:])
-
-	w := bufio.writer_to_writer(&b)
-	return wprintf(w, fmt, ..args, flush=flush, newline=newline)
+// flush is ignored
+fprintf :: proc(f: any, fmt: string, args: ..any, flush := true, newline := false, loc := #caller_location) -> (n: int) {
+	fd := get_fd(f)
+	s := bprintf(buf[:], fmt, ..args, newline=newline)
+	n = len(s)
+	write(fd, transmute([]byte)s)
+	return n
 }
 
 // fprintfln formats according to the specified format string and writes to fd, followed by a newline.
-fprintfln :: proc(f: ^os.File, fmt: string, args: ..any, flush := true, loc := #caller_location) -> int {
+// flush is ignored
+fprintfln :: proc(f: any, fmt: string, args: ..any, flush := true, loc := #caller_location) -> int {
 	return fprintf(f, fmt, ..args, flush=flush, newline=true, loc=loc)
 }
 
 // print formats using the default print settings and writes to stdout
-print   :: proc(args: ..any, sep := " ", flush := true) -> int { return wprint(w=stdout, args=args, sep=sep, flush=flush) }
+print   :: proc(args: ..any, sep := " ", flush := true) -> int { return fprint(stdout, ..args, sep=sep, flush=flush) }
 // println formats using the default print settings and writes to stdout
-println :: proc(args: ..any, sep := " ", flush := true) -> int { return wprintln(w=stdout, args=args, sep=sep, flush=flush) }
+println :: proc(args: ..any, sep := " ", flush := true) -> int { return fprintln(stdout, ..args, sep=sep, flush=flush) }
 // printf formats according to the specififed format string and writes to stdout
-printf  :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush) }
+printf  :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(stdout, fmt, ..args, flush=flush) }
 // printfln formats according to the specified format string and writes to stdout, followed by a newline.
-printfln :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush, newline=true) }
+printfln :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(stdout, fmt, ..args, flush=flush, newline=true) }
 
 // eprint formats using the default print settings and writes to stderr
-eprint   :: proc(args: ..any, sep := " ", flush := true) -> int { return wprint(w=stderr, args=args, sep=sep, flush=flush) }
+eprint   :: proc(args: ..any, sep := " ", flush := true) -> int { return fprint(stderr, ..args, sep=sep, flush=flush) }
 // eprintln formats using the default print settings and writes to stderr
-eprintln :: proc(args: ..any, sep := " ", flush := true) -> int { return wprintln(w=stderr, args=args, sep=sep, flush=flush) }
+eprintln :: proc(args: ..any, sep := " ", flush := true) -> int { return fprintln(stderr, ..args, sep=sep, flush=flush) }
 // eprintf formats according to the specififed format string and writes to stderr
-eprintf  :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stderr, fmt, ..args, flush=flush) }
+eprintf  :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(stderr, fmt, ..args, flush=flush) }
 // eprintfln formats according to the specified format string and writes to stderr, followed by a newline.
-eprintfln :: proc(fmt: string, args: ..any, flush := true) -> int { return wprintf(stdout, fmt, ..args, flush=flush, newline=true) }
+eprintfln :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(stderr, fmt, ..args, flush=flush, newline=true) }
