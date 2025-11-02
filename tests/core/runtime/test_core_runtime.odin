@@ -293,6 +293,65 @@ test_soa_array_allocator_resize_overlapping :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_soa_array_inject_at_elem :: proc(t: ^testing.T) {
+
+	V :: struct {a: u8, b: f32}
+
+	array := make(#soa[dynamic]V, 0, 2)
+	defer delete(array)
+
+	append(&array, V{1, 1.5}, V{2, 2.5}, V{3, 3.5})
+
+	expect_inject(t, &array, 0, {0, 0.5}, {{0, 0.5}, {1, 1.5}, {2, 2.5}, {3, 3.5}})
+	expect_inject(t, &array, 2, {5, 5.5}, {{0, 0.5}, {1, 1.5}, {5, 5.5}, {2, 2.5}, {3, 3.5}})
+	expect_inject(t, &array, 5, {9, 9.5}, {{0, 0.5}, {1, 1.5}, {5, 5.5}, {2, 2.5}, {3, 3.5}, {9, 9.5}})
+
+	expect_inject :: proc(t: ^testing.T, arr: ^#soa[dynamic]V, index: int, arg: V, expected_slice: []V) {
+		ok, err := inject_at_soa(arr, index, arg)
+		testing.expectf(t, ok == true, "Injection of %v at index %d failed", arg, index)
+		testing.expectf(t, err == nil, "Injection allocation of %v at index %d failed: %v", arg, index, err)
+		equals := len(arr) == len(expected_slice)
+		for e, i in expected_slice {
+			if arr[i] != e {
+				equals = false
+				break
+			}
+		}
+		testing.expectf(t, equals, "After injection of %v at index %d, expected array to be\n&%v, got\n%v", arg, index, expected_slice, arr)
+	}
+}
+
+@(test)
+test_soa_array_inject_at_elems :: proc(t: ^testing.T) {
+
+	V :: struct {a: u8, b: f32}
+
+	array := make(#soa[dynamic]V, 0, 2)
+	defer delete(array)
+
+	append(&array, V{1, 1.5}, V{2, 2.5}, V{3, 3.5})
+
+	expect_inject(t, &array, 0, {{0, 0.5}}, {{0, 0.5}, {1, 1.5}, {2, 2.5}, {3, 3.5}})
+	expect_inject(t, &array, 2, {{5, 5.5}, {6, 6.5}}, {{0, 0.5}, {1, 1.5}, {5, 5.5}, {6, 6.5}, {2, 2.5}, {3, 3.5}})
+	expect_inject(t, &array, 6, {{9, 9.5}, {10, 10.5}}, {{0, 0.5}, {1, 1.5}, {5, 5.5}, {6, 6.5}, {2, 2.5}, {3, 3.5}, {9, 9.5}, {10, 10.5}})
+	expect_inject(t, &array, 6, {}, {{0, 0.5}, {1, 1.5}, {5, 5.5}, {6, 6.5}, {2, 2.5}, {3, 3.5}, {9, 9.5}, {10, 10.5}})
+
+	expect_inject :: proc(t: ^testing.T, arr: ^#soa[dynamic]V, index: int, args: []V, expected_slice: []V) {
+		ok, err := inject_at_soa(arr, index, ..args)
+		testing.expectf(t, ok == true, "Injection of %v at index %d failed", args, index)
+		testing.expectf(t, err == nil, "Injection allocation of %v at index %d failed: %v", args, index, err)
+		equals := len(arr) == len(expected_slice)
+		for e, i in expected_slice {
+			if arr[i] != e {
+				equals = false
+				break
+			}
+		}
+		testing.expectf(t, equals, "After injection of %v at index %d, expected array to be\n&%v, got\n%v", args, index, expected_slice, arr)
+	}
+}
+
+@(test)
 test_memory_equal :: proc(t: ^testing.T) {
 	data: [256]u8
 	cmp: [256]u8
