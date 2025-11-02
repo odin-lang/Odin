@@ -3210,6 +3210,17 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 	return ce
 }
 
+empty_selector_expr :: proc(tok: tokenizer.Token, operand: ^ast.Expr) -> ^ast.Selector_Expr {
+	field := ast.new(ast.Ident, tok.pos, end_pos(tok))
+	field.name = ""
+
+	sel := ast.new(ast.Selector_Expr, operand.pos, field)
+	sel.expr  = operand
+	sel.op = tok
+	sel.field = field
+
+	return sel
+}
 
 parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^ast.Expr) {
 	operand = value
@@ -3343,8 +3354,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 			case:
 				error(p, p.curr_tok.pos, "expected a selector")
-				advance_token(p)
-				operand = ast.new(ast.Bad_Expr, operand.pos, end_pos(tok))
+				operand = empty_selector_expr(tok, operand)
 			}
 
 		case .Arrow_Right:
@@ -3361,8 +3371,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 				operand = sel
 			case:
 				error(p, p.curr_tok.pos, "expected a selector")
-				advance_token(p)
-				operand = ast.new(ast.Bad_Expr, operand.pos, end_pos(tok))
+				operand = empty_selector_expr(tok, operand)
 			}
 
 		case .Pointer:
