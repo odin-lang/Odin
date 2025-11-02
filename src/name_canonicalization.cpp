@@ -758,11 +758,11 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			}
 
 			if (f->flags & EntityFlags_IsSubtype) {
-				type_writer_appendc(w, "#subtype");
+				type_writer_appendc(w, "#subtype ");
 			}
 
 			if (f->flags & EntityFlag_Using) {
-				type_writer_appendc(w, "using");
+				type_writer_appendc(w, "using ");
 			}
 			type_writer_append(w, f->token.string.text, f->token.string.len);
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
