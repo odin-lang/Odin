@@ -1,7 +1,7 @@
 package flags
 
 import "core:fmt"
-@require import "core:os"
+@require import os "core:os/os2"
 @require import "core:path/filepath"
 import "core:strings"
 
@@ -38,7 +38,7 @@ parse_or_exit :: proc(
 
 	error := parse(model, args, style, true, true, allocator, loc)
 	if error != nil {
-		stderr := os.stream_from_handle(os.stderr)
+		stderr := os.to_stream(os.stderr)
 
 		if len(args) == 0 {
 			// No arguments entered, and there was an error; show the usage,
@@ -65,18 +65,18 @@ Inputs:
 */
 @(optimization_mode="favor_size")
 print_errors :: proc(data_type: typeid, error: Error, program: string, style: Parsing_Style = .Odin) {
-	stderr := os.stream_from_handle(os.stderr)
-	stdout := os.stream_from_handle(os.stdout)
+	stderr := os.to_stream(os.stderr)
+	stdout := os.to_stream(os.stdout)
 
 	switch specific_error in error {
 	case Parse_Error:
 		fmt.wprintfln(stderr, "[%T.%v] %s", specific_error, specific_error.reason, specific_error.message)
 	case Open_File_Error:
-		fmt.wprintfln(stderr, "[%T#%i] Unable to open file with perms 0o%o in mode 0x%x: %s",
+		fmt.wprintfln(stderr, "[%T#%i] Unable to open file with perms 0o%o and flags %v: %s",
 			specific_error,
 			specific_error.errno,
 			specific_error.perms,
-			specific_error.mode,
+			specific_error.flags,
 			specific_error.filename)
 	case Validation_Error:
 		fmt.wprintfln(stderr, "[%T] %s", specific_error, specific_error.message)

@@ -7,7 +7,7 @@ import "core:fmt"
 @require import "core:log"
 import "core:math"
 @require import "core:net"
-import "core:os"
+import os "core:os/os2"
 import "core:strings"
 import "core:testing"
 import "core:time/datetime"
@@ -1249,7 +1249,7 @@ test_os_handle :: proc(t: ^testing.T) {
 	test_data := "Hellope!"
 
 	W :: struct {
-		outf: os.Handle `args:"file=cw"`,
+		outf: ^os.File `args:"file=cw"`,
 	}
 	w: W
 
@@ -1263,7 +1263,7 @@ test_os_handle :: proc(t: ^testing.T) {
 	os.write_string(w.outf, test_data)
 
 	R :: struct {
-		inf: os.Handle `args:"file=r"`,
+		inf: ^os.File `args:"file=r"`,
 	}
 	r: R
 
@@ -1274,8 +1274,8 @@ test_os_handle :: proc(t: ^testing.T) {
 		return
 	}
 	defer os.close(r.inf)
-	data, read_ok := os.read_entire_file_from_handle(r.inf, context.temp_allocator)
-	testing.expect_value(t, read_ok, true)
+	data, read_err := os.read_entire_file(r.inf, context.temp_allocator)
+	testing.expect_value(t, read_err, nil)
 	file_contents_equal := 0 == bytes.compare(transmute([]u8)test_data, data)
 	testing.expectf(t, file_contents_equal, "expected file contents to be the same, got %v", data)
 }

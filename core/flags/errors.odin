@@ -1,6 +1,6 @@
 package flags
 
-import "core:os"
+import os "core:os/os2"
 
 Parse_Error_Reason :: enum {
 	None,
@@ -29,8 +29,8 @@ Parse_Error :: struct {
 Open_File_Error :: struct {
 	filename: string,
 	errno: os.Error,
-	mode: int,
-	perms: int,
+	flags: os.File_Flags,
+	perms: os.Permissions,
 }
 
 // Raised during parsing.
