@@ -336,48 +336,6 @@ test_join_filename :: proc(t: ^testing.T) {
 	}
 }
 
-@(test)
-test_split_path_list :: proc(t: ^testing.T) {
-	Test_Case :: struct {
-		path_list: string,
-		expected: []string,
-	}
-
-	when ODIN_OS != .Windows {
-		test_cases := [?]Test_Case {
-			{``, {}},
-			{`/bin:`, {`/bin`, ``}},
-			{`/usr/local/bin`, {`/usr/local/bin`}},
-			{`/usr/local/bin:/usr/bin`, {`/usr/local/bin`, `/usr/bin`}},
-			{`"/extra bin":/bin`, {`/extra bin`, `/bin`}},
-			{`"/extra:bin":/bin`, {`/extra:bin`, `/bin`}},
-		}
-	} else {
-		test_cases := [?]Test_Case {
-			{``, {}},
-			{`C:\bin;`, {`C:\bin`, ``}},
-			{`C:\usr\local\bin`, {`C:\usr\local\bin`}},
-			{`C:\usr\local\bin;C:\usr\bin`, {`C:\usr\local\bin`, `C:\usr\bin`}},
-			{`"C:\extra bin";C:\bin`, {`C:\extra bin`, `C:\bin`}},
-			{`"C:\extra;bin";C:\bin`, {`C:\extra;bin`, `C:\bin`}},
-		}
-	}
-
-	for tc in test_cases {
-		result, err := os.split_path_list(tc.path_list, context.temp_allocator)
-		if testing.expectf(t, len(result) == len(tc.expected), "expected split_path_list(%q) -> %v; got %v, %v", tc.path_list, tc.expected, result, err) {
-			ok := true
-			for entry, i in result {
-				if entry != tc.expected[i] {
-					ok = false
-					break
-				}
-			}
-			testing.expectf(t, ok, "expected split_path_list(%q) -> %v; got %v, %v", tc.path_list, tc.expected, result, err)
-		}
-	}
-}
-
 Glob_Test :: struct {
 	pattern: string,
 	matches: []string,
@@ -445,4 +403,160 @@ test_glob :: proc(t: ^testing.T) {
 		testing.expect_value(t, err, glob.err)
 		compare_matches(t, glob.pattern, globbed, glob.matches)
 	}
+}
+
+
+// TODO: merge this and `test_split_list`
+@(test)
+test_split_path_list :: proc(t: ^testing.T) {
+	Test_Case :: struct {
+		path_list: string,
+		expected: []string,
+	}
+
+	when ODIN_OS != .Windows {
+		test_cases := [?]Test_Case {
+			{``, {}},
+			{`/bin:`, {`/bin`, ``}},
+			{`/usr/local/bin`, {`/usr/local/bin`}},
+			{`/usr/local/bin:/usr/bin`, {`/usr/local/bin`, `/usr/bin`}},
+			{`"/extra bin":/bin`, {`/extra bin`, `/bin`}},
+			{`"/extra:bin":/bin`, {`/extra:bin`, `/bin`}},
+		}
+	} else {
+		test_cases := [?]Test_Case {
+			{``, {}},
+			{`C:\bin;`, {`C:\bin`, ``}},
+			{`C:\usr\local\bin`, {`C:\usr\local\bin`}},
+			{`C:\usr\local\bin;C:\usr\bin`, {`C:\usr\local\bin`, `C:\usr\bin`}},
+			{`"C:\extra bin";C:\bin`, {`C:\extra bin`, `C:\bin`}},
+			{`"C:\extra;bin";C:\bin`, {`C:\extra;bin`, `C:\bin`}},
+		}
+	}
+
+	for tc in test_cases {
+		result, err := os.split_path_list(tc.path_list, context.temp_allocator)
+		if testing.expectf(t, len(result) == len(tc.expected), "expected split_path_list(%q) -> %v; got %v, %v", tc.path_list, tc.expected, result, err) {
+			ok := true
+			for entry, i in result {
+				if entry != tc.expected[i] {
+					ok = false
+					break
+				}
+			}
+			testing.expectf(t, ok, "expected split_path_list(%q) -> %v; got %v, %v", tc.path_list, tc.expected, result, err)
+		}
+	}
+}
+
+@(test)
+test_split_list :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		test_split_list_windows(t)
+	} else {
+		test_split_list_unix(t)
+	}
+}
+
+test_split_list_windows :: proc(t: ^testing.T) {
+	Datum :: struct {
+		i: int,
+		v: string,
+		e: [3]string,
+	}
+	@static data := []Datum{
+		{ 0, "C:\\Odin;C:\\Visual Studio;\"C:\\Some Other\"",
+			[3]string{"C:\\Odin", "C:\\Visual Studio", "C:\\Some Other"} }, // Issue #1537
+		{ 1, "a;;b", [3]string{"a", "", "b"} },
+		{ 2, "a;b;", [3]string{"a", "b", ""} },
+		{ 3, ";a;b", [3]string{"", "a", "b"} },
+		{ 4, ";;", [3]string{"", "", ""} },
+		{ 5, "\"a;b\"c;d;\"f\"", [3]string{"a;bc", "d", "f"} },
+		{ 6, "\"a;b;c\";d\";e\";f", [3]string{"a;b;c", "d;e", "f"} },
+	}
+
+	for d, i in data {
+		assert(i == d.i, fmt.tprintf("wrong data index: i %d != d.i %d\n", i, d.i))
+		r, err := os.split_path_list(d.v, context.allocator)
+		testing.expectf(t, err == nil, "Expected err to be nil, got %v", err)
+		defer delete_split(r)
+		testing.expect(t, len(r) == len(d.e), fmt.tprintf("i:%d %s(%s) len(r) %d != len(d.e) %d", i, #procedure, d.v, len(r), len(d.e)))
+		if len(r) == len(d.e) {
+			for _, j in r {
+				testing.expect(t, r[j] == d.e[j], fmt.tprintf("i:%d %s(%v) -> %v[%d] != %v", i, #procedure, d.v, r[j], j, d.e[j]))
+			}
+		}
+	}
+
+	{
+		v := ""
+		r, err := os.split_path_list(v, context.allocator)
+		testing.expectf(t, err == nil, "Expected err to be nil, got %v", err)
+		defer delete_split(r)
+		testing.expect(t, r == nil, fmt.tprintf("%s(%s) -> %v != nil", #procedure, v, r))
+	}
+	{
+		v := "a"
+		r, err := os.split_path_list(v, context.allocator)
+		testing.expectf(t, err == nil, "Expected err to be nil, got %v", err)
+		defer delete_split(r)
+		testing.expect(t, len(r) == 1, fmt.tprintf("%s(%s) len(r) %d != 1", #procedure, v, len(r)))
+		if len(r) == 1 {
+			testing.expect(t, r[0] == "a", fmt.tprintf("%s(%v) -> %v[0] != a", #procedure, v, r[0]))
+		}
+	}
+}
+
+test_split_list_unix :: proc(t: ^testing.T) {
+	Datum :: struct {
+		v: string,
+		e: [3]string,
+	}
+	@static data := []Datum{
+		{ "/opt/butler:/home/fancykillerpanda/Projects/Odin/Odin:/usr/local/sbin",
+			[3]string{"/opt/butler", "/home/fancykillerpanda/Projects/Odin/Odin", "/usr/local/sbin"} }, // Issue #1537
+		{ "a::b", [3]string{"a", "", "b"} },
+		{ "a:b:", [3]string{"a", "b", ""} },
+		{ ":a:b", [3]string{"", "a", "b"} },
+		{ "::", [3]string{"", "", ""} },
+		{ "\"a:b\"c:d:\"f\"", [3]string{"a:bc", "d", "f"} },
+		{ "\"a:b:c\":d\":e\":f", [3]string{"a:b:c", "d:e", "f"} },
+	}
+
+	for d in data {
+		r, err := os.split_path_list(d.v, context.allocator)
+		testing.expectf(t, err == nil, "Expected err to be nil, got %v", err)
+		defer delete_split(r)
+		testing.expectf(t, len(r) == len(d.e), "%s len(r) %d != len(d.e) %d", d.v, len(r), len(d.e))
+		if len(r) == len(d.e) {
+			for _, j in r {
+				testing.expectf(t, r[j] == d.e[j], "%v -> %v[%d] != %v", d.v, r[j], j, d.e[j])
+			}
+		}
+	}
+
+	{
+		v := ""
+		r, err := os.split_path_list(v, context.allocator)
+		testing.expectf(t, err == nil, "Expected err to be nil, got %v", err)
+		testing.expectf(t, r == nil, "'%s' -> '%v' != nil", v, r)
+	}
+	{
+		v := "a"
+		r, err := os.split_path_list(v, context.allocator)
+		testing.expectf(t, err == nil, "Expected err to be nil, got %v", err)
+		defer delete_split(r)
+		testing.expectf(t, len(r) == 1, "'%s' len(r) %d != 1", v, len(r))
+		if len(r) == 1 {
+			testing.expectf(t, r[0] == "a", "'%v' -> %v[0] != a", v, r[0])
+		}
+	}
+}
+
+@(private)
+delete_split :: proc(s: []string) {
+	for part in s {
+		delete(part)
+	}
+	delete(s)
 }
