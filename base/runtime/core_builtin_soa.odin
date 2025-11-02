@@ -509,7 +509,7 @@ append_nothing_soa :: proc(array: ^$T/#soa[dynamic]$E, loc := #caller_location) 
 		return 0, nil
 	}
 	prev_len := len(array)
-	resize(array, len(array)+1, loc) or_return
+	resize_soa(array, len(array)+1, loc) or_return
 	return len(array)-prev_len, nil
 }
 
@@ -527,7 +527,8 @@ inject_at_elem_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, #no_
 	m :: 1
 	new_len := n + m
 
-	resize(array, new_len, loc) or_return
+	resize_soa(array, new_len, loc) or_return
+
 	when size_of(E) != 0 {
 		ti := type_info_base(type_info_of(typeid_of(T)))
 		si := &ti.variant.(Type_Info_Struct)
@@ -553,6 +554,7 @@ inject_at_elem_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, #no_
 			item_offset += type.size
 		}
 	}
+
 	ok = true
 	return
 }
@@ -575,7 +577,8 @@ inject_at_elems_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, #no
 	m := len(args)
 	new_len := n + m
 
-	resize(array, new_len, loc) or_return
+	resize_soa(array, new_len, loc) or_return
+
 	when size_of(E) != 0 {
 		ti := type_info_base(type_info_of(typeid_of(T)))
 		si := &ti.variant.(Type_Info_Struct)
@@ -604,6 +607,7 @@ inject_at_elems_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, #no
 			item_offset += type.size
 		}
 	}
+
 	ok = true
 	return
 }
