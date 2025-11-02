@@ -5,7 +5,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
 import "core:mem"
-import "core:os"
+@(require) import os "core:os/os2"
 import "core:reflect"
 import "core:strconv"
 import "core:strings"
@@ -208,7 +208,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type: typeid, arg_tag: string, out_error: ^Error) {
 	// Core types currently supported:
 	//
-	// - os.Handle
+	// - ^os.File
 	// - time.Time
 	// - datetime.DateTime
 	// - net.Host_Or_Endpoint
@@ -216,47 +216,44 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 	GENERIC_RFC_3339_ERROR :: "Invalid RFC 3339 string. Try this format: `yyyy-mm-ddThh:mm:ssZ`, for example `2024-02-29T16:30:00Z`."
 
 	out_error^ = nil
-
-	if data_type == os.Handle {
+	if data_type == ^os.File {
 		// NOTE: `os` is hopefully available everywhere, even if it might panic on some calls.
-		wants_read := false
-		wants_write := false
-		mode: int
+		flags: os.File_Flags
 
 		if file, ok := get_struct_subtag(arg_tag, SUBTAG_FILE); ok {
 			for i in 0..<len(file) {
 				#no_bounds_check switch file[i] {
-				case 'r': wants_read = true
-				case 'w': wants_write = true
-				case 'c': mode |= os.O_CREATE
-				case 'a': mode |= os.O_APPEND
-				case 't': mode |= os.O_TRUNC
+				case 'r': flags |= {.Read}
+				case 'w': flags |= {.Write}
+				case 'c': flags |= {.Create}
+				case 'a': flags |= {.Append}
+				case 't': flags |= {.Trunc}
 				}
 			}
 		}
 
 		// Sane default.
 		// owner/group/other: r--r--r--
-		perms: int = 0o444
+		octal_perms: int = 0o444
 
-		if wants_read && wants_write {
-			mode |= os.O_RDWR
-			perms |= 0o200
-		} else if wants_write {
-			mode |= os.O_WRONLY
-			perms |= 0o200
+		if flags >= {.Read, .Write} {
+			octal_perms |= 0o200
+		} else if .Write in flags {
+			octal_perms |= 0o200
 		} else {
-			mode |= os.O_RDONLY
+			flags |= {.Read}
 		}
 
 		if permstr, ok := get_struct_subtag(arg_tag, SUBTAG_PERMS); ok {
 			if value, parse_ok := strconv.parse_u64_of_base(permstr, 8); parse_ok {
-				perms = int(value)
+				octal_perms = int(value)
 			}
 		}
 
-		handle, errno := os.open(str, mode, perms)
-		if errno != nil {
+		perms := os.perm(octal_perms)
+
+		f, error := os.open(str, flags, perms)
+		if error != nil {
 			// NOTE(Feoramund): os.Error is system-dependent, and there's
 			// currently no good way to translate them all into strings.
 			//
@@ -266,14 +263,14 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 			// it up.
 			out_error^ = Open_File_Error {
 				str,
-				errno,
-				mode,
+				error,
+				flags,
 				perms,
 			}
 			return
 		}
 
-		(^os.Handle)(ptr)^ = handle
+		(^^os.File)(ptr)^ = f
 		return
 	}
 
@@ -463,6 +460,11 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 		}
 
 	case:
+		if type_info.id == ^os.File {
+			parse_and_set_pointer_by_named_type(ptr, str, type_info.id, arg_tag, &error)
+			return
+		}
+
 		if !parse_and_set_pointer_by_base_type(ptr, str, type_info) {
 			return Parse_Error {
 				// The caller will add more details.
