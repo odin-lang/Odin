@@ -9248,6 +9248,20 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 		return kind;
 	}
 
+	if (x.mode == Addressing_Builtin && y.mode == Addressing_Builtin) {
+		if (type_hint == nullptr) {
+			error(node, "Built-in procedures cannot be used within a ternary expression since they have no well-defined signature");
+			return kind;
+		}
+	}
+
+	if (x.mode == Addressing_ProcGroup && y.mode == Addressing_ProcGroup) {
+		if (type_hint == nullptr) {
+			error(node, "Procedure groups cannot be used within a ternary expression since they have no well-defined signature that can be inferred without a context");
+			return kind;
+		}
+	}
+
 	// NOTE(bill, 2023-01-30): Allow for expression like this:
 	//     x: union{f32} = f32(123) if cond else nil
 	if (type_hint && !is_type_any(type_hint)) {
