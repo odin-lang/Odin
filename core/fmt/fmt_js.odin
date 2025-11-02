@@ -1,8 +1,6 @@
 #+build js
 package fmt
 
-import "core:strings"
-
 foreign import "odin_env"
 
 @(private="file")
