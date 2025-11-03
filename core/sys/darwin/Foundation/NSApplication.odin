@@ -186,6 +186,11 @@ RunningApplication_localizedName :: proc "c" (self: ^RunningApplication) -> ^Str
 	return msgSend(^String, self, "localizedName")
 }
 
+@(objc_type=RunningApplication, objc_name="finishedLaunching")
+RunningApplication_finishedLaunching :: proc "c" (self: ^RunningApplication) -> BOOL {
+	return msgSend(BOOL, self, "isFinishedLaunching")
+}
+
 ApplicationDelegateTemplate :: struct {
 	// Launching Applications
 	applicationWillFinishLaunching:                              proc(notification: ^Notification),
