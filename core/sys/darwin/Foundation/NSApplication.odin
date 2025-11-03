@@ -132,6 +132,11 @@ Application_finishLaunching :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "finishLaunching")
 }
 
+@(objc_type=Application, objc_name="stop")
+Application_stop :: proc "c" (self: ^Application, sender: ^Object) {
+	msgSend(nil, self, "stop:", sender)
+}
+
 @(objc_type=Application, objc_name="terminate")
 Application_terminate :: proc "c" (self: ^Application, sender: ^Object) {
 	msgSend(nil, self, "terminate:", sender)
