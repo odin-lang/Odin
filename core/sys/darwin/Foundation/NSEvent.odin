@@ -262,7 +262,7 @@ Event_otherEventWithType :: proc "c" (
 	ctx: id,
 	subtype: i16,
 	data1: Integer,
-	data2: Integer
+	data2: Integer,
 ) -> ^Event {
 	return msgSend(
 		^Event,
@@ -276,7 +276,7 @@ Event_otherEventWithType :: proc "c" (
 		ctx,
 		subtype,
 		data1,
-		data2
+		data2,
 	)
 }
 
