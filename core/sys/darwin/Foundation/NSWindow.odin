@@ -776,6 +776,10 @@ Window_close :: proc "c" (self: ^Window) {
 Window_setDelegate :: proc "c" (self: ^Window, delegate: ^WindowDelegate) {
 	msgSend(nil, self, "setDelegate:", delegate)
 }
+@(objc_type = Window, objc_name = "delegate")
+Window_delegate :: proc "c" (self: ^Window) -> ^WindowDelegate {
+	return msgSend(^WindowDelegate, self, "delegate")
+}
 @(objc_type=Window, objc_name="backingScaleFactor")
 Window_backingScaleFactor :: proc "c" (self: ^Window) -> Float {
 	return msgSend(Float, self, "backingScaleFactor")
