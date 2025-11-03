@@ -161,6 +161,12 @@ Application_nextEventMatchingMask :: proc "c" (self: ^Application, mask: EventMa
 Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
 	msgSend(nil, self, "sendEvent:", event)
 }
+
+@(objc_type=Application, objc_name="postEvent")
+Application_postEvent :: proc "c" (self: ^Application, event: ^Event, atStart: BOOL) {
+	msgSend(nil, self, "postEvent:atStart:", event, atStart)
+}
+
 @(objc_type=Application, objc_name="updateWindows")
 Application_updateWindows :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "updateWindows")
