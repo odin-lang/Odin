@@ -654,6 +654,10 @@ Responder :: struct {using _: Object}
 @(objc_class="NSView")
 View :: struct {using _: Responder}
 
+@(objc_type=View, objc_name="alloc", objc_is_class_method=true)
+View_alloc :: proc "c" () -> ^View {
+	return msgSend(^View, View, "alloc")
+}
 
 @(objc_type=View, objc_name="initWithFrame")
 View_initWithFrame :: proc "c" (self: ^View, frame: Rect) -> ^View {
