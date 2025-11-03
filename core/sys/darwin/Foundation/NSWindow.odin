@@ -56,6 +56,60 @@ BackingStoreType :: enum UInteger {
 	Buffered    = 2,
 }
 
+WindowCollectionBehaviorFlag :: enum UInteger {
+	CanJoinAllSpaces          = 0,
+	MoveToActiveSpace         = 1,
+	Managed                   = 2,
+	Transient                 = 3,
+	Stationary                = 4,
+	ParticipatesInCycle       = 5,
+	IgnoresCycle              = 6,
+	FullScreenPrimary         = 7,
+	FullScreenAuxiliary       = 8,
+	FullScreenNone            = 9,
+	FullScreenAllowsTiling    = 11,
+	FullScreenDisallowsTiling = 12,
+	Primary                   = 16,
+	Auxiliary                 = 17,
+	CanJoinAllApplications    = 18,
+}
+WindowCollectionBehavior :: distinct bit_set[WindowCollectionBehaviorFlag; UInteger]
+WindowCollectionBehaviorDefault                   :: WindowCollectionBehavior{}
+WindowCollectionBehaviorPrimary                   :: WindowCollectionBehavior{.Primary, .FullScreenAuxiliary}
+WindowCollectionBehaviorAuxiliary                 :: WindowCollectionBehavior{.Auxiliary, .FullScreenNone}
+WindowCollectionBehaviorCanJoinAllApplications    :: WindowCollectionBehavior{.CanJoinAllApplications}
+WindowCollectionBehaviorCanJoinAllSpaces          :: WindowCollectionBehavior{.CanJoinAllSpaces}
+WindowCollectionBehaviorMoveToActiveSpace         :: WindowCollectionBehavior{.MoveToActiveSpace}
+WindowCollectionBehaviorStationary                :: WindowCollectionBehavior{.Stationary}
+WindowCollectionBehaviorManaged                   :: WindowCollectionBehavior{.Managed}
+WindowCollectionBehaviorTransient                 :: WindowCollectionBehavior{.Transient}
+WindowCollectionBehaviorFullScreenPrimary         :: WindowCollectionBehavior{.FullScreenPrimary}
+WindowCollectionBehaviorFullScreenAuxiliary       :: WindowCollectionBehavior{.FullScreenAuxiliary}
+WindowCollectionBehaviorFullScreenNone            :: WindowCollectionBehavior{.FullScreenNone}
+WindowCollectionBehaviorFullScreenAllowsTiling    :: WindowCollectionBehavior{.FullScreenAllowsTiling}
+WindowCollectionBehaviorFullScreenDisallowsTiling :: WindowCollectionBehavior{.FullScreenDisallowsTiling}
+WindowCollectionBehaviorParticipatesInCycle       :: WindowCollectionBehavior{.ParticipatesInCycle}
+WindowCollectionBehaviorIgnoresCycle              :: WindowCollectionBehavior{.IgnoresCycle}
+
+WindowLevel :: enum Integer {
+	Normal      = 0,
+	Floating    = 3,
+	Submenu     = 3,
+	TornOffMenu = 3,
+	ModalPanel  = 8,
+	MainMenu    = 24,
+	Status      = 25,
+	PopUpMenu   = 101,
+	ScreenSaver = 1000,
+}
+
+WindowTabbingMode :: enum Integer {
+	Automatic  = 0,
+	Preferred  = 1,
+	Disallowed = 2,
+}
+
+
 WindowDelegateTemplate :: struct {
 	// Managing Sheets
 	windowWillPositionSheetUsingRect:                                    proc(window: ^Window, sheet: ^Window, rect: Rect) -> Rect,
