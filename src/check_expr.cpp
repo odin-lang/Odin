@@ -9200,6 +9200,52 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 	return kind;
 }
 
+
+gb_internal void check_expr_as_value_for_ternary(CheckerContext *c, Operand *o, Ast *e, Type *type_hint) {
+	check_expr_base(c, o, e, type_hint);
+	check_not_tuple(c, o);
+	error_operand_no_value(o);
+
+	switch (o->mode) {
+	case Addressing_Type: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+		defer (gb_string_free(expr_str));
+
+		error(o->expr, "A type '%s' cannot be used as a runtime value", expr_str);
+
+		error_line("\tSuggestion: If a runtime 'typeid' is wanted, use 'typeid_of' to convert a type\n");
+
+		o->mode = Addressing_Invalid;
+
+	} break;
+
+	case Addressing_Builtin: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+		defer (gb_string_free(expr_str));
+
+		error(o->expr, "A built-in procedure '%s' cannot be used as a runtime value", expr_str);
+
+		error_line("\tNote: Built-in procedures are implemented by the compiler and might not be actually instantiated procedures\n");
+
+		o->mode = Addressing_Invalid;
+	} break;
+
+	case Addressing_ProcGroup: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+		defer (gb_string_free(expr_str));
+
+		error(o->expr, "Cannot use overloaded procedure '%s' as a runtime value", expr_str);
+
+		error_line("\tNote: Please specify which procedure in the procedure group to use, via cast or type inference\n");
+
+		o->mode = Addressing_Invalid;
+	} break;
+	}
+}
+
 gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	Operand cond = {Addressing_Invalid};
@@ -9213,7 +9259,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	Operand x = {Addressing_Invalid};
 	Operand y = {Addressing_Invalid};
-	check_expr_or_type(c, &x, te->x, type_hint);
+	check_expr_as_value_for_ternary(c, &x, te->x, type_hint);
 	node->viral_state_flags |= te->x->viral_state_flags;
 
 	if (te->y != nullptr) {
@@ -9221,7 +9267,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 		if (type_hint == nullptr && is_type_typed(x.type)) {
 			th = x.type;
 		}
-		check_expr_or_type(c, &y, te->y, th);
+		check_expr_as_value_for_ternary(c, &y, te->y, th);
 		node->viral_state_flags |= te->y->viral_state_flags;
 	} else {
 		error(node, "A ternary expression must have an else clause");
@@ -9246,6 +9292,20 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 	if (y.mode == Addressing_Invalid) {
 		x.mode = Addressing_Invalid;
 		return kind;
+	}
+
+	if (x.mode == Addressing_Builtin && y.mode == Addressing_Builtin) {
+		if (type_hint == nullptr) {
+			error(node, "Built-in procedures cannot be used within a ternary expression since they have no well-defined signature");
+			return kind;
+		}
+	}
+
+	if (x.mode == Addressing_ProcGroup && y.mode == Addressing_ProcGroup) {
+		if (type_hint == nullptr) {
+			error(node, "Procedure groups cannot be used within a ternary expression since they have no well-defined signature that can be inferred without a context");
+			return kind;
+		}
 	}
 
 	// NOTE(bill, 2023-01-30): Allow for expression like this:
