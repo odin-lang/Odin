@@ -740,6 +740,14 @@ Window_backgroundColor :: proc "c" (self: ^Window) -> ^Color {
 Window_setBackgroundColor :: proc "c" (self: ^Window, color: ^Color) {
 	msgSend(nil, self, "setBackgroundColor:", color)
 }
+@(objc_type = Window, objc_name = "orderFront")
+Window_orderFront :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "orderFront:", sender)
+}
+@(objc_type = Window, objc_name = "orderOut")
+Window_orderOut :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "orderOut:", sender)
+}
 @(objc_type=Window, objc_name="makeKeyAndOrderFront")
 Window_makeKeyAndOrderFront :: proc "c" (self: ^Window, key: ^Object) {
 	msgSend(nil, self, "makeKeyAndOrderFront:", key)
