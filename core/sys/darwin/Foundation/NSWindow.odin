@@ -864,3 +864,35 @@ Window_performWindowDragWithEvent :: proc "c" (self: ^Window, event: ^Event) {
 Window_setToolbar :: proc "c" (self: ^Window, toolbar: ^Toolbar) {
 	msgSend(nil, self, "setToolbar:", toolbar)
 }
+@(objc_type = Window, objc_name = "setCollectionBehavior")
+Window_setCollectionBehavior :: proc "c" (self: ^Window, behavior: WindowCollectionBehavior) {
+	msgSend(nil, self, "setCollectionBehavior:", behavior)
+}
+@(objc_type = Window, objc_name = "collectionBehavior")
+Window_collectionBehavior :: proc "c" (self: ^Window) -> WindowCollectionBehavior {
+	return msgSend(WindowCollectionBehavior, self, "collectionBehavior")
+}
+@(objc_type = Window, objc_name = "setLevel")
+Window_setLevel :: proc "c" (self: ^Window, level: WindowLevel) {
+	msgSend(nil, self, "setLevel:", level)
+}
+@(objc_type = Window, objc_name = "setReleasedWhenClosed")
+Window_setReleasedWhenClosed :: proc "c" (self: ^Window, flag: BOOL) {
+	msgSend(nil, self, "setReleasedWhenClosed:", flag)
+}
+@(objc_type = Window, objc_name = "makeFirstResponder")
+Window_makeFirstResponder :: proc "c" (self: ^Window, responder: ^Responder) -> BOOL {
+	return msgSend(BOOL, self, "makeFirstResponder:", responder)
+}
+@(objc_type = Window, objc_name = "setRestorable")
+Window_setRestorable :: proc "c" (self: ^Window, flag: BOOL) {
+	msgSend(nil, self, "setRestorable:", flag)
+}
+@(objc_type = Window, objc_name = "setTabbingMode")
+Window_setTabbingMode :: proc "c" (self: ^Window, mode: WindowTabbingMode) {
+	msgSend(nil, self, "setTabbingMode:", mode)
+}
+@(objc_type = Window, objc_name = "toggleFullScreen")
+Window_toggleFullScreen :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "toggleFullScreen:", sender)
+}
