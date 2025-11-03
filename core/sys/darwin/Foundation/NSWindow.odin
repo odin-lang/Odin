@@ -728,6 +728,10 @@ Window_setFrame :: proc "c" (self: ^Window, frame: Rect, display: BOOL) {
 Window_setFrameOrigin :: proc "c" (self: ^Window, origin: Point) {
 	msgSend(nil, self, "setFrameOrigin:", origin)
 }
+@(objc_type=Window, objc_name="center")
+Window_center :: proc "c" (self: ^Window) {
+	msgSend(nil, self, "center")
+}
 @(objc_type=Window, objc_name="opaque")
 Window_opaque :: proc "c" (self: ^Window) -> BOOL {
 	return msgSend(BOOL, self, "opaque")
