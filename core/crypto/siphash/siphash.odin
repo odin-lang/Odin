@@ -11,7 +11,7 @@ package siphash
 
 /*
     Copyright 2022 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog:  Initial implementation.

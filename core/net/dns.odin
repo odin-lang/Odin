@@ -12,7 +12,7 @@ package net
 	Copyright 2022 Jeroen van Rijn      <nom@duclavier.com>.
 	Copyright 2024 Feoramund            <rune@swevencraft.org>.
 	Copyright 2025 Christiano Haesbaert <haesbaert@haesbaert.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Tetralux:        Initial implementation

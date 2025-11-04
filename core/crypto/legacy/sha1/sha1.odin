@@ -13,7 +13,7 @@ package sha1
 
 /*
     Copyright 2021 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
