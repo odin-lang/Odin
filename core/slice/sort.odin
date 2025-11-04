@@ -282,7 +282,9 @@ sort_by_generic_cmp :: proc(data: $T/[]$E, cmp: Generic_Cmp, user_data: rawptr) 
 }
 
 
-// stable_sort sorts a slice
+/*
+Sorts a slice while maintaining the relative order of elements with the same key. For an example see either `stable_sort_by` or `stable_sort_by_cmp`.
+*/
 stable_sort :: proc(data: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
@@ -291,7 +293,32 @@ stable_sort :: proc(data: $T/[]$E) where ORD(E) {
 	}
 }
 
-// stable_sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
+/*
+Sorts a slice while maintaining the relative order of elements with the same key. Two items `i` and `j` are ordered if `less(i, j)` returns `true`.
+
+Example:
+	import "core:slice"
+	import "core:fmt"
+	
+	main :: proc() {
+		arr := []Example {
+			{2, "name"},
+			{3, "Bill"},
+			{1, "My"},
+			{2, "is"}
+		}
+		slice.stable_sort_by(arr, proc(i, j: Example) -> bool {
+			return i.n < j.n
+		})
+		
+		for e in arr do  fmt.printf("%s ", e.s)
+	}
+	
+	Example :: struct { n: int, s: string }
+
+Output:
+	My name is Bill 
+*/
 stable_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
@@ -300,6 +327,32 @@ stable_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	}
 }
 
+
+/*
+Sorts a slice while maintaining the relative order of elements with the same key. The ordering of the any two items is defined by the user-provided `cmp`.
+
+Example:
+	import "core:slice"
+	import "core:fmt"
+	
+	main :: proc() {
+		arr := []Example {
+			{2, "name"},
+			{3, "Bill"},
+			{1, "My"},
+			{2, "is"}
+		}
+		slice.stable_sort_by_cmp(arr, proc(i, j: Example) -> slice.Ordering {
+			return slice.cmp(i.n, j.n)
+		})
+		
+		for e in arr do  fmt.printf("%s ", e.s)
+	}
+	
+	Example :: struct { n: int, s: string }
+Output:
+	My name is Bill 
+*/
 stable_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
