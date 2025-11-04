@@ -1005,6 +1005,7 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 		switch (index) {
 		case 0: return 0; // data
 		case 1: return 2; // id
+		default: GB_PANIC("index > 1");
 		}
 	} else if (build_context.ptr_size != build_context.int_size) {
 		switch (t->kind) {
@@ -1203,6 +1204,7 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		switch (index) {
 		case 0: result_type = t_rawptr; break;
 		case 1: result_type = t_typeid; break;
+		default: GB_PANIC("index > 1");
 		}
 	} else if (is_type_dynamic_array(t)) {
 		switch (index) {

@@ -185,8 +185,7 @@ gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValue
 	}
 	Type *bt = base_type(t);
 	GB_ASSERT(bt->kind == Type_Struct || bt->kind == Type_Union);
-	
-	GB_ASSERT(value_count_ == bt->Struct.fields.count);
+	GB_ASSERT(bt->kind != Type_Struct || value_count_ == bt->Struct.fields.count);
 	
 	auto field_remapping = lb_get_struct_remapping(m, t);
 	unsigned values_with_padding_count = elem_count;
@@ -513,7 +512,7 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 	max_count = mp_pack_count(a, nails, size);
 	if (sz < max_count) {
 		debug_print_big_int(a);
-		gb_printf_err("%s -> %tu\n", type_to_string(original_type), sz);;
+		gb_printf_err("%s -> %tu\n", type_to_string(original_type), sz);
 	}
 	GB_ASSERT_MSG(sz >= max_count, "max_count: %tu, sz: %tu, written: %tu, type %s", max_count, sz, written, type_to_string(original_type));
 	GB_ASSERT(gb_size_of(rop64) >= sz);

@@ -2178,11 +2178,14 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 					LLVMSetLinkage(var_global_ref, LLVMInternalLinkage);
 				}
 
-				LLVMValueRef vals[2] = {
-					lb_emit_conv(p, var_global.addr, t_rawptr).value,
-					lb_typeid(p->module, var_type).value,
-				};
-				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals, gb_count_of(vals));
+				auto vals = array_make<LLVMValueRef>(temporary_allocator(), 0, 3);
+				array_add(&vals, lb_emit_conv(p, var_global.addr, t_rawptr).value);
+				if (build_context.metrics.ptr_size == 4) {
+					array_add(&vals, LLVMConstNull(lb_type_padding_filler(p->module, 4, 4)));
+				}
+				array_add(&vals, lb_typeid(p->module, var_type).value);
+
+				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals.data, vals.count);
 				LLVMSetInitializer(global, init);
 			} else {
 				LLVMSetInitializer(global, value.value);

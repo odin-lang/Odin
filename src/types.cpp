@@ -4577,6 +4577,8 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 			case 1:
 				if (field_type_) *field_type_ = t_typeid;
 				return 8; // id
+			default:
+				GB_PANIC("index > 1");
 			}
 		}
 		break;
@@ -4654,6 +4656,7 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 					switch (index) {
 					case 0: t = t_rawptr; break;
 					case 1: t = t_typeid; break;
+					default: GB_PANIC("index > 1");
 					}
 				}
 				break;
@@ -4919,7 +4922,7 @@ gb_internal Type *type_internal_index(Type *t, isize index) {
 	case Type_Slice:
 		{
 			GB_ASSERT(index == 0 || index == 1);
-			return index == 0 ? t_rawptr : t_typeid;
+			return index == 0 ? t_rawptr : t_int;
 		}
 	case Type_DynamicArray:
 		{
