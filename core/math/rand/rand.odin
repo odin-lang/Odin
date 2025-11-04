@@ -208,7 +208,7 @@ Inputs:
 Returns:
 - val: A random 31 bit value in the range `[0, n)`
 
-WARNING: Panics if n is less than 0
+WARNING: Panics if n is less than or equal to 0
 
 Example:
 	import "core:math/rand"
@@ -249,7 +249,7 @@ Inputs:
 Returns:
 - val: A random 63 bit value in the range `[0, n)`
 
-WARNING: Panics if n is less than 0
+WARNING: Panics if n is less than or equal to 0
 
 Example:
 	import "core:math/rand"
@@ -290,7 +290,7 @@ Inputs:
 Returns:
 - val: A random 127 bit value in the range `[0, n)`
 
-WARNING: Panics if n is less than 0
+WARNING: Panics if n is less than or equal to 0
 
 Example:
 	import "core:math/rand"
@@ -331,7 +331,7 @@ Inputs:
 Returns:
 - val: A random integer value in the range `[0, n)`
 
-WARNING: Panics if n is less than 0
+WARNING: Panics if n is less than or equal to 0
 
 Example:
 	import "core:math/rand"
