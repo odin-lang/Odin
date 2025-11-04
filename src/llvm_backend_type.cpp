@@ -356,7 +356,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		small_const_values[2] = type_info_flags.value;
 		small_const_values[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 3));
 		small_const_values[4] = id.value;
-		isize variant_index = 5;
+		unsigned variant_index = 5;
 
 		LLVMTypeRef full_variant_type = LLVMStructGetTypeAtIndex(stype, variant_index);
 		unsigned full_variant_elem_count = LLVMCountStructElementTypes(full_variant_type);
