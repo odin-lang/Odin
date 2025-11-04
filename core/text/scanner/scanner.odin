@@ -341,8 +341,10 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 				case 'x':
 					ch = advance(s)
 					base, prefix = 16, 'x'
-				case:
+				case 'o':
+					ch = advance(s)
 					base, prefix = 8, 'o'
+				case:
 					digsep = 1 // Leading zero
 				}
 			} else {
