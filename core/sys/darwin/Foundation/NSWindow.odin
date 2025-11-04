@@ -56,6 +56,60 @@ BackingStoreType :: enum UInteger {
 	Buffered    = 2,
 }
 
+WindowCollectionBehaviorFlag :: enum UInteger {
+	CanJoinAllSpaces          = 0,
+	MoveToActiveSpace         = 1,
+	Managed                   = 2,
+	Transient                 = 3,
+	Stationary                = 4,
+	ParticipatesInCycle       = 5,
+	IgnoresCycle              = 6,
+	FullScreenPrimary         = 7,
+	FullScreenAuxiliary       = 8,
+	FullScreenNone            = 9,
+	FullScreenAllowsTiling    = 11,
+	FullScreenDisallowsTiling = 12,
+	Primary                   = 16,
+	Auxiliary                 = 17,
+	CanJoinAllApplications    = 18,
+}
+WindowCollectionBehavior :: distinct bit_set[WindowCollectionBehaviorFlag; UInteger]
+WindowCollectionBehaviorDefault                   :: WindowCollectionBehavior{}
+WindowCollectionBehaviorPrimary                   :: WindowCollectionBehavior{.Primary, .FullScreenAuxiliary}
+WindowCollectionBehaviorAuxiliary                 :: WindowCollectionBehavior{.Auxiliary, .FullScreenNone}
+WindowCollectionBehaviorCanJoinAllApplications    :: WindowCollectionBehavior{.CanJoinAllApplications}
+WindowCollectionBehaviorCanJoinAllSpaces          :: WindowCollectionBehavior{.CanJoinAllSpaces}
+WindowCollectionBehaviorMoveToActiveSpace         :: WindowCollectionBehavior{.MoveToActiveSpace}
+WindowCollectionBehaviorStationary                :: WindowCollectionBehavior{.Stationary}
+WindowCollectionBehaviorManaged                   :: WindowCollectionBehavior{.Managed}
+WindowCollectionBehaviorTransient                 :: WindowCollectionBehavior{.Transient}
+WindowCollectionBehaviorFullScreenPrimary         :: WindowCollectionBehavior{.FullScreenPrimary}
+WindowCollectionBehaviorFullScreenAuxiliary       :: WindowCollectionBehavior{.FullScreenAuxiliary}
+WindowCollectionBehaviorFullScreenNone            :: WindowCollectionBehavior{.FullScreenNone}
+WindowCollectionBehaviorFullScreenAllowsTiling    :: WindowCollectionBehavior{.FullScreenAllowsTiling}
+WindowCollectionBehaviorFullScreenDisallowsTiling :: WindowCollectionBehavior{.FullScreenDisallowsTiling}
+WindowCollectionBehaviorParticipatesInCycle       :: WindowCollectionBehavior{.ParticipatesInCycle}
+WindowCollectionBehaviorIgnoresCycle              :: WindowCollectionBehavior{.IgnoresCycle}
+
+WindowLevel :: enum Integer {
+	Normal      = 0,
+	Floating    = 3,
+	Submenu     = 3,
+	TornOffMenu = 3,
+	ModalPanel  = 8,
+	MainMenu    = 24,
+	Status      = 25,
+	PopUpMenu   = 101,
+	ScreenSaver = 1000,
+}
+
+WindowTabbingMode :: enum Integer {
+	Automatic  = 0,
+	Preferred  = 1,
+	Disallowed = 2,
+}
+
+
 WindowDelegateTemplate :: struct {
 	// Managing Sheets
 	windowWillPositionSheetUsingRect:                                    proc(window: ^Window, sheet: ^Window, rect: Rect) -> Rect,
@@ -600,6 +654,10 @@ Responder :: struct {using _: Object}
 @(objc_class="NSView")
 View :: struct {using _: Responder}
 
+@(objc_type=View, objc_name="alloc", objc_is_class_method=true)
+View_alloc :: proc "c" () -> ^View {
+	return msgSend(^View, View, "alloc")
+}
 
 @(objc_type=View, objc_name="initWithFrame")
 View_initWithFrame :: proc "c" (self: ^View, frame: Rect) -> ^View {
@@ -670,6 +728,10 @@ Window_setFrame :: proc "c" (self: ^Window, frame: Rect, display: BOOL) {
 Window_setFrameOrigin :: proc "c" (self: ^Window, origin: Point) {
 	msgSend(nil, self, "setFrameOrigin:", origin)
 }
+@(objc_type=Window, objc_name="center")
+Window_center :: proc "c" (self: ^Window) {
+	msgSend(nil, self, "center")
+}
 @(objc_type=Window, objc_name="opaque")
 Window_opaque :: proc "c" (self: ^Window) -> BOOL {
 	return msgSend(BOOL, self, "opaque")
@@ -685,6 +747,14 @@ Window_backgroundColor :: proc "c" (self: ^Window) -> ^Color {
 @(objc_type=Window, objc_name="setBackgroundColor")
 Window_setBackgroundColor :: proc "c" (self: ^Window, color: ^Color) {
 	msgSend(nil, self, "setBackgroundColor:", color)
+}
+@(objc_type = Window, objc_name = "orderFront")
+Window_orderFront :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "orderFront:", sender)
+}
+@(objc_type = Window, objc_name = "orderOut")
+Window_orderOut :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "orderOut:", sender)
 }
 @(objc_type=Window, objc_name="makeKeyAndOrderFront")
 Window_makeKeyAndOrderFront :: proc "c" (self: ^Window, key: ^Object) {
@@ -721,6 +791,10 @@ Window_close :: proc "c" (self: ^Window) {
 @(objc_type=Window, objc_name="setDelegate")
 Window_setDelegate :: proc "c" (self: ^Window, delegate: ^WindowDelegate) {
 	msgSend(nil, self, "setDelegate:", delegate)
+}
+@(objc_type = Window, objc_name = "delegate")
+Window_delegate :: proc "c" (self: ^Window) -> ^WindowDelegate {
+	return msgSend(^WindowDelegate, self, "delegate")
 }
 @(objc_type=Window, objc_name="backingScaleFactor")
 Window_backingScaleFactor :: proc "c" (self: ^Window) -> Float {
@@ -797,4 +871,36 @@ Window_performWindowDragWithEvent :: proc "c" (self: ^Window, event: ^Event) {
 @(objc_type=Window, objc_name="setToolbar")
 Window_setToolbar :: proc "c" (self: ^Window, toolbar: ^Toolbar) {
 	msgSend(nil, self, "setToolbar:", toolbar)
+}
+@(objc_type = Window, objc_name = "setCollectionBehavior")
+Window_setCollectionBehavior :: proc "c" (self: ^Window, behavior: WindowCollectionBehavior) {
+	msgSend(nil, self, "setCollectionBehavior:", behavior)
+}
+@(objc_type = Window, objc_name = "collectionBehavior")
+Window_collectionBehavior :: proc "c" (self: ^Window) -> WindowCollectionBehavior {
+	return msgSend(WindowCollectionBehavior, self, "collectionBehavior")
+}
+@(objc_type = Window, objc_name = "setLevel")
+Window_setLevel :: proc "c" (self: ^Window, level: WindowLevel) {
+	msgSend(nil, self, "setLevel:", level)
+}
+@(objc_type = Window, objc_name = "setReleasedWhenClosed")
+Window_setReleasedWhenClosed :: proc "c" (self: ^Window, flag: BOOL) {
+	msgSend(nil, self, "setReleasedWhenClosed:", flag)
+}
+@(objc_type = Window, objc_name = "makeFirstResponder")
+Window_makeFirstResponder :: proc "c" (self: ^Window, responder: ^Responder) -> BOOL {
+	return msgSend(BOOL, self, "makeFirstResponder:", responder)
+}
+@(objc_type = Window, objc_name = "setRestorable")
+Window_setRestorable :: proc "c" (self: ^Window, flag: BOOL) {
+	msgSend(nil, self, "setRestorable:", flag)
+}
+@(objc_type = Window, objc_name = "setTabbingMode")
+Window_setTabbingMode :: proc "c" (self: ^Window, mode: WindowTabbingMode) {
+	msgSend(nil, self, "setTabbingMode:", mode)
+}
+@(objc_type = Window, objc_name = "toggleFullScreen")
+Window_toggleFullScreen :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "toggleFullScreen:", sender)
 }
