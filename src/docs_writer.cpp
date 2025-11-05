@@ -620,6 +620,7 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 			if (type->Struct.is_polymorphic) { doc_type.flags |= OdinDocTypeFlag_Struct_polymorphic; }
 			if (type->Struct.is_packed)      { doc_type.flags |= OdinDocTypeFlag_Struct_packed; }
 			if (type->Struct.is_raw_union)   { doc_type.flags |= OdinDocTypeFlag_Struct_raw_union; }
+			if (type->Struct.is_all_or_none) { doc_type.flags |= OdinDocTypeFlag_Struct_all_or_none; }
 
 			auto fields = array_make<OdinDocEntityIndex>(heap_allocator(), type->Struct.fields.count);
 			defer (array_free(&fields));
