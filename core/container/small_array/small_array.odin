@@ -28,11 +28,11 @@ Small_Array :: struct($N: int, $T: typeid) where N >= 0 {
 /*
 Returns the amount of items in the small-array.
 
-**Inputs**
+Inputs:
 - `a`: The small-array
 
-**Returns**
-- the amount of items in the array
+Returns:
+- The amount of items in the array
 */
 len :: proc "contextless" (a: $A/Small_Array) -> int {
 	return a.len
@@ -41,10 +41,11 @@ len :: proc "contextless" (a: $A/Small_Array) -> int {
 /*
 Returns the capacity of the small-array.
 
-**Inputs**
+Inputs:
 - `a`: The small-array
 
-**Returns** the capacity
+Returns:
+- The capacity of the array's backing buffer
 */
 cap :: proc "contextless" (a: $A/Small_Array) -> int {
 	return builtin.len(a.data)
@@ -53,11 +54,11 @@ cap :: proc "contextless" (a: $A/Small_Array) -> int {
 /*
 Returns how many more items the small-array could fit.
 
-**Inputs**
+Inputs:
 - `a`: The small-array
 
-**Returns**
-- the number of unused slots
+Returns:
+- The number of unused slots
 */
 space :: proc "contextless" (a: $A/Small_Array) -> int {
 	return builtin.len(a.data) - a.len
@@ -66,11 +67,11 @@ space :: proc "contextless" (a: $A/Small_Array) -> int {
 /*
 Returns a slice of the data.
 
-**Inputs**
+Inputs:
 - `a`: The pointer to the small-array
 
-**Returns**
-- the slice
+Returns:
+- The slice
 
 Example:
 
@@ -100,55 +101,56 @@ slice :: proc "contextless" (a: ^$A/Small_Array($N, $T)) -> []T {
 }
 
 /*
-Get a copy of the item at the specified position.
-This operation assumes that the small-array is large enough.
+Returns a copy of the item at the specified position.
+Unlike `get_safe`, this operation assumes that the small-array has sufficient capacity.
 
 This will result in:
-	- the value if 0 <= index < len
-	- the zero value of the type if len < index < capacity
-	- 'crash' if capacity < index or index < 0
+- the value if `0 <= index < len`
+- the zero value of the type if `len < index < capacity`
+- 'crash' if `capacity < index` or `index < 0`
 
-**Inputs**
+Inputs:
 - `a`: The small-array
 - `index`: The position of the item to get
 
-**Returns**
-- the element at the specified position
+Returns:
+- The element at the specified position
 */
 get :: proc "contextless" (a: $A/Small_Array($N, $T), index: int) -> T {
 	return a.data[index]
 }
 
 /*
-Get a pointer to the item at the specified position.
-This operation assumes that the small-array is large enough.
+Returns a pointer to the item at the specified position.
+Unlike `get_ptr_safe, this operation assumes that the small-array has sufficient capacity.
 
 This will result in:
-	- the pointer if 0 <= index < len
-	- the pointer to the zero value if len < index < capacity
-	- 'crash' if capacity < index or index < 0
+- the pointer if `0 <= index < len`
+- the pointer to the zero value if `len < index < capacity`
+- 'panic' if `capacity < index` or `index < 0`
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `index`: The position of the item to get
 
-**Returns**
-- the pointer to the element at the specified position
+Returns:
+- The pointer to the element at the specified position
 */
 get_ptr :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int) -> ^T {
 	return &a.data[index]
 }
 
 /*
-Attempt to get a copy of the item at the specified position.
+Attempts to get a copy of the item at the specified position.
+Unlike `get`, this operation does not assume that the small-array has sufficient capacity.
 
-**Inputs**
+Inputs:
 - `a`: The small-array
 - `index`: The position of the item to get
 
-**Returns**
+Returns:
 - the element at the specified position
-- true if element exists, false otherwise
+- `true` if element exists, `false` otherwise
 
 Example:
 
@@ -177,15 +179,16 @@ get_safe :: proc "contextless" (a: $A/Small_Array($N, $T), index: int) -> (T, bo
 }
 
 /*
-Get a pointer to the item at the specified position.
+Attempts to get a pointer to the item at the specified position.
+Unlike `get_ptr`, this operation does not assume that the small-array has sufficient capacity.
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `index`: The position of the item to get
 
-**Returns**
-- the pointer to the element at the specified position
-- true if element exists, false otherwise
+Returns:
+- The pointer to the element at the specified position
+- `true` if element exists, `false` otherwise
 */
 get_ptr_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int) -> (^T, bool) #no_bounds_check {
 	if index < 0 || index >= a.len {
@@ -195,14 +198,14 @@ get_ptr_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int) -> (
 }
 
 /*
-Set the element at the specified position to the given value.
-This operation assumes that the small-array is large enough.
+Sets the element at the specified position to the given value.
+This operation assumes that the small-array has sufficient capacity.
 
 This will result in:
-	- the value being set if 0 <= index < capacity
-	- 'crash' otherwise
+- the value being set if `0 <= index < capacity`
+- 'panic' otherwise
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `index`: The position of the item to set
 - `value`: The value to set the element to
@@ -253,10 +256,10 @@ Tries to resize the small-array to the specified length.
 The memory of added elements will be zeroed out.
 
 The new length will be:
-	- `length` if `length` <= capacity
-	- capacity if length > capacity
+- `length` if `length` <= capacity
+- capacity if `length` > capacity
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `length`: The new desired length
 
@@ -297,10 +300,10 @@ resize :: proc "contextless" (a: ^$A/Small_Array($N, $T), length: int) {
 Tries to resize the small-array to the specified length.
 
 The new length will be:
-	- `length` if `length` <= capacity
-	- capacity if length > capacity
+- `length` if `length` <= capacity
+- capacity if `length` > capacity
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `length`: The new desired length
 
@@ -336,12 +339,12 @@ non_zero_resize :: proc "contextless" (a: ^$A/Small_Array, length: int) {
 /*
 Attempts to add the given element to the end.
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `item`: The item to append
 
-**Returns** 
-- true if there was enough space to fit the element, false otherwise
+Returns:
+- `true` if there was enough space to fit the element, `false` otherwise
 
 Example:
 	
@@ -375,15 +378,15 @@ push_back :: proc "contextless" (a: ^$A/Small_Array($N, $T), item: T) -> bool {
 Attempts to add the given element at the beginning.
 This operation assumes that the small-array is not empty.
 
-Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+*Note: Performing this operation will cause pointers obtained
+through `get_ptr(_safe)` to reference incorrect elements.*
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `item`: The item to append
 
-**Returns** 
-- true if there was enough space to fit the element, false otherwise
+Returns:
+- `true` if there was enough space to fit the element, `false` otherwise
 
 Example:
 	
@@ -419,11 +422,11 @@ push_front :: proc "contextless" (a: ^$A/Small_Array($N, $T), item: T) -> bool {
 Removes and returns the last element of the small-array.
 This operation assumes that the small-array is not empty.
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 
-**Returns** 
-- a copy of the element removed from the end of the small-array
+Returns:
+- A copy of the element removed from the end of the small-array
 
 Example:
 
@@ -455,14 +458,14 @@ pop_back :: proc "odin" (a: ^$A/Small_Array($N, $T), loc := #caller_location) ->
 Removes and returns the first element of the small-array.
 This operation assumes that the small-array is not empty.
 
-Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+*Note: Performing this operation will cause pointers obtained
+through `get_ptr(_safe)` to reference incorrect elements.*
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 
-**Returns** 
-- a copy of the element removed from the beginning of the small-array
+Returns:
+- A copy of the element removed from the beginning of the small-array
 
 Example:
 
@@ -496,12 +499,12 @@ pop_front :: proc "odin" (a: ^$A/Small_Array($N, $T), loc := #caller_location) -
 Attempts to remove and return the last element of the small array.
 Unlike `pop_back`, it does not assume that the array is non-empty.
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 
-**Returns** 
-- a copy of the element removed from the end of the small-array
-- true if the small-array was not empty, false otherwise
+Returns:
+- A copy of the element removed from the end of the small-array
+- `true` if the small-array was not empty, `false` otherwise
 
 Example:
 
@@ -531,15 +534,15 @@ pop_back_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T)) -> (item: T, ok
 Attempts to remove and return the first element of the small array.
 Unlike `pop_front`, it does not assume that the array is non-empty.
 
-Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+*Note: Performing this operation will cause pointers obtained
+through `get_ptr(_safe)` to reference incorrect elements.*
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 
-**Returns** 
-- a copy of the element removed from the beginning of the small-array
-- true if the small-array was not empty, false otherwise
+Returns:
+- A copy of the element removed from the beginning of the small-array
+- `true` if the small-array was not empty, `false` otherwise
 
 Example:
 
@@ -569,12 +572,12 @@ pop_front_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T)) -> (item: T, o
 
 /*
 Decreases the length of the small-array by the given amount.
-The elements are therefore not really removed and can be
-recovered by calling `resize`.
 
-Note: This procedure assumes that the array has a sufficient length.
+The elements are therefore not really removed and can be recovered by calling `resize`.
 
-**Inputs**
+*Note: This procedure assumes that the array has a sufficient length.*
+
+Inputs:
 - `a`: A pointer to the small-array
 - `count`: The amount the length should be reduced by
 
@@ -604,11 +607,12 @@ consume :: proc "odin" (a: ^$A/Small_Array($N, $T), count: int, loc := #caller_l
 
 /*
 Removes the element at the specified index while retaining order.
+This operation assumes that the small-array has a sufficient length.
 
-Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+*Note: Performing this operation will cause pointers obtained
+through `get_ptr(_safe)` to reference incorrect elements.*
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `index`: The position of the element to remove
 
@@ -641,8 +645,9 @@ ordered_remove :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, lo
 
 /*
 Removes the element at the specified index without retaining order.
+This operation assumes that the small-array has a sufficient length.
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `index`: The position of the element to remove
 
@@ -677,7 +682,7 @@ unordered_remove :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, 
 /*
 Sets the length of the small-array to 0.
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 
 Example:
@@ -705,16 +710,16 @@ clear :: proc "contextless" (a: ^$A/Small_Array($N, $T)) {
 }
 
 /*
-Attempts to append all elements to the small-array returning
-false if there is not enough space to fit all of them.
+Attempts to append all elements to the small-array.
+If there is not enough space to fit all of them, none of them are appended.
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
-- `item`: The item to append
+- `items`: The items to append
 - ..:
 
-**Returns**
-- true if there was enough space to fit the element, false otherwise
+Returns:
+- `true` if there was enough space to fit the elements, `false` otherwise
 
 Example:
 	
@@ -743,16 +748,16 @@ push_back_elems :: proc "contextless" (a: ^$A/Small_Array($N, $T), items: ..T) -
 /*
 Tries to insert an element at the specified position.
 
-Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+*Note: Performing this operation will cause pointers obtained
+through `get_ptr(_safe)` to reference incorrect elements.*
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `item`: The item to insert
 - `index`: The index to insert the item at
 
-**Returns**
-- true if there was enough space to fit the element, false otherwise
+Returns:
+- `true` if there was enough space to fit the element, `false` otherwise
 
 Example:
 
@@ -790,13 +795,13 @@ append_elems :: push_back_elems
 /*
 Tries to append the element(s) to the small-array.
 
-**Inputs**
+Inputs:
 - `a`: A pointer to the small-array
 - `item`: The item to append
 - ..:
 
-**Returns**
-- true if there was enough space to fit the element, false otherwise
+Returns:
+- `true` if there was enough space to fit the element, `false` otherwise
 
 Example:
 
