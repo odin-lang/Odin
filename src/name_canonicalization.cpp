@@ -527,6 +527,11 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		} else if (s->flags & (ScopeFlag_Builtin)) {
 			goto write_base_name;
 		}
+
+		if (e->kind == Entity_TypeName) {
+			goto write_base_name;
+		}
+
 		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
 
 		auto const print_scope_flags = [](Scope *s) {
@@ -543,7 +548,7 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		};
 
 		print_scope_flags(s);
-		GB_PANIC("weird entity %.*s", LIT(e->token.string));
+		GB_PANIC("weird entity %.*s (%.*s)", LIT(e->token.string), LIT(entity_strings[e->kind]));
 	}
 	if (e->pkg != nullptr) {
 		type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
