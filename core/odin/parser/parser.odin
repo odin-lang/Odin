@@ -2658,11 +2658,12 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		align:           ^ast.Expr
 		min_field_align: ^ast.Expr
 		max_field_align: ^ast.Expr
-		is_packed:    bool
-		is_raw_union: bool
-		is_no_copy:   bool
-		fields:       ^ast.Field_List
-		name_count:   int
+		is_packed:       bool
+		is_raw_union:    bool
+		is_no_copy:      bool
+		is_all_or_none:  bool
+		fields:          ^ast.Field_List
+		name_count:      int
 
 		if allow_token(p, .Open_Paren) {
 			param_count: int
@@ -2684,6 +2685,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
 				}
 				is_packed = true
+			case "all_or_none":
+				if is_all_or_none {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				is_all_or_none = true
 			case "align":
 				if align != nil {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
@@ -2726,6 +2732,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			error(p, tok.pos, "'#raw_union' cannot also be '#packed")
 		}
 
+		if is_raw_union && is_all_or_none {
+			is_all_or_none = false
+			error(p, tok.pos, "'#raw_union' cannot also be '#all_or_none")
+		}
+
 		where_token: tokenizer.Token
 		where_clauses: []^ast.Expr
 
@@ -2745,17 +2756,18 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		close := expect_closing_brace_of_field_list(p)
 
 		st := ast.new(ast.Struct_Type, tok.pos, end_pos(close))
-		st.poly_params     = poly_params
-		st.align           = align
-		st.min_field_align = min_field_align
-		st.max_field_align = max_field_align
-		st.is_packed       = is_packed
-		st.is_raw_union    = is_raw_union
-		st.is_no_copy      = is_no_copy
-		st.fields          = fields
-		st.name_count      = name_count
-		st.where_token     = where_token
-		st.where_clauses   = where_clauses
+		st.poly_params       = poly_params
+		st.align             = align
+		st.min_field_align   = min_field_align
+		st.max_field_align   = max_field_align
+		st.is_packed         = is_packed
+		st.is_raw_union      = is_raw_union
+		st.is_no_copy        = is_no_copy
+		st.is_all_or_none    = is_all_or_none
+		st.fields            = fields
+		st.name_count        = name_count
+		st.where_token       = where_token
+		st.where_clauses     = where_clauses
 		return st
 
 	case .Union:

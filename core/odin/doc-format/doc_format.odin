@@ -281,6 +281,7 @@ Type_Flag_Struct :: enum u32le {
 	Polymorphic = 0,
 	Packed      = 1,
 	Raw_Union   = 2,
+	All_Or_None = 3,
 }
 
 Type_Flags_Union :: distinct bit_set[Type_Flag_Union; u32le]
