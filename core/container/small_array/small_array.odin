@@ -105,8 +105,8 @@ This operation assumes that the small-array is large enough.
 
 This will result in:
 	- the value if 0 <= index < len
-	- the zero value of the type if len < index < capacity
-	- 'crash' if capacity < index or index < 0
+	- the zero value of the type if len <= index < capacity
+	- 'panic' if capacity < index or index < 0
 
 **Inputs**
 - `a`: The small-array
@@ -116,6 +116,9 @@ This will result in:
 - the element at the specified position
 */
 get :: proc "contextless" (a: $A/Small_Array($N, $T), index: int) -> T {
+	if a.len <= index && index < builtin.len(a.data) {
+		return {}
+	}
 	return a.data[index]
 }
 
@@ -126,7 +129,7 @@ This operation assumes that the small-array is large enough.
 This will result in:
 	- the pointer if 0 <= index < len
 	- the pointer to the zero value if len < index < capacity
-	- 'crash' if capacity < index or index < 0
+	- 'panic' if capacity < index or index < 0
 
 **Inputs**
 - `a`: A pointer to the small-array
@@ -136,6 +139,9 @@ This will result in:
 - the pointer to the element at the specified position
 */
 get_ptr :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int) -> ^T {
+	if a.len <= index && index < builtin.len(a.data) {
+		return nil
+	}
 	return &a.data[index]
 }
 
