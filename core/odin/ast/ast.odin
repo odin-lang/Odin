@@ -790,6 +790,7 @@ Struct_Type :: struct {
 	is_packed:       bool,
 	is_raw_union:    bool,
 	is_no_copy:      bool,
+	is_all_or_none:  bool,
 	fields:          ^Field_List,
 	name_count:      int,
 }

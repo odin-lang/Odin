@@ -9838,6 +9838,51 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 
 		c->bit_field_bit_size = prev_bit_field_bit_size;
 	}
+
+	if (bt->kind == Type_Struct && bt->Struct.is_all_or_none && elems.count > 0 && bt->Struct.fields.count > 0) {
+		PtrSet<Entity *> missing_fields = {};
+		defer (ptr_set_destroy(&missing_fields));
+
+		for_array(i, bt->Struct.fields) {
+			Entity *field = bt->Struct.fields[i];
+			String name = field->token.string;
+			if (is_blank_ident(name) || name == "") {
+				continue;
+			}
+			bool found = string_set_exists(&fields_visited, name);
+			String *raw_union = string_map_get(&fields_visited_through_raw_union, name);
+			if (!found && raw_union == nullptr) {
+				ptr_set_add(&missing_fields, field);
+			}
+		}
+
+		if (missing_fields.count > 0) {
+			ERROR_BLOCK();
+
+			if (build_context.terse_errors) {
+				gbString fields_string = gb_string_make(heap_allocator(), "");
+				defer (gb_string_free(fields_string));
+				isize i = 0;
+				FOR_PTR_SET(field, missing_fields) {
+					if (i > 0) {
+						fields_string = gb_string_appendc(fields_string, ", ");
+					}
+					String name = field->token.string;
+					fields_string = gb_string_append_length(fields_string, name.text, name.len);
+					i += 1;
+				}
+
+				error(o->expr, "All or none of the fields must be assigned to a struct with '#all_or_none' applied, missing fields: %s", fields_string);
+			} else {
+				error(o->expr, "All or none of the fields must be assigned to a struct with '#all_or_none' applied, missing fields:");
+				FOR_PTR_SET(field, missing_fields) {
+					gbString s = type_to_string(field->type);
+					error_line("\t%.*s: %s\n", LIT(field->token.string), s);
+					gb_string_free(s);
+				}
+			}
+		}
+	}
 }
 
 gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {

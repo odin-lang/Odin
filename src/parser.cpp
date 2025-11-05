@@ -1230,7 +1230,7 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 }
 
 gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
-                     Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_no_copy,
+                     Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_no_copy, bool is_all_or_none,
                      Ast *align, Ast *min_field_align, Ast *max_field_align,
                      Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
@@ -1241,6 +1241,7 @@ gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, i
 	result->StructType.is_packed          = is_packed;
 	result->StructType.is_raw_union       = is_raw_union;
 	result->StructType.is_no_copy         = is_no_copy;
+	result->StructType.is_all_or_none     = is_all_or_none;
 	result->StructType.align              = align;
 	result->StructType.min_field_align    = min_field_align;
 	result->StructType.max_field_align    = max_field_align;
@@ -2773,6 +2774,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Token    token = expect_token(f, Token_struct);
 		Ast *polymorphic_params = nullptr;
 		bool is_packed          = false;
+		bool is_all_or_none     = false;
 		bool is_raw_union       = false;
 		bool no_copy            = false;
 		Ast *align              = nullptr;
@@ -2802,6 +2804,11 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_packed = true;
+			} else if (tag.string == "all_or_none") {
+				if (is_packed) {
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
+				}
+				is_all_or_none = true;
 			} else if (tag.string == "align") {
 				if (align) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
@@ -2872,6 +2879,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			is_packed = false;
 			syntax_error(token, "'#raw_union' cannot also be '#packed'");
 		}
+		if (is_raw_union && is_all_or_none) {
+			is_all_or_none = false;
+			syntax_error(token, "'#raw_union' cannot also be '#all_or_none'");
+		}
 
 		Token where_token = {};
 		Array<Ast *> where_clauses = {};
@@ -2901,7 +2912,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		parser_check_polymorphic_record_parameters(f, polymorphic_params);
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, min_field_align, max_field_align, where_token, where_clauses);
+		return ast_struct_type(f, token, decls, name_count,
+		                       polymorphic_params, is_packed, is_raw_union, no_copy, is_all_or_none,
+		                       align, min_field_align, max_field_align,
+		                       where_token, where_clauses);
 	} break;
 
 	case Token_union: {
