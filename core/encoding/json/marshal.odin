@@ -62,7 +62,7 @@ Marshal_Options :: struct {
 	mjson_skipped_first_braces_end: bool,
 }
 
-User_Marshaller :: #type proc(w: io.Writer, v: any)
+User_Marshaller :: #type proc(w: io.Writer, v: any) -> Marshal_Error
 User_Marshaller_Map :: map[typeid]User_Marshaller
 
 marshal :: proc(v: any, opt: Marshal_Options = {}, user_marshallers: User_Marshaller_Map = nil, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Marshal_Error) {
@@ -97,7 +97,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options, user_mars
 	if user_marshallers != nil {
 		marshaller := user_marshallers[v.id]
 		if marshaller != nil {
-			marshaller(w, v)
+			marshaller(w, v) or_return
 			return
 		}
 	}
