@@ -26,7 +26,7 @@ Unmarshal_Error :: union {
 	Unsupported_Type_Error,
 }
 
-User_Unmarshaller :: #type proc(p: ^Parser, v: any)
+User_Unmarshaller :: #type proc(p: ^Parser, v: any) -> Unmarshal_Error
 User_Unmarshaller_Map :: map[typeid]User_Unmarshaller
 
 unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, user_unmarshallers: User_Unmarshaller_Map, allocator := context.allocator) -> Unmarshal_Error {
@@ -277,7 +277,7 @@ unmarshal_value :: proc(p: ^Parser, v: any, user_unmarshallers: User_Unmarshalle
 	if user_unmarshallers != nil {
 		unmarshaller := user_unmarshallers[v.id]
 		if unmarshaller != nil {
-			unmarshaller(p, v)
+			unmarshaller(p, v) or_return
 			return
 		}
 	}
