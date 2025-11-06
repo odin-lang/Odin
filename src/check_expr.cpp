@@ -9857,6 +9857,12 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		}
 
 		if (missing_fields.count > 0) {
+			Ast *expr = o->expr;
+			if (expr == nullptr) {
+				GB_ASSERT(elems.count > 0);
+				expr = elems[elems.count-1];
+			}
+
 			ERROR_BLOCK();
 
 			if (build_context.terse_errors) {
@@ -9872,9 +9878,9 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 					i += 1;
 				}
 
-				error(o->expr, "All or none of the fields must be assigned to a struct with '#all_or_none' applied, missing fields: %s", fields_string);
+				error(expr, "All or none of the fields must be assigned to a struct with '#all_or_none' applied, missing fields: %s", fields_string);
 			} else {
-				error(o->expr, "All or none of the fields must be assigned to a struct with '#all_or_none' applied, missing fields:");
+				error(expr, "All or none of the fields must be assigned to a struct with '#all_or_none' applied, missing fields:");
 				FOR_PTR_SET(field, missing_fields) {
 					gbString s = type_to_string(field->type);
 					error_line("\t%.*s: %s\n", LIT(field->token.string), s);
