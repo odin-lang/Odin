@@ -74,24 +74,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # MacOS 13 runs on Intel, 14 runs on ARM
-        os: [macos-14, ubuntu-latest]
+        os: [macos-15-intel, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
+    name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'macos-15-intel' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
     timeout-minutes: 15
     steps:
 
       - uses: actions/checkout@v4
 
       - name: Download LLVM (MacOS Intel)
-        if: matrix.os == 'macos-13'
+        if: matrix.os == 'macos-15-intel'
         run: |
           brew update
           brew install llvm@20 lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS ARM)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-latest'
         run: |
           brew update
           brew install llvm@20 wasmtime lua@5.4 lld
@@ -143,7 +142,7 @@ jobs:
         run: |
           ./odin build examples/demo -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
           wasmtime ./demo.wasm
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-latest'
 
       - name: Check benchmarks
         run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
