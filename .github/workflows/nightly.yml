@@ -124,7 +124,7 @@ jobs:
   build_macos:
     name: MacOS Build
     if: github.repository == 'odin-lang/Odin'
-    runs-on: macos-14 # Intel machine
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - name: Download LLVM and setup PATH
@@ -163,7 +163,7 @@ jobs:
   build_macos_arm:
     name: MacOS ARM Build
     if: github.repository == 'odin-lang/Odin'
-    runs-on: macos-14 # ARM machine
+    runs-on: macos-latest # ARM machine
     steps:
       - uses: actions/checkout@v4
       - name: Download LLVM and setup PATH
