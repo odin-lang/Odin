@@ -632,8 +632,16 @@ when ODIN_OS == .Darwin {
 
 	pthread_t :: distinct c.ulong
 
+	when ODIN_ARCH == .arm64 {
+		@(private)
+		__SIZEOF_PTHREAD_ATTR_T :: 64
+	} else {
+		@(private)
+		__SIZEOF_PTHREAD_ATTR_T :: 56
+	}
+
 	pthread_attr_t :: struct #raw_union {
-		__size: [56]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+		__size: [__SIZEOF_PTHREAD_ATTR_T]c.char,
 		__align: c.long,
 	}
 
