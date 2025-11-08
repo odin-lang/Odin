@@ -1662,7 +1662,7 @@ gb_internal Token expect_operator(AstFile *f) {
 		syntax_error(prev, "'..' for ranges are not allowed, did you mean '..<' or '..='?");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
-	
+
 	advance_token(f);
 	return prev;
 }
@@ -1847,7 +1847,6 @@ gb_internal Ast *        parse_proc_type(AstFile *f, Token proc_token);
 gb_internal Array<Ast *> parse_stmt_list(AstFile *f);
 gb_internal Ast *        parse_stmt(AstFile *f);
 gb_internal Ast *        parse_body(AstFile *f);
-gb_internal Ast *        parse_do_body(AstFile *f, Token const &token, char const *msg);
 gb_internal Ast *        parse_block_stmt(AstFile *f, b32 is_when);
 
 
@@ -2605,16 +2604,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			}
 
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
-		} else if (allow_token(f, Token_do)) {
-			Ast *curr_proc = f->curr_proc;
-			Ast *body = nullptr;
-			f->curr_proc = type;
-			body = convert_stmt_to_body(f, parse_stmt(f));
-			f->curr_proc = curr_proc;
-
-			syntax_error(body, "'do' for procedure bodies is not allowed, prefer {}");
-
-			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
 		}
 
 		if (tags != 0) {
@@ -2673,7 +2662,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			count_expr = parse_expr(f, false);
 			f->expr_level--;
 		}
-		
+
 		expect_token(f, Token_CloseBracket);
 		return ast_array_type(f, token, count_expr, parse_type(f));
 	} break;
@@ -2691,21 +2680,21 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		return ast_map_type(f, token, key, value);
 	} break;
-	
+
 	case Token_matrix: {
 		Token token = expect_token(f, Token_matrix);
 		Ast *row_count = nullptr;
 		Ast *column_count = nullptr;
 		Ast *type = nullptr;
 		Token open, close;
-		
+
 		open  = expect_token_after(f, Token_OpenBracket, "matrix");
 		row_count = parse_expr(f, true);
 		expect_token(f, Token_Comma);
 		column_count = parse_expr(f, true);
 		close = expect_token(f, Token_CloseBracket);
 		type = parse_type(f);
-		
+
 		return ast_matrix_type(f, token, row_count, column_count, type);
 	} break;
 
@@ -4592,27 +4581,6 @@ gb_internal Ast *parse_body(AstFile *f) {
 	return ast_block_stmt(f, stmts, open, close);
 }
 
-gb_internal Ast *parse_do_body(AstFile *f, Token const &token, char const *msg) {
-	Token open, close;
-	isize prev_expr_level = f->expr_level;
-	bool prev_allow_newline = f->allow_newline;
-
-	// NOTE(bill): The body may be within an expression so reset to zero
-	f->expr_level = 0;
-	f->allow_newline = false;
-
-	Ast *body = convert_stmt_to_body(f, parse_stmt(f));
-	if (build_context.disallow_do) {
-		syntax_error(body, "'do' has been disallowed");
-	} else if (token.pos.file_id != 0 && !ast_on_same_line(token, body)) {
-		syntax_error(body, "The body of a 'do' must be on the same line as %s", msg);
-	}
-	f->expr_level = prev_expr_level;
-	f->allow_newline = prev_allow_newline;
-
-	return body;
-}
-
 gb_internal bool parse_control_statement_semicolon_separator(AstFile *f) {
 	Token tok = peek_token(f);
 	if (tok.kind != Token_OpenBrace) {
@@ -4671,11 +4639,7 @@ if_else_chain:;
 		syntax_error(f->curr_token, "Expected condition for if statement");
 	}
 
-	if (allow_token(f, Token_do)) {
-		body = parse_do_body(f, cond ? ast_token(cond) : token, "the if statement");
-	} else {
-		body = parse_block_stmt(f, false);
-	}
+	body = parse_block_stmt(f, false);
 
 	bool ignore_strict_style = false;
 	if (token.pos.line == ast_end_token(body).pos.line) {
@@ -4702,10 +4666,6 @@ if_else_chain:;
 			goto if_else_chain;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
-			break;
-		case Token_do:
-			expect_token(f, Token_do);
-			else_stmt = parse_do_body(f, else_token, "'else'");
 			break;
 		default:
 			syntax_error(f->curr_token, "Expected if statement block statement");
@@ -4741,11 +4701,7 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 
 	bool was_in_when_statement = f->in_when_statement;
 	f->in_when_statement = true;
-	if (allow_token(f, Token_do)) {
-		body = parse_do_body(f, cond ? ast_token(cond) : token, "then when statement");
-	} else {
-		body = parse_block_stmt(f, true);
-	}
+	body = parse_block_stmt(f, true);
 
 	bool ignore_strict_style = false;
 	if (token.pos.line == ast_end_token(body).pos.line) {
@@ -4761,10 +4717,6 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, true);
 			break;
-		case Token_do: {
-			expect_token(f, Token_do);
-			else_stmt = parse_do_body(f, else_token, "'else'");
-		} break;
 		default:
 			syntax_error(f->curr_token, "Expected when statement block statement");
 			else_stmt = ast_bad_stmt(f, f->curr_token, f->tokens[f->curr_token_index+1]);
@@ -4819,8 +4771,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 	Ast *body = nullptr;
 	bool is_range = false;
 
-	if (f->curr_token.kind != Token_OpenBrace &&
-	    f->curr_token.kind != Token_do) {
+	if (f->curr_token.kind != Token_OpenBrace) {
 		isize prev_level = f->expr_level;
 		defer (f->expr_level = prev_level);
 		f->expr_level = -1;
@@ -4835,11 +4786,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 			rhs = parse_expr(f, false);
 			f->allow_range = prev_allow_range;
 
-			if (allow_token(f, Token_do)) {
-				body = parse_do_body(f, token, "the for statement");
-			} else {
-				body = parse_block_stmt(f, false);
-			}
+			body = parse_block_stmt(f, false);
 
 			return ast_range_stmt(f, token, {}, in_token, rhs, body);
 		}
@@ -4855,7 +4802,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 			init = cond;
 			cond = nullptr;
 
-			if (f->curr_token.kind == Token_OpenBrace || f->curr_token.kind == Token_do) {
+			if (f->curr_token.kind == Token_OpenBrace) {
 				syntax_error(f->curr_token, "Expected ';', followed by a condition expression and post statement, got %.*s", LIT(token_strings[f->curr_token.kind]));
 			} else {
 				if (f->curr_token.kind != Token_Semicolon) {
@@ -4868,8 +4815,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 					expect_token(f, Token_Semicolon);
 				}
 
-				if (f->curr_token.kind != Token_OpenBrace &&
-				    f->curr_token.kind != Token_do) {
+				if (f->curr_token.kind != Token_OpenBrace) {
 					post = parse_simple_stmt(f, StmtAllowFlag_None);
 				}
 			}
@@ -4877,11 +4823,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 	}
 
 
-	if (allow_token(f, Token_do)) {
-		body = parse_do_body(f, token, "the for statement");
-	} else {
-		body = parse_block_stmt(f, false);
-	}
+	body = parse_block_stmt(f, false);
 
 	if (is_range) {
 		GB_ASSERT(cond->kind == Ast_AssignStmt);
@@ -5255,11 +5197,7 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	f->expr_level = prev_level;
 	f->allow_range = prev_allow_range;
 
-	if (allow_token(f, Token_do)) {
-		body = parse_do_body(f, for_token, "the for statement");
-	} else {
-		body = parse_block_stmt(f, false);
-	}
+	body = parse_block_stmt(f, false);
 	if (bad_stmt) {
 		return ast_bad_stmt(f, unroll_token, f->curr_token);
 	}
@@ -5489,14 +5427,6 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			return parse_when_stmt(f);
 		case Token_OpenBrace:
 			return parse_block_stmt(f, true);
-		case Token_do: {
-			expect_token(f, Token_do);
-			Ast *stmt = parse_do_body(f, {}, "the for statement");
-			if (build_context.disallow_do) {
-				syntax_error(stmt, "'do' has been disallowed");
-			}
-			return stmt;
-		} break;
 		default:
 			fix_advance_to_next_stmt(f);
 			return ast_bad_stmt(f, token, f->curr_token);
@@ -6907,7 +6837,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
-		
+
 
 		for (String const &path : build_context.extra_packages) {
 			String fullpath = path_to_full_path(permanent_allocator(), path); // LEAK?
@@ -6924,7 +6854,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 		}
 	}
-	
+
 	thread_pool_wait();
 
 	for (ParseFileErrorNode *node = p->file_error_head; node != nullptr; node = node->next) {
@@ -6956,4 +6886,3 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	return ParseFile_None;
 }
-

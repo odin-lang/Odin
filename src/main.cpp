@@ -363,7 +363,6 @@ enum BuildFlagKind {
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
 
-	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_DefaultToPanicAllocator,
 	BuildFlag_StrictStyle,
@@ -592,7 +591,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
 
-	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToPanicAllocator, str_lit("default-to-panic-allocator"),BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
@@ -1429,9 +1427,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_DisableRedZone:
 							build_context.disable_red_zone = true;
-							break;
-						case BuildFlag_DisallowDo:
-							build_context.disallow_do = true;
 							break;
 						case BuildFlag_NoRTTI:
 							if (name == "disallow-rtti") {
@@ -2577,12 +2572,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
-	if (check) {
-		if (print_flag("-disallow-do")) {
-			print_usage_line(2, "Disallows the 'do' keyword in the project.");
-		}
-	}
-
 	if (doc) {
 		if (print_flag("-doc-format")) {
 			print_usage_line(2, "Generates documentation as the .odin-doc format (useful for external tooling).");
@@ -3714,7 +3703,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
-	
+
 	// Warn about Windows i386 thread-local storage limitations
 	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
 		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
