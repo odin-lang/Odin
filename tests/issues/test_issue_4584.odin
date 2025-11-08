@@ -193,6 +193,6 @@ expect_float_matrix_value :: proc(t: ^testing.T, value, expected: $M/matrix[$N, 
 			}
 		}
 	}
-	if !ok do log.errorf("expected %v to be %v, got %v", value_expr, expected, value, location=loc)
+	if !ok { log.errorf("expected %v to be %v, got %v", value_expr, expected, value, location=loc) }
 	return ok
 }
