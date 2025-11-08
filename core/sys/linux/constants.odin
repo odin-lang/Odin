@@ -54,6 +54,8 @@ PRIO_MIN :: -20
 SIGRTMIN :: Signal(32)
 SIGRTMAX :: Signal(64)
 
+_NSIG :: 65
+
 S_IFMT   :: Mode{.IFREG, .IFDIR, .IFCHR, .IFIFO}
 S_IFSOCK :: Mode{.IFREG, .IFDIR}
 S_IFLNK  :: Mode{.IFREG, .IFCHR}
