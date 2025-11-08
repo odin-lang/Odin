@@ -53,8 +53,6 @@ execute_struct_checks :: proc(t: ^testing.T) {
 	defer delete(odin_buf)
 	odin_out := get_output(t, &odin_buf, #directory + "/structs/odin_structs", nil)
 
-	log.infof("C:\n%s\n\nOdin: %s", c_out, odin_out)
-
 	testing.expectf(t, c_out == odin_out, "The C output and Odin output differ!\nC output:\n%s\n\n\n\nOdin Output:\n%s", c_out, odin_out)
 
 	/* ----------- HELPERS ----------- */
