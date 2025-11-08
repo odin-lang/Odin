@@ -489,6 +489,7 @@ foreign kernel32 {
 	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
 	LoadLibraryExW :: proc(c_str: LPCWSTR, hFile: HANDLE, dwFlags: LoadLibraryEx_Flags) -> HMODULE ---
 	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
+	FreeLibraryAndExitThread :: proc(hLibModule: HMODULE, dwExitCode: DWORD) -> VOID ---
 	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
 
 	LoadResource :: proc(hModule: HMODULE, hResInfo: HRSRC) -> HGLOBAL ---
