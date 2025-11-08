@@ -74,9 +74,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15-intel, macos-latest, ubuntu-latest]
+        os: [macos-15-intel, macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'macos-15-intel' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
+    name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'macos-15-intel' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') || (matrix.os == 'ubuntu-24.04-arm' && 'Ubuntu ARM') }} Build, Check, and Test
     timeout-minutes: 15
     steps:
 
@@ -97,7 +97,7 @@ jobs:
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
