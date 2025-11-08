@@ -103,13 +103,15 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
       - name: Build Odin
         run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
       - name: Odin report
         run: ./odin report
+      - name: Get needed vendor libs
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: sudo apt-get install -y liblua5.4-dev
       - name: Compile needed Vendor
         run: |
           make -C vendor/stb/src
