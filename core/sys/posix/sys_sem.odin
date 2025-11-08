@@ -144,9 +144,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		semid_ds :: struct {
 			sem_perm:  ipc_perm,  // [PSX] operation permission structure
 			sem_otime: time_t,    // [PSX] last semop()
-			__sem_otime_high: c.ulong,
 			sem_ctime: time_t,    // [PSX] last time changed by semctl()
-			__sem_ctime_high: c.ulong,
 			sem_nsems: c.ulong, // [PSX] number of semaphores in set
 			__glibc_reserved3: c.ulong,
 			__glibc_reserved4: c.ulong,
@@ -155,7 +153,9 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		semid_ds :: struct {
 			sem_perm:  ipc_perm,  // [PSX] operation permission structure
 			sem_otime: time_t,    // [PSX] last semop()
+			__sem_otime_high: c.ulong,
 			sem_ctime: time_t,    // [PSX] last time changed by semctl()
+			__sem_ctime_high: c.ulong,
 			sem_nsems: c.ulong, // [PSX] number of semaphores in set
 			__glibc_reserved3: c.ulong,
 			__glibc_reserved4: c.ulong,
