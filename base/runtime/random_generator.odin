@@ -44,33 +44,53 @@ random_generator_reset_u64 :: proc(rg: Random_Generator, p: u64) {
 
 
 Default_Random_State :: struct {
-	state: u64,
-	inc:   u64,
+	s: [4]u64,
 }
 
 default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode, p: []byte) {
 	@(require_results)
 	read_u64 :: proc "contextless" (r: ^Default_Random_State) -> u64 {
-		old_state := r.state
-		r.state = old_state * 6364136223846793005 + (r.inc|1)
-		xor_shifted := (((old_state >> 59) + 5) ~ old_state) * 12605985483714917081
-		rot := (old_state >> 59)
-		return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 63))
+		// xoshiro256** output function and state transition
+		rotl :: proc "contextless" (x: u64, k: u64) -> u64 {
+			return (x << k) | (x >> ((-k) & 63))
+		}
+
+		result := rotl(r.s[1] * 5, 7) * 9
+		t := r.s[1] << 17
+
+		r.s[2] = r.s[2] ~ r.s[0]
+		r.s[3] = r.s[3] ~ r.s[1]
+		r.s[1] = r.s[1] ~ r.s[2]
+		r.s[0] = r.s[0] ~ r.s[3]
+		r.s[2] = r.s[2] ~ t
+		r.s[3] = rotl(r.s[3], 45)
+
+		return result
 	}
 
 	@(thread_local)
 	global_rand_seed: Default_Random_State
 
 	init :: proc "contextless" (r: ^Default_Random_State, seed: u64) {
-		seed := seed
-		if seed == 0 {
-			seed = u64(intrinsics.read_cycle_counter())
+		// splitmix64 to expand a 64-bit seed into 256 bits of state
+		sm64_next :: proc "contextless" (s: ^u64) -> u64 {
+			s^ += 0x9E3779B97F4A7C15
+			z := s^
+			z = (z ~ (z >> 30)) * 0xBF58476D1CE4E5B9
+			z = (z ~ (z >> 27)) * 0x94D049BB133111EB
+			return z ~ (z >> 31)
 		}
-		r.state = 0
-		r.inc = (seed << 1) | 1
-		_ = read_u64(r)
-		r.state += seed
-		_ = read_u64(r)
+
+		local_seed := seed
+		r.s[0] = sm64_next(&local_seed)
+		r.s[1] = sm64_next(&local_seed)
+		r.s[2] = sm64_next(&local_seed)
+		r.s[3] = sm64_next(&local_seed)
+		// Extremely unlikely all zero; ensure non-zero state
+		if (r.s[0] | r.s[1] | r.s[2] | r.s[3]) == 0 {
+			// force a minimal non-zero tweak
+			r.s[0] = 1
+		}
 	}
 
 	r: ^Default_Random_State = ---
@@ -82,8 +102,8 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 
 	switch mode {
 	case .Read:
-		if r.state == 0 && r.inc == 0 {
-			init(r, 0)
+		if (r.s[0] | r.s[1] | r.s[2] | r.s[3]) == 0 {
+			init(r, u64(intrinsics.read_cycle_counter()))
 		}
 
 		switch len(p) {
@@ -106,7 +126,7 @@ default_random_generator_proc :: proc(data: rawptr, mode: Random_Generator_Mode,
 		}
 
 	case .Reset:
-		seed: u64
+		seed: u64 = 0
 		mem_copy_non_overlapping(&seed, raw_data(p), min(size_of(seed), len(p)))
 		init(r, seed)
 
