@@ -2090,6 +2090,7 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			name = gb_string_append_length(name, ename.text, ename.len);
 
 			lbProcedure *dummy = lb_create_dummy_procedure(m, make_string_c(name), dummy_type);
+			dummy->is_startup = true;
 			LLVMSetVisibility(dummy->value, LLVMHiddenVisibility);
 			LLVMSetLinkage(dummy->value, LLVMWeakAnyLinkage);
 
