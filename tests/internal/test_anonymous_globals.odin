@@ -4,6 +4,7 @@ import "core:testing"
 
 
 
+// https://github.com/odin-lang/Odin/pull/5908
 @(test)
 test_address_of_anonymous_global :: proc(t: ^testing.T) {
     // This loop exists so that we do more computation with stack memory
@@ -32,6 +33,8 @@ Inner_Struct :: struct{
 
 
 
+// https://github.com/odin-lang/Odin/pull/5908
+//
 // Regression test for commit f1e3977cf94dfc0457f05d499cc280d8e1329086 where a larger anonymous global is needed to trigger
 // the bug
 @(test)
