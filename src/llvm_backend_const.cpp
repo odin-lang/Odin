@@ -802,13 +802,21 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 	if (value.kind == ExactValue_Procedure) {
 		lbValue res = {};
-		Ast *expr = unparen_expr(value.value_procedure);
-		GB_ASSERT(expr != nullptr);
-		if (expr->kind == Ast_ProcLit) {
-			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
-		} else {
+		for (;;) {
+			Ast *expr = unparen_expr(value.value_procedure);
+			GB_ASSERT(expr != nullptr);
+			if (expr->kind == Ast_ProcLit) {
+				res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
+				break;
+			}
 			Entity *e = entity_from_expr(expr);
-			res = lb_find_procedure_value_from_entity(m, e);
+			GB_ASSERT(e != nullptr);
+			if (e->kind != Entity_Constant) {
+				res = lb_find_procedure_value_from_entity(m, e);
+				break;
+			}
+			value = e->Constant.value;
+			GB_ASSERT(value.kind == ExactValue_Procedure);
 		}
 		if (res.value == nullptr) {
 			// This is an unspecialized polymorphic procedure, return nil or dummy value
