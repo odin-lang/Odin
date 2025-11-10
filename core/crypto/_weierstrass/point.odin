@@ -533,15 +533,15 @@ is_on_curve :: proc "contextless" (x, y: ^$T) -> bool {
 @(private)
 set_yy_candidate :: proc "contextless" (maybe_yy, x: ^$T) {
 	// RHS: x^3 + ax + b
-	tmp: T
+	a_x, b_fe: T
 
 	fe_square(maybe_yy, x)
 	fe_mul(maybe_yy, maybe_yy, x)
 
-	fe_a(&tmp)
-	fe_mul(&tmp, &tmp, x)
-	fe_add(maybe_yy, maybe_yy, &tmp)
+	fe_a(&a_x)
+	fe_mul(&a_x, &a_x, x)
+	fe_add(maybe_yy, maybe_yy, &a_x)
 
-	fe_b(&tmp)
-	fe_add(maybe_yy, maybe_yy, &tmp)
+	fe_b(&b_fe)
+	fe_add(maybe_yy, maybe_yy, &b_fe)
 }
