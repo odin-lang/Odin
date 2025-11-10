@@ -13,7 +13,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-msvc-" + TYPE + "/lib/wgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the docs at '" + #directory + "doc.odin'")
 	}
 
 	@(export)
@@ -39,7 +39,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the docs at '" + #directory + "doc.odin'")
 	}
 
 	@(export)
@@ -56,7 +56,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the README at '" + #directory + "README.md'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v27.0.2.0, make sure to read the docs at '" + #directory + "doc.odin'")
 	}
 
 	@(export)
