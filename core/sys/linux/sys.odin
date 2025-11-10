@@ -510,7 +510,7 @@ sendfile :: proc "contextless" (out_fd: Fd, in_fd: Fd, offset: ^i64, count: uint
 	Available since Linux 2.0.
 */
 socket :: proc "contextless" (domain: Address_Family, socktype: Socket_Type, sockflags: Socket_FD_Flags, protocol: Protocol) -> (Fd, Errno) {
-	sock_type_flags: int = cast(int) socktype | transmute(int) sockflags
+	sock_type_flags: int = cast(int) socktype | cast(int) transmute(i32) sockflags
 	ret := syscall(SYS_socket, domain, sock_type_flags, protocol)
 	return errno_unwrap(ret, Fd)
 }
@@ -543,7 +543,7 @@ where
 	T == Sock_Addr_Any
 {
 	addr_len: i32 = size_of(T)
-	ret := syscall(SYS_accept4, sock, addr, &addr_len, transmute(int) sockflags)
+	ret := syscall(SYS_accept4, sock, addr, &addr_len, transmute(i32) sockflags)
 	return errno_unwrap(ret, Fd)
 }
 
@@ -2927,11 +2927,46 @@ statx :: proc "contextless" (dir: Fd, pathname: cstring, flags: FD_Flags, mask: 
 
 // TODO(flysand): pidfd_send_signal
 
-// TODO(flysand): io_uring_setup
+/*
+	Setup a context for performing asynchronous I/O.
 
-// TODO(flysand): io_uring_enter
+	Available since Linux 5.1
+*/
+io_uring_setup :: proc "contextless" (entries: u32, params: ^IO_Uring_Params) -> (Fd, Errno) {
+	ret := syscall(SYS_io_uring_setup, entries, params)
+	return errno_unwrap(ret, Fd)
+}
 
-// TODO(flysand): io_uring_register
+/*
+	Initiate and/or complete I/O using the shared submission and completion queues.
+
+	Available since Linux 5.1
+*/
+io_uring_enter :: proc "contextless" (fd: Fd, to_submit: u32, min_complete: u32, flags: IO_Uring_Enter_Flags, sig: ^Sig_Set) -> (int, Errno) {
+	ret := syscall(SYS_io_uring_enter, fd, to_submit, min_complete, transmute(u32)flags, sig, size_of(Sig_Set) if sig != nil else 0)
+	return errno_unwrap(ret, int)
+}
+
+/*
+	Initiate and.or complete I/O using the shared submission and completion queues.
+
+	Available since Linux 5.11
+*/
+io_uring_enter2 :: proc "contextless" (fd: Fd, to_submit: u32, min_complete: u32, flags: IO_Uring_Enter_Flags, arg: ^IO_Uring_Getevents_Arg) -> (int, Errno) {
+	assert_contextless(.EXT_ARG in flags)
+	ret := syscall(SYS_io_uring_enter, fd, to_submit, min_complete, transmute(u32)flags, arg, size_of(IO_Uring_Getevents_Arg))
+	return errno_unwrap(ret, int)
+}
+
+/*
+	Register files or user buffers for asynchronous I/O.
+
+	Available since Linux 5.1
+*/
+io_uring_register :: proc "contextless" (fd: Fd, opcode: IO_Uring_Register_Opcode, arg: rawptr, nr_args: u32) -> Errno {
+	ret := syscall(SYS_io_uring_register, fd, opcode, arg, nr_args)
+	return Errno(-ret)
+}
 
 // TODO(flysand): open_tree
 

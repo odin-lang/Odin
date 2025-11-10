@@ -1964,3 +1964,265 @@ RISCV_HWProbe_Misaligned_Scalar_Perf :: enum {
 	UNSUPPORTED,
 }
 
+IO_Uring_Enter_Flags_Bits :: enum {
+	GETEVENTS,
+	SQ_WAKEUP,
+	SQ_WAIT,
+	EXT_ARG, // Available since Linux 5.11
+	REGISTERED_RING,
+}
+
+IO_Uring_Register_Opcode :: enum uint {
+	REGISTER_BUFFERS = 0,
+	UNREGISTER_BUFFERS = 1,
+	REGISTER_FILES = 2,
+	UNREGISTER_FILES = 3,
+	REGISTER_EVENTFD = 4,
+	UNREGISTER_EVENTFD = 5,
+	REGISTER_FILES_UPDATE = 6,
+	REGISTER_EVENTFD_ASYNC = 7,
+	REGISTER_PROBE = 8,
+	REGISTER_PERSONALITY = 9,
+	UNREGISTER_PERSONALITY = 10,
+	REGISTER_RESTRICTIONS = 11,
+	REGISTER_ENABLE_RINGS = 12,
+	/* extended with tagging */
+	REGISTER_FILES2 = 13,
+	REGISTER_FILES_UPDATE2 = 14,
+	REGISTER_BUFFERS2 = 15,
+	REGISTER_BUFFERS_UPDATE = 16,
+	/* set/clear io-wq thread affinities */
+	REGISTER_IOWQ_AFF = 17,
+	UNREGISTER_IOWQ_AFF = 18,
+	/* set/get max number of io-wq workers */
+	REGISTER_IOWQ_MAX_WORKERS = 19,
+	/* register/unregister io_uring fd with the ring */
+	REGISTER_RING_FDS = 20,
+	UNREGISTER_RING_FDS = 21,
+	/* register ring based provide buffer group */
+	REGISTER_PBUF_RING = 22,
+	UNREGISTER_PBUF_RING = 23,
+	/* sync cancelation API */
+	REGISTER_SYNC_CANCEL = 24,
+	/* register a range of fixed file slots for automatic slot allocation */
+	REGISTER_FILE_ALLOC_RANGE = 25,
+	/* this goes last */
+	REGISTER_LAST,
+	/* flag added to the opcode to use a registered ring fd */
+	REGISTER_USE_REGISTERED_RING = 1 << 31,
+}
+
+IO_Uring_Setup_Flags_Bits :: enum {
+	// io_context is polled.
+	IOPOLL,
+	// SQ poll thread.
+	SQPOLL,
+	// sq_thread_cpu is valid.
+	SQ_AFF,
+	// app defines CQ size.
+	CQSIZE,
+	// clamp SQ/CQ ring sizes.
+	CLAMP,
+	// attach to existing wq.
+	ATTACH_WQ,
+	// start with ring disabled.
+	R_DISABLED,
+	// continue submit on error.
+	SUBMIT_ALL,
+	// Cooperative task running. When requests complete, they often require
+	// forcing the submitter to transition to the kernel to complete. If this
+	// flag is set, work will be done when the task transitions anyway, rather
+	// than force an inter-processor interrupt reschedule. This avoids interrupting
+	// a task running in userspace, and saves an IPI.
+	COOP_TASKRUN,
+	// If COOP_TASKRUN is set, get notified if task work is available for
+	// running and a kernel transition would be needed to run it. This sets
+	// IORING_SQ_TASKRUN in the sq ring flags. Not valid with COOP_TASKRUN.
+	TASKRUN_FLAG,
+	// SQEs are 128 bytes.
+	SQE128,
+	// CQEs are 32 bytes.
+	CQE32,
+	// Only one task is allowed to submit requests
+	SINGLE_ISSUER,
+	// Defer running task work to get events.
+	// Rather than running bits of task work whenever the task transitions
+	// try to do it just before it is needed.
+	DEFER_TASKRUN,
+}
+
+IO_Uring_Features_Bits :: enum {
+	SINGLE_MMAP,
+	NODROP,
+	SUBMIT_STABLE,
+	RW_CUR_POS,
+	CUR_PERSONALITY,
+	FAST_POLL,
+	POLL_32BITS,
+	SQPOLL_NONFIXED,
+	EXT_ARG,
+	NATIVE_WORKERS,
+	RSRC_TAGS,
+}
+
+IO_Uring_CQE_Flags_Bits :: enum {
+	// If set, the upper 16 bits are the buffer ID.
+	BUFFER,
+	// If set, parent SQE will generate more CQE entries.
+	MORE,
+	// If set, more data to read after socket recv.
+	SOCK_NONEMPTY,
+	// Set for notification CQEs. Can be used to distinct them from sends.
+	NOTIF,
+}
+
+IO_Uring_OP :: enum u8 {
+	NOP,
+	READV,
+	WRITEV,
+	FSYNC,
+	READ_FIXED,
+	WRITE_FIXED,
+	POLL_ADD,
+	POLL_REMOVE,
+	SYNC_FILE_RANGE,
+	SENDMSG,
+	RECVMSG,
+	TIMEOUT,
+	TIMEOUT_REMOVE,
+	ACCEPT,
+	ASYNC_CANCEL,
+	LINK_TIMEOUT,
+	CONNECT,
+	FALLOCATE,
+	OPENAT,
+	CLOSE,
+	FILES_UPDATE,
+	STATX,
+	READ,
+	WRITE,
+	FADVISE,
+	MADVISE,
+	SEND,
+	RECV,
+	OPENAT2,
+	EPOLL_CTL,
+	SPLICE,
+	PROVIDE_BUFFERS,
+	REMOVE_BUFFERS,
+	TEE,
+	SHUTDOWN,
+	RENAMEAT,
+	UNLINKAT,
+	MKDIRAT,
+	SYMLINKAT,
+	LINKAT,
+	MSG_RING,
+	FSETXATTR,
+	SETXATTR,
+	FGETXATTR,
+	GETXATTR,
+	SOCKET,
+	URING_CMD,
+	SEND_ZC,
+	SENDMSG_ZC,
+	READ_MULTISHOT,
+	WAITID,
+	FUTEX_WAIT,
+	FUTEX_WAKE,
+	FUTEX_WAITV,
+	FIXED_FD_INSTALL,
+	FTRUNCATE,
+	BIND,
+	LISTEN,
+}
+
+IO_Uring_SQE_Flags_Bits :: enum {
+	// Use fixed fileset.
+	FIXED_FILE,
+	// Issue after inflight IO.
+	IO_DRAIN,
+	// Links next sqe.
+	IO_LINK,
+	// Like LINK, but stronger.
+	IO_HARDLINK,
+	// Always go async.
+	ASYNC,
+	// Select buffer from sq.buf_group.
+	BUFFER_SELECT,
+	// Don't post CQE if request succeeded.
+	CQE_SKIP_SUCCESS,
+}
+
+IO_Uring_Poll_Add_Flags_Bits :: enum {
+	ADD_MULTI,
+	UPDATE_EVENTS,
+	UPDATE_USER_DATA,
+	ADD_LEVEL,
+}
+
+IO_Uring_Fsync_Flags_Bits :: enum {
+	DATASYNC,
+}
+
+IO_Uring_Timeout_Flags_Bits :: enum {
+	ABS,
+	UPDATE,
+	BOOTTIME,
+	REALTIME,
+	LINK_TIMEOUT_UPDATE,
+	ETIME_SUCCESS,
+}
+
+IO_Uring_Cmd_Flags_Bits :: enum {
+	// use registered buffer; pass this flag along with setting sqe.buf_index.
+	FIXED,
+}
+
+IO_Uring_Splice_Flags_Bits :: enum {
+	MOVE,
+	NONBLOCK,
+	MORE,
+	GIFT,
+	F_FD_IN_FIXED = 31,
+}
+
+IO_Uring_Accept_Flags_Bits :: enum {
+	MULTISHOT,
+}
+
+IO_Uring_Send_Recv_Flags_Bits :: enum {
+	/*
+		If set, instead of first attempting to send
+		or receive and arm poll if that yields an
+		-EAGAIN result, arm poll upfront and skip
+		the initial transfer attempt.
+	 */
+	RECVSEND_POLL_FIRST,
+	/*
+		Multishot recv. Sets IORING_CQE_F_MORE if
+		the handler will continue to report
+		CQEs on behalf of the same SQE.
+	*/
+	RECV_MULTISHOT,
+	/*
+		Use registered buffers, the index is stored in
+		the buf_index field.
+	*/
+	RECVSEND_FIXED_BUF,
+	/*
+		If set, SEND[MSG]_ZC should report
+		the zerocopy usage in cqe.res
+		for the IORING_CQE_F_NOTIF cqe.
+		0 is reported if zerocopy was actually possible.
+		IORING_NOTIF_USAGE_ZC_COPIED if data was copied
+		(at least partially).
+	*/
+	SEND_ZC_REPORT_USAGE,
+}
+
+IO_Uring_Submission_Queue_Flags_Bits :: enum {
+	NEED_WAKEUP,
+	CQ_OVERFLOW,
+	TASKRUN,
+}
