@@ -23,6 +23,8 @@ bld/
 [Oo]bj/
 [Ll]og/
 ![Cc]ore/[Ll]og/
+# Nix build results
+result/
 # Visual Studio 2015 cache/options directory
 .vs/
 # Visual Studio Code options directory
