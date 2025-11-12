@@ -219,6 +219,13 @@ LINES                                :: 0x0001      // GL_LINES
 TRIANGLES                            :: 0x0004      // GL_TRIANGLES
 QUADS                                :: 0x0007      // GL_QUADS
 
+// Primitive assembly draw modes
+PrimitiveDrawMode :: enum {
+	LINES = LINES,      // GL_LINES
+	TRIANGLES = TRIANGLES,      // GL_TRIANGLES
+	QUADS = QUADS,      // GL_QUADS
+}
+
 // GL equivalent data types
 UNSIGNED_BYTE                        :: 0x1401      // GL_UNSIGNED_BYTE
 FLOAT                                :: 0x1406      // GL_FLOAT
@@ -393,7 +400,7 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 	// Functions Declaration - Vertex level operations
 	//------------------------------------------------------------------------------------
-	Begin        :: proc(mode: c.int)     --- // Initialize drawing mode (how to organize vertex)
+	Begin        :: proc(mode: PrimitiveDrawMode)     --- // Initialize drawing mode (how to organize vertex)
 	End          :: proc()                --- // Finish vertex providing
 	Vertex2i     :: proc(x, y: c.int)     --- // Define one vertex (position) - 2 int
 	Vertex2f     :: proc(x, y: f32)       --- // Define one vertex (position) - 2 f32
