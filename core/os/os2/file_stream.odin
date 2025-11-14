@@ -16,9 +16,10 @@ File_Stream_Mode :: enum {
 	Destroy,
 	Query, // query what modes are available
 
-	Fstat,
+	Fstat, // File specific (not available on io.Stream)
 }
 
+// Superset interface of io.Stream_Proc with the added `runtime.Allocator` parameter needed for the Fstat mode
 File_Stream_Proc :: #type proc(
 	stream_data: rawptr,
 	mode:        File_Stream_Mode,
@@ -72,8 +73,6 @@ file_io_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte
 	err = error_to_io_error(ferr)
 	return
 }
-
-
 
 @(private="package")
 file_stream_fstat_utility :: proc(f: ^File_Impl, p: []byte, allocator: runtime.Allocator) -> (err: Error) {
