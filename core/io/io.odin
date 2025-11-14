@@ -38,8 +38,11 @@ Error :: enum i32 {
 	// This is usually a sign of a broken `io.Reader` implementation
 	No_Progress,
 
+	// Invalid whence argument
 	Invalid_Whence,
+	// Invalid offset
 	Invalid_Offset,
+	// Invalid "unread" operation
 	Invalid_Unread,
 
 	Negative_Read,
@@ -50,8 +53,19 @@ Error :: enum i32 {
 	// Unknown means that an error has occurred but cannot be categorized
 	Unknown,
 
-	// Empty is returned when a procedure has not been implemented for an io.Stream
-	Empty = -1,
+	// Indicates that an attempt to retrieve a Stream's size was made, but the
+	// stream doesn't have a size.
+	No_Size,
+
+	Permission_Denied,
+
+	// Stream cannot be used since it has been Closed
+	Closed,
+
+	// Unsupported is returned when a procedure has not been implemented for an io.Stream
+	Unsupported = -1,
+
+	Empty = Unsupported,
 }
 
 Stream_Mode :: enum {
@@ -102,7 +116,7 @@ destroy :: proc(s: Stream) -> (err: Error) {
 	if s.procedure != nil {
 		_, err = s.procedure(s.data, .Destroy, nil, 0, nil)
 	} else {
-		err = .Empty
+		err = .Unsupported
 	}
 	return
 }
@@ -138,7 +152,7 @@ read :: proc(s: Reader, p: []byte, n_read: ^int = nil) -> (n: int, err: Error) {
 		n = int(n64)
 		if n_read != nil { n_read^ += n }
 	} else {
-		err = .Empty
+		err = .Unsupported
 	}
 	return
 }
@@ -151,7 +165,7 @@ write :: proc(s: Writer, p: []byte, n_written: ^int = nil) -> (n: int, err: Erro
 		n = int(n64)
 		if n_written != nil { n_written^ += n }
 	} else {
-		err = .Empty
+		err = .Unsupported
 	}
 	return
 }
@@ -167,7 +181,7 @@ seek :: proc(s: Seeker, offset: i64, whence: Seek_From) -> (n: i64, err: Error) 
 	if s.procedure != nil {
 		n, err = s.procedure(s.data, .Seek, nil, offset, whence)
 	} else {
-		err = .Empty
+		err = .Unsupported
 	}
 	return
 }
@@ -192,7 +206,7 @@ flush :: proc(s: Flusher) -> (err: Error) {
 size :: proc(s: Stream) -> (n: i64, err: Error) {
 	if s.procedure != nil {
 		n, err = s.procedure(s.data, .Size, nil, 0, nil)
-		if err == .Empty {
+		if err == .Unsupported {
 			n = 0
 			curr := seek(s, 0, .Current) or_return
 			end  := seek(s, 0, .End)     or_return
@@ -200,7 +214,7 @@ size :: proc(s: Stream) -> (n: i64, err: Error) {
 			n = end
 		}
 	} else {
-		err = .Empty
+		err = .Unsupported
 	}
 	return
 }
@@ -217,7 +231,7 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 	if r.procedure != nil {
 		n64: i64
 		n64, err = r.procedure(r.data, .Read_At, p, offset, nil)
-		if err != .Empty {
+		if err != .Unsupported {
 			n = int(n64)
 		} else {
 			curr := seek(r, offset, .Current) or_return
@@ -229,7 +243,7 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 		}
 		if n_read != nil { n_read^ += n }
 	} else {
-		err = .Empty
+		err = .Unsupported
 	}
 	return
 }
@@ -243,7 +257,7 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) ->
 	if w.procedure != nil {
 		n64: i64
 		n64, err = w.procedure(w.data, .Write_At, p, offset, nil)
-		if err != .Empty {
+		if err != .Unsupported {
 			n = int(n64)
 		} else {
 			curr := seek(w, offset, .Current) or_return
@@ -255,7 +269,7 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) ->
 		}
 		if n_written != nil { n_written^ += n }
 	} else {
-		err = .Empty
+		err = .Unsupported
 	}
 	return
 }
@@ -440,7 +454,7 @@ copy_n :: proc(dst: Writer, src: Reader, n: i64) -> (written: i64, err: Error) {
 @(private)
 _copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, err: Error) {
 	if dst.procedure == nil || src.procedure == nil {
-		return 0, .Empty
+		return 0, .Unsupported
 	}
 	buf := buf
 	if buf == nil {
