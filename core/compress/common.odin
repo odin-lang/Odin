@@ -297,7 +297,7 @@ peek_data_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid
 	curr := z.input->impl_seek(0, .Current) or_return
 	r, e1 := io.to_reader_at(z.input)
 	if !e1 {
-		return T{}, .Empty
+		return T{}, .Unsupported
 	}
 	when size <= 128 {
 		b: [size]u8
@@ -306,7 +306,7 @@ peek_data_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid
 	}
 	_, e2 := io.read_at(r, b[:], curr)
 	if e2 != .None {
-		return T{}, .Empty
+		return T{}, .Unsupported
 	}
 
 	res = (^T)(&b[0])^
@@ -324,7 +324,7 @@ peek_data_at_offset_from_stream :: #force_inline proc(z: ^Context_Stream_Input, 
 
 	r, e3 := io.to_reader_at(z.input)
 	if !e3 {
-		return T{}, .Empty
+		return T{}, .Unsupported
 	}
 	when size <= 128 {
 		b: [size]u8
@@ -333,7 +333,7 @@ peek_data_at_offset_from_stream :: #force_inline proc(z: ^Context_Stream_Input, 
 	}
 	_, e4 := io.read_at(r, b[:], pos)
 	if e4 != .None {
-		return T{}, .Empty
+		return T{}, .Unsupported
 	}
 
 	// Return read head to original position.
