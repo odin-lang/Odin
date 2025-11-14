@@ -6,7 +6,16 @@ import "core:slice"
 import "core:time"
 import "core:time/datetime"
 
+region_load_local :: proc(check_env: bool, allocator := context.allocator) ->  (out_reg: ^datetime.TZ_Region, ok: bool) {
+	local_name := local_tz_name(check_env, allocator) or_return
+	defer delete(local_name, allocator)
+
+	return _region_load(local_name, allocator)
+}
+
 region_load :: proc(reg: string, allocator := context.allocator) ->  (out_reg: ^datetime.TZ_Region, ok: bool) {
+	if (reg == "local") { return nil, false }
+
 	return _region_load(reg, allocator)
 }
 
