@@ -342,6 +342,22 @@ foreign kernel32 {
 		hTemplateFile: HANDLE,
 	) -> HANDLE ---
 
+	LockFileEx :: proc(
+		hFile: HANDLE,
+		dwFLags: DWORD,
+		dwReserved: DWORD,
+		nNumberOfBytesToLockLow: DWORD,
+		nNumberOfBytesToLockHigh: DWORD,
+		lpOverlapped: ^LPOVERLAPPED,
+	) -> BOOL ---
+	UnlockFileEx :: proc(
+		hFile: HANDLE,
+		dwReserved: DWORD,
+		nNumberOfBytesToUnlockLow: DWORD,
+		nNumberOfBytesToLockHigh: DWORD,
+		lpOverlapped: ^LPOVERLAPPED,
+	) -> BOOL --- 
+
 	GetFileTime :: proc(
 		hFile: HANDLE,
 		lpCreationTime: LPFILETIME,
@@ -683,6 +699,9 @@ FILE_MAP_COPY            :: DWORD(0x00000001)
 FILE_MAP_RESERVE         :: DWORD(0x80000000)
 FILE_MAP_TARGETS_INVALID :: DWORD(0x40000000)
 FILE_MAP_LARGE_PAGES     :: DWORD(0x20000000)
+
+LOCKFILE_FAIL_IMMEDIATELY :: DWORD (0x00000001)
+LOCKFILE_EXCLUSIVE_LOCK :: DWORD(0x00000002)
 
 // Flags for `SetFileCompletionNotificationModes`.
 FILE_SKIP_COMPLETION_PORT_ON_SUCCESS :: 0x1
