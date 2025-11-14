@@ -36,7 +36,6 @@ init_std_files :: proc "contextless" () {
 			data = impl,
 			procedure = _file_stream_proc,
 		}
-		impl.file.fstat = _fstat
 		return &impl.file
 	}
 
@@ -110,7 +109,6 @@ __new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
 		data = impl,
 		procedure = _file_stream_proc,
 	}
-	impl.file.fstat = _fstat
 	return &impl.file
 }
 
@@ -371,7 +369,7 @@ _exists :: proc(path: string) -> bool {
 	return posix.access(cpath) == .OK
 }
 
-_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+_file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From, allocator: runtime.Allocator) -> (n: i64, err: Error) {
 	f  := (^File_Impl)(stream_data)
 	fd := f.fd
 
@@ -489,18 +487,19 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		return
 
 	case .Flush:
-		ferr := _sync(&f.file)
-		err   = error_to_io_error(ferr)
+		err = _sync(&f.file)
 		return
 
 	case .Close, .Destroy:
-		ferr := _close(f)
-		err   = error_to_io_error(ferr)
+		err = _close(f)
 		return
 
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
 
+	case .Fstat:
+		err = file_stream_fstat_utility(f, p, allocator)
+		return
 	case:
 		return 0, .Unsupported
 	}

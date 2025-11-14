@@ -22,8 +22,7 @@ import "base:runtime"
 */
 File :: struct {
 	impl:   rawptr,
-	stream: io.Stream,
-	fstat:  Fstat_Callback,
+	stream: File_Stream,
 }
 
 /*
@@ -218,7 +217,11 @@ name :: proc(f: ^File) -> string {
 */
 close :: proc(f: ^File) -> Error {
 	if f != nil {
-		return io.close(f.stream)
+		if f.stream.procedure == nil {
+			return .Unsupported
+		}
+		_, err := f.stream.procedure(f, .Close, nil, 0, nil, runtime.nil_allocator())
+		return err
 	}
 	return nil
 }
@@ -235,7 +238,10 @@ close :: proc(f: ^File) -> Error {
 */
 seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
 	if f != nil {
-		return io.seek(f.stream, offset, whence)
+		if f.stream.procedure == nil {
+			return 0, .Unsupported
+		}
+		return f.stream.procedure(f, .Seek, nil, offset, whence, runtime.nil_allocator())
 	}
 	return 0, .Invalid_File
 }
@@ -247,7 +253,12 @@ seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Err
 */
 read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	if f != nil {
-		return io.read(f.stream, p)
+		if f.stream.procedure == nil {
+			return 0, .Unsupported
+		}
+		n64: i64
+		n64, err = f.stream.procedure(f, .Read, p, 0, nil, runtime.nil_allocator())
+		return int(n64), err
 	}
 	return 0, .Invalid_File
 }
@@ -260,7 +271,12 @@ read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 */
 read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	if f != nil {
-		return io.read_at(f.stream, p, offset)
+		if f.stream.procedure == nil {
+			return 0, .Unsupported
+		}
+		n64: i64
+		n64, err = f.stream.procedure(f, .Read_At, p, offset, nil, runtime.nil_allocator())
+		return int(n64), err
 	}
 	return 0, .Invalid_File
 }
@@ -272,7 +288,12 @@ read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 */
 write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	if f != nil {
-		return io.write(f.stream, p)
+		if f.stream.procedure == nil {
+			return 0, .Unsupported
+		}
+		n64: i64
+		n64, err = f.stream.procedure(f, .Write, p, 0, nil, runtime.nil_allocator())
+		return int(n64), err
 	}
 	return 0, .Invalid_File
 }
@@ -284,7 +305,12 @@ write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 */
 write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	if f != nil {
-		return io.write_at(f.stream, p, offset)
+		if f.stream.procedure == nil {
+			return 0, .Unsupported
+		}
+		n64: i64
+		n64, err = f.stream.procedure(f, .Write_At, p, offset, nil, runtime.nil_allocator())
+		return int(n64), err
 	}
 	return 0, .Invalid_File
 }
@@ -294,7 +320,18 @@ write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 */
 file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 	if f != nil {
-		return io.size(f.stream)
+		if f.stream.procedure == nil {
+			return 0, .Unsupported
+		}
+		n, err = f.stream.procedure(f, .Size, nil, 0, nil, runtime.nil_allocator())
+		if err == .Unsupported {
+			n = 0
+			curr := seek(f, 0, .Current) or_return
+			end  := seek(f, 0, .End)     or_return
+			seek(f, curr, .Start)        or_return
+			n = end
+		}
+		return
 	}
 	return 0, .Invalid_File
 }
@@ -304,7 +341,11 @@ file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 */
 flush :: proc(f: ^File) -> Error {
 	if f != nil {
-		return io.flush(f.stream)
+		if f.stream.procedure == nil {
+			return .Unsupported
+		}
+		_, err := f.stream.procedure(f, .Flush, nil, 0, nil, runtime.nil_allocator())
+		return err
 	}
 	return nil
 }

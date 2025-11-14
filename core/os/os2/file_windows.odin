@@ -65,7 +65,6 @@ init_std_files :: proc "contextless" () {
 			data = impl,
 			procedure = _file_stream_proc,
 		}
-		impl.file.fstat = _fstat
 
 		return &impl.file
 	}
@@ -185,7 +184,6 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 		data = impl,
 		procedure = _file_stream_proc,
 	}
-	impl.file.fstat = _fstat
 
 	return &impl.file, nil
 }
@@ -827,44 +825,38 @@ _exists :: proc(path: string) -> bool {
 }
 
 @(private="package")
-_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+_file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From, allocator: runtime.Allocator) -> (n: i64, err: Error) {
 	f := (^File_Impl)(stream_data)
-	ferr: Error
 	switch mode {
 	case .Read:
-		n, ferr = _read(f, p)
-		err = error_to_io_error(ferr)
+		n, err = _read(f, p)
 		return
 	case .Read_At:
-		n, ferr = _read_at(f, p, offset)
-		err = error_to_io_error(ferr)
+		n, err = _read_at(f, p, offset)
 		return
 	case .Write:
-		n, ferr = _write(f, p)
-		err = error_to_io_error(ferr)
+		n, err = _write(f, p)
 		return
 	case .Write_At:
-		n, ferr = _write_at(f, p, offset)
-		err = error_to_io_error(ferr)
+		n, err = _write_at(f, p, offset)
 		return
 	case .Seek:
-		n, ferr = _seek(f, offset, whence)
-		err = error_to_io_error(ferr)
+		n, err = _seek(f, offset, whence)
 		return
 	case .Size:
-		n, ferr = _file_size(f)
-		err = error_to_io_error(ferr)
+		n, err = _file_size(f)
 		return
 	case .Flush:
-		ferr = _flush(f)
-		err = error_to_io_error(ferr)
+		err = _flush(f)
 		return
 	case .Close, .Destroy:
-		ferr = _close(f)
-		err = error_to_io_error(ferr)
+		err = _close(f)
 		return
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+	case .Fstat:
+		err = file_stream_fstat_utility(f, p, allocator)
+		return
 	}
 	return 0, .Unsupported
 }

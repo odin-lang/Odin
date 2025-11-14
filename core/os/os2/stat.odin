@@ -46,8 +46,11 @@ file_info_delete :: proc(fi: File_Info, allocator: runtime.Allocator) {
 fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
 	if f == nil {
 		return {}, nil
-	} else if f.fstat != nil {
-		return f->fstat(allocator)
+	} else if f.stream.procedure != nil {
+		fi: File_Info
+		data := ([^]byte)(&fi)[:size_of(fi)]
+		_, err := f.stream.procedure(f, .Fstat, data, 0, nil, allocator)
+		return fi, err
 	}
 	return {}, .Invalid_Callback
 }
