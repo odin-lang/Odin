@@ -390,7 +390,7 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 			}
 
 		case .Destroy:
-			return 0, .Empty
+			return 0, .Unsupported
 		
 		case .Query:
 			return io.query_utility({ .Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query })

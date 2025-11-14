@@ -557,6 +557,6 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
 
 	case:
-		return 0, .Empty
+		return 0, .Unsupported
 	}
 }

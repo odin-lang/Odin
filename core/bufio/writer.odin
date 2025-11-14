@@ -249,5 +249,5 @@ _writer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 	case .Query:
 		return io.query_utility({.Flush, .Write, .Destroy, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
