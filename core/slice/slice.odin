@@ -255,7 +255,7 @@ Searches the given slice for the given element.
 If the slice is not sorted, the returned index is unspecified and meaningless.
 
 If the value is found then the returned int is the index of the matching element.
-If there are multiple matches, then any one of the matches could be returned.
+If there are multiple matches, then the returned int is the index of the first matching element.
 
 If the value is not found then the returned int is the index where a matching
 element could be inserted while maintaining sorted order.
@@ -266,7 +266,8 @@ Example:
 	/*
 	Looks up a series of four elements. The first is found, with a
 	uniquely determined position; the second and third are not
-	found; the fourth could match any position in `[1, 4]`.
+	found; the fourth matches a uniquely determined position being
+	the first match at index 1.
 	*/
 
 	index: int
@@ -284,7 +285,7 @@ Example:
 	assert(index == 13 && found == false)
 
 	index, found = slice.binary_search(s, 1)
-	assert(index >= 1 && index <= 4 && found == true)
+	assert(index == 1 && found == true)
 */
 @(require_results)
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
@@ -297,7 +298,7 @@ Searches the given slice for the given element.
 If the slice is not sorted, the returned index is unspecified and meaningless.
 
 If the value is found then the returned int is the index of the matching element.
-If there are multiple matches, then any one of the matches could be returned.
+If there are multiple matches, then the returned int is the index of the first matching element.
 
 If the value is not found then the returned int is the index where a matching
 element could be inserted while maintaining sorted order.

@@ -160,7 +160,7 @@ test_binary_search :: proc(t: ^testing.T) {
 	testing.expect(t, found == false, "Expected found to be false.")
 
 	index, found = slice.binary_search(s, 1)
-	testing.expect(t, index >= 1 && index <= 4, "Expected index to be 1, 2, 3, or 4.")
+	testing.expect(t, index == 1, "Expected index to be 1.")
 	testing.expect(t, found == true, "Expected found to be true.")
 
 	index, found = slice.binary_search(s, -1)
