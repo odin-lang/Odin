@@ -99,19 +99,15 @@ end_pos :: proc(tok: tokenizer.Token) -> tokenizer.Pos {
 	pos := tok.pos
 	pos.offset += len(tok.text)
 
-	if tok.kind == .Comment || tok.kind == .String {
-		if tok.text[:2] == "/*" || tok.text[:1] == "`" {
-			for i := 0; i < len(tok.text); i += 1 {
-				c := tok.text[i]
-				if c == '\n' {
-					pos.line += 1
-					pos.column = 1
-				} else {
-					pos.column += 1
-				}
+	if (tok.kind == .Comment && tok.text[:2] == "/*") || (tok.kind == .String && tok.text[:1] == "`") {
+		for i := 0; i < len(tok.text); i += 1 {
+			c := tok.text[i]
+			if c == '\n' {
+				pos.line += 1
+				pos.column = 1
+			} else {
+				pos.column += 1
 			}
-		} else {
-			pos.column += len(tok.text)
 		}
 	} else {
 		pos.column += len(tok.text)
