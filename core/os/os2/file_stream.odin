@@ -1,5 +1,6 @@
 package os2
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:io"
 
@@ -14,10 +15,11 @@ File_Stream_Mode :: enum {
 	Seek,
 	Size,
 	Destroy,
-	Query, // query what modes are available
+	Query, // query what modes are available on `io.Stream`
 
 	Fstat, // File specific (not available on io.Stream)
 }
+#assert(intrinsics.type_is_superset_of(File_Stream_Mode, io.Stream_Mode))
 
 // Superset interface of io.Stream_Proc with the added `runtime.Allocator` parameter needed for the Fstat mode
 File_Stream_Proc :: #type proc(
