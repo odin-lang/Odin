@@ -336,6 +336,7 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_polymorphic_record_parameter_value,
 
 	BuiltinProc_type_is_subtype_of,
+	BuiltinProc_type_is_superset_of,
 
 	BuiltinProc_type_field_index_of,
 
@@ -708,6 +709,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_polymorphic_record_parameter_value"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_subtype_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_superset_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics },
 
 	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
