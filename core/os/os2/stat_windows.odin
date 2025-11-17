@@ -287,9 +287,9 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 
 	ti: win32.FILE_ATTRIBUTE_TAG_INFO
 	if !win32.GetFileInformationByHandleEx(h, .FileAttributeTagInfo, &ti, size_of(ti)) {
-		err := win32.GetLastError()
-		if err != win32.ERROR_INVALID_PARAMETER {
-			return {}, Platform_Error(err)
+		err := _get_platform_error()
+		if perr, ok := is_platform_error(err); ok && perr != i32(win32.ERROR_INVALID_PARAMETER) {
+			return {}, err
 		}
 		// Indicate this is a symlink on FAT file systems
 		ti.ReparseTag = 0

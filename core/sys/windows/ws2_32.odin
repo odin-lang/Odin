@@ -121,6 +121,18 @@ foreign ws2_32 {
 		lpOverlapped: LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasendto)
+	WSASendTo :: proc(
+		s: SOCKET,
+		lpBuffers: LPWSABUF,
+		dwBufferCount: DWORD,
+		lpNumberOfBytesSent: LPDWORD,
+		dwFlags: DWORD,
+		lpTo: ^SOCKADDR_STORAGE_LH,
+		iToLen: c_int,
+		lpOverlapped: LPWSAOVERLAPPED,
+		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsarecv)
 	WSARecv :: proc(
 		s: SOCKET,
@@ -128,6 +140,18 @@ foreign ws2_32 {
 		dwBufferCount: DWORD,
 		lpNumberOfBytesRecvd: LPDWORD,
 		lpFlags: LPDWORD,
+		lpOverlapped: LPWSAOVERLAPPED,
+		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsarecvfrom)
+	WSARecvFrom :: proc(
+		s: SOCKET,
+		lpBuffers: LPWSABUF,
+		dwBufferCount: DWORD,
+		lpNumberOfBytesRecvd: LPDWORD,
+		lpFlags: LPDWORD,
+		lpFrom: ^SOCKADDR_STORAGE_LH,
+		lpFromlen: ^c_int,
 		lpOverlapped: LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
