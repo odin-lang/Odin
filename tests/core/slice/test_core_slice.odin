@@ -226,6 +226,85 @@ UNIQUE_TEST_VECTORS :: [][2][]int{
 }
 
 @test
+test_combination_iterator :: proc(t: ^testing.T) {
+    n_choose_k :: proc(n, k: int) -> int {
+        down_to, up_to := 0, 0
+        if k > n - k {
+            down_to, up_to = k, n - k
+        } else {
+            down_to, up_to = n - k, k
+        }
+        if n == k || k == 0 { return 1 }
+        num := 1 
+        for n := n; n > down_to; n -= 1 {
+            num *= n
+        }
+
+        den := 1
+        for i in 1..=up_to {
+            den *= i
+        }
+
+        return num / den
+    }
+
+    // Using only prime numbers to generate a simple hash for different combinations
+    s := []int{2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 47, 97}
+    seen: map[int]bool
+    defer delete(seen)
+
+    unique_combination: map[int]bool
+    defer delete(unique_combination)
+
+    for k := 0; k <= len(s); k += 1 {
+        iter := slice.make_combination_iterator(s, k)
+        defer slice.destroy_combination_iterator(iter)
+
+        if k == 0 {
+            testing.expect(t, len(iter.combination) == 0)
+            continue
+        }
+        if k == len(s) {
+            testing.expect(t, len(iter.combination) == len(s))
+            continue
+        }
+
+        combination_counted := 0
+        for slice.combine(&iter) {
+            combination_hash := 1 // the product of differents prime number will produce an unique identifier
+            for item in iter.combination {
+                seen[item] = true
+                combination_hash *= item
+            }
+
+            unseen := 0
+            for item in s {
+                if item not_in seen { unseen += 1 }
+            }
+
+            // Considering 'n' choose 'k' then they must be 'n - k' unseen numbers
+            if n_minus_k := len(s) - k;  unseen != n_minus_k {
+                log.errorf("Expect %d (%d - %d) element to not be present in the combination", n_minus_k, len(s), k)
+                testing.fail(t)
+                return
+            } 
+            combination_counted += 1
+
+            // Each combination is unique must be unique
+            testing.expect(t, combination_hash not_in unique_combination, "Expect each combination to be unique")
+            unique_combination[combination_hash] = true
+
+            clear(&seen)
+            clear(&unique_combination)
+        }
+        expected := n_choose_k(len(s), k)
+
+        // Using 'k' there are exactly 'n! / (k! * (n - k)!)'
+        testing.expect_value(t, combination_counted, expected) 
+    }
+}
+
+@test
 test_unique :: proc(t: ^testing.T) {
 	for v in UNIQUE_TEST_VECTORS {
 		assorted := v[0]
