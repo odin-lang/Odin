@@ -295,8 +295,8 @@ test_combination_iterator :: proc(t: ^testing.T) {
             unique_combination[combination_hash] = true
 
             clear(&seen)
-            clear(&unique_combination)
         }
+        clear(&unique_combination)
         expected := n_choose_k(len(s), k)
 
         // Using 'k' there are exactly 'n! / (k! * (n - k)!)'
