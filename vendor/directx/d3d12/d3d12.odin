@@ -853,12 +853,12 @@ FEATURE :: enum i32 {
 	OPTIONS20                             = 49,
 	PREDICATION                           = 50,
 	PLACED_RESOURCE_SUPPORT_INFO	      = 51,
-    HARDWARE_COPY	                      = 52,
-    OPTIONS21	                          = 53,
-    TIGHT_ALIGNMENT	                      = 54,
-    APPLICATION_SPECIFIC_DRIVER_STATE	  = 56,
-    BYTECODE_BYPASS_HASH_SUPPORTED	      = 57,
-    SHADER_CACHE_ABI_SUPPORT	          = 61,
+	HARDWARE_COPY	                      = 52,
+	OPTIONS21	                          = 53,
+	TIGHT_ALIGNMENT	                      = 54,
+	APPLICATION_SPECIFIC_DRIVER_STATE	  = 56,
+	BYTECODE_BYPASS_HASH_SUPPORTED	      = 57,
+	SHADER_CACHE_ABI_SUPPORT	          = 61,
 }
 
 SHADER_MIN_PRECISION_SUPPORT :: distinct bit_set[SHADER_MIN_PRECISION_SUPPORT_FLAG; u32]
