@@ -800,6 +800,38 @@ Window_delegate :: proc "c" (self: ^Window) -> ^WindowDelegate {
 Window_backingScaleFactor :: proc "c" (self: ^Window) -> Float {
 	return msgSend(Float, self, "backingScaleFactor")
 }
+@(objc_type = Window, objc_name = "convertRectFromBacking")
+Window_convertRectFromBacking :: proc "c" (self: ^Window, rect: Rect) -> Rect {
+	return msgSend(Rect, self, "convertRectFromBacking:", rect)
+}
+@(objc_type = Window, objc_name = "convertRectFromScreen")
+Window_convertRectFromScreen :: proc "c" (self: ^Window, rect: Rect) -> Rect {
+	return msgSend(Rect, self, "convertRectFromScreen:", rect)
+}
+@(objc_type = Window, objc_name = "convertPointFromBacking")
+Window_convertPointFromBacking :: proc "c" (self: ^Window, point: Point) -> Point {
+	return msgSend(Point, self, "convertPointFromBacking:", point)
+}
+@(objc_type = Window, objc_name = "convertPointFromScreen")
+Window_convertPointFromScreen :: proc "c" (self: ^Window, point: Point) -> Point {
+	return msgSend(Point, self, "convertPointFromScreen:", point)
+}
+@(objc_type = Window, objc_name = "convertRectToBacking")
+Window_convertRectToBacking :: proc "c" (self: ^Window, rect: Rect) -> Rect {
+	return msgSend(Rect, self, "convertRectToBacking:", rect)
+}
+@(objc_type = Window, objc_name = "convertRectToScreen")
+Window_convertRectToScreen :: proc "c" (self: ^Window, rect: Rect) -> Rect {
+	return msgSend(Rect, self, "convertRectToScreen:", rect)
+}
+@(objc_type = Window, objc_name = "convertPointToBacking")
+Window_convertPointToBacking :: proc "c" (self: ^Window, point: Point) -> Point {
+	return msgSend(Point, self, "convertPointToBacking:", point)
+}
+@(objc_type = Window, objc_name = "convertPointToScreen")
+Window_convertPointToScreen :: proc "c" (self: ^Window, point: Point) -> Point {
+	return msgSend(Point, self, "convertPointToScreen:", point)
+}
 @(objc_type=Window, objc_name="setWantsLayer")
 Window_setWantsLayer :: proc "c" (self: ^Window, ok: BOOL) {
 	msgSend(nil, self, "setWantsLayer:", ok)
