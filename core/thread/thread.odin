@@ -106,7 +106,7 @@ To start the thread, call `start()`. Also the `create_and_start()`
 procedure can be called to create and start the thread immediately.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 */
 
 create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal, name: Maybe(string) = nil) -> ^Thread {
@@ -183,7 +183,7 @@ specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -201,7 +201,7 @@ specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -219,7 +219,7 @@ specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -238,7 +238,7 @@ specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -257,7 +257,7 @@ specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -276,7 +276,7 @@ specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -299,7 +299,7 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 automatically freed.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -337,7 +337,7 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 automatically freed.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -379,7 +379,7 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 automatically freed.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -427,7 +427,7 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 automatically freed.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -481,7 +481,7 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 automatically freed.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
@@ -537,7 +537,7 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 automatically freed.
 
 Optionally specify the thread's name/description.
-the name/description will be truncated to 15 bytes on Unix and 63 bytes on Windows.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
