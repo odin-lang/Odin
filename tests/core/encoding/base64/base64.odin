@@ -36,3 +36,18 @@ test_decoding :: proc(t: ^testing.T) {
 		testing.expect_value(t, v, test.vector)
 	}
 }
+
+@(test)
+test_roundtrip :: proc(t: ^testing.T) {
+	values: [1024]u8
+	for &v, i in values[:] {
+		v = u8(i)
+	}
+
+	encoded := base64.encode(values[:]); defer delete(encoded)
+	decoded := base64.decode(encoded);   defer delete(decoded)
+
+	for v, i in decoded {
+		testing.expect_value(t, v, values[i])
+	}
+}
