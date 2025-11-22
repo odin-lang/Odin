@@ -1972,9 +1972,11 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 	if (type_size_of(parent_base_type) == 0) {
 		GB_ASSERT(tag.value == nullptr);
 		switch_instr = LLVMBuildSwitch(p->builder, lb_const_bool(p->module, t_llvm_bool, false).value, else_block->block, cast(unsigned)num_cases);
-	} else {
+	} else if (switch_kind == TypeSwitch_Union) {
 		GB_ASSERT(tag.value != nullptr);
 		switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
+	} else if (switch_kind == TypeSwitch_Any) {
+		// gb_printf_err("HERE!\n");
 	}
 
 	bool all_by_reference = false;
@@ -2025,28 +2027,38 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 	}
 	lbValue backing_ptr = backing_data.addr;
 
+
+	Ast *default_clause = nullptr;
+
 	for (Ast *clause : body->stmts) {
 		ast_node(cc, CaseClause, clause);
 
 		Entity *case_entity = implicit_entity_of_node(clause);
-		lb_open_scope(p, cc->scope);
 
 		if (cc->list.count == 0) {
-			lb_start_block(p, default_block);
-			if (case_entity->flags & EntityFlag_Value) {
-				lb_store_type_case_implicit(p, clause, parent_value, true);
-			} else {
-				lb_store_type_case_implicit(p, clause, parent_ptr, true);
+			default_clause = clause;
+			if (switch_instr != nullptr) {
+				lb_open_scope(p, cc->scope);
+
+				lb_start_block(p, default_block);
+				if (case_entity->flags & EntityFlag_Value) {
+					lb_store_type_case_implicit(p, clause, parent_value, true);
+				} else {
+					lb_store_type_case_implicit(p, clause, parent_ptr, true);
+				}
+				lb_type_case_body(p, ss->label, clause, p->curr_block, done);
 			}
-			lb_type_case_body(p, ss->label, clause, p->curr_block, done);
 			continue;
 		}
+
+		lb_open_scope(p, cc->scope);
 
 		lbBlock *body = lb_create_block(p, "typeswitch.body");
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
 		}
 
+		lbBlock *next_cond = nullptr;
 		bool saw_nil = false;
 		for (Ast *type_expr : cc->list) {
 			Type *case_type = type_of_expr(type_expr);
@@ -2064,7 +2076,16 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 				}
 			}
 			GB_ASSERT(on_val.value != nullptr);
-			LLVMAddCase(switch_instr, on_val.value, body->block);
+
+			if (switch_instr != nullptr) {
+				LLVMAddCase(switch_instr, on_val.value, body->block);
+			} else {
+				next_cond = lb_create_block(p, "typeswitch.case.next");
+				lbValue cond = lb_emit_comp(p, Token_CmpEq, on_val, tag);
+
+				lb_emit_if(p, cond, body, next_cond);
+				lb_start_block(p, next_cond);
+			}
 		}
 
 
@@ -2111,6 +2132,27 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		}
 
 		lb_type_case_body(p, ss->label, clause, body, done);
+
+		if (switch_instr == nullptr) {
+			lb_start_block(p, next_cond);
+		}
+	}
+
+	if (default_block != nullptr && switch_instr == nullptr) {
+		GB_ASSERT(default_clause != nullptr);
+
+		Entity *case_entity = implicit_entity_of_node(default_clause);
+		ast_node(cc, CaseClause, default_clause);
+
+		lb_open_scope(p, cc->scope);
+
+		lb_start_block(p, else_block);
+		if (case_entity->flags & EntityFlag_Value) {
+			lb_store_type_case_implicit(p, default_clause, parent_value, true);
+		} else {
+			lb_store_type_case_implicit(p, default_clause, parent_ptr, true);
+		}
+		lb_type_case_body(p, ss->label, default_clause, p->curr_block, done);
 	}
 
 	lb_emit_jump(p, done);
