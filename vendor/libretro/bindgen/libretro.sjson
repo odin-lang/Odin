@@ -1,0 +1,14 @@
+inputs = ["libretro.h"]
+package_name = "libretro"
+output_folder = "../"
+
+remove_type_prefix = "retro_"
+
+// This is a bug! See rungen.sh
+//remove_macro_prefix = "RETRO_"
+
+// This is a bit strange that this is needed.
+// Could it be a bug perhaps?
+remove_enum_member_prefix = {
+	"retro_key" = "RETRO"
+}
