@@ -1982,11 +1982,13 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 	if (type_size_of(parent_base_type) == 0) {
 		GB_ASSERT(tag.value == nullptr);
 		switch_instr = LLVMBuildSwitch(p->builder, lb_const_bool(p->module, t_llvm_bool, false).value, else_block->block, cast(unsigned)num_cases);
-	} else if (switch_kind == TypeSwitch_Union) {
+	} else {
 		GB_ASSERT(tag.value != nullptr);
-		switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
-	} else if (switch_kind == TypeSwitch_Any) {
-		// gb_printf_err("HERE!\n");
+		if (switch_kind == TypeSwitch_Any && is_arch_wasm()) {
+			// Only do the if-else chain on wasm targets
+		} else {
+			switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
+		}
 	}
 
 	bool all_by_reference = false;
