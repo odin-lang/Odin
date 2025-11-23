@@ -2227,53 +2227,45 @@ IO_Uring_Submission_Queue_Flags_Bits :: enum {
 	TASKRUN,
 }
 
-Mount_Flags :: enum {
-	MS_RDONLY      = log2(1),
-	MS_NOSUID      = log2(2),
-	MS_NODEV       = log2(4),
-	MS_NOEXEC      = log2(8),
-	MS_SYNCHRONOUS = log2(16),
-	MS_REMOUNT     = log2(32),
-	MS_MANDLOCK    = log2(64),
-	MS_DIRSYNC     = log2(128),
-	MS_NOATIME     = log2(1024),
-	MS_NODIRATIME  = log2(2048),
-	MS_BIND        = log2(4096),
-	MS_MOVE        = log2(8192),
-	MS_REC         = log2(16384),
-	MS_SILENT      = log2(32768),
-	MS_POSIXACL    = log2(1<<16),
-	MS_UNBINDABLE  = log2(1<<17),
-	MS_PRIVATE     = log2(1<<18),
-	MS_SLAVE       = log2(1<<19),
-	MS_SHARED      = log2(1<<20),
-	MS_RELATIME    = log2(1<<21),
-	MS_KERNMOUNT   = log2(1<<22),
-	MS_I_VERSION   = log2(1<<23),
-	MS_STRICTATIME = log2(1<<24),
-	MS_LAZYTIME    = log2(1<<25),
-	MS_ACTIVE      = log2(1<<30),
-	MS_NOUSER      = log2(1<<31),
-	MS_NOSYMFOLLOW = log2(256),
+Mount_Flags_Bits :: enum {
+	RDONLY      = log2(1),
+	NOSUID      = log2(2),
+	NODEV       = log2(4),
+	NOEXEC      = log2(8),
+	SYNCHRONOUS = log2(16),
+	REMOUNT     = log2(32),
+	MANDLOCK    = log2(64),
+	DIRSYNC     = log2(128),
+	NOATIME     = log2(1024),
+	NODIRATIME  = log2(2048),
+	BIND        = log2(4096),
+	MOVE        = log2(8192),
+	REC         = log2(16384),
+	SILENT      = log2(32768),
+	POSIXACL    = log2(1<<16),
+	UNBINDABLE  = log2(1<<17),
+	PRIVATE     = log2(1<<18),
+	SLAVE       = log2(1<<19),
+	SHARED      = log2(1<<20),
+	RELATIME    = log2(1<<21),
+	KERNMOUNT   = log2(1<<22),
+	I_VERSION   = log2(1<<23),
+	STRICTATIME = log2(1<<24),
+	LAZYTIME    = log2(1<<25),
+	ACTIVE      = log2(1<<30),
+	NOUSER      = log2(1<<31),
+	NOSYMFOLLOW = log2(256),
 }
 
-Mount_Flag_Set :: bit_set[Mount_Flags; u64]
-
-Umount2_Flags :: enum {
-	MNT_FORCE       = 1,
-	MNT_DETACH      = 2,
-	MNT_EXPIRE      = 4,
-	UMOUNT_NOFOLLOW = 8,
-	UMOUNT_UNUSED   = 0,
+Umount2_Flags_Bits :: enum {
+	MNT_FORCE       = log2(0x00000001),
+	MNT_DETACH      = log2(0x00000002),
+	MNT_EXPIRE      = log2(0x00000004),
+	UMOUNT_NOFOLLOW = log2(0x00000008),
+	UMOUNT_UNUSED   = log2(0x80000000),
 }
 
-Umount2_Flag_Set :: bit_set[Umount2_Flags; u32]
-
-Swap_Flags :: enum {
-	SWAP_FLAG_PREFER     = log2(0x8000),
-	SWAP_FLAG_PRIO_MASK  = log2(0x7fff),
-	SWAP_FLAG_PRIO_SHIFT = 0,
-	SWAP_FLAG_DISCARD    = log2(0x10000),
+Swap_Flags_Bits :: enum {
+	PREFER  = log2(0x8000),
+	DISCARD = log2(0x10000),
 }
-
-Swap_Flag_Set :: bit_set[Swap_Flags; u32]

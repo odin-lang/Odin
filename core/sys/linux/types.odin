@@ -1742,3 +1742,9 @@ Reboot_Operation :: enum u64 {
 	RB_AUTOBOOT_2  = 0xa1b2c3d4,
 	RB_SW_SUSPEND  = 0xd000fce2,
 }
+
+Mount_Flags :: bit_set[Mount_Flags_Bits; u64]
+
+Umount2_Flags :: bit_set[Umount2_Flags_Bits; u32]
+
+Swap_Flags :: bit_set[Swap_Flags_Bits; u32]

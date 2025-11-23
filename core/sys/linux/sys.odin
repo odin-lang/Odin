@@ -2206,7 +2206,7 @@ settimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
 	Mount filesystem
 	Available since Linux 1.0
 */
-mount :: proc "contextless" (source: cstring, target: cstring, filesystemtype: cstring, mountflags: Mount_Flag_Set, data: rawptr) -> (Errno) {
+mount :: proc "contextless" (source: cstring, target: cstring, filesystemtype: cstring, mountflags: Mount_Flags, data: rawptr) -> (Errno) {
 	ret := syscall(SYS_mount, cast(rawptr) source, cast(rawptr) target, cast(rawptr) filesystemtype, transmute(u64) mountflags, data)
 	return Errno(-ret)
 }
@@ -2215,7 +2215,7 @@ mount :: proc "contextless" (source: cstring, target: cstring, filesystemtype: c
 	Unmount filesystem
 	Available since Linux 2.1
 */
-umount2 :: proc "contextless" (target: cstring, flags: Umount2_Flag_Set) -> (Errno) {
+umount2 :: proc "contextless" (target: cstring, flags: Umount2_Flags) -> (Errno) {
 	ret := syscall(SYS_umount2, cast(rawptr) target, transmute(u32) flags)
 	return Errno(-ret)
 }
@@ -2224,7 +2224,7 @@ umount2 :: proc "contextless" (target: cstring, flags: Umount2_Flag_Set) -> (Err
 	Start swapping to file/device
 	Available since Linux 2.0
 */
-swapon :: proc "contextless" (path: cstring, swapflags: Swap_Flag_Set) -> (Errno) {
+swapon :: proc "contextless" (path: cstring, swapflags: Swap_Flags) -> (Errno) {
 	ret := syscall(SYS_swapon, cast(rawptr) path, transmute(u32) swapflags)
 	return Errno(-ret)
 }
