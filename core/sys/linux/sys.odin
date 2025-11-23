@@ -2109,13 +2109,15 @@ vhangup :: proc "contextless" () -> (Errno) {
 	return Errno(-ret)
 }
 
-/*
-	Get or set local descriptor table
-	Available since Linux 2.1
-*/
-modify_ldt :: proc "contextless" (func: i32, ptr: rawptr, bytecount: uint) -> (int, Errno) {
-	ret := syscall(SYS_modify_ldt, func, ptr, bytecount)
-	return errno_unwrap(ret, int)
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	/*
+		Get or set local descriptor table
+		Available since Linux 2.1
+	*/
+	modify_ldt :: proc "contextless" (func: i32, ptr: rawptr, bytecount: uint) -> (int, Errno) {
+		ret := syscall(SYS_modify_ldt, func, ptr, bytecount)
+		return errno_unwrap(ret, int)
+	}
 }
 
 /*
@@ -2139,13 +2141,15 @@ prctl :: proc "contextless" (op: i32, args: ..u64) -> (Errno) {
 	return Errno(-ret)
 }
 
-/* 
-	Set architecture-specific thread state
-	Available since Linux 2.6.19
-*/
-arch_prctl :: proc "contextless" (op: i32, addr: uint) -> (Errno) {
-	ret := syscall(SYS_arch_prctl, op, addr)
-	return Errno(-ret)
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	/* 
+		Set architecture-specific thread state
+		Available since Linux 2.6.19
+	*/
+	arch_prctl :: proc "contextless" (op: i32, addr: uint) -> (Errno) {
+		ret := syscall(SYS_arch_prctl, op, addr)
+		return Errno(-ret)
+	}
 }
 
 /* 
@@ -2270,13 +2274,15 @@ setdomainname :: proc "contextless" (name: string) -> (Errno) {
 // TODO(flysand): iopl
 // deprecated
 
-/*
-	Set port input/output permissions
-	Available since Linux 1.0
-*/
-ioperm :: proc "contextless" (form: u32, num: u32, turn_on: i32) -> (Errno) {
-	ret := syscall(SYS_ioperm, form, num, turn_on)
-	return Errno(-ret)
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	/*
+		Set port input/output permissions
+		Available since Linux 1.0
+	*/
+	ioperm :: proc "contextless" (form: u32, num: u32, turn_on: i32) -> (Errno) {
+		ret := syscall(SYS_ioperm, form, num, turn_on)
+		return Errno(-ret)
+	}
 }
 
 /* 
