@@ -1215,19 +1215,6 @@ threading_example :: proc() {
 		}
 
 		thread.pool_start(&pool)
-
-		{
-			// Wait a moment before we cancel a thread
-			time.sleep(5 * time.Millisecond)
-
-			// Allow one thread to print at a time.
-			for !did_acquire(&print_mutex) { thread.yield() }
-
-			thread.terminate(pool.threads[N - 1], 0)
-			fmt.println("Canceled last thread")
-			print_mutex = false
-		}
-
 		thread.pool_finish(&pool)
 	}
 }
