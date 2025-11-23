@@ -457,6 +457,15 @@ gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_float(T) {
 	return bias(t*2 - 1, 1 - g) * 0.5 + 0.5
 }
 
+@(require_results) sign_f16   :: proc "contextless" (x: f16)   -> f16   { return f16(int(0 < x) - int(x < 0)) }
+@(require_results) sign_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(int(0 < x) - int(x < 0)) }
+@(require_results) sign_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(int(0 < x) - int(x < 0)) }
+@(require_results) sign_f32   :: proc "contextless" (x: f32)   -> f32   { return f32(int(0 < x) - int(x < 0)) }
+@(require_results) sign_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(int(0 < x) - int(x < 0)) }
+@(require_results) sign_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(int(0 < x) - int(x < 0)) }
+@(require_results) sign_f64   :: proc "contextless" (x: f64)   -> f64   { return f64(int(0 < x) - int(x < 0)) }
+@(require_results) sign_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(int(0 < x) - int(x < 0)) }
+@(require_results) sign_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(int(0 < x) - int(x < 0)) }
 @(require_results) sign_int   :: proc "contextless" (x: int)   -> int   { return int(0 < x) - int(x < 0) }
 @(require_results) sign_i16   :: proc "contextless" (x: i16)   -> i16   { return i16(int(0 < x) - int(x < 0)) }
 @(require_results) sign_i16le :: proc "contextless" (x: i16le) -> i16le { return i16le(int(0 < x) - int(x < 0)) }
@@ -467,25 +476,25 @@ gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_float(T) {
 @(require_results) sign_i64   :: proc "contextless" (x: i64)   -> i64   { return i64(int(0 < x) - int(x < 0)) }
 @(require_results) sign_i64le :: proc "contextless" (x: i64le) -> i64le { return i64le(int(0 < x) - int(x < 0)) }
 @(require_results) sign_i64be :: proc "contextless" (x: i64be) -> i64be { return i64be(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f16   :: proc "contextless" (x: f16)   -> f16   { return f16(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f32   :: proc "contextless" (x: f32)   -> f32   { return f32(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f64   :: proc "contextless" (x: f64)   -> f64   { return f64(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(int(0 < x) - int(x < 0)) }
-@(require_results) sign_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(int(0 < x) - int(x < 0)) }
 sign :: proc{
+	sign_f16, sign_f16le, sign_f16be,
+	sign_f32, sign_f32le, sign_f32be,
+	sign_f64, sign_f64le, sign_f64be,
 	sign_int,
 	sign_i16, sign_i16le, sign_i16be,
 	sign_i32, sign_i32le, sign_i32be,
 	sign_i64, sign_i64le, sign_i64be,
-	sign_f16, sign_f16le, sign_f16be,
-	sign_f32, sign_f32le, sign_f32be,
-	sign_f64, sign_f64le, sign_f64be,
 }
 
+@(require_results) sign_bit_f16   :: proc "contextless" (x: f16)   -> bool { return (transmute(u16)x) & (1<<15) != 0 }
+@(require_results) sign_bit_f16le :: proc "contextless" (x: f16le) -> bool { return #force_inline sign_bit_f16(f16(x)) }
+@(require_results) sign_bit_f16be :: proc "contextless" (x: f16be) -> bool { return #force_inline sign_bit_f16(f16(x)) }
+@(require_results) sign_bit_f32   :: proc "contextless" (x: f32)   -> bool { return (transmute(u32)x) & (1<<31) != 0 }
+@(require_results) sign_bit_f32le :: proc "contextless" (x: f32le) -> bool { return #force_inline sign_bit_f32(f32(x)) }
+@(require_results) sign_bit_f32be :: proc "contextless" (x: f32be) -> bool { return #force_inline sign_bit_f32(f32(x)) }
+@(require_results) sign_bit_f64   :: proc "contextless" (x: f64)   -> bool { return (transmute(u64)x) & (1<<63) != 0 }
+@(require_results) sign_bit_f64le :: proc "contextless" (x: f64le) -> bool { return #force_inline sign_bit_f64(f64(x)) }
+@(require_results) sign_bit_f64be :: proc "contextless" (x: f64be) -> bool { return #force_inline sign_bit_f64(f64(x)) }
 @(require_results) sign_bit_int   :: proc "contextless" (x: int)   -> bool { return uint(x) & (1<<(size_of(int)*8 - 1)) != 0 }
 @(require_results) sign_bit_i16   :: proc "contextless" (x: i16)   -> bool { return u16(x) & (1<<15) != 0 }
 @(require_results) sign_bit_i16le :: proc "contextless" (x: i16le) -> bool { return #force_inline sign_bit_i16(i16(x)) }
@@ -496,23 +505,14 @@ sign :: proc{
 @(require_results) sign_bit_i64   :: proc "contextless" (x: i64)   -> bool { return u64(x) & (1<<63) != 0 }
 @(require_results) sign_bit_i64le :: proc "contextless" (x: i64le) -> bool { return #force_inline sign_bit_i64(i64(x)) }
 @(require_results) sign_bit_i64be :: proc "contextless" (x: i64be) -> bool { return #force_inline sign_bit_i64(i64(x)) }
-@(require_results) sign_bit_f16   :: proc "contextless" (x: f16)   -> bool { return (transmute(u16)x) & (1<<15) != 0 }
-@(require_results) sign_bit_f16le :: proc "contextless" (x: f16le) -> bool { return #force_inline sign_bit_f16(f16(x)) }
-@(require_results) sign_bit_f16be :: proc "contextless" (x: f16be) -> bool { return #force_inline sign_bit_f16(f16(x)) }
-@(require_results) sign_bit_f32   :: proc "contextless" (x: f32)   -> bool { return (transmute(u32)x) & (1<<31) != 0 }
-@(require_results) sign_bit_f32le :: proc "contextless" (x: f32le) -> bool { return #force_inline sign_bit_f32(f32(x)) }
-@(require_results) sign_bit_f32be :: proc "contextless" (x: f32be) -> bool { return #force_inline sign_bit_f32(f32(x)) }
-@(require_results) sign_bit_f64   :: proc "contextless" (x: f64)   -> bool { return (transmute(u64)x) & (1<<63) != 0 }
-@(require_results) sign_bit_f64le :: proc "contextless" (x: f64le) -> bool { return #force_inline sign_bit_f64(f64(x)) }
-@(require_results) sign_bit_f64be :: proc "contextless" (x: f64be) -> bool { return #force_inline sign_bit_f64(f64(x)) }
 sign_bit :: proc{
+	sign_bit_f16, sign_bit_f16le, sign_bit_f16be,
+	sign_bit_f32, sign_bit_f32le, sign_bit_f32be,
+	sign_bit_f64, sign_bit_f64le, sign_bit_f64be,
 	sign_bit_int,
 	sign_bit_i16, sign_bit_i16le, sign_bit_i16be,
 	sign_bit_i32, sign_bit_i32le, sign_bit_i32be,
 	sign_bit_i64, sign_bit_i64le, sign_bit_i64be,
-	sign_bit_f16, sign_bit_f16le, sign_bit_f16be,
-	sign_bit_f32, sign_bit_f32le, sign_bit_f32be,
-	sign_bit_f64, sign_bit_f64le, sign_bit_f64be,
 }
 
 @(require_results)
