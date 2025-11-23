@@ -1692,7 +1692,7 @@ IO_Uring_Send_Recv_Flags :: bit_set[IO_Uring_Send_Recv_Flags_Bits; u16]
 
 IO_Uring_Submission_Queue_Flags :: bit_set[IO_Uring_Submission_Queue_Flags_Bits; u32]
 
-Clock_State :: enum {
+Clock_State :: enum i32 {
 	TIME_OK = 0,
 	TIME_INS = 1,
 	TIME_DEL = 2,
@@ -1702,34 +1702,34 @@ Clock_State :: enum {
 }
 
 Timex :: struct {
-	modes:     int,
-	offset:    i64,
-	freq:      i64,
-	maxerror:  i64,
-	esterror:  i64,
-	status:    int,
-	constant:  i64,
-	precision: i64,
-	tolerance: i64,
+	modes:     u32,
+	offset:    int,
+	freq:      int,
+	maxerror:  int,
+	esterror:  int,
+	status:    i32,
+	constant:  int,
+	precision: int,
+	tolerance: int,
 	time:      Time_Val,
-	tick:      i64,
-	ppsfreq:   i64,
-	jitter:    i64,
-	shift:     int,
-	stabil:    i64,
-	jitcnt:    i64,
-	calcnt:    i64,
-	errcnt:    i64,
-	stbcnt:    i64,
-	tai:       int,
+	tick:      int,
+	ppsfreq:   int,
+	jitter:    int,
+	shift:     i32,
+	stabil:    int,
+	jitcnt:    int,
+	calcnt:    int,
+	errcnt:    int,
+	stbcnt:    int,
+	tai:       i32,
 }
 
 Reboot_Magic :: enum u64 {
 	RB_MAGIC_1     = 0xfee1dead,
-	RB_MAGIC_2     = 0x28121969,
-	RB_MAGIC_2A    = 0x05121996, // Since Linux 2.1.17
-	RB_MAGIC_2B    = 0x16041998, // Since Linux 2.1.97
-	RB_MAGIC_2C    = 0x20112000, // Since Linux 2.5.71
+	RB_MAGIC_2     = 672274793,
+	RB_MAGIC_2A    = 85072278, // Since Linux 2.1.17
+	RB_MAGIC_2B    = 369367448, // Since Linux 2.1.97
+	RB_MAGIC_2C    = 537993216, // Since Linux 2.5.71
 }
 
 Reboot_Operation :: enum u64 {
@@ -1743,7 +1743,7 @@ Reboot_Operation :: enum u64 {
 	RB_SW_SUSPEND  = 0xd000fce2,
 }
 
-Mount_Flags :: bit_set[Mount_Flags_Bits; u64]
+Mount_Flags :: bit_set[Mount_Flags_Bits; uint]
 
 Umount2_Flags :: bit_set[Umount2_Flags_Bits; u32]
 

@@ -2136,7 +2136,8 @@ pivot_root :: proc "contextless" (new_root: cstring, old_root: cstring) -> (Errn
 	Operations on a process or thread
 	Available since Linux 2.1.57
 */
-prctl :: proc "contextless" (op: i32, args: ..u64) -> (Errno) {
+prctl :: proc "contextless" (op: i32, args: ..uint) -> (Errno) {
+	assert_contextless(len(args) <= 4)
 	ret := syscall(SYS_prctl, op, args[0], args[1], args[2], args[3])
 	return Errno(-ret)
 }
@@ -2211,7 +2212,7 @@ settimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
 	Available since Linux 1.0
 */
 mount :: proc "contextless" (source: cstring, target: cstring, filesystemtype: cstring, mountflags: Mount_Flags, data: rawptr) -> (Errno) {
-	ret := syscall(SYS_mount, cast(rawptr) source, cast(rawptr) target, cast(rawptr) filesystemtype, transmute(u64) mountflags, data)
+	ret := syscall(SYS_mount, cast(rawptr) source, cast(rawptr) target, cast(rawptr) filesystemtype, transmute(uint) mountflags, data)
 	return Errno(-ret)
 }
 
@@ -2247,7 +2248,7 @@ swapoff :: proc "contextless" (path: cstring) -> (Errno) {
 	Available since Linux 1.0
 */
 reboot :: proc "contextless" (magic: Reboot_Magic, magic2: Reboot_Magic, op: Reboot_Operation, arg: rawptr) -> (Errno) {
-	ret := syscall(SYS_reboot, magic, magic2, op, arg)
+	ret := syscall(SYS_reboot, cast(i32)magic, cast(i32)magic2, cast(i32)op, arg)
 	return Errno(-ret)
 }
 
@@ -2341,7 +2342,7 @@ gettid :: proc "contextless" () -> Pid {
 	Initiate a file readahead into page cache
 	Available since Linux 2.1
 */
-readahead :: proc "contextless" (fd: Fd, offset: u64, count: u64) -> (Errno) {
+readahead :: proc "contextless" (fd: Fd, offset: int, count: uint) -> (Errno) {
 	ret := syscall(SYS_readahead, fd, offset, count)
 	return Errno(-ret)
 }
@@ -2350,7 +2351,7 @@ readahead :: proc "contextless" (fd: Fd, offset: u64, count: u64) -> (Errno) {
 	Set an extended attribute value
 	Available since Linux 2.6.25
 */
-setxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: u64, flags: i32) -> (Errno) {
+setxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: uint, flags: i32) -> (Errno) {
 	ret := syscall(SYS_setxattr, cast(rawptr) path, cast(rawptr) name, value, size, flags)
 	return Errno(-ret)
 }
@@ -2359,7 +2360,7 @@ setxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, siz
 	Set an extended attribute value
 	Available since Linux 2.6.25
 */
-lsetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: u64, flags: i32) -> (Errno) {
+lsetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: uint, flags: i32) -> (Errno) {
 	ret := syscall(SYS_lsetxattr, cast(rawptr) path, cast(rawptr) name, value, size, flags)
 	return Errno(-ret)
 }
@@ -2368,7 +2369,7 @@ lsetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, si
 	Set an extended attribute value
 	Available since Linux 2.6.25
 */
-fsetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: u64, flags: i32) -> (Errno) {
+fsetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: uint, flags: i32) -> (Errno) {
 	ret := syscall(SYS_fsetxattr, fd, cast(rawptr) name, value, size, flags)
 	return Errno(-ret)
 }
@@ -2377,7 +2378,7 @@ fsetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: u64
 	Retrieve an extended attribute
 	Available since Linux 2.6.25
 */
-getxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: u64) -> (Errno) {
+getxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: uint) -> (Errno) {
 	ret := syscall(SYS_getxattr, cast(rawptr) path, cast(rawptr) name, value, size)
 	return Errno(-ret)
 }
@@ -2386,7 +2387,7 @@ getxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, siz
 	Retrieve an extended attribute
 	Available since Linux 2.6.25
 */
-lgetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: u64) -> (Errno) {
+lgetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: uint) -> (Errno) {
 	ret := syscall(SYS_lgetxattr, cast(rawptr) path, cast(rawptr) name, value, size)
 	return Errno(-ret)
 }
@@ -2395,7 +2396,7 @@ lgetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, si
 	Retrieve an extended attribute
 	Available since Linux 2.6.25
 */
-fgetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: u64) -> (Errno) {
+fgetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: uint) -> (Errno) {
 	ret := syscall(SYS_fgetxattr, fd, cast(rawptr) name, value, size)
 	return Errno(-ret)
 }
@@ -2404,7 +2405,7 @@ fgetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: u64
 	List extended attribute names
 	Available since Linux 2.6.25
 */
-listxattr :: proc "contextless" (path: cstring, list: cstring, size: u64) -> (Errno) {
+listxattr :: proc "contextless" (path: cstring, list: cstring, size: uint) -> (Errno) {
 	ret := syscall(SYS_listxattr, cast(rawptr) path, cast(rawptr) list, size)
 	return Errno(-ret)
 }
@@ -2413,7 +2414,7 @@ listxattr :: proc "contextless" (path: cstring, list: cstring, size: u64) -> (Er
 	List extended attribute names
 	Available since Linux 2.6.25
 */
-llistxattr :: proc "contextless" (path: cstring, list: cstring, size: u64) -> (Errno) {
+llistxattr :: proc "contextless" (path: cstring, list: cstring, size: uint) -> (Errno) {
 	ret := syscall(SYS_llistxattr, cast(rawptr) path, cast(rawptr) list, size)
 	return Errno(-ret)
 }
@@ -2422,7 +2423,7 @@ llistxattr :: proc "contextless" (path: cstring, list: cstring, size: u64) -> (E
 	List extended attribute names
 	Available since Linux 2.6.25
 */
-flistxattr :: proc "contextless" (fd: Fd, list: cstring, size: u64) -> (Errno) {
+flistxattr :: proc "contextless" (fd: Fd, list: cstring, size: uint) -> (Errno) {
 	ret := syscall(SYS_flistxattr, fd, cast(rawptr) list, size)
 	return Errno(-ret)
 }
