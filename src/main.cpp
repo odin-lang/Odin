@@ -1309,23 +1309,17 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.vet_flags |= VetFlag_All;
 							break;
 
-						case BuildFlag_VetUnusedVariables: build_context.vet_flags |= VetFlag_UnusedVariables; break;
-						case BuildFlag_VetUnusedImports:   build_context.vet_flags |= VetFlag_UnusedImports;   break;
-						case BuildFlag_VetUnused:          build_context.vet_flags |= VetFlag_Unused;          break;
-						case BuildFlag_VetShadowing:       build_context.vet_flags |= VetFlag_Shadowing;       break;
-						case BuildFlag_VetUsingStmt:       build_context.vet_flags |= VetFlag_UsingStmt;       break;
-						case BuildFlag_VetUsingParam:      build_context.vet_flags |= VetFlag_UsingParam;      break;
-						case BuildFlag_VetStyle:           build_context.vet_flags |= VetFlag_Style;           break;
-						case BuildFlag_VetSemicolon:       build_context.vet_flags |= VetFlag_Semicolon;       break;
-						case BuildFlag_VetCast:            build_context.vet_flags |= VetFlag_Cast;            break;
-						case BuildFlag_VetTabs:            build_context.vet_flags |= VetFlag_Tabs;            break;
-						case BuildFlag_VetUnusedProcedures:
-							build_context.vet_flags |= VetFlag_UnusedProcedures;
-							if (!set_flags[BuildFlag_VetPackages]) {
-								gb_printf_err("-%.*s must be used with -vet-packages\n", LIT(name));
-								bad_flags = true;
-							}
-							break;
+						case BuildFlag_VetUnusedVariables:  build_context.vet_flags |= VetFlag_UnusedVariables;  break;
+						case BuildFlag_VetUnusedImports:    build_context.vet_flags |= VetFlag_UnusedImports;    break;
+						case BuildFlag_VetUnused:           build_context.vet_flags |= VetFlag_Unused;           break;
+						case BuildFlag_VetShadowing:        build_context.vet_flags |= VetFlag_Shadowing;        break;
+						case BuildFlag_VetUsingStmt:        build_context.vet_flags |= VetFlag_UsingStmt;        break;
+						case BuildFlag_VetUsingParam:       build_context.vet_flags |= VetFlag_UsingParam;       break;
+						case BuildFlag_VetStyle:            build_context.vet_flags |= VetFlag_Style;            break;
+						case BuildFlag_VetSemicolon:        build_context.vet_flags |= VetFlag_Semicolon;        break;
+						case BuildFlag_VetCast:             build_context.vet_flags |= VetFlag_Cast;             break;
+						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
+						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
 						case BuildFlag_VetPackages:
 							{
@@ -1786,6 +1780,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 			did_you_mean_flag(name);
 			bad_flags = true;
 		}
+	}
+
+	if (set_flags[BuildFlag_VetUnusedProcedures] && !set_flags[BuildFlag_VetPackages]) {
+		gb_printf_err("-vet-unused-procedures must be used with -vet-packages\n");
+		bad_flags = true;
 	}
 
 	if ((!(build_context.export_timings_format == TimingsExportUnspecified)) && (build_context.export_timings_file.len == 0)) {
