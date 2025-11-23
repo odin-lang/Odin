@@ -1,6 +1,8 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
@@ -15,9 +17,6 @@
 
 	These aren't exported for the same reasons.
 */
-
-
-package math_big
 
 import "base:intrinsics"
 import "core:mem"
@@ -1051,7 +1050,6 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		Normalize both x and y, ensure that y >= b/2, [b == 2**MP_DIGIT_BIT]
 	*/
 	norm := internal_count_bits(y) % _DIGIT_BITS
-
 	if norm < _DIGIT_BITS - 1 {
 		norm = (_DIGIT_BITS - 1) - norm
 		internal_shl(x, x, norm) or_return
@@ -1071,33 +1069,29 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		y = y*b**{n-t}
 	*/
 
+
 	_private_int_shl_leg(y, n - t) or_return
 
-	gte := internal_gte(x, y)
-	for gte {
+	for internal_gte(x, y) {
 		q.digit[n - t] += 1
 		internal_sub(x, x, y) or_return
-		gte = internal_gte(x, y)
 	}
 
 	/*
 		Reset y by shifting it back down.
 	*/
 	_private_int_shr_leg(y, n - t)
-
 	/*
 		Step 3. for i from n down to (t + 1).
 	*/
 	#no_bounds_check for i := n; i >= (t + 1); i -= 1 {
 		if i > x.used { continue }
-
 		/*
 			step 3.1 if xi == yt then set q{i-t-1} to b-1, otherwise set q{i-t-1} to (xi*b + x{i-1})/yt
 		*/
 		if x.digit[i] == y.digit[t] {
-			q.digit[(i - t) - 1] = 1 << (_DIGIT_BITS - 1)
+			q.digit[(i - t) - 1] = 1 << _DIGIT_BITS - 1
 		} else {
-
 			tmp := _WORD(x.digit[i]) << _DIGIT_BITS
 			tmp |= _WORD(x.digit[i - 1])
 			tmp /= _WORD(y.digit[t])

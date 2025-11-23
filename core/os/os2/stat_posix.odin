@@ -14,7 +14,7 @@ internal_stat :: proc(stat: posix.stat_t, fullpath: string) -> (fi: File_Info) {
 	fi.inode = u128(stat.st_ino)
 	fi.size = i64(stat.st_size)
 
-	fi.mode = int(transmute(posix._mode_t)(stat.st_mode - posix.S_IFMT))
+	fi.mode = transmute(Permissions)u32(transmute(posix._mode_t)(stat.st_mode - posix.S_IFMT))
 
 	fi.type = .Undetermined
 	switch {

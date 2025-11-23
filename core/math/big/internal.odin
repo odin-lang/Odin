@@ -1,6 +1,8 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	==========================    Low-level routines    ==========================
 
@@ -24,8 +26,6 @@
 
 	TODO: Handle +/- Infinity and NaN.
 */
-
-package math_big
 
 import "base:builtin"
 import "base:intrinsics"
@@ -746,19 +746,15 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 
 	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used / 3) * 2) {
 		assert(denominator.used >= 160 && numerator.used >= 240, "MUL_KARATSUBA_CUTOFF global not properly set.")
-		err = _private_int_div_recursive(quotient, remainder, numerator, denominator)
+		return _private_int_div_recursive(quotient, remainder, numerator, denominator)
 	} else {
-		when true {
-			err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator)
-		} else {
-			/*
-				NOTE(Jeroen): We no longer need or use `_private_int_div_small`.
-				We'll keep it around for a bit until we're reasonably certain div_school is bug free.
-			*/
-			err = _private_int_div_small(quotient, remainder, numerator, denominator)
-		}
+		return #force_inline _private_int_div_school(quotient, remainder, numerator, denominator)
+		/*
+			NOTE(Jeroen): We no longer need or use `_private_int_div_small`.
+			We'll keep it around for a bit until we're reasonably certain div_school is bug free.
+		*/
+		// err = _private_int_div_small(quotient, remainder, numerator, denominator)
 	}
-	return
 }
 
 /*

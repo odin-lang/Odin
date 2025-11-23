@@ -24,3 +24,17 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	}
 	return ret, 0
 }
+
+
+_exit :: proc "contextless" (code: int) -> ! {
+	SYS_exit_group ::
+		231 when ODIN_ARCH == .amd64 else
+		248 when ODIN_ARCH == .arm32 else
+		94  when ODIN_ARCH == .arm64 else
+		252 when ODIN_ARCH == .i386  else
+		94  when ODIN_ARCH == .riscv64 else
+		0
+
+	intrinsics.syscall(uintptr(SYS_exit_group), uintptr(i32(code)))
+	unreachable()
+}

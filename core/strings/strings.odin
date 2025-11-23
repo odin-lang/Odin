@@ -1,4 +1,4 @@
-// Procedures to manipulate UTF-8 encoded strings
+// A `string` builder, as well as procedures to manipulate `UTF-8` encoded strings.
 package strings
 
 import "base:intrinsics"
@@ -436,8 +436,13 @@ equal_fold :: proc(u, v: string) -> (res: bool) {
 			return false
 		}
 
-		// TODO(bill): Unicode folding
-
+		r := unicode.simple_fold(sr)
+		for r != sr && r < tr {
+			r = unicode.simple_fold(sr)
+		}
+		if r == tr {
+			continue loop
+		}
 		return false
 	}
 
@@ -2927,7 +2932,6 @@ Output:
 	abc1    abc2    abc3
 
 */
-
 expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	if tab_size <= 0 {
 		panic("tab size must be positive")

@@ -8,7 +8,7 @@ _multi_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, of
 	if mode == .Query {
 		return query_utility({.Read, .Query})
 	} else if mode != .Read {
-		return 0, .Empty
+		return 0, .Unsupported
 	}
 	mr := (^Multi_Reader)(stream_data)
 	for len(mr.readers) > 0 {
@@ -61,7 +61,7 @@ _multi_writer_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, of
 	if mode == .Query {
 		return query_utility({.Write, .Query})
 	} else if mode != .Write {
-		return 0, .Empty
+		return 0, .Unsupported
 	}
 	mw := (^Multi_Writer)(stream_data)
 	for w in mw.writers {

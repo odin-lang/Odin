@@ -3,7 +3,7 @@ package testing
 
 /*
 	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Ginger Bill: Initial implementation.
@@ -63,6 +63,9 @@ LOG_STATE_CHANGES     : bool   : #config(ODIN_TEST_LOG_STATE_CHANGES, false)
 USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
 // Output a report of the tests to the given path.
 JSON_REPORT           : string : #config(ODIN_TEST_JSON_REPORT, "")
+// Print the full file path for failed test cases on a new line
+// in a way that's friendly to regex capture for an editor's "go to error".
+GO_TO_ERROR           : bool   : #config(ODIN_TEST_GO_TO_ERROR, false)
 
 get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 	when LOG_LEVEL == "debug"   { return .Debug   } else
@@ -803,7 +806,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			}
 		} else {
 			if total_done_count != last_done_count {
-				if !global_ansi_disabled {
+				if !(global_ansi_disabled || !FANCY_OUTPUT) {
 					fmt.wprintf(stdout, OSC_WINDOW_TITLE, total_done_count, total_test_count)
 				}
 				last_done_count = total_done_count

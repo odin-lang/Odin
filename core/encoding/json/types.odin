@@ -1,14 +1,13 @@
-package encoding_json
-
-import "core:strings"
-
 /*
-	JSON 
+Encoding and decoding JSON in strict `JSON`, [[ JSON5 ; https://json5.org/ ]] and [[ BitSquid ; https://bitsquid.blogspot.com/2009/10/simplified-json-notation.html ]] variants.
+
+Using one of these `Specification`s.
+	JSON
 		strict JSON
-	JSON5 
+	JSON5
 		pure superset of JSON and valid JavaScript
 		https://json5.org/
-		
+
 		* Object keys may be an ECMAScript 5.1 IdentifierName.
 		* Objects may have a single trailing comma.
 		* Arrays may have a single trailing comma.
@@ -21,17 +20,21 @@ import "core:strings"
 		* Numbers may begin with an explicit plus sign.
 		* Single and multi-line comments are allowed.
 		* Additional white space characters are allowed.
-		
+
 	MJSON
 		pure superset of JSON5, may not be valid JavaScript
 		https://bitsquid.blogspot.com/2009/10/simplified-json-notation.html
-		
+
 		* All the same features as JSON5 plus extras.
 		* Assume an object definition at the root level (no need to surround entire file with { } ).
 		* Commas are optional, using comma insertion rules with newlines.
 		* Quotes around object keys are optional if the keys are valid identifiers.
 		* : can be replaced with =
 */
+package encoding_json
+
+import "core:strings"
+
 Specification :: enum {
 	JSON,
 	JSON5, // https://json5.org/

@@ -24,3 +24,11 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	}
 	return int(ret), 0
 }
+
+_exit :: proc "contextless" (code: int) -> ! {
+	@(default_calling_convention="c")
+	foreign libc {
+		exit :: proc(status: i32) -> ! ---
+	}
+	exit(i32(code))
+}

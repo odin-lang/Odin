@@ -218,6 +218,8 @@ struct DeclInfo {
 	Ast *         proc_lit;      // Ast_ProcLit
 	Type *        gen_proc_type; // Precalculated
 
+	Entity *     para_poly_original;
+
 	bool          is_using;
 	bool          where_clauses_evaluated;
 	bool          foreign_require_results;
@@ -417,7 +419,7 @@ struct GenProcsData {
 
 struct GenTypesData {
 	Array<Entity *> types;
-	RwMutex         mutex;
+	RecursiveMutex  mutex;
 };
 
 struct Defineable {

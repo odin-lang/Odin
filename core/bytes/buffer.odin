@@ -434,5 +434,5 @@ _buffer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Destroy, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }

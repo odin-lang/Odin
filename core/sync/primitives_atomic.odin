@@ -13,7 +13,7 @@ Atomic_Mutex_State :: enum Futex {
 // The zero value for a Atomic_Mutex is an unlocked mutex
 //
 // An Atomic_Mutex must not be copied after first use
-Atomic_Mutex :: struct #no_copy {
+Atomic_Mutex :: struct {
 	state: Atomic_Mutex_State,
 }
 
@@ -105,7 +105,7 @@ Atomic_RW_Mutex_State_Reader_Mask :: ~Atomic_RW_Mutex_State_Is_Writing
 // The zero value for an Atomic_RW_Mutex is an unlocked mutex.
 //
 // An Atomic_RW_Mutex must not be copied after first use.
-Atomic_RW_Mutex :: struct #no_copy {
+Atomic_RW_Mutex :: struct {
 	state: Atomic_RW_Mutex_State,
 	mutex: Atomic_Mutex,
 	sema:  Atomic_Sema,
@@ -246,7 +246,7 @@ atomic_rw_mutex_shared_guard :: proc "contextless" (m: ^Atomic_RW_Mutex) -> bool
 // The zero value for a Recursive_Mutex is an unlocked mutex
 //
 // An Atomic_Recursive_Mutex must not be copied after first use
-Atomic_Recursive_Mutex :: struct #no_copy {
+Atomic_Recursive_Mutex :: struct {
 	owner:     int,
 	recursion: int,
 	mutex: Mutex,
@@ -309,7 +309,7 @@ atomic_recursive_mutex_guard :: proc "contextless" (m: ^Atomic_Recursive_Mutex) 
 // waiting for signalling the occurence of an event
 //
 // An Atomic_Cond must not be copied after first use
-Atomic_Cond :: struct #no_copy {
+Atomic_Cond :: struct {
 	state: Futex,
 }
 
@@ -344,7 +344,7 @@ atomic_cond_broadcast :: proc "contextless" (c: ^Atomic_Cond) {
 // Posting to the semaphore increases the count by one, or the provided amount.
 //
 // An Atomic_Sema must not be copied after first use
-Atomic_Sema :: struct #no_copy {
+Atomic_Sema :: struct {
 	count: Futex,
 }
 

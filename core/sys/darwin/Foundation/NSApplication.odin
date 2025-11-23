@@ -132,6 +132,11 @@ Application_finishLaunching :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "finishLaunching")
 }
 
+@(objc_type=Application, objc_name="stop")
+Application_stop :: proc "c" (self: ^Application, sender: ^Object) {
+	msgSend(nil, self, "stop:", sender)
+}
+
 @(objc_type=Application, objc_name="terminate")
 Application_terminate :: proc "c" (self: ^Application, sender: ^Object) {
 	msgSend(nil, self, "terminate:", sender)
@@ -156,6 +161,12 @@ Application_nextEventMatchingMask :: proc "c" (self: ^Application, mask: EventMa
 Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
 	msgSend(nil, self, "sendEvent:", event)
 }
+
+@(objc_type=Application, objc_name="postEvent")
+Application_postEvent :: proc "c" (self: ^Application, event: ^Event, atStart: BOOL) {
+	msgSend(nil, self, "postEvent:atStart:", event, atStart)
+}
+
 @(objc_type=Application, objc_name="updateWindows")
 Application_updateWindows :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "updateWindows")
@@ -173,6 +184,11 @@ RunningApplication_currentApplication :: proc "c" () -> ^RunningApplication {
 @(objc_type=RunningApplication, objc_name="localizedName")
 RunningApplication_localizedName :: proc "c" (self: ^RunningApplication) -> ^String {
 	return msgSend(^String, self, "localizedName")
+}
+
+@(objc_type=RunningApplication, objc_name="finishedLaunching")
+RunningApplication_finishedLaunching :: proc "c" (self: ^RunningApplication) -> BOOL {
+	return msgSend(BOOL, self, "isFinishedLaunching")
 }
 
 ApplicationDelegateTemplate :: struct {

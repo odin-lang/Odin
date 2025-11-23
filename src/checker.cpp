@@ -923,6 +923,22 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	return *found;
 }
 
+
+gb_internal AstPackage *try_get_core_package(CheckerInfo *info, String name) {
+	if (name == "runtime") {
+		return get_runtime_package(info);
+	}
+
+	gbAllocator a = heap_allocator();
+	String path = get_fullpath_core_collection(a, name, nullptr);
+	defer (gb_free(a, path.text));
+	auto found = string_map_get(&info->packages, path);
+	if (found == nullptr) {
+		return nullptr;
+	}
+	return *found;
+}
+
 gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name, bool required=false) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
@@ -1416,6 +1432,8 @@ gb_internal void init_universal(void) {
 		t_objc_SEL      = alloc_type_pointer(t_objc_selector);
 		t_objc_Class    = alloc_type_pointer(t_objc_class);
 		t_objc_Ivar     = alloc_type_pointer(t_objc_ivar);
+
+		t_objc_instancetype = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_instancetype"), t_objc_id);
 	}
 }
 
@@ -1499,8 +1517,11 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	map_destroy(&i->objc_msgSend_types);
 	string_set_destroy(&i->obcj_class_name_set);
-	mpsc_destroy(&i->objc_class_implementations);
 	map_destroy(&i->objc_method_implementations);
+
+	// NOTE(harold): Disabling this: It can cause the 'count == 0' assert to trigger
+	//               when there's checker errors and the queue is still full as it did not reach the generation stage.
+	// mpsc_destroy(&i->objc_class_implementations);
 
 	string_map_destroy(&i->load_file_cache);
 	string_map_destroy(&i->load_directory_cache);
@@ -3386,12 +3407,20 @@ gb_internal void init_core_map_type(Checker *c) {
 	t_raw_map_ptr       = alloc_type_pointer(t_raw_map);
 }
 
+gb_internal void init_core_objc_c(Checker *c) {
+	if (build_context.metrics.os == TargetOs_darwin) {
+		t_objc_super     = find_core_type(c, str_lit("objc_super"));
+		t_objc_super_ptr = alloc_type_pointer(t_objc_super);
+	}
+}
+
 gb_internal void init_preload(Checker *c) {
 	init_core_type_info(c);
 	init_mem_allocator(c);
 	init_core_context(c);
 	init_core_source_code_location(c);
 	init_core_map_type(c);
+	init_core_objc_c(c);
 }
 
 gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
@@ -5080,26 +5109,22 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 			error(token, "Unable to find package: %.*s", LIT(path));
 			exit_with_errors();
 		}
-		AstPackage *pkg = *found;
-		GB_ASSERT(pkg->scope != nullptr);
+		AstPackage *child_pkg = *found;
+		GB_ASSERT(child_pkg->scope != nullptr);
 
-		id->package = pkg;
+		id->package = child_pkg;
 
-		ImportGraphNode **found_node = nullptr;
-		ImportGraphNode *m = nullptr;
-		ImportGraphNode *n = nullptr;
-
-		found_node = map_get(M, pkg);
+		ImportGraphNode **found_node = map_get(M, child_pkg);
 		GB_ASSERT(found_node != nullptr);
-		m = *found_node;
+		ImportGraphNode *child = *found_node;
 
 		found_node = map_get(M, parent_pkg);
 		GB_ASSERT(found_node != nullptr);
-		n = *found_node;
+		ImportGraphNode *parent = *found_node;
 
-		import_graph_node_set_add(&n->succ, m);
-		import_graph_node_set_add(&m->pred, n);
-		ptr_set_add(&m->scope->imported, n->scope);
+		import_graph_node_set_add(&parent->succ, child);
+		import_graph_node_set_add(&child->pred, parent);
+		ptr_set_add(&parent->scope->imported, child->scope);
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
@@ -7006,8 +7031,10 @@ gb_internal void check_objc_context_provider_procedures(Checker *c) {
 	}
 }
 
-gb_internal void check_unique_package_names(Checker *c) {
+gb_internal bool check_unique_package_names(Checker *c) {
 	ERROR_BLOCK();
+
+	bool ok = true;
 
 	StringMap<AstPackage *> pkgs = {}; // Key: package name
 	string_map_init(&pkgs, 2*c->info.packages.count);
@@ -7033,6 +7060,7 @@ gb_internal void check_unique_package_names(Checker *c) {
 			continue;
 		}
 
+		ok = false;
 
 		begin_error_block();
 		error(curr, "Duplicate declaration of 'package %.*s'", LIT(name));
@@ -7055,6 +7083,8 @@ gb_internal void check_unique_package_names(Checker *c) {
 
 		end_error_block();
 	}
+
+	return ok;
 }
 
 gb_internal void check_add_entities_from_queues(Checker *c) {
@@ -7437,7 +7467,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
 	TIME_SECTION("check unique package names");
-	check_unique_package_names(c);
+	bool package_names_are_unique = check_unique_package_names(c);
 
 	TIME_SECTION("sanity checks");
 	check_merge_queues_into_arrays(c);
@@ -7494,7 +7524,8 @@ gb_internal void check_parsed_files(Checker *c) {
 			c->info.type_info_types_hash_map[index] = tt;
 
 			bool exists = map_set_if_not_previously_exists(&c->info.min_dep_type_info_index_map, tt.hash, index);
-			if (exists) {
+			// Because we've already written a nice error about a duplicate package declaration, skip this panic if the package names aren't unique.
+			if (package_names_are_unique && exists) {
 				for (auto const &entry : c->info.min_dep_type_info_index_map) {
 					if (entry.key != tt.hash) {
 						continue;

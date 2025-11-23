@@ -1,5 +1,5 @@
 /*
-The SIMD support package.
+Cross-platform `SIMD` support types and procedures.
 
 SIMD (Single Instruction Multiple Data), is a CPU hardware feature that
 introduce special registers and instructions which operate on multiple units
@@ -271,7 +271,7 @@ Inputs:
 Returns:
 - A vector that is the sum of two input vectors.
 
-**Operation**:
+Operation:
 	
 	for i in 0 ..< len(res) {
 		res[i] = a[i] + b[i]
@@ -307,7 +307,7 @@ Inputs:
 Returns:
 - A vector that is the difference of two vectors, `a` - `b`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = a[i] - b[i]
@@ -342,7 +342,7 @@ Inputs:
 Returns:
 - A vector that is the product of two vectors.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = a[i] * b[i]
@@ -380,7 +380,7 @@ Inputs:
 Returns:
 - A vector that is the quotient of two vectors, `a` / `b`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = a[i] / b[i]
@@ -420,7 +420,7 @@ Result:
 - A vector, where each lane is the lane from `a` shifted left by the amount
 specified in the corresponding lane of the vector `b`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if b[i] < 8*size_of(a[i]) {
@@ -470,7 +470,7 @@ Result:
 - A vector, where each lane is the lane from `a` shifted right by the amount
 specified in the corresponding lane of the vector `b`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if b[i] < 8*size_of(a[i]) {
@@ -515,7 +515,7 @@ Result:
 - A vector, where each lane is the lane from `a` shifted left by the amount
 specified in the corresponding lane of the vector `b`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		mask := 8*size_of(a[i]) - 1
@@ -561,7 +561,7 @@ Result:
 - A vector, where each lane is the lane from `a` shifted right by the amount
 specified in the corresponding lane of the vector `b`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		mask := 8*size_of(a[i]) - 1
@@ -604,7 +604,7 @@ Inputs:
 Returns:
 - The saturated sum of the two vectors.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		switch {
@@ -653,7 +653,7 @@ Inputs:
 Returns:
 - The saturated difference of the two vectors.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		switch {
@@ -697,7 +697,7 @@ Inputs:
 Returns:
 - A vector that is the result of the bitwise AND operation between two vectors.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = a[i] & b[i]
@@ -732,7 +732,7 @@ Inputs:
 Returns:
 - A vector that is the result of the bitwise OR operation between two vectors.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = a[i] | b[i]
@@ -767,7 +767,7 @@ Inputs:
 Returns:
 - A vector that is the result of the bitwise XOR operation between two vectors.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = a[i] ~ b[i]
@@ -802,7 +802,7 @@ Inputs:
 Returns:
 - A vector that is the result of the bitwise AND NOT operation between two vectors.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = a[i] &~ b[i]
@@ -836,7 +836,7 @@ Inputs:
 Returns:
 - The negated version of the vector `a`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = -a[i]
@@ -867,7 +867,7 @@ Inputs:
 Returns:
 - The absolute value of a vector.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		switch {
@@ -903,7 +903,7 @@ Inputs:
 Returns:
 - A vector containing with minimum values from corresponding lanes of `a` and `b`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if a[i] < b[i] {
@@ -942,7 +942,7 @@ Inputs:
 Returns:
 - A vector containing with maximum values from corresponding lanes of `a` and `b`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if a[i] > b[i] {
@@ -983,7 +983,7 @@ Inputs:
 Returns:
 - A vector containing clamped values in each lane.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		val := v[i]
@@ -1029,7 +1029,7 @@ Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
 containing the comparison results for each lane.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if a[i] == b[i] {
@@ -1071,7 +1071,7 @@ Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
 containing the comparison results for each lane.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if a[i] != b[i] {
@@ -1113,7 +1113,7 @@ Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
 containing the comparison results for each lane.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if a[i] < b[i] {
@@ -1156,7 +1156,7 @@ Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
 containing the comparison results for each lane.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if a[i] <= b[i] {
@@ -1199,7 +1199,7 @@ Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
 containing the comparison results for each lane.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if a[i] > b[i] {
@@ -1242,7 +1242,7 @@ Returns:
 - A vector of unsigned integers of the same size as the input vector's lanes,
 containing the comparison results for each lane.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if a[i] >= b[i] {
@@ -1301,7 +1301,7 @@ Returns:
 loaded from the pointer vector `ptr`, and all values from masked indices loaded
 from the value vector `val`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if mask[i]&1 == 1 {
@@ -1384,7 +1384,7 @@ Inputs:
 	set), the corresponding lane is written into memory. Otherwise it's not
 	written into memory.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(ptr) {
 		if mask[i]&1 == 1 {
@@ -1457,7 +1457,7 @@ Returns:
 - The loaded vector. The lanes for which the mask was set are loaded from
 memory, and the other lanes are loaded from the `val` vector.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		if mask[i]&1 == 1 {
@@ -1525,7 +1525,7 @@ Inputs:
 - `val`: The vector to store.
 - `mask`: The mask, selecting which lanes of the vector to store into memory.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(val) {
 		if mask[i]&1 == 1 {
@@ -1594,7 +1594,7 @@ Inputs:
 Returns:
 - The result vector, holding masked memory values unmasked default values.
 
-**Operation**:
+Operation:
 
 	mem_idx := 0
 	for i in 0 ..< len(mask) {
@@ -1667,7 +1667,7 @@ Inputs:
 - `val`: The vector to store into memory.
 - `mask`: The mask that selects which values to store into memory.
 
-**Operation**:
+Operation:
 
 	mem_idx := 0
 	for i in 0 ..< len(mask) {
@@ -1729,7 +1729,7 @@ Inputs:
 Returns:
 - The value of the lane at the specified index.
 
-**Operation**:
+Operation:
 
 	return a[idx]
 */
@@ -1749,7 +1749,7 @@ Inputs:
 Returns:
 - Vector with the specified lane replaced.
 
-**Operation**:
+Operation:
 
 	a[idx] = elem
 */
@@ -1775,7 +1775,7 @@ Inputs:
 Result:
 - Sum of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	for n > 1 {
 		n = n / 2
@@ -1823,7 +1823,7 @@ Inputs:
 Result:
 - Product of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	for n > 1 {
 		n = n / 2
@@ -1865,7 +1865,7 @@ Inputs:
 Result:
 - Sum of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 0
 	for i in 0 ..< len(a) {
@@ -1888,7 +1888,7 @@ Inputs:
 Result:
 - Product of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 1
 	for i in 0 ..< len(a) {
@@ -1916,7 +1916,7 @@ Inputs:
 Result:
 - Sum of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	for n > 1 {
 		n = n / 2
@@ -1964,7 +1964,7 @@ Inputs:
 Result:
 - Product of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	for n > 1 {
 		n = n / 2
@@ -2003,7 +2003,7 @@ Inputs:
 Result:
 - Minimum value of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 0
 	for i in 0 ..< len(a) {
@@ -2024,7 +2024,7 @@ Inputs:
 Result:
 - Maximum value of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 0
 	for i in 0 ..< len(a) {
@@ -2045,7 +2045,7 @@ Inputs:
 Result:
 - Bitwise AND of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 0
 	for i in 0 ..< len(a) {
@@ -2066,7 +2066,7 @@ Inputs:
 Result:
 - Bitwise OR of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 0
 	for i in 0 ..< len(a) {
@@ -2087,7 +2087,7 @@ Inputs:
 Result:
 - Bitwise XOR of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 0
 	for i in 0 ..< len(a) {
@@ -2108,7 +2108,7 @@ Inputs:
 Result:
 - Bitwise OR of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 0
 	for i in 0 ..< len(a) {
@@ -2129,7 +2129,7 @@ Inputs:
 Result:
 - Bitwise AND of all lanes, as a scalar.
 
-**Operation**:
+Operation:
 
 	res := 0
 	for i in 0 ..< len(a) {
@@ -2154,7 +2154,7 @@ Inputs:
 Result:
 - Swizzled input vector.
 
-**Operation**:
+Operation:
 
 	res = {}
 	for i in 0 ..< len(indices) {
@@ -2220,7 +2220,7 @@ Result:
 - A bitset of integers, corresponding to the indexes of the lanes, whose MSBs
   are set.
 
-**Operation**:
+Operation:
 
 	bits_per_lane = 8*size_of(a[0])
 	res = bit_set {}
@@ -2266,7 +2266,7 @@ Result:
 - A bitset of integers, corresponding to the indexes of the lanes, whose LSBs
   are set.
 
-**Operation**:
+Operation:
 
 	res = bit_set {}
 	for i in 0 ..< len(a) {
@@ -2314,7 +2314,7 @@ Inputs:
 Result:
 - Input vectors, shuffled according to the indices.
 
-**Operation**:
+Operation:
 
 	res = {}
 	for i in 0 ..< len(indices) {
@@ -2386,7 +2386,7 @@ Inputs:
 Result:
 - The result of selecting values from the two input vectors.
 
-**Operation**:
+Operation:
 
 	res = {}
 	for i in 0 ..< len(cond) {
@@ -2636,6 +2636,7 @@ fma :: intrinsics.fused_mul_add
 /*
 Convert pointer to SIMD vector to an array pointer.
 */
+@(require_results)
 to_array_ptr :: #force_inline proc "contextless" (v: ^#simd[$LANES]$E) -> ^[LANES]E {
 	return (^[LANES]E)(v)
 }
@@ -2643,6 +2644,7 @@ to_array_ptr :: #force_inline proc "contextless" (v: ^#simd[$LANES]$E) -> ^[LANE
 /*
 Convert SIMD vector to an array.
 */
+@(require_results)
 to_array :: #force_inline proc "contextless" (v: #simd[$LANES]$E) -> [LANES]E {
 	return transmute([LANES]E)(v)
 }
@@ -2650,6 +2652,7 @@ to_array :: #force_inline proc "contextless" (v: #simd[$LANES]$E) -> [LANES]E {
 /*
 Convert array to SIMD vector.
 */
+@(require_results)
 from_array :: #force_inline proc "contextless" (v: $A/[$LANES]$E) -> #simd[LANES]E {
 	return transmute(#simd[LANES]E)v
 }
@@ -2657,6 +2660,7 @@ from_array :: #force_inline proc "contextless" (v: $A/[$LANES]$E) -> #simd[LANES
 /*
 Convert slice to SIMD vector.
 */
+@(require_results)
 from_slice :: proc($T: typeid/#simd[$LANES]$E, slice: []E) -> T {
 	assert(len(slice) >= LANES, "slice length must be a least the number of lanes")
 	array: [LANES]E
@@ -2672,7 +2676,7 @@ Perform binary not operation on a SIMD vector.
 This procedure returns a vector where each lane is the result of the binary
 NOT operation of the corresponding lane in the vector `a`.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = ~a[i]
@@ -2689,13 +2693,15 @@ Example:
 	   | 0xff | 0xaf | 0x7f | 0x00 |
 	   +------+------+------+------+
 */
+@(require_results)
 bit_not :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
-	return xor(v, T(~E(0)))
+	return bit_xor(v, T(~E(0)))
 }
 
 /*
 Copy the signs from lanes of one SIMD vector into another SIMD vector.
 */
+@(require_results)
 copysign :: #force_inline proc "contextless" (v, sign: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
 	neg_zero := to_bits(T(-0.0))
 	sign_bit := to_bits(sign) & neg_zero
@@ -2711,6 +2717,7 @@ This procedure returns a vector, each lane of which contains either +1.0 or
 input vector. If the lane of the input vector has NaN, then the result vector
 will contain this NaN value as-is.
 */
+@(require_results)
 signum :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
 	is_nan := lanes_ne(v, v)
 	return select(is_nan, v, copysign(T(1), v))
@@ -2728,7 +2735,7 @@ Inputs:
 Returns:
 - Negated vector.
 
-**Operation**:
+Operation:
 
 	for i in 0 ..< len(res) {
 		res[i] = 1.0 / a[i]
@@ -2745,6 +2752,7 @@ Example:
 	   |  0.5 |   1  | 0.33 |  0.2 |
 	   +------+------+------+------+
 */
+@(require_results)
 recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
 	return T(1) / v
 }
@@ -2756,7 +2764,7 @@ Inputs:
 - `V`: The type of the vector to create.
 Result:
 - A vector of the given type, where each lane contains the index of that lane.
-**Operation**:
+Operation:
 	for i in 0 ..< N {
 		res[i] = i
 	}

@@ -509,6 +509,7 @@ struct BuildContext {
 	bool   show_more_timings;
 	bool   show_defineables;
 	String export_defineables_file;
+	bool   ignore_unused_defineables;
 	bool   show_system_calls;
 	bool   keep_temp_files;
 	bool   ignore_unknown_attributes;
@@ -548,6 +549,8 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
+	bool   build_diagnostics;
+
 	bool   use_single_module;
 	bool   use_separate_modules;
 	bool   module_per_file;
@@ -572,6 +575,8 @@ struct BuildContext {
 	SourceCodeLocationInfo source_code_location_info;
 
 	bool   min_link_libs;
+
+	String export_linked_libs_path;
 
 	bool   print_linker_flags;
 
@@ -966,14 +971,6 @@ gb_internal bool is_excluded_target_filename(String name) {
 	if (string_starts_with(name, str_lit("."))) {
 		// Ignore .*.odin files
 		return true;
-	}
-
-	if (build_context.command_kind != Command_test) {
-		String test_suffix = str_lit("_test");
-		if (string_ends_with(name, test_suffix) && name != test_suffix) {
-			// Ignore *_test.odin files
-			return true;
-		}
 	}
 
 	String str1 = {};
@@ -2099,7 +2096,19 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 	for (;;) {
 		String str = string_split_iterator(&it, ',');
 		if (str == "") break;
+
 		if (!string_set_exists(&build_context.target_features_set, str)) {
+			String plus_str = concatenate_strings(temporary_allocator(), make_string_c("+"), str);
+
+			if (!string_set_exists(&build_context.target_features_set, plus_str)) {
+				if (not_enabled) *not_enabled = str;
+				return false;
+			}
+		}
+
+		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), str);
+
+		if (string_set_exists(&build_context.target_features_set, minus_str)) {
 			if (not_enabled) *not_enabled = str;
 			return false;
 		}

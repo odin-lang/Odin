@@ -46,6 +46,7 @@ DEFAULT_MAX_SCAN_TOKEN_SIZE :: 1<<16
 @(private)
 _INIT_BUF_SIZE :: 4096
 
+// Initializes a Scanner buffer an allocator `buf_allocator`
 scanner_init :: proc(s: ^Scanner, r: io.Reader, buf_allocator := context.allocator) -> ^Scanner {
 	s.r = r
 	s.split = scan_lines
@@ -53,6 +54,8 @@ scanner_init :: proc(s: ^Scanner, r: io.Reader, buf_allocator := context.allocat
 	s.buf.allocator = buf_allocator
 	return s
 }
+
+// Initializes a Scanner buffer a user provided bytes buffer `buf`
 scanner_init_with_buffer :: proc(s: ^Scanner, r: io.Reader, buf: []byte) -> ^Scanner {
 	s.r = r
 	s.split = scan_lines
@@ -75,24 +78,27 @@ scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 	return s._err
 }
 
-// Returns the most recent token created by scanner_scan.
+// Returns the most recent token created by 'scan'.
 // The underlying array may point to data that may be overwritten
-// by another call to scanner_scan.
+// by another call to 'scan'.
 // Treat the returned value as if it is immutable.
 scanner_bytes :: proc(s: ^Scanner) -> []byte {
 	return s.token
 }
 
-// Returns the most recent token created by scanner_scan.
+// Returns the most recent token created by 'scan'.
 // The underlying array may point to data that may be overwritten
-// by another call to scanner_scan.
+// by another call to 'scan'.
 // Treat the returned value as if it is immutable.
 scanner_text :: proc(s: ^Scanner) -> string {
 	return string(s.token)
 }
 
-// scanner_scan advances the scanner
-scanner_scan :: proc(s: ^Scanner) -> bool {
+// scanner_scan is an alias of scan
+scanner_scan :: scan
+
+// scan advances the Scanner
+scan :: proc(s: ^Scanner) -> bool {
 	set_err :: proc(s: ^Scanner, err: Scanner_Error) {
 		switch s._err {
 		case nil, .EOF:
@@ -229,6 +235,7 @@ scanner_scan :: proc(s: ^Scanner) -> bool {
 	}
 }
 
+// scan_bytes is a splitting procedure that returns each byte as a token
 scan_bytes :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
 	if at_eof && len(data) == 0 {
 		return
@@ -236,6 +243,10 @@ scan_bytes :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, 
 	return 1, data[0:1], nil, false
 }
 
+// scan_runes is a splitting procedure that returns each UTF-8 encoded rune as a token.
+// The lsit of runes return is equivalent to that of iterating over a string in a 'for in' loop, meaning any
+// erroneous UTF-8 encodings will be returned as U+FFFD. Unfortunately this means it is impossible for the "client"
+// to know whether a U+FFFD is an expected replacement rune or an encoding of an error.
 scan_runes :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
 	if at_eof && len(data) == 0 {
 		return
@@ -264,7 +275,8 @@ scan_runes :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, 
 	token = ERROR_RUNE
 	return
 }
-
+// scan_words is a splitting procedure that returns each Unicode-space-separated word of text, excluding the surrounded spaces.
+// It will never return return an empty string.
 scan_words :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
 	is_space :: proc "contextless" (r:  rune) -> bool {
 		switch r {
@@ -312,6 +324,8 @@ scan_words :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, 
 	return
 }
 
+// scan_lines is a splitting procedure that returns each line of text stripping of any trailing newline and an optional preceding carriage return (\r?\n).
+// A new line is allowed to be empty.
 scan_lines :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
 	trim_carriage_return :: proc "contextless" (data: []byte) -> []byte {
 		if len(data) > 0 && data[len(data)-1] == '\r' {

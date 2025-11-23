@@ -1,3 +1,4 @@
+// A convenient and efficient way to index strings by `Unicode` code point (`rune`) rather than byte.
 package utf8string
 
 import "core:unicode/utf8"

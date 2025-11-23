@@ -354,7 +354,7 @@ _tee_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, offs
 	case .Query:
 		return query_utility({.Read, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 // tee_reader_init returns a Reader that writes to 'w' what it reads from 'r'
@@ -404,7 +404,7 @@ _limited_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, 
 	case .Query:
 		return query_utility({.Read, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 limited_reader_init :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {

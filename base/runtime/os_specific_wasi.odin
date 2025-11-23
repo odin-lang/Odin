@@ -23,6 +23,9 @@ foreign wasi {
 		argv:     [^]cstring,
 		argv_buf: [^]byte,
 	) -> u16 ---
+
+	@(private="file")
+	proc_exit :: proc(rval: u32) -> ! ---
 }
 
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
@@ -52,4 +55,9 @@ _wasi_setup_args :: proc() {
 		delete(args__)
 		delete(args_buf)
 	}
+}
+
+
+_exit :: proc "contextless" (code: int) -> ! {
+	proc_exit(u32(code))
 }

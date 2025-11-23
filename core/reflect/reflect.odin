@@ -70,6 +70,7 @@ Type_Kind :: enum {
 }
 
 
+// type_kind returns a enum `Type_Kind` to state what kind of type a typeid is
 @(require_results)
 type_kind :: proc(T: typeid) -> Type_Kind {
 	ti := type_info_of(T)
@@ -108,31 +109,51 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 	return .Invalid
 }
 
-// TODO(bill): Better name
+// Returns the `Type_Kind` of the base-type of a typeid.
 @(require_results)
 underlying_type_kind :: proc(T: typeid) -> Type_Kind {
 	return type_kind(runtime.typeid_base(T))
 }
 
-// TODO(bill): Better name
+// Returns the `Type_Kind` of the core-type of a typeid. See
 @(require_results)
 backing_type_kind :: proc(T: typeid) -> Type_Kind {
 	return type_kind(runtime.typeid_core(T))
 }
 
 
+// type_info_base returns the base-type of a `^Type_Info` stripping the `distinct`ness from the first level
 type_info_base :: runtime.type_info_base
+
+// type_info_core returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum or bit_set `^Type_Info`.
+// This is also aliased as `type_info_base_without_enum`
 type_info_core :: runtime.type_info_core 
+
+
+// type_info_base_without_enum returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum or bit_set `^Type_Info`.
+// This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
 
 
 when !ODIN_NO_RTTI {
+	// typeid_base returns the base-type of a `typeid` stripping the `distinct`ness from the first level
 	typeid_base :: runtime.typeid_base
+
+	// typeid_core returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
+	// returns the backing integer type of an enum or bit_set `typeid`.
+	// This is also aliased as `typeid_base_without_enum`
 	typeid_core :: runtime.typeid_core
+
+	// typeid_base_without_enum returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
+	// returns the backing integer type of an enum or bit_set `typeid`.
+	// This is also aliased as `typeid_core`
 	typeid_base_without_enum :: typeid_core
 }
 
 
+// any_base returns an `any` where the `typeid` has been replaced with the `base-type` equivalent
 @(require_results)
 any_base :: proc(v: any) -> any {
 	v := v
@@ -141,6 +162,8 @@ any_base :: proc(v: any) -> any {
 	}
 	return v
 }
+
+// any_core returns an `any` where the `typeid` has been replaced with the `core-type` equivalent
 @(require_results)
 any_core :: proc(v: any) -> any {
 	v := v
@@ -150,6 +173,20 @@ any_core :: proc(v: any) -> any {
 	return v
 }
 
+// typeid_elem returns a `typeid` of the element-type of a type if possible, otherwise it returns itself
+//     complex32  -> f16
+//     complex64  -> f32
+//     complex128 -> f64
+//     quaternion64  -> f16
+//     quaternion128 -> f32
+//     quaternion256 -> f64
+//     ^T         -> T
+//     [^]T       -> T
+//     #soa^T     -> T
+//     [N]T       -> T
+//     []T        -> T
+//     [dynamic]T -> T
+//     #simd[N]T  -> T
 @(require_results)
 typeid_elem :: proc(id: typeid) -> typeid {
 	ti := type_info_of(id)
@@ -160,11 +197,13 @@ typeid_elem :: proc(id: typeid) -> typeid {
 	#partial switch v in ti.variant {
 	case Type_Info_Complex:
 		switch bits {
+		case 32:  return f16
 		case 64:  return f32
 		case 128: return f64
 		}
 	case Type_Info_Quaternion:
 		switch bits {
+		case  64: return f16
 		case 128: return f32
 		case 256: return f64
 		}
@@ -181,6 +220,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 }
 
 
+// returns the size of the type that the passed typeid represents
 @(require_results)
 size_of_typeid :: proc(T: typeid) -> int {
 	if ti := type_info_of(T); ti != nil {
@@ -189,6 +229,7 @@ size_of_typeid :: proc(T: typeid) -> int {
 	return 0
 }
 
+// returns the alignment of the type that the passed typeid represents
 @(require_results)
 align_of_typeid :: proc(T: typeid) -> int {
 	if ti := type_info_of(T); ti != nil {
@@ -197,6 +238,7 @@ align_of_typeid :: proc(T: typeid) -> int {
 	return 1
 }
 
+// Reinterprets the data stored at `v` as a slice of bytes
 @(require_results)
 as_bytes :: proc(v: any) -> []byte {
 	if v != nil {
@@ -206,11 +248,13 @@ as_bytes :: proc(v: any) -> []byte {
 	return nil
 }
 
+// Splits the data stored in `any` into its two components: `data` and `id`
 @(require_results)
 any_data :: #force_inline proc(v: any) -> (data: rawptr, id: typeid) {
 	return v.data, v.id
 }
 
+// Returns true if the `any` value is either `nil` or the data stored at the address is all zeroed
 @(require_results)
 is_nil :: proc(v: any) -> bool {
 	if v == nil {
@@ -228,6 +272,16 @@ is_nil :: proc(v: any) -> bool {
 	return true
 }
 
+
+// Returns the length of the type that represents the `any` value, or returns 0 if not possible
+//     len(^T)   -> len(T)
+//     len([N]T) -> N
+//     len(#simd[N]T) -> N
+//     len([]T)
+//     len([dynamic]T)
+//     len(map[K]V)
+//     len(string) or len(cstring)
+//     len(string16) or len(cstring16)
 @(require_results)
 length :: proc(val: any) -> int {
 	if val == nil { return 0 }
@@ -255,10 +309,19 @@ length :: proc(val: any) -> int {
 		return runtime.map_len((^runtime.Raw_Map)(val.data)^)
 
 	case Type_Info_String:
-		if a.is_cstring {
-			return len((^cstring)(val.data)^)
-		} else {
-			return (^runtime.Raw_String)(val.data).len
+		switch a.encoding {
+		case .UTF_8:
+			if a.is_cstring {
+				return len((^cstring)(val.data)^)
+			} else {
+				return (^runtime.Raw_String)(val.data).len
+			}
+		case .UTF_16:
+			if a.is_cstring {
+				return len((^cstring16)(val.data)^)
+			} else {
+				return (^runtime.Raw_String16)(val.data).len
+			}
 		}
 
 	case Type_Info_Simd_Vector:
@@ -268,6 +331,12 @@ length :: proc(val: any) -> int {
 	return 0
 }
 
+// Returns the capacity of the type that represents the `any` value, or returns 0 if not possible
+//     cap(^T)        -> cap(T)
+//     cap([N]T)      -> N
+//     cap(#simd[N]T) -> N
+//     cap([dynamic]T)
+//     cap(map[K]V)
 @(require_results)
 capacity :: proc(val: any) -> int {
 	if val == nil { return 0 }
@@ -299,6 +368,7 @@ capacity :: proc(val: any) -> int {
 }
 
 
+// Dynamically indexes `any` as an indexable-type if possible. Returns `nil` if not possible
 @(require_results)
 index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	if val == nil { return nil }
@@ -350,15 +420,25 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	case Type_Info_String:
 		if a.is_cstring { return nil }
 
-		raw := (^runtime.Raw_String)(val.data)
-		runtime.bounds_check_error_loc(loc, i, raw.len)
-		offset := uintptr(size_of(u8) * i)
-		data := rawptr(uintptr(raw.data) + offset)
-		return any{data, typeid_of(u8)}
+		switch a.encoding {
+		case .UTF_8:
+			raw := (^runtime.Raw_String)(val.data)
+			runtime.bounds_check_error_loc(loc, i, raw.len)
+			offset := uintptr(size_of(u8) * i)
+			data := rawptr(uintptr(raw.data) + offset)
+			return any{data, typeid_of(u8)}
+		case .UTF_16:
+			raw := (^runtime.Raw_String16)(val.data)
+			runtime.bounds_check_error_loc(loc, i, raw.len)
+			offset := uintptr(size_of(u16) * i)
+			data := rawptr(uintptr(raw.data) + offset)
+			return any{data, typeid_of(u16)}
+		}
 	}
 	return nil
 }
 
+// Dereferences `any` if it represents a pointer-based value (`^T -> T`)
 @(require_results)
 deref :: proc(val: any) -> any {
 	if val != nil {
@@ -375,20 +455,22 @@ deref :: proc(val: any) -> any {
 
 
 
-// Struct_Tag represents the type of the string of a struct field
+// `Struct_Tag` represents the type of the `string` of a struct field
 //
-// Through convention, tags are the concatenation of optionally space separationed key:"value" pairs.
+// Through convention, tags are the concatenation of optionally space-separated key:"value" pairs.
 // Each key is a non-empty string which contains no control characters other than space, quotes, and colon.
 Struct_Tag :: distinct string
 
+// `Struct_Field` represents a information of a field of a struct
 Struct_Field :: struct {
 	name:     string,
 	type:     ^Type_Info,
 	tag:      Struct_Tag,
-	offset:   uintptr,
+	offset:   uintptr, // in bytes
 	is_using: bool,
 }
 
+// Returns a `Struct_Field` containing the information for a struct field of a typeid `T` at index `i`
 @(require_results)
 struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -404,6 +486,7 @@ struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 	return
 }
 
+// Returns a `Struct_Field` containing the information for a struct field by `name` of a typeid `T`
 @(require_results)
 struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -422,6 +505,10 @@ struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 	return
 }
 
+// Returns an `any` of a struct field specified by name
+// Example:
+// 	v := struct_field_value_by_name(the_struct, "field_name")
+// 	nested_value_through_using := struct_field_value_by_name(the_struct, "field_name", allow_using=true)
 @(require_results)
 struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) -> any {
 	if a == nil { return nil }
@@ -452,6 +539,10 @@ struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) 
 	return nil
 }
 
+// Returns an `any` of a struct field specified by a `Struct_Field`
+// Example:
+// 	field := struct_field_value_by_name(the_struct, "field_name")
+// 	value_by_field := struct_field_value(the_struct, field)
 @(require_results)
 struct_field_value :: proc(a: any, field: Struct_Field) -> any {
 	if a == nil { return nil }
@@ -461,6 +552,7 @@ struct_field_value :: proc(a: any, field: Struct_Field) -> any {
 	}
 }
 
+// Returns a `[]string` of the names of the struct fields of type `T`
 @(require_results)
 struct_field_names :: proc(T: typeid) -> []string {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -470,6 +562,7 @@ struct_field_names :: proc(T: typeid) -> []string {
 	return nil
 }
 
+// Returns a `[]^Type_Info` of the types of the struct fields of type `T`
 @(require_results)
 struct_field_types :: proc(T: typeid) -> []^Type_Info {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -480,6 +573,7 @@ struct_field_types :: proc(T: typeid) -> []^Type_Info {
 }
 
 
+// Returns a `[]Struct_Tag` of the tags of the struct fields of type `T`
 @(require_results)
 struct_field_tags :: proc(T: typeid) -> []Struct_Tag {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -489,6 +583,7 @@ struct_field_tags :: proc(T: typeid) -> []Struct_Tag {
 	return nil
 }
 
+// Returns a `[]uintptr` of the offsets in bytes of the struct fields of type `T`
 @(require_results)
 struct_field_offsets :: proc(T: typeid) -> []uintptr {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -498,6 +593,7 @@ struct_field_offsets :: proc(T: typeid) -> []uintptr {
 	return nil
 }
 
+// Struct_Field_Count_Method is the count method used by `struct_field_count` in order to find the number of fields
 Struct_Field_Count_Method :: enum {
 	Top_Level,
 	Using,
@@ -556,6 +652,10 @@ struct_field_count :: proc(T: typeid, method := Struct_Field_Count_Method.Top_Le
 	return
 }
 
+// Returns the fields of a struct type `T` as an `#soa` slice.
+// This is useful to iterate over.
+// Example:
+// 	for field, i in reflect.struct_fields_zipped(Foo) { ... }
 @(require_results)
 struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -572,13 +672,26 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 }
 
 
-
+// struct_tag_get returns the value associated with a key in the tag string.
+// If the key is present in the tag, the value (which might be empty) is returned. Otherwise an empty string is returned.
+// This is just a wrapper around `struct_tag_lookup` with the `ok` value being ignored.
+//
+// The convention for struct tags is usually of the form:
+//
+// 	`key:"value" another:"set" and:"whatever"`
 @(require_results)
 struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: string) {
 	v, _ := struct_tag_lookup(tag, key)
-	return string(v)
+	return v
 }
 
+// struct_tag_lookup returns the value associated with a key in the tag string.
+// If the key is present in the tag, the value (which might be empty) is return. Otherwise an empty string is returned.
+// The `ok` value returns whether the value was explicit set in the tag string.
+//
+// The convention for struct tags is usually of the form:
+//
+// 	`key:"value" another:"set" and:"whatever"`
 @(require_results)
 struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: bool) {
 	for t := tag; t != ""; /**/ {
@@ -638,6 +751,7 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: b
 }
 
 
+// Returns the string representation of an enum value. It will panic if the value passed is not an enum.
 @(require_results)
 enum_string :: proc(a: any) -> string {
 	if a == nil { return "" }
@@ -656,7 +770,7 @@ enum_string :: proc(a: any) -> string {
 	return ""
 }
 
-// Given a enum type and a value name, get the enum value.
+// Given an enum type and a value name, get the enum value.
 @(require_results)
 enum_from_name :: proc($Enum_Type: typeid, name: string) -> (value: Enum_Type, ok: bool) {
 	ti := type_info_base(type_info_of(Enum_Type))
@@ -674,6 +788,7 @@ enum_from_name :: proc($Enum_Type: typeid, name: string) -> (value: Enum_Type, o
 	return
 }
 
+// enum_from_name_any returns the value of an enum field's name if found, returns `0, false` otherwise.
 @(require_results)
 enum_from_name_any :: proc(Enum_Type: typeid, name: string) -> (value: Type_Info_Enum_Value, ok: bool) {
 	ti := runtime.type_info_base(type_info_of(Enum_Type))
@@ -690,6 +805,7 @@ enum_from_name_any :: proc(Enum_Type: typeid, name: string) -> (value: Type_Info
 	return
 }
 
+// enum_name_from_value returns the name of enum field if a valid name using parametric polymorphism, otherwise returns `"", false`
 @(require_results)
 enum_name_from_value :: proc(value: $Enum_Type) -> (name: string, ok: bool) where intrinsics.type_is_enum(Enum_Type) {
 	ti := type_info_base(type_info_of(Enum_Type))
@@ -706,6 +822,7 @@ enum_name_from_value :: proc(value: $Enum_Type) -> (name: string, ok: bool) wher
 	return
 }
 
+// enum_name_from_value_any returns the name of enum field if a valid name using reflection, otherwise returns `"", false`
 @(require_results)
 enum_name_from_value_any :: proc(value: any) -> (name: string, ok: bool) {
 	if value.id == nil {
@@ -725,9 +842,7 @@ enum_name_from_value_any :: proc(value: any) -> (name: string, ok: bool) {
 	return
 }
 
-/*
-Returns whether the value given has a defined name in the enum type.
-*/
+// Returns whether the value given has a defined name in the enum type.
 @(require_results)
 enum_value_has_name :: proc(value: $T) -> bool where intrinsics.type_is_enum(T) {
 	when len(T) == cap(T) {
@@ -749,6 +864,7 @@ enum_value_has_name :: proc(value: $T) -> bool where intrinsics.type_is_enum(T) 
 
 
 
+// enum_field_names returns `[]string` of the names of the fields of type `Enum_Type`
 @(require_results)
 enum_field_names :: proc(Enum_Type: typeid) -> []string {
 	ti := runtime.type_info_base(type_info_of(Enum_Type))
@@ -757,6 +873,7 @@ enum_field_names :: proc(Enum_Type: typeid) -> []string {
 	}
 	return nil
 }
+// enum_field_values returns `[]Type_Info_Enum_Value` of the values of the fields of type `Enum_Type`
 @(require_results)
 enum_field_values :: proc(Enum_Type: typeid) -> []Type_Info_Enum_Value {
 	ti := runtime.type_info_base(type_info_of(Enum_Type))
@@ -766,11 +883,16 @@ enum_field_values :: proc(Enum_Type: typeid) -> []Type_Info_Enum_Value {
 	return nil
 }
 
+// Represents an `Enum_Field` storing the `name` and `value`
 Enum_Field :: struct {
 	name:  string,
 	value: Type_Info_Enum_Value,
 }
 
+// Returns a #soa slice of the enum field information of type `Enum_Type`
+// This is useful to iterate over.
+// Example:
+// 	for field, i in reflect.enum_fields_zipped(Foo) { ... }
 @(require_results)
 enum_fields_zipped :: proc(Enum_Type: typeid) -> (fields: #soa[]Enum_Field) {
 	ti := runtime.type_info_base(type_info_of(Enum_Type))
@@ -782,17 +904,20 @@ enum_fields_zipped :: proc(Enum_Type: typeid) -> (fields: #soa[]Enum_Field) {
 
 
 
+// Returns `^Type_Info` of a any-encoded union type. Panics if a union was not passed.
 @(require_results)
 union_variant_type_info :: proc(a: any) -> ^Type_Info {
 	id := union_variant_typeid(a)
 	return type_info_of(id)
 }
 
+// Returns whether the `Type_Info_Union` store no tag (called a "pure maybe").
 @(require_results)
 type_info_union_is_pure_maybe :: proc(info: runtime.Type_Info_Union) -> bool {
 	return len(info.variants) == 1 && is_pointer_internally(info.variants[0])
 }
 
+// UNSAFE: Returns `typeid` of a any-encoded union type. Panics if a union was not passed.
 @(require_results)
 union_variant_typeid :: proc(a: any) -> typeid {
 	if a == nil { return nil }
@@ -833,6 +958,7 @@ union_variant_typeid :: proc(a: any) -> typeid {
 	panic("expected a union to reflect.union_variant_typeid")
 }
 
+// UNSAFE: Returns the underlying tag value of a union. Panics if a union was not passed.
 @(require_results)
 get_union_variant_raw_tag :: proc(a: any) -> i64 {
 	if a == nil { return -1 }
@@ -864,6 +990,7 @@ get_union_variant_raw_tag :: proc(a: any) -> i64 {
 	panic("expected a union to reflect.get_union_variant_raw_tag")
 }
 
+// Returns the underlying variant value of a union. Panics if a union was not passed.
 @(require_results)
 get_union_variant :: proc(a: any) -> any {
 	if a == nil {
@@ -876,6 +1003,14 @@ get_union_variant :: proc(a: any) -> any {
 	return any{a.data, id}
 }
 
+// Converts a pointer to a union, to a union containing the pointers to the variant types, and stores a pointer of the variant value in the new union
+//
+// Example:
+// 	val: union{i32, f32, string}
+//	val = "123"
+// 	ptr: union{^i32, ^f32, ^string} = get_union_as_ptr_variants(&val)
+// 	sp := ptr.(^string)
+// 	assert(sp^ == "123")
 @(require_results)
 get_union_as_ptr_variants :: proc(val: ^$T) -> (res: intrinsics.type_convert_variants_to_pointers(T)) where intrinsics.type_is_union(T) {
 	ptr := rawptr(val)
@@ -886,7 +1021,7 @@ get_union_as_ptr_variants :: proc(val: ^$T) -> (res: intrinsics.type_convert_var
 }
 
 
-
+// UNSAFE: Manually set the tag value of a union using an integer. Panics if a union was not passed.
 set_union_variant_raw_tag :: proc(a: any, tag: i64) {
 	if a == nil { return }
 
@@ -917,6 +1052,7 @@ set_union_variant_raw_tag :: proc(a: any, tag: i64) {
 	panic("expected a union to reflect.set_union_variant_raw_tag")
 }
 
+// UNSAFE: Manually set the tag value of a union using a `typeid`. Panics if a union was not passed.
 set_union_variant_typeid :: proc(a: any, id: typeid) {
 	if a == nil { return }
 
@@ -947,6 +1083,7 @@ set_union_variant_typeid :: proc(a: any, id: typeid) {
 	panic("expected a union to reflect.set_union_variant_typeid")
 }
 
+// UNSAFE: Manually set the tag value of a union using a `^Type_Info`. Panics if a union was not passed.
 set_union_variant_type_info :: proc(a: any, tag_ti: ^Type_Info) {
 	if a == nil { return }
 
@@ -977,6 +1114,7 @@ set_union_variant_type_info :: proc(a: any, tag_ti: ^Type_Info) {
 	panic("expected a union to reflect.set_union_variant_type_info")
 }
 
+// UNSAFE: Manually set the variant value of a union using an `any`. Panics if a union was not passed.
 set_union_value :: proc(dst: any, value: any) -> bool {
 	if dst == nil { return false }
 
@@ -1015,6 +1153,7 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 	panic("expected a union to reflect.set_union_variant_typeid")
 }
 
+// UNSAFE: Checks to see if the data stored is a `bit_set` and is big endian. Panics if a `bit_set` was not passed.
 @(require_results)
 bit_set_is_big_endian :: proc(value: any, loc := #caller_location) -> bool {
 	if value == nil { return ODIN_ENDIAN == .Big }
@@ -1046,6 +1185,10 @@ Bit_Field :: struct {
 	tag:    Struct_Tag,
 }
 
+// Returns the fields of a `bit_field` type `T` as an `#soa` slice.
+// This is useful to iterate over.
+// Example:
+// 	for field, i in reflect.bit_fields_zipped(Foo_Bit_Field) { ... }
 @(require_results)
 bit_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Bit_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -1061,6 +1204,7 @@ bit_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Bit_Field) {
 	return nil
 }
 
+// bit_field_names returns a `[]string` of the field names of a `bit_field` type `T`
 @(require_results)
 bit_field_names :: proc(T: typeid) -> []string {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -1070,6 +1214,7 @@ bit_field_names :: proc(T: typeid) -> []string {
 	return nil
 }
 
+// bit_field_types returns a `[]^Type_Info` of the field representation types of a `bit_field` type `T`, not the backing integer-bit-width types
 @(require_results)
 bit_field_types :: proc(T: typeid) -> []^Type_Info {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -1079,6 +1224,7 @@ bit_field_types :: proc(T: typeid) -> []^Type_Info {
 	return nil
 }
 
+// bit_field_types returns a `[]uintptr` of the field bit-width-sizes of a `bit_field` type `T`
 @(require_results)
 bit_field_sizes :: proc(T: typeid) -> []uintptr {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -1088,6 +1234,7 @@ bit_field_sizes :: proc(T: typeid) -> []uintptr {
 	return nil
 }
 
+// bit_field_types returns a `[]uintptr` of the field offsets in bits of a `bit_field` type `T`
 @(require_results)
 bit_field_offsets :: proc(T: typeid) -> []uintptr {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -1097,6 +1244,7 @@ bit_field_offsets :: proc(T: typeid) -> []uintptr {
 	return nil
 }
 
+// bit_field_types returns a `[]Struct_Tag` of the field tags of a `bit_field` type `T`
 @(require_results)
 bit_field_tags :: proc(T: typeid) -> []Struct_Tag {
 	ti := runtime.type_info_base(type_info_of(T))
@@ -1106,6 +1254,7 @@ bit_field_tags :: proc(T: typeid) -> []Struct_Tag {
 	return nil
 }
 
+// as_bool attempts to convert an `any` to a `bool`.
 @(require_results)
 as_bool :: proc(a: any) -> (value: bool, valid: bool) {
 	if a == nil { return }
@@ -1129,6 +1278,7 @@ as_bool :: proc(a: any) -> (value: bool, valid: bool) {
 	return
 }
 
+// as_int attempts to convert an `any` to a `int`.
 @(require_results)
 as_int :: proc(a: any) -> (value: int, valid: bool) {
 	v: i64
@@ -1137,6 +1287,7 @@ as_int :: proc(a: any) -> (value: int, valid: bool) {
 	return
 }
 
+// as_uint attempts to convert an `any` to a `uint`.
 @(require_results)
 as_uint :: proc(a: any) -> (value: uint, valid: bool) {
 	v: u64
@@ -1145,6 +1296,7 @@ as_uint :: proc(a: any) -> (value: uint, valid: bool) {
 	return
 }
 
+// as_i64 attempts to convert an `any` to a `i64`.
 @(require_results)
 as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 	if a == nil { return }
@@ -1253,6 +1405,7 @@ as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 	return
 }
 
+// as_u64 attempts to convert an `any` to a `u64`.
 @(require_results)
 as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 	if a == nil { return }
@@ -1363,6 +1516,7 @@ as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 }
 
 
+// as_f64 attempts to convert an `any` to a `f64`.
 @(require_results)
 as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 	if a == nil { return }
@@ -1480,6 +1634,7 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 }
 
 
+// as_string attempts to convert an `any` to a `string`.
 @(require_results)
 as_string :: proc(a: any) -> (value: string, valid: bool) {
 	if a == nil { return }
@@ -1493,6 +1648,27 @@ as_string :: proc(a: any) -> (value: string, valid: bool) {
 		switch v in a {
 		case string:  value = v
 		case cstring: value = string(v)
+		case: valid = false
+		}
+	}
+
+	return
+}
+
+// as_string16 attempts to convert an `any` to a `string16`.
+@(require_results)
+as_string16 :: proc(a: any) -> (value: string16, valid: bool) {
+	if a == nil { return }
+	a := a
+	ti := runtime.type_info_core(type_info_of(a.id))
+	a.id = ti.id
+
+	#partial switch info in ti.variant {
+	case Type_Info_String:
+		valid = true
+		switch v in a {
+		case string16:  value = v
+		case cstring16: value = string16(v)
 		case: valid = false
 		}
 	}
@@ -1543,6 +1719,8 @@ relative_pointer_to_absolute_raw :: proc(data: rawptr, base_integer_id: typeid) 
 
 
 
+// as_pointer attempts to convert an `any` to a `rawptr`.
+// This only works for `^T`, `[^]T`, `cstring`, `cstring16` based types
 @(require_results)
 as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
 	if a == nil { return }
@@ -1551,14 +1729,15 @@ as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
 	a.id = ti.id
 
 	#partial switch info in ti.variant {
-	case Type_Info_Pointer:
+	case Type_Info_Pointer, Type_Info_Multi_Pointer:
 		valid = true
 		value = (^rawptr)(a.data)^
 
 	case Type_Info_String:
 		valid = true
 		switch v in a {
-		case cstring: value = rawptr(v)
+		case cstring:   value = rawptr(v)
+		case cstring16: value = rawptr(v)
 		case: valid = false
 		}
 	}
@@ -1567,6 +1746,7 @@ as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
 }
 
 
+// Returns the equivalent of doing `raw_data(v)` where `v` is a non-any value
 @(require_results)
 as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
 	if a == nil { return }
@@ -1578,8 +1758,10 @@ as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
 	case Type_Info_String:
 		valid = true
 		switch v in a {
-		case string:  value = raw_data(v)
-		case cstring: value = rawptr(v) // just in case
+		case string:    value = raw_data(v)
+		case cstring:   value = rawptr(v) // just in case
+		case string16:  value = raw_data(v)
+		case cstring16: value = rawptr(v) // just in case
 		case: valid = false
 		}
 
@@ -1604,10 +1786,13 @@ ne :: not_equal
 
 DEFAULT_EQUAL_MAX_RECURSION_LEVEL :: 32
 
+// Checks to see if two `any` values are not semantically equivalent
 @(require_results)
 not_equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_level := 0) -> bool {
 	return !equal(a, b, including_indirect_array_recursion, recursion_level)
 }
+
+// Checks to see if two `any` values are semantically equivalent
 @(require_results)
 equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_level := 0) -> bool {
 	if a == nil && b == nil {
@@ -1702,14 +1887,27 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return runtime.memory_compare(a.data, b.data, t.size) == 0
 		
 	case Type_Info_String:
-		if v.is_cstring {
-			x := string((^cstring)(a.data)^)
-			y := string((^cstring)(b.data)^)
-			return x == y
-		} else {
-			x := (^string)(a.data)^
-			y := (^string)(b.data)^
-			return x == y
+		switch v.encoding {
+		case .UTF_8:
+			if v.is_cstring {
+				x := string((^cstring)(a.data)^)
+				y := string((^cstring)(b.data)^)
+				return x == y
+			} else {
+				x := (^string)(a.data)^
+				y := (^string)(b.data)^
+				return x == y
+			}
+		case .UTF_16:
+			if v.is_cstring {
+				x := string16((^cstring16)(a.data)^)
+				y := string16((^cstring16)(b.data)^)
+				return x == y
+			} else {
+				x := (^string16)(a.data)^
+				y := (^string16)(b.data)^
+				return x == y
+			}
 		}
 		return true
 	case Type_Info_Array:

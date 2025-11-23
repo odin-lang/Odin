@@ -224,6 +224,27 @@ test_big_math_vectors :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+bug_5931 :: proc(t: ^testing.T) {
+	numerator, divisor, quotient, remainder: big.Int
+	defer big.destroy(&numerator, &divisor, &quotient, &remainder)
+
+	big.string_to_int(&numerator, "3351951982485649274893506249551461531869841455148098344430890360930192345844485855956241793418914802713278852793799976230545127411560969441984014513833901")
+	big.string_to_int(&divisor,   "115792089237316195423570985008687907853269984665640564039457584007908834671663")
+
+	big.int_divmod(&quotient, &remainder, &numerator, &divisor)
+	quo_str, _ := big.int_itoa_string(&quotient)
+	defer delete(quo_str)
+	assert(quo_str == "28948022309329048855892746252171976963317496166410141009864396001977208667923")
+
+	rem_str, _ := big.int_itoa_string(&remainder)
+	defer delete(rem_str)
+	assert(rem_str == "28948022309329048855892746252171976963317496166410141009864396001977208667952")
+}
+
+
+// Test helpers
+
 expect_a :: proc(t: ^testing.T, format: string, a, expected, res: ^big.Int, err: big.Error, loc := #caller_location) {
 	if err != .Okay { return }
 

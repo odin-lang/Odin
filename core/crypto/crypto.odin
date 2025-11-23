@@ -1,7 +1,4 @@
-/*
-package crypto implements a selection of cryptography algorithms and useful
-helper routines.
-*/
+// A selection of cryptography algorithms and useful helper routines.
 package crypto
 
 import "base:runtime"

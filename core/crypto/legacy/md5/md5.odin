@@ -1,5 +1,5 @@
 /*
-package md5 implements the MD5 hash algorithm.
+`MD5` hash algorithm.
 
 WARNING: The MD5 algorithm is known to be insecure and should only be
 used for interoperating with legacy applications.
@@ -12,7 +12,7 @@ package md5
 
 /*
     Copyright 2021 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.

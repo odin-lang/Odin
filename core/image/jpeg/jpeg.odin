@@ -1,3 +1,4 @@
+// Reader for baseline `JPEG` images.
 package jpeg
 
 import "core:bytes"

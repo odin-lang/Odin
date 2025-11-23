@@ -68,6 +68,11 @@ main :: proc() {
 	fmt.println("iovec", size_of(posix.iovec), align_of(posix.iovec))
 
 	fmt.println("semid_ds", size_of(posix.semid_ds), align_of(posix.semid_ds))
+	fmt.println("semid_ds.sem_perm", offset_of(posix.semid_ds, sem_perm))
+	fmt.println("semid_ds.sem_otime", offset_of(posix.semid_ds, sem_otime))
+	fmt.println("semid_ds.sem_ctime", offset_of(posix.semid_ds, sem_ctime))
+	fmt.println("semid_ds.sem_nsems", offset_of(posix.semid_ds, sem_nsems))
+
 	fmt.println("sembuf", size_of(posix.sembuf), align_of(posix.sembuf))
 
 	fmt.println("itimerval", size_of(posix.itimerval), align_of(posix.itimerval))

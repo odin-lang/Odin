@@ -1,3 +1,4 @@
+// Bindings for [[ Jimmy Lefevre's Text Shape ; https://github.com/JimmyLefevre/kb ]] Unicode text segmentation and OpenType shaping.
 package vendor_kb_text_shape
 
 when ODIN_OS == .Windows {

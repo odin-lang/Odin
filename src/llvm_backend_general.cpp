@@ -186,9 +186,32 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 				lb_init_module(pm, do_threading);
 			}
 
-			if (pkg->kind == Package_Runtime) {
-				// allow this to be per file
-			} else if (!module_per_file) {
+			bool allow_for_per_file = pkg->kind == Package_Runtime || module_per_file;
+
+			#if 0
+			if (!allow_for_per_file) {
+				if (pkg->files.count >= 20) {
+					isize proc_count = 0;
+					for (Entity *e : gen->info->entities) {
+						if (e->kind != Entity_Procedure) {
+							continue;
+						}
+						if (e->Procedure.is_foreign) {
+							continue;
+						}
+						if (e->pkg == pkg) {
+							proc_count += 1;
+						}
+					}
+
+					if (proc_count >= 300) {
+						allow_for_per_file = true;
+					}
+				}
+			}
+			#endif
+
+			if (!allow_for_per_file) {
 				continue;
 			}
 			// NOTE(bill): Probably per file is not a good idea, so leave this for later
@@ -1493,8 +1516,11 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
 	GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
+	LLVMValueRef ptr = u.value;
+	ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(uvt, 0), "");
+
 	lbValue tag_ptr = {};
-	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, u.value, 1, "");
+	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
 	return tag_ptr;
 }
@@ -1719,8 +1745,92 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 	map_set(&m->func_raw_types, type, new_abi_fn_type);
 
 	return new_abi_fn_type;
-
 }
+
+
+gb_internal LLVMTypeRef lb_type_internal_union_block_type(lbModule *m, Type *type) {
+	GB_ASSERT(type->kind == Type_Union);
+
+	if (type->Union.variants.count <= 0) {
+		return nullptr;
+	}
+	if (type->Union.variants.count == 1) {
+		return lb_type(m, type->Union.variants[0]);
+	}
+
+	i64 align = type_align_of(type);
+
+	unsigned block_size = cast(unsigned)type->Union.variant_block_size;
+	if (block_size == 0) {
+		return lb_type_padding_filler(m, block_size, align);
+	}
+
+	bool all_pointers = align == build_context.ptr_size;
+	for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {
+		Type *t = type->Union.variants[i];
+		if (!is_type_internally_pointer_like(t)) {
+			all_pointers = false;
+		}
+	}
+	if (all_pointers) {
+		return lb_type(m, t_rawptr);
+	}
+
+	{
+		Type *pt = type->Union.variants[0];
+		for (isize i = 1; i < type->Union.variants.count; i++) {
+			Type *t = type->Union.variants[i];
+			if (!are_types_identical(pt, t)) {
+				goto end_check_for_all_the_same;
+			}
+		}
+		return lb_type(m, pt);
+	} end_check_for_all_the_same:;
+
+	{
+		Type *first_different = nullptr;
+		for (isize i = 0; i < type->Union.variants.count; i++) {
+			Type *t = type->Union.variants[i];
+			if (type_size_of(t) == 0) {
+				continue;
+			}
+			if (first_different == nullptr) {
+				first_different = t;
+			} else if (!are_types_identical(first_different, t)) {
+				goto end_rest_zero_except_one;
+			}
+		}
+		if (first_different != nullptr) {
+			return lb_type(m, first_different);
+		}
+	} end_rest_zero_except_one:;
+
+	// {
+	// 	LLVMTypeRef first_different = nullptr;
+	// 	for (isize i = 0; i < type->Union.variants.count; i++) {
+	// 		Type *t = type->Union.variants[i];
+	// 		if (type_size_of(t) == 0) {
+	// 			continue;
+	// 		}
+	// 		if (first_different == nullptr) {
+	// 			first_different = lb_type(m, base_type(t));
+	// 		} else {
+	// 			LLVMTypeRef llvm_t = lb_type(m, base_type(t));
+	// 			if (llvm_t != first_different) {
+	// 				goto end_rest_zero_except_one_llvm_like;
+	// 			}
+	// 		}
+	// 	}
+	// 	if (first_different != nullptr) {
+	// 		return first_different;
+	// 	}
+	// } end_rest_zero_except_one_llvm_like:;
+
+
+	return lb_type_padding_filler(m, block_size, align);
+}
+
+
 gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	LLVMContextRef ctx = m->ctx;
 	i64 size = type_size_of(type); // Check size
@@ -2233,8 +2343,6 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 			}
 
-			unsigned block_size = cast(unsigned)type->Union.variant_block_size;
-
 			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 3);
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
@@ -2252,20 +2360,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					array_add(&fields, padding_type);
 				}
 			} else {
-				LLVMTypeRef block_type = nullptr;
-
-				bool all_pointers = align == build_context.ptr_size;
-				for (isize i = 0; all_pointers && i < type->Union.variants.count; i++) {
-					Type *t = type->Union.variants[i];
-					if (!is_type_internally_pointer_like(t)) {
-						all_pointers = false;
-					}
-				}
-				if (all_pointers) {
-					block_type = lb_type(m, t_rawptr);
-				} else {
-					block_type = lb_type_padding_filler(m, block_size, align);
-				}
+				LLVMTypeRef block_type = lb_type_internal_union_block_type(m, type);
 
 				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
@@ -2452,29 +2547,9 @@ gb_internal LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef c
 	unsigned kind = 0;
 	String s = make_string_c(name);
 
-	#if ODIN_LLVM_MINIMUM_VERSION_12
-		kind = LLVMGetEnumAttributeKindForName(name, s.len);
-		GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
-		return LLVMCreateTypeAttribute(ctx, kind, type);
-	#else
-		// NOTE(2021-02-25, bill); All this attributes require a type associated with them
-		// and the current LLVM C API does not expose this functionality yet.
-		// It is better to ignore the attributes for the time being
-		if (s == "byval") {
-			// return nullptr;
-		} else if (s == "byref") {
-			return nullptr;
-		} else if (s == "preallocated") {
-			return nullptr;
-		} else if (s == "sret") {
-			// return nullptr;
-		}
-		
-
-		kind = LLVMGetEnumAttributeKindForName(name, s.len);
-		GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
-		return LLVMCreateEnumAttribute(ctx, kind, 0);
-	#endif	
+	kind = LLVMGetEnumAttributeKindForName(name, s.len);
+	GB_ASSERT_MSG(kind != 0, "unknown attribute: %s", name);
+	return LLVMCreateTypeAttribute(ctx, kind, type);
 }
 
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value) {
@@ -2515,6 +2590,20 @@ gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, cha
 
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name) {
 	lb_add_proc_attribute_at_index(p, index, name, 0);
+}
+
+gb_internal void lb_add_proc_attribute_at_index_with_string(lbProcedure *p, isize index, String const &name, String const &value) {
+	LLVMAttributeRef attr = lb_create_string_attribute(p->module->ctx, name, value);
+	GB_ASSERT(attr != nullptr);
+	LLVMAddAttributeAtIndex(p->value, cast(unsigned)index, attr);
+}
+
+gb_internal void lb_add_nocapture_proc_attribute_at_index(lbProcedure *p, isize index) {
+	#if LLVM_VERSION_MAJOR >= 21
+		lb_add_proc_attribute_at_index_with_string(p, index, make_string_c("captures"), make_string_c("none"));
+	#else
+		lb_add_proc_attribute_at_index(p, index, "nocapture");
+	#endif
 }
 
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
@@ -2906,11 +2995,16 @@ gb_internal lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *
 	} else {
 		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
 	}
+	i64 align = MINIMUM_SLICE_ALIGNMENT;
 	if (!is_type_u8_slice(slice_type)) {
 		Type *bt = base_type(slice_type);
 		Type *elem = bt->Slice.elem;
 		i64 sz = type_size_of(elem);
+		align = gb_max(type_align_of(elem), align);
 		GB_ASSERT(sz > 0);
+		GB_ASSERT(align > 0);
+
+		LLVMSetAlignment(global_data, (u32)align);
 		ptr = LLVMConstPointerCast(ptr, lb_type(m, alloc_type_pointer(elem)));
 		data_len /= sz;
 	}
@@ -2961,11 +3055,16 @@ gb_internal lbValue lb_find_or_add_entity_string16_slice_with_type(lbModule *m, 
 	} else {
 		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
 	}
+	i64 align = MINIMUM_SLICE_ALIGNMENT;
 	if (!is_type_u16_slice(slice_type)) {
 		Type *bt = base_type(slice_type);
 		Type *elem = bt->Slice.elem;
 		i64 sz = type_size_of(elem);
+		align = gb_max(type_align_of(elem), align);
 		GB_ASSERT(sz > 0);
+		GB_ASSERT(align > 0);
+
+		LLVMSetAlignment(global_data, (u32)align);
 		ptr = LLVMConstPointerCast(ptr, lb_type(m, alloc_type_pointer(elem)));
 		data_len /= sz;
 	}
@@ -3184,17 +3283,26 @@ gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lb
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
+	LLVMTypeRef actual_type = lb_type(m, type);
+	if (value.value != nullptr) {
+		LLVMTypeRef value_type = LLVMTypeOf(value.value);
+		GB_ASSERT_MSG(lb_sizeof(actual_type) == lb_sizeof(value_type), "%s vs %s", LLVMPrintTypeToString(actual_type), LLVMPrintTypeToString(value_type));
+		actual_type = value_type;
+	}
+
 	Scope *scope = nullptr;
 	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
 	lbValue g = {};
 	g.type = alloc_type_pointer(type);
-	g.value = LLVMAddGlobal(m->mod, lb_type(m, type), alloc_cstring(temporary_allocator(), name));
+	g.value = LLVMAddGlobal(m->mod, actual_type, alloc_cstring(temporary_allocator(), name));
 	if (value.value != nullptr) {
 		GB_ASSERT_MSG(LLVMIsConstant(value.value), LLVMPrintValueToString(value.value));
 		LLVMSetInitializer(g.value, value.value);
 	} else {
 		LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, type)));
 	}
+
+	g.value = LLVMConstPointerCast(g.value, lb_type(m, g.type));
 
 	lb_add_entity(m, e, g);
 	lb_add_member(m, name, g);

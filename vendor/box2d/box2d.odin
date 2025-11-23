@@ -1,3 +1,4 @@
+// Bindings for [[ Box2D ; https://box2d.org ]].
 package vendor_box2d
 
 import "base:intrinsics"
@@ -1560,6 +1561,12 @@ foreign lib {
 
 	// Get the revolute joint spring damping ratio, non-dimensional
 	RevoluteJoint_GetSpringDampingRatio :: proc(jointId: JointId) -> f32 ---
+
+	// Set the revolute joint spring target angle, radians
+	RevoluteJoint_SetTargetAngle        :: proc(jointId: JointId, angle: f32) ---
+
+	// Get the revolute joint spring target angle, radians
+	RevoluteJoint_GetTargetAngle        :: proc(jointId: JointId) -> f32 ---
 
 	// Get the revolute joint current angle in radians relative to the reference angle
 	//	@see b2RevoluteJointDef::referenceAngle

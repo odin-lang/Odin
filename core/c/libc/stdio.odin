@@ -275,7 +275,7 @@ foreign libc {
 	// 7.21.7 Character input/output functions
 	fgetc     :: proc(stream: ^FILE) -> int ---
 	fgets     :: proc(s: [^]char, n: int, stream: ^FILE) -> [^]char ---
-	fputc     :: proc(s: cstring, stream: ^FILE) -> int ---
+	fputc     :: proc(s: c.int, stream: ^FILE) -> int ---
 	getc      :: proc(stream: ^FILE) -> int ---
 	getchar   :: proc() -> int ---
 	putc      :: proc(c: int, stream: ^FILE) -> int ---
@@ -390,7 +390,7 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 			}
 
 		case .Destroy:
-			return 0, .Empty
+			return 0, .Unsupported
 		
 		case .Query:
 			return io.query_utility({ .Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query })

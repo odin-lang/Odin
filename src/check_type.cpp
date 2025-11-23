@@ -312,6 +312,7 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		e->state = EntityState_Resolved;
 		e->file = ctx->file;
 		e->pkg = pkg;
+		e->TypeName.original_type_for_parapoly = original_type;
 		add_entity_use(ctx, node, e);
 	}
 
@@ -321,8 +322,8 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 	e->TypeName.objc_metadata = original_type->Named.type_name->TypeName.objc_metadata;
 
 	auto *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(ctx, original_type);
-	rw_mutex_lock(&found_gen_types->mutex);
-	defer (rw_mutex_unlock(&found_gen_types->mutex));
+	mutex_lock(&found_gen_types->mutex);
+	defer (mutex_unlock(&found_gen_types->mutex));
 
 	for (Entity *prev : found_gen_types->types) {
 		if (prev == e) {
@@ -653,9 +654,10 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		context = str_lit("struct #raw_union");
 	}
 
-	struct_type->Struct.node       = node;
-	struct_type->Struct.scope      = ctx->scope;
-	struct_type->Struct.is_packed  = st->is_packed;
+	struct_type->Struct.node           = node;
+	struct_type->Struct.scope          = ctx->scope;
+	struct_type->Struct.is_packed      = st->is_packed;
+	struct_type->Struct.is_all_or_none = st->is_all_or_none;
 	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
 		&struct_type->Struct.is_polymorphic,
@@ -1610,6 +1612,12 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 				error_line("\tSuggestion: Try slicing the value with '%s[:]'\n", os);
 				gb_string_free(os);
 			}
+		} else if (is_type_pointer(poly_type)) {
+			if (is_polymorphic_type_assignable(ctx, type_deref(poly_type), operand.type, /*compound*/false, /*modify_type*/false)) {
+				gbString os = expr_to_string(operand.expr);
+				error_line("\tSuggestion: Did you mean '&%s'?\n", os);
+				gb_string_free(os);
+			}
 		}
 	}
 	return t_invalid;
@@ -1626,6 +1634,8 @@ gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 	} else if (expr->kind == Ast_Ident) {
 		Operand x= {};
 		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, true);
+		GB_ASSERT(e != nullptr);
+
 		if (e->flags & EntityFlag_Param) {
 			return true;
 		}

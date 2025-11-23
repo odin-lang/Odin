@@ -14,6 +14,8 @@ foreign kernel32 {
 	SetHandleInformation :: proc(hObject: rawptr, dwMask: u32, dwFlags: u32) -> b32 ---
 	WriteFile            :: proc(hFile: rawptr, lpBuffer: rawptr, nNumberOfBytesToWrite: u32, lpNumberOfBytesWritten: ^u32, lpOverlapped: rawptr) -> b32 ---
 	GetLastError         :: proc() -> u32 ---
+
+	ExitProcess          :: proc(code: u32) -> ! ---
 }
 
 _stderr_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #no_bounds_check {
@@ -48,4 +50,8 @@ _stderr_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #
 	}
 	n = int(total_write)
 	return
+}
+
+_exit :: proc "contextless" (code: int) -> ! {
+	ExitProcess(u32(code))
 }

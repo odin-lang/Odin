@@ -1,6 +1,6 @@
 
 /*
-The `i18n` package is a flexible and easy to use way to localise applications.
+A flexible and easy way to add translations/internationalization (`i18n`) to applications.
 
 It has two calls to get a translation: `get()` and `get_n()`, which the user can alias into something like `T` and `Tn`
 with statements like:

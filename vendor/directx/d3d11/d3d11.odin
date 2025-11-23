@@ -1,3 +1,4 @@
+// Bindings for [[ Direct3D 11 ; https://learn.microsoft.com/en-us/windows/win32/direct3d11/atoc-dx-graphics-direct3d-11 ]].
 package directx_d3d11
 
 foreign import "system:d3d11.lib"

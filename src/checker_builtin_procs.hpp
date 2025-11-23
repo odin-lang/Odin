@@ -49,12 +49,19 @@ enum BuiltinProcId {
 
 	BuiltinProc_constant_log2,
 
+	BuiltinProc_constant_floor,
+	BuiltinProc_constant_trunc,
+	BuiltinProc_constant_ceil,
+	BuiltinProc_constant_round,
+
 	BuiltinProc_transpose,
 	BuiltinProc_outer_product,
 	BuiltinProc_hadamard_product,
 	BuiltinProc_matrix_flatten,
 	
 	BuiltinProc_soa_struct,
+
+	BuiltinProc_concatenate,
 
 	BuiltinProc_alloca,
 	BuiltinProc_cpu_relax,
@@ -251,6 +258,8 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_quaternion,
 	BuiltinProc_type_is_string,
 	BuiltinProc_type_is_string16,
+	BuiltinProc_type_is_cstring,
+	BuiltinProc_type_is_cstring16,
 	BuiltinProc_type_is_typeid,
 	BuiltinProc_type_is_any,
 
@@ -285,6 +294,8 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_bit_set,
 	BuiltinProc_type_is_simd_vector,
 	BuiltinProc_type_is_matrix,
+	BuiltinProc_type_is_raw_union,
+
 
 	BuiltinProc_type_is_specialized_polymorphic_record,
 	BuiltinProc_type_is_unspecialized_polymorphic_record,
@@ -354,6 +365,7 @@ BuiltinProc__type_end,
 	BuiltinProc_objc_register_class,
 	BuiltinProc_objc_ivar_get,
 	BuiltinProc_objc_block,
+	BuiltinProc_objc_super,
 
 	BuiltinProc_constant_utf16_cstring,
 
@@ -413,7 +425,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("has_target_feature"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("constant_log2"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_log2"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_floor"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_trunc"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_ceil"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("constant_round"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("transpose"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -421,6 +437,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 		
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
+
+	{STR_LIT("concatenate"), 2, true, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("alloca"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("cpu_relax"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
@@ -606,6 +624,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_boolean"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_bit_field"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_integer"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_rune"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_float"),             1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -613,6 +632,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_quaternion"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_string"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_string16"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_cstring"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_cstring16"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_typeid"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_any"),               1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -645,9 +666,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_enum"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_proc"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_bit_set"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("type_is_bit_field"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_matrix"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_raw_union"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_specialized_polymorphic_record"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_unspecialized_polymorphic_record"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -715,7 +736,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_ivar_get"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
-	{STR_LIT("objc_block"),             1, true,  Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("objc_block"),             1, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("objc_super"),             1, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

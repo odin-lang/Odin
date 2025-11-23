@@ -1,15 +1,17 @@
+/*
+`Base64` encoding and decoding.
+
+A secondary param can be used to supply a custom alphabet to `encode` and a matching decoding table to `decode`.
+
+If none is supplied it just uses the standard Base64 alphabet.
+In case your specific version does not use padding, you may
+truncate it from the encoded output.
+*/
 package encoding_base64
 
 import "core:io"
 import "core:mem"
 import "core:strings"
-
-// @note(zh): Encoding utility for Base64
-// A secondary param can be used to supply a custom alphabet to
-// @link(encode) and a matching decoding table to @link(decode).
-// If none is supplied it just uses the standard Base64 alphabet.
-// Incase your specific version does not use padding, you may
-// truncate it from the encoded output.
 
 ENC_TABLE := [64]byte {
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
@@ -24,23 +26,39 @@ ENC_TABLE := [64]byte {
 
 PADDING :: '='
 
-DEC_TABLE := [128]int {
-    -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, 62, -1, -1, -1, 63,
+DEC_TABLE := [256]u8 {
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0, 62,  0,  0,  0, 63,
     52, 53, 54, 55, 56, 57, 58, 59,
-    60, 61, -1, -1, -1, -1, -1, -1,
-    -1,  0,  1,  2,  3,  4,  5,  6,
+    60, 61,  0,  0,  0,  0,  0,  0,
+     0,  0,  1,  2,  3,  4,  5,  6,
      7,  8,  9, 10, 11, 12, 13, 14,
     15, 16, 17, 18, 19, 20, 21, 22,
-    23, 24, 25, -1, -1, -1, -1, -1,
-    -1, 26, 27, 28, 29, 30, 31, 32,
+    23, 24, 25,  0,  0,  0,  0,  0,
+     0, 26, 27, 28, 29, 30, 31, 32,
     33, 34, 35, 36, 37, 38, 39, 40,
     41, 42, 43, 44, 45, 46, 47, 48,
-    49, 50, 51, -1, -1, -1, -1, -1,
+    49, 50, 51,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
 }
 
 encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> (encoded: string, err: mem.Allocator_Error) #optional_allocator_error {
@@ -118,10 +136,10 @@ decode_into :: proc(w: io.Writer, data: string, DEC_TBL := DEC_TABLE) -> io.Erro
 	i, j: int
 	for ; j + 3 <= length; i, j = i + 4, j + 3 {
 		#no_bounds_check {
-			c0 = DEC_TBL[data[i]]
-			c1 = DEC_TBL[data[i + 1]]
-			c2 = DEC_TBL[data[i + 2]]
-			c3 = DEC_TBL[data[i + 3]]
+			c0 = int(DEC_TBL[data[i]])
+			c1 = int(DEC_TBL[data[i + 1]])
+			c2 = int(DEC_TBL[data[i + 2]])
+			c3 = int(DEC_TBL[data[i + 3]])
 
 			b0 = (c0 << 2) | (c1 >> 4)
 			b1 = (c1 << 4) | (c2 >> 2)
@@ -138,9 +156,9 @@ decode_into :: proc(w: io.Writer, data: string, DEC_TBL := DEC_TABLE) -> io.Erro
 	rest := length - j
 	if rest > 0 {
 		#no_bounds_check {
-			c0 = DEC_TBL[data[i]]
-			c1 = DEC_TBL[data[i + 1]]
-			c2 = DEC_TBL[data[i + 2]]
+			c0 = int(DEC_TBL[data[i]])
+			c1 = int(DEC_TBL[data[i + 1]])
+			c2 = int(DEC_TBL[data[i + 2]])
 
 			b0 = (c0 << 2) | (c1 >> 4)
 			b1 = (c1 << 4) | (c2 >> 2)

@@ -160,6 +160,6 @@ _reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Seek, .Size, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
