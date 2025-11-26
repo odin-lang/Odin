@@ -2485,6 +2485,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_min:
 	case BuiltinProc_max:
 	case BuiltinProc_type_is_subtype_of:
+	case BuiltinProc_type_is_superset_of:
 	case BuiltinProc_objc_send:
 	case BuiltinProc_objc_find_selector: 
 	case BuiltinProc_objc_find_class: 
@@ -7396,6 +7397,129 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_bool;
 		} break;
+
+	case BuiltinProc_type_is_superset_of:
+		{
+			Operand op_super = {};
+			Operand op_sub   = {};
+
+			check_expr_or_type(c, &op_super, ce->args[0]);
+			if (op_super.mode != Addressing_Type) {
+				gbString e = expr_to_string(op_super.expr);
+				error(op_super.expr, "'%.*s' expects a type, got %s", LIT(builtin_name), e);
+				gb_string_free(e);
+				return false;
+			}
+			check_expr_or_type(c, &op_sub, ce->args[1]);
+			if (op_sub.mode != Addressing_Type) {
+				gbString e = expr_to_string(op_sub.expr);
+				error(op_sub.expr, "'%.*s' expects a type, got %s", LIT(builtin_name), e);
+				gb_string_free(e);
+				return false;
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+
+			Type *super = op_super.type;
+			Type *sub   = op_sub.type;
+			if (are_types_identical(super, sub)) {
+				operand->value = exact_value_bool(true);
+				return true;
+			}
+
+			super = base_type(super);
+			sub   = base_type(sub);
+			if (are_types_identical(super, sub)) {
+				operand->value = exact_value_bool(true);
+				return true;
+			}
+
+			if (super->kind != sub->kind) {
+				gbString a = type_to_string(op_super.type);
+				gbString b = type_to_string(op_sub.type);
+				error(op_super.expr, "'%.*s' expects types of the same kind, got %s vs %s", LIT(builtin_name), a, b);
+				gb_string_free(b);
+				gb_string_free(a);
+				return false;
+			}
+
+			if (super->kind == Type_Enum) {
+				if (sub->Enum.fields.count > super->Enum.fields.count) {
+					operand->value = exact_value_bool(false);
+					return true;
+				}
+
+
+				Type *base_super = base_enum_type(super);
+				Type *base_sub   = base_enum_type(sub);
+				if (base_super == base_sub && base_super == nullptr) {
+					// okay
+				} else if (!are_types_identical(base_type(base_super), base_type(base_sub))) {
+					operand->value = exact_value_bool(false);
+					return true;
+				}
+
+				for (Entity *f_sub : sub->Enum.fields) {
+					bool found = false;
+
+					if (f_sub->kind != Entity_Constant) {
+						continue;
+					}
+
+					for (Entity *f_super : super->Enum.fields) {
+						if (f_super->kind != Entity_Constant) {
+							continue;
+						}
+
+						if (f_sub->token.string == f_super->token.string) {
+							if (compare_exact_values(Token_CmpEq, f_sub->Constant.value, f_super->Constant.value)) {
+								found = true;
+								break;
+							}
+						}
+					}
+
+					if (!found) {
+						operand->value = exact_value_bool(false);
+						return true;
+					}
+				}
+
+				operand->value = exact_value_bool(true);
+				return true;
+
+			} else if (super->kind == Type_Union) {
+				if (sub->Union.variants.count > super->Union.variants.count) {
+					operand->value = exact_value_bool(false);
+					return true;
+				}
+				if (sub->Union.kind != super->Union.kind) {
+					operand->value = exact_value_bool(false);
+					return true;
+				}
+
+				for_array(i, sub->Union.variants) {
+					Type *t_sub   = sub->Union.variants[i];
+					Type *t_super = super->Union.variants[i];
+					if (!are_types_identical(t_sub, t_super)) {
+						operand->value = exact_value_bool(false);
+						return true;
+					}
+				}
+
+				operand->value = exact_value_bool(true);
+				return true;
+
+			}
+			gbString a = type_to_string(op_super.type);
+			gbString b = type_to_string(op_sub.type);
+			error(op_super.expr, "'%.*s' expects types of the same kind and either an enum or union, got %s vs %s", LIT(builtin_name), a, b);
+			gb_string_free(b);
+			gb_string_free(a);
+			return false;
+		}
+
 
 	case BuiltinProc_type_field_index_of:
 		{

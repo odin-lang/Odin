@@ -215,7 +215,8 @@ type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V --
 type_is_specialized_polymorphic_record   :: proc($T: typeid) -> bool ---
 type_is_unspecialized_polymorphic_record :: proc($T: typeid) -> bool ---
 
-type_is_subtype_of :: proc($T, $U: typeid) -> bool ---
+type_is_subtype_of  :: proc($T, $U: typeid) -> bool ---
+type_is_superset_of :: proc($Super, $Sub: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
