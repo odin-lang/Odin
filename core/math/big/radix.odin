@@ -185,16 +185,15 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	/*
 		Fast path for radixes that are a power of two.
 	*/
+	count := count_bits(a) or_return
+
 	if is_power_of_two(int(radix)) {
 		if zero_terminate {
 			available -= 1
 			buffer[available] = 0
 		}
 
-		shift, count: int
-		// mask  := _WORD(radix - 1);
-		shift, err = log(DIGIT(radix), 2)
-		count, err = count_bits(a)
+		shift := log(DIGIT(radix), 2) or_return
 		digit: _WORD
 
 		for offset := 0; offset < count; offset += shift {
@@ -224,7 +223,17 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		return written, nil
 	}
 
-	return _itoa_raw_full(a, radix, buffer, zero_terminate)
+	// NOTE(Jeroen): The new method is faster for an `Int` up to ~32768 bits in size with optimizations.
+	//               At `.None` or `.Minimal`, it appears to always be faster.
+	//               If we optimize `itoa` further, this needs to be evaluated.
+	itoa_method := _itoa_raw_full
+
+	when ODIN_OPTIMIZATION_MODE >= .Size {
+		if count >= 32768 {
+			itoa_method = _itoa_raw_old
+		}
+	}
+	return itoa_method(a, radix, buffer, zero_terminate)
 }
 
 itoa :: proc{int_itoa_string, int_itoa_raw}
@@ -601,14 +610,89 @@ RADIX_TABLE_REVERSE_SIZE :: 80
 	Stores a bignum as a ASCII string in a given radix (2..64)
 	The buffer must be appropriately sized. This routine doesn't check.
 */
+
 _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
 	assert_if_nil(a)
 	context.allocator = allocator
 
-	temp, denominator := &Int{}, &Int{}
+	// Calculate largest radix^n that fits within _DIGIT_BITS
+	divisor     := ITOA_DIVISOR
+	digit_count := ITOA_COUNT
+	_radix      := DIGIT(radix)
 
-	internal_copy(temp, a)           or_return
-	internal_set(denominator, radix) or_return
+	if radix != 10 {
+		i := _WORD(1)
+		digit_count = -1
+		for i < _WORD(1 << _DIGIT_BITS) {
+			divisor = DIGIT(i)
+			i *= _WORD(radix)
+			digit_count += 1
+		}
+	}
+
+	temp := &Int{}
+	internal_copy(temp, a) or_return
+	defer internal_destroy(temp)
+
+	available := len(buffer)
+	if zero_terminate {
+		available -= 1
+		buffer[available] = 0
+	}
+
+	if a.sign == .Negative {
+		temp.sign = .Zero_or_Positive
+	}
+
+	remainder: DIGIT
+	for {
+		if remainder, err = internal_divmod(temp, temp, divisor); err != nil {
+			return len(buffer) - available, err
+		}
+
+		count := digit_count
+		for available > 0 && count > 0 {
+			available -= 1
+			buffer[available] = RADIX_TABLE[remainder % _radix]
+			remainder /= _radix
+			count -= 1
+		}
+
+		if temp.used == 0 {
+			break
+		}
+	}
+
+	// Remove leading zero if we ended up with one.
+	if buffer[available] == '0' {
+		available += 1
+	}
+
+	if a.sign == .Negative {
+		available -= 1
+		buffer[available] = '-'
+	}
+
+	/*
+		If we overestimated the size, we need to move the buffer left.
+	*/
+	written = len(buffer) - available
+	if written < len(buffer) {
+		diff := len(buffer) - written
+		mem.copy(&buffer[0], &buffer[diff], written)
+	}
+	return written, nil
+}
+
+// Old internal digit extraction procedure.
+// We're keeping this around as ground truth for the tests.
+_itoa_raw_old :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
+	assert_if_nil(a)
+	context.allocator = allocator
+
+	temp := &Int{}
+	internal_copy(temp, a) or_return
+	defer internal_destroy(temp)
 
 	available := len(buffer)
 	if zero_terminate {
@@ -623,7 +707,6 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 	remainder: DIGIT
 	for {
 		if remainder, err = #force_inline internal_divmod(temp, temp, DIGIT(radix)); err != nil {
-			internal_destroy(temp, denominator)
 			return len(buffer) - available, err
 		}
 		available -= 1
@@ -637,8 +720,6 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		available -= 1
 		buffer[available] = '-'
 	}
-
-	internal_destroy(temp, denominator)
 
 	/*
 		If we overestimated the size, we need to move the buffer left.
