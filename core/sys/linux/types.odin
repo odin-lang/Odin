@@ -1691,3 +1691,60 @@ IO_Uring_Accept_Flags :: bit_set[IO_Uring_Accept_Flags_Bits; u16]
 IO_Uring_Send_Recv_Flags :: bit_set[IO_Uring_Send_Recv_Flags_Bits; u16]
 
 IO_Uring_Submission_Queue_Flags :: bit_set[IO_Uring_Submission_Queue_Flags_Bits; u32]
+
+Clock_State :: enum i32 {
+	TIME_OK = 0,
+	TIME_INS = 1,
+	TIME_DEL = 2,
+	TIME_OOP = 3,
+	TIME_WAIT = 4,
+	TIME_ERROR = 5,
+}
+
+Timex :: struct {
+	modes:     u32,
+	offset:    int,
+	freq:      int,
+	maxerror:  int,
+	esterror:  int,
+	status:    i32,
+	constant:  int,
+	precision: int,
+	tolerance: int,
+	time:      Time_Val,
+	tick:      int,
+	ppsfreq:   int,
+	jitter:    int,
+	shift:     i32,
+	stabil:    int,
+	jitcnt:    int,
+	calcnt:    int,
+	errcnt:    int,
+	stbcnt:    int,
+	tai:       i32,
+}
+
+Reboot_Magic :: enum u64 {
+	RB_MAGIC_1     = 0xfee1dead,
+	RB_MAGIC_2     = 672274793,
+	RB_MAGIC_2A    = 85072278, // Since Linux 2.1.17
+	RB_MAGIC_2B    = 369367448, // Since Linux 2.1.97
+	RB_MAGIC_2C    = 537993216, // Since Linux 2.5.71
+}
+
+Reboot_Operation :: enum u64 {
+	RB_DISABLE_CAD = 0,
+	RB_ENABLE_CAD  = 0x89abcdef,
+	RB_HALT_SYSTEM = 0xcdef0123,
+	RB_KEXEC       = 0x45584543,
+	RB_POWER_OFF   = 0x4321fedc,
+	RB_AUTOBOOT    = 0x01234567,
+	RB_AUTOBOOT_2  = 0xa1b2c3d4,
+	RB_SW_SUSPEND  = 0xd000fce2,
+}
+
+Mount_Flags :: bit_set[Mount_Flags_Bits; uint]
+
+Umount2_Flags :: bit_set[Umount2_Flags_Bits; u32]
+
+Swap_Flags :: bit_set[Swap_Flags_Bits; u32]

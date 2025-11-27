@@ -1067,7 +1067,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		}
 	}
 
-	buf: [256]byte
+	buf: [BUF_SIZE]byte
 	start := 0
 
 	if fi.hash && !is_signed {
