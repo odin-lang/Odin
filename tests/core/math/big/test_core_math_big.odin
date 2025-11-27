@@ -314,4 +314,19 @@ test_itoa :: proc(t: ^testing.T) {
 		str_new := string(buffer_new[:written_new])
 		testing.expect_value(t, str_new, str_old)
 	}
+
+	// Also test a number with a large number of zeroes
+	big.set(a, "2970714761494550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000802525522395693895558562897961119110387707542077460459880227570865486047631557732177235787527971863645406120285117781450154113859156752194121206131440514109132606823127467068869589613665129498148285292867292641704871893467328665051712596763187306247339023362481")
+	size, _ := big.radix_size(a, 10, false)
+	buffer_old := make([]u8, size)
+	defer delete(buffer_old)
+	buffer_new := make([]u8, size)
+	defer delete(buffer_new)
+
+	written_old, _ := big._itoa_raw_old (a, 10, buffer_old, false)
+	written_new, _ := big._itoa_raw_full(a, 10, buffer_new, false)
+
+	str_old := string(buffer_old[:written_old])
+	str_new := string(buffer_new[:written_new])
+	testing.expect_value(t, str_new, str_old)
 }
