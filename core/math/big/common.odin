@@ -160,6 +160,8 @@ Error :: enum byte {
 	Cannot_Write_File       = 52,
 
 	Unimplemented           = 127,
+
+	Okay = None,
 }
 
 #assert(intrinsics.type_is_superset_of(Error, runtime.Allocator_Error))
