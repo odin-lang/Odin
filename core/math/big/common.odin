@@ -223,9 +223,15 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 	*/
 	DIGIT        :: distinct u64
 	_WORD        :: distinct u128
+	// Base 10 extraction constants
+	ITOA_DIVISOR :: DIGIT(1_000_000_000_000_000_000)
+	ITOA_COUNT   :: 18
 } else {
 	DIGIT        :: distinct u32
 	_WORD        :: distinct u64
+	// Base 10 extraction constants
+	ITOA_DIVISOR :: DIGIT(100_000_000)
+	ITOA_COUNT   :: 8
 }
 #assert(size_of(_WORD) == 2 * size_of(DIGIT))
 

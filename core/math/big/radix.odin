@@ -601,14 +601,89 @@ RADIX_TABLE_REVERSE_SIZE :: 80
 	Stores a bignum as a ASCII string in a given radix (2..64)
 	The buffer must be appropriately sized. This routine doesn't check.
 */
+
 _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
 	assert_if_nil(a)
 	context.allocator = allocator
 
-	temp, denominator := &Int{}, &Int{}
+	// Calculate largest radix^n that fits within _DIGIT_BITS
+	divisor     := ITOA_DIVISOR
+	digit_count := ITOA_COUNT
+	_radix      := DIGIT(radix)
 
-	internal_copy(temp, a)           or_return
-	internal_set(denominator, radix) or_return
+	if radix != 10 {
+		i := _WORD(1)
+		digit_count = -1
+		for i < _WORD(1 << _DIGIT_BITS) {
+			divisor = DIGIT(i)
+			i *= _WORD(radix)
+			digit_count += 1
+		}
+	}
+
+	temp := &Int{}
+	internal_copy(temp, a) or_return
+	defer internal_destroy(temp)
+
+	available := len(buffer)
+	if zero_terminate {
+		available -= 1
+		buffer[available] = 0
+	}
+
+	if a.sign == .Negative {
+		temp.sign = .Zero_or_Positive
+	}
+
+	remainder: DIGIT
+	for {
+		if remainder, err = internal_divmod(temp, temp, divisor); err != nil {
+			return len(buffer) - available, err
+		}
+
+		count := digit_count
+		for available > 0 && count > 0 {
+			available -= 1
+			buffer[available] = RADIX_TABLE[remainder % _radix]
+			remainder /= _radix
+			count -= 1
+		}
+
+		if temp.used == 0 {
+			break
+		}
+	}
+
+	// Remove leading zero if we ended up with one.
+	if buffer[available] == '0' {
+		available += 1
+	}
+
+	if a.sign == .Negative {
+		available -= 1
+		buffer[available] = '-'
+	}
+
+	/*
+		If we overestimated the size, we need to move the buffer left.
+	*/
+	written = len(buffer) - available
+	if written < len(buffer) {
+		diff := len(buffer) - written
+		mem.copy(&buffer[0], &buffer[diff], written)
+	}
+	return written, nil
+}
+
+// Old internal digit extraction procedure.
+// We're keeping this around as ground truth for the tests.
+_itoa_raw_old :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
+	assert_if_nil(a)
+	context.allocator = allocator
+
+	temp := &Int{}
+	internal_copy(temp, a) or_return
+	defer internal_destroy(temp)
 
 	available := len(buffer)
 	if zero_terminate {
@@ -623,7 +698,6 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 	remainder: DIGIT
 	for {
 		if remainder, err = #force_inline internal_divmod(temp, temp, DIGIT(radix)); err != nil {
-			internal_destroy(temp, denominator)
 			return len(buffer) - available, err
 		}
 		available -= 1
@@ -637,8 +711,6 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		available -= 1
 		buffer[available] = '-'
 	}
-
-	internal_destroy(temp, denominator)
 
 	/*
 		If we overestimated the size, we need to move the buffer left.

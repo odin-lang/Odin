@@ -288,3 +288,30 @@ atoi :: proc(t: ^testing.T, i: ^big.Int, a: string, loc := #caller_location) -> 
 	testing.expect(t, err == nil, loc=loc)
 	return err == nil
 }
+
+@(test)
+test_itoa :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	big.random(a, 2048)
+	defer big.destroy(a)
+
+	for radix in 2..=64 {
+		if big.is_power_of_two(radix) {
+			// Powers of two are trivial, and are handled before `_itoa_raw_*` is called.
+			continue
+		}
+
+		size, _ := big.radix_size(a, i8(radix), false)
+		buffer_old := make([]u8, size)
+		defer delete(buffer_old)
+		buffer_new := make([]u8, size)
+		defer delete(buffer_new)
+
+		written_old, _ := big._itoa_raw_old (a, i8(radix), buffer_old, false)
+		written_new, _ := big._itoa_raw_full(a, i8(radix), buffer_new, false)
+
+		str_old := string(buffer_old[:written_old])
+		str_new := string(buffer_new[:written_new])
+		testing.expect_value(t, str_new, str_old)
+	}
+}
