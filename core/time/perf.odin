@@ -13,6 +13,7 @@ Tick :: struct {
 /*
 Obtain the current tick.
 */
+@(require_results)
 tick_now :: proc "contextless" () -> Tick {
 	return _tick_now()
 }
@@ -20,6 +21,7 @@ tick_now :: proc "contextless" () -> Tick {
 /*
 Add duration to a tick.
 */
+@(require_results)
 tick_add :: proc "contextless" (t: Tick, d: Duration) -> Tick {
 	return Tick{t._nsec + i64(d)}
 }
@@ -27,6 +29,7 @@ tick_add :: proc "contextless" (t: Tick, d: Duration) -> Tick {
 /*
 Obtain the difference between ticks.
 */
+@(require_results)
 tick_diff :: proc "contextless" (start, end: Tick) -> Duration {
 	d := end._nsec - start._nsec
 	return Duration(d)
@@ -43,6 +46,7 @@ then the returned duration is 0.
 This procedure is meant to be used in a loop, or in other scenarios, where one
 might want to obtain time between multiple ticks at specific points.
 */
+@(require_results)
 tick_lap_time :: proc "contextless" (prev: ^Tick) -> Duration {
 	d: Duration
 	t := tick_now()
@@ -56,6 +60,7 @@ tick_lap_time :: proc "contextless" (prev: ^Tick) -> Duration {
 /*
 Obtain the duration since last tick.
 */
+@(require_results)
 tick_since :: proc "contextless" (start: Tick) -> Duration {
 	return tick_diff(start, tick_now())
 }
@@ -101,6 +106,7 @@ This procedure checks if the CPU contains an invariant TSC (Time stamp counter).
 Invariant TSC is a feature of modern processors that allows them to run their
 TSC at a fixed frequency, independent of ACPI state, and CPU frequency.
 */
+@(require_results)
 has_invariant_tsc :: proc "contextless" () -> bool {
 	when ODIN_ARCH == .amd64 {
 		return x86_has_invariant_tsc()
@@ -122,6 +128,7 @@ dividing the readings from TSC by the duration of the sleep.
 
 The duration of sleep can be controlled by `fallback_sleep` parameter.
 */
+@(require_results)
 tsc_frequency :: proc "contextless" (fallback_sleep := 2 * Second) -> (u64, bool) {
 	if !has_invariant_tsc() {
 		return 0, false
