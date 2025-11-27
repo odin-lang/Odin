@@ -1207,7 +1207,7 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 	/*
 		Automatically choose the number of Rabin-Miller trials?
 	*/
-	if trials == -1 {
+	if trials < 0 {
 		trials = number_of_rabin_miller_trials(size_in_bits)
 	}
 

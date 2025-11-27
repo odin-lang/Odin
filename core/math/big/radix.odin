@@ -110,7 +110,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	/*
 		We weren't given a size. Let's compute it.
 	*/
-	if size == -1 {
+	if size < 0 {
 		size = radix_size(a, radix, zero_terminate) or_return
 	}
 

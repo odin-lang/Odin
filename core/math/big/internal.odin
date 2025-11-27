@@ -1199,14 +1199,14 @@ internal_cmp_mag :: internal_compare_magnitude
 	bool := a < b
 */
 internal_int_less_than :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
-	return internal_cmp(a, b) == -1
+	return internal_cmp(a, b) < 0
 }
 
 /*
 	bool := a < b
 */
 internal_int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than: bool) {
-	return internal_cmp_digit(a, b) == -1
+	return internal_cmp_digit(a, b) < 0
 }
 
 /*
@@ -1214,7 +1214,7 @@ internal_int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_t
     Compares the magnitudes only, ignores the sign.
 */
 internal_int_less_than_abs :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
-	return internal_cmp_mag(a, b) == -1
+	return internal_cmp_mag(a, b) < 0
 }
 
 internal_less_than :: proc {
@@ -2933,7 +2933,7 @@ internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
 		If we don't pass the number of previously used DIGITs, we zero all remaining ones.
 	*/
 	zero_count: int
-	if old_used == -1 {
+	if old_used < 0 {
 		zero_count = len(dest.digit) - dest.used
 	} else {
 		zero_count = old_used - dest.used

@@ -1662,7 +1662,7 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	defer internal_destroy(bracket_low, bracket_high, bracket_mid, t, bi_base)
 
 	ic := #force_inline internal_cmp(a, base)
-	if ic == -1 || ic == 0 {
+	if ic <= 0 {
 		return 1 if ic == 0 else 0, nil
 	}
 	defer if err != nil {
@@ -2492,9 +2492,9 @@ _private_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 		bitcnt -= 1
 		if bitcnt == 0 {
 			/*
-				If digidx == -1 we are out of digits.
+				If digidx < 0 we are out of digits.
 			*/
-			if digidx == -1 { break }
+			if digidx < 0 { break }
 
 			/*
 				Read next digit and reset the bitcnt.
@@ -2748,9 +2748,9 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 		bitcnt -= 1
 		if bitcnt == 0 {
 			/*
-				If digidx == -1 we are out of digits so break.
+				If digidx < 0 we are out of digits so break.
 			*/
-			if digidx == -1 { break }
+			if digidx < 0 { break }
 
 			/*
 				Read next digit and reset the bitcnt.

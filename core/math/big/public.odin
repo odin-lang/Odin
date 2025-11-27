@@ -593,7 +593,7 @@ int_less_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) 
 	c: int
 	c, err = cmp(a, b)
 
-	return c == -1, err
+	return c < 0, err
 }
 
 /*
@@ -608,7 +608,7 @@ int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := contex
 	c: int
 	c, err = cmp(a, b)
 
-	return c == -1, err
+	return c < 0, err
 }
 
 /*
@@ -624,7 +624,7 @@ int_less_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocat
 	c: int
 	c, err = cmp_mag(a, b)
 
-	return c == -1, err
+	return c < 0, err
 }
 
 less_than :: proc {
