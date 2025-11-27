@@ -693,7 +693,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 	fi: Info
 	end := len(fmt)
 	unused_args: bit_set[0 ..< MAX_CHECKED_ARGS]
-	for i in 0 ..< len(args) {
+	for _, i in args {
 		unused_args += {i}
 	}
 
@@ -816,7 +816,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 		}
 	}
 
-	if unused_args != {} {
+	if unused_args != nil {
 		// Use default options when formatting extra arguments.
 		extra_fi := Info { writer = fi.writer, n = fi.n }
 
@@ -1711,7 +1711,7 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 	}
 
 	type_info := type_info_of(v.id)
-	#partial switch e in type_info.variant {
+	#partial switch &e in type_info.variant {
 	case: fmt_bad_verb(fi, verb)
 	case runtime.Type_Info_Enum:
 		switch verb {
@@ -1751,7 +1751,7 @@ stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.T
 	et := runtime.type_info_base(enum_type)
 	ev := ev
 	ev += runtime.Type_Info_Enum_Value(offset)
-	#partial switch e in et.variant {
+	#partial switch &e in et.variant {
 	case: return "", false
 	case runtime.Type_Info_Enum:
 		if reflect.is_string(e.base) {
@@ -1788,7 +1788,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 			return false
 		}
 		t := runtime.type_info_base(ti)
-		#partial switch info in t.variant {
+		#partial switch &info in t.variant {
 		case runtime.Type_Info_Integer:
 			switch info.endianness {
 			case .Platform: return false
@@ -1802,7 +1802,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 	byte_swap :: bits.byte_swap
 
 	type_info := type_info_of(v.id)
-	#partial switch info in type_info.variant {
+	#partial switch &info in type_info.variant {
 	case runtime.Type_Info_Named:
 		val := v
 		val.id = info.base.id
@@ -2528,7 +2528,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 		}
 	}
 
-	#partial switch b in info.base.variant {
+	#partial switch &b in info.base.variant {
 	case runtime.Type_Info_Struct:
 		fmt_struct(fi, v, verb, b, info.name)
 	case runtime.Type_Info_Bit_Field:
@@ -2794,7 +2794,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	fi.ignore_user_formatters = false
 
 	type_info := type_info_of(v.id)
-	switch info in type_info.variant {
+	switch &info in type_info.variant {
 	case runtime.Type_Info_Any:        // Ignore
 	case runtime.Type_Info_Parameters: // Ignore
 
@@ -2819,7 +2819,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 				elem := runtime.type_info_base(info.elem)
 				if elem != nil {
-					#partial switch e in elem.variant {
+					#partial switch &e in elem.variant {
 					case runtime.Type_Info_Array,
 					     runtime.Type_Info_Slice,
 					     runtime.Type_Info_Dynamic_Array,
@@ -2881,7 +2881,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					return
 				}
 
-				#partial switch e in elem.variant {
+				#partial switch &e in elem.variant {
 				case runtime.Type_Info_Integer:
 					switch verb {
 					case 's', 'q':
@@ -3238,7 +3238,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 
 	base_arg := arg
 	base_arg.id = runtime.typeid_base(base_arg.id)
-	switch a in base_arg {
+	switch &a in base_arg {
 	case bool:       fmt_bool(fi, a, verb)
 	case b8:         fmt_bool(fi, bool(a), verb)
 	case b16:        fmt_bool(fi, bool(a), verb)
