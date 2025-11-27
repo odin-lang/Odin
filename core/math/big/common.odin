@@ -6,6 +6,7 @@ package math_big
 */
 
 import "base:intrinsics"
+import "base:runtime"
 
 /*
 	TODO: Make the tunables runtime adjustable where practical.
@@ -138,11 +139,12 @@ Flags :: bit_set[Flag; u8]
 /*
 	Errors are a strict superset of runtime.Allocation_Error.
 */
-Error :: enum int {
-	Okay                    = 0,
+Error :: enum byte {
+	None                    = 0,
 	Out_Of_Memory           = 1,
 	Invalid_Pointer         = 2,
 	Invalid_Argument        = 3,
+	Mode_Not_Implemented    = 4, // Allocation
 
 	Assignment_To_Immutable = 10,
 	Max_Iterations_Reached  = 11,
@@ -160,11 +162,15 @@ Error :: enum int {
 	Unimplemented           = 127,
 }
 
+#assert(intrinsics.type_is_superset_of(Error, runtime.Allocator_Error))
+
+
 Error_String :: #sparse[Error]string{
-	.Okay                    = "Okay",
+	.None                    = "None",
 	.Out_Of_Memory           = "Out of memory",
 	.Invalid_Pointer         = "Invalid pointer",
 	.Invalid_Argument        = "Invalid argument",
+	.Mode_Not_Implemented    = "Allocation mode not implemented",
 
 	.Assignment_To_Immutable = "Assignment to immutable",
 	.Max_Iterations_Reached  = "Max iterations reached",

@@ -2177,7 +2177,11 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 		If not yet initialized, initialize the `digit` backing with the allocator we were passed.
 	*/
 	if cap == 0 {
-		a.digit = make([dynamic]DIGIT, needed, allocator)
+		mem_err: mem.Allocator_Error
+		a.digit, mem_err = make([dynamic]DIGIT, needed, allocator)
+		if mem_err != nil {
+			return cast(Error)mem_err
+		}
 	} else if cap < needed {
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
