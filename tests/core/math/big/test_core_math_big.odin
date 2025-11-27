@@ -246,7 +246,7 @@ bug_5931 :: proc(t: ^testing.T) {
 // Test helpers
 
 expect_a :: proc(t: ^testing.T, format: string, a, expected, res: ^big.Int, err: big.Error, loc := #caller_location) {
-	if err != .Okay { return }
+	if err != nil { return }
 
 	equal, _ := big.equals(res, expected)
 	if !equal {
@@ -264,7 +264,7 @@ expect_a :: proc(t: ^testing.T, format: string, a, expected, res: ^big.Int, err:
 }
 
 expect_ab :: proc(t: ^testing.T, format: string, a, b, expected, res: ^big.Int, err: big.Error, loc := #caller_location) {
-	if err != .Okay { return }
+	if err != nil { return }
 
 	equal, _ := big.equals(res, expected)
 	if !equal {
@@ -285,6 +285,6 @@ expect_ab :: proc(t: ^testing.T, format: string, a, b, expected, res: ^big.Int, 
 
 atoi :: proc(t: ^testing.T, i: ^big.Int, a: string, loc := #caller_location) -> bool {
 	err := big.atoi(i, a, 16)
-	testing.expect(t, err == .Okay, loc=loc)
-	return err == .Okay
+	testing.expect(t, err == nil, loc=loc)
+	return err == nil
 }

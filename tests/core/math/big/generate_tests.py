@@ -147,7 +147,7 @@ class Error(Enum):
 	Out_Of_Memory           = 1
 	Invalid_Pointer         = 2
 	Invalid_Argument        = 3
-	Unknown_Error           = 4
+	Mode_Not_Implemented    = 4
 	Assignment_To_Immutable = 10
 	Max_Iterations_Reached  = 11
 	Buffer_Overflow         = 12
@@ -224,6 +224,8 @@ def write_test_case(op = "", a = 0, b = 0, expected_result = 0, expected_error =
 	else:
 		vectors.write("\"{}\", ".format(test_arg_to_odin(expected_result)))
 
+	if expected_error == Error.Okay:
+		expected_error = "Error.None"
 	vectors.write("{}}},\n".format(expected_error)[5:])
 
 def test_add(a = 0, b = 0, expected_error = Error.Okay):
@@ -464,7 +466,7 @@ TESTS = {
 		[  0xa85e79177036820e9e63d14514884413c283db3dba2771f66ec888ae94fe253826ed3230efc1de0cbb4a2ba16fede5fe980d232472cca9e8f339714c56a9e64b5cff7538c33773f128898e8cad47234e8a086b4ce5b902231e2da75cc6cb510d892feb9c9c19ee5f5b7967cb7f081fb79099afe2d20203b0693ecc95c656e5515e0903a4ebc84d22fc2a176ba36dd795195535cfdf473e547930fbd6eae51ad11e974198b4733a10115f391c0fefd22654f5acd63c6415d4cbdaad6c1fc1812333d701b64bb230307fb37911561f5287efd67c2eec5a26a694931aec299c67874881bab0c42941cf0f4ef8ca3548e1adcc7f712eb714762184d656385ceacc7b9f75620dfa7ec62b70ee92a5998cee14ad2b9df3f0c861678bc3311c1fe78c5ce4ed30b90c56d18d50261a4f46fdbf6af94737920b50adf1229503edea8b32900000697f366eba632074a66dcd9999a1510ccefa6110bac2207602b16cd4ce42a36fbf276b5b14550faf75194256f175a867169ff30f8e4770d094b617e3df29612359e33d2a3e8f4e12acf243a22b2732e35a5039fea630886e80f49fb310cb34cd1ecb0dc3036761ac8eed5e2e3d6ea88c5b2f552405149fcb100f50368e969c7d1d45db10ea868838dddc3fbc54c9b658761522c31e46661f46205a6c8783d60638db10bc9515ece8509aa181332207c5a2753ee4a8297a65695fbd8184de, Error.Okay, ],
 	],
 	test_root_n: [
-		[  1298074214633706907132624082305024, 2, Error.Okay, ],	
+		[  1298074214633706907132624082305024, 2, Error.Okay, ],
 	],
 	test_shl_leg: [
 		[ 3192,			1 ],
