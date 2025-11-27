@@ -360,6 +360,166 @@ int_max :: proc(n: int, gen := context.random_generator) -> (val: int) {
 }
 
 /*
+Generates a random 32 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 32 bit value in the range `[0, n)`
+
+WARNING: Panics if n is equal to 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint32_max_example :: proc() {
+		fmt.println(rand.uint32_max(16))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint32_max :: proc(n: u32, gen := context.random_generator) -> (val: u32) {
+	if n == 0 {
+		panic("Invalid argument to uint32_max")
+	}
+	if n & (n - 1) == 0 {
+		return uint32(gen) & (n - 1)
+	}
+	min := (-n) % n
+	v := uint32(gen)
+	for v < min {
+		v = uint32(gen)
+	}
+	return v % n
+}
+
+/*
+Generates a random 64 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 64 bit value in the range `[0, n)`
+
+WARNING: Panics if n is equal to 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint64_max_example :: proc() {
+		fmt.println(rand.uint64_max(16))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint64_max :: proc(n: u64, gen := context.random_generator) -> (val: u64) {
+	if n == 0 {
+		panic("Invalid argument to uint64_max")
+	}
+	if n & (n - 1) == 0 {
+		return uint64(gen) & (n - 1)
+	}
+	min := (-n) % n
+	v := uint64(gen)
+	for v < min {
+		v = uint64(gen)
+	}
+	return v % n
+}
+
+/*
+Generates a random 128 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 128 bit value in the range `[0, n)`
+
+WARNING: Panics if n is equal to 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint128_max_example :: proc() {
+		fmt.println(rand.uint128_max(16))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint128_max :: proc(n: u128, gen := context.random_generator) -> (val: u128) {
+	if n == 0 {
+		panic("Invalid argument to uint128_max")
+	}
+	if n & (n - 1) == 0 {
+		return uint128(gen) & (n - 1)
+	}
+	min := (-n) % n
+	v := uint128(gen)
+	for v < min {
+		v = uint128(gen)
+	}
+	return v % n
+}
+
+/*
+Generates a random integer value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random integer value in the range `[0, n)`
+
+WARNING: Panics if n is equal to 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint_max_example :: proc() {
+		fmt.println(rand.uint_max(16))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint_max :: proc(n: uint, gen := context.random_generator) -> (val: uint) {
+	if n <= 0 {
+		panic("Invalid argument to uint_max")
+	}
+	when size_of(int) == 4 {
+		return uint(uint32_max(u32(n), gen))
+	} else {
+		return uint(uint64_max(u64(n), gen))
+	}
+}
+
+/*
 Generates a random double floating point value in the range `[0, 1)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Returns:
