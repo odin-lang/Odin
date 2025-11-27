@@ -185,16 +185,15 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	/*
 		Fast path for radixes that are a power of two.
 	*/
+	count := count_bits(a) or_return
+
 	if is_power_of_two(int(radix)) {
 		if zero_terminate {
 			available -= 1
 			buffer[available] = 0
 		}
 
-		shift, count: int
-		// mask  := _WORD(radix - 1);
-		shift, err = log(DIGIT(radix), 2)
-		count, err = count_bits(a)
+		shift := log(DIGIT(radix), 2) or_return
 		digit: _WORD
 
 		for offset := 0; offset < count; offset += shift {
@@ -224,7 +223,17 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		return written, nil
 	}
 
-	return _itoa_raw_full(a, radix, buffer, zero_terminate)
+	// NOTE(Jeroen): The new method is faster for an `Int` up to ~32768 bits in size with optimizations.
+	//               At `.None` or `.Minimal`, it appears to always be faster.
+	//               If we optimize `itoa` further, this needs to be evaluated.
+	itoa_method := _itoa_raw_full
+
+	when ODIN_OPTIMIZATION_MODE >= .Size {
+		if count >= 32768 {
+			itoa_method = _itoa_raw_old
+		}
+	}
+	return itoa_method(a, radix, buffer, zero_terminate)
 }
 
 itoa :: proc{int_itoa_string, int_itoa_raw}
