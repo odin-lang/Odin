@@ -2791,7 +2791,8 @@ internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 		x *= _DIGIT_BITS
 		x += internal_count_lsb(q)
 	} else {
-		lnz := []int{
+		@(static, rodata)
+		lnz := [?]int{
    			4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
 		}
 

@@ -357,8 +357,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 		internal_set(la, bit_count) or_return
 
 		/* k = floor(2^29/log_2(radix)) + 1 */
-		lb := _log_bases
-		internal_set(k, lb[radix]) or_return
+		internal_set(k, _log_bases[radix]) or_return
 
 		/* n = floor((la *  k) / 2^29) + 1 */
 		internal_mul(k, la, k) or_return
@@ -564,8 +563,9 @@ internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_F
  */
 
 _RADIX_SIZE_SCALE :: 29
-_log_bases :: [65]u32{
-			0,         0, 0x20000001, 0x14309399, 0x10000001,
+@(rodata)
+_log_bases := [65]u32{
+	0,         0,          0x20000001, 0x14309399, 0x10000001,
 	0xdc81a35, 0xc611924,  0xb660c9e,  0xaaaaaab,  0xa1849cd,
 	0x9a209a9, 0x94004e1,  0x8ed19c2,  0x8a5ca7d,  0x867a000,
 	0x830cee3, 0x8000001,  0x7d42d60,  0x7ac8b32,  0x7887847,
@@ -584,6 +584,7 @@ _log_bases :: [65]u32{
 	Characters used in radix conversions.
 */
 RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
+@(rodata)
 RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{
 	0x3e, 0xff, 0xff, 0xff, 0x3f, 0x00, 0x01, 0x02, 0x03, 0x04, /* +,-./01234 */
 	0x05, 0x06, 0x07, 0x08, 0x09, 0xff, 0xff, 0xff, 0xff, 0xff, /* 56789:;<=> */

@@ -3217,6 +3217,7 @@ _private_int_shr_leg :: proc(quotient: ^Int, digits: int, allocator := context.a
 	Tables used by `internal_*` and `_*`.
 */
 
+@(rodata)
 _private_int_rem_128 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 	0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
@@ -3229,6 +3230,7 @@ _private_int_rem_128 := [?]DIGIT{
 }
 #assert(128 * size_of(DIGIT) == size_of(_private_int_rem_128))
 
+@(rodata)
 _private_int_rem_105 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1,
 	0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1,
@@ -3241,6 +3243,7 @@ _private_int_rem_105 := [?]DIGIT{
 #assert(105 * size_of(DIGIT) == size_of(_private_int_rem_105))
 
 _PRIME_TAB_SIZE :: 256
+@(rodata)
 _private_prime_table := [_PRIME_TAB_SIZE]DIGIT{
 	0x0002, 0x0003, 0x0005, 0x0007, 0x000B, 0x000D, 0x0011, 0x0013,
 	0x0017, 0x001D, 0x001F, 0x0025, 0x0029, 0x002B, 0x002F, 0x0035,
@@ -3281,6 +3284,7 @@ _private_prime_table := [_PRIME_TAB_SIZE]DIGIT{
 #assert(_PRIME_TAB_SIZE * size_of(DIGIT) == size_of(_private_prime_table))
 
 when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
+	@(rodata)
 	_factorial_table := [35]_WORD{
 /* f(00): */                                                     1,
 /* f(01): */                                                     1,
@@ -3319,6 +3323,7 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 /* f(34): */   295_232_799_039_604_140_847_618_609_643_520_000_000,
 	}
 } else {
+	@(rodata)
 	_factorial_table := [21]_WORD{
 /* f(00): */                                                     1,
 /* f(01): */                                                     1,
