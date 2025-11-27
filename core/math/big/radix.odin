@@ -616,7 +616,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 	context.allocator = allocator
 
 	// Calculate largest radix^n that fits within _DIGIT_BITS
-	divisor     := ITOA_DIVISOR
+	divisor     := _WORD(ITOA_DIVISOR)
 	digit_count := ITOA_COUNT
 	_radix      := DIGIT(radix)
 
@@ -624,7 +624,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		i := _WORD(1)
 		digit_count = -1
 		for i < _WORD(1 << _DIGIT_BITS) {
-			divisor = DIGIT(i)
+			divisor = _WORD(i)
 			i *= _WORD(radix)
 			digit_count += 1
 		}
@@ -644,11 +644,30 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		temp.sign = .Zero_or_Positive
 	}
 
+	q := &Int{}
+	defer internal_destroy(q)
+
 	remainder: DIGIT
 	for {
-		if remainder, err = internal_divmod(temp, temp, divisor); err != nil {
-			return len(buffer) - available, err
+		internal_grow(q, temp.used) or_return
+		q.used = temp.used
+		q.sign = temp.sign
+
+		w := _WORD(0)
+
+		for ix := temp.used - 1; ix >= 0; ix -= 1 {
+			t := DIGIT(0)
+			w = (w << _WORD(_DIGIT_BITS) | _WORD(temp.digit[ix]))
+			if w >= divisor {
+				t = DIGIT(w / divisor)
+				w -= _WORD(t) * divisor
+			}
+			q.digit[ix] = t
 		}
+		remainder = DIGIT(w)
+
+		internal_clamp(q)
+		q, temp = temp, q
 
 		count := digit_count
 		for available > 0 && count > 0 {
