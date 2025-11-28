@@ -520,6 +520,318 @@ uint_max :: proc(n: uint, gen := context.random_generator) -> (val: uint) {
 }
 
 /*
+Generates a random unsigned 32 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 32 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint32_range_example :: proc() {
+		fmt.println(rand.uint32_range(5,15))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+uint32_range :: proc(lo, hi: u32, gen := context.random_generator) -> (val: u32) {
+	assert(lo < hi, "Invalid arguments to uint32_range: lo must be less than hi")
+	range := hi - lo
+	if (range & (range - 1)) == 0 {
+		return lo + (uint32(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint32(gen)
+	for v < threshold {
+		v = uint32(gen)
+	}
+	return lo + (v % range)
+}
+
+/*
+Generates a random unsigned 64 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 64 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint64_range_example :: proc() {
+		fmt.println(rand.uint64_range(5,15))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+uint64_range :: proc(lo, hi: u64, gen := context.random_generator) -> (val: u64) {
+	assert(lo < hi, "Invalid arguments to uint64_range: lo must be less than hi")
+	range := hi - lo
+	if (range & (range - 1)) == 0 {
+		return lo + (uint64(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint64(gen)
+	for v < threshold {
+		v = uint64(gen)
+	}
+	return lo + (v % range)
+}
+
+/*
+Generates a random unsigned 128 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 128 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint128_range_example :: proc() {
+		fmt.println(rand.uint128_range(5,15))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+uint128_range :: proc(lo, hi: u128, gen := context.random_generator) -> (val: u128) {
+	assert(lo < hi, "Invalid arguments to uint128_range: lo must be less than hi")
+	range := hi - lo
+	if (range & (range - 1)) == 0 {
+		return lo + (uint128(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint128(gen)
+	for v < threshold {
+		v = uint128(gen)
+	}
+	return lo + (v % range)
+}
+
+/*
+Generates a random unsigned integer value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random integer value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint_range_example :: proc() {
+		fmt.println(rand.uint_range(5,15))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint_range :: proc(lo, hi: uint, gen := context.random_generator) -> (val: uint) {
+	assert(lo < hi, "Invalid arguments to uint_range: lo must be less than hi")
+	when size_of(int) == 4 {
+		return uint(uint32_range(u32(lo), u32(hi), gen))
+	} else {
+		return uint(uint64_range(u64(lo), u64(hi), gen))
+	}
+}
+
+/*
+Generates a random signed 32 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 32 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int32_range_example :: proc() {
+		fmt.println(rand.int32_range(-10,10))
+	}
+
+Possible Output:
+
+	6
+	-9
+
+*/
+int32_range :: proc(lo, hi: i32, gen := context.random_generator) -> (val: i32) {
+	assert(lo < hi, "Invalid arguments to int32_range: lo must be less than hi")
+	range := u32(hi) - u32(lo)
+	if (range & (range - 1)) == 0 {
+		return lo + i32(uint32(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint32(gen)
+	for v < threshold {
+		v = uint32(gen)
+	}
+	return lo + i32(v % range)
+}
+
+/*
+Generates a random signed 64 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 64 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int64_range_example :: proc() {
+		fmt.println(rand.int64_range(-10,10))
+	}
+
+Possible Output:
+
+	6
+	-9
+
+*/
+int64_range :: proc(lo, hi: i64, gen := context.random_generator) -> (val: i64) {
+	assert(lo < hi, "Invalid arguments to int64_range: lo must be less than hi")
+	range := u64(hi) - u64(lo)
+	if (range & (range - 1)) == 0 {
+		return lo + i64(uint64(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint64(gen)
+	for v < threshold {
+		v = uint64(gen)
+	}
+	return lo + i64(v % range)
+}
+
+/*
+Generates a random signed 128 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 128 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int128_range_example :: proc() {
+		fmt.println(rand.int128_range(-10,10))
+	}
+
+Possible Output:
+
+	6
+	-9
+
+*/
+int128_range :: proc(lo, hi: i128, gen := context.random_generator) -> (val: i128) {
+	assert(lo < hi, "Invalid arguments to int128_range: lo must be less than hi")
+	range := u128(hi) - u128(lo)
+	if (range & (range - 1)) == 0 {
+		return lo + i128(uint128(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint128(gen)
+	for v < threshold {
+		v = uint128(gen)
+	}
+	return lo + i128(v % range)
+}
+
+/*
+Generates a random signed integer value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random integer value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int_range_example :: proc() {
+		fmt.println(rand.int_range(-10,10))
+	}
+
+Possible Output:
+
+	6
+	-9
+
+*/
+@(require_results)
+int_range :: proc(lo, hi: int, gen := context.random_generator) -> (val: int) {
+	assert(lo < hi, "Invalid arguments to int_range: lo must be less than hi")
+	when size_of(int) == 4 {
+		return int(int32_range(i32(lo), i32(hi), gen))
+	} else {
+		return int(int64_range(i64(lo), i64(hi), gen))
+	}
+}
+
+/*
 Generates a random double floating point value in the range `[0, 1)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Returns:
