@@ -1,6 +1,7 @@
 // Flux easing used for animations
 package ease
 
+import "base:intrinsics"
 import "core:time"
 
 Flux_Map :: struct($T: typeid) {
@@ -41,8 +42,8 @@ flux_init :: proc($T: typeid, value_capacity := 8, allocator := context.allocato
 
 // delete map content
 flux_destroy :: proc(flux: Flux_Map($T), allocator := context.allocator, loc := #caller_location) where intrinsics.type_is_float(T) {
-	delete(flux.values, allocator, loc)
-	delete(flux.keys_to_be_deleted, allocator, loc)
+	delete(flux.values, loc)
+	delete(flux.keys_to_be_deleted, loc)
 }
 
 // clear map content, stops all animations
