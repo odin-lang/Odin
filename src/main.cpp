@@ -3804,7 +3804,7 @@ int main(int arg_count, char const **arg_ptr) {
 			String invalid;
 			if (!check_target_feature_is_valid_for_target_arch(item, &invalid) && item != str_lit("help")) {
 				if (item != str_lit("?")) {
-					gb_printf_err("Unkown target feature '%.*s'.\n", LIT(invalid));
+					gb_printf_err("Unknown target feature '%.*s'.\n", LIT(invalid));
 				}
 				gb_printf("Possible -target-features for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
 				gb_printf("\n");
