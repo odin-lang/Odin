@@ -309,7 +309,7 @@ struct Tokenizer {
 	i32 error_count;
 
 	bool insert_semicolon;
-	
+	bool skip_one_newline;
 	LoadedFile loaded_file;
 };
 
@@ -653,8 +653,15 @@ gb_internal gb_inline void tokenizer_skip_line(Tokenizer *t) {
 	}
 }
 
-gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newline) {
-	if (on_newline) {
+enum TokenSkipNewline : u8 {
+	TokenSkipNewline_Always,
+	TokenSkipNewline_Once,
+	TokenSkipNewline_Never,
+};
+
+gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, TokenSkipNewline skip_newline) {
+	switch (skip_newline) {
+	case TokenSkipNewline_Never:
 		for (;;) {
 			switch (t->curr_rune) {
 			case ' ':
@@ -665,7 +672,24 @@ gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newli
 			}
 			break;
 		}
-	} else {
+		break;
+	case TokenSkipNewline_Once:
+		for (;;) {
+			switch (t->curr_rune) {
+			case '\n':
+				advance_to_next_rune(t);
+				tokenizer_skip_whitespace(t, TokenSkipNewline_Never);
+				break;
+			case ' ':
+			case '\t':
+			case '\r':
+				advance_to_next_rune(t);
+				continue;
+			}
+			break;
+		}
+		break;
+	case TokenSkipNewline_Always:
 		for (;;) {
 			switch (t->curr_rune) {
 			case '\n':
@@ -677,11 +701,23 @@ gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newli
 			}
 			break;
 		}
+		break;
 	}
 }
 
 gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
-	tokenizer_skip_whitespace(t, t->insert_semicolon);
+	{
+		TokenSkipNewline skip_newline = TokenSkipNewline_Never;
+		if (!t->insert_semicolon) {
+			if (t->skip_one_newline) {
+				t->skip_one_newline = false;
+				skip_newline = TokenSkipNewline_Once;
+			} else {
+				skip_newline = TokenSkipNewline_Always;
+			}
+		}
+		tokenizer_skip_whitespace(t, skip_newline);
+	}
 
 	token->kind = Token_Invalid;
 	token->string.text = t->curr;
@@ -746,6 +782,7 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 
 		case '\\':
 			t->insert_semicolon = false;
+			t->skip_one_newline = true;
 			tokenizer_get_token(t, token);
 			if (token->pos.line == current_pos.line) {
 				tokenizer_err(t, token_pos_add_column(current_pos), "Expected a newline after \\");
