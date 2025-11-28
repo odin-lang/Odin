@@ -328,7 +328,7 @@ is_soa_pointer :: proc(info: ^Type_Info) -> bool {
 @(require_results)
 is_pointer_internally :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
-	#partial switch v in info.variant {
+	#partial switch v in type_info_base(info).variant {
 	case Type_Info_Pointer, Type_Info_Multi_Pointer,
 	     Type_Info_Procedure:
 		return true
