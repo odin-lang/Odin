@@ -790,8 +790,10 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 			// Is >256 KiB good enough?
 			if (sz > 1ll<<18) {
 				bool is_ref = false;
-				if((e->flags & EntityFlag_ForValue) != 0) {
+				if ((e->flags & EntityFlag_ForValue) != 0) {
 					is_ref = type_deref(e->Variable.for_loop_parent_type) != NULL;
+				} else if ((e->flags & EntityFlag_SwitchValue) != 0) {
+					is_ref = !(e->flags & EntityFlag_Value);
 				}
 				if(!is_ref) {
 					gbString type_str = type_to_string(e->type);
