@@ -546,9 +546,7 @@ Possible Output:
 
 */
 uint32_range :: proc(lo, hi: u32, gen := context.random_generator) -> (val: u32) {
-	if lo >= hi {
-		panic("Invalid arguments to uint32_range: lo must be less than hi")
-	}
+	assert(lo < hi, "Invalid arguments to uint32_range: lo must be less than hi")
 	range := hi - lo
 	if (range & (range - 1)) == 0 {
 		return lo + (uint32(gen) & (range - 1))
@@ -588,9 +586,7 @@ Possible Output:
 
 */
 uint64_range :: proc(lo, hi: u64, gen := context.random_generator) -> (val: u64) {
-	if lo >= hi {
-		panic("Invalid arguments to uint64_range: lo must be less than hi")
-	}
+	assert(lo < hi, "Invalid arguments to uint64_range: lo must be less than hi")
 	range := hi - lo
 	if (range & (range - 1)) == 0 {
 		return lo + (uint64(gen) & (range - 1))
@@ -630,9 +626,7 @@ Possible Output:
 
 */
 uint128_range :: proc(lo, hi: u128, gen := context.random_generator) -> (val: u128) {
-	if lo >= hi {
-		panic("Invalid arguments to uint128_range: lo must be less than hi")
-	}
+	assert(lo < hi, "Invalid arguments to uint128_range: lo must be less than hi")
 	range := hi - lo
 	if (range & (range - 1)) == 0 {
 		return lo + (uint128(gen) & (range - 1))
@@ -673,9 +667,7 @@ Possible Output:
 */
 @(require_results)
 uint_range :: proc(lo, hi: uint, gen := context.random_generator) -> (val: uint) {
-	if lo >= hi {
-		panic("Invalid arguments to uint_range: lo must be less than hi")
-	}
+	assert(lo < hi, "Invalid arguments to uint_range: lo must be less than hi")
 	when size_of(int) == 4 {
 		return uint(uint32_range(u32(lo), u32(hi), gen))
 	} else {
@@ -710,9 +702,7 @@ Possible Output:
 
 */
 int32_range :: proc(lo, hi: i32, gen := context.random_generator) -> (val: i32) {
-	if lo >= hi {
-		panic("Invalid arguments to int32_range: lo must be less than hi")
-	}
+	assert(lo < hi, "Invalid arguments to int32_range: lo must be less than hi")
 	range := u32(hi) - u32(lo)
 	if (range & (range - 1)) == 0 {
 		return lo + i32(uint32(gen) & (range - 1))
@@ -752,9 +742,7 @@ Possible Output:
 
 */
 int64_range :: proc(lo, hi: i64, gen := context.random_generator) -> (val: i64) {
-	if lo >= hi {
-		panic("Invalid arguments to int64_range: lo must be less than hi")
-	}
+	assert(lo < hi, "Invalid arguments to int64_range: lo must be less than hi")
 	range := u64(hi) - u64(lo)
 	if (range & (range - 1)) == 0 {
 		return lo + i64(uint64(gen) & (range - 1))
@@ -794,9 +782,7 @@ Possible Output:
 
 */
 int128_range :: proc(lo, hi: i128, gen := context.random_generator) -> (val: i128) {
-	if lo >= hi {
-		panic("Invalid arguments to int128_range: lo must be less than hi")
-	}
+	assert(lo < hi, "Invalid arguments to int128_range: lo must be less than hi")
 	range := u128(hi) - u128(lo)
 	if (range & (range - 1)) == 0 {
 		return lo + i128(uint128(gen) & (range - 1))
@@ -837,9 +823,7 @@ Possible Output:
 */
 @(require_results)
 int_range :: proc(lo, hi: int, gen := context.random_generator) -> (val: int) {
-	if lo >= hi {
-		panic("Invalid arguments to int_range: lo must be less than hi")
-	}
+	assert(lo < hi, "Invalid arguments to int_range: lo must be less than hi")
 	when size_of(int) == 4 {
 		return int(int32_range(i32(lo), i32(hi), gen))
 	} else {
