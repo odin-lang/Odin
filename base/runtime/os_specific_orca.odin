@@ -4,6 +4,8 @@ package runtime
 
 import "base:intrinsics"
 
+_HAS_RAND_BYTES :: false
+
 // Constants allowing to specify the level of logging verbosity.
 log_level :: enum u32 {
 	// Only errors are logged.
