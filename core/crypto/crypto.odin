@@ -4,6 +4,10 @@ package crypto
 import "base:runtime"
 import "core:mem"
 
+// HAS_RAND_BYTES is true iff the runtime provides a cryptographic
+// entropy source.
+HAS_RAND_BYTES :: runtime.HAS_RAND_BYTES
+
 // compare_constant_time returns 1 iff a and b are equal, 0 otherwise.
 //
 // The execution time of this routine is constant regardless of the contents
@@ -54,7 +58,7 @@ rand_bytes :: proc (dst: []byte) {
 	// zero-fill the buffer first
 	mem.zero_explicit(raw_data(dst), len(dst))
 
-	_rand_bytes(dst)
+	runtime.rand_bytes(dst)
 }
 
 // random_generator returns a `runtime.Random_Generator` backed by the

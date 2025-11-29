@@ -2,7 +2,10 @@
 #+private
 package runtime
 
+foreign import bcrypt "system:Bcrypt.lib"
 foreign import kernel32 "system:Kernel32.lib"
+
+_HAS_RAND_BYTES :: true
 
 @(private="file")
 @(default_calling_convention="system")
@@ -16,6 +19,12 @@ foreign kernel32 {
 	GetLastError         :: proc() -> u32 ---
 
 	ExitProcess          :: proc(code: u32) -> ! ---
+}
+
+@(private="file")
+@(default_calling_convention="system")
+foreign bcrypt {
+	BCryptGenRandom :: proc(hAlgorithm: rawptr, pBuffer: [^]u8, cbBuffer: u32, dwFlags: u32) -> i32 ---
 }
 
 _stderr_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #no_bounds_check {
@@ -50,6 +59,30 @@ _stderr_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #
 	}
 	n = int(total_write)
 	return
+}
+
+_rand_bytes :: proc "contextless" (dst: []byte) {
+	ensure_contextless(u64(len(dst)) <= u64(max(u32)), "base/runtime: oversized rand_bytes request")
+
+	BCRYPT_USE_SYSTEM_PREFERRED_RNG :: 0x00000002
+
+	ERROR_INVALID_HANDLE :: 6
+	ERROR_INVALID_PARAMETER :: 87
+
+	ret := BCryptGenRandom(nil, raw_data(dst), u32(len(dst)), BCRYPT_USE_SYSTEM_PREFERRED_RNG)
+	switch ret {
+	case 0:
+	case ERROR_INVALID_HANDLE:
+		// The handle to the first parameter is invalid.
+		// This should not happen here, since we explicitly pass nil to it
+		panic_contextless("base/runtime: BCryptGenRandom Invalid handle for hAlgorithm")
+	case ERROR_INVALID_PARAMETER:
+		// One of the parameters was invalid
+		panic_contextless("base/runtime: BCryptGenRandom Invalid parameter")
+	case:
+		// Unknown error
+		panic_contextless("base/runtime: BCryptGenRandom failed")
+	}
 }
 
 _exit :: proc "contextless" (code: int) -> ! {

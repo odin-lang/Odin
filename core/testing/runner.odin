@@ -151,9 +151,9 @@ run_test_task :: proc(task: thread.Task) {
 		options = logger_options,
 	}
 
-	random_generator_state: runtime.Default_Random_State
+	random_generator_state: rand.Xoshiro256_Random_State
 	context.random_generator = {
-		procedure = runtime.default_random_generator_proc,
+		procedure = rand.xoshiro256_random_generator_proc,
 		data = &random_generator_state,
 	}
 	rand.reset(data.t.seed)

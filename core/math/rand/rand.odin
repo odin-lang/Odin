@@ -11,13 +11,48 @@ Generator :: runtime.Random_Generator
 Generator_Query_Info :: runtime.Random_Generator_Query_Info
 
 Default_Random_State :: runtime.Default_Random_State
+
+/*
+Returns an instance of the runtime pseudorandom generator.  If no
+initial state is provided, the PRNG will be lazily initialized with
+entropy from the system entropy source on first-use.
+
+The cryptographic security of the returned random number generator
+is directly dependent on the quality of the initialization entropy.
+Calling `reset`/`create` SHOULD be done with no seed/state, or
+32-bytes of high-quality entropy.
+
+WARNING:
+- The lazy initialization will panic if there is no system entropy
+  source available.
+- While the generator is cryptographically secure, developers SHOULD
+  prefer `crypto.random_generator()` for cryptographic use cases such
+  as key generation.
+
+Inputs:
+- state: Optional initial PRNG state.
+
+Returns:
+- A `Generator` instance.
+*/
 default_random_generator :: runtime.default_random_generator
 
 @(require_results)
-create :: proc(seed: u64) -> (state: Default_Random_State) {
+create_u64 :: proc(seed: u64) -> (state: Default_Random_State) {
 	seed := seed
 	runtime.default_random_generator_proc(&state, .Reset, ([^]byte)(&seed)[:size_of(seed)])
 	return
+}
+
+@(require_results)
+create_bytes :: proc(seed: []byte) -> (state: Default_Random_State) {
+	runtime.default_random_generator_proc(&state, .Reset, seed)
+	return
+}
+
+create :: proc {
+	create_u64,
+	create_bytes,
 }
 
 /*
@@ -39,10 +74,14 @@ Possible Output:
 
 	10
 */
-reset :: proc(seed: u64, gen := context.random_generator) {
-	runtime.random_generator_reset_u64(gen, seed)
+reset :: proc {
+	reset_u64,
+	reset_bytes,
 }
 
+reset_u64 :: proc(seed: u64, gen := context.random_generator) {
+	runtime.random_generator_reset_u64(gen, seed)
+}
 
 reset_bytes :: proc(bytes: []byte, gen := context.random_generator) {
 	runtime.random_generator_reset_bytes(gen, bytes)
