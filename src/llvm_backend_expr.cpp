@@ -664,6 +664,11 @@ gb_internal lbValue lb_emit_matrix_transpose(lbProcedure *p, lbValue m, Type *ty
 	Type *mt = base_type(m.type);
 	GB_ASSERT(mt->kind == Type_Matrix);
 
+	Type *rt = base_type(type);
+	if (rt->kind == Type_Matrix && rt->Matrix.is_row_major != mt->Matrix.is_row_major) {
+		GB_PANIC("TODO: transpose with changing layout");
+	}
+
 	if (lb_is_matrix_simdable(mt) && lb_is_matrix_simdable(type)) {
 		unsigned stride = cast(unsigned)matrix_type_stride_in_elems(mt);
 		unsigned row_count    = cast(unsigned)mt->Matrix.row_count;
