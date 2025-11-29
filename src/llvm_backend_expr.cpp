@@ -634,7 +634,7 @@ gb_internal LLVMValueRef lb_matrix_to_trimmed_vector(lbProcedure *p, lbValue m) 
 }
 
 
-gb_internal lbValue lb_emit_matrix_tranpose(lbProcedure *p, lbValue m, Type *type) {
+gb_internal lbValue lb_emit_matrix_transpose(lbProcedure *p, lbValue m, Type *type) {
 	if (is_type_array(m.type)) {
 		i32 rank = type_math_rank(m.type);
 		if (rank == 2) {
@@ -664,7 +664,7 @@ gb_internal lbValue lb_emit_matrix_tranpose(lbProcedure *p, lbValue m, Type *typ
 	Type *mt = base_type(m.type);
 	GB_ASSERT(mt->kind == Type_Matrix);
 
-	if (lb_is_matrix_simdable(mt)) {
+	if (lb_is_matrix_simdable(mt) && lb_is_matrix_simdable(type)) {
 		unsigned stride = cast(unsigned)matrix_type_stride_in_elems(mt);
 		unsigned row_count    = cast(unsigned)mt->Matrix.row_count;
 		unsigned column_count = cast(unsigned)mt->Matrix.column_count;
