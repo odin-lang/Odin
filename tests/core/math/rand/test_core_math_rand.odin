@@ -87,11 +87,11 @@ test_issue_5978 :: proc(t:^testing.T) {
 	cases := []struct {
 		seed: u64,
 		expected: int,
-	}{ {13, 1}, {27, 5} };
+	}{ {13, 1}, {27, 5} }
 
 	for c in cases {
-		rand.reset(c.seed);
-		i, _ := rand.choice_bit_set(s);
+		rand.reset(c.seed)
+		i, _ := rand.choice_bit_set(s)
 		testing.expectf(t, i == c.expected, "choice_bit_set returned %v with seed %v, expected %v", i, c.seed, c.expected)
 	}
 }
