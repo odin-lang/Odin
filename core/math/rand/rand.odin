@@ -1199,11 +1199,14 @@ choice_bit_set :: proc(set: $T/bit_set[$E], gen := context.random_generator) -> 
 		return {}, false
 	}
 
-	core_set := transmute(intrinsics.type_bit_set_underlying_type(T))set
+	target := int_max(total_set, gen)
 
-	for target := int_max(total_set, gen); target > 0; target -= 1 {
-		core_set &= core_set - 1
+	for value in set {
+		if target == 0 {
+			return value, true
+		}
+		target -= 1
 	}
 
-	return E(intrinsics.count_trailing_zeros(core_set)), true
+	return {}, false
 }
