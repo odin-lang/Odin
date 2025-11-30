@@ -78,6 +78,24 @@ rand_issue_5881 :: proc(t:^testing.T, rng: Generator) {
 	expect_quaternion_sign_uniformity(t, rng, 200_000)
 }
 
+@(test)
+test_issue_5978 :: proc(t:^testing.T) {
+	// Tests issue #5978 https://github.com/odin-lang/Odin/issues/5978
+
+	s := bit_set[1 ..= 5]{1, 5}
+
+	cases := []struct {
+		seed: u64,
+		expected: int,
+	}{ {13, 1}, {27, 5} }
+
+	for c in cases {
+		rand.reset(c.seed)
+		i, _ := rand.choice_bit_set(s)
+		testing.expectf(t, i == c.expected, "choice_bit_set returned %v with seed %v, expected %v", i, c.seed, c.expected)
+	}
+}
+
 // Helper: compute chi-square statistic for counts vs equal-expected across k bins
 @(private = "file")
 chi_square_equal :: proc(counts: []int) -> f64 {
