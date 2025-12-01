@@ -17,13 +17,14 @@ easytype :: enum c.int {
 
 easyoptionflags :: distinct bit_set[easyoptionflag; c.uint]
 easyoptionflag :: enum c.uint {
-	/* "alias" means it is provided for old programs to remain functional,
-	   we prefer another name */
+	/* "alias" means it is provided for old programs to remain functional, we prefer another name */
 	ALIAS = 0,
 }
 
-/* The CURLOPTTYPE_* id ranges can still be used to figure out what type/size
-   to use for curl_easy_setopt() for the given id */
+/*
+		The CURLOPTTYPE_* id ranges can still be used to figure out what type/size
+		to use for curl_easy_setopt() for the given id
+	*/
 easyoption :: struct {
 	name:  cstring,
 	id:    option,
