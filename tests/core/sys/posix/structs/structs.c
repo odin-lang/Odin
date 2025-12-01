@@ -102,6 +102,11 @@ int main(int argc, char *argv[])
 	printf("iovec %zu %zu\n", sizeof(struct iovec), _Alignof(struct iovec));
 
 	printf("semid_ds %zu %zu\n", sizeof(struct semid_ds), _Alignof(struct semid_ds));
+	printf("semid_ds.sem_perm %zu\n", offsetof(struct semid_ds, sem_perm));
+	printf("semid_ds.sem_otime %zu\n", offsetof(struct semid_ds, sem_otime));
+	printf("semid_ds.sem_ctime %zu\n", offsetof(struct semid_ds, sem_ctime));
+	printf("semid_ds.sem_nsems %zu\n", offsetof(struct semid_ds, sem_nsems));
+
 	printf("sembuf %zu %zu\n", sizeof(struct sembuf), _Alignof(struct sembuf));
 
 	printf("itimerval %zu %zu\n", sizeof(struct itimerval), _Alignof(struct itimerval));

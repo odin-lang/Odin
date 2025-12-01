@@ -181,15 +181,9 @@ gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isiz
 	stypes[0] = lb_type(m, tibt->Struct.fields[0]->type);
 	stypes[1] = lb_type(m, tibt->Struct.fields[1]->type);
 	stypes[2] = lb_type(m, tibt->Struct.fields[2]->type);
-	isize variant_index = 0;
-	if (build_context.ptr_size == 8) {
-		stypes[3] = lb_type(m, t_i32); // padding
-		stypes[4] = lb_type(m, tibt->Struct.fields[3]->type);
-		variant_index = 5;
-	} else {
-		stypes[3] = lb_type(m, tibt->Struct.fields[3]->type);
-		variant_index = 4;
-	}
+	stypes[3] = lb_type(m, t_i32); // padding
+	stypes[4] = lb_type(m, tibt->Struct.fields[3]->type);
+	isize variant_index = 5;
 
 	LLVMTypeRef *modified_types = gb_alloc_array(heap_allocator(), LLVMTypeRef, Typeid__COUNT);
 	GB_ASSERT(Typeid__COUNT == ut->Union.variants.count);
@@ -360,16 +354,9 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 		small_const_values[0] = LLVMConstInt(lb_type(m, t_int), size, true);
 		small_const_values[1] = LLVMConstInt(lb_type(m, t_int), align, true);
 		small_const_values[2] = type_info_flags.value;
-
-		unsigned variant_index = 0;
-		if (build_context.ptr_size == 8) {
-			small_const_values[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 3));
-			small_const_values[4] = id.value;
-			variant_index = 5;
-		} else {
-			small_const_values[3] = id.value;
-			variant_index = 4;
-		}
+		small_const_values[3] = LLVMConstNull(LLVMStructGetTypeAtIndex(stype, 3));
+		small_const_values[4] = id.value;
+		unsigned variant_index = 5;
 
 		LLVMTypeRef full_variant_type = LLVMStructGetTypeAtIndex(stype, variant_index);
 		unsigned full_variant_elem_count = LLVMCountStructElementTypes(full_variant_type);
@@ -830,10 +817,10 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 			{
 				u8 flags = 0;
-				if (t->Struct.is_packed)    flags |= 1<<0;
-				if (t->Struct.is_raw_union) flags |= 1<<1;
-				//
-				if (t->Struct.custom_align) flags |= 1<<3;
+				if (t->Struct.is_packed)      flags |= 1<<0;
+				if (t->Struct.is_raw_union)   flags |= 1<<1;
+				if (t->Struct.is_all_or_none) flags |= 1<<2;
+				if (t->Struct.custom_align)   flags |= 1<<3;
 
 				vals[6] = lb_const_int(m, t_u8, flags).value;
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {

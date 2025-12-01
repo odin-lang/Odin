@@ -105,8 +105,13 @@ This operation assumes that the small-array is large enough.
 
 This will result in:
 	- the value if 0 <= index < len
-	- the zero value of the type if len < index < capacity
-	- 'crash' if capacity < index or index < 0
+	- raise a bounds check error if capacity <= index
+	- the previous value if len < index < capacity, which defauls to T's zero value.
+
+	e.g. if you call `small_array.push(&a, 0, 1, 2)`, and `i := pop_back(&a)`,
+	then `get(a, 2)` will return the earlier value `2` at that location.
+
+	See also `get_safe`, which returns T's zero value and `false` if `index` is out of bounds.
 
 **Inputs**
 - `a`: The small-array
@@ -125,8 +130,13 @@ This operation assumes that the small-array is large enough.
 
 This will result in:
 	- the pointer if 0 <= index < len
-	- the pointer to the zero value if len < index < capacity
-	- 'crash' if capacity < index or index < 0
+	- raise a bounds check error if capacity <= index
+	- a pointer to the previous value if len < index < capacity, which defauls to T's zero value.
+
+	e.g. if you call `small_array.push(&a, 0, 1, 2)`, and `i := pop_back(&a)`,
+	then `get_ptr(a, 2)` will return a pointer to the slot containing the earlier value `2` at that location.
+
+	See also `get_ptr_safe`, which returns a nil pointer, and `false` if `index` is out of bounds.
 
 **Inputs**
 - `a`: A pointer to the small-array
@@ -309,7 +319,7 @@ Example:
 	import "core:container/small_array"
 	import "core:fmt"
 
-	non_zero_resize :: proc() {
+	non_zero_resize_example :: proc() {
 		a: small_array.Small_Array(5, int)
 
 		small_array.push_back(&a, 1)

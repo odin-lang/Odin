@@ -2,7 +2,7 @@ package math_big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
@@ -1050,7 +1050,6 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		Normalize both x and y, ensure that y >= b/2, [b == 2**MP_DIGIT_BIT]
 	*/
 	norm := internal_count_bits(y) % _DIGIT_BITS
-
 	if norm < _DIGIT_BITS - 1 {
 		norm = (_DIGIT_BITS - 1) - norm
 		internal_shl(x, x, norm) or_return
@@ -1070,33 +1069,29 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		y = y*b**{n-t}
 	*/
 
+
 	_private_int_shl_leg(y, n - t) or_return
 
-	gte := internal_gte(x, y)
-	for gte {
+	for internal_gte(x, y) {
 		q.digit[n - t] += 1
 		internal_sub(x, x, y) or_return
-		gte = internal_gte(x, y)
 	}
 
 	/*
 		Reset y by shifting it back down.
 	*/
 	_private_int_shr_leg(y, n - t)
-
 	/*
 		Step 3. for i from n down to (t + 1).
 	*/
 	#no_bounds_check for i := n; i >= (t + 1); i -= 1 {
 		if i > x.used { continue }
-
 		/*
 			step 3.1 if xi == yt then set q{i-t-1} to b-1, otherwise set q{i-t-1} to (xi*b + x{i-1})/yt
 		*/
 		if x.digit[i] == y.digit[t] {
-			q.digit[(i - t) - 1] = 1 << (_DIGIT_BITS - 1)
+			q.digit[(i - t) - 1] = 1 << _DIGIT_BITS - 1
 		} else {
-
 			tmp := _WORD(x.digit[i]) << _DIGIT_BITS
 			tmp |= _WORD(x.digit[i - 1])
 			tmp /= _WORD(y.digit[t])
@@ -1667,7 +1662,7 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	defer internal_destroy(bracket_low, bracket_high, bracket_mid, t, bi_base)
 
 	ic := #force_inline internal_cmp(a, base)
-	if ic == -1 || ic == 0 {
+	if ic <= 0 {
 		return 1 if ic == 0 else 0, nil
 	}
 	defer if err != nil {
@@ -2497,9 +2492,9 @@ _private_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 		bitcnt -= 1
 		if bitcnt == 0 {
 			/*
-				If digidx == -1 we are out of digits.
+				If digidx < 0 we are out of digits.
 			*/
-			if digidx == -1 { break }
+			if digidx < 0 { break }
 
 			/*
 				Read next digit and reset the bitcnt.
@@ -2753,9 +2748,9 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 		bitcnt -= 1
 		if bitcnt == 0 {
 			/*
-				If digidx == -1 we are out of digits so break.
+				If digidx < 0 we are out of digits so break.
 			*/
-			if digidx == -1 { break }
+			if digidx < 0 { break }
 
 			/*
 				Read next digit and reset the bitcnt.
@@ -3222,6 +3217,7 @@ _private_int_shr_leg :: proc(quotient: ^Int, digits: int, allocator := context.a
 	Tables used by `internal_*` and `_*`.
 */
 
+@(rodata)
 _private_int_rem_128 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 	0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
@@ -3234,6 +3230,7 @@ _private_int_rem_128 := [?]DIGIT{
 }
 #assert(128 * size_of(DIGIT) == size_of(_private_int_rem_128))
 
+@(rodata)
 _private_int_rem_105 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1,
 	0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1,
@@ -3246,6 +3243,7 @@ _private_int_rem_105 := [?]DIGIT{
 #assert(105 * size_of(DIGIT) == size_of(_private_int_rem_105))
 
 _PRIME_TAB_SIZE :: 256
+@(rodata)
 _private_prime_table := [_PRIME_TAB_SIZE]DIGIT{
 	0x0002, 0x0003, 0x0005, 0x0007, 0x000B, 0x000D, 0x0011, 0x0013,
 	0x0017, 0x001D, 0x001F, 0x0025, 0x0029, 0x002B, 0x002F, 0x0035,
@@ -3286,6 +3284,7 @@ _private_prime_table := [_PRIME_TAB_SIZE]DIGIT{
 #assert(_PRIME_TAB_SIZE * size_of(DIGIT) == size_of(_private_prime_table))
 
 when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
+	@(rodata)
 	_factorial_table := [35]_WORD{
 /* f(00): */                                                     1,
 /* f(01): */                                                     1,
@@ -3324,6 +3323,7 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 /* f(34): */   295_232_799_039_604_140_847_618_609_643_520_000_000,
 	}
 } else {
+	@(rodata)
 	_factorial_table := [21]_WORD{
 /* f(00): */                                                     1,
 /* f(01): */                                                     1,

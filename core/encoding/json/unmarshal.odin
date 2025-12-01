@@ -188,8 +188,18 @@ assign_float :: proc(val: any, f: $T) -> bool {
 
 
 @(private)
-unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> (ok: bool, err: Error) {
-	val := val
+unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.Type_Info) -> (ok: bool, err: Error) {
+	str: string
+	switch {
+	case token.kind == .String:
+		str = unquote_string(token, p.spec, p.allocator) or_return
+	case:
+		str = clone_string(token.text, p.allocator) or_return
+	}
+	defer if !ok || (val.id != string && val.id != cstring) {
+		delete(str, p.allocator)
+	}
+
 	switch &dst in val {
 	case string:
 		dst = str
@@ -339,7 +349,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	case .Ident:
 		advance_token(p)
 		if p.spec == .MJSON {
-			if unmarshal_string_token(p, any{v.data, ti.id}, token.text, ti) or_return {
+			if unmarshal_string_token(p, any{v.data, ti.id}, token, ti) or_return {
 				return nil
 			}
 		}
@@ -347,18 +357,10 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		
 	case .String:
 		advance_token(p)
-		str  := unquote_string(token, p.spec, p.allocator) or_return
-		dest := any{v.data, ti.id}
-		if !(unmarshal_string_token(p, dest, str, ti) or_return) {
-			delete(str, p.allocator)
-			return UNSUPPORTED_TYPE
+		if unmarshal_string_token(p, any{v.data, ti.id}, token, ti) or_return {
+			return nil
 		}
-
-		switch destv in dest {
-		case string, cstring:
-		case: delete(str, p.allocator)
-		}
-		return nil
+		return UNSUPPORTED_TYPE
 
 	case .Open_Brace:
 		return unmarshal_object(p, v, .Close_Brace)

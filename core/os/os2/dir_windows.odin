@@ -18,7 +18,7 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	path := concatenate({base_path, `\`, win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_else ""}, allocator) or_return
 
-	handle := win32.HANDLE(_open_internal(path, {.Read}, 0o666) or_else 0)
+	handle := win32.HANDLE(_open_internal(path, {.Read}, Permissions_Read_Write_All) or_else 0)
 	defer win32.CloseHandle(handle)
 
 	fi.fullpath = path

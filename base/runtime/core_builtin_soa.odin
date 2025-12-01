@@ -501,6 +501,121 @@ append_soa :: proc{
 }
 
 
+// `append_nothing_soa` appends an empty value to a dynamic SOA array. It returns `1, nil` if successful, and `0, err` when it was not possible,
+// whatever `err` happens to be.
+@builtin
+append_nothing_soa :: proc(array: ^$T/#soa[dynamic]$E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	if array == nil {
+		return 0, nil
+	}
+	prev_len := len(array)
+	resize_soa(array, len(array)+1, loc) or_return
+	return len(array)-prev_len, nil
+}
+
+
+// `inject_at_elem_soa` injects an element in a dynamic SOA array at a specified index and moves the previous elements after that index "across"
+@builtin
+inject_at_elem_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, #no_broadcast arg: E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
+	if array == nil {
+		return
+	}
+	n := max(len(array), index)
+	m :: 1
+	new_len := n + m
+
+	resize_soa(array, new_len, loc) or_return
+
+	when size_of(E) != 0 {
+		ti := type_info_base(type_info_of(typeid_of(T)))
+		si := &ti.variant.(Type_Info_Struct)
+
+		field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+
+		item_offset := 0
+
+		arg_copy := arg
+		arg_ptr := &arg_copy
+
+		for i in 0..<field_count {
+			data := (^uintptr)(uintptr(array) + uintptr(si.offsets[i]))^
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+			item_offset = align_forward_int(item_offset, type.align)
+
+			src := data + uintptr(index * type.size)
+			dst := data + uintptr((index + m) * type.size)
+			mem_copy(rawptr(dst), rawptr(src), (n - index) * type.size)
+
+			mem_copy(rawptr(src), rawptr(uintptr(arg_ptr) + uintptr(item_offset)), type.size)
+
+			item_offset += type.size
+		}
+	}
+
+	ok = true
+	return
+}
+
+// `inject_at_elems_soa` injects multiple elements in a dynamic SOA array at a specified index and moves the previous elements after that index "across"
+@builtin
+inject_at_elems_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
+	if array == nil {
+		return
+	}
+	if len(args) == 0 {
+		ok = true
+		return
+	}
+
+	n := max(len(array), index)
+	m := len(args)
+	new_len := n + m
+
+	resize_soa(array, new_len, loc) or_return
+
+	when size_of(E) != 0 {
+		ti := type_info_base(type_info_of(typeid_of(T)))
+		si := &ti.variant.(Type_Info_Struct)
+
+		field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+
+		item_offset := 0
+
+		args_ptr := &args[0]
+
+		for i in 0..<field_count {
+			data := (^uintptr)(uintptr(array) + uintptr(si.offsets[i]))^
+			type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
+			item_offset = align_forward_int(item_offset, type.align)
+
+			src := data + uintptr(index * type.size)
+			dst := data + uintptr((index + m) * type.size)
+			mem_copy(rawptr(dst), rawptr(src), (n - index) * type.size)
+
+			for j in 0..<len(args) {
+				d := rawptr(src + uintptr(j*type.size))
+				s := rawptr(uintptr(args_ptr) + uintptr(item_offset) + uintptr(j*size_of(E)))
+				mem_copy(d, s, type.size)
+			}
+
+			item_offset += type.size
+		}
+	}
+
+	ok = true
+	return
+}
+
+// `inject_at_soa` injects something into a dynamic SOA array at a specified index and moves the previous elements after that index "across"
+@builtin inject_at_soa :: proc{inject_at_elem_soa, inject_at_elems_soa}
+
+
 delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	when field_count != 0 {

@@ -242,9 +242,146 @@ gb_internal gb_inline void type_set_clear(TypeSet *s) {
 typedef TYPE_WRITER_PROC(TypeWriterProc);
 
 
+enum { SIP_BLOCK_SIZE = 8 };
+
+struct SipHashContext {
+	u64   v0, v1, v2, v3;      // State values
+	u64   k0, k1;              // Split key
+	isize c_rounds;            // Number of message rounds
+	isize d_rounds;            // Number of finalization rounds
+	u8    buf[SIP_BLOCK_SIZE]; // Provided data
+	isize last_block;          // offset from last block
+	isize total_length;
+	bool  is_initialized;
+};
+
+struct TypeidHashContext {
+	SipHashContext sip;
+};
+
+
+void typeid_hash_context_init(TypeidHashContext *hash_ctx) {
+	SipHashContext *sip = &hash_ctx->sip;
+	sip->c_rounds = 2;
+	sip->d_rounds = 4;
+
+	// some random numbers to act as the seed
+	sip->k0 = 0xa6592ea25e04ac3cull;
+	sip->k1 = 0xba3cba04ed28a9aeull;
+
+	//
+	sip->v0 = 0x736f6d6570736575 ^ sip->k0;
+	sip->v1 = 0x646f72616e646f6d ^ sip->k1;
+	sip->v2 = 0x6c7967656e657261 ^ sip->k0;
+	sip->v3 = 0x7465646279746573 ^ sip->k1;
+
+	sip->last_block = 0;
+	sip->total_length = 0;
+
+	sip->is_initialized = true;
+}
+
+u64 rotate_left64(u64 x, u64 k) {
+	static u64 const n = 64;
+	u64 s = k & (n-1);
+	return (x<<s) | (x>>(n-2));
+}
+
+void sip_compress(SipHashContext *sip) {
+	sip->v0 += sip->v1;
+	sip->v1 =  rotate_left64(sip->v1, 13);
+	sip->v1 ^= sip->v0;
+	sip->v0 =  rotate_left64(sip->v0, 32);
+	sip->v2 += sip->v3;
+	sip->v3 =  rotate_left64(sip->v3, 16);
+	sip->v3 ^= sip->v2;
+	sip->v0 += sip->v3;
+	sip->v3 =  rotate_left64(sip->v3, 21);
+	sip->v3 ^= sip->v0;
+	sip->v2 += sip->v1;
+	sip->v1 =  rotate_left64(sip->v1, 17);
+	sip->v1 ^= sip->v2;
+	sip->v2 =  rotate_left64(sip->v2, 32);
+}
+
+void sip_block(SipHashContext *sip, void const *ptr, isize len) {
+	u8 const *data = cast(u8 const *)ptr;
+	while (len >= SIP_BLOCK_SIZE) {
+		u64 m = 0;
+		gb_memcopy(&m, data, 8);
+
+		sip->v3 ^= m;
+
+		for (isize i = 0; i < sip->c_rounds; i++) {
+			sip_compress(sip);
+		}
+
+		sip->v0 ^= m;
+
+		data += SIP_BLOCK_SIZE;
+		len -= SIP_BLOCK_SIZE;
+	}
+}
+
+void typeid_hash_context_update(TypeidHashContext *ctx, void const *ptr, isize len) {
+	GB_ASSERT(ctx->sip.is_initialized);
+	SipHashContext *sip = &ctx->sip;
+
+	u8 const *data = cast(u8 const *)ptr;
+	sip->total_length += len;
+	if (sip->last_block > 0) {
+		isize n = gb_min(SIP_BLOCK_SIZE - sip->last_block, len);
+		gb_memcopy(sip->buf + sip->last_block, data, n);
+		sip->last_block += n;
+		if (sip->last_block == SIP_BLOCK_SIZE) {
+			sip_block(sip, sip->buf, SIP_BLOCK_SIZE);
+			sip->last_block = 0;
+		}
+		data += n;
+		len -= n;
+	}
+
+	if (len >= SIP_BLOCK_SIZE) {
+		isize n = len & ~(SIP_BLOCK_SIZE-1);
+		sip_block(sip, data, n);
+		data += n;
+		len -= n;
+	}
+	if (len > 0) {
+		isize n = gb_min(SIP_BLOCK_SIZE, len);
+		gb_memcopy(sip->buf, data, n);
+		sip->last_block = n;
+	}
+}
+
+u64 typeid_hash_context_fini(TypeidHashContext *ctx) {
+	GB_ASSERT(ctx->sip.is_initialized);
+	SipHashContext *sip = &ctx->sip;
+
+	u8 tmp[SIP_BLOCK_SIZE] = {};
+	gb_memcopy(tmp, sip->buf, gb_min(sip->last_block, SIP_BLOCK_SIZE));
+	tmp[7] = u8(sip->total_length & 0xff);
+	sip_block(sip, tmp, SIP_BLOCK_SIZE);
+
+	sip->v2 ^= 0xff;
+
+	for (isize i = 0; i < sip->d_rounds; i++) {
+		sip_compress(sip);
+	}
+
+	u64 res = sip->v0 ^ sip->v1 ^ sip->v2 ^ sip->v3;
+
+	*sip = {};
+
+	return res ? res : 1;
+}
+
+
+
 struct TypeWriter {
-	TypeWriterProc *proc;
-	void *user_data;
+	TypeWriterProc *  proc;
+	void *            user_data;
+	TypeidHashContext hash_ctx;
 };
 
 bool type_writer_append(TypeWriter *w, void const *ptr, isize len) {
@@ -289,13 +426,14 @@ void type_writer_destroy_string(TypeWriter *w) {
 
 
 TYPE_WRITER_PROC(type_writer_hasher_writer_proc) {
-	u64 *seed = cast(u64 *)w->user_data;
-	*seed = fnv64a(ptr, len, *seed);
+	TypeidHashContext *ctx = cast(TypeidHashContext *)w->user_data;
+	typeid_hash_context_update(ctx, ptr, len);
 	return true;
 }
 
-void type_writer_make_hasher(TypeWriter *w, u64 *hash) {
-	w->user_data = hash;
+void type_writer_make_hasher(TypeWriter *w, TypeidHashContext *ctx) {
+	typeid_hash_context_init(ctx);
+	w->user_data = ctx;
 	w->proc = type_writer_hasher_writer_proc;
 }
 
@@ -378,11 +516,10 @@ gb_internal u64 type_hash_canonical_type(Type *type) {
 		return prev_hash;
 	}
 
-	u64 hash = fnv64a(nullptr, 0);
 	TypeWriter w = {};
-	type_writer_make_hasher(&w, &hash);
+	type_writer_make_hasher(&w, &w.hash_ctx);
 	write_type_to_canonical_string(&w, type);
-	hash = hash ? hash : 1;
+	u64 hash = typeid_hash_context_fini(&w.hash_ctx);
 
 	type->canonical_hash.store(hash, std::memory_order_relaxed);
 
@@ -417,7 +554,7 @@ gb_internal gbString string_canonical_entity_name(gbAllocator allocator, Entity 
 
 gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 	GB_ASSERT(e != nullptr);
-	if (e->kind == Entity_Procedure || e->kind == Entity_TypeName) {
+	if (e->kind == Entity_Procedure || e->kind == Entity_TypeName || e->kind == Entity_Variable) {
 		if (e->kind == Entity_Procedure && (e->Procedure.is_export || e->Procedure.is_foreign)) {
 			// no prefix
 			return;
@@ -527,6 +664,11 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		} else if (s->flags & (ScopeFlag_Builtin)) {
 			goto write_base_name;
 		}
+
+		if (e->kind == Entity_TypeName) {
+			goto write_base_name;
+		}
+
 		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
 
 		auto const print_scope_flags = [](Scope *s) {
@@ -543,7 +685,7 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		};
 
 		print_scope_flags(s);
-		GB_PANIC("weird entity %.*s", LIT(e->token.string));
+		GB_PANIC("weird entity %.*s (%.*s)", LIT(e->token.string), LIT(entity_strings[e->kind]));
 	}
 	if (e->pkg != nullptr) {
 		type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
@@ -744,8 +886,9 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			write_canonical_params(w, type->Struct.polymorphic_params);
 		}
 
-		if (type->Struct.is_packed)    type_writer_appendc(w, "#packed");
-		if (type->Struct.is_raw_union) type_writer_appendc(w, "#raw_union");
+		if (type->Struct.is_packed)      type_writer_appendc(w, "#packed");
+		if (type->Struct.is_raw_union)   type_writer_appendc(w, "#raw_union");
+		if (type->Struct.is_all_or_none) type_writer_appendc(w, "#all_or_none");
 		if (type->Struct.custom_min_field_align != 0) type_writer_append_fmt(w, "#min_field_align(%lld)", cast(long long)type->Struct.custom_min_field_align);
 		if (type->Struct.custom_max_field_align != 0) type_writer_append_fmt(w, "#max_field_align(%lld)", cast(long long)type->Struct.custom_max_field_align);
 		if (type->Struct.custom_align != 0)           type_writer_append_fmt(w, "#align(%lld)",           cast(long long)type->Struct.custom_align);
@@ -755,6 +898,14 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			GB_ASSERT(f->kind == Entity_Variable);
 			if (i > 0) {
 				type_writer_appendc(w, CANONICAL_FIELD_SEPARATOR);
+			}
+
+			if (f->flags & EntityFlags_IsSubtype) {
+				type_writer_appendc(w, "#subtype ");
+			}
+
+			if (f->flags & EntityFlag_Using) {
+				type_writer_appendc(w, "using ");
 			}
 			type_writer_append(w, f->token.string.text, f->token.string.len);
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);

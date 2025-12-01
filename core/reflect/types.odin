@@ -328,7 +328,7 @@ is_soa_pointer :: proc(info: ^Type_Info) -> bool {
 @(require_results)
 is_pointer_internally :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
-	#partial switch v in info.variant {
+	#partial switch v in type_info_base(info).variant {
 	case Type_Info_Pointer, Type_Info_Multi_Pointer,
 	     Type_Info_Procedure:
 		return true
@@ -696,9 +696,9 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		}
 
 		io.write_string(w, "struct ", &n) or_return
-		if .packed    in info.flags { io.write_string(w, "#packed ",    &n) or_return }
-		if .raw_union in info.flags { io.write_string(w, "#raw_union ", &n) or_return }
-		// if .no_copy   in info.flags { io.write_string(w, "#no_copy ", &n) or_return }
+		if .packed      in info.flags { io.write_string(w, "#packed ",    &n) or_return }
+		if .raw_union   in info.flags { io.write_string(w, "#raw_union ", &n) or_return }
+		if .all_or_none in info.flags { io.write_string(w, "#all_or_none ", &n) or_return }
 		if .align in info.flags {
 			io.write_string(w, "#align(",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return

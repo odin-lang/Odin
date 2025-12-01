@@ -2681,7 +2681,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_transpose:
 		{
 			lbValue m = lb_build_expr(p, ce->args[0]);
-			return lb_emit_matrix_tranpose(p, m, tv.type);
+			return lb_emit_matrix_transpose(p, m, tv.type);
 		}
 
 	case BuiltinProc_outer_product:

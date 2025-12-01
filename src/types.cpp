@@ -162,6 +162,7 @@ struct TypeStruct {
 	bool            are_offsets_set             : 1;
 	bool            is_packed                   : 1;
 	bool            is_raw_union                : 1;
+	bool            is_all_or_none              : 1;
 	bool            is_poly_specialized         : 1;
 
 	std::atomic<bool> are_offsets_being_processed;
@@ -3084,9 +3085,10 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		break;
 
 	case Type_Struct:
-		if (x->Struct.is_raw_union == y->Struct.is_raw_union &&
-		    x->Struct.fields.count == y->Struct.fields.count &&
-		    x->Struct.is_packed    == y->Struct.is_packed &&
+		if (x->Struct.is_raw_union   == y->Struct.is_raw_union &&
+		    x->Struct.fields.count   == y->Struct.fields.count &&
+		    x->Struct.is_packed      == y->Struct.is_packed &&
+		    x->Struct.is_all_or_none == y->Struct.is_all_or_none &&
 		    x->Struct.soa_kind == y->Struct.soa_kind &&
 		    x->Struct.soa_count == y->Struct.soa_count &&
 		    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
@@ -4577,6 +4579,8 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 			case 1:
 				if (field_type_) *field_type_ = t_typeid;
 				return 8; // id
+			default:
+				GB_PANIC("index > 1");
 			}
 		}
 		break;
@@ -4654,6 +4658,7 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 					switch (index) {
 					case 0: t = t_rawptr; break;
 					case 1: t = t_typeid; break;
+					default: GB_PANIC("index > 1");
 					}
 				}
 				break;
@@ -4919,7 +4924,7 @@ gb_internal Type *type_internal_index(Type *t, isize index) {
 	case Type_Slice:
 		{
 			GB_ASSERT(index == 0 || index == 1);
-			return index == 0 ? t_rawptr : t_typeid;
+			return index == 0 ? t_rawptr : t_int;
 		}
 	case Type_DynamicArray:
 		{

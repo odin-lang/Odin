@@ -790,8 +790,10 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 			// Is >256 KiB good enough?
 			if (sz > 1ll<<18) {
 				bool is_ref = false;
-				if((e->flags & EntityFlag_ForValue) != 0) {
+				if ((e->flags & EntityFlag_ForValue) != 0) {
 					is_ref = type_deref(e->Variable.for_loop_parent_type) != NULL;
+				} else if ((e->flags & EntityFlag_SwitchValue) != 0) {
+					is_ref = !(e->flags & EntityFlag_Value);
 				}
 				if(!is_ref) {
 					gbString type_str = type_to_string(e->type);
@@ -919,6 +921,22 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 			gb_printf_err("%.*s\n", LIT(entry.key));
 		}
 		GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
+	}
+	return *found;
+}
+
+
+gb_internal AstPackage *try_get_core_package(CheckerInfo *info, String name) {
+	if (name == "runtime") {
+		return get_runtime_package(info);
+	}
+
+	gbAllocator a = heap_allocator();
+	String path = get_fullpath_core_collection(a, name, nullptr);
+	defer (gb_free(a, path.text));
+	auto found = string_map_get(&info->packages, path);
+	if (found == nullptr) {
+		return nullptr;
 	}
 	return *found;
 }
@@ -7015,8 +7033,10 @@ gb_internal void check_objc_context_provider_procedures(Checker *c) {
 	}
 }
 
-gb_internal void check_unique_package_names(Checker *c) {
+gb_internal bool check_unique_package_names(Checker *c) {
 	ERROR_BLOCK();
+
+	bool ok = true;
 
 	StringMap<AstPackage *> pkgs = {}; // Key: package name
 	string_map_init(&pkgs, 2*c->info.packages.count);
@@ -7042,6 +7062,7 @@ gb_internal void check_unique_package_names(Checker *c) {
 			continue;
 		}
 
+		ok = false;
 
 		begin_error_block();
 		error(curr, "Duplicate declaration of 'package %.*s'", LIT(name));
@@ -7064,6 +7085,8 @@ gb_internal void check_unique_package_names(Checker *c) {
 
 		end_error_block();
 	}
+
+	return ok;
 }
 
 gb_internal void check_add_entities_from_queues(Checker *c) {
@@ -7446,7 +7469,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
 	TIME_SECTION("check unique package names");
-	check_unique_package_names(c);
+	bool package_names_are_unique = check_unique_package_names(c);
 
 	TIME_SECTION("sanity checks");
 	check_merge_queues_into_arrays(c);
@@ -7503,7 +7526,8 @@ gb_internal void check_parsed_files(Checker *c) {
 			c->info.type_info_types_hash_map[index] = tt;
 
 			bool exists = map_set_if_not_previously_exists(&c->info.min_dep_type_info_index_map, tt.hash, index);
-			if (exists) {
+			// Because we've already written a nice error about a duplicate package declaration, skip this panic if the package names aren't unique.
+			if (package_names_are_unique && exists) {
 				for (auto const &entry : c->info.min_dep_type_info_index_map) {
 					if (entry.key != tt.hash) {
 						continue;

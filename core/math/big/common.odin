@@ -2,10 +2,11 @@ package math_big
 
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 */
 
 import "base:intrinsics"
+import "base:runtime"
 
 /*
 	TODO: Make the tunables runtime adjustable where practical.
@@ -138,11 +139,12 @@ Flags :: bit_set[Flag; u8]
 /*
 	Errors are a strict superset of runtime.Allocation_Error.
 */
-Error :: enum int {
-	Okay                    = 0,
+Error :: enum byte {
+	None                    = 0,
 	Out_Of_Memory           = 1,
 	Invalid_Pointer         = 2,
 	Invalid_Argument        = 3,
+	Mode_Not_Implemented    = 4, // Allocation
 
 	Assignment_To_Immutable = 10,
 	Max_Iterations_Reached  = 11,
@@ -158,13 +160,19 @@ Error :: enum int {
 	Cannot_Write_File       = 52,
 
 	Unimplemented           = 127,
+
+	Okay = None,
 }
 
+#assert(intrinsics.type_is_superset_of(Error, runtime.Allocator_Error))
+
+
 Error_String :: #sparse[Error]string{
-	.Okay                    = "Okay",
+	.None                    = "None",
 	.Out_Of_Memory           = "Out of memory",
 	.Invalid_Pointer         = "Invalid pointer",
 	.Invalid_Argument        = "Invalid argument",
+	.Mode_Not_Implemented    = "Allocation mode not implemented",
 
 	.Assignment_To_Immutable = "Assignment to immutable",
 	.Max_Iterations_Reached  = "Max iterations reached",
@@ -215,9 +223,15 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 	*/
 	DIGIT        :: distinct u64
 	_WORD        :: distinct u128
+	// Base 10 extraction constants
+	ITOA_DIVISOR :: DIGIT(1_000_000_000_000_000_000)
+	ITOA_COUNT   :: 18
 } else {
 	DIGIT        :: distinct u32
 	_WORD        :: distinct u64
+	// Base 10 extraction constants
+	ITOA_DIVISOR :: DIGIT(100_000_000)
+	ITOA_COUNT   :: 8
 }
 #assert(size_of(_WORD) == 2 * size_of(DIGIT))
 

@@ -374,7 +374,7 @@ foreign xlib {
 	SetSelectionOwner :: proc(
 		display:     ^Display,
 		selection:   Atom,
-		owber:       Window,
+		owner:       Window,
 		time:        Time,
 		) ---
 	GetSelectionOwner :: proc(
@@ -1030,6 +1030,7 @@ foreign xlib {
 	Pending       :: proc(display: ^Display) -> i32 ---
 	NextEvent     :: proc(display: ^Display, event: ^XEvent) ---
 	PeekEvent     :: proc(display: ^Display, event: ^XEvent) ---
+	FilterEvent   :: proc(event: ^XEvent, window: Window) -> b32 ---
 	GetEventData  :: proc(display: ^Display, cookie: ^XGenericEventCookie) -> b32 ---
 	FreeEventData :: proc(display: ^Display, cookie: ^XGenericEventCookie) ---
 	// Selecting events using a predicate procedure
@@ -1697,6 +1698,24 @@ foreign xlib {
 		res_class: cstring,
 	) -> XIM ---
 	SetLocaleModifiers :: proc(modifiers: cstring) -> cstring ---
+	CreateIC :: proc(
+		im: XIM,
+		#c_vararg args: ..any,
+	) -> XIC ---
+	SetICFocus :: proc(
+		ic: XIC,
+	) ---
+	UnsetICFocus :: proc(
+		ic: XIC,
+	) ---
+	SetICValues :: proc(
+		ic: XIC,
+		#c_vararg args: ..any,
+	) -> cstring ---
+	VaCreateNestedList :: proc(
+		unused: i32,
+		#c_vararg args: ..any,
+	) -> XVaNestedList ---
 }
 
 @(default_calling_convention="c")
@@ -2046,4 +2065,12 @@ foreign xlib {
 		num: u32,
 		xkb: XkbDescPtr,
 	) -> Status ---
+	Xutf8LookupString :: proc(
+		ic: XIC,
+		event: ^XKeyPressedEvent,
+		buffer_return: ^cstring,
+		bytes_buffer: i32,
+		keysym_return: ^KeySym,
+		status_return: ^LookupStringStatus,
+	) -> i32 ---
 }

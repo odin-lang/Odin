@@ -704,7 +704,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_uintptr: return lb_debug_type_basic_type(m, str_lit("uintptr"), ptr_bits, LLVMDWARFTypeEncoding_Unsigned);
 
 		case Basic_typeid:
-			return lb_debug_type_basic_type(m, str_lit("typeid"), ptr_bits, LLVMDWARFTypeEncoding_Unsigned);
+			return lb_debug_type_basic_type(m, str_lit("typeid"), 64, LLVMDWARFTypeEncoding_Unsigned);
 
 		// Endian Specific Types
 		case Basic_i16le:  return lb_debug_type_basic_type(m, str_lit("i16le"),  16,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagLittleEndian);
@@ -820,8 +820,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			{
 				LLVMMetadataRef elements[2] = {};
 				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("id"),   t_typeid, ptr_bits);
-				return lb_debug_basic_struct(m, str_lit("any"), 2*ptr_bits, ptr_bits, elements, gb_count_of(elements));
+				elements[1] = lb_debug_struct_field(m, str_lit("id"),   t_typeid, 64);
+				return lb_debug_basic_struct(m, str_lit("any"), 128, 64, elements, gb_count_of(elements));
 			}
 
 		// Untyped types

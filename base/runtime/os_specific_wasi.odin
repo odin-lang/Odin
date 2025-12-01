@@ -4,6 +4,8 @@ package runtime
 
 foreign import wasi "wasi_snapshot_preview1"
 
+_HAS_RAND_BYTES :: true
+
 @(default_calling_convention="contextless")
 foreign wasi {
 	fd_write :: proc(
@@ -23,12 +25,24 @@ foreign wasi {
 		argv:     [^]cstring,
 		argv_buf: [^]byte,
 	) -> u16 ---
+
+	@(private="file")
+	proc_exit :: proc(rval: u32) -> ! ---
+
+	@(private ="file")
+	random_get :: proc(buf: []u8) -> u16 ---
 }
 
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	n: uint
 	err := fd_write(1, {data}, &n)
 	return int(n), _OS_Errno(err)
+}
+
+_rand_bytes :: proc "contextless" (dst: []byte) {
+	if errno := random_get(dst); errno != 0 {
+		panic_contextless("base/runtime: wasi.random_get failed")
+	}
 }
 
 _wasi_setup_args :: proc() {
@@ -52,4 +66,9 @@ _wasi_setup_args :: proc() {
 		delete(args__)
 		delete(args_buf)
 	}
+}
+
+
+_exit :: proc "contextless" (code: int) -> ! {
+	proc_exit(u32(code))
 }

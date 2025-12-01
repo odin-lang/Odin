@@ -1,3 +1,5 @@
+#+build !freestanding
+
 package log
 
 import "base:runtime"

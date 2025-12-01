@@ -81,7 +81,7 @@ String_initWithString :: proc "c" (self: ^String, other: ^String) -> ^String {
 
 @(objc_type=String, objc_name="initWithCString")
 String_initWithCString :: proc "c" (self: ^String, pString: cstring, encoding: StringEncoding) -> ^String {
-	return msgSend(^String, self, "initWithCstring:encoding:", pString, encoding)
+	return msgSend(^String, self, "initWithCString:encoding:", pString, encoding)
 }
 
 @(objc_type=String, objc_name="initWithBytesNoCopy")

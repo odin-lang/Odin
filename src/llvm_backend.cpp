@@ -2090,6 +2090,7 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			name = gb_string_append_length(name, ename.text, ename.len);
 
 			lbProcedure *dummy = lb_create_dummy_procedure(m, make_string_c(name), dummy_type);
+			dummy->is_startup = true;
 			LLVMSetVisibility(dummy->value, LLVMHiddenVisibility);
 			LLVMSetLinkage(dummy->value, LLVMWeakAnyLinkage);
 
@@ -2900,7 +2901,18 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		args[0] = lb_addr_load(p, all_tests_slice);
 		lbValue result = lb_emit_call(p, runner, args);
 
-		lbValue exit_runner = lb_find_package_value(m, str_lit("os"), str_lit("exit"));
+		lbValue exit_runner = {};
+		{
+			AstPackage *pkg = get_runtime_package(m->info);
+
+			String name = str_lit("exit");
+			Entity *e = scope_lookup_current(pkg->scope, name);
+			if (e == nullptr) {
+				compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg->name), LIT(name));
+			}
+			exit_runner = lb_find_value_from_entity(m, e);
+		}
+
 		auto exit_args = array_make<lbValue>(temporary_allocator(), 1);
 		exit_args[0] = lb_emit_select(p, result, lb_const_int(m, t_int, 0), lb_const_int(m, t_int, 1));
 		lb_emit_call(p, exit_runner, exit_args, ProcInlining_none);

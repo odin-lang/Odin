@@ -3,21 +3,19 @@ package os2
 import "core:io"
 import "base:runtime"
 
+/*
+	General errors that are common within this package which cannot
+	be categorized by `io.Error` nor `runtime.Allocator_Error`.
+*/
 General_Error :: enum u32 {
 	None,
 
-	Permission_Denied,
 	Exist,
 	Not_Exist,
-	Closed,
 
 	Timeout,
 
 	Broken_Pipe,
-
-	// Indicates that an attempt to retrieve a file's size was made, but the
-	// file doesn't have a size.
-	No_Size,
 
 	Invalid_File,
 	Invalid_Dir,
@@ -29,12 +27,14 @@ General_Error :: enum u32 {
 
 	No_HOME_Variable,
 	Env_Var_Not_Found,
-
-	Unsupported,
 }
 
+// A platform specific error
 Platform_Error :: _Platform_Error
 
+/*
+	`Error` is a union of different classes of errors that could be returned from procedures in this package.
+*/
 Error :: union #shared_nil {
 	General_Error,
 	io.Error,
@@ -46,6 +46,7 @@ Error :: union #shared_nil {
 ERROR_NONE :: Error{}
 
 
+// Attempts to convert an `Error` into a platform specific error as an integer. `ok` is false if not possible
 @(require_results)
 is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
 	v := ferr.(Platform_Error) or_else {}
@@ -53,6 +54,7 @@ is_platform_error :: proc(ferr: Error) -> (err: i32, ok: bool) {
 }
 
 
+// Attempts to return the error `ferr` as a string without any allocation
 @(require_results)
 error_string :: proc(ferr: Error) -> string {
 	if ferr == nil {
@@ -62,19 +64,15 @@ error_string :: proc(ferr: Error) -> string {
 	case General_Error:
 		switch e {
 		case .None: return ""
-		case .Permission_Denied:      return "permission denied"
 		case .Exist:                  return "file already exists"
 		case .Not_Exist:              return "file does not exist"
-		case .Closed:                 return "file already closed"
 		case .Timeout:                return "i/o timeout"
 		case .Broken_Pipe:            return "Broken pipe"
-		case .No_Size:                return "file has no definite size"
 		case .Invalid_File:           return "invalid file"
 		case .Invalid_Dir:            return "invalid directory"
 		case .Invalid_Path:           return "invalid path"
 		case .Invalid_Callback:       return "invalid callback"
 		case .Invalid_Command:        return "invalid command"
-		case .Unsupported:            return "unsupported"
 		case .Pattern_Has_Separator:  return "pattern has separator"
 		case .No_HOME_Variable:       return "no $HOME variable"
 		case .Env_Var_Not_Found:      return "environment variable not found"
@@ -95,7 +93,11 @@ error_string :: proc(ferr: Error) -> string {
 		case .Negative_Write:    return "negative write"
 		case .Negative_Count:    return "negative count"
 		case .Buffer_Full:       return "buffer full"
-		case .Unknown, .Empty: //
+		case .Permission_Denied: return "permission denied"
+		case .Closed:            return "file already closed"
+		case .No_Size:           return "file has no definite size"
+		case .Unsupported:       return "unsupported"
+		case .Unknown: //
 		}
 	case runtime.Allocator_Error:
 		switch e {
@@ -112,6 +114,9 @@ error_string :: proc(ferr: Error) -> string {
 	return "unknown error"
 }
 
+/*
+	`print_error` is a utility procedure which will print an error `ferr` to a specified file `f`.
+*/
 print_error :: proc(f: ^File, ferr: Error, msg: string) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	err_str := error_string(ferr)
@@ -126,4 +131,15 @@ print_error :: proc(f: ^File, ferr: Error, msg: string) {
 	copy(buf[len(msg) + 2:], err_str)
 	buf[length - 1] = '\n'
 	write(f, buf)
+}
+
+
+
+// Attempts to convert an `Error` `ferr` into an `io.Error`
+@(private)
+error_to_io_error :: proc(ferr: Error) -> io.Error {
+	if ferr == nil {
+		return .None
+	}
+	return ferr.(io.Error) or_else .Unknown
 }
