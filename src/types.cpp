@@ -4279,7 +4279,7 @@ gb_internal bool type_set_offsets(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		if (t->Struct.are_offsets_being_processed.load()) {
-			return true
+			return true;
 		}
 		MUTEX_GUARD(&t->Struct.offset_mutex);
 		if (!t->Struct.are_offsets_set) {
