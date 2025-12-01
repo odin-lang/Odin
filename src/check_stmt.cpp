@@ -2596,6 +2596,10 @@ void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 			unsafe_return_error(o, "a slice of a compound literal");
 		}
 	} else if (o.mode == Addressing_Constant && is_type_slice(type)) {
+		if (is_load_directive_call(o.expr)) {
+			return;
+		}
+
 		ERROR_BLOCK();
 		unsafe_return_error(o, "a compound literal of a slice");
 		error_line("\tNote: A constant slice value will use the memory of the current stack frame\n");
