@@ -3305,7 +3305,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 			if (id == BuiltinProc_fixed_point_div ||
 			    id == BuiltinProc_fixed_point_div_sat) {
-				res.value = lb_integer_division_intrinsics(p, x.value, y.value, scale.value, platform_type, name);
+				res.value = lb_integer_division_fixed_point_intrinsics(p, x.value, y.value, scale.value, platform_type, name);
 			} else {
 				LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
 

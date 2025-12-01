@@ -1161,8 +1161,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 			case IntegerDivisionByZero_Zero:
 				return zero;
 			case IntegerDivisionByZero_AllBits:
-				// return all_bits;
-				break;
+				return all_bits;
 			}
 		} else {
 			if (!is_signed && lb_sizeof(type) <= 8) {
@@ -1198,7 +1197,6 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	lb_start_block(p, edge_case_block);
 
-
 	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
 		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
@@ -1214,17 +1212,17 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 		incoming_values[1] = all_bits;
 		break;
 	}
+	LLVMValueRef res = nullptr;
 
 	lb_emit_jump(p, done_block);
 	lb_start_block(p, done_block);
 
-	LLVMValueRef res = incoming_values[0];
 
 	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
-	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
 		break;
+	case IntegerDivisionByZero_Self:
 	case IntegerDivisionByZero_Zero:
 	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");
@@ -1233,6 +1231,9 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 		incoming_blocks[0] = p->curr_block->preds[0]->block;
 		incoming_blocks[1] = p->curr_block->preds[1]->block;
 
+		GB_ASSERT(incoming_blocks[0] == safe_block->block);
+		GB_ASSERT(incoming_blocks[1] == edge_case_block->block);
+
 		LLVMAddIncoming(res, incoming_values, incoming_blocks, 2);
 		break;
 	}
@@ -1240,7 +1241,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	return res;
 }
 
-gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, char const *name) {
+gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, char const *name) {
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
@@ -1310,13 +1311,13 @@ gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValu
 	lb_emit_jump(p, done_block);
 	lb_start_block(p, done_block);
 
-	LLVMValueRef res = incoming_values[0];
+	LLVMValueRef res = nullptr;
 
 	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
-	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
 		break;
+	case IntegerDivisionByZero_Self:
 	case IntegerDivisionByZero_Zero:
 	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");
@@ -1423,9 +1424,9 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 
 	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
-	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
 		break;
+	case IntegerDivisionByZero_Self:
 	case IntegerDivisionByZero_Zero:
 	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");

@@ -1570,8 +1570,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_Zero;
 							} else if (str_eq_ignore_case(value.value_string, "self")) {
 								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_Self;
-							}else {
-								gb_printf_err("-integer-division-by-zero options are 'trap', 'zero', and 'self'.\n");
+							} else if (str_eq_ignore_case(value.value_string, "all-bits")) {
+								build_context.integer_division_by_zero_behaviour = IntegerDivisionByZero_AllBits;
+							} else {
+								gb_printf_err("-integer-division-by-zero options are 'trap', 'zero', 'self', and 'all-bits'.\n");
 								bad_flags = true;
 							}
 							break;
