@@ -794,3 +794,70 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 	return
 }
 
+
+// The `^Type_Info` type refers to absolutely no internal pointers, meaning it can be trivially copied
+has_no_indirections :: proc(ti: ^Type_Info) -> bool {
+	if ti == nil {
+		return true
+	}
+
+	#partial switch &info in ti.variant {
+	case Type_Info_Named:
+		return has_no_indirections(info.base)
+
+	case Type_Info_Integer,
+	     Type_Info_Rune,
+	     Type_Info_Boolean,
+	     Type_Info_Float,
+	     Type_Info_Complex,
+	     Type_Info_Quaternion,
+	     Type_Info_Type_Id:
+		return true
+	case Type_Info_String,
+	     Type_Info_Any:
+		return false
+
+	case Type_Info_Enum:
+		return has_no_indirections(info.base)
+
+	case Type_Info_Pointer,
+	     Type_Info_Multi_Pointer,
+	     Type_Info_Soa_Pointer,
+	     Type_Info_Procedure,
+	     Type_Info_Slice,
+	     Type_Info_Dynamic_Array,
+	     Type_Info_Map:
+		return false
+
+	case Type_Info_Parameters:
+		// If you have gotten here, it's a procedure
+		return false
+
+	case Type_Info_Array:
+		return has_no_indirections(info.elem)
+	case Type_Info_Enumerated_Array:
+		return has_no_indirections(info.elem)
+
+	case Type_Info_Simd_Vector:
+		return true
+	case Type_Info_Matrix:
+		return true
+	case Type_Info_Bit_Set:
+		return true
+	case Type_Info_Bit_Field:
+		return true
+
+	case Type_Info_Struct:
+		for i in 0..<info.field_count {
+			has_no_indirections(info.types[i]) or_return
+		}
+		return true
+	case Type_Info_Union:
+		for v in info.variants {
+			has_no_indirections(v) or_return
+		}
+		return true
+	}
+
+	return false
+}
