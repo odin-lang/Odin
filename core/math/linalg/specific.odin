@@ -635,7 +635,7 @@ quaternion_from_forward_and_up_f16 :: proc "contextless" (forward, up: Vector3f1
 	case:
 		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
 		q.w = (m[0, 1] - m[1, 0]) / S
-		q.x = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[2, 0] + m[0, 2]) / S
 		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
@@ -679,7 +679,7 @@ quaternion_from_forward_and_up_f32 :: proc "contextless" (forward, up: Vector3f3
 	case:
 		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
 		q.w = (m[0, 1] - m[1, 0]) / S
-		q.x = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[2, 0] + m[0, 2]) / S
 		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
@@ -723,7 +723,7 @@ quaternion_from_forward_and_up_f64 :: proc "contextless" (forward, up: Vector3f6
 	case:
 		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
 		q.w = (m[0, 1] - m[1, 0]) / S
-		q.x = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[2, 0] + m[0, 2]) / S
 		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
