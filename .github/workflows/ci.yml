@@ -278,6 +278,10 @@ jobs:
           sudo ./llvm.sh 18
           echo "/usr/lib/llvm-18/bin" >> $GITHUB_PATH
 
+      - name: Install libcurl
+        run: |
+        sudo apt-get install libcurl4-openssl-dev
+
       - name: Build Odin
         run: ./build_odin.sh release
 
