@@ -39,34 +39,33 @@ socklen_t :: c.int
 /* This is the global package copyright */
 COPYRIGHT :: "Daniel Stenberg, <daniel@haxx.se>."
 
-/* This is the version number of the libcurl package from which this header
-   file origins: */
+/* This is the version number of the libcurl package from which this header file origins: */
 VERSION :: "8.15.0"
 
-/* The numeric version number is also available "in parts" by using these
-   defines: */
+/* The numeric version number is also available "in parts" by using these defines: */
 VERSION_MAJOR :: 8
 VERSION_MINOR :: 15
 VERSION_PATCH :: 0
 
-/* This is the numeric version of the libcurl version number, meant for easier
-   parsing and comparisons by programs. The LIBCURL_VERSION_NUM define will
-   always follow this syntax:
+/*
+	This is the numeric version of the libcurl version number, meant for easier
+	parsing and comparisons by programs. The LIBCURL_VERSION_NUM define will
+	always follow this syntax:
 
-         0xXXYYZZ
+		0xXXYYZZ
 
-   Where XX, YY and ZZ are the main version, release and patch numbers in
-   hexadecimal (using 8 bits each). All three numbers are always represented
-   using two digits. 1.2 would appear as "0x010200" while version 9.11.7
-   appears as "0x090b07".
+	Where XX, YY and ZZ are the main version, release and patch numbers in
+	hexadecimal (using 8 bits each). All three numbers are always represented
+	using two digits. 1.2 would appear as "0x010200" while version 9.11.7
+	appears as "0x090b07".
 
-   This 6-digit (24 bits) hexadecimal number does not show pre-release number,
-   and it is always a greater number in a more recent release. It makes
-   comparisons with greater than and less than work.
+	This 6-digit (24 bits) hexadecimal number does not show pre-release number,
+	and it is always a greater number in a more recent release. It makes
+	comparisons with greater than and less than work.
 
-   Note: This define is the full hex number and _does not_ use the
-   CURL_VERSION_BITS() macro since curl's own configure script greps for it
-   and needs it to contain the full number.
+	Note: This define is the full hex number and _does not_ use the
+	CURL_VERSION_BITS() macro since curl's own configure script greps for it
+	and needs it to contain the full number.
 */
 VERSION_NUM :: 0x080f00
 
@@ -121,8 +120,10 @@ sslbackend :: enum c.int {
 /* bits for the CURLOPT_FOLLOWLOCATION option */
 FOLLOW_ALL       :: 1 /* generic follow redirects */
 
-/* Do not use the custom method in the follow-up request if the HTTP code
-   instructs so (301, 302, 303). */
+/*
+	Do not use the custom method in the follow-up request if the HTTP code
+	instructs so (301, 302, 303).
+*/
 FOLLOW_OBEYCODE  :: 2
 
 /* Only use the custom method in the first request, always reset in the next */
@@ -186,21 +187,27 @@ httppost :: struct {
                                    set. Added in 7.46.0 */
 }
 
-/* This is a return code for the progress callback that, when returned, will
-   signal libcurl to continue executing the default progress function */
+/*
+	This is a return code for the progress callback that, when returned, will
+	signal libcurl to continue executing the default progress function
+*/
 PROGRESSFUNC_CONTINUE :: 0x10000001
 
-/* This is the CURLOPT_PROGRESSFUNCTION callback prototype. It is now
-   considered deprecated but was the only choice up until 7.31.0 */
+/*
+	This is the CURLOPT_PROGRESSFUNCTION callback prototype. It is now
+	considered deprecated but was the only choice up until 7.31.0
+*/
 progress_callback :: #type proc "c" (clientp: rawptr,
                                      dltotal: f64,
                                      dlnow:   f64,
                                      ultotal: f64,
                                      ulnow:   f64) -> c.int
 
-/* This is the CURLOPT_XFERINFOFUNCTION callback prototype. It was introduced
-   in 7.32.0, avoids the use of floating point numbers and provides more
-   detailed information. */
+/*
+	This is the CURLOPT_XFERINFOFUNCTION callback prototype. It was introduced
+	in 7.32.0, avoids the use of floating point numbers and provides more
+	detailed information.
+*/
 xferinfo_callback :: #type proc "c" (clientp:  rawptr,
                                       dltotal: off_t,
                                       dlnow:   off_t,
@@ -211,25 +218,33 @@ xferinfo_callback :: #type proc "c" (clientp:  rawptr,
 /* The maximum receive buffer size. */
 MAX_READ_SIZE :: 10*1024*1024
 
-  /* Tests have proven that 20K is a bad buffer size for uploads on Windows,
-     while 16K for some odd reason performed a lot better. We do the ifndef
-     check to allow this value to easier be changed at build time for those
-     who feel adventurous. The practical minimum is about 400 bytes since
-     libcurl uses a buffer of this size as a scratch area (unrelated to
-     network send operations). */
+/*
+	Tests have proven that 20K is a bad buffer size for uploads on Windows,
+	while 16K for some odd reason performed a lot better. We do the ifndef
+	check to allow this value to easier be changed at build time for those
+	who feel adventurous. The practical minimum is about 400 bytes since
+	libcurl uses a buffer of this size as a scratch area (unrelated to
+	network send operations).
+*/
 MAX_WRITE_SIZE :: 16384
 
-/* The only reason to have a max limit for this is to avoid the risk of a bad
-   server feeding libcurl with a never-ending header that will cause reallocs
-   infinitely */
+/*
+	The only reason to have a max limit for this is to avoid the risk of a bad
+	server feeding libcurl with a never-ending header that will cause reallocs
+	infinitely
+*/
 MAX_HTTP_HEADER :: 100*1024
 
-/* This is a magic return code for the write callback that, when returned,
-   will signal libcurl to pause receiving on the current transfer. */
+/*
+	This is a magic return code for the write callback that, when returned,
+	will signal libcurl to pause receiving on the current transfer.
+*/
 WRITEFUNC_PAUSE :: 0x10000001
 
-/* This is a magic return code for the write callback that, when returned,
-   will signal an error from the callback. */
+/*
+	This is a magic return code for the write callback that, when returned,
+	will signal an error from the callback.
+*/
 WRITEFUNC_ERROR :: 0xFFFFFFFF
 
 write_callback :: #type proc "c" (buffer: [^]byte,
@@ -311,9 +326,11 @@ CHUNK_BGN_FUNC_OK   :: 0
 CHUNK_BGN_FUNC_FAIL :: 1 /* tell the lib to end the task */
 CHUNK_BGN_FUNC_SKIP :: 2 /* skip this chunk over */
 
-/* if splitting of data transfer is enabled, this callback is called before
-   download of an individual chunk started. Note that parameter "remains" works
-   only for FTP wildcard downloading (for now), otherwise is not used */
+/*
+	if splitting of data transfer is enabled, this callback is called before
+	download of an individual chunk started. Note that parameter "remains" works
+	only for FTP wildcard downloading (for now), otherwise is not used
+*/
 chunk_bgn_callback :: #type proc "c" (transfer_info: rawptr,
                                       ptr: rawptr,
                                       remains: c.int) -> c.long
@@ -325,12 +342,14 @@ CHUNK_END_FUNC_FAIL :: 1 /* tell the lib to end the task */
 
 
 
-/* If splitting of data transfer is enabled this callback is called after
-   download of an individual chunk finished.
-   Note! After this callback was set then it have to be called FOR ALL chunks.
-   Even if downloading of this chunk was skipped in CHUNK_BGN_FUNC.
-   This is the reason why we do not need "transfer_info" parameter in this
-   callback and we are not interested in "remains" parameter too. */
+/*
+	If splitting of data transfer is enabled this callback is called after
+	download of an individual chunk finished.
+	Note! After this callback was set then it have to be called FOR ALL chunks.
+	Even if downloading of this chunk was skipped in CHUNK_BGN_FUNC.
+	This is the reason why we do not need "transfer_info" parameter in this
+	callback and we are not interested in "remains" parameter too.
+*/
 chunk_end_callback :: #type proc "c" (ptr: rawptr) -> c.long
 
 /* return codes for FNMATCHFUNCTION */
@@ -338,8 +357,10 @@ FNMATCHFUNC_MATCH   :: 0 /* string corresponds to the pattern */
 FNMATCHFUNC_NOMATCH :: 1 /* pattern does not match the string */
 FNMATCHFUNC_FAIL    :: 2 /* an error occurred */
 
-/* callback type for wildcard downloading pattern matching. If the
-   string matches the pattern, return CURL_FNMATCHFUNC_MATCH value, etc. */
+/*
+	callback type for wildcard downloading pattern matching. If the
+	string matches the pattern, return CURL_FNMATCHFUNC_MATCH value, etc.
+*/
 fnmatch_callback :: #type proc "c" (ptr: rawptr,
                                     pattern: cstring,
                                     string:  cstring) -> c.int
@@ -354,18 +375,23 @@ seek_callback :: #type proc "c" (instream: rawptr,
                                  offset:   off_t,
                                  origin:   c.int) -> c.int /* 'whence' */
 
-/* This is a return code for the read callback that, when returned, will
-   signal libcurl to immediately abort the current transfer. */
+/*
+	This is a return code for the read callback that, when returned, will
+	signal libcurl to immediately abort the current transfer.
+*/
 READFUNC_ABORT :: 0x10000000
-/* This is a return code for the read callback that, when returned, will
-   signal libcurl to pause sending data on the current transfer. */
+/*
+	This is a return code for the read callback that, when returned, will
+	signal libcurl to pause sending data on the current transfer.
+*/
 READFUNC_PAUSE :: 0x10000001
 
-/* Return code for when the trailing headers' callback has terminated
-   without any errors */
+/*  Return code for when the trailing headers' callback has terminated without any errors */
 TRAILERFUNC_OK :: 0
-/* Return code for when was an error in the trailing header's list and we
-  want to abort the request */
+/*
+	Return code for when was an error in the trailing header's list and we
+	want to abort the request
+*/
 TRAILERFUNC_ABORT :: 1
 
 read_callback :: #type proc "c" (buffer:   [^]byte,
@@ -379,14 +405,16 @@ trailer_callback :: #type proc "c" (list: ^^slist,
 socktype :: enum c.int {
 	IPCXN,  /* socket created for a specific IP connection */
 	ACCEPT, /* socket created by accept() call */
-	LAST,    /* never use */
+	LAST,   /* never use */
 }
 
-/* The return code from the sockopt_callback can signal information back
-   to libcurl: */
+/*
+	The return code from the sockopt_callback can signal information back
+	to libcurl:
+*/
 SOCKOPT_OK    :: 0
 SOCKOPT_ERROR :: 1 /* causes libcurl to abort and return
-                                CURLE_ABORTED_BY_CALLBACK */
+                      CURLE_ABORTED_BY_CALLBACK */
 SOCKOPT_ALREADY_CONNECTED :: 2
 
 sockopt_callback :: #type proc "c" (clientp: rawptr,
@@ -464,18 +492,17 @@ prereq_callback :: #type proc "c" (clientp: rawptr,
                                    conn_primary_port: c.int,
                                    conn_local_port:   c.int) -> c.int
 
-/* Return code for when the pre-request callback has terminated without
-   any errors */
+/*  Return code for when the pre-request callback has terminated without any errors */
 PREREQFUNC_OK :: 0
-/* Return code for when the pre-request callback wants to abort the
-   request */
+/* Return code for when the pre-request callback wants to abort the request */
 PREREQFUNC_ABORT :: 1
 
-/* All possible error codes from all sorts of curl functions. Future versions
-   may return other values, stay prepared.
+/*
+	All possible error codes from all sorts of curl functions. Future versions
+	may return other values, stay prepared.
 
-   Always add new return codes last. Never *EVER* remove any. The return
-   codes must remain the same!
+	Always add new return codes last. Never *EVER* remove any. The return
+	codes must remain the same!
  */
 code :: enum c.int {
 	E_OK = 0,
@@ -788,40 +815,54 @@ usessl :: enum c.int {
 
 /* Definition of bits for the CURLOPT_SSL_OPTIONS argument: */
 
-/* - ALLOW_BEAST tells libcurl to allow the BEAST SSL vulnerability in the
-   name of improving interoperability with older servers. Some SSL libraries
-   have introduced work-arounds for this flaw but those work-arounds sometimes
-   make the SSL communication fail. To regain functionality with those broken
-   servers, a user can this way allow the vulnerability back. */
+/*
+	- ALLOW_BEAST tells libcurl to allow the BEAST SSL vulnerability in the
+	name of improving interoperability with older servers. Some SSL libraries
+	have introduced work-arounds for this flaw but those work-arounds sometimes
+	make the SSL communication fail. To regain functionality with those broken
+	servers, a user can this way allow the vulnerability back.
+*/
 SSLOPT_ALLOW_BEAST :: 1<<0
 
-/* - NO_REVOKE tells libcurl to disable certificate revocation checks for those
-   SSL backends where such behavior is present. */
+/*
+	- NO_REVOKE tells libcurl to disable certificate revocation checks for those
+	SSL backends where such behavior is present.
+*/
 SSLOPT_NO_REVOKE :: 1<<1
 
-/* - NO_PARTIALCHAIN tells libcurl to *NOT* accept a partial certificate chain
-   if possible. The OpenSSL backend has this ability. */
+/*
+	- NO_PARTIALCHAIN tells libcurl to *NOT* accept a partial certificate chain
+	if possible. The OpenSSL backend has this ability.
+*/
 SSLOPT_NO_PARTIALCHAIN :: 1<<2
 
-/* - REVOKE_BEST_EFFORT tells libcurl to ignore certificate revocation offline
-   checks and ignore missing revocation list for those SSL backends where such
-   behavior is present. */
+/*
+	- REVOKE_BEST_EFFORT tells libcurl to ignore certificate revocation offline
+	checks and ignore missing revocation list for those SSL backends where such
+	behavior is present.
+*/
 SSLOPT_REVOKE_BEST_EFFORT :: 1<<3
 
-/* - CURLSSLOPT_NATIVE_CA tells libcurl to use standard certificate store of
-   operating system. Currently implemented under MS-Windows. */
+/*
+	- CURLSSLOPT_NATIVE_CA tells libcurl to use standard certificate store of
+	operating system. Currently implemented under MS-Windows.
+*/
 SSLOPT_NATIVE_CA :: 1<<4
 
-/* - CURLSSLOPT_AUTO_CLIENT_CERT tells libcurl to automatically locate and use
-   a client certificate for authentication. (Schannel) */
+/*
+	- CURLSSLOPT_AUTO_CLIENT_CERT tells libcurl to automatically locate and use
+	a client certificate for authentication. (Schannel)
+*/
 SSLOPT_AUTO_CLIENT_CERT :: 1<<5
 
 /* If possible, send data using TLS 1.3 early data */
 SSLOPT_EARLYDATA :: 1<<6
 
-/* The default connection attempt delay in milliseconds for happy eyeballs.
-   CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS.3 and happy-eyeballs-timeout-ms.d document
-   this value, keep them in sync. */
+/*
+	The default connection attempt delay in milliseconds for happy eyeballs.
+	CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS.3 and happy-eyeballs-timeout-ms.d document
+	this value, keep them in sync.
+*/
 HET_DEFAULT :: 200
 
 /* The default connection upkeep interval in milliseconds. */
@@ -908,8 +949,8 @@ hstswrite_callback :: #type proc "c" (easy: ^CURL,
 HSTS_ENABLE       :: (c.long)(1<<0)
 HSTS_READONLYFILE :: (c.long)(1<<1)
 
-/* The CURLPROTO_ defines below are for the **deprecated** CURLOPT_*PROTOCOLS
-   options. Do not use. */
+/* The CURLPROTO_ defines below are for the **deprecated** CURLOPT_*PROTOCOLS options. Do not use. */
+
 PROTO_HTTP    :: (1<<0)
 PROTO_HTTPS   :: (1<<1)
 PROTO_FTP     :: (1<<2)
@@ -942,16 +983,14 @@ PROTO_MQTT    :: (1<<28)
 PROTO_GOPHERS :: (1<<29)
 PROTO_ALL     :: (~c.int(0)) /* enable everything */
 
-/* long may be 32 or 64 bits, but we should never depend on anything else
-   but 32 */
+/* long may be 32 or 64 bits, but we should never depend on anything else but 32 */
 OPTTYPE_LONG          :: 0
 OPTTYPE_OBJECTPOINT   :: 10000
 OPTTYPE_FUNCTIONPOINT :: 20000
 OPTTYPE_OFF_T         :: 30000
 OPTTYPE_BLOB          :: 40000
 
-/* *OPTTYPE_STRINGPOINT is an alias for OBJECTPOINT to allow tools to extract the
-   string options from the header file */
+/* *OPTTYPE_STRINGPOINT is an alias for OBJECTPOINT to allow tools to extract the string options from the header file */
 
 
 /* CURLOPT aliases that make no runtime difference */
@@ -971,7 +1010,6 @@ OPTTYPE_VALUES      :: OPTTYPE_LONG
 /*
  * All CURLOPT_* values.
  */
-
 option :: enum c.int {
 	/* This is the FILE * or void * the regular output should be written to. */
 	WRITEDATA = OPTTYPE_CBPOINT + 1,
@@ -2016,15 +2054,17 @@ option :: enum c.int {
 
 
 
-  /* Below here follows defines for the CURLOPT_IPRESOLVE option. If a host
-     name resolves addresses using more than one IP protocol version, this
-     option might be handy to force libcurl to use a specific IP version. */
+ /*
+ 	Below here follows defines for the CURLOPT_IPRESOLVE option. If a host
+ 	name resolves addresses using more than one IP protocol version, this
+ 	option might be handy to force libcurl to use a specific IP version.
+ */
 IPRESOLVE_WHATEVER :: 0 /* default, uses addresses to all IP
                            versions that your system allows */
 IPRESOLVE_V4       :: 1 /* uses only IPv4 addresses/connections */
 IPRESOLVE_V6       :: 2 /* uses only IPv6 addresses/connections */
 
-  /* Convenient "aliases" */
+/* Convenient "aliases" */
 PT_RTSPHEADER :: option.HTTPHEADER
 
 /* These constants are for use with the CURLOPT_HTTP_VERSION option. */
@@ -2039,17 +2079,18 @@ HTTP_VERSION_2TLS  :: 4 /* use version 2 for HTTPS, version 1.1 for
 HTTP_VERSION_2_PRIOR_KNOWLEDGE :: 5 /* please use HTTP 2 without
                                                   HTTP/1.1 Upgrade */
 HTTP_VERSION_3     :: 30 /* Use HTTP/3, fallback to HTTP/2 or
-                                       HTTP/1 if needed. For HTTPS only. For
-                                       HTTP, this option makes libcurl
-                                       return error. */
+                            HTTP/1 if needed. For HTTPS only. For
+                            HTTP, this option makes libcurl
+                            return error. */
 HTTP_VERSION_3ONLY :: 31 /* Use HTTP/3 without fallback. For
-                                       HTTPS only. For HTTP, this makes
-                                       libcurl return error. */
+                            HTTPS only. For HTTP, this makes
+                            libcurl return error. */
 HTTP_VERSION_LAST  :: 32 /* *ILLEGAL* http version */
 
-/* Convenience definition simple because the name of the version is HTTP/2 and
-   not 2.0. The 2_0 version of the enum name was set while the version was
-   still planned to be 2.0 and we stick to it for compatibility. */
+/*
+	Convenience definition simple because the name of the version is HTTP/2 and
+	not 2.0. The 2_0 version of the enum name was set while the version was
+	still planned to be 2.0 and we stick to it for compatibility. */
 HTTP_VERSION_2 :: HTTP_VERSION_2_0
 
 /*
@@ -2072,12 +2113,12 @@ RTSPREQ_LAST          :: 12 /* not used */
 
   /* These enums are for use with the CURLOPT_NETRC option. */
 NETRC_IGNORED  :: 0 /* The .netrc will never be read.
-                                  This is the default. */
+                       This is the default. */
 NETRC_OPTIONAL :: 1 /* A user:password in the URL will be preferred
-                                  to one in the .netrc. */
+                       to one in the .netrc. */
 NETRC_REQUIRED :: 2 /* A user:password in the URL will be ignored.
-                                  Unless one is set programmatically, the
-                                  .netrc will be queried. */
+                       Unless one is set programmatically, the
+                       .netrc will be queried. */
 NETRC_OPTION :: enum c.int {
 	/* we set a single member here, just to make sure we still provide the enum,
 	   but the values to use are defined above with L suffixes */
@@ -2109,15 +2150,18 @@ TLSAUTH_NONE :: 0
 TLSAUTH_SRP  :: 1
 
 TLSAUTH :: enum c.int {
-	/* we set a single member here, just to make sure we still provide the enum,
-	   but the values to use are defined above with L suffixes */
+	/*
+		we set a single member here, just to make sure we still provide the enum,
+		but the values to use are defined above with L suffixes
+	*/
 	LAST = 2,
 }
 
-/* symbols to use with CURLOPT_POSTREDIR.
-   CURL_REDIR_POST_301, CURL_REDIR_POST_302 and CURL_REDIR_POST_303
-   can be bitwise ORed so that CURL_REDIR_POST_301 | CURL_REDIR_POST_302
-   | CURL_REDIR_POST_303 == CURL_REDIR_POST_ALL */
+/*
+	symbols to use with CURLOPT_POSTREDIR.
+	CURL_REDIR_POST_301, CURL_REDIR_POST_302 and CURL_REDIR_POST_303
+	can be bitwise ORed so that CURL_REDIR_POST_301 | CURL_REDIR_POST_302 | CURL_REDIR_POST_303 == CURL_REDIR_POST_ALL
+*/
 
 REDIR_GET_ALL  :: 0
 REDIR_POST_301 :: 1
@@ -2131,9 +2175,11 @@ TIMECOND_IFUNMODSINCE :: 2
 TIMECOND_LASTMOD      :: 3
 
 TimeCond :: enum c.int {
-	/* we set a single member here, just to make sure we still provide
-	   the enum typedef, but the values to use are defined above with L
-	   suffixes */
+	/*
+		we set a single member here, just to make sure we still provide
+		the enum typedef, but the values to use are defined above with L
+		suffixes
+	*/
 	LAST = 4,
 }
 
@@ -2152,8 +2198,7 @@ MIMEOPT_FORMESCAPE :: 1<<0 /* Use backslash-escaping for forms. */
 
 @(default_calling_convention="c", link_prefix="curl_")
 foreign lib {
-	/* curl_strequal() and curl_strnequal() are subject for removal in a future
-	   release */
+	/* curl_strequal() and curl_strnequal() are subject for removal in a future release */
 	strequal  :: proc(s1, s2: cstring) -> c.int ---
 	strnequal :: proc(s1, s2: cstring, n: c.size_t) -> c.int ---
 
@@ -2479,8 +2524,10 @@ foreign lib {
 	getdate :: proc(p: cstring, unused: ^c.time_t) -> c.time_t ---
 }
 
-/* info about the certificate chain, for SSL backends that support it. Asked
-   for with CURLOPT_CERTINFO / CURLINFO_CERTINFO */
+/*
+	info about the certificate chain, for SSL backends that support it. Asked
+	for with CURLOPT_CERTINFO / CURLINFO_CERTINFO
+*/
 certinfo :: struct {
 	num_of_certs: c.int,  /* number of certificates with information */
 	certinfo: ^^slist,    /* for each index in this array, there is a
@@ -2489,9 +2536,11 @@ certinfo :: struct {
 	                         eg "Subject:foo", "Issuer:bar", etc. */
 }
 
-/* Information about the SSL library used and the respective internal SSL
-   handle, which can be used to obtain further information regarding the
-   connection. Asked for with CURLINFO_TLS_SSL_PTR or CURLINFO_TLS_SESSION. */
+/*
+	Information about the SSL library used and the respective internal SSL
+	handle, which can be used to obtain further information regarding the
+	connection. Asked for with CURLINFO_TLS_SSL_PTR or CURLINFO_TLS_SESSION.
+*/
 tlssessioninfo :: struct {
 	backend:   sslbackend,
 	internals: rawptr,
@@ -2680,11 +2729,13 @@ version_enum :: enum c.int {
 	TWELFTH,  /* 8.8.0 */
 }
 
-/* The 'CURLVERSION_NOW' is the symbolic name meant to be used by
-   basically all programs ever that want to get version information. It is
-   meant to be a built-in version number for what kind of struct the caller
-   expects. If the struct ever changes, we redefine the NOW to another enum
-   from above. */
+/*
+	The 'CURLVERSION_NOW' is the symbolic name meant to be used by
+	basically all programs ever that want to get version information. It is
+	meant to be a built-in version number for what kind of struct the caller
+	expects. If the struct ever changes, we redefine the NOW to another enum
+	from above.
+*/
 VERSION_NOW :: version_enum.TWELFTH
 
 version_info_data :: struct {
@@ -2792,8 +2843,7 @@ PAUSE_SEND_CONT :: 0
 PAUSE_ALL       :: PAUSE_RECV|PAUSE_SEND
 PAUSE_CONT      :: PAUSE_RECV_CONT|PAUSE_SEND_CONT
 
-/* This is the curl_ssls_export_cb callback prototype. It
- * is passed to curl_easy_ssls_export() to extract SSL sessions/tickets. */
+/* This is the curl_ssls_export_cb callback prototype. It is passed to curl_easy_ssls_export() to extract SSL sessions/tickets. */
 ssls_export_cb :: #type proc "c" (handle: ^CURL,
                                   userptr: rawptr,
                                   session_key: cstring,
