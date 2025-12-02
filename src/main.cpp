@@ -4059,7 +4059,7 @@ end_of_code_gen:;
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
-		system_must_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
+		system_must_exec_command_line_app("odin run", "\'%.*s\' %.*s", LIT(exe_name), LIT(run_args_string));
 
 		if (!build_context.keep_executable) {
 			char const *filename = cast(char const *)exe_name.text;

@@ -587,9 +587,9 @@ gb_internal String string_join_and_quote(gbAllocator a, Array<String> strings) {
 			s = gb_string_append_fmt(s, " ");
 		}
 #if defined(GB_SYSTEM_WINDOWS)
-		s = gb_string_append_fmt(s, "\"%.*s\" ", LIT(escape_char(a, strings[i], '\\')));
+		s = gb_string_append_fmt(s, "\'%.*s\' ", LIT(escape_char(a, strings[i], '\\')));
 #else
-		s = gb_string_append_fmt(s, "\"%.*s\" ", LIT(strings[i]));
+		s = gb_string_append_fmt(s, "\'%.*s\' ", LIT(strings[i]));
 #endif
 	}
 
