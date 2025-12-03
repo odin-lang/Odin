@@ -112,6 +112,9 @@ jobs:
       - name: Get needed vendor libs
         if: matrix.os == 'ubuntu-24.04-arm'
         run: sudo apt-get install -y liblua5.4-dev
+      - name: Install libcurl
+        run: |
+          sudo apt-get install libcurl4-openssl-dev
       - name: Compile needed Vendor
         run: |
           make -C vendor/stb/src
@@ -280,7 +283,7 @@ jobs:
 
       - name: Install libcurl
         run: |
-        sudo apt-get install libcurl4-openssl-dev
+          sudo apt-get install libcurl4-openssl-dev
 
       - name: Build Odin
         run: ./build_odin.sh release
