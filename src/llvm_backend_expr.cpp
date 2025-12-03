@@ -5785,11 +5785,11 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 		if (is_type_union(t)) {
 			Type *type = type_of_expr(expr);
 			lbAddr v = lb_add_local_generated(p, type, false);
-			lb_addr_store(p, v, lb_emit_union_cast(p, lb_build_expr(p, ta->expr), type, pos));
+			lb_addr_store(p, v, lb_emit_union_cast(p, e, type, pos));
 			return v;
 		} else if (is_type_any(t)) {
 			Type *type = type_of_expr(expr);
-			return lb_emit_any_cast_addr(p, lb_build_expr(p, ta->expr), type, pos);
+			return lb_emit_any_cast_addr(p, e, type, pos);
 		} else {
 			GB_PANIC("TODO(bill): type assertion %s", type_to_string(e.type));
 		}
