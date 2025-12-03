@@ -8,10 +8,12 @@ import "core:sync"
 import "core:slice"
 import "core:strings"
 import "core:sys/linux"
+import "core:sys/posix"
 
 _ :: sync
 _ :: slice
 _ :: linux
+_ :: posix
 
 when ODIN_NO_CRT {
 	// TODO: Override the libc environment functions' weak linkage to
@@ -251,21 +253,6 @@ when ODIN_NO_CRT {
 	}
 
 } else {
-	// We are linking with libc, so use libc env functions
-	foreign import libc "system:c"
-
-	@(default_calling_convention="c")
-	foreign libc {
-		@(link_name="environ")
-		libc_environ: [^]cstring
-
-		@(link_name="__errno_location")
-		libc_errno_location :: proc() -> ^int ---
-
-		getenv   :: proc(name: cstring) -> cstring ---
-		setenv   :: proc(name: cstring, val: cstring, overwrite: b32) -> i32 ---
-		unsetenv :: proc(name: cstring) -> i32 ---
-	}
 
 	_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 		if key == "" {
@@ -275,7 +262,7 @@ when ODIN_NO_CRT {
 		temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 		ckey := strings.clone_to_cstring(key, temp_allocator)
-		cval := getenv(ckey)
+		cval := posix.getenv(ckey)
 		if cval == nil {
 			return
 		}
@@ -297,7 +284,7 @@ when ODIN_NO_CRT {
 			copy(buf, key)
 		}
 
-		cval := getenv(cstring(raw_data(buf)))
+		cval := posix.getenv(cstring(raw_data(buf)))
 		if cval == nil {
 			return
 		}
@@ -322,10 +309,10 @@ when ODIN_NO_CRT {
 		ckey := strings.clone_to_cstring(key, temp_allocator) or_return
 		cval := strings.clone_to_cstring(value, temp_allocator) or_return
 
-		if setenv(ckey, cval, true) != 0 {
-			errno := libc_errno_location()^
-			err = _get_platform_error(cast(linux.Errno)errno)
-			//err = _get_platform_error_from_errno()
+		if posix.setenv(ckey, cval, true) != nil {
+			posix_errno := posix.errno()
+			linux_errno := cast(linux.Errno)(cast(int)posix_errno)
+			err = _get_platform_error(linux_errno)
 		}
 		return
 	}
@@ -335,12 +322,14 @@ when ODIN_NO_CRT {
 
 		ckey := strings.clone_to_cstring(key, temp_allocator)
 
-		ok = unsetenv(ckey) == 0
+		ok = posix.unsetenv(ckey) == .OK
 		return
 	}
 
+	// NOTE(laytan): clearing the env is weird, why would you ever do that?
+
 	_clear_env :: proc() {
-		for entry := libc_environ[0]; entry != nil; entry = libc_environ[0] {
+		for entry := posix.environ[0]; entry != nil; entry = posix.environ[0] {
 			key := strings.truncate_to_byte(string(entry), '=')
 			_unset_env(key)
 		}
@@ -348,7 +337,7 @@ when ODIN_NO_CRT {
 
 	_environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
 		n := 0
-		for entry := libc_environ[0]; entry != nil; n, entry = n+1, libc_environ[n] {}
+		for entry := posix.environ[0]; entry != nil; n, entry = n+1, posix.environ[n] {}
 
 		r := make([dynamic]string, 0, n, allocator) or_return
 		defer if err != nil {
@@ -358,7 +347,7 @@ when ODIN_NO_CRT {
 			delete(r)
 		}
 
-		for i, entry := 0, libc_environ[0]; entry != nil; i, entry = i+1, libc_environ[i] {
+		for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
 			append(&r, strings.clone(string(entry), allocator) or_return)
 		}
 
@@ -366,9 +355,11 @@ when ODIN_NO_CRT {
 		return
 	}
 
+
+
 	export_cstring_environment :: proc(allocator: runtime.Allocator) -> []cstring {
 		env := make([dynamic]cstring, allocator)
-		for i, entry := 0, libc_environ[0]; entry != nil; i, entry = i+1, libc_environ[i] {
+		for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
 			append(&env, entry)
 		}
 		append(&env, nil)
