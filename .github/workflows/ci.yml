@@ -113,6 +113,7 @@ jobs:
         if: matrix.os == 'ubuntu-24.04-arm'
         run: sudo apt-get install -y liblua5.4-dev
       - name: Install libcurl
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
         run: |
           sudo apt-get install libcurl4-openssl-dev
       - name: Compile needed Vendor
