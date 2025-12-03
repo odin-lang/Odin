@@ -115,11 +115,11 @@ jobs:
       - name: Install libcurl (Ubuntu)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
         run: |
-          sudo apt-get install libcurl4-openssl-dev
+          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
       - name: Install libcurl (macOS)
         if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
         run: |
-          brew install curl
+          brew install curl mbedtls
       - name: Compile needed Vendor
         run: |
           make -C vendor/stb/src
@@ -288,7 +288,7 @@ jobs:
 
       - name: Install libcurl
         run: |
-          sudo apt-get install libcurl4-openssl-dev
+          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
 
       - name: Build Odin
         run: ./build_odin.sh release
