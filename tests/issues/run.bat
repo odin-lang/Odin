@@ -3,7 +3,7 @@
 if not exist "build\" mkdir build
 pushd build
 
-set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style
+set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables
 
 @echo on
 
