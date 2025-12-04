@@ -24,7 +24,7 @@ test_curl :: proc(t: ^testing.T) {
 	curl.global_init(curl.GLOBAL_ALL)
 
 	c := curl.easy_init()
-	testing.expect(t, c == nil, "curl.easy_init failed")
+	testing.expect(t, c != nil, "curl.easy_init failed")
 
 	defer curl.easy_cleanup(c)
 
