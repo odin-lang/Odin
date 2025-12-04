@@ -3,15 +3,16 @@ package vendor_curl
 import c "core:c/libc"
 
 when ODIN_OS == .Windows {
-	@(export, extra_linker_flags="/NODEFAULTLIB:libcmt")
+	@(export, extra_linker_flags="/NODEFAULTLIB:msvcrt")
 	foreign import lib {
-		"lib/libcurl_a.lib",
+		"lib/libcurl.lib",
 		"system:Advapi32.lib",
 		"system:Crypt32.lib",
 		"system:Normaliz.lib",
 		"system:Secur32.lib",
 		"system:Wldap32.lib",
 		"system:Ws2_32.lib",
+		"system:iphlpapi.lib",
 	}
 } else when ODIN_OS == .Linux {
 	@(export)
@@ -40,11 +41,11 @@ socklen_t :: c.int
 COPYRIGHT :: "Daniel Stenberg, <daniel@haxx.se>."
 
 /* This is the version number of the libcurl package from which this header file origins: */
-VERSION :: "8.15.0"
+VERSION :: "8.17.0"
 
 /* The numeric version number is also available "in parts" by using these defines: */
 VERSION_MAJOR :: 8
-VERSION_MINOR :: 15
+VERSION_MINOR :: 17
 VERSION_PATCH :: 0
 
 /*
