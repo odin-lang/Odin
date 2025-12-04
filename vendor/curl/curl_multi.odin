@@ -332,8 +332,50 @@ Moption :: enum c.int {
 
 	/* maximum number of concurrent streams to support on a connection */
 	MAX_CONCURRENT_STREAMS = OPTTYPE_LONG + 16,
+
+	/* network has changed, adjust caches/connection reuse */
+	NETWORK_CHANGED = OPTTYPE_LONG + 17,
+
+	/* This is the notify callback function pointer */
+	NOTIFYFUNCTION = OPTTYPE_FUNCTIONPOINT + 18,
+
+	/* This is the argument passed to the notify callback */
+	NOTIFYDATA = OPTTYPE_OBJECTPOINT + 19,
 }
 
+/* Definition of bits for the CURLMOPT_NETWORK_CHANGED argument: */
+
+/* - CURLMNWC_CLEAR_CONNS tells libcurl to prevent further reuse of existing
+     connections. Connections that are idle will be closed. Ongoing transfers
+     will continue with the connection they have. */
+MNWC_CLEAR_CONNS :: 1 << 0
+
+/* - CURLMNWC_CLEAR_DNS tells libcurl to prevent further reuse of existing
+     connections. Connections that are idle will be closed. Ongoing transfers
+     will continue with the connection they have. */
+MNWC_CLEAR_DNS :: 1 << 0
+
+Minfo :: enum c.int {
+	/* first, never use this */
+	NONE = 0,
+	/* The number of easy handles currently managed by the multi handle,
+	 * e.g. have been added but not yet removed. */
+	XFERS_CURRENT = 1,
+	/* The number of easy handles running, e.g. not done and not queueing. */
+	XFERS_RUNNING = 2,
+	/* The number of easy handles waiting to start, e.g. for a connection
+	 * to become available due to limits on parallelism, max connections
+	 * or other factors. */
+	INFO_XFERS_PENDING = 3,
+	/* The number of easy handles finished, waiting for their results to
+	 * be read via `curl_multi_info_read()`. */
+	XFERS_DONE = 4,
+	/* The total number of easy handles added to the multi handle, ever. */
+	XFERS_ADDED = 5,
+
+	/* the last unused */
+	LASTENTRY,
+}
 
 @(default_calling_convention="c", link_prefix="curl_")
 foreign lib {
@@ -370,6 +412,34 @@ foreign lib {
 	 */
 	multi_get_handles :: proc(multi_handle: ^CURLM) -> ^^CURL ---
 
+	/*
+	 * Name:    curl_multi_get_offt()
+	 *
+	 * Desc:    Retrieves a numeric value for the `CURLMINFO_*` enums.
+	 *
+	 * Returns: CULRM_OK or error when value could not be obtained.
+	*/
+	multi_get_offt :: proc(multi_handle: ^CURLM, info: Minfo, value: ^off_t) -> Mcode ---
+}
+
+
+/*
+ * Notifications dispatched by a multi handle, when enabled.
+ */
+MULTI_NOTIFY :: enum c.uint {
+	INFO_READ = 0,
+	EASY_DONE = 1,
+}
+
+/*
+ * Callback to install via CURLMOPT_NOTIFYFUNCTION.
+ */
+curl_notify_function :: #type proc "c" (multi_handle: ^CURLM, notification: MULTI_NOTIFY, easy: ^CURL, user_data: rawptr)
+
+@(default_calling_convention="c", link_prefix="curl_")
+foreign lib {
+	multi_notify_disable :: proc(multi: ^CURLM, notification: MULTI_NOTIFY) -> Mcode ---
+	multi_notify_enable  :: proc(multi: ^CURLM, notification: MULTI_NOTIFY) -> Mcode ---
 }
 
 /*

@@ -68,7 +68,7 @@ VERSION_PATCH :: 0
 	CURL_VERSION_BITS() macro since curl's own configure script greps for it
 	and needs it to contain the full number.
 */
-VERSION_NUM :: 0x080f00
+VERSION_NUM :: 0x081100
 
 /*
  * This is the date and time when the full source package was created. The
@@ -79,7 +79,7 @@ VERSION_NUM :: 0x080f00
  *
  * "2007-11-23"
  */
-TIMESTAMP :: "2025-07-16"
+TIMESTAMP :: "2025-11-05"
 
 
 /* linked-list structure for the CURLOPT_QUOTE option (and other) */
