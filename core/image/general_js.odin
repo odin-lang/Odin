@@ -1,4 +1,3 @@
-#+build js
 package image
 
 load :: proc{
