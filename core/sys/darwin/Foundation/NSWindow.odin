@@ -643,6 +643,14 @@ Layer_setContentsScale :: proc "c" (self: ^Layer, scale: Float) {
 Layer_frame :: proc "c" (self: ^Layer) -> Rect {
 	return msgSend(Rect, self, "frame")
 }
+@(objc_type=Layer, objc_name="position")
+Layer_position :: proc "c" (self: ^Layer) -> Point {
+	return msgSend(Point, self, "position")
+}
+@(objc_type=Layer, objc_name="setPosition")
+Layer_setPosition :: proc "c" (self: ^Layer, position: Point) {
+	msgSend(nil, self, "setPosition:", position)
+}
 @(objc_type=Layer, objc_name="addSublayer")
 Layer_addSublayer :: proc "c" (self: ^Layer, layer: ^Layer) {
 	msgSend(nil, self, "addSublayer:", layer)
@@ -784,6 +792,10 @@ Window_setAcceptsMouseMovedEvents :: proc "c" (self: ^Window, ok: BOOL) {
 Window_setStyleMask :: proc "c" (self: ^Window, style_mask: WindowStyleMask) {
 	msgSend(nil, self, "setStyleMask:", style_mask)
 }
+@(objc_type=Window, objc_name="performClose")
+Window_performClose :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "performClose:", sender)
+}
 @(objc_type=Window, objc_name="close")
 Window_close :: proc "c" (self: ^Window) {
 	msgSend(nil, self, "close")
@@ -915,6 +927,18 @@ Window_collectionBehavior :: proc "c" (self: ^Window) -> WindowCollectionBehavio
 @(objc_type = Window, objc_name = "setLevel")
 Window_setLevel :: proc "c" (self: ^Window, level: WindowLevel) {
 	msgSend(nil, self, "setLevel:", level)
+}
+@(objc_type = Window, objc_name = "keyWindow")
+Window_keyWindow :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isKeyWindow")
+}
+@(objc_type = Window, objc_name = "mainWindow")
+Window_mainWindow :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isMainWindow")
+}
+@(objc_type = Window, objc_name = "parentWindow")
+Window_parentWindow :: proc "c" (self: ^Window) -> ^Window {
+	return msgSend(^Window, self, "parentWindow")
 }
 @(objc_type = Window, objc_name = "setReleasedWhenClosed")
 Window_setReleasedWhenClosed :: proc "c" (self: ^Window, flag: BOOL) {
