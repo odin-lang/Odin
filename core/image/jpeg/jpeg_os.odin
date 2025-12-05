@@ -1,3 +1,4 @@
+#+build !js
 package jpeg
 
 import "core:os"
