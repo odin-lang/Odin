@@ -237,7 +237,7 @@ foreign lib {
 	CreateWindowFrom         :: proc(data: rawptr) -> ^Window ---
 	GetWindowID              :: proc(window: ^Window) -> u32 ---
 	GetWindowFromID          :: proc(id: u32) -> ^Window ---
-	GetWindowFlags           :: proc(window: ^Window) -> u32 ---
+	GetWindowFlags           :: proc(window: ^Window) -> WindowFlags ---
 	SetWindowTitle           :: proc(window: ^Window,  title: cstring) ---
 	GetWindowTitle           :: proc(window: ^Window) -> cstring ---
 	SetWindowIcon            :: proc(window: ^Window, icon: ^Surface) ---
