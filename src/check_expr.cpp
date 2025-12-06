@@ -10838,6 +10838,20 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 		break;
 	}
+	case Type_Union: {
+		if (cl->elems.count == 0) {
+			break; // NOTE(bill): No need to init
+		}
+		TypeUnion *u = &t->Union;
+		if (u->variants.count != 1) {
+			gbString str = type_to_string(type);
+			error(node, "'%s' ('union') compound literals are only allowed for unions with a single variant", str);
+			gb_string_free(str);
+			return kind;
+		}
+
+		return check_compound_literal(c, o, node, u->variants[0]);
+	}
 
 
 	default: {
