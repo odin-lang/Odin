@@ -23,7 +23,7 @@ normalized_east_asian_width       :: unicode.normalized_east_asian_width
 Grapheme :: struct {
 	byte_index: int,
 	rune_index: int,
-	width:      int,
+	width:      int, // The width of the Grapheme in number of monospace cells
 }
 
 
@@ -40,7 +40,7 @@ Grapheme_Iterator :: struct {
 
 	grapheme_count: int, // The number of graphemes in the string
 	rune_count:     int, // The number of runes in the string
-	width:          int, // The widrth of the string in number of monospace cells
+	width:          int, // The width of the string in number of monospace cells
 
 	last_rune:                  rune,
 	last_rune_breaks_forward:   bool,
@@ -152,7 +152,7 @@ decode_grapheme_iterate :: proc(it: ^Grapheme_Iterator) -> (text: string, graphe
 					it.rune_count,
 					it.width - it.last_width,
 				}
-				text = it.str[byte_index:][:grapheme.width]
+				text = it.str[byte_index:it.curr_offset]
 				ok = true
 
 
