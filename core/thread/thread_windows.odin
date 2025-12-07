@@ -185,6 +185,6 @@ _set_name :: proc(thread: ^Thread) {
 	buf: [_THREAD_DESCRIPTION_LENGTH]u16
 	// _THREAD_DESCRIPTION_LENGTH includes terminating null
 	utf16.encode_string(buf[:len(buf) - 1], name)
-	win32.SetThreadDescription(t_handle, raw_data(buf[:]))
+	win32.SetThreadDescription(t_handle, cstring16(buf))
 }
 
