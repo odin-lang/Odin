@@ -92,6 +92,11 @@ Application_activate :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "activate")
 }
 
+@(objc_type=Application, objc_name="active")
+Application_active :: proc "c" (self: ^Application) -> BOOL {
+	return msgSend(BOOL, self, "isActive")
+}
+
 @(objc_type=Application, objc_name="setTitle")
 Application_setTitle :: proc "c" (self: ^Application, title: ^String) {
 	msgSend(nil, self, "setTitle", title)
@@ -105,6 +110,35 @@ Application_mainMenu :: proc "c" (self: ^Application) -> ^Menu {
 @(objc_type=Application, objc_name="setMainMenu")
 Application_setMainMenu :: proc "c" (self: ^Application, menu: ^Menu) {
 	msgSend(nil, self, "setMainMenu:", menu)
+}
+
+// This property is actually not exposed in AppKit's public API.
+// But there is basically no other way to configure the apple menu without using NIB files.
+// Therefore, an Odin binding for this non-public API was created.
+// Note: SDL also calls this non-public method.
+@(objc_type=Application, objc_name="setAppleMenu")
+Application_setAppleMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setAppleMenu:", menu)
+}
+
+@(objc_type=Application, objc_name="servicesMenu")
+Application_servicesMenu :: proc "c" (self: ^Application) -> ^Menu {
+	return msgSend(^Menu, self, "servicesMenu")
+}
+
+@(objc_type=Application, objc_name="setServicesMenu")
+Application_setServicesMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setServicesMenu:", menu)
+}
+
+@(objc_type=Application, objc_name="windowsMenu")
+Application_windowsMenu :: proc "c" (self: ^Application) -> ^Menu {
+	return msgSend(^Menu, self, "windowsMenu")
+}
+
+@(objc_type=Application, objc_name="setWindowsMenu")
+Application_setWindowsMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setWindowsMenu:", menu)
 }
 
 @(objc_type=Application, objc_name="mainWindow")
