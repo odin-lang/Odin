@@ -82,6 +82,7 @@ package all
 @(require) import "core:image/png"
 @(require) import "core:image/qoi"
 @(require) import "core:image/tga"
+@(require) import "core:image/jpeg"
 
 @(require) import "core:io"
 @(require) import "core:log"
@@ -110,6 +111,7 @@ package all
 @(require) import "core:prof/spall"
 
 @(require) import "core:os"
+@(require) import "core:os/os2"
 
 @(require) import "core:path/slashpath"
 @(require) import "core:path/filepath"

@@ -19,6 +19,7 @@ Writer :: struct {
 
 }
 
+// Initialized a Writer with an `allocator`
 writer_init :: proc(b: ^Writer, wr: io.Writer, size: int = DEFAULT_BUF_SIZE, allocator := context.allocator) {
 	size := size
 	size = max(size, MIN_READ_BUFFER_SIZE)
@@ -27,6 +28,7 @@ writer_init :: proc(b: ^Writer, wr: io.Writer, size: int = DEFAULT_BUF_SIZE, all
 	b.buf = make([]byte, size, allocator)
 }
 
+// Initialized a Writer with a user provided buffer `buf`
 writer_init_with_buf :: proc(b: ^Writer, wr: io.Writer, buf: []byte) {
 	writer_reset(b, wr)
 	b.buf_allocator = {}
@@ -247,5 +249,5 @@ _writer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 	case .Query:
 		return io.query_utility({.Flush, .Write, .Destroy, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }

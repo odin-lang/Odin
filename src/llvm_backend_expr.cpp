@@ -634,7 +634,7 @@ gb_internal LLVMValueRef lb_matrix_to_trimmed_vector(lbProcedure *p, lbValue m) 
 }
 
 
-gb_internal lbValue lb_emit_matrix_tranpose(lbProcedure *p, lbValue m, Type *type) {
+gb_internal lbValue lb_emit_matrix_transpose(lbProcedure *p, lbValue m, Type *type) {
 	if (is_type_array(m.type)) {
 		i32 rank = type_math_rank(m.type);
 		if (rank == 2) {
@@ -664,7 +664,12 @@ gb_internal lbValue lb_emit_matrix_tranpose(lbProcedure *p, lbValue m, Type *typ
 	Type *mt = base_type(m.type);
 	GB_ASSERT(mt->kind == Type_Matrix);
 
-	if (lb_is_matrix_simdable(mt)) {
+	Type *rt = base_type(type);
+	if (rt->kind == Type_Matrix && rt->Matrix.is_row_major != mt->Matrix.is_row_major) {
+		GB_PANIC("TODO: transpose with changing layout");
+	}
+
+	if (lb_is_matrix_simdable(mt) && lb_is_matrix_simdable(type)) {
 		unsigned stride = cast(unsigned)matrix_type_stride_in_elems(mt);
 		unsigned row_count    = cast(unsigned)mt->Matrix.row_count;
 		unsigned column_count = cast(unsigned)mt->Matrix.column_count;
@@ -1156,8 +1161,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 			case IntegerDivisionByZero_Zero:
 				return zero;
 			case IntegerDivisionByZero_AllBits:
-				// return all_bits;
-				break;
+				return all_bits;
 			}
 		} else {
 			if (!is_signed && lb_sizeof(type) <= 8) {
@@ -1193,7 +1197,6 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	lb_start_block(p, edge_case_block);
 
-
 	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
 		lb_call_intrinsic(p, "llvm.trap", nullptr, 0, nullptr, 0);
@@ -1209,17 +1212,17 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 		incoming_values[1] = all_bits;
 		break;
 	}
+	LLVMValueRef res = nullptr;
 
 	lb_emit_jump(p, done_block);
 	lb_start_block(p, done_block);
 
-	LLVMValueRef res = incoming_values[0];
 
 	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
-	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
 		break;
+	case IntegerDivisionByZero_Self:
 	case IntegerDivisionByZero_Zero:
 	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");
@@ -1228,6 +1231,9 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 		incoming_blocks[0] = p->curr_block->preds[0]->block;
 		incoming_blocks[1] = p->curr_block->preds[1]->block;
 
+		GB_ASSERT(incoming_blocks[0] == safe_block->block);
+		GB_ASSERT(incoming_blocks[1] == edge_case_block->block);
+
 		LLVMAddIncoming(res, incoming_values, incoming_blocks, 2);
 		break;
 	}
@@ -1235,7 +1241,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	return res;
 }
 
-gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, char const *name) {
+gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, char const *name) {
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
@@ -1305,13 +1311,13 @@ gb_internal LLVMValueRef lb_integer_division_intrinsics(lbProcedure *p, LLVMValu
 	lb_emit_jump(p, done_block);
 	lb_start_block(p, done_block);
 
-	LLVMValueRef res = incoming_values[0];
+	LLVMValueRef res = nullptr;
 
 	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
-	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
 		break;
+	case IntegerDivisionByZero_Self:
 	case IntegerDivisionByZero_Zero:
 	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");
@@ -1418,9 +1424,9 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 
 	switch (behaviour)  {
 	case IntegerDivisionByZero_Trap:
-	case IntegerDivisionByZero_Self:
 		res = incoming_values[0];
 		break;
+	case IntegerDivisionByZero_Self:
 	case IntegerDivisionByZero_Zero:
 	case IntegerDivisionByZero_AllBits:
 		res = LLVMBuildPhi(p->builder, type, "");
@@ -2502,7 +2508,6 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		}
 		for (Type *vt : dst->Union.variants) {
 			if (src_type == t_llvm_bool && is_type_boolean(vt)) {
-				value = lb_emit_conv(p, value, vt);
 				lbAddr parent = lb_add_local_generated(p, t, true);
 				lb_emit_store_union_variant(p, parent.addr, value, vt);
 				return lb_addr_load(p, parent);
@@ -2563,10 +2568,11 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 		Type *dt = t;
 
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		GB_ASSERT(is_type_struct(st) || is_type_raw_union(st));
 		Selection sel = {};
-		sel.index.allocator = heap_allocator();
-		defer (array_free(&sel.index));
+		sel.index.allocator = temporary_allocator();
 		if (lookup_subtype_polymorphic_selection(t, src_type, &sel)) {
 			if (sel.entity == nullptr) {
 				GB_PANIC("invalid subtype cast  %s -> ", type_to_string(src_type), type_to_string(t));
@@ -3929,6 +3935,20 @@ gb_internal lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	return res;
 }
 
+gb_internal Type *lb_build_expr_original_const_type(Ast *expr) {
+	expr = unparen_expr(expr);
+	Type *type = type_of_expr(expr);
+	if (is_type_union(type)) {
+		if (expr->kind == Ast_CallExpr) {
+			if (expr->CallExpr.proc->tav.mode == Addressing_Type) {
+				Type *res = lb_build_expr_original_const_type(expr->CallExpr.args[0]);
+				return res;
+			}
+		}
+	}
+	return type_of_expr(expr);
+}
+
 gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
@@ -3940,9 +3960,11 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
 
 
+
 	if (tv.value.kind != ExactValue_Invalid) {
+		Type *original_type = lb_build_expr_original_const_type(expr);
 		// NOTE(bill): Short on constant values
-		return lb_const_value(p->module, type, tv.value, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
+		return lb_const_value(p->module, type, tv.value, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL, original_type);
 	} else if (tv.mode == Addressing_Type) {
 		// NOTE(bill, 2023-01-16): is this correct? I hope so at least
 		return lb_typeid(m, tv.type);
@@ -4023,7 +4045,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode == Addressing_Constant);
 
-		return lb_const_value(p->module, type, tv.value);
+		return lb_const_value(p->module, type, tv.value, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL, tv.type);
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, expr);
@@ -4304,7 +4326,7 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_Constant) {
 		Type *t = default_type(type_of_expr(expr));
-		lbValue v = lb_const_value(p->module, t, e->Constant.value);
+		lbValue v = lb_const_value(p->module, t, e->Constant.value, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL, e->type);
 		if (LLVMIsConstant(v.value)) {
 			lbAddr g = lb_add_global_generated_from_procedure(p, t, v);
 			return g;
@@ -5763,11 +5785,11 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 		if (is_type_union(t)) {
 			Type *type = type_of_expr(expr);
 			lbAddr v = lb_add_local_generated(p, type, false);
-			lb_addr_store(p, v, lb_emit_union_cast(p, lb_build_expr(p, ta->expr), type, pos));
+			lb_addr_store(p, v, lb_emit_union_cast(p, e, type, pos));
 			return v;
 		} else if (is_type_any(t)) {
 			Type *type = type_of_expr(expr);
-			return lb_emit_any_cast_addr(p, lb_build_expr(p, ta->expr), type, pos);
+			return lb_emit_any_cast_addr(p, e, type, pos);
 		} else {
 			GB_PANIC("TODO(bill): type assertion %s", type_to_string(e.type));
 		}

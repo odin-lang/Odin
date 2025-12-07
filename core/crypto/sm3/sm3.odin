@@ -1,5 +1,5 @@
 /*
-package sm3 implements the SM3 hash algorithm.
+`SM3` hash algorithm.
 
 See:
 - [[ https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02 ]]
@@ -8,7 +8,7 @@ package sm3
 
 /*
     Copyright 2021 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.

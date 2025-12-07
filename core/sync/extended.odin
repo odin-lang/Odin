@@ -26,7 +26,7 @@ is not allowed to become negative.
 **Note**: Just like any synchronization primitives, a wait group cannot be
 copied after first use. See documentation for `Mutex` or `Cond`.
 */
-Wait_Group :: struct #no_copy {
+Wait_Group :: struct {
 	counter: int,
 	mutex:   Mutex,
 	cond:    Cond,
@@ -144,7 +144,7 @@ thread procedure.
 		thread.destroy(t)
 	}
 */
-Barrier :: struct #no_copy {
+Barrier :: struct {
 	mutex: Mutex,
 	cond:  Cond,
 	index:         int,
@@ -206,7 +206,7 @@ When a thread calls `auto_reset_event_wait`, its execution will be blocked,
 until the event is signalled by another thread. The call to
 `auto_reset_event_signal` wakes up exactly one thread waiting for the event.
 */
-Auto_Reset_Event :: struct #no_copy {
+Auto_Reset_Event :: struct {
 	// status ==  0: Event is reset and no threads are waiting
 	// status ==  1: Event is signalled
 	// status == -N: Event is reset and N threads are waiting
@@ -260,7 +260,7 @@ of entries into the critical section.
 This type of synchronization primitive is applicable for short critical sections
 in low-contention systems, as it uses a spinlock under the hood.
 */
-Ticket_Mutex :: struct #no_copy {
+Ticket_Mutex :: struct {
 	ticket:  uint,
 	serving: uint,
 }
@@ -332,7 +332,7 @@ Once a lock on a benaphore is acquired by a thread, no other thread is allowed
 into any critical sections, associted with the same benaphore, until the lock
 is released.
 */
-Benaphore :: struct #no_copy {
+Benaphore :: struct {
 	counter: i32,
 	sema:    Sema,
 }
@@ -424,7 +424,7 @@ to acquire another lock on the same benaphore. When a thread has acquired the
 lock on a benaphore, the benaphore will stay locked until the thread releases
 the lock as many times as it has been locked by the thread.
 */
-Recursive_Benaphore :: struct #no_copy {
+Recursive_Benaphore :: struct {
 	counter:   int,
 	owner:     int,
 	recursion: i32,
@@ -536,7 +536,7 @@ Once action.
 `Once` a synchronization primitive, that only allows a single entry into a
 critical section from a single thread.
 */
-Once :: struct #no_copy {
+Once :: struct {
 	m:    Mutex,
 	done: bool,
 }
@@ -636,7 +636,7 @@ A Parker is an associated token which is initially not present:
 * The `unpark` procedure automatically makes the token available if it
   was not already.
 */
-Parker :: struct #no_copy {
+Parker :: struct {
 	state: Futex,
 }
 
@@ -713,7 +713,7 @@ A one-shot event is an associated token which is initially not present:
 * The `one_shot_event_signal` procedure automatically makes the token
   available if its was not already.
 */
-One_Shot_Event :: struct #no_copy {
+One_Shot_Event :: struct {
 	state: Futex,
 }
 

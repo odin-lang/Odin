@@ -29,19 +29,16 @@ _stdin := File{
 	stream = {
 		procedure = _file_stream_proc,
 	},
-	fstat = _fstat,
 }
 _stdout := File{
 	stream = {
 		procedure = _file_stream_proc,
 	},
-	fstat = _fstat,
 }
 _stderr := File{
 	stream = {
 		procedure = _file_stream_proc,
 	},
-	fstat = _fstat,
 }
 
 @init
@@ -55,7 +52,6 @@ _standard_stream_init :: proc "contextless" () {
 			data = impl,
 			procedure = _file_stream_proc,
 		}
-		impl.file.fstat = _fstat
 		return &impl.file
 	}
 
@@ -65,7 +61,7 @@ _standard_stream_init :: proc "contextless" () {
 	stderr = new_std(&files[2], 2, "/proc/self/fd/2")
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
 
@@ -88,7 +84,7 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 	if .Trunc in flags         { sys_flags += {.TRUNC} }
 	if .Inheritable in flags   { sys_flags -= {.CLOEXEC} }
 
-	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)u32(perm))
+	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)transmute(u32)perm)
 	if errno != .NONE {
 		return nil, _get_platform_error(errno)
 	}
@@ -109,7 +105,6 @@ _new_file :: proc(fd: uintptr, _: string, allocator: runtime.Allocator) -> (f: ^
 		data = impl,
 		procedure = _file_stream_proc,
 	}
-	impl.file.fstat = _fstat
 	return &impl.file, nil
 }
 
@@ -132,7 +127,7 @@ _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
 
 
 @(require_results)
-_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm := 0o777) -> (f: ^File, err: Error) {
+_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm: Permissions) -> (f: ^File, err: Error) {
 	assert(buffer_size > 0)
 	f, err = _open(name, flags, perm)
 	if f != nil && err == nil {
@@ -198,7 +193,7 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 	case .NONE:
 		return n, nil
 	case:
-		return -1, _get_platform_error(errno)
+		return 0, _get_platform_error(errno)
 	}
 }
 
@@ -209,7 +204,7 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 
 	n, errno := linux.read(f.fd, p[:min(len(p), MAX_RW)])
 	if errno != .NONE {
-		return -1, _get_platform_error(errno)
+		return 0, _get_platform_error(errno)
 	}
 	return i64(n), io.Error.EOF if n == 0 else nil
 }
@@ -223,7 +218,7 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 	}
 	n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
 	if errno != .NONE {
-		return -1, _get_platform_error(errno)
+		return 0, _get_platform_error(errno)
 	}
 	if n == 0 {
 		return 0, .EOF
@@ -276,7 +271,7 @@ _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	s: linux.Stat = ---
 	errno := linux.fstat(f.fd, &s)
 	if errno != .NONE {
-		return -1, _get_platform_error(errno)
+		return 0, _get_platform_error(errno)
 	}
 
 	if s.mode & linux.S_IFMT == linux.S_IFREG {
@@ -369,15 +364,15 @@ _fchdir :: proc(f: ^File) -> Error {
 	return _get_platform_error(linux.fchdir(impl.fd))
 }
 
-_chmod :: proc(name: string, mode: int) -> Error {
+_chmod :: proc(name: string, mode: Permissions) -> Error {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
-	return _get_platform_error(linux.chmod(name_cstr, transmute(linux.Mode)(u32(mode))))
+	return _get_platform_error(linux.chmod(name_cstr, transmute(linux.Mode)transmute(u32)mode))
 }
 
-_fchmod :: proc(f: ^File, mode: int) -> Error {
+_fchmod :: proc(f: ^File, mode: Permissions) -> Error {
 	impl := (^File_Impl)(f.impl)
-	return _get_platform_error(linux.fchmod(impl.fd, transmute(linux.Mode)(u32(mode))))
+	return _get_platform_error(linux.fchmod(impl.fd, transmute(linux.Mode)transmute(u32)mode))
 }
 
 // NOTE: will throw error without super user priviledges
@@ -476,89 +471,77 @@ _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator: runtime.Alloc
 }
 
 @(private="package")
-_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+_file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From, allocator: runtime.Allocator) -> (n: i64, err: Error) {
 	f := (^File_Impl)(stream_data)
-	ferr: Error
 	switch mode {
 	case .Read:
-		n, ferr = _read(f, p)
-		err = error_to_io_error(ferr)
+		n, err = _read(f, p)
 		return
 	case .Read_At:
-		n, ferr = _read_at(f, p, offset)
-		err = error_to_io_error(ferr)
+		n, err = _read_at(f, p, offset)
 		return
 	case .Write:
-		n, ferr = _write(f, p)
-		err = error_to_io_error(ferr)
+		n, err = _write(f, p)
 		return
 	case .Write_At:
-		n, ferr = _write_at(f, p, offset)
-		err = error_to_io_error(ferr)
+		n, err = _write_at(f, p, offset)
 		return
 	case .Seek:
-		n, ferr = _seek(f, offset, whence)
-		err = error_to_io_error(ferr)
+		n, err = _seek(f, offset, whence)
 		return
 	case .Size:
-		n, ferr = _file_size(f)
-		err = error_to_io_error(ferr)
+		n, err = _file_size(f)
 		return
 	case .Flush:
-		ferr = _flush(f)
-		err = error_to_io_error(ferr)
+		err = _flush(f)
 		return
 	case .Close, .Destroy:
-		ferr = _close(f)
-		err = error_to_io_error(ferr)
+		err = _close(f)
 		return
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+	case .Fstat:
+		err = file_stream_fstat_utility(f, p, allocator)
+		return
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 
 @(private="package")
-_file_stream_buffered_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+_file_stream_buffered_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From, allocator: runtime.Allocator) -> (n: i64, err: Error) {
 	f := (^File_Impl)(stream_data)
-	ferr: Error
 	switch mode {
 	case .Read:
-		n, ferr = _read(f, p)
-		err = error_to_io_error(ferr)
+		n, err = _read(f, p)
 		return
 	case .Read_At:
-		n, ferr = _read_at(f, p, offset)
-		err = error_to_io_error(ferr)
+		n, err = _read_at(f, p, offset)
 		return
 	case .Write:
-		n, ferr = _write(f, p)
-		err = error_to_io_error(ferr)
+		n, err = _write(f, p)
 		return
 	case .Write_At:
-		n, ferr = _write_at(f, p, offset)
-		err = error_to_io_error(ferr)
+		n, err = _write_at(f, p, offset)
 		return
 	case .Seek:
-		n, ferr = _seek(f, offset, whence)
-		err = error_to_io_error(ferr)
+		n, err = _seek(f, offset, whence)
 		return
 	case .Size:
-		n, ferr = _file_size(f)
-		err = error_to_io_error(ferr)
+		n, err = _file_size(f)
 		return
 	case .Flush:
-		ferr = _flush(f)
-		err = error_to_io_error(ferr)
+		err = _flush(f)
 		return
 	case .Close, .Destroy:
-		ferr = _close(f)
-		err = error_to_io_error(ferr)
+		err = _close(f)
 		return
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+	case .Fstat:
+		err = file_stream_fstat_utility(f, p, allocator)
+		return
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 

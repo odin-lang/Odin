@@ -1,3 +1,4 @@
+// Bindings for [[ SDL3 Image ; https://wiki.libsdl.org/SDL3_image/FrontPage ]].
 package sdl3_image
 
 import "core:c"

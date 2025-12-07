@@ -34,7 +34,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		return .Exist
 	}
 
-	clean_path := clean_path(path, temp_allocator)
+	clean_path := clean_path(path, temp_allocator) or_return
 	return internal_mkdir_all(clean_path)
 
 	internal_mkdir_all :: proc(path: string) -> Error {
@@ -113,4 +113,8 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 	}
 
 	return concatenate({"/", arg}, allocator)
+}
+
+_get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absolute_path: string, err: Error) {
+	return "", .Unsupported
 }

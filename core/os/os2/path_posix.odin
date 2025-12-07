@@ -133,7 +133,7 @@ _get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absol
 	rel_cstr := clone_to_cstring(rel, temp_allocator) or_return
 	path_ptr := posix.realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", Platform_Error(posix.errno())
+		return "", _get_platform_error()
 	}
 	defer posix.free(path_ptr)
 

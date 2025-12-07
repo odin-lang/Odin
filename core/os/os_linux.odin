@@ -908,7 +908,7 @@ _dup :: proc(fd: Handle) -> (Handle, Error) {
 @(require_results)
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Error) {
 	buf : [256]byte
-	fd_str := strconv.itoa( buf[:], cast(int)fd )
+	fd_str := strconv.write_int( buf[:], cast(i64)fd, 10 )
 
 	procfs_path := strings.concatenate( []string{ "/proc/self/fd/", fd_str } )
 	defer delete(procfs_path)

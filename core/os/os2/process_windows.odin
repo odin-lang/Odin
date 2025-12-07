@@ -8,11 +8,6 @@ import win32 "core:sys/windows"
 import "core:time"
 
 @(private="package")
-_exit :: proc "contextless" (code: int) -> ! {
-	win32.ExitProcess(u32(code))
-}
-
-@(private="package")
 _get_uid :: proc() -> int {
 	return -1
 }

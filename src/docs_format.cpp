@@ -94,6 +94,7 @@ enum OdinDocTypeFlag_Struct : u32 {
 	OdinDocTypeFlag_Struct_polymorphic = 1<<0,
 	OdinDocTypeFlag_Struct_packed      = 1<<1,
 	OdinDocTypeFlag_Struct_raw_union   = 1<<2,
+	OdinDocTypeFlag_Struct_all_or_none = 1<<3,
 };
 
 enum OdinDocTypeFlag_Union : u32 {
@@ -124,21 +125,76 @@ enum {
 
 struct OdinDocType {
 	OdinDocTypeKind kind;
+	// Type_Kind specific used by some types
+	// Underlying flag types:
+	// .Basic   - Type_Flags_Basic
+	// .Struct  - Type_Flags_Struct
+	// .Union   - Type_Flags_Union
+	// .Proc    - Type_Flags_Proc
+	// .Bit_Set - Type_Flags_Bit_Set
 	u32             flags;
+
+	// Used by:
+	// .Basic
+	// .Named
+	// .Generic
 	OdinDocString   name;
+
+	// Used By: .Struct, .Union
 	OdinDocString   custom_align;
 
-	// Used by some types
+	// Used by:
+	// .Array            - 1   count: 0=len
+	// .Enumerated_Array - 1   count: 0=len
+	// .SOA_Struct_Fixed - 1   count: 0=len
+	// .Bit_Set          - 2   count: 0=lower, 1=upper
+	// .Simd_Vector      - 1   count: 0=len
+	// .Matrix           - 2   count: 0=row_count, 1=column_count
+	// .Struct           - <=2 count: 0=min_field_align, 1=max_field_align
 	u32 elem_count_len;
 	i64 elem_counts[OdinDocType_ElemsCap];
 
-	// Each of these is esed by some types, not all
+	// Used by: .Procedures
+	// blank implies the "odin" calling convention
 	OdinDocString calling_convention;
+
+	// Used by:
+	// .Named              - 1 type:    0=base type
+	// .Generic            - <1 type:   0=specialization
+	// .Pointer            - 1 type:    0=element
+	// .Array              - 1 type:    0=element
+	// .Enumerated_Array   - 2 types:   0=index and 1=element
+	// .Slice              - 1 type:    0=element
+	// .Dynamic_Array      - 1 type:    0=element
+	// .Map                - 2 types:   0=key, 1=value
+	// .SOA_Struct_Fixed   - 1 type:    underlying SOA struct element
+	// .SOA_Struct_Slice   - 1 type:    underlying SOA struct element
+	// .SOA_Struct_Dynamic - 1 type:    underlying SOA struct element
+	// .Union              - 0+ types:  variants
+	// .Enum               - <1 type:   0=base type
+	// .Proc               - 2 types:   0=parameters, 1=results
+	// .Bit_Set            - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
+	// .Simd_Vector        - 1 type:    0=element
+	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
+	// .Multi_Pointer      - 1 type:    0=element
+	// .Matrix             - 1 type:    0=element
+	// .Soa_Pointer        - 1 type:    0=element
+	// .Bit_Field          - 1 type:    0=backing type
 	OdinDocArray<OdinDocTypeIndex> types;
+
+	// Used by:
+	// .Named       - 1 field for the definition
+	// .Struct      - fields
+	// .Enum        - fields
+	// .Parameters  - parameters (procedures only)
 	OdinDocArray<OdinDocEntityIndex> entities;
+
+	// Used By: .Struct, .Union
 	OdinDocTypeIndex polmorphic_params;
+	// Used By: .Struct, .Union
 	OdinDocArray<OdinDocString> where_clauses;
-	OdinDocArray<OdinDocString> tags; // struct field tags
+	// Used By: .Struct
+	OdinDocArray<OdinDocString> tags;
 };
 
 struct OdinDocAttribute {

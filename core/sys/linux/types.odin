@@ -763,7 +763,7 @@ Sig_Action :: struct($T: typeid) {
 	Note, on linux these are technically passed by OR'ing together
 	with Socket_Type, our wrapper does this under the hood.
 */
-Socket_FD_Flags :: bit_set[Socket_FD_Flags_Bits; int]
+Socket_FD_Flags :: bit_set[Socket_FD_Flags_Bits; i32]
 
 /*
 	Address family for the socket.
@@ -1446,9 +1446,25 @@ EPoll_Data :: struct #raw_union {
 	u64: u64,
 }
 
-EPoll_Event :: struct #packed {
-	events: EPoll_Event_Set,
-	data:   EPoll_Data,
+/*
+	Linux kernel only packs this struct on x86_64.
+	include/uapi/linux/eventpoll.h:	
+		#ifdef __x86_64__
+		#define EPOLL_PACKED __attribute__((packed))
+		#else
+		#define EPOLL_PACKED
+		#endif
+*/
+when ODIN_ARCH == .amd64 {
+	EPoll_Event :: struct #packed {
+		events: EPoll_Event_Set,
+		data:   EPoll_Data,
+	}
+} else {
+	EPoll_Event :: struct {
+		events: EPoll_Event_Set,
+		data:   EPoll_Data,
+	}
 }
 
 /*
@@ -1472,3 +1488,263 @@ RISCV_HWProbe :: struct {
 		raw:                    u64,
 	},
 }
+
+IO_Uring_Params :: struct {
+	sq_entries:     u32,
+	cq_entries:     u32,
+	flags:          IO_Uring_Setup_Flags,
+	sq_thread_cpu:  u32,
+	sq_thread_idle: u32,
+	features:       IO_Uring_Features,
+	wq_fd:          u32,
+	resv:           [3]u32,
+	sq_off:         IO_SQ_Ring_Offsets,
+	cq_off:         IO_CQ_Ring_Offsets,
+}
+
+IO_Uring_Setup_Flags :: bit_set[IO_Uring_Setup_Flags_Bits; u32]
+
+IO_Uring_Features :: bit_set[IO_Uring_Features_Bits; u32]
+
+IO_SQ_Ring_Offsets :: struct {
+	head:         u32,
+	tail:         u32,
+	ring_mask:    u32,
+	ring_entries: u32,
+	flags:        u32,
+	dropped:      u32,
+	array:        u32,
+	resv1:        u32,
+	user_addr:    u64,
+}
+
+IO_CQ_Ring_Offsets :: struct {
+	head:         u32,
+	tail:         u32,
+	ring_mask:    u32,
+	ring_entries: u32,
+	overflow:     u32,
+	cqes:         u32,
+	flags:        u32,
+	resv1:        u32,
+	user_addr:    u64,
+}
+
+IO_Uring_Enter_Flags :: bit_set[IO_Uring_Enter_Flags_Bits; u32]
+
+IO_Uring_Getevents_Arg :: struct #min_field_align(8) {
+	sigmask:    ^Sig_Set,
+	sigmask_sz: u32,
+	// pad:     u32,
+	ts:         ^Time_Spec,
+}
+#assert(align_of(IO_Uring_Getevents_Arg) == 8)
+
+IO_Uring_Rsrc_Register :: struct($T: typeid) {
+	nr:    u32,
+	resv:  u32,
+	resv2: u64,
+	using _: struct #min_field_align(8) {
+		data:  [^]T,
+		tags:  [^]u64,
+	},
+}
+
+IO_Uring_Rsrc_Update2 :: struct($T: typeid) {
+	offset: u32,
+	resv:   u32,
+	using _: struct #min_field_align(8) {
+		data: [^]T,
+		tags: [^]u64,
+	},
+	nr:    u32,
+	resv2: u32,
+}
+
+// The completion queue entry when the .CQE32 flag is not set on setup.
+IO_Uring_CQE :: struct {
+	// sq.data submission passed back.
+	user_data: u64,
+	// result code for this event.
+	res:       i32,
+	flags:     IO_Uring_CQE_Flags,
+}
+#assert(size_of(IO_Uring_CQE) == 16)
+
+// The completion queue entry when the .CQE32 flag is set on setup.
+IO_Uring_CQE32 :: struct {
+	using _: IO_Uring_CQE,
+	pad:     u64,
+	pad2:    u64,
+}
+#assert(size_of(IO_Uring_CQE32) == 32)
+
+IO_Uring_CQE_Flags :: bit_set[IO_Uring_CQE_Flags_Bits; u32]
+IO_Uring_SQE_Flags :: bit_set[IO_Uring_SQE_Flags_Bits; u8]
+
+// The submission queue entry when the .SQE128 flag is not set on setup.
+IO_Uring_SQE :: struct {
+	opcode:           IO_Uring_OP,
+	flags:            IO_Uring_SQE_Flags,
+	using __ioprio: struct #raw_union {
+		ioprio:             u16,
+		sq_accept_flags:    IO_Uring_Accept_Flags,
+		sq_send_recv_flags: IO_Uring_Send_Recv_Flags,
+	},
+	fd: Fd,
+	using __offset: struct #raw_union {
+		// Offset into file.
+		off:     u64,
+		addr2:   u64,
+		using _: struct {
+			cmd_op: u32,
+			__pad1: u32,
+		},
+		statx: ^Statx,
+	},
+	using __iovecs:   struct #raw_union {
+		// Pointer to buffer or iovecs.
+		addr:          u64,
+		splice_off_in: u64,
+		using _: struct {
+			level:   u32,
+			optname: u32,
+		},
+	},
+	using __len: struct #raw_union {
+		// Buffer size or number of iovecs.
+		len:          u32,
+		poll_flags:   IO_Uring_Poll_Add_Flags,
+		statx_mask:   Statx_Mask,
+		epoll_ctl_op: EPoll_Ctl_Opcode,
+		shutdown_how: Shutdown_How,
+	},
+	using __contents: struct #raw_union {
+		rw_flags:         i32,
+		fsync_flags:      IO_Uring_Fsync_Flags,
+		// compatibility.
+		poll_events:      Fd_Poll_Events,
+		// word-reversed for BE.
+		poll32_events:    u32,
+		sync_range_flags: u32,
+		msg_flags:        Socket_Msg,
+		timeout_flags:    IO_Uring_Timeout_Flags,
+		accept_flags:     Socket_FD_Flags,
+		cancel_flags:     u32,
+		open_flags:       Open_Flags,
+		statx_flags:      FD_Flags,
+		fadvise_advice:   u32,
+		splice_flags:     IO_Uring_Splice_Flags,
+		rename_flags:     u32,
+		unlink_flags:     u32,
+		hardlink_flags:   u32,
+		xattr_flags:      u32,
+		msg_ring_flags:   u32,
+		uring_cmd_flags:  IO_Uring_Cmd_Flags,
+	},
+	// Data to be passed back at completion time.
+	user_data: u64,
+	using __buffer: struct #raw_union {
+		// Index into fixed buffers, if used.
+		buf_index: u16,
+		// For grouped buffer selection.
+		buf_group: u16,
+	},
+	// Personality to use, if used.
+	personality: u16,
+	using _: struct #raw_union {
+		splice_fd_in: Fd,
+		file_index:   u32,
+		using _:      struct {
+			addr_len: u16,
+			__pad3:   [1]u16,
+		},
+	},
+	using __: struct #raw_union {
+		using _: struct {
+			addr3:  u64,
+			__pad2: [1]u64,
+		},
+	},
+}
+#assert(size_of(IO_Uring_SQE) == 64)
+
+// The submission queue entry when the .SQE128 flag is set on setup.
+IO_Uring_SQE128 :: struct {
+	using _: IO_Uring_SQE,
+	cmd:     [64]byte,
+}
+#assert(size_of(IO_Uring_SQE128) == 128)
+
+IO_Uring_Poll_Add_Flags :: bit_set[IO_Uring_Poll_Add_Flags_Bits; u32]
+
+IO_Uring_Fsync_Flags :: bit_set[IO_Uring_Fsync_Flags_Bits; u32]
+
+IO_Uring_Timeout_Flags :: bit_set[IO_Uring_Timeout_Flags_Bits; u32]
+
+IO_Uring_Cmd_Flags :: bit_set[IO_Uring_Cmd_Flags_Bits; u32]
+
+IO_Uring_Splice_Flags :: bit_set[IO_Uring_Splice_Flags_Bits; u32]
+
+IO_Uring_Accept_Flags :: bit_set[IO_Uring_Accept_Flags_Bits; u16]
+
+IO_Uring_Send_Recv_Flags :: bit_set[IO_Uring_Send_Recv_Flags_Bits; u16]
+
+IO_Uring_Submission_Queue_Flags :: bit_set[IO_Uring_Submission_Queue_Flags_Bits; u32]
+
+Clock_State :: enum i32 {
+	TIME_OK = 0,
+	TIME_INS = 1,
+	TIME_DEL = 2,
+	TIME_OOP = 3,
+	TIME_WAIT = 4,
+	TIME_ERROR = 5,
+}
+
+Timex :: struct {
+	modes:     u32,
+	offset:    int,
+	freq:      int,
+	maxerror:  int,
+	esterror:  int,
+	status:    i32,
+	constant:  int,
+	precision: int,
+	tolerance: int,
+	time:      Time_Val,
+	tick:      int,
+	ppsfreq:   int,
+	jitter:    int,
+	shift:     i32,
+	stabil:    int,
+	jitcnt:    int,
+	calcnt:    int,
+	errcnt:    int,
+	stbcnt:    int,
+	tai:       i32,
+}
+
+Reboot_Magic :: enum u64 {
+	RB_MAGIC_1     = 0xfee1dead,
+	RB_MAGIC_2     = 672274793,
+	RB_MAGIC_2A    = 85072278, // Since Linux 2.1.17
+	RB_MAGIC_2B    = 369367448, // Since Linux 2.1.97
+	RB_MAGIC_2C    = 537993216, // Since Linux 2.5.71
+}
+
+Reboot_Operation :: enum u64 {
+	RB_DISABLE_CAD = 0,
+	RB_ENABLE_CAD  = 0x89abcdef,
+	RB_HALT_SYSTEM = 0xcdef0123,
+	RB_KEXEC       = 0x45584543,
+	RB_POWER_OFF   = 0x4321fedc,
+	RB_AUTOBOOT    = 0x01234567,
+	RB_AUTOBOOT_2  = 0xa1b2c3d4,
+	RB_SW_SUSPEND  = 0xd000fce2,
+}
+
+Mount_Flags :: bit_set[Mount_Flags_Bits; uint]
+
+Umount2_Flags :: bit_set[Umount2_Flags_Bits; u32]
+
+Swap_Flags :: bit_set[Swap_Flags_Bits; u32]

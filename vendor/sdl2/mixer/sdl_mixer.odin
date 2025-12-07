@@ -1,3 +1,4 @@
+// Bindings for [[ SDL2 Mixer ; https://wiki.libsdl.org/SDL2_mixer/FrontPage ]].
 package sdl2_mixer
 
 import "core:c"

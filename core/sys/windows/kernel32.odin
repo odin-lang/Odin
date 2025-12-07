@@ -342,6 +342,22 @@ foreign kernel32 {
 		hTemplateFile: HANDLE,
 	) -> HANDLE ---
 
+	LockFileEx :: proc(
+		hFile: HANDLE,
+		dwFLags: DWORD,
+		dwReserved: DWORD,
+		nNumberOfBytesToLockLow: DWORD,
+		nNumberOfBytesToLockHigh: DWORD,
+		lpOverlapped: ^LPOVERLAPPED,
+	) -> BOOL ---
+	UnlockFileEx :: proc(
+		hFile: HANDLE,
+		dwReserved: DWORD,
+		nNumberOfBytesToUnlockLow: DWORD,
+		nNumberOfBytesToLockHigh: DWORD,
+		lpOverlapped: ^LPOVERLAPPED,
+	) -> BOOL --- 
+
 	GetFileTime :: proc(
 		hFile: HANDLE,
 		lpCreationTime: LPFILETIME,
@@ -413,6 +429,7 @@ foreign kernel32 {
 		lpBytesLeftThisMessage: ^u32,
 	) -> BOOL ---
 	CancelIo :: proc(handle: HANDLE) -> BOOL ---
+	CancelIoEx :: proc(hFile: HANDLE, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetOverlappedResult :: proc(
 		hFile: HANDLE,
 		lpOverlapped: LPOVERLAPPED,
@@ -488,6 +505,7 @@ foreign kernel32 {
 	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
 	LoadLibraryExW :: proc(c_str: LPCWSTR, hFile: HANDLE, dwFlags: LoadLibraryEx_Flags) -> HMODULE ---
 	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
+	FreeLibraryAndExitThread :: proc(hLibModule: HMODULE, dwExitCode: DWORD) -> VOID ---
 	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
 
 	LoadResource :: proc(hModule: HMODULE, hResInfo: HRSRC) -> HGLOBAL ---
@@ -554,6 +572,7 @@ foreign kernel32 {
 	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 
 	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---
+	RtlNtStatusToDosError :: proc(status: NTSTATUS) -> ULONG ---
 
 	GetSystemPowerStatus :: proc(lpSystemPowerStatus: ^SYSTEM_POWER_STATUS) -> BOOL ---
 }
@@ -680,6 +699,9 @@ FILE_MAP_COPY            :: DWORD(0x00000001)
 FILE_MAP_RESERVE         :: DWORD(0x80000000)
 FILE_MAP_TARGETS_INVALID :: DWORD(0x40000000)
 FILE_MAP_LARGE_PAGES     :: DWORD(0x20000000)
+
+LOCKFILE_FAIL_IMMEDIATELY :: DWORD (0x00000001)
+LOCKFILE_EXCLUSIVE_LOCK :: DWORD(0x00000002)
 
 // Flags for `SetFileCompletionNotificationModes`.
 FILE_SKIP_COMPLETION_PORT_ON_SUCCESS :: 0x1

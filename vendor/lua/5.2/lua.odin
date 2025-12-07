@@ -1,3 +1,4 @@
+// Bindings for [[ Lua 5.2 ; https://www.lua.org/manual/5.2/ ]].
 package lua_5_2
 
 import "base:intrinsics"
@@ -13,7 +14,7 @@ when LUA_SHARED {
 	when ODIN_OS == .Windows {
 		// Does nothing special on windows
 		foreign import lib "windows/lua52dll.lib"
-	} else when ODIN_OS == .Linux {
+	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua52.so"
 	} else {
 		foreign import lib "system:lua5.2"
@@ -21,7 +22,7 @@ when LUA_SHARED {
 } else {
 	when ODIN_OS == .Windows {
 		foreign import lib "windows/lua52dll.lib"
-	} else when ODIN_OS == .Linux {
+	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua52.a"
 	} else {
 		foreign import lib "system:lua5.2"

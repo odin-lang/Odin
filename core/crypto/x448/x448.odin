@@ -1,6 +1,5 @@
 /*
-package x448 implements the X448 (aka curve448) Elliptic-Curve
-Diffie-Hellman key exchange protocol.
+`X448` (aka `curve448`) Elliptic-Curve Diffie-Hellman key exchange protocol.
 
 See:
 - [[ https://www.rfc-editor.org/rfc/rfc7748 ]]

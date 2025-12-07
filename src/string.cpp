@@ -633,23 +633,28 @@ gb_internal String normalize_path(gbAllocator a, String const &path, String cons
 		return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, widechar_input, input_length, output, output_size, nullptr, nullptr);
 	}
 #elif defined(GB_SYSTEM_UNIX) || defined(GB_SYSTEM_OSX)
-
-	#include <iconv.h>
+	#include <wchar.h>
 
 	gb_internal int convert_multibyte_to_widechar(char const *multibyte_input, usize input_length, wchar_t *output, usize output_size) {
-		iconv_t conv = iconv_open("WCHAR_T", "UTF-8");
-		size_t result = iconv(conv, cast(char **)&multibyte_input, &input_length, cast(char **)&output, &output_size);
-		iconv_close(conv);
+		String	string = copy_string(heap_allocator(), make_string(cast(u8 const*)multibyte_input, input_length)); /* Guarantee NULL terminator */
+		u8*		input = string.text;
 
-		return cast(int)result;
+		mbstate_t	ps = { 0 };
+		size_t	result = mbsrtowcs(output, cast(const char**)&input, output_size, &ps);
+
+		gb_free(heap_allocator(), string.text);
+		return (result == (size_t)-1) ? -1 : (int)result;
 	}
 
 	gb_internal int convert_widechar_to_multibyte(wchar_t const *widechar_input, usize input_length, char* output, usize output_size) {
-		iconv_t conv = iconv_open("UTF-8", "WCHAR_T");
-		size_t result = iconv(conv, cast(char**) &widechar_input, &input_length, cast(char **)&output, &output_size);
-		iconv_close(conv);
+		String	string = copy_string(heap_allocator(), make_string(cast(u8 const*)widechar_input, input_length)); /* Guarantee NULL terminator */
+		u8*		input = string.text;
 
-		return cast(int)result;
+		mbstate_t	ps = { 0 };
+		size_t	result = wcsrtombs(output, cast(const wchar_t**)&input, output_size, &ps);
+
+		gb_free(heap_allocator(), string.text);
+		return (result == (size_t)-1) ? -1 : (int)result;
 	}
 #else
 #error Implement system

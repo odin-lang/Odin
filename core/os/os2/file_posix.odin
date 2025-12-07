@@ -36,7 +36,6 @@ init_std_files :: proc "contextless" () {
 			data = impl,
 			procedure = _file_stream_proc,
 		}
-		impl.file.fstat = _fstat
 		return &impl.file
 	}
 
@@ -46,7 +45,7 @@ init_std_files :: proc "contextless" () {
 	stderr = new_std(&files[2], posix.STDERR_FILENO, "/dev/stderr")
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	if name == "" {
 		err = .Invalid_Path
 		return
@@ -72,7 +71,7 @@ _open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Err
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cname := clone_to_cstring(name, temp_allocator) or_return
 
-	fd := posix.open(cname, sys_flags, transmute(posix.mode_t)posix._mode_t(perm))
+	fd := posix.open(cname, sys_flags, transmute(posix.mode_t)posix._mode_t(transmute(u32)perm))
 	if fd < 0 {
 		err = _get_platform_error()
 		return
@@ -110,7 +109,6 @@ __new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
 		data = impl,
 		procedure = _file_stream_proc,
 	}
-	impl.file.fstat = _fstat
 	return &impl.file
 }
 
@@ -284,17 +282,17 @@ _fchdir :: proc(f: ^File) -> Error {
 	return nil
 }
 
-_fchmod :: proc(f: ^File, mode: int) -> Error {
-	if posix.fchmod(__fd(f), transmute(posix.mode_t)posix._mode_t(mode)) != .OK {
+_fchmod :: proc(f: ^File, mode: Permissions) -> Error {
+	if posix.fchmod(__fd(f), transmute(posix.mode_t)posix._mode_t(transmute(u32)mode)) != .OK {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_chmod :: proc(name: string, mode: int) -> (err: Error) {
+_chmod :: proc(name: string, mode: Permissions) -> (err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cname := clone_to_cstring(name, temp_allocator) or_return
-	if posix.chmod(cname, transmute(posix.mode_t)posix._mode_t(mode)) != .OK {
+	if posix.chmod(cname, transmute(posix.mode_t)posix._mode_t(transmute(u32)mode)) != .OK {
 		return _get_platform_error()
 	}
 	return nil
@@ -371,7 +369,7 @@ _exists :: proc(path: string) -> bool {
 	return posix.access(cpath) == .OK
 }
 
-_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+_file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From, allocator: runtime.Allocator) -> (n: i64, err: Error) {
 	f  := (^File_Impl)(stream_data)
 	fd := f.fd
 
@@ -382,12 +380,14 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 
 		to_read := uint(min(len(p), MAX_RW))
-		n = i64(posix.read(fd, raw_data(p), to_read))
+		_n := i64(posix.read(fd, raw_data(p), to_read))
 		switch {
-		case n == 0:
+		case _n == 0:
 			err = .EOF
-		case n < 0:
+		case _n < 0:
 			err = .Unknown
+		case:
+			n = _n
 		}
 		return
 
@@ -402,12 +402,14 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		}
 
 		to_read := uint(min(len(p), MAX_RW))
-		n = i64(posix.pread(fd, raw_data(p), to_read, posix.off_t(offset)))
+		_n := i64(posix.pread(fd, raw_data(p), to_read, posix.off_t(offset)))
 		switch {
-		case n == 0:
+		case _n == 0:
 			err = .EOF
-		case n < 0:
+		case _n < 0:
 			err = .Unknown
+		case:
+			n = _n
 		}
 		return
 
@@ -460,15 +462,18 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 			return
 		}
 
-		n = i64(posix.lseek(fd, posix.off_t(offset), posix.Whence(whence)))
-		if n < 0 {
+		_n := i64(posix.lseek(fd, posix.off_t(offset), posix.Whence(whence)))
+		if _n < 0 {
 			#partial switch posix.get_errno() {
 			case .EINVAL:
 				err = .Invalid_Offset
 			case:
 				err = .Unknown
 			}
+			return
 		}
+
+		n = _n
 		return
 
 	case .Size:
@@ -482,19 +487,20 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		return
 
 	case .Flush:
-		ferr := _sync(&f.file)
-		err   = error_to_io_error(ferr)
+		err = _sync(&f.file)
 		return
 
 	case .Close, .Destroy:
-		ferr := _close(f)
-		err   = error_to_io_error(ferr)
+		err = _close(f)
 		return
 
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
 
+	case .Fstat:
+		err = file_stream_fstat_utility(f, p, allocator)
+		return
 	case:
-		return 0, .Empty
+		return 0, .Unsupported
 	}
 }

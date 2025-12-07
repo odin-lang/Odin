@@ -783,14 +783,13 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 
 				i64 is_packed_offset     = type_offset_of(tag_type, 5);
 				i64 is_raw_union_offset  = type_offset_of(tag_type, 6);
-				i64 is_no_copy_offset    = type_offset_of(tag_type, 7);
-				i64 custom_align_offset  = type_offset_of(tag_type, 8);
+				i64 custom_align_offset  = type_offset_of(tag_type, 7);
 
-				i64 equal_offset         = type_offset_of(tag_type, 9);
+				i64 equal_offset         = type_offset_of(tag_type, 8);
 
-				i64 soa_kind_offset      = type_offset_of(tag_type, 10);
-				i64 soa_base_type_offset = type_offset_of(tag_type, 11);
-				i64 soa_len_offset       = type_offset_of(tag_type, 12);
+				i64 soa_kind_offset      = type_offset_of(tag_type, 9);
+				i64 soa_base_type_offset = type_offset_of(tag_type, 10);
+				i64 soa_len_offset       = type_offset_of(tag_type, 11);
 
 				// TODO(bill): equal proc stuff
 				gb_unused(equal_offset);
@@ -825,7 +824,6 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 
 				set_bool(m, global, offset+is_packed_offset,    t->Struct.is_packed);
 				set_bool(m, global, offset+is_raw_union_offset, t->Struct.is_raw_union);
-				set_bool(m, global, offset+is_no_copy_offset,   t->Struct.is_no_copy);
 				set_bool(m, global, offset+custom_align_offset, t->Struct.custom_align != 0);
 
 				if (t->Struct.soa_kind != StructSoa_None) {

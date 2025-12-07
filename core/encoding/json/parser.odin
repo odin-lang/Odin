@@ -137,7 +137,7 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 	case .Ident:
 		if p.spec == .MJSON {
 			advance_token(p)
-			return string(token.text), nil
+			return clone_string(token.text, p.allocator, loc)
 		}
 		
 	case .String:

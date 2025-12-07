@@ -1738,6 +1738,28 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				return true;
 			},
 
+			add_document_event_listener: (name_ptr, name_len, name_code, data, callback, use_capture) => {
+				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
+				let element = document;
+				let key = listener_key('document', name, data, callback, !!use_capture);
+				if (wasmMemoryInterface.listenerMap.has(key)) {
+					return false;
+				}
+
+				let listener = (e) => {
+					let event_data = {};
+					event_data.id_ptr = 0;
+					event_data.id_len = 0;
+					event_data.event = e;
+					event_data.name_code = name_code;
+
+					onEventReceived(event_data, data, callback);
+				};
+				wasmMemoryInterface.listenerMap.set(key, listener);
+				element.addEventListener(name, listener, !!use_capture);
+				return true;
+			},
+
 			remove_event_listener: (id_ptr, id_len, name_ptr, name_len, data, callback, use_capture) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
@@ -1761,6 +1783,20 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				let element = window;
 
 				let key = listener_key('window', name, data, callback, !!use_capture);
+				let listener = wasmMemoryInterface.listenerMap.get(key);
+				if (listener === undefined) {
+					return false;
+				}
+				wasmMemoryInterface.listenerMap.delete(key);
+
+				element.removeEventListener(name, listener, !!use_capture);
+				return true;
+			},
+			remove_document_event_listener: (name_ptr, name_len, data, callback, use_capture) => {
+				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
+				let element = document;
+
+				let key = listener_key('document', name, data, callback, !!use_capture);
 				let listener = wasmMemoryInterface.listenerMap.get(key);
 				if (listener === undefined) {
 					return false;
@@ -1901,7 +1937,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					if (buf_len > 0 && buf_ptr) {
 						let n = Math.min(buf_len, str.length);
 						str = str.substring(0, n);
-						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
+						wasmMemoryInterface.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
 						return n;
 					}
 				}
@@ -1965,7 +2001,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					if (buf_len > 0 && buf_ptr) {
 						let n = Math.min(buf_len, str.length);
 						str = str.substring(0, n);
-						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
+						wasmMemoryInterface.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
 						return n;
 					}
 				}
@@ -2076,7 +2112,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 		wasmMemoryInterface.setMemory(exports.memory);
 	}
 
-	exports._start();
+	if (exports._start) {
+		exports._start();
+	}
 
 	// Define a `@export step :: proc(delta_time: f64) -> (keep_going: bool) {`
 	// in your app and it will get called every frame.
@@ -2094,7 +2132,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 			prevTimeStamp = currTimeStamp;
 
 			if (!exports.step(dt, odin_ctx)) {
-				exports._end();
+				if (exports._end) {
+					exports._end();
+				}
 				return;
 			}
 
@@ -2103,7 +2143,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 		window.requestAnimationFrame(step);
 	} else {
-		exports._end();
+		if (exports._end) {
+			exports._end();
+		}
 	}
 
 	return;

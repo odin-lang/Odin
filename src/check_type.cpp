@@ -267,19 +267,19 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_,
 
 
 gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(CheckerContext *ctx, Type *original_type) {
-	mutex_lock(&ctx->info->gen_types_mutex); // @@global
-
 	GenTypesData *found_gen_types = nullptr;
-	auto *found_gen_types_ptr = map_get(&ctx->info->gen_types, original_type);
-	if (found_gen_types_ptr == nullptr) {
+
+	GB_ASSERT(original_type->kind == Type_Named);
+	mutex_lock(&original_type->Named.gen_types_data_mutex);
+	if (original_type->Named.gen_types_data == nullptr) {
 		GenTypesData *gen_types = gb_alloc_item(permanent_allocator(), GenTypesData);
 		gen_types->types = array_make<Entity *>(heap_allocator());
-		map_set(&ctx->info->gen_types, original_type, gen_types);
-		found_gen_types_ptr = map_get(&ctx->info->gen_types, original_type);
+		original_type->Named.gen_types_data = gen_types;
 	}
-	found_gen_types = *found_gen_types_ptr;
-	GB_ASSERT(found_gen_types != nullptr);
-	mutex_unlock(&ctx->info->gen_types_mutex); // @@global
+	found_gen_types = original_type->Named.gen_types_data;
+
+	mutex_unlock(&original_type->Named.gen_types_data_mutex);
+
 	return found_gen_types;
 }
 
@@ -312,6 +312,7 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		e->state = EntityState_Resolved;
 		e->file = ctx->file;
 		e->pkg = pkg;
+		e->TypeName.original_type_for_parapoly = original_type;
 		add_entity_use(ctx, node, e);
 	}
 
@@ -653,9 +654,10 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		context = str_lit("struct #raw_union");
 	}
 
-	struct_type->Struct.node       = node;
-	struct_type->Struct.scope      = ctx->scope;
-	struct_type->Struct.is_packed  = st->is_packed;
+	struct_type->Struct.node           = node;
+	struct_type->Struct.scope          = ctx->scope;
+	struct_type->Struct.is_packed      = st->is_packed;
+	struct_type->Struct.is_all_or_none = st->is_all_or_none;
 	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
 		&struct_type->Struct.is_polymorphic,
@@ -1106,7 +1108,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 
 	GB_ASSERT(fields.count <= bf->fields.count);
 
-	auto bit_offsets = slice_make<i64>(permanent_allocator(), fields.count);
+	auto bit_offsets = permanent_slice_make<i64>(fields.count);
 	i64 curr_offset = 0;
 	for_array(i, bit_sizes) {
 		bit_offsets[i] = curr_offset;
@@ -1610,6 +1612,12 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 				error_line("\tSuggestion: Try slicing the value with '%s[:]'\n", os);
 				gb_string_free(os);
 			}
+		} else if (is_type_pointer(poly_type)) {
+			if (is_polymorphic_type_assignable(ctx, type_deref(poly_type), operand.type, /*compound*/false, /*modify_type*/false)) {
+				gbString os = expr_to_string(operand.expr);
+				error_line("\tSuggestion: Did you mean '&%s'?\n", os);
+				gb_string_free(os);
+			}
 		}
 	}
 	return t_invalid;
@@ -1626,6 +1634,8 @@ gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 	} else if (expr->kind == Ast_Ident) {
 		Operand x= {};
 		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, true);
+		GB_ASSERT(e != nullptr);
+
 		if (e->flags & EntityFlag_Param) {
 			return true;
 		}
@@ -2085,7 +2095,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 							if (op.mode == Addressing_Constant) {
 								poly_const = op.value;
 							} else {
-								error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
+								if (!ctx->in_proc_group) {
+									error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
+								}
 								success = false;
 							}
 						}
@@ -2705,7 +2717,7 @@ gb_internal Type *get_map_cell_type(Type *type) {
 	// Padding exists
 	Type *s = alloc_type_struct();
 	Scope *scope = create_scope(nullptr, nullptr);
-	s->Struct.fields = slice_make<Entity *>(permanent_allocator(), 2);
+	s->Struct.fields = permanent_slice_make<Entity *>(2);
 	s->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("v"), alloc_type_array(type, len), false, 0, EntityState_Resolved);
 	s->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("_"), alloc_type_array(t_u8, padding), false, 1, EntityState_Resolved);
 	s->Struct.scope = scope;
@@ -2730,7 +2742,7 @@ gb_internal void init_map_internal_debug_types(Type *type) {
 
 	Type *metadata_type = alloc_type_struct();
 	Scope *metadata_scope = create_scope(nullptr, nullptr);
-	metadata_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 5);
+	metadata_type->Struct.fields = permanent_slice_make<Entity *>(5);
 	metadata_type->Struct.fields[0] = alloc_entity_field(metadata_scope, make_token_ident("key"),    key,       false, 0, EntityState_Resolved);
 	metadata_type->Struct.fields[1] = alloc_entity_field(metadata_scope, make_token_ident("value"),  value,     false, 1, EntityState_Resolved);
 	metadata_type->Struct.fields[2] = alloc_entity_field(metadata_scope, make_token_ident("hash"),   t_uintptr, false, 2, EntityState_Resolved);
@@ -2748,7 +2760,7 @@ gb_internal void init_map_internal_debug_types(Type *type) {
 
 	Scope *scope = create_scope(nullptr, nullptr);
 	Type *debug_type = alloc_type_struct();
-	debug_type->Struct.fields = slice_make<Entity *>(permanent_allocator(), 3);
+	debug_type->Struct.fields = permanent_slice_make<Entity *>(3);
 	debug_type->Struct.fields[0] = alloc_entity_field(scope, make_token_ident("data"),       metadata_type, false, 0, EntityState_Resolved);
 	debug_type->Struct.fields[1] = alloc_entity_field(scope, make_token_ident("len"),        t_int,         false, 1, EntityState_Resolved);
 	debug_type->Struct.fields[2] = alloc_entity_field(scope, make_token_ident("allocator"),  t_allocator,   false, 2, EntityState_Resolved);
@@ -2981,13 +2993,13 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 	if (wait_to_finish) {
 		wait_signal_until_available(&old_struct->Struct.fields_wait_signal);
 	} else {
-		GB_ASSERT(old_struct->Struct.fields_wait_signal.futex.load());
+		GB_ASSERT(old_struct->Struct.fields_wait_signal.futex.load() != 0);
 	}
 
 	field_count = old_struct->Struct.fields.count;
 
-	t->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
-	t->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
+	t->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
+	t->Struct.tags = permanent_alloc_array<String>(field_count+extra_field_count);
 
 
 	auto const &add_entity = [](Scope *scope, Entity *entity) {
@@ -3105,7 +3117,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	if (is_polymorphic) {
 		field_count = 0;
 
-		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 		soa_struct->Struct.soa_count = 0;
 
@@ -3115,7 +3127,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		Type *old_array = base_type(elem);
 		field_count = cast(isize)old_array->Array.count;
 
-		soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
+		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 
 		string_map_init(&scope->elements, 8);
@@ -3157,8 +3169,8 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		if (old_struct->Struct.fields_wait_signal.futex.load()) {
 			field_count = old_struct->Struct.fields.count;
 
-			soa_struct->Struct.fields = slice_make<Entity *>(permanent_allocator(), field_count+extra_field_count);
-			soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
+			soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
+			soa_struct->Struct.tags = permanent_alloc_array<String>(field_count+extra_field_count);
 
 			for_array(i, old_struct->Struct.fields) {
 				Entity *old_field = old_struct->Struct.fields[i];
@@ -3353,7 +3365,7 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 	}
 }
 gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
-	GB_ASSERT_NOT_NULL(type);
+	GB_ASSERT(type != nullptr);
 	if (e == nullptr) {
 		*type = t_invalid;
 		return true;
@@ -3510,8 +3522,9 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 
 	case_ast_node(pt, PointerType, e);
 		CheckerContext c = *ctx;
-		c.type_path = new_checker_type_path();
-		defer (destroy_checker_type_path(c.type_path));
+
+		TEMPORARY_ALLOCATOR_GUARD();
+		c.type_path = new_checker_type_path(temporary_allocator());
 
 		Type *elem = t_invalid;
 		Operand o = {};
@@ -3745,8 +3758,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 
 gb_internal Type *check_type(CheckerContext *ctx, Ast *e) {
 	CheckerContext c = *ctx;
-	c.type_path = new_checker_type_path();
-	defer (destroy_checker_type_path(c.type_path));
+	TEMPORARY_ALLOCATOR_GUARD();
+	c.type_path = new_checker_type_path(temporary_allocator());
 
 	return check_type_expr(&c, e, nullptr);
 }

@@ -43,7 +43,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-WASM_Allocator :: struct #no_copy {
+WASM_Allocator :: struct {
 	// The minimum alignment of allocations.
 	alignment: uint,
 	// A region that contains as payload a single forward linked list of pointers to
@@ -89,10 +89,12 @@ wasm_allocator_init :: proc(a: ^WASM_Allocator, alignment: uint = 8) {
 
 global_default_wasm_allocator_data: WASM_Allocator
 
+@(require_results)
 default_wasm_allocator :: proc() -> Allocator {
 	return wasm_allocator(&global_default_wasm_allocator_data)
 }
 
+@(require_results)
 wasm_allocator :: proc(a: ^WASM_Allocator) -> Allocator {
 	return {
 		data      = a,
