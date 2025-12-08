@@ -1933,7 +1933,7 @@ break_state :: struct {
 }
 
 decode :: struct {
-	 Codepoint: rune,
+	Codepoint: rune,
 
 	SourceCharactersConsumed: c.int,
 	Valid: b32,
