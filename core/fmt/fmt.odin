@@ -2076,9 +2076,6 @@ handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Str
 
 
 __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_Struct, type_name: string) -> (ok: bool) {
-	if fi.state.parent_struct == nil {
-		return false
-	}
 	ut := type_info_of(v.id)
 
 	if !reflect.is_raw_union(ut) {
@@ -2104,8 +2101,14 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 
 	tag := reflect.struct_field_value_by_name(fi.state.parent_struct, tag_name, true)
 	if tag == nil {
+		// try the current type just in case the tag is also stored here
+		tag = reflect.struct_field_value_by_name(v, tag_name, false)
+	}
+	if tag == nil {
 		return false
 	}
+
+
 	tag_info := reflect.type_info_base(type_info_of(tag.id))
 	#partial switch ti in tag_info.variant {
 	case reflect.Type_Info_Enum:

@@ -1776,8 +1776,8 @@ allocator_op :: struct {
 	Kind: allocator_op_kind,
 
 	using op: struct #raw_union {
-		Allocate: allocator_op_allocate,
-		Free:     allocator_op_free,
+		Allocate: allocator_op_allocate `raw_union_tag:"Kind=.ALLOCATE"`,
+		Free:     allocator_op_free     `raw_union_tag:"Kind=.FREE"`,
 	},
 }
 

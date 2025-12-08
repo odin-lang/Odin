@@ -93,16 +93,16 @@ device_notification :: struct {
 	data: struct #raw_union {
 		started: struct {
 			_unused: c.int,
-		},
+		} `raw_union_tag:"type=.started"`,
 		stopped: struct {
 			_unused: c.int,
-		},
+		} `raw_union_tag:"type=.stopped"`,
 		rerouted: struct {
 			_unused: c.int,
-		},
+		} `raw_union_tag:"type=.rerouted"`,
 		interruption: struct {
 			_unused: c.int,
-		},
+		} `raw_union_tag:"type=.interruption_began,.interruption_ended,"`,
 	},
 }
 
