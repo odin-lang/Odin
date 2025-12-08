@@ -2108,7 +2108,7 @@ arena :: struct {
 	BlockSentinel:     arena_block_header,
 	FreeBlockSentinel: arena_block_header,
 
-	Error: c.int,
+	Error: b32,
 }
 
 glyph_storage :: struct {
@@ -2117,7 +2117,7 @@ glyph_storage :: struct {
 	GlyphSentinel:     glyph,
 	FreeGlyphSentinel: glyph,
 
-	Error: c.int,
+	Error: b32,
 }
 
 glyph_parent :: struct {
@@ -2129,8 +2129,8 @@ font_coverage_test :: struct {
 	Font:          ^font,
 	BaseCodepoint: rune,
 
-	CurrentBaseError: c.int,
-	Error:            c.int,
+	CurrentBaseError: b32,
+	Error:            b32,
 
 	BaseParents:     [MAXIMUM_RECOMPOSITION_PARENTS]glyph_parent `fmt:"v,BaseParentCount"`,
 	BaseParentCount: u32,
