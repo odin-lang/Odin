@@ -312,10 +312,19 @@ foreign lib {
 	FontCoverageTestCodepoint :: proc(Test: ^font_coverage_test, Codepoint: rune) ---
 	FontCoverageTestEnd       :: proc(Test: ^font_coverage_test) -> b32  ---
 
-	EncodeUtf8        :: proc(Codepoint: rune) -> encode_utf8 ---
 	ScriptDirection   :: proc(Script: script) -> direction ---
 	ScriptIsComplex   :: proc(Script: script) -> b32 ---
 	ScriptTagToScript :: proc(Tag: script_tag) -> script ---
+}
+
+@(require_results)
+EncodeUtf8 :: proc "c" (Codepoint: rune) -> (Encoded: [4]u8, EncodedLength: c.int, Valid: b32) {
+	return expand_values(kbts_EncodeUtf8(Codepoint))
+}
+
+@(default_calling_convention="c", require_results)
+foreign lib {
+	kbts_EncodeUtf8 :: proc(Codepoint: rune) -> encode_utf8 ---
 }
 
 @(require_results)
