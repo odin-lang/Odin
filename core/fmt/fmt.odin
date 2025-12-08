@@ -2112,21 +2112,26 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 		tag_string := reflect.enum_string(tag)
 
 		for tag, index in info.tags[:info.field_count] {
-			rut := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "raw_union_tag") or_continue
-			head_tag, match, tail_name := strings.partition(string(rut), "=")
-			if head_tag != tag_name || match != "=" {
-				continue
-			}
+			rut_list := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "raw_union_tag") or_continue
 
-			// just ignore the `A.` prefix for `A.B` stuff entirely
-			if _, _, try_tail_name := strings.partition(string(rut), "."); try_tail_name != "" {
-				tail_name = try_tail_name
-			}
+			for rut in strings.split_iterator(&rut_list, ",") {
+				head_tag, match, tail_name := strings.partition(string(rut), "=")
+				if head_tag != tag_name || match != "=" {
+					continue
+				}
 
-			if tail_name == tag_string {
-				io.write_string(fi.writer, "#raw_union ", &fi.n)
-				fmt_arg(fi, any{v.data, info.types[index].id}, the_verb)
-				return true
+				// just ignore the `A.` prefix for `A.B` stuff entirely
+				if _, _, try_tail_name := strings.partition(string(rut), "."); try_tail_name != "" {
+					tail_name = try_tail_name
+				}
+
+				if tail_name == tag_string {
+					io.write_string(fi.writer, "#raw_union(.", &fi.n)
+					io.write_string(fi.writer, tag_string, &fi.n)
+					io.write_string(fi.writer, ") ", &fi.n)
+					fmt_arg(fi, any{v.data, info.types[index].id}, the_verb)
+					return true
+				}
 			}
 		}
 	}
