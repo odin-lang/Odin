@@ -1,4 +1,3 @@
-// Bindings for [[ Jimmy Lefevre's Text Shape ; https://github.com/JimmyLefevre/kb ]] Unicode text segmentation and OpenType shaping.
 package vendor_kb_text_shape
 
 when ODIN_OS == .Windows {
@@ -11,6 +10,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
+import "base:runtime"
 import "core:c"
 
 //
@@ -21,16 +21,14 @@ import "core:c"
 foreign lib {
 	SizeOfShapeContext             :: proc() -> c.int ---
 	PlaceShapeContext              :: proc(Allocator: allocator_function, AllocatorData: rawptr, Memory: rawptr) -> ^shape_context ---
-	PlaceShapeContextFixedMemory   :: proc(Memory: rawptr, Size: c.int) -> ^shape_context ---
 	CreateShapeContext             :: proc(Allocator: allocator_function, AllocatorData: rawptr) -> ^shape_context ---
 	DestroyShapeContext            :: proc(Context: ^shape_context) ---
-	ShapePushFontFromMemory        :: proc(Context: ^shape_context, Memory: rawptr, Size: c.int, FontIndex: c.int) -> ^font ---
 	ShapePushFont                  :: proc(Context: ^shape_context, Font: ^font) -> ^font ---
 	ShapePopFont                   :: proc(Context: ^shape_context) -> ^font ---
 	ShapeBegin                     :: proc(Context: ^shape_context, ParagraphDirection: direction, Language: language) ---
 	ShapeEnd                       :: proc(Context: ^shape_context) ---
-	ShapePushFeature               :: proc(Context: ^shape_context, FeatureTag: u32, Value: c.int) ---
-	ShapePopFeature                :: proc(Context: ^shape_context, FeatureTag: u32) -> b32 ---
+	ShapePushFeature               :: proc(Context: ^shape_context, FeatureTag: feature_tag, Value: c.int) ---
+	ShapePopFeature                :: proc(Context: ^shape_context, FeatureTag: feature_tag) -> b32 ---
 	ShapeCodepoint                 :: proc(Context: ^shape_context, Codepoint: rune) ---
 	ShapeCodepointWithUserId       :: proc(Context: ^shape_context, Codepoint: rune, UserId: c.int) ---
 	ShapeError                     :: proc(Context: ^shape_context) -> shape_error ---
@@ -38,6 +36,23 @@ foreign lib {
 	ShapeNextManualRun             :: proc(Context: ^shape_context, Direction: direction, Script: script) ---
 	ShapeEndManualRuns             :: proc(Context: ^shape_context) ---
 	ShapeManualBreak               :: proc(Context: ^shape_context) ---
+}
+
+@(require_results)
+PlaceShapeContextFixedMemory :: proc "c" (Memory: []byte) -> ^shape_context {
+	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	foreign lib {
+		PlaceShapeContextFixedMemory :: proc(Memory: rawptr, Size: c.int) -> ^shape_context ---
+	}
+	return PlaceShapeContextFixedMemory(raw_data(Memory), c.int(len(Memory)))
+}
+
+ShapePushFontFromMemory :: proc "c" (Context: ^shape_context, Memory: []byte, FontIndex: c.int) -> ^font {
+	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	foreign lib {
+		ShapePushFontFromMemory :: proc(Context: ^shape_context, Memory: rawptr, Size: c.int, FontIndex: c.int) -> ^font ---
+	}
+	return ShapePushFontFromMemory(Context, raw_data(Memory), c.int(len(Memory)), FontIndex)
 }
 
 @(require_results)
@@ -105,8 +120,6 @@ ShapeCodepointIteratorNext :: proc "contextless" (It: ^shape_codepoint_iterator)
 //
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
-	FontCount                         :: proc(FileData: rawptr, FileSize: c.int) -> b32 ---
-	FontFromMemory                    :: proc(FileData: rawptr, FileSize: c.int, FontIndex: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> font ---
 	FreeFont                          :: proc(Font: ^font) ---
 	FontIsValid                       :: proc(Font: ^font) -> b32 ---
 	LoadFont                          :: proc(Font: ^font, State: ^load_font_state, FontData: rawptr, FontDataSize: c.int, FontIndex: c.int, ScratchSize_: ^c.int, OutputSize_: ^c.int) -> load_font_error ---
@@ -133,6 +146,24 @@ foreign lib {
 	// A single glyph_config can be shared by multiple glyphs.
 
 	DestroyGlyphConfig                :: proc(Config: ^glyph_config) ---
+}
+
+@(require_results)
+FontCount :: proc "c" (FileData: []byte) -> c.int {
+	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	foreign lib {
+		FontCount :: proc(FileData: rawptr, FileSize: c.int) -> c.int ---
+	}
+	return FontCount(raw_data(FileData), c.int(len(FileData)))
+}
+
+@(require_results)
+FontFromMemory :: proc "c" (FileData: []byte, FontIndex: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> font {
+	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	foreign lib {
+		FontFromMemory :: proc(FileData: rawptr, FileSize: c.int, FontIndex: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> font ---
+	}
+	return FontFromMemory(raw_data(FileData), c.int(len(FileData)), FontIndex, Allocator, AllocatorData)
 }
 
 
@@ -321,4 +352,31 @@ GuessTextPropertiesUtf8 :: proc "contextless" (Utf8: string) -> (Direction: dire
 	}
 	GuessTextPropertiesUtf8(cstring(raw_data(Utf8)), c.int(len(Utf8)), &Direction, &Script)
 	return
+}
+
+
+
+
+@(require_results)
+AllocatorFromOdinAllocator :: proc "contextless" (allocator: ^runtime.Allocator) -> (Allocator: allocator_function, AllocatorData: rawptr) {
+	allocator_function :: proc "c" (Data: rawptr, Op: ^allocator_op) {
+		if Data == nil {
+			return
+		}
+		context = runtime.default_context()
+		context.allocator = (^runtime.Allocator)(Data)^
+
+		switch Op.Kind {
+		case .NONE:
+			return
+		case .ALLOCATE:
+			data, _ := runtime.mem_alloc(int(Op.Allocate.Size), runtime.DEFAULT_ALIGNMENT)
+			Op.Allocate.Pointer = raw_data(data)
+			Op.Allocate.Size    = u32(len(data))
+		case .FREE:
+			_ = runtime.mem_free(Op.Free.Pointer)
+		}
+	}
+
+	return allocator_function, rawptr(allocator)
 }
