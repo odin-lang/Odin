@@ -19,23 +19,23 @@ import "core:c"
 //
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
-	SizeOfShapeContext             :: proc() -> c.int ---
-	PlaceShapeContext              :: proc(Allocator: allocator_function, AllocatorData: rawptr, Memory: rawptr) -> ^shape_context ---
-	CreateShapeContext             :: proc(Allocator: allocator_function, AllocatorData: rawptr) -> ^shape_context ---
-	DestroyShapeContext            :: proc(Context: ^shape_context) ---
-	ShapePushFont                  :: proc(Context: ^shape_context, Font: ^font) -> ^font ---
-	ShapePopFont                   :: proc(Context: ^shape_context) -> ^font ---
-	ShapeBegin                     :: proc(Context: ^shape_context, ParagraphDirection: direction, Language: language) ---
-	ShapeEnd                       :: proc(Context: ^shape_context) ---
-	ShapePushFeature               :: proc(Context: ^shape_context, FeatureTag: feature_tag, Value: c.int) ---
-	ShapePopFeature                :: proc(Context: ^shape_context, FeatureTag: feature_tag) -> b32 ---
-	ShapeCodepoint                 :: proc(Context: ^shape_context, Codepoint: rune) ---
-	ShapeCodepointWithUserId       :: proc(Context: ^shape_context, Codepoint: rune, UserId: c.int) ---
-	ShapeError                     :: proc(Context: ^shape_context) -> shape_error ---
-	ShapeBeginManualRuns           :: proc(Context: ^shape_context) ---
-	ShapeNextManualRun             :: proc(Context: ^shape_context, Direction: direction, Script: script) ---
-	ShapeEndManualRuns             :: proc(Context: ^shape_context) ---
-	ShapeManualBreak               :: proc(Context: ^shape_context) ---
+	SizeOfShapeContext       :: proc() -> c.int ---
+	PlaceShapeContext        :: proc(Allocator: allocator_function, AllocatorData: rawptr, Memory: rawptr) -> ^shape_context ---
+	CreateShapeContext       :: proc(Allocator: allocator_function, AllocatorData: rawptr) -> ^shape_context ---
+	DestroyShapeContext      :: proc(Context: ^shape_context) ---
+	ShapePushFont            :: proc(Context: ^shape_context, Font: ^font) -> ^font ---
+	ShapePopFont             :: proc(Context: ^shape_context) -> ^font ---
+	ShapeBegin               :: proc(Context: ^shape_context, ParagraphDirection: direction, Language: language) ---
+	ShapeEnd                 :: proc(Context: ^shape_context) ---
+	ShapePushFeature         :: proc(Context: ^shape_context, FeatureTag: feature_tag, Value: c.int) ---
+	ShapePopFeature          :: proc(Context: ^shape_context, FeatureTag: feature_tag) -> b32 ---
+	ShapeCodepoint           :: proc(Context: ^shape_context, Codepoint: rune) ---
+	ShapeCodepointWithUserId :: proc(Context: ^shape_context, Codepoint: rune, UserId: c.int) ---
+	ShapeError               :: proc(Context: ^shape_context) -> shape_error ---
+	ShapeBeginManualRuns     :: proc(Context: ^shape_context) ---
+	ShapeNextManualRun       :: proc(Context: ^shape_context, Direction: direction, Script: script) ---
+	ShapeEndManualRuns       :: proc(Context: ^shape_context) ---
+	ShapeManualBreak         :: proc(Context: ^shape_context) ---
 }
 
 @(require_results)
@@ -120,17 +120,17 @@ ShapeCodepointIteratorNext :: proc "contextless" (It: ^shape_codepoint_iterator)
 //
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
-	FreeFont                          :: proc(Font: ^font) ---
-	FontIsValid                       :: proc(Font: ^font) -> b32 ---
-	LoadFont                          :: proc(Font: ^font, State: ^load_font_state, FontData: rawptr, FontDataSize: c.int, FontIndex: c.int, ScratchSize_: ^c.int, OutputSize_: ^c.int) -> load_font_error ---
-	PlaceBlob                         :: proc(Font: ^font, State: ^load_font_state, ScratchMemory: rawptr, OutputMemory: rawptr) -> load_font_error ---
-	GetFontInfo                       :: proc(Font: ^font, Info: ^font_info) ---
+	FreeFont    :: proc(Font: ^font) ---
+	FontIsValid :: proc(Font: ^font) -> b32 ---
+	LoadFont    :: proc(Font: ^font, State: ^load_font_state, FontData: rawptr, FontDataSize: c.int, FontIndex: c.int, ScratchSize_: ^c.int, OutputSize_: ^c.int) -> load_font_error ---
+	PlaceBlob   :: proc(Font: ^font, State: ^load_font_state, ScratchMemory: rawptr, OutputMemory: rawptr) -> load_font_error ---
+	GetFontInfo :: proc(Font: ^font, Info: ^font_info) ---
 
 	// A shape_config is a bag of pre-computed data for a specific shaping setup.
-	SizeOfShapeConfig                 :: proc(Font: ^font, Script: script, Language: language) -> b32 ---
-	PlaceShapeConfig                  :: proc(Font: ^font, Script: script, Language: language, Memory: rawptr) -> ^shape_config ---
-	CreateShapeConfig                 :: proc(Font: ^font, Script: script, Language: language, Allocator: allocator_function, AllocatorData: rawptr) -> ^shape_config ---
-	DestroyShapeConfig                :: proc(Config: ^shape_config) ---
+	SizeOfShapeConfig  :: proc(Font: ^font, Script: script, Language: language) -> b32 ---
+	PlaceShapeConfig   :: proc(Font: ^font, Script: script, Language: language, Memory: rawptr) -> ^shape_config ---
+	CreateShapeConfig  :: proc(Font: ^font, Script: script, Language: language, Allocator: allocator_function, AllocatorData: rawptr) -> ^shape_config ---
+	DestroyShapeConfig :: proc(Config: ^shape_config) ---
 
 	// A glyph_storage holds and recycles glyph data.
 	InitializeGlyphStorage            :: proc(Storage: ^glyph_storage, Allocator: allocator_function, AllocatorData: rawptr) -> b32 ---
@@ -145,7 +145,7 @@ foreign lib {
 	// A glyph_config specifies glyph-specific shaping parameters.
 	// A single glyph_config can be shared by multiple glyphs.
 
-	DestroyGlyphConfig                :: proc(Config: ^glyph_config) ---
+	DestroyGlyphConfig :: proc(Config: ^glyph_config) ---
 }
 
 @(require_results)
@@ -303,10 +303,10 @@ foreign lib {
 	FontCoverageTestCodepoint :: proc(Test: ^font_coverage_test, Codepoint: rune) ---
 	FontCoverageTestEnd       :: proc(Test: ^font_coverage_test) -> b32  ---
 
-	EncodeUtf8                :: proc(Codepoint: rune) -> encode_utf8 ---
-	ScriptDirection           :: proc(Script: script) -> direction ---
-	ScriptIsComplex           :: proc(Script: script) -> b32 ---
-	ScriptTagToScript         :: proc(Tag: script_tag) -> script ---
+	EncodeUtf8        :: proc(Codepoint: rune) -> encode_utf8 ---
+	ScriptDirection   :: proc(Script: script) -> direction ---
+	ScriptIsComplex   :: proc(Script: script) -> b32 ---
+	ScriptTagToScript :: proc(Tag: script_tag) -> script ---
 }
 
 @(require_results)
