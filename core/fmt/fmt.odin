@@ -42,6 +42,8 @@ Info_State :: struct {
 	width:     int,
 	prec:      int,
 	indent:    int,
+
+	parent_struct: any,
 }
 
 
@@ -2071,6 +2073,68 @@ handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Str
 	}
 	return
 }
+
+
+__handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_Struct, type_name: string) -> (ok: bool) {
+	if fi.state.parent_struct == nil {
+		return false
+	}
+	ut := type_info_of(v.id)
+
+	if !reflect.is_raw_union(ut) {
+		return false
+	}
+
+	tag_name: string
+	for tag in info.tags[:info.field_count] {
+		rut := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "raw_union_tag") or_continue
+		head_tag, match, _ := strings.partition(string(rut), "=")
+		if match != "=" {
+			continue
+		}
+		if tag_name == "" {
+			tag_name = head_tag
+		} else if tag_name != head_tag {
+			return false
+		}
+	}
+	if tag_name == "" {
+		return false
+	}
+
+	tag := reflect.struct_field_value_by_name(fi.state.parent_struct, tag_name, true)
+	if tag == nil {
+		return false
+	}
+	tag_info := reflect.type_info_base(type_info_of(tag.id))
+	#partial switch ti in tag_info.variant {
+	case reflect.Type_Info_Enum:
+		tag_string := reflect.enum_string(tag)
+
+		for tag, index in info.tags[:info.field_count] {
+			rut := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "raw_union_tag") or_continue
+			head_tag, match, tail_name := strings.partition(string(rut), "=")
+			if head_tag != tag_name || match != "=" {
+				continue
+			}
+
+			// just ignore the `A.` prefix for `A.B` stuff entirely
+			if _, _, try_tail_name := strings.partition(string(rut), "."); try_tail_name != "" {
+				tail_name = try_tail_name
+			}
+
+			if tail_name == tag_string {
+				io.write_string(fi.writer, "#raw_union ", &fi.n)
+				fmt_arg(fi, any{v.data, info.types[index].id}, the_verb)
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+
 // Formats a struct for output, handling various struct types (e.g., SOA, raw unions)
 //
 // Inputs:
@@ -2086,8 +2150,11 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		return
 	}
 	if .raw_union in info.flags {
+		if __handle_raw_union_tag(fi, v, the_verb, info, type_name) {
+			return
+		}
 		if type_name == "" {
-			io.write_string(fi.writer, "(raw union)", &fi.n)
+			io.write_string(fi.writer, "(#raw_union)", &fi.n)
 		} else {
 			io.write_string(fi.writer, type_name, &fi.n)
 			io.write_string(fi.writer, "{}", &fi.n)
@@ -2225,6 +2292,8 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			verb := the_verb if the_verb == 'w' else 'v'
 
 			new_state := fi.state
+			new_state.parent_struct = v
+
 			if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
 				continue
 			}
