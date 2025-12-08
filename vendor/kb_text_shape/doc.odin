@@ -21,9 +21,7 @@
 				GlyphX := CursorX + Glyph.OffsetX
 				GlyphY := CursorY + Glyph.OffsetY
 
-				_ = GlyphX
-				_ = GlyphY
-				// DisplayGlyph(Glyph.Id, GlyphX, GlyphY)
+				DisplayGlyph(Glyph.Id, GlyphX, GlyphY)
 
 				CursorX += Glyph.AdvanceX
 				CursorY += Glyph.AdvanceY

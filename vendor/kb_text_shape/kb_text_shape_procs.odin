@@ -40,59 +40,59 @@ foreign lib {
 
 @(require_results)
 PlaceShapeContextFixedMemory :: proc "c" (Memory: []byte) -> ^shape_context {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		PlaceShapeContextFixedMemory :: proc(Memory: rawptr, Size: c.int) -> ^shape_context ---
+		kbts_PlaceShapeContextFixedMemory :: proc(Memory: rawptr, Size: c.int) -> ^shape_context ---
 	}
-	return PlaceShapeContextFixedMemory(raw_data(Memory), c.int(len(Memory)))
+	return kbts_PlaceShapeContextFixedMemory(raw_data(Memory), c.int(len(Memory)))
 }
 
 ShapePushFontFromMemory :: proc "c" (Context: ^shape_context, Memory: []byte, FontIndex: c.int) -> ^font {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		ShapePushFontFromMemory :: proc(Context: ^shape_context, Memory: rawptr, Size: c.int, FontIndex: c.int) -> ^font ---
+		kbts_ShapePushFontFromMemory :: proc(Context: ^shape_context, Memory: rawptr, Size: c.int, FontIndex: c.int) -> ^font ---
 	}
-	return ShapePushFontFromMemory(Context, raw_data(Memory), c.int(len(Memory)), FontIndex)
+	return kbts_ShapePushFontFromMemory(Context, raw_data(Memory), c.int(len(Memory)), FontIndex)
 }
 
 @(require_results)
-ShapeRun :: proc "contextless" (Context: ^shape_context) -> (Run: run, ok: b32) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+ShapeRun :: proc "contextless" (Context: ^shape_context) -> (Run: run, Ok: b32) {
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		ShapeRun :: proc(Context: ^shape_context, Run: ^run) -> b32 ---
+		kbts_ShapeRun :: proc(Context: ^shape_context, Run: ^run) -> b32 ---
 	}
-	ok = ShapeRun(Context, &Run)
+	Ok = kbts_ShapeRun(Context, &Run)
 	return
 }
 
 ShapeUtf32 :: proc "c" (Context: ^shape_context, Utf32: []rune) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		ShapeUtf32 :: proc(Context: ^shape_context, Utf32: [^]rune, Length: c.int) ---
+		kbts_ShapeUtf32 :: proc(Context: ^shape_context, Utf32: [^]rune, Length: c.int) ---
 	}
-	ShapeUtf32(Context, raw_data(Utf32), c.int(len(Utf32)))
+	kbts_ShapeUtf32(Context, raw_data(Utf32), c.int(len(Utf32)))
 }
 ShapeUtf32WithUserId :: proc "c" (Context: ^shape_context, Utf32: []rune, UserId: c.int, UserIdIncrement: c.int) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		ShapeUtf32WithUserId :: proc(Context: ^shape_context, Utf32: [^]rune, Length: c.int, UserId: c.int, UserIdIncrement: c.int) ---
+		kbts_ShapeUtf32WithUserId :: proc(Context: ^shape_context, Utf32: [^]rune, Length: c.int, UserId: c.int, UserIdIncrement: c.int) ---
 	}
-	ShapeUtf32WithUserId(Context, raw_data(Utf32), c.int(len(Utf32)), UserId, UserIdIncrement)
+	kbts_ShapeUtf32WithUserId(Context, raw_data(Utf32), c.int(len(Utf32)), UserId, UserIdIncrement)
 }
 
 ShapeUtf8 :: proc(Context: ^shape_context, Utf8: string, UserIdGenerationMode: user_id_generation_mode) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		ShapeUtf8 :: proc(Context: ^shape_context, Utf8: [^]byte, Length: c.int, UserIdGenerationMode: user_id_generation_mode) ---
+		kbts_ShapeUtf8 :: proc(Context: ^shape_context, Utf8: [^]byte, Length: c.int, UserIdGenerationMode: user_id_generation_mode) ---
 	}
-	ShapeUtf8(Context, raw_data(Utf8), c.int(len(Utf8)), UserIdGenerationMode)
+	kbts_ShapeUtf8(Context, raw_data(Utf8), c.int(len(Utf8)), UserIdGenerationMode)
 }
 ShapeUtf8WithUserId :: proc(Context: ^shape_context, Utf8: string, UserId: c.int, UserIdGenerationMode: user_id_generation_mode) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		ShapeUtf8WithUserId :: proc(Context: ^shape_context, Utf8: [^]byte, Length: c.int, UserId: c.int, UserIdGenerationMode: user_id_generation_mode) ---
+		kbts_ShapeUtf8WithUserId :: proc(Context: ^shape_context, Utf8: [^]byte, Length: c.int, UserId: c.int, UserIdGenerationMode: user_id_generation_mode) ---
 	}
-	ShapeUtf8WithUserId(Context, raw_data(Utf8), c.int(len(Utf8)), UserId, UserIdGenerationMode)
+	kbts_ShapeUtf8WithUserId(Context, raw_data(Utf8), c.int(len(Utf8)), UserId, UserIdGenerationMode)
 }
 
 
@@ -104,12 +104,12 @@ foreign lib {
 }
 
 @(require_results)
-ShapeCodepointIteratorNext :: proc "contextless" (It: ^shape_codepoint_iterator) -> (Codepoint: shape_codepoint, CodepointIndex: c.int, ok: b32) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+ShapeCodepointIteratorNext :: proc "contextless" (It: ^shape_codepoint_iterator) -> (Codepoint: shape_codepoint, CodepointIndex: c.int, Ok: b32) {
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		ShapeCodepointIteratorNext :: proc(It: ^shape_codepoint_iterator, Codepoint: ^shape_codepoint, CodepointIndex: ^c.int) -> b32 ---
+		kbts_ShapeCodepointIteratorNext :: proc(It: ^shape_codepoint_iterator, Codepoint: ^shape_codepoint, CodepointIndex: ^c.int) -> b32 ---
 	}
-	ok = ShapeCodepointIteratorNext(It, &Codepoint, &CodepointIndex)
+	Ok = kbts_ShapeCodepointIteratorNext(It, &Codepoint, &CodepointIndex)
 	return
 }
 
@@ -122,7 +122,6 @@ ShapeCodepointIteratorNext :: proc "contextless" (It: ^shape_codepoint_iterator)
 foreign lib {
 	FreeFont    :: proc(Font: ^font) ---
 	FontIsValid :: proc(Font: ^font) -> b32 ---
-	LoadFont    :: proc(Font: ^font, State: ^load_font_state, FontData: rawptr, FontDataSize: c.int, FontIndex: c.int, ScratchSize_: ^c.int, OutputSize_: ^c.int) -> load_font_error ---
 	PlaceBlob   :: proc(Font: ^font, State: ^load_font_state, ScratchMemory: rawptr, OutputMemory: rawptr) -> load_font_error ---
 	GetFontInfo :: proc(Font: ^font, Info: ^font_info) ---
 
@@ -149,70 +148,80 @@ foreign lib {
 }
 
 @(require_results)
-FontCount :: proc "c" (FileData: []byte) -> c.int {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+LoadFont :: proc "contextless" (Font: ^font, State: ^load_font_state, FontData: []byte, FontIndex: c.int) -> (ScratchSize, OutputSize: c.int, Err: load_font_error) {
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		FontCount :: proc(FileData: rawptr, FileSize: c.int) -> c.int ---
+		kbts_LoadFont :: proc(Font: ^font, State: ^load_font_state, FontData: rawptr, FontDataSize: c.int, FontIndex: c.int, ScratchSize_: ^c.int, OutputSize_: ^c.int) -> load_font_error ---
 	}
-	return FontCount(raw_data(FileData), c.int(len(FileData)))
-}
-
-@(require_results)
-FontFromMemory :: proc "c" (FileData: []byte, FontIndex: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> font {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
-	foreign lib {
-		FontFromMemory :: proc(FileData: rawptr, FileSize: c.int, FontIndex: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> font ---
-	}
-	return FontFromMemory(raw_data(FileData), c.int(len(FileData)), FontIndex, Allocator, AllocatorData)
-}
-
-
-@(require_results)
-ShapeDirect :: proc "contextless" (Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Allocator: allocator_function, AllocatorData: rawptr) -> (Output: glyph_iterator, err: shape_error) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
-	foreign lib {
-		ShapeDirect :: proc(Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Allocator: allocator_function, AllocatorData: rawptr, Output: ^glyph_iterator) -> shape_error ---
-	}
-	err = ShapeDirect(Config, Storage, RunDirection, Allocator, AllocatorData, &Output)
+	Err = kbts_LoadFont(Font, State, raw_data(FontData), c.int(len(FontData)), FontIndex, &ScratchSize, &OutputSize)
 	return
 }
 
 @(require_results)
-ShapeDirectFixedMemory :: proc "contextless" (Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Memory: rawptr, MemorySize: c.int) -> (Output: glyph_iterator, err: shape_error) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+FontCount :: proc "c" (FileData: []byte) -> c.int {
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		ShapeDirectFixedMemory :: proc(Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Memory: rawptr, MemorySize: c.int, Output: ^glyph_iterator) -> shape_error ---
+		kbts_FontCount :: proc(FileData: rawptr, FileSize: c.int) -> c.int ---
 	}
-	err = ShapeDirectFixedMemory(Config, Storage, RunDirection, Memory, MemorySize, &Output)
+	return kbts_FontCount(raw_data(FileData), c.int(len(FileData)))
+}
+
+@(require_results)
+FontFromMemory :: proc "c" (FileData: []byte, FontIndex: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> font {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_FontFromMemory :: proc(FileData: rawptr, FileSize: c.int, FontIndex: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> font ---
+	}
+	return kbts_FontFromMemory(raw_data(FileData), c.int(len(FileData)), FontIndex, Allocator, AllocatorData)
+}
+
+
+@(require_results)
+ShapeDirect :: proc "contextless" (Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Allocator: allocator_function, AllocatorData: rawptr) -> (Output: glyph_iterator, Err: shape_error) {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_ShapeDirect :: proc(Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Allocator: allocator_function, AllocatorData: rawptr, Output: ^glyph_iterator) -> shape_error ---
+	}
+	Err = kbts_ShapeDirect(Config, Storage, RunDirection, Allocator, AllocatorData, &Output)
+	return
+}
+
+@(require_results)
+ShapeDirectFixedMemory :: proc "contextless" (Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Memory: rawptr, MemorySize: c.int) -> (Output: glyph_iterator, Err: shape_error) {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_ShapeDirectFixedMemory :: proc(Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Memory: rawptr, MemorySize: c.int, Output: ^glyph_iterator) -> shape_error ---
+	}
+	Err = kbts_ShapeDirectFixedMemory(Config, Storage, RunDirection, Memory, MemorySize, &Output)
 	return
 }
 
 
 @(require_results)
 SizeOfGlyphConfig :: proc "c" (Overrides: []feature_override) -> c.int {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		SizeOfGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int) -> c.int ---
+		kbts_SizeOfGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int) -> c.int ---
 	}
-	return SizeOfGlyphConfig(raw_data(Overrides), c.int(len(Overrides)))
+	return kbts_SizeOfGlyphConfig(raw_data(Overrides), c.int(len(Overrides)))
 }
 
 @(require_results)
 PlaceGlyphConfig :: proc "c" (Overrides: []feature_override, Memory: rawptr) -> ^glyph_config {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		PlaceGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int, Memory: rawptr) -> ^glyph_config ---
+		kbts_PlaceGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int, Memory: rawptr) -> ^glyph_config ---
 	}
-	return PlaceGlyphConfig(raw_data(Overrides), c.int(len(Overrides)), Memory)
+	return kbts_PlaceGlyphConfig(raw_data(Overrides), c.int(len(Overrides)), Memory)
 }
 
 @(require_results)
 CreateGlyphConfig :: proc(Overrides: []feature_override, Allocator: allocator_function, AllocatorData: rawptr) -> ^glyph_config {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		CreateGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> ^glyph_config ---
+		kbts_CreateGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> ^glyph_config ---
 	}
-	return CreateGlyphConfig(raw_data(Overrides), c.int(len(Overrides)), Allocator, AllocatorData)
+	return kbts_CreateGlyphConfig(raw_data(Overrides), c.int(len(Overrides)), Allocator, AllocatorData)
 }
 
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
@@ -221,12 +230,12 @@ foreign lib {
 }
 
 @(require_results)
-GlyphIteratorNext :: proc "contextless" (It: ^glyph_iterator) -> (Glyph: ^glyph, ok: b32) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+GlyphIteratorNext :: proc "contextless" (It: ^glyph_iterator) -> (Glyph: ^glyph, Ok: b32) {
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		GlyphIteratorNext :: proc(It: ^glyph_iterator, Glyph: ^^glyph) -> b32 ---
+		kbts_GlyphIteratorNext :: proc(It: ^glyph_iterator, Glyph: ^^glyph) -> b32 ---
 	}
-	ok = GlyphIteratorNext(It, &Glyph)
+	Ok = kbts_GlyphIteratorNext(It, &Glyph)
 	return
 }
 
@@ -242,12 +251,12 @@ foreign lib {
 }
 
 @(require_results)
-Break :: proc "contextless" (State: ^break_state) -> (Break: break_type, ok: b32) {
+Break :: proc "contextless" (State: ^break_state) -> (Break: break_type, Ok: b32) {
 	@(default_calling_convention="c", require_results)
 	foreign lib {
 		kbts_Break :: proc(State: ^break_state, Break: ^break_type) -> b32 ---
 	}
-	ok = kbts_Break(State, &Break)
+	Ok = kbts_Break(State, &Break)
 	return
 }
 
@@ -256,42 +265,42 @@ BreakEntireString :: proc "c" (Direction: direction, JapaneseLineBreakStyle: jap
                                Input: []byte, InputFormat: text_format,
                                Breaks: []break_type, BreakCount: ^c.int,
                                BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		BreakEntireString :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-		                          Input: rawptr, InputSizeInBytes: c.int, InputFormat: text_format,
-		                          Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
-		                          BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
+		kbts_BreakEntireString :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
+		                               Input: rawptr, InputSizeInBytes: c.int, InputFormat: text_format,
+		                               Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
+		                               BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
 	}
-	BreakEntireString(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Input), c.int(len(Input)), InputFormat, raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
+	kbts_BreakEntireString(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Input), c.int(len(Input)), InputFormat, raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
 }
 
 BreakEntireStringUtf32 :: proc "c" (Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
                                     Utf32: []rune,
                                     Breaks: []break_type, BreakCount: ^c.int,
                                     BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		BreakEntireStringUtf32 :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-		                               Utf32: [^]rune, Utf32Count: c.int,
-		                               Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
-		                               BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
+		kbts_BreakEntireStringUtf32 :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
+		                                    Utf32: [^]rune, Utf32Count: c.int,
+		                                    Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
+		                                    BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
 	}
-	BreakEntireStringUtf32(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Utf32), c.int(len(Utf32)), raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
+	kbts_BreakEntireStringUtf32(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Utf32), c.int(len(Utf32)), raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
 }
 
 BreakEntireStringUtf8 :: proc "c" (Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
                                    Utf8: string,
                                    Breaks: []break_type, BreakCount: ^c.int,
                                    BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		BreakEntireStringUtf8 :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-		                              Utf8: [^]byte, Utf8Length: c.int,
-		                              Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
-		                              BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
+		kbts_BreakEntireStringUtf8 :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
+		                                   Utf8: [^]byte, Utf8Length: c.int,
+		                                   Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
+		                                   BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
 	}
-	BreakEntireStringUtf8(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Utf8), c.int(len(Utf8)), raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
+	kbts_BreakEntireStringUtf8(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Utf8), c.int(len(Utf8)), raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
 }
 
 
@@ -311,22 +320,22 @@ foreign lib {
 
 @(require_results)
 DecodeUtf8 :: proc "c" (Utf8: string) -> decode {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		DecodeUtf8 :: proc(Utf8: [^]byte, Length: un) -> decode ---
+		kbts_DecodeUtf8 :: proc(Utf8: [^]byte, Length: un) -> decode ---
 	}
-	return DecodeUtf8(raw_data(Utf8), un(len(Utf8)))
+	return kbts_DecodeUtf8(raw_data(Utf8), un(len(Utf8)))
 }
 
 // This is a quick guess that stops at the first glyph that has a strong script/direction associated to it.
 // It is convenient, but only works if you are sure your input text is mono-script and mono-direction.
 @(require_results)
 GuessTextProperties :: proc "contextless" (Text: []byte, Format: text_format) -> (Direction: direction, Script: script) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		GuessTextProperties :: proc(Text: rawptr, TextSizeInBytes: c.int, Format: text_format, Direction: ^direction, Script: ^script) ---
+		kbts_GuessTextProperties :: proc(Text: rawptr, TextSizeInBytes: c.int, Format: text_format, Direction: ^direction, Script: ^script) ---
 	}
-	GuessTextProperties(raw_data(Text), c.int(len(Text)), Format, &Direction, &Script)
+	kbts_GuessTextProperties(raw_data(Text), c.int(len(Text)), Format, &Direction, &Script)
 	return
 }
 
@@ -334,11 +343,11 @@ GuessTextProperties :: proc "contextless" (Text: []byte, Format: text_format) ->
 // It is convenient, but only works if you are sure your input text is mono-script and mono-direction.
 @(require_results)
 GuessTextPropertiesUtf32 :: proc "contextless" (Utf32: []rune) -> (Direction: direction, Script: script) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c", require_results)
 	foreign lib {
-		GuessTextPropertiesUtf32 :: proc(Utf32: [^]rune, Utf32Count: c.int, Direction: ^direction, Script: ^script) ---
+		kbts_GuessTextPropertiesUtf32 :: proc(Utf32: [^]rune, Utf32Count: c.int, Direction: ^direction, Script: ^script) ---
 	}
-	GuessTextPropertiesUtf32(raw_data(Utf32), c.int(len(Utf32)), &Direction, &Script)
+	kbts_GuessTextPropertiesUtf32(raw_data(Utf32), c.int(len(Utf32)), &Direction, &Script)
 	return
 }
 
@@ -346,11 +355,11 @@ GuessTextPropertiesUtf32 :: proc "contextless" (Utf32: []rune) -> (Direction: di
 // It is convenient, but only works if you are sure your input text is mono-script and mono-direction._results)
 @(require_results)
 GuessTextPropertiesUtf8 :: proc "contextless" (Utf8: string) -> (Direction: direction, Script: script) {
-	@(default_calling_convention="c", link_prefix="kbts_", require_results)
+	@(default_calling_convention="c",  require_results)
 	foreign lib {
-		GuessTextPropertiesUtf8 :: proc(Utf8: cstring, Utf8Length: c.int, Direction: ^direction, Script: ^script) ---
+		kbts_GuessTextPropertiesUtf8 :: proc(Utf8: cstring, Utf8Length: c.int, Direction: ^direction, Script: ^script) ---
 	}
-	GuessTextPropertiesUtf8(cstring(raw_data(Utf8)), c.int(len(Utf8)), &Direction, &Script)
+	kbts_GuessTextPropertiesUtf8(cstring(raw_data(Utf8)), c.int(len(Utf8)), &Direction, &Script)
 	return
 }
 
