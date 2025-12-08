@@ -379,9 +379,9 @@ AllocatorFromOdinAllocator :: proc "contextless" (allocator: ^runtime.Allocator)
 		case .NONE:
 			return
 		case .ALLOCATE:
-			data, _ := runtime.mem_alloc(int(Op.Allocate.Size), runtime.DEFAULT_ALIGNMENT)
-			Op.Allocate.Pointer = raw_data(data)
-			Op.Allocate.Size    = u32(len(data))
+			res, _ := runtime.mem_alloc(int(Op.Allocate.Size), runtime.DEFAULT_ALIGNMENT)
+			Op.Allocate.Pointer = raw_data(res)
+			Op.Allocate.Size    = u32(len(res))
 		case .FREE:
 			_ = runtime.mem_free(Op.Free.Pointer)
 		}
