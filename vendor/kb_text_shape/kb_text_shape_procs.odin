@@ -246,7 +246,7 @@ GlyphIteratorNext :: proc "contextless" (It: ^glyph_iterator) -> (Glyph: ^glyph,
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
 	BreakBegin        :: proc(State: ^break_state, ParagraphDirection: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags) ---
-	BreakAddCodepoint :: proc(State: ^break_state, Codepoint: rune, PositionIncrement: c.int, EndOfText: c.int) ---
+	BreakAddCodepoint :: proc(State: ^break_state, Codepoint: rune, PositionIncrement: c.int, EndOfText: b32) ---
 	BreakEnd          :: proc(State: ^break_state) ---
 }
 
