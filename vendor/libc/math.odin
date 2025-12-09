@@ -204,3 +204,8 @@ modf :: proc "c" (num: f64, iptr: ^f64) -> f64 {
 	iptr^ = integral
 	return fractional
 }
+
+@(require, linkage="strong", link_name="remainderf")
+remainderf :: proc "c" (x, y: f32) -> f32 {
+	return math.remainder(x, y)
+}
