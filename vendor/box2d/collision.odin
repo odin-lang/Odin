@@ -49,7 +49,7 @@ ShapeCastInput :: struct {
 	canEncroach: bool,
 }
 
-// Low level ray cast or shape-cast output data
+// Low level ray cast or shape-cast output data. Returns a zero fraction and normal in the case of initial overlap.
 CastOutput :: struct {
 	// The surface normal at the hit point
 	normal:     Vec2,
@@ -227,7 +227,7 @@ DistanceInput :: struct {
 DistanceOutput :: struct {
 	pointA:       Vec2, // Closest point on shapeA
 	pointB:       Vec2, // Closest point on shapeB
-	normal:       Vec2, // Normal vector that points from A to B
+	normal:       Vec2, // Normal vector that points from A to B. Invalid if distance is zero.
 	distance:     f32,  // The final distance, zero if overlapped
 	iterations:   i32,  // Number of GJK iterations used
 	simplexCount: i32,  // The number of simplexes stored in the simplex array
@@ -459,6 +459,9 @@ PlaneResult :: struct {
 	// The collision plane between the mover and convex shape
 	plane: Plane,
 
+	// The collision point on the shape.
+	point: Vec2,
+
 	// Did the collision register a hit? If not this plane should be ignored.
 	hit:   bool,
 }
@@ -482,8 +485,8 @@ CollisionPlane :: struct {
 
 // Result returned by b2SolvePlanes
 PlaneSolverResult :: struct {
-	// The final position of the mover
-	position:       Vec2,
+	// The translation of the mover
+	translation:    Vec2,
 
 	// The number of iterations used by the plane solver. For diagnostics.
 	iterationCount: i32,

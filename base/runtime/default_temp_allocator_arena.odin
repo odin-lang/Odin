@@ -235,6 +235,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 				if start < old_end && old_end == block.used && new_end <= block.capacity {
 					// grow data in-place, adjusting next allocation
 					block.used = uint(new_end)
+					arena.total_used = uint(new_end)
 					data = block.base[start:new_end]
 					// sanitizer.address_unpoison(data)
 					return

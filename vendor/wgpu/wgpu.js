@@ -3265,6 +3265,10 @@ class WebGPUObjectManager {
 	 * @returns {number}
 	 */
 	create(object) {
+		if (object === null) {
+			return 0;
+		}
+
 		this.objects[this.idx] = { references: 1, object };
 		this.idx += 1;
 		return this.idx;
@@ -3280,6 +3284,10 @@ class WebGPUObjectManager {
 
 	/** @param {number} idx */
 	release(idx) {
+		if (idx === 0) {
+			return;
+		}
+
 		this.objects[idx-1].references -= 1;
 		if (this.objects[idx-1].references == 0) {
 			delete this.objects[idx-1];
@@ -3288,6 +3296,10 @@ class WebGPUObjectManager {
 
 	/** @param {number} idx */
 	reference(idx) {
+		if (idx === 0) {
+			return;
+		}
+
 		this.objects[idx-1].references += 1;
 	}
 	

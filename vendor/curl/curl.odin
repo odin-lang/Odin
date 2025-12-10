@@ -3,15 +3,16 @@ package vendor_curl
 import c "core:c/libc"
 
 when ODIN_OS == .Windows {
-	@(export, extra_linker_flags="/NODEFAULTLIB:libcmt")
+	@(export, extra_linker_flags="/NODEFAULTLIB:msvcrt")
 	foreign import lib {
-		"lib/libcurl_a.lib",
+		"lib/libcurl.lib",
 		"system:Advapi32.lib",
 		"system:Crypt32.lib",
 		"system:Normaliz.lib",
 		"system:Secur32.lib",
 		"system:Wldap32.lib",
 		"system:Ws2_32.lib",
+		"system:iphlpapi.lib",
 	}
 } else when ODIN_OS == .Linux {
 	@(export)
@@ -40,11 +41,11 @@ socklen_t :: c.int
 COPYRIGHT :: "Daniel Stenberg, <daniel@haxx.se>."
 
 /* This is the version number of the libcurl package from which this header file origins: */
-VERSION :: "8.15.0"
+VERSION :: "8.17.0"
 
 /* The numeric version number is also available "in parts" by using these defines: */
 VERSION_MAJOR :: 8
-VERSION_MINOR :: 15
+VERSION_MINOR :: 17
 VERSION_PATCH :: 0
 
 /*
@@ -67,7 +68,7 @@ VERSION_PATCH :: 0
 	CURL_VERSION_BITS() macro since curl's own configure script greps for it
 	and needs it to contain the full number.
 */
-VERSION_NUM :: 0x080f00
+VERSION_NUM :: 0x081100
 
 /*
  * This is the date and time when the full source package was created. The
@@ -78,7 +79,7 @@ VERSION_NUM :: 0x080f00
  *
  * "2007-11-23"
  */
-TIMESTAMP :: "2025-07-16"
+TIMESTAMP :: "2025-11-05"
 
 
 /* linked-list structure for the CURLOPT_QUOTE option (and other) */

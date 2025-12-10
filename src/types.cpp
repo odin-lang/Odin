@@ -4278,6 +4278,9 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 gb_internal bool type_set_offsets(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
+		if (t->Struct.are_offsets_being_processed.load()) {
+			return true;
+		}
 		MUTEX_GUARD(&t->Struct.offset_mutex);
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed.store(true);

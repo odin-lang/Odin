@@ -2116,9 +2116,6 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		}
 		return in_value.kind == ExactValue_String;
 	} else if (is_type_integer(type) || is_type_rune(type)) {
-		if (in_value.kind == ExactValue_Bool) {
-			return false;
-		}
 		ExactValue v = exact_value_to_integer(in_value);
 		if (v.kind != ExactValue_Integer) {
 			return false;
@@ -4172,7 +4169,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 	default:
 		if (is_ise_expr(be->left)) {
 			// Evalute the right before the left for an '.X' expression
-			check_expr_or_type(c, y, be->right, type_hint);
+			check_expr_or_type(c, y, be->right, token_is_comparison(op.kind) ? nullptr : type_hint);
 
 			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, y->type)) { // RHS in this case
 				check_expr_or_type(c, x, be->left, y->type);
@@ -4184,7 +4181,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, x->type)) {
 				check_expr_with_type_hint(c, y, be->right, x->type);
 			} else {
-				check_expr_with_type_hint(c, y, be->right, type_hint);
+				check_expr_with_type_hint(c, y, be->right, token_is_comparison(op.kind) ? nullptr : type_hint);
 			}
 		}
 		break;
@@ -8148,6 +8145,7 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 
 			if (operand->mode != Addressing_Invalid) {
 				update_untyped_expr_type(c, arg, t, false);
+				check_representable_as_constant(c, operand->value, t, &operand->value);
 			}
 			break;
 		}

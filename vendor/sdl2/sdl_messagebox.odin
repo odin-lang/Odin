@@ -66,7 +66,7 @@ MessageBoxData :: struct {
 	message: cstring,        /**< UTF-8 message text */
 
 	numbuttons: c.int,
-	buttons:    ^MessageBoxButtonData,
+	buttons:    [^]MessageBoxButtonData,
 
 	colorScheme: ^MessageBoxColorScheme,   /**< ::SDL_MessageBoxColorScheme, can be NULL to use system settings */
 }

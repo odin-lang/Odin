@@ -511,8 +511,8 @@ camera :: struct {
 	name: cstring,
 	type: camera_type,
 	data: struct #raw_union {
-		perspective:  camera_perspective,
-		orthographic: camera_orthographic,
+		perspective:  camera_perspective  `raw_union_tag:"type=.perspective"`,
+		orthographic: camera_orthographic `raw_union_tag:"type=.orthographic"`,
 	},
 	extras:           extras_t,
 	extensions_count: uint,

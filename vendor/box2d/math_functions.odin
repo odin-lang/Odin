@@ -415,31 +415,10 @@ RelativeAngle :: proc "c" (b, a: Rot) -> f32 {
 	return Atan2(s, c)
 }
 
-// Convert an angle in the range [-2*pi, 2*pi] into the range [-pi, pi]
+// Convert any angle into the range [-pi, pi]
 @(require_results)
 UnwindAngle :: proc "c" (radians: f32) -> f32 {
-	if radians < -PI {
-		return radians + 2.0 * PI
-	} else if radians > PI {
-		return radians - 2.0 * PI
-	}
-	return radians
-}
-
-// Convert any into the range [-pi, pi] (slow)
-@(require_results)
-UnwindLargeAngle :: proc "c" (radians: f32) -> f32 {
-	radians := radians
-
-	for radians > PI {
-		radians -= 2. * PI
-	}
-
-	for radians < -PI {
-		radians += 2. * PI
-	}
-
-	return radians
+	return math.remainder(radians, 2. * PI)
 }
 
 // Rotate a vector
@@ -563,6 +542,17 @@ AABB_Union :: proc "c" (a, b: AABB) -> (c: AABB) {
 	return
 }
 
+// Do a and b overlap
+@(require_results)
+AABB_Overlaps :: proc "c" (a, b: AABB) -> bool {
+	return !(
+		b.lowerBound.x > a.upperBound.x ||
+		b.lowerBound.y > a.upperBound.y ||
+		a.lowerBound.x > b.upperBound.x ||
+		a.lowerBound.y > b.upperBound.y \
+	)
+}
+
 // Compute the bounding box of an array of circles
 @(require_results)
 MakeAABB :: proc "c" (points: []Vec2, radius: f32) -> AABB {
@@ -624,4 +614,16 @@ IsValidPlane :: proc "c" (plane: Plane) -> bool {
 	IsValidVec2(plane.normal)  or_return
 	IsNormalized(plane.normal) or_return
 	return true
+}
+
+// One-dimensional mass-spring-damper simulation. Returns the new velocity given the position and time step.
+// You can then compute the new position using:
+// position += timeStep * newVelocity
+// This drives towards a zero position. By using implicit integration we get a stable solution
+// that doesn't require transcendental functions.
+@(require_results)
+b2SpringDamper :: proc "c" (hertz, dampingRatio, position, velocity, timeStep: f32) -> f32 {
+	omega  := 2. * PI * hertz
+	omegaH := omega * timeStep
+	return (velocity - omega * omegaH * position) / (1. + 2. * dampingRatio * omegaH + omegaH * omegaH)
 }

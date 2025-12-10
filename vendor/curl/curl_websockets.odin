@@ -59,11 +59,24 @@ foreign lib {
 	 * Sends data over the websocket connection. Use after successful
 	 * curl_easy_perform() with CURLOPT_CONNECT_ONLY option.
 	 */
-	ws_send :: proc(curl: CURL, buffer: rawptr,
+	ws_send :: proc(curl: ^CURL, buffer: rawptr,
 	                buflen: c.size_t, sent: ^c.size_t,
 	                fragsize: off_t,
 	                flags: ws_flags) -> code ---
 
+
+	/*
+	 * NAME curl_ws_start_frame()
+	 *
+	 * DESCRIPTION
+	 *
+	 * Buffers a websocket frame header with the given flags and length.
+	 * Errors when a previous frame is not complete, e.g. not all its
+	 * payload has been added.
+	 */
+	ws_start_frame :: proc(curl: ^CURL,
+	                       flags: c.uint,
+	                       frame_len: off_t) -> code ---
 
 	ws_meta :: proc(curl: ^CURL) -> ^ws_frame ---
 }

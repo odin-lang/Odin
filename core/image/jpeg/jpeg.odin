@@ -648,27 +648,17 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				color_components[id].v_sampling_factor = cast(int)vertical_sampling
 				color_components[id].h_sampling_factor = cast(int)horizontal_sampling
 			}
-		case .SOF2: // Progressive DCT
-			fallthrough
-		case .SOF3: // Lossless (sequential)
-			fallthrough
-		case .SOF5: // Differential sequential DCT
-			fallthrough
-		case .SOF6: // Differential progressive DCT
-			fallthrough
-		case .SOF7: // Differential lossless (sequential)
-			fallthrough
-		case .SOF9: // Extended sequential DCT, Arithmetic coding
-			fallthrough
-		case .SOF10: // Progressive DCT, Arithmetic coding
-			fallthrough
-		case .SOF11: // Lossless (sequential), Arithmetic coding
-			fallthrough
-		case .SOF13: // Differential sequential DCT, Arithmetic coding
-			fallthrough
-		case .SOF14: // Differential progressive DCT, Arithmetic coding
-			fallthrough
-		case .SOF15: // Differential lossless (sequential), Arithmetic coding
+		case .SOF2,  // Progressive DCT
+		     .SOF3,  // Lossless (sequential)
+		     .SOF5,  // Differential sequential DCT
+		     .SOF6,  // Differential progressive DCT
+		     .SOF7,  // Differential lossless (sequential)
+		     .SOF9,  // Extended sequential DCT, Arithmetic coding
+		     .SOF10, // Progressive DCT, Arithmetic coding
+		     .SOF11, // Lossless (sequential), Arithmetic coding
+		     .SOF13, // Differential sequential DCT, Arithmetic coding
+		     .SOF14, // Differential progressive DCT, Arithmetic coding
+		     .SOF15: // Differential lossless (sequential), Arithmetic coding
 			if img.metadata != nil {
 				info := img.metadata.(^image.JPEG_Info)
 				info.frame_type = marker

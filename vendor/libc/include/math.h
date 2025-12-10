@@ -43,6 +43,8 @@ double tan(double);
 double atan2(double, double);
 double modf(double, double*);
 
+float remainderf(float x, float y);
+
 bool __isnanf(float);
 bool __isnand(double);
 #define isnan(x)                                           \
