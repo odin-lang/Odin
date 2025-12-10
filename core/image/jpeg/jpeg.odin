@@ -653,7 +653,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		     .SOF5,  // Differential sequential DCT
 		     .SOF6,  // Differential progressive DCT
 		     .SOF7,  // Differential lossless (sequential)
-		     .SOF9:, // Extended sequential DCT, Arithmetic coding
+		     .SOF9,  // Extended sequential DCT, Arithmetic coding
 		     .SOF10, // Progressive DCT, Arithmetic coding
 		     .SOF11, // Lossless (sequential), Arithmetic coding
 		     .SOF13, // Differential sequential DCT, Arithmetic coding
