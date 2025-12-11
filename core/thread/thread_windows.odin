@@ -6,8 +6,11 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:sync"
 import win32 "core:sys/windows"
+import "core:unicode/utf16"
 
 _IS_SUPPORTED :: true
+//NOTE(peperronii): not sure about the exact length but there must be a limit
+_THREAD_DESCRIPTION_LENGTH :: 128
 
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
@@ -22,7 +25,7 @@ _thread_priority_map := [Thread_Priority]i32{
 	.High = +2,
 }
 
-_create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(string)) -> ^Thread {
 	win32_thread_id: win32.DWORD
 
 	__windows_thread_entry_proc :: proc "system" (t_: rawptr) -> win32.DWORD {
@@ -43,6 +46,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 				_maybe_destroy_default_temp_allocator(init_context)
 				runtime.run_thread_local_cleaners()
 			}
+
+			_set_name(t)
 
 			t.procedure(t)
 		}
@@ -76,6 +81,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	thread.win32_thread    = win32_thread
 	thread.win32_thread_id = win32_thread_id
 	thread.id              = int(win32_thread_id)
+	thread.name            = name
 
 	ok := win32.SetThreadPriority(win32_thread, _thread_priority_map[priority])
 	assert(ok == true)
@@ -150,5 +156,35 @@ _terminate :: proc(thread: ^Thread, exit_code: int) {
 
 _yield :: proc() {
 	win32.SwitchToThread()
+}
+
+_get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.Source_Code_Location) -> (name: string, err: runtime.Allocator_Error) {
+	t_handle: win32.HANDLE
+	if thread == nil {
+		t_handle = win32.GetCurrentThread()
+	} else {
+		t_handle = thread.win32_thread
+	}
+	
+	buf_16: win32.PWSTR
+	win32.GetThreadDescription(t_handle, &buf_16)
+	name = win32.wstring_to_utf8(buf_16, -1, allocator) or_return
+	win32.LocalFree(rawptr(buf_16))
+
+	return
+}
+
+_set_name :: proc(thread: ^Thread) {
+	name, ok := thread.name.?
+	if !ok {
+		return
+	}
+
+	t_handle := thread.win32_thread
+
+	buf: [_THREAD_DESCRIPTION_LENGTH]u16
+	// _THREAD_DESCRIPTION_LENGTH includes terminating null
+	utf16.encode_string(buf[:len(buf) - 1], name)
+	win32.SetThreadDescription(t_handle, cstring16(raw_data(buf[:])))
 }
 
