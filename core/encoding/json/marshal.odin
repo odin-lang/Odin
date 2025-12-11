@@ -62,6 +62,78 @@ Marshal_Options :: struct {
 	mjson_skipped_first_braces_end: bool,
 }
 
+User_Marshaler :: #type proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> Marshal_Error
+
+Register_User_Marshaler_Error :: enum {
+	None,
+	No_User_Marshaler,
+	Marshaler_Previously_Found,
+}
+
+// Example User Marshaler:
+// Custom Marshaler for `int`
+// Some_Marshaler :: proc(w: io.Writer, v: any, opt: ^json.Marshal_Options) -> json.Marshal_Error {
+// 	io.write_string(w, fmt.tprintf("%b", v))
+// 	return json.Marshal_Data_Error.None
+// }
+//
+// main :: proc() {
+//	// Ensure the json._user_marshaler map is initialized
+//	json.set_user_marshalers(new(map[typeid]json.User_Marshaler))
+//	reg_err := json.register_user_marshaler(type_info_of(int).id, Some_Marshaler)
+//	assert(reg_err == .None)
+//
+//
+// 	// Use the custom marshaler
+// 	SomeType :: struct {
+// 		value: int,
+// 	}
+//
+// 	x := SomeType{42}
+// 	data, marshal_err := json.marshal(x)
+// 	assert(marshal_err == nil)
+// 	defer delete(data)
+//
+// 	fmt.println("Custom output:", string(data)) // Custom output: {"value":101010}
+// }
+
+// NOTE(Jeroen): This is a pointer to prevent accidental additions
+// it is prefixed with `_` rather than marked with a private attribute so that users can access it if necessary
+_user_marshalers: ^map[typeid]User_Marshaler
+
+// Sets user-defined marshalers for custom json marshaling of specific types
+//
+// Inputs:
+// - m: A pointer to a map of typeids to User_Marshaler procs.
+//
+// NOTE: Must be called before using register_user_marshaler.
+//
+set_user_marshalers :: proc(m: ^map[typeid]User_Marshaler) {
+	assert(_user_marshalers == nil, "set_user_marshalers must not be called more than once.")
+	_user_marshalers = m
+}
+
+// Registers a user-defined marshaler for a specific typeid
+//
+// Inputs:
+// - id: The typeid of the custom type.
+// - formatter: The User_Marshaler function for the custom type.
+//
+// Returns: A Register_User_Marshaler_Error value indicating the success or failure of the operation.
+//
+// WARNING: set_user_marshalers must be called before using this procedure.
+//
+register_user_marshaler :: proc(id: typeid, marshaler: User_Marshaler) -> Register_User_Marshaler_Error {
+	if _user_marshalers == nil {
+		return .No_User_Marshaler
+	}
+	if prev, found := _user_marshalers[id]; found && prev != nil {
+		return .Marshaler_Previously_Found
+	}
+	_user_marshalers[id] = marshaler
+	return .None
+}
+
 marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Marshal_Error) {
 	b := strings.builder_make(allocator, loc)
 	defer if err != nil {
@@ -89,6 +161,13 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	if v == nil {
 		io.write_string(w, "null") or_return
 		return
+	}
+
+	if _user_marshalers != nil {
+		marshaler := _user_marshalers[v.id]
+		if marshaler != nil {
+			return marshaler(w, v, opt)
+		}
 	}
 
 	ti := runtime.type_info_base(type_info_of(v.id))
