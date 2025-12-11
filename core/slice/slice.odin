@@ -447,7 +447,7 @@ rotate_right :: proc "contextless" (array: $T/[]$E, k: int) {
 	rotate_left(array, -k)
 }
 
-swap_with_slice :: proc "contextless" (a, b: $T/[]$E, loc := #caller_location) {
+swap_with_slice :: proc(a, b: $T/[]$E, loc := #caller_location) {
 	assert(len(a) == len(b), "miss matching slice lengths", loc)
 
 	ptr_swap_non_overlapping(raw_data(a), raw_data(b), len(a)*size_of(E))
