@@ -112,6 +112,22 @@ push_back_elems :: proc(x: ^$X/Xar($T, $SHIFT), values: ..T, loc := #caller_loca
 	return
 }
 
+append_and_get_ptr :: push_back_elem_and_get_ptr
+
+@(require_results)
+push_back_elem_and_get_ptr :: proc(x: ^$X/Xar($T, $SHIFT), value: T, loc := #caller_location) -> (ptr: ^T, err: mem.Allocator_Error) {
+	chunk_idx, elem_idx, chunk_cap := meta_get(SHIFT, uint(x.len))
+	if x.chunks[chunk_idx] == nil {
+		x.chunks[chunk_idx] = make([^]T, chunk_cap, x.allocator) or_return
+	}
+	x.chunks[chunk_idx][elem_idx] = value
+	x.len += 1
+	n = 1
+	ptr = &x.chunks[chunk_idx][elem_idx]
+	return
+}
+
+
 pop :: proc(x: ^$X/Xar($T, $SHIFT), loc := #caller_location) -> (val: T) {
 	assert(x.len > 0, loc=loc)
 	index := uint(x.len-1)
