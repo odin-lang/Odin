@@ -81,9 +81,15 @@ _region_load :: proc(_reg_str: string, allocator := context.allocator) -> (out_r
 	}
 	defer if _reg_str == "local" { delete(reg_str, allocator) }
 
-	db_path := "/usr/share/zoneinfo"
-	region_path := filepath.join({db_path, reg_str}, allocator)
-	defer delete(region_path, allocator)
+	db_paths := []string{"/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"}
+	for db_path in db_paths {
+		region_path := filepath.join({db_path, reg_str}, allocator)
+		defer delete(region_path, allocator)
 
-	return load_tzif_file(region_path, reg_str, allocator)
+		if tz_reg, ok := load_tzif_file(region_path, reg_str, allocator); ok {
+			return tz_reg, true
+		}
+	}
+
+	return nil, false
 }
