@@ -24,6 +24,7 @@ package all
 @(require) import "core:container/intrusive/list"
 @(require) import "core:container/rbtree"
 @(require) import "core:container/topological_sort"
+@(require) import "core:container/xar"
 
 @(require) import "core:crypto"
 @(require) import "core:crypto/aead"
