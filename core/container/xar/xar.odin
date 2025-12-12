@@ -1,3 +1,20 @@
+/*
+	Exponential Array (Xar).
+
+	A fixed inline array of multi-pointers to exponentially growing chunks.
+
+	Xar(T, SHIFT)
+
+
+	Size of chunks:
+	len(chunks[0]) == 1<<(SHIFT+0)
+	len(chunks[1]) == 1<<(SHIFT+0)
+	len(chunks[2]) == 1<<(SHIFT+1)
+	len(chunks[3]) == 1<<(SHIFT+2)
+
+
+	For more information: https://azmr.uk/dyn/#exponential-arrayxar
+*/
 package container_xar
 
 @(require) import "core:mem"
