@@ -1,4 +1,4 @@
-/*  kb_text_shape - v2.03 - text segmentation and shaping
+/*  kb_text_shape - v2.05 - text segmentation and shaping
     by Jimmy Lefevre
 
     SECURITY
@@ -1245,6 +1245,9 @@
      See https://unicode.org/reports/tr9 for more information.
 
    VERSION HISTORY
+     2.05  - Fix custom allocator initialization for kbts_shape_context.PermanentArena.
+     2.04  - Fix Indic syllable logic for small/single-character syllables.
+             Fix wrong indirection in pointer code in Indic syllable logic.
      2.03  - Fix loading blobs directly, fix a parsing edge case in GPOS format 2 subtables.
      2.02  - Improve globbing of cursive attachments.
      2.01  - Add kbts_InitializeGlyphStorage and kbts_ScriptDirection.
@@ -23172,20 +23175,33 @@ static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_s
 
         case KBTS__REPH_ENCODING_IMPLICIT:
           if((ScanGlyphIndex >= 2) &&
-             (Second->SyllabicClass == KBTS_INDIC_SYLLABIC_CLASS_HALANT) &&
-             kbts__WouldSubstitute(Scratchpad, Config, Storage, LookupList, Frames, Rphf, 0, FirstGlyphs[0], 2))
+             (Second->SyllabicClass == KBTS_INDIC_SYLLABIC_CLASS_HALANT))
           {
-            OnePastRephIndex = 2;
+            kbts_glyph Scratch[2];
+            Scratch[0] = *FirstGlyphs[0];
+            Scratch[1] = *FirstGlyphs[1];
+
+            if(kbts__WouldSubstitute(Scratchpad, Config, Storage, LookupList, Frames, Rphf, 0, Scratch, 2))
+            {
+              OnePastRephIndex = 2;
+            }
           }
           break;
 
         case KBTS__REPH_ENCODING_EXPLICIT:
           if((ScanGlyphIndex >= 3) &&
              (Second->SyllabicClass == KBTS_INDIC_SYLLABIC_CLASS_HALANT) &&
-             (Third->SyllabicClass == KBTS_INDIC_SYLLABIC_CLASS_ZWJ) &&
-             kbts__WouldSubstitute(Scratchpad, Config, Storage, LookupList, Frames, Rphf, 0, FirstGlyphs[0], 3))
+             (Third->SyllabicClass == KBTS_INDIC_SYLLABIC_CLASS_ZWJ))
           {
-            OnePastRephIndex = 3;
+            kbts_glyph Scratch[3];
+            Scratch[0] = *FirstGlyphs[0];
+            Scratch[1] = *FirstGlyphs[1];
+            Scratch[2] = *FirstGlyphs[2];
+
+            if(kbts__WouldSubstitute(Scratchpad, Config, Storage, LookupList, Frames, Rphf, 0, Scratch, 3))
+            {
+              OnePastRephIndex = 3;
+            }
           }
           break;
         }
@@ -24068,6 +24084,7 @@ static void kbts__EndCluster(kbts__shape_scratchpad *Scratchpad, kbts_shape_conf
     kbts_glyph *First = Storage->GlyphSentinel.Next;
     kbts_glyph *Second = First->Next;
     if((First->SyllabicPosition == KBTS__SYLLABIC_POSITION_RA_TO_BECOME_REPH) &&
+       kbts__GlyphIsValid(Storage, Second) &&
        (Second->SyllabicPosition != KBTS__SYLLABIC_POSITION_RA_TO_BECOME_REPH))
     {
       kbts__reph_position RephPosition = Config->IndicScriptProperties.RephPosition;
@@ -25005,6 +25022,9 @@ KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext(kbts_allocator_function *
 
     KBTS_MEMSET(Result, 0, sizeof(*Result));
 
+    Result->PermanentArena.Allocator = Allocator;
+    Result->PermanentArena.AllocatorData = AllocatorData;
+
     Result->FontArena.Allocator = Allocator;
     Result->FontArena.AllocatorData = AllocatorData;
 
@@ -25013,6 +25033,9 @@ KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext(kbts_allocator_function *
 
     Result->ScratchArena.Allocator = Allocator;
     Result->ScratchArena.AllocatorData = AllocatorData;
+
+    Result->GlyphStorage.Arena.Allocator = Allocator;
+    Result->GlyphStorage.Arena.AllocatorData = AllocatorData;
 
     KBTS__DLLIST_SENTINEL_INIT(&Result->FeatureOverrideSentinel);
     KBTS__DLLIST_SENTINEL_INIT(&Result->FreeFeatureOverrideSentinel);
@@ -25055,6 +25078,7 @@ KBTS_EXPORT void kbts_DestroyShapeContext(kbts_shape_context *Context)
 {
   if(Context)
   {
+    kbts__FreeArena(&Context->PermanentArena);
     kbts__FreeArena(&Context->ConfigArena);
     kbts__FreeArena(&Context->ScratchArena);
     kbts__FreeArena(&Context->FontArena);
