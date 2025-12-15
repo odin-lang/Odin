@@ -835,3 +835,90 @@ Returns:
 write_int :: proc(b: ^Builder, i: int, base: int = 10) -> (n: int) {
 	return write_i64(b, i64(i), base)
 }
+
+
+/*
+Replaces all instances of `old` in the string in a Builder `b` with the `new` string
+
+*Allocates Using The Allocator On The Builder*
+
+Inputs:
+- b: The input `Builder`
+- old: The substring to be replaced
+- new: The replacement string
+
+Returns:
+- replaced: The number of replacements
+- err: if any allocation errors occurred
+*/
+builder_replace_all :: proc(b: ^Builder, old, new: string) -> (replaced: int, err: mem.Allocator_Error) {
+	return builder_replace(b, old, new, -1)
+}
+
+/*
+Replaces n instances of `old` in the string in a Builder `b` with the `new` string
+
+*Allocates Using The Allocator On The Builder*
+
+Inputs:
+- b: The input `Builder`
+- old: The substring to be replaced
+- new: The replacement string
+- n: The number of instances to replace (if `n < 0`, no limit on the number of replacements)
+
+Returns:
+- replaced: The number of replacements
+- err: if any allocation errors occurred
+*/
+builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_location) -> (replaced: int, err: mem.Allocator_Error) {
+	if old == new || n == 0 {
+		return
+	}
+
+	if m := count(to_string(b^), old); m == 0 {
+		return
+	}
+
+	if len(old) == 0 {
+		for i := 0; i <= len(b.buf); i += len(new)+1 {
+			if n > 0 && replaced == n {
+				break
+			}
+
+			resize(&b.buf, len(b.buf)+len(new), loc) or_return
+			copy(b.buf[i+len(new):], b.buf[i:])
+			copy(b.buf[i:], new)
+			replaced += 1
+		}
+	} else {
+		for i := 0; i < len(b.buf); /**/ {
+			if n > 0 && replaced == n {
+				break
+			}
+
+			j := index(string(b.buf[i:]), old)
+			if j < 0 {
+				break
+			}
+
+			if len(new) >= len(old) {
+				resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
+			}
+
+			cur := b.buf[i+j:]
+			src := cur[len(old):]
+			dst := cur[len(new):]
+			copy(dst, src)
+			copy(cur, new)
+
+			i += j+len(new)
+
+			replaced += 1
+
+			if len(new) < len(old) {
+				resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
+			}
+		}
+	}
+	return
+}
