@@ -184,10 +184,11 @@ print_rune :: #force_no_inline proc "contextless" (r: rune) -> int #no_bounds_ch
 
 
 print_u64 :: #force_no_inline proc "contextless" (x: u64) #no_bounds_check {
+	b :: u64(10)
+	u := x
+
 	a: [129]byte
 	i := len(a)
-	b := u64(10)
-	u := x
 	for u >= b {
 		i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 		u /= b
@@ -199,11 +200,9 @@ print_u64 :: #force_no_inline proc "contextless" (x: u64) #no_bounds_check {
 
 
 print_i64 :: #force_no_inline proc "contextless" (x: i64) #no_bounds_check {
-	b :: i64(10)
-
-	u := x
-	neg := u < 0
-	u = abs(u)
+	b :: u64(10)
+	u := u64(abs(x))
+	neg := x < 0
 
 	a: [129]byte
 	i := len(a)
