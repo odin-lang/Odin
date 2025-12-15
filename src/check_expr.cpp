@@ -4390,6 +4390,10 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 			return;
 		}
 
+		if (c->proc_name == "main") {
+			gb_printf_err("HERE! 1 %s\n", type_to_string(x->type));
+		}
+
 		if (op.kind == Token_Quo && is_type_integer(x->type)) {
 			op.kind = Token_QuoEq; // NOTE(bill): Hack to get division of integers
 		}
@@ -4451,7 +4455,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 					break;
 				}
 			}
-		} else {
+		} else if (!is_type_array_like(x->type)) {
 			x->value = exact_binary_operator_value(op.kind, a, b);
 		}
 
