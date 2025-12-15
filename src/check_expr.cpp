@@ -4455,7 +4455,10 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 					break;
 				}
 			}
-		} else if (!is_type_array_like(x->type)) {
+		} else if (is_type_array_like(x->type)) {
+			x->mode = Addressing_Value;
+			return;
+		} else {
 			x->value = exact_binary_operator_value(op.kind, a, b);
 		}
 
