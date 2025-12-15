@@ -2502,7 +2502,7 @@ foreign lib {
 	 * Appends a string to a linked list. If no list exists, it will be created
 	 * first. Returns the new list, after appending.
 	 */
-	slist_append :: proc(list: ^slist, data: [^]byte) -> ^slist ---
+	slist_append :: proc(list: ^slist, data: cstring) -> ^slist ---
 
 	/*
 	 * NAME curl_slist_free_all()
