@@ -12103,6 +12103,25 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 
 
 
+gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y, bool *do_break_) {
+	ast_node(x_cl, CompoundLit, x.value_compound);
+	ast_node(y_cl, CompoundLit, y.value_compound);
+
+	if (x_cl->elems.count != y_cl->elems.count) {
+		if (do_break_) *do_break_ = true;
+	}
+
+	bool test = op == Token_CmpEq;
+
+	for (isize i = 0; i < x_cl->elems.count; i++) {
+		Ast *lhs = x_cl->elems[i];
+		Ast *rhs = y_cl->elems[i];
+		if (compare_exact_values(op, lhs->tav.value, rhs->tav.value) != test) {
+			return !test;
+		}
+	}
+	return test;
+}
 
 
 
