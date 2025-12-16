@@ -24,6 +24,7 @@ State :: struct {
 
 	up_index, down_index: int, // multi-lines
 
+	translate_by_grapheme: bool, // translates by codepoint by default
 
 	// undo
 	undo: [dynamic]^Undo_State,
@@ -302,14 +303,32 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 	case .End:
 		pos = len(buf)
 	case .Left:
-		pos -= 1
-		for pos >= 0 && is_continuation_byte(buf[pos]) {
+		if s.translate_by_grapheme {
+			// TODO(bill): determine if there is a faster way to determine the last grapheme
+			// rather than iterate across the entire string (which may be very slow)
+			it := utf8.decode_grapheme_iterator_make(string(buf[:pos]))
+			g: utf8.Grapheme
+			for {
+				_, g = utf8.decode_grapheme_iterate(&it) or_break
+			}
+			pos -= max(g.width, 1)
+		} else {
 			pos -= 1
+			for pos >= 0 && is_continuation_byte(buf[pos]) {
+				pos -= 1
+			}
 		}
 	case .Right:
-		pos += 1
-		for pos < len(buf) && is_continuation_byte(buf[pos]) {
+		if s.translate_by_grapheme {
+			it := utf8.decode_grapheme_iterator_make(string(buf[pos:]))
+
+			_, g, _ := utf8.decode_grapheme_iterate(&it)
+			pos += max(g.width, 1)
+		} else {
 			pos += 1
+			for pos < len(buf) && is_continuation_byte(buf[pos]) {
+				pos += 1
+			}
 		}
 	case .Up:
 		pos = s.up_index
