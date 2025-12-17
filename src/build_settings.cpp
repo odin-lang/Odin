@@ -835,7 +835,7 @@ gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
-	str_lit("x86_64-pc-none-msvc"),
+	str_lit("x86_64-pc-windows-msvc"),
 	TargetABI_Win64,
 };
 
