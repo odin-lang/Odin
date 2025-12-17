@@ -7,10 +7,11 @@ import "base:intrinsics"
 IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 @(private)
-RUNTIME_LINKAGE :: "strong" when (
-	ODIN_USE_SEPARATE_MODULES || 
-	ODIN_BUILD_MODE == .Dynamic ||
-	!ODIN_NO_CRT) else "internal"
+RUNTIME_LINKAGE :: "strong"   when ODIN_USE_SEPARATE_MODULES else
+                   "internal" when ODIN_NO_ENTRY_POINT && (ODIN_BUILD_MODE == .Static || ODIN_BUILD_MODE == .Dynamic || ODIN_BUILD_MODE == .Object) else
+                   "strong"   when ODIN_BUILD_MODE == .Dynamic else
+                   "strong "  when !ODIN_NO_CRT else
+                   "internal"
 RUNTIME_REQUIRE :: false // !ODIN_TILDE
 
 @(private)
