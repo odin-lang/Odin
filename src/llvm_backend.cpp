@@ -15,6 +15,8 @@
 #define LLVM_WEAK_MONOMORPHIZATION (USE_SEPARATE_MODULES && build_context.internal_weak_monomorphization)
 #endif
 
+#define LLVM_SET_INTERNAL_WEAK_LINKAGE(value) LLVMSetLinkage(value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
+
 
 #include "llvm_backend.hpp"
 #include "llvm_abi.cpp"
@@ -170,7 +172,7 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 		if (ec.e->kind == Entity_Variable) {
 			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
 			if (other_global) {
-				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+				LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
 				if (!ec.e->Variable.is_export && !ec.e->Variable.is_foreign) {
 					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
 				}
@@ -178,7 +180,7 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 		} else if (ec.e->kind == Entity_Procedure) {
 			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
 			if (other_global) {
-				LLVMSetLinkage(other_global, LLVMWeakAnyLinkage);
+				LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
 				if (!ec.e->Procedure.is_export && !ec.e->Procedure.is_foreign) {
 					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
 				}
@@ -2092,7 +2094,7 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			lbProcedure *dummy = lb_create_dummy_procedure(m, make_string_c(name), dummy_type);
 			dummy->is_startup = true;
 			LLVMSetVisibility(dummy->value, LLVMHiddenVisibility);
-			LLVMSetLinkage(dummy->value, LLVMWeakAnyLinkage);
+			LLVM_SET_INTERNAL_WEAK_LINKAGE(p->value);
 
 			lb_begin_procedure_body(dummy);
 			lb_init_global_var(m, dummy, e, init_expr, var);
@@ -2127,7 +2129,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	// Make sure shared libraries call their own runtime startup on Linux.
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
-	LLVMSetLinkage(p->value, LLVMWeakAnyLinkage);
+	LLVM_SET_INTERNAL_WEAK_LINKAGE(p->value);
 
 	p->global_variables = &global_variables;
 	p->objc_names       = objc_names;
@@ -2147,7 +2149,7 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	// Make sure shared libraries call their own runtime cleanup on Linux.
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
-	LLVMSetLinkage(p->value, LLVMWeakAnyLinkage);
+	LLVM_SET_INTERNAL_WEAK_LINKAGE(p->value);
 
 	lb_begin_procedure_body(p);
 
@@ -3418,7 +3420,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 		} else if (!is_foreign) {
-			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
+			LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
 		}
 		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
 		LLVMSetAlignment(g.value, cast(u32)type_align_of(e->type));
