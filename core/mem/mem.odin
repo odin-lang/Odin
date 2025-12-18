@@ -462,6 +462,26 @@ buffer_from_slice :: proc "contextless" (backing: $T/[]$E) -> [dynamic]E {
 }
 
 /*
+Create a dynamic array from slice.
+
+This procedure creates a dynamic array, using slice `backing` as the backing
+buffer for the dynamic array. The resulting dynamic array will panic
+if attempted to grow beyond the size of the specified slice.
+*/
+@(require_results)
+buffer_from_slice_panicking :: proc "contextless" (backing: $T/[]$E) -> [dynamic]E {
+	return transmute([dynamic]E)Raw_Dynamic_Array {
+			data = raw_data(backing),
+			len = 0,
+			cap = len(backing),
+			allocator = Allocator {
+				procedure = panic_allocator_proc,
+				data = nil,
+			},
+		}
+}
+
+/*
 Check whether a number is a power of two.
 
 This procedure checks whether a given pointer-sized unsigned integer contains
