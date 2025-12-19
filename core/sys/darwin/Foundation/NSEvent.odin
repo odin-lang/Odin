@@ -334,6 +334,11 @@ Event_locationInWindow :: proc "c" (self: ^Event) -> Point {
 	return msgSend(Point, self, "locationInWindow")
 }
 
+@(objc_type=Event, objc_name="mouseLocation", objc_is_class_method=true)
+Event_mouseLocation :: proc "c" () -> Point {
+	return msgSend(Point, Event, "mouseLocation")
+}
+
 
 @(objc_type=Event, objc_name="deltaX")
 Event_deltaX :: proc "c" (self: ^Event) -> Float {

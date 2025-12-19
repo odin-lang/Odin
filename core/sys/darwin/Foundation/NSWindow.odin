@@ -699,6 +699,14 @@ View_convertPointFromView :: proc "c" (self: ^View, point: Point, view: ^View) -
 View_addSubview :: proc "c" (self: ^View, view: ^View) {
 	msgSend(nil, self, "addSubview:", view)
 }
+@(objc_type=View, objc_name="isFlipped")
+View_isFlipped :: proc "c" (self: ^View) -> BOOL {
+	return msgSend(BOOL, self, "isFlipped")
+}
+@(objc_type=View, objc_name="setIsFlipped")
+View_setIsFlipped :: proc "c" (self: ^View, flipped: BOOL) {
+	msgSend(nil, self, "setIsFlipped:", flipped)
+}
 
 @(objc_class="NSWindow")
 Window :: struct {using _: Responder}
