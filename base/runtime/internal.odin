@@ -148,6 +148,7 @@ mem_alloc_non_zeroed :: #force_no_inline proc(size: int, alignment: int = DEFAUL
 	return allocator.procedure(allocator.data, .Alloc_Non_Zeroed, size, alignment, nil, 0, loc)
 }
 
+@builtin
 mem_free :: #force_no_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	if ptr == nil || allocator.procedure == nil {
 		return nil
@@ -172,7 +173,7 @@ mem_free_bytes :: #force_no_inline proc(bytes: []byte, allocator := context.allo
 	return err
 }
 
-
+@builtin
 mem_free_all :: #force_no_inline proc(allocator := context.allocator, loc := #caller_location) -> (err: Allocator_Error) {
 	if allocator.procedure != nil {
 		_, err = allocator.procedure(allocator.data, .Free_All, 0, 0, nil, 0, loc)
@@ -341,7 +342,7 @@ memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_ch
 	case y == nil: return +1
 	}
 	a, b := cast([^]byte)x, cast([^]byte)y
-	
+
 	n := uint(n)
 	i := uint(0)
 	m := uint(0)
@@ -1409,4 +1410,3 @@ when .Address in ODIN_SANITIZER_FLAGS {
 		__asan_unpoison_memory_region :: proc "system" (address: rawptr, size: uint) ---
 	}
 }
-

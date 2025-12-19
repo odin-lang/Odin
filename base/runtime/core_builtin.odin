@@ -267,7 +267,10 @@ non_zero_resize :: proc{
 
 // Shrinks the capacity of a dynamic array or map down to the current length, or the given capacity.
 @builtin
-shrink :: proc{shrink_dynamic_array, shrink_map}
+shrink :: proc{
+	shrink_dynamic_array,
+	shrink_map,
+}
 
 // `free` will try to free the passed pointer, with the given `allocator` if the allocator supports this operation.
 @builtin
@@ -794,7 +797,11 @@ inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, ar
 }
 
 // `inject_at` injects something into a dynamic array at a specified index and moves the previous elements after that index "across"
-@builtin inject_at :: proc{inject_at_elem, inject_at_elems, inject_at_elem_string}
+@builtin inject_at :: proc{
+	inject_at_elem,
+	inject_at_elems,
+	inject_at_elem_string,
+}
 
 
 
@@ -858,7 +865,6 @@ assign_at :: proc{
 	assign_at_elems,
 	assign_at_elem_string,
 }
-
 
 
 
@@ -1000,6 +1006,7 @@ non_zero_resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: i
 // If `len(array) < new_cap`, then `len(array)` will be left unchanged.
 //
 // Note: Prefer the procedure group `shrink`
+@builtin
 shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int new_cap := -1, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
 	return _shrink_dynamic_array((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), new_cap, loc)
 }

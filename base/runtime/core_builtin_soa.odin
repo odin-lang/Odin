@@ -615,7 +615,7 @@ inject_at_elems_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, #no
 // `inject_at_soa` injects something into a dynamic SOA array at a specified index and moves the previous elements after that index "across"
 @builtin inject_at_soa :: proc{inject_at_elem_soa, inject_at_elems_soa}
 
-
+@builtin
 delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	when field_count != 0 {
@@ -626,6 +626,7 @@ delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc
 	return nil
 }
 
+@builtin
 delete_soa_dynamic_array :: proc(array: $T/#soa[dynamic]$E, loc := #caller_location) -> Allocator_Error {
 	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	when field_count != 0 {
@@ -644,7 +645,7 @@ delete_soa :: proc{
 	delete_soa_dynamic_array,
 }
 
-
+@builtin
 clear_soa_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) {
 	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	when field_count != 0 {
