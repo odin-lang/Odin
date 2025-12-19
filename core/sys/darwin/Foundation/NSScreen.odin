@@ -3,17 +3,21 @@ package objc_Foundation
 @(objc_class="NSScreen")
 Screen :: struct {using _: Object}
 
-@(objc_type=Screen, objc_name="mainScreen")
+@(objc_type=Screen, objc_name="mainScreen", objc_is_class_method=true)
 Screen_mainScreen :: proc "c" () -> ^Screen {
 	return msgSend(^Screen, Screen, "mainScreen")
 }
-@(objc_type=Screen, objc_name="deepestScreen")
+@(objc_type=Screen, objc_name="deepestScreen", objc_is_class_method=true)
 Screen_deepestScreen :: proc "c" () -> ^Screen {
 	return msgSend(^Screen, Screen, "deepestScreen")
 }
-@(objc_type=Screen, objc_name="screens")
+@(objc_type=Screen, objc_name="screens", objc_is_class_method=true)
 Screen_screens :: proc "c" () -> ^Array {
 	return msgSend(^Array, Screen, "screens")
+}
+@(objc_type=Screen, objc_name="screensHaveSeparateSpaces", objc_is_class_method=true)
+Screen_screensHaveSeparateSpaces :: proc "c" () -> BOOL {
+	return msgSend(BOOL, Screen, "screensHaveSeparateSpaces")
 }
 @(objc_type=Screen, objc_name="frame")
 Screen_frame :: proc "c" (self: ^Screen) -> Rect {
