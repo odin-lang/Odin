@@ -25,7 +25,7 @@ foreign lib {
 	poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: c.int) -> c.int ---
 }
 
-when ODIN_OS == .Haiku {
+when ODIN_OS == .Haiku || ODIN_OS == .Linux {
 	nfds_t :: c.ulong
 } else {
 	nfds_t :: c.uint

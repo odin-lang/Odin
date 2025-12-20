@@ -41,6 +41,8 @@ main :: proc() {
 	fmt.println("ai_canonname", offset_of(posix.addrinfo, ai_canonname))
 
 	fmt.println("pollfd", size_of(posix.pollfd), align_of(posix.pollfd))
+	fmt.println("nfds_t", size_of(posix.nfds_t), align_of(posix.nfds_t))
+
 	fmt.println("passwd", size_of(posix.passwd), align_of(posix.passwd))
 
 	when ODIN_OS != .Haiku {
