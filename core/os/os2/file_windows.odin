@@ -372,7 +372,10 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 		to_read := min(win32.DWORD(length), MAX_RW)
 		switch f.kind {
 		case .Console:
-			total_read, err = read_console(handle, p[total_read:][:to_read])
+			// NOTE(laytan): at least for now, just use ReadFile, it seems to work fine,
+			// but, there may be issues with certain situations that we need to get reproductions for.
+			// total_read, err = read_console(handle, p[total_read:][:to_read])
+			fallthrough
 		case .Pipe, .File:
 			single_read_length: win32.DWORD
 			ok := win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
