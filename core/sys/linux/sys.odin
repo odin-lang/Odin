@@ -2992,15 +2992,36 @@ epoll_pwait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32, 
 
 // TODO(flysand): signalfd
 
-// TODO(flysand): timerfd_create
+/*
+	Create Linux file descriptor based timer.
+	Available since Linux 2.6.25
+*/
+timerfd_create :: proc "contextless" (clock_id: Clock_Id, flags: Open_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_timerfd_create, clock_id, transmute(u32)flags)
+	return errno_unwrap2(ret, Fd)
+}
 
 // TODO(flysand): eventfd
 
 // TODO(flysand): fallocate
 
-// TODO(flysand): timerfd_settime
+/*
+	Arm/disarm the state of the Linux file descriptor based timer.
+	Available since Linux 2.6.25
+*/
+timerfd_settime :: proc "contextless" (fd: Fd, flags: ITimer_Flags, new_value: ^ITimer_Spec, old_value: ^ITimer_Spec) -> Errno {
+	ret := syscall(SYS_timerfd_settime, fd, transmute(u32)flags, new_value, old_value)
+	return Errno(-ret)
+}
 
-// TODO(flysand): timerfd_gettime
+/*
+	Get the state of the Linux file descriptor based timer.
+	Available since Linux 2.6.25
+*/
+timerfd_gettime :: proc "contextless" (fd: Fd, curr_value: ^ITimer_Spec) -> Errno {
+	ret := syscall(SYS_timerfd_gettime, fd, curr_value)
+	return Errno(-ret)
+}
 
 // TODO(flysand): accept4
 
