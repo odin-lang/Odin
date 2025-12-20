@@ -364,34 +364,30 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 
 	handle := _handle(&f.file)
 
-	single_read_length: win32.DWORD
 	total_read: int
 
 	sync.shared_guard(&f.rw_mutex) // multiple readers
 
 	if sync.guard(&f.p_mutex) {
 		to_read := min(win32.DWORD(length), MAX_RW)
-		ok: win32.BOOL
-		if f.kind == .Console {
-			n, cerr := read_console(handle, p[total_read:][:to_read])
-			total_read += n
-			if cerr != nil {
-				return i64(total_read), cerr
+		switch f.kind {
+		case .Console:
+			total_read, err = read_console(handle, p[total_read:][:to_read])
+		case .Pipe, .File:
+			single_read_length: win32.DWORD
+			ok := win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
+			if ok {
+				total_read += int(single_read_length)
+			} else {
+				err = _get_platform_error()
 			}
-			ok = true
-		} else {
-			ok = win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
 		}
+	}
 
-		if single_read_length > 0 && ok {
-			total_read += int(single_read_length)
-		} else if single_read_length == 0 && ok {
-			// ok and 0 bytes means EOF:
-			// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
-			err = .EOF
-		} else {
-			err = _get_platform_error()
-		}
+	if total_read == 0 && err == nil {
+		// ok and 0 bytes means EOF:
+		// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
+		err = .EOF
 	}
 
 	return i64(total_read), err
