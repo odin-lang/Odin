@@ -2868,9 +2868,13 @@ gb_internal lbValue lb_handle_objc_auto_send(lbProcedure *p, Ast *expr, Slice<lb
 			GB_ASSERT(se->expr->tav.mode == Addressing_Type && se->expr->tav.type->kind == Type_Named);
 
 			objc_class = entity_from_expr(se->expr);
-
 			GB_ASSERT(objc_class);
 			GB_ASSERT(objc_class->kind == Entity_TypeName);
+
+			if (objc_class->TypeName.is_type_alias) {
+				objc_class = objc_class->type->Named.type_name;
+			}
+
 			GB_ASSERT(objc_class->TypeName.objc_class_name != "");
 		}
 
