@@ -378,6 +378,7 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 			if cerr != nil {
 				return i64(total_read), cerr
 			}
+			ok = true
 		} else {
 			ok = win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
 		}
