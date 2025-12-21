@@ -37,7 +37,7 @@ _destroy :: proc(thread: ^Thread) {
 	unimplemented("core:thread procedure not supported on target")
 }
 
-_terminate :: proc(using thread : ^Thread, exit_code: int) {
+_terminate :: proc(thread : ^Thread, exit_code: int) {
 	unimplemented("core:thread procedure not supported on target")
 }
 
