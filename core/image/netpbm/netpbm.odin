@@ -1,4 +1,3 @@
-#+vet !using-stmt
 package netpbm
 
 import "core:bytes"
@@ -73,8 +72,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 		}
 	}
 
-	// using info so we can just talk about the header
-	using info
+	header := &info.header
 
 	// validation
 	if header.format in (PBM + PGM + Formats{.Pf}) && img.channels != 1 \
@@ -664,14 +662,14 @@ autoselect_pbm_format_from_image :: proc(img: ^Image, prefer_binary := true, for
 
 		ASCII   :: Formats{.P1, .P2, .P3}
 	*/
-	using res.header
+	h := &res.header
 
-	width    = img.width
-	height   = img.height
-	channels = img.channels
-	depth    = img.depth
-	maxval   = 255 if img.depth == 8 else 65535
-	little_endian = true if ODIN_ENDIAN == .Little else false
+	h.width    = img.width
+	h.height   = img.height
+	h.channels = img.channels
+	h.depth    = img.depth
+	h.maxval   = 255 if img.depth == 8 else 65535
+	h.little_endian = ODIN_ENDIAN == .Little
 
 	// Assume we'll find a suitable format
 	ok = true
@@ -680,37 +678,37 @@ autoselect_pbm_format_from_image :: proc(img: ^Image, prefer_binary := true, for
 	case 1:
 		// Must be Portable Float Map
 		if img.depth == 32 {
-			format = .Pf
+			h.format = .Pf
 			return
 		}
 
 		if force_black_and_white {
 			// Portable Bit Map
-			format = .P4 if prefer_binary else .P1
-			maxval = 1
+			h.format = .P4 if prefer_binary else .P1
+			h.maxval = 1
 			return
 		} else {
 			// Portable Gray Map
-			format = .P5 if prefer_binary else .P2
+			h.format = .P5 if prefer_binary else .P2
 			return
 		}
 
 	case 3:
 		// Must be Portable Float Map
 		if img.depth == 32 {
-			format = .PF
+			h.format = .PF
 			return
 		}
 
 		// Portable Pixel Map
-		format = .P6 if prefer_binary else .P3
+		h.format = .P6 if prefer_binary else .P3
 		return
 
 	case:
 		// Portable Arbitrary Map
 		if img.depth == 8 || img.depth == 16 {
-			format = .P7
-			scale  = pfm_scale
+			h.format = .P7
+			h.scale  = pfm_scale
 			return
 		}
 	}
