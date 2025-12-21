@@ -2107,7 +2107,7 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 	if (exports.memory) {
 		if (wasmMemoryInterface.memory) {
-			console.warn("WASM module exports memory, but `runWasm` was given an interface with existing memory too");
+			console.warn('WASM module exports memory, but `runWasm` was given an interface with existing memory too. Did you mean to use `-extra-linker-flags:"--import-memory"` to tell the compiler not to export memory?');
 		}
 		wasmMemoryInterface.setMemory(exports.memory);
 	}
