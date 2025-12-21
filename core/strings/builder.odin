@@ -880,6 +880,20 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 	}
 
 	if len(old) == 0 {
+		// NOTE(bill): reserve the necessary memory
+		found := 0
+		for i := 0; i <= len(b.buf); i += len(new)+1 {
+			if n > 0 && found == n {
+				break
+			}
+			found += 1
+		}
+		if found == 0 {
+			return
+		}
+		reserve(&b.buf, len(b.buf) + len(new)*found) or_return
+
+
 		for i := 0; i <= len(b.buf); i += len(new)+1 {
 			if n > 0 && replaced == n {
 				break
@@ -891,6 +905,27 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 			replaced += 1
 		}
 	} else {
+		if len(new) > len(old) {
+			// NOTE(bill): reserve the necessary memory
+			found := 0
+			for i := 0; i < len(b.buf); /**/ {
+				if n > 0 && found == n {
+					break
+				}
+
+				j := index(string(b.buf[i:]), old)
+				if j < 0 {
+					break
+				}
+				i += j+len(old)
+				found += 1
+			}
+			if found == 0 {
+				return
+			}
+			reserve(&b.buf, len(b.buf) + (len(new)-len(old))*found) or_return
+		}
+
 		for i := 0; i < len(b.buf); /**/ {
 			if n > 0 && replaced == n {
 				break
@@ -901,7 +936,7 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 				break
 			}
 
-			if len(new) >= len(old) {
+			if len(new) > len(old) {
 				resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
 			}
 
