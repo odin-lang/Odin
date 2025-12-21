@@ -93,12 +93,13 @@ test_p256_g_y :: proc(t: ^testing.T) {
 
 @(test)
 test_p256_scalarmul :: proc(t: ^testing.T) {
-	p, q, r: Point_p256r1
+	g, p, q, r: Point_p256r1
 	sc: Scalar_p256r1
 	b: [1]byte
 	tmp: [32]byte
 
-	pt_generator(&p)
+	pt_generator(&g)
+	pt_identity(&p)
 	pt_identity(&q)
 	pt_identity(&r)
 
@@ -110,13 +111,16 @@ test_p256_scalarmul :: proc(t: ^testing.T) {
 		s := string(hex.encode(tmp[:], context.temp_allocator))
 
 		if i != 0 {
-			pt_add(&q, &q, &p)
+			pt_add(&p, &p, &g)
 		}
-		pt_scalar_mul(&r, &p, &sc)
+		pt_scalar_mul(&q, &g, &sc)
+		pt_scalar_mul_generator(&r, &sc)
+		pt_rescale(&p, &p)
 		pt_rescale(&q, &q)
 		pt_rescale(&r, &r)
 
-		testing.expectf(t, pt_equal(&q, &r) == 1, "sc: %s, %v %v", s, q, r)
+		testing.expectf(t, pt_equal(&p, &q) == 1, "sc: %s, %v %v", s, q, r)
+		testing.expectf(t, pt_equal(&p, &r) == 1, "sc: %s, %v %v", s, q, r)
 	}
 }
 

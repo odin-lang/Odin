@@ -255,7 +255,7 @@ pt_add :: proc "contextless" (p, a, b: ^$T) {
 }
 
 @(private)
-pt_add_mixed :: proc "contextless" (p, a, b: ^$T) {
+pt_add_mixed :: proc "contextless" (p, a: ^$T, x2, y2: ^$U) {
 	// Algorithm 5 from "Complete addition formulas for prime
 	// order elliptic curves" by Renes, Costello, and Batina.
 	//
@@ -266,7 +266,7 @@ pt_add_mixed :: proc "contextless" (p, a, b: ^$T) {
 	// The operation costs are `11M + 2mb + 23a` saving
 	// `1M + 6a` over `pt_add`.
 
-	when T == Point_p256r1 {
+	when T == Point_p256r1 && U == Field_Element_p256r1 {
 		t0, t1, t2, t3, t4, b_fe: Field_Element_p256r1
 		x3, y3, z3: Field_Element_p256r1
 		defer fe_clear_vec([]^Field_Element_p256r1{&t0, &t1, &t2, &t3, &t4, &x3, &y3, &z3})
@@ -275,7 +275,6 @@ pt_add_mixed :: proc "contextless" (p, a, b: ^$T) {
 	}
 
 	x1, y1, z1 := &a._x, &a._y, &a._z
-	x2, y2 := &b._x, &b._y
 
 	fe_b(&b_fe)
 
@@ -533,15 +532,17 @@ is_on_curve :: proc "contextless" (x, y: ^$T) -> bool {
 @(private)
 set_yy_candidate :: proc "contextless" (maybe_yy, x: ^$T) {
 	// RHS: x^3 + ax + b
-	a_x, b_fe: T
+	rhs, tmp: T
 
-	fe_square(maybe_yy, x)
-	fe_mul(maybe_yy, maybe_yy, x)
+	fe_square(&tmp, x)
+	fe_mul(&rhs, &tmp, x)
 
-	fe_a(&a_x)
-	fe_mul(&a_x, &a_x, x)
-	fe_add(maybe_yy, maybe_yy, &a_x)
+	fe_a(&tmp)
+	fe_mul(&tmp, &tmp, x)
+	fe_add(&rhs, &rhs, &tmp)
 
-	fe_b(&b_fe)
-	fe_add(maybe_yy, maybe_yy, &b_fe)
+	fe_b(&tmp)
+	fe_add(maybe_yy, &rhs, &tmp)
+
+	fe_clear(&rhs)
 }
