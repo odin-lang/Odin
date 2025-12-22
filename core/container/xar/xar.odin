@@ -323,7 +323,6 @@ push_back_elem_and_get_ptr :: proc(x: ^$X/Xar($T, $SHIFT), value: T, loc := #cal
 	}
 	x.chunks[chunk_idx][elem_idx] = value
 	x.len += 1
-	n = 1
 	ptr = &x.chunks[chunk_idx][elem_idx]
 	return
 }
