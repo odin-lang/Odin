@@ -260,7 +260,7 @@ Example:
 Possible Output:
 
 	6
-	500
+	13
 
 */
 @(require_results)
@@ -301,7 +301,7 @@ Example:
 Possible Output:
 
 	6
-	500
+	13
 
 */
 @(require_results)
@@ -342,7 +342,7 @@ Example:
 Possible Output:
 
 	6
-	500
+	13
 
 */
 @(require_results)
