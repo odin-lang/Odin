@@ -17,6 +17,7 @@ import "base:intrinsics"
 import "core:os"
 import "core:sync"
 import "core:c/libc"
+import "core:strconv"
 import "core:terminal/ansi"
 
 import win32 "core:sys/windows"
@@ -89,23 +90,16 @@ stop_test_callback :: proc "system" (info: ^win32.EXCEPTION_POINTERS) -> win32.L
 			os.flush(os.stdout)
 		}
 
-		// This is an attempt at being compliant by avoiding printf.
 		expbuf: [8]byte
-		expstr: string
-		{
-			expnum := cast(int)code
-			i := len(expbuf) - 2
-			for expnum > 0 {
-				m := expnum % 10
-				expnum /= 10
-				expbuf[i] = cast(u8)('0' + m)
-				i -= 1
+		expstr := strconv.write_uint(expbuf[:], cast(u64)code, 16)
+		for &c in expbuf {
+			if 'a' <= c && c <= 'f' {
+				c -= 32
 			}
-			expstr = cast(string)expbuf[1 + i:len(expbuf) - 1]
 		}
 
 		advisory_a := `
-The test runner's main thread has caught an unrecoverable error (signal `
+The test runner's main thread has caught an unrecoverable error (exception 0x`
 		advisory_b := `) and will now forcibly terminate.
 This is a dire bug and should be reported to the Odin developers.
 `
@@ -155,7 +149,7 @@ This is a dire bug and should be reported to the Odin developers.
 	}
 
 	// Pass on the exeption to the next handler. As we don't wont to recover from it.
-	// This will allow debuggers handle it properly.
+	// This also allows debuggers handle it properly.
 	return win32.EXCEPTION_CONTINUE_SEARCH
 }
 
