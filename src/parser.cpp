@@ -2803,7 +2803,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				}
 				is_packed = true;
 			} else if (tag.string == "all_or_none") {
-				if (is_packed) {
+				if (is_all_or_none) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_all_or_none = true;

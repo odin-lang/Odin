@@ -21,12 +21,12 @@ write_ptr_at :: proc(w: Writer_At, p: rawptr, byte_size: int, offset: i64, n_wri
 }
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [32]byte
+	buf: [64]byte
 	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 write_i64 :: proc(w: Writer, i: i64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [32]byte
+	buf: [65]byte
 	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
@@ -39,12 +39,12 @@ write_int :: proc(w: Writer, i: int, base: int = 10, n_written: ^int = nil) -> (
 }
 
 write_u128 :: proc(w: Writer, i: u128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [39]byte
+	buf: [128]byte
 	s := strconv.write_bits_128(buf[:], i, base, false, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 write_i128 :: proc(w: Writer, i: i128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [40]byte
+	buf: [129]byte
 	s := strconv.write_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }

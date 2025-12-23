@@ -193,21 +193,36 @@ close :: proc(socket: Any_Socket) {
 	_close(socket)
 }
 
+/*
+	Receive data into a buffer from a TCP socket.
+
+	If no error occurs, `recv_tcp` returns the number of bytes received and `buf` will contain this data received.
+	If the connection has been gracefully closed, the return value is `0, nil` (0 bytes read and no error).
+*/
 recv_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_read: int, err: TCP_Recv_Error) {
 	return _recv_tcp(socket, buf)
 }
 
+/*
+	Receive data into a buffer from a UDP socket.
+
+	If no error occurs, `recv_udp` returns the number of bytes received and `buf` will contain this data received.
+	If the "connection" has been gracefully closed, the return value is `0, nil` (0 bytes read and no error).
+*/
 recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: UDP_Recv_Error) {
 	return _recv_udp(socket, buf)
 }
 
 /*
-	Receive data from into a buffer from any socket.
+	Receive data into a buffer from any socket.
 
 	Note: `remote_endpoint` parameter is non-nil only if the socket type is UDP. On TCP sockets it
 	will always return `nil`.
 
-	Errors that can be returned: `TCP_Recv_Error`, or `UDP_Recv_Error`
+	Errors that can be returned: `TCP_Recv_Error`, or `UDP_Recv_Error`.
+
+	If no error occurs, `recv_any` returns the number of bytes received and `buf` will contain this data received.
+	If the connection has been gracefully closed, the return value is `0, nil, nil` (0 bytes read and no error).
 */
 recv_any :: proc(socket: Any_Socket, buf: []byte) -> (
 	bytes_read: int,
