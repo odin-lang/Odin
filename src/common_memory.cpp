@@ -113,6 +113,13 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	return ptr;	
 }
 
+
+template <typename T>
+gb_internal T *arena_alloc_item(Arena *arena) {
+	return cast(T *)arena_alloc(arena, gb_size_of(T), gb_align_of(T));
+}
+
+
 gb_internal void arena_free_all(Arena *arena) {
 	while (arena->curr_block != nullptr) {
 		MemoryBlock *free_block = arena->curr_block;
@@ -346,7 +353,7 @@ gb_internal gbAllocator arena_allocator(Arena *arena) {
 gb_internal GB_ALLOCATOR_PROC(arena_allocator_proc) {
 	void *ptr = nullptr;
 	Arena *arena = cast(Arena *)allocator_data;
-	GB_ASSERT_NOT_NULL(arena);
+	GB_ASSERT(arena != nullptr);
 
 	switch (type) {
 	case gbAllocation_Alloc:
@@ -394,6 +401,48 @@ gb_internal Arena *get_arena(ThreadArenaKind kind) {
 }
 
 
+template <typename T>
+gb_internal T *permanent_alloc_item() {
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	return arena_alloc_item<T>(arena);
+}
+
+template <typename T>
+gb_internal T *permanent_alloc_array(isize count) {
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+}
+
+template <typename T>
+gb_internal Slice<T> permanent_slice_make(isize count) {
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	T *data = cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	return {data, count};
+}
+
+template <typename T>
+gb_internal T *temporary_alloc_item() {
+	Arena *arena = get_arena(ThreadArena_Temporary);
+	return arena_alloc_item<T>(arena);
+}
+
+template <typename T>
+gb_internal T *temporary_alloc_array(isize count) {
+	Arena *arena = get_arena(ThreadArena_Temporary);
+	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+}
+
+template <typename T>
+gb_internal Slice<T> temporary_slice_make(isize count) {
+	Arena *arena = get_arena(ThreadArena_Temporary);
+	T *data = cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	return {data, count};
+}
+
+
+
+
+
 
 gb_internal GB_ALLOCATOR_PROC(thread_arena_allocator_proc) {
 	void *ptr = nullptr;
@@ -432,15 +481,16 @@ gb_internal gbAllocator permanent_allocator() {
 }
 
 gb_internal gbAllocator temporary_allocator() {
-	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Permanent};
+	// return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Temporary};
+	return permanent_allocator();
 }
 
 
 #define TEMP_ARENA_GUARD(arena) ArenaTempGuard GB_DEFER_3(_arena_guard_){arena}
 
 
-// #define TEMPORARY_ALLOCATOR_GUARD()
-#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
+// #define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
+#define TEMPORARY_ALLOCATOR_GUARD()
 #define PERMANENT_ALLOCATOR_GUARD()
 
 

@@ -79,7 +79,7 @@ set compiler_flags= %compiler_flags% /utf-8
 set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\" -DGIT_SHA=\"%GIT_SHA%\"
 
 rem fileversion is defined as {Major,Minor,Build,Private: u16} so a bit limited
-set rc_flags="-DGIT_SHA=%GIT_SHA% -DVP=dev-%V1%-%V2%:%GIT_SHA% nologo -DV1=%V1% -DV2=%V2% -DV3=%V3% -DV4=%V4% -DVF=%odin_version_full% -DNIGHTLY=%nightly%"
+set rc_flags=-nologo "-DGIT_SHA=%GIT_SHA% -DVP=dev-%V1%-%V2%:%GIT_SHA% nologo -DV1=%V1% -DV2=%V2% -DV3=%V3% -DV4=%V4% -DVF=%odin_version_full% -DNIGHTLY=%nightly%"
 
 if %nightly% equ 1 set compiler_defines=%compiler_defines% -DNIGHTLY
 

@@ -42,11 +42,13 @@ WSAID_GETACCEPTEXSOCKADDRS :: GUID{0xb5367df2, 0xcbac, 0x11cf, {0x95, 0xca, 0x00
 WSAID_CONNECTX             :: GUID{0x25a207b9, 0xddf3, 0x4660, {0x8e, 0xe9, 0x76, 0xe5, 0x8c, 0x74, 0x06, 0x3e}}
 
 SIO_GET_EXTENSION_FUNCTION_POINTER :: IOC_INOUT | IOC_WS2 | 6
+SIO_UDP_CONNRESET                  :: IOC_IN | IOC_VENDOR | 12
 
-IOC_OUT   :: 0x40000000
-IOC_IN    :: 0x80000000
-IOC_INOUT :: (IOC_IN | IOC_OUT)
-IOC_WS2   :: 0x08000000
+IOC_OUT    :: 0x40000000
+IOC_IN     :: 0x80000000
+IOC_INOUT  :: (IOC_IN | IOC_OUT)
+IOC_WS2    :: 0x08000000
+IOC_VENDOR :: 0x18000000
 
 SO_UPDATE_ACCEPT_CONTEXT :: 28683
 
@@ -121,6 +123,18 @@ foreign ws2_32 {
 		lpOverlapped: LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasendto)
+	WSASendTo :: proc(
+		s: SOCKET,
+		lpBuffers: LPWSABUF,
+		dwBufferCount: DWORD,
+		lpNumberOfBytesSent: LPDWORD,
+		dwFlags: DWORD,
+		lpTo: ^SOCKADDR_STORAGE_LH,
+		iToLen: c_int,
+		lpOverlapped: LPWSAOVERLAPPED,
+		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsarecv)
 	WSARecv :: proc(
 		s: SOCKET,
@@ -128,6 +142,18 @@ foreign ws2_32 {
 		dwBufferCount: DWORD,
 		lpNumberOfBytesRecvd: LPDWORD,
 		lpFlags: LPDWORD,
+		lpOverlapped: LPWSAOVERLAPPED,
+		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsarecvfrom)
+	WSARecvFrom :: proc(
+		s: SOCKET,
+		lpBuffers: LPWSABUF,
+		dwBufferCount: DWORD,
+		lpNumberOfBytesRecvd: LPDWORD,
+		lpFlags: LPDWORD,
+		lpFrom: ^SOCKADDR_STORAGE_LH,
+		lpFromlen: ^c_int,
 		lpOverlapped: LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---

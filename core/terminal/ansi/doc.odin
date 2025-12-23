@@ -1,7 +1,6 @@
 /*
-package ansi implements constant references to many widely-supported ANSI
-escape codes, primarily used in terminal emulators for enhanced graphics, such
-as colors, text styling, and animated displays.
+Constant references to many widely-supported `ANSI` escape codes.
+Primarily used in terminal emulators for enhanced graphics, such as colors, text styling, and animated displays.
 
 For example, you can print out a line of cyan text like this:
 	fmt.println(ansi.CSI + ansi.FG_CYAN + ansi.SGR + "Hellope!" + ansi.CSI + ansi.RESET + ansi.SGR)

@@ -1937,7 +1937,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					if (buf_len > 0 && buf_ptr) {
 						let n = Math.min(buf_len, str.length);
 						str = str.substring(0, n);
-						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
+						wasmMemoryInterface.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
 						return n;
 					}
 				}
@@ -2001,7 +2001,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					if (buf_len > 0 && buf_ptr) {
 						let n = Math.min(buf_len, str.length);
 						str = str.substring(0, n);
-						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
+						wasmMemoryInterface.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(str))
 						return n;
 					}
 				}
@@ -2107,12 +2107,14 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 	if (exports.memory) {
 		if (wasmMemoryInterface.memory) {
-			console.warn("WASM module exports memory, but `runWasm` was given an interface with existing memory too");
+			console.warn('WASM module exports memory, but `runWasm` was given an interface with existing memory too. Did you mean to use `-extra-linker-flags:"--import-memory"` to tell the compiler not to export memory?');
 		}
 		wasmMemoryInterface.setMemory(exports.memory);
 	}
 
-	exports._start();
+	if (exports._start) {
+		exports._start();
+	}
 
 	// Define a `@export step :: proc(delta_time: f64) -> (keep_going: bool) {`
 	// in your app and it will get called every frame.
@@ -2130,7 +2132,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 			prevTimeStamp = currTimeStamp;
 
 			if (!exports.step(dt, odin_ctx)) {
-				exports._end();
+				if (exports._end) {
+					exports._end();
+				}
 				return;
 			}
 
@@ -2139,7 +2143,9 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 		window.requestAnimationFrame(step);
 	} else {
-		exports._end();
+		if (exports._end) {
+			exports._end();
+		}
 	}
 
 	return;

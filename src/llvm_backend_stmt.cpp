@@ -3,8 +3,6 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 		return;
 	}
 
-	auto *min_dep_set = &p->module->info->minimum_dependency_set;
-
 	for (Ast *ident : vd->names) {
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
@@ -21,7 +19,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			}
 		}
 
-		if (!polymorphic_struct && !ptr_set_exists(min_dep_set, e)) {
+		if (!polymorphic_struct && e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 			continue;
 		}
 
@@ -56,7 +54,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			if (gpd) {
 				rw_mutex_shared_lock(&gpd->mutex);
 				for (Entity *e : gpd->procs) {
-					if (!ptr_set_exists(min_dep_set, e)) {
+					if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 						continue;
 					}
 					DeclInfo *d = decl_info_of_entity(e);
@@ -94,7 +92,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			value.value = nested_proc->value;
 			value.type = nested_proc->type;
 
-			array_add(&p->module->procedures_to_generate, nested_proc);
+			mpsc_enqueue(&p->module->procedures_to_generate, nested_proc);
 			array_add(&p->children, nested_proc);
 			string_map_set(&p->module->members, name, value);
 		}
@@ -2180,11 +2178,14 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 					LLVMSetLinkage(var_global_ref, LLVMInternalLinkage);
 				}
 
-				LLVMValueRef vals[2] = {
-					lb_emit_conv(p, var_global.addr, t_rawptr).value,
-					lb_typeid(p->module, var_type).value,
-				};
-				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals, gb_count_of(vals));
+				auto vals = array_make<LLVMValueRef>(temporary_allocator(), 0, 3);
+				array_add(&vals, lb_emit_conv(p, var_global.addr, t_rawptr).value);
+				if (build_context.metrics.ptr_size == 4) {
+					array_add(&vals, LLVMConstNull(lb_type_padding_filler(p->module, 4, 4)));
+				}
+				array_add(&vals, lb_typeid(p->module, var_type).value);
+
+				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals.data, vals.count);
 				LLVMSetInitializer(global, init);
 			} else {
 				LLVMSetInitializer(global, value.value);

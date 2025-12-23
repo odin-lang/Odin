@@ -1,3 +1,4 @@
+// A priority queue data structure.
 package container_priority_queue
 
 import "base:builtin"

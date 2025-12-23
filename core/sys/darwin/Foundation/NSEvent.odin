@@ -250,6 +250,35 @@ kVK :: enum {
 	ISO_Section               = 0x0A,
 }
 
+/* class methods for creating events */
+
+@(objc_type=Event, objc_name="otherEventWithType", objc_is_class_method=true)
+Event_otherEventWithType :: proc "c" (
+	type: EventType,
+	location: Point,
+	flags: EventModifierFlags,
+	time: TimeInterval,
+	window_number: Integer,
+	ctx: id,
+	subtype: i16,
+	data1: Integer,
+	data2: Integer,
+) -> ^Event {
+	return msgSend(
+		^Event,
+		Event,
+		"otherEventWithType:location:modifierFlags:timestamp:windowNumber:context:subtype:data1:data2:",
+		type,
+		location,
+		flags,
+		time,
+		window_number,
+		ctx,
+		subtype,
+		data1,
+		data2,
+	)
+}
 
 /* these messages are valid for all events */
 
@@ -303,6 +332,11 @@ Event_pressure :: proc "c" (self: ^Event) -> f32 {
 @(objc_type=Event, objc_name="locationInWindow")
 Event_locationInWindow :: proc "c" (self: ^Event) -> Point {
 	return msgSend(Point, self, "locationInWindow")
+}
+
+@(objc_type=Event, objc_name="mouseLocation", objc_is_class_method=true)
+Event_mouseLocation :: proc "c" () -> Point {
+	return msgSend(Point, Event, "mouseLocation")
 }
 
 

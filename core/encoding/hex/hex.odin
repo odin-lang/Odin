@@ -1,3 +1,4 @@
+// Encoding and decoding of hex-encoded binary, e.g. `0x23` -> `#`.
 package encoding_hex
 
 import "core:io"

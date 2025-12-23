@@ -1,3 +1,4 @@
+// Bindings for [[ QuartzCore ; https://developer.apple.com/documentation/quartzcore ]].
 package objc_QuartzCore
 
 import NS "core:sys/darwin/Foundation"
@@ -45,6 +46,10 @@ MetalLayer_pixelFormat :: proc "c" (self: ^MetalLayer) -> MTL.PixelFormat {
 @(objc_type=MetalLayer, objc_name="setPixelFormat")
 MetalLayer_setPixelFormat :: proc "c" (self: ^MetalLayer, pixelFormat: MTL.PixelFormat) {
 	msgSend(nil, self, "setPixelFormat:", pixelFormat)
+}
+@(objc_type=MetalLayer, objc_name="setColorSpace")
+MetalLayer_setColorSpace :: proc "c" (self: ^MetalLayer, colorspace: NS.id) {
+	msgSend(nil, self, "setColorspace:", colorspace)
 }
 
 @(objc_type=MetalLayer, objc_name="framebufferOnly")
@@ -123,5 +128,23 @@ DrawablePresentedHandler :: ^NS.Block
 @(objc_type=MetalDrawable, objc_name="addPresentedHandler")
 MetalDrawable_addPresentedHandler :: proc "c" (self: ^MetalDrawable, block: DrawablePresentedHandler) {
 	msgSend(nil, self, "addPresentedHandler:", block)
+}
+
+@(objc_class="CATransaction")
+Transaction :: struct { using _: NS.Object }
+
+@(objc_type=Transaction, objc_name="begin", objc_is_class_method=true)
+transaction_begin :: proc() {
+	msgSend(nil, Transaction, "begin")
+}
+
+@(objc_type=Transaction, objc_name="commit", objc_is_class_method=true)
+transaction_commit :: proc() {
+	msgSend(nil, Transaction, "commit")
+}
+
+@(objc_type=Transaction, objc_name="flush", objc_is_class_method=true)
+transaction_flush :: proc() {
+	msgSend(nil, Transaction, "flush")
 }
 

@@ -11,6 +11,7 @@ import "core:reflect"
 import "base:runtime"
 import "base:intrinsics"
 import "core:math/big"
+import "core:math/rand"
 
 /*
 	Odin is a general-purpose programming language with distinct typing built
@@ -1215,19 +1216,6 @@ threading_example :: proc() {
 		}
 
 		thread.pool_start(&pool)
-
-		{
-			// Wait a moment before we cancel a thread
-			time.sleep(5 * time.Millisecond)
-
-			// Allow one thread to print at a time.
-			for !did_acquire(&print_mutex) { thread.yield() }
-
-			thread.terminate(pool.threads[N - 1], 0)
-			fmt.println("Canceled last thread")
-			print_mutex = false
-		}
-
 		thread.pool_finish(&pool)
 	}
 }
@@ -2270,6 +2258,10 @@ arbitrary_precision_mathematics :: proc() {
 
 	a, b, c, d, e, f, res := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
 	defer big.destroy(a, b, c, d, e, f, res)
+
+	// Set the context RNG to something that does not require
+	// cryptographic entropy (not supported on all targets).
+	context.random_generator = rand.xoshiro256_random_generator()
 
 	// How many bits should the random prime be?
 	bits   := 64

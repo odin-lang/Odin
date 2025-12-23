@@ -587,6 +587,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	d->proc_lit = proc_lit;
 	d->proc_checked_state = ProcCheckedState_Unchecked;
 	d->defer_use_checked = false;
+	d->para_poly_original = old_decl->entity;
 
 	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
 	entity->state.store(EntityState_Resolved);
@@ -608,7 +609,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		entity->flags |= EntityFlag_Disabled;
 	}
 
-	d->entity = entity;
+	d->entity.store(entity);
 
 	AstFile *file = nullptr;
 	{
@@ -821,9 +822,11 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	if (is_type_enum(dst) && are_types_identical(dst->Enum.base_type, operand->type)) {
-		if (c->in_enum_type) {
-			return 3;
+	if (c != nullptr) {
+		if (is_type_enum(dst) && are_types_identical(dst->Enum.base_type, operand->type)) {
+			if (c->in_enum_type) {
+				return 3;
+			}
 		}
 	}
 
@@ -1738,7 +1741,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	o->expr = n;
 	String name = n->Ident.token.string;
 
-	Entity *e = scope_lookup(c->scope, name);
+	Entity *e = scope_lookup(c->scope, name, n->Ident.hash);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
 			error(n, "'_' cannot be used as a value");
@@ -2113,9 +2116,6 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		}
 		return in_value.kind == ExactValue_String;
 	} else if (is_type_integer(type) || is_type_rune(type)) {
-		if (in_value.kind == ExactValue_Bool) {
-			return false;
-		}
 		ExactValue v = exact_value_to_integer(in_value);
 		if (v.kind != ExactValue_Integer) {
 			return false;
@@ -2331,6 +2331,20 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		if (out_value) *out_value = in_value;
 	} else if (is_type_bit_set(type)) {
 		if (in_value.kind == ExactValue_Integer) {
+			return true;
+		}
+	} else if (is_type_typeid(type)) {
+
+		if (in_value.kind == ExactValue_Compound) {
+			ast_node(cl, CompoundLit, in_value.value_compound);
+			if (cl->elems.count == 0) {
+				in_value = exact_value_typeid(nullptr);
+			} else {
+				return false;
+			}
+		}
+		if (in_value.kind == ExactValue_Typeid) {
+			if (out_value) *out_value = in_value;
 			return true;
 		}
 	}
@@ -3222,6 +3236,9 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 }
 
 gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
+	if (are_types_identical(operand->type, y)) {
+		return true;
+	}
 	if (check_is_assignable_to(c, operand, y)) {
 		return true;
 	}
@@ -3503,27 +3520,42 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 
+
 	Type *bt = base_type(type);
 	if (is_const_expr && is_type_constant_type(bt)) {
+		Type *elem = core_array_type(bt);
+
 		if (core_type(bt)->kind == Type_Basic) {
-			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
+			if (check_representable_as_constant(c, x->value, type, &x->value)) {
 				return true;
-			} else if (check_is_castable_to(c, x, type)) {
-				if (is_type_pointer(type)) {
-					return true;
-				}
 			}
+			goto check_castable;
+		} else if (!are_types_identical(elem, bt) &&
+		           elem->kind == Type_Basic &&
+		           check_representable_as_constant(c, x->value, elem, &x->value)) {
+			if (check_representable_as_constant(c, x->value, type, &x->value)) {
+				return true;
+			}
+			goto check_castable;
 		} else if (check_is_castable_to(c, x, type)) {
 			x->value = {};
 			x->mode = Addressing_Value;
 			return true;
 		}
-	} else if (check_is_castable_to(c, x, type)) {
+
+		return false;
+	}
+
+check_castable:
+	if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
 		} else if (is_type_union(type)) {
+			if (is_type_union_constantable(type)) {
+				return true;
+			}
 			x->mode = Addressing_Value;
 		}
 		if (x->mode == Addressing_Value) {
@@ -4137,7 +4169,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 	default:
 		if (is_ise_expr(be->left)) {
 			// Evalute the right before the left for an '.X' expression
-			check_expr_or_type(c, y, be->right, type_hint);
+			check_expr_or_type(c, y, be->right, token_is_comparison(op.kind) ? nullptr : type_hint);
 
 			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, y->type)) { // RHS in this case
 				check_expr_or_type(c, x, be->left, y->type);
@@ -4149,7 +4181,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, x->type)) {
 				check_expr_with_type_hint(c, y, be->right, x->type);
 			} else {
-				check_expr_with_type_hint(c, y, be->right, type_hint);
+				check_expr_with_type_hint(c, y, be->right, token_is_comparison(op.kind) ? nullptr : type_hint);
 			}
 		}
 		break;
@@ -4419,6 +4451,9 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 					break;
 				}
 			}
+		} else if (is_type_array_like(x->type)) {
+			x->mode = Addressing_Value;
+			return;
 		} else {
 			x->value = exact_binary_operator_value(op.kind, a, b);
 		}
@@ -4639,7 +4674,6 @@ gb_internal ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 }
 
 gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
-	// GB_ASSERT_NOT_NULL(target_type);
 	if (target_type == nullptr || operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
 	    is_type_typed(operand->type) ||
@@ -4810,7 +4844,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			TEMPORARY_ALLOCATOR_GUARD();
 
 			isize count = t->Union.variants.count;
-			ValidIndexAndScore *valids = gb_alloc_array(temporary_allocator(), ValidIndexAndScore, count);
+			ValidIndexAndScore *valids = temporary_alloc_array<ValidIndexAndScore>(count);
 			isize valid_count = 0;
 			isize first_success_index = -1;
 			for_array(i, t->Union.variants) {
@@ -4851,7 +4885,10 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 					break;
 				}
 				operand->type = new_type;
-				operand->mode = Addressing_Value;
+				if (operand->mode != Addressing_Constant ||
+				    !elem_type_can_be_constant(operand->type)) {
+					operand->mode = Addressing_Value;
+				}
 				break;
 			} else if (valid_count > 1) {
 				ERROR_BLOCK();
@@ -5093,7 +5130,11 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 		}
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
-			if (is_type_struct(node->tav.type)) {
+			if (is_type_raw_union(node->tav.type)) {
+				if (success_) *success_ = false;
+				if (finish_) *finish_ = true;
+				return empty_exact_value;
+			} else if (is_type_struct(node->tav.type)) {
 				bool found = false;
 				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
@@ -5102,7 +5143,6 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					ast_node(fv, FieldValue, elem);
 					String name = fv->field->Ident.token.string;
 					Selection sub_sel = lookup_field(node->tav.type, name, false);
-					defer (array_free(&sub_sel.index));
 					if (sub_sel.index.count > 0 &&
 					    sub_sel.index[0] == index) {
 						value = fv->value->tav.value;
@@ -5363,7 +5403,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		}
 	} else */if (node->kind == Ast_Ident) {
 		String name = node->Ident.token.string;
-		return scope_lookup(c->scope, name);
+		return scope_lookup(c->scope, name, node->Ident.hash);
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
 		ast_node(se, SelectorExpr, node);
 		if (se->token.kind == Token_ArrowRight) {
@@ -5385,7 +5425,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 
 		if (op_expr->kind == Ast_Ident) {
 			String op_name = op_expr->Ident.token.string;
-			Entity *e = scope_lookup(c->scope, op_name);
+			Entity *e = scope_lookup(c->scope, op_name, op_expr->Ident.hash);
 			if (e == nullptr) {
 				return nullptr;
 			}
@@ -5482,7 +5522,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	if (op_expr->kind == Ast_Ident) {
 		String op_name = op_expr->Ident.token.string;
-		Entity *e = scope_lookup(c->scope, op_name);
+		Entity *e = scope_lookup(c->scope, op_name, op_expr->Ident.hash);
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
@@ -5808,7 +5848,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	switch (entity->kind) {
 	case Entity_Constant:
-	operand->value = entity->Constant.value;
+		operand->value = entity->Constant.value;
 		operand->mode = Addressing_Constant;
 		if (operand->value.kind == ExactValue_Procedure) {
 			Entity *proc = strip_entity_wrapping(operand->value.value_procedure);
@@ -5905,7 +5945,7 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 				return true;
 			}
 		} else {
-			Entity *e = scope_lookup(s, name);
+			Entity *e = scope_lookup(s, name, i->hash);
 			if (e != nullptr) {
 				if (out_scope) *out_scope = e->scope;
 				return true;
@@ -6029,7 +6069,7 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 			}
 			rw_mutex_shared_lock(&decl->deps_mutex);
 			rw_mutex_lock(&c->decl->deps_mutex);
-			for (Entity *dep : decl->deps) {
+			FOR_PTR_SET(dep, decl->deps) {
 				ptr_set_add(&c->decl->deps, dep);
 			}
 			rw_mutex_unlock(&c->decl->deps_mutex);
@@ -6185,7 +6225,6 @@ gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *
 					continue;
 				}
 			}
-			break;
 		}
 	}
 
@@ -6257,7 +6296,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	}
 
 	GB_ASSERT(ce->split_args);
-	auto visited = slice_make<bool>(temporary_allocator(), pt->param_count);
+	auto visited = temporary_slice_make<bool>(pt->param_count);
 	auto ordered_operands = array_make<Operand>(temporary_allocator(), pt->param_count);
 	defer ({
 		for (Operand const &o : ordered_operands) {
@@ -6473,7 +6512,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 
 		if (e && e->kind == Entity_Constant && is_type_proc(e->type)) {
-			if (o->mode != Addressing_Constant) {
+			bool ok = false;
+			if (o->mode == Addressing_Constant) {
+				ok = true;
+			} else if (o->value.kind == ExactValue_Procedure) {
+				ok = true;
+			}
+
+			if (!ok) {
 				if (show_error) {
 					error(o->expr, "Expected a constant procedure value for the argument '%.*s'", LIT(e->token.string));
 				}
@@ -6972,6 +7018,10 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				array_unordered_remove(&procs, proc_index);
 				continue;
 			}
+			if (!pt->Proc.variadic && max_arg_count != ISIZE_MAX && param_count < max_arg_count) {
+				array_unordered_remove(&procs, proc_index);
+				continue;
+			}
 			proc_index++;
 		}
 	}
@@ -6980,10 +7030,10 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	isize lhs_count = -1;
 	i32 variadic_index = -1;
 
-	auto positional_operands = array_make<Operand>(heap_allocator(), 0, 0);
-	auto named_operands = array_make<Operand>(heap_allocator(), 0, 0);
-	defer (array_free(&positional_operands));
-	defer (array_free(&named_operands));
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto positional_operands = array_make<Operand>(temporary_allocator(), 0, 0);
+	auto named_operands = array_make<Operand>(temporary_allocator(), 0, 0);
 
 	if (procs.count == 1) {
 		Entity *e = procs[0];
@@ -7024,7 +7074,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		if (proc_arg_count >= 0) {
 			lhs_count = proc_arg_count;
 			if (lhs_count > 0)  {
-				lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
+				lhs = gb_alloc_array(temporary_allocator(), Entity *, lhs_count);
 				for (isize param_index = 0; param_index < lhs_count; param_index++) {
 					Entity *e = nullptr;
 					for (Entity *p : procs) {
@@ -7110,13 +7160,9 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		array_add(&named_operands, o);
 	}
 
-	gb_free(heap_allocator(), lhs);
+	auto valids = array_make<ValidIndexAndScore>(temporary_allocator(), 0, procs.count);
 
-	auto valids = array_make<ValidIndexAndScore>(heap_allocator(), 0, procs.count);
-	defer (array_free(&valids));
-
-	auto proc_entities = array_make<Entity *>(heap_allocator(), 0, procs.count*2 + 1);
-	defer (array_free(&proc_entities));
+	auto proc_entities = array_make<Entity *>(temporary_allocator(), 0, procs.count*2 + 1);
 	for (Entity *proc : procs) {
 		array_add(&proc_entities, proc);
 	}
@@ -7247,7 +7293,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 
 		// Try to reduce the list further for `$T: typeid` like parameters
-		bool *possibly_ignore = gb_alloc_array(temporary_allocator(), bool, procs.count);
+		bool *possibly_ignore = temporary_alloc_array<bool>(procs.count);
 		isize possibly_ignore_set = 0;
 
 		if (true) {
@@ -7335,7 +7381,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 
 		isize max_spaces = gb_max(max_name_length, max_type_length);
-		char *spaces = gb_alloc_array(temporary_allocator(), char, max_spaces+1);
+		char *spaces = temporary_alloc_array<char>(max_spaces+1);
 		for (isize i = 0; i < max_spaces; i++) {
 			spaces[i] = ' ';
 		}
@@ -7450,8 +7496,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		Entity *e = proc_entities[valids[0].index];
 		GB_ASSERT(e != nullptr);
 
-		Array<Operand> named_operands = {};
-
 		check_call_arguments_single(c, call, operand,
 			e, e->type,
 			positional_operands, named_operands,
@@ -7510,11 +7554,10 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		return check_call_arguments_proc_group(c, operand, call);
 	}
 
-	auto positional_operands = array_make<Operand>(heap_allocator(), 0, positional_args.count);
-	auto named_operands      = array_make<Operand>(heap_allocator(), 0, 0);
+	TEMPORARY_ALLOCATOR_GUARD();
 
-	defer (array_free(&positional_operands));
-	defer (array_free(&named_operands));
+	auto positional_operands = array_make<Operand>(temporary_allocator(), 0, positional_args.count);
+	auto named_operands      = array_make<Operand>(temporary_allocator(), 0, 0);
 
 	if (positional_args.count > 0) {
 		Entity **lhs =  nullptr;
@@ -7601,6 +7644,8 @@ gb_internal isize lookup_polymorphic_record_parameter(Type *t, String parameter_
 
 
 gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *operand, Ast *call) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	ast_node(ce, CallExpr, call);
 
 	Type *original_type = operand->type;
@@ -7609,7 +7654,6 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	bool show_error = true;
 
 	Array<Operand> operands = {};
-	defer (array_free(&operands));
 
 	CallArgumentError err = CallArgumentError_None;
 
@@ -7617,15 +7661,14 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		// NOTE(bill, 2019-10-26): Allow a cycle in the parameters but not in the fields themselves
 		auto prev_type_path = c->type_path;
-		c->type_path = new_checker_type_path();
-		defer ({
-			destroy_checker_type_path(c->type_path);
-			c->type_path = prev_type_path;
-		});
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		c->type_path = new_checker_type_path(temporary_allocator());
+		defer (c->type_path = prev_type_path);
 
 		if (is_call_expr_field_value(ce)) {
 			named_fields = true;
-			operands = array_make<Operand>(heap_allocator(), ce->args.count);
+			operands = array_make<Operand>(temporary_allocator(), ce->args.count);
 			for_array(i, ce->args) {
 				Ast *arg = ce->args[i];
 				ast_node(fv, FieldValue, arg);
@@ -7657,7 +7700,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			}
 
 		} else {
-			operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
+			operands = array_make<Operand>(temporary_allocator(), 0, 2*ce->args.count);
 
 			Entity **lhs = nullptr;
 			isize lhs_count = -1;
@@ -7699,7 +7742,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	} else {
 		TEMPORARY_ALLOCATOR_GUARD();
 
-		bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
+		bool *visited = temporary_alloc_array<bool>(param_count);
 
 		// LEAK(bill)
 		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
@@ -7883,11 +7926,10 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	{
 		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
-
 		mutex_lock(&found_gen_types->mutex);
 		defer (mutex_unlock(&found_gen_types->mutex));
-		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 
+		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 		if (found_entity) {
 			operand->mode = Addressing_Type;
 			operand->type = found_entity->type;
@@ -8015,6 +8057,174 @@ gb_internal bool check_call_parameter_mixture(Slice<Ast *> const &args, char con
 	return Expr_Stmt; \
 }
 
+gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *operand, Ast *call, Slice<Ast *> const &args, Type *type_hint) {
+	GB_ASSERT(operand->mode == Addressing_Type);
+	Type *t = operand->type;
+	if (is_type_polymorphic_record(t)) {
+		CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("polymorphic type construction");
+
+		if (!is_type_named(t)) {
+			gbString s = expr_to_string(operand->expr);
+			error(call, "Illegal use of an unnamed polymorphic record, %s", s);
+			gb_string_free(s);
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;;
+			return Expr_Expr;
+		}
+		auto err = check_polymorphic_record_type(c, operand, call);
+		if (err == 0) {
+			Ast *ident = operand->expr;
+			while (ident->kind == Ast_SelectorExpr) {
+				Ast *s = ident->SelectorExpr.selector;
+				ident = s;
+			}
+			Type *ot = operand->type;
+			GB_ASSERT(ot->kind == Type_Named);
+			Entity *e = ot->Named.type_name;
+			add_entity_use(c, ident, e);
+			add_type_and_value(c, call, Addressing_Type, ot, empty_exact_value);
+		} else {
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
+		}
+	} else {
+		CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("type conversion");
+
+		operand->mode = Addressing_Invalid;
+		isize arg_count = args.count;
+		switch (arg_count) {
+		case 0:
+			{
+				gbString str = type_to_string(t);
+				error(call, "Missing argument in conversion to '%s'", str);
+				gb_string_free(str);
+			} break;
+		default:
+			{
+				gbString str = type_to_string(t);
+				if (t->kind == Type_Basic) {
+					ERROR_BLOCK();
+					switch (t->Basic.kind) {
+					case Basic_complex32:
+					case Basic_complex64:
+					case Basic_complex128:
+						error(call, "Too many arguments in conversion to '%s'", str);
+						error_line("\tSuggestion: %s(1+2i) or construct with 'complex'\n", str);
+						break;
+					case Basic_quaternion64:
+					case Basic_quaternion128:
+					case Basic_quaternion256:
+						error(call, "Too many arguments in conversion to '%s'", str);
+						error_line("\tSuggestion: %s(1+2i+3j+4k) or construct with 'quaternion'\n", str);
+						break;
+					default:
+						error(call, "Too many arguments in conversion to '%s'", str);
+					}
+				} else {
+					error(call, "Too many arguments in conversion to '%s'", str);
+				}
+				gb_string_free(str);
+			} break;
+		case 1: {
+			Ast *arg = args[0];
+			if (arg->kind == Ast_FieldValue) {
+				error(call, "'field = value' cannot be used in a type conversion");
+				arg = arg->FieldValue.value;
+				// NOTE(bill): Carry on the cast regardless
+			}
+			check_expr_with_type_hint(c, operand, arg, t);
+			if (operand->mode != Addressing_Invalid) {
+				if (is_type_polymorphic(t)) {
+					error(call, "A polymorphic type cannot be used in a type conversion");
+				} else {
+					// NOTE(bill): Otherwise the compiler can override the polymorphic type
+					// as it assumes it is determining the type
+					check_cast(c, operand, t);
+				}
+			}
+			operand->type = t;
+			operand->expr = call;
+
+
+			if (operand->mode != Addressing_Invalid) {
+				update_untyped_expr_type(c, arg, t, false);
+				check_representable_as_constant(c, operand->value, t, &operand->value);
+			}
+			break;
+		}
+		}
+	}
+	return Expr_Expr;
+}
+
+
+void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<Type *> param_types);
+
+gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *call, Entity *proc_entity, Type *proc_type) {
+	auto &proc = proc_type->Proc;
+	Slice<Entity *> params = proc.params ? proc.params->Tuple.variables : Slice<Entity *>{};
+
+	Type *self_type = nullptr;
+	isize params_start = 1;
+
+	ast_node(ce, CallExpr, call);
+
+	Type *return_type = proc.result_count == 0 ? nullptr : proc.results->Tuple.variables[0]->type;
+	bool is_return_instancetype = return_type != nullptr && return_type == t_objc_instancetype;
+
+	if (params.count == 0 || !is_type_objc_ptr_to_object(params[0]->type)) {
+		if (!proc_entity->Procedure.is_objc_class_method) {
+			// Not a class method, invalid call
+			error(call, "Invalid Objective-C call: The Objective-C method is not a class method but this first parameter is not an Objective-C object pointer.");
+			return;
+		}
+
+		if (is_return_instancetype) {
+			if (ce->proc->kind == Ast_SelectorExpr) {
+				ast_node(se, SelectorExpr, ce->proc);
+
+				// NOTE(harold): These should have already been checked, right?
+				GB_ASSERT(se->expr->tav.mode == Addressing_Type && se->expr->tav.type->kind == Type_Named);
+
+				return_type = alloc_type_pointer(se->expr->tav.type);
+			} else {
+				return_type = proc_entity->Procedure.objc_class->type;
+			}
+		}
+
+		self_type    = t_objc_Class;
+		params_start = 0;
+	} else if (ce->args.count > 0) {
+		GB_ASSERT(is_type_objc_ptr_to_object(params[0]->type));
+
+		if (ce->args[0]->tav.objc_super_target) {
+			self_type = t_objc_super_ptr;
+		} else {
+			self_type = ce->args[0]->tav.type;
+		}
+
+		if (is_return_instancetype) {
+			// NOTE(harold): These should have already been checked, right?
+			GB_ASSERT(ce->args[0]->tav.type && ce->args[0]->tav.type->kind == Type_Pointer && ce->args[0]->tav.type->Pointer.elem->kind == Type_Named);
+
+			return_type = ce->args[0]->tav.type;
+		}
+	}
+
+	auto param_types = slice_make<Type *>(permanent_allocator(), proc.param_count + 2 - params_start);
+	param_types[0] = self_type;
+	param_types[1] = t_objc_SEL;
+
+	for (isize i = params_start; i < params.count; i++) {
+		param_types[i+2-params_start] = params[i]->type;
+	}
+
+	if (is_return_instancetype) {
+		operand->type = return_type;
+	}
+
+	add_objc_proc_type(c, call, return_type, param_types);
+}
 
 gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
 	if (proc != nullptr &&
@@ -8071,99 +8281,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	}
 
 	if (operand->mode == Addressing_Type) {
-		Type *t = operand->type;
-		if (is_type_polymorphic_record(t)) {
-			CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("polymorphic type construction");
-
-			if (!is_type_named(t)) {
-				gbString s = expr_to_string(operand->expr);
-				error(call, "Illegal use of an unnamed polymorphic record, %s", s);
-				gb_string_free(s);
-				operand->mode = Addressing_Invalid;
-				operand->type = t_invalid;;
-				return Expr_Expr;
-			}
-			auto err = check_polymorphic_record_type(c, operand, call);
-			if (err == 0) {
-				Ast *ident = operand->expr;
-				while (ident->kind == Ast_SelectorExpr) {
-					Ast *s = ident->SelectorExpr.selector;
-					ident = s;
-				}
-				Type *ot = operand->type;
-				GB_ASSERT(ot->kind == Type_Named);
-				Entity *e = ot->Named.type_name;
-				add_entity_use(c, ident, e);
-				add_type_and_value(c, call, Addressing_Type, ot, empty_exact_value);
-			} else {
-				operand->mode = Addressing_Invalid;
-				operand->type = t_invalid;
-			}
-		} else {
-			CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("type conversion");
-
-			operand->mode = Addressing_Invalid;
-			isize arg_count = args.count;
-			switch (arg_count) {
-			case 0:
-				{
-					gbString str = type_to_string(t);
-					error(call, "Missing argument in conversion to '%s'", str);
-					gb_string_free(str);
-				} break;
-			default:
-				{
-					gbString str = type_to_string(t);
-					if (t->kind == Type_Basic) {
-						ERROR_BLOCK();
-						switch (t->Basic.kind) {
-						case Basic_complex32:
-						case Basic_complex64:
-						case Basic_complex128:
-							error(call, "Too many arguments in conversion to '%s'", str);
-							error_line("\tSuggestion: %s(1+2i) or construct with 'complex'\n", str);
-							break;
-						case Basic_quaternion64:
-						case Basic_quaternion128:
-						case Basic_quaternion256:
-							error(call, "Too many arguments in conversion to '%s'", str);
-							error_line("\tSuggestion: %s(1+2i+3j+4k) or construct with 'quaternion'\n", str);
-							break;
-						default:
-							error(call, "Too many arguments in conversion to '%s'", str);
-						}
-					} else {
-						error(call, "Too many arguments in conversion to '%s'", str);
-					}
-					gb_string_free(str);
-				} break;
-			case 1: {
-				Ast *arg = args[0];
-				if (arg->kind == Ast_FieldValue) {
-					error(call, "'field = value' cannot be used in a type conversion");
-					arg = arg->FieldValue.value;
-					// NOTE(bill): Carry on the cast regardless
-				}
-				check_expr_with_type_hint(c, operand, arg, t);
-				if (operand->mode != Addressing_Invalid) {
-					if (is_type_polymorphic(t)) {
-						error(call, "A polymorphic type cannot be used in a type conversion");
-					} else {
-						// NOTE(bill): Otherwise the compiler can override the polymorphic type
-						// as it assumes it is determining the type
-						check_cast(c, operand, t);
-					}
-				}
-				operand->type = t;
-				operand->expr = call;
-				if (operand->mode != Addressing_Invalid) {
-					update_untyped_expr_type(c, arg, t, false);
-				}
-				break;
-			}
-			}
-		}
-		return Expr_Expr;
+		return check_call_expr_as_type_cast(c, operand, call, args, type_hint);
 	}
 
 	if (operand->mode == Addressing_Builtin) {
@@ -8335,9 +8453,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				if (c->curr_proc_decl == nullptr) {
 					error(call, "Calling a '#force_inline' procedure that enables target features is not allowed at file scope");
 				} else {
-					GB_ASSERT(c->curr_proc_decl->entity);
-					GB_ASSERT(c->curr_proc_decl->entity->type->kind == Type_Proc);
-					String scope_features = c->curr_proc_decl->entity->type->Proc.enable_target_feature;
+					Entity *e = c->curr_proc_decl->entity.load();
+					GB_ASSERT(e);
+					GB_ASSERT(e->type->kind == Type_Proc);
+					String scope_features = e->type->Proc.enable_target_feature;
 					if (!check_target_feature_is_superset_of(scope_features, pt->Proc.enable_target_feature, &invalid)) {
 						ERROR_BLOCK();
 						error(call, "Inlined procedure enables target feature '%.*s', this requires the calling procedure to at least enable the same feature", LIT(invalid));
@@ -8367,6 +8486,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				operand->expr->CallExpr.optional_ok_one = true;
 			}
 		}
+	}
+
+	Entity *proc_entity = entity_from_expr(call->CallExpr.proc);
+	bool is_objc_call = proc_entity && proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_objc_impl_or_import;
+	if (is_objc_call) {
+		check_objc_call_expr(c, operand, call, proc_entity, pt);
 	}
 
 	return Expr_Expr;
@@ -8630,7 +8755,7 @@ gb_internal bool check_range(CheckerContext *c, Ast *node, bool is_for_loop, Ope
 	return true;
 }
 
-gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Operand *o) {
+gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Operand *o, Type *field_type) {
 	if (is_operand_nil(*o)) {
 		return true;
 	}
@@ -8644,6 +8769,13 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
 			return true;
 		}
+	}
+	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
+		add_type_info_type(c, o->type);
+		return true;
+	}
+	if (is_type_any(field_type)) {
+		return false;
 	}
 	return o->mode == Addressing_Constant;
 }
@@ -8874,7 +9006,7 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 	isize count = multi_map_count(seen, key);
 	if (count) {
 		TEMPORARY_ALLOCATOR_GUARD();
-		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
+		TypeAndToken *taps = temporary_alloc_array<TypeAndToken>(count);
 
 		multi_map_get_all(seen, key, taps);
 		for (isize i = 0; i < count; i++) {
@@ -9069,6 +9201,52 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 	return kind;
 }
 
+
+gb_internal void check_expr_as_value_for_ternary(CheckerContext *c, Operand *o, Ast *e, Type *type_hint) {
+	check_expr_base(c, o, e, type_hint);
+	check_not_tuple(c, o);
+	error_operand_no_value(o);
+
+	switch (o->mode) {
+	case Addressing_Type: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+		defer (gb_string_free(expr_str));
+
+		error(o->expr, "A type '%s' cannot be used as a runtime value", expr_str);
+
+		error_line("\tSuggestion: If a runtime 'typeid' is wanted, use 'typeid_of' to convert a type\n");
+
+		o->mode = Addressing_Invalid;
+
+	} break;
+
+	case Addressing_Builtin: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+		defer (gb_string_free(expr_str));
+
+		error(o->expr, "A built-in procedure '%s' cannot be used as a runtime value", expr_str);
+
+		error_line("\tNote: Built-in procedures are implemented by the compiler and might not be actually instantiated procedures\n");
+
+		o->mode = Addressing_Invalid;
+	} break;
+
+	case Addressing_ProcGroup: {
+		ERROR_BLOCK();
+		gbString expr_str = expr_to_string(o->expr);
+		defer (gb_string_free(expr_str));
+
+		error(o->expr, "Cannot use overloaded procedure '%s' as a runtime value", expr_str);
+
+		error_line("\tNote: Please specify which procedure in the procedure group to use, via cast or type inference\n");
+
+		o->mode = Addressing_Invalid;
+	} break;
+	}
+}
+
 gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	Operand cond = {Addressing_Invalid};
@@ -9082,7 +9260,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	Operand x = {Addressing_Invalid};
 	Operand y = {Addressing_Invalid};
-	check_expr_or_type(c, &x, te->x, type_hint);
+	check_expr_as_value_for_ternary(c, &x, te->x, type_hint);
 	node->viral_state_flags |= te->x->viral_state_flags;
 
 	if (te->y != nullptr) {
@@ -9090,7 +9268,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 		if (type_hint == nullptr && is_type_typed(x.type)) {
 			th = x.type;
 		}
-		check_expr_or_type(c, &y, te->y, th);
+		check_expr_as_value_for_ternary(c, &y, te->y, th);
 		node->viral_state_flags |= te->y->viral_state_flags;
 	} else {
 		error(node, "A ternary expression must have an else clause");
@@ -9115,6 +9293,20 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 	if (y.mode == Addressing_Invalid) {
 		x.mode = Addressing_Invalid;
 		return kind;
+	}
+
+	if (x.mode == Addressing_Builtin && y.mode == Addressing_Builtin) {
+		if (type_hint == nullptr) {
+			error(node, "Built-in procedures cannot be used within a ternary expression since they have no well-defined signature");
+			return kind;
+		}
+	}
+
+	if (x.mode == Addressing_ProcGroup && y.mode == Addressing_ProcGroup) {
+		if (type_hint == nullptr) {
+			error(node, "Procedure groups cannot be used within a ternary expression since they have no well-defined signature that can be inferred without a context");
+			return kind;
+		}
 	}
 
 	// NOTE(bill, 2023-01-30): Allow for expression like this:
@@ -9595,8 +9787,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 						break;
 					}
 				}
-				if (is_constant &&
-				    (is_type_any(ft) || is_type_union(ft) || is_type_raw_union(ft) || is_type_typeid(ft))) {
+				if (is_constant && elem_cannot_be_constant(ft)) {
 					is_constant = false;
 				}
 			}
@@ -9631,11 +9822,11 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		Operand o = {};
 		check_expr_or_type(c, &o, fv->value, field->type);
 
-		if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
+		if (elem_cannot_be_constant(field->type)) {
 			is_constant = false;
 		}
 		if (is_constant) {
-			is_constant = check_is_operand_compound_lit_constant(c, &o);
+			is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
 		}
 
 		u8 prev_bit_field_bit_size = c->bit_field_bit_size;
@@ -9647,6 +9838,57 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		check_assignment(c, &o, field->type, assignment_str);
 
 		c->bit_field_bit_size = prev_bit_field_bit_size;
+	}
+
+	if (bt->kind == Type_Struct && bt->Struct.is_all_or_none && elems.count > 0 && bt->Struct.fields.count > 0) {
+		PtrSet<Entity *> missing_fields = {};
+		defer (ptr_set_destroy(&missing_fields));
+
+		for_array(i, bt->Struct.fields) {
+			Entity *field = bt->Struct.fields[i];
+			String name = field->token.string;
+			if (is_blank_ident(name) || name == "") {
+				continue;
+			}
+			bool found = string_set_exists(&fields_visited, name);
+			String *raw_union = string_map_get(&fields_visited_through_raw_union, name);
+			if (!found && raw_union == nullptr) {
+				ptr_set_add(&missing_fields, field);
+			}
+		}
+
+		if (missing_fields.count > 0) {
+			Ast *expr = o->expr;
+			if (expr == nullptr) {
+				GB_ASSERT(elems.count > 0);
+				expr = elems[elems.count-1];
+			}
+
+			ERROR_BLOCK();
+
+			if (build_context.terse_errors) {
+				gbString fields_string = gb_string_make(heap_allocator(), "");
+				defer (gb_string_free(fields_string));
+				isize i = 0;
+				FOR_PTR_SET(field, missing_fields) {
+					if (i > 0) {
+						fields_string = gb_string_appendc(fields_string, ", ");
+					}
+					String name = field->token.string;
+					fields_string = gb_string_append_length(fields_string, name.text, name.len);
+					i += 1;
+				}
+
+				error(expr, "All or none of the fields must be assigned to a struct with '#all_or_none' applied, missing fields: %s", fields_string);
+			} else {
+				error(expr, "All or none of the fields must be assigned to a struct with '#all_or_none' applied, missing fields:");
+				FOR_PTR_SET(field, missing_fields) {
+					gbString s = type_to_string(field->type);
+					error_line("\t%.*s: %s\n", LIT(field->token.string), s);
+					gb_string_free(s);
+				}
+			}
+		}
 	}
 }
 
@@ -9668,7 +9910,10 @@ gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr) {
 }
 
 gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCompoundLit *cl) {
-	if (cl->elems.count > 0 && (check_feature_flags(c, node) & OptInFeatureFlag_DynamicLiterals) == 0 && !build_context.dynamic_literals) {
+	if (cl->elems.count == 0) {
+		return false;
+	}
+	if ((check_feature_flags(c, node) & OptInFeatureFlag_DynamicLiterals) == 0 && !build_context.dynamic_literals) {
 		ERROR_BLOCK();
 		error(node, "Compound literals of dynamic types are disabled by default");
 		error_line("\tSuggestion: If you want to enable them for this specific file, add '#+feature dynamic-literals' at the top of the file\n");
@@ -9679,9 +9924,13 @@ gb_internal bool check_for_dynamic_literals(CheckerContext *c, Ast *node, AstCom
 			error_line("\tWarning: As '-default-to-panic-allocator' has been set, the dynamic compound literal may not be initialized as expected\n");
 		}
 		return false;
+	} else if (c->curr_proc_decl != nullptr && c->curr_proc_calling_convention != ProcCC_Odin) {
+		if (c->scope != nullptr && (c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+			error(node, "Compound literals of dynamic types require a 'context' to defined");
+		}
 	}
 
-	return cl->elems.count > 0;
+	return true;
 }
 
 gb_internal IntegerDivisionByZeroKind check_for_integer_division_by_zero(CheckerContext *c, Ast *node) {
@@ -9801,7 +10050,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			if (t->Struct.is_raw_union) {
 				if (cl->elems.count > 0) {
 					// NOTE: unions cannot be constant
-					is_constant = false;
+					is_constant = elem_type_can_be_constant(t);
 
 					if (cl->elems[0]->kind != Ast_FieldValue) {
 						gbString type_str = type_to_string(type);
@@ -9861,11 +10110,11 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					Operand o = {};
 					check_expr_or_type(c, &o, elem, field->type);
 
-					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
+					if (elem_cannot_be_constant(field->type)) {
 						is_constant = false;
 					}
 					if (is_constant) {
-						is_constant = check_is_operand_compound_lit_constant(c, &o);
+						is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
 					}
 
 					check_assignment(c, &o, field->type, str_lit("structure literal"));
@@ -10010,7 +10259,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
 					check_assignment(c, &operand, elem_type, context_name);
 
-					is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 				} else {
 					Operand op_index = {};
 					check_expr(c, &op_index, fv->field);
@@ -10042,7 +10293,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
 					check_assignment(c, &operand, elem_type, context_name);
 
-					is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 				}
 			}
 
@@ -10069,7 +10322,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				check_expr_with_type_hint(c, &operand, e, elem_type);
 				check_assignment(c, &operand, elem_type, context_name);
 
-				is_constant = is_constant && operand.mode == Addressing_Constant;
+				if (is_constant) {
+					is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+				}
 			}
 
 			if (max < index) {
@@ -10243,7 +10498,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
 					check_assignment(c, &operand, elem_type, context_name);
 
-					is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 
 					TokenKind upper_op = Token_LtEq;
 					if (op.kind == Token_RangeHalf) {
@@ -10284,7 +10541,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
 					check_assignment(c, &operand, elem_type, context_name);
 
-					is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 
 					add_to_seen_map(c, &seen, op_index);
 				}
@@ -10314,7 +10573,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				check_expr_with_type_hint(c, &operand, e, elem_type);
 				check_assignment(c, &operand, elem_type, context_name);
 
-				is_constant = is_constant && operand.mode == Addressing_Constant;
+				if (is_constant) {
+					is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+				}
 			}
 
 			if (max < index) {
@@ -10920,7 +11181,7 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 		}
 	}
 
-	auto modified_args = slice_make<Ast *>(heap_allocator(), ce->args.count+1);
+	auto modified_args = permanent_slice_make<Ast *>(ce->args.count+1);
 	modified_args[0] = first_arg;
 	slice_copy(&modified_args, ce->args, 1);
 	ce->args = modified_args;
@@ -11423,6 +11684,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 		o->mode = Addressing_Value;
 		o->type = type;
+		o->value = exact_value_procedure(node);
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, node);
@@ -11841,6 +12103,25 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 
 
 
+gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y, bool *do_break_) {
+	ast_node(x_cl, CompoundLit, x.value_compound);
+	ast_node(y_cl, CompoundLit, y.value_compound);
+
+	if (x_cl->elems.count != y_cl->elems.count) {
+		if (do_break_) *do_break_ = true;
+	}
+
+	bool test = op == Token_CmpEq;
+
+	for (isize i = 0; i < x_cl->elems.count; i++) {
+		Ast *lhs = x_cl->elems[i];
+		Ast *rhs = y_cl->elems[i];
+		if (compare_exact_values(op, lhs->tav.value, rhs->tav.value) != test) {
+			return !test;
+		}
+	}
+	return test;
+}
 
 
 

@@ -29,4 +29,4 @@ constant-time byte comparison.
 
 ## License
 
-This library is made available under the BSD-3 license.
+This library is made available under the zlib license.

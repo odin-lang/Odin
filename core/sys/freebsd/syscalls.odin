@@ -2,7 +2,7 @@ package sys_freebsd
 
 /*
 	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Feoramund: Initial implementation.
@@ -62,7 +62,7 @@ read :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
 //
 // The write() function appeared in Version 1 AT&T UNIX.
 write :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
-	result, ok := intrinsics.syscall_bsd(SYS_pwrite,
+	result, ok := intrinsics.syscall_bsd(SYS_write,
 		cast(uintptr)fd,
 		cast(uintptr)raw_data(buf),
 		cast(uintptr)len(buf))

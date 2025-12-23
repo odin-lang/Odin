@@ -10,10 +10,6 @@ import "core:strings"
 import kq "core:sys/kqueue"
 import    "core:sys/posix"
 
-_exit :: proc "contextless" (code: int) -> ! {
-	posix.exit(i32(code))
-}
-
 _get_uid :: proc() -> int {
 	return int(posix.getuid())
 }

@@ -21,12 +21,12 @@ write_ptr_at :: proc(w: Writer_At, p: rawptr, byte_size: int, offset: i64, n_wri
 }
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [32]byte
+	buf: [64]byte
 	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 write_i64 :: proc(w: Writer, i: i64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [32]byte
+	buf: [65]byte
 	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
@@ -39,12 +39,12 @@ write_int :: proc(w: Writer, i: int, base: int = 10, n_written: ^int = nil) -> (
 }
 
 write_u128 :: proc(w: Writer, i: u128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [39]byte
+	buf: [128]byte
 	s := strconv.write_bits_128(buf[:], i, base, false, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
 write_i128 :: proc(w: Writer, i: i128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
-	buf: [40]byte
+	buf: [129]byte
 	s := strconv.write_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
 	return write_string(w, s, n_written)
 }
@@ -187,6 +187,23 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 		return
 	} else if is_printable(r) {
 		write_encoded_rune(w, r, false, &n) or_return
+		return
+	}
+	if r < 32 && for_json {
+		switch r {
+		case '\b': write_string(w, `\b`, &n) or_return
+		case '\f': write_string(w, `\f`, &n) or_return
+		case '\n': write_string(w, `\n`, &n) or_return
+		case '\r': write_string(w, `\r`, &n) or_return
+		case '\t': write_string(w, `\t`, &n) or_return
+		case:
+			write_byte(w, '\\', &n) or_return
+			write_byte(w, 'u', &n)  or_return
+			write_byte(w, '0', &n)  or_return
+			write_byte(w, '0', &n)  or_return
+			write_byte(w, DIGITS_LOWER[r>>4 & 0xf], &n) or_return
+			write_byte(w, DIGITS_LOWER[r    & 0xf], &n) or_return
+		}
 		return
 	}
 	switch r {
@@ -337,7 +354,7 @@ _tee_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, offs
 	case .Query:
 		return query_utility({.Read, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 // tee_reader_init returns a Reader that writes to 'w' what it reads from 'r'
@@ -387,7 +404,7 @@ _limited_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, 
 	case .Query:
 		return query_utility({.Read, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 limited_reader_init :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {

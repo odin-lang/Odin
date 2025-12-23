@@ -1,5 +1,5 @@
 /*
-package hmac implements the HMAC MAC algorithm.
+`HMAC` message authentication code (`MAC`) algorithm.
 
 See:
 - [[ https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.198-1.pdf ]]

@@ -1,12 +1,12 @@
+package encoding_varint
+
 /*
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-
-package encoding_varint
 
 // In theory we should use the bigint package. In practice, varints bigger than this indicate a corrupted file.
 // Instead we'll set limits on the values we'll encode/decode

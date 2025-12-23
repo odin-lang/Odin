@@ -1,3 +1,4 @@
+// The `.odin-doc` file format, as used by these package docs at `pkg.odin-lang.org`.
 package odin_doc_format
 
 import "core:mem"
@@ -218,12 +219,13 @@ Type :: struct {
 	custom_align: String,
 
 	// Used by:
-	// .Array            - 1 count: 0=len
-	// .Enumerated_Array - 1 count: 0=len
-	// .SOA_Struct_Fixed - 1 count: 0=len
-	// .Bit_Set          - 2 count: 0=lower, 1=upper
-	// .Simd_Vector      - 1 count: 0=len
-	// .Matrix           - 2 count: 0=row_count, 1=column_count
+	// .Array            - 1   count: 0=len
+	// .Enumerated_Array - 1   count: 0=len
+	// .SOA_Struct_Fixed - 1   count: 0=len
+	// .Bit_Set          - 2   count: 0=lower, 1=upper
+	// .Simd_Vector      - 1   count: 0=len
+	// .Matrix           - 2   count: 0=row_count, 1=column_count
+	// .Struct           - <=2 count: 0=min_field_align, 1=max_field_align
 	elem_count_len: u32le,
 	elem_counts:    [Type_Elems_Cap]i64le,
 
@@ -280,6 +282,7 @@ Type_Flag_Struct :: enum u32le {
 	Polymorphic = 0,
 	Packed      = 1,
 	Raw_Union   = 2,
+	All_Or_None = 3,
 }
 
 Type_Flags_Union :: distinct bit_set[Type_Flag_Union; u32le]

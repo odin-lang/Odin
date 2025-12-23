@@ -184,10 +184,11 @@ print_rune :: #force_no_inline proc "contextless" (r: rune) -> int #no_bounds_ch
 
 
 print_u64 :: #force_no_inline proc "contextless" (x: u64) #no_bounds_check {
+	b :: u64(10)
+	u := x
+
 	a: [129]byte
 	i := len(a)
-	b := u64(10)
-	u := x
 	for u >= b {
 		i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 		u /= b
@@ -199,11 +200,9 @@ print_u64 :: #force_no_inline proc "contextless" (x: u64) #no_bounds_check {
 
 
 print_i64 :: #force_no_inline proc "contextless" (x: i64) #no_bounds_check {
-	b :: i64(10)
-
-	u := x
-	neg := u < 0
-	u = abs(u)
+	b :: u64(10)
+	u := u64(abs(x))
+	neg := x < 0
 
 	a: [129]byte
 	i := len(a)
@@ -408,9 +407,9 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		}
 
 		print_string("struct ")
-		if .packed    in info.flags { print_string("#packed ") }
-		if .raw_union in info.flags { print_string("#raw_union ") }
-		// if .no_copy   in info.flags { print_string("#no_copy ") }
+		if .packed      in info.flags { print_string("#packed ") }
+		if .raw_union   in info.flags { print_string("#raw_union ") }
+		if .all_or_none in info.flags { print_string("#all_or_none ") }
 		if .align in info.flags {
 			print_string("#align(")
 			print_u64(u64(ti.align))

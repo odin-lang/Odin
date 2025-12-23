@@ -1,3 +1,4 @@
+// Bindings for [[ stb_image.h ; https://github.com/nothings/stb/blob/master/stb_image.h ]].
 package stb_image
 
 import "core:c"

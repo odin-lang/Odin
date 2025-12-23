@@ -1,5 +1,5 @@
 /*
-The package `table` implements plain-text/markdown/HTML/custom rendering of tables.
+Plain-text/markdown/HTML/custom rendering of tables.
 
 **Custom rendering.**
 Example:

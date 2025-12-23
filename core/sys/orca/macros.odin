@@ -1,6 +1,6 @@
-// File contains implementations of the Orca API that are defined as macros in Orca.
-
 package orca
+
+// Implementations of the `Orca` API that are defined as macros in Orca.
 
 ////////////////////////////////////////////////////////////////////////////////
 // Helpers for logging, asserting and aborting.

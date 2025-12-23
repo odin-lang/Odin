@@ -1,5 +1,5 @@
 /*
-package kmac implements the KMAC MAC algorithm.
+`KMAC` message authentication code (`MAC`) algorithm.
 
 See:
 - [[ https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-185.pdf ]]

@@ -31,6 +31,7 @@ offset applied to it.
 - Only 4-digit years are accepted.
 - Leap seconds are smeared into 23:59:59.
 */
+@(require_results)
 rfc3339_to_time_utc :: proc(rfc_datetime: string, is_leap: ^bool = nil) -> (res: Time, consumed: int) {
 	offset: int
 
@@ -67,6 +68,7 @@ by the RFC 3339 string.
 - Only 4-digit years are accepted.
 - Leap seconds are smeared into 23:59:59.
 */
+@(require_results)
 rfc3339_to_time_and_offset :: proc(rfc_datetime: string, is_leap: ^bool = nil) -> (res: Time, utc_offset: int, consumed: int) {
 	moment, offset, leap_second, count := rfc3339_to_components(rfc_datetime)
 	if count == 0 {
@@ -109,6 +111,7 @@ represented by the RFC 3339 string.
 
 Performs no validation on whether components are valid, e.g. it'll return hour = 25 if that's what it's given
 */
+@(require_results)
 rfc3339_to_components :: proc(rfc_datetime: string) -> (res: dt.DateTime, utc_offset: int, is_leap: bool, consumed: int) {
 	moment, offset, count, leap_second, ok := _rfc3339_to_components(rfc_datetime)
 	if !ok {
@@ -198,6 +201,7 @@ The boolean `ok` is false if the `time` is not a valid datetime, or if allocatin
 - `utc_offset`: offset in minutes wrt UTC (ie. the timezone)
 - `include_nanos`: whether to include nanoseconds in the result.
 */
+@(require_results)
 time_to_rfc3339 :: proc(time: Time, utc_offset : int = 0, include_nanos := true, allocator := context.allocator) -> (res: string, ok: bool) {
 	utc_offset := utc_offset
 

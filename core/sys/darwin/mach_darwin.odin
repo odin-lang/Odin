@@ -11,7 +11,7 @@ task_t :: mach_port_t
 semaphore_t :: distinct u64
 
 kern_return_t :: distinct c.int
-thread_act_t   :: distinct u64
+thread_act_t   :: distinct u32
 thread_state_t :: distinct ^u32
 thread_list_t  :: [^]thread_act_t
 vm_region_recurse_info_t :: distinct ^i32
