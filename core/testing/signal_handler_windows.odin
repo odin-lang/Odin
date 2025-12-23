@@ -9,7 +9,6 @@ package testing
 	List of contributors:
 		Feoramund:   Total rewrite.
 		blob1807:    Windows Win32 API rewrite.
-	
 */
 
 import "base:runtime"
@@ -27,7 +26,7 @@ import win32 "core:sys/windows"
 
 @(private="file") stop_test_gate:   sync.Mutex
 @(private="file") stop_test_index:  int
-@(private="file") stop_test_signal: Exception_Code
+@(private="file") stop_test_signal: win32.DWORD
 @(private="file") stop_test_passed: bool
 @(private="file") stop_test_alert:  int
 
@@ -43,31 +42,6 @@ when ODIN_ARCH == .i386 {
 	local_test_index: int
 	@(private="file", thread_local)
 	local_test_index_set: bool
-}
-
-
-@(private="file")
-Exception_Code :: enum win32.DWORD {
-	Datatype_Misalignment     = win32.EXCEPTION_DATATYPE_MISALIGNMENT,
-	Breakpoint                = win32.EXCEPTION_BREAKPOINT,
-	Single_Step               = win32.EXCEPTION_SINGLE_STEP,
-	Access_Violation          = win32.EXCEPTION_ACCESS_VIOLATION,
-	In_Page_Error             = win32.EXCEPTION_IN_PAGE_ERROR,
-	Illegal_Instruction       = win32.EXCEPTION_ILLEGAL_INSTRUCTION,
-	Noncontinuable_Exception  = win32.EXCEPTION_NONCONTINUABLE_EXCEPTION,
-	Invaild_Disposition       = win32.EXCEPTION_INVALID_DISPOSITION,
-	Array_Bounds_Exceeded     = win32.EXCEPTION_ARRAY_BOUNDS_EXCEEDED,
-	FLT_Denormal_Operand      = win32.EXCEPTION_FLT_DENORMAL_OPERAND,
-	FLT_Divide_By_Zero        = win32.EXCEPTION_FLT_DIVIDE_BY_ZERO,
-	FLT_Inexact_Result        = win32.EXCEPTION_FLT_INEXACT_RESULT,
-	FLT_Invalid_Operation     = win32.EXCEPTION_FLT_INVALID_OPERATION,
-	FLT_Overflow              = win32.EXCEPTION_FLT_OVERFLOW,
-	FLT_Stack_Check           = win32.EXCEPTION_FLT_STACK_CHECK,
-	FLT_Underflow             = win32.EXCEPTION_FLT_UNDERFLOW,
-	INT_Divide_By_Zero        = win32.EXCEPTION_INT_DIVIDE_BY_ZERO,
-	INT_Overflow              = win32.EXCEPTION_INT_OVERFLOW,
-	PRIV_Instruction          = win32.EXCEPTION_PRIV_INSTRUCTION,
-	Stack_Overflow            = win32.EXCEPTION_STACK_OVERFLOW,
 }
 
 
@@ -101,7 +75,7 @@ stop_test_callback :: proc "system" (info: ^win32.EXCEPTION_POINTERS) -> win32.L
 	}
 
 	context = runtime.default_context()
-	code := Exception_Code(info.ExceptionRecord.ExceptionCode)
+	code := info.ExceptionRecord.ExceptionCode
 
 	if local_test_index == -1 {
 		// We're the test runner, and we ourselves have caught a signal from
@@ -166,11 +140,11 @@ This is a dire bug and should be reported to the Odin developers.
 			}
 			signal := local_test_expected_failures.signal
 			switch signal {
-			case libc.SIGILL:  passed = code == .Illegal_Instruction
-			case libc.SIGSEGV: passed = code == .Access_Violation
+			case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION
+			case libc.SIGSEGV: passed = code == win32.EXCEPTION_ACCESS_VIOLATION
 			case libc.SIGFPE:
-				#partial switch code {
-				case .FLT_Denormal_Operand ..= .INT_Overflow:
+				switch code {
+				case win32.EXCEPTION_FLT_DENORMAL_OPERAND ..= win32.EXCEPTION_INT_OVERFLOW:
 					passed = true
 				}
 			}
@@ -225,12 +199,13 @@ _should_stop_test :: proc() -> (test_index: int, reason: Stop_Reason, ok: bool) 
 		if intrinsics.atomic_load(&stop_test_passed) {
 			reason = .Successful_Stop
 		} else {
-			#partial switch intrinsics.atomic_load(&stop_test_signal) {
-			case .Illegal_Instruction:      reason = .Illegal_Instruction
-			case .Access_Violation:         reason = .Segmentation_Fault
-			case .Breakpoint, .Single_Step: reason = .Unhandled_Trap
+			switch intrinsics.atomic_load(&stop_test_signal) {
+			case win32.EXCEPTION_ILLEGAL_INSTRUCTION: reason = .Illegal_Instruction
+			case win32.EXCEPTION_ACCESS_VIOLATION:    reason = .Segmentation_Fault
+			case win32.EXCEPTION_BREAKPOINT:          reason = .Unhandled_Trap
+			case win32.EXCEPTION_SINGLE_STEP:         reason = .Unhandled_Trap
 
-			case .FLT_Denormal_Operand ..= .INT_Overflow:
+			case win32.EXCEPTION_FLT_DENORMAL_OPERAND ..= win32.EXCEPTION_INT_OVERFLOW:
 				reason = .Arithmetic_Error
 			}
 		}
