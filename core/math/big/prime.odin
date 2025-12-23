@@ -1,6 +1,8 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
@@ -8,9 +10,6 @@
 
 	This file contains prime finding operations.
 */
-
-
-package math_big
 
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
@@ -135,7 +134,8 @@ internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (k
 	a1, p1, r := &Int{}, &Int{}, &Int{}
 	defer internal_destroy(a1, p1, r)
 
-	table := []int{0, 1, 0, -1, 0, -1, 0, 1}
+	@(static, rodata)
+	table := [?]int{0, 1, 0, -1, 0, -1, 0, 1}
 
 	if internal_int_is_zero(p) {
 		if a.used == 1 && a.digit[0] == 1 {
@@ -1208,7 +1208,7 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 	/*
 		Automatically choose the number of Rabin-Miller trials?
 	*/
-	if trials == -1 {
+	if trials < 0 {
 		trials = number_of_rabin_miller_trials(size_in_bits)
 	}
 

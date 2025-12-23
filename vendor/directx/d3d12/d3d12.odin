@@ -1,3 +1,4 @@
+// Bindings for [[ Direct3D 12 ; https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics ]].
 package directx_d3d12
 
 foreign import "system:d3d12.lib"
@@ -718,7 +719,7 @@ STREAM_OUTPUT_DESC :: struct {
 }
 
 INPUT_LAYOUT_DESC :: struct {
-	pInputElementDescs: [^]INPUT_ELEMENT_DESC,
+	pInputElementDescs: [^]INPUT_ELEMENT_DESC `fmt:"v,NumElements"`,
 	NumElements:        u32,
 }
 
@@ -849,6 +850,15 @@ FEATURE :: enum i32 {
 	OPTIONS17                             = 46,
 	OPTIONS18                             = 47,
 	OPTIONS19                             = 48,
+	OPTIONS20                             = 49,
+	PREDICATION                           = 50,
+	PLACED_RESOURCE_SUPPORT_INFO	      = 51,
+	HARDWARE_COPY	                      = 52,
+	OPTIONS21	                          = 53,
+	TIGHT_ALIGNMENT	                      = 54,
+	APPLICATION_SPECIFIC_DRIVER_STATE	  = 56,
+	BYTECODE_BYPASS_HASH_SUPPORTED	      = 57,
+	SHADER_CACHE_ABI_SUPPORT	          = 61,
 }
 
 SHADER_MIN_PRECISION_SUPPORT :: distinct bit_set[SHADER_MIN_PRECISION_SUPPORT_FLAG; u32]
@@ -959,6 +969,11 @@ VIEW_INSTANCING_TIER :: enum i32 {
 	_1            = 1,
 	_2            = 2,
 	_3            = 3,
+}
+
+WORK_GRAPHS_TIER :: enum i32 {
+	NOT_SUPPORTED = 0,
+	_1_0          = 10,
 }
 
 FEATURE_DATA_OPTIONS :: struct {
@@ -1275,6 +1290,53 @@ FEATURE_DATA_OPTIONS19 :: struct {
 	ComputeOnlyCustomHeapSupported:                 BOOL,
 }
 
+RECREATE_AT_TIER :: enum i32 {
+	NOT_SUPPORTED = 0,
+	_1            = 1,
+}
+
+FEATURE_DATA_OPTIONS20 :: struct {
+	ComputeOnlyWriteWatchSupported: BOOL,
+	RecreateAtTier:                 RECREATE_AT_TIER,
+}
+
+EXECUTE_INDIRECT_TIER :: enum i32 {
+	_1_0 = 10,
+	_1_1 = 11,
+}
+
+FEATURE_DATA_OPTIONS21 :: struct {
+	WorkGraphsTier:                    WORK_GRAPHS_TIER,
+	ExecuteIndirectTier:               EXECUTE_INDIRECT_TIER,
+	SampleCmpGradientAndBiasSupported: BOOL,
+	ExtendedCommandInfoSupported:      BOOL,
+}
+
+TIGHT_ALIGNMENT_TIER :: enum i32 {
+	NOT_SUPPORTED = 0,
+	_1            = NOT_SUPPORTED + 1,
+}
+
+FEATURE_DATA_TIGHT_ALIGNMENT :: struct {
+	SupportTier: TIGHT_ALIGNMENT_TIER,
+}
+
+FEATURE_DATA_PREDICATION :: struct {
+	Supported: BOOL,
+}
+
+FEATURE_DATA_HARDWARE_COPY :: struct {
+	Supported: BOOL,
+}
+
+FEATURE_DATA_APPLICATION_SPECIFIC_DRIVER_STATE :: struct {
+	Supported: BOOL,
+}
+
+FEATURE_DATA_BYTECODE_BYPASS_HASH_SUPPORTED :: struct {
+	Supported: BOOL,
+}
+
 WAVE_MMA_INPUT_DATATYPE :: enum i32 {
 	INVALID = 0,
 	BYTE    = 1,
@@ -1390,14 +1452,16 @@ TEXTURE_LAYOUT :: enum i32 {
 
 RESOURCE_FLAGS :: distinct bit_set[RESOURCE_FLAG; u32]
 RESOURCE_FLAG :: enum u32 {
-	ALLOW_RENDER_TARGET         = 0,
-	ALLOW_DEPTH_STENCIL         = 1,
-	ALLOW_UNORDERED_ACCESS      = 2,
-	DENY_SHADER_RESOURCE        = 3,
-	ALLOW_CROSS_ADAPTER         = 4,
-	ALLOW_SIMULTANEOUS_ACCESS   = 5,
-	VIDEO_DECODE_REFERENCE_ONLY = 6,
-	VIDEO_ENCODE_REFERENCE_ONLY = 7,
+	ALLOW_RENDER_TARGET               = 0,
+	ALLOW_DEPTH_STENCIL               = 1,
+	ALLOW_UNORDERED_ACCESS            = 2,
+	DENY_SHADER_RESOURCE              = 3,
+	ALLOW_CROSS_ADAPTER               = 4,
+	ALLOW_SIMULTANEOUS_ACCESS         = 5,
+	VIDEO_DECODE_REFERENCE_ONLY       = 6,
+	VIDEO_ENCODE_REFERENCE_ONLY       = 7,
+	RAYTRACING_ACCELERATION_STRUCTURE = 8,
+	USE_TIGHT_ALIGNMENT               = 10,
 }
 
 MIP_REGION :: struct {
@@ -1648,7 +1712,7 @@ VIEW_INSTANCING_FLAG :: enum u32 {
 
 VIEW_INSTANCING_DESC :: struct {
 	ViewInstanceCount:      u32,
-	pViewInstanceLocations: [^]VIEW_INSTANCE_LOCATION,
+	pViewInstanceLocations: [^]VIEW_INSTANCE_LOCATION `fmt:"v,ViewInstanceCount"`,
 	Flags:                  VIEW_INSTANCING_FLAGS,
 }
 
@@ -3089,13 +3153,13 @@ EXISTING_COLLECTION_DESC :: struct {
 SUBOBJECT_TO_EXPORTS_ASSOCIATION :: struct {
 	pSubobjectToAssociate: ^STATE_SUBOBJECT,
 	NumExports:            u32,
-	pExports:              [^]^i16,
+	pExports:              [^]cstring16 `fmt:"v,NumExports"`,
 }
 
 DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION :: struct {
-	SubobjectToAssociate: ^i16,
+	SubobjectToAssociate: cstring16,
 	NumExports:           u32,
-	pExports:             [^]^i16,
+	pExports:             [^]cstring16 `fmt:"v,NumExports"`,
 }
 
 HIT_GROUP_TYPE :: enum i32 {
@@ -3104,11 +3168,11 @@ HIT_GROUP_TYPE :: enum i32 {
 }
 
 HIT_GROUP_DESC :: struct {
-	HitGroupExport:           ^i16,
+	HitGroupExport:           cstring16,
 	Type:                     HIT_GROUP_TYPE,
-	AnyHitShaderImport:       ^i16,
-	ClosestHitShaderImport:   ^i16,
-	IntersectionShaderImport: ^i16,
+	AnyHitShaderImport:       cstring16,
+	ClosestHitShaderImport:   cstring16,
+	IntersectionShaderImport: cstring16,
 }
 
 RAYTRACING_SHADER_CONFIG :: struct {
@@ -3265,7 +3329,8 @@ SERIALIZED_DATA_DRIVER_MATCHING_IDENTIFIER :: struct {
 }
 
 SERIALIZED_DATA_TYPE :: enum i32 {
-	SERIALIZED_DATA_RAYTRACING_ACCELERATION_STRUCTURE = 0,
+	RAYTRACING_ACCELERATION_STRUCTURE = 0,
+	APPLICATION_SPECIFIC_DRIVER_STATE = 1,
 }
 
 DRIVER_MATCHING_IDENTIFIER_STATUS :: enum i32 {
@@ -3505,14 +3570,14 @@ DRED_ALLOCATION_TYPE :: enum i32 {
 
 DRED_ALLOCATION_NODE :: struct {
 	ObjectNameA:    cstring,
-	ObjectNameW:    ^i16,
+	ObjectNameW:    cstring16,
 	AllocationType: DRED_ALLOCATION_TYPE,
 	pNext:          ^DRED_ALLOCATION_NODE,
 }
 
 DRED_ALLOCATION_NODE1 :: struct {
 	ObjectNameA:    cstring,
-	ObjectNameW:    ^i16,
+	ObjectNameW:    cstring16,
 	AllocationType: DRED_ALLOCATION_TYPE,
 	pNext:          ^DRED_ALLOCATION_NODE1,
 	pObject:        ^IUnknown,
@@ -3538,7 +3603,7 @@ DRED_PAGE_FAULT_OUTPUT1 :: struct {
 	pHeadRecentFreedAllocationNode: ^DRED_ALLOCATION_NODE1,
 }
 
-DRED_PAGE_FAULT_FLAGS :: bit_set[DRED_PAGE_FAULT_FLAG;u32]
+DRED_PAGE_FAULT_FLAGS :: distinct bit_set[DRED_PAGE_FAULT_FLAG; u32]
 DRED_PAGE_FAULT_FLAG :: enum u32 {
 }
 
@@ -3818,7 +3883,7 @@ RENDER_PASS_ENDING_ACCESS_RESOLVE_PARAMETERS :: struct {
 	pSrcResource:           ^IResource,
 	pDstResource:           ^IResource,
 	SubresourceCount:       u32,
-	pSubresourceParameters: [^]RENDER_PASS_ENDING_ACCESS_RESOLVE_SUBRESOURCE_PARAMETERS,
+	pSubresourceParameters: [^]RENDER_PASS_ENDING_ACCESS_RESOLVE_SUBRESOURCE_PARAMETERS `fmt:"v,SubresourceCount"`,
 	Format:                 dxgi.FORMAT,
 	ResolveMode:            RESOLVE_MODE,
 	PreserveResolveSource:  BOOL,
@@ -3900,7 +3965,7 @@ SHADER_CACHE_MODE :: enum i32 {
 	DISK   = 1,
 }
 
-SHADER_CACHE_FLAGS :: bit_set[SHADER_CACHE_FLAG;u32]
+SHADER_CACHE_FLAGS :: distinct bit_set[SHADER_CACHE_FLAG; u32]
 SHADER_CACHE_FLAG :: enum u32 {
 	DRIVER_VERSIONED = 0,
 	USE_WORKING_DIR  = 1,
@@ -3931,7 +3996,7 @@ IShaderCacheSession_VTable :: struct {
 }
 
 
-SHADER_CACHE_KIND_FLAGS :: bit_set[SHADER_CACHE_KIND_FLAG;u32]
+SHADER_CACHE_KIND_FLAGS :: distinct bit_set[SHADER_CACHE_KIND_FLAG; u32]
 SHADER_CACHE_KIND_FLAG :: enum u32 {
 	IMPLICIT_D3D_CACHE_FOR_DRIVER = 0,
 	IMPLICIT_D3D_CONVERSIONS      = 1,
@@ -3939,7 +4004,7 @@ SHADER_CACHE_KIND_FLAG :: enum u32 {
 	APPLICATION_MANAGED           = 3,
 }
 
-SHADER_CACHE_CONTROL_FLAGS :: bit_set[SHADER_CACHE_CONTROL_FLAG;u32]
+SHADER_CACHE_CONTROL_FLAGS :: distinct bit_set[SHADER_CACHE_CONTROL_FLAG; u32]
 SHADER_CACHE_CONTROL_FLAG :: enum u32 {
 	DISABLE = 0,
 	ENABLE  = 1,

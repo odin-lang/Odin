@@ -1,9 +1,9 @@
-// This package helps break dependency cycles.
+// This package helps break dependency cycles for the regular expression engine.
 package regex_common
 
 /*
 	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Feoramund: Initial implementation.

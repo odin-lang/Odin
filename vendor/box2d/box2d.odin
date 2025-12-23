@@ -1,7 +1,10 @@
+// Bindings for [[ Box2D ; https://box2d.org ]].
 package vendor_box2d
 
 import "base:intrinsics"
 import "core:c"
+
+_ :: intrinsics
 
 when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	@(private) VECTOR_EXT :: "_simd" when #config(VENDOR_BOX2D_ENABLE_SIMD128, intrinsics.has_target_feature("simd128")) else ""
@@ -330,7 +333,7 @@ MakeOffsetProxy :: proc "c" (points: []Vec2, radius: f32, position: Vec2, rotati
 @(link_prefix="b2", default_calling_convention="c", require_results)
 foreign lib {
 	// Perform a linear shape cast of shape B moving and shape A fixed. Determines the hit point, normal, and translation fraction.
-	// You may optionally supply an array to hold debug data.
+	// Initially touching shapes are treated as a miss.
 	ShapeCast :: proc(#by_ptr input: ShapeCastPairInput) -> CastOutput ---
 
 	// Evaluate the transform sweep at a specific time.
@@ -480,12 +483,12 @@ foreign lib {
  */
 
 @(require_results)
-SolvePlanes :: proc(position: Vec2, planes: []CollisionPlane) -> PlaneSolverResult {
+SolvePlanes :: proc(targetDelta: Vec2, planes: []CollisionPlane) -> PlaneSolverResult {
 	foreign lib {
-		b2SolvePlanes :: proc "c" (position: Vec2, planes: [^]CollisionPlane, count: i32) -> PlaneSolverResult ---
+		b2SolvePlanes :: proc "c" (targetDelta: Vec2, planes: [^]CollisionPlane, count: i32) -> PlaneSolverResult ---
 	}
 
-	return b2SolvePlanes(position, raw_data(planes), i32(len(planes)))
+	return b2SolvePlanes(targetDelta, raw_data(planes), i32(len(planes)))
 }
 
 @(require_results)
@@ -549,7 +552,6 @@ foreign lib {
 
 	// Cast a ray into the world to collect shapes in the path of the ray.
 	// Your callback function controls whether you get the closest point, any point, or n-points.
-	// The ray-cast ignores shapes that contain the starting point.
 	//	@note The callback function may receive shapes in any order
 	//	@param worldId The world to cast the ray against
 	//	@param origin The start point of the ray
@@ -560,7 +562,7 @@ foreign lib {
 	//	@return traversal performance counters
 	World_CastRay                 :: proc(worldId: WorldId, origin: Vec2, translation: Vec2, filter: QueryFilter, fcn: CastResultFcn, ctx: rawptr) -> TreeStats ---
 
-	// Cast a ray into the world to collect the closest hit. This is a convenience function.
+	// Cast a ray into the world to collect the closest hit. This is a convenience function. Ignores initial overlap.
 	// This is less general than b2World_CastRay() and does not allow for custom filtering.
 	World_CastRayClosest          :: proc(worldId: WorldId, origin: Vec2, translation: Vec2, filter: QueryFilter) -> RayResult ---
 
@@ -635,13 +637,6 @@ foreign lib {
 	// @param pushSpeed The maximum contact constraint push out speed (meters per second)
 	//	@note Advanced feature
 	World_SetContactTuning        :: proc(worldId: WorldId, hertz: f32, dampingRatio: f32, pushSpeed: f32) ---
-
-	// Adjust joint tuning parameters
-	// @param worldId The world id
-	// @param hertz The contact stiffness (cycles per second)
-	// @param dampingRatio The contact bounciness with 1 being critical damping (non-dimensional)
-	// @note Advanced feature
-	World_SetJointTuning          :: proc(worldId: WorldId, hertz: f32, dampingRatio: f32) ---
 
 	// Set the maximum linear speed. Usually in m/s.
 	World_SetMaximumLinearSpeed   :: proc(worldId: WorldId, maximumLinearSpeed: f32) ---
@@ -770,6 +765,7 @@ foreign lib {
 
 	// Set the velocity to reach the given transform after a given time step.
 	// The result will be close but maybe not exact. This is meant for kinematic bodies.
+	// The target is not applied if the velocity would be below the sleep threshold.
 	// This will automatically wake the body if asleep.
 	Body_SetTargetTransform         :: proc(bodyId: BodyId, target: Transform, timeStep: f32) ---
 
@@ -1067,6 +1063,12 @@ foreign lib {
 	// Get the shape material identifier
 	Shape_GetMaterial              :: proc(shapeId: ShapeId) -> c.int ---
 
+	// Set the shape surface material
+	Shape_SetSurfaceMaterial       :: proc(shapeId: ShapeId, surfaceMaterial: SurfaceMaterial) ---
+
+	// Get the shape surface material
+	Shape_GetSurfaceMaterial       :: proc(shapeId: ShapeId) -> SurfaceMaterial ---
+
 	// Get the shape filter
 	Shape_GetFilter                :: proc(shapeId: ShapeId) -> Filter ---
 
@@ -1257,11 +1259,29 @@ foreign lib {
 	// Get the world that owns this joint
 	Joint_GetWorld            :: proc(jointId: JointId) -> WorldId ---
 
+	// Set the local anchor on bodyA
+	Joint_SetLocalAnchorA     :: proc(jointId: JointId, localAnchor: Vec2) ---
+
 	// Get the local anchor on bodyA
 	Joint_GetLocalAnchorA     :: proc(jointId: JointId) -> Vec2 ---
 
+	// Set the local anchor on bodyB
+	Joint_SetLocalAnchorB     :: proc(jointId: JointId, localAnchor: Vec2) ---
+
 	// Get the local anchor on bodyB
 	Joint_GetLocalAnchorB     :: proc(jointId: JointId) -> Vec2 ---
+
+	// Get the joint reference angle in radians (revolute, prismatic, and weld)
+	Joint_GetReferenceAngle   :: proc(jointId: JointId) -> f32 ---
+
+	// Set the joint reference angle in radians, must be in [-pi,pi]. (revolute, prismatic, and weld)
+	Joint_SetReferenceAngle   :: proc(jointId: JointId, angleInRadians: f32) ---
+
+	// Set the local axis on bodyA (prismatic and wheel)
+	Joint_SetLocalAxisA       :: proc(jointId: JointId, localAxis: Vec2) ---
+
+	// Get the local axis on bodyA (prismatic and wheel)
+	Joint_GetLocalAxisA       :: proc(jointId: JointId) -> Vec2 ---
 
 	// Toggle collision between connected bodies
 	Joint_SetCollideConnected :: proc(jointId: JointId, shouldCollide: bool) ---
@@ -1283,6 +1303,21 @@ foreign lib {
 
 	// Get the current constraint torque for this joint. Usually in Newton * meters.
 	Joint_GetConstraintTorque :: proc(jointId: JointId) -> f32 ---
+
+	// Get the current linear separation error for this joint. Does not consider admissible movement. Usually in meters.
+	Joint_GetLinearSeparation :: proc(jointId: JointId) -> f32 ---
+
+	// Get the current angular separation error for this joint. Does not consider admissible movement. Usually in meters.
+	Joint_GetAngularSeparation :: proc(jointId: JointId) -> f32 ---
+
+	// Get the joint constraint tuning. Advanced feature.
+	Joint_GetConstraintTuning :: proc(jointId: JointId, hertz: ^f32, dampingRatio: ^f32) ---
+
+	// Set the joint constraint tuning. Advanced feature.
+	// @param jointId the joint
+	// @param hertz the stiffness in Hertz (cycles per second)
+	// @param dampingRatio the non-dimensional damping ratio (one for critical damping)
+	Joint_SetConstraintTuning :: proc(jointId: JointId, hertz: f32, dampingRatio: f32) ---
 
 	/**
 	 * @defgroup distance_joint Distance Joint
@@ -1378,7 +1413,8 @@ foreign lib {
 	// Get the motor joint linear offset target
 	MotorJoint_GetLinearOffset     :: proc(jointId: JointId) -> Vec2 ---
 
-	// Set the motor joint angular offset target in radians
+	// Set the motor joint angular offset target in radians. This angle will be unwound
+	// so the motor will drive along the shortest arc.
 	MotorJoint_SetAngularOffset    :: proc(jointId: JointId, angularOffset: f32) ---
 
 	// Get the motor joint angular offset target in radians
@@ -1414,31 +1450,37 @@ foreign lib {
 
 	// Create a mouse joint
 	//	@see b2MouseJointDef for details
-	CreateMouseJoint                 :: proc(worldId: WorldId, #by_ptr def: MouseJointDef) -> JointId ---
+	CreateMouseJoint                    :: proc(worldId: WorldId, #by_ptr def: MouseJointDef) -> JointId ---
 
 	// Set the mouse joint target
-	MouseJoint_SetTarget             :: proc(jointId: JointId, target: Vec2) ---
+	MouseJoint_SetTarget                :: proc(jointId: JointId, target: Vec2) ---
 
 	// Get the mouse joint target
-	MouseJoint_GetTarget             :: proc(jointId: JointId) -> Vec2 ---
+	MouseJoint_GetTarget                :: proc(jointId: JointId) -> Vec2 ---
 
 	// Set the mouse joint spring stiffness in Hertz
-	MouseJoint_SetSpringHertz        :: proc(jointId: JointId, hertz: f32) ---
+	MouseJoint_SetSpringHertz           :: proc(jointId: JointId, hertz: f32) ---
 
 	// Get the mouse joint spring stiffness in Hertz
-	MouseJoint_GetSpringHertz        :: proc(jointId: JointId) -> f32 ---
+	MouseJoint_GetSpringHertz           :: proc(jointId: JointId) -> f32 ---
 
 	// Set the mouse joint spring damping ratio, non-dimensional
-	MouseJoint_SetSpringDampingRatio :: proc(jointId: JointId, dampingRatio: f32) ---
+	MouseJoint_SetSpringDampingRatio    :: proc(jointId: JointId, dampingRatio: f32) ---
 
 	// Get the mouse joint damping ratio, non-dimensional
-	MouseJoint_GetSpringDampingRatio :: proc(jointId: JointId) -> f32 ---
+	MouseJoint_GetSpringDampingRatio    :: proc(jointId: JointId) -> f32 ---
+
+	// Set the prismatic joint sprint target angle, usually in meters
+	PrismaticJoint_SetTargetTranslation :: proc(jointId: JointId, translation: f32) ---
+
+	// Get the prismatic joint sprint target translation, usually in meters
+	PrismaticJoint_GetTargetTranslation :: proc(jointId: JointId) -> f32 ---
 
 	// Set the mouse joint maximum force, usually in newtons
-	MouseJoint_SetMaxForce           :: proc(jointId: JointId, maxForce: f32) ---
+	MouseJoint_SetMaxForce              :: proc(jointId: JointId, maxForce: f32) ---
 
 	// Get the mouse joint maximum force, usually in newtons
-	MouseJoint_GetMaxForce           :: proc(jointId: JointId) -> f32 ---
+	MouseJoint_GetMaxForce              :: proc(jointId: JointId) -> f32 ---
 
 	/**@}*/
 
@@ -1561,6 +1603,12 @@ foreign lib {
 	// Get the revolute joint spring damping ratio, non-dimensional
 	RevoluteJoint_GetSpringDampingRatio :: proc(jointId: JointId) -> f32 ---
 
+	// Set the revolute joint spring target angle, radians
+	RevoluteJoint_SetTargetAngle        :: proc(jointId: JointId, angle: f32) ---
+
+	// Get the revolute joint spring target angle, radians
+	RevoluteJoint_GetTargetAngle        :: proc(jointId: JointId) -> f32 ---
+
 	// Get the revolute joint current angle in radians relative to the reference angle
 	//	@see b2RevoluteJointDef::referenceAngle
 	RevoluteJoint_GetAngle              :: proc(jointId: JointId) -> f32 ---
@@ -1578,7 +1626,7 @@ foreign lib {
 	RevoluteJoint_GetUpperLimit         :: proc(jointId: JointId) -> f32 ---
 
 	// Set the revolute joint limits in radians. It is expected that lower <= upper
-	// and that -0.95 * B2_PI <= lower && upper <= -0.95 * B2_PI.
+	// and that -0.99 * B2_PI <= lower && upper <= -0.99 * B2_PI.
 	RevoluteJoint_SetLimits             :: proc(jointId: JointId, lower, upper: f32) ---
 
 	// Enable/disable a revolute joint motor
@@ -1617,12 +1665,6 @@ foreign lib {
 	// Create a weld joint
 	//	@see b2WeldJointDef for details
 	CreateWeldJoint                  :: proc(worldId: WorldId, #by_ptr def: WeldJointDef) -> JointId ---
-
-	// Get the weld joint reference angle in radians
-	WeldJoint_GetReferenceAngle      :: proc(jointId: JointId) -> f32 ---
-
-	// Set the weld joint reference angle in radians, must be in [-pi,pi].
-	WeldJoint_SetReferenceAngle      :: proc(jointId: JointId, angleInRadians: f32) ---
 
 	// Set the weld joint linear stiffness in Hertz. 0 is rigid.
 	WeldJoint_SetLinearHertz         :: proc(jointId: JointId, hertz: f32) ---

@@ -62,7 +62,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	case .Size:
 		n, os_err = file_size(fd)
 	case .Destroy:
-		err = .Empty
+		err = .Unsupported
 	case .Query:
 		return io.query_utility({.Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query})
 	}

@@ -6,8 +6,6 @@ _ :: intrinsics
 // High performance, cache-friendly, open-addressed Robin Hood hashing hash map
 // data structure with various optimizations for Odin.
 //
-// Copyright 2022 (c) Dale Weiler
-//
 // The core of the hash map data structure is the Raw_Map struct which is a
 // type-erased representation of the map. This type-erased representation is
 // used in two ways: static and dynamic. When static type information is known,
@@ -985,6 +983,9 @@ __dynamic_map_entry :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 // IMPORTANT: USED WITHIN THE COMPILER
 @(private)
 __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uint, loc := #caller_location) -> Allocator_Error {
+	if m == nil {
+		return nil
+	}
 	return map_reserve_dynamic(m, info, uintptr(new_capacity), loc)
 }
 

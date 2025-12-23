@@ -80,7 +80,7 @@ _unset_env :: proc(key: string) -> (ok: bool) {
 // NOTE(laytan): clearing the env is weird, why would you ever do that?
 
 _clear_env :: proc() {
-	for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
+	for entry := posix.environ[0]; entry != nil; entry = posix.environ[0] {
 		key := strings.truncate_to_byte(string(entry), '=')
 		_unset_env(key)
 	}

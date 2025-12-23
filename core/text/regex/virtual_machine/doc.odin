@@ -1,7 +1,6 @@
 /*
-package regex_vm implements a threaded virtual machine for interpreting
-regular expressions, based on the designs described by Russ Cox and attributed
-to both Ken Thompson and Rob Pike.
+A threaded virtual machine for interpreting regular expressions.
+Based on the designs described by Russ Cox and attributed to both Ken Thompson and Rob Pike.
 
 The virtual machine executes all threads in lock step, i.e. the string pointer
 does not advance until all threads have finished processing the current rune.

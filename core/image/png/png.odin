@@ -1,15 +1,14 @@
+#+vet !using-stmt
+package png
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 		Ginger Bill:     Cosmetic changes.
 */
-
-
-#+vet !using-stmt
-package png
 
 import "core:compress"
 import "core:compress/zlib"
@@ -136,14 +135,6 @@ Text :: struct {
 	keyword_localized: string,
 	language:          string,
 	text:              string,
-}
-
-Exif :: struct {
-	byte_order: enum {
-		little_endian,
-		big_endian,
-	},
-	data: []u8,
 }
 
 iCCP :: struct {

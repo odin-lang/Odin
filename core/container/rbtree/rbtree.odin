@@ -1,4 +1,4 @@
-// This package implements a red-black tree
+// A red-black tree with the same API as our AVL tree.
 package container_rbtree
 
 @(require) import "base:intrinsics"
@@ -128,9 +128,9 @@ find_value :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (value: Value, ok: bo
 	return
 }
 
-// find_or_insert attempts to insert the value into the tree, and returns
-// the node, a boolean indicating if the value was inserted, and the
-// node allocator error if relevant.  If the value is already present, the existing node is updated.
+// find_or_insert attempts to insert the key-value pair into the tree, and returns
+// the node, a boolean indicating if a new node was inserted, and the
+// node allocator error if relevant. If the key is already present, the existing node is updated and returned.
 find_or_insert :: proc(t: ^$T/Tree($Key, $Value), key: Key, value: Value) -> (n: ^Node(Key, Value), inserted: bool, err: runtime.Allocator_Error) {
 	n_ptr := &t._root
 	for n_ptr^ != nil {
@@ -141,6 +141,7 @@ find_or_insert :: proc(t: ^$T/Tree($Key, $Value), key: Key, value: Value) -> (n:
 		case .Greater:
 			n_ptr = &n._right
 		case .Equal:
+			n.value = value
 			return
 		}
 	}

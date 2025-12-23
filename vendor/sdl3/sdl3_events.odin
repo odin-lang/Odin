@@ -519,44 +519,82 @@ UserEvent :: struct {
 
 
 Event :: struct #raw_union {
-	type:            EventType,                  /**< Event type, shared with all events, Uint32 to cover user events which are not in the SDL_EventType enumeration */
-	common:          CommonEvent,                /**< Common event data */
-	display:         DisplayEvent,               /**< Display event data */
-	window:          WindowEvent,                /**< Window event data */
-	kdevice:         KeyboardDeviceEvent,        /**< Keyboard device change event data */
-	key:             KeyboardEvent,              /**< Keyboard event data */
-	edit:            TextEditingEvent,           /**< Text editing event data */
-	edit_candidates: TextEditingCandidatesEvent, /**< Text editing candidates event data */
-	text:            TextInputEvent,             /**< Text input event data */
-	mdevice:         MouseDeviceEvent,           /**< Mouse device change event data */
-	motion:          MouseMotionEvent,           /**< Mouse motion event data */
-	button:          MouseButtonEvent,           /**< Mouse button event data */
-	wheel:           MouseWheelEvent,            /**< Mouse wheel event data */
-	jdevice:         JoyDeviceEvent,             /**< Joystick device change event data */
-	jaxis:           JoyAxisEvent,               /**< Joystick axis event data */
-	jball:           JoyBallEvent,               /**< Joystick ball event data */
-	jhat:            JoyHatEvent,                /**< Joystick hat event data */
-	jbutton:         JoyButtonEvent,             /**< Joystick button event data */
-	jbattery:        JoyBatteryEvent,            /**< Joystick battery event data */
-	gdevice:         GamepadDeviceEvent,         /**< Gamepad device event data */
-	gaxis:           GamepadAxisEvent,           /**< Gamepad axis event data */
-	gbutton:         GamepadButtonEvent,         /**< Gamepad button event data */
-	gtouchpad:       GamepadTouchpadEvent,       /**< Gamepad touchpad event data */
-	gsensor:         GamepadSensorEvent,         /**< Gamepad sensor event data */
-	adevice:         AudioDeviceEvent,           /**< Audio device event data */
-	cdevice:         CameraDeviceEvent,          /**< Camera device event data */
-	sensor:          SensorEvent,                /**< Sensor event data */
-	quit:            QuitEvent,                  /**< Quit request event data */
-	user:            UserEvent,                  /**< Custom event data */
-	tfinger:         TouchFingerEvent,           /**< Touch finger event data */
-	pproximity:      PenProximityEvent,          /**< Pen proximity event data */
-	ptouch:          PenTouchEvent,              /**< Pen tip touching event data */
-	pmotion:         PenMotionEvent,             /**< Pen motion event data */
-	pbutton:         PenButtonEvent,             /**< Pen button event data */
-	paxis:           PenAxisEvent,               /**< Pen axis event data */
-	render:          RenderEvent,                /**< Render event data */
-	drop:            DropEvent,                  /**< Drag and drop event data */
-	clipboard:       ClipboardEvent,             /**< Clipboard event data */
+	/**< Event type, shared with all events, Uint32 to cover user events which are not in the SDL_EventType enumeration */
+	type:            EventType                  `raw_union_tag:"type=FIRST"`,
+	/**< Common event data */
+	common:          CommonEvent                `raw_union_tag:"type=TERMINATE,LOW_MEMORY,WILL_ENTER_BACKGROUND,DID_ENTER_BACKGROUND,WILL_ENTER_FOREGROUND,DID_ENTER_FOREGROUND,LOCALE_CHANGED,SYSTEM_THEME_CHANGED,POLL_SENTINEL"`,
+	/**< Display event data */
+	display:         DisplayEvent               `raw_union_tag:"type=DISPLAY_ORIENTATION,DISPLAY_ADDED,DISPLAY_REMOVED,DISPLAY_MOVED,DISPLAY_DESKTOP_MODE_CHANGED,DISPLAY_CURRENT_MODE_CHANGED,DISPLAY_CONTENT_SCALE_CHANGED"`,
+	/**< Window event data */
+	window:          WindowEvent                `raw_union_tag:"type=WINDOW_SHOWN,WINDOW_HIDDEN,WINDOW_EXPOSED,WINDOW_MOVED,WINDOW_RESIZED,WINDOW_PIXEL_SIZE_CHANGED,WINDOW_METAL_VIEW_RESIZED,WINDOW_MINIMIZED,WINDOW_MAXIMIZED,WINDOW_RESTORED,WINDOW_MOUSE_ENTER,WINDOW_MOUSE_LEAVE,WINDOW_FOCUS_GAINED,WINDOW_FOCUS_LOST,WINDOW_CLOSE_REQUESTED,WINDOW_HIT_TEST,WINDOW_ICCPROF_CHANGED,WINDOW_DISPLAY_CHANGED,WINDOW_DISPLAY_SCALE_CHANGED,WINDOW_SAFE_AREA_CHANGED,WINDOW_OCCLUDED,WINDOW_ENTER_FULLSCREEN,WINDOW_LEAVE_FULLSCREEN,WINDOW_DESTROYED"`,
+	/**< Keyboard device change event data */
+	kdevice:         KeyboardDeviceEvent        `raw_union_tag:"type=KEYMAP_CHANGED,KEYBOARD_ADDED,KEYBOARD_REMOVED"`,
+	/**< Keyboard event data */
+	key:             KeyboardEvent              `raw_union_tag:"type=KEY_DOWN,KEY_UP"`,
+	/**< Text editing event data */
+	edit:            TextEditingEvent           `raw_union_tag:"type=TEXT_EDITING"`,
+	/**< Text editing candidates event data */
+	edit_candidates: TextEditingCandidatesEvent `raw_union_tag:"type=TEXT_EDITING_CANDIDATES"`,
+	/**< Text input event data */
+	text:            TextInputEvent             `raw_union_tag:"type=TEXT_INPUT"`,
+	/**< Mouse device change event data */
+	mdevice:         MouseDeviceEvent           `raw_union_tag:"type=MOUSE_ADDED,MOUSE_REMOVED"`,
+	/**< Mouse motion event data */
+	motion:          MouseMotionEvent           `raw_union_tag:"type=MOUSE_MOTION"`,
+	/**< Mouse button event data */
+	button:          MouseButtonEvent           `raw_union_tag:"type=MOUSE_BUTTON_DOWN,MOUSE_BUTTON_UP"`,
+	/**< Mouse wheel event data */
+	wheel:           MouseWheelEvent            `raw_union_tag:"type=MOUSE_WHEEL"`,
+	/**< Joystick device change event data */
+	jdevice:         JoyDeviceEvent             `raw_union_tag:"type=JOYSTICK_ADDED,JOYSTICK_REMOVED,JOYSTICK_UPDATE_COMPLETE"`,
+	/**< Joystick axis event data */
+	jaxis:           JoyAxisEvent               `raw_union_tag:"type=JOYSTICK_AXIS_MOTION"`,
+	/**< Joystick ball event data */
+	jball:           JoyBallEvent               `raw_union_tag:"type=JOYSTICK_BALL_MOTION"`,
+	/**< Joystick hat event data */
+	jhat:            JoyHatEvent                `raw_union_tag:"type=JOYSTICK_HAT_MOTION"`,
+	/**< Joystick button event data */
+	jbutton:         JoyButtonEvent             `raw_union_tag:"type=JOYSTICK_BUTTON_DOWN,JOYSTICK_BUTTON_UP"`,
+	/**< Joystick battery event data */
+	jbattery:        JoyBatteryEvent            `raw_union_tag:"type=JOYSTICK_BATTERY_UPDATED"`,
+	/**< Gamepad device event data */
+	gdevice:         GamepadDeviceEvent         `raw_union_tag:"type=GAMEPAD_ADDED,GAMEPAD_REMOVED,GAMEPAD_REMAPPED,GAMEPAD_UPDATE_COMPLETE,GAMEPAD_STEAM_HANDLE_UPDATED"`,
+	/**< Gamepad axis event data */
+	gaxis:           GamepadAxisEvent           `raw_union_tag:"type=GAMEPAD_AXIS_MOTION"`,
+	/**< Gamepad button event data */
+	gbutton:         GamepadButtonEvent         `raw_union_tag:"type=GAMEPAD_BUTTON_DOWN,GAMEPAD_BUTTON_UP"`,
+	/**< Gamepad touchpad event data */
+	gtouchpad:       GamepadTouchpadEvent       `raw_union_tag:"type=GAMEPAD_TOUCHPAD_DOWN,GAMEPAD_TOUCHPAD_MOTION,GAMEPAD_TOUCHPAD_UP"`,
+	/**< Gamepad sensor event data */
+	gsensor:         GamepadSensorEvent         `raw_union_tag:"type=GAMEPAD_SENSOR_UPDATE"`,
+	/**< Audio device event data */
+	adevice:         AudioDeviceEvent           `raw_union_tag:"type=AUDIO_DEVICE_ADDED,AUDIO_DEVICE_REMOVED,AUDIO_DEVICE_FORMAT_CHANGED"`,
+	/**< Camera device event data */
+	cdevice:         CameraDeviceEvent          `raw_union_tag:"type=CAMERA_DEVICE_ADDED,CAMERA_DEVICE_REMOVED,CAMERA_DEVICE_APPROVED,CAMERA_DEVICE_DENIED"`,
+	/**< Sensor event data */
+	sensor:          SensorEvent                `raw_union_tag:"type=SENSOR_UPDATE"`,
+	/**< Quit request event data */
+	quit:            QuitEvent                  `raw_union_tag:"type=QUIT"`,
+	/**< Custom event data */
+	user:            UserEvent                  `raw_union_tag:"type=USER"`,
+	/**< Touch finger event data */
+	tfinger:         TouchFingerEvent           `raw_union_tag:"type=FINGER_DOWN,FINGER_UP,FINGER_MOTION,FINGER_CANCELED"`,
+	/**< Pen proximity event data */
+	pproximity:      PenProximityEvent          `raw_union_tag:"type=PEN_PROXIMITY_IN,PEN_PROXIMITY_OUT"`,
+	/**< Pen tip touching event data */
+	ptouch:          PenTouchEvent              `raw_union_tag:"type=PEN_DOWN,PEN_UP"`,
+	/**< Pen motion event data */
+	pmotion:         PenMotionEvent             `raw_union_tag:"type=PEN_MOTION"`,
+	/**< Pen button event data */
+	pbutton:         PenButtonEvent             `raw_union_tag:"type=PEN_BUTTON_DOWN,PEN_BUTTON_UP"`,
+	/**< Pen axis event data */
+	paxis:           PenAxisEvent               `raw_union_tag:"type=PEN_AXIS"`,
+	/**< Render event data */
+	render:          RenderEvent                `raw_union_tag:"type=RENDER_TARGETS_RESET,RENDER_DEVICE_RESET,RENDER_DEVICE_LOST"`,
+	/**< Drag and drop event data */
+	drop:            DropEvent                  `raw_union_tag:"type=DROP_FILE,DROP_TEXT,DROP_BEGIN,DROP_COMPLETE,DROP_POSITION"`,
+	/**< Clipboard event data */
+	clipboard:       ClipboardEvent             `raw_union_tag:"type=CLIPBOARD_UPDATE"`,
 
 	/* This is necessary for ABI compatibility between Visual C++ and GCC.
 	   Visual C++ will respect the push pack pragma and use 52 bytes (size of

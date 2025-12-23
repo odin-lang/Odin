@@ -23,6 +23,14 @@ nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, .None
 }
 
+// nil_allocator returns an allocator which will return `nil` for any result.
+// * `.Alloc`, `.Alloc_Non_Zero`, `.Resize`, `.Resize_Non_Zeroed` will return `nil, .Out_Of_Memory`
+// * `.Free` will return `nil, .None`
+// * `.Free_All` will return `nil, .Mode_Not_Implemented`
+// * `.Query_Features`, `.Query_Info` will return `nil, .Mode_Not_Implemented`
+//
+// This is extremely useful for creating a dynamic array from a buffer which does not nothing
+// on a resize/reserve beyond the originally allocated memory.
 @(require_results)
 nil_allocator :: proc "contextless" () -> Allocator {
 	return Allocator{
@@ -73,6 +81,9 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, nil
 }
 
+// panic_allocator returns an allocator which will panic for any non-zero-sized allocation or `query_info`
+//
+// This is extremely useful for to check when something does a memory operation when it should not, and thus panic.
 @(require_results)
 panic_allocator :: proc() -> Allocator {
 	return Allocator{

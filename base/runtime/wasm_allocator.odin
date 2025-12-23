@@ -43,7 +43,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-WASM_Allocator :: struct #no_copy {
+WASM_Allocator :: struct {
 	// The minimum alignment of allocations.
 	alignment: uint,
 	// A region that contains as payload a single forward linked list of pointers to

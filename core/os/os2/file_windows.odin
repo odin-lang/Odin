@@ -12,7 +12,6 @@ import win32 "core:sys/windows"
 
 INVALID_HANDLE :: ~uintptr(0)
 
-S_IWRITE :: 0o200
 _ERROR_BAD_NETPATH :: 53
 MAX_RW :: 1<<30
 
@@ -66,7 +65,6 @@ init_std_files :: proc "contextless" () {
 			data = impl,
 			procedure = _file_stream_proc,
 		}
-		impl.file.fstat = _fstat
 
 		return &impl.file
 	}
@@ -81,7 +79,7 @@ _handle :: proc "contextless" (f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
 }
 
-_open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: uintptr, err: Error) {
+_open_internal :: proc(name: string, flags: File_Flags, perm: Permissions) -> (handle: uintptr, err: Error) {
 	if len(name) == 0 {
 		err = .Not_Exist
 		return
@@ -122,7 +120,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 	}
 
 	attrs: u32 = win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS
-	if perm & S_IWRITE == 0 {
+	if .Write_User not_in perm {
 		attrs = win32.FILE_ATTRIBUTE_READONLY
 		if create_mode == win32.CREATE_ALWAYS {
 			// NOTE(bill): Open has just asked to create a file in read-only mode.
@@ -150,7 +148,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: int) -> (handle: u
 }
 
 
-_open :: proc(name: string, flags: File_Flags, perm: int) -> (f: ^File, err: Error) {
+_open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	flags := flags if flags != nil else {.Read}
 	handle := _open_internal(name, flags, perm) or_return
 	return _new_file(handle, name, file_allocator())
@@ -186,14 +184,13 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 		data = impl,
 		procedure = _file_stream_proc,
 	}
-	impl.file.fstat = _fstat
 
 	return &impl.file, nil
 }
 
 
 @(require_results)
-_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm := 0o777) -> (f: ^File, err: Error) {
+_open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm: Permissions) -> (f: ^File, err: Error) {
 	assert(buffer_size > 0)
 	flags := flags if flags != nil else {.Read}
 	handle := _open_internal(name, flags, perm) or_return
@@ -367,33 +364,33 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 
 	handle := _handle(&f.file)
 
-	single_read_length: win32.DWORD
 	total_read: int
 
 	sync.shared_guard(&f.rw_mutex) // multiple readers
 
 	if sync.guard(&f.p_mutex) {
 		to_read := min(win32.DWORD(length), MAX_RW)
-		ok: win32.BOOL
-		if f.kind == .Console {
-			n, cerr := read_console(handle, p[total_read:][:to_read])
-			total_read += n
-			if cerr != nil {
-				return i64(total_read), cerr
+		switch f.kind {
+		case .Console:
+			// NOTE(laytan): at least for now, just use ReadFile, it seems to work fine,
+			// but, there may be issues with certain situations that we need to get reproductions for.
+			// total_read, err = read_console(handle, p[total_read:][:to_read])
+			fallthrough
+		case .Pipe, .File:
+			single_read_length: win32.DWORD
+			ok := win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
+			if ok {
+				total_read += int(single_read_length)
+			} else {
+				err = _get_platform_error()
 			}
-		} else {
-			ok = win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
 		}
+	}
 
-		if single_read_length > 0 && ok {
-			total_read += int(single_read_length)
-		} else if single_read_length == 0 && ok {
-			// ok and 0 bytes means EOF:
-			// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
-			err = .EOF
-		} else {
-			err = _get_platform_error()
-		}
+	if total_read == 0 && err == nil {
+		// ok and 0 bytes means EOF:
+		// https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file
+		err = .EOF
 	}
 
 	return i64(total_read), err
@@ -744,7 +741,7 @@ _fchdir :: proc(f: ^File) -> Error {
 	return nil
 }
 
-_fchmod :: proc(f: ^File, mode: int) -> Error {
+_fchmod :: proc(f: ^File, mode: Permissions) -> Error {
 	if f == nil || f.impl == nil {
 		return nil
 	}
@@ -753,7 +750,7 @@ _fchmod :: proc(f: ^File, mode: int) -> Error {
 		return _get_platform_error()
 	}
 	attrs := d.dwFileAttributes
-	if mode & S_IWRITE != 0 {
+	if .Write_User in mode {
 		attrs &~= win32.FILE_ATTRIBUTE_READONLY
 	} else {
 		attrs |= win32.FILE_ATTRIBUTE_READONLY
@@ -780,7 +777,7 @@ _chdir :: proc(name: string) -> Error {
 	return nil
 }
 
-_chmod :: proc(name: string, mode: int) -> Error {
+_chmod :: proc(name: string, mode: Permissions) -> Error {
 	f := open(name, {.Write}) or_return
 	defer close(f)
 	return _fchmod(f, mode)
@@ -828,46 +825,40 @@ _exists :: proc(path: string) -> bool {
 }
 
 @(private="package")
-_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+_file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From, allocator: runtime.Allocator) -> (n: i64, err: Error) {
 	f := (^File_Impl)(stream_data)
-	ferr: Error
 	switch mode {
 	case .Read:
-		n, ferr = _read(f, p)
-		err = error_to_io_error(ferr)
+		n, err = _read(f, p)
 		return
 	case .Read_At:
-		n, ferr = _read_at(f, p, offset)
-		err = error_to_io_error(ferr)
+		n, err = _read_at(f, p, offset)
 		return
 	case .Write:
-		n, ferr = _write(f, p)
-		err = error_to_io_error(ferr)
+		n, err = _write(f, p)
 		return
 	case .Write_At:
-		n, ferr = _write_at(f, p, offset)
-		err = error_to_io_error(ferr)
+		n, err = _write_at(f, p, offset)
 		return
 	case .Seek:
-		n, ferr = _seek(f, offset, whence)
-		err = error_to_io_error(ferr)
+		n, err = _seek(f, offset, whence)
 		return
 	case .Size:
-		n, ferr = _file_size(f)
-		err = error_to_io_error(ferr)
+		n, err = _file_size(f)
 		return
 	case .Flush:
-		ferr = _flush(f)
-		err = error_to_io_error(ferr)
+		err = _flush(f)
 		return
 	case .Close, .Destroy:
-		ferr = _close(f)
-		err = error_to_io_error(ferr)
+		err = _close(f)
 		return
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+	case .Fstat:
+		err = file_stream_fstat_utility(f, p, allocator)
+		return
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 

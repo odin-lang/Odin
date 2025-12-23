@@ -211,11 +211,11 @@ _file_type_from_create_file :: proc(wname: win32.wstring, create_file_attributes
 	return file_type(h)
 }
 
-_file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (type: File_Type, mode: int) {
+_file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (type: File_Type, mode: Permissions) {
 	if file_attributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
-		mode |= 0o444
+		mode += Permissions_Write_All
 	} else {
-		mode |= 0o666
+		mode += Permissions_Read_Write_All
 	}
 
 	is_sym := false
@@ -229,7 +229,7 @@ _file_type_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: wi
 		type = .Symlink
 	} else if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
 		type = .Directory
-		mode |= 0o111
+		mode += Permissions_Execute_All
 	} else if h != nil {
 		type = file_type(h)
 	}
@@ -287,9 +287,9 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 
 	ti: win32.FILE_ATTRIBUTE_TAG_INFO
 	if !win32.GetFileInformationByHandleEx(h, .FileAttributeTagInfo, &ti, size_of(ti)) {
-		err := win32.GetLastError()
-		if err != win32.ERROR_INVALID_PARAMETER {
-			return {}, Platform_Error(err)
+		err := _get_platform_error()
+		if perr, ok := is_platform_error(err); ok && perr != i32(win32.ERROR_INVALID_PARAMETER) {
+			return {}, err
 		}
 		// Indicate this is a symlink on FAT file systems
 		ti.ReparseTag = 0

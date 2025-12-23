@@ -1,6 +1,5 @@
 /*
-package hkdf implements the HKDF HMAC-based Extract-and-Expand Key
-Derivation Function.
+`HKDF` HMAC-based Extract-and-Expand Key Derivation Function.
 
 See: [[ https://www.rfc-editor.org/rfc/rfc5869 ]]
 */

@@ -1,8 +1,9 @@
+//  Bindings for [[LZ4 ; https://github.com/lz4/lz4]].
 package vendor_compress_lz4
 
 when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:libcmt")
-	foreign import lib "lib/liblz4_static.lib"
+	foreign import lib { "lib/liblz4_static.lib", "system:ucrt.lib" }
 }
 
 import "core:c"

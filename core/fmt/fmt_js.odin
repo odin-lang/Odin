@@ -19,7 +19,7 @@ write_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 		write(fd, p)
 		return i64(len(p)), nil
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 @(private="file")

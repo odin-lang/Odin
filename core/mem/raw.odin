@@ -18,6 +18,17 @@ Memory layout of the `cstring` type.
 */
 Raw_Cstring :: runtime.Raw_Cstring
 
+
+/*
+Memory layout of the `string16` type.
+*/
+Raw_String16 :: runtime.Raw_String16
+
+/*
+Memory layout of the `cstring16` type.
+*/
+Raw_Cstring16 :: runtime.Raw_Cstring16
+
 /*
 Memory layout of `[]T` types.
 */

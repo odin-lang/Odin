@@ -50,17 +50,8 @@ get_environment_color :: proc() -> Color_Depth {
 		//
 		// Only a small sampling of some common values are checked here.
 		switch term {
-		case "ansi":       fallthrough
-		case "konsole":    fallthrough
-		case "putty":      fallthrough
-		case "rxvt":       fallthrough
-		case "rxvt-color": fallthrough
-		case "screen":     fallthrough
-		case "st":         fallthrough
-		case "tmux":       fallthrough
-		case "vte":        fallthrough
-		case "xterm":      fallthrough
-		case "xterm-color":
+		case "ansi", "konsole", "putty", "rxvt", "rxvt-color", "screen",
+		     "st", "tmux", "vte", "xterm", "xterm-color":
 			return .Three_Bit
 		}
 	}

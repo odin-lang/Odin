@@ -1,5 +1,7 @@
 #include "parser_pos.cpp"
 
+gb_global std::atomic<bool> g_parsing_done;
+
 gb_internal bool in_vet_packages(AstFile *file) {
 	if (file == nullptr) {
 		return true;
@@ -176,7 +178,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		return nullptr;
 	}
 	if (f == nullptr) {
-		f = node->thread_safe_file();
+		if (g_parsing_done.load(std::memory_order_relaxed)) {
+			f = node->file();
+		} else {
+			f = node->thread_safe_file();
+		}
 	}
 	Ast *n = alloc_ast_node(f, node->kind);
 	gb_memmove(n, node, ast_node_size(node->kind));
@@ -744,6 +750,7 @@ gb_internal Ast *ast_matrix_index_expr(AstFile *f, Ast *expr, Token open, Token 
 gb_internal Ast *ast_ident(AstFile *f, Token token) {
 	Ast *result = alloc_ast_node(f, Ast_Ident);
 	result->Ident.token = token;
+	result->Ident.hash = string_hash(token.string);
 	return result;
 }
 
@@ -1223,7 +1230,7 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 }
 
 gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
-                     Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_no_copy,
+                     Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_all_or_none,
                      Ast *align, Ast *min_field_align, Ast *max_field_align,
                      Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
@@ -1233,7 +1240,7 @@ gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, i
 	result->StructType.polymorphic_params = polymorphic_params;
 	result->StructType.is_packed          = is_packed;
 	result->StructType.is_raw_union       = is_raw_union;
-	result->StructType.is_no_copy         = is_no_copy;
+	result->StructType.is_all_or_none     = is_all_or_none;
 	result->StructType.align              = align;
 	result->StructType.min_field_align    = min_field_align;
 	result->StructType.max_field_align    = max_field_align;
@@ -2732,7 +2739,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (allow_token(f, Token_Comma)) {
 				Ast *dummy_name = parse_ident(f);
 				if (!err_once) {
-					error(dummy_name, "'bit_field' fields do not support multiple names per field");
+					syntax_error(dummy_name, "'bit_field' fields do not support multiple names per field");
 					err_once = true;
 				}
 			}
@@ -2766,8 +2773,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Token    token = expect_token(f, Token_struct);
 		Ast *polymorphic_params = nullptr;
 		bool is_packed          = false;
+		bool is_all_or_none     = false;
 		bool is_raw_union       = false;
-		bool no_copy            = false;
 		Ast *align              = nullptr;
 		Ast *min_field_align    = nullptr;
 		Ast *max_field_align    = nullptr;
@@ -2795,6 +2802,11 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_packed = true;
+			} else if (tag.string == "all_or_none") {
+				if (is_all_or_none) {
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
+				}
+				is_all_or_none = true;
 			} else if (tag.string == "align") {
 				if (align) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
@@ -2849,11 +2861,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_raw_union = true;
-			} else if (tag.string == "no_copy") {
-				if (no_copy) {
-					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
-				}
-				no_copy = true;
 			} else {
 				syntax_error(tag, "Invalid struct tag '#%.*s'", LIT(tag.string));
 			}
@@ -2864,6 +2871,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		if (is_raw_union && is_packed) {
 			is_packed = false;
 			syntax_error(token, "'#raw_union' cannot also be '#packed'");
+		}
+		if (is_raw_union && is_all_or_none) {
+			is_all_or_none = false;
+			syntax_error(token, "'#raw_union' cannot also be '#all_or_none'");
 		}
 
 		Token where_token = {};
@@ -2894,7 +2905,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		parser_check_polymorphic_record_parameters(f, polymorphic_params);
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, min_field_align, max_field_align, where_token, where_clauses);
+		return ast_struct_type(f, token, decls, name_count,
+		                       polymorphic_params, is_packed, is_raw_union, is_all_or_none,
+		                       align, min_field_align, max_field_align,
+		                       where_token, where_clauses);
 	} break;
 
 	case Token_union: {
@@ -3292,8 +3306,16 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			open = expect_token(f, Token_OpenBracket);
 
 			if (f->curr_token.kind == Token_CloseBracket) {
-				error(f->curr_token, "Expected an operand, got ]");
+				ERROR_BLOCK();
+				syntax_error(f->curr_token, "Expected an operand, got ]");
 				close = expect_token(f, Token_CloseBracket);
+
+				if (f->allow_type) {
+					gbString s = expr_to_string(operand);
+					error_line("\tSuggestion: If a type was wanted, did you mean '[]%s'?", s);
+					gb_string_free(s);
+				}
+
 				operand = ast_index_expr(f, operand, nullptr, open, close);
 				break;
 			}
@@ -6417,6 +6439,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 				switch (flag) {
 				case OptInFeatureFlag_IntegerDivisionByZero_Trap:
 				case OptInFeatureFlag_IntegerDivisionByZero_Zero:
+				case OptInFeatureFlag_IntegerDivisionByZero_AllBits:
 					syntax_error(token_for_pos, "Feature flag does not support notting with '!' - '%.*s'", LIT(p));
 					break;
 				}
@@ -6429,6 +6452,7 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 			error_line("\tinteger-division-by-zero:trap\n");
 			error_line("\tinteger-division-by-zero:zero\n");
 			error_line("\tinteger-division-by-zero:self\n");
+			error_line("\tinteger-division-by-zero:all-bits\n");
 			return OptInFeatureFlag_NONE;
 		}
 	}
@@ -6554,6 +6578,10 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (string_starts_with(lc, str_lit("vet"))) {
 		f->vet_flags = parse_vet_tag(tok, lc);
 		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("test"))) {
+		if ((build_context.command_kind & Command_test) == 0) {
+			return false;
+		}
 	} else if (string_starts_with(lc, str_lit("ignore"))) {
 		return false;
 	} else if (string_starts_with(lc, str_lit("private"))) {
@@ -6581,7 +6609,7 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (lc == "no-instrumentation") {
 		f->flags |= AstFile_NoInstrumentation;
 	} else {
-		error(tok, "Unknown tag '%.*s'", LIT(lc));
+		syntax_error(tok, "Unknown tag '%.*s'", LIT(lc));
 	}
 
 	return true;
@@ -6923,6 +6951,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
 		}
 	}
+
+	g_parsing_done.store(true, std::memory_order_relaxed);
 
 	return ParseFile_None;
 }

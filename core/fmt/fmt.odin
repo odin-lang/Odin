@@ -42,6 +42,8 @@ Info_State :: struct {
 	width:     int,
 	prec:      int,
 	indent:    int,
+
+	parent_struct: any,
 }
 
 
@@ -693,7 +695,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 	fi: Info
 	end := len(fmt)
 	unused_args: bit_set[0 ..< MAX_CHECKED_ARGS]
-	for i in 0 ..< len(args) {
+	for _, i in args {
 		unused_args += {i}
 	}
 
@@ -816,7 +818,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 		}
 	}
 
-	if unused_args != {} {
+	if unused_args != nil {
 		// Use default options when formatting extra arguments.
 		extra_fi := Info { writer = fi.writer, n = fi.n }
 
@@ -1067,7 +1069,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		}
 	}
 
-	buf: [256]byte
+	buf: [BUF_SIZE]byte
 	start := 0
 
 	if fi.hash && !is_signed {
@@ -1281,7 +1283,7 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 	if !fi.plus {
 		// Strip sign from "+<value>" but not "+Inf".
 		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:] 
+			str = str[1:]
 		}
 	}
 
@@ -1711,7 +1713,7 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 	}
 
 	type_info := type_info_of(v.id)
-	#partial switch e in type_info.variant {
+	#partial switch &e in type_info.variant {
 	case: fmt_bad_verb(fi, verb)
 	case runtime.Type_Info_Enum:
 		switch verb {
@@ -1751,7 +1753,7 @@ stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.T
 	et := runtime.type_info_base(enum_type)
 	ev := ev
 	ev += runtime.Type_Info_Enum_Value(offset)
-	#partial switch e in et.variant {
+	#partial switch &e in et.variant {
 	case: return "", false
 	case runtime.Type_Info_Enum:
 		if reflect.is_string(e.base) {
@@ -1788,7 +1790,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 			return false
 		}
 		t := runtime.type_info_base(ti)
-		#partial switch info in t.variant {
+		#partial switch &info in t.variant {
 		case runtime.Type_Info_Integer:
 			switch info.endianness {
 			case .Platform: return false
@@ -1802,7 +1804,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 	byte_swap :: bits.byte_swap
 
 	type_info := type_info_of(v.id)
-	#partial switch info in type_info.variant {
+	#partial switch &info in type_info.variant {
 	case runtime.Type_Info_Named:
 		val := v
 		val.id = info.base.id
@@ -1937,7 +1939,7 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 	}
 	fi.record_level += 1
 	defer fi.record_level -= 1
-	
+
 	if fi.hash {
 		io.write_byte(fi.writer, '\n', &fi.n)
 		defer fmt_write_indent(fi)
@@ -2071,6 +2073,76 @@ handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Str
 	}
 	return
 }
+
+
+__handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_Struct, type_name: string) -> (ok: bool) {
+	ut := type_info_of(v.id)
+
+	if !reflect.is_raw_union(ut) {
+		return false
+	}
+
+	tag_name: string
+	for tag in info.tags[:info.field_count] {
+		rut := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "raw_union_tag") or_continue
+		head_tag, match, _ := strings.partition(string(rut), "=")
+		if match != "=" {
+			continue
+		}
+		if tag_name == "" {
+			tag_name = head_tag
+		} else if tag_name != head_tag {
+			return false
+		}
+	}
+	if tag_name == "" {
+		return false
+	}
+
+	tag := reflect.struct_field_value_by_name(fi.state.parent_struct, tag_name, true)
+	if tag == nil {
+		// try the current type just in case the tag is also stored here
+		tag = reflect.struct_field_value_by_name(v, tag_name, false)
+	}
+	if tag == nil {
+		return false
+	}
+
+
+	tag_info := reflect.type_info_base(type_info_of(tag.id))
+	#partial switch ti in tag_info.variant {
+	case reflect.Type_Info_Enum:
+		tag_string := reflect.enum_string(tag)
+
+		for tag, index in info.tags[:info.field_count] {
+			rut_list := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "raw_union_tag") or_continue
+
+			for rut in strings.split_iterator(&rut_list, ",") {
+				head_tag, match, tail_name := strings.partition(string(rut), "=")
+				if head_tag != tag_name || match != "=" {
+					continue
+				}
+
+				// just ignore the `A.` prefix for `A.B` stuff entirely
+				if _, _, try_tail_name := strings.partition(string(rut), "."); try_tail_name != "" {
+					tail_name = try_tail_name
+				}
+
+				if tail_name == tag_string {
+					io.write_string(fi.writer, "#raw_union(.", &fi.n)
+					io.write_string(fi.writer, tag_string, &fi.n)
+					io.write_string(fi.writer, ") ", &fi.n)
+					fmt_arg(fi, any{v.data, info.types[index].id}, the_verb)
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+
 // Formats a struct for output, handling various struct types (e.g., SOA, raw unions)
 //
 // Inputs:
@@ -2086,8 +2158,11 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		return
 	}
 	if .raw_union in info.flags {
+		if __handle_raw_union_tag(fi, v, the_verb, info, type_name) {
+			return
+		}
 		if type_name == "" {
-			io.write_string(fi.writer, "(raw union)", &fi.n)
+			io.write_string(fi.writer, "(#raw_union)", &fi.n)
 		} else {
 			io.write_string(fi.writer, type_name, &fi.n)
 			io.write_string(fi.writer, "{}", &fi.n)
@@ -2225,6 +2300,8 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			verb := the_verb if the_verb == 'w' else 'v'
 
 			new_state := fi.state
+			new_state.parent_struct = v
+
 			if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
 				continue
 			}
@@ -2528,7 +2605,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 		}
 	}
 
-	#partial switch b in info.base.variant {
+	#partial switch &b in info.base.variant {
 	case runtime.Type_Info_Struct:
 		fmt_struct(fi, v, verb, b, info.name)
 	case runtime.Type_Info_Bit_Field:
@@ -2794,7 +2871,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	fi.ignore_user_formatters = false
 
 	type_info := type_info_of(v.id)
-	switch info in type_info.variant {
+	switch &info in type_info.variant {
 	case runtime.Type_Info_Any:        // Ignore
 	case runtime.Type_Info_Parameters: // Ignore
 
@@ -2819,7 +2896,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 				elem := runtime.type_info_base(info.elem)
 				if elem != nil {
-					#partial switch e in elem.variant {
+					#partial switch &e in elem.variant {
 					case runtime.Type_Info_Array,
 					     runtime.Type_Info_Slice,
 					     runtime.Type_Info_Dynamic_Array,
@@ -2881,7 +2958,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					return
 				}
 
-				#partial switch e in elem.variant {
+				#partial switch &e in elem.variant {
 				case runtime.Type_Info_Integer:
 					switch verb {
 					case 's', 'q':
@@ -3238,7 +3315,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 
 	base_arg := arg
 	base_arg.id = runtime.typeid_base(base_arg.id)
-	switch a in base_arg {
+	switch &a in base_arg {
 	case bool:       fmt_bool(fi, a, verb)
 	case b8:         fmt_bool(fi, bool(a), verb)
 	case b16:        fmt_bool(fi, bool(a), verb)

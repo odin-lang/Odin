@@ -59,6 +59,11 @@ template <typename T> struct TypeIsPtrSizedInteger { enum {value = false}; };
 template <> struct TypeIsPtrSizedInteger<isize> { enum {value = true}; };
 template <> struct TypeIsPtrSizedInteger<usize> { enum {value = true}; };
 
+template <typename T> struct TypeIs64BitInteger { enum {value = false}; };
+template <> struct TypeIs64BitInteger<u64> { enum {value = true}; };
+template <> struct TypeIs64BitInteger<i64> { enum {value = true}; };
+
+
 
 #include "unicode.cpp"
 #include "array.cpp"

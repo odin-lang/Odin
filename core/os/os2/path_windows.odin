@@ -305,13 +305,13 @@ _get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absol
 	rel_utf16 := win32.utf8_to_utf16(rel, temp_allocator)
 	n := win32.GetFullPathNameW(cstring16(raw_data(rel_utf16)), 0, nil, nil)
 	if n == 0 {
-		return "", Platform_Error(win32.GetLastError())
+		return "", _get_platform_error()
 	}
 
 	buf := make([]u16, n, temp_allocator) or_return
 	n = win32.GetFullPathNameW(cstring16(raw_data(rel_utf16)), u32(n), cstring16(raw_data(buf)), nil)
 	if n == 0 {
-		return "", Platform_Error(win32.GetLastError())
+		return "", _get_platform_error()
 	}
 
 	return win32.utf16_to_utf8(buf, allocator)
