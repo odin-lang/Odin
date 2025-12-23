@@ -308,6 +308,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				case .Open_Bracket:
 					// This could be a CDATA tag part of a tag's body. Unread the `<![`
 					t.offset -= 3
+					t.read_offset = t.offset
 
 					// Instead of calling `parse_body` here, we could also `continue loop`
 					// and fall through to the `case:` at the bottom of the outer loop.
