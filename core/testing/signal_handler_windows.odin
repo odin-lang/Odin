@@ -165,7 +165,7 @@ _setup_signal_handler :: proc() {
 	// - Asserts and panics;
 	// - Arithmetic errors; and
 	// - Segmentation faults (illegal memory access).
-	win32.AddVectoredExceptionHandler(1, stop_test_callback)
+	win32.AddVectoredExceptionHandler(0, stop_test_callback)
 }
 
 _setup_task_signal_handler :: proc(test_index: int) {
