@@ -737,7 +737,21 @@ try_cross_linking:;
 			}
 
 			if (build_context.build_mode == BuildMode_StaticLibrary) {
-				compiler_error("TODO(bill): -build-mode:static on non-windows targets");
+				TIME_SECTION("Static Library Creation");
+
+				gbString ar_command = gb_string_make(heap_allocator(), "");
+				defer (gb_string_free(ar_command));
+
+				ar_command = gb_string_appendc(ar_command, "ar rcs ");
+				ar_command = gb_string_append_fmt(ar_command, "\"%.*s\" ", LIT(output_filename));
+				ar_command = gb_string_appendc(ar_command, object_files);
+
+				result = system_exec_command_line_app("ar", ar_command);
+				if (result) {
+					return result;
+				}
+
+				return result;
 			}
 
 			// NOTE(dweiler): We use clang as a frontend for the linker as there are
