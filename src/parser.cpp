@@ -5818,6 +5818,11 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		return nullptr;
 	}
 
+	if (string_ends_with(path, str_lit(".odin"))) {
+		error(pos, "'import' declarations cannot import directories with a .odin extension/suffix");
+		return nullptr;
+	}
+
 	isize files_with_ext = 0;
 	isize files_to_reserve = 1; // always reserve 1
 	for (FileInfo fi : list) {
