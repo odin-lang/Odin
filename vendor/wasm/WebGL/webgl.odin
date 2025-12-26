@@ -313,6 +313,43 @@ GetActiveAttrib :: proc {
 	GetActiveAttribAlloc,
 }
 
+GetActiveUniformBuf :: proc "contextless" (program: Program, index: u32, name_buf: []byte) -> (info: ActiveInfo) {
+	foreign webgl {
+		@(link_name="GetActiveUniform")
+		_GetActiveUniform :: proc "contextless" (shader: Program, index: u32, size: ^int, type: ^Enum, name_buf: []byte, name_len: ^int) ---
+	}
+	name_len: int
+	_GetActiveUniform(program, index, &info.size, &info.type, name_buf, &name_len)
+	info.name = string(name_buf[:name_len])
+	return
+}
+
+GetActiveUniformAlloc :: proc(program: Program, index: u32, allocator: runtime.Allocator, loc := #caller_location) -> (info: ActiveInfo) {
+	foreign webgl {
+		@(link_name="GetActiveUniform")
+		_GetActiveUniform :: proc "contextless" (shader: Program, index: u32, size: ^int, type: ^Enum, name_buf: []byte, name_len: ^int) ---
+	}
+
+	name_len: int
+
+	// Passing {} to the buf but giving it a name_len ptr will write the needed len into that int
+	_GetActiveUniform(program, index, &info.size, &info.type, {}, &name_len)
+
+	if name_len > 0 {
+		name_buf := make([]byte, name_len, allocator, loc)
+		_GetActiveUniform(program, index, &info.size, &info.type, name_buf, &name_len)
+		assert(name_len == len(name_buf))
+		info.name = string(name_buf[:name_len])
+	}
+
+	return
+}
+
+GetActiveUniform :: proc {
+	GetActiveUniformBuf,
+	GetActiveUniformAlloc,
+}
+
 GetProgramInfoLog :: proc "contextless" (program: Program, buf: []byte) -> string {
 	foreign webgl {
 		@(link_name="GetProgramInfoLog")

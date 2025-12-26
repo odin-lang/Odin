@@ -3,6 +3,7 @@ package webgl
 foreign import "webgl2"
 
 import "base:intrinsics"
+import "base:runtime"
 import glm "core:math/linalg/glsl"
 
 Query             :: distinct u32
@@ -109,13 +110,35 @@ foreign webgl2 {
 	BindVertexArray   :: proc(vertexArray: VertexArrayObject) ---	
 }
 
-GetActiveUniformBlockName :: proc(program: Program, uniformBlockIndex: i32, buf: []byte) -> string {
+GetActiveUniformBlockNameBuf :: proc(program: Program, uniformBlockIndex: i32, buf: []byte) -> string {
 	foreign webgl2 {
 		_GetActiveUniformBlockName :: proc "contextless" (program: Program, uniformBlockIndex: i32, buf: []byte, length: ^int) ---
 	}
 	n: int
 	_GetActiveUniformBlockName(program, uniformBlockIndex, buf, &n)
 	return string(buf[:n])	
+}
+
+GetActiveUniformBlockNameAlloc :: proc(program: Program, uniformBlockIndex: i32, allocator: runtime.Allocator, loc := #caller_location) -> string {
+	foreign webgl2 {
+		_GetActiveUniformBlockName :: proc "contextless" (program: Program, uniformBlockIndex: i32, buf: []byte, length: ^int) ---
+	}
+	n: int
+	_GetActiveUniformBlockName(program, uniformBlockIndex, {}, &n)
+
+	if n > 0 {
+		buf := make([]byte, n, allocator, loc)
+		_GetActiveUniformBlockName(program, uniformBlockIndex, buf, &n)
+		assert(n == len(buf))
+		return string(buf[:n])
+	}
+
+	return ""
+}
+
+GetActiveUniformBlockName :: proc {
+	GetActiveUniformBlockNameBuf,
+	GetActiveUniformBlockNameAlloc,
 }
 
 

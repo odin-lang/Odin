@@ -646,6 +646,27 @@ class WebGLInterface {
 				}
 			},
 
+			GetActiveUniform: (program, index, size_ptr, type_ptr, name_buf_ptr, name_buf_len, name_len_ptr) => {
+				let info = this.ctx.getActiveUniform(program, index);
+				
+				if (size_ptr) {
+					this.mem.storeInt(size_ptr, info.size);
+				}
+
+				if (type_ptr) {
+					this.mem.storeI32(type_ptr, info.type);
+				}
+
+				if name_buf_ptr && name_buf_len > 0 {
+					let n = Math.min(name_buf_len, info.name.length);
+					let name = info.name.substring(0, n);
+					this.mem.loadBytes(name_buf_ptr, name_buf_len).set(new TextEncoder().encode(name));
+					this.mem.storeInt(name_len_ptr, n);
+				} else if name_len_ptr {
+					this.mem.storeInt(name_len_ptr, info.name.length);
+				}
+			},
+
 			GetAttribLocation: (program, name_ptr, name_len) => {
 				let name = this.mem.loadString(name_ptr, name_len);
 				return this.ctx.getAttribLocation(this.programs[program], name);
