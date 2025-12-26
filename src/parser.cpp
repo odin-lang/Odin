@@ -5818,8 +5818,8 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		return nullptr;
 	}
 
-	if (string_ends_with(path, str_lit(".odin"))) {
-		error(pos, "'import' declarations cannot import directories with a .odin extension/suffix");
+	if (string_ends_with(path, FILE_EXT)) {
+		error(pos, "'import' declarations cannot import directories with a %.*s extension/suffix", LIT(FILE_EXT));
 		return nullptr;
 	}
 
@@ -5853,11 +5853,38 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
-		if (ext == FILE_EXT && !fi.is_dir) {
+		if (ext == FILE_EXT) {
 			if (is_excluded_target_filename(name)) {
 				continue;
 			}
-			parser_add_file_to_process(p, pkg, fi, pos);
+			if (!fi.is_dir) { // file
+				parser_add_file_to_process(p, pkg, fi, pos);
+			} else { // directory
+				// NOTE(bill): Only allow this to be nested ONCE, to prevent heavy hierarchical testing
+				Array<FileInfo> nested_list = {};
+				ReadDirectoryError nested_list_rd_err = read_directory(fi.fullpath, &nested_list);
+				defer (array_free(&nested_list));
+
+				if (nested_list_rd_err == ReadDirectory_None) {
+					for (FileInfo fi : nested_list) {
+						String name = fi.name;
+						String ext = path_extension(name);
+						if (ext == FILE_EXT) {
+							if (is_excluded_target_filename(name)) {
+								continue;
+							}
+							if (!fi.is_dir) { // file
+								parser_add_file_to_process(p, pkg, fi, pos);
+							}
+						} else if (ext == ".S" || ext ==".s") {
+							if (is_excluded_target_filename(name)) {
+								continue;
+							}
+							parser_add_foreign_file_to_process(p, pkg, AstForeignFile_S, fi, pos);
+						}
+					}
+				}
+			}
 		} else if (ext == ".S" || ext ==".s") {
 			if (is_excluded_target_filename(name)) {
 				continue;
