@@ -3,6 +3,7 @@ package webgl
 foreign import "webgl"
 
 import glm "core:math/linalg/glsl"
+import "base:runtime"
 
 Enum :: distinct u32
 
@@ -24,6 +25,12 @@ ContextAttribute :: enum u32 {
 	desynchronized               = 7,
 }
 ContextAttributes :: distinct bit_set[ContextAttribute; u32]
+
+ActiveInfo :: struct {
+	size: int,
+	type: Enum,
+	name: string,
+}
 
 DEFAULT_CONTEXT_ATTRIBUTES :: ContextAttributes{}
 
@@ -260,7 +267,6 @@ UniformMatrix4fv :: proc "contextless" (location: i32, m: glm.mat4) {
 	value := transmute([4*4]f32)m
 	_UniformMatrix4fv(location, &value[0])
 }
-
 GetShaderiv :: proc "contextless" (shader: Shader, pname: Enum) -> (p: i32) {
 	foreign webgl {
 		@(link_name="GetShaderiv")
@@ -270,6 +276,42 @@ GetShaderiv :: proc "contextless" (shader: Shader, pname: Enum) -> (p: i32) {
 	return
 }
 
+GetActiveAttribBuf :: proc "contextless" (program: Program, index: u32, name_buf: []byte) -> (info: ActiveInfo) {
+	foreign webgl {
+		@(link_name="GetActiveAttrib")
+		_GetActiveAttrib :: proc "contextless" (shader: Program, index: u32, size: ^int, type: ^Enum, name_buf: []byte, name_len: ^int) ---
+	}
+	name_len: int
+	_GetActiveAttrib(program, index, &info.size, &info.type, name_buf, &name_len)
+	info.name = string(name_buf[:name_len])
+	return
+}
+
+GetActiveAttribAlloc :: proc(program: Program, index: u32, allocator: runtime.Allocator, loc := #caller_location) -> (info: ActiveInfo) {
+	foreign webgl {
+		@(link_name="GetActiveAttrib")
+		_GetActiveAttrib :: proc "contextless" (shader: Program, index: u32, size: ^int, type: ^Enum, name_buf: []byte, name_len: ^int) ---
+	}
+
+	name_len: int
+
+	// Passing {} to the buf but giving it a name_len ptr will write the needed len into that int
+	_GetActiveAttrib(program, index, &info.size, &info.type, {}, &name_len)
+
+	if name_len > 0 {
+		name_buf := make([]byte, name_len, allocator, loc)
+		_GetActiveAttrib(program, index, &info.size, &info.type, name_buf, &name_len)
+		assert(name_len == len(name_buf))
+		info.name = string(name_buf[:name_len])
+	}
+
+	return
+}
+
+GetActiveAttrib :: proc {
+	GetActiveAttribBuf,
+	GetActiveAttribAlloc,
+}
 
 GetProgramInfoLog :: proc "contextless" (program: Program, buf: []byte) -> string {
 	foreign webgl {
