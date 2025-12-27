@@ -540,6 +540,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 	map_init(&p->direct_parameters);
 	p->variadic_reuses.allocator = heap_allocator();
+	p->partial_return_type_cache.allocator = heap_allocator();
 
 	GB_ASSERT(p->type != nullptr);
 
@@ -1045,6 +1046,32 @@ gb_internal lbValue lb_emit_conjugate(lbProcedure *p, lbValue val, Type *type) {
 	return lb_emit_load(p, res);
 }
 
+gb_internal lbValue lb_get_partial_return_local(lbProcedure *p, Type *type, Array<lbReturnTypeCache> *stack, bool use_stack) {
+	if (use_stack) {
+		if (stack->allocator.proc == nullptr) {
+			stack->allocator = heap_allocator();
+		}
+
+		for_array(i, p->partial_return_type_cache) {
+			lbReturnTypeCache entry = p->partial_return_type_cache[i];
+			if (are_types_identical(entry.type, type)) {
+				array_unordered_remove(&p->partial_return_type_cache, i);
+				array_add(stack, entry);
+				return entry.addr.addr;
+			}
+		}
+
+		lbReturnTypeCache new_entry = {type, {}};
+		new_entry.addr = lb_add_local(p, type, nullptr, true, false);
+		array_add(stack, new_entry);
+		return new_entry.addr.addr;
+	} else {
+		lbAddr addr = lb_add_local(p, type, nullptr, true, false);
+		return addr.addr;
+	}
+}
+
+
 gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining) {
 	lbModule *m = p->module;
 
@@ -1154,13 +1181,22 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			}
 		}
 
+		Array<lbReturnTypeCache> partial_return_stack = {};
+		defer ({
+			for (lbReturnTypeCache const &entry : partial_return_stack) {
+				array_add(&p->partial_return_type_cache, entry);
+			}
+			array_free(&partial_return_stack);
+		});
+
+
 		Type *rt = reduce_tuple_to_single_type(results);
 		Type *original_rt = rt;
 		if (split_returns) {
 			GB_ASSERT(rt->kind == Type_Tuple);
 			for (isize j = 0; j < rt->Tuple.variables.count-1; j++) {
 				Type *partial_return_type = rt->Tuple.variables[j]->type;
-				lbValue partial_return_ptr = lb_add_local(p, partial_return_type, nullptr, true, false).addr;
+				lbValue partial_return_ptr = lb_get_partial_return_local(p, partial_return_type, &partial_return_stack, /*use_stack*/true);
 				array_add(&processed_args, partial_return_ptr);
 			}
 			rt = reduce_tuple_to_single_type(rt->Tuple.variables[rt->Tuple.variables.count-1]->type);
