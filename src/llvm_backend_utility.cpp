@@ -1151,11 +1151,15 @@ gb_internal lbValue lb_emit_tuple_ep(lbProcedure *p, lbValue ptr, i32 index) {
 		lbValue res = tf->values[index];
 		GB_ASSERT(are_types_identical(res.type, result_type));
 
-		// NOTE(bill): make an explicit copy because partial return values are sharing memory
-		// See: lb_get_partial_return_local
-		lbAddr addr = lb_add_local_generated(p, res.type, false);
-		lb_addr_store(p, addr, res);
-		return addr.addr;
+		if (LB_TUPLE_FIX_USE_PARTIAL_RETURN_CACHE) {
+			// NOTE(bill): make an explicit copy because partial return values are sharing memory
+			// See: lb_get_partial_return_local
+			lbAddr addr = lb_add_local_generated(p, res.type, false);
+			lb_addr_store(p, addr, res);
+			return addr.addr;
+		} else {
+			return lb_address_from_load_or_generate_local(p, res);
+		}
 	} else {
 		return lb_emit_struct_ep_internal(p, ptr, index, result_type);
 	}

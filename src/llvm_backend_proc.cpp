@@ -1196,7 +1196,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			GB_ASSERT(rt->kind == Type_Tuple);
 			for (isize j = 0; j < rt->Tuple.variables.count-1; j++) {
 				Type *partial_return_type = rt->Tuple.variables[j]->type;
-				lbValue partial_return_ptr = lb_get_partial_return_local(p, partial_return_type, &partial_return_stack, /*use_stack*/true);
+				lbValue partial_return_ptr = lb_get_partial_return_local(p, partial_return_type, &partial_return_stack, /*use_stack*/LB_TUPLE_FIX_USE_PARTIAL_RETURN_CACHE);
 				array_add(&processed_args, partial_return_ptr);
 			}
 			rt = reduce_tuple_to_single_type(rt->Tuple.variables[rt->Tuple.variables.count-1]->type);
