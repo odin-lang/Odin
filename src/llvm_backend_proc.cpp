@@ -1212,15 +1212,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			}
 			tuple_fix_values[ret_count-1] = result;
 
-		#if 0
-			for (isize j = 0; j < ret_count; j++) {
-				tuple_geps[j] = lb_emit_struct_ep(p, result_ptr, cast(i32)j);
-			}
-			for (isize j = 0; j < ret_count; j++) {
-				lb_emit_store(p, tuple_geps[j], tuple_fix_values[j]);
-			}
-		#endif
-
 			result = lb_emit_load(p, result_ptr);
 
 			lbTupleFix tf = {tuple_fix_values};

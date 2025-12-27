@@ -309,7 +309,15 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 
 				// NOTE(bill): Explicit instructions are set here because some instructions could have side effects
 				switch (LLVMGetInstructionOpcode(curr_instr)) {
-				// case LLVMAlloca:
+				case LLVMAlloca:
+					if (map_get(&p->tuple_fix_map, curr_instr) != nullptr) {
+						// NOTE(bill, 2025-12-27): Remove temporary tuple fix alloca instructions
+						// if they are never used
+						removal_count += 1;
+						LLVMInstructionEraseFromParent(curr_instr);
+						was_dead_instructions = true;
+					}
+					break;
 				case LLVMLoad:
 					if (LLVMGetVolatile(curr_instr)) {
 						break;
