@@ -458,6 +458,13 @@ enum IntegerDivisionByZeroKind : u8 {
 	IntegerDivisionByZero_AllBits,
 };
 
+enum DumpAstFormat : u8 {
+	DumpAstFormat_Default,
+	DumpAstFormat_SEXP,
+	DumpAstFormat_JSON,
+	DumpAstFormat_XML,
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -540,6 +547,12 @@ struct BuildContext {
 	bool   keep_object_files;
 	bool   disallow_do;
 	bool   show_import_graph;
+	bool   dump_ast;
+	bool   dump_ast_omit_defaults;
+	bool   dump_ast_disregard_filetags;
+	bool   dump_ast_no_ids;
+	DumpAstFormat dump_ast_format;
+	StringMap<StringSet> ast_dump_packages;
 
 	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 

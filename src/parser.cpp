@@ -6713,6 +6713,13 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	return true;
 }
 
+gb_internal bool ignore_file_tag_result() {
+	if (!build_context.dump_ast) {
+		return false;
+	}
+	return build_context.dump_ast_disregard_filetags;
+}
+
 gb_internal bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
@@ -6791,7 +6798,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 		GB_ASSERT(tok.kind == Token_FileTag);
 		GB_ASSERT(string_starts_with(tok.string, str_lit("#+")));
 		String lt = string_trim_whitespace(substring(tok.string, 2, tok.string.len));
-		if (parse_file_tag(lt, tok, f) == false) {
+		if ((parse_file_tag(lt, tok, f) == false) && (ignore_file_tag_result() == false)) {
 			return false;
 		}
 	}
@@ -6827,6 +6834,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	u64 end = time_stamp_time_now();
 	f->time_to_parse = cast(f64)(end-start)/cast(f64)time_stamp__freq();
+
+	maybe_dump_ast(f, tags);
 
 	for (int i = 0; i < AstDelayQueue_COUNT; i++) {
 		array_init(f->delayed_decls_queues+i, ast_allocator(f), 0, f->delayed_decl_count);
@@ -6910,7 +6919,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 		if (pkg->name.len == 0) {
 			pkg->name = file->package_name;
 		} else if (pkg->name != file->package_name) {
-			if (file->tokens.count > 0 && file->tokens[0].kind != Token_EOF) {
+			if (!ignore_file_tag_result() && file->tokens.count > 0 && file->tokens[0].kind != Token_EOF) {
 				Token tok = file->package_token;
 				tok.pos.file_id = file->id;
 				tok.pos.line = gb_max(tok.pos.line, 1);
