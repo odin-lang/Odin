@@ -1962,7 +1962,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		num_cases += cc->list.count;
 		if (cc->list.count == 0) {
 			GB_ASSERT(default_block == nullptr);
-			default_block = lb_create_block(p, "typeswitch.default.body");
+			default_block = lb_create_block(p, "typeswitch.case.default");
 			else_block = default_block;
 		}
 	}
@@ -2042,7 +2042,16 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			continue;
 		}
 
-		lbBlock *body = lb_create_block(p, "typeswitch.body");
+		char const *body_name = "typeswitch.case";
+
+		if (!are_types_identical(case_entity->type, parent_base_type)) {
+			gbString canonical_name = temp_canonical_string(case_entity->type);
+			gbString bn = gb_string_make(heap_allocator(), "typeswitch.case.");
+			bn = gb_string_append_length(bn, canonical_name, gb_string_length(canonical_name));
+			body_name = cast(char const *)bn;
+		}
+
+		lbBlock *body = lb_create_block(p, body_name);
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
 		}
