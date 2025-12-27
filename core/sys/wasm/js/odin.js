@@ -626,7 +626,7 @@ class WebGLInterface {
 			},
 
 			GetActiveAttrib: (program, index, size_ptr, type_ptr, name_buf_ptr, name_buf_len, name_len_ptr) => {
-				let info = this.ctx.getActiveAttrib(program, index);
+				const info = this.ctx.getActiveAttrib(this.programs[program], index);
 				
 				if (size_ptr) {
 					this.mem.storeInt(size_ptr, info.size);
@@ -636,18 +636,18 @@ class WebGLInterface {
 					this.mem.storeI32(type_ptr, info.type);
 				}
 
-				if name_buf_ptr && name_buf_len > 0 {
+				if (name_buf_ptr && name_buf_len > 0) {
 					let n = Math.min(name_buf_len, info.name.length);
 					let name = info.name.substring(0, n);
 					this.mem.loadBytes(name_buf_ptr, name_buf_len).set(new TextEncoder().encode(name));
 					this.mem.storeInt(name_len_ptr, n);
-				} else if name_len_ptr {
+				} else if (name_len_ptr) {
 					this.mem.storeInt(name_len_ptr, info.name.length);
 				}
 			},
 
 			GetActiveUniform: (program, index, size_ptr, type_ptr, name_buf_ptr, name_buf_len, name_len_ptr) => {
-				let info = this.ctx.getActiveUniform(program, index);
+				let info = this.ctx.getActiveUniform(this.programs[program], index);
 				
 				if (size_ptr) {
 					this.mem.storeInt(size_ptr, info.size);
@@ -657,12 +657,12 @@ class WebGLInterface {
 					this.mem.storeI32(type_ptr, info.type);
 				}
 
-				if name_buf_ptr && name_buf_len > 0 {
+				if (name_buf_ptr && name_buf_len > 0) {
 					let n = Math.min(name_buf_len, info.name.length);
 					let name = info.name.substring(0, n);
 					this.mem.loadBytes(name_buf_ptr, name_buf_len).set(new TextEncoder().encode(name));
 					this.mem.storeInt(name_len_ptr, n);
-				} else if name_len_ptr {
+				} else if (name_len_ptr) {
 					this.mem.storeInt(name_len_ptr, info.name.length);
 				}
 			},
@@ -1301,7 +1301,6 @@ class WebGLInterface {
 				this.assertWebGL2();
 				return this.ctx.getUniformBlockIndex(this.programs[program], this.mem.loadString(uniformBlockName_ptr, uniformBlockName_len));
 			},
-			// any getActiveUniformBlockParameter(WebGLProgram program, GLuint uniformBlockIndex, GLenum pname);
 			GetActiveUniformBlockName: (program, uniformBlockIndex, buf_ptr, buf_len, length_ptr) => {
 				this.assertWebGL2();
 				let name = this.ctx.getActiveUniformBlockName(this.programs[program], uniformBlockIndex);
@@ -1310,6 +1309,22 @@ class WebGLInterface {
 				name = name.substring(0, n);
 				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(name))
 				this.mem.storeInt(length_ptr, n);
+			},
+			GetActiveUniforms: (program, uniformIndices_ptr, uniformIndices_len, pname, res_ptr) => {
+				thid.assertWebGL2();
+				let indices = this.mem.loadU32Array(uniformIndices_ptr, uniformIndices_len);
+				this.ctx.getActiveUniforms(this.programs[program], indices, pname)
+				this.mem.loadI32Array(res_ptr, indices.length).set(indices)
+			},
+			GetActiveUniformBlockParameter: (program, uniformBlockIndex, pname, params_ptr) => {
+				this.assertWebGL2();
+				let res = this.ctx.getActiveUniformBlockParameter(this.programs[program], uniformBlockIndex, pname);
+
+				if (e instanceof Uint32Array) { // for pname GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES 
+					this.mem.loadU32Array(params_ptr, res.length).set(res)
+				} else {
+					this.mem.storeI32(params_ptr, res)
+				}
 			},
 			UniformBlockBinding: (program, uniformBlockIndex, uniformBlockBinding) => {
 				this.assertWebGL2();
