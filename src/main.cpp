@@ -69,6 +69,7 @@ gb_global Timings global_timings = {0};
 #include "checker.hpp"
 
 #include "parser.cpp"
+#include "dumper.cpp"
 #include "checker.cpp"
 #include "docs.cpp"
 
@@ -324,6 +325,8 @@ enum BuildFlagKind {
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 	BuildFlag_DidYouMeanLimit,
+	BuildFlag_DumpAst,
+	BuildFlag_DumpAstOpts,
 
 	BuildFlag_ShowDefineables,
 	BuildFlag_ExportDefineables,
@@ -558,6 +561,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_DidYouMeanLimit,         str_lit("did-you-mean-limit"),        BuildFlagParam_Integer, Command__does_check);
+	add_flag(&build_flags, BuildFlag_DumpAst,                 str_lit("dump-ast"),                  BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_DumpAstOpts,             str_lit("dump-ast-opts"),             BuildFlagParam_String,  Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_ShowDefineables,         str_lit("show-defineables"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
@@ -1315,6 +1320,102 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
+						case BuildFlag_DumpAst:
+							{
+								build_context.dump_ast = true;
+								GB_ASSERT(value.kind == ExactValue_String);
+								String val = string_trim_whitespace(value.value_string);
+								if (val == "-") {
+									break;
+								}
+								String_Iterator it = {val, 0};
+								for (;;) {
+									String package_files = string_split_iterator(&it, ';');
+									if (package_files.len == 0) {
+										break;
+									}
+
+									isize colon_idx = string_index_byte(package_files, ':');
+									if (colon_idx < 0) {
+										String package_name = string_trim_whitespace(package_files);
+										if (!string_is_valid_identifier(package_name)) {
+											gb_printf_err("-%.*s package '%.*s' must be a valid identifier\n", LIT(name), LIT(package_name));
+											bad_flags = true;
+											continue;
+										}
+										StringSet *files_set = string_map_get(&build_context.ast_dump_packages, package_name);
+										if (files_set != nullptr) {
+											// clear the set to dump all the files in the packages
+											string_set_clear(files_set);
+										} else {
+											StringSet empty_set;
+											string_set_init(&empty_set);
+											string_map_set(&build_context.ast_dump_packages, package_name, empty_set);
+										}
+									} else {
+										String package_name = substring(package_files, 0, colon_idx);
+										package_name = string_trim_whitespace(package_name);
+										if (!string_is_valid_identifier(package_name)) {
+											gb_printf_err("-%.*s package '%.*s' must be a valid identifier\n", LIT(name), LIT(package_name));
+											bad_flags = true;
+											continue;
+										}
+										StringSet *files_set = string_map_get(&build_context.ast_dump_packages, package_name);
+										if (files_set != nullptr) {
+											if (files_set->entries.count == 0) {
+												// nothing to do, whole package will be dumped
+												continue;
+											}
+										} else {
+											StringSet new_files_set;
+											string_set_init(&new_files_set);
+											string_map_set(&build_context.ast_dump_packages, package_name, new_files_set);
+											files_set = string_map_get(&build_context.ast_dump_packages, package_name);
+											GB_ASSERT(files_set != nullptr);
+										}
+										String files = substring(package_files, colon_idx + 1, package_files.len);
+										String_Iterator files_it = {files, 0};
+										for (;;) {
+											String file = string_split_iterator(&files_it, ',');
+											if (file.len == 0) {
+												break;
+											}
+
+											file = string_trim_whitespace(file);
+											if (!string_ends_with(file, STR_LIT(".odin"))) {
+												gb_printf_err("-%.*s %.*s in package %.*s must be a valid odin source file\n", LIT(name), LIT(file), LIT(package_name));
+												bad_flags = true;
+												continue;
+											}
+											string_set_add(files_set, file);
+										}
+									}
+								}
+							}
+							break;
+						case BuildFlag_DumpAstOpts:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								String val = string_trim_whitespace(value.value_string);
+								String_Iterator it = {val, 0};
+								bool format_set = false;
+								for (;;) {
+									String opt = string_split_iterator(&it, ',');
+									if (opt.len == 0) {
+										break;
+									}
+									if (opt == "omit-defaults") {
+										build_context.dump_ast_omit_defaults = true;
+									} else if (opt == "disregard-filetags") {
+										build_context.dump_ast_disregard_filetags = true;
+									} else {
+										gb_printf_err("-%.*s unknown style option %.*s\n", LIT(name), LIT(opt));
+										bad_flags = true;
+										continue;
+									}
+								}
+							}
+							break;
 						case BuildFlag_Vet:
 							build_context.vet_flags |= VetFlag_All;
 							break;
@@ -2710,6 +2811,22 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (run_or_build) {
+		if (print_flag("-dump-ast:<string>")) {
+			print_usage_line(2, "Dumps AST to files. The passed string can either be '-' or a semicolon-separated list of dump specs.");
+			print_usage_line(2, "Dump spec: <package name>[:<comma-separated list of files>]");
+			print_usage_line(2, "Example dump specs:");
+				print_usage_line(3, "utf8 - dump AST for all the files in the utf8 package");
+				print_usage_line(3, "unicode:doc.odin,fold.odin - dump AST only for doc.odin and fold.odin in unicode package");
+		}
+		if (print_flag("-dump-ast-opts:<string>")) {
+			print_usage_line(2, "Options for -dump-ast. The passed string is a comma-separated list of options.");
+			print_usage_line(2, "Possible options:");
+				print_usage_line(3, "omit-defaults - skip values and attributes with default values (false for booleans, empty strings or empty lists)");
+				print_usage_line(3, "disregard-filetags - ignore build effects of file tags, so this will make the compiler only to parse the files and dump the ast");
+		}
+	}
+
+	if (run_or_build) {
 		if (print_flag("-dynamic-map-calls")) {
 			print_usage_line(2, "Uses dynamic map calls to minimize code generation at the cost of runtime execution.");
 		}
@@ -3787,6 +3904,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	string_set_init(&build_context.custom_attributes);
 	string_set_init(&build_context.vet_packages);
+	string_map_init(&build_context.ast_dump_packages);
 
 	if (!parse_build_flags(args)) {
 		return 1;
@@ -4085,6 +4203,13 @@ int main(int arg_count, char const **arg_ptr) {
 	if (any_errors()) {
 		print_all_errors();
 		return 1;
+	}
+
+	// If we disregarded filetags, then we parsed files that
+	// otherwise would be ignored. We can't continue with checking
+	// types and generating code, so stop here.
+	if (build_context.dump_ast && build_context.dump_ast_disregard_filetags) {
+		return 0;
 	}
 
 	checker->parser = parser;
