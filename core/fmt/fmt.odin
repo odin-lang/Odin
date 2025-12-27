@@ -2447,6 +2447,166 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 		fmt_write_array(fi, data, n, elem_size, elem.id, verb)
 	}
 }
+
+
+@(private)
+fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) -> bool {
+	switch a in v {
+	case runtime.Source_Code_Location:
+		io.write_string(fi.writer, a.file_path, &fi.n)
+
+		when ODIN_ERROR_POS_STYLE == .Default {
+			io.write_byte(fi.writer, '(', &fi.n)
+			io.write_int(fi.writer, int(a.line), 10, &fi.n)
+			if a.column != 0 {
+				io.write_byte(fi.writer, ':', &fi.n)
+				io.write_int(fi.writer, int(a.column), 10, &fi.n)
+			}
+			io.write_byte(fi.writer, ')', &fi.n)
+		} else when ODIN_ERROR_POS_STYLE == .Unix {
+			io.write_byte(fi.writer, ':', &fi.n)
+			io.write_int(fi.writer, int(a.line), 10, &fi.n)
+			if a.column != 0 {
+				io.write_byte(fi.writer, ':', &fi.n)
+				io.write_int(fi.writer, int(a.column), 10, &fi.n)
+			}
+			io.write_byte(fi.writer, ':', &fi.n)
+		} else {
+			#panic("Unhandled ODIN_ERROR_POS_STYLE")
+		}
+		return true
+
+	case time.Duration:
+		ffrac :: proc(buf: []byte, v: u64, prec: int) -> (nw: int, nv: u64) {
+			v := v
+			w := len(buf)
+			print := false
+			for _ in 0..<prec {
+				digit := v % 10
+				print = print || digit != 0
+				if print {
+					w -= 1
+					buf[w] = byte(digit) + '0'
+				}
+				v /= 10
+			}
+			if print {
+				w -= 1
+				buf[w] = '.'
+			}
+			return w, v
+		}
+		fint :: proc(buf: []byte, v: u64) -> int {
+			v := v
+			w := len(buf)
+			if v == 0 {
+				w -= 1
+				buf[w] = '0'
+			} else {
+				for v > 0 {
+					w -= 1
+					buf[w] = byte(v%10) + '0'
+					v /= 10
+				}
+			}
+			return w
+		}
+
+		buf: [32]byte
+		w := len(buf)
+		u := u64(a)
+		neg := a < 0
+		if neg {
+			u = -u
+		}
+
+		if u < u64(time.Second) {
+			prec: int
+			w -= 1
+			buf[w] = 's'
+			w -= 1
+			switch {
+			case u == 0:
+				io.write_string(fi.writer, "0s", &fi.n)
+				return true
+			case u < u64(time.Microsecond):
+				prec = 0
+				buf[w] = 'n'
+			case u < u64(time.Millisecond):
+				prec = 3
+				// U+00B5 'µ' micro sign == 0xC2 0xB5
+				w -= 1 // Need room for two bytes
+				copy(buf[w:], "µ")
+			case:
+				prec = 6
+				buf[w] = 'm'
+			}
+			w, u = ffrac(buf[:w], u, prec)
+			w = fint(buf[:w], u)
+		} else {
+			w -= 1
+			buf[w] = 's'
+			w, u = ffrac(buf[:w], u, 9)
+			w = fint(buf[:w], u%60)
+			u /= 60
+			if u > 0 {
+				w -= 1
+				buf[w] = 'm'
+				w = fint(buf[:w], u%60)
+				u /= 60
+				if u > 0 {
+					w -= 1
+					buf[w] = 'h'
+					w = fint(buf[:w], u)
+				}
+			}
+		}
+
+		if neg {
+			w -= 1
+			buf[w] = '-'
+		}
+		io.write_string(fi.writer, string(buf[w:]), &fi.n)
+		return true
+
+	case time.Time:
+		write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
+			n := width-1
+			for x := i; x >= 10; x /= 10 {
+				n -= 1
+			}
+			for _ in 0..<n {
+				io.write_byte(fi.writer, '0', &fi.n)
+			}
+			io.write_i64(fi.writer, i, 10, &fi.n)
+		}
+
+
+		t := a
+		y, mon, d := time.date(t)
+		h, min, s := time.clock(t)
+		ns := (t._nsec - (t._nsec/1e9 + time.UNIX_TO_ABSOLUTE)*1e9) % 1e9
+		write_padded_number(fi, i64(y), 4)
+		io.write_byte(fi.writer, '-', &fi.n)
+		write_padded_number(fi, i64(mon), 2)
+		io.write_byte(fi.writer, '-', &fi.n)
+		write_padded_number(fi, i64(d), 2)
+		io.write_byte(fi.writer, ' ', &fi.n)
+
+		write_padded_number(fi, i64(h), 2)
+		io.write_byte(fi.writer, ':', &fi.n)
+		write_padded_number(fi, i64(min), 2)
+		io.write_byte(fi.writer, ':', &fi.n)
+		write_padded_number(fi, i64(s), 2)
+		io.write_byte(fi.writer, '.', &fi.n)
+		write_padded_number(fi, (ns), 9)
+		io.write_string(fi.writer, " +0000 UTC", &fi.n)
+		return true
+	}
+
+	return false
+}
+
 // Formats a named type into a string representation
 //
 // Inputs:
@@ -2458,159 +2618,9 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 // NOTE: This procedure supports built-in custom formatters for core library types such as runtime.Source_Code_Location, time.Duration, and time.Time.
 //
 fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) {
-	write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
-		n := width-1
-		for x := i; x >= 10; x /= 10 {
-			n -= 1
-		}
-		for _ in 0..<n {
-			io.write_byte(fi.writer, '0', &fi.n)
-		}
-		io.write_i64(fi.writer, i, 10, &fi.n)
-	}
-
 	// Built-in Custom Formatters for core library types
-	if verb != 'w' {
-		switch a in v {
-		case runtime.Source_Code_Location:
-			io.write_string(fi.writer, a.file_path, &fi.n)
-
-			when ODIN_ERROR_POS_STYLE == .Default {
-				io.write_byte(fi.writer, '(', &fi.n)
-				io.write_int(fi.writer, int(a.line), 10, &fi.n)
-				if a.column != 0 {
-					io.write_byte(fi.writer, ':', &fi.n)
-					io.write_int(fi.writer, int(a.column), 10, &fi.n)
-				}
-				io.write_byte(fi.writer, ')', &fi.n)
-			} else when ODIN_ERROR_POS_STYLE == .Unix {
-				io.write_byte(fi.writer, ':', &fi.n)
-				io.write_int(fi.writer, int(a.line), 10, &fi.n)
-				if a.column != 0 {
-					io.write_byte(fi.writer, ':', &fi.n)
-					io.write_int(fi.writer, int(a.column), 10, &fi.n)
-				}
-				io.write_byte(fi.writer, ':', &fi.n)
-			} else {
-				#panic("Unhandled ODIN_ERROR_POS_STYLE")
-			}
-			return
-
-		case time.Duration:
-			ffrac :: proc(buf: []byte, v: u64, prec: int) -> (nw: int, nv: u64) {
-				v := v
-				w := len(buf)
-				print := false
-				for _ in 0..<prec {
-					digit := v % 10
-					print = print || digit != 0
-					if print {
-						w -= 1
-						buf[w] = byte(digit) + '0'
-					}
-					v /= 10
-				}
-				if print {
-					w -= 1
-					buf[w] = '.'
-				}
-				return w, v
-			}
-			fint :: proc(buf: []byte, v: u64) -> int {
-				v := v
-				w := len(buf)
-				if v == 0 {
-					w -= 1
-					buf[w] = '0'
-				} else {
-					for v > 0 {
-						w -= 1
-						buf[w] = byte(v%10) + '0'
-						v /= 10
-					}
-				}
-				return w
-			}
-
-			buf: [32]byte
-			w := len(buf)
-			u := u64(a)
-			neg := a < 0
-			if neg {
-				u = -u
-			}
-
-			if u < u64(time.Second) {
-				prec: int
-				w -= 1
-				buf[w] = 's'
-				w -= 1
-				switch {
-				case u == 0:
-					io.write_string(fi.writer, "0s", &fi.n)
-					return
-				case u < u64(time.Microsecond):
-					prec = 0
-					buf[w] = 'n'
-				case u < u64(time.Millisecond):
-					prec = 3
-					// U+00B5 'µ' micro sign == 0xC2 0xB5
-					w -= 1 // Need room for two bytes
-					copy(buf[w:], "µ")
-				case:
-					prec = 6
-					buf[w] = 'm'
-				}
-				w, u = ffrac(buf[:w], u, prec)
-				w = fint(buf[:w], u)
-			} else {
-				w -= 1
-				buf[w] = 's'
-				w, u = ffrac(buf[:w], u, 9)
-				w = fint(buf[:w], u%60)
-				u /= 60
-				if u > 0 {
-					w -= 1
-					buf[w] = 'm'
-					w = fint(buf[:w], u%60)
-					u /= 60
-					if u > 0 {
-						w -= 1
-						buf[w] = 'h'
-						w = fint(buf[:w], u)
-					}
-				}
-			}
-
-			if neg {
-				w -= 1
-				buf[w] = '-'
-			}
-			io.write_string(fi.writer, string(buf[w:]), &fi.n)
-			return
-
-		case time.Time:
-			t := a
-			y, mon, d := time.date(t)
-			h, min, s := time.clock(t)
-			ns := (t._nsec - (t._nsec/1e9 + time.UNIX_TO_ABSOLUTE)*1e9) % 1e9
-			write_padded_number(fi, i64(y), 4)
-			io.write_byte(fi.writer, '-', &fi.n)
-			write_padded_number(fi, i64(mon), 2)
-			io.write_byte(fi.writer, '-', &fi.n)
-			write_padded_number(fi, i64(d), 2)
-			io.write_byte(fi.writer, ' ', &fi.n)
-
-			write_padded_number(fi, i64(h), 2)
-			io.write_byte(fi.writer, ':', &fi.n)
-			write_padded_number(fi, i64(min), 2)
-			io.write_byte(fi.writer, ':', &fi.n)
-			write_padded_number(fi, i64(s), 2)
-			io.write_byte(fi.writer, '.', &fi.n)
-			write_padded_number(fi, (ns), 9)
-			io.write_string(fi.writer, " +0000 UTC", &fi.n)
-			return
-		}
+	if verb != 'w' && fmt_named_buitlin_custom_formatters(fi, v, verb, info) {
+		return
 	}
 
 	#partial switch &b in info.base.variant {
