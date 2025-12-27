@@ -279,6 +279,7 @@ foreign user32 {
 	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
 
 	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> int ---
+	FrameRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> int ---
 	EqualRect :: proc(lprc1, lprc2: ^RECT) -> BOOL ---
 	OffsetRect :: proc(lprc1: ^RECT, dx, dy: INT) -> BOOL ---
 	InflateRect :: proc(lprc1: ^RECT, dx, dy: INT) -> BOOL ---
@@ -321,6 +322,11 @@ foreign user32 {
 	SetClipboardData :: proc(uFormat: UINT, hMem: HANDLE) -> HANDLE ---
 	IsClipboardFormatAvailable :: proc(format: UINT) -> BOOL ---
 	EmptyClipboard :: proc() -> BOOL ---
+
+	SetScrollInfo :: proc(hwnd: HWND, nBar: c_int, lpsi: ^SCROLLINFO, redraw: BOOL) -> c_int ---
+	GetScrollInfo :: proc(hwnd: HWND, nBar: c_int, lpsi: ^SCROLLINFO) -> BOOL ---
+	ShowScrollBar :: proc(hwnd: HWND, nBar: c_int, bShow: BOOL) -> BOOL ---
+	EnableScrollBar :: proc(hwnd: HWND, wSBflags: UINT, wArrows: UINT) -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "system" (
@@ -874,3 +880,56 @@ LPNONCLIENTMETRICSW :: ^NONCLIENTMETRICSW
 
 LWA_COLORKEY :: 0x1
 LWA_ALPHA    :: 0x2
+
+SCROLLINFO :: struct {
+	cbSize: UINT,
+	fMask: UINT,
+	nMin: c_int,
+	nMax: c_int,
+	nPage: UINT,
+	nPos: c_int,
+	nTrackPos: c_int,
+}
+LPSCROLLINFO :: ^SCROLLINFO
+
+// Scroll Bar Constants
+SB_MIN              :: 0
+SB_HORZ             :: 0
+SB_VERT             :: 1
+SB_CTL              :: 2
+SB_BOTH             :: 3
+
+// Scroll Bar Commands
+SB_LINEUP           :: 0
+SB_LINELEFT         :: 0
+SB_LINEDOWN         :: 1
+SB_LINERIGHT        :: 1
+SB_PAGEUP           :: 2
+SB_PAGELEFT         :: 2
+SB_PAGEDOWN         :: 3
+SB_PAGERIGHT        :: 3
+SB_THUMBPOSITION    :: 4
+SB_THUMBTRACK       :: 5
+SB_TOP              :: 6
+SB_LEFT             :: 6
+SB_BOTTOM           :: 7
+SB_RIGHT            :: 7
+SB_ENDSCROLL        :: 8
+
+// Constants for SCROLLINFO.fMask
+SIF_RANGE           :: 0x0001
+SIF_PAGE            :: 0x0002
+SIF_POS             :: 0x0004
+SIF_DISABLENOSCROLL :: 0x0008
+SIF_TRACKPOS        :: 0x0010
+SIF_ALL             :: (SIF_RANGE | SIF_PAGE | SIF_POS | SIF_TRACKPOS)
+
+// EnableScrollBar() flags
+ESB_ENABLE_BOTH     :: 0x0000
+ESB_DISABLE_BOTH    :: 0x0003
+ESB_DISABLE_LEFT    :: 0x0001
+ESB_DISABLE_RIGHT   :: 0x0002
+ESB_DISABLE_UP      :: 0x0001
+ESB_DISABLE_DOWN    :: 0x0002
+ESB_DISABLE_LTUP    :: ESB_DISABLE_LEFT
+ESB_DISABLE_RTDN    :: ESB_DISABLE_RIGHT
