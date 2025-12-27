@@ -109,6 +109,9 @@ WindowTabbingMode :: enum Integer {
 	Disallowed = 2,
 }
 
+WindowOcclusionStateVisibleBit :: 0x2
+WindowOcclusionState :: distinct UInteger
+
 
 WindowDelegateTemplate :: struct {
 	// Managing Sheets
@@ -967,4 +970,12 @@ Window_setTabbingMode :: proc "c" (self: ^Window, mode: WindowTabbingMode) {
 @(objc_type = Window, objc_name = "toggleFullScreen")
 Window_toggleFullScreen :: proc "c" (self: ^Window, sender: id) {
 	msgSend(nil, self, "toggleFullScreen:", sender)
+}
+@(objc_type=Window, objc_name="occlusionState")
+Window_occlusionState :: proc "c" (self: ^Window) -> WindowOcclusionState {
+	return msgSend(WindowOcclusionState, self, "occlusionState")
+}
+@(objc_type=Window, objc_name="occlusionStateVisible")
+Window_occlusionStateVisible :: proc "c" (self: ^Window) -> BOOL {
+	return (Window_occlusionState(self) & WindowOcclusionStateVisibleBit) != 0
 }
