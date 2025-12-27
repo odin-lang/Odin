@@ -2,7 +2,7 @@ package unicode
 
 import "base:runtime"
 
-MAX_RUNE         :: '\U00010fff' // Maximum valid unicode code point
+MAX_RUNE         :: '\U0010ffff' // Maximum valid unicode code point
 REPLACEMENT_CHAR :: '\ufffd'     // Represented an invalid code point
 MAX_ASCII        :: '\u007f'     // Maximum ASCII value
 MAX_LATIN1       :: '\u00ff'     // Maximum Latin-1 value
