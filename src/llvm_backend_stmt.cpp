@@ -1720,7 +1720,46 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
 
-		body_blocks[i] = lb_create_block(p, cc->list.count == 0 ? "switch.default.body" : "switch.case.body");
+		char const *block_name = cc->list.count == 0 ? "switch.default.body" : "switch.case.body";
+
+		if (is_trivial && cc->list.count >= 1) {
+			gbString bn = gb_string_make(heap_allocator(), "switch.case.");
+
+			Ast *first = cc->list[0];
+			if (first->tav.mode == Addressing_Type) {
+				bn = gb_string_appendc(bn, "type.");
+			} else if (is_type_rune(first->tav.type)) {
+				bn = gb_string_appendc(bn, "rune.");
+			} else {
+				bn = gb_string_appendc(bn, "value.");
+			}
+
+			for_array(i, cc->list) {
+				if (i > 0) {
+					bn = gb_string_appendc(bn, "..");
+				}
+
+				Ast *expr = cc->list[i];
+				if (expr->tav.mode == Addressing_Type) {
+					bn = write_type_to_string(bn, expr->tav.type, false);
+				} else {
+					ExactValue value = expr->tav.value;
+					if (is_type_rune(expr->tav.type) && value.kind == ExactValue_Integer) {
+
+						Rune r = cast(Rune)exact_value_to_i64(value);
+						u8 rune_temp[6] = {};
+						isize size = gb_utf8_encode_rune(rune_temp, r);
+						bn = gb_string_append_length(bn, rune_temp, size);
+					} else {
+						bn = write_exact_value_to_string(bn, value, 1024);
+					}
+				}
+			}
+
+			block_name = cast(char const *)bn;
+		}
+
+		body_blocks[i] = lb_create_block(p, block_name);
 		if (cc->list.count == 0) {
 			default_block = body_blocks[i];
 		}
