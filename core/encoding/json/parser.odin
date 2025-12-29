@@ -38,7 +38,7 @@ parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers
 
 	switch p.spec {
 	case .JSON:
-		return parse_object(&p, loc)
+		return parse_value(&p, loc)
 	case .JSON5:
 		return parse_value(&p, loc)
 	case .SJSON:
@@ -84,7 +84,7 @@ expect_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
 
 
 parse_colon :: proc(p: ^Parser) -> (err: Error) {
-	colon_err := expect_token(p, .Colon) 
+	colon_err := expect_token(p, .Colon)
 	if colon_err == nil {
 		return nil
 	}
@@ -133,13 +133,13 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 		f, _ := strconv.parse_f64(token.text)
 		value = Float(f)
 		return
-		
+
 	case .Ident:
 		if p.spec == .MJSON {
 			advance_token(p)
 			return clone_string(token.text, p.allocator, loc)
 		}
-		
+
 	case .String:
 		advance_token(p)
 		return unquote_string(token, p.spec, p.allocator, loc)
@@ -192,7 +192,7 @@ parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 	for p.curr_token.kind != .Close_Bracket {
 		elem := parse_value(p, loc) or_return
 		append(&array, elem, loc)
-		
+
 		if parse_comma(p) {
 			break
 		}
@@ -278,7 +278,7 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 		if parse_comma(p) {
 			break
 		}
-	}	
+	}
 	return obj, .None
 }
 
