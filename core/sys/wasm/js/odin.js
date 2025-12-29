@@ -616,6 +616,9 @@ class WebGLInterface {
 			FramebufferTexture2D: (target, attachment, textarget, texture, level) => {
 				this.ctx.framebufferTexture2D(target, attachment, textarget, this.textures[texture], level);
 			},
+			CheckFramebufferStatus: (target) => {
+				return this.ctx.checkFramebufferStatus(target)
+			},
 			FrontFace: (mode) => {
 				this.ctx.frontFace(mode);
 			},

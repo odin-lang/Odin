@@ -113,6 +113,7 @@ foreign webgl {
 	Flush                   :: proc() ---
 	FramebufferRenderbuffer :: proc(target, attachment, renderbufertarget: Enum, renderbuffer: Renderbuffer) ---
 	FramebufferTexture2D    :: proc(target, attachment, textarget: Enum, texture: Texture, level: i32) ---
+	CheckFramebufferStatus  :: proc(target: Enum) -> Enum ---
 	FrontFace               :: proc(mode: Enum) ---
 	
 	GenerateMipmap :: proc(target: Enum) ---
