@@ -2050,6 +2050,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				}
 			},
 
+			set_document_title: (title_ptr, title_len) => {
+				let title = wasmMemoryInterface.loadString(title_ptr, title_len);
+				document.title = title;
+			},
+
 			get_element_key_f64: (id_ptr, id_len, key_ptr, key_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
