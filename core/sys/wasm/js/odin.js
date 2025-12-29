@@ -1304,17 +1304,21 @@ class WebGLInterface {
 				this.assertWebGL2();
 				return this.ctx.getUniformBlockIndex(this.programs[program], this.mem.loadString(uniformBlockName_ptr, uniformBlockName_len));
 			},
-			GetActiveUniformBlockName: (program, uniformBlockIndex, buf_ptr, buf_len, length_ptr) => {
+			GetActiveUniformBlockName: (program, uniformBlockIndex, name_buf_ptr, name_buf_len, name_length_ptr) => {
 				this.assertWebGL2();
 				let name = this.ctx.getActiveUniformBlockName(this.programs[program], uniformBlockIndex);
 
-				let n = Math.min(buf_len, name.length);
-				name = name.substring(0, n);
-				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(name))
-				this.mem.storeInt(length_ptr, n);
+				if (name_buf_ptr && name_buf_len > 0) {
+					let n = Math.min(name_buf_len, name.length);
+					name = name.substring(0, n);
+					this.mem.loadBytes(name_buf_ptr, name_buf_len).set(new TextEncoder().encode(name));
+					this.mem.storeInt(name_length_ptr, n);
+				} else if (name_length_ptr) {
+					this.mem.storeInt(name_length_ptr, name.length);
+				}
 			},
 			GetActiveUniforms: (program, uniformIndices_ptr, uniformIndices_len, pname, res_ptr) => {
-				thid.assertWebGL2();
+				this.assertWebGL2();
 				let indices = this.mem.loadU32Array(uniformIndices_ptr, uniformIndices_len);
 				this.ctx.getActiveUniforms(this.programs[program], indices, pname)
 				this.mem.loadI32Array(res_ptr, indices.length).set(indices)
@@ -1323,7 +1327,7 @@ class WebGLInterface {
 				this.assertWebGL2();
 				let res = this.ctx.getActiveUniformBlockParameter(this.programs[program], uniformBlockIndex, pname);
 
-				if (e instanceof Uint32Array) { // for pname GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES 
+				if (res instanceof Uint32Array) { // for pname GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES 
 					this.mem.loadU32Array(params_ptr, res.length).set(res)
 				} else {
 					this.mem.storeI32(params_ptr, res)
