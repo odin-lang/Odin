@@ -8172,13 +8172,7 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 	Type *return_type = proc.result_count == 0 ? nullptr : proc.results->Tuple.variables[0]->type;
 	bool is_return_instancetype = return_type != nullptr && return_type == t_objc_instancetype;
 
-	if (params.count == 0 || !is_type_objc_ptr_to_object(params[0]->type)) {
-		if (!proc_entity->Procedure.is_objc_class_method) {
-			// Not a class method, invalid call
-			error(call, "Invalid Objective-C call: The Objective-C method is not a class method but this first parameter is not an Objective-C object pointer.");
-			return;
-		}
-
+	if (proc_entity->Procedure.is_objc_class_method) {
 		if (is_return_instancetype) {
 			if (ce->proc->kind == Ast_SelectorExpr) {
 				ast_node(se, SelectorExpr, ce->proc);
@@ -8194,7 +8188,8 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 
 		self_type    = t_objc_Class;
 		params_start = 0;
-	} else if (ce->args.count > 0) {
+	} else {
+		GB_ASSERT(ce->args.count > 0);
 		GB_ASSERT(is_type_objc_ptr_to_object(params[0]->type));
 
 		if (ce->args[0]->tav.objc_super_target) {
