@@ -4027,6 +4027,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		} else if (ev.kind == ExactValue_String) {
 			String model = ev.value_string;
 			if (model == "default" ||
+			    model == "globaldynamic" ||
 			    model == "localdynamic" ||
 			    model == "initialexec" ||
 			    model == "localexec") {
@@ -4035,6 +4036,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 				ERROR_BLOCK();
 				error(elem, "Invalid thread local model '%.*s'. Valid models:", LIT(model));
 				error_line("\tdefault\n");
+				error_line("\tglobaldynamic\n");
 				error_line("\tlocaldynamic\n");
 				error_line("\tinitialexec\n");
 				error_line("\tlocalexec\n");
