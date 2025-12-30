@@ -1745,7 +1745,6 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 				} else {
 					ExactValue value = expr->tav.value;
 					if (is_type_rune(expr->tav.type) && value.kind == ExactValue_Integer) {
-
 						Rune r = cast(Rune)exact_value_to_i64(value);
 						u8 rune_temp[6] = {};
 						isize size = gb_utf8_encode_rune(rune_temp, r);
@@ -2170,20 +2169,26 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		lbValue value = {};
-		if (vd->values.count > 0) {
-			GB_ASSERT(vd->names.count == vd->values.count);
-			Ast *ast_value = vd->values[i];
-			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
-			          ast_value->tav.mode == Addressing_Invalid);
 
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
-		}
 
 		Ast *ident = vd->names[i];
 		GB_ASSERT(!is_blank_ident(ident));
 		Entity *e = entity_of_node(ident);
 		GB_ASSERT(e->flags & EntityFlag_Static);
 		String name = e->token.string;
+
+		if (vd->values.count > 0) {
+			GB_ASSERT(vd->names.count == vd->values.count);
+			Ast *ast_value = vd->values[i];
+			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
+			          ast_value->tav.mode == Addressing_Invalid);
+
+			auto cc = LB_CONST_CONTEXT_DEFAULT_NO_LOCAL;
+			if (e->Variable.is_rodata) {
+				cc.is_rodata = true;
+			}
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, cc);
+		}
 
 		String mangled_name = {};
 		{
