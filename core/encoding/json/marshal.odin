@@ -413,13 +413,13 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				}
 
 				opt_write_iteration(w, opt, first_iteration) or_return
+				first_iteration = false
 
 				if opt.pretty {
 					comment := reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "jsoncomment")
 					opt_write_comment(w, opt, &comment) or_return
 				}
 
-				first_iteration = false
 				if json_name != "" {
 					opt_write_key(w, opt, json_name) or_return
 				} else {
