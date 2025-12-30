@@ -2183,7 +2183,7 @@ gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 		return expr;
 	}
 	if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
-		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
+		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[e->kind]));
 		return ast_bad_expr(f, token, f->curr_token);
 	}
 	ProcInlining pi = ProcInlining_none;
@@ -2197,17 +2197,17 @@ gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 
 	if (pi != ProcInlining_none) {
 		if (e->kind == Ast_ProcLit) {
-			if (expr->ProcLit.inlining != ProcInlining_none &&
-			    expr->ProcLit.inlining != pi) {
+			if (e->ProcLit.inlining != ProcInlining_none &&
+			    e->ProcLit.inlining != pi) {
 				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure literal");
 			}
-			expr->ProcLit.inlining = pi;
+			e->ProcLit.inlining = pi;
 		} else if (e->kind == Ast_CallExpr) {
-			if (expr->CallExpr.inlining != ProcInlining_none &&
-			    expr->CallExpr.inlining != pi) {
+			if (e->CallExpr.inlining != ProcInlining_none &&
+			    e->CallExpr.inlining != pi) {
 				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure call");
 			}
-			expr->CallExpr.inlining = pi;
+			e->CallExpr.inlining = pi;
 		}
 	}
 
