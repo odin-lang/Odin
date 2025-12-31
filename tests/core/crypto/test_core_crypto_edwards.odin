@@ -10,7 +10,7 @@ import "core:crypto/x25519"
 import "core:crypto/x448"
 
 @(test)
-test_sqrt_ratio_m1 :: proc(t: ^testing.T) {
+test_edwards25519_sqrt_ratio_m1 :: proc(t: ^testing.T) {
 	test_vectors := []struct {
 		u: string,
 		v: string,
@@ -747,14 +747,14 @@ test_x448 :: proc(t: ^testing.T) {
 	}
 }
 
-@(private)
+@(private="file")
 ge_str :: proc(ge: ^ristretto255.Group_Element) -> string {
 	b: [ristretto255.ELEMENT_SIZE]byte
 	ristretto255.ge_bytes(ge, b[:])
 	return string(hex.encode(b[:], context.temp_allocator))
 }
 
-@(private)
+@(private="file")
 fe_str :: proc(fe: ^field.Tight_Field_Element) -> string {
 	b: [32]byte
 	field.fe_to_bytes(&b, fe)

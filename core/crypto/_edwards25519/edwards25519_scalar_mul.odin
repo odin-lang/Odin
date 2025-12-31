@@ -8,7 +8,7 @@ import "core:mem"
 //
 // Note: When generating, the values were reduced to Tight_Field_Element
 // ranges, even though that is not required.
-@(private)
+@(private,rodata)
 GE_BASEPOINT_TABLE := Multiply_Table {
 	{
 		{62697248952638, 204681361388450, 631292143396476, 338455783676468, 1213667448819585},
