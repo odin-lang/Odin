@@ -498,6 +498,13 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 	if (big_int_is_zero(a)) {
 		return LLVMConstNull(lb_type(m, original_type));
 	}
+	
+	BigInt val = {};
+	big_int_init(&val, a);
+
+	if (big_int_is_neg(&val)) {
+		mp_incr(&val);
+	}
 
 	size_t sz = cast(size_t)type_size_of(original_type);
 	u64 rop64[4] = {}; // 2 u64 is the maximum we will ever need, so doubling it will be fine :P
@@ -509,7 +516,7 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 	size_t nails = 0;
 	mp_endian endian = MP_LITTLE_ENDIAN;
 
-	max_count = mp_pack_count(a, nails, size);
+	max_count = mp_pack_count(&val, nails, size);
 	if (sz < max_count) {
 		debug_print_big_int(a);
 		gb_printf_err("%s -> %tu\n", type_to_string(original_type), sz);
@@ -520,7 +527,7 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 	mp_err err = mp_pack(rop, sz, &written,
 	                     MP_LSB_FIRST,
 	                     size, endian, nails,
-	                     a);
+	                     &val);
 	GB_ASSERT(err == MP_OKAY);
 
 	if (!is_type_endian_little(original_type)) {
@@ -531,12 +538,18 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 		}
 	}
 
+	if (big_int_is_neg(a)) {
+		// sizeof instead of sz for sign extend to work properly
+		for (size_t i = 0; i < sizeof rop64; i++) {
+			rop[i] = ~rop[i];
+		}
+	} 
+
+	big_int_dealloc(&val);
+
 	GB_ASSERT(!is_type_array(original_type));
 
 	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((sz+7)/8), cast(u64 *)rop);
-	if (big_int_is_neg(a)) {
-		value = LLVMConstNeg(value);
-	}
 
 	return value;
 }

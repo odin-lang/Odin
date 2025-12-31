@@ -33,6 +33,7 @@ $ODIN build ../test_issue_5097.odin $COMMON
 $ODIN build ../test_issue_5097-2.odin $COMMON
 $ODIN build ../test_issue_5265.odin $COMMON
 $ODIN test ../test_issue_5699.odin $COMMON
+$ODIN test ../test_issue_6068.odin $COMMON
 
 set +x
 
