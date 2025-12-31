@@ -12,7 +12,7 @@
 		import "core:container/xar"
 
 		example :: proc() {
-			x: xar.Xar(int, 4)
+			x: xar.Array(int, 4)
 			defer xar.destroy(&x)
 
 			xar.push_back(&x, 10)
@@ -38,7 +38,7 @@ MAX_SHIFT :: PLATFORM_BITS>>1
 /*
 	An Exponential Array with stable element addresses.
 
-	Unlike `[dynamic]T` which reallocates and moves elements when growing, `Xar`
+	Unlike `[dynamic]T` which reallocates and moves elements when growing, `Array`
 	allocates separate chunks of exponentially increasing size. This guarantees
 	that pointers to elements remain valid for the lifetime of the container.
 
@@ -66,11 +66,11 @@ MAX_SHIFT :: PLATFORM_BITS>>1
 
 		example :: proc() {
 			// Xar with initial chunk size of 16 (1 << 4)
-			x: xar.Xar(My_Struct, 4)
+			x: xar.Array(My_Struct, 4)
 			defer xar.destroy(&x)
 		}
 */
-Xar :: struct($T: typeid, $SHIFT: uint) where 0 < SHIFT, SHIFT <= MAX_SHIFT {
+Array :: struct($T: typeid, $SHIFT: uint) where 0 < SHIFT, SHIFT <= MAX_SHIFT {
 	chunks:    [(1 << (_LOG2_PLATFORM_BITS - intrinsics.constant_log2(SHIFT))) + 1][^]T,
 	len:       int,
 	allocator: mem.Allocator,
@@ -84,7 +84,7 @@ Initializes an exponential array with the given allocator.
 - `x`: Pointer to the exponential array to initialize
 - `allocator`: Allocator to use for chunk allocations (defaults to context.allocator)
 */
-init :: proc(x: ^$X/Xar($T, $SHIFT), allocator := context.allocator) {
+init :: proc(x: ^$X/Array($T, $SHIFT), allocator := context.allocator) {
 	x^ = {allocator = allocator}
 }
 
@@ -94,7 +94,7 @@ Frees all allocated chunks and resets the exponential array.
 **Inputs**
 - `x`: Pointer to the exponential array to destroy
 */
-destroy :: proc(x: ^$X/Xar($T, $SHIFT)) {
+destroy :: proc(x: ^$X/Array($T, $SHIFT)) {
 	#reverse for c, i in x.chunks {
 		if c != nil {
 			n := 1 << (SHIFT + uint(i if i > 0 else 1) - 1)
@@ -109,19 +109,19 @@ destroy :: proc(x: ^$X/Xar($T, $SHIFT)) {
 Resets the array's length to zero without freeing memory.
 Allocated chunks are retained for reuse.
 */
-clear :: proc(x: ^$X/Xar($T, $SHIFT)) {
+clear :: proc(x: ^$X/Array($T, $SHIFT)) {
 	x.len = 0
 }
 
 // Returns the length of the exponential-array
 @(require_results)
-len :: proc(x: $X/Xar($T, $SHIFT)) -> int {
+len :: proc(x: $X/Array($T, $SHIFT)) -> int {
 	return x.len
 }
 
 // Returns the number of allocated elements
 @(require_results)
-cap :: proc(x: $X/Xar($T, $SHIFT)) -> int {
+cap :: proc(x: $X/Array($T, $SHIFT)) -> int {
 	#reverse for c, i in x.chunks {
 		if c != nil {
 			return 1 << (SHIFT + uint(i if i > 0 else 1))
@@ -161,7 +161,7 @@ Get a copy of the element at the specified index.
 - a copy of the element
 */
 @(require_results)
-get :: proc(x: ^$X/Xar($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: T) #no_bounds_check {
+get :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: T) #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index, x.len)
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
 	return x.chunks[chunk_idx][elem_idx]
@@ -185,7 +185,7 @@ Example:
 	import "core:container/xar"
 
 	get_ptr_example :: proc() {
-		x: xar.Xar(int, 4)
+		x: xar.Array(int, 4)
 		defer xar.destroy(&x)
 
 		xar.push_back(&x, 100)
@@ -200,7 +200,7 @@ Example:
 	}
 */
 @(require_results)
-get_ptr :: proc(x: ^$X/Xar($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: ^T) #no_bounds_check {
+get_ptr :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: ^T) #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index, x.len)
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
 	return &x.chunks[chunk_idx][elem_idx]
@@ -214,7 +214,7 @@ Set the element at the specified index to the given value.
 - `index`: Position of the element (0-indexed)
 - `value`: The value to set
 */
-set :: proc(x: ^$X/Xar($T, $SHIFT), #any_int index: int, value: T, loc := #caller_location) #no_bounds_check {
+set :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, value: T, loc := #caller_location) #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index, x.len)
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
 	x.chunks[chunk_idx][elem_idx] = value
@@ -240,7 +240,7 @@ Example:
 	import "core:container/xar"
 
 	push_back_example :: proc() {
-		x: xar.Xar(string, 4)
+		x: xar.Array(string, 4)
 		defer xar.destroy(&x)
 
 		xar.push_back(&x, "hello")
@@ -250,7 +250,7 @@ Example:
 		fmt.println(xar.get(&x, 1))  // world
 	}
 */
-push_back_elem :: proc(x: ^$X/Xar($T, $SHIFT), value: T, loc := #caller_location) -> (n: int, err: mem.Allocator_Error) {
+push_back_elem :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc := #caller_location) -> (n: int, err: mem.Allocator_Error) {
 	if x.allocator.procedure == nil {
 		// to minic `[dynamic]T` behaviour
 		x.allocator = context.allocator
@@ -277,7 +277,7 @@ Append multiple elements to the end of the exponential array.
 - number of elements successfully added
 - allocation error if chunk allocation failed (partial append possible)
 */
-push_back_elems :: proc(x: ^$X/Xar($T, $SHIFT), values: ..T, loc := #caller_location) -> (n: int, err: mem.Allocator_Error) {
+push_back_elems :: proc(x: ^$X/Array($T, $SHIFT), values: ..T, loc := #caller_location) -> (n: int, err: mem.Allocator_Error) {
 	for value in values {
 		n += push_back_elem(x, value, loc) or_return
 	}
@@ -303,7 +303,7 @@ Example:
 	import "core:container/xar"
 
 	push_back_and_get_ptr_example :: proc() {
-		x: xar.Xar(My_Struct, 4)
+		x: xar.Array(My_Struct, 4)
 		defer xar.destroy(&x)
 
 		ptr := xar.push_back_elem_and_get_ptr(&x, My_Struct{}) or_else panic("alloc failed")
@@ -311,7 +311,7 @@ Example:
 	}
 */
 @(require_results)
-push_back_elem_and_get_ptr :: proc(x: ^$X/Xar($T, $SHIFT), value: T, loc := #caller_location) -> (ptr: ^T, err: mem.Allocator_Error) {
+push_back_elem_and_get_ptr :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc := #caller_location) -> (ptr: ^T, err: mem.Allocator_Error) {
 	if x.allocator.procedure == nil {
 		// to minic `[dynamic]T` behaviour
 		x.allocator = context.allocator
@@ -330,7 +330,7 @@ push_back_elem_and_get_ptr :: proc(x: ^$X/Xar($T, $SHIFT), value: T, loc := #cal
 // `pop` will remove and return the end value of an exponential array `x` and reduces the length of the array by 1.
 //
 // Note: If the exponential array has no elements (`xar.len(x) == 0`), this procedure will panic.
-pop :: proc(x: ^$X/Xar($T, $SHIFT), loc := #caller_location) -> (val: T) {
+pop :: proc(x: ^$X/Array($T, $SHIFT), loc := #caller_location) -> (val: T) {
 	assert(x.len > 0, loc=loc)
 	index := uint(x.len-1)
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, index)
@@ -341,7 +341,7 @@ pop :: proc(x: ^$X/Xar($T, $SHIFT), loc := #caller_location) -> (val: T) {
 // `pop_safe` trys to remove and return the end value of dynamic array `x` and reduces the length of the array by 1.
 // If the operation is not possible, it will return false.
 @(require_results)
-pop_safe :: proc(x: ^$X/Xar($T, $SHIFT)) -> (val: T, ok: bool) {
+pop_safe :: proc(x: ^$X/Array($T, $SHIFT)) -> (val: T, ok: bool) {
 	if x.len == 0 {
 		return
 	}
@@ -369,7 +369,7 @@ pop_safe :: proc(x: ^$X/Xar($T, $SHIFT)) -> (val: T, ok: bool) {
 		import "core:encoding/xar"
 
 		unordered_remove_example :: proc() {
-			x: xar.Xar(int, 4)
+			x: xar.Array(int, 4)
 			defer xar.destroy(&x)
 
 			xar.push_back(&x, 10)
@@ -383,7 +383,7 @@ pop_safe :: proc(x: ^$X/Xar($T, $SHIFT)) -> (val: T, ok: bool) {
 			fmt.println(xar.get(&x, 1))  // 20
 		}
 */
-unordered_remove :: proc(x: ^$X/Xar($T, $SHIFT), #any_int index: int, loc := #caller_location) {
+unordered_remove :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) {
 	runtime.bounds_check_error_loc(loc, index, x.len)
 	n := x.len-1
 	if index != n {
@@ -402,7 +402,7 @@ Fields:
 - `idx`: Current iteration index
 */
 Iterator :: struct($T: typeid, $SHIFT: uint) {
-	xar: ^Xar(T, SHIFT),
+	xar: ^Array(T, SHIFT),
 	idx: int,
 }
 
@@ -420,7 +420,7 @@ Example:
 	import "lib:xar"
 
 	iteration_example :: proc() {
-		x: xar.Xar(int, 4)
+		x: xar.Array(int, 4)
 		defer xar.destroy(&x)
 
 		xar.push_back(&x, 10)
@@ -439,7 +439,7 @@ Output:
 	20
 	30
 */
-iterator :: proc(xar: ^$X/Xar($T, $SHIFT)) -> Iterator(T, SHIFT) {
+iterator :: proc(xar: ^$X/Array($T, $SHIFT)) -> Iterator(T, SHIFT) {
 	return {xar = auto_cast xar, idx = 0}
 }
 
