@@ -122,9 +122,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Rune:
 		r := a.(rune)
-		io.write_byte(w, '"')                  or_return
-		io.write_escaped_rune(w, r, '"', true) or_return
-		io.write_byte(w, '"')                  or_return
+		io.write_byte(w, '"')                             or_return
+		io.write_escaped_rune(w, r, '"', for_json = true) or_return
+		io.write_byte(w, '"')                             or_return
 
 	case runtime.Type_Info_Float:
 		switch f in a {
